@@ -26,7 +26,7 @@ spec:
           kubernetes.io/metadata.name: openshift-monitoring
     ports:
     - protocol: TCP
-      port: 2112  # Metrics port
+      port: 2112  # Conversion pod metrics
 {% endif %}
   egress:
   # Allow Kubernetes API access (critical for operator functionality)

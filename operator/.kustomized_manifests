@@ -162,6 +162,12 @@ spec:
                 - "true"
                 - "false"
                 type: string
+              feature_network_policies:
+                description: 'Enable network policies for security (default: false)'
+                enum:
+                - "true"
+                - "false"
+                type: string
               feature_ocp_live_migration:
                 description: 'Enable OCP live migration (default: false)'
                 enum:
