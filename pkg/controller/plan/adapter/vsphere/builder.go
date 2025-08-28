@@ -1296,6 +1296,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					"vmdkKey": fmt.Sprint(disk.Key),
 					"vmID":    vmRef.ID,
 				}
+
 				r.Log.Info("target namespace for migration", "namespace", namespace)
 				pvc := core.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1332,7 +1333,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				pvc.Annotations["copy-offload"] = baseVolume(disk.File, false)
 
 				// Apply PVC template naming if configured, replacing the commonName
-				if err := r.setPVCNameFromTemplate(&pvc.ObjectMeta, vm, diskIndex, disk); err != nil {
+				if err := r.setColdMigrationDefaultPVCName(&pvc.ObjectMeta, vm, diskIndex, disk); err != nil {
 					r.Log.Info("Failed to set PVC name from template for populator volume, using default name", "error", err)
 				}
 
@@ -1546,6 +1547,38 @@ func (r *Builder) setObjectNameFromTemplate(objectMeta *metav1.ObjectMeta, templ
 	}
 
 	return nil
+}
+
+func (r *Builder) setColdMigrationDefaultPVCName(objectMeta *metav1.ObjectMeta, vm *model.VM, diskIndex int, disk vsphere.Disk) error {
+	pvcNameTemplate := r.getPVCNameTemplate(vm)
+	if pvcNameTemplate == "" {
+		pvcNameTemplate = "{{.PlanName}}-{{.VmName}}-disk-{{.DiskIndex}}"
+	}
+
+	planVM := r.getPlanVM(vm)
+	rootDiskIndex := 0
+	if planVM != nil {
+		rootDiskIndex = utils.GetBootDiskNumber(planVM.RootDisk)
+	}
+
+	templateData := api.PVCNameTemplateData{
+		VmName:         r.getPlanVMSafeName(vm),
+		PlanName:       r.Plan.Name,
+		DiskIndex:      diskIndex,
+		RootDiskIndex:  rootDiskIndex,
+		Shared:         disk.Shared,
+		FileName:       extractDiskFileName(baseVolume(disk.File, false)),
+		WinDriveLetter: disk.WinDriveLetter,
+	}
+
+	templateConfig := TemplateConfig{
+		Template:        pvcNameTemplate,
+		UseGenerateName: r.Plan.Spec.PVCNameTemplateUseGenerateName,
+		TemplateType:    "PVC",
+	}
+
+	return r.setObjectNameFromTemplate(objectMeta, templateConfig, &templateData)
+
 }
 
 // setPVCNameFromTemplate sets PVC name/generateName using the PVC template
