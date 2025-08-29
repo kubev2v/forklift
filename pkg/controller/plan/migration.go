@@ -1577,6 +1577,11 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 		step.MarkCompleted()
 		step.AddError("Guest conversion failed. See pod logs for details.")
 	default:
+		if pod.Status.PodIP == "" {
+			// we get the progress from the pod and we cannot connect to the pod without PodIP
+			break
+		}
+
 		useV2vForTransfer, err := r.Context.Plan.ShouldUseV2vForTransfer()
 		switch {
 		case err != nil:
@@ -1594,8 +1599,7 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 
 func (r *Migration) updateConversionProgressV2vMonitor(pod *core.Pod, step *plan.Step) (err error) {
 	var diskRegex = regexp.MustCompile(`v2v_disk_transfers\{disk_id="(\d+)"\} (\d{1,3}\.?\d*)`)
-	serviceName := pod.Name + ServiceNameSuffix
-	url := fmt.Sprintf("http://%s.%s.svc.cluster.local:%d/metrics", serviceName, pod.Namespace, MetricsPort)
+	url := fmt.Sprintf("http://%s:2112/metrics", pod.Status.PodIP)
 	resp, err := http.Get(url)
 	switch {
 	case err == nil:
