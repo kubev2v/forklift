@@ -1,0 +1,311 @@
+# Network policies for virt-v2v conversion workloads
+# Applies to virt-v2v pods used by VMware and OVA migrations for guest conversion
+#
+# NFS Configuration:
+# - Default: NFSv4 (port 2049 TCP/UDP only)
+# - NFSv3: Set nfs_v3_support=true to enable ports 111 (rpcbind) and 20048 (mountd)
+# - Note: NFSv3 mountd port may vary depending on server configuration
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: forklift-virt-v2v-policy
+  namespace: {{ app_namespace }}
+  labels:
+    app: {{ app_name }}
+spec:
+  podSelector:
+    matchLabels:
+      forklift.app: virt-v2v
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow controller communication
+  - from:
+    - podSelector:
+        matchLabels:
+          control-plane: controller-manager
+    # all ports allowed (ports omitted)
+  egress:
+  # Allow communication with controller
+  - to:
+    - podSelector:
+        matchLabels:
+          control-plane: controller-manager
+    # All ports allowed (ports omitted)
+  # Allow external source connections for all migration types:
+  # - VMware vCenter API (virt-v2v and VDDK populators)
+  # - oVirt Engine API and imageio (oVirt populators)
+  # - OpenStack APIs (OpenStack populators)
+  - ports:
+    - protocol: TCP
+      port: 443   # HTTPS
+    - protocol: TCP
+      port: 8443  # HTTPS Development
+    - protocol: TCP
+      port: 902   # vSphere NFC
+    - protocol: TCP
+      port: 5000  # OpenStack Keystone
+    - protocol: TCP
+      port: 8774  # OpenStack Nova
+    - protocol: TCP
+      port: 8776  # OpenStack Cinder
+    - protocol: TCP
+      port: 9696  # OpenStack Neutron
+    - protocol: TCP
+      port: 35357 # OpenStack Admin (legacy; modern Keystone commonly uses 5000)
+    - protocol: TCP
+      port: 8080  # HTTP Dev
+    - protocol: TCP
+      port: 8443  # HTTPS Development
+    - protocol: TCP
+      port: 54322 # oVirt imageio
+    - protocol: TCP
+      port: 54323 # oVirt imageio proxy
+  # Allow DNS resolution
+  - ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow NFS storage access
+  # NFSv4: Port 2049 TCP/UDP (default configuration)
+  # NFSv3: Add ports 111 (rpcbind) and mountd if needed
+  - ports:
+    - protocol: TCP
+      port: 2049  # NFS (NFSv4/NFSv3 data)
+    - protocol: UDP
+      port: 2049  # NFS (NFSv4/NFSv3 data)
+{% if nfs_v3_support|default(false)|bool %}
+    # NFSv3 additional ports (enable with nfs_v3_support: true)
+    - protocol: TCP
+      port: 111   # rpcbind
+    - protocol: UDP
+      port: 111   # rpcbind
+    - protocol: TCP
+      port: 20048 # mountd (default port, may vary)
+    - protocol: UDP
+      port: 20048 # mountd (default port, may vary)
+{% endif %}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: forklift-consumer-policy
+  namespace: {{ app_namespace }}
+  labels:
+    app: {{ app_name }}
+spec:
+  podSelector:
+    matchLabels:
+      forklift.app: consumer
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow controller communication
+  - from:
+    - podSelector:
+        matchLabels:
+          control-plane: controller-manager
+    # All ports allowed (ports omitted)
+  egress:
+  # Allow communication with controller
+  - to:
+    - podSelector:
+        matchLabels:
+          control-plane: controller-manager
+    # All ports allowed (ports omitted)
+  # Allow HTTP/HTTPS access for OVA downloads
+  - ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+  # Allow DNS resolution
+  - ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow NFS storage access
+  # NFSv4: Port 2049 TCP/UDP (default configuration)
+  # NFSv3: Add ports 111 (rpcbind) and mountd if needed
+  - ports:
+    - protocol: TCP
+      port: 2049  # NFS (NFSv4/NFSv3 data)
+    - protocol: UDP
+      port: 2049  # NFS (NFSv4/NFSv3 data)
+{% if nfs_v3_support|default(false)|bool %}
+    # NFSv3 additional ports (enable with nfs_v3_support: true)
+    - protocol: TCP
+      port: 111   # rpcbind
+    - protocol: UDP
+      port: 111   # rpcbind
+    - protocol: TCP
+      port: 20048 # mountd (default port, may vary)
+    - protocol: UDP
+      port: 20048 # mountd (default port, may vary)
+{% endif %}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: forklift-ovirt-populator-policy
+  namespace: {{ app_namespace }}
+  labels:
+    app: {{ app_name }}
+spec:
+  podSelector:
+    matchLabels:
+      populator: ovirt
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow controller communication
+  - from:
+    - podSelector:
+        matchLabels:
+          control-plane: controller-manager
+    # All ports allowed (ports omitted)
+  # Allow monitoring access to metrics
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-monitoring
+    ports:
+    - protocol: TCP
+      port: 8080  # oVirt populator metrics
+  egress:
+  # Allow communication with controller
+  - to:
+    - podSelector:
+        matchLabels:
+          control-plane: controller-manager
+    # All ports allowed (ports omitted)
+  # Allow oVirt API and imageio access
+  - ports:
+    - protocol: TCP
+      port: 443     # oVirt API
+    - protocol: TCP
+      port: 8443    # HTTPS Development
+    - protocol: TCP
+      port: 54322   # oVirt imageio
+    - protocol: TCP
+      port: 54323   # oVirt imageio proxy
+  # Allow DNS resolution
+  - ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: forklift-openstack-populator-policy
+  namespace: {{ app_namespace }}
+  labels:
+    app: {{ app_name }}
+spec:
+  podSelector:
+    matchLabels:
+      populator: openstack
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow controller communication
+  - from:
+    - podSelector:
+        matchLabels:
+          control-plane: controller-manager
+    # All ports allowed (ports omitted)
+  # Allow monitoring access to metrics
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-monitoring
+    ports:
+    - protocol: TCP
+      port: 8081  # OpenStack populator metrics
+  egress:
+  # Allow communication with controller
+  - to:
+    - podSelector:
+        matchLabels:
+          control-plane: controller-manager
+    # All ports allowed (ports omitted)
+  # Allow OpenStack API access
+  - ports:
+    - protocol: TCP
+      port: 443   # HTTPS
+    - protocol: TCP
+      port: 5000  # OpenStack Keystone
+    - protocol: TCP
+      port: 8774  # OpenStack Nova
+    - protocol: TCP
+      port: 8776  # OpenStack Cinder
+    - protocol: TCP
+      port: 9696  # OpenStack Neutron
+    - protocol: TCP
+      port: 35357 # OpenStack Admin (legacy; modern Keystone commonly uses 5000)
+  # Allow DNS resolution
+  - ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: forklift-vsphere-xcopy-populator-policy
+  namespace: {{ app_namespace }}
+  labels:
+    app: {{ app_name }}
+spec:
+  podSelector:
+    matchLabels:
+      populator: vsphere-xcopy
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow controller communication
+  - from:
+    - podSelector:
+        matchLabels:
+          control-plane: controller-manager
+    # All ports allowed (ports omitted)
+  # Allow monitoring access to metrics
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-monitoring
+    ports:
+    - protocol: TCP
+      port: 8082  # vSphere Xcopy populator metrics
+  egress:
+  # Allow communication with controller
+  - to:
+    - podSelector:
+        matchLabels:
+          control-plane: controller-manager
+    # All ports allowed (ports omitted)
+  # Allow vSphere API and NFC access
+  - ports:
+    - protocol: TCP
+      port: 443   # vSphere API
+    - protocol: TCP
+      port: 8443  # HTTPS Development
+    - protocol: TCP
+      port: 902   # vSphere NFC
+  # Allow DNS resolution
+  - ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53

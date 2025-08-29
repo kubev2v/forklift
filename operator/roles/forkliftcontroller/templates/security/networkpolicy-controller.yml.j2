@@ -1,0 +1,93 @@
+# Forklift Controller NetworkPolicy - allows all-port communication with proper DNS resolution
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: forklift-controller-policy
+  namespace: {{ app_namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ app_name }}
+      control-plane: controller-manager
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow all Forklift components to communicate with controller
+  - from:
+    - podSelector:
+        matchLabels:
+          app: {{ app_name }}
+    # All ports allowed by omitting 'ports'
+  # Allow OpenShift console access
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-console
+    # All ports allowed by omitting 'ports'
+  # Allow monitoring access
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-monitoring
+    # All ports allowed by omitting 'ports'
+  egress:
+  # Allow egress to Forklift components (including self-communication to inventory service)
+  - to:
+    - podSelector:
+        matchLabels:
+          app: {{ app_name }}
+    # All ports allowed by omitting 'ports'
+  # Explicit rule for validation service communication
+  - to:
+    - podSelector:
+        matchLabels:
+          service: forklift-validation
+    ports:
+    - protocol: TCP
+      port: 8181  # OPA validation service port
+  # Explicit rule for OVA provider service communication
+  - to:
+    - podSelector:
+        matchLabels:
+          provider: ova-provider
+    ports:
+    - protocol: TCP
+      port: 8080  # OVA provider service port
+  # Allow ALL DNS resolution (unrestricted - essential for service discovery)
+  - ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow all other internal cluster communication (required for inventory service, etc.)
+  - to:
+    - namespaceSelector: {}
+  # Allow Kubernetes API access
+  - ports:
+    - protocol: TCP
+      port: 6443
+    - protocol: TCP
+      port: 443
+  # Allow external provider API access
+  - ports:
+    - protocol: TCP
+      port: 443   # vSphere/OpenStack/oVirt HTTPS
+    - protocol: TCP
+      port: 8443  # vSphere/oVirt HTTPS Development
+    - protocol: TCP
+      port: 902   # vSphere NFC
+    - protocol: TCP
+      port: 5000  # OpenStack Keystone
+    - protocol: TCP
+      port: 8774  # OpenStack Nova
+    - protocol: TCP
+      port: 8776  # OpenStack Cinder
+    - protocol: TCP
+      port: 9696  # OpenStack Neutron
+    - protocol: TCP
+      port: 35357 # OpenStack Admin (legacy; modern Keystone commonly uses 5000)
+    - protocol: TCP
+      port: 8080  # oVirt/OVA HTTP
+    - protocol: TCP
+      port: 54322 # oVirt imageio
