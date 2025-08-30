@@ -11,6 +11,7 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/plan/ensurer"
 	"github.com/kubev2v/forklift/pkg/controller/plan/migrator/base"
@@ -1207,13 +1208,32 @@ func (r *Builder) mapNetworks(target *cnv.VirtualMachine) {
 	for _, network := range r.Map.Network.Spec.Map {
 		networkMap[network.Source.Name] = network.Destination
 	}
+	// Map networks to NICs
+	interfacesMap := make(map[string]*cnv.Interface)
+	for _, ifc := range target.Spec.Template.Spec.Domain.Devices.Interfaces {
+		currentInterface := ifc
+		networkName := ifc.Name
+		interfacesMap[networkName] = &currentInterface
+	}
+	var kInterface *cnv.Interface
+
 	for i := range target.Spec.Template.Spec.Networks {
 		network := &target.Spec.Template.Spec.Networks[i]
+		kInterface = interfacesMap[network.Name]
 		switch {
 		case network.Multus != nil:
 			destination := networkMap[network.Multus.NetworkName]
 			network.Multus.NetworkName = path.Join(destination.Namespace, destination.Name)
 		case network.Pod != nil:
+			if r.Plan.DestinationHasUdnNetwork(r.Destination) {
+				network.Pod = &cnv.PodNetwork{}
+				kInterface.Binding = &cnv.PluginBinding{
+					Name: planbase.UdnL2bridge,
+				}
+			} else {
+				network.Pod = &cnv.PodNetwork{}
+				kInterface.Masquerade = &cnv.InterfaceMasquerade{}
+			}
 		}
 	}
 }

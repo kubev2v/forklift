@@ -36,6 +36,7 @@ import (
 	template "github.com/openshift/api/template/v1"
 	"github.com/openshift/library-go/pkg/template/generator"
 	"github.com/openshift/library-go/pkg/template/templateprocessing"
+	"gopkg.in/yaml.v2"
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -1958,8 +1959,11 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 
 	environment = append(environment,
 		core.EnvVar{
-			Name:  "LOCAL_MIGRATION",
-			Value: strconv.FormatBool(r.Destination.Provider.IsHost()),
+			Name: "LOCAL_MIGRATION",
+			Value: strconv.FormatBool(
+				r.Destination.Provider.IsHost() &&
+					!r.Plan.DestinationHasUdnNetwork(r.Destination),
+			),
 		},
 	)
 	// pod annotations
@@ -1969,6 +1973,21 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 		if err != nil {
 			return
 		}
+	}
+	if r.Plan.DestinationHasUdnNetwork(r.Destination) {
+		metricsPort := OpenPort{Protocol: "tcp", Port: 2112}
+		dataServerPort := OpenPort{Protocol: "tcp", Port: 8080}
+		ports := []OpenPort{metricsPort, dataServerPort}
+		var yamlPorts []byte
+		yamlPorts, err = yaml.Marshal(ports)
+		if err != nil {
+			return
+		}
+		/*
+		   For the User Defined Networks we need to open some port so we can communicate with our metrics server inside the User Defined Network Namespace.
+		   Docs: https://docs.redhat.com/en/documentation/openshift_container_platform/4.19/html/multiple_networks/primary-networks#opening-default-network-ports-udn_about-user-defined-networks
+		*/
+		annotations[planbase.AnnOpenDefaultPorts] = string(yamlPorts)
 	}
 	var seccompProfile core.SeccompProfile
 	if settings.Settings.OpenShift {

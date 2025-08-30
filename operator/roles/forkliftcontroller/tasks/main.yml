@@ -42,7 +42,7 @@
     - name: "Obtain ocp cluster version"
       set_fact:
         ocp_version: "{{ cluster_version.resources[0].status.history | selectattr('state', 'equalto', 'Completed') | map(attribute='version') | first }}"
-  
+
   - name: "Setup controller config map"
     k8s:
       state : present

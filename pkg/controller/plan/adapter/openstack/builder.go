@@ -17,6 +17,7 @@ import (
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/openstack"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
+	"github.com/kubev2v/forklift/pkg/settings"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -594,7 +595,9 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 				kInterface.Model = interfaceModel
 				if m := nic.(map[string]interface{}); ok {
 					if macAddress, ok := m["OS-EXT-IPS-MAC:mac_addr"]; ok {
-						kInterface.MacAddress = macAddress.(string)
+						if !r.Plan.DestinationHasUdnNetwork(r.Destination) || settings.Settings.UdnSupportsMac {
+							kInterface.MacAddress = macAddress.(string)
+						}
 					}
 					if ipType, ok := m["OS-EXT-IPS:type"]; ok {
 						if ipType.(string) == "floating" {
@@ -605,8 +608,15 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 
 				switch networkPair.Destination.Type {
 				case Pod:
-					kNetwork.Pod = &cnv.PodNetwork{}
-					kInterface.Masquerade = &cnv.InterfaceMasquerade{}
+					if r.Plan.DestinationHasUdnNetwork(r.Destination) {
+						kNetwork.Pod = &cnv.PodNetwork{}
+						kInterface.Binding = &cnv.PluginBinding{
+							Name: planbase.UdnL2bridge,
+						}
+					} else {
+						kNetwork.Pod = &cnv.PodNetwork{}
+						kInterface.Masquerade = &cnv.InterfaceMasquerade{}
+					}
 				case Multus:
 					kNetwork.Multus = &cnv.MultusNetwork{
 						NetworkName: path.Join(

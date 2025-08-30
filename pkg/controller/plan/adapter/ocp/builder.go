@@ -497,7 +497,15 @@ func (r *Builder) mapNetworks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.Vi
 
 			// Check if the network is mapped to the pod network
 			if pair.Destination.Type == Pod {
-				targetNetwork.Pod = &cnv.PodNetwork{}
+				if r.Plan.DestinationHasUdnNetwork(r.Destination) {
+					network.Pod = &cnv.PodNetwork{}
+					kInterface.Binding = &cnv.PluginBinding{
+						Name: planbase.UdnL2bridge,
+					}
+				} else {
+					network.Pod = &cnv.PodNetwork{}
+					kInterface.Masquerade = &cnv.InterfaceMasquerade{}
+				}
 				continue
 			}
 
@@ -526,7 +534,15 @@ func (r *Builder) mapNetworks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.Vi
 				continue
 			}
 
-			targetNetwork.Pod = &cnv.PodNetwork{}
+			if r.Plan.DestinationHasUdnNetwork(r.Destination) {
+				network.Pod = &cnv.PodNetwork{}
+				kInterface.Binding = &cnv.PluginBinding{
+					Name: planbase.UdnL2bridge,
+				}
+			} else {
+				network.Pod = &cnv.PodNetwork{}
+				kInterface.Masquerade = &cnv.InterfaceMasquerade{}
+			}
 		default:
 			r.Log.Error(nil, "Unknown network type")
 			continue
