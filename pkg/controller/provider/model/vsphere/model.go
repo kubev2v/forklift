@@ -326,6 +326,9 @@ type VM struct {
 	GuestDisks               []GuestDisk    `sql:""`
 	GuestIpStacks            []GuestIpStack `sql:""`
 	SecureBoot               bool           `sql:""`
+	ToolsStatus              string         `sql:""`
+	ToolsRunningStatus       string         `sql:""`
+	ToolsVersionStatus       string         `sql:""`
 	DiskEnableUuid           bool           `sql:""`
 	NestedHVEnabled          bool           `sql:""`
 }

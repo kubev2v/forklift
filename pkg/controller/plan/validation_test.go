@@ -5,8 +5,9 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/provider"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	"github.com/kubev2v/forklift/pkg/controller/base"
-	"github.com/kubev2v/forklift/pkg/lib/condition"
+	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -80,8 +81,8 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			source := createProvider(sourceName, sourceNamespace, "https://source", api.OpenShift, &core.ObjectReference{Name: sourceSecretName, Namespace: sourceNamespace})
 			destination := createProvider(destName, destNamespace, "", api.OpenShift, &core.ObjectReference{})
 			plan := createPlan(testPlanName, testNamespace, source, destination)
-			source.Status.Conditions.SetCondition(condition.Condition{Type: condition.Ready, Status: condition.True})
-			destination.Status.Conditions.SetCondition(condition.Condition{Type: condition.Ready, Status: condition.True})
+			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 
 			reconciler = createFakeReconciler(secret, plan, source, destination)
 			err := reconciler.ensureSecretForProvider(plan)
@@ -96,8 +97,8 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			source := createProvider(sourceName, sourceNamespace, "", api.OpenShift, &core.ObjectReference{Name: sourceSecretName, Namespace: sourceNamespace})
 			destination := createProvider(destName, destNamespace, "https://destination", api.OpenShift, &core.ObjectReference{})
 			plan := createPlan(testPlanName, testNamespace, source, destination)
-			source.Status.Conditions.SetCondition(condition.Condition{Type: condition.Ready, Status: condition.True})
-			destination.Status.Conditions.SetCondition(condition.Condition{Type: condition.Ready, Status: condition.True})
+			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 
 			reconciler = createFakeReconciler(secret, plan, source, destination)
 			err := reconciler.ensureSecretForProvider(plan)
@@ -107,7 +108,142 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			gomega.Expect(plan.Referenced.Secret).To(gomega.BeNil())
 		})
 	})
+
+	ginkgo.Describe("GuestToolsIssue aggregation", func() {
+		var (
+			mockValidator   *mockGuestToolsValidator
+			guestToolsIssue libcnd.Condition
+		)
+
+		ginkgo.BeforeEach(func() {
+			mockValidator = &mockGuestToolsValidator{
+				responses: make(map[string]guestToolsResponse),
+			}
+			guestToolsIssue = libcnd.Condition{
+				Type:     GuestToolsIssue,
+				Status:   libcnd.True,
+				Reason:   NotValid,
+				Category: api.CategoryCritical,
+				Message:  "",
+				Items:    []string{},
+			}
+		})
+
+		ginkgo.It("should append multiple failing VMs to Items", func() {
+			// Setup multiple VMs with guest tools issues
+			mockValidator.responses["vm1"] = guestToolsResponse{ok: false, msg: "VM1 tools not installed"}
+			mockValidator.responses["vm2"] = guestToolsResponse{ok: false, msg: "VM2 tools not running"}
+			mockValidator.responses["vm3"] = guestToolsResponse{ok: true, msg: ""}
+
+			refs := []ref.Ref{
+				{Name: "vm1", Namespace: "test"},
+				{Name: "vm2", Namespace: "test"},
+				{Name: "vm3", Namespace: "test"},
+			}
+
+			// Simulate the validation loop
+			for _, vmRef := range refs {
+				ok, err := mockValidator.GuestToolsInstalled(vmRef)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				if !ok {
+					guestToolsIssue.Items = append(guestToolsIssue.Items, vmRef.String())
+				}
+			}
+
+			// Verify that both failing VMs are in Items
+			gomega.Expect(guestToolsIssue.Items).To(gomega.HaveLen(2))
+			gomega.Expect(guestToolsIssue.Items).To(gomega.ContainElement(" id: name:'vm1' "))
+			gomega.Expect(guestToolsIssue.Items).To(gomega.ContainElement(" id: name:'vm2' "))
+			gomega.Expect(guestToolsIssue.Items).NotTo(gomega.ContainElement(" id: name:'vm3' "))
+
+			// Generic message is now used from condition level
+			gomega.Expect(guestToolsIssue.Message).To(gomega.Equal(""))
+		})
+
+		ginkgo.It("should add failing VM to Items with generic guidance", func() {
+			// Setup VM with specific tools issue
+			mockValidator.responses["encrypted-vm"] = guestToolsResponse{
+				ok:  false,
+				msg: "Unable to determine VMware Tools status for this powered-on VM. This commonly occurs when an encrypted VM is locked and VMware Tools cannot start. Power off the VM manually (or unlock the disks) before migration.",
+			}
+
+			vmRef := ref.Ref{Name: "encrypted-vm", Namespace: "test"}
+			ok, err := mockValidator.GuestToolsInstalled(vmRef)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(ok).To(gomega.BeFalse())
+
+			guestToolsIssue.Items = append(guestToolsIssue.Items, vmRef.String())
+
+			// Verify VM is added to Items (message is now generic at condition level)
+			gomega.Expect(guestToolsIssue.Items).To(gomega.ContainElement(" id: name:'encrypted-vm' "))
+		})
+
+		ginkgo.It("should add failing VMs to Items regardless of provider type", func() {
+			// Setup VM that returns empty message (e.g., from non-VSphere providers)
+			mockValidator.responses["vm-empty-msg"] = guestToolsResponse{ok: false, msg: ""}
+
+			vmRef := ref.Ref{Name: "vm-empty-msg", Namespace: "test"}
+			ok, err := mockValidator.GuestToolsInstalled(vmRef)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(ok).To(gomega.BeFalse())
+
+			guestToolsIssue.Items = append(guestToolsIssue.Items, vmRef.String())
+
+			// Verify VM is added to Items (providers no longer return messages)
+			gomega.Expect(guestToolsIssue.Items).To(gomega.ContainElement(" id: name:'vm-empty-msg' "))
+		})
+
+		ginkgo.It("should add all failing VMs to Items with generic message", func() {
+			// Setup multiple VMs where first one has detailed message
+			mockValidator.responses["first-vm"] = guestToolsResponse{
+				ok:  false,
+				msg: "First VM detailed error message",
+			}
+			mockValidator.responses["second-vm"] = guestToolsResponse{
+				ok:  false,
+				msg: "Second VM error message",
+			}
+
+			refs := []ref.Ref{
+				{Name: "first-vm", Namespace: "test"},
+				{Name: "second-vm", Namespace: "test"},
+			}
+
+			// Simulate the validation loop
+			for _, vmRef := range refs {
+				ok, err := mockValidator.GuestToolsInstalled(vmRef)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				if !ok {
+					guestToolsIssue.Items = append(guestToolsIssue.Items, vmRef.String())
+				}
+			}
+
+			// Verify both VMs are added to Items (messages are now generic at condition level)
+			gomega.Expect(guestToolsIssue.Items).To(gomega.HaveLen(2))
+		})
+	})
 })
+
+// Mock validator for testing GuestToolsIssue aggregation
+type guestToolsResponse struct {
+	ok  bool
+	msg string
+	err error
+}
+
+type mockGuestToolsValidator struct {
+	responses map[string]guestToolsResponse
+}
+
+func (m *mockGuestToolsValidator) GuestToolsInstalled(vmRef ref.Ref) (bool, error) {
+	if response, exists := m.responses[vmRef.Name]; exists {
+		return response.ok, response.err
+	}
+	// Default: tools are OK
+	return true, nil
+}
 
 //nolint:errcheck
 func createFakeReconciler(objects ...runtime.Object) *Reconciler {
