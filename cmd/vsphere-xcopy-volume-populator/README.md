@@ -162,6 +162,23 @@ to have a secret with those required fields
 | STORAGE_PASSWORD | string | y | |
 | STORAGE_SKIP_SSL_VERIFICATION | true/false | n | false |
 
+The `ESXI_CLONE_METHOD` setting can be configured in the Provider settings using the `esxiCloneMethod` key:
+
+```yaml
+apiVersion: forklift.konveyor.io/v1beta1
+kind: Provider
+metadata:
+  name: my-vsphere-provider
+  namespace: openshift-mtv
+spec:
+  type: vsphere
+  url: https://vcenter.example.com
+  secret:
+    name: vsphere-credentials
+    namespace: openshift-mtv
+  settings:
+    `esxiCloneMethod`: "vib"  # or "ssh". The deafult is "vib"
+```
 
 Provider specific entries in the secret shall be documented below:
 
