@@ -82,7 +82,7 @@ func NewWithRemoteEsxcliSSH(storageApi VMDKCapable, vmwareClient vmware.Client, 
 	}, nil
 }
 
-func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) (errFinal error) {
+func (p *RemoteEsxcliPopulator) Populate(vmId string, migrationHostId, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) (errFinal error) {
 	// isn't it better to not call close the channel from the caller?
 	defer func() {
 		r := recover()
@@ -115,10 +115,19 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		cloneMethod,
 		sourceVMDKFile,
 		pv)
-	host, err := p.VSphereClient.GetEsxByVm(context.Background(), vmId)
-	if err != nil {
-		return err
+	var host *object.HostSystem
+	if migrationHostId == "" {
+		host, err = p.VSphereClient.GetEsxByVm(context.Background(), vmId)
+		if err != nil {
+			return err
+		}
+	} else {
+		host, err = p.VSphereClient.GetEsxById(context.Background(), migrationHostId)
+		if err != nil {
+			return err
+		}
 	}
+
 	klog.Infof("Got ESXi host: %s", host)
 
 	hostID := strings.ReplaceAll(strings.ToLower(host.String()), ":", "-")

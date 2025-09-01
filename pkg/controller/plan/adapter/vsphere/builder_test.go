@@ -262,6 +262,205 @@ var _ = Describe("vSphere builder", func() {
 			Expect(pvcs[0].Spec.AccessModes).To(ConsistOf(core.ReadWriteOnce))
 			Expect(pvcs[0].Spec.VolumeMode).To(Equal(ptr.To(core.PersistentVolumeBlock)))
 		})
+
+		It("should not set migrationHost when dedicatedMigrationHosts is not set", func() {
+			// Setup
+			builder := createBuilder(
+				&core.Secret{
+					ObjectMeta: meta.ObjectMeta{Name: "test-secret", Namespace: "test"},
+				},
+			)
+			vm := model.VM{
+				VM1: model.VM1{
+					VM0: model.VM0{
+						ID:   "test-vm-id",
+						Name: "test",
+					},
+					Disks: []vsphere.Disk{
+						{
+							Datastore: vsphere.Ref{ID: "ds-1"},
+							File:      "[datastore1] vm-123/vm-123.vmdk",
+							Bus:       container.SCSI,
+							Capacity:  1024 * 1024 * 1024, // 1 GiB
+							Key:       2000,
+						},
+					},
+				},
+			}
+
+			dsMap := []v1beta1.StoragePair{
+				{
+					Source: ref.Ref{ID: "ds-1"},
+					Destination: v1beta1.DestinationStorage{
+						StorageClass: "test-sc",
+					},
+					OffloadPlugin: &v1beta1.OffloadPlugin{
+						VSphereXcopyPluginConfig: &v1beta1.VSphereXcopyPluginConfig{
+							StorageVendorProduct: "test-vendor",
+							SecretRef:            "test-secret",
+						},
+					},
+				},
+			}
+			storageMap := v1beta1.StorageMap{
+				Spec: v1beta1.StorageMapSpec{
+					Map: dsMap,
+				},
+			}
+			annotations := map[string]string{"test-annotation": "true"}
+			secretName := "test-secret"
+
+			// Mock inventory
+			inventory := &mockInventory{
+				ds: model.Datastore{Resource: model.Resource{ID: "ds-1"}},
+				vm: vm,
+			}
+			builder.Source.Inventory = inventory
+			builder.Context.Map.Storage = &storageMap
+
+			// Execute
+			pvcs, err := builder.PopulatorVolumes(ref.Ref{ID: vm.ID}, annotations, secretName)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pvcs).To(HaveLen(1))
+
+			populator := &v1beta1.VSphereXcopyVolumePopulator{}
+			err = builder.Destination.Client.Get(context.TODO(), client.ObjectKey{Name: pvcs[0].Name, Namespace: pvcs[0].Namespace}, populator)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(populator.Spec.MigrationHost).To(BeEmpty())
+		})
+
+		It("should set migrationHost when provider dedicatedOffloadMigrationHosts is set", func() {
+			// Setup
+			builder := createBuilder(
+				&core.Secret{
+					ObjectMeta: meta.ObjectMeta{Name: "test-secret", Namespace: "test"},
+				},
+			)
+			builder.Source.Provider.Spec.DedicatedOffloadMigrationHosts = []string{"host1", "host2"}
+			vm := model.VM{
+				VM1: model.VM1{
+					VM0: model.VM0{
+						ID:   "test-vm-id",
+						Name: "test",
+					},
+					Disks: []vsphere.Disk{
+						{
+							Datastore: vsphere.Ref{ID: "ds-1"},
+							File:      "[datastore1] vm-123/vm-123.vmdk",
+							Bus:       container.SCSI,
+							Capacity:  1024 * 1024 * 1024, // 1 GiB
+							Key:       2000,
+						},
+					},
+				},
+			}
+
+			dsMap := []v1beta1.StoragePair{
+				{
+					Source: ref.Ref{ID: "ds-1"},
+					Destination: v1beta1.DestinationStorage{
+						StorageClass: "test-sc",
+					},
+					OffloadPlugin: &v1beta1.OffloadPlugin{
+						VSphereXcopyPluginConfig: &v1beta1.VSphereXcopyPluginConfig{
+							StorageVendorProduct: "test-vendor",
+							SecretRef:            "test-secret",
+						},
+					},
+				},
+			}
+			storageMap := v1beta1.StorageMap{
+				Spec: v1beta1.StorageMapSpec{
+					Map: dsMap,
+				},
+			}
+			annotations := map[string]string{"test-annotation": "true"}
+			secretName := "test-secret"
+
+			// Mock inventory
+			inventory := &mockInventory{
+				ds: model.Datastore{Resource: model.Resource{ID: "ds-1"}},
+				vm: vm,
+			}
+			builder.Source.Inventory = inventory
+			builder.Context.Map.Storage = &storageMap
+
+			// Execute
+			pvcs, err := builder.PopulatorVolumes(ref.Ref{ID: vm.ID}, annotations, secretName)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pvcs).To(HaveLen(1))
+
+			populator := &v1beta1.VSphereXcopyVolumePopulator{}
+			err = builder.Destination.Client.Get(context.TODO(), client.ObjectKey{Name: pvcs[0].Name, Namespace: pvcs[0].Namespace}, populator)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(populator.Spec.MigrationHost).To(BeElementOf("host1", "host2"))
+		})
+
+		It("should use plan-level dedicatedOffloadMigrationHosts over provider-level", func() {
+			// Setup
+			builder := createBuilder(
+				&core.Secret{
+					ObjectMeta: meta.ObjectMeta{Name: "test-secret", Namespace: "test"},
+				},
+			)
+			// Set provider-level hosts
+			builder.Source.Provider.Spec.DedicatedOffloadMigrationHosts = []string{"provider-host1", "provider-host2"}
+			// Set plan-level hosts (should override)
+			builder.Plan.Spec.DedicatedOffloadMigrationHosts = []string{"plan-host1"}
+
+			vm := model.VM{
+				VM1: model.VM1{
+					VM0: model.VM0{
+						ID:   "test-vm-id",
+						Name: "test",
+					},
+					Disks: []vsphere.Disk{
+						{
+							Datastore: vsphere.Ref{ID: "ds-1"},
+							File:      "[datastore1] vm-123/vm-123.vmdk",
+							Bus:       container.SCSI,
+							Capacity:  1024 * 1024 * 1024,
+							Key:       2000,
+						},
+					},
+				},
+			}
+
+			dsMap := []v1beta1.StoragePair{
+				{
+					Source: ref.Ref{ID: "ds-1"},
+					Destination: v1beta1.DestinationStorage{
+						StorageClass: "test-sc",
+					},
+					OffloadPlugin: &v1beta1.OffloadPlugin{
+						VSphereXcopyPluginConfig: &v1beta1.VSphereXcopyPluginConfig{
+							StorageVendorProduct: "test-vendor",
+							SecretRef:            "test-secret",
+						},
+					},
+				},
+			}
+			storageMap := v1beta1.StorageMap{
+				Spec: v1beta1.StorageMapSpec{
+					Map: dsMap,
+				},
+			}
+			builder.Source.Inventory = &mockInventory{
+				ds: model.Datastore{Resource: model.Resource{ID: "ds-1"}},
+				vm: vm,
+			}
+			builder.Context.Map.Storage = &storageMap
+
+			// Execute
+			pvcs, err := builder.PopulatorVolumes(ref.Ref{ID: vm.ID}, nil, "test-secret")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pvcs).To(HaveLen(1))
+
+			populator := &v1beta1.VSphereXcopyVolumePopulator{}
+			err = builder.Destination.Client.Get(context.TODO(), client.ObjectKey{Name: pvcs[0].Name, Namespace: pvcs[0].Namespace}, populator)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(populator.Spec.MigrationHost).To(Equal("plan-host1"))
+		})
 	})
 
 	Context("formatHostAddress", func() {

@@ -305,6 +305,11 @@ type PlanSpec struct {
 	// execution order. If not specified, no custom scripts are injected.
 	// +optional
 	CustomizationScripts *core.ObjectReference `json:"customizationScripts,omitempty"`
+	// DedicatedOffloadMigrationHosts is a list of ESXi host IDs dedicated
+	// to storage offload (XCOPY) migrations. Overrides the provider-level
+	// setting if set.
+	// +optional
+	DedicatedOffloadMigrationHosts []string `json:"dedicatedOffloadMigrationHosts,omitempty"`
 }
 
 // Find a planned VM.

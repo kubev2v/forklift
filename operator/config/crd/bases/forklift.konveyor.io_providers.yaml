@@ -60,6 +60,14 @@ spec:
           spec:
             description: Defines the desired state of Provider.
             properties:
+              dedicatedOffloadMigrationHosts:
+                description: |-
+                  DedicatedOffloadMigrationHosts is a list of ESXi host IDs dedicated
+                  to storage offload (XCOPY) migrations. When set, the populator will
+                  use one of these hosts instead of the VM's registered host.
+                items:
+                  type: string
+                type: array
               secret:
                 description: |-
                   References a secret containing credentials and

@@ -40,6 +40,12 @@ spec:
             type: object
           spec:
             properties:
+              migrationHost:
+                description: |-
+                  MigrationHost is the name of the ESX through which the storage offload
+                  migration executes. Set from PlanSpec.DedicatedOffloadMigrationHosts
+                  or ProviderSpec.DedicatedOffloadMigrationHosts (plan overrides provider).
+                type: string
               secretName:
                 description: The secret name with vsphere and storage credentials
                 type: string

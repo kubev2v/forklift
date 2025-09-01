@@ -3482,6 +3482,14 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              dedicatedOffloadMigrationHosts:
+                description: |-
+                  DedicatedOffloadMigrationHosts is a list of ESXi host IDs dedicated
+                  to storage offload (XCOPY) migrations. Overrides the provider-level
+                  setting if set.
+                items:
+                  type: string
+                type: array
               deleteGuestConversionPod:
                 description: |-
                   DeleteGuestConversionPod determines if the guest conversion pod should be deleted after successful migration.
@@ -5914,6 +5922,14 @@ spec:
           spec:
             description: Defines the desired state of Provider.
             properties:
+              dedicatedOffloadMigrationHosts:
+                description: |-
+                  DedicatedOffloadMigrationHosts is a list of ESXi host IDs dedicated
+                  to storage offload (XCOPY) migrations. When set, the populator will
+                  use one of these hosts instead of the VM's registered host.
+                items:
+                  type: string
+                type: array
               secret:
                 description: |-
                   References a secret containing credentials and
@@ -6444,6 +6460,12 @@ spec:
             type: object
           spec:
             properties:
+              migrationHost:
+                description: |-
+                  MigrationHost is the name of the ESX through which the storage offload
+                  migration executes. Set from PlanSpec.DedicatedOffloadMigrationHosts
+                  or ProviderSpec.DedicatedOffloadMigrationHosts (plan overrides provider).
+                type: string
               secretName:
                 description: The secret name with vsphere and storage credentials
                 type: string

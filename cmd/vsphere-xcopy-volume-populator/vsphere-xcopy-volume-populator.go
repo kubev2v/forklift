@@ -59,6 +59,7 @@ var (
 	vspherePassword            string
 	esxiCloneMethod            string
 	sshTimeoutSeconds          int
+	migrationHost              string
 
 	// kube args
 	httpEndpoint string
@@ -196,7 +197,7 @@ func main() {
 	quitCh := make(chan error)
 
 	hll := populator.NewHostLeaseLocker(clientSet)
-	go p.Populate(sourceVmId, sourceVMDKFile, pv, hll, progressCh, xCopyUsedCh, quitCh)
+	go p.Populate(sourceVmId, migrationHost, pv, hll, progressCh, xCopyUsedCh, quitCh)
 
 	for {
 		select {
@@ -300,6 +301,7 @@ func handleArgs() {
 	flag.StringVar(&vspherePassword, "vsphere-password", os.Getenv("GOVMOMI_PASSWORD"), "vSphere's API password")
 	flag.StringVar(&esxiCloneMethod, "esxi-clone-method", os.Getenv("ESXI_CLONE_METHOD"), "ESXi clone method: 'vib' (default) or 'ssh'")
 	flag.IntVar(&sshTimeoutSeconds, "ssh-timeout-seconds", 30, "SSH timeout in seconds for ESXi operations (default: 30)")
+	flag.StringVar(&migrationHost, "migration-host", "", "the ESX id to use for the population")
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 	// Metrics args

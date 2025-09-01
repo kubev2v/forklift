@@ -101,6 +101,11 @@ type ProviderSpec struct {
 	Secret core.ObjectReference `json:"secret" ref:"Secret"`
 	// Provider settings.
 	Settings map[string]string `json:"settings,omitempty"`
+	// DedicatedOffloadMigrationHosts is a list of ESXi host IDs dedicated
+	// to storage offload (XCOPY) migrations. When set, the populator will
+	// use one of these hosts instead of the VM's registered host.
+	// +optional
+	DedicatedOffloadMigrationHosts []string `json:"dedicatedOffloadMigrationHosts,omitempty"`
 }
 
 // ProviderStatus defines the observed state of Provider
