@@ -42,6 +42,11 @@ const (
 	MigrationOnlyConversion MigrationType = "conversion"
 )
 
+const (
+	namespaceLabelPrimaryUDN = "k8s.ovn.org/primary-user-defined-network"
+	nadLabelUDN              = "k8s.ovn.org/user-defined-network"
+)
+
 // PlanSpec defines the desired state of Plan.
 type PlanSpec struct {
 	// Description
@@ -277,7 +282,7 @@ func (r *Plan) DestinationHasUdnNetwork(client k8sclient.Client) bool {
 	if err != nil {
 		return false
 	}
-	_, hasUdnLabel := namespace.ObjectMeta.Labels["k8s.ovn.org/primary-user-defined-network"]
+	_, hasUdnLabel := namespace.ObjectMeta.Labels[namespaceLabelPrimaryUDN]
 	if !hasUdnLabel {
 		return false
 	}
@@ -285,7 +290,7 @@ func (r *Plan) DestinationHasUdnNetwork(client k8sclient.Client) bool {
 	nadList := &k8snet.NetworkAttachmentDefinitionList{}
 	listOpts := []k8sclient.ListOption{
 		k8sclient.InNamespace(r.Spec.TargetNamespace),
-		k8sclient.MatchingLabels{"k8s.ovn.org/user-defined-network": ""},
+		k8sclient.MatchingLabels{nadLabelUDN: ""},
 	}
 
 	err = client.List(context.TODO(), nadList, listOpts...)
