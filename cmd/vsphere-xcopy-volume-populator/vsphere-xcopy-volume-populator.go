@@ -52,6 +52,7 @@ var (
 	vsphereHostname            string
 	vsphereUsername            string
 	vspherePassword            string
+	migrationHost              string
 
 	// kube args
 	httpEndpoint string
@@ -140,7 +141,7 @@ func main() {
 	progressCh := make(chan uint)
 	quitCh := make(chan error)
 
-	go p.Populate(sourceVmId, sourceVMDKFile, pv, progressCh, quitCh)
+	go p.Populate(sourceVmId, migrationHost, sourceVMDKFile, pv, progressCh, quitCh)
 
 	for {
 		select {
@@ -232,6 +233,7 @@ func handleArgs() {
 	flag.StringVar(&vsphereHostname, "vsphere-hostname", os.Getenv("GOVMOMI_HOSTNAME"), "vSphere's API hostname")
 	flag.StringVar(&vsphereUsername, "vsphere-username", os.Getenv("GOVMOMI_USERNAME"), "vSphere's API username")
 	flag.StringVar(&vspherePassword, "vsphere-password", os.Getenv("GOVMOMI_PASSWORD"), "vSphere's API password")
+	flag.StringVar(&migrationHost, "migration-host", "", "the ESX id to use for the population")
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 	// Metrics args

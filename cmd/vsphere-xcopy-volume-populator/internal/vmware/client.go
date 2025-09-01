@@ -21,6 +21,7 @@ import (
 //go:generate go run go.uber.org/mock/mockgen -destination=mocks/vmware_mock_client.go -package=vmware_mocks . Client
 type Client interface {
 	GetEsxByVm(ctx context.Context, vmName string) (*object.HostSystem, error)
+	GetEsxById(ctx context.Context, hostId string) (*object.HostSystem, error)
 	RunEsxCommand(ctx context.Context, host *object.HostSystem, command []string) ([]esx.Values, error)
 	GetDatastore(ctx context.Context, dc *object.Datacenter, datastore string) (*object.Datastore, error)
 }
@@ -57,7 +58,7 @@ func (c *VSphereClient) RunEsxCommand(ctx context.Context, host *object.HostSyst
 	if err != nil {
 		klog.Errorf("Failed to run esxcli command: %+v %s %s", res, err, reflect.TypeOf(err))
 		if fault, ok := err.(*esx.Fault); ok {
-			fmt.Printf("CLI Fault: %+v\n", fault.MessageDetail())
+			klog.Infof("CLI Fault: %+v\n", fault.MessageDetail())
 		}
 
 		return nil, err
@@ -90,7 +91,7 @@ func (c *VSphereClient) GetEsxByVm(ctx context.Context, vmId string) (*object.Ho
 			}
 		} else {
 			vm = result
-			fmt.Printf("found vm %v\n", vm)
+			klog.Infof("found vm %v\n", vm)
 			break
 		}
 	}
@@ -122,6 +123,28 @@ func (c *VSphereClient) GetDatastore(ctx context.Context, dc *object.Datacenter,
 	}
 
 	return ds, nil
+}
+
+func (c *VSphereClient) GetEsxById(ctx context.Context, hostId string) (*object.HostSystem, error) {
+	finder := find.NewFinder(c.Client.Client, true)
+	datacenters, err := finder.DatacenterList(ctx, "*")
+	if err != nil {
+		return nil, fmt.Errorf("failed getting datacenters: %w", err)
+	}
+
+	for _, dc := range datacenters {
+		finder.SetDatacenter(dc)
+		host, err := finder.HostSystem(ctx, hostId)
+		if err != nil {
+			if _, ok := err.(*find.NotFoundError); !ok {
+				return nil, fmt.Errorf("error searching for Host in Datacenter '%s': %w", dc.Name(), err)
+			}
+		} else {
+			klog.Infof("found host %v\n", host)
+			return host, nil
+		}
+	}
+	return nil, fmt.Errorf("didn't find any host with id %s", hostId)
 }
 
 type Obj struct {

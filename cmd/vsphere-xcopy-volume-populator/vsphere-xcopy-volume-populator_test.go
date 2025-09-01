@@ -13,6 +13,7 @@ import (
 	vmware_mocks "github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware/mocks"
 	"github.com/vmware/govmomi/cli/esx"
 	"github.com/vmware/govmomi/object"
+	"github.com/vmware/govmomi/vim25/types"
 	"go.uber.org/mock/gomock"
 )
 
@@ -38,7 +39,12 @@ var _ = Describe("Populator", func() {
 			VSphereClient: vmwareClient,
 			StorageApi:    storageClient,
 		}
-		dummyHost = &object.HostSystem{}
+		c := object.NewCommon(nil, types.ManagedObjectReference{
+			Type:  "HostSystem",
+			Value: "host-123",
+		})
+		dummyHost = &object.HostSystem{Common: c}
+		dummyHost.InventoryPath = "host-123"
 	})
 
 	AfterEach(func() {
@@ -46,12 +52,13 @@ var _ = Describe("Populator", func() {
 	})
 
 	type testCase struct {
-		name       string
-		setup      func()
-		sourceVmId string
-		sourceVMDK string
-		targetPVC  string
-		want       error
+		name          string
+		setup         func()
+		sourceVmId    string
+		sourceVMDK    string
+		targetPVC     string
+		migrationHost string
+		want          error
 	}
 
 	DescribeTable("should handle various population scenarios",
@@ -63,7 +70,7 @@ var _ = Describe("Populator", func() {
 
 			go func() {
 				defer GinkgoRecover()
-				underTest.Populate(tc.sourceVmId, tc.sourceVMDK, populator.PersistentVolume{Name: tc.targetPVC}, progressCh, quitCh)
+				underTest.Populate(tc.sourceVmId, tc.migrationHost, tc.sourceVMDK, populator.PersistentVolume{Name: tc.targetPVC}, progressCh, quitCh)
 			}()
 
 			if tc.want != nil {
@@ -118,32 +125,67 @@ var _ = Describe("Populator", func() {
 			targetPVC:  "pvc-12345",
 			setup: func() {
 				vmwareClient.EXPECT().GetEsxByVm(gomock.Any(), "my-vm").Return(nil, fmt.Errorf("no host found")).Times(1)
+				vmwareClient.EXPECT().GetEsxById(gomock.Any(), gomock.Any()).Times(0)
 			},
 			want: fmt.Errorf("no host found"),
+		}),
+		Entry("migrationHost - fail to locate an ESX by id", testCase{
+			sourceVmId:    "my-vm",
+			migrationHost: "host-123",
+			sourceVMDK:    "[my-ds] my-vm/vmdisk.vmdk",
+			targetPVC:     "pvc-12345",
+			setup: func() {
+				vmwareClient.EXPECT().GetEsxById(gomock.Any(), "host-123").Return(nil, fmt.Errorf("no host found")).Times(1)
+				vmwareClient.EXPECT().GetEsxByVm(gomock.Any(), gomock.Any()).Times(0)
+			},
+			want: fmt.Errorf("no host found"),
+		}),
+		Entry("migrationHost - call on specific host instead of a vm host", testCase{
+			sourceVmId:    "my-vm",
+			migrationHost: "host-123",
+			sourceVMDK:    "[my-ds] my-vm/vmdisk.vmdk",
+			targetPVC:     "pvc-12345",
+			setup: func() {
+				vmwareClient.EXPECT().GetEsxByVm(gomock.Any(), gomock.Any()).Times(0)
+				positivePathMockCalls(vmwareClient, storageClient, true)
+			},
+			want: nil,
 		}),
 		Entry("working source and target", testCase{
 			sourceVmId: "my-vm",
 			sourceVMDK: "[my-ds] my-vm/vmdisk.vmdk",
 			targetPVC:  "pvc-12345",
-			setup: func() {
-				vmwareClient.EXPECT().GetEsxByVm(context.Background(), gomock.Any()).Return(dummyHost, nil)
-				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"software", "vib", "get", "-n", "vmkfstools-wrapper"}).Return([]esx.Values{{"Version": {populator.VibVersion}}}, nil)
-				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "adapter", "list"}).Return([]esx.Values{{"UID": {"iqn.test"}, "LinkState": {"link-up"}, "Driver": {"iscsi"}}}, nil)
-				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any()).Return(nil, nil)
-				storageClient.EXPECT().ResolvePVToLUN(gomock.Any()).Return(populator.LUN{NAA: "naa.616263"}, nil)
-				storageClient.EXPECT().CurrentMappedGroups(gomock.Any(), gomock.Any()).Return([]string{}, nil)
-				storageClient.EXPECT().Map("xcopy-esxs", gomock.Any(), nil).Return(populator.LUN{NAA: "naa.616263"}, nil)
-				storageClient.EXPECT().UnMap(gomock.Any(), gomock.Any(), nil).AnyTimes()
-				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "device", "list", "-d", "naa.616263"}).Return(nil, nil)
-				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(),
-					[]string{"vmkfstools", "clone", "-s", "/vmfs/volumes/my-ds/my-vm/vmdisk.vmdk", "-t", "/vmfs/devices/disks/naa.616263"}).
-					Return([]esx.Values{{"message": {`{"taskId": "1"}`}}}, nil)
-				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"vmkfstools", "taskGet", "-i", "1"}).
-					Return([]esx.Values{{"message": {`{"exitCode": "0"}`}}}, nil)
-				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"vmkfstools", "taskClean", "-i", "1"}).Return(nil, nil)
-				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "adapter", "rescan", "-t", "delete", "-a", "1"}).Return(nil, nil)
-			},
-			want: nil,
+			setup:      func() { positivePathMockCalls(vmwareClient, storageClient, false) },
+			want:       nil,
 		}),
 	)
 })
+
+func positivePathMockCalls(vmwareClient *vmware_mocks.MockClient, storageClient *storage_mocks.MockStorageApi, useMigrationHost bool) {
+	c := object.NewCommon(nil, types.ManagedObjectReference{
+		Type:  "HostSystem",
+		Value: "host-123",
+	})
+	dummyHost := &object.HostSystem{Common: c}
+
+	if useMigrationHost {
+		vmwareClient.EXPECT().GetEsxById(context.Background(), gomock.Any()).Return(dummyHost, nil)
+	} else {
+		vmwareClient.EXPECT().GetEsxByVm(context.Background(), gomock.Any()).Return(dummyHost, nil)
+	}
+	vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"software", "vib", "get", "-n", "vmkfstools-wrapper"}).Return([]esx.Values{{"Version": {populator.VibVersion}}}, nil)
+	vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "adapter", "list"}).Return([]esx.Values{{"UID": {"iqn.test"}, "LinkState": {"link-up"}, "Driver": {"iscsi"}}}, nil)
+	storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any()).Return(nil, nil)
+	storageClient.EXPECT().ResolvePVToLUN(gomock.Any()).Return(populator.LUN{NAA: "naa.616263"}, nil)
+	storageClient.EXPECT().CurrentMappedGroups(gomock.Any(), gomock.Any()).Return([]string{}, nil)
+	storageClient.EXPECT().Map("xcopy-esxs", gomock.Any(), nil).Return(populator.LUN{NAA: "naa.616263"}, nil)
+	storageClient.EXPECT().UnMap(gomock.Any(), gomock.Any(), nil).AnyTimes()
+	vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "device", "list", "-d", "naa.616263"}).Return(nil, nil)
+	vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(),
+		[]string{"vmkfstools", "clone", "-s", "/vmfs/volumes/my-ds/my-vm/vmdisk.vmdk", "-t", "/vmfs/devices/disks/naa.616263"}).
+		Return([]esx.Values{{"message": {`{"taskId": "1"}`}}}, nil)
+	vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"vmkfstools", "taskGet", "-i", "1"}).
+		Return([]esx.Values{{"message": {`{"exitCode": "0"}`}}}, nil)
+	vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"vmkfstools", "taskClean", "-i", "1"}).Return(nil, nil)
+	vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "adapter", "rescan", "-t", "delete", "-a", "1"}).Return(nil, nil)
+}

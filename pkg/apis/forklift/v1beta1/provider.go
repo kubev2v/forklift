@@ -62,12 +62,13 @@ const (
 
 // Provider settings.
 const (
-	VDDK                   = "vddkInitImage"
-	SDK                    = "sdkEndpoint"
-	VCenter                = "vcenter"
-	ESXI                   = "esxi"
-	UseVddkAioOptimization = "useVddkAioOptimization"
-	VddkConfig             = "vddkConfig"
+	VDDK                           = "vddkInitImage"
+	SDK                            = "sdkEndpoint"
+	VCenter                        = "vcenter"
+	ESXI                           = "esxi"
+	UseVddkAioOptimization         = "useVddkAioOptimization"
+	VddkConfig                     = "vddkConfig"
+	DedicatedOffloadMigrationHosts = "dedicatedOffloadMigrationHosts"
 )
 
 const OvaProviderFinalizer = "forklift/ova-provider"
