@@ -37,7 +37,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Types
@@ -370,7 +369,7 @@ func (r *Reconciler) validateTargetNamespace(plan *api.Plan) (err error) {
 	return
 }
 
-// Validate the target namespace.
+// Validate unsupported User Defined Network configurations in the destination namespace.
 func (r *Reconciler) validateUserDefinedNetwork(ctx *plancontext.Context) (err error) {
 	nads, err := r.getDestinationNamespaceNads(ctx)
 	if err != nil {
@@ -381,7 +380,7 @@ func (r *Reconciler) validateUserDefinedNetwork(ctx *plancontext.Context) (err e
 		var networkConfig model.NetworkConfig
 		err = json.Unmarshal([]byte(nad.Spec.Config), &networkConfig)
 		if err != nil {
-			fmt.Println("error unmarshalling network config, skipping", err)
+			r.Log.Info("Skipping NAD: failed to parse network config", "namespace", nad.Namespace, "name", nad.Name, "error", err.Error())
 			continue
 		}
 		if networkConfig.Type != model.OvnOverlayType {
@@ -403,9 +402,9 @@ func (r *Reconciler) validateUserDefinedNetwork(ctx *plancontext.Context) (err e
 
 func (r *Reconciler) getDestinationNamespaceNads(ctx *plancontext.Context) (*k8snet.NetworkAttachmentDefinitionList, error) {
 	nadList := &k8snet.NetworkAttachmentDefinitionList{}
-	listOpts := []k8sclient.ListOption{
-		k8sclient.InNamespace(ctx.Plan.Spec.TargetNamespace),
-		k8sclient.MatchingLabels{"k8s.ovn.org/user-defined-network": ""},
+	listOpts := []client.ListOption{
+		client.InNamespace(ctx.Plan.Spec.TargetNamespace),
+		client.MatchingLabels{"k8s.ovn.org/user-defined-network": ""},
 	}
 
 	err := ctx.Destination.Client.List(context.TODO(), nadList, listOpts...)

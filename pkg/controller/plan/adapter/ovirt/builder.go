@@ -237,6 +237,7 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 	var kInterfaces []cnv.Interface
 
 	numNetworks := 0
+	hasUDN := r.Plan.DestinationHasUdnNetwork(r.Destination)
 	netMapIn := r.Context.Map.Network.Spec.Map
 	for i := range netMapIn {
 		mapped := &netMapIn[i]
@@ -273,19 +274,18 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 				Model: nic.Interface,
 			}
 
-			if !r.Plan.DestinationHasUdnNetwork(r.Destination) || settings.Settings.UdnSupportsMac {
+			if !hasUDN || settings.Settings.UdnSupportsMac {
 				kInterface.MacAddress = nic.MAC
 			}
 
 			switch mapped.Destination.Type {
 			case Pod:
-				if r.Plan.DestinationHasUdnNetwork(r.Destination) {
-					kNetwork.Pod = &cnv.PodNetwork{}
+				kNetwork.Pod = &cnv.PodNetwork{}
+				if hasUDN {
 					kInterface.Binding = &cnv.PluginBinding{
 						Name: planbase.UdnL2bridge,
 					}
 				} else {
-					kNetwork.Pod = &cnv.PodNetwork{}
 					kInterface.Masquerade = &cnv.InterfaceMasquerade{}
 				}
 			case Multus:
