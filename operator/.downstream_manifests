@@ -37,9 +37,329 @@ spec:
           metadata:
             type: object
           spec:
+            additionalProperties: true
             description: Spec defines the desired state of ForkliftController
+            properties:
+              api_container_limits_cpu:
+                description: 'API service CPU limit (default: 1000m)'
+                example: 2000m
+                type: string
+              api_container_limits_memory:
+                description: 'API service memory limit (default: 1Gi)'
+                example: 2Gi
+                type: string
+              api_container_requests_cpu:
+                description: 'API service CPU request (default: 100m)'
+                example: 200m
+                type: string
+              api_container_requests_memory:
+                description: 'API service memory request (default: 150Mi)'
+                example: 300Mi
+                type: string
+              api_image_fqin:
+                description: API service image
+                example: quay.io/konveyor/forklift-api:latest
+                type: string
+              controller_block_overhead:
+                description: 'Block overhead in bytes (default: 0)'
+                pattern: ^[0-9]+$
+                type: string
+              controller_cleanup_retries:
+                description: 'Cleanup retry count (default: 10)'
+                pattern: ^[1-9][0-9]*$
+                type: string
+              controller_container_limits_cpu:
+                description: 'Controller CPU limit (default: 500m)'
+                example: 1000m
+                type: string
+              controller_container_limits_memory:
+                description: 'Controller memory limit (default: 800Mi)'
+                example: 1Gi
+                type: string
+              controller_container_requests_cpu:
+                description: 'Controller CPU request (default: 100m)'
+                example: 200m
+                type: string
+              controller_container_requests_memory:
+                description: 'Controller memory request (default: 350Mi)'
+                example: 500Mi
+                type: string
+              controller_dv_status_check_retries:
+                description: 'DataVolume status check retries (default: 10)'
+                pattern: ^[1-9][0-9]*$
+                type: string
+              controller_filesystem_overhead:
+                description: 'Filesystem overhead percentage (default: 10)'
+                pattern: ^(0|[1-9][0-9]?|100)$
+                type: string
+              controller_image_fqin:
+                description: Controller pod image
+                example: quay.io/konveyor/forklift-controller:latest
+                type: string
+              controller_log_level:
+                description: 'Log verbosity level (default: 3)'
+                pattern: ^([0-9]|10)$
+                type: string
+              controller_max_concurrent_reconciles:
+                description: 'Max concurrent reconciles (default: 10)'
+                pattern: ^[1-9][0-9]*$
+                type: string
+              controller_max_vm_inflight:
+                description: 'Max concurrent VM migrations (default: 20)'
+                pattern: ^[1-9][0-9]*$
+                type: string
+              controller_ovirt_warm_migration:
+                description: 'Enable oVirt warm migration (default: true)'
+                enum:
+                - "true"
+                - "false"
+                type: string
+              controller_precopy_interval:
+                description: 'Precopy interval in minutes (default: 60)'
+                pattern: ^[1-9][0-9]*$
+                type: string
+              controller_retain_precopy_importer_pods:
+                description: 'Retain precopy pods (default: false)'
+                enum:
+                - "true"
+                - "false"
+                type: string
+              controller_snapshot_removal_check_retries:
+                description: 'Snapshot removal retries (default: 20)'
+                pattern: ^[1-9][0-9]*$
+                type: string
+              controller_snapshot_removal_timeout_minuts:
+                description: 'Snapshot removal timeout in minutes (default: 120)'
+                pattern: ^[1-9][0-9]*$
+                type: string
+              controller_snapshot_status_check_rate_seconds:
+                description: 'Snapshot status check rate in seconds (default: 10)'
+                pattern: ^[1-9][0-9]*$
+                type: string
+              controller_tls_connection_timeout_sec:
+                description: 'TLS connection timeout seconds (default: 5)'
+                pattern: ^[1-9][0-9]*$
+                type: string
+              controller_vddk_job_active_deadline_sec:
+                description: 'VDDK job timeout in seconds (default: 300)'
+                pattern: ^[1-9][0-9]*$
+                type: string
+              controller_vsphere_incremental_backup:
+                description: 'Use vSphere incremental backup (default: true)'
+                enum:
+                - "true"
+                - "false"
+                type: string
+              feature_auth_required:
+                description: 'Require authentication (default: true)'
+                enum:
+                - "true"
+                - "false"
+                type: string
+              feature_copy_offload:
+                description: 'Enable copy offload plugins (default: false)'
+                enum:
+                - "true"
+                - "false"
+                type: string
+              feature_ocp_live_migration:
+                description: 'Enable OCP live migration (default: false)'
+                enum:
+                - "true"
+                - "false"
+                type: string
+              feature_ui_plugin:
+                description: 'Enable UI plugin (default: true)'
+                enum:
+                - "true"
+                - "false"
+                type: string
+              feature_validation:
+                description: 'Enable validation service (default: true)'
+                enum:
+                - "true"
+                - "false"
+                type: string
+              feature_vmware_system_serial_number:
+                description: 'Use VMware system serial numbers (default: true)'
+                enum:
+                - "true"
+                - "false"
+                type: string
+              feature_volume_populator:
+                description: 'Enable volume populators (default: true)'
+                enum:
+                - "true"
+                - "false"
+                type: string
+              hooks_container_limits_cpu:
+                description: 'Hooks CPU limit (default: 1000m)'
+                example: 2000m
+                type: string
+              hooks_container_limits_memory:
+                description: 'Hooks memory limit (default: 1Gi)'
+                example: 2Gi
+                type: string
+              hooks_container_requests_cpu:
+                description: 'Hooks CPU request (default: 100m)'
+                example: 200m
+                type: string
+              hooks_container_requests_memory:
+                description: 'Hooks memory request (default: 150Mi)'
+                example: 300Mi
+                type: string
+              image_pull_policy:
+                description: 'Image pull policy (default: Always)'
+                enum:
+                - Always
+                - IfNotPresent
+                - Never
+                type: string
+              inventory_container_limits_cpu:
+                description: 'Inventory CPU limit (default: 1000m)'
+                example: 2000m
+                type: string
+              inventory_container_limits_memory:
+                description: 'Inventory memory limit (default: 1Gi)'
+                example: 2Gi
+                type: string
+              inventory_container_requests_cpu:
+                description: 'Inventory CPU request (default: 500m)'
+                example: 1000m
+                type: string
+              inventory_container_requests_memory:
+                description: 'Inventory memory request (default: 500Mi)'
+                example: 1Gi
+                type: string
+              k8s_cluster:
+                description: 'Whether running on Kubernetes (vs OpenShift) (default:
+                  false)'
+                enum:
+                - "true"
+                - "false"
+                type: string
+              must_gather_image_fqin:
+                description: Must-gather debugging image
+                example: quay.io/konveyor/forklift-must-gather:latest
+                type: string
+              ova_container_limits_cpu:
+                description: 'OVA CPU limit (default: 1000m)'
+                example: 2000m
+                type: string
+              ova_container_limits_memory:
+                description: 'OVA memory limit (default: 1Gi)'
+                example: 2Gi
+                type: string
+              ova_container_requests_cpu:
+                description: 'OVA CPU request (default: 100m)'
+                example: 200m
+                type: string
+              ova_container_requests_memory:
+                description: 'OVA memory request (default: 150Mi)'
+                example: 300Mi
+                type: string
+              ova_provider_server_fqin:
+                description: OVA provider server image
+                example: quay.io/konveyor/ova-provider-server:latest
+                type: string
+              populator_controller_image_fqin:
+                description: Volume populator controller image
+                example: quay.io/konveyor/populator-controller:latest
+                type: string
+              populator_openstack_image_fqin:
+                description: OpenStack populator image
+                example: quay.io/konveyor/openstack-populator:latest
+                type: string
+              populator_ovirt_image_fqin:
+                description: oVirt populator image
+                example: quay.io/konveyor/ovirt-populator:latest
+                type: string
+              populator_vsphere_xcopy_volume_image_fqin:
+                description: vSphere xcopy populator image
+                example: quay.io/konveyor/vsphere-populator:latest
+                type: string
+              ui_plugin_container_limits_cpu:
+                description: 'UI plugin CPU limit (default: 100m)'
+                example: 200m
+                type: string
+              ui_plugin_container_limits_memory:
+                description: 'UI plugin memory limit (default: 800Mi)'
+                example: 1Gi
+                type: string
+              ui_plugin_container_requests_cpu:
+                description: 'UI plugin CPU request (default: 100m)'
+                example: 200m
+                type: string
+              ui_plugin_container_requests_memory:
+                description: 'UI plugin memory request (default: 150Mi)'
+                example: 300Mi
+                type: string
+              ui_plugin_image_fqin:
+                description: UI plugin image
+                example: quay.io/konveyor/forklift-ui-plugin:latest
+                type: string
+              validation_container_limits_cpu:
+                description: 'Validation CPU limit (default: 1000m)'
+                example: 2000m
+                type: string
+              validation_container_limits_memory:
+                description: 'Validation memory limit (default: 300Mi)'
+                example: 500Mi
+                type: string
+              validation_container_requests_cpu:
+                description: 'Validation CPU request (default: 400m)'
+                example: 500m
+                type: string
+              validation_container_requests_memory:
+                description: 'Validation memory request (default: 50Mi)'
+                example: 100Mi
+                type: string
+              validation_image_fqin:
+                description: Validation service image
+                example: quay.io/konveyor/forklift-validation:latest
+                type: string
+              validation_policy_agent_search_interval:
+                description: 'Policy agent search interval in seconds (default: 120)'
+                pattern: ^[1-9][0-9]*$
+                type: string
+              vddk_image:
+                description: VDDK image for VMware disk access
+                example: quay.io/konveyor/vddk:7.0.3
+                type: string
+              virt_v2v_container_limits_cpu:
+                description: 'virt-v2v CPU limit (default: 4000m)'
+                example: 8000m
+                type: string
+              virt_v2v_container_limits_memory:
+                description: 'virt-v2v memory limit (default: 8Gi)'
+                example: 16Gi
+                type: string
+              virt_v2v_container_requests_cpu:
+                description: 'virt-v2v CPU request (default: 1000m)'
+                example: 2000m
+                type: string
+              virt_v2v_container_requests_memory:
+                description: 'virt-v2v memory request (default: 1Gi)'
+                example: 2Gi
+                type: string
+              virt_v2v_dont_request_kvm:
+                description: Don't request KVM for virt-v2v
+                enum:
+                - "true"
+                - "false"
+                type: string
+              virt_v2v_extra_args:
+                description: Additional arguments for virt-v2v
+                example: --debug-overlays
+                type: string
+              virt_v2v_extra_conf_config_map:
+                description: ConfigMap name containing extra virt-v2v configuration
+                type: string
+              virt_v2v_image_fqin:
+                description: Virt-v2v conversion image used by migration pods
+                example: quay.io/konveyor/forklift-virt-v2v:latest
+                type: string
             type: object
-            x-kubernetes-preserve-unknown-fields: true
           status:
             description: Status defines the observed state of ForkliftController
             type: object
