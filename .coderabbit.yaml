@@ -1,10 +1,10 @@
 reviews:
   profile: assertive
-  high_level_summary: true
+  high_level_summary: false
   review_status: true
   commit_status: true
   changed_files_summary: true
-  sequence_diagrams: true
+  sequence_diagrams: false
   estimate_code_review_effort: true
   assess_linked_issues: true
   related_issues: true
@@ -45,7 +45,7 @@ reviews:
         - **Security**: Be vigilant against vulnerabilities (e.g., injection, insecure direct object references). Sanitize inputs. Do not hardcode secrets.
         - **Performance**: Write efficient code, but avoid premature optimization. Be mindful of algorithmic complexity and memory allocations.
         - **coverage**: Make sure that the code has unit tests.
-  auto_review:
-    enabled: true
-    auto_incremental_review: true
-    drafts: false  # ignore draft PRs
+auto_review:
+  enabled: false
+  auto_incremental_review: false
+  drafts: false
