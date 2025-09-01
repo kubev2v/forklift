@@ -103,7 +103,7 @@ GOLANGCI_LINT_BIN ?= $(GOBIN)/golangci-lint
 ##@ Main Targets
 
 .PHONY: ci
-ci: all tidy vendor generate-verify lint
+ci: all tidy vendor generate-verify lint validate-forklift-controller-crd
 
 .PHONY: all
 all: test forklift-controller
@@ -147,6 +147,11 @@ e2e-sanity-ova:
 .PHONY: validation-test
 validation-test: opa-bin
 	ENVIRONMENT=test ${OPA} test validation/policies --explain fails
+
+.PHONY: validate-forklift-controller-crd
+validate-forklift-controller-crd:
+	@echo "Validating ForkliftController CRD..."
+	python3 hack/validate_forklift_controller_crd.py
 
 .PHONY: integration-test
 integration-test: generate fmt vet manifests envtest
