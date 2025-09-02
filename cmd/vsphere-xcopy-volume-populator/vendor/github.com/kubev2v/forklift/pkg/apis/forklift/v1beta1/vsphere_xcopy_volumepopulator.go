@@ -31,6 +31,9 @@ type VSphereXcopyVolumePopulatorSpec struct {
 	// StorageVendorProduct is the storage vendor the target disk and PVC are connected to
 	// Supported values [vantara, ontap, primera3par]
 	StorageVendorProduct string `json:"storageVendorProduct"`
+	// MigrationHost is the name of the ESX through which the storage offload
+	// migration executes. Use this with combination of Provider.Spec.Settings.MigrationHosts
+	MigrationHost string `json:"migrationHost,omitempty"`
 }
 
 type VSphereXcopyVolumePopulatorStatus struct {

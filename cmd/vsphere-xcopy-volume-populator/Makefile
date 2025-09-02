@@ -30,8 +30,12 @@ test: fmt vet
 	go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
 .PHONY: generate 
-generate:
+generate: vendor
 	go generate ./...
+
+.PHONY: vendor
+vendor:
+	go mod vendor
 
 .PHONY: build
 build: fmt vet
@@ -40,9 +44,7 @@ build: fmt vet
 	-ldflags="-w -s -X github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator.VibVersion=$(VIB_VERSION)" \
 	-o bin/vsphere-xcopy-volume-populator
 
-MOCKGEN := $(shell which mockgen 2>/dev/null)
-install-mockgen:
-	[ -z "$(MOCKGEN)" ] && go install go.uber.org/mock/mockgen@latest || true
+
 
 # pre-requisits: ensure a PVC exists.
 test-copy-using-cli: build
@@ -54,6 +56,7 @@ test-copy-using-cli: build
 		--storage-vendor-product=ontap \
 		--secret-name=populator-secret \
 		--owner-uid=test-cli \
+		--migration-host=host-3078 \
 		--kubeconfig=$$KUBECONFIG
 
 

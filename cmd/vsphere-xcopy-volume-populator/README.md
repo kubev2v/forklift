@@ -1,5 +1,23 @@
 # vSphere XCOPY Volume-Populator
 
+This volume populator leverages vSphere's XCOPY feature to perform hardware-accelerated copies of VMDKs directly to target PVCs. It offloads the data transfer to the underlying storage array, significantly speeding up virtual machine disk migration.
+
+
+
+## High-Level Workflow
+1.  A user creates a `Plan` with a `StorageMap` configured for copy offload.
+2.  The `forklift-controller` processes the migration plan.
+3.  For each disk to be migrated, the controller creates a target `PersistentVolumeClaim` (PVC).
+4.  It then creates a `VSphereXcopyVolumePopulator` custom resource containing the details of the source VMDK and the target PVC.
+5.  The PVC's `dataSourceRef` field is set to point to the newly created `VSphereXcopyVolumePopulator` resource. This tells the Kubernetes volume provisioning system to use the populator to provide data for the PVC.
+6.  The `volume-populator-controller` detects the `VSphereXcopyVolumePopulator` resource and launches a populator pod.
+7.  The `vsphere-xcopy-volume-populator` container within the pod starts execution.
+8.  It connects to the storage array's API using credentials from the specified secret. It then maps the LUN backing the target PVC to an appropriate ESXi host.
+9.  It connects to the vSphere API and invokes the custom `vmkfstools-wrapper` on the ESXi host.
+10. The wrapper executes a `vmkfstools` command to perform a hardware-accelerated clone (XCOPY) from the source VMDK to the target LUN.
+11. Upon successful completion of the copy, the populator pod terminates.
+12. The PVC is now bound and populated with the disk data, ready to be attached to the migrated virtual machine.
+
 ## Forklift Controller
 When the feature flag `feature_copy_offload` is true (off by default), the controller
 consult the storagemaps offload plugin configuration, to decided if VM disk from
@@ -52,6 +70,7 @@ spec:
   targetPVC: my-pvc 
   vmdkPath: '[my-vsphere-ds] vm-1/vm-1.vmdk'
 ```
+
 
 ## vmkfstools-wrapper
 An ESXi CLI extension that exposes the vmkfstools clone operation to API interaction.
@@ -196,6 +215,35 @@ Provider specific entries in the secret shall be documented below:
 | POWERFLEX_SYSTEM_ID | string | the system id of the storage array. Can be taken from `vxflexos-config` from the `vxflexos` namespace or the openshift-operators namespace. |
 
 
+## Dedicated Hosts for Copy Offload
+
+For more granular control over the copy offload process, you can designate specific ESXi hosts to handle the data transfer operations. This can be useful for isolating the migration workload, ensuring that only hosts with the `vmkfstools-wrapper` are used, or for adhering to specific network and security policies.
+
+When this feature is configured, the volume populator will only select a host from the dedicated list to map the target PVC's LUN and execute the `vmkfstools` XCOPY command. The chosen host must have access to the datastore of the source VMDK. If the setting is omitted, the populator will select any suitable ESXi host that has access to the required storage.
+
+### Configuration
+
+To specify dedicated hosts, edit your vSphere `Provider` resource and add the `dedicatedOffloadMigrationHosts` key to the `spec.settings` map. The value should be a comma-separated list of ESXi hostnames as they appear in vCenter.
+
+**Example `Provider` configuration:**
+
+```yaml
+apiVersion: forklift.konveyor.io/v1beta1
+kind: Provider
+metadata:
+  name: my-vsphere-provider
+  namespace: openshift-mtv
+spec:
+  type: vsphere
+  url: https://your-vcenter.example.com/sdk
+  secret:
+    name: vsphere-credentials
+    namespace: openshift-mtv
+  settings:
+    # randomly select one of the list for migration
+    dedicatedOffloadMigrationHosts: "host-1234,host-5678"
+```
+
 # Setup copy offload
 - Set the feature flag
   `oc patch forkliftcontrollers.forklift.konveyor.io forklift-controller --type merge -p '{"spec": {"feature_copy_offload": "true"}}' -n openshift-mtv`
@@ -246,4 +294,4 @@ Provider specific entries in the secret shall be documented below:
   ...
   ```
   Try to set a mgmt interface for the SVM and put that hostname in the STORAGE_HOSTNAME
-
+nd put that hostname in the STORAGE_HOSTNAME

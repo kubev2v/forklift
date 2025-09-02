@@ -4389,6 +4389,11 @@ spec:
             type: object
           spec:
             properties:
+              migrationHost:
+                description: |-
+                  MigrationHost is the name of the ESX through which the storage offload
+                  migration executes. Use this with combination of Provider.Spec.Settings.MigrationHosts
+                type: string
               secretName:
                 description: The secret name with vsphere and storage credentials
                 type: string

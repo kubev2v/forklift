@@ -123,9 +123,9 @@ func TestPopulate(t *testing.T) {
 	progress := make(chan uint)
 	quit := make(chan error)
 
-	mockPopulator.EXPECT().Populate("vm-1", "source.vmdk", pv, progress, quit).Return(nil)
+	mockPopulator.EXPECT().Populate("vm-1", "", "source.vmdk", pv, progress, quit).Return(nil)
 
-	err := mockPopulator.Populate("vm-1", "source.vmdk", pv, progress, quit)
+	err := mockPopulator.Populate("vm-1", "", "source.vmdk", pv, progress, quit)
 	if err != nil {
 		t.Errorf("Populate() error = %v, wantErr %v", err, false)
 	}

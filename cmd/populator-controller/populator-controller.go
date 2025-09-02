@@ -149,6 +149,10 @@ func getVXPopulatorPodArgs(_ bool, u *unstructured.Unstructured, pvc corev1.Pers
 		"--secret-name=" + xcopy.Spec.SecretName,
 		"--storage-vendor-product=" + xcopy.Spec.StorageVendorProduct,
 	}
+	if xcopy.Spec.MigrationHost != "" {
+		args = append(args, "--migration-host="+xcopy.Spec.MigrationHost)
+
+	}
 	return args, nil
 }
 

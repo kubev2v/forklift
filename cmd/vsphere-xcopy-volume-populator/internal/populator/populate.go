@@ -5,12 +5,16 @@ import (
 	"strings"
 )
 
+//go:generate go run go.uber.org/mock/mockgen -destination=populator_mocks/populator_mock.go -package=mocks . Populator
 type Populator interface {
 	// Populate will populate the volume identified by volumeHanle with the content of
 	// the sourceVMDKFile.
+	// vmId the vm that has the source vmdk
+	// migrationHostId the ESX that will perform the populaton. If empty the ESX of the vm will be used.
+	// sourceVMDKFile the path to the vmdk file
 	// persistentVolume is a slim version of k8s PersistentVolume created by the CSI driver,
 	// to help identify its underlying LUN in the storage system.
-	Populate(vmId string, sourceVMDKFile string, persistentVolume PersistentVolume, progress chan<- uint, quit chan error) error
+	Populate(vmId string, migrationHostId string, sourceVMDKFile string, persistentVolume PersistentVolume, progress chan<- uint, quit chan error) error
 }
 
 type PersistentVolume struct {

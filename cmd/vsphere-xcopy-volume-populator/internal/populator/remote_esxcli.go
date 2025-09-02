@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
+	"github.com/vmware/govmomi/object"
 	"k8s.io/klog/v2"
 )
 
@@ -55,7 +56,7 @@ func NewWithRemoteEsxcli(storageApi StorageApi, vsphereHostname, vsphereUsername
 
 }
 
-func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, progress chan<- uint, quit chan error) (errFinal error) {
+func (p *RemoteEsxcliPopulator) Populate(vmId string, migrationHostId string, sourceVMDKFile string, pv PersistentVolume, progress chan<- uint, quit chan error) (errFinal error) {
 	// isn't it better to not call close the channel from the caller?
 	defer func() {
 		r := recover()
@@ -72,10 +73,19 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		"Starting to populate using remote esxcli vmkfstools, source vmdk %s target LUN %s",
 		sourceVMDKFile,
 		pv)
-	host, err := p.VSphereClient.GetEsxByVm(context.Background(), vmId)
-	if err != nil {
-		return err
+	var host *object.HostSystem
+	if migrationHostId == "" {
+		host, err = p.VSphereClient.GetEsxByVm(context.Background(), vmId)
+		if err != nil {
+			return err
+		}
+	} else {
+		host, err = p.VSphereClient.GetEsxById(context.Background(), migrationHostId)
+		if err != nil {
+			return err
+		}
 	}
+
 	klog.Infof("Got ESXi host: %s", host)
 
 	err = ensureVib(p.VSphereClient, host, vmDisk.Datastore, VibVersion)
