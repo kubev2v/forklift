@@ -24,7 +24,7 @@ WORKDIR /forklift/cmd/vsphere-xcopy-volume-populator
 RUN CGO_ENABLED=0 go test -c -tags=e2e -o /tests.test ./e2e-tests/tests
 
 # Final stage
-FROM golang:1.24
+FROM golang:1.25
 
 # Set shell with pipefail and error handling for the entire stage
 SHELL ["/bin/bash", "-o", "pipefail", "-e", "-c"]
