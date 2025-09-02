@@ -18,6 +18,10 @@ package provider
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -38,10 +42,13 @@ import (
 	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	libref "github.com/kubev2v/forklift/pkg/lib/ref"
+	"github.com/kubev2v/forklift/pkg/lib/sshkeys"
 	"github.com/kubev2v/forklift/pkg/settings"
+	"golang.org/x/crypto/ssh"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/storage/names"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -258,6 +265,15 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		return
 	}
 
+	// Ensure SSH keys for vSphere providers
+	if provider.Type() == api.VSphere {
+		err = r.ensureSSHKeys(provider)
+		if err != nil {
+			r.Log.Error(err, "failed to ensure SSH keys for vSphere provider")
+			return
+		}
+	}
+
 	// Update the container.
 	err = r.updateContainer(provider)
 	if err != nil {
@@ -458,5 +474,127 @@ func (r *Reconciler) removeVolumeOfOVAServer(provider *api.Provider) error {
 			r.Log.Error(err, "Failed to remove finalizer", "provider", provider)
 		}
 	}
+	return nil
+}
+
+// ensureSSHKeys generates and stores SSH keys for vSphere providers if they don't exist
+func (r *Reconciler) ensureSSHKeys(provider *api.Provider) error {
+	if provider.Type() != api.VSphere {
+		return nil
+	}
+
+	// Use provider name for SSH key naming
+	providerName := provider.Name
+	if providerName == "" {
+		return fmt.Errorf("provider name is empty")
+	}
+
+	// Check if SSH keys already exist
+	privateSecretName, err := sshkeys.GenerateSSHPrivateSecretName(providerName)
+	if err != nil {
+		return fmt.Errorf("failed to generate SSH private secret name: %w", err)
+	}
+	publicSecretName, err := sshkeys.GenerateSSHPublicSecretName(providerName)
+	if err != nil {
+		return fmt.Errorf("failed to generate SSH public secret name: %w", err)
+	}
+
+	_, err = r.getSSHKeySecret(provider.Namespace, privateSecretName)
+	if err == nil {
+		// SSH keys already exist, skip generation
+		r.Log.V(1).Info("SSH keys already exist for provider", "provider", provider.Name)
+		return nil
+	}
+
+	if !k8serr.IsNotFound(err) {
+		return fmt.Errorf("failed to check for existing SSH private key secret: %w", err)
+	}
+
+	// Generate new SSH key pair
+	r.Log.Info("Generating SSH keys for vSphere provider", "provider", provider.Name)
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return fmt.Errorf("failed to generate RSA key: %w", err)
+	}
+
+	// Convert private key to PEM format
+	privateKeyPEM := &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+	}
+	privateKeyBytes := pem.EncodeToMemory(privateKeyPEM)
+
+	// Convert public key to SSH format
+	publicKey, err := ssh.NewPublicKey(&privateKey.PublicKey)
+	if err != nil {
+		return fmt.Errorf("failed to create SSH public key: %w", err)
+	}
+	publicKeyBytes := ssh.MarshalAuthorizedKey(publicKey)
+
+	// Store SSH keys in secrets
+	err = r.storeSSHKeySecret(provider.Namespace, privateSecretName, "private-key", privateKeyBytes, provider)
+	if err != nil {
+		return fmt.Errorf("failed to store private key: %w", err)
+	}
+
+	err = r.storeSSHKeySecret(provider.Namespace, publicSecretName, "public-key", publicKeyBytes, provider)
+	if err != nil {
+		return fmt.Errorf("failed to store public key: %w", err)
+	}
+
+	r.Log.Info("SSH keys generated and stored successfully", "provider", provider.Name)
+	return nil
+}
+
+// getSSHKeySecret retrieves an SSH key secret
+func (r *Reconciler) getSSHKeySecret(namespace, secretName string) (*v1.Secret, error) {
+	secret := &v1.Secret{}
+	key := client.ObjectKey{
+		Namespace: namespace,
+		Name:      secretName,
+	}
+	err := r.Get(context.TODO(), key, secret)
+	return secret, err
+}
+
+// storeSSHKeySecret creates or updates an SSH key secret
+func (r *Reconciler) storeSSHKeySecret(namespace, secretName, keyName string, keyData []byte, provider *api.Provider) error {
+	providerLabel, err := sshkeys.SanitizeProviderName(provider.Name)
+	if err != nil {
+		return fmt.Errorf("failed to sanitize provider name for secret label: %w", err)
+	}
+
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: namespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/name":        "forklift",
+				"app.kubernetes.io/component":   "ssh-keys",
+				"app.kubernetes.io/managed-by":  "forklift-controller",
+				"forklift.konveyor.io/provider": providerLabel,
+			},
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         provider.APIVersion,
+					Kind:               provider.Kind,
+					Name:               provider.Name,
+					UID:                provider.UID,
+					Controller:         &[]bool{true}[0],
+					BlockOwnerDeletion: &[]bool{true}[0],
+				},
+			},
+		},
+		Type: v1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			keyName: keyData,
+		},
+	}
+
+	err = r.Create(context.TODO(), secret)
+	if err != nil && !k8serr.IsAlreadyExists(err) {
+		return fmt.Errorf("failed to create secret %s: %w", secretName, err)
+	}
+
 	return nil
 }

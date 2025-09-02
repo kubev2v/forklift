@@ -2,11 +2,8 @@ package populator
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -18,7 +15,15 @@ var xcopyInitiatorGroup = "xcopy-esxs"
 
 const taskPollingInterval = 5 * time.Second
 
-var progressPattern = regexp.MustCompile(`\s(\d+)\%`)
+// CloneMethod represents the method used for cloning operations
+type CloneMethod string
+
+const (
+	// CloneMethodSSH uses SSH to perform cloning operations
+	CloneMethodSSH CloneMethod = "ssh"
+	// CloneMethodVIB uses VIB to perform cloning operations
+	CloneMethodVIB CloneMethod = "vib"
+)
 
 type vmkfstoolsClone struct {
 	Pid    int    `json:"pid"`
@@ -41,6 +46,11 @@ type EsxCli interface {
 type RemoteEsxcliPopulator struct {
 	VSphereClient vmware.Client
 	StorageApi    StorageApi
+	// SSH-related fields (only used when using SSH method)
+	SSHPrivateKey []byte
+	SSHPublicKey  []byte
+	UseSSHMethod  bool
+	SSHTimeout    time.Duration
 }
 
 func NewWithRemoteEsxcli(storageApi StorageApi, vsphereHostname, vsphereUsername, vspherePassword string) (Populator, error) {
@@ -51,8 +61,27 @@ func NewWithRemoteEsxcli(storageApi StorageApi, vsphereHostname, vsphereUsername
 	return &RemoteEsxcliPopulator{
 		VSphereClient: c,
 		StorageApi:    storageApi,
+		UseSSHMethod:  false,            // VIB method
+		SSHTimeout:    30 * time.Second, // Default timeout (not used for VIB method)
 	}, nil
+}
 
+func NewWithRemoteEsxcliSSH(storageApi StorageApi, vsphereHostname, vsphereUsername, vspherePassword string, sshPrivateKey, sshPublicKey []byte, sshTimeoutSeconds int) (Populator, error) {
+	c, err := vmware.NewClient(vsphereHostname, vsphereUsername, vspherePassword)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create vmware client: %w", err)
+	}
+	if len(sshPrivateKey) == 0 || len(sshPublicKey) == 0 {
+		return nil, fmt.Errorf("ssh key material must be non-empty")
+	}
+	return &RemoteEsxcliPopulator{
+		VSphereClient: c,
+		StorageApi:    storageApi,
+		SSHPrivateKey: sshPrivateKey,
+		SSHPublicKey:  sshPublicKey,
+		UseSSHMethod:  true,
+		SSHTimeout:    time.Duration(sshTimeoutSeconds) * time.Second,
+	}, nil
 }
 
 func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, progress chan<- uint, quit chan error) (errFinal error) {
@@ -68,8 +97,20 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	if err != nil {
 		return err
 	}
+
+	var cloneMethod CloneMethod
+	klog.Infof("Debug: UseSSHMethod field value: %t", p.UseSSHMethod)
+	if p.UseSSHMethod {
+		cloneMethod = CloneMethodSSH
+		klog.Infof("Debug: Set cloneMethod to SSH")
+	} else {
+		cloneMethod = CloneMethodVIB
+		klog.Infof("Debug: Set cloneMethod to VIB")
+	}
+
 	klog.Infof(
-		"Starting to populate using remote esxcli vmkfstools, source vmdk %s target LUN %s",
+		"Starting populate via remote esxcli vmkfstools (%s), source vmdk=%s, pv=%v",
+		cloneMethod,
 		sourceVMDKFile,
 		pv)
 	host, err := p.VSphereClient.GetEsxByVm(context.Background(), vmId)
@@ -78,10 +119,14 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	}
 	klog.Infof("Got ESXi host: %s", host)
 
-	err = ensureVib(p.VSphereClient, host, vmDisk.Datastore, VibVersion)
-	if err != nil {
-		return fmt.Errorf("failed to ensure VIB is installed: %w", err)
+	// Only ensure VIB if using VIB method
+	if !p.UseSSHMethod {
+		err = ensureVib(p.VSphereClient, host, vmDisk.Datastore, VibVersion)
+		if err != nil {
+			return fmt.Errorf("failed to ensure VIB is installed: %w", err)
+		}
 	}
+
 	// for iSCSI add the host to the group using IQN. Is there something else for FC?
 	r, err := p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "adapter", "list"})
 	if err != nil {
@@ -217,22 +262,22 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	klog.Infof("resolved lun with IQN %s to lun %s", lun.IQN, targetLUN)
 
 	retries := 5
-	for i := 1; i < retries; i++ {
-		_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", lun.NAA})
+	for i := 1; i <= retries; i++ {
+		_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", targetLUN})
 		if err == nil {
-			klog.Infof("found device %s", lun.NAA)
+			klog.Infof("found device %s", targetLUN)
 			break
 		} else {
 			_, err = p.VSphereClient.RunEsxCommand(
 				context.Background(), host, []string{"storage", "core", "adapter", "rescan", "-t", "add", "-a", "1"})
 			if err != nil {
-				klog.Errorf("failed to rescan for adapters, atepmt %d/%d due to: %s", i, retries, err)
+				klog.Errorf("failed to rescan for adapters, attempt %d/%d due to: %s", i, retries, err)
 				time.Sleep(5 * time.Second)
 			}
 		}
 	}
 	if err != nil {
-		return fmt.Errorf("failed to find the device %s after scanning: %w", lun.NAA, err)
+		return fmt.Errorf("failed to find the device %s after scanning: %w", targetLUN, err)
 	}
 
 	defer func() {
@@ -248,9 +293,9 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		// map the LUN back to the original OCP worker
 		klog.Infof("about to map the volume back to the originalInitiatorGroups, which are: %s", originalInitiatorGroups)
 		for _, group := range originalInitiatorGroups {
-			_, err := p.StorageApi.Map(group, lun, mappingContext)
-			if err != nil {
-				klog.Warningf("failed to map the volume back the original holder - this may cause problems: %v", err)
+			_, errMap := p.StorageApi.Map(group, lun, mappingContext)
+			if errMap != nil {
+				klog.Warningf("failed to map the volume back the original holder - this may cause problems: %v", errMap)
 			}
 		}
 		// unmap devices appear dead in ESX right after they are unmapped, now
@@ -266,70 +311,45 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		}
 	}()
 
-	r, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"vmkfstools", "clone", "-s", vmDisk.Path(), "-t", targetLUN})
-	if err != nil {
-		klog.Infof("error during copy, response from esxcli %+v", r)
-		return err
-	}
+	// Execute the clone using the unified task handling approach
+	var executor TaskExecutor
+	if p.UseSSHMethod {
+		sshSetupCtx, sshCancel := context.WithTimeout(context.Background(), p.SSHTimeout)
+		defer sshCancel()
 
-	response := ""
-	klog.Info("respose from esxcli ", r)
-	for _, l := range r {
-		response += l.Value("message")
-	}
-
-	v := vmkfstoolsClone{}
-	err = json.Unmarshal([]byte(response), &v)
-	if err != nil {
-		return err
-	}
-
-	if v.TaskId != "" {
-		defer func() {
-			klog.Info("cleaning up task artifacts")
-			r, errClean := p.VSphereClient.RunEsxCommand(context.Background(),
-				host, []string{"vmkfstools", "taskClean", "-i", v.TaskId})
-			if errClean != nil {
-				klog.Errorf("failed cleaning up task artifacts %v", r)
-			}
-		}()
-	}
-	for {
-		r, err = p.VSphereClient.RunEsxCommand(context.Background(),
-			host, []string{"vmkfstools", "taskGet", "-i", v.TaskId})
+		// Setup secure script
+		finalScriptPath, err := ensureSecureScript(sshSetupCtx, p.VSphereClient, host, vmDisk.Datastore)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to ensure secure script: %w", err)
 		}
-		response := ""
-		klog.Info("respose from esxcli ", r)
-		for _, l := range r {
-			response += l.Value("message")
-		}
-		v := vmkfstoolsTask{}
-		err = json.Unmarshal([]byte(response), &v)
+		klog.V(2).Infof("Secure script ready at path: %s", finalScriptPath)
+
+		// Enable SSH access
+		err = vmware.EnableSSHAccess(sshSetupCtx, p.VSphereClient, host, p.SSHPrivateKey, p.SSHPublicKey, finalScriptPath)
 		if err != nil {
-			klog.Errorf("failed to unmarshal response from esxcli %+v", r)
-			return err
+			return fmt.Errorf("failed to enable SSH access: %w", err)
 		}
 
-		klog.Infof("respose from esxcli %+v", v)
-
-		// exmple output - Clone: 20% done.
-		match := progressPattern.FindStringSubmatch(v.LastLine)
-		if len(match) > 1 {
-			i, _ := strconv.Atoi(match[1])
-			progress <- uint(i)
+		// Get host IP
+		hostIP, err := vmware.GetHostIPAddress(sshSetupCtx, host)
+		if err != nil {
+			return fmt.Errorf("failed to get host IP address: %w", err)
 		}
 
-		if v.ExitCode != "" {
-			if v.ExitCode == "0" {
-				err = nil
-			} else {
-				err = fmt.Errorf("failed with exit code %s with stderr: %s", v.ExitCode, v.Stderr)
-			}
-			return err
+		// Create SSH client with background context (no timeout for long-running operations)
+		sshClient := vmware.NewSSHClient()
+		err = sshClient.Connect(context.Background(), hostIP, "root", p.SSHPrivateKey)
+		if err != nil {
+			return fmt.Errorf("failed to connect via SSH: %w", err)
 		}
+		defer sshClient.Close()
 
-		time.Sleep(taskPollingInterval)
+		klog.V(2).Infof("SSH connection established with restricted commands")
+		executor = NewSSHTaskExecutor(sshClient)
+	} else {
+		executor = NewVIBTaskExecutor(p.VSphereClient)
 	}
+
+	// Use unified task execution
+	return ExecuteCloneTask(context.Background(), executor, host, vmDisk.Path(), targetLUN, progress)
 }
