@@ -46,3 +46,32 @@ __pycache__
 # ignore intermediate manifests
 operator/streams/**/upstream_manifests
 operator/streams/**/downstream_manifests
+
+# ignore tekton pipelines
+.tekton/forklift-api-dev-preview-pull-request.yaml-e
+.tekton/forklift-api-dev-preview-push.yaml-e
+.tekton/forklift-controller-dev-preview-pull-request.yaml-e
+.tekton/forklift-controller-dev-preview-push.yaml-e
+.tekton/forklift-operator-bundle-dev-preview-pull-request.yaml-e
+.tekton/forklift-operator-bundle-dev-preview-push.yaml-e
+.tekton/forklift-operator-dev-preview-pull-request.yaml-e
+.tekton/forklift-operator-dev-preview-push.yaml-e
+.tekton/forklift-operator-virt-v2v-btrfs-comp-pull-request.yaml-e
+.tekton/forklift-operator-virt-v2v-btrfs-comp-push.yaml-e
+.tekton/openstack-populator-dev-preview-pull-request.yaml-e
+.tekton/openstack-populator-dev-preview-push.yaml-e
+.tekton/ova-provider-server-dev-preview-pull-request.yaml-e
+.tekton/ova-provider-server-dev-preview-push.yaml-e
+.tekton/ovirt-populator-dev-preview-pull-request.yaml-e
+.tekton/ovirt-populator-dev-preview-push.yaml-e
+.tekton/populator-controller-dev-preview-pull-request.yaml-e
+.tekton/populator-controller-dev-preview-push.yaml-e
+.tekton/validation-dev-preview-pull-request.yaml-e
+.tekton/validation-dev-preview-push.yaml-e
+.tekton/virt-v2v-dev-preview-pull-request.yaml-e
+.tekton/virt-v2v-dev-preview-push.yaml-e
+.tekton/vsphere-xcopy-volume-populator-dev-preview-pull-request.yaml-e
+.tekton/vsphere-xcopy-volume-populator-dev-preview-push.yaml-e
+
+# passwords directories
+.passwords/

@@ -139,12 +139,248 @@ Create a secret where the migration provider is setup, usually openshift-mtv
 and put the credentials of the storage system. All of the provider are required
 to have a secret with those required fields
 
+| Key | Value | Mandatory | Default |
+| --- | --- | --- | --- |
+| STORAGE_HOSTNAME | ip/hostname | y | |
+| STORAGE_USERNAME | string | y | |
+| STORAGE_PASSWORD | string | y | |
+| STORAGE_SKIP_SSL_VERIFICATION | true/false | n | false |
+
+# Clone Methods: VIB vs SSH
+
+The vsphere-xcopy-volume-populator supports two methods for executing vmkfstools clone operations on ESXi hosts:
+
+## VIB Method (Default)
+Uses a custom VIB (vSphere Installation Bundle) installed on ESXi hosts to expose vmkfstools operations via the vSphere API.
+
+## SSH Method
+Uses SSH to directly execute vmkfstools commands on ESXi hosts. This method is useful when VIB installation is not possible or preferred.
+
+## Configuring Clone Method
+
+The clone method is configured in the Provider settings using the `esxiCloneMethod` key:
+
+```yaml
+apiVersion: forklift.konveyor.io/v1beta1
+kind: Provider
+metadata:
+  name: my-vsphere-provider
+  namespace: openshift-mtv
+spec:
+  type: vsphere
+  url: https://vcenter.example.com
+  secret:
+    name: vsphere-credentials
+    namespace: openshift-mtv
+  settings:
+    esxiCloneMethod: "vib"  # or "ssh". The default is "vib"
 ```
-STORAGE_HOSTNAME
-STORAGE_USERNAME
-STORAGE_PASSWORD
-STORAGE_SKIP_SSL_VERIFICATION
+
+# SSH Method Setup
+
+When using the SSH method (`esxiCloneMethod: "ssh"`), SSH keys are **automatically generated** during the Provider reconciliation process. No manual key generation is required.
+
+## 1. Automatic SSH Key Generation
+
+SSH keys are automatically generated and stored when you create or update a vSphere Provider:
+
+- **2048-bit RSA key pairs** are generated automatically
+- Keys are stored in **separate Kubernetes secrets** in the Provider's namespace
+- Keys are **automatically injected** into migration pods as needed
+
+## 2. SSH Secret Names
+
+SSH keys are stored in secrets with predictable names based on your vSphere Provider Name:
+
+| Secret Type | Naming Pattern                             | Contains |
+| --- |--------------------------------------------| --- |
+| Private Key | `offload-ssh-keys-{provider-name}-private` | `private-key`: RSA private key in PEM format |
+| Public Key | `offload-ssh-keys-{proider-name}-public`   | `public-key`: SSH public key in authorized_keys format |
+
+**Example**: For a Provider with Name `vcenter-example`, the secrets would be:
+- `offload-ssh-keys-vcenter-example-private`
+- `offload-ssh-keys-vcenter-example-public`
+
+## 3. Finding Your SSH Secrets
+
+To find the SSH secrets for your vSphere Provider:
+
+```bash
+# List all SSH key secrets in the Provider namespace
+oc get secrets -l app.kubernetes.io/component=ssh-keys -n openshift-mtv
+
+# View a specific private key secret (replace with your actual secret name)
+oc get secret offload-ssh-keys-vcenter-example-private -o yaml -n openshift-mtv
+
+# View a specific public key secret (replace with your actual secret name)
+oc get secret offload-ssh-keys-vcenter-example-public -o yaml -n openshift-mtv
 ```
+
+## 4. Optional: Customizing SSH Keys
+
+If you need to replace the auto-generated keys with your own:
+
+```bash
+# Generate your own key pair (if needed)
+ssh-keygen -t rsa -b 4096 -f custom_esxi_key -N ""
+
+# Replace the private key secret (use your actual secret name)
+oc create secret generic offload-ssh-keys-vcenter-example-private \
+  --from-file=private-key=custom_esxi_key \
+  --dry-run=client -o yaml | oc replace -f - -n openshift-mtv
+
+# Replace the public key secret (use your actual secret name)
+oc create secret generic offload-ssh-keys-vcenter-example-public \
+  --from-file=public-key=custom_esxi_key.pub \
+  --dry-run=client -o yaml | oc replace -f - -n openshift-mtv
+```
+
+## 5. SSH Timeout Configuration
+
+You can configure the SSH timeout by adding it to your Provider secret (the main storage credentials secret):
+
+```bash
+# Add SSH timeout to existing Provider secret
+oc patch secret vsphere-credentials -p '{"data":{"SSH_TIMEOUT_SECONDS":"'$(echo -n "60" | base64)'"}}' -n openshift-mtv
+```
+
+## 6. ESXi Host Requirements
+
+### SSH Service
+SSH must be enabled on ESXi hosts for the SSH method to work:
+
+```bash
+# Via ESXi shell:
+vim-cmd hostsvc/enable_ssh
+vim-cmd hostsvc/start_ssh
+
+# Via vSphere Client:
+# Host → Configure → Services → SSH Client → Start
+```
+
+### SSH Setup Requirements
+The SSH method requires:
+1. **SSH service must be manually enabled** on ESXi hosts (see commands above)
+2. **Manual SSH key deployment** - the system will provide instructions in logs if keys need to be installed
+3. Once SSH and keys are configured, the system sets up secure command restrictions automatically
+
+**Important**: SSH service enablement and initial key deployment must be done manually. The system will detect missing keys and provide step-by-step instructions in the logs.
+
+## 7. Manual SSH Key Installation
+
+You can prepare your hosts for the SSH method by manually adding the restricted SSH key to your ESXi hosts using the following steps. 
+
+**Note**: A simpler approach is to let one migration fail and follow the instructions in the populator pod logs - they will have the exact key and datastore path filled in for you.
+
+If you want to configure SSH keys prior to the first migration:
+
+### Step 1: Extract the Public Key
+
+First, get the public key from the auto-generated secret:
+
+```bash
+# List SSH key secrets to find the right one
+oc get secrets -l app.kubernetes.io/component=ssh-keys -n openshift-mtv
+
+# Extract the public key (replace with your actual secret name)
+oc get secret offload-ssh-keys-vcenter-example-public \
+  -o jsonpath='{.data.public-key}' -n openshift-mtv | base64 -d > esxi_public_key.pub
+
+# View the public key
+cat esxi_public_key.pub
+```
+
+### Step 2: Prepare the Restricted Key Entry
+
+The system requires command restrictions for security. Create the restricted key entry:
+
+```bash
+# The public key needs to be prefixed with command restrictions
+# The script path will be: /vmfs/volumes/{datastore-name}/secure-vmkfstools-wrapper.py
+# Replace {datastore-name} with your actual datastore name
+echo 'command="python /vmfs/volumes/datastore1/secure-vmkfstools-wrapper.py",no-port-forwarding,no-agent-forwarding,no-X11-forwarding '$(cat esxi_public_key.pub) > restricted_key.pub
+
+# View the final restricted key
+cat restricted_key.pub
+```
+
+### Step 3: Install the Key on ESXi Host
+
+Connect to each ESXi host and install the key:
+
+```bash
+# SSH to the ESXi host as root
+ssh root@esxi-host-ip
+
+# Add the restricted public key to authorized_keys
+# Copy the content from restricted_key.pub and paste it into the file
+vi /etc/ssh/keys-root/authorized_keys
+```
+
+### Step 4: Alternative - One-Command Installation
+
+If you have network access from your local machine to the ESXi host:
+
+```bash
+# Copy the restricted key directly (replace with your ESXi IP)
+cat restricted_key.pub | ssh root@esxi-host-ip \
+  'cat >> /etc/ssh/keys-root/authorized_keys'
+```
+
+### Step 5: Verify Installation
+
+Test the SSH key installation:
+
+```bash
+# Test SSH connection using the private key
+# Extract private key from secret first
+oc get secret offload-ssh-keys-vcenter-example-private \
+  -o jsonpath='{.data.private-key}' -n openshift-mtv | base64 -d > esxi_private_key
+
+# Set proper permissions
+chmod 600 esxi_private_key
+
+# Test connection
+ssh -i esxi_private_key root@esxi-host-ip
+
+# If successful, you should be connected with restricted commands
+# Try a test command (should be restricted to the secure script)
+```
+
+### Step 6: Cleanup Local Files
+
+After installation, clean up the key files:
+
+```bash
+# Remove local key files for security
+rm -f esxi_public_key.pub restricted_key.pub esxi_private_key
+```
+
+### Important Notes
+
+- The public key must include command restrictions for security
+- The command path in the restrictions must match the secure script path: `/vmfs/volumes/{datastore-name}/secure-vmkfstools-wrapper.py`
+- Each ESXi host in your migration environment needs the key installed
+- SSH service must be enabled on all target ESXi hosts
+
+## 8. Security Considerations
+
+### SSH Key Security
+- Store SSH private keys securely in Kubernetes secrets
+- Use separate key pairs for different environments
+- Rotate keys periodically
+- Consider using shorter-lived keys for enhanced security
+
+### ESXi Access Control
+- Commands are restricted to vmkfstools operations only
+
+## 9. SSH Method Advantages
+
+- **No VIB Installation**: Doesn't require custom VIB deployment on ESXi hosts
+- **Standard SSH**: Uses standard ESXi SSH service (no custom components)
+- **Security**: Uses secure key-based authentication with command restrictions
+- **Compatibility**: Works with any ESXi version that supports SSH
+- **Flexibility**: Easier to troubleshoot and monitor SSH connections
 
 Provider specific entries in the secret shall be documented below:
 
@@ -209,6 +445,54 @@ or the openshift-operators namespace.
   ```
   
     resolution: ssh into the ESXi and run `/etc/init.d/hostd restart`. Wait for few seconds till the ESX renews the connection with vSphere.
+
+## SSH Method
+- **Error**: `manual SSH key configuration required` or `failed to connect via SSH`
+  
+  **Causes and Solutions**:
+  1. **SSH service disabled**: Manually enable SSH on the ESXi host using the commands in section 6
+  2. **SSH keys not deployed**: Follow the manual instructions provided in the pod logs
+  3. **Network connectivity**: Verify ESXi management network is accessible from migration pods
+  4. **Timeout issues**: Increase `SSH_TIMEOUT_SECONDS` in the Provider secret (default: 30)
+  
+  **Verification steps**:
+  ```bash
+  # Check if SSH service is running on ESXi
+  vim-cmd hostsvc/get_ssh_status
+  
+  # Manually test SSH connectivity from a migration pod
+  ssh -i /path/to/private_key root@esxi-host-ip
+  ```
+
+- **Error**: `failed to start vmkfstools clone` or `task execution failed`
+  
+  **Causes and Solutions**:
+  1. **Insufficient privileges**: Ensure vSphere user has required privileges (see vSphere User Privileges section)
+  2. **Command restrictions**: The secure script may not have been deployed properly
+  3. **Datastore access**: Verify the ESXi host has access to both source and target datastores
+  
+  **Debugging**:
+  ```bash
+  # Check available vmkfstools commands via SSH
+  ssh root@esxi-host 'which vmkfstools'
+  ssh root@esxi-host 'vmkfstools --help'
+  ```
+
+- **Error**: `SSH connection timeout` or `context deadline exceeded`
+  
+  **Solutions**:
+  1. Increase `SSH_TIMEOUT_SECONDS` in the Provider secret
+  2. Check network latency between migration pods and ESXi hosts
+  3. Verify ESXi host is not overloaded
+  4. Consider using dedicated migration network
+
+- **Security warnings**: `Manual SSH key configuration required`
+  
+  This is expected behavior when SSH keys aren't configured yet. The system will:
+  1. Detect that SSH key authentication isn't working
+  2. Provide detailed instructions in the logs for manual key installation
+  3. Once keys are installed, use secure key-based authentication with command restrictions
+  4. Restrict commands to vmkfstools operations only
 
 ## NetApp
 - Error `cannot derive SVM to use; please specify SVM in config file`
