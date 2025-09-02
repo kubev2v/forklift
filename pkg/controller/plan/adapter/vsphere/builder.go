@@ -2,6 +2,7 @@ package vsphere
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net"
@@ -31,6 +32,7 @@ import (
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
 	libref "github.com/kubev2v/forklift/pkg/lib/ref"
+	"github.com/kubev2v/forklift/pkg/lib/sshkeys"
 	"github.com/kubev2v/forklift/pkg/settings"
 	"github.com/kubev2v/forklift/pkg/templateutil"
 	"github.com/vmware/govmomi/vim25"
@@ -1757,6 +1759,21 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 			dst.Data["GOVMOMI_INSECURE"] = value
 		}
 	}
+
+	// Add provider settings to the secret
+	if esxiCloneMethod, ok := r.Source.Provider.Spec.Settings[api.ESXiCloneMethod]; ok {
+		dst.Data["ESXI_CLONE_METHOD"] = []byte(esxiCloneMethod)
+	}
+
+	// Add SSH keys for vSphere providers
+	if r.Source.Provider.Type() == api.VSphere {
+		err := r.addSSHKeysToSecret(dst)
+		if err != nil {
+			r.Log.Error(err, "Failed to add SSH keys to secret", "secret", dst.Name)
+			// Continue without SSH keys - this will fall back to VIB method or fail gracefully
+		}
+	}
+
 	// Update secret1 with the merged data.
 	if err := r.Destination.Update(context.Background(), dst); err != nil {
 		return fmt.Errorf("failed to update secret1: %w", err)
@@ -1874,5 +1891,58 @@ func (r *Builder) ensurePopulatorServiceAccount(namespace string) error {
 		return err
 	}
 
+	return nil
+}
+
+// addSSHKeysToSecret adds SSH keys from provider controller to the migration secret
+func (r *Builder) addSSHKeysToSecret(secret *core.Secret) error {
+	// Generate secret names based on provider name
+	providerName := r.Source.Provider.Name
+	if providerName == "" {
+		return fmt.Errorf("provider name is empty")
+	}
+
+	privateSecretName, err := sshkeys.GenerateSSHPrivateSecretName(providerName)
+	if err != nil {
+		return fmt.Errorf("error generating private ssh key %v", err)
+	}
+	publicSecretName, err := sshkeys.GenerateSSHPublicSecretName(providerName)
+	if err != nil {
+		return fmt.Errorf("error generating public ssh key %v", err)
+	}
+	// Get SSH private key
+	privateSecret := &core.Secret{}
+	err = r.Get(context.Background(), client.ObjectKey{
+		Name:      privateSecretName,
+		Namespace: r.Source.Provider.Namespace,
+	}, privateSecret)
+	if err != nil {
+		return fmt.Errorf("failed to get SSH private key secret %s: %w", privateSecretName, err)
+	}
+
+	// Get SSH public key
+	publicSecret := &core.Secret{}
+	err = r.Get(context.Background(), client.ObjectKey{
+		Name:      publicSecretName,
+		Namespace: r.Source.Provider.Namespace,
+	}, publicSecret)
+	if err != nil {
+		return fmt.Errorf("failed to get SSH public key secret %s: %w", publicSecretName, err)
+	}
+
+	// Add SSH keys to the migration secret as base64-encoded environment variables
+	if privateKeyData, found := privateSecret.Data["private-key"]; found {
+		secret.Data["SSH_PRIVATE_KEY"] = []byte(base64.StdEncoding.EncodeToString(privateKeyData))
+	} else {
+		return fmt.Errorf("private key not found in secret %s", privateSecretName)
+	}
+
+	if publicKeyData, found := publicSecret.Data["public-key"]; found {
+		secret.Data["SSH_PUBLIC_KEY"] = []byte(base64.StdEncoding.EncodeToString(publicKeyData))
+	} else {
+		return fmt.Errorf("public key not found in secret %s", publicSecretName)
+	}
+
+	r.Log.Info("SSH keys added to migration secret", "secret", secret.Name)
 	return nil
 }
