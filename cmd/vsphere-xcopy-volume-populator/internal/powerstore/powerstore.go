@@ -46,11 +46,11 @@ func (p *PowerstoreClonner) CurrentMappedGroups(targetLUN populator.LUN, mapping
 	klog.Infof("Volume %s is currently mapped to hosts: %v", targetLUN.Name, mappedHosts)
 	hostName, ok := mappingContext[hostNameContextKey].(string)
 	if !ok || hostName == "" {
-		return nil, fmt.Errorf("mappingContext missing %q", hostNameContextKey)
+		return nil, fmt.Errorf("mappingContext missing or empty %q", hostNameContextKey)
 	}
 	initiatorGroup, ok := mappingContext[initiatorGroupContextKey].(string)
 	if !ok || initiatorGroup == "" {
-		return nil, fmt.Errorf("mappingContext missing %q", initiatorGroupContextKey)
+		return nil, fmt.Errorf("mappingContext missing or empty %q", initiatorGroupContextKey)
 	}
 	if slices.Contains(mappedHosts, hostName) {
 		mappedHosts = append(mappedHosts, initiatorGroup)
@@ -179,7 +179,7 @@ func (p *PowerstoreClonner) EnsureClonnerIgroup(initiatorGroup string, adapterId
 	return mappingContext, nil
 }
 
-func getHostByInitiator(adapterIds []string, hosts *[]gopowerstore.Host, initiatorGroup string ) (bool, populator.MappingContext, error) {
+func getHostByInitiator(adapterIds []string, hosts *[]gopowerstore.Host, initiatorGroup string) (bool, populator.MappingContext, error) {
 	for _, host := range *hosts {
 		for _, initiator := range host.Initiators {
 			for _, adapterId := range adapterIds {
@@ -200,13 +200,13 @@ func getHostByInitiator(adapterIds []string, hosts *[]gopowerstore.Host, initiat
 func detectPortType(adapterId string) (gopowerstore.InitiatorProtocolTypeEnum, error) {
 	switch {
 	case strings.HasPrefix(adapterId, "iqn."):
-		return gopowerstore.InitiatorProtocolTypeEnumISCSI
+		return gopowerstore.InitiatorProtocolTypeEnumISCSI, nil
 	case strings.HasPrefix(adapterId, "fc."):
-		return gopowerstore.InitiatorProtocolTypeEnumFC
+		return gopowerstore.InitiatorProtocolTypeEnumFC, nil
 	case strings.HasPrefix(adapterId, "nqn."):
-		return gopowerstore.InitiatorProtocolTypeEnumNVME
+		return gopowerstore.InitiatorProtocolTypeEnumNVME, nil
 	default:
-		return 0, fmt.Errorf("Could not determine port type for adapter ID: %s", adapterId)
+		return gopowerstore.InitiatorProtocolTypeEnumISCSI, fmt.Errorf("Could not determine port type for adapter ID: %s", adapterId)
 	}
 }
 

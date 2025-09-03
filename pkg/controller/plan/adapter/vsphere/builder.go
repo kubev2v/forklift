@@ -1193,30 +1193,58 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 	return
 }
 
-// FIXME rgolan - the behaviour needs to be per disk hense this method is flawed. Needs a bigger change.
-// For now this method returns true, if there's a mapping (backend by copy-offload-mapping ConfigMap, that
-// maps StoragetClasses to Vsphere data stores
-func (r *Builder) SupportsVolumePopulators() bool {
+// Check whether the specific VM supports Volume Populators by examining only the datastores used by this VM.
+// This prevents mixed configuration issues where some VMs have offload-capable datastores and others don't.
+func (r *Builder) SupportsVolumePopulators(vmRef ref.Ref) bool {
 	if !settings.Settings.Features.CopyOffload || r.Plan.Spec.Warm {
 		return false
 	}
+
+	// Get the VM to access its disks
+	vm := &model.VM{}
+	err := r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		klog.Errorf("failed to get VM to detect volume populators support: %s", err)
+		return false
+	}
+
+	if !r.Context.Plan.Spec.MigrateSharedDisks {
+		vm.RemoveSharedDisks()
+	}
+
+	// Build datastore map for lookups
+	dsMap := make(map[string]*api.StoragePair)
 	dsMapIn := r.Context.Map.Storage.Spec.Map
-	for _, m := range dsMapIn {
-		ref := m.Source
+	for i := range dsMapIn {
+		mapped := &dsMapIn[i]
+		ref := mapped.Source
 		ds := &model.Datastore{}
 		err := r.Source.Inventory.Find(ds, ref)
 		if err != nil {
 			klog.Errorf("failed to get datastore to detect volume populators support: %s", err)
 			return false
 		}
+		dsMap[ds.ID] = mapped
+	}
 
-		if m.OffloadPlugin != nil && m.OffloadPlugin.VSphereXcopyPluginConfig != nil {
-			klog.V(2).Infof("found offload plugin: config %+v on ds map  %+v", m.OffloadPlugin.VSphereXcopyPluginConfig, dsMapIn)
-			return true
+	// Check each disk's datastore for offload capability
+	for _, disk := range vm.Disks {
+		mapped, found := dsMap[disk.Datastore.ID]
+		if !found {
+			// Skip unmapped datastores (will be caught by validation elsewhere)
+			continue
+		}
 
+		// If any disk's datastore doesn't have offload capability, we cannot use populators for this VM
+		if mapped.OffloadPlugin == nil || mapped.OffloadPlugin.VSphereXcopyPluginConfig == nil {
+			klog.V(2).Infof("VM %s has disk on datastore %s without offload capability, cannot use volume populators", vmRef.String(), disk.Datastore.ID)
+			return false
 		}
 	}
-	return false
+
+	// All disks are on datastores with offload capability
+	klog.V(2).Infof("VM %s: all disks are on datastores with offload capability, can use volume populators", vmRef.String())
+	return true
 }
 
 // PopulatorVolumes creates PVC in case the their are needed for the disks

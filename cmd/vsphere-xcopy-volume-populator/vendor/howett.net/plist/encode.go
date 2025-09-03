@@ -96,11 +96,11 @@ func NewBinaryEncoder(w io.Writer) *Encoder {
 // Struct values are encoded as dictionaries, with only exported fields being serialized. Struct field encoding may be influenced with the use of tags.
 // The tag format is:
 //
-//     `plist:"<key>[,flags...]"`
+//	`plist:"<key>[,flags...]"`
 //
 // The following flags are supported:
 //
-//     omitempty    Only include the field if it is not set to the zero value for its type.
+//	omitempty    Only include the field if it is not set to the zero value for its type.
 //
 // If the key is "-", the field is ignored.
 //

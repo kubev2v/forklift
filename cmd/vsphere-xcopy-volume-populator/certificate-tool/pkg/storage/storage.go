@@ -35,7 +35,7 @@ func StorageInfo(credentials StorageCredentials) (Storage, error) {
 	case "ontap":
 		i, err := getOntapSystemInfo(credentials.Hostname, credentials.Username, credentials.Password, credentials.SSLSkipVerify)
 		if err != nil {
-			return Storage{},err
+			return Storage{}, err
 		}
 		fmt.Printf("Storage system info %v\n", i)
 		storage.Vendor = "NetApp"
