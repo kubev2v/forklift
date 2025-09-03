@@ -74,3 +74,6 @@ operator/streams/**/downstream_manifests
 .tekton/virt-v2v-dev-preview-push.yaml-e
 .tekton/vsphere-xcopy-volume-populator-dev-preview-pull-request.yaml-e
 .tekton/vsphere-xcopy-volume-populator-dev-preview-push.yaml-e
+
+# passwords directories
+.passwords/
