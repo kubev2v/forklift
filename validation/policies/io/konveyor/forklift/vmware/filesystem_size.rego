@@ -37,7 +37,7 @@ failing_disks_by_space[info] {
     path := disk.diskPath
     free_space := disk.freeSpace
 
-    lower(path) == "c:\\"
+    is_windows_c(path)
     free_space < MIN_SPACE_WINDOWS_C_BYTES
     info := {"disk": disk, "required_mb": 100}
 }
@@ -60,7 +60,11 @@ is_special_disk(path) {
 } else {
     path == "/boot"
 } else {
-    lower(path) == "c:\\"
+    is_windows_c(path)
+}
+
+is_windows_c(path) {
+	lower(path) in {"c:", "c:\\", "c:/"}
 }
 
 concerns[flag] {

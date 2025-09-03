@@ -52,10 +52,32 @@ test_insufficient_boot_space {
     results[_].id == "vmware.guestDisks.freespace"
 }
 
-test_insufficient_windows_c_space {
+test_insufficient_windows_c_backslash_space {
     mock_vm := {
         "guestDisks": [
             {"diskPath": "C:\\", "freeSpace": 99 * 1024 * 1024}
+        ]
+    }
+    results = concerns with input as mock_vm
+    count(results) == 1
+    results[_].id == "vmware.guestDisks.freespace"
+}
+
+test_insufficient_windows_c_space {
+    mock_vm := {
+        "guestDisks": [
+            {"diskPath": "C:", "freeSpace": 99 * 1024 * 1024}
+        ]
+    }
+    results = concerns with input as mock_vm
+    count(results) == 1
+    results[_].id == "vmware.guestDisks.freespace"
+}
+
+test_insufficient_windows_c_forward_slash_space {
+    mock_vm := {
+        "guestDisks": [
+            {"diskPath": "C:/", "freeSpace": 99 * 1024 * 1024}
         ]
     }
     results = concerns with input as mock_vm
