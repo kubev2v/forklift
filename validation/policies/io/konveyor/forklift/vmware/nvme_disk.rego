@@ -10,7 +10,7 @@ concerns[flag] {
     flag := {
         "id": "vmware.disk.nvme.detected",
         "category": "Critical",
-        "label": "Disk NVMe was detcted",
+        "label": "Disk NVMe was detected",
         "assessment": "NVMe disks are not currently supported by MTV. The VM cannot be migrated"
     }
 }
