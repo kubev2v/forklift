@@ -1,6 +1,8 @@
 package io.konveyor.forklift.openstack
 
-test_with_no_vif_model {
+import rego.v1
+
+test_with_no_vif_model if {
 	mock_vm := {
 		"name": "test",
 		"image": {"properties": {}},
@@ -9,7 +11,7 @@ test_with_no_vif_model {
 	count(results) == 0
 }
 
-test_with_supported_e1000 {
+test_with_supported_e1000 if {
 	mock_vm := {
 		"name": "test",
 		"image": {"properties": {"hw_vif_model": "e1000"}},
@@ -18,7 +20,7 @@ test_with_supported_e1000 {
 	count(results) == 0
 }
 
-test_with_unsupported_virtual_e1000 {
+test_with_unsupported_virtual_e1000 if {
 	mock_vm := {
 		"name": "test",
 		"image": {"properties": {"hw_vif_model": "VirtualE1000"}},

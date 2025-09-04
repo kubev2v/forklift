@@ -1,17 +1,19 @@
 package io.konveyor.forklift.ovirt
 
-default vm_has_custom_properties = false
+import rego.v1
 
-vm_has_custom_properties = true {
-    count(input.properties) != 0
+default vm_has_custom_properties := false
+
+vm_has_custom_properties if {
+	count(input.properties) != 0
 }
 
-concerns[flag] {
-    vm_has_custom_properties
-    flag := {
-        "id": "ovirt.vm.custom_properties.detected",
-        "category": "Warning",
-        "label": "VM custom properties detected",
-        "assessment": "The VM is configured with custom properties, which are not currently supported by OpenShift Virtualization."
-    }
+concerns contains flag if {
+	vm_has_custom_properties
+	flag := {
+		"id": "ovirt.vm.custom_properties.detected",
+		"category": "Warning",
+		"label": "VM custom properties detected",
+		"assessment": "The VM is configured with custom properties, which are not currently supported by OpenShift Virtualization.",
+	}
 }

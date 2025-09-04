@@ -1,17 +1,19 @@
 package io.konveyor.forklift.ovirt
 
-default has_usb_enabled = false
+import rego.v1
 
-has_usb_enabled = value {
-   value :=  input.usbEnabled
+default has_usb_enabled := false
+
+has_usb_enabled := value if {
+	value := input.usbEnabled
 }
 
-concerns[flag] {
-    has_usb_enabled
-    flag := {
-        "id": "ovirt.usb.enabled",
-        "category": "Warning",
-        "label": "USB support enabled",
-        "assessment": "The VM has USB support enabled, but USB device attachment is not currently supported by OpenShift Virtualization."
-    }
+concerns contains flag if {
+	has_usb_enabled
+	flag := {
+		"id": "ovirt.usb.enabled",
+		"category": "Warning",
+		"label": "USB support enabled",
+		"assessment": "The VM has USB support enabled, but USB device attachment is not currently supported by OpenShift Virtualization.",
+	}
 }

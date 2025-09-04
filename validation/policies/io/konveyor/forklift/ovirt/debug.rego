@@ -1,5 +1,7 @@
 package io.konveyor.forklift.ovirt
 
-debug {
+import rego.v1
+
+debug if {
 	trace(sprintf("** debug ** vm name: %v", [input.name]))
 }
