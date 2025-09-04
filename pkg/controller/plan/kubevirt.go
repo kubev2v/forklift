@@ -1743,6 +1743,16 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 					MountPath: "/opt",
 				},
 			},
+			Resources: core.ResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceCPU:    resource.MustParse("100m"),
+					core.ResourceMemory: resource.MustParse("128Mi"),
+				},
+				Limits: core.ResourceList{
+					core.ResourceCPU:    resource.MustParse("500m"),
+					core.ResourceMemory: resource.MustParse("512Mi"),
+				},
+			},
 			SecurityContext: &core.SecurityContext{
 				AllowPrivilegeEscalation: &allowPrivilageEscalation,
 				Capabilities: &core.Capabilities{
