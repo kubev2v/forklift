@@ -1,15 +1,14 @@
 package io.konveyor.forklift.openstack
 
-import future.keywords.if
-import future.keywords.in
+import rego.v1
 
-default has_numa_enabled = false
+default has_numa_enabled := false
 
 has_numa_enabled if "hw:pci_numa_affinity_policy" in object.keys(input.flavor.extraSpecs)
 
 has_numa_enabled if "hw:numa_nodes" in object.keys(input.flavor.extraSpecs)
 
-concerns[flag] {
+concerns contains flag if {
 	has_numa_enabled
 	flag := {
 		"id": "openstack.numa_tuning.detected",

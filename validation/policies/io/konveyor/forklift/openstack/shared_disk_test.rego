@@ -1,6 +1,8 @@
 package io.konveyor.forklift.openstack
 
-test_with_no_volumes {
+import rego.v1
+
+test_with_no_volumes if {
 	mock_vm := {
 		"name": "test",
 		"volumes": [],
@@ -9,7 +11,7 @@ test_with_no_volumes {
 	count(results) == 0
 }
 
-test_without_shared_disk {
+test_without_shared_disk if {
 	mock_vm := {
 		"name": "test",
 		"volumes": [
@@ -17,14 +19,14 @@ test_without_shared_disk {
 			{"id": "2", "status": "in-use", "attachments": [{"AttachmentID": "1"}]},
 			{"id": "3", "status": "in-use", "attachments": [{"AttachmentID": "1"}]},
 			{"id": "4", "status": "in-use", "attachments": []},
-			{"id": "5", "status": "in-use" },
+			{"id": "5", "status": "in-use"},
 		],
 	}
 	results := concerns with input as mock_vm
 	count(results) == 0
 }
 
-test_with_shared_disk {
+test_with_shared_disk if {
 	mock_vm := {
 		"name": "test",
 		"volumes": [
@@ -32,7 +34,7 @@ test_with_shared_disk {
 			{"id": "2", "status": "in-use", "attachments": [{"AttachmentID": "1"}]},
 			{"id": "3", "status": "in-use", "attachments": [{"AttachmentID": "1"}]},
 			{"id": "4", "status": "in-use", "attachments": []},
-			{"id": "5", "status": "in-use" },
+			{"id": "5", "status": "in-use"},
 		],
 	}
 	results := concerns with input as mock_vm

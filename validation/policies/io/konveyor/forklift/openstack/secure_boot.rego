@@ -1,14 +1,14 @@
 package io.konveyor.forklift.openstack
 
-import future.keywords.if
+import rego.v1
 
-default secure_boot_enabled = false
+default secure_boot_enabled := false
 
 secure_boot_enabled if input.image.properties.os_secure_boot == "required"
 
 secure_boot_enabled if input.flavor.extraSpecs["os:secure_boot"] == "required"
 
-concerns[flag] {
+concerns contains flag if {
 	secure_boot_enabled
 	flag := {
 		"id": "openstack.secure_boot.detected",

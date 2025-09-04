@@ -1,13 +1,12 @@
 package io.konveyor.forklift.openstack
 
-import future.keywords.if
-import future.keywords.in
+import rego.v1
 
-default has_cpushares_enabled = false
+default has_cpushares_enabled := false
 
 has_cpushares_enabled if "quota:cpu_shares" in object.keys(input.flavor.extraSpecs)
 
-concerns[flag] {
+concerns contains flag if {
 	has_cpushares_enabled
 	flag := {
 		"id": "openstack.cpu.shares.defined",

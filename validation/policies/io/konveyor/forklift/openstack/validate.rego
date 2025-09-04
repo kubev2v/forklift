@@ -1,12 +1,14 @@
 package io.konveyor.forklift.openstack
 
-validate = {
+import rego.v1
+
+validate := {
 	"rules_version": RULES_VERSION,
 	"errors": errors,
 	"concerns": concerns,
 }
 
-errors[message] {
+errors contains message if {
 	not valid_vm_string
 	message := "No VM name found in input body"
 }

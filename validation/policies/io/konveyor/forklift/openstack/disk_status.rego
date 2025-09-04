@@ -1,11 +1,13 @@
 package io.konveyor.forklift.openstack
 
-valid_disk_status[i] {
+import rego.v1
+
+valid_disk_status contains i if {
 	some i
 	regex.match(`available|in-use`, input.volumes[i].status)
 }
 
-concerns[flag] {
+concerns contains flag if {
 	count(valid_disk_status) != count(input.volumes)
 	flag := {
 		"id": "openstack.disk.status.unsupported",

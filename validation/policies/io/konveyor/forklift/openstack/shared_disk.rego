@@ -1,16 +1,18 @@
 package io.konveyor.forklift.openstack
 
+import rego.v1
+
 volumes := input.volumes
 
-shared_disks[i] {
+shared_disks contains i if {
 	some i
 	count(volumes[i].attachments) > 1
 }
 
-concerns[flag] {
+concerns contains flag if {
 	count(shared_disks) > 0
 	flag := {
-	    "id": "openstack.disk.shared.detected",
+		"id": "openstack.disk.shared.detected",
 		"category": "Warning",
 		"label": "Shared disk detected",
 		"assessment": "The VM has a disk that is shared. Shared disks are not currently supported by OpenShift Virtualization.",

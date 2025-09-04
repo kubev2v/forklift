@@ -1,25 +1,27 @@
 package io.konveyor.forklift.openstack
 
-default valid_input = true
+import rego.v1
 
-valid_input = false {
+default valid_input := true
+
+valid_input := false if {
 	is_null(input)
 }
 
-default valid_vm_string = false
+default valid_vm_string := false
 
-valid_vm_string {
+valid_vm_string if {
 	is_string(input.name)
 }
 
-default valid_vm_name = false
+default valid_vm_name := false
 
-valid_vm_name {
+valid_vm_name if {
 	regex.match("^(([A-Za-z0-9][-A-Za-z0-9.]*)?[A-Za-z0-9])?$", input.name)
 	count(input.name) < 64
 }
 
-concerns[flag] {
+concerns contains flag if {
 	valid_input
 	valid_vm_string
 	not valid_vm_name

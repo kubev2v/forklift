@@ -1,6 +1,8 @@
 package io.konveyor.forklift.openstack
 
-test_without_boot_menu_enabled {
+import rego.v1
+
+test_without_boot_menu_enabled if {
 	mock_vm := {
 		"name": "test",
 		"image": {"properties": {"hw_boot_menu": "false"}},
@@ -9,7 +11,7 @@ test_without_boot_menu_enabled {
 	count(results) == 0
 }
 
-test_with_boot_menu_enabled {
+test_with_boot_menu_enabled if {
 	mock_vm := {
 		"name": "test",
 		"image": {"properties": {"hw_boot_menu": "true"}},

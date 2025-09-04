@@ -1,6 +1,8 @@
 package io.konveyor.forklift.openstack
 
-test_without_os_distro_defined {
+import rego.v1
+
+test_without_os_distro_defined if {
 	mock_vm := {
 		"name": "test",
 		"image": {"properties": {"os_version": "6"}},
@@ -9,7 +11,7 @@ test_without_os_distro_defined {
 	count(results) == 0
 }
 
-test_without_os_version_defined {
+test_without_os_version_defined if {
 	mock_vm := {
 		"name": "test",
 		"image": {"properties": {"os_distro": "rhel"}},
@@ -18,7 +20,7 @@ test_without_os_version_defined {
 	count(results) == 0
 }
 
-test_with_unsupported_os_distro {
+test_with_unsupported_os_distro if {
 	mock_vm := {
 		"name": "test",
 		"image": {"properties": {"os_distro": "debian", "os_version": "10"}},
@@ -27,7 +29,7 @@ test_with_unsupported_os_distro {
 	count(results) == 1
 }
 
-test_with_unsupported_os_version {
+test_with_unsupported_os_version if {
 	mock_vm := {
 		"name": "test",
 		"image": {"properties": {"os_distro": "rhel", "os_version": "6"}},
@@ -36,7 +38,7 @@ test_with_unsupported_os_version {
 	count(results) == 1
 }
 
-test_with_supported_rhel {
+test_with_supported_rhel if {
 	mock_vm := {
 		"name": "test",
 		"image": {"properties": {"os_distro": "rhel", "os_version": "9"}},
@@ -45,7 +47,7 @@ test_with_supported_rhel {
 	count(results) == 0
 }
 
-test_with_supported_centos {
+test_with_supported_centos if {
 	mock_vm := {
 		"name": "test",
 		"image": {"properties": {"os_distro": "centos", "os_version": "8-stream"}},
@@ -54,7 +56,7 @@ test_with_supported_centos {
 	count(results) == 0
 }
 
-test_with_supported_fedora {
+test_with_supported_fedora if {
 	mock_vm := {
 		"name": "test",
 		"image": {"properties": {"os_distro": "fedora", "os_version": "38"}},
@@ -63,7 +65,7 @@ test_with_supported_fedora {
 	count(results) == 0
 }
 
-test_with_supported_windows {
+test_with_supported_windows if {
 	mock_vm := {
 		"name": "test",
 		"image": {"properties": {"os_distro": "windows", "os_version": "10"}},

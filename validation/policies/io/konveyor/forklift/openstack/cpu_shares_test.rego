@@ -1,6 +1,8 @@
 package io.konveyor.forklift.openstack
 
-test_without_cpushares_defined {
+import rego.v1
+
+test_without_cpushares_defined if {
 	mock_vm := {
 		"name": "test",
 		"flavor": {"extraSpecs": {}},
@@ -9,7 +11,7 @@ test_without_cpushares_defined {
 	count(results) == 0
 }
 
-test_with_cpushares_enabled {
+test_with_cpushares_enabled if {
 	mock_vm := {
 		"name": "test",
 		"flavor": {"extraSpecs": {"quota:cpu_shares": "1000"}},
@@ -18,7 +20,7 @@ test_with_cpushares_enabled {
 	count(results) == 1
 }
 
-test_with_cpushares_empty {
+test_with_cpushares_empty if {
 	mock_vm := {
 		"name": "test",
 		"flavor": {"extraSpecs": {"quota:cpu_shares": ""}},

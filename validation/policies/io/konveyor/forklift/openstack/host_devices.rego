@@ -1,13 +1,12 @@
 package io.konveyor.forklift.openstack
 
-import future.keywords.if
-import future.keywords.in
+import rego.v1
 
-default host_devices = false
+default host_devices := false
 
 host_devices if "pci_passthrough:alias" in object.keys(input.flavor.extraSpecs)
 
-concerns[flag] {
+concerns contains flag if {
 	host_devices
 	flag := {
 		"id": "openstack.host_devices.mapped",

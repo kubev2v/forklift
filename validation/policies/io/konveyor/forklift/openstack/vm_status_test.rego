@@ -1,6 +1,8 @@
 package io.konveyor.forklift.openstack
 
-test_with_first_valid_status {
+import rego.v1
+
+test_with_first_valid_status if {
 	mock_vm := {
 		"name": "test",
 		"status": "ACTIVE",
@@ -9,7 +11,7 @@ test_with_first_valid_status {
 	count(results) == 0
 }
 
-test_with_second_valid_status {
+test_with_second_valid_status if {
 	mock_vm := {
 		"name": "test",
 		"status": "SHUTOFF",
@@ -18,7 +20,7 @@ test_with_second_valid_status {
 	count(results) == 0
 }
 
-test_with_invalid_status {
+test_with_invalid_status if {
 	mock_vm := {
 		"name": "test",
 		"status": "PAUSED",

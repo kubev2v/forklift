@@ -1,5 +1,5 @@
 FROM registry.access.redhat.com/ubi9-minimal:9.6-1752587672
-RUN curl -L https://github.com/open-policy-agent/opa/releases/download/v0.62.1/opa_linux_amd64 > /usr/bin/opa
+RUN curl -L https://github.com/open-policy-agent/opa/releases/download/v1.8.0/opa_linux_amd64 > /usr/bin/opa
 RUN chmod +x /usr/bin/opa
 COPY validation/policies /usr/share/opa/policies/
 COPY validation/entrypoint.sh /usr/bin/
