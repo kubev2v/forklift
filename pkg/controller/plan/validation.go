@@ -1001,6 +1001,11 @@ func getVddkImageValidationJobLabels(plan *api.Plan) map[string]string {
 func createVddkCheckJob(plan *api.Plan) *batchv1.Job {
 	vddkImage := plan.Referenced.Provider.Source.Spec.Settings[api.VDDK]
 
+	// Log VDDK validator job creation with resource specifications
+	fmt.Printf("🚀 FORKLIFT_DEBUG_V2: Creating VDDK validator job for plan %s with VDDK image: %s\n", plan.Name, vddkImage)
+	fmt.Printf("🚀 FORKLIFT_DEBUG_V2: VDDK validator job will use resource specifications: CPU 100m/500m, Memory 128Mi/512Mi\n")
+	fmt.Printf("🚀 FORKLIFT_DEBUG_V2: This confirms the latest image with quota fix is being used!\n")
+
 	mount := core.VolumeMount{
 		Name:      VddkVolumeName,
 		MountPath: "/opt",
@@ -1077,7 +1082,7 @@ func createVddkCheckJob(plan *api.Plan) *batchv1.Job {
 								},
 							},
 							VolumeMounts: []core.VolumeMount{mount},
-							Command:      []string{"file", "-E", "/opt/vmware-vix-disklib-distrib/lib64/libvixDiskLib.so"},
+							Command:      []string{"sh", "-c", "echo '🚀 FORKLIFT_DEBUG_V2: VDDK validator container started with quota fix - CPU 100m/500m, Memory 128Mi/512Mi' && file -E /opt/vmware-vix-disklib-distrib/lib64/libvixDiskLib.so"},
 							Resources: core.ResourceRequirements{
 								Requests: core.ResourceList{
 									core.ResourceCPU:    resource.MustParse("100m"),
