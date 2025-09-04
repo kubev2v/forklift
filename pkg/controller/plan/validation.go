@@ -57,6 +57,7 @@ const (
 	VMStorageNotSupported         = "VMStorageNotSupported"
 	VMMultiplePodNetworkMappings  = "VMMultiplePodNetworkMappings"
 	VMMissingGuestIPs             = "VMMissingGuestIPs"
+	VMIpNotMatchingUdnSubnet      = "VMIpNotMatchingUdnSubnet"
 	VMMissingChangedBlockTracking = "VMMissingChangedBlockTracking"
 	VMHasSnapshots                = "VMHasSnapshots"
 	HostNotReady                  = "HostNotReady"
@@ -600,6 +601,14 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "Guest information on vNICs is missing, cannot preserve static IPs. If this machine has static IP, make sure VMware tools are installed and the VM is running.",
 		Items:    []string{},
 	}
+	vmIpDoesNotMatchUdnSubnet := libcnd.Condition{
+		Type:     VMIpNotMatchingUdnSubnet,
+		Status:   True,
+		Reason:   NotValid,
+		Category: api.CategoryWarn,
+		Message:  "VM IP does not match with the primary UDN subnet",
+		Items:    []string{},
+	}
 	missingCbtForWarm := libcnd.Condition{
 		Type:     VMMissingChangedBlockTracking,
 		Status:   True,
@@ -943,6 +952,14 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			sharedDisks.Type = fmt.Sprintf("%s-%s", sharedDisks.Type, ref.ID)
 			sharedDisksConditions = append(sharedDisksConditions, sharedDisks)
 		}
+
+		ok, err = validator.UdnStaticIPs(*ref, ctx.Destination.Client)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			vmIpDoesNotMatchUdnSubnet.Items = append(vmIpDoesNotMatchUdnSubnet.Items, ref.String())
+		}
 		// Destination.
 		provider = plan.Referenced.Provider.Destination
 		if provider == nil {
@@ -1065,6 +1082,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(missingCbtForWarm.Items) > 0 {
 		plan.Status.SetCondition(missingCbtForWarm)
+	}
+	if len(vmIpDoesNotMatchUdnSubnet.Items) > 0 {
+		plan.Status.SetCondition(vmIpDoesNotMatchUdnSubnet)
 	}
 	if len(vmHasSnapshotsForWarm.Items) > 0 {
 		plan.Status.SetCondition(vmHasSnapshotsForWarm)

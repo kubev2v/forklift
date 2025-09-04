@@ -3,6 +3,7 @@ package vsphere
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -659,7 +660,6 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	if err != nil {
 		return
 	}
-
 	if object.Template == nil {
 		object.Template = &cnv.VirtualMachineInstanceTemplateSpec{}
 	}
@@ -683,9 +683,27 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	return
 }
 
+func isIPv4(address string) bool {
+	ip := net.ParseIP(address)
+	return ip != nil && ip.To4() != nil
+}
+
+func (r *Builder) findInterfaceIps(vm *model.VM, nic vsphere.NIC) []string {
+	var interfaceIps []string
+	for _, net := range vm.GuestNetworks {
+		if net.DeviceConfigId == nic.DeviceKey {
+			if isIPv4(net.IP) {
+				interfaceIps = append(interfaceIps, net.IP)
+			}
+		}
+	}
+	return interfaceIps
+}
+
 func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err error) {
 	var kNetworks []cnv.Network
 	var kInterfaces []cnv.Interface
+	var staticIpInterfaces = make(map[string][]string)
 
 	numNetworks := 0
 	hasUDN := r.Plan.DestinationHasUdnNetwork(r.Destination)
@@ -728,6 +746,12 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 				kInterface.Binding = &cnv.PluginBinding{
 					Name: planbase.UdnL2bridge,
 				}
+				if r.Plan.Spec.PreserveStaticIPs {
+					ips := r.findInterfaceIps(vm, nic)
+					if len(ips) > 0 {
+						staticIpInterfaces[networkName] = ips
+					}
+				}
 			} else {
 				kInterface.Masquerade = &cnv.InterfaceMasquerade{}
 			}
@@ -744,6 +768,18 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 
 	object.Template.Spec.Networks = kNetworks
 	object.Template.Spec.Domain.Devices.Interfaces = kInterfaces
+
+	if hasUDN && r.Plan.Spec.PreserveStaticIPs {
+		var staticIpInterfacesAnnotation []byte
+		staticIpInterfacesAnnotation, err = json.Marshal(staticIpInterfaces)
+		if err != nil {
+			return err
+		}
+		if object.Template.ObjectMeta.Annotations == nil {
+			object.Template.ObjectMeta.Annotations = make(map[string]string)
+		}
+		object.Template.ObjectMeta.Annotations[planbase.AnnStaticUdnIp] = string(staticIpInterfacesAnnotation)
+	}
 	return
 }
 
