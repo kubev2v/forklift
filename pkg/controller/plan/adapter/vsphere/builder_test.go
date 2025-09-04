@@ -11,6 +11,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/settings"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/vmware/govmomi/vim25/types"
@@ -240,6 +241,251 @@ var _ = Describe("vSphere builder", func() {
 			Expect(pvcs).To(HaveLen(1))
 			Expect(pvcs[0].Spec.AccessModes).To(ConsistOf(core.ReadWriteOnce))
 			Expect(pvcs[0].Spec.VolumeMode).To(Equal(ptr.To(core.PersistentVolumeBlock)))
+		})
+	})
+
+	Context("SupportsVolumePopulators", func() {
+		var (
+			builder *Builder
+			vmRef   ref.Ref
+		)
+
+		BeforeEach(func() {
+			builder = createBuilder()
+			vmRef = ref.Ref{ID: "test-vm-id", Name: "test-vm"}
+		})
+
+		Context("when copy offload feature is disabled", func() {
+			BeforeEach(func() {
+				// Mock settings to disable copy offload
+				originalSettings := settings.Settings
+				settings.Settings = settings.ControllerSettings{
+					Features: settings.Features{
+						CopyOffload: false,
+					},
+				}
+				DeferCleanup(func() {
+					settings.Settings = originalSettings
+				})
+			})
+
+			It("should return false", func() {
+				result := builder.SupportsVolumePopulators(vmRef)
+				Expect(result).To(BeFalse())
+			})
+		})
+
+		Context("when plan is warm migration", func() {
+			BeforeEach(func() {
+				// Enable copy offload but set warm migration
+				originalSettings := settings.Settings
+				settings.Settings = settings.ControllerSettings{
+					Features: settings.Features{
+						CopyOffload: true,
+					},
+				}
+				DeferCleanup(func() {
+					settings.Settings = originalSettings
+				})
+
+				plan := createPlan()
+				plan.Spec.Warm = true
+				builder.Context.Plan = plan
+			})
+
+			It("should return false", func() {
+				result := builder.SupportsVolumePopulators(vmRef)
+				Expect(result).To(BeFalse())
+			})
+		})
+
+		Context("when VM is not found in inventory", func() {
+			BeforeEach(func() {
+				// Enable copy offload
+				originalSettings := settings.Settings
+				settings.Settings = settings.ControllerSettings{
+					Features: settings.Features{
+						CopyOffload: true,
+					},
+				}
+				DeferCleanup(func() {
+					settings.Settings = originalSettings
+				})
+
+				// Mock inventory that returns error for VM lookup
+				inventory := &mockInventory{}
+				builder.Source.Inventory = inventory
+				vmRef = ref.Ref{ID: "test-vm-id", Name: "missing_from_inventory"}
+
+			})
+
+			It("should return false", func() {
+				result := builder.SupportsVolumePopulators(vmRef)
+				Expect(result).To(BeFalse())
+			})
+		})
+
+		Context("when VM has mixed disks - some with offload, some without", func() {
+			BeforeEach(func() {
+				// Enable copy offload
+				originalSettings := settings.Settings
+				settings.Settings = settings.ControllerSettings{
+					Features: settings.Features{
+						CopyOffload: true,
+					},
+				}
+				DeferCleanup(func() {
+					settings.Settings = originalSettings
+				})
+
+				vm := model.VM{
+					VM1: model.VM1{
+						VM0: model.VM0{
+							ID:   "test-vm-id",
+							Name: "test-vm",
+						},
+						Disks: []vsphere.Disk{
+							{
+								Datastore: vsphere.Ref{ID: "ds-1"},
+								File:      "[datastore1] vm-123/vm-123.vmdk",
+								Bus:       container.SCSI,
+								Capacity:  1024 * 1024 * 1024,
+								Key:       2000,
+							},
+							{
+								Datastore: vsphere.Ref{ID: "ds-2"},
+								File:      "[datastore2] vm-123/vm-123-2.vmdk",
+								Bus:       container.SCSI,
+								Capacity:  1024 * 1024 * 1024,
+								Key:       2001,
+							},
+						},
+					},
+				}
+
+				inventory := &mockInventory{
+					vm: vm,
+					ds: model.Datastore{Resource: model.Resource{ID: "ds-1"}},
+				}
+				builder.Source.Inventory = inventory
+
+				// Mixed storage mapping - one with offload, one without
+				storageMap := v1beta1.StorageMap{
+					Spec: v1beta1.StorageMapSpec{
+						Map: []v1beta1.StoragePair{
+							{
+								Source: ref.Ref{ID: "ds-1"},
+								Destination: v1beta1.DestinationStorage{
+									StorageClass: "test-sc",
+								},
+								OffloadPlugin: &v1beta1.OffloadPlugin{
+									VSphereXcopyPluginConfig: &v1beta1.VSphereXcopyPluginConfig{
+										StorageVendorProduct: "test-vendor",
+										SecretRef:            "test-secret",
+									},
+								},
+							},
+							{
+								Source: ref.Ref{ID: "ds-2"},
+								Destination: v1beta1.DestinationStorage{
+									StorageClass: "test-sc-2",
+								},
+								// No OffloadPlugin - this should cause failure
+							},
+						},
+					},
+				}
+				builder.Context.Map.Storage = &storageMap
+			})
+
+			It("should return false", func() {
+				result := builder.SupportsVolumePopulators(vmRef)
+				Expect(result).To(BeFalse())
+			})
+		})
+
+		Context("when VM has all disks with offload capability", func() {
+			BeforeEach(func() {
+				// Enable copy offload
+				originalSettings := settings.Settings
+				settings.Settings = settings.ControllerSettings{
+					Features: settings.Features{
+						CopyOffload: true,
+					},
+				}
+				DeferCleanup(func() {
+					settings.Settings = originalSettings
+				})
+
+				vm := model.VM{
+					VM1: model.VM1{
+						VM0: model.VM0{
+							ID:   "test-vm-id",
+							Name: "test-vm",
+						},
+						Disks: []vsphere.Disk{
+							{
+								Datastore: vsphere.Ref{ID: "ds-1"},
+								File:      "[datastore1] vm-123/vm-123.vmdk",
+								Bus:       container.SCSI,
+								Capacity:  1024 * 1024 * 1024,
+								Key:       2000,
+							},
+							{
+								Datastore: vsphere.Ref{ID: "ds-2"},
+								File:      "[datastore2] vm-123/vm-123-2.vmdk",
+								Bus:       container.SCSI,
+								Capacity:  1024 * 1024 * 1024,
+								Key:       2001,
+							},
+						},
+					},
+				}
+
+				inventory := &mockInventory{
+					vm: vm,
+					ds: model.Datastore{Resource: model.Resource{ID: "ds-1"}},
+				}
+				builder.Source.Inventory = inventory
+
+				// All storage mappings with offload capability
+				storageMap := v1beta1.StorageMap{
+					Spec: v1beta1.StorageMapSpec{
+						Map: []v1beta1.StoragePair{
+							{
+								Source: ref.Ref{ID: "ds-1"},
+								Destination: v1beta1.DestinationStorage{
+									StorageClass: "test-sc",
+								},
+								OffloadPlugin: &v1beta1.OffloadPlugin{
+									VSphereXcopyPluginConfig: &v1beta1.VSphereXcopyPluginConfig{
+										StorageVendorProduct: "test-vendor",
+										SecretRef:            "test-secret",
+									},
+								},
+							},
+							{
+								Source: ref.Ref{ID: "ds-2"},
+								Destination: v1beta1.DestinationStorage{
+									StorageClass: "test-sc-2",
+								},
+								OffloadPlugin: &v1beta1.OffloadPlugin{
+									VSphereXcopyPluginConfig: &v1beta1.VSphereXcopyPluginConfig{
+										StorageVendorProduct: "test-vendor-2",
+										SecretRef:            "test-secret-2",
+									},
+								},
+							},
+						},
+					},
+				}
+				builder.Context.Map.Storage = &storageMap
+			})
+
+			It("should return true", func() {
+				result := builder.SupportsVolumePopulators(vmRef)
+				Expect(result).To(BeTrue())
+			})
 		})
 	})
 
