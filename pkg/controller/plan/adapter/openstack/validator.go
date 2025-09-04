@@ -67,6 +67,11 @@ func (r *Validator) MaintenanceMode(vmRef ref.Ref) (ok bool, err error) {
 	return
 }
 
+// NO-OP
+func (r *Validator) UdnStaticIPs(vmRef ref.Ref, client client.Client) (ok bool, err error) {
+	return true, nil
+}
+
 // NOOP
 func (r *Validator) UnSupportedDisks(vmRef ref.Ref) ([]string, error) {
 	return []string{}, nil
