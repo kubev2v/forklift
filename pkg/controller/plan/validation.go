@@ -26,6 +26,7 @@ import (
 	core "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
@@ -1016,6 +1017,16 @@ func createVddkCheckJob(plan *api.Plan) *batchv1.Job {
 					Drop: []core.Capability{"ALL"},
 				},
 			},
+			Resources: core.ResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceCPU:    resource.MustParse("100m"),
+					core.ResourceMemory: resource.MustParse("128Mi"),
+				},
+				Limits: core.ResourceList{
+					core.ResourceCPU:    resource.MustParse("500m"),
+					core.ResourceMemory: resource.MustParse("512Mi"),
+				},
+			},
 		},
 	}
 
@@ -1067,6 +1078,16 @@ func createVddkCheckJob(plan *api.Plan) *batchv1.Job {
 							},
 							VolumeMounts: []core.VolumeMount{mount},
 							Command:      []string{"file", "-E", "/opt/vmware-vix-disklib-distrib/lib64/libvixDiskLib.so"},
+							Resources: core.ResourceRequirements{
+								Requests: core.ResourceList{
+									core.ResourceCPU:    resource.MustParse("100m"),
+									core.ResourceMemory: resource.MustParse("128Mi"),
+								},
+								Limits: core.ResourceList{
+									core.ResourceCPU:    resource.MustParse("500m"),
+									core.ResourceMemory: resource.MustParse("512Mi"),
+								},
+							},
 						},
 					},
 					Volumes: volumes,
