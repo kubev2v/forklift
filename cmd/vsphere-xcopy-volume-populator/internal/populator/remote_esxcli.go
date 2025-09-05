@@ -272,8 +272,8 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 				context.Background(), host, []string{"storage", "core", "adapter", "rescan", "-t", "add", "-a", "1"})
 			if err != nil {
 				klog.Errorf("failed to rescan for adapters, attempt %d/%d due to: %s", i, retries, err)
-				time.Sleep(5 * time.Second)
 			}
+			time.Sleep(5 * time.Second)
 		}
 	}
 	if err != nil {
