@@ -1733,11 +1733,6 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	// VDDK image
 	var initContainers []core.Container
 	if vddkImage, found := r.Source.Provider.Spec.Settings[api.VDDK]; found {
-		// Log VDDK init container creation with resource specifications
-		fmt.Printf("🚀 FORKLIFT_DEBUG_V2: Creating VDDK init container for VM %s with VDDK image: %s\n", vm.Ref.Name, vddkImage)
-		fmt.Printf("🚀 FORKLIFT_DEBUG_V2: VDDK init container will use resource specifications: CPU 100m/500m, Memory 128Mi/512Mi\n")
-		fmt.Printf("🚀 FORKLIFT_DEBUG_V2: This confirms the latest image with quota fix is being used!\n")
-		
 		initContainers = append(initContainers, core.Container{
 			Name:            "vddk-side-car",
 			Image:           vddkImage,
