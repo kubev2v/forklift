@@ -362,6 +362,7 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 							network.VNICs,
 							model.VNIC{
 								Key:        nic.Key,
+								Device:     nic.Device,
 								PortGroup:  nic.Portgroup,
 								DPortGroup: dGroup(),
 								IpAddress:  nic.Spec.Ip.IpAddress,
@@ -374,6 +375,25 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 						func(i, j int) bool {
 							return network.VNICs[i].MTU > network.VNICs[j].MTU
 						})
+				}
+			case fVirtualNicManagerNet:
+				if array, cast := p.Val.(types.ArrayOfVirtualNicManagerNetConfig); cast {
+					v.model.ManagementIPs = nil
+					for _, nc := range array.VirtualNicManagerNetConfig {
+						if nc.NicType != string(types.HostVirtualNicManagerNicTypeManagement) {
+							continue
+						}
+						for ix := range nc.CandidateVnic {
+							for _, selectedVnicKey := range nc.SelectedVnic {
+								if nc.CandidateVnic[ix].Key != selectedVnicKey {
+									continue
+								}
+								if nc.CandidateVnic[ix].Spec.Ip.IpAddress != "" {
+									v.model.ManagementIPs = append(v.model.ManagementIPs, nc.CandidateVnic[ix].Spec.Ip.IpAddress)
+								}
+							}
+						}
+					}
 				}
 			case fScsiLun:
 				if array, cast := p.Val.(types.ArrayOfScsiLun); cast {

@@ -1,0 +1,60 @@
+package settings
+
+import (
+	"fmt"
+	"os"
+
+	"k8s.io/apimachinery/pkg/api/resource"
+)
+
+// Env
+const (
+	OVAProviderServerImage = "OVA_PROVIDER_SERVER_IMAGE"
+)
+
+// Defaults
+const (
+	DefaultOVACPULimit      = "1000m"
+	DefaultOVACPURequest    = "100m"
+	DefaultOVAMemoryLimit   = "1Gi"
+	DefaultOVAMemoryRequest = "512Mi"
+)
+
+type Providers struct {
+	OVA struct {
+		Pod struct {
+			ContainerImage string
+			Resources      struct {
+				CPU struct {
+					Request string
+					Limit   string
+				}
+				Memory struct {
+					Request string
+					Limit   string
+				}
+			}
+		}
+	}
+}
+
+func (r *Providers) Load() error {
+	r.OVA.Pod.Resources.CPU.Limit = Lookup(OvaContainerLimitsCpu, DefaultOVACPULimit)
+	if _, err := resource.ParseQuantity(r.OVA.Pod.Resources.CPU.Limit); err != nil {
+		return fmt.Errorf("invalid OVA CPU limit %q: %w", r.OVA.Pod.Resources.CPU.Limit, err)
+	}
+	r.OVA.Pod.Resources.CPU.Request = Lookup(OvaContainerRequestsCpu, DefaultOVACPURequest)
+	if _, err := resource.ParseQuantity(r.OVA.Pod.Resources.CPU.Request); err != nil {
+		return fmt.Errorf("invalid OVA CPU request %q: %w", r.OVA.Pod.Resources.CPU.Request, err)
+	}
+	r.OVA.Pod.Resources.Memory.Limit = Lookup(OvaContainerLimitsMemory, DefaultOVAMemoryLimit)
+	if _, err := resource.ParseQuantity(r.OVA.Pod.Resources.Memory.Limit); err != nil {
+		return fmt.Errorf("invalid OVA memory limit %q: %w", r.OVA.Pod.Resources.Memory.Limit, err)
+	}
+	r.OVA.Pod.Resources.Memory.Request = Lookup(OvaContainerRequestsMemory, DefaultOVAMemoryRequest)
+	if _, err := resource.ParseQuantity(r.OVA.Pod.Resources.Memory.Request); err != nil {
+		return fmt.Errorf("invalid OVA memory request %q: %w", r.OVA.Pod.Resources.Memory.Request, err)
+	}
+	r.OVA.Pod.ContainerImage = os.Getenv(OVAProviderServerImage)
+	return nil
+}
