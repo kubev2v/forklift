@@ -2598,6 +2598,9 @@ spec:
                     status:
                       description: The condition status [true,false].
                       type: string
+                    suggestion:
+                      description: A suggested action or resolution for the condition.
+                      type: string
                     type:
                       description: The condition type.
                       type: string
@@ -2649,6 +2652,10 @@ spec:
                                 type: string
                               status:
                                 description: The condition status [true,false].
+                                type: string
+                              suggestion:
+                                description: A suggested action or resolution for
+                                  the condition.
                                 type: string
                               type:
                                 description: The condition type.
@@ -2855,6 +2862,10 @@ spec:
                                 type: string
                               status:
                                 description: The condition status [true,false].
+                                type: string
+                              suggestion:
+                                description: A suggested action or resolution for
+                                  the condition.
                                 type: string
                               type:
                                 description: The condition type.

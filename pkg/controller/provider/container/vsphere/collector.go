@@ -76,27 +76,28 @@ const (
 	fDrsVmBehavior = "configuration.drsConfig.defaultVmBehavior"
 	fDrsVmCfg      = "configuration.drsVmConfig"
 	// Host
-	fVm             = "vm"
-	fOverallStatus  = "overallStatus"
-	fProductName    = "config.product.name"
-	fProductVersion = "config.product.version"
-	fVSwitch        = "config.network.vswitch"
-	fPortGroup      = "config.network.portgroup"
-	fPNIC           = "config.network.pnic"
-	fVNIC           = "config.network.vnic"
-	fTimezone       = "config.dateTimeInfo.timeZone.name"
-	fInMaintMode    = "summary.runtime.inMaintenanceMode"
-	fCpuSockets     = "summary.hardware.numCpuPkgs"
-	fCpuCores       = "summary.hardware.numCpuCores"
-	fHostMemorySize = "summary.hardware.memorySize"
-	fThumbprint     = "summary.config.sslThumbprint"
-	fMgtServerIp    = "summary.managementServerIp"
-	fScsiLun        = "config.storageDevice.scsiLun"
-	fHostBusAdapter = "config.storageDevice.hostBusAdapter"
-	fScsiTopology   = "config.storageDevice.scsiTopology.adapter"
-	fAdvancedOption = "configManager.advancedOption"
-	fmodel          = "hardware.systemInfo.model"
-	fvendor         = "hardware.systemInfo.vendor"
+	fVm                   = "vm"
+	fOverallStatus        = "overallStatus"
+	fProductName          = "config.product.name"
+	fProductVersion       = "config.product.version"
+	fVSwitch              = "config.network.vswitch"
+	fPortGroup            = "config.network.portgroup"
+	fPNIC                 = "config.network.pnic"
+	fVNIC                 = "config.network.vnic"
+	fVirtualNicManagerNet = "config.virtualNicManagerInfo.netConfig"
+	fTimezone             = "config.dateTimeInfo.timeZone.name"
+	fInMaintMode          = "summary.runtime.inMaintenanceMode"
+	fCpuSockets           = "summary.hardware.numCpuPkgs"
+	fCpuCores             = "summary.hardware.numCpuCores"
+	fHostMemorySize       = "summary.hardware.memorySize"
+	fThumbprint           = "summary.config.sslThumbprint"
+	fMgtServerIp          = "summary.managementServerIp"
+	fScsiLun              = "config.storageDevice.scsiLun"
+	fHostBusAdapter       = "config.storageDevice.hostBusAdapter"
+	fScsiTopology         = "config.storageDevice.scsiTopology.adapter"
+	fAdvancedOption       = "configManager.advancedOption"
+	fmodel                = "hardware.systemInfo.model"
+	fvendor               = "hardware.systemInfo.vendor"
 	// Network
 	fTag     = "tag"
 	fSummary = "summary"
@@ -743,6 +744,7 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 				fPortGroup,
 				fPNIC,
 				fVNIC,
+				fVirtualNicManagerNet,
 				fScsiLun,
 				fAdvancedOption,
 				fHostBusAdapter,
