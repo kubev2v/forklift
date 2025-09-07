@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/lib/util"
 	"github.com/vmware/govmomi/object"
 	"golang.org/x/crypto/ssh"
 	"k8s.io/klog/v2"
@@ -15,7 +17,7 @@ import (
 // SSHClient interface for SSH operations
 type SSHClient interface {
 	Connect(ctx context.Context, hostname, username string, privateKey []byte) error
-	ExecuteCommand(sshCommand string, args ...string) (string, error)
+	ExecuteCommand(datastore, sshCommand string, args ...string) (string, error)
 	Close() error
 }
 
@@ -74,8 +76,10 @@ func (c *ESXiSSHClient) Connect(ctx context.Context, hostname, username string, 
 	return nil
 }
 
-// executeCommand executes a command using the SSH_ORIGINAL_COMMAND pattern
-func (c *ESXiSSHClient) ExecuteCommand(sshCommand string, args ...string) (string, error) {
+// ExecuteCommand executes a command using the SSH_ORIGINAL_COMMAND pattern
+// Uses structured format: DS=<datastore>;CMD=<operation> <args...>
+// If datastore is empty, only tests connectivity without calling the wrapper
+func (c *ESXiSSHClient) ExecuteCommand(datastore, sshCommand string, args ...string) (string, error) {
 	if c.sshClient == nil {
 		return "", fmt.Errorf("SSH client not connected")
 	}
@@ -87,11 +91,15 @@ func (c *ESXiSSHClient) ExecuteCommand(sshCommand string, args ...string) (strin
 	}
 	defer session.Close()
 
-	// Build the complete command with arguments
-	fullCommand := sshCommand
+	// Build the command part
+	cmdPart := sshCommand
 	if len(args) > 0 {
-		fullCommand = fmt.Sprintf("%s %s", sshCommand, strings.Join(args, " "))
+		cmdPart = fmt.Sprintf("%s %s", sshCommand, strings.Join(args, " "))
 	}
+
+	// Build structured command: DS=<datastore>;CMD=<command>
+	// For connectivity tests, datastore can be empty
+	fullCommand := fmt.Sprintf("DS=%s;CMD=%s", datastore, cmdPart)
 
 	klog.V(2).Infof("Executing SSH command: %s", fullCommand)
 
@@ -164,12 +172,15 @@ func EnableSSHAccess(ctx context.Context, vmwareClient Client, host *object.Host
 	}
 	klog.Infof("ESXi version %s detected", version)
 
-	pythonCommand := fmt.Sprintf("python %s", scriptPath)
+	// Use the shared restricted SSH command template
 	restrictedPublicKey := fmt.Sprintf(`command="%s",no-port-forwarding,no-agent-forwarding,no-X11-forwarding %s`,
-		pythonCommand, publicKeyStr)
+		util.RestrictedSSHCommandTemplate, publicKeyStr)
 
 	// Step 7: Test SSH connectivity first (using private key for authentication)
-	if testSSHConnectivity(ctx, hostIP, privateKey) {
+	// Pass empty datastore for connectivity test - the wrapper won't be called
+	// Create a logger adapter from klog to logging.LevelLogger
+	log := logging.WithName("ssh-setup")
+	if util.TestSSHConnectivity(ctx, hostIP, privateKey, log) {
 		klog.Infof("SSH connectivity test passed - keys already configured correctly")
 		return nil
 	}
@@ -186,42 +197,6 @@ func EnableSSHAccess(ctx context.Context, vmwareClient Client, host *object.Host
 	klog.Errorf("4. Save and exit")
 	klog.Errorf("5. Restart the operation")
 	return fmt.Errorf("manual SSH key configuration required for ESXi %s - see logs for instructions", version)
-}
-
-// testSSHConnectivity tests if we can connect via SSH and execute a restricted command
-func testSSHConnectivity(ctx context.Context, hostIP string, privateKey []byte) bool {
-	klog.Infof("Testing SSH connectivity to %s", hostIP)
-
-	client := NewSSHClient()
-	// Use a short timeout for connectivity testing to avoid indefinite hangs
-	testCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	err := client.Connect(testCtx, hostIP, "root", privateKey)
-	if err != nil {
-		klog.Infof("SSH connectivity test failed to connect: %v", err)
-		return false
-	}
-	defer client.Close()
-
-	// Try to execute a simple test command - this will test if the restricted command setup is working
-	// We expect this to fail with a "task not found" type error, which indicates SSH restrictions are working correctly
-	output, err := client.(*ESXiSSHClient).ExecuteCommand("--version")
-
-	klog.Infof("SSH test command output: '%s'", output)
-	klog.Infof("SSH test command error: %v", err)
-
-	if strings.Contains(output, "<?xml version=") {
-		klog.Infof("Received XML response from script - SSH working correctly")
-		return true
-	}
-
-	if strings.Contains(output, "No such file or directory") && strings.Contains(output, ".py") {
-		klog.Infof("SSH working but script file not found - configuration issue")
-		return true
-	}
-
-	klog.Infof("SSH connectivity issue detected, none of the expecter responses were received: %v, err: %v", output, err)
-	return false
 }
 
 // getESXiVersion retrieves the ESXi version from the host

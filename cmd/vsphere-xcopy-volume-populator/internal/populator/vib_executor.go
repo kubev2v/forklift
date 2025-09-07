@@ -20,7 +20,8 @@ func NewVIBTaskExecutor(client vmware.Client) TaskExecutor {
 	}
 }
 
-func (e *VIBTaskExecutor) StartClone(ctx context.Context, host *object.HostSystem, sourcePath, targetLUN string) (*vmkfstoolsTask, error) {
+func (e *VIBTaskExecutor) StartClone(ctx context.Context, host *object.HostSystem, _, sourcePath, targetLUN string) (*vmkfstoolsTask, error) {
+	// Note: VIB method doesn't use the datastore parameter, but accepts it for interface compatibility
 	r, err := e.VSphereClient.RunEsxCommand(ctx, host, []string{"vmkfstools", "clone", "-s", sourcePath, "-t", targetLUN})
 	if err != nil {
 		klog.Infof("error during copy, response from esxcli %+v", r)
@@ -42,7 +43,8 @@ func (e *VIBTaskExecutor) StartClone(ctx context.Context, host *object.HostSyste
 	return &t, nil
 }
 
-func (e *VIBTaskExecutor) GetTaskStatus(ctx context.Context, host *object.HostSystem, taskId string) (*vmkfstoolsTask, error) {
+func (e *VIBTaskExecutor) GetTaskStatus(ctx context.Context, host *object.HostSystem, _, taskId string) (*vmkfstoolsTask, error) {
+	// Note: VIB method doesn't use the datastore parameter, but accepts it for interface compatibility
 	r, err := e.VSphereClient.RunEsxCommand(ctx, host, []string{"vmkfstools", "taskGet", "-i", taskId})
 	if err != nil {
 		return nil, err
@@ -66,7 +68,8 @@ func (e *VIBTaskExecutor) GetTaskStatus(ctx context.Context, host *object.HostSy
 	return &t, nil
 }
 
-func (e *VIBTaskExecutor) CleanupTask(ctx context.Context, host *object.HostSystem, taskId string) error {
+func (e *VIBTaskExecutor) CleanupTask(ctx context.Context, host *object.HostSystem, datastore, taskId string) error {
+	// Note: VIB method doesn't use the datastore parameter, but accepts it for interface compatibility
 	r, errClean := e.VSphereClient.RunEsxCommand(ctx, host, []string{"vmkfstools", "taskClean", "-i", taskId})
 	if errClean != nil {
 		klog.Errorf("failed cleaning up task artifacts %v", r)

@@ -437,7 +437,8 @@ The SSH method requires:
 
 You can prepare your hosts for the SSH method by manually adding the restricted SSH key to your ESXi hosts using the following steps. 
 
-**Note**: A simpler approach is to let one migration fail and follow the instructions in the populator pod logs - they will have the exact key and datastore path filled in for you.
+**Note**: When the ESXi is not ready, the SSHNotReady condition will show which ESXi hosts are not ready and give the exact instructions to follow
+to fix the situation.
 
 If you want to configure SSH keys prior to the first migration:
 
@@ -463,9 +464,8 @@ The system requires command restrictions for security. Create the restricted key
 
 ```bash
 # The public key needs to be prefixed with command restrictions
-# The script path will be: /vmfs/volumes/{datastore-name}/secure-vmkfstools-wrapper.py
-# Replace {datastore-name} with your actual datastore name
-echo 'command="python /vmfs/volumes/datastore1/secure-vmkfstools-wrapper.py",no-port-forwarding,no-agent-forwarding,no-X11-forwarding '$(cat esxi_public_key.pub) > restricted_key.pub
+# The system now uses dynamic datastore routing - a single key works for all datastores
+echo 'command="sh -c '\''DS=$(echo \"$SSH_ORIGINAL_COMMAND\" | sed -n \"s|.*/vmfs/volumes/\\([^/]*\\)/.*|\\1|p\"); exec python /vmfs/volumes/$DS/secure-vmkfstools-wrapper.py'\''",no-port-forwarding,no-agent-forwarding,no-X11-forwarding '$(cat esxi_public_key.pub) > restricted_key.pub
 
 # View the final restricted key
 cat restricted_key.pub
@@ -514,7 +514,8 @@ rm -f esxi_public_key.pub restricted_key.pub esxi_private_key
 **Important Notes**
 
 - The public key must include command restrictions for security
-- The command path in the restrictions must match the secure script path: `/vmfs/volumes/{datastore-name}/secure-vmkfstools-wrapper.py`
+- The system uses dynamic datastore routing - the inline shell command automatically detects the datastore from the SSH command and routes to the correct script location
+- A single SSH key works for all datastores - no need to hardcode datastore paths
 - Each ESXi host in your migration environment needs the key installed
 - SSH service must be enabled on all target ESXi hosts
 
