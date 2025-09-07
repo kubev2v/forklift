@@ -45,6 +45,18 @@ var _ = Describe("vSphere builder", func() {
 						"providerkey": []byte("providerval"),
 					},
 				},
+				&core.Secret{
+					ObjectMeta: meta.ObjectMeta{Name: "offload-ssh-keys-test-vsphere-provider-private", Namespace: "test"},
+					Data: map[string][]byte{
+						"private-key": []byte("fake-private-key"),
+					},
+				},
+				&core.Secret{
+					ObjectMeta: meta.ObjectMeta{Name: "offload-ssh-keys-test-vsphere-provider-public", Namespace: "test"},
+					Data: map[string][]byte{
+						"public-key": []byte("fake-public-key"),
+					},
+				},
 			)
 
 			// Execute
@@ -57,9 +69,11 @@ var _ = Describe("vSphere builder", func() {
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
 			Expect(errGet).NotTo(HaveOccurred())
-			Expect(underTest.Data).To(HaveLen(2))
+			Expect(underTest.Data).To(HaveLen(4))
 			Expect(underTest.Data).To(HaveKeyWithValue("storagekey", []byte("storageval")))
 			Expect(underTest.Data).To(HaveKeyWithValue("providerkey", []byte("providerval")))
+			Expect(underTest.Data).To(HaveKey("SSH_PRIVATE_KEY"))
+			Expect(underTest.Data).To(HaveKey("SSH_PUBLIC_KEY"))
 
 		})
 		It("should set default access mode to ReadWriteMany for block volumes", func() {
@@ -506,7 +520,11 @@ func createBuilder(objs ...runtime.Object) *Builder {
 			},
 			Source: plancontext.Source{
 				Provider: &v1beta1.Provider{
-					ObjectMeta: meta.ObjectMeta{Name: "test-provider", Namespace: "test"},
+					ObjectMeta: meta.ObjectMeta{Name: "test-vsphere-provider", Namespace: "test"},
+					Spec: v1beta1.ProviderSpec{
+						Type: (*v1beta1.ProviderType)(ptr.To("vsphere")),
+						URL:  "test-vsphere-provider",
+					},
 				},
 				Inventory: nil,
 				Secret: &core.Secret{

@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
+	populator_mocks "github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator/populator_mocks"
+	"go.uber.org/mock/gomock"
 )
 
 func TestVMDisk_Path(t *testing.T) {
@@ -58,7 +60,7 @@ func TestParseVmdkPath(t *testing.T) {
 			expectError:    false,
 		},
 		{
-			name:           "Invalid VMDK Path - missing ']' ",
+			name:           "Invalid VMDK Path - missing ']'",
 			vmdkPath:       "[mydatastore myvm/myvm.vmdk",
 			expectedVMDisk: populator.VMDisk{},
 			expectError:    true,
@@ -106,5 +108,25 @@ func TestParseVmdkPath(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestPopulate(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockPopulator := populator_mocks.NewMockPopulator(ctrl)
+	pv := populator.PersistentVolume{
+		Name:         "test-pv",
+		VolumeHandle: "test-handle",
+	}
+	progress := make(chan uint)
+	quit := make(chan error)
+
+	mockPopulator.EXPECT().Populate("vm-1", "source.vmdk", pv, progress, quit).Return(nil)
+
+	err := mockPopulator.Populate("vm-1", "source.vmdk", pv, progress, quit)
+	if err != nil {
+		t.Errorf("Populate() error = %v, wantErr %v", err, false)
 	}
 }

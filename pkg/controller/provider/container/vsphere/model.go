@@ -811,6 +811,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				}
 			case fGuestDisk:
 				if disks, cast := p.Val.(types.ArrayOfGuestDiskInfo); cast {
+					var diskMountPoints []model.DiskMountPoint
 					for _, info := range disks.GuestDiskInfo {
 						// Default to 0 so the policy can flag missing mappings
 						guestDiskKey := int32(0)
@@ -818,8 +819,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 							// VMware guarantees at least one mapping when non-empty
 							guestDiskKey = info.Mappings[0].Key
 						}
-
-						newGuestDisk := model.GuestDisk{
+						diskMountPoint := model.DiskMountPoint{
 							DiskPath:       info.DiskPath,
 							Capacity:       info.Capacity,
 							FreeSpace:      info.FreeSpace,
@@ -827,8 +827,17 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 							Key:            guestDiskKey,
 						}
 
-						v.updateOrAppendGuestDisk(newGuestDisk)
+						// Check for m.model.Disks with the same key (disk keys are expected to be unique)
+						for i, disk := range v.model.Disks {
+							if disk.Key == diskMountPoint.Key {
+								// Update the Disk's WinDriveLetter using the new DiskMountPoint's DiskPath
+								v.model.Disks[i].WinDriveLetter = extractWindowsDriveLetter(diskMountPoint.DiskPath)
+								break
+							}
+						}
+						diskMountPoints = append(diskMountPoints, diskMountPoint)
 					}
+					v.model.GuestDisks = diskMountPoints
 				}
 			case fGuestNet:
 				if nics, cast := p.Val.(types.ArrayOfGuestNicInfo); cast {
@@ -1073,7 +1082,7 @@ func (v *VmAdapter) getDiskController(key int32) *model.Controller {
 }
 
 // getDiskGuestInfo retrieves the guest disk information for a given device key.
-func (v *VmAdapter) getDiskGuestInfo(deviceKey int32) *model.GuestDisk {
+func (v *VmAdapter) getDiskGuestInfo(deviceKey int32) *model.DiskMountPoint {
 	for i := range v.model.GuestDisks {
 		if v.model.GuestDisks[i].Key == deviceKey {
 			return &v.model.GuestDisks[i]
@@ -1186,34 +1195,4 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 	}
 
 	v.model.Disks = disks
-}
-
-// updateOrAppendGuestDisk updates an existing guest disk with the same key or appends a new one
-func (v *VmAdapter) updateOrAppendGuestDisk(newDisk model.GuestDisk) {
-	foundExistingDisk := false
-
-	// Find existing disk with the same key (keys are expected to be unique)
-	for i, existingDisk := range v.model.GuestDisks {
-		if existingDisk.Key == newDisk.Key {
-			// Replace existing disk
-			v.model.GuestDisks[i] = newDisk
-
-			foundExistingDisk = true
-			break // Exit the loop when found
-		}
-	}
-
-	// No existing disk found, append new one
-	if !foundExistingDisk {
-		v.model.GuestDisks = append(v.model.GuestDisks, newDisk)
-	}
-
-	// Check for m.model.Disks with the same key (disk keys are expected to be unique)
-	for i, disk := range v.model.Disks {
-		if disk.Key == newDisk.Key {
-			// Update the Disk's WinDriveLetter using the new GuestDisk's DiskPath
-			v.model.Disks[i].WinDriveLetter = extractWindowsDriveLetter(newDisk.DiskPath)
-			return
-		}
-	}
 }

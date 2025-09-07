@@ -21,3 +21,13 @@ Each plan execution is idempotent. Subsequent migrations will only affect
 incomplete or failed VM migrations.
 */
 package plan
+
+/*
+For the User Defined Networks we need to open some port so we can communicate with our metrics server inside the User Defined Network Namespace.
+Docs: https://docs.redhat.com/en/documentation/openshift_container_platform/4.19/html/multiple_networks/primary-networks#opening-default-network-ports-udn_about-user-defined-networks
+*/
+type OpenPort struct {
+	// valid values are tcp, udp, sctp, icmp
+	Protocol string `yaml:"protocol"`
+	Port     int    `yaml:"port,omitempty"`
+}
