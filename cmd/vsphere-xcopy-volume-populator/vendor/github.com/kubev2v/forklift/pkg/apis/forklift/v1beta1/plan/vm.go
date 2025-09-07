@@ -54,8 +54,10 @@ type VM struct {
 	//   - .VmName: name of the VM
 	//   - .PlanName: name of the migration plan
 	//   - .DiskIndex: initial volume index of the disk
+	//   - .WinDriveLetter: Windows drive letter (lowercase, if applicable, e.g. "c", requires guest agent)
 	//   - .RootDiskIndex: index of the root disk
 	//   - .Shared: true if the volume is shared by multiple VMs, false otherwise
+	//   - .FileName: name of the file in the source provider (VMware only, filename includes the .vmdk suffix)
 	// Note:
 	//   This template overrides the plan level template.
 	// Examples:
@@ -103,6 +105,16 @@ type VM struct {
 	// +optional
 	// +kubebuilder:validation:Enum=on;off;auto
 	TargetPowerState TargetPowerState `json:"targetPowerState,omitempty"`
+	// DeleteVmOnFailMigration controls whether the target VM created by this Plan is deleted when a migration fails.
+	// When true and the migration fails after the target VM has been created, the controller
+	// will delete the target VM (and related target-side resources) during failed-migration cleanup
+	// and when the Plan is deleted. When false (default), the target VM is preserved to aid
+	// troubleshooting. The source VM is never modified.
+	//
+	// Note: If the Plan-level option is set to true, the VM-level option will be ignored.
+	//
+	// +optional
+	DeleteVmOnFailMigration bool `json:"deleteVmOnFailMigration,omitempty"`
 }
 
 // Find a Hook for the specified step.
