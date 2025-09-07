@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/kubev2v/forklift/pkg/lib/util"
 	"net"
 	liburl "net/url"
 	"path"
@@ -33,7 +34,6 @@ import (
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
 	libref "github.com/kubev2v/forklift/pkg/lib/ref"
-	"github.com/kubev2v/forklift/pkg/lib/sshkeys"
 	"github.com/kubev2v/forklift/pkg/settings"
 	"github.com/kubev2v/forklift/pkg/templateutil"
 	"github.com/vmware/govmomi/vim25"
@@ -2076,11 +2076,11 @@ func (r *Builder) addSSHKeysToSecret(secret *core.Secret) error {
 		return fmt.Errorf("provider name is empty")
 	}
 
-	privateSecretName, err := sshkeys.GenerateSSHPrivateSecretName(providerName)
+	privateSecretName, err := util.GenerateSSHPrivateSecretName(providerName)
 	if err != nil {
 		return fmt.Errorf("error generating private ssh key %v", err)
 	}
-	publicSecretName, err := sshkeys.GenerateSSHPublicSecretName(providerName)
+	publicSecretName, err := util.GenerateSSHPublicSecretName(providerName)
 	if err != nil {
 		return fmt.Errorf("error generating public ssh key %v", err)
 	}

@@ -351,7 +351,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	}
 
 	// Use unified task execution
-	return ExecuteCloneTask(context.Background(), executor, host, vmDisk.Path(), targetLUN, progress)
+	return ExecuteCloneTask(context.Background(), executor, host, vmDisk.Datastore, vmDisk.Path(), targetLUN, progress)
 }
 
 // After mapping a volume the ESX needs a rescan to see the device. ESXs can opt-in to do it automatically
