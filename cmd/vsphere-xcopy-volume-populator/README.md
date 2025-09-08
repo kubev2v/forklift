@@ -155,6 +155,7 @@ Create a secret where the migration provider is setup, usually openshift-mtv
 and put the credentials of the storage system. All of the provider are required
 to have a secret with those required fields
 
+<<<<<<< HEAD
 | Key | Value | Mandatory | Default |
 | --- | --- | --- | --- |
 | STORAGE_HOSTNAME | ip/hostname | y | |
@@ -398,6 +399,15 @@ rm -f esxi_public_key.pub restricted_key.pub esxi_private_key
 - **Compatibility**: Works with any ESXi version that supports SSH
 - **Flexibility**: Easier to troubleshoot and monitor SSH connections
 
+=======
+```
+STORAGE_HOSTNAME
+STORAGE_USERNAME
+STORAGE_PASSWORD
+STORAGE_SKIP_SSL_VERIFICATION
+```
+
+>>>>>>> 0cf55182b (add clone bytes progress to populator)
 Provider specific entries in the secret shall be documented below:
 
 ## Hitachi Vantara
@@ -405,6 +415,7 @@ Provider specific entries in the secret shall be documented below:
 
 ## NetApp ONTAP
 
+<<<<<<< HEAD
 | Key | Value | Description |
 | --- | --- | --- |
 | ONTAP_SVM | string | the SVM to use in all the client interactions. Can be taken from trident.netapp.io/v1/TridentBackend.config.ontap_config.svm resource field. |
@@ -429,6 +440,19 @@ Provider specific entries in the secret shall be documented below:
 | Key | Value | Description |
 | --- | --- | --- |
 | POWERFLEX_SYSTEM_ID | string | the system id of the storage array. Can be taken from `vxflexos-config` from the `vxflexos` namespace or the openshift-operators namespace. |
+=======
+Add these keys to the secret mentioned in the storage map:
+
+`ONTAP_SVM` - the SVM to use in all the client interactions. Can be taken from 
+trident.netapp.io/v1/TridentBackend.config.ontap_config.svm resource field.
+
+## Dell PowerMax
+
+Add these keys to the secret mentioned in the storage map:
+
+`POWERMAX_SYMMETRIX_ID` - the symmetrix id of the storage array. Can be taken
+from the ConfigMap under the 'powermax' namespace, which the CSI driver uses.
+>>>>>>> 0cf55182b (add clone bytes progress to populator)
 
 
 # Setup copy offload
@@ -471,6 +495,7 @@ Provider specific entries in the secret shall be documented below:
   
     resolution: ssh into the ESXi and run `/etc/init.d/hostd restart`. Wait for few seconds till the ESX renews the connection with vSphere.
 
+<<<<<<< HEAD
 ## SSH Method
 - **Error**: `manual SSH key configuration required` or `failed to connect via SSH`
   
@@ -519,6 +544,8 @@ Provider specific entries in the secret shall be documented below:
   3. Once keys are installed, use secure key-based authentication with command restrictions
   4. Restrict commands to vmkfstools operations only
 
+=======
+>>>>>>> 0cf55182b (add clone bytes progress to populator)
 ## NetApp
 - Error `cannot derive SVM to use; please specify SVM in config file`
   This is a configuration issue with Ontap and could be fixed by specifying a default
