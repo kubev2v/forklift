@@ -11,7 +11,7 @@ ARG DEFAULT_CHANNEL
 ARG REGISTRY
 ARG OCP_VERSIONS
 
-ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:1b175152ba646644f576818314bc98f4af9487f6f8663160c1a67d4bb298f620"
+ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:ed75c1f76ea648fcc1cf47bca9b42e435d155722013779c3c796af946c7d1557"
 
 ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:247cc6736d2f0bbb0d3caf67ee2750862ea4a415703bd12dba716f2bcd19af00"
 
