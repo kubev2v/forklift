@@ -788,6 +788,25 @@ func (in *PlanSpec) DeepCopyInto(out *PlanSpec) {
 		*out = new(v1.Affinity)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.ConvertorLabels != nil {
+		in, out := &in.ConvertorLabels, &out.ConvertorLabels
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.ConvertorNodeSelector != nil {
+		in, out := &in.ConvertorNodeSelector, &out.ConvertorNodeSelector
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.ConvertorAffinity != nil {
+		in, out := &in.ConvertorAffinity, &out.ConvertorAffinity
+		*out = new(v1.Affinity)
+		(*in).DeepCopyInto(*out)
+	}
 	out.Provider = in.Provider
 	out.Map = in.Map
 	if in.VMs != nil {
