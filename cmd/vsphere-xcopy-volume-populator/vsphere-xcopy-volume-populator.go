@@ -18,6 +18,7 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/powerflex"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/powermax"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/powerstore"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/primera3par"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/pure"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vantara"
@@ -113,6 +114,13 @@ func main() {
 			storageHostname, storageUsername, storagePassword, storageSkipSSLVerification == "true")
 		if err != nil {
 			klog.Fatalf("failed to initialize PowerMax clonner with %s", err)
+		}
+		storageApi = &sm
+	case forklift.StorageVendorProductPowerStore:
+		sm, err := powerstore.NewPowerstoreClonner(
+			storageHostname, storageUsername, storagePassword, storageSkipSSLVerification == "true")
+		if err != nil {
+			klog.Fatalf("failed to initialize PowerStore clonner with %s", err)
 		}
 		storageApi = &sm
 	default:

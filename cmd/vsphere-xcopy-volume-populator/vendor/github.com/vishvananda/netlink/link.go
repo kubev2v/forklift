@@ -993,6 +993,7 @@ func (gtp *GTP) Type() string {
 }
 
 // Virtual XFRM Interfaces
+//
 //	Named "xfrmi" to prevent confusion with XFRM objects
 type Xfrmi struct {
 	LinkAttrs

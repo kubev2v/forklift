@@ -5,8 +5,8 @@
 package obj
 
 import (
-	"github.com/twitchyliquid64/golang-asm/goobj"
 	"encoding/binary"
+	"github.com/twitchyliquid64/golang-asm/goobj"
 	"log"
 )
 

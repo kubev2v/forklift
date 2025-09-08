@@ -15,6 +15,8 @@ import (
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
+	"github.com/vmware/govmomi/vim25/types"
+
 	"k8s.io/klog/v2"
 )
 
@@ -93,6 +95,10 @@ func (c *VSphereClient) GetEsxByVm(ctx context.Context, vmId string) (*object.Ho
 			fmt.Printf("found vm %v\n", vm)
 			break
 		}
+	}
+	if vm == nil {
+		moref := types.ManagedObjectReference{Type: "VirtualMachine", Value: vmId}
+		vm = object.NewVirtualMachine(c.Client.Client, moref)
 	}
 	if vm == nil {
 		return nil, fmt.Errorf("failed to find VM with ID %s", vmId)

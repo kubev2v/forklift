@@ -22,14 +22,14 @@ DescribeTable describes a table-driven test.
 
 For example:
 
-    DescribeTable("a simple table",
-        func(x int, y int, expected bool) {
-            Ω(x > y).Should(Equal(expected))
-        },
-        Entry("x > y", 1, 0, true),
-        Entry("x == y", 0, 0, false),
-        Entry("x < y", 0, 1, false),
-    )
+	DescribeTable("a simple table",
+	    func(x int, y int, expected bool) {
+	        Ω(x > y).Should(Equal(expected))
+	    },
+	    Entry("x > y", 1, 0, true),
+	    Entry("x == y", 0, 0, false),
+	    Entry("x < y", 0, 1, false),
+	)
 
 The first argument to `DescribeTable` is a string description.
 The second argument is a function that will be run for each table entry.  Your assertions go here - the function is equivalent to a Ginkgo It.

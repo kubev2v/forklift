@@ -5084,6 +5084,7 @@ spec:
                               - pureFlashArray
                               - powerflex
                               - powermax
+                              - powerstore
                               type: string
                           required:
                           - secretRef

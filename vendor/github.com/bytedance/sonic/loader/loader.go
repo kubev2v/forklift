@@ -17,7 +17,7 @@
 package loader
 
 import (
-    `unsafe`
+	"unsafe"
 )
 
 // Function is a function pointer
@@ -25,13 +25,13 @@ type Function unsafe.Pointer
 
 // Options used to load a module
 type Options struct {
-    // NoPreempt is used to disable async preemption for this module
-    NoPreempt bool
+	// NoPreempt is used to disable async preemption for this module
+	NoPreempt bool
 }
 
 // Loader is a helper used to load a module simply
 type Loader struct {
-    Name string // module name
-    File string // file name
-    Options 
+	Name string // module name
+	File string // file name
+	Options
 }

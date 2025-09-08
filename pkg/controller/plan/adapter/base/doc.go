@@ -91,8 +91,8 @@ type Builder interface {
 	LunPersistentVolumes(vmRef ref.Ref) (pvs []core.PersistentVolume, err error)
 	// Build LUN PVCs.
 	LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.PersistentVolumeClaim, err error)
-	// check whether the builder supports Volume Populators
-	SupportsVolumePopulators() bool
+	// check whether the builder supports Volume Populators for a specific VM
+	SupportsVolumePopulators(vmRef ref.Ref) bool
 	// Build populator volumes
 	PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) ([]*core.PersistentVolumeClaim, error)
 	// Transferred bytes
