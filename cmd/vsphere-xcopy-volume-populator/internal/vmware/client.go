@@ -3,6 +3,7 @@ package vmware
 import (
 	"context"
 	"encoding/xml"
+	"net/url"
 	"reflect"
 	"strings"
 
@@ -17,7 +18,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-//go:generate mockgen -destination=mocks/vmware_mock_client.go -package=vmware_mocks . Client
+//go:generate go run go.uber.org/mock/mockgen -destination=mocks/vmware_mock_client.go -package=vmware_mocks . Client
 type Client interface {
 	GetEsxByVm(ctx context.Context, vmName string) (*object.HostSystem, error)
 	RunEsxCommand(ctx context.Context, host *object.HostSystem, command []string) ([]esx.Values, error)
@@ -28,13 +29,13 @@ type VSphereClient struct {
 	*govmomi.Client
 }
 
-func NewClient(hostname, username, password string) (Client, error) {
+func NewClient(vcenterUrl, username, password string) (Client, error) {
 	ctx := context.Background()
-	vcenterUrl := fmt.Sprintf("%s:%s@%s", username, password, hostname)
 	u, err := soap.ParseURL(vcenterUrl)
 	if err != nil {
 		return nil, fmt.Errorf("Failed parsing vCenter URL: %w", err)
 	}
+	u.User = url.UserPassword(username, password)
 
 	c, err := govmomi.NewClient(ctx, u, true)
 	if err != nil {
@@ -58,7 +59,6 @@ func (c *VSphereClient) RunEsxCommand(ctx context.Context, host *object.HostSyst
 		if fault, ok := err.(*esx.Fault); ok {
 			fmt.Printf("CLI Fault: %+v\n", fault.MessageDetail())
 		}
-
 		return nil, err
 	}
 	for _, valueMap := range res.Values {
