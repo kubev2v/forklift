@@ -178,7 +178,7 @@ func main() {
 	}
 
 	progressCh := make(chan uint)
-	cloneProgressBytesCh := make(chan uint)
+	cloneProgressBytesCh := make(chan uint64)
 	quitCh := make(chan error)
 
 	go p.Populate(sourceVmId, sourceVMDKFile, pv, progressCh, quitCh, cloneProgressBytesCh)
