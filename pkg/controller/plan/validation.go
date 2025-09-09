@@ -1312,6 +1312,15 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 			Message:  "VDDK image not set on the provider, this is required for the warm migration",
 		})
 	}
+	if plan.Spec.SkipGuestConversion && vddkImage == "" {
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     VDDKInitImageUnavailable,
+			Status:   True,
+			Reason:   NotSet,
+			Category: api.CategoryCritical,
+			Message:  "VDDK image not set on the provider, this is required for the raw copy mode migration",
+		})
+	}
 
 	return
 }
