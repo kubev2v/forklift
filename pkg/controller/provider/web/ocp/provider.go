@@ -134,7 +134,7 @@ func (h ProviderHandler) AddCount(ctx *gin.Context, r *Provider) (err error) {
 	r.VMCount = int64(len(vms))
 
 	// Network
-	nets, err := h.NetworkAttachmentDefinitions(ctx, &r.Object)
+	nets, err := h.NetworkAttachmentDefinitions(ctx)
 	if err != nil {
 		return liberr.Wrap(err)
 	}

@@ -44,7 +44,7 @@ func (h NadHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusNotImplemented)
 		return
 	}
-	nads, err := h.NetworkAttachmentDefinitions(ctx, h.Provider)
+	nads, err := h.NetworkAttachmentDefinitions(ctx)
 	if err != nil {
 		log.Trace(
 			err,
@@ -74,7 +74,7 @@ func (h NadHandler) Get(ctx *gin.Context) {
 		base.SetForkliftError(ctx, err)
 		return
 	}
-	nads, err := h.NetworkAttachmentDefinitions(ctx, h.Provider)
+	nads, err := h.NetworkAttachmentDefinitions(ctx)
 	if err != nil {
 		log.Trace(
 			err,

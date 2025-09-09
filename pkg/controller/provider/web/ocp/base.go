@@ -267,51 +267,35 @@ func (h Handler) StorageClasses(ctx *gin.Context) (storageclasses []model.Storag
 	return
 }
 
-func (h Handler) NetworkAttachmentDefinitions(ctx *gin.Context, provider *api.Provider) (nets []model.NetworkAttachmentDefinition, err error) {
+func (h Handler) NetworkAttachmentDefinitions(ctx *gin.Context) (nets []model.NetworkAttachmentDefinition, err error) {
 	client, err := h.UserClient(ctx)
 	if err != nil {
 		return
 	}
 
-	// Determine which namespaces to query
-	var namespacesToQuery []string
-	if provider != nil && provider.IsRestrictedHost() {
-		// For restricted host providers, query specific namespaces
-		namespacesToQuery = []string{provider.GetNamespace(), core.NamespaceDefault}
-	} else {
-		// For non-restricted providers, query all namespaces (empty slice means no namespace restriction)
-		namespacesToQuery = []string{""}
+	list := net.NetworkAttachmentDefinitionList{}
+	options := h.ListOptions(ctx)
+
+	err = client.List(context.TODO(), &list, options...)
+	if err != nil {
+		h.setError(ref.ToKind(&net.NetworkAttachmentDefinition{}), err)
+		return
 	}
 
-	// Query each namespace and collect results, empty namespace means all namespaces
-	for _, ns := range namespacesToQuery {
-		list := net.NetworkAttachmentDefinitionList{}
-		options := h.ListOptions(ctx)
-		if ns != "" {
-			options = append(options, ocpclient.InNamespace(ns))
-		}
-
-		err = client.List(context.TODO(), &list, options...)
-		if err != nil {
-			h.setError(ref.ToKind(&net.NetworkAttachmentDefinition{}), err)
-			return
-		}
-
-		// Convert items to model objects and append to results
-		for _, nad := range list.Items {
-			m := model.NetworkAttachmentDefinition{}
-			m.With(&nad)
-			networkConfig := model.NetworkConfig{}
-			if err := json.Unmarshal([]byte(nad.Spec.Config), &networkConfig); err == nil {
-				if networkConfig.IsUnsupportedUdn() {
-					log.Info("NAD is not supported UDN configuration, skipping", "nad", nad, "networkConfig", networkConfig)
-					continue
-				}
-			} else {
-				log.Error(err, "Failed to unmarshal network config, ignoring as the NAD does not match UDN specification")
+	// Convert items to model objects and append to results
+	for _, nad := range list.Items {
+		m := model.NetworkAttachmentDefinition{}
+		m.With(&nad)
+		networkConfig := model.NetworkConfig{}
+		if err := json.Unmarshal([]byte(nad.Spec.Config), &networkConfig); err == nil {
+			if networkConfig.IsUnsupportedUdn() {
+				log.Info("NAD is not supported UDN configuration, skipping", "nad", nad, "networkConfig", networkConfig)
+				continue
 			}
-			nets = append(nets, m)
+		} else {
+			log.Error(err, "Failed to unmarshal network config, ignoring as the NAD does not match UDN specification")
 		}
+		nets = append(nets, m)
 	}
 
 	h.clearError(ref.ToKind(&net.NetworkAttachmentDefinition{}))
