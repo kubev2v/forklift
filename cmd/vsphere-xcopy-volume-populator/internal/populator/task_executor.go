@@ -78,7 +78,7 @@ func ParseProgress(lastLine string, xcloneWrites string) (int, int, error) {
 }
 
 // ExecuteCloneTask handles the unified task execution logic
-func ExecuteCloneTask(ctx context.Context, executor TaskExecutor, host *object.HostSystem, sourcePath, targetLUN string, progress chan<- uint, cloneProgressBytes chan<- uint) error {
+func ExecuteCloneTask(ctx context.Context, executor TaskExecutor, host *object.HostSystem, sourcePath, targetLUN string, progress chan<- uint64, cloneProgressBytes chan<- uint64) error {
 	// Start the clone task
 	task, err := executor.StartClone(ctx, host, sourcePath, targetLUN)
 	if err != nil {
@@ -108,8 +108,8 @@ func ExecuteCloneTask(ctx context.Context, executor TaskExecutor, host *object.H
 
 		// Report progress if found
 		if progressValue, cloneProgress, err := ParseProgress(taskStatus.LastLine, taskStatus.XcloneWrites); err == nil {
-			progress <- uint(progressValue)
-			cloneProgressBytes <- uint(cloneProgress)
+			progress <- uint64(progressValue)
+			cloneProgressBytes <- uint64(cloneProgress)
 		}
 
 		// Check for task completion

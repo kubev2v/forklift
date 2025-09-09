@@ -177,7 +177,7 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	progressCh := make(chan uint)
+	progressCh := make(chan uint64)
 	cloneProgressBytesCh := make(chan uint64)
 	quitCh := make(chan error)
 

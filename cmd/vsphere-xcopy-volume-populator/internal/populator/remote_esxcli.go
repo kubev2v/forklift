@@ -86,7 +86,7 @@ func NewWithRemoteEsxcliSSH(storageApi StorageApi, vsphereHostname, vsphereUsern
 	}, nil
 }
 
-func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, progress chan<- uint, quit chan error, cloneProgressBytes chan<- uint64) (errFinal error) {
+func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, progress chan<- uint64, quit chan error, cloneProgressBytes chan<- uint64) (errFinal error) {
 	// isn't it better to not call close the channel from the caller?
 	defer func() {
 		r := recover()
