@@ -12,7 +12,7 @@ import (
 )
 
 // Unified progress pattern that handles both VIB and SSH output formats
-var progressPattern = regexp.MustCompile(`\s(\d+)\%`)
+var progressPattern = regexp.MustCompile(`(\d+)\%`)
 var cloneProgressPattern = regexp.MustCompile(`(\d+)`)
 
 // TaskInfo represents information about a started clone task
