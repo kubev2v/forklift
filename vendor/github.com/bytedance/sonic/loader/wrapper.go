@@ -12,16 +12,16 @@
 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 * See the License for the specific language governing permissions and
 * limitations under the License.
-*/
+ */
 
 package loader
 
 import (
-	`reflect`
-	`unsafe`
+	"reflect"
+	"unsafe"
 
-	`github.com/bytedance/sonic/loader/internal/abi`
-	`github.com/bytedance/sonic/loader/internal/rt`
+	"github.com/bytedance/sonic/loader/internal/abi"
+	"github.com/bytedance/sonic/loader/internal/rt"
 )
 
 var _C_Redzone = []bool{false, false, false, false}
@@ -29,7 +29,7 @@ var _C_Redzone = []bool{false, false, false, false}
 // CFunc is a function information for C func
 type CFunc struct {
 	// C function name
-	Name     string
+	Name string
 
 	// entry pc relative to entire text segment
 	EntryOff uint32
@@ -41,38 +41,38 @@ type CFunc struct {
 	MaxStack uintptr
 
 	// PC->SP delta lists of the function
-	Pcsp     [][2]uint32
+	Pcsp [][2]uint32
 }
 
 // GoC is the wrapper for Go calls to C
 type GoC struct {
 	// CName is the name of corresponding C function
-	CName     string
+	CName string
 
 	// CEntry points out where to store the entry address of corresponding C function.
 	// It won't be set if nil
-	CEntry   *uintptr
+	CEntry *uintptr
 
-	// GoFunc is the POINTER of corresponding go stub function. 
-	// It is used to generate Go-C ABI conversion wrapper and receive the wrapper's address 
-	//   eg. &func(a int, b int) int 
-	//     FOR 
+	// GoFunc is the POINTER of corresponding go stub function.
+	// It is used to generate Go-C ABI conversion wrapper and receive the wrapper's address
+	//   eg. &func(a int, b int) int
+	//     FOR
 	//     int add(int a, int b)
 	// It won't be set if nil
-	GoFunc   interface{} 
+	GoFunc interface{}
 }
 
 // WrapGoC wraps C functions and loader it into Go stubs
 func WrapGoC(text []byte, natives []CFunc, stubs []GoC, modulename string, filename string) {
 	funcs := make([]Func, len(natives))
-	
+
 	// register C funcs
 	for i, f := range natives {
 		fn := Func{
-			Flag: FuncFlag_ASM,
+			Flag:     FuncFlag_ASM,
 			EntryOff: f.EntryOff,
 			TextSize: f.TextSize,
-			Name: f.Name,
+			Name:     f.Name,
 		}
 		if len(f.Pcsp) != 0 {
 			fn.Pcsp = (*Pcdata)(unsafe.Pointer(&natives[i].Pcsp))
@@ -116,7 +116,7 @@ func WrapGoC(text []byte, natives []CFunc, stubs []GoC, modulename string, filen
 			if stubs[i].CName != natives[j].Name {
 				continue
 			}
-			
+
 			// calculate corresponding C entry
 			pc := uintptr(native_entry + uintptr(natives[j].EntryOff))
 			if stubs[i].CEntry != nil {
@@ -130,17 +130,17 @@ func WrapGoC(text []byte, natives []CFunc, stubs []GoC, modulename string, filen
 
 			// assemble wrapper codes
 			layout := abi.NewFunctionLayout(reflect.TypeOf(stubs[i].GoFunc).Elem())
-			frame := abi.NewFrame(&layout, _C_Redzone, true) 
+			frame := abi.NewFrame(&layout, _C_Redzone, true)
 			tcode := abi.CallC(pc, frame, natives[j].MaxStack)
 			code = append(code, tcode...)
 			size := uint32(len(tcode))
-		
+
 			fn := Func{
-				Flag: FuncFlag_ASM,
+				Flag:     FuncFlag_ASM,
 				ArgsSize: int32(layout.ArgSize()),
 				EntryOff: entryOff,
 				TextSize: size,
-				Name: stubs[i].CName + "_go",
+				Name:     stubs[i].CName + "_go",
 			}
 
 			// add check-stack and grow-stack texts' pcsp
@@ -174,9 +174,9 @@ func WrapGoC(text []byte, natives []CFunc, stubs []GoC, modulename string, filen
 			wrapIds = append(wrapIds, i)
 		}
 	}
-	gofuncs := Load(code, wraps, modulename+"/go", []string{filename+".go"})
+	gofuncs := Load(code, wraps, modulename+"/go", []string{filename + ".go"})
 
-	// set go func value 
+	// set go func value
 	for i := range gofuncs {
 		idx := wrapIds[i]
 		w := rt.UnpackEface(stubs[idx].GoFunc)

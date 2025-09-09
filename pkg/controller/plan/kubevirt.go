@@ -1863,6 +1863,41 @@ func (r *KubeVirt) findTemplate(vm *plan.VMStatus) (tmpl *template.Template, err
 	return
 }
 
+// getConvertorAffinity returns the affinity configuration for virt-v2v convertor pods.
+// If ConvertorAffinity is specified in the plan, it uses that; otherwise, spread virt-v2v pods across nodes.
+func (r *KubeVirt) getConvertorAffinity() *core.Affinity {
+	// If custom convertor affinity is specified, use it
+	if r.Plan.Spec.ConvertorAffinity != nil {
+		return r.Plan.Spec.ConvertorAffinity.DeepCopy()
+	}
+
+	// Default pod anti-affinity behavior to spread virt-v2v pods across nodes
+	return &core.Affinity{
+		PodAntiAffinity: &core.PodAntiAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+				{
+					Weight: 100,
+					PodAffinityTerm: core.PodAffinityTerm{
+						NamespaceSelector: &meta.LabelSelector{},
+						TopologyKey:       "kubernetes.io/hostname",
+						LabelSelector: &meta.LabelSelector{
+							MatchExpressions: []meta.LabelSelectorRequirement{
+								{
+									Key: kApp,
+									Values: []string{
+										"virt-v2v",
+									},
+									Operator: meta.LabelSelectorOpIn,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, libvirtConfigMap *core.ConfigMap, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, v2vSecret *core.Secret) (pod *core.Pod, err error) {
 	volumes, volumeMounts, volumeDevices, err := r.podVolumeMounts(vmVolumes, libvirtConfigMap, vddkConfigmap, pvcs, vm)
 	if err != nil {
@@ -1998,12 +2033,27 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 			Type: core.SeccompProfileTypeRuntimeDefault,
 		}
 	}
+	// pod labels - start with user-defined labels, then system conversion labels override them
+	podLabels := make(map[string]string)
+	if r.Plan.Spec.ConvertorLabels != nil {
+		maps.Copy(podLabels, r.Plan.Spec.ConvertorLabels)
+	}
+	// System conversion labels override user labels
+	maps.Copy(podLabels, r.conversionLabels(vm.Ref, false))
+
+	// pod node selector
+	var podNodeSelector map[string]string
+	if r.Plan.Spec.ConvertorNodeSelector != nil {
+		podNodeSelector = make(map[string]string)
+		maps.Copy(podNodeSelector, r.Plan.Spec.ConvertorNodeSelector)
+	}
+
 	// pod
 	pod = &core.Pod{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace:    r.Plan.Spec.TargetNamespace,
 			Annotations:  annotations,
-			Labels:       r.conversionLabels(vm.Ref, false),
+			Labels:       podLabels,
 			GenerateName: r.getGeneratedName(vm),
 		},
 		Spec: core.PodSpec{
@@ -2013,30 +2063,8 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 				RunAsNonRoot:   &nonRoot,
 				SeccompProfile: &seccompProfile,
 			},
-			Affinity: &core.Affinity{
-				PodAntiAffinity: &core.PodAntiAffinity{
-					PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
-						{
-							Weight: 100,
-							PodAffinityTerm: core.PodAffinityTerm{
-								NamespaceSelector: &meta.LabelSelector{},
-								TopologyKey:       "kubernetes.io/hostname",
-								LabelSelector: &meta.LabelSelector{
-									MatchExpressions: []meta.LabelSelectorRequirement{
-										{
-											Key: kApp,
-											Values: []string{
-												"virt-v2v",
-											},
-											Operator: meta.LabelSelectorOpIn,
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
+			NodeSelector:   podNodeSelector,
+			Affinity:       r.getConvertorAffinity(),
 			RestartPolicy:  core.RestartPolicyNever,
 			InitContainers: initContainers,
 			Containers: []core.Container{

@@ -7,10 +7,10 @@
 package obj
 
 import (
+	"fmt"
 	"github.com/twitchyliquid64/golang-asm/dwarf"
 	"github.com/twitchyliquid64/golang-asm/objabi"
 	"github.com/twitchyliquid64/golang-asm/src"
-	"fmt"
 	"sort"
 	"sync"
 )

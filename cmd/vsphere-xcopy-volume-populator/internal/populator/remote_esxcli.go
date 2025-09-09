@@ -189,7 +189,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 			drv := driver[0]
 			link := linkState[0]
 			id := uid[0]
-
+			id = strings.ToLower(strings.TrimSpace(id))
 			// Check if the UID is FC, iSCSI or NVMe-oF
 			isTargetUID := strings.HasPrefix(id, "fc.") || strings.HasPrefix(id, "iqn.") || strings.HasPrefix(id, "nqn.")
 

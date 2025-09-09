@@ -5,8 +5,8 @@
 package obj
 
 import (
-	"github.com/twitchyliquid64/golang-asm/objabi"
 	"fmt"
+	"github.com/twitchyliquid64/golang-asm/objabi"
 	"strings"
 )
 

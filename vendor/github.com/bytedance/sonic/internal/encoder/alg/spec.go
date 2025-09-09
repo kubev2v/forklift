@@ -34,28 +34,28 @@ import (
 //
 // Note: it does not check for the invalid UTF-8 characters.
 func Valid(data []byte) (ok bool, start int) {
-    n := len(data)
-    if n == 0 {
-        return false, -1
-    }
-    s := rt.Mem2Str(data)
-    p := 0
-    m := types.NewStateMachine()
-    ret := native.ValidateOne(&s, &p, m, 0)
-    types.FreeStateMachine(m)
+	n := len(data)
+	if n == 0 {
+		return false, -1
+	}
+	s := rt.Mem2Str(data)
+	p := 0
+	m := types.NewStateMachine()
+	ret := native.ValidateOne(&s, &p, m, 0)
+	types.FreeStateMachine(m)
 
-    if ret < 0 {
-        return false, p-1
-    }
+	if ret < 0 {
+		return false, p - 1
+	}
 
-    /* check for trailing spaces */
-    for ;p < n; p++ {
-        if (types.SPACE_MASK & (1 << data[p])) == 0 {
-            return false, p
-        }
-    }
+	/* check for trailing spaces */
+	for ; p < n; p++ {
+		if (types.SPACE_MASK & (1 << data[p])) == 0 {
+			return false, p
+		}
+	}
 
-    return true, ret
+	return true, ret
 }
 
 var typeByte = rt.UnpackEface(byte(0)).Type
@@ -150,7 +150,7 @@ func HtmlEscape(dst []byte, src []byte) []byte {
 	return dst
 }
 
-func F64toa(buf []byte, v float64) ([]byte) {
+func F64toa(buf []byte, v float64) []byte {
 	if v == 0 {
 		return append(buf, '0')
 	}
@@ -163,7 +163,7 @@ func F64toa(buf []byte, v float64) ([]byte) {
 	}
 }
 
-func F32toa(buf []byte, v float32) ([]byte) {
+func F32toa(buf []byte, v float32) []byte {
 	if v == 0 {
 		return append(buf, '0')
 	}
@@ -176,7 +176,7 @@ func F32toa(buf []byte, v float32) ([]byte) {
 	}
 }
 
-func I64toa(buf []byte, v int64) ([]byte) {
+func I64toa(buf []byte, v int64) []byte {
 	buf = rt.GuardSlice2(buf, 32)
 	ret := native.I64toa((*byte)(rt.IndexByte(buf, len(buf))), v)
 	if ret > 0 {
@@ -186,7 +186,7 @@ func I64toa(buf []byte, v int64) ([]byte) {
 	}
 }
 
-func U64toa(buf []byte, v uint64) ([]byte) {
+func U64toa(buf []byte, v uint64) []byte {
 	buf = rt.GuardSlice2(buf, 32)
 	ret := native.U64toa((*byte)(rt.IndexByte(buf, len(buf))), v)
 	if ret > 0 {
@@ -195,4 +195,3 @@ func U64toa(buf []byte, v uint64) ([]byte) {
 		return buf
 	}
 }
-

@@ -1,4 +1,3 @@
-
 /*
  * Copyright 2021 ByteDance Inc.
  *
@@ -18,17 +17,16 @@
 package neon
 
 import (
-    `unsafe`
-    `github.com/bytedance/sonic/internal/native/types`
+	"github.com/bytedance/sonic/internal/native/types"
+	"unsafe"
 )
 
 //go:nosplit
 func value(s unsafe.Pointer, n int, p int, v *types.JsonState, flags uint64) (ret int) {
-    return __value(s, n, p, v, flags)
+	return __value(s, n, p, v, flags)
 }
 
 //go:nosplit
 //go:noescape
 //goland:noinspection GoUnusedParameter
 func __value(s unsafe.Pointer, n int, p int, v *types.JsonState, flags uint64) (ret int)
-

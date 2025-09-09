@@ -92,11 +92,11 @@ func NewDecoder(r io.ReadSeeker) *Decoder {
 // To decode property list values into an interface value, Unmarshal decodes the property list into the concrete value contained
 // in the interface value. If the interface value is nil, Unmarshal stores one of the following in the interface value:
 //
-//     string, bool, uint64, float64
-//     plist.UID for "CoreFoundation Keyed Archiver UIDs" (convertible to uint64)
-//     []byte, for plist data
-//     []interface{}, for plist arrays
-//     map[string]interface{}, for plist dictionaries
+//	string, bool, uint64, float64
+//	plist.UID for "CoreFoundation Keyed Archiver UIDs" (convertible to uint64)
+//	[]byte, for plist data
+//	[]interface{}, for plist arrays
+//	map[string]interface{}, for plist dictionaries
 //
 // If a property list value is not appropriate for a given value type, Unmarshal aborts immediately and returns an error.
 //

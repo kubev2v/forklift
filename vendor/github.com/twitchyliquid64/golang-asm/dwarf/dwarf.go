@@ -9,9 +9,9 @@ package dwarf
 
 import (
 	"bytes"
-	"github.com/twitchyliquid64/golang-asm/objabi"
 	"errors"
 	"fmt"
+	"github.com/twitchyliquid64/golang-asm/objabi"
 	"os/exec"
 	"sort"
 	"strconv"

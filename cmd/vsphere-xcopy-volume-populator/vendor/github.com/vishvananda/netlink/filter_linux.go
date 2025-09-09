@@ -52,7 +52,8 @@ func (filter *U32) Type() string {
 
 // Fw filter filters on firewall marks
 // NOTE: this is in filter_linux because it refers to nl.TcPolice which
-//       is defined in nl/tc_linux.go
+//
+//	is defined in nl/tc_linux.go
 type Fw struct {
 	FilterAttrs
 	ClassId uint32

@@ -32,12 +32,12 @@ package obj
 
 import (
 	"bufio"
+	"fmt"
 	"github.com/twitchyliquid64/golang-asm/dwarf"
 	"github.com/twitchyliquid64/golang-asm/goobj"
 	"github.com/twitchyliquid64/golang-asm/objabi"
 	"github.com/twitchyliquid64/golang-asm/src"
 	"github.com/twitchyliquid64/golang-asm/sys"
-	"fmt"
 	"sync"
 )
 

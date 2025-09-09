@@ -9,9 +9,9 @@
 package arch
 
 import (
+	"errors"
 	"github.com/twitchyliquid64/golang-asm/obj"
 	"github.com/twitchyliquid64/golang-asm/obj/arm64"
-	"errors"
 )
 
 var arm64LS = map[string]uint8{

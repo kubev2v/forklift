@@ -1,5 +1,3 @@
-
-
 package base64x
 
 import (
