@@ -23,12 +23,12 @@ type TaskInfo struct {
 
 // TaskStatus represents the current status of a clone task
 type TaskStatus struct {
-	TaskId   string
-	ExitCode string
-	Stderr   string
-	LastLine string
+	TaskId       string
+	ExitCode     string
+	Stderr       string
+	LastLine     string
 	XcloneWrites string
-	XcopyUsed bool
+	XcopyUsed    bool
 }
 
 // TaskExecutor abstracts the transport-specific operations for task execution
@@ -50,14 +50,18 @@ func ParseProgress(lastLine string, xcloneWrites string) (int, int, error) {
 		return -1, -1, fmt.Errorf("lastLine is empty")
 	}
 
-	klog.V(2).Infof("ParseProgress: parsing line: %q", lastLine)
 
-	progress, cloneProgress := -1, -1
+	// Defaults when not found
+	progress := -1
+	cloneProgress := -1
+
 	// VIB format: "Clone: 15% done."
 	match := progressPattern.FindStringSubmatch(lastLine)
 	if len(match) > 1 {
-		if progress, err := strconv.Atoi(match[1]); err == nil {
-			klog.V(2).Infof("ParseProgress: extracted progress: %d%%", progress)
+		tempProgress, err := strconv.Atoi(match[1])
+		if err == nil {
+			progress = tempProgress
+			klog.Infof("ParseProgress: extracted progress: %d%%", progress)
 		} else {
 			klog.Warningf("ParseProgress: failed to parse progress number from %q: %v", match[1], err)
 			return -1, -1, fmt.Errorf("failed to parse progress number from %q: %v", match[1], err)
@@ -65,14 +69,16 @@ func ParseProgress(lastLine string, xcloneWrites string) (int, int, error) {
 	}
 
 	xcloneWritesMatch := cloneProgressPattern.FindStringSubmatch(xcloneWrites)
-		if len(xcloneWritesMatch) > 1 {
-			if cloneProgress, err := strconv.Atoi(xcloneWritesMatch[1]); err == nil {
-				klog.V(2).Infof("ParseProgress: extracted clone bytes progress: %d%%", cloneProgress)
-			} else {
-				klog.Warningf("ParseProgress: failed to parse clone bytes progress number from %q: %v", match[1], err)
-				return -1, -1, fmt.Errorf("failed to parse clone bytes progress number from %q: %v", match[1], err)
-			}
+	if len(xcloneWritesMatch) > 1 {
+		tempCloneProgress, err := strconv.Atoi(xcloneWritesMatch[1])
+		if err == nil {
+			cloneProgress = tempCloneProgress
+			klog.Infof("ParseProgress: extracted clone bytes progress: %d", cloneProgress)
+		} else {
+			klog.Warningf("ParseProgress: failed to parse clone bytes progress number from %q: %v", xcloneWritesMatch[1], err)
+			return -1, -1, fmt.Errorf("failed to parse clone bytes progress number from %q: %v", xcloneWritesMatch[1], err)
 		}
+	}
 
 	return progress, cloneProgress, nil
 }
