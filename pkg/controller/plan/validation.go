@@ -583,12 +583,12 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "VM host is in maintenance mode.",
 		Items:    []string{},
 	}
-	multipleNetworkMappings := libcnd.Condition{
+	multiplePodNetworkMappings := libcnd.Condition{
 		Type:     VMMultiplePodNetworkMappings,
 		Status:   True,
 		Reason:   NotValid,
 		Category: api.CategoryCritical,
-		Message:  "VM has invalid network mappings: only one interface can be mapped to a Pod network or to a unique Multus networks.",
+		Message:  "VM has more than one interface mapped to the pod network.",
 		Items:    []string{},
 	}
 	missingStaticIPs := libcnd.Condition{
@@ -811,12 +811,12 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			if !ok {
 				unmappedNetwork.Items = append(unmappedNetwork.Items, ref.String())
 			}
-			ok, err = validator.NetworkMapping(*ref)
+			ok, err = validator.PodNetwork(*ref)
 			if err != nil {
 				return err
 			}
 			if !ok {
-				multipleNetworkMappings.Items = append(multipleNetworkMappings.Items, ref.String())
+				multiplePodNetworkMappings.Items = append(multiplePodNetworkMappings.Items, ref.String())
 			}
 		}
 		if plan.Referenced.Map.Storage != nil {
@@ -1042,8 +1042,8 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	if len(maintenanceMode.Items) > 0 {
 		plan.Status.SetCondition(maintenanceMode)
 	}
-	if len(multipleNetworkMappings.Items) > 0 {
-		plan.Status.SetCondition(multipleNetworkMappings)
+	if len(multiplePodNetworkMappings.Items) > 0 {
+		plan.Status.SetCondition(multiplePodNetworkMappings)
 	}
 	if len(missingStaticIPs.Items) > 0 {
 		plan.Status.SetCondition(missingStaticIPs)
