@@ -9,7 +9,7 @@ ARG VERSION="99.0.0"
 ARG OPERATOR_BUNDLE_IMAGE
 ARG OPM_OPTS
 
-RUN microdnf install gettext -y
+RUN microdnf install gettext containers-common -y
 
 COPY --from=opm /bin/opm /bin/opm
 COPY operator /app

@@ -1,49 +1,48 @@
-FROM registry.access.redhat.com/ubi9:9.6-1754586119 AS appliance
+# Build virt-v2v binary
+FROM registry.access.redhat.com/ubi9/go-toolset:1.24.4-1753221510 AS builder
+WORKDIR /app
+COPY --chown=1001:0 ./ ./
+ENV GOFLAGS "-mod=vendor -tags=strictfipsruntime"
+ENV GOEXPERIMENT strictfipsruntime
 
-RUN subscription-manager refresh && \
-    dnf install -y --setopt=install_weak_deps=False \
-        qemu-img \
-        libguestfs-devel \
-        libguestfs-winsupport \
-        libguestfs-xfs
+RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-monitor ./cmd/virt-v2v-monitor/virt-v2v-monitor.go
+RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o image-converter ./cmd/image-converter/image-converter.go
+RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-wrapper ./cmd/virt-v2v/entrypoint.go
+
+# Main container
+FROM quay.io/centos/centos:stream9
+RUN rm /etc/pki/tls/fips_local.cnf && \
+    echo -e '[fips_sect]\ntls1-prf-ems-check = 0\nactivate = 1' > /etc/pki/tls/fips_local.cnf && \
+    sed -i '/^\\[ crypto_policy \\]/a Options=RHNoEnforceEMSinFIPS' /etc/pki/tls/openssl.cnf
+
+# The virt-v2v-in-place in centos is not in the bin directory and is not accessible via PATH
+ENV PATH="$PATH:/usr/libexec"
+ENV LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1
+
+RUN mkdir /disks && \
+    source /etc/os-release && \
+    dnf install -y \
+        virt-v2v && \
+    dnf clean all
+
+# TODO: This should be replaced with `dnf install -y virtio-win` from centos-stream10
+RUN dnf install -y https://kojihub.stream.centos.org/kojifiles/packages/virtio-win/1.9.40/1.el9/noarch/virtio-win-1.9.40-1.el9.noarch.rpm
+
+RUN ( [ "$(rpm -q glibc)" == "glibc-2.34-66.el9.x86_64" ] && dnf -y downgrade glibc-2.34-65.el9.x86_64 || true ) && \
+dnf -y install libguestfs libguestfs-appliance libguestfs-xfs libguestfs-winsupport qemu-img supermin && \
+        depmod $(ls /lib/modules/ |tail -n1)
 
 # Create tarball for the appliance.
 #
 # LIBGUESTFS_BACKEND=direct is required to work around the following bug:
 # https://issues.redhat.com/browse/RHEL-104684
 # and it can be removed when that bug gets fixed.
-RUN mkdir -p /usr/local/lib/guestfs/appliance && \
-    cd /usr/local/lib/guestfs/appliance && \
-    LIBGUESTFS_BACKEND=direct libguestfs-make-fixed-appliance . && \
-    qemu-img convert -c -O qcow2 root root.qcow2 && \
-    mv -vf root.qcow2 root
-
-FROM registry.access.redhat.com/ubi9/go-toolset:1.24.4-1753221510 AS builder
-WORKDIR /app
-COPY --chown=1001:0 ./ ./
-ENV GOFLAGS="-mod=vendor -tags=strictfipsruntime"
-ENV GOEXPERIMENT=strictfipsruntime
-ENV GOCACHE=/go-build/cache
-
-RUN --mount=type=cache,target=${GOCACHE},uid=1001 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-monitor github.com/kubev2v/forklift/cmd/virt-v2v-monitor
-RUN --mount=type=cache,target=${GOCACHE},uid=1001 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o image-converter github.com/kubev2v/forklift/cmd/image-converter
-RUN --mount=type=cache,target=${GOCACHE},uid=1001 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-wrapper github.com/kubev2v/forklift/cmd/virt-v2v
-
-FROM registry.access.redhat.com/ubi9:9.6-1754586119
-
-# RUN rm /etc/pki/tls/fips_local.cnf && \
-#     echo -e '[fips_sect]\ntls1-prf-ems-check = 0\nactivate = 1' > /etc/pki/tls/fips_local.cnf && \
-#     sed -i '/^\\[ crypto_policy \\]/a Options=RHNoEnforceEMSinFIPS' /etc/pki/tls/openssl.cnf
-# RUN mv /etc/pki/tls/certs/ca-bundle.crt /etc/pki/tls/certs/ca-bundle.crt.bak && \
-#     ln -sf /opt/ca-bundle.crt /etc/pki/tls/certs/ca-bundle.crt
-
-RUN subscription-manager refresh && \
-    mkdir /disks && \
-    source /etc/os-release && \
-    dnf install -y \
-        virt-v2v \
-        virtio-win && \
-    dnf clean all
+RUN mkdir -p /usr/lib64/guestfs/appliance && \
+        cd /usr/lib64/guestfs/appliance && \
+        LIBGUESTFS_BACKEND=direct libguestfs-make-fixed-appliance . && \
+        qemu-img convert -c -O qcow2 root root.qcow2 && \
+        mv -vf root.qcow2 root && \
+        tar -cvf /libguestfs-appliance.tar /usr/lib64/guestfs/appliance
 
 # This prevents libvirt from attempting to create files in the root directory,
 # which would lead to permission errors.
@@ -55,15 +54,13 @@ ENV HOME=/home/qemu
 # absence of an init process to clean up zombie processes. 'catatonit' acts
 # as PID 1 to resolve this.
 # Refer to: https://issues.redhat.com/browse/RHEL-105529
-RUN dnf install -y catatonit
+RUN dnf install -y https://kojihub.stream.centos.org/kojifiles/packages/catatonit/0.2.0/2.el9/x86_64/catatonit-0.2.0-2.el9.x86_64.rpm
 
 # This ensures that the 'libvirt:qemu:///session' connection method, which is
 # the officially tested and supported flow, is utilized instead of direct connections.
 ENV LIBGUESTFS_BACKEND=libvirt:qemu:///session
 
-
-RUN mkdir -p /usr/lib64/guestfs/appliance
-COPY --from=appliance /usr/local/lib/guestfs/appliance /usr/lib64/guestfs/appliance
+RUN mkdir -p /etc/pki/CA/ && chown qemu:qemu /etc/pki/CA/
 
 COPY --from=builder /app/virt-v2v-monitor /usr/local/bin/virt-v2v-monitor
 
@@ -71,19 +68,18 @@ COPY --from=builder /app/image-converter /usr/local/bin/image-converter
 
 COPY --from=builder /app/virt-v2v-wrapper /usr/bin/virt-v2v-wrapper
 
-
 ENTRYPOINT ["/usr/libexec/catatonit/catatonit", "/usr/bin/virt-v2v-wrapper"]
 
 LABEL \
-        com.redhat.component="mtv-virt-v2v-container" \
-        name="migration-toolkit-virtualization/mtv-virt-v2v-rhel9" \
+        com.redhat.component="forklift-virt-v2v-container" \
+        name="forklift/forklift-virt-v2v-rhel9" \
         license="Apache License 2.0" \
-        io.k8s.display-name="Migration Toolkit for Virtualization" \
-        io.k8s.description="Migration Toolkit for Virtualization - Virt-V2V" \
+        io.k8s.display-name="Forklift" \
+        io.k8s.description="Forklift - Virt-V2V" \
         io.openshift.tags="migration,mtv,forklift" \
-        summary="Migration Toolkit for Virtualization - Virt-V2V" \
-        description="Migration Toolkit for Virtualization - Virt-V2V" \
+        summary="Forklift - Virt-V2V" \
+        description="Forklift - Virt-V2V" \
+        io.k8s.description="Forklift - Virt-V2V" \
         vendor="Red Hat, Inc." \
-        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
-        distribution-scope="public" \
-        url="https://github.com/kubev2v/forklift"
+        maintainer="Forklift by Konveyor Community <forklift-dev@googlegroups.com>"
+
