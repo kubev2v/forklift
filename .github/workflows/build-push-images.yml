@@ -48,7 +48,7 @@ jobs:
             file: build/validation/Containerfile
             repo: forklift-validation
           - name: virt-v2v
-            file: build/virt-v2v/Containerfile-upstream
+            file: build/virt-v2v/Containerfile
             repo: forklift-virt-v2v
           - name: virt-v2v
             file: build/virt-v2v/Containerfile-upstream-fedora

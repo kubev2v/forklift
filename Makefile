@@ -278,7 +278,7 @@ push-operator-image: build-operator-image
 
 build-virt-v2v-image: check_container_runtime
 	$(eval VIRT_V2V_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-virt-v2v:$(REGISTRY_TAG))
-	$(CONTAINER_CMD) build -t $(VIRT_V2V_IMAGE) -f build/virt-v2v/Containerfile-upstream .
+	$(CONTAINER_CMD) build -t $(VIRT_V2V_IMAGE) -f build/virt-v2v/Containerfile .
 
 push-virt-v2v-image: build-virt-v2v-image
 	$(CONTAINER_CMD) push $(VIRT_V2V_IMAGE)
