@@ -39,7 +39,7 @@ jobs:
             file: build/ova-provider-server/Containerfile
             repo: forklift-ova-provider-server
           - name: ovirt-populator
-            file: build/ovirt-populator/Containerfile-upstream
+            file: build/ovirt-populator/Containerfile
             repo: ovirt-populator
           - name: populator-controller
             file: build/populator-controller/Containerfile

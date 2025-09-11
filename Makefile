@@ -325,7 +325,7 @@ push-populator-controller-image: build-populator-controller-image
 
 build-ovirt-populator-image: check_container_runtime
 	$(eval OVIRT_POPULATOR_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/ovirt-populator:$(REGISTRY_TAG))
-	$(CONTAINER_CMD) build -t $(OVIRT_POPULATOR_IMAGE) -f build/ovirt-populator/Containerfile-upstream .
+	$(CONTAINER_CMD) build -t $(OVIRT_POPULATOR_IMAGE) -f build/ovirt-populator/Containerfile .
 
 push-ovirt-populator-image: build-ovirt-populator-image
 	$(CONTAINER_CMD) push $(OVIRT_POPULATOR_IMAGE)
