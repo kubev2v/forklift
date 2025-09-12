@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	liburl "net/url"
+	"os"
 	"path"
 	"regexp"
 	"slices"
@@ -47,6 +48,7 @@ import (
 	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+	"libvirt.org/go/libvirt"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -183,6 +185,131 @@ type Builder struct {
 	hosts map[string]*api.Host
 }
 
+// DomainXML implements base.Builder.
+func (r *Builder) DomainXML(vmRef ref.Ref) (xml string, err error) {
+	vm := &model.VM{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef.String())
+		return
+	}
+
+	libvirtURL, _, connectionSecret, err := r.getSourceDetails(vm, r.Source.Secret)
+	if err != nil {
+		err = liberr.Wrap(err, "failed to get source details")
+		return
+	}
+
+	vmName := vmRef.Name
+	if vmName == "" {
+		err = fmt.Errorf("VM name is empty for vmRef: %s", vmRef.String())
+		return
+	}
+
+	r.Log.V(2).Info(
+		"Attempting to fetch libvirt domain XML from VMware",
+		"vm", vmRef.String(),
+		"libvirtURL", libvirtURL.String())
+
+	// Extract credentials from the connection secret
+	username := string(connectionSecret.Data["user"])
+	password := string(connectionSecret.Data["password"])
+
+	connectionURL := libvirtURL
+	// for vSphere we need to use virConnectOpenAuth, not url parameters
+	connectionURL.User = nil // Remove any existing user info
+
+	// Add 'cacert' query parameter to url if specified. The 'cacert' libvirt url
+	// param was introduced in libvirt 11.5.0
+	if cacertData, exists := connectionSecret.Data["cacert"]; exists && len(cacertData) > 0 {
+		libvirtversion, versionerr := libvirt.GetVersion()
+		if versionerr != nil {
+			err = liberr.Wrap(versionerr, "Failed to get libvirt version")
+			return
+		}
+		if libvirtversion < 11005000 {
+			r.Log.Info("Libvirt version doesn't support CA cert parameter", "version", libvirtversion)
+			err = planbase.LibvirtVersionInsufficient
+			return
+		}
+		tmpFile, tmpErr := os.CreateTemp("", "vsphere-cacert-*.pem")
+		if tmpErr != nil {
+			err = liberr.Wrap(tmpErr, "failed to create CA cert file")
+			return
+		}
+		defer func() {
+			if tmpFile != nil {
+				tmpFile.Close()
+				os.Remove(tmpFile.Name())
+			}
+		}()
+
+		if _, tmpErr = tmpFile.Write(cacertData); tmpErr != nil {
+			err = liberr.Wrap(tmpErr, "failed to write CA cert")
+			return
+		}
+
+		query := connectionURL.Query()
+		query.Set("cacert", tmpFile.Name())
+		connectionURL.RawQuery = query.Encode()
+		r.Log.V(1).Info("Using CA certificate for SSL verification")
+	} else {
+		r.Log.Info("No CA certificate provided, SSL verification depends on insecureSkipVerify or system CA")
+	}
+
+	r.Log.V(2).Info("Libvirt connection details", "libvirt url", connectionURL.String())
+
+	auth := &libvirt.ConnectAuth{
+		CredType: []libvirt.ConnectCredentialType{
+			libvirt.CRED_AUTHNAME,
+			libvirt.CRED_PASSPHRASE,
+		},
+		Callback: func(creds []*libvirt.ConnectCredential) {
+			for _, cred := range creds {
+				switch cred.Type {
+				case libvirt.CRED_AUTHNAME:
+					cred.Result = username
+					cred.ResultLen = len(username)
+				case libvirt.CRED_PASSPHRASE:
+					cred.Result = password
+					cred.ResultLen = len(password)
+				}
+			}
+		},
+	}
+
+	conn, err := libvirt.NewConnectWithAuth(connectionURL.String(), auth, 0)
+	if err != nil {
+		err = liberr.Wrap(err, "failed to connect to libvirt")
+		return
+	}
+	defer conn.Close()
+
+	domain, err := conn.LookupDomainByName(vmName)
+	if err != nil {
+		err = liberr.Wrap(err, "failed to lookup domain", "name", vmName)
+		return
+	}
+	defer func() {
+		if free_err := domain.Free(); free_err != nil {
+			r.Log.V(1).Error(free_err, "Failed to free libvirt domain")
+		}
+	}()
+
+	xml, err = domain.GetXMLDesc(0)
+	if err != nil {
+		err = liberr.Wrap(err, "failed to get domain XML")
+		return
+	}
+
+	r.Log.V(2).Info(
+		"Successfully fetched libvirt domain XML from VMware",
+		"vm", vmRef.String(),
+		"xmlLength", len(xml))
+
+	return
+}
+
 // Create DataVolume certificate configmap.
 // No-op for vSphere.
 func (r *Builder) ConfigMap(_ ref.Ref, _ *core.Secret, _ *core.ConfigMap) (err error) {
@@ -265,7 +392,7 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		})
 	}
 
-	libvirtURL, fingerprint, err := r.getSourceDetails(vm, sourceSecret)
+	libvirtURL, fingerprint, _, err := r.getSourceDetails(vm, sourceSecret)
 	if err != nil {
 		return
 	}
@@ -355,7 +482,7 @@ func getHostAddress(host *model.Host) string {
 	return host.Name
 }
 
-func (r *Builder) getSourceDetails(vm *model.VM, sourceSecret *core.Secret) (libvirtURL liburl.URL, fingerprint string, err error) {
+func (r *Builder) getSourceDetails(vm *model.VM, sourceSecret *core.Secret) (libvirtURL liburl.URL, fingerprint string, hostSecret *core.Secret, err error) {
 	host, err := r.host(vm.Host)
 	if err != nil {
 		return
@@ -371,7 +498,6 @@ func (r *Builder) getSourceDetails(vm *model.VM, sourceSecret *core.Secret) (lib
 
 	if hostDef, found := r.hosts[host.ID]; found {
 		// Connect through ESXi
-		var hostSecret *core.Secret
 		if hostSecret, err = r.hostSecret(hostDef); err != nil {
 			return
 		}
@@ -398,6 +524,7 @@ func (r *Builder) getSourceDetails(vm *model.VM, sourceSecret *core.Secret) (lib
 			RawQuery: sslVerify,
 		}
 		fingerprint = r.Source.Provider.Status.Fingerprint
+		hostSecret = sourceSecret
 	} else {
 		// Connect through VCenter
 		path := host.Path
@@ -427,6 +554,7 @@ func (r *Builder) getSourceDetails(vm *model.VM, sourceSecret *core.Secret) (lib
 			RawQuery: sslVerify,
 		}
 		fingerprint = r.Source.Provider.Status.Fingerprint
+		hostSecret = sourceSecret
 	}
 
 	return

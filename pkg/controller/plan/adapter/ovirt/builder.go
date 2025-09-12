@@ -118,6 +118,11 @@ type Builder struct {
 	*plancontext.Context
 }
 
+// DomainXML implements base.Builder.
+func (r *Builder) DomainXML(vmRef ref.Ref) (xml string, err error) {
+	return "", planbase.DomainXMLNotImplementedError
+}
+
 // Create DataVolume certificate configmap.
 func (r *Builder) ConfigMap(_ ref.Ref, in *core.Secret, object *core.ConfigMap) (err error) {
 	object.BinaryData["ca.pem"] = in.Data["cacert"]

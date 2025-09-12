@@ -10,11 +10,11 @@ import (
 	"strconv"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
-	adapter "github.com/kubev2v/forklift/pkg/controller/plan/adapter/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/provider/container"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	webhookutils "github.com/kubev2v/forklift/pkg/forklift-api/webhooks/util"
+	vsphereclient "github.com/kubev2v/forklift/pkg/lib/client/vsphere"
 	libcontainer "github.com/kubev2v/forklift/pkg/lib/inventory/container"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	"github.com/kubev2v/forklift/pkg/settings"
@@ -230,7 +230,7 @@ func (admitter *SecretAdmitter) testConnectionToHost(hostName string) (tested bo
 			return false, err
 		}
 
-		h := adapter.EsxHost{
+		h := vsphereclient.EsxHost{
 			Secret: updatedSecret,
 			URL:    url,
 		}

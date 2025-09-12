@@ -7,10 +7,10 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/base"
-	adapter "github.com/kubev2v/forklift/pkg/controller/plan/adapter/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/validation"
+	vsphereclient "github.com/kubev2v/forklift/pkg/lib/client/vsphere"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libref "github.com/kubev2v/forklift/pkg/lib/ref"
@@ -307,7 +307,7 @@ func (r *Reconciler) testConnection(host *api.Host) (err error) {
 			)
 		}
 		secret.Data["thumbprint"] = []byte(hostModel.Thumbprint)
-		h := adapter.EsxHost{
+		h := vsphereclient.EsxHost{
 			Secret: secret,
 			URL:    url,
 		}
