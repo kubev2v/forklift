@@ -264,6 +264,13 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 			Value: vm.HostName,
 		})
 	}
+	planVM := r.getPlanVM(vm)
+	if planVM != nil && planVM.NbdeClevis {
+		env = append(env, core.EnvVar{
+			Name:  "V2V_NBDE_CLEVIS",
+			Value: "true",
+		})
+	}
 
 	libvirtURL, fingerprint, err := r.getSourceDetails(vm, sourceSecret)
 	if err != nil {

@@ -78,6 +78,7 @@ const (
 	InvalidDiskSizes              = "InvalidDiskSizes"
 	MacConflicts                  = "MacConflicts"
 	MissingPvcForOnlyConversion   = "MissingPvcForOnlyConversion"
+	LuksAndClevisIncompatibility  = "LuksAndClevisIncompatibility"
 	UnsupportedUdn                = "UnsupportedUserDefinedNetwork"
 	unsupportedVersion            = "UnsupportedVersion"
 	VDDKInvalid                   = "VDDKInvalid"
@@ -705,6 +706,14 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "Missing required PVCs for conversion-only mode. Ensure vendor-provided PVCs exist in the target namespace and are labeled with vmID and vmUUID.",
 		Items:    []string{},
 	}
+	luksAndClevisIncompatibility := libcnd.Condition{
+		Type:     LuksAndClevisIncompatibility,
+		Status:   True,
+		Reason:   NotValid,
+		Category: api.CategoryWarn,
+		Message:  "LUKS keys and Clevis cannot be configured together; Clevis will be used.",
+		Items:    []string{},
+	}
 
 	var sharedDisksConditions []libcnd.Condition
 	setOf := map[string]bool{}
@@ -862,6 +871,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		}
 		if !ok {
 			vmMigrationTypeUnsupported.Items = append(vmMigrationTypeUnsupported.Items, ref.String())
+		}
+		if vm.LUKS.Name != "" && vm.NbdeClevis {
+			luksAndClevisIncompatibility.Items = append(luksAndClevisIncompatibility.Items, ref.String())
 		}
 		unsupported, err := validator.UnSupportedDisks(*ref)
 		if err != nil {
@@ -1092,6 +1104,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(missingPvcForOnlyConversion.Items) > 0 {
 		plan.Status.SetCondition(missingPvcForOnlyConversion)
+	}
+	if len(luksAndClevisIncompatibility.Items) > 0 {
+		plan.Status.SetCondition(luksAndClevisIncompatibility)
 	}
 	return nil
 }
