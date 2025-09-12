@@ -42,6 +42,11 @@ func (r *Validator) InvalidDiskSizes(vmRef ref.Ref) ([]string, error) {
 	return invalidDisks, nil
 }
 
+// NO-OP
+func (r *Validator) UdnStaticIPs(vmRef ref.Ref, client client.Client) (ok bool, err error) {
+	return true, nil
+}
+
 func (r *Validator) MacConflicts(vmRef ref.Ref) ([]planbase.MacConflict, error) {
 	// Get source VM using common helper
 	vm, err := planbase.FindSourceVM[model.Workload](r.Source.Inventory, vmRef)

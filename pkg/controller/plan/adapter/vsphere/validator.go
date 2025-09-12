@@ -1,13 +1,18 @@
 package vsphere
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"net"
 	"strings"
 
+	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	ocpmodel "github.com/kubev2v/forklift/pkg/controller/provider/model/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
@@ -15,14 +20,21 @@ import (
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/templateutil"
 	"github.com/vmware/govmomi/vim25/types"
+	core "k8s.io/api/core/v1"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // vSphere validator.
 type Validator struct {
 	*plancontext.Context
 }
+
+const (
+	namespaceLabelPrimaryUDN = "k8s.ovn.org/primary-user-defined-network"
+	nadLabelUDN              = "k8s.ovn.org/user-defined-network"
+)
 
 // Validate whether warm migration is supported from this provider type.
 func (r *Validator) WarmMigration() (ok bool) {
@@ -430,6 +442,121 @@ func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, m
 		}
 	}
 	return true, "", "", nil
+}
+
+func (r *Validator) getUdnSubnet(client client.Client) (string, error) {
+	key := k8sclient.ObjectKey{
+		Name: r.Plan.Spec.TargetNamespace,
+	}
+	namespace := &core.Namespace{}
+	err := client.Get(context.TODO(), key, namespace)
+	if err != nil {
+		return "", err
+	}
+	_, hasUdnLabel := namespace.ObjectMeta.Labels[namespaceLabelPrimaryUDN]
+	if !hasUdnLabel {
+		return "", nil
+	}
+
+	nadList := &k8snet.NetworkAttachmentDefinitionList{}
+	listOpts := []k8sclient.ListOption{
+		k8sclient.InNamespace(r.Plan.Spec.TargetNamespace),
+		k8sclient.MatchingLabels{nadLabelUDN: ""},
+	}
+
+	err = client.List(context.TODO(), nadList, listOpts...)
+	if err != nil {
+		return "", err
+	}
+	for _, nad := range nadList.Items {
+		var networkConfig ocpmodel.NetworkConfig
+		err = json.Unmarshal([]byte(nad.Spec.Config), &networkConfig)
+		if err != nil {
+			r.Log.Info("Skipping NAD: failed to parse network config", "namespace", nad.Namespace, "name", nad.Name, "error", err.Error())
+			continue
+		}
+		if networkConfig.IsUnsupportedUdn() && networkConfig.AllowPersistentIPs {
+			return networkConfig.Subnets, nil
+		}
+	}
+	return "", nil
+}
+func (r *Validator) getSourceNetworkForPodNetworkTarget(vmRef ref.Ref) (net *model.Network, err error) {
+	vm := &model.Workload{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef)
+		return
+	}
+
+	mapping := r.Plan.Referenced.Map.Network.Spec.Map
+	for i := range mapping {
+		mapped := &mapping[i]
+		ref := mapped.Source
+		network := &model.Network{}
+		fErr := r.Source.Inventory.Find(network, ref)
+		if fErr != nil {
+			err = fErr
+			return
+		}
+		if mapped.Destination.Type == Pod {
+			return network, nil
+		}
+	}
+	return
+}
+
+func (r *Validator) UdnStaticIPs(vmRef ref.Ref, client client.Client) (ok bool, err error) {
+	// Check static IPs
+	if !r.Plan.DestinationHasUdnNetwork(client) {
+		return true, nil
+	}
+	if ok, err = r.StaticIPs(vmRef); err != nil {
+		return false, liberr.Wrap(err, "vm", vmRef)
+	} else if !ok {
+		return false, nil
+	}
+	sourceNetwork, err := r.getSourceNetworkForPodNetworkTarget(vmRef)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef)
+		return
+	}
+	if sourceNetwork == nil {
+		// No Pod network mapping found, validation passes
+		return true, nil
+	}
+	vm := &model.Workload{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef)
+		return
+	}
+
+	udnSubnet, err := r.getUdnSubnet(client)
+	if udnSubnet == "" {
+		// No UDN subnet configured, validation passes
+		return true, nil
+	}
+	if err != nil {
+		return false, liberr.Wrap(err, "vm", vmRef)
+	}
+	for _, guestNetwork := range vm.GuestNetworks {
+		if guestNetwork.Network == sourceNetwork.Name {
+			// Validate the NAD
+			_, ipNet, err := net.ParseCIDR(udnSubnet)
+			if err != nil {
+				return false, liberr.Wrap(err, "udnSubnet", udnSubnet)
+			}
+			ip := net.ParseIP(guestNetwork.IP)
+			if ip == nil {
+				// Invalid IP in guest network
+				r.Log.V(4).Info("Invalid IP in guest network", "vm", vmRef.String(), "ip", guestNetwork.IP)
+				return false, nil
+			}
+			return ipNet.Contains(ip), nil
+		}
+	}
+	return true, nil
 }
 
 // Validate that we have information about static IPs for every guest network.

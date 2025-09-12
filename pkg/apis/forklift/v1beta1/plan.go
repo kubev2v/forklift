@@ -43,8 +43,10 @@ const (
 )
 
 const (
+	// namespaceLabelPrimaryUDN is the label key used to identify namespaces with primary user-defined networks
 	namespaceLabelPrimaryUDN = "k8s.ovn.org/primary-user-defined-network"
-	nadLabelUDN              = "k8s.ovn.org/user-defined-network"
+	// nadLabelUDN is the label key used to identify NetworkAttachmentDefinitions that are user-defined networks
+	nadLabelUDN = "k8s.ovn.org/user-defined-network"
 )
 
 // PlanSpec defines the desired state of Plan.
