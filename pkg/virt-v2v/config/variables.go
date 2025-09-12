@@ -26,6 +26,7 @@ const (
 	EnvLocalMigrationName         = "LOCAL_MIGRATION"
 	EnvVirtIoWinLegacyDriversName = "VIRTIO_WIN"
 	EnvHostName                   = "V2V_HOSTNAME"
+	EnvNbdeClevis                 = "V2V_NBDE_CLEVIS"
 	EnvMultipleIpsPerNicName      = "V2V_multipleIPsPerNic"
 )
 
@@ -90,6 +91,7 @@ type AppConfig struct {
 	VddkConfFile         string
 	InspectionOutputFile string
 	Luksdir              string
+	NbdeClevis           bool
 	DynamicScriptsDir    string
 	Workdir              string
 	VddkLibDir           string
@@ -100,6 +102,7 @@ func (s *AppConfig) Load() (err error) {
 	s.ExtraArgs = s.getExtraArgs()
 	flag.BoolVar(&s.IsLocalMigration, "local-migration", s.getEnvBool(EnvLocalMigrationName, true), "Migration is in local or remote cluster")
 	flag.BoolVar(&s.IsInPlace, "in-place", s.getEnvBool(EnvInPlaceName, false), "Run virt-v2v-in-place on already populated disks")
+	flag.BoolVar(&s.NbdeClevis, "nbde-clevis", s.getEnvBool(EnvNbdeClevis, false), "virt-v2v should unencrypt the disks via clevis client")
 	flag.StringVar(&s.Source, "source", os.Getenv(EnvSourceName), "Source of VM ['ova','vSphere']")
 	flag.StringVar(&s.LibvirtUrl, "libvirt-url", os.Getenv(EnvLibvirtUrlName), "Libvirt domain to the vSphere")
 	flag.StringVar(&s.Fingerprint, "fingerprint", os.Getenv(EnvFingerprintName), "Fingerprint for the vddk")
