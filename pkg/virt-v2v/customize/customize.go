@@ -449,6 +449,10 @@ func (c *Customize) addRhelRunScripts(cmdBuilder utils.CommandBuilder) error {
 
 // addLuksKeysToCustomize appends key arguments to extraArgs
 func (c *Customize) addLuksKeysToCustomize(cmdBuilder utils.CommandBuilder) error {
+	if c.appConfig.NbdeClevis {
+		cmdBuilder.AddArgs("--key", "all:clevis")
+		return nil
+	}
 	if c.appConfig.Luksdir == "" {
 		return nil
 	}

@@ -75,9 +75,10 @@ func (c *Conversion) addCommonArgs(cmd utils.CommandBuilder) error {
 			cmd.AddArg("--mac", mac)
 		}
 	}
-
-	// Adds LUKS keys, if they exist
-	if c.Luksdir != "" {
+	if c.NbdeClevis {
+		cmd.AddArgs("--key", "all:clevis")
+	} else if c.Luksdir != "" {
+		// Adds LUKS keys, if they exist
 		err := utils.AddLUKSKeys(c.fileSystem, cmd, c.Luksdir)
 		if err != nil {
 			return fmt.Errorf("error adding LUKS keys: %v", err)
