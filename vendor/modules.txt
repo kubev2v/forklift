@@ -16,7 +16,7 @@ github.com/beorn7/perks/quantile
 # github.com/blang/semver/v4 v4.0.0
 ## explicit; go 1.14
 github.com/blang/semver/v4
-# github.com/bytedance/sonic v1.13.2
+# github.com/bytedance/sonic v1.13.3
 ## explicit; go 1.17
 github.com/bytedance/sonic
 github.com/bytedance/sonic/ast
@@ -89,19 +89,19 @@ github.com/fsnotify/fsnotify
 # github.com/fxamacker/cbor/v2 v2.7.0
 ## explicit; go 1.17
 github.com/fxamacker/cbor/v2
-# github.com/gabriel-vasile/mimetype v1.4.8
-## explicit; go 1.20
+# github.com/gabriel-vasile/mimetype v1.4.9
+## explicit; go 1.23.0
 github.com/gabriel-vasile/mimetype
 github.com/gabriel-vasile/mimetype/internal/charset
 github.com/gabriel-vasile/mimetype/internal/json
 github.com/gabriel-vasile/mimetype/internal/magic
-# github.com/gin-contrib/cors v1.7.5
+# github.com/gin-contrib/cors v1.7.6
 ## explicit; go 1.23.0
 github.com/gin-contrib/cors
-# github.com/gin-contrib/sse v1.0.0
-## explicit; go 1.13
+# github.com/gin-contrib/sse v1.1.0
+## explicit; go 1.23
 github.com/gin-contrib/sse
-# github.com/gin-gonic/gin v1.10.0
+# github.com/gin-gonic/gin v1.10.1
 ## explicit; go 1.20
 github.com/gin-gonic/gin
 github.com/gin-gonic/gin/binding
@@ -392,7 +392,7 @@ github.com/openshift/library-go/pkg/template/templateprocessing
 # github.com/ovirt/go-ovirt v0.0.0-20230808190322-9fd1992199b2
 ## explicit; go 1.15
 github.com/ovirt/go-ovirt
-# github.com/pelletier/go-toml/v2 v2.2.3
+# github.com/pelletier/go-toml/v2 v2.2.4
 ## explicit; go 1.21.0
 github.com/pelletier/go-toml/v2
 github.com/pelletier/go-toml/v2/internal/characters
@@ -452,8 +452,8 @@ github.com/twitchyliquid64/golang-asm/objabi
 github.com/twitchyliquid64/golang-asm/src
 github.com/twitchyliquid64/golang-asm/sys
 github.com/twitchyliquid64/golang-asm/unsafeheader
-# github.com/ugorji/go/codec v1.2.12
-## explicit; go 1.11
+# github.com/ugorji/go/codec v1.3.0
+## explicit; go 1.21
 github.com/ugorji/go/codec
 # github.com/vmware/govmomi v0.50.0
 ## explicit; go 1.23.0
@@ -512,10 +512,10 @@ go.uber.org/zap/internal/exit
 go.uber.org/zap/internal/pool
 go.uber.org/zap/internal/stacktrace
 go.uber.org/zap/zapcore
-# golang.org/x/arch v0.15.0
+# golang.org/x/arch v0.18.0
 ## explicit; go 1.23.0
 golang.org/x/arch/x86/x86asm
-# golang.org/x/crypto v0.36.0
+# golang.org/x/crypto v0.39.0
 ## explicit; go 1.23.0
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blowfish
@@ -528,7 +528,7 @@ golang.org/x/crypto/scrypt
 golang.org/x/crypto/sha3
 golang.org/x/crypto/ssh
 golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
-# golang.org/x/net v0.38.0
+# golang.org/x/net v0.41.0
 ## explicit; go 1.23.0
 golang.org/x/net/context
 golang.org/x/net/html
@@ -547,19 +547,19 @@ golang.org/x/net/websocket
 ## explicit; go 1.18
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
-# golang.org/x/sync v0.13.0
+# golang.org/x/sync v0.15.0
 ## explicit; go 1.23.0
 golang.org/x/sync/errgroup
-# golang.org/x/sys v0.31.0
+# golang.org/x/sys v0.33.0
 ## explicit; go 1.23.0
 golang.org/x/sys/cpu
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/term v0.30.0
+# golang.org/x/term v0.32.0
 ## explicit; go 1.23.0
 golang.org/x/term
-# golang.org/x/text v0.24.0
+# golang.org/x/text v0.26.0
 ## explicit; go 1.23.0
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
@@ -584,10 +584,11 @@ golang.org/x/text/unicode/norm
 # golang.org/x/time v0.7.0
 ## explicit; go 1.18
 golang.org/x/time/rate
-# golang.org/x/tools v0.26.0
-## explicit; go 1.22.0
+# golang.org/x/tools v0.33.0
+## explicit; go 1.23.0
 golang.org/x/tools/cover
 golang.org/x/tools/go/ast/inspector
+golang.org/x/tools/internal/astutil/edge
 # gomodules.xyz/jsonpatch/v2 v2.4.0
 ## explicit; go 1.20
 gomodules.xyz/jsonpatch/v2
