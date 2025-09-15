@@ -51,6 +51,9 @@ def clone(args):
         with open(os.path.join(tmp_dir, "rdmfile"), "w") as rdmfile_file:
             rdmfile_file.write(f"{rdmfile}\n")
 
+        with open(os.path.join(tmp_dir, "targetLun"), "w") as target_lun_file:
+            target_lun_file.write(f"{os.path.basename(target)}")
+
         result = {"taskId": str(task_id),  "pid": int(task.pid)}
         print(XML.format("0", json.dumps(result)))
 
@@ -84,11 +87,19 @@ def taskGet(args):
                   "exitCode": "1", "lastLine": line.rstrip(), "stdErr": e}
         print(XML.format("1", json.dumps(result)))
         return
+    try:
+        with open(os.path.join(tmp_dir, "targetLun"), "r") as target_lun_file:
+            target_lun = target_lun_file.read()
+        xcopy_used, xclone_writes = was_xcopy_used(target_lun)
+    except Exception as e:
+        result = {"taskId": args.task_id[0], "pid": int(pid),
+                  "exitCode": "1", "lastLine": line.rstrip(), "stdErr": e}
+        print(XML.format("1", json.dumps(result)))
 
     result = {"taskId": args.task_id[0], "pid": int(pid),
-              "exitCode": exitcode, "lastLine": line.rstrip(), "stdErr": ste}
+            "exitCode": exitcode, "lastLine": line.rstrip(),
+            "xcopyUsed": xcopy_used, "xcloneWrites": xclone_writes, "stdErr": ste}
     print(XML.format("0", json.dumps(result)))
-
 
 def taskClean(args):
     tmp_dir = TMP_PREFIX.format(args.task_id[0])
@@ -121,6 +132,32 @@ def extract_rdmdisk_file(rdm_file):
     except Exception as e:
         logging.error(e)
     return ""
+
+def was_xcopy_used(target_lun):
+    stats_path = f"/storage/scsifw/devices/{target_lun.strip()}/stats"
+
+    try:
+        target_lun_stats = subprocess.run(
+            ["vsish", "-r", "-e", "cat", stats_path],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Error: Unable to read stats for device {target_lun}")
+        raise e
+
+    write_ops = 0
+    for statistic in target_lun_stats.stdout.splitlines():
+        if "clonewriteops" in statistic.lower():
+            try:
+                write_ops = int(statistic.split(':')[1], 16)
+            except ValueError:
+                logging.error(f"Error: Unable to parse statistic: {statistic.split(':')[1]}")
+                write_ops = 0
+            break
+
+    return write_ops > 0, str(write_ops)
 
 
 def main():

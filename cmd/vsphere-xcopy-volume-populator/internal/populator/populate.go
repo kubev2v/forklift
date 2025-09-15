@@ -10,7 +10,7 @@ type Populator interface {
 	// the sourceVMDKFile.
 	// persistentVolume is a slim version of k8s PersistentVolume created by the CSI driver,
 	// to help identify its underlying LUN in the storage system.
-	Populate(vmId string, sourceVMDKFile string, persistentVolume PersistentVolume, progress chan<- uint, quit chan error) error
+	Populate(vmId string, sourceVMDKFile string, persistentVolume PersistentVolume, progress chan<- uint64, quit chan error, cloneProgressBytes chan<- uint64) error
 }
 
 type PersistentVolume struct {

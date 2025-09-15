@@ -71,6 +71,8 @@ func (e *VIBTaskExecutor) GetTaskStatus(ctx context.Context, host *object.HostSy
 		ExitCode: v.ExitCode,
 		Stderr:   v.Stderr,
 		LastLine: v.LastLine,
+		XcopyUsed: v.XcopyUsed,
+		XcloneWrites: v.XcloneWrites,
 	}, nil
 }
 

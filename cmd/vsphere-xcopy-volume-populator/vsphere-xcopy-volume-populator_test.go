@@ -56,14 +56,15 @@ var _ = Describe("Populator", func() {
 
 	DescribeTable("should handle various population scenarios",
 		func(tc testCase) {
-			progressCh := make(chan uint)
+			progressCh := make(chan uint64)
+			cloneProgressBytesCh := make(chan uint64)
 			quitCh := make(chan error, 1)
 
 			tc.setup()
 
 			go func() {
 				defer GinkgoRecover()
-				underTest.Populate(tc.sourceVmId, tc.sourceVMDK, populator.PersistentVolume{Name: tc.targetPVC}, progressCh, quitCh)
+				underTest.Populate(tc.sourceVmId, tc.sourceVMDK, populator.PersistentVolume{Name: tc.targetPVC}, progressCh, quitCh, cloneProgressBytesCh)
 			}()
 
 			if tc.want != nil {
@@ -138,6 +139,8 @@ var _ = Describe("Populator", func() {
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(),
 					[]string{"vmkfstools", "clone", "-s", "/vmfs/volumes/my-ds/my-vm/vmdisk.vmdk", "-t", "/vmfs/devices/disks/naa.616263"}).
 					Return([]esx.Values{{"message": {`{"taskId": "1"}`}}}, nil)
+				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"vmkfstools", "taskGet", "-i", "1"}).
+					Return([]esx.Values{{"message": {`{"exitCode": "0"}`}}}, nil)
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"vmkfstools", "taskGet", "-i", "1"}).
 					Return([]esx.Values{{"message": {`{"exitCode": "0"}`}}}, nil)
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"vmkfstools", "taskClean", "-i", "1"}).Return(nil, nil)

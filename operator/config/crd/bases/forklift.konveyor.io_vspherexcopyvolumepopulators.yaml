@@ -66,6 +66,8 @@ spec:
             properties:
               progress:
                 type: string
+              cloneProgressBytes:
+                type: string
             type: object
         required:
         - spec
