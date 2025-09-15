@@ -1239,7 +1239,7 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 // Check whether the specific VM supports Volume Populators by examining only the datastores used by this VM.
 // This prevents mixed configuration issues where some VMs have offload-capable datastores and others don't.
 func (r *Builder) SupportsVolumePopulators(vmRef ref.Ref) bool {
-	if !settings.Settings.Features.CopyOffload || r.Plan.Spec.Warm {
+	if !settings.Settings.Features.CopyOffload {
 		return false
 	}
 
