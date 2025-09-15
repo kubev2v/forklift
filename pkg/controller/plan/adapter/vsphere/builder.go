@@ -524,6 +524,37 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		return
 	}
 
+	// For storage offload warm migrations, match this DataVolume to the
+	// existing PVC via the backing file name.
+	var pvcMap map[string]*core.PersistentVolumeClaim
+	if r.Plan.Spec.Warm && r.SupportsVolumePopulators(vmRef) {
+		pvcMap = make(map[string]*core.PersistentVolumeClaim)
+		pvcs := &core.PersistentVolumeClaimList{}
+		pvcLabels := map[string]string{
+			"vmID":      vmRef.ID,
+			"migration": string(r.Migration.UID),
+		}
+
+		err = r.Context.Destination.Client.List(
+			context.TODO(),
+			pvcs,
+			&client.ListOptions{
+				Namespace:     r.Plan.Spec.TargetNamespace,
+				LabelSelector: labels.SelectorFromSet(pvcLabels),
+			},
+		)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+
+		for _, pvc := range pvcs.Items {
+			if copyOffload, present := pvc.Annotations["copy-offload"]; present && copyOffload != "" {
+				pvcMap[baseVolume(copyOffload, r.Plan.Spec.Warm)] = &pvc
+			}
+		}
+	}
+
 	// Sort disks by bus, so we can match the disk index to the boot order.
 	// Important: need to match order in mapDisks method
 	disks := r.sortedDisksAsVmware(vm.Disks)
@@ -597,9 +628,17 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		//       matching the disk and PVC index.
 		dv.ObjectMeta.Annotations[planbase.AnnDiskIndex] = fmt.Sprintf("%d", diskIndex)
 
-		// Set PVC name/generateName using template if configured
-		if err := r.setPVCNameFromTemplate(&dv.ObjectMeta, vm, diskIndex, disk); err != nil {
-			r.Log.Info("Failed to set PVC name from template", "error", err)
+		if pvcMap != nil {
+			// In a warm migration with storage offload, the PVC has already been created with
+			// the name template. Copy the result to the DataVolume so it can adopt the PVC.
+			if pvc, present := pvcMap[dvSource.VDDK.BackingFile]; present && pvc != nil {
+				dv.ObjectMeta.Name = pvc.Name
+			}
+		} else {
+			// Set PVC name/generateName using template if configured
+			if err := r.setPVCNameFromTemplate(&dv.ObjectMeta, vm, diskIndex, disk); err != nil {
+				r.Log.Info("Failed to set PVC name from template", "error", err)
+			}
 		}
 
 		if !useV2vForTransfer && vddkConfigMap != nil {

@@ -741,7 +741,8 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				return
 			}
 
-			if !r.builder.SupportsVolumePopulators(vm.Ref) {
+			if !(r.builder.SupportsVolumePopulators(vm.Ref) && !r.Plan.Spec.Warm) {
+				// Only avoid this for storage offload cold migration
 				var dataVolumes []cdi.DataVolume
 				dataVolumes, err = r.kubevirt.DataVolumes(vm)
 				if err != nil {

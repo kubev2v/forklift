@@ -42,6 +42,12 @@ const (
 	// Related to https://github.com/kubevirt/containerized-data-importer/pull/3572
 	AnnVddkExtraArgs = "cdi.kubevirt.io/storage.pod.vddk.extraargs"
 
+	// Allow DataVolume to adopt a PVC
+	AnnAllowClaimAdoption = "cdi.kubevirt.io/allowClaimAdoption"
+
+	// Inform CDI that the DataVolume is already filled up
+	AnnPrePopulated = "cdi.kubevirt.io/storage.prePopulated"
+
 	// In a UDN namespace we can't directly reach the virt-v2v pod unless we specify default opened ports on the pod network.
 	AnnOpenDefaultPorts = "k8s.ovn.org/open-default-ports"
 
