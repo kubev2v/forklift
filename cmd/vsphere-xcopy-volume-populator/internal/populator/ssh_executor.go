@@ -39,10 +39,11 @@ func (e *SSHTaskExecutor) GetTaskStatus(ctx context.Context, host *object.HostSy
 	}
 
 	return &TaskStatus{
-		TaskId:   taskStatus.TaskId,
-		ExitCode: taskStatus.ExitCode,
-		Stderr:   taskStatus.Stderr,
-		LastLine: taskStatus.LastLine,
+		TaskId:    taskStatus.TaskId,
+		ExitCode:  taskStatus.ExitCode,
+		Stderr:    taskStatus.Stderr,
+		LastLine:  taskStatus.LastLine,
+		XcopyUsed: taskStatus.XcopyUsed,
 	}, nil
 }
 
