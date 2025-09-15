@@ -67,10 +67,11 @@ func (e *VIBTaskExecutor) GetTaskStatus(ctx context.Context, host *object.HostSy
 	klog.Infof("response from esxcli %+v", v)
 
 	return &TaskStatus{
-		TaskId:   v.TaskId,
-		ExitCode: v.ExitCode,
-		Stderr:   v.Stderr,
-		LastLine: v.LastLine,
+		TaskId:    v.TaskId,
+		ExitCode:  v.ExitCode,
+		Stderr:    v.Stderr,
+		LastLine:  v.LastLine,
+		XcopyUsed: v.XcopyUsed,
 	}, nil
 }
 

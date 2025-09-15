@@ -24,11 +24,12 @@ const (
 )
 
 type VmkfstoolsTask struct {
-	TaskId   string `json:"taskId"`
-	Pid      int    `json:"pid"`
-	ExitCode string `json:"exitCode"`
-	LastLine string `json:"lastLine"`
-	Stderr   string `json:"stdErr"`
+	TaskId    string `json:"taskId"`
+	Pid       int    `json:"pid"`
+	ExitCode  string `json:"exitCode"`
+	LastLine  string `json:"lastLine"`
+	XcopyUsed bool   `json:"xcopyUsed"`
+	Stderr    string `json:"stdErr"`
 }
 
 // XMLResponse represents the XML response structure

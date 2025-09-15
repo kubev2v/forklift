@@ -7,8 +7,13 @@ import os
 import subprocess
 import uuid
 import re
+import sys
+import shlex
 
 TMP_PREFIX = "/tmp/vmkfstools-wrapper-{}"
+
+# Version information for debugging
+SCRIPT_VERSION = "0.0.2"
 
 XML = """<?xml version="1.0" ?>
 <output xmlns="http://www.vmware.com/Products/ESX/5.0/esxcli/">
@@ -20,20 +25,58 @@ XML = """<?xml version="1.0" ?>
 """
 
 
+def validate_path(path):
+    """Validate that path is safe and within expected directories"""
+    # Log which version is running for debugging
+    logging.info(f"vmkfstools-wrapper version {SCRIPT_VERSION} validating path: {path}")
+
+    # Normalize the path to prevent bypasses
+    path = os.path.normpath(path)
+
+    # Only allow paths in specific safe directories for ESXi operations
+    allowed_prefixes = [
+        '/vmfs/volumes/',      # Datastore volumes (source VMDK files)
+        '/vmfs/devices/disks/', # ESXi disk devices (target devices for cloning)
+        '/tmp/'
+    ]
+    if not any(path.startswith(prefix) for prefix in allowed_prefixes):
+        raise ValueError(f"Path not in allowed directories: {path}")
+
+    # Prevent path traversal attacks
+    if '..' in path or '//' in path:
+        raise ValueError(f"Invalid path detected: {path}")
+
+    logging.info(f"Path validation passed for: {path}")
+    return path
+
+
 def clone(args):
-    source = args.source_vmdk
-    target = args.target_lun
+    # Validate inputs for security
+    try:
+        logging.info("Validating source VMDK path...")
+        source = shlex.quote(validate_path(args.source_vmdk))
+        logging.info("Source VMDK path validation passed")
+
+        logging.info("Validating target LUN path...")
+        target = shlex.quote(validate_path(args.target_lun))
+        logging.info("Target LUN path validation passed")
+    except ValueError as ve:
+        # Path validation errors
+        logging.error(f"Path validation failed: {ve}")
+        print(XML.format("1", f"Path validation error: {ve}"))
+        raise
+
     task_id = uuid.uuid4()
     tmp_dir = TMP_PREFIX.format(task_id)
     os.makedirs(tmp_dir, mode=0o750, exist_ok=True)
-    rdmfile = f"{source}-rdmdisk-{os.getpid()}"
+    rdmfile = f"{args.source_vmdk}-rdmdisk-{os.getpid()}"
 
     stdout_file = open(os.path.join(tmp_dir, "out"), "w")
     stderr_file = open(os.path.join(tmp_dir, "err"), "w")
-    vmkfstools_cmdline = f"trap 'echo -n $? > {tmp_dir}/exitcode' EXIT;" \
+    vmkfstools_cmdline = f"trap 'echo -n $? > {shlex.quote(f'{tmp_dir}/exitcode')}' EXIT;" \
         f"/bin/vmkfstools " \
         f"-i {source} " \
-        f"-d rdm:{target} {rdmfile}"
+        f"-d rdm:{target} {shlex.quote(rdmfile)}"
     logging.info(f"about to run {vmkfstools_cmdline}")
     try:
         task = subprocess.Popen(
@@ -50,6 +93,9 @@ def clone(args):
 
         with open(os.path.join(tmp_dir, "rdmfile"), "w") as rdmfile_file:
             rdmfile_file.write(f"{rdmfile}\n")
+
+        with open(os.path.join(tmp_dir, "targetLun"), "w") as target_lun_file:
+            target_lun_file.write(f"{os.path.basename(target)}")
 
         result = {"taskId": str(task_id),  "pid": int(task.pid)}
         print(XML.format("0", json.dumps(result)))
@@ -84,11 +130,21 @@ def taskGet(args):
                   "exitCode": "1", "lastLine": line.rstrip(), "stdErr": e}
         print(XML.format("1", json.dumps(result)))
         return
+    try:
+        with open(os.path.join(tmp_dir, "targetLun"), "r") as target_lun_file:
+            target_lun = target_lun_file.read()
+        xcopy_used, xclone_writes = was_xcopy_used(target_lun)
+        # Log xclone_writes for debugging, but don't expose in result
+        logging.info(f"XCOPY used: {xcopy_used}, clone write ops: {xclone_writes}")
+    except Exception as e:
+        result = {"taskId": args.task_id[0], "pid": int(pid),
+                  "exitCode": "1", "lastLine": line.rstrip(), "stdErr": e}
+        print(XML.format("1", json.dumps(result)))
 
     result = {"taskId": args.task_id[0], "pid": int(pid),
-              "exitCode": exitcode, "lastLine": line.rstrip(), "stdErr": ste}
+            "exitCode": exitcode, "lastLine": line.rstrip(),
+            "xcopyUsed": xcopy_used, "stdErr": ste}
     print(XML.format("0", json.dumps(result)))
-
 
 def taskClean(args):
     tmp_dir = TMP_PREFIX.format(args.task_id[0])
@@ -121,6 +177,36 @@ def extract_rdmdisk_file(rdm_file):
     except Exception as e:
         logging.error(e)
     return ""
+
+def was_xcopy_used(target_lun):
+    stats_path = f"/storage/scsifw/devices/{target_lun.strip()}/stats"
+
+    try:
+        target_lun_stats = subprocess.run(
+            ["vsish", "-r", "-e", "cat", stats_path],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+
+        logging.info(f"vshish stats {target_lun_stats}")
+    except subprocess.CalledProcessError as e:
+        # don't panic, just warn we can't extract xcopy info
+        logging.error(f"Error: Unable to read XCOPY stats for device {target_lun} with path {stats_path}")
+        return False, "0"
+        
+
+    write_ops = 0
+    for statistic in target_lun_stats.stdout.splitlines():
+        if "clonewriteops" in statistic.lower():
+            try:
+                write_ops = int(statistic.split(':')[1], 16)
+            except ValueError:
+                logging.error(f"Error: Unable to parse statistic: {statistic.split(':')[1]}")
+                write_ops = 0
+            break
+
+    return write_ops > 0, str(write_ops)
 
 
 def main():
