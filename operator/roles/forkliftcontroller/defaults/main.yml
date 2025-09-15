@@ -141,7 +141,7 @@ ova_provider_server_fqin: "{{ lookup( 'env', 'OVA_PROVIDER_SERVER_IMAGE') or loo
 ova_container_limits_cpu: "1000m"
 ova_container_limits_memory: "1Gi"
 ova_container_requests_cpu: "100m"
-ova_container_requests_memory: "150Mi"
+ova_container_requests_memory: "512Mi"
 
 metric_service_name: "{{ app_name }}-metrics"
 metric_servicemonitor_name: "{{ app_name }}-metrics"

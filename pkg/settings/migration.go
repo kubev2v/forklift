@@ -257,7 +257,7 @@ func (r *Migration) Load() (err error) {
 	if val, found := os.LookupEnv(OvaContainerRequestsMemory); found {
 		r.OvaContainerRequestsMemory = val
 	} else {
-		r.OvaContainerRequestsMemory = "150Mi"
+		r.OvaContainerRequestsMemory = "512Mi"
 	}
 	r.MaxConcurrentReconciles, err = getPositiveEnvLimit(MaxConcurrentReconciles, 10)
 	if err != nil {
