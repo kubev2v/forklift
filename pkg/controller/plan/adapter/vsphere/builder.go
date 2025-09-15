@@ -1429,6 +1429,29 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				// populator name is the name of the populator, and we can't use generateName for the populator
 				populatorName := pvc.ObjectMeta.Name
 
+				// For warm migration, add annotations to jump-start the DataVolume
+				v := r.getPlanVMStatus(vm)
+				if v != nil && v.Warm != nil {
+					pvc.Annotations[planbase.AnnEndpoint] = r.Source.Provider.Spec.URL
+					pvc.Annotations[planbase.AnnImportBackingFile] = baseVolume(disk.File, r.Plan.Spec.Warm)
+					pvc.Annotations[planbase.AnnSecret] = secretName
+					pvc.Annotations[planbase.AnnUUID] = vm.UUID
+					pvc.Annotations[planbase.AnnThumbprint] = r.Source.Provider.Status.Fingerprint
+					pvc.Annotations[planbase.AnnVddkInitImageURL] = settings.GetVDDKImage(r.Source.Provider.Spec.Settings)
+					pvc.Annotations[planbase.AnnPodPhase] = "Succeeded"
+
+					n := len(v.Warm.Precopies)
+					if n > 0 { // Should be 1 at this point
+						snapshot := v.Warm.Precopies[n-1].Snapshot
+						pvc.Annotations[planbase.AnnFinalCheckpoint] = "false"
+						pvc.Annotations[planbase.AnnCurrentCheckpoint] = snapshot
+						pvc.Annotations[planbase.AnnPreviousCheckpoint] = ""
+
+						copied := fmt.Sprintf("%s.%s", planbase.AnnCheckpointsCopied, snapshot)
+						pvc.Annotations[copied] = "xcopy-initial-offload" // Any value should work here
+					}
+				}
+
 				// Update DataSourceRef to point to the volume populator
 				pvc.Spec.DataSourceRef.Name = populatorName
 

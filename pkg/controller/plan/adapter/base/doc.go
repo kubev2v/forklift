@@ -42,6 +42,39 @@ const (
 	// Related to https://github.com/kubevirt/containerized-data-importer/pull/3572
 	AnnVddkExtraArgs = "cdi.kubevirt.io/storage.pod.vddk.extraargs"
 
+	// CDI import backing file annotation on PVC
+	AnnImportBackingFile = "cdi.kubevirt.io/storage.import.backingFile"
+
+	// Source URL
+	AnnEndpoint = "cdi.kubevirt.io/storage.import.endpoint"
+
+	// Secret name for source credentials
+	AnnSecret = "cdi.kubevirt.io/storage.import.secretName"
+
+	// PVC UUID
+	AnnUUID = "cdi.kubevirt.io/storage.import.uuid"
+
+	// VDDK-specific thumbprint
+	AnnThumbprint = "cdi.kubevirt.io/storage.import.vddk.thumbprint"
+
+	// VDDK image
+	AnnVddkInitImageURL = "cdi.kubevirt.io/storage.pod.vddk.initimageurl"
+
+	// Importer pod progress phase
+	AnnPodPhase = "cdi.kubevirt.io/storage.pod.phase"
+
+	// True if the current checkpoint is the one taken for the cutover
+	AnnFinalCheckpoint = "cdi.kubevirt.io/storage.checkpoint.final"
+
+	// Current checkpoint reference
+	AnnCurrentCheckpoint = "cdi.kubevirt.io/storage.checkpoint.current"
+
+	// Previous checkpoint reference
+	AnnPreviousCheckpoint = "cdi.kubevirt.io/storage.checkpoint.previous"
+
+	// Not a whole annotation but a prefix, append a snapshot name to mark that the snapshot was already copied
+	AnnCheckpointsCopied = "cdi.kubevirt.io/storage.checkpoint.copied"
+
 	// Allow DataVolume to adopt a PVC
 	AnnAllowClaimAdoption = "cdi.kubevirt.io/allowClaimAdoption"
 
