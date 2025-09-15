@@ -8,6 +8,7 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -25,6 +26,15 @@ const (
 	auditRestrictedLabel   = "pod-security.kubernetes.io/audit"
 	enforceRestrictedLabel = "pod-security.kubernetes.io/enforce"
 	qemuGroup              = 107
+)
+
+// Env vars
+const (
+	ProviderNamespace  = "PROVIDER_NAMESPACE"
+	ProviderName       = "PROVIDER_NAME"
+	CatalogPath        = "CATALOG_PATH"
+	ApplianceEndpoints = "APPLIANCE_ENDPOINTS"
+	AuthRequired       = "AUTH_REQUIRED"
 )
 
 func (r Reconciler) CreateOVAServerDeployment(provider *api.Provider, ctx context.Context) (err error) {
@@ -64,6 +74,15 @@ func (r Reconciler) CreateOVAServerDeployment(provider *api.Provider, ctx contex
 		err = liberr.Wrap(err)
 		r.Log.Error(err, "Failed to create OVA server service")
 		return
+	}
+
+	if Settings.OpenShift {
+		err = r.createServerRoute(provider, ctx, ownerReference, labels)
+		if err != nil {
+			err = liberr.Wrap(err)
+			r.Log.Error(err, "Failed to create OVA server route")
+			return
+		}
 	}
 	return
 }
@@ -191,6 +210,32 @@ func (r *Reconciler) createServerService(provider *api.Provider, ctx context.Con
 	return
 }
 
+func (r *Reconciler) createServerRoute(provider *api.Provider, ctx context.Context, ownerReference metav1.OwnerReference, labels map[string]string) (err error) {
+	routeName := fmt.Sprintf("ova-route-%s", provider.Name)
+	route := &routev1.Route{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            routeName,
+			Namespace:       provider.Namespace,
+			Labels:          labels,
+			OwnerReferences: []metav1.OwnerReference{ownerReference},
+		},
+		Spec: routev1.RouteSpec{
+			Path: "/appliances",
+			To: routev1.RouteTargetReference{
+				Kind: "Service",
+				Name: fmt.Sprintf("ova-service-%s", provider.Name),
+			},
+			TLS: &routev1.TLSConfig{
+				Termination:                   routev1.TLSTerminationEdge,
+				InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+			},
+		},
+	}
+
+	err = r.Create(ctx, route)
+	return
+}
+
 func (r *Reconciler) makeOvaProviderPodSpec(pvcName, providerName, providerNamespace string) core.PodSpec {
 	imageName, ok := os.LookupEnv(ovaImageVar)
 	if !ok {
@@ -242,6 +287,28 @@ func (r *Reconciler) makeOvaProviderPodSpec(pvcName, providerName, providerNames
 			},
 		},
 		SecurityContext: securityContext,
+		Env: []core.EnvVar{
+			{
+				Name:  ProviderName,
+				Value: providerName,
+			},
+			{
+				Name:  ProviderNamespace,
+				Value: providerNamespace,
+			},
+			{
+				Name:  CatalogPath,
+				Value: mountPath,
+			},
+			{
+				Name:  ApplianceEndpoints,
+				Value: "true",
+			},
+			{
+				Name:  AuthRequired,
+				Value: "true",
+			},
+		},
 	}
 
 	volume := core.Volume{

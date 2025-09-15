@@ -1,5 +1,5 @@
 //nolint:errcheck
-package main
+package inventory
 
 import (
 	"os"

@@ -29,6 +29,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	"github.com/kubev2v/forklift/pkg/settings"
 	"github.com/kubev2v/forklift/pkg/webhook"
+	route "github.com/openshift/api/route/v1"
 	template "github.com/openshift/api/template/v1"
 	"github.com/pkg/profile"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -136,6 +137,9 @@ func main() {
 	}
 	if err := multicluster.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "proceeding without optional multicluster APIs.")
+	}
+	if err := route.Install(mgr.GetScheme()); err != nil {
+		log.Error(err, "proceeding without optional route APIs.")
 	}
 	// Setup all Controllers
 	log.Info("Setting up controller")
