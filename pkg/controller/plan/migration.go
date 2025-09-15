@@ -1061,6 +1061,24 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				break
 			}
 
+			pvcs, err := r.kubevirt.getPVCs(vm.Ref)
+			if err != nil {
+				break
+			}
+			for _, pvc := range pvcs {
+				n := len(vm.Warm.Precopies)
+				pvc.Annotations[base.AnnPodPhase] = "Unknown" // Signal CDI to work on this PVC
+				pvc.Annotations[base.AnnCurrentCheckpoint] = vm.Warm.Precopies[n-1].Snapshot
+				backingFile := pvc.Annotations[base.AnnImportBackingFile]
+				pvc.Annotations[base.AnnPreviousCheckpoint] = vm.Warm.Precopies[n-2].DeltaMap()[backingFile]
+				err = r.Destination.Client.Update(context.TODO(), pvc)
+				if err != nil {
+					step.AddError(err.Error())
+					err = nil
+					break
+				}
+			}
+
 			switch vm.Phase {
 			case api.PhaseAddCheckpoint:
 				vm.Phase = api.PhaseWaitForDataVolumesStatus
