@@ -1484,6 +1484,10 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) 
 
 	// Set the target node name if specified in the plan
 	if len(r.Plan.Spec.TargetNodeSelector) > 0 {
+		// If the node selector is not set, set it to an empty map
+		if object.Spec.Template.Spec.NodeSelector == nil {
+			object.Spec.Template.Spec.NodeSelector = make(map[string]string)
+		}
 		maps.Copy(object.Spec.Template.Spec.NodeSelector, r.Plan.Spec.TargetNodeSelector)
 	}
 
