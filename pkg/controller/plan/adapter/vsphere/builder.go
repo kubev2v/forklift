@@ -1410,8 +1410,8 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				} else {
 					pvc.Annotations = annotations
 				}
-				pvc.Annotations[planbase.AnnDiskSource] = baseVolume(disk.File, false)
-				pvc.Annotations["copy-offload"] = baseVolume(disk.File, false)
+				pvc.Annotations[planbase.AnnDiskSource] = baseVolume(disk.File, r.Plan.Spec.Warm)
+				pvc.Annotations["copy-offload"] = baseVolume(disk.File, r.Plan.Spec.Warm)
 
 				// Apply PVC template naming if configured, replacing the commonName
 				if err := r.setColdMigrationDefaultPVCName(&pvc.ObjectMeta, vm, diskIndex, disk); err != nil {
@@ -1442,7 +1442,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					},
 					Spec: api.VSphereXcopyVolumePopulatorSpec{
 						VmId:                 vmRef.ID,
-						VmdkPath:             disk.File,
+						VmdkPath:             baseVolume(disk.File, r.Plan.Spec.Warm),
 						SecretName:           secretName,
 						StorageVendorProduct: string(storageVendorProduct),
 					},
@@ -1543,7 +1543,7 @@ func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.Persi
 
 func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error) {
 	// copy-offload only
-	taskName = pvc.Annotations[planbase.AnnDiskSource]
+	taskName = baseVolume(pvc.Annotations[planbase.AnnDiskSource], r.Plan.Spec.Warm)
 	return
 }
 
