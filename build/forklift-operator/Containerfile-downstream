@@ -22,5 +22,6 @@ LABEL \
     vendor="Red Hat, Inc." \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
     version="$VERSION" \
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:2.9::el9" \
     revision="$REVISION"
 
