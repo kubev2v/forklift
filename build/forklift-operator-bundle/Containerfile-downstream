@@ -105,6 +105,7 @@ LABEL operators.operatorframework.io.test.mediatype.v1=scorecard+v1
 # Main labels
 LABEL \
     com.redhat.component="mtv-operator-bundle-container" \
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:2.8::el9" \
     name="${REGISTRY}/mtv-operator-bundle" \
     License="Apache License 2.0" \
     io.k8s.display-name="Migration Toolkit for Virtualization" \
