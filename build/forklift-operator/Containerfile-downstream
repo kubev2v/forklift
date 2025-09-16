@@ -12,6 +12,7 @@ ARG REVISION
 
 LABEL \
     com.redhat.component="mtv-operator-container" \
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:2.8::el9" \
     name="${REGISTRY}/mtv-rhel9-operator" \
     license="Apache License 2.0" \
     io.k8s.display-name="Migration Toolkit for Virtualization" \
