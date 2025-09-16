@@ -66,6 +66,7 @@ ARG REVISION
 
 LABEL \
     com.redhat.component="mtv-virt-v2v-container" \
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:2.8::el9" \
     name="${REGISTRY}/mtv-virt-v2v-rhel9" \
     license="Apache License 2.0" \
     io.k8s.display-name="Migration Toolkit for Virtualization" \
@@ -76,3 +77,4 @@ LABEL \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
     version="$VERSION" \
     revision="$REVISION"
+
