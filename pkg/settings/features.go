@@ -19,11 +19,11 @@ const (
 // OpenShift version where the FeatureVmwareSystemSerialNumber feature is supported:
 //   - https://issues.redhat.com/browse/CNV-64582
 //   - https://issues.redhat.com/browse/MTV-2988
-const ocpMinForVmwareSystemSerial = "4.20.0"
+const ocpMinForVmwareSystemSerial = "4.20.0-0"
 
 // OpenShift version where the defined MAC address is supported in User Defined Network:
 //   - https://issues.redhat.com/browse/CNV-66820
-const ocpMinForUdnMacSupport = "4.20.0"
+const ocpMinForUdnMacSupport = "4.20.0-0"
 
 // Feature gates.
 type Features struct {

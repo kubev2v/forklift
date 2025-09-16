@@ -39,16 +39,16 @@ func TestFeatures_Load_VmwareSystemSerialNumber(t *testing.T) {
 			expectedResult: true,
 		},
 		{
-			name:           "feature enabled, version with pre-release below minimum",
+			name:           "feature enabled, version with pre-release above minimum",
 			featureFlag:    "true",
 			openshiftVer:   "4.20.0-alpha.1",
-			expectedResult: false, // 4.20.0-alpha.1 < 4.20.0 per semver spec
+			expectedResult: true, // 4.20.0-alpha.1 > 4.20.0-0 per semver spec (numeric < non-numeric)
 		},
 		{
 			name:           "feature enabled, pre-release version above minimum",
 			featureFlag:    "true",
 			openshiftVer:   "4.21.0-alpha.1",
-			expectedResult: true, // 4.21.0-alpha.1 > 4.20.0
+			expectedResult: true, // 4.21.0-alpha.1 > 4.20.0-0
 		},
 
 		// V-prefixed version support
