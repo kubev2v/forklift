@@ -41,54 +41,55 @@ import (
 
 // Types
 const (
-	WarmMigrationNotReady         = "WarmMigrationNotReady"
-	MigrationTypeNotValid         = "MigrationTypeNotValid"
-	NamespaceNotValid             = "NamespaceNotValid"
-	TransferNetNotValid           = "TransferNetworkNotValid"
-	NetRefNotValid                = "NetworkMapRefNotValid"
-	NetMapNotReady                = "NetworkMapNotReady"
-	DsMapNotReady                 = "StorageMapNotReady"
-	DsRefNotValid                 = "StorageRefNotValid"
-	VMRefNotValid                 = "VMRefNotValid"
-	VMNotFound                    = "VMNotFound"
-	VMAlreadyExists               = "VMAlreadyExists"
-	VMNetworksNotMapped           = "VMNetworksNotMapped"
-	VMStorageNotMapped            = "VMStorageNotMapped"
-	VMStorageNotSupported         = "VMStorageNotSupported"
-	VMMultiplePodNetworkMappings  = "VMMultiplePodNetworkMappings"
-	VMMissingGuestIPs             = "VMMissingGuestIPs"
-	VMIpNotMatchingUdnSubnet      = "VMIpNotMatchingUdnSubnet"
-	VMMissingChangedBlockTracking = "VMMissingChangedBlockTracking"
-	VMHasSnapshots                = "VMHasSnapshots"
-	HostNotReady                  = "HostNotReady"
-	DuplicateVM                   = "DuplicateVM"
-	SharedDisks                   = "SharedDisks"
-	SharedWarnDisks               = "SharedWarnDisks"
-	NameNotValid                  = "TargetNameNotValid"
-	HookNotValid                  = "HookNotValid"
-	HookNotReady                  = "HookNotReady"
-	HookStepNotValid              = "HookStepNotValid"
-	Executing                     = "Executing"
-	Succeeded                     = "Succeeded"
-	Failed                        = "Failed"
-	Canceled                      = "Canceled"
-	Deleted                       = "Deleted"
-	Paused                        = "Paused"
-	Archived                      = "Archived"
-	UnsupportedDisks              = "UnsupportedDisks"
-	InvalidDiskSizes              = "InvalidDiskSizes"
-	MacConflicts                  = "MacConflicts"
-	MissingPvcForOnlyConversion   = "MissingPvcForOnlyConversion"
-	LuksAndClevisIncompatibility  = "LuksAndClevisIncompatibility"
-	UnsupportedUdn                = "UnsupportedUserDefinedNetwork"
-	unsupportedVersion            = "UnsupportedVersion"
-	VDDKInvalid                   = "VDDKInvalid"
-	ValidatingVDDK                = "ValidatingVDDK"
-	VDDKInitImageNotReady         = "VDDKInitImageNotReady"
-	VDDKInitImageUnavailable      = "VDDKInitImageUnavailable"
-	UnsupportedOvaSource          = "UnsupportedOvaSource"
-	VMPowerStateUnsupported       = "VMPowerStateUnsupported"
-	VMMigrationTypeUnsupported    = "VMMigrationTypeUnsupported"
+	WarmMigrationNotReady           = "WarmMigrationNotReady"
+	MigrationTypeNotValid           = "MigrationTypeNotValid"
+	NamespaceNotValid               = "NamespaceNotValid"
+	TransferNetNotValid             = "TransferNetworkNotValid"
+	NetRefNotValid                  = "NetworkMapRefNotValid"
+	NetMapNotReady                  = "NetworkMapNotReady"
+	NetMapPreservingIPsOnPodNetwork = "NetMapPreservingIPsOnPodNetwork"
+	DsMapNotReady                   = "StorageMapNotReady"
+	DsRefNotValid                   = "StorageRefNotValid"
+	VMRefNotValid                   = "VMRefNotValid"
+	VMNotFound                      = "VMNotFound"
+	VMAlreadyExists                 = "VMAlreadyExists"
+	VMNetworksNotMapped             = "VMNetworksNotMapped"
+	VMStorageNotMapped              = "VMStorageNotMapped"
+	VMStorageNotSupported           = "VMStorageNotSupported"
+	VMMultiplePodNetworkMappings    = "VMMultiplePodNetworkMappings"
+	VMMissingGuestIPs               = "VMMissingGuestIPs"
+	VMIpNotMatchingUdnSubnet        = "VMIpNotMatchingUdnSubnet"
+	VMMissingChangedBlockTracking   = "VMMissingChangedBlockTracking"
+	VMHasSnapshots                  = "VMHasSnapshots"
+	HostNotReady                    = "HostNotReady"
+	DuplicateVM                     = "DuplicateVM"
+	SharedDisks                     = "SharedDisks"
+	SharedWarnDisks                 = "SharedWarnDisks"
+	NameNotValid                    = "TargetNameNotValid"
+	HookNotValid                    = "HookNotValid"
+	HookNotReady                    = "HookNotReady"
+	HookStepNotValid                = "HookStepNotValid"
+	Executing                       = "Executing"
+	Succeeded                       = "Succeeded"
+	Failed                          = "Failed"
+	Canceled                        = "Canceled"
+	Deleted                         = "Deleted"
+	Paused                          = "Paused"
+	Archived                        = "Archived"
+	UnsupportedDisks                = "UnsupportedDisks"
+	InvalidDiskSizes                = "InvalidDiskSizes"
+	MacConflicts                    = "MacConflicts"
+	MissingPvcForOnlyConversion     = "MissingPvcForOnlyConversion"
+	LuksAndClevisIncompatibility    = "LuksAndClevisIncompatibility"
+	UnsupportedUdn                  = "UnsupportedUserDefinedNetwork"
+	unsupportedVersion              = "UnsupportedVersion"
+	VDDKInvalid                     = "VDDKInvalid"
+	ValidatingVDDK                  = "ValidatingVDDK"
+	VDDKInitImageNotReady           = "VDDKInitImageNotReady"
+	VDDKInitImageUnavailable        = "VDDKInitImageUnavailable"
+	UnsupportedOvaSource            = "UnsupportedOvaSource"
+	VMPowerStateUnsupported         = "VMPowerStateUnsupported"
+	VMMigrationTypeUnsupported      = "VMMigrationTypeUnsupported"
 )
 
 // Categories
@@ -98,6 +99,13 @@ const (
 	Critical = libcnd.Critical
 	Error    = libcnd.Error
 	Warn     = libcnd.Warn
+)
+
+// Network types
+const (
+	Pod     = "pod"
+	Multus  = "multus"
+	Ignored = "ignored"
 )
 
 // Reasons
@@ -453,6 +461,25 @@ func (r *Reconciler) validateNetworkMap(plan *api.Plan) (err error) {
 			Category: api.CategoryCritical,
 			Message:  "Map.Network does not have Ready condition.",
 		})
+	}
+	// Check if we are preserving static IPs and give warning if we are mapping to Pod Network.
+	// The Pod network has different subnet than the source provider so the VMs might not be accessible.
+	if plan.Spec.PreserveStaticIPs {
+		var hasMappingToPodNetwork bool
+		for _, networkMap := range mp.Spec.Map {
+			if networkMap.Destination.Type == Pod {
+				hasMappingToPodNetwork = true
+			}
+		}
+		// The UDNs can be valid network for which there are additional validations to check the subnet ranges per VM
+		if hasMappingToPodNetwork && !plan.DestinationHasUdnNetwork(r.Client) {
+			plan.Status.SetCondition(libcnd.Condition{
+				Type:     NetMapPreservingIPsOnPodNetwork,
+				Status:   True,
+				Category: api.CategoryWarn,
+				Message:  "Your migration plan preserves the static IPs of VMs and uses Pod Networking target network mapping. This combination isn't supported, because VM IPs aren't preserved in Pod Networking migrations.",
+			})
+		}
 	}
 
 	plan.Referenced.Map.Network = mp
