@@ -59,7 +59,8 @@ func (h ApplianceHandler) AddRoutes(e *gin.Engine) {
 	router := e.Group("/")
 	router.GET(AppliancesRoute, h.List)
 	router.POST(AppliancesRoute, h.Upload)
-	router.DELETE(ApplianceRoute, h.Delete)
+	// leave the delete endpoint disabled for now
+	// router.DELETE(ApplianceRoute, h.Delete)
 }
 
 // List godoc
