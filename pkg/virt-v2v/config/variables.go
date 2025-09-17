@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type MountPath string
@@ -28,6 +29,8 @@ const (
 	EnvHostName                   = "V2V_HOSTNAME"
 	EnvNbdeClevis                 = "V2V_NBDE_CLEVIS"
 	EnvMultipleIpsPerNicName      = "V2V_multipleIPsPerNic"
+	EnvRemoteInspection           = "V2V_remoteInspection"
+	EnvRemoteInspectionDisk       = "V2V_remoteInspectDisk_"
 )
 
 const (
@@ -85,6 +88,11 @@ type AppConfig struct {
 	// hostname
 	HostName string
 
+	// V2V_remoteInspection
+	IsRemoteInspection bool
+	// RemoteInspectionDisks
+	RemoteInspectionDisks []string
+
 	// V2V_multipleIPsPerNic
 	MultipleIpsPerNicName string
 	// Paths
@@ -122,6 +130,8 @@ func (s *AppConfig) Load() (err error) {
 	flag.StringVar(&s.VirtIoWinLegacyDrivers, "virtio-win-legacy-drivers", os.Getenv(EnvVirtIoWinLegacyDriversName), "Path to the virtio-win legacy drivers ISO")
 	flag.StringVar(&s.HostName, "hostname", os.Getenv(EnvHostName), "Hostname of the vm")
 	flag.StringVar(&s.MultipleIpsPerNicName, "multiple-ips-per-nic", os.Getenv(EnvMultipleIpsPerNicName), "Multiple IPs per NIC")
+	flag.BoolVar(&s.IsRemoteInspection, "remote-inspection", s.getEnvBool(EnvRemoteInspection, true), "Run virt-v2v-inspection on remote disks")
+	s.RemoteInspectionDisks = s.getRemoteInspectionDisks()
 	flag.Parse()
 
 	return s.validate()
@@ -139,6 +149,20 @@ func (s *AppConfig) getExtraArgs() []string {
 		}
 	}
 	return extraArgs
+}
+
+func (s *AppConfig) getRemoteInspectionDisks() []string {
+	var disks []string
+
+	envVars := os.Environ()
+
+	for _, envVar := range envVars {
+		if strings.Contains(envVar, EnvRemoteInspectionDisk) {
+			disks = append(disks, strings.Split(envVar, "=")[1])
+		}
+	}
+
+	return disks
 }
 
 // Get boolean.

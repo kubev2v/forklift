@@ -22,14 +22,15 @@ var (
 
 // Steps.
 const (
-	Initialize      = "Initialize"
-	Cutover         = "Cutover"
-	DiskAllocation  = "DiskAllocation"
-	DiskTransfer    = "DiskTransfer"
-	ImageConversion = "ImageConversion"
-	DiskTransferV2v = "DiskTransferV2v"
-	VMCreation      = "VirtualMachineCreation"
-	Unknown         = "Unknown"
+	Initialize          = "Initialize"
+	Cutover             = "Cutover"
+	DiskAllocation      = "DiskAllocation"
+	DiskTransfer        = "DiskTransfer"
+	ImageConversion     = "ImageConversion"
+	DiskTransferV2v     = "DiskTransferV2v"
+	VMCreation          = "VirtualMachineCreation"
+	PreflightInspection = "PreflightInspection"
+	Unknown             = "Unknown"
 )
 
 type Migrator interface {
