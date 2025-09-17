@@ -71,7 +71,7 @@ func (h ApplianceHandler) AddRoutes(e *gin.Engine) {
 // @router /appliances [get]
 func (h ApplianceHandler) List(ctx *gin.Context) {
 	if !h.permitted(ctx) {
-		ctx.AbortWithStatus(http.StatusUnauthorized)
+		ctx.AbortWithStatus(http.StatusForbidden)
 		return
 	}
 	entries, err := os.ReadDir(h.OVAStoragePath)
@@ -87,8 +87,8 @@ func (h ApplianceHandler) List(ctx *gin.Context) {
 		dirPath := pathlib.Join(h.OVAStoragePath, entry.Name())
 		dirEntries, dErr := os.ReadDir(dirPath)
 		if dErr != nil {
-			_ = ctx.Error(dErr)
-			return
+			log.Error(dErr, "couldn't read directory", "dir", dirPath)
+			continue
 		}
 		for _, dirEntry := range dirEntries {
 			if dirEntry.IsDir() {
@@ -116,7 +116,7 @@ func (h ApplianceHandler) List(ctx *gin.Context) {
 // @router /appliances [post]
 func (h ApplianceHandler) Upload(ctx *gin.Context) {
 	if !h.permitted(ctx) {
-		ctx.AbortWithStatus(http.StatusUnauthorized)
+		ctx.AbortWithStatus(http.StatusForbidden)
 		return
 	}
 	input, err := ctx.FormFile(ApplianceField)
@@ -162,6 +162,7 @@ func (h ApplianceHandler) Upload(ctx *gin.Context) {
 	err = h.upload(src, path)
 	if err != nil {
 		log.Error(err, "failed uploading file")
+		_ = os.RemoveAll(pathlib.Dir(path))
 		_ = ctx.Error(err)
 		return
 	}
@@ -219,7 +220,7 @@ func (h ApplianceHandler) validate(path string) (appliance *ApplianceInfo, err e
 // @param filename path string true "Filename of OVA in catalog"
 func (h ApplianceHandler) Delete(ctx *gin.Context) {
 	if !h.permitted(ctx) {
-		ctx.AbortWithStatus(http.StatusUnauthorized)
+		ctx.AbortWithStatus(http.StatusForbidden)
 		return
 	}
 	filename := pathlib.Base(ctx.Param(Filename))
