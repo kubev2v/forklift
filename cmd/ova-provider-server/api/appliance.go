@@ -223,6 +223,11 @@ func (h ApplianceHandler) Delete(ctx *gin.Context) {
 		return
 	}
 	filename := pathlib.Base(ctx.Param(Filename))
+	if !strings.HasSuffix(strings.ToLower(filename), ova.ExtOVA) {
+		err := &BadRequestError{"filename must end with .ova extension"}
+		_ = ctx.Error(err)
+		return
+	}
 	path := h.fullPath(filename)
 	_, err := os.Stat(path)
 	if err != nil {
