@@ -194,6 +194,17 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 						Progress:    libitr.Progress{Total: 1},
 					},
 				})
+		case api.PhasePreflightInspection:
+			pipeline = append(
+				pipeline,
+				&plan.Step{
+					Task: plan.Task{
+						Name:        PreflightInspection,
+						Description: "Inspect disks before migration.",
+						Phase:       api.StepPending,
+						Progress:    libitr.Progress{Total: 1},
+					},
+				})
 		}
 		next, done, _ := itinerary.Next(step.Name)
 		if !done {
@@ -264,6 +275,13 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 		} else {
 			step = Initialize
 		}
+	case api.PhasePreflightInspection:
+		if !r.Context.Plan.Spec.SkipGuestConversion &&
+			r.Context.Plan.Spec.RunPreflightInspection {
+			step = PreflightInspection
+		} else {
+			step = Initialize
+		}
 	default:
 		step = Unknown
 	}
@@ -278,6 +296,7 @@ func (r *BaseMigrator) warmItinerary() *libitr.Itinerary {
 			{Name: api.PhasePreHook, All: HasPreHook},
 			{Name: api.PhaseCreateInitialSnapshot},
 			{Name: api.PhaseWaitForInitialSnapshot},
+			{Name: api.PhasePreflightInspection, All: VSphere},
 			{Name: api.PhaseStoreInitialSnapshotDeltas, All: VSphere},
 			{Name: api.PhaseCreateDataVolumes},
 			// Precopy loop start

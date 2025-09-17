@@ -357,6 +357,7 @@ type Disk struct {
 	Serial                string `json:"serial,omitempty"`
 	WinDriveLetter        string `json:"winDriveLetter,omitempty"`
 	ChangeTrackingEnabled bool   `json:"changeTrackingEnabled"`
+	ParentFile            string `json:"parent"`
 }
 
 // Virtual Device.
