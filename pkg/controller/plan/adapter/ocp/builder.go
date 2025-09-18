@@ -4,12 +4,16 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
+	libutil "github.com/kubev2v/forklift/pkg/lib/util"
 	export "kubevirt.io/api/export/v1alpha1"
 
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -43,38 +47,21 @@ type Builder struct {
 }
 
 // ConfigMap implements base.Builder
-func (r *Builder) ConfigMap(vmRef ref.Ref, secret *core.Secret, object *core.ConfigMap) error {
-	vmExport := &export.VirtualMachineExport{}
-	r.Log.Info("Fetching vmExport", "vmRef", vmRef)
-
-	key := client.ObjectKey{
-		Namespace: vmRef.Namespace,
-		Name:      vmRef.Name,
-	}
-	err := r.sourceClient.Get(context.TODO(), key, vmExport)
-	if err != nil {
-		r.Log.Error(err, "Failed to get VM-export ConfigMap")
-		return liberr.Wrap(err)
-	}
-
-	links := vmExport.Status.Links
-	if links.External != nil {
-		object.Data = map[string]string{
-			"ca.pem": links.External.Cert,
-		}
-	} else {
-		return liberr.Wrap(fmt.Errorf("failed to get external link from VM-exports"))
-	}
-
-	return nil
+// No-op for OCP.
+func (r *Builder) ConfigMap(vmRef ref.Ref, secret *core.Secret, object *core.ConfigMap) (err error) {
+	return
 }
 
 // DataVolumes implements base.Builder
-func (r *Builder) DataVolumes(vmRef ref.Ref, secret *v1.Secret, configMap *v1.ConfigMap, dvTemplate *cdi.DataVolume, vddkConfigMap *v1.ConfigMap) (dvs []cdi.DataVolume, err error) {
+func (r *Builder) DataVolumes(vmRef ref.Ref, secret *v1.Secret, _ *core.ConfigMap, dvTemplate *cdi.DataVolume, vddkConfigMap *v1.ConfigMap) (dvs []cdi.DataVolume, err error) {
 	vmExport := &export.VirtualMachineExport{}
 	key := client.ObjectKey{
 		Namespace: vmRef.Namespace,
 		Name:      vmRef.Name,
+	}
+
+	if secret == nil || secret.Name == "" {
+		return nil, liberr.New("missing export token secret; cannot set SecretExtraHeaders on DataVolume")
 	}
 
 	err = r.sourceClient.Get(context.TODO(), key, vmExport)
@@ -87,6 +74,16 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *v1.Secret, configMap *v1.Co
 	storageMap := map[string]v1beta1.DestinationStorage{}
 	for _, storage := range r.Map.Storage.Spec.Map {
 		storageMap[storage.Source.Name] = storage.Destination
+	}
+
+	// Create a dedicated certificate ConfigMap for the DataVolumes
+	// This is needed because the passed configMap might be a prehook ConfigMap without certificates
+	certConfigMap, err := r.createCertificateConfigMap(vmExport, vmRef)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	if certConfigMap == nil {
+		return nil, liberr.New("certificate ConfigMap creation returned nil without error")
 	}
 
 	dataVolumes := []cdi.DataVolume{}
@@ -107,7 +104,10 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *v1.Secret, configMap *v1.Co
 			return nil, liberr.Wrap(fmt.Errorf("failed to get export URL, available formats: %v", volume.Formats))
 		}
 		storageClassName := storageMap[*pvc.Spec.StorageClassName].StorageClass
-		dataVolume.Spec = *createDataVolumeSpec(size, storageClassName, url, configMap.Name, secret.Name)
+		if storageClassName == "" {
+			return nil, liberr.Wrap(fmt.Errorf("missing storage class name; cannot create DataVolume"))
+		}
+		dataVolume.Spec = *createDataVolumeSpec(size, storageClassName, url, certConfigMap.Name, secret.Name)
 
 		err = r.Destination.Client.Create(context.TODO(), dataVolume, &client.CreateOptions{})
 		if err != nil {
@@ -549,25 +549,25 @@ func (r *Builder) getSourceVmFromDefinition(vme *export.VirtualMachineExport) (*
 		}
 	}
 
-	caCert := vme.Status.Links.External.Cert
 	var transport *http.Transport
 
-	if caCert != "" {
-		caCertPool := x509.NewCertPool()
-		if !caCertPool.AppendCertsFromPEM([]byte(caCert)) {
-			return nil, liberr.New("failed to parse CA certificate")
-		}
-
-		tlsConfig := &tls.Config{
-			RootCAs: caCertPool,
-		}
-
-		transport = &http.Transport{TLSClientConfig: tlsConfig}
-
-	} else {
-		r.Log.Info("Certificate from VM export is empty, using system CA certificates")
-		transport = &http.Transport{}
+	// For OCP to OCP migrations, get the server certificate directly (including self-signed)
+	parsedURL, err := url.Parse(vmManifestUrl)
+	if err != nil {
+		return nil, liberr.Wrap(err, "failed to parse VM manifest URL")
 	}
+
+	cert, err := libutil.GetTlsCertificate(parsedURL, r.Source.Secret)
+	if err != nil {
+		return nil, liberr.Wrap(err, "failed to get server certificate for VM manifest")
+	}
+
+	// Create transport with the server certificate
+	tlsConfig := &tls.Config{
+		RootCAs: x509.NewCertPool(),
+	}
+	tlsConfig.RootCAs.AddCert(cert)
+	transport = &http.Transport{TLSClientConfig: tlsConfig}
 
 	httpClient := &http.Client{Transport: transport}
 	req, err := http.NewRequest("GET", vmManifestUrl, nil)
@@ -688,4 +688,74 @@ func (r *Builder) LunPersistentVolumes(vmRef ref.Ref) (pvs []core.PersistentVolu
 func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.PersistentVolumeClaim, err error) {
 	// do nothing
 	return
+}
+
+// createCertificateConfigMap creates a ConfigMap with the server certificate
+func (r *Builder) createCertificateConfigMap(vmExport *export.VirtualMachineExport, vmRef ref.Ref) (*core.ConfigMap, error) {
+	r.Log.Info("Creating certificate ConfigMap for OCP to OCP migration", "vmRef", vmRef)
+
+	links := vmExport.Status.Links
+	if links == nil || links.External == nil {
+		return nil, liberr.New("no external links found in VM export")
+	}
+
+	// Get the export URL to retrieve the server certificate
+	exportURL := ""
+	if len(links.External.Volumes) > 0 && len(links.External.Volumes[0].Formats) > 0 {
+		exportURL = links.External.Volumes[0].Formats[0].Url
+	}
+
+	var certPEM string
+	if exportURL != "" {
+		// Try to get the server certificate directly (including self-signed)
+		parsedURL, err := url.Parse(exportURL)
+		if err != nil {
+			r.Log.Info("Failed to parse export URL, using export certificate", "error", err)
+			certPEM = links.External.Cert
+		} else {
+			cert, err := libutil.GetTlsCertificate(parsedURL, r.Source.Secret)
+			if err != nil {
+				r.Log.Info("Failed to get server certificate, using export certificate", "error", err)
+				certPEM = links.External.Cert
+			} else {
+				// Convert the certificate to PEM format
+				certPEM = string(pem.EncodeToMemory(&pem.Block{
+					Type:  "CERTIFICATE",
+					Bytes: cert.Raw,
+				}))
+				r.Log.Info("Successfully retrieved server certificate", "vmRef", vmRef)
+			}
+		}
+	} else {
+		certPEM = links.External.Cert
+	}
+
+	// Validate certificate content
+	if strings.TrimSpace(certPEM) == "" {
+		return nil, liberr.New("empty certificate PEM; cannot create certificate ConfigMap")
+	}
+
+	// Create the ConfigMap with the certificate
+	configMap := &core.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: fmt.Sprintf("%s-%s-cert-", r.Plan.Name, vmRef.ID),
+			Namespace:    r.Plan.Spec.TargetNamespace,
+			Labels: map[string]string{
+				"plan": r.Plan.Name,
+				"vmID": vmRef.ID,
+			},
+		},
+		Data: map[string]string{
+			"ca.pem": certPEM,
+		},
+	}
+
+	// Create the ConfigMap in the destination cluster
+	err := r.Destination.Client.Create(context.TODO(), configMap)
+	if err != nil {
+		return nil, liberr.Wrap(err, "failed to create certificate ConfigMap")
+	}
+
+	r.Log.Info("Created certificate ConfigMap", "configMap", configMap.Name, "vmRef", vmRef)
+	return configMap, nil
 }
