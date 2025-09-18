@@ -176,10 +176,6 @@ func (*Collector) Version() (string, string, string, string, error) {
 	return "", "", "", "", nil
 }
 
-func (*Collector) GetRuntimeErrors() map[string]error {
-	return nil
-}
-
 func (r *Collector) Name() string {
 	return "tester"
 }
