@@ -774,6 +774,45 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 					}
 				}
 			}
+
+			if r.builder.SupportsVolumePopulators(vm.Ref) && r.Plan.Spec.Warm {
+				// Wait for the DataVolume to adopt the PVC before proceeding
+				var pvcs []*core.PersistentVolumeClaim
+				pvcs, err = r.kubevirt.getPVCs(vm.Ref)
+				if err != nil {
+					r.Log.Error(err, "error getting PVCs on VM", "vm", vm.Name)
+					return
+				}
+				for _, pvc := range pvcs {
+					owners := pvc.GetOwnerReferences()
+					if len(owners) < 1 {
+						r.Log.Info("no owners listed on PVC yet", "pvc", pvc.Name)
+						return
+					}
+					dataVolume := &cdi.DataVolume{}
+					err = r.Destination.Client.Get(
+						context.TODO(),
+						types.NamespacedName{Namespace: pvc.Namespace, Name: owners[0].Name},
+						dataVolume)
+					if err != nil {
+						r.Log.Error(err, "error getting matching DataVolume for PVC", "pvc", pvc.Name)
+						return
+					}
+
+					// Super hack alert: once the DataVolume has adopted the PVC,
+					// set the 'allowClaimAdoption' annotation to false. This gets
+					// CDI to allow the DataVolume to go to the Paused state, which
+					// allows forklift to reuse all the existing warm migration
+					// logic to continue after a storage offload initial copy.
+					dataVolume.Annotations["cdi.kubevirt.io/allowClaimAdoption"] = "false"
+					err = r.Destination.Client.Update(context.TODO(), dataVolume)
+					if err != nil {
+						r.Log.Error(err, "error updating DataVolume, retrying", "dv", dataVolume.Name)
+						return
+					}
+				}
+			}
+
 			r.NextPhase(vm)
 		case api.PhaseCreateVM:
 			step, found := vm.FindStep(r.migrator.Step(vm))
