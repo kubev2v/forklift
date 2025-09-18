@@ -804,7 +804,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 					// CDI to allow the DataVolume to go to the Paused state, which
 					// allows forklift to reuse all the existing warm migration
 					// logic to continue after a storage offload initial copy.
-					dataVolume.Annotations["cdi.kubevirt.io/allowClaimAdoption"] = "false"
+					dataVolume.Annotations[base.AnnAllowClaimAdoption] = "false"
 					err = r.Destination.Client.Update(context.TODO(), dataVolume)
 					if err != nil {
 						r.Log.Error(err, "error updating DataVolume, retrying", "dv", dataVolume.Name)
