@@ -234,12 +234,3 @@ func (r *Collector) ClearError(kind string) {
 func (r *Collector) SetError(kind string, err error) {
 	r.errors[kind] = err
 }
-
-// returns a copy of all current errors that were encountered while querying the inventory
-func (r *Collector) GetRuntimeErrors() map[string]error {
-	errors := make(map[string]error)
-	for k, v := range r.errors {
-		errors[k] = v
-	}
-	return errors
-}

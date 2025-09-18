@@ -152,11 +152,6 @@ func (r *Collector) Version() (major, minor, build, revision string, err error) 
 	return
 }
 
-// returns runtime errors - not supported by ovirt collector
-func (r *Collector) GetRuntimeErrors() map[string]error {
-	return nil
-}
-
 func parseVersion(fullVersion string) (major, minor, build, revision string) {
 	version := strings.Split(fullVersion, ".")
 	major = version[0]
