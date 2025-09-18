@@ -42,8 +42,15 @@ rules:
   - console.openshift.io
   resources:
   - consoleplugins
+  - consoleclidownloads
   verbs:
   - '*'
+- apiGroups:
+  - route.openshift.io
+  resources:
+    - routes
+  verbs:
+    - '*'
 - apiGroups:
   - operator.openshift.io
   resources:
