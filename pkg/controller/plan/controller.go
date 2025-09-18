@@ -276,32 +276,15 @@ func (r *Reconciler) updatePlanStatus(plan *api.Plan) error {
 	// Record events.
 	r.Record(plan, plan.Status.Conditions)
 
-	// Try to fetch latest version first to get current ResourceVersion
-	latest := &api.Plan{}
-	key := client.ObjectKeyFromObject(plan)
-	if err := r.Get(context.TODO(), key, latest); err != nil {
-		r.Log.V(1).Info("Failed to fetch latest plan version, trying update with current version",
-			"plan", plan.Name, "error", err.Error())
-
-		// Fallback: try update with current plan
-		plan.Status.ObservedGeneration = plan.Generation
-		if updateErr := r.Status().Update(context.TODO(), plan.DeepCopy()); updateErr != nil {
-			r.Log.Error(updateErr, "Failed to update plan status with current version")
-			return updateErr
-		}
-		return nil
-	}
-
-	// Preserve our status changes but use latest ResourceVersion and Generation
-	latest.Status = plan.Status
-	latest.Status.ObservedGeneration = latest.Generation
+	// Apply changes.
+	plan.Status.ObservedGeneration = plan.Generation
 
 	// At this point, the plan contains data that is not persisted by design, like the Referenced data
 	// and the staged flags in the status, and more data that has been loaded in the validate function,
 	// like the name of the VMs in the spec section, therefore we don't want the plan to be overridden
 	// by data from the server (even the spec section is overridden) and so we pass a copy of the plan
-	if err := r.Status().Update(context.TODO(), latest.DeepCopy()); err != nil {
-		r.Log.Error(err, "Failed to update plan status with latest ResourceVersion")
+	if err := r.Status().Update(context.TODO(), plan.DeepCopy()); err != nil {
+		r.Log.Error(err, "Failed to update plan status", "plan", plan)
 		return err
 	}
 
