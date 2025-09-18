@@ -1439,6 +1439,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					pvc.Annotations[planbase.AnnThumbprint] = r.Source.Provider.Status.Fingerprint
 					pvc.Annotations[planbase.AnnVddkInitImageURL] = settings.GetVDDKImage(r.Source.Provider.Spec.Settings)
 					pvc.Annotations[planbase.AnnPodPhase] = "Succeeded"
+					pvc.Annotations[planbase.AnnSource] = "vddk"
 
 					n := len(v.Warm.Precopies)
 					if n > 0 { // Should be 1 at this point
@@ -1895,8 +1896,10 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 			dst.Data["GOVMOMI_HOSTNAME"] = []byte(h.Hostname())
 		case "user":
 			dst.Data["GOVMOMI_USERNAME"] = value
+			dst.Data["accessKeyId"] = value
 		case "password":
 			dst.Data["GOVMOMI_PASSWORD"] = value
+			dst.Data["secretKey"] = value
 		case "insecureSkipVerify":
 			dst.Data["GOVMOMI_INSECURE"] = value
 		}
