@@ -1,6 +1,8 @@
 package base
 
 import (
+	"errors"
+
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
@@ -53,6 +55,8 @@ const (
 	AnnStaticUdnIp = "network.kubevirt.io/addresses"
 )
 
+var LibvirtVersionInsufficient = errors.New("The installed libvirt library version is not new enough")
+var DomainXMLNotImplementedError = errors.New("provider does not support DomainXML")
 var VolumePopulatorNotSupportedError = liberr.New("provider does not support volume populators")
 
 // Adapter API.
@@ -107,6 +111,8 @@ type Builder interface {
 	GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error)
 	// Get the virtual machine preference name
 	PreferenceName(vmRef ref.Ref, configMap *core.ConfigMap) (name string, err error)
+	// Get the libvirt domain xml for the vm
+	DomainXML(vmRef ref.Ref) (xml string, err error)
 }
 
 // Client API.
