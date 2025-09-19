@@ -802,6 +802,9 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 							r.Log.Error(err, "error getting matching DataVolume for PVC", "pvc", pvc.Name)
 							return
 						}
+						if dataVolume.Annotations == nil {
+							dataVolume.Annotations = make(map[string]string)
+						}
 
 						// Super hack alert: once the DataVolume has adopted the PVC,
 						// set the 'allowClaimAdoption' annotation to false. This gets

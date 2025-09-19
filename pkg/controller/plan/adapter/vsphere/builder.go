@@ -520,9 +520,9 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 
 	// For storage offload warm migrations, match this DataVolume to the
 	// existing PVC via the backing file name.
-	var pvcMap map[string]*core.PersistentVolumeClaim
+	var pvcMap map[string]core.PersistentVolumeClaim
 	if r.Plan.Spec.Warm && r.SupportsVolumePopulators(vmRef) {
-		pvcMap = make(map[string]*core.PersistentVolumeClaim)
+		pvcMap = make(map[string]core.PersistentVolumeClaim)
 		pvcs := &core.PersistentVolumeClaimList{}
 		pvcLabels := map[string]string{
 			"vmID":      vmRef.ID,
@@ -544,7 +544,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 
 		for _, pvc := range pvcs.Items {
 			if copyOffload, present := pvc.Annotations["copy-offload"]; present && copyOffload != "" {
-				pvcMap[baseVolume(copyOffload, r.Plan.Spec.Warm)] = &pvc
+				pvcMap[baseVolume(copyOffload, r.Plan.Spec.Warm)] = pvc
 			}
 		}
 	}
@@ -625,7 +625,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		if pvcMap != nil && dvSource.VDDK != nil {
 			// In a warm migration with storage offload, the PVC has already been created with
 			// the name template. Copy the result to the DataVolume so it can adopt the PVC.
-			if pvc, present := pvcMap[dvSource.VDDK.BackingFile]; present && pvc != nil {
+			if pvc, present := pvcMap[dvSource.VDDK.BackingFile]; present {
 				dv.ObjectMeta.Name = pvc.Name
 			}
 		} else {
