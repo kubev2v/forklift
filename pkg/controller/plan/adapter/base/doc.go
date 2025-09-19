@@ -45,46 +45,46 @@ const (
 	// CDI import backing file annotation on PVC
 	AnnImportBackingFile = "cdi.kubevirt.io/storage.import.backingFile"
 
-	// Source URL
+	// Source URL, on PVC
 	AnnEndpoint = "cdi.kubevirt.io/storage.import.endpoint"
 
-	// Secret name for source credentials
+	// Secret name for source credentials, on PVC
 	AnnSecret = "cdi.kubevirt.io/storage.import.secretName"
 
-	// PVC UUID
+	// VM UUID, on PVC
 	AnnUUID = "cdi.kubevirt.io/storage.import.uuid"
 
 	// VDDK-specific thumbprint
 	AnnThumbprint = "cdi.kubevirt.io/storage.import.vddk.thumbprint"
 
-	// VDDK image
+	// VDDK image, on PVC
 	AnnVddkInitImageURL = "cdi.kubevirt.io/storage.pod.vddk.initimageurl"
 
-	// Importer pod progress phase
+	// Importer pod progress phase, on PVC
 	AnnPodPhase = "cdi.kubevirt.io/storage.pod.phase"
 
-	// True if the current checkpoint is the one taken for the cutover
+	// True if the current checkpoint is the one taken for the cutover, on PVC
 	AnnFinalCheckpoint = "cdi.kubevirt.io/storage.checkpoint.final"
 
-	// Current checkpoint reference
+	// Current checkpoint reference, on PVC
 	AnnCurrentCheckpoint = "cdi.kubevirt.io/storage.checkpoint.current"
 
-	// Previous checkpoint reference
+	// Previous checkpoint reference, on PVC
 	AnnPreviousCheckpoint = "cdi.kubevirt.io/storage.checkpoint.previous"
 
-	// Not a whole annotation but a prefix, append a snapshot name to mark that the snapshot was already copied
+	// Not a whole annotation but a prefix, append a snapshot name to mark that the snapshot was already copied (on PVC)
 	AnnCheckpointsCopied = "cdi.kubevirt.io/storage.checkpoint.copied"
 
-	// Allow DataVolume to adopt a PVC
+	// Allow DataVolume to adopt a PVC, on DataVolume
 	AnnAllowClaimAdoption = "cdi.kubevirt.io/allowClaimAdoption"
 
-	// Inform CDI that the DataVolume is already filled up
+	// Inform CDI that the DataVolume is already filled up, on DataVolume
 	AnnPrePopulated = "cdi.kubevirt.io/storage.prePopulated"
 
-	// Tell CDI which importer to use
+	// Tell CDI which importer to use, on PVC
 	AnnSource = "cdi.kubevirt.io/storage.import.source"
 
-	// Name of the current importer pod
+	// Name of the current importer pod, on PVC
 	AnnImportPod = "cdi.kubevirt.io/storage.import.importPod"
 
 	// In a UDN namespace we can't directly reach the virt-v2v pod unless we specify default opened ports on the pod network.

@@ -91,12 +91,6 @@ const (
 	WindowsPrefix  = "win"
 )
 
-// Annotations
-const (
-	// CDI import backing file annotation on PVC
-	AnnImportBackingFile = "cdi.kubevirt.io/storage.import.backingFile"
-)
-
 const (
 	Shareable = "shareable"
 )
@@ -628,7 +622,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		//       matching the disk and PVC index.
 		dv.ObjectMeta.Annotations[planbase.AnnDiskIndex] = fmt.Sprintf("%d", diskIndex)
 
-		if pvcMap != nil {
+		if pvcMap != nil && dvSource.VDDK != nil {
 			// In a warm migration with storage offload, the PVC has already been created with
 			// the name template. Copy the result to the DataVolume so it can adopt the PVC.
 			if pvc, present := pvcMap[dvSource.VDDK.BackingFile]; present && pvc != nil {
@@ -976,7 +970,7 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 		if source, ok := pvc.Annotations[planbase.AnnDiskSource]; ok {
 			pvcMap[trimBackingFileName(source)] = pvc
 		} else {
-			pvcMap[trimBackingFileName(pvc.Annotations[AnnImportBackingFile])] = pvc
+			pvcMap[trimBackingFileName(pvc.Annotations[planbase.AnnImportBackingFile])] = pvc
 		}
 	}
 
@@ -1164,7 +1158,7 @@ func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
 
 // Return a stable identifier for a PersistentDataVolume.
 func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string {
-	return baseVolume(pvc.Annotations[AnnImportBackingFile], r.Plan.Spec.Warm)
+	return baseVolume(pvc.Annotations[planbase.AnnImportBackingFile], r.Plan.Spec.Warm)
 }
 
 // Load
