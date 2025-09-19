@@ -84,6 +84,9 @@ const (
 	// Tell CDI which importer to use
 	AnnSource = "cdi.kubevirt.io/storage.import.source"
 
+	// Name of the current importer pod
+	AnnImportPod = "cdi.kubevirt.io/storage.import.importPod"
+
 	// In a UDN namespace we can't directly reach the virt-v2v pod unless we specify default opened ports on the pod network.
 	AnnOpenDefaultPorts = "k8s.ovn.org/open-default-ports"
 

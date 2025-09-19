@@ -1449,7 +1449,8 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 						pvc.Annotations[planbase.AnnPreviousCheckpoint] = ""
 
 						copied := fmt.Sprintf("%s.%s", planbase.AnnCheckpointsCopied, snapshot)
-						pvc.Annotations[copied] = "xcopy-initial-offload" // Any value should work here
+						pvc.Annotations[copied] = "xcopy-initial-offload"                // Any value should work here
+						pvc.Annotations[planbase.AnnImportPod] = "xcopy-initial-offload" // Should match above
 					}
 				}
 
