@@ -39,6 +39,7 @@ import (
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1333,6 +1334,26 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		return
 	}
 
+	// Get a list of existing PVCs to avoid creating duplicates
+	pvcLabels := map[string]string{
+		"migration": string(r.Migration.UID),
+		"vmID":      vmRef.ID,
+	}
+	pvcList := &v1.PersistentVolumeClaimList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		pvcList,
+		&client.ListOptions{
+			LabelSelector: labels.SelectorFromSet(pvcLabels),
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		})
+	if err != nil {
+		if !k8serr.IsNotFound(err) {
+			err = liberr.Wrap(err)
+			return
+		}
+	}
+
 	// Get sorted disks to maintain consistent indexing with other parts of the system
 	sortedDisks := r.sortedDisksAsVmware(vm.Disks)
 
@@ -1472,14 +1493,24 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				if err != nil {
 					return nil, fmt.Errorf("failed to merge secrets for popoulators %w", err)
 				}
-				// TODO should we handle if already exists due to re-entry? if the former
-				// reconcile was successful in creating the pvc but failed after that, e.g when
-				// creating the volumepopulator resouce failed
-				r.Log.Info("Creating pvc", "pvc", pvc)
-				err = r.Destination.Client.Create(context.TODO(), &pvc, &client.CreateOptions{})
-				if err != nil {
-					// ignore if already exists?
-					return nil, err
+				if !r.isPVCExistsInList(&pvc, pvcList) {
+					r.Log.Info("Creating pvc", "pvc", pvc)
+					err = r.Destination.Client.Create(context.TODO(), &pvc, &client.CreateOptions{})
+					if err != nil {
+						if k8serr.IsAlreadyExists(err) {
+							continue
+						}
+						return nil, err
+					}
+				} else {
+					r.Log.Info("Updating pre-existing pvc", "pvc", pvc)
+					err = r.Destination.Client.Update(context.TODO(), &pvc, &client.UpdateOptions{})
+					if err != nil {
+						if k8serr.IsNotFound(err) {
+							continue
+						}
+						return nil, err
+					}
 				}
 
 				r.Log.Info("Ensuring a populator service account")
@@ -2085,4 +2116,13 @@ func (r *Builder) addSSHKeysToSecret(secret *core.Secret) error {
 
 	r.Log.Info("SSH keys added to migration secret", "secret", secret.Name)
 	return nil
+}
+
+func (r *Builder) isPVCExistsInList(pvc *core.PersistentVolumeClaim, pvcList *v1.PersistentVolumeClaimList) bool {
+	for _, item := range pvcList.Items {
+		if r.ResolvePersistentVolumeClaimIdentifier(pvc) == r.ResolvePersistentVolumeClaimIdentifier(&item) {
+			return true
+		}
+	}
+	return false
 }
