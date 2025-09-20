@@ -2135,6 +2135,259 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	return
 }
 
+func (r *KubeVirt) EnsureGuestInspectionPod(vm *plan.VMStatus) (pod *core.Pod, err error) {
+	var volumes []core.Volume
+	var mounts []core.VolumeMount
+
+	labels := r.vmLabels(vm.Ref)
+
+	// Create secret for virt-v2v inspection pod
+	v2vSecret, err := r.ensureSecret(vm.Ref, r.secretDataSetterForCDI(vm.Ref), labels)
+	if err != nil {
+		return
+	}
+
+	// Create vddk aio configmap if desired
+	var vddkConfigMap *core.ConfigMap
+	if r.Source.Provider.UseVddkAioOptimization() {
+		vddkConfigMap, err = r.ensureVddkConfigMap()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if vddkConfigMap != nil {
+		mounts = append(mounts,
+			core.VolumeMount{
+				Name:      VddkConf,
+				MountPath: fmt.Sprintf("/mnt/%s", VddkConf),
+			},
+		)
+		volumes = append(volumes, core.Volume{
+			Name: VddkConf,
+			VolumeSource: core.VolumeSource{
+				ConfigMap: &core.ConfigMapVolumeSource{
+					LocalObjectReference: core.LocalObjectReference{
+						Name: vddkConfigMap.Name,
+					},
+				},
+			},
+		})
+	}
+
+	// mount the secret for the password and CA certificate
+	volumes = append(volumes, core.Volume{
+		Name: "secret-volume",
+		VolumeSource: core.VolumeSource{
+			Secret: &core.SecretVolumeSource{
+				SecretName: v2vSecret.Name,
+			},
+		},
+	})
+
+	// add volume and mount for the libvirt domain xml config map.
+	// the virt-v2v pod expects to see the libvirt xml at /mnt/v2v/input.xml
+	// libvirtConfigMap, err := r.ensureLibvirtConfigMap(vm.Ref, vmCr, []*core.PersistentVolumeClaim{})
+	// if err != nil {
+	// 	return
+	// }
+
+	// volumes = append(volumes, core.Volume{
+	// 	Name: "libvirt-domain-xml",
+	// 	VolumeSource: core.VolumeSource{
+	// 		ConfigMap: &core.ConfigMapVolumeSource{
+	// 			LocalObjectReference: core.LocalObjectReference{
+	// 				Name: libvirtConfigMap.Name,
+	// 			},
+	// 		},
+	// 	},
+	// })
+
+	// Temporary space for VDDK library
+	volumes = append(volumes, core.Volume{
+		Name: VddkVolumeName,
+		VolumeSource: core.VolumeSource{
+			EmptyDir: &core.EmptyDirVolumeSource{},
+		},
+	})
+
+	mounts = append(mounts,
+		core.VolumeMount{
+			Name:      "secret-volume",
+			ReadOnly:  true,
+			MountPath: "/etc/secret",
+		},
+		// core.VolumeMount{
+		// 	Name:      "libvirt-domain-xml",
+		// 	MountPath: "/mnt/v2v",
+		// },
+		core.VolumeMount{
+			Name:      "vddk-vol-mount",
+			MountPath: "/opt",
+		},
+	)
+
+	extraConfigMapExists := len(Settings.Migration.VirtV2vExtraConfConfigMap) > 0
+	if extraConfigMapExists {
+		volumes = append(volumes, core.Volume{
+			Name: ExtraV2vConf,
+			VolumeSource: core.VolumeSource{
+				ConfigMap: &core.ConfigMapVolumeSource{
+					LocalObjectReference: core.LocalObjectReference{
+						Name: genExtraV2vConfConfigMapName(r.Plan),
+					},
+				},
+			},
+		})
+		mounts = append(mounts,
+			core.VolumeMount{
+				Name:      ExtraV2vConf,
+				MountPath: fmt.Sprintf("/mnt/%s", ExtraV2vConf),
+			},
+		)
+	}
+
+	// qemu group
+	fsGroup := qemuGroup
+	user := qemuUser
+	nonRoot := true
+	allowPrivilageEscalation := false
+
+	// VDDK image
+	var initContainers []core.Container
+
+	vddkImage := settings.GetVDDKImage(r.Source.Provider.Spec.Settings)
+	if vddkImage != "" {
+		initContainers = append(initContainers, core.Container{
+			Name:            "vddk-side-car",
+			Image:           vddkImage,
+			ImagePullPolicy: core.PullIfNotPresent,
+			VolumeMounts: []core.VolumeMount{
+				{
+					Name:      VddkVolumeName,
+					MountPath: "/opt",
+				},
+			},
+			Resources: core.ResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceCPU:    resource.MustParse("100m"),
+					core.ResourceMemory: resource.MustParse("150Mi"),
+				},
+				Limits: core.ResourceList{
+					core.ResourceCPU:    resource.MustParse("1000m"),
+					core.ResourceMemory: resource.MustParse("500Mi"),
+				},
+			},
+			SecurityContext: &core.SecurityContext{
+				AllowPrivilegeEscalation: &allowPrivilageEscalation,
+				Capabilities: &core.Capabilities{
+					Drop: []core.Capability{"ALL"},
+				},
+			},
+		})
+	}
+
+	// seccomp profile
+	var seccompProfile core.SeccompProfile
+	if settings.Settings.OpenShift {
+		unshare := "profiles/unshare.json"
+		seccompProfile = core.SeccompProfile{
+			Type:             core.SeccompProfileTypeLocalhost,
+			LocalhostProfile: &unshare,
+		}
+	} else {
+		seccompProfile = core.SeccompProfile{
+			Type: core.SeccompProfileTypeRuntimeDefault,
+		}
+	}
+
+	// Inspection pod labels
+	podLabels := r.inspectionLabels(vm.Ref)
+
+	// pod environment
+	environment, err := r.Builder.PodEnvironment(vm.Ref, r.Source.Secret)
+	if err != nil {
+		return
+	}
+
+	// Get VM model and data from inventory
+	virtualMachine := &model.VM{}
+	err = r.Context.Source.Inventory.Find(virtualMachine, vm.Ref)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		return
+	}
+
+	// Add disks to be inspected
+	for i, disk := range virtualMachine.Disks {
+		environment = append(environment, core.EnvVar{
+			Name:  fmt.Sprintf("V2V_remoteInspectDisk_%d", i),
+			Value: fmt.Sprintf("\"%s\"", disk.ParentFile),
+		})
+	}
+
+	pod = &core.Pod{
+		ObjectMeta: meta.ObjectMeta{
+			Namespace:    r.Plan.Spec.TargetNamespace,
+			Labels:       podLabels,
+			GenerateName: r.getGeneratedName(vm) + "inspection",
+		},
+		Spec: core.PodSpec{
+			SecurityContext: &core.PodSecurityContext{
+				FSGroup:        &fsGroup,
+				RunAsUser:      &user,
+				RunAsNonRoot:   &nonRoot,
+				SeccompProfile: &seccompProfile,
+			},
+			RestartPolicy:  core.RestartPolicyNever,
+			InitContainers: initContainers,
+			Containers: []core.Container{
+				{
+					Name:            "virt-v2v-inspection",
+					Env:             environment,
+					ImagePullPolicy: core.PullAlways,
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceCPU:    resource.MustParse(Settings.Migration.VirtV2vContainerRequestsCpu),
+							core.ResourceMemory: resource.MustParse(Settings.Migration.VirtV2vContainerRequestsMemory),
+						},
+						Limits: core.ResourceList{
+							core.ResourceCPU:    resource.MustParse(Settings.Migration.VirtV2vContainerLimitsCpu),
+							core.ResourceMemory: resource.MustParse(Settings.Migration.VirtV2vContainerLimitsMemory),
+						},
+					},
+					EnvFrom: []core.EnvFromSource{
+						{
+							Prefix: "V2V_",
+							SecretRef: &core.SecretEnvSource{
+								LocalObjectReference: core.LocalObjectReference{
+									Name: v2vSecret.Name,
+								},
+							},
+						},
+					},
+					Image:        Settings.Migration.VirtV2vImage,
+					VolumeMounts: mounts,
+					SecurityContext: &core.SecurityContext{
+						AllowPrivilegeEscalation: &allowPrivilageEscalation,
+						Capabilities: &core.Capabilities{
+							Drop: []core.Capability{"ALL"},
+						},
+					},
+				},
+			},
+			Volumes: volumes,
+		},
+	}
+
+	// Request access to /dev/kvm via Kubevirt's Device Manager
+	// That is to ensure the appliance virt-v2v uses would not
+	// run in emulation mode, which is significantly slower
+	r.setKvmOnPodSpec(&pod.Spec)
+
+	return
+}
+
 func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, libvirtConfigMap *core.ConfigMap, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, vm *plan.VMStatus) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, err error) {
 	pvcsByName := make(map[string]*core.PersistentVolumeClaim)
 	for _, pvc := range pvcs {
@@ -2660,6 +2913,13 @@ func (r *KubeVirt) conversionLabels(vmRef ref.Ref, filterOutMigrationLabel bool)
 		labels = r.vmLabels(vmRef)
 	}
 	labels[kApp] = "virt-v2v"
+	return
+}
+
+// Labels for an inspection pod.
+func (r *KubeVirt) inspectionLabels(vmRef ref.Ref) (labels map[string]string) {
+	labels = r.vmLabels(vmRef)
+	labels[kApp] = "virt-v2v-inspection"
 	return
 }
 
