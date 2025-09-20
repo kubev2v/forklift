@@ -6,6 +6,11 @@
       ui_plugin_state: "present"
     when: feature_ui_plugin|bool
 
+  - name: "Set CLI download feature state"
+    set_fact:
+      cli_download_state: "present"
+    when: feature_cli_download|bool
+
   - name: "Set validation feature state"
     set_fact:
       validation_state: "present"
@@ -233,6 +238,34 @@
             plugins: "{{ console_plugins + [ui_plugin_console_name] }}"
       when: ui_plugin_console_name not in console_plugins
 
+  - when: feature_cli_download|bool and not k8s_cluster|bool
+    block:
+
+    - name: "Setup CLI download service"
+      k8s:
+        state: "{{ cli_download_state }}"
+        definition: "{{ lookup('template', 'cli-download/service-cli-download.yml.j2') }}"
+
+    - name: "Setup CLI download deployment"
+      k8s:
+        state: "{{ cli_download_state }}"
+        definition: "{{ lookup('template', 'cli-download/deployment-cli-download.yml.j2') }}"
+
+    - name: "Setup CLI download route"
+      k8s:
+        state: "{{ cli_download_state }}"
+        definition: "{{ lookup('template', 'cli-download/route-cli-download.yml.j2') }}"
+
+    - name: "Setup ConsoleCLIDownload for kubectl-mtv"
+      k8s:
+        state: "{{ cli_download_state }}"
+        definition: "{{ lookup('template', 'cli-download/console-cli-download-kubectl-mtv.yml.j2') }}"
+
+    - name: "Setup ConsoleCLIDownload for kubectl-mtv MCP"
+      k8s:
+        state: "{{ cli_download_state }}"
+        definition: "{{ lookup('template', 'cli-download/console-cli-download-mcp.yml.j2') }}"
+
   - name: "Create controller service-account token Secret for download vddk tar"
     k8s:
       state: present
@@ -256,6 +289,15 @@
       loop_var: resource_kind
     vars:
       feature_label: "{{ ui_plugin_service_name }}"
+
+  - when: not feature_cli_download|bool
+    name: "Cleanup {{ cli_download_service_name }} if disabled"
+    include_tasks: cleanup.yml
+    loop: "{{ forklift_resources }}"
+    loop_control:
+      loop_var: resource_kind
+    vars:
+      feature_label: "{{ cli_download_service_name }}"
 
   - when: not feature_validation|bool
     name: "Cleanup {{ validation_service_name }} if disabled"

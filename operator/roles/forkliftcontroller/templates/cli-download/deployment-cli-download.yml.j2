@@ -1,0 +1,42 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ cli_download_deployment_name }}
+  namespace: "{{ app_namespace }}"
+  labels:
+    app: {{ app_name }}
+    service: {{ cli_download_service_name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ app_name }}
+      service: {{ cli_download_service_name }}
+  template:
+    metadata:
+      labels:
+        app: {{ app_name }}
+        service: {{ cli_download_service_name }}
+    spec:
+      containers:
+        - name: "{{ cli_download_container_name }}"
+          image: "{{ cli_download_image_fqin }}"
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          imagePullPolicy: "{{ image_pull_policy }}"
+          resources:
+            limits:
+              cpu: "{{ cli_download_container_limits_cpu }}"
+              memory: "{{ cli_download_container_limits_memory }}"
+            requests:
+              cpu: "{{ cli_download_container_requests_cpu }}"
+              memory: "{{ cli_download_container_requests_memory }}"
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%

@@ -58,7 +58,27 @@ spec:
                 type: string
               api_image_fqin:
                 description: API service image
-                example: quay.io/konveyor/forklift-api:latest
+                example: quay.io/kubev2v/forklift-api:latest
+                type: string
+              cli_download_container_limits_cpu:
+                description: 'CLI download service CPU limit (default: 100m)'
+                example: 200m
+                type: string
+              cli_download_container_limits_memory:
+                description: 'CLI download service memory limit (default: 128Mi)'
+                example: 256Mi
+                type: string
+              cli_download_container_requests_cpu:
+                description: 'CLI download service CPU request (default: 50m)'
+                example: 100m
+                type: string
+              cli_download_container_requests_memory:
+                description: 'CLI download service memory request (default: 64Mi)'
+                example: 128Mi
+                type: string
+              cli_download_image_fqin:
+                description: CLI download service image
+                example: quay.io/kubev2v/forklift-cli-download:latest
                 type: string
               controller_block_overhead:
                 description: 'Block overhead in bytes (default: 0)'
@@ -94,7 +114,7 @@ spec:
                 type: string
               controller_image_fqin:
                 description: Controller pod image
-                example: quay.io/konveyor/forklift-controller:latest
+                example: quay.io/kubev2v/forklift-controller:latest
                 type: string
               controller_log_level:
                 description: 'Log verbosity level (default: 3)'
@@ -152,6 +172,12 @@ spec:
                 type: string
               feature_auth_required:
                 description: 'Require authentication (default: true)'
+                enum:
+                - "true"
+                - "false"
+                type: string
+              feature_cli_download:
+                description: 'Enable CLI download service (default: true)'
                 enum:
                 - "true"
                 - "false"
@@ -240,7 +266,7 @@ spec:
                 type: string
               must_gather_image_fqin:
                 description: Must-gather debugging image
-                example: quay.io/konveyor/forklift-must-gather:latest
+                example: quay.io/kubev2v/forklift-must-gather:latest
                 type: string
               ova_container_limits_cpu:
                 description: 'OVA CPU limit (default: 1000m)'
@@ -260,23 +286,23 @@ spec:
                 type: string
               ova_provider_server_fqin:
                 description: OVA provider server image
-                example: quay.io/konveyor/ova-provider-server:latest
+                example: quay.io/kubev2v/ova-provider-server:latest
                 type: string
               populator_controller_image_fqin:
                 description: Volume populator controller image
-                example: quay.io/konveyor/populator-controller:latest
+                example: quay.io/kubev2v/populator-controller:latest
                 type: string
               populator_openstack_image_fqin:
                 description: OpenStack populator image
-                example: quay.io/konveyor/openstack-populator:latest
+                example: quay.io/kubev2v/openstack-populator:latest
                 type: string
               populator_ovirt_image_fqin:
                 description: oVirt populator image
-                example: quay.io/konveyor/ovirt-populator:latest
+                example: quay.io/kubev2v/ovirt-populator:latest
                 type: string
               populator_vsphere_xcopy_volume_image_fqin:
                 description: vSphere xcopy populator image
-                example: quay.io/konveyor/vsphere-populator:latest
+                example: quay.io/kubev2v/vsphere-populator:latest
                 type: string
               ui_plugin_container_limits_cpu:
                 description: 'UI plugin CPU limit (default: 100m)'
@@ -296,7 +322,7 @@ spec:
                 type: string
               ui_plugin_image_fqin:
                 description: UI plugin image
-                example: quay.io/konveyor/forklift-ui-plugin:latest
+                example: quay.io/kubev2v/forklift-ui-plugin:latest
                 type: string
               validation_container_limits_cpu:
                 description: 'Validation CPU limit (default: 1000m)'
@@ -316,7 +342,7 @@ spec:
                 type: string
               validation_image_fqin:
                 description: Validation service image
-                example: quay.io/konveyor/forklift-validation:latest
+                example: quay.io/kubev2v/forklift-validation:latest
                 type: string
               validation_policy_agent_search_interval:
                 description: 'Policy agent search interval in seconds (default: 120)'
@@ -324,7 +350,7 @@ spec:
                 type: string
               vddk_image:
                 description: VDDK image for VMware disk access
-                example: quay.io/konveyor/vddk:7.0.3
+                example: quay.io/kubev2v/vddk:7.0.3
                 type: string
               virt_v2v_container_limits_cpu:
                 description: 'virt-v2v CPU limit (default: 4000m)'
@@ -357,7 +383,7 @@ spec:
                 type: string
               virt_v2v_image_fqin:
                 description: Virt-v2v conversion image used by migration pods
-                example: quay.io/konveyor/forklift-virt-v2v:latest
+                example: quay.io/kubev2v/forklift-virt-v2v:latest
                 type: string
             type: object
           status:
@@ -6285,6 +6311,13 @@ rules:
   - console.openshift.io
   resources:
   - consoleplugins
+  - consoleclidownloads
+  verbs:
+  - '*'
+- apiGroups:
+  - route.openshift.io
+  resources:
+  - routes
   verbs:
   - '*'
 - apiGroups:
@@ -6430,6 +6463,8 @@ spec:
           value: ${MUST_GATHER_IMAGE}
         - name: UI_PLUGIN_IMAGE
           value: ${UI_PLUGIN_IMAGE}
+        - name: CLI_DOWNLOAD_IMAGE
+          value: ${CLI_DOWNLOAD_IMAGE}
         - name: VALIDATION_IMAGE
           value: ${VALIDATION_IMAGE}
         - name: VIRT_V2V_IMAGE

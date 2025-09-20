@@ -71,84 +71,9 @@ def load_tasks_variables(tasks_file):
         # Add variables from defaults that should correspond to CRD properties
         defaults_variables = set(defaults_data.keys())
         
-        # Filter out template variables and service configuration, not CRD properties
-        excluded_fields = {
-            'app_name',
-            'app_namespace', 
-            'forklift_operator_version',
-            'forklift_resources',
-            # Service and component names
-            'controller_configmap_name',
-            'controller_service_name',
-            'controller_deployment_name',
-            'controller_container_name',
-            'ovirt_osmap_configmap_name',
-            'vsphere_osmap_configmap_name', 
-            'virt_customize_configmap_name',
-            'profiler_volume_path',
-            # Inventory service fields
-            'inventory_volume_path',
-            'inventory_container_name',
-            'inventory_service_name',
-            'inventory_route_name',
-            'inventory_route_timeout',
-            'inventory_tls_secret_name',
-            'inventory_issuer_name',
-            'inventory_certificate_name',
-            # Services configuration
-            'services_service_name',
-            'services_route_name',
-            'services_tls_secret_name', 
-            'services_issuer_name',
-            'services_certificate_name',
-            # Validation service configuration
-            'validation_configmap_name',
-            'validation_service_name',
-            'validation_deployment_name',
-            'validation_container_name',
-            'validation_extra_volume_name',
-            'validation_extra_volume_mountpath',
-            'validation_tls_secret_name',
-            'validation_issuer_name',
-            'validation_certificate_name',
-            'validation_state',
-            # UI Plugin configuration
-            'ui_plugin_console_name',
-            'ui_plugin_display_name',
-            'ui_plugin_service_name',
-            'ui_plugin_deployment_name',
-            'ui_plugin_container_name',
-            'ui_plugin_state',
-            # API service configuration
-            'api_service_name',
-            'api_deployment_name',
-            'api_container_name',
-            'api_tls_secret_name',
-            'api_issuer_name', 
-            'api_certificate_name',
-            # Populator configuration
-            'populator_controller_deployment_name',
-            'populator_controller_container_name',
-            # VDDK configuration
-            'vddk_build_config_name',
-            'vddk_image_stream_name',
-            # Metrics configuration
-            'metric_service_name',
-            'metric_servicemonitor_name',
-            'metric_interval',
-            'metric_port_name',
-            'metrics_rule_name',
-            # Additional internal variables that should not be CRD properties  
-            'app_namespace',
-            'forklift_resources',
-            'ui_plugin_console_name',
-            'ui_plugin_service_name', 
-            'validation_service_name',
-        }
-        
-        # Add relevant defaults variables (those that should correspond to CRD properties)
-        relevant_defaults = defaults_variables - excluded_fields
-        variables.update(relevant_defaults)
+        # Note: excluded_fields are now applied globally at the end of this function
+        # to filter out calculated/derived variables that shouldn't be in CRD
+        variables.update(defaults_variables)
     
     # Filter out Ansible built-in variables, internal variables, and false positives
     ansible_builtin = {
@@ -163,7 +88,89 @@ def load_tasks_variables(tasks_file):
         'resources', 'bool', 'lookup', 'template', 'present', 'absent'
     }
     
-    return variables - ansible_builtin
+    # Also filter out the calculated/derived variables that shouldn't be in CRD
+    # (apply the same exclusions that were applied to defaults)
+    excluded_fields = {
+        'app_name',
+        'app_namespace', 
+        'forklift_operator_version',
+        'forklift_resources',
+        # Service and component names
+        'controller_configmap_name',
+        'controller_service_name',
+        'controller_deployment_name',
+        'controller_container_name',
+        'ovirt_osmap_configmap_name',
+        'vsphere_osmap_configmap_name', 
+        'virt_customize_configmap_name',
+        'profiler_volume_path',
+        # Inventory service fields
+        'inventory_volume_path',
+        'inventory_container_name',
+        'inventory_service_name',
+        'inventory_route_name',
+        'inventory_route_timeout',
+        'inventory_tls_secret_name',
+        'inventory_issuer_name',
+        'inventory_certificate_name',
+        # Services configuration
+        'services_service_name',
+        'services_route_name',
+        'services_tls_secret_name', 
+        'services_issuer_name',
+        'services_certificate_name',
+        # Validation service configuration
+        'validation_configmap_name',
+        'validation_service_name',
+        'validation_deployment_name',
+        'validation_container_name',
+        'validation_extra_volume_name',
+        'validation_extra_volume_mountpath',
+        'validation_tls_secret_name',
+        'validation_issuer_name',
+        'validation_certificate_name',
+        'validation_state',
+        # UI Plugin configuration
+        'ui_plugin_console_name',
+        'ui_plugin_display_name',
+        'ui_plugin_service_name',
+        'ui_plugin_deployment_name',
+        'ui_plugin_container_name',
+        'ui_plugin_state',
+        # API service configuration
+        'api_service_name',
+        'api_deployment_name',
+        'api_container_name',
+        'api_tls_secret_name',
+        'api_issuer_name', 
+        'api_certificate_name',
+        # CLI Download service configuration (calculated/derived values)
+        'cli_download_container_name',
+        'cli_download_deployment_name', 
+        'cli_download_route_name',
+        'cli_download_service_name',
+        'cli_download_state',
+        # Populator configuration
+        'populator_controller_deployment_name',
+        'populator_controller_container_name',
+        # VDDK configuration
+        'vddk_build_config_name',
+        'vddk_image_stream_name',
+        # Metrics configuration
+        'metric_service_name',
+        'metric_servicemonitor_name',
+        'metric_interval',
+        'metric_port_name',
+        'metrics_rule_name',
+        # Additional internal variables that should not be CRD properties  
+        'app_namespace',
+        'forklift_resources',
+        'ui_plugin_console_name',
+        'ui_plugin_service_name', 
+        'validation_service_name',
+    }
+    
+    return variables - ansible_builtin - excluded_fields
 
 
 def validate_forklift_controller_crd(crd_file, tasks_file):

@@ -1,0 +1,22 @@
+---
+apiVersion: console.openshift.io/v1
+kind: ConsoleCLIDownload
+metadata:
+  name: kubectl-mtv
+spec:
+  description: |
+    **DEV PREVIEW** A kubectl plugin that helps users of Forklift migrate virtualization workloads from oVirt,
+    VMware, OpenStack, and OVA files to KubeVirt on Kubernetes.
+  displayName: kubectl-mtv - MTV command line interface
+{% set route_host = ((lookup('k8s', api_version='route.openshift.io/v1', kind='Route', namespace=app_namespace, resource_name=cli_download_route_name) | default({})).status.ingress[0].host | default(cli_download_route_name ~ '-' ~ app_namespace ~ '.apps.cluster.local')) %}
+  links:
+    - href: "https://{{ route_host }}/kubectl-mtv-linux-amd64.tar.gz"
+      text: Download kubectl-mtv for Linux for x86_64
+    - href: "https://{{ route_host }}/kubectl-mtv-linux-arm64.tar.gz"
+      text: Download kubectl-mtv for Linux for ARM64
+    - href: "https://{{ route_host }}/kubectl-mtv-darwin-amd64.tar.gz"
+      text: Download kubectl-mtv for macOS for x86_64
+    - href: "https://{{ route_host }}/kubectl-mtv-darwin-arm64.tar.gz"
+      text: Download kubectl-mtv for macOS for ARM64
+    - href: "https://{{ route_host }}/kubectl-mtv-windows-amd64.zip"
+      text: Download kubectl-mtv for Windows for x86_64

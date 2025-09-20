@@ -9,6 +9,7 @@ feature_volume_populator: true
 feature_copy_offload: false
 feature_ocp_live_migration: false
 feature_vmware_system_serial_number: true
+feature_cli_download: true
 
 k8s_cluster: false
 feature_auth_required: true
@@ -97,6 +98,17 @@ ui_plugin_container_limits_memory: "800Mi"
 ui_plugin_container_requests_cpu: "100m"
 ui_plugin_container_requests_memory: "150Mi"
 ui_plugin_state: absent
+
+cli_download_image_fqin: "{{ lookup( 'env', 'CLI_DOWNLOAD_IMAGE') or lookup( 'env', 'RELATED_IMAGE_CLI_DOWNLOAD') }}"
+cli_download_service_name: "{{ app_name }}-cli-download"
+cli_download_route_name: "{{ cli_download_service_name }}"
+cli_download_deployment_name: "{{ cli_download_service_name }}"
+cli_download_container_name: "{{ app_name }}-cli-download"
+cli_download_container_limits_cpu: "100m"
+cli_download_container_limits_memory: "128Mi"
+cli_download_container_requests_cpu: "50m"
+cli_download_container_requests_memory: "64Mi"
+cli_download_state: absent
 
 api_image_fqin: "{{ lookup( 'env', 'API_IMAGE') or lookup( 'env', 'RELATED_IMAGE_API') }}"
 api_service_name: "{{ app_name }}-api"

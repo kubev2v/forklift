@@ -86,6 +86,7 @@ POPULATOR_CONTROLLER_IMAGE ?= quay.io/kubev2v/populator-controller:latest
 OVIRT_POPULATOR_IMAGE ?= quay.io/kubev2v/ovirt-populator:latest
 OPENSTACK_POPULATOR_IMAGE ?= quay.io/kubev2v/openstack-populator:latest
 OVA_PROVIDER_SERVER_IMAGE ?= quay.io/kubev2v/forklift-ova-provider-server:latest
+CLI_DOWNLOAD_IMAGE ?= quay.io/kubev2v/forklift-cli-download:latest
 VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/vsphere-xcopy-volume-populator:$(REGISTRY_TAG)
 
 ### OLM
@@ -304,6 +305,7 @@ build-operator-bundle-image: check_container_runtime
 		--build-arg OPENSTACK_POPULATOR_IMAGE=$(OPENSTACK_POPULATOR_IMAGE) \
 		--build-arg MUST_GATHER_IMAGE=$(MUST_GATHER_IMAGE) \
 		--build-arg UI_PLUGIN_IMAGE=$(UI_PLUGIN_IMAGE) \
+		--build-arg CLI_DOWNLOAD_IMAGE=$(CLI_DOWNLOAD_IMAGE) \
 		--build-arg OVA_PROVIDER_SERVER_IMAGE=$(OVA_PROVIDER_SERVER_IMAGE)
 
 push-operator-bundle-image: build-operator-bundle-image
@@ -356,6 +358,13 @@ build-ova-provider-server-image: check_container_runtime
 push-ova-provider-server-image: build-ova-provider-server-image
 	$(CONTAINER_CMD) push $(OVA_PROVIDER_SERVER_IMAGE)
 
+build-cli-download-image: check_container_runtime
+	$(eval CLI_DOWNLOAD_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-cli-download:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) build -t $(CLI_DOWNLOAD_IMAGE) -f build/forklift-cli-download/Containerfile .
+
+push-cli-download-image: build-cli-download-image
+	$(CONTAINER_CMD) push $(CLI_DOWNLOAD_IMAGE)
+
 build-all-images: build-api-image \
                   build-controller-image \
                   build-validation-image \
@@ -366,6 +375,7 @@ build-all-images: build-api-image \
                   build-openstack-populator-image\
                   build-vsphere-xcopy-volume-populator-image\
                   build-ova-provider-server-image \
+                  build-cli-download-image \
                   build-operator-bundle-image \
                   build-operator-index-image
 
@@ -379,6 +389,7 @@ push-all-images:  push-api-image \
                   push-openstack-populator-image\
                   push-vsphere-xcopy-volume-populator-image\
                   push-ova-provider-server-image \
+                  push-cli-download-image \
                   push-operator-bundle-image \
 				  push-operator-index-image            
 
