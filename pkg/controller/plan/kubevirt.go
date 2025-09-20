@@ -1399,15 +1399,25 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 		// or vSphere, and in the latter case the conversion pod acts as the first-consumer
 		annotations[planbase.AnnBindImmediate] = "true"
 	}
+	if r.Plan.Spec.Warm && r.Builder.SupportsVolumePopulators(vm.Ref) {
+		// For storage offload, tie DataVolume to pre-imported PVC
+		annotations[planbase.AnnAllowClaimAdoption] = "true"
+		annotations[planbase.AnnPrePopulated] = "true"
+	}
 	// Do not delete the DV when the import completes as we check the DV to get the current
 	// disk transfer status.
 	annotations[AnnDeleteAfterCompletion] = "false"
 	dvTemplate := cdi.DataVolume{
 		ObjectMeta: meta.ObjectMeta{
-			Namespace:    r.Plan.Spec.TargetNamespace,
-			Annotations:  annotations,
-			GenerateName: r.getGeneratedName(vm),
+			Namespace:   r.Plan.Spec.TargetNamespace,
+			Annotations: annotations,
 		},
+	}
+	if !(r.Builder.SupportsVolumePopulators(vm.Ref) && r.Plan.Spec.Warm) {
+		// For storage offload warm migrations, the template should have already
+		// been applied to the PVC that will be adopted by this DataVolume, so
+		// only add generateName for other migration types.
+		dvTemplate.ObjectMeta.GenerateName = r.getGeneratedName(vm)
 	}
 	dvTemplate.Labels = r.vmLabels(vm.Ref)
 

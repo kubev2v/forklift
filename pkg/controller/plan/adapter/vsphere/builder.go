@@ -91,12 +91,6 @@ const (
 	WindowsPrefix  = "win"
 )
 
-// Annotations
-const (
-	// CDI import backing file annotation on PVC
-	AnnImportBackingFile = "cdi.kubevirt.io/storage.import.backingFile"
-)
-
 const (
 	Shareable = "shareable"
 )
@@ -524,6 +518,37 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		return
 	}
 
+	// For storage offload warm migrations, match this DataVolume to the
+	// existing PVC via the backing file name.
+	var pvcMap map[string]core.PersistentVolumeClaim
+	if r.Plan.Spec.Warm && r.SupportsVolumePopulators(vmRef) {
+		pvcMap = make(map[string]core.PersistentVolumeClaim)
+		pvcs := &core.PersistentVolumeClaimList{}
+		pvcLabels := map[string]string{
+			"vmID":      vmRef.ID,
+			"migration": string(r.Migration.UID),
+		}
+
+		err = r.Context.Destination.Client.List(
+			context.TODO(),
+			pvcs,
+			&client.ListOptions{
+				Namespace:     r.Plan.Spec.TargetNamespace,
+				LabelSelector: labels.SelectorFromSet(pvcLabels),
+			},
+		)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+
+		for _, pvc := range pvcs.Items {
+			if copyOffload, present := pvc.Annotations["copy-offload"]; present && copyOffload != "" {
+				pvcMap[baseVolume(copyOffload, r.Plan.Spec.Warm)] = pvc
+			}
+		}
+	}
+
 	// Sort disks by bus, so we can match the disk index to the boot order.
 	// Important: need to match order in mapDisks method
 	disks := r.sortedDisksAsVmware(vm.Disks)
@@ -597,9 +622,17 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		//       matching the disk and PVC index.
 		dv.ObjectMeta.Annotations[planbase.AnnDiskIndex] = fmt.Sprintf("%d", diskIndex)
 
-		// Set PVC name/generateName using template if configured
-		if err := r.setPVCNameFromTemplate(&dv.ObjectMeta, vm, diskIndex, disk); err != nil {
-			r.Log.Info("Failed to set PVC name from template", "error", err)
+		if pvcMap != nil && dvSource.VDDK != nil {
+			// In a warm migration with storage offload, the PVC has already been created with
+			// the name template. Copy the result to the DataVolume so it can adopt the PVC.
+			if pvc, present := pvcMap[dvSource.VDDK.BackingFile]; present {
+				dv.ObjectMeta.Name = pvc.Name
+			}
+		} else {
+			// Set PVC name/generateName using template if configured
+			if err := r.setPVCNameFromTemplate(&dv.ObjectMeta, vm, diskIndex, disk); err != nil {
+				r.Log.Info("Failed to set PVC name from template", "error", err)
+			}
 		}
 
 		if !useV2vForTransfer && vddkConfigMap != nil {
@@ -937,7 +970,7 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 		if source, ok := pvc.Annotations[planbase.AnnDiskSource]; ok {
 			pvcMap[trimBackingFileName(source)] = pvc
 		} else {
-			pvcMap[trimBackingFileName(pvc.Annotations[AnnImportBackingFile])] = pvc
+			pvcMap[trimBackingFileName(pvc.Annotations[planbase.AnnImportBackingFile])] = pvc
 		}
 	}
 
@@ -1125,7 +1158,7 @@ func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
 
 // Return a stable identifier for a PersistentDataVolume.
 func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string {
-	return baseVolume(pvc.Annotations[AnnImportBackingFile], r.Plan.Spec.Warm)
+	return baseVolume(pvc.Annotations[planbase.AnnImportBackingFile], r.Plan.Spec.Warm)
 }
 
 // Load
@@ -1239,7 +1272,7 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 // Check whether the specific VM supports Volume Populators by examining only the datastores used by this VM.
 // This prevents mixed configuration issues where some VMs have offload-capable datastores and others don't.
 func (r *Builder) SupportsVolumePopulators(vmRef ref.Ref) bool {
-	if !settings.Settings.Features.CopyOffload || r.Plan.Spec.Warm {
+	if !settings.Settings.Features.CopyOffload {
 		return false
 	}
 
@@ -1297,6 +1330,24 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
 		err = liberr.Wrap(err, "vm", vmRef.String())
+		return
+	}
+
+	// Get a list of existing PVCs to avoid creating duplicates
+	pvcLabels := map[string]string{
+		"migration": string(r.Migration.UID),
+		"vmID":      vmRef.ID,
+	}
+	pvcList := &core.PersistentVolumeClaimList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		pvcList,
+		&client.ListOptions{
+			LabelSelector: labels.SelectorFromSet(pvcLabels),
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		})
+	if err != nil {
+		err = liberr.Wrap(err)
 		return
 	}
 
@@ -1371,8 +1422,8 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				} else {
 					pvc.Annotations = annotations
 				}
-				pvc.Annotations[planbase.AnnDiskSource] = baseVolume(disk.File, false)
-				pvc.Annotations["copy-offload"] = baseVolume(disk.File, false)
+				pvc.Annotations[planbase.AnnDiskSource] = baseVolume(disk.File, r.Plan.Spec.Warm)
+				pvc.Annotations["copy-offload"] = baseVolume(disk.File, r.Plan.Spec.Warm)
 
 				// Apply PVC template naming if configured, replacing the commonName
 				if err := r.setColdMigrationDefaultPVCName(&pvc.ObjectMeta, vm, diskIndex, disk); err != nil {
@@ -1390,6 +1441,31 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				// populator name is the name of the populator, and we can't use generateName for the populator
 				populatorName := pvc.ObjectMeta.Name
 
+				// For warm migration, add annotations to jump-start the DataVolume
+				v := r.getPlanVMStatus(vm)
+				if v != nil && v.Warm != nil {
+					pvc.Annotations[planbase.AnnEndpoint] = r.Source.Provider.Spec.URL
+					pvc.Annotations[planbase.AnnImportBackingFile] = baseVolume(disk.File, r.Plan.Spec.Warm)
+					pvc.Annotations[planbase.AnnSecret] = secretName
+					pvc.Annotations[planbase.AnnUUID] = vm.UUID
+					pvc.Annotations[planbase.AnnThumbprint] = r.Source.Provider.Status.Fingerprint
+					pvc.Annotations[planbase.AnnVddkInitImageURL] = settings.GetVDDKImage(r.Source.Provider.Spec.Settings)
+					pvc.Annotations[planbase.AnnPodPhase] = "Succeeded"
+					pvc.Annotations[planbase.AnnSource] = "vddk"
+
+					n := len(v.Warm.Precopies)
+					if n > 0 { // Should be 1 at this point
+						snapshot := v.Warm.Precopies[n-1].Snapshot
+						pvc.Annotations[planbase.AnnFinalCheckpoint] = "false"
+						pvc.Annotations[planbase.AnnCurrentCheckpoint] = snapshot
+						pvc.Annotations[planbase.AnnPreviousCheckpoint] = ""
+
+						copied := fmt.Sprintf("%s.%s", planbase.AnnCheckpointsCopied, snapshot)
+						pvc.Annotations[copied] = "xcopy-initial-offload"                // Any value should work here
+						pvc.Annotations[planbase.AnnImportPod] = "xcopy-initial-offload" // Should match above
+					}
+				}
+
 				// Update DataSourceRef to point to the volume populator
 				pvc.Spec.DataSourceRef.Name = populatorName
 
@@ -1403,7 +1479,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					},
 					Spec: api.VSphereXcopyVolumePopulatorSpec{
 						VmId:                 vmRef.ID,
-						VmdkPath:             disk.File,
+						VmdkPath:             baseVolume(disk.File, r.Plan.Spec.Warm),
 						SecretName:           secretName,
 						StorageVendorProduct: string(storageVendorProduct),
 					},
@@ -1414,25 +1490,26 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				if err != nil {
 					return nil, fmt.Errorf("failed to merge secrets for popoulators %w", err)
 				}
-				// TODO should we handle if already exists due to re-entry? if the former
-				// reconcile was successful in creating the pvc but failed after that, e.g when
-				// creating the volumepopulator resouce failed
-				r.Log.Info("Creating pvc", "pvc", pvc)
-				err = r.Destination.Client.Create(context.TODO(), &pvc, &client.CreateOptions{})
-				if err != nil {
-					// ignore if already exists?
-					return nil, err
-				}
-
-				r.Log.Info("Ensuring a populator service account")
-				err := r.ensurePopulatorServiceAccount(namespace)
-				if err != nil {
-					return nil, err
-				}
-				r.Log.Info("Creating the populator resource", "VSphereXcopyVolumePopulator", vp)
-				err = r.Destination.Client.Create(context.TODO(), &vp, &client.CreateOptions{})
-				if err != nil {
-					return nil, err
+				if !r.isPVCExistsInList(&pvc, pvcList) {
+					r.Log.Info("Creating pvc", "pvc", pvc)
+					err = r.Destination.Client.Create(context.TODO(), &pvc, &client.CreateOptions{})
+					if err != nil {
+						if k8serr.IsAlreadyExists(err) {
+							continue
+						}
+						return nil, err
+					}
+					// Should probably check these separately
+					r.Log.Info("Ensuring a populator service account")
+					err := r.ensurePopulatorServiceAccount(namespace)
+					if err != nil {
+						return nil, err
+					}
+					r.Log.Info("Creating the populator resource", "VSphereXcopyVolumePopulator", vp)
+					err = r.Destination.Client.Create(context.TODO(), &vp, &client.CreateOptions{})
+					if err != nil {
+						return nil, err
+					}
 				}
 
 			}
@@ -1504,7 +1581,7 @@ func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.Persi
 
 func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error) {
 	// copy-offload only
-	taskName = pvc.Annotations[planbase.AnnDiskSource]
+	taskName = baseVolume(pvc.Annotations[planbase.AnnDiskSource], r.Plan.Spec.Warm)
 	return
 }
 
@@ -1833,8 +1910,10 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 			dst.Data["GOVMOMI_HOSTNAME"] = []byte(h.Hostname())
 		case "user":
 			dst.Data["GOVMOMI_USERNAME"] = value
+			dst.Data["accessKeyId"] = value
 		case "password":
 			dst.Data["GOVMOMI_PASSWORD"] = value
+			dst.Data["secretKey"] = value
 		case "insecureSkipVerify":
 			dst.Data["GOVMOMI_INSECURE"] = value
 		}
@@ -2025,4 +2104,13 @@ func (r *Builder) addSSHKeysToSecret(secret *core.Secret) error {
 
 	r.Log.Info("SSH keys added to migration secret", "secret", secret.Name)
 	return nil
+}
+
+func (r *Builder) isPVCExistsInList(pvc *core.PersistentVolumeClaim, pvcList *core.PersistentVolumeClaimList) bool {
+	for _, item := range pvcList.Items {
+		if r.ResolvePersistentVolumeClaimIdentifier(pvc) == r.ResolvePersistentVolumeClaimIdentifier(&item) {
+			return true
+		}
+	}
+	return false
 }
