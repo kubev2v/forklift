@@ -1499,17 +1499,17 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 						}
 						return nil, err
 					}
-				}
-
-				r.Log.Info("Ensuring a populator service account")
-				err := r.ensurePopulatorServiceAccount(namespace)
-				if err != nil {
-					return nil, err
-				}
-				r.Log.Info("Creating the populator resource", "VSphereXcopyVolumePopulator", vp)
-				err = r.Destination.Client.Create(context.TODO(), &vp, &client.CreateOptions{})
-				if err != nil {
-					return nil, err
+					// Should probably check these separately
+					r.Log.Info("Ensuring a populator service account")
+					err := r.ensurePopulatorServiceAccount(namespace)
+					if err != nil {
+						return nil, err
+					}
+					r.Log.Info("Creating the populator resource", "VSphereXcopyVolumePopulator", vp)
+					err = r.Destination.Client.Create(context.TODO(), &vp, &client.CreateOptions{})
+					if err != nil {
+						return nil, err
+					}
 				}
 
 			}
