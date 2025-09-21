@@ -79,7 +79,7 @@ require (
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/google/uuid v1.6.0
 	github.com/josharian/intern v1.0.0 // indirect
-	github.com/kubernetes-csi/csi-proxy/client v1.1.3 // indirect
+	github.com/kubernetes-csi/csi-proxy/client v1.3.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattermost/xml-roundtrip-validator v0.1.1-0.20230502164821-3079e7b80fca // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
