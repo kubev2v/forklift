@@ -73,7 +73,7 @@ func (r *Validator) VMMigrationType(vmRef ref.Ref) (ok bool, err error) {
 			return
 		}
 		for _, cnd := range vm.Status.Conditions {
-			if cnd.Type == ConditionStorageLiveMigratable || cnd.Type == ConditionLiveMigratable {
+			if cnd.Type == ConditionStorageLiveMigratable {
 				if cnd.Status != True {
 					ok = false
 					return
