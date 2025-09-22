@@ -5358,6 +5358,11 @@ spec:
               fingerprint:
                 description: Fingerprint.
                 type: string
+              hosts:
+                description: OVA provider hosts
+                items:
+                  type: string
+                type: array
               observedGeneration:
                 description: The most recent generation observed by the controller.
                 format: int64
@@ -6145,6 +6150,9 @@ rules:
   - routes
   verbs:
   - create
+  - get
+  - list
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole

@@ -100,6 +100,9 @@ type ProviderStatus struct {
 	// Fingerprint.
 	// +optional
 	Fingerprint string `json:"fingerprint,omitempty"`
+	// OVA provider hosts
+	// +optional
+	Hosts []string `json:"hosts,omitempty"`
 }
 
 // +genclient
