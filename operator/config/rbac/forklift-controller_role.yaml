@@ -211,3 +211,6 @@ rules:
     - routes
   verbs:
     - create
+    - get
+    - list
+    - watch

@@ -11,8 +11,10 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -233,6 +235,24 @@ func (r *Reconciler) createServerRoute(provider *api.Provider, ctx context.Conte
 	}
 
 	err = r.Create(ctx, route)
+	return
+}
+
+func (r *Reconciler) getServerRouteHosts(ctx context.Context, provider *api.Provider) (hosts []string, err error) {
+	key := types.NamespacedName{Namespace: provider.Namespace, Name: fmt.Sprintf("ova-route-%s", provider.Name)}
+	route := routev1.Route{}
+	err = r.Get(ctx, key, &route)
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			err = nil
+			return
+		}
+		err = liberr.Wrap(err)
+		return
+	}
+	for _, ingress := range route.Status.Ingress {
+		hosts = append(hosts, fmt.Sprintf("https://%s", ingress.Host))
+	}
 	return
 }
 

@@ -243,6 +243,15 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 				return
 			}
 		}
+
+		if Settings.OpenShift {
+			var routeHosts []string
+			routeHosts, err = r.getServerRouteHosts(ctx, provider)
+			if err != nil {
+				return
+			}
+			provider.Status.Hosts = routeHosts
+		}
 	}
 
 	if provider.DeletionTimestamp != nil && k8sutil.ContainsFinalizer(provider, api.OvaProviderFinalizer) {
