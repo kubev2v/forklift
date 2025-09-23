@@ -156,6 +156,12 @@ spec:
                 description: 'Snapshot status check rate in seconds (default: 10)'
                 pattern: ^[1-9][0-9]*$
                 type: string
+              controller_static_udn_ip_addresses:
+                description: 'Enable static udn IP addresses feature (default: false)'
+                enum:
+                - "true"
+                - "false"
+                type: string
               controller_tls_connection_timeout_sec:
                 description: 'TLS connection timeout seconds (default: 5)'
                 pattern: ^[1-9][0-9]*$

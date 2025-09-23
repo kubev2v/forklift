@@ -979,13 +979,14 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			sharedDisks.Type = fmt.Sprintf("%s-%s", sharedDisks.Type, ref.ID)
 			sharedDisksConditions = append(sharedDisksConditions, sharedDisks)
 		}
-
-		ok, err = validator.UdnStaticIPs(*ref, ctx.Destination.Client)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			vmIpDoesNotMatchUdnSubnet.Items = append(vmIpDoesNotMatchUdnSubnet.Items, ref.String())
+		if settings.Settings.StaticUdnIpAddresses && plan.Spec.PreserveStaticIPs && plan.DestinationHasUdnNetwork(r.Client) {
+			ok, err = validator.UdnStaticIPs(*ref, ctx.Destination.Client)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				vmIpDoesNotMatchUdnSubnet.Items = append(vmIpDoesNotMatchUdnSubnet.Items, ref.String())
+			}
 		}
 		// Destination.
 		provider = plan.Referenced.Provider.Destination

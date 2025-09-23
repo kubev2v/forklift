@@ -802,7 +802,7 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 	object.Template.Spec.Networks = kNetworks
 	object.Template.Spec.Domain.Devices.Interfaces = kInterfaces
 
-	if hasUDN && r.Plan.Spec.PreserveStaticIPs && len(staticIpInterfaces) > 0 {
+	if settings.Settings.StaticUdnIpAddresses && hasUDN && r.Plan.Spec.PreserveStaticIPs && len(staticIpInterfaces) > 0 {
 		var staticIpInterfacesAnnotation []byte
 		staticIpInterfacesAnnotation, err = json.Marshal(staticIpInterfaces)
 		if err != nil {
