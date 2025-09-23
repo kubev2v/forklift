@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/nginx-126:1-1756959223
+FROM registry.access.redhat.com/ubi9/nginx-126:9.6-1758528699
 COPY build/forklift-cli-download/artifacts /opt/app-root/src/
 EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]
