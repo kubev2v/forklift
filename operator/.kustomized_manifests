@@ -3057,6 +3057,7 @@ spec:
                   its oVirt cluster.
                 type: boolean
               preserveStaticIPs:
+                default: true
                 description: Preserve static IPs of VMs in vSphere
                 type: boolean
               provider:

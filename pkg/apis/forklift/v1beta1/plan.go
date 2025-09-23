@@ -110,6 +110,7 @@ type PlanSpec struct {
 	// Preserve the CPU model and flags the VM runs with in its oVirt cluster.
 	PreserveClusterCPUModel bool `json:"preserveClusterCpuModel,omitempty"`
 	// Preserve static IPs of VMs in vSphere
+	// +kubebuilder:default:=true
 	PreserveStaticIPs bool `json:"preserveStaticIPs,omitempty"`
 	// Deprecated: this field will be deprecated in 2.8.
 	DiskBus cnv.DiskBus `json:"diskBus,omitempty"`
