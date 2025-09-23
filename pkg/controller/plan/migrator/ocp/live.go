@@ -52,7 +52,9 @@ const (
 	EnsurePreference                       = "EnsurePreference"
 	EnsureInstanceType                     = "EnsureInstanceType"
 	EnsureDataVolumes                      = "EnsureDataVolumes"
+	EnsurePersistentVolumeClaims           = "EnsurePersistentVolumeClaims"
 	CreateTarget                           = "CreateTarget"
+	SetOwnerReferences                     = "SetOwnerReferences"
 	WaitForTargetVMI                       = "WaitForTargetVMI"
 	CreateVirtualMachineInstanceMigrations = "CreateVirtualMachineInstanceMigrations"
 	WaitForStateTransfer                   = "WaitForStateTransfer"
@@ -192,7 +194,9 @@ func (r *LiveMigrator) Itinerary(vm planapi.VM) (itinerary *libitr.Itinerary) {
 			{Name: EnsurePreference},
 			{Name: EnsureInstanceType},
 			{Name: EnsureDataVolumes},
+			{Name: EnsurePersistentVolumeClaims},
 			{Name: CreateTarget},
+			{Name: SetOwnerReferences},
 			{Name: CreateServiceExports, All: FlagSubmariner | FlagIntercluster},
 			{Name: WaitForTargetVMI},
 			{Name: CreateVirtualMachineInstanceMigrations},
@@ -226,7 +230,7 @@ func (r *LiveMigrator) Step(vm *planapi.VMStatus) (step string) {
 		step = base.Initialize
 	case PreHook, PostHook:
 		step = vm.Phase
-	case CreateSecrets, CreateConfigMaps, EnsurePreference, EnsureInstanceType, EnsureDataVolumes, CreateTarget, CreateServiceExports:
+	case CreateSecrets, CreateConfigMaps, EnsurePreference, EnsureInstanceType, EnsureDataVolumes, CreateTarget, SetOwnerReferences, CreateServiceExports:
 		step = PrepareTarget
 	case WaitForTargetVMI, CreateVirtualMachineInstanceMigrations, WaitForStateTransfer:
 		step = Synchronization
@@ -465,6 +469,26 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 			break
 		}
 		r.NextPhase(vm)
+	case EnsurePersistentVolumeClaims:
+		var pvcs []core.PersistentVolumeClaim
+		pvcs, err = r.builder.PersistentVolumeClaims(vm)
+		if err != nil {
+			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				r.Log.Error(err, "error building volumes", "vm", vm.Name)
+				r.StepError(vm, err)
+				err = nil
+			}
+			break
+		}
+		err = r.ensurer.PersistentVolumeClaims(vm, pvcs)
+		if err != nil {
+			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				r.StepError(vm, err)
+				err = nil
+			}
+			break
+		}
+		r.NextPhase(vm)
 	case CreateTarget:
 		var target *cnv.VirtualMachine
 		target, err = r.builder.VirtualMachine(vm)
@@ -476,6 +500,16 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 			break
 		}
 		err = r.ensurer.VirtualMachine(vm, target)
+		if err != nil {
+			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				r.StepError(vm, err)
+				err = nil
+			}
+			break
+		}
+		r.NextPhase(vm)
+	case SetOwnerReferences:
+		err = r.ensurer.EnsureOwnerReferences(vm)
 		if err != nil {
 			if !errors.As(err, &web.ProviderNotReadyError{}) {
 				r.StepError(vm, err)
@@ -990,6 +1024,71 @@ func (r *LiveMigrator) DeleteJobs(vm *planapi.VMStatus) (err error) {
 type Ensurer struct {
 	*ensurer.Ensurer
 	SourceClient client.Client
+}
+
+// EnsureOwnerReferences are set on the target VM's DataVolumes.
+func (r *Ensurer) EnsureOwnerReferences(vm *planapi.VMStatus) (err error) {
+	vms := &cnv.VirtualMachineList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		vms,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	if len(vms.Items) == 0 {
+		err = liberr.New("unable to locate target VM for setting owner references")
+		return
+	}
+	target := &vms.Items[0]
+	dvs := &cdi.DataVolumeList{}
+	err = r.Destination.Client.List(
+		context.Background(),
+		dvs,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		})
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	for i := range dvs.Items {
+		dv := &dvs.Items[i]
+		r.Labeler.SetOwnerReferences(target, dv)
+		err = r.Destination.Client.Update(context.Background(), dv)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+	}
+	pvcs := &core.PersistentVolumeClaimList{}
+	err = r.Destination.Client.List(
+		context.Background(),
+		pvcs,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		})
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	for i := range pvcs.Items {
+		pvc := &pvcs.Items[i]
+		r.Labeler.SetOwnerReferences(target, pvc)
+		err = r.Destination.Client.Update(context.Background(), pvc)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+	}
+	return
 }
 
 // EnsureTargetVMIM
