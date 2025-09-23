@@ -8,7 +8,9 @@ metadata:
     pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "main"
+      == "main" && ("build/forklift-cli-download/Containerfile-downstream".pathChanged() ||
+      "build/forklift-cli-download/artifacts/***".pathChanged() ||
+      "build/forklift-cli-download/download-latest-release.sh".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: forklift-operator-dev-preview
@@ -25,9 +27,18 @@ spec:
   - name: output-image
     value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-cli-download-dev-preview:{{revision}}
   - name: dockerfile
-    value: build/forklift-cli-download-dev-preview/Containerfile-downstream
+    value: build/forklift-cli-download/Containerfile-downstream
   - name: path-context
     value: .
+  - name: build-source-image
+    value: "true"
+  - name: prefetch-input
+    value: '[{"type": "generic", "path": ".konflux/forklift-cli-download/"}]'
+  - name: build-args-file
+    value: build/release.conf
+  - name: build-args
+    value:
+      - "REVISION={{revision}}"
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
@@ -63,7 +74,7 @@ spec:
       description: Skip checks against built image
       name: skip-checks
       type: string
-    - default: "false"
+    - default: "true"
       description: Execute the build with network isolation
       name: hermetic
       type: string

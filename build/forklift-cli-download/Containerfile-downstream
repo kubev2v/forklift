@@ -1,5 +1,6 @@
 FROM registry.redhat.io/ubi9/nginx-126:1-1756959223
-COPY build/forklift-cli-download/artifacts /opt/app-root/src/
+# COPY build/forklift-cli-download/artifacts /opt/app-root/src/
+RUN cp /cachi2/output/deps/generic/* /opt/app-root/src/
 EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]
 
