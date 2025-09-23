@@ -10,6 +10,7 @@ import (
 const (
 	FeatureOvirtWarmMigration        = "FEATURE_OVIRT_WARM_MIGRATION"
 	FeatureRetainPrecopyImporterPods = "FEATURE_RETAIN_PRECOPY_IMPORTER_PODS"
+	FeatureStaticUdnIpAddresses      = "FEATURE_STATIC_UDN_IP_ADDRESSES"
 	FeatureVsphereIncrementalBackup  = "FEATURE_VSPHERE_INCREMENTAL_BACKUP"
 	FeatureCopyOffload               = "FEATURE_COPY_OFFLOAD"
 	FeatureOCPLiveMigration          = "FEATURE_OCP_LIVE_MIGRATION"
@@ -42,6 +43,8 @@ type Features struct {
 	VmwareSystemSerialNumber bool
 	// Whether to create VMs with MAC address with the User Defined Network
 	UdnSupportsMac bool
+	// Whether to create VMs with MAC address with the User Defined Network
+	StaticUdnIpAddresses bool
 }
 
 // isOpenShiftVersionAboveMinimum checks if OpenShift version is above or equal to minimum version using semantic versioning
@@ -70,6 +73,7 @@ func (r *Features) isOpenShiftVersionAboveMinimum(minimumVersion string) bool {
 func (r *Features) Load() (err error) {
 	r.OvirtWarmMigration = getEnvBool(FeatureOvirtWarmMigration, false)
 	r.RetainPrecopyImporterPods = getEnvBool(FeatureRetainPrecopyImporterPods, false)
+	r.StaticUdnIpAddresses = getEnvBool(FeatureStaticUdnIpAddresses, false)
 	r.VsphereIncrementalBackup = getEnvBool(FeatureVsphereIncrementalBackup, false)
 	r.CopyOffload = getEnvBool(FeatureCopyOffload, false)
 	r.OCPLiveMigration = getEnvBool(FeatureOCPLiveMigration, false)

@@ -132,6 +132,10 @@ spec:
         - name: FEATURE_OVIRT_WARM_MIGRATION
           value: "true"
 {% endif %}
+{% if controller_static_udn_ip_addresses|bool %}
+        - name: FEATURE_STATIC_UDN_IP_ADDRESSES
+          value: "true"
+{% endif %}
 {% if controller_retain_precopy_importer_pods|bool %}
         - name: FEATURE_RETAIN_PRECOPY_IMPORTER_PODS
           value: "true"
