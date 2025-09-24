@@ -1269,6 +1269,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 
 			if pod == nil {
+				r.Log.Info("Couldn't find the virt-v2v inspection pod")
 				return
 			}
 
