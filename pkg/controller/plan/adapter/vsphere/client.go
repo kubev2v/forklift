@@ -31,7 +31,8 @@ const (
 	snapshotName           = "forklift-migration-precopy"
 	snapshotDesc           = "Forklift Operator warm migration precopy"
 	taskType               = "Task"
-	createSnapshotTaskName = "CreateSnapshot_Task"
+	createSnapshotTaskName = "vim.VirtualMachine.createSnapshot"
+	removeSnapshotTaskName = "vim.vm.Snapshot.remove"
 )
 
 // vSphere VM Client
@@ -50,7 +51,7 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (snapsh
 	}
 
 	// Check if there's already a running CreateSnapshot task - prevents duplicates
-	if existingTaskId := r.findRunningSnapshotTask(vmRef, vm, hostsFunc); existingTaskId != "" {
+	if existingTaskId := r.findRunningSnapshotTask(vmRef, vm, hostsFunc, createSnapshotTaskName); existingTaskId != "" {
 		return "", existingTaskId, nil
 	}
 
@@ -65,7 +66,7 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (snapsh
 }
 
 // Check if there's already a running CreateSnapshot task on the VM to prevent duplicates
-func (r *Client) findRunningSnapshotTask(vmRef ref.Ref, vm *object.VirtualMachine, hosts util.HostsFunc) string {
+func (r *Client) findRunningSnapshotTask(vmRef ref.Ref, vm *object.VirtualMachine, hosts util.HostsFunc, snapshotTaskName string) string {
 	// Get the ESXi client
 	client, err := r.getClientFromVmRef(vmRef, hosts)
 	if err != nil {
@@ -95,9 +96,8 @@ func (r *Client) findRunningSnapshotTask(vmRef ref.Ref, vm *object.VirtualMachin
 		if err != nil {
 			continue
 		}
-
 		// Check if this is a running CreateSnapshot task
-		if task.Info.Name == createSnapshotTaskName &&
+		if task.Info.Name == snapshotTaskName &&
 			(task.Info.State == types.TaskInfoStateRunning || task.Info.State == types.TaskInfoStateQueued) {
 			return taskRef.Value
 		}
@@ -111,8 +111,24 @@ func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hosts util.Hosts
 	r.Log.V(1).Info("RemoveSnapshot",
 		"vmRef", vmRef,
 		"snapshot", snapshot)
-	taskId, err = r.removeSnapshot(vmRef, snapshot, false, hosts)
-	return
+	vm, err := r.getVM(vmRef, hosts)
+	if err != nil {
+		return
+	}
+	// Check if there's already a running remove snapshot task - prevents duplicates
+	if existingTaskId := r.findRunningSnapshotTask(vmRef, vm, hosts, removeSnapshotTaskName); existingTaskId != "" {
+		return existingTaskId, nil
+	}
+	r.Log.Info("Removing snapshot",
+		"vmRef", vmRef,
+		"snapshot", snapshot,
+		"children", false)
+
+	task, err := vm.RemoveSnapshot(context.TODO(), snapshot, false, nil)
+	if err != nil {
+		return "", liberr.Wrap(err)
+	}
+	return task.Reference().Value, nil
 }
 
 // Set DataVolume checkpoints.
@@ -501,24 +517,6 @@ func (r *Client) getVM(vmRef ref.Ref, hosts util.HostsFunc) (vsphereVm *object.V
 
 func nullableHosts() (hosts map[string]*v1beta1.Host, err error) {
 	return
-}
-
-// Remove a VM snapshot and optionally its children.
-func (r *Client) removeSnapshot(vmRef ref.Ref, snapshot string, children bool, hosts util.HostsFunc) (taskId string, err error) {
-	r.Log.Info("Removing snapshot",
-		"vmRef", vmRef,
-		"snapshot", snapshot,
-		"children", children)
-
-	vm, err := r.getVM(vmRef, hosts)
-	if err != nil {
-		return
-	}
-	task, err := vm.RemoveSnapshot(context.TODO(), snapshot, children, nil)
-	if err != nil {
-		return "", liberr.Wrap(err)
-	}
-	return task.Reference().Value, nil
 }
 
 // Connect to the vSphere API.
