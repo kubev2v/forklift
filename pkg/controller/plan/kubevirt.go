@@ -2111,7 +2111,7 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, libv
 		for i, disk := range virtualMachine.Disks {
 			environment = append(environment, core.EnvVar{
 				Name:  fmt.Sprintf("V2V_remoteInspectDisk_%d", i),
-				Value: fmt.Sprintf("%s", disk.ParentFile),
+				Value: disk.ParentFile,
 			})
 		}
 	}
