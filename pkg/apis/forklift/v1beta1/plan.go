@@ -224,9 +224,9 @@ type PlanSpec struct {
 	// +optional
 	// +kubebuilder:validation:Enum=on;off;auto
 	TargetPowerState plan.TargetPowerState `json:"targetPowerState,omitempty"`
-	// RunPreflightInspection controls if an inspection step on VM base disks should be performed before starting the first disk transfer. Only applies to the warm migration type.
-	// - true (default): Inspection step will be run before transfering any disks. This step can fail if inspection finds out that migration can fail.
-	// - false: No inspection will be run before disk transfer.
+	// RunPreflightInspection controls whether an inspection step on VM base disks is performed before starting the first disk transfer. Applies only to warm migrations from VMWare.
+	// - true (default): Inspection step runs before transferring any disks and may fail if it detects the migration would fail.
+	// - false: No inspection is performed before disk transfer.
 	// +kubebuilder:default:=true
 	RunPreflightInspection bool `json:"runPreflightInspection,omitempty"`
 }

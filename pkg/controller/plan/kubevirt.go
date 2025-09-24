@@ -102,6 +102,8 @@ const (
 	kUse = "use"
 	// DV secret
 	kDV = "isDV"
+	// Populator secret
+	kPopulator = "isPopulator"
 )
 
 // User
@@ -625,8 +627,7 @@ func (r *KubeVirt) DataVolumes(vm *plan.VMStatus) (dataVolumes []cdi.DataVolume,
 
 func (r *KubeVirt) PopulatorVolumes(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, err error) {
 	labels := r.vmLabels(vmRef)
-	// if this is added then migration fails on "RemovePenultimateSnapshot" with "no snapshots for this VM"
-	//labels[kPopulator] = "true"
+	labels[kPopulator] = "true"
 	secret, err := r.ensureSecret(vmRef, r.copyDataFromProviderSecret, labels)
 	if err != nil {
 		err = liberr.Wrap(err)

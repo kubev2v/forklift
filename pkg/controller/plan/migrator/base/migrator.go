@@ -248,9 +248,14 @@ func (r *BaseMigrator) ExecutePhase(vm *plan.VMStatus) (ok bool, err error) {
 // Step gets the name of the pipeline step corresponding to the current VM phase.
 func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 	switch status.Phase {
-	case api.PhaseStarted, api.PhaseCreateInitialSnapshot, api.PhaseWaitForInitialSnapshot,
-		api.PhaseStoreInitialSnapshotDeltas, api.PhaseCreateDataVolumes:
+	case api.PhaseStarted, api.PhaseCreateInitialSnapshot, api.PhaseWaitForInitialSnapshot:
 		step = Initialize
+	case api.PhaseStoreInitialSnapshotDeltas, api.PhaseCreateDataVolumes:
+		if r.Context.Plan.Spec.RunPreflightInspection {
+			step = DiskTransfer
+		} else {
+			step = Initialize
+		}
 	case api.PhaseAllocateDisks:
 		step = DiskAllocation
 	case api.PhaseCopyDisks, api.PhaseCopyingPaused, api.PhaseRemovePreviousSnapshot, api.PhaseWaitForPreviousSnapshotRemoval,

@@ -230,7 +230,10 @@ func (c *Conversion) RunRemoteV2vInspection() (err error) {
 		AddFlag("-v").
 		AddFlag("-x")
 
-	c.addVirtV2vRemoteInspectionArgs(v2vCmdBuilder)
+	err = c.addVirtV2vRemoteInspectionArgs(v2vCmdBuilder)
+	if err != nil {
+		return err
+	}
 
 	err = c.addVirtV2vVsphereArgs(v2vCmdBuilder)
 	if err != nil {
@@ -243,8 +246,12 @@ func (c *Conversion) RunRemoteV2vInspection() (err error) {
 	return v2vCmd.Run()
 }
 
-func (c *Conversion) addVirtV2vRemoteInspectionArgs(cmd utils.CommandBuilder) {
+func (c *Conversion) addVirtV2vRemoteInspectionArgs(cmd utils.CommandBuilder) (err error) {
+	if len(c.RemoteInspectionDisks) == 0 {
+		return fmt.Errorf("No remote disks were supplied")
+	}
 	for _, disk := range c.RemoteInspectionDisks {
 		cmd.AddArg("-io", fmt.Sprintf("vddk-file=%s", disk))
 	}
+	return
 }
