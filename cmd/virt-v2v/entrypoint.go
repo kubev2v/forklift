@@ -36,7 +36,7 @@ func main() {
 	if env.IsRemoteInspection {
 		err = convert.RunRemoteV2vInspection()
 		if err != nil {
-			fmt.Println("Failed to execute virt-v2v-inspection command", err)
+			fmt.Println("Failed to execute virt-v2v-inspector command", err)
 			os.Exit(1)
 		}
 	} else {

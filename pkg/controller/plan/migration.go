@@ -1238,12 +1238,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				r.NextPhase(vm)
 			}
 		case api.PhasePreflightInspection:
-			// Skip this phase if conversion is also skipped or preflight check is disabled
-			if r.Plan.Spec.SkipGuestConversion || !r.Context.Plan.Spec.RunPreflightInspection {
-				r.NextPhase(vm)
-				return
-			}
-
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
@@ -1462,7 +1456,7 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (ready bool, err
 		}
 	}
 
-	err = r.kubevirt.EnsureGuestConversionPod(vm, &vmCr, pvcs)
+	err = r.kubevirt.EnsureVirtV2vPod(vm, &vmCr, pvcs, VirtV2vConversionPod)
 	if err != nil {
 		return
 	}
@@ -1479,31 +1473,12 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (ready bool, err
 
 // Ensure the guest inspection pod is present.
 func (r *Migration) ensureGuestInspectionPod(vm *plan.VMStatus) (ready bool, err error) {
-	// If no labeled pods were found, create a pod
-	pod, err := r.getInspectionPod(vm)
+	var vmCr VirtualMachine
+	var pvcs []*core.PersistentVolumeClaim
+	// pass empty vmCr and pvcs because they are not used when getting inspection pod
+	err = r.kubevirt.EnsureVirtV2vPod(vm, &vmCr, pvcs, VirtV2vInspectionPod)
 	if err != nil {
 		return
-	}
-	if pod == nil {
-		// Get inspection pod
-		pod, err = r.kubevirt.EnsureGuestInspectionPod(vm)
-		if err != nil {
-			return
-		}
-
-		err = r.Destination.Client.Create(context.TODO(), pod)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-		r.Log.Info(
-			"Created virt-v2v inspection pod.",
-			"pod",
-			path.Join(
-				pod.Namespace,
-				pod.Name),
-			"vm",
-			vm.String())
 	}
 
 	ready = true

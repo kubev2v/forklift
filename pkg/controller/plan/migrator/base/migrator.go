@@ -200,7 +200,7 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 				&plan.Step{
 					Task: plan.Task{
 						Name:        PreflightInspection,
-						Description: "Inspect disks before migration.",
+						Description: "Inspect VM before migration.",
 						Phase:       api.StepPending,
 						Progress:    libitr.Progress{Total: 1},
 					},
@@ -276,12 +276,7 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 			step = Initialize
 		}
 	case api.PhasePreflightInspection:
-		if !r.Context.Plan.Spec.SkipGuestConversion &&
-			r.Context.Plan.Spec.RunPreflightInspection {
-			step = PreflightInspection
-		} else {
-			step = Initialize
-		}
+		step = PreflightInspection
 	default:
 		step = Unknown
 	}
@@ -296,7 +291,7 @@ func (r *BaseMigrator) warmItinerary() *libitr.Itinerary {
 			{Name: api.PhasePreHook, All: HasPreHook},
 			{Name: api.PhaseCreateInitialSnapshot},
 			{Name: api.PhaseWaitForInitialSnapshot},
-			{Name: api.PhasePreflightInspection, All: VSphere},
+			{Name: api.PhasePreflightInspection, All: RunInspection},
 			{Name: api.PhaseStoreInitialSnapshotDeltas, All: VSphere},
 			{Name: api.PhaseCreateDataVolumes},
 			// Precopy loop start
@@ -403,11 +398,17 @@ func (r *BasePredicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 		allowed = r.context.Plan.IsSourceProviderOpenstack()
 	case VSphere:
 		allowed = r.context.Plan.IsSourceProviderVSphere()
+	case RunInspection:
+		allowed = r.context.Plan.Spec.RunPreflightInspection &&
+			r.context.Source.Provider.RequiresConversion() &&
+			!r.context.Plan.Spec.SkipGuestConversion &&
+			r.context.Plan.IsSourceProviderVSphere()
+
 	}
 
 	return
 }
 
 func (r *BasePredicate) Count() int {
-	return 0x40
+	return 0x80
 }
