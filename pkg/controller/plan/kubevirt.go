@@ -100,6 +100,10 @@ const (
 	kLUKS = "isLUKS"
 	// Use
 	kUse = "use"
+	// DV secret
+	kDV = "isDV"
+	// Populator secret
+	kPopulator = "isPopulator"
 )
 
 // User
@@ -123,6 +127,12 @@ const (
 
 	VddkAioBufSizeDefault  = "16"
 	VddkAioBufCountDefault = "4"
+)
+
+// VirtV2V pod types
+const (
+	VirtV2vConversionPod = 0
+	VirtV2vInspectionPod = 1
 )
 
 // Map of VirtualMachines keyed by vmID.
@@ -591,6 +601,7 @@ func (r *KubeVirt) DeleteVM(vm *plan.VMStatus) (err error) {
 
 func (r *KubeVirt) DataVolumes(vm *plan.VMStatus) (dataVolumes []cdi.DataVolume, err error) {
 	labels := r.vmLabels(vm.Ref)
+	labels[kDV] = "true"
 	secret, err := r.ensureSecret(vm.Ref, r.secretDataSetterForCDI(vm.Ref), labels)
 	if err != nil {
 		return
@@ -616,6 +627,7 @@ func (r *KubeVirt) DataVolumes(vm *plan.VMStatus) (dataVolumes []cdi.DataVolume,
 
 func (r *KubeVirt) PopulatorVolumes(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, err error) {
 	labels := r.vmLabels(vmRef)
+	labels[kPopulator] = "true"
 	secret, err := r.ensureSecret(vmRef, r.copyDataFromProviderSecret, labels)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -974,17 +986,20 @@ func (r *KubeVirt) getListOptionsNamespaced() (listOptions *client.ListOptions) 
 	}
 }
 
-// Ensure the guest conversion (virt-v2v) pod exists on the destination.
-func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvcs []*core.PersistentVolumeClaim) (err error) {
+// Ensure the guest conversion/inspection (virt-v2v) pod exists on the destination.
+func (r *KubeVirt) EnsureVirtV2vPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvcs []*core.PersistentVolumeClaim, podType int) (err error) {
 	labels := r.vmLabels(vm.Ref)
 	v2vSecret, err := r.ensureSecret(vm.Ref, r.secretDataSetterForCDI(vm.Ref), labels)
 	if err != nil {
 		return
 	}
 
-	libvirtConfigMap, err := r.ensureLibvirtConfigMap(vm.Ref, vmCr, pvcs)
-	if err != nil {
-		return
+	var libvirtConfigMap = &core.ConfigMap{}
+	if podType == VirtV2vConversionPod {
+		libvirtConfigMap, err = r.ensureLibvirtConfigMap(vm.Ref, vmCr, pvcs)
+		if err != nil {
+			return
+		}
 	}
 
 	var vddkConfigMap *core.ConfigMap
@@ -995,12 +1010,24 @@ func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, vmCr *VirtualMach
 		}
 	}
 
-	newPod, err := r.guestConversionPod(vm, vmCr.Spec.Template.Spec.Volumes, libvirtConfigMap, vddkConfigMap, pvcs, v2vSecret)
+	// vmVolumes is not used when creating inspection pod so it can be empty
+	vmVolumes := []cnv.Volume{}
+	if podType == VirtV2vConversionPod {
+		vmVolumes = vmCr.Spec.Template.Spec.Volumes
+	}
+	newPod, err := r.getVirtV2vPod(vm, vmVolumes, libvirtConfigMap, vddkConfigMap, pvcs, v2vSecret, podType)
 	if err != nil {
 		return
 	}
 
-	list, err := r.GetPodsWithLabels(r.conversionLabels(vm.Ref, true))
+	var podTypeLabels = map[string]string{}
+	switch podType {
+	case VirtV2vConversionPod:
+		podTypeLabels = r.conversionLabels(vm.Ref, true)
+	case VirtV2vInspectionPod:
+		podTypeLabels = r.inspectionLabels(vm.Ref)
+	}
+	list, err := r.GetPodsWithLabels(podTypeLabels)
 	if err != nil {
 		return
 	}
@@ -1912,8 +1939,8 @@ func (r *KubeVirt) getConvertorAffinity() *core.Affinity {
 	}
 }
 
-func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, libvirtConfigMap *core.ConfigMap, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, v2vSecret *core.Secret) (pod *core.Pod, err error) {
-	volumes, volumeMounts, volumeDevices, err := r.podVolumeMounts(vmVolumes, libvirtConfigMap, vddkConfigmap, pvcs, vm)
+func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, libvirtConfigMap *core.ConfigMap, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, v2vSecret *core.Secret, podType int) (pod *core.Pod, err error) {
+	volumes, volumeMounts, volumeDevices, err := r.podVolumeMounts(vmVolumes, libvirtConfigMap, vddkConfigmap, pvcs, vm, podType)
 	if err != nil {
 		return
 	}
@@ -1935,7 +1962,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 		err = vErr
 		return
 	}
-	if useV2vForTransfer && !r.IsCopyOffload(pvcs) {
+	if (useV2vForTransfer && !r.IsCopyOffload(pvcs)) || podType == VirtV2vInspectionPod {
 		// mount the secret for the password and CA certificate
 		volumes = append(volumes, core.Volume{
 			Name: "secret-volume",
@@ -2047,13 +2074,47 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 			Type: core.SeccompProfileTypeRuntimeDefault,
 		}
 	}
+
+	var podName string
+	var containerName string
 	// pod labels - start with user-defined labels, then system conversion labels override them
 	podLabels := make(map[string]string)
-	if r.Plan.Spec.ConvertorLabels != nil {
-		maps.Copy(podLabels, r.Plan.Spec.ConvertorLabels)
+	switch podType {
+	case VirtV2vConversionPod:
+		if r.Plan.Spec.ConvertorLabels != nil {
+			maps.Copy(podLabels, r.Plan.Spec.ConvertorLabels)
+		}
+		// System conversion labels override user labels
+		maps.Copy(podLabels, r.conversionLabels(vm.Ref, false))
+		podName = r.getGeneratedName(vm)
+		containerName = "virt-v2v"
+	case VirtV2vInspectionPod:
+		maps.Copy(podLabels, r.inspectionLabels(vm.Ref))
+		// Add inspection pod specific settings
+		podName = r.getGeneratedName(vm) + "inspection-"
+		containerName = "virt-v2v-inspection"
+		environment = append(environment,
+			core.EnvVar{
+				Name:  "V2V_remoteInspection",
+				Value: "true",
+			})
+
+		// Get VM model and data from inventory
+		virtualMachine := &model.VM{}
+		err = r.Context.Source.Inventory.Find(virtualMachine, vm.Ref)
+		if err != nil {
+			err = liberr.Wrap(err, "vm", vm.Ref.String())
+			return
+		}
+
+		// Add disks to be inspected
+		for i, disk := range virtualMachine.Disks {
+			environment = append(environment, core.EnvVar{
+				Name:  fmt.Sprintf("V2V_remoteInspectDisk_%d", i),
+				Value: disk.ParentFile,
+			})
+		}
 	}
-	// System conversion labels override user labels
-	maps.Copy(podLabels, r.conversionLabels(vm.Ref, false))
 
 	// pod node selector
 	var podNodeSelector map[string]string
@@ -2068,7 +2129,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 			Namespace:    r.Plan.Spec.TargetNamespace,
 			Annotations:  annotations,
 			Labels:       podLabels,
-			GenerateName: r.getGeneratedName(vm),
+			GenerateName: podName,
 		},
 		Spec: core.PodSpec{
 			SecurityContext: &core.PodSecurityContext{
@@ -2083,7 +2144,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 			InitContainers: initContainers,
 			Containers: []core.Container{
 				{
-					Name:            "virt-v2v",
+					Name:            containerName,
 					Env:             environment,
 					ImagePullPolicy: core.PullAlways,
 					Resources: core.ResourceRequirements{
@@ -2135,7 +2196,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	return
 }
 
-func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, libvirtConfigMap *core.ConfigMap, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, vm *plan.VMStatus) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, err error) {
+func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, libvirtConfigMap *core.ConfigMap, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, vm *plan.VMStatus, podType int) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, err error) {
 	pvcsByName := make(map[string]*core.PersistentVolumeClaim)
 	for _, pvc := range pvcs {
 		pvcsByName[pvc.Name] = pvc
@@ -2175,18 +2236,26 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, libvirtConfigMap *cor
 		}
 	}
 
-	// add volume and mount for the libvirt domain xml config map.
-	// the virt-v2v pod expects to see the libvirt xml at /mnt/v2v/input.xml
-	volumes = append(volumes, core.Volume{
-		Name: "libvirt-domain-xml",
-		VolumeSource: core.VolumeSource{
-			ConfigMap: &core.ConfigMapVolumeSource{
-				LocalObjectReference: core.LocalObjectReference{
-					Name: libvirtConfigMap.Name,
+	if podType == VirtV2vConversionPod {
+		// add volume and mount for the libvirt domain xml config map.
+		// the virt-v2v pod expects to see the libvirt xml at /mnt/v2v/input.xml
+		volumes = append(volumes, core.Volume{
+			Name: "libvirt-domain-xml",
+			VolumeSource: core.VolumeSource{
+				ConfigMap: &core.ConfigMapVolumeSource{
+					LocalObjectReference: core.LocalObjectReference{
+						Name: libvirtConfigMap.Name,
+					},
 				},
 			},
-		},
-	})
+		})
+		mounts = append(mounts,
+			core.VolumeMount{
+				Name:      "libvirt-domain-xml",
+				MountPath: "/mnt/v2v",
+			},
+		)
+	}
 
 	extraConfigMapExists := len(Settings.Migration.VirtV2vExtraConfConfigMap) > 0
 	if extraConfigMapExists {
@@ -2239,10 +2308,6 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, libvirtConfigMap *cor
 		})
 		mounts = append(mounts,
 			core.VolumeMount{
-				Name:      "libvirt-domain-xml",
-				MountPath: "/mnt/v2v",
-			},
-			core.VolumeMount{
 				Name:      VddkVolumeName,
 				MountPath: "/opt",
 			},
@@ -2254,11 +2319,7 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, libvirtConfigMap *cor
 	case api.VSphere:
 		mounts = append(mounts,
 			core.VolumeMount{
-				Name:      "libvirt-domain-xml",
-				MountPath: "/mnt/v2v",
-			},
-			core.VolumeMount{
-				Name:      "vddk-vol-mount",
+				Name:      VddkVolumeName,
 				MountPath: "/opt",
 			},
 		)
@@ -2660,6 +2721,13 @@ func (r *KubeVirt) conversionLabels(vmRef ref.Ref, filterOutMigrationLabel bool)
 		labels = r.vmLabels(vmRef)
 	}
 	labels[kApp] = "virt-v2v"
+	return
+}
+
+// Labels for an inspection pod.
+func (r *KubeVirt) inspectionLabels(vmRef ref.Ref) (labels map[string]string) {
+	labels = r.vmLabels(vmRef)
+	labels[kApp] = "virt-v2v-inspection"
 	return
 }
 

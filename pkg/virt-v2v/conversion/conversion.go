@@ -224,3 +224,34 @@ func (c *Conversion) RunCustomize(osinfo utils.InspectionOS) error {
 	custom := customize.NewCustomize(c.AppConfig, disks, osinfo)
 	return custom.Run()
 }
+
+func (c *Conversion) RunRemoteV2vInspection() (err error) {
+	v2vCmdBuilder := c.CommandBuilder.New("virt-v2v-inspector").
+		AddFlag("-v").
+		AddFlag("-x")
+
+	err = c.addVirtV2vRemoteInspectionArgs(v2vCmdBuilder)
+	if err != nil {
+		return err
+	}
+
+	err = c.addVirtV2vVsphereArgs(v2vCmdBuilder)
+	if err != nil {
+		return err
+	}
+
+	v2vCmd := v2vCmdBuilder.Build()
+	v2vCmd.SetStdout(os.Stdout)
+	v2vCmd.SetStderr(os.Stderr)
+	return v2vCmd.Run()
+}
+
+func (c *Conversion) addVirtV2vRemoteInspectionArgs(cmd utils.CommandBuilder) (err error) {
+	if len(c.RemoteInspectionDisks) == 0 {
+		return fmt.Errorf("No remote disks were supplied")
+	}
+	for _, disk := range c.RemoteInspectionDisks {
+		cmd.AddArg("-io", fmt.Sprintf("vddk-file=%s", disk))
+	}
+	return
+}

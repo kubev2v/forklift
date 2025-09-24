@@ -1290,6 +1290,13 @@ spec:
                   but will be more predictable.
                   **DANGER** When set to false, the generated PVC name may not be unique and may cause conflicts.
                 type: boolean
+              runPreflightInspection:
+                default: true
+                description: |-
+                  RunPreflightInspection controls whether an inspection step on VM base disks is performed before starting the first disk transfer. Applies only to warm migrations from VMWare.
+                  - true (default): Inspection step runs before transferring any disks and may fail if it detects the migration would fail.
+                  - false: No inspection is performed before disk transfer.
+                type: boolean
               skipGuestConversion:
                 default: false
                 description: Determines if the plan should skip the guest conversion.

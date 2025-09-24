@@ -18,18 +18,20 @@ var (
 	VirtV2vDiskCopy         libitr.Flag = 0x10
 	OpenstackImageMigration libitr.Flag = 0x20
 	VSphere                 libitr.Flag = 0x40
+	RunInspection           libitr.Flag = 0x80
 )
 
 // Steps.
 const (
-	Initialize      = "Initialize"
-	Cutover         = "Cutover"
-	DiskAllocation  = "DiskAllocation"
-	DiskTransfer    = "DiskTransfer"
-	ImageConversion = "ImageConversion"
-	DiskTransferV2v = "DiskTransferV2v"
-	VMCreation      = "VirtualMachineCreation"
-	Unknown         = "Unknown"
+	Initialize          = "Initialize"
+	Cutover             = "Cutover"
+	DiskAllocation      = "DiskAllocation"
+	DiskTransfer        = "DiskTransfer"
+	ImageConversion     = "ImageConversion"
+	DiskTransferV2v     = "DiskTransferV2v"
+	VMCreation          = "VirtualMachineCreation"
+	PreflightInspection = "PreflightInspection"
+	Unknown             = "Unknown"
 )
 
 type Migrator interface {

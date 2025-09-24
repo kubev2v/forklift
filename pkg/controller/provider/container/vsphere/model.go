@@ -1136,6 +1136,9 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 						ID:   datastoreId,
 					}
 				}
+				if backing.Parent != nil {
+					md.ParentFile = backing.Parent.FileName
+				}
 				disks = append(disks, md)
 			case *types.VirtualDiskFlatVer2BackingInfo:
 				md := model.Disk{
@@ -1149,6 +1152,9 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					Bus:            bus,
 					Serial:         backing.Uuid,
 					WinDriveLetter: winDriveLetter,
+				}
+				if backing.Parent != nil {
+					md.ParentFile = backing.Parent.FileName
 				}
 				if backing.Datastore != nil {
 					datastoreId, _ := sanitize(backing.Datastore.Value)

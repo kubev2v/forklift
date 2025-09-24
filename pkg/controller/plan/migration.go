@@ -1237,6 +1237,52 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			if step.MarkedCompleted() && !step.HasError() {
 				r.NextPhase(vm)
 			}
+		case api.PhasePreflightInspection:
+			step, found := vm.FindStep(r.migrator.Step(vm))
+			if !found {
+				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
+				break
+			}
+			step.MarkStarted()
+			step.Phase = api.StepRunning
+
+			// Create inspection pod if missing
+			var ready bool
+			if ready, err = r.ensureGuestInspectionPod(vm); err != nil {
+				step.AddError(err.Error())
+				err = nil
+				break
+			}
+			if !ready {
+				r.Log.Info("virt-v2v inspection pod isn't ready yet")
+				return
+			}
+
+			// Fetch the inspection pod
+			var pod *core.Pod
+			pod, err = r.getInspectionPod(vm)
+
+			if err != nil {
+				step.AddError(err.Error())
+				err = nil
+				break
+			}
+
+			if pod == nil {
+				r.Log.Info("Couldn't find the virt-v2v inspection pod")
+				return
+			}
+
+			if pod.Status.Phase == core.PodSucceeded {
+				r.NextPhase(vm)
+			}
+
+			if pod.Status.Phase == core.PodFailed {
+				step.Error = &plan.Error{
+					Reasons: []string{"VM guest inspection failed"},
+					Phase:   step.Phase,
+				}
+			}
 		case api.PhaseCompleted:
 			vm.MarkCompleted()
 			r.Log.Info(
@@ -1411,7 +1457,7 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (ready bool, err
 		}
 	}
 
-	err = r.kubevirt.EnsureGuestConversionPod(vm, &vmCr, pvcs)
+	err = r.kubevirt.EnsureVirtV2vPod(vm, &vmCr, pvcs, VirtV2vConversionPod)
 	if err != nil {
 		return
 	}
@@ -1421,6 +1467,35 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (ready bool, err
 		ready, err = r.kubevirt.EnsureOVAVirtV2VPVCStatus(vm.ID)
 	case api.VSphere:
 		ready = true
+	}
+
+	return
+}
+
+// Ensure the guest inspection pod is present.
+func (r *Migration) ensureGuestInspectionPod(vm *plan.VMStatus) (ready bool, err error) {
+	var vmCr VirtualMachine
+	var pvcs []*core.PersistentVolumeClaim
+	// pass empty vmCr and pvcs because they are not used when getting inspection pod
+	err = r.kubevirt.EnsureVirtV2vPod(vm, &vmCr, pvcs, VirtV2vInspectionPod)
+	if err != nil {
+		return
+	}
+
+	ready = true
+	return
+}
+
+// Get pod that has inspection label
+func (r *Migration) getInspectionPod(vm *plan.VMStatus) (pod *core.Pod, err error) {
+	list, err := r.kubevirt.GetPodsWithLabels(r.kubevirt.inspectionLabels(vm.Ref))
+	if err != nil {
+		return
+	}
+
+	if len(list.Items) > 0 {
+		pod = &list.Items[0]
+		return
 	}
 
 	return

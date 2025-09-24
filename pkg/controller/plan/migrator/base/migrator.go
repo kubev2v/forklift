@@ -194,6 +194,17 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 						Progress:    libitr.Progress{Total: 1},
 					},
 				})
+		case api.PhasePreflightInspection:
+			pipeline = append(
+				pipeline,
+				&plan.Step{
+					Task: plan.Task{
+						Name:        PreflightInspection,
+						Description: "Inspect VM before migration.",
+						Phase:       api.StepPending,
+						Progress:    libitr.Progress{Total: 1},
+					},
+				})
 		}
 		next, done, _ := itinerary.Next(step.Name)
 		if !done {
@@ -237,9 +248,14 @@ func (r *BaseMigrator) ExecutePhase(vm *plan.VMStatus) (ok bool, err error) {
 // Step gets the name of the pipeline step corresponding to the current VM phase.
 func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 	switch status.Phase {
-	case api.PhaseStarted, api.PhaseCreateInitialSnapshot, api.PhaseWaitForInitialSnapshot,
-		api.PhaseStoreInitialSnapshotDeltas, api.PhaseCreateDataVolumes:
+	case api.PhaseStarted, api.PhaseCreateInitialSnapshot, api.PhaseWaitForInitialSnapshot:
 		step = Initialize
+	case api.PhaseStoreInitialSnapshotDeltas, api.PhaseCreateDataVolumes:
+		if r.Context.Plan.Spec.RunPreflightInspection {
+			step = DiskTransfer
+		} else {
+			step = Initialize
+		}
 	case api.PhaseAllocateDisks:
 		step = DiskAllocation
 	case api.PhaseCopyDisks, api.PhaseCopyingPaused, api.PhaseRemovePreviousSnapshot, api.PhaseWaitForPreviousSnapshotRemoval,
@@ -264,6 +280,8 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 		} else {
 			step = Initialize
 		}
+	case api.PhasePreflightInspection:
+		step = PreflightInspection
 	default:
 		step = Unknown
 	}
@@ -278,6 +296,7 @@ func (r *BaseMigrator) warmItinerary() *libitr.Itinerary {
 			{Name: api.PhasePreHook, All: HasPreHook},
 			{Name: api.PhaseCreateInitialSnapshot},
 			{Name: api.PhaseWaitForInitialSnapshot},
+			{Name: api.PhasePreflightInspection, All: RunInspection},
 			{Name: api.PhaseStoreInitialSnapshotDeltas, All: VSphere},
 			{Name: api.PhaseCreateDataVolumes},
 			// Precopy loop start
@@ -384,11 +403,17 @@ func (r *BasePredicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 		allowed = r.context.Plan.IsSourceProviderOpenstack()
 	case VSphere:
 		allowed = r.context.Plan.IsSourceProviderVSphere()
+	case RunInspection:
+		allowed = r.context.Plan.Spec.RunPreflightInspection &&
+			r.context.Source.Provider.RequiresConversion() &&
+			!r.context.Plan.Spec.SkipGuestConversion &&
+			r.context.Plan.IsSourceProviderVSphere()
+
 	}
 
 	return
 }
 
 func (r *BasePredicate) Count() int {
-	return 0x40
+	return 0x80
 }
