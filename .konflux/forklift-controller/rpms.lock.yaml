@@ -4,13 +4,13 @@ lockfileVendor: redhat
 arches:
 - arch: x86_64
   packages:
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/l/libvirt-libs-10.10.0-7.3.el9_6.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/l/libvirt-libs-10.10.0-7.7.el9_6.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
-    size: 5334776
-    checksum: sha256:ae4b238d060353147d22e1ff475b14784428fdb3f98e64db9462afa161358f8d
+    size: 5325120
+    checksum: sha256:aaa2440e2be453e33ddb5480163fe4d7b70fb51efdd3d40542d87d7727af58d9
     name: libvirt-libs
-    evr: 10.10.0-7.3.el9_6
-    sourcerpm: libvirt-10.10.0-7.3.el9_6.src.rpm
+    evr: 10.10.0-7.7.el9_6
+    sourcerpm: libvirt-10.10.0-7.7.el9_6.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/c/cyrus-sasl-gssapi-2.1.27-21.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 28739
@@ -88,20 +88,20 @@ arches:
     name: tar
     evr: 2:1.34-7.el9
     sourcerpm: tar-1.34-7.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/codeready-builder/os/Packages/l/libvirt-devel-10.10.0-7.3.el9_6.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/codeready-builder/os/Packages/l/libvirt-devel-10.10.0-7.7.el9_6.x86_64.rpm
     repoid: codeready-builder-for-rhel-9-x86_64-rpms
-    size: 215425
-    checksum: sha256:166e3cfb49a839beae100bdca016699309076a7022ddd86f9ebdddc24e0cd5c1
+    size: 214197
+    checksum: sha256:47f8657312197e50d8da0e7584d4452c731d30c7e78974c44f7911a193fb3ad1
     name: libvirt-devel
-    evr: 10.10.0-7.3.el9_6
-    sourcerpm: libvirt-10.10.0-7.3.el9_6.src.rpm
+    evr: 10.10.0-7.7.el9_6
+    sourcerpm: libvirt-10.10.0-7.7.el9_6.src.rpm
   source:
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/source/SRPMS/Packages/l/libvirt-10.10.0-7.3.el9_6.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/source/SRPMS/Packages/l/libvirt-10.10.0-7.7.el9_6.src.rpm
     repoid: rhel-9-for-x86_64-appstream-source-rpms
-    size: 10052196
-    checksum: sha256:02378dd26cdb2e647249fecf5087ba4e53c86b72f80528f51567f2ffc67f436b
+    size: 10090679
+    checksum: sha256:cec90c01d79ecbbd6709e4d9f44287f4d4f110e939a12a11387dcdbdf1e7e3f6
     name: libvirt
-    evr: 10.10.0-7.3.el9_6
+    evr: 10.10.0-7.7.el9_6
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/c/cyrus-sasl-2.1.27-21.el9.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
     size: 4030574
