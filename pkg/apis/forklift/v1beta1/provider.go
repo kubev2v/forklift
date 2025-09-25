@@ -100,9 +100,13 @@ type ProviderStatus struct {
 	// Fingerprint.
 	// +optional
 	Fingerprint string `json:"fingerprint,omitempty"`
-	// OVA provider hosts
+	// Externally routable provider URLs
 	// +optional
-	Hosts []string `json:"hosts,omitempty"`
+	URLs []ProviderURL `json:"urls,omitempty"`
+}
+
+type ProviderURL struct {
+	URL string `json:"url,omitempty"`
 }
 
 // +genclient

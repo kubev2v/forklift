@@ -138,8 +138,11 @@ func main() {
 	if err := multicluster.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "proceeding without optional multicluster APIs.")
 	}
-	if err := route.Install(mgr.GetScheme()); err != nil {
-		log.Error(err, "proceeding without optional route APIs.")
+	if Settings.OpenShift {
+		if err := route.Install(mgr.GetScheme()); err != nil {
+			log.Error(err, "unable to add route APIs to scheme")
+			os.Exit(1)
+		}
 	}
 	// Setup all Controllers
 	log.Info("Setting up controller")
