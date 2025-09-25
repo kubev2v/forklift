@@ -10,7 +10,6 @@ import (
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
-	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 )
 
@@ -124,16 +123,6 @@ func (r *Scheduler) buildInFlight() (err error) {
 		vm := &model.VM{}
 		err = r.Source.Inventory.Find(vm, vmStatus.Ref)
 		if err != nil {
-			if errors.As(err, &web.NotFoundError{}) {
-				vmStatus.SetCondition(libcnd.Condition{
-					Type:     api.ConditionCanceled,
-					Status:   libcnd.True,
-					Category: api.CategoryAdvisory,
-					Reason:   NotFound,
-					Message:  "VM was not found in inventory.",
-					Durable:  true,
-				})
-			}
 			return
 		}
 		if vmStatus.Running() {
