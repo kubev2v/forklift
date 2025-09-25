@@ -111,6 +111,18 @@ func (r *Migration) Run() (reQ time.Duration, err error) {
 		var vm *plan.VMStatus
 		vm, hasNext, err = r.scheduler.Next()
 		if err != nil {
+			if errors.As(err, &web.NotFoundError{}) {
+				vm.SetCondition(libcnd.Condition{
+					Type:     api.ConditionCanceled,
+					Status:   libcnd.True,
+					Category: api.CategoryAdvisory,
+					Reason:   NotFound,
+					Message:  "VM was not found in inventory.",
+					Durable:  true,
+				})
+				err = nil
+				continue
+			}
 			return
 		}
 		if hasNext {
