@@ -101,10 +101,12 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 			err = r.Get(resource, id)
 			return
 		}
-		name := ref.Name
+		ns, name := r.resolve(ref)
 		if name != "" {
-			ns, name := path.Split(name)
-			ns = strings.TrimRight(ns, "/")
+			if ns == "" {
+				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
+				break
+			}
 			list := []NetworkAttachmentDefinition{}
 			err = r.List(
 				&list,
@@ -235,17 +237,11 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 			err = r.Get(resource, id)
 			return
 		}
-		name := ref.Name
+		ns, name := r.resolve(ref)
 		if name != "" {
-			var ns string
-
-			// ref.Namespace might be missing when passed from NetworkMaps
-			// or StorageMaps
-			if ref.Namespace != "" {
-				ns = ref.Namespace
-			} else {
-				ns, name = path.Split(name)
-				ns = strings.TrimRight(ns, "/")
+			if ns == "" {
+				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
+				break
 			}
 			list := []VM{}
 			err = r.List(
@@ -281,14 +277,11 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 			err = r.Get(resource, id)
 			return
 		}
-		name := ref.Name
+		ns, name := r.resolve(ref)
 		if name != "" {
-			var ns string
-			if ref.Namespace != "" {
-				ns = ref.Namespace
-			} else {
-				ns, name = path.Split(name)
-				ns = strings.TrimRight(ns, "/")
+			if ns == "" {
+				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
+				break
 			}
 			list := []PersistentVolumeClaim{}
 			err = r.List(
@@ -324,14 +317,11 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 			err = r.Get(resource, id)
 			return
 		}
-		name := ref.Name
+		ns, name := r.resolve(ref)
 		if name != "" {
-			var ns string
-			if ref.Namespace != "" {
-				ns = ref.Namespace
-			} else {
-				ns, name = path.Split(name)
-				ns = strings.TrimRight(ns, "/")
+			if ns == "" {
+				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
+				break
 			}
 			list := []DataVolume{}
 			err = r.List(
@@ -367,14 +357,11 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 			err = r.Get(resource, id)
 			return
 		}
-		name := ref.Name
+		ns, name := r.resolve(ref)
 		if name != "" {
-			var ns string
-			if ref.Namespace != "" {
-				ns = ref.Namespace
-			} else {
-				ns, name = path.Split(name)
-				ns = strings.TrimRight(ns, "/")
+			if ns == "" {
+				err = liberr.Wrap(RefNotUniqueError{Ref: ref})
+				break
 			}
 			list := []KubeVirt{}
 			err = r.List(
@@ -598,5 +585,20 @@ func (r *Finder) KubeVirt(ref *base.Ref) (object interface{}, err error) {
 		object = kv
 	}
 
+	return
+}
+
+// Resolve a Ref into a namespace and name. The OCP provider tolerates
+// a Ref that contains a namespaced name in the `Name` field, so if the
+// Namespace field isn't populated, then the Name field needs to be checked
+// for a namespaced name.
+func (r *Finder) resolve(ref base.Ref) (namespace string, name string) {
+	if ref.Namespace != "" {
+		namespace = ref.Namespace
+		name = ref.Name
+	} else {
+		namespace, name = path.Split(ref.Name)
+		namespace = strings.TrimRight(namespace, "/")
+	}
 	return
 }
