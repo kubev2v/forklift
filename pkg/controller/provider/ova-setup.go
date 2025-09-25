@@ -238,7 +238,7 @@ func (r *Reconciler) createServerRoute(provider *api.Provider, ctx context.Conte
 	return
 }
 
-func (r *Reconciler) getServerRouteHosts(ctx context.Context, provider *api.Provider) (hosts []string, err error) {
+func (r *Reconciler) getServerURLs(ctx context.Context, provider *api.Provider) (urls []api.ProviderURL, err error) {
 	key := types.NamespacedName{Namespace: provider.Namespace, Name: fmt.Sprintf("ova-route-%s", provider.Name)}
 	route := routev1.Route{}
 	err = r.Get(ctx, key, &route)
@@ -251,7 +251,22 @@ func (r *Reconciler) getServerRouteHosts(ctx context.Context, provider *api.Prov
 		return
 	}
 	for _, ingress := range route.Status.Ingress {
-		hosts = append(hosts, fmt.Sprintf("https://%s", ingress.Host))
+		admitted := false
+		for _, c := range ingress.Conditions {
+			if c.Type == routev1.RouteAdmitted && c.Status == core.ConditionTrue {
+				admitted = true
+				break
+			}
+		}
+		if !admitted {
+			continue
+		}
+		scheme := "http"
+		if route.Spec.TLS != nil {
+			scheme = "https"
+		}
+		url := api.ProviderURL{URL: fmt.Sprintf("%s://%s%s", scheme, ingress.Host, route.Spec.Path)}
+		urls = append(urls, url)
 	}
 	return
 }

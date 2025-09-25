@@ -5358,11 +5358,6 @@ spec:
               fingerprint:
                 description: Fingerprint.
                 type: string
-              hosts:
-                description: OVA provider hosts
-                items:
-                  type: string
-                type: array
               observedGeneration:
                 description: The most recent generation observed by the controller.
                 format: int64
@@ -5370,6 +5365,14 @@ spec:
               phase:
                 description: Current life cycle phase of the provider.
                 type: string
+              urls:
+                description: Externally routable provider URLs
+                items:
+                  properties:
+                    url:
+                      type: string
+                  type: object
+                type: array
             type: object
         type: object
     served: true

@@ -44,6 +44,7 @@ import (
 	libref "github.com/kubev2v/forklift/pkg/lib/ref"
 	"github.com/kubev2v/forklift/pkg/lib/sshkeys"
 	"github.com/kubev2v/forklift/pkg/settings"
+	routev1 "github.com/openshift/api/route/v1"
 	"golang.org/x/crypto/ssh"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -128,7 +129,15 @@ func Add(mgr manager.Manager) error {
 		log.Trace(err)
 		return err
 	}
-
+	if Settings.OpenShift {
+		err = cnt.Watch(
+			source.Kind(mgr.GetCache(), &routev1.Route{},
+				libref.TypedHandler[*routev1.Route](&api.Provider{})))
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+	}
 	return nil
 }
 
@@ -245,12 +254,12 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		}
 
 		if Settings.OpenShift {
-			var routeHosts []string
-			routeHosts, err = r.getServerRouteHosts(ctx, provider)
+			var urls []api.ProviderURL
+			urls, err = r.getServerURLs(ctx, provider)
 			if err != nil {
 				return
 			}
-			provider.Status.Hosts = routeHosts
+			provider.Status.URLs = urls
 		}
 	}
 
