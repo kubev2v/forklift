@@ -8,12 +8,17 @@ import (
 	"time"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
+	"github.com/vmware/govmomi/object"
 	"k8s.io/klog/v2"
 )
 
 var xcopyInitiatorGroup = "xcopy-esxs"
 
-const taskPollingInterval = 5 * time.Second
+const (
+	taskPollingInterval = 5 * time.Second
+	rescanSleepInterval = 5 * time.Second
+	rescanRetries       = 5
+)
 
 // CloneMethod represents the method used for cloning operations
 type CloneMethod string
@@ -261,21 +266,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	targetLUN := fmt.Sprintf("/vmfs/devices/disks/%s", lun.NAA)
 	klog.Infof("resolved lun with IQN %s to lun %s", lun.IQN, targetLUN)
 
-	retries := 5
-	for i := 1; i <= retries; i++ {
-		_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", targetLUN})
-		if err == nil {
-			klog.Infof("found device %s", targetLUN)
-			break
-		} else {
-			_, err = p.VSphereClient.RunEsxCommand(
-				context.Background(), host, []string{"storage", "core", "adapter", "rescan", "-t", "add", "-a", "1"})
-			if err != nil {
-				klog.Errorf("failed to rescan for adapters, attempt %d/%d due to: %s", i, retries, err)
-			}
-			time.Sleep(5 * time.Second)
-		}
-	}
+	err = rescan(p.VSphereClient, host, lun.NAA)
 	if err != nil {
 		return fmt.Errorf("failed to find the device %s after scanning: %w", targetLUN, err)
 	}
@@ -352,4 +343,31 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 
 	// Use unified task execution
 	return ExecuteCloneTask(context.Background(), executor, host, vmDisk.Path(), targetLUN, progress)
+}
+
+// After mapping a volume the ESX needs a rescan to see the device. ESXs can opt-in to do it automatically
+func rescan(client vmware.Client, host *object.HostSystem, targetLUN string) error {
+	for i := 1; i <= rescanRetries; i++ {
+		_, err := client.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", targetLUN})
+		if err == nil {
+			klog.Infof("found device %s", targetLUN)
+			return nil
+		} else {
+			_, err = client.RunEsxCommand(
+				context.Background(), host, []string{"storage", "core", "adapter", "rescan", "-t", "add", "-a", "1"})
+			if err != nil {
+				klog.Errorf("failed to rescan for adapters, attempt %d/%d due to: %s", i, rescanRetries, err)
+			}
+			time.Sleep(rescanSleepInterval)
+		}
+	}
+
+	// last check after the last rescan
+	_, err := client.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", targetLUN})
+	if err == nil {
+		klog.Infof("found device %s", targetLUN)
+		return nil
+	} else {
+		return fmt.Errorf("failed to find device %s: %w", targetLUN, err)
+	}
 }
