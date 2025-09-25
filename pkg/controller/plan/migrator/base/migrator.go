@@ -248,19 +248,13 @@ func (r *BaseMigrator) ExecutePhase(vm *plan.VMStatus) (ok bool, err error) {
 // Step gets the name of the pipeline step corresponding to the current VM phase.
 func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 	switch status.Phase {
-	case api.PhaseStarted, api.PhaseCreateInitialSnapshot, api.PhaseWaitForInitialSnapshot:
+	case api.PhaseStarted, api.PhaseCreateInitialSnapshot, api.PhaseWaitForInitialSnapshot, api.PhaseStoreInitialSnapshotDeltas:
 		step = Initialize
-	case api.PhaseStoreInitialSnapshotDeltas, api.PhaseCreateDataVolumes:
-		if r.Context.Plan.Spec.RunPreflightInspection {
-			step = DiskTransfer
-		} else {
-			step = Initialize
-		}
 	case api.PhaseAllocateDisks:
 		step = DiskAllocation
 	case api.PhaseCopyDisks, api.PhaseCopyingPaused, api.PhaseRemovePreviousSnapshot, api.PhaseWaitForPreviousSnapshotRemoval,
 		api.PhaseCreateSnapshot, api.PhaseWaitForSnapshot, api.PhaseStoreSnapshotDeltas, api.PhaseAddCheckpoint,
-		api.PhaseConvertOpenstackSnapshot, api.PhaseWaitForDataVolumesStatus:
+		api.PhaseConvertOpenstackSnapshot, api.PhaseWaitForDataVolumesStatus, api.PhaseCreateDataVolumes:
 		step = DiskTransfer
 	case api.PhaseRemovePenultimateSnapshot, api.PhaseWaitForPenultimateSnapshotRemoval, api.PhaseCreateFinalSnapshot,
 		api.PhaseWaitForFinalSnapshot, api.PhaseAddFinalCheckpoint, api.PhaseFinalize, api.PhaseRemoveFinalSnapshot,
@@ -296,8 +290,8 @@ func (r *BaseMigrator) warmItinerary() *libitr.Itinerary {
 			{Name: api.PhasePreHook, All: HasPreHook},
 			{Name: api.PhaseCreateInitialSnapshot},
 			{Name: api.PhaseWaitForInitialSnapshot},
-			{Name: api.PhasePreflightInspection, All: RunInspection},
 			{Name: api.PhaseStoreInitialSnapshotDeltas, All: VSphere},
+			{Name: api.PhasePreflightInspection, All: RunInspection},
 			{Name: api.PhaseCreateDataVolumes},
 			// Precopy loop start
 			{Name: api.PhaseWaitForDataVolumesStatus},
