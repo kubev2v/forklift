@@ -230,7 +230,7 @@ func (r *LiveMigrator) Step(vm *planapi.VMStatus) (step string) {
 		step = base.Initialize
 	case PreHook, PostHook:
 		step = vm.Phase
-	case CreateSecrets, CreateConfigMaps, EnsurePreference, EnsureInstanceType, EnsureDataVolumes, CreateTarget, SetOwnerReferences, CreateServiceExports:
+	case CreateSecrets, CreateConfigMaps, EnsurePreference, EnsureInstanceType, EnsureDataVolumes, EnsurePersistentVolumeClaims, CreateTarget, SetOwnerReferences, CreateServiceExports:
 		step = PrepareTarget
 	case WaitForTargetVMI, CreateVirtualMachineInstanceMigrations, WaitForStateTransfer:
 		step = Synchronization
