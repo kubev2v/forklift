@@ -248,19 +248,11 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	// End staging conditions.
 	plan.Status.EndStagingConditions()
 
-	if err = r.updatePlanStatus(plan); err != nil {
-		r.Log.Error(err, "failed to update plan status")
-		return
-	}
-
 	//
 	// Execute.
 	// The plan is updated as needed to reflect status.
 	result.RequeueAfter, err = r.execute(plan)
 	if err != nil {
-		if updateErr := r.updatePlanStatus(plan); updateErr != nil {
-			r.Log.Error(err, "failed to update plan status")
-		}
 		return
 	}
 
@@ -351,6 +343,14 @@ func (r *Reconciler) archive(plan *api.Plan) {
 //  5. If a new migration is being started, update the context and snapshot.
 //  6. Run the migration.
 func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
+	defer func() {
+		if err == nil {
+			err = r.updatePlanStatus(plan)
+			if err != nil {
+				err = liberr.Wrap(err)
+			}
+		}
+	}()
 	conditionRequiresReQ := plan.Status.HasReQCondition()
 	if plan.Status.HasBlockerCondition() || plan.Status.HasCondition(Archived) || conditionRequiresReQ {
 		if conditionRequiresReQ || plan.Status.HasBlockerCondition() {
@@ -365,14 +365,7 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 		}
 		return
 	}
-	defer func() {
-		if err == nil {
-			err = r.updatePlanStatus(plan)
-			if err != nil {
-				err = liberr.Wrap(err)
-			}
-		}
-	}()
+
 	ctx, err := plancontext.New(r, plan, r.Log)
 	if err != nil {
 		return
