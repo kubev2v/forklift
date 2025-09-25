@@ -31,8 +31,8 @@
 package arm64
 
 import (
-	"fmt"
 	"github.com/twitchyliquid64/golang-asm/obj"
+	"fmt"
 )
 
 var strcond = [16]string{
