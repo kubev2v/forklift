@@ -6,11 +6,11 @@ package wasm
 
 import (
 	"bytes"
-	"encoding/binary"
-	"fmt"
 	"github.com/twitchyliquid64/golang-asm/obj"
 	"github.com/twitchyliquid64/golang-asm/objabi"
 	"github.com/twitchyliquid64/golang-asm/sys"
+	"encoding/binary"
+	"fmt"
 	"io"
 	"math"
 )
