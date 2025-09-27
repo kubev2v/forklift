@@ -2,19 +2,17 @@ package plan
 
 import (
 	"context"
-	"math/rand"
-	"regexp"
-	"strings"
-	"time"
 
+	"github.com/kubev2v/forklift/pkg/controller/plan/util"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/util/validation"
 	cnv "kubevirt.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func (r *KubeVirt) changeVmNameDNS1123(vmName string, vmNamespace string) (generatedName string, err error) {
-	generatedName = changeVmName(vmName)
+	generatedName = util.ChangeVmName(vmName)
 	nameExist, errName := r.checkIfVmNameExistsInNamespace(generatedName, vmNamespace)
 	if errName != nil {
 		err = liberr.Wrap(errName)
@@ -23,65 +21,13 @@ func (r *KubeVirt) changeVmNameDNS1123(vmName string, vmNamespace string) (gener
 	if nameExist {
 		// If the name exists and it's at max allowed length, remove 5 chars from the end
 		// so we won't reach the limit after appending vmId
-		if len(generatedName) == NameMaxLength {
-			generatedName = generatedName[0 : NameMaxLength-5]
+		max := validation.DNS1123LabelMaxLength
+		if len(generatedName) > max-5 {
+			generatedName = generatedName[:max-5]
 		}
-		generatedName = generatedName + "-" + generateRandVmNameSuffix()
+		generatedName = generatedName + "-" + util.GenerateRandomSuffix()
 	}
 	return
-}
-
-// changes VM name to match DNS1123 RFC convention.
-func changeVmName(currName string) string {
-	newName := strings.ToLower(currName)
-	newName = strings.Trim(newName, ".-")
-
-	parts := strings.Split(newName, ".")
-	var validParts []string
-
-	for _, part := range parts {
-		part = strings.ReplaceAll(part, "_", "-")
-		part = strings.ReplaceAll(part, "+", "-")
-		part = strings.ReplaceAll(part, "*", "-")
-		part = strings.ReplaceAll(part, " ", "-")
-		part = strings.ReplaceAll(part, "/", "-")
-		part = strings.ReplaceAll(part, "\\", "-")
-
-		notAllowedChars := regexp.MustCompile("[^a-z0-9-]")
-		part = notAllowedChars.ReplaceAllString(part, "")
-
-		part = strings.Trim(part, "-.")
-
-		// Remove multiple dashes
-		partsByDashes := strings.Split(part, "-")
-		var cleanedParts []string
-		for _, p := range partsByDashes {
-			if p != "" {
-				cleanedParts = append(cleanedParts, p)
-			}
-		}
-		part = strings.Join(cleanedParts, "-")
-
-		// Add part only if not empty
-		if part != "" {
-			validParts = append(validParts, part)
-		}
-	}
-
-	// Join valid parts with dots
-	newName = strings.Join(validParts, ".")
-
-	// Ensure length does not exceed max
-	if len(newName) > NameMaxLength {
-		newName = newName[0:NameMaxLength]
-	}
-
-	// Handle case where name is empty after all processing
-	if newName == "" {
-		newName = "vm-" + generateRandVmNameSuffix()
-	}
-
-	return newName
 }
 
 // Checks if VM with the newly generated name exists on the destination
@@ -118,17 +64,4 @@ func (r *KubeVirt) checkIfVmNameExistsInNamespace(name string, namespace string)
 	}
 	nameExist = false
 	return
-}
-
-// Generates a random string of length four, consisting of lowercase letters and digits.
-func generateRandVmNameSuffix() string {
-	const charset = "abcdefghijklmnopqrstuvwxyz" + "0123456789"
-	source := rand.NewSource(time.Now().UTC().UnixNano())
-	seededRand := rand.New(source)
-
-	b := make([]byte, 4)
-	for i := range b {
-		b[i] = charset[seededRand.Intn(len(charset))]
-	}
-	return string(b)
 }
