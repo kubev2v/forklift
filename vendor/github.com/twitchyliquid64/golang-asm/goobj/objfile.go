@@ -20,11 +20,11 @@ package goobj
 
 import (
 	"bytes"
+	"github.com/twitchyliquid64/golang-asm/bio"
 	"crypto/sha1"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/twitchyliquid64/golang-asm/bio"
 	"github.com/twitchyliquid64/golang-asm/unsafeheader"
 	"io"
 	"unsafe"
@@ -268,16 +268,15 @@ func (p *ImportedPkg) Write(w *Writer) {
 // Symbol definition.
 //
 // Serialized format:
-//
-//	Sym struct {
-//	   Name  string
-//	   ABI   uint16
-//	   Type  uint8
-//	   Flag  uint8
-//	   Flag2 uint8
-//	   Siz   uint32
-//	   Align uint32
-//	}
+// Sym struct {
+//    Name  string
+//    ABI   uint16
+//    Type  uint8
+//    Flag  uint8
+//    Flag2 uint8
+//    Siz   uint32
+//    Align uint32
+// }
 type Sym [SymSize]byte
 
 const SymSize = stringRefSize + 2 + 1 + 1 + 1 + 4 + 4
@@ -373,14 +372,13 @@ const HashSize = sha1.Size
 // Relocation.
 //
 // Serialized format:
-//
-//	Reloc struct {
-//	   Off  int32
-//	   Siz  uint8
-//	   Type uint8
-//	   Add  int64
-//	   Sym  SymRef
-//	}
+// Reloc struct {
+//    Off  int32
+//    Siz  uint8
+//    Type uint8
+//    Add  int64
+//    Sym  SymRef
+// }
 type Reloc [RelocSize]byte
 
 const RelocSize = 4 + 1 + 1 + 8 + 8
@@ -418,11 +416,10 @@ func (r *Reloc) fromBytes(b []byte) { copy(r[:], b) }
 // Aux symbol info.
 //
 // Serialized format:
-//
-//	Aux struct {
-//	   Type uint8
-//	   Sym  SymRef
-//	}
+// Aux struct {
+//    Type uint8
+//    Sym  SymRef
+// }
 type Aux [AuxSize]byte
 
 const AuxSize = 1 + 8
@@ -459,12 +456,11 @@ func (a *Aux) fromBytes(b []byte) { copy(a[:], b) }
 // Referenced symbol flags.
 //
 // Serialized format:
-//
-//	RefFlags struct {
-//	   Sym   symRef
-//	   Flag  uint8
-//	   Flag2 uint8
-//	}
+// RefFlags struct {
+//    Sym   symRef
+//    Flag  uint8
+//    Flag2 uint8
+// }
 type RefFlags [RefFlagsSize]byte
 
 const RefFlagsSize = 8 + 1 + 1
@@ -487,11 +483,10 @@ func (r *RefFlags) Write(w *Writer) { w.Bytes(r[:]) }
 // Referenced symbol name.
 //
 // Serialized format:
-//
-//	RefName struct {
-//	   Sym  symRef
-//	   Name string
-//	}
+// RefName struct {
+//    Sym  symRef
+//    Name string
+// }
 type RefName [RefNameSize]byte
 
 const RefNameSize = 8 + stringRefSize
