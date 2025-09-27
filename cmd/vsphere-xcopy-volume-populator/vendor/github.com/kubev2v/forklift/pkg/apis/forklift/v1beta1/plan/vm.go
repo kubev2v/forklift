@@ -43,6 +43,13 @@ type VM struct {
 	// Disk decryption LUKS keys
 	// +optional
 	LUKS core.ObjectReference `json:"luks" ref:"Secret"`
+	// Attempt passphrase-less unlocking for all devices with Clevis, over the network.
+	// Conversion pod running on target cluster will attempt to connect to a TANG server, make sure TANG
+	// server is available on target network.
+	// https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/8/html/security_hardening/configuring-automated-unlocking-of-encrypted-volumes-using-policy-based-decryption_security-hardening
+	// If both nbdeClevis and LUKS are configured, nbdeClevis takes precedence.
+	// +optional
+	NbdeClevis bool `json:"nbdeClevis,omitempty"`
 	// Choose the primary disk the VM boots from
 	// +optional
 	RootDisk string `json:"rootDisk,omitempty"`
