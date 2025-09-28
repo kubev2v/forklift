@@ -1,6 +1,8 @@
 package io.konveyor.forklift.openstack
 
-test_without_host_devices {
+import rego.v1
+
+test_without_host_devices if {
 	mock_vm := {
 		"name": "test",
 		"flavor": {"extraSpecs": {}},
@@ -9,7 +11,7 @@ test_without_host_devices {
 	count(results) == 0
 }
 
-test_with_host_devices {
+test_with_host_devices if {
 	mock_vm := {
 		"name": "test",
 		"flavor": {"extraSpecs": {"pci_passthrough:alias": "alias1:2"}},

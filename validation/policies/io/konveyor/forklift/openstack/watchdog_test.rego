@@ -1,6 +1,8 @@
 package io.konveyor.forklift.openstack
 
-test_without_watchdog {
+import rego.v1
+
+test_without_watchdog if {
 	mock_vm := {
 		"name": "test",
 		"flavor": {"extraSpecs": {}},
@@ -10,7 +12,7 @@ test_without_watchdog {
 	count(results) == 0
 }
 
-test_with_flavor_watchdog {
+test_with_flavor_watchdog if {
 	mock_vm := {
 		"name": "test",
 		"flavor": {"extraSpecs": {"hw:watchdog_action": "reset"}},
@@ -19,7 +21,7 @@ test_with_flavor_watchdog {
 	count(results) == 1
 }
 
-test_with_image_watchdog {
+test_with_image_watchdog if {
 	mock_vm := {
 		"name": "test",
 		"image": {"properties": {"hw_watchdog_action": "reset"}},
@@ -28,7 +30,7 @@ test_with_image_watchdog {
 	count(results) == 1
 }
 
-test_with_flavor_and_image_watchdogs {
+test_with_flavor_and_image_watchdogs if {
 	mock_vm := {
 		"name": "test",
 		"flavor": {"extraSpecs": {"hw:watchdog_action": "reset"}},

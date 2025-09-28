@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-CMD="/usr/bin/opa run --server"
+CMD="/usr/bin/opa run --server --addr 0.0.0.0:8181"
 if [ -f "$TLS_CERT_FILE" ] && [ -f "$TLS_KEY_FILE" ]; then
   CMD="$CMD --tls-cert-file $TLS_CERT_FILE --tls-private-key-file $TLS_KEY_FILE"
 else

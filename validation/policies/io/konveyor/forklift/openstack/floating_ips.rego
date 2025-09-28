@@ -1,13 +1,15 @@
 package io.konveyor.forklift.openstack
 
+import rego.v1
+
 addresses := input.addresses
 
-floating_ips[i] {
-  some i
+floating_ips contains i if {
+	some i
 	addresses[i][_]["OS-EXT-IPS:type"] == "floating"
 }
 
-concerns[flag] {
+concerns contains flag if {
 	count(floating_ips) != 0
 	flag := {
 		"id": "openstack.network.floating_ips.detected",

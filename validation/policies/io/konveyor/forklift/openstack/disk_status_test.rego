@@ -1,6 +1,8 @@
 package io.konveyor.forklift.openstack
 
-test_with_valid_disk_status {
+import rego.v1
+
+test_with_valid_disk_status if {
 	mock_vm := {
 		"name": "test",
 		"volumes": [
@@ -22,7 +24,7 @@ test_with_valid_disk_status {
 	count(results) == 0
 }
 
-test_with_one_invalid_disk_status {
+test_with_one_invalid_disk_status if {
 	mock_vm := {
 		"name": "test",
 		"volumes": [
@@ -44,7 +46,7 @@ test_with_one_invalid_disk_status {
 	count(results) == 1
 }
 
-test_with_two_invalid_disk_status {
+test_with_two_invalid_disk_status if {
 	mock_vm := {
 		"name": "test",
 		"volumes": [

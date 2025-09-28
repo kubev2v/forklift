@@ -1,12 +1,12 @@
 package io.konveyor.forklift.openstack
 
-import future.keywords.if
+import rego.v1
 
-default has_boot_menu_enabled = false
+default has_boot_menu_enabled := false
 
 has_boot_menu_enabled if input.image.properties.hw_boot_menu == "true"
 
-concerns[flag] {
+concerns contains flag if {
 	has_boot_menu_enabled
 	flag := {
 		"id": "openstack.bios.boot_menu.enabled",
