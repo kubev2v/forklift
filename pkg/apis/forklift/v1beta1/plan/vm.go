@@ -57,8 +57,10 @@ type VM struct {
 	// +optional
 	InstanceType string `json:"instanceType,omitempty"`
 	// PVCNameTemplate is a template for generating PVC names for VM disks.
+	// Generated names must be valid DNS-1123 labels (lowercase alphanumerics, '-' allowed, max 63 chars).
 	// It follows Go template syntax and has access to the following variables:
-	//   - .VmName: name of the VM
+	//   - .VmName: name of the VM in the source cluster (original source name)
+	//   - .TargetVmName: final VM name in the target cluster (may equal .VmName if no rename/normalization)
 	//   - .PlanName: name of the migration plan
 	//   - .DiskIndex: initial volume index of the disk
 	//   - .WinDriveLetter: Windows drive letter (lowercase, if applicable, e.g. "c", requires guest agent)
@@ -68,9 +70,11 @@ type VM struct {
 	// Note:
 	//   This template overrides the plan level template.
 	// Examples:
-	//   "{{.VmName}}-disk-{{.DiskIndex}}"
+	//   "{{.TargetVmName}}-disk-{{.DiskIndex}}"
 	//   "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
-	//   "{{if .Shared}}shared-{{end}}{{.VmName}}-{{.DiskIndex}}"
+	//   "{{if .Shared}}shared-{{end}}{{.VmName | lower}}-{{.DiskIndex}}"
+	// See:
+	// 	 https://github.com/kubev2v/forklift/tree/main/pkg/templateutil for template functions.
 	// +optional
 	PVCNameTemplate string `json:"pvcNameTemplate,omitempty"`
 	// VolumeNameTemplate is a template for generating volume interface names in the target virtual machine.

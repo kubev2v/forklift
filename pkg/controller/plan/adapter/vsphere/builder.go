@@ -1598,6 +1598,10 @@ func (r *Builder) getPlanVM(vm *model.VM) *plan.VM {
 
 // getPlanVMStatus get the plan VM status for the given vsphere VM
 func (r *Builder) getPlanVMStatus(vm *model.VM) *plan.VMStatus {
+	if r.Plan == nil || r.Plan.Status.Migration.VMs == nil {
+		return nil
+	}
+
 	for _, planVMStatus := range r.Plan.Status.Migration.VMs {
 		if planVMStatus.ID == vm.ID {
 			return planVMStatus
@@ -1719,9 +1723,23 @@ func (r *Builder) setPVCNameFromTemplate(objectMeta *metav1.ObjectMeta, vm *mode
 		isWarm = true
 	}
 
+	// Get plan VM status
+	planVMStatus := r.getPlanVMStatus(vm)
+
+	// Resolve names with safe fallbacks
+	vmName := vm.Name
+	targetVmName := ""
+	if planVMStatus != nil && planVMStatus.NewName != "" {
+		targetVmName = planVMStatus.NewName
+	} else {
+		// Best-effort DNS1123-safe fallback
+		targetVmName = utils.ChangeVmName(vmName)
+	}
+
 	// Create template data
 	templateData := api.PVCNameTemplateData{
-		VmName:         r.getPlanVMSafeName(vm),
+		VmName:         vmName,
+		TargetVmName:   targetVmName,
 		PlanName:       r.Plan.Name,
 		DiskIndex:      diskIndex,
 		RootDiskIndex:  rootDiskIndex,

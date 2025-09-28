@@ -77,11 +77,12 @@ const (
 	AnnOriginalID = "original-ID"
 	// DV deletion on completion
 	AnnDeleteAfterCompletion = "cdi.kubevirt.io/storage.deleteAfterCompletion"
-	// Max Length for vm name
-	NameMaxLength            = 63
-	VddkVolumeName           = "vddk-vol-mount"
+	// VddkVolumeName is the volume name used for the VDDK library scratch space.
+	VddkVolumeName = "vddk-vol-mount"
+	// DynamicScriptsVolumeName is the volume name used to mount first-boot scripts.
 	DynamicScriptsVolumeName = "scripts-volume-mount"
-	DynamicScriptsMountPath  = "/mnt/dynamic_scripts"
+	// DynamicScriptsMountPath is the mount path for first-boot scripts.
+	DynamicScriptsMountPath = "/mnt/dynamic_scripts"
 )
 
 // Labels

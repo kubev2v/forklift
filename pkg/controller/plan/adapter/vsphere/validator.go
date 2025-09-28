@@ -9,9 +9,11 @@ import (
 
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/plan/util"
 	ocpmodel "github.com/kubev2v/forklift/pkg/controller/provider/model/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
@@ -161,9 +163,13 @@ func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (ok b
 		return true, nil
 	}
 
+	// Get target VM name (either from TargetName field or cleaned VM name)
+	targetVmName := r.getPlanVMTargetName(vm)
+
 	for i, disk := range vm.Disks {
 		testData := api.PVCNameTemplateData{
 			VmName:         vm.Name,
+			TargetVmName:   targetVmName,
 			PlanName:       r.Plan.Name,
 			DiskIndex:      i,
 			RootDiskIndex:  1,
@@ -604,6 +610,31 @@ func (r *Validator) ChangeTrackingEnabled(vmRef ref.Ref) (bool, error) {
 		return false, liberr.Wrap(err, "vm", vmRef)
 	}
 	return vm.ChangeTrackingEnabled, nil
+}
+
+// getPlanVM get the plan VM for the given vsphere VM by looping over plan.Spec.VMs
+func (r *Validator) getPlanVM(vm *model.VM) *plan.VM {
+	for i := range r.Plan.Spec.VMs {
+		if r.Plan.Spec.VMs[i].ID == vm.ID {
+			return &r.Plan.Spec.VMs[i]
+		}
+	}
+	return nil
+}
+
+// getPlanVMTargetName returns the target VM name, either by using the TargetName field if present,
+// or by cleaning the VM name to make it DNS1123 compatible
+func (r *Validator) getPlanVMTargetName(vm *model.VM) string {
+	// Get plan VM from spec.vms and use the TargetName field if present
+	planVM := r.getPlanVM(vm)
+	if planVM != nil {
+		if name := strings.TrimSpace(planVM.TargetName); name != "" {
+			return name
+		}
+	}
+
+	// Otherwise, clean the VM name
+	return util.ChangeVmName(vm.Name)
 }
 
 // Validate that VM has no pre-existing snapshots for warm migration

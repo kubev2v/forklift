@@ -1262,22 +1262,24 @@ spec:
                 - source
                 type: object
               pvcNameTemplate:
-                description: |-
-                  PVCNameTemplate is a template for generating PVC names for VM disks.
-                  It follows Go template syntax and has access to the following variables:
-                    - .VmName: name of the VM
-                    - .PlanName: name of the migration plan
-                    - .DiskIndex: initial volume index of the disk
-                    - .WinDriveLetter: Windows drive letter (lowercase, if applicable, e.g. "c", requires guest agent)
-                    - .RootDiskIndex: index of the root disk
-                    - .Shared: true if the volume is shared by multiple VMs, false otherwise
-                    - .FileName: name of the file in the source provider (VMware only, filename includes the .vmdk suffix)
-                  Note:
-                    This template can be overridden at the individual VM level.
-                  Examples:
-                    "{{.VmName}}-disk-{{.DiskIndex}}"
-                    "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
-                    "{{if .Shared}}shared-{{end}}{{.VmName}}-{{.DiskIndex}}"
+                description: "PVCNameTemplate is a template for generating PVC names
+                  for VM disks.\nGenerated names must be valid DNS-1123 labels (lowercase
+                  alphanumerics, '-' allowed, max 63 chars).\nIt follows Go template
+                  syntax and has access to the following variables:\n  - .VmName:
+                  name of the VM in the source cluster (original source name)\n  -
+                  .TargetVmName: final VM name in the target cluster (may equal .VmName
+                  if no rename/normalization)\n  - .PlanName: name of the migration
+                  plan\n  - .DiskIndex: initial volume index of the disk\n  - .WinDriveLetter:
+                  Windows drive letter (lowercase, if applicable, e.g. \"c\", requires
+                  guest agent)\n  - .RootDiskIndex: index of the root disk\n  - .Shared:
+                  true if the volume is shared by multiple VMs, false otherwise\n
+                  \ - .FileName: name of the file in the source provider (VMware only,
+                  filename includes the .vmdk suffix)\nNote:\n  This template can
+                  be overridden at the individual VM level.\nExamples:\n  \"{{.TargetVmName}}-disk-{{.DiskIndex}}\"\n
+                  \ \"{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}\"\n
+                  \ \"{{if .Shared}}shared-{{end}}{{.VmName | lower}}-{{.DiskIndex}}\"\nSee:\n\t
+                  https://github.com/kubev2v/forklift/tree/main/pkg/templateutil for
+                  template functions."
                 type: string
               pvcNameTemplateUseGenerateName:
                 default: true
@@ -2481,22 +2483,26 @@ spec:
                           "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
                       type: string
                     pvcNameTemplate:
-                      description: |-
-                        PVCNameTemplate is a template for generating PVC names for VM disks.
-                        It follows Go template syntax and has access to the following variables:
-                          - .VmName: name of the VM
-                          - .PlanName: name of the migration plan
-                          - .DiskIndex: initial volume index of the disk
-                          - .WinDriveLetter: Windows drive letter (lowercase, if applicable, e.g. "c", requires guest agent)
-                          - .RootDiskIndex: index of the root disk
-                          - .Shared: true if the volume is shared by multiple VMs, false otherwise
-                          - .FileName: name of the file in the source provider (VMware only, filename includes the .vmdk suffix)
-                        Note:
-                          This template overrides the plan level template.
-                        Examples:
-                          "{{.VmName}}-disk-{{.DiskIndex}}"
-                          "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
-                          "{{if .Shared}}shared-{{end}}{{.VmName}}-{{.DiskIndex}}"
+                      description: "PVCNameTemplate is a template for generating PVC
+                        names for VM disks.\nGenerated names must be valid DNS-1123
+                        labels (lowercase alphanumerics, '-' allowed, max 63 chars).\nIt
+                        follows Go template syntax and has access to the following
+                        variables:\n  - .VmName: name of the VM in the source cluster
+                        (original source name)\n  - .TargetVmName: final VM name in
+                        the target cluster (may equal .VmName if no rename/normalization)\n
+                        \ - .PlanName: name of the migration plan\n  - .DiskIndex:
+                        initial volume index of the disk\n  - .WinDriveLetter: Windows
+                        drive letter (lowercase, if applicable, e.g. \"c\", requires
+                        guest agent)\n  - .RootDiskIndex: index of the root disk\n
+                        \ - .Shared: true if the volume is shared by multiple VMs,
+                        false otherwise\n  - .FileName: name of the file in the source
+                        provider (VMware only, filename includes the .vmdk suffix)\nNote:\n
+                        \ This template overrides the plan level template.\nExamples:\n
+                        \ \"{{.TargetVmName}}-disk-{{.DiskIndex}}\"\n  \"{{if eq .DiskIndex
+                        .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}\"\n
+                        \ \"{{if .Shared}}shared-{{end}}{{.VmName | lower}}-{{.DiskIndex}}\"\nSee:\n\t
+                        https://github.com/kubev2v/forklift/tree/main/pkg/templateutil
+                        for template functions."
                       type: string
                     rootDisk:
                       description: Choose the primary disk the VM boots from
@@ -3168,22 +3174,27 @@ spec:
                             type: object
                           type: array
                         pvcNameTemplate:
-                          description: |-
-                            PVCNameTemplate is a template for generating PVC names for VM disks.
-                            It follows Go template syntax and has access to the following variables:
-                              - .VmName: name of the VM
-                              - .PlanName: name of the migration plan
-                              - .DiskIndex: initial volume index of the disk
-                              - .WinDriveLetter: Windows drive letter (lowercase, if applicable, e.g. "c", requires guest agent)
-                              - .RootDiskIndex: index of the root disk
-                              - .Shared: true if the volume is shared by multiple VMs, false otherwise
-                              - .FileName: name of the file in the source provider (VMware only, filename includes the .vmdk suffix)
-                            Note:
-                              This template overrides the plan level template.
-                            Examples:
-                              "{{.VmName}}-disk-{{.DiskIndex}}"
-                              "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
-                              "{{if .Shared}}shared-{{end}}{{.VmName}}-{{.DiskIndex}}"
+                          description: "PVCNameTemplate is a template for generating
+                            PVC names for VM disks.\nGenerated names must be valid
+                            DNS-1123 labels (lowercase alphanumerics, '-' allowed,
+                            max 63 chars).\nIt follows Go template syntax and has
+                            access to the following variables:\n  - .VmName: name
+                            of the VM in the source cluster (original source name)\n
+                            \ - .TargetVmName: final VM name in the target cluster
+                            (may equal .VmName if no rename/normalization)\n  - .PlanName:
+                            name of the migration plan\n  - .DiskIndex: initial volume
+                            index of the disk\n  - .WinDriveLetter: Windows drive
+                            letter (lowercase, if applicable, e.g. \"c\", requires
+                            guest agent)\n  - .RootDiskIndex: index of the root disk\n
+                            \ - .Shared: true if the volume is shared by multiple
+                            VMs, false otherwise\n  - .FileName: name of the file
+                            in the source provider (VMware only, filename includes
+                            the .vmdk suffix)\nNote:\n  This template overrides the
+                            plan level template.\nExamples:\n  \"{{.TargetVmName}}-disk-{{.DiskIndex}}\"\n
+                            \ \"{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}\"\n
+                            \ \"{{if .Shared}}shared-{{end}}{{.VmName | lower}}-{{.DiskIndex}}\"\nSee:\n\t
+                            https://github.com/kubev2v/forklift/tree/main/pkg/templateutil
+                            for template functions."
                           type: string
                         restorePowerState:
                           description: Source VM power state before migration.
