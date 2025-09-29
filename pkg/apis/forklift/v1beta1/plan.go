@@ -365,6 +365,14 @@ func (r *Plan) IsSourceProviderOCP() bool {
 
 func (r *Plan) IsSourceProviderVSphere() bool { return r.Provider.Source.Type() == VSphere }
 
+func (r *Plan) ShouldRunPreflightInspection() bool {
+	isWarm := r.Spec.Type == MigrationWarm || r.Spec.Warm
+	return r.IsSourceProviderVSphere() &&
+		isWarm &&
+		!r.Spec.SkipGuestConversion &&
+		r.Spec.RunPreflightInspection
+}
+
 // PVCNameTemplateData contains fields used in naming templates.
 type PVCNameTemplateData struct {
 	VmName         string `json:"vmName"`
