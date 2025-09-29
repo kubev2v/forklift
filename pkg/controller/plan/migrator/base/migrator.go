@@ -254,8 +254,16 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 		step = DiskAllocation
 	case api.PhaseCopyDisks, api.PhaseCopyingPaused, api.PhaseRemovePreviousSnapshot, api.PhaseWaitForPreviousSnapshotRemoval,
 		api.PhaseCreateSnapshot, api.PhaseWaitForSnapshot, api.PhaseStoreSnapshotDeltas, api.PhaseAddCheckpoint,
-		api.PhaseConvertOpenstackSnapshot, api.PhaseWaitForDataVolumesStatus, api.PhaseCreateDataVolumes:
+		api.PhaseConvertOpenstackSnapshot, api.PhaseWaitForDataVolumesStatus:
 		step = DiskTransfer
+	case api.PhaseCreateDataVolumes:
+		// This phase should be present in DiskTransfer step only when executing Preflight Inspection to avoid UI pipeline artifacts.
+		// If not executing Preflight Inspection, keep the Initialize step.
+		if r.Context.Plan.ShouldRunPreflightInspection() {
+			step = DiskTransfer
+		} else {
+			step = Initialize
+		}
 	case api.PhaseRemovePenultimateSnapshot, api.PhaseWaitForPenultimateSnapshotRemoval, api.PhaseCreateFinalSnapshot,
 		api.PhaseWaitForFinalSnapshot, api.PhaseAddFinalCheckpoint, api.PhaseFinalize, api.PhaseRemoveFinalSnapshot,
 		api.PhaseWaitForFinalSnapshotRemoval, api.PhaseWaitForFinalDataVolumesStatus:
@@ -398,11 +406,7 @@ func (r *BasePredicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 	case VSphere:
 		allowed = r.context.Plan.IsSourceProviderVSphere()
 	case RunInspection:
-		allowed = r.context.Plan.Spec.RunPreflightInspection &&
-			r.context.Source.Provider.RequiresConversion() &&
-			!r.context.Plan.Spec.SkipGuestConversion &&
-			r.context.Plan.IsSourceProviderVSphere()
-
+		allowed = r.context.Plan.ShouldRunPreflightInspection()
 	}
 
 	return
