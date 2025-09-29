@@ -1470,9 +1470,16 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				pvc.Spec.DataSourceRef.Name = populatorName
 
 				pvcs = append(pvcs, &pvc)
-
 				vp := api.VSphereXcopyVolumePopulator{
 					ObjectMeta: metav1.ObjectMeta{
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "v1",
+								Kind:       "PersistentVolumeClaim",
+								Name:       pvc.Name,
+								UID:        pvc.UID,
+							},
+						},
 						Name:      populatorName,
 						Namespace: namespace,
 						Labels:    labels,
@@ -1499,9 +1506,23 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 						}
 						return nil, err
 					}
+
+					// Fetch the PVC back to get the UID assigned by Kubernetes
+					createdPVC := &core.PersistentVolumeClaim{}
+					err = r.Destination.Client.Get(context.TODO(), client.ObjectKey{
+						Namespace: pvc.Namespace,
+						Name:      pvc.Name,
+					}, createdPVC)
+					if err != nil {
+						return nil, err
+					}
+
+					// Update the populator's owner reference with the actual PVC UID
+					vp.OwnerReferences[0].UID = createdPVC.UID
+
 					// Should probably check these separately
 					r.Log.Info("Ensuring a populator service account")
-					err := r.ensurePopulatorServiceAccount(namespace)
+					err = r.ensurePopulatorServiceAccount(namespace)
 					if err != nil {
 						return nil, err
 					}
@@ -1511,7 +1532,6 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 						return nil, err
 					}
 				}
-
 			}
 		}
 	}
