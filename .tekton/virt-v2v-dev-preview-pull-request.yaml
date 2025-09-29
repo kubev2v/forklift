@@ -46,6 +46,13 @@ spec:
     - name: build-args
       value:
         - "REVISION={{revision}}"
+  taskRunSpecs:
+  - pipelineTaskName: build-source-image
+    computeResources:
+      requests:
+        memory: 4Gi
+      limits:
+        memory: 4Gi
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
