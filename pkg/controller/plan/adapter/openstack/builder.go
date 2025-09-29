@@ -540,7 +540,9 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 	numNetworks := 0
 	for vmNetworkName, vmAddresses := range vm.Addresses {
 		if nics, ok := vmAddresses.([]interface{}); ok {
-			for _, nic := range nics {
+			// Use only first NIC in order to avoid duplicates in case of multiple NICs per interface
+			if len(nics) > 0 {
+				nic := nics[0]
 				// Look for the network map for the source network
 				var vmNetworkID string
 				for _, vmNetwork := range vm.Networks {
