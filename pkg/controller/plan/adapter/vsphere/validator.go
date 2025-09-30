@@ -362,7 +362,7 @@ func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, m
 		return false, msg, "", liberr.Wrap(err, "vm", vmRef)
 	}
 	// Warm migration
-	if vm.HasSharedDisk() && r.Plan.Spec.Warm {
+	if vm.HasSharedDisk() && r.Plan.IsWarm() {
 		return false, "The shared disks cannot be used with warm migration", "", nil
 	}
 
@@ -599,9 +599,8 @@ func (r *Validator) StaticIPs(vmRef ref.Ref) (ok bool, err error) {
 
 // Validate that the vm has the change tracking enabled
 func (r *Validator) ChangeTrackingEnabled(vmRef ref.Ref) (bool, error) {
-	// Check if this is a warm migration using both old and new fields for backward compatibility
-	isWarmMigration := r.Plan.Spec.Warm || r.Plan.Spec.Type == api.MigrationWarm
-	if !isWarmMigration {
+	// Check if this is a warm migration
+	if !r.Plan.IsWarm() {
 		return true, nil
 	}
 	vm := &model.Workload{}
@@ -639,9 +638,8 @@ func (r *Validator) getPlanVMTargetName(vm *model.VM) string {
 
 // Validate that VM has no pre-existing snapshots for warm migration
 func (r *Validator) HasSnapshot(vmRef ref.Ref) (ok bool, msg string, category string, err error) {
-	// Check if this is a warm migration using both old and new fields for backward compatibility
-	isWarmMigration := r.Plan.Spec.Warm || r.Plan.Spec.Type == api.MigrationWarm
-	if !isWarmMigration {
+	// Check if this is a warm migration
+	if !r.Plan.IsWarm() {
 		return true, "", "", nil
 	}
 	vm := &model.VM{}

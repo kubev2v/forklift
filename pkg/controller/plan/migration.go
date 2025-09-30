@@ -754,7 +754,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 
 			// Create DataVolumes unless this is a cold migration using storage offload
-			if r.Plan.Spec.Warm || !r.builder.SupportsVolumePopulators(vm.Ref) {
+			if r.Plan.IsWarm() || !r.builder.SupportsVolumePopulators(vm.Ref) {
 				var dataVolumes []cdi.DataVolume
 				dataVolumes, err = r.kubevirt.DataVolumes(vm)
 				if err != nil {
@@ -788,7 +788,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 
 			// Wait for the DataVolume to adopt the PVC before proceeding
-			if r.builder.SupportsVolumePopulators(vm.Ref) && r.Plan.Spec.Warm {
+			if r.builder.SupportsVolumePopulators(vm.Ref) && r.Plan.IsWarm() {
 				var pvcs []*core.PersistentVolumeClaim
 				pvcs, err = r.kubevirt.getPVCs(vm.Ref)
 				if err != nil {
@@ -905,7 +905,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				break
 			}
 			if step.MarkedCompleted() && !step.HasError() {
-				if r.Plan.Spec.Warm {
+				if r.Plan.IsWarm() {
 					now := meta.Now()
 					next := meta.NewTime(now.Add(time.Duration(Settings.PrecopyInterval) * time.Minute))
 					n := len(vm.Warm.Precopies)
@@ -1666,7 +1666,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 					continue
 				}
 
-				if r.Plan.Spec.Warm && len(importer.Status.ContainerStatuses) > 0 {
+				if r.Plan.IsWarm() && len(importer.Status.ContainerStatuses) > 0 {
 					vm.Warm.Failures = int(importer.Status.ContainerStatuses[0].RestartCount)
 				}
 				if restartLimitExceeded(importer) {
