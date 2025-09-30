@@ -22,6 +22,7 @@ ARG REVISION
 LABEL \
     com.redhat.component="mtv-api-container" \
     name="${REGISTRY}/mtv-api-rhel9" \
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:2.9::el9" \
     license="Apache License 2.0" \
     io.k8s.display-name="Migration Toolkit for Virtualization" \
     io.k8s.description="Migration Toolkit for Virtualization - API" \
