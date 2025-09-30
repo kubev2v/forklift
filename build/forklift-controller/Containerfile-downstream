@@ -31,5 +31,6 @@ LABEL \
     summary="Migration Toolkit for Virtualization - Controller" \
     vendor="Red Hat, Inc." \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:2.9::el9" \
     version="$VERSION" \
     revision="$REVISION"
