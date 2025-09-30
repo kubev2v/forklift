@@ -25,6 +25,7 @@ ARG REVISION
 
 LABEL \
     com.redhat.component="mtv-validation-container" \
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:2.9::el9" \
     name="${REGISTRY}/mtv-validation-rhel9" \
     license="Apache License 2.0" \
     io.k8s.display-name="Migration Toolkit for Virtualization" \
