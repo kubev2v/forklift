@@ -10,16 +10,15 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression:
       event == "pull_request" && target_branch
-      == "main" && ( ".tekton/ovirt-populator-dev-preview-*.yaml".pathChanged() ||
-      ".konflux/ovirt-populator/rpms.lock.yaml".pathChanged() ||
-      "build/ovirt-populator/Containerfile-downstream".pathChanged() ||
-      "cmd/ovirt-populator/***".pathChanged() )
+      == "release-2.10" && ( ".tekton/openstack-populator-2-10-*.yaml".pathChanged() ||
+      ".konflux/openstack-populator/rpms.lock.yaml".pathChanged() ||
+      "build/openstack-populator/Containerfile-downstream".pathChanged() )
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: forklift-operator-dev-preview
-    appstudio.openshift.io/component: ovirt-populator-dev-preview
+    appstudio.openshift.io/application: forklift-operator-2-10
+    appstudio.openshift.io/component: openstack-populator-2-10
     pipelines.appstudio.openshift.io/type: build
-  name: ovirt-populator-dev-preview-on-pull-request
+  name: openstack-populator-2-10-on-pull-request
   namespace: rh-mtv-1-tenant
 spec:
   params:
@@ -28,17 +27,17 @@ spec:
     - name: revision
       value: "{{revision}}"
     - name: output-image
-      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/ovirt-populator-dev-preview:on-pr-{{revision}}
+      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-2-10/openstack-populator-2-10:on-pr-{{revision}}
     - name: image-expires-after
       value: 5d
     - name: dockerfile
-      value: build/ovirt-populator/Containerfile-downstream
+      value: build/openstack-populator/Containerfile-downstream
     - name: path-context
       value: .
     - name: build-source-image
       value: "true"
     - name: prefetch-input
-      value: '[{"type": "rpm", "path": ".konflux/ovirt-populator"}]'
+      value: '[{"type": "rpm", "path": ".konflux/openstack-populator"}]'
     - name: build-args-file
       value: build/release.conf
     - name: build-args
@@ -203,7 +202,7 @@ spec:
           - name: dev-package-managers
             value: "true"
           - name: ACTIVATION_KEY
-            value: activation-key-rhel8
+            value: activation-key-rhel9
         runAfter:
           - clone-repository
         taskRef:
@@ -622,7 +621,7 @@ spec:
       - name: netrc
         optional: true
   taskRunTemplate:
-    serviceAccountName: build-pipeline-ovirt-populator-dev-preview
+    serviceAccountName: build-pipeline-openstack-populator-2-10
   workspaces:
     - name: git-auth
       secret:

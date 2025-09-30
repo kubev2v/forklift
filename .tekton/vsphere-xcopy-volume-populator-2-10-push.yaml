@@ -9,17 +9,16 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression:
       event == "push" && target_branch
-      == "main" && ( "operator/config/manifests/***".pathChanged() ||
-      ".tekton/forklift-operator-bundle-*.yaml".pathChanged() ||
-      "build/forklift-operator-bundle/Containerfile-downstream".pathChanged() ||
-      "build/forklift-operator-bundle/images.conf".pathChanged() ||
-      "operator/export-vars.sh".pathChanged() )
+      == "release-2.10" && ( ".tekton/vsphere-xcopy-volume-populator-2-10-*.yaml".pathChanged() ||
+      ".konflux/vsphere-xcopy-volume-populator/rpms.lock.yaml".pathChanged() ||
+      "build/vsphere-xcopy-volume-populator/Containerfile-downstream".pathChanged() ||
+      "cmd/vsphere-xcopy-volume-populator/***".pathChanged() )
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: forklift-operator-dev-preview
-    appstudio.openshift.io/component: forklift-operator-bundle-dev-preview
+    appstudio.openshift.io/application: forklift-operator-2-10
+    appstudio.openshift.io/component: vsphere-xcopy-volume-populator-2-10
     pipelines.appstudio.openshift.io/type: build
-  name: forklift-operator-bundle-dev-preview-on-push
+  name: vsphere-xcopy-volume-populator-2-10-on-push
   namespace: rh-mtv-1-tenant
 spec:
   params:
@@ -28,20 +27,19 @@ spec:
     - name: revision
       value: "{{revision}}"
     - name: output-image
-      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-operator-bundle-dev-preview:{{revision}}
+      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-2-10/vsphere-xcopy-volume-populator-2-10:{{revision}}
     - name: dockerfile
-      value: build/forklift-operator-bundle/Containerfile-downstream
+      value: build/vsphere-xcopy-volume-populator/Containerfile-downstream
     - name: path-context
       value: .
     - name: build-source-image
       value: "true"
     - name: prefetch-input
-      value: '[{"type": "gomod", "path": ".konflux/forklift-operator-bundle"}]'
+      value: '[{"type": "rpm", "path": ".konflux/vsphere-xcopy-volume-populator"}]'
     - name: build-args-file
       value: build/release.conf
     - name: build-args
       value:
-        - "EVENT_TITLE={{body.head_commit.message}}"
         - "REVISION={{revision}}"
   pipelineSpec:
     description: |
@@ -199,6 +197,8 @@ spec:
             value: $(params.output-image).prefetch
           - name: ociArtifactExpiresAfter
             value: $(params.image-expires-after)
+          - name: dev-package-managers
+            value: "true"
         runAfter:
           - clone-repository
         taskRef:
@@ -617,7 +617,7 @@ spec:
       - name: netrc
         optional: true
   taskRunTemplate:
-    serviceAccountName: build-pipeline-forklift-operator-bundle-dev-preview
+    serviceAccountName: build-pipeline-vsphere-xcopy-volume-populator-2-10
   workspaces:
     - name: git-auth
       secret:

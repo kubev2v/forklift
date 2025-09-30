@@ -4,21 +4,25 @@ metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/kubev2v/forklift?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: "{{revision}}"
+    build.appstudio.redhat.com/pull_request_number: "{{pull_request_number}}"
     build.appstudio.redhat.com/target_branch: "{{target_branch}}"
-    pipelinesascode.tekton.dev/cancel-in-progress: "false"
+    pipelinesascode.tekton.dev/cancel-in-progress: "true"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression:
-      event == "push" && target_branch
-      == "main" && ( ".tekton/vsphere-xcopy-volume-populator-dev-preview-*.yaml".pathChanged() ||
-      ".konflux/vsphere-xcopy-volume-populator/rpms.lock.yaml".pathChanged() ||
-      "build/vsphere-xcopy-volume-populator/Containerfile-downstream".pathChanged() ||
-      "cmd/vsphere-xcopy-volume-populator/***".pathChanged() )
+      event == "pull_request" && target_branch
+      == "release-2.10" && ( ".tekton/forklift-api-2-10-*.yaml".pathChanged() ||
+      ".konflux/forklift-api/rpms.lock.yaml".pathChanged() ||
+      "build/forklift-api/Containerfile-downstream".pathChanged() ||
+      "pkg/forklift-api/***".pathChanged() ||
+      "pkg/controller/***".pathChanged() ||
+      "pkg/lib/***".pathChanged() ||
+      "cmd/forklift-api/***".pathChanged() )
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: forklift-operator-dev-preview
-    appstudio.openshift.io/component: vsphere-xcopy-volume-populator-dev-preview
+    appstudio.openshift.io/application: forklift-operator-2-10
+    appstudio.openshift.io/component: forklift-api-2-10
     pipelines.appstudio.openshift.io/type: build
-  name: vsphere-xcopy-volume-populator-dev-preview-on-push
+  name: forklift-api-2-10-on-pull-request
   namespace: rh-mtv-1-tenant
 spec:
   params:
@@ -27,15 +31,17 @@ spec:
     - name: revision
       value: "{{revision}}"
     - name: output-image
-      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/vsphere-xcopy-volume-populator-dev-preview:{{revision}}
+      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-2-10/forklift-api-2-10:on-pr-{{revision}}
+    - name: image-expires-after
+      value: 5d
     - name: dockerfile
-      value: build/vsphere-xcopy-volume-populator/Containerfile-downstream
+      value: build/forklift-api/Containerfile-downstream
     - name: path-context
       value: .
     - name: build-source-image
       value: "true"
     - name: prefetch-input
-      value: '[{"type": "rpm", "path": ".konflux/vsphere-xcopy-volume-populator"}]'
+      value: '[{"type": "rpm", "path": ".konflux/forklift-api"}]'
     - name: build-args-file
       value: build/release.conf
     - name: build-args
@@ -199,6 +205,8 @@ spec:
             value: $(params.image-expires-after)
           - name: dev-package-managers
             value: "true"
+          - name: ACTIVATION_KEY
+            value: activation-key-rhel9
         runAfter:
           - clone-repository
         taskRef:
@@ -617,7 +625,7 @@ spec:
       - name: netrc
         optional: true
   taskRunTemplate:
-    serviceAccountName: build-pipeline-vsphere-xcopy-volume-populator-dev-preview
+    serviceAccountName: build-pipeline-forklift-api-2-10
   workspaces:
     - name: git-auth
       secret:

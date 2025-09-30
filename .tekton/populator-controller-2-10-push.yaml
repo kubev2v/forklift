@@ -9,16 +9,16 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression:
       event == "push" && target_branch
-      == "main" && ( ".tekton/populator-controller-dev-preview-*.yaml".pathChanged() ||
+      == "release-2.10" && ( ".tekton/populator-controller-2-10-*.yaml".pathChanged() ||
       ".konflux/populator-controller/rpms.lock.yaml".pathChanged() ||
       "build/populator-controller/Containerfile-downstream".pathChanged() ||
       "cmd/populator-controller/***".pathChanged() )
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: forklift-operator-dev-preview
-    appstudio.openshift.io/component: populator-controller-dev-preview
+    appstudio.openshift.io/application: forklift-operator-2-10
+    appstudio.openshift.io/component: populator-controller-2-10
     pipelines.appstudio.openshift.io/type: build
-  name: populator-controller-dev-preview-on-push
+  name: populator-controller-2-10-on-push
   namespace: rh-mtv-1-tenant
 spec:
   params:
@@ -27,7 +27,7 @@ spec:
     - name: revision
       value: "{{revision}}"
     - name: output-image
-      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/populator-controller-dev-preview:{{revision}}
+      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-2-10/populator-controller-2-10:{{revision}}
     - name: dockerfile
       value: build/populator-controller/Containerfile-downstream
     - name: path-context
@@ -619,7 +619,7 @@ spec:
       - name: netrc
         optional: true
   taskRunTemplate:
-    serviceAccountName: build-pipeline-populator-controller-dev-preview
+    serviceAccountName: build-pipeline-populator-controller-2-10
   workspaces:
     - name: git-auth
       secret:
