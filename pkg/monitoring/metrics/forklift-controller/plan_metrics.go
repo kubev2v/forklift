@@ -44,7 +44,6 @@ func RecordPlanMetrics(c client.Client) {
 				}
 
 				isLocal := destProvider.Spec.URL == ""
-				isWarm := m.Spec.Warm
 
 				var target, mode, key string
 				if isLocal {
@@ -52,7 +51,7 @@ func RecordPlanMetrics(c client.Client) {
 				} else {
 					target = Remote
 				}
-				if isWarm {
+				if m.IsWarm() {
 					mode = Warm
 				} else {
 					mode = Cold

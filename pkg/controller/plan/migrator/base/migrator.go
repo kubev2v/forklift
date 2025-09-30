@@ -43,7 +43,7 @@ func (r *BaseMigrator) Complete(vm *plan.VMStatus) {
 func (r *BaseMigrator) Status(vm plan.VM) (status *plan.VMStatus) {
 	if current, found := r.Context.Plan.Status.Migration.FindVM(vm.Ref); !found {
 		status = &plan.VMStatus{VM: vm}
-		if r.Context.Plan.Spec.Warm {
+		if r.Context.Plan.IsWarm() {
 			status.Warm = &plan.Warm{}
 		}
 	} else {
@@ -60,7 +60,7 @@ func (r *BaseMigrator) Reset(vm *plan.VMStatus, pipeline []*plan.Step) {
 	vm.Phase = step.Name
 	vm.Pipeline = pipeline
 	vm.Error = nil
-	if r.Context.Plan.Spec.Warm {
+	if r.Context.Plan.IsWarm() {
 		vm.Warm = &plan.Warm{}
 	}
 }
@@ -230,7 +230,7 @@ func (r *BaseMigrator) Itinerary(vm plan.VM) (itinerary *libitr.Itinerary) {
 	// Plan.Spec.Type supersedes the deprecated Warm boolean.
 	if r.Context.Plan.Spec.Type == api.MigrationOnlyConversion {
 		itinerary = r.onlyConversionItinerary()
-	} else if r.Context.Plan.Spec.Warm {
+	} else if r.Context.Plan.IsWarm() {
 		itinerary = r.warmItinerary()
 	} else {
 		itinerary = r.coldItinerary()
@@ -277,7 +277,7 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 	case api.PhasePreHook, api.PhasePostHook:
 		step = status.Phase
 	case api.PhaseStorePowerState, api.PhasePowerOffSource, api.PhaseWaitForPowerOff:
-		if r.Context.Plan.Spec.Warm {
+		if r.Context.Plan.IsWarm() {
 			step = Cutover
 		} else {
 			step = Initialize
