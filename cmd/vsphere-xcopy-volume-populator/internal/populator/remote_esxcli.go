@@ -36,11 +36,13 @@ type vmkfstoolsClone struct {
 }
 
 type vmkfstoolsTask struct {
-	Pid      int    `json:"pid"`
-	ExitCode string `json:"exitCode"`
-	Stderr   string `json:"stdErr"`
-	LastLine string `json:"lastLine"`
-	TaskId   string `json:"taskId"`
+	Pid          int    `json:"pid"`
+	ExitCode     string `json:"exitCode"`
+	Stderr       string `json:"stdErr"`
+	LastLine     string `json:"lastLine"`
+	XcopyUsed    bool   `json:"xcopyUsed"`
+	XcloneWrites string `json:"xcloneWrites,omitempty"`
+	TaskId       string `json:"taskId"`
 }
 
 type EsxCli interface {
@@ -89,7 +91,7 @@ func NewWithRemoteEsxcliSSH(storageApi StorageApi, vsphereHostname, vsphereUsern
 	}, nil
 }
 
-func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, progress chan<- uint, quit chan error) (errFinal error) {
+func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, progress chan<- uint64, quit chan error, cloneProgressBytes chan<- uint64) (errFinal error) {
 	// isn't it better to not call close the channel from the caller?
 	defer func() {
 		r := recover()
@@ -342,7 +344,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	}
 
 	// Use unified task execution
-	return ExecuteCloneTask(context.Background(), executor, host, vmDisk.Path(), targetLUN, progress)
+	return ExecuteCloneTask(context.Background(), executor, host, vmDisk.Path(), targetLUN, progress, cloneProgressBytes)
 }
 
 // After mapping a volume the ESX needs a rescan to see the device. ESXs can opt-in to do it automatically

@@ -180,15 +180,16 @@ func main() {
 		klog.Fatalf("Failed to fetch the volume handle details from the target pvc %s: %s", ownerName, err)
 	}
 
-	progressCounter, err := setupTracing()
+	progressCounter, cloneProgressBytesGauge, err := setupTracingMetrics()
 	if err != nil {
 		klog.Fatal(err)
 	}
 
-	progressCh := make(chan uint)
+	progressCh := make(chan uint64)
+	cloneProgressBytesCh := make(chan uint64)
 	quitCh := make(chan error)
 
-	go p.Populate(sourceVmId, sourceVMDKFile, pv, progressCh, quitCh)
+	go p.Populate(sourceVmId, sourceVMDKFile, pv, progressCh, quitCh, cloneProgressBytesCh)
 
 	for {
 		select {
@@ -199,6 +200,15 @@ func main() {
 				klog.Error(err)
 			} else if float64(p) > metric.Counter.GetValue() {
 				progressCounter.WithLabelValues(ownerUID).Add(float64(p) - metric.Counter.GetValue())
+			}
+		case c := <-cloneProgressBytesCh:
+			klog.Infof(" clone bytes progress reported %d", c)
+			metric := dto.Metric{}
+			if err := cloneProgressBytesGauge.WithLabelValues(ownerUID).Write(&metric); err != nil {
+				klog.Infof("didnt write gauge")
+				klog.Error(err)
+			} else {
+				cloneProgressBytesGauge.WithLabelValues(ownerUID).Set(float64(c))
 			}
 		case q := <-quitCh:
 			klog.Infof("channel quit %s", q)
@@ -324,40 +334,43 @@ func handleArgs() {
 	}
 }
 
-func setupTracing() (*prometheus.CounterVec, error) {
+func startMetricsServer(certFile, keyFile string) {
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		cfg := tls.Config{MinVersion: tls.VersionTLS12}
+		server := http.Server{
+			Addr:      ":8443",
+			TLSConfig: &cfg,
+		}
+		klog.Info("Starting metrics server")
+		if err := server.ListenAndServeTLS(certFile, keyFile); err != nil {
+			klog.Fatal("Error starting Prometheus endpoint: ", err)
+		}
+	}()
+}
+
+func setupTracingMetrics() (*prometheus.CounterVec, *prometheus.GaugeVec, error) {
 	certsDirectory, err := os.MkdirTemp("", "certsdir")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	certBytes, keyBytes, err := cert.GenerateSelfSignedCertKey("", nil, nil)
 	if err != nil {
-		return nil, fmt.Errorf("Error generating cert for prometheus")
+		return nil, nil, fmt.Errorf("Error generating cert for prometheus: %w", err)
 	}
 
 	certFile := path.Join(certsDirectory, "tls.crt")
 	if err = os.WriteFile(certFile, certBytes, 0600); err != nil {
-		return nil, fmt.Errorf("Error writing cert file: %w", err)
+		return nil, nil, fmt.Errorf("Error writing cert file: %w", err)
 	}
 
 	keyFile := path.Join(certsDirectory, "tls.key")
 	if err = os.WriteFile(keyFile, keyBytes, 0600); err != nil {
-		return nil, fmt.Errorf("Error writing key file: %w", err)
+		return nil, nil, fmt.Errorf("Error writing key file: %w", err)
 	}
 
-	go func() {
-		http.Handle("/metrics", promhttp.Handler())
-		// use minimum TLS 1.2
-		cfg := tls.Config{MinVersion: tls.VersionTLS12}
-		server := http.Server{
-			Addr:      ":8443",
-			TLSConfig: &cfg}
-		klog.Info("Staring metrics server")
-		if err := server.ListenAndServeTLS(certFile, keyFile); err != nil {
-			klog.Fatal("Error starting prometheus endpoint: ", err)
-		}
-	}()
-
+	// Register metrics
 	progressCounter := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "vsphere_xcopy_volume_populator_progress",
@@ -365,12 +378,26 @@ func setupTracing() (*prometheus.CounterVec, error) {
 		},
 		[]string{"ownerUID"},
 	)
+
+	progressGauge := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "vsphere_xcopy_volume_populator_clone_progress_bytes",
+			Help: "Progress of vsphere XCOPY volume population in bytes (Gauge)",
+		},
+		[]string{"ownerUID"},
+	)
+
+	// Register both to the default registry
 	if err := prometheus.Register(progressCounter); err != nil {
-		return nil, fmt.Errorf("Prometheus progress gauge not registered: %w", err)
+		return nil, nil, fmt.Errorf("Progress counter not registered: %w", err)
+	}
+	if err := prometheus.Register(progressGauge); err != nil {
+		return nil, nil, fmt.Errorf("Progress gauge not registered: %w", err)
 	}
 
-	return progressCounter, nil
+	startMetricsServer(certFile, keyFile)
 
+	return progressCounter, progressGauge, nil
 }
 
 // getSSHKeysFromEnvironment retrieves SSH keys from environment variables set by the provider controller
