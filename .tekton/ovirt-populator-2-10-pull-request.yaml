@@ -10,18 +10,16 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression:
       event == "pull_request" && target_branch
-      == "main" && ( ".tekton/virt-v2v-dev-preview-*.yaml".pathChanged() ||
-      ".konflux/virt-v2v/rpms.lock.yaml".pathChanged() ||
-      "build/virt-v2v/Containerfile-downstream".pathChanged() ||
-      "pkg/virt-v2v/***".pathChanged() ||
-      "cmd/virt-v2v/***".pathChanged() ||
-      "cmd/virt-v2v-monitor/***".pathChanged() )
+      == "release-2.10" && ( ".tekton/ovirt-populator-2-10-*.yaml".pathChanged() ||
+      ".konflux/ovirt-populator/rpms.lock.yaml".pathChanged() ||
+      "build/ovirt-populator/Containerfile-downstream".pathChanged() ||
+      "cmd/ovirt-populator/***".pathChanged() )
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: forklift-operator-dev-preview
-    appstudio.openshift.io/component: virt-v2v-dev-preview
+    appstudio.openshift.io/application: forklift-operator-2-10
+    appstudio.openshift.io/component: ovirt-populator-2-10
     pipelines.appstudio.openshift.io/type: build
-  name: virt-v2v-dev-preview-on-pull-request
+  name: ovirt-populator-2-10-on-pull-request
   namespace: rh-mtv-1-tenant
 spec:
   params:
@@ -30,29 +28,22 @@ spec:
     - name: revision
       value: "{{revision}}"
     - name: output-image
-      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/virt-v2v-dev-preview:on-pr-{{revision}}
+      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-2-10/ovirt-populator-2-10:on-pr-{{revision}}
     - name: image-expires-after
       value: 5d
     - name: dockerfile
-      value: build/virt-v2v/Containerfile-downstream
+      value: build/ovirt-populator/Containerfile-downstream
     - name: path-context
       value: .
     - name: build-source-image
       value: "true"
     - name: prefetch-input
-      value: '[{"type": "rpm", "path": ".konflux/virt-v2v/appliance"}, {"type": "rpm", "path": ".konflux/virt-v2v/runtime"}, {"type": "rpm", "path": ".konflux/virt-v2v/winlegacyiso"}]'
+      value: '[{"type": "rpm", "path": ".konflux/ovirt-populator"}]'
     - name: build-args-file
       value: build/release.conf
     - name: build-args
       value:
         - "REVISION={{revision}}"
-  taskRunSpecs:
-  - pipelineTaskName: build-source-image
-    computeResources:
-      requests:
-        memory: 4Gi
-      limits:
-        memory: 4Gi
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
@@ -212,7 +203,7 @@ spec:
           - name: dev-package-managers
             value: "true"
           - name: ACTIVATION_KEY
-            value: activation-key-rhel9
+            value: activation-key-rhel8
         runAfter:
           - clone-repository
         taskRef:
@@ -631,7 +622,7 @@ spec:
       - name: netrc
         optional: true
   taskRunTemplate:
-    serviceAccountName: build-pipeline-virt-v2v-dev-preview
+    serviceAccountName: build-pipeline-ovirt-populator-2-10
   workspaces:
     - name: git-auth
       secret:

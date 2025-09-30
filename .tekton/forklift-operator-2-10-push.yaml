@@ -4,21 +4,21 @@ metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/kubev2v/forklift?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: "{{revision}}"
-    build.appstudio.redhat.com/pull_request_number: "{{pull_request_number}}"
     build.appstudio.redhat.com/target_branch: "{{target_branch}}"
-    pipelinesascode.tekton.dev/cancel-in-progress: "true"
+    pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression:
-      event == "pull_request" && target_branch
-      == "main" && ( ".tekton/validation-dev-preview-*.yaml".pathChanged() ||
-      "build/validation/Containerfile-downstream".pathChanged() ||
-      "validation/***".pathChanged() )
+      event == "push" && target_branch
+      == "release-2.10" && ( ".tekton/forklift-operator-2-10-*.yaml".pathChanged() ||
+      "build/forklift-operator/Containerfile-downstream".pathChanged() ||
+      "operator/roles/***".pathChanged() ||
+      "operator/watches.yaml".pathChanged() )
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: forklift-operator-dev-preview
-    appstudio.openshift.io/component: validation-dev-preview
+    appstudio.openshift.io/application: forklift-operator-2-10
+    appstudio.openshift.io/component: forklift-operator-2-10
     pipelines.appstudio.openshift.io/type: build
-  name: validation-dev-preview-on-pull-request
+  name: forklift-operator-2-10-on-push
   namespace: rh-mtv-1-tenant
 spec:
   params:
@@ -27,17 +27,13 @@ spec:
     - name: revision
       value: "{{revision}}"
     - name: output-image
-      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/validation-dev-preview:on-pr-{{revision}}
-    - name: image-expires-after
-      value: 5d
+      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-2-10/forklift-operator-2-10:{{revision}}
     - name: dockerfile
-      value: build/validation/Containerfile-downstream
+      value: build/forklift-operator/Containerfile-downstream
     - name: path-context
       value: .
     - name: build-source-image
       value: "true"
-    - name: prefetch-input
-      value: '[{"type": "gomod", "path": ".konflux/validation"}]'
     - name: build-args-file
       value: build/release.conf
     - name: build-args
@@ -617,7 +613,7 @@ spec:
       - name: netrc
         optional: true
   taskRunTemplate:
-    serviceAccountName: build-pipeline-validation-dev-preview
+    serviceAccountName: build-pipeline-forklift-operator-2-10
   workspaces:
     - name: git-auth
       secret:

@@ -9,7 +9,7 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression:
       event == "push" && target_branch
-      == "main" && ( ".tekton/forklift-operator-virt-v2v-btrfs-comp-*.yaml".pathChanged() ||
+      == "release-2.10" && ( ".tekton/forklift-operator-virt-v2v-btrfs-comp-*.yaml".pathChanged() ||
       ".konflux/virt-v2v/rpms.lock.yaml".pathChanged() ||
       "build/virt-v2v/Containerfile-downstream-fssupport".pathChanged() ||
       "pkg/virt-v2v/***".pathChanged() ||
@@ -621,7 +621,7 @@ spec:
       - name: netrc
         optional: true
   taskRunTemplate:
-    serviceAccountName: build-pipeline-virt-v2v-dev-preview
+    serviceAccountName: build-pipeline-virt-v2v-2-10
   workspaces:
     - name: git-auth
       secret:
