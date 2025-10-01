@@ -22,6 +22,7 @@ ARG REVISION
 LABEL \
     com.redhat.component="mtv-rhv-populator-container" \
     name="${REGISTRY}/mtv-rhv-populator-rhel8" \
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:2.9::el8" \
     license="Apache License 2.0" \
     io.k8s.display-name="Migration Toolkit for Virtualization" \
     io.k8s.description="Migration Toolkit for Virtualization - RHV Populator" \
