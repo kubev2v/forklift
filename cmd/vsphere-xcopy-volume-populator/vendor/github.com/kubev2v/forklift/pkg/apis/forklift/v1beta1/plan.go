@@ -43,8 +43,10 @@ const (
 )
 
 const (
+	// namespaceLabelPrimaryUDN is the label key used to identify namespaces with primary user-defined networks
 	namespaceLabelPrimaryUDN = "k8s.ovn.org/primary-user-defined-network"
-	nadLabelUDN              = "k8s.ovn.org/user-defined-network"
+	// nadLabelUDN is the label key used to identify NetworkAttachmentDefinitions that are user-defined networks
+	nadLabelUDN = "k8s.ovn.org/user-defined-network"
 )
 
 // PlanSpec defines the desired state of Plan.
@@ -54,6 +56,8 @@ type PlanSpec struct {
 	// Target namespace.
 	TargetNamespace string `json:"targetNamespace"`
 	// TargetLabels are labels that should be applied to the target virtual machines.
+	// Note: System-managed labels (migration, plan, vmID, app) will override any user-defined
+	// labels with the same keys to ensure proper system functionality.
 	// See Pod Labels documentation for more details,
 	// https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#labels
 	TargetLabels map[string]string `json:"targetLabels,omitempty"`
@@ -67,7 +71,29 @@ type PlanSpec struct {
 	// Since VMs are a workload type based on Pods, Pod-affinity affects VMs as well.
 	// See virtual machine instance Affinity documentation for more details,
 	// https://kubevirt.io/user-guide/compute/node_assignment/#affinity-and-anti-affinity
+	// +structType=atomic
 	TargetAffinity *core.Affinity `json:"targetAffinity,omitempty"`
+	// ConvertorLabels are labels that should be applied to the virt-v2v convertor pods.
+	// The convertor pods run virt-v2v to convert VMware disks, install KVM guest agents and drivers,
+	// and handle disk data migration for cold migrations from VMware to KubeVirt.
+	// Note: System-managed labels (migration, plan, vmID, forklift.app) will override any user-defined
+	// labels with the same keys to ensure proper system functionality.
+	// See Pod Labels documentation for more details,
+	// https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#labels
+	ConvertorLabels map[string]string `json:"convertorLabels,omitempty"`
+	// ConvertorNodeSelector constrains the scheduler to only schedule virt-v2v convertor pods on nodes
+	// which contain the specified labels. This is useful for dedicating specific nodes for disk conversion
+	// workloads that require high I/O performance or network access to source VMware infrastructure.
+	// See Pod NodeSelector documentation for more details,
+	// https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector
+	ConvertorNodeSelector map[string]string `json:"convertorNodeSelector,omitempty"`
+	// ConvertorAffinity allows specifying hard- and soft-affinity for virt-v2v convertor pods.
+	// This can be used to optimize placement for disk conversion performance, such as co-locating
+	// with storage or ensuring network proximity to VMware infrastructure for cold migration data transfers.
+	// See Pod Affinity documentation for more details,
+	// https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#affinity-and-anti-affinity
+	// +structType=atomic
+	ConvertorAffinity *core.Affinity `json:"convertorAffinity,omitempty"`
 	// Providers.
 	Provider provider.Pair `json:"provider"`
 	// Resource mapping.
@@ -84,12 +110,15 @@ type PlanSpec struct {
 	// Preserve the CPU model and flags the VM runs with in its oVirt cluster.
 	PreserveClusterCPUModel bool `json:"preserveClusterCpuModel,omitempty"`
 	// Preserve static IPs of VMs in vSphere
+	// +kubebuilder:default:=true
 	PreserveStaticIPs bool `json:"preserveStaticIPs,omitempty"`
 	// Deprecated: this field will be deprecated in 2.8.
 	DiskBus cnv.DiskBus `json:"diskBus,omitempty"`
 	// PVCNameTemplate is a template for generating PVC names for VM disks.
+	// Generated names must be valid DNS-1123 labels (lowercase alphanumerics, '-' allowed, max 63 chars).
 	// It follows Go template syntax and has access to the following variables:
-	//   - .VmName: name of the VM
+	//   - .VmName: name of the VM in the source cluster (original source name)
+	//   - .TargetVmName: final VM name in the target cluster (may equal .VmName if no rename/normalization)
 	//   - .PlanName: name of the migration plan
 	//   - .DiskIndex: initial volume index of the disk
 	//   - .WinDriveLetter: Windows drive letter (lowercase, if applicable, e.g. "c", requires guest agent)
@@ -99,9 +128,11 @@ type PlanSpec struct {
 	// Note:
 	//   This template can be overridden at the individual VM level.
 	// Examples:
-	//   "{{.VmName}}-disk-{{.DiskIndex}}"
+	//   "{{.TargetVmName}}-disk-{{.DiskIndex}}"
 	//   "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
-	//   "{{if .Shared}}shared-{{end}}{{.VmName}}-{{.DiskIndex}}"
+	//   "{{if .Shared}}shared-{{end}}{{.VmName | lower}}-{{.DiskIndex}}"
+	// See:
+	// 	 https://github.com/kubev2v/forklift/tree/main/pkg/templateutil for template functions.
 	// +optional
 	PVCNameTemplate string `json:"pvcNameTemplate,omitempty"`
 	// PVCNameTemplateUseGenerateName indicates if the PVC name template should use generateName instead of name.
@@ -197,6 +228,11 @@ type PlanSpec struct {
 	// +optional
 	// +kubebuilder:validation:Enum=on;off;auto
 	TargetPowerState plan.TargetPowerState `json:"targetPowerState,omitempty"`
+	// RunPreflightInspection controls whether an inspection step on VM base disks is performed before starting the first disk transfer. Applies only to warm migrations from VMWare.
+	// - true (default): Inspection step runs before transferring any disks and may fail if it detects the migration would fail.
+	// - false: No inspection is performed before disk transfer.
+	// +kubebuilder:default:=true
+	RunPreflightInspection bool `json:"runPreflightInspection,omitempty"`
 }
 
 // Find a planned VM.
@@ -329,9 +365,18 @@ func (r *Plan) IsSourceProviderOCP() bool {
 
 func (r *Plan) IsSourceProviderVSphere() bool { return r.Provider.Source.Type() == VSphere }
 
+func (r *Plan) ShouldRunPreflightInspection() bool {
+	isWarm := r.Spec.Type == MigrationWarm || r.Spec.Warm
+	return r.IsSourceProviderVSphere() &&
+		isWarm &&
+		!r.Spec.SkipGuestConversion &&
+		r.Spec.RunPreflightInspection
+}
+
 // PVCNameTemplateData contains fields used in naming templates.
 type PVCNameTemplateData struct {
 	VmName         string `json:"vmName"`
+	TargetVmName   string `json:"targetVmName"`
 	PlanName       string `json:"planName"`
 	DiskIndex      int    `json:"diskIndex"`
 	WinDriveLetter string `json:"winDriveLetter,omitempty"`
