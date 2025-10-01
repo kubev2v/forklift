@@ -81,6 +81,7 @@ ENTRYPOINT ["/usr/libexec/catatonit/catatonit", "/usr/bin/virt-v2v-wrapper"]
 ARG VERSION
 ARG REGISTRY
 ARG REVISION
+ARG CPE
 
 LABEL \
     com.redhat.component="mtv-virt-v2v-container" \
@@ -90,7 +91,7 @@ LABEL \
     io.k8s.description="Migration Toolkit for Virtualization - Virt-V2V" \
     io.openshift.tags="migration,mtv,forklift" \
     summary="Migration Toolkit for Virtualization - Virt-V2V" \
-    cpe="cpe:/a:redhat:migration_toolkit_virtualization:2.9::el9" \
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:${CPE}::el9" \
     description="Migration Toolkit for Virtualization - Virt-V2V" \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
     version="$VERSION" \

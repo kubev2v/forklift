@@ -32,6 +32,7 @@ ENTRYPOINT ["/bin/vsphere-xcopy-volume-populator"]
 ARG VERSION
 ARG REGISTRY
 ARG REVISION
+ARG CPE
 
 LABEL \
     com.redhat.component="mtv-vsphere-xcopy-volume-populator-container" \
@@ -45,5 +46,5 @@ LABEL \
     vendor="Red Hat, Inc." \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
     version="$VERSION" \
-    cpe="cpe:/a:redhat:migration_toolkit_virtualization:2.9::el9" \
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:${CPE}::el9" \
     revision="$REVISION"
