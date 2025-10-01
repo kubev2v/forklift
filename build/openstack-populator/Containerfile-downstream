@@ -20,6 +20,7 @@ ARG REGISTRY
 ARG REVISION
 
 LABEL \
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:2.9::el9" \
     com.redhat.component="mtv-openstack-populator-container" \
     name="${REGISTRY}/mtv-openstack-populator-rhel9" \
     license="Apache License 2.0" \
