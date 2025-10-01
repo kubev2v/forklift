@@ -19,10 +19,11 @@ ENTRYPOINT ["/usr/local/bin/ova-provider-server"]
 ARG VERSION
 ARG REGISTRY
 ARG REVISION
+ARG CPE
 
 LABEL \
     com.redhat.component="mtv-ova-provider-server-container" \
-    cpe="cpe:/a:redhat:migration_toolkit_virtualization:2.9::el9" \
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:${CPE}::el9" \
     name="${REGISTRY}/mtv-ova-provider-server-rhel9" \
     license="Apache License 2.0" \
     io.k8s.display-name="Migration Toolkit for Virtualization" \
