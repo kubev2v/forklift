@@ -6,7 +6,6 @@
 package arch
 
 import (
-	"fmt"
 	"github.com/twitchyliquid64/golang-asm/obj"
 	"github.com/twitchyliquid64/golang-asm/obj/arm"
 	"github.com/twitchyliquid64/golang-asm/obj/arm64"
@@ -16,6 +15,7 @@ import (
 	"github.com/twitchyliquid64/golang-asm/obj/s390x"
 	"github.com/twitchyliquid64/golang-asm/obj/wasm"
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
+	"fmt"
 	"strings"
 )
 
