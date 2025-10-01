@@ -669,7 +669,7 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 }
 
 func (r *Builder) SupportsVolumePopulators(vmRef ref.Ref) bool {
-	return !r.Context.Plan.Spec.Warm && r.Context.Plan.Provider.Destination.IsHost()
+	return !r.Context.Plan.IsWarm() && r.Context.Plan.Provider.Destination.IsHost()
 }
 
 func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) (pvcs []*core.PersistentVolumeClaim, err error) {

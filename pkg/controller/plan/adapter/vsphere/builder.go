@@ -521,7 +521,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 	// For storage offload warm migrations, match this DataVolume to the
 	// existing PVC via the backing file name.
 	var pvcMap map[string]core.PersistentVolumeClaim
-	if r.Plan.Spec.Warm && r.SupportsVolumePopulators(vmRef) {
+	if r.Plan.IsWarm() && r.SupportsVolumePopulators(vmRef) {
 		pvcMap = make(map[string]core.PersistentVolumeClaim)
 		pvcs := &core.PersistentVolumeClaimList{}
 		pvcLabels := map[string]string{
@@ -544,7 +544,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 
 		for _, pvc := range pvcs.Items {
 			if copyOffload, present := pvc.Annotations["copy-offload"]; present && copyOffload != "" {
-				pvcMap[baseVolume(copyOffload, r.Plan.Spec.Warm)] = pvc
+				pvcMap[baseVolume(copyOffload, r.Plan.IsWarm())] = pvc
 			}
 		}
 	}
@@ -577,7 +577,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 			// Let CDI do the copying
 			dvSource = cdi.DataVolumeSource{
 				VDDK: &cdi.DataVolumeSourceVDDK{
-					BackingFile:  baseVolume(disk.File, r.Plan.Spec.Warm),
+					BackingFile:  baseVolume(disk.File, r.Plan.IsWarm()),
 					UUID:         vm.UUID,
 					URL:          url,
 					SecretRef:    secret.Name,
@@ -612,7 +612,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		if dv.ObjectMeta.Annotations == nil {
 			dv.ObjectMeta.Annotations = make(map[string]string)
 		}
-		dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = baseVolume(disk.File, r.Plan.Spec.Warm)
+		dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = baseVolume(disk.File, r.Plan.IsWarm())
 		if disk.Shared {
 			dv.ObjectMeta.Labels[Shareable] = "true"
 		}
@@ -667,7 +667,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 				vmRef.String()))
 		return
 	}
-	if r.Plan.Spec.Warm && !vm.ChangeTrackingEnabled {
+	if r.Plan.IsWarm() && !vm.ChangeTrackingEnabled {
 		err = liberr.New(
 			fmt.Sprintf(
 				"Changed Block Tracking (CBT) is disabled for VM %s",
@@ -1096,7 +1096,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 		list = append(
 			list,
 			&plan.Task{
-				Name: baseVolume(disk.File, r.Plan.Spec.Warm),
+				Name: baseVolume(disk.File, r.Plan.IsWarm()),
 				Progress: libitr.Progress{
 					Total: mB,
 				},
@@ -1153,12 +1153,12 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 
 // Return a stable identifier for a VDDK DataVolume.
 func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
-	return baseVolume(dv.ObjectMeta.Annotations[planbase.AnnDiskSource], r.Plan.Spec.Warm)
+	return baseVolume(dv.ObjectMeta.Annotations[planbase.AnnDiskSource], r.Plan.IsWarm())
 }
 
 // Return a stable identifier for a PersistentDataVolume.
 func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string {
-	return baseVolume(pvc.Annotations[planbase.AnnImportBackingFile], r.Plan.Spec.Warm)
+	return baseVolume(pvc.Annotations[planbase.AnnImportBackingFile], r.Plan.IsWarm())
 }
 
 // Load
@@ -1422,8 +1422,8 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				} else {
 					pvc.Annotations = annotations
 				}
-				pvc.Annotations[planbase.AnnDiskSource] = baseVolume(disk.File, r.Plan.Spec.Warm)
-				pvc.Annotations["copy-offload"] = baseVolume(disk.File, r.Plan.Spec.Warm)
+				pvc.Annotations[planbase.AnnDiskSource] = baseVolume(disk.File, r.Plan.IsWarm())
+				pvc.Annotations["copy-offload"] = baseVolume(disk.File, r.Plan.IsWarm())
 
 				// Apply PVC template naming if configured, replacing the commonName
 				if err := r.setColdMigrationDefaultPVCName(&pvc.ObjectMeta, vm, diskIndex, disk); err != nil {
@@ -1445,7 +1445,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				v := r.getPlanVMStatus(vm)
 				if v != nil && v.Warm != nil {
 					pvc.Annotations[planbase.AnnEndpoint] = r.Source.Provider.Spec.URL
-					pvc.Annotations[planbase.AnnImportBackingFile] = baseVolume(disk.File, r.Plan.Spec.Warm)
+					pvc.Annotations[planbase.AnnImportBackingFile] = baseVolume(disk.File, r.Plan.IsWarm())
 					pvc.Annotations[planbase.AnnSecret] = secretName
 					pvc.Annotations[planbase.AnnUUID] = vm.UUID
 					pvc.Annotations[planbase.AnnThumbprint] = r.Source.Provider.Status.Fingerprint
@@ -1479,7 +1479,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					},
 					Spec: api.VSphereXcopyVolumePopulatorSpec{
 						VmId:                 vmRef.ID,
-						VmdkPath:             baseVolume(disk.File, r.Plan.Spec.Warm),
+						VmdkPath:             baseVolume(disk.File, r.Plan.IsWarm()),
 						SecretName:           secretName,
 						StorageVendorProduct: string(storageVendorProduct),
 					},
@@ -1581,7 +1581,7 @@ func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.Persi
 
 func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error) {
 	// copy-offload only
-	taskName = baseVolume(pvc.Annotations[planbase.AnnDiskSource], r.Plan.Spec.Warm)
+	taskName = baseVolume(pvc.Annotations[planbase.AnnDiskSource], r.Plan.IsWarm())
 	return
 }
 
@@ -1718,10 +1718,7 @@ func (r *Builder) setPVCNameFromTemplate(objectMeta *metav1.ObjectMeta, vm *mode
 		rootDiskIndex = utils.GetBootDiskNumber(planVM.RootDisk)
 	}
 
-	isWarm := r.Plan.Spec.Warm
-	if r.Plan.Spec.Type == api.MigrationWarm {
-		isWarm = true
-	}
+	isWarm := r.Plan.IsWarm()
 
 	// Get plan VM status
 	planVMStatus := r.getPlanVMStatus(vm)

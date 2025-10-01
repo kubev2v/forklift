@@ -424,7 +424,7 @@ func (r Client) Finalize(vms []*planapi.VMStatus, planName string) {
 		}
 	}()
 
-	if !r.Plan.Spec.Warm {
+	if !r.Plan.IsWarm() {
 		r.Log.Info("Skipping precopy removal for cold migration")
 		return
 	}
