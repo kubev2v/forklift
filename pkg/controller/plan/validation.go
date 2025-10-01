@@ -307,7 +307,7 @@ func (r *Reconciler) ensureSecretForProvider(plan *api.Plan) error {
 
 // Validate that warm migration is supported from the source provider.
 func (r *Reconciler) validateWarmMigration(ctx *plancontext.Context) (err error) {
-	if !ctx.Plan.Spec.Warm {
+	if !ctx.Plan.IsWarm() {
 		return
 	}
 	provider := ctx.Plan.Referenced.Provider.Source
@@ -1021,8 +1021,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			}
 		}
 		// Warm migration.
-		isWarmMigration := plan.Spec.Warm || plan.Spec.Type == api.MigrationWarm
-		if isWarmMigration {
+		if plan.IsWarm() {
 			enabled, err := validator.ChangeTrackingEnabled(*ref)
 			if err != nil {
 				return err
@@ -1366,7 +1365,7 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 		}
 		err = r.validateVddkImageJob(job, plan)
 	}
-	if plan.Spec.Warm && vddkImage == "" {
+	if plan.IsWarm() && vddkImage == "" {
 		plan.Status.SetCondition(libcnd.Condition{
 			Type:     VDDKInitImageUnavailable,
 			Status:   True,

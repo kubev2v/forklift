@@ -1421,13 +1421,13 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 		}
 	}
 
-	if r.Plan.Spec.Warm || !r.Destination.Provider.IsHost() || r.Plan.IsSourceProviderOCP() {
+	if r.Plan.IsWarm() || !r.Destination.Provider.IsHost() || r.Plan.IsSourceProviderOCP() {
 		// Set annotation for WFFC storage classes. Note that we create data volumes while
 		// running a cold migration to the local cluster only when the source is either OpenShift
 		// or vSphere, and in the latter case the conversion pod acts as the first-consumer
 		annotations[planbase.AnnBindImmediate] = "true"
 	}
-	if r.Plan.Spec.Warm && r.Builder.SupportsVolumePopulators(vm.Ref) {
+	if r.Plan.IsWarm() && r.Builder.SupportsVolumePopulators(vm.Ref) {
 		// For storage offload, tie DataVolume to pre-imported PVC
 		annotations[planbase.AnnAllowClaimAdoption] = "true"
 		annotations[planbase.AnnPrePopulated] = "true"
@@ -1441,7 +1441,7 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 			Annotations: annotations,
 		},
 	}
-	if !(r.Builder.SupportsVolumePopulators(vm.Ref) && r.Plan.Spec.Warm) {
+	if !(r.Builder.SupportsVolumePopulators(vm.Ref) && r.Plan.IsWarm()) {
 		// For storage offload warm migrations, the template should have already
 		// been applied to the PVC that will be adopted by this DataVolume, so
 		// only add generateName for other migration types.

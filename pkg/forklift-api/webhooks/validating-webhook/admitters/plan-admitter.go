@@ -26,7 +26,7 @@ type PlanAdmitter struct {
 
 func (admitter *PlanAdmitter) validateStorage() error {
 
-	if admitter.plan.Spec.Warm {
+	if admitter.plan.IsWarm() {
 		log.Info("Warm migration supports all storages, passing")
 		return nil
 	}
@@ -82,8 +82,7 @@ func (admitter *PlanAdmitter) validateStorage() error {
 
 func (admitter *PlanAdmitter) validateWarmMigrations() error {
 	providerType := admitter.sourceProvider.Type()
-	isWarmMigration := admitter.plan.Spec.Warm
-	if providerType == api.OpenStack && isWarmMigration {
+	if providerType == api.OpenStack && admitter.plan.IsWarm() {
 		err := liberr.New("warm migration is not supported by the provider")
 		log.Error(err, "provider", providerType)
 		return err

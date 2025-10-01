@@ -52,7 +52,6 @@ func RecordMigrationMetrics(c client.Client) {
 				}
 
 				isLocal := destProvider.Spec.URL == ""
-				isWarm := plan.Spec.Warm
 
 				var target, mode string
 				if isLocal {
@@ -60,7 +59,7 @@ func RecordMigrationMetrics(c client.Client) {
 				} else {
 					target = Remote
 				}
-				if isWarm {
+				if plan.IsWarm() {
 					mode = Warm
 				} else {
 					mode = Cold
