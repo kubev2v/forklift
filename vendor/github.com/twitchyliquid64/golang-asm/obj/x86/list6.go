@@ -31,8 +31,8 @@
 package x86
 
 import (
-	"fmt"
 	"github.com/twitchyliquid64/golang-asm/obj"
+	"fmt"
 )
 
 var Register = []string{
