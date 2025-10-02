@@ -472,6 +472,15 @@ lint: $(GOLANGCI_LINT_BIN)
 update-tekton:
 	SKIP_UPDATE=false ./update-tekton.sh .tekton/*.yaml
 
+.PHONY: validate-commits validate-commits-range
+validate-commits:
+	@echo "Validating commit messages..."
+	@./scripts/validate-commits.sh --verbose
+
+validate-commits-range:
+	@echo "Validating commit messages in range: $(RANGE)"
+	@./scripts/validate-commits.sh --range "$(RANGE)" --verbose
+
 $(GOLANGCI_LINT_BIN):
 	$(MAKE) lint-install
 
