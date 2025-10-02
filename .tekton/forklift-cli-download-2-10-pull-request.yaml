@@ -49,6 +49,20 @@ spec:
 
       _Uses `buildah` to create a container image leveraging [trusted artifacts](https://konflux-ci.dev/architecture/ADR/0036-trusted-artifacts.html). It also optionally creates a source image and runs some build-time tests. Information is shared between tasks using OCI artifacts instead of PVCs. EC will pass the [`trusted_task.trusted`](https://conforma.dev/docs/policy/packages/release_trusted_task.html#trusted_task__trusted) policy as long as all data used to build the artifact is generated from trusted tasks.
       This pipeline is pushed as a Tekton bundle to [quay.io](https://quay.io/repository/konflux-ci/tekton-catalog/pipeline-docker-build-oci-ta?tab=tags)_
+    finally:
+      - name: show-sbom
+        params:
+          - name: IMAGE_URL
+            value: $(tasks.build-image-index.results.IMAGE_URL)
+        taskRef:
+          params:
+            - name: name
+              value: show-sbom
+            - name: bundle
+              value: quay.io/konflux-ci/tekton-catalog/task-show-sbom:0.1@sha256:beb0616db051952b4b861dd8c3e00fa1c0eccbd926feddf71194d3bb3ace9ce7
+            - name: kind
+              value: task
+          resolver: bundles
     params:
       - description: Source Repository URL
         name: git-url
@@ -61,15 +75,11 @@ spec:
         name: output-image
         type: string
       - default: .
-        description:
-          Path to the source code of an application's component from where
-          to build image.
+        description: Path to the source code of an application's component from where to build image.
         name: path-context
         type: string
       - default: Dockerfile
-        description:
-          Path to the Dockerfile inside the context specified by parameter
-          path-context
+        description: Path to the Dockerfile inside the context specified by parameter path-context
         name: dockerfile
         type: string
       - default: "false"
@@ -85,15 +95,12 @@ spec:
         name: hermetic
         type: string
       - default: ""
-        description: Build dependencies to be prefetched
+        description: Build dependencies to be prefetched by Cachi2
         name: prefetch-input
         type: string
       - default: ""
-        description:
-          Image tag expiration time, time values could be something like
-          1h, 2d, 3w for hours, days, and weeks, respectively.
+        description: Image tag expiration time, time values could be something like 1h, 2d, 3w for hours, days, and weeks, respectively.
         name: image-expires-after
-        type: string
       - default: "false"
         description: Build a source image.
         name: build-source-image
@@ -111,11 +118,13 @@ spec:
         name: build-args-file
         type: string
       - default: "false"
-        description:
-          Whether to enable privileged mode, should be used only with remote
-          VMs
+        description: Whether to enable privileged mode, should be used only with remote VMs
         name: privileged-nested
         type: string
+      - name: buildah-format
+        default: docker
+        type: string
+        description: The format for the resulting image's mediaType. Valid values are oci or docker.
     results:
       - description: ""
         name: IMAGE_URL
@@ -231,6 +240,8 @@ spec:
             value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
           - name: CACHI2_ARTIFACT
             value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
+          - name: BUILDAH_FORMAT
+            value: $(params.buildah-format)
         runAfter:
           - prefetch-dependencies
         taskRef:
@@ -260,6 +271,8 @@ spec:
           - name: IMAGES
             value:
               - $(tasks.build-container.results.IMAGE_URL)@$(tasks.build-container.results.IMAGE_DIGEST)
+          - name: BUILDAH_FORMAT
+            value: $(params.buildah-format)
         runAfter:
           - build-container
         taskRef:
