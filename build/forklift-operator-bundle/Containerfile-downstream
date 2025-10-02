@@ -15,7 +15,7 @@ ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:79044257d00
 
 ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:7299f3ea109a2c7108df43e4e696689fd6bbaf31f70f7b7ddaf46ef1eaf22d16"
 
-ARG MUST_GATHER_IMAGE="registry.redhat.io/mtv-candidate/mtv-must-gather-rhel8@sha256:6bf3647275909aaeddda81e4ba1194a258cbfaf71ad5f692b84f494875dce320"
+ARG MUST_GATHER_IMAGE="registry.redhat.io/mtv-candidate/mtv-must-gather-rhel8@sha256:bb9c441896a8b617b8d22f035910a12c01bdad2b1b28bd69f170f984317806ff"
 
 ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-openstack-populator-rhel9@sha256:b2c18035c9f8210164cb312b3bfa4e7e081d67fccbd2a127d31d5c20a4f331fa"
 
