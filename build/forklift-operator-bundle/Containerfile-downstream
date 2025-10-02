@@ -11,31 +11,31 @@ ARG DEFAULT_CHANNEL
 ARG REGISTRY
 ARG OCP_VERSIONS
 
-ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:3006ee4c5e963de3850c83b544e02da0d5802f90b44b86cb49ec92db966daf43"
+ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:3d1a9a93afc6cfa47b10cca719ef968e55cdf80dea86715db6ace6aeba2cf257"
 
-ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:26fba943f34fa8baf776821662194a9d3e6ae0625bb94d3b3d74b5c9718cbcbe"
+ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:a0b8deacfae44a90de710790cfefcf3ca3839c1b2f6893ff21f1ca8641fdd0e4"
 
-ARG MUST_GATHER_IMAGE="registry.redhat.io/mtv-candidate/mtv-must-gather-rhel8@sha256:739f287fc4dee80888ce372feca9b7e01da50ab6cae0396595a944bf9b7b6b10"
+ARG MUST_GATHER_IMAGE="registry.redhat.io/mtv-candidate/mtv-must-gather-rhel8@sha256:25f39590551b95cbe40b8ed0013b7e5bb80076b9c3d786e1a65aab8d899351b2"
 
-ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-openstack-populator-rhel9@sha256:2224f474b472a911e9ac9508936a5cb4dd26191640f37d41da7360b138fb963f"
+ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-openstack-populator-rhel9@sha256:687a62d11df3b900a6cbad1e5e0bf0332360d9f1faeb630c3c5c6414e1d9ce6d"
 
-ARG OPERATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhel9-operator@sha256:306832877ac80c6a19e858c1a38a60437fb8be3754920f02f493743bd7fae7f1"
+ARG OPERATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhel9-operator@sha256:4e28772a1f700741ff3ca7803735f99fb2230a7e93ddaad9f083c17479422893"
 
-ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/mtv-candidate/mtv-ova-provider-server-rhel9@sha256:b7125fc0244b347f98d81fa029f1cebb03c43c0b6f8c69e1fcbc32c3a8cf7773"
+ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/mtv-candidate/mtv-ova-provider-server-rhel9@sha256:29b3536087d61dd532afa3aa42353d64c380ddee0ebe6e421ceb404d1e27edac"
 
-ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhv-populator-rhel8@sha256:2e0254577c66cb4c00cc7c1d98b1d4732c1fbbb0b1f631cfc39d74f8ae9cbfde"
+ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhv-populator-rhel8@sha256:bdc2069c39012baaf0a85593175438cbabb1e239f54efa79cb17c24860dcf690"
 
-ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-populator-controller-rhel9@sha256:c71d71f807d9631bf2baa54200fc69accb3311f9c83d07ed083f08a32e62d863"
+ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-populator-controller-rhel9@sha256:6d036993b563142b0f8e4bd1dd5be03a14c664666b3d1698cf0adcedad094b08"
 
-ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:3541c357e3672ac99e9cf6099224ecb8da508d44d7e46f761715ff8da588c7ec"
+ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:53f2602cb41a4b4a3c6acfee1098625bb8215d631ffcd54570bd074e94e83dea"
 
-ARG CLI_DOWNLOAD_IMAGE="registry.redhat.io/mtv-candidate/mtv-cli-download-rhel9@sha256:f866ce146aa1dc222be1a0f6144a2815662c1b80b2338d87238ce67534d07443"
+ARG CLI_DOWNLOAD_IMAGE="registry.redhat.io/mtv-candidate/mtv-cli-download-rhel9@sha256:c37064666d2ba5953aee19b007b5d63e1170cf1e56391dd5c32ec46efc0436fe"
 
-ARG VALIDATION_IMAGE="registry.redhat.io/mtv-candidate/mtv-validation-rhel9@sha256:8fec2c15a89e3708d24891dc5dc82cee5b19fc5964894bec3e4e8f4290226600"
+ARG VALIDATION_IMAGE="registry.redhat.io/mtv-candidate/mtv-validation-rhel9@sha256:3a7b3a281191def90709f091fd7015ebb63e19df53dd54f538c8b208a45c31c7"
 
-ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel9@sha256:aa083f37b3cadcb4f5172eabe1ef55d5b6f731d3286f9fba0fbbfa548a65fd89"
+ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel9@sha256:b434d3f5e16aabc4350cf41291342903b5d93ee9de2624ac21bb4f6aa765b6bb"
 
-ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:0312dd52c69eeb8ae75480a7519f569db0d1801bd97c8d7b2b3284ee53c42e59"
+ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:017bc928a8e9579db2a74b991aed550e56e3ad42e9e0f78cede7014e96deb6f4"
 
 USER root
 
