@@ -17,11 +17,11 @@ ARG CONTROLLER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-co
 
 ARG MUST_GATHER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-must-gather-rhel8@sha256:cab2b3895b41e437be2f3a365f2a6189a697579792a51b00a5fdd86fab1e7576"
 
-ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-openstack-populator-rhel9@sha256:8e8092cc83a5ad70d5c1fa784821bc06384b7a7971b5b51edfda78bc24e64559"
+ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-openstack-populator-rhel9@sha256:1ece4758c997f8c0b3f3e36379a1e30331a249bb61afb2b337da962749b4668d"
 
 ARG OPERATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-rhel9-operator@sha256:870e72382984a54db32149dfed59a4c1abc798074556528157a9f32f4d04cb82"
 
-ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-ova-provider-server-rhel9@sha256:e1c81d8a9b68c9e22b1cdc5051ff7483e714ad0408aae9e8f4d2798942c667a8"
+ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-ova-provider-server-rhel9@sha256:b9998a87bf511aefc8ee3651c707cb8eec220742ca584bcc7e2322c5b2a03b95"
 
 ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-rhv-populator-rhel8@sha256:dab6a2490d40100647b454489673ff354a268a31b8e71674a714f09e26654dd1"
 
