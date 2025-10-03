@@ -1497,6 +1497,21 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) 
 	object.Spec.RunStrategy = &runStrategy
 	object.Spec.Running = nil // Ensure running is not set
 
+	// Add kubevirt template annotations if they are missing
+	kubevirtWorkloadAnn := []string{
+		"vm.kubevirt.io/flavor",
+		"vm.kubevirt.io/os",
+		"vm.kubevirt.io/workload",
+	}
+	if object.Spec.Template.ObjectMeta.Annotations == nil {
+		object.Spec.Template.ObjectMeta.Annotations = make(map[string]string)
+	}
+	for _, ann := range kubevirtWorkloadAnn {
+		if _, ok := object.Spec.Template.ObjectMeta.Annotations[ann]; !ok {
+			object.Spec.Template.ObjectMeta.Annotations[ann] = ""
+		}
+	}
+
 	err = r.Builder.VirtualMachine(vm.Ref, &object.Spec, pvcs, vm.InstanceType != "", sortVolumesByLibvirt)
 	if err != nil {
 		return
