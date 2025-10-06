@@ -4,7 +4,7 @@ RUN cp /cachi2/output/deps/generic/* /opt/app-root/src/
 EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]
 
-ARG VERSION
+ARG MTV_VERSION
 ARG REGISTRY
 ARG REVISION
 ARG CPE
@@ -21,5 +21,5 @@ LABEL \
     summary="Migration Toolkit for Virtualization - CLI Download Service" \
     vendor="Red Hat, Inc." \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
-    version="$VERSION" \
+    version="$MTV_VERSION" \
     revision="$REVISION"

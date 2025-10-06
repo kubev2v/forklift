@@ -5,7 +5,7 @@ WORKDIR /app
 COPY operator/watches.yaml watches.yaml
 COPY operator/roles roles
 
-ARG VERSION
+ARG MTV_VERSION
 ARG RELEASE
 ARG REGISTRY
 ARG REVISION
@@ -22,7 +22,7 @@ LABEL \
     description="Migration Toolkit for Virtualization - Operator" \
     vendor="Red Hat, Inc." \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
-    version="$VERSION" \
+    version="$MTV_VERSION" \
     cpe="cpe:/a:redhat:migration_toolkit_virtualization:${CPE}::el9" \
     revision="$REVISION"
 
