@@ -6719,7 +6719,7 @@ metadata:
       Container Platform", "OpenShift Platform Plus"]'
     repository: https://github.com/kubev2v/forklift
     support: Red Hat
-  name: mtv-operator.v${VERSION}
+  name: mtv-operator.v${MTV_VERSION}
   namespace: openshift-mtv
 spec:
   apiservicedefinitions: {}
@@ -6874,7 +6874,7 @@ spec:
     name: ova_provider_server
   - image: ${VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE}
     name: vsphere_xcopy_volume_populator
-  version: ${VERSION}
+  version: ${MTV_VERSION}
 ---
 apiVersion: scorecard.operatorframework.io/v1alpha3
 kind: Configuration
