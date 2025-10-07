@@ -85,6 +85,10 @@ func main() {
 
 func runVirtV2VInspection(disks []string) error {
 	args := []string{"-v", "-x", "-if", "raw", "-i", "disk", "-O", global.INSPECTION}
+	args, err := addCommonArgs(args)
+	if err != nil {
+		return err
+	}
 	args = append(args, disks...)
 	fmt.Println("Running the virt-v2v-inspector with args: ", args)
 	v2vCmd := exec.Command("virt-v2v-inspector", args...)
