@@ -29,7 +29,7 @@ COPY --from=builder /src/cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper/e
 
 ENTRYPOINT ["/bin/vsphere-xcopy-volume-populator"]
 
-ARG VERSION
+ARG MTV_VERSION
 ARG REGISTRY
 ARG REVISION
 ARG CPE
@@ -45,6 +45,6 @@ LABEL \
     description="Migration Toolkit for Virtualization - vSphere XCOPY Volume Populator" \
     vendor="Red Hat, Inc." \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
-    version="$VERSION" \
+    version="$MTV_VERSION" \
     cpe="cpe:/a:redhat:migration_toolkit_virtualization:${CPE}::el9" \
     revision="$REVISION"

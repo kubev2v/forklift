@@ -19,7 +19,7 @@ RUN microdnf -y install tar libvirt-libs && microdnf clean all
 COPY --from=builder /app/manager /usr/local/bin/forklift-controller
 ENTRYPOINT ["/usr/local/bin/forklift-controller"]
 
-ARG VERSION
+ARG MTV_VERSION
 ARG REGISTRY
 ARG REVISION
 ARG CPE
@@ -35,6 +35,6 @@ LABEL \
     summary="Migration Toolkit for Virtualization - Controller" \
     vendor="Red Hat, Inc." \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
-    version="$VERSION" \
+    version="$MTV_VERSION" \
     cpe="cpe:/a:redhat:migration_toolkit_virtualization:${CPE}::el9" \
     revision="$REVISION"

@@ -16,7 +16,7 @@ RUN microdnf -y install tar && microdnf clean all
 COPY --from=builder /app/controller /usr/local/bin/populator-controller
 ENTRYPOINT ["/usr/local/bin/populator-controller"]
 
-ARG VERSION
+ARG MTV_VERSION
 ARG REGISTRY
 ARG REVISION
 ARG CPE
@@ -32,6 +32,6 @@ LABEL \
     description="Migration Toolkit for Virtualization - Populator Controller" \
     vendor="Red Hat, Inc." \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
-    version="$VERSION" \
+    version="$MTV_VERSION" \
     revision="$REVISION" \
     cpe="cpe:/a:redhat:migration_toolkit_virtualization:${CPE}::el9"

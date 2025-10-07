@@ -87,7 +87,7 @@ COPY --from=builder /app/virt-v2v-wrapper /usr/bin/virt-v2v-wrapper
 
 ENTRYPOINT ["/usr/libexec/catatonit/catatonit", "/usr/bin/virt-v2v-wrapper"]
 
-ARG VERSION
+ARG MTV_VERSION
 ARG REGISTRY
 ARG REVISION
 
@@ -101,5 +101,5 @@ LABEL \
     summary="Migration Toolkit for Virtualization - Virt-V2V" \
     description="Migration Toolkit for Virtualization - Virt-V2V" \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
-    version="$VERSION" \ 
+    version="$MTV_VERSION" \ 
     revision="$REVISION"
