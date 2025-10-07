@@ -4,7 +4,7 @@ FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel9@sha256:2e8ded84e20ba61
 
 ARG EVENT_TITLE
 
-ARG VERSION
+ARG MTV_VERSION
 ARG RELEASE
 ARG CHANNEL
 ARG DEFAULT_CHANNEL
@@ -54,7 +54,7 @@ RUN source ./images.conf && \
     -q \
     --overwrite \
     --extra-service-accounts forklift-controller,forklift-api,forklift-populator-controller \
-    --version $VERSION \
+    --version $MTV_VERSION \
     --channels $CHANNEL \
     --default-channel $DEFAULT_CHANNEL \
     --output-dir build
@@ -63,7 +63,7 @@ USER 1001
 
 FROM scratch
 
-ARG VERSION
+ARG MTV_VERSION
 ARG RELEASE
 ARG CHANNEL
 ARG DEFAULT_CHANNEL
@@ -121,5 +121,5 @@ LABEL \
     url="https://github.com/kubev2v/forklift" \
     distribution-scope="public" \
     release=$RELEASE \
-    version=$VERSION \
+    version=$MTV_VERSION \
     revision="$REVISION"

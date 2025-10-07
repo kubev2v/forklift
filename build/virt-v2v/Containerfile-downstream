@@ -78,7 +78,7 @@ COPY --from=winlegacyiso /usr/share/virtio-win/virtio-win.iso /usr/local/virtio-
 
 ENTRYPOINT ["/usr/libexec/catatonit/catatonit", "/usr/bin/virt-v2v-wrapper"]
 
-ARG VERSION
+ARG MTV_VERSION
 ARG REGISTRY
 ARG REVISION
 ARG CPE
@@ -94,5 +94,5 @@ LABEL \
     cpe="cpe:/a:redhat:migration_toolkit_virtualization:${CPE}::el9" \
     description="Migration Toolkit for Virtualization - Virt-V2V" \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
-    version="$VERSION" \
+    version="$MTV_VERSION" \
     revision="$REVISION"

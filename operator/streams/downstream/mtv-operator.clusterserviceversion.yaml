@@ -1,7 +1,7 @@
 apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
-  name: ${CSV_NAME}.v${VERSION}
+  name: ${CSV_NAME}.v${MTV_VERSION}
   namespace: ${NAMESPACE}
   annotations:
     capabilities: Seamless Upgrades
@@ -105,7 +105,7 @@ spec:
       url: ${DOCS_LINK_URL}
     - name: Forklift Operator
       url: https://github.com/kubev2v/forklift
-  version: ${VERSION}
+  version: ${MTV_VERSION}
   minKubeVersion: 1.27.0
   apiservicedefinitions: {}
   customresourcedefinitions:
