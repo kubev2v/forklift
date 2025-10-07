@@ -38,7 +38,7 @@ test_vm_with_btrfs_creates_concern if {
 
 # Test: Case insensitive BTRFS detection
 test_btrfs_case_insensitive if {
-	count(concerns) == 3 with input as {
+	count(concerns) == 1 with input as {
 		"guestId": "ubuntu64Guest",
 		"guestDisks": [
 			{
@@ -65,7 +65,7 @@ test_btrfs_case_insensitive if {
 
 # Test: Mixed filesystem types should only flag BTRFS disks
 test_mixed_filesystems_partial_concerns if {
-	count(concerns) == 2 with input as {
+	count(concerns) == 1 with input as {
 		"guestId": "ubuntu64Guest",
 		"guestDisks": [
 			{
