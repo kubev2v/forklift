@@ -16,7 +16,7 @@ concerns contains flag if {
 	btrfs_disks[idx]
 	disk := input.guestDisks[idx]
 	flag := {
-		"id": sprintf("vmware.guestDisks.btrfs.unsupported.%v", [idx]),
+		"id": "vmware.guestDisks.btrfs.unsupported",
 		"category": "Warning",
 		"label": "BTRFS filesystem detected on disk",
 		"assessment": "BTRFS filesystem is not supported and may cause issues during guest conversion",
