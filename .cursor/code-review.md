@@ -1,8 +1,8 @@
 Changes should be clear and easy to review
 
-reviewer should be able to easily access the exact story or bug being worked on from the URL in the commit
+The URL for the exact story or bug being worked on should be listed in the commit
 
-reviewer should be able to understand from the header and body of the commit what was changed
+The header and body of the commit should clearly explain what was changed
 
 actual code change should be consistent with the description in the commit 
 
