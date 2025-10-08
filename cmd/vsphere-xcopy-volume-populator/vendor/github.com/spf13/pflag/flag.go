@@ -27,32 +27,23 @@ unaffected.
 Define flags using flag.String(), Bool(), Int(), etc.
 
 This declares an integer flag, -flagname, stored in the pointer ip, with type *int.
-
 	var ip = flag.Int("flagname", 1234, "help message for flagname")
-
 If you like, you can bind the flag to a variable using the Var() functions.
-
 	var flagvar int
 	func init() {
 		flag.IntVar(&flagvar, "flagname", 1234, "help message for flagname")
 	}
-
 Or you can create custom flags that satisfy the Value interface (with
 pointer receivers) and couple them to flag parsing by
-
 	flag.Var(&flagVal, "name", "help message for flagname")
-
 For such flags, the default value is just the initial value of the variable.
 
 After all flags are defined, call
-
 	flag.Parse()
-
 to parse the command line into the defined flags.
 
 Flags may then be used directly. If you're using the flags themselves,
 they are all pointers; if you bind to variables, they're values.
-
 	fmt.Println("ip has value ", *ip)
 	fmt.Println("flagvar has value ", flagvar)
 
@@ -63,26 +54,22 @@ The arguments are indexed from 0 through flag.NArg()-1.
 The pflag package also defines some new functions that are not in flag,
 that give one-letter shorthands for flags. You can use these by appending
 'P' to the name of any function that defines a flag.
-
 	var ip = flag.IntP("flagname", "f", 1234, "help message")
 	var flagvar bool
 	func init() {
 		flag.BoolVarP(&flagvar, "boolname", "b", true, "help message")
 	}
 	flag.VarP(&flagval, "varname", "v", "help message")
-
 Shorthand letters can be used with single dashes on the command line.
 Boolean shorthand flags can be combined with other shorthand flags.
 
 Command line flag syntax:
-
 	--flag    // boolean flags only
 	--flag=x
 
 Unlike the flag package, a single dash before an option means something
 different than a double dash. Single dashes signify a series of shorthand
 letters for flags. All but the last shorthand letter must be boolean flags.
-
 	// boolean flags
 	-f
 	-abc
@@ -173,7 +160,7 @@ type FlagSet struct {
 	args              []string // arguments after flags
 	argsLenAtDash     int      // len(args) when a '--' was located when parsing, or -1 if no --
 	errorHandling     ErrorHandling
-	output            io.Writer // nil means stderr; use out() accessor
+	output            io.Writer // nil means stderr; use Output() accessor
 	interspersed      bool      // allow interspersed option/non-option args
 	normalizeNameFunc func(f *FlagSet, name string) NormalizedName
 
@@ -268,11 +255,18 @@ func (f *FlagSet) normalizeFlagName(name string) NormalizedName {
 	return n(f, name)
 }
 
-func (f *FlagSet) out() io.Writer {
+// Output returns the destination for usage and error messages. os.Stderr is returned if
+// output was not set or was set to nil.
+func (f *FlagSet) Output() io.Writer {
 	if f.output == nil {
 		return os.Stderr
 	}
 	return f.output
+}
+
+// Name returns the name of the flag set.
+func (f *FlagSet) Name() string {
+	return f.name
 }
 
 // SetOutput sets the destination for usage and error messages.
@@ -371,7 +365,7 @@ func (f *FlagSet) ShorthandLookup(name string) *Flag {
 	}
 	if len(name) > 1 {
 		msg := fmt.Sprintf("can not look up shorthand which is more than one ASCII character: %q", name)
-		fmt.Fprintf(f.out(), msg)
+		fmt.Fprintf(f.Output(), msg)
 		panic(msg)
 	}
 	c := name[0]
@@ -495,7 +489,7 @@ func (f *FlagSet) Set(name, value string) error {
 	}
 
 	if flag.Deprecated != "" {
-		fmt.Fprintf(f.out(), "Flag --%s has been deprecated, %s\n", flag.Name, flag.Deprecated)
+		fmt.Fprintf(f.Output(), "Flag --%s has been deprecated, %s\n", flag.Name, flag.Deprecated)
 	}
 	return nil
 }
@@ -536,7 +530,7 @@ func Set(name, value string) error {
 // otherwise, the default values of all defined flags in the set.
 func (f *FlagSet) PrintDefaults() {
 	usages := f.FlagUsages()
-	fmt.Fprint(f.out(), usages)
+	fmt.Fprint(f.Output(), usages)
 }
 
 // defaultIsZeroValue returns true if the default value for this flag represents
@@ -771,7 +765,7 @@ func PrintDefaults() {
 
 // defaultUsage is the default function to print a usage message.
 func defaultUsage(f *FlagSet) {
-	fmt.Fprintf(f.out(), "Usage of %s:\n", f.name)
+	fmt.Fprintf(f.Output(), "Usage of %s:\n", f.name)
 	f.PrintDefaults()
 }
 
@@ -857,7 +851,7 @@ func (f *FlagSet) AddFlag(flag *Flag) {
 	_, alreadyThere := f.formal[normalizedFlagName]
 	if alreadyThere {
 		msg := fmt.Sprintf("%s flag redefined: %s", f.name, flag.Name)
-		fmt.Fprintln(f.out(), msg)
+		fmt.Fprintln(f.Output(), msg)
 		panic(msg) // Happens only if flags are declared with identical names
 	}
 	if f.formal == nil {
@@ -873,7 +867,7 @@ func (f *FlagSet) AddFlag(flag *Flag) {
 	}
 	if len(flag.Shorthand) > 1 {
 		msg := fmt.Sprintf("%q shorthand is more than one ASCII character", flag.Shorthand)
-		fmt.Fprintf(f.out(), msg)
+		fmt.Fprintf(f.Output(), msg)
 		panic(msg)
 	}
 	if f.shorthands == nil {
@@ -883,7 +877,7 @@ func (f *FlagSet) AddFlag(flag *Flag) {
 	used, alreadyThere := f.shorthands[c]
 	if alreadyThere {
 		msg := fmt.Sprintf("unable to redefine %q shorthand in %q flagset: it's already used for %q flag", c, f.name, used.Name)
-		fmt.Fprintf(f.out(), msg)
+		fmt.Fprintf(f.Output(), msg)
 		panic(msg)
 	}
 	f.shorthands[c] = flag
@@ -922,7 +916,7 @@ func VarP(value Value, name, shorthand, usage string) {
 func (f *FlagSet) failf(format string, a ...interface{}) error {
 	err := fmt.Errorf(format, a...)
 	if f.errorHandling != ContinueOnError {
-		fmt.Fprintln(f.out(), err)
+		fmt.Fprintln(f.Output(), err)
 		f.usage()
 	}
 	return err
@@ -940,9 +934,9 @@ func (f *FlagSet) usage() {
 	}
 }
 
-// --unknown (args will be empty)
-// --unknown --next-flag ... (args will be --next-flag ...)
-// --unknown arg ... (args will be arg ...)
+//--unknown (args will be empty)
+//--unknown --next-flag ... (args will be --next-flag ...)
+//--unknown arg ... (args will be arg ...)
 func stripUnknownFlagValue(args []string) []string {
 	if len(args) == 0 {
 		//--unknown
@@ -1073,7 +1067,7 @@ func (f *FlagSet) parseSingleShortArg(shorthands string, args []string, fn parse
 	}
 
 	if flag.ShorthandDeprecated != "" {
-		fmt.Fprintf(f.out(), "Flag shorthand -%s has been deprecated, %s\n", flag.Shorthand, flag.ShorthandDeprecated)
+		fmt.Fprintf(f.Output(), "Flag shorthand -%s has been deprecated, %s\n", flag.Shorthand, flag.ShorthandDeprecated)
 	}
 
 	err = fn(flag, value)
