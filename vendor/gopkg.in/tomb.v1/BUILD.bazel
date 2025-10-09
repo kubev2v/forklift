@@ -1,9 +1,0 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
-
-go_library(
-    name = "tomb_v1",
-    srcs = ["tomb.go"],
-    importmap = "github.com/konveyor/forklift-controller/vendor/gopkg.in/tomb.v1",
-    importpath = "gopkg.in/tomb.v1",
-    visibility = ["//visibility:public"],
-)
