@@ -1,9 +1,0 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
-
-go_library(
-    name = "json",
-    srcs = ["json.go"],
-    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/gin-gonic/gin/internal/json",
-    importpath = "github.com/gin-gonic/gin/internal/json",
-    visibility = ["//vendor/github.com/gin-gonic/gin:__subpackages__"],
-)
