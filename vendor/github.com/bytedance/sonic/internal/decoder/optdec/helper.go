@@ -5,9 +5,10 @@ import (
 	"strconv"
 
 	"github.com/bytedance/sonic/internal/native"
-	"github.com/bytedance/sonic/internal/native/types"
 	"github.com/bytedance/sonic/internal/utils"
+	"github.com/bytedance/sonic/internal/native/types"
 )
+
 
 func SkipNumberFast(json string, start int) (int, bool) {
 	// find the number ending, we parsed in native, it always valid
@@ -27,10 +28,6 @@ func SkipNumberFast(json string, start int) (int, bool) {
 	return pos, true
 }
 
-func isSpace(c byte) bool {
-	return c == ' ' || c == '\t' || c == '\n' || c == '\r'
-}
-
 // pos is the start index of the raw
 func ValidNumberFast(raw string) bool {
 	ret := utils.SkipNumber(raw, 0)
@@ -46,22 +43,12 @@ func ValidNumberFast(raw string) bool {
 	return true
 }
 
-func SkipOneFast2(json string, pos *int) (int, error) {
-	// find the number ending, we parsed in sonic-cpp, it always valid
-	start := native.SkipOneFast(&json, pos)
-	if start < 0 {
-		return -1, error_syntax(*pos, json, types.ParsingError(-start).Error())
-	}
-	return start, nil
-}
-
 func SkipOneFast(json string, pos int) (string, error) {
-	// find the number ending, we parsed in sonic-cpp, it always valid
 	start := native.SkipOneFast(&json, &pos)
 	if start < 0 {
-		// TODO: details error code
 		return "", error_syntax(pos, json, types.ParsingError(-start).Error())
 	}
+
 	return json[start:pos], nil
 }
 
