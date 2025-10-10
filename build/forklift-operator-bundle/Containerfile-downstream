@@ -31,7 +31,7 @@ ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@s
 
 ARG CLI_DOWNLOAD_IMAGE="registry.redhat.io/mtv-candidate/mtv-cli-download-rhel9@sha256:f5ff106e73872468bc3e76689da0ec2183b89e823052997165df0f9570d71907"
 
-ARG VALIDATION_IMAGE="registry.redhat.io/mtv-candidate/mtv-validation-rhel9@sha256:ad4d3d70ab8243ae261220c8e6b9dc010bf548dec55ff2a0858fa634416fc08f"
+ARG VALIDATION_IMAGE="registry.redhat.io/mtv-candidate/mtv-validation-rhel9@sha256:9da505c9c205e317677bbc0a6251d061c14d471ce56d5bec0e59a60895e46f78"
 
 ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel9@sha256:589b9a370cf8880e95fca61306cd417d7766c0b5387aadbf665c070d5480ca4b"
 
