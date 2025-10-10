@@ -1,40 +1,37 @@
-MTV is based on upstream forklift. Its purpose is to mass migrate data from 5 source providers (VMware vSphere, oVirt, openstack, OVA files or another cluster in OpenShift) -> to their destination which is CNV / OpenShift virtualization. The provider is where the data lives originally before the migration (example VMware). The target is OpenShift. 
+MTV is based on upstream forklift. Its purpose is to mass migrate data from 5 source providers (VMware vSphere, oVirt, openstack, OVA files or another cluster in OpenShift) -> to their destination which is CNV / OpenShift virtualization. The provider is the original source for VMs before the migration (example VMware). The target is OpenShift. 
 
 OpenShift has a number of operators and MTV exists as a container platform operator. 
 
 MTV defines Kubernetes objects called Custom Resources (CR)
 
-Before the migration starts, the person who is the OpenShift user selects the provider CR. The user would also configure a CR for network mapping and storage mapping. This means specifying that 
+Before the migration starts, the person who is the OpenShift user selects the provider CR. The user would also configure a CR for network mapping and storage mapping. A network map is a CR that defines how the VM network in the provider maps to the networks in the target OpenShift cluster during migration. Similarly a storage map is a CR that defines how datastores, volumes and disks from the provider VMs should be mapped to storage in the OpenShift cluster during migration.
 
-  * VLANs or OVN network should go to the (pod -> KubeVirt vm)
-  * multus network goes to(NetworkAttachmentDefinition)
-  * ignored -> does not go anywhere its excluded from migrated vm in OpenShift and the data store on the VM would go to a storage class in OpenShift. 
 
-Two services to be aware of are, an inventory service (pkg/lib/inventory) that gets the data from the vm and a validation service (validation/service) that makes sure the the data is compatible for migration (example an unsupported file system may not be able to be migrated).
+Two services to be aware of are the inventory service and the validation service. The inventory service (pkg/lib/inventory) gets a list of VMs from a provider as well as the virtual hardware configuration of each VM. The validation service (validation/service) makes sure the the migration is successful (example an unsupported file system may not be able to be migrated).
 
 After the user configures the provider, network and storage CR-they can create a plan CR for the migration plan. They will choose which groups of VMs can be migrated together either grouped ("compute" directories on VMWare) or ungrouped (multiple VMs that are located anywhere on the provider) and choose which ones will have which storage and network mapping.
 
 There are different types of migrations (cold, warm, live, conversion). All migration types support RCM or RawCopyMode. RawCopyMode shows up in the plan CR as "skipGuestConversion: true" meaning it will not use virtv2v to install virtio drivers. VDDK is required for RCM. VDDK is VMware's library that gives access to the the VM disk files or VDMK.  
 
-  - cold migration is the default migration where the VM is turned off before the migration. This has a longer downtime. In a cold migration a DataVolume is created and virtv2v does the guest conversion by swapping existing drivers with its own drivers and then it goes to the target vm.
+  - cold migration is the default migration where the VM is turned off before the migration. This has a longer downtime. Cold migration to a remote cluster will create a VDDK DataVolume, and use CDI to transfer disks before passing them to virt-v2v. If the cold migration is to the same cluster it creates a blank DataVolume so virt-v2v can manage the data transfer itself.
 
- - warm migration can have shorter downtime because the VM stays on during the migration. There is one snapshot taken that is copied, then a series of snapshots where only the changes between snapshots are copied. Then finally the VM is turned off for the cutover phase and the final changes are copied-target vm is made and the guest conversion moves this copy to the target vm. This is supported for vSphere, oVirt and Red Hat virtualization.
+ - warm migration can have shorter downtime because the VM stays on during the migration. There is one snapshot taken that is copied, then a series of snapshots where only the changes between snapshots are copied. Then finally the VM is turned off for the cutover phase and the final changes are copied-target VM is made and the guest conversion moves this copy to the target VM. This is supported for vSphere, oVirt and Red Hat virtualization.
 
  - Live migration has almost no downtime. This is for moving data from one cluster to another. This is only for CNV and we rely on CNV to do the migration and VirtualMachineInstanceMigration manages the state.
 
- - Conversion is not technically a migration; rather, it installs the virtIO drivers to change the guest OS and puts the changed guest OS in a target vm.
+ - Conversion-only is not technically a migration; rather, it installs the virtIO drivers to change the guest OS and puts the changed guest OS in a target VM. Conversion-only migration needs a pre-existing Persistent Volume Claim (PVC).
 
 Storage:
 
- VM disk data is copied to a persistent volume claim PVC in OpenShift that can be used by a KubeVirt VM. In the final step of a migration, the controller creates a virtual machine CR and a vm pod/virt-launcher (logic in pkg/controller/plan) and the transferred PVCs are in the format of disks on the VM (pkg/controller/plan/adapter). 
+ VM disk data is copied to a PVC in OpenShift that can be used by a KubeVirt VM. In the final step of a migration, the controller creates a virtual machine CR and a VM pod/virt-launcher (logic in pkg/controller/plan) and the transferred PVCs are in the format of disks on the VM (pkg/controller/plan/adapter). 
  
- The storage configuration options are as follows: volume modes (file system or block), Access Modes (ReadWriteOnce or ReadWriteMany), Storage Classes defines performance and maps data stores to storage classes. 
+  Storage maps map data stores to storage classes. 
 
- 1 containerized data importer or CDI creates DataVolumes that provision a persistent volume claim PVC. A DataVolume is an abstraction of a PVC. (logic in cmd/*-populator). Typically used for warm migrations but user can choose data transfer method.
+ 1 Forklift creates DataVolumes and then containerized data importer (CDI) provisions PVCs based on the DataVolumes. CDI is typically used for warm migrations but user can choose data transfer method.
  
- 2 virt-v2v uses the the libguestfs virt-v2v tool (libguestfs is upstream of virt-v2v). This migration creates blank DataVolumes which the virt-V2V pods copy to convert the data. This is associated with cold migrations but again the user can choose. If in a cold migration the target cluster is different than the cluster where MTV is installed VDDK needs to be installed. If VDDK is not installed the migration would fail.
+ 2 virt-v2v is part of the the libguestfs project. The virt-v2v tool creates blank DataVolumes which the virt-V2V pods copy to convert the data. This is associated with cold migrations but again the user can choose. If in a cold migration the target cluster is different than the cluster where MTV is installed VDDK needs to be installed. If VDDK is not installed the migration would fail.
 
- 3 Storage offload uses storage arrays in XCOPY to copy data between LUN or Logical Unit Number to identify the storage volume. 
+ 3 Storage offload uses the SCSI XCOPY command to do rapid copies of VM disks directly on a supported storage array. This requires the source and destination providers to both be connected to the same storage array, and forklift must figure out how to map the source and destination storage to the correct logical unit number on the storage array so it copies the right thing.
  
 
  good to know where it lives: 

@@ -2,7 +2,7 @@ Changes should be clear and easy to review
 
 The URL for the exact story or bug being worked on should be listed in the commit
 
-The header and body of the commit should clearly explain what was changed
+The header and body of the commit should clearly explain what was changed. Please reference COMMIT_MESSAGE_GUIDE.md for rules
 
 actual code change should be consistent with the description in the commit 
 
