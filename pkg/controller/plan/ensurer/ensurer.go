@@ -7,6 +7,7 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/plan/namespace"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -41,6 +42,19 @@ func (r *Ensurer) VirtualMachine(vm *planapi.VMStatus, target *cnv.VirtualMachin
 
 	if len(vms.Items) == 0 {
 		r.Labeler.SetLabels(target, r.Labeler.VMLabels(vm.Ref))
+
+		if applied, err2 := namespace.EnsureKubemacpoolExclusion(r.Context); err2 != nil {
+			r.Log.Error(err2, "Failed to set namespace kubemacpool exclusion for live migration", "vm", vm.Name)
+		} else if applied {
+			r.Log.Info("Applied kubemacpool namespace exclusion for OCP live migration",
+				"vm", vm.Name,
+				"namespace", r.Plan.Spec.TargetNamespace)
+		} else if r.Plan.IsSourceProviderOCP() && (r.Source.Provider == nil || r.Destination.Provider == nil || !namespace.IsSameClusterMigration(r.Source.Provider, r.Destination.Provider)) {
+			r.Log.Info("Skipped kubemacpool exclusion — cross-cluster OCP migration; MAC address conflicts should be investigated",
+				"vm", vm.Name,
+				"namespace", r.Plan.Spec.TargetNamespace)
+		}
+
 		err = r.Destination.Client.Create(context.TODO(), target)
 		if err != nil {
 			err = liberr.Wrap(err)
