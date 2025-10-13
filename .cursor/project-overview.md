@@ -1,4 +1,4 @@
-MTV is based on upstream forklift. Its purpose is to mass migrate data from 5 source providers (VMware vSphere, oVirt, openstack, OVA files or another cluster in OpenShift) -> to their destination which is CNV / OpenShift virtualization. The provider is the original source for VMs before the migration (example VMware). The target is OpenShift. 
+MTV is based on upstream forklift. Its purpose is to mass migrate virtual machines from 5 source providers (VMware vSphere, oVirt, openstack, OVA files or another cluster in OpenShift) -> to their destination which is CNV / OpenShift virtualization. The provider is the original source for VMs before the migration (example VMware). The target is OpenShift. 
 
 OpenShift has a number of operators and MTV exists as a container platform operator. 
 
@@ -7,7 +7,7 @@ MTV defines Kubernetes objects called Custom Resources (CR)
 Before the migration starts, the person who is the OpenShift user selects the provider CR. The user would also configure a CR for network mapping and storage mapping. A network map is a CR that defines how the VM network in the provider maps to the networks in the target OpenShift cluster during migration. Similarly a storage map is a CR that defines how datastores, volumes and disks from the provider VMs should be mapped to storage in the OpenShift cluster during migration.
 
 
-Two services to be aware of are the inventory service and the validation service. The inventory service (pkg/lib/inventory) gets a list of VMs from a provider as well as the virtual hardware configuration of each VM. The validation service (validation/service) makes sure the the migration is successful (example an unsupported file system may not be able to be migrated).
+Two services to be aware of are the inventory service and the validation service. The inventory service (pkg/lib/inventory) gets a list of VMs from a provider as well as the virtual hardware configuration of each VM. The validation service (validation/service) makes sure the the migration is likely to be successful (example an unsupported file system may not be able to be migrated).
 
 After the user configures the provider, network and storage CR-they can create a plan CR for the migration plan. They will choose which groups of VMs can be migrated together either grouped ("compute" directories on VMWare) or ungrouped (multiple VMs that are located anywhere on the provider) and choose which ones will have which storage and network mapping.
 
@@ -29,7 +29,7 @@ Storage:
 
  1 Forklift creates DataVolumes and then containerized data importer (CDI) provisions PVCs based on the DataVolumes. CDI is typically used for warm migrations but user can choose data transfer method.
  
- 2 virt-v2v is part of the the libguestfs project. The virt-v2v tool creates blank DataVolumes which the virt-V2V pods copy to convert the data. This is associated with cold migrations but again the user can choose. If in a cold migration the target cluster is different than the cluster where MTV is installed VDDK needs to be installed. If VDDK is not installed the migration would fail.
+ 2 virt-v2v is part of the libguestfs project. The virt-v2v tool creates blank DataVolumes which the virt-V2V pods copy to convert the data. This is associated with cold migrations but again the user can choose. If in a cold migration the target cluster is different than the cluster where MTV is installed VDDK needs to be installed. If VDDK is not installed the migration would fail.
 
  3 Storage offload uses the SCSI XCOPY command to do rapid copies of VM disks directly on a supported storage array. This requires the source and destination providers to both be connected to the same storage array, and forklift must figure out how to map the source and destination storage to the correct logical unit number on the storage array so it copies the right thing.
  
