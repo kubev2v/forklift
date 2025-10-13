@@ -2534,12 +2534,6 @@ func (r *KubeVirt) ensureConfigMap(vmRef ref.Ref) (configMap *core.ConfigMap, er
 	}
 	if len(list.Items) > 0 {
 		configMap = &list.Items[0]
-		// If a ConfigMap already exists (e.g. from a hook), merge in any missing
-		// provider-specific data required for the migration.
-		err = r.updateConfigMap(vmRef, configMap)
-		if err != nil {
-			return
-		}
 	} else {
 		configMap, err = r.configMap(vmRef)
 		if err != nil {
@@ -2552,56 +2546,6 @@ func (r *KubeVirt) ensureConfigMap(vmRef ref.Ref) (configMap *core.ConfigMap, er
 		}
 		r.Log.V(1).Info(
 			"ConfigMap created.",
-			"configMap",
-			path.Join(
-				configMap.Namespace,
-				configMap.Name),
-			"vm",
-			vmRef.String())
-	}
-
-	return
-}
-
-// updateConfigMap merges provider-specific data (e.g., certificates)
-// into an existing ConfigMap without overwriting existing keys.
-func (r *KubeVirt) updateConfigMap(vmRef ref.Ref, configMap *core.ConfigMap) (err error) {
-	// Create a temporary ConfigMap to get the provider data from the builder.
-	tempConfigMap := &core.ConfigMap{
-		Data: make(map[string]string),
-	}
-
-	err = r.Builder.ConfigMap(vmRef, r.Source.Secret, tempConfigMap)
-	if err != nil {
-		return
-	}
-
-	if configMap.Data == nil {
-		configMap.Data = make(map[string]string)
-	}
-
-	needsUpdate := false
-	for key, value := range tempConfigMap.Data {
-		if _, exists := configMap.Data[key]; !exists {
-			r.Log.Info(
-				"Updating ConfigMap with missing data.",
-				"key",
-				key,
-				"configMap",
-				configMap.Name)
-			configMap.Data[key] = value
-			needsUpdate = true
-		}
-	}
-
-	if needsUpdate {
-		err = r.Destination.Client.Update(context.TODO(), configMap)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-		r.Log.V(1).Info(
-			"ConfigMap updated with provider data.",
 			"configMap",
 			path.Join(
 				configMap.Namespace,
