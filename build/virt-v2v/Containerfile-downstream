@@ -25,6 +25,7 @@ RUN mkdir -p /usr/local/lib/guestfs/appliance && \
 
 FROM registry.redhat.io/ubi9/go-toolset:1.24.4-1752083840 AS builder
 USER 0
+RUN dnf install -y libvirt-devel
 WORKDIR /app
 COPY --chown=1001:0 ./ ./
 ENV GOFLAGS="-mod=vendor -tags=strictfipsruntime"
@@ -45,7 +46,8 @@ RUN mkdir /disks && \
     dnf update -y && \
     dnf install -y --setopt=install_weak_deps=False \
     virt-v2v \
-    virtio-win
+    virtio-win \
+    libvirt-libs
 
 # This prevents libvirt from attempting to create files in the root directory,
 # which would lead to permission errors.

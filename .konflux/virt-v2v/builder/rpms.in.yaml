@@ -1,9 +1,10 @@
 packages:
-  - tar
+  - libvirt-devel
 contentOrigin:
   repofiles:
     - ./redhat.repo
 context:
   containerfile:
-    file: ../../build/forklift-controller/Containerfile-downstream
+    file: ../../../build/virt-v2v/Containerfile-downstream
+    stageName: builder
 arches: [x86_64]
