@@ -11,6 +11,13 @@ arches:
     name: abattis-cantarell-fonts
     evr: 0.301-4.el9
     sourcerpm: abattis-cantarell-fonts-0.301-4.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/a/adobe-source-code-pro-fonts-2.030.1.050-12.el9.1.noarch.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 856543
+    checksum: sha256:cfb5e8fddaed92b1b22c957183d0ea626a4468f42a46dae4e68a795cb8c20393
+    name: adobe-source-code-pro-fonts
+    evr: 2.030.1.050-12.el9.1
+    sourcerpm: adobe-source-code-pro-fonts-2.030.1.050-12.el9.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/a/augeas-libs-1.14.1-2.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
     size: 438164
@@ -1117,13 +1124,6 @@ arches:
     name: webkit2gtk3-jsc
     evr: 2.48.5-1.el9_6
     sourcerpm: webkit2gtk3-2.48.5-1.el9_6.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/a/adobe-source-code-pro-fonts-2.030.1.050-12.el9.1.noarch.rpm
-    repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 856543
-    checksum: sha256:cfb5e8fddaed92b1b22c957183d0ea626a4468f42a46dae4e68a795cb8c20393
-    name: adobe-source-code-pro-fonts
-    evr: 2.030.1.050-12.el9.1
-    sourcerpm: adobe-source-code-pro-fonts-2.030.1.050-12.el9.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/b/binutils-2.35.2-63.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 4818636
@@ -1390,13 +1390,13 @@ arches:
     name: iptables-nft
     evr: 1.8.10-11.el9_5
     sourcerpm: iptables-1.8.10-11.el9_5.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/i/iputils-20210202-11.el9_6.1.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/i/iputils-20210202-11.el9_6.3.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 178195
-    checksum: sha256:2760d3b457614fd29d24f6ceff4cd5354fb099193237ba9914dbeee5e69e67d3
+    size: 177724
+    checksum: sha256:7fe14d3955bb4964bd23e720e6008f01c371b9442cb65d28049b31b34e3885de
     name: iputils
-    evr: 20210202-11.el9_6.1
-    sourcerpm: iputils-20210202-11.el9_6.1.src.rpm
+    evr: 20210202-11.el9_6.3
+    sourcerpm: iputils-20210202-11.el9_6.3.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/j/jansson-2.14-1.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 49137
@@ -1432,20 +1432,20 @@ arches:
     name: kbd-misc
     evr: 2.4.0-11.el9
     sourcerpm: kbd-2.4.0-11.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/k/kernel-core-5.14.0-570.46.1.el9_6.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/k/kernel-core-5.14.0-570.52.1.el9_6.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 18749273
-    checksum: sha256:8f24806824a41bd7f46639e8b5ec1d91a8d7efbbf9c5013aeceaa3d3da65e17c
+    size: 18756117
+    checksum: sha256:172aa1e4e4771635e2c7c08171d32d6e2e81700126b0f58860c12d6a123ed77e
     name: kernel-core
-    evr: 5.14.0-570.46.1.el9_6
-    sourcerpm: kernel-5.14.0-570.46.1.el9_6.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/k/kernel-modules-core-5.14.0-570.46.1.el9_6.x86_64.rpm
+    evr: 5.14.0-570.52.1.el9_6
+    sourcerpm: kernel-5.14.0-570.52.1.el9_6.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/k/kernel-modules-core-5.14.0-570.52.1.el9_6.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 32553461
-    checksum: sha256:d2979b47c83328db421fb6b978ecbd049a221cadf41e7a210f88fc640fe06857
+    size: 32566577
+    checksum: sha256:6835502149838d07665f525ae1b22185f2c49eee884d5021e31f61ab346d697d
     name: kernel-modules-core
-    evr: 5.14.0-570.46.1.el9_6
-    sourcerpm: kernel-5.14.0-570.46.1.el9_6.src.rpm
+    evr: 5.14.0-570.52.1.el9_6
+    sourcerpm: kernel-5.14.0-570.52.1.el9_6.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/k/kmod-28-10.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 132888
@@ -2870,12 +2870,12 @@ arches:
     checksum: sha256:5e4edd2e85c004f5fb06f0761d6cf41c530bb9973262315285be0ad11e8e8b51
     name: iptables
     evr: 1.8.10-11.el9_5
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/i/iputils-20210202-11.el9_6.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/i/iputils-20210202-11.el9_6.3.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
-    size: 601258
-    checksum: sha256:9dd32ad99d09763e61fc6fe281ef4aa7f74e64bc25653f74f270a41eb92193c6
+    size: 602275
+    checksum: sha256:79375c85da02cdf2841d922fc83c1872045d6b0c9cbfee75b71a941f06a3ee7d
     name: iputils
-    evr: 20210202-11.el9_6.1
+    evr: 20210202-11.el9_6.3
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/j/jansson-2.14-1.el9.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
     size: 447607
@@ -2894,12 +2894,12 @@ arches:
     checksum: sha256:8d50e573c7beff06b0167dd7d6bccfe542bc393aaf652bbecb205277af293231
     name: kbd
     evr: 2.4.0-11.el9
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/k/kernel-5.14.0-570.46.1.el9_6.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/k/kernel-5.14.0-570.52.1.el9_6.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
-    size: 149418451
-    checksum: sha256:9697c21f4d6b9fff7025997104a7d46aea812679b6e16b5d2e70e92b5fbc4417
+    size: 149453862
+    checksum: sha256:7153252b63a1ff7d52c5fe7e12ddeba5fbcb3a52b21f2d41396fd8e321c974b9
     name: kernel
-    evr: 5.14.0-570.46.1.el9_6
+    evr: 5.14.0-570.52.1.el9_6
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/source/SRPMS/Packages/k/kmod-28-10.el9.src.rpm
     repoid: rhel-9-for-x86_64-baseos-source-rpms
     size: 582431
