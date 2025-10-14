@@ -1,0 +1,19 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "goobj",
+    srcs = [
+        "builtin.go",
+        "builtinlist.go",
+        "funcinfo.go",
+        "objfile.go",
+    ],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/twitchyliquid64/golang-asm/goobj",
+    importpath = "github.com/twitchyliquid64/golang-asm/goobj",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/twitchyliquid64/golang-asm/bio",
+        "//vendor/github.com/twitchyliquid64/golang-asm/objabi",
+        "//vendor/github.com/twitchyliquid64/golang-asm/unsafeheader",
+    ],
+)

@@ -20,7 +20,6 @@ import (
     `io`
 
     `github.com/bytedance/sonic/ast`
-    `github.com/bytedance/sonic/internal/rt`
 )
 
 // Config is a combination of sonic/encoder.Options and sonic/decoder.Options
@@ -69,14 +68,7 @@ type Config struct {
 
     // ValidateString indicates decoder and encoder to valid string values: decoder will return errors 
     // when unescaped control chars(\u0000-\u001f) in the string value of JSON.
-    ValidateString                bool
-
-    // NoValidateJSONMarshaler indicates that the encoder should not validate the output string
-    // after encoding the JSONMarshaler to JSON.
-    NoValidateJSONMarshaler       bool
-    
-    // NoEncoderNewline indicates that the encoder should not add a newline after every message
-    NoEncoderNewline bool
+    ValidateString                    bool
 }
  
 var (
@@ -95,7 +87,6 @@ var (
     // ConfigFastest is the fastest config of APIs, aiming at speed.
     ConfigFastest = Config{
         NoQuoteTextMarshaler: true,
-        NoValidateJSONMarshaler: true,
     }.Froze()
 )
  
@@ -174,41 +165,22 @@ func UnmarshalString(buf string, val interface{}) error {
     return ConfigDefault.UnmarshalFromString(buf, val)
 }
 
-// Get searches and locates the given path from src json,
-// and returns a ast.Node representing the partially json.
+// Get searches the given path from json,
+// and returns its representing ast.Node.
 //
 // Each path arg must be integer or string:
 //     - Integer is target index(>=0), means searching current node as array.
 //     - String is target key, means searching current node as object.
 //
 // 
-// Notice: It expects the src json is **Well-formed** and **Immutable** when calling,
-// otherwise it may return unexpected result. 
-// Considering memory safty, the returned JSON is **Copied** from the input
+// Note, the api expects the json is well-formed at least,
+// otherwise it may return unexpected result.
 func Get(src []byte, path ...interface{}) (ast.Node, error) {
-    return GetCopyFromString(rt.Mem2Str(src), path...)
+    return GetFromString(string(src), path...)
 }
 
-// GetFromString is same with Get except src is string.
-//
-// WARNING: The returned JSON is **Referenced** from the input. 
-// Caching or long-time holding the returned node may cause OOM.
-// If your src is big, consider use GetFromStringCopy().
+// GetFromString is same with Get except src is string,
+// which can reduce unnecessary memory copy.
 func GetFromString(src string, path ...interface{}) (ast.Node, error) {
     return ast.NewSearcher(src).GetByPath(path...)
-}
-
-// GetCopyFromString is same with Get except src is string
-func GetCopyFromString(src string, path ...interface{}) (ast.Node, error) {
-    return ast.NewSearcher(src).GetByPathCopy(path...)
-}
-
-// Valid reports whether data is a valid JSON encoding.
-func Valid(data []byte) bool {
-    return ConfigDefault.Valid(data)
-}
-
-// Valid reports whether data is a valid JSON encoding.
-func ValidString(data string) bool {
-    return ConfigDefault.Valid(rt.Str2Mem(data))
 }

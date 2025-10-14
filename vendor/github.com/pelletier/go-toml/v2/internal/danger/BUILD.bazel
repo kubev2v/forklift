@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "danger",
+    srcs = [
+        "danger.go",
+        "typeid.go",
+    ],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/pelletier/go-toml/v2/internal/danger",
+    importpath = "github.com/pelletier/go-toml/v2/internal/danger",
+    visibility = ["//vendor/github.com/pelletier/go-toml/v2:__subpackages__"],
+)

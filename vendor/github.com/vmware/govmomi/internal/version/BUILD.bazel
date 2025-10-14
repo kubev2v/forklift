@@ -1,0 +1,9 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "version",
+    srcs = ["version.go"],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/vmware/govmomi/internal/version",
+    importpath = "github.com/vmware/govmomi/internal/version",
+    visibility = ["//vendor/github.com/vmware/govmomi:__subpackages__"],
+)

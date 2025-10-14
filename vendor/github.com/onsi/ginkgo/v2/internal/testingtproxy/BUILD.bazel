@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "testingtproxy",
+    srcs = ["testing_t_proxy.go"],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/onsi/ginkgo/v2/internal/testingtproxy",
+    importpath = "github.com/onsi/ginkgo/v2/internal/testingtproxy",
+    visibility = ["//vendor/github.com/onsi/ginkgo/v2:__subpackages__"],
+    deps = [
+        "//vendor/github.com/onsi/ginkgo/v2/formatter",
+        "//vendor/github.com/onsi/ginkgo/v2/internal",
+        "//vendor/github.com/onsi/ginkgo/v2/reporters",
+        "//vendor/github.com/onsi/ginkgo/v2/types",
+    ],
+)

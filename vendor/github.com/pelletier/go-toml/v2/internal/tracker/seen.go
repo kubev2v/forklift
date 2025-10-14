@@ -57,11 +57,7 @@ type SeenTracker struct {
 	currentIdx int
 }
 
-var pool = sync.Pool{
-	New: func() interface{} {
-		return &SeenTracker{}
-	},
-}
+var pool sync.Pool
 
 func (s *SeenTracker) reset() {
 	// Always contains a root element at index 0.
@@ -153,9 +149,8 @@ func (s *SeenTracker) setExplicitFlag(parentIdx int) {
 
 // CheckExpression takes a top-level node and checks that it does not contain
 // keys that have been seen in previous calls, and validates that types are
-// consistent. It returns true if it is the first time this node's key is seen.
-// Useful to clear array tables on first use.
-func (s *SeenTracker) CheckExpression(node *unstable.Node) (bool, error) {
+// consistent.
+func (s *SeenTracker) CheckExpression(node *unstable.Node) error {
 	if s.entries == nil {
 		s.reset()
 	}
@@ -171,7 +166,7 @@ func (s *SeenTracker) CheckExpression(node *unstable.Node) (bool, error) {
 	}
 }
 
-func (s *SeenTracker) checkTable(node *unstable.Node) (bool, error) {
+func (s *SeenTracker) checkTable(node *unstable.Node) error {
 	if s.currentIdx >= 0 {
 		s.setExplicitFlag(s.currentIdx)
 	}
@@ -197,7 +192,7 @@ func (s *SeenTracker) checkTable(node *unstable.Node) (bool, error) {
 		} else {
 			entry := s.entries[idx]
 			if entry.kind == valueKind {
-				return false, fmt.Errorf("toml: expected %s to be a table, not a %s", string(k), entry.kind)
+				return fmt.Errorf("toml: expected %s to be a table, not a %s", string(k), entry.kind)
 			}
 		}
 		parentIdx = idx
@@ -206,27 +201,25 @@ func (s *SeenTracker) checkTable(node *unstable.Node) (bool, error) {
 	k := it.Node().Data
 	idx := s.find(parentIdx, k)
 
-	first := false
 	if idx >= 0 {
 		kind := s.entries[idx].kind
 		if kind != tableKind {
-			return false, fmt.Errorf("toml: key %s should be a table, not a %s", string(k), kind)
+			return fmt.Errorf("toml: key %s should be a table, not a %s", string(k), kind)
 		}
 		if s.entries[idx].explicit {
-			return false, fmt.Errorf("toml: table %s already exists", string(k))
+			return fmt.Errorf("toml: table %s already exists", string(k))
 		}
 		s.entries[idx].explicit = true
 	} else {
 		idx = s.create(parentIdx, k, tableKind, true, false)
-		first = true
 	}
 
 	s.currentIdx = idx
 
-	return first, nil
+	return nil
 }
 
-func (s *SeenTracker) checkArrayTable(node *unstable.Node) (bool, error) {
+func (s *SeenTracker) checkArrayTable(node *unstable.Node) error {
 	if s.currentIdx >= 0 {
 		s.setExplicitFlag(s.currentIdx)
 	}
@@ -249,7 +242,7 @@ func (s *SeenTracker) checkArrayTable(node *unstable.Node) (bool, error) {
 		} else {
 			entry := s.entries[idx]
 			if entry.kind == valueKind {
-				return false, fmt.Errorf("toml: expected %s to be a table, not a %s", string(k), entry.kind)
+				return fmt.Errorf("toml: expected %s to be a table, not a %s", string(k), entry.kind)
 			}
 		}
 
@@ -259,23 +252,22 @@ func (s *SeenTracker) checkArrayTable(node *unstable.Node) (bool, error) {
 	k := it.Node().Data
 	idx := s.find(parentIdx, k)
 
-	firstTime := idx < 0
-	if firstTime {
-		idx = s.create(parentIdx, k, arrayTableKind, true, false)
-	} else {
+	if idx >= 0 {
 		kind := s.entries[idx].kind
 		if kind != arrayTableKind {
-			return false, fmt.Errorf("toml: key %s already exists as a %s,  but should be an array table", kind, string(k))
+			return fmt.Errorf("toml: key %s already exists as a %s,  but should be an array table", kind, string(k))
 		}
 		s.clear(idx)
+	} else {
+		idx = s.create(parentIdx, k, arrayTableKind, true, false)
 	}
 
 	s.currentIdx = idx
 
-	return firstTime, nil
+	return nil
 }
 
-func (s *SeenTracker) checkKeyValue(node *unstable.Node) (bool, error) {
+func (s *SeenTracker) checkKeyValue(node *unstable.Node) error {
 	parentIdx := s.currentIdx
 	it := node.Key()
 
@@ -289,11 +281,11 @@ func (s *SeenTracker) checkKeyValue(node *unstable.Node) (bool, error) {
 		} else {
 			entry := s.entries[idx]
 			if it.IsLast() {
-				return false, fmt.Errorf("toml: key %s is already defined", string(k))
+				return fmt.Errorf("toml: key %s is already defined", string(k))
 			} else if entry.kind != tableKind {
-				return false, fmt.Errorf("toml: expected %s to be a table, not a %s", string(k), entry.kind)
+				return fmt.Errorf("toml: expected %s to be a table, not a %s", string(k), entry.kind)
 			} else if entry.explicit {
-				return false, fmt.Errorf("toml: cannot redefine table %s that has already been explicitly defined", string(k))
+				return fmt.Errorf("toml: cannot redefine table %s that has already been explicitly defined", string(k))
 			}
 		}
 
@@ -311,39 +303,45 @@ func (s *SeenTracker) checkKeyValue(node *unstable.Node) (bool, error) {
 		return s.checkArray(value)
 	}
 
-	return false, nil
+	return nil
 }
 
-func (s *SeenTracker) checkArray(node *unstable.Node) (first bool, err error) {
+func (s *SeenTracker) checkArray(node *unstable.Node) error {
 	it := node.Children()
 	for it.Next() {
 		n := it.Node()
 		switch n.Kind {
 		case unstable.InlineTable:
-			first, err = s.checkInlineTable(n)
+			err := s.checkInlineTable(n)
 			if err != nil {
-				return false, err
+				return err
 			}
 		case unstable.Array:
-			first, err = s.checkArray(n)
+			err := s.checkArray(n)
 			if err != nil {
-				return false, err
+				return err
 			}
 		}
 	}
-	return first, nil
+	return nil
 }
 
-func (s *SeenTracker) checkInlineTable(node *unstable.Node) (first bool, err error) {
+func (s *SeenTracker) checkInlineTable(node *unstable.Node) error {
+	if pool.New == nil {
+		pool.New = func() interface{} {
+			return &SeenTracker{}
+		}
+	}
+
 	s = pool.Get().(*SeenTracker)
 	s.reset()
 
 	it := node.Children()
 	for it.Next() {
 		n := it.Node()
-		first, err = s.checkKeyValue(n)
+		err := s.checkKeyValue(n)
 		if err != nil {
-			return false, err
+			return err
 		}
 	}
 
@@ -354,5 +352,5 @@ func (s *SeenTracker) checkInlineTable(node *unstable.Node) (first bool, err err
 	// redefinition of its keys: check* functions cannot walk into
 	// a value.
 	pool.Put(s)
-	return first, nil
+	return nil
 }

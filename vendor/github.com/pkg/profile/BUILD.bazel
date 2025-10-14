@@ -1,0 +1,10 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "profile",
+    srcs = ["profile.go"],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/pkg/profile",
+    importpath = "github.com/pkg/profile",
+    visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/felixge/fgprof"],
+)

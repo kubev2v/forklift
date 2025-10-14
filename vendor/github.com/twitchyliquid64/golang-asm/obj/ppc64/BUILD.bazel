@@ -1,0 +1,22 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "ppc64",
+    srcs = [
+        "a.out.go",
+        "anames.go",
+        "anames9.go",
+        "asm9.go",
+        "doc.go",
+        "list9.go",
+        "obj9.go",
+    ],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/twitchyliquid64/golang-asm/obj/ppc64",
+    importpath = "github.com/twitchyliquid64/golang-asm/obj/ppc64",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/twitchyliquid64/golang-asm/obj",
+        "//vendor/github.com/twitchyliquid64/golang-asm/objabi",
+        "//vendor/github.com/twitchyliquid64/golang-asm/sys",
+    ],
+)
