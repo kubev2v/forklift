@@ -129,6 +129,10 @@ spec:
                 type: string
                 description: "Must-gather debugging image"
                 example: "quay.io/kubev2v/forklift-must-gather:latest"
+              ova_proxy_fqin:
+                type: string
+                description: "OVA inventory proxy image"
+                example: "quay.io/kubev2v/forklift-ova-proxy:latest"
 
               # Controller Resource Configuration
               controller_container_limits_cpu:

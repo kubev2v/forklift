@@ -294,6 +294,10 @@ spec:
                 description: OVA provider server image
                 example: quay.io/kubev2v/ova-provider-server:latest
                 type: string
+              ova_proxy_fqin:
+                description: OVA inventory proxy image
+                example: quay.io/kubev2v/forklift-ova-proxy:latest
+                type: string
               populator_controller_image_fqin:
                 description: Volume populator controller image
                 example: quay.io/kubev2v/populator-controller:latest
@@ -5380,14 +5384,49 @@ spec:
               phase:
                 description: Current life cycle phase of the provider.
                 type: string
-              urls:
-                description: Externally routable provider URLs
-                items:
-                  properties:
-                    url:
-                      type: string
-                  type: object
-                type: array
+              service:
+                description: Provider URLs
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
             type: object
         type: object
     served: true
@@ -6531,6 +6570,8 @@ spec:
           value: ${OPENSTACK_POPULATOR_IMAGE}
         - name: OVA_PROVIDER_SERVER_IMAGE
           value: ${OVA_PROVIDER_SERVER_IMAGE}
+        - name: OVA_PROXY_IMAGE
+          value: ${OVA_PROXY_IMAGE}
         - name: OVIRT_OS_MAP
           value: ${OVIRT_OS_MAP}
         - name: VSPHERE_OS_MAP
@@ -6755,6 +6796,11 @@ spec:
       kind: OpenstackVolumePopulator
       name: openstackvolumepopulators.forklift.konveyor.io
       version: v1beta1
+    - description: OVA Provider Server
+      displayName: OVAProviderServer
+      kind: OVAProviderServer
+      name: ovaproviderservers.forklift.konveyor.io
+      version: v1beta1
     - description: oVirt Volume Populator
       displayName: OvirtVolumePopulator
       kind: OvirtVolumePopulator
@@ -6872,6 +6918,8 @@ spec:
     name: ui_plugin
   - image: ${OVA_PROVIDER_SERVER_IMAGE}
     name: ova_provider_server
+  - image: ${OVA_PROXY_IMAGE}
+    name: ova_proxy
   - image: ${VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE}
     name: vsphere_xcopy_volume_populator
   version: ${MTV_VERSION}
