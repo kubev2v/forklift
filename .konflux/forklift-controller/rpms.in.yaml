@@ -1,7 +1,5 @@
 packages:
   - tar
-  - libvirt-devel
-  - libvirt-libs
 contentOrigin:
   repofiles:
     - ./redhat.repo
