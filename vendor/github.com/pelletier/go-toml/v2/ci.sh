@@ -77,9 +77,8 @@ cover() {
 
     pushd "$dir"
     go test -covermode=atomic  -coverpkg=./... -coverprofile=coverage.out.tmp ./...
-    grep -Ev '(fuzz|testsuite|tomltestgen|gotoml-test-decoder|gotoml-test-encoder)' coverage.out.tmp > coverage.out
+    cat coverage.out.tmp | grep -v fuzz | grep -v testsuite | grep -v tomltestgen | grep -v gotoml-test-decoder > coverage.out
     go tool cover -func=coverage.out
-    echo "Coverage profile for ${branch}: ${dir}/coverage.out" >&2
     popd
 
     if [ "${branch}" != "HEAD" ]; then
@@ -152,7 +151,7 @@ bench() {
     fi
 
     export GOMAXPROCS=2
-    go test '-bench=^Benchmark(Un)?[mM]arshal' -count=10 -run=Nothing ./... | tee "${out}"
+    nice -n -19 taskset --cpu-list 0,1 go test '-bench=^Benchmark(Un)?[mM]arshal' -count=5 -run=Nothing ./... | tee "${out}"
     popd
 
     if [ "${branch}" != "HEAD" ]; then
@@ -161,12 +160,10 @@ bench() {
 }
 
 fmktemp() {
-    if mktemp --version &> /dev/null; then
-	# GNU
-        mktemp --suffix=-$1
+    if mktemp --version|grep GNU >/dev/null; then
+        mktemp --suffix=-$1;
     else
-	# BSD
-	mktemp -t $1
+        mktemp -t $1;
     fi
 }
 
@@ -186,14 +183,12 @@ with open(sys.argv[1]) as f:
             lines.append(line.split(','))
 
 results = []
-for line in reversed(lines[2:]):
-    if len(line) < 8 or line[0] == "":
-        continue
+for line in reversed(lines[1:]):
     v2 = float(line[1])
     results.append([
         line[0].replace("-32", ""),
         "%.1fx" % (float(line[3])/v2),  # v1
-        "%.1fx" % (float(line[7])/v2),  # bs
+        "%.1fx" % (float(line[5])/v2),  # bs
     ])
 # move geomean to the end
 results.append(results[0])
@@ -264,10 +259,10 @@ benchmark() {
 
         if [ "$1" = "-html" ]; then
             tmpcsv=`fmktemp csv`
-            benchstat -format csv go-toml-v2.txt go-toml-v1.txt bs-toml.txt > $tmpcsv
+            benchstat -csv -geomean go-toml-v2.txt go-toml-v1.txt bs-toml.txt > $tmpcsv
             benchstathtml $tmpcsv
         else
-            benchstat go-toml-v2.txt go-toml-v1.txt bs-toml.txt
+            benchstat -geomean go-toml-v2.txt go-toml-v1.txt bs-toml.txt
         fi
 
         rm -f go-toml-v2.txt go-toml-v1.txt bs-toml.txt

@@ -4,7 +4,3 @@
 
 # Output of go build ./cmd/fsnotify
 /fsnotify
-/fsnotify.exe
-
-/test/kqueue
-/test/a.out

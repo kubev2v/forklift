@@ -1,0 +1,68 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "decoder",
+    srcs = [
+        "decoder_amd64.go",
+        "decoder_compat.go",
+    ],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/bytedance/sonic/decoder",
+    importpath = "github.com/bytedance/sonic/decoder",
+    visibility = ["//visibility:public"],
+    deps = select({
+        "@io_bazel_rules_go//go/platform:386": [
+            "//vendor/github.com/bytedance/sonic/internal/native/types",
+            "//vendor/github.com/bytedance/sonic/option",
+        ],
+        "@io_bazel_rules_go//go/platform:amd64": [
+            "//vendor/github.com/bytedance/sonic/internal/decoder",
+            "//vendor/github.com/bytedance/sonic/internal/native/types",
+            "//vendor/github.com/bytedance/sonic/option",
+        ],
+        "@io_bazel_rules_go//go/platform:arm": [
+            "//vendor/github.com/bytedance/sonic/internal/native/types",
+            "//vendor/github.com/bytedance/sonic/option",
+        ],
+        "@io_bazel_rules_go//go/platform:arm64": [
+            "//vendor/github.com/bytedance/sonic/internal/native/types",
+            "//vendor/github.com/bytedance/sonic/option",
+        ],
+        "@io_bazel_rules_go//go/platform:mips": [
+            "//vendor/github.com/bytedance/sonic/internal/native/types",
+            "//vendor/github.com/bytedance/sonic/option",
+        ],
+        "@io_bazel_rules_go//go/platform:mips64": [
+            "//vendor/github.com/bytedance/sonic/internal/native/types",
+            "//vendor/github.com/bytedance/sonic/option",
+        ],
+        "@io_bazel_rules_go//go/platform:mips64le": [
+            "//vendor/github.com/bytedance/sonic/internal/native/types",
+            "//vendor/github.com/bytedance/sonic/option",
+        ],
+        "@io_bazel_rules_go//go/platform:mipsle": [
+            "//vendor/github.com/bytedance/sonic/internal/native/types",
+            "//vendor/github.com/bytedance/sonic/option",
+        ],
+        "@io_bazel_rules_go//go/platform:ppc64": [
+            "//vendor/github.com/bytedance/sonic/internal/native/types",
+            "//vendor/github.com/bytedance/sonic/option",
+        ],
+        "@io_bazel_rules_go//go/platform:ppc64le": [
+            "//vendor/github.com/bytedance/sonic/internal/native/types",
+            "//vendor/github.com/bytedance/sonic/option",
+        ],
+        "@io_bazel_rules_go//go/platform:riscv64": [
+            "//vendor/github.com/bytedance/sonic/internal/native/types",
+            "//vendor/github.com/bytedance/sonic/option",
+        ],
+        "@io_bazel_rules_go//go/platform:s390x": [
+            "//vendor/github.com/bytedance/sonic/internal/native/types",
+            "//vendor/github.com/bytedance/sonic/option",
+        ],
+        "@io_bazel_rules_go//go/platform:wasm": [
+            "//vendor/github.com/bytedance/sonic/internal/native/types",
+            "//vendor/github.com/bytedance/sonic/option",
+        ],
+        "//conditions:default": [],
+    }),
+)

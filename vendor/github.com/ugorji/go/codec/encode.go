@@ -984,10 +984,6 @@ func NewEncoderBytes(out *[]byte, h Handle) *Encoder {
 	return e
 }
 
-func (e *Encoder) HandleName() string {
-	return e.hh.Name()
-}
-
 func (e *Encoder) init(h Handle) {
 	initHandle(h)
 	e.err = errEncoderNotInitialized
@@ -1154,9 +1150,12 @@ func (e *Encoder) MustEncode(v interface{}) {
 	}
 }
 
-// Release is a no-op.
+// Release releases shared (pooled) resources.
 //
-// Deprecated: Pooled resources are not used with an Encoder.
+// It is important to call Release() when done with an Encoder, so those resources
+// are released instantly for use by subsequently created Encoders.
+//
+// Deprecated: Release is a no-op as pooled resources are not used with an Encoder.
 // This method is kept for compatibility reasons only.
 func (e *Encoder) Release() {
 }

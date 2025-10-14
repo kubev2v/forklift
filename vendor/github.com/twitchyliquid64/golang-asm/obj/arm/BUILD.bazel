@@ -1,0 +1,21 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "arm",
+    srcs = [
+        "a.out.go",
+        "anames.go",
+        "anames5.go",
+        "asm5.go",
+        "list5.go",
+        "obj5.go",
+    ],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/twitchyliquid64/golang-asm/obj/arm",
+    importpath = "github.com/twitchyliquid64/golang-asm/obj/arm",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/twitchyliquid64/golang-asm/obj",
+        "//vendor/github.com/twitchyliquid64/golang-asm/objabi",
+        "//vendor/github.com/twitchyliquid64/golang-asm/sys",
+    ],
+)

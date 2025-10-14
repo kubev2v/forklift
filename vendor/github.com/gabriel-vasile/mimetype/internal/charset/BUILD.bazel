@@ -1,0 +1,10 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "charset",
+    srcs = ["charset.go"],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/gabriel-vasile/mimetype/internal/charset",
+    importpath = "github.com/gabriel-vasile/mimetype/internal/charset",
+    visibility = ["//vendor/github.com/gabriel-vasile/mimetype:__subpackages__"],
+    deps = ["//vendor/golang.org/x/net/html"],
+)

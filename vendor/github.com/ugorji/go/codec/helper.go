@@ -110,7 +110,8 @@ package codec
 //
 // ------------------------------------------
 // Bounds Checking
-//    - Allow bytesDecReader to incur "bounds check error", and recover that as an io error.
+//    - Allow bytesDecReader to incur "bounds check error", and
+//      recover that as an io.EOF.
 //      This allows the bounds check branch to always be taken by the branch predictor,
 //      giving better performance (in theory), while ensuring that the code is shorter.
 //
@@ -856,10 +857,26 @@ type BasicHandle struct {
 	// Once a Handle has been initialized (used), do not modify this option. It will be ignored.
 	TimeNotBuiltin bool
 
-	// ExplicitRelease is ignored and has no effect.
+	// ExplicitRelease configures whether Release() is implicitly called after an encode or
+	// decode call.
 	//
-	// Deprecated: Pools are only used for long-lived objects shared across goroutines.
-	// It is maintained for backward compatibility.
+	// If you will hold onto an Encoder or Decoder for re-use, by calling Reset(...)
+	// on it or calling (Must)Encode repeatedly into a given []byte or io.Writer,
+	// then you do not want it to be implicitly closed after each Encode/Decode call.
+	// Doing so will unnecessarily return resources to the shared pool, only for you to
+	// grab them right after again to do another Encode/Decode call.
+	//
+	// Instead, you configure ExplicitRelease=true, and you explicitly call Release() when
+	// you are truly done.
+	//
+	// As an alternative, you can explicitly set a finalizer - so its resources
+	// are returned to the shared pool before it is garbage-collected. Do it as below:
+	//    runtime.SetFinalizer(e, (*Encoder).Release)
+	//    runtime.SetFinalizer(d, (*Decoder).Release)
+	//
+	// Deprecated: This is not longer used as pools are only used for long-lived objects
+	// which are shared across goroutines.
+	// Setting this value has no effect. It is maintained for backward compatibility.
 	ExplicitRelease bool
 
 	// ---- cache line
@@ -2472,7 +2489,7 @@ func panicValToErr(h errDecorator, v interface{}, err *error) {
 	case runtime.Error:
 		d, dok := h.(*Decoder)
 		if dok && d.bytes && isSliceBoundsError(xerr.Error()) {
-			*err = io.ErrUnexpectedEOF
+			*err = io.EOF
 		} else {
 			h.wrapErr(xerr, err)
 		}
@@ -2786,7 +2803,7 @@ func freelistCapacity(length int) (capacity int) {
 // bytesFreelist is a list of byte buffers, sorted by cap.
 //
 // In anecdotal testing (running go test -tsd 1..6), we couldn't get
-// the length of the list > 4 at any time. So we believe a linear search
+// the length ofthe list > 4 at any time. So we believe a linear search
 // without bounds checking is sufficient.
 //
 // Typical usage model:
@@ -2804,7 +2821,7 @@ func freelistCapacity(length int) (capacity int) {
 //	v1 := v0
 //	... use v1 ...
 //	blist.put(v1)
-//	if !byteSliceSameData(v0, v1) {
+//	if byteSliceAddr(v0) != byteSliceAddr(v1) {
 //	  blist.put(v0)
 //	}
 type bytesFreelist [][]byte

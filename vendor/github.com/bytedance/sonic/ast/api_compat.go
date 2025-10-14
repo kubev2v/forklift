@@ -1,4 +1,4 @@
-// +build !amd64 !go1.16 go1.23
+// +build !amd64 go1.21
 
 /*
  * Copyright 2022 ByteDance Inc.
@@ -21,14 +21,11 @@ package ast
 import (
     `encoding/base64`
     `encoding/json`
+    `fmt`
 
     `github.com/bytedance/sonic/internal/native/types`
     `github.com/bytedance/sonic/internal/rt`
 )
-
-func init() {
-    println("WARNING: sonic only supports Go1.16~1.22 && CPU amd64, but your environment is not suitable")
-}
 
 func quote(buf *[]byte, val string) {
     quoteString(buf, val)
@@ -52,7 +49,7 @@ func encodeBase64(src []byte) string {
 }
 
 func (self *Parser) decodeValue() (val types.JsonState) {
-    e, v := decodeValue(self.s, self.p, self.dbuf == nil)
+    e, v := decodeValue(self.s, self.p)
     if e < 0 {
         return v
     }
@@ -87,25 +84,37 @@ func (self *Node) encodeInterface(buf *[]byte) error {
     return nil
 }
 
-func (self *Parser) getByPath(path ...interface{}) (int, types.ParsingError) {
+func (self *Searcher) GetByPath(path ...interface{}) (Node, error) {
+    self.parser.p = 0
+
     var err types.ParsingError
     for _, p := range path {
         if idx, ok := p.(int); ok && idx >= 0 {
-            if err = self.searchIndex(idx); err != 0 {
-                return -1, err
+            if err = self.parser.searchIndex(idx); err != 0 {
+                return Node{}, self.parser.ExportError(err)
             }
         } else if key, ok := p.(string); ok {
-            if err = self.searchKey(key); err != 0 {
-                return -1, err
+            if err = self.parser.searchKey(key); err != 0 {
+                return Node{}, self.parser.ExportError(err)
             }
         } else {
             panic("path must be either int(>=0) or string")
         }
     }
 
-    var start int
-    if start, err = self.skip(); err != 0 {
-        return -1, err
+    var start = self.parser.p
+    if start, err = self.parser.skip(); err != 0 {
+        return Node{}, self.parser.ExportError(err)
     }
-    return start, 0
+    ns := len(self.parser.s)
+    if self.parser.p > ns || start >= ns || start>=self.parser.p {
+        return Node{}, fmt.Errorf("skip %d char out of json boundary", start)
+    }
+
+    t := switchRawType(self.parser.s[start])
+    if t == _V_NONE {
+        return Node{}, self.parser.ExportError(err)
+    }
+
+    return newRawNode(self.parser.s[start:self.parser.p], t), nil
 }

@@ -1,0 +1,28 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go-json",
+    srcs = [
+        "color.go",
+        "decode.go",
+        "encode.go",
+        "error.go",
+        "json.go",
+        "option.go",
+        "path.go",
+        "query.go",
+    ],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/goccy/go-json",
+    importpath = "github.com/goccy/go-json",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/goccy/go-json/internal/decoder",
+        "//vendor/github.com/goccy/go-json/internal/encoder",
+        "//vendor/github.com/goccy/go-json/internal/encoder/vm",
+        "//vendor/github.com/goccy/go-json/internal/encoder/vm_color",
+        "//vendor/github.com/goccy/go-json/internal/encoder/vm_color_indent",
+        "//vendor/github.com/goccy/go-json/internal/encoder/vm_indent",
+        "//vendor/github.com/goccy/go-json/internal/errors",
+        "//vendor/github.com/goccy/go-json/internal/runtime",
+    ],
+)

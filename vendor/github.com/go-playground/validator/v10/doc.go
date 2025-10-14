@@ -194,13 +194,6 @@ such as min or max won't run, but if a value is set validation will run.
 
 	Usage: omitempty
 
-# Omit Nil
-
-Allows to skip the validation if the value is nil (same as omitempty, but
-only for the nil-values).
-
-	Usage: omitnil
-
 # Dive
 
 This tells the validator to dive into a slice, array or map and validate that
@@ -254,7 +247,7 @@ Example #2
 This validates that the value is not the data types default zero value.
 For numbers ensures value is not zero. For strings ensures value is
 not "". For slices, maps, pointers, interfaces, channels and functions
-ensures the value is not nil. For structs ensures value is not the zero value when using WithRequiredStructEnabled.
+ensures the value is not nil.
 
 	Usage: required
 
@@ -263,7 +256,7 @@ ensures the value is not nil. For structs ensures value is not the zero value wh
 The field under validation must be present and not empty only if all
 the other specified fields are equal to the value following the specified
 field. For strings ensures value is not "". For slices, maps, pointers,
-interfaces, channels and functions ensures the value is not nil. For structs ensures value is not the zero value.
+interfaces, channels and functions ensures the value is not nil.
 
 	Usage: required_if
 
@@ -280,7 +273,7 @@ Examples:
 The field under validation must be present and not empty unless all
 the other specified fields are equal to the value following the specified
 field. For strings ensures value is not "". For slices, maps, pointers,
-interfaces, channels and functions ensures the value is not nil. For structs ensures value is not the zero value.
+interfaces, channels and functions ensures the value is not nil.
 
 	Usage: required_unless
 
@@ -297,7 +290,7 @@ Examples:
 The field under validation must be present and not empty only if any
 of the other specified fields are present. For strings ensures value is
 not "". For slices, maps, pointers, interfaces, channels and functions
-ensures the value is not nil. For structs ensures value is not the zero value.
+ensures the value is not nil.
 
 	Usage: required_with
 
@@ -314,7 +307,7 @@ Examples:
 The field under validation must be present and not empty only if all
 of the other specified fields are present. For strings ensures value is
 not "". For slices, maps, pointers, interfaces, channels and functions
-ensures the value is not nil. For structs ensures value is not the zero value.
+ensures the value is not nil.
 
 	Usage: required_with_all
 
@@ -328,7 +321,7 @@ Example:
 The field under validation must be present and not empty only when any
 of the other specified fields are not present. For strings ensures value is
 not "". For slices, maps, pointers, interfaces, channels and functions
-ensures the value is not nil. For structs ensures value is not the zero value.
+ensures the value is not nil.
 
 	Usage: required_without
 
@@ -345,7 +338,7 @@ Examples:
 The field under validation must be present and not empty only when all
 of the other specified fields are not present. For strings ensures value is
 not "". For slices, maps, pointers, interfaces, channels and functions
-ensures the value is not nil. For structs ensures value is not the zero value.
+ensures the value is not nil.
 
 	Usage: required_without_all
 
@@ -359,7 +352,7 @@ Example:
 The field under validation must not be present or not empty only if all
 the other specified fields are equal to the value following the specified
 field. For strings ensures value is not "". For slices, maps, pointers,
-interfaces, channels and functions ensures the value is not nil. For structs ensures value is not the zero value.
+interfaces, channels and functions ensures the value is not nil.
 
 	Usage: excluded_if
 
@@ -376,7 +369,7 @@ Examples:
 The field under validation must not be present or empty unless all
 the other specified fields are equal to the value following the specified
 field. For strings ensures value is not "". For slices, maps, pointers,
-interfaces, channels and functions ensures the value is not nil. For structs ensures value is not the zero value.
+interfaces, channels and functions ensures the value is not nil.
 
 	Usage: excluded_unless
 
@@ -886,6 +879,8 @@ This is done using os.Stat and github.com/gabriel-vasile/mimetype
 
 	Usage: image
 
+# URL String
+
 # File Path
 
 This validates that a string value contains a valid file path but does not
@@ -1388,12 +1383,6 @@ This validates that a string is a valid 24 character hexadecimal string.
 This validates that a string value contains a valid cron expression.
 
 	Usage: cron
-
-# SpiceDb ObjectID/Permission/Object Type
-
-This validates that a string is valid for use with SpiceDb for the indicated purpose. If no purpose is given, a purpose of 'id' is assumed.
-
-	Usage: spicedb=id|permission|type
 
 # Alias Validators and Tags
 

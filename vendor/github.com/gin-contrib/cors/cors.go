@@ -17,17 +17,14 @@ type Config struct {
 	// Default value is []
 	AllowOrigins []string
 
-	// AllowOriginFunc is a custom function to validate the origin. It takes the origin
-	// as an argument and returns true if allowed or false otherwise. If this option is
+	// AllowOriginFunc is a custom function to validate the origin. It take the origin
+	// as argument and returns true if allowed or false otherwise. If this option is
 	// set, the content of AllowOrigins is ignored.
 	AllowOriginFunc func(origin string) bool
 
 	// AllowMethods is a list of methods the client is allowed to use with
-	// cross-domain requests. Default value is simple methods (GET, POST, PUT, PATCH, DELETE, HEAD, and OPTIONS)
+	// cross-domain requests. Default value is simple methods (GET and POST)
 	AllowMethods []string
-
-	// AllowPrivateNetwork indicates whether the response should include allow private network header
-	AllowPrivateNetwork bool
 
 	// AllowHeaders is list of non simple headers the client is allowed to use with
 	// cross-domain requests.
@@ -37,11 +34,11 @@ type Config struct {
 	// cookies, HTTP authentication or client side SSL certificates.
 	AllowCredentials bool
 
-	// ExposeHeaders indicates which headers are safe to expose to the API of a CORS
+	// ExposedHeaders indicates which headers are safe to expose to the API of a CORS
 	// API specification
 	ExposeHeaders []string
 
-	// MaxAge indicates how long (with second-precision) the results of a preflight request
+	// MaxAge indicates how long (in seconds) the results of a preflight request
 	// can be cached
 	MaxAge time.Duration
 
@@ -51,17 +48,11 @@ type Config struct {
 	// Allows usage of popular browser extensions schemas
 	AllowBrowserExtensions bool
 
-	// Allows to add custom schema like tauri://
-	CustomSchemas []string
-
 	// Allows usage of WebSocket protocol
 	AllowWebSockets bool
 
 	// Allows usage of file:// schema (dangerous!) use it only when you 100% sure it's needed
 	AllowFiles bool
-
-	// Allows to pass custom OPTIONS response status code for old browsers / clients
-	OptionsResponseStatusCode int
 }
 
 // AddAllowMethods is allowed to add custom methods
@@ -90,9 +81,6 @@ func (c Config) getAllowedSchemas() []string {
 	if c.AllowFiles {
 		allowedSchemas = append(allowedSchemas, FileSchemas...)
 	}
-	if c.CustomSchemas != nil {
-		allowedSchemas = append(allowedSchemas, c.CustomSchemas...)
-	}
 	return allowedSchemas
 }
 
@@ -107,7 +95,7 @@ func (c Config) validateAllowedSchemas(origin string) bool {
 }
 
 // Validate is check configuration of user defined.
-func (c Config) Validate() error {
+func (c *Config) Validate() error {
 	if c.AllowAllOrigins && (c.AllowOriginFunc != nil || len(c.AllowOrigins) > 0) {
 		return errors.New("conflict settings: all origins are allowed. AllowOriginFunc or AllowOrigins is not needed")
 	}
@@ -115,7 +103,10 @@ func (c Config) Validate() error {
 		return errors.New("conflict settings: all origins disabled")
 	}
 	for _, origin := range c.AllowOrigins {
-		if !strings.Contains(origin, "*") && !c.validateAllowedSchemas(origin) {
+		if origin == "*" {
+			c.AllowAllOrigins = true
+			return nil
+		} else if !strings.Contains(origin, "*") && !c.validateAllowedSchemas(origin) {
 			return errors.New("bad origin: origins must contain '*' or include " + strings.Join(c.getAllowedSchemas(), ","))
 		}
 	}
@@ -144,7 +135,7 @@ func (c Config) parseWildcardRules() [][]string {
 			continue
 		}
 		if i == (len(o) - 1) {
-			wRules = append(wRules, []string{o[:i], "*"})
+			wRules = append(wRules, []string{o[:i-1], "*"})
 			continue
 		}
 
@@ -157,7 +148,7 @@ func (c Config) parseWildcardRules() [][]string {
 // DefaultConfig returns a generic default configuration mapped to localhost.
 func DefaultConfig() Config {
 	return Config{
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"},
 		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type"},
 		AllowCredentials: false,
 		MaxAge:           12 * time.Hour,

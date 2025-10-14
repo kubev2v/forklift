@@ -1,0 +1,68 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "internal",
+    srcs = [
+        "counter.go",
+        "failer.go",
+        "focus.go",
+        "group.go",
+        "node.go",
+        "ordering.go",
+        "output_interceptor.go",
+        "output_interceptor_unix.go",
+        "output_interceptor_win.go",
+        "progress_report.go",
+        "progress_report_bsd.go",
+        "progress_report_unix.go",
+        "progress_report_win.go",
+        "progress_reporter_manager.go",
+        "report_entry.go",
+        "spec.go",
+        "spec_context.go",
+        "suite.go",
+        "tree.go",
+        "writer.go",
+    ],
+    importmap = "github.com/konveyor/forklift-controller/vendor/github.com/onsi/ginkgo/v2/internal",
+    importpath = "github.com/onsi/ginkgo/v2/internal",
+    visibility = ["//vendor/github.com/onsi/ginkgo/v2:__subpackages__"],
+    deps = [
+        "//vendor/github.com/go-logr/logr",
+        "//vendor/github.com/go-logr/logr/funcr",
+        "//vendor/github.com/onsi/ginkgo/v2/internal/interrupt_handler",
+        "//vendor/github.com/onsi/ginkgo/v2/internal/parallel_support",
+        "//vendor/github.com/onsi/ginkgo/v2/reporters",
+        "//vendor/github.com/onsi/ginkgo/v2/types",
+        "//vendor/golang.org/x/net/context",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/golang.org/x/sys/unix",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//vendor/golang.org/x/sys/unix",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//vendor/golang.org/x/sys/unix",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//vendor/golang.org/x/sys/unix",
+        ],
+        "@io_bazel_rules_go//go/platform:ios": [
+            "//vendor/golang.org/x/sys/unix",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/golang.org/x/sys/unix",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//vendor/golang.org/x/sys/unix",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//vendor/golang.org/x/sys/unix",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//vendor/golang.org/x/sys/unix",
+        ],
+        "//conditions:default": [],
+    }),
+)
