@@ -100,13 +100,21 @@ type ProviderStatus struct {
 	// Fingerprint.
 	// +optional
 	Fingerprint string `json:"fingerprint,omitempty"`
-	// Externally routable provider URLs
+	// Provider URLs
 	// +optional
-	URLs []ProviderURL `json:"urls,omitempty"`
+	Service *core.ObjectReference `json:"service,omitempty"`
 }
 
+type ProviderURLKind string
+
+const (
+	Route   ProviderURLKind = "route"
+	Service ProviderURLKind = "service"
+)
+
 type ProviderURL struct {
-	URL string `json:"url,omitempty"`
+	URL  string          `json:"url,omitempty"`
+	Kind ProviderURLKind `json:"kind,omitempty"`
 }
 
 // +genclient
