@@ -105,18 +105,6 @@ type ProviderStatus struct {
 	Service *core.ObjectReference `json:"service,omitempty"`
 }
 
-type ProviderURLKind string
-
-const (
-	Route   ProviderURLKind = "route"
-	Service ProviderURLKind = "service"
-)
-
-type ProviderURL struct {
-	URL  string          `json:"url,omitempty"`
-	Kind ProviderURLKind `json:"kind,omitempty"`
-}
-
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:openapi-gen=true
