@@ -108,6 +108,8 @@ func (r *ProxyServer) Proxy(ctx *gin.Context) {
 		proxy = &httputil.ReverseProxy{
 			Rewrite: func(req *httputil.ProxyRequest) {
 				req.SetURL(u)
+				req.Out.URL.Path = u.Path
+				req.Out.URL.RawPath = u.Path
 				req.SetXForwarded()
 			},
 		}
