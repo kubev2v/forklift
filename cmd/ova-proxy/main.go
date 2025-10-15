@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -80,13 +79,13 @@ func (r *ProxyServer) Proxy(ctx *gin.Context) {
 	proxy, ok := r.Cache.Get(key)
 	if !ok {
 		provider := &api.Provider{}
-		err := r.Client.Get(context.Background(), types.NamespacedName{
+		err := r.Client.Get(ctx.Request.Context(), types.NamespacedName{
 			Namespace: providerNamespace,
 			Name:      providerName,
 		},
 			provider)
 		if err != nil {
-			r.Log.Error(err, "error getting provider", "provider", provider.Name)
+			r.Log.Error(err, "error getting provider", "provider", key)
 			errorCode := http.StatusInternalServerError
 			if k8serr.IsNotFound(err) {
 				errorCode = http.StatusNotFound
@@ -96,7 +95,7 @@ func (r *ProxyServer) Proxy(ctx *gin.Context) {
 		}
 		if provider.Status.Service == nil {
 			r.Log.Error(errors.New("not ready"), "provider service is not ready")
-			_ = ctx.AbortWithError(http.StatusServiceUnavailable, fmt.Errorf("provider %s service is not ready", providerName))
+			_ = ctx.AbortWithError(http.StatusServiceUnavailable, fmt.Errorf("provider %s service is not ready", key))
 			return
 		}
 		service := provider.Status.Service
@@ -106,10 +105,11 @@ func (r *ProxyServer) Proxy(ctx *gin.Context) {
 			_ = ctx.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}
-		proxy = httputil.NewSingleHostReverseProxy(u)
-		proxy.Rewrite = func(req *httputil.ProxyRequest) {
-			req.SetURL(u)
-			req.SetXForwarded()
+		proxy = &httputil.ReverseProxy{
+			Rewrite: func(req *httputil.ProxyRequest) {
+				req.SetURL(u)
+				req.SetXForwarded()
+			},
 		}
 		r.Cache.Add(key, proxy)
 	}
