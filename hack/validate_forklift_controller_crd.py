@@ -162,6 +162,15 @@ def load_tasks_variables(tasks_file):
         'metric_interval',
         'metric_port_name',
         'metrics_rule_name',
+        # OVA Proxy configuration
+        'ova_proxy_container_name',
+        'ova_proxy_certificate_name',
+        'ova_proxy_issuer_name',
+        'ova_proxy_route_name',
+        'ova_proxy_route_timeout',
+        'ova_proxy_service_name',
+        'ova_proxy_subapp_name',
+        'ova_proxy_tls_secret_name',
         # Additional internal variables that should not be CRD properties  
         'app_namespace',
         'forklift_resources',

@@ -384,6 +384,24 @@ spec:
                 description: "OVA memory request (default: 150Mi)"
                 example: "300Mi"
 
+              # OVA Proxy Settings
+              ova_proxy_container_limits_cpu:
+                type: string
+                description: "OVA Proxy CPU limit (default: 1000m)"
+                example: "2000m"
+              ova_proxy_container_limits_memory:
+                type: string
+                description: "OVA Proxy memory limit (default: 1Gi)"
+                example: "2Gi"
+              ova_proxy_container_requests_cpu:
+                type: string
+                description: "OVA Proxy CPU request (default: 250m)"
+                example: "200m"
+              ova_proxy_container_requests_memory:
+                type: string
+                description: "OVA Proxy memory request (default: 512Mi)"
+                example: "300Mi"
+
               # Logging & General Settings
               controller_log_level:
                 type: string
