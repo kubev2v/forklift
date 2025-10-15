@@ -15,6 +15,11 @@ COPY --from=opm /bin/opm /bin/opm
 COPY operator /app
 WORKDIR /app
 
+# Add a configure container policy to allow pulling from insecure registries
+# Ref: https://github.com/containers/image/blob/main/docs/containers-policy.json.5.md
+RUN mkdir -p /etc/containers && \
+    echo '{"default":[{"type":"insecureAcceptAnything"}]}' > /etc/containers/policy.json
+
 RUN cat catalog/operator.yml | envsubst > operator.yaml
 RUN opm render ${OPERATOR_BUNDLE_IMAGE} ${OPM_OPTS} -o yaml >> operator.yaml
 
