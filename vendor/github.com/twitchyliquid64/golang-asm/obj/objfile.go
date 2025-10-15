@@ -8,13 +8,13 @@ package obj
 
 import (
 	"bytes"
-	"crypto/sha1"
-	"encoding/binary"
-	"fmt"
 	"github.com/twitchyliquid64/golang-asm/bio"
 	"github.com/twitchyliquid64/golang-asm/goobj"
 	"github.com/twitchyliquid64/golang-asm/objabi"
 	"github.com/twitchyliquid64/golang-asm/sys"
+	"crypto/sha1"
+	"encoding/binary"
+	"fmt"
 	"io"
 	"path/filepath"
 	"sort"
@@ -359,14 +359,14 @@ func contentHash64(s *LSym) goobj.Hash64Type {
 // Depending on the category of the referenced symbol, we choose
 // different hash algorithms such that the hash is globally
 // consistent.
-//   - For referenced content-addressable symbol, its content hash
-//     is globally consistent.
-//   - For package symbol and builtin symbol, its local index is
-//     globally consistent.
-//   - For non-package symbol, its fully-expanded name is globally
-//     consistent. For now, we require we know the current package
-//     path so we can always expand symbol names. (Otherwise,
-//     symbols with relocations are not considered hashable.)
+// - For referenced content-addressable symbol, its content hash
+//   is globally consistent.
+// - For package symbol and builtin symbol, its local index is
+//   globally consistent.
+// - For non-package symbol, its fully-expanded name is globally
+//   consistent. For now, we require we know the current package
+//   path so we can always expand symbol names. (Otherwise,
+//   symbols with relocations are not considered hashable.)
 //
 // For now, we assume there is no circular dependencies among
 // hashed symbols.
