@@ -2,12 +2,12 @@ package ova
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/labeler"
 	"github.com/kubev2v/forklift/pkg/settings"
-	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -43,6 +43,10 @@ const (
 	CatalogPath        = "CATALOG_PATH"
 	ApplianceEndpoints = "APPLIANCE_ENDPOINTS"
 	AuthRequired       = "AUTH_REQUIRED"
+)
+
+const (
+	SettingApplianceManagement = "applianceManagement"
 )
 
 type Labeler struct {
@@ -98,7 +102,6 @@ func (r *Builder) PersistentVolume(provider *api.Provider) (pv *core.PersistentV
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: r.prefix(provider),
 			Labels:       r.Labeler.ServerLabels(provider, r.OVAProviderServer),
-			Namespace:    Settings.Namespace,
 		},
 		Spec: core.PersistentVolumeSpec{
 			Capacity: core.ResourceList{
@@ -116,7 +119,6 @@ func (r *Builder) PersistentVolume(provider *api.Provider) (pv *core.PersistentV
 			PersistentVolumeReclaimPolicy: core.PersistentVolumeReclaimRetain,
 		},
 	}
-	r.Labeler.SetOwnerReference(r.OVAProviderServer, pv, false, false)
 	return
 }
 
@@ -140,7 +142,6 @@ func (r *Builder) PersistentVolumeClaim(provider *api.Provider, pv *core.Persist
 			},
 		},
 	}
-	r.Labeler.SetOwnerReference(r.OVAProviderServer, pvc, false, false)
 	return
 }
 
@@ -167,7 +168,6 @@ func (r *Builder) Deployment(provider *api.Provider, pvc *core.PersistentVolumeC
 			},
 		},
 	}
-	r.Labeler.SetOwnerReference(r.OVAProviderServer, deployment, false, false)
 	return
 }
 
@@ -208,11 +208,11 @@ func (r *Builder) PodSpec(provider *api.Provider, pvc *core.PersistentVolumeClai
 					},
 					{
 						Name:  CatalogPath,
-						Value: r.NFSMountPath(),
+						Value: r.nfsMountPath(),
 					},
 					{
 						Name:  ApplianceEndpoints,
-						Value: "true",
+						Value: r.applianceEndpoints(provider),
 					},
 					{
 						Name:  AuthRequired,
@@ -255,30 +255,6 @@ func (r *Builder) Service(provider *api.Provider) (svc *core.Service) {
 			Type: core.ServiceTypeClusterIP,
 		},
 	}
-	r.Labeler.SetOwnerReference(r.OVAProviderServer, svc, false, false)
-	return
-}
-
-func (r *Builder) Route(provider *api.Provider, svc *core.Service) (route *routev1.Route) {
-	route = &routev1.Route{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: r.prefix(provider),
-			Namespace:    Settings.Namespace,
-			Labels:       r.Labeler.ServerLabels(provider, r.OVAProviderServer),
-		},
-		Spec: routev1.RouteSpec{
-			Path: "/appliances",
-			To: routev1.RouteTargetReference{
-				Kind: "Service",
-				Name: svc.Name,
-			},
-			TLS: &routev1.TLSConfig{
-				Termination:                   routev1.TLSTerminationEdge,
-				InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
-			},
-		},
-	}
-	r.Labeler.SetOwnerReference(r.OVAProviderServer, route, false, false)
 	return
 }
 
@@ -297,10 +273,16 @@ func (r *Builder) securityContext() (sc *core.SecurityContext) {
 	return
 }
 
+func (r *Builder) applianceEndpoints(provider *api.Provider) string {
+	gateEnabled := Settings.Features.OVAApplianceManagement
+	providerEnabled, _ := strconv.ParseBool(provider.Spec.Settings[SettingApplianceManagement])
+	return strconv.FormatBool(gateEnabled && providerEnabled)
+}
+
 func (r *Builder) containerImage() string {
 	return Settings.Providers.OVA.Pod.ContainerImage
 }
 
-func (r *Builder) NFSMountPath() string {
+func (r *Builder) nfsMountPath() string {
 	return NFSVolumeMountPath
 }

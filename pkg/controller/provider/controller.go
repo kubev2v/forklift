@@ -230,6 +230,13 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		if err != nil {
 			return
 		}
+		clonedProvider := provider.DeepCopy()
+		k8sutil.RemoveFinalizer(provider, api.OvaProviderFinalizer)
+		if pErr := r.Patch(context.TODO(), provider, client.MergeFrom(clonedProvider)); err != nil {
+			r.Log.Error(pErr, "Failed to remove finalizer", "provider", provider)
+			err = pErr
+			return
+		}
 	}
 
 	// Begin staging conditions.
@@ -450,11 +457,6 @@ func (r *Reconciler) removeVolumeOfOVAServer(provider *api.Provider) error {
 				r.Log.Error(err, "Failed to delete PV", "PV", pv)
 				return err
 			}
-		}
-		clonedProvider := provider.DeepCopy()
-		k8sutil.RemoveFinalizer(provider, api.OvaProviderFinalizer)
-		if err := r.Patch(context.TODO(), provider, client.MergeFrom(clonedProvider)); err != nil {
-			r.Log.Error(err, "Failed to remove finalizer", "provider", provider)
 		}
 	}
 	return nil

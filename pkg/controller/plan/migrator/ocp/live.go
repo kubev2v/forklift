@@ -1059,7 +1059,10 @@ func (r *Ensurer) EnsureOwnerReferences(vm *planapi.VMStatus) (err error) {
 	}
 	for i := range dvs.Items {
 		dv := &dvs.Items[i]
-		r.Labeler.SetBlockingOwnerReference(target, dv)
+		err = r.Labeler.SetBlockingOwnerReference(r.Scheme(), target, dv)
+		if err != nil {
+			return
+		}
 		err = r.Destination.Client.Update(context.Background(), dv)
 		if err != nil {
 			err = liberr.Wrap(err)
@@ -1080,7 +1083,10 @@ func (r *Ensurer) EnsureOwnerReferences(vm *planapi.VMStatus) (err error) {
 	}
 	for i := range pvcs.Items {
 		pvc := &pvcs.Items[i]
-		r.Labeler.SetBlockingOwnerReference(target, pvc)
+		err = r.Labeler.SetBlockingOwnerReference(r.Scheme(), target, pvc)
+		if err != nil {
+			return
+		}
 		err = r.Destination.Client.Update(context.Background(), pvc)
 		if err != nil {
 			err = liberr.Wrap(err)

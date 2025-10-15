@@ -1,8 +1,10 @@
 package labeler
 
 import (
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 type Labeler struct{}
@@ -65,23 +67,23 @@ func (r *Labeler) DeleteAnnotation(object client.Object, key string) {
 	object.SetAnnotations(annotations)
 }
 
-func (r *Labeler) SetBlockingOwnerReference(owner client.Object, object client.Object) {
-	r.SetOwnerReference(owner, object, true, false)
+func (r *Labeler) SetBlockingOwnerReference(scheme *runtime.Scheme, owner client.Object, object client.Object) (err error) {
+	err = r.SetOwnerReference(scheme, owner, object, true, false)
+	return
 }
 
-func (r *Labeler) SetOwnerReference(owner client.Object, object client.Object, blockOwnerDeletion bool, isController bool) {
-	kind := owner.GetObjectKind().GroupVersionKind().Kind
-	apiVersion := owner.GetObjectKind().GroupVersionKind().GroupVersion().String()
-	reference := meta.OwnerReference{
-		APIVersion:         apiVersion,
-		Kind:               kind,
-		Name:               owner.GetName(),
-		UID:                owner.GetUID(),
-		BlockOwnerDeletion: &blockOwnerDeletion,
-		Controller:         &isController,
+func (r *Labeler) SetOwnerReference(scheme *runtime.Scheme, owner client.Object, object client.Object, blockOwnerDeletion bool, isController bool) (err error) {
+	if isController {
+		err = controllerutil.SetControllerReference(
+			owner, object, scheme,
+			controllerutil.WithBlockOwnerDeletion(blockOwnerDeletion),
+		)
+	} else {
+		err = controllerutil.SetOwnerReference(
+			owner, object, scheme,
+			controllerutil.WithBlockOwnerDeletion(blockOwnerDeletion),
+		)
 	}
-
-	references := object.GetOwnerReferences()
-	references = append(references, reference)
-	object.SetOwnerReferences(references)
+	err = liberr.Wrap(err)
+	return
 }

@@ -2,17 +2,21 @@ package ova
 
 import (
 	"context"
+	"strconv"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/base"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/storage/names"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -20,7 +24,9 @@ import (
 )
 
 const (
-	Name = "ova-server"
+	Name                       = "ova-server"
+	ApplianceManagementEnabled = "ApplianceManagementEnabled"
+	FeatureEnabled             = "FeatureEnabled"
 )
 
 var log = logging.WithName(Name)
@@ -78,7 +84,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 	ova := &api.OVAProviderServer{}
 	err = r.Get(ctx, request.NamespacedName, ova)
 	if err != nil {
-		if kerrors.IsNotFound(err) {
+		if k8serrors.IsNotFound(err) {
 			r.Log.Info("OVA provider server deleted.")
 			err = nil
 		}
@@ -89,12 +95,25 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		r.Log.V(2).Info("Conditions.", "all", ova.Status.Conditions)
 	}()
 
-	err = r.DeployOVAProviderServer(ctx, ova)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
+	if ova.DeletionTimestamp.IsZero() {
+		err = r.AddFinalizer(ova)
+		if err != nil {
+			return
+		}
+		err = r.Deploy(ctx, ova)
+		if err != nil {
+			return
+		}
+	} else {
+		err = r.Teardown(ctx, ova)
+		if err != nil {
+			return
+		}
+		err = r.RemoveFinalizer(ova)
+		if err != nil {
+			return
+		}
 	}
-
 	err = r.Status().Update(ctx, ova)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -105,10 +124,32 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 	return
 }
 
-func (r *Reconciler) DeployOVAProviderServer(ctx context.Context, ova *api.OVAProviderServer) (err error) {
-	if ova.Status.Phase == libcnd.Ready {
-		return
+func (r *Reconciler) AddFinalizer(ova *api.OVAProviderServer) (err error) {
+	patch := client.MergeFrom(ova.DeepCopy())
+	if controllerutil.AddFinalizer(ova, api.OvaProviderFinalizer) {
+		err = r.Patch(context.TODO(), ova, patch)
+		if err != nil {
+			err = liberr.Wrap(err)
+			r.Log.Error(err, "failed to add finalizer", "server", ova.Name, "namespace", ova.Namespace)
+			return
+		}
 	}
+	return
+}
+
+func (r *Reconciler) RemoveFinalizer(ova *api.OVAProviderServer) (err error) {
+	patch := client.MergeFrom(ova.DeepCopy())
+	if controllerutil.RemoveFinalizer(ova, api.OvaProviderFinalizer) {
+		err = r.Patch(context.TODO(), ova, patch)
+		if err != nil {
+			err = liberr.Wrap(err)
+			r.Log.Error(err, "failed to remove finalizer", "server", ova.Name, "namespace", ova.Namespace)
+			return
+		}
+	}
+	return
+}
+func (r *Reconciler) Deploy(ctx context.Context, ova *api.OVAProviderServer) (err error) {
 	provider := &api.Provider{}
 	err = r.Get(
 		context.TODO(),
@@ -124,29 +165,41 @@ func (r *Reconciler) DeployOVAProviderServer(ctx context.Context, ova *api.OVAPr
 		return
 	}
 
-	builder := Builder{OVAProviderServer: ova}
-	ensurer := Ensurer{
-		Client: r.Client,
+	build := Builder{OVAProviderServer: ova}
+	ensure := Ensurer{
+		Client:            r.Client,
+		OVAProviderServer: ova,
+		Log:               r.Log,
 	}
-	pv := builder.PersistentVolume(provider)
-	pv, err = ensurer.PersistentVolume(ctx, pv)
+	pv := build.PersistentVolume(provider)
+	pv, err = ensure.PersistentVolume(ctx, pv)
 	if err != nil {
 		return
 	}
-	pvc := builder.PersistentVolumeClaim(provider, pv)
-	pvc, err = ensurer.PersistentVolumeClaim(ctx, pvc)
+	pvc := build.PersistentVolumeClaim(provider, pv)
+	pvc, err = ensure.PersistentVolumeClaim(ctx, pvc)
 	if err != nil {
 		return
 	}
-	deployment := builder.Deployment(provider, pvc)
-	err = ensurer.Deployment(ctx, deployment)
+	deployment := build.Deployment(provider, pvc)
+	err = ensure.Deployment(ctx, deployment)
 	if err != nil {
 		return
 	}
-	service := builder.Service(provider)
-	service, err = ensurer.Service(ctx, service)
+	service := build.Service(provider)
+	service, err = ensure.Service(ctx, service)
 	if err != nil {
 		return
+	}
+	if r.managementEndpoints(deployment) {
+		ova.Status.SetCondition(
+			libcnd.Condition{
+				Type:     ApplianceManagementEnabled,
+				Status:   libcnd.True,
+				Reason:   FeatureEnabled,
+				Category: libcnd.Advisory,
+				Message:  "OVA appliance management endpoints are enabled for this provider.",
+			})
 	}
 	ova.Status.Service = &v1.ObjectReference{
 		Kind:      "Service",
@@ -155,4 +208,54 @@ func (r *Reconciler) DeployOVAProviderServer(ctx context.Context, ova *api.OVAPr
 	}
 	ova.Status.Phase = libcnd.Ready
 	return
+}
+
+func (r *Reconciler) Teardown(ctx context.Context, ova *api.OVAProviderServer) (err error) {
+	provider := &api.Provider{}
+	err = r.Get(
+		context.TODO(),
+		types.NamespacedName{
+			Namespace: ova.Spec.Provider.Namespace,
+			Name:      ova.Spec.Provider.Name,
+		},
+		provider,
+	)
+	if err != nil {
+		log.Error(err, "Failed to get provider CR.")
+		err = liberr.Wrap(err)
+		return
+	}
+	del := Deleter{
+		OVAProviderServer: ova,
+		Client:            r.Client,
+		Log:               r.Log,
+	}
+	err = del.Service(ctx, provider)
+	if err != nil {
+		return
+	}
+	err = del.Deployment(ctx, provider)
+	if err != nil {
+		return
+	}
+	err = del.PersistentVolumeClaim(ctx, provider)
+	if err != nil {
+		return
+	}
+	err = del.PersistentVolume(ctx, provider)
+	if err != nil {
+		return
+	}
+	return
+}
+
+func (r *Reconciler) managementEndpoints(deployment *appsv1.Deployment) bool {
+	for _, container := range deployment.Spec.Template.Spec.Containers {
+		for _, env := range container.Env {
+			if env.Name == ApplianceEndpoints {
+				return env.Value == strconv.FormatBool(true)
+			}
+		}
+	}
+	return false
 }

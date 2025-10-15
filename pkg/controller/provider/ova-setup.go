@@ -14,7 +14,7 @@ import (
 
 func (r Reconciler) EnsureOVAProviderServer(ctx context.Context, provider *api.Provider) (err error) {
 	builder := ova.Builder{}
-	ensurer := ova.Ensurer{Client: r.Client}
+	ensurer := ova.Ensurer{Client: r.Client, Log: r.Log}
 	server := builder.ProviderServer(provider)
 	server, err = ensurer.ProviderServer(ctx, server)
 	if err != nil {
@@ -36,7 +36,7 @@ func (r Reconciler) DeleteOVAProviderServer(ctx context.Context, provider *api.P
 		err = liberr.Wrap(err)
 		return
 	}
-	propagation := v1.DeletePropagationBackground
+	propagation := v1.DeletePropagationForeground
 	for i := range list.Items {
 		item := &list.Items[i]
 		err = r.Delete(ctx, item, &k8sclient.DeleteOptions{PropagationPolicy: &propagation})

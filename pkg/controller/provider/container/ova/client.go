@@ -48,6 +48,10 @@ func (r *Client) Connect(provider *api.Provider) (err error) {
 		},
 	}
 
+	if provider.Status.Service == nil {
+		err = liberr.New("OVA inventory service not ready.")
+		return
+	}
 	service := provider.Status.Service
 	svcURL := fmt.Sprintf("http://%s.%s.svc.cluster.local:8080", service.Name, service.Namespace)
 

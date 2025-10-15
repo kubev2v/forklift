@@ -5,7 +5,7 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
-	routev1 "github.com/openshift/api/route/v1"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 	appsv1 "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	k8slabels "k8s.io/apimachinery/pkg/labels"
@@ -13,7 +13,9 @@ import (
 )
 
 type Ensurer struct {
-	Labeler
+	OVAProviderServer *api.OVAProviderServer
+	Labeler           Labeler
+	Log               logging.LevelLogger
 	k8sclient.Client
 }
 
@@ -42,6 +44,7 @@ func (r *Ensurer) ProviderServer(ctx context.Context, server *api.OVAProviderSer
 			err = liberr.Wrap(err)
 			return
 		}
+		r.Log.Info("Created OVAProviderServer.", "server", server.Name, "namespace", server.Namespace)
 		out = server
 	} else {
 		out = &existing[0]
@@ -53,7 +56,6 @@ func (r *Ensurer) PersistentVolume(ctx context.Context, pv *core.PersistentVolum
 	list := &core.PersistentVolumeList{}
 	err = r.List(ctx, list, &k8sclient.ListOptions{
 		LabelSelector: k8slabels.SelectorFromSet(pv.Labels),
-		Namespace:     pv.Namespace,
 	})
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -65,6 +67,7 @@ func (r *Ensurer) PersistentVolume(ctx context.Context, pv *core.PersistentVolum
 			err = liberr.Wrap(err)
 			return
 		}
+		r.Log.Info("Created PersistentVolume.", "pv", pv.Name, "server", r.OVAProviderServer.Name, "namespace", r.OVAProviderServer.Namespace)
 		out = pv
 	} else {
 		out = &list.Items[0]
@@ -83,11 +86,16 @@ func (r *Ensurer) PersistentVolumeClaim(ctx context.Context, pvc *core.Persisten
 		return
 	}
 	if len(list.Items) == 0 {
+		err = r.Labeler.SetBlockingOwnerReference(r.Scheme(), r.OVAProviderServer, pvc)
+		if err != nil {
+			return
+		}
 		err = r.Create(ctx, pvc)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
 		}
+		r.Log.Info("Created PersistentVolumeClaim.", "pvc", pvc.Name, "server", r.OVAProviderServer.Name, "namespace", r.OVAProviderServer.Namespace)
 		out = pvc
 	} else {
 		out = &list.Items[0]
@@ -106,11 +114,16 @@ func (r *Ensurer) Deployment(ctx context.Context, deployment *appsv1.Deployment)
 		return
 	}
 	if len(list.Items) == 0 {
+		err = r.Labeler.SetBlockingOwnerReference(r.Scheme(), r.OVAProviderServer, deployment)
+		if err != nil {
+			return
+		}
 		err = r.Create(ctx, deployment)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
 		}
+		r.Log.Info("Created Deployment.", "deployment", deployment.Name, "server", r.OVAProviderServer.Name, "namespace", r.OVAProviderServer.Namespace)
 	}
 	return
 }
@@ -126,37 +139,19 @@ func (r *Ensurer) Service(ctx context.Context, svc *core.Service) (out *core.Ser
 		return
 	}
 	if len(list.Items) == 0 {
+		err = r.Labeler.SetBlockingOwnerReference(r.Scheme(), r.OVAProviderServer, svc)
+		if err != nil {
+			return
+		}
 		err = r.Create(ctx, svc)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
 		}
+		r.Log.Info("Created Service.", "service", svc.Name, "server", r.OVAProviderServer.Name, "namespace", r.OVAProviderServer.Namespace)
 		out = svc
 	} else {
 		out = &list.Items[0]
-	}
-	return
-}
-
-func (r *Ensurer) Route(ctx context.Context, route *routev1.Route) (out *routev1.Route, err error) {
-	list := &routev1.RouteList{}
-	err = r.List(ctx, list, &k8sclient.ListOptions{
-		LabelSelector: k8slabels.SelectorFromSet(route.Labels),
-		Namespace:     route.Namespace,
-	})
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	if len(list.Items) == 0 {
-		err = r.Create(ctx, route)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-		out = route
-	} else {
-		route = &list.Items[0]
 	}
 	return
 }
