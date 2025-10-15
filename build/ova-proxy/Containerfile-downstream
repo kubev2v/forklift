@@ -12,8 +12,8 @@ FROM registry.redhat.io/ubi9-minimal:9.6-1752587672
 # RUN microdnf -y update && microdnf -y clean all
 # Required to be able to get files from within the pod
 
-COPY --from=builder /app/manager /usr/local/bin/forklift-controller
-ENTRYPOINT ["/usr/local/bin/forklift-controller"]
+COPY --from=builder /app/proxy /usr/local/bin/ova-proxy
+ENTRYPOINT ["/usr/local/bin/ova-proxy"]
 
 ARG VERSION
 ARG REGISTRY
