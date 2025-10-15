@@ -45,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	cnv "kubevirt.io/api/core/v1"
 	instancetypeapi "kubevirt.io/api/instancetype"
@@ -2519,12 +2520,26 @@ func (r *KubeVirt) ensureConfigMap(vmRef ref.Ref) (configMap *core.ConfigMap, er
 	if err != nil {
 		return
 	}
+
+	//Get base selector for the VM
+	selector := r.vmLabels(vmRef)
+
+	// Create "step doesn't exist" requirement
+	requiredLabels, err := k8slabels.NewRequirement(kStep, selection.DoesNotExist, nil)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	// Combine base selector with "step doesn't exist" requirement {migration, plan, vmID, !step}
+	labelsSelector := k8slabels.SelectorFromSet(selector).Add(*requiredLabels)
+
 	list := &core.ConfigMapList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(r.vmLabels(vmRef)),
+			LabelSelector: labelsSelector,
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
