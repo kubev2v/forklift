@@ -232,7 +232,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		}
 		clonedProvider := provider.DeepCopy()
 		k8sutil.RemoveFinalizer(provider, api.OvaProviderFinalizer)
-		if pErr := r.Patch(context.TODO(), provider, client.MergeFrom(clonedProvider)); err != nil {
+		if pErr := r.Patch(context.TODO(), provider, client.MergeFrom(clonedProvider)); pErr != nil {
 			r.Log.Error(pErr, "Failed to remove finalizer", "provider", provider)
 			err = pErr
 			return

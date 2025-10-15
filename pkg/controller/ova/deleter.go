@@ -38,10 +38,10 @@ func (r *Deleter) Service(ctx context.Context, provider *api.Provider) (err erro
 				err = nil
 				continue
 			}
-			r.Log.Error(err, "failed to delete Service for provider server", "service", item.Name, "server", r.OVAProviderServer.Name, "namespace", r.OVAProviderServer.Name)
+			r.Log.Error(err, "failed to delete Service for provider server", "service", item.Name, "server", r.OVAProviderServer.Name, "namespace", r.OVAProviderServer.Namespace)
 			return
 		}
-		r.Log.Info("deleted Service for provider server", "service", item.Name, "server", r.OVAProviderServer.Name, "namespace", r.OVAProviderServer.Name)
+		r.Log.Info("deleted Service for provider server", "service", item.Name, "server", r.OVAProviderServer.Name, "namespace", r.OVAProviderServer.Namespace)
 	}
 	return
 }
@@ -64,10 +64,10 @@ func (r *Deleter) Deployment(ctx context.Context, provider *api.Provider) (err e
 				err = nil
 				continue
 			}
-			r.Log.Error(err, "failed to delete Deployment for provider server", "deployment", item.Name, "server", r.OVAProviderServer.Name, "namespace", r.OVAProviderServer.Name)
+			r.Log.Error(err, "failed to delete Deployment for provider server", "deployment", item.Name, "server", r.OVAProviderServer.Name, "namespace", r.OVAProviderServer.Namespace)
 			return
 		}
-		r.Log.Info("deleted Deployment for provider server", "service", item.Name, "server", r.OVAProviderServer.Name, "namespace", r.OVAProviderServer.Name)
+		r.Log.Info("deleted Deployment for provider server", "service", item.Name, "server", r.OVAProviderServer.Name, "namespace", r.OVAProviderServer.Namespace)
 	}
 	return
 }
@@ -90,10 +90,10 @@ func (r *Deleter) PersistentVolumeClaim(ctx context.Context, provider *api.Provi
 				err = nil
 				continue
 			}
-			r.Log.Error(err, "failed to delete PVC for provider server", "pvc", item.Name, "server", r.OVAProviderServer.Name, "namespace", r.OVAProviderServer.Name)
+			r.Log.Error(err, "failed to delete PVC for provider server", "pvc", item.Name, "server", r.OVAProviderServer.Name, "namespace", r.OVAProviderServer.Namespace)
 			return
 		}
-		r.Log.Info("deleted PVC for provider server", "pvc", item.Name, "server", r.OVAProviderServer.Name, "namespace", r.OVAProviderServer.Name)
+		r.Log.Info("deleted PVC for provider server", "pvc", item.Name, "server", r.OVAProviderServer.Name, "namespace", r.OVAProviderServer.Namespace)
 	}
 	return
 }
@@ -115,10 +115,10 @@ func (r *Deleter) PersistentVolume(ctx context.Context, provider *api.Provider) 
 				err = nil
 				continue
 			}
-			r.Log.Error(err, "failed to delete PV for provider server", "pv", item.Name, "server", r.OVAProviderServer.Name, "namespace", r.OVAProviderServer.Name)
+			r.Log.Error(err, "failed to delete PV for provider server", "pv", item.Name, "server", r.OVAProviderServer.Name, "namespace", r.OVAProviderServer.Namespace)
 			return
 		}
-		r.Log.Info("deleted PV for provider server", "pv", item.Name, "server", r.OVAProviderServer.Name, "namespace", r.OVAProviderServer.Name)
+		r.Log.Info("deleted PV for provider server", "pv", item.Name, "server", r.OVAProviderServer.Name, "namespace", r.OVAProviderServer.Namespace)
 	}
 	return
 }
