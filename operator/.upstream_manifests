@@ -195,6 +195,11 @@ spec:
                 - "false"
                 type: string
               feature_ocp_live_migration:
+                enum:
+                - "true"
+                - "false"
+                type: string
+              feature_ova_appliance_management:
                 description: 'Enable OCP live migration (default: false)'
                 enum:
                 - "true"

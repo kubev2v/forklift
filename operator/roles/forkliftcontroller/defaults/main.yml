@@ -10,6 +10,7 @@ feature_copy_offload: false
 feature_ocp_live_migration: false
 feature_vmware_system_serial_number: true
 feature_cli_download: true
+feature_ova_appliance_management: false
 
 k8s_cluster: false
 feature_auth_required: true
