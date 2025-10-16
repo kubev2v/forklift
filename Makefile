@@ -86,6 +86,7 @@ POPULATOR_CONTROLLER_IMAGE ?= quay.io/kubev2v/populator-controller:latest
 OVIRT_POPULATOR_IMAGE ?= quay.io/kubev2v/ovirt-populator:latest
 OPENSTACK_POPULATOR_IMAGE ?= quay.io/kubev2v/openstack-populator:latest
 OVA_PROVIDER_SERVER_IMAGE ?= quay.io/kubev2v/forklift-ova-provider-server:latest
+OVA_PROXY_IMAGE ?= quay.io/kubev2v/forklift-ova-proxy:latest
 CLI_DOWNLOAD_IMAGE ?= quay.io/kubev2v/forklift-cli-download:latest
 VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/vsphere-xcopy-volume-populator:$(REGISTRY_TAG)
 
@@ -307,6 +308,7 @@ build-operator-bundle-image: check_container_runtime
 		--build-arg UI_PLUGIN_IMAGE=$(UI_PLUGIN_IMAGE) \
 		--build-arg CLI_DOWNLOAD_IMAGE=$(CLI_DOWNLOAD_IMAGE) \
 		--build-arg OVA_PROVIDER_SERVER_IMAGE=$(OVA_PROVIDER_SERVER_IMAGE)
+		--build-arg OVA_PROXY_IMAGE=$(OVA_PROXY_IMAGE)
 
 push-operator-bundle-image: build-operator-bundle-image
 	$(CONTAINER_CMD) push $(OPERATOR_BUNDLE_IMAGE)
@@ -365,6 +367,13 @@ build-cli-download-image: check_container_runtime
 push-cli-download-image: build-cli-download-image
 	$(CONTAINER_CMD) push $(CLI_DOWNLOAD_IMAGE)
 
+build-ova-proxy-image: check_container_runtime
+	$(eval OVA_PROXY_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-proxy:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) build -t $(OVA_PROXY_IMAGE) -f build/ova-proxy/Containerfile .
+
+push-ova-proxy-image: build-ova-proxy-image
+	$(CONTAINER_CMD) push $(OVA_PROXY_IMAGE)
+
 build-all-images: build-api-image \
                   build-controller-image \
                   build-validation-image \
@@ -376,6 +385,7 @@ build-all-images: build-api-image \
                   build-vsphere-xcopy-volume-populator-image\
                   build-ova-provider-server-image \
                   build-cli-download-image \
+                  build-ova-proxy-image \
                   build-operator-bundle-image \
                   build-operator-index-image
 
@@ -390,6 +400,7 @@ push-all-images:  push-api-image \
                   push-vsphere-xcopy-volume-populator-image\
                   push-ova-provider-server-image \
                   push-cli-download-image \
+                  push-ova-proxy-image \
                   push-operator-bundle-image \
 				  push-operator-index-image            
 

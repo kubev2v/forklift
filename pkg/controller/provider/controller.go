@@ -44,9 +44,7 @@ import (
 	libref "github.com/kubev2v/forklift/pkg/lib/ref"
 	"github.com/kubev2v/forklift/pkg/lib/sshkeys"
 	"github.com/kubev2v/forklift/pkg/settings"
-	routev1 "github.com/openshift/api/route/v1"
 	"golang.org/x/crypto/ssh"
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -129,14 +127,12 @@ func Add(mgr manager.Manager) error {
 		log.Trace(err)
 		return err
 	}
-	if Settings.OpenShift {
-		err = cnt.Watch(
-			source.Kind(mgr.GetCache(), &routev1.Route{},
-				libref.TypedHandler[*routev1.Route](&api.Provider{})))
-		if err != nil {
-			log.Trace(err)
-			return err
-		}
+	err = cnt.Watch(
+		source.Kind(mgr.GetCache(), &api.OVAProviderServer{},
+			libref.TypedHandler[*api.OVAProviderServer](&api.Provider{})))
+	if err != nil {
+		log.Trace(err)
+		return err
 	}
 	return nil
 }
@@ -209,63 +205,36 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	}
 
 	if provider.Type() == api.Ova && provider.DeletionTimestamp == nil {
-
-		deploymentName := fmt.Sprintf("%s-deployment-%s", ovaServer, provider.Name)
-
-		deployment := &appsv1.Deployment{}
-		err = r.Get(context.TODO(), client.ObjectKey{
-			Namespace: provider.Namespace,
-			Name:      deploymentName},
-			deployment)
-
-		// If the deployment does not exist
-		if err != nil {
-			if k8serr.IsNotFound(err) {
-				err = r.CreateOVAServerDeployment(provider, ctx)
-				if err != nil {
-					r.handleServerCreationFailure(provider, err)
-					return
-				}
-				provider.Status.Phase = Staging
-				provider.Status.SetCondition(
-					libcnd.Condition{
-						Type:     Staging,
-						Status:   True,
-						Category: Required,
-						Message:  "The OVA server is being inizialized.",
-					})
-				err = r.Status().Update(context.TODO(), provider.DeepCopy())
-				result.RequeueAfter = OvaReconcilerRetry
-				return
-			}
-			return
-		}
-
-		// The ova server pod is not running yet
-		if deployment.Status.AvailableReplicas == 0 {
-			if provider.CreationTimestamp.Add(OvaTimeout).After(time.Now()) {
-				result.RequeueAfter = OvaReconcilerRetry
-				return
-			} else { // Timeout reached
-				err = fmt.Errorf("the OVA provider server creation timed out. Please ensure that the NFS export is set correctly")
-				r.handleServerCreationFailure(provider, err)
-				return
-			}
-		}
-
-		if Settings.OpenShift {
-			var urls []api.ProviderURL
-			urls, err = r.getServerURLs(ctx, provider)
+		if !provider.HasReconciled() {
+			// the provider has changed, so delete the old
+			// so we can redeploy.
+			err = r.DeleteOVAProviderServer(ctx, provider)
 			if err != nil {
 				return
 			}
-			provider.Status.URLs = urls
+		}
+		err = r.EnsureOVAProviderServer(ctx, provider)
+		if err != nil {
+			return
 		}
 	}
 
+	// although the way we deploy OVA servers has changed, we will
+	// leave this for now to ensure legacy PVs are cleaned up
 	if provider.DeletionTimestamp != nil && k8sutil.ContainsFinalizer(provider, api.OvaProviderFinalizer) {
 		err = r.removeVolumeOfOVAServer(provider)
 		if err != nil {
+			return
+		}
+		err = r.DeleteOVAProviderServer(ctx, provider)
+		if err != nil {
+			return
+		}
+		clonedProvider := provider.DeepCopy()
+		k8sutil.RemoveFinalizer(provider, api.OvaProviderFinalizer)
+		if pErr := r.Patch(context.TODO(), provider, client.MergeFrom(clonedProvider)); pErr != nil {
+			r.Log.Error(pErr, "Failed to remove finalizer", "provider", provider)
+			err = pErr
 			return
 		}
 	}
@@ -488,11 +457,6 @@ func (r *Reconciler) removeVolumeOfOVAServer(provider *api.Provider) error {
 				r.Log.Error(err, "Failed to delete PV", "PV", pv)
 				return err
 			}
-		}
-		clonedProvider := provider.DeepCopy()
-		k8sutil.RemoveFinalizer(provider, api.OvaProviderFinalizer)
-		if err := r.Patch(context.TODO(), provider, client.MergeFrom(clonedProvider)); err != nil {
-			r.Log.Error(err, "Failed to remove finalizer", "provider", provider)
 		}
 	}
 	return nil

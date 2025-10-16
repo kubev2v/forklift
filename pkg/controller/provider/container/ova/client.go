@@ -48,14 +48,16 @@ func (r *Client) Connect(provider *api.Provider) (err error) {
 		},
 	}
 
-	serverURL := fmt.Sprintf("http://ova-service-%s.%s.svc.cluster.local:8080", provider.Name, provider.Namespace)
-	if serverURL == "" {
+	if provider.Status.Service == nil {
+		err = liberr.New("OVA inventory service not ready.")
 		return
 	}
+	service := provider.Status.Service
+	svcURL := fmt.Sprintf("http://%s.%s.svc.cluster.local:8080", service.Name, service.Namespace)
 
-	url := serverURL + "/test_connection"
+	testURL := svcURL + "/test_connection"
 	res := ""
-	status, err := client.Get(url, &res)
+	status, err := client.Get(testURL, &res)
 	if err != nil {
 		return
 	}
@@ -65,7 +67,7 @@ func (r *Client) Connect(provider *api.Provider) (err error) {
 	}
 
 	r.client = client
-	r.serviceURL = serverURL
+	r.serviceURL = svcURL
 	return
 }
 
