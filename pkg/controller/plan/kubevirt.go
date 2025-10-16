@@ -1427,7 +1427,7 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 		// or vSphere, and in the latter case the conversion pod acts as the first-consumer
 		annotations[planbase.AnnBindImmediate] = "true"
 	}
-	if r.Plan.IsWarm() && r.Builder.SupportsVolumePopulators(vm.Ref) {
+	if r.Plan.IsWarm() && r.Builder.SupportsVolumePopulators() {
 		// For storage offload, tie DataVolume to pre-imported PVC
 		annotations[planbase.AnnAllowClaimAdoption] = "true"
 		annotations[planbase.AnnPrePopulated] = "true"
@@ -1441,7 +1441,7 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 			Annotations: annotations,
 		},
 	}
-	if !(r.Builder.SupportsVolumePopulators(vm.Ref) && r.Plan.IsWarm()) {
+	if !(r.Builder.SupportsVolumePopulators() && r.Plan.IsWarm()) {
 		// For storage offload warm migrations, the template should have already
 		// been applied to the PVC that will be adopted by this DataVolume, so
 		// only add generateName for other migration types.
