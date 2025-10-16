@@ -45,7 +45,6 @@ func (r Reconciler) DeleteOVAProviderServer(ctx context.Context, provider *api.P
 				err = nil
 				continue
 			}
-		} else {
 			err = liberr.Wrap(err)
 			return
 		}

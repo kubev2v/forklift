@@ -96,7 +96,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 	}()
 
 	if ova.DeletionTimestamp.IsZero() {
-		err = r.AddFinalizer(ova)
+		err = r.AddFinalizer(ctx, ova)
 		if err != nil {
 			return
 		}
@@ -109,7 +109,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		if err != nil {
 			return
 		}
-		err = r.RemoveFinalizer(ova)
+		err = r.RemoveFinalizer(ctx, ova)
 		if err != nil {
 			return
 		}
@@ -124,10 +124,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 	return
 }
 
-func (r *Reconciler) AddFinalizer(ova *api.OVAProviderServer) (err error) {
+func (r *Reconciler) AddFinalizer(ctx context.Context, ova *api.OVAProviderServer) (err error) {
 	patch := client.MergeFrom(ova.DeepCopy())
 	if controllerutil.AddFinalizer(ova, api.OvaProviderFinalizer) {
-		err = r.Patch(context.TODO(), ova, patch)
+		err = r.Patch(ctx, ova, patch)
 		if err != nil {
 			err = liberr.Wrap(err)
 			r.Log.Error(err, "failed to add finalizer", "server", ova.Name, "namespace", ova.Namespace)
@@ -137,10 +137,10 @@ func (r *Reconciler) AddFinalizer(ova *api.OVAProviderServer) (err error) {
 	return
 }
 
-func (r *Reconciler) RemoveFinalizer(ova *api.OVAProviderServer) (err error) {
+func (r *Reconciler) RemoveFinalizer(ctx context.Context, ova *api.OVAProviderServer) (err error) {
 	patch := client.MergeFrom(ova.DeepCopy())
 	if controllerutil.RemoveFinalizer(ova, api.OvaProviderFinalizer) {
-		err = r.Patch(context.TODO(), ova, patch)
+		err = r.Patch(ctx, ova, patch)
 		if err != nil {
 			err = liberr.Wrap(err)
 			r.Log.Error(err, "failed to remove finalizer", "server", ova.Name, "namespace", ova.Namespace)

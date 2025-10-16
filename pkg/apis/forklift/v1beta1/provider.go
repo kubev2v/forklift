@@ -100,7 +100,7 @@ type ProviderStatus struct {
 	// Fingerprint.
 	// +optional
 	Fingerprint string `json:"fingerprint,omitempty"`
-	// Provider URLs
+	// Provider service reference
 	// +optional
 	Service *core.ObjectReference `json:"service,omitempty"`
 }
