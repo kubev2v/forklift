@@ -1,5 +1,7 @@
 package powermax
 
+//go:generate mockgen -destination=mock_powermax_client_test.go -package=powermax github.com/dell/gopowermax/v2 Pmax
+
 import (
 	"context"
 	"fmt"
@@ -18,6 +20,7 @@ const portGroupIDKey = "portGroupID"
 type PowermaxClonner struct {
 	client      gopowermax.Pmax
 	symmetrixID string
+	portGroupID string
 }
 
 // CurrentMappedGroups implements populator.StorageApi.
@@ -150,60 +153,8 @@ func (p *PowermaxClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn 
 		}
 	}
 
-	fibre := ""
-	iscsi := ""
-	for _, iqn := range clonnerIqn {
-		if strings.HasPrefix(iqn, "iqn") {
-			iscsi = "iscsi"
-		} else if strings.HasPrefix(iqn, "wwn") {
-			fibre = "fibre"
-		}
-	}
-
-	pgIds := []string{}
-	if fibre != "" {
-		pgs, err := p.client.GetPortGroupList(ctx, p.symmetrixID, fibre)
-		if err != nil {
-			return nil, err
-		}
-		pgIds = append(pgIds, pgs.PortGroupIDs...)
-	}
-	if iscsi != "" {
-		pgs, err := p.client.GetPortGroupList(ctx, p.symmetrixID, iscsi)
-		if err != nil {
-			return nil, err
-		}
-		pgIds = append(pgIds, pgs.PortGroupIDs...)
-	}
-	klog.Infof("port group IDs %s", pgIds)
-
-	portGroupID := ""
-	for _, pgId := range pgIds {
-		pg, err := p.client.GetPortGroupByID(ctx, p.symmetrixID, pgId)
-		if err != nil {
-			return nil, err
-		}
-		allPortsOnline := false
-		for _, portKey := range pg.SymmetrixPortKey {
-			port, err := p.client.GetPort(ctx, p.symmetrixID, portKey.DirectorID, portKey.PortID)
-			if err != nil {
-				return nil, err
-			}
-			if port.SymmetrixPort.PortStatus == "Online" {
-				allPortsOnline = true
-			} else {
-				allPortsOnline = false
-				break
-			}
-		}
-		if allPortsOnline {
-			portGroupID = pg.PortGroupID
-			break
-		}
-	}
-
-	klog.Infof("port group ID %s", portGroupID)
-	mappingContext := map[string]any{portGroupIDKey: portGroupID}
+	klog.Infof("port group ID %s", p.portGroupID)
+	mappingContext := map[string]any{portGroupIDKey: p.portGroupID}
 	return mappingContext, err
 }
 
@@ -278,15 +229,22 @@ func (p *PowermaxClonner) UnMap(initiatorGroup string, targetLUN populator.LUN, 
 	return nil
 }
 
+var newClientWithArgs = gopowermax.NewClientWithArgs
+
 func NewPowermaxClonner(hostname, username, password string, sslSkipVerify bool) (PowermaxClonner, error) {
 	symID := os.Getenv("POWERMAX_SYMMETRIX_ID")
 	if symID == "" {
 		return PowermaxClonner{}, fmt.Errorf("Please set POWERMAX_SYMMETRIX_ID in the pod environment or in the secret" +
 			" attached to the relevant storage map")
 	}
+	portGroupID := os.Getenv("POWERMAX_PORT_GROUP_ID")
+	if portGroupID == "" {
+		return PowermaxClonner{}, fmt.Errorf("Please set POWERMAX_PORT_GROUP_ID in the pod environment or in the secret" +
+			" attached to the relevant storage map")
+	}
 	// using the same application name as the driver
 	applicationName := "csi"
-	client, err := gopowermax.NewClientWithArgs(
+	client, err := newClientWithArgs(
 		hostname,
 		applicationName,
 		sslSkipVerify,
@@ -308,5 +266,5 @@ func NewPowermaxClonner(hostname, username, password string, sslSkipVerify bool)
 		return PowermaxClonner{}, err
 	}
 	klog.Info("successfuly logged in to PowerMax")
-	return PowermaxClonner{client: client, symmetrixID: symID}, nil
+	return PowermaxClonner{client: client, symmetrixID: symID, portGroupID: portGroupID}, nil
 }

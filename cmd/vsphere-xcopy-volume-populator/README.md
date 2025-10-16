@@ -422,6 +422,7 @@ Provider specific entries in the secret shall be documented below:
 | Key | Value | Description |
 | --- | --- | --- |
 | POWERMAX_SYMMETRIX_ID | string | the symmetrix id of the storage array. Can be taken from the ConfigMap under the 'powermax' namespace, which the CSI driver uses. |
+| POWERMAX_PORT_GROUP_ID | string | the port group id to use for masking view creation. |
 
 
 ## Dell PowerFlex
