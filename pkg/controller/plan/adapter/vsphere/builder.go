@@ -1273,7 +1273,7 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 // For now this method returns true, if there's a mapping (backend by copy-offload-mapping ConfigMap, that
 // maps StoragetClasses to Vsphere data stores
 func (r *Builder) SupportsVolumePopulators() bool {
-	if !settings.Settings.Features.CopyOffload || r.Plan.IsWarm() {
+	if !settings.Settings.Features.CopyOffload {
 		return false
 	}
 	dsMapIn := r.Context.Map.Storage.Spec.Map
