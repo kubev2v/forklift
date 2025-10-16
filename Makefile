@@ -368,7 +368,7 @@ push-cli-download-image: build-cli-download-image
 	$(CONTAINER_CMD) push $(CLI_DOWNLOAD_IMAGE)
 
 build-ova-proxy-image: check_container_runtime
-	$(eval OVA_PROXY_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-proxy-server:$(REGISTRY_TAG))
+	$(eval OVA_PROXY_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-proxy:$(REGISTRY_TAG))
 	$(CONTAINER_CMD) build -t $(OVA_PROXY_IMAGE) -f build/ova-proxy/Containerfile .
 
 push-ova-proxy-image: build-ova-proxy-image
