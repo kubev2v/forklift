@@ -82,12 +82,10 @@ spec:
                 type: string
               controller_block_overhead:
                 description: 'Block overhead in bytes (default: 0)'
-                pattern: ^[0-9]+$
-                type: string
+                x-kubernetes-int-or-string: true
               controller_cleanup_retries:
                 description: 'Cleanup retry count (default: 10)'
-                pattern: ^[1-9][0-9]*$
-                type: string
+                x-kubernetes-int-or-string: true
               controller_container_limits_cpu:
                 description: 'Controller CPU limit (default: 500m)'
                 example: 1000m
@@ -106,131 +104,94 @@ spec:
                 type: string
               controller_dv_status_check_retries:
                 description: 'DataVolume status check retries (default: 10)'
-                pattern: ^[1-9][0-9]*$
-                type: string
+                x-kubernetes-int-or-string: true
               controller_filesystem_overhead:
                 description: 'Filesystem overhead percentage (default: 10)'
-                pattern: ^(0|[1-9][0-9]?|100)$
-                type: string
+                x-kubernetes-int-or-string: true
               controller_image_fqin:
                 description: Controller pod image
                 example: quay.io/kubev2v/forklift-controller:latest
                 type: string
               controller_log_level:
                 description: 'Log verbosity level (default: 3)'
-                pattern: ^([0-9]|10)$
-                type: string
+                x-kubernetes-int-or-string: true
               controller_max_concurrent_reconciles:
                 description: 'Max concurrent reconciles (default: 10)'
-                pattern: ^[1-9][0-9]*$
-                type: string
+                x-kubernetes-int-or-string: true
               controller_max_vm_inflight:
                 description: 'Max concurrent VM migrations (default: 20)'
-                pattern: ^[1-9][0-9]*$
-                type: string
+                x-kubernetes-int-or-string: true
               controller_ovirt_warm_migration:
                 description: 'Enable oVirt warm migration (default: true)'
-                enum:
-                - "true"
-                - "false"
-                type: string
+                type: boolean
+                x-kubernetes-preserve-unknown-fields: true
               controller_precopy_interval:
                 description: 'Precopy interval in minutes (default: 60)'
-                pattern: ^[1-9][0-9]*$
-                type: string
+                x-kubernetes-int-or-string: true
               controller_retain_precopy_importer_pods:
                 description: 'Retain precopy pods (default: false)'
-                enum:
-                - "true"
-                - "false"
-                type: string
+                type: boolean
+                x-kubernetes-preserve-unknown-fields: true
               controller_snapshot_removal_check_retries:
                 description: 'Snapshot removal retries (default: 20)'
-                pattern: ^[1-9][0-9]*$
-                type: string
+                x-kubernetes-int-or-string: true
               controller_snapshot_removal_timeout_minuts:
                 description: 'Snapshot removal timeout in minutes (default: 120)'
-                pattern: ^[1-9][0-9]*$
-                type: string
+                x-kubernetes-int-or-string: true
               controller_snapshot_status_check_rate_seconds:
                 description: 'Snapshot status check rate in seconds (default: 10)'
-                pattern: ^[1-9][0-9]*$
-                type: string
+                x-kubernetes-int-or-string: true
               controller_static_udn_ip_addresses:
                 description: 'Enable static udn IP addresses feature (default: false)'
-                enum:
-                - "true"
-                - "false"
-                type: string
+                type: boolean
+                x-kubernetes-preserve-unknown-fields: true
               controller_tls_connection_timeout_sec:
                 description: 'TLS connection timeout seconds (default: 5)'
-                pattern: ^[1-9][0-9]*$
-                type: string
+                x-kubernetes-int-or-string: true
               controller_vddk_job_active_deadline_sec:
                 description: 'VDDK job timeout in seconds (default: 300)'
-                pattern: ^[1-9][0-9]*$
-                type: string
+                x-kubernetes-int-or-string: true
               controller_vsphere_incremental_backup:
                 description: 'Use vSphere incremental backup (default: true)'
-                enum:
-                - "true"
-                - "false"
-                type: string
+                type: boolean
+                x-kubernetes-preserve-unknown-fields: true
               feature_auth_required:
                 description: 'Require authentication (default: true)'
-                enum:
-                - "true"
-                - "false"
-                type: string
+                type: boolean
+                x-kubernetes-preserve-unknown-fields: true
               feature_cli_download:
                 description: 'Enable CLI download service (default: true)'
-                enum:
-                - "true"
-                - "false"
-                type: string
+                type: boolean
+                x-kubernetes-preserve-unknown-fields: true
               feature_copy_offload:
                 description: 'Enable copy offload plugins (default: false)'
-                enum:
-                - "true"
-                - "false"
-                type: string
+                type: boolean
+                x-kubernetes-preserve-unknown-fields: true
               feature_ocp_live_migration:
                 description: 'Enable OCP live migration (default: false)'
-                enum:
-                - "true"
-                - "false"
-                type: string
+                type: boolean
+                x-kubernetes-preserve-unknown-fields: true
               feature_ova_appliance_management:
                 description: 'Enable OVA appliance management endpoints (default:
                   false)'
-                enum:
-                - "true"
-                - "false"
-                type: string
+                type: boolean
+                x-kubernetes-preserve-unknown-fields: true
               feature_ui_plugin:
                 description: 'Enable UI plugin (default: true)'
-                enum:
-                - "true"
-                - "false"
-                type: string
+                type: boolean
+                x-kubernetes-preserve-unknown-fields: true
               feature_validation:
                 description: 'Enable validation service (default: true)'
-                enum:
-                - "true"
-                - "false"
-                type: string
+                type: boolean
+                x-kubernetes-preserve-unknown-fields: true
               feature_vmware_system_serial_number:
                 description: 'Use VMware system serial numbers (default: true)'
-                enum:
-                - "true"
-                - "false"
-                type: string
+                type: boolean
+                x-kubernetes-preserve-unknown-fields: true
               feature_volume_populator:
                 description: 'Enable volume populators (default: true)'
-                enum:
-                - "true"
-                - "false"
-                type: string
+                type: boolean
+                x-kubernetes-preserve-unknown-fields: true
               hooks_container_limits_cpu:
                 description: 'Hooks CPU limit (default: 1000m)'
                 example: 2000m
@@ -273,10 +234,8 @@ spec:
               k8s_cluster:
                 description: 'Whether running on Kubernetes (vs OpenShift) (default:
                   false)'
-                enum:
-                - "true"
-                - "false"
-                type: string
+                type: boolean
+                x-kubernetes-preserve-unknown-fields: true
               must_gather_image_fqin:
                 description: Must-gather debugging image
                 example: quay.io/kubev2v/forklift-must-gather:latest
@@ -379,8 +338,7 @@ spec:
                 type: string
               validation_policy_agent_search_interval:
                 description: 'Policy agent search interval in seconds (default: 120)'
-                pattern: ^[1-9][0-9]*$
-                type: string
+                x-kubernetes-int-or-string: true
               vddk_image:
                 description: VDDK image for VMware disk access
                 example: quay.io/kubev2v/vddk:7.0.3
@@ -403,10 +361,8 @@ spec:
                 type: string
               virt_v2v_dont_request_kvm:
                 description: Don't request KVM for virt-v2v
-                enum:
-                - "true"
-                - "false"
-                type: string
+                type: boolean
+                x-kubernetes-preserve-unknown-fields: true
               virt_v2v_extra_args:
                 description: Additional arguments for virt-v2v
                 example: --debug-overlays
@@ -6811,9 +6767,9 @@ metadata:
   name: forklift-controller
   namespace: konveyor-forklift
 spec:
-  feature_ui_plugin: "true"
-  feature_validation: "true"
-  feature_volume_populator: "true"
+  feature_ui_plugin: true
+  feature_validation: true
+  feature_volume_populator: true
 ---
 apiVersion: forklift.konveyor.io/v1beta1
 kind: Hook
@@ -6954,9 +6910,9 @@ metadata:
           "namespace": konveyor-forklift
         },
         "spec": {
-          "feature_ui_plugin": "true",
-          "feature_validation": "true",
-          "feature_volume_populator": "true"
+          "feature_ui_plugin": true,
+          "feature_validation": true,
+          "feature_volume_populator": true
         }
       }
     operatorframework.io/suggested-namespace: konveyor-forklift
