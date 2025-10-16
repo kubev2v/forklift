@@ -22,6 +22,10 @@ func (r Reconciler) EnsureOVAProviderServer(ctx context.Context, provider *api.P
 		return
 	}
 	provider.Status.Service = server.Status.Service
+	cnd := server.Status.FindCondition(ova.ApplianceManagementEnabled)
+	if cnd != nil {
+		provider.Status.SetCondition(*cnd)
+	}
 	return
 }
 
