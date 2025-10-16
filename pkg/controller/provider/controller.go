@@ -204,6 +204,10 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		}
 	}
 
+	// Begin staging conditions.
+	provider.Status.Phase = Staging
+	provider.Status.BeginStagingConditions()
+
 	if provider.Type() == api.Ova && provider.DeletionTimestamp == nil {
 		if !provider.HasReconciled() {
 			// the provider has changed, so delete the old
@@ -238,10 +242,6 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 			return
 		}
 	}
-
-	// Begin staging conditions.
-	provider.Status.Phase = Staging
-	provider.Status.BeginStagingConditions()
 
 	// Validations.
 	err = r.validate(provider)
