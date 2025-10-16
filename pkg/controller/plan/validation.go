@@ -8,8 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -133,6 +135,160 @@ const (
 const (
 	Shareable = "shareable"
 )
+
+// Retry configuration for inventory service calls
+const (
+	MaxRetries     = 3
+	BaseDelay      = time.Second * 2
+	MaxDelay       = time.Second * 30
+	BackoffFactor  = 2.0
+)
+
+// extractHTTPStatus extracts HTTP status code from error if available
+func (r *Reconciler) extractHTTPStatus(err error) int {
+	// Check if the error is a liberr.Error with context
+	if liberrErr, ok := err.(*liberr.Error); ok {
+		// Look for HTTP status in the error context
+		for i := 0; i < len(liberrErr.Context); i += 2 {
+			if key, ok := liberrErr.Context[i].(string); ok {
+				if key == "status" || key == "http_status" {
+					if status, ok := liberrErr.Context[i+1].(int); ok {
+						return status
+					}
+				}
+			}
+		}
+	}
+	
+	// Check for HTTP status in error message as fallback
+	message := err.Error()
+	if strings.Contains(message, "status:") {
+		parts := strings.Split(message, "status:")
+		if len(parts) > 1 {
+			statusStr := strings.Fields(parts[1])[0]
+			if status, parseErr := strconv.Atoi(statusStr); parseErr == nil {
+				return status
+			}
+		}
+	}
+	
+	return 0
+}
+
+// classifyInventoryError determines if an inventory service error is notRetryable or retryable
+func (r *Reconciler) classifyInventoryError(err error) (isNotRetryable bool, reason string) {
+	// Extract HTTP status code
+	status := r.extractHTTPStatus(err)
+	
+	// Check for notRetryable failures based on HTTP status codes
+	switch status {
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return true, fmt.Sprintf("authentication/authorization error (HTTP %d)", status)
+	case http.StatusNotFound:
+		// For inventory service, 404 might be temporary if service is down
+		// But if it's a specific resource not found, it's notRetryable
+		if strings.Contains(err.Error(), "not found") {
+			return true, fmt.Sprintf("resource not found (HTTP %d)", status)
+		}
+		return false, fmt.Sprintf("inventory service unavailable (HTTP %d)", status)
+	case http.StatusBadRequest:
+		return true, fmt.Sprintf("bad request - likely configuration issue (HTTP %d)", status)
+	case http.StatusMethodNotAllowed:
+		return true, fmt.Sprintf("method not allowed (HTTP %d)", status)
+	}
+	
+	// Check for specific error types that indicate notRetryable failures
+	if errors.As(err, &web.NotFoundError{}) {
+		return true, "resource not found"
+	}
+	if errors.As(err, &web.RefNotUniqueError{}) {
+		return true, "ambiguous reference"
+	}
+	if errors.As(err, &web.ProviderNotSupportedError{}) {
+		return true, "provider not supported"
+	}
+	if errors.As(err, &web.ResourceNotResolvedError{}) {
+		return true, "resource cannot be resolved"
+	}
+	
+	// Check for retryable error types
+	if errors.As(err, &web.ProviderNotReadyError{}) {
+		return false, "provider temporarily not ready"
+	}
+	if errors.As(err, &web.ConflictError{}) {
+		return false, "temporary conflict"
+	}
+	
+	// Check for network-related errors (usually retryable)
+	message := err.Error()
+	if strings.Contains(message, "timeout") || strings.Contains(message, "connection") {
+		return false, "network connectivity issue"
+	}
+	
+	// Default to retryable for unknown errors
+	return false, "unknown error, defaulting to retryable"
+}
+
+// retryWithBackoff executes a function with exponential backoff retry logic
+func (r *Reconciler) retryWithBackoff(ctx context.Context, operation func() error, operationName string) error {
+	var lastErr error
+	delay := BaseDelay
+	
+	for attempt := 0; attempt <= MaxRetries; attempt++ {
+		if attempt > 0 {
+			r.Log.Info("Retrying inventory service call", 
+				"operation", operationName, 
+				"attempt", attempt, 
+				"maxRetries", MaxRetries,
+				"delay", delay)
+			
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+		
+		err := operation()
+		if err == nil {
+			if attempt > 0 {
+				r.Log.Info("Inventory service call succeeded after retry", 
+					"operation", operationName, 
+					"attempt", attempt+1)
+			}
+			return nil
+		}
+		
+		lastErr = err
+		
+		// Check if this is a notRetryable failure
+		isNotRetryable, reason := r.classifyInventoryError(err)
+		if isNotRetryable {
+			r.Log.Error(err, "NotRetryable failure detected, not retrying", 
+				"operation", operationName, 
+				"reason", reason)
+			return err
+		}
+		
+		// If this was the last attempt, don't calculate delay for next iteration
+		if attempt < MaxRetries {
+			delay = time.Duration(float64(delay) * BackoffFactor)
+			if delay > MaxDelay {
+				delay = MaxDelay
+			}
+		}
+	}
+	
+	// All retries exhausted
+	r.Log.Error(lastErr, "All retry attempts exhausted for inventory service call", 
+		"operation", operationName, 
+		"maxRetries", MaxRetries)
+	
+	// Log suggestion for the two notRetryable issues not covered by HTTP status codes
+	r.Log.Info("If this error persists, it may be due to: 1) Provider credentials are invalid or expired, or 2) Provider is not accessible from the current network location")
+	
+	return lastErr
+}
 
 // Validate the plan resource.
 func (r *Reconciler) validate(plan *api.Plan) error {
@@ -774,11 +930,19 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		if provider == nil {
 			return nil
 		}
-		inventory, pErr := web.NewClient(provider)
-		if pErr != nil {
-			return liberr.Wrap(pErr)
-		}
-		v, pErr := inventory.VM(ref)
+		// Create inventory client with retry logic
+		var inventory web.Client
+		var v interface{}
+		pErr := r.retryWithBackoff(context.TODO(), func() error {
+			var err error
+			inventory, err = web.NewClient(provider)
+			if err != nil {
+				return err
+			}
+			v, err = inventory.VM(ref)
+			return err
+		}, fmt.Sprintf("VM lookup for %s", ref.String()))
+		
 		if pErr != nil {
 			if errors.As(pErr, &web.NotFoundError{}) {
 				notFound.Items = append(notFound.Items, ref.String())
@@ -993,10 +1157,6 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		if provider == nil {
 			return nil
 		}
-		inventory, pErr = web.NewClient(provider)
-		if pErr != nil {
-			return liberr.Wrap(pErr)
-		}
 		vmName := ref.Name
 		if vm.TargetName != "" {
 			// if target name is provided, use it to look for existing VMs
@@ -1006,7 +1166,19 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			Name:      vmName,
 			Namespace: plan.Spec.TargetNamespace,
 		}
-		_, pErr = inventory.VM(vmRef)
+		
+		// Check for existing VM in destination with retry logic
+		var existingVM interface{}
+		pErr = r.retryWithBackoff(context.TODO(), func() error {
+			var err error
+			inventory, err = web.NewClient(provider)
+			if err != nil {
+				return err
+			}
+			existingVM, err = inventory.VM(vmRef)
+			return err
+		}, fmt.Sprintf("destination VM lookup for %s", vmRef.String()))
+		
 		if pErr == nil {
 			if _, found := plan.Status.Migration.FindVM(*ref); !found {
 				// This VM is preexisting or is being managed by a
