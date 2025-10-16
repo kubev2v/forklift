@@ -3,7 +3,6 @@ package plan
 import (
 	"context"
 	"encoding/json"
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
@@ -50,7 +49,6 @@ import (
 	instancetypeapi "kubevirt.io/api/instancetype"
 	instancetype "kubevirt.io/api/instancetype/v1beta1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
-	libvirtxml "libvirt.org/libvirt-go-xml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -995,14 +993,6 @@ func (r *KubeVirt) EnsureVirtV2vPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvc
 		return
 	}
 
-	var libvirtConfigMap = &core.ConfigMap{}
-	if podType == VirtV2vConversionPod {
-		libvirtConfigMap, err = r.ensureLibvirtConfigMap(vm.Ref, vmCr, pvcs)
-		if err != nil {
-			return
-		}
-	}
-
 	var vddkConfigMap *core.ConfigMap
 	if r.Source.Provider.UseVddkAioOptimization() {
 		vddkConfigMap, err = r.ensureVddkConfigMap()
@@ -1016,7 +1006,7 @@ func (r *KubeVirt) EnsureVirtV2vPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvc
 	if podType == VirtV2vConversionPod {
 		vmVolumes = vmCr.Spec.Template.Spec.Volumes
 	}
-	newPod, err := r.getVirtV2vPod(vm, vmVolumes, libvirtConfigMap, vddkConfigMap, pvcs, v2vSecret, podType)
+	newPod, err := r.getVirtV2vPod(vm, vmVolumes, vddkConfigMap, pvcs, v2vSecret, podType)
 	if err != nil {
 		return
 	}
@@ -1955,8 +1945,8 @@ func (r *KubeVirt) getConvertorAffinity() *core.Affinity {
 	}
 }
 
-func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, libvirtConfigMap *core.ConfigMap, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, v2vSecret *core.Secret, podType int) (pod *core.Pod, err error) {
-	volumes, volumeMounts, volumeDevices, err := r.podVolumeMounts(vmVolumes, libvirtConfigMap, vddkConfigmap, pvcs, vm, podType)
+func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, v2vSecret *core.Secret, podType int) (pod *core.Pod, err error) {
+	volumes, volumeMounts, volumeDevices, err := r.podVolumeMounts(vmVolumes, vddkConfigmap, pvcs, vm, podType)
 	if err != nil {
 		return
 	}
@@ -1978,22 +1968,21 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, libv
 		err = vErr
 		return
 	}
-	if (useV2vForTransfer && !r.IsCopyOffload(pvcs)) || podType == VirtV2vInspectionPod {
-		// mount the secret for the password and CA certificate
-		volumes = append(volumes, core.Volume{
-			Name: "secret-volume",
-			VolumeSource: core.VolumeSource{
-				Secret: &core.SecretVolumeSource{
-					SecretName: v2vSecret.Name,
-				},
+	volumes = append(volumes, core.Volume{
+		Name: "secret-volume",
+		VolumeSource: core.VolumeSource{
+			Secret: &core.SecretVolumeSource{
+				SecretName: v2vSecret.Name,
 			},
-		})
-		volumeMounts = append(volumeMounts, core.VolumeMount{
-			Name:      "secret-volume",
-			ReadOnly:  true,
-			MountPath: "/etc/secret",
-		})
-	} else {
+		},
+	})
+	volumeMounts = append(volumeMounts, core.VolumeMount{
+		Name:      "secret-volume",
+		ReadOnly:  true,
+		MountPath: "/etc/secret",
+	})
+
+	if !useV2vForTransfer || r.IsCopyOffload(pvcs) {
 		environment = append(environment,
 			core.EnvVar{
 				Name:  "V2V_inPlace",
@@ -2212,7 +2201,7 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, libv
 	return
 }
 
-func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, libvirtConfigMap *core.ConfigMap, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, vm *plan.VMStatus, podType int) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, err error) {
+func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, vm *plan.VMStatus, podType int) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, err error) {
 	pvcsByName := make(map[string]*core.PersistentVolumeClaim)
 	for _, pvc := range pvcs {
 		pvcsByName[pvc.Name] = pvc
@@ -2250,27 +2239,6 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, libvirtConfigMap *cor
 				MountPath: fmt.Sprintf("/mnt/disks/disk%v", i),
 			})
 		}
-	}
-
-	if podType == VirtV2vConversionPod {
-		// add volume and mount for the libvirt domain xml config map.
-		// the virt-v2v pod expects to see the libvirt xml at /mnt/v2v/input.xml
-		volumes = append(volumes, core.Volume{
-			Name: "libvirt-domain-xml",
-			VolumeSource: core.VolumeSource{
-				ConfigMap: &core.ConfigMapVolumeSource{
-					LocalObjectReference: core.LocalObjectReference{
-						Name: libvirtConfigMap.Name,
-					},
-				},
-			},
-		})
-		mounts = append(mounts,
-			core.VolumeMount{
-				Name:      "libvirt-domain-xml",
-				MountPath: "/mnt/v2v",
-			},
-		)
 	}
 
 	extraConfigMapExists := len(Settings.Migration.VirtV2vExtraConfConfigMap) > 0
@@ -2412,91 +2380,6 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, libvirtConfigMap *cor
 	return
 }
 
-func (r *KubeVirt) libvirtDomain(vmCr *VirtualMachine, pvcs []*core.PersistentVolumeClaim) (domain *libvirtxml.Domain) {
-	pvcsByName := make(map[string]*core.PersistentVolumeClaim)
-	for _, pvc := range pvcs {
-		pvcsByName[pvc.Name] = pvc
-	}
-
-	// FIXME: this should really be as complete an XML domain definition as possible
-	// to give virt-v2v the best chance of converting the disk correctly. Things
-	// like block device name translation and network translation may not work properly
-	// without the full metadata, so we may see weird things happening in some
-	// conversions. For now, this xml definition is just a minimal domain XML file
-	// with the locations of each disk on the VM that is to be converted, but it
-	// should be fixed properly in the future.
-	libvirtDisks := make([]libvirtxml.DomainDisk, 0)
-	for i, vol := range vmCr.Spec.Template.Spec.Volumes {
-		diskSource := libvirtxml.DomainDiskSource{}
-
-		pvc := pvcsByName[vol.PersistentVolumeClaim.ClaimName]
-		if pvc == nil {
-			r.Log.V(1).Info(
-				"Failed to find the PVC to the Volume for the libvirt domain",
-				"volume",
-				vol.Name,
-				"pvc",
-				vol.PersistentVolumeClaim.ClaimName)
-			continue
-		}
-		if pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == core.PersistentVolumeBlock {
-			diskSource.Block = &libvirtxml.DomainDiskSourceBlock{
-				Dev: fmt.Sprintf("/dev/block%v", i),
-			}
-		} else {
-			diskSource.File = &libvirtxml.DomainDiskSourceFile{
-				// the location where the disk images will be found on
-				// the virt-v2v pod. See also podVolumeMounts.
-				File: fmt.Sprintf("/mnt/disks/disk%v/disk.img", i),
-			}
-		}
-
-		libvirtDisk := libvirtxml.DomainDisk{
-			Device: "disk",
-			Driver: &libvirtxml.DomainDiskDriver{
-				Name: "qemu",
-				Type: "raw",
-			},
-			Source: &diskSource,
-			Target: &libvirtxml.DomainDiskTarget{
-				Dev: "sd" + string(rune('a'+i)),
-				Bus: "scsi",
-			},
-		}
-		libvirtDisks = append(libvirtDisks, libvirtDisk)
-	}
-
-	kDomain := vmCr.Spec.Template.Spec.Domain
-	domain = &libvirtxml.Domain{
-		Type: "kvm",
-		Name: vmCr.Name,
-		Memory: &libvirtxml.DomainMemory{
-			Value: uint(kDomain.Resources.Requests.Memory().Value()),
-		},
-		CPU: &libvirtxml.DomainCPU{
-			Topology: &libvirtxml.DomainCPUTopology{
-				Sockets: int(kDomain.CPU.Sockets),
-				Cores:   int(kDomain.CPU.Cores),
-			},
-		},
-		OS: &libvirtxml.DomainOS{
-			Type: &libvirtxml.DomainOSType{
-				Type: "hvm",
-			},
-			BootDevices: []libvirtxml.DomainBootDevice{
-				{
-					Dev: "sd",
-				},
-			},
-		},
-		Devices: &libvirtxml.DomainDeviceList{
-			Disks: libvirtDisks,
-		},
-	}
-
-	return
-}
-
 func (r *KubeVirt) findConfigMapInNamespace(name string, namespace string) (configMap *core.ConfigMap, exists bool, err error) {
 	configmap := &core.ConfigMap{}
 	err = r.Destination.Client.Get(
@@ -2553,39 +2436,6 @@ func (r *KubeVirt) ensureConfigMap(vmRef ref.Ref) (configMap *core.ConfigMap, er
 			"vm",
 			vmRef.String())
 	}
-
-	return
-}
-
-// Ensure the Libvirt domain config map exists on the destination.
-func (r *KubeVirt) ensureLibvirtConfigMap(vmRef ref.Ref, vmCr *VirtualMachine, pvcs []*core.PersistentVolumeClaim) (configMap *core.ConfigMap, err error) {
-	configMap, err = r.ensureConfigMap(vmRef)
-	if err != nil {
-		return
-	}
-	domain := r.libvirtDomain(vmCr, pvcs)
-	domainXML, err := xml.Marshal(domain)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	if configMap.BinaryData == nil {
-		configMap.BinaryData = make(map[string][]byte)
-	}
-	configMap.BinaryData["input.xml"] = domainXML
-	err = r.Destination.Client.Update(context.TODO(), configMap)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	r.Log.V(1).Info(
-		"ConfigMap updated.",
-		"configMap",
-		path.Join(
-			configMap.Namespace,
-			configMap.Name),
-		"vm",
-		vmRef.String())
 
 	return
 }
