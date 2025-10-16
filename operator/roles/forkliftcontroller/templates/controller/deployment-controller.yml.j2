@@ -243,6 +243,10 @@ spec:
           value: '8082'
         - name: OVA_PROVIDER_SERVER_IMAGE
           value: {{ ova_provider_server_fqin }}
+{% if feature_ova_appliance_management|bool %}
+        - name: FEATURE_OVA_APPLIANCE_MANAGEMENT
+          value: "true"
+{% endif %}
 {% if feature_validation|bool %}
         - name: POLICY_AGENT_URL
           value: "https://{{ validation_service_name }}.{{ app_namespace }}.svc.cluster.local:8181"

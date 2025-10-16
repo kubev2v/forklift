@@ -36,6 +36,8 @@ type ControllerSettings struct {
 	Profiler
 	// Feature gates.
 	Features
+	// Provider settings.
+	Providers
 	OpenShift   bool
 	Development bool
 }
@@ -71,6 +73,10 @@ func (r *ControllerSettings) Load() error {
 		return err
 	}
 	err = r.Features.Load()
+	if err != nil {
+		return err
+	}
+	err = r.Providers.Load()
 	if err != nil {
 		return err
 	}
@@ -132,4 +138,14 @@ func GetVDDKImage(providerSpecSettings map[string]string) string {
 	}
 
 	return vddkImage
+}
+
+// Lookup the value of an environment variable and
+// return a fallback value if it isn't found.
+func Lookup(env string, fallback string) string {
+	if val, found := os.LookupEnv(env); found {
+		return val
+	} else {
+		return fallback
+	}
 }

@@ -25,7 +25,7 @@ const (
 	ApplianceRoute  = AppliancesRoute + "/:" + Filename
 	Filename        = "filename"
 	DirectoryPrefix = "appliance-"
-	ApplianceField  = "appliance"
+	ApplianceField  = "file"
 )
 
 // ApplianceInfo JSON resource
