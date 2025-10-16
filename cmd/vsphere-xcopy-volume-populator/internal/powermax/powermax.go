@@ -90,14 +90,15 @@ func (p *PowermaxClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn 
 	// 3. create InitiatorGroup on the masking view
 	// 4. add clonnerIqn to that initiar group
 	// 5. add port group with protocol type that match the cloner IQN type, only if they all online
-	klog.Infof("ensuring storage group %s exists with hosts %v", initiatorGroup, clonnerIqn)
-	sg, err := p.client.GetStorageGroup(ctx, p.symmetrixID, initiatorGroup)
+	storageGroupId := getStorageGroupId(initiatorGroup)
+	klog.Infof("ensuring storage group %s exists with hosts %v", storageGroupId, clonnerIqn)
+	sg, err := p.client.GetStorageGroup(ctx, p.symmetrixID, storageGroupId)
 	if err == nil {
-		klog.Infof("group %s exists", initiatorGroup)
+		klog.Infof("group %s exists", storageGroupId)
 	}
 	if e, ok := err.(*pmxtypes.Error); ok && e.HTTPStatusCode == 404 {
-		klog.Infof("group %s doesn't exist - create it", initiatorGroup)
-		_, err := p.client.CreateStorageGroup(ctx, p.symmetrixID, initiatorGroup, "none", "", true, nil)
+		klog.Infof("group %s doesn't exist - create it", storageGroupId)
+		_, err := p.client.CreateStorageGroup(ctx, p.symmetrixID, storageGroupId, "none", "", true, nil)
 		if err != nil {
 			klog.Errorf("failed to create group %v ", err)
 			return nil, err
@@ -124,12 +125,13 @@ func (p *PowermaxClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn 
 		}
 	}
 
-	hg, err := p.client.GetHostGroupByID(ctx, p.symmetrixID, initiatorGroup)
+	hostGroupId := getHostGroupId(initiatorGroup)
+	hg, err := p.client.GetHostGroupByID(ctx, p.symmetrixID, hostGroupId)
 	if err != nil {
 		if e, ok := err.(*pmxtypes.Error); ok && e.HTTPStatusCode == 404 {
-			hg, err = p.client.CreateHostGroup(ctx, p.symmetrixID, initiatorGroup, hostIdsToAdd, nil)
+			hg, err = p.client.CreateHostGroup(ctx, p.symmetrixID, hostGroupId, hostIdsToAdd, nil)
 			if err != nil {
-				return nil, fmt.Errorf("failed to create new hostGroup with id %s: %w", initiatorGroup, err)
+				return nil, fmt.Errorf("failed to create new hostGroup with id %s: %w", hostGroupId, err)
 			}
 		} else {
 			return nil, err
@@ -142,7 +144,7 @@ func (p *PowermaxClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn 
 		for _, iqn := range clonnerIqn {
 			if slices.Contains(host.Initiators, iqn) {
 				klog.Infof("adding host %s to host group", host.HostID)
-				_, err := p.client.UpdateHostGroupHosts(ctx, p.symmetrixID, initiatorGroup, []string{host.HostID})
+				_, err := p.client.UpdateHostGroupHosts(ctx, p.symmetrixID, hostGroupId, []string{host.HostID})
 				if err != nil {
 					return nil, err
 				}
@@ -209,21 +211,22 @@ func (p *PowermaxClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn 
 
 // Map implements populator.StorageApi.
 func (p *PowermaxClonner) Map(initiatorGroup string, targetLUN populator.LUN, mappingContext populator.MappingContext) (populator.LUN, error) {
-	klog.Infof("mapping volume %s to %s", targetLUN.ProviderID, initiatorGroup)
+	storageGroupId := getStorageGroupId(initiatorGroup)
+	klog.Infof("mapping volume %s to %s", targetLUN.ProviderID, storageGroupId)
 	ctx := context.TODO()
-	volumesMapped, err := p.client.GetVolumeIDListInStorageGroup(ctx, p.symmetrixID, initiatorGroup)
+	volumesMapped, err := p.client.GetVolumeIDListInStorageGroup(ctx, p.symmetrixID, storageGroupId)
 	if err != nil {
 		return targetLUN, err
 	}
 	if slices.Contains(volumesMapped, targetLUN.ProviderID) {
-		klog.Infof("volume %s already mapped to storage-group %s", targetLUN.ProviderID, initiatorGroup)
+		klog.Infof("volume %s already mapped to storage-group %s", targetLUN.ProviderID, storageGroupId)
 		return targetLUN, nil
 	}
 
-	err = p.client.AddVolumesToStorageGroupS(ctx, p.symmetrixID, initiatorGroup, false, targetLUN.ProviderID)
+	err = p.client.AddVolumesToStorageGroupS(ctx, p.symmetrixID, storageGroupId, false, targetLUN.ProviderID)
 	if err != nil {
 
-		klog.Infof("failed mapping volume %s to %s: %v", targetLUN.ProviderID, initiatorGroup, err)
+		klog.Infof("failed mapping volume %s to %s: %v", targetLUN.ProviderID, storageGroupId, err)
 		return targetLUN, err
 	}
 
@@ -243,7 +246,7 @@ func (p *PowermaxClonner) Map(initiatorGroup string, targetLUN populator.LUN, ma
 	}
 
 	if mv == nil {
-		mv, err = p.client.CreateMaskingView(ctx, p.symmetrixID, initiatorGroup, initiatorGroup, initiatorGroup, false, portGroupID.(string))
+		mv, err = p.client.CreateMaskingView(ctx, p.symmetrixID, initiatorGroup, storageGroupId, getHostGroupId(initiatorGroup), false, portGroupID.(string))
 		if err != nil {
 			return populator.LUN{}, err
 		}
@@ -309,4 +312,12 @@ func NewPowermaxClonner(hostname, username, password string, sslSkipVerify bool)
 	}
 	klog.Info("successfuly logged in to PowerMax")
 	return PowermaxClonner{client: client, symmetrixID: symID}, nil
+}
+
+func getStorageGroupId(baseName string) string {
+	return fmt.Sprintf("%s-SG", baseName)
+}
+
+func getHostGroupId(baseName string) string {
+	return fmt.Sprintf("%s-HG", baseName)
 }
