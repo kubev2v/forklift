@@ -200,6 +200,13 @@ spec:
                 - "true"
                 - "false"
                 type: string
+              feature_ova_appliance_management:
+                description: 'Enable OVA appliance management endpoints (default:
+                  false)'
+                enum:
+                - "true"
+                - "false"
+                type: string
               feature_ui_plugin:
                 description: 'Enable UI plugin (default: true)'
                 enum:
@@ -293,6 +300,26 @@ spec:
               ova_provider_server_fqin:
                 description: OVA provider server image
                 example: quay.io/kubev2v/ova-provider-server:latest
+                type: string
+              ova_proxy_container_limits_cpu:
+                description: 'OVA Proxy CPU limit (default: 1000m)'
+                example: 2000m
+                type: string
+              ova_proxy_container_limits_memory:
+                description: 'OVA Proxy memory limit (default: 1Gi)'
+                example: 2Gi
+                type: string
+              ova_proxy_container_requests_cpu:
+                description: 'OVA Proxy CPU request (default: 250m)'
+                example: 200m
+                type: string
+              ova_proxy_container_requests_memory:
+                description: 'OVA Proxy memory request (default: 512Mi)'
+                example: 300Mi
+                type: string
+              ova_proxy_fqin:
+                description: OVA inventory proxy image
+                example: quay.io/kubev2v/forklift-ova-proxy:latest
                 type: string
               populator_controller_image_fqin:
                 description: Volume populator controller image
@@ -1793,6 +1820,187 @@ spec:
         type: object
     served: true
     storage: true
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.3
+  name: ovaproviderservers.forklift.konveyor.io
+spec:
+  group: forklift.konveyor.io
+  names:
+    kind: OVAProviderServer
+    listKind: OVAProviderServerList
+    plural: ovaproviderservers
+    singular: ovaproviderserver
+  scope: Namespaced
+  versions:
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              provider:
+                description: Reference to a Provider resource.
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+                x-kubernetes-validations:
+                - message: spec.provider is immutable
+                  rule: oldSelf == null || oldSelf.name == '' || self == oldSelf
+            required:
+            - provider
+            type: object
+          status:
+            properties:
+              conditions:
+                description: List of conditions.
+                items:
+                  description: Condition
+                  properties:
+                    category:
+                      description: The condition category.
+                      type: string
+                    durable:
+                      description: The condition is durable - never un-staged.
+                      type: boolean
+                    items:
+                      description: A list of items referenced in the `Message`.
+                      items:
+                        type: string
+                      type: array
+                    lastTransitionTime:
+                      description: When the last status transition occurred.
+                      format: date-time
+                      type: string
+                    message:
+                      description: The human readable description of the condition.
+                      type: string
+                    reason:
+                      description: The reason for the condition or transition.
+                      type: string
+                    status:
+                      description: The condition status [true,false].
+                      type: string
+                    type:
+                      description: The condition type.
+                      type: string
+                  required:
+                  - category
+                  - lastTransitionTime
+                  - status
+                  - type
+                  type: object
+                type: array
+              phase:
+                description: Current life cycle phase of the OVA server.
+                type: string
+              service:
+                description: Reference to Service resource
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -5380,14 +5588,49 @@ spec:
               phase:
                 description: Current life cycle phase of the provider.
                 type: string
-              urls:
-                description: Externally routable provider URLs
-                items:
-                  properties:
-                    url:
-                      type: string
-                  type: object
-                type: array
+              service:
+                description: Provider service reference
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
             type: object
         type: object
     served: true
@@ -6531,6 +6774,8 @@ spec:
           value: ${OPENSTACK_POPULATOR_IMAGE}
         - name: OVA_PROVIDER_SERVER_IMAGE
           value: ${OVA_PROVIDER_SERVER_IMAGE}
+        - name: OVA_PROXY_IMAGE
+          value: ${OVA_PROXY_IMAGE}
         - name: OVIRT_OS_MAP
           value: ${OVIRT_OS_MAP}
         - name: VSPHERE_OS_MAP

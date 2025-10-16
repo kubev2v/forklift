@@ -15,6 +15,7 @@ const (
 	FeatureCopyOffload               = "FEATURE_COPY_OFFLOAD"
 	FeatureOCPLiveMigration          = "FEATURE_OCP_LIVE_MIGRATION"
 	FeatureVmwareSystemSerialNumber  = "FEATURE_VMWARE_SYSTEM_SERIAL_NUMBER"
+	FeatureOVAApplianceManagement    = "FEATURE_OVA_APPLIANCE_MANAGEMENT"
 )
 
 // OpenShift version where the FeatureVmwareSystemSerialNumber feature is supported:
@@ -45,6 +46,8 @@ type Features struct {
 	UdnSupportsMac bool
 	// Whether to create VMs with MAC address with the User Defined Network
 	StaticUdnIpAddresses bool
+	// Whether to enable support for appliance management endpoints for the OVA provider.
+	OVAApplianceManagement bool
 }
 
 // isOpenShiftVersionAboveMinimum checks if OpenShift version is above or equal to minimum version using semantic versioning
@@ -79,5 +82,6 @@ func (r *Features) Load() (err error) {
 	r.OCPLiveMigration = getEnvBool(FeatureOCPLiveMigration, false)
 	r.VmwareSystemSerialNumber = getEnvBool(FeatureVmwareSystemSerialNumber, true) && r.isOpenShiftVersionAboveMinimum(ocpMinForVmwareSystemSerial)
 	r.UdnSupportsMac = r.isOpenShiftVersionAboveMinimum(ocpMinForUdnMacSupport)
+	r.OVAApplianceManagement = getEnvBool(FeatureOVAApplianceManagement, false)
 	return
 }

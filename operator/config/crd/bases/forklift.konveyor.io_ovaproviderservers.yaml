@@ -4,39 +4,17 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.3
-  name: providers.forklift.konveyor.io
+  name: ovaproviderservers.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
   names:
-    kind: Provider
-    listKind: ProviderList
-    plural: providers
-    singular: provider
+    kind: OVAProviderServer
+    listKind: OVAProviderServerList
+    plural: ovaproviderservers
+    singular: ovaproviderserver
   scope: Namespaced
   versions:
-  - additionalPrinterColumns:
-    - jsonPath: .spec.type
-      name: TYPE
-      type: string
-    - jsonPath: .status.phase
-      name: STATUS
-      type: string
-    - jsonPath: .status.conditions[?(@.type=='Ready')].status
-      name: READY
-      type: string
-    - jsonPath: .status.conditions[?(@.type=='ConnectionTestSucceeded')].status
-      name: CONNECTED
-      type: string
-    - jsonPath: .status.conditions[?(@.type=='InventoryCreated')].status
-      name: INVENTORY
-      type: string
-    - jsonPath: .spec.url
-      name: URL
-      type: string
-    - jsonPath: .metadata.creationTimestamp
-      name: AGE
-      type: date
-    name: v1beta1
+  - name: v1beta1
     schema:
       openAPIV3Schema:
         properties:
@@ -58,12 +36,9 @@ spec:
           metadata:
             type: object
           spec:
-            description: Defines the desired state of Provider.
             properties:
-              secret:
-                description: |-
-                  References a secret containing credentials and
-                  other confidential information.
+              provider:
+                description: Reference to a Provider resource.
                 properties:
                   apiVersion:
                     description: API version of the referent.
@@ -105,25 +80,13 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
-              settings:
-                additionalProperties:
-                  type: string
-                description: Provider settings.
-                type: object
-              type:
-                description: Provider type.
-                type: string
-              url:
-                description: |-
-                  The provider URL.
-                  Empty may be used for the `host` provider.
-                type: string
+                x-kubernetes-validations:
+                - message: spec.provider is immutable
+                  rule: oldSelf == null || oldSelf.name == '' || self == oldSelf
             required:
-            - secret
-            - type
+            - provider
             type: object
           status:
-            description: ProviderStatus defines the observed state of Provider
             properties:
               conditions:
                 description: List of conditions.
@@ -164,18 +127,11 @@ spec:
                   - type
                   type: object
                 type: array
-              fingerprint:
-                description: Fingerprint.
-                type: string
-              observedGeneration:
-                description: The most recent generation observed by the controller.
-                format: int64
-                type: integer
               phase:
-                description: Current life cycle phase of the provider.
+                description: Current life cycle phase of the OVA server.
                 type: string
               service:
-                description: Provider service reference
+                description: Reference to Service resource
                 properties:
                   apiVersion:
                     description: API version of the referent.

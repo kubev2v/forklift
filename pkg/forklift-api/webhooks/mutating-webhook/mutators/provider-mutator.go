@@ -36,6 +36,7 @@ func (mutator *ProviderMutator) Mutate(ar *admissionv1.AdmissionReview) *admissi
 			Value: mutator.provider.Spec,
 		})
 	}
+
 	if metadataChanged {
 		patches = append(patches, util.PatchOperation{
 			Op:    "replace",
