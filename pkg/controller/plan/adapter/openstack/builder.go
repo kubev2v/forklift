@@ -879,7 +879,7 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 	return
 }
 
-func (r *Builder) SupportsVolumePopulators(vmRef ref.Ref) bool {
+func (r *Builder) SupportsVolumePopulators() bool {
 	return true
 }
 
