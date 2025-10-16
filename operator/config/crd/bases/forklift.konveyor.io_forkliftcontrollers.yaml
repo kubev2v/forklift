@@ -62,10 +62,11 @@ spec:
               feature_ocp_live_migration:
                 type: string
                 enum: ["true", "false"]
+                description: "Enable OCP live migration (default: false)"
               feature_ova_appliance_management:
                 type: string
                 enum: [ "true", "false" ]
-                description: "Enable OCP live migration (default: false)"
+                description: "Enable OVA appliance management endpoints (default: false)"
               feature_vmware_system_serial_number:
                 type: string
                 enum: ["true", "false"]
