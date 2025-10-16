@@ -106,12 +106,12 @@ var _ = Describe("ProxyServer", func() {
 			})
 			spy := NewSpyClient(provider)
 			parsed, _ := url.Parse(backend.URL)
-			svcDialRedirect(parsed.Host)
 
 			proxy := &ProxyServer{
-				Client: spy,
-				Log:    logr.Discard(),
-				Cache:  NewProxyCache(300),
+				Client:    spy,
+				Log:       logr.Discard(),
+				Cache:     NewProxyCache(300),
+				Transport: svcDialRedirect(parsed.Host),
 			}
 			// path that the proxy should resolve into a request to /appliances
 			// against the server for the provider specified by the URL params
@@ -193,9 +193,8 @@ func makeCtx(method, ns, provider, urlPath string) (*gin.Context, *closeNotifyRe
 	return c, recorder
 }
 
-// svcDialRedirect redirects any dial to "*.svc.cluster.local:8080" to backendAddr for the duration
-// of the current spec, and restores the transport afterward.
-func svcDialRedirect(backendAddr string) {
+// svcDialRedirect returns a transport that redirects any dial to "*.svc.cluster.local:8080" to backendAddr
+func svcDialRedirect(backendAddr string) http.RoundTripper {
 	original := http.DefaultTransport.(*http.Transport)
 	clone := original.Clone()
 	clone.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -205,6 +204,5 @@ func svcDialRedirect(backendAddr string) {
 		d := &net.Dialer{Timeout: 5 * time.Second}
 		return d.DialContext(ctx, network, addr)
 	}
-	http.DefaultTransport = clone
-	DeferCleanup(func() { http.DefaultTransport = original })
+	return clone
 }

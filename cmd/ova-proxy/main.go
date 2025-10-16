@@ -42,9 +42,10 @@ type ProxyServer struct {
 		// Key path
 		Key string
 	}
-	Client k8sclient.Client
-	Log    logr.Logger
-	Cache  *ProxyCache
+	Transport http.RoundTripper
+	Client    k8sclient.Client
+	Log       logr.Logger
+	Cache     *ProxyCache
 }
 
 func (r *ProxyServer) Run() (err error) {
@@ -112,6 +113,9 @@ func (r *ProxyServer) Proxy(ctx *gin.Context) {
 				req.Out.URL.RawPath = u.Path
 				req.SetXForwarded()
 			},
+		}
+		if r.Transport != nil {
+			proxy.Transport = r.Transport
 		}
 		r.Cache.Add(key, proxy)
 	}

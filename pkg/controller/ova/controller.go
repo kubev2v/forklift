@@ -152,7 +152,7 @@ func (r *Reconciler) RemoveFinalizer(ctx context.Context, ova *api.OVAProviderSe
 func (r *Reconciler) Deploy(ctx context.Context, ova *api.OVAProviderServer) (err error) {
 	provider := &api.Provider{}
 	err = r.Get(
-		context.TODO(),
+		ctx,
 		types.NamespacedName{
 			Namespace: ova.Spec.Provider.Namespace,
 			Name:      ova.Spec.Provider.Name,
@@ -213,7 +213,7 @@ func (r *Reconciler) Deploy(ctx context.Context, ova *api.OVAProviderServer) (er
 func (r *Reconciler) Teardown(ctx context.Context, ova *api.OVAProviderServer) (err error) {
 	provider := &api.Provider{}
 	err = r.Get(
-		context.TODO(),
+		ctx,
 		types.NamespacedName{
 			Namespace: ova.Spec.Provider.Namespace,
 			Name:      ova.Spec.Provider.Name,
