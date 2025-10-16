@@ -654,7 +654,7 @@ func pvcSourceName(namespace, name string) string {
 	return fmt.Sprintf("%s/%s", namespace, name)
 }
 
-func (r *Builder) SupportsVolumePopulators(vmRef ref.Ref) bool {
+func (r *Builder) SupportsVolumePopulators() bool {
 	return false
 }
 

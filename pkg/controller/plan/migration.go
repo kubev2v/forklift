@@ -389,7 +389,7 @@ func markStartedStepsCompleted(vm *plan.VMStatus) {
 }
 
 func (r *Migration) deletePopulatorPVCs(vm *plan.VMStatus) (err error) {
-	if r.builder.SupportsVolumePopulators(vm.Ref) {
+	if r.builder.SupportsVolumePopulators() {
 		err = r.kubevirt.DeletePopulatedPVCs(vm)
 	}
 	return
@@ -724,7 +724,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				}
 			}
 
-			if r.builder.SupportsVolumePopulators(vm.Ref) {
+			if r.builder.SupportsVolumePopulators() {
 				var pvcs []*core.PersistentVolumeClaim
 				if pvcs, err = r.kubevirt.PopulatorVolumes(vm.Ref); err != nil {
 					if !errors.As(err, &web.ProviderNotReadyError{}) {
@@ -753,8 +753,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				return
 			}
 
-			// Create DataVolumes unless this is a cold migration using storage offload
-			if r.Plan.IsWarm() || !r.builder.SupportsVolumePopulators(vm.Ref) {
+			if !r.builder.SupportsVolumePopulators() {
 				var dataVolumes []cdi.DataVolume
 				dataVolumes, err = r.kubevirt.DataVolumes(vm)
 				if err != nil {
@@ -788,7 +787,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 
 			// Wait for the DataVolume to adopt the PVC before proceeding
-			if r.builder.SupportsVolumePopulators(vm.Ref) && r.Plan.IsWarm() {
+			if r.builder.SupportsVolumePopulators() && r.Plan.IsWarm() {
 				var pvcs []*core.PersistentVolumeClaim
 				pvcs, err = r.kubevirt.getPVCs(vm.Ref)
 				if err != nil {
@@ -893,7 +892,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			step.MarkStarted()
 			step.Phase = api.StepRunning
 
-			if r.builder.SupportsVolumePopulators(vm.Ref) {
+			if r.builder.SupportsVolumePopulators() {
 				err = r.updatePopulatorCopyProgress(vm, step)
 			} else {
 				// Fallback to non-volume populator path
