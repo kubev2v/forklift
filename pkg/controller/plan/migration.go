@@ -752,8 +752,8 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				r.Log.Info("PreTransferActions hook isn't ready yet")
 				return
 			}
-
-			if !r.builder.SupportsVolumePopulators() {
+			// Create DataVolumes unless this is a cold migration using storage offload
+			if r.Plan.IsWarm() || !r.builder.SupportsVolumePopulators() {
 				var dataVolumes []cdi.DataVolume
 				dataVolumes, err = r.kubevirt.DataVolumes(vm)
 				if err != nil {
