@@ -37,7 +37,7 @@ mkdir -p ${ESXCLI_PLUGINS_DIR}
 # in esxcli-vmkfstools.xml, but this is left just to prove we can use it.
 # Should be removed if we find it useless.
 cp -v esxcli-vmkfstools.xml ${ESXCLI_PLUGINS_DIR}
-cp -v vmkfstools_wrapper.py ${CUSTOM_VIB_BIN_DIR}/vmkfstools-wrapper
+cp -v vmkfstools_wrapper.py.versioned ${CUSTOM_VIB_BIN_DIR}/vmkfstools-wrapper
 chmod +x ${CUSTOM_VIB_BIN_DIR}/vmkfstools-wrapper
 
 # Create tgz with payload

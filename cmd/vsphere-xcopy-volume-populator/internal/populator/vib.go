@@ -31,11 +31,14 @@ func ensureVib(client vmware.Client, esx *object.HostSystem, datastore string, d
 		return fmt.Errorf("failed to get the VIB version from ESXi %s: %w", esx.Name(), err)
 	}
 
-	klog.Infof("current vib version on ESXi %s: %s", esx.Name(), version)
 	if version == desiredVibVersion {
+		klog.Infof("vib version on ESXi %s is at the expected version: %s", esx.Name(), version)
+		klog.Infof("validating esxcli vmkfstools is active")
+		version, err := client.RunEsxCommand(context.Background(), esx, []string{"version"})
 		return nil
 	}
 
+	klog.Infof("vib version on ESXi %s is %s - installing the expected version", esx.Name(), version)
 	dc, err := getHostDC(esx)
 	if err != nil {
 		return err
@@ -50,7 +53,8 @@ func ensureVib(client vmware.Client, esx *object.HostSystem, datastore string, d
 	if err != nil {
 		return fmt.Errorf("failed to install the VIB on ESXi %s: %w", esx.Name(), err)
 	}
-	klog.Infof("installed vib on ESXi %s version %s", esx.Name(), VibVersion)
+	klog.Infof("installed vib on ESXi %s version %s.", esx.Name(), VibVersion)
+	klog.Infof("ATTENTION - please restart hostd to make the vmkfstools esxcli plugin active by running '/etc/init.d/hostd restart'")
 	return nil
 }
 

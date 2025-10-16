@@ -9,6 +9,20 @@
    </namespaces>
 
    <commands>
+      <command path="vmkfstools.version">
+         <description>vmkfstools version</description>
+         <output-spec>
+            <structure typeName="result">
+               <field name="status"> <string/></field>
+               <field name="message"> <string/></field>
+            </structure>
+         </output-spec>
+         <format-parameters>
+            <formatter>simple</formatter>
+         </format-parameters>
+         <execute>/opt/redhat/vmkfstools-wrapper --version</execute>
+      </command>
+
       <command path="vmkfstools.clone">
          <description>Clone VMDK to RDM</description>
          <input-spec>

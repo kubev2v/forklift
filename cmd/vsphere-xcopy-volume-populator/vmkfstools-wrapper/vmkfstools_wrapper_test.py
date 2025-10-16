@@ -23,7 +23,8 @@ class TestVmkfstoolsWrapper(unittest.TestCase):
             main()
             mocked_clone.assert_called_once_with(
                 Namespace(clone=True, source_vmdk="foo", target_lun="bar",
-                          task_get=False, task_clean=False, task_id=None))
+                          task_get=False, task_clean=False, task_id=None,
+                          version=False))
 
     @patch('sys.argv', ['vmkfstools_wrapper', '--task-get', '-i', 'foo'])
     def test_task_get(self):
@@ -33,7 +34,8 @@ class TestVmkfstoolsWrapper(unittest.TestCase):
             main()
             mocked_get.assert_called_once_with(
                 Namespace(clone=False, source_vmdk=None, target_lun=None,
-                          task_get=True, task_clean=False, task_id=['foo']))
+                          task_get=True, task_clean=False, task_id=['foo'],
+                          version=False))
 
     @patch('sys.argv', ['vmkfstools_wrapper', '--task-clean', '-i', 'foo'])
     def test_task_clean(self):
@@ -43,7 +45,8 @@ class TestVmkfstoolsWrapper(unittest.TestCase):
             main()
             mocked_task_clean.assert_called_once_with(
                 Namespace(clone=False, source_vmdk=None, target_lun=None,
-                          task_get=False, task_clean=True, task_id=['foo']))
+                          task_get=False, task_clean=True, task_id=['foo'],
+                          version=False))
 
 
 if __name__ == '__main__':
