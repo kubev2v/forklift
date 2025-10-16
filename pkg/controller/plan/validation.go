@@ -464,7 +464,7 @@ func (r *Reconciler) validateNetworkMap(plan *api.Plan) (err error) {
 	}
 	// Check if we are preserving static IPs and give warning if we are mapping to Pod Network.
 	// The Pod network has different subnet than the source provider so the VMs might not be accessible.
-	if plan.Spec.PreserveStaticIPs {
+	if plan.Referenced.Provider.Source.SupportsPreserveStaticIps() && plan.Spec.PreserveStaticIPs {
 		var hasMappingToPodNetwork bool
 		for _, networkMap := range mp.Spec.Map {
 			if networkMap.Destination.Type == Pod {
