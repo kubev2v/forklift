@@ -146,6 +146,10 @@ func (p *Provider) Type() ProviderType {
 	return Undefined
 }
 
+func (p *Provider) SupportsPreserveStaticIps() bool {
+	return p.Type() == VSphere
+}
+
 // This provider is the `host` cluster.
 func (p *Provider) IsHost() bool {
 	return p.Type() == OpenShift && p.Spec.URL == ""
