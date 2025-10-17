@@ -30,9 +30,9 @@ metadata:
           "namespace": "konveyor-forklift"
         },
         "spec": {
-          "feature_ui_plugin": "true",
-          "feature_validation": "true",
-          "feature_volume_populator": "true"
+          "feature_ui_plugin": true,
+          "feature_validation": true,
+          "feature_volume_populator": true
         }
       }
     operatorframework.io/suggested-namespace: ${NAMESPACE}
