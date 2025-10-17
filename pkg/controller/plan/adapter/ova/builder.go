@@ -423,6 +423,14 @@ func (r *Builder) PreferenceName(vmRef ref.Ref, configMap *core.ConfigMap) (name
 	return
 }
 
+func (r *Builder) ConfigMaps(vmRef ref.Ref) (list []core.ConfigMap, err error) {
+	return nil, nil
+}
+
+func (r *Builder) Secrets(vmRef ref.Ref) (list []core.Secret, err error) {
+	return nil, nil
+}
+
 func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err error) {
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
