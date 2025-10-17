@@ -144,6 +144,8 @@ type KubeVirt struct {
 	*plancontext.Context
 	// Builder
 	Builder adapter.Builder
+	// Ensurer
+	Ensurer adapter.Ensurer
 }
 
 // Build a VirtualMachineMap.
@@ -1568,6 +1570,27 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) 
 		if _, ok := object.Spec.Template.ObjectMeta.Annotations[ann]; !ok {
 			object.Spec.Template.ObjectMeta.Annotations[ann] = ""
 		}
+	}
+
+	var configmaps []core.ConfigMap
+	configmaps, err = r.Builder.ConfigMaps(vm.Ref)
+	if err != nil {
+		return
+	}
+	err = r.Ensurer.SharedConfigMaps(vm, configmaps)
+	if err != nil {
+		return
+	}
+
+	var secrets []core.Secret
+	secrets, err = r.Builder.Secrets(vm.Ref)
+	if err != nil {
+		return
+
+	}
+	err = r.Ensurer.SharedSecrets(vm, secrets)
+	if err != nil {
+		return
 	}
 
 	err = r.Builder.VirtualMachine(vm.Ref, &object.Spec, pvcs, vm.InstanceType != "", sortVolumesByLibvirt)
