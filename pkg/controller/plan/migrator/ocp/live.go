@@ -1578,6 +1578,11 @@ func (r *Builder) ConfigMaps(vm *planapi.VMStatus) (list []core.ConfigMap, err e
 		case vol.ConfigMap != nil:
 			key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.ConfigMap.Name}
 			sources = append(sources, key)
+		case vol.Sysprep != nil:
+			if vol.Sysprep.ConfigMap != nil {
+				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.Sysprep.ConfigMap.Name}
+				sources = append(sources, key)
+			}
 		default:
 			continue
 		}
@@ -1650,6 +1655,11 @@ func (r *Builder) Secrets(vm *planapi.VMStatus) (list []core.Secret, err error) 
 			}
 			if vol.CloudInitConfigDrive.NetworkDataSecretRef != nil {
 				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.CloudInitConfigDrive.NetworkDataSecretRef.Name}
+				sources = append(sources, key)
+			}
+		case vol.Sysprep != nil:
+			if vol.Sysprep.Secret != nil {
+				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.Sysprep.Secret.Name}
 				sources = append(sources, key)
 			}
 		default:
