@@ -1,5 +1,5 @@
-//go:build go1.24 && !go1.25 && !goexperiment.swissmap
-// +build go1.24,!go1.25,!goexperiment.swissmap
+//go:build go1.24 && !go1.26 && !goexperiment.swissmap
+// +build go1.24,!go1.26,!goexperiment.swissmap
 
 package rt
 
@@ -24,5 +24,5 @@ type GoMapIterator struct {
 	Bucket      uintptr
 	CheckBucket uintptr
 	// different from go1.23
-	ClearSeq uint64
+	ClearSeq    uint64
 }
