@@ -857,7 +857,8 @@ func (c *controller) updatePvc(ctx context.Context, pvc *corev1.PersistentVolume
 
 func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolumeClaim, cr *unstructured.Unstructured) error {
 	populatorKind := pvc.Spec.DataSourceRef.Kind
-	importRegExp := regexp.MustCompile("progress\\{ownerUID=\"" + string(pvc.UID) + "\"\\} (\\d+\\.?\\d*)")
+	progressRe := regexp.MustCompile("vsphere_xcopy_volume_populator_progress\\{ownerUID=\"" + string(pvc.UID) + "\"\\} (\\d+\\.?\\d*)")
+	cloneBytesRe := regexp.MustCompile("vsphere_xcopy_volume_populator_clone_progress_bytes\\{ownerUID=\"" + string(pvc.UID) + "\"\\} (\\d+\\.?\\d*)")
 
 	url, err := getMetricsURL(pod)
 	if err != nil {
@@ -882,13 +883,25 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 		return err
 	}
 
-	match := importRegExp.FindStringSubmatch(string(body))
+	match := progressRe.FindStringSubmatch(string(body))
 	if match == nil {
-		klog.V(5).Info("Failed to find matches, regex: ", importRegExp)
+		klog.V(5).Info("Failed to find matches, regex: ", progressRe)
 		return nil
 	}
 
-	progress, err := strconv.ParseFloat(string(match[1]), 64)
+	progressVal, err := strconv.ParseFloat(string(match[1]), 64)
+	if err != nil {
+		klog.V(5).Info("Could not convert progress: ", err)
+		return err
+	}
+
+	matchCloneBytes := cloneBytesRe.FindStringSubmatch(string(body))
+	if matchCloneBytes == nil {
+		klog.V(5).Info("Failed to find matches, regex: ", cloneBytesRe)
+		return nil
+	}
+
+	cloneBytesVal, err := strconv.ParseFloat(string(matchCloneBytes[1]), 64)
 	if err != nil {
 		klog.V(5).Info("Could not convert progress: ", err)
 		return err
@@ -906,9 +919,15 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 		return err
 	}
 
-	err = updatePopulatorProgress(int64(progress), latestPopulator)
+	err = updatePopulatorProgress(int64(progressVal), latestPopulator)
 	if err != nil {
 		klog.V(5).Info("Failed to update progress: ", err)
+		return err
+	}
+
+	err = updatePopulatorCloneBytes(cloneBytesVal, latestPopulator)
+	if err != nil {
+		klog.V(5).Info("Failed to update clone bytes progress: ", err)
 		return err
 	}
 
@@ -918,8 +937,12 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 		return err
 	}
 
-	if progress != 0 {
-		klog.Info("Updated progress: ", progress)
+	if progressVal != 0 {
+		klog.Info("Updated progress: ", progressVal)
+	}
+
+	if cloneBytesVal != 0 {
+		klog.Info("Updated clone progress bytes: ", cloneBytesVal)
 	}
 
 	return nil
@@ -930,6 +953,15 @@ func updatePopulatorProgress(progress int64, cr *unstructured.Unstructured) erro
 		return err
 	}
 
+	return nil
+}
+
+func updatePopulatorCloneBytes(bytes float64, cr *unstructured.Unstructured) error {
+	// store as integer string if whole number, else as float string
+	val := fmt.Sprintf("%v", bytes)
+	if err := unstructured.SetNestedField(cr.Object, val, "status", "cloneProgressBytes"); err != nil {
+		return err
+	}
 	return nil
 }
 
