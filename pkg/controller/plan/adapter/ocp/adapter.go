@@ -7,6 +7,7 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/plan/ensurer"
 	ocp "github.com/kubev2v/forklift/pkg/lib/client/openshift"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
@@ -16,6 +17,13 @@ import (
 
 // Openshift adapter.
 type Adapter struct{}
+
+// Constructs a ensurer.
+func (r *Adapter) Ensurer(ctx *plancontext.Context) (ensure base.Ensurer, err error) {
+	e := &ensurer.Ensurer{Context: ctx}
+	ensure = e
+	return
+}
 
 // Constructs a openstack builder.
 func (r *Adapter) Builder(ctx *plancontext.Context) (builder base.Builder, err error) {
