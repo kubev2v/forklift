@@ -56,6 +56,17 @@ test-copy-using-cli: build
 		--owner-uid=test-cli \
 		--kubeconfig=$$KUBECONFIG
 
+test-flashsystem: build
+	bin/vsphere-xcopy-volume-populator \
+		--source-vm-id=vm-3006 \
+		--source-vmdk="[TEST_DS] migtest/migtest.vmdk" \
+		--owner-name=test-cli \
+		--target-namespace=redhat-test \
+		--storage-vendor-product=flashsystem \
+		--storage-skip-ssl-verification=true \
+		--secret-name=populator-secret \
+		--owner-uid=test-cli \
+		--kubeconfig=$$KUBECONFIG
 
 test-copy-using-cli-3par: build
 	bin/vsphere-xcopy-volume-populator \
