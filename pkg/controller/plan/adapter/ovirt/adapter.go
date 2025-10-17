@@ -3,6 +3,7 @@ package ovirt
 import (
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/plan/ensurer"
 )
 
 // oVirt adapter.
@@ -29,6 +30,13 @@ func (r *Adapter) Client(ctx *plancontext.Context) (client base.Client, err erro
 		return
 	}
 	client = c
+	return
+}
+
+// Constructs a ensurer.
+func (r *Adapter) Ensurer(ctx *plancontext.Context) (ensure base.Ensurer, err error) {
+	e := &ensurer.Ensurer{Context: ctx}
+	ensure = e
 	return
 }
 
