@@ -112,6 +112,8 @@ type Adapter interface {
 	Validator(ctx *plancontext.Context) (Validator, error)
 	// Construct DestinationClient.
 	DestinationClient(ctx *plancontext.Context) (DestinationClient, error)
+	// Ensurer
+	Ensurer(ctx *plancontext.Context) (ensure Ensurer, err error)
 }
 
 // Builder API.
@@ -152,6 +154,10 @@ type Builder interface {
 	GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error)
 	// Get the virtual machine preference name
 	PreferenceName(vmRef ref.Ref, configMap *core.ConfigMap) (name string, err error)
+	// Build VM ConfigMaps
+	ConfigMaps(vmRef ref.Ref) (list []core.ConfigMap, err error)
+	// Build VM Secrets
+	Secrets(vmRef ref.Ref) (list []core.Secret, err error)
 }
 
 // Client API.
@@ -235,4 +241,13 @@ type DestinationClient interface {
 	DeletePopulatorDataSource(vm *planapi.VMStatus) error
 	// Set the VolumePopulator CustomResource Ownership.
 	SetPopulatorCrOwnership() error
+}
+
+// Ensurer API
+// Ensures creates or check that the resources are present
+type Ensurer interface {
+	// SharedConfigMaps ensures that shared ConfigMap with VM are present
+	SharedConfigMaps(vm *planapi.VMStatus, configMaps []core.ConfigMap) (err error)
+	// SharedSecrets ensures that shared Secret with VM are present
+	SharedSecrets(vm *planapi.VMStatus, secrets []core.Secret) (err error)
 }
