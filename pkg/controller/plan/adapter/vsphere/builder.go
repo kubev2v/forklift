@@ -1109,6 +1109,14 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 	return
 }
 
+func (r *Builder) ConfigMaps(vmRef ref.Ref) (list []core.ConfigMap, err error) {
+	return nil, nil
+}
+
+func (r *Builder) Secrets(vmRef ref.Ref) (list []core.Secret, err error) {
+	return nil, nil
+}
+
 func (r *Builder) PreferenceName(vmRef ref.Ref, configMap *core.ConfigMap) (name string, err error) {
 	var os string
 	for _, vmConf := range r.Migration.Status.VMs {
