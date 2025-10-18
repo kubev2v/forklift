@@ -280,6 +280,7 @@ func (r *Builder) mapDisks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.Virtu
 	r.mapPVCsToTarget(targetVmSpec, persistentVolumeClaims, diskMap)
 	r.mapConfigMapsToTarget(targetVmSpec, configMaps)
 	r.mapSecretsToTarget(targetVmSpec, secrets)
+	r.mapCloudInit(targetVmSpec, sourceVm)
 	r.mapDeviceDisks(targetVmSpec, sourceVm, diskMap)
 }
 
@@ -298,6 +299,20 @@ func (r *Builder) mapDeviceDisks(targetVmSpec *cnv.VirtualMachineSpec, sourceVm 
 	for _, disk := range sourceVm.Spec.Template.Spec.Domain.Devices.Disks {
 		if r.isDiskInDiskMap(&disk, diskMap) {
 			targetVmSpec.Template.Spec.Domain.Devices.Disks = append(targetVmSpec.Template.Spec.Domain.Devices.Disks, *disk.DeepCopy())
+		}
+	}
+}
+
+func (r *Builder) mapCloudInit(targetVmSpec *cnv.VirtualMachineSpec, sourceVm *cnv.VirtualMachine) {
+	for _, volume := range sourceVm.Spec.Template.Spec.Volumes {
+		if volume.CloudInitNoCloud != nil {
+			targetVolume := cnv.Volume{
+				Name: volume.Name,
+				VolumeSource: cnv.VolumeSource{
+					CloudInitNoCloud: volume.CloudInitNoCloud.DeepCopy(),
+				},
+			}
+			targetVmSpec.Template.Spec.Volumes = append(targetVmSpec.Template.Spec.Volumes, targetVolume)
 		}
 	}
 }
@@ -322,6 +337,8 @@ func createDiskMap(sourceVm *cnv.VirtualMachine, vmRef ref.Ref) map[string]*cnv.
 				key = vol.ConfigMap.Name
 			case vol.Secret != nil:
 				key = vol.Secret.SecretName
+			case vol.CloudInitNoCloud != nil:
+				key = vol.Name
 			}
 
 			diskMap[key] = &currentDisk
