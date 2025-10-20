@@ -58,7 +58,7 @@ func (r *Ensurer) VirtualMachine(vm *planapi.VMStatus, target *cnv.VirtualMachin
 	return
 }
 
-// DataVolumes have been created on the destination cluster. Although we build DataVolumes with the same
+// DataVolumes ensures DVs have been created on the destination cluster. Although we build DataVolumes with the same
 // names they had on the source cluster, we search by label so that we notice conflicts with existing DVs.
 func (r *Ensurer) DataVolumes(vm *planapi.VMStatus, dvs []cdi.DataVolume) (err error) {
 	list := &cdi.DataVolumeList{}
@@ -92,6 +92,47 @@ func (r *Ensurer) DataVolumes(vm *planapi.VMStatus, dvs []cdi.DataVolume) (err e
 				path.Join(
 					dv.Namespace,
 					dv.Name),
+				"vm",
+				vm.String())
+		}
+	}
+	return
+}
+
+// PersistentVolumeClaims ensures PVCs have been created on the destination cluster. Although we build PersistentVolumeClaims with the same
+// names they had on the source cluster, we search by label so that we notice conflicts with existing PVCs.
+func (r *Ensurer) PersistentVolumeClaims(vm *planapi.VMStatus, pvcs []core.PersistentVolumeClaim) (err error) {
+	list := &core.PersistentVolumeClaimList{}
+	err = r.Destination.Client.List(
+		context.Background(),
+		list,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		})
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	exists := make(map[string]bool)
+	for _, pvc := range list.Items {
+		exists[pvc.Annotations[api.AnnDiskSource]] = true
+	}
+
+	for _, pvc := range pvcs {
+		if !exists[pvc.Annotations[api.AnnDiskSource]] {
+			r.Labeler.SetLabels(&pvc, r.Labeler.VMLabels(vm.Ref))
+			err = r.Destination.Client.Create(context.Background(), &pvc)
+			if err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
+			r.Log.Info("Created PersistentVolumeClaim.",
+				"dv",
+				path.Join(
+					pvc.Namespace,
+					pvc.Name),
 				"vm",
 				vm.String())
 		}

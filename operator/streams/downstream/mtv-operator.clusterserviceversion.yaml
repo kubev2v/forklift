@@ -1,7 +1,7 @@
 apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
-  name: ${CSV_NAME}.v${VERSION}
+  name: ${CSV_NAME}.v${MTV_VERSION}
   namespace: ${NAMESPACE}
   annotations:
     capabilities: Seamless Upgrades
@@ -58,9 +58,9 @@ spec:
 
     ### Compatibility
 
-    Migration Toolkit for Virtualization 2.7 is supported on OpenShift 4.15, 4.16 and 4.17
+    Migration Toolkit for Virtualization 2.10 is supported on OpenShift 4.18, 4.19 and 4.20
 
-    Migration Toolkit for Virtualization 2.8 is supported on OpenShift 4.16, 4.17 and 4.18
+    Migration Toolkit for Virtualization 2.11 is supported on OpenShift 4.19, 4.20 and 4.21
 
     More information on compatibility in the [MTV Lifecycle document](https://access.redhat.com/support/policy/updates/migration-toolkit-for-virtualization).
 
@@ -105,7 +105,7 @@ spec:
       url: ${DOCS_LINK_URL}
     - name: Forklift Operator
       url: https://github.com/kubev2v/forklift
-  version: ${VERSION}
+  version: ${MTV_VERSION}
   minKubeVersion: 1.27.0
   apiservicedefinitions: {}
   customresourcedefinitions:
@@ -139,6 +139,11 @@ spec:
         displayName: OpenstackVolumePopulator
         kind: OpenstackVolumePopulator
         name: openstackvolumepopulators.forklift.konveyor.io
+        version: v1beta1
+      - description: OVA Provider Server
+        displayName: OVAProviderServer
+        kind: OVAProviderServer
+        name: ovaproviderservers.forklift.konveyor.io
         version: v1beta1
       - description: oVirt Volume Populator
         displayName: OvirtVolumePopulator
@@ -188,5 +193,7 @@ spec:
       image: "${UI_PLUGIN_IMAGE}"
     - name: ova_provider_server
       image: "${OVA_PROVIDER_SERVER_IMAGE}"
+    - name: ova_proxy
+      image: "${OVA_PROXY_IMAGE}"
     - name: vsphere_xcopy_volume_populator
       image: "${VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE}"

@@ -1,13 +1,20 @@
 package vsphere
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"net"
 	"strings"
 
+	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/plan/util"
+	ocpmodel "github.com/kubev2v/forklift/pkg/controller/provider/model/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
@@ -15,14 +22,21 @@ import (
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/templateutil"
 	"github.com/vmware/govmomi/vim25/types"
+	core "k8s.io/api/core/v1"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // vSphere validator.
 type Validator struct {
 	*plancontext.Context
 }
+
+const (
+	namespaceLabelPrimaryUDN = "k8s.ovn.org/primary-user-defined-network"
+	nadLabelUDN              = "k8s.ovn.org/user-defined-network"
+)
 
 // Validate whether warm migration is supported from this provider type.
 func (r *Validator) WarmMigration() (ok bool) {
@@ -149,9 +163,13 @@ func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (ok b
 		return true, nil
 	}
 
+	// Get target VM name (either from TargetName field or cleaned VM name)
+	targetVmName := r.getPlanVMTargetName(vm)
+
 	for i, disk := range vm.Disks {
 		testData := api.PVCNameTemplateData{
 			VmName:         vm.Name,
+			TargetVmName:   targetVmName,
 			PlanName:       r.Plan.Name,
 			DiskIndex:      i,
 			RootDiskIndex:  1,
@@ -344,7 +362,7 @@ func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, m
 		return false, msg, "", liberr.Wrap(err, "vm", vmRef)
 	}
 	// Warm migration
-	if vm.HasSharedDisk() && r.Plan.Spec.Warm {
+	if vm.HasSharedDisk() && r.Plan.IsWarm() {
 		return false, "The shared disks cannot be used with warm migration", "", nil
 	}
 
@@ -432,6 +450,121 @@ func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, m
 	return true, "", "", nil
 }
 
+func (r *Validator) getUdnSubnet(client client.Client) (string, error) {
+	key := k8sclient.ObjectKey{
+		Name: r.Plan.Spec.TargetNamespace,
+	}
+	namespace := &core.Namespace{}
+	err := client.Get(context.TODO(), key, namespace)
+	if err != nil {
+		return "", err
+	}
+	_, hasUdnLabel := namespace.ObjectMeta.Labels[namespaceLabelPrimaryUDN]
+	if !hasUdnLabel {
+		return "", nil
+	}
+
+	nadList := &k8snet.NetworkAttachmentDefinitionList{}
+	listOpts := []k8sclient.ListOption{
+		k8sclient.InNamespace(r.Plan.Spec.TargetNamespace),
+		k8sclient.MatchingLabels{nadLabelUDN: ""},
+	}
+
+	err = client.List(context.TODO(), nadList, listOpts...)
+	if err != nil {
+		return "", err
+	}
+	for _, nad := range nadList.Items {
+		var networkConfig ocpmodel.NetworkConfig
+		err = json.Unmarshal([]byte(nad.Spec.Config), &networkConfig)
+		if err != nil {
+			r.Log.Info("Skipping NAD: failed to parse network config", "namespace", nad.Namespace, "name", nad.Name, "error", err.Error())
+			continue
+		}
+		if networkConfig.IsUnsupportedUdn() && networkConfig.AllowPersistentIPs {
+			return networkConfig.Subnets, nil
+		}
+	}
+	return "", nil
+}
+func (r *Validator) getSourceNetworkForPodNetworkTarget(vmRef ref.Ref) (net *model.Network, err error) {
+	vm := &model.Workload{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef)
+		return
+	}
+
+	mapping := r.Plan.Referenced.Map.Network.Spec.Map
+	for i := range mapping {
+		mapped := &mapping[i]
+		ref := mapped.Source
+		network := &model.Network{}
+		fErr := r.Source.Inventory.Find(network, ref)
+		if fErr != nil {
+			err = fErr
+			return
+		}
+		if mapped.Destination.Type == Pod {
+			return network, nil
+		}
+	}
+	return
+}
+
+func (r *Validator) UdnStaticIPs(vmRef ref.Ref, client client.Client) (ok bool, err error) {
+	// Check static IPs
+	if !r.Plan.DestinationHasUdnNetwork(client) {
+		return true, nil
+	}
+	if ok, err = r.StaticIPs(vmRef); err != nil {
+		return false, liberr.Wrap(err, "vm", vmRef)
+	} else if !ok {
+		return false, nil
+	}
+	sourceNetwork, err := r.getSourceNetworkForPodNetworkTarget(vmRef)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef)
+		return
+	}
+	if sourceNetwork == nil {
+		// No Pod network mapping found, validation passes
+		return true, nil
+	}
+	vm := &model.Workload{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef)
+		return
+	}
+
+	udnSubnet, err := r.getUdnSubnet(client)
+	if udnSubnet == "" {
+		// No UDN subnet configured, validation passes
+		return true, nil
+	}
+	if err != nil {
+		return false, liberr.Wrap(err, "vm", vmRef)
+	}
+	for _, guestNetwork := range vm.GuestNetworks {
+		if guestNetwork.Network == sourceNetwork.Name {
+			// Validate the NAD
+			_, ipNet, err := net.ParseCIDR(udnSubnet)
+			if err != nil {
+				return false, liberr.Wrap(err, "udnSubnet", udnSubnet)
+			}
+			ip := net.ParseIP(guestNetwork.IP)
+			if ip == nil {
+				// Invalid IP in guest network
+				r.Log.V(4).Info("Invalid IP in guest network", "vm", vmRef.String(), "ip", guestNetwork.IP)
+				return false, nil
+			}
+			return ipNet.Contains(ip), nil
+		}
+	}
+	return true, nil
+}
+
 // Validate that we have information about static IPs for every guest network.
 // Virtual nics are not required to have a static IP.
 func (r *Validator) StaticIPs(vmRef ref.Ref) (ok bool, err error) {
@@ -466,9 +599,8 @@ func (r *Validator) StaticIPs(vmRef ref.Ref) (ok bool, err error) {
 
 // Validate that the vm has the change tracking enabled
 func (r *Validator) ChangeTrackingEnabled(vmRef ref.Ref) (bool, error) {
-	// Check if this is a warm migration using both old and new fields for backward compatibility
-	isWarmMigration := r.Plan.Spec.Warm || r.Plan.Spec.Type == api.MigrationWarm
-	if !isWarmMigration {
+	// Check if this is a warm migration
+	if !r.Plan.IsWarm() {
 		return true, nil
 	}
 	vm := &model.Workload{}
@@ -479,11 +611,35 @@ func (r *Validator) ChangeTrackingEnabled(vmRef ref.Ref) (bool, error) {
 	return vm.ChangeTrackingEnabled, nil
 }
 
+// getPlanVM get the plan VM for the given vsphere VM by looping over plan.Spec.VMs
+func (r *Validator) getPlanVM(vm *model.VM) *plan.VM {
+	for i := range r.Plan.Spec.VMs {
+		if r.Plan.Spec.VMs[i].ID == vm.ID {
+			return &r.Plan.Spec.VMs[i]
+		}
+	}
+	return nil
+}
+
+// getPlanVMTargetName returns the target VM name, either by using the TargetName field if present,
+// or by cleaning the VM name to make it DNS1123 compatible
+func (r *Validator) getPlanVMTargetName(vm *model.VM) string {
+	// Get plan VM from spec.vms and use the TargetName field if present
+	planVM := r.getPlanVM(vm)
+	if planVM != nil {
+		if name := strings.TrimSpace(planVM.TargetName); name != "" {
+			return name
+		}
+	}
+
+	// Otherwise, clean the VM name
+	return util.ChangeVmName(vm.Name)
+}
+
 // Validate that VM has no pre-existing snapshots for warm migration
 func (r *Validator) HasSnapshot(vmRef ref.Ref) (ok bool, msg string, category string, err error) {
-	// Check if this is a warm migration using both old and new fields for backward compatibility
-	isWarmMigration := r.Plan.Spec.Warm || r.Plan.Spec.Type == api.MigrationWarm
-	if !isWarmMigration {
+	// Check if this is a warm migration
+	if !r.Plan.IsWarm() {
 		return true, "", "", nil
 	}
 	vm := &model.VM{}

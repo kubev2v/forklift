@@ -1,5 +1,5 @@
 FROM registry.redhat.io/ubi9/go-toolset:1.24.4-1752083840 AS builder
-
+USER 0
 WORKDIR /app
 COPY --chown=1001:0 ./ ./
 ENV GOFLAGS="-mod=vendor -tags=strictfipsruntime"
@@ -16,9 +16,10 @@ RUN microdnf -y install tar && microdnf clean all
 COPY --from=builder /app/controller /usr/local/bin/populator-controller
 ENTRYPOINT ["/usr/local/bin/populator-controller"]
 
-ARG VERSION
+ARG MTV_VERSION
 ARG REGISTRY
 ARG REVISION
+ARG CPE
 
 LABEL \
     com.redhat.component="mtv-populator-controller-container" \
@@ -31,5 +32,6 @@ LABEL \
     description="Migration Toolkit for Virtualization - Populator Controller" \
     vendor="Red Hat, Inc." \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
-    version="$VERSION" \
-    revision="$REVISION"
+    version="$MTV_VERSION" \
+    revision="$REVISION" \
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:${CPE}::el9"

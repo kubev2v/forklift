@@ -1,0 +1,25 @@
+FROM registry.redhat.io/ubi9/nginx-126:1-1756959223
+# COPY build/forklift-cli-download/artifacts /opt/app-root/src/
+RUN cp /cachi2/output/deps/generic/* /opt/app-root/src/
+EXPOSE 8080
+CMD ["nginx", "-g", "daemon off;"]
+
+ARG MTV_VERSION
+ARG REGISTRY
+ARG REVISION
+ARG CPE
+
+LABEL \
+    com.redhat.component="mtv-cli-download-container" \
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:${CPE}::el9" \
+    name="${REGISTRY}/mtv-cli-download-rhel9" \
+    license="Apache License 2.0" \
+    io.k8s.display-name="Migration Toolkit for Virtualization" \
+    io.k8s.description="Migration Toolkit for Virtualization - CLI Download Service" \
+    io.openshift.tags="migration,mtv,forklift,cli" \
+    description="Migration Toolkit for Virtualization - CLI Download Service" \
+    summary="Migration Toolkit for Virtualization - CLI Download Service" \
+    vendor="Red Hat, Inc." \
+    maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+    version="$MTV_VERSION" \
+    revision="$REVISION"

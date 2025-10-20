@@ -46,6 +46,8 @@ spec:
           value: ${MUST_GATHER_IMAGE}
         - name: UI_PLUGIN_IMAGE
           value: ${UI_PLUGIN_IMAGE}
+        - name: CLI_DOWNLOAD_IMAGE
+          value: ${CLI_DOWNLOAD_IMAGE}
         - name: VALIDATION_IMAGE
           value: ${VALIDATION_IMAGE}
         - name: VIRT_V2V_IMAGE
@@ -72,6 +74,8 @@ spec:
           value: ${OPENSTACK_POPULATOR_IMAGE}
         - name: OVA_PROVIDER_SERVER_IMAGE
           value: ${OVA_PROVIDER_SERVER_IMAGE}
+        - name: OVA_PROXY_IMAGE
+          value: ${OVA_PROXY_IMAGE}
         - name: OVIRT_OS_MAP
           value: ${OVIRT_OS_MAP}
         - name: VSPHERE_OS_MAP

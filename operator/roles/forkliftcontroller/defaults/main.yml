@@ -9,6 +9,8 @@ feature_volume_populator: true
 feature_copy_offload: false
 feature_ocp_live_migration: false
 feature_vmware_system_serial_number: true
+feature_cli_download: true
+feature_ova_appliance_management: false
 
 k8s_cluster: false
 feature_auth_required: true
@@ -42,6 +44,7 @@ controller_snapshot_removal_check_retries: 20
 controller_vsphere_incremental_backup: true
 controller_ovirt_warm_migration: true
 controller_retain_precopy_importer_pods: false
+controller_static_udn_ip_addresses: false
 controller_max_vm_inflight: 20
 controller_filesystem_overhead: 10
 controller_block_overhead: 0
@@ -98,6 +101,17 @@ ui_plugin_container_requests_cpu: "100m"
 ui_plugin_container_requests_memory: "150Mi"
 ui_plugin_state: absent
 
+cli_download_image_fqin: "{{ lookup( 'env', 'CLI_DOWNLOAD_IMAGE') or lookup( 'env', 'RELATED_IMAGE_CLI_DOWNLOAD') }}"
+cli_download_service_name: "{{ app_name }}-cli-download"
+cli_download_route_name: "{{ cli_download_service_name }}"
+cli_download_deployment_name: "{{ cli_download_service_name }}"
+cli_download_container_name: "{{ app_name }}-cli-download"
+cli_download_container_limits_cpu: "100m"
+cli_download_container_limits_memory: "128Mi"
+cli_download_container_requests_cpu: "50m"
+cli_download_container_requests_memory: "64Mi"
+cli_download_state: absent
+
 api_image_fqin: "{{ lookup( 'env', 'API_IMAGE') or lookup( 'env', 'RELATED_IMAGE_API') }}"
 api_service_name: "{{ app_name }}-api"
 api_deployment_name: "{{ api_service_name }}"
@@ -141,7 +155,21 @@ ova_provider_server_fqin: "{{ lookup( 'env', 'OVA_PROVIDER_SERVER_IMAGE') or loo
 ova_container_limits_cpu: "1000m"
 ova_container_limits_memory: "1Gi"
 ova_container_requests_cpu: "100m"
-ova_container_requests_memory: "150Mi"
+ova_container_requests_memory: "512Mi"
+
+ova_proxy_fqin: "{{ lookup( 'env', 'OVA_PROXY_IMAGE') or lookup( 'env', 'RELATED_IMAGE_OVA_PROXY') }}"
+ova_proxy_container_name: "{{ app_name }}-ova-proxy"
+ova_proxy_service_name: "{{ app_name }}-ova-proxy"
+ova_proxy_route_name: "{{ ova_proxy_service_name }}"
+ova_proxy_route_timeout: "360s"
+ova_proxy_subapp_name: "ova-proxy"
+ova_proxy_container_limits_cpu: "1000m"
+ova_proxy_container_limits_memory: "1Gi"
+ova_proxy_container_requests_cpu: "250m"
+ova_proxy_container_requests_memory: "512Mi"
+ova_proxy_tls_secret_name: "{{ ova_proxy_service_name }}-serving-cert"
+ova_proxy_issuer_name: "{{ ova_proxy_service_name }}-issuer"
+ova_proxy_certificate_name: "{{ ova_proxy_service_name }}-certificate"
 
 metric_service_name: "{{ app_name }}-metrics"
 metric_servicemonitor_name: "{{ app_name }}-metrics"

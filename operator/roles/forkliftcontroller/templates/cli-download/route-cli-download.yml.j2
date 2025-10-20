@@ -1,0 +1,18 @@
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ cli_download_route_name }}
+  namespace: {{ app_namespace }}
+  labels:
+    app: {{ app_name }}
+    service: {{ cli_download_service_name }}
+spec:
+  to:
+    kind: Service
+    name: {{ cli_download_service_name }}
+  port:
+    targetPort: 8080
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

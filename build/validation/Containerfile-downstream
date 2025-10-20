@@ -1,5 +1,5 @@
-FROM registry.redhat.io/ubi9/go-toolset:1.24.4-1752083840 AS mtv-opa
-
+FROM registry.redhat.io/ubi9/go-toolset:1.24.6-1758501173 AS mtv-opa
+USER 0
 WORKDIR /app/opa
 ENV GOFLAGS="-tags=strictfipsruntime"
 ENV GOEXPERIMENT=strictfipsruntime
@@ -19,9 +19,10 @@ COPY --from=mtv-opa /tmp/opa /usr/bin/opa
 
 ENTRYPOINT ["/usr/bin/entrypoint.sh"]
 
-ARG VERSION
+ARG MTV_VERSION
 ARG REGISTRY
 ARG REVISION
+ARG CPE
 
 LABEL \
     com.redhat.component="mtv-validation-container" \
@@ -34,6 +35,7 @@ LABEL \
     description="Migration Toolkit for Virtualization - Validation Service" \
     vendor="Red Hat, Inc." \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
-    version="$VERSION" \
-    revision="$REVISION"
+    version="$MTV_VERSION" \
+    revision="$REVISION" \
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:${CPE}::el9"
 

@@ -1,5 +1,5 @@
 FROM registry.redhat.io/ubi8/go-toolset:1.24.4-1752591614 AS builder
-
+USER 0
 ENV GOPATH=$APP_ROOT
 WORKDIR /app
 COPY --chown=1001:0 ./ ./
@@ -15,9 +15,10 @@ RUN microdnf install -y python3-ovirt-engine-sdk4 ovirt-imageio-client
 
 ENTRYPOINT ["/usr/local/bin/ovirt-populator"]
 
-ARG VERSION
+ARG MTV_VERSION
 ARG REGISTRY
 ARG REVISION
+ARG CPE
 
 LABEL \
     com.redhat.component="mtv-rhv-populator-container" \
@@ -30,6 +31,7 @@ LABEL \
     description="Migration Toolkit for Virtualization - RHV Populator" \
     vendor="Red Hat, Inc." \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
-    version="$VERSION" \
-    revision="$REVISION"
+    version="$MTV_VERSION" \
+    revision="$REVISION" \
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:${CPE}::el8"
 

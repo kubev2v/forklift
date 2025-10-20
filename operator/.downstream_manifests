@@ -58,7 +58,27 @@ spec:
                 type: string
               api_image_fqin:
                 description: API service image
-                example: quay.io/konveyor/forklift-api:latest
+                example: quay.io/kubev2v/forklift-api:latest
+                type: string
+              cli_download_container_limits_cpu:
+                description: 'CLI download service CPU limit (default: 100m)'
+                example: 200m
+                type: string
+              cli_download_container_limits_memory:
+                description: 'CLI download service memory limit (default: 128Mi)'
+                example: 256Mi
+                type: string
+              cli_download_container_requests_cpu:
+                description: 'CLI download service CPU request (default: 50m)'
+                example: 100m
+                type: string
+              cli_download_container_requests_memory:
+                description: 'CLI download service memory request (default: 64Mi)'
+                example: 128Mi
+                type: string
+              cli_download_image_fqin:
+                description: CLI download service image
+                example: quay.io/kubev2v/forklift-cli-download:latest
                 type: string
               controller_block_overhead:
                 description: 'Block overhead in bytes (default: 0)'
@@ -94,7 +114,7 @@ spec:
                 type: string
               controller_image_fqin:
                 description: Controller pod image
-                example: quay.io/konveyor/forklift-controller:latest
+                example: quay.io/kubev2v/forklift-controller:latest
                 type: string
               controller_log_level:
                 description: 'Log verbosity level (default: 3)'
@@ -136,6 +156,12 @@ spec:
                 description: 'Snapshot status check rate in seconds (default: 10)'
                 pattern: ^[1-9][0-9]*$
                 type: string
+              controller_static_udn_ip_addresses:
+                description: 'Enable static udn IP addresses feature (default: false)'
+                enum:
+                - "true"
+                - "false"
+                type: string
               controller_tls_connection_timeout_sec:
                 description: 'TLS connection timeout seconds (default: 5)'
                 pattern: ^[1-9][0-9]*$
@@ -156,6 +182,12 @@ spec:
                 - "true"
                 - "false"
                 type: string
+              feature_cli_download:
+                description: 'Enable CLI download service (default: true)'
+                enum:
+                - "true"
+                - "false"
+                type: string
               feature_copy_offload:
                 description: 'Enable copy offload plugins (default: false)'
                 enum:
@@ -164,6 +196,13 @@ spec:
                 type: string
               feature_ocp_live_migration:
                 description: 'Enable OCP live migration (default: false)'
+                enum:
+                - "true"
+                - "false"
+                type: string
+              feature_ova_appliance_management:
+                description: 'Enable OVA appliance management endpoints (default:
+                  false)'
                 enum:
                 - "true"
                 - "false"
@@ -240,7 +279,7 @@ spec:
                 type: string
               must_gather_image_fqin:
                 description: Must-gather debugging image
-                example: quay.io/konveyor/forklift-must-gather:latest
+                example: quay.io/kubev2v/forklift-must-gather:latest
                 type: string
               ova_container_limits_cpu:
                 description: 'OVA CPU limit (default: 1000m)'
@@ -260,23 +299,43 @@ spec:
                 type: string
               ova_provider_server_fqin:
                 description: OVA provider server image
-                example: quay.io/konveyor/ova-provider-server:latest
+                example: quay.io/kubev2v/ova-provider-server:latest
+                type: string
+              ova_proxy_container_limits_cpu:
+                description: 'OVA Proxy CPU limit (default: 1000m)'
+                example: 2000m
+                type: string
+              ova_proxy_container_limits_memory:
+                description: 'OVA Proxy memory limit (default: 1Gi)'
+                example: 2Gi
+                type: string
+              ova_proxy_container_requests_cpu:
+                description: 'OVA Proxy CPU request (default: 250m)'
+                example: 200m
+                type: string
+              ova_proxy_container_requests_memory:
+                description: 'OVA Proxy memory request (default: 512Mi)'
+                example: 300Mi
+                type: string
+              ova_proxy_fqin:
+                description: OVA inventory proxy image
+                example: quay.io/kubev2v/forklift-ova-proxy:latest
                 type: string
               populator_controller_image_fqin:
                 description: Volume populator controller image
-                example: quay.io/konveyor/populator-controller:latest
+                example: quay.io/kubev2v/populator-controller:latest
                 type: string
               populator_openstack_image_fqin:
                 description: OpenStack populator image
-                example: quay.io/konveyor/openstack-populator:latest
+                example: quay.io/kubev2v/openstack-populator:latest
                 type: string
               populator_ovirt_image_fqin:
                 description: oVirt populator image
-                example: quay.io/konveyor/ovirt-populator:latest
+                example: quay.io/kubev2v/ovirt-populator:latest
                 type: string
               populator_vsphere_xcopy_volume_image_fqin:
                 description: vSphere xcopy populator image
-                example: quay.io/konveyor/vsphere-populator:latest
+                example: quay.io/kubev2v/vsphere-populator:latest
                 type: string
               ui_plugin_container_limits_cpu:
                 description: 'UI plugin CPU limit (default: 100m)'
@@ -296,7 +355,7 @@ spec:
                 type: string
               ui_plugin_image_fqin:
                 description: UI plugin image
-                example: quay.io/konveyor/forklift-ui-plugin:latest
+                example: quay.io/kubev2v/forklift-ui-plugin:latest
                 type: string
               validation_container_limits_cpu:
                 description: 'Validation CPU limit (default: 1000m)'
@@ -316,7 +375,7 @@ spec:
                 type: string
               validation_image_fqin:
                 description: Validation service image
-                example: quay.io/konveyor/forklift-validation:latest
+                example: quay.io/kubev2v/forklift-validation:latest
                 type: string
               validation_policy_agent_search_interval:
                 description: 'Policy agent search interval in seconds (default: 120)'
@@ -324,7 +383,7 @@ spec:
                 type: string
               vddk_image:
                 description: VDDK image for VMware disk access
-                example: quay.io/konveyor/vddk:7.0.3
+                example: quay.io/kubev2v/vddk:7.0.3
                 type: string
               virt_v2v_container_limits_cpu:
                 description: 'virt-v2v CPU limit (default: 4000m)'
@@ -357,7 +416,7 @@ spec:
                 type: string
               virt_v2v_image_fqin:
                 description: Virt-v2v conversion image used by migration pods
-                example: quay.io/konveyor/forklift-virt-v2v:latest
+                example: quay.io/kubev2v/forklift-virt-v2v:latest
                 type: string
             type: object
           status:
@@ -1250,22 +1309,26 @@ spec:
                         type: object
                       type: array
                     pvcNameTemplate:
-                      description: |-
-                        PVCNameTemplate is a template for generating PVC names for VM disks.
-                        It follows Go template syntax and has access to the following variables:
-                          - .VmName: name of the VM
-                          - .PlanName: name of the migration plan
-                          - .DiskIndex: initial volume index of the disk
-                          - .WinDriveLetter: Windows drive letter (lowercase, if applicable, e.g. "c", requires guest agent)
-                          - .RootDiskIndex: index of the root disk
-                          - .Shared: true if the volume is shared by multiple VMs, false otherwise
-                          - .FileName: name of the file in the source provider (VMware only, filename includes the .vmdk suffix)
-                        Note:
-                          This template overrides the plan level template.
-                        Examples:
-                          "{{.VmName}}-disk-{{.DiskIndex}}"
-                          "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
-                          "{{if .Shared}}shared-{{end}}{{.VmName}}-{{.DiskIndex}}"
+                      description: "PVCNameTemplate is a template for generating PVC
+                        names for VM disks.\nGenerated names must be valid DNS-1123
+                        labels (lowercase alphanumerics, '-' allowed, max 63 chars).\nIt
+                        follows Go template syntax and has access to the following
+                        variables:\n  - .VmName: name of the VM in the source cluster
+                        (original source name)\n  - .TargetVmName: final VM name in
+                        the target cluster (may equal .VmName if no rename/normalization)\n
+                        \ - .PlanName: name of the migration plan\n  - .DiskIndex:
+                        initial volume index of the disk\n  - .WinDriveLetter: Windows
+                        drive letter (lowercase, if applicable, e.g. \"c\", requires
+                        guest agent)\n  - .RootDiskIndex: index of the root disk\n
+                        \ - .Shared: true if the volume is shared by multiple VMs,
+                        false otherwise\n  - .FileName: name of the file in the source
+                        provider (VMware only, filename includes the .vmdk suffix)\nNote:\n
+                        \ This template overrides the plan level template.\nExamples:\n
+                        \ \"{{.TargetVmName}}-disk-{{.DiskIndex}}\"\n  \"{{if eq .DiskIndex
+                        .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}\"\n
+                        \ \"{{if .Shared}}shared-{{end}}{{.VmName | lower}}-{{.DiskIndex}}\"\nSee:\n\t
+                        https://github.com/kubev2v/forklift/tree/main/pkg/templateutil
+                        for template functions."
                       type: string
                     restorePowerState:
                       description: Source VM power state before migration.
@@ -1757,6 +1820,187 @@ spec:
         type: object
     served: true
     storage: true
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.3
+  name: ovaproviderservers.forklift.konveyor.io
+spec:
+  group: forklift.konveyor.io
+  names:
+    kind: OVAProviderServer
+    listKind: OVAProviderServerList
+    plural: ovaproviderservers
+    singular: ovaproviderserver
+  scope: Namespaced
+  versions:
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              provider:
+                description: Reference to a Provider resource.
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+                x-kubernetes-validations:
+                - message: spec.provider is immutable
+                  rule: oldSelf == null || oldSelf.name == '' || self == oldSelf
+            required:
+            - provider
+            type: object
+          status:
+            properties:
+              conditions:
+                description: List of conditions.
+                items:
+                  description: Condition
+                  properties:
+                    category:
+                      description: The condition category.
+                      type: string
+                    durable:
+                      description: The condition is durable - never un-staged.
+                      type: boolean
+                    items:
+                      description: A list of items referenced in the `Message`.
+                      items:
+                        type: string
+                      type: array
+                    lastTransitionTime:
+                      description: When the last status transition occurred.
+                      format: date-time
+                      type: string
+                    message:
+                      description: The human readable description of the condition.
+                      type: string
+                    reason:
+                      description: The reason for the condition or transition.
+                      type: string
+                    status:
+                      description: The condition status [true,false].
+                      type: string
+                    type:
+                      description: The condition type.
+                      type: string
+                  required:
+                  - category
+                  - lastTransitionTime
+                  - status
+                  - type
+                  type: object
+                type: array
+              phase:
+                description: Current life cycle phase of the OVA server.
+                type: string
+              service:
+                description: Reference to Service resource
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -3031,6 +3275,7 @@ spec:
                   its oVirt cluster.
                 type: boolean
               preserveStaticIPs:
+                default: true
                 description: Preserve static IPs of VMs in vSphere
                 type: boolean
               provider:
@@ -3127,22 +3372,24 @@ spec:
                 - source
                 type: object
               pvcNameTemplate:
-                description: |-
-                  PVCNameTemplate is a template for generating PVC names for VM disks.
-                  It follows Go template syntax and has access to the following variables:
-                    - .VmName: name of the VM
-                    - .PlanName: name of the migration plan
-                    - .DiskIndex: initial volume index of the disk
-                    - .WinDriveLetter: Windows drive letter (lowercase, if applicable, e.g. "c", requires guest agent)
-                    - .RootDiskIndex: index of the root disk
-                    - .Shared: true if the volume is shared by multiple VMs, false otherwise
-                    - .FileName: name of the file in the source provider (VMware only, filename includes the .vmdk suffix)
-                  Note:
-                    This template can be overridden at the individual VM level.
-                  Examples:
-                    "{{.VmName}}-disk-{{.DiskIndex}}"
-                    "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
-                    "{{if .Shared}}shared-{{end}}{{.VmName}}-{{.DiskIndex}}"
+                description: "PVCNameTemplate is a template for generating PVC names
+                  for VM disks.\nGenerated names must be valid DNS-1123 labels (lowercase
+                  alphanumerics, '-' allowed, max 63 chars).\nIt follows Go template
+                  syntax and has access to the following variables:\n  - .VmName:
+                  name of the VM in the source cluster (original source name)\n  -
+                  .TargetVmName: final VM name in the target cluster (may equal .VmName
+                  if no rename/normalization)\n  - .PlanName: name of the migration
+                  plan\n  - .DiskIndex: initial volume index of the disk\n  - .WinDriveLetter:
+                  Windows drive letter (lowercase, if applicable, e.g. \"c\", requires
+                  guest agent)\n  - .RootDiskIndex: index of the root disk\n  - .Shared:
+                  true if the volume is shared by multiple VMs, false otherwise\n
+                  \ - .FileName: name of the file in the source provider (VMware only,
+                  filename includes the .vmdk suffix)\nNote:\n  This template can
+                  be overridden at the individual VM level.\nExamples:\n  \"{{.TargetVmName}}-disk-{{.DiskIndex}}\"\n
+                  \ \"{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}\"\n
+                  \ \"{{if .Shared}}shared-{{end}}{{.VmName | lower}}-{{.DiskIndex}}\"\nSee:\n\t
+                  https://github.com/kubev2v/forklift/tree/main/pkg/templateutil for
+                  template functions."
                 type: string
               pvcNameTemplateUseGenerateName:
                 default: true
@@ -3154,6 +3401,13 @@ spec:
                   the PVC name being "{{.VmName}}-disk-{{.DiskIndex}}", which may not be unique.
                   but will be more predictable.
                   **DANGER** When set to false, the generated PVC name may not be unique and may cause conflicts.
+                type: boolean
+              runPreflightInspection:
+                default: true
+                description: |-
+                  RunPreflightInspection controls whether an inspection step on VM base disks is performed before starting the first disk transfer. Applies only to warm migrations from VMWare.
+                  - true (default): Inspection step runs before transferring any disks and may fail if it detects the migration would fail.
+                  - false: No inspection is performed before disk transfer.
                 type: boolean
               skipGuestConversion:
                 default: false
@@ -4339,22 +4593,26 @@ spec:
                           "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
                       type: string
                     pvcNameTemplate:
-                      description: |-
-                        PVCNameTemplate is a template for generating PVC names for VM disks.
-                        It follows Go template syntax and has access to the following variables:
-                          - .VmName: name of the VM
-                          - .PlanName: name of the migration plan
-                          - .DiskIndex: initial volume index of the disk
-                          - .WinDriveLetter: Windows drive letter (lowercase, if applicable, e.g. "c", requires guest agent)
-                          - .RootDiskIndex: index of the root disk
-                          - .Shared: true if the volume is shared by multiple VMs, false otherwise
-                          - .FileName: name of the file in the source provider (VMware only, filename includes the .vmdk suffix)
-                        Note:
-                          This template overrides the plan level template.
-                        Examples:
-                          "{{.VmName}}-disk-{{.DiskIndex}}"
-                          "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
-                          "{{if .Shared}}shared-{{end}}{{.VmName}}-{{.DiskIndex}}"
+                      description: "PVCNameTemplate is a template for generating PVC
+                        names for VM disks.\nGenerated names must be valid DNS-1123
+                        labels (lowercase alphanumerics, '-' allowed, max 63 chars).\nIt
+                        follows Go template syntax and has access to the following
+                        variables:\n  - .VmName: name of the VM in the source cluster
+                        (original source name)\n  - .TargetVmName: final VM name in
+                        the target cluster (may equal .VmName if no rename/normalization)\n
+                        \ - .PlanName: name of the migration plan\n  - .DiskIndex:
+                        initial volume index of the disk\n  - .WinDriveLetter: Windows
+                        drive letter (lowercase, if applicable, e.g. \"c\", requires
+                        guest agent)\n  - .RootDiskIndex: index of the root disk\n
+                        \ - .Shared: true if the volume is shared by multiple VMs,
+                        false otherwise\n  - .FileName: name of the file in the source
+                        provider (VMware only, filename includes the .vmdk suffix)\nNote:\n
+                        \ This template overrides the plan level template.\nExamples:\n
+                        \ \"{{.TargetVmName}}-disk-{{.DiskIndex}}\"\n  \"{{if eq .DiskIndex
+                        .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}\"\n
+                        \ \"{{if .Shared}}shared-{{end}}{{.VmName | lower}}-{{.DiskIndex}}\"\nSee:\n\t
+                        https://github.com/kubev2v/forklift/tree/main/pkg/templateutil
+                        for template functions."
                       type: string
                     rootDisk:
                       description: Choose the primary disk the VM boots from
@@ -5026,22 +5284,27 @@ spec:
                             type: object
                           type: array
                         pvcNameTemplate:
-                          description: |-
-                            PVCNameTemplate is a template for generating PVC names for VM disks.
-                            It follows Go template syntax and has access to the following variables:
-                              - .VmName: name of the VM
-                              - .PlanName: name of the migration plan
-                              - .DiskIndex: initial volume index of the disk
-                              - .WinDriveLetter: Windows drive letter (lowercase, if applicable, e.g. "c", requires guest agent)
-                              - .RootDiskIndex: index of the root disk
-                              - .Shared: true if the volume is shared by multiple VMs, false otherwise
-                              - .FileName: name of the file in the source provider (VMware only, filename includes the .vmdk suffix)
-                            Note:
-                              This template overrides the plan level template.
-                            Examples:
-                              "{{.VmName}}-disk-{{.DiskIndex}}"
-                              "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
-                              "{{if .Shared}}shared-{{end}}{{.VmName}}-{{.DiskIndex}}"
+                          description: "PVCNameTemplate is a template for generating
+                            PVC names for VM disks.\nGenerated names must be valid
+                            DNS-1123 labels (lowercase alphanumerics, '-' allowed,
+                            max 63 chars).\nIt follows Go template syntax and has
+                            access to the following variables:\n  - .VmName: name
+                            of the VM in the source cluster (original source name)\n
+                            \ - .TargetVmName: final VM name in the target cluster
+                            (may equal .VmName if no rename/normalization)\n  - .PlanName:
+                            name of the migration plan\n  - .DiskIndex: initial volume
+                            index of the disk\n  - .WinDriveLetter: Windows drive
+                            letter (lowercase, if applicable, e.g. \"c\", requires
+                            guest agent)\n  - .RootDiskIndex: index of the root disk\n
+                            \ - .Shared: true if the volume is shared by multiple
+                            VMs, false otherwise\n  - .FileName: name of the file
+                            in the source provider (VMware only, filename includes
+                            the .vmdk suffix)\nNote:\n  This template overrides the
+                            plan level template.\nExamples:\n  \"{{.TargetVmName}}-disk-{{.DiskIndex}}\"\n
+                            \ \"{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}\"\n
+                            \ \"{{if .Shared}}shared-{{end}}{{.VmName | lower}}-{{.DiskIndex}}\"\nSee:\n\t
+                            https://github.com/kubev2v/forklift/tree/main/pkg/templateutil
+                            for template functions."
                           type: string
                         restorePowerState:
                           description: Source VM power state before migration.
@@ -5325,6 +5588,49 @@ spec:
               phase:
                 description: Current life cycle phase of the provider.
                 type: string
+              service:
+                description: Provider service reference
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
             type: object
         type: object
     served: true
@@ -6099,6 +6405,15 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - route.openshift.io
+  resources:
+  - routes
+  verbs:
+  - create
+  - get
+  - list
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -6279,6 +6594,13 @@ rules:
   - console.openshift.io
   resources:
   - consoleplugins
+  - consoleclidownloads
+  verbs:
+  - '*'
+- apiGroups:
+  - route.openshift.io
+  resources:
+  - routes
   verbs:
   - '*'
 - apiGroups:
@@ -6424,6 +6746,8 @@ spec:
           value: ${MUST_GATHER_IMAGE}
         - name: UI_PLUGIN_IMAGE
           value: ${UI_PLUGIN_IMAGE}
+        - name: CLI_DOWNLOAD_IMAGE
+          value: ${CLI_DOWNLOAD_IMAGE}
         - name: VALIDATION_IMAGE
           value: ${VALIDATION_IMAGE}
         - name: VIRT_V2V_IMAGE
@@ -6450,6 +6774,8 @@ spec:
           value: ${OPENSTACK_POPULATOR_IMAGE}
         - name: OVA_PROVIDER_SERVER_IMAGE
           value: ${OVA_PROVIDER_SERVER_IMAGE}
+        - name: OVA_PROXY_IMAGE
+          value: ${OVA_PROXY_IMAGE}
         - name: OVIRT_OS_MAP
           value: ${OVIRT_OS_MAP}
         - name: VSPHERE_OS_MAP
@@ -6638,7 +6964,7 @@ metadata:
       Container Platform", "OpenShift Platform Plus"]'
     repository: https://github.com/kubev2v/forklift
     support: Red Hat
-  name: mtv-operator.v${VERSION}
+  name: mtv-operator.v${MTV_VERSION}
   namespace: openshift-mtv
 spec:
   apiservicedefinitions: {}
@@ -6673,6 +6999,11 @@ spec:
       displayName: OpenstackVolumePopulator
       kind: OpenstackVolumePopulator
       name: openstackvolumepopulators.forklift.konveyor.io
+      version: v1beta1
+    - description: OVA Provider Server
+      displayName: OVAProviderServer
+      kind: OVAProviderServer
+      name: ovaproviderservers.forklift.konveyor.io
       version: v1beta1
     - description: oVirt Volume Populator
       displayName: OvirtVolumePopulator
@@ -6716,9 +7047,9 @@ spec:
 
     ### Compatibility
 
-    Migration Toolkit for Virtualization 2.7 is supported on OpenShift 4.15, 4.16 and 4.17
+    Migration Toolkit for Virtualization 2.10 is supported on OpenShift 4.18, 4.19 and 4.20
 
-    Migration Toolkit for Virtualization 2.8 is supported on OpenShift 4.16, 4.17 and 4.18
+    Migration Toolkit for Virtualization 2.11 is supported on OpenShift 4.19, 4.20 and 4.21
 
     More information on compatibility in the [MTV Lifecycle document](https://access.redhat.com/support/policy/updates/migration-toolkit-for-virtualization).
 
@@ -6791,9 +7122,11 @@ spec:
     name: ui_plugin
   - image: ${OVA_PROVIDER_SERVER_IMAGE}
     name: ova_provider_server
+  - image: ${OVA_PROXY_IMAGE}
+    name: ova_proxy
   - image: ${VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE}
     name: vsphere_xcopy_volume_populator
-  version: ${VERSION}
+  version: ${MTV_VERSION}
 ---
 apiVersion: scorecard.operatorframework.io/v1alpha3
 kind: Configuration

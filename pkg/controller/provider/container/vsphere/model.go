@@ -852,12 +852,14 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 								dnsList = info.DnsConfig.IpAddress
 							}
 							guestNetworksList = append(guestNetworksList, model.GuestNetwork{
-								MAC:          strings.ToLower(info.MacAddress),
-								IP:           ip.IpAddress,
-								Origin:       ip.Origin,
-								PrefixLength: ip.PrefixLength,
-								DNS:          dnsList,
-								Device:       strconv.Itoa(index),
+								MAC:            strings.ToLower(info.MacAddress),
+								IP:             ip.IpAddress,
+								Origin:         ip.Origin,
+								PrefixLength:   ip.PrefixLength,
+								DNS:            dnsList,
+								Device:         strconv.Itoa(index),
+								DeviceConfigId: info.DeviceConfigId,
+								Network:        info.Network,
 							})
 						}
 					}
@@ -947,8 +949,9 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 							nicList = append(
 								nicList,
 								model.NIC{
-									MAC:   strings.ToLower(nic.MacAddress),
-									Index: nicsIndex,
+									MAC:       strings.ToLower(nic.MacAddress),
+									Index:     nicsIndex,
+									DeviceKey: nic.Key,
 									Network: model.Ref{
 										Kind: model.NetKind,
 										ID:   network,
@@ -1133,6 +1136,9 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 						ID:   datastoreId,
 					}
 				}
+				if backing.Parent != nil {
+					md.ParentFile = backing.Parent.FileName
+				}
 				disks = append(disks, md)
 			case *types.VirtualDiskFlatVer2BackingInfo:
 				md := model.Disk{
@@ -1146,6 +1152,9 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					Bus:            bus,
 					Serial:         backing.Uuid,
 					WinDriveLetter: winDriveLetter,
+				}
+				if backing.Parent != nil {
+					md.ParentFile = backing.Parent.FileName
 				}
 				if backing.Datastore != nil {
 					datastoreId, _ := sanitize(backing.Datastore.Value)

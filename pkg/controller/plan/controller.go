@@ -248,19 +248,11 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	// End staging conditions.
 	plan.Status.EndStagingConditions()
 
-	if err = r.updatePlanStatus(plan); err != nil {
-		r.Log.Error(err, "failed to update plan status")
-		return
-	}
-
 	//
 	// Execute.
 	// The plan is updated as needed to reflect status.
 	result.RequeueAfter, err = r.execute(plan)
 	if err != nil {
-		if updateErr := r.updatePlanStatus(plan); updateErr != nil {
-			r.Log.Error(err, "failed to update plan status")
-		}
 		return
 	}
 
@@ -276,32 +268,15 @@ func (r *Reconciler) updatePlanStatus(plan *api.Plan) error {
 	// Record events.
 	r.Record(plan, plan.Status.Conditions)
 
-	// Try to fetch latest version first to get current ResourceVersion
-	latest := &api.Plan{}
-	key := client.ObjectKeyFromObject(plan)
-	if err := r.Get(context.TODO(), key, latest); err != nil {
-		r.Log.V(1).Info("Failed to fetch latest plan version, trying update with current version",
-			"plan", plan.Name, "error", err.Error())
-
-		// Fallback: try update with current plan
-		plan.Status.ObservedGeneration = plan.Generation
-		if updateErr := r.Status().Update(context.TODO(), plan.DeepCopy()); updateErr != nil {
-			r.Log.Error(updateErr, "Failed to update plan status with current version")
-			return updateErr
-		}
-		return nil
-	}
-
-	// Preserve our status changes but use latest ResourceVersion and Generation
-	latest.Status = plan.Status
-	latest.Status.ObservedGeneration = latest.Generation
+	// Apply changes.
+	plan.Status.ObservedGeneration = plan.Generation
 
 	// At this point, the plan contains data that is not persisted by design, like the Referenced data
 	// and the staged flags in the status, and more data that has been loaded in the validate function,
 	// like the name of the VMs in the spec section, therefore we don't want the plan to be overridden
 	// by data from the server (even the spec section is overridden) and so we pass a copy of the plan
-	if err := r.Status().Update(context.TODO(), latest.DeepCopy()); err != nil {
-		r.Log.Error(err, "Failed to update plan status with latest ResourceVersion")
+	if err := r.Status().Update(context.TODO(), plan.DeepCopy()); err != nil {
+		r.Log.Error(err, "Failed to update plan status", "plan", plan)
 		return err
 	}
 
@@ -368,6 +343,14 @@ func (r *Reconciler) archive(plan *api.Plan) {
 //  5. If a new migration is being started, update the context and snapshot.
 //  6. Run the migration.
 func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
+	defer func() {
+		if err == nil {
+			err = r.updatePlanStatus(plan)
+			if err != nil {
+				err = liberr.Wrap(err)
+			}
+		}
+	}()
 	conditionRequiresReQ := plan.Status.HasReQCondition()
 	if plan.Status.HasBlockerCondition() || plan.Status.HasCondition(Archived) || conditionRequiresReQ {
 		if conditionRequiresReQ || plan.Status.HasBlockerCondition() {
@@ -382,14 +365,7 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 		}
 		return
 	}
-	defer func() {
-		if err == nil {
-			err = r.updatePlanStatus(plan)
-			if err != nil {
-				err = liberr.Wrap(err)
-			}
-		}
-	}()
+
 	ctx, err := plancontext.New(r, plan, r.Log)
 	if err != nil {
 		return

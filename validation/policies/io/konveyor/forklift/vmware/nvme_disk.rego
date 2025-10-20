@@ -1,16 +1,18 @@
 package io.konveyor.forklift.vmware
 
-has_nvme_bus {
-    some i
-    input.disks[i].bus == "nvme"
+import rego.v1
+
+has_nvme_bus if {
+	some i
+	input.disks[i].bus == "nvme"
 }
 
-concerns[flag] {
-    has_nvme_bus
-    flag := {
-        "id": "vmware.disk.nvme.detected",
-        "category": "Critical",
-        "label": "Disk NVMe was detected",
-        "assessment": "NVMe disks are not currently supported by MTV. The VM cannot be migrated"
-    }
+concerns contains flag if {
+	has_nvme_bus
+	flag := {
+		"id": "vmware.disk.nvme.detected",
+		"category": "Critical",
+		"label": "Disk NVMe was detected",
+		"assessment": "NVMe disks are not currently supported by MTV. The VM cannot be migrated",
+	}
 }

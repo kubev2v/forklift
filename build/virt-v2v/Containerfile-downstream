@@ -24,6 +24,8 @@ RUN mkdir -p /usr/local/lib/guestfs/appliance && \
     mv -vf root.qcow2 root
 
 FROM registry.redhat.io/ubi9/go-toolset:1.24.4-1752083840 AS builder
+USER 0
+RUN dnf install -y libvirt-devel
 WORKDIR /app
 COPY --chown=1001:0 ./ ./
 ENV GOFLAGS="-mod=vendor -tags=strictfipsruntime"
@@ -44,7 +46,8 @@ RUN mkdir /disks && \
     dnf update -y && \
     dnf install -y --setopt=install_weak_deps=False \
     virt-v2v \
-    virtio-win
+    virtio-win \
+    libvirt-libs
 
 # This prevents libvirt from attempting to create files in the root directory,
 # which would lead to permission errors.
@@ -77,9 +80,10 @@ COPY --from=winlegacyiso /usr/share/virtio-win/virtio-win.iso /usr/local/virtio-
 
 ENTRYPOINT ["/usr/libexec/catatonit/catatonit", "/usr/bin/virt-v2v-wrapper"]
 
-ARG VERSION
+ARG MTV_VERSION
 ARG REGISTRY
 ARG REVISION
+ARG CPE
 
 LABEL \
     com.redhat.component="mtv-virt-v2v-container" \
@@ -89,7 +93,8 @@ LABEL \
     io.k8s.description="Migration Toolkit for Virtualization - Virt-V2V" \
     io.openshift.tags="migration,mtv,forklift" \
     summary="Migration Toolkit for Virtualization - Virt-V2V" \
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:${CPE}::el9" \
     description="Migration Toolkit for Virtualization - Virt-V2V" \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
-    version="$VERSION" \
+    version="$MTV_VERSION" \
     revision="$REVISION"

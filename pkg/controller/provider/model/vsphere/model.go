@@ -357,6 +357,7 @@ type Disk struct {
 	Serial                string `json:"serial,omitempty"`
 	WinDriveLetter        string `json:"winDriveLetter,omitempty"`
 	ChangeTrackingEnabled bool   `json:"changeTrackingEnabled"`
+	ParentFile            string `json:"parent"`
 }
 
 // Virtual Device.
@@ -366,19 +367,22 @@ type Device struct {
 
 // Virtual ethernet card.
 type NIC struct {
-	Network Ref    `json:"network"`
-	MAC     string `json:"mac"`
-	Index   int    `json:"order"`
+	Network   Ref    `json:"network"`
+	MAC       string `json:"mac"`
+	Index     int    `json:"order"`
+	DeviceKey int32  `json:"deviceKey"`
 }
 
 // Guest network.
 type GuestNetwork struct {
-	Device       string   `json:"device"`
-	MAC          string   `json:"mac"`
-	IP           string   `json:"ip"`
-	Origin       string   `json:"origin"`
-	PrefixLength int32    `json:"prefix"`
-	DNS          []string `json:"dns"`
+	Device         string   `json:"device"`
+	DeviceConfigId int32    `json:"deviceConfigId"`
+	MAC            string   `json:"mac"`
+	IP             string   `json:"ip"`
+	Origin         string   `json:"origin"`
+	PrefixLength   int32    `json:"prefix"`
+	DNS            []string `json:"dns"`
+	Network        string   `json:"network"`
 }
 
 // Guest ipStack

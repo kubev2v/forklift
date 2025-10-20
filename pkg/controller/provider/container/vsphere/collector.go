@@ -35,6 +35,8 @@ const (
 	RetryDelay = time.Second * 5
 	// Max object in each update.
 	MaxObjectUpdates = 10000
+	// Connection timeout for provider operations.
+	ConnectionTimeout = 30 * time.Second
 )
 
 // Types
@@ -336,7 +338,7 @@ func (r *Collector) Follow(moRef interface{}, p []string, dst interface{}) error
 	}
 
 	ctx := context.Background()
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, ConnectionTimeout)
 	defer cancel()
 	client, err := r.buildClient(ctx)
 	if err != nil {
@@ -349,7 +351,7 @@ func (r *Collector) Follow(moRef interface{}, p []string, dst interface{}) error
 // Test connect/logout.
 func (r *Collector) Test() (status int, err error) {
 	ctx := context.Background()
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, ConnectionTimeout)
 	defer cancel()
 	status, err = r.connect(ctx)
 	if err == nil {
@@ -362,11 +364,6 @@ func (r *Collector) Test() (status int, err error) {
 // NO-OP
 func (r *Collector) Version() (_, _, _, _ string, err error) {
 	return
-}
-
-// returns runtime errors - not supported by vsphere collector
-func (r *Collector) GetRuntimeErrors() map[string]error {
-	return nil
 }
 
 // Start the collector.

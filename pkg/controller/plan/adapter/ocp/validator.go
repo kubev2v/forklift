@@ -73,7 +73,7 @@ func (r *Validator) VMMigrationType(vmRef ref.Ref) (ok bool, err error) {
 			return
 		}
 		for _, cnd := range vm.Status.Conditions {
-			if cnd.Type == ConditionStorageLiveMigratable || cnd.Type == ConditionLiveMigratable {
+			if cnd.Type == ConditionStorageLiveMigratable {
 				if cnd.Status != True {
 					ok = false
 					return
@@ -351,6 +351,11 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 
 // NO-OP
 func (r *Validator) DirectStorage(vmRef ref.Ref) (bool, error) {
+	return true, nil
+}
+
+// NO-OP
+func (r *Validator) UdnStaticIPs(vmRef ref.Ref, client k8sclient.Client) (ok bool, err error) {
 	return true, nil
 }
 

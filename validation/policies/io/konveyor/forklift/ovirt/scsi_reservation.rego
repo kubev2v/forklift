@@ -1,16 +1,18 @@
 package io.konveyor.forklift.ovirt
 
-disks_with_scsi_reservation [i] {
-    some i
-    input.diskAttachments[i].scsiReservation == true
+import rego.v1
+
+disks_with_scsi_reservation contains i if {
+	some i
+	input.diskAttachments[i].scsiReservation == true
 }
 
-concerns[flag] {
-    count(disks_with_scsi_reservation) > 0
-    flag := {
-        "id": "ovirt.disk.scsi_reservation.enabled",
-        "category": "Warning",
-        "label": "Shared disk detected",
-        "assessment": "The VM has a disk that is shared. Shared disks are not currently supported by OpenShift Virtualization."
-    }
+concerns contains flag if {
+	count(disks_with_scsi_reservation) > 0
+	flag := {
+		"id": "ovirt.disk.scsi_reservation.enabled",
+		"category": "Warning",
+		"label": "Shared disk detected",
+		"assessment": "The VM has a disk that is shared. Shared disks are not currently supported by OpenShift Virtualization.",
+	}
 }

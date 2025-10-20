@@ -41,53 +41,55 @@ import (
 
 // Types
 const (
-	WarmMigrationNotReady         = "WarmMigrationNotReady"
-	MigrationTypeNotValid         = "MigrationTypeNotValid"
-	NamespaceNotValid             = "NamespaceNotValid"
-	TransferNetNotValid           = "TransferNetworkNotValid"
-	NetRefNotValid                = "NetworkMapRefNotValid"
-	NetMapNotReady                = "NetworkMapNotReady"
-	DsMapNotReady                 = "StorageMapNotReady"
-	DsRefNotValid                 = "StorageRefNotValid"
-	VMRefNotValid                 = "VMRefNotValid"
-	VMNotFound                    = "VMNotFound"
-	VMAlreadyExists               = "VMAlreadyExists"
-	VMNetworksNotMapped           = "VMNetworksNotMapped"
-	VMStorageNotMapped            = "VMStorageNotMapped"
-	VMStorageNotSupported         = "VMStorageNotSupported"
-	VMMultiplePodNetworkMappings  = "VMMultiplePodNetworkMappings"
-	VMMissingGuestIPs             = "VMMissingGuestIPs"
-	VMMissingChangedBlockTracking = "VMMissingChangedBlockTracking"
-	VMHasSnapshots                = "VMHasSnapshots"
-	HostNotReady                  = "HostNotReady"
-	DuplicateVM                   = "DuplicateVM"
-	SharedDisks                   = "SharedDisks"
-	SharedWarnDisks               = "SharedWarnDisks"
-	NameNotValid                  = "TargetNameNotValid"
-	HookNotValid                  = "HookNotValid"
-	HookNotReady                  = "HookNotReady"
-	HookStepNotValid              = "HookStepNotValid"
-	Executing                     = "Executing"
-	Succeeded                     = "Succeeded"
-	Failed                        = "Failed"
-	Canceled                      = "Canceled"
-	Deleted                       = "Deleted"
-	Paused                        = "Paused"
-	Archived                      = "Archived"
-	UnsupportedDisks              = "UnsupportedDisks"
-	InvalidDiskSizes              = "InvalidDiskSizes"
-	MacConflicts                  = "MacConflicts"
-	MissingPvcForOnlyConversion   = "MissingPvcForOnlyConversion"
-	LuksAndClevisIncompatibility  = "LuksAndClevisIncompatibility"
-	UnsupportedUdn                = "UnsupportedUserDefinedNetwork"
-	unsupportedVersion            = "UnsupportedVersion"
-	VDDKInvalid                   = "VDDKInvalid"
-	ValidatingVDDK                = "ValidatingVDDK"
-	VDDKInitImageNotReady         = "VDDKInitImageNotReady"
-	VDDKInitImageUnavailable      = "VDDKInitImageUnavailable"
-	UnsupportedOvaSource          = "UnsupportedOvaSource"
-	VMPowerStateUnsupported       = "VMPowerStateUnsupported"
-	VMMigrationTypeUnsupported    = "VMMigrationTypeUnsupported"
+	WarmMigrationNotReady           = "WarmMigrationNotReady"
+	MigrationTypeNotValid           = "MigrationTypeNotValid"
+	NamespaceNotValid               = "NamespaceNotValid"
+	TransferNetNotValid             = "TransferNetworkNotValid"
+	NetRefNotValid                  = "NetworkMapRefNotValid"
+	NetMapNotReady                  = "NetworkMapNotReady"
+	NetMapPreservingIPsOnPodNetwork = "NetMapPreservingIPsOnPodNetwork"
+	DsMapNotReady                   = "StorageMapNotReady"
+	DsRefNotValid                   = "StorageRefNotValid"
+	VMRefNotValid                   = "VMRefNotValid"
+	VMNotFound                      = "VMNotFound"
+	VMAlreadyExists                 = "VMAlreadyExists"
+	VMNetworksNotMapped             = "VMNetworksNotMapped"
+	VMStorageNotMapped              = "VMStorageNotMapped"
+	VMStorageNotSupported           = "VMStorageNotSupported"
+	VMMultiplePodNetworkMappings    = "VMMultiplePodNetworkMappings"
+	VMMissingGuestIPs               = "VMMissingGuestIPs"
+	VMIpNotMatchingUdnSubnet        = "VMIpNotMatchingUdnSubnet"
+	VMMissingChangedBlockTracking   = "VMMissingChangedBlockTracking"
+	VMHasSnapshots                  = "VMHasSnapshots"
+	HostNotReady                    = "HostNotReady"
+	DuplicateVM                     = "DuplicateVM"
+	SharedDisks                     = "SharedDisks"
+	SharedWarnDisks                 = "SharedWarnDisks"
+	NameNotValid                    = "TargetNameNotValid"
+	HookNotValid                    = "HookNotValid"
+	HookNotReady                    = "HookNotReady"
+	HookStepNotValid                = "HookStepNotValid"
+	Executing                       = "Executing"
+	Succeeded                       = "Succeeded"
+	Failed                          = "Failed"
+	Canceled                        = "Canceled"
+	Deleted                         = "Deleted"
+	Paused                          = "Paused"
+	Archived                        = "Archived"
+	UnsupportedDisks                = "UnsupportedDisks"
+	InvalidDiskSizes                = "InvalidDiskSizes"
+	MacConflicts                    = "MacConflicts"
+	MissingPvcForOnlyConversion     = "MissingPvcForOnlyConversion"
+	LuksAndClevisIncompatibility    = "LuksAndClevisIncompatibility"
+	UnsupportedUdn                  = "UnsupportedUserDefinedNetwork"
+	unsupportedVersion              = "UnsupportedVersion"
+	VDDKInvalid                     = "VDDKInvalid"
+	ValidatingVDDK                  = "ValidatingVDDK"
+	VDDKInitImageNotReady           = "VDDKInitImageNotReady"
+	VDDKInitImageUnavailable        = "VDDKInitImageUnavailable"
+	UnsupportedOvaSource            = "UnsupportedOvaSource"
+	VMPowerStateUnsupported         = "VMPowerStateUnsupported"
+	VMMigrationTypeUnsupported      = "VMMigrationTypeUnsupported"
 )
 
 // Categories
@@ -97,6 +99,13 @@ const (
 	Critical = libcnd.Critical
 	Error    = libcnd.Error
 	Warn     = libcnd.Warn
+)
+
+// Network types
+const (
+	Pod     = "pod"
+	Multus  = "multus"
+	Ignored = "ignored"
 )
 
 // Reasons
@@ -298,7 +307,7 @@ func (r *Reconciler) ensureSecretForProvider(plan *api.Plan) error {
 
 // Validate that warm migration is supported from the source provider.
 func (r *Reconciler) validateWarmMigration(ctx *plancontext.Context) (err error) {
-	if !ctx.Plan.Spec.Warm {
+	if !ctx.Plan.IsWarm() {
 		return
 	}
 	provider := ctx.Plan.Referenced.Provider.Source
@@ -453,6 +462,25 @@ func (r *Reconciler) validateNetworkMap(plan *api.Plan) (err error) {
 			Message:  "Map.Network does not have Ready condition.",
 		})
 	}
+	// Check if we are preserving static IPs and give warning if we are mapping to Pod Network.
+	// The Pod network has different subnet than the source provider so the VMs might not be accessible.
+	if plan.Referenced.Provider.Source.SupportsPreserveStaticIps() && plan.Spec.PreserveStaticIPs {
+		var hasMappingToPodNetwork bool
+		for _, networkMap := range mp.Spec.Map {
+			if networkMap.Destination.Type == Pod {
+				hasMappingToPodNetwork = true
+			}
+		}
+		// The UDNs can be valid network for which there are additional validations to check the subnet ranges per VM
+		if hasMappingToPodNetwork && !plan.DestinationHasUdnNetwork(r.Client) {
+			plan.Status.SetCondition(libcnd.Condition{
+				Type:     NetMapPreservingIPsOnPodNetwork,
+				Status:   True,
+				Category: api.CategoryWarn,
+				Message:  "Your migration plan preserves the static IPs of VMs and uses Pod Networking target network mapping. This combination isn't supported, because VM IPs aren't preserved in Pod Networking migrations.",
+			})
+		}
+	}
 
 	plan.Referenced.Map.Network = mp
 
@@ -598,6 +626,14 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Reason:   MissingGuestInfo,
 		Category: api.CategoryWarn,
 		Message:  "Guest information on vNICs is missing, cannot preserve static IPs. If this machine has static IP, make sure VMware tools are installed and the VM is running.",
+		Items:    []string{},
+	}
+	vmIpDoesNotMatchUdnSubnet := libcnd.Condition{
+		Type:     VMIpNotMatchingUdnSubnet,
+		Status:   True,
+		Reason:   NotValid,
+		Category: api.CategoryWarn,
+		Message:  "VM IP does not match with the primary UDN subnet",
 		Items:    []string{},
 	}
 	missingCbtForWarm := libcnd.Condition{
@@ -943,6 +979,15 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			sharedDisks.Type = fmt.Sprintf("%s-%s", sharedDisks.Type, ref.ID)
 			sharedDisksConditions = append(sharedDisksConditions, sharedDisks)
 		}
+		if settings.Settings.StaticUdnIpAddresses && plan.Spec.PreserveStaticIPs && plan.DestinationHasUdnNetwork(r.Client) {
+			ok, err = validator.UdnStaticIPs(*ref, ctx.Destination.Client)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				vmIpDoesNotMatchUdnSubnet.Items = append(vmIpDoesNotMatchUdnSubnet.Items, ref.String())
+			}
+		}
 		// Destination.
 		provider = plan.Referenced.Provider.Destination
 		if provider == nil {
@@ -976,8 +1021,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			}
 		}
 		// Warm migration.
-		isWarmMigration := plan.Spec.Warm || plan.Spec.Type == api.MigrationWarm
-		if isWarmMigration {
+		if plan.IsWarm() {
 			enabled, err := validator.ChangeTrackingEnabled(*ref)
 			if err != nil {
 				return err
@@ -1065,6 +1109,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(missingCbtForWarm.Items) > 0 {
 		plan.Status.SetCondition(missingCbtForWarm)
+	}
+	if len(vmIpDoesNotMatchUdnSubnet.Items) > 0 {
+		plan.Status.SetCondition(vmIpDoesNotMatchUdnSubnet)
 	}
 	if len(vmHasSnapshotsForWarm.Items) > 0 {
 		plan.Status.SetCondition(vmHasSnapshotsForWarm)
@@ -1318,7 +1365,7 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 		}
 		err = r.validateVddkImageJob(job, plan)
 	}
-	if plan.Spec.Warm && vddkImage == "" {
+	if plan.IsWarm() && vddkImage == "" {
 		plan.Status.SetCondition(libcnd.Condition{
 			Type:     VDDKInitImageUnavailable,
 			Status:   True,

@@ -4,36 +4,38 @@ FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel9@sha256:2e8ded84e20ba61
 
 ARG EVENT_TITLE
 
-ARG VERSION
+ARG MTV_VERSION
 ARG RELEASE
 ARG CHANNEL
 ARG DEFAULT_CHANNEL
 ARG REGISTRY
 ARG OCP_VERSIONS
 
-ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:957e63686e4600db53ff14c159413d242db69fcd4f578a3272cc46f3efc86f06"
+ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:d1a32a9ba1a4743d1c8c30a602e9c00bbbc925a339ffd8d71d92a1c8491f739d"
 
-ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:474b2cc4e5e4a7bd9eec1e7c3e3b8bdfe4408beddb29150fea632c4a06428078"
+ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:26fb4bbb0291edad76248ae7ca83ae32e70d4e46af4c637881933c41256d9f3a"
 
-ARG MUST_GATHER_IMAGE="registry.redhat.io/mtv-candidate/mtv-must-gather-rhel8@sha256:0a4c5436023ab3e580028e5500c2f4523efc2fdf8a4d1630e63863a0a4d43c7d"
+ARG MUST_GATHER_IMAGE="registry.redhat.io/mtv-candidate/mtv-must-gather-rhel8@sha256:60afa9833f88888a33ae19f46dcb1379d2c796e6b3ea707eeef66602dc337b18"
 
-ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-openstack-populator-rhel9@sha256:2ed5d902bba875dc3a64ed63857de5ed7b7170b8bc09dc41c6ff3205542e023a"
+ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-openstack-populator-rhel9@sha256:2e3355e475928e01875be4fb0b077f8dabea3f0971ad13c0b5d071cc37bedb75"
 
-ARG OPERATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhel9-operator@sha256:02c11a0087c7c9cc722d916314ce3a0b12a15b808a6bb4329a0dec7f7a017eea"
+ARG OPERATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhel9-operator@sha256:ee363946d0c2faaaf2109e9ce903155f4afc17fb4d317f81134e3af289db0da1"
 
-ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/mtv-candidate/mtv-ova-provider-server-rhel9@sha256:6ccd02b9f56e68dd767d666a0dbba719eaacf7c8ea06d454299d7ededc0f6244"
+ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/mtv-candidate/mtv-ova-provider-server-rhel9@sha256:569c2afc5a9fda21d00ab232953d252c68f2a1108aadacb6661484338fb43463"
 
-ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhv-populator-rhel8@sha256:e31d0a4f28b0beb5ac33aef10c1ac8e866cf29a7c9fd4f3949727235aeae6a6c"
+ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhv-populator-rhel8@sha256:783460012af5c193226118374eb385012538176e4f18a3ad3cd0b13e5b8f0112"
 
-ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-populator-controller-rhel9@sha256:079cdfc0e2c1cbcfe56ab53ff9d733ffc09f1d97f017ceb5c821548f9d981054"
+ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-populator-controller-rhel9@sha256:34be818ebf9b39648efb59f781cb10fa07ccaca10a1da316ec93b2f19e216ba0"
 
-ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:a828882aa0a5f2dfac188bd7fe076d96eac5b66e84643c6dbf090371817aa2ce"
+ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:071f6e9b6fe2fa04aa2f08399d2d0bcbb0d41d1eceb8529e6e71acc3e3181bd4"
 
-ARG VALIDATION_IMAGE="registry.redhat.io/mtv-candidate/mtv-validation-rhel9@sha256:54f0a5e906adb1d12e7a6856f95b9c671427a58c34ea72ed2a48318d60e0a763"
+ARG CLI_DOWNLOAD_IMAGE="registry.redhat.io/mtv-candidate/mtv-cli-download-rhel9@sha256:f5ff106e73872468bc3e76689da0ec2183b89e823052997165df0f9570d71907"
 
-ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel9@sha256:b4e39671856d41f9ca2999deae97e5fd3cd41903b0423011fd10d9bf72cecd50"
+ARG VALIDATION_IMAGE="registry.redhat.io/mtv-candidate/mtv-validation-rhel9@sha256:9da505c9c205e317677bbc0a6251d061c14d471ce56d5bec0e59a60895e46f78"
 
-ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:7554f570bd275ffc6f5d32b26f1b7df33dd46474add04bc4ca7d92ca0a09e1d8"
+ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel9@sha256:e898aef47f07f4f4a366d43bb8e35bb324ba509bda08c62c6e9d1f4b86788151"
+
+ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:8950d953767bbe154730626940e7845ad5f9ceda9dafb68bace3b109bb94e370"
 
 USER root
 
@@ -52,7 +54,7 @@ RUN source ./images.conf && \
     -q \
     --overwrite \
     --extra-service-accounts forklift-controller,forklift-api,forklift-populator-controller \
-    --version $VERSION \
+    --version $MTV_VERSION \
     --channels $CHANNEL \
     --default-channel $DEFAULT_CHANNEL \
     --output-dir build
@@ -61,13 +63,14 @@ USER 1001
 
 FROM scratch
 
-ARG VERSION
+ARG MTV_VERSION
 ARG RELEASE
 ARG CHANNEL
 ARG DEFAULT_CHANNEL
 ARG REGISTRY
 ARG OCP_VERSIONS
 ARG REVISION
+ARG CPE
 
 COPY --from=builder /repo/build/manifests /manifests/
 COPY --from=builder /repo/build/metadata /metadata/
@@ -105,6 +108,7 @@ LABEL operators.operatorframework.io.test.mediatype.v1=scorecard+v1
 # Main labels
 LABEL \
     com.redhat.component="mtv-operator-bundle-container" \
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:${CPE}::el9" \
     name="${REGISTRY}/mtv-operator-bundle" \
     License="Apache License 2.0" \
     io.k8s.display-name="Migration Toolkit for Virtualization" \
@@ -117,5 +121,5 @@ LABEL \
     url="https://github.com/kubev2v/forklift" \
     distribution-scope="public" \
     release=$RELEASE \
-    version=$VERSION \
+    version=$MTV_VERSION \
     revision="$REVISION"

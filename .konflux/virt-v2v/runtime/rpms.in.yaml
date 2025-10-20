@@ -2,6 +2,7 @@ packages:
   - virt-v2v
   - virtio-win
   - catatonit
+  - libvirt-libs
 contentOrigin:
   repofiles:
     - ./redhat.repo

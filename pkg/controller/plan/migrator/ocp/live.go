@@ -52,7 +52,9 @@ const (
 	EnsurePreference                       = "EnsurePreference"
 	EnsureInstanceType                     = "EnsureInstanceType"
 	EnsureDataVolumes                      = "EnsureDataVolumes"
+	EnsurePersistentVolumeClaims           = "EnsurePersistentVolumeClaims"
 	CreateTarget                           = "CreateTarget"
+	SetOwnerReferences                     = "SetOwnerReferences"
 	WaitForTargetVMI                       = "WaitForTargetVMI"
 	CreateVirtualMachineInstanceMigrations = "CreateVirtualMachineInstanceMigrations"
 	WaitForStateTransfer                   = "WaitForStateTransfer"
@@ -192,7 +194,9 @@ func (r *LiveMigrator) Itinerary(vm planapi.VM) (itinerary *libitr.Itinerary) {
 			{Name: EnsurePreference},
 			{Name: EnsureInstanceType},
 			{Name: EnsureDataVolumes},
+			{Name: EnsurePersistentVolumeClaims},
 			{Name: CreateTarget},
+			{Name: SetOwnerReferences},
 			{Name: CreateServiceExports, All: FlagSubmariner | FlagIntercluster},
 			{Name: WaitForTargetVMI},
 			{Name: CreateVirtualMachineInstanceMigrations},
@@ -226,7 +230,7 @@ func (r *LiveMigrator) Step(vm *planapi.VMStatus) (step string) {
 		step = base.Initialize
 	case PreHook, PostHook:
 		step = vm.Phase
-	case CreateSecrets, CreateConfigMaps, EnsurePreference, EnsureInstanceType, EnsureDataVolumes, CreateTarget, CreateServiceExports:
+	case CreateSecrets, CreateConfigMaps, EnsurePreference, EnsureInstanceType, EnsureDataVolumes, EnsurePersistentVolumeClaims, CreateTarget, SetOwnerReferences, CreateServiceExports:
 		step = PrepareTarget
 	case WaitForTargetVMI, CreateVirtualMachineInstanceMigrations, WaitForStateTransfer:
 		step = Synchronization
@@ -465,6 +469,26 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 			break
 		}
 		r.NextPhase(vm)
+	case EnsurePersistentVolumeClaims:
+		var pvcs []core.PersistentVolumeClaim
+		pvcs, err = r.builder.PersistentVolumeClaims(vm)
+		if err != nil {
+			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				r.Log.Error(err, "error building volumes", "vm", vm.Name)
+				r.StepError(vm, err)
+				err = nil
+			}
+			break
+		}
+		err = r.ensurer.PersistentVolumeClaims(vm, pvcs)
+		if err != nil {
+			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				r.StepError(vm, err)
+				err = nil
+			}
+			break
+		}
+		r.NextPhase(vm)
 	case CreateTarget:
 		var target *cnv.VirtualMachine
 		target, err = r.builder.VirtualMachine(vm)
@@ -476,6 +500,16 @@ func (r *LiveMigrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 			break
 		}
 		err = r.ensurer.VirtualMachine(vm, target)
+		if err != nil {
+			if !errors.As(err, &web.ProviderNotReadyError{}) {
+				r.StepError(vm, err)
+				err = nil
+			}
+			break
+		}
+		r.NextPhase(vm)
+	case SetOwnerReferences:
+		err = r.ensurer.EnsureOwnerReferences(vm)
 		if err != nil {
 			if !errors.As(err, &web.ProviderNotReadyError{}) {
 				r.StepError(vm, err)
@@ -677,8 +711,7 @@ func (r *LiveMigrator) RequiresLocalPreference(vm *planapi.VMStatus) (required b
 		return
 	}
 	required = virtualMachine.Object.Spec.Preference != nil &&
-		virtualMachine.Object.Spec.Preference.Kind != kubevirtapi.ClusterSingularPreferenceResourceName
-
+		!strings.EqualFold(virtualMachine.Object.Spec.Preference.Kind, kubevirtapi.ClusterSingularPreferenceResourceName)
 	return
 }
 
@@ -692,7 +725,7 @@ func (r *LiveMigrator) RequiresClusterPreference(vm *planapi.VMStatus) (required
 		return
 	}
 	required = virtualMachine.Object.Spec.Preference != nil &&
-		virtualMachine.Object.Spec.Preference.Kind == kubevirtapi.ClusterSingularPreferenceResourceName
+		strings.EqualFold(virtualMachine.Object.Spec.Preference.Kind, kubevirtapi.ClusterSingularPreferenceResourceName)
 	return
 }
 
@@ -706,7 +739,7 @@ func (r *LiveMigrator) RequiresLocalInstanceType(vm *planapi.VMStatus) (required
 		return
 	}
 	required = virtualMachine.Object.Spec.Instancetype != nil &&
-		virtualMachine.Object.Spec.Instancetype.Kind != kubevirtapi.ClusterSingularResourceName
+		!strings.EqualFold(virtualMachine.Object.Spec.Instancetype.Kind, kubevirtapi.ClusterSingularResourceName)
 	return
 }
 
@@ -720,7 +753,7 @@ func (r *LiveMigrator) RequiresClusterInstanceType(vm *planapi.VMStatus) (requir
 		return
 	}
 	required = virtualMachine.Object.Spec.Instancetype != nil &&
-		virtualMachine.Object.Spec.Instancetype.Kind == kubevirtapi.ClusterSingularResourceName
+		strings.EqualFold(virtualMachine.Object.Spec.Instancetype.Kind, kubevirtapi.ClusterSingularResourceName)
 	return
 }
 
@@ -992,6 +1025,77 @@ type Ensurer struct {
 	SourceClient client.Client
 }
 
+// EnsureOwnerReferences are set on the target VM's DataVolumes.
+func (r *Ensurer) EnsureOwnerReferences(vm *planapi.VMStatus) (err error) {
+	vms := &cnv.VirtualMachineList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		vms,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	if len(vms.Items) == 0 {
+		err = liberr.New("unable to locate target VM for setting owner references")
+		return
+	}
+	target := &vms.Items[0]
+	dvs := &cdi.DataVolumeList{}
+	err = r.Destination.Client.List(
+		context.Background(),
+		dvs,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		})
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	for i := range dvs.Items {
+		dv := &dvs.Items[i]
+		err = r.Labeler.SetBlockingOwnerReference(r.Scheme(), target, dv)
+		if err != nil {
+			return
+		}
+		err = r.Destination.Client.Update(context.Background(), dv)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+	}
+	pvcs := &core.PersistentVolumeClaimList{}
+	err = r.Destination.Client.List(
+		context.Background(),
+		pvcs,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		})
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	for i := range pvcs.Items {
+		pvc := &pvcs.Items[i]
+		err = r.Labeler.SetBlockingOwnerReference(r.Scheme(), target, pvc)
+		if err != nil {
+			return
+		}
+		err = r.Destination.Client.Update(context.Background(), pvc)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+	}
+	return
+}
+
 // EnsureTargetVMIM
 func (r *Ensurer) EnsureTargetVMIM(vm *planapi.VMStatus, target *cnv.VirtualMachineInstanceMigration) (out *cnv.VirtualMachineInstanceMigration, err error) {
 	list := &cnv.VirtualMachineInstanceMigrationList{}
@@ -1198,20 +1302,24 @@ func (r *Builder) VirtualMachine(vm *planapi.VMStatus) (object *cnv.VirtualMachi
 	if source.Object.Spec.RunStrategy != nil {
 		r.Labeler.SetAnnotation(object, AnnRestoreRunStrategy, string(runStrategy))
 	}
-	r.mapNetworks(object)
+	r.mapNetworks(source.Namespace, object)
 	return
 }
 
-func (r *Builder) mapNetworks(target *cnv.VirtualMachine) {
+func (r *Builder) mapNetworks(srcNS string, target *cnv.VirtualMachine) {
 	networkMap := make(map[string]api.DestinationNetwork)
 	for _, network := range r.Map.Network.Spec.Map {
-		networkMap[network.Source.Name] = network.Destination
+		networkMap[path.Join(network.Source.Namespace, network.Source.Name)] = network.Destination
 	}
 	for i := range target.Spec.Template.Spec.Networks {
 		network := &target.Spec.Template.Spec.Networks[i]
 		switch {
 		case network.Multus != nil:
-			destination := networkMap[network.Multus.NetworkName]
+			sourceNetwork := network.Multus.NetworkName
+			if len(strings.Split(sourceNetwork, "/")) == 1 {
+				sourceNetwork = path.Join(srcNS, sourceNetwork)
+			}
+			destination := networkMap[sourceNetwork]
 			network.Multus.NetworkName = path.Join(destination.Namespace, destination.Name)
 		case network.Pod != nil:
 		}
@@ -1405,7 +1513,7 @@ func (r *Builder) LocalInstanceType(vm *planapi.VMStatus) (target *instancetype.
 		return
 	}
 
-	if virtualMachine.Object.Spec.Instancetype == nil || virtualMachine.Object.Spec.Instancetype.Kind == kubevirtapi.ClusterSingularResourceName {
+	if virtualMachine.Object.Spec.Instancetype == nil || strings.EqualFold(virtualMachine.Object.Spec.Instancetype.Kind, kubevirtapi.ClusterSingularResourceName) {
 		err = liberr.New("VM does not have a reference to a local InstanceType.")
 		return
 	}
@@ -1434,7 +1542,7 @@ func (r *Builder) LocalPreference(vm *planapi.VMStatus) (target *instancetype.Vi
 		return
 	}
 
-	if virtualMachine.Object.Spec.Preference == nil || virtualMachine.Object.Spec.Preference.Kind == kubevirtapi.ClusterSingularPreferenceResourceName {
+	if virtualMachine.Object.Spec.Preference == nil || strings.EqualFold(virtualMachine.Object.Spec.Preference.Kind, kubevirtapi.ClusterSingularPreferenceResourceName) {
 		err = liberr.New("VM does not have a reference to a local Preference.")
 		return
 	}
@@ -1470,6 +1578,11 @@ func (r *Builder) ConfigMaps(vm *planapi.VMStatus) (list []core.ConfigMap, err e
 		case vol.ConfigMap != nil:
 			key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.ConfigMap.Name}
 			sources = append(sources, key)
+		case vol.Sysprep != nil:
+			if vol.Sysprep.ConfigMap != nil {
+				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.Sysprep.ConfigMap.Name}
+				sources = append(sources, key)
+			}
 		default:
 			continue
 		}
@@ -1542,6 +1655,11 @@ func (r *Builder) Secrets(vm *planapi.VMStatus) (list []core.Secret, err error) 
 			}
 			if vol.CloudInitConfigDrive.NetworkDataSecretRef != nil {
 				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.CloudInitConfigDrive.NetworkDataSecretRef.Name}
+				sources = append(sources, key)
+			}
+		case vol.Sysprep != nil:
+			if vol.Sysprep.Secret != nil {
+				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.Sysprep.Secret.Name}
 				sources = append(sources, key)
 			}
 		default:

@@ -119,11 +119,6 @@ func (r *Collector) Version() (_, _, _, _ string, err error) {
 	return
 }
 
-// returns runtime errors - not supported by openstack collector
-func (r *Collector) GetRuntimeErrors() map[string]error {
-	return nil
-}
-
 // Follow link
 func (r *Collector) Follow(moRef interface{}, p []string, dst interface{}) error {
 	return fmt.Errorf("not implemented")

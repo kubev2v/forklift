@@ -63,6 +63,10 @@ spec:
                 type: string
                 enum: ["true", "false"]
                 description: "Enable OCP live migration (default: false)"
+              feature_ova_appliance_management:
+                type: string
+                enum: [ "true", "false" ]
+                description: "Enable OVA appliance management endpoints (default: false)"
               feature_vmware_system_serial_number:
                 type: string
                 enum: ["true", "false"]
@@ -71,56 +75,68 @@ spec:
                 type: string
                 enum: ["true", "false"]
                 description: "Require authentication (default: true)"
+              feature_cli_download:
+                type: string
+                enum: ["true", "false"]
+                description: "Enable CLI download service (default: true)"
 
               # Container Images
               controller_image_fqin:
                 type: string
                 description: "Controller pod image"
-                example: "quay.io/konveyor/forklift-controller:latest"
+                example: "quay.io/kubev2v/forklift-controller:latest"
               virt_v2v_image_fqin:
                 type: string
                 description: "Virt-v2v conversion image used by migration pods"
-                example: "quay.io/konveyor/forklift-virt-v2v:latest"
+                example: "quay.io/kubev2v/forklift-virt-v2v:latest"
               vddk_image:
                 type: string
                 description: "VDDK image for VMware disk access"
-                example: "quay.io/konveyor/vddk:7.0.3"
+                example: "quay.io/kubev2v/vddk:7.0.3"
               api_image_fqin:
                 type: string
                 description: "API service image"
-                example: "quay.io/konveyor/forklift-api:latest"
+                example: "quay.io/kubev2v/forklift-api:latest"
+              cli_download_image_fqin:
+                type: string
+                description: "CLI download service image"
+                example: "quay.io/kubev2v/forklift-cli-download:latest"
               ui_plugin_image_fqin:
                 type: string
                 description: "UI plugin image"
-                example: "quay.io/konveyor/forklift-ui-plugin:latest"
+                example: "quay.io/kubev2v/forklift-ui-plugin:latest"
               validation_image_fqin:
                 type: string
                 description: "Validation service image"
-                example: "quay.io/konveyor/forklift-validation:latest"
+                example: "quay.io/kubev2v/forklift-validation:latest"
               populator_controller_image_fqin:
                 type: string
                 description: "Volume populator controller image"
-                example: "quay.io/konveyor/populator-controller:latest"
+                example: "quay.io/kubev2v/populator-controller:latest"
               populator_ovirt_image_fqin:
                 type: string
                 description: "oVirt populator image"
-                example: "quay.io/konveyor/ovirt-populator:latest"
+                example: "quay.io/kubev2v/ovirt-populator:latest"
               populator_openstack_image_fqin:
                 type: string
                 description: "OpenStack populator image"
-                example: "quay.io/konveyor/openstack-populator:latest"
+                example: "quay.io/kubev2v/openstack-populator:latest"
               populator_vsphere_xcopy_volume_image_fqin:
                 type: string
                 description: "vSphere xcopy populator image"
-                example: "quay.io/konveyor/vsphere-populator:latest"
+                example: "quay.io/kubev2v/vsphere-populator:latest"
               ova_provider_server_fqin:
                 type: string
                 description: "OVA provider server image"
-                example: "quay.io/konveyor/ova-provider-server:latest"
+                example: "quay.io/kubev2v/ova-provider-server:latest"
               must_gather_image_fqin:
                 type: string
                 description: "Must-gather debugging image"
-                example: "quay.io/konveyor/forklift-must-gather:latest"
+                example: "quay.io/kubev2v/forklift-must-gather:latest"
+              ova_proxy_fqin:
+                type: string
+                description: "OVA inventory proxy image"
+                example: "quay.io/kubev2v/forklift-ova-proxy:latest"
 
               # Controller Resource Configuration
               controller_container_limits_cpu:
@@ -175,6 +191,24 @@ spec:
                 type: string
                 description: "API service memory request (default: 150Mi)"
                 example: "300Mi"
+
+              # CLI Download Resource Configuration
+              cli_download_container_limits_cpu:
+                type: string
+                description: "CLI download service CPU limit (default: 100m)"
+                example: "200m"
+              cli_download_container_limits_memory:
+                type: string
+                description: "CLI download service memory limit (default: 128Mi)"
+                example: "256Mi"
+              cli_download_container_requests_cpu:
+                type: string
+                description: "CLI download service CPU request (default: 50m)"
+                example: "100m"
+              cli_download_container_requests_memory:
+                type: string
+                description: "CLI download service memory request (default: 64Mi)"
+                example: "128Mi"
 
               # UI Plugin Resource Configuration
               ui_plugin_container_limits_cpu:
@@ -271,6 +305,10 @@ spec:
                 type: string
                 enum: ["true", "false"]
                 description: "Retain precopy pods (default: false)"
+              controller_static_udn_ip_addresses:
+                type: string
+                enum: ["true", "false"]
+                description: "Enable static udn IP addresses feature (default: false)"
 
               # Storage & Performance Settings
               controller_filesystem_overhead:
@@ -345,6 +383,24 @@ spec:
               ova_container_requests_memory:
                 type: string
                 description: "OVA memory request (default: 150Mi)"
+                example: "300Mi"
+
+              # OVA Proxy Settings
+              ova_proxy_container_limits_cpu:
+                type: string
+                description: "OVA Proxy CPU limit (default: 1000m)"
+                example: "2000m"
+              ova_proxy_container_limits_memory:
+                type: string
+                description: "OVA Proxy memory limit (default: 1Gi)"
+                example: "2Gi"
+              ova_proxy_container_requests_cpu:
+                type: string
+                description: "OVA Proxy CPU request (default: 250m)"
+                example: "200m"
+              ova_proxy_container_requests_memory:
+                type: string
+                description: "OVA Proxy memory request (default: 512Mi)"
                 example: "300Mi"
 
               # Logging & General Settings

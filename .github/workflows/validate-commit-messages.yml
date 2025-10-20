@@ -1,0 +1,45 @@
+name: Validate Commit Messages
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate-commits:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch full history to get all commits
+    
+    - name: Validate commit messages
+      run: |
+        # Determine commit range based on event type
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          # For PRs, validate commits in the PR
+          COMMIT_RANGE="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+        else
+          # For pushes, determine the range carefully
+          if [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+            # New branch, validate only the latest commit
+            COMMIT_RANGE="HEAD~1..HEAD"
+          else
+            # Check if the before SHA exists in the current repository
+            if git cat-file -e "${{ github.event.before }}" 2>/dev/null; then
+              # Before SHA exists, validate commits in this push
+              COMMIT_RANGE="${{ github.event.before }}..${{ github.event.after }}"
+            else
+              # Before SHA doesn't exist (force push), validate only the latest commit
+              echo "Warning: Before SHA ${{ github.event.before }} not found (likely force push)"
+              echo "Falling back to validating only the latest commit"
+              COMMIT_RANGE="HEAD~1..HEAD"
+            fi
+          fi
+        fi
+        
+        
+        # Make script executable and run validation
+        chmod +x ./scripts/validate-commits.sh
+        ./scripts/validate-commits.sh --range "$COMMIT_RANGE" --verbose

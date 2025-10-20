@@ -1,0 +1,20 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ cli_download_service_name }}
+  namespace: "{{ app_namespace }}"
+  labels:
+    app: {{ app_name }}
+    service: {{ cli_download_service_name }}
+spec:
+  ports:
+    - name: 8080-tcp
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+  selector:
+    app: {{ app_name }}
+    service: {{ cli_download_service_name }}
+  type: ClusterIP
+  sessionAffinity: None

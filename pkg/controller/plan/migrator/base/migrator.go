@@ -43,7 +43,7 @@ func (r *BaseMigrator) Complete(vm *plan.VMStatus) {
 func (r *BaseMigrator) Status(vm plan.VM) (status *plan.VMStatus) {
 	if current, found := r.Context.Plan.Status.Migration.FindVM(vm.Ref); !found {
 		status = &plan.VMStatus{VM: vm}
-		if r.Context.Plan.Spec.Warm {
+		if r.Context.Plan.IsWarm() {
 			status.Warm = &plan.Warm{}
 		}
 	} else {
@@ -60,7 +60,7 @@ func (r *BaseMigrator) Reset(vm *plan.VMStatus, pipeline []*plan.Step) {
 	vm.Phase = step.Name
 	vm.Pipeline = pipeline
 	vm.Error = nil
-	if r.Context.Plan.Spec.Warm {
+	if r.Context.Plan.IsWarm() {
 		vm.Warm = &plan.Warm{}
 	}
 }
@@ -194,6 +194,17 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 						Progress:    libitr.Progress{Total: 1},
 					},
 				})
+		case api.PhasePreflightInspection:
+			pipeline = append(
+				pipeline,
+				&plan.Step{
+					Task: plan.Task{
+						Name:        PreflightInspection,
+						Description: "Inspect VM before migration.",
+						Phase:       api.StepPending,
+						Progress:    libitr.Progress{Total: 1},
+					},
+				})
 		}
 		next, done, _ := itinerary.Next(step.Name)
 		if !done {
@@ -219,7 +230,7 @@ func (r *BaseMigrator) Itinerary(vm plan.VM) (itinerary *libitr.Itinerary) {
 	// Plan.Spec.Type supersedes the deprecated Warm boolean.
 	if r.Context.Plan.Spec.Type == api.MigrationOnlyConversion {
 		itinerary = r.onlyConversionItinerary()
-	} else if r.Context.Plan.Spec.Warm {
+	} else if r.Context.Plan.IsWarm() {
 		itinerary = r.warmItinerary()
 	} else {
 		itinerary = r.coldItinerary()
@@ -237,8 +248,7 @@ func (r *BaseMigrator) ExecutePhase(vm *plan.VMStatus) (ok bool, err error) {
 // Step gets the name of the pipeline step corresponding to the current VM phase.
 func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 	switch status.Phase {
-	case api.PhaseStarted, api.PhaseCreateInitialSnapshot, api.PhaseWaitForInitialSnapshot,
-		api.PhaseStoreInitialSnapshotDeltas, api.PhaseCreateDataVolumes:
+	case api.PhaseStarted, api.PhaseCreateInitialSnapshot, api.PhaseWaitForInitialSnapshot, api.PhaseStoreInitialSnapshotDeltas:
 		step = Initialize
 	case api.PhaseAllocateDisks:
 		step = DiskAllocation
@@ -246,6 +256,14 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 		api.PhaseCreateSnapshot, api.PhaseWaitForSnapshot, api.PhaseStoreSnapshotDeltas, api.PhaseAddCheckpoint,
 		api.PhaseConvertOpenstackSnapshot, api.PhaseWaitForDataVolumesStatus:
 		step = DiskTransfer
+	case api.PhaseCreateDataVolumes:
+		// This phase should be present in DiskTransfer step only when executing Preflight Inspection to avoid UI pipeline artifacts.
+		// If not executing Preflight Inspection, keep the Initialize step.
+		if r.Context.Plan.ShouldRunPreflightInspection() {
+			step = DiskTransfer
+		} else {
+			step = Initialize
+		}
 	case api.PhaseRemovePenultimateSnapshot, api.PhaseWaitForPenultimateSnapshotRemoval, api.PhaseCreateFinalSnapshot,
 		api.PhaseWaitForFinalSnapshot, api.PhaseAddFinalCheckpoint, api.PhaseFinalize, api.PhaseRemoveFinalSnapshot,
 		api.PhaseWaitForFinalSnapshotRemoval, api.PhaseWaitForFinalDataVolumesStatus:
@@ -259,11 +277,13 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 	case api.PhasePreHook, api.PhasePostHook:
 		step = status.Phase
 	case api.PhaseStorePowerState, api.PhasePowerOffSource, api.PhaseWaitForPowerOff:
-		if r.Context.Plan.Spec.Warm {
+		if r.Context.Plan.IsWarm() {
 			step = Cutover
 		} else {
 			step = Initialize
 		}
+	case api.PhasePreflightInspection:
+		step = PreflightInspection
 	default:
 		step = Unknown
 	}
@@ -279,6 +299,7 @@ func (r *BaseMigrator) warmItinerary() *libitr.Itinerary {
 			{Name: api.PhaseCreateInitialSnapshot},
 			{Name: api.PhaseWaitForInitialSnapshot},
 			{Name: api.PhaseStoreInitialSnapshotDeltas, All: VSphere},
+			{Name: api.PhasePreflightInspection, All: RunInspection},
 			{Name: api.PhaseCreateDataVolumes},
 			// Precopy loop start
 			{Name: api.PhaseWaitForDataVolumesStatus},
@@ -384,11 +405,13 @@ func (r *BasePredicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 		allowed = r.context.Plan.IsSourceProviderOpenstack()
 	case VSphere:
 		allowed = r.context.Plan.IsSourceProviderVSphere()
+	case RunInspection:
+		allowed = r.context.Plan.ShouldRunPreflightInspection()
 	}
 
 	return
 }
 
 func (r *BasePredicate) Count() int {
-	return 0x40
+	return 0x80
 }

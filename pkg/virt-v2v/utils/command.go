@@ -111,6 +111,6 @@ func (cb *CommandBuilderImpl) AddExtraArgs(values ...string) CommandBuilder {
 }
 
 func (cb *CommandBuilderImpl) Build() CommandExecutor {
-	fmt.Print("Building command:", cb.BaseCommand, cb.Args)
+	fmt.Println("Building command:", cb.BaseCommand, cb.Args)
 	return &Command{cmd: exec.Command(cb.BaseCommand, cb.Args...)}
 }

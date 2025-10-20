@@ -1,7 +1,7 @@
 apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
-  name: ${CSV_NAME}.v${VERSION}
+  name: ${CSV_NAME}.v${MTV_VERSION}
   namespace: ${NAMESPACE}
   annotations:
     capabilities: Seamless Upgrades
@@ -109,7 +109,7 @@ spec:
       url: ${DOCS_LINK_URL}
     - name: Forklift Operator
       url: https://github.com/kubev2v/forklift
-  version: ${VERSION}
+  version: ${MTV_VERSION}
   minKubeVersion: 1.27.0
   apiservicedefinitions: {}
   customresourcedefinitions:
@@ -143,6 +143,11 @@ spec:
         displayName: OpenstackVolumePopulator
         kind: OpenstackVolumePopulator
         name: openstackvolumepopulators.forklift.konveyor.io
+        version: v1beta1
+      - description: OVA Provider Server
+        displayName: OVAProviderServer
+        kind: OVAProviderServer
+        name: ovaproviderservers.forklift.konveyor.io
         version: v1beta1
       - description: oVirt Volume Populator
         displayName: OvirtVolumePopulator
@@ -192,5 +197,7 @@ spec:
       image: "${UI_PLUGIN_IMAGE}"
     - name: ova_provider_server
       image: "${OVA_PROVIDER_SERVER_IMAGE}"
+    - name: ova_proxy
+      image: "${OVA_PROXY_IMAGE}"
     - name: vsphere_xcopy_volume_populator
       image: "${VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE}"
