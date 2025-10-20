@@ -1676,6 +1676,11 @@ func (r *Builder) Secrets(vm *planapi.VMStatus) (list []core.Secret, err error) 
 				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.Sysprep.Secret.Name}
 				sources = append(sources, key)
 			}
+		case vol.ContainerDisk != nil:
+			if vol.ContainerDisk.ImagePullSecret != "" {
+				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.ContainerDisk.ImagePullSecret}
+				sources = append(sources, key)
+			}
 		default:
 			continue
 		}
