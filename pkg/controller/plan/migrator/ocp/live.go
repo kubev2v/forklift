@@ -1448,10 +1448,7 @@ func (r *Builder) targetPvc(source *model.PersistentVolumeClaim, storage api.Des
 	pvc = core.PersistentVolumeClaim{}
 	pvc.Namespace = r.Plan.Spec.TargetNamespace
 	pvc.Name = source.Name
-	pvc.Labels = source.Object.Labels
-	pvc.Annotations = source.Object.Annotations
 	pvc.Spec = core.PersistentVolumeClaimSpec{
-		Selector:         source.Object.Spec.Selector,
 		Resources:        source.Object.Spec.Resources,
 		StorageClassName: &storage.StorageClass,
 	}
