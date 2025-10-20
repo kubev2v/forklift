@@ -156,6 +156,10 @@ func (r *LiveMigrator) Complete(vm *planapi.VMStatus) {
 		if err != nil {
 			r.Log.Error(err, "Unable to clean up datavolumes.", "vm", vm.String())
 		}
+		err = r.DeletePersistentVolumeClaims(vm)
+		if err != nil {
+			r.Log.Error(err, "Unable to clean up PVCs.", "vm", vm.String())
+		}
 		err = r.DeleteVirtualMachine(vm)
 		if err != nil {
 			r.Log.Error(err, "Unable to clean up target VM.", "vm", vm.String())
@@ -932,6 +936,23 @@ func (r *LiveMigrator) DeleteDataVolumes(vm *planapi.VMStatus) (err error) {
 	err = r.Destination.Client.DeleteAllOf(
 		context.Background(),
 		&cdi.DataVolume{},
+		&client.DeleteAllOfOptions{
+			ListOptions: client.ListOptions{
+				LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+				Namespace:     r.Plan.Spec.TargetNamespace,
+			},
+		})
+	if err != nil {
+		err = liberr.Wrap(err)
+	}
+	return
+}
+
+// DeletePersistentVolumeClaims deletes the PersistentVolumeClaims that were created for this VM.
+func (r *LiveMigrator) DeletePersistentVolumeClaims(vm *planapi.VMStatus) (err error) {
+	err = r.Destination.Client.DeleteAllOf(
+		context.Background(),
+		&core.PersistentVolumeClaim{},
 		&client.DeleteAllOfOptions{
 			ListOptions: client.ListOptions{
 				LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
