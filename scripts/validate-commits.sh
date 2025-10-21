@@ -6,9 +6,9 @@
 set -e
 
 # Configuration
-readonly BOT_PATTERNS=("dependabot" "renovate" "bot" "github-actions" "automated" "^ci$" "^ci-" "-ci$" "-ci-" "\\.ci\\." "@ci\\." "^ci@")
+readonly BOT_PATTERNS=("dependabot" "renovate" "bot" "github-actions" "automated" "^ci$" "^ci-" "-ci$" "-ci-" "\\.ci\\." "@ci\\." "^ci@" "konflux" "konflux-ci" "red-hat-konflux" "@no-reply.konflux-ci.dev")
 readonly ISSUE_PATTERN="^Resolves: ([A-Z]+-[0-9]+( [A-Z]+-[0-9]+)*|[A-Z]+-[0-9]+(, ?[A-Z]+-[0-9]+)+|[A-Z]+-[0-9]+( and [A-Z]+-[0-9]+)+)( \\| .*)?$"
-readonly NONE_PATTERN="^Resolves: None$"
+readonly NONE_PATTERN="^Resolves: [Nn][Oo][Nn][Ee]$"
 
 # Default values
 COMMIT_RANGE=""
