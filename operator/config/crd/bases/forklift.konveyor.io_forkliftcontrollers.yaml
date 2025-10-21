@@ -63,6 +63,10 @@ spec:
                 type: string
                 enum: ["true", "false"]
                 description: "Enable OCP live migration (default: false)"
+              feature_ova_appliance_management:
+                type: string
+                enum: [ "true", "false" ]
+                description: "Enable OVA appliance management endpoints (default: false)"
               feature_vmware_system_serial_number:
                 type: string
                 enum: ["true", "false"]
@@ -129,6 +133,10 @@ spec:
                 type: string
                 description: "Must-gather debugging image"
                 example: "quay.io/kubev2v/forklift-must-gather:latest"
+              ova_proxy_fqin:
+                type: string
+                description: "OVA inventory proxy image"
+                example: "quay.io/kubev2v/forklift-ova-proxy:latest"
 
               # Controller Resource Configuration
               controller_container_limits_cpu:
@@ -375,6 +383,24 @@ spec:
               ova_container_requests_memory:
                 type: string
                 description: "OVA memory request (default: 150Mi)"
+                example: "300Mi"
+
+              # OVA Proxy Settings
+              ova_proxy_container_limits_cpu:
+                type: string
+                description: "OVA Proxy CPU limit (default: 1000m)"
+                example: "2000m"
+              ova_proxy_container_limits_memory:
+                type: string
+                description: "OVA Proxy memory limit (default: 1Gi)"
+                example: "2Gi"
+              ova_proxy_container_requests_cpu:
+                type: string
+                description: "OVA Proxy CPU request (default: 250m)"
+                example: "200m"
+              ova_proxy_container_requests_memory:
+                type: string
+                description: "OVA Proxy memory request (default: 512Mi)"
                 example: "300Mi"
 
               # Logging & General Settings

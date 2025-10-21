@@ -713,6 +713,14 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 	return nil, nil
 }
 
+func (r *Builder) ConfigMaps(vmRef ref.Ref) (list []core.ConfigMap, err error) {
+	return nil, nil
+}
+
+func (r *Builder) Secrets(vmRef ref.Ref) (list []core.Secret, err error) {
+	return nil, nil
+}
+
 func (r *Builder) PreferenceName(vmRef ref.Ref, configMap *core.ConfigMap) (name string, err error) {
 	vm := &model.Workload{}
 	if err = r.Source.Inventory.Find(vm, vmRef); err != nil {
@@ -879,7 +887,7 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 	return
 }
 
-func (r *Builder) SupportsVolumePopulators(vmRef ref.Ref) bool {
+func (r *Builder) SupportsVolumePopulators() bool {
 	return true
 }
 

@@ -1,0 +1,23 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+{% if not k8s_cluster|bool %}
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: {{ ova_proxy_tls_secret_name }}
+{% endif %}
+  labels:
+    app: {{ app_name }}
+    subapp: {{ ova_proxy_subapp_name }}
+    service: {{ ova_proxy_service_name }}
+  name: {{ ova_proxy_service_name }}
+  namespace: {{ app_namespace }}
+spec:
+  ports:
+  - name: api-https
+    port: 8443
+    targetPort: 8443
+    protocol: TCP
+  selector:
+    app: {{ app_name }}
+    subapp: {{ ova_proxy_subapp_name }}

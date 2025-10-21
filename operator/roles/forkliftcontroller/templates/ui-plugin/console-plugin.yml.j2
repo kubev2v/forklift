@@ -33,3 +33,11 @@ spec:
           name: {{ services_service_name }}
           namespace: {{ app_namespace }}
           port: 8443
+    - alias: {{ ova_proxy_service_name }}
+      authorization: UserToken
+      endpoint:
+        type: Service
+        service:
+          name: {{ ova_proxy_service_name }}
+          namespace: {{ app_namespace }}
+          port: 8443

@@ -144,6 +144,8 @@ type KubeVirt struct {
 	*plancontext.Context
 	// Builder
 	Builder adapter.Builder
+	// Ensurer
+	Ensurer adapter.Ensurer
 }
 
 // Build a VirtualMachineMap.
@@ -1427,7 +1429,7 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 		// or vSphere, and in the latter case the conversion pod acts as the first-consumer
 		annotations[planbase.AnnBindImmediate] = "true"
 	}
-	if r.Plan.IsWarm() && r.Builder.SupportsVolumePopulators(vm.Ref) {
+	if r.Plan.IsWarm() && r.Builder.SupportsVolumePopulators() {
 		// For storage offload, tie DataVolume to pre-imported PVC
 		annotations[planbase.AnnAllowClaimAdoption] = "true"
 		annotations[planbase.AnnPrePopulated] = "true"
@@ -1441,7 +1443,7 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 			Annotations: annotations,
 		},
 	}
-	if !(r.Builder.SupportsVolumePopulators(vm.Ref) && r.Plan.IsWarm()) {
+	if !(r.Builder.SupportsVolumePopulators() && r.Plan.IsWarm()) {
 		// For storage offload warm migrations, the template should have already
 		// been applied to the PVC that will be adopted by this DataVolume, so
 		// only add generateName for other migration types.
@@ -1568,6 +1570,27 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) 
 		if _, ok := object.Spec.Template.ObjectMeta.Annotations[ann]; !ok {
 			object.Spec.Template.ObjectMeta.Annotations[ann] = ""
 		}
+	}
+
+	var configmaps []core.ConfigMap
+	configmaps, err = r.Builder.ConfigMaps(vm.Ref)
+	if err != nil {
+		return
+	}
+	err = r.Ensurer.SharedConfigMaps(vm, configmaps)
+	if err != nil {
+		return
+	}
+
+	var secrets []core.Secret
+	secrets, err = r.Builder.Secrets(vm.Ref)
+	if err != nil {
+		return
+
+	}
+	err = r.Ensurer.SharedSecrets(vm, secrets)
+	if err != nil {
+		return
 	}
 
 	err = r.Builder.VirtualMachine(vm.Ref, &object.Spec, pvcs, vm.InstanceType != "", sortVolumesByLibvirt)

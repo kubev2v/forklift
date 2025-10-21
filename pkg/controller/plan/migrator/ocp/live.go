@@ -156,6 +156,10 @@ func (r *LiveMigrator) Complete(vm *planapi.VMStatus) {
 		if err != nil {
 			r.Log.Error(err, "Unable to clean up datavolumes.", "vm", vm.String())
 		}
+		err = r.DeletePersistentVolumeClaims(vm)
+		if err != nil {
+			r.Log.Error(err, "Unable to clean up PVCs.", "vm", vm.String())
+		}
 		err = r.DeleteVirtualMachine(vm)
 		if err != nil {
 			r.Log.Error(err, "Unable to clean up target VM.", "vm", vm.String())
@@ -944,6 +948,23 @@ func (r *LiveMigrator) DeleteDataVolumes(vm *planapi.VMStatus) (err error) {
 	return
 }
 
+// DeletePersistentVolumeClaims deletes the PersistentVolumeClaims that were created for this VM.
+func (r *LiveMigrator) DeletePersistentVolumeClaims(vm *planapi.VMStatus) (err error) {
+	err = r.Destination.Client.DeleteAllOf(
+		context.Background(),
+		&core.PersistentVolumeClaim{},
+		&client.DeleteAllOfOptions{
+			ListOptions: client.ListOptions{
+				LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+				Namespace:     r.Plan.Spec.TargetNamespace,
+			},
+		})
+	if err != nil {
+		err = liberr.Wrap(err)
+	}
+	return
+}
+
 // DeleteVirtualMachine deletes the target VirtualMachine.
 func (r *LiveMigrator) DeleteVirtualMachine(vm *planapi.VMStatus) (err error) {
 	err = r.Destination.Client.DeleteAllOf(
@@ -1059,7 +1080,10 @@ func (r *Ensurer) EnsureOwnerReferences(vm *planapi.VMStatus) (err error) {
 	}
 	for i := range dvs.Items {
 		dv := &dvs.Items[i]
-		r.Labeler.SetOwnerReferences(target, dv)
+		err = r.Labeler.SetBlockingOwnerReference(r.Scheme(), target, dv)
+		if err != nil {
+			return
+		}
 		err = r.Destination.Client.Update(context.Background(), dv)
 		if err != nil {
 			err = liberr.Wrap(err)
@@ -1080,7 +1104,10 @@ func (r *Ensurer) EnsureOwnerReferences(vm *planapi.VMStatus) (err error) {
 	}
 	for i := range pvcs.Items {
 		pvc := &pvcs.Items[i]
-		r.Labeler.SetOwnerReferences(target, pvc)
+		err = r.Labeler.SetBlockingOwnerReference(r.Scheme(), target, pvc)
+		if err != nil {
+			return
+		}
 		err = r.Destination.Client.Update(context.Background(), pvc)
 		if err != nil {
 			err = liberr.Wrap(err)
@@ -1442,10 +1469,7 @@ func (r *Builder) targetPvc(source *model.PersistentVolumeClaim, storage api.Des
 	pvc = core.PersistentVolumeClaim{}
 	pvc.Namespace = r.Plan.Spec.TargetNamespace
 	pvc.Name = source.Name
-	pvc.Labels = source.Object.Labels
-	pvc.Annotations = source.Object.Annotations
 	pvc.Spec = core.PersistentVolumeClaimSpec{
-		Selector:         source.Object.Spec.Selector,
 		Resources:        source.Object.Spec.Resources,
 		StorageClassName: &storage.StorageClass,
 	}
@@ -1572,6 +1596,11 @@ func (r *Builder) ConfigMaps(vm *planapi.VMStatus) (list []core.ConfigMap, err e
 		case vol.ConfigMap != nil:
 			key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.ConfigMap.Name}
 			sources = append(sources, key)
+		case vol.Sysprep != nil:
+			if vol.Sysprep.ConfigMap != nil {
+				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.Sysprep.ConfigMap.Name}
+				sources = append(sources, key)
+			}
 		default:
 			continue
 		}
@@ -1644,6 +1673,16 @@ func (r *Builder) Secrets(vm *planapi.VMStatus) (list []core.Secret, err error) 
 			}
 			if vol.CloudInitConfigDrive.NetworkDataSecretRef != nil {
 				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.CloudInitConfigDrive.NetworkDataSecretRef.Name}
+				sources = append(sources, key)
+			}
+		case vol.Sysprep != nil:
+			if vol.Sysprep.Secret != nil {
+				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.Sysprep.Secret.Name}
+				sources = append(sources, key)
+			}
+		case vol.ContainerDisk != nil:
+			if vol.ContainerDisk.ImagePullSecret != "" {
+				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.ContainerDisk.ImagePullSecret}
 				sources = append(sources, key)
 			}
 		default:

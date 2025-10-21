@@ -517,6 +517,14 @@ func (r *Builder) PreferenceName(vmRef ref.Ref, configMap *core.ConfigMap) (name
 	return
 }
 
+func (r *Builder) ConfigMaps(vmRef ref.Ref) (list []core.ConfigMap, err error) {
+	return nil, nil
+}
+
+func (r *Builder) Secrets(vmRef ref.Ref) (list []core.Secret, err error) {
+	return nil, nil
+}
+
 func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err error) {
 	vm := &model.Workload{}
 	err = r.Source.Inventory.Find(vm, vmRef)
@@ -668,7 +676,7 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 	return
 }
 
-func (r *Builder) SupportsVolumePopulators(vmRef ref.Ref) bool {
+func (r *Builder) SupportsVolumePopulators() bool {
 	return !r.Context.Plan.IsWarm() && r.Context.Plan.Provider.Destination.IsHost()
 }
 

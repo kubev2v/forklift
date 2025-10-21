@@ -89,7 +89,7 @@ func (r *Context) build() (err error) {
 		return
 	}
 	r.Hooks = r.Plan.Hooks
-	r.Labeler = Labeler{r}
+	r.Labeler = Labeler{Context: r}
 
 	return
 }
