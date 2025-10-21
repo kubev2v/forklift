@@ -58,6 +58,12 @@ func (r *Builder) ConfigMap(vmRef ref.Ref, secret *core.Secret, object *core.Con
 		return liberr.Wrap(err)
 	}
 
+	// For Skipped exports (e.g., ContainerDisk-only VMs), no cert to provide
+	if vmExport.Status != nil && vmExport.Status.Phase == export.Skipped {
+		r.Log.Info("VMExport is skipped, no ConfigMap cert needed", "vmRef", vmRef)
+		return nil
+	}
+
 	links := vmExport.Status.Links
 	if links.External != nil {
 		object.Data = map[string]string{
@@ -82,6 +88,12 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *v1.Secret, configMap *v1.Co
 	if err != nil {
 		r.Log.Error(err, "Failed to get VM-export ConfigMap")
 		return nil, liberr.Wrap(err)
+	}
+
+	// For Skipped exports (e.g., ContainerDisk-only VMs), no volumes to transfer
+	if vmExport.Status != nil && vmExport.Status.Phase == export.Skipped {
+		r.Log.Info("VMExport is skipped, no DataVolumes to create", "vmRef", vmRef)
+		return []cdi.DataVolume{}, nil
 	}
 
 	// Build storage map
@@ -159,6 +171,12 @@ func (r *Builder) Secret(vmRef ref.Ref, in *core.Secret, object *core.Secret) er
 	if err != nil {
 		r.Log.Error(err, "Failed to get VM-export Secret")
 		return liberr.Wrap(err)
+	}
+
+	// For Skipped exports (e.g., ContainerDisk-only VMs), no token secret
+	if vmExport.Status != nil && vmExport.Status.Phase == export.Skipped {
+		r.Log.Info("VMExport is skipped, no Secret token needed", "vmRef", vmRef)
+		return nil
 	}
 
 	// Export pod is ready
@@ -254,13 +272,7 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 
 // VirtualMachine implements base.Builder
 func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*v1.PersistentVolumeClaim, usesInstanceType bool, sortVolumesByLibvirt bool) error {
-	vmExport := &export.VirtualMachineExport{}
-	err := r.sourceClient.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vmExport)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
-	sourceVm, err := r.getSourceVmFromDefinition(vmExport)
+	sourceVm, err := r.getSourceVmFromDefinition(vmRef)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -482,7 +494,23 @@ func (r *Builder) mapNetworks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.Vi
 	targetVmSpec.Template.Spec.Domain.Devices.Interfaces = interfaces
 }
 
-func (r *Builder) getSourceVmFromDefinition(vme *export.VirtualMachineExport) (*cnv.VirtualMachine, error) {
+func (r *Builder) getSourceVmFromDefinition(vmRef ref.Ref) (*cnv.VirtualMachine, error) {
+	vme := &export.VirtualMachineExport{}
+	if err := r.sourceClient.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vme); err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
+	// For Skipped exports (e.g., ContainerDisk-only VMs), read VM directly from source
+	if vme.Status != nil && vme.Status.Phase == export.Skipped {
+		sourceVm := &cnv.VirtualMachine{}
+		if err := r.sourceClient.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, sourceVm); err != nil {
+			return nil, liberr.Wrap(err, "failed to get source VM for skipped export")
+		}
+		r.Log.Info("Retrieved VM directly from source for skipped export", "vm", sourceVm.Name)
+		return sourceVm, nil
+	}
+
+	// Fetch VM manifest from export server
 	var vmManifestUrl string
 	for _, manifest := range vme.Status.Links.External.Manifests {
 		if manifest.Type == export.AllManifests {
