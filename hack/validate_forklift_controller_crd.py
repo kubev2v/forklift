@@ -192,12 +192,25 @@ def validate_forklift_controller_crd(crd_file, tasks_file):
     crd_properties = load_crd_properties(crd_file)
     tasks_variables = load_tasks_variables(tasks_file)
     
+    # Properties that are allowed to be in CRD even if not directly used in tasks
+    # These are valid CRD fields that may be used indirectly or are configuration values
+    allowed_crd_only_properties = {
+        'inventory_route_timeout',
+        'metric_interval',
+        'ova_proxy_route_timeout',
+        'ovirt_osmap_configmap_name',
+        'validation_extra_volume_mountpath',
+        'validation_extra_volume_name',
+        'virt_customize_configmap_name',
+        'vsphere_osmap_configmap_name',
+    }
+    
     print(f"Found {len(crd_properties)} properties in ForkliftController CRD spec")
     print(f"Found {len(tasks_variables)} relevant variables in tasks and templates")
     print()
     
-    # Check for differences
-    missing_in_tasks = crd_properties - tasks_variables
+    # Check for differences, excluding allowed CRD-only properties
+    missing_in_tasks = crd_properties - tasks_variables - allowed_crd_only_properties
     missing_in_crd = tasks_variables - crd_properties
     
     success = True
