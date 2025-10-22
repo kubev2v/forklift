@@ -30,12 +30,19 @@ To download the latest kubectl-mtv release artifacts from GitHub:
 
 The script downloads the following files from the latest kubectl-mtv GitHub release:
 
+**kubectl-mtv CLI binaries:**
 - `kubectl-mtv-linux-amd64.tar.gz` - Linux x86_64 binary
 - `kubectl-mtv-linux-arm64.tar.gz` - Linux ARM64 binary
 - `kubectl-mtv-darwin-amd64.tar.gz` - macOS x86_64 binary
 - `kubectl-mtv-darwin-arm64.tar.gz` - macOS ARM64 binary
 - `kubectl-mtv-windows-amd64.zip` - Windows x86_64 binary
-- `kubectl-mtv-mcp-servers-linux-amd64.tar.gz` - MCP servers for Linux
+
+**MCP (Model Context Protocol) servers:**
+- `mcp-servers-linux-amd64.tar.gz` - MCP servers for Linux x86_64
+- `mcp-servers-linux-arm64.tar.gz` - MCP servers for Linux ARM64
+- `mcp-servers-darwin-amd64.tar.gz` - MCP servers for macOS x86_64
+- `mcp-servers-darwin-arm64.tar.gz` - MCP servers for macOS ARM64
+- `mcp-servers-windows-amd64.zip` - MCP servers for Windows x86_64
 
 The script automatically renames the files to remove version numbers, ensuring they match the expected filenames referenced in the ConsoleCLIDownload resources.
 
