@@ -1,6 +1,6 @@
 package populator
 
-//go:generate go run go.uber.org/mock/mockgen -destination=mocks/storage_mock_client.go -package=storage_mocks . StorageApi
+//go:generate mockgen -destination=mocks/storage_mock_client.go -package=storage_mocks . StorageApi
 type StorageApi interface {
 	StorageMapper
 	StorageResolver
@@ -23,6 +23,7 @@ type StorageResolver interface {
 	ResolvePVToLUN(persistentVolume PersistentVolume) (LUN, error)
 }
 
-type SciniAware interface {
-	SciniRequired() bool
+type PowerMaxApi interface {
+	StorageApi
+	EnsureClonnerIgroupWithHost(initiatorGroup string, clonnerIqn []string, esxiHostName string) (MappingContext, error)
 }
