@@ -30,11 +30,6 @@ go_library(
     importpath = "github.com/konveyor/forklift-controller/cmd/forklift-controller",
     visibility = ["//visibility:private"],
     deps = [
-        "//pkg/apis",
-        "//pkg/controller",
-        "//pkg/lib/logging",
-        "//pkg/settings",
-        "//pkg/webhook",
         "//vendor/github.com/go-logr/logr",
         "//vendor/github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1:k8s_cni_cncf_io",
         "//vendor/github.com/openshift/api/template/v1:template",
@@ -50,5 +45,9 @@ go_library(
         "//vendor/sigs.k8s.io/controller-runtime/pkg/manager",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/manager/signals",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/metrics/server",
+        "@com_github_kubev2v_forklift//pkg/apis:go_default_library",
+        "@com_github_kubev2v_forklift//pkg/lib/logging:go_default_library",
+        "@com_github_kubev2v_forklift//pkg/settings:go_default_library",
+        "@com_github_kubev2v_forklift//pkg/webhook:go_default_library",
     ],
 )

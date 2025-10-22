@@ -2,8 +2,6 @@ module github.com/kubev2v/forklift
 
 go 1.23.8
 
-toolchain go1.24.6
-
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/gin-contrib/cors v1.3.1

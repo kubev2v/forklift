@@ -10,11 +10,11 @@ go_library(
     importpath = "github.com/konveyor/forklift-controller/cmd/openstack-populator",
     visibility = ["//visibility:private"],
     deps = [
-        "//pkg/lib/client/openstack",
-        "//pkg/metrics",
         "//vendor/github.com/prometheus/client_golang/prometheus",
         "//vendor/github.com/prometheus/client_model/go",
         "//vendor/k8s.io/klog/v2:klog",
+        "@com_github_kubev2v_forklift//pkg/lib/client/openstack:go_default_library",
+        "@com_github_kubev2v_forklift//pkg/metrics:go_default_library",
     ],
 )
 
@@ -38,4 +38,3 @@ go_test(
     srcs = ["openstack-populator_test.go"],
     embed = [":openstack-populator_lib"],
 )
-

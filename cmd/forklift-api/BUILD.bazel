@@ -6,9 +6,6 @@ go_library(
     importpath = "github.com/konveyor/forklift-controller/cmd/forklift-api",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis",
-        "//pkg/forklift-api",
-        "//pkg/lib/logging",
         "//vendor/github.com/go-logr/logr",
         "//vendor/github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1:k8s_cni_cncf_io",
         "//vendor/k8s.io/client-go/kubernetes/scheme",
@@ -16,6 +13,8 @@ go_library(
         "//vendor/k8s.io/client-go/tools/clientcmd/api",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/client",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/log",
+        "@com_github_kubev2v_forklift//pkg/apis:go_default_library",
+        "@com_github_kubev2v_forklift//pkg/lib/logging:go_default_library",
     ],
 )
 
