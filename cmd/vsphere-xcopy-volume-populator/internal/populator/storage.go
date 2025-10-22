@@ -23,6 +23,11 @@ type StorageResolver interface {
 	ResolvePVToLUN(persistentVolume PersistentVolume) (LUN, error)
 }
 
+type PowerMaxApi interface {
+	StorageApi
+	EnsureClonnerIgroupForHost(initiatorGroup string, clonnerIqn []string, esxiHostName string) (MappingContext, error)
+}
+
 type SciniAware interface {
 	SciniRequired() bool
 }

@@ -213,9 +213,25 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		klog.Infof("no valid HBA UIDs found for host %s", host)
 		return fmt.Errorf("no valid HBA UIDs found for host %s", host)
 	}
-	mappingContext, err := p.StorageApi.EnsureClonnerIgroup(xcopyInitiatorGroup, hbaUIDs)
+	//mappingContext, err := p.StorageApi.EnsureClonnerIgroup(xcopyInitiatorGroup, hbaUIDs)
 
-	if err != nil {
+	var mappingContext map[string]interface{}
+	var maperr error
+	// For PowerMax - add esxi host name
+	if pmx, ok := p.StorageApi.(PowerMaxApi); ok {
+		klog.Infof("ESX host name %s: ", host.Name())
+		esxname, err := host.ObjectName(context.Background())
+		if err != nil {
+			klog.Infof("object name failed")
+		}
+		klog.Infof("ESX host name %s: ", esxname)
+		esxiHostName := esxname
+		mappingContext, maperr = pmx.EnsureClonnerIgroupForHost(xcopyInitiatorGroup, hbaUIDs, esxiHostName)
+	} else {
+		mappingContext, maperr = p.StorageApi.EnsureClonnerIgroup(xcopyInitiatorGroup, hbaUIDs)
+	}
+
+	if maperr != nil {
 		return fmt.Errorf("failed to add the ESX HBA UID %s to the initiator group %w", hbaUIDs, err)
 	}
 
