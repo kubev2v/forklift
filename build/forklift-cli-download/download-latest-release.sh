@@ -41,7 +41,11 @@ download_file "kubectl-mtv-linux-arm64.tar.gz" "kubectl-mtv-${TAG}-linux-arm64.t
 download_file "kubectl-mtv-darwin-amd64.tar.gz" "kubectl-mtv-${TAG}-darwin-amd64.tar.gz"
 download_file "kubectl-mtv-darwin-arm64.tar.gz" "kubectl-mtv-${TAG}-darwin-arm64.tar.gz"
 download_file "kubectl-mtv-windows-amd64.zip" "kubectl-mtv-${TAG}-windows-amd64.zip"
-download_file "kubectl-mtv-mcp-servers-linux-amd64.tar.gz" "kubectl-mtv-mcp-servers-linux-amd64.tar.gz"
+download_file "mcp-servers-linux-amd64.tar.gz" "mcp-servers-${TAG}-linux-amd64.tar.gz"
+download_file "mcp-servers-linux-arm64.tar.gz" "mcp-servers-${TAG}-linux-arm64.tar.gz"
+download_file "mcp-servers-darwin-amd64.tar.gz" "mcp-servers-${TAG}-darwin-amd64.tar.gz"
+download_file "mcp-servers-darwin-arm64.tar.gz" "mcp-servers-${TAG}-darwin-arm64.tar.gz"
+download_file "mcp-servers-windows-amd64.zip" "mcp-servers-${TAG}-windows-amd64.zip"
 
 echo "Download completed!"
 ls -la "${ARTIFACTS_DIR}"
