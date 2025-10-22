@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	ovirtsdk "github.com/ovirt/go-ovirt"
 )
 

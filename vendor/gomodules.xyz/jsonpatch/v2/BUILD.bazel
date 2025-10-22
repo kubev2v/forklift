@@ -1,9 +1,0 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
-
-go_library(
-    name = "jsonpatch",
-    srcs = ["jsonpatch.go"],
-    importmap = "github.com/konveyor/forklift-controller/vendor/gomodules.xyz/jsonpatch/v2",
-    importpath = "gomodules.xyz/jsonpatch/v2",
-    visibility = ["//visibility:public"],
-)

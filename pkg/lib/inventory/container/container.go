@@ -3,10 +3,10 @@ package container
 import (
 	"sync"
 
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	"github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	"github.com/konveyor/forklift-controller/pkg/lib/ref"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	"github.com/kubev2v/forklift/pkg/lib/inventory/model"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/lib/ref"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -146,6 +146,8 @@ type Collector interface {
 	// Return the status code of the connection
 	// 0 = Ignore
 	Test() (int, error)
+	// Follow the link
+	Follow(moRef interface{}, p []string, dst interface{}) error
 	// Reset
 	Reset()
 	// Get the system version - currently, ovirt-only

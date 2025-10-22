@@ -1,6 +1,4 @@
-FROM registry.access.redhat.com/ubi9:9.5-1731517889 AS appliance
-
-ENV LIBGUESTFS_BACKEND direct
+FROM registry.access.redhat.com/ubi9:9.5-1747219013 AS appliance
 
 RUN subscription-manager refresh && \
     dnf install -y --setopt=install_weak_deps=False \
@@ -10,23 +8,33 @@ RUN subscription-manager refresh && \
         libguestfs-xfs
 
 # Create tarball for the appliance.
+#
+# LIBGUESTFS_BACKEND=direct is required to work around the following bug:
+# https://issues.redhat.com/browse/RHEL-104684
+# and it can be removed when that bug gets fixed.
+#
+# It is also required during contianer runtime to work around the following bug:
+# https://issues.redhat.com/browse/RHEL-105490
+ENV LIBGUESTFS_BACKEND=direct
+
 RUN mkdir -p /usr/local/lib/guestfs/appliance && \
     cd /usr/local/lib/guestfs/appliance && \
     libguestfs-make-fixed-appliance . && \
     qemu-img convert -c -O qcow2 root root.qcow2 && \
     mv -vf root.qcow2 root
 
-FROM registry.access.redhat.com/ubi9/go-toolset:1.21.13-2.1727893526 AS builder
+FROM registry.access.redhat.com/ubi9/go-toolset:1.23.6-1747333074 AS builder
 WORKDIR /app
 COPY --chown=1001:0 ./ ./
-ENV GOFLAGS "-mod=vendor -tags=strictfipsruntime"
-ENV GOEXPERIMENT strictfipsruntime
+ENV GOFLAGS="-mod=vendor -tags=strictfipsruntime"
+ENV GOEXPERIMENT=strictfipsruntime
+ENV GOCACHE=/go-build/cache
 
-RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-monitor github.com/konveyor/forklift-controller/cmd/virt-v2v-monitor
-RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o image-converter github.com/konveyor/forklift-controller/cmd/image-converter
-RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-wrapper virt-v2v/cmd/entrypoint.go
+RUN --mount=type=cache,target=${GOCACHE},uid=1001 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-monitor github.com/kubev2v/forklift/cmd/virt-v2v-monitor
+RUN --mount=type=cache,target=${GOCACHE},uid=1001 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o image-converter github.com/kubev2v/forklift/cmd/image-converter
+RUN --mount=type=cache,target=${GOCACHE},uid=1001 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-wrapper github.com/kubev2v/forklift/cmd/virt-v2v
 
-FROM registry.access.redhat.com/ubi9:9.5-1731517889
+FROM registry.access.redhat.com/ubi9:9.5-1747219013
 
 # RUN rm /etc/pki/tls/fips_local.cnf && \
 #     echo -e '[fips_sect]\ntls1-prf-ems-check = 0\nactivate = 1' > /etc/pki/tls/fips_local.cnf && \
@@ -42,6 +50,8 @@ RUN subscription-manager refresh && \
         virtio-win && \
     dnf clean all
 
+# It is required during contianer runtime to work around the following bug:
+# https://issues.redhat.com/browse/RHEL-105490
 ENV LIBGUESTFS_BACKEND=direct
 
 RUN mkdir -p /usr/lib64/guestfs/appliance
@@ -67,6 +77,4 @@ LABEL \
         vendor="Red Hat, Inc." \
         maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
         distribution-scope="public" \
-        release="v2.7" \
-        url="https://github.com/kubev2v/forklift" \
-        version="v2.7.1"
+        url="https://github.com/kubev2v/forklift"

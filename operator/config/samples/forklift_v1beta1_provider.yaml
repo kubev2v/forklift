@@ -7,6 +7,6 @@ metadata:
 spec:
   type: vmware
   secret:
-    name: ''
-    namespace: ''
-  url: ''
+    name: ""
+    namespace: ""
+  url: ""

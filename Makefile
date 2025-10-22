@@ -1,8 +1,10 @@
-GOOS ?= `go env GOOS`
-GOPATH ?= `go env GOPATH`
+GOOS ?= $(shell go env GOOS)
+GOPATH ?= $(shell go env GOPATH)
 GOBIN ?= $(GOPATH)/bin
 GO111MODULE = auto
 
+ENVTEST_K8S_VERSION = 1.31.0
+ENVTEST_VERSION ?= release-0.19
 
 CONTAINER_RUNTIME ?=
 
@@ -20,7 +22,7 @@ REGISTRY ?= quay.io
 REGISTRY_ORG ?= kubev2v
 REGISTRY_TAG ?= devel
 
-VERSION ?= 2.7.0
+VERSION ?= 99.0.0
 NAMESPACE ?= konveyor-forklift
 OPERATOR_NAME ?= forklift-operator
 CHANNELS ?= development
@@ -29,6 +31,13 @@ CATALOG_NAMESPACE ?= konveyor-forklift
 CATALOG_NAME ?= forklift-catalog
 CATALOG_DISPLAY_NAME ?= Konveyor Forklift
 CATALOG_PUBLISHER ?= Community
+
+# Defaults for local development
+VSPHERE_OS_MAP ?= forklift-virt-customize
+OVIRT_OS_MAP ?= forklift-ovirt-osmap
+VIRT_CUSTOMIZE_MAP ?= forklift-virt-customize
+METRICS_PORT ?= 8888
+METRICS_PORT_INVENTORY ?= 8889
 
 # Use OPM_OPTS="--use-http" when using a non HTTPS registry
 # Use OPM_OPTS="--skip-tls-verify" when using an HTTPS registry with self-signed certificate
@@ -44,44 +53,49 @@ CONTROLLER_GEN ?= $(DEFAULT_CONTROLLER_GEN)
 DEFAULT_KUBECTL = $(GOBIN)/kubectl
 KUBECTL ?= $(DEFAULT_KUBECTL)
 
+# By default use the kustomize installed by the
+# 'kustomize' target
+DEFAULT_KUSTOMIZE = $(GOBIN)/kustomize
+KUSTOMIZE ?= $(DEFAULT_KUSTOMIZE)
+
 # Image URLs to use all building/pushing image targets
-CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-controller:$(REGISTRY_TAG)
-API_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-api:$(REGISTRY_TAG)
-VALIDATION_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-validation:$(REGISTRY_TAG)
-VIRT_V2V_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-virt-v2v:$(REGISTRY_TAG)
-OPERATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator:$(REGISTRY_TAG)
+# Each build image target overrides the variable of that image
+# This is used for the bundle build so we don't need to build all images
+# So the bundle will point to latest available images and to those which were built.
+# Example: REGISTRY_ORG=mnecas0 make build-controller-image build-operator-bundle-image
+# This will build controller and bundle pointing to that controller
+
+### Components
+CONTROLLER_IMAGE ?= quay.io/kubev2v/forklift-controller:latest
+API_IMAGE ?= quay.io/kubev2v/forklift-api:latest
+VALIDATION_IMAGE ?= quay.io/kubev2v/forklift-validation:latest
+VIRT_V2V_IMAGE ?= quay.io/kubev2v/forklift-virt-v2v:latest
+OPERATOR_IMAGE ?= quay.io/kubev2v/forklift-operator:latest
+POPULATOR_CONTROLLER_IMAGE ?= quay.io/kubev2v/populator-controller:latest
+OVIRT_POPULATOR_IMAGE ?= quay.io/kubev2v/ovirt-populator:latest
+OPENSTACK_POPULATOR_IMAGE ?= quay.io/kubev2v/openstack-populator:latest
+OVA_PROVIDER_SERVER_IMAGE ?= quay.io/kubev2v/forklift-ova-provider-server:latest
+VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/vsphere-xcopy-volume-populator:$(REGISTRY_TAG)
+
+### OLM
 OPERATOR_BUNDLE_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-bundle:$(REGISTRY_TAG)
 OPERATOR_INDEX_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-index:$(REGISTRY_TAG)
-POPULATOR_CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/populator-controller:$(REGISTRY_TAG)
-OVIRT_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/ovirt-populator:$(REGISTRY_TAG)
-OPENSTACK_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/openstack-populator:$(REGISTRY_TAG)
-OVA_PROVIDER_SERVER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-provider-server:$(REGISTRY_TAG)
 
 ### External images
 MUST_GATHER_IMAGE ?= quay.io/kubev2v/forklift-must-gather:latest
 UI_PLUGIN_IMAGE ?= quay.io/kubev2v/forklift-console-plugin:latest
 
-BAZEL_OPTS ?= --verbose_failures
+# Golangci-lint version
+GOLANGCI_LINT_VERSION ?= v1.64.2
+GOLANGCI_LINT_BIN ?= $(GOBIN)/golangci-lint
 
-ifneq (,$(findstring /usr/lib64/ccache,$(PATH)))
-CCACHE_DIR ?= $${HOME}/.ccache
-BAZEL_OPTS +=	--sandbox_writable_path=$(CCACHE_DIR)
-$(shell [ -d $(CCACHE_DIR) ] || mkdir -p $(CCACHE_DIR))
-endif
-
-XDG_RUNTIME_DIR ?=
-ifneq (,$(XDG_RUNTIME_DIR))
-BAZEL_OPTS +=	--sandbox_writable_path=$${XDG_RUNTIME_DIR}
-$(shell [ -d $(XDG_RUNTIME_DIR) ] || mkdir -p $(XDG_RUNTIME_DIR))
-endif
-
-ci: all tidy vendor bazel-generate generate-verify
+ci: all tidy vendor generate-verify lint
 
 all: test forklift-controller
 
 # Run tests
 test: generate fmt vet manifests validation-test
-	go test -coverprofile=cover.out ./pkg/... ./cmd/... ./virt-v2v/...
+	go test -coverprofile=cover.out ./pkg/... ./cmd/...
 
 # Experimental e2e target
 e2e-sanity: e2e-sanity-ovirt e2e-sanity-vsphere
@@ -110,42 +124,29 @@ e2e-sanity-ova:
 
 # Build forklift-controller binary
 forklift-controller: generate fmt vet
-	go build -o bin/forklift-controller github.com/konveyor/forklift-controller/cmd/forklift-controller
-
-# Define variables with default values for debug
-define DEBUG_VARS
-ROLE ?= main
-VIRT_V2V_IMAGE ?= quay.io/virt-v2v/forklift-virt-v2v:latest
-API_HOST ?= localhost
-API_PORT ?= 443
-DLV_PORT ?= 5432
-BLOCK_OVERHEAD ?= 0
-FILESYSTEM_OVERHEAD ?= 10
-MAX_VM_INFLIGHT ?= 2
-CLEANUP_RETRIES ?= 10
-SNAPSHOT_STATUS_CHECK_RATE_SECONDS ?= 10
-SNAPSHOT_REMOVAL_TIMEOUT_MINUTES ?= 120
-VDDK_JOB_ACTIVE_DEADLINE ?= 300
-PRECOPY_INTERVAL ?= 60
-OPENSHIFT ?= true
-METRICS_PORT ?= 8081
-KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION ?= v1
-FEATURE_VSPHERE_INCREMENTAL_BACKUP ?= true
-VSPHERE_OS_MAP ?= forklift-virt-customize
-OVIRT_OS_MAP ?= forklift-ovirt-osmap
-VIRT_CUSTOMIZE_MAP ?= forklift-virt-customize
-endef
-$(eval $(DEBUG_VARS))
-
-build-debug-%: fmt vet
-	go build -o bin/$* -gcflags=all="-N -l" github.com/konveyor/forklift-controller/cmd/$*
-
-debug-%: build-debug-%
-	dlv --listen=:$(DLV_PORT) --headless=true --api-version=2 exec bin/$*
+	go build -o bin/forklift-controller github.com/kubev2v/forklift/cmd/forklift-controller
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
+.PHONY: run
 run: generate fmt vet
-	export METRICS_PORT=8888;\
+	VSPHERE_OS_MAP=$(VSPHERE_OS_MAP) \
+	OVIRT_OS_MAP=$(OVIRT_OS_MAP) \
+	VIRT_V2V_IMAGE=$(VIRT_V2V_IMAGE) \
+	VIRT_CUSTOMIZE_MAP=$(VIRT_CUSTOMIZE_MAP) \
+	METRICS_PORT=$(METRICS_PORT) \
+	AUTH_REQUIRED=false \
+		KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION=v1 go run ./cmd/forklift-controller/main.go
+
+# Run against the configured Kubernetes cluster in ~/.kube/config
+.PHONY: run-inventory
+run-inventory: generate fmt vet
+	VSPHERE_OS_MAP=$(VSPHERE_OS_MAP) \
+	OVIRT_OS_MAP=$(OVIRT_OS_MAP) \
+	VIRT_V2V_IMAGE=$(VIRT_V2V_IMAGE) \
+	VIRT_CUSTOMIZE_MAP=$(VIRT_CUSTOMIZE_MAP) \
+	METRICS_PORT=$(METRICS_PORT_INVENTORY) \
+	ROLE=inventory \
+	AUTH_REQUIRED=false \
 		KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION=v1 go run ./cmd/forklift-controller/main.go
 
 # Install CRDs into a cluster
@@ -180,135 +181,106 @@ generate-verify: generate
 	./hack/verify-generate.sh
 
 build-controller-image: check_container_runtime
-	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run cmd/forklift-controller:forklift-controller-image \
-		$(BAZEL_OPTS) \
-		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
+	$(eval CONTROLLER_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-controller:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) build -t $(CONTROLLER_IMAGE) -f build/forklift-controller/Containerfile .
 
 push-controller-image: build-controller-image
-	$(CONTAINER_CMD) tag bazel/cmd/forklift-controller:forklift-controller-image $(CONTROLLER_IMAGE)
 	$(CONTAINER_CMD) push $(CONTROLLER_IMAGE)
 
 build-api-image: check_container_runtime
-	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run cmd/forklift-api:forklift-api-image \
-		$(BAZEL_OPTS) \
-		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
+	$(eval API_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-api:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) build -t $(API_IMAGE) -f build/forklift-api/Containerfile .
 
 push-api-image: build-api-image
-	$(CONTAINER_CMD) tag bazel/cmd/forklift-api:forklift-api-image $(API_IMAGE)
 	$(CONTAINER_CMD) push $(API_IMAGE)
 
 build-validation-image: check_container_runtime
-	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run validation:forklift-validation-image \
-		$(BAZEL_OPTS) \
-		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
+	$(eval VALIDATION_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-validation:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) build -t $(VALIDATION_IMAGE) -f build/validation/Containerfile .
 
 push-validation-image: build-validation-image
-	$(CONTAINER_CMD) tag bazel/validation:forklift-validation-image $(VALIDATION_IMAGE)
 	$(CONTAINER_CMD) push $(VALIDATION_IMAGE)
 
 build-operator-image: check_container_runtime
-	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run operator:forklift-operator-image \
-		$(BAZEL_OPTS) \
-		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
+	$(eval OPERATOR_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-operator:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) build -t $(OPERATOR_IMAGE) -f build/forklift-operator/Containerfile .
 
 push-operator-image: build-operator-image
-	$(CONTAINER_CMD) tag bazel/operator:forklift-operator-image $(OPERATOR_IMAGE)
 	$(CONTAINER_CMD) push $(OPERATOR_IMAGE)
 
 build-virt-v2v-image: check_container_runtime
-	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run --package_path=virt-v2v forklift-virt-v2v \
-		$(BAZEL_OPTS) \
-		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
+	$(eval VIRT_V2V_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-virt-v2v:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) build -t $(VIRT_V2V_IMAGE) -f build/virt-v2v/Containerfile-upstream .
 
 push-virt-v2v-image: build-virt-v2v-image
-	$(CONTAINER_CMD) tag bazel:forklift-virt-v2v $(VIRT_V2V_IMAGE)
 	$(CONTAINER_CMD) push $(VIRT_V2V_IMAGE)
 
 build-operator-bundle-image: check_container_runtime
-	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run operator:forklift-operator-bundle-image \
-		$(BAZEL_OPTS) \
-		--action_env CONTAINER_CMD=$(CONTAINER_CMD) \
-		--action_env VERSION=$(VERSION) \
-		--action_env NAMESPACE=$(NAMESPACE) \
-		--action_env CHANNELS=$(CHANNELS) \
-		--action_env DEFAULT_CHANNEL=$(DEFAULT_CHANNEL) \
-		--action_env OPERATOR_IMAGE=$(OPERATOR_IMAGE) \
-		--action_env MUST_GATHER_IMAGE=$(MUST_GATHER_IMAGE) \
-		--action_env UI_PLUGIN_IMAGE=$(UI_PLUGIN_IMAGE) \
-		--action_env VALIDATION_IMAGE=$(VALIDATION_IMAGE) \
-		--action_env VIRT_V2V_IMAGE=$(VIRT_V2V_IMAGE) \
-		--action_env CONTROLLER_IMAGE=$(CONTROLLER_IMAGE) \
-		--action_env API_IMAGE=$(API_IMAGE) \
-		--action_env POPULATOR_CONTROLLER_IMAGE=$(POPULATOR_CONTROLLER_IMAGE) \
-		--action_env OVIRT_POPULATOR_IMAGE=$(OVIRT_POPULATOR_IMAGE) \
-		--action_env OPENSTACK_POPULATOR_IMAGE=$(OPENSTACK_POPULATOR_IMAGE)\
-		--action_env OVA_PROVIDER_SERVER_IMAGE=$(OVA_PROVIDER_SERVER_IMAGE)
+	$(CONTAINER_CMD) build \
+		-t $(OPERATOR_BUNDLE_IMAGE) \
+		-f build/forklift-operator-bundle/Containerfile . \
+		--build-arg STREAM=dev \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg CONTROLLER_IMAGE=$(CONTROLLER_IMAGE) \
+		--build-arg API_IMAGE=$(API_IMAGE) \
+		--build-arg VALIDATION_IMAGE=$(VALIDATION_IMAGE) \
+		--build-arg VIRT_V2V_IMAGE=$(VIRT_V2V_IMAGE) \
+		--build-arg OPERATOR_IMAGE=$(OPERATOR_IMAGE) \
+		--build-arg POPULATOR_CONTROLLER_IMAGE=$(POPULATOR_CONTROLLER_IMAGE) \
+		--build-arg OVIRT_POPULATOR_IMAGE=$(OVIRT_POPULATOR_IMAGE) \
+		--build-arg OPENSTACK_POPULATOR_IMAGE=$(OPENSTACK_POPULATOR_IMAGE) \
+		--build-arg MUST_GATHER_IMAGE=$(MUST_GATHER_IMAGE) \
+		--build-arg UI_PLUGIN_IMAGE=$(UI_PLUGIN_IMAGE) \
+		--build-arg OVA_PROVIDER_SERVER_IMAGE=$(OVA_PROVIDER_SERVER_IMAGE)
 
 push-operator-bundle-image: build-operator-bundle-image
-	 $(CONTAINER_CMD) tag bazel/operator:forklift-operator-bundle-image $(OPERATOR_BUNDLE_IMAGE)
 	 $(CONTAINER_CMD) push $(OPERATOR_BUNDLE_IMAGE)
 
 build-operator-index-image: check_container_runtime
-	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run operator:forklift-operator-index-image \
-		$(BAZEL_OPTS) \
-		--action_env CONTAINER_CMD=$(CONTAINER_CMD) \
-		--action_env VERSION=$(VERSION) \
-		--action_env CHANNELS=$(CHANNELS) \
-		--action_env DEFAULT_CHANNEL=$(DEFAULT_CHANNEL) \
-		--action_env OPM_OPTS=$(OPM_OPTS) \
-		--action_env REGISTRY=$(REGISTRY) \
-		--action_env REGISTRY_TAG=$(REGISTRY_TAG) \
-		--action_env REGISTRY_ORG=$(REGISTRY_ORG)
+	$(eval OPERATOR_INDEX_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-index:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) build $(BUILD_OPT) -t $(OPERATOR_INDEX_IMAGE) -f build/forklift-operator-index/Containerfile . \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg OPERATOR_BUNDLE_IMAGE=$(OPERATOR_BUNDLE_IMAGE) \
+		--build-arg CHANNELS=$(CHANNELS) \
+		--build-arg DEFAULT_CHANNEL=$(DEFAULT_CHANNEL) \
+		--build-arg OPM_OPTS=$(OPM_OPTS)
 
 push-operator-index-image: build-operator-index-image
-	$(CONTAINER_CMD) tag bazel/operator:forklift-operator-index-image $(OPERATOR_INDEX_IMAGE)
 	$(CONTAINER_CMD) push $(OPERATOR_INDEX_IMAGE)
 
 build-populator-controller-image: check_container_runtime
-	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run cmd/populator-controller:populator-controller-image \
-		$(BAZEL_OPTS) \
-		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
+	$(eval POPULATOR_CONTROLLER_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/populator-controller:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) build -t $(POPULATOR_CONTROLLER_IMAGE) -f build/populator-controller/Containerfile .
 
 push-populator-controller-image: build-populator-controller-image
-	$(CONTAINER_CMD) tag bazel/cmd/populator-controller:populator-controller-image $(POPULATOR_CONTROLLER_IMAGE)
 	$(CONTAINER_CMD) push $(POPULATOR_CONTROLLER_IMAGE)
 
 build-ovirt-populator-image:
-	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run cmd/ovirt-populator:ovirt-populator-image \
-		$(BAZEL_OPTS) \
-		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
+	$(eval OVIRT_POPULATOR_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/ovirt-populator:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) build -t $(OVIRT_POPULATOR_IMAGE) -f build/ovirt-populator/Containerfile-upstream .
 
 push-ovirt-populator-image: build-ovirt-populator-image
-	$(CONTAINER_CMD) tag bazel/cmd/ovirt-populator:ovirt-populator-image $(OVIRT_POPULATOR_IMAGE)
 	$(CONTAINER_CMD) push $(OVIRT_POPULATOR_IMAGE)
 
 build-openstack-populator-image: check_container_runtime
-	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run cmd/openstack-populator:openstack-populator-image \
-		$(BAZEL_OPTS) \
-		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
+	$(eval OPENSTACK_POPULATOR_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/openstack-populator:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) build -t $(OPENSTACK_POPULATOR_IMAGE) -f build/openstack-populator/Containerfile .
 
 push-openstack-populator-image: build-openstack-populator-image
-	$(CONTAINER_CMD) tag bazel/cmd/openstack-populator:openstack-populator-image $(OPENSTACK_POPULATOR_IMAGE)
 	$(CONTAINER_CMD) push $(OPENSTACK_POPULATOR_IMAGE)
 
+build-vsphere-xcopy-volume-populator-image: check_container_runtime
+	$(eval VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/vsphere-xcopy-volume-populator:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) build -t $(VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE) -f build/vsphere-xcopy-volume-populator/Containerfile .
+
+push-vsphere-xcopy-volume-populator-image: build-vsphere-xcopy-volume-populator-image
+	$(CONTAINER_CMD) push $(VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE)
+
 build-ova-provider-server-image: check_container_runtime
-	export CONTAINER_CMD=$(CONTAINER_CMD); \
-	bazel run cmd/ova-provider-server:ova-provider-server-image \
-		$(BAZEL_OPTS) \
-		--action_env CONTAINER_CMD=$(CONTAINER_CMD)
+	$(eval OVA_PROVIDER_SERVER_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-provider-server:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) build -t $(OVA_PROVIDER_SERVER_IMAGE) -f build/ova-provider-server/Containerfile .
 
 push-ova-provider-server-image: build-ova-provider-server-image
-	$(CONTAINER_CMD) tag bazel/cmd/ova-provider-server:ova-provider-server-image $(OVA_PROVIDER_SERVER_IMAGE)
 	$(CONTAINER_CMD) push $(OVA_PROVIDER_SERVER_IMAGE)
 
 build-all-images: build-api-image \
@@ -316,24 +288,31 @@ build-all-images: build-api-image \
                   build-validation-image \
                   build-operator-image \
                   build-virt-v2v-image \
-                  build-operator-bundle-image \
-                  build-operator-index-image \
                   build-populator-controller-image \
                   build-ovirt-populator-image \
                   build-openstack-populator-image\
-                  build-ova-provider-server-image
+                  build-vsphere-xcopy-volume-populator-image\
+                  build-ova-provider-server-image \
+                  build-operator-bundle-image \
+                  build-operator-index-image
 
 push-all-images:  push-api-image \
                   push-controller-image \
                   push-validation-image \
                   push-operator-image \
                   push-virt-v2v-image \
-                  push-operator-bundle-image \
-                  push-operator-index-image \
                   push-populator-controller-image \
                   push-ovirt-populator-image \
                   push-openstack-populator-image\
-                  push-ova-provider-server-image
+                  push-vsphere-xcopy-volume-populator-image\
+                  push-ova-provider-server-image \
+                  push-operator-bundle-image \
+                  push-operator-index-image
+
+
+.PHONY: deploy-operator-index
+deploy-operator-index:
+	export OPERATOR_INDEX_IMAGE=${OPERATOR_INDEX_IMAGE}; envsubst < operator/forklift-operator-catalog.yaml | kubectl apply -f -
 
 .PHONY: check_container_runtime
 check_container_runtime:
@@ -343,21 +322,26 @@ check_container_runtime:
 			exit 1; \
 	fi
 
-bazel-generate:
-	bazel run //:gazelle cmd operator pkg tests validation
-
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN)
 $(DEFAULT_CONTROLLER_GEN):
-	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.15.0
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.17.0
 
 .PHONY: kubectl
 kubectl: $(KUBECTL)
 $(DEFAULT_KUBECTL):
 	curl -L https://dl.k8s.io/release/v1.25.10/bin/linux/amd64/kubectl -o $(GOBIN)/kubectl && chmod +x $(GOBIN)/kubectl
 
+.PHONY: kustomize
+kustomize: $(KUSTOMIZE)
+$(DEFAULT_KUSTOMIZE):
+	go install sigs.k8s.io/kustomize/kustomize/v5@v5.3.0
+
 validation-test: opa-bin
 	ENVIRONMENT=test ${OPA} test validation/policies --explain fails
+
+mockgen-install:
+	go install go.uber.org/mock/mockgen@v0.4.0
 
 opa-bin:
 ifeq (, $(shell command -v opa))
@@ -518,3 +502,49 @@ undeploy: kubectl
 		$(KUBECTL) -n $(REGISTRY_ORG) get rolebinding $${ROLE_BINDING} -o name 2>/dev/null | xargs -r $(KUBECTL) -n $(REGISTRY_ORG) delete ; \
 	done;
 	@echo "Done!"
+
+.PHONY: envtest
+envtest: $(ENVTEST) ## Download setup-envtest locally if necessary.
+$(ENVTEST): $(LOCALBIN)
+    $(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest,$(ENVTEST_VERSION))
+
+integration-test: generate fmt vet manifests
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -i --bin-dir $(LOCALBIN) -p path)" go test ./pkg/controller/migration/... -coverprofile cover.out
+
+build-controller:
+	go build -o bin/forklift-controller cmd/forklift-controller/main.go
+
+dev-controller: generate fmt vet build-controller
+	ROLE="main" \
+	API_HOST="forklift-inventory-openshift-mtv.apps.ocp-edge-cluster-0.qe.lab.redhat.com" \
+	./bin/forklift-controller
+	#dlv --listen=:5432 --headless=true --api-version=2 exec ./bin/forklift-controller \
+
+.PHONY: kustomized-manifests
+kustomized-manifests: kubectl
+	kubectl kustomize operator/config/manifests > operator/.kustomized_manifests
+
+.PHONY: generate-manifests
+generate-manifests: kubectl manifests
+	kubectl kustomize operator/streams/upstream > operator/streams/upstream/upstream_manifests
+	kubectl kustomize operator/streams/downstream > operator/streams/downstream/downstream_manifests
+	STREAM=upstream bash operator/streams/prepare-vars.sh
+	STREAM=downstream bash operator/streams/prepare-vars.sh
+
+.PHONY: lint-install
+lint-install:
+	@echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."
+	GOBIN=$(GOBIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	@echo "golangci-lint installed successfully."
+
+.PHONY: lint
+lint: $(GOLANGCI_LINT_BIN)
+	@echo "Running golangci-lint..."
+	$(GOLANGCI_LINT_BIN) run ./pkg/... ./cmd/...
+
+.PHONY: update-tekton
+update-tekton:
+	SKIP_UPDATE=false ./update-tekton.sh .tekton/*.yaml
+
+$(GOLANGCI_LINT_BIN):
+	$(MAKE) lint-install

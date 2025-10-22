@@ -1,6 +1,6 @@
 package model
 
-import liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+import liberr "github.com/kubev2v/forklift/pkg/lib/error"
 
 // FK relation.
 type FkRelation struct {

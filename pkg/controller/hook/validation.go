@@ -2,8 +2,9 @@ package hook
 
 import (
 	"encoding/base64"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
+
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 )
 
 // Types

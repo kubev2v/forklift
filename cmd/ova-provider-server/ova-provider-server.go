@@ -15,8 +15,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"unicode"
 
-	"github.com/konveyor/forklift-controller/pkg/lib/gob"
+	"github.com/kubev2v/forklift/pkg/lib/gob"
 
 	"github.com/google/uuid"
 )
@@ -113,6 +114,7 @@ type VirtualSystem struct {
 
 type Envelope struct {
 	XMLName        xml.Name        `xml:"Envelope"`
+	Attributes     []xml.Attr      `xml:",any,attr"`
 	VirtualSystem  []VirtualSystem `xml:"VirtualSystem"`
 	DiskSection    DiskSection     `xml:"DiskSection"`
 	NetworkSection NetworkSection  `xml:"NetworkSection"`
@@ -123,6 +125,7 @@ type Envelope struct {
 type VM struct {
 	Name                  string
 	OvaPath               string
+	OvaSource             string
 	OsType                string
 	RevisionValidated     int64
 	PolicyVersion         int
@@ -428,6 +431,46 @@ func readOVF(ovfFile string) (*Envelope, error) {
 	return &envelope, nil
 }
 
+const (
+	Unknown    = "Unknown"
+	VMware     = "VMware"
+	VirtualBox = "VirtualBox"
+	Xen        = "Xen"
+	Ovirt      = "oVirt"
+)
+
+// Check the OVF XML for any markers that might cause import problems later on.
+// Not guaranteed to correctly guess the OVA source, but should be good enough
+// to filter out some obvious problem cases.
+func guessOvaSource(envelope Envelope) string {
+	namespaceMap := map[string]string{
+		"http://schemas.citrix.com/ovf/envelope/1": Xen,
+		"http://www.citrix.com/xenclient/ovf/1":    Xen,
+		"http://www.virtualbox.org/ovf/machine":    VirtualBox,
+		"http://www.ovirt.org/ovf":                 Ovirt,
+	}
+
+	foundVMware := false
+
+	for _, attribute := range envelope.Attributes {
+		if source, present := namespaceMap[attribute.Value]; present {
+			return source
+		}
+
+		// Other products may contain a VMware namespace, use it as a default if present
+		// and if no others are found.
+		if strings.Contains(attribute.Value, "http://www.vmware.com/schema/ovf") {
+			foundVMware = true
+		}
+	}
+
+	if foundVMware {
+		return VMware
+	}
+
+	return Unknown
+}
+
 func convertToVmStruct(envelope []Envelope, ovaPath []string) ([]VM, error) {
 	var vms []VM
 
@@ -437,9 +480,10 @@ func convertToVmStruct(envelope []Envelope, ovaPath []string) ([]VM, error) {
 
 			// Initialize a new VM
 			newVM := VM{
-				OvaPath: ovaPath[i],
-				Name:    virtualSystem.Name,
-				OsType:  virtualSystem.OperatingSystemSection.OsType,
+				OvaPath:   ovaPath[i],
+				OvaSource: guessOvaSource(vmXml),
+				Name:      virtualSystem.Name,
+				OsType:    virtualSystem.OperatingSystemSection.OsType,
 			}
 
 			for _, item := range virtualSystem.HardwareSection.Items {
@@ -466,8 +510,23 @@ func convertToVmStruct(envelope []Envelope, ovaPath []string) ([]VM, error) {
 					newVM.MemoryUnits = item.AllocationUnits
 
 				} else {
+					var itemKind string
+					if len(item.ElementName) > 0 {
+						// if the `ElementName` element has a name such as "Hard Disk 1", strip off the
+						// number suffix to try to get a more generic name for the device type
+						itemKind = strings.TrimRightFunc(item.ElementName, func(r rune) bool {
+							return unicode.IsDigit(r) || unicode.IsSpace(r)
+						})
+					} else {
+						// Some .ova files do not include an `ElementName` element for each device. Fall
+						// back to using the `Description` element
+						itemKind = item.Description
+					}
+					if len(itemKind) == 0 {
+						itemKind = "Unknown"
+					}
 					newVM.Devices = append(newVM.Devices, Device{
-						Kind: item.ElementName[:len(item.ElementName)-2],
+						Kind: itemKind,
 					})
 				}
 

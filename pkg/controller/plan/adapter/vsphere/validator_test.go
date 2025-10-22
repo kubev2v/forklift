@@ -2,13 +2,13 @@
 package vsphere
 
 import (
-	v1beta1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
+	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +29,11 @@ func (m *mockInventory) Find(resource interface{}, ref ref.Ref) error {
 				GuestNetworks: []vsphere.GuestNetwork{
 					{MAC: "mac1"},
 				},
-				GuestID: "windows7Guest"},
+				GuestID: "windows7Guest",
+				VM1: model.VM1{
+					PowerState: "poweredOn", // default state
+				},
+			},
 		}
 		if ref.Name == "full_guest_network" {
 			res.VM.GuestNetworks = append(res.VM.GuestNetworks, vsphere.GuestNetwork{MAC: "mac2"})
@@ -100,12 +104,12 @@ var _ = Describe("vsphere validation tests", func() {
 			},
 
 			// Directly declare entries here
-			Entry("when the vm doesn't have static ips, and the plan set with static ip", "test", true, true),
+			Entry("when the vm doesn't have static ips, and the plan set with static ip", "test", true, false),
 			Entry("when the vm doesn't have static ips, and the plan set without static ip", "test", false, false),
 			Entry("when the vm have static ips, and the plan set with static ip", "full_guest_network", true, false),
 			Entry("when the vm have static ips, and the plan set without static ip", "test", false, false),
 			Entry("when the vm doesn't have static ips, and the plan set without static ip, vm is non-windows", "not_windows_guest", false, false),
-			Entry("when the vm doesn't have static ips, and the plan set with static ip, vm is non-windows", "not_windows_guest", true, true),
+			Entry("when the vm doesn't have static ips, and the plan set with static ip, vm is non-windows", "not_windows_guest", true, false),
 			Entry("when the vm doesn't exist", "missing_from_invetory", true, true),
 		)
 	})

@@ -2,21 +2,21 @@ package provider
 
 import (
 	"context"
+	"crypto/x509"
 	"fmt"
 	"net/http"
 	"net/url"
 	"regexp"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/container"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ovirt"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/vsphere"
-	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
-	"github.com/konveyor/forklift-controller/pkg/lib/util"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/controller/base"
+	"github.com/kubev2v/forklift/pkg/controller/provider/container"
+	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	libref "github.com/kubev2v/forklift/pkg/lib/ref"
+	"github.com/kubev2v/forklift/pkg/lib/util"
 	core "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -174,6 +174,29 @@ func (r *Reconciler) validateURL(provider *api.Provider) error {
 	return nil
 }
 
+func (r *Reconciler) validateConnectionStatus(provider *api.Provider, secret *core.Secret) {
+	if base.GetInsecureSkipVerifyFlag(secret) {
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     ConnectionInsecure,
+			Status:   True,
+			Reason:   SkipTLSVerification,
+			Category: Warn,
+			Message:  "TLS is susceptible to machine-in-the-middle attacks when certificate verification is skipped.",
+		})
+	} else {
+		_, err := base.VerifyTLSConnection(provider.Spec.URL, secret)
+		if err != nil {
+			provider.Status.SetCondition(libcnd.Condition{
+				Type:     ConnectionTestFailed,
+				Status:   True,
+				Reason:   Tested,
+				Category: Critical,
+				Message:  err.Error(),
+			})
+		}
+	}
+}
+
 // Validate secret (ref).
 //  1. The references is complete.
 //  2. The secret exists.
@@ -203,7 +226,7 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 		Name:      ref.Name,
 	}
 	err = r.Get(context.TODO(), key, secret)
-	if errors.IsNotFound(err) {
+	if k8serrors.IsNotFound(err) {
 		err = nil
 		newCnd.Reason = NotFound
 		provider.Status.Phase = ValidationFailed
@@ -218,42 +241,41 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 	switch provider.Type() {
 	case api.OpenShift:
 		keyList = []string{"token"}
+
 	case api.VSphere:
 		keyList = []string{
 			"user",
 			"password",
 		}
 
-		if vsphere.GetInsecureSkipVerifyFlag(secret) {
-			provider.Status.SetCondition(libcnd.Condition{
-				Type:     ConnectionInsecure,
-				Status:   True,
-				Reason:   SkipTLSVerification,
-				Category: Warn,
-				Message:  "TLS is susceptible to machine-in-the-middle attacks when certificate verification is skipped.",
-			})
-		}
+		r.validateConnectionStatus(provider, secret)
 
-		url, _ := url.Parse(provider.Spec.URL)
-		if crt, err := util.GetTlsCertificate(url, secret); err == nil {
-			provider.Status.Fingerprint = util.Fingerprint(crt)
-		} else {
-			log.Error(err, "failed to get TLS certificate", "url", provider.Spec.URL)
+		var providerUrl *url.URL
+		providerUrl, err = url.Parse(provider.Spec.URL)
+		if err != nil {
+			return
+		}
+		var crt *x509.Certificate
+		crt, err = util.GetTlsCertificate(providerUrl, secret)
+		if err != nil {
+			provider.Status.Phase = ConnectionFailed
 			provider.Status.SetCondition(libcnd.Condition{
 				Type:     ConnectionTestFailed,
 				Status:   True,
 				Reason:   Tested,
 				Category: Critical,
-				Message:  "TLS certificate cannot be retrieved",
+				Message:  err.Error(),
 			})
+			return
 		}
+		provider.Status.Fingerprint = util.Fingerprint(crt)
 	case api.OVirt:
 		keyList = []string{
 			"user",
 			"password",
 		}
 
-		if ovirt.GetInsecureSkipVerifyFlag(secret) {
+		if base.GetInsecureSkipVerifyFlag(secret) {
 			provider.Status.SetCondition(libcnd.Condition{
 				Type:     ConnectionInsecure,
 				Status:   True,

@@ -20,12 +20,12 @@ import (
 	"context"
 	"time"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/controller/base"
-	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
-	"github.com/konveyor/forklift-controller/pkg/settings"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/controller/base"
+	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
+	libref "github.com/kubev2v/forklift/pkg/lib/ref"
+	"github.com/kubev2v/forklift/pkg/settings"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -69,9 +69,9 @@ func Add(mgr manager.Manager) error {
 	}
 	// Primary CR.
 	err = cnt.Watch(
-		source.Kind(mgr.GetCache(), &api.Host{}),
-		&handler.EnqueueRequestForObject{},
-		&HostPredicate{})
+		source.Kind(mgr.GetCache(), &api.Host{},
+			&handler.TypedEnqueueRequestForObject[*api.Host]{},
+			&HostPredicate{}))
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -81,27 +81,26 @@ func Add(mgr manager.Manager) error {
 	// events when changes to the provider inventory are detected.
 	channel := make(chan event.GenericEvent, 10)
 	err = cnt.Watch(
-		&source.Channel{Source: channel},
-		&handler.EnqueueRequestForObject{})
+		source.Channel(channel, &handler.EnqueueRequestForObject{}))
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
 	// References.
 	err = cnt.Watch(
-		source.Kind(mgr.GetCache(), &api.Provider{}),
-		libref.Handler(&api.Host{}),
-		&ProviderPredicate{
-			client:  mgr.GetClient(),
-			channel: channel,
-		})
+		source.Kind(mgr.GetCache(), &api.Provider{},
+			libref.TypedHandler[*api.Provider](&api.Host{}),
+			&ProviderPredicate{
+				client:  mgr.GetClient(),
+				channel: channel,
+			}))
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
 	err = cnt.Watch(
-		source.Kind(mgr.GetCache(), &core.Secret{}),
-		libref.Handler(&api.Host{}))
+		source.Kind(mgr.GetCache(), &core.Secret{},
+			libref.TypedHandler[*core.Secret](&api.Host{})))
 	if err != nil {
 		log.Trace(err)
 		return err

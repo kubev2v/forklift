@@ -51,5 +51,3 @@ for k in "${!images[@]}"; do
     new_image="${new_image/quay.io\/redhat-user-workloads\/rh-mtv-1-tenant\/forklift-operator/registry.redhat.io\/migration-toolkit-virtualization}"
     export "$k=$new_image"
 done
-
-export VERSION="v2.7.0"

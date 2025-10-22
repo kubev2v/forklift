@@ -6,12 +6,12 @@ metadata:
   namespace: ${NAMESPACE}
 spec:
   provider:
-    namespace: ''
-    name: ''
+    namespace: ""
+    name: ""
   map:
-  - source:
-      id: ''
-    destination:
-      type: pod
-      namespace: ''
-      name: ''
+    - source:
+        id: ""
+      destination:
+        type: pod
+        namespace: ""
+        name: ""

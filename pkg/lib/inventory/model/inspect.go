@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"strings"
 
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	fb "github.com/kubev2v/forklift/pkg/lib/filebacked"
 )
 
 func Inspect(model interface{}) (md *Definition, err error) {

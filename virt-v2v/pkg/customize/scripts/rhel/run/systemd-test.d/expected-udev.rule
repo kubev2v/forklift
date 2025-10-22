@@ -1,1 +1,0 @@
-SUBSYSTEM=="net",ACTION=="add",ATTR{address}=="aa:bb:cc:dd:ee:fd",NAME="ens160"

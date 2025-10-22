@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"testing"
 
-	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
-	"github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+	fb "github.com/kubev2v/forklift/pkg/lib/filebacked"
+	"github.com/kubev2v/forklift/pkg/lib/inventory/model"
 	"github.com/onsi/gomega"
 )
 

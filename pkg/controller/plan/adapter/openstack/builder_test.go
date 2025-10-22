@@ -1,7 +1,7 @@
 package openstack
 
 import (
-	v1beta1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

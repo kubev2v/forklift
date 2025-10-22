@@ -1,0 +1,23 @@
+# Disk DescriptorFile
+version=1
+encoding="UTF-8"
+CID=cee4a7b7
+parentCID=ffffffff
+createType="vmfsRawDeviceMap"
+
+# Extent description
+RW 83886080 VMFSRDM "rdmdisktest-rdm.vmdk"
+
+# The Disk Data Base 
+#DDB
+
+ddb.adapterType = "lsilogic"
+ddb.deletable = "true"
+ddb.geometry.cylinders = "5221"
+ddb.geometry.heads = "255"
+ddb.geometry.sectors = "63"
+ddb.longContentID = "a4b8f218877c162762bbc160cee4a7b7"
+ddb.toolsInstallType = "4"
+ddb.toolsVersion = "12389"
+ddb.uuid = "60 00 C2 9e 32 c9 d7 63-c9 0a 44 b0 00 89 79 6e"
+ddb.virtualHWVersion = "14"

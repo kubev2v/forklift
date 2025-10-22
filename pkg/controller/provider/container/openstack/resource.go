@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"time"
 
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/openstack"
-	libclient "github.com/konveyor/forklift-controller/pkg/lib/client/openstack"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/openstack"
+	libclient "github.com/kubev2v/forklift/pkg/lib/client/openstack"
 )
 
 type Region struct {

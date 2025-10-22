@@ -31,3 +31,19 @@ test_supported_windows {
     results = concerns with input as mock_vm
     count(results) == 0
 }
+
+test_unsupported_photonOS {
+    mock_vm := { "name": "test",
+                 "guestId": "photonGuest"
+                }
+    results = concerns with input as mock_vm
+    count(results) == 1
+}
+
+test_unsupported_photonOS_64 {
+    mock_vm := { "name": "test",
+                 "guestId": "vmwarePhoton64Guest"
+                }
+    results = concerns with input as mock_vm
+    count(results) == 1
+}

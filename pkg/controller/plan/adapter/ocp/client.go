@@ -4,12 +4,12 @@ import (
 	"context"
 	"time"
 
-	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/util"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	"github.com/konveyor/forklift-controller/pkg/settings"
+	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/plan/util"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	"github.com/kubev2v/forklift/pkg/settings"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,7 +25,12 @@ type Client struct {
 }
 
 // CheckSnapshotReady implements base.Client
-func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (bool, error) {
+func (r *Client) CheckSnapshotReady(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (bool, string, error) {
+	return false, "", nil
+}
+
+// CheckSnapshotRemove implements base.Client
+func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (bool, error) {
 	return false, nil
 }
 
@@ -35,12 +40,12 @@ func (r *Client) Close() {
 }
 
 // CreateSnapshot implements base.Client
-func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (string, error) {
-	return "", nil
+func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (string, string, error) {
+	return "", "", nil
 }
 
 // Remove a VM snapshot. No-op for this provider.
-func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc) (err error) {
+func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc) (removeTaskId string, err error) {
 	return
 }
 
@@ -73,8 +78,14 @@ func (r *Client) PowerOff(vmRef ref.Ref) error {
 		return err
 	}
 
-	running := false
-	vm.Spec.Running = &running
+	if vm.Spec.Running != nil {
+		running := false
+		vm.Spec.Running = &running
+	} else if vm.Spec.RunStrategy != nil {
+		runStrategy := cnv.RunStrategyHalted
+		vm.Spec.RunStrategy = &runStrategy
+	}
+
 	err = r.sourceClient.Update(context.Background(), &vm)
 	if err != nil {
 		return err
@@ -91,8 +102,14 @@ func (r *Client) PowerOn(vmRef ref.Ref) error {
 		return err
 	}
 
-	running := true
-	vm.Spec.Running = &running
+	if vm.Spec.Running != nil {
+		running := true
+		vm.Spec.Running = &running
+	} else if vm.Spec.RunStrategy != nil {
+		runStrategy := cnv.RunStrategyAlways
+		vm.Spec.RunStrategy = &runStrategy
+	}
+
 	err = r.sourceClient.Update(context.Background(), &vm)
 	if err != nil {
 		return err
@@ -110,10 +127,10 @@ func (r *Client) PowerState(vmRef ref.Ref) (planapi.VMPowerState, error) {
 		return planapi.VMPowerStateUnknown, err
 	}
 
-	if vm.Spec.Running != nil && *vm.Spec.Running {
+	if (vm.Spec.Running != nil && *vm.Spec.Running) ||
+		(vm.Spec.RunStrategy != nil && *vm.Spec.RunStrategy == cnv.RunStrategyAlways) {
 		return planapi.VMPowerStateOn, nil
 	}
-
 	return planapi.VMPowerStateOff, nil
 }
 
@@ -126,7 +143,8 @@ func (r *Client) PoweredOff(vmRef ref.Ref) (bool, error) {
 		return false, err
 	}
 
-	if vm.Spec.Running != nil && *vm.Spec.Running {
+	if (vm.Spec.Running != nil && *vm.Spec.Running) ||
+		(vm.Spec.RunStrategy != nil && *vm.Spec.RunStrategy == cnv.RunStrategyAlways) {
 		return false, nil
 	}
 

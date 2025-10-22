@@ -1,0 +1,124 @@
+FROM registry.redhat.io/ubi9/go-toolset:1.23.6-1745588370 AS envsubst
+
+FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel9@sha256:2a659b5ec1c8510f224dd6aadee896c2f4e4396cd72a719fb6688c411ca7be21 AS builder
+
+ARG EVENT_TITLE
+
+ARG VERSION
+ARG RELEASE
+ARG CHANNEL
+ARG DEFAULT_CHANNEL
+ARG REGISTRY
+ARG OCP_VERSIONS
+
+ARG API_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-api-rhel9@sha256:a0f11f997b324efb9d1acfccc625bcc245570761100f14bcbb07e3e416d2c7ab"
+
+ARG CONTROLLER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-controller-rhel9@sha256:2d29c5569a8cbd82d751a6413ca0268217c8e15e1df248e089cb84282aaf1e24"
+
+ARG MUST_GATHER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-must-gather-rhel8@sha256:fc1afdae1b8020e7fdf2a9dd189bbbc6f29e40178d633de14ce4f947a96b0b01"
+
+ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-openstack-populator-rhel9@sha256:2ea6542c1e46a46f54616eee905aa98ac1ac1acff27ed42af2cb813350d380a1"
+
+ARG OPERATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-rhel9-operator@sha256:ec2310a59d6b55783190f5a3511fd43011e38e3be262e8b875051d586fb9f2fa"
+
+ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-ova-provider-server-rhel9@sha256:afe40e67617f3c3d1feda2f51025d8c9da7107aeaab489ce0c529f9fe3b99b17"
+
+ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-rhv-populator-rhel8@sha256:b4d4690342c3a8d54dfded33119509e3fdef0898dd676d5acde4793fa80d1e1a"
+
+ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-populator-controller-rhel9@sha256:70ab9bd90349675558bbdaa665335e5a89b015c4219d6dbf573a8cf05f4f7962"
+
+ARG UI_PLUGIN_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-console-plugin-rhel9@sha256:e3b15194ba23ed224f5d66754e133ea300fd68d3a4883235cc79e2c04112108f"
+
+ARG VALIDATION_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-validation-rhel9@sha256:ad3462d96286b4569413299895c37771435e5b2bec6bacd33e4d7464952f753a"
+
+ARG VIRT_V2V_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel9@sha256:394885521c3477040c0a9dc63d8dfcb53db4de2c404a68652cad233d360f6ee3"
+
+ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:d54c5a65bb25af3e81fac9708407ae7a5cc4aa3e1d0b3c719481305a8c184ba9"
+
+USER root
+
+COPY --from=envsubst /usr/bin/envsubst /usr/bin/envsubst
+
+COPY ./operator /repo
+COPY ./build/forklift-operator-bundle/images.conf /repo/images.conf
+WORKDIR /repo
+
+# Set project name to mtv-operator so operator-sdk can successfully generate resources
+RUN cp PROJECT PROJECT.template && PROJECT_NAME=mtv-operator envsubst < PROJECT.template > PROJECT
+RUN source ./images.conf && \
+    cat .downstream_manifests \
+    | envsubst \
+    | operator-sdk generate bundle \
+    -q \
+    --overwrite \
+    --extra-service-accounts forklift-controller,forklift-api,forklift-populator-controller \
+    --version $VERSION \
+    --channels $CHANNEL \
+    --default-channel $DEFAULT_CHANNEL \
+    --output-dir build
+
+# Fixme: CSV from operator-sdk does not contain `relatedImages` which causes issues in diconnected environments.
+RUN DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') envsubst < mtv-csv.yml > build/manifests/mtv-operator.clusterserviceversion.yaml
+
+USER 1001
+
+FROM scratch
+
+ARG VERSION
+ARG RELEASE
+ARG CHANNEL
+ARG DEFAULT_CHANNEL
+ARG REGISTRY
+ARG OCP_VERSIONS
+ARG REVISION
+
+COPY --from=builder /repo/build/manifests /manifests/
+COPY --from=builder /repo/build/metadata /metadata/
+
+# These are three labels needed to control how the pipeline should handle this container image
+# This first label tells the pipeline that this is a bundle image and should be
+# delivered via an index image
+LABEL com.redhat.delivery.operator.bundle=true
+
+# This second label tells the pipeline which versions of OpenShift the operator supports.
+# This is used to control which index images should include this operator.
+LABEL com.redhat.openshift.versions=$OCP_VERSIONS
+
+# This third label tells the pipeline that this operator should *also* be supported on OCP 4.4 and
+# earlier.  It is used to control whether or not the pipeline should attempt to automatically
+# backport this content into the old appregistry format and upload it to the quay.io application
+# registry endpoints.
+LABEL com.redhat.delivery.backport=false
+
+# The rest of these labels are copies of the same content in annotations.yaml and are needed by OLM
+LABEL operators.operatorframework.io.bundle.mediatype.v1=registry+v1
+LABEL operators.operatorframework.io.bundle.manifests.v1=manifests/
+LABEL operators.operatorframework.io.bundle.metadata.v1=metadata/
+LABEL operators.operatorframework.io.bundle.package.v1=mtv-operator
+LABEL operators.operatorframework.io.bundle.channels.v1=$CHANNEL
+LABEL operators.operatorframework.io.bundle.channel.default.v1=$DEFAULT_CHANNEL
+
+# Not sure whate these label expand to
+LABEL operators.operatorframework.io.metrics.builder=operator-sdk-v1.22.0+git
+LABEL operators.operatorframework.io.metrics.mediatype.v1=metrics+v1
+LABEL operators.operatorframework.io.metrics.project_layout=ansible.sdk.operatorframework.io/v1
+LABEL operators.operatorframework.io.test.config.v1=tests/scorecard/
+LABEL operators.operatorframework.io.test.mediatype.v1=scorecard+v1
+
+# Main labels
+LABEL \
+    com.redhat.component="mtv-operator-bundle-container" \
+    name="${REGISTRY}/mtv-operator-bundle" \
+    License="Apache License 2.0" \
+    io.k8s.display-name="Migration Toolkit for Virtualization" \
+    io.openshift.tags="migration" \
+    io.k8s.description="Migration Toolkit for Virtualization - Operator Bundle" \
+    summary="Migration Toolkit for Virtualization - Operator Bundle" \
+    maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+    description="Migration Toolkit for Virtualization - Operator Bundle" \
+    vendor="Red Hat, Inc." \
+    url="https://github.com/kubev2v/forklift" \
+    distribution-scope="public" \
+    release=$RELEASE \
+    version=$VERSION \
+    revision="$REVISION"

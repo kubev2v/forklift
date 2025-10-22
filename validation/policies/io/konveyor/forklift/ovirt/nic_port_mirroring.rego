@@ -8,6 +8,7 @@ nics_with_port_mirroring_enabled [i] {
 concerns[flag] {
     count(nics_with_port_mirroring_enabled) > 0
     flag := {
+        "id": "ovirt.nic.port_mirroring.detected",
         "category": "Warning",
         "label": "NIC with port mirroring detected",
         "assessment": "The VM is using a vNIC Profile configured with port mirroring. This is not currently supported by OpenShift Virtualization."

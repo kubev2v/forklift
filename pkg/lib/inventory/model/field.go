@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/pkg/errors"
 )
 
@@ -266,7 +266,6 @@ func (f *Field) WithFields() (withFields map[string]bool) {
 				}
 			}
 		}
-		break
 	}
 
 	return
@@ -429,7 +428,8 @@ func (f *Field) AsValue(object interface{}) (value interface{}, err error) {
 		reflect.Int64:
 		switch val.Kind() {
 		case reflect.String:
-			n, err := strconv.ParseInt(val.String(), 0, 64)
+			var n int64
+			n, err = strconv.ParseInt(val.String(), 0, 64)
 			if err != nil {
 				err = liberr.Wrap(err)
 			}

@@ -1,8 +1,8 @@
 package ocp
 
 import (
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/base"
-	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
+	"github.com/kubev2v/forklift/pkg/controller/provider/model/base"
+	libref "github.com/kubev2v/forklift/pkg/lib/ref"
 )
 
 // Kinds

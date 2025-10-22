@@ -8,21 +8,21 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
-	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	utils "github.com/konveyor/forklift-controller/pkg/controller/plan/util"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	utils "github.com/kubev2v/forklift/pkg/controller/plan/util"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/web/ovirt"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -55,8 +55,9 @@ const (
 
 // Network types
 const (
-	Pod    = "pod"
-	Multus = "multus"
+	Pod     = "pod"
+	Multus  = "multus"
+	Ignored = "ignored"
 )
 
 // Template labels
@@ -178,7 +179,7 @@ func (r *Builder) Secret(_ ref.Ref, in, object *core.Secret) (err error) {
 }
 
 // Create DataVolume specs for the VM.
-func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume) (dvs []cdi.DataVolume, err error) {
+func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume, vddkConfigMap *core.ConfigMap) (dvs []cdi.DataVolume, err error) {
 	vm := &model.Workload{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
@@ -212,7 +213,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 						},
 					},
 					Storage: &cdi.StorageSpec{
-						Resources: core.ResourceRequirements{
+						Resources: core.VolumeResourceRequirements{
 							Requests: core.ResourceList{
 								core.ResourceStorage: *resource.NewQuantity(size, resource.BinarySI),
 							},
@@ -244,7 +245,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 }
 
 // Create the destination Kubevirt VM.
-func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim, usesInstanceType bool) (err error) {
+func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim, usesInstanceType bool, sortVolumesByLibvirt bool) (err error) {
 	vm := &model.Workload{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
@@ -268,7 +269,6 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	}
 	r.mapDisks(vm, persistentVolumeClaims, object)
 	r.mapFirmware(vm, &vm.Cluster, object)
-	r.setMachine(object)
 	if !usesInstanceType {
 		r.mapCPU(vm, object)
 		r.mapMemory(vm, object)
@@ -292,6 +292,12 @@ func (r *Builder) mapNetworks(vm *model.Workload, object *cnv.VirtualMachineSpec
 	netMapIn := r.Context.Map.Network.Spec.Map
 	for i := range netMapIn {
 		mapped := &netMapIn[i]
+
+		// Skip network mappings with destination type 'Ignored'
+		if mapped.Destination.Type == Ignored {
+			continue
+		}
+
 		ref := mapped.Source
 		network := &model.Network{}
 		fErr := r.Source.Inventory.Find(network, ref)
@@ -362,16 +368,7 @@ func (r *Builder) mapClock(vm *model.Workload, object *cnv.VirtualMachineSpec) {
 
 func (r *Builder) mapMemory(vm *model.Workload, object *cnv.VirtualMachineSpec) {
 	reservation := resource.NewQuantity(vm.Memory, resource.BinarySI)
-	object.Template.Spec.Domain.Resources = cnv.ResourceRequirements{
-		Requests: map[core.ResourceName]resource.Quantity{
-			core.ResourceMemory: *reservation,
-		},
-	}
 	object.Template.Spec.Domain.Memory = &cnv.Memory{Guest: reservation}
-}
-
-func (r *Builder) setMachine(object *cnv.VirtualMachineSpec) {
-	object.Template.Spec.Domain.Machine = &cnv.Machine{Type: "q35"}
 }
 
 func (r *Builder) mapCPU(vm *model.Workload, object *cnv.VirtualMachineSpec) {
@@ -699,7 +696,7 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 					},
 					StorageClassName: &sc,
 					VolumeMode:       &volMode,
-					Resources: core.ResourceRequirements{
+					Resources: core.VolumeResourceRequirements{
 						Requests: core.ResourceList{
 							core.ResourceStorage: *resource.NewQuantity(da.Disk.Lun.LogicalUnits.LogicalUnit[0].Size, resource.BinarySI),
 						},
@@ -899,7 +896,7 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskA
 		},
 		Spec: core.PersistentVolumeClaimSpec{
 			AccessModes: accessModes,
-			Resources: core.ResourceRequirements{
+			Resources: core.VolumeResourceRequirements{
 				Requests: map[core.ResourceName]resource.Quantity{
 					core.ResourceStorage: *resource.NewQuantity(diskSize, resource.BinarySI)},
 			},

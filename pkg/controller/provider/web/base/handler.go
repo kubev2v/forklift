@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/base"
-	libcontainer "github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
-	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/controller/provider/model/base"
+	libcontainer "github.com/kubev2v/forklift/pkg/lib/inventory/container"
+	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -140,6 +140,10 @@ func (h *Handler) setDetail(ctx *gin.Context) (status int) {
 	}
 
 	return
+}
+
+func (h *Handler) Token(ctx *gin.Context) string {
+	return DefaultAuth.Token(ctx)
 }
 
 // Permit request - Authorization.

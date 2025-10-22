@@ -3,13 +3,14 @@ package ovirt
 import (
 	"strconv"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/container"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	"github.com/konveyor/forklift-controller/pkg/settings"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	"github.com/kubev2v/forklift/pkg/controller/provider/container"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/web/ovirt"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	"github.com/kubev2v/forklift/pkg/settings"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // oVirt validator.
@@ -21,6 +22,12 @@ type Validator struct {
 // Load.
 func (r *Validator) Load() (err error) {
 	r.inventory, err = web.NewClient(r.plan.Referenced.Provider.Source)
+	return
+}
+
+// NOOP
+func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, s string, s2 string, err error) {
+	ok = true
 	return
 }
 

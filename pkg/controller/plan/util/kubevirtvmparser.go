@@ -4,7 +4,7 @@ import (
 	cnv "kubevirt.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 )
 
 const (

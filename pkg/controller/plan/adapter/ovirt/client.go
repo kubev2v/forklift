@@ -8,15 +8,15 @@ import (
 	"sync"
 	"time"
 
-	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/util"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ovirt"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	"github.com/konveyor/forklift-controller/pkg/settings"
+	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	"github.com/kubev2v/forklift/pkg/controller/base"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/plan/util"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/web/ovirt"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	"github.com/kubev2v/forklift/pkg/settings"
 	ovirtsdk "github.com/ovirt/go-ovirt"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
@@ -40,7 +40,7 @@ type Client struct {
 }
 
 // Create a VM snapshot and return its ID.
-func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (snapshot string, err error) {
+func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (snapshotId string, creationTaskId string, err error) {
 	_, vmService, err := r.getVM(vmRef)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -70,13 +70,18 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (snapsh
 		}
 		return
 	}
-	snapshot = snap.MustSnapshot().MustId()
+	snapshotId = snap.MustSnapshot().MustId()
 	return
 }
 
+// CheckSnapshotRemove implements base.Client
+func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (bool, error) {
+	return false, nil
+}
+
 // Check if a snapshot is ready to transfer, to avoid importer restarts.
-func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool, err error) {
-	correlationID, err := r.getSnapshotCorrelationID(vmRef, &snapshot)
+func (r *Client) CheckSnapshotReady(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (ready bool, snapshotId string, err error) {
+	correlationID, err := r.getSnapshotCorrelationID(vmRef, &precopy.Snapshot)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -105,7 +110,7 @@ func (r *Client) CheckSnapshotReady(vmRef ref.Ref, snapshot string) (ready bool,
 }
 
 // Remove a VM snapshot. No-op for this provider.
-func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc) (err error) {
+func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc) (removeTaskId string, err error) {
 	return
 }
 
@@ -383,7 +388,7 @@ func (r *Client) connect() (err error) {
 		Username(r.user()).
 		Password(r.password()).
 		CACert(r.cacert()).
-		Insecure(ovirt.GetInsecureSkipVerifyFlag(r.Source.Secret)).
+		Insecure(base.GetInsecureSkipVerifyFlag(r.Source.Secret)).
 		Build()
 	if err != nil {
 		err = liberr.Wrap(err)

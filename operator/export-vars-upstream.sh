@@ -34,5 +34,3 @@ for k in "${!images[@]}"; do
     new_image="${image/redhat-user-workloads\/rh-mtv-1-tenant\/forklift-operator/kubev2v}"
     export "$k=$new_image"
 done
-
-export VERSION="v2.7.0"

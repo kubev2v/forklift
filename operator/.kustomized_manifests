@@ -1,0 +1,4460 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: forklift-operator-system
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: forkliftcontrollers.forklift.konveyor.io
+spec:
+  group: forklift.konveyor.io
+  names:
+    kind: ForkliftController
+    listKind: ForkliftControllerList
+    plural: forkliftcontrollers
+    singular: forkliftcontroller
+  scope: Namespaced
+  versions:
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: ForkliftController is the Schema for the forkliftcontrollers
+          API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Spec defines the desired state of ForkliftController
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+          status:
+            description: Status defines the observed state of ForkliftController
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.0
+  name: hooks.forklift.konveyor.io
+spec:
+  group: forklift.konveyor.io
+  names:
+    kind: Hook
+    listKind: HookList
+    plural: hooks
+    singular: hook
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: Ready
+      type: string
+    - jsonPath: .spec.image
+      name: Image
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: Hook is the Schema for the hooks API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Hook specification.
+            properties:
+              deadline:
+                description: Hook deadline in seconds.
+                format: int64
+                type: integer
+              image:
+                description: Image to run.
+                type: string
+              playbook:
+                description: A base64 encoded Ansible playbook.
+                type: string
+              serviceAccount:
+                description: Service account.
+                type: string
+            required:
+            - image
+            type: object
+          status:
+            description: Hook status.
+            properties:
+              conditions:
+                description: List of conditions.
+                items:
+                  description: Condition
+                  properties:
+                    category:
+                      description: The condition category.
+                      type: string
+                    durable:
+                      description: The condition is durable - never un-staged.
+                      type: boolean
+                    items:
+                      description: A list of items referenced in the `Message`.
+                      items:
+                        type: string
+                      type: array
+                    lastTransitionTime:
+                      description: When the last status transition occurred.
+                      format: date-time
+                      type: string
+                    message:
+                      description: The human readable description of the condition.
+                      type: string
+                    reason:
+                      description: The reason for the condition or transition.
+                      type: string
+                    status:
+                      description: The condition status [true,false].
+                      type: string
+                    type:
+                      description: The condition type.
+                      type: string
+                  required:
+                  - category
+                  - lastTransitionTime
+                  - status
+                  - type
+                  type: object
+                type: array
+              observedGeneration:
+                description: The most recent generation observed by the controller.
+                format: int64
+                type: integer
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.0
+  name: hosts.forklift.konveyor.io
+spec:
+  group: forklift.konveyor.io
+  names:
+    kind: Host
+    listKind: HostList
+    plural: hosts
+    singular: host
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: READY
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='ConnectionTestSucceeded')].status
+      name: CONNECTED
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: HostSpec defines the desired state of Host
+            properties:
+              id:
+                description: |-
+                  The object ID.
+                  vsphere:
+                    The managed object ID.
+                type: string
+              ipAddress:
+                description: IP address used for disk transfer.
+                type: string
+              name:
+                description: |-
+                  An object Name.
+                  vsphere:
+                    A qualified name.
+                type: string
+              namespace:
+                description: |-
+                  The VM Namespace
+                  Only relevant for an openshift source.
+                type: string
+              provider:
+                description: Provider
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              secret:
+                description: Credentials.
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              type:
+                description: Type used to qualify the name.
+                type: string
+            required:
+            - ipAddress
+            - provider
+            - secret
+            type: object
+          status:
+            description: HostStatus defines the observed state of Host
+            properties:
+              conditions:
+                description: List of conditions.
+                items:
+                  description: Condition
+                  properties:
+                    category:
+                      description: The condition category.
+                      type: string
+                    durable:
+                      description: The condition is durable - never un-staged.
+                      type: boolean
+                    items:
+                      description: A list of items referenced in the `Message`.
+                      items:
+                        type: string
+                      type: array
+                    lastTransitionTime:
+                      description: When the last status transition occurred.
+                      format: date-time
+                      type: string
+                    message:
+                      description: The human readable description of the condition.
+                      type: string
+                    reason:
+                      description: The reason for the condition or transition.
+                      type: string
+                    status:
+                      description: The condition status [true,false].
+                      type: string
+                    type:
+                      description: The condition type.
+                      type: string
+                  required:
+                  - category
+                  - lastTransitionTime
+                  - status
+                  - type
+                  type: object
+                type: array
+              observedGeneration:
+                description: The most recent generation observed by the controller.
+                format: int64
+                type: integer
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.0
+  name: migrations.forklift.konveyor.io
+spec:
+  group: forklift.konveyor.io
+  names:
+    kind: Migration
+    listKind: MigrationList
+    plural: migrations
+    singular: migration
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: READY
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Running')].status
+      name: RUNNING
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Succeeded')].status
+      name: SUCCEEDED
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Failed')].status
+      name: FAILED
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: MigrationSpec defines the desired state of Migration
+            properties:
+              cancel:
+                description: List of VMs which will have their imports canceled.
+                items:
+                  description: |-
+                    Source reference.
+                    Either the ID or Name must be specified.
+                  properties:
+                    id:
+                      description: |-
+                        The object ID.
+                        vsphere:
+                          The managed object ID.
+                      type: string
+                    name:
+                      description: |-
+                        An object Name.
+                        vsphere:
+                          A qualified name.
+                      type: string
+                    namespace:
+                      description: |-
+                        The VM Namespace
+                        Only relevant for an openshift source.
+                      type: string
+                    type:
+                      description: Type used to qualify the name.
+                      type: string
+                  type: object
+                type: array
+              cutover:
+                description: |-
+                  Date and time to finalize a warm migration.
+                  If present, this will override the value set on the Plan.
+                format: date-time
+                type: string
+              plan:
+                description: Reference to the associated Plan.
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+            required:
+            - plan
+            type: object
+          status:
+            description: MigrationStatus defines the observed state of Migration
+            properties:
+              completed:
+                description: Completed timestamp.
+                format: date-time
+                type: string
+              conditions:
+                description: List of conditions.
+                items:
+                  description: Condition
+                  properties:
+                    category:
+                      description: The condition category.
+                      type: string
+                    durable:
+                      description: The condition is durable - never un-staged.
+                      type: boolean
+                    items:
+                      description: A list of items referenced in the `Message`.
+                      items:
+                        type: string
+                      type: array
+                    lastTransitionTime:
+                      description: When the last status transition occurred.
+                      format: date-time
+                      type: string
+                    message:
+                      description: The human readable description of the condition.
+                      type: string
+                    reason:
+                      description: The reason for the condition or transition.
+                      type: string
+                    status:
+                      description: The condition status [true,false].
+                      type: string
+                    type:
+                      description: The condition type.
+                      type: string
+                  required:
+                  - category
+                  - lastTransitionTime
+                  - status
+                  - type
+                  type: object
+                type: array
+              observedGeneration:
+                description: The most recent generation observed by the controller.
+                format: int64
+                type: integer
+              started:
+                description: Started timestamp.
+                format: date-time
+                type: string
+              vms:
+                description: VM status
+                items:
+                  description: VM Status
+                  properties:
+                    completed:
+                      description: Completed timestamp.
+                      format: date-time
+                      type: string
+                    conditions:
+                      description: List of conditions.
+                      items:
+                        description: Condition
+                        properties:
+                          category:
+                            description: The condition category.
+                            type: string
+                          durable:
+                            description: The condition is durable - never un-staged.
+                            type: boolean
+                          items:
+                            description: A list of items referenced in the `Message`.
+                            items:
+                              type: string
+                            type: array
+                          lastTransitionTime:
+                            description: When the last status transition occurred.
+                            format: date-time
+                            type: string
+                          message:
+                            description: The human readable description of the condition.
+                            type: string
+                          reason:
+                            description: The reason for the condition or transition.
+                            type: string
+                          status:
+                            description: The condition status [true,false].
+                            type: string
+                          type:
+                            description: The condition type.
+                            type: string
+                        required:
+                        - category
+                        - lastTransitionTime
+                        - status
+                        - type
+                        type: object
+                      type: array
+                    error:
+                      description: Errors
+                      properties:
+                        phase:
+                          type: string
+                        reasons:
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - phase
+                      - reasons
+                      type: object
+                    firmware:
+                      description: The firmware type detected from the OVF file produced
+                        by virt-v2v.
+                      type: string
+                    hooks:
+                      description: Enable hooks.
+                      items:
+                        description: Plan hook.
+                        properties:
+                          hook:
+                            description: Hook reference.
+                            properties:
+                              apiVersion:
+                                description: API version of the referent.
+                                type: string
+                              fieldPath:
+                                description: |-
+                                  If referring to a piece of an object instead of an entire object, this string
+                                  should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                                  For example, if the object reference is to a container within a pod, this would take on a value like:
+                                  "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                                  the event) or if no container name is specified "spec.containers[2]" (container with
+                                  index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                                  referencing a part of an object.
+                                type: string
+                              kind:
+                                description: |-
+                                  Kind of the referent.
+                                  More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                                type: string
+                              name:
+                                description: |-
+                                  Name of the referent.
+                                  More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                type: string
+                              namespace:
+                                description: |-
+                                  Namespace of the referent.
+                                  More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                                type: string
+                              resourceVersion:
+                                description: |-
+                                  Specific resourceVersion to which this reference is made, if any.
+                                  More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                                type: string
+                              uid:
+                                description: |-
+                                  UID of the referent.
+                                  More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                                type: string
+                            type: object
+                            x-kubernetes-map-type: atomic
+                          step:
+                            description: Pipeline step.
+                            type: string
+                        required:
+                        - hook
+                        - step
+                        type: object
+                      type: array
+                    id:
+                      description: |-
+                        The object ID.
+                        vsphere:
+                          The managed object ID.
+                      type: string
+                    instanceType:
+                      description: Selected InstanceType that will override the VM
+                        properties.
+                      type: string
+                    luks:
+                      description: Disk decryption LUKS keys
+                      properties:
+                        apiVersion:
+                          description: API version of the referent.
+                          type: string
+                        fieldPath:
+                          description: |-
+                            If referring to a piece of an object instead of an entire object, this string
+                            should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                            For example, if the object reference is to a container within a pod, this would take on a value like:
+                            "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                            the event) or if no container name is specified "spec.containers[2]" (container with
+                            index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                            referencing a part of an object.
+                          type: string
+                        kind:
+                          description: |-
+                            Kind of the referent.
+                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                          type: string
+                        name:
+                          description: |-
+                            Name of the referent.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          type: string
+                        namespace:
+                          description: |-
+                            Namespace of the referent.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                          type: string
+                        resourceVersion:
+                          description: |-
+                            Specific resourceVersion to which this reference is made, if any.
+                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                          type: string
+                        uid:
+                          description: |-
+                            UID of the referent.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                          type: string
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    name:
+                      description: |-
+                        An object Name.
+                        vsphere:
+                          A qualified name.
+                      type: string
+                    namespace:
+                      description: |-
+                        The VM Namespace
+                        Only relevant for an openshift source.
+                      type: string
+                    networkNameTemplate:
+                      description: |-
+                        NetworkNameTemplate is a template for generating network interface names in the target virtual machine.
+                        It follows Go template syntax and has access to the following variables:
+                          - .NetworkName: If target network is multus, name of the Multus network attachment definition, empty otherwise.
+                          - .NetworkNamespace: If target network is multus, namespace where the network attachment definition is located.
+                          - .NetworkType: type of the network ("Multus" or "Pod")
+                          - .NetworkIndex: sequential index of the network interface (0-based)
+                        The template can be used to customize network interface names based on target network configuration.
+                        Note:
+                          - This template will override at the plan level template
+                          - If not specified on VM level and on Plan leverl, default naming conventions will be used
+                        Examples:
+                          "net-{{.NetworkIndex}}"
+                          "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
+                      type: string
+                    newName:
+                      description: The new name of the VM after matching DNS1123 requirements.
+                      type: string
+                    operatingSystem:
+                      description: The Operating System detected by virt-v2v.
+                      type: string
+                    phase:
+                      description: Phase
+                      type: string
+                    pipeline:
+                      description: Migration pipeline.
+                      items:
+                        description: Pipeline step.
+                        properties:
+                          annotations:
+                            additionalProperties:
+                              type: string
+                            description: Annotations.
+                            type: object
+                          completed:
+                            description: Completed timestamp.
+                            format: date-time
+                            type: string
+                          description:
+                            description: Name
+                            type: string
+                          error:
+                            description: Error.
+                            properties:
+                              phase:
+                                type: string
+                              reasons:
+                                items:
+                                  type: string
+                                type: array
+                            required:
+                            - phase
+                            - reasons
+                            type: object
+                          name:
+                            description: Name.
+                            type: string
+                          phase:
+                            description: Phase
+                            type: string
+                          progress:
+                            description: Progress.
+                            properties:
+                              completed:
+                                description: Completed units.
+                                format: int64
+                                type: integer
+                              total:
+                                description: Total units.
+                                format: int64
+                                type: integer
+                            required:
+                            - completed
+                            - total
+                            type: object
+                          reason:
+                            description: Reason
+                            type: string
+                          started:
+                            description: Started timestamp.
+                            format: date-time
+                            type: string
+                          tasks:
+                            description: Nested tasks.
+                            items:
+                              description: Migration task.
+                              properties:
+                                annotations:
+                                  additionalProperties:
+                                    type: string
+                                  description: Annotations.
+                                  type: object
+                                completed:
+                                  description: Completed timestamp.
+                                  format: date-time
+                                  type: string
+                                description:
+                                  description: Name
+                                  type: string
+                                error:
+                                  description: Error.
+                                  properties:
+                                    phase:
+                                      type: string
+                                    reasons:
+                                      items:
+                                        type: string
+                                      type: array
+                                  required:
+                                  - phase
+                                  - reasons
+                                  type: object
+                                name:
+                                  description: Name.
+                                  type: string
+                                phase:
+                                  description: Phase
+                                  type: string
+                                progress:
+                                  description: Progress.
+                                  properties:
+                                    completed:
+                                      description: Completed units.
+                                      format: int64
+                                      type: integer
+                                    total:
+                                      description: Total units.
+                                      format: int64
+                                      type: integer
+                                  required:
+                                  - completed
+                                  - total
+                                  type: object
+                                reason:
+                                  description: Reason
+                                  type: string
+                                started:
+                                  description: Started timestamp.
+                                  format: date-time
+                                  type: string
+                              required:
+                              - name
+                              - progress
+                              type: object
+                            type: array
+                        required:
+                        - name
+                        - progress
+                        type: object
+                      type: array
+                    pvcNameTemplate:
+                      description: |-
+                        PVCNameTemplate is a template for generating PVC names for VM disks.
+                        It follows Go template syntax and has access to the following variables:
+                          - .VmName: name of the VM
+                          - .PlanName: name of the migration plan
+                          - .DiskIndex: initial volume index of the disk
+                          - .RootDiskIndex: index of the root disk
+                          - .Shared: true if the volume is shared by multiple VMs, false otherwise
+                        Note:
+                          This template overrides the plan level template.
+                        Examples:
+                          "{{.VmName}}-disk-{{.DiskIndex}}"
+                          "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
+                          "{{if .Shared}}shared-{{end}}{{.VmName}}-{{.DiskIndex}}"
+                      type: string
+                    restorePowerState:
+                      description: Source VM power state before migration.
+                      type: string
+                    rootDisk:
+                      description: Choose the primary disk the VM boots from
+                      type: string
+                    started:
+                      description: Started timestamp.
+                      format: date-time
+                      type: string
+                    targetName:
+                      description: |-
+                        TargetName specifies a custom name for the VM in the target cluster.
+                        If not provided, the original VM name will be used and automatically adjusted to meet k8s DNS1123 requirements.
+                        If provided, this exact name will be used instead. The migration will fail if the name is not unique or already in use.
+                      type: string
+                    type:
+                      description: Type used to qualify the name.
+                      type: string
+                    volumeNameTemplate:
+                      description: |-
+                        VolumeNameTemplate is a template for generating volume interface names in the target virtual machine.
+                        It follows Go template syntax and has access to the following variables:
+                          - .PVCName: name of the PVC mounted to the VM using this volume
+                          - .VolumeIndex: sequential index of the volume interface (0-based)
+                        Note:
+                          - This template will override at the plan level template
+                          - If not specified on VM level and on Plan leverl, default naming conventions will be used
+                        Examples:
+                          "disk-{{.VolumeIndex}}"
+                          "pvc-{{.PVCName}}"
+                      type: string
+                    warm:
+                      description: Warm migration status
+                      properties:
+                        consecutiveFailures:
+                          type: integer
+                        failures:
+                          type: integer
+                        nextPrecopyAt:
+                          format: date-time
+                          type: string
+                        precopies:
+                          items:
+                            description: Precopy durations
+                            properties:
+                              createTaskId:
+                                type: string
+                              deltas:
+                                items:
+                                  properties:
+                                    deltaId:
+                                      type: string
+                                    disk:
+                                      type: string
+                                  required:
+                                  - deltaId
+                                  - disk
+                                  type: object
+                                type: array
+                              end:
+                                format: date-time
+                                type: string
+                              removeTaskId:
+                                type: string
+                              snapshot:
+                                type: string
+                              start:
+                                format: date-time
+                                type: string
+                            type: object
+                          type: array
+                        successes:
+                          type: integer
+                      required:
+                      - consecutiveFailures
+                      - failures
+                      - successes
+                      type: object
+                  required:
+                  - phase
+                  - pipeline
+                  type: object
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.0
+  name: networkmaps.forklift.konveyor.io
+spec:
+  group: forklift.konveyor.io
+  names:
+    kind: NetworkMap
+    listKind: NetworkMapList
+    plural: networkmaps
+    singular: networkmap
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: READY
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Network map spec.
+            properties:
+              map:
+                description: Map.
+                items:
+                  description: Mapped network.
+                  properties:
+                    destination:
+                      description: Destination network.
+                      properties:
+                        name:
+                          description: The name.
+                          type: string
+                        namespace:
+                          description: The namespace (multus only).
+                          type: string
+                        type:
+                          description: |-
+                            Type of network to use for the destination.
+                            Valid values:
+                            - pod: Use the Kubernetes pod network
+                            - multus: Use a Multus additional network
+                            - ignored: Network is excluded from mapping
+                          enum:
+                          - pod
+                          - multus
+                          - ignored
+                          type: string
+                      required:
+                      - type
+                      type: object
+                    source:
+                      description: Source network.
+                      properties:
+                        id:
+                          description: |-
+                            The object ID.
+                            vsphere:
+                              The managed object ID.
+                          type: string
+                        name:
+                          description: |-
+                            An object Name.
+                            vsphere:
+                              A qualified name.
+                          type: string
+                        namespace:
+                          description: |-
+                            The VM Namespace
+                            Only relevant for an openshift source.
+                          type: string
+                        type:
+                          description: Type used to qualify the name.
+                          type: string
+                      type: object
+                  required:
+                  - destination
+                  - source
+                  type: object
+                type: array
+              provider:
+                description: Provider
+                properties:
+                  destination:
+                    description: Destination.
+                    properties:
+                      apiVersion:
+                        description: API version of the referent.
+                        type: string
+                      fieldPath:
+                        description: |-
+                          If referring to a piece of an object instead of an entire object, this string
+                          should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                          For example, if the object reference is to a container within a pod, this would take on a value like:
+                          "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                          the event) or if no container name is specified "spec.containers[2]" (container with
+                          index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                          referencing a part of an object.
+                        type: string
+                      kind:
+                        description: |-
+                          Kind of the referent.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                        type: string
+                      name:
+                        description: |-
+                          Name of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                      namespace:
+                        description: |-
+                          Namespace of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                        type: string
+                      resourceVersion:
+                        description: |-
+                          Specific resourceVersion to which this reference is made, if any.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                        type: string
+                      uid:
+                        description: |-
+                          UID of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  source:
+                    description: Source.
+                    properties:
+                      apiVersion:
+                        description: API version of the referent.
+                        type: string
+                      fieldPath:
+                        description: |-
+                          If referring to a piece of an object instead of an entire object, this string
+                          should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                          For example, if the object reference is to a container within a pod, this would take on a value like:
+                          "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                          the event) or if no container name is specified "spec.containers[2]" (container with
+                          index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                          referencing a part of an object.
+                        type: string
+                      kind:
+                        description: |-
+                          Kind of the referent.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                        type: string
+                      name:
+                        description: |-
+                          Name of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                      namespace:
+                        description: |-
+                          Namespace of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                        type: string
+                      resourceVersion:
+                        description: |-
+                          Specific resourceVersion to which this reference is made, if any.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                        type: string
+                      uid:
+                        description: |-
+                          UID of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                required:
+                - destination
+                - source
+                type: object
+            required:
+            - map
+            - provider
+            type: object
+          status:
+            description: MapStatus defines the observed state of Maps.
+            properties:
+              conditions:
+                description: List of conditions.
+                items:
+                  description: Condition
+                  properties:
+                    category:
+                      description: The condition category.
+                      type: string
+                    durable:
+                      description: The condition is durable - never un-staged.
+                      type: boolean
+                    items:
+                      description: A list of items referenced in the `Message`.
+                      items:
+                        type: string
+                      type: array
+                    lastTransitionTime:
+                      description: When the last status transition occurred.
+                      format: date-time
+                      type: string
+                    message:
+                      description: The human readable description of the condition.
+                      type: string
+                    reason:
+                      description: The reason for the condition or transition.
+                      type: string
+                    status:
+                      description: The condition status [true,false].
+                      type: string
+                    type:
+                      description: The condition type.
+                      type: string
+                  required:
+                  - category
+                  - lastTransitionTime
+                  - status
+                  - type
+                  type: object
+                type: array
+              observedGeneration:
+                description: The most recent generation observed by the controller.
+                format: int64
+                type: integer
+              references:
+                items:
+                  description: |-
+                    Source reference.
+                    Either the ID or Name must be specified.
+                  properties:
+                    id:
+                      description: |-
+                        The object ID.
+                        vsphere:
+                          The managed object ID.
+                      type: string
+                    name:
+                      description: |-
+                        An object Name.
+                        vsphere:
+                          A qualified name.
+                      type: string
+                    namespace:
+                      description: |-
+                        The VM Namespace
+                        Only relevant for an openshift source.
+                      type: string
+                    type:
+                      description: Type used to qualify the name.
+                      type: string
+                  type: object
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.0
+  name: openstackvolumepopulators.forklift.konveyor.io
+spec:
+  group: forklift.konveyor.io
+  names:
+    kind: OpenstackVolumePopulator
+    listKind: OpenstackVolumePopulatorList
+    plural: openstackvolumepopulators
+    shortNames:
+    - osvp
+    - osvps
+    singular: openstackvolumepopulator
+  scope: Namespaced
+  versions:
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              identityUrl:
+                type: string
+              imageId:
+                type: string
+              secretName:
+                type: string
+              transferNetwork:
+                description: The network attachment definition that should be used
+                  for disk transfer.
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+            required:
+            - identityUrl
+            - imageId
+            - secretName
+            type: object
+          status:
+            properties:
+              progress:
+                type: string
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.0
+  name: ovirtvolumepopulators.forklift.konveyor.io
+spec:
+  group: forklift.konveyor.io
+  names:
+    kind: OvirtVolumePopulator
+    listKind: OvirtVolumePopulatorList
+    plural: ovirtvolumepopulators
+    shortNames:
+    - ovvp
+    - ovvps
+    singular: ovirtvolumepopulator
+  scope: Namespaced
+  versions:
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              diskId:
+                type: string
+              engineSecretName:
+                type: string
+              engineUrl:
+                type: string
+              transferNetwork:
+                description: The network attachment definition that should be used
+                  for disk transfer.
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+            required:
+            - diskId
+            - engineSecretName
+            - engineUrl
+            type: object
+          status:
+            properties:
+              progress:
+                type: string
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.0
+  name: plans.forklift.konveyor.io
+spec:
+  group: forklift.konveyor.io
+  names:
+    kind: Plan
+    listKind: PlanList
+    plural: plans
+    singular: plan
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: READY
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Executing')].status
+      name: EXECUTING
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Succeeded')].status
+      name: SUCCEEDED
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Failed')].status
+      name: FAILED
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: PlanSpec defines the desired state of Plan.
+            properties:
+              archived:
+                description: Whether this plan should be archived.
+                type: boolean
+              deleteGuestConversionPod:
+                description: |-
+                  DeleteGuestConversionPod determines if the guest conversion pod should be deleted after successful migration.
+                  Note:
+                    - If this option is enabled and migration succeeds then the pod will get deleted. However the VM could still not boot and the virt-v2v logs, with additional information, will be deleted alongside guest conversion pod.
+                    - If migration fails the conversion pod will remain present even if this option is enabled.
+                type: boolean
+              description:
+                description: Description
+                type: string
+              diskBus:
+                description: 'Deprecated: this field will be deprecated in 2.8.'
+                type: string
+              installLegacyDrivers:
+                description: |-
+                  InstallLegacyDrivers determines whether to install legacy windows drivers in the VM.
+                  The following Vm's are lack of SHA-2 support and need legacy drivers:
+                  Windows XP (all)
+                  Windows Server 2003
+                  Windows Vista (all)
+                  Windows Server 2008
+                  Windows 7 (pre-SP1)
+                  Windows Server 2008 R2
+                  Behavior:
+                  - If set to nil (unset), the system will automatically detect whether the VM requires legacy drivers
+                    based on its guest OS type (using IsLegacyWindows).
+                  - If set to true, legacy drivers will be installed unconditionally by setting the VIRTIO_WIN environment variable.
+                  - If set to false, legacy drivers will be skipped, and the system will fall back to using the standard (SHA-2 signed) drivers.
+
+                  When enabled, legacy drivers are exposed to the virt-v2v conversion process via the VIRTIO_WIN environment variable,
+                  which points to the legacy ISO at /usr/local/virtio-win.iso.
+                type: boolean
+              map:
+                description: Resource mapping.
+                properties:
+                  network:
+                    description: Network.
+                    properties:
+                      apiVersion:
+                        description: API version of the referent.
+                        type: string
+                      fieldPath:
+                        description: |-
+                          If referring to a piece of an object instead of an entire object, this string
+                          should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                          For example, if the object reference is to a container within a pod, this would take on a value like:
+                          "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                          the event) or if no container name is specified "spec.containers[2]" (container with
+                          index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                          referencing a part of an object.
+                        type: string
+                      kind:
+                        description: |-
+                          Kind of the referent.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                        type: string
+                      name:
+                        description: |-
+                          Name of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                      namespace:
+                        description: |-
+                          Namespace of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                        type: string
+                      resourceVersion:
+                        description: |-
+                          Specific resourceVersion to which this reference is made, if any.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                        type: string
+                      uid:
+                        description: |-
+                          UID of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  storage:
+                    description: Storage.
+                    properties:
+                      apiVersion:
+                        description: API version of the referent.
+                        type: string
+                      fieldPath:
+                        description: |-
+                          If referring to a piece of an object instead of an entire object, this string
+                          should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                          For example, if the object reference is to a container within a pod, this would take on a value like:
+                          "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                          the event) or if no container name is specified "spec.containers[2]" (container with
+                          index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                          referencing a part of an object.
+                        type: string
+                      kind:
+                        description: |-
+                          Kind of the referent.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                        type: string
+                      name:
+                        description: |-
+                          Name of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                      namespace:
+                        description: |-
+                          Namespace of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                        type: string
+                      resourceVersion:
+                        description: |-
+                          Specific resourceVersion to which this reference is made, if any.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                        type: string
+                      uid:
+                        description: |-
+                          UID of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                required:
+                - network
+                - storage
+                type: object
+              migrateSharedDisks:
+                default: true
+                description: Determines if the plan should migrate shared disks.
+                type: boolean
+              networkNameTemplate:
+                description: |-
+                  NetworkNameTemplate is a template for generating network interface names in the target virtual machine.
+                  It follows Go template syntax and has access to the following variables:
+                    - .NetworkName: If target network is multus, name of the Multus network attachment definition, empty otherwise.
+                    - .NetworkNamespace: If target network is multus, namespace where the network attachment definition is located.
+                    - .NetworkType: type of the network ("Multus" or "Pod")
+                    - .NetworkIndex: sequential index of the network interface (0-based)
+                  The template can be used to customize network interface names based on target network configuration.
+                  Note:
+                    - This template can be overridden at the individual VM level
+                    - If not specified on VM level and on Plan leverl, default naming conventions will be used
+                  Examples:
+                    "net-{{.NetworkIndex}}"
+                    "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
+                type: string
+              preserveClusterCpuModel:
+                description: Preserve the CPU model and flags the VM runs with in
+                  its oVirt cluster.
+                type: boolean
+              preserveStaticIPs:
+                description: Preserve static IPs of VMs in vSphere
+                type: boolean
+              provider:
+                description: Providers.
+                properties:
+                  destination:
+                    description: Destination.
+                    properties:
+                      apiVersion:
+                        description: API version of the referent.
+                        type: string
+                      fieldPath:
+                        description: |-
+                          If referring to a piece of an object instead of an entire object, this string
+                          should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                          For example, if the object reference is to a container within a pod, this would take on a value like:
+                          "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                          the event) or if no container name is specified "spec.containers[2]" (container with
+                          index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                          referencing a part of an object.
+                        type: string
+                      kind:
+                        description: |-
+                          Kind of the referent.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                        type: string
+                      name:
+                        description: |-
+                          Name of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                      namespace:
+                        description: |-
+                          Namespace of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                        type: string
+                      resourceVersion:
+                        description: |-
+                          Specific resourceVersion to which this reference is made, if any.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                        type: string
+                      uid:
+                        description: |-
+                          UID of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  source:
+                    description: Source.
+                    properties:
+                      apiVersion:
+                        description: API version of the referent.
+                        type: string
+                      fieldPath:
+                        description: |-
+                          If referring to a piece of an object instead of an entire object, this string
+                          should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                          For example, if the object reference is to a container within a pod, this would take on a value like:
+                          "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                          the event) or if no container name is specified "spec.containers[2]" (container with
+                          index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                          referencing a part of an object.
+                        type: string
+                      kind:
+                        description: |-
+                          Kind of the referent.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                        type: string
+                      name:
+                        description: |-
+                          Name of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                      namespace:
+                        description: |-
+                          Namespace of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                        type: string
+                      resourceVersion:
+                        description: |-
+                          Specific resourceVersion to which this reference is made, if any.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                        type: string
+                      uid:
+                        description: |-
+                          UID of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                required:
+                - destination
+                - source
+                type: object
+              pvcNameTemplate:
+                description: |-
+                  PVCNameTemplate is a template for generating PVC names for VM disks.
+                  It follows Go template syntax and has access to the following variables:
+                    - .VmName: name of the VM
+                    - .PlanName: name of the migration plan
+                    - .DiskIndex: initial volume index of the disk
+                    - .WinDriveLetter: Windows drive letter (lower case, if applicable, e.g. "c", require guest agent)
+                    - .RootDiskIndex: index of the root disk
+                    - .Shared: true if the volume is shared by multiple VMs, false otherwise
+                    - .FileName: name of the file in the source provider (vmWare only, require guest agent)
+                  Note:
+                    This template can be overridden at the individual VM level.
+                  Examples:
+                    "{{.VmName}}-disk-{{.DiskIndex}}"
+                    "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
+                    "{{if .Shared}}shared-{{end}}{{.VmName}}-{{.DiskIndex}}"
+                type: string
+              pvcNameTemplateUseGenerateName:
+                default: true
+                description: |-
+                  PVCNameTemplateUseGenerateName indicates if the PVC name template should use generateName instead of name.
+                  Setting this to false will use the name field of the PVCNameTemplate.
+                  This is useful when using a template that generates a name without a suffix.
+                  For example, if the template is "{{.VmName}}-disk-{{.DiskIndex}}", setting this to false will result in
+                  the PVC name being "{{.VmName}}-disk-{{.DiskIndex}}", which may not be unique.
+                  but will be more predictable.
+                  **DANGER** When set to false, the generated PVC name may not be unique and may cause conflicts.
+                type: boolean
+              skipGuestConversion:
+                default: false
+                description: Determines if the plan should skip the guest conversion.
+                type: boolean
+              targetNamespace:
+                description: Target namespace.
+                type: string
+              transferNetwork:
+                description: The network attachment definition that should be used
+                  for disk transfer.
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              useCompatibilityMode:
+                default: true
+                description: |-
+                  useCompatibilityMode controls whether to use VirtIO devices when skipGuestConversion is true (Raw Copy mode).
+                  This setting has no effect when skipGuestConversion is false (V2V Conversion always uses VirtIO).
+                  - true (default): Use compatibility devices (SATA bus, E1000E NIC) to ensure bootability
+                  - false: Use high-performance VirtIO devices (requires VirtIO drivers already installed in source VM)
+                type: boolean
+              vms:
+                description: List of VMs.
+                items:
+                  description: A VM listed on the plan.
+                  properties:
+                    hooks:
+                      description: Enable hooks.
+                      items:
+                        description: Plan hook.
+                        properties:
+                          hook:
+                            description: Hook reference.
+                            properties:
+                              apiVersion:
+                                description: API version of the referent.
+                                type: string
+                              fieldPath:
+                                description: |-
+                                  If referring to a piece of an object instead of an entire object, this string
+                                  should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                                  For example, if the object reference is to a container within a pod, this would take on a value like:
+                                  "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                                  the event) or if no container name is specified "spec.containers[2]" (container with
+                                  index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                                  referencing a part of an object.
+                                type: string
+                              kind:
+                                description: |-
+                                  Kind of the referent.
+                                  More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                                type: string
+                              name:
+                                description: |-
+                                  Name of the referent.
+                                  More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                type: string
+                              namespace:
+                                description: |-
+                                  Namespace of the referent.
+                                  More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                                type: string
+                              resourceVersion:
+                                description: |-
+                                  Specific resourceVersion to which this reference is made, if any.
+                                  More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                                type: string
+                              uid:
+                                description: |-
+                                  UID of the referent.
+                                  More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                                type: string
+                            type: object
+                            x-kubernetes-map-type: atomic
+                          step:
+                            description: Pipeline step.
+                            type: string
+                        required:
+                        - hook
+                        - step
+                        type: object
+                      type: array
+                    id:
+                      description: |-
+                        The object ID.
+                        vsphere:
+                          The managed object ID.
+                      type: string
+                    instanceType:
+                      description: Selected InstanceType that will override the VM
+                        properties.
+                      type: string
+                    luks:
+                      description: Disk decryption LUKS keys
+                      properties:
+                        apiVersion:
+                          description: API version of the referent.
+                          type: string
+                        fieldPath:
+                          description: |-
+                            If referring to a piece of an object instead of an entire object, this string
+                            should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                            For example, if the object reference is to a container within a pod, this would take on a value like:
+                            "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                            the event) or if no container name is specified "spec.containers[2]" (container with
+                            index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                            referencing a part of an object.
+                          type: string
+                        kind:
+                          description: |-
+                            Kind of the referent.
+                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                          type: string
+                        name:
+                          description: |-
+                            Name of the referent.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          type: string
+                        namespace:
+                          description: |-
+                            Namespace of the referent.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                          type: string
+                        resourceVersion:
+                          description: |-
+                            Specific resourceVersion to which this reference is made, if any.
+                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                          type: string
+                        uid:
+                          description: |-
+                            UID of the referent.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                          type: string
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    name:
+                      description: |-
+                        An object Name.
+                        vsphere:
+                          A qualified name.
+                      type: string
+                    namespace:
+                      description: |-
+                        The VM Namespace
+                        Only relevant for an openshift source.
+                      type: string
+                    networkNameTemplate:
+                      description: |-
+                        NetworkNameTemplate is a template for generating network interface names in the target virtual machine.
+                        It follows Go template syntax and has access to the following variables:
+                          - .NetworkName: If target network is multus, name of the Multus network attachment definition, empty otherwise.
+                          - .NetworkNamespace: If target network is multus, namespace where the network attachment definition is located.
+                          - .NetworkType: type of the network ("Multus" or "Pod")
+                          - .NetworkIndex: sequential index of the network interface (0-based)
+                        The template can be used to customize network interface names based on target network configuration.
+                        Note:
+                          - This template will override at the plan level template
+                          - If not specified on VM level and on Plan leverl, default naming conventions will be used
+                        Examples:
+                          "net-{{.NetworkIndex}}"
+                          "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
+                      type: string
+                    pvcNameTemplate:
+                      description: |-
+                        PVCNameTemplate is a template for generating PVC names for VM disks.
+                        It follows Go template syntax and has access to the following variables:
+                          - .VmName: name of the VM
+                          - .PlanName: name of the migration plan
+                          - .DiskIndex: initial volume index of the disk
+                          - .RootDiskIndex: index of the root disk
+                          - .Shared: true if the volume is shared by multiple VMs, false otherwise
+                        Note:
+                          This template overrides the plan level template.
+                        Examples:
+                          "{{.VmName}}-disk-{{.DiskIndex}}"
+                          "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
+                          "{{if .Shared}}shared-{{end}}{{.VmName}}-{{.DiskIndex}}"
+                      type: string
+                    rootDisk:
+                      description: Choose the primary disk the VM boots from
+                      type: string
+                    targetName:
+                      description: |-
+                        TargetName specifies a custom name for the VM in the target cluster.
+                        If not provided, the original VM name will be used and automatically adjusted to meet k8s DNS1123 requirements.
+                        If provided, this exact name will be used instead. The migration will fail if the name is not unique or already in use.
+                      type: string
+                    type:
+                      description: Type used to qualify the name.
+                      type: string
+                    volumeNameTemplate:
+                      description: |-
+                        VolumeNameTemplate is a template for generating volume interface names in the target virtual machine.
+                        It follows Go template syntax and has access to the following variables:
+                          - .PVCName: name of the PVC mounted to the VM using this volume
+                          - .VolumeIndex: sequential index of the volume interface (0-based)
+                        Note:
+                          - This template will override at the plan level template
+                          - If not specified on VM level and on Plan leverl, default naming conventions will be used
+                        Examples:
+                          "disk-{{.VolumeIndex}}"
+                          "pvc-{{.PVCName}}"
+                      type: string
+                  type: object
+                type: array
+              volumeNameTemplate:
+                description: |-
+                  VolumeNameTemplate is a template for generating volume interface names in the target virtual machine.
+                  It follows Go template syntax and has access to the following variables:
+                    - .PVCName: name of the PVC mounted to the VM using this volume
+                    - .VolumeIndex: sequential index of the volume interface (0-based)
+                  Note:
+                    - This template can be overridden at the individual VM level
+                    - If not specified on VM level and on Plan leverl, default naming conventions will be used
+                  Examples:
+                    "disk-{{.VolumeIndex}}"
+                    "pvc-{{.PVCName}}"
+                type: string
+              warm:
+                description: Whether this is a warm migration.
+                type: boolean
+            required:
+            - map
+            - provider
+            - targetNamespace
+            - vms
+            type: object
+          status:
+            description: PlanStatus defines the observed state of Plan.
+            properties:
+              conditions:
+                description: List of conditions.
+                items:
+                  description: Condition
+                  properties:
+                    category:
+                      description: The condition category.
+                      type: string
+                    durable:
+                      description: The condition is durable - never un-staged.
+                      type: boolean
+                    items:
+                      description: A list of items referenced in the `Message`.
+                      items:
+                        type: string
+                      type: array
+                    lastTransitionTime:
+                      description: When the last status transition occurred.
+                      format: date-time
+                      type: string
+                    message:
+                      description: The human readable description of the condition.
+                      type: string
+                    reason:
+                      description: The reason for the condition or transition.
+                      type: string
+                    status:
+                      description: The condition status [true,false].
+                      type: string
+                    type:
+                      description: The condition type.
+                      type: string
+                  required:
+                  - category
+                  - lastTransitionTime
+                  - status
+                  - type
+                  type: object
+                type: array
+              migration:
+                description: Migration
+                properties:
+                  completed:
+                    description: Completed timestamp.
+                    format: date-time
+                    type: string
+                  history:
+                    description: History
+                    items:
+                      description: Snapshot
+                      properties:
+                        conditions:
+                          description: List of conditions.
+                          items:
+                            description: Condition
+                            properties:
+                              category:
+                                description: The condition category.
+                                type: string
+                              durable:
+                                description: The condition is durable - never un-staged.
+                                type: boolean
+                              items:
+                                description: A list of items referenced in the `Message`.
+                                items:
+                                  type: string
+                                type: array
+                              lastTransitionTime:
+                                description: When the last status transition occurred.
+                                format: date-time
+                                type: string
+                              message:
+                                description: The human readable description of the
+                                  condition.
+                                type: string
+                              reason:
+                                description: The reason for the condition or transition.
+                                type: string
+                              status:
+                                description: The condition status [true,false].
+                                type: string
+                              type:
+                                description: The condition type.
+                                type: string
+                            required:
+                            - category
+                            - lastTransitionTime
+                            - status
+                            - type
+                            type: object
+                          type: array
+                        map:
+                          description: Map.
+                          properties:
+                            network:
+                              description: Snapshot object reference.
+                              properties:
+                                generation:
+                                  format: int64
+                                  type: integer
+                                name:
+                                  type: string
+                                namespace:
+                                  type: string
+                                uid:
+                                  description: |-
+                                    UID is a type that holds unique ID values, including UUIDs.  Because we
+                                    don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                    intent and helps make sure that UIDs and names do not get conflated.
+                                  type: string
+                              required:
+                              - generation
+                              - name
+                              - namespace
+                              - uid
+                              type: object
+                            storage:
+                              description: Snapshot object reference.
+                              properties:
+                                generation:
+                                  format: int64
+                                  type: integer
+                                name:
+                                  type: string
+                                namespace:
+                                  type: string
+                                uid:
+                                  description: |-
+                                    UID is a type that holds unique ID values, including UUIDs.  Because we
+                                    don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                    intent and helps make sure that UIDs and names do not get conflated.
+                                  type: string
+                              required:
+                              - generation
+                              - name
+                              - namespace
+                              - uid
+                              type: object
+                          required:
+                          - network
+                          - storage
+                          type: object
+                        migration:
+                          description: Migration
+                          properties:
+                            generation:
+                              format: int64
+                              type: integer
+                            name:
+                              type: string
+                            namespace:
+                              type: string
+                            uid:
+                              description: |-
+                                UID is a type that holds unique ID values, including UUIDs.  Because we
+                                don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                intent and helps make sure that UIDs and names do not get conflated.
+                              type: string
+                          required:
+                          - generation
+                          - name
+                          - namespace
+                          - uid
+                          type: object
+                        plan:
+                          description: Plan
+                          properties:
+                            generation:
+                              format: int64
+                              type: integer
+                            name:
+                              type: string
+                            namespace:
+                              type: string
+                            uid:
+                              description: |-
+                                UID is a type that holds unique ID values, including UUIDs.  Because we
+                                don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                intent and helps make sure that UIDs and names do not get conflated.
+                              type: string
+                          required:
+                          - generation
+                          - name
+                          - namespace
+                          - uid
+                          type: object
+                        provider:
+                          description: Provider
+                          properties:
+                            destination:
+                              description: Snapshot object reference.
+                              properties:
+                                generation:
+                                  format: int64
+                                  type: integer
+                                name:
+                                  type: string
+                                namespace:
+                                  type: string
+                                uid:
+                                  description: |-
+                                    UID is a type that holds unique ID values, including UUIDs.  Because we
+                                    don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                    intent and helps make sure that UIDs and names do not get conflated.
+                                  type: string
+                              required:
+                              - generation
+                              - name
+                              - namespace
+                              - uid
+                              type: object
+                            source:
+                              description: Snapshot object reference.
+                              properties:
+                                generation:
+                                  format: int64
+                                  type: integer
+                                name:
+                                  type: string
+                                namespace:
+                                  type: string
+                                uid:
+                                  description: |-
+                                    UID is a type that holds unique ID values, including UUIDs.  Because we
+                                    don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                    intent and helps make sure that UIDs and names do not get conflated.
+                                  type: string
+                              required:
+                              - generation
+                              - name
+                              - namespace
+                              - uid
+                              type: object
+                          required:
+                          - destination
+                          - source
+                          type: object
+                      required:
+                      - map
+                      - migration
+                      - plan
+                      - provider
+                      type: object
+                    type: array
+                  started:
+                    description: Started timestamp.
+                    format: date-time
+                    type: string
+                  vms:
+                    description: VM status
+                    items:
+                      description: VM Status
+                      properties:
+                        completed:
+                          description: Completed timestamp.
+                          format: date-time
+                          type: string
+                        conditions:
+                          description: List of conditions.
+                          items:
+                            description: Condition
+                            properties:
+                              category:
+                                description: The condition category.
+                                type: string
+                              durable:
+                                description: The condition is durable - never un-staged.
+                                type: boolean
+                              items:
+                                description: A list of items referenced in the `Message`.
+                                items:
+                                  type: string
+                                type: array
+                              lastTransitionTime:
+                                description: When the last status transition occurred.
+                                format: date-time
+                                type: string
+                              message:
+                                description: The human readable description of the
+                                  condition.
+                                type: string
+                              reason:
+                                description: The reason for the condition or transition.
+                                type: string
+                              status:
+                                description: The condition status [true,false].
+                                type: string
+                              type:
+                                description: The condition type.
+                                type: string
+                            required:
+                            - category
+                            - lastTransitionTime
+                            - status
+                            - type
+                            type: object
+                          type: array
+                        error:
+                          description: Errors
+                          properties:
+                            phase:
+                              type: string
+                            reasons:
+                              items:
+                                type: string
+                              type: array
+                          required:
+                          - phase
+                          - reasons
+                          type: object
+                        firmware:
+                          description: The firmware type detected from the OVF file
+                            produced by virt-v2v.
+                          type: string
+                        hooks:
+                          description: Enable hooks.
+                          items:
+                            description: Plan hook.
+                            properties:
+                              hook:
+                                description: Hook reference.
+                                properties:
+                                  apiVersion:
+                                    description: API version of the referent.
+                                    type: string
+                                  fieldPath:
+                                    description: |-
+                                      If referring to a piece of an object instead of an entire object, this string
+                                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                                      the event) or if no container name is specified "spec.containers[2]" (container with
+                                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                                      referencing a part of an object.
+                                    type: string
+                                  kind:
+                                    description: |-
+                                      Kind of the referent.
+                                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                                    type: string
+                                  name:
+                                    description: |-
+                                      Name of the referent.
+                                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                    type: string
+                                  namespace:
+                                    description: |-
+                                      Namespace of the referent.
+                                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                                    type: string
+                                  resourceVersion:
+                                    description: |-
+                                      Specific resourceVersion to which this reference is made, if any.
+                                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                                    type: string
+                                  uid:
+                                    description: |-
+                                      UID of the referent.
+                                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                                    type: string
+                                type: object
+                                x-kubernetes-map-type: atomic
+                              step:
+                                description: Pipeline step.
+                                type: string
+                            required:
+                            - hook
+                            - step
+                            type: object
+                          type: array
+                        id:
+                          description: |-
+                            The object ID.
+                            vsphere:
+                              The managed object ID.
+                          type: string
+                        instanceType:
+                          description: Selected InstanceType that will override the
+                            VM properties.
+                          type: string
+                        luks:
+                          description: Disk decryption LUKS keys
+                          properties:
+                            apiVersion:
+                              description: API version of the referent.
+                              type: string
+                            fieldPath:
+                              description: |-
+                                If referring to a piece of an object instead of an entire object, this string
+                                should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                                For example, if the object reference is to a container within a pod, this would take on a value like:
+                                "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                                the event) or if no container name is specified "spec.containers[2]" (container with
+                                index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                                referencing a part of an object.
+                              type: string
+                            kind:
+                              description: |-
+                                Kind of the referent.
+                                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                              type: string
+                            name:
+                              description: |-
+                                Name of the referent.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                            namespace:
+                              description: |-
+                                Namespace of the referent.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                              type: string
+                            resourceVersion:
+                              description: |-
+                                Specific resourceVersion to which this reference is made, if any.
+                                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                              type: string
+                            uid:
+                              description: |-
+                                UID of the referent.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                              type: string
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        name:
+                          description: |-
+                            An object Name.
+                            vsphere:
+                              A qualified name.
+                          type: string
+                        namespace:
+                          description: |-
+                            The VM Namespace
+                            Only relevant for an openshift source.
+                          type: string
+                        networkNameTemplate:
+                          description: |-
+                            NetworkNameTemplate is a template for generating network interface names in the target virtual machine.
+                            It follows Go template syntax and has access to the following variables:
+                              - .NetworkName: If target network is multus, name of the Multus network attachment definition, empty otherwise.
+                              - .NetworkNamespace: If target network is multus, namespace where the network attachment definition is located.
+                              - .NetworkType: type of the network ("Multus" or "Pod")
+                              - .NetworkIndex: sequential index of the network interface (0-based)
+                            The template can be used to customize network interface names based on target network configuration.
+                            Note:
+                              - This template will override at the plan level template
+                              - If not specified on VM level and on Plan leverl, default naming conventions will be used
+                            Examples:
+                              "net-{{.NetworkIndex}}"
+                              "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
+                          type: string
+                        newName:
+                          description: The new name of the VM after matching DNS1123
+                            requirements.
+                          type: string
+                        operatingSystem:
+                          description: The Operating System detected by virt-v2v.
+                          type: string
+                        phase:
+                          description: Phase
+                          type: string
+                        pipeline:
+                          description: Migration pipeline.
+                          items:
+                            description: Pipeline step.
+                            properties:
+                              annotations:
+                                additionalProperties:
+                                  type: string
+                                description: Annotations.
+                                type: object
+                              completed:
+                                description: Completed timestamp.
+                                format: date-time
+                                type: string
+                              description:
+                                description: Name
+                                type: string
+                              error:
+                                description: Error.
+                                properties:
+                                  phase:
+                                    type: string
+                                  reasons:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - phase
+                                - reasons
+                                type: object
+                              name:
+                                description: Name.
+                                type: string
+                              phase:
+                                description: Phase
+                                type: string
+                              progress:
+                                description: Progress.
+                                properties:
+                                  completed:
+                                    description: Completed units.
+                                    format: int64
+                                    type: integer
+                                  total:
+                                    description: Total units.
+                                    format: int64
+                                    type: integer
+                                required:
+                                - completed
+                                - total
+                                type: object
+                              reason:
+                                description: Reason
+                                type: string
+                              started:
+                                description: Started timestamp.
+                                format: date-time
+                                type: string
+                              tasks:
+                                description: Nested tasks.
+                                items:
+                                  description: Migration task.
+                                  properties:
+                                    annotations:
+                                      additionalProperties:
+                                        type: string
+                                      description: Annotations.
+                                      type: object
+                                    completed:
+                                      description: Completed timestamp.
+                                      format: date-time
+                                      type: string
+                                    description:
+                                      description: Name
+                                      type: string
+                                    error:
+                                      description: Error.
+                                      properties:
+                                        phase:
+                                          type: string
+                                        reasons:
+                                          items:
+                                            type: string
+                                          type: array
+                                      required:
+                                      - phase
+                                      - reasons
+                                      type: object
+                                    name:
+                                      description: Name.
+                                      type: string
+                                    phase:
+                                      description: Phase
+                                      type: string
+                                    progress:
+                                      description: Progress.
+                                      properties:
+                                        completed:
+                                          description: Completed units.
+                                          format: int64
+                                          type: integer
+                                        total:
+                                          description: Total units.
+                                          format: int64
+                                          type: integer
+                                      required:
+                                      - completed
+                                      - total
+                                      type: object
+                                    reason:
+                                      description: Reason
+                                      type: string
+                                    started:
+                                      description: Started timestamp.
+                                      format: date-time
+                                      type: string
+                                  required:
+                                  - name
+                                  - progress
+                                  type: object
+                                type: array
+                            required:
+                            - name
+                            - progress
+                            type: object
+                          type: array
+                        pvcNameTemplate:
+                          description: |-
+                            PVCNameTemplate is a template for generating PVC names for VM disks.
+                            It follows Go template syntax and has access to the following variables:
+                              - .VmName: name of the VM
+                              - .PlanName: name of the migration plan
+                              - .DiskIndex: initial volume index of the disk
+                              - .RootDiskIndex: index of the root disk
+                              - .Shared: true if the volume is shared by multiple VMs, false otherwise
+                            Note:
+                              This template overrides the plan level template.
+                            Examples:
+                              "{{.VmName}}-disk-{{.DiskIndex}}"
+                              "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}"
+                              "{{if .Shared}}shared-{{end}}{{.VmName}}-{{.DiskIndex}}"
+                          type: string
+                        restorePowerState:
+                          description: Source VM power state before migration.
+                          type: string
+                        rootDisk:
+                          description: Choose the primary disk the VM boots from
+                          type: string
+                        started:
+                          description: Started timestamp.
+                          format: date-time
+                          type: string
+                        targetName:
+                          description: |-
+                            TargetName specifies a custom name for the VM in the target cluster.
+                            If not provided, the original VM name will be used and automatically adjusted to meet k8s DNS1123 requirements.
+                            If provided, this exact name will be used instead. The migration will fail if the name is not unique or already in use.
+                          type: string
+                        type:
+                          description: Type used to qualify the name.
+                          type: string
+                        volumeNameTemplate:
+                          description: |-
+                            VolumeNameTemplate is a template for generating volume interface names in the target virtual machine.
+                            It follows Go template syntax and has access to the following variables:
+                              - .PVCName: name of the PVC mounted to the VM using this volume
+                              - .VolumeIndex: sequential index of the volume interface (0-based)
+                            Note:
+                              - This template will override at the plan level template
+                              - If not specified on VM level and on Plan leverl, default naming conventions will be used
+                            Examples:
+                              "disk-{{.VolumeIndex}}"
+                              "pvc-{{.PVCName}}"
+                          type: string
+                        warm:
+                          description: Warm migration status
+                          properties:
+                            consecutiveFailures:
+                              type: integer
+                            failures:
+                              type: integer
+                            nextPrecopyAt:
+                              format: date-time
+                              type: string
+                            precopies:
+                              items:
+                                description: Precopy durations
+                                properties:
+                                  createTaskId:
+                                    type: string
+                                  deltas:
+                                    items:
+                                      properties:
+                                        deltaId:
+                                          type: string
+                                        disk:
+                                          type: string
+                                      required:
+                                      - deltaId
+                                      - disk
+                                      type: object
+                                    type: array
+                                  end:
+                                    format: date-time
+                                    type: string
+                                  removeTaskId:
+                                    type: string
+                                  snapshot:
+                                    type: string
+                                  start:
+                                    format: date-time
+                                    type: string
+                                type: object
+                              type: array
+                            successes:
+                              type: integer
+                          required:
+                          - consecutiveFailures
+                          - failures
+                          - successes
+                          type: object
+                      required:
+                      - phase
+                      - pipeline
+                      type: object
+                    type: array
+                type: object
+              observedGeneration:
+                description: The most recent generation observed by the controller.
+                format: int64
+                type: integer
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.0
+  name: providers.forklift.konveyor.io
+spec:
+  group: forklift.konveyor.io
+  names:
+    kind: Provider
+    listKind: ProviderList
+    plural: providers
+    singular: provider
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.type
+      name: TYPE
+      type: string
+    - jsonPath: .status.phase
+      name: STATUS
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: READY
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='ConnectionTestSucceeded')].status
+      name: CONNECTED
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='InventoryCreated')].status
+      name: INVENTORY
+      type: string
+    - jsonPath: .spec.url
+      name: URL
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Defines the desired state of Provider.
+            properties:
+              secret:
+                description: |-
+                  References a secret containing credentials and
+                  other confidential information.
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              settings:
+                additionalProperties:
+                  type: string
+                description: Provider settings.
+                type: object
+              type:
+                description: Provider type.
+                type: string
+              url:
+                description: |-
+                  The provider URL.
+                  Empty may be used for the `host` provider.
+                type: string
+            required:
+            - secret
+            - type
+            type: object
+          status:
+            description: ProviderStatus defines the observed state of Provider
+            properties:
+              conditions:
+                description: List of conditions.
+                items:
+                  description: Condition
+                  properties:
+                    category:
+                      description: The condition category.
+                      type: string
+                    durable:
+                      description: The condition is durable - never un-staged.
+                      type: boolean
+                    items:
+                      description: A list of items referenced in the `Message`.
+                      items:
+                        type: string
+                      type: array
+                    lastTransitionTime:
+                      description: When the last status transition occurred.
+                      format: date-time
+                      type: string
+                    message:
+                      description: The human readable description of the condition.
+                      type: string
+                    reason:
+                      description: The reason for the condition or transition.
+                      type: string
+                    status:
+                      description: The condition status [true,false].
+                      type: string
+                    type:
+                      description: The condition type.
+                      type: string
+                  required:
+                  - category
+                  - lastTransitionTime
+                  - status
+                  - type
+                  type: object
+                type: array
+              fingerprint:
+                description: Fingerprint.
+                type: string
+              observedGeneration:
+                description: The most recent generation observed by the controller.
+                format: int64
+                type: integer
+              phase:
+                description: Current life cycle phase of the provider.
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.0
+  name: storagemaps.forklift.konveyor.io
+spec:
+  group: forklift.konveyor.io
+  names:
+    kind: StorageMap
+    listKind: StorageMapList
+    plural: storagemaps
+    singular: storagemap
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: READY
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Storage map spec.
+            properties:
+              map:
+                description: Map.
+                items:
+                  description: Mapped storage.
+                  properties:
+                    destination:
+                      description: Destination storage.
+                      properties:
+                        accessMode:
+                          description: Access mode.
+                          enum:
+                          - ReadWriteOnce
+                          - ReadWriteMany
+                          - ReadOnlyMany
+                          type: string
+                        storageClass:
+                          description: A storage class.
+                          type: string
+                        volumeMode:
+                          description: Volume mode.
+                          enum:
+                          - Filesystem
+                          - Block
+                          type: string
+                      required:
+                      - storageClass
+                      type: object
+                    offloadPlugin:
+                      description: Offload Plugin
+                      properties:
+                        vsphereXcopyConfig:
+                          description: |-
+                            VSphereXcopyPluginConfig works with the Vsphere Xcopy Volume Populator
+                            to offload the copy to Vsphere and the storage array.
+                          properties:
+                            secretRef:
+                              description: |-
+                                SecretRef is the name of the secret with the storage credentials for the plugin.
+                                The secret should reside in the same namespace where the source provider is.
+                              type: string
+                            storageVendorProduct:
+                              description: StorageVendorProduct the string identifier
+                                of the storage vendor product
+                              enum:
+                              - vantara
+                              - ontap
+                              - primera3par
+                              - pureFlashArray
+                              - powerflex
+                              type: string
+                          required:
+                          - secretRef
+                          - storageVendorProduct
+                          type: object
+                      required:
+                      - vsphereXcopyConfig
+                      type: object
+                    source:
+                      description: Source storage.
+                      properties:
+                        id:
+                          description: |-
+                            The object ID.
+                            vsphere:
+                              The managed object ID.
+                          type: string
+                        name:
+                          description: |-
+                            An object Name.
+                            vsphere:
+                              A qualified name.
+                          type: string
+                        namespace:
+                          description: |-
+                            The VM Namespace
+                            Only relevant for an openshift source.
+                          type: string
+                        type:
+                          description: Type used to qualify the name.
+                          type: string
+                      type: object
+                  required:
+                  - destination
+                  - source
+                  type: object
+                type: array
+              provider:
+                description: Provider
+                properties:
+                  destination:
+                    description: Destination.
+                    properties:
+                      apiVersion:
+                        description: API version of the referent.
+                        type: string
+                      fieldPath:
+                        description: |-
+                          If referring to a piece of an object instead of an entire object, this string
+                          should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                          For example, if the object reference is to a container within a pod, this would take on a value like:
+                          "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                          the event) or if no container name is specified "spec.containers[2]" (container with
+                          index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                          referencing a part of an object.
+                        type: string
+                      kind:
+                        description: |-
+                          Kind of the referent.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                        type: string
+                      name:
+                        description: |-
+                          Name of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                      namespace:
+                        description: |-
+                          Namespace of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                        type: string
+                      resourceVersion:
+                        description: |-
+                          Specific resourceVersion to which this reference is made, if any.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                        type: string
+                      uid:
+                        description: |-
+                          UID of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  source:
+                    description: Source.
+                    properties:
+                      apiVersion:
+                        description: API version of the referent.
+                        type: string
+                      fieldPath:
+                        description: |-
+                          If referring to a piece of an object instead of an entire object, this string
+                          should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                          For example, if the object reference is to a container within a pod, this would take on a value like:
+                          "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                          the event) or if no container name is specified "spec.containers[2]" (container with
+                          index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                          referencing a part of an object.
+                        type: string
+                      kind:
+                        description: |-
+                          Kind of the referent.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                        type: string
+                      name:
+                        description: |-
+                          Name of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                      namespace:
+                        description: |-
+                          Namespace of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                        type: string
+                      resourceVersion:
+                        description: |-
+                          Specific resourceVersion to which this reference is made, if any.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                        type: string
+                      uid:
+                        description: |-
+                          UID of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                required:
+                - destination
+                - source
+                type: object
+            required:
+            - map
+            - provider
+            type: object
+          status:
+            description: MapStatus defines the observed state of Maps.
+            properties:
+              conditions:
+                description: List of conditions.
+                items:
+                  description: Condition
+                  properties:
+                    category:
+                      description: The condition category.
+                      type: string
+                    durable:
+                      description: The condition is durable - never un-staged.
+                      type: boolean
+                    items:
+                      description: A list of items referenced in the `Message`.
+                      items:
+                        type: string
+                      type: array
+                    lastTransitionTime:
+                      description: When the last status transition occurred.
+                      format: date-time
+                      type: string
+                    message:
+                      description: The human readable description of the condition.
+                      type: string
+                    reason:
+                      description: The reason for the condition or transition.
+                      type: string
+                    status:
+                      description: The condition status [true,false].
+                      type: string
+                    type:
+                      description: The condition type.
+                      type: string
+                  required:
+                  - category
+                  - lastTransitionTime
+                  - status
+                  - type
+                  type: object
+                type: array
+              observedGeneration:
+                description: The most recent generation observed by the controller.
+                format: int64
+                type: integer
+              references:
+                items:
+                  description: |-
+                    Source reference.
+                    Either the ID or Name must be specified.
+                  properties:
+                    id:
+                      description: |-
+                        The object ID.
+                        vsphere:
+                          The managed object ID.
+                      type: string
+                    name:
+                      description: |-
+                        An object Name.
+                        vsphere:
+                          A qualified name.
+                      type: string
+                    namespace:
+                      description: |-
+                        The VM Namespace
+                        Only relevant for an openshift source.
+                      type: string
+                    type:
+                      description: Type used to qualify the name.
+                      type: string
+                  type: object
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.0
+  name: vspherexcopyvolumepopulators.forklift.konveyor.io
+spec:
+  group: forklift.konveyor.io
+  names:
+    kind: VSphereXcopyVolumePopulator
+    listKind: VSphereXcopyVolumePopulatorList
+    plural: vspherexcopyvolumepopulators
+    shortNames:
+    - vxvp
+    - vxvps
+    singular: vspherexcopyvolumepopulator
+  scope: Namespaced
+  versions:
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              secretName:
+                description: The secret name with vsphere and storage credentials
+                type: string
+              storageVendorProduct:
+                description: |-
+                  StorageVendorProduct is the storage vendor the target disk and PVC are connected to
+                  Supported values [vantara, ontap, primera3par]
+                type: string
+              vmId:
+                description: VmId is the VM object id in vSphere
+                type: string
+              vmdkPath:
+                description: |-
+                  VmdkPath is the full path the vmdk disk. A valid path format is
+                  '[$DATASTORE_NAME] $VM_HOME/$DISK_NAME.vmdk'
+                type: string
+            required:
+            - secretName
+            - storageVendorProduct
+            - vmId
+            - vmdkPath
+            type: object
+          status:
+            properties:
+              progress:
+                type: string
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: forklift-api
+  namespace: forklift-operator-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: forklift-controller
+  namespace: forklift-operator-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: forklift-operator
+  namespace: forklift-operator-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: forklift-populator-controller
+  namespace: forklift-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: leader-election-role
+  namespace: forklift-operator-system
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - services
+  - services/finalizers
+  - endpoints
+  - persistentvolumeclaims
+  - events
+  - configmaps
+  - secrets
+  - namespaces
+  verbs:
+  - '*'
+- apiGroups:
+  - route.openshift.io
+  resources:
+  - routes
+  verbs:
+  - '*'
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  - daemonsets
+  - replicasets
+  - statefulsets
+  verbs:
+  - '*'
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - servicemonitors
+  - prometheusrules
+  verbs:
+  - get
+  - create
+  - update
+  - patch
+  - list
+  - watch
+- apiGroups:
+  - apps.openshift.io
+  resources:
+  - deploymentconfigs
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - apps
+  resourceNames:
+  - forklift-operator
+  resources:
+  - deployments/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - forklift.konveyor.io
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+- apiGroups:
+  - build.openshift.io
+  resources:
+  - builds
+  - buildconfigs
+  - buildconfigs/instantiate
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - update
+  - patch
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagestreamtags
+  - imagestreams
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - update
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: forklift-api-role
+rules:
+- apiGroups:
+  - forklift.konveyor.io
+  resources:
+  - plans
+  - providers
+  - storagemaps
+  - hosts
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - storageclasses
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - k8s.cni.cncf.io
+  resources:
+  - network-attachment-definitions
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: forklift-controller-role
+rules:
+- apiGroups:
+  - forklift.konveyor.io
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - secrets
+  - namespaces
+  - events
+  - configmaps
+  - persistentvolumes
+  - persistentvolumeclaims
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+- apiGroups:
+  - k8s.cni.cncf.io
+  resources:
+  - network-attachment-definitions
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - storageclasses
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - kubevirt.io
+  resources:
+  - virtualmachines
+  - virtualmachines/finalizers
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - cdi.kubevirt.io
+  resources:
+  - datavolumes
+  - datavolumes/finalizers
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - security.openshift.io
+  resourceNames:
+  - anyuid
+  resources:
+  - securitycontextconstraints
+  verbs:
+  - use
+- apiGroups:
+  - template.openshift.io
+  resources:
+  - templates
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - export.kubevirt.io
+  resources:
+  - virtualmachineexports
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - instancetype.kubevirt.io
+  resources:
+  - virtualmachinepreferences
+  - virtualmachineclusterpreferences
+  - virtualmachineinstancetypes
+  - virtualmachineclusterinstancetypes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  verbs:
+  - create
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles
+  - rolebindings
+  - clusterroles
+  - clusterrolebindings
+  verbs:
+  - get
+  - patch
+  - create
+- apiGroups:
+  - build.openshift.io
+  resources:
+  - builds
+  - buildconfigs
+  - buildconfigs/instantiate
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - update
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagestreamtags
+  - imagestreams
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: forklift-populator-controller-role
+rules:
+- apiGroups:
+  - forklift.konveyor.io
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - secrets
+  - namespaces
+  - events
+  - configmaps
+  - persistentvolumes
+  - persistentvolumeclaims
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+- apiGroups:
+  - k8s.cni.cncf.io
+  resources:
+  - network-attachment-definitions
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - storageclasses
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - kubevirt.io
+  resources:
+  - virtualmachines
+  - virtualmachines/finalizers
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - cdi.kubevirt.io
+  resources:
+  - datavolumes
+  - datavolumes/finalizers
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - security.openshift.io
+  resourceNames:
+  - anyuid
+  resources:
+  - securitycontextconstraints
+  verbs:
+  - use
+- apiGroups:
+  - template.openshift.io
+  resources:
+  - templates
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - export.kubevirt.io
+  resources:
+  - virtualmachineexports
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - clusterversions
+  - proxies
+  verbs:
+  - get
+- apiGroups:
+  - oauth.openshift.io
+  resources:
+  - oauthclients
+  verbs:
+  - '*'
+- apiGroups:
+  - forklift.konveyor.io
+  resources:
+  - forkliftcontrollers
+  - forkliftcontrollers/status
+  - forkliftcontrollers/finalizers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - console.openshift.io
+  resources:
+  - consoleplugins
+  verbs:
+  - '*'
+- apiGroups:
+  - operator.openshift.io
+  resources:
+  - consoles
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - mutatingwebhookconfigurations
+  - validatingwebhookconfigurations
+  verbs:
+  - '*'
+- apiGroups:
+  - cert-manager.io
+  resources:
+  - issuers
+  - certificates
+  verbs:
+  - '*'
+- apiGroups:
+  - security.openshift.io
+  resources:
+  - securitycontextconstraints
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - watch
+  - update
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: leader-election-rolebinding
+  namespace: forklift-operator-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: forklift-operator
+  namespace: forklift-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: forklift-api-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: forklift-api-role
+subjects:
+- kind: ServiceAccount
+  name: forklift-api
+  namespace: forklift-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: forklift-controller-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: forklift-controller-role
+subjects:
+- kind: ServiceAccount
+  name: forklift-controller
+  namespace: forklift-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: forklift-populator-controller-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: forklift-populator-controller-role
+subjects:
+- kind: ServiceAccount
+  name: forklift-populator-controller
+  namespace: forklift-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: manager-role
+subjects:
+- kind: ServiceAccount
+  name: forklift-operator
+  namespace: konveyor-forklift
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: forklift-operator-ansible
+  namespace: forklift-operator-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: forklift
+      name: controller-manager
+  template:
+    metadata:
+      labels:
+        app: forklift
+        name: controller-manager
+    spec:
+      containers:
+      - args:
+        - --health-probe-bind-address=:6789
+        - --metrics-bind-address=127.0.0.1:8080
+        - --leader-elect
+        - --leader-election-id=forklift-operator
+        env:
+        - name: WATCH_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.annotations['olm.targetNamespaces']
+        - name: ANSIBLE_GATHERING
+          value: explicit
+        - name: CONTROLLER_IMAGE
+          value: ${CONTROLLER_IMAGE}
+        - name: API_IMAGE
+          value: ${API_IMAGE}
+        - name: MUST_GATHER_IMAGE
+          value: ${MUST_GATHER_IMAGE}
+        - name: UI_PLUGIN_IMAGE
+          value: ${UI_PLUGIN_IMAGE}
+        - name: VALIDATION_IMAGE
+          value: ${VALIDATION_IMAGE}
+        - name: VIRT_V2V_IMAGE
+          value: ${VIRT_V2V_IMAGE}
+        - name: VIRT_V2V_DONT_REQUEST_KVM
+          value: ${VIRT_V2V_DONT_REQUEST_KVM}
+        - name: SNAPSHOT_REMOVAL_TIMEOUT
+          value: ${SNAPSHOT_REMOVAL_TIMEOUT}
+        - name: SNAPSHOT_STATUS_CHECK_RATE
+          value: ${SNAPSHOT_STATUS_CHECK_RATE}
+        - name: CLEANUP_RETRIES
+          value: ${CLEANUP_RETRIES}
+        - name: CDI_EXPORT_TOKEN_TTL
+          value: ${CDI_EXPORT_TOKEN_TTL}
+        - name: FILESYSTEM_OVERHEAD
+          value: ${FILESYSTEM_OVERHEAD}
+        - name: BLOCK_OVERHEAD
+          value: ${BLOCK_OVERHEAD}
+        - name: POPULATOR_CONTROLLER_IMAGE
+          value: ${POPULATOR_CONTROLLER_IMAGE}
+        - name: OVIRT_POPULATOR_IMAGE
+          value: ${OVIRT_POPULATOR_IMAGE}
+        - name: OPENSTACK_POPULATOR_IMAGE
+          value: ${OPENSTACK_POPULATOR_IMAGE}
+        - name: OVA_PROVIDER_SERVER_IMAGE
+          value: ${OVA_PROVIDER_SERVER_IMAGE}
+        - name: OVIRT_OS_MAP
+          value: ${OVIRT_OS_MAP}
+        - name: VSPHERE_OS_MAP
+          value: ${VSPHERE_OS_MAP}
+        - name: VIRT_CUSTOMIZE_MAP
+          value: ${VIRT_CUSTOMIZE_MAP}
+        - name: VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE
+          value: ${VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE}
+        image: ${OPERATOR_IMAGE}
+        imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 6789
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: forklift-operator
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 6789
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+      serviceAccountName: forklift-operator
+---
+apiVersion: forklift.konveyor.io/v1beta1
+kind: ForkliftController
+metadata:
+  name: forklift-controller
+  namespace: ${NAMESPACE}
+spec:
+  feature_ui_plugin: "true"
+  feature_validation: "true"
+  feature_volume_populator: "true"
+---
+apiVersion: forklift.konveyor.io/v1beta1
+kind: Hook
+metadata:
+  name: example-hook
+  namespace: ${NAMESPACE}
+spec:
+  image: quay.io/konveyor/hook-runner
+  playbook: <base64-encoded-playbook>
+---
+apiVersion: forklift.konveyor.io/v1beta1
+kind: Host
+metadata:
+  name: example-host
+  namespace: ${NAMESPACE}
+spec:
+  id: ""
+  ipAddress: ""
+  provider:
+    name: ""
+    namespace: ""
+---
+apiVersion: forklift.konveyor.io/v1beta1
+kind: Migration
+metadata:
+  name: example-migration
+  namespace: ${NAMESPACE}
+spec:
+  plan:
+    name: example-plan
+    namespace: ${NAMESPACE}
+---
+apiVersion: forklift.konveyor.io/v1beta1
+kind: NetworkMap
+metadata:
+  name: example-networkmap
+  namespace: ${NAMESPACE}
+spec:
+  map:
+  - destination:
+      name: ""
+      namespace: ""
+      type: pod
+    source:
+      id: ""
+  provider:
+    name: ""
+    namespace: ""
+---
+apiVersion: forklift.konveyor.io/v1beta1
+kind: OpenstackVolumePopulator
+metadata:
+  name: example-openstack
+  namespace: ${NAMESPACE}
+spec:
+  identityUrl: ""
+  imageId: ""
+  secretName: ""
+---
+apiVersion: forklift.konveyor.io/v1beta1
+kind: OvirtVolumePopulator
+metadata:
+  name: example-ovirt-imageio
+  namespace: ${NAMESPACE}
+spec:
+  diskId: ""
+  engineSecretName: ""
+  engineUrl: ""
+---
+apiVersion: forklift.konveyor.io/v1beta1
+kind: Plan
+metadata:
+  name: example-plan
+  namespace: ${NAMESPACE}
+spec:
+  provider:
+    destination:
+      name: ""
+      namespace: ""
+    source:
+      name: ""
+      namespace: ""
+---
+apiVersion: forklift.konveyor.io/v1beta1
+kind: Provider
+metadata:
+  name: example-provider
+  namespace: ${NAMESPACE}
+spec:
+  secret:
+    name: ""
+    namespace: ""
+  type: vmware
+  url: ""
+---
+apiVersion: forklift.konveyor.io/v1beta1
+kind: StorageMap
+metadata:
+  name: example-storagemap
+  namespace: ${NAMESPACE}
+spec:
+  map:
+  - destination:
+      storageClass: ""
+    source:
+      id: ""
+  provider:
+    name: ""
+    namespace: ""
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    capabilities: Seamless Upgrades
+    categories: Modernization & Migration
+    certified: "false"
+    containerImage: ${OPERATOR_IMAGE}
+    createdAt: ${DATE}
+    description: Facilitates migration of VM workloads to OpenShift Virtualization
+    features.operators.openshift.io/cnf: "false"
+    features.operators.openshift.io/cni: "false"
+    features.operators.openshift.io/csi: "false"
+    features.operators.openshift.io/disconnected: "false"
+    features.operators.openshift.io/fips-compliant: "true"
+    features.operators.openshift.io/fipsmode: "true"
+    features.operators.openshift.io/proxy-aware: "false"
+    features.operators.openshift.io/tls-profiles: "false"
+    features.operators.openshift.io/token-auth-aws: "false"
+    features.operators.openshift.io/token-auth-azure: "false"
+    features.operators.openshift.io/token-auth-gcp: "false"
+    olm.skipRange: '>=0.0.0 <${VERSION}'
+    operatorframework.io/initialization-resource: |-
+      {
+        "apiVersion": "forklift.konveyor.io/v1beta1",
+        "kind": "ForkliftController",
+        "metadata": {
+          "name": "forklift-controller",
+          "namespace": "konveyor-forklift"
+        },
+        "spec": {
+          "feature_ui_plugin": "true",
+          "feature_validation": "true",
+          "feature_volume_populator": "true"
+        }
+      }
+    operatorframework.io/suggested-namespace: ${NAMESPACE}
+    operators.openshift.io/valid-subscription: '["OpenShift Kubernetes Engine", "OpenShift
+      Container Platform", "OpenShift Platform Plus"]'
+    repository: https://github.com/kubev2v/forklift
+    support: https://github.com/kubev2v/forklift/issues
+  name: forklift-operator.v${VERSION}
+  namespace: ${NAMESPACE}
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: VM migration controller
+      displayName: ForkliftController
+      kind: ForkliftController
+      name: forkliftcontrollers.forklift.konveyor.io
+      version: v1beta1
+    - description: VM migration
+      displayName: Migration
+      kind: Migration
+      name: migrations.forklift.konveyor.io
+      version: v1beta1
+    - description: VM migration plan
+      displayName: Plan
+      kind: Plan
+      name: plans.forklift.konveyor.io
+      version: v1beta1
+    - description: VM provider
+      displayName: Provider
+      kind: Provider
+      name: providers.forklift.konveyor.io
+      version: v1beta1
+    - description: VM host
+      displayName: Host
+      kind: Host
+      name: hosts.forklift.konveyor.io
+      version: v1beta1
+    - description: VM network map
+      displayName: NetworkMap
+      kind: NetworkMap
+      name: networkmaps.forklift.konveyor.io
+      version: v1beta1
+    - description: VM storage map
+      displayName: StorageMap
+      kind: StorageMap
+      name: storagemaps.forklift.konveyor.io
+      version: v1beta1
+    - description: Hook schema for the hooks API
+      displayName: Hook
+      kind: Hook
+      name: hooks.forklift.konveyor.io
+      version: v1beta1
+    - description: oVirt Volume Populator
+      displayName: OvirtVolumePopulator
+      kind: OvirtVolumePopulator
+      name: ovirtvolumepopulators.forklift.konveyor.io
+      version: v1beta1
+    - description: OpenStack Volume Populator
+      displayName: OpenstackVolumePopulator
+      kind: OpenstackVolumePopulator
+      name: openstackvolumepopulators.forklift.konveyor.io
+      version: v1beta1
+  description: |
+    The Forklift Operator fully manages the deployment and life cycle of Forklift on [OpenShift](https://www.openshift.com/).
+
+
+    Forklift is a project within the [Konveyor community](https://www.konveyor.io/).
+
+
+    ### Install
+
+    OpenShift Virtualization / KubeVirt is required and must be installed prior attempting to deploy Forklift.
+
+    Once you have successfully installed the Operator, proceed to deploy components by creating the required ForkliftController CR.
+
+    By default, the Operator installs the following components on a target cluster:
+
+    * Controller, to coordinate migration processes.
+    * UI, the web console to manage migrations.
+    * Validation, a service to validate migration workflows.
+
+    ### Compatibility
+
+    Forklift 2.5 is supported on OpenShift 4.12 to 4.15
+
+    Forklift 2.6 is supported on OpenShift 4.14 and 4.15
+
+    Forklift 2.7 is supported on OpenShift 4.15 and 4.16
+
+    ### Documentation
+    Documentation can be found on our [website](https://konveyor.github.io/forklift).
+
+    ### Getting help
+    If you encounter any issues while using Forklift operator, you can create an issue on our [Github repo](https://github.com/kubev2v/forklift/issues), for bugs, enhancements or other requests.
+
+    ### Contributing
+    You can contribute by:
+
+    * Raising any issues you find using Forklift Operator
+    * Fixing issues by opening [Pull Requests](https://github.com/kubev2v/forklift/pulls)
+    * Improving [documentation](https://github.com/kubev2v/forklift-documentation)
+  displayName: Forklift Operator
+  icon:
+  - base64data: iVBORw0KGgoAAAANSUhEUgAAANUAAADVCAIAAABPIiLUAAAABmJLR0QA/wD/AP+gvaeTAAATZElEQVR42u2diZ+N5fvHv/9TG6JQvkVRlsn2I5RlrDNjjMGMsY19NzTImsmeJFtCKolQZClZohCtqFCY33vm4u6e5zznzME5+s45n+f1eXnNuc/znDlnztv93Nd1X8t/Hnp4uCT9W/qP/gSS+JPEnySJP0n8SZL4k8SfJIk/SfxJkviTxJ8kiT9J/EmS+JPEnySJP0n8SZL4k8SfJIk/SfxJkviTxJ8kiT9J/EmS+JPEnyT+JEn8SeJPksSfJP4kSfxJ4k+SxJ8k/iRJ/EniT5LEnyT+JEn8SeJPksSfJP6kBKvRUwVtWgx6+BHxJz0oPdWgsEu7vOH9+y2Y0GPVzK6oXct88SclUU/UK2qfkT+kb/a8cZnGnK9BfbLFn5Ro5uoONeZKi0OY81Va3FP8SQlQvbpD2zTPz+2eUzK818qSbrGx81X/iaHiT7oX1a5d1LLZ4DvMdY2fOV8dXhoo/qR4VavWbeamFvVeca/M+SrolyX+pGqYy3hhEMxNH9YrfuZmj84syuo3d2w1S8C5YzLFnxRVfV/NXTEj3vUctBX2y+rYeuCTd1Z1jRoWVntVgycLxZ8UrmHZWdUCNLmwd6e2AxvUD7Ek2rXIr/byl9vkiT8pXJ3b5MWmZ9n0bo8+Nsy/pE6dImzhgT2zZ43sGY8tPDQ7S/xJ4WpYv5obKIS99MLg2rWH8W9uj5wZd+l/QbimxZ8UVaFbF4kVlIs/KVxDs7KSzV/ntnniTwrXy63zks3fsJws8SeFiy2yZPNHRIz4k6JqzpikLwHxFIo/qUJPN5owpGD1mjX7583/yEYK+iZ9CfhK+zzxJ1VozNj15ZXH+fO/2UiHjIHJ5m9Ebj/xJ1WoZauZ5XeOps2mWRjp3Xr17laLJnZ/+JFh4k+q0IWLl42/ESPfsZFqg0nvX888XSj+pApt3Pil8bdh40EbGdQ7O9n8deswQPxJFRo56h3j78cfr9yOJGiZn2z+igf0FX9ShZq9MN0tAVu0LGHk8ceLVpYkl78lk7vX9IxM8ZcwnTv3m/E3esy7NjJzVM9kT4FNGhWIP6lC76z7wvh7b8thG8nrlZNs/jI75oq/tFbz5jPqPTGmIuygaI3x9/PPv9ttkYoFyeZvzMA+4i/t9NTTEwbmr1z91r6zZ38FuEGDVzHY5Lkpbgn4UuvXLLA02V7Asik12wso/u5Fm987VO4d7LzZ+JkzP9vI+AkbbYRUy2RPgc8/UyD+0kujRq3z+cPysPG31uyzkW3bj9pIbmbSl4C9OuWKv/TS802nllc9Xmw+g/HBQ1bbw8uXrz7y6AhGMl7UElD8JUHfffeLz5/5XBr9d+KtW7dH2rWf/VBlzYP40zHvVvgXcfF0rMkVEcTfPWr16r0+f1u3HrHxEycv2siUqe/ZyLSiBC8BXx+bSbEiShbVrVsU+cZq1R5lk7H4S2Vh//r8uRvu8hV7bOSjj47ZmTndcxLC3LCcfq+2HxCafM6v/r8OcyZO3LRly+ErV65hlYu/VM+zfGr8zZu3fAQ7dJzL+IC8Ffbwjz+uP1ZrJCOtmt3jEnDhhB6jcvvCXLRsNzb9iovXwdylS1cD69GmTaeJvxTXkSPn/K+8pGRrgMtOnedV3BBrDSPnPP6ovhjM4dbGs4hzB/v60qU/y6McvIH+ucvFX4prwYKP/W99956TNv71sR9sZEbJ+zYypbB3tcz16DjguWeHxJjn1q8/cOHCpfLox/ff/4JLnIVBg4bjdf9NfWX2fMP/+q9f/7vO48WMl735qY3s2nXczszq2j/A3OJJPcbm9+nVJRfmQjcwnm082bZYXFhDbObYkpH9m16qXaf42rW/fRp69nqD8eycZfbw6tW/atcZVeEvbDyEjTjCpUbn9eneccCzjQpCmcN9Y8xBVWzmmAuZEdnxU/xfWmv37hM+GYsW7WTwyfpj3RLwlVcX2JkUeQ6N1SN3DuaWLt3NavLWrajMEdaKnQFzNcWwEH8PQqzwfEqOHj1n44ePnLWR0tLtkVcRL8O9e+HCj2MzRxyNMZfx0qxU/QOKv/tShw5zA4Yn8xnjTIQ2snfvKTuzbr3RjrmA48Y/fv31jw8//Hr6jPfx56Vetxnxl2Dh+IUYH6D8/JWM9+lT5owSmPvyy+9v3LgZjTl81zt2fIX3uE3b0nRgTvwlUtwifZiwHuwO+/ffN2PYEH/++RdrR+Y5Fojmpk5Pib/7VfHod32wzp67vff1xRdnAsxhLMPczFnbOneZ/+hjI/WnE38J0AsvTg9whrvYNuL++usG2rf/29lzPujabaH5YiTxl2BZFL47sFhtHEeMmBN/CRbLNQKcsDA6V27v+mHPdmy5k/8mib/7ErF03EzxmzClYcYCFuF9zpLdv/+0nTZo0Cqfv99++9NisSTxdxebabh52YrAJsWGxVBgmyuGo44DELnDhsZi4b3Tn1T8VaPJUzZTNwjnXMCHF//hwpzY+fDHgVhsib9qFCOELs5jxcrP7KXchocdn356QmyJv2rMiFu37hO/chJ+7dV69V4SGoslib9wPfPspPJEHObtY/kIc/54ZuZi4SX+oorN1oTw56pd7dlz0h8nOlp4ib/o0cuZixPCnyt1MHPmVn+cECzhJf6iytUquM/j99+vWQAB+W+BWKwaGhMv/h6EJkzcWJ6gg3gCi8UKGNR5A1eKMPEXrtdf/zBR/BFeYK9JFQR/fNWqvSJM/IUrUEDjfo4DB87Ya7pGNAHvjCT+gsJuSBR/LPUaNBz3UGUt1GAdgmbTBJn4C9Hnn58uT9wxYMCK27FY56rEYlEpUJCJvxCdOvVjAvnjbm4vSy1Uf3zt2s8FmfgLEVFSCeTPlZyiFjRp55bbQRSMArHEX4hIv4gdW3UPh1XdI+CZqEGBJf5iiUoXiYXvk0+OR6YUMfk1bjKlbbvZWCHpnOQm/oKiilkC4Ttx4qIFojq1bVu6fsNBP6yQ5DcsbisQI6U7f917LEoUfFTJ8GuycPMlKDDGzZ1Uc3PWSOnLX37V6rn3c5D84QXxj6LgRrWXfPvtTywABF/68kc1FqbAadO20EmG0lL3DN/Jkz/6FTPwtsR5IblLSkFX/tFtW5jpMNBPIc7DVThFr3ZdEAioPnjwO3bkSJ8rLHyLcuSBa2kZrD+++Psn/23lys/ulj+rOW6iblUg/jRQTKho2Nv+urAGVakXf4nxuVATg+LdkyZtIm8tdAXGHfmu+HNmLwWHrl+/4caJhQ6tZLV8+R7/8tZtXhN/qf8hqTH12WenAjYpD3HaUcAvcHJZ2a444QM4d1WgEGBulPLzLVvN9E8bPnyt+Evlj4cHePEbn8RgiBXb3Lk7/LkKB4rrYRT7oLaQuyo7e6n/VKuMmdHej//fYOqdHkniLzXlepLHPmha5F/Vt9+b8VwFu9Z5GnXtutB/ypV9DgjPn3/a2LHrxV/KfjYy0+JfyWGiuguZDk+f/imeq1ydDfbZ/HEm3dC3xA3XP613nyXiLzU/WP0G4wIRLvv2fdsjczF2LpnhpIvjHPGfvXDxMk+5yxct3hkPfwUF/1Dr37XZbYssAdO48eSLFy+7c2jQ9Xjd0eIvNT9YoEX05s2HAqFQBASwFRYNpiEFcWXHkUQSLaGJvDhKoxph/C4CVH/44VJkpV7xl5ofbIfnjaM9H9NhqEeGOszuNCIG3FPUwqoWPio8L1u22998O33m50gbmQZGgTY1NvlRgEH8pSx/7LG6L5siV9FO853Ghw+f9Q1Vwkh9YoCYks5MWgSWUqaN26t/v3ZhNYAVT75IVtZSwZfK/P300z+7ukuW7Ip2ml+69HTVdLU5c3fQ0pIcXoKp4i8mBJf+Ii/yANCa0pxS/N27jh+/4L7y7XdKZETKb6Dl0ijvU5Sj5L4cec9l2mMmpl65sEt9/jZt+tJ98dxJQxdblK7yu3S8/fb+BL4BXINs99F/iz03zJTCoWsUc5VG/OHPCzhfnK/YOWgOHfreP0drMvGXMLGNFuicS4SV9fKj8tq4cRsCzxLJp4A88ZdIEQQQZ4VTVmZ4pEWD+EuwZs/+IB7+Jk3eLBTEX1JEBHKkKeqbJv7OryT+Eq/nnp+Kny9QnO+XX/7AMmVPVhCIvwchNmHZnyBQj6gTAo9VGUP8SeJPfwVJ/EniT5LEnyT+/sfVoOH4B1PChy1jBQ2kKX8kihPpSYwnjhJC2/mZcBVcJ8eO/WAOvK+/Pm891oh34llX2iy/sodvq4xZ/EuHVRtkz5eHOf2XETr6Wul2J/LWGJ84cZOdRmQeD1/u9Doxf4Qs2PYdhQqGFq2pjHAu5lkTqWvkHAmglOWPumZ898xz1tqUGL6c/ssteRbXsZXW4yG5kiTbWstJSybftes4DykvREiBqzFAbJVVA//gg68CaW+EPfMDIJKrQZAzrwPKFsZMDseFO8Gk7NEFsidxaCuYL8X5GzHyHSYhSCJc6vz5iogVpjTyIxGTEA/pUp6RcbuoACc83WiC44/iQPxAWzZOBiPA4kWMP+psUC4Icb6ljpOgZPmaZW9+aq9ASXErWsqkCOhs4kEb45cvX6Wk0LrKzGJOFkOpzB81BhBfvFUspdJoZJJH335lbk7aveek9aGEP/bW4ObAwe+Iia8g7L1DXGL8ffPNBW6vrnUgLdD5LbSLIR2pcZPJN27cBFbyidwvsmYhhUPfsmmPF7T2NTEi+6VU4M/1ODWGgMk/hx6TDDI/2SrN0s/sHg1/nEAfch6uqCxs1S/rTccfKRrQ5l6NZaUrWsUijx+uXLnmF+Ww2Y6KaYEMy4yMWWIolfljxcacRJRK6zalfN/A1LXbQjsB44OHrNisky92SYuWJXBjcBh/lsbLfMarWXip8QeLmDX+FrAl51ozaSwbfiZY1Z6iq5H96nbtSi1kxsp6QLBK3ae+/UGsMj8cPXqObDTLuiVvnLxJqOIhpqvZH/DHVdk5y/z5j7w1lmsVC7Wy2zfKgP3hDGSrP2nhMNBpli9Vs7ZsOWy2CBE0Zn/wxjiHAqa2jhRDqcnf++8fJjkNDxz3QZoK8TPxzHhMXJt7DAIsDJ4lvIpnXTkByvvxEAeKPZw5axsPXaU9XmHnJ984uUJp7757gNNcx17ShZhZXXQ0pSlZDvJmOIc39lBlwTV+3rrtiKbA9PI/43zG59Knb1myXdC4Y7BzmVAVIyj+JPEnSenDH3tuGBwxxM0xcAn2LNYx67/5Cz4i8Ztie02eC98iGz5irdtJ84Wjp1372dE2A02B2ro4hvxXGDxktZlB7n06EydU/EZ3Jr0LbZDFa+zPjmjrVe05Jv6S4u+uxSZb7KS1pUv92lPFmKKRl2DGspnBVxV4cfzPMV6ZOkPNW5REc0Zu86p50NjNfwpLuU2l3cNuij8Y42Oyf+M7z20w4GgMPUaMWBtnaU3+LOIvifxh/+KdiV0ozTnz4uGPg9qVeBNj8/fEk2P9KjP8FpdELP7ShT+CX+Kslcs9N37+rByb2wKJ5I+tYb92EccYr5iz+Esp/tgowycckO19UVHK/1uzjUFReZ7Fgffxx8cCqb7Ok+LzR91clpLmavnqq/P+JV1emR+Nv1Wr9vpnsuL033xi+cPHHvnxmfX9hxs2HvQvIWDMPRW5UBZ/d8dftAJqIOhX2GD/l+nQPwHns/+tuHKlPn9+2TUKRIfWRQjwN216lTY17JEEsjkTy19kk5JIYW/5l9QUn2XN4G/nzm/++8wkXxacMntOlfIa1FgOvAg3UEJm3AkUpTRQovGXWZU/zN5I/ohd8Ht4cHlkIdTE8kd4hP/ZA//HxN+/sP6zYJbtlWFRbpcskgNEbw//Qm5bAf4I4iIoGuE6CdgxBKVG8hewbEK/6aSu/2ynW/z9+/wRH+BHI4e+zqzXqtyCzb0Xj/3BxBlqfwQOvwS5+Esv/ggpDe0G6CvQAsmSNqrlj4Ar3xEdgz8O8zmLv5Tlj4A8emn4stvouPEb/D86kVqBFyH+ym8vTYC+TWnV8octHM3/bFOjJaDYQdChBQ4miT+Ma/+zUxJd/P1P2L8sxv3aajDhdzTFRbeu6uTnvCQ+f1YX1S+Ez0FrzGj8EXZK1gipdFWchUfO+vH6sn/Tgj80b96HgX4veARxu5A157cAsbhR14Um0v4lOtpldtrhTzOh+x8BF6C/H+jzR2YJbzJStlki/mo2f0xye/eeiqdXL9luofsfzv9C00rfm8iN2y0oQ/nD3A7cxyl4H8lftIP/IeKvxvOH6tYbjQc4xjcNSYGGqNH8f0RB+xe69LZo8Qdk5fkLAGL9bSEo/tKIPxPdE9imCzQ5x1dMe+lIuzgaf8Tf+10zSTGx2Jlo/Fm4f+RCUPzVeP46d5nfrfsiE00T4ryKPjNUL6CTJVnlhEL5OZS+OnWeZ3u+qEPHKt8uv8s9hSwQC0e0G2lzJ7PEbbGwa+dfAsSkRLk3H002U1Lrw424nBU+hX9moHNJqJ5vOtW/pKZkpSj+WRJ/kviTJPEniT9JEn+S+JMk8SeJP0kSf5L4kyTxJ4k/SRJ/kviTJPEniT9JEn+S+JMk8SeJP0kSf5L4kyTxJ4k/SRJ/kviTxJ8kiT9J/EmS+JPEnySJP0n8SZL4k8SfJIk/SfxJkviTxJ8kiT9J/EmS+JPEnyTFp/8Hhe6NJEDFtHIAAAAASUVORK5CYII=
+    mediatype: image/png
+  install:
+    spec:
+      deployments: null
+    strategy: deployment
+  installModes:
+  - supported: true
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: false
+    type: AllNamespaces
+  keywords:
+  - migration
+  - konveyor
+  - forklift
+  links:
+  - name: Forklift Documentation
+    url: https://konveyor.github.io/forklift
+  - name: Forklift Operator
+    url: https://github.com/kubev2v/forklift
+  maintainers:
+  - email: forklift-dev@googlegroups.com
+    name: Forklift by Konveyor Community
+  maturity: stable
+  minKubeVersion: 1.24.0
+  provider:
+    name: Konveyor
+    url: https://www.konveyor.io
+  version: ${VERSION}
+---
+apiVersion: scorecard.operatorframework.io/v1alpha3
+kind: Configuration
+metadata:
+  name: config
+stages:
+- parallel: true
+  tests:
+  - entrypoint:
+    - scorecard-test
+    - basic-check-spec
+    image: quay.io/operator-framework/scorecard-test:v1.34.2
+    labels:
+      suite: basic
+      test: basic-check-spec-test
+  - entrypoint:
+    - scorecard-test
+    - olm-bundle-validation
+    image: quay.io/operator-framework/scorecard-test:v1.34.2
+    labels:
+      suite: olm
+      test: olm-bundle-validation-test
+  - entrypoint:
+    - scorecard-test
+    - olm-crds-have-validation
+    image: quay.io/operator-framework/scorecard-test:v1.34.2
+    labels:
+      suite: olm
+      test: olm-crds-have-validation-test
+  - entrypoint:
+    - scorecard-test
+    - olm-crds-have-resources
+    image: quay.io/operator-framework/scorecard-test:v1.34.2
+    labels:
+      suite: olm
+      test: olm-crds-have-resources-test
+  - entrypoint:
+    - scorecard-test
+    - olm-spec-descriptors
+    image: quay.io/operator-framework/scorecard-test:v1.34.2
+    labels:
+      suite: olm
+      test: olm-spec-descriptors-test
+  - entrypoint:
+    - scorecard-test
+    - olm-status-descriptors
+    image: quay.io/operator-framework/scorecard-test:v1.34.2
+    labels:
+      suite: olm
+      test: olm-status-descriptors-test

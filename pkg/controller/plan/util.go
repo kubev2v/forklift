@@ -3,7 +3,7 @@ package plan
 import (
 	"context"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"

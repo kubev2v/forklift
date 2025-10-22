@@ -1,5 +1,6 @@
-run:
-  skip-dirs:
+issues:
+  exclude-dirs:
+    - vendor
     - pkg/lib/gob
 linters:
   enable:

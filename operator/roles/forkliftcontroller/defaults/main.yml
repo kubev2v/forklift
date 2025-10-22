@@ -6,6 +6,7 @@ app_namespace: "{{ lookup( 'env', 'WATCH_NAMESPACE') or 'konveyor-forklift' }}"
 feature_ui_plugin: true
 feature_validation: true
 feature_volume_populator: true
+feature_copy_offload: false
 
 k8s_cluster: false
 feature_auth_required: true
@@ -43,6 +44,7 @@ controller_max_vm_inflight: 20
 controller_filesystem_overhead: 10
 controller_block_overhead: 0
 controller_vddk_job_active_deadline_sec: 300
+controller_tls_connection_timeout_sec: 5
 profiler_volume_path: "/var/cache/profiler"
 
 inventory_volume_path: "/var/cache/inventory"
@@ -109,14 +111,33 @@ populator_ovirt_image_fqin: "{{ lookup( 'env', 'OVIRT_POPULATOR_IMAGE') or looku
 populator_controller_deployment_name: "{{ app_name }}-volume-populator-controller"
 populator_controller_container_name: "{{ app_name }}-populator-controller"
 populator_openstack_image_fqin: "{{ lookup( 'env', 'OPENSTACK_POPULATOR_IMAGE') or lookup( 'env', 'RELATED_IMAGE_OPENSTACK_POPULATOR') }}"
+populator_vsphere_xcopy_volume_image_fqin: "{{ lookup( 'env', 'VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE') or lookup( 'env', 'RELATED_IMAGE_VSPHERE_XCOPY_VOLUME_POPULATOR') }}"
 
 must_gather_image_fqin: "{{ lookup( 'env', 'MUST_GATHER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_MUST_GATHER') }}"
+
 virt_v2v_image_fqin: "{{ lookup( 'env', 'VIRT_V2V_IMAGE') or lookup( 'env', 'RELATED_IMAGE_VIRT_V2V') }}"
 virt_v2v_dont_request_kvm: "{{ lookup( 'env', 'VIRT_V2V_DONT_REQUEST_KVM') }}"
 virt_v2v_extra_args: "{{ lookup( 'env', 'VIRT_V2V_EXTRA_ARGS') }}"
 virt_v2v_extra_conf_config_map: "{{ lookup( 'env', 'VIRT_V2V_EXTRA_CONF_CONFIG_MAP') }}"
+virt_v2v_container_limits_cpu: "4000m"
+virt_v2v_container_limits_memory: "8Gi"
+virt_v2v_container_requests_cpu: "1000m"
+virt_v2v_container_requests_memory: "1Gi"
+
+vddk_image: "{{ lookup( 'env', 'VDDK_IMAGE') }}"
+vddk_build_config_name: "vddk"
+vddk_image_stream_name: "vddk"
+
+hooks_container_limits_cpu: "1000m"
+hooks_container_limits_memory: "1Gi"
+hooks_container_requests_cpu: "100m"
+hooks_container_requests_memory: "150Mi"
 
 ova_provider_server_fqin: "{{ lookup( 'env', 'OVA_PROVIDER_SERVER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_OVA_PROVIDER_SERVER') }}"
+ova_container_limits_cpu: "1000m"
+ova_container_limits_memory: "1Gi"
+ova_container_requests_cpu: "100m"
+ova_container_requests_memory: "150Mi"
 
 metric_service_name: "{{ app_name }}-metrics"
 metric_servicemonitor_name: "{{ app_name }}-metrics"

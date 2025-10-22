@@ -6,14 +6,15 @@ import (
 	"path"
 	"strings"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
-	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"gopkg.in/yaml.v2"
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -32,8 +33,6 @@ type HookRunner struct {
 	*plancontext.Context
 	// VM.
 	vm *planapi.VMStatus
-	// Hook.
-	hookRef *planapi.HookRef
 	// Hook.
 	hook *api.Hook
 }
@@ -181,6 +180,16 @@ func (r *HookRunner) template(mp *core.ConfigMap) (template *core.PodTemplateSpe
 				{
 					Name:  "hook",
 					Image: r.hook.Spec.Image,
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceCPU:    resource.MustParse(Settings.Migration.HooksContainerRequestsCpu),
+							core.ResourceMemory: resource.MustParse(Settings.Migration.HooksContainerRequestsMemory),
+						},
+						Limits: core.ResourceList{
+							core.ResourceCPU:    resource.MustParse(Settings.Migration.HooksContainerLimitsCpu),
+							core.ResourceMemory: resource.MustParse(Settings.Migration.HooksContainerLimitsMemory),
+						},
+					},
 					VolumeMounts: []core.VolumeMount{
 						{
 							Name:      "hook",

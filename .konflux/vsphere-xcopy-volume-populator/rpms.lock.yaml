@@ -1,0 +1,87 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/appstream/os/Packages/l/libxcrypt-compat-4.4.18-3.el9.x86_64.rpm
+    repoid: ubi-9-for-x86_64-appstream-rpms
+    size: 93189
+    checksum: sha256:2bd6c288e1970a001d3a1ae69166c0d926d9c87ce892edcb2110f4e142c12a7a
+    name: libxcrypt-compat
+    evr: 4.4.18-3.el9
+    sourcerpm: libxcrypt-4.4.18-3.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/appstream/os/Packages/p/python-unversioned-command-3.9.21-2.el9.noarch.rpm
+    repoid: ubi-9-for-x86_64-appstream-rpms
+    size: 10730
+    checksum: sha256:d835fd578f8ebf17c5914a4d8695ca78e68676880b690dd2a322b541a2897a71
+    name: python-unversioned-command
+    evr: 3.9.21-2.el9
+    sourcerpm: python3.9-3.9.21-2.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/e/expat-2.5.0-5.el9_6.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 121835
+    checksum: sha256:63522da84934e944305c9e206894031988ab9e561bba2e6c131d76093d1a0211
+    name: expat
+    evr: 2.5.0-5.el9_6
+    sourcerpm: expat-2.5.0-5.el9_6.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/p/python3-3.9.21-2.el9.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 30481
+    checksum: sha256:65c73ac98cfbd459b1b9672da58f4e7cf89b6ad979717aa9912ebbed7242a944
+    name: python3
+    evr: 3.9.21-2.el9
+    sourcerpm: python3.9-3.9.21-2.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/p/python3-libs-3.9.21-2.el9.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 8477687
+    checksum: sha256:7d1a15f4540d24ce9e3c17fbfa9850e1ce87c41993b94931a85f1fcfda7eefdd
+    name: python3-libs
+    evr: 3.9.21-2.el9
+    sourcerpm: python3.9-3.9.21-2.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/p/python3-pip-wheel-21.3.1-1.el9.noarch.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 1193706
+    checksum: sha256:75c46aab03898c66ce16be556432b71aed7efcedce02b9263339c14f57b4fdc0
+    name: python3-pip-wheel
+    evr: 21.3.1-1.el9
+    sourcerpm: python-pip-21.3.1-1.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/p/python3-setuptools-wheel-53.0.0-13.el9.noarch.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 480100
+    checksum: sha256:daf18aa58dd3571cf4258a5a4f67410a1d30ab8c62cd64b2ea99eda5a7f618cf
+    name: python3-setuptools-wheel
+    evr: 53.0.0-13.el9
+    sourcerpm: python-setuptools-53.0.0-13.el9.src.rpm
+  source:
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/source/SRPMS/Packages/e/expat-2.5.0-5.el9_6.src.rpm
+    repoid: ubi-9-for-x86_64-baseos-source-rpms
+    size: 8369732
+    checksum: sha256:736df300c50aad5de613ee8322bedb9522042024a95df9c886089e225bc764f7
+    name: expat
+    evr: 2.5.0-5.el9_6
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/source/SRPMS/Packages/l/libxcrypt-4.4.18-3.el9.src.rpm
+    repoid: ubi-9-for-x86_64-baseos-source-rpms
+    size: 543970
+    checksum: sha256:d18f72eb41ecd0370e2e47f1dc5774be54e9ff3b4dd333578017666c7c488f40
+    name: libxcrypt
+    evr: 4.4.18-3.el9
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/source/SRPMS/Packages/p/python-pip-21.3.1-1.el9.src.rpm
+    repoid: ubi-9-for-x86_64-baseos-source-rpms
+    size: 8984717
+    checksum: sha256:cb9e0cca3bd8dc24798cf1fb333d574774ce8288598331d44994d768f33648d3
+    name: python-pip
+    evr: 21.3.1-1.el9
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/source/SRPMS/Packages/p/python-setuptools-53.0.0-13.el9.src.rpm
+    repoid: ubi-9-for-x86_64-baseos-source-rpms
+    size: 2081089
+    checksum: sha256:45c590d9b7665158618dcb0727fcadf0b72879920db69986fc2035550892a511
+    name: python-setuptools
+    evr: 53.0.0-13.el9
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/source/SRPMS/Packages/p/python3.9-3.9.21-2.el9.src.rpm
+    repoid: ubi-9-for-x86_64-baseos-source-rpms
+    size: 20275578
+    checksum: sha256:2c3c3bca78968c0d35e31053709304ff0dc67ccbac5538e7a889cc883b5556df
+    name: python3.9
+    evr: 3.9.21-2.el9
+  module_metadata: []

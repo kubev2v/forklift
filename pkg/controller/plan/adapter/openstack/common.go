@@ -3,7 +3,7 @@ package openstack
 import (
 	"fmt"
 
-	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 )
 
 const (

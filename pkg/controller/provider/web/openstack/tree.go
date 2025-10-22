@@ -4,10 +4,10 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/openstack"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
-	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/openstack"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
+	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
+	libref "github.com/kubev2v/forklift/pkg/lib/ref"
 )
 
 // Routes.

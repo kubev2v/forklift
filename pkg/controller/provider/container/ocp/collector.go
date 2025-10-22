@@ -3,11 +3,11 @@ package ocp
 import (
 	"path"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	libcontainer "github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
-	libocp "github.com/konveyor/forklift-controller/pkg/lib/inventory/container/ocp"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	libcontainer "github.com/kubev2v/forklift/pkg/lib/inventory/container"
+	libocp "github.com/kubev2v/forklift/pkg/lib/inventory/container/ocp"
+	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
 )
 
@@ -15,7 +15,6 @@ import (
 func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) libcontainer.Collector {
 	return &Collector{
 		Collector: libocp.New(
-			db,
 			provider,
 			secret,
 			&Namespace{

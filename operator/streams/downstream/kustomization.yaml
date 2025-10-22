@@ -1,0 +1,5 @@
+resources:
+  - mtv-operator.clusterserviceversion.yaml
+  - ../../config/default
+  - ../../config/samples
+  - ../../config/scorecard

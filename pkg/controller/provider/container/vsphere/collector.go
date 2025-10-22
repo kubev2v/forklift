@@ -2,6 +2,7 @@ package vsphere
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	liburl "net/url"
 	"path"
@@ -9,11 +10,14 @@ import (
 	"strings"
 	"time"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/lib/util"
+
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/controller/base"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/session"
@@ -46,6 +50,7 @@ const (
 	DVPortGroup     = "DistributedVirtualPortgroup"
 	DVSwitch        = "VmwareDistributedVirtualSwitch"
 	Datastore       = "Datastore"
+	ResourcePool    = "ResourcePool"
 )
 
 // Fields
@@ -83,6 +88,12 @@ const (
 	fCpuCores       = "summary.hardware.numCpuCores"
 	fThumbprint     = "summary.config.sslThumbprint"
 	fMgtServerIp    = "summary.managementServerIp"
+	fScsiLun        = "config.storageDevice.scsiLun"
+	fHostBusAdapter = "config.storageDevice.hostBusAdapter"
+	fScsiTopology   = "config.storageDevice.scsiTopology.adapter"
+	fAdvancedOption = "configManager.advancedOption"
+	fmodel          = "hardware.systemInfo.model"
+	fvendor         = "hardware.systemInfo.vendor"
 	// Network
 	fTag     = "tag"
 	fSummary = "summary"
@@ -92,44 +103,52 @@ const (
 	fKey          = "key"
 	// DV Switch
 	fDVSwitchHost = "config.host"
+	// ResourcePool
+	fResourcePool = "resourcePool"
 	// Datastore
 	fDsType      = "summary.type"
 	fCapacity    = "summary.capacity"
 	fFreeSpace   = "summary.freeSpace"
 	fDsMaintMode = "summary.maintenanceMode"
+	fVmfsExtent  = "info"
 	// VM
-	fUUID                = "config.uuid"
-	fFirmware            = "config.firmware"
-	fFtInfo              = "config.ftInfo"
-	fBootOptions         = "config.bootOptions"
-	fCpuAffinity         = "config.cpuAffinity"
-	fCpuHotAddEnabled    = "config.cpuHotAddEnabled"
-	fCpuHotRemoveEnabled = "config.cpuHotRemoveEnabled"
-	fMemoryHotAddEnabled = "config.memoryHotAddEnabled"
-	fNumCpu              = "config.hardware.numCPU"
-	fNumCoresPerSocket   = "config.hardware.numCoresPerSocket"
-	fMemorySize          = "config.hardware.memoryMB"
-	fDevices             = "config.hardware.device"
-	fExtraConfig         = "config.extraConfig"
-	fChangeTracking      = "config.changeTrackingEnabled"
-	fGuestName           = "summary.config.guestFullName"
-	fGuestID             = "summary.guest.guestId"
-	fTpmPresent          = "summary.config.tpmPresent"
-	fBalloonedMemory     = "summary.quickStats.balloonedMemory"
-	fVmIpAddress         = "summary.guest.ipAddress"
-	fStorageUsed         = "summary.storage.committed"
-	fRuntimeHost         = "runtime.host"
-	fPowerState          = "runtime.powerState"
-	fConnectionState     = "runtime.connectionState"
-	fSnapshot            = "snapshot"
-	fIsTemplate          = "config.template"
-	fGuestNet            = "guest.net"
-	fGuestIpStack        = "guest.ipStack"
+	fUUID                     = "config.uuid"
+	fFirmware                 = "config.firmware"
+	fFtInfo                   = "config.ftInfo"
+	fBootOptions              = "config.bootOptions"
+	fCpuAffinity              = "config.cpuAffinity"
+	fCpuHotAddEnabled         = "config.cpuHotAddEnabled"
+	fCpuHotRemoveEnabled      = "config.cpuHotRemoveEnabled"
+	fMemoryHotAddEnabled      = "config.memoryHotAddEnabled"
+	fNumCpu                   = "config.hardware.numCPU"
+	fNumCoresPerSocket        = "config.hardware.numCoresPerSocket"
+	fMemorySize               = "config.hardware.memoryMB"
+	fDevices                  = "config.hardware.device"
+	fExtraConfig              = "config.extraConfig"
+	fNestedHVEnabled          = "config.nestedHVEnabled"
+	fChangeTracking           = "config.changeTrackingEnabled"
+	fGuestName                = "summary.config.guestFullName"
+	fGuestNameFromVmwareTools = "guest.guestFullName"
+	fGuestID                  = "summary.guest.guestId"
+	fTpmPresent               = "summary.config.tpmPresent"
+	fBalloonedMemory          = "summary.quickStats.balloonedMemory"
+	fVmIpAddress              = "summary.guest.ipAddress"
+	fStorageUsed              = "summary.storage.committed"
+	fRuntimeHost              = "runtime.host"
+	fPowerState               = "runtime.powerState"
+	fConnectionState          = "runtime.connectionState"
+	fSnapshot                 = "snapshot"
+	fIsTemplate               = "config.template"
+	fGuestNet                 = "guest.net"
+	fGuestDisk                = "guest.disk"
+	fGuestIpStack             = "guest.ipStack"
+	fHostName                 = "guest.hostName"
 )
 
 // Selections
 const (
 	TraverseFolders = "traverseFolders"
+	TraverseVApps   = "TraverseVApps"
 )
 
 // Actions
@@ -195,6 +214,32 @@ var TsDatacenterDatastore = &types.TraversalSpec{
 	},
 }
 
+// Datacenter/nested VApp traversal Spec.
+var TsDatacenterNestedVApp = &types.TraversalSpec{
+	SelectionSpec: types.SelectionSpec{
+		Name: TraverseVApps, // Unique name for this TraversalSpec
+	},
+	Type: ResourcePool,  // vApps are ResourcePools in vSphere
+	Path: fResourcePool, // Traverse nested resource pools
+	SelectSet: []types.BaseSelectionSpec{
+		&types.SelectionSpec{
+			Name: TraverseVApps, // Recursively traverse nested vApps
+		},
+		TsDatacenterVApp, // Traverse VMs in the vApp
+	},
+}
+
+// Datacenter/root VApp traversal Spec.
+var TsDatacenterVApp = &types.TraversalSpec{
+	Type: ResourcePool,
+	Path: fVm,
+	SelectSet: []types.BaseSelectionSpec{
+		&types.SelectionSpec{
+			Name: TraverseFolders,
+		},
+	},
+}
+
 // Root Folder traversal Spec
 var TsRootFolder = &types.TraversalSpec{
 	SelectionSpec: types.SelectionSpec{
@@ -211,6 +256,8 @@ var TsRootFolder = &types.TraversalSpec{
 		TsDatacenterHost,
 		TsDatacenterNet,
 		TsDatacenterDatastore,
+		TsDatacenterVApp,
+		TsDatacenterNestedVApp,
 	},
 }
 
@@ -278,6 +325,24 @@ func (r *Collector) Reset() {
 // Reset.
 func (r *Collector) HasParity() bool {
 	return r.parity
+}
+
+// Follow
+func (r *Collector) Follow(moRef interface{}, p []string, dst interface{}) error {
+	ref, ok := moRef.(types.ManagedObjectReference)
+	if !ok {
+		return fmt.Errorf("reference must be of type ManagedObjectReference")
+	}
+
+	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	client, err := r.buildClient(ctx)
+	if err != nil {
+		return err
+	}
+	defer client.CloseIdleConnections()
+	return client.RetrieveOne(ctx, ref, p, dst)
 }
 
 // Test connect/logout.
@@ -363,9 +428,14 @@ func (r *Collector) getUpdates(ctx context.Context) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	defer pc.Destroy(context.Background())
+	defer func() {
+		err := pc.Destroy(context.Background())
+		if err != nil {
+			r.log.Error(err, "destroy failed.")
+		}
+	}()
+
 	filter := r.filter(pc)
-	filter.Options.MaxObjectUpdates = MaxObjectUpdates
 	err = pc.CreateFilter(ctx, filter.CreateFilter)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -383,7 +453,10 @@ func (r *Collector) getUpdates(ctx context.Context) error {
 			w.End()
 		}
 		if tx != nil {
-			tx.End()
+			err := tx.End()
+			if err != nil {
+				r.log.Error(err, "tx end failed.")
+			}
 		}
 	}()
 	for {
@@ -496,28 +569,8 @@ func (r *Collector) watch() (list []*libmodel.Watch) {
 // Build the client.
 func (r *Collector) connect(ctx context.Context) (status int, err error) {
 	r.close()
-	url, err := liburl.Parse(r.url)
+	r.client, err = r.buildClient(ctx)
 	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	url.User = liburl.UserPassword(
-		r.user(),
-		r.password())
-	soapClient := soap.NewClient(url, r.getInsecureSkipVerifyFlag())
-	soapClient.SetThumbprint(url.Host, r.thumbprint())
-	vimClient, err := vim25.NewClient(ctx, soapClient)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	r.client = &govmomi.Client{
-		SessionManager: session.NewManager(vimClient),
-		Client:         vimClient,
-	}
-	err = r.client.Login(ctx, url.User)
-	if err != nil {
-		err = liberr.Wrap(err)
 		if strings.Contains(err.Error(), "incorrect") && strings.Contains(err.Error(), "password") {
 			return http.StatusUnauthorized, err
 		}
@@ -525,6 +578,41 @@ func (r *Collector) connect(ctx context.Context) (status int, err error) {
 	}
 
 	return http.StatusOK, nil
+}
+
+// Build the client.
+func (r *Collector) buildClient(ctx context.Context) (*govmomi.Client, error) {
+	url, err := liburl.Parse(r.url)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	url.User = liburl.UserPassword(
+		r.user(),
+		r.password())
+	thumbprint := r.thumbprint()
+	skipVerifying := base.GetInsecureSkipVerifyFlag(r.secret)
+
+	if !skipVerifying {
+		cert, errtls := base.VerifyTLSConnection(r.url, r.secret)
+		if errtls != nil {
+			return nil, liberr.Wrap(errtls)
+		}
+		thumbprint = util.Fingerprint(cert)
+	}
+
+	soapClient := soap.NewClient(url, skipVerifying)
+	soapClient.SetThumbprint(url.Host, thumbprint)
+	vimClient, err := vim25.NewClient(ctx, soapClient)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	client := &govmomi.Client{
+		SessionManager: session.NewManager(vimClient),
+		Client:         vimClient,
+	}
+	err = client.Login(ctx, url.User)
+	return client, err
+
 }
 
 // Close connections.
@@ -559,22 +647,6 @@ func (r *Collector) thumbprint() string {
 	return r.provider.Status.Fingerprint
 }
 
-// getInsecureSkipVerifyFlag gets the insecureSkipVerify boolean flag
-// value from the provider connection secret.
-func (r *Collector) getInsecureSkipVerifyFlag() bool {
-	insecure, found := r.secret.Data["insecureSkipVerify"]
-	if !found {
-		return false
-	}
-
-	insecureSkipVerify, err := strconv.ParseBool(string(insecure))
-	if err != nil {
-		return false
-	}
-
-	return insecureSkipVerify
-}
-
 // Build the object Spec filter.
 func (r *Collector) filter(pc *property.Collector) *property.WaitFilter {
 	return &property.WaitFilter{
@@ -587,7 +659,9 @@ func (r *Collector) filter(pc *property.Collector) *property.WaitFilter {
 				PropSet: r.propertySpec(),
 			},
 		},
-		Options: &types.WaitOptions{},
+		Options: &types.WaitOptions{
+			MaxObjectUpdates: MaxObjectUpdates,
+		},
 	}
 }
 
@@ -666,6 +740,12 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 				fPortGroup,
 				fPNIC,
 				fVNIC,
+				fScsiLun,
+				fAdvancedOption,
+				fHostBusAdapter,
+				fScsiTopology,
+				fmodel,
+				fvendor,
 			},
 		},
 		{ // Network
@@ -712,6 +792,7 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 				fCapacity,
 				fFreeSpace,
 				fDsMaintMode,
+				fVmfsExtent,
 				fHost,
 			},
 		},
@@ -739,8 +820,11 @@ func (r *Collector) vmPathSet() []string {
 		fMemorySize,
 		fDevices,
 		fGuestNet,
+		fGuestDisk,
 		fExtraConfig,
+		fNestedHVEnabled,
 		fGuestName,
+		fGuestNameFromVmwareTools,
 		fGuestID,
 		fBalloonedMemory,
 		fVmIpAddress,
@@ -754,6 +838,7 @@ func (r *Collector) vmPathSet() []string {
 		fSnapshot,
 		fChangeTracking,
 		fGuestIpStack,
+		fHostName,
 	}
 
 	apiVer := strings.Split(r.client.ServiceContent.About.ApiVersion, ".")
@@ -990,20 +1075,4 @@ func (r Collector) applyLeave(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	}
 
 	return nil
-}
-
-// GetInsecureSkipVerifyFlag gets the insecureSkipVerify boolean flag
-// value from the VSphere connection secret.
-func GetInsecureSkipVerifyFlag(secret *core.Secret) bool {
-	insecure, found := secret.Data["insecureSkipVerify"]
-	if !found {
-		return false
-	}
-
-	insecureSkipVerify, err := strconv.ParseBool(string(insecure))
-	if err != nil {
-		return false
-	}
-
-	return insecureSkipVerify
 }

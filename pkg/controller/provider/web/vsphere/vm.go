@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
+	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
 )
 
 // Routes.
@@ -56,6 +56,9 @@ func (h VMHandler) List(ctx *gin.Context) {
 			ctx.Status(http.StatusInternalServerError)
 		}
 	}()
+
+	// We need model.MaxDetail for retrieving IsTemplate field from the database
+	h.Detail = model.MaxDetail
 	db := h.Collector.DB()
 	list := []model.VM{}
 	err = db.List(&list, h.ListOptions(ctx))
@@ -69,6 +72,13 @@ func (h VMHandler) List(ctx *gin.Context) {
 	}
 	pb := PathBuilder{DB: db}
 	for _, m := range list {
+		if m.IsTemplate {
+			log.Info(
+				"Skipping template VM",
+				"vmID", m.ID,
+				"isTemplate", m.IsTemplate)
+			continue
+		}
 		r := &VM{}
 		r.With(&m)
 		r.Link(h.Provider)
@@ -210,32 +220,37 @@ func (r *VM1) Content(detail int) interface{} {
 // VM full detail.
 type VM struct {
 	VM1
-	PolicyVersion         int                  `json:"policyVersion"`
-	UUID                  string               `json:"uuid"`
-	Firmware              string               `json:"firmware"`
-	ConnectionState       string               `json:"connectionState"`
-	Snapshot              model.Ref            `json:"snapshot"`
-	ChangeTrackingEnabled bool                 `json:"changeTrackingEnabled"`
-	CpuAffinity           []int32              `json:"cpuAffinity"`
-	CpuHotAddEnabled      bool                 `json:"cpuHotAddEnabled"`
-	CpuHotRemoveEnabled   bool                 `json:"cpuHotRemoveEnabled"`
-	MemoryHotAddEnabled   bool                 `json:"memoryHotAddEnabled"`
-	FaultToleranceEnabled bool                 `json:"faultToleranceEnabled"`
-	CpuCount              int32                `json:"cpuCount"`
-	CoresPerSocket        int32                `json:"coresPerSocket"`
-	MemoryMB              int32                `json:"memoryMB"`
-	GuestName             string               `json:"guestName"`
-	GuestID               string               `json:"guestId"`
-	BalloonedMemory       int32                `json:"balloonedMemory"`
-	IpAddress             string               `json:"ipAddress"`
-	StorageUsed           int64                `json:"storageUsed"`
-	TpmEnabled            bool                 `json:"tpmEnabled"`
-	NumaNodeAffinity      []string             `json:"numaNodeAffinity"`
-	Devices               []model.Device       `json:"devices"`
-	NICs                  []model.NIC          `json:"nics"`
-	GuestNetworks         []model.GuestNetwork `json:"guestNetworks"`
-	GuestIpStacks         []model.GuestIpStack `json:"guestIpStacks"`
-	SecureBoot            bool                 `json:"secureBoot"`
+	PolicyVersion            int                  `json:"policyVersion"`
+	UUID                     string               `json:"uuid"`
+	Firmware                 string               `json:"firmware"`
+	ConnectionState          string               `json:"connectionState"`
+	Snapshot                 model.Ref            `json:"snapshot"`
+	ChangeTrackingEnabled    bool                 `json:"changeTrackingEnabled"`
+	CpuAffinity              []int32              `json:"cpuAffinity"`
+	CpuHotAddEnabled         bool                 `json:"cpuHotAddEnabled"`
+	CpuHotRemoveEnabled      bool                 `json:"cpuHotRemoveEnabled"`
+	MemoryHotAddEnabled      bool                 `json:"memoryHotAddEnabled"`
+	FaultToleranceEnabled    bool                 `json:"faultToleranceEnabled"`
+	CpuCount                 int32                `json:"cpuCount"`
+	CoresPerSocket           int32                `json:"coresPerSocket"`
+	MemoryMB                 int32                `json:"memoryMB"`
+	GuestName                string               `json:"guestName"`
+	GuestNameFromVmwareTools string               `json:"guestNameFromVmwareTools"`
+	HostName                 string               `json:"hostName"`
+	GuestID                  string               `json:"guestId"`
+	BalloonedMemory          int32                `json:"balloonedMemory"`
+	IpAddress                string               `json:"ipAddress"`
+	StorageUsed              int64                `json:"storageUsed"`
+	TpmEnabled               bool                 `json:"tpmEnabled"`
+	NumaNodeAffinity         []string             `json:"numaNodeAffinity"`
+	Devices                  []model.Device       `json:"devices"`
+	NICs                     []model.NIC          `json:"nics"`
+	GuestNetworks            []model.GuestNetwork `json:"guestNetworks"`
+	GuestDisks               []model.GuestDisk    `json:"guestDisks"`
+	GuestIpStacks            []model.GuestIpStack `json:"guestIpStacks"`
+	SecureBoot               bool                 `json:"secureBoot"`
+	DiskEnableUuid           bool                 `json:"diskEnableUuid"`
+	NestedHVEnabled          bool                 `json:"nestedHVEnabled"`
 }
 
 // Build the resource using the model.
@@ -255,6 +270,8 @@ func (r *VM) With(m *model.VM) {
 	r.CoresPerSocket = m.CoresPerSocket
 	r.MemoryMB = m.MemoryMB
 	r.GuestName = m.GuestName
+	r.GuestNameFromVmwareTools = m.GuestNameFromVmwareTools
+	r.HostName = m.HostName
 	r.GuestID = m.GuestID
 	r.BalloonedMemory = m.BalloonedMemory
 	r.IpAddress = m.IpAddress
@@ -265,8 +282,11 @@ func (r *VM) With(m *model.VM) {
 	r.NumaNodeAffinity = m.NumaNodeAffinity
 	r.NICs = m.NICs
 	r.GuestNetworks = m.GuestNetworks
+	r.GuestDisks = m.GuestDisks
 	r.GuestIpStacks = m.GuestIpStacks
 	r.SecureBoot = m.SecureBoot
+	r.DiskEnableUuid = m.DiskEnableUuid
+	r.NestedHVEnabled = m.NestedHVEnabled
 }
 
 // Build self link (URI).
@@ -286,4 +306,42 @@ func (r *VM) Content(detail int) interface{} {
 	}
 
 	return r
+}
+
+func (r *VM) HasDisk(disk model.Disk) bool {
+	for _, d := range r.Disks {
+		if d.File == disk.File {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *VM) HasSharedDisk() bool {
+	for _, d := range r.Disks {
+		if d.Shared {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *VM) RemoveSharedDisks() {
+	var disks []model.Disk
+	for _, disk := range r.Disks {
+		if !disk.Shared {
+			disks = append(disks, disk)
+		}
+	}
+	r.Disks = disks
+}
+
+func (r *VM) RemoveDisk(removeDisk model.Disk) {
+	var disks []model.Disk
+	for _, disk := range r.Disks {
+		if disk.File != removeDisk.File {
+			disks = append(disks, disk)
+		}
+	}
+	r.Disks = disks
 }

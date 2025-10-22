@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -25,6 +25,28 @@ func Handler(owner interface{}) handler.EventHandler {
 	ownerKind := ToKind(owner)
 	return handler.EnqueueRequestsFromMapFunc(
 		func(ctx context.Context, a client.Object) []reconcile.Request {
+			refKind := ToKind(a)
+			list := GetRequests(ownerKind, a)
+			if len(list) > 0 {
+				log.V(4).Info(
+					"handler: request list.",
+					"referenced",
+					refKind,
+					"owner",
+					ownerKind,
+					"list",
+					list)
+			}
+			return list
+		})
+}
+
+// TypedHandler creates a typed handler for reference mapping
+func TypedHandler[T client.Object](owner interface{}) handler.TypedEventHandler[T, reconcile.Request] {
+	log := logging.WithName("ref|handler")
+	ownerKind := ToKind(owner)
+	return handler.TypedEnqueueRequestsFromMapFunc(
+		func(ctx context.Context, a T) []reconcile.Request {
 			refKind := ToKind(a)
 			list := GetRequests(ownerKind, a)
 			if len(list) > 0 {

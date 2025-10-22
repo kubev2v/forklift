@@ -82,3 +82,28 @@ rules:
   - create
   - update
   - patch
+- apiGroups:
+    - build.openshift.io
+  resources:
+    - builds
+    - buildconfigs
+    - buildconfigs/instantiate
+  verbs:
+    - create
+    - get
+    - list
+    - watch
+    - update
+    - patch
+- apiGroups:
+    - image.openshift.io
+  resources:
+    - imagestreamtags
+    - imagestreams
+  verbs:
+    - create
+    - get
+    - list
+    - watch
+    - update
+    - patch

@@ -1,11 +1,12 @@
 package ova
 
 import (
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/ova"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/web/ova"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // OVA validator.
@@ -23,6 +24,12 @@ func (r *Validator) Load() (err error) {
 // Validate whether warm migration is supported from this provider type.
 func (r *Validator) WarmMigration() (ok bool) {
 	ok = false
+	return
+}
+
+// NOOP
+func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, s string, s2 string, err error) {
+	ok = true
 	return
 }
 
@@ -71,8 +78,7 @@ func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
 			return
 		}
 		for _, nic := range vm.NICs {
-			// TODO move from NIC name to NIC ID? ID should be unique
-			if nic.Name == network.Name && mapped.Destination.Type == Pod {
+			if nic.Network == network.Name && mapped.Destination.Type == Pod {
 				podMapped++
 			}
 		}
@@ -84,8 +90,21 @@ func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
 
 // Validate that a VM's disk backing storage has been mapped.
 func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
-	//For OVA providers, we don't have an actual storage connected,
-	// since we use a dummy storage for mapping the function should always return true.
+	if r.plan.Referenced.Map.Storage == nil {
+		return
+	}
+	vm := &model.VM{}
+	err = r.inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef.String())
+		return
+	}
+
+	for _, disk := range vm.Disks {
+		if !r.plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: disk.ID}) {
+			return
+		}
+	}
 	ok = true
 	return
 }

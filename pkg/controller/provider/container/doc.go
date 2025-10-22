@@ -1,14 +1,14 @@
 package container
 
 import (
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ocp"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/openstack"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ova"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/ovirt"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/vsphere"
-	libcontainer "github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/controller/provider/container/ocp"
+	"github.com/kubev2v/forklift/pkg/controller/provider/container/openstack"
+	"github.com/kubev2v/forklift/pkg/controller/provider/container/ova"
+	"github.com/kubev2v/forklift/pkg/controller/provider/container/ovirt"
+	"github.com/kubev2v/forklift/pkg/controller/provider/container/vsphere"
+	libcontainer "github.com/kubev2v/forklift/pkg/lib/inventory/container"
+	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
 	core "k8s.io/api/core/v1"
 )
 
@@ -20,7 +20,7 @@ func Build(
 	//
 	switch provider.Type() {
 	case api.OpenShift:
-		return ocp.New(db, provider, secret)
+		return ocp.New(nil, provider, secret)
 	case api.VSphere:
 		return vsphere.New(db, provider, secret)
 	case api.OVirt:

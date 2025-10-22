@@ -1,1 +1,6 @@
-* @mnecas @yaacov
+* @mnecas @yaacov @solenoci @Hazanel @mrnold
+.konflux @solenoci @mnecas
+.tekton  @solenoci @mnecas
+renovate.json @solenoci @mnecas
+docs @mnecas @yaacov
+cmd/vsphere-xcopy-volume-populator @rgolangh @mnecas

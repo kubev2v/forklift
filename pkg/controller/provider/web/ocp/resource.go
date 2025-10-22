@@ -1,7 +1,7 @@
 package ocp
 
 import (
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/ocp"
 )
 
 // REST Resource.

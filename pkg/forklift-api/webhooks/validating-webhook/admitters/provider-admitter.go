@@ -3,9 +3,9 @@ package admitters
 import (
 	"encoding/json"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/util"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/forklift-api/webhooks/util"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	admissionv1 "k8s.io/api/admission/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -13,19 +13,6 @@ import (
 type ProviderAdmitter struct {
 	Client   client.Client
 	provider api.Provider
-}
-
-func (admitter *ProviderAdmitter) validateVddkImage() error {
-	if image, found := admitter.provider.Spec.Settings[api.VDDK]; found {
-		if image == "" {
-			err := liberr.New("The specified VDDK init image name is empty")
-			log.Error(err, "The specified VDDK init image cannot be empty, failing",
-				"provider", admitter.provider.Name,
-				"namespace", admitter.provider.Namespace)
-			return err
-		}
-	}
-	return nil
 }
 
 func (admitter *ProviderAdmitter) validateSdkEndpointType() error {

@@ -4,11 +4,11 @@ import (
 	"errors"
 	"path"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	refapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	"github.com/konveyor/forklift-controller/pkg/controller/validation"
-	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	refapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web"
+	"github.com/kubev2v/forklift/pkg/controller/validation"
+	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 )
 
 // Types
@@ -41,8 +41,9 @@ const (
 
 // Network types.
 const (
-	Pod    = "pod"
-	Multus = "multus"
+	Pod     = "pod"
+	Multus  = "multus"
+	Ignored = "ignored"
 )
 
 // Validate the mp resource.
@@ -151,7 +152,7 @@ func (r *Reconciler) validateDestination(mp *api.NetworkMap) (err error) {
 next:
 	for _, entry := range list {
 		switch entry.Destination.Type {
-		case Pod:
+		case Ignored, Pod:
 			continue next
 		case Multus:
 			if entry.Destination.Namespace == "" {

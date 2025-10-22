@@ -9,6 +9,7 @@ has_ksm_enabled = value {
 concerns[flag] {
     has_ksm_enabled
     flag := {
+        "id": "ovirt.cluster.ksm_enabled",
         "category": "Warning",
         "label": "Cluster has KSM enabled",
         "assessment": "The host running the source VM has kernel samepage merging enabled for more efficient memory utilization. This feature is not currently supported by OpenShift Virtualization."

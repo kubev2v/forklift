@@ -9,15 +9,15 @@ import (
 	"net/http"
 	"strconv"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	adapter "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/vsphere"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/container"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
-	webhookutils "github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/util"
-	libcontainer "github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	"github.com/konveyor/forklift-controller/pkg/settings"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	adapter "github.com/kubev2v/forklift/pkg/controller/plan/adapter/vsphere"
+	"github.com/kubev2v/forklift/pkg/controller/provider/container"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
+	webhookutils "github.com/kubev2v/forklift/pkg/forklift-api/webhooks/util"
+	libcontainer "github.com/kubev2v/forklift/pkg/lib/inventory/container"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/settings"
 	admissionv1 "k8s.io/api/admission/v1beta1"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -126,7 +126,7 @@ func (admitter *SecretAdmitter) validateProviderSecret() *admissionv1.AdmissionR
 func (admitter *SecretAdmitter) validateHostSecret() *admissionv1.AdmissionResponse {
 	if hostName, ok := admitter.secret.GetLabels()["createdForResource"]; ok {
 		if _, ok := admitter.secret.Data["user"]; !ok {
-			err := errors.New("Missing credentials on Host secret")
+			err := errors.New("missing credentials on Host secret")
 			return webhookutils.ToAdmissionResponseError(err)
 		}
 		tested, err := admitter.testConnectionToHost(hostName)
@@ -171,6 +171,27 @@ func (admitter *SecretAdmitter) buildProviderCollector(providerType *api.Provide
 	}
 }
 
+func (admitter *SecretAdmitter) ensureEsxiCredentials(provider *api.Provider) (*core.Secret, error) {
+	updatedSecret := admitter.secret.DeepCopy()
+	user, ok := updatedSecret.Data["user"]
+
+	// if the user is not set and the api type is ESXi, we need to copy the credentials from the provider
+	if provider.Spec.Settings[api.SDK] == api.ESXI && (!ok || string(user) == "") {
+		ref := provider.Spec.Secret
+		providerSecret := &core.Secret{}
+		if err := admitter.Client.Get(context.TODO(), client.ObjectKey{Namespace: ref.Namespace, Name: ref.Name}, providerSecret); err != nil {
+			log.Error(err, "failed to get provider secret for Host secret without credentials")
+			return nil, err
+		}
+
+		// update the deep copy with user and password
+		updatedSecret.Data["user"] = providerSecret.Data["user"]
+		updatedSecret.Data["password"] = providerSecret.Data["password"]
+	}
+
+	return updatedSecret, nil
+}
+
 func (admitter *SecretAdmitter) testConnectionToHost(hostName string) (tested bool, err error) {
 	provider := &api.Provider{}
 	providerName := string(admitter.secret.Data["provider"])
@@ -203,8 +224,14 @@ func (admitter *SecretAdmitter) testConnectionToHost(hostName string) (tested bo
 		}
 		admitter.secret.Data["thumbprint"] = []byte(hostModel.Thumbprint)
 		url := fmt.Sprintf("https://%s/sdk", admitter.secret.Data["ip"])
+
+		updatedSecret, err := admitter.ensureEsxiCredentials(provider)
+		if err != nil {
+			return false, err
+		}
+
 		h := adapter.EsxHost{
-			Secret: &admitter.secret,
+			Secret: updatedSecret,
 			URL:    url,
 		}
 		log.Info("Testing provider connection")

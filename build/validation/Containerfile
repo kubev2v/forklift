@@ -1,5 +1,6 @@
-FROM registry.access.redhat.com/ubi9-minimal:9.5-1731604394
-RUN curl https://github.com/open-policy-agent/opa/releases/download/v0.62.1/opa_linux_amd64 -o /usr/bin/opa
+FROM registry.access.redhat.com/ubi9-minimal:9.6-1747218906
+RUN curl -L https://github.com/open-policy-agent/opa/releases/download/v0.62.1/opa_linux_amd64 > /usr/bin/opa
+RUN chmod +x /usr/bin/opa
 COPY validation/policies /usr/share/opa/policies/
 COPY validation/entrypoint.sh /usr/bin/
 
@@ -7,7 +8,6 @@ ENTRYPOINT ["/usr/bin/entrypoint.sh"]
 
 LABEL \
         com.redhat.component="mtv-validation-container" \
-        version="$CI_VERSION" \
         name="migration-toolkit-virtualization/mtv-validation-rhel9" \
         license="Apache License 2.0" \
         io.k8s.display-name="Migration Toolkit for Virtualization" \

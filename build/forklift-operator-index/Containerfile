@@ -1,0 +1,41 @@
+# The OPM 1.53.0 has problem, once there will be new version with the fix we can bump to latest.
+# https://github.com/operator-framework/operator-registry/pull/1664
+# Ref: https://redhat-internal.slack.com/archives/C074JM28DTP/p1746458556603619
+FROM quay.io/operator-framework/opm:v1.52.0 AS opm
+FROM registry.access.redhat.com/ubi9-minimal:9.6-1747218906 AS builder
+ARG CHANNELS="development"
+ARG DEFAULT_CHANNEL="development"
+ARG VERSION="99.0.0"
+ARG OPERATOR_BUNDLE_IMAGE
+ARG OPM_OPTS
+
+RUN microdnf install gettext -y
+
+COPY --from=opm /bin/opm /bin/opm
+COPY operator /app
+WORKDIR /app
+
+RUN cat catalog/operator.yml | envsubst > operator.yaml
+RUN opm render ${OPERATOR_BUNDLE_IMAGE} ${OPM_OPTS} -o yaml >> operator.yaml
+
+FROM quay.io/operator-framework/opm:v1.52.0
+
+COPY --from=builder /app/operator.yaml /configs/operator.yaml
+
+CMD ["serve", "/configs"]
+ENTRYPOINT ["/bin/opm"]
+
+# Main labels
+LABEL \
+        com.redhat.component="mtv-operator-index-container" \
+        name="migration-toolkit-virtualization/mtv-operator-index" \
+        License="Apache License 2.0" \
+        io.k8s.display-name="Migration Toolkit for Virtualization" \
+        io.openshift.tags="migration" \
+        io.k8s.description="Migration Toolkit for Virtualization - Operator Index" \
+        summary="Migration Toolkit for Virtualization - Operator Index" \
+        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+        description="Migration Toolkit for Virtualization - Operator Index" \
+        vendor="Red Hat, Inc." \
+        distribution-scope="public" \
+        url="https://github.com/kubev2v/forklift" \

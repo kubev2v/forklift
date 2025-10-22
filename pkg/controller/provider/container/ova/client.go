@@ -7,10 +7,10 @@ import (
 	liburl "net/url"
 	"time"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
 )
 
@@ -84,34 +84,6 @@ func (r *Client) list(path string, list interface{}) (err error) {
 	if status != http.StatusOK {
 		err = liberr.New(http.StatusText(status))
 		return
-	}
-
-	return
-}
-
-// Get a resource.
-func (r *Client) get(path string, object interface{}) (err error) {
-	url, err := liburl.Parse(r.serviceURL)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	url.Path = path
-	defer func() {
-		if err != nil {
-			err = liberr.Wrap(err, "url", url.String())
-		}
-	}()
-	status, err := r.client.Get(url.String(), object)
-	if err != nil {
-		return
-	}
-	switch status {
-	case http.StatusOK:
-	case http.StatusNotFound:
-		err = &NotFound{}
-	default:
-		err = liberr.New(http.StatusText(status))
 	}
 
 	return

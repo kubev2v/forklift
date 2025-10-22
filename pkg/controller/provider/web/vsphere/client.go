@@ -3,9 +3,9 @@ package vsphere
 import (
 	"strings"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 )
 
 // Errors.

@@ -4,14 +4,11 @@
 
 # Ignore all test-related files
 **/test
-**/*.md
 
 # Ignore build artifacts
 **/bin
 **/dist
 **/node_modules
-WORKSPACE
-**/BUILD.bazel
 
 # Ignore docs
 docs/

@@ -1,14 +1,12 @@
 package ocp
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/ocp"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
 	storage "k8s.io/api/storage/v1"
 )
 
@@ -43,12 +41,10 @@ func (h StorageClassHandler) List(ctx *gin.Context) {
 		return
 	}
 	if h.WatchRequest {
-		h.watch(ctx)
+		ctx.Status(http.StatusNotImplemented)
 		return
 	}
-	db := h.Collector.DB()
-	list := []model.StorageClass{}
-	err = db.List(&list, h.ListOptions(ctx))
+	storageclasses, err := h.StorageClasses(ctx)
 	if err != nil {
 		log.Trace(
 			err,
@@ -58,12 +54,13 @@ func (h StorageClassHandler) List(ctx *gin.Context) {
 		return
 	}
 	content := []interface{}{}
-	for _, m := range list {
+	for _, m := range storageclasses {
 		r := &StorageClass{}
 		r.With(&m)
 		r.Link(h.Provider)
 		content = append(content, r.Content(h.Detail))
 	}
+	h.Page.Slice(&content)
 
 	ctx.JSON(http.StatusOK, content)
 }
@@ -76,17 +73,7 @@ func (h StorageClassHandler) Get(ctx *gin.Context) {
 		base.SetForkliftError(ctx, err)
 		return
 	}
-	m := &model.StorageClass{
-		Base: model.Base{
-			UID: ctx.Param(StorageClassParam),
-		},
-	}
-	db := h.Collector.DB()
-	err = db.Get(m)
-	if errors.Is(err, model.NotFound) {
-		ctx.Status(http.StatusNotFound)
-		return
-	}
+	storageclasses, err := h.StorageClasses(ctx)
 	if err != nil {
 		log.Trace(
 			err,
@@ -95,36 +82,17 @@ func (h StorageClassHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	r := &StorageClass{}
-	r.With(m)
-	r.Link(h.Provider)
-	content := r.Content(model.MaxDetail)
-
-	ctx.JSON(http.StatusOK, content)
-}
-
-// Watch.
-func (h StorageClassHandler) watch(ctx *gin.Context) {
-	db := h.Collector.DB()
-	err := h.Watch(
-		ctx,
-		db,
-		&model.StorageClass{},
-		func(in libmodel.Model) (r interface{}) {
-			m := in.(*model.StorageClass)
-			sc := &StorageClass{}
-			sc.With(m)
-			sc.Link(h.Provider)
-			r = sc
+	for _, sc := range storageclasses {
+		if sc.UID == ctx.Param(NsParam) {
+			r := &StorageClass{}
+			r.With(&sc)
+			r.Link(h.Provider)
+			content := r.Content(model.MaxDetail)
+			ctx.JSON(http.StatusOK, content)
 			return
-		})
-	if err != nil {
-		log.Trace(
-			err,
-			"url",
-			ctx.Request.URL)
-		ctx.Status(http.StatusInternalServerError)
+		}
 	}
+	ctx.Status(http.StatusNotFound)
 }
 
 // REST Resource.

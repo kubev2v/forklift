@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"reflect"
 
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	"github.com/konveyor/forklift-controller/pkg/lib/ref"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/lib/ref"
 )
 
 // Package logger.

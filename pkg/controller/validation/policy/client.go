@@ -11,12 +11,12 @@ import (
 	"os"
 	"time"
 
-	refapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	"github.com/konveyor/forklift-controller/pkg/settings"
+	refapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/settings"
 )
 
 var log = logging.WithName("validation|policy")
@@ -199,7 +199,7 @@ func (c *Client) buildTransport() (err error) {
 		transport.TLSClientConfig = &tls.Config{
 			RootCAs: pool,
 		}
-	} else {
+	} else if Settings.Development {
 		transport.TLSClientConfig = &tls.Config{
 			InsecureSkipVerify: true,
 		}
@@ -321,6 +321,13 @@ func (r *Worker) run() {
 				task.completed = time.Now()
 			} else {
 				task.Error = err
+				task.Concerns = []model.Concern{
+					{
+						Category:   "Critical",
+						Label:      err.Error(),
+						Assessment: err.Error(),
+					},
+				}
 			}
 			func() {
 				defer func() {
@@ -372,10 +379,11 @@ func (r *Pool) Start() {
 					"task",
 					task.String())
 			} else {
-				log.Info(
+				log.Error(
+					task.Error,
 					"VM validation failed.",
-					"task",
-					task.String())
+					"task", task.String(),
+				)
 			}
 			task.notify()
 		}

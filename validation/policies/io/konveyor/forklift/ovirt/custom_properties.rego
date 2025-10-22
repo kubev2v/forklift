@@ -9,6 +9,7 @@ vm_has_custom_properties = true {
 concerns[flag] {
     vm_has_custom_properties
     flag := {
+        "id": "ovirt.vm.custom_properties.detected",
         "category": "Warning",
         "label": "VM custom properties detected",
         "assessment": "The VM is configured with custom properties, which are not currently supported by OpenShift Virtualization."

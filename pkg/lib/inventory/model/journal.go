@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"sync"
 
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	"github.com/konveyor/forklift-controller/pkg/lib/ref"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	fb "github.com/kubev2v/forklift/pkg/lib/filebacked"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/lib/ref"
 )
 
 // Serial number pool.
@@ -366,18 +366,6 @@ func (r *Journal) Close() (err error) {
 	r.log.V(3).Info("journal closed.")
 
 	return
-}
-
-// Model is being watched.
-// Determine if there a watch interested in the model.
-func (r *Journal) hasWatch(model Model) bool {
-	for _, w := range r.watches {
-		if w.Match(model) {
-			return true
-		}
-	}
-
-	return false
 }
 
 // Stock event handler.

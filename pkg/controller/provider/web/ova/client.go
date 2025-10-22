@@ -3,9 +3,9 @@ package ova
 import (
 	"strings"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 )
 
 // Errors.
@@ -298,6 +298,7 @@ func (r *Finder) Storage(ref *base.Ref) (object interface{}, err error) {
 	storage := &Storage{}
 	err = r.ByRef(storage, *ref)
 	if err == nil {
+		ref.ID = storage.ID
 		ref.Name = storage.Name
 		object = storage
 	}

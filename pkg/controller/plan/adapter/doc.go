@@ -1,14 +1,14 @@
 package adapter
 
 import (
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/ocp"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/openstack"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/ova"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/ovirt"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/vsphere"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
+	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/ocp"
+	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/openstack"
+	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/ova"
+	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/ovirt"
+	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/vsphere"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 )
 
 type Adapter = base.Adapter

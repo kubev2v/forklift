@@ -1,0 +1,88 @@
+FROM registry.redhat.io/ubi9:9.6-1747219013 AS win2008iso
+
+RUN rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+RUN yum install -y --setopt=install_weak_deps=False virtio-win-1.9.4-2.el7.2
+
+FROM registry.redhat.io/ubi9:9.6-1747219013 AS appliance
+
+RUN dnf update -y && \
+    dnf install -y --setopt=install_weak_deps=False \
+    qemu-img \
+    libguestfs-devel \
+    libguestfs-winsupport \
+    libguestfs-xfs
+
+# Create tarball for the appliance.
+#
+# LIBGUESTFS_BACKEND=direct is required to work around the following bug:
+# https://issues.redhat.com/browse/RHEL-104684
+# and it can be removed when that bug gets fixed.
+#
+# It is also required during contianer runtime to work around the following bug:
+# https://issues.redhat.com/browse/RHEL-105490
+ENV LIBGUESTFS_BACKEND=direct
+
+RUN mkdir -p /usr/local/lib/guestfs/appliance && \
+    cd /usr/local/lib/guestfs/appliance && \
+    libguestfs-make-fixed-appliance . && \
+    qemu-img convert -c -O qcow2 root root.qcow2 && \
+    mv -vf root.qcow2 root
+
+FROM registry.redhat.io/ubi9/go-toolset:1.23.6-1745588370 AS builder
+WORKDIR /app
+COPY --chown=1001:0 ./ ./
+ENV GOFLAGS="-mod=vendor -tags=strictfipsruntime"
+ENV GOEXPERIMENT=strictfipsruntime
+
+RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-monitor github.com/kubev2v/forklift/cmd/virt-v2v-monitor
+RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o image-converter github.com/kubev2v/forklift/cmd/image-converter
+RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-wrapper github.com/kubev2v/forklift/cmd/virt-v2v
+
+FROM registry.redhat.io/ubi9:9.6-1747219013 AS runtime
+
+RUN rm /etc/pki/tls/fips_local.cnf && \
+    echo -e '[fips_sect]\ntls1-prf-ems-check = 0\nactivate = 1' > /etc/pki/tls/fips_local.cnf && \
+    sed -i '/^\\[ crypto_policy \\]/a Options=RHNoEnforceEMSinFIPS' /etc/pki/tls/openssl.cnf
+
+RUN mkdir /disks && \
+    source /etc/os-release && \
+    dnf update -y && \
+    dnf install -y --setopt=install_weak_deps=False \
+    virt-v2v \
+    virtio-win
+
+# It is required during contianer runtime to work around the following bug:
+# https://issues.redhat.com/browse/RHEL-105490
+ENV LIBGUESTFS_BACKEND=direct
+
+ENV PATH="$PATH:/usr/libexec"
+
+RUN mkdir -p /usr/lib64/guestfs/appliance
+COPY --from=appliance /usr/local/lib/guestfs/appliance /usr/lib64/guestfs/appliance
+
+COPY --from=builder /app/virt-v2v-monitor /usr/local/bin/virt-v2v-monitor
+
+COPY --from=builder /app/image-converter /usr/local/bin/image-converter
+
+COPY --from=builder /app/virt-v2v-wrapper /usr/bin/virt-v2v-wrapper
+
+COPY --from=win2008iso /usr/share/virtio-win/virtio-win.iso /usr/share/virtio-win/virtio-win-2008.iso
+
+ENTRYPOINT ["/usr/bin/virt-v2v-wrapper"]
+
+ARG VERSION
+ARG REGISTRY
+ARG REVISION
+
+LABEL \
+    com.redhat.component="mtv-virt-v2v-container" \
+    name="${REGISTRY}/mtv-virt-v2v-rhel9" \
+    license="Apache License 2.0" \
+    io.k8s.display-name="Migration Toolkit for Virtualization" \
+    io.k8s.description="Migration Toolkit for Virtualization - Virt-V2V" \
+    io.openshift.tags="migration,mtv,forklift" \
+    summary="Migration Toolkit for Virtualization - Virt-V2V" \
+    description="Migration Toolkit for Virtualization - Virt-V2V" \
+    maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+    version="$VERSION" \
+    revision="$REVISION"

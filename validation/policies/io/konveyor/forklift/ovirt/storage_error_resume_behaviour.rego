@@ -9,6 +9,7 @@ storage_error_resume_behaviour = true {
 concerns[flag] {
     storage_error_resume_behaviour
     flag := {
+        "id": "ovirt.storage.resume_behavior.unsupported",
         "category": "Information",
         "label": "VM storage error resume behavior",
         "assessment": sprintf("The VM has storage error resume behavior set to '%v', which is not currently supported by OpenShift Virtualization", [input.storageErrorResumeBehaviour])

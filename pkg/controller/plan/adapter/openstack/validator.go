@@ -1,11 +1,12 @@
 package openstack
 
 import (
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/web/openstack"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Validator
@@ -67,6 +68,12 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 
 // Validate that a VM's Host isn't in maintenance mode.
 func (r *Validator) MaintenanceMode(vmRef ref.Ref) (ok bool, err error) {
+	ok = true
+	return
+}
+
+// NOOP
+func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, s string, s2 string, err error) {
 	ok = true
 	return
 }

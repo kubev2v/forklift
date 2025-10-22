@@ -1,14 +1,14 @@
 package web
 
 import (
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/openstack"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ova"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
-	"github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
-	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/openstack"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/ova"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/ovirt"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
+	"github.com/kubev2v/forklift/pkg/lib/inventory/container"
+	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
 )
 
 // All handlers.

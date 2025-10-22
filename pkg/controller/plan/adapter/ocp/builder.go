@@ -8,16 +8,16 @@ import (
 	"io"
 	"net/http"
 
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libitr "github.com/konveyor/forklift-controller/pkg/lib/itinerary"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
 	export "kubevirt.io/api/export/v1alpha1"
 
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
-	"github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/ref"
-	planbase "github.com/konveyor/forklift-controller/pkg/controller/plan/adapter/base"
-	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	ocpclient "github.com/konveyor/forklift-controller/pkg/lib/client/openshift"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	ocpclient "github.com/kubev2v/forklift/pkg/lib/client/openshift"
 	core "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -33,8 +33,9 @@ import (
 
 // Network types
 const (
-	Pod    = "pod"
-	Multus = "multus"
+	Pod     = "pod"
+	Multus  = "multus"
+	Ignored = "ignored"
 )
 
 type Builder struct {
@@ -57,15 +58,20 @@ func (r *Builder) ConfigMap(vmRef ref.Ref, secret *core.Secret, object *core.Con
 		return liberr.Wrap(err)
 	}
 
-	object.Data = map[string]string{
-		"ca.pem": vmExport.Status.Links.External.Cert,
+	links := vmExport.Status.Links
+	if links.External != nil {
+		object.Data = map[string]string{
+			"ca.pem": links.External.Cert,
+		}
+	} else {
+		return liberr.Wrap(fmt.Errorf("failed to get external link from VM-exports"))
 	}
 
 	return nil
 }
 
 // DataVolumes implements base.Builder
-func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume) (dvs []cdi.DataVolume, err error) {
+func (r *Builder) DataVolumes(vmRef ref.Ref, secret *v1.Secret, configMap *v1.ConfigMap, dvTemplate *cdi.DataVolume, vddkConfigMap *v1.ConfigMap) (dvs []cdi.DataVolume, err error) {
 	vmExport := &export.VirtualMachineExport{}
 	key := client.ObjectKey{
 		Namespace: vmRef.Namespace,
@@ -244,7 +250,7 @@ func (r *Builder) TemplateLabels(vmRef ref.Ref) (labels map[string]string, err e
 }
 
 // VirtualMachine implements base.Builder
-func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim, usesInstanceType bool) error {
+func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*v1.PersistentVolumeClaim, usesInstanceType bool, sortVolumesByLibvirt bool) error {
 	vmExport := &export.VirtualMachineExport{}
 	err := r.sourceClient.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vmExport)
 	if err != nil {
@@ -281,8 +287,28 @@ func (r *Builder) mapDisks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.Virtu
 	targetVmSpec.Template.Spec.Volumes = []cnv.Volume{}
 
 	r.mapPVCsToTarget(targetVmSpec, persistentVolumeClaims, diskMap)
-	r.mapConfigMapsToTarget(targetVmSpec, configMaps, diskMap)
-	r.mapSecretsToTarget(targetVmSpec, secrets, diskMap)
+	r.mapConfigMapsToTarget(targetVmSpec, configMaps)
+	r.mapSecretsToTarget(targetVmSpec, secrets)
+	r.mapDeviceDisks(targetVmSpec, sourceVm, diskMap)
+}
+
+// FIXME: The map does not contain all possible disk configuration
+// We should go through the missing and implement them or warn around them
+func (r *Builder) isDiskInDiskMap(disk *cnv.Disk, diskMap map[string]*cnv.Disk) bool {
+	for _, val := range diskMap {
+		if disk.Name == val.Name {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *Builder) mapDeviceDisks(targetVmSpec *cnv.VirtualMachineSpec, sourceVm *cnv.VirtualMachine, diskMap map[string]*cnv.Disk) {
+	for _, disk := range sourceVm.Spec.Template.Spec.Domain.Devices.Disks {
+		if r.isDiskInDiskMap(&disk, diskMap) {
+			targetVmSpec.Template.Spec.Domain.Devices.Disks = append(targetVmSpec.Template.Spec.Domain.Devices.Disks, *disk.DeepCopy())
+		}
+	}
 }
 
 func createDiskMap(sourceVm *cnv.VirtualMachine, pvcMap map[string]*core.PersistentVolumeClaim, vmRef ref.Ref) map[string]*cnv.Disk {
@@ -329,7 +355,6 @@ func (r *Builder) mapPVCsToTarget(targetVmSpec *cnv.VirtualMachineSpec, persiste
 				},
 			}
 			targetVmSpec.Template.Spec.Volumes = append(targetVmSpec.Template.Spec.Volumes, targetVolume)
-			targetVmSpec.Template.Spec.Domain.Devices.Disks = append(targetVmSpec.Template.Spec.Domain.Devices.Disks, *disk.DeepCopy())
 		}
 	}
 }
@@ -374,7 +399,7 @@ func (r *Builder) createEnvMaps(sourceVm *cnv.VirtualMachine, vmRef ref.Ref) (ma
 	return configMaps, secrets
 }
 
-func (r *Builder) mapConfigMapsToTarget(targetVmSpec *cnv.VirtualMachineSpec, configMaps map[string]*envMap, diskMap map[string]*cnv.Disk) {
+func (r *Builder) mapConfigMapsToTarget(targetVmSpec *cnv.VirtualMachineSpec, configMaps map[string]*envMap) {
 	for _, configMap := range configMaps {
 		// Create configmap on destination cluster
 		sourceConfigMap := configMap.envResource.(*core.ConfigMap)
@@ -406,17 +431,11 @@ func (r *Builder) mapConfigMapsToTarget(targetVmSpec *cnv.VirtualMachineSpec, co
 			},
 		}
 
-		if disk, ok := diskMap[sourceConfigMap.Name]; ok {
-			targetVmSpec.Template.Spec.Domain.Devices.Disks = append(targetVmSpec.Template.Spec.Domain.Devices.Disks, *disk.DeepCopy())
-		} else {
-			r.Log.Info("ConfigMap disk not found in diskMap, should never happen", "configMap", sourceConfigMap.Name)
-		}
-
 		targetVmSpec.Template.Spec.Volumes = append(targetVmSpec.Template.Spec.Volumes, configMapVolume)
 	}
 }
 
-func (r *Builder) mapSecretsToTarget(targetVmSpec *cnv.VirtualMachineSpec, secrets map[string]*envMap, diskMap map[string]*cnv.Disk) {
+func (r *Builder) mapSecretsToTarget(targetVmSpec *cnv.VirtualMachineSpec, secrets map[string]*envMap) {
 	for _, secret := range secrets {
 		// Create secret on destination cluster
 		sourceSecret := secret.envResource.(*core.Secret)
@@ -444,12 +463,6 @@ func (r *Builder) mapSecretsToTarget(targetVmSpec *cnv.VirtualMachineSpec, secre
 					SecretName: targetSecret.Name,
 				},
 			},
-		}
-
-		if disk, ok := diskMap[sourceSecret.Name]; ok {
-			targetVmSpec.Template.Spec.Domain.Devices.Disks = append(targetVmSpec.Template.Spec.Domain.Devices.Disks, *disk.DeepCopy())
-		} else {
-			r.Log.Info("Secret disk not found in diskMap, should never happen", "secret", sourceSecret.Name)
 		}
 
 		targetVmSpec.Template.Spec.Volumes = append(targetVmSpec.Template.Spec.Volumes, secretVolume)
@@ -484,11 +497,44 @@ func (r *Builder) mapNetworks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.Vi
 				r.Log.Info("Network not found", "namespace", namespace, "name", name)
 				continue
 			}
+
+			// Check if the network should be ignored
+			if pair.Destination.Type == Ignored {
+				r.Log.Info("Network is ignored", "namespace", namespace, "name", name)
+				continue
+			}
+
+			// Check if the network is mapped to the pod network
+			if pair.Destination.Type == Pod {
+				targetNetwork.Pod = &cnv.PodNetwork{}
+				continue
+			}
+
 			targetNetwork.Multus = &cnv.MultusNetwork{
 				NetworkName: fmt.Sprintf("%s/%s", pair.Destination.Namespace, pair.Destination.Name),
 			}
 
 		case network.Pod != nil:
+			pair, found := r.Map.Network.FindNetworkByType(Pod)
+			if !found {
+				r.Log.Info("Network not found", "type", Pod)
+				continue
+			}
+
+			// Check if the network should be ignored
+			if pair.Destination.Type == Ignored {
+				r.Log.Info("Network is ignored", "type", Pod)
+				continue
+			}
+
+			// Check if the network is mapped to a multus network
+			if pair.Destination.Type == Multus {
+				targetNetwork.Multus = &cnv.MultusNetwork{
+					NetworkName: fmt.Sprintf("%s/%s", pair.Destination.Namespace, pair.Destination.Name),
+				}
+				continue
+			}
+
 			targetNetwork.Pod = &cnv.PodNetwork{}
 		default:
 			r.Log.Error(nil, "Unknown network type")
@@ -513,14 +559,25 @@ func (r *Builder) getSourceVmFromDefinition(vme *export.VirtualMachineExport) (*
 	}
 
 	caCert := vme.Status.Links.External.Cert
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM([]byte(caCert))
+	var transport *http.Transport
 
-	tlsConfig := &tls.Config{
-		RootCAs: caCertPool,
+	if caCert != "" {
+		caCertPool := x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM([]byte(caCert)) {
+			return nil, liberr.New("failed to parse CA certificate")
+		}
+
+		tlsConfig := &tls.Config{
+			RootCAs: caCertPool,
+		}
+
+		transport = &http.Transport{TLSClientConfig: tlsConfig}
+
+	} else {
+		r.Log.Info("Certificate from VM export is empty, using system CA certificates")
+		transport = &http.Transport{}
 	}
 
-	transport := &http.Transport{TLSClientConfig: tlsConfig}
 	httpClient := &http.Client{Transport: transport}
 	req, err := http.NewRequest("GET", vmManifestUrl, nil)
 	if err != nil {
@@ -592,7 +649,7 @@ func createDataVolumeSpec(size resource.Quantity, storageClassName, url, configM
 			},
 		},
 		Storage: &cdi.StorageSpec{
-			Resources: core.ResourceRequirements{
+			Resources: core.VolumeResourceRequirements{
 				Requests: core.ResourceList{
 					core.ResourceStorage: size,
 				},

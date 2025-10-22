@@ -12,11 +12,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/konveyor/forklift-controller/pkg/apis"
+	"github.com/kubev2v/forklift/pkg/apis"
 	"k8s.io/klog/v2"
 
 	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
-	forkliftv1 "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	forkliftv1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	authenticationv1 "k8s.io/api/authentication/v1"

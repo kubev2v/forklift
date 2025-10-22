@@ -18,6 +18,7 @@ const (
 	WorkingDir     = "WORKING_DIR"
 	AuthRequired   = "AUTH_REQUIRED"
 	Host           = "API_HOST"
+	Namespace      = "POD_NAMESPACE"
 	Port           = "API_PORT"
 	TLSCertificate = "API_TLS_CERTIFICATE"
 	TLSKey         = "API_TLS_KEY"
@@ -40,6 +41,8 @@ type Inventory struct {
 	AuthRequired bool
 	// Host.
 	Host string
+	// Pod namespace
+	Namespace string
 	// Port
 	Port int
 	// TLS
@@ -80,6 +83,10 @@ func (r *Inventory) Load() error {
 		r.Host = s
 	} else {
 		r.Host = "localhost"
+	}
+	// Namespace
+	if s, found := os.LookupEnv(Namespace); found {
+		r.Namespace = s
 	}
 	// Port
 	if s, found := os.LookupEnv(Port); found {

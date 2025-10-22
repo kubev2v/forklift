@@ -17,14 +17,14 @@ limitations under the License.
 package controller
 
 import (
-	"github.com/konveyor/forklift-controller/pkg/controller/hook"
-	"github.com/konveyor/forklift-controller/pkg/controller/host"
-	"github.com/konveyor/forklift-controller/pkg/controller/map/network"
-	"github.com/konveyor/forklift-controller/pkg/controller/map/storage"
-	"github.com/konveyor/forklift-controller/pkg/controller/migration"
-	"github.com/konveyor/forklift-controller/pkg/controller/plan"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider"
-	"github.com/konveyor/forklift-controller/pkg/settings"
+	"github.com/kubev2v/forklift/pkg/controller/hook"
+	"github.com/kubev2v/forklift/pkg/controller/host"
+	"github.com/kubev2v/forklift/pkg/controller/map/network"
+	"github.com/kubev2v/forklift/pkg/controller/map/storage"
+	"github.com/kubev2v/forklift/pkg/controller/migration"
+	"github.com/kubev2v/forklift/pkg/controller/plan"
+	"github.com/kubev2v/forklift/pkg/controller/provider"
+	"github.com/kubev2v/forklift/pkg/settings"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 

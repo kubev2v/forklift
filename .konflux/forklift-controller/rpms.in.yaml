@@ -1,0 +1,9 @@
+packages:
+  - tar
+contentOrigin:
+  repofiles:
+    - ./redhat.repo
+context:
+  containerfile:
+    file: ../../build/forklift-controller/Containerfile-downstream
+arches: [x86_64]

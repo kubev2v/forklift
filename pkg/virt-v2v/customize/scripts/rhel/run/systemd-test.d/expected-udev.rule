@@ -1,0 +1,3 @@
+SUBSYSTEM=="net",ACTION=="add",ATTR{address}=="aa:bb:cc:dd:ee:ff",NAME="ens160"
+SUBSYSTEM=="net",ACTION=="add",ATTR{address}=="aa:bb:cc:dd:ee:fe",NAME="eth1"
+SUBSYSTEM=="net",ACTION=="add",ATTR{address}=="aa:bb:cc:dd:ee:fd",NAME="enp3s0"

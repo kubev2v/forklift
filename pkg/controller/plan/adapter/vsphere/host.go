@@ -3,11 +3,10 @@ package vsphere
 import (
 	"context"
 	liburl "net/url"
-	"strconv"
 	"time"
 
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/session"
@@ -73,8 +72,11 @@ func (r *EsxHost) connect(ctx context.Context) (err error) {
 	url.User = liburl.UserPassword(
 		r.user(),
 		r.password())
-	soapClient := soap.NewClient(url, r.getInsecureSkipVerifyFlag())
+
+	// Always use insecure skip verify for ESX hosts.
+	soapClient := soap.NewClient(url, true)
 	soapClient.SetThumbprint(url.Host, r.thumbprint())
+
 	vimClient, err := vim25.NewClient(ctx, soapClient)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -127,20 +129,4 @@ func (r *EsxHost) thumbprint() string {
 	}
 
 	return ""
-}
-
-// GetInsecureSkipVerifyFlag gets the insecureSkipVerify boolean flag
-// value from the provider connection secret.
-func (r *EsxHost) getInsecureSkipVerifyFlag() bool {
-	insecure, found := r.Secret.Data["insecureSkipVerify"]
-	if !found {
-		return true
-	}
-
-	insecureSkipVerify, err := strconv.ParseBool(string(insecure))
-	if err != nil {
-		return true
-	}
-
-	return insecureSkipVerify
 }

@@ -1,7 +1,7 @@
 package ovirt
 
 import (
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/model/ocp"
+	"github.com/kubev2v/forklift/pkg/controller/provider/model/ocp"
 )
 
 // Build all models.

@@ -19,10 +19,10 @@ export GOPATH="$HOME/go"
 
 # Running 'go get -d' will clone the forklift-controller repo into the proper
 # location on your $GOPATH
-go get -d github.com/konveyor/forklift-controller
+go get -d github.com/kubev2v/forklift
 
 # Take a peek at the newly cloned files
-ls -Fal $GOPATH/src/github.com/konveyor/forklift-controller
+ls -Fal $GOPATH/src/github.com/kubev2v/forklift
 ```
 
 __5. Login __
@@ -61,7 +61,6 @@ should be aware of.
 | Command | Description |
 | --- | --- |
 | `run` | Build a controller manager binary and run the controller against the active cluster |
-| `manager` | Build a controller manager binary |
 | `install` | Install generated CRDs onto the active cluster |
 | `manifests` | Generate updated CRDs from types.go files, RBAC from annotations in controller, deploy manifest YAML |
-| `docker-build` | Build the controller into a container image. Requires support for multi-stage builds, which may require moby-engine |
+

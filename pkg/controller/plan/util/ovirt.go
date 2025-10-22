@@ -6,10 +6,10 @@ import (
 
 	core "k8s.io/api/core/v1"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ovirt"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/ovirt"
 )
 
 // Build an OvirtVolumePopulator for XDiskAttachment and source URL

@@ -9,6 +9,7 @@ has_cpushares_enabled = true {
 concerns[flag] {
     has_cpushares_enabled
     flag := {
+        "id": "ovirt.cpu.shares.defined",
         "category": "Warning",
         "label": "VM has CPU Shares Defined",
         "assessment": "The VM has CPU shares defined. This functionality is not currently supported by OpenShift Virtualization. The VM can be migrated but the CPU shares configuration will be missing in the target environment."

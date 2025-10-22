@@ -20,9 +20,9 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/konveyor/forklift-controller/pkg/forklift-api/services"
-	webhooks "github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/forklift-api/services"
+	webhooks "github.com/kubev2v/forklift/pkg/forklift-api/webhooks"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 

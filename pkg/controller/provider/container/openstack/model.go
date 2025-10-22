@@ -5,11 +5,11 @@ import (
 	"errors"
 	"time"
 
-	model "github.com/konveyor/forklift-controller/pkg/controller/provider/model/openstack"
-	libclient "github.com/konveyor/forklift-controller/pkg/lib/client/openstack"
-	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/openstack"
+	libclient "github.com/kubev2v/forklift/pkg/lib/client/openstack"
+	fb "github.com/kubev2v/forklift/pkg/lib/filebacked"
+	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 )
 
 // All adapters.

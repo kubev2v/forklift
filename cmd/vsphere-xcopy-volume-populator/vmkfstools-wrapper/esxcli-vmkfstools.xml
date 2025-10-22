@@ -1,0 +1,72 @@
+<?xml version="1.0"?>
+<plugin xmlns="http://www.vmware.com/Products/ESX/5.0/esxcli/">
+   <version>1.0.0</version>
+
+   <namespaces>
+      <namespace path="vmkfstools">
+         <description>vmkfstools operations</description>
+      </namespace>
+   </namespaces>
+
+   <commands>
+      <command path="vmkfstools.clone">
+         <description>Clone VMDK to RDM</description>
+         <input-spec>
+            <parameter name="source-vmdk" type="string" required="true" shortname="s">
+               <description>Full path to the source VMDK (e.g., /vmfs/volumes/$datastore/$vmname/$vmname.vmdk)</description>
+            </parameter>
+            <parameter name="target-lun" type="string" required="true" shortname="t">
+               <description>Target RDM device (e.g., /vmfs/devices/disks/naa.$8-digits-vendor$24-disk-serial-number-in-hex)</description>
+            </parameter>
+         </input-spec>
+         <output-spec>
+            <structure typeName="result">
+               <field name="status"> <string/></field>
+               <field name="message"> <string/></field>
+            </structure>
+         </output-spec>
+         <format-parameters>
+            <formatter>simple</formatter>
+         </format-parameters>
+         <execute>/opt/redhat/vmkfstools-wrapper --clone -s $val{source-vmdk} -t $val{target-lun} </execute>
+      </command>
+      <command path="vmkfstools.taskGet">
+         <description>Get a clone task status</description>
+         <input-spec>
+            <parameter name="id" type="string" required="true" shortname="i">
+               <description>Task ID</description>
+            </parameter>
+         </input-spec>
+         <output-spec>
+            <structure typeName="result">
+               <field name="status"> <string/></field>
+               <field name="message"> <string/></field>
+            </structure>
+         </output-spec>
+         <format-parameters>
+            <formatter>simple</formatter>
+         </format-parameters>
+         <execute>/opt/redhat/vmkfstools-wrapper --task-get -i $val{id}</execute>
+      </command>
+      <command path="vmkfstools.taskClean">
+         <description>Clean task artifacts</description>
+         <input-spec>
+            <parameter name="id" type="string" required="true" shortname="i">
+               <description>Task ID</description>
+            </parameter>
+         </input-spec>
+         <output-spec>
+            <structure typeName="result">
+               <field name="status"> <string/></field>
+               <field name="message"> <string/></field>
+            </structure>
+         </output-spec>
+         <format-parameters>
+            <formatter>simple</formatter>
+         </format-parameters>
+         <execute>/opt/redhat/vmkfstools-wrapper --task-clean -i $val{id}</execute>
+      </command>
+
+   </commands>
+
+</plugin>

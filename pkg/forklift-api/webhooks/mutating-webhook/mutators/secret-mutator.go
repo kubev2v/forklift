@@ -13,10 +13,10 @@ import (
 	"net/url"
 	"strconv"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/util"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/forklift-api/webhooks/util"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 	admissionv1 "k8s.io/api/admission/v1beta1"
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -159,7 +159,7 @@ func (mutator *SecretMutator) patchSecret() *admissionv1.AdmissionResponse {
 func (mutator *SecretMutator) mutateHostSecret() *admissionv1.AdmissionResponse {
 	if _, ok := mutator.secret.GetLabels()["createdForResource"]; ok { // checking this just because there's no point in mutating an invalid secret
 		var secretChanged bool
-		if _, ok := mutator.secret.Data["user"]; !ok {
+		if user, ok := mutator.secret.Data["user"]; !ok || string(user) == "" {
 			provider := &api.Provider{}
 			providerName := string(mutator.secret.Data["provider"])
 			providerNamespace := mutator.secret.Namespace

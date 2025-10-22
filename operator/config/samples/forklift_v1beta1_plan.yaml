@@ -7,9 +7,8 @@ metadata:
 spec:
   provider:
     source:
-      namespace: ''
-      name: ''
+      namespace: ""
+      name: ""
     destination:
-      namespace: ''
-      name: ''
-
+      namespace: ""
+      name: ""

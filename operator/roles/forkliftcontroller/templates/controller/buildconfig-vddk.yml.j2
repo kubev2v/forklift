@@ -1,0 +1,33 @@
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: "{{ vddk_build_config_name }}"
+  namespace: "{{ app_namespace }}"
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 1
+  source:
+    dockerfile: |
+      FROM registry.access.redhat.com/ubi9/ubi-minimal
+      ARG VDDK_FILE
+      COPY secrets/token /tmp/secrets/token
+      RUN microdnf install -y tar gzip file \
+       && curl -k \
+            -H "Authorization: Bearer $(cat /tmp/secrets/token)" \
+            "https://{{ inventory_service_name }}.{{ app_namespace }}.svc.cluster.local:8443/vddk/download-tar?filename=${VDDK_FILE}" \
+            -o /vddk.tar.gz \
+       && tar -zxvf /vddk.tar.gz
+      ENTRYPOINT ["cp", "-r", "/vmware-vix-disklib-distrib", "/opt"]
+    secrets:
+      - secret:
+          name: "{{ controller_service_name }}-token"
+        destinationDir: secrets
+  strategy:
+    dockerStrategy:
+      buildArgs:
+        - name: VDDK_FILE
+  output:
+    to:
+      kind: ImageStreamTag
+      name: "{{ vddk_image_stream_name }}:latest"

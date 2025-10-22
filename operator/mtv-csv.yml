@@ -1,0 +1,996 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: |-
+      [
+        {
+          "apiVersion": "forklift.konveyor.io/v1beta1",
+          "kind": "ForkliftController",
+          "metadata": {
+            "name": "forklift-controller",
+            "namespace": "openshift-mtv"
+          },
+          "spec": {
+            "feature_ui_plugin": "true",
+            "feature_validation": "true",
+            "feature_volume_populator": "true"
+          }
+        },
+        {
+          "apiVersion": "forklift.konveyor.io/v1beta1",
+          "kind": "Hook",
+          "metadata": {
+            "name": "example-hook",
+            "namespace": "openshift-mtv"
+          },
+          "spec": {
+            "image": "quay.io/konveyor/hook-runner",
+            "playbook": "\u003cbase64-encoded-playbook\u003e"
+          }
+        },
+        {
+          "apiVersion": "forklift.konveyor.io/v1beta1",
+          "kind": "Host",
+          "metadata": {
+            "name": "example-host",
+            "namespace": "openshift-mtv"
+          },
+          "spec": {
+            "id": "",
+            "ipAddress": "",
+            "provider": {
+              "name": "",
+              "namespace": ""
+            }
+          }
+        },
+        {
+          "apiVersion": "forklift.konveyor.io/v1beta1",
+          "kind": "Migration",
+          "metadata": {
+            "name": "example-migration",
+            "namespace": "openshift-mtv"
+          },
+          "spec": {
+            "plan": {
+              "name": "example-plan",
+              "namespace": "openshift-mtv"
+            }
+          }
+        },
+        {
+          "apiVersion": "forklift.konveyor.io/v1beta1",
+          "kind": "NetworkMap",
+          "metadata": {
+            "name": "example-networkmap",
+            "namespace": "openshift-mtv"
+          },
+          "spec": {
+            "map": [
+              {
+                "destination": {
+                  "name": "",
+                  "namespace": "",
+                  "type": "pod"
+                },
+                "source": {
+                  "id": ""
+                }
+              }
+            ],
+            "provider": {
+              "name": "",
+              "namespace": ""
+            }
+          }
+        },
+        {
+          "apiVersion": "forklift.konveyor.io/v1beta1",
+          "kind": "OpenstackVolumePopulator",
+          "metadata": {
+            "name": "example-openstack",
+            "namespace": "openshift-mtv"
+          },
+          "spec": {
+            "identityUrl": "",
+            "imageId": "",
+            "secretName": ""
+          }
+        },
+        {
+          "apiVersion": "forklift.konveyor.io/v1beta1",
+          "kind": "OvirtVolumePopulator",
+          "metadata": {
+            "name": "example-ovirt-imageio",
+            "namespace": "openshift-mtv"
+          },
+          "spec": {
+            "diskId": "",
+            "engineSecretName": "",
+            "engineUrl": ""
+          }
+        },
+        {
+          "apiVersion": "forklift.konveyor.io/v1beta1",
+          "kind": "Plan",
+          "metadata": {
+            "name": "example-plan",
+            "namespace": "openshift-mtv"
+          },
+          "spec": {
+            "provider": {
+              "destination": {
+                "name": "",
+                "namespace": ""
+              },
+              "source": {
+                "name": "",
+                "namespace": ""
+              }
+            }
+          }
+        },
+        {
+          "apiVersion": "forklift.konveyor.io/v1beta1",
+          "kind": "Provider",
+          "metadata": {
+            "name": "example-provider",
+            "namespace": "openshift-mtv"
+          },
+          "spec": {
+            "secret": {
+              "name": "",
+              "namespace": ""
+            },
+            "type": "vmware",
+            "url": ""
+          }
+        },
+        {
+          "apiVersion": "forklift.konveyor.io/v1beta1",
+          "kind": "StorageMap",
+          "metadata": {
+            "name": "example-storagemap",
+            "namespace": "openshift-mtv"
+          },
+          "spec": {
+            "map": [
+              {
+                "destination": {
+                  "storageClass": ""
+                },
+                "source": {
+                  "id": ""
+                }
+              }
+            ],
+            "provider": {
+              "name": "",
+              "namespace": ""
+            }
+          }
+        }
+      ]
+    capabilities: Seamless Upgrades
+    categories: OpenShift Optional
+    certified: "true"
+    containerImage: ${OPERATOR_IMAGE}
+    createdAt: ${DATE}
+    description: Facilitates migration of VM workloads to OpenShift Virtualization
+    features.operators.openshift.io/cnf: "false"
+    features.operators.openshift.io/cni: "false"
+    features.operators.openshift.io/csi: "false"
+    features.operators.openshift.io/disconnected: "false"
+    features.operators.openshift.io/fips-compliant: "true"
+    features.operators.openshift.io/fipsmode: "true"
+    features.operators.openshift.io/proxy-aware: "false"
+    features.operators.openshift.io/tls-profiles: "false"
+    features.operators.openshift.io/token-auth-aws: "false"
+    features.operators.openshift.io/token-auth-azure: "false"
+    features.operators.openshift.io/token-auth-gcp: "false"
+    operatorframework.io/initialization-resource: |-
+      {
+        "apiVersion": "forklift.konveyor.io/v1beta1",
+        "kind": "ForkliftController",
+        "metadata": {
+          "name": "forklift-controller",
+          "namespace": "openshift-mtv"
+        },
+        "spec": {
+          "feature_ui_plugin": "true",
+          "feature_validation": "true",
+          "feature_volume_populator": "true"
+        }
+      }
+    operatorframework.io/suggested-namespace: openshift-mtv
+    operators.openshift.io/valid-subscription: '["OpenShift Kubernetes Engine", "OpenShift
+      Container Platform", "OpenShift Platform Plus"]'
+    operators.operatorframework.io/builder: operator-sdk-v1.38.0-ocp
+    operators.operatorframework.io/project_layout: ansible.sdk.operatorframework.io/v1
+    repository: https://github.com/kubev2v/forklift
+    support: Red Hat
+  name: mtv-operator.v${VERSION}
+  namespace: openshift-mtv
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+      - description: VM migration controller
+        displayName: ForkliftController
+        kind: ForkliftController
+        name: forkliftcontrollers.forklift.konveyor.io
+        version: v1beta1
+      - description: Hook schema for the hooks API
+        displayName: Hook
+        kind: Hook
+        name: hooks.forklift.konveyor.io
+        version: v1beta1
+      - description: VM host
+        displayName: Host
+        kind: Host
+        name: hosts.forklift.konveyor.io
+        version: v1beta1
+      - description: VM migration
+        displayName: Migration
+        kind: Migration
+        name: migrations.forklift.konveyor.io
+        version: v1beta1
+      - description: VM network map
+        displayName: NetworkMap
+        kind: NetworkMap
+        name: networkmaps.forklift.konveyor.io
+        version: v1beta1
+      - description: OpenStack Volume Populator
+        displayName: OpenstackVolumePopulator
+        kind: OpenstackVolumePopulator
+        name: openstackvolumepopulators.forklift.konveyor.io
+        version: v1beta1
+      - description: oVirt Volume Populator
+        displayName: OvirtVolumePopulator
+        kind: OvirtVolumePopulator
+        name: ovirtvolumepopulators.forklift.konveyor.io
+        version: v1beta1
+      - description: VM migration plan
+        displayName: Plan
+        kind: Plan
+        name: plans.forklift.konveyor.io
+        version: v1beta1
+      - description: VM provider
+        displayName: Provider
+        kind: Provider
+        name: providers.forklift.konveyor.io
+        version: v1beta1
+      - description: VM storage map
+        displayName: StorageMap
+        kind: StorageMap
+        name: storagemaps.forklift.konveyor.io
+        version: v1beta1
+      - description: VSphere Xcopy Volume Populator
+        displayName: VSphereXcopyVolumePopulator
+        kind: VSphereXcopyVolumePopulator
+        name: vspherexcopyvolumepopulators.forklift.konveyor.io
+        version: v1beta1
+  description: |
+    The Migration Toolkit for Virtualization Operator manages the deployment and life cycle of Migration Toolkit for Virtualization on [OpenShift](https://www.openshift.com/) Container Platform.
+
+    ### Installation
+
+    OpenShift Virtualization must be installed on an OpenShift migration target cluster before you can use MTV to transfer any VMs to that cluster
+
+    Once you have successfully installed the Operator, proceed to deploy components by creating the required ForkliftController CR.
+
+    By default, the Operator installs the following components on a target cluster:
+
+    * Controller, to coordinate migration processes.
+    * UI, the web console to manage migrations.
+    * Validation, a service to validate migration workflows.
+
+    ### Compatibility
+
+    Migration Toolkit for Virtualization 2.8 is supported on OpenShift 4.16, 4.17 and 4.18
+
+    Migration Toolkit for Virtualization 2.9 is supported on OpenShift 4.17, 4.18 and 4.19
+
+    More information on compatibility in the [MTV Lifecycle document](https://access.redhat.com/support/policy/updates/migration-toolkit-for-virtualization).
+
+    ### Documentation
+    Documentation can be found on the [Red Hat Customer Portal](https://access.redhat.com/documentation/en-us/migration_toolkit_for_virtualization/).
+
+    ### Getting help
+    If you encounter any issues while using Migration Toolkit for Virtualization Operator, create a [support case](https://access.redhat.com/support/cases/) for bugs, enhancements, or other requests.
+
+    ### Contributing
+    You can contribute by:
+
+    * Creating a case in the [Red Hat Customer Portal](https://access.redhat.com/support/cases/) with any issues you find using Migration Toolkit for Application and its Operator.
+    * Fixing issues by opening Pull Requests in the [KubeV2V](https://github.com/kubev2v/) under Forklift Projects.
+    * Improving Forklift upstream [documentation](https://github.com/kubev2v/forklift-documentation/).
+  displayName: Migration Toolkit for Virtualization Operator
+  icon:
+    - base64data: PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzOCIgaGVpZ2h0PSIzOCIgdmlld0JveD0iMCAwIDM4IDM4Ij48ZGVmcz48c3R5bGU+LmF7ZmlsbDojZTAwO308L3N0eWxlPjwvZGVmcz48cGF0aCBkPSJNMjgsMi4yNUE3Ljc1ODcsNy43NTg3LDAsMCwxLDM1Ljc1LDEwVjI4QTcuNzU4Nyw3Ljc1ODcsMCwwLDEsMjgsMzUuNzVIMTBBNy43NTg3LDcuNzU4NywwLDAsMSwyLjI1LDI4VjEwQTcuNzU4Nyw3Ljc1ODcsMCwwLDEsMTAsMi4yNUgyOE0yOCwxSDEwYTksOSwwLDAsMC05LDlWMjhhOSw5LDAsMCwwLDksOUgyOGE5LDksMCwwLDAsOS05VjEwYTksOSwwLDAsMC05LTlaIi8+PHBhdGggZD0iTTI3LDE1LjkxMzFIMTYuODE3OGwuNzc4OS0uNzc4M2EuNjI1Ni42MjU2LDAsMSwwLS44ODQ4LS44ODQ4bC0xLjg0NjcsMS44NDY3YS42MjU5LjYyNTksMCwwLDAsLjAwMS44ODQ3bDEuODQ2NywxLjg0NTdhLjYyNDkuNjI0OSwwLDEsMCwuODgyOC0uODg0N2wtLjc4LS43NzkzSDI2LjM3NVYyNi4zNzVIMTcuMTYzMVYyNC44OWEuNjI1LjYyNSwwLDAsMC0xLjI1LDBWMjdhLjYyNTYuNjI1NiwwLDAsMCwuNjI1LjYyNUgyN0EuNjI1Ni42MjU2LDAsMCwwLDI3LjYyNSwyN1YxNi41MzgxQS42MjU2LjYyNTYsMCwwLDAsMjcsMTUuOTEzMVoiLz48cGF0aCBjbGFzcz0iYSIgZD0iTTIzLjEzMzgsMjEuMDE4NmwtMS44NDY3LTEuODQ1N2EuNjI0OS42MjQ5LDAsMSwwLS44ODI4Ljg4NDdsLjc4Ljc3OTNIMTEuNjI1VjExLjYyNWg5LjIxMTlWMTMuMTFhLjYyNS42MjUsMCwwLDAsMS4yNSwwVjExYS42MjU2LjYyNTYsMCwwLDAtLjYyNS0uNjI1SDExYS42MjU2LjYyNTYsMCwwLDAtLjYyNS42MjVWMjEuNDYxOWEuNjI1Ni42MjU2LDAsMCwwLC42MjUuNjI1SDIxLjE4MjJsLS43Nzg5Ljc3ODNhLjYyNTYuNjI1NiwwLDAsMCwuODg0OC44ODQ4bDEuODQ2Ny0xLjg0NjdhLjYyNTkuNjI1OSwwLDAsMC0uMDAxLS44ODQ3WiIvPjwvc3ZnPg==
+      mediatype: image/svg+xml
+  install:
+    spec:
+      clusterPermissions:
+        - rules:
+            - apiGroups:
+                - forklift.konveyor.io
+              resources:
+                - plans
+                - providers
+                - storagemaps
+                - hosts
+              verbs:
+                - get
+                - list
+            - apiGroups:
+                - storage.k8s.io
+              resources:
+                - storageclasses
+              verbs:
+                - get
+                - list
+            - apiGroups:
+                - k8s.cni.cncf.io
+              resources:
+                - network-attachment-definitions
+              verbs:
+                - get
+                - list
+            - apiGroups:
+                - authorization.k8s.io
+              resources:
+                - subjectaccessreviews
+              verbs:
+                - create
+            - apiGroups:
+                - ""
+              resources:
+                - secrets
+              verbs:
+                - get
+          serviceAccountName: forklift-api
+        - rules:
+            - apiGroups:
+                - forklift.konveyor.io
+              resources:
+                - '*'
+              verbs:
+                - '*'
+            - apiGroups:
+                - ""
+              resources:
+                - pods
+                - secrets
+                - namespaces
+                - events
+                - configmaps
+                - persistentvolumes
+                - persistentvolumeclaims
+                - services
+              verbs:
+                - get
+                - list
+                - watch
+                - create
+                - update
+                - patch
+                - delete
+            - apiGroups:
+                - batch
+              resources:
+                - jobs
+              verbs:
+                - get
+                - list
+                - watch
+                - create
+                - update
+                - patch
+                - delete
+            - apiGroups:
+                - authentication.k8s.io
+              resources:
+                - tokenreviews
+              verbs:
+                - create
+            - apiGroups:
+                - authorization.k8s.io
+              resources:
+                - subjectaccessreviews
+              verbs:
+                - create
+            - apiGroups:
+                - k8s.cni.cncf.io
+              resources:
+                - network-attachment-definitions
+              verbs:
+                - get
+                - list
+                - watch
+            - apiGroups:
+                - storage.k8s.io
+              resources:
+                - storageclasses
+              verbs:
+                - get
+                - list
+                - watch
+            - apiGroups:
+                - kubevirt.io
+              resources:
+                - virtualmachines
+                - virtualmachines/finalizers
+              verbs:
+                - get
+                - list
+                - watch
+                - create
+                - update
+                - patch
+                - delete
+            - apiGroups:
+                - cdi.kubevirt.io
+              resources:
+                - datavolumes
+                - datavolumes/finalizers
+              verbs:
+                - get
+                - list
+                - watch
+                - create
+                - update
+                - patch
+                - delete
+            - apiGroups:
+                - security.openshift.io
+              resourceNames:
+                - anyuid
+              resources:
+                - securitycontextconstraints
+              verbs:
+                - use
+            - apiGroups:
+                - template.openshift.io
+              resources:
+                - templates
+              verbs:
+                - get
+                - list
+            - apiGroups:
+                - export.kubevirt.io
+              resources:
+                - virtualmachineexports
+              verbs:
+                - get
+                - list
+                - watch
+                - create
+                - update
+                - patch
+                - delete
+            - apiGroups:
+                - apps
+              resources:
+                - deployments
+              verbs:
+                - get
+                - list
+                - watch
+                - create
+                - update
+                - patch
+                - delete
+            - apiGroups:
+                - instancetype.kubevirt.io
+              resources:
+                - virtualmachinepreferences
+                - virtualmachineclusterpreferences
+                - virtualmachineinstancetypes
+                - virtualmachineclusterinstancetypes
+              verbs:
+                - get
+                - list
+                - watch
+            - apiGroups:
+                - ""
+              resources:
+                - serviceaccounts
+              verbs:
+                - create
+            - apiGroups:
+                - rbac.authorization.k8s.io
+              resources:
+                - roles
+                - rolebindings
+                - clusterroles
+                - clusterrolebindings
+              verbs:
+                - get
+                - patch
+                - create
+            - apiGroups:
+                - build.openshift.io
+              resources:
+                - builds
+                - buildconfigs
+                - buildconfigs/instantiate
+              verbs:
+                - create
+                - get
+                - list
+                - watch
+                - update
+            - apiGroups:
+                - image.openshift.io
+              resources:
+                - imagestreamtags
+                - imagestreams
+              verbs:
+                - get
+                - list
+                - watch
+          serviceAccountName: forklift-controller
+        - rules:
+            - apiGroups:
+                - ""
+              resources:
+                - namespaces
+              verbs:
+                - list
+                - watch
+            - apiGroups:
+                - config.openshift.io
+              resources:
+                - clusterversions
+                - proxies
+              verbs:
+                - get
+            - apiGroups:
+                - oauth.openshift.io
+              resources:
+                - oauthclients
+              verbs:
+                - '*'
+            - apiGroups:
+                - forklift.konveyor.io
+              resources:
+                - forkliftcontrollers
+                - forkliftcontrollers/status
+                - forkliftcontrollers/finalizers
+              verbs:
+                - create
+                - delete
+                - get
+                - list
+                - patch
+                - update
+                - watch
+            - apiGroups:
+                - console.openshift.io
+              resources:
+                - consoleplugins
+              verbs:
+                - '*'
+            - apiGroups:
+                - operator.openshift.io
+              resources:
+                - consoles
+              verbs:
+                - get
+                - list
+                - watch
+                - update
+                - patch
+            - apiGroups:
+                - admissionregistration.k8s.io
+              resources:
+                - mutatingwebhookconfigurations
+                - validatingwebhookconfigurations
+              verbs:
+                - '*'
+            - apiGroups:
+                - cert-manager.io
+              resources:
+                - issuers
+                - certificates
+              verbs:
+                - '*'
+            - apiGroups:
+                - security.openshift.io
+              resources:
+                - securitycontextconstraints
+              verbs:
+                - create
+                - delete
+                - get
+                - list
+                - watch
+                - update
+                - patch
+          serviceAccountName: forklift-operator
+        - rules:
+            - apiGroups:
+                - forklift.konveyor.io
+              resources:
+                - '*'
+              verbs:
+                - '*'
+            - apiGroups:
+                - ""
+              resources:
+                - pods
+                - secrets
+                - namespaces
+                - events
+                - configmaps
+                - persistentvolumes
+                - persistentvolumeclaims
+                - services
+              verbs:
+                - get
+                - list
+                - watch
+                - create
+                - update
+                - patch
+                - delete
+            - apiGroups:
+                - batch
+              resources:
+                - jobs
+              verbs:
+                - get
+                - list
+                - watch
+                - create
+                - update
+                - patch
+                - delete
+            - apiGroups:
+                - authentication.k8s.io
+              resources:
+                - tokenreviews
+              verbs:
+                - create
+            - apiGroups:
+                - authorization.k8s.io
+              resources:
+                - subjectaccessreviews
+              verbs:
+                - create
+            - apiGroups:
+                - k8s.cni.cncf.io
+              resources:
+                - network-attachment-definitions
+              verbs:
+                - get
+                - list
+                - watch
+            - apiGroups:
+                - storage.k8s.io
+              resources:
+                - storageclasses
+              verbs:
+                - get
+                - list
+                - watch
+            - apiGroups:
+                - kubevirt.io
+              resources:
+                - virtualmachines
+                - virtualmachines/finalizers
+              verbs:
+                - get
+                - list
+                - watch
+                - create
+                - update
+                - patch
+                - delete
+            - apiGroups:
+                - cdi.kubevirt.io
+              resources:
+                - datavolumes
+                - datavolumes/finalizers
+              verbs:
+                - get
+                - list
+                - watch
+                - create
+                - update
+                - patch
+                - delete
+            - apiGroups:
+                - security.openshift.io
+              resourceNames:
+                - anyuid
+              resources:
+                - securitycontextconstraints
+              verbs:
+                - use
+            - apiGroups:
+                - template.openshift.io
+              resources:
+                - templates
+              verbs:
+                - get
+                - list
+            - apiGroups:
+                - export.kubevirt.io
+              resources:
+                - virtualmachineexports
+              verbs:
+                - get
+                - list
+                - watch
+                - create
+                - update
+                - patch
+                - delete
+            - apiGroups:
+                - apps
+              resources:
+                - deployments
+              verbs:
+                - get
+                - list
+                - watch
+                - create
+                - update
+                - patch
+                - delete
+          serviceAccountName: forklift-populator-controller
+      deployments:
+        - label:
+            control-plane: controller-manager
+          name: forklift-operator-ansible
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: forklift
+                name: controller-manager
+            strategy: {}
+            template:
+              metadata:
+                labels:
+                  app: forklift
+                  name: controller-manager
+              spec:
+                containers:
+                  - args:
+                      - --health-probe-bind-address=:6789
+                      - --metrics-bind-address=127.0.0.1:8080
+                      - --leader-elect
+                      - --leader-election-id=forklift-operator
+                    env:
+                      - name: WATCH_NAMESPACE
+                        valueFrom:
+                          fieldRef:
+                            fieldPath: metadata.annotations['olm.targetNamespaces']
+                      - name: ANSIBLE_GATHERING
+                        value: explicit
+                      - name: CONTROLLER_IMAGE
+                        value: ${CONTROLLER_IMAGE}
+                      - name: API_IMAGE
+                        value: ${API_IMAGE}
+                      - name: MUST_GATHER_IMAGE
+                        value: ${MUST_GATHER_IMAGE}
+                      - name: UI_PLUGIN_IMAGE
+                        value: ${UI_PLUGIN_IMAGE}
+                      - name: VALIDATION_IMAGE
+                        value: ${VALIDATION_IMAGE}
+                      - name: VIRT_V2V_IMAGE
+                        value: ${VIRT_V2V_IMAGE}
+                      - name: VIRT_V2V_DONT_REQUEST_KVM
+                        value: ${VIRT_V2V_DONT_REQUEST_KVM}
+                      - name: SNAPSHOT_REMOVAL_TIMEOUT
+                        value: ${SNAPSHOT_REMOVAL_TIMEOUT}
+                      - name: SNAPSHOT_STATUS_CHECK_RATE
+                        value: ${SNAPSHOT_STATUS_CHECK_RATE}
+                      - name: CLEANUP_RETRIES
+                        value: ${CLEANUP_RETRIES}
+                      - name: CDI_EXPORT_TOKEN_TTL
+                        value: ${CDI_EXPORT_TOKEN_TTL}
+                      - name: FILESYSTEM_OVERHEAD
+                        value: ${FILESYSTEM_OVERHEAD}
+                      - name: BLOCK_OVERHEAD
+                        value: ${BLOCK_OVERHEAD}
+                      - name: POPULATOR_CONTROLLER_IMAGE
+                        value: ${POPULATOR_CONTROLLER_IMAGE}
+                      - name: OVIRT_POPULATOR_IMAGE
+                        value: ${OVIRT_POPULATOR_IMAGE}
+                      - name: OPENSTACK_POPULATOR_IMAGE
+                        value: ${OPENSTACK_POPULATOR_IMAGE}
+                      - name: OVA_PROVIDER_SERVER_IMAGE
+                        value: ${OVA_PROVIDER_SERVER_IMAGE}
+                      - name: OVIRT_OS_MAP
+                        value: ${OVIRT_OS_MAP}
+                      - name: VSPHERE_OS_MAP
+                        value: ${VSPHERE_OS_MAP}
+                      - name: VIRT_CUSTOMIZE_MAP
+                        value: ${VIRT_CUSTOMIZE_MAP}
+                      - name: VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE
+                        value: ${VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE}
+                    image: ${OPERATOR_IMAGE}
+                    imagePullPolicy: Always
+                    livenessProbe:
+                      httpGet:
+                        path: /healthz
+                        port: 6789
+                      initialDelaySeconds: 15
+                      periodSeconds: 20
+                    name: forklift-operator
+                    readinessProbe:
+                      httpGet:
+                        path: /readyz
+                        port: 6789
+                      initialDelaySeconds: 5
+                      periodSeconds: 10
+                    resources:
+                      requests:
+                        cpu: 10m
+                        memory: 64Mi
+                serviceAccountName: forklift-operator
+      permissions:
+        - rules:
+            - apiGroups:
+                - ""
+              resources:
+                - pods
+                - services
+                - services/finalizers
+                - endpoints
+                - persistentvolumeclaims
+                - events
+                - configmaps
+                - secrets
+                - namespaces
+              verbs:
+                - '*'
+            - apiGroups:
+                - route.openshift.io
+              resources:
+                - routes
+              verbs:
+                - '*'
+            - apiGroups:
+                - apps
+              resources:
+                - deployments
+                - daemonsets
+                - replicasets
+                - statefulsets
+              verbs:
+                - '*'
+            - apiGroups:
+                - monitoring.coreos.com
+              resources:
+                - servicemonitors
+                - prometheusrules
+              verbs:
+                - get
+                - create
+                - update
+                - patch
+                - list
+                - watch
+            - apiGroups:
+                - apps.openshift.io
+              resources:
+                - deploymentconfigs
+              verbs:
+                - get
+                - list
+                - watch
+                - create
+                - update
+                - patch
+                - delete
+            - apiGroups:
+                - apps
+              resourceNames:
+                - forklift-operator
+              resources:
+                - deployments/finalizers
+              verbs:
+                - update
+            - apiGroups:
+                - forklift.konveyor.io
+              resources:
+                - '*'
+              verbs:
+                - '*'
+            - apiGroups:
+                - coordination.k8s.io
+              resources:
+                - leases
+              verbs:
+                - get
+                - list
+                - watch
+                - create
+                - update
+                - patch
+            - apiGroups:
+                - build.openshift.io
+              resources:
+                - builds
+                - buildconfigs
+                - buildconfigs/instantiate
+              verbs:
+                - create
+                - get
+                - list
+                - watch
+                - update
+                - patch
+            - apiGroups:
+                - image.openshift.io
+              resources:
+                - imagestreamtags
+                - imagestreams
+              verbs:
+                - create
+                - get
+                - list
+                - watch
+                - update
+                - patch
+          serviceAccountName: forklift-operator
+    strategy: deployment
+  installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: false
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+  keywords:
+    - migration
+    - forklift
+    - konveyor
+    - mtv
+  links:
+    - name: Migration Toolkit for Virtualization Documentation
+      url: https://access.redhat.com/documentation/en-us/migration_toolkit_for_virtualization
+    - name: Forklift Operator
+      url: https://github.com/kubev2v/forklift
+  maintainers:
+    - email: openshift-operators@redhat.com
+      name: Red Hat
+  maturity: stable
+  minKubeVersion: 1.27.0
+  provider:
+    name: Red Hat
+  relatedImages:
+    - image: ${OPERATOR_IMAGE}
+      name: forklift-operator
+    - image: ${CONTROLLER_IMAGE}
+      name: controller
+    - image: ${MUST_GATHER_IMAGE}
+      name: must_gather
+    - image: ${VALIDATION_IMAGE}
+      name: validation
+    - image: ${API_IMAGE}
+      name: api
+    - image: ${POPULATOR_CONTROLLER_IMAGE}
+      name: populator_controller
+    - image: ${OVIRT_POPULATOR_IMAGE}
+      name: rhv_populator
+    - image: ${VIRT_V2V_IMAGE}
+      name: virt_v2v
+    - image: ${OPENSTACK_POPULATOR_IMAGE}
+      name: openstack_populator
+    - image: ${UI_PLUGIN_IMAGE}
+      name: ui_plugin
+    - image: ${OVA_PROVIDER_SERVER_IMAGE}
+      name: ova_provider_server
+    - image: ${VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE}
+      name: vsphere_xcopy_volume_populator
+  version: ${VERSION}
+

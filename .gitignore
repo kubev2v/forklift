@@ -31,10 +31,6 @@ migsamples
 # tilt settings
 tools/tilt/tilt-settings.json
 
-# bazel build artifacts
-bazel-*
-.bazeldnf
-
 # deploy env
 hack/deploy/**/deploy.env
 
@@ -42,3 +38,11 @@ hack/deploy/**/deploy.env
 vendor/**/Dockerfile
 vendor/**/Dockerfile.vcsim
 vendor/**/Dockerfile.govc
+
+cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper/vmkfstools-wrapper.vib
+.github/workflows/build-push-images-hal.yml
+__pycache__
+
+# ignore intermediate manifests
+operator/streams/**/upstream_manifests
+operator/streams/**/downstream_manifests

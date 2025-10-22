@@ -22,16 +22,16 @@ import (
 	"sort"
 	"time"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	planapi "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1/plan"
-	"github.com/konveyor/forklift-controller/pkg/controller/base"
-	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
-	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	libref "github.com/konveyor/forklift-controller/pkg/lib/ref"
-	metrics "github.com/konveyor/forklift-controller/pkg/monitoring/metrics/forklift-controller"
-	"github.com/konveyor/forklift-controller/pkg/settings"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	"github.com/kubev2v/forklift/pkg/controller/base"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
+	libref "github.com/kubev2v/forklift/pkg/lib/ref"
+	metrics "github.com/kubev2v/forklift/pkg/monitoring/metrics/forklift-controller"
+	"github.com/kubev2v/forklift/pkg/settings"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/storage/names"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -77,9 +77,9 @@ func Add(mgr manager.Manager) error {
 	}
 	// Primary CR.
 	err = cnt.Watch(
-		source.Kind(mgr.GetCache(), &api.Plan{}),
-		&handler.EnqueueRequestForObject{},
-		&PlanPredicate{})
+		source.Kind(mgr.GetCache(), &api.Plan{},
+			&handler.TypedEnqueueRequestForObject[*api.Plan]{},
+			&PlanPredicate{}))
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -89,8 +89,7 @@ func Add(mgr manager.Manager) error {
 	// events when changes to the provider inventory are detected.
 	channel := make(chan event.GenericEvent, 10)
 	err = cnt.Watch(
-		&source.Channel{Source: channel},
-		&handler.EnqueueRequestForObject{})
+		source.Channel(channel, &handler.EnqueueRequestForObject{}))
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -98,48 +97,52 @@ func Add(mgr manager.Manager) error {
 	// References.
 	// Provider.
 	err = cnt.Watch(
-		source.Kind(mgr.GetCache(), &api.Provider{}),
-		libref.Handler(&api.Plan{}),
-		&ProviderPredicate{
-			client:  mgr.GetClient(),
-			channel: channel,
-		})
+		source.Kind(mgr.GetCache(), &api.Provider{},
+			libref.TypedHandler[*api.Provider](&api.Plan{}),
+			&ProviderPredicate{
+				client:  mgr.GetClient(),
+				channel: channel,
+			}))
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
 	// NetworkMap.
 	err = cnt.Watch(
-		source.Kind(mgr.GetCache(), &api.NetworkMap{}),
-		libref.Handler(&api.Plan{}),
-		&NetMapPredicate{})
+		source.Kind(mgr.GetCache(), &api.NetworkMap{},
+			libref.TypedHandler[*api.NetworkMap](&api.Plan{}),
+			&NetMapPredicate{}))
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
 	// StorageMap.
 	err = cnt.Watch(
-		source.Kind(mgr.GetCache(), &api.StorageMap{}),
-		libref.Handler(&api.Plan{}),
-		&DsMapPredicate{})
+		source.Kind(mgr.GetCache(), &api.StorageMap{},
+			libref.TypedHandler[*api.StorageMap](&api.Plan{}),
+			&DsMapPredicate{}))
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
 	// Hook..
 	err = cnt.Watch(
-		source.Kind(mgr.GetCache(), &api.Hook{}),
-		handler.EnqueueRequestsFromMapFunc(RequestForMigration),
-		&HookPredicate{})
+		source.Kind(mgr.GetCache(), &api.Hook{},
+			handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, a *api.Hook) []reconcile.Request {
+				return RequestForMigration(ctx, a)
+			}),
+			&HookPredicate{}))
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
 	// Migration.
 	err = cnt.Watch(
-		source.Kind(mgr.GetCache(), &api.Migration{}),
-		handler.EnqueueRequestsFromMapFunc(RequestForMigration),
-		&MigrationPredicate{})
+		source.Kind(mgr.GetCache(), &api.Migration{},
+			handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, a *api.Migration) []reconcile.Request {
+				return RequestForMigration(ctx, a)
+			}),
+			&MigrationPredicate{}))
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -210,6 +213,13 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	// Validations.
 	err = r.validate(plan)
 	if err != nil {
+		if r.isDanglingArchivedPlan(plan) {
+			r.Log.Info("Dangling Plan - Aborting reconcile of plan without source provider.")
+			r.archive(plan)
+			if err = r.updatePlanStatus(plan); err != nil {
+				r.Log.Error(err, "failed to update plan status")
+			}
+		}
 		return
 	}
 
@@ -229,7 +239,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		plan.Status.SetCondition(libcnd.Condition{
 			Type:     libcnd.Ready,
 			Status:   True,
-			Category: Required,
+			Category: api.CategoryRequired,
 			Message:  "The migration plan is ready.",
 		})
 	}
@@ -237,17 +247,8 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	// End staging conditions.
 	plan.Status.EndStagingConditions()
 
-	// Record events.
-	r.Record(plan, plan.Status.Conditions)
-
-	// Apply changes.
-	plan.Status.ObservedGeneration = plan.Generation
-	// At this point, the plan contains data that is not persisted by design, like the Referenced data
-	// and the staged flags in the status, and more data that has been loaded in the validate function,
-	// like the name of the VMs in the spec section, therefore we don't want the plan to be overridden
-	// by data from the server (even the spec section is overridden) and so we pass a copy of the plan
-	err = r.Status().Update(context.TODO(), plan.DeepCopy())
-	if err != nil {
+	if err = r.updatePlanStatus(plan); err != nil {
+		r.Log.Error(err, "failed to update plan status")
 		return
 	}
 
@@ -256,11 +257,36 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	// The plan is updated as needed to reflect status.
 	result.RequeueAfter, err = r.execute(plan)
 	if err != nil {
+		if updateErr := r.updatePlanStatus(plan); updateErr != nil {
+			r.Log.Error(err, "failed to update plan status")
+		}
 		return
 	}
 
 	// Done.
 	return
+}
+
+func (r *Reconciler) isDanglingArchivedPlan(plan *api.Plan) bool {
+	return plan.Spec.Archived && plan.Referenced.Provider.Source == nil
+}
+
+func (r *Reconciler) updatePlanStatus(plan *api.Plan) error {
+	// Record events.
+	r.Record(plan, plan.Status.Conditions)
+
+	// Apply changes.
+	plan.Status.ObservedGeneration = plan.Generation
+
+	// At this point, the plan contains data that is not persisted by design, like the Referenced data
+	// and the staged flags in the status, and more data that has been loaded in the validate function,
+	// like the name of the VMs in the spec section, therefore we don't want the plan to be overridden
+	// by data from the server (even the spec section is overridden) and so we pass a copy of the plan
+	if err := r.Status().Update(context.TODO(), plan.DeepCopy()); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (r *Reconciler) setPopulatorDataSourceLabels(plan *api.Plan) {
@@ -308,7 +334,7 @@ func (r *Reconciler) archive(plan *api.Plan) {
 		libcnd.Condition{
 			Type:     Archived,
 			Status:   True,
-			Category: Advisory,
+			Category: api.CategoryAdvisory,
 			Reason:   UserRequested,
 			Message:  "The migration plan has been archived.",
 		})
@@ -325,7 +351,7 @@ func (r *Reconciler) archive(plan *api.Plan) {
 func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	conditionRequiresReQ := plan.Status.HasReQCondition()
 	if plan.Status.HasBlockerCondition() || plan.Status.HasCondition(Archived) || conditionRequiresReQ {
-		if conditionRequiresReQ {
+		if conditionRequiresReQ || plan.Status.HasBlockerCondition() {
 			r.Log.Info(
 				"Found a condition requiring re-reconcile.",
 				"plan",
@@ -378,7 +404,7 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 					libcnd.Condition{
 						Type:     Canceled,
 						Status:   True,
-						Category: Advisory,
+						Category: api.CategoryAdvisory,
 						Reason:   Modified,
 						Message:  "The migration has been canceled.",
 						Durable:  true,
@@ -424,7 +450,7 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	if migration == nil {
 		r.Log.Info("No pending migrations found.")
 		plan.Status.DeleteCondition(Executing)
-		reQ = NoReQ
+		reQ = base.SlowReQ
 		return
 	}
 
@@ -500,7 +526,7 @@ func (r *Reconciler) matchSnapshot(ctx *plancontext.Context) (matched bool) {
 				libcnd.Condition{
 					Type:     Canceled,
 					Status:   True,
-					Category: Advisory,
+					Category: api.CategoryAdvisory,
 					Reason:   Modified,
 					Message:  "The migration has been canceled.",
 					Durable:  true,
@@ -548,7 +574,7 @@ func (r *Reconciler) activeMigration(plan *api.Plan) (migration *api.Migration, 
 	deleted := libcnd.Condition{
 		Type:     Canceled,
 		Status:   True,
-		Category: Advisory,
+		Category: api.CategoryAdvisory,
 		Reason:   Deleted,
 		Message:  "The migration has been deleted.",
 		Durable:  true,

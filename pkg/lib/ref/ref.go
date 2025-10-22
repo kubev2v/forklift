@@ -3,7 +3,7 @@ package ref
 import (
 	"reflect"
 
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 	v1 "k8s.io/api/core/v1"
 )
 

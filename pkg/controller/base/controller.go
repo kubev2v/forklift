@@ -1,12 +1,19 @@
 package base
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
+	"fmt"
+	"net"
+	"net/url"
+	"strconv"
 	"time"
 
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web"
+	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/lib/util"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -102,4 +109,57 @@ func (r *Reconciler) Record(object runtime.Object, cnd libcnd.Conditions) {
 			cnd)
 		record(cnd)
 	}
+}
+
+// GetInsecureSkipVerifyFlag gets the insecureSkipVerify boolean flag
+// value from the provider connection secret.
+func GetInsecureSkipVerifyFlag(secret *core.Secret) bool {
+	insecure, found := secret.Data["insecureSkipVerify"]
+	if !found {
+		return false
+	}
+
+	insecureSkipVerify, err := strconv.ParseBool(string(insecure))
+	if err != nil {
+		return false
+	}
+
+	return insecureSkipVerify
+}
+
+func VerifyTLSConnection(rawURL string, secret *core.Secret) (*x509.Certificate, error) {
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid URL: %w", err)
+	}
+
+	// Attempt to get certificate
+	cert, err := util.GetTlsCertificate(parsedURL, secret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get TLS certificate: %w", err)
+	}
+	if cert == nil {
+		return nil, fmt.Errorf("received nil certificate from GetTlsCertificate")
+	}
+
+	// Create cert pool
+	tlsConfig := &tls.Config{
+		RootCAs: x509.NewCertPool(),
+	}
+	tlsConfig.RootCAs.AddCert(cert)
+
+	// Ensure host:port
+	host := parsedURL.Host
+	if _, _, err := net.SplitHostPort(parsedURL.Host); err != nil {
+		host = parsedURL.Host + ":443"
+	}
+
+	// Dial TLS
+	conn, err := tls.Dial("tcp", host, tlsConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a secure TLS connection: %w", err)
+	}
+	defer conn.Close()
+
+	return cert, nil
 }

@@ -3,8 +3,8 @@ package webhooks
 import (
 	"net/http"
 
-	mutating_webhooks "github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/mutating-webhook"
-	"github.com/konveyor/forklift-controller/pkg/forklift-api/webhooks/mutating-webhook/mutators"
+	mutating_webhooks "github.com/kubev2v/forklift/pkg/forklift-api/webhooks/mutating-webhook"
+	"github.com/kubev2v/forklift/pkg/forklift-api/webhooks/mutating-webhook/mutators"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 

@@ -19,8 +19,8 @@ import (
 	"runtime"
 
 	"github.com/google/uuid"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 )
 
 var log = logging.WithName("filebacked")

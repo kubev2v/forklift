@@ -7,44 +7,122 @@ on:
       - release-*
   workflow_dispatch:
 
+env:
+  REGISTRY: quay.io
+  # Set tag 'latest' on main branch
+  REGISTRY_TAG: ${{ (github.head_ref||github.ref_name)=='main' && 'latest' || (github.head_ref||github.ref_name) }}
+  REGISTRY_ORG: kubev2v
+  VERSION: ${{ (github.head_ref||github.ref_name)=='main' && '99.0.0' || (github.head_ref||github.ref_name) }}
+
 jobs:
   build_push:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: forklift-api
+            file: build/forklift-api/Containerfile
+            repo: forklift-api
+          - name: forklift-controller
+            file: build/forklift-controller/Containerfile
+            repo: forklift-controller
+          - name: forklift-operator
+            file: build/forklift-operator/Containerfile
+            repo: forklift-operator
+          - name: openstack-populator
+            file: build/openstack-populator/Containerfile
+            repo: openstack-populator
+          - name: openstack-populator
+            file: build/openstack-populator/Containerfile
+            repo: openstack-populator
+          - name: forklift-ova-provider-server
+            file: build/ova-provider-server/Containerfile
+            repo: forklift-ova-provider-server
+          - name: ovirt-populator
+            file: build/ovirt-populator/Containerfile-upstream
+            repo: ovirt-populator
+          - name: populator-controller
+            file: build/populator-controller/Containerfile
+            repo: populator-controller
+          - name: forklift-validation
+            file: build/validation/Containerfile
+            repo: forklift-validation
+          - name: virt-v2v
+            file: build/virt-v2v/Containerfile-upstream
+            repo: forklift-virt-v2v
+          - name: virt-v2v
+            file: build/virt-v2v/Containerfile-upstream-fedora
+            repo: forklift-virt-v2v-fedora
+          - name: virt-v2v
+            file: build/virt-v2v/Containerfile-upstream-fssupport
+            repo: forklift-virt-v2v-fssupport
+          - name: vsphere-xcopy-volume-populator
+            file: build/vsphere-xcopy-volume-populator/Containerfile
+            repo: vsphere-xcopy-volume-populator
     runs-on: ubuntu-latest
-    env:
-      REGISTRY: quay.io
-      # Set tag 'latest' on main branch
-      REGISTRY_TAG: ${{ (github.head_ref||github.ref_name)=='main' && 'latest' || (github.head_ref||github.ref_name) }}
-      REGISTRY_ORG: kubev2v
-      USE_BAZEL_VERSION: 5.4.0
     steps:
-      - name: Free Disk Space (Ubuntu)            
-        uses: jlumbroso/free-disk-space@main      
-        with:                                     
-          tool-cache: false                       
-          android: true                           
-          dotnet: true                            
-          haskell: true                           
-          large-packages: false                   
-          swap-storage: false                     
-          docker-images: false                    
       - name: Checkout forklift
         uses: actions/checkout@v4
 
-      - name: Login to quay.io with bot account
+      - name: Login to ${{ env.REGISTRY }} with bot account
         uses: docker/login-action@v3
         with:
-          registry: quay.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_TOKEN }}
 
-      - name: Bazel cache
-        id: bazel-cache
-        uses: actions/cache@v3
+      - name: Build and push ${{ matrix.name }} image to ${{ env.REGISTRY }}
+        uses: docker/build-push-action@v6
         with:
-          path: ~/.cache/bazel
-          key: ${{ runner.os }}-bazel-cache-${{ hashFiles('WORKSPACE') }}
+          push: true
+          file: "${{ matrix.file }}"
+          tags: ${{ env.REGISTRY }}/${{ env.REGISTRY_ORG }}/${{ matrix.repo }}:${{ env.REGISTRY_TAG }}
 
-      - name: Build and push images to quay.io
-        run: |
-          cd ${GITHUB_WORKSPACE}
-          ./hack/release-images.sh
+  build_push_bundle:
+    runs-on: ubuntu-latest
+    needs: build_push
+    steps:
+      - name: Checkout forklift
+        uses: actions/checkout@v4
+
+      - name: Login to ${{ env.REGISTRY }} with bot account
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_TOKEN }}
+
+      - name: Build and push forklift-operator-bundle image to ${{ env.REGISTRY }}
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          file: "build/forklift-operator-bundle/Containerfile"
+          tags: ${{ env.REGISTRY }}/${{ env.REGISTRY_ORG }}/forklift-operator-bundle:${{ env.REGISTRY_TAG }}
+          build-args: |
+            VERSION=${{ env.VERSION }}
+            STREAM=dev
+
+  build_push_index:
+    runs-on: ubuntu-latest
+    needs: build_push_bundle
+    steps:
+      - name: Checkout forklift
+        uses: actions/checkout@v4
+
+      - name: Login to ${{ env.REGISTRY }} with bot account
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_TOKEN }}
+
+      - name: Build and push forklift-operator-index image to ${{ env.REGISTRY }}
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          file: "build/forklift-operator-index/Containerfile"
+          tags: ${{ env.REGISTRY }}/${{ env.REGISTRY_ORG }}/forklift-operator-index:${{ env.REGISTRY_TAG }}
+          build-args: |
+            OPERATOR_BUNDLE_IMAGE=${{ env.REGISTRY }}/${{ env.REGISTRY_ORG }}/forklift-operator-bundle:${{ env.REGISTRY_TAG }}
+            STREAM=dev
+            VERSION=${{ env.VERSION }}

@@ -1,15 +1,15 @@
 package ocp
 
 import (
+	"context"
 	"path"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/ocp"
-	"github.com/konveyor/forklift-controller/pkg/controller/watch/handler"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
-	"golang.org/x/net/context"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
+	"github.com/kubev2v/forklift/pkg/controller/watch/handler"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
@@ -21,52 +21,41 @@ type Handler struct {
 	*handler.Handler
 }
 
-// Ensure watch on VMs.
+// Ensure watch on host. OCP inventory doesn't support watches. Instead, a
+// generic event is sent to the channel periodically to trigger reconciliation.
 func (r *Handler) Watch(watch *handler.WatchManager) (err error) {
-	w, err := watch.Ensure(
-		r.Provider(),
-		&ocp.VM{},
-		r)
-	if err != nil {
-		return
-	}
-
+	watch.EnsurePeriodicEvents(r.Provider(), &ocp.VM{}, handler.DefaultEventInterval, r.generateEvents)
 	log.Info(
-		"Inventory watch ensured.",
+		"Periodic Inventory events ensured.",
 		"provider",
 		path.Join(
 			r.Provider().Namespace,
 			r.Provider().Name),
-		"watch",
-		w.ID())
+	)
 
 	return
 }
 
 // Resource created.
 func (r *Handler) Created(e libweb.Event) {
-	if vm, cast := e.Resource.(*ocp.VM); cast {
-		r.changed(vm)
-	}
+	log.Info("OCP doesn't support web watches, this should not be called",
+		"provider",
+		path.Join(
+			r.Provider().Namespace,
+			r.Provider().Name))
 }
 
 // Resource deleted.
 func (r *Handler) Deleted(e libweb.Event) {
-	if vm, cast := e.Resource.(*ocp.VM); cast {
-		r.changed(vm)
-	}
+	log.Info("OCP doesn't support web watches, this should not be called",
+		"provider",
+		path.Join(
+			r.Provider().Namespace,
+			r.Provider().Name))
 }
 
-// VM changed.
-// Find all of the Plan CRs the reference both the provider
-// and in the same target namespace and enqueue reconcile events.
-func (r *Handler) changed(vm *ocp.VM) {
-	log.V(3).Info(
-		"VM changed.",
-		"name",
-		path.Join(
-			vm.Namespace,
-			vm.Name))
+// Send a generic event into the channel for all associated CRs.
+func (r *Handler) generateEvents() {
 	list := api.PlanList{}
 	err := r.List(context.TODO(), &list)
 	if err != nil {
@@ -76,17 +65,7 @@ func (r *Handler) changed(vm *ocp.VM) {
 	}
 	for i := range list.Items {
 		plan := &list.Items[i]
-		ref := plan.Spec.Provider.Destination
-		if !r.MatchProvider(ref) {
-			continue
-		}
-		if plan.Spec.TargetNamespace == vm.Namespace {
-			log.V(3).Info(
-				"Queue reconcile event.",
-				"plan",
-				path.Join(
-					plan.Namespace,
-					plan.Name))
+		if r.MatchProvider(plan.Spec.Provider.Source) || r.MatchProvider(plan.Spec.Provider.Destination) {
 			r.Enqueue(event.GenericEvent{
 				Object: plan,
 			})

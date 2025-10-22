@@ -5,9 +5,9 @@ import (
 	"os"
 	"time"
 
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	fb "github.com/konveyor/forklift-controller/pkg/lib/filebacked"
-	"github.com/konveyor/forklift-controller/pkg/lib/logging"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	fb "github.com/kubev2v/forklift/pkg/lib/filebacked"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 )
 
 // Database client.
@@ -202,11 +202,8 @@ func (r *Client) Begin(labels ...string) (tx *Tx, error error) {
 	session := r.pool.Writer()
 	realTx, err := session.Begin()
 	if err != nil {
-		err = liberr.Wrap(
-			err,
-			"db",
-			r.path)
-		return
+		r.log.V(3).Error(err, "begin transaction failed.")
+		return nil, err
 	}
 	tx = &Tx{
 		session: session,

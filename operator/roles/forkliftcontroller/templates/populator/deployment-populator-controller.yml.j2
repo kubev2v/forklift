@@ -28,6 +28,10 @@ spec:
             value: {{ populator_ovirt_image_fqin }}
           - name: OPENSTACK_POPULATOR_IMAGE
             value: {{ populator_openstack_image_fqin }}
+{% if feature_copy_offload|bool %}
+          - name: VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE
+            value: {{ populator_vsphere_xcopy_volume_image_fqin }}
+{% endif %}
           ports:
             - containerPort: 8080
               name: http-endpoint

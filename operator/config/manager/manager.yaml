@@ -8,7 +8,7 @@ metadata:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: forklift-operator
+  name: forklift-operator-ansible
   namespace: system
   labels:
     control-plane: controller-manager
@@ -78,6 +78,8 @@ spec:
           value: ${VSPHERE_OS_MAP}
         - name: VIRT_CUSTOMIZE_MAP
           value: ${VIRT_CUSTOMIZE_MAP}
+        - name: VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE
+          value: ${VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE}
         livenessProbe:
           httpGet:
             path: /healthz

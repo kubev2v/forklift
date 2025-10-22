@@ -5,7 +5,7 @@ import (
 	"encoding/pem"
 	"fmt"
 
-	"github.com/konveyor/forklift-controller/tests/suit/utils"
+	"github.com/kubev2v/forklift/tests/suit/utils"
 )
 
 func (r *OpenStackClient) SetupClient(vmName string, networkName string, volumeTypeName string) (err error) {

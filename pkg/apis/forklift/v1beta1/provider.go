@@ -17,7 +17,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
+	"os"
+	"strconv"
+
+	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -59,10 +62,12 @@ const (
 
 // Provider settings.
 const (
-	VDDK    = "vddkInitImage"
-	SDK     = "sdkEndpoint"
-	VCenter = "vcenter"
-	ESXI    = "esxi"
+	VDDK                   = "vddkInitImage"
+	SDK                    = "sdkEndpoint"
+	VCenter                = "vcenter"
+	ESXI                   = "esxi"
+	UseVddkAioOptimization = "useVddkAioOptimization"
+	VddkConfig             = "vddkConfig"
 )
 
 const OvaProviderFinalizer = "forklift/ova-provider"
@@ -140,6 +145,13 @@ func (p *Provider) IsHost() bool {
 	return p.Type() == OpenShift && p.Spec.URL == ""
 }
 
+// This provider is a `host` provider but it is not within the main forklift
+// namespace (e.g. generally 'konveyor-forklift' or 'openshift-mtv'). All other
+// 'host' providers are namespace-scoped and should use limited credentials
+func (p *Provider) IsRestrictedHost() bool {
+	return p.IsHost() && p.GetNamespace() != os.Getenv("POD_NAMESPACE")
+}
+
 // Current generation has been reconciled.
 func (p *Provider) HasReconciled() bool {
 	return p.Generation == p.Status.ObservedGeneration
@@ -151,4 +163,17 @@ func (p *Provider) RequiresConversion() bool {
 		return false
 	}
 	return *p.Spec.ConvertDisk
+}
+
+// This provider support the vddk aio parameters.
+func (p *Provider) UseVddkAioOptimization() bool {
+	useVddkAioOptimization := p.Spec.Settings[UseVddkAioOptimization]
+	if useVddkAioOptimization == "" {
+		return false
+	}
+	parseBool, err := strconv.ParseBool(useVddkAioOptimization)
+	if err != nil {
+		return false
+	}
+	return parseBool
 }

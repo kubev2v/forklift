@@ -7,6 +7,6 @@ import (
 func SetForkliftError(ctx *gin.Context, err error) {
 	if err != nil {
 		ctx.Header("forklift-error-message", err.Error())
-		ctx.Error(err)
+		_ = ctx.Error(err)
 	}
 }
