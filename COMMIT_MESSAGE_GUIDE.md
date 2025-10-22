@@ -170,6 +170,12 @@ You can test your commit messages locally using:
 ./scripts/validate-commits.sh --verbose         # Show detailed output
 ```
 
+## Adoption Notice
+
+Please be aware that as these changes become more familiar to those who contribute to this product conforming to this format will become more important
+At a later date omitting the valid messages and committing will _*break*_ CI as well as various other automation & tooling. 
+This will make the lives of those who work on CI, QE, and documentation much more difficult so please be aware of this criticality moving forward.
+
 ## Need Help?
 
 If you're still having trouble with commit message validation:
