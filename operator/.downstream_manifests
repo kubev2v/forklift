@@ -7047,9 +7047,9 @@ spec:
 
     ### Compatibility
 
-    Migration Toolkit for Virtualization 2.10 is supported on OpenShift 4.18, 4.19 and 4.20
+    Migration Toolkit for Virtualization 2.9 is supported on OpenShift 4.17, 4.18 and 4.19
 
-    Migration Toolkit for Virtualization 2.11 is supported on OpenShift 4.19, 4.20 and 4.21
+    Migration Toolkit for Virtualization 2.10 is supported on OpenShift 4.18, 4.19 and 4.20
 
     More information on compatibility in the [MTV Lifecycle document](https://access.redhat.com/support/policy/updates/migration-toolkit-for-virtualization).
 
