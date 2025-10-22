@@ -1,0 +1,19 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_binary(
+    name = "virt-v2v-monitor",
+    embed = [":virt-v2v-monitor_lib"],
+    visibility = ["//visibility:public"],
+)
+
+go_library(
+    name = "virt-v2v-monitor_lib",
+    srcs = ["virt-v2v-monitor.go"],
+    importpath = "github.com/konveyor/forklift-controller/cmd/virt-v2v-monitor",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//vendor/github.com/prometheus/client_golang/prometheus",
+        "//vendor/github.com/prometheus/client_golang/prometheus/promhttp",
+        "//vendor/github.com/prometheus/client_model/go",
+    ],
+)

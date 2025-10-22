@@ -1,0 +1,36 @@
+# Container Runtime
+build --action_env=CONTAINER_CMD
+build --action_env=XDG_RUNTIME_DIR
+# Operator
+## Default operator config
+build --action_env=VERSION=2.7.0
+build --action_env=NAMESPACE=konveyor-forklift
+build --action_env=CHANNELS=development
+build --action_env=DEFAULT_CHANNEL=development
+build --action_env=OPM_OPTS
+
+## Images which should be installed
+build --action_env=CONTROLLER_IMAGE=quay.io/kubev2v/forklift-controller:latest
+build --action_env=API_IMAGE=quay.io/kubev2v/forklift-api:latest
+build --action_env=MUST_GATHER_IMAGE=quay.io/kubev2v/forklift-must-gather:latest
+build --action_env=UI_PLUGIN_IMAGE=quay.io/kubev2v/forklift-console-plugin:latest
+build --action_env=VALIDATION_IMAGE=quay.io/kubev2v/forklift-validation:latest
+build --action_env=VIRT_V2V_IMAGE=quay.io/kubev2v/forklift-virt-v2v:latest
+build --action_env=POPULATOR_CONTROLLER_IMAGE=quay.io/kubev2v/populator-controller:latest
+build --action_env=OPENSTACK_POPULATOR_IMAGE=quay.io/kubev2v/openstack-populator:latest
+build --action_env=OVIRT_POPULATOR_IMAGE=quay.io/kubev2v/ovirt-populator:latest
+build --action_env=OPERATOR_IMAGE=quay.io/kubev2v/forklift-operator:latest
+build --action_env=OVA_PROVIDER_SERVER_IMAGE=quay.io/kubev2v/forklift-ova-provider-server:latest
+
+# Appliance build
+# container_run_and_extract() does not work inside Podman and Docker
+# sandboxes. Use slightly less secure but working processwrapper sandbox.
+# NOTE: Same configuration is in virt-v2v/.bazelrc.
+build --strategy_regexp="Action appliance/libguestfs-appliance.tar"=processwrapper-sandbox
+build --strategy_regexp="RunAndCommitLayer no-ems-in-fips-layer.tar"=processwrapper-sandbox
+build --strategy_regexp="RunAndCommitLayer ca-certificate-from-secret-layer.tar"=processwrapper-sandbox
+
+# For populator images, we need to use processwrapper sandbox as well
+build --strategy_regexp="RunAndCommitLayer cmd/ovirt-populator/ovirt-imageio-layer-run-layer.tar"=processwrapper-sandbox
+
+build --strategy_regexp="RunAndCommitLayer operator/forklift-operator-image-layer-run-layer.tar"=processwrapper-sandbox

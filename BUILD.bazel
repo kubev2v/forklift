@@ -1,0 +1,140 @@
+load("@bazel_gazelle//:def.bzl", "gazelle")
+load("@bazeldnf//:def.bzl", "bazeldnf")
+load("@bazel_tools//tools/python:toolchain.bzl", "py_runtime_pair")
+
+bazeldnf(name = "bazeldnf")
+
+py_runtime(
+    name = "py2_runtime",
+    interpreter_path = "/usr/bin/python2",
+    python_version = "PY2",
+)
+
+py_runtime(
+    name = "py3_runtime",
+    interpreter_path = "/usr/bin/python3",
+    python_version = "PY3",
+)
+
+py_runtime_pair(
+    name = "py_runtime_pair",
+    py2_runtime = ":py2_runtime",
+    py3_runtime = ":py3_runtime",
+)
+
+toolchain(
+    name = "py_toolchain",
+    toolchain = "py_runtime_pair",
+    toolchain_type = "@bazel_tools//tools/python:toolchain_type",
+)
+
+# gazelle:prefix github.com/konveyor/forklift-controller
+gazelle(name = "gazelle")
+
+# gazelle:proto disable_global
+
+genrule(
+    name = "build-controller",
+    srcs = [
+        "//cmd/forklift-controller",
+    ],
+    outs = ["forklift-controller"],
+    cmd = "echo '#!/bin/sh\n\ncp -f $(SRCS) $$1' > \"$@\"",
+    executable = 1,
+)
+
+load(
+    "@io_bazel_rules_docker//container:container.bzl",
+    "container_pull",
+    "container_push",
+)
+
+container_push(
+    name = "push-ova-provider-server",
+    format = "Docker",
+    image = "//cmd/ova-provider-server:ova-provider-server-image",
+    registry = "$${REGISTRY:-quay.io}",
+    repository = "$${REGISTRY_ORG:-}$${REGISTRY_ORG:+/}forklift-ova-provider-server",
+    tag = "$${REGISTRY_TAG:-devel}",
+)
+
+container_push(
+    name = "push-ovirt-populator",
+    format = "Docker",
+    image = "//cmd/ovirt-populator:ovirt-populator-image",
+    registry = "$${REGISTRY:-quay.io}",
+    repository = "$${REGISTRY_ORG:-}$${REGISTRY_ORG:+/}ovirt-populator",
+    tag = "$${REGISTRY_TAG:-devel}",
+)
+
+container_push(
+    name = "push-openstack-populator",
+    format = "Docker",
+    image = "//cmd/openstack-populator:openstack-populator-image",
+    registry = "$${REGISTRY:-quay.io}",
+    repository = "$${REGISTRY_ORG:-}$${REGISTRY_ORG:+/}openstack-populator",
+    tag = "$${REGISTRY_TAG:-devel}",
+)
+
+container_push(
+    name = "push-forklift-controller",
+    format = "Docker",
+    image = "//cmd/forklift-controller:forklift-controller-image",
+    registry = "$${REGISTRY:-quay.io}",
+    repository = "$${REGISTRY_ORG:-}$${REGISTRY_ORG:+/}forklift-controller",
+    tag = "$${REGISTRY_TAG:-devel}",
+)
+
+container_push(
+    name = "push-forklift-api",
+    format = "Docker",
+    image = "//cmd/forklift-api:forklift-api-image",
+    registry = "$${REGISTRY:-quay.io}",
+    repository = "$${REGISTRY_ORG:-}$${REGISTRY_ORG:+/}forklift-api",
+    tag = "$${REGISTRY_TAG:-devel}",
+)
+
+container_push(
+    name = "push-forklift-operator-index",
+    format = "Docker",
+    image = "//operator:forklift-operator-index-image",
+    registry = "$${REGISTRY:-quay.io}",
+    repository = "$${REGISTRY_ORG:-}$${REGISTRY_ORG:+/}forklift-operator-index",
+    tag = "$${REGISTRY_TAG:-devel}",
+)
+
+container_push(
+    name = "push-forklift-operator-bundle",
+    format = "Docker",
+    image = "//operator:forklift-operator-bundle-image",
+    registry = "$${REGISTRY:-quay.io}",
+    repository = "$${REGISTRY_ORG:-}$${REGISTRY_ORG:+/}forklift-operator-bundle",
+    tag = "$${REGISTRY_TAG:-devel}",
+)
+
+container_push(
+    name = "push-forklift-operator",
+    format = "Docker",
+    image = "//operator:forklift-operator-image",
+    registry = "$${REGISTRY:-quay.io}",
+    repository = "$${REGISTRY_ORG:-}$${REGISTRY_ORG:+/}forklift-operator",
+    tag = "$${REGISTRY_TAG:-devel}",
+)
+
+container_push(
+    name = "push-forklift-validation",
+    format = "Docker",
+    image = "//validation:forklift-validation-image",
+    registry = "$${REGISTRY:-quay.io}",
+    repository = "$${REGISTRY_ORG:-}$${REGISTRY_ORG:+/}forklift-validation",
+    tag = "$${REGISTRY_TAG:-devel}",
+)
+
+container_push(
+    name = "push-populator-controller",
+    format = "Docker",
+    image = "//cmd/populator-controller:populator-controller-image",
+    registry = "$${REGISTRY:-quay.io}",
+    repository = "$${REGISTRY_ORG:-}$${REGISTRY_ORG:+/}populator-controller",
+    tag = "$${REGISTRY_TAG:-devel}",
+)
