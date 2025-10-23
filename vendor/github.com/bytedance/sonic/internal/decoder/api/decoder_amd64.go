@@ -1,5 +1,5 @@
-//go:build go1.17 && !go1.25
-// +build go1.17,!go1.25
+//go:build go1.17 && !go1.26
+// +build go1.17,!go1.26
 
 /*
  * Copyright 2021 ByteDance Inc.
@@ -20,19 +20,19 @@
 package api
 
 import (
+	"github.com/bytedance/sonic/internal/envs"
 	"github.com/bytedance/sonic/internal/decoder/jitdec"
 	"github.com/bytedance/sonic/internal/decoder/optdec"
-	"github.com/bytedance/sonic/internal/envs"
 )
 
 var (
 	pretouchImpl = jitdec.Pretouch
-	decodeImpl   = jitdec.Decode
-)
+	decodeImpl = jitdec.Decode
+) 
 
-func init() {
+ func init() {
 	if envs.UseOptDec {
 		pretouchImpl = optdec.Pretouch
 		decodeImpl = optdec.Decode
 	}
-}
+ }
