@@ -61,7 +61,20 @@ The VIB should be installed on every ESXi that is connected to the datastores wh
 are holds migratable VMs.
 See vmkfstools-wrapper/README.md for the installation of the tool using ansible
 
-## Storage Provider
+## Supported Storage Providers
+
+The `storageVendorProduct` field in the `StorageMap` identifies which storage product to use for copy offload. Below is a list of supported providers and the corresponding values to use.
+
+| Vendor          | `storageVendorProduct` value | More Info |
+| --------------- | ---------------------------- |:---:|
+| Hitachi Vantara | `vantara`                    | [Link](#hitachi-vantara) |
+| NetApp          | `ontap`                      | [Link](#netapp-ontap) |
+| HPE             | `primera3par`                | |
+| Pure Storage    | `pureFlashArray`             | [Link](#pure-flasharray) |
+| Dell            | `powerflex`                  | [Link](#dell-powerflex) |
+| Dell            | `powermax`                   | [Link](#dell-powermax) |
+| Dell            | `powerstore`                 | |
+
 If a storage provider wants their storage to be supported, they need
 to implement a go package named after their product, and mutate main
 package so their specific code path is initialized.
