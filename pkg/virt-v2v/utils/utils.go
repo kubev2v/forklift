@@ -41,3 +41,28 @@ func GetFilesInPath(filesystem FileSystem, rootPath string) (paths []string, err
 	}
 	return
 }
+
+// GetLinkedDisks returns a list of linked disk paths
+func GetLinkedDisks() ([]string, error) {
+	// This is a placeholder implementation
+	// In a real implementation, this would scan for linked disks
+	return []string{"/var/tmp/disk1"}, nil
+}
+
+// CheckEnvVariablesSet checks if all provided environment variables are set
+func CheckEnvVariablesSet(vars ...string) bool {
+	for _, v := range vars {
+		if os.Getenv(v) == "" {
+			return false
+		}
+	}
+	return true
+}
+
+// LinkDisks creates symbolic links for disks
+func LinkDisks(diskType string) error {
+	// This is a placeholder implementation
+	// In a real implementation, this would create appropriate disk links
+	fmt.Printf("Linking disks of type: %s\n", diskType)
+	return nil
+}

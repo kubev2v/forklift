@@ -1,0 +1,8 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "config",
+    srcs = ["variables.go"],
+    importpath = "github.com/konveyor/forklift-controller/pkg/virt-v2v/config",
+    visibility = ["//visibility:public"],
+)

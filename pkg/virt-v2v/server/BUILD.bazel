@@ -1,0 +1,9 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "server",
+    srcs = ["server.go"],
+    importpath = "github.com/konveyor/forklift-controller/pkg/virt-v2v/server",
+    visibility = ["//visibility:public"],
+    deps = ["@com_github_kubev2v_forklift//pkg/virt-v2v/config:go_default_library"],
+)

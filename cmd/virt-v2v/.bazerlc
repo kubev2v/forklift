@@ -1,0 +1,7 @@
+# Appliance build
+# container_run_and_extract() does not work inside Podman and Docker
+# sandboxes. Use slightly less secure but working processwrapper sandbox.
+# NOTE: Same configuration is in .bazelrc in repository root.
+build --strategy_regexp="Action appliance/libguestfs-appliance.tar"=processwrapper-sandbox
+build --strategy_regexp="RunAndCommitLayer no-ems-in-fips-layer.tar"=processwrapper-sandbox
+build --strategy_regexp="RunAndCommitLayer ca-certificate-from-secret-layer.tar"=processwrapper-sandbox

@@ -1,0 +1,16 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "utils",
+    srcs = [
+        "command.go",
+        "filesystem.go",
+        "mock_command.go",
+        "mock_filesystem.go",
+        "utils.go",
+        "xml-reader.go",
+    ],
+    importpath = "github.com/konveyor/forklift-controller/pkg/virt-v2v/utils",
+    visibility = ["//visibility:public"],
+    deps = ["//vendor/go.uber.org/mock/gomock"],
+)
