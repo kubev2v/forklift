@@ -96,6 +96,7 @@ spec:
                               - powerflex
                               - powermax
                               - powerstore
+                              - infinibox
                               type: string
                           required:
                           - secretRef

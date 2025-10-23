@@ -14,6 +14,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/client-go/util/cert"
 
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/infinibox"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/ontap"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/powerflex"
@@ -121,6 +122,13 @@ func main() {
 			storageHostname, storageUsername, storagePassword, storageSkipSSLVerification == "true")
 		if err != nil {
 			klog.Fatalf("failed to initialize PowerStore clonner with %s", err)
+		}
+		storageApi = &sm
+	case forklift.StorageVendorProductInfinibox:
+		sm, err := infinibox.NewInfiniboxClonner(
+			storageHostname, storageUsername, storagePassword, storageSkipSSLVerification == "true")
+		if err != nil {
+			klog.Fatalf("failed to initialize Infinibox clonner with %s", err)
 		}
 		storageApi = &sm
 	default:
