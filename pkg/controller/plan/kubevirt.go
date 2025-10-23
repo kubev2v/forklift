@@ -103,6 +103,14 @@ const (
 	kDV = "isDV"
 	// Populator secret
 	kPopulator = "isPopulator"
+	// Resource label
+	kResource = "resource"
+)
+
+// Resource labels
+const (
+	ResourceVMConfig   = "vm-config"
+	ResourceVDDKConfig = "vddk-config"
 )
 
 // User
@@ -2425,6 +2433,7 @@ func (r *KubeVirt) ensureConfigMap(vmRef ref.Ref) (configMap *core.ConfigMap, er
 	if err != nil {
 		return
 	}
+
 	list := &core.ConfigMapList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
@@ -2624,6 +2633,7 @@ func (r *KubeVirt) inspectionLabels(vmRef ref.Ref) (labels map[string]string) {
 func (r *KubeVirt) vmLabels(vmRef ref.Ref) (labels map[string]string) {
 	labels = r.planLabels()
 	labels[kVM] = vmRef.ID
+	labels[kResource] = ResourceVMConfig
 	return
 }
 
@@ -2632,6 +2642,7 @@ func (r *KubeVirt) vmLabels(vmRef ref.Ref) (labels map[string]string) {
 func (r *KubeVirt) vddkLabels() (labels map[string]string) {
 	labels = r.planLabels()
 	labels[kUse] = VddkConf
+	labels[kResource] = ResourceVDDKConfig
 	return
 }
 
