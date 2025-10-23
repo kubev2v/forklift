@@ -815,6 +815,16 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 				setOfTargetName[vm.TargetName] = true
 			}
 		}
+
+		// We don't need to revalidate a VM that was already successfully
+		// migrated by this plan, but we still want to consider it for
+		// name and ID uniqueness checks.
+		if status, found := plan.Status.Migration.FindVM(*ref); found {
+			if status.HasCondition(api.ConditionSucceeded) {
+				continue
+			}
+		}
+
 		// check for supported OVA source
 		if ova, ok := v.(*ova.VM); ok {
 			for _, concern := range ova.Concerns {
