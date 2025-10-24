@@ -58,6 +58,8 @@ type Migration struct {
 	*plancontext.Context
 	// Builder
 	builder adapter.Builder
+	// Ensurer
+	ensurer adapter.Ensurer
 	// kubevirt.
 	kubevirt KubeVirt
 	// Source client.
@@ -159,6 +161,10 @@ func (r *Migration) init() (err error) {
 	if err != nil {
 		return
 	}
+	r.ensurer, err = adapter.Ensurer(r.Context)
+	if err != nil {
+		return
+	}
 	r.destinationClient, err = adapter.DestinationClient(r.Context)
 	if err != nil {
 		return
@@ -166,6 +172,7 @@ func (r *Migration) init() (err error) {
 	r.kubevirt = KubeVirt{
 		Context: r.Context,
 		Builder: r.builder,
+		Ensurer: r.ensurer,
 	}
 	r.scheduler, err = scheduler.New(r.Context)
 	if err != nil {

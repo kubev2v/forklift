@@ -13,6 +13,7 @@ import (
 
 type Adapter = base.Adapter
 type Builder = base.Builder
+type Ensurer = base.Ensurer
 type Client = base.Client
 type Validator = base.Validator
 type DestinationClient = base.DestinationClient

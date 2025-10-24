@@ -3,6 +3,7 @@ package openstack
 import (
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/plan/ensurer"
 )
 
 // Openstack adapter.
@@ -18,6 +19,13 @@ func (r *Adapter) Builder(ctx *plancontext.Context) (builder base.Builder, err e
 func (r *Adapter) Validator(ctx *plancontext.Context) (validator base.Validator, err error) {
 	v := &Validator{Context: ctx}
 	validator = v
+	return
+}
+
+// Constructs a ensurer.
+func (r *Adapter) Ensurer(ctx *plancontext.Context) (ensure base.Ensurer, err error) {
+	e := &ensurer.Ensurer{Context: ctx}
+	ensure = e
 	return
 }
 
