@@ -248,12 +248,17 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 			return
 		}
 		if !slices.Contains(originalInitiatorGroups, xcopyInitiatorGroup) {
-			if mappingContext != nil {
-				mappingContext["UnmapAllSdc"] = false
-			}
-			errUnmap := p.StorageApi.UnMap(xcopyInitiatorGroup, lun, mappingContext)
-			if errUnmap != nil {
-				klog.Infof("failed to unmap all initiator groups during partial cleanup: %s", errUnmap)
+			// Only attempt cleanup if lun was successfully resolved
+			if lun.Name != "" {
+				if mappingContext != nil {
+					mappingContext["UnmapAllSdc"] = false
+				}
+				errUnmap := p.StorageApi.UnMap(xcopyInitiatorGroup, lun, mappingContext)
+				if errUnmap != nil {
+					klog.Infof("failed to unmap all initiator groups during partial cleanup: %s", errUnmap)
+				}
+			} else {
+				klog.V(2).Infof("Skipping cleanup unmap as LUN was not successfully resolved")
 			}
 		}
 	}()
