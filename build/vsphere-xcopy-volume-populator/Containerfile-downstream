@@ -5,7 +5,7 @@ WORKDIR /src/cmd/vsphere-xcopy-volume-populator
 ENV GOFLAGS="-mod=vendor -tags=strictfipsruntime"
 ENV GOEXPERIMENT=strictfipsruntime
 
-RUN GOOS=linux GOARCH=amd64 make build test
+RUN make build test
 
 # We need python for running a test during build process
 # This is not used for actually running the populator in production

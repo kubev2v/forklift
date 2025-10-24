@@ -7,7 +7,7 @@ ENV GOEXPERIMENT=strictfipsruntime
 COPY .konflux/validation/go.mod go.mod
 COPY .konflux/validation/go.sum go.sum
 
-RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /tmp/opa github.com/open-policy-agent/opa
+RUN go build -ldflags="-w -s" -o /tmp/opa github.com/open-policy-agent/opa
 
 FROM registry.redhat.io/ubi9-minimal:9.6-1752587672
 WORKDIR /app

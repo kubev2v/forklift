@@ -30,8 +30,8 @@
 package s390x
 
 import (
-	"fmt"
 	"github.com/twitchyliquid64/golang-asm/obj"
+	"fmt"
 )
 
 func init() {

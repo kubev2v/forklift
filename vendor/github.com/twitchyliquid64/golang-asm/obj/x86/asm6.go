@@ -31,11 +31,11 @@
 package x86
 
 import (
-	"encoding/binary"
-	"fmt"
 	"github.com/twitchyliquid64/golang-asm/obj"
 	"github.com/twitchyliquid64/golang-asm/objabi"
 	"github.com/twitchyliquid64/golang-asm/sys"
+	"encoding/binary"
+	"fmt"
 	"log"
 	"strings"
 )
@@ -59,6 +59,7 @@ var (
 // is very slight but negative, so the alignment is disabled by
 // setting MaxLoopPad = 0. The code is here for reference and
 // for future experiments.
+//
 const (
 	loopAlign  = 16
 	maxLoopPad = 0
@@ -872,9 +873,9 @@ var ysha1rnds4 = []ytab{
 // up in instinit.  For example, oclass distinguishes the constants 0 and 1
 // from the more general 8-bit constants, but instinit says
 //
-//	ycover[Yi0*Ymax+Ys32] = 1
-//	ycover[Yi1*Ymax+Ys32] = 1
-//	ycover[Yi8*Ymax+Ys32] = 1
+//        ycover[Yi0*Ymax+Ys32] = 1
+//        ycover[Yi1*Ymax+Ys32] = 1
+//        ycover[Yi8*Ymax+Ys32] = 1
 //
 // which means that Yi0, Yi1, and Yi8 all count as Ys32 (signed 32)
 // if that's what an instruction can handle.
@@ -888,28 +889,26 @@ var ysha1rnds4 = []ytab{
 // is, the Ztype) and the z bytes.
 //
 // For example, let's look at AADDL.  The optab line says:
-//
-//	{AADDL, yaddl, Px, opBytes{0x83, 00, 0x05, 0x81, 00, 0x01, 0x03}},
+//        {AADDL, yaddl, Px, opBytes{0x83, 00, 0x05, 0x81, 00, 0x01, 0x03}},
 //
 // and yaddl says
-//
-//	var yaddl = []ytab{
-//	        {Yi8, Ynone, Yml, Zibo_m, 2},
-//	        {Yi32, Ynone, Yax, Zil_, 1},
-//	        {Yi32, Ynone, Yml, Zilo_m, 2},
-//	        {Yrl, Ynone, Yml, Zr_m, 1},
-//	        {Yml, Ynone, Yrl, Zm_r, 1},
-//	}
+//        var yaddl = []ytab{
+//                {Yi8, Ynone, Yml, Zibo_m, 2},
+//                {Yi32, Ynone, Yax, Zil_, 1},
+//                {Yi32, Ynone, Yml, Zilo_m, 2},
+//                {Yrl, Ynone, Yml, Zr_m, 1},
+//                {Yml, Ynone, Yrl, Zm_r, 1},
+//        }
 //
 // so there are 5 possible types of ADDL instruction that can be laid down, and
 // possible states used to lay them down (Ztype and z pointer, assuming z
 // points at opBytes{0x83, 00, 0x05,0x81, 00, 0x01, 0x03}) are:
 //
-//	Yi8, Yml -> Zibo_m, z (0x83, 00)
-//	Yi32, Yax -> Zil_, z+2 (0x05)
-//	Yi32, Yml -> Zilo_m, z+2+1 (0x81, 0x00)
-//	Yrl, Yml -> Zr_m, z+2+1+2 (0x01)
-//	Yml, Yrl -> Zm_r, z+2+1+2+1 (0x03)
+//        Yi8, Yml -> Zibo_m, z (0x83, 00)
+//        Yi32, Yax -> Zil_, z+2 (0x05)
+//        Yi32, Yml -> Zilo_m, z+2+1 (0x81, 0x00)
+//        Yrl, Yml -> Zr_m, z+2+1+2 (0x01)
+//        Yml, Yrl -> Zm_r, z+2+1+2+1 (0x03)
 //
 // The Pconstant in the optab line controls the prefix bytes to emit.  That's
 // relatively straightforward as this program goes.
@@ -919,7 +918,7 @@ var ysha1rnds4 = []ytab{
 // encoded addressing mode for the Yml arg), and then a single immediate byte.
 // Zilo_m is the same but a long (32-bit) immediate.
 var optab =
-// as, ytab, andproto, opcode
+//	as, ytab, andproto, opcode
 [...]Optab{
 	{obj.AXXX, nil, 0, opBytes{}},
 	{AAAA, ynone, P32, opBytes{0x37}},
@@ -4163,11 +4162,11 @@ func (ab *AsmBuf) asmvex(ctxt *obj.Link, rm, v, r *obj.Addr, vex, opcode uint8) 
 //	EVEX.R    : 1 bit | EVEX extension bit      | RxrEvex
 //
 // Examples:
-//
 //	REG_Z30 => 30
 //	REG_X15 => 15
 //	REG_R9  => 9
 //	REG_AX  => 0
+//
 func regIndex(r int16) int {
 	lower3bits := reg[r]
 	high4bit := regrex[r] & Rxr << 1

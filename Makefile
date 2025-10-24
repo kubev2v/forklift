@@ -10,14 +10,35 @@ ENVTEST_VERSION ?= release-0.19
 CONTAINER_RUNTIME ?=
 
 ifeq ($(CONTAINER_RUNTIME),)
-CONTAINER_CMD ?= $(shell command -v podman 2>/dev/null)
+# Try Docker first (better Rosetta 2 support on macOS ARM64)
+CONTAINER_CMD ?= $(shell command -v docker 2>/dev/null)
 ifeq ($(CONTAINER_CMD),)
-CONTAINER_CMD := $(shell command -v docker 2>/dev/null)
+CONTAINER_CMD := $(shell command -v podman 2>/dev/null)
 endif
 CONTAINER_RUNTIME=$(shell basename $(CONTAINER_CMD))
 else
 CONTAINER_CMD := $(shell command -v $(CONTAINER_RUNTIME) 2>/dev/null)
 endif
+
+# Platform for container builds, default is amd64
+# To explicitly set platform:
+#   make build-controller-image PLATFORM=linux/amd64
+#   make build-controller-image PLATFORM=linux/arm64
+PLATFORM ?= linux/amd64
+ifneq ($(PLATFORM),)
+PLATFORM_FLAG := --platform $(PLATFORM)
+else
+PLATFORM_FLAG :=
+endif
+
+# Extract architecture from PLATFORM for image tag suffix
+# e.g., linux/amd64 -> amd64, linux/arm64 -> arm64
+PLATFORM_ARCH ?= $(shell echo $(PLATFORM) | cut -d'/' -f2)
+PLATFORM_SUFFIX := -$(PLATFORM_ARCH)
+
+# By default, bundle references platform-specific images for development
+# Use the -multiarch targets for production multi-arch bundles
+COMPONENT_IMAGE_SUFFIX ?= $(PLATFORM_SUFFIX)
 
 REGISTRY ?= quay.io
 REGISTRY_ORG ?= kubev2v
@@ -77,26 +98,30 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 # This will build controller and bundle pointing to that controller
 
 ### Components
-CONTROLLER_IMAGE ?= quay.io/kubev2v/forklift-controller:latest
-API_IMAGE ?= quay.io/kubev2v/forklift-api:latest
-VALIDATION_IMAGE ?= quay.io/kubev2v/forklift-validation:latest
-VIRT_V2V_IMAGE ?= quay.io/kubev2v/forklift-virt-v2v:latest
-OPERATOR_IMAGE ?= quay.io/kubev2v/forklift-operator:latest
-POPULATOR_CONTROLLER_IMAGE ?= quay.io/kubev2v/populator-controller:latest
-OVIRT_POPULATOR_IMAGE ?= quay.io/kubev2v/ovirt-populator:latest
-OPENSTACK_POPULATOR_IMAGE ?= quay.io/kubev2v/openstack-populator:latest
-OVA_PROVIDER_SERVER_IMAGE ?= quay.io/kubev2v/forklift-ova-provider-server:latest
-OVA_PROXY_IMAGE ?= quay.io/kubev2v/forklift-ova-proxy:latest
-CLI_DOWNLOAD_IMAGE ?= quay.io/kubev2v/forklift-cli-download:latest
-VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/vsphere-xcopy-volume-populator:$(REGISTRY_TAG)
+# These are used by the bundle to reference component images
+# By default, they use platform-specific images for development (with platform suffix)
+# Set MULTI_ARCH=true to reference multi-arch manifest names for production
+CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-controller:$(REGISTRY_TAG)$(COMPONENT_IMAGE_SUFFIX)
+API_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-api:$(REGISTRY_TAG)$(COMPONENT_IMAGE_SUFFIX)
+VALIDATION_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-validation:$(REGISTRY_TAG)$(COMPONENT_IMAGE_SUFFIX)
+VIRT_V2V_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-virt-v2v:$(REGISTRY_TAG)$(COMPONENT_IMAGE_SUFFIX)
+OPERATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator:$(REGISTRY_TAG)$(COMPONENT_IMAGE_SUFFIX)
+POPULATOR_CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/populator-controller:$(REGISTRY_TAG)$(COMPONENT_IMAGE_SUFFIX)
+OVIRT_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/ovirt-populator:$(REGISTRY_TAG)$(COMPONENT_IMAGE_SUFFIX)
+OPENSTACK_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/openstack-populator:$(REGISTRY_TAG)$(COMPONENT_IMAGE_SUFFIX)
+OVA_PROVIDER_SERVER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-provider-server:$(REGISTRY_TAG)$(COMPONENT_IMAGE_SUFFIX)
+OVA_PROXY_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-proxy:$(REGISTRY_TAG)$(COMPONENT_IMAGE_SUFFIX)
+CLI_DOWNLOAD_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-cli-download:$(REGISTRY_TAG)$(COMPONENT_IMAGE_SUFFIX)
+VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/vsphere-xcopy-volume-populator:$(REGISTRY_TAG)$(COMPONENT_IMAGE_SUFFIX)
 
 ### OLM
-OPERATOR_BUNDLE_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-bundle:$(REGISTRY_TAG)
-OPERATOR_INDEX_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-index:$(REGISTRY_TAG)
+OPERATOR_BUNDLE_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-bundle:$(REGISTRY_TAG)$(PLATFORM_SUFFIX)
+OPERATOR_INDEX_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-index:$(REGISTRY_TAG)$(PLATFORM_SUFFIX)
 
 ### External images
-MUST_GATHER_IMAGE ?= quay.io/kubev2v/forklift-must-gather:latest
-UI_PLUGIN_IMAGE ?= quay.io/kubev2v/forklift-console-plugin:latest
+# These are built in separate repositories but referenced by the bundle
+MUST_GATHER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-must-gather:$(REGISTRY_TAG)$(COMPONENT_IMAGE_SUFFIX)
+UI_PLUGIN_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-console-plugin:$(REGISTRY_TAG)$(COMPONENT_IMAGE_SUFFIX)
 
 # Golangci-lint version
 GOLANGCI_LINT_VERSION ?= v1.64.2
@@ -256,39 +281,49 @@ install: manifests kubectl
 ##@ Container Images
 
 build-controller-image: check_container_runtime
-	$(eval CONTROLLER_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-controller:$(REGISTRY_TAG))
-	$(CONTAINER_CMD) build -t $(CONTROLLER_IMAGE) -f build/forklift-controller/Containerfile .
+	$(eval CONTROLLER_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-controller:$(REGISTRY_TAG)$(PLATFORM_SUFFIX))
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(CONTROLLER_IMAGE) -f build/forklift-controller/Containerfile .
 
 push-controller-image: build-controller-image
 	$(CONTAINER_CMD) push $(CONTROLLER_IMAGE)
 
 build-api-image: check_container_runtime
-	$(eval API_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-api:$(REGISTRY_TAG))
-	$(CONTAINER_CMD) build -t $(API_IMAGE) -f build/forklift-api/Containerfile .
+	$(eval API_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-api:$(REGISTRY_TAG)$(PLATFORM_SUFFIX))
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(API_IMAGE) -f build/forklift-api/Containerfile .
 
 push-api-image: build-api-image
 	$(CONTAINER_CMD) push $(API_IMAGE)
 
 build-validation-image: check_container_runtime
-	$(eval VALIDATION_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-validation:$(REGISTRY_TAG))
-	$(CONTAINER_CMD) build -t $(VALIDATION_IMAGE) -f build/validation/Containerfile .
+	$(eval VALIDATION_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-validation:$(REGISTRY_TAG)$(PLATFORM_SUFFIX))
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(VALIDATION_IMAGE) -f build/validation/Containerfile .
 
 push-validation-image: build-validation-image
 	$(CONTAINER_CMD) push $(VALIDATION_IMAGE)
 
 build-operator-image: check_container_runtime
-	$(eval OPERATOR_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-operator:$(REGISTRY_TAG))
-	$(CONTAINER_CMD) build -t $(OPERATOR_IMAGE) -f build/forklift-operator/Containerfile .
+	$(eval OPERATOR_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-operator:$(REGISTRY_TAG)$(PLATFORM_SUFFIX))
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(OPERATOR_IMAGE) -f build/forklift-operator/Containerfile .
 
 push-operator-image: build-operator-image
 	$(CONTAINER_CMD) push $(OPERATOR_IMAGE)
 
 build-virt-v2v-image: check_container_runtime
-	$(eval VIRT_V2V_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-virt-v2v:$(REGISTRY_TAG))
-	$(CONTAINER_CMD) build -t $(VIRT_V2V_IMAGE) -f build/virt-v2v/Containerfile-upstream .
+	@if [ "$(PLATFORM_ARCH)" != "amd64" ]; then \
+		echo "Notice: virt-v2v image build is only supported on amd64 platform."; \
+		echo "Current platform: $(PLATFORM) - skipping virt-v2v image build."; \
+	else \
+		$(eval VIRT_V2V_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-virt-v2v:$(REGISTRY_TAG)$(PLATFORM_SUFFIX)) \
+		$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(VIRT_V2V_IMAGE) -f build/virt-v2v/Containerfile-upstream .; \
+	fi
 
 push-virt-v2v-image: build-virt-v2v-image
-	$(CONTAINER_CMD) push $(VIRT_V2V_IMAGE)
+	@if [ "$(PLATFORM_ARCH)" != "amd64" ]; then \
+		echo "Notice: virt-v2v image push is only supported on amd64 platform."; \
+		echo "Current platform: $(PLATFORM) - skipping virt-v2v image push."; \
+	else \
+		$(CONTAINER_CMD) push $(VIRT_V2V_IMAGE); \
+	fi
 
 build-operator-bundle-image: check_container_runtime
 	$(CONTAINER_CMD) build \
@@ -314,7 +349,7 @@ push-operator-bundle-image: build-operator-bundle-image
 	$(CONTAINER_CMD) push $(OPERATOR_BUNDLE_IMAGE)
 
 build-operator-index-image: check_container_runtime
-	$(eval OPERATOR_INDEX_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-index:$(REGISTRY_TAG))
+	$(eval OPERATOR_INDEX_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-index:$(REGISTRY_TAG)$(PLATFORM_SUFFIX))
 	$(CONTAINER_CMD) build $(BUILD_OPT) -t $(OPERATOR_INDEX_IMAGE) -f build/forklift-operator-index/Containerfile . \
 		--build-arg VERSION=$(VERSION) \
 		--build-arg OPERATOR_BUNDLE_IMAGE=$(OPERATOR_BUNDLE_IMAGE) \
@@ -325,51 +360,73 @@ build-operator-index-image: check_container_runtime
 push-operator-index-image: build-operator-index-image
 	$(CONTAINER_CMD) push $(OPERATOR_INDEX_IMAGE)
 
+build-operator-bundle-image-multiarch: check_container_runtime
+	$(MAKE) build-operator-bundle-image COMPONENT_IMAGE_SUFFIX=
+
+push-operator-bundle-image-multiarch: build-operator-bundle-image-multiarch
+	$(CONTAINER_CMD) push $(OPERATOR_BUNDLE_IMAGE)
+
+build-operator-index-image-multiarch: check_container_runtime
+	$(MAKE) build-operator-index-image COMPONENT_IMAGE_SUFFIX=
+
+push-operator-index-image-multiarch: build-operator-index-image-multiarch
+	$(CONTAINER_CMD) push $(OPERATOR_INDEX_IMAGE)
+
 build-populator-controller-image: check_container_runtime
-	$(eval POPULATOR_CONTROLLER_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/populator-controller:$(REGISTRY_TAG))
-	$(CONTAINER_CMD) build -t $(POPULATOR_CONTROLLER_IMAGE) -f build/populator-controller/Containerfile .
+	$(eval POPULATOR_CONTROLLER_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/populator-controller:$(REGISTRY_TAG)$(PLATFORM_SUFFIX))
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(POPULATOR_CONTROLLER_IMAGE) -f build/populator-controller/Containerfile .
 
 push-populator-controller-image: build-populator-controller-image
 	$(CONTAINER_CMD) push $(POPULATOR_CONTROLLER_IMAGE)
 
 build-ovirt-populator-image: check_container_runtime
-	$(eval OVIRT_POPULATOR_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/ovirt-populator:$(REGISTRY_TAG))
-	$(CONTAINER_CMD) build -t $(OVIRT_POPULATOR_IMAGE) -f build/ovirt-populator/Containerfile-upstream .
+	@if [ "$(PLATFORM_ARCH)" != "amd64" ]; then \
+		echo "Notice: ovirt-populator image build is only supported on amd64 platform."; \
+		echo "Current platform: $(PLATFORM) - skipping ovirt-populator image build."; \
+	else \
+		$(eval OVIRT_POPULATOR_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/ovirt-populator:$(REGISTRY_TAG)$(PLATFORM_SUFFIX)) \
+		$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(OVIRT_POPULATOR_IMAGE) -f build/ovirt-populator/Containerfile-upstream .; \
+	fi
 
 push-ovirt-populator-image: build-ovirt-populator-image
-	$(CONTAINER_CMD) push $(OVIRT_POPULATOR_IMAGE)
+	@if [ "$(PLATFORM_ARCH)" != "amd64" ]; then \
+		echo "Notice: ovirt-populator image push is only supported on amd64 platform."; \
+		echo "Current platform: $(PLATFORM) - skipping ovirt-populator image push."; \
+	else \
+		$(CONTAINER_CMD) push $(OVIRT_POPULATOR_IMAGE); \
+	fi
 
 build-openstack-populator-image: check_container_runtime
-	$(eval OPENSTACK_POPULATOR_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/openstack-populator:$(REGISTRY_TAG))
-	$(CONTAINER_CMD) build -t $(OPENSTACK_POPULATOR_IMAGE) -f build/openstack-populator/Containerfile .
+	$(eval OPENSTACK_POPULATOR_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/openstack-populator:$(REGISTRY_TAG)$(PLATFORM_SUFFIX))
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(OPENSTACK_POPULATOR_IMAGE) -f build/openstack-populator/Containerfile .
 
 push-openstack-populator-image: build-openstack-populator-image
 	$(CONTAINER_CMD) push $(OPENSTACK_POPULATOR_IMAGE)
 
 build-vsphere-xcopy-volume-populator-image: check_container_runtime
-	$(eval VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/vsphere-xcopy-volume-populator:$(REGISTRY_TAG))
-	$(CONTAINER_CMD) build -t $(VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE) -f build/vsphere-xcopy-volume-populator/Containerfile .
+	$(eval VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/vsphere-xcopy-volume-populator:$(REGISTRY_TAG)$(PLATFORM_SUFFIX))
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE) -f build/vsphere-xcopy-volume-populator/Containerfile .
 
 push-vsphere-xcopy-volume-populator-image: build-vsphere-xcopy-volume-populator-image
 	$(CONTAINER_CMD) push $(VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE)
 
 build-ova-provider-server-image: check_container_runtime
-	$(eval OVA_PROVIDER_SERVER_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-provider-server:$(REGISTRY_TAG))
-	$(CONTAINER_CMD) build -t $(OVA_PROVIDER_SERVER_IMAGE) -f build/ova-provider-server/Containerfile .
+	$(eval OVA_PROVIDER_SERVER_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-provider-server:$(REGISTRY_TAG)$(PLATFORM_SUFFIX))
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(OVA_PROVIDER_SERVER_IMAGE) -f build/ova-provider-server/Containerfile .
 
 push-ova-provider-server-image: build-ova-provider-server-image
 	$(CONTAINER_CMD) push $(OVA_PROVIDER_SERVER_IMAGE)
 
 build-cli-download-image: check_container_runtime
-	$(eval CLI_DOWNLOAD_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-cli-download:$(REGISTRY_TAG))
-	$(CONTAINER_CMD) build -t $(CLI_DOWNLOAD_IMAGE) -f build/forklift-cli-download/Containerfile .
+	$(eval CLI_DOWNLOAD_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-cli-download:$(REGISTRY_TAG)$(PLATFORM_SUFFIX))
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(CLI_DOWNLOAD_IMAGE) -f build/forklift-cli-download/Containerfile .
 
 push-cli-download-image: build-cli-download-image
 	$(CONTAINER_CMD) push $(CLI_DOWNLOAD_IMAGE)
 
 build-ova-proxy-image: check_container_runtime
-	$(eval OVA_PROXY_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-proxy:$(REGISTRY_TAG))
-	$(CONTAINER_CMD) build -t $(OVA_PROXY_IMAGE) -f build/ova-proxy/Containerfile .
+	$(eval OVA_PROXY_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-proxy:$(REGISTRY_TAG)$(PLATFORM_SUFFIX))
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(OVA_PROXY_IMAGE) -f build/ova-proxy/Containerfile .
 
 push-ova-proxy-image: build-ova-proxy-image
 	$(CONTAINER_CMD) push $(OVA_PROXY_IMAGE)
@@ -404,6 +461,119 @@ push-all-images:  push-api-image \
                   push-operator-bundle-image \
 				  push-operator-index-image            
 
+##@ Multi-Architecture Manifests
+
+push-controller-image-manifest:
+	$(eval MANIFEST_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-controller:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) manifest create $(MANIFEST_IMAGE) \
+		$(MANIFEST_IMAGE)-amd64 \
+		$(MANIFEST_IMAGE)-arm64
+	$(CONTAINER_CMD) manifest push $(MANIFEST_IMAGE)
+
+push-api-image-manifest:
+	$(eval MANIFEST_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-api:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) manifest create $(MANIFEST_IMAGE) \
+		$(MANIFEST_IMAGE)-amd64 \
+		$(MANIFEST_IMAGE)-arm64
+	$(CONTAINER_CMD) manifest push $(MANIFEST_IMAGE)
+
+push-validation-image-manifest:
+	$(eval MANIFEST_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-validation:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) manifest create $(MANIFEST_IMAGE) \
+		$(MANIFEST_IMAGE)-amd64 \
+		$(MANIFEST_IMAGE)-arm64
+	$(CONTAINER_CMD) manifest push $(MANIFEST_IMAGE)
+
+push-operator-image-manifest:
+	$(eval MANIFEST_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-operator:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) manifest create $(MANIFEST_IMAGE) \
+		$(MANIFEST_IMAGE)-amd64 \
+		$(MANIFEST_IMAGE)-arm64
+	$(CONTAINER_CMD) manifest push $(MANIFEST_IMAGE)
+
+push-virt-v2v-image-manifest:
+	$(eval MANIFEST_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-virt-v2v:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) manifest create $(MANIFEST_IMAGE) \
+		$(MANIFEST_IMAGE)-amd64
+	$(CONTAINER_CMD) manifest push $(MANIFEST_IMAGE)
+
+push-populator-controller-image-manifest:
+	$(eval MANIFEST_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/populator-controller:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) manifest create $(MANIFEST_IMAGE) \
+		$(MANIFEST_IMAGE)-amd64 \
+		$(MANIFEST_IMAGE)-arm64
+	$(CONTAINER_CMD) manifest push $(MANIFEST_IMAGE)
+
+push-ovirt-populator-image-manifest:
+	$(eval MANIFEST_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/ovirt-populator:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) manifest create $(MANIFEST_IMAGE) \
+		$(MANIFEST_IMAGE)-amd64
+	$(CONTAINER_CMD) manifest push $(MANIFEST_IMAGE)
+
+push-openstack-populator-image-manifest:
+	$(eval MANIFEST_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/openstack-populator:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) manifest create $(MANIFEST_IMAGE) \
+		$(MANIFEST_IMAGE)-amd64 \
+		$(MANIFEST_IMAGE)-arm64
+	$(CONTAINER_CMD) manifest push $(MANIFEST_IMAGE)
+
+push-vsphere-xcopy-volume-populator-image-manifest:
+	$(eval MANIFEST_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/vsphere-xcopy-volume-populator:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) manifest create $(MANIFEST_IMAGE) \
+		$(MANIFEST_IMAGE)-amd64 \
+		$(MANIFEST_IMAGE)-arm64
+	$(CONTAINER_CMD) manifest push $(MANIFEST_IMAGE)
+
+push-ova-provider-server-image-manifest:
+	$(eval MANIFEST_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-provider-server:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) manifest create $(MANIFEST_IMAGE) \
+		$(MANIFEST_IMAGE)-amd64 \
+		$(MANIFEST_IMAGE)-arm64
+	$(CONTAINER_CMD) manifest push $(MANIFEST_IMAGE)
+
+push-cli-download-image-manifest:
+	$(eval MANIFEST_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-cli-download:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) manifest create $(MANIFEST_IMAGE) \
+		$(MANIFEST_IMAGE)-amd64 \
+		$(MANIFEST_IMAGE)-arm64
+	$(CONTAINER_CMD) manifest push $(MANIFEST_IMAGE)
+
+push-ova-proxy-image-manifest:
+	$(eval MANIFEST_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-proxy:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) manifest create $(MANIFEST_IMAGE) \
+		$(MANIFEST_IMAGE)-amd64 \
+		$(MANIFEST_IMAGE)-arm64
+	$(CONTAINER_CMD) manifest push $(MANIFEST_IMAGE)
+
+push-operator-bundle-image-manifest:
+	$(eval MANIFEST_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-bundle:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) manifest create $(MANIFEST_IMAGE) \
+		$(MANIFEST_IMAGE)-amd64 \
+		$(MANIFEST_IMAGE)-arm64
+	$(CONTAINER_CMD) manifest push $(MANIFEST_IMAGE)
+
+push-operator-index-image-manifest:
+	$(eval MANIFEST_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-index:$(REGISTRY_TAG))
+	$(CONTAINER_CMD) manifest create $(MANIFEST_IMAGE) \
+		$(MANIFEST_IMAGE)-amd64 \
+		$(MANIFEST_IMAGE)-arm64
+	$(CONTAINER_CMD) manifest push $(MANIFEST_IMAGE)
+
+push-all-images-manifest: push-controller-image-manifest \
+                          push-api-image-manifest \
+                          push-validation-image-manifest \
+                          push-operator-image-manifest \
+                          push-virt-v2v-image-manifest \
+                          push-populator-controller-image-manifest \
+                          push-ovirt-populator-image-manifest \
+                          push-openstack-populator-image-manifest \
+                          push-vsphere-xcopy-volume-populator-image-manifest \
+                          push-ova-provider-server-image-manifest \
+                          push-cli-download-image-manifest \
+                          push-ova-proxy-image-manifest \
+                          push-operator-bundle-image-manifest \
+                          push-operator-index-image-manifest
+
 .PHONY: check_container_runtime
 check_container_runtime:
 	@if [ ! -x "$(CONTAINER_CMD)" ]; then \
@@ -417,6 +587,11 @@ check_container_runtime:
 .PHONY: deploy-operator-index
 deploy-operator-index: kubectl
 	export OPERATOR_INDEX_IMAGE=${OPERATOR_INDEX_IMAGE}; envsubst < operator/forklift-operator-catalog.yaml | $(KUBECTL) apply -f -
+
+.PHONY: deploy-operator-index-multiarch
+deploy-operator-index-multiarch: kubectl
+	$(eval OPERATOR_INDEX_IMAGE_MULTIARCH=$(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-index:$(REGISTRY_TAG))
+	export OPERATOR_INDEX_IMAGE=${OPERATOR_INDEX_IMAGE_MULTIARCH}; envsubst < operator/forklift-operator-catalog.yaml | $(KUBECTL) apply -f -
 
 ##@ Tool Installation
 

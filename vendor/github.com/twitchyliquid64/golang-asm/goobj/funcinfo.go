@@ -6,8 +6,8 @@ package goobj
 
 import (
 	"bytes"
-	"encoding/binary"
 	"github.com/twitchyliquid64/golang-asm/objabi"
+	"encoding/binary"
 )
 
 // CUFileIndex is used to index the filenames that are stored in the

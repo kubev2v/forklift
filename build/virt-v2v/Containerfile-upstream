@@ -1,15 +1,15 @@
 # Build virt-v2v binary
 FROM quay.io/centos/centos:stream9 AS builder
 USER 0
-RUN --mount=type=cache,target=/var/cache/dnf dnf -y install --enablerepo=crb libvirt-devel golang
+RUN --mount=type=cache,target=/var/cache/dnf dnf -y install --enablerepo=crb libvirt-devel golang gcc
 WORKDIR /app
 COPY --chown=1001:0 ./ ./
-ENV GOFLAGS "-mod=vendor -tags=strictfipsruntime"
-ENV GOEXPERIMENT strictfipsruntime
+ENV GOFLAGS="-mod=vendor -tags=strictfipsruntime"
+ENV GOEXPERIMENT=strictfipsruntime
 
-RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-monitor ./cmd/virt-v2v-monitor/virt-v2v-monitor.go
-RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o image-converter ./cmd/image-converter/image-converter.go
-RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-wrapper ./cmd/virt-v2v/entrypoint.go
+RUN go build -ldflags="-w -s" -o virt-v2v-monitor ./cmd/virt-v2v-monitor/virt-v2v-monitor.go
+RUN go build -ldflags="-w -s" -o image-converter ./cmd/image-converter/image-converter.go
+RUN CGO_ENABLED=1 go build -ldflags="-w -s" -o virt-v2v-wrapper ./cmd/virt-v2v/entrypoint.go
 
 # Main container
 FROM quay.io/centos/centos:stream9
@@ -23,7 +23,7 @@ ENV LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1
 
 RUN mkdir /disks && \
     source /etc/os-release && \
-    dnf install -y \
+    dnf install -y --enablerepo=crb \
         virt-v2v && \
     dnf clean all
 
@@ -31,7 +31,7 @@ RUN mkdir /disks && \
 RUN dnf install -y https://kojihub.stream.centos.org/kojifiles/packages/virtio-win/1.9.40/1.el9/noarch/virtio-win-1.9.40-1.el9.noarch.rpm
 
 RUN ( [ "$(rpm -q glibc)" == "glibc-2.34-66.el9.x86_64" ] && dnf -y downgrade glibc-2.34-65.el9.x86_64 || true ) && \
-dnf -y install libguestfs libguestfs-appliance libguestfs-xfs libguestfs-winsupport qemu-img supermin && \
+dnf -y install --enablerepo=crb libguestfs libguestfs-appliance libguestfs-xfs libguestfs-winsupport qemu-img supermin && \
         depmod $(ls /lib/modules/ |tail -n1)
 
 # Create tarball for the appliance.
