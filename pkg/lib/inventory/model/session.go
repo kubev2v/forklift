@@ -4,7 +4,7 @@ import (
 	"database/sql"
 
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // DB session.
