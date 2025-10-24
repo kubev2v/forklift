@@ -209,6 +209,10 @@ func (r *Client) PreTransferActions(vmRef ref.Ref) (ready bool, err error) {
 		r.Log.Info("VM-export is ready.", "vm", vmRef.Name)
 		return true, nil
 	}
+	if vmExport.Status != nil && vmExport.Status.Phase == export.Skipped {
+		r.Log.Info("VM-export is skipped (no exportable volumes), will migrate VM definition only.", "vm", vmRef.Name)
+		return true, nil
+	}
 
 	r.Log.Info("Waiting for VM-export to be ready...", "vm", vmRef.Name)
 	return false, nil
