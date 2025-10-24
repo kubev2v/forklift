@@ -14,7 +14,8 @@ import (
 
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	fb "github.com/kubev2v/forklift/pkg/lib/filebacked"
-	"github.com/mattn/go-sqlite3"
+	sqlite3 "modernc.org/sqlite"
+	sqlite3lib "modernc.org/sqlite/lib"
 )
 
 // DDL templates.
@@ -316,8 +317,13 @@ func (t Table) Insert(model interface{}) (err error) {
 	params := t.Params(md)
 	r, err := t.DB.Exec(stmt, params...)
 	if err != nil {
-		if sql3Err, cast := err.(sqlite3.Error); cast {
-			if sql3Err.Code == sqlite3.ErrConstraint {
+		var sqliteErr *sqlite3.Error
+		if errors.As(err, &sqliteErr) {
+			// Check if it's a constraint violation (UNIQUE, PRIMARY KEY, etc.)
+			code := sqliteErr.Code()
+			if code == sqlite3lib.SQLITE_CONSTRAINT ||
+				code == sqlite3lib.SQLITE_CONSTRAINT_UNIQUE ||
+				code == sqlite3lib.SQLITE_CONSTRAINT_PRIMARYKEY {
 				return t.Update(model)
 			}
 		}

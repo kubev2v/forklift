@@ -4,7 +4,7 @@ import (
 	"database/sql"
 
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // DB session.
@@ -94,7 +94,7 @@ func (p *Pool) Open(nWriter, nReader int, path string, journal *Journal) (err er
 	p.next.reader = make(chan *Session, nReader)
 	for id := 0; id < total; id++ {
 		session := &Session{id: id}
-		session.db, err = sql.Open("sqlite3", path)
+		session.db, err = sql.Open("sqlite", path)
 		if err != nil {
 			return
 		}

@@ -16,9 +16,16 @@ executing the migration effort.
 ---
 
 ## Deploy
-Deploy the latest Forklift operator index to the cluster
+Deploy the Forklift operator index to the cluster.
+
+For single-architecture deployment (development):
 ```bash
-make deploy-operator-index REGISTRY_TAG=latest
+make deploy-operator-index PLATFORM=linux/amd64 REGISTRY_TAG=latest
+```
+
+For multi-architecture deployment (production):
+```bash
+make deploy-operator-index-multiarch REGISTRY_TAG=latest
 ```
 
 
@@ -32,6 +39,10 @@ make push-controller-image \
      deploy-operator-index
 ```
 Note: The order of targets is important as the bundle needs to be created after controller and index after bundle.
+
+### Multi-Architecture Builds
+
+For information about building images for multiple architectures (AMD64, ARM64) and creating multi-arch manifests, see the [Cross-Platform Build Support](docs/enhancements/cross-platform-build-support.md) enhancement document.
 
 ## Development
 
@@ -107,6 +118,7 @@ For comprehensive information about commit message formatting, supported issue t
 | REGISTRY_TAG               | devel                                          | The tag with which the image will be built and pushed to the registry. |
 | REGISTRY_ORG               | kubev2v                                        | The registry organization to which the built image should be pushed.   |
 | REGISTRY                   | quay.io                                        | The registry address to which the images should be pushed.             |
+| PLATFORM                   | linux/amd64                                    | The target platform for container image builds (e.g.: linux/arm64, linux/amd64). |
 | CONTAINER_CMD              | autodetected                                   | The container runtime command (e.g.: /usr/bin/podman)                  |
 | VERSION                    | 99.0.0                                         | The version with which the forklift should be built.                   |
 | NAMESPACE                  | konveyor-forklift                              | The namespace in which the operator should be installed.               |

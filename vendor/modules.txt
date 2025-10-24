@@ -70,6 +70,9 @@ github.com/cloudwego/base64x/internal/rt
 # github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 ## explicit
 github.com/davecgh/go-spew/spew
+# github.com/dustin/go-humanize v1.0.1
+## explicit; go 1.16
+github.com/dustin/go-humanize
 # github.com/emicklei/go-restful/v3 v3.11.0
 ## explicit; go 1.13
 github.com/emicklei/go-restful/v3
@@ -182,8 +185,8 @@ github.com/google/go-cmp/cmp/internal/value
 ## explicit; go 1.12
 github.com/google/gofuzz
 github.com/google/gofuzz/bytesource
-# github.com/google/pprof v0.0.0-20241029153458-d1b30febd7db
-## explicit; go 1.22
+# github.com/google/pprof v0.0.0-20250317173921-a4b03ec1a45e
+## explicit; go 1.23
 github.com/google/pprof/profile
 # github.com/google/uuid v1.6.0
 ## explicit
@@ -260,9 +263,6 @@ github.com/mailru/easyjson/jwriter
 # github.com/mattn/go-isatty v0.0.20
 ## explicit; go 1.15
 github.com/mattn/go-isatty
-# github.com/mattn/go-sqlite3 v1.14.28
-## explicit; go 1.19
-github.com/mattn/go-sqlite3
 # github.com/mitchellh/copystructure v1.2.0
 ## explicit; go 1.15
 github.com/mitchellh/copystructure
@@ -288,6 +288,9 @@ github.com/munnerz/goautoneg
 # github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 ## explicit
 github.com/mxk/go-flowrate/flowrate
+# github.com/ncruces/go-strftime v0.1.9
+## explicit; go 1.17
+github.com/ncruces/go-strftime
 # github.com/nxadm/tail v1.4.11
 ## explicit; go 1.13
 github.com/nxadm/tail
@@ -424,6 +427,9 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
+# github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec
+## explicit; go 1.12
+github.com/remyoudompheng/bigfft
 # github.com/shopspring/decimal v1.4.0
 ## explicit; go 1.10
 github.com/shopspring/decimal
@@ -515,7 +521,7 @@ go.uber.org/zap/zapcore
 # golang.org/x/arch v0.15.0
 ## explicit; go 1.23.0
 golang.org/x/arch/x86/x86asm
-# golang.org/x/crypto v0.36.0
+# golang.org/x/crypto v0.41.0
 ## explicit; go 1.23.0
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blowfish
@@ -528,7 +534,10 @@ golang.org/x/crypto/scrypt
 golang.org/x/crypto/sha3
 golang.org/x/crypto/ssh
 golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
-# golang.org/x/net v0.38.0
+# golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b
+## explicit; go 1.23.0
+golang.org/x/exp/constraints
+# golang.org/x/net v0.43.0
 ## explicit; go 1.23.0
 golang.org/x/net/context
 golang.org/x/net/html
@@ -547,19 +556,19 @@ golang.org/x/net/websocket
 ## explicit; go 1.18
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
-# golang.org/x/sync v0.13.0
+# golang.org/x/sync v0.16.0
 ## explicit; go 1.23.0
 golang.org/x/sync/errgroup
-# golang.org/x/sys v0.31.0
-## explicit; go 1.23.0
+# golang.org/x/sys v0.36.0
+## explicit; go 1.24.0
 golang.org/x/sys/cpu
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/term v0.30.0
+# golang.org/x/term v0.34.0
 ## explicit; go 1.23.0
 golang.org/x/term
-# golang.org/x/text v0.24.0
+# golang.org/x/text v0.28.0
 ## explicit; go 1.23.0
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
@@ -584,9 +593,10 @@ golang.org/x/text/unicode/norm
 # golang.org/x/time v0.7.0
 ## explicit; go 1.18
 golang.org/x/time/rate
-# golang.org/x/tools v0.26.0
-## explicit; go 1.22.0
+# golang.org/x/tools v0.36.0
+## explicit; go 1.23.0
 golang.org/x/tools/cover
+golang.org/x/tools/go/ast/edge
 golang.org/x/tools/go/ast/inspector
 # gomodules.xyz/jsonpatch/v2 v2.4.0
 ## explicit; go 1.20
@@ -1183,6 +1193,44 @@ libvirt.org/go/libvirt
 # libvirt.org/libvirt-go-xml v7.4.0+incompatible
 ## explicit
 libvirt.org/libvirt-go-xml
+# modernc.org/libc v1.66.10
+## explicit; go 1.23.0
+modernc.org/libc
+modernc.org/libc/errno
+modernc.org/libc/fcntl
+modernc.org/libc/fts
+modernc.org/libc/grp
+modernc.org/libc/honnef.co/go/netdb
+modernc.org/libc/langinfo
+modernc.org/libc/limits
+modernc.org/libc/netdb
+modernc.org/libc/netinet/in
+modernc.org/libc/poll
+modernc.org/libc/pthread
+modernc.org/libc/pwd
+modernc.org/libc/signal
+modernc.org/libc/stdio
+modernc.org/libc/stdlib
+modernc.org/libc/sys/socket
+modernc.org/libc/sys/stat
+modernc.org/libc/sys/types
+modernc.org/libc/termios
+modernc.org/libc/time
+modernc.org/libc/unistd
+modernc.org/libc/utime
+modernc.org/libc/uuid
+modernc.org/libc/uuid/uuid
+modernc.org/libc/wctype
+# modernc.org/mathutil v1.7.1
+## explicit; go 1.21
+modernc.org/mathutil
+# modernc.org/memory v1.11.0
+## explicit; go 1.23.0
+modernc.org/memory
+# modernc.org/sqlite v1.39.1
+## explicit; go 1.24.0
+modernc.org/sqlite
+modernc.org/sqlite/lib
 # sigs.k8s.io/controller-runtime v0.20.4
 ## explicit; go 1.23.0
 sigs.k8s.io/controller-runtime/pkg/cache
