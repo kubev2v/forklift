@@ -2137,10 +2137,17 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 
 		// Add disks to be inspected
 		for i, disk := range virtualMachine.Disks {
-			environment = append(environment, core.EnvVar{
-				Name:  fmt.Sprintf("V2V_remoteInspectDisk_%d", i),
-				Value: disk.ParentFile,
-			})
+			// If parent disk is empty then fail with error message
+			if disk.ParentFile != "" {
+				environment = append(environment, core.EnvVar{
+					Name:  fmt.Sprintf("V2V_remoteInspectDisk_%d", i),
+					Value: disk.ParentFile,
+				})
+			} else {
+				errMsg := fmt.Sprintf("Parent disk of %s was not found. Please investigate if a precopy snapshot has a parent backing or retry later.", disk.File)
+				err = liberr.New(errMsg, "vm", vm.Ref.String())
+				return
+			}
 		}
 	}
 
