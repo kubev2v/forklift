@@ -26,6 +26,13 @@ import (
 const (
 	// VM step label
 	kStep = "step"
+	// Hook ID label
+	kHook = "hook"
+)
+
+// Resource label
+const (
+	ResourceHookConfig = "hook-config"
 )
 
 // Hook runner.
@@ -362,5 +369,7 @@ func (r *HookRunner) labels() map[string]string {
 		kMigration: string(r.Migration.UID),
 		kVM:        r.vm.ID,
 		kStep:      r.vm.Phase,
+		kHook:      string(r.hook.UID),
+		kResource:  ResourceHookConfig,
 	}
 }
