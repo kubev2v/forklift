@@ -1049,7 +1049,7 @@ func (r Collector) applyLeave(tx *libmodel.Tx, u types.ObjectUpdate) error {
 				ID: u.Obj.Value,
 			},
 		}
-	case Network:
+	case Network, OpaqueNetwork, DVPortGroup, DVSwitch:
 		deleted = &model.Network{
 			Base: model.Base{
 				ID: u.Obj.Value,
