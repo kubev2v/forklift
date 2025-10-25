@@ -1,4 +1,3 @@
-//go:build codecgen.exec
 // +build codecgen.exec
 
 // Copyright (c) 2012-2020 Ugorji Nwoke. All rights reserved.
