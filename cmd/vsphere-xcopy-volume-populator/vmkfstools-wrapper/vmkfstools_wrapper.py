@@ -8,6 +8,7 @@ import subprocess
 import uuid
 import re
 
+VERSION = "__VERSION__"
 TMP_PREFIX = "/tmp/vmkfstools-wrapper-{}"
 
 XML = """<?xml version="1.0" ?>
@@ -62,6 +63,9 @@ def clone(args):
         stdout_file.close()
         stderr_file.close()
 
+def version():
+        result = {"version": VERSION}
+        print(XML.format("0", json.dumps(result)))
 
 def taskGet(args):
     tmp_dir = TMP_PREFIX.format(args.task_id[0])
@@ -146,6 +150,8 @@ def main():
     parser.add_argument("-i", "--task-id", type=str, nargs=1,
                         metavar="task_id", default=None,
                         help="id of task to get")
+    parser.add_argument("--version", action="store_true",
+                        help="get the version")
     args = parser.parse_args()
     logging.basicConfig(filename='/var/log/vmkfstools-wrapper.log',
                         level=logging.INFO,
