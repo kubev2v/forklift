@@ -273,9 +273,20 @@ func (h Handler) NetworkAttachmentDefinitions(ctx *gin.Context, provider *api.Pr
 		return
 	}
 
+	requestedNS := ctx.Request.URL.Query().Get(NsParam)
 	// Determine which namespaces to query
 	var namespacesToQuery []string
-	if provider != nil && provider.IsRestrictedHost() {
+
+	if requestedNS != "" {
+		if provider != nil && provider.IsRestrictedHost() {
+			// Validate the requested namespace is in allowed list
+			if requestedNS != provider.GetNamespace() && requestedNS != core.NamespaceDefault {
+				return nil, liberr.New("Namespace '%s' not allowed for restricted provider. Allowed namespaces: ['%s', 'default']",
+					requestedNS, provider.GetNamespace())
+			}
+		}
+		namespacesToQuery = []string{requestedNS}
+	} else if provider != nil && provider.IsRestrictedHost() {
 		// For restricted host providers, query specific namespaces
 		namespacesToQuery = []string{provider.GetNamespace(), core.NamespaceDefault}
 	} else {
