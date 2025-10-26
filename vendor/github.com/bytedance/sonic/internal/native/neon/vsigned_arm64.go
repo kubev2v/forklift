@@ -1,3 +1,4 @@
+
 /*
  * Copyright 2021 ByteDance Inc.
  *
@@ -17,12 +18,12 @@
 package neon
 
 import (
-	"github.com/bytedance/sonic/internal/native/types"
+    `github.com/bytedance/sonic/internal/native/types`
 )
 
 //go:nosplit
 func vsigned(s *string, p *int, v *types.JsonState) {
-	__vsigned(s, p, v)
+    __vsigned(s, p, v)
 }
 
 //go:nosplit

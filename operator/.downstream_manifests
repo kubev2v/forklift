@@ -5747,6 +5747,7 @@ spec:
                               description: StorageVendorProduct the string identifier
                                 of the storage vendor product
                               enum:
+                              - flashsystem
                               - vantara
                               - ontap
                               - primera3par
@@ -5754,6 +5755,7 @@ spec:
                               - powerflex
                               - powermax
                               - powerstore
+                              - infinibox
                               type: string
                           required:
                           - secretRef
