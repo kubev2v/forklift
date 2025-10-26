@@ -131,6 +131,13 @@ func main() {
 			klog.Fatalf("failed to initialize PowerStore clonner with %s", err)
 		}
 		storageApi = &sm
+	case forklift.StorageVendorProductInfinibox:
+		sm, err := infinibox.NewInfiniboxClonner(
+			storageHostname, storageUsername, storagePassword, storageSkipSSLVerification == "true")
+		if err != nil {
+			klog.Fatalf("failed to initialize Infinibox clonner with %s", err)
+		}
+		storageApi = &sm
 	default:
 		klog.Fatalf("Unsupported storage vendor %s use one of %v",
 			storageVendor, forklift.StorageVendorProducts())
