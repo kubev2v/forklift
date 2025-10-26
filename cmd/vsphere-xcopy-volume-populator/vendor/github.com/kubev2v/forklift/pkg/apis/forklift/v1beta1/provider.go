@@ -100,6 +100,9 @@ type ProviderStatus struct {
 	// Fingerprint.
 	// +optional
 	Fingerprint string `json:"fingerprint,omitempty"`
+	// Provider service reference
+	// +optional
+	Service *core.ObjectReference `json:"service,omitempty"`
 }
 
 // +genclient
@@ -137,6 +140,10 @@ func (p *Provider) Type() ProviderType {
 		return *p.Spec.Type
 	}
 	return Undefined
+}
+
+func (p *Provider) SupportsPreserveStaticIps() bool {
+	return p.Type() == VSphere
 }
 
 // This provider is the `host` cluster.
