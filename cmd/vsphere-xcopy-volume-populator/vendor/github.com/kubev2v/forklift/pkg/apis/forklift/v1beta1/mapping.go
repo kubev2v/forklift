@@ -69,6 +69,7 @@ const (
 	StorageVendorProductPowerFlex      StorageVendorProduct = "powerflex"
 	StorageVendorProductPowerMax       StorageVendorProduct = "powermax"
 	StorageVendorProductPowerStore     StorageVendorProduct = "powerstore"
+	StorageVendorProductInfinibox      StorageVendorProduct = "infinibox"
 )
 
 func StorageVendorProducts() []StorageVendorProduct {
@@ -81,6 +82,7 @@ func StorageVendorProducts() []StorageVendorProduct {
 		StorageVendorProductPowerFlex,
 		StorageVendorProductPowerMax,
 		StorageVendorProductPowerStore,
+		StorageVendorProductInfinibox,
 	}
 }
 
