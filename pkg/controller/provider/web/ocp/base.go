@@ -3,6 +3,7 @@ package ocp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	pathlib "path"
 
 	"github.com/gin-gonic/gin"
@@ -273,16 +274,30 @@ func (h Handler) NetworkAttachmentDefinitions(ctx *gin.Context, provider *api.Pr
 		return
 	}
 
+	requestedNS := ctx.Request.URL.Query().Get(NsParam)
 	// Determine which namespaces to query
 	var namespacesToQuery []string
-	if provider != nil && provider.IsRestrictedHost() {
-		// For restricted host providers, query specific namespaces
+
+	if requestedNS != "" {
+		// Case A: Namespace explicitly specified in the query parameter
+		// Validate that restricted providers can only access allowed namespaces, then search only the requested namespace
+		if provider != nil && provider.IsRestrictedHost() {
+			if requestedNS != provider.GetNamespace() && requestedNS != core.NamespaceDefault {
+				return nil, liberr.New(fmt.Sprintf(
+					"Namespace %q not allowed for restricted provider. Allowed namespaces: [%q, %q]",
+					requestedNS, provider.GetNamespace(), core.NamespaceDefault))
+			}
+		}
+		namespacesToQuery = []string{requestedNS}
+	} else if provider != nil && provider.IsRestrictedHost() {
+		// Case B: No namespace specified, restricted provider
+		// Search only provider's namespace and default namespace
 		namespacesToQuery = []string{provider.GetNamespace(), core.NamespaceDefault}
 	} else {
-		// For non-restricted providers, query all namespaces (empty slice means no namespace restriction)
+		// Case C: No namespace specified, non-restricted (root) provider
+		// Search all namespaces (empty string means no namespace filter)
 		namespacesToQuery = []string{""}
 	}
-
 	// Query each namespace and collect results, empty namespace means all namespaces
 	for _, ns := range namespacesToQuery {
 		list := net.NetworkAttachmentDefinitionList{}
