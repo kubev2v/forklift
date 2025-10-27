@@ -1360,6 +1360,13 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 
 	} else if vm.Error != nil {
 		vm.Phase = api.PhaseCompleted
+
+		// Failed warm migration can't follow its planned itinerary to snapshot removal phase
+		// so we remove the snapshot here to prevent an orphaned snapshot.
+		if r.Plan.IsWarm() && !vm.HasCondition(api.ConditionFailed) {
+			r.removeLastWarmSnapshot(vm)
+		}
+
 		vm.SetCondition(
 			libcnd.Condition{
 				Type:     api.ConditionFailed,
