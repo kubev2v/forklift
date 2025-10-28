@@ -1218,6 +1218,21 @@ func (r *KubeVirt) DeletePVCConsumerPod(vm *plan.VMStatus) (err error) {
 	return
 }
 
+// Delete the inspection pod.
+func (r *KubeVirt) DeletePreflightInspectionPod(vm *plan.VMStatus) (err error) {
+	list, err := r.GetPodsWithLabels(r.inspectionLabels(vm.Ref))
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for _, object := range list.Items {
+		err := r.DeleteObject(&object, vm, "Deleted preflight inspection pod.", "pod")
+		if err != nil {
+			return err
+		}
+	}
+	return
+}
+
 // Delete the guest conversion pod on the destination cluster.
 func (r *KubeVirt) DeleteGuestConversionPod(vm *plan.VMStatus) (err error) {
 	list, err := r.GetPodsWithLabels(r.conversionLabels(vm.Ref, true))
