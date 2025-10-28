@@ -321,7 +321,7 @@ push-virt-v2v-image: build-virt-v2v-image
 
 build-operator-bundle-image: check_container_runtime
 	$(eval OPERATOR_BUNDLE_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-bundle:$(REGISTRY_TAG)$(PLATFORM_SUFFIX))
-	$(CONTAINER_CMD) build \
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) \
 		-t $(OPERATOR_BUNDLE_IMAGE) \
 		-f build/forklift-operator-bundle/Containerfile . \
 		--build-arg STREAM=dev \
@@ -345,7 +345,8 @@ push-operator-bundle-image: build-operator-bundle-image
 
 build-operator-index-image: check_container_runtime
 	$(eval OPERATOR_INDEX_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-index:$(REGISTRY_TAG)$(PLATFORM_SUFFIX))
-	$(CONTAINER_CMD) build $(BUILD_OPT) -t $(OPERATOR_INDEX_IMAGE) -f build/forklift-operator-index/Containerfile . \
+	$(eval OPERATOR_BUNDLE_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-bundle:$(REGISTRY_TAG)$(PLATFORM_SUFFIX))
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(OPERATOR_INDEX_IMAGE) -f build/forklift-operator-index/Containerfile . \
 		--build-arg VERSION=$(VERSION) \
 		--build-arg OPERATOR_BUNDLE_IMAGE=$(OPERATOR_BUNDLE_IMAGE) \
 		--build-arg CHANNELS=$(CHANNELS) \
