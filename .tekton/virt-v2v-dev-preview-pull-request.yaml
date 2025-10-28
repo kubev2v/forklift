@@ -47,6 +47,12 @@ spec:
       value:
         - "REVISION={{revision}}"
   taskRunSpecs:
+  - pipelineTaskName: prefetch-input
+    computeResources:
+      requests:
+        memory: 8Gi
+      limits:
+        memory: 8Gi
   - pipelineTaskName: build-source-image
     computeResources:
       requests:
