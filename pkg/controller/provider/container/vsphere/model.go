@@ -802,7 +802,8 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 
 					//In case of ExtraConfig update, on initial state model.Disks is not ready yet
 					if len(v.model.Disks) > 0 {
-						isCBTEnabledForDisks(ctkPerDisk, v.model.Disks)
+						hasSnapshots := v.model.Snapshot.ID != ""
+						isCBTEnabledForDisksWithSnapshotCheck(ctkPerDisk, v.model.Disks, hasSnapshots)
 					}
 				}
 			case fNestedHVEnabled:
@@ -966,7 +967,8 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 					v.updateDisks(&devArray)
 
 					if len(ctkPerDisk) > 0 {
-						isCBTEnabledForDisks(ctkPerDisk, v.model.Disks)
+						hasSnapshots := v.model.Snapshot.ID != ""
+						isCBTEnabledForDisksWithSnapshotCheck(ctkPerDisk, v.model.Disks, hasSnapshots)
 					}
 					if len(v.model.GuestNetworks) > 0 {
 						SortNICsByGuestNetworkOrder(&v.model)
@@ -991,6 +993,36 @@ func isCBTEnabledForDisks(ctkPerDisk map[string]bool, disks []model.Disk) {
 		// In vSphere, ControllerKey values are typically large integers that encode the controller bus number.
 		// To extract the actual controller index (e.g., scsi0, scsi1), we round down to the nearest 100 to get the base,
 		// then subtract it from the ControllerKey. For example, 16001 → controllerIndex 1 (16001 - 16000).
+		baseKey := (disk.ControllerKey / 100) * 100
+		controllerIndex := disk.ControllerKey - baseKey
+		deviceKey := fmt.Sprintf("%s%d:%d", disk.Bus, controllerIndex, disk.UnitNumber)
+
+		if ctkPerDisk[deviceKey] {
+			disk.ChangeTrackingEnabled = true
+		} else {
+			disk.ChangeTrackingEnabled = false
+		}
+	}
+}
+
+// isCBTEnabledForDisksWithSnapshotCheck performs snapshot-aware CBT detection.
+// This function uses ChangeId from disk backing information as the primary method
+// for CBT detection, which works reliably even when snapshots exist.
+// ExtraConfig-based detection is used as a fallback when ChangeId is not available.
+func isCBTEnabledForDisksWithSnapshotCheck(ctkPerDisk map[string]bool, disks []model.Disk, hasSnapshots bool) {
+	for i := range disks {
+		disk := &disks[i]
+
+		// Primary method: Use ChangeId from disk backing information
+		// This is the most reliable method and works with snapshots
+		if disk.ChangeTrackingEnabled {
+			// CBT is already detected from ChangeId in updateDisks()
+			continue
+		}
+
+		// Fallback method: Use ExtraConfig data when ChangeId is not available
+		// This would help detect CBT in the event that snapshots are created or deleted, resetting the ChangeId.
+		// Primary and fallback method would not detect if CBT is incompatible with disk type like a shared virtual SCSI bus.
 		baseKey := (disk.ControllerKey / 100) * 100
 		controllerIndex := disk.ControllerKey - baseKey
 		deviceKey := fmt.Sprintf("%s%d:%d", disk.Bus, controllerIndex, disk.UnitNumber)
@@ -1152,6 +1184,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					Bus:            bus,
 					Serial:         backing.Uuid,
 					WinDriveLetter: winDriveLetter,
+					ChangeTrackingEnabled: backing.ChangeId != "",
 				}
 				if backing.Parent != nil {
 					md.ParentFile = backing.Parent.FileName
@@ -1177,6 +1210,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					Bus:            bus,
 					Serial:         backing.Uuid,
 					WinDriveLetter: winDriveLetter,
+					ChangeTrackingEnabled: backing.ChangeId != "",
 				}
 				if backing.Datastore != nil {
 					datastoreId, _ := sanitize(backing.Datastore.Value)
@@ -1197,6 +1231,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					RDM:            true,
 					Bus:            bus,
 					WinDriveLetter: winDriveLetter,
+					ChangeTrackingEnabled: backing.ChangeId != "",
 				}
 				disks = append(disks, md)
 			}
