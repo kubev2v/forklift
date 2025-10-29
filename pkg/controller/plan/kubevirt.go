@@ -81,6 +81,8 @@ const (
 	DynamicScriptsVolumeName = "scripts-volume-mount"
 	// DynamicScriptsMountPath is the mount path for first-boot scripts.
 	DynamicScriptsMountPath = "/mnt/dynamic_scripts"
+	// Annotation to specify current number of retries for getting parent backing
+	ParentBackingRetriesAnnotation = "parentBackingRetries"
 )
 
 // Labels
@@ -996,7 +998,7 @@ func (r *KubeVirt) getListOptionsNamespaced() (listOptions *client.ListOptions) 
 }
 
 // Ensure the guest conversion/inspection (virt-v2v) pod exists on the destination.
-func (r *KubeVirt) EnsureVirtV2vPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvcs []*core.PersistentVolumeClaim, podType int) (err error) {
+func (r *KubeVirt) EnsureVirtV2vPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvcs []*core.PersistentVolumeClaim, podType int, step *plan.Step) (err error) {
 	labels := r.vmLabels(vm.Ref)
 	v2vSecret, err := r.ensureSecret(vm.Ref, r.secretDataSetterForCDI(vm.Ref), labels)
 	if err != nil {
@@ -1016,7 +1018,11 @@ func (r *KubeVirt) EnsureVirtV2vPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvc
 	if podType == VirtV2vConversionPod {
 		vmVolumes = vmCr.Spec.Template.Spec.Volumes
 	}
-	newPod, err := r.getVirtV2vPod(vm, vmVolumes, vddkConfigMap, pvcs, v2vSecret, podType)
+	newPod, err := r.getVirtV2vPod(vm, vmVolumes, vddkConfigMap, pvcs, v2vSecret, podType, step)
+	if newPod == nil && err == nil {
+		r.Log.Info("Couldn't prepare pod for vm.", "vm", vm.String())
+		return
+	}
 	if err != nil {
 		return
 	}
@@ -1991,7 +1997,7 @@ func (r *KubeVirt) getConvertorAffinity() *core.Affinity {
 	}
 }
 
-func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, v2vSecret *core.Secret, podType int) (pod *core.Pod, err error) {
+func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, v2vSecret *core.Secret, podType int, step *plan.Step) (pod *core.Pod, err error) {
 	volumes, volumeMounts, volumeDevices, err := r.podVolumeMounts(vmVolumes, vddkConfigmap, pvcs, vm, podType)
 	if err != nil {
 		return
@@ -2158,12 +2164,48 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 			return
 		}
 
+		var retries int
+		var limitExceeded bool
+		if step.Annotations == nil {
+			step.Annotations = make(map[string]string)
+		}
+		retriesAnnotation := step.Annotations[ParentBackingRetriesAnnotation]
+		if retriesAnnotation == "" {
+			step.Annotations[ParentBackingRetriesAnnotation] = "1"
+		} else {
+			retries, err = strconv.Atoi(retriesAnnotation)
+			if err != nil {
+				return nil, err
+			}
+			limitExceeded = retries > settings.Settings.MaxParentBackingRetries
+		}
+
 		// Add disks to be inspected
 		for i, disk := range virtualMachine.Disks {
-			environment = append(environment, core.EnvVar{
-				Name:  fmt.Sprintf("V2V_remoteInspectDisk_%d", i),
-				Value: disk.ParentFile,
-			})
+			// If parent disk is empty then fail with error message
+			if disk.ParentFile != "" {
+				environment = append(environment, core.EnvVar{
+					Name:  fmt.Sprintf("V2V_remoteInspectDisk_%d", i),
+					Value: disk.ParentFile,
+				})
+			} else if limitExceeded {
+				// If retry limit was exceeded then collect all the failing disks and put them as a step errors
+				errMsg := fmt.Sprintf("Parent disk of %s was not found. This is possibly an environment issue. Please investigate if a precopy snapshot has a parent backing.", disk.File)
+				step.AddError(errMsg)
+				err = liberr.New(errMsg)
+				r.Log.Error(err, "Failed to get parent backing of VM disk.", "vm", vm.Ref.String())
+			} else {
+				// Retry on the next run and log the missing parent disk
+				retries += 1
+				step.Annotations[ParentBackingRetriesAnnotation] = strconv.Itoa(retries)
+				errMsg := fmt.Sprintf("Parent disk of %s was not found, will retry on next attempt", disk.File)
+				r.Log.Info(errMsg,
+					"vm", vm.Ref.String())
+				return
+			}
+		}
+		if limitExceeded {
+			return nil, err
 		}
 	}
 
