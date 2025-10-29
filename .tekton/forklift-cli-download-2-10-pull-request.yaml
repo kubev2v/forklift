@@ -10,6 +10,8 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
       == "release-2.10" && ("build/forklift-cli-download/Containerfile-downstream".pathChanged() ||
+      ".tekton/forklift-cli-download-2-10-*.yaml".pathChanged() ||
+      ".konflux/forklift-cli-download/artifacts.lock.yaml".pathChanged() ||
       "build/forklift-cli-download/artifacts/***".pathChanged() ||
       "build/forklift-cli-download/download-latest-release.sh".pathChanged())
   creationTimestamp: null
