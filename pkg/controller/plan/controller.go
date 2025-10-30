@@ -200,6 +200,14 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		return
 	}
 
+	// Don't reconcile succeeded plans unless they need archiving.
+	if plan.Status.HasCondition(Succeeded) && !plan.Spec.Archived {
+		r.Log.V(1).Info("Skipping reconcile of succeeded plan.", "plan", plan.Name)
+		result.RequeueAfter = 0
+		err = nil
+		return
+	}
+
 	// Postpone as needed.
 	postpone, err := r.postpone()
 	if err != nil {
