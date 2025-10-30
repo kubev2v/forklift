@@ -209,11 +209,11 @@ var _ = Describe("vSphere builder", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(pvcs).To(HaveLen(1))
 			pvc := pvcs[0]
-			Expect(pvc.Name).Should(HavePrefix(fmt.Sprintf("%s-%s-disk-", builder.Plan.Name, vm.Name)))
+			// The default template now uses trunc 4 for both plan and VM names
+			Expect(pvc.Name).Should(HavePrefix(fmt.Sprintf("%.4s-%.4s-disk-", builder.Plan.Name, vm.Name)))
 			Expect(pvc.Spec.DataSourceRef.Kind).To(Equal(v1beta1.VSphereXcopyVolumePopulatorKind))
 			Expect(pvc.Spec.DataSourceRef.APIGroup).To(Equal(&v1beta1.SchemeGroupVersion.Group))
 			Expect(pvc.Spec.DataSourceRef.Name).To(Equal(pvc.Name))
-
 		})
 
 		It("should honor explicit AccessMode StorageMap and ignore VolumeMode from StorageMap", func() {
