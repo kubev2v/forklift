@@ -30,10 +30,10 @@
 package ppc64
 
 import (
-	"encoding/binary"
-	"fmt"
 	"github.com/twitchyliquid64/golang-asm/obj"
 	"github.com/twitchyliquid64/golang-asm/objabi"
+	"encoding/binary"
+	"fmt"
 	"log"
 	"math"
 	"sort"
