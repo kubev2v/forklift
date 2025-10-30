@@ -14,7 +14,7 @@ require (
 	github.com/netapp/trident v0.0.0-20240628081112-cb68cb389d9d
 	github.com/onsi/ginkgo/v2 v2.25.1
 	github.com/onsi/gomega v1.38.2
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/vmware/govmomi v0.50.0
 	go.uber.org/mock v0.5.2
 	golang.org/x/crypto v0.41.0
