@@ -40,7 +40,6 @@ var (
 			{Name: api.PhaseWaitForPowerOff},
 			{Name: api.PhaseCreateDataVolumes},
 			{Name: api.PhaseCopyDisks, All: CDIDiskCopy},
-			{Name: api.PhaseAllocateDisks, All: VirtV2vDiskCopy},
 			{Name: api.PhaseCreateGuestConversionPod, All: RequiresConversion},
 			{Name: api.PhaseConvertGuest, All: RequiresConversion},
 			{Name: api.PhaseCopyDisksVirtV2V, All: RequiresConversion},

@@ -88,7 +88,7 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 						Phase:       api.StepPending,
 					},
 				})
-		case api.PhaseAllocateDisks, api.PhaseCopyDisks, api.PhaseCopyDisksVirtV2V, api.PhaseConvertOpenstackSnapshot:
+		case api.PhaseCopyDisks, api.PhaseCopyDisksVirtV2V, api.PhaseConvertOpenstackSnapshot:
 			tasks, pErr := r.builder.Tasks(vm.Ref)
 			if pErr != nil {
 				err = liberr.Wrap(pErr)
@@ -103,9 +103,6 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 			case api.PhaseCopyDisks:
 				taskName = DiskTransfer
 				taskDescription = "Transfer disks."
-			case api.PhaseAllocateDisks:
-				taskName = DiskAllocation
-				taskDescription = "Allocate disks."
 			case api.PhaseCopyDisksVirtV2V:
 				taskName = DiskTransferV2v
 				taskDescription = "Copy disks."
@@ -248,8 +245,6 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 	case api.PhaseStarted, api.PhaseCreateInitialSnapshot, api.PhaseWaitForInitialSnapshot,
 		api.PhaseStoreInitialSnapshotDeltas, api.PhaseCreateDataVolumes:
 		step = Initialize
-	case api.PhaseAllocateDisks:
-		step = DiskAllocation
 	case api.PhaseCopyDisks, api.PhaseCopyingPaused, api.PhaseRemovePreviousSnapshot, api.PhaseWaitForPreviousSnapshotRemoval,
 		api.PhaseCreateSnapshot, api.PhaseWaitForSnapshot, api.PhaseStoreSnapshotDeltas, api.PhaseAddCheckpoint,
 		api.PhaseConvertOpenstackSnapshot, api.PhaseWaitForDataVolumesStatus:
