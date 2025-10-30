@@ -47,7 +47,7 @@ spec:
       value:
         - "REVISION={{revision}}"
   taskRunSpecs:
-  - pipelineTaskName: prefetch-input
+  - pipelineTaskName: prefetch-dependencies
     computeResources:
       requests:
         memory: 8Gi
