@@ -1019,11 +1019,11 @@ func (r *KubeVirt) EnsureVirtV2vPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvc
 		vmVolumes = vmCr.Spec.Template.Spec.Volumes
 	}
 	newPod, err := r.getVirtV2vPod(vm, vmVolumes, vddkConfigMap, pvcs, v2vSecret, podType, step)
-	if newPod == nil && err == nil {
-		r.Log.Info("Couldn't prepare pod for vm.", "vm", vm.String())
+	if err != nil {
 		return
 	}
-	if err != nil {
+	if newPod == nil {
+		r.Log.Info("Couldn't prepare virt-v2v pod for vm.", "vm", vm.String())
 		return
 	}
 
@@ -2150,62 +2150,15 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 		// Add inspection pod specific settings
 		podName = r.getGeneratedName(vm) + "inspection-"
 		containerName = "virt-v2v-inspection"
-		environment = append(environment,
-			core.EnvVar{
-				Name:  "V2V_remoteInspection",
-				Value: "true",
-			})
 
-		// Get VM model and data from inventory
-		virtualMachine := &model.VM{}
-		err = r.Context.Source.Inventory.Find(virtualMachine, vm.Ref)
+		var success bool
+		environment, success, err = r.buildInspectionPodEnvironment(environment, vm, step)
 		if err != nil {
-			err = liberr.Wrap(err, "vm", vm.Ref.String())
-			return
-		}
-
-		var retries int
-		var limitExceeded bool
-		if step.Annotations == nil {
-			step.Annotations = make(map[string]string)
-		}
-		retriesAnnotation := step.Annotations[ParentBackingRetriesAnnotation]
-		if retriesAnnotation == "" {
-			step.Annotations[ParentBackingRetriesAnnotation] = "1"
-		} else {
-			retries, err = strconv.Atoi(retriesAnnotation)
-			if err != nil {
-				return nil, err
-			}
-			limitExceeded = retries > settings.Settings.MaxParentBackingRetries
-		}
-
-		// Add disks to be inspected
-		for i, disk := range virtualMachine.Disks {
-			// If parent disk is empty then fail with error message
-			if disk.ParentFile != "" {
-				environment = append(environment, core.EnvVar{
-					Name:  fmt.Sprintf("V2V_remoteInspectDisk_%d", i),
-					Value: disk.ParentFile,
-				})
-			} else if limitExceeded {
-				// If retry limit was exceeded then collect all the failing disks and put them as a step errors
-				errMsg := fmt.Sprintf("Parent disk of %s was not found. This is possibly an environment issue. Please investigate if a precopy snapshot has a parent backing.", disk.File)
-				step.AddError(errMsg)
-				err = liberr.New(errMsg)
-				r.Log.Error(err, "Failed to get parent backing of VM disk.", "vm", vm.Ref.String())
-			} else {
-				// Retry on the next run and log the missing parent disk
-				retries += 1
-				step.Annotations[ParentBackingRetriesAnnotation] = strconv.Itoa(retries)
-				errMsg := fmt.Sprintf("Parent disk of %s was not found, will retry on next attempt", disk.File)
-				r.Log.Info(errMsg,
-					"vm", vm.Ref.String())
-				return
-			}
-		}
-		if limitExceeded {
 			return nil, err
+		}
+		if !success {
+			// This is intentional and it means that pod was not created and no error occured (yet), e.g. retry
+			return nil, nil //nolint:nilnil
 		}
 	}
 
@@ -2287,6 +2240,68 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 	r.setKvmOnPodSpec(&pod.Spec)
 
 	return
+}
+
+// Build the inspection pod environment
+func (r *KubeVirt) buildInspectionPodEnvironment(env []core.EnvVar, vm *plan.VMStatus, step *plan.Step) (newEnv []core.EnvVar, success bool, err error) {
+	newEnv = append(env,
+		core.EnvVar{
+			Name:  "V2V_remoteInspection",
+			Value: "true",
+		})
+
+	// Get VM model and data from inventory
+	virtualMachine := &model.VM{}
+	err = r.Context.Source.Inventory.Find(virtualMachine, vm.Ref)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		return
+	}
+
+	var retries int
+	var limitExceeded bool
+	if step.Annotations == nil {
+		step.Annotations = make(map[string]string)
+	}
+	retriesAnnotation := step.Annotations[ParentBackingRetriesAnnotation]
+	if retriesAnnotation == "" {
+		step.Annotations[ParentBackingRetriesAnnotation] = "1"
+	} else {
+		retries, err = strconv.Atoi(retriesAnnotation)
+		if err != nil {
+			return
+		}
+		limitExceeded = retries > settings.Settings.MaxParentBackingRetries
+	}
+
+	// Add disks to be inspected
+	for i, disk := range virtualMachine.Disks {
+		// If parent disk is empty then fail with error message
+		if disk.ParentFile != "" {
+			newEnv = append(newEnv, core.EnvVar{
+				Name:  fmt.Sprintf("V2V_remoteInspectDisk_%d", i),
+				Value: disk.ParentFile,
+			})
+		} else if limitExceeded {
+			// If retry limit was exceeded then collect all the failing disks and put them as a step errors
+			errMsg := fmt.Sprintf("Parent disk of %s was not found. This is possibly an environment issue. Please investigate if a precopy snapshot has a parent backing.", disk.File)
+			step.AddError(errMsg)
+			err = liberr.New(errMsg)
+			r.Log.Error(err, "Failed to get parent backing of VM disk.", "vm", vm.Ref.String())
+		} else {
+			// Retry on the next run and log the missing parent disk
+			retries += 1
+			step.Annotations[ParentBackingRetriesAnnotation] = strconv.Itoa(retries)
+			errMsg := fmt.Sprintf("Parent disk of %s was not found, will retry on next attempt", disk.File)
+			r.Log.Info(errMsg,
+				"vm", vm.Ref.String())
+			return
+		}
+	}
+	if limitExceeded {
+		return
+	}
+	return newEnv, true, nil
 }
 
 func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, vm *plan.VMStatus, podType int) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, err error) {
