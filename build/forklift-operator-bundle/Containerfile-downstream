@@ -11,9 +11,9 @@ ARG DEFAULT_CHANNEL
 ARG REGISTRY
 ARG OCP_VERSIONS
 
-ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:48ed99fd6182fb0c96c0faba2d04c9a6810b7505faaa7104a43925afa4c1bdea"
+ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:fa1f4f2141c044b15e875b5624446c548fe91ba054474f199da52cf6e6da4fd6"
 
-ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:863547b1134c26c361b70f214c1f489306a42d674fc59f382b56e3b103b10c82"
+ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:3cf647ce2ab607c3391bc0129203611b8872b0393c296a3721a8c86c9fd469ec"
 
 ARG MUST_GATHER_IMAGE="registry.redhat.io/mtv-candidate/mtv-must-gather-rhel8@sha256:41f415d1043b1542d191140549c709a6f3833447c65b846a082a5d660046bc45"
 
@@ -29,7 +29,7 @@ ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhv-populator-rh
 
 ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-populator-controller-rhel9@sha256:34be818ebf9b39648efb59f781cb10fa07ccaca10a1da316ec93b2f19e216ba0"
 
-ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:d7c5335ad929c3fef15194972183cb4e97e130ec8889cfbdc1044dc04690df08"
+ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:fc49d317ec0917f72b7f93c73281013ff9532d1962116e5a87008fb5f26d8e0c"
 
 ARG CLI_DOWNLOAD_IMAGE="registry.redhat.io/mtv-candidate/mtv-cli-download-rhel9@sha256:9d6e2939e3f4ce752a0f57dc3d4bdfad9067fa7455ba661babc8c0c1a4fad115"
 

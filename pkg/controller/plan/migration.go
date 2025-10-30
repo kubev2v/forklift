@@ -427,6 +427,9 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool) error
 	if err := r.kubevirt.DeleteGuestConversionPod(vm); failOnErr(err) {
 		return err
 	}
+	if err := r.kubevirt.DeletePreflightInspectionPod(vm); failOnErr(err) {
+		return err
+	}
 	if err := r.kubevirt.DeleteSecret(vm); failOnErr(err) {
 		return err
 	}
