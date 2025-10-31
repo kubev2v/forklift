@@ -461,7 +461,7 @@ github.com/twitchyliquid64/golang-asm/unsafeheader
 # github.com/ugorji/go/codec v1.2.12
 ## explicit; go 1.11
 github.com/ugorji/go/codec
-# github.com/vmware/govmomi v0.50.0
+# github.com/vmware/govmomi v0.52.0
 ## explicit; go 1.23.0
 github.com/vmware/govmomi
 github.com/vmware/govmomi/fault
