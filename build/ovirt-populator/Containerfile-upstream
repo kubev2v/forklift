@@ -9,8 +9,10 @@ RUN GOOS=linux GOARCH=amd64 go build -o ovirt-populator github.com/kubev2v/forkl
 
 FROM quay.io/centos/centos:stream9
 COPY --from=builder /app/ovirt-populator /usr/local/bin/ovirt-populator
+RUN update-crypto-policies --set LEGACY
 RUN dnf install -y centos-release-ovirt45
-RUN dnf install -y python3-ovirt-engine-sdk4 ovirt-imageio-client && dnf clean all
+RUN dnf config-manager --set-disabled ovirt-45-upstream resilientstorage || true
+RUN dnf install -y --skip-broken python3-ovirt-engine-sdk4 ovirt-imageio-client && dnf clean all
 
 ENTRYPOINT ["/usr/local/bin/ovirt-populator"]
 LABEL \
@@ -24,4 +26,3 @@ LABEL \
         description="Migration Toolkit for Virtualization - oVirt Populator" \
         vendor="Red Hat, Inc." \
         maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"
-
