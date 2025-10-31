@@ -151,10 +151,20 @@ func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, data
 	changeIds := previous.DeltaMap()
 	for i := range datavolumes {
 		dv := &datavolumes[i]
-		dv.Spec.Checkpoints = append(dv.Spec.Checkpoints, cdi.DataVolumeCheckpoint{
-			Current:  current.Snapshot,
-			Previous: changeIds[dv.Spec.Source.VDDK.BackingFile],
-		})
+		alreadyExists := false
+		for _, checkpoint := range dv.Spec.Checkpoints {
+			if checkpoint.Current == current.Snapshot {
+				r.Log.V(1).Info("Snapshot already exists in DataVolume checkpoints list", "vmRef", vmRef, "DataVolume", dv.Name, "checkpoints", dv.Spec.Checkpoints)
+				alreadyExists = true
+				break
+			}
+		}
+		if !alreadyExists {
+			dv.Spec.Checkpoints = append(dv.Spec.Checkpoints, cdi.DataVolumeCheckpoint{
+				Current:  current.Snapshot,
+				Previous: changeIds[dv.Spec.Source.VDDK.BackingFile],
+			})
+		}
 		dv.Spec.FinalCheckpoint = final
 	}
 	return
