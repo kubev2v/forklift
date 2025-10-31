@@ -253,6 +253,8 @@ type FileSystem struct {
 type NFSServerInstance struct {
 	// Unique identifier for NFS server
 	ID string `json:"id"`
+	// IsNFSv3Enabled is set to true if nfsv3 is enabled on NAS server
+	IsNFSv3Enabled bool `json:"is_nfsv3_enabled,omitempty"`
 	// IsNFSv4Enabled is set to true if nfsv4 is enabled on NAS server
 	IsNFSv4Enabled bool `json:"is_nfsv4_enabled,omitempty"`
 }
@@ -328,5 +330,5 @@ func (n *FileSystem) Fields() []string {
 }
 
 func (n *NFSServerInstance) Fields() []string {
-	return []string{"id", "is_nfsv4_enabled"}
+	return []string{"id", "is_nfsv3_enabled", "is_nfsv4_enabled"}
 }
