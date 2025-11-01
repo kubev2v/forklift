@@ -1,5 +1,5 @@
 /*
- Copyright © 2020 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2020-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -253,6 +253,8 @@ type Pmax interface {
 	GetDirectorIDList(ctx context.Context, symID string) (*types.DirectorIDList, error)
 	// GetPortList returns a list of all the ports on a specified director/array.
 	GetPortList(ctx context.Context, symID string, directorID string, query string) (*types.PortList, error)
+	// GetPortListByProtocol returns a list of ports associated with a given protocol for a specified Symmetrix array.
+	GetPortListByProtocol(ctx context.Context, symID string, protocol string) (*types.PortList, error)
 	// GetPort returns port details.
 	GetPort(ctx context.Context, symID string, directorID string, portID string) (*types.Port, error)
 	// GetListOfTargetAddresses returns an array of all IP addresses which expose iscsi targets.
@@ -387,6 +389,10 @@ type Pmax interface {
 	DeleteMigrationEnvironment(ctx context.Context, localSymID, remoteSymID string) error
 	// GetMigrationEnvironment returns a migration environment
 	GetMigrationEnvironment(ctx context.Context, localSymID, remoteSymID string) (*types.MigrationEnv, error)
+	// MigrateStorageGroup creates a Storage Group given the storageGroupID (name), srpID (storage resource pool), service level, and boolean for thick volumes.
+	// If srpID is "None" then serviceLevel and thickVolumes settings are ignored
+	MigrateStorageGroup(ctx context.Context, symID, storageGroupID, srpID, serviceLevel string, thickVolumes bool) (*types.StorageGroup, error)
+
 	// GetStorageGroupMigration returns migration sessions on the array
 	GetStorageGroupMigration(ctx context.Context, localSymID string) (*types.MigrationStorageGroups, error)
 	// GetStorageGroupMigrationByID returns migration details for a storage group
@@ -437,4 +443,10 @@ type Pmax interface {
 
 	// RefreshSymmetrix refreshes cache on the symID
 	RefreshSymmetrix(ctx context.Context, symID string) error
+
+	// GetNFSServerList get NFS Server list on a symID
+	GetNFSServerList(ctx context.Context, symID string) (*types.NFSServerIterator, error)
+
+	// GetNFSServerByID fetch specific NFS server on symID
+	GetNFSServerByID(ctx context.Context, symID, nfsID string) (*types.NFSServer, error)
 }
