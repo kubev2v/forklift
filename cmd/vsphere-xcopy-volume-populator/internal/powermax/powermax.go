@@ -8,16 +8,44 @@ import (
 	"strings"
 
 	gopowermax "github.com/dell/gopowermax/v2"
-	pmxtypes "github.com/dell/gopowermax/v2/types/v100"
+	pmaxtypes "github.com/dell/gopowermax/v2/types/v100"
+	"github.com/google/uuid"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
 	"k8s.io/klog/v2"
 )
 
 const portGroupIDKey = "portGroupID"
+const storageGroupIDKey = "storageGroupID"
+const hostIDKey = "hostID"
+const maskingViewIDKey = "maskingViewID"
+const uuidKey = "uuid"
 
 type PowermaxClonner struct {
 	client      gopowermax.Pmax
 	symmetrixID string
+}
+
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
+func findSubstringInList(list []string, sub string) (bool, int) {
+	for i, s := range list {
+		if strings.Contains(s, sub) {
+			return true, i
+		}
+	}
+	return false, -1
+}
+
+func shortUUID() string {
+	id := uuid.New()
+	return strings.ReplaceAll(id.String(), "-", "")[:6]
 }
 
 // CurrentMappedGroups implements populator.StorageApi.
@@ -80,6 +108,170 @@ func (p *PowermaxClonner) CurrentMappedGroups(targetLUN populator.LUN, mappingCo
 	return foundHostGroups, nil
 }
 
+// implements populator.PowerMaxApi
+func (p *PowermaxClonner) EnsureClonnerIgroupForHost(initiatorGroup string, initiators []string, esxiHostName string) (populator.MappingContext, error) {
+	ctx := context.TODO()
+	// remove "." from the string  for both IP and fqdn
+	esxiHostName = strings.ReplaceAll(esxiHostName, ".", "")
+
+	prefix := "mtv-xcopy-" + esxiHostName // base prefix
+	shortuuid := shortUUID()
+
+	klog.Infof("Prefix for temporary PowerMax objects used in this migration:%s ", prefix)
+
+	//STEP 1 - Generate unique names for host group, port group, storage group, masking view
+	sgname := "sg-" + prefix + "-" + shortuuid
+	mvname := "mv-" + prefix + "-" + shortuuid
+
+	hgprefix := "hg-" + prefix
+	hgname := hgprefix + "-" + shortuuid
+
+	pgprefix := "pg-" + prefix
+	pgname := pgprefix + "-" + shortuuid
+
+	klog.Infof("StorageGroup name: %s", sgname)
+	klog.Infof("HostGroup name: %s", hgname)
+	klog.Infof("PortGroup name: %s", pgname)
+	klog.Infof("MaskingView name: %s", mvname)
+
+	//STEP 2 - If there is an existing host group use it, else create a new one
+	var wwns []string
+	for _, fcaddress := range initiators {
+		parts := strings.Split(fcaddress, ":")
+		if len(parts) != 2 {
+			continue
+		}
+		wwns = append(wwns, parts[1])
+	}
+	// Lookup all hosts and find matching prefix
+	hostList, err := p.client.GetHostList(ctx, p.symmetrixID)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get host list: %w", err)
+	}
+
+	var matchedHostID string
+	for _, hostID := range hostList.HostIDs {
+		if strings.HasPrefix(hostID, hgprefix) {
+			matchedHostID = hostID
+			break
+		}
+	}
+	if matchedHostID == "" {
+		// Check if the initiators already present in a host
+		klog.Infof("Check for existing HostGroup : %v", wwns)
+		var existingHostID string
+		for _, hostID := range hostList.HostIDs {
+			//klog.Infof("Check Host %s: ", hostID)
+			host, err := p.client.GetHostByID(ctx, p.symmetrixID, hostID)
+			if err != nil {
+				continue
+			}
+
+			for _, init := range host.Initiators {
+				if contains(wwns, init) {
+					existingHostID = hostID
+					klog.Infof("Host %s has the initiator %s", hostID, init)
+					break
+				}
+			}
+		}
+		if existingHostID != "" {
+			klog.Infof("Use existing host %s:", existingHostID)
+			hgname = existingHostID
+		} else {
+			// Create new host with all initiators
+			klog.Infof("Create new host with all initiators : %v", wwns)
+			hostFlags := &pmaxtypes.HostFlags{
+				VolumeSetAddressing: &pmaxtypes.HostFlag{},
+				DisableQResetOnUA:   &pmaxtypes.HostFlag{},
+				EnvironSet:          &pmaxtypes.HostFlag{},
+				AvoidResetBroadcast: &pmaxtypes.HostFlag{},
+				OpenVMS:             &pmaxtypes.HostFlag{},
+				SCSI3:               &pmaxtypes.HostFlag{},
+				Spc2ProtocolVersion: &pmaxtypes.HostFlag{
+					Enabled:  true,
+					Override: true,
+				},
+				SCSISupport1:  &pmaxtypes.HostFlag{},
+				ConsistentLUN: false,
+			}
+			_, err := p.client.CreateHost(ctx, p.symmetrixID, hgname, wwns, hostFlags)
+			if err != nil {
+				return nil, fmt.Errorf("Failed to create new host %s: %w", hgname, err)
+			}
+		}
+		matchedHostID = hgname
+	}
+
+	// STEP - 3 If default port group - POWERMAX_PORT_GROUP_ID - is empty then
+	// Lookup all hosts and find matching prefix
+	pgList, err := p.client.GetPortGroupList(ctx, p.symmetrixID, "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get host list: %w", err)
+	}
+
+	var matchedPGID string
+	for _, pgID := range pgList.PortGroupIDs {
+		if strings.HasPrefix(pgID, pgprefix) {
+			matchedPGID = pgID
+			break
+		}
+	}
+
+	if matchedPGID != "" {
+		klog.Infof("PortGroup %s found", matchedPGID)
+		pgname = matchedPGID
+	} else {
+		initiatorList, err := p.client.GetInitiatorList(ctx, p.symmetrixID, "", false, true)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get initiator list: %w", err)
+		}
+
+		klog.Infof("Initiator list %v: ", initiatorList.InitiatorIDs)
+
+		// Create PortGroup based on logged-in initiators' ports
+		var loggedInPorts []pmaxtypes.PortKey
+		for _, initiator := range wwns {
+			found, index := findSubstringInList(initiatorList.InitiatorIDs, initiator)
+			if found {
+				pmax_initiator, err := p.client.GetInitiatorByID(ctx, p.symmetrixID, initiatorList.InitiatorIDs[index])
+				if err != nil {
+					// return nil, fmt.Errorf("Failed to get initiator by ID %s: %w", initiator, err)
+					continue
+				}
+				if pmax_initiator.LoggedIn {
+					for _, portKey := range pmax_initiator.SymmetrixPortKey {
+						klog.Infof("Logged in initiator found %s: ", pmax_initiator.InitiatorID)
+						loggedInPorts = append(loggedInPorts, pmaxtypes.PortKey(portKey))
+					}
+				}
+			}
+		}
+		if len(loggedInPorts) == 0 {
+			return nil, fmt.Errorf("No logged-in initiators found")
+		}
+		klog.Infof("Found %d logged-in initiators", len(loggedInPorts))
+
+		_, err = p.client.CreatePortGroup(ctx, p.symmetrixID, pgname, loggedInPorts, "SCSI_FC")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create port group %s: %w", pgname, err)
+		}
+	}
+
+	// STEP 4 - Create new storage group for each migration
+	_, err = p.client.CreateStorageGroup(ctx, p.symmetrixID, sgname, "none", "", true, nil)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to creeate storage group %s: %w", sgname, err)
+	}
+
+	// STEP 5 - save mapping context - uuid necessary to cleanup temp powermax objects
+	mappingContext := map[string]any{portGroupIDKey: pgname, storageGroupIDKey: sgname, hostIDKey: hgname, maskingViewIDKey: mvname, uuidKey: shortuuid}
+
+	return mappingContext, nil
+
+}
+
 // EnsureClonnerIgroup implements populator.StorageApi.
 func (p *PowermaxClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn []string) (populator.MappingContext, error) {
 	ctx := context.TODO()
@@ -95,7 +287,7 @@ func (p *PowermaxClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn 
 	if err == nil {
 		klog.Infof("group %s exists", initiatorGroup)
 	}
-	if e, ok := err.(*pmxtypes.Error); ok && e.HTTPStatusCode == 404 {
+	if e, ok := err.(*pmaxtypes.Error); ok && e.HTTPStatusCode == 404 {
 		klog.Infof("group %s doesn't exist - create it", initiatorGroup)
 		_, err := p.client.CreateStorageGroup(ctx, p.symmetrixID, initiatorGroup, "none", "", true, nil)
 		if err != nil {
@@ -126,7 +318,7 @@ func (p *PowermaxClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn 
 
 	hg, err := p.client.GetHostGroupByID(ctx, p.symmetrixID, initiatorGroup)
 	if err != nil {
-		if e, ok := err.(*pmxtypes.Error); ok && e.HTTPStatusCode == 404 {
+		if e, ok := err.(*pmaxtypes.Error); ok && e.HTTPStatusCode == 404 {
 			hg, err = p.client.CreateHostGroup(ctx, p.symmetrixID, initiatorGroup, hostIdsToAdd, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create new hostGroup with id %s: %w", initiatorGroup, err)
@@ -209,48 +401,46 @@ func (p *PowermaxClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn 
 
 // Map implements populator.StorageApi.
 func (p *PowermaxClonner) Map(initiatorGroup string, targetLUN populator.LUN, mappingContext populator.MappingContext) (populator.LUN, error) {
-	klog.Infof("mapping volume %s to %s", targetLUN.ProviderID, initiatorGroup)
 	ctx := context.TODO()
-	volumesMapped, err := p.client.GetVolumeIDListInStorageGroup(ctx, p.symmetrixID, initiatorGroup)
-	if err != nil {
-		return targetLUN, err
-	}
-	if slices.Contains(volumesMapped, targetLUN.ProviderID) {
-		klog.Infof("volume %s already mapped to storage-group %s", targetLUN.ProviderID, initiatorGroup)
-		return targetLUN, nil
-	}
-
-	err = p.client.AddVolumesToStorageGroupS(ctx, p.symmetrixID, initiatorGroup, false, targetLUN.ProviderID)
-	if err != nil {
-
-		klog.Infof("failed mapping volume %s to %s: %v", targetLUN.ProviderID, initiatorGroup, err)
-		return targetLUN, err
-	}
-
-	mv, err := p.client.GetMaskingViewByID(ctx, p.symmetrixID, initiatorGroup)
-	if err != nil {
-		// probably not found, will be created later
-		if e, ok := err.(*pmxtypes.Error); ok && e.HTTPStatusCode == 404 {
-			klog.Infof("masking view not found %s ", e)
-		} else {
-			return populator.LUN{}, err
-		}
-	}
 
 	portGroupID, ok := mappingContext[portGroupIDKey]
 	if !ok {
-		return populator.LUN{}, fmt.Errorf("there is no port group in the mappning context, can't continue with mapping")
+		return populator.LUN{}, fmt.Errorf("there is no port group in the mapping context, can't continue with mapping")
 	}
 
-	if mv == nil {
-		mv, err = p.client.CreateMaskingView(ctx, p.symmetrixID, initiatorGroup, initiatorGroup, initiatorGroup, false, portGroupID.(string))
-		if err != nil {
-			return populator.LUN{}, err
-		}
+	storageGroupID, ok := mappingContext[storageGroupIDKey]
+	if !ok {
+		return populator.LUN{}, fmt.Errorf("there is no storage group in the mapping context, can't continue with mapping")
 	}
 
-	klog.Infof("successfully mapped volume %s to %s with masking view %s", targetLUN.ProviderID, initiatorGroup, mv.MaskingViewID)
-	return targetLUN, err
+	hostID, ok := mappingContext[hostIDKey]
+	if !ok {
+		return populator.LUN{}, fmt.Errorf("there is no host in the mapping context, can't continue with mapping")
+	}
+
+	maskingViewID, ok := mappingContext[maskingViewIDKey]
+	if !ok {
+		return populator.LUN{}, fmt.Errorf("there is no masking view in the mapping context, can't continue with mapping")
+	}
+
+	klog.Infof("Masking view ID %s", maskingViewID.(string))
+	klog.Infof("storage group ID %s", storageGroupID.(string))
+	klog.Infof("port group ID %s", portGroupID.(string))
+	klog.Infof("host ID %s", hostID.(string))
+
+	// Add volume to the SG
+	err := p.client.AddVolumesToStorageGroupS(ctx, p.symmetrixID, storageGroupID.(string), false, targetLUN.ProviderID)
+	if err != nil {
+		return targetLUN, fmt.Errorf("failed mapping volume %s to SG %s: %w", targetLUN.ProviderID, storageGroupID, err)
+	}
+	// Create Masking View
+	_, err = p.client.CreateMaskingView(ctx, p.symmetrixID, maskingViewID.(string), storageGroupID.(string), hostID.(string), true, portGroupID.(string))
+	if err != nil {
+		return targetLUN, fmt.Errorf("Failed to create masking view %s: %w", maskingViewID.(string), err)
+	}
+
+	klog.Infof("Mapped volume %s to SG %s", targetLUN.ProviderID, storageGroupID)
+	return targetLUN, nil
 }
 
 // ResolvePVToLUN implements populator.StorageApi.
@@ -269,11 +459,47 @@ func (p *PowermaxClonner) ResolvePVToLUN(pv populator.PersistentVolume) (populat
 // UnMap implements populator.StorageApi.
 func (p *PowermaxClonner) UnMap(initiatorGroup string, targetLUN populator.LUN, mappingContext populator.MappingContext) error {
 	ctx := context.TODO()
-	klog.Infof("removing volume ID %s from storage group %s", targetLUN.ProviderID, initiatorGroup)
+	portGroupID, ok := mappingContext[portGroupIDKey]
+	if !ok {
+		return fmt.Errorf("there is no port group in the mapping context, can't continue with mapping")
+	}
 
-	_, err := p.client.RemoveVolumesFromStorageGroup(ctx, p.symmetrixID, initiatorGroup, false, targetLUN.ProviderID)
+	storageGroupID, ok := mappingContext[storageGroupIDKey]
+	if !ok {
+		return fmt.Errorf("there is no storage group in the mapping context, can't continue with mapping")
+	}
+	hostID, ok := mappingContext[hostIDKey]
+	if !ok {
+		return fmt.Errorf("there is no host in the mapping context, can't continue with mapping")
+	}
+
+	uuid, ok := mappingContext[uuidKey]
+	if !ok {
+		return fmt.Errorf("there is no uuid in the mapping context, can't continue with mapping")
+	}
+
+	maskingViewID, ok := mappingContext[maskingViewIDKey]
+	if !ok {
+		return fmt.Errorf("there is no masking view in the mapping context, can't continue with mapping")
+	}
+	klog.Infof("Masking view ID %s", maskingViewID.(string))
+	klog.Infof("storage group ID %s", storageGroupID.(string))
+	klog.Infof("port group ID %s", portGroupID.(string))
+	klog.Infof("host ID %s", hostID.(string))
+
+	err := p.client.DeleteMaskingView(ctx, p.symmetrixID, maskingViewID.(string))
+	klog.Infof("Removing volume %s from Storage Group %s", targetLUN.ProviderID, storageGroupID.(string))
+
+	// Remove the volume from the pre-created SG
+	_, err = p.client.RemoveVolumesFromStorageGroup(ctx, p.symmetrixID, storageGroupID.(string), false, targetLUN.ProviderID)
 	if err != nil {
-		return fmt.Errorf("failed removing volume from storage group:  %w", err)
+		return fmt.Errorf("failed removing volume %s from SG %s: %w", targetLUN.ProviderID, storageGroupID.(string), err)
+	}
+
+	klog.Infof("Successfully removed volume %s from Storage Group %s", targetLUN.ProviderID, storageGroupID.(string))
+	err = p.client.DeleteStorageGroup(ctx, p.symmetrixID, storageGroupID.(string))
+	if strings.Contains(portGroupID.(string), uuid.(string)) {
+		err = p.client.DeletePortGroup(ctx, p.symmetrixID, portGroupID.(string))
 	}
 	return nil
 }
