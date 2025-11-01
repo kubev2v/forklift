@@ -197,6 +197,30 @@ func IsLegacyWindows(vm *model.VM) bool {
 	return false
 }
 
+func countIPsPerMac(macsToIps string) map[string]int {
+	macIPCount := make(map[string]int)
+
+	// Split entries by underscore `_`
+	entries := strings.Split(macsToIps, "_")
+
+	for _, entry := range entries {
+		// entry example:
+		// "00:50:56:be:67:bc:ip:192.168.1.100,192.168.1.1,24,8.8.8.8,8.8.4.4"
+
+		// Split by ":ip:" to separate MAC from rest
+		parts := strings.SplitN(entry, ":ip:", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		mac := parts[0]
+
+		// Here we increment count per mac for each entry found
+		macIPCount[mac]++
+	}
+
+	return macIPCount
+}
+
 func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env []core.EnvVar, err error) {
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
@@ -233,14 +257,7 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 			Value: "/usr/local/virtio-win-legacy.iso",
 		})
 	} else if isWindows(vm) { // We check for multiple IPs per NIC only on Windows VMs
-		macIPCount := make(map[string]int)
-
-		for _, gn := range vm.GuestNetworks {
-			//IS ipv4
-			if gn.Origin == string(types.NetIpConfigInfoIpAddressOriginManual) && net.IP.To4(net.ParseIP(gn.IP)) != nil {
-				macIPCount[gn.MAC]++
-			}
-		}
+		macIPCount := countIPsPerMac(macsToIps)
 
 		for _, count := range macIPCount {
 			if count > 1 {
@@ -306,34 +323,126 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 	return
 }
 
-func (r *Builder) mapMacStaticIps(vm *model.VM) (ipMap string, err error) {
-	// on windows machines we check if the interface origin is manual
-	// on linux we collect all networks.
-	isWindowsFlag := isWindows(vm)
+func isNonGlobalIPv6(ipStr string) bool {
+	ip := net.ParseIP(ipStr)
+	if ip == nil || ip.To4() != nil {
+		return false // It's IPv4 or invalid, allow it.
+	}
 
+	// Filter IPv6 link-local (fe80::/10)
+	if ip.IsLinkLocalUnicast() {
+		return true
+	}
+
+	// Filter ULA (fc00::/7) - check first byte with bitmask
+	if ipv6 := ip.To16(); ipv6 != nil && ipv6[0]&0xfe == 0xfc {
+		return true // Matches fc00::/7 (includes both fc00::/8 and fd00::/8)
+	}
+
+	return false // Considered global IPv6
+}
+
+func selectGateway(ip string, device string, stacks []vsphere.GuestIpStack, isWindows bool) string {
+	isIPv4 := net.ParseIP(ip).To4() != nil
+	var fallbackGW string
+
+	// Local IP filtering only for Linux
+	if !isWindows && isNonGlobalIPv6(ip) {
+		return ""
+	}
+
+	// Check if the IP address itself is global IPv6 (not link-local, not ULA)
+	isGlobalIPv6 := !isIPv4 && !isNonGlobalIPv6(ip)
+
+	for _, stack := range stacks {
+		if stack.Device != device {
+			continue
+		}
+		gw := net.ParseIP(stack.Gateway)
+		if gw == nil {
+			continue
+		}
+		// Gateway must match IP family (IPv4 with IPv4, IPv6 with IPv6)
+		gwIPv4 := gw.To4() != nil
+		if isIPv4 != gwIPv4 {
+			continue
+		}
+
+		// Only consider default routes (0.0.0.0 for IPv4, :: or ::/0 for IPv6)
+		if stack.Network != "0.0.0.0" && stack.Network != "::" && stack.Network != "::/0" {
+			continue
+		}
+
+		// IPv6 gateway handling
+		if !isIPv4 {
+			// Link-local gateways (fe80::) are saved as fallback but we keep searching
+			// for a global gateway. This handles SLAAC scenarios where global IPs
+			// use link-local gateways for routing.
+			if strings.HasPrefix(stack.Gateway, "fe80::") {
+				if fallbackGW == "" {
+					fallbackGW = stack.Gateway
+				}
+				continue
+			}
+			// Prefer global IPv6 gateway
+			return stack.Gateway
+		}
+
+		// IPv4: first valid match wins
+		return stack.Gateway
+	}
+
+	// For global IPv6 addresses, return link-local gateway as fallback
+	// This handles the valid case where a device has a global IPv6 address
+	// configured via SLAAC (IPv6 stateless autoconfigure)
+	// with only a link-local gateway available
+	if isGlobalIPv6 {
+		return fallbackGW
+	}
+
+	// No suitable gateway found
+	return ""
+}
+
+func (r *Builder) mapMacStaticIps(vm *model.VM) (ipMap string, err error) {
+	isWindowsFlag := isWindows(vm)
 	var configurations []string
-	for _, guestNetwork := range vm.GuestNetworks {
-		if !isWindowsFlag || guestNetwork.Origin == string(types.NetIpConfigInfoIpAddressOriginManual) {
-			gateway := ""
-			isIpv4 := net.IP.To4(net.ParseIP(guestNetwork.IP)) != nil
-			for _, ipStack := range vm.GuestIpStacks {
-				gwIpv4 := net.IP.To4(net.ParseIP(ipStack.Gateway)) != nil
-				if gwIpv4 && !isIpv4 || !gwIpv4 && isIpv4 {
-					// not the right IPv4 / IPv6 correlation
-					continue
-				}
-				if ipStack.Device != guestNetwork.Device {
-					continue
-				}
-				if ipStack.Network != "0.0.0.0" {
-					continue
-				}
-				gateway = ipStack.Gateway
+
+	// Create a sorted copy of GuestNetworks with IPv4 addresses first
+	// This ensures virt-v2v configures IPv4 as primary (backward compatible)
+	// and IPv6 addresses  are added by the complementary script
+	sortedNetworks := make([]vsphere.GuestNetwork, len(vm.GuestNetworks))
+	copy(sortedNetworks, vm.GuestNetworks)
+	sort.SliceStable(sortedNetworks, func(i, j int) bool {
+		ipI := net.ParseIP(sortedNetworks[i].IP)
+		ipJ := net.ParseIP(sortedNetworks[j].IP)
+		// IPv4 addresses should come before IPv6
+		return ipI != nil && ipI.To4() != nil && (ipJ == nil || ipJ.To4() == nil)
+	})
+
+	for _, guestNetwork := range sortedNetworks {
+		// Skip link-local addresses
+		if ip := net.ParseIP(guestNetwork.IP); ip != nil && ip.IsLinkLocalUnicast() {
+			continue
+		}
+
+		// For Windows: include manual + link-layer (for SLAAC - IPv6 autoconfiguration)
+		// For Linux: include all origins
+		if !isWindowsFlag ||
+			guestNetwork.Origin == string(types.NetIpConfigInfoIpAddressOriginManual) ||
+			guestNetwork.Origin == string(types.NetIpConfigInfoIpAddressOriginLinklayer) {
+			gateway := selectGateway(guestNetwork.IP, guestNetwork.Device, vm.GuestIpStacks, isWindowsFlag)
+			if isWindowsFlag && gateway == "" {
+				continue // Skip only Windows IPs with no gateway, linux allows empty gateways
 			}
 			dnsString := strings.Join(guestNetwork.DNS, ",")
-			configurationString := fmt.Sprintf("%s:ip:%s,%s,%d,%s", guestNetwork.MAC, guestNetwork.IP, gateway, guestNetwork.PrefixLength, dnsString)
-
-			// if DNS is "", we get configurationString with trailing comma, use TrimSuffix to remove it.
+			configurationString := fmt.Sprintf("%s:ip:%s,%s,%d,%s",
+				guestNetwork.MAC,
+				guestNetwork.IP,
+				gateway,
+				guestNetwork.PrefixLength,
+				dnsString,
+			)
 			configurations = append(configurations, strings.TrimSuffix(configurationString, ","))
 		}
 	}
@@ -345,16 +454,58 @@ func isWindows(vm *model.VM) bool {
 }
 
 // Retrieve the IP address of an ESXI host from its Management Network VNIC or fall back to the hostname.
+// IPv6 addresses are wrapped in brackets for URL compatibility.
 func getHostAddress(host *model.Host) string {
+	var ipv4Address, ipv6Address string
+
 	for _, vnic := range host.Network.VNICs {
 		if vnic.PortGroup == ManagementNetwork {
 			if vnic.IpAddress != "" && net.ParseIP(vnic.IpAddress) != nil {
-				return vnic.IpAddress // Return the IP address if found
+				ip := net.ParseIP(vnic.IpAddress)
+				if ip.To4() != nil {
+					// IPv4 address
+					if ipv4Address == "" {
+						ipv4Address = vnic.IpAddress
+					}
+				}
+			}
+			// Check IPv6 addresses
+			if ipv6Address == "" && len(vnic.IpV6Address) > 0 {
+				// Use the first non-link-local IPv6 address
+				for _, ipv6 := range vnic.IpV6Address {
+					if ipv6 != "" {
+						if ip := net.ParseIP(ipv6); ip != nil && !ip.IsLinkLocalUnicast() {
+							ipv6Address = ipv6
+							break
+						}
+					}
+				}
 			}
 		}
 	}
+
+	// Prefer IPv6 if available, otherwise use IPv4
+	if ipv6Address != "" {
+		result := formatHostAddress(ipv6Address)
+		return result
+	} else if ipv4Address != "" {
+		result := formatHostAddress(ipv4Address)
+		return result
+	}
+
 	// otherwise fall back to the host name
 	return host.Name
+}
+
+// formatHostAddress wraps IPv6 addresses in brackets for URL compatibility.
+func formatHostAddress(address string) string {
+	ip := net.ParseIP(address)
+	if ip != nil && ip.To4() == nil {
+		// IPv6 address - wrap in brackets
+		return "[" + address + "]"
+	}
+	// IPv4 address or hostname - return as-is
+	return address
 }
 
 func (r *Builder) getSourceDetails(vm *model.VM, sourceSecret *core.Secret) (libvirtURL liburl.URL, fingerprint string, err error) {
@@ -379,7 +530,7 @@ func (r *Builder) getSourceDetails(vm *model.VM, sourceSecret *core.Secret) (lib
 		}
 		libvirtURL = liburl.URL{
 			Scheme:   "esx",
-			Host:     hostDef.Spec.IpAddress,
+			Host:     formatHostAddress(hostDef.Spec.IpAddress),
 			User:     liburl.User(string(hostSecret.Data["user"])),
 			Path:     "",
 			RawQuery: sslVerify,

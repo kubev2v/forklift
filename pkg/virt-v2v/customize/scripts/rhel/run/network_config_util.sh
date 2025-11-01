@@ -41,15 +41,17 @@ remove_quotes() {
     echo "$1" | tr -d '"' | tr -d "'" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
 }
 
-# Validate MAC address and IPv4 address and extract them
+# # Extract MAC and IP (IPv4/IPv6) from a line in the mapping file
+
 extract_mac_ip() {
     S_HW=""
     S_IP=""
-    if echo "$1" | grep -qE '^([0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}):ip:([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}).*$'; then
-        S_HW=$(echo "$1" | sed -nE 's/^([0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}):ip:.*$/\1/p')
-        S_IP=$(echo "$1" | sed -nE 's/^.*:ip:([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}).*$/\1/p')
-    fi
+    line="$1"
+    S_HW=$(echo "$line" | sed -n 's/^\([0-9a-fA-F:]\{17\}\):ip:.*/\1/p')
+    S_IP=$(echo "$line" | sed -n 's/^.*:ip:\([^,]*\).*/\1/p')
 }
+
+
 
 # Network infrastructure reading functions
 # ----------------------------------------
@@ -97,8 +99,8 @@ udev_from_ifcfg() {
             continue
         fi
 
-        # Find the matching network script file
-        IFCFG=$(grep -l "IPADDR=.*$S_IP.*$" "$NETWORK_SCRIPTS_DIR"/*)
+        # Find the matching network script file (check both IPv4 and IPv6 patterns)
+        IFCFG=$(grep -l -E "(IPADDR|IPV6ADDR)=.*$S_IP.*$" "$NETWORK_SCRIPTS_DIR"/*)
         if [ -z "$IFCFG" ]; then
             log "Info: no ifcg config file name found for $S_IP."
             continue
@@ -202,7 +204,7 @@ udev_from_nm_dhcp_lease() {
             continue
         fi
 
-        # find all lease files that mention the given address
+        # find all lease files that mention the given address (IPv4 or IPv6)
         LEASE_FILES=$(grep -El "ADDRESS=$S_IP$" "$NM_LEASES_DIR"/*.lease)
         if [ -z "$LEASE_FILES" ]; then
             log "Warning: No lease files found containing address $S_IP"
@@ -367,6 +369,7 @@ udev_from_netplan() {
                 return
             fi
             netplan generate --root-dir "$NETPLAN_DIR" 2>&3
+            # Check for both IPv4 and IPv6 address patterns in systemd-networkd config
             NM_FILE=$(grep -El "Address[0-9]*=.*$S_IP.*$" "$SYSTEMD_NETWORK_DIR"/*)
             if [ -z "$NM_FILE" ]; then
                 log "Info: no systemd nm config file name found for $S_IP."
@@ -463,19 +466,26 @@ udev_from_ifquery() {
 
 # Checks for duplicate hardware addresses 
 check_dupe_hws() {
-    input=$(cat)
-
-    # Extract MAC addresses, convert to uppercase, sort them, and find duplicates
-    dupes=$(echo "$input" | grep -ioE "[0-9A-F:]{17}" | tr 'a-f' 'A-F' | sort | uniq -d)
-
-    # If duplicates are found, print an error and exit
-    if [ -n "$dupes" ]; then
-        log "Warning: Duplicate hw: $dupes"
-        return 0
-    fi
-
-    echo "$input"
+    awk '
+    {
+        print
+        mac = ""
+        name = ""
+        if (match($0, /ATTR\{address\}=="([0-9a-f:]+)"/, m)) mac = tolower(m[1])
+        if (match($0, /NAME=="([^"]+)"/, n)) name = n[1]
+        if (mac && name) {
+            if ((mac in seen) && seen[mac] != name) {
+                printf "Error: MAC %s assigned to multiple interface names: %s and %s\n", mac, seen[mac], name > "/dev/stderr"
+                exit_code = 1
+            } else {
+                seen[mac] = name
+            }
+        }
+    }
+    END { exit(exit_code) }
+    ' 
 }
+
 
 # Create udev rules check for duplicates and write them to udev file
 main() {
@@ -486,7 +496,8 @@ main() {
         udev_from_dhclient_lease
         udev_from_netplan
         udev_from_ifquery
-    } | check_dupe_hws > "$UDEV_RULES_FILE" 2>/dev/null
+    } | awk '!seen[$0]++' | check_dupe_hws > "$UDEV_RULES_FILE" 2>/dev/null
+
     echo "New udev rule:"
     cat $UDEV_RULES_FILE
 }
