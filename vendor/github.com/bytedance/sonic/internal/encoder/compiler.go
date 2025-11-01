@@ -50,12 +50,19 @@ var pretouchType func(_vt reflect.Type, opts option.CompileOptions, v uint8) (ma
 func pretouchTypeVM(_vt reflect.Type, opts option.CompileOptions, v uint8) (map[reflect.Type]uint8, error) {
 	/* compile function */
 	compiler := NewCompiler().apply(opts)
+	encoder := func(vt *rt.GoType, ex ...interface{}) (interface{}, error) {
+		pp, err := compiler.Compile(vt.Pack(), ex[0].(bool))
+		if err != nil {
+			return nil, err
+		}
+		return &pp, nil
+	}
 
 	/* find or compile */
 	vt := rt.UnpackType(_vt)
 	if val := vars.GetProgram(vt); val != nil {
 		return nil, nil
-	} else if _, err := vars.ComputeProgram(vt, makeEncoderVM, v == 1); err == nil {
+	} else if _, err := vars.ComputeProgram(vt, encoder, v == 1); err == nil {
 		return compiler.rec, nil
 	} else {
 		return nil, err
@@ -287,6 +294,12 @@ func (self *Compiler) compileMapBody(p *ir.Program, sp int, vt reflect.Type) {
 }
 
 func (self *Compiler) compileMapBodyKey(p *ir.Program, vk reflect.Type) {
+	// followed as `encoding/json/emcode.go:resolveKeyName
+	if vk.Kind() == reflect.String {
+		self.compileString(p, vk)
+		return
+	}
+
 	if !vk.Implements(vars.EncodingTextMarshalerType) {
 		self.compileMapBodyTextKey(p, vk)
 	} else {
