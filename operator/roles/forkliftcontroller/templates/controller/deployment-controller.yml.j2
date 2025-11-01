@@ -109,6 +109,10 @@ spec:
         - name: MAX_CONCURRENT_RECONCILES
           value: "{{ controller_max_concurrent_reconciles }}"
 {% endif %}
+{% if controller_max_parent_backing_retries is number %}
+        - name: MAX_PARENT_BACKING_RETRIES
+          value: "{{ controller_max_parent_backing_retries }}"
+{% endif %}
 {% if controller_cdi_export_token_ttl is number %}
         - name: CDI_EXPORT_TOKEN_TTL
           value: "{{ controller_cdi_export_token_ttl }}"

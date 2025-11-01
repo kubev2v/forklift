@@ -47,6 +47,7 @@ const (
 	OvaContainerRequestsMemory     = "OVA_CONTAINER_REQUESTS_MEMORY"
 	TlsConnectionTimeout           = "TLS_CONNECTION_TIMEOUT"
 	MaxConcurrentReconciles        = "MAX_CONCURRENT_RECONCILES"
+	MaxParentBackingRetries        = "MAX_PARENT_BACKING_RETRIES"
 )
 
 // Migration settings
@@ -109,6 +110,8 @@ type Migration struct {
 	TlsConnectionTimeout int
 	// MaxConcurrentReconciles is the limit of how many reconciles can run at once
 	MaxConcurrentReconciles int
+	// MaxParentBackingRetries is the limit of how many retries can happen while getting parent backing of a disk
+	MaxParentBackingRetries int
 }
 
 // Load settings.
@@ -260,6 +263,10 @@ func (r *Migration) Load() (err error) {
 		r.OvaContainerRequestsMemory = "512Mi"
 	}
 	r.MaxConcurrentReconciles, err = getPositiveEnvLimit(MaxConcurrentReconciles, 10)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	r.MaxParentBackingRetries, err = getPositiveEnvLimit(MaxParentBackingRetries, 10)
 	if err != nil {
 		return liberr.Wrap(err)
 	}

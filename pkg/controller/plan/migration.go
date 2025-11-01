@@ -1215,7 +1215,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			step.MarkStarted()
 			step.Phase = api.StepRunning
 			var ready bool
-			if ready, err = r.ensureGuestConversionPod(vm); err != nil {
+			if ready, err = r.ensureGuestConversionPod(vm, step); err != nil {
 				step.AddError(err.Error())
 				err = nil
 				break
@@ -1269,7 +1269,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 
 			// Create inspection pod if missing
 			var ready bool
-			if ready, err = r.ensureGuestInspectionPod(vm); err != nil {
+			if ready, err = r.ensureGuestInspectionPod(vm, step); err != nil {
 				step.AddError(err.Error())
 				err = nil
 				break
@@ -1464,7 +1464,7 @@ func (r *Migration) end() (completed bool, err error) {
 }
 
 // Ensure the guest conversion pod is present.
-func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (ready bool, err error) {
+func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus, step *plan.Step) (ready bool, err error) {
 	if r.vmMap == nil {
 		r.vmMap, err = r.kubevirt.VirtualMachineMap()
 		if err != nil {
@@ -1485,7 +1485,7 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (ready bool, err
 		}
 	}
 
-	err = r.kubevirt.EnsureVirtV2vPod(vm, &vmCr, pvcs, VirtV2vConversionPod)
+	err = r.kubevirt.EnsureVirtV2vPod(vm, &vmCr, pvcs, VirtV2vConversionPod, step)
 	if err != nil {
 		return
 	}
@@ -1501,17 +1501,19 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (ready bool, err
 }
 
 // Ensure the guest inspection pod is present.
-func (r *Migration) ensureGuestInspectionPod(vm *plan.VMStatus) (ready bool, err error) {
+func (r *Migration) ensureGuestInspectionPod(vm *plan.VMStatus, step *plan.Step) (ready bool, err error) {
 	var vmCr VirtualMachine
 	var pvcs []*core.PersistentVolumeClaim
 	// pass empty vmCr and pvcs because they are not used when getting inspection pod
-	err = r.kubevirt.EnsureVirtV2vPod(vm, &vmCr, pvcs, VirtV2vInspectionPod)
+	err = r.kubevirt.EnsureVirtV2vPod(vm, &vmCr, pvcs, VirtV2vInspectionPod, step)
 	if err != nil {
 		return
 	}
-
-	ready = true
-	return
+	// When inspection pod does not exist, something went wrong while creating, most likely the parent backing was missing
+	if pod, err := r.getInspectionPod(vm); pod == nil {
+		return false, err
+	}
+	return true, err
 }
 
 // Get pod that has inspection label

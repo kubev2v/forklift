@@ -118,6 +118,9 @@ spec:
               controller_max_concurrent_reconciles:
                 description: 'Max concurrent reconciles (default: 10)'
                 x-kubernetes-int-or-string: true
+              controller_max_parent_backing_retries:
+                description: 'Max retries when getting parent disks (default: 10)'
+                x-kubernetes-int-or-string: true
               controller_max_vm_inflight:
                 description: 'Max concurrent VM migrations (default: 20)'
                 x-kubernetes-int-or-string: true

@@ -306,6 +306,9 @@ spec:
               controller_tls_connection_timeout_sec:
                 x-kubernetes-int-or-string: true
                 description: "TLS connection timeout seconds (default: 5)"
+              controller_max_parent_backing_retries:
+                x-kubernetes-int-or-string: true
+                description: "Max retries when getting parent disks (default: 10)"
 
               # Migration Feature-Specific Settings
               controller_vsphere_incremental_backup:
