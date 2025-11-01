@@ -1,3 +1,21 @@
+/*
+ *
+ * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package pmax
 
 import (
@@ -18,6 +36,7 @@ const (
 	XNFSExport     = "/nfs_export"
 	XNASServer     = "/nas_server"
 	XFileInterface = "/file_interface"
+	XNFSServer     = "/nfs_server"
 )
 
 // GetFileSystemList get file system list on a symID
@@ -471,4 +490,66 @@ func (c *Client) GetFileInterfaceByID(ctx context.Context, symID, interfaceID st
 		return nil, err
 	}
 	return fileInterface, nil
+}
+
+// GetNFSServerList get NFS Server list on a symID
+func (c *Client) GetNFSServerList(ctx context.Context, symID string) (*types.NFSServerIterator, error) {
+	defer c.TimeSpent("GetNFSServerList", time.Now())
+	if _, err := c.IsAllowedArray(symID); err != nil {
+		return nil, err
+	}
+	ctx, cancel := c.GetTimeoutContext(ctx)
+	defer cancel()
+	URL := c.urlPrefix() + XFile + SymmetrixX + symID + XNFSServer
+
+	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
+	if err != nil {
+		log.Error("GetNFSServerList failed: " + err.Error())
+		return nil, err
+	}
+
+	if err = c.checkResponse(resp); err != nil {
+		return nil, err
+	}
+
+	nfsServerList := new(types.NFSServerIterator)
+	if err := json.NewDecoder(resp.Body).Decode(nfsServerList); err != nil {
+		return nil, err
+	}
+	err = resp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+	return nfsServerList, nil
+}
+
+// GetNFSServerByID fetch specific NFS server on a symID
+func (c *Client) GetNFSServerByID(ctx context.Context, symID, nfsID string) (*types.NFSServer, error) {
+	defer c.TimeSpent("GetNFSServerByID", time.Now())
+	if _, err := c.IsAllowedArray(symID); err != nil {
+		return nil, err
+	}
+	ctx, cancel := c.GetTimeoutContext(ctx)
+	defer cancel()
+
+	URL := c.urlPrefix() + XFile + SymmetrixX + symID + XNFSServer + "/" + nfsID
+	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
+	if err != nil {
+		log.Error("GetNFSServerByID failed: " + err.Error())
+		return nil, err
+	}
+
+	if err = c.checkResponse(resp); err != nil {
+		return nil, err
+	}
+
+	nfsServer := new(types.NFSServer)
+	if err := json.NewDecoder(resp.Body).Decode(nfsServer); err != nil {
+		return nil, err
+	}
+	err = resp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+	return nfsServer, nil
 }
