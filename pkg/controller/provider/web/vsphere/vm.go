@@ -249,8 +249,13 @@ type VM struct {
 	GuestDisks               []model.DiskMountPoint `json:"guestDisks"`
 	GuestIpStacks            []model.GuestIpStack   `json:"guestIpStacks"`
 	SecureBoot               bool                   `json:"secureBoot"`
-	DiskEnableUuid           bool                   `json:"diskEnableUuid"`
-	NestedHVEnabled          bool                   `json:"nestedHVEnabled"`
+	ToolsStatus              string                 `json:"toolsStatus"`
+	ToolsRunningStatus       string                 `json:"toolsRunningStatus"`
+	// Note: vSphere reports version as "toolsVersionStatus2"; we keep the Go field
+	// name ToolsVersionStatus for continuity while serializing as toolsVersionStatus2.
+	ToolsVersionStatus string `json:"toolsVersionStatus2"`
+	DiskEnableUuid     bool   `json:"diskEnableUuid"`
+	NestedHVEnabled    bool   `json:"nestedHVEnabled"`
 }
 
 // Build the resource using the model.
@@ -285,6 +290,9 @@ func (r *VM) With(m *model.VM) {
 	r.GuestDisks = m.GuestDisks
 	r.GuestIpStacks = m.GuestIpStacks
 	r.SecureBoot = m.SecureBoot
+	r.ToolsStatus = m.ToolsStatus
+	r.ToolsRunningStatus = m.ToolsRunningStatus
+	r.ToolsVersionStatus = m.ToolsVersionStatus
 	r.DiskEnableUuid = m.DiskEnableUuid
 	r.NestedHVEnabled = m.NestedHVEnabled
 }

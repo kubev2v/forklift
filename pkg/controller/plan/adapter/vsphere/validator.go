@@ -28,6 +28,17 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	ToolsNotInstalled = string(types.VirtualMachineToolsStatusToolsNotInstalled)
+	ToolsOk           = string(types.VirtualMachineToolsStatusToolsOk)
+
+	GuestToolsNotRunning = string(types.VirtualMachineToolsRunningStatusGuestToolsNotRunning)
+	GuestToolsRunning    = string(types.VirtualMachineToolsRunningStatusGuestToolsRunning)
+
+	GuestToolsCurrent   = string(types.VirtualMachineToolsVersionStatusGuestToolsCurrent)
+	GuestToolsUnmanaged = string(types.VirtualMachineToolsVersionStatusGuestToolsUnmanaged)
+)
+
 // vSphere validator.
 type Validator struct {
 	*plancontext.Context
@@ -664,4 +675,35 @@ func (r *Validator) PowerState(vmRef ref.Ref) (ok bool, err error) {
 func (r *Validator) VMMigrationType(vmRef ref.Ref) (ok bool, err error) {
 	ok = true
 	return
+}
+
+// Validate guest tools (VMware Tools) status for the VM.
+func (r *Validator) GuestToolsInstalled(vmRef ref.Ref) (ok bool, err error) {
+	vm := &model.VM{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef.String())
+		return
+	}
+
+	// Only check VMware Tools status if VM is powered on
+	if vm.PowerState == string(types.VirtualMachinePowerStatePoweredOn) {
+		// Check all VMware Tools issues: unknown status, not installed, not running, or unmanaged
+		if isUnknownToolsStatus(vm.ToolsStatus) || vm.ToolsStatus == ToolsNotInstalled ||
+			vm.ToolsRunningStatus == GuestToolsNotRunning || vm.ToolsVersionStatus == GuestToolsUnmanaged {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+// isUnknownToolsStatus normalizes how we treat unreported/unknown statuses.
+func isUnknownToolsStatus(s string) bool {
+	switch s {
+	case "", "null", "<nil>":
+		return true
+	default:
+		return false
+	}
 }
