@@ -16,7 +16,7 @@ require (
 	github.com/onsi/gomega v1.38.2
 	github.com/stretchr/testify v1.10.0
 	github.com/vmware/govmomi v0.50.0
-	go.uber.org/mock v0.5.2
+	go.uber.org/mock v0.6.0
 	golang.org/x/crypto v0.41.0
 	k8s.io/apimachinery v0.32.8
 	k8s.io/client-go v0.32.8
