@@ -1,0 +1,1566 @@
+
+state 0
+	$accept: .input $end 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	input  goto 1
+	expr  goto 2
+	or_expr  goto 3
+	and_expr  goto 4
+	comparison_expr  goto 5
+	additive_expr  goto 6
+	multiplicative_expr  goto 7
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 1
+	$accept:  input.$end 
+
+	$end  accept
+	.  error
+
+
+state 2
+	input:  expr.    (1)
+
+	.  reduce 1 (src line 47)
+
+
+state 3
+	expr:  or_expr.    (2)
+	or_expr:  or_expr.K_OR and_expr 
+
+	K_OR  shift 28
+	.  reduce 2 (src line 51)
+
+
+state 4
+	or_expr:  and_expr.    (3)
+	and_expr:  and_expr.K_AND comparison_expr 
+
+	K_AND  shift 29
+	.  reduce 3 (src line 55)
+
+
+state 5
+	and_expr:  comparison_expr.    (5)
+	comparison_expr:  comparison_expr.EQ additive_expr 
+	comparison_expr:  comparison_expr.NE additive_expr 
+	comparison_expr:  comparison_expr.LT additive_expr 
+	comparison_expr:  comparison_expr.LE additive_expr 
+	comparison_expr:  comparison_expr.GT additive_expr 
+	comparison_expr:  comparison_expr.GE additive_expr 
+	comparison_expr:  comparison_expr.REQ additive_expr 
+	comparison_expr:  comparison_expr.RNE additive_expr 
+	comparison_expr:  comparison_expr.K_LIKE additive_expr 
+	comparison_expr:  comparison_expr.K_ILIKE additive_expr 
+	comparison_expr:  comparison_expr.K_NOT K_LIKE additive_expr 
+	comparison_expr:  comparison_expr.K_NOT K_ILIKE additive_expr 
+	comparison_expr:  comparison_expr.K_IS K_NULL 
+	comparison_expr:  comparison_expr.K_IS K_NOT K_NULL 
+	comparison_expr:  comparison_expr.K_BETWEEN additive_expr K_AND additive_expr 
+	comparison_expr:  comparison_expr.K_NOT K_BETWEEN additive_expr K_AND additive_expr 
+	comparison_expr:  comparison_expr.K_IN additive_expr 
+	comparison_expr:  comparison_expr.K_NOT K_IN additive_expr 
+
+	K_LIKE  shift 38
+	K_ILIKE  shift 39
+	K_BETWEEN  shift 42
+	K_IN  shift 43
+	K_IS  shift 41
+	K_NOT  shift 40
+	EQ  shift 30
+	NE  shift 31
+	LT  shift 32
+	LE  shift 33
+	GT  shift 34
+	GE  shift 35
+	REQ  shift 36
+	RNE  shift 37
+	.  reduce 5 (src line 60)
+
+
+state 6
+	comparison_expr:  additive_expr.    (7)
+	additive_expr:  additive_expr.PLUS multiplicative_expr 
+	additive_expr:  additive_expr.MINUS multiplicative_expr 
+
+	PLUS  shift 44
+	MINUS  shift 45
+	.  reduce 7 (src line 65)
+
+
+state 7
+	additive_expr:  multiplicative_expr.    (26)
+	multiplicative_expr:  multiplicative_expr.STAR not_expr 
+	multiplicative_expr:  multiplicative_expr.SLASH not_expr 
+	multiplicative_expr:  multiplicative_expr.PERCENT not_expr 
+
+	STAR  shift 46
+	SLASH  shift 47
+	PERCENT  shift 48
+	.  reduce 26 (src line 106)
+
+
+state 8
+	multiplicative_expr:  not_expr.    (29)
+
+	.  reduce 29 (src line 112)
+
+
+state 9
+	not_expr:  unary_expr.    (33)
+
+	.  reduce 33 (src line 119)
+
+
+state 10
+	not_expr:  K_NOT.not_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	not_expr  goto 49
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 11
+	not_expr:  K_LEN.not_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	not_expr  goto 50
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 12
+	not_expr:  K_ANY.not_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	not_expr  goto 51
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 13
+	not_expr:  K_ALL.not_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	not_expr  goto 52
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 14
+	not_expr:  K_SUM.not_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	not_expr  goto 53
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 15
+	unary_expr:  primary.    (39)
+
+	.  reduce 39 (src line 128)
+
+
+state 16
+	unary_expr:  MINUS.unary_expr 
+
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	unary_expr  goto 54
+	primary  goto 15
+	array  goto 19
+
+state 17
+	unary_expr:  PLUS.unary_expr 
+
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	unary_expr  goto 55
+	primary  goto 15
+	array  goto 19
+
+state 18
+	unary_expr:  LPAREN.expr RPAREN 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	expr  goto 56
+	or_expr  goto 3
+	and_expr  goto 4
+	comparison_expr  goto 5
+	additive_expr  goto 6
+	multiplicative_expr  goto 7
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 19
+	unary_expr:  array.    (43)
+
+	.  reduce 43 (src line 133)
+
+
+state 20
+	primary:  NUMERIC_LITERAL.    (50)
+
+	.  reduce 50 (src line 157)
+
+
+state 21
+	primary:  STRING_LITERAL.    (51)
+
+	.  reduce 51 (src line 159)
+
+
+state 22
+	primary:  IDENTIFIER.    (52)
+
+	.  reduce 52 (src line 160)
+
+
+state 23
+	primary:  RFC3339.    (53)
+
+	.  reduce 53 (src line 161)
+
+
+state 24
+	primary:  DATE.    (54)
+
+	.  reduce 54 (src line 162)
+
+
+state 25
+	primary:  K_TRUE.    (55)
+
+	.  reduce 55 (src line 163)
+
+
+state 26
+	primary:  K_FALSE.    (56)
+
+	.  reduce 56 (src line 164)
+
+
+state 27
+	array:  LBRACKET.opt_array_elements RBRACKET 
+	opt_array_elements: .    (45)
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  reduce 45 (src line 140)
+
+	expr  goto 59
+	or_expr  goto 3
+	and_expr  goto 4
+	comparison_expr  goto 5
+	additive_expr  goto 6
+	multiplicative_expr  goto 7
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+	array_elements  goto 58
+	opt_array_elements  goto 57
+
+state 28
+	or_expr:  or_expr K_OR.and_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	and_expr  goto 60
+	comparison_expr  goto 5
+	additive_expr  goto 6
+	multiplicative_expr  goto 7
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 29
+	and_expr:  and_expr K_AND.comparison_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	comparison_expr  goto 61
+	additive_expr  goto 6
+	multiplicative_expr  goto 7
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 30
+	comparison_expr:  comparison_expr EQ.additive_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	additive_expr  goto 62
+	multiplicative_expr  goto 7
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 31
+	comparison_expr:  comparison_expr NE.additive_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	additive_expr  goto 63
+	multiplicative_expr  goto 7
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 32
+	comparison_expr:  comparison_expr LT.additive_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	additive_expr  goto 64
+	multiplicative_expr  goto 7
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 33
+	comparison_expr:  comparison_expr LE.additive_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	additive_expr  goto 65
+	multiplicative_expr  goto 7
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 34
+	comparison_expr:  comparison_expr GT.additive_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	additive_expr  goto 66
+	multiplicative_expr  goto 7
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 35
+	comparison_expr:  comparison_expr GE.additive_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	additive_expr  goto 67
+	multiplicative_expr  goto 7
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 36
+	comparison_expr:  comparison_expr REQ.additive_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	additive_expr  goto 68
+	multiplicative_expr  goto 7
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 37
+	comparison_expr:  comparison_expr RNE.additive_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	additive_expr  goto 69
+	multiplicative_expr  goto 7
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 38
+	comparison_expr:  comparison_expr K_LIKE.additive_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	additive_expr  goto 70
+	multiplicative_expr  goto 7
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 39
+	comparison_expr:  comparison_expr K_ILIKE.additive_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	additive_expr  goto 71
+	multiplicative_expr  goto 7
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 40
+	comparison_expr:  comparison_expr K_NOT.K_LIKE additive_expr 
+	comparison_expr:  comparison_expr K_NOT.K_ILIKE additive_expr 
+	comparison_expr:  comparison_expr K_NOT.K_BETWEEN additive_expr K_AND additive_expr 
+	comparison_expr:  comparison_expr K_NOT.K_IN additive_expr 
+
+	K_LIKE  shift 72
+	K_ILIKE  shift 73
+	K_BETWEEN  shift 74
+	K_IN  shift 75
+	.  error
+
+
+state 41
+	comparison_expr:  comparison_expr K_IS.K_NULL 
+	comparison_expr:  comparison_expr K_IS.K_NOT K_NULL 
+
+	K_NULL  shift 76
+	K_NOT  shift 77
+	.  error
+
+
+state 42
+	comparison_expr:  comparison_expr K_BETWEEN.additive_expr K_AND additive_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	additive_expr  goto 78
+	multiplicative_expr  goto 7
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 43
+	comparison_expr:  comparison_expr K_IN.additive_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	additive_expr  goto 79
+	multiplicative_expr  goto 7
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 44
+	additive_expr:  additive_expr PLUS.multiplicative_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	multiplicative_expr  goto 80
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 45
+	additive_expr:  additive_expr MINUS.multiplicative_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	multiplicative_expr  goto 81
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 46
+	multiplicative_expr:  multiplicative_expr STAR.not_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	not_expr  goto 82
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 47
+	multiplicative_expr:  multiplicative_expr SLASH.not_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	not_expr  goto 83
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 48
+	multiplicative_expr:  multiplicative_expr PERCENT.not_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	not_expr  goto 84
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 49
+	not_expr:  K_NOT not_expr.    (34)
+
+	.  reduce 34 (src line 121)
+
+
+state 50
+	not_expr:  K_LEN not_expr.    (35)
+
+	.  reduce 35 (src line 122)
+
+
+state 51
+	not_expr:  K_ANY not_expr.    (36)
+
+	.  reduce 36 (src line 123)
+
+
+state 52
+	not_expr:  K_ALL not_expr.    (37)
+
+	.  reduce 37 (src line 124)
+
+
+state 53
+	not_expr:  K_SUM not_expr.    (38)
+
+	.  reduce 38 (src line 125)
+
+
+state 54
+	unary_expr:  MINUS unary_expr.    (40)
+
+	.  reduce 40 (src line 130)
+
+
+state 55
+	unary_expr:  PLUS unary_expr.    (41)
+
+	.  reduce 41 (src line 131)
+
+
+state 56
+	unary_expr:  LPAREN expr.RPAREN 
+
+	RPAREN  shift 85
+	.  error
+
+
+state 57
+	array:  LBRACKET opt_array_elements.RBRACKET 
+
+	RBRACKET  shift 86
+	.  error
+
+
+state 58
+	opt_array_elements:  array_elements.    (46)
+	opt_array_elements:  array_elements.COMMA 
+	array_elements:  array_elements.COMMA expr 
+
+	COMMA  shift 87
+	.  reduce 46 (src line 142)
+
+
+state 59
+	array_elements:  expr.    (48)
+
+	.  reduce 48 (src line 146)
+
+
+state 60
+	or_expr:  or_expr K_OR and_expr.    (4)
+	and_expr:  and_expr.K_AND comparison_expr 
+
+	K_AND  shift 29
+	.  reduce 4 (src line 57)
+
+
+state 61
+	and_expr:  and_expr K_AND comparison_expr.    (6)
+	comparison_expr:  comparison_expr.EQ additive_expr 
+	comparison_expr:  comparison_expr.NE additive_expr 
+	comparison_expr:  comparison_expr.LT additive_expr 
+	comparison_expr:  comparison_expr.LE additive_expr 
+	comparison_expr:  comparison_expr.GT additive_expr 
+	comparison_expr:  comparison_expr.GE additive_expr 
+	comparison_expr:  comparison_expr.REQ additive_expr 
+	comparison_expr:  comparison_expr.RNE additive_expr 
+	comparison_expr:  comparison_expr.K_LIKE additive_expr 
+	comparison_expr:  comparison_expr.K_ILIKE additive_expr 
+	comparison_expr:  comparison_expr.K_NOT K_LIKE additive_expr 
+	comparison_expr:  comparison_expr.K_NOT K_ILIKE additive_expr 
+	comparison_expr:  comparison_expr.K_IS K_NULL 
+	comparison_expr:  comparison_expr.K_IS K_NOT K_NULL 
+	comparison_expr:  comparison_expr.K_BETWEEN additive_expr K_AND additive_expr 
+	comparison_expr:  comparison_expr.K_NOT K_BETWEEN additive_expr K_AND additive_expr 
+	comparison_expr:  comparison_expr.K_IN additive_expr 
+	comparison_expr:  comparison_expr.K_NOT K_IN additive_expr 
+
+	K_LIKE  shift 38
+	K_ILIKE  shift 39
+	K_BETWEEN  shift 42
+	K_IN  shift 43
+	K_IS  shift 41
+	K_NOT  shift 40
+	EQ  shift 30
+	NE  shift 31
+	LT  shift 32
+	LE  shift 33
+	GT  shift 34
+	GE  shift 35
+	REQ  shift 36
+	RNE  shift 37
+	.  reduce 6 (src line 62)
+
+
+state 62
+	comparison_expr:  comparison_expr EQ additive_expr.    (8)
+	additive_expr:  additive_expr.PLUS multiplicative_expr 
+	additive_expr:  additive_expr.MINUS multiplicative_expr 
+
+	PLUS  shift 44
+	MINUS  shift 45
+	.  reduce 8 (src line 67)
+
+
+state 63
+	comparison_expr:  comparison_expr NE additive_expr.    (9)
+	additive_expr:  additive_expr.PLUS multiplicative_expr 
+	additive_expr:  additive_expr.MINUS multiplicative_expr 
+
+	PLUS  shift 44
+	MINUS  shift 45
+	.  reduce 9 (src line 68)
+
+
+state 64
+	comparison_expr:  comparison_expr LT additive_expr.    (10)
+	additive_expr:  additive_expr.PLUS multiplicative_expr 
+	additive_expr:  additive_expr.MINUS multiplicative_expr 
+
+	PLUS  shift 44
+	MINUS  shift 45
+	.  reduce 10 (src line 69)
+
+
+state 65
+	comparison_expr:  comparison_expr LE additive_expr.    (11)
+	additive_expr:  additive_expr.PLUS multiplicative_expr 
+	additive_expr:  additive_expr.MINUS multiplicative_expr 
+
+	PLUS  shift 44
+	MINUS  shift 45
+	.  reduce 11 (src line 70)
+
+
+state 66
+	comparison_expr:  comparison_expr GT additive_expr.    (12)
+	additive_expr:  additive_expr.PLUS multiplicative_expr 
+	additive_expr:  additive_expr.MINUS multiplicative_expr 
+
+	PLUS  shift 44
+	MINUS  shift 45
+	.  reduce 12 (src line 71)
+
+
+state 67
+	comparison_expr:  comparison_expr GE additive_expr.    (13)
+	additive_expr:  additive_expr.PLUS multiplicative_expr 
+	additive_expr:  additive_expr.MINUS multiplicative_expr 
+
+	PLUS  shift 44
+	MINUS  shift 45
+	.  reduce 13 (src line 72)
+
+
+state 68
+	comparison_expr:  comparison_expr REQ additive_expr.    (14)
+	additive_expr:  additive_expr.PLUS multiplicative_expr 
+	additive_expr:  additive_expr.MINUS multiplicative_expr 
+
+	PLUS  shift 44
+	MINUS  shift 45
+	.  reduce 14 (src line 73)
+
+
+state 69
+	comparison_expr:  comparison_expr RNE additive_expr.    (15)
+	additive_expr:  additive_expr.PLUS multiplicative_expr 
+	additive_expr:  additive_expr.MINUS multiplicative_expr 
+
+	PLUS  shift 44
+	MINUS  shift 45
+	.  reduce 15 (src line 74)
+
+
+state 70
+	comparison_expr:  comparison_expr K_LIKE additive_expr.    (16)
+	additive_expr:  additive_expr.PLUS multiplicative_expr 
+	additive_expr:  additive_expr.MINUS multiplicative_expr 
+
+	PLUS  shift 44
+	MINUS  shift 45
+	.  reduce 16 (src line 75)
+
+
+state 71
+	comparison_expr:  comparison_expr K_ILIKE additive_expr.    (17)
+	additive_expr:  additive_expr.PLUS multiplicative_expr 
+	additive_expr:  additive_expr.MINUS multiplicative_expr 
+
+	PLUS  shift 44
+	MINUS  shift 45
+	.  reduce 17 (src line 76)
+
+
+state 72
+	comparison_expr:  comparison_expr K_NOT K_LIKE.additive_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	additive_expr  goto 88
+	multiplicative_expr  goto 7
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 73
+	comparison_expr:  comparison_expr K_NOT K_ILIKE.additive_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	additive_expr  goto 89
+	multiplicative_expr  goto 7
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 74
+	comparison_expr:  comparison_expr K_NOT K_BETWEEN.additive_expr K_AND additive_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	additive_expr  goto 90
+	multiplicative_expr  goto 7
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 75
+	comparison_expr:  comparison_expr K_NOT K_IN.additive_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	additive_expr  goto 91
+	multiplicative_expr  goto 7
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 76
+	comparison_expr:  comparison_expr K_IS K_NULL.    (20)
+
+	.  reduce 20 (src line 85)
+
+
+state 77
+	comparison_expr:  comparison_expr K_IS K_NOT.K_NULL 
+
+	K_NULL  shift 92
+	.  error
+
+
+state 78
+	comparison_expr:  comparison_expr K_BETWEEN additive_expr.K_AND additive_expr 
+	additive_expr:  additive_expr.PLUS multiplicative_expr 
+	additive_expr:  additive_expr.MINUS multiplicative_expr 
+
+	K_AND  shift 93
+	PLUS  shift 44
+	MINUS  shift 45
+	.  error
+
+
+state 79
+	comparison_expr:  comparison_expr K_IN additive_expr.    (24)
+	additive_expr:  additive_expr.PLUS multiplicative_expr 
+	additive_expr:  additive_expr.MINUS multiplicative_expr 
+
+	PLUS  shift 44
+	MINUS  shift 45
+	.  reduce 24 (src line 99)
+
+
+state 80
+	additive_expr:  additive_expr PLUS multiplicative_expr.    (27)
+	multiplicative_expr:  multiplicative_expr.STAR not_expr 
+	multiplicative_expr:  multiplicative_expr.SLASH not_expr 
+	multiplicative_expr:  multiplicative_expr.PERCENT not_expr 
+
+	STAR  shift 46
+	SLASH  shift 47
+	PERCENT  shift 48
+	.  reduce 27 (src line 108)
+
+
+state 81
+	additive_expr:  additive_expr MINUS multiplicative_expr.    (28)
+	multiplicative_expr:  multiplicative_expr.STAR not_expr 
+	multiplicative_expr:  multiplicative_expr.SLASH not_expr 
+	multiplicative_expr:  multiplicative_expr.PERCENT not_expr 
+
+	STAR  shift 46
+	SLASH  shift 47
+	PERCENT  shift 48
+	.  reduce 28 (src line 109)
+
+
+state 82
+	multiplicative_expr:  multiplicative_expr STAR not_expr.    (30)
+
+	.  reduce 30 (src line 114)
+
+
+state 83
+	multiplicative_expr:  multiplicative_expr SLASH not_expr.    (31)
+
+	.  reduce 31 (src line 115)
+
+
+state 84
+	multiplicative_expr:  multiplicative_expr PERCENT not_expr.    (32)
+
+	.  reduce 32 (src line 116)
+
+
+state 85
+	unary_expr:  LPAREN expr RPAREN.    (42)
+
+	.  reduce 42 (src line 132)
+
+
+state 86
+	array:  LBRACKET opt_array_elements RBRACKET.    (44)
+
+	.  reduce 44 (src line 136)
+
+
+state 87
+	opt_array_elements:  array_elements COMMA.    (47)
+	array_elements:  array_elements COMMA.expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  reduce 47 (src line 143)
+
+	expr  goto 94
+	or_expr  goto 3
+	and_expr  goto 4
+	comparison_expr  goto 5
+	additive_expr  goto 6
+	multiplicative_expr  goto 7
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 88
+	comparison_expr:  comparison_expr K_NOT K_LIKE additive_expr.    (18)
+	additive_expr:  additive_expr.PLUS multiplicative_expr 
+	additive_expr:  additive_expr.MINUS multiplicative_expr 
+
+	PLUS  shift 44
+	MINUS  shift 45
+	.  reduce 18 (src line 77)
+
+
+state 89
+	comparison_expr:  comparison_expr K_NOT K_ILIKE additive_expr.    (19)
+	additive_expr:  additive_expr.PLUS multiplicative_expr 
+	additive_expr:  additive_expr.MINUS multiplicative_expr 
+
+	PLUS  shift 44
+	MINUS  shift 45
+	.  reduce 19 (src line 81)
+
+
+state 90
+	comparison_expr:  comparison_expr K_NOT K_BETWEEN additive_expr.K_AND additive_expr 
+	additive_expr:  additive_expr.PLUS multiplicative_expr 
+	additive_expr:  additive_expr.MINUS multiplicative_expr 
+
+	K_AND  shift 95
+	PLUS  shift 44
+	MINUS  shift 45
+	.  error
+
+
+state 91
+	comparison_expr:  comparison_expr K_NOT K_IN additive_expr.    (25)
+	additive_expr:  additive_expr.PLUS multiplicative_expr 
+	additive_expr:  additive_expr.MINUS multiplicative_expr 
+
+	PLUS  shift 44
+	MINUS  shift 45
+	.  reduce 25 (src line 100)
+
+
+state 92
+	comparison_expr:  comparison_expr K_IS K_NOT K_NULL.    (21)
+
+	.  reduce 21 (src line 86)
+
+
+state 93
+	comparison_expr:  comparison_expr K_BETWEEN additive_expr K_AND.additive_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	additive_expr  goto 96
+	multiplicative_expr  goto 7
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 94
+	array_elements:  array_elements COMMA expr.    (49)
+
+	.  reduce 49 (src line 150)
+
+
+state 95
+	comparison_expr:  comparison_expr K_NOT K_BETWEEN additive_expr K_AND.additive_expr 
+
+	K_NOT  shift 10
+	K_TRUE  shift 25
+	K_FALSE  shift 26
+	K_LEN  shift 11
+	K_ANY  shift 12
+	K_ALL  shift 13
+	K_SUM  shift 14
+	NUMERIC_LITERAL  shift 20
+	STRING_LITERAL  shift 21
+	IDENTIFIER  shift 22
+	DATE  shift 24
+	RFC3339  shift 23
+	LPAREN  shift 18
+	PLUS  shift 17
+	MINUS  shift 16
+	LBRACKET  shift 27
+	.  error
+
+	additive_expr  goto 97
+	multiplicative_expr  goto 7
+	not_expr  goto 8
+	unary_expr  goto 9
+	primary  goto 15
+	array  goto 19
+
+state 96
+	comparison_expr:  comparison_expr K_BETWEEN additive_expr K_AND additive_expr.    (22)
+	additive_expr:  additive_expr.PLUS multiplicative_expr 
+	additive_expr:  additive_expr.MINUS multiplicative_expr 
+
+	PLUS  shift 44
+	MINUS  shift 45
+	.  reduce 22 (src line 90)
+
+
+state 97
+	comparison_expr:  comparison_expr K_NOT K_BETWEEN additive_expr K_AND additive_expr.    (23)
+	additive_expr:  additive_expr.PLUS multiplicative_expr 
+	additive_expr:  additive_expr.MINUS multiplicative_expr 
+
+	PLUS  shift 44
+	MINUS  shift 45
+	.  reduce 23 (src line 94)
+
+
+42 terminals, 14 nonterminals
+57 grammar rules, 98/16000 states
+0 shift/reduce, 0 reduce/reduce conflicts reported
+63 working sets used
+memory: parser 213/240000
+91 extra closures
+656 shift entries, 1 exceptions
+48 goto entries
+166 entries saved by goto default
+Optimizer space used: output 118/240000
+118 table entries, 6 zero
+maximum spread: 41, maximum offset: 95
