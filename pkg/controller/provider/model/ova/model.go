@@ -74,6 +74,7 @@ type VM struct {
 	PolicyVersion         int       `sql:"d0,index(policyVersion)"`
 	UUID                  string    `sql:""`
 	Firmware              string    `sql:""`
+	SecureBoot            bool      `sql:""`
 	CpuAffinity           []int32   `sql:""`
 	CpuHotAddEnabled      bool      `sql:""`
 	CpuHotRemoveEnabled   bool      `sql:""`
