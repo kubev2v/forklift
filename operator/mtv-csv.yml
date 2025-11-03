@@ -4,7 +4,7 @@ metadata:
   annotations:
     capabilities: Seamless Upgrades
     categories: OpenShift Optional
-    certified: true
+    certified: "true"
     containerImage: ${OPERATOR_IMAGE}
     createdAt: ${DATE}
     description: Facilitates migration of VM workloads to OpenShift Virtualization
