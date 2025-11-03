@@ -1,12 +1,16 @@
 package plan
 
 import (
+	"context"
+	"fmt"
 	"strconv"
+	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/provider"
 	"github.com/kubev2v/forklift/pkg/controller/base"
 	"github.com/kubev2v/forklift/pkg/lib/condition"
+	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -187,3 +191,237 @@ func createPlan(name, namespace string, source, destination *api.Provider) *api.
 		},
 	}
 }
+
+var _ = ginkgo.Describe("Inventory Service Retry Logic", func() {
+	var (
+		reconciler *Reconciler
+	)
+
+	ginkgo.BeforeEach(func() {
+		reconciler = &Reconciler{
+			base.Reconciler{},
+		}
+	})
+
+	ginkgo.Describe("extractHTTPStatus", func() {
+		ginkgo.It("should extract HTTP status from error message", func() {
+			status := reconciler.extractHTTPStatus(fmt.Errorf("GET failed. status: 401 url: http://example.com"))
+			gomega.Expect(status).To(gomega.Equal(401))
+
+			status = reconciler.extractHTTPStatus(fmt.Errorf("POST failed. status: 403 url: http://example.com"))
+			gomega.Expect(status).To(gomega.Equal(403))
+
+			status = reconciler.extractHTTPStatus(fmt.Errorf("PUT failed. status: 500 url: http://example.com"))
+			gomega.Expect(status).To(gomega.Equal(500))
+		})
+
+		ginkgo.It("should return 0 for errors without status codes", func() {
+			status := reconciler.extractHTTPStatus(fmt.Errorf("connection timeout"))
+			gomega.Expect(status).To(gomega.Equal(0))
+
+			status = reconciler.extractHTTPStatus(fmt.Errorf("network unreachable"))
+			gomega.Expect(status).To(gomega.Equal(0))
+
+			status = reconciler.extractHTTPStatus(fmt.Errorf("invalid error format"))
+			gomega.Expect(status).To(gomega.Equal(0))
+		})
+
+		ginkgo.It("should handle malformed status codes", func() {
+			status := reconciler.extractHTTPStatus(fmt.Errorf("GET failed. status: abc url: http://example.com"))
+			gomega.Expect(status).To(gomega.Equal(0))
+
+			status = reconciler.extractHTTPStatus(fmt.Errorf("GET failed. status: url: http://example.com"))
+			gomega.Expect(status).To(gomega.Equal(0))
+		})
+
+		ginkgo.It("should handle liberr.Error with context", func() {
+			// Create a mock liberr.Error with status in context
+			liberrErr := &liberr.Error{
+				Context: []interface{}{"status", 404, "url", "http://example.com"},
+			}
+			status := reconciler.extractHTTPStatus(liberrErr)
+			gomega.Expect(status).To(gomega.Equal(404))
+		})
+	})
+
+	ginkgo.Describe("classifyInventoryError", func() {
+		ginkgo.It("should classify notRetryable HTTP errors correctly", func() {
+			// 401 Unauthorized
+			isNotRetryable, reason := reconciler.classifyInventoryError(fmt.Errorf("GET failed. status: 401 url: http://example.com"))
+			gomega.Expect(isNotRetryable).To(gomega.BeTrue())
+			gomega.Expect(reason).To(gomega.ContainSubstring("authentication/authorization error"))
+
+			// 403 Forbidden
+			isNotRetryable, reason = reconciler.classifyInventoryError(fmt.Errorf("GET failed. status: 403 url: http://example.com"))
+			gomega.Expect(isNotRetryable).To(gomega.BeTrue())
+			gomega.Expect(reason).To(gomega.ContainSubstring("authentication/authorization error"))
+
+			// 400 Bad Request
+			isNotRetryable, reason = reconciler.classifyInventoryError(fmt.Errorf("GET failed. status: 400 url: http://example.com"))
+			gomega.Expect(isNotRetryable).To(gomega.BeTrue())
+			gomega.Expect(reason).To(gomega.ContainSubstring("bad request"))
+
+			// 405 Method Not Allowed
+			isNotRetryable, reason = reconciler.classifyInventoryError(fmt.Errorf("GET failed. status: 405 url: http://example.com"))
+			gomega.Expect(isNotRetryable).To(gomega.BeTrue())
+			gomega.Expect(reason).To(gomega.ContainSubstring("method not allowed"))
+		})
+
+		ginkgo.It("should classify 404 errors based on context", func() {
+			// 404 with "not found" in message - notRetryable
+			isNotRetryable, reason := reconciler.classifyInventoryError(fmt.Errorf("GET failed. status: 404 url: http://example.com - resource not found"))
+			gomega.Expect(isNotRetryable).To(gomega.BeTrue())
+			gomega.Expect(reason).To(gomega.ContainSubstring("resource not found"))
+
+			// 404 without "not found" in message - retryable (service unavailable)
+			isNotRetryable, reason = reconciler.classifyInventoryError(fmt.Errorf("GET failed. status: 404 url: http://example.com"))
+			gomega.Expect(isNotRetryable).To(gomega.BeFalse())
+			gomega.Expect(reason).To(gomega.ContainSubstring("inventory service unavailable"))
+		})
+
+		ginkgo.It("should classify retryable HTTP errors correctly", func() {
+			// 503 Service Unavailable
+			isNotRetryable, reason := reconciler.classifyInventoryError(fmt.Errorf("GET failed. status: 503 url: http://example.com"))
+			gomega.Expect(isNotRetryable).To(gomega.BeFalse())
+			gomega.Expect(reason).To(gomega.ContainSubstring("service unavailable"))
+
+			// 502 Bad Gateway
+			isNotRetryable, reason = reconciler.classifyInventoryError(fmt.Errorf("GET failed. status: 502 url: http://example.com"))
+			gomega.Expect(isNotRetryable).To(gomega.BeFalse())
+			gomega.Expect(reason).To(gomega.ContainSubstring("service unavailable"))
+
+			// 504 Gateway Timeout
+			isNotRetryable, reason = reconciler.classifyInventoryError(fmt.Errorf("GET failed. status: 504 url: http://example.com"))
+			gomega.Expect(isNotRetryable).To(gomega.BeFalse())
+			gomega.Expect(reason).To(gomega.ContainSubstring("service unavailable"))
+
+			// 429 Too Many Requests
+			isNotRetryable, reason = reconciler.classifyInventoryError(fmt.Errorf("GET failed. status: 429 url: http://example.com"))
+			gomega.Expect(isNotRetryable).To(gomega.BeFalse())
+			gomega.Expect(reason).To(gomega.ContainSubstring("rate limited"))
+		})
+
+		ginkgo.It("should classify network errors as retryable", func() {
+			isNotRetryable, reason := reconciler.classifyInventoryError(fmt.Errorf("connection timeout"))
+			gomega.Expect(isNotRetryable).To(gomega.BeFalse())
+			gomega.Expect(reason).To(gomega.ContainSubstring("network connectivity issue"))
+
+			isNotRetryable, reason = reconciler.classifyInventoryError(fmt.Errorf("connection refused"))
+			gomega.Expect(isNotRetryable).To(gomega.BeFalse())
+			gomega.Expect(reason).To(gomega.ContainSubstring("network connectivity issue"))
+
+			isNotRetryable, reason = reconciler.classifyInventoryError(fmt.Errorf("network unreachable"))
+			gomega.Expect(isNotRetryable).To(gomega.BeFalse())
+			gomega.Expect(reason).To(gomega.ContainSubstring("network connectivity issue"))
+		})
+
+		ginkgo.It("should default unknown errors to retryable", func() {
+			isNotRetryable, reason := reconciler.classifyInventoryError(fmt.Errorf("unknown error"))
+			gomega.Expect(isNotRetryable).To(gomega.BeFalse())
+			gomega.Expect(reason).To(gomega.Equal("unknown error, defaulting to retryable"))
+		})
+	})
+
+	ginkgo.Describe("retryWithBackoff", func() {
+		ginkgo.It("should succeed on first attempt", func() {
+			attemptCount := 0
+			operation := func() error {
+				attemptCount++
+				return nil // Success immediately
+			}
+
+			err := reconciler.retryWithBackoff(context.Background(), operation, "test operation")
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(attemptCount).To(gomega.Equal(1))
+		})
+
+		ginkgo.It("should retry with exponential backoff and succeed", func() {
+			attemptCount := 0
+			operation := func() error {
+				attemptCount++
+				if attemptCount < 3 {
+					return fmt.Errorf("temporary network error")
+				}
+				return nil // Success on 3rd attempt
+			}
+
+			err := reconciler.retryWithBackoff(context.Background(), operation, "test operation")
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(attemptCount).To(gomega.Equal(3))
+		})
+
+		ginkgo.It("should not retry notRetryable errors", func() {
+			attemptCount := 0
+			operation := func() error {
+				attemptCount++
+				return fmt.Errorf("GET failed. status: 401 url: http://example.com")
+			}
+
+			err := reconciler.retryWithBackoff(context.Background(), operation, "test operation")
+			gomega.Expect(err).To(gomega.Not(gomega.BeNil()))
+			gomega.Expect(attemptCount).To(gomega.Equal(1)) // Should not retry notRetryable errors
+		})
+
+		ginkgo.It("should exhaust all retries for retryable errors", func() {
+			attemptCount := 0
+			operation := func() error {
+				attemptCount++
+				return fmt.Errorf("temporary network error")
+			}
+
+			err := reconciler.retryWithBackoff(context.Background(), operation, "test operation")
+			gomega.Expect(err).To(gomega.Not(gomega.BeNil()))
+			gomega.Expect(attemptCount).To(gomega.Equal(4)) // MaxRetries + 1 = 4 attempts
+		})
+
+		ginkgo.It("should respect context cancellation", func() {
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel() // Cancel immediately
+
+			attemptCount := 0
+			operation := func() error {
+				attemptCount++
+				return fmt.Errorf("temporary network error")
+			}
+
+			err := reconciler.retryWithBackoff(ctx, operation, "test operation")
+			gomega.Expect(err).To(gomega.Equal(context.Canceled))
+			gomega.Expect(attemptCount).To(gomega.Equal(1)) // Should not retry after cancellation
+		})
+
+		ginkgo.It("should handle context timeout", func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*10)
+			defer cancel()
+
+			attemptCount := 0
+			operation := func() error {
+				attemptCount++
+				time.Sleep(time.Millisecond * 20) // Longer than context timeout
+				return fmt.Errorf("temporary network error")
+			}
+
+			err := reconciler.retryWithBackoff(ctx, operation, "test operation")
+			gomega.Expect(err).To(gomega.Equal(context.DeadlineExceeded))
+		})
+
+		ginkgo.It("should cap delay at MaxDelay", func() {
+			// This test verifies that delay doesn't exceed MaxDelay (30 seconds)
+			// We can't easily test the exact timing, but we can verify the logic
+			attemptCount := 0
+			operation := func() error {
+				attemptCount++
+				return fmt.Errorf("temporary network error")
+			}
+
+			start := time.Now()
+			err := reconciler.retryWithBackoff(context.Background(), operation, "test operation")
+			duration := time.Since(start)
+
+			gomega.Expect(err).To(gomega.Not(gomega.BeNil()))
+			gomega.Expect(attemptCount).To(gomega.Equal(4))
+			// Should take at least 2+4+8+16 = 30 seconds, but not much more
+			gomega.Expect(duration).To(gomega.BeNumerically(">=", time.Second*30))
+			gomega.Expect(duration).To(gomega.BeNumerically("<", time.Second*35)) // Allow some tolerance
+		})
+	})
+})
