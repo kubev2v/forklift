@@ -7625,6 +7625,8 @@ spec:
     name: ova_proxy
   - image: ${VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE}
     name: vsphere_xcopy_volume_populator
+  - image: ${CLI_DOWNLOAD_IMAGE}
+    name: cli_download
   version: ${MTV_VERSION}
 ---
 apiVersion: scorecard.operatorframework.io/v1alpha3

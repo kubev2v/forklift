@@ -695,3 +695,5 @@ spec:
       image: "${OVA_PROXY_IMAGE}"
     - name: vsphere_xcopy_volume_populator
       image: "${VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE}"
+    - name: cli_download
+      image: "${CLI_DOWNLOAD_IMAGE}"
