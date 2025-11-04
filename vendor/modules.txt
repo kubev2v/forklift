@@ -220,7 +220,7 @@ github.com/gophercloud/gophercloud/openstack/networking/v2/networks
 github.com/gophercloud/gophercloud/openstack/networking/v2/subnets
 github.com/gophercloud/gophercloud/openstack/utils
 github.com/gophercloud/gophercloud/pagination
-# github.com/gophercloud/utils v0.0.0-20230418172808-6eab72e966e1
+# github.com/gophercloud/utils v0.0.0-20231010081019-80377eca5d56
 ## explicit; go 1.15
 github.com/gophercloud/utils/env
 github.com/gophercloud/utils/gnocchi
