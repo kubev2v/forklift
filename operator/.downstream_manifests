@@ -7600,35 +7600,6 @@ spec:
   minKubeVersion: 1.27.0
   provider:
     name: Red Hat
-  relatedImages:
-  - image: ${OPERATOR_IMAGE}
-    name: forklift-operator
-  - image: ${CONTROLLER_IMAGE}
-    name: controller
-  - image: ${MUST_GATHER_IMAGE}
-    name: must_gather
-  - image: ${VALIDATION_IMAGE}
-    name: validation
-  - image: ${API_IMAGE}
-    name: api
-  - image: ${POPULATOR_CONTROLLER_IMAGE}
-    name: populator_controller
-  - image: ${OVIRT_POPULATOR_IMAGE}
-    name: rhv_populator
-  - image: ${VIRT_V2V_IMAGE}
-    name: virt_v2v
-  - image: ${OPENSTACK_POPULATOR_IMAGE}
-    name: openstack_populator
-  - image: ${UI_PLUGIN_IMAGE}
-    name: ui_plugin
-  - image: ${OVA_PROVIDER_SERVER_IMAGE}
-    name: ova_provider_server
-  - image: ${OVA_PROXY_IMAGE}
-    name: ova_proxy
-  - image: ${VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE}
-    name: vsphere_xcopy_volume_populator
-  - image: ${CLI_DOWNLOAD_IMAGE}
-    name: cli_download
   version: ${MTV_VERSION}
 ---
 apiVersion: scorecard.operatorframework.io/v1alpha3
