@@ -363,7 +363,9 @@ var _ = Describe("vsphere validation tests", func() {
 			// Critical cases - powered on VMs with tools issues
 			Entry("when VMware Tools are not installed", "tools_not_installed", false, false),
 			Entry("when VMware Tools are not running", "tools_not_running", false, false),
-			Entry("when VMware Tools are unmanaged", "tools_unmanaged", false, false),
+
+			// Unmanaged tools (open-vm-tools) should pass validation
+			Entry("when VMware Tools are unmanaged (open-vm-tools)", "tools_unmanaged", true, false),
 
 			// Encrypted/unknown tools status must block when VM is powered on
 			Entry("when VMware Tools status is empty (encrypted VM) -> block", "tools_status_unknown", false, false),
