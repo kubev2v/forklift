@@ -122,6 +122,15 @@ test-copy-using-cli-infinibox: build
 		--secret-name=populator-secret \
 		--kubeconfig=$$KUBECONFIG
 
+test-copy-using-cli-powerstore: build
+	bin/vsphere-xcopy-volume-populator \
+		--source-vm-id="rhel9" \
+		--source-vmdk="[iscsi1] rhel9/rhel9.vmdk" \
+		--owner-name=test8-rhel9-disk-0-cf5cdf1f  \
+		--target-namespace=default \
+		--storage-vendor-product=powerstore \
+		--secret-name=powerstore-secret \
+		--kubeconfig=$$KUBECONFIG
 .PHONY: vmkfstools-wrapper
 vmkfstools-wrapper:
 	$(MAKE) -C vmkfstools-wrapper build
