@@ -74,6 +74,10 @@ github.com/dell/gopowerstore v1.19.0 h1:iXWqHm2ct3dbLvDnRgzHDb5aCf8Zwx1mToPV6feN
 github.com/dell/gopowerstore v1.19.0/go.mod h1:ZEF/MMMvPk/JdPeKIUGZFXd+AgQxVqCw/NePpV3QcHc=
 github.com/dell/goscaleio v1.20.0 h1:/g0zxlJiGzw5AZEqxjgwaYVc4fmv+DBoAU2PPueZxxE=
 github.com/dell/goscaleio v1.20.0/go.mod h1:XAHq2m2QNJH2l9gu47gQX2m6HjZZlzc1LIa0lrWvSkA=
+github.com/dell/gopowerstore v1.19.0 h1:iXWqHm2ct3dbLvDnRgzHDb5aCf8Zwx1mToPV6feN/H0=
+github.com/dell/gopowerstore v1.19.0/go.mod h1:ZEF/MMMvPk/JdPeKIUGZFXd+AgQxVqCw/NePpV3QcHc=
+github.com/dell/goscaleio v1.20.0 h1:/g0zxlJiGzw5AZEqxjgwaYVc4fmv+DBoAU2PPueZxxE=
+github.com/dell/goscaleio v1.20.0/go.mod h1:XAHq2m2QNJH2l9gu47gQX2m6HjZZlzc1LIa0lrWvSkA=
 github.com/devans10/pugo/flasharray v0.0.0-20241116160615-6bb8c469c9a0 h1:iywqp5xOufeydKSioTnPN8MctrbDmdLjatSHV80j/z8=
 github.com/devans10/pugo/flasharray v0.0.0-20241116160615-6bb8c469c9a0/go.mod h1:7dF4rgfqItyj4bkbwZkwp/Ul+bM4lku/CQvS9OIYF4o=
 github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815/go.mod h1:WwZ+bS3ebgob9U8Nd0kOddGdZWjyMGR8Wziv+TBNwSE=
