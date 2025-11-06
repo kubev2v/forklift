@@ -7,6 +7,7 @@ import (
 
 	"github.com/dell/gopowerstore"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/fcutil"
 	"k8s.io/klog/v2"
 )
 
@@ -80,6 +81,9 @@ func (p *PowerstoreClonner) EnsureClonnerIgroup(initiatorGroup string, adapterId
 			return mappingContext, nil
 		}
 	}
+	// if no host group found or host, create new host group
+	
+
 	host, err := p.Client.GetHostByName(ctx, initiatorGroup)
 	if err != nil {
 		klog.Infof("initiator group %s not found, creating new initiator group", initiatorGroup)
@@ -90,16 +94,19 @@ func (p *PowerstoreClonner) EnsureClonnerIgroup(initiatorGroup string, adapterId
 			if err != nil {
 				return nil, fmt.Errorf("failed to detect port type for adapter %s: %w", a, err)
 			}
+			portName, err := modifyWwnByType(a, pt)
+			if err != nil {
+				return nil, fmt.Errorf("failed to modify WWN by type for adapter %s: %w", a, err)
+			}
 			inits = append(inits, gopowerstore.InitiatorCreateModify{
-				PortName: &a,
+				PortName: &portName,
 				PortType: &pt,
 			})
 		}
-
-		createParams := &gopowerstore.HostCreate{
-			Name:       &initiatorGroup,
-			OsType:     &osType,
-			Initiators: &inits,
+	createParams := &gopowerstore.HostCreate{
+		Name:       &initiatorGroup,
+		OsType:     &osType,
+		Initiators: &inits,
 		}
 
 		createResp, err := p.Client.CreateHost(ctx, createParams)
@@ -117,50 +124,7 @@ func (p *PowerstoreClonner) EnsureClonnerIgroup(initiatorGroup string, adapterId
 		klog.Infof("Found existing initiator group %s with ID %s", initiatorGroup, host.ID)
 	}
 
-	// Step 2: Add initiators (adapter IDs) to the host
-	atLeastOneAdded := false
 
-	for _, adapterId := range adapterIds {
-		portType, err := detectPortType(adapterId)
-		if err != nil {
-			return nil, fmt.Errorf("failed to detect port type for adapter %s: %w", adapterId, err)
-		}
-		klog.Infof("Processing adapter %s with type %s", adapterId, portType)
-
-		// Check if initiator already exists on this host
-		found := false
-		for _, initiator := range host.Initiators {
-			if initiator.PortName == adapterId {
-				klog.Infof("Initiator %s already exists on initiator group %s", adapterId, initiatorGroup)
-				found = true
-				atLeastOneAdded = true
-				break
-			}
-		}
-
-		if !found {
-			modifyParams := &gopowerstore.HostModify{
-				AddInitiators: &[]gopowerstore.InitiatorCreateModify{
-					{
-						PortName: &adapterId,
-						PortType: &portType,
-					},
-				},
-			}
-
-			_, err = p.Client.ModifyHost(ctx, modifyParams, host.ID)
-			if err != nil {
-				klog.Warningf("Failed to add initiator %s to initiator group %s: %s", adapterId, initiatorGroup, err)
-				continue
-			}
-			klog.Infof("Successfully added initiator %s with port-type %s to initiator-group %s", adapterId, portType, initiatorGroup)
-			atLeastOneAdded = true
-		}
-	}
-
-	if !atLeastOneAdded {
-		return nil, fmt.Errorf("failed to add any adapters to initiator group %s", initiatorGroup)
-	}
 
 	mappingContext = createMappingContext(&host, initiatorGroup)
 
@@ -168,12 +132,39 @@ func (p *PowerstoreClonner) EnsureClonnerIgroup(initiatorGroup string, adapterId
 	return mappingContext, nil
 }
 
+
+
+func modifyWwnByType(adapterId string , portType gopowerstore.InitiatorProtocolTypeEnum) (string, error) {
+	switch portType {
+	case gopowerstore.InitiatorProtocolTypeEnumISCSI:
+		return adapterId, nil
+	case gopowerstore.InitiatorProtocolTypeEnumFC:
+		wwpn, err := fcutil.ExtractAndFormatWWPN(adapterId)
+		if err != nil {
+			return "", fmt.Errorf("failed to extract and format WWPN for adapter %s: %w", adapterId, err)
+		}
+		return wwpn, nil
+	case gopowerstore.InitiatorProtocolTypeEnumNVME:
+		return adapterId, nil
+	}
+	return "", fmt.Errorf("invalid port type: %s", portType)
+}
+
+
 func getHostByInitiator(adapterIds []string, hosts *[]gopowerstore.Host, initiatorGroup string) (bool, populator.MappingContext, error) {
 	for _, host := range *hosts {
 		for _, initiator := range host.Initiators {
 			for _, adapterId := range adapterIds {
-				if initiator.PortName == adapterId {
-					klog.Infof("Found existing initiator group %s with ID %s name %s", initiatorGroup, host.ID, host.Name)
+				portType, err := detectPortType(adapterId)
+				if err != nil {
+					return false, populator.MappingContext{}, fmt.Errorf("failed to detect port type for adapter %s: %w", adapterId, err)
+				}
+				formattedAdapterId, err := modifyWwnByType(adapterId, portType)
+				if err != nil {
+					return false, populator.MappingContext{}, fmt.Errorf("failed to modify WWN by type for adapter %s: %w", adapterId, err)
+				}
+				if initiator.PortName == formattedAdapterId {
+					klog.Infof("Found existing initiator group %s with ID %s name %s port name %s", initiatorGroup, host.ID, host.Name, initiator.PortName)
 					mappingContext := createMappingContext(&host, initiatorGroup)
 					return true, mappingContext, nil
 				}
