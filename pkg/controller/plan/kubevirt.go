@@ -1453,17 +1453,25 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 		}
 	}
 
+	if r.Plan.IsWarm() {
+		if r.Builder.SupportsVolumePopulators() {
+			// For storage offload, tie DataVolume to pre-imported PVC
+			annotations[planbase.AnnAllowClaimAdoption] = "true"
+			annotations[planbase.AnnPrePopulated] = "true"
+		} else {
+			// For warm migrations that use traditional  (ImageIO, VDDK) import sources (not populators),
+			// explicitly disable CDI's populator auto-detection to avoid webhook validation errors
+			annotations[planbase.AnnUsePopulator] = "false"
+		}
+	}
+
 	if r.Plan.IsWarm() || !r.Destination.Provider.IsHost() || r.Plan.IsSourceProviderOCP() {
 		// Set annotation for WFFC storage classes. Note that we create data volumes while
 		// running a cold migration to the local cluster only when the source is either OpenShift
 		// or vSphere, and in the latter case the conversion pod acts as the first-consumer
 		annotations[planbase.AnnBindImmediate] = "true"
 	}
-	if r.Plan.IsWarm() && r.Builder.SupportsVolumePopulators() {
-		// For storage offload, tie DataVolume to pre-imported PVC
-		annotations[planbase.AnnAllowClaimAdoption] = "true"
-		annotations[planbase.AnnPrePopulated] = "true"
-	}
+
 	// Do not delete the DV when the import completes as we check the DV to get the current
 	// disk transfer status.
 	annotations[AnnDeleteAfterCompletion] = "false"

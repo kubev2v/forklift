@@ -2,6 +2,7 @@ package ovirt
 
 import (
 	"context"
+	"encoding/pem"
 	"fmt"
 	"net/url"
 	"path"
@@ -11,12 +12,14 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	"github.com/kubev2v/forklift/pkg/controller/base"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	utils "github.com/kubev2v/forklift/pkg/controller/plan/util"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/ovirt"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
+	util "github.com/kubev2v/forklift/pkg/lib/util"
 	"github.com/kubev2v/forklift/pkg/settings"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -120,8 +123,56 @@ type Builder struct {
 
 // Create DataVolume certificate configmap.
 func (r *Builder) ConfigMap(_ ref.Ref, in *core.Secret, object *core.ConfigMap) (err error) {
-	object.BinaryData["ca.pem"] = in.Data["cacert"]
+	// For CNV 4.21+, ConfigMap is only needed in secure mode (when insecureSkipVerify is not used).
+	// For CNV < 4.21, ConfigMap is required even in insecure mode as a fallback,
+	// since the InsecureSkipVerify field is not supported.
+	if cacert, exists := in.Data["cacert"]; exists && len(cacert) > 0 {
+		object.BinaryData["ca.pem"] = cacert
+	} else {
+		// If no CA cert provided, try to fetch it from the oVirt engine.
+		// This is needed for CNV < 4.21 when insecure mode is enabled but
+		// InsecureSkipVerify field is not supported.
+		cacert, err = r.fetchOVirtCACert()
+		if err != nil {
+			r.Log.Error(err, "Failed to fetch CA certificate from oVirt engine")
+			// Don't return error - let migration proceed and fail with clear error if cert is actually needed
+			err = nil
+		} else if len(cacert) > 0 {
+			object.BinaryData["ca.pem"] = cacert
+		}
+	}
 	return
+}
+
+// Fetches the CA certificate from the oVirt engine URL.
+// This is needed for CNV < 4.21 in insecure mode as a fallback when InsecureSkipVerify field is not supported.
+func (r *Builder) fetchOVirtCACert() (cert []byte, err error) {
+	engineURL := r.Source.Provider.Spec.URL
+	parsedURL, err := url.Parse(engineURL)
+	if err != nil {
+		return nil, liberr.Wrap(err, "failed to parse oVirt engine URL", "url", engineURL)
+	}
+
+	tempSecret := &core.Secret{
+		Data: map[string][]byte{
+			"insecureSkipVerify": []byte("true"),
+		},
+	}
+
+	cacert, err := util.GetTlsCertificate(parsedURL, tempSecret)
+	if err != nil {
+		return nil, liberr.Wrap(err, "failed to fetch certificate from oVirt engine")
+	}
+	if cacert == nil {
+		return nil, liberr.New("no certificate returned from oVirt engine")
+	}
+
+	certPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: cacert.Raw,
+	})
+
+	return certPEM, nil
 }
 
 func (r *Builder) PodEnvironment(_ ref.Ref, _ *core.Secret) (env []core.EnvVar, err error) {
@@ -162,14 +213,27 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 				if da.Disk.ActualSize > size {
 					size = da.Disk.ActualSize
 				}
+
+				insecure := base.GetInsecureSkipVerifyFlag(r.Source.Secret)
+
+				imageioSource := &cdi.DataVolumeSourceImageIO{
+					URL:       url,
+					DiskID:    da.Disk.ID,
+					SecretRef: secret.Name,
+				}
+
+				if insecure && settings.Settings.InsecureSkipVerifySupported {
+					// CNV 4.21+: Use CDI's insecureSkipVerify field to skip TLS verification
+					imageioSource.InsecureSkipVerify = &insecure
+				} else {
+					// CNV < 4.21 or secure mode: Use ConfigMap with CA cert
+					// For older CNV versions with insecure flag, fall back to using CA cert
+					// since InsecureSkipVerify field is not supported
+					imageioSource.CertConfigMap = configMap.Name
+				}
 				dvSpec := cdi.DataVolumeSpec{
 					Source: &cdi.DataVolumeSource{
-						Imageio: &cdi.DataVolumeSourceImageIO{
-							URL:           url,
-							DiskID:        da.Disk.ID,
-							SecretRef:     secret.Name,
-							CertConfigMap: configMap.Name,
-						},
+						Imageio: imageioSource,
 					},
 					Storage: &cdi.StorageSpec{
 						Resources: core.VolumeResourceRequirements{
