@@ -45,6 +45,7 @@ const (
 	MigrationTypeNotValid           = "MigrationTypeNotValid"
 	NamespaceNotValid               = "NamespaceNotValid"
 	TransferNetNotValid             = "TransferNetworkNotValid"
+	TransferNetMissingDefaultRoute  = "TransferNetworkMissingDefaultRoute"
 	NetRefNotValid                  = "NetworkMapRefNotValid"
 	NetMapNotReady                  = "NetworkMapNotReady"
 	NetMapPreservingIPsOnPodNetwork = "NetMapPreservingIPsOnPodNetwork"
@@ -1213,6 +1214,13 @@ func (r *Reconciler) validateTransferNetwork(plan *api.Plan) (err error) {
 		Reason:   NotValid,
 		Message:  "Transfer network default route annotation is not a valid IP address.",
 	}
+	missingDefaultRoute := libcnd.Condition{
+		Type:     TransferNetMissingDefaultRoute,
+		Status:   True,
+		Category: api.CategoryWarn,
+		Reason:   NotValid,
+		Message:  "Transfer network missing default route annotation.",
+	}
 	key := client.ObjectKey{
 		Namespace: plan.Spec.TransferNetwork.Namespace,
 		Name:      plan.Spec.TransferNetwork.Name,
@@ -1230,6 +1238,7 @@ func (r *Reconciler) validateTransferNetwork(plan *api.Plan) (err error) {
 	}
 	route, found := netAttachDef.Annotations[AnnForkliftNetworkRoute]
 	if !found {
+		plan.Status.SetCondition(missingDefaultRoute)
 		return
 	}
 	ip := net.ParseIP(route)
