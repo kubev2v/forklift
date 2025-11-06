@@ -77,3 +77,6 @@ operator/streams/**/downstream_manifests
 
 # passwords directories
 .passwords/
+
+.gemini/
+gha-creds-*.json
