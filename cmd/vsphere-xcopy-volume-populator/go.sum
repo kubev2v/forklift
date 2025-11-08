@@ -74,10 +74,6 @@ github.com/dell/gopowerstore v1.19.0 h1:iXWqHm2ct3dbLvDnRgzHDb5aCf8Zwx1mToPV6feN
 github.com/dell/gopowerstore v1.19.0/go.mod h1:ZEF/MMMvPk/JdPeKIUGZFXd+AgQxVqCw/NePpV3QcHc=
 github.com/dell/goscaleio v1.20.0 h1:/g0zxlJiGzw5AZEqxjgwaYVc4fmv+DBoAU2PPueZxxE=
 github.com/dell/goscaleio v1.20.0/go.mod h1:XAHq2m2QNJH2l9gu47gQX2m6HjZZlzc1LIa0lrWvSkA=
-github.com/dell/gopowerstore v1.19.0 h1:iXWqHm2ct3dbLvDnRgzHDb5aCf8Zwx1mToPV6feN/H0=
-github.com/dell/gopowerstore v1.19.0/go.mod h1:ZEF/MMMvPk/JdPeKIUGZFXd+AgQxVqCw/NePpV3QcHc=
-github.com/dell/goscaleio v1.20.0 h1:/g0zxlJiGzw5AZEqxjgwaYVc4fmv+DBoAU2PPueZxxE=
-github.com/dell/goscaleio v1.20.0/go.mod h1:XAHq2m2QNJH2l9gu47gQX2m6HjZZlzc1LIa0lrWvSkA=
 github.com/devans10/pugo/flasharray v0.0.0-20241116160615-6bb8c469c9a0 h1:iywqp5xOufeydKSioTnPN8MctrbDmdLjatSHV80j/z8=
 github.com/devans10/pugo/flasharray v0.0.0-20241116160615-6bb8c469c9a0/go.mod h1:7dF4rgfqItyj4bkbwZkwp/Ul+bM4lku/CQvS9OIYF4o=
 github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815/go.mod h1:WwZ+bS3ebgob9U8Nd0kOddGdZWjyMGR8Wziv+TBNwSE=
@@ -443,12 +439,12 @@ golang.org/x/sys v0.0.0-20220209214540-3681064d5158/go.mod h1:oPkhp1MJrh7nUepCBc
 golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.2.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.10.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
-golang.org/x/sys v0.36.0 h1:KVRy2GtZBrk1cBYA7MKu5bEZFxQk4NIDV6RLVcC8o0k=
-golang.org/x/sys v0.36.0/go.mod h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks=
+golang.org/x/sys v0.37.0 h1:fdNQudmxPjkdUTPnLn5mdQv7Zwvbvpaxqs831goi9kQ=
+golang.org/x/sys v0.37.0/go.mod h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks=
 golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1/go.mod h1:bj7SfCRtBDWHUb9snDiAeCFNEtKQo2Wmx5Cou7ajbmo=
 golang.org/x/term v0.0.0-20210927222741-03fcf44c2211/go.mod h1:jbD1KX2456YbFQfuXm/mYQcufACuNUgVhRMnK/tPxf8=
-golang.org/x/term v0.34.0 h1:O/2T7POpk0ZZ7MAzMeWFSg6S5IpWd/RXDlM9hgM3DR4=
-golang.org/x/term v0.34.0/go.mod h1:5jC53AEywhIVebHgPVeg0mj8OD3VO9OzclacVrqpaAw=
+golang.org/x/term v0.36.0 h1:zMPR+aF8gfksFprF/Nc/rd1wRS1EI6nDBGyWAvDzx2Q=
+golang.org/x/term v0.36.0/go.mod h1:Qu394IJq6V6dCBRgwqshf3mPF85AqzYEzofzRdZkWss=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/text v0.3.2/go.mod h1:bEr9sfX3Q8Zfm5fL9x+3itogRgK3+ptLWKqgva+5dAk=
 golang.org/x/text v0.3.3/go.mod h1:5Zoc/QRtKVWzQhOtBMvqHzDpF6irO9z98xDceosuGiQ=
