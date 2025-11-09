@@ -45,6 +45,7 @@ import (
 	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
 	instancetypeapi "kubevirt.io/api/instancetype"
 	instancetype "kubevirt.io/api/instancetype/v1beta1"
@@ -909,13 +910,19 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) (er
 		})
 	}
 	nonRoot := true
-	var user *int64
 	allowPrivilageEscalation := false
-	
+	securityContext := &core.SecurityContext{
+		AllowPrivilegeEscalation: &allowPrivilageEscalation,
+		RunAsNonRoot:             &nonRoot,
+		Capabilities: &core.Capabilities{
+			Drop: []core.Capability{"ALL"},
+		},
+	}
+
 	// Only set user ID when MTV controller runs on Kubernetes
 	// When MTV controller runs on OpenShift, SCCs will assign appropriate IDs automatically
 	if !Settings.OpenShift {
-		user = &qemuUser
+		securityContext.RunAsUser = ptr.To(qemuUser)
 	}
 	pod := &core.Pod{
 		ObjectMeta: meta.ObjectMeta{
@@ -942,14 +949,7 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) (er
 							core.ResourceMemory: resource.MustParse(Settings.Migration.VirtV2vContainerLimitsMemory),
 						},
 					},
-					SecurityContext: &core.SecurityContext{
-						AllowPrivilegeEscalation: &allowPrivilageEscalation,
-						RunAsNonRoot:             &nonRoot,
-						RunAsUser:                user,
-						Capabilities: &core.Capabilities{
-							Drop: []core.Capability{"ALL"},
-						},
-					},
+					SecurityContext: securityContext,
 				},
 			},
 			Volumes: volumes,
@@ -1995,17 +1995,8 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 	}
 
 	// qemu group
-	var fsGroup *int64
-	var user *int64
 	nonRoot := true
 	allowPrivilageEscalation := false
-	
-	// Only set user/group IDs when MTV controller runs on Kubernetes
-	// When MTV controller runs on OpenShift, SCCs will assign appropriate IDs automatically
-	if !Settings.OpenShift {
-		fsGroup = &qemuGroup
-		user = &qemuUser
-	}
 	// virt-v2v image
 	useV2vForTransfer, vErr := r.Context.Plan.ShouldUseV2vForTransfer()
 	if vErr != nil {
@@ -2124,6 +2115,18 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 		}
 	}
 
+	psc := &core.PodSecurityContext{
+		RunAsNonRoot:   &nonRoot,
+		SeccompProfile: &seccompProfile,
+	}
+
+	// Only set user/group IDs when MTV controller runs on Kubernetes
+	// When MTV controller runs on OpenShift, SCCs will assign appropriate IDs automatically
+	if !Settings.OpenShift {
+		psc.FSGroup = ptr.To(qemuGroup)
+		psc.RunAsUser = ptr.To(qemuUser)
+	}
+
 	var podName string
 	var containerName string
 	// pod labels - start with user-defined labels, then system conversion labels override them
@@ -2181,16 +2184,11 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 			GenerateName: podName,
 		},
 		Spec: core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				FSGroup:        fsGroup,
-				RunAsUser:      user,
-				RunAsNonRoot:   &nonRoot,
-				SeccompProfile: &seccompProfile,
-			},
-			NodeSelector:   podNodeSelector,
-			Affinity:       r.getConvertorAffinity(),
-			RestartPolicy:  core.RestartPolicyNever,
-			InitContainers: initContainers,
+			SecurityContext: psc,
+			NodeSelector:    podNodeSelector,
+			Affinity:        r.getConvertorAffinity(),
+			RestartPolicy:   core.RestartPolicyNever,
+			InitContainers:  initContainers,
 			Containers: []core.Container{
 				{
 					Name:            containerName,
