@@ -13,6 +13,7 @@ type DeleteHostInput struct {
 	HostName  string `json:"host_name,omitempty"`
 	Namespace string `json:"namespace,omitempty"`
 	AllHosts  bool   `json:"all_hosts,omitempty"`
+	DryRun    bool   `json:"dry_run,omitempty"`
 }
 
 // GetDeleteHostTool returns the tool definition
@@ -25,6 +26,7 @@ func GetDeleteHostTool() *mcp.Tool {
 
     Args:
         host_name: Name of the host to delete (required unless all_hosts=True)
+        dry_run: If true, shows the kubectl-mtv command instead of executing it (educational mode) (optional, default: false)
         namespace: Kubernetes namespace containing the host (optional)
         all_hosts: Delete all hosts in the namespace (optional)
 
@@ -41,6 +43,11 @@ func GetDeleteHostTool() *mcp.Tool {
 }
 
 func HandleDeleteHost(ctx context.Context, req *mcp.CallToolRequest, input DeleteHostInput) (*mcp.CallToolResult, any, error) {
+	// Enable dry run mode if requested
+	if input.DryRun {
+		ctx = mtvmcp.WithDryRun(ctx, true)
+	}
+
 	args := []string{"delete", "host"}
 
 	if input.AllHosts {
@@ -56,7 +63,7 @@ func HandleDeleteHost(ctx context.Context, req *mcp.CallToolRequest, input Delet
 		args = append(args, "-n", input.Namespace)
 	}
 
-	result, err := mtvmcp.RunKubectlMTVCommand(args)
+	result, err := mtvmcp.RunKubectlMTVCommand(ctx, args)
 	if err != nil {
 		return nil, "", err
 	}

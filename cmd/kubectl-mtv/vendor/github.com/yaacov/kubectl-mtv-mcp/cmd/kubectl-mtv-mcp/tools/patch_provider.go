@@ -25,6 +25,7 @@ type PatchProviderInput struct {
 	ProviderDomainName     string `json:"provider_domain_name,omitempty"`
 	ProviderProjectName    string `json:"provider_project_name,omitempty"`
 	ProviderRegionName     string `json:"provider_region_name,omitempty"`
+	DryRun                 bool   `json:"dry_run,omitempty"`
 }
 
 // GetPatchProviderTool returns the tool definition
@@ -86,6 +87,11 @@ func GetPatchProviderTool() *mcp.Tool {
 }
 
 func HandlePatchProvider(ctx context.Context, req *mcp.CallToolRequest, input PatchProviderInput) (*mcp.CallToolResult, any, error) {
+	// Enable dry run mode if requested
+	if input.DryRun {
+		ctx = mtvmcp.WithDryRun(ctx, true)
+	}
+
 	// Validate required parameters
 	if err := mtvmcp.ValidateRequiredParams(map[string]string{
 		"provider_name": input.ProviderName,
@@ -142,7 +148,7 @@ func HandlePatchProvider(ctx context.Context, req *mcp.CallToolRequest, input Pa
 		args = append(args, "--provider-region-name", input.ProviderRegionName)
 	}
 
-	result, err := mtvmcp.RunKubectlMTVCommand(args)
+	result, err := mtvmcp.RunKubectlMTVCommand(ctx, args)
 	if err != nil {
 		return nil, "", err
 	}
