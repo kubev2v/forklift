@@ -49,6 +49,11 @@ type IPEntry struct {
 	DNS          []string
 }
 
+type ScriptMatch struct {
+	Path   string
+	Groups []string
+}
+
 func formatIPs(ips []IPEntry) string {
 	var b strings.Builder
 	b.WriteString("(\n")
@@ -327,26 +332,34 @@ func (c *Customize) addWinDynamicScripts(cmdBuilder utils.CommandBuilder, dir st
 		return err
 	}
 	for _, script := range dynamicScripts {
-		fmt.Printf("Adding windows dynamic scripts '%s'\n", script)
-		upload := c.formatUpload(script, filepath.Join(WinFirstbootScriptsPath, filepath.Base(script)))
+		fmt.Printf("Adding windows dynamic scripts '%s'\n", script.Path)
+		upload := c.formatUpload(script.Path, filepath.Join(WinFirstbootScriptsPath, filepath.Base(script.Path)))
 		cmdBuilder.AddArg(UploadCmd, upload)
 	}
 	return nil
 }
 
-// getScriptsWithRegex retrieves all scripts with suffix from the specified directory
-func (c *Customize) getScriptsWithRegex(directory string, regex string) ([]string, error) {
+// getScriptsWithRegex retrieves all scripts matching the regex from the specified directory
+// and returns both the script paths and their regex match groups
+func (c *Customize) getScriptsWithRegex(directory string, regex string) ([]ScriptMatch, error) {
 	files, err := c.fileSystem.ReadDir(directory)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read scripts directory: %w", err)
 	}
 
 	r := regexp.MustCompile(regex)
-	var scripts []string
+	var scripts []ScriptMatch
 	for _, file := range files {
-		if !file.IsDir() && r.MatchString(file.Name()) {
+		if file.IsDir() {
+			continue
+		}
+		groups := r.FindStringSubmatch(file.Name())
+		if groups != nil {
 			scriptPath := filepath.Join(directory, file.Name())
-			scripts = append(scripts, scriptPath)
+			scripts = append(scripts, ScriptMatch{
+				Path:   scriptPath,
+				Groups: groups,
+			})
 		}
 	}
 	return scripts, nil
@@ -470,12 +483,10 @@ func (c *Customize) addRhelDynamicScripts(cmdBuilder utils.CommandBuilder, dir s
 		return err
 	}
 	for _, script := range dynamicScripts {
-		fmt.Printf("Adding linux dynamic scripts '%s'\n", script)
-		r := regexp.MustCompile(LinuxDynamicRegex)
-		groups := r.FindStringSubmatch(filepath.Base(script))
+		fmt.Printf("Adding linux dynamic scripts '%s'\n", script.Path)
 		// Option from the second regex group `(run|firstboot)`
-		action := groups[2]
-		cmdBuilder.AddArg(action, script)
+		action := script.Groups[2]
+		cmdBuilder.AddArg(action, script.Path)
 	}
 	return nil
 }
