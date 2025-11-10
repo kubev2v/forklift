@@ -281,11 +281,6 @@
         state: "{{ cli_download_state }}"
         definition: "{{ lookup('template', 'cli-download/console-cli-download-kubectl-mtv.yml.j2') }}"
 
-    - name: "Setup ConsoleCLIDownload for kubectl-mtv MCP"
-      k8s:
-        state: "{{ cli_download_state }}"
-        definition: "{{ lookup('template', 'cli-download/console-cli-download-mcp.yml.j2') }}"
-
   - name: "Create controller service-account token Secret for download vddk tar"
     k8s:
       state: present

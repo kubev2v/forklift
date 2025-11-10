@@ -46,7 +46,8 @@ RUN mkdir -p /usr/lib64/guestfs/appliance && \
 # This prevents libvirt from attempting to create files in the root directory,
 # which would lead to permission errors.
 # Refer to: https://issues.redhat.com/browse/RHEL-105490
-RUN mkdir /home/qemu && chown qemu:qemu /home/qemu
+RUN mkdir -p /home/qemu/.cache/libvirt && \
+    chown -R qemu:qemu /home/qemu
 ENV HOME=/home/qemu
 
 # The 'virt-v2v' tool can hang when destroying libguestfs domains due to the

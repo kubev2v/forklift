@@ -85,6 +85,12 @@ func (r *Validator) VMMigrationType(vmRef ref.Ref) (ok bool, err error) {
 	return
 }
 
+// NO-OP
+func (r *Validator) GuestToolsInstalled(vmRef ref.Ref) (ok bool, err error) {
+	ok = true
+	return
+}
+
 // MaintenanceMode implements base.Validator
 func (r *Validator) MaintenanceMode(vmRef ref.Ref) (bool, error) {
 	return true, nil

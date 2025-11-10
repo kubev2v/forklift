@@ -1,8 +1,0 @@
-config/test-config.env
-logs/
-vm_info_*.env
-*.env
-ansible/*.retry
-config/*.pem
-config/*.key
-config/*.crt

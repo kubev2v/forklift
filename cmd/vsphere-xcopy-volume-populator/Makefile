@@ -83,12 +83,14 @@ test-copy-using-cli-pureflasharray: build
 	bin/vsphere-xcopy-volume-populator \
 		--source-vm-id="vm-67218" \
 		--source-vmdk="[eco-iscsi-pure] vm-6/vm-6.vmdk" \
-		--owner-name=test-pure-vm-6-22ab1d65 \
-		--owner-uid=test-pure-vm-6-22ab1d65 \
+		--owner-name=test-vm-6 \
+		--owner-uid=test-vm-6 \
 		--target-namespace=default \
 		--storage-vendor-product=pureFlashArray \
 		--secret-name=populator-secret \
-		--kubeconfig=$$KUBECONFIG
+		--kubeconfig=$$KUBECONFIG \
+		--esxi-clone-method=ssh
+
 
 test-copy-using-cli-powerflex: build
 	GOSCALEIO_DEBUG=1 bin/vsphere-xcopy-volume-populator \
@@ -120,6 +122,15 @@ test-copy-using-cli-infinibox: build
 		--secret-name=populator-secret \
 		--kubeconfig=$$KUBECONFIG
 
+test-copy-using-cli-powerstore: build
+	bin/vsphere-xcopy-volume-populator \
+		--source-vm-id="rhel9" \
+		--source-vmdk="[iscsi1] rhel9/rhel9.vmdk" \
+		--owner-name=test8-rhel9-disk-0-cf5cdf1f  \
+		--target-namespace=default \
+		--storage-vendor-product=powerstore \
+		--secret-name=powerstore-secret \
+		--kubeconfig=$$KUBECONFIG
 .PHONY: vmkfstools-wrapper
 vmkfstools-wrapper:
 	$(MAKE) -C vmkfstools-wrapper build
