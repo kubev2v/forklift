@@ -16,6 +16,7 @@ type CreateHookInput struct {
 	ServiceAccount string `json:"service_account,omitempty"`
 	Playbook       string `json:"playbook,omitempty"`
 	Deadline       int    `json:"deadline,omitempty"`
+	DryRun         bool   `json:"dry_run,omitempty"`
 }
 
 // GetCreateHookTool returns the tool definition
@@ -39,6 +40,7 @@ func GetCreateHookTool() *mcp.Tool {
 
     Args:
         hook_name: Name for the new migration hook (required)
+        dry_run: If true, shows the kubectl-mtv command instead of executing it (educational mode) (optional, default: false)
         image: Container image URL to run (optional, default: quay.io/kubev2v/hook-runner)
         namespace: Kubernetes namespace to create the hook in (optional)
         service_account: Service account to use for the hook (optional)
@@ -65,6 +67,11 @@ func GetCreateHookTool() *mcp.Tool {
 }
 
 func HandleCreateHook(ctx context.Context, req *mcp.CallToolRequest, input CreateHookInput) (*mcp.CallToolResult, any, error) {
+	// Enable dry run mode if requested
+	if input.DryRun {
+		ctx = mtvmcp.WithDryRun(ctx, true)
+	}
+
 	// Validate required parameters
 	if err := mtvmcp.ValidateRequiredParams(map[string]string{
 		"hook_name": input.HookName,
@@ -92,7 +99,7 @@ func HandleCreateHook(ctx context.Context, req *mcp.CallToolRequest, input Creat
 		args = append(args, "--deadline", fmt.Sprintf("%d", input.Deadline))
 	}
 
-	result, err := mtvmcp.RunKubectlMTVCommand(args)
+	result, err := mtvmcp.RunKubectlMTVCommand(ctx, args)
 	if err != nil {
 		return nil, "", err
 	}

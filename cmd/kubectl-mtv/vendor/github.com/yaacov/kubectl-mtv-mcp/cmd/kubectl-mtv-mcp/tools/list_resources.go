@@ -14,6 +14,7 @@ type ListResourcesInput struct {
 	Namespace     string `json:"namespace,omitempty" jsonschema:"Kubernetes namespace to query (optional, defaults to current namespace)"`
 	AllNamespaces bool   `json:"all_namespaces,omitempty" jsonschema:"List resources across all namespaces"`
 	InventoryURL  string `json:"inventory_url,omitempty" jsonschema:"Base URL for inventory service (optional, only used for provider listings to fetch inventory counts)"`
+	DryRun        bool   `json:"dry_run,omitempty" jsonschema:"If true, shows commands instead of executing (educational mode)"`
 }
 
 // GetListResourcesTool returns the tool definition
@@ -24,6 +25,8 @@ func GetListResourcesTool() *mcp.Tool {
 
     Unified tool to list various MTV resource types including providers, plans, mappings, hosts, and hooks.
     This consolidates multiple list operations into a single efficient tool.
+
+    Dry Run Mode: Set dry_run=true to see the command without executing (useful for teaching users)
 
     Args:
         resource_type: Type of resource to list - 'provider', 'plan', 'mapping', 'host', or 'hook'
@@ -50,6 +53,11 @@ func GetListResourcesTool() *mcp.Tool {
 }
 
 func HandleListResources(ctx context.Context, req *mcp.CallToolRequest, input ListResourcesInput) (*mcp.CallToolResult, any, error) {
+	// Enable dry run mode if requested
+	if input.DryRun {
+		ctx = mtvmcp.WithDryRun(ctx, true)
+	}
+
 	args := []string{"get"}
 
 	// Validate resource type
@@ -72,7 +80,7 @@ func HandleListResources(ctx context.Context, req *mcp.CallToolRequest, input Li
 		args = append(args, "--inventory-url", input.InventoryURL)
 	}
 
-	result, err := mtvmcp.RunKubectlMTVCommand(args)
+	result, err := mtvmcp.RunKubectlMTVCommand(ctx, args)
 	if err != nil {
 		return nil, "", err
 	}

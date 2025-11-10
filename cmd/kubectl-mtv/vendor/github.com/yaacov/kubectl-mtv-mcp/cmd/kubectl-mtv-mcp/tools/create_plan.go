@@ -56,6 +56,7 @@ type CreatePlanInput struct {
 	ConvertorLabels                string `json:"convertor_labels,omitempty"`
 	ConvertorNodeSelector          string `json:"convertor_node_selector,omitempty"`
 	ConvertorAffinity              string `json:"convertor_affinity,omitempty"`
+	DryRun                         bool   `json:"dry_run,omitempty"`
 }
 
 // GetCreatePlanTool returns the tool definition
@@ -66,6 +67,12 @@ func GetCreatePlanTool() *mcp.Tool {
 
     Migration plans define which VMs to migrate and all the configuration for how they should be migrated.
     Plans coordinate providers, mappings, VM selection, and migration behavior.
+
+    Dry Run Mode (Educational):
+    - Set dry_run=true to see the kubectl-mtv command without executing it
+    - Use this to teach users how to perform tasks themselves in the terminal
+    - Returns the exact command that would be executed with all parameters
+    - Useful when users want to learn the CLI instead of having you execute operations
 
     Automatic Behaviors:
     - Target provider: If not specified, uses first available OpenShift provider automatically
@@ -238,6 +245,7 @@ func GetCreatePlanTool() *mcp.Tool {
     Args:
         plan_name: Name for the new migration plan (required)
         source_provider: Name of the source provider to migrate from (required). Supports namespace/name pattern (e.g., 'other-namespace/my-provider') to reference providers in different namespaces, defaults to plan namespace if not specified.
+        dry_run: If true, shows the kubectl-mtv command instead of executing it (educational mode) (optional, default: false)
         namespace: Kubernetes namespace to create the plan in (optional)
         target_provider: Name of the target provider to migrate to (optional, auto-detects first OpenShift provider if not specified). Supports namespace/name pattern (e.g., 'other-namespace/my-provider') to reference providers in different namespaces, defaults to plan namespace if not specified.
         network_mapping: Name of existing network mapping to use (optional, auto-created if not provided)
@@ -384,6 +392,11 @@ func GetCreatePlanTool() *mcp.Tool {
 }
 
 func HandleCreatePlan(ctx context.Context, req *mcp.CallToolRequest, input CreatePlanInput) (*mcp.CallToolResult, any, error) {
+	// Enable dry run mode if requested
+	if input.DryRun {
+		ctx = mtvmcp.WithDryRun(ctx, true)
+	}
+
 	// Validate required parameters
 	if err := mtvmcp.ValidateRequiredParams(map[string]string{
 		"plan_name":       input.PlanName,
@@ -555,7 +568,7 @@ func HandleCreatePlan(ctx context.Context, req *mcp.CallToolRequest, input Creat
 		args = append(args, "--convertor-affinity", input.ConvertorAffinity)
 	}
 
-	result, err := mtvmcp.RunKubectlMTVCommand(args)
+	result, err := mtvmcp.RunKubectlMTVCommand(ctx, args)
 	if err != nil {
 		return nil, "", err
 	}
