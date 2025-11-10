@@ -914,6 +914,33 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) (er
 	if len(pvcNames) == 0 {
 		return
 	}
+
+	// Check if a consumer pod already exists for this VM
+	// This prevents creating duplicate pods on repeated reconciliation
+	podList := &core.PodList{}
+	err = r.Client.List(
+		context.TODO(),
+		podList,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(r.consumerLabels(vm.Ref, false)),
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// If a consumer pod already exists and is not failed/succeeded, don't create another
+	for _, pod := range podList.Items {
+		if pod.Status.Phase != core.PodFailed && pod.Status.Phase != core.PodSucceeded {
+			r.Log.V(1).Info(
+				"Consumer pod already exists, skipping creation.",
+				"pod", pod.Name,
+				"phase", pod.Status.Phase)
+			return nil
+		}
+	}
+
 	volumes := []core.Volume{}
 	for _, pvcName := range pvcNames {
 		volumes = append(volumes, core.Volume{

@@ -223,6 +223,17 @@ func (r *Scheduler) cost(vm *model.VM, vmStatus *plan.VMStatus) int {
 			// By setting the cost to 0 other VMs can start migrating
 			return 0
 		default:
+			// For cold migrations using storage offload (volume populators),
+			// PhaseCreateDataVolumes is where the actual disk copy happens via
+			// populator pods. These are NOT tracked as individual disk tasks,
+			// so we should not count them in the cost calculation to avoid
+			// preventing other VMs from starting.
+			// Once the VM moves to PhaseCopyDisks, the populator work is complete.
+			if vmStatus.Phase == api.PhaseCreateDataVolumes && !r.Plan.IsWarm() {
+				// Cold migration with storage offload - populator pods do the work
+				// Cost should be based on whether populators are actively running
+				return 1 // Count as 1 VM in flight, not per-disk
+			}
 			// CDI transfers the disks in parallel by different pods
 			return len(vm.Disks) - r.finishedDisks(vmStatus)
 		}
