@@ -1655,7 +1655,7 @@ func (r *Builder) setObjectNameFromTemplate(objectMeta *metav1.ObjectMeta, templ
 func (r *Builder) setColdMigrationDefaultPVCName(objectMeta *metav1.ObjectMeta, vm *model.VM, diskIndex int, disk vsphere.Disk) error {
 	pvcNameTemplate := r.getPVCNameTemplate(vm)
 	if pvcNameTemplate == "" {
-		pvcNameTemplate = "{{.PlanName}}-{{.VmName}}-disk-{{.DiskIndex}}"
+		pvcNameTemplate = "{{trunc 4 .PlanName}}-{{trunc 4 .VmName}}-disk-{{.DiskIndex}}"
 	}
 
 	planVM := r.getPlanVM(vm)

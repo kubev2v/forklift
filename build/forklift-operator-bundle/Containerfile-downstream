@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi9/go-toolset:1.24.4-1752083840 AS envsubst
+FROM quay.io/konflux-ci/yq AS tools
 
 FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel9@sha256:2e8ded84e20ba61e6dd10c99b95d1831f9852d87f47badb9535ee3ced22506a7 AS builder
 
@@ -11,17 +11,17 @@ ARG DEFAULT_CHANNEL
 ARG REGISTRY
 ARG OCP_VERSIONS
 
-ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:aca91671bc5af04d937b76791f8baf5dc4b3a4c8b4edc994245704aa9c0893c4"
+ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:ac9b4782c1a8b727907e448c2d6ad97ef3c8471f6f37f2dc14b5003a016ed84a"
 
-ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:93abe1cc09edf708e0584b5ee89881117cdd57da9a943f29a2c64b156e82a6e4"
+ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:e1465bd441553a73b8e7e9ea086126e89d62c238620249ffd37065e7019796cd"
 
-ARG MUST_GATHER_IMAGE="registry.redhat.io/mtv-candidate/mtv-must-gather-rhel8@sha256:41f415d1043b1542d191140549c709a6f3833447c65b846a082a5d660046bc45"
+ARG MUST_GATHER_IMAGE="registry.redhat.io/mtv-candidate/mtv-must-gather-rhel8@sha256:47eb2275d99b6776beba7f8d9c9d42d259b1822c2285ce28f77edf50c98b2ad6"
 
 ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-openstack-populator-rhel9@sha256:2e3355e475928e01875be4fb0b077f8dabea3f0971ad13c0b5d071cc37bedb75"
 
 ARG OPERATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhel9-operator@sha256:8812fa2efe6a85a46cf79a43cda93ce7277c764b0ce0c59e55b9feaa0147f0e8"
 
-ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/mtv-candidate/mtv-ova-provider-server-rhel9@sha256:569c2afc5a9fda21d00ab232953d252c68f2a1108aadacb6661484338fb43463"
+ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/mtv-candidate/mtv-ova-provider-server-rhel9@sha256:46e8ae14e7a469ade842ece4f72005358ed1e23bfa4539642576a4a4f6af4014"
 
 ARG OVA_PROXY_IMAGE="registry.redhat.io/mtv-candidate/mtv-ova-proxy-rhel9@sha256:82c51a57a3ea7d48a709ce3eddce05217526e363533a3bbc193d14467fee95bf"
 
@@ -29,19 +29,20 @@ ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhv-populator-rh
 
 ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-populator-controller-rhel9@sha256:34be818ebf9b39648efb59f781cb10fa07ccaca10a1da316ec93b2f19e216ba0"
 
-ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:6f268fb6863f951d60c13b8d59b18b62fb2bb5bb84a70747e028ea964de6ea77"
+ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:1a1756d846f28affdcc987f538e2c64615dec30d541bb4716fe96345f3dda66a"
 
 ARG CLI_DOWNLOAD_IMAGE="registry.redhat.io/mtv-candidate/mtv-cli-download-rhel9@sha256:9d6e2939e3f4ce752a0f57dc3d4bdfad9067fa7455ba661babc8c0c1a4fad115"
 
 ARG VALIDATION_IMAGE="registry.redhat.io/mtv-candidate/mtv-validation-rhel9@sha256:9da505c9c205e317677bbc0a6251d061c14d471ce56d5bec0e59a60895e46f78"
 
-ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel9@sha256:52b997f8ab0e1b212cd075235c37aeefa639d30b16e34cfd0efb8f19e1fa292b"
+ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel9@sha256:98c089be26e896487b1f71477b0ec5cc7c6e43d470a4e88fa919e9f812a0659b"
 
-ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:93a69744c265ac1ae156ccaa9cf3b585a7366396e31a01e129fc2656130b8b7a"
+ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:f53bad1572d1919d928116aa781602c3c4be8268293dd937f04cede076ac1ccb"
 
 USER root
 
-COPY --from=envsubst /usr/bin/envsubst /usr/bin/envsubst
+COPY --from=tools /usr/bin/envsubst /usr/bin/envsubst
+COPY --from=tools /usr/bin/yq /usr/bin/yq
 
 COPY ./operator /repo
 COPY ./build/forklift-operator-bundle/images.conf /repo/images.conf
@@ -61,6 +62,11 @@ RUN source ./images.conf && \
     --default-channel $DEFAULT_CHANNEL \
     --output-dir build
 
+# CSV from operator-sdk does not contain `relatedImages` which causes issues in diconnected environments.
+# Load relatedImages object from "operator/related_images.yaml", append it to generated CSV spec and envsubst the ENV variables for specific images
+# MTV-3558
+RUN yq eval -i 'load("related_images.yaml").relatedImages as $images | .spec.relatedImages = $images' build/manifests/mtv-operator.clusterserviceversion.yaml
+RUN envsubst < build/manifests/mtv-operator.clusterserviceversion.yaml > temp.yaml && cp temp.yaml build/manifests/mtv-operator.clusterserviceversion.yaml
 USER 1001
 
 FROM scratch

@@ -668,30 +668,3 @@ spec:
         kind: VSphereXcopyVolumePopulator
         name: vspherexcopyvolumepopulators.forklift.konveyor.io
         version: v1beta1
-  relatedImages:
-    - name: forklift-operator
-      image: "${OPERATOR_IMAGE}"
-    - name: controller
-      image: "${CONTROLLER_IMAGE}"
-    - name: must_gather
-      image: "${MUST_GATHER_IMAGE}"
-    - name: validation
-      image: "${VALIDATION_IMAGE}"
-    - name: api
-      image: "${API_IMAGE}"
-    - name: populator_controller
-      image: "${POPULATOR_CONTROLLER_IMAGE}"
-    - name: rhv_populator
-      image: "${OVIRT_POPULATOR_IMAGE}"
-    - name: virt_v2v
-      image: "${VIRT_V2V_IMAGE}"
-    - name: openstack_populator
-      image: "${OPENSTACK_POPULATOR_IMAGE}"
-    - name: ui_plugin
-      image: "${UI_PLUGIN_IMAGE}"
-    - name: ova_provider_server
-      image: "${OVA_PROVIDER_SERVER_IMAGE}"
-    - name: ova_proxy
-      image: "${OVA_PROXY_IMAGE}"
-    - name: vsphere_xcopy_volume_populator
-      image: "${VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE}"

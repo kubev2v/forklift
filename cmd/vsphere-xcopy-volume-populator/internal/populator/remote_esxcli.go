@@ -95,6 +95,10 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		r := recover()
 		if r != nil {
 			klog.Infof("recovered %v", r)
+			// if we paniced we must return with an error. Otherwise, the pod will exit with 0 and will
+			// continue to convertion, and will likely fail, if the copy wasn't completed.
+			quit <- fmt.Errorf("recovered failure: %v", r)
+			return
 		}
 		quit <- errFinal
 	}()
@@ -214,7 +218,6 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		return fmt.Errorf("no valid HBA UIDs found for host %s", host)
 	}
 	mappingContext, err := p.StorageApi.EnsureClonnerIgroup(xcopyInitiatorGroup, hbaUIDs)
-
 	if err != nil {
 		return fmt.Errorf("failed to add the ESX HBA UID %s to the initiator group %w", hbaUIDs, err)
 	}
@@ -281,6 +284,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		fullCleanUpAttempted = true
 		if mappingContext != nil {
 			mappingContext["UnmapAllSdc"] = true
+			mappingContext[CleanupXcopyInitiatorGroup] = true
 		}
 		errUnmap := p.StorageApi.UnMap(xcopyInitiatorGroup, lun, mappingContext)
 		if errUnmap != nil {
