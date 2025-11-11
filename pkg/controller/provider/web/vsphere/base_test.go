@@ -233,3 +233,20 @@ func TestHostPathNestedDatacenterTwoLevels(t *testing.T) {
 
 	g.Expect(pb.Path(&host)).To(Equal("/myfolder/myfolder2/mydc/mycluster/myhost"))
 }
+
+func TestVMWithCopiesToolsFields(t *testing.T) {
+	m := &model.VM{
+		ToolsStatus:        "toolsOk",
+		ToolsRunningStatus: "guestToolsRunning",
+		ToolsVersionStatus: "guestToolsCurrent",
+	}
+	var r VM
+	r.With(m)
+
+	if r.ToolsStatus != m.ToolsStatus ||
+		r.ToolsRunningStatus != m.ToolsRunningStatus ||
+		r.ToolsVersionStatus != m.ToolsVersionStatus {
+		t.Fatalf("With() did not copy tools fields: got %q/%q/%q",
+			r.ToolsStatus, r.ToolsRunningStatus, r.ToolsVersionStatus)
+	}
+}
