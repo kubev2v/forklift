@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/yaacov/kubectl-mtv-mcp/pkg/mtvmcp"
 )
 
 // GetLogsInput represents the input for GetLogs
@@ -17,6 +18,7 @@ type GetLogsInput struct {
 	PlanID      string `json:"plan_id,omitempty" jsonschema:"Plan UUID for finding importer pods (required for importer type)"`
 	MigrationID string `json:"migration_id,omitempty" jsonschema:"Migration UUID for finding importer pods (required for importer type)"`
 	VMID        string `json:"vm_id,omitempty" jsonschema:"VM ID for finding importer pods (required for importer type)"`
+	DryRun      bool   `json:"dry_run,omitempty" jsonschema:"If true, shows commands instead of executing (educational mode)"`
 }
 
 // GetGetLogsTool returns the tool definition
@@ -72,6 +74,11 @@ func GetGetLogsTool() *mcp.Tool {
 }
 
 func HandleGetLogs(ctx context.Context, req *mcp.CallToolRequest, input GetLogsInput) (*mcp.CallToolResult, any, error) {
+	// Enable dry run mode if requested
+	if input.DryRun {
+		ctx = mtvmcp.WithDryRun(ctx, true)
+	}
+
 	podType := input.PodType
 	if podType == "" {
 		podType = "controller"

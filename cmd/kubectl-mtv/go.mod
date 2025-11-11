@@ -4,7 +4,7 @@ go 1.24.0
 
 toolchain go1.24.4
 
-require github.com/yaacov/kubectl-mtv v0.1.47
+require github.com/yaacov/kubectl-mtv v0.1.48
 
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
@@ -50,7 +50,7 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
 	github.com/yaacov/karl-interpreter v0.0.1 // indirect
-	github.com/yaacov/kubectl-mtv-mcp v0.0.4 // indirect
+	github.com/yaacov/kubectl-mtv-mcp v0.0.5 // indirect
 	github.com/yaacov/tree-search-language/v6 v6.0.8 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	golang.org/x/net v0.43.0 // indirect

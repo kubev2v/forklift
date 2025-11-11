@@ -11,8 +11,8 @@ import (
 )
 
 // findControllerPod finds the forklift-controller pod in the specified namespace
-func findControllerPod(namespace string) (string, error) {
-	output, err := mtvmcp.RunKubectlCommand([]string{"get", "pods", "-n", namespace, "-l", "app=forklift-controller", "-o", "jsonpath={.items[0].metadata.name}"})
+func findControllerPod(ctx context.Context, namespace string) (string, error) {
+	output, err := mtvmcp.RunKubectlCommand(ctx, []string{"get", "pods", "-n", namespace, "-l", "app=forklift-controller", "-o", "jsonpath={.items[0].metadata.name}"})
 	if err != nil {
 		return "", fmt.Errorf("failed to find controller pod: %w", err)
 	}
@@ -30,7 +30,7 @@ func findControllerPod(namespace string) (string, error) {
 func getControllerLogs(ctx context.Context, container string, lines int, follow bool, namespace string) (*mcp.CallToolResult, any, error) {
 	// Get MTV operator namespace if not provided
 	if namespace == "" {
-		versionOutput, err := mtvmcp.RunKubectlMTVCommand([]string{"version", "-o", "json"})
+		versionOutput, err := mtvmcp.RunKubectlMTVCommand(ctx, []string{"version", "-o", "json"})
 		if err != nil {
 			return nil, "", fmt.Errorf("failed to get operator namespace: %w", err)
 		}
@@ -49,13 +49,13 @@ func getControllerLogs(ctx context.Context, container string, lines int, follow 
 	}
 
 	// Find controller pod
-	podName, err := findControllerPod(namespace)
+	podName, err := findControllerPod(ctx, namespace)
 	if err != nil {
 		return nil, "", err
 	}
 
 	// Get pod information
-	podInfoOutput, err := mtvmcp.RunKubectlCommand([]string{"get", "pod", "-n", namespace, podName, "-o", "json"})
+	podInfoOutput, err := mtvmcp.RunKubectlCommand(ctx, []string{"get", "pod", "-n", namespace, podName, "-o", "json"})
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to get pod info: %w", err)
 	}
@@ -78,7 +78,7 @@ func getControllerLogs(ctx context.Context, container string, lines int, follow 
 		logsArgs = append(logsArgs, "-f")
 	}
 
-	logsOutput, err := mtvmcp.RunKubectlCommand(logsArgs)
+	logsOutput, err := mtvmcp.RunKubectlCommand(ctx, logsArgs)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to get logs: %w", err)
 	}
@@ -105,7 +105,7 @@ func getImporterLogs(ctx context.Context, lines int, follow bool, namespace, pla
 
 	// Find PVCs with migration labels
 	labelSelector := fmt.Sprintf("plan=%s,migration=%s,vmID=%s", planID, migrationID, vmID)
-	pvcsOutput, err := mtvmcp.RunKubectlCommand([]string{"get", "pvc", "-n", namespace, "-l", labelSelector, "-o", "json"})
+	pvcsOutput, err := mtvmcp.RunKubectlCommand(ctx, []string{"get", "pvc", "-n", namespace, "-l", labelSelector, "-o", "json"})
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to get PVCs: %w", err)
 	}
@@ -144,7 +144,7 @@ func getImporterLogs(ctx context.Context, lines int, follow bool, namespace, pla
 	}
 
 	// Find prime PVC owned by migration PVC
-	allPVCsOutput, err := mtvmcp.RunKubectlCommand([]string{"get", "pvc", "-n", namespace, "-o", "json"})
+	allPVCsOutput, err := mtvmcp.RunKubectlCommand(ctx, []string{"get", "pvc", "-n", namespace, "-o", "json"})
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to get all PVCs: %w", err)
 	}
@@ -197,7 +197,7 @@ func getImporterLogs(ctx context.Context, lines int, follow bool, namespace, pla
 	}
 
 	// Get pod information
-	podInfoOutput, err := mtvmcp.RunKubectlCommand([]string{"get", "pod", "-n", namespace, importerPodName, "-o", "json"})
+	podInfoOutput, err := mtvmcp.RunKubectlCommand(ctx, []string{"get", "pod", "-n", namespace, importerPodName, "-o", "json"})
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to get pod info: %w", err)
 	}
@@ -217,7 +217,7 @@ func getImporterLogs(ctx context.Context, lines int, follow bool, namespace, pla
 		logsArgs = append(logsArgs, "-f")
 	}
 
-	logsOutput, err := mtvmcp.RunKubectlCommand(logsArgs)
+	logsOutput, err := mtvmcp.RunKubectlCommand(ctx, logsArgs)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to get logs: %w", err)
 	}
@@ -260,7 +260,7 @@ func getMigrationPVCs(ctx context.Context, migrationID, planID, vmID, namespace 
 
 	args = append(args, "-o", "json")
 
-	output, err := mtvmcp.RunKubectlCommand(args)
+	output, err := mtvmcp.RunKubectlCommand(ctx, args)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to get PVCs: %w", err)
 	}
@@ -294,7 +294,7 @@ func getMigrationPVCs(ctx context.Context, migrationID, planID, vmID, namespace 
 						descArgs = append(descArgs, "-n", pvcNs)
 					}
 					descArgs = append(descArgs, pvcName)
-					describeOutput, _ := mtvmcp.RunKubectlCommand(descArgs)
+					describeOutput, _ := mtvmcp.RunKubectlCommand(ctx, descArgs)
 					describeStdout := mtvmcp.ExtractStdoutFromResponse(describeOutput)
 					pvcMap["describe"] = describeStdout
 					items[i] = pvcMap
@@ -335,7 +335,7 @@ func getMigrationDataVolumes(ctx context.Context, migrationID, planID, vmID, nam
 
 	args = append(args, "-o", "json")
 
-	output, err := mtvmcp.RunKubectlCommand(args)
+	output, err := mtvmcp.RunKubectlCommand(ctx, args)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to get DataVolumes: %w", err)
 	}
@@ -369,7 +369,7 @@ func getMigrationDataVolumes(ctx context.Context, migrationID, planID, vmID, nam
 						descArgs = append(descArgs, "-n", dvNs)
 					}
 					descArgs = append(descArgs, dvName)
-					describeOutput, _ := mtvmcp.RunKubectlCommand(descArgs)
+					describeOutput, _ := mtvmcp.RunKubectlCommand(ctx, descArgs)
 					describeStdout := mtvmcp.ExtractStdoutFromResponse(describeOutput)
 					dvMap["describe"] = describeStdout
 					items[i] = dvMap
