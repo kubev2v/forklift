@@ -22,6 +22,8 @@ const (
 	LinuxDynamicRegex       = `^([0-9]+_linux_(run|firstboot)(([\w\-]*).sh))$`
 	ShellSuffix             = ".sh"
 	UploadCmd               = "--upload"
+	RunCmd                  = "--run"
+	FirstbootCmd            = "--firstboot"
 )
 
 //go:embed scripts
@@ -436,7 +438,7 @@ func (c *Customize) addRhelFirstbootScripts(cmdBuilder utils.CommandBuilder) err
 		return nil
 	}
 	for _, scripts := range firstBootScripts {
-		cmdBuilder.AddArg("--firstboot", scripts)
+		cmdBuilder.AddArg(FirstbootCmd, scripts)
 	}
 	return nil
 }
@@ -455,7 +457,7 @@ func (c *Customize) addRhelRunScripts(cmdBuilder utils.CommandBuilder) error {
 		return nil
 	}
 	for _, scripts := range runScripts {
-		cmdBuilder.AddArg("--run", scripts)
+		cmdBuilder.AddArg(RunCmd, scripts)
 	}
 	return nil
 }
@@ -486,7 +488,16 @@ func (c *Customize) addRhelDynamicScripts(cmdBuilder utils.CommandBuilder, dir s
 		fmt.Printf("Adding linux dynamic scripts '%s'\n", script.Path)
 		// Option from the second regex group `(run|firstboot)`
 		action := script.Groups[2]
-		cmdBuilder.AddArg(action, script.Path)
+		var cmd string
+		switch action {
+		case "run":
+			cmd = RunCmd
+		case "firstboot":
+			cmd = FirstbootCmd
+		default:
+			return fmt.Errorf("invalid action '%s' extracted from script filename '%s': expected 'run' or 'firstboot'", action, script.Path)
+		}
+		cmdBuilder.AddArg(cmd, script.Path)
 	}
 	return nil
 }
