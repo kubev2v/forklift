@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/yaacov/kubectl-mtv-mcp/pkg/mtvmcp"
 )
 
 // GetMigrationStorageInput represents the input for GetMigrationStorage
@@ -15,6 +16,7 @@ type GetMigrationStorageInput struct {
 	VMID          string `json:"vm_id,omitempty" jsonschema:"VM ID to filter by (optional) - e.g., vm-47, vm-73"`
 	Namespace     string `json:"namespace,omitempty" jsonschema:"Kubernetes namespace to search in (optional)"`
 	AllNamespaces bool   `json:"all_namespaces,omitempty" jsonschema:"Search across all namespaces"`
+	DryRun        bool   `json:"dry_run,omitempty" jsonschema:"If true, shows commands instead of executing (educational mode)"`
 }
 
 // GetGetMigrationStorageTool returns the tool definition
@@ -77,6 +79,11 @@ func GetGetMigrationStorageTool() *mcp.Tool {
 }
 
 func HandleGetMigrationStorage(ctx context.Context, req *mcp.CallToolRequest, input GetMigrationStorageInput) (*mcp.CallToolResult, any, error) {
+	// Enable dry run mode if requested
+	if input.DryRun {
+		ctx = mtvmcp.WithDryRun(ctx, true)
+	}
+
 	resourceType := input.ResourceType
 	if resourceType == "" {
 		resourceType = "all"
