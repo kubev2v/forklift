@@ -16,9 +16,11 @@ import (
 )
 
 var (
-	sse  bool
-	port string
-	host string
+	sse      bool
+	port     string
+	host     string
+	certFile string
+	keyFile  string
 )
 
 // NewMCPServerCmd creates the mcp-server command
@@ -33,7 +35,14 @@ USE WITH CAUTION: Includes write operations that can modify resources.
 
 Modes:
   Default: Stdio mode for AI assistant integration
-  --sse:   HTTP server mode for web-based integrations
+  --sse:   HTTP server mode with optional TLS
+
+Security:
+  --cert-file:   Path to TLS certificate file (enables TLS when both cert and key provided)
+  --key-file:    Path to TLS private key file (enables TLS when both cert and key provided)
+
+Authentication:
+  Authorization bearer token header is automatically passed through to the kubectl-mtv-mcp server.
 
 Quick Setup for AI Assistants:
 
@@ -55,6 +64,7 @@ Manual Claude config: Add to claude_desktop_config.json:
 				// SSE mode - run HTTP server
 				addr := net.JoinHostPort(host, port)
 
+				// Create MCP handler
 				handler := mcp.NewSSEHandler(func(req *http.Request) *mcp.Server {
 					return cmd.CreateReadServer()
 				}, nil)
@@ -67,9 +77,19 @@ Manual Claude config: Add to claude_desktop_config.json:
 				// Start server in a goroutine
 				errChan := make(chan error, 1)
 				go func() {
-					log.Printf("Starting kubectl-mtv MCP server in SSE mode on %s", addr)
-					log.Printf("Connect clients to: http://%s/sse", addr)
-					errChan <- server.ListenAndServe()
+					// Check if TLS should be enabled (both cert and key files provided)
+					useTLS := certFile != "" && keyFile != ""
+
+					if useTLS {
+						log.Printf("Starting kubectl-mtv MCP server with TLS in SSE mode on %s", addr)
+						log.Printf("Using cert: %s, key: %s", certFile, keyFile)
+						log.Printf("Connect clients to: https://%s/sse", addr)
+						errChan <- server.ListenAndServeTLS(certFile, keyFile)
+					} else {
+						log.Printf("Starting kubectl-mtv MCP server in SSE mode on %s", addr)
+						log.Printf("Connect clients to: http://%s/sse", addr)
+						errChan <- server.ListenAndServe()
+					}
 				}()
 
 				// Wait for either an error or interrupt signal
@@ -120,6 +140,8 @@ Manual Claude config: Add to claude_desktop_config.json:
 	mcpCmd.Flags().BoolVar(&sse, "sse", false, "Run in SSE (Server-Sent Events) mode over HTTP")
 	mcpCmd.Flags().StringVar(&port, "port", "8080", "Port to listen on for SSE mode")
 	mcpCmd.Flags().StringVar(&host, "host", "127.0.0.1", "Host address to bind to for SSE mode")
+	mcpCmd.Flags().StringVar(&certFile, "cert-file", "", "Path to TLS certificate file (enables TLS when used with --key-file)")
+	mcpCmd.Flags().StringVar(&keyFile, "key-file", "", "Path to TLS private key file (enables TLS when used with --cert-file)")
 
 	return mcpCmd
 }

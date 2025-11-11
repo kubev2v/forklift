@@ -27,6 +27,7 @@ type PatchPlanVmInput struct {
 	RemoveHook              string `json:"remove_hook,omitempty"`
 	ClearHooks              bool   `json:"clear_hooks,omitempty"`
 	DeleteVMOnFailMigration *bool  `json:"delete_vm_on_fail_migration,omitempty"`
+	DryRun                  bool   `json:"dry_run,omitempty"`
 }
 
 // GetPatchPlanVmTool returns the tool definition
@@ -140,6 +141,11 @@ func GetPatchPlanVmTool() *mcp.Tool {
 }
 
 func HandlePatchPlanVm(ctx context.Context, req *mcp.CallToolRequest, input PatchPlanVmInput) (*mcp.CallToolResult, any, error) {
+	// Enable dry run mode if requested
+	if input.DryRun {
+		ctx = mtvmcp.WithDryRun(ctx, true)
+	}
+
 	// Validate required parameters
 	if err := mtvmcp.ValidateRequiredParams(map[string]string{
 		"plan_name": input.PlanName,
@@ -203,7 +209,7 @@ func HandlePatchPlanVm(ctx context.Context, req *mcp.CallToolRequest, input Patc
 		args = append(args, "--clear-hooks")
 	}
 
-	result, err := mtvmcp.RunKubectlMTVCommand(args)
+	result, err := mtvmcp.RunKubectlMTVCommand(ctx, args)
 	if err != nil {
 		return nil, "", err
 	}
