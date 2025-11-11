@@ -688,9 +688,9 @@ func (r *Validator) GuestToolsInstalled(vmRef ref.Ref) (ok bool, err error) {
 
 	// Only check VMware Tools status if VM is powered on
 	if vm.PowerState == string(types.VirtualMachinePowerStatePoweredOn) {
-		// Check all VMware Tools issues: unknown status, not installed, not running, or unmanaged
+		// Check critical VMware Tools issues: unknown status, not installed, or not running
 		if isUnknownToolsStatus(vm.ToolsStatus) || vm.ToolsStatus == ToolsNotInstalled ||
-			vm.ToolsRunningStatus == GuestToolsNotRunning || vm.ToolsVersionStatus == GuestToolsUnmanaged {
+			vm.ToolsRunningStatus == GuestToolsNotRunning {
 			return false, nil
 		}
 	}

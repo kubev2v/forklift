@@ -10,8 +10,7 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression:
       event == "push" && target_branch
       == "main" && ("build/forklift-cli-download/Containerfile-downstream".pathChanged() ||
-      "build/forklift-cli-download/artifacts/***".pathChanged() ||
-      "build/forklift-cli-download/download-latest-release.sh".pathChanged())
+      "cmd/kubectl-mtv/***".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: forklift-operator-dev-preview
@@ -34,7 +33,7 @@ spec:
     - name: build-source-image
       value: "true"
     - name: prefetch-input
-      value: '[{"type": "generic", "path": ".konflux/forklift-cli-download/"}]'
+      value: '[]'
     - name: build-args-file
       value: build/release.conf
     - name: build-args
