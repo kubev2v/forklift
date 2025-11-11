@@ -16,6 +16,7 @@ type ListInventoryInput struct {
 	Query         string `json:"query,omitempty" jsonschema:"Optional filter query using SQL-like syntax with WHERE/SELECT/ORDER BY/LIMIT"`
 	OutputFormat  string `json:"output_format,omitempty" jsonschema:"Output format - 'json' for full data or 'planvms' for plan-compatible VM structures (default 'json')"`
 	InventoryURL  string `json:"inventory_url,omitempty" jsonschema:"Base URL for inventory service (optional, auto-discovered if not provided)"`
+	DryRun        bool   `json:"dry_run,omitempty" jsonschema:"If true, shows commands instead of executing (educational mode)"`
 }
 
 // GetListInventoryTool returns the tool definition
@@ -168,6 +169,11 @@ func GetListInventoryTool() *mcp.Tool {
 }
 
 func HandleListInventory(ctx context.Context, req *mcp.CallToolRequest, input ListInventoryInput) (*mcp.CallToolResult, any, error) {
+	// Enable dry run mode if requested
+	if input.DryRun {
+		ctx = mtvmcp.WithDryRun(ctx, true)
+	}
+
 	// Validate required parameters
 	if err := mtvmcp.ValidateRequiredParams(map[string]string{
 		"resource_type": input.ResourceType,
@@ -211,7 +217,7 @@ func HandleListInventory(ctx context.Context, req *mcp.CallToolRequest, input Li
 		args = append(args, "-o", "json") // Default to json for unsupported formats
 	}
 
-	result, err := mtvmcp.RunKubectlMTVCommand(args)
+	result, err := mtvmcp.RunKubectlMTVCommand(ctx, args)
 	if err != nil {
 		return nil, "", err
 	}
