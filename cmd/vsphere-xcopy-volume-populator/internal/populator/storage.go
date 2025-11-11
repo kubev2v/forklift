@@ -1,5 +1,10 @@
 package populator
 
+const (
+	// CleanupXcopyInitiatorGroup is the key to signal cleanup of the initiator group.
+	CleanupXcopyInitiatorGroup = "cleanupXcopyInitiatorGroup"
+)
+
 //go:generate go run go.uber.org/mock/mockgen -destination=mocks/storage_mock_client.go -package=storage_mocks . StorageApi
 type StorageApi interface {
 	StorageMapper

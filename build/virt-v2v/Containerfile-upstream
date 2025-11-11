@@ -4,12 +4,12 @@ USER 0
 RUN --mount=type=cache,target=/var/cache/dnf dnf -y install --enablerepo=crb libvirt-devel golang
 WORKDIR /app
 COPY --chown=1001:0 ./ ./
-ENV GOFLAGS "-mod=vendor -tags=strictfipsruntime"
-ENV GOEXPERIMENT strictfipsruntime
+ENV GOFLAGS="-mod=vendor -tags=strictfipsruntime"
+ENV GOEXPERIMENT=strictfipsruntime
 
-RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-monitor ./cmd/virt-v2v-monitor/virt-v2v-monitor.go
-RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o image-converter ./cmd/image-converter/image-converter.go
-RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-wrapper ./cmd/virt-v2v/entrypoint.go
+RUN go build -ldflags="-w -s" -o virt-v2v-monitor ./cmd/virt-v2v-monitor/virt-v2v-monitor.go
+RUN go build -ldflags="-w -s" -o image-converter ./cmd/image-converter/image-converter.go
+RUN go build -ldflags="-w -s" -o virt-v2v-wrapper ./cmd/virt-v2v/entrypoint.go
 
 # Main container
 FROM quay.io/centos/centos:stream9
@@ -49,7 +49,8 @@ RUN mkdir -p /usr/lib64/guestfs/appliance && \
 # This prevents libvirt from attempting to create files in the root directory,
 # which would lead to permission errors.
 # Refer to: https://issues.redhat.com/browse/RHEL-105490
-RUN mkdir /home/qemu && chown qemu:qemu /home/qemu
+RUN mkdir -p /home/qemu/.cache/libvirt && \
+    chown -R qemu:qemu /home/qemu
 ENV HOME=/home/qemu
 
 # The libvirt can hang when destroying libguestfs domains due to the

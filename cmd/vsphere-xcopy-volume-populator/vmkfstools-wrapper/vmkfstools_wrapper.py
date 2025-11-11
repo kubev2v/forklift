@@ -54,8 +54,13 @@ def clone(args):
         result = {"taskId": str(task_id),  "pid": int(task.pid)}
         print(XML.format("0", json.dumps(result)))
 
+
     except Exception as e:
-        print(XML.format("1", f"Error running subprocess: {e}"))
+        errno = getattr(e, 'errno', None)
+        if errno == errno.ENOSPC:
+            print(XML.format("28", f"Error running subprocess: {e} tmpfs free space is low"))
+        else:
+            print(XML.format("1", f"Error running subprocess: {e}"))
         raise
 
     finally:
@@ -65,6 +70,12 @@ def clone(args):
 
 def taskGet(args):
     tmp_dir = TMP_PREFIX.format(args.task_id[0])
+
+    if not os.path.isdir(tmp_dir):
+        result = {"taskId": args.task_id[0], "error": f"Task directory {tmp_dir} not found"}
+        print(XML.format("1", json.dumps(result)))
+        return
+
     with open(os.path.join(tmp_dir, "pid"), "r") as f:
         pid = f.read()
     with open(os.path.join(tmp_dir, "out"), "r") as f:
@@ -92,6 +103,12 @@ def taskGet(args):
 
 def taskClean(args):
     tmp_dir = TMP_PREFIX.format(args.task_id[0])
+
+    if not os.path.isdir(tmp_dir):
+        result = {"taskId": args.task_id[0], "error": f"Task directory {tmp_dir} not found"}
+        print(XML.format("1", json.dumps(result)))
+        return
+
     with open(os.path.join(tmp_dir, "rdmfile"), "r") as rdmfile_file:
         rdmfile = rdmfile_file.read()
         rdmfile = rdmfile.rstrip()
@@ -107,6 +124,13 @@ def taskClean(args):
                 logging.info(f"failed to remove files {e}")
                 print(XML.format("1", f"failed to remove files {e}"))
                 return
+    try:
+        os.rmdir(tmp_dir)
+        logging.info(f"removed task directory {tmp_dir}")
+    except Exception as e:
+        logging.info(f"failed to remove task directory {e}")
+        print(XML.format("1", f"failed to remove task directory {e}"))
+        return
     print(XML.format("0", ""))
 
 

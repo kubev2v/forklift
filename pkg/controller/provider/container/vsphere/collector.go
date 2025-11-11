@@ -146,6 +146,11 @@ const (
 	fGuestDisk                = "guest.disk"
 	fGuestIpStack             = "guest.ipStack"
 	fHostName                 = "guest.hostName"
+	// fToolsStatus is deprecated since vSphere API 4.0; use fToolsRunningStatus instead
+	fToolsStatus        = "guest.toolsStatus"
+	fToolsRunningStatus = "guest.toolsRunningStatus"
+	// fToolsVersionStatus is deprecated since vSphere API 5.1; use fToolsVersionStatus2 for more detailed status
+	fToolsVersionStatus = "guest.toolsVersionStatus2"
 )
 
 // Selections
@@ -842,6 +847,9 @@ func (r *Collector) vmPathSet() []string {
 		fChangeTracking,
 		fGuestIpStack,
 		fHostName,
+		fToolsStatus,
+		fToolsRunningStatus,
+		fToolsVersionStatus,
 	}
 
 	apiVer := strings.Split(r.client.ServiceContent.About.ApiVersion, ".")
@@ -1049,7 +1057,7 @@ func (r Collector) applyLeave(tx *libmodel.Tx, u types.ObjectUpdate) error {
 				ID: u.Obj.Value,
 			},
 		}
-	case Network:
+	case Network, OpaqueNetwork, DVPortGroup, DVSwitch:
 		deleted = &model.Network{
 			Base: model.Base{
 				ID: u.Obj.Value,

@@ -74,6 +74,8 @@ The `storageVendorProduct` field in the `StorageMap` identifies which storage pr
 | Dell            | `powerflex`                  | [Link](#dell-powerflex) |
 | Dell            | `powermax`                   | [Link](#dell-powermax) |
 | Dell            | `powerstore`                 | |
+| Infinidat       | `infinibox`                  | |
+| IBM             | `flashsystem`                | |
 
 If a storage provider wants their storage to be supported, they need
 to implement a go package named after their product, and mutate main
@@ -435,6 +437,7 @@ Provider specific entries in the secret shall be documented below:
 | Key | Value | Description |
 | --- | --- | --- |
 | POWERMAX_SYMMETRIX_ID | string | the symmetrix id of the storage array. Can be taken from the ConfigMap under the 'powermax' namespace, which the CSI driver uses. |
+| POWERMAX_PORT_GROUP_NAME | string | the port group to use for masking view creation. |
 
 
 ## Dell PowerFlex

@@ -232,6 +232,8 @@ type Validator interface {
 	MacConflicts(vmRef ref.Ref) ([]MacConflict, error)
 	// Validate that the PVC name template is valid
 	PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (bool, error)
+	// Validate guest tools installation and status (e.g., VMware Tools, VirtIO drivers).
+	GuestToolsInstalled(vmRef ref.Ref) (ok bool, err error)
 }
 
 // DestinationClient API.

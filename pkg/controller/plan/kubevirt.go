@@ -103,6 +103,14 @@ const (
 	kDV = "isDV"
 	// Populator secret
 	kPopulator = "isPopulator"
+	// Resource label
+	kResource = "resource"
+)
+
+// Resource labels
+const (
+	ResourceVMConfig   = "vm-config"
+	ResourceVDDKConfig = "vddk-config"
 )
 
 // User
@@ -144,6 +152,23 @@ type KubeVirt struct {
 	Builder adapter.Builder
 	// Ensurer
 	Ensurer adapter.Ensurer
+}
+
+// CNINetworkConfig represents a CNI network configuration parsed from a NetworkAttachmentDefinition.
+// This includes the IPAM configuration with routes for determining default gateway.
+type CNINetworkConfig struct {
+	IPAM CNIIPAMConfig `json:"ipam"`
+}
+
+// CNIIPAMConfig represents the IPAM section of a CNI network configuration.
+type CNIIPAMConfig struct {
+	Routes []CNIRoute `json:"routes"`
+}
+
+// CNIRoute represents a single route entry in the CNI IPAM configuration.
+type CNIRoute struct {
+	Dst string `json:"dst"` // Destination network in CIDR notation (e.g., "0.0.0.0/0" for default route)
+	GW  string `json:"gw"`  // Gateway IP address
 }
 
 // Build a VirtualMachineMap.
@@ -1201,6 +1226,21 @@ func (r *KubeVirt) DeletePVCConsumerPod(vm *plan.VMStatus) (err error) {
 	}
 	for _, object := range list.Items {
 		err = r.DeleteObject(&object, vm, "Deleted PVC consumer pod.", "pod")
+		if err != nil {
+			return err
+		}
+	}
+	return
+}
+
+// Delete the inspection pod.
+func (r *KubeVirt) DeletePreflightInspectionPod(vm *plan.VMStatus) (err error) {
+	list, err := r.GetPodsWithLabels(r.inspectionLabels(vm.Ref))
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for _, object := range list.Items {
+		err := r.DeleteObject(&object, vm, "Deleted preflight inspection pod.", "pod")
 		if err != nil {
 			return err
 		}
@@ -2425,6 +2465,7 @@ func (r *KubeVirt) ensureConfigMap(vmRef ref.Ref) (configMap *core.ConfigMap, er
 	if err != nil {
 		return
 	}
+
 	list := &core.ConfigMapList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
@@ -2624,6 +2665,7 @@ func (r *KubeVirt) inspectionLabels(vmRef ref.Ref) (labels map[string]string) {
 func (r *KubeVirt) vmLabels(vmRef ref.Ref) (labels map[string]string) {
 	labels = r.planLabels()
 	labels[kVM] = vmRef.ID
+	labels[kResource] = ResourceVMConfig
 	return
 }
 
@@ -2632,6 +2674,7 @@ func (r *KubeVirt) vmLabels(vmRef ref.Ref) (labels map[string]string) {
 func (r *KubeVirt) vddkLabels() (labels map[string]string) {
 	labels = r.planLabels()
 	labels[kUse] = VddkConf
+	labels[kResource] = ResourceVDDKConfig
 	return
 }
 
@@ -2642,11 +2685,56 @@ func (r *KubeVirt) vmAllButMigrationLabels(vmRef ref.Ref) (labels map[string]str
 	return
 }
 
-// setTransferNetwork sets the transfer network annotation on the DataVolume so
-// that it can be used by the importer pod. If the `forklift.konveyor.io/route` annotation
-// is present on the referenced NAD, then it will be used with the `k8s.v1.cni.cncf.io/networks` annotation
-// to set the default route. If not, this will fall back to setting the `v1.multus-cni.io/default-network` annotation
-// with the namespaced name of the NAD.
+// guessTransferNetworkDefaultRoute determines the default gateway IP address for the transfer network
+// by checking the NetworkAttachmentDefinition in the following priority order:
+//
+//  1. Checks the AnnForkliftNetworkRoute annotation on the NAD
+//  2. Parses the NAD's spec.config JSON and looks for the default route (0.0.0.0/0 or ::/0)
+//     in the ipam.routes array, extracting the gateway IP from the matching route entry
+//
+// Returns:
+//   - route: The gateway IP address as a string (e.g., "192.168.1.1")
+//   - found: true if a route was found, false otherwise
+func (r *KubeVirt) guessTransferNetworkDefaultRoute(netAttachDef *k8snet.NetworkAttachmentDefinition) (route string, found bool) {
+	// First, try to get the default route from the annotation.
+	route, found = netAttachDef.Annotations[AnnForkliftNetworkRoute]
+	if found {
+		return route, true
+	}
+
+	// If the route annotation is not set, try to get the default route from the gw config value.
+	// Parse the Config string which is a JSON string containing network configuration.
+	if netAttachDef.Spec.Config != "" {
+		var config CNINetworkConfig
+		err := json.Unmarshal([]byte(netAttachDef.Spec.Config), &config)
+		if err != nil {
+			// If we can't parse the config, just return not found
+			return "", false
+		}
+
+		// Look for the default route (0.0.0.0/0 or ::/0) in the routes
+		for _, r := range config.IPAM.Routes {
+			if r.Dst == "0.0.0.0/0" || r.Dst == "::/0" {
+				return r.GW, true
+			}
+		}
+	}
+
+	return "", false
+}
+
+// setTransferNetwork configures the transfer network for the DataVolume's importer pod
+// by setting appropriate annotations based on whether a default gateway route can be determined.
+//
+// Behavior:
+//   - If a default gateway is found (via annotation or NAD config): Sets the
+//     k8s.v1.cni.cncf.io/networks annotation with the gateway to configure routing
+//   - If no default gateway is found: Falls back to setting the legacy
+//     v1.multus-cni.io/default-network annotation with the NAD's namespaced name
+//
+// The default gateway is discovered by checking the NAD annotation and IPAM config
+// (see guessTransferNetworkDefaultRoute for details).
+//
 // FIXME: the codepath using the multus annotation should be phased out.
 func (r *KubeVirt) setTransferNetwork(annotations map[string]string) (err error) {
 	key := client.ObjectKey{
@@ -2660,7 +2748,7 @@ func (r *KubeVirt) setTransferNetwork(annotations map[string]string) (err error)
 		return
 	}
 
-	route, found := netAttachDef.Annotations[AnnForkliftNetworkRoute]
+	route, found := r.guessTransferNetworkDefaultRoute(netAttachDef)
 	if found {
 		nse := k8snet.NetworkSelectionElement{
 			Namespace: key.Namespace,
@@ -2671,7 +2759,7 @@ func (r *KubeVirt) setTransferNetwork(annotations map[string]string) (err error)
 			nse.GatewayRequest = []net.IP{ip}
 		} else {
 			err = liberr.New(
-				"Transfer network default route annotation is not a valid IP address.",
+				"Transfer network default route is not a valid IP address.",
 				"route", route)
 			return
 		}
