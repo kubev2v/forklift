@@ -1172,7 +1172,7 @@ k8s.io/utils/net
 k8s.io/utils/pointer
 k8s.io/utils/ptr
 k8s.io/utils/trace
-# kubevirt.io/api v1.6.0-beta.0.0.20250702170314-dd941825f5d3
+# kubevirt.io/api v1.6.3
 ## explicit; go 1.23.0
 kubevirt.io/api/core
 kubevirt.io/api/core/v1
