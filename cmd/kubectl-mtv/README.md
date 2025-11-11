@@ -10,6 +10,7 @@ make build
 ```
 
 ### Cross-Platform Builds
+
 ```bash
 # Build for specific platforms
 make build-linux     # Linux (AMD64 + ARM64)

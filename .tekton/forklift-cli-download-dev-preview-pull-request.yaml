@@ -35,8 +35,6 @@ spec:
       value: .
     - name: build-source-image
       value: "true"
-    - name: prefetch-input
-      value: '[]'
     - name: build-args-file
       value: build/release.conf
     - name: build-args
