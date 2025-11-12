@@ -1,9 +1,9 @@
-FROM registry.redhat.io/ubi9:9.6-1747219013 AS winlegacyiso
+FROM registry.redhat.io/ubi9:9.6-1760340943 AS winlegacyiso
 
 RUN rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 RUN yum install -y --setopt=install_weak_deps=False virtio-win-1.9.4-2.el7.2
 
-FROM registry.redhat.io/ubi9:9.6-1747219013 AS appliance
+FROM registry.redhat.io/ubi9:9.6-1760340943 AS appliance
 
 RUN dnf update -y && \
     dnf install -y --setopt=install_weak_deps=False \
@@ -40,7 +40,7 @@ RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-monitor github
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o image-converter github.com/kubev2v/forklift/cmd/image-converter
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-wrapper github.com/kubev2v/forklift/cmd/virt-v2v
 
-FROM registry.redhat.io/ubi9:9.6-1747219013 AS runtime
+FROM registry.redhat.io/ubi9:9.6-1760340943 AS runtime
 
 RUN rm /etc/pki/tls/fips_local.cnf && \
     echo -e '[fips_sect]\ntls1-prf-ems-check = 0\nactivate = 1' > /etc/pki/tls/fips_local.cnf && \
