@@ -81,7 +81,12 @@ func main() {
 		// virt-customize
 		err = convert.RunCustomize(inspection.OS)
 		if err != nil {
-			fmt.Println("Failed to customize the VM", err)
+			warningMsg := fmt.Sprintf("VM customization failed: %v. Migration will proceed but customization was not applied successfully.", err)
+			fmt.Println("WARNING:", warningMsg)
+			server.AddWarning(server.Warning{
+				Reason:  "CustomizationFailed",
+				Message: warningMsg,
+			})
 		}
 		// In the remote migrations we can not connect to the conversion pod from the controller.
 		// This connection is needed for to get the additional configuration which is gathered either form virt-v2v or
