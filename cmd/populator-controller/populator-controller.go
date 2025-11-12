@@ -9,6 +9,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	populator_machinery "github.com/kubev2v/forklift/pkg/lib-volume-populator/populator-machinery"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -16,11 +17,15 @@ import (
 )
 
 const (
-	prefix     = "forklift.konveyor.io"
-	mountPath  = "/mnt/"
-	devicePath = "/dev/block"
-	groupName  = "forklift.konveyor.io"
-	apiVersion = "v1beta1"
+	prefix               = "forklift.konveyor.io"
+	mountPath            = "/mnt/"
+	devicePath           = "/dev/block"
+	groupName            = "forklift.konveyor.io"
+	apiVersion           = "v1beta1"
+	defaultCpuLimit      = "1000m"
+	defaultMemoryLimit   = "1Gi"
+	defaultCpuRequest    = "100m"
+	defaultMemoryRequest = "512Mi"
 )
 
 type populator struct {
@@ -56,7 +61,7 @@ var populators = map[string]populator{
 }
 
 func main() {
-	var metricsPath, masterURL, kubeconfig string
+	var metricsPath, masterURL, kubeconfig, cpuLimit, cpuRequest, memoryLimit, memoryRequest string
 
 	// Controller args
 	if f := flag.Lookup("kubeconfig"); f != nil {
@@ -67,9 +72,19 @@ func main() {
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 	// Metrics args
 	flag.StringVar(&metricsPath, "metrics-path", "/metrics", "The HTTP path where prometheus metrics will be exposed. Default is `/metrics`.")
-
+	// Resource flags
+	flag.StringVar(&cpuLimit, "populator-container-limits-cpu", defaultCpuLimit, "CPU limit for populator container (e.g., 500m, 1)")
+	flag.StringVar(&cpuRequest, "populator-container-requests-cpu", defaultCpuRequest, "CPU request for populator container (e.g., 250m, 500m)")
+	flag.StringVar(&memoryLimit, "populator-container-limits-memory", defaultMemoryLimit, "Memory limit for populator container (e.g., 512Mi, 1Gi)")
+	flag.StringVar(&memoryRequest, "populator-container-requests-memory", defaultMemoryRequest, "Memory request for populator container (e.g., 256Mi, 512Mi)")
 	klog.InitFlags(nil)
 	flag.Parse()
+
+	// Parse resources from flags
+	resources, err := getResources(cpuLimit, cpuRequest, memoryLimit, memoryRequest)
+	if err != nil {
+		klog.Fatalf("Failed to parse resources: %v", err)
+	}
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
@@ -91,7 +106,7 @@ func main() {
 		metricsEndpoint := populator.metricsEndpoint
 		go func() {
 			populator_machinery.RunController(masterURL, kubeconfig, imageName, metricsEndpoint, metricsPath,
-				prefix, gk, gvr, mountPath, devicePath, controllerFunc)
+				prefix, gk, gvr, mountPath, devicePath, controllerFunc, resources)
 			<-stop
 		}()
 	}
@@ -158,4 +173,37 @@ func getVolumePath(rawBlock bool) string {
 	} else {
 		return mountPath + "disk.img"
 	}
+}
+
+func getResources(cpuLimit, cpuRequest, memoryLimit, memoryRequest string) (*corev1.ResourceRequirements, error) {
+	parsedCpuLimit, err := resource.ParseQuantity(cpuLimit)
+	if err != nil {
+		klog.Warningf("Failed to parse CPU limit: %v, using default: %s", err, defaultCpuLimit)
+		parsedCpuLimit, _ = resource.ParseQuantity(defaultCpuLimit)
+	}
+	parsedMemoryLimit, err := resource.ParseQuantity(memoryLimit)
+	if err != nil {
+		klog.Warningf("Failed to parse memory limit: %v, using default: %s", err, defaultMemoryLimit)
+		parsedMemoryLimit, _ = resource.ParseQuantity(defaultMemoryLimit)
+	}
+	parsedCpuRequest, err := resource.ParseQuantity(cpuRequest)
+	if err != nil {
+		klog.Warningf("Failed to parse CPU request: %v, using default: %s", err, defaultCpuRequest)
+		parsedCpuRequest, _ = resource.ParseQuantity(defaultCpuRequest)
+	}
+	parsedMemoryRequest, err := resource.ParseQuantity(memoryRequest)
+	if err != nil {
+		klog.Warningf("Failed to parse memory request: %v, using default: %s", err, defaultMemoryRequest)
+		parsedMemoryRequest, _ = resource.ParseQuantity(defaultMemoryRequest)
+	}
+	return &corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    parsedCpuLimit,
+			corev1.ResourceMemory: parsedMemoryLimit,
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    parsedCpuRequest,
+			corev1.ResourceMemory: parsedMemoryRequest,
+		},
+	}, nil
 }
