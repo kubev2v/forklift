@@ -158,6 +158,11 @@ ova_container_limits_memory: "1Gi"
 ova_container_requests_cpu: "100m"
 ova_container_requests_memory: "512Mi"
 
+populator_container_limits_cpu: "1000m"
+populator_container_limits_memory: "1Gi"
+populator_container_requests_cpu: "100m"
+populator_container_requests_memory: "512Mi"
+
 ova_proxy_fqin: "{{ lookup( 'env', 'OVA_PROXY_IMAGE') or lookup( 'env', 'RELATED_IMAGE_OVA_PROXY') }}"
 ova_proxy_container_name: "{{ app_name }}-ova-proxy"
 ova_proxy_service_name: "{{ app_name }}-ova-proxy"
