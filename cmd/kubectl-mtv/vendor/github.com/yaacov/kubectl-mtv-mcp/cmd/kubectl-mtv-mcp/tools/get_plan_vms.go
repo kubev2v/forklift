@@ -11,6 +11,7 @@ import (
 type GetPlanVmsInput struct {
 	PlanName  string `json:"plan_name" jsonschema:"Name of the migration plan to query"`
 	Namespace string `json:"namespace,omitempty" jsonschema:"Kubernetes namespace containing the plan (optional)"`
+	DryRun    bool   `json:"dry_run,omitempty" jsonschema:"If true, shows commands instead of executing (educational mode)"`
 }
 
 // GetGetPlanVmsTool returns the tool definition
@@ -39,6 +40,11 @@ func GetGetPlanVmsTool() *mcp.Tool {
 }
 
 func HandleGetPlanVms(ctx context.Context, req *mcp.CallToolRequest, input GetPlanVmsInput) (*mcp.CallToolResult, any, error) {
+	// Enable dry run mode if requested
+	if input.DryRun {
+		ctx = mtvmcp.WithDryRun(ctx, true)
+	}
+
 	// Validate required parameters
 	if err := mtvmcp.ValidateRequiredParams(map[string]string{
 		"plan_name": input.PlanName,
@@ -54,7 +60,7 @@ func HandleGetPlanVms(ctx context.Context, req *mcp.CallToolRequest, input GetPl
 
 	args = append(args, "-o", "json")
 
-	result, err := mtvmcp.RunKubectlMTVCommand(args)
+	result, err := mtvmcp.RunKubectlMTVCommand(ctx, args)
 	if err != nil {
 		return nil, "", err
 	}

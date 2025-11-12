@@ -39,6 +39,7 @@ type PatchPlanInput struct {
 	ConvertorLabels                string `json:"convertor_labels,omitempty"`
 	ConvertorNodeSelector          string `json:"convertor_node_selector,omitempty"`
 	ConvertorAffinity              string `json:"convertor_affinity,omitempty"`
+	DryRun                         bool   `json:"dry_run,omitempty"`
 }
 
 // GetPatchPlanTool returns the tool definition
@@ -136,6 +137,11 @@ func GetPatchPlanTool() *mcp.Tool {
 }
 
 func HandlePatchPlan(ctx context.Context, req *mcp.CallToolRequest, input PatchPlanInput) (*mcp.CallToolResult, any, error) {
+	// Enable dry run mode if requested
+	if input.DryRun {
+		ctx = mtvmcp.WithDryRun(ctx, true)
+	}
+
 	// Validate required parameters
 	if err := mtvmcp.ValidateRequiredParams(map[string]string{
 		"plan_name": input.PlanName,
@@ -225,7 +231,7 @@ func HandlePatchPlan(ctx context.Context, req *mcp.CallToolRequest, input PatchP
 		args = append(args, "--convertor-affinity", input.ConvertorAffinity)
 	}
 
-	result, err := mtvmcp.RunKubectlMTVCommand(args)
+	result, err := mtvmcp.RunKubectlMTVCommand(ctx, args)
 	if err != nil {
 		return nil, "", err
 	}

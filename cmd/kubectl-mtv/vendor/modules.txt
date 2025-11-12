@@ -160,7 +160,7 @@ github.com/xlab/treeprint
 # github.com/yaacov/karl-interpreter v0.0.1
 ## explicit; go 1.21
 github.com/yaacov/karl-interpreter/pkg/karl
-# github.com/yaacov/kubectl-mtv v0.1.47
+# github.com/yaacov/kubectl-mtv v0.1.48
 ## explicit; go 1.24.0
 github.com/yaacov/kubectl-mtv/cmd
 github.com/yaacov/kubectl-mtv/cmd/archive
@@ -245,7 +245,7 @@ github.com/yaacov/kubectl-mtv/pkg/util/flags
 github.com/yaacov/kubectl-mtv/pkg/util/output
 github.com/yaacov/kubectl-mtv/pkg/util/query
 github.com/yaacov/kubectl-mtv/pkg/util/watch
-# github.com/yaacov/kubectl-mtv-mcp v0.0.4
+# github.com/yaacov/kubectl-mtv-mcp v0.0.5
 ## explicit; go 1.23.0
 github.com/yaacov/kubectl-mtv-mcp/cmd/kubectl-mtv-mcp
 github.com/yaacov/kubectl-mtv-mcp/cmd/kubectl-mtv-mcp/tools

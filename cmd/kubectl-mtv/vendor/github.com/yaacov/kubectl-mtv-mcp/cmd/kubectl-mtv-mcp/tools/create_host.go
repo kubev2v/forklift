@@ -20,6 +20,7 @@ type CreateHostInput struct {
 	HostInsecureSkipTLS *bool  `json:"host_insecure_skip_tls,omitempty"`
 	Cacert              string `json:"cacert,omitempty"`
 	InventoryURL        string `json:"inventory_url,omitempty"`
+	DryRun              bool   `json:"dry_run,omitempty"`
 }
 
 // GetCreateHostTool returns the tool definition
@@ -47,6 +48,7 @@ func GetCreateHostTool() *mcp.Tool {
     Args:
         host_name: Name of the host in provider inventory (required)
         provider: Name of vSphere provider (required)
+        dry_run: If true, shows the kubectl-mtv command instead of executing it (educational mode) (optional, default: false)
         namespace: Kubernetes namespace to create the host in (optional)
         username: Username for host authentication (required unless using existing_secret or ESXi provider)
         password: Password for host authentication (required unless using existing_secret or ESXi provider)
@@ -76,6 +78,11 @@ func GetCreateHostTool() *mcp.Tool {
 }
 
 func HandleCreateHost(ctx context.Context, req *mcp.CallToolRequest, input CreateHostInput) (*mcp.CallToolResult, any, error) {
+	// Enable dry run mode if requested
+	if input.DryRun {
+		ctx = mtvmcp.WithDryRun(ctx, true)
+	}
+
 	// Validate required parameters
 	if err := mtvmcp.ValidateRequiredParams(map[string]string{
 		"host_name": input.HostName,
@@ -116,7 +123,7 @@ func HandleCreateHost(ctx context.Context, req *mcp.CallToolRequest, input Creat
 		args = append(args, "--inventory-url", input.InventoryURL)
 	}
 
-	result, err := mtvmcp.RunKubectlMTVCommand(args)
+	result, err := mtvmcp.RunKubectlMTVCommand(ctx, args)
 	if err != nil {
 		return nil, "", err
 	}

@@ -16,6 +16,7 @@ type ManagePlanLifecycleInput struct {
 	Namespace string `json:"namespace,omitempty" jsonschema:"Kubernetes namespace containing the plan (optional)"`
 	Cutover   string `json:"cutover,omitempty" jsonschema:"Cutover time in ISO8601 format for start action (optional)"`
 	VMs       string `json:"vms,omitempty" jsonschema:"VM names for cancel action - comma-separated or @filename (required for cancel)"`
+	DryRun    bool   `json:"dry_run,omitempty" jsonschema:"If true, shows commands instead of executing (educational mode)"`
 }
 
 // GetManagePlanLifecycleTool returns the tool definition
@@ -26,6 +27,8 @@ func GetManagePlanLifecycleTool() *mcp.Tool {
 
     Unified tool for all plan lifecycle actions including start, cancel, cutover, archive, and unarchive.
     Each action has specific prerequisites and effects on the migration process.
+
+    Dry Run Mode: Set dry_run=true to see the command without executing (useful for teaching users)
 
     Actions:
     - 'start': Begin migrating VMs in the plan
@@ -96,6 +99,11 @@ func GetManagePlanLifecycleTool() *mcp.Tool {
 
 // HandleManagePlanLifecycle handles plan lifecycle operations
 func HandleManagePlanLifecycle(ctx context.Context, req *mcp.CallToolRequest, input ManagePlanLifecycleInput) (*mcp.CallToolResult, any, error) {
+	// Enable dry run mode if requested
+	if input.DryRun {
+		ctx = mtvmcp.WithDryRun(ctx, true)
+	}
+
 	// Validate required parameters
 	if err := mtvmcp.ValidateRequiredParams(map[string]string{
 		"action":    input.Action,
@@ -160,7 +168,7 @@ func HandleManagePlanLifecycle(ctx context.Context, req *mcp.CallToolRequest, in
 		}
 	}
 
-	result, err := mtvmcp.RunKubectlMTVCommand(args)
+	result, err := mtvmcp.RunKubectlMTVCommand(ctx, args)
 	if err != nil {
 		return nil, "", err
 	}

@@ -96,6 +96,9 @@ const (
 	// Enhancement doc: https://github.com/openshift/enhancements/pull/1793
 	// Example: network.kubevirt.io/addresses: '{"iface1": ["192.168.0.1/24", "fd23:3214::123/64"]}'
 	AnnStaticUdnIp = "network.kubevirt.io/addresses"
+
+	// Explicitly disable CDI's populator auto-detection to avoid webhook validation errors
+	AnnUsePopulator = "cdi.kubevirt.io/storage.usePopulator"
 )
 
 var VolumePopulatorNotSupportedError = liberr.New("provider does not support volume populators")

@@ -13,6 +13,7 @@ type DeleteProviderInput struct {
 	ProviderName string `json:"provider_name,omitempty"`
 	Namespace    string `json:"namespace,omitempty"`
 	AllProviders bool   `json:"all_providers,omitempty"`
+	DryRun       bool   `json:"dry_run,omitempty"`
 }
 
 // GetDeleteProviderTool returns the tool definition
@@ -25,6 +26,7 @@ func GetDeleteProviderTool() *mcp.Tool {
 
     Args:
         provider_name: Name of the provider to delete (required unless all_providers=True)
+        dry_run: If true, shows the kubectl-mtv command instead of executing it (educational mode) (optional, default: false)
         namespace: Kubernetes namespace containing the provider (optional)
         all_providers: Delete all providers in the namespace (optional)
 
@@ -41,6 +43,11 @@ func GetDeleteProviderTool() *mcp.Tool {
 }
 
 func HandleDeleteProvider(ctx context.Context, req *mcp.CallToolRequest, input DeleteProviderInput) (*mcp.CallToolResult, any, error) {
+	// Enable dry run mode if requested
+	if input.DryRun {
+		ctx = mtvmcp.WithDryRun(ctx, true)
+	}
+
 	args := []string{"delete", "provider"}
 
 	if input.AllProviders {
@@ -56,7 +63,7 @@ func HandleDeleteProvider(ctx context.Context, req *mcp.CallToolRequest, input D
 		args = append(args, "-n", input.Namespace)
 	}
 
-	result, err := mtvmcp.RunKubectlMTVCommand(args)
+	result, err := mtvmcp.RunKubectlMTVCommand(ctx, args)
 	if err != nil {
 		return nil, "", err
 	}

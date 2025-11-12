@@ -11,7 +11,7 @@ func handleGetVersion(ctx context.Context, req *mcp.CallToolRequest, input struc
 	RandomString string `json:"random_string"`
 }) (*mcp.CallToolResult, any, error) {
 	args := []string{"version", "-o", "json"}
-	result, err := mtvmcp.RunKubectlMTVCommand(args)
+	result, err := mtvmcp.RunKubectlMTVCommand(ctx, args)
 	if err != nil {
 		return nil, "", err
 	}

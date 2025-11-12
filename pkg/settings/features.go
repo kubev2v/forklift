@@ -27,6 +27,11 @@ const ocpMinForVmwareSystemSerial = "4.20.0-0"
 //   - https://issues.redhat.com/browse/CNV-66820
 const ocpMinForUdnMacSupport = "4.20.0-0"
 
+// OpenShift version where InsecureSkipVerify is supported for ImageIO data sources:
+//   - https://issues.redhat.com/browse/CNV-71978
+//   - https://github.com/kubevirt/containerized-data-importer/pull/3944
+const ocpMinForInsecureSkipVerify = "4.21.0-0"
+
 // Feature gates.
 type Features struct {
 	// Whether migration is supported from oVirt sources.
@@ -48,6 +53,8 @@ type Features struct {
 	StaticUdnIpAddresses bool
 	// Whether to enable support for appliance management endpoints for the OVA provider.
 	OVAApplianceManagement bool
+	// Whether CDI supports InsecureSkipVerify for ImageIO data sources (CNV 4.21+)
+	InsecureSkipVerifySupported bool
 }
 
 // isOpenShiftVersionAboveMinimum checks if OpenShift version is above or equal to minimum version using semantic versioning
@@ -82,6 +89,7 @@ func (r *Features) Load() (err error) {
 	r.OCPLiveMigration = getEnvBool(FeatureOCPLiveMigration, false)
 	r.VmwareSystemSerialNumber = getEnvBool(FeatureVmwareSystemSerialNumber, true) && r.isOpenShiftVersionAboveMinimum(ocpMinForVmwareSystemSerial)
 	r.UdnSupportsMac = r.isOpenShiftVersionAboveMinimum(ocpMinForUdnMacSupport)
+	r.InsecureSkipVerifySupported = r.isOpenShiftVersionAboveMinimum(ocpMinForInsecureSkipVerify)
 	r.OVAApplianceManagement = getEnvBool(FeatureOVAApplianceManagement, false)
 	return
 }
