@@ -28,6 +28,7 @@ type CreateProviderInput struct {
 	ProviderDomainName     string `json:"provider_domain_name,omitempty"`
 	ProviderProjectName    string `json:"provider_project_name,omitempty"`
 	ProviderRegionName     string `json:"provider_region_name,omitempty"`
+	DryRun                 bool   `json:"dry_run,omitempty"`
 }
 
 // GetCreateProviderTool returns the tool definition
@@ -38,6 +39,8 @@ func GetCreateProviderTool() *mcp.Tool {
 
     Providers connect MTV to source virtualization platforms (vSphere, oVirt, OpenStack, OpenShift, OVA).
     Each provider type requires different authentication and connection parameters.
+
+    Dry Run Mode: Set dry_run=true to see the command without executing (useful for teaching users)
 
     Provider Types and Required Parameters:
     - vSphere: url, username/password OR token, optional: cacert, vddk_init_image, sdk_endpoint
@@ -66,6 +69,7 @@ func GetCreateProviderTool() *mcp.Tool {
     Args:
         provider_name: Name for the new provider (required)
         provider_type: Type of provider - 'vsphere', 'ovirt', 'openstack', 'openshift', or 'ova' (required)
+        dry_run: If true, shows the kubectl-mtv command instead of executing it (educational mode) (optional, default: false)
         namespace: Kubernetes namespace to create the provider in (optional)
         secret: Name of existing secret containing provider credentials (optional, alternative to individual credentials)
         url: Provider URL/endpoint (required for most provider types)
@@ -103,6 +107,11 @@ func GetCreateProviderTool() *mcp.Tool {
 }
 
 func HandleCreateProvider(ctx context.Context, req *mcp.CallToolRequest, input CreateProviderInput) (*mcp.CallToolResult, any, error) {
+	// Enable dry run mode if requested
+	if input.DryRun {
+		ctx = mtvmcp.WithDryRun(ctx, true)
+	}
+
 	// Validate required parameters
 	if err := mtvmcp.ValidateRequiredParams(map[string]string{
 		"provider_name": input.ProviderName,
@@ -164,7 +173,7 @@ func HandleCreateProvider(ctx context.Context, req *mcp.CallToolRequest, input C
 		args = append(args, "--provider-region-name", input.ProviderRegionName)
 	}
 
-	result, err := mtvmcp.RunKubectlMTVCommand(args)
+	result, err := mtvmcp.RunKubectlMTVCommand(ctx, args)
 	if err != nil {
 		return nil, "", err
 	}
