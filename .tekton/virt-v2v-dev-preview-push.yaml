@@ -215,7 +215,7 @@ spec:
           - name: dev-package-managers
             value: "true"
           - name: ACTIVATION_KEY
-            value: activation-key-rhel9
+            value: activation-key-rhel10
         runAfter:
           - clone-repository
         taskRef:
