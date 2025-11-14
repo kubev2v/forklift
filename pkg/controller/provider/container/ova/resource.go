@@ -15,6 +15,7 @@ type VM struct {
 	Name                  string   `json:"Name"`
 	OvaPath               string   `json:"OvaPath"`
 	OvaSource             string   `json:"OvaSource"`
+	OsType                string   `json:"OsType"`
 	RevisionValidated     int64    `json:"RevisionValidated"`
 	PolicyVersion         int      `json:"PolicyVersion"`
 	UUID                  string   `json:"UUID"`
@@ -71,6 +72,7 @@ func (r *VM) ApplyTo(m *model.VM) {
 	m.ID = r.UUID
 	m.OvaPath = r.OvaPath
 	m.OvaSource = r.OvaSource
+	m.OsType = r.OsType
 	m.RevisionValidated = r.RevisionValidated
 	m.PolicyVersion = r.PolicyVersion
 	m.UUID = r.UUID

@@ -205,6 +205,7 @@ type VM struct {
 	VM1
 	OvaPath               string          `json:"ovaPath"`
 	OvaSource             string          `json:"ovaSource"`
+	OsType                string          `json:"osType"`
 	RevisionValidated     int64           `json:"revisionValidated"`
 	PolicyVersion         int             `json:"policyVersion"`
 	UUID                  string          `json:"uuid"`
@@ -257,6 +258,7 @@ func (r *VM) With(m *model.VM) {
 	r.NICs = m.NICs
 	r.OvaPath = m.OvaPath
 	r.OvaSource = m.OvaSource
+	r.OsType = m.OsType
 	r.Disks = m.Disks
 	r.Networks = m.Networks
 }

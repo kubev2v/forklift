@@ -70,6 +70,7 @@ type VM struct {
 	Base
 	OvaPath               string    `sql:""`
 	OvaSource             string    `sql:""`
+	OsType                string    `sql:""`
 	RevisionValidated     int64     `sql:"d0,index(revisionValidated)"`
 	PolicyVersion         int       `sql:"d0,index(policyVersion)"`
 	UUID                  string    `sql:""`
