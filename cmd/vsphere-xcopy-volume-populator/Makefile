@@ -35,7 +35,7 @@ generate:
 
 .PHONY: build
 build: fmt vet
-	PATH=$(PATH) \
+	PATH="$(PATH)" \
 	go build \
 	-ldflags="-w -s -X github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator.VibVersion=$(VIB_VERSION)" \
 	-o bin/vsphere-xcopy-volume-populator
