@@ -53,7 +53,7 @@ func formatIPs(ips []IPEntry) string {
 	var b strings.Builder
 	b.WriteString("(\n")
 	for i, ip := range ips {
-		b.WriteString("'" + ip.IP + "'")
+		b.WriteString(fmt.Sprintf("    @{ IPAddress = '%s'; Gateway = '%s'; PrefixLength = %s }", ip.IP, ip.Gateway, ip.PrefixLength))
 		if i < len(ips)-1 {
 			b.WriteString(",")
 		}
@@ -66,9 +66,19 @@ func formatIPs(ips []IPEntry) string {
 func formatDNS(dns []string) string {
 	var b strings.Builder
 	b.WriteString("(\n")
-	for i, ip := range dns {
+
+	// Filter out blank/empty DNS entries
+	var validDNS []string
+	for _, ip := range dns {
+		trimmed := strings.TrimSpace(ip)
+		if trimmed != "" {
+			validDNS = append(validDNS, trimmed)
+		}
+	}
+
+	for i, ip := range validDNS {
 		b.WriteString("'" + ip + "'")
-		if i < len(dns)-1 {
+		if i < len(validDNS)-1 {
 			b.WriteString(",")
 		}
 		b.WriteString("\n")
@@ -176,14 +186,18 @@ func (c *Customize) injectComplementryStaticIPTemplate(templatePath, outputPath 
 		}
 		mac := strings.ReplaceAll(parts[0], ":", "-") // Windows format
 		ipParts := strings.Split(parts[1], ",")
-		if len(ipParts) < 5 {
+		// Require at least IP, gateway, and prefix (DNS is optional)
+		if len(ipParts) < 3 {
 			continue
 		}
 
 		ip := ipParts[0]
 		gw := ipParts[1]
 		prefix := ipParts[2]
-		dns := ipParts[3:]
+		dns := []string{}
+		if len(ipParts) > 3 {
+			dns = ipParts[3:]
+		}
 
 		ipEntry := IPEntry{
 			IP:           ip,
