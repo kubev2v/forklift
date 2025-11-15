@@ -120,12 +120,13 @@ func TestPopulate(t *testing.T) {
 		Name:         "test-pv",
 		VolumeHandle: "test-handle",
 	}
-	progress := make(chan uint)
+	progress := make(chan uint64)
+	cloneProgressBytes := make(chan uint64)
 	quit := make(chan error)
 
-	mockPopulator.EXPECT().Populate("vm-1", "source.vmdk", pv, progress, quit).Return(nil)
+	mockPopulator.EXPECT().Populate("vm-1", "source.vmdk", pv, progress, quit, cloneProgressBytes).Return(nil)
 
-	err := mockPopulator.Populate("vm-1", "source.vmdk", pv, progress, quit)
+	err := mockPopulator.Populate("vm-1", "source.vmdk", pv, progress, quit, cloneProgressBytes)
 	if err != nil {
 		t.Errorf("Populate() error = %v, wantErr %v", err, false)
 	}
