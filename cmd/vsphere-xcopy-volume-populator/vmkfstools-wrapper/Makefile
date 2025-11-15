@@ -6,6 +6,7 @@ test:
 	python vmkfstools_wrapper_test.py
 
 build: test
+	sed "s/__VERSION__/$(VIB_VERSION)/g" vmkfstools_wrapper.py > vmkfstools_wrapper.py.versioned
 	VIB_VERSION=${VIB_VERSION} ./create-vib.sh 
 
 install: build
