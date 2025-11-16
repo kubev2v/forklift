@@ -3,6 +3,7 @@ package plan
 import (
 	"strconv"
 
+	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/provider"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
@@ -224,6 +225,127 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			gomega.Expect(guestToolsIssue.Items).To(gomega.HaveLen(2))
 		})
 	})
+
+	ginkgo.Describe("validateTransferNetwork", func() {
+		ginkgo.It("should pass validation when route annotation has valid IP", func() {
+			nad := &k8snet.NetworkAttachmentDefinition{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-nad",
+					Namespace: "test-ns",
+					Annotations: map[string]string{
+						AnnForkliftNetworkRoute: "192.168.1.1",
+					},
+				},
+			}
+
+			reconciler := createFakeReconciler(nad)
+			plan := &api.Plan{
+				Spec: api.PlanSpec{
+					TransferNetwork: &core.ObjectReference{
+						Namespace: "test-ns",
+						Name:      "test-nad",
+					},
+				},
+			}
+
+			err := reconciler.validateTransferNetwork(plan)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(TransferNetNotValid)).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("should pass validation when route annotation is 'none'", func() {
+			nad := &k8snet.NetworkAttachmentDefinition{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-nad",
+					Namespace: "test-ns",
+					Annotations: map[string]string{
+						AnnForkliftNetworkRoute: AnnForkliftRouteValueNone,
+					},
+				},
+			}
+
+			reconciler := createFakeReconciler(nad)
+			plan := &api.Plan{
+				Spec: api.PlanSpec{
+					TransferNetwork: &core.ObjectReference{
+						Namespace: "test-ns",
+						Name:      "test-nad",
+					},
+				},
+			}
+
+			err := reconciler.validateTransferNetwork(plan)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(TransferNetNotValid)).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("should set warning when route annotation is missing", func() {
+			nad := &k8snet.NetworkAttachmentDefinition{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-nad",
+					Namespace: "test-ns",
+				},
+			}
+
+			reconciler := createFakeReconciler(nad)
+			plan := &api.Plan{
+				Spec: api.PlanSpec{
+					TransferNetwork: &core.ObjectReference{
+						Namespace: "test-ns",
+						Name:      "test-nad",
+					},
+				},
+			}
+
+			err := reconciler.validateTransferNetwork(plan)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(TransferNetMissingDefaultRoute)).To(gomega.BeTrue())
+		})
+
+		ginkgo.It("should set error when route annotation has invalid IP", func() {
+			nad := &k8snet.NetworkAttachmentDefinition{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-nad",
+					Namespace: "test-ns",
+					Annotations: map[string]string{
+						AnnForkliftNetworkRoute: "invalid-ip-address",
+					},
+				},
+			}
+
+			reconciler := createFakeReconciler(nad)
+			plan := &api.Plan{
+				Spec: api.PlanSpec{
+					TransferNetwork: &core.ObjectReference{
+						Namespace: "test-ns",
+						Name:      "test-nad",
+					},
+				},
+			}
+
+			err := reconciler.validateTransferNetwork(plan)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(TransferNetNotValid)).To(gomega.BeTrue())
+			gomega.Expect(plan.Status.FindCondition(TransferNetNotValid).Reason).To(gomega.Equal(NotValid))
+		})
+
+		ginkgo.It("should set error when NAD does not exist", func() {
+			reconciler := createFakeReconciler()
+			plan := &api.Plan{
+				Spec: api.PlanSpec{
+					TransferNetwork: &core.ObjectReference{
+						Namespace: "test-ns",
+						Name:      "non-existent-nad",
+					},
+				},
+			}
+
+			err := reconciler.validateTransferNetwork(plan)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(TransferNetNotValid)).To(gomega.BeTrue())
+			gomega.Expect(plan.Status.FindCondition(TransferNetNotValid).Reason).To(gomega.Equal(NotFound))
+		})
+	})
 })
 
 // Mock validator for testing GuestToolsIssue aggregation
@@ -252,6 +374,7 @@ func createFakeReconciler(objects ...runtime.Object) *Reconciler {
 
 	scheme := runtime.NewScheme()
 	_ = core.AddToScheme(scheme)
+	_ = k8snet.AddToScheme(scheme)
 	api.SchemeBuilder.AddToScheme(scheme)
 
 	client := fakeClient.NewClientBuilder().
