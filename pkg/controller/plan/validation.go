@@ -1261,9 +1261,12 @@ func (r *Reconciler) validateTransferNetwork(plan *api.Plan) (err error) {
 		plan.Status.SetCondition(missingDefaultRoute)
 		return
 	}
-	ip := net.ParseIP(route)
-	if ip == nil {
-		plan.Status.SetCondition(notValid)
+	// Handle case where user explicitly requested not to have a default route
+	if route != AnnForkliftRouteValueNone {
+		ip := net.ParseIP(route)
+		if ip == nil {
+			plan.Status.SetCondition(notValid)
+		}
 	}
 
 	return

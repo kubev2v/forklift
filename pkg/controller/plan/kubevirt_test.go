@@ -2,6 +2,9 @@
 package plan
 
 import (
+	"encoding/json"
+
+	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
@@ -37,11 +40,196 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 		})
 	})
 
+	ginkgo.Describe("setTransferNetwork", func() {
+		ginkgo.It("should set modern annotation with gateway when route annotation has IP", func() {
+			nad := &k8snet.NetworkAttachmentDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nad",
+					Namespace: "test-ns",
+					Annotations: map[string]string{
+						AnnForkliftNetworkRoute: "192.168.1.1",
+					},
+				},
+			}
+
+			kubevirt := createKubeVirtWithTransferNetwork(nad, "test-ns", "test-nad")
+			annotations := make(map[string]string)
+
+			err := kubevirt.setTransferNetwork(annotations)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(annotations).To(HaveKey(AnnTransferNetwork))
+			Expect(annotations).ToNot(HaveKey(AnnLegacyTransferNetwork))
+
+			var networks []k8snet.NetworkSelectionElement
+			err = json.Unmarshal([]byte(annotations[AnnTransferNetwork]), &networks)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(networks).To(HaveLen(1))
+			Expect(networks[0].Name).To(Equal("test-nad"))
+			Expect(networks[0].Namespace).To(Equal("test-ns"))
+			Expect(networks[0].GatewayRequest).To(HaveLen(1))
+			Expect(networks[0].GatewayRequest[0].String()).To(Equal("192.168.1.1"))
+		})
+
+		ginkgo.It("should set modern annotation without gateway when route annotation is 'none'", func() {
+			nad := &k8snet.NetworkAttachmentDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nad",
+					Namespace: "test-ns",
+					Annotations: map[string]string{
+						AnnForkliftNetworkRoute: AnnForkliftRouteValueNone,
+					},
+				},
+			}
+
+			kubevirt := createKubeVirtWithTransferNetwork(nad, "test-ns", "test-nad")
+			annotations := make(map[string]string)
+
+			err := kubevirt.setTransferNetwork(annotations)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(annotations).To(HaveKey(AnnTransferNetwork))
+			Expect(annotations).ToNot(HaveKey(AnnLegacyTransferNetwork))
+
+			var networks []k8snet.NetworkSelectionElement
+			err = json.Unmarshal([]byte(annotations[AnnTransferNetwork]), &networks)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(networks).To(HaveLen(1))
+			Expect(networks[0].Name).To(Equal("test-nad"))
+			Expect(networks[0].Namespace).To(Equal("test-ns"))
+			Expect(networks[0].GatewayRequest).To(BeEmpty())
+		})
+
+		ginkgo.It("should set modern annotation with gateway from IPAM config", func() {
+			nadConfig := `{
+				"cniVersion": "0.3.1",
+				"name": "test-network",
+				"type": "ovn-k8s-cni-overlay",
+				"ipam": {
+					"type": "static",
+					"routes": [
+						{"dst": "0.0.0.0/0", "gw": "10.0.0.1"}
+					]
+				}
+			}`
+			nad := &k8snet.NetworkAttachmentDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nad",
+					Namespace: "test-ns",
+				},
+				Spec: k8snet.NetworkAttachmentDefinitionSpec{
+					Config: nadConfig,
+				},
+			}
+
+			kubevirt := createKubeVirtWithTransferNetwork(nad, "test-ns", "test-nad")
+			annotations := make(map[string]string)
+
+			err := kubevirt.setTransferNetwork(annotations)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(annotations).To(HaveKey(AnnTransferNetwork))
+			Expect(annotations).ToNot(HaveKey(AnnLegacyTransferNetwork))
+
+			var networks []k8snet.NetworkSelectionElement
+			err = json.Unmarshal([]byte(annotations[AnnTransferNetwork]), &networks)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(networks).To(HaveLen(1))
+			Expect(networks[0].Name).To(Equal("test-nad"))
+			Expect(networks[0].Namespace).To(Equal("test-ns"))
+			Expect(networks[0].GatewayRequest).To(HaveLen(1))
+			Expect(networks[0].GatewayRequest[0].String()).To(Equal("10.0.0.1"))
+		})
+
+		ginkgo.It("should prefer gateway from annotation over gateway from IPAM config", func() {
+			nadConfig := `{
+				"cniVersion": "0.3.1",
+				"name": "test-network",
+				"type": "ovn-k8s-cni-overlay",
+				"ipam": {
+					"type": "static",
+					"routes": [
+						{"dst": "0.0.0.0/0", "gw": "10.0.0.1"}
+					]
+				}
+			}`
+			nad := &k8snet.NetworkAttachmentDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nad",
+					Namespace: "test-ns",
+					Annotations: map[string]string{
+						AnnForkliftNetworkRoute: "192.168.1.1",
+					},
+				},
+				Spec: k8snet.NetworkAttachmentDefinitionSpec{
+					Config: nadConfig,
+				},
+			}
+
+			kubevirt := createKubeVirtWithTransferNetwork(nad, "test-ns", "test-nad")
+			annotations := make(map[string]string)
+
+			err := kubevirt.setTransferNetwork(annotations)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(annotations).To(HaveKey(AnnTransferNetwork))
+			Expect(annotations).ToNot(HaveKey(AnnLegacyTransferNetwork))
+
+			var networks []k8snet.NetworkSelectionElement
+			err = json.Unmarshal([]byte(annotations[AnnTransferNetwork]), &networks)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(networks).To(HaveLen(1))
+			Expect(networks[0].Name).To(Equal("test-nad"))
+			Expect(networks[0].Namespace).To(Equal("test-ns"))
+			Expect(networks[0].GatewayRequest).To(HaveLen(1))
+			Expect(networks[0].GatewayRequest[0].String()).To(Equal("192.168.1.1"))
+		})
+
+		ginkgo.It("should fall back to legacy annotation when no route found", func() {
+			nad := &k8snet.NetworkAttachmentDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nad",
+					Namespace: "test-ns",
+				},
+			}
+
+			kubevirt := createKubeVirtWithTransferNetwork(nad, "test-ns", "test-nad")
+			annotations := make(map[string]string)
+
+			err := kubevirt.setTransferNetwork(annotations)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(annotations).ToNot(HaveKey(AnnTransferNetwork))
+			Expect(annotations).To(HaveKey(AnnLegacyTransferNetwork))
+			Expect(annotations[AnnLegacyTransferNetwork]).To(Equal("test-ns/test-nad"))
+		})
+
+		ginkgo.It("should return error for invalid IP in route annotation", func() {
+			nad := &k8snet.NetworkAttachmentDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-nad",
+					Namespace: "test-ns",
+					Annotations: map[string]string{
+						AnnForkliftNetworkRoute: "invalid-ip",
+					},
+				},
+			}
+
+			kubevirt := createKubeVirtWithTransferNetwork(nad, "test-ns", "test-nad")
+			annotations := make(map[string]string)
+
+			err := kubevirt.setTransferNetwork(annotations)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("not a valid IP address"))
+		})
+	})
+
 })
 
 func createKubeVirt(objs ...runtime.Object) *KubeVirt {
 	scheme := runtime.NewScheme()
 	_ = v1.AddToScheme(scheme)
+	_ = k8snet.AddToScheme(scheme)
 	v1beta1.SchemeBuilder.AddToScheme(scheme)
 	client := fake.NewClientBuilder().
 		WithScheme(scheme).
@@ -54,7 +242,7 @@ func createKubeVirt(objs ...runtime.Object) *KubeVirt {
 			},
 			Log:       KubeVirtLog,
 			Migration: createMigration(),
-			Plan:      createPlanKubevirt(),
+			Plan:      createPlanKubevirt(nil),
 			Client:    client,
 		},
 	}
@@ -69,11 +257,23 @@ func createMigration() *v1beta1.Migration {
 		},
 	}
 }
-func createPlanKubevirt() *v1beta1.Plan {
+func createPlanKubevirt(transferNetwork *v1.ObjectReference) *v1beta1.Plan {
 	return &v1beta1.Plan{
 		ObjectMeta: metav1.ObjectMeta{},
 		Spec: v1beta1.PlanSpec{
-			Type: "cold",
+			Type:            "cold",
+			TransferNetwork: transferNetwork,
 		},
 	}
+}
+
+func createKubeVirtWithTransferNetwork(nad *k8snet.NetworkAttachmentDefinition, namespace, name string) *KubeVirt {
+	transferNetwork := &v1.ObjectReference{
+		Namespace: namespace,
+		Name:      name,
+	}
+
+	kubevirt := createKubeVirt(nad)
+	kubevirt.Plan = createPlanKubevirt(transferNetwork)
+	return kubevirt
 }

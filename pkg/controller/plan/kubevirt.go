@@ -64,6 +64,9 @@ const (
 	// Annotation to specify the default route for the transfer network.
 	// To be set on the transfer network NAD by the end user.
 	AnnForkliftNetworkRoute = "forklift.konveyor.io/route"
+	// Special value for AnnForkliftNetworkRoute to explicitly request no gateway.
+	// Use this to enable modern k8s.v1.cni.cncf.io/networks annotation without default-route.
+	AnnForkliftRouteValueNone = "none"
 	// Contains validations for a Kubevirt VM. Needs to be removed when
 	// creating a VM from a template.
 	AnnKubevirtValidations = "vm.kubevirt.io/validations"
@@ -2793,8 +2796,13 @@ func (r *KubeVirt) guessTransferNetworkDefaultRoute(netAttachDef *k8snet.Network
 //
 // Behavior:
 //   - If a default gateway is found (via annotation or NAD config): Sets the
-//     k8s.v1.cni.cncf.io/networks annotation with the gateway to configure routing
-//   - If no default gateway is found: Falls back to setting the legacy
+//     k8s.v1.cni.cncf.io/networks annotation with the gateway IP in default-route
+//   - If route annotation is explicitly set to "none" (AnnForkliftRouteValueNone):
+//     Sets k8s.v1.cni.cncf.io/networks annotation without default-route field.
+//     Useful for example when only ESXi hosts are accessible via transfer network
+//     but vCenter is not.
+//   - If no route annotation exists and no gateway found in NAD config:
+//     Falls back to setting the legacy
 //     v1.multus-cni.io/default-network annotation with the NAD's namespaced name
 //
 // The default gateway is discovered by checking the NAD annotation and IPAM config
@@ -2819,15 +2827,19 @@ func (r *KubeVirt) setTransferNetwork(annotations map[string]string) (err error)
 			Namespace: key.Namespace,
 			Name:      key.Name,
 		}
-		ip := net.ParseIP(route)
-		if ip != nil {
-			nse.GatewayRequest = []net.IP{ip}
-		} else {
-			err = liberr.New(
-				"Transfer network default route is not a valid IP address.",
-				"route", route)
-			return
+
+		if route != AnnForkliftRouteValueNone {
+			ip := net.ParseIP(route)
+			if ip != nil {
+				nse.GatewayRequest = []net.IP{ip}
+			} else {
+				err = liberr.New(
+					"Transfer network default route is not a valid IP address.",
+					"route", route)
+				return
+			}
 		}
+
 		transferNetwork, jErr := json.Marshal([]k8snet.NetworkSelectionElement{nse})
 		if jErr != nil {
 			err = liberr.Wrap(jErr)
