@@ -14,36 +14,11 @@ spec:
     - Ingress
     - Egress
   ingress:
-    # Allow controller to communicate with API webhooks
-    - from:
-      - podSelector:
-          matchLabels:
-            control-plane: controller-manager
-      ports:
-      - protocol: TCP
-        port: 8443
-    # Allow OpenShift Console to access API webhooks
-    - from:
-      - namespaceSelector:
-          matchLabels:
-            kubernetes.io/metadata.name: openshift-console
-      ports:
-      - protocol: TCP
-        port: 8443
-    {% if not k8s_cluster|bool %}
-    # Allow monitoring to access API metrics
-    - from:
-      - namespaceSelector:
-          matchLabels:
-            kubernetes.io/metadata.name: openshift-monitoring
-      ports:
-      - protocol: TCP
-        port: 8443
-    {% endif %}
     # Allow 8443 from anywhere:
-    # Required because Kubernetes/OpenShift API server webhook calls do not
-    # originate from a Pod/Namespace that NetworkPolicy can match. Without
-    # this, admission webhooks (e.g. Forklift API validation) would be blocked.
+    # Required for admission webhooks. Flow: user -> k8s API server -> webhook -> k8s API server -> user
+    # The API server calls the webhook, but API server traffic does not originate from a Pod/Namespace
+    # that NetworkPolicy can match (API server runs on control plane nodes). Without this open ingress
+    # rule, admission webhooks (e.g. Forklift API validation) would be blocked.
     - ports:
       - protocol: TCP
         port: 8443
