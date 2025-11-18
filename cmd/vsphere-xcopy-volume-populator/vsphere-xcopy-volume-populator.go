@@ -203,7 +203,8 @@ func main() {
 	progressCh := make(chan uint)
 	quitCh := make(chan error)
 
-	go p.Populate(sourceVmId, sourceVMDKFile, pv, progressCh, quitCh)
+	hll := populator.NewHostLeaseLocker(clientSet)
+	go p.Populate(sourceVmId, sourceVMDKFile, pv, hll, progressCh, quitCh)
 
 	for {
 		select {

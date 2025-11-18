@@ -89,7 +89,7 @@ func NewWithRemoteEsxcliSSH(storageApi StorageApi, vsphereHostname, vsphereUsern
 	}, nil
 }
 
-func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, progress chan<- uint, quit chan error) (errFinal error) {
+func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint, quit chan error) (errFinal error) {
 	// isn't it better to not call close the channel from the caller?
 	defer func() {
 		r := recover()
@@ -274,7 +274,12 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	targetLUN := fmt.Sprintf("/vmfs/devices/disks/%s", lun.NAA)
 	klog.Infof("resolved lun with IQN %s to lun %s", lun.IQN, targetLUN)
 
-	err = rescan(p.VSphereClient, host, lun.NAA)
+	err = hostLocker.WithLock(context.Background(), strings.ReplaceAll(strings.ToLower(host.String()), ":", "-"),
+		func() error {
+			return rescan(p.VSphereClient, host, lun.NAA)
+		},
+	)
+
 	if err != nil {
 		return fmt.Errorf("failed to find the device %s after scanning: %w", targetLUN, err)
 	}
