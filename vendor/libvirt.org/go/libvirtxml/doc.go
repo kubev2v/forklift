@@ -1,5 +1,5 @@
 /*
- * This file is part of the libvirt-go-xml project
+ * This file is part of the libvirt-go-xml-module project
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,7 +23,7 @@
  *
  */
 
-// Package libvirt-go-xml defines structs for parsing libvirt XML schemas
+// Package libvirt-go-xml-module defines structs for parsing libvirt XML schemas
 //
 // The libvirt API uses XML schemas/documents to describe the configuration
 // of many of its managed objects. Thus when using the libvirt-go package,
@@ -33,38 +33,37 @@
 //
 // Example creating a domain XML document from configuration:
 //
-//  package main
+//	package main
 //
-//  import (
-//   "libvirt.org/libvirt-go-xml"
-//  )
+//	import (
+//	 "libvirt.org/go/libvirtxml"
+//	)
 //
-//  func main() {
-//    domcfg := &libvirtxml.Domain{Type: "kvm", Name: "demo",
-//                                 UUID: "8f99e332-06c4-463a-9099-330fb244e1b3",
-//                                 ....}
-//    xmldoc, err := domcfg.Marshal()
-//  }
+//	func main() {
+//	  domcfg := &libvirtxml.Domain{Type: "kvm", Name: "demo",
+//	                               UUID: "8f99e332-06c4-463a-9099-330fb244e1b3",
+//	                               ....}
+//	  xmldoc, err := domcfg.Marshal()
+//	}
 //
 // Example parsing a domainXML document, in combination with libvirt-go
 //
-//  package main
+//	package main
 //
-//  import (
-//    "libvirt.org/libvirt-go"
-//    "libvirt.org/libvirt-go-xml"
-//    "fmt"
-//  )
+//	import (
+//	  "libvirt.org/go/libvirt"
+//	  "libvirt.org/go/libvirtxml"
+//	  "fmt"
+//	)
 //
-//  func main() {
-//    conn, err := libvirt.NewConnect("qemu:///system")
-//    dom, err := conn.LookupDomainByName("demo")
-//    xmldoc, err := dom.GetXMLDesc(0)
+//	func main() {
+//	  conn, err := libvirt.NewConnect("qemu:///system")
+//	  dom, err := conn.LookupDomainByName("demo")
+//	  xmldoc, err := dom.GetXMLDesc(0)
 //
-//    domcfg := &libvirtxml.Domain{}
-//    err = domcfg.Unmarshal(xmldoc)
+//	  domcfg := &libvirtxml.Domain{}
+//	  err = domcfg.Unmarshal(xmldoc)
 //
-//    fmt.Printf("Virt type %s\n", domcfg.Type)
-//  }
-//
+//	  fmt.Printf("Virt type %s\n", domcfg.Type)
+//	}
 package libvirtxml

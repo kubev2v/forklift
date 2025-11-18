@@ -45,7 +45,7 @@ require (
 	kubevirt.io/api v1.6.0-beta.0.0.20250702170314-dd941825f5d3
 	kubevirt.io/containerized-data-importer-api v1.60.3-0.20241105012228-50fbed985de9
 	libvirt.org/go/libvirt v1.10009.1
-	libvirt.org/libvirt-go-xml v7.4.0+incompatible
+	libvirt.org/go/libvirtxml v1.11009.0
 	modernc.org/sqlite v1.39.1
 	sigs.k8s.io/controller-runtime v0.20.4
 	sigs.k8s.io/mcs-api v0.1.0

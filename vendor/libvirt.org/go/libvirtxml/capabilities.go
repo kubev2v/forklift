@@ -1,5 +1,5 @@
 /*
- * This file is part of the libvirt-go-xml project
+ * This file is part of the libvirt-go-xml-module project
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -30,9 +30,11 @@ import (
 )
 
 type CapsHostCPUTopology struct {
-	Sockets int `xml:"sockets,attr"`
-	Cores   int `xml:"cores,attr"`
-	Threads int `xml:"threads,attr"`
+	Sockets  int `xml:"sockets,attr"`
+	Dies     int `xml:"dies,attr,omitempty"`
+	Clusters int `xml:"clusters,attr,omitempty"`
+	Cores    int `xml:"cores,attr"`
+	Threads  int `xml:"threads,attr"`
 }
 
 type CapsHostCPUFeatureFlag struct {
@@ -48,16 +50,42 @@ type CapsHostCPUMicrocode struct {
 	Version int `xml:"version,attr"`
 }
 
+type CapsHostCPUSignature struct {
+	Family   int `xml:"family,attr"`
+	Model    int `xml:"model,attr"`
+	Stepping int `xml:"stepping,attr"`
+}
+
+type CapsHostCPUCounter struct {
+	Name      string `xml:"name,attr"`
+	Frequency uint   `xml:"frequency,attr"`
+	Scaling   string `xml:"scaling,attr,omitempty"`
+}
+
+type CapsHostCPUCache struct {
+	Level *uint  `xml:"level,attr,omitempty"`
+	Mode  string `xml:"mode,attr"`
+}
+
+type CapsHostCPUMaxPhysAddr struct {
+	Mode string `xml:"mode,attr"`
+	Bits uint   `xml:"bits,attr,omitempty"`
+}
+
 type CapsHostCPU struct {
 	XMLName      xml.Name                 `xml:"cpu"`
 	Arch         string                   `xml:"arch,omitempty"`
 	Model        string                   `xml:"model,omitempty"`
 	Vendor       string                   `xml:"vendor,omitempty"`
+	Microcode    *CapsHostCPUMicrocode    `xml:"microcode"`
+	Signature    *CapsHostCPUSignature    `xml:"signature"`
+	Counter      *CapsHostCPUCounter      `xml:"counter"`
 	Topology     *CapsHostCPUTopology     `xml:"topology"`
+	Cache        *CapsHostCPUCache        `xml:"cache"`
+	MaxPhysAddr  *CapsHostCPUMaxPhysAddr  `xml:"maxphysaddr"`
 	FeatureFlags []CapsHostCPUFeatureFlag `xml:"feature"`
 	Features     *CapsHostCPUFeatures     `xml:"features"`
 	PageSizes    []CapsHostCPUPageSize    `xml:"pages"`
-	Microcode    *CapsHostCPUMicrocode    `xml:"microcode"`
 }
 
 type CapsHostCPUFeature struct {
@@ -82,11 +110,12 @@ type CapsHostNUMAPageInfo struct {
 }
 
 type CapsHostNUMACPU struct {
-	ID       int    `xml:"id,attr"`
-	SocketID *int   `xml:"socket_id,attr"`
-	DieID    *int   `xml:"die_id,attr"`
-	CoreID   *int   `xml:"core_id,attr"`
-	Siblings string `xml:"siblings,attr,omitempty"`
+	ID        int    `xml:"id,attr"`
+	SocketID  *int   `xml:"socket_id,attr"`
+	DieID     *int   `xml:"die_id,attr"`
+	ClusterID *int   `xml:"cluster_id,attr"`
+	CoreID    *int   `xml:"core_id,attr"`
+	Siblings  string `xml:"siblings,attr,omitempty"`
 }
 
 type CapsHostNUMASibling struct {
@@ -94,11 +123,30 @@ type CapsHostNUMASibling struct {
 	Value int `xml:"value,attr"`
 }
 
+type CapsHostNUMACacheSize struct {
+	Value uint   `xml:"value,attr,omitempty"`
+	Unit  string `xml:"unit,attr,omitempty"`
+}
+
+type CapsHostNUMACacheLine struct {
+	Value uint   `xml:"value,attr,omitempty"`
+	Unit  string `xml:"unit,attr,omitempty"`
+}
+
+type CapsHostNUMACache struct {
+	Level         int                    `xml:"level,attr,omitempty"`
+	Associativity string                 `xml:"associativity,attr,omitempty"`
+	Policy        string                 `xml:"policy,attr,omitempty"`
+	Size          *CapsHostNUMACacheSize `xml:"size"`
+	Line          *CapsHostNUMACacheLine `xml:"line"`
+}
+
 type CapsHostNUMACell struct {
 	ID        int                    `xml:"id,attr"`
 	Memory    *CapsHostNUMAMemory    `xml:"memory"`
 	PageInfo  []CapsHostNUMAPageInfo `xml:"pages"`
 	Distances *CapsHostNUMADistances `xml:"distances"`
+	Cache     []CapsHostNUMACache    `xml:"cache"`
 	CPUS      *CapsHostNUMACPUs      `xml:"cpus"`
 }
 
@@ -107,12 +155,33 @@ type CapsHostNUMADistances struct {
 }
 
 type CapsHostNUMACPUs struct {
-	Num  uint              `xml:"num,attr,omitempty"`
+	Num  uint              `xml:"num,attr"`
 	CPUs []CapsHostNUMACPU `xml:"cpu"`
 }
 
+type CapsHostNUMAInterconnects struct {
+	Latency   []CapsHostNUMAInterconnectLatency   `xml:"latency"`
+	Bandwidth []CapsHostNUMAInterconnectBandwidth `xml:"bandwidth"`
+}
+
+type CapsHostNUMAInterconnectLatency struct {
+	Initiator uint   `xml:"initiator,attr"`
+	Target    uint   `xml:"target,attr"`
+	Type      string `xml:"type,attr"`
+	Value     uint   `xml:"value,attr"`
+}
+
+type CapsHostNUMAInterconnectBandwidth struct {
+	Initiator uint   `xml:"initiator,attr"`
+	Target    uint   `xml:"target,attr"`
+	Type      string `xml:"type,attr"`
+	Value     uint   `xml:"value,attr"`
+	Unit      string `xml:"unit,attr"`
+}
+
 type CapsHostNUMATopology struct {
-	Cells *CapsHostNUMACells `xml:"cells"`
+	Cells         *CapsHostNUMACells         `xml:"cells"`
+	Interconnects *CapsHostNUMAInterconnects `xml:"interconnects"`
 }
 
 type CapsHostNUMACells struct {
@@ -229,9 +298,10 @@ type CapsHostMemoryBandwidthMonitorFeature struct {
 }
 
 type CapsGuestMachine struct {
-	Name      string `xml:",chardata"`
-	MaxCPUs   int    `xml:"maxCpus,attr,omitempty"`
-	Canonical string `xml:"canonical,attr,omitempty"`
+	Name       string `xml:",chardata"`
+	MaxCPUs    int    `xml:"maxCpus,attr,omitempty"`
+	Deprecated string `xml:"deprecated,attr,omitempty"`
+	Canonical  string `xml:"canonical,attr,omitempty"`
 }
 
 type CapsGuestDomain struct {

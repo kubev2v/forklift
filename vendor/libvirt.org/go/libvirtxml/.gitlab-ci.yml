@@ -9,7 +9,7 @@ stages:
 # merge requests are submitted
 check-dco:
   stage: prebuild
-  image: registry.gitlab.com/libvirt/libvirt-ci/check-dco:master
+  image: registry.gitlab.com/libvirt/libvirt-ci/check-dco:latest
   script:
     - /check-dco
   except:
@@ -18,7 +18,7 @@ check-dco:
 
 go-fmt:
   stage: prebuild
-  image: registry.gitlab.com/libvirt/libvirt-ci/go-fmt:master
+  image: registry.gitlab.com/libvirt/libvirt-ci/go-fmt:latest
   script:
     - /go-fmt
   artifacts:
@@ -30,25 +30,14 @@ go-fmt:
 .go_build: &go_build
   stage: build
   script:
+    - apk add git
     - go test -timeout 10m -tags xmlroundtrip -v
 
 
-go_1_10:
-  <<: *go_build
-  image: golang:1.10
-
 go_1_11:
   <<: *go_build
-  image: golang:1.11
+  image: golang:1.11-alpine
 
-go_1_12:
+go_1_24:
   <<: *go_build
-  image: golang:1.12
-
-go_1_13:
-  <<: *go_build
-  image: golang:1.13
-
-go_1_14:
-  <<: *go_build
-  image: golang:1.14
+  image: golang:1.16-alpine

@@ -1,5 +1,5 @@
 /*
- * This file is part of the libvirt-go-xml project
+ * This file is part of the libvirt-go-xml-module project
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -111,7 +111,8 @@ type NetworkForward struct {
 }
 
 type NetworkForwardDriver struct {
-	Name string `xml:"name,attr"`
+	Name  string `xml:"name,attr,omitempty"`
+	Model string `xml:"model,attr,omitempty"`
 }
 
 type NetworkForwardPF struct {
