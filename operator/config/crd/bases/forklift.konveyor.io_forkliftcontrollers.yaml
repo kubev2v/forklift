@@ -282,6 +282,13 @@ spec:
               controller_precopy_interval:
                 x-kubernetes-int-or-string: true
                 description: "Precopy interval in minutes (default: 60)"
+              controller_host_lease_namespace:
+                type: string
+                description: "Namespace for host lease objects (default: openshift-mtv)"
+                example: "openshift-mtv"
+              controller_host_lease_duration_seconds:
+                x-kubernetes-int-or-string: true
+                description: "Host lease duration in seconds (default: 10)"
               controller_max_concurrent_reconciles:
                 x-kubernetes-int-or-string: true
                 description: "Max concurrent reconciles (default: 10)"
