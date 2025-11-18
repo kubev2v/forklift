@@ -52,6 +52,8 @@ const (
 	TlsConnectionTimeout             = "TLS_CONNECTION_TIMEOUT"
 	MaxConcurrentReconciles          = "MAX_CONCURRENT_RECONCILES"
 	MaxParentBackingRetries          = "MAX_PARENT_BACKING_RETRIES"
+	HostLeaseNamespace               = "HOST_LEASE_NAMESPACE"
+	HostLeaseDurationSeconds         = "HOST_LEASE_DURATION_SECONDS"
 )
 
 // Default values for populator container resources
@@ -128,6 +130,10 @@ type Migration struct {
 	MaxConcurrentReconciles int
 	// MaxParentBackingRetries is the limit of how many retries can happen while getting parent backing of a disk
 	MaxParentBackingRetries int
+	// HostLeaseNamespace is the namespace for host lease objects used in copy offload
+	HostLeaseNamespace string
+	// HostLeaseDurationSeconds is the host lease duration in seconds used in copy offload
+	HostLeaseDurationSeconds string
 }
 
 // Load settings.
@@ -318,5 +324,8 @@ func (r *Migration) Load() (err error) {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	// Host lease settings for copy offload
+	r.HostLeaseNamespace = Lookup(HostLeaseNamespace, "openshift-mtv")
+	r.HostLeaseDurationSeconds = Lookup(HostLeaseDurationSeconds, "10")
 	return
 }
