@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
+
 	"github.com/vmware/govmomi/object"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
@@ -90,7 +91,7 @@ func NewWithRemoteEsxcliSSH(storageApi StorageApi, vsphereHostname, vsphereUsern
 	}, nil
 }
 
-func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, progress chan<- uint, quit chan error) (errFinal error) {
+func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint, quit chan error) (errFinal error) {
 	// isn't it better to not call close the channel from the caller?
 	defer func() {
 		r := recover()
@@ -276,7 +277,13 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	targetLUN := fmt.Sprintf("/vmfs/devices/disks/%s", lun.NAA)
 	klog.Infof("resolved lun with IQN %s to lun %s", lun.IQN, targetLUN)
 
-	err = rescan(p.VSphereClient, host, lun.NAA)
+	leaseHostID := strings.ReplaceAll(strings.ToLower(host.String()), ":", "-")
+	err = hostLocker.WithLock(context.Background(), leaseHostID,
+		func(ctx context.Context) error {
+			return rescan(ctx, p.VSphereClient, host, lun.NAA)
+		},
+	)
+
 	if err != nil {
 		return fmt.Errorf("failed to find the device %s after scanning: %w", targetLUN, err)
 	}
@@ -386,7 +393,7 @@ func waitForDeviceStateOff(client vmware.Client, host *object.HostSystem, device
 			return false, nil // Retry on error
 		}
 
-		if result != nil && len(result) > 0 && result[0] != nil && len(result[0]["Status"]) > 0 {
+		if len(result) > 0 && result[0] != nil && len(result[0]["Status"]) > 0 {
 			status := result[0]["Status"][0]
 			klog.V(2).Infof("device %s status: %s", deviceNAA, status)
 			if status == "off" {
@@ -400,8 +407,13 @@ func waitForDeviceStateOff(client vmware.Client, host *object.HostSystem, device
 }
 
 // After mapping a volume the ESX needs a rescan to see the device. ESXs can opt-in to do it automatically
-func rescan(client vmware.Client, host *object.HostSystem, targetLUN string) error {
+func rescan(ctx context.Context, client vmware.Client, host *object.HostSystem, targetLUN string) error {
 	for i := 1; i <= rescanRetries; i++ {
+		// Check if we should abort (lease was lost)
+		if ctx.Err() != nil {
+			return fmt.Errorf("rescan aborted (lease lost): %w", ctx.Err())
+		}
+
 		result, err := client.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", targetLUN})
 		if err == nil {
 			status := ""
@@ -421,8 +433,20 @@ func rescan(client vmware.Client, host *object.HostSystem, targetLUN string) err
 			if err != nil {
 				klog.Errorf("failed to rescan for adapters, attempt %d/%d due to: %s", i, rescanRetries, err)
 			}
-			time.Sleep(rescanSleepInterval)
+
+			// Sleep but respect context cancellation
+			select {
+			case <-time.After(rescanSleepInterval):
+				// Continue to next iteration
+			case <-ctx.Done():
+				return fmt.Errorf("rescan aborted during retry sleep (lease lost): %w", ctx.Err())
+			}
 		}
+	}
+
+	// Check one more time before final attempt
+	if ctx.Err() != nil {
+		return fmt.Errorf("rescan aborted before final attempt (lease lost): %w", ctx.Err())
 	}
 
 	// last check after the last rescan

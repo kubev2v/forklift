@@ -180,6 +180,10 @@ See [README](internal/vantara/README.md)
 | POWERFLEX_SYSTEM_ID | string | the system id of the storage array. Can be taken from `vxflexos-config` from the `vxflexos` namespace or the openshift-operators namespace. |
 
 
+## Host Lease Management
+
+To prevent overloading ESXi hosts during concurrent migrations, the vsphere-xcopy-volume-populator uses a distributed lease mechanism based on Kubernetes Lease objects.
+This ensures that heavy operations like storage rescans are serialized per ESXi host. For more details on its configuration, behavior, and monitoring, refer to the [Host Lease Management documentation](docs/copy-offload-lease-management.md).
 
 ## Limitations
 - A migration plan cannot mix VDDK mappings with copy-offload mappings.
@@ -188,7 +192,7 @@ See [README](internal/vantara/README.md)
   in the plan must **either** include copy-offload details (secret + product)
   **or** none of them must; otherwise the plan will fail.
 
-This volume populator implementation is specific for performing XCOPY from a source vmdk 
+This volume populator implementation is specific for performing XCOPY from a source vmdk
 descriptor disk file to a target PVC; this also works if the underlying disk is
 vVol or RDM. The way it works is by performing the XCOPY using vmkfstools on the target ESXi.
 
