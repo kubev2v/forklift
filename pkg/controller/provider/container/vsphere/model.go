@@ -925,6 +925,8 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 							nic = &device.VirtualEthernetCard
 						case *types.VirtualVmxnet3:
 							nic = &device.VirtualEthernetCard
+						case *types.VirtualPCNet32:
+							nic = &device.VirtualEthernetCard
 						}
 
 						if nic != nil && nic.Backing != nil {
