@@ -29,9 +29,9 @@ vet:
 test: fmt vet
 	go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
-.PHONY: generate 
+.PHONY: generate
 generate:
-	go generate ./...
+	GOFLAGS="-mod=mod" go generate ./...
 
 .PHONY: build
 build: fmt vet

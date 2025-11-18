@@ -9,10 +9,11 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
-	storage_mocks "github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator/mocks"
+	populator_mocks "github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator/mocks"
 	vmware_mocks "github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware/mocks"
 	"github.com/vmware/govmomi/cli/esx"
 	"github.com/vmware/govmomi/object"
+	"github.com/vmware/govmomi/vim25/types"
 	"go.uber.org/mock/gomock"
 )
 
@@ -25,20 +26,24 @@ var _ = Describe("Populator", func() {
 	var (
 		mockCtrl      *gomock.Controller
 		vmwareClient  *vmware_mocks.MockClient
-		storageClient *storage_mocks.MockStorageApi
+		storageClient *populator_mocks.MockStorageApi
 		underTest     populator.RemoteEsxcliPopulator
+		hostLocker    *populator_mocks.MockHostlocker
 		dummyHost     *object.HostSystem
 	)
 
 	BeforeEach(func() {
 		mockCtrl = gomock.NewController(GinkgoT())
 		vmwareClient = vmware_mocks.NewMockClient(mockCtrl)
-		storageClient = storage_mocks.NewMockStorageApi(mockCtrl)
+		storageClient = populator_mocks.NewMockStorageApi(mockCtrl)
+		hostLocker = populator_mocks.NewMockHostlocker(mockCtrl)
 		underTest = populator.RemoteEsxcliPopulator{
 			VSphereClient: vmwareClient,
 			StorageApi:    storageClient,
 		}
-		dummyHost = &object.HostSystem{}
+		dummyHost = &object.HostSystem{
+			Common: object.NewCommon(nil, types.ManagedObjectReference{ServerGUID: "HostSystem:host-1000"}),
+		}
 	})
 
 	AfterEach(func() {
@@ -63,7 +68,7 @@ var _ = Describe("Populator", func() {
 
 			go func() {
 				defer GinkgoRecover()
-				underTest.Populate(tc.sourceVmId, tc.sourceVMDK, populator.PersistentVolume{Name: tc.targetPVC}, progressCh, quitCh)
+				underTest.Populate(tc.sourceVmId, tc.sourceVMDK, populator.PersistentVolume{Name: tc.targetPVC}, hostLocker, progressCh, quitCh)
 			}()
 
 			if tc.want != nil {
@@ -133,8 +138,6 @@ var _ = Describe("Populator", func() {
 				storageClient.EXPECT().ResolvePVToLUN(gomock.Any()).Return(populator.LUN{NAA: "naa.616263"}, nil)
 				storageClient.EXPECT().CurrentMappedGroups(gomock.Any(), gomock.Any()).Return([]string{}, nil)
 				storageClient.EXPECT().Map("xcopy-esxs", gomock.Any(), nil).Return(populator.LUN{NAA: "naa.616263"}, nil)
-				storageClient.EXPECT().UnMap(gomock.Any(), gomock.Any(), nil).AnyTimes()
-				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "device", "list", "-d", "naa.616263"}).Return(nil, nil)
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(),
 					[]string{"vmkfstools", "clone", "-s", "/vmfs/volumes/my-ds/my-vm/vmdisk.vmdk", "-t", "/vmfs/devices/disks/naa.616263"}).
 					Return([]esx.Values{{"message": {`{"taskId": "1"}`}}}, nil)
@@ -145,6 +148,9 @@ var _ = Describe("Populator", func() {
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "device", "list", "-d", "naa.616263"}).Return([]esx.Values{map[string][]string{"Status": []string{"off"}}}, nil)
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "device", "detached", "remove", "-d", "naa.616263"}).Return(nil, nil)
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "adapter", "rescan", "-t", "delete", "-A", "vmhbatest"}).Return(nil, nil)
+				storageClient.EXPECT().UnMap("xcopy-esxs", gomock.Any(), nil).Return(nil)
+				// FIXME the mock host lock is eliminating the call to the rescan login during the test. This needs fixing
+				hostLocker.EXPECT().WithLock(gomock.Any(), gomock.Any(), gomock.Any())
 			},
 			want: nil,
 		}),
