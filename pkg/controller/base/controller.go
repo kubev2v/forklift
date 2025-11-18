@@ -133,7 +133,7 @@ func VerifyTLSConnection(rawURL string, secret *core.Secret) (*x509.Certificate,
 		return nil, fmt.Errorf("invalid URL: %w", err)
 	}
 
-	// Attempt to get certificate
+	// Get the TLS certificate from the server
 	cert, err := util.GetTlsCertificate(parsedURL, secret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get TLS certificate: %w", err)
@@ -142,20 +142,66 @@ func VerifyTLSConnection(rawURL string, secret *core.Secret) (*x509.Certificate,
 		return nil, fmt.Errorf("received nil certificate from GetTlsCertificate")
 	}
 
-	// Create cert pool
+	// Prepare TLS config with the retrieved certificate
 	tlsConfig := &tls.Config{
 		RootCAs: x509.NewCertPool(),
 	}
 	tlsConfig.RootCAs.AddCert(cert)
 
-	// Ensure host:port
-	host := parsedURL.Host
-	if _, _, err := net.SplitHostPort(parsedURL.Host); err != nil {
-		host = parsedURL.Host + ":443"
+	// Extract hostname and port (add :443 if no port specified)
+	hostname, port, err := net.SplitHostPort(parsedURL.Host)
+	if err != nil {
+		hostname = parsedURL.Host
+		port = "443"
 	}
 
-	// Dial TLS
-	conn, err := tls.Dial("tcp", host, tlsConfig)
+	// Check if hostname is actually an IP address
+	isHostnameIP := net.ParseIP(hostname) != nil
+
+	// Determine if certificate matches the hostname directly
+	certMatchesHostname := false
+	if !isHostnameIP {
+		// Hostname (not IP): check if it exists in certificate's DNS names
+		for _, dnsName := range cert.DNSNames {
+			if dnsName == hostname {
+				certMatchesHostname = true
+				break
+			}
+		}
+		// Fallback: check if Common Name (CN) matches
+		if !certMatchesHostname && cert.Subject.CommonName == hostname {
+			certMatchesHostname = true
+		}
+	}
+
+	// If hostname doesn't match certificate, attempt IP resolution and matching
+	connectionHostname := hostname
+	if !certMatchesHostname && !isHostnameIP {
+		// Resolve hostname to IP addresses
+		if ips, err := net.LookupIP(hostname); err == nil && len(ips) > 0 {
+			// Check each resolved IP against certificate's IP addresses
+			for _, resolvedIP := range ips {
+				for _, certIP := range cert.IPAddresses {
+					if certIP.Equal(resolvedIP) {
+						// Found matching IP - use for connection
+						connectionHostname = resolvedIP.String()
+						break
+					}
+				}
+				if connectionHostname != hostname {
+					break
+				}
+			}
+		}
+	}
+
+	// Set ServerName only if connecting with a hostname (not IP)
+	if net.ParseIP(connectionHostname) == nil {
+		tlsConfig.ServerName = connectionHostname
+	}
+
+	// Establish TLS connection with hostname or matched IP
+	conn, err := tls.Dial("tcp", net.JoinHostPort(connectionHostname, port), tlsConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a secure TLS connection: %w", err)
 	}
