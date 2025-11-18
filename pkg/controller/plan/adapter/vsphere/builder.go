@@ -1955,6 +1955,14 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 		dst.Data["ESXI_CLONE_METHOD"] = []byte(esxiCloneMethod)
 	}
 
+	// Add controller-level settings for host leases (copy offload)
+	if settings.Settings.Migration.HostLeaseNamespace != "" {
+		dst.Data["HOST_LEASE_NAMESPACE"] = []byte(settings.Settings.Migration.HostLeaseNamespace)
+	}
+	if settings.Settings.Migration.HostLeaseDurationSeconds != "" {
+		dst.Data["HOST_LEASE_DURATION_SECONDS"] = []byte(settings.Settings.Migration.HostLeaseDurationSeconds)
+	}
+
 	// Add SSH keys for vSphere providers
 	if r.Source.Provider.Type() == api.VSphere {
 		err := r.addSSHKeysToSecret(dst)
@@ -1995,6 +2003,11 @@ func (r *Builder) ensurePopulatorServiceAccount(namespace string) error {
 				Resources: []string{"persistentvolumeclaims"},
 				Verbs:     []string{"get", "list", "watch"},
 			},
+			{
+				APIGroups: []string{"coordination.k8s.io"},
+				Resources: []string{"leases"},
+				Verbs:     []string{"get", "list", "watch", "create", "update", "patch"},
+			},
 		},
 	}
 	err = r.Destination.Client.Create(context.TODO(), &role, &client.CreateOptions{})
@@ -2024,6 +2037,65 @@ func (r *Builder) ensurePopulatorServiceAccount(namespace string) error {
 
 	err = r.Destination.Client.Create(context.TODO(), &binding, &client.CreateOptions{})
 	if err != nil && !k8serr.IsAlreadyExists(err) {
+		return err
+	}
+
+	// Create Role in openshift-mtv namespace for cross-namespace lease access
+	mtvRole := rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "populator-lease-reader",
+			Namespace: "openshift-mtv",
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"coordination.k8s.io"},
+				Resources: []string{"leases"},
+				Verbs:     []string{"get", "list", "watch", "create", "update"},
+			},
+		},
+	}
+	err = r.Destination.Client.Create(context.TODO(), &mtvRole, &client.CreateOptions{})
+	if err != nil && !k8serr.IsAlreadyExists(err) {
+		return err
+	}
+
+	// Create RoleBinding in openshift-mtv namespace
+	mtvBinding := rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "populator-lease-reader-binding",
+			Namespace: "openshift-mtv",
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      "populator",
+				Namespace: namespace,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			Kind:     "Role",
+			Name:     "populator-lease-reader",
+			APIGroup: "rbac.authorization.k8s.io",
+		},
+	}
+
+	updatedMtvBinding := &rbacv1.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: mtvBinding.Name, Namespace: mtvBinding.Namespace}}
+	_, err = controllerutil.CreateOrPatch(
+		context.TODO(),
+		r.Destination.Client,
+		updatedMtvBinding, func() error {
+			if updatedMtvBinding.CreationTimestamp.IsZero() {
+				updatedMtvBinding.Subjects = mtvBinding.Subjects
+				updatedMtvBinding.RoleRef = mtvBinding.RoleRef
+			} else {
+				if !slices.Contains(updatedMtvBinding.Subjects, mtvBinding.Subjects[0]) {
+					updatedMtvBinding.Subjects = append(updatedMtvBinding.Subjects, mtvBinding.Subjects[0])
+				}
+			}
+			return nil
+		})
+
+	if err != nil {
 		return err
 	}
 

@@ -67,6 +67,57 @@ to implement a go package named after their product, and mutate main
 package so their specific code path is initialized.
 See [internal/populator/storage.go](internal/populator/storage.go)
 
+## Secret with Storage Provider Credentials
+
+Create a secret where the migration provider is setup, usually openshift-mtv
+and put the credentials of the storage system. All of the providers are required
+to have a secret with the following fields:
+
+| Key | Value | Mandatory | Default |
+| --- | --- | --- | --- |
+| STORAGE_HOSTNAME | ip/hostname | y | |
+| STORAGE_USERNAME | string | y | |
+| STORAGE_PASSWORD | string | y | |
+| STORAGE_SKIP_SSL_VERIFICATION | true/false | n | false |
+
+Provider-specific entries in the secret are documented below:
+
+### Hitachi Vantara
+
+See [README](internal/vantara/README.md)
+
+### NetApp ONTAP
+
+| Key | Value | Description |
+| --- | --- | --- |
+| ONTAP_SVM | string | the SVM to use in all the client interactions. Can be taken from trident.netapp.io/v1/TridentBackend.config.ontap_config.svm resource field. |
+
+
+### Pure FlashArray
+
+| Key | Value | Description |
+| --- | --- | --- |
+| PURE_CLUSTER_PREFIX | string | Cluster prefix is set in the StorageCluster resource. Get it with  `printf "px_%.8s" $(oc get storagecluster -A -o=jsonpath='{.items[?(@.spec.cloudStorage.provider=="pure")].status.clusterUid}')` |
+
+### Dell PowerMax
+
+| Key | Value | Description |
+| --- | --- | --- |
+| POWERMAX_SYMMETRIX_ID | string | the symmetrix id of the storage array. Can be taken from the ConfigMap under the 'powermax' namespace, which the CSI driver uses. |
+| POWERMAX_PORT_GROUP_NAME | string | the port group to use for masking view creation. |
+
+### Dell PowerFlex
+
+| Key | Value | Description |
+| --- | --- | --- |
+| POWERFLEX_SYSTEM_ID | string | the system id of the storage array. Can be taken from `vxflexos-config` from the `vxflexos` namespace or the openshift-operators namespace. |
+
+
+## Host Lease Management
+
+To prevent overloading ESXi hosts during concurrent migrations, the vsphere-xcopy-volume-populator uses a distributed lease mechanism based on Kubernetes Lease objects.
+This ensures that heavy operations like storage rescans are serialized per ESXi host. For more details on its configuration, behavior, and monitoring, refer to the [Host Lease Management documentation](docs/copy-offload-lease-management.md).
+
 ## Limitations
 - A migration plan cannot mix VDDK mappings with copy-offload mappings.
   Because the migration controller copies disks **either** through CDI volumes
@@ -74,7 +125,7 @@ See [internal/populator/storage.go](internal/populator/storage.go)
   in the plan must **either** include copy-offload details (secret + product)
   **or** none of them must; otherwise the plan will fail.
 
-This volume populator implementation is specific for performing XCOPY from a source vmdk 
+This volume populator implementation is specific for performing XCOPY from a source vmdk
 descriptor disk file to a target PVC; this also works if the underlying disk is
 vVol or RDM. The way it works is by performing the XCOPY using vmkfstools on the target ESXi.
 
