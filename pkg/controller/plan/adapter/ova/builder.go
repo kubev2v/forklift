@@ -21,7 +21,6 @@ import (
 	"github.com/kubev2v/forklift/pkg/settings"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
@@ -338,15 +337,18 @@ func (r *Builder) mapFirmware(vm *model.VM, vmRef ref.Ref, object *cnv.VirtualMa
 	case BIOS:
 		firmware.Bootloader = &cnv.Bootloader{BIOS: &cnv.BIOS{}}
 	default:
-		// We don't distinguish between UEFI and UEFI with secure boot, but we anyway would have
-		// disabled secure boot, even if we knew it was enabled on the source, because the guest
-		// OS won't be able to boot without getting the NVRAM data. By starting the VM without
-		// secure boot we ease the procedure users need to do in order to make a guest OS that
-		// was previously configured with secure boot bootable.
+		// For UEFI firmware, use the SecureBoot value from the VM
 		firmware.Bootloader = &cnv.Bootloader{
 			EFI: &cnv.EFI{
-				SecureBoot: ptr.To(false),
+				SecureBoot: &vm.SecureBoot,
 			}}
+		if vm.SecureBoot {
+			object.Template.Spec.Domain.Features = &cnv.Features{
+				SMM: &cnv.FeatureState{
+					Enabled: &vm.SecureBoot,
+				},
+			}
+		}
 	}
 	object.Template.Spec.Domain.Firmware = firmware
 }
