@@ -81,6 +81,7 @@ const (
 	TemplateOSLabel       = "os.template.kubevirt.io/%s"
 	TemplateWorkloadLabel = "workload.template.kubevirt.io/server"
 	TemplateFlavorLabel   = "flavor.template.kubevirt.io/medium"
+	TemplateNAALabel      = "volume.csi.k8s.io/affinity-source-naa"
 )
 
 // Operating Systems
@@ -1335,11 +1336,12 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 	sortedDisks := r.sortedDisksAsVmware(vm.Disks)
 
 	dsMapIn := r.Context.Map.Storage.Spec.Map
+	dsNaaMap := make(map[string]string)
 	for i := range dsMapIn {
 		mapped := &dsMapIn[i]
-		ref := mapped.Source
+		sourceRef := mapped.Source
 		ds := &model.Datastore{}
-		fErr := r.Source.Inventory.Find(ds, ref)
+		fErr := r.Source.Inventory.Find(ds, sourceRef)
 		if fErr != nil {
 			err = fErr
 			return
@@ -1348,8 +1350,21 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		pvblock := core.PersistentVolumeBlock
 		for diskIndex, disk := range sortedDisks {
 			if disk.Datastore.ID == ds.ID {
+				naa, ok := dsNaaMap[ds.ID]
+				if !ok {
+					vsphereClient := &Client{Context: r.Context}
+					err = vsphereClient.connect()
+					if err != nil {
+						r.Log.Error(err, "failed to connect to vSphere client, continue without storage affinity label")
+					}
+					naa, err = vsphereClient.getNAAFromDatastore(context.TODO(), ref.Ref{ID: ds.ID, Name: ds.Name})
+					defer vsphereClient.Close()
+					if err != nil {
+						r.Log.Error(err, "failed to get NAA from datastore %s, continue without storage affinity label", ds.Name)
+					}
+					dsNaaMap[ds.ID] = naa
+				}
 				storageClass := mapped.Destination.StorageClass
-
 				r.Log.Info(fmt.Sprintf("getting storage mapping by storage class %q and datastore %v datastore name %s datastore", storageClass, disk.Datastore, disk.Datastore))
 				vsphereInstance := r.Context.Plan.Provider.Source.GetName()
 				storageVendorProduct := mapped.OffloadPlugin.VSphereXcopyPluginConfig.StorageVendorProduct
@@ -1366,8 +1381,9 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				labels := map[string]string{
 					"migration": string(r.Migration.UID),
 					// we need uniqness and a value which is less than 64 chars, hence using vmRef.id + disk.key
-					"vmdkKey": fmt.Sprint(disk.Key),
-					"vmID":    vmRef.ID,
+					"vmdkKey":        fmt.Sprint(disk.Key),
+					"vmID":           vmRef.ID,
+					TemplateNAALabel: naa,
 				}
 
 				r.Log.Info("target namespace for migration", "namespace", namespace)
