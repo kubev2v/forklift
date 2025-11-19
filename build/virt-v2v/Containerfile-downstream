@@ -71,7 +71,7 @@ RUN rm /etc/pki/tls/fips_local.cnf && \
 
 RUN mkdir /disks && \
     source /etc/os-release && \
-    dnf update -y && \
+    dnf update -y --exclude=kernel,kernel-core,kernel-modules,kernel-modules-core && \
     dnf install -y --setopt=install_weak_deps=False \
     virt-v2v \
     virtio-win \
