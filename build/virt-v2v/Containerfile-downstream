@@ -3,7 +3,7 @@ FROM registry.redhat.io/ubi9:9.6-1747219013 AS winlegacyiso
 RUN rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 RUN yum install -y --setopt=install_weak_deps=False virtio-win-1.9.4-2.el7.2
 
-FROM registry.redhat.io/ubi9:9.6-1747219013 AS appliance
+FROM registry.redhat.io/ubi10:10.1-1762952713 AS appliance
 
 RUN dnf update -y && \
     dnf install -y --setopt=install_weak_deps=False \
@@ -113,13 +113,13 @@ ARG CPE
 
 LABEL \
     com.redhat.component="mtv-virt-v2v-container" \
-    name="${REGISTRY}/mtv-virt-v2v-rhel9" \
+    name="${REGISTRY}/mtv-virt-v2v-rhel10" \
     license="Apache License 2.0" \
     io.k8s.display-name="Migration Toolkit for Virtualization" \
     io.k8s.description="Migration Toolkit for Virtualization - Virt-V2V" \
     io.openshift.tags="migration,mtv,forklift" \
     summary="Migration Toolkit for Virtualization - Virt-V2V" \
-    cpe="cpe:/a:redhat:migration_toolkit_virtualization:${CPE}::el9" \
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:${CPE}::el10" \
     description="Migration Toolkit for Virtualization - Virt-V2V" \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
     version="$MTV_VERSION" \
