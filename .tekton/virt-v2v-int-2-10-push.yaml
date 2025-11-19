@@ -8,7 +8,12 @@ metadata:
     pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "release-2.10"
+      == "release-2.10" && ( ".tekton/virt-v2v-int-2-10-*.yaml".pathChanged() ||
+      ".konflux/virt-v2v/rpms.lock.yaml".pathChanged() ||
+      "build/virt-v2v/Containerfile-downstream".pathChanged() ||
+      "pkg/virt-v2v/***".pathChanged() ||
+      "cmd/virt-v2v/***".pathChanged() ||
+      "cmd/virt-v2v-monitor/***".pathChanged() )
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: forklift-operator-int-2-10
@@ -28,6 +33,28 @@ spec:
     value: build/virt-v2v/Containerfile-downstream
   - name: path-context
     value: .
+  - name: build-source-image
+    value: "true"
+  - name: prefetch-input
+    value: '[{"type": "rpm", "path": ".konflux/virt-v2v/appliance"}, {"type": "rpm", "path": ".konflux/virt-v2v/runtime"}, {"type": "rpm", "path": ".konflux/virt-v2v/winlegacyiso"}, {"type": "rpm", "path": ".konflux/virt-v2v/builder"}]'
+  - name: build-args-file
+    value: build/release.conf
+  - name: build-args
+    value:
+    - "REVISION={{revision}}"
+  taskRunSpecs:
+  - pipelineTaskName: prefetch-dependencies
+    computeResources:
+      requests:
+        memory: 4Gi
+      limits:
+        memory: 4Gi
+  - pipelineTaskName: build-source-image
+    computeResources:
+      requests:
+        memory: 4Gi
+      limits:
+        memory: 4Gi
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
@@ -76,7 +103,7 @@ spec:
         1h, 2d, 3w for hours, days, and weeks, respectively.
       name: image-expires-after
       type: string
-    - default: "false"
+    - default: "true"
       description: Build a source image.
       name: build-source-image
       type: string
@@ -172,6 +199,10 @@ spec:
         value: $(params.output-image).prefetch
       - name: ociArtifactExpiresAfter
         value: $(params.image-expires-after)
+      - name: dev-package-managers
+        value: "true"
+      - name: ACTIVATION_KEY
+        value: activation-key-rhel10
       runAfter:
       - clone-repository
       taskRef:
