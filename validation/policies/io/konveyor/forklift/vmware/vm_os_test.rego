@@ -100,3 +100,22 @@ test_supported_windows if {
 	results = concerns with input as mock_vm
 	count(results) == 0
 }
+
+test_supported_windows_2025 if {
+	mock_vm := {
+		"name": "test",
+		"guestId": "windows2022srvNext_64Guest",
+	}
+	results = concerns with input as mock_vm
+	count(results) == 0
+}
+
+
+test_supported_windows_2025_by_guestName if {
+	mock_vm := {
+		"name": "test",
+		"guestNameFromVmwareTools": "Microsoft Windows Server 2025 (64-bit)",
+	}
+	results = concerns with input as mock_vm
+	count(results) == 0
+}

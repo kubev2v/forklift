@@ -48,7 +48,7 @@ test_windows_vm_missing_key_property_creates_concern if {
 # Test: Non-Windows VM with invalid disk mapping (key == 0) should not trigger
 test_non_windows_vm_invalid_disk_no_concern if {
 	count(concerns) == 0 with input as {
-		"guestId": "ubuntu64Guest",
+		"guestId": "rhel10_64guest",
 		"guestDisks": [{
 			"key": 0,
 			"diskPath": "[datastore1] VM1/VM1.vmdk",
