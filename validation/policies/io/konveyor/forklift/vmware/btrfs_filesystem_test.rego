@@ -5,7 +5,7 @@ import rego.v1
 # Test: VM with no BTRFS disks should not trigger concerns
 test_vm_without_btrfs_no_concerns if {
 	count(concerns) == 0 with input as {
-		"guestId": "ubuntu64Guest",
+		"guestId": "rhel10_64guest",
 		"guestDisks": [
 			{
 				"key": 2000,
@@ -26,7 +26,7 @@ test_vm_without_btrfs_no_concerns if {
 # Test: VM with BTRFS disk should trigger concern
 test_vm_with_btrfs_creates_concern if {
 	count(concerns) == 1 with input as {
-		"guestId": "ubuntu64Guest",
+		"guestId": "rhel10_64guest",
 		"guestDisks": [{
 			"key": 2000,
 			"diskPath": "/dev/sda1",
@@ -39,7 +39,7 @@ test_vm_with_btrfs_creates_concern if {
 # Test: Case insensitive BTRFS detection
 test_btrfs_case_insensitive if {
 	count(concerns) == 1 with input as {
-		"guestId": "ubuntu64Guest",
+		"guestId": "rhel10_64guest",
 		"guestDisks": [
 			{
 				"key": 2000,
@@ -66,7 +66,7 @@ test_btrfs_case_insensitive if {
 # Test: Mixed filesystem types should only flag BTRFS disks
 test_mixed_filesystems_partial_concerns if {
 	count(concerns) == 1 with input as {
-		"guestId": "ubuntu64Guest",
+		"guestId": "rhel10_64guest",
 		"guestDisks": [
 			{
 				"key": 2000,
@@ -99,7 +99,7 @@ test_mixed_filesystems_partial_concerns if {
 # Test: Empty guest disks array should not cause errors
 test_empty_guest_disks_no_concerns if {
 	count(concerns) == 0 with input as {
-		"guestId": "ubuntu64Guest",
+		"guestId": "rhel10_64guest",
 		"guestDisks": [],
 	}
 }
@@ -107,7 +107,7 @@ test_empty_guest_disks_no_concerns if {
 # Test: Missing filesystemType field should not trigger concern
 test_missing_filesystem_type_no_concern if {
 	count(concerns) == 0 with input as {
-		"guestId": "ubuntu64Guest",
+		"guestId": "rhel10_64guest",
 		"guestDisks": [{
 			"key": 2000,
 			"diskPath": "/dev/sda1",
@@ -120,7 +120,7 @@ test_missing_filesystem_type_no_concern if {
 # Test: Empty filesystemType should not trigger concern
 test_empty_filesystem_type_no_concern if {
 	count(concerns) == 0 with input as {
-		"guestId": "ubuntu64Guest",
+		"guestId": "rhel10_64guest",
 		"guestDisks": [{
 			"key": 2000,
 			"diskPath": "/dev/sda1",
@@ -133,7 +133,7 @@ test_empty_filesystem_type_no_concern if {
 # Test: Verify concern structure and content
 test_concern_structure_and_content if {
 	startswith(concerns[_].id, "vmware.guestDisks.btrfs.unsupported") with input as {
-		"guestId": "ubuntu64Guest",
+		"guestId": "rhel10_64guest",
 		"guestDisks": [{
 			"key": 2000,
 			"diskPath": "/dev/sda1",
@@ -143,7 +143,7 @@ test_concern_structure_and_content if {
 	}
 
 	concerns[_].category == "Warning" with input as {
-		"guestId": "ubuntu64Guest",
+		"guestId": "rhel10_64guest",
 		"guestDisks": [{
 			"key": 2000,
 			"diskPath": "/dev/sda1",
@@ -153,7 +153,7 @@ test_concern_structure_and_content if {
 	}
 
 	contains(concerns[_].label, "BTRFS filesystem detected") with input as {
-		"guestId": "ubuntu64Guest",
+		"guestId": "rhel10_64guest",
 		"guestDisks": [{
 			"key": 2000,
 			"diskPath": "/dev/sda1",
@@ -163,7 +163,7 @@ test_concern_structure_and_content if {
 	}
 
 	contains(concerns[_].assessment, "is not supported") with input as {
-		"guestId": "ubuntu64Guest",
+		"guestId": "rhel10_64guest",
 		"guestDisks": [{
 			"key": 2000,
 			"diskPath": "/dev/sda1",
@@ -177,7 +177,7 @@ test_concern_structure_and_content if {
 test_btrfs_disks_rule if {
 	# Should find BTRFS disks
 	count(btrfs_disks) == 1 with input as {
-		"guestId": "ubuntu64Guest",
+		"guestId": "rhel10_64guest",
 		"guestDisks": [{
 			"key": 2000,
 			"diskPath": "/dev/sda1",
@@ -188,7 +188,7 @@ test_btrfs_disks_rule if {
 
 	# Should not find non-BTRFS disks
 	count(btrfs_disks) == 0 with input as {
-		"guestId": "ubuntu64Guest",
+		"guestId": "rhel10_64guest",
 		"guestDisks": [{
 			"key": 2000,
 			"diskPath": "/dev/sda1",
@@ -199,7 +199,7 @@ test_btrfs_disks_rule if {
 
 	# Should handle multiple BTRFS disks
 	count(btrfs_disks) == 2 with input as {
-		"guestId": "ubuntu64Guest",
+		"guestId": "rhel10_64guest",
 		"guestDisks": [
 			{
 				"key": 2000,
