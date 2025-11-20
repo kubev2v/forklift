@@ -1,5 +1,5 @@
 /*
- * This file is part of the libvirt-go-xml project
+ * This file is part of the libvirt-go-xml-module project
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -47,17 +47,28 @@ type DomainSnapshotParent struct {
 	Name string `xml:"name"`
 }
 
+type DomainSnapshotInactiveDomain struct {
+	XMLName xml.Name `xml:"inactiveDomain"`
+	Domain
+}
+
+type DomainSnapshotCookie struct {
+	XML string `xml:",innerxml"`
+}
+
 type DomainSnapshot struct {
-	XMLName      xml.Name              `xml:"domainsnapshot"`
-	Name         string                `xml:"name,omitempty"`
-	Description  string                `xml:"description,omitempty"`
-	State        string                `xml:"state,omitempty"`
-	CreationTime string                `xml:"creationTime,omitempty"`
-	Parent       *DomainSnapshotParent `xml:"parent"`
-	Memory       *DomainSnapshotMemory `xml:"memory"`
-	Disks        *DomainSnapshotDisks  `xml:"disks"`
-	Domain       *Domain               `xml:"domain"`
-	Active       *uint                 `xml:"active"`
+	XMLName        xml.Name                      `xml:"domainsnapshot"`
+	Name           string                        `xml:"name,omitempty"`
+	Description    string                        `xml:"description,omitempty"`
+	State          string                        `xml:"state,omitempty"`
+	CreationTime   string                        `xml:"creationTime,omitempty"`
+	Parent         *DomainSnapshotParent         `xml:"parent"`
+	Memory         *DomainSnapshotMemory         `xml:"memory"`
+	Disks          *DomainSnapshotDisks          `xml:"disks"`
+	Domain         *Domain                       `xml:"domain"`
+	InactiveDomain *DomainSnapshotInactiveDomain `xml:"inactiveDomain"`
+	Active         *uint                         `xml:"active"`
+	Cookie         *DomainSnapshotCookie         `xml:"cookie"`
 }
 
 type domainSnapshotDisk DomainSnapshotDisk

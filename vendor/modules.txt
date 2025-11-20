@@ -1190,9 +1190,9 @@ kubevirt.io/controller-lifecycle-operator-sdk/api
 # libvirt.org/go/libvirt v1.10009.1
 ## explicit; go 1.11
 libvirt.org/go/libvirt
-# libvirt.org/libvirt-go-xml v7.4.0+incompatible
-## explicit
-libvirt.org/libvirt-go-xml
+# libvirt.org/go/libvirtxml v1.11009.0
+## explicit; go 1.11
+libvirt.org/go/libvirtxml
 # modernc.org/libc v1.66.10
 ## explicit; go 1.23.0
 modernc.org/libc

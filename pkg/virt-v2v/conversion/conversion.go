@@ -13,7 +13,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/virt-v2v/customize"
 	"github.com/kubev2v/forklift/pkg/virt-v2v/utils"
 	"libvirt.org/go/libvirt"
-	libvirtxml "libvirt.org/libvirt-go-xml"
+	libvirtxml "libvirt.org/go/libvirtxml"
 )
 
 type Conversion struct {

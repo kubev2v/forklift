@@ -1,5 +1,5 @@
 /*
- * This file is part of the libvirt-go-xml project
+ * This file is part of the libvirt-go-xml-module project
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -43,13 +43,14 @@ type DomainControllerPCIModel struct {
 }
 
 type DomainControllerPCITarget struct {
-	ChassisNr *uint
-	Chassis   *uint
-	Port      *uint
-	BusNr     *uint
-	Index     *uint
-	NUMANode  *uint
-	Hotplug   string
+	ChassisNr  *uint
+	Chassis    *uint
+	Port       *uint
+	BusNr      *uint
+	Index      *uint
+	NUMANode   *uint
+	Hotplug    string
+	MemReserve *uint64
 }
 
 type DomainControllerPCI struct {
@@ -77,15 +78,34 @@ type DomainControllerXenBus struct {
 	MaxEventChannels uint `xml:"maxEventChannels,attr,omitempty"`
 }
 
+type DomainControllerNVME struct {
+	Serial string `xml:"serial,omitempty"`
+}
+
+type DomainControllerDriverIOThreads struct {
+	IOThread []DomainControllerDriverIOThread `xml:"iothread"`
+}
+
+type DomainControllerDriverIOThread struct {
+	ID     uint                                  `xml:"id,attr"`
+	Queues []DomainControllerDriverIOThreadQueue `xml:"queue"`
+}
+
+type DomainControllerDriverIOThreadQueue struct {
+	ID uint `xml:"id,attr"`
+}
+
 type DomainControllerDriver struct {
-	Queues     *uint  `xml:"queues,attr"`
-	CmdPerLUN  *uint  `xml:"cmd_per_lun,attr"`
-	MaxSectors *uint  `xml:"max_sectors,attr"`
-	IOEventFD  string `xml:"ioeventfd,attr,omitempty"`
-	IOThread   uint   `xml:"iothread,attr,omitempty"`
-	IOMMU      string `xml:"iommu,attr,omitempty"`
-	ATS        string `xml:"ats,attr,omitempty"`
-	Packed     string `xml:"packed,attr,omitempty"`
+	Queues     *uint                            `xml:"queues,attr"`
+	CmdPerLUN  *uint                            `xml:"cmd_per_lun,attr"`
+	MaxSectors *uint                            `xml:"max_sectors,attr"`
+	IOEventFD  string                           `xml:"ioeventfd,attr,omitempty"`
+	IOThread   uint                             `xml:"iothread,attr,omitempty"`
+	IOMMU      string                           `xml:"iommu,attr,omitempty"`
+	ATS        string                           `xml:"ats,attr,omitempty"`
+	Packed     string                           `xml:"packed,attr,omitempty"`
+	PagePerVQ  string                           `xml:"page_per_vq,attr,omitempty"`
+	IOThreads  *DomainControllerDriverIOThreads `xml:"iothreads"`
 }
 
 type DomainController struct {
@@ -98,6 +118,7 @@ type DomainController struct {
 	USB          *DomainControllerUSB          `xml:"-"`
 	VirtIOSerial *DomainControllerVirtIOSerial `xml:"-"`
 	XenBus       *DomainControllerXenBus       `xml:"-"`
+	NVME         *DomainControllerNVME         `xml:"-"`
 	ACPI         *DomainDeviceACPI             `xml:"acpi"`
 	Alias        *DomainAlias                  `xml:"alias"`
 	Address      *DomainAddress                `xml:"address"`
@@ -158,6 +179,7 @@ type DomainDiskSource struct {
 	Volume        *DomainDiskSourceVolume    `xml:"-"`
 	NVME          *DomainDiskSourceNVME      `xml:"-"`
 	VHostUser     *DomainDiskSourceVHostUser `xml:"-"`
+	VHostVDPA     *DomainDiskSourceVHostVDPA `xml:"-"`
 	StartupPolicy string                     `xml:"startupPolicy,attr,omitempty"`
 	Index         uint                       `xml:"index,attr,omitempty"`
 	Encryption    *DomainDiskEncryption      `xml:"encryption"`
@@ -167,6 +189,12 @@ type DomainDiskSource struct {
 	Cookies       *DomainDiskCookies         `xml:"cookies"`
 	Readahead     *DomainDiskSourceReadahead `xml:"readahead"`
 	Timeout       *DomainDiskSourceTimeout   `xml:"timeout"`
+	DataStore     *DomainDiskDataStore       `xml:"dataStore"`
+}
+
+type DomainDiskDataStore struct {
+	Format *DomainDiskFormat `xml:"format"`
+	Source *DomainDiskSource `xml:"source"`
 }
 
 type DomainDiskSlices struct {
@@ -181,6 +209,7 @@ type DomainDiskSlice struct {
 
 type DomainDiskSourceFile struct {
 	File     string                 `xml:"file,attr,omitempty"`
+	FDGroup  string                 `xml:"fdgroup,attr,omitempty"`
 	SecLabel []DomainDeviceSecLabel `xml:"seclabel"`
 }
 
@@ -204,21 +233,31 @@ type DomainDiskSourceDir struct {
 }
 
 type DomainDiskSourceNetwork struct {
-	Protocol  string                            `xml:"protocol,attr,omitempty"`
-	Name      string                            `xml:"name,attr,omitempty"`
-	Query     string                            `xml:"query,attr,omitempty"`
-	TLS       string                            `xml:"tls,attr,omitempty"`
-	Hosts     []DomainDiskSourceHost            `xml:"host"`
-	Identity  *DomainDiskSourceNetworkIdentity  `xml:"identity"`
-	Initiator *DomainDiskSourceNetworkInitiator `xml:"initiator"`
-	Snapshot  *DomainDiskSourceNetworkSnapshot  `xml:"snapshot"`
-	Config    *DomainDiskSourceNetworkConfig    `xml:"config"`
-	Auth      *DomainDiskAuth                   `xml:"auth"`
+	Protocol    string                             `xml:"protocol,attr,omitempty"`
+	Name        string                             `xml:"name,attr,omitempty"`
+	Query       string                             `xml:"query,attr,omitempty"`
+	TLS         string                             `xml:"tls,attr,omitempty"`
+	TLSHostname string                             `xml:"tlsHostname,attr,omitempty"`
+	Hosts       []DomainDiskSourceHost             `xml:"host"`
+	Identity    *DomainDiskSourceNetworkIdentity   `xml:"identity"`
+	KnownHosts  *DomainDiskSourceNetworkKnownHosts `xml:"knownHosts"`
+	Initiator   *DomainDiskSourceNetworkInitiator  `xml:"initiator"`
+	Snapshot    *DomainDiskSourceNetworkSnapshot   `xml:"snapshot"`
+	Config      *DomainDiskSourceNetworkConfig     `xml:"config"`
+	Reconnect   *DomainDiskSourceNetworkReconnect  `xml:"reconnect"`
+	Auth        *DomainDiskAuth                    `xml:"auth"`
+}
+
+type DomainDiskSourceNetworkKnownHosts struct {
+	Path string `xml:"path,attr"`
 }
 
 type DomainDiskSourceNetworkIdentity struct {
-	User  string `xml:"user,attr"`
-	Group string `xml:"group,attr"`
+	User      string `xml:"user,attr,omitempty"`
+	Group     string `xml:"group,attr,omitempty"`
+	UserName  string `xml:"username,attr,omitempty"`
+	Keyfile   string `xml:"keyfile,attr,omitempty"`
+	AgentSock string `xml:"agentsock,attr,omitempty"`
 }
 
 type DomainDiskSourceNetworkInitiator struct {
@@ -237,6 +276,10 @@ type DomainDiskSourceNetworkConfig struct {
 	File string `xml:"file,attr"`
 }
 
+type DomainDiskSourceNetworkReconnect struct {
+	Delay string `xml:"delay,attr"`
+}
+
 type DomainDiskSourceVolume struct {
 	Pool     string                 `xml:"pool,attr,omitempty"`
 	Volume   string                 `xml:"volume,attr,omitempty"`
@@ -245,6 +288,10 @@ type DomainDiskSourceVolume struct {
 }
 
 type DomainDiskSourceVHostUser DomainChardevSource
+
+type DomainDiskSourceVHostVDPA struct {
+	Dev string `xml:"dev,attr"`
+}
 
 type DomainDiskMetadataCache struct {
 	MaxSize *DomainDiskMetadataCacheSize `xml:"max_size"`
@@ -255,24 +302,41 @@ type DomainDiskMetadataCacheSize struct {
 	Value int    `xml:",cdata"`
 }
 
+type DomainDiskIOThreads struct {
+	IOThread []DomainDiskIOThread `xml:"iothread"`
+}
+
+type DomainDiskIOThread struct {
+	ID     uint                      `xml:"id,attr"`
+	Queues []DomainDiskIOThreadQueue `xml:"queue"`
+}
+
+type DomainDiskIOThreadQueue struct {
+	ID uint `xml:"id,attr"`
+}
+
 type DomainDiskDriver struct {
-	Name          string                   `xml:"name,attr,omitempty"`
-	Type          string                   `xml:"type,attr,omitempty"`
-	Cache         string                   `xml:"cache,attr,omitempty"`
-	ErrorPolicy   string                   `xml:"error_policy,attr,omitempty"`
-	RErrorPolicy  string                   `xml:"rerror_policy,attr,omitempty"`
-	IO            string                   `xml:"io,attr,omitempty"`
-	IOEventFD     string                   `xml:"ioeventfd,attr,omitempty"`
-	EventIDX      string                   `xml:"event_idx,attr,omitempty"`
-	CopyOnRead    string                   `xml:"copy_on_read,attr,omitempty"`
-	Discard       string                   `xml:"discard,attr,omitempty"`
-	IOThread      *uint                    `xml:"iothread,attr"`
-	DetectZeros   string                   `xml:"detect_zeroes,attr,omitempty"`
-	Queues        *uint                    `xml:"queues,attr"`
-	IOMMU         string                   `xml:"iommu,attr,omitempty"`
-	ATS           string                   `xml:"ats,attr,omitempty"`
-	Packed        string                   `xml:"packed,attr,omitempty"`
-	MetadataCache *DomainDiskMetadataCache `xml:"metadata_cache"`
+	Name           string                   `xml:"name,attr,omitempty"`
+	Type           string                   `xml:"type,attr,omitempty"`
+	Cache          string                   `xml:"cache,attr,omitempty"`
+	ErrorPolicy    string                   `xml:"error_policy,attr,omitempty"`
+	RErrorPolicy   string                   `xml:"rerror_policy,attr,omitempty"`
+	IO             string                   `xml:"io,attr,omitempty"`
+	IOEventFD      string                   `xml:"ioeventfd,attr,omitempty"`
+	EventIDX       string                   `xml:"event_idx,attr,omitempty"`
+	CopyOnRead     string                   `xml:"copy_on_read,attr,omitempty"`
+	Discard        string                   `xml:"discard,attr,omitempty"`
+	DiscardNoUnref string                   `xml:"discard_no_unref,attr,omitempty"`
+	IOThread       *uint                    `xml:"iothread,attr"`
+	IOThreads      *DomainDiskIOThreads     `xml:"iothreads"`
+	DetectZeros    string                   `xml:"detect_zeroes,attr,omitempty"`
+	Queues         *uint                    `xml:"queues,attr"`
+	QueueSize      *uint                    `xml:"queue_size,attr"`
+	IOMMU          string                   `xml:"iommu,attr,omitempty"`
+	ATS            string                   `xml:"ats,attr,omitempty"`
+	Packed         string                   `xml:"packed,attr,omitempty"`
+	PagePerVQ      string                   `xml:"page_per_vq,attr,omitempty"`
+	MetadataCache  *DomainDiskMetadataCache `xml:"metadata_cache"`
 }
 
 type DomainDiskTarget struct {
@@ -284,8 +348,9 @@ type DomainDiskTarget struct {
 }
 
 type DomainDiskEncryption struct {
-	Format string            `xml:"format,attr,omitempty"`
-	Secret *DomainDiskSecret `xml:"secret"`
+	Format  string             `xml:"format,attr,omitempty"`
+	Engine  string             `xml:"engine,attr,omitempty"`
+	Secrets []DomainDiskSecret `xml:"secret"`
 }
 
 type DomainDiskReadOnly struct {
@@ -321,6 +386,14 @@ type DomainDiskIOTune struct {
 	GroupName              string `xml:"group_name,omitempty"`
 }
 
+type ThrottleFilter struct {
+	Group string `xml:"group,attr"`
+}
+
+type ThrottleFilters struct {
+	ThrottleFilter []ThrottleFilter `xml:"throttlefilter"`
+}
+
 type DomainDiskGeometry struct {
 	Cylinders uint   `xml:"cyls,attr"`
 	Headers   uint   `xml:"heads,attr"`
@@ -329,8 +402,9 @@ type DomainDiskGeometry struct {
 }
 
 type DomainDiskBlockIO struct {
-	LogicalBlockSize  uint `xml:"logical_block_size,attr,omitempty"`
-	PhysicalBlockSize uint `xml:"physical_block_size,attr,omitempty"`
+	LogicalBlockSize   uint  `xml:"logical_block_size,attr,omitempty"`
+	PhysicalBlockSize  uint  `xml:"physical_block_size,attr,omitempty"`
+	DiscardGranularity *uint `xml:"discard_granularity,attr"`
 }
 
 type DomainDiskFormat struct {
@@ -358,45 +432,47 @@ type DomainBackendDomain struct {
 }
 
 type DomainDisk struct {
-	XMLName       xml.Name                `xml:"disk"`
-	Device        string                  `xml:"device,attr,omitempty"`
-	RawIO         string                  `xml:"rawio,attr,omitempty"`
-	SGIO          string                  `xml:"sgio,attr,omitempty"`
-	Snapshot      string                  `xml:"snapshot,attr,omitempty"`
-	Model         string                  `xml:"model,attr,omitempty"`
-	Driver        *DomainDiskDriver       `xml:"driver"`
-	Auth          *DomainDiskAuth         `xml:"auth"`
-	Source        *DomainDiskSource       `xml:"source"`
-	BackingStore  *DomainDiskBackingStore `xml:"backingStore"`
-	BackendDomain *DomainBackendDomain    `xml:"backenddomain"`
-	Geometry      *DomainDiskGeometry     `xml:"geometry"`
-	BlockIO       *DomainDiskBlockIO      `xml:"blockio"`
-	Mirror        *DomainDiskMirror       `xml:"mirror"`
-	Target        *DomainDiskTarget       `xml:"target"`
-	IOTune        *DomainDiskIOTune       `xml:"iotune"`
-	ReadOnly      *DomainDiskReadOnly     `xml:"readonly"`
-	Shareable     *DomainDiskShareable    `xml:"shareable"`
-	Transient     *DomainDiskTransient    `xml:"transient"`
-	Serial        string                  `xml:"serial,omitempty"`
-	WWN           string                  `xml:"wwn,omitempty"`
-	Vendor        string                  `xml:"vendor,omitempty"`
-	Product       string                  `xml:"product,omitempty"`
-	Encryption    *DomainDiskEncryption   `xml:"encryption"`
-	Boot          *DomainDeviceBoot       `xml:"boot"`
-	ACPI          *DomainDeviceACPI       `xml:"acpi"`
-	Alias         *DomainAlias            `xml:"alias"`
-	Address       *DomainAddress          `xml:"address"`
+	XMLName         xml.Name                `xml:"disk"`
+	Device          string                  `xml:"device,attr,omitempty"`
+	RawIO           string                  `xml:"rawio,attr,omitempty"`
+	SGIO            string                  `xml:"sgio,attr,omitempty"`
+	Snapshot        string                  `xml:"snapshot,attr,omitempty"`
+	Model           string                  `xml:"model,attr,omitempty"`
+	Driver          *DomainDiskDriver       `xml:"driver"`
+	Auth            *DomainDiskAuth         `xml:"auth"`
+	Source          *DomainDiskSource       `xml:"source"`
+	BackingStore    *DomainDiskBackingStore `xml:"backingStore"`
+	BackendDomain   *DomainBackendDomain    `xml:"backenddomain"`
+	Geometry        *DomainDiskGeometry     `xml:"geometry"`
+	BlockIO         *DomainDiskBlockIO      `xml:"blockio"`
+	Mirror          *DomainDiskMirror       `xml:"mirror"`
+	Target          *DomainDiskTarget       `xml:"target"`
+	IOTune          *DomainDiskIOTune       `xml:"iotune"`
+	ThrottleFilters *ThrottleFilters        `xml:"throttlefilters"`
+	ReadOnly        *DomainDiskReadOnly     `xml:"readonly"`
+	Shareable       *DomainDiskShareable    `xml:"shareable"`
+	Transient       *DomainDiskTransient    `xml:"transient"`
+	Serial          string                  `xml:"serial,omitempty"`
+	WWN             string                  `xml:"wwn,omitempty"`
+	Vendor          string                  `xml:"vendor,omitempty"`
+	Product         string                  `xml:"product,omitempty"`
+	Encryption      *DomainDiskEncryption   `xml:"encryption"`
+	Boot            *DomainDeviceBoot       `xml:"boot"`
+	ACPI            *DomainDeviceACPI       `xml:"acpi"`
+	Alias           *DomainAlias            `xml:"alias"`
+	Address         *DomainAddress          `xml:"address"`
 }
 
 type DomainFilesystemDriver struct {
-	Type     string `xml:"type,attr,omitempty"`
-	Format   string `xml:"format,attr,omitempty"`
-	Name     string `xml:"name,attr,omitempty"`
-	WRPolicy string `xml:"wrpolicy,attr,omitempty"`
-	IOMMU    string `xml:"iommu,attr,omitempty"`
-	ATS      string `xml:"ats,attr,omitempty"`
-	Packed   string `xml:"packed,attr,omitempty"`
-	Queue    uint   `xml:"queue,attr,omitempty"`
+	Type      string `xml:"type,attr,omitempty"`
+	Format    string `xml:"format,attr,omitempty"`
+	Name      string `xml:"name,attr,omitempty"`
+	WRPolicy  string `xml:"wrpolicy,attr,omitempty"`
+	IOMMU     string `xml:"iommu,attr,omitempty"`
+	ATS       string `xml:"ats,attr,omitempty"`
+	Packed    string `xml:"packed,attr,omitempty"`
+	PagePerVQ string `xml:"page_per_vq,attr,omitempty"`
+	Queue     uint   `xml:"queue,attr,omitempty"`
 }
 
 type DomainFilesystemSource struct {
@@ -470,12 +546,33 @@ type DomainFilesystemBinaryLock struct {
 	Flock string `xml:"flock,attr,omitempty"`
 }
 
+type DomainFilesystemBinaryThreadPool struct {
+	Size uint `xml:"size,attr,omitempty"`
+}
+
+type DomainFilesystemBinaryOpenFiles struct {
+	Max uint `xml:"max,attr,"`
+}
+
 type DomainFilesystemBinary struct {
-	Path    string                         `xml:"path,attr,omitempty"`
-	XAttr   string                         `xml:"xattr,attr,omitempty"`
-	Cache   *DomainFilesystemBinaryCache   `xml:"cache"`
-	Sandbox *DomainFilesystemBinarySandbox `xml:"sandbox"`
-	Lock    *DomainFilesystemBinaryLock    `xml:"lock"`
+	Path       string                            `xml:"path,attr,omitempty"`
+	XAttr      string                            `xml:"xattr,attr,omitempty"`
+	Cache      *DomainFilesystemBinaryCache      `xml:"cache"`
+	Sandbox    *DomainFilesystemBinarySandbox    `xml:"sandbox"`
+	Lock       *DomainFilesystemBinaryLock       `xml:"lock"`
+	ThreadPool *DomainFilesystemBinaryThreadPool `xml:"thread_pool"`
+	OpenFiles  *DomainFilesystemBinaryOpenFiles  `xml:"openfiles"`
+}
+
+type DomainFilesystemIDMapEntry struct {
+	Start  uint `xml:"start,attr"`
+	Target uint `xml:"target,attr"`
+	Count  uint `xml:"count,attr"`
+}
+
+type DomainFilesystemIDMap struct {
+	UID []DomainFilesystemIDMapEntry `xml:"uid"`
+	GID []DomainFilesystemIDMapEntry `xml:"gid"`
 }
 
 type DomainFilesystem struct {
@@ -487,6 +584,7 @@ type DomainFilesystem struct {
 	DMode          string                          `xml:"dmode,attr,omitempty"`
 	Driver         *DomainFilesystemDriver         `xml:"driver"`
 	Binary         *DomainFilesystemBinary         `xml:"binary"`
+	IDMap          *DomainFilesystemIDMap          `xml:"idmap"`
 	Source         *DomainFilesystemSource         `xml:"source"`
 	Target         *DomainFilesystemTarget         `xml:"target"`
 	ReadOnly       *DomainFilesystemReadOnly       `xml:"readonly"`
@@ -508,23 +606,45 @@ type DomainInterfaceModel struct {
 	Type string `xml:"type,attr"`
 }
 
+type DomainInterfaceSourceVHostUser struct {
+	Chardev *DomainChardevSource `xml:"-"`
+	Dev     string               `xml:"-"`
+}
+
 type DomainInterfaceSource struct {
-	User      *DomainInterfaceSourceUser     `xml:"-"`
-	Ethernet  *DomainInterfaceSourceEthernet `xml:"-"`
-	VHostUser *DomainChardevSource           `xml:"-"`
-	Server    *DomainInterfaceSourceServer   `xml:"-"`
-	Client    *DomainInterfaceSourceClient   `xml:"-"`
-	MCast     *DomainInterfaceSourceMCast    `xml:"-"`
-	Network   *DomainInterfaceSourceNetwork  `xml:"-"`
-	Bridge    *DomainInterfaceSourceBridge   `xml:"-"`
-	Internal  *DomainInterfaceSourceInternal `xml:"-"`
-	Direct    *DomainInterfaceSourceDirect   `xml:"-"`
-	Hostdev   *DomainInterfaceSourceHostdev  `xml:"-"`
-	UDP       *DomainInterfaceSourceUDP      `xml:"-"`
-	VDPA      *DomainInterfaceSourceVDPA     `xml:"-"`
+	User      *DomainInterfaceSourceUser      `xml:"-"`
+	Ethernet  *DomainInterfaceSourceEthernet  `xml:"-"`
+	VHostUser *DomainInterfaceSourceVHostUser `xml:"-"`
+	Server    *DomainInterfaceSourceServer    `xml:"-"`
+	Client    *DomainInterfaceSourceClient    `xml:"-"`
+	MCast     *DomainInterfaceSourceMCast     `xml:"-"`
+	Network   *DomainInterfaceSourceNetwork   `xml:"-"`
+	Bridge    *DomainInterfaceSourceBridge    `xml:"-"`
+	Internal  *DomainInterfaceSourceInternal  `xml:"-"`
+	Direct    *DomainInterfaceSourceDirect    `xml:"-"`
+	Hostdev   *DomainInterfaceSourceHostdev   `xml:"-"`
+	UDP       *DomainInterfaceSourceUDP       `xml:"-"`
+	VDPA      *DomainInterfaceSourceVDPA      `xml:"-"`
+	Null      *DomainInterfaceSourceNull      `xml:"-"`
+	VDS       *DomainInterfaceSourceVDS       `xml:"-"`
 }
 
 type DomainInterfaceSourceUser struct {
+	Dev string `xml:"dev,attr,omitempty"`
+}
+
+type DomainInterfaceSourcePortForward struct {
+	Proto   string                                  `xml:"proto,attr"`
+	Address string                                  `xml:"address,attr,omitempty"`
+	Dev     string                                  `xml:"dev,attr,omitempty"`
+	Ranges  []DomainInterfaceSourcePortForwardRange `xml:"range"`
+}
+
+type DomainInterfaceSourcePortForwardRange struct {
+	Start   uint   `xml:"start,attr"`
+	End     uint   `xml:"end,attr,omitempty"`
+	To      uint   `xml:"to,attr,omitempty"`
+	Exclude string `xml:"exclude,attr,omitempty"`
 }
 
 type DomainInterfaceSourceEthernet struct {
@@ -585,6 +705,16 @@ type DomainInterfaceSourceVDPA struct {
 	Device string `xml:"dev,attr,omitempty"`
 }
 
+type DomainInterfaceSourceNull struct {
+}
+
+type DomainInterfaceSourceVDS struct {
+	SwitchID     string `xml:"switchid,attr"`
+	PortID       int    `xml:"portid,attr,omitempty"`
+	PortGroupID  string `xml:"portgroupid,attr,omitempty"`
+	ConnectionID int    `xml:"connectionid,attr,omitempty"`
+}
+
 type DomainInterfaceSourceLocal struct {
 	Address string `xml:"address,attr,omitempty"`
 	Port    uint   `xml:"port,attr,omitempty"`
@@ -609,18 +739,21 @@ type DomainInterfaceScript struct {
 }
 
 type DomainInterfaceDriver struct {
-	Name        string                      `xml:"name,attr,omitempty"`
-	TXMode      string                      `xml:"txmode,attr,omitempty"`
-	IOEventFD   string                      `xml:"ioeventfd,attr,omitempty"`
-	EventIDX    string                      `xml:"event_idx,attr,omitempty"`
-	Queues      uint                        `xml:"queues,attr,omitempty"`
-	RXQueueSize uint                        `xml:"rx_queue_size,attr,omitempty"`
-	TXQueueSize uint                        `xml:"tx_queue_size,attr,omitempty"`
-	IOMMU       string                      `xml:"iommu,attr,omitempty"`
-	ATS         string                      `xml:"ats,attr,omitempty"`
-	Packed      string                      `xml:"packed,attr,omitempty"`
-	Host        *DomainInterfaceDriverHost  `xml:"host"`
-	Guest       *DomainInterfaceDriverGuest `xml:"guest"`
+	Name          string                      `xml:"name,attr,omitempty"`
+	TXMode        string                      `xml:"txmode,attr,omitempty"`
+	IOEventFD     string                      `xml:"ioeventfd,attr,omitempty"`
+	EventIDX      string                      `xml:"event_idx,attr,omitempty"`
+	Queues        uint                        `xml:"queues,attr,omitempty"`
+	RXQueueSize   uint                        `xml:"rx_queue_size,attr,omitempty"`
+	TXQueueSize   uint                        `xml:"tx_queue_size,attr,omitempty"`
+	IOMMU         string                      `xml:"iommu,attr,omitempty"`
+	ATS           string                      `xml:"ats,attr,omitempty"`
+	Packed        string                      `xml:"packed,attr,omitempty"`
+	PagePerVQ     string                      `xml:"page_per_vq,attr,omitempty"`
+	RSS           string                      `xml:"rss,attr,omitempty"`
+	RSSHashReport string                      `xml:"rss_hash_report,attr,omitempty"`
+	Host          *DomainInterfaceDriverHost  `xml:"host"`
+	Guest         *DomainInterfaceDriverGuest `xml:"guest"`
 }
 
 type DomainInterfaceDriverHost struct {
@@ -720,8 +853,12 @@ type DomainInterfaceFilterParam struct {
 }
 
 type DomainInterfaceBackend struct {
-	Tap   string `xml:"tap,attr,omitempty"`
-	VHost string `xml:"vhost,attr,omitempty"`
+	Type     string `xml:"type,attr,omitempty"`
+	Tap      string `xml:"tap,attr,omitempty"`
+	VHost    string `xml:"vhost,attr,omitempty"`
+	LogFile  string `xml:"logFile,attr,omitempty"`
+	Hostname string `xml:"hostname,attr,omitempty"`
+	FQDN     string `xml:"fqdn,attr,omitempty"`
 }
 
 type DomainInterfaceTune struct {
@@ -745,9 +882,9 @@ type DomainInterfaceCoalesceRXFrames struct {
 }
 
 type DomainROM struct {
-	Bar     string `xml:"bar,attr,omitempty"`
-	File    string `xml:"file,attr,omitempty"`
-	Enabled string `xml:"enabled,attr,omitempty"`
+	Bar     string  `xml:"bar,attr,omitempty"`
+	File    *string `xml:"file,attr"`
+	Enabled string  `xml:"enabled,attr,omitempty"`
 }
 
 type DomainInterfaceIP struct {
@@ -776,52 +913,55 @@ type DomainInterfacePortOptions struct {
 }
 
 type DomainInterface struct {
-	XMLName             xml.Name                    `xml:"interface"`
-	Managed             string                      `xml:"managed,attr,omitempty"`
-	TrustGuestRXFilters string                      `xml:"trustGuestRxFilters,attr,omitempty"`
-	MAC                 *DomainInterfaceMAC         `xml:"mac"`
-	Source              *DomainInterfaceSource      `xml:"source"`
-	Boot                *DomainDeviceBoot           `xml:"boot"`
-	VLan                *DomainInterfaceVLan        `xml:"vlan"`
-	VirtualPort         *DomainInterfaceVirtualPort `xml:"virtualport"`
-	IP                  []DomainInterfaceIP         `xml:"ip"`
-	Route               []DomainInterfaceRoute      `xml:"route"`
-	Script              *DomainInterfaceScript      `xml:"script"`
-	DownScript          *DomainInterfaceScript      `xml:"downscript"`
-	BackendDomain       *DomainBackendDomain        `xml:"backenddomain"`
-	Target              *DomainInterfaceTarget      `xml:"target"`
-	Guest               *DomainInterfaceGuest       `xml:"guest"`
-	Model               *DomainInterfaceModel       `xml:"model"`
-	Driver              *DomainInterfaceDriver      `xml:"driver"`
-	Backend             *DomainInterfaceBackend     `xml:"backend"`
-	FilterRef           *DomainInterfaceFilterRef   `xml:"filterref"`
-	Tune                *DomainInterfaceTune        `xml:"tune"`
-	Teaming             *DomainInterfaceTeaming     `xml:"teaming"`
-	Link                *DomainInterfaceLink        `xml:"link"`
-	MTU                 *DomainInterfaceMTU         `xml:"mtu"`
-	Bandwidth           *DomainInterfaceBandwidth   `xml:"bandwidth"`
-	PortOptions         *DomainInterfacePortOptions `xml:"port"`
-	Coalesce            *DomainInterfaceCoalesce    `xml:"coalesce"`
-	ROM                 *DomainROM                  `xml:"rom"`
-	ACPI                *DomainDeviceACPI           `xml:"acpi"`
-	Alias               *DomainAlias                `xml:"alias"`
-	Address             *DomainAddress              `xml:"address"`
+	XMLName             xml.Name                           `xml:"interface"`
+	Managed             string                             `xml:"managed,attr,omitempty"`
+	TrustGuestRXFilters string                             `xml:"trustGuestRxFilters,attr,omitempty"`
+	MAC                 *DomainInterfaceMAC                `xml:"mac"`
+	Source              *DomainInterfaceSource             `xml:"source"`
+	Boot                *DomainDeviceBoot                  `xml:"boot"`
+	VLan                *DomainInterfaceVLan               `xml:"vlan"`
+	VirtualPort         *DomainInterfaceVirtualPort        `xml:"virtualport"`
+	IP                  []DomainInterfaceIP                `xml:"ip"`
+	Route               []DomainInterfaceRoute             `xml:"route"`
+	PortForward         []DomainInterfaceSourcePortForward `xml:"portForward"`
+	Script              *DomainInterfaceScript             `xml:"script"`
+	DownScript          *DomainInterfaceScript             `xml:"downscript"`
+	BackendDomain       *DomainBackendDomain               `xml:"backenddomain"`
+	Target              *DomainInterfaceTarget             `xml:"target"`
+	Guest               *DomainInterfaceGuest              `xml:"guest"`
+	Model               *DomainInterfaceModel              `xml:"model"`
+	Driver              *DomainInterfaceDriver             `xml:"driver"`
+	Backend             *DomainInterfaceBackend            `xml:"backend"`
+	FilterRef           *DomainInterfaceFilterRef          `xml:"filterref"`
+	Tune                *DomainInterfaceTune               `xml:"tune"`
+	Teaming             *DomainInterfaceTeaming            `xml:"teaming"`
+	Link                *DomainInterfaceLink               `xml:"link"`
+	MTU                 *DomainInterfaceMTU                `xml:"mtu"`
+	Bandwidth           *DomainInterfaceBandwidth          `xml:"bandwidth"`
+	PortOptions         *DomainInterfacePortOptions        `xml:"port"`
+	Coalesce            *DomainInterfaceCoalesce           `xml:"coalesce"`
+	ROM                 *DomainROM                         `xml:"rom"`
+	ACPI                *DomainDeviceACPI                  `xml:"acpi"`
+	Alias               *DomainAlias                       `xml:"alias"`
+	Address             *DomainAddress                     `xml:"address"`
 }
 
 type DomainChardevSource struct {
-	Null      *DomainChardevSourceNull      `xml:"-"`
-	VC        *DomainChardevSourceVC        `xml:"-"`
-	Pty       *DomainChardevSourcePty       `xml:"-"`
-	Dev       *DomainChardevSourceDev       `xml:"-"`
-	File      *DomainChardevSourceFile      `xml:"-"`
-	Pipe      *DomainChardevSourcePipe      `xml:"-"`
-	StdIO     *DomainChardevSourceStdIO     `xml:"-"`
-	UDP       *DomainChardevSourceUDP       `xml:"-"`
-	TCP       *DomainChardevSourceTCP       `xml:"-"`
-	UNIX      *DomainChardevSourceUNIX      `xml:"-"`
-	SpiceVMC  *DomainChardevSourceSpiceVMC  `xml:"-"`
-	SpicePort *DomainChardevSourceSpicePort `xml:"-"`
-	NMDM      *DomainChardevSourceNMDM      `xml:"-"`
+	Null        *DomainChardevSourceNull        `xml:"-"`
+	VC          *DomainChardevSourceVC          `xml:"-"`
+	Pty         *DomainChardevSourcePty         `xml:"-"`
+	Dev         *DomainChardevSourceDev         `xml:"-"`
+	File        *DomainChardevSourceFile        `xml:"-"`
+	Pipe        *DomainChardevSourcePipe        `xml:"-"`
+	StdIO       *DomainChardevSourceStdIO       `xml:"-"`
+	UDP         *DomainChardevSourceUDP         `xml:"-"`
+	TCP         *DomainChardevSourceTCP         `xml:"-"`
+	UNIX        *DomainChardevSourceUNIX        `xml:"-"`
+	SpiceVMC    *DomainChardevSourceSpiceVMC    `xml:"-"`
+	SpicePort   *DomainChardevSourceSpicePort   `xml:"-"`
+	NMDM        *DomainChardevSourceNMDM        `xml:"-"`
+	QEMUVDAgent *DomainChardevSourceQEMUVDAgent `xml:"-"`
+	DBus        *DomainChardevSourceDBus        `xml:"-"`
 }
 
 type DomainChardevSourceNull struct {
@@ -893,6 +1033,23 @@ type DomainChardevSourceNMDM struct {
 	Slave  string `xml:"slave,attr"`
 }
 
+type DomainChardevSourceQEMUVDAgentMouse struct {
+	Mode string `xml:"mode,attr"`
+}
+
+type DomainChardevSourceQEMUVDAgentClipBoard struct {
+	CopyPaste string `xml:"copypaste,attr"`
+}
+
+type DomainChardevSourceQEMUVDAgent struct {
+	Mouse     *DomainChardevSourceQEMUVDAgentMouse     `xml:"mouse"`
+	ClipBoard *DomainChardevSourceQEMUVDAgentClipBoard `xml:"clipboard"`
+}
+
+type DomainChardevSourceDBus struct {
+	Channel string `xml:"channel,attr,omitempty"`
+}
+
 type DomainChardevTarget struct {
 	Type  string `xml:"type,attr,omitempty"`
 	Name  string `xml:"name,attr,omitempty"`
@@ -946,7 +1103,8 @@ type DomainAlias struct {
 }
 
 type DomainDeviceACPI struct {
-	Index uint `xml:"index,attr,omitempty"`
+	Index   uint   `xml:"index,attr,omitempty"`
+	Nodeset string `xml:"nodeset,attr,omitempty"`
 }
 
 type DomainAddressPCI struct {
@@ -1121,9 +1279,10 @@ type DomainInput struct {
 }
 
 type DomainInputDriver struct {
-	IOMMU  string `xml:"iommu,attr,omitempty"`
-	ATS    string `xml:"ats,attr,omitempty"`
-	Packed string `xml:"packed,attr,omitempty"`
+	IOMMU     string `xml:"iommu,attr,omitempty"`
+	ATS       string `xml:"ats,attr,omitempty"`
+	Packed    string `xml:"packed,attr,omitempty"`
+	PagePerVQ string `xml:"page_per_vq,attr,omitempty"`
 }
 
 type DomainInputSource struct {
@@ -1136,9 +1295,10 @@ type DomainInputSourcePassthrough struct {
 }
 
 type DomainInputSourceEVDev struct {
-	Dev    string `xml:"dev,attr"`
-	Grab   string `xml:"grab,attr,omitempty"`
-	Repeat string `xml:"repeat,attr,omitempty"`
+	Dev        string `xml:"dev,attr"`
+	Grab       string `xml:"grab,attr,omitempty"`
+	GrabToggle string `xml:"grabToggle,attr,omitempty"`
+	Repeat     string `xml:"repeat,attr,omitempty"`
 }
 
 type DomainGraphicListenerAddress struct {
@@ -1200,6 +1360,8 @@ type DomainGraphicRDP struct {
 	AutoPort    string                  `xml:"autoport,attr,omitempty"`
 	ReplaceUser string                  `xml:"replaceUser,attr,omitempty"`
 	MultiUser   string                  `xml:"multiUser,attr,omitempty"`
+	Username    string                  `xml:"username,attr,omitempty"`
+	Passwd      string                  `xml:"passwd,attr,omitempty"`
 	Listen      string                  `xml:"listen,attr,omitempty"`
 	Listeners   []DomainGraphicListener `xml:"listen"`
 }
@@ -1282,6 +1444,17 @@ type DomainGraphicEGLHeadless struct {
 	GL *DomainGraphicEGLHeadlessGL `xml:"gl"`
 }
 
+type DomainGraphicDBusGL struct {
+	Enable     string `xml:"enable,attr,omitempty"`
+	RenderNode string `xml:"rendernode,attr,omitempty"`
+}
+
+type DomainGraphicDBus struct {
+	Address string               `xml:"address,attr,omitempty"`
+	P2P     string               `xml:"p2p,attr,omitempty"`
+	GL      *DomainGraphicDBusGL `xml:"gl"`
+}
+
 type DomainGraphicAudio struct {
 	ID uint `xml:"id,attr,omitempty"`
 }
@@ -1294,6 +1467,7 @@ type DomainGraphic struct {
 	Desktop     *DomainGraphicDesktop     `xml:"-"`
 	Spice       *DomainGraphicSpice       `xml:"-"`
 	EGLHeadless *DomainGraphicEGLHeadless `xml:"-"`
+	DBus        *DomainGraphicDBus        `xml:"-"`
 	Audio       *DomainGraphicAudio       `xml:"audio"`
 }
 
@@ -1309,13 +1483,15 @@ type DomainVideoResolution struct {
 }
 
 type DomainVideoModel struct {
-	Type       string                 `xml:"type,attr"`
+	Type       string                 `xml:"type,attr,omitempty"`
 	Heads      uint                   `xml:"heads,attr,omitempty"`
 	Ram        uint                   `xml:"ram,attr,omitempty"`
 	VRam       uint                   `xml:"vram,attr,omitempty"`
 	VRam64     uint                   `xml:"vram64,attr,omitempty"`
 	VGAMem     uint                   `xml:"vgamem,attr,omitempty"`
 	Primary    string                 `xml:"primary,attr,omitempty"`
+	Blob       string                 `xml:"blob,attr,omitempty"`
+	EDID       string                 `xml:"edid,attr,omitempty"`
 	Accel      *DomainVideoAccel      `xml:"acceleration"`
 	Resolution *DomainVideoResolution `xml:"resolution"`
 }
@@ -1330,11 +1506,12 @@ type DomainVideo struct {
 }
 
 type DomainVideoDriver struct {
-	Name    string `xml:"name,attr,omitempty"`
-	VGAConf string `xml:"vgaconf,attr,omitempty"`
-	IOMMU   string `xml:"iommu,attr,omitempty"`
-	ATS     string `xml:"ats,attr,omitempty"`
-	Packed  string `xml:"packed,attr,omitempty"`
+	Name      string `xml:"name,attr,omitempty"`
+	VGAConf   string `xml:"vgaconf,attr,omitempty"`
+	IOMMU     string `xml:"iommu,attr,omitempty"`
+	ATS       string `xml:"ats,attr,omitempty"`
+	Packed    string `xml:"packed,attr,omitempty"`
+	PagePerVQ string `xml:"page_per_vq,attr,omitempty"`
 }
 
 type DomainMemBalloonStats struct {
@@ -1359,9 +1536,10 @@ type DomainVSockCID struct {
 }
 
 type DomainVSockDriver struct {
-	IOMMU  string `xml:"iommu,attr,omitempty"`
-	ATS    string `xml:"ats,attr,omitempty"`
-	Packed string `xml:"packed,attr,omitempty"`
+	IOMMU     string `xml:"iommu,attr,omitempty"`
+	ATS       string `xml:"ats,attr,omitempty"`
+	Packed    string `xml:"packed,attr,omitempty"`
+	PagePerVQ string `xml:"page_per_vq,attr,omitempty"`
 }
 
 type DomainVSock struct {
@@ -1375,9 +1553,10 @@ type DomainVSock struct {
 }
 
 type DomainMemBalloonDriver struct {
-	IOMMU  string `xml:"iommu,attr,omitempty"`
-	ATS    string `xml:"ats,attr,omitempty"`
-	Packed string `xml:"packed,attr,omitempty"`
+	IOMMU     string `xml:"iommu,attr,omitempty"`
+	ATS       string `xml:"ats,attr,omitempty"`
+	Packed    string `xml:"packed,attr,omitempty"`
+	PagePerVQ string `xml:"page_per_vq,attr,omitempty"`
 }
 
 type DomainPanic struct {
@@ -1388,18 +1567,28 @@ type DomainPanic struct {
 	Address *DomainAddress    `xml:"address"`
 }
 
+type DomainSoundDriver struct {
+	IOMMU     string `xml:"iommu,attr,omitempty"`
+	ATS       string `xml:"ats,attr,omitempty"`
+	Packed    string `xml:"packed,attr,omitempty"`
+	PagePerVQ string `xml:"page_per_vq,attr,omitempty"`
+}
+
 type DomainSoundCodec struct {
 	Type string `xml:"type,attr"`
 }
 
 type DomainSound struct {
-	XMLName xml.Name           `xml:"sound"`
-	Model   string             `xml:"model,attr"`
-	Codec   []DomainSoundCodec `xml:"codec"`
-	Audio   *DomainSoundAudio  `xml:"audio"`
-	ACPI    *DomainDeviceACPI  `xml:"acpi"`
-	Alias   *DomainAlias       `xml:"alias"`
-	Address *DomainAddress     `xml:"address"`
+	XMLName      xml.Name           `xml:"sound"`
+	Model        string             `xml:"model,attr"`
+	MultiChannel string             `xml:"multichannel,attr,omitempty"`
+	Streams      uint               `xml:"streams,attr,omitempty"`
+	Codec        []DomainSoundCodec `xml:"codec"`
+	Audio        *DomainSoundAudio  `xml:"audio"`
+	ACPI         *DomainDeviceACPI  `xml:"acpi"`
+	Alias        *DomainAlias       `xml:"alias"`
+	Driver       *DomainSoundDriver `xml:"driver"`
+	Address      *DomainAddress     `xml:"address"`
 }
 
 type DomainSoundAudio struct {
@@ -1407,17 +1596,20 @@ type DomainSoundAudio struct {
 }
 
 type DomainAudio struct {
-	XMLName    xml.Name               `xml:"audio"`
-	ID         int                    `xml:"id,attr"`
-	None       *DomainAudioNone       `xml:"-"`
-	ALSA       *DomainAudioALSA       `xml:"-"`
-	CoreAudio  *DomainAudioCoreAudio  `xml:"-"`
-	Jack       *DomainAudioJack       `xml:"-"`
-	OSS        *DomainAudioOSS        `xml:"-"`
-	PulseAudio *DomainAudioPulseAudio `xml:"-"`
-	SDL        *DomainAudioSDL        `xml:"-"`
-	SPICE      *DomainAudioSPICE      `xml:"-"`
-	File       *DomainAudioFile       `xml:"-"`
+	XMLName     xml.Name               `xml:"audio"`
+	ID          int                    `xml:"id,attr"`
+	TimerPeriod uint                   `xml:"timerPeriod,attr,omitempty"`
+	None        *DomainAudioNone       `xml:"-"`
+	ALSA        *DomainAudioALSA       `xml:"-"`
+	CoreAudio   *DomainAudioCoreAudio  `xml:"-"`
+	Jack        *DomainAudioJack       `xml:"-"`
+	OSS         *DomainAudioOSS        `xml:"-"`
+	PulseAudio  *DomainAudioPulseAudio `xml:"-"`
+	SDL         *DomainAudioSDL        `xml:"-"`
+	SPICE       *DomainAudioSPICE      `xml:"-"`
+	File        *DomainAudioFile       `xml:"-"`
+	DBus        *DomainAudioDBus       `xml:"-"`
+	PipeWire    *DomainAudioPipeWire   `xml:"-"`
 }
 
 type DomainAudioChannel struct {
@@ -1505,6 +1697,19 @@ type DomainAudioPulseAudioChannel struct {
 	Latency    uint   `xml:"latency,attr,omitempty"`
 }
 
+type DomainAudioPipeWire struct {
+	RuntimeDir string                        `xml:"runtimeDir,attr,omitempty"`
+	Input      *DomainAudioPulseAudioChannel `xml:"input"`
+	Output     *DomainAudioPulseAudioChannel `xml:"output"`
+}
+
+type DomainAudioPipeWireChannel struct {
+	DomainAudioChannel
+	Name       string `xml:"name,attr,omitempty"`
+	StreamName string `xml:"streamName,attr,omitempty"`
+	Latency    uint   `xml:"latency,attr,omitempty"`
+}
+
 type DomainAudioSDL struct {
 	Driver string                 `xml:"driver,attr,omitempty"`
 	Input  *DomainAudioSDLChannel `xml:"input"`
@@ -1532,6 +1737,15 @@ type DomainAudioFile struct {
 }
 
 type DomainAudioFileChannel struct {
+	DomainAudioChannel
+}
+
+type DomainAudioDBus struct {
+	Input  *DomainAudioDBusChannel `xml:"input"`
+	Output *DomainAudioDBusChannel `xml:"output"`
+}
+
+type DomainAudioDBusChannel struct {
 	DomainAudioChannel
 }
 
@@ -1570,9 +1784,10 @@ type DomainRNG struct {
 }
 
 type DomainRNGDriver struct {
-	IOMMU  string `xml:"iommu,attr,omitempty"`
-	ATS    string `xml:"ats,attr,omitempty"`
-	Packed string `xml:"packed,attr,omitempty"`
+	IOMMU     string `xml:"iommu,attr,omitempty"`
+	ATS       string `xml:"ats,attr,omitempty"`
+	Packed    string `xml:"packed,attr,omitempty"`
+	PagePerVQ string `xml:"page_per_vq,attr,omitempty"`
 }
 
 type DomainHostdevSubsysUSB struct {
@@ -1580,7 +1795,15 @@ type DomainHostdevSubsysUSB struct {
 }
 
 type DomainHostdevSubsysUSBSource struct {
-	Address *DomainAddressUSB `xml:"address"`
+	GuestReset    string                        `xml:"guestReset,attr,omitempty"`
+	StartUpPolicy string                        `xml:"startupPolicy,attr,omitempty"`
+	Address       *DomainAddressUSB             `xml:"address"`
+	Product       *DomainHostDevProductVendorID `xml:"product"`
+	Vendor        *DomainHostDevProductVendorID `xml:"vendor"`
+}
+
+type DomainHostDevProductVendorID struct {
+	ID string `xml:"id,attr,omitempty"`
 }
 
 type DomainHostdevSubsysSCSI struct {
@@ -1636,10 +1859,13 @@ type DomainHostdevSubsysPCISource struct {
 }
 
 type DomainHostdevSubsysPCIDriver struct {
-	Name string `xml:"name,attr,omitempty"`
+	Name  string `xml:"name,attr,omitempty"`
+	Model string `xml:"model,attr,omitempty"`
 }
 
 type DomainHostdevSubsysPCI struct {
+	Display string                        `xml:"display,attr,omitempty"`
+	RamFB   string                        `xml:"ramfb,attr,omitempty"`
 	Driver  *DomainHostdevSubsysPCIDriver `xml:"driver"`
 	Source  *DomainHostdevSubsysPCISource `xml:"source"`
 	Teaming *DomainInterfaceTeaming       `xml:"teaming"`
@@ -1748,15 +1974,40 @@ type DomainMemorydevTargetSize struct {
 	Unit  string `xml:"unit,attr,omitempty"`
 }
 
+type DomainMemorydevTargetBlock struct {
+	Value uint   `xml:",chardata"`
+	Unit  string `xml:"unit,attr,omitempty"`
+}
+
+type DomainMemorydevTargetRequested struct {
+	Value uint   `xml:",chardata"`
+	Unit  string `xml:"unit,attr,omitempty"`
+}
+
 type DomainMemorydevTargetLabel struct {
 	Size *DomainMemorydevTargetSize `xml:"size"`
 }
 
+type DomainMemorydevTargetAddress struct {
+	Base *uint `xml:"base,attr"`
+}
+
 type DomainMemorydevTarget struct {
-	Size     *DomainMemorydevTargetSize     `xml:"size"`
-	Node     *DomainMemorydevTargetNode     `xml:"node"`
-	Label    *DomainMemorydevTargetLabel    `xml:"label"`
-	ReadOnly *DomainMemorydevTargetReadOnly `xml:"readonly"`
+	DynamicMemslots string                          `xml:"dynamicMemslots,attr,omitempty"`
+	Size            *DomainMemorydevTargetSize      `xml:"size"`
+	Node            *DomainMemorydevTargetNode      `xml:"node"`
+	Label           *DomainMemorydevTargetLabel     `xml:"label"`
+	Block           *DomainMemorydevTargetBlock     `xml:"block"`
+	Requested       *DomainMemorydevTargetRequested `xml:"requested"`
+	ReadOnly        *DomainMemorydevTargetReadOnly  `xml:"readonly"`
+	Address         *DomainMemorydevTargetAddress   `xml:"address"`
+}
+
+type DomainMemorydevDriver struct {
+	IOMMU     string `xml:"iommu,attr,omitempty"`
+	ATS       string `xml:"ats,attr,omitempty"`
+	Packed    string `xml:"packed,attr,omitempty"`
+	PagePerVQ string `xml:"page_per_vq,attr,omitempty"`
 }
 
 type DomainMemorydev struct {
@@ -1764,6 +2015,7 @@ type DomainMemorydev struct {
 	Model   string                 `xml:"model,attr"`
 	Access  string                 `xml:"access,attr,omitempty"`
 	Discard string                 `xml:"discard,attr,omitempty"`
+	Driver  *DomainMemorydevDriver `xml:"driver"`
 	UUID    string                 `xml:"uuid,omitempty"`
 	Source  *DomainMemorydevSource `xml:"source"`
 	Target  *DomainMemorydevTarget `xml:"target"`
@@ -1789,16 +2041,22 @@ type DomainHub struct {
 }
 
 type DomainIOMMU struct {
-	Model  string             `xml:"model,attr"`
-	Driver *DomainIOMMUDriver `xml:"driver"`
+	Model   string             `xml:"model,attr"`
+	Driver  *DomainIOMMUDriver `xml:"driver"`
+	ACPI    *DomainDeviceACPI  `xml:"acpi"`
+	Alias   *DomainAlias       `xml:"alias"`
+	Address *DomainAddress     `xml:"address"`
 }
 
 type DomainIOMMUDriver struct {
-	IntRemap    string `xml:"intremap,attr,omitempty"`
-	CachingMode string `xml:"caching_mode,attr,omitempty"`
-	EIM         string `xml:"eim,attr,omitempty"`
-	IOTLB       string `xml:"iotlb,attr,omitempty"`
-	AWBits      uint   `xml:"aw_bits,attr,omitempty"`
+	IntRemap       string `xml:"intremap,attr,omitempty"`
+	CachingMode    string `xml:"caching_mode,attr,omitempty"`
+	EIM            string `xml:"eim,attr,omitempty"`
+	IOTLB          string `xml:"iotlb,attr,omitempty"`
+	AWBits         uint   `xml:"aw_bits,attr,omitempty"`
+	DMATranslation string `xml:"dma_translation,attr,omitempty"`
+	Passthrough    string `xml:"passthrough,attr,omitempty"`
+	XTSup          string `xml:"xtsup,attr,omitempty"`
 }
 
 type DomainNVRAM struct {
@@ -1849,6 +2107,7 @@ type DomainTPM struct {
 type DomainTPMBackend struct {
 	Passthrough *DomainTPMBackendPassthrough `xml:"-"`
 	Emulator    *DomainTPMBackendEmulator    `xml:"-"`
+	External    *DomainTPMBackendExternal    `xml:"-"`
 }
 
 type DomainTPMBackendPassthrough struct {
@@ -1859,6 +2118,39 @@ type DomainTPMBackendEmulator struct {
 	Version         string                      `xml:"version,attr,omitempty"`
 	Encryption      *DomainTPMBackendEncryption `xml:"encryption"`
 	PersistentState string                      `xml:"persistent_state,attr,omitempty"`
+	Debug           uint                        `xml:"debug,attr,omitempty"`
+	ActivePCRBanks  *DomainTPMBackendPCRBanks   `xml:"active_pcr_banks"`
+	Source          *DomainTPMBackendSource     `xml:"source"`
+	Profile         *DomainTPMBackendProfile    `xml:"profile"`
+}
+
+type DomainTPMBackendProfile struct {
+	Source         string `xml:"source,attr,omitempty"`
+	RemoveDisabled string `xml:"removeDisabled,attr,omitempty"`
+	Name           string `xml:"name,attr,omitempty"`
+}
+
+type DomainTPMBackendSource struct {
+	File *DomainTPMBackendSourceFile `xml:"-"`
+	Dir  *DomainTPMBackendSourceDir  `xml:"-"`
+}
+
+type DomainTPMBackendSourceFile struct {
+	Path string `xml:"path,attr,omitempty"`
+}
+
+type DomainTPMBackendSourceDir struct {
+	Path string `xml:"path,attr,omitempty"`
+}
+
+type DomainTPMBackendPCRBanks struct {
+	SHA1   *DomainTPMBackendPCRBank `xml:"sha1"`
+	SHA256 *DomainTPMBackendPCRBank `xml:"sha256"`
+	SHA384 *DomainTPMBackendPCRBank `xml:"sha384"`
+	SHA512 *DomainTPMBackendPCRBank `xml:"sha512"`
+}
+
+type DomainTPMBackendPCRBank struct {
 }
 
 type DomainTPMBackendEncryption struct {
@@ -1867,6 +2159,12 @@ type DomainTPMBackendEncryption struct {
 
 type DomainTPMBackendDevice struct {
 	Path string `xml:"path,attr"`
+}
+
+type DomainTPMBackendExternalSource DomainChardevSource
+
+type DomainTPMBackendExternal struct {
+	Source *DomainTPMBackendExternalSource `xml:"source"`
 }
 
 type DomainShmem struct {
@@ -1901,6 +2199,40 @@ type DomainShmemMSI struct {
 	IOEventFD string `xml:"ioeventfd,attr,omitempty"`
 }
 
+type DomainCrypto struct {
+	Model   string               `xml:"model,attr,omitempty"`
+	Type    string               `xml:"type,attr,omitempty"`
+	Backend *DomainCryptoBackend `xml:"backend"`
+	Alias   *DomainAlias         `xml:"alias"`
+	Address *DomainAddress       `xml:"address"`
+}
+
+type DomainCryptoBackend struct {
+	BuiltIn *DomainCryptoBackendBuiltIn `xml:"-"`
+	LKCF    *DomainCryptoBackendLKCF    `xml:"-"`
+	Queues  uint                        `xml:"queues,attr,omitempty"`
+}
+
+type DomainCryptoBackendBuiltIn struct {
+}
+
+type DomainCryptoBackendLKCF struct {
+}
+
+type DomainPStore struct {
+	Backend string            `xml:"backend,attr"`
+	Path    string            `xml:"path"`
+	Size    DomainPStoreSize  `xml:"size"`
+	ACPI    *DomainDeviceACPI `xml:"acpi"`
+	Alias   *DomainAlias      `xml:"alias"`
+	Address *DomainAddress    `xml:"address"`
+}
+
+type DomainPStoreSize struct {
+	Size uint64 `xml:",chardata"`
+	Unit string `xml:"unit,attr"`
+}
+
 type DomainDeviceList struct {
 	Emulator     string              `xml:"emulator,omitempty"`
 	Disks        []DomainDisk        `xml:"disk"`
@@ -1923,7 +2255,7 @@ type DomainDeviceList struct {
 	RedirDevs    []DomainRedirDev    `xml:"redirdev"`
 	RedirFilters []DomainRedirFilter `xml:"redirfilter"`
 	Hubs         []DomainHub         `xml:"hub"`
-	Watchdog     *DomainWatchdog     `xml:"watchdog"`
+	Watchdogs    []DomainWatchdog    `xml:"watchdog"`
 	MemBalloon   *DomainMemBalloon   `xml:"memballoon"`
 	RNGs         []DomainRNG         `xml:"rng"`
 	NVRAM        *DomainNVRAM        `xml:"nvram"`
@@ -1932,6 +2264,8 @@ type DomainDeviceList struct {
 	Memorydevs   []DomainMemorydev   `xml:"memory"`
 	IOMMU        *DomainIOMMU        `xml:"iommu"`
 	VSock        *DomainVSock        `xml:"vsock"`
+	Crypto       []DomainCrypto      `xml:"crypto"`
+	PStore       *DomainPStore       `xml:"pstore"`
 }
 
 type DomainMemory struct {
@@ -1976,7 +2310,8 @@ type DomainMemoryAccess struct {
 }
 
 type DomainMemoryAllocation struct {
-	Mode string `xml:"mode,attr,omitempty"`
+	Mode    string `xml:"mode,attr,omitempty"`
+	Threads uint   `xml:"threads,attr,omitempty"`
 }
 
 type DomainMemoryDiscard struct {
@@ -2003,8 +2338,11 @@ type DomainSMBios struct {
 }
 
 type DomainNVRam struct {
-	NVRam    string `xml:",chardata"`
-	Template string `xml:"template,attr,omitempty"`
+	NVRam          string            `xml:",chardata"`
+	Source         *DomainDiskSource `xml:"source"`
+	Template       string            `xml:"template,attr,omitempty"`
+	Format         string            `xml:"format,attr,omitempty"`
+	TemplateFormat string            `xml:"templateFormat,attr,omitempty"`
 }
 
 type DomainBootDevice struct {
@@ -2075,10 +2413,12 @@ type DomainBIOS struct {
 }
 
 type DomainLoader struct {
-	Path     string `xml:",chardata"`
-	Readonly string `xml:"readonly,attr,omitempty"`
-	Secure   string `xml:"secure,attr,omitempty"`
-	Type     string `xml:"type,attr,omitempty"`
+	Path      string `xml:",chardata"`
+	Readonly  string `xml:"readonly,attr,omitempty"`
+	Secure    string `xml:"secure,attr,omitempty"`
+	Stateless string `xml:"stateless,attr,omitempty"`
+	Type      string `xml:"type,attr,omitempty"`
+	Format    string `xml:"format,attr,omitempty"`
 }
 
 type DomainACPI struct {
@@ -2119,6 +2459,7 @@ type DomainOS struct {
 	Kernel       string                `xml:"kernel,omitempty"`
 	Initrd       string                `xml:"initrd,omitempty"`
 	Cmdline      string                `xml:"cmdline,omitempty"`
+	Shim         string                `xml:"shim,omitempty"`
 	DTB          string                `xml:"dtb,omitempty"`
 	ACPI         *DomainACPI           `xml:"acpi"`
 	BootDevices  []DomainBootDevice    `xml:"boot"`
@@ -2128,7 +2469,12 @@ type DomainOS struct {
 }
 
 type DomainResource struct {
-	Partition string `xml:"partition,omitempty"`
+	Partition    string                      `xml:"partition,omitempty"`
+	FibreChannel *DomainResourceFibreChannel `xml:"fibrechannel"`
+}
+
+type DomainResourceFibreChannel struct {
+	AppID string `xml:"appid,attr"`
 }
 
 type DomainVCPU struct {
@@ -2156,10 +2502,11 @@ type DomainCPUModel struct {
 }
 
 type DomainCPUTopology struct {
-	Sockets int `xml:"sockets,attr,omitempty"`
-	Dies    int `xml:"dies,attr,omitempty"`
-	Cores   int `xml:"cores,attr,omitempty"`
-	Threads int `xml:"threads,attr,omitempty"`
+	Sockets  int `xml:"sockets,attr,omitempty"`
+	Dies     int `xml:"dies,attr,omitempty"`
+	Clusters int `xml:"clusters,attr,omitempty"`
+	Cores    int `xml:"cores,attr,omitempty"`
+	Threads  int `xml:"threads,attr,omitempty"`
 }
 
 type DomainCPUFeature struct {
@@ -2172,18 +2519,26 @@ type DomainCPUCache struct {
 	Mode  string `xml:"mode,attr"`
 }
 
+type DomainCPUMaxPhysAddr struct {
+	Mode  string `xml:"mode,attr"`
+	Bits  uint   `xml:"bits,attr,omitempty"`
+	Limit uint   `xml:"limit,attr,omitempty"`
+}
+
 type DomainCPU struct {
-	XMLName    xml.Name           `xml:"cpu"`
-	Match      string             `xml:"match,attr,omitempty"`
-	Mode       string             `xml:"mode,attr,omitempty"`
-	Check      string             `xml:"check,attr,omitempty"`
-	Migratable string             `xml:"migratable,attr,omitempty"`
-	Model      *DomainCPUModel    `xml:"model"`
-	Vendor     string             `xml:"vendor,omitempty"`
-	Topology   *DomainCPUTopology `xml:"topology"`
-	Cache      *DomainCPUCache    `xml:"cache"`
-	Features   []DomainCPUFeature `xml:"feature"`
-	Numa       *DomainNuma        `xml:"numa"`
+	XMLName            xml.Name              `xml:"cpu"`
+	Match              string                `xml:"match,attr,omitempty"`
+	Mode               string                `xml:"mode,attr,omitempty"`
+	Check              string                `xml:"check,attr,omitempty"`
+	Migratable         string                `xml:"migratable,attr,omitempty"`
+	DeprecatedFeatures string                `xml:"deprecated_features,attr,omitempty"`
+	Model              *DomainCPUModel       `xml:"model"`
+	Vendor             string                `xml:"vendor,omitempty"`
+	Topology           *DomainCPUTopology    `xml:"topology"`
+	Cache              *DomainCPUCache       `xml:"cache"`
+	MaxPhysAddr        *DomainCPUMaxPhysAddr `xml:"maxphysaddr"`
+	Features           []DomainCPUFeature    `xml:"feature"`
+	Numa               *DomainNuma           `xml:"numa"`
 }
 
 type DomainNuma struct {
@@ -2245,6 +2600,7 @@ type DomainNUMAInterconnectLatency struct {
 type DomainNUMAInterconnectBandwidth struct {
 	Initiator uint   `xml:"initiator,attr"`
 	Target    uint   `xml:"target,attr"`
+	Cache     uint   `xml:"cache,attr,omitempty"`
 	Type      string `xml:"type,attr"`
 	Value     uint   `xml:"value,attr"`
 	Unit      string `xml:"unit,attr"`
@@ -2255,6 +2611,7 @@ type DomainClock struct {
 	Basis      string        `xml:"basis,attr,omitempty"`
 	Adjustment string        `xml:"adjustment,attr,omitempty"`
 	TimeZone   string        `xml:"timezone,attr,omitempty"`
+	Start      uint          `xml:"start,attr,omitempty"`
 	Timer      []DomainTimer `xml:"timer"`
 }
 
@@ -2300,8 +2657,15 @@ type DomainFeatureHyperVSTimer struct {
 	Direct *DomainFeatureState `xml:"direct"`
 }
 
+type DomainFeatureHyperVTLBFlush struct {
+	DomainFeatureState
+	Direct   *DomainFeatureState `xml:"direct"`
+	Extended *DomainFeatureState `xml:"extended"`
+}
+
 type DomainFeatureHyperV struct {
 	DomainFeature
+	Mode            string                        `xml:"mode,attr,omitempty"`
 	Relaxed         *DomainFeatureState           `xml:"relaxed"`
 	VAPIC           *DomainFeatureState           `xml:"vapic"`
 	Spinlocks       *DomainFeatureHyperVSpinlocks `xml:"spinlocks"`
@@ -2313,15 +2677,34 @@ type DomainFeatureHyperV struct {
 	VendorId        *DomainFeatureHyperVVendorId  `xml:"vendor_id"`
 	Frequencies     *DomainFeatureState           `xml:"frequencies"`
 	ReEnlightenment *DomainFeatureState           `xml:"reenlightenment"`
-	TLBFlush        *DomainFeatureState           `xml:"tlbflush"`
+	TLBFlush        *DomainFeatureHyperVTLBFlush  `xml:"tlbflush"`
 	IPI             *DomainFeatureState           `xml:"ipi"`
 	EVMCS           *DomainFeatureState           `xml:"evmcs"`
+	AVIC            *DomainFeatureState           `xml:"avic"`
+	EMSRBitmap      *DomainFeatureState           `xml:"emsr_bitmap"`
+	XMMInput        *DomainFeatureState           `xml:"xmm_input"`
+}
+
+type DomainFeatureKVMDirtyRing struct {
+	DomainFeatureState
+	Size uint `xml:"size,attr,omitempty"`
 }
 
 type DomainFeatureKVM struct {
-	Hidden        *DomainFeatureState `xml:"hidden"`
-	HintDedicated *DomainFeatureState `xml:"hint-dedicated"`
-	PollControl   *DomainFeatureState `xml:"poll-control"`
+	Hidden        *DomainFeatureState        `xml:"hidden"`
+	HintDedicated *DomainFeatureState        `xml:"hint-dedicated"`
+	PollControl   *DomainFeatureState        `xml:"poll-control"`
+	PVIPI         *DomainFeatureState        `xml:"pv-ipi"`
+	DirtyRing     *DomainFeatureKVMDirtyRing `xml:"dirty-ring"`
+}
+
+type DomainFeatureTCGTBCache struct {
+	Unit string `xml:"unit,attr,omitempty"`
+	Size uint   `xml:",chardata"`
+}
+
+type DomainFeatureTCG struct {
+	TBCache *DomainFeatureTCGTBCache `xml:"tb-cache"`
 }
 
 type DomainFeatureXenPassthrough struct {
@@ -2371,15 +2754,47 @@ type DomainFeatureCapability struct {
 }
 
 type DomainLaunchSecurity struct {
-	SEV *DomainLaunchSecuritySEV `xml:"-"`
+	SEV    *DomainLaunchSecuritySEV    `xml:"-"`
+	SEVSNP *DomainLaunchSecuritySEVSNP `xml:"-"`
+	S390PV *DomainLaunchSecurityS390PV `xml:"-"`
+	TDX    *DomainLaunchSecurityTDX    `xml:"-"`
 }
 
 type DomainLaunchSecuritySEV struct {
+	KernelHashes    string `xml:"kernelHashes,attr,omitempty"`
 	CBitPos         *uint  `xml:"cbitpos"`
 	ReducedPhysBits *uint  `xml:"reducedPhysBits"`
 	Policy          *uint  `xml:"policy"`
 	DHCert          string `xml:"dhCert"`
 	Session         string `xml:"sesion"`
+}
+
+type DomainLaunchSecuritySEVSNP struct {
+	KernelHashes            string  `xml:"kernelHashes,attr,omitempty"`
+	AuthorKey               string  `xml:"authorKey,attr,omitempty"`
+	VCEK                    string  `xml:"vcek,attr,omitempty"`
+	CBitPos                 *uint   `xml:"cbitpos"`
+	ReducedPhysBits         *uint   `xml:"reducedPhysBits"`
+	Policy                  *uint64 `xml:"policy"`
+	GuestVisibleWorkarounds string  `xml:"guestVisibleWorkarounds,omitempty"`
+	IDBlock                 string  `xml:"idBlock,omitempty"`
+	IDAuth                  string  `xml:"idAuth,omitempty"`
+	HostData                string  `xml:"hostData,omitempty"`
+}
+
+type DomainLaunchSecurityS390PV struct {
+}
+
+type DomainLaunchSecurityTDX struct {
+	Policy                 *uint                       `xml:"policy"`
+	MrConfigId             string                      `xml:"mrConfigId,omitempty"`
+	MrOwner                string                      `xml:"mrOwner,omitempty"`
+	MrOwnerConfig          string                      `xml:"mrOwnerConfig,omitempty"`
+	QuoteGenerationService *DomainLaunchSecurityTDXQGS `xml:"quoteGenerationService"`
+}
+
+type DomainLaunchSecurityTDXQGS struct {
+	Path string `xml:"path,attr,omitempty"`
 }
 
 type DomainFeatureCapabilities struct {
@@ -2439,32 +2854,45 @@ type DomainFeatureIBS struct {
 	Value string `xml:"value,attr"`
 }
 
+type DomainFeatureAsyncTeardown struct {
+	Enabled string `xml:"enabled,attr,omitempty"`
+}
+
+type DomainFeatureAIA struct {
+	Value string `xml:"value,attr"`
+}
+
 type DomainFeatureList struct {
-	PAE          *DomainFeature             `xml:"pae"`
-	ACPI         *DomainFeature             `xml:"acpi"`
-	APIC         *DomainFeatureAPIC         `xml:"apic"`
-	HAP          *DomainFeatureState        `xml:"hap"`
-	Viridian     *DomainFeature             `xml:"viridian"`
-	PrivNet      *DomainFeature             `xml:"privnet"`
-	HyperV       *DomainFeatureHyperV       `xml:"hyperv"`
-	KVM          *DomainFeatureKVM          `xml:"kvm"`
-	Xen          *DomainFeatureXen          `xml:"xen"`
-	PVSpinlock   *DomainFeatureState        `xml:"pvspinlock"`
-	PMU          *DomainFeatureState        `xml:"pmu"`
-	VMPort       *DomainFeatureState        `xml:"vmport"`
-	GIC          *DomainFeatureGIC          `xml:"gic"`
-	SMM          *DomainFeatureSMM          `xml:"smm"`
-	IOAPIC       *DomainFeatureIOAPIC       `xml:"ioapic"`
-	HPT          *DomainFeatureHPT          `xml:"hpt"`
-	HTM          *DomainFeatureState        `xml:"htm"`
-	NestedHV     *DomainFeatureState        `xml:"nested-hv"`
-	Capabilities *DomainFeatureCapabilities `xml:"capabilities"`
-	VMCoreInfo   *DomainFeatureState        `xml:"vmcoreinfo"`
-	MSRS         *DomainFeatureMSRS         `xml:"msrs"`
-	CCFAssist    *DomainFeatureState        `xml:"ccf-assist"`
-	CFPC         *DomainFeatureCFPC         `xml:"cfpc"`
-	SBBC         *DomainFeatureSBBC         `xml:"sbbc"`
-	IBS          *DomainFeatureIBS          `xml:"ibs"`
+	PAE           *DomainFeature              `xml:"pae"`
+	ACPI          *DomainFeature              `xml:"acpi"`
+	APIC          *DomainFeatureAPIC          `xml:"apic"`
+	HAP           *DomainFeatureState         `xml:"hap"`
+	Viridian      *DomainFeature              `xml:"viridian"`
+	PrivNet       *DomainFeature              `xml:"privnet"`
+	HyperV        *DomainFeatureHyperV        `xml:"hyperv"`
+	KVM           *DomainFeatureKVM           `xml:"kvm"`
+	Xen           *DomainFeatureXen           `xml:"xen"`
+	PVSpinlock    *DomainFeatureState         `xml:"pvspinlock"`
+	PMU           *DomainFeatureState         `xml:"pmu"`
+	VMPort        *DomainFeatureState         `xml:"vmport"`
+	GIC           *DomainFeatureGIC           `xml:"gic"`
+	SMM           *DomainFeatureSMM           `xml:"smm"`
+	IOAPIC        *DomainFeatureIOAPIC        `xml:"ioapic"`
+	HPT           *DomainFeatureHPT           `xml:"hpt"`
+	HTM           *DomainFeatureState         `xml:"htm"`
+	NestedHV      *DomainFeatureState         `xml:"nested-hv"`
+	Capabilities  *DomainFeatureCapabilities  `xml:"capabilities"`
+	VMCoreInfo    *DomainFeatureState         `xml:"vmcoreinfo"`
+	MSRS          *DomainFeatureMSRS          `xml:"msrs"`
+	CCFAssist     *DomainFeatureState         `xml:"ccf-assist"`
+	CFPC          *DomainFeatureCFPC          `xml:"cfpc"`
+	SBBC          *DomainFeatureSBBC          `xml:"sbbc"`
+	IBS           *DomainFeatureIBS           `xml:"ibs"`
+	TCG           *DomainFeatureTCG           `xml:"tcg"`
+	AsyncTeardown *DomainFeatureAsyncTeardown `xml:"async-teardown"`
+	RAS           *DomainFeatureState         `xml:"ras"`
+	PS2           *DomainFeatureState         `xml:"ps2"`
+	AIA           *DomainFeatureAIA           `xml:"aia"`
 }
 
 type DomainCPUTuneShares struct {
@@ -2512,6 +2940,7 @@ type DomainCPUTuneEmulatorSched struct {
 
 type DomainCPUCacheTune struct {
 	VCPUs   string                      `xml:"vcpus,attr,omitempty"`
+	ID      string                      `xml:"id,attr,omitempty"`
 	Cache   []DomainCPUCacheTuneCache   `xml:"cache"`
 	Monitor []DomainCPUCacheTuneMonitor `xml:"monitor"`
 }
@@ -2592,6 +3021,26 @@ type DomainQEMUCapabilities struct {
 type DomainQEMUDeprecation struct {
 	XMLName  xml.Name `xml:"http://libvirt.org/schemas/domain/qemu/1.0 deprecation"`
 	Behavior string   `xml:"behavior,attr,omitempty"`
+}
+
+type DomainQEMUOverride struct {
+	XMLName xml.Name                   `xml:"http://libvirt.org/schemas/domain/qemu/1.0 override"`
+	Devices []DomainQEMUOverrideDevice `xml:"device"`
+}
+
+type DomainQEMUOverrideDevice struct {
+	Alias    string                     `xml:"alias,attr"`
+	Frontend DomainQEMUOverrideFrontend `xml:"frontend"`
+}
+
+type DomainQEMUOverrideFrontend struct {
+	Properties []DomainQEMUOverrideProperty `xml:"property"`
+}
+
+type DomainQEMUOverrideProperty struct {
+	Name  string `xml:"name,attr"`
+	Type  string `xml:"type,attr,omitempty"`
+	Value string `xml:"value,attr,omitempty"`
 }
 
 type DomainLXCNamespace struct {
@@ -2690,8 +3139,22 @@ type DomainIOThreadIDs struct {
 	IOThreads []DomainIOThread `xml:"iothread"`
 }
 
+type DomainIOThreadPoll struct {
+	Max    *uint `xml:"max,attr"`
+	Grow   *uint `xml:"grow,attr"`
+	Shrink *uint `xml:"shrink,attr"`
+}
+
 type DomainIOThread struct {
-	ID uint `xml:"id,attr"`
+	ID      uint                `xml:"id,attr"`
+	PoolMin *uint               `xml:"thread_pool_min,attr"`
+	PoolMax *uint               `xml:"thread_pool_max,attr"`
+	Poll    *DomainIOThreadPoll `xml:"poll"`
+}
+
+type DomainDefaultIOThread struct {
+	PoolMin *uint `xml:"thread_pool_min,attr"`
+	PoolMax *uint `xml:"thread_pool_max,attr"`
 }
 
 type DomainKeyWrap struct {
@@ -2748,53 +3211,63 @@ type DomainGenID struct {
 	Value string `xml:",chardata"`
 }
 
+type DomainThrottleGroups struct {
+	ThrottleGroups []ThrottleGroup `xml:"throttlegroup"`
+}
+
+type ThrottleGroup DomainDiskIOTune
+
 // NB, try to keep the order of fields in this struct
 // matching the order of XML elements that libvirt
 // will generate when dumping XML.
 type Domain struct {
-	XMLName        xml.Name              `xml:"domain"`
-	Type           string                `xml:"type,attr,omitempty"`
-	ID             *int                  `xml:"id,attr"`
-	Name           string                `xml:"name,omitempty"`
-	UUID           string                `xml:"uuid,omitempty"`
-	GenID          *DomainGenID          `xml:"genid"`
-	Title          string                `xml:"title,omitempty"`
-	Description    string                `xml:"description,omitempty"`
-	Metadata       *DomainMetadata       `xml:"metadata"`
-	MaximumMemory  *DomainMaxMemory      `xml:"maxMemory"`
-	Memory         *DomainMemory         `xml:"memory"`
-	CurrentMemory  *DomainCurrentMemory  `xml:"currentMemory"`
-	BlockIOTune    *DomainBlockIOTune    `xml:"blkiotune"`
-	MemoryTune     *DomainMemoryTune     `xml:"memtune"`
-	MemoryBacking  *DomainMemoryBacking  `xml:"memoryBacking"`
-	VCPU           *DomainVCPU           `xml:"vcpu"`
-	VCPUs          *DomainVCPUs          `xml:"vcpus"`
-	IOThreads      uint                  `xml:"iothreads,omitempty"`
-	IOThreadIDs    *DomainIOThreadIDs    `xml:"iothreadids"`
-	CPUTune        *DomainCPUTune        `xml:"cputune"`
-	NUMATune       *DomainNUMATune       `xml:"numatune"`
-	Resource       *DomainResource       `xml:"resource"`
-	SysInfo        []DomainSysInfo       `xml:"sysinfo"`
-	Bootloader     string                `xml:"bootloader,omitempty"`
-	BootloaderArgs string                `xml:"bootloader_args,omitempty"`
-	OS             *DomainOS             `xml:"os"`
-	IDMap          *DomainIDMap          `xml:"idmap"`
-	Features       *DomainFeatureList    `xml:"features"`
-	CPU            *DomainCPU            `xml:"cpu"`
-	Clock          *DomainClock          `xml:"clock"`
-	OnPoweroff     string                `xml:"on_poweroff,omitempty"`
-	OnReboot       string                `xml:"on_reboot,omitempty"`
-	OnCrash        string                `xml:"on_crash,omitempty"`
-	PM             *DomainPM             `xml:"pm"`
-	Perf           *DomainPerf           `xml:"perf"`
-	Devices        *DomainDeviceList     `xml:"devices"`
-	SecLabel       []DomainSecLabel      `xml:"seclabel"`
-	KeyWrap        *DomainKeyWrap        `xml:"keywrap"`
-	LaunchSecurity *DomainLaunchSecurity `xml:"launchSecurity"`
+	XMLName         xml.Name               `xml:"domain"`
+	Type            string                 `xml:"type,attr,omitempty"`
+	ID              *int                   `xml:"id,attr"`
+	Name            string                 `xml:"name,omitempty"`
+	UUID            string                 `xml:"uuid,omitempty"`
+	HWUUID          string                 `xml:"hwuuid,omitempty"`
+	GenID           *DomainGenID           `xml:"genid"`
+	Title           string                 `xml:"title,omitempty"`
+	Description     string                 `xml:"description,omitempty"`
+	Metadata        *DomainMetadata        `xml:"metadata"`
+	MaximumMemory   *DomainMaxMemory       `xml:"maxMemory"`
+	Memory          *DomainMemory          `xml:"memory"`
+	CurrentMemory   *DomainCurrentMemory   `xml:"currentMemory"`
+	BlockIOTune     *DomainBlockIOTune     `xml:"blkiotune"`
+	MemoryTune      *DomainMemoryTune      `xml:"memtune"`
+	MemoryBacking   *DomainMemoryBacking   `xml:"memoryBacking"`
+	VCPU            *DomainVCPU            `xml:"vcpu"`
+	VCPUs           *DomainVCPUs           `xml:"vcpus"`
+	IOThreads       uint                   `xml:"iothreads,omitempty"`
+	IOThreadIDs     *DomainIOThreadIDs     `xml:"iothreadids"`
+	DefaultIOThread *DomainDefaultIOThread `xml:"defaultiothread"`
+	CPUTune         *DomainCPUTune         `xml:"cputune"`
+	NUMATune        *DomainNUMATune        `xml:"numatune"`
+	Resource        *DomainResource        `xml:"resource"`
+	SysInfo         []DomainSysInfo        `xml:"sysinfo"`
+	Bootloader      string                 `xml:"bootloader,omitempty"`
+	BootloaderArgs  string                 `xml:"bootloader_args,omitempty"`
+	OS              *DomainOS              `xml:"os"`
+	IDMap           *DomainIDMap           `xml:"idmap"`
+	ThrottleGroups  *DomainThrottleGroups  `xml:"throttlegroups"`
+	Features        *DomainFeatureList     `xml:"features"`
+	CPU             *DomainCPU             `xml:"cpu"`
+	Clock           *DomainClock           `xml:"clock"`
+	OnPoweroff      string                 `xml:"on_poweroff,omitempty"`
+	OnReboot        string                 `xml:"on_reboot,omitempty"`
+	OnCrash         string                 `xml:"on_crash,omitempty"`
+	PM              *DomainPM              `xml:"pm"`
+	Perf            *DomainPerf            `xml:"perf"`
+	Devices         *DomainDeviceList      `xml:"devices"`
+	SecLabel        []DomainSecLabel       `xml:"seclabel"`
+	KeyWrap         *DomainKeyWrap         `xml:"keywrap"`
+	LaunchSecurity  *DomainLaunchSecurity  `xml:"launchSecurity"`
 
 	/* Hypervisor namespaces must all be last */
 	QEMUCommandline      *DomainQEMUCommandline
 	QEMUCapabilities     *DomainQEMUCapabilities
+	QEMUOverride         *DomainQEMUOverride
 	QEMUDeprecation      *DomainQEMUDeprecation
 	LXCNamespace         *DomainLXCNamespace
 	BHyveCommandline     *DomainBHyveCommandline
@@ -2836,12 +3309,18 @@ type domainControllerXenBus struct {
 	domainController
 }
 
+type domainControllerNVME struct {
+	DomainControllerNVME
+	domainController
+}
+
 func (a *DomainControllerPCITarget) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 	marshalUintAttr(&start, "chassisNr", a.ChassisNr, "%d")
 	marshalUintAttr(&start, "chassis", a.Chassis, "%d")
 	marshalUintAttr(&start, "port", a.Port, "%d")
 	marshalUintAttr(&start, "busNr", a.BusNr, "%d")
 	marshalUintAttr(&start, "index", a.Index, "%d")
+	marshalUint64Attr(&start, "memReserve", a.MemReserve, "%d")
 	if a.Hotplug != "" {
 		start.Attr = append(start.Attr, xml.Attr{
 			xml.Name{Local: "hotplug"}, a.Hotplug,
@@ -2880,6 +3359,10 @@ func (a *DomainControllerPCITarget) UnmarshalXML(d *xml.Decoder, start xml.Start
 			}
 		} else if attr.Name.Local == "index" {
 			if err := unmarshalUintAttr(attr.Value, &a.Index, 10); err != nil {
+				return err
+			}
+		} else if attr.Name.Local == "memReserve" {
+			if err := unmarshalUint64Attr(attr.Value, &a.MemReserve, 10); err != nil {
 				return err
 			}
 		} else if attr.Name.Local == "hotplug" {
@@ -2947,6 +3430,13 @@ func (a *DomainController) MarshalXML(e *xml.Encoder, start xml.StartElement) er
 			xenbus.DomainControllerXenBus = *a.XenBus
 		}
 		return e.EncodeElement(xenbus, start)
+	} else if a.Type == "nvme" {
+		nvme := domainControllerNVME{}
+		nvme.domainController = domainController(*a)
+		if a.NVME != nil {
+			nvme.DomainControllerNVME = *a.NVME
+		}
+		return e.EncodeElement(nvme, start)
 	} else {
 		gen := domainController(*a)
 		return e.EncodeElement(gen, start)
@@ -3002,6 +3492,15 @@ func (a *DomainController) UnmarshalXML(d *xml.Decoder, start xml.StartElement) 
 		}
 		*a = DomainController(xenbus.domainController)
 		a.XenBus = &xenbus.DomainControllerXenBus
+		return nil
+	} else if typ == "nvme" {
+		var nvme domainControllerNVME
+		err := d.DecodeElement(&nvme, &start)
+		if err != nil {
+			return err
+		}
+		*a = DomainController(nvme.domainController)
+		a.NVME = &nvme.DomainControllerNVME
 		return nil
 	} else {
 		var gen domainController
@@ -3127,6 +3626,11 @@ type domainDiskSourceVHostUser struct {
 	domainDiskSource
 }
 
+type domainDiskSourceVHostVDPA struct {
+	DomainDiskSourceVHostVDPA
+	domainDiskSource
+}
+
 func (a *DomainDiskSource) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 	if a.File != nil {
 		if a.StartupPolicy == "" && a.Encryption == nil && a.File.File == "" {
@@ -3175,6 +3679,11 @@ func (a *DomainDiskSource) MarshalXML(e *xml.Encoder, start xml.StartElement) er
 	} else if a.VHostUser != nil {
 		vhost := domainDiskSourceVHostUser{
 			*a.VHostUser, domainDiskSource(*a),
+		}
+		return e.EncodeElement(&vhost, start)
+	} else if a.VHostVDPA != nil {
+		vhost := domainDiskSourceVHostVDPA{
+			*a.VHostVDPA, domainDiskSource(*a),
 		}
 		return e.EncodeElement(&vhost, start)
 	}
@@ -3259,6 +3768,16 @@ func (a *DomainDiskSource) UnmarshalXML(d *xml.Decoder, start xml.StartElement) 
 		}
 		*a = DomainDiskSource(vhost.domainDiskSource)
 		a.VHostUser = &vhost.DomainDiskSourceVHostUser
+	} else if a.VHostVDPA != nil {
+		vhost := domainDiskSourceVHostVDPA{
+			*a.VHostVDPA, domainDiskSource(*a),
+		}
+		err := d.DecodeElement(&vhost, &start)
+		if err != nil {
+			return err
+		}
+		*a = DomainDiskSource(vhost.domainDiskSource)
+		a.VHostVDPA = &vhost.DomainDiskSourceVHostVDPA
 	}
 	return nil
 }
@@ -3292,6 +3811,10 @@ func (a *DomainDiskBackingStore) MarshalXML(e *xml.Encoder, start xml.StartEleme
 			start.Attr = append(start.Attr, xml.Attr{
 				xml.Name{Local: "type"}, "vhostuser",
 			})
+		} else if a.Source.VHostVDPA != nil {
+			start.Attr = append(start.Attr, xml.Attr{
+				xml.Name{Local: "type"}, "vhostvdpa",
+			})
 		}
 	}
 	disk := domainDiskBackingStore(*a)
@@ -3316,6 +3839,8 @@ func (a *DomainDiskBackingStore) UnmarshalXML(d *xml.Decoder, start xml.StartEle
 		a.Source.Volume = &DomainDiskSourceVolume{}
 	} else if typ == "vhostuser" {
 		a.Source.VHostUser = &DomainDiskSourceVHostUser{}
+	} else if typ == "vhostvdpa" {
+		a.Source.VHostVDPA = &DomainDiskSourceVHostVDPA{}
 	}
 	disk := domainDiskBackingStore(*a)
 	err := d.DecodeElement(&disk, &start)
@@ -3323,6 +3848,78 @@ func (a *DomainDiskBackingStore) UnmarshalXML(d *xml.Decoder, start xml.StartEle
 		return err
 	}
 	*a = DomainDiskBackingStore(disk)
+	if !ok && a.Source.File.File == "" {
+		a.Source.File = nil
+	}
+	return nil
+}
+
+type domainDiskDataStore DomainDiskDataStore
+
+func (a *DomainDiskDataStore) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	start.Name.Local = "dataStore"
+	if a.Source != nil {
+		if a.Source.File != nil {
+			start.Attr = append(start.Attr, xml.Attr{
+				xml.Name{Local: "type"}, "file",
+			})
+		} else if a.Source.Block != nil {
+			start.Attr = append(start.Attr, xml.Attr{
+				xml.Name{Local: "type"}, "block",
+			})
+		} else if a.Source.Dir != nil {
+			start.Attr = append(start.Attr, xml.Attr{
+				xml.Name{Local: "type"}, "dir",
+			})
+		} else if a.Source.Network != nil {
+			start.Attr = append(start.Attr, xml.Attr{
+				xml.Name{Local: "type"}, "network",
+			})
+		} else if a.Source.Volume != nil {
+			start.Attr = append(start.Attr, xml.Attr{
+				xml.Name{Local: "type"}, "volume",
+			})
+		} else if a.Source.VHostUser != nil {
+			start.Attr = append(start.Attr, xml.Attr{
+				xml.Name{Local: "type"}, "vhostuser",
+			})
+		} else if a.Source.VHostVDPA != nil {
+			start.Attr = append(start.Attr, xml.Attr{
+				xml.Name{Local: "type"}, "vhostvdpa",
+			})
+		}
+	}
+	disk := domainDiskDataStore(*a)
+	return e.EncodeElement(disk, start)
+}
+
+func (a *DomainDiskDataStore) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	typ, ok := getAttr(start.Attr, "type")
+	if !ok {
+		typ = "file"
+	}
+	a.Source = &DomainDiskSource{}
+	if typ == "file" {
+		a.Source.File = &DomainDiskSourceFile{}
+	} else if typ == "block" {
+		a.Source.Block = &DomainDiskSourceBlock{}
+	} else if typ == "network" {
+		a.Source.Network = &DomainDiskSourceNetwork{}
+	} else if typ == "dir" {
+		a.Source.Dir = &DomainDiskSourceDir{}
+	} else if typ == "volume" {
+		a.Source.Volume = &DomainDiskSourceVolume{}
+	} else if typ == "vhostuser" {
+		a.Source.VHostUser = &DomainDiskSourceVHostUser{}
+	} else if typ == "vhostvdpa" {
+		a.Source.VHostVDPA = &DomainDiskSourceVHostVDPA{}
+	}
+	disk := domainDiskDataStore(*a)
+	err := d.DecodeElement(&disk, &start)
+	if err != nil {
+		return err
+	}
+	*a = DomainDiskDataStore(disk)
 	if !ok && a.Source.File.File == "" {
 		a.Source.File = nil
 	}
@@ -3368,6 +3965,10 @@ func (a *DomainDiskMirror) MarshalXML(e *xml.Encoder, start xml.StartElement) er
 			start.Attr = append(start.Attr, xml.Attr{
 				xml.Name{Local: "type"}, "vhostuser",
 			})
+		} else if a.Source.VHostVDPA != nil {
+			start.Attr = append(start.Attr, xml.Attr{
+				xml.Name{Local: "type"}, "vhostvdpa",
+			})
 		}
 	}
 	disk := domainDiskMirror(*a)
@@ -3392,6 +3993,8 @@ func (a *DomainDiskMirror) UnmarshalXML(d *xml.Decoder, start xml.StartElement) 
 		a.Source.Volume = &DomainDiskSourceVolume{}
 	} else if typ == "vhostuser" {
 		a.Source.VHostUser = &DomainDiskSourceVHostUser{}
+	} else if typ == "vhostvdpa" {
+		a.Source.VHostVDPA = &DomainDiskSourceVHostVDPA{}
 	}
 	disk := domainDiskMirror(*a)
 	err := d.DecodeElement(&disk, &start)
@@ -3453,6 +4056,10 @@ func (a *DomainDisk) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 			start.Attr = append(start.Attr, xml.Attr{
 				xml.Name{Local: "type"}, "vhostuser",
 			})
+		} else if a.Source.VHostVDPA != nil {
+			start.Attr = append(start.Attr, xml.Attr{
+				xml.Name{Local: "type"}, "vhostvdpa",
+			})
 		}
 	}
 	disk := domainDisk(*a)
@@ -3479,6 +4086,8 @@ func (a *DomainDisk) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error 
 		a.Source.NVME = &DomainDiskSourceNVME{}
 	} else if typ == "vhostuser" {
 		a.Source.VHostUser = &DomainDiskSourceVHostUser{}
+	} else if typ == "vhostvdpa" {
+		a.Source.VHostVDPA = &DomainDiskSourceVHostVDPA{}
 	}
 	disk := domainDisk(*a)
 	err := d.DecodeElement(&disk, &start)
@@ -3840,7 +4449,11 @@ func (a *DomainInterfaceSourceHostdev) UnmarshalXML(d *xml.Decoder, start xml.St
 					}
 				} else if typ == "usb" {
 					a.USB = &DomainHostdevSubsysUSBSource{
+						"",
+						"",
 						&DomainAddressUSB{},
+						&DomainHostDevProductVendorID{},
+						&DomainHostDevProductVendorID{},
 					}
 					err := d.DecodeElement(a.USB, &tok)
 					if err != nil {
@@ -3854,23 +4467,56 @@ func (a *DomainInterfaceSourceHostdev) UnmarshalXML(d *xml.Decoder, start xml.St
 	return nil
 }
 
+func (a *DomainInterfaceSourceVHostUser) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	if a.Chardev != nil {
+		typ := getChardevSourceType(a.Chardev)
+		if typ != "" {
+			start.Attr = append(start.Attr, xml.Attr{
+				xml.Name{Local: "type"}, typ,
+			})
+		}
+		return e.EncodeElement(a.Chardev, start)
+	} else if a.Dev != "" {
+		start.Attr = append(start.Attr, xml.Attr{
+			xml.Name{Local: "dev"}, a.Dev,
+		})
+		e.EncodeToken(start)
+		e.EncodeToken(start.End())
+		e.Flush()
+	}
+	return nil
+}
+
+func (a *DomainInterfaceSourceVHostUser) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	dev, ok := getAttr(start.Attr, "dev")
+	if ok {
+		a.Dev = dev
+		d.Skip()
+		return nil
+	} else {
+		typ, ok := getAttr(start.Attr, "type")
+		if !ok {
+			typ = "unix"
+		}
+		a.Chardev = createChardevSource(typ)
+		d.DecodeElement(a.Chardev, &start)
+	}
+	return nil
+}
+
 func (a *DomainInterfaceSource) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 	if a.User != nil {
-		/* We don't want an empty <source></source> for User mode */
-		//return e.EncodeElement(a.User, start)
-		return nil
+		if a.User.Dev != "" {
+			return e.EncodeElement(a.User, start)
+		} else {
+			return nil
+		}
 	} else if a.Ethernet != nil {
 		if len(a.Ethernet.IP) > 0 && len(a.Ethernet.Route) > 0 {
 			return e.EncodeElement(a.Ethernet, start)
 		}
 		return nil
 	} else if a.VHostUser != nil {
-		typ := getChardevSourceType(a.VHostUser)
-		if typ != "" {
-			start.Attr = append(start.Attr, xml.Attr{
-				xml.Name{Local: "type"}, typ,
-			})
-		}
 		return e.EncodeElement(a.VHostUser, start)
 	} else if a.Server != nil {
 		return e.EncodeElement(a.Server, start)
@@ -3892,6 +4538,10 @@ func (a *DomainInterfaceSource) MarshalXML(e *xml.Encoder, start xml.StartElemen
 		return e.EncodeElement(a.UDP, start)
 	} else if a.VDPA != nil {
 		return e.EncodeElement(a.VDPA, start)
+	} else if a.Null != nil {
+		return e.EncodeElement(a.Null, start)
+	} else if a.VDS != nil {
+		return e.EncodeElement(a.VDS, start)
 	}
 	return nil
 }
@@ -3902,11 +4552,6 @@ func (a *DomainInterfaceSource) UnmarshalXML(d *xml.Decoder, start xml.StartElem
 	} else if a.Ethernet != nil {
 		return d.DecodeElement(a.Ethernet, &start)
 	} else if a.VHostUser != nil {
-		typ, ok := getAttr(start.Attr, "type")
-		if !ok {
-			typ = "pty"
-		}
-		a.VHostUser = createChardevSource(typ)
 		return d.DecodeElement(a.VHostUser, &start)
 	} else if a.Server != nil {
 		return d.DecodeElement(a.Server, &start)
@@ -3928,6 +4573,10 @@ func (a *DomainInterfaceSource) UnmarshalXML(d *xml.Decoder, start xml.StartElem
 		return d.DecodeElement(a.UDP, &start)
 	} else if a.VDPA != nil {
 		return d.DecodeElement(a.VDPA, &start)
+	} else if a.Null != nil {
+		return d.DecodeElement(a.Null, &start)
+	} else if a.VDS != nil {
+		return d.DecodeElement(a.VDS, &start)
 	}
 	return nil
 }
@@ -3989,6 +4638,14 @@ func (a *DomainInterface) MarshalXML(e *xml.Encoder, start xml.StartElement) err
 			start.Attr = append(start.Attr, xml.Attr{
 				xml.Name{Local: "type"}, "vdpa",
 			})
+		} else if a.Source.Null != nil {
+			start.Attr = append(start.Attr, xml.Attr{
+				xml.Name{Local: "type"}, "null",
+			})
+		} else if a.Source.VDS != nil {
+			start.Attr = append(start.Attr, xml.Attr{
+				xml.Name{Local: "type"}, "vds",
+			})
 		}
 	}
 	fs := domainInterface(*a)
@@ -4006,7 +4663,7 @@ func (a *DomainInterface) UnmarshalXML(d *xml.Decoder, start xml.StartElement) e
 	} else if typ == "ethernet" {
 		a.Source.Ethernet = &DomainInterfaceSourceEthernet{}
 	} else if typ == "vhostuser" {
-		a.Source.VHostUser = &DomainChardevSource{}
+		a.Source.VHostUser = &DomainInterfaceSourceVHostUser{}
 	} else if typ == "server" {
 		a.Source.Server = &DomainInterfaceSourceServer{}
 	} else if typ == "client" {
@@ -4027,6 +4684,10 @@ func (a *DomainInterface) UnmarshalXML(d *xml.Decoder, start xml.StartElement) e
 		a.Source.UDP = &DomainInterfaceSourceUDP{}
 	} else if typ == "vdpa" {
 		a.Source.VDPA = &DomainInterfaceSourceVDPA{}
+	} else if typ == "null" {
+		a.Source.Null = &DomainInterfaceSourceNull{}
+	} else if typ == "vds" {
+		a.Source.VDS = &DomainInterfaceSourceVDS{}
 	}
 	fs := domainInterface(*a)
 	err := d.DecodeElement(&fs, &start)
@@ -4111,6 +4772,32 @@ func (d *DomainSmartcard) Marshal() (string, error) {
 	return string(doc), nil
 }
 
+func (a *DomainTPMBackendExternalSource) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	start.Name.Local = "source"
+	src := DomainChardevSource(*a)
+	typ := getChardevSourceType(&src)
+	if typ != "" {
+		start.Attr = append(start.Attr, xml.Attr{
+			xml.Name{Local: "type"}, typ,
+		})
+	}
+	return e.EncodeElement(&src, start)
+}
+
+func (a *DomainTPMBackendExternalSource) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	typ, ok := getAttr(start.Attr, "type")
+	if !ok {
+		typ = "unix"
+	}
+	src := createChardevSource(typ)
+	err := d.DecodeElement(&src, &start)
+	if err != nil {
+		return err
+	}
+	*a = DomainTPMBackendExternalSource(*src)
+	return nil
+}
+
 func (a *DomainTPMBackend) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 	start.Name.Local = "backend"
 	if a.Passthrough != nil {
@@ -4126,6 +4813,14 @@ func (a *DomainTPMBackend) MarshalXML(e *xml.Encoder, start xml.StartElement) er
 			xml.Name{Local: "type"}, "emulator",
 		})
 		err := e.EncodeElement(a.Emulator, start)
+		if err != nil {
+			return err
+		}
+	} else if a.External != nil {
+		start.Attr = append(start.Attr, xml.Attr{
+			xml.Name{Local: "type"}, "external",
+		})
+		err := e.EncodeElement(a.External, start)
 		if err != nil {
 			return err
 		}
@@ -4147,6 +4842,57 @@ func (a *DomainTPMBackend) UnmarshalXML(d *xml.Decoder, start xml.StartElement) 
 	} else if typ == "emulator" {
 		a.Emulator = &DomainTPMBackendEmulator{}
 		err := d.DecodeElement(a.Emulator, &start)
+		if err != nil {
+			return err
+		}
+	} else if typ == "external" {
+		a.External = &DomainTPMBackendExternal{}
+		err := d.DecodeElement(a.External, &start)
+		if err != nil {
+			return err
+		}
+	} else {
+		d.Skip()
+	}
+	return nil
+}
+
+func (a *DomainTPMBackendSource) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	start.Name.Local = "source"
+	if a.File != nil {
+		start.Attr = append(start.Attr, xml.Attr{
+			xml.Name{Local: "type"}, "file",
+		})
+		err := e.EncodeElement(a.File, start)
+		if err != nil {
+			return err
+		}
+	} else if a.Dir != nil {
+		start.Attr = append(start.Attr, xml.Attr{
+			xml.Name{Local: "type"}, "dir",
+		})
+		err := e.EncodeElement(a.Dir, start)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (a *DomainTPMBackendSource) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	typ, ok := getAttr(start.Attr, "type")
+	if !ok {
+		return fmt.Errorf("Missing TPM source type")
+	}
+	if typ == "file" {
+		a.File = &DomainTPMBackendSourceFile{}
+		err := d.DecodeElement(a.File, &start)
+		if err != nil {
+			return err
+		}
+	} else if typ == "dir" {
+		a.Dir = &DomainTPMBackendSourceDir{}
+		err := d.DecodeElement(a.Dir, &start)
 		if err != nil {
 			return err
 		}
@@ -4207,6 +4953,10 @@ func getChardevSourceType(s *DomainChardevSource) string {
 		return "spiceport"
 	} else if s.NMDM != nil {
 		return "nmdm"
+	} else if s.QEMUVDAgent != nil {
+		return "qemu-vdagent"
+	} else if s.DBus != nil {
+		return "dbus"
 	}
 	return ""
 }
@@ -4264,6 +5014,14 @@ func createChardevSource(typ string) *DomainChardevSource {
 	case "nmdm":
 		return &DomainChardevSource{
 			NMDM: &DomainChardevSourceNMDM{},
+		}
+	case "qemu-vdagent":
+		return &DomainChardevSource{
+			QEMUVDAgent: &DomainChardevSourceQEMUVDAgent{},
+		}
+	case "dbus":
+		return &DomainChardevSource{
+			DBus: &DomainChardevSourceDBus{},
 		}
 	}
 
@@ -4331,7 +5089,13 @@ func (a *DomainChardevSource) MarshalXML(e *xml.Encoder, start xml.StartElement)
 	} else if a.SpicePort != nil {
 		return e.EncodeElement(a.SpicePort, start)
 	} else if a.NMDM != nil {
-		return e.EncodeElement(a.NMDM, start)
+		if a.NMDM.Master != "" && a.NMDM.Slave != "" {
+			return e.EncodeElement(a.NMDM, start)
+		}
+	} else if a.QEMUVDAgent != nil {
+		return e.EncodeElement(a.QEMUVDAgent, start)
+	} else if a.DBus != nil {
+		return e.EncodeElement(a.DBus, start)
 	}
 	return nil
 }
@@ -4376,6 +5140,10 @@ func (a *DomainChardevSource) UnmarshalXML(d *xml.Decoder, start xml.StartElemen
 		return d.DecodeElement(a.SpicePort, &start)
 	} else if a.NMDM != nil {
 		return d.DecodeElement(a.NMDM, &start)
+	} else if a.QEMUVDAgent != nil {
+		return d.DecodeElement(a.QEMUVDAgent, &start)
+	} else if a.DBus != nil {
+		return d.DecodeElement(a.DBus, &start)
 	}
 	return nil
 }
@@ -5197,6 +5965,11 @@ type domainGraphicEGLHeadless struct {
 	Audio *DomainGraphicAudio `xml:"audio"`
 }
 
+type domainGraphicDBus struct {
+	DomainGraphicDBus
+	Audio *DomainGraphicAudio `xml:"audio"`
+}
+
 func (a *DomainGraphic) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 	start.Name.Local = "graphics"
 	if a.SDL != nil {
@@ -5235,6 +6008,12 @@ func (a *DomainGraphic) MarshalXML(e *xml.Encoder, start xml.StartElement) error
 		})
 		egl := domainGraphicEGLHeadless{*a.EGLHeadless, a.Audio}
 		return e.EncodeElement(egl, start)
+	} else if a.DBus != nil {
+		start.Attr = append(start.Attr, xml.Attr{
+			xml.Name{Local: "type"}, "dbus",
+		})
+		dbus := domainGraphicDBus{*a.DBus, a.Audio}
+		return e.EncodeElement(dbus, start)
 	}
 	return nil
 }
@@ -5298,6 +6077,15 @@ func (a *DomainGraphic) UnmarshalXML(d *xml.Decoder, start xml.StartElement) err
 		a.EGLHeadless = &egl.DomainGraphicEGLHeadless
 		a.Audio = egl.Audio
 		return nil
+	} else if typ == "dbus" {
+		var dbus domainGraphicDBus
+		err := d.DecodeElement(&dbus, &start)
+		if err != nil {
+			return err
+		}
+		a.DBus = &dbus.DomainGraphicDBus
+		a.Audio = dbus.Audio
+		return nil
 	}
 	return nil
 }
@@ -5307,6 +6095,11 @@ func (a *DomainAudio) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 	if a.ID != 0 {
 		start.Attr = append(start.Attr, xml.Attr{
 			xml.Name{Local: "id"}, fmt.Sprintf("%d", a.ID),
+		})
+	}
+	if a.TimerPeriod != 0 {
+		start.Attr = append(start.Attr, xml.Attr{
+			xml.Name{Local: "timerPeriod"}, fmt.Sprintf("%d", a.TimerPeriod),
 		})
 	}
 	if a.None != nil {
@@ -5354,6 +6147,16 @@ func (a *DomainAudio) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 			xml.Name{Local: "type"}, "file",
 		})
 		return e.EncodeElement(a.File, start)
+	} else if a.DBus != nil {
+		start.Attr = append(start.Attr, xml.Attr{
+			xml.Name{Local: "type"}, "dbus",
+		})
+		return e.EncodeElement(a.DBus, start)
+	} else if a.PipeWire != nil {
+		start.Attr = append(start.Attr, xml.Attr{
+			xml.Name{Local: "type"}, "pipewire",
+		})
+		return e.EncodeElement(a.PipeWire, start)
 	}
 	return nil
 }
@@ -5370,6 +6173,15 @@ func (a *DomainAudio) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 			return err
 		}
 		a.ID = int(idval)
+	}
+
+	period, ok := getAttr(start.Attr, "timerPeriod")
+	if ok {
+		periodval, err := strconv.ParseUint(period, 10, 32)
+		if err != nil {
+			return err
+		}
+		a.TimerPeriod = uint(periodval)
 	}
 
 	if typ == "none" {
@@ -5444,6 +6256,22 @@ func (a *DomainAudio) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 		}
 		a.File = &file
 		return nil
+	} else if typ == "dbus" {
+		var dbus DomainAudioDBus
+		err := d.DecodeElement(&dbus, &start)
+		if err != nil {
+			return err
+		}
+		a.DBus = &dbus
+		return nil
+	} else if typ == "pipewire" {
+		var pipewire DomainAudioPipeWire
+		err := d.DecodeElement(&pipewire, &start)
+		if err != nil {
+			return err
+		}
+		a.PipeWire = &pipewire
+		return nil
 	}
 	return nil
 }
@@ -5472,6 +6300,55 @@ func (d *DomainWatchdog) Marshal() (string, error) {
 	return string(doc), nil
 }
 
+func (a *DomainCryptoBackend) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	start.Name.Local = "backend"
+	if a.BuiltIn != nil {
+		start.Attr = append(start.Attr, xml.Attr{
+			xml.Name{Local: "model"}, "builtin",
+		})
+	} else if a.LKCF != nil {
+		start.Attr = append(start.Attr, xml.Attr{
+			xml.Name{Local: "model"}, "lkcf",
+		})
+	}
+	marshalUintAttr(&start, "queues", &a.Queues, "%d")
+	e.EncodeToken(start)
+	e.EncodeToken(start.End())
+	return nil
+}
+
+func (a *DomainCryptoBackend) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	typ, ok := getAttr(start.Attr, "model")
+	if !ok {
+		return fmt.Errorf("Missing 'model' attribute on domain crypto backend")
+	}
+	for _, attr := range start.Attr {
+		if attr.Name.Local == "queues" {
+			var v *uint
+			if err := unmarshalUintAttr(attr.Value, &v, 10); err != nil {
+				return err
+			}
+			if v != nil {
+				a.Queues = *v
+			}
+		}
+	}
+
+	if typ == "builtin" {
+		var builtin DomainCryptoBackendBuiltIn
+		a.BuiltIn = &builtin
+		d.Skip()
+		return nil
+	} else if typ == "lkcf" {
+		var lkcf DomainCryptoBackendLKCF
+		a.LKCF = &lkcf
+		d.Skip()
+		return nil
+	}
+
+	return nil
+}
+
 func marshalUintAttr(start *xml.StartElement, name string, val *uint, format string) {
 	if val != nil {
 		start.Attr = append(start.Attr, xml.Attr{
@@ -5486,6 +6363,13 @@ func marshalUint64Attr(start *xml.StartElement, name string, val *uint64, format
 			xml.Name{Local: name}, fmt.Sprintf(format, *val),
 		})
 	}
+}
+
+func (a *DomainMemorydevTargetAddress) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	marshalUintAttr(&start, "base", a.Base, "0x%08x")
+	e.EncodeToken(start)
+	e.EncodeToken(start.End())
+	return nil
 }
 
 func (a *DomainAddressPCI) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
@@ -5697,6 +6581,19 @@ func unmarshalUintAttr(valstr string, valptr **uint, base int) error {
 	}
 	vali := uint(val)
 	*valptr = &vali
+	return nil
+}
+
+func (a *DomainMemorydevTargetAddress) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	for _, attr := range start.Attr {
+		if attr.Name.Local == "base" {
+			if err := unmarshalUintAttr(attr.Value, &a.Base, 0); err != nil {
+				return err
+			}
+		}
+	}
+
+	d.Skip()
 	return nil
 }
 
@@ -5987,6 +6884,13 @@ func (d *DomainCPU) Marshal() (string, error) {
 }
 
 func (a *DomainLaunchSecuritySEV) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+
+	if a.KernelHashes != "" {
+		start.Attr = append(start.Attr, xml.Attr{
+			xml.Name{Local: "kernelHashes"}, a.KernelHashes,
+		})
+	}
+
 	e.EncodeToken(start)
 
 	if a.CBitPos != nil {
@@ -6016,19 +6920,23 @@ func (a *DomainLaunchSecuritySEV) MarshalXML(e *xml.Encoder, start xml.StartElem
 		e.EncodeToken(policy.End())
 	}
 
-	dhcert := xml.StartElement{
-		Name: xml.Name{Local: "dhCert"},
+	if a.DHCert != "" {
+		dhcert := xml.StartElement{
+			Name: xml.Name{Local: "dhCert"},
+		}
+		e.EncodeToken(dhcert)
+		e.EncodeToken(xml.CharData(fmt.Sprintf("%s", a.DHCert)))
+		e.EncodeToken(dhcert.End())
 	}
-	e.EncodeToken(dhcert)
-	e.EncodeToken(xml.CharData(fmt.Sprintf("%s", a.DHCert)))
-	e.EncodeToken(dhcert.End())
 
-	session := xml.StartElement{
-		Name: xml.Name{Local: "session"},
+	if a.Session != "" {
+		session := xml.StartElement{
+			Name: xml.Name{Local: "session"},
+		}
+		e.EncodeToken(session)
+		e.EncodeToken(xml.CharData(fmt.Sprintf("%s", a.Session)))
+		e.EncodeToken(session.End())
 	}
-	e.EncodeToken(session)
-	e.EncodeToken(xml.CharData(fmt.Sprintf("%s", a.Session)))
-	e.EncodeToken(session.End())
 
 	e.EncodeToken(start.End())
 
@@ -6036,6 +6944,12 @@ func (a *DomainLaunchSecuritySEV) MarshalXML(e *xml.Encoder, start xml.StartElem
 }
 
 func (a *DomainLaunchSecuritySEV) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	for _, attr := range start.Attr {
+		if attr.Name.Local == "kernelHashes" {
+			a.KernelHashes = attr.Value
+		}
+	}
+
 	for {
 		tok, err := d.Token()
 		if err == io.EOF {
@@ -6104,6 +7018,308 @@ func (a *DomainLaunchSecuritySEV) UnmarshalXML(d *xml.Decoder, start xml.StartEl
 	return nil
 }
 
+func (a *DomainLaunchSecuritySEVSNP) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+
+	if a.KernelHashes != "" {
+		start.Attr = append(start.Attr, xml.Attr{
+			xml.Name{Local: "kernelHashes"}, a.KernelHashes,
+		})
+	}
+
+	if a.AuthorKey != "" {
+		start.Attr = append(start.Attr, xml.Attr{
+			xml.Name{Local: "authorKey"}, a.AuthorKey,
+		})
+	}
+
+	if a.VCEK != "" {
+		start.Attr = append(start.Attr, xml.Attr{
+			xml.Name{Local: "vcek"}, a.VCEK,
+		})
+	}
+
+	e.EncodeToken(start)
+
+	if a.CBitPos != nil {
+		cbitpos := xml.StartElement{
+			Name: xml.Name{Local: "cbitpos"},
+		}
+		e.EncodeToken(cbitpos)
+		e.EncodeToken(xml.CharData(fmt.Sprintf("%d", *a.CBitPos)))
+		e.EncodeToken(cbitpos.End())
+	}
+
+	if a.ReducedPhysBits != nil {
+		reducedPhysBits := xml.StartElement{
+			Name: xml.Name{Local: "reducedPhysBits"},
+		}
+		e.EncodeToken(reducedPhysBits)
+		e.EncodeToken(xml.CharData(fmt.Sprintf("%d", *a.ReducedPhysBits)))
+		e.EncodeToken(reducedPhysBits.End())
+	}
+
+	if a.Policy != nil {
+		policy := xml.StartElement{
+			Name: xml.Name{Local: "policy"},
+		}
+		e.EncodeToken(policy)
+		e.EncodeToken(xml.CharData(fmt.Sprintf("0x%08x", *a.Policy)))
+		e.EncodeToken(policy.End())
+	}
+
+	if a.GuestVisibleWorkarounds != "" {
+		gvwo := xml.StartElement{
+			Name: xml.Name{Local: "guestVisibleWorkarounds"},
+		}
+		e.EncodeToken(gvwo)
+		e.EncodeToken(xml.CharData(fmt.Sprintf("%s", a.GuestVisibleWorkarounds)))
+		e.EncodeToken(gvwo.End())
+	}
+
+	if a.IDBlock != "" {
+		idBlock := xml.StartElement{
+			Name: xml.Name{Local: "idBlock"},
+		}
+		e.EncodeToken(idBlock)
+		e.EncodeToken(xml.CharData(fmt.Sprintf("%s", a.IDBlock)))
+		e.EncodeToken(idBlock.End())
+	}
+
+	if a.IDAuth != "" {
+		idAuth := xml.StartElement{
+			Name: xml.Name{Local: "idAuth"},
+		}
+		e.EncodeToken(idAuth)
+		e.EncodeToken(xml.CharData(fmt.Sprintf("%s", a.IDAuth)))
+		e.EncodeToken(idAuth.End())
+	}
+
+	if a.HostData != "" {
+		hostData := xml.StartElement{
+			Name: xml.Name{Local: "hostData"},
+		}
+		e.EncodeToken(hostData)
+		e.EncodeToken(xml.CharData(fmt.Sprintf("%s", a.HostData)))
+		e.EncodeToken(hostData.End())
+	}
+
+	e.EncodeToken(start.End())
+
+	return nil
+}
+
+func (a *DomainLaunchSecuritySEVSNP) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	for _, attr := range start.Attr {
+		if attr.Name.Local == "kernelHashes" {
+			a.KernelHashes = attr.Value
+		} else if attr.Name.Local == "authorKey" {
+			a.AuthorKey = attr.Value
+		} else if attr.Name.Local == "vcek" {
+			a.VCEK = attr.Value
+		}
+	}
+
+	for {
+		tok, err := d.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		switch tok := tok.(type) {
+		case xml.StartElement:
+			if tok.Name.Local == "policy" {
+				data, err := d.Token()
+				if err != nil {
+					return err
+				}
+				switch data := data.(type) {
+				case xml.CharData:
+					if err := unmarshalUint64Attr(string(data), &a.Policy, 16); err != nil {
+						return err
+					}
+				}
+			} else if tok.Name.Local == "cbitpos" {
+				data, err := d.Token()
+				if err != nil {
+					return err
+				}
+				switch data := data.(type) {
+				case xml.CharData:
+					if err := unmarshalUintAttr(string(data), &a.CBitPos, 10); err != nil {
+						return err
+					}
+				}
+			} else if tok.Name.Local == "reducedPhysBits" {
+				data, err := d.Token()
+				if err != nil {
+					return err
+				}
+				switch data := data.(type) {
+				case xml.CharData:
+					if err := unmarshalUintAttr(string(data), &a.ReducedPhysBits, 10); err != nil {
+						return err
+					}
+				}
+			} else if tok.Name.Local == "guestVisibleWorkarounds" {
+				data, err := d.Token()
+				if err != nil {
+					return err
+				}
+				switch data := data.(type) {
+				case xml.CharData:
+					a.GuestVisibleWorkarounds = string(data)
+				}
+			} else if tok.Name.Local == "idBlock" {
+				data, err := d.Token()
+				if err != nil {
+					return err
+				}
+				switch data := data.(type) {
+				case xml.CharData:
+					a.IDBlock = string(data)
+				}
+			} else if tok.Name.Local == "idAuth" {
+				data, err := d.Token()
+				if err != nil {
+					return err
+				}
+				switch data := data.(type) {
+				case xml.CharData:
+					a.IDAuth = string(data)
+				}
+			} else if tok.Name.Local == "hostData" {
+				data, err := d.Token()
+				if err != nil {
+					return err
+				}
+				switch data := data.(type) {
+				case xml.CharData:
+					a.HostData = string(data)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (a *DomainLaunchSecurityTDX) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+
+	e.EncodeToken(start)
+
+	if a.Policy != nil {
+		policy := xml.StartElement{
+			Name: xml.Name{Local: "policy"},
+		}
+		e.EncodeToken(policy)
+		e.EncodeToken(xml.CharData(fmt.Sprintf("0x%08x", *a.Policy)))
+		e.EncodeToken(policy.End())
+	}
+
+	mrConfigId := xml.StartElement{
+		Name: xml.Name{Local: "mrConfigId"},
+	}
+	e.EncodeToken(mrConfigId)
+	e.EncodeToken(xml.CharData(fmt.Sprintf("%s", a.MrConfigId)))
+	e.EncodeToken(mrConfigId.End())
+
+	mrOwner := xml.StartElement{
+		Name: xml.Name{Local: "mrOwner"},
+	}
+	e.EncodeToken(mrOwner)
+	e.EncodeToken(xml.CharData(fmt.Sprintf("%s", a.MrOwner)))
+	e.EncodeToken(mrOwner.End())
+
+	mrOwnerConfig := xml.StartElement{
+		Name: xml.Name{Local: "mrOwnerConfig"},
+	}
+	e.EncodeToken(mrOwnerConfig)
+	e.EncodeToken(xml.CharData(fmt.Sprintf("%s", a.MrOwnerConfig)))
+	e.EncodeToken(mrOwnerConfig.End())
+
+	if a.QuoteGenerationService != nil {
+		qgs := xml.StartElement{
+			Name: xml.Name{Local: "quoteGenerationService"},
+		}
+		if a.QuoteGenerationService.Path != "" {
+			qgs.Attr = append(qgs.Attr, xml.Attr{
+				xml.Name{Local: "path"}, a.QuoteGenerationService.Path,
+			})
+		}
+
+		e.EncodeToken(qgs)
+		e.EncodeToken(qgs.End())
+	}
+
+	e.EncodeToken(start.End())
+
+	return nil
+}
+
+func (a *DomainLaunchSecurityTDX) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	for {
+		tok, err := d.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		switch tok := tok.(type) {
+		case xml.StartElement:
+			if tok.Name.Local == "policy" {
+				data, err := d.Token()
+				if err != nil {
+					return err
+				}
+				switch data := data.(type) {
+				case xml.CharData:
+					if err := unmarshalUintAttr(string(data), &a.Policy, 16); err != nil {
+						return err
+					}
+				}
+			} else if tok.Name.Local == "mrConfigId" {
+				data, err := d.Token()
+				if err != nil {
+					return err
+				}
+				switch data := data.(type) {
+				case xml.CharData:
+					a.MrConfigId = string(data)
+				}
+			} else if tok.Name.Local == "mrOwner" {
+				data, err := d.Token()
+				if err != nil {
+					return err
+				}
+				switch data := data.(type) {
+				case xml.CharData:
+					a.MrOwner = string(data)
+				}
+			} else if tok.Name.Local == "mrOwnerConfig" {
+				data, err := d.Token()
+				if err != nil {
+					return err
+				}
+				switch data := data.(type) {
+				case xml.CharData:
+					a.MrOwnerConfig = string(data)
+				}
+			} else if tok.Name.Local == "quoteGenerationService" {
+				a.QuoteGenerationService = &DomainLaunchSecurityTDXQGS{}
+				err = d.DecodeElement(&a.QuoteGenerationService, &tok)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (a *DomainLaunchSecurity) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 
 	if a.SEV != nil {
@@ -6111,6 +7327,21 @@ func (a *DomainLaunchSecurity) MarshalXML(e *xml.Encoder, start xml.StartElement
 			xml.Name{Local: "type"}, "sev",
 		})
 		return e.EncodeElement(a.SEV, start)
+	} else if a.SEVSNP != nil {
+		start.Attr = append(start.Attr, xml.Attr{
+			xml.Name{Local: "type"}, "sev-snp",
+		})
+		return e.EncodeElement(a.SEVSNP, start)
+	} else if a.S390PV != nil {
+		start.Attr = append(start.Attr, xml.Attr{
+			xml.Name{Local: "type"}, "s390-pv",
+		})
+		return e.EncodeElement(a.S390PV, start)
+	} else if a.TDX != nil {
+		start.Attr = append(start.Attr, xml.Attr{
+			xml.Name{Local: "type"}, "tdx",
+		})
+		return e.EncodeElement(a.TDX, start)
 	} else {
 		return nil
 	}
@@ -6133,6 +7364,15 @@ func (a *DomainLaunchSecurity) UnmarshalXML(d *xml.Decoder, start xml.StartEleme
 	if typ == "sev" {
 		a.SEV = &DomainLaunchSecuritySEV{}
 		return d.DecodeElement(a.SEV, &start)
+	} else if typ == "sev-snp" {
+		a.SEVSNP = &DomainLaunchSecuritySEVSNP{}
+		return d.DecodeElement(a.SEVSNP, &start)
+	} else if typ == "s390-pv" {
+		a.S390PV = &DomainLaunchSecurityS390PV{}
+		return d.DecodeElement(a.S390PV, &start)
+	} else if typ == "tdx" {
+		a.TDX = &DomainLaunchSecurityTDX{}
+		return d.DecodeElement(a.TDX, &start)
 	}
 
 	return nil
@@ -6206,4 +7446,82 @@ func (a *DomainSysInfo) UnmarshalXML(d *xml.Decoder, start xml.StartElement) err
 		*a = DomainSysInfo(gen)
 		return nil
 	}
+}
+
+type domainNVRam DomainNVRam
+
+func (a *DomainNVRam) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	start.Name.Local = "nvram"
+	if a.Source != nil {
+		if a.Source.File != nil {
+			start.Attr = append(start.Attr, xml.Attr{
+				xml.Name{Local: "type"}, "file",
+			})
+		} else if a.Source.Block != nil {
+			start.Attr = append(start.Attr, xml.Attr{
+				xml.Name{Local: "type"}, "block",
+			})
+		} else if a.Source.Dir != nil {
+			start.Attr = append(start.Attr, xml.Attr{
+				xml.Name{Local: "type"}, "dir",
+			})
+		} else if a.Source.Network != nil {
+			start.Attr = append(start.Attr, xml.Attr{
+				xml.Name{Local: "type"}, "network",
+			})
+		} else if a.Source.Volume != nil {
+			start.Attr = append(start.Attr, xml.Attr{
+				xml.Name{Local: "type"}, "volume",
+			})
+		} else if a.Source.NVME != nil {
+			start.Attr = append(start.Attr, xml.Attr{
+				xml.Name{Local: "type"}, "nvme",
+			})
+		} else if a.Source.VHostUser != nil {
+			start.Attr = append(start.Attr, xml.Attr{
+				xml.Name{Local: "type"}, "vhostuser",
+			})
+		} else if a.Source.VHostVDPA != nil {
+			start.Attr = append(start.Attr, xml.Attr{
+				xml.Name{Local: "type"}, "vhostvdpa",
+			})
+		}
+	}
+	disk := domainNVRam(*a)
+	return e.EncodeElement(disk, start)
+}
+
+func (a *DomainNVRam) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	typ, ok := getAttr(start.Attr, "type")
+
+	if ok {
+		a.Source = &DomainDiskSource{}
+		if typ == "file" {
+			a.Source.File = &DomainDiskSourceFile{}
+		} else if typ == "block" {
+			a.Source.Block = &DomainDiskSourceBlock{}
+		} else if typ == "network" {
+			a.Source.Network = &DomainDiskSourceNetwork{}
+		} else if typ == "dir" {
+			a.Source.Dir = &DomainDiskSourceDir{}
+		} else if typ == "volume" {
+			a.Source.Volume = &DomainDiskSourceVolume{}
+		} else if typ == "nvme" {
+			a.Source.NVME = &DomainDiskSourceNVME{}
+		} else if typ == "vhostuser" {
+			a.Source.VHostUser = &DomainDiskSourceVHostUser{}
+		} else if typ == "vhostvdpa" {
+			a.Source.VHostVDPA = &DomainDiskSourceVHostVDPA{}
+		}
+	}
+	disk := domainNVRam(*a)
+	err := d.DecodeElement(&disk, &start)
+	if err != nil {
+		return err
+	}
+	if a.Source != nil {
+		a.NVRam = ""
+	}
+	*a = DomainNVRam(disk)
+	return nil
 }
