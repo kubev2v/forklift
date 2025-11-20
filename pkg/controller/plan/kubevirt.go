@@ -1967,6 +1967,14 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 			Value: strconv.FormatBool(r.Destination.Provider.IsHost()),
 		},
 	)
+	// Set LIBGUESTFS_BACKEND to direct to avoid needing user namespaces
+	// This is required for libguestfs to work in restricted security contexts
+	environment = append(environment,
+		core.EnvVar{
+			Name:  "LIBGUESTFS_BACKEND",
+			Value: "direct",
+		},
+	)
 	// pod annotations
 	annotations := map[string]string{}
 	if r.Plan.Spec.TransferNetwork != nil {
@@ -1974,6 +1982,11 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 		if err != nil {
 			return
 		}
+	}
+	// Disable AppArmor for virt-v2v container to allow mount operations
+	// This is required for libguestfs to remount the root filesystem
+	if !settings.Settings.OpenShift {
+		annotations["container.apparmor.security.beta.kubernetes.io/virt-v2v"] = "unconfined"
 	}
 	var seccompProfile core.SeccompProfile
 	if settings.Settings.OpenShift {
@@ -1984,7 +1997,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 		}
 	} else {
 		seccompProfile = core.SeccompProfile{
-			Type: core.SeccompProfileTypeRuntimeDefault,
+			Type: core.SeccompProfileTypeUnconfined,
 		}
 	}
 	// pod
@@ -2067,6 +2080,9 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 						AllowPrivilegeEscalation: &allowPrivilageEscalation,
 						Capabilities: &core.Capabilities{
 							Drop: []core.Capability{"ALL"},
+							// Add SYS_ADMIN capability required for libguestfs to create user namespaces
+							// This is needed even with LIBGUESTFS_BACKEND=direct for some operations
+							Add: []core.Capability{"SYS_ADMIN"},
 						},
 					},
 				},

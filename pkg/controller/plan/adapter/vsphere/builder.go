@@ -562,31 +562,18 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		}
 
 		storageClass := mapped.Destination.StorageClass
-		var dvSource cdi.DataVolumeSource
-		useV2vForTransfer, vErr := r.Context.Plan.ShouldUseV2vForTransfer()
-		if vErr != nil {
-			err = vErr
-			return
-		}
-		if useV2vForTransfer {
-			// Let virt-v2v do the copying
-			dvSource = cdi.DataVolumeSource{
-				Blank: &cdi.DataVolumeBlankImage{},
-			}
-		} else {
-			vddkImage := settings.GetVDDKImage(r.Source.Provider.Spec.Settings)
+		vddkImage := settings.GetVDDKImage(r.Source.Provider.Spec.Settings)
 
-			// Let CDI do the copying
-			dvSource = cdi.DataVolumeSource{
-				VDDK: &cdi.DataVolumeSourceVDDK{
-					BackingFile:  baseVolume(disk.File, r.Plan.Spec.Warm),
-					UUID:         vm.UUID,
-					URL:          url,
-					SecretRef:    secret.Name,
-					Thumbprint:   thumbprint,
-					InitImageURL: vddkImage,
-				},
-			}
+		// Let CDI do the copying
+		dvSource := cdi.DataVolumeSource{
+			VDDK: &cdi.DataVolumeSourceVDDK{
+				BackingFile:  baseVolume(disk.File, r.Plan.Spec.Warm),
+				UUID:         vm.UUID,
+				URL:          url,
+				SecretRef:    secret.Name,
+				Thumbprint:   thumbprint,
+				InitImageURL: vddkImage,
+			},
 		}
 		alignedCapacity := utils.RoundUp(disk.Capacity, utils.DefaultAlignBlockSize)
 		dvSpec := cdi.DataVolumeSpec{
@@ -685,7 +672,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 			}
 		}
 
-		if !useV2vForTransfer && vddkConfigMap != nil {
+		if vddkConfigMap != nil {
 			dv.ObjectMeta.Annotations[planbase.AnnVddkExtraArgs] = vddkConfigMap.Name
 		}
 		dvs = append(dvs, *dv)

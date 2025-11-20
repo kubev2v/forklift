@@ -204,7 +204,7 @@ func (r *Migration) Load() (err error) {
 	if val, found := os.LookupEnv(VirtV2vContainerLimitsMemory); found {
 		r.VirtV2vContainerLimitsMemory = val
 	} else {
-		r.VirtV2vContainerLimitsMemory = "8Gi"
+		r.VirtV2vContainerLimitsMemory = "12Gi"
 	}
 	if val, found := os.LookupEnv(VirtV2vContainerRequestsCpu); found {
 		r.VirtV2vContainerRequestsCpu = val
