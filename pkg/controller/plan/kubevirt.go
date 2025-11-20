@@ -1212,6 +1212,42 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 		r.Log.Info("Setting the vm OS ", vm.OperatingSystem, "vmId", vm.ID)
 	}
 
+	// Fetch warnings before shutting down
+	warningsURL := fmt.Sprintf("http://%s:8080/warnings", pod.Status.PodIP)
+	if resp, err = http.Get(warningsURL); err == nil {
+		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusOK {
+			var body []byte
+			if resp.Body != nil {
+				if data, err := io.ReadAll(resp.Body); err == nil {
+					body = data
+				}
+			}
+
+			contentType := resp.Header.Get("Content-Type")
+			if contentType != "application/json" {
+				r.Log.Info("contentType=%s, expect application/json", contentType)
+			}
+
+			var warnings []struct {
+				Reason  string `json:"reason"`
+				Message string `json:"message"`
+			}
+			if err = json.Unmarshal(body, &warnings); err == nil {
+				for _, warning := range warnings {
+					vm.SetCondition(libcnd.Condition{
+						Type:     ConversionHasWarnings,
+						Status:   True,
+						Category: "Warning",
+						Reason:   warning.Reason,
+						Message:  warning.Message,
+					})
+					r.Log.Info("Conversion warning detected", "reason", warning.Reason, "vmId", vm.ID)
+				}
+			}
+		}
+	}
+
 	shutdownURL := fmt.Sprintf("http://%s:8080/shutdown", pod.Status.PodIP)
 	resp, err = http.Post(shutdownURL, "application/json", nil)
 	if err == nil {

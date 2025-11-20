@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -12,11 +13,23 @@ import (
 )
 
 var (
-	server *http.Server
+	server   *http.Server
+	warnings []Warning
 )
+
+// Warning represents a non-fatal issue that occurred during migration
+type Warning struct {
+	Reason  string `json:"reason"`  // Short reason code (e.g., "CustomizationFailed")
+	Message string `json:"message"` // Detailed message
+}
 
 type Server struct {
 	AppConfig *config.AppConfig
+}
+
+// AddWarning adds a warning that will be exposed via the /warnings endpoint
+func AddWarning(warning Warning) {
+	warnings = append(warnings, warning)
 }
 
 // Start creates a webserver which is exposing information about the guest.
@@ -26,6 +39,7 @@ type Server struct {
 func (s Server) Start() error {
 	http.HandleFunc("/vm", s.vmHandler)
 	http.HandleFunc("/inspection", s.inspectorHandler)
+	http.HandleFunc("/warnings", s.warningsHandler)
 	http.HandleFunc("/shutdown", s.shutdownHandler)
 	server = &http.Server{Addr: ":8080"}
 
@@ -79,6 +93,27 @@ func (s Server) inspectorHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		fmt.Printf("Error writing response: %v\n", err)
 		http.Error(w, "Error writing response", http.StatusInternalServerError)
+	}
+}
+
+func (s Server) warningsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if len(warnings) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	warningsJSON, err := json.Marshal(warnings)
+	if err != nil {
+		fmt.Printf("Error marshaling warnings: %v\n", err)
+		http.Error(w, "Error marshaling warnings", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(warningsJSON); err != nil {
+		fmt.Printf("Error writing warnings response: %v\n", err)
 	}
 }
 
