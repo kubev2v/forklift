@@ -18,6 +18,14 @@ func init() {
 	networkIDMap = NewUUIDMap()
 }
 
+// ResourceTypes
+const (
+	ResourceTypeProcessor       = 3
+	ResourceTypeMemory          = 4
+	ResourceTypeEthernetAdapter = 10
+	ResourceTypeHardDiskDrive   = 17
+)
+
 func ConvertToVmStruct(envelope []ova.Envelope, ovaPath []string) []ova.VM {
 	var vms []ova.VM
 
@@ -34,14 +42,8 @@ func ConvertToVmStruct(envelope []ova.Envelope, ovaPath []string) []ova.VM {
 			}
 
 			for _, item := range virtualSystem.HardwareSection.Items {
-				if strings.Contains(item.ElementName, "Network adapter") {
-					newVM.NICs = append(newVM.NICs, ova.NIC{
-						Name:    item.ElementName,
-						MAC:     item.Address,
-						Network: item.Connection,
-					})
-					//for _conf := range item.
-				} else if strings.Contains(item.Description, "Number of Virtual CPUs") {
+				switch item.ResourceType {
+				case ResourceTypeProcessor:
 					newVM.CpuCount = item.VirtualQuantity
 					newVM.CpuUnits = item.AllocationUnits
 					if item.CoresPerSocket != "" {
@@ -52,11 +54,16 @@ func ConvertToVmStruct(envelope []ova.Envelope, ovaPath []string) []ova.VM {
 							newVM.CoresPerSocket = int32(num)
 						}
 					}
-				} else if strings.Contains(item.Description, "Memory Size") {
+				case ResourceTypeMemory:
 					newVM.MemoryMB = item.VirtualQuantity
 					newVM.MemoryUnits = item.AllocationUnits
-
-				} else {
+				case ResourceTypeEthernetAdapter:
+					newVM.NICs = append(newVM.NICs, ova.NIC{
+						Name:    item.ElementName,
+						MAC:     item.Address,
+						Network: item.Connection,
+					})
+				default:
 					var itemKind string
 					if len(item.ElementName) > 0 {
 						// if the `ElementName` element has a name such as "Hard Disk 1", strip off the
@@ -76,7 +83,6 @@ func ConvertToVmStruct(envelope []ova.Envelope, ovaPath []string) []ova.VM {
 						Kind: itemKind,
 					})
 				}
-
 			}
 
 			for j, disk := range vmXml.DiskSection.Disks {

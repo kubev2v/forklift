@@ -111,7 +111,7 @@ type Item struct {
 	Description     string          `xml:"Description,omitempty"`
 	ElementName     string          `xml:"ElementName"`
 	InstanceID      string          `xml:"InstanceID"`
-	ResourceType    string          `xml:"ResourceType"`
+	ResourceType    int             `xml:"ResourceType"`
 	VirtualQuantity int32           `xml:"VirtualQuantity"`
 	Address         string          `xml:"Address,omitempty"`
 	ResourceSubType string          `xml:"ResourceSubType,omitempty"`
