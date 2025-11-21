@@ -20,8 +20,8 @@ func NewSSHTaskExecutor(sshClient vmware.SSHClient) TaskExecutor {
 	}
 }
 
-func (e *SSHTaskExecutor) StartClone(ctx context.Context, host *object.HostSystem, sourcePath, targetLUN string) (*TaskInfo, error) {
-	task, err := e.SSHClient.StartVmkfstoolsClone(sourcePath, targetLUN)
+func (e *SSHTaskExecutor) StartClone(ctx context.Context, host *object.HostSystem, datastore, sourcePath, targetLUN string) (*TaskInfo, error) {
+	task, err := e.SSHClient.StartVmkfstoolsClone(datastore, sourcePath, targetLUN)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start vmkfstools clone: %w", err)
 	}
@@ -32,8 +32,8 @@ func (e *SSHTaskExecutor) StartClone(ctx context.Context, host *object.HostSyste
 	}, nil
 }
 
-func (e *SSHTaskExecutor) GetTaskStatus(ctx context.Context, host *object.HostSystem, taskId string) (*TaskStatus, error) {
-	taskStatus, err := e.SSHClient.GetTaskStatus(taskId)
+func (e *SSHTaskExecutor) GetTaskStatus(ctx context.Context, host *object.HostSystem, datastore, taskId string) (*TaskStatus, error) {
+	taskStatus, err := e.SSHClient.GetTaskStatus(datastore, taskId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get task status: %w", err)
 	}
@@ -46,8 +46,8 @@ func (e *SSHTaskExecutor) GetTaskStatus(ctx context.Context, host *object.HostSy
 	}, nil
 }
 
-func (e *SSHTaskExecutor) CleanupTask(ctx context.Context, host *object.HostSystem, taskId string) error {
-	err := e.SSHClient.CleanupTask(taskId)
+func (e *SSHTaskExecutor) CleanupTask(ctx context.Context, host *object.HostSystem, datastore, taskId string) error {
+	err := e.SSHClient.CleanupTask(datastore, taskId)
 	if err != nil {
 		klog.Errorf("Failed cleaning up task artifacts: %v", err)
 		return err

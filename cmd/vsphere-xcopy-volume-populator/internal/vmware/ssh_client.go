@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/lib/util"
 	"github.com/vmware/govmomi/object"
 	"golang.org/x/crypto/ssh"
 	"k8s.io/klog/v2"
@@ -22,6 +24,12 @@ const (
 	SSHOperationStatus  SSHOperation = "status"
 	SSHOperationCleanup SSHOperation = "cleanup"
 )
+
+// RestrictedSSHCommandTemplate is the inline shell command used in SSH authorized_keys
+// to restrict SSH access and route commands to the Python wrapper based on datastore.
+// Format: DS=<datastore>;CMD=<operation> <args...>
+// When DS is empty, it returns a simple success response for connectivity testing without calling the wrapper.
+const RestrictedSSHCommandTemplate = `sh -c 'DS=$(echo \"$SSH_ORIGINAL_COMMAND\" | sed -n \"s/^DS=\\([^;]*\\);.*/\\1/p\"); CMD=$(echo \"$SSH_ORIGINAL_COMMAND\" | sed -n \"s/^DS=[^;]*;CMD=\\(.*\\)/\\1/p\"); if [ -z \"$DS\" ]; then echo \"SSH_OK\"; else SSH_ORIGINAL_COMMAND=\"$CMD\" exec python /vmfs/volumes/$DS/secure-vmkfstools-wrapper.py; fi'`
 
 type VmkfstoolsTask struct {
 	TaskId   string `json:"taskId"`
@@ -52,9 +60,9 @@ type Field struct {
 // SSHClient interface for SSH operations
 type SSHClient interface {
 	Connect(ctx context.Context, hostname, username string, privateKey []byte) error
-	StartVmkfstoolsClone(sourceVMDK, targetLUN string) (*VmkfstoolsTask, error)
-	GetTaskStatus(taskId string) (*VmkfstoolsTask, error)
-	CleanupTask(taskId string) error
+	StartVmkfstoolsClone(datastore, sourceVMDK, targetLUN string) (*VmkfstoolsTask, error)
+	GetTaskStatus(datastore, taskId string) (*VmkfstoolsTask, error)
+	CleanupTask(datastore, taskId string) error
 	Close() error
 }
 
@@ -114,7 +122,9 @@ func (c *ESXiSSHClient) Connect(ctx context.Context, hostname, username string, 
 }
 
 // executeCommand executes a command using the SSH_ORIGINAL_COMMAND pattern
-func (c *ESXiSSHClient) executeCommand(sshCommand string, args ...string) (string, error) {
+// Uses structured format: DS=<datastore>;CMD=<operation> <args...>
+// If datastore is empty, only tests connectivity without calling the wrapper
+func (c *ESXiSSHClient) executeCommand(datastore, sshCommand string, args ...string) (string, error) {
 	if c.sshClient == nil {
 		return "", fmt.Errorf("SSH client not connected")
 	}
@@ -126,11 +136,15 @@ func (c *ESXiSSHClient) executeCommand(sshCommand string, args ...string) (strin
 	}
 	defer session.Close()
 
-	// Build the complete command with arguments
-	fullCommand := sshCommand
+	// Build the command part
+	cmdPart := sshCommand
 	if len(args) > 0 {
-		fullCommand = fmt.Sprintf("%s %s", sshCommand, strings.Join(args, " "))
+		cmdPart = fmt.Sprintf("%s %s", sshCommand, strings.Join(args, " "))
 	}
+
+	// Build structured command: DS=<datastore>;CMD=<command>
+	// For connectivity tests, datastore can be empty
+	fullCommand := fmt.Sprintf("DS=%s;CMD=%s", datastore, cmdPart)
 
 	klog.V(2).Infof("Executing SSH command: %s", fullCommand)
 
@@ -174,10 +188,10 @@ func (c *ESXiSSHClient) executeCommand(sshCommand string, args ...string) (strin
 	return string(output), nil
 }
 
-func (c *ESXiSSHClient) StartVmkfstoolsClone(sourceVMDK, targetLUN string) (*VmkfstoolsTask, error) {
-	klog.Infof("Starting vmkfstools clone: source=%s, target=%s", sourceVMDK, targetLUN)
+func (c *ESXiSSHClient) StartVmkfstoolsClone(datastore, sourceVMDK, targetLUN string) (*VmkfstoolsTask, error) {
+	klog.Infof("Starting vmkfstools clone: datastore=%s, source=%s, target=%s", datastore, sourceVMDK, targetLUN)
 
-	output, err := c.executeCommand(string(SSHOperationClone), sourceVMDK, targetLUN)
+	output, err := c.executeCommand(datastore, string(SSHOperationClone), sourceVMDK, targetLUN)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start clone: %w", err)
 	}
@@ -194,10 +208,10 @@ func (c *ESXiSSHClient) StartVmkfstoolsClone(sourceVMDK, targetLUN string) (*Vmk
 	return task, nil
 }
 
-func (c *ESXiSSHClient) GetTaskStatus(taskId string) (*VmkfstoolsTask, error) {
-	klog.V(2).Infof("Getting task status for %s", taskId)
+func (c *ESXiSSHClient) GetTaskStatus(datastore, taskId string) (*VmkfstoolsTask, error) {
+	klog.V(2).Infof("Getting task status for %s (datastore=%s)", taskId, datastore)
 
-	output, err := c.executeCommand(string(SSHOperationStatus), taskId)
+	output, err := c.executeCommand(datastore, string(SSHOperationStatus), taskId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get task status: %w", err)
 	}
@@ -214,10 +228,10 @@ func (c *ESXiSSHClient) GetTaskStatus(taskId string) (*VmkfstoolsTask, error) {
 	return task, nil
 }
 
-func (c *ESXiSSHClient) CleanupTask(taskId string) error {
-	klog.Infof("Cleaning up task %s", taskId)
+func (c *ESXiSSHClient) CleanupTask(datastore, taskId string) error {
+	klog.Infof("Cleaning up task %s (datastore=%s)", taskId, datastore)
 
-	output, err := c.executeCommand(string(SSHOperationCleanup), taskId)
+	output, err := c.executeCommand(datastore, string(SSHOperationCleanup), taskId)
 	if err != nil {
 		return fmt.Errorf("failed to cleanup task: %w", err)
 	}
@@ -315,12 +329,15 @@ func EnableSSHAccess(ctx context.Context, vmwareClient Client, host *object.Host
 	}
 	klog.Infof("ESXi version %s detected", version)
 
-	pythonCommand := fmt.Sprintf("python %s", scriptPath)
+	// Use the shared restricted SSH command template
 	restrictedPublicKey := fmt.Sprintf(`command="%s",no-port-forwarding,no-agent-forwarding,no-X11-forwarding %s`,
-		pythonCommand, publicKeyStr)
+		RestrictedSSHCommandTemplate, publicKeyStr)
 
 	// Step 7: Test SSH connectivity first (using private key for authentication)
-	if testSSHConnectivity(ctx, hostIP, privateKey, "test") {
+	// Pass empty datastore for connectivity test - the wrapper won't be called
+	// Create a logger adapter from klog to logging.LevelLogger
+	log := logging.WithName("ssh-setup")
+	if util.TestSSHConnectivity(ctx, hostIP, privateKey, log) {
 		klog.Infof("SSH connectivity test passed - keys already configured correctly")
 		return nil
 	}
@@ -337,42 +354,6 @@ func EnableSSHAccess(ctx context.Context, vmwareClient Client, host *object.Host
 	klog.Errorf("4. Save and exit")
 	klog.Errorf("5. Restart the operation")
 	return fmt.Errorf("manual SSH key configuration required for ESXi %s - see logs for instructions", version)
-}
-
-// testSSHConnectivity tests if we can connect via SSH and execute a restricted command
-func testSSHConnectivity(ctx context.Context, hostIP string, privateKey []byte, testCommand string) bool {
-	klog.Infof("Testing SSH connectivity to %s", hostIP)
-
-	client := NewSSHClient()
-	// Use a short timeout for connectivity testing to avoid indefinite hangs
-	testCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	err := client.Connect(testCtx, hostIP, "root", privateKey)
-	if err != nil {
-		klog.Infof("SSH connectivity test failed to connect: %v", err)
-		return false
-	}
-	defer client.Close()
-
-	// Try to execute a simple test command - this will test if the restricted command setup is working
-	// We expect this to fail with a "task not found" type error, which indicates SSH restrictions are working correctly
-	output, err := client.(*ESXiSSHClient).executeCommand(string(SSHOperationStatus), "test-task-id")
-
-	klog.Infof("SSH test command output: '%s'", output)
-	klog.Infof("SSH test command error: %v", err)
-
-	if strings.Contains(output, "<?xml version=") {
-		klog.Infof("Received XML response from script - SSH working correctly")
-		return true
-	}
-
-	if strings.Contains(output, "No such file or directory") && strings.Contains(output, ".py") {
-		klog.Infof("SSH working but script file not found - configuration issue")
-		return true
-	}
-
-	klog.Infof("SSH connectivity issue detected, none of the expecter responses were received: %v, err: %v", output, err)
-	return false
 }
 
 // getESXiVersion retrieves the ESXi version from the host

@@ -7,10 +7,14 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
+
+	"github.com/kubev2v/forklift/pkg/lib/inventory/model"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/base"
 	"github.com/kubev2v/forklift/pkg/controller/provider/container"
+	vsphere "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libref "github.com/kubev2v/forklift/pkg/lib/ref"
@@ -34,6 +38,7 @@ const (
 	LoadInventory           = "LoadInventory"
 	InventoryError          = "InventoryError"
 	ConnectionInsecure      = "ConnectionInsecure"
+	SSHReadiness            = "SSHReadiness"
 )
 
 // Categories
@@ -57,6 +62,13 @@ const (
 	Started             = "Started"
 	SkipTLSVerification = "SkipTLSVerification"
 )
+
+// RestrictedSSHCommandTemplate is the inline shell command used in SSH authorized_keys
+// to restrict SSH access and route commands to the Python wrapper based on datastore.
+// Format: DS=<datastore>;CMD=<operation> <args...>
+// When DS is empty, it returns a simple success response for connectivity testing without calling the wrapper.
+// NOTE: This is duplicated in cmd/vsphere-xcopy-volume-populator/internal/vmware/ssh_client.go
+const RestrictedSSHCommandTemplate = `sh -c 'DS=$(echo \"$SSH_ORIGINAL_COMMAND\" | sed -n \"s/^DS=\\([^;]*\\);.*/\\1/p\"); CMD=$(echo \"$SSH_ORIGINAL_COMMAND\" | sed -n \"s/^DS=[^;]*;CMD=\\(.*\\)/\\1/p\"); if [ -z \"$DS\" ]; then echo \"SSH_OK\"; else SSH_ORIGINAL_COMMAND=\"$CMD\" exec python /vmfs/volumes/$DS/secure-vmkfstools-wrapper.py; fi'`
 
 // Phases
 const (
@@ -94,6 +106,13 @@ func (r *Reconciler) validate(provider *api.Provider) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+
+	// Validate SSH readiness for vSphere providers when SSH method is enabled
+	err = r.validateSSHReadiness(provider, secret)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
 	if !provider.Status.HasBlockerCondition() {
 		provider.Status.SetCondition(
 			libcnd.Condition{
@@ -397,4 +416,430 @@ func isValidNFSPath(nfsPath string) bool {
 	nfsRegex := `^[^:]+:\/[^:].*$`
 	re := regexp.MustCompile(nfsRegex)
 	return re.MatchString(nfsPath)
+}
+
+// hostInfo holds information about a host for SSH testing
+type hostInfo struct {
+	name string
+	ip   string
+}
+
+// getHostsForSSHValidation retrieves the list of hosts to test for SSH readiness
+// Returns a slice of hostInfo with name and IP, or sets a condition and returns nil on error
+func (r *Reconciler) getHostsForSSHValidation(provider *api.Provider) []hostInfo {
+	sdkEndpoint := provider.Spec.Settings[api.SDK]
+	isDirectESXi := (sdkEndpoint == api.ESXI)
+
+	r.Log.Info("SSH validation: provider connection type",
+		"provider", provider.Name,
+		"sdkEndpoint", sdkEndpoint,
+		"isDirectESXi", isDirectESXi)
+
+	if isDirectESXi {
+		// For direct ESXi connections, extract IP from provider URL
+		r.Log.Info("SSH validation: direct ESXi connection detected, extracting IP from provider URL",
+			"provider", provider.Name,
+			"providerURL", provider.Spec.URL)
+
+		providerURL, err := url.Parse(provider.Spec.URL)
+		if err != nil {
+			provider.Status.SetCondition(libcnd.Condition{
+				Type:     SSHReadiness,
+				Status:   False,
+				Reason:   "InvalidProviderURL",
+				Category: Warn,
+				Message:  fmt.Sprintf("Cannot validate SSH readiness: failed to parse provider URL: %v", err),
+			})
+			return nil
+		}
+
+		// Extract hostname/IP from URL (could be hostname:port or just hostname)
+		hostIP := providerURL.Hostname()
+		if hostIP == "" {
+			provider.Status.SetCondition(libcnd.Condition{
+				Type:     SSHReadiness,
+				Status:   False,
+				Reason:   "NoHostIPInURL",
+				Category: Warn,
+				Message:  fmt.Sprintf("Cannot validate SSH readiness: no host/IP found in provider URL: %s", provider.Spec.URL),
+			})
+			return nil
+		}
+
+		r.Log.Info("SSH validation: extracted IP from provider URL",
+			"provider", provider.Name,
+			"hostIP", hostIP)
+
+		// Single host for direct ESXi
+		return []hostInfo{{name: "ESXi", ip: hostIP}}
+	}
+
+	// For vCenter connections, use inventory to get ESXi hosts
+	r.Log.Info("SSH validation: vCenter connection, attempting to get collector", "provider", provider.Name, "namespace", provider.Namespace)
+	collector, found := r.container.Get(provider)
+	if !found {
+		r.Log.Error(nil, "SSH validation: collector not found for provider - SSH readiness check failed", "provider", provider.Name, "namespace", provider.Namespace)
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     SSHReadiness,
+			Status:   False,
+			Reason:   "InventoryCollectorNotFound",
+			Category: Warn,
+			Message:  "Cannot validate SSH readiness: inventory collector not found. Ensure the provider is properly configured and inventory collection has started.",
+		})
+		return nil
+	}
+
+	r.Log.Info("SSH validation: collector found, checking parity", "provider", provider.Name, "hasParity", collector.HasParity())
+	if !collector.HasParity() {
+		r.Log.Error(nil, "SSH validation: collector does not have parity yet - SSH readiness check failed", "provider", provider.Name)
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     SSHReadiness,
+			Status:   False,
+			Reason:   "InventoryNotReady",
+			Category: Warn,
+			Message:  "Cannot validate SSH readiness: inventory collection has not completed (parity not reached). Wait for inventory to finish loading.",
+		})
+		return nil
+	}
+
+	r.Log.Info("SSH validation: listing hosts from database", "provider", provider.Name)
+
+	// Get hosts from inventory
+	db := collector.DB()
+	var hosts []vsphere.Host
+	listOptions := model.ListOptions{Detail: model.MaxDetail}
+	r.Log.Info("SSH validation: listing hosts with options",
+		"provider", provider.Name,
+		"listOptions", listOptions)
+	err := db.List(&hosts, listOptions)
+	if err != nil {
+		r.Log.Error(err, "SSH validation: failed to list hosts from inventory - SSH readiness check failed", "provider", provider.Name)
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     SSHReadiness,
+			Status:   False,
+			Reason:   "HostListError",
+			Category: Warn,
+			Message:  fmt.Sprintf("Cannot validate SSH readiness: failed to list hosts from inventory: %v", err),
+		})
+		return nil
+	}
+
+	r.Log.Info("SSH validation: hosts retrieved from inventory", "provider", provider.Name, "hostCount", len(hosts))
+
+	if len(hosts) == 0 {
+		r.Log.Error(nil, "SSH validation: no hosts in inventory - SSH readiness check failed", "provider", provider.Name)
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     SSHReadiness,
+			Status:   False,
+			Reason:   "NoHostsFound",
+			Category: Warn,
+			Message:  "Cannot validate SSH readiness: no ESXi hosts found in inventory. Ensure hosts are properly added to the vSphere provider.",
+		})
+		return nil
+	}
+
+	// Helper function to get host IP from ManagementIPs
+	getHostIP := func(host *vsphere.Host) string {
+		if len(host.ManagementIPs) > 0 {
+			r.Log.V(3).Info("SSH validation: using ManagementIP for host",
+				"provider", provider.Name,
+				"hostName", host.Name,
+				"managementIPs", host.ManagementIPs,
+				"selectedIP", host.ManagementIPs[0])
+			return host.ManagementIPs[0]
+		}
+		r.Log.V(3).Info("SSH validation: no ManagementIPs for host",
+			"provider", provider.Name,
+			"hostName", host.Name)
+		return ""
+	}
+
+	// Log detailed host information for debugging
+	r.Log.V(3).Info("SSH validation: analyzing host inventory", "provider", provider.Name)
+	var hostsToTest []hostInfo
+	hostsWithIP := 0
+	hostsWithoutIP := 0
+	for i := range hosts {
+		hostIP := getHostIP(&hosts[i])
+		r.Log.V(3).Info("SSH validation: host details",
+			"provider", provider.Name,
+			"hostIndex", i,
+			"hostName", hosts[i].Name,
+			"hostID", hosts[i].ID,
+			"managementIPsCount", len(hosts[i].ManagementIPs),
+			"managementIPs", hosts[i].ManagementIPs,
+			"resolvedIP", hostIP,
+			"productVersion", hosts[i].ProductVersion,
+			"status", hosts[i].Status)
+		hostsWithIP++
+		hostsToTest = append(hostsToTest, hostInfo{name: hosts[i].Name, ip: hostIP})
+	}
+
+	r.Log.V(2).Info("SSH validation: host IP summary",
+		"provider", provider.Name,
+		"totalHosts", len(hosts),
+		"hostsWithIP", hostsWithIP,
+		"hostsWithoutIP", hostsWithoutIP)
+
+	if hostsWithIP == 0 {
+		r.Log.Error(nil, "SSH validation: no hosts with IP found - SSH readiness check failed",
+			"provider", provider.Name,
+			"totalHosts", len(hosts),
+			"hostsWithIP", hostsWithIP,
+			"hostsWithoutIP", hostsWithoutIP)
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     SSHReadiness,
+			Status:   False,
+			Reason:   "NoHostIP",
+			Category: Warn,
+			Message:  fmt.Sprintf("Cannot validate SSH readiness: no ESXi hosts with management IP address found in inventory (found %d hosts total, but none have management IP addresses). Check that VirtualNicManager configuration is being collected.", len(hosts)),
+		})
+		return nil
+	}
+
+	return hostsToTest
+}
+
+// validateSSHReadiness validates SSH readiness for vSphere providers when SSH method is enabled
+func (r *Reconciler) validateSSHReadiness(provider *api.Provider, secret *core.Secret) error {
+	// Only validate SSH for vSphere providers
+	if provider.Type() != api.VSphere {
+		r.Log.V(3).Info("SSH validation: skipping non-vSphere provider",
+			"provider", provider.Name,
+			"providerType", provider.Type())
+		return nil
+	}
+
+	// Check if ESXiCloneMethod is set to "ssh"
+	esxiCloneMethod, methodSet := provider.Spec.Settings[api.ESXiCloneMethod]
+	if !methodSet || esxiCloneMethod != "ssh" {
+		r.Log.V(3).Info("SSH validation: SSH method not enabled, skipping",
+			"provider", provider.Name,
+			"esxiCloneMethod", esxiCloneMethod,
+			"methodSet", methodSet)
+		// SSH method not enabled, remove any existing SSH readiness conditions
+		provider.Status.DeleteCondition(SSHReadiness)
+		return nil
+	}
+
+	r.Log.Info("SSH validation: starting validation for vSphere provider with SSH method enabled",
+		"provider", provider.Name,
+		"namespace", provider.Namespace,
+		"providerType", provider.Type())
+
+	// Check if SSH keys exist (they should be created by ensureSSHKeys)
+	privateSecretName, err := util.GenerateSSHPrivateSecretName(provider.Name)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	publicSecretName, err := util.GenerateSSHPublicSecretName(provider.Name)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// Try to get the SSH key secrets
+	privateSecret := &core.Secret{}
+	err = r.Get(context.TODO(), client.ObjectKey{
+		Namespace: provider.Namespace,
+		Name:      privateSecretName,
+	}, privateSecret)
+
+	publicSecret := &core.Secret{}
+	err2 := r.Get(context.TODO(), client.ObjectKey{
+		Namespace: provider.Namespace,
+		Name:      publicSecretName,
+	}, publicSecret)
+
+	if err != nil || err2 != nil {
+		// SSH keys don't exist yet - this is expected on first reconcile
+		// They will be created by ensureSSHKeys after validation
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     SSHReadiness,
+			Status:   False,
+			Reason:   "SSHKeysNotFound",
+			Category: Warn,
+			Message: fmt.Sprintf(
+				"SSH method is enabled but SSH keys are being generated. "+
+					"After keys are created, you must manually install the public key on each ESXi host. "+
+					"Expected secrets: %s, %s",
+				privateSecretName, publicSecretName),
+		})
+		return nil
+	}
+
+	// Get public key content
+	publicKeyBytes, ok := publicSecret.Data["public-key"]
+	if !ok {
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     SSHReadiness,
+			Status:   False,
+			Reason:   "SSHPublicKeyInvalid",
+			Category: Warn,
+			Message:  fmt.Sprintf("SSH public key secret '%s' does not contain 'public-key' data", publicSecretName),
+		})
+		return nil
+	}
+	publicKey := string(publicKeyBytes)
+
+	publicKeyPreview := publicKey
+	if len(publicKey) > 60 {
+		publicKeyPreview = publicKey[:60] + "..."
+	}
+	r.Log.V(3).Info("SSH validation: loaded public key from secret",
+		"provider", provider.Name,
+		"publicKeyLength", len(publicKey),
+		"publicKeyPreview", publicKeyPreview)
+
+	// Get private key for testing
+	privateKeyBytes, ok := privateSecret.Data["private-key"]
+	if !ok {
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     SSHReadiness,
+			Status:   False,
+			Reason:   "SSHPrivateKeyInvalid",
+			Category: Warn,
+			Message:  fmt.Sprintf("SSH private key secret '%s' does not contain 'private-key' data", privateSecretName),
+		})
+		return nil
+	}
+
+	privateKeyPreview := string(privateKeyBytes)
+	if len(privateKeyBytes) > 60 {
+		privateKeyPreview = string(privateKeyBytes[:60]) + "..."
+	}
+	r.Log.V(3).Info("SSH validation: loaded private key from secret",
+		"provider", provider.Name,
+		"privateKeyLength", len(privateKeyBytes),
+		"privateKeyPreview", privateKeyPreview)
+
+	// Get list of hosts to test based on provider connection type
+	hostsToTest := r.getHostsForSSHValidation(provider)
+	if hostsToTest == nil {
+		// Error condition already set by getHostsForSSHValidation
+		return nil
+	}
+
+	r.Log.Info("SSH validation: hosts to test",
+		"provider", provider.Name,
+		"hostCount", len(hostsToTest))
+
+	// Build the restricted key format with dynamic datastore routing
+	restrictedKey := fmt.Sprintf(`command="%s",no-port-forwarding,no-agent-forwarding,no-X11-forwarding %s`, RestrictedSSHCommandTemplate, publicKey)
+
+	// Log the keys being used
+	r.Log.V(3).Info("SSH validation: key details for testing",
+		"provider", provider.Name,
+		"publicKeyLength", len(publicKey),
+		"publicKeyPrefix", func() string {
+			if len(publicKey) > 40 {
+				return publicKey[:40] + "..."
+			}
+			return publicKey
+		}(),
+		"restrictedKeyLength", len(restrictedKey),
+		"privateKeyLength", len(privateKeyBytes))
+
+	// Test SSH connectivity on ALL hosts (don't stop early)
+	r.Log.Info("SSH validation: testing all hosts for complete status",
+		"provider", provider.Name,
+		"totalHosts", len(hostsToTest))
+	failedHosts := []string{}
+	successHosts := []string{}
+
+	// Test all hosts to provide complete status
+	for i := range hostsToTest {
+		host := &hostsToTest[i]
+		if host.ip == "" {
+			r.Log.Info("SSH validation: host has no management IP - marking as failed",
+				"provider", provider.Name,
+				"hostName", host.name)
+			failedHosts = append(failedHosts, fmt.Sprintf("%s (no management IP)", host.name))
+			continue
+		}
+		r.Log.V(3).Info("SSH validation: testing host",
+			"provider", provider.Name,
+			"hostName", host.name,
+			"hostIP", host.ip,
+			"hostIndex", i+1,
+			"totalHosts", len(hostsToTest))
+		hostResult := r.testSSHConnectivity(host.ip, privateKeyBytes)
+		r.Log.V(3).Info("SSH validation: host test result",
+			"provider", provider.Name,
+			"hostName", host.name,
+			"hostIP", host.ip,
+			"success", hostResult)
+
+		if hostResult {
+			successHosts = append(successHosts, fmt.Sprintf("%s (%s)", host.name, host.ip))
+		} else {
+			failedHosts = append(failedHosts, fmt.Sprintf("%s (%s)", host.name, host.ip))
+		}
+	}
+
+	r.Log.Info("SSH validation: all hosts tested",
+		"provider", provider.Name,
+		"successCount", len(successHosts),
+		"failedCount", len(failedHosts))
+
+	// If all hosts passed, we're done
+	if len(failedHosts) == 0 {
+		r.Log.Info("SSH validation: all hosts have SSH working",
+			"provider", provider.Name,
+			"hostCount", len(hostsToTest))
+		provider.Status.DeleteCondition(SSHReadiness)
+		return nil
+	}
+
+	// Build detailed message with both success and failure lists
+	var message strings.Builder
+	if len(successHosts) == 0 {
+		message.WriteString(fmt.Sprintf("SSH connectivity failed for all %d ESXi host(s). Manual SSH key installation required.\n\n", len(hostsToTest)))
+	} else {
+		message.WriteString(fmt.Sprintf("SSH connectivity: %d succeeded, %d failed (of %d total host(s)).\n\n",
+			len(successHosts), len(failedHosts), len(hostsToTest)))
+	}
+
+	if len(successHosts) > 0 {
+		message.WriteString(fmt.Sprintf("✓ SSH WORKING (%d hosts):\n", len(successHosts)))
+		for _, host := range successHosts {
+			message.WriteString(fmt.Sprintf("  • %s\n", host))
+		}
+		message.WriteString("\n")
+	}
+
+	if len(failedHosts) > 0 {
+		message.WriteString(fmt.Sprintf("✗ SSH SETUP NEEDED (%d hosts):\n", len(failedHosts)))
+		for _, host := range failedHosts {
+			message.WriteString(fmt.Sprintf("  • %s\n", host))
+		}
+		message.WriteString("\n")
+	}
+
+	message.WriteString("SETUP INSTRUCTIONS:\n\n")
+	message.WriteString("1. Enable SSH on each ESXi host:\n")
+	message.WriteString("   vim-cmd hostsvc/enable_ssh\n")
+	message.WriteString("   vim-cmd hostsvc/start_ssh\n\n")
+	message.WriteString("2. Add the following line to /etc/ssh/keys-root/authorized_keys on each ESXi host:\n\n")
+	message.WriteString(restrictedKey + "\n\n")
+
+	reason := "SSHConnectivityFailed"
+	if len(successHosts) > 0 {
+		reason = "SSHPartiallyConfigured"
+	}
+
+	provider.Status.SetCondition(libcnd.Condition{
+		Type:     SSHReadiness,
+		Status:   False,
+		Reason:   reason,
+		Category: Warn,
+		Message:  message.String(),
+		Items:    failedHosts,
+	})
+	return nil
+}
+
+// testSSHConnectivity tests SSH connectivity to an ESXi host
+// This matches the exact implementation from the populator's testSSHConnectivity
+func (r *Reconciler) testSSHConnectivity(hostIP string, privateKey []byte) bool {
+	return util.TestSSHConnectivity(context.Background(), hostIP, privateKey, r.Log)
 }
