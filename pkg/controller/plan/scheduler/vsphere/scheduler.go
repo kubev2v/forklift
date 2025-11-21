@@ -62,11 +62,35 @@ type pendingVM struct {
 func (r *Scheduler) Next() (vm *plan.VMStatus, hasNext bool, err error) {
 	mutex.Lock()
 	defer mutex.Unlock()
+
+	r.Log.V(1).Info(
+		"[SCHEDULER-DEBUG] ========== Next() called ==========",
+		"plan", r.Plan.Name)
+
 	err = r.buildSchedule()
 	if err != nil {
 		return
 	}
-	for _, vms := range r.schedulable() {
+
+	schedulableVMs := r.schedulable()
+	totalSchedulable := 0
+	for _, vms := range schedulableVMs {
+		totalSchedulable += len(vms)
+	}
+
+	r.Log.V(1).Info(
+		"[SCHEDULER-DEBUG] Schedulable VMs summary",
+		"totalSchedulable", totalSchedulable,
+		"inFlightMap", r.inFlight,
+		"pendingMap", func() map[string]int {
+			m := make(map[string]int)
+			for host, vms := range r.pending {
+				m[host] = len(vms)
+			}
+			return m
+		}())
+
+	for _, vms := range schedulableVMs {
 		if len(vms) > 0 {
 			vm = vms[0].status
 			hasNext = true
@@ -75,9 +99,14 @@ func (r *Scheduler) Next() (vm *plan.VMStatus, hasNext bool, err error) {
 
 	if hasNext {
 		r.Log.Info(
-			"Next scheduled VM.",
-			"vm",
-			vm.String())
+			"[SCHEDULER-DEBUG] ********** Next scheduled VM **********",
+			"vm", vm.String(),
+			"phase", vm.Phase,
+			"started", vm.MarkedStarted(),
+			"completed", vm.MarkedCompleted())
+	} else {
+		r.Log.V(1).Info(
+			"[SCHEDULER-DEBUG] No schedulable VMs available")
 	}
 
 	return
@@ -126,7 +155,18 @@ func (r *Scheduler) buildInFlight() (err error) {
 			return
 		}
 		if vmStatus.Running() {
-			r.inFlight[vm.Host] += r.cost(vm, vmStatus)
+			vmCost := r.cost(vm, vmStatus)
+			r.inFlight[vm.Host] += vmCost
+			r.Log.V(1).Info(
+				"[SCHEDULER-DEBUG] VM counted as in-flight",
+				"vm", vmStatus.Name,
+				"host", vm.Host,
+				"phase", vmStatus.Phase,
+				"cost", vmCost,
+				"started", vmStatus.MarkedStarted(),
+				"completed", vmStatus.MarkedCompleted(),
+				"running", vmStatus.Running(),
+				"currentInFlight", r.inFlight[vm.Host])
 		}
 	}
 
@@ -194,11 +234,21 @@ func (r *Scheduler) buildPending() (err error) {
 		}
 
 		if !vmStatus.MarkedStarted() && !vmStatus.MarkedCompleted() {
+			vmCost := r.cost(vm, vmStatus)
 			pending := &pendingVM{
 				status: vmStatus,
-				cost:   r.cost(vm, vmStatus),
+				cost:   vmCost,
 			}
 			r.pending[vm.Host] = append(r.pending[vm.Host], pending)
+			r.Log.V(1).Info(
+				"[SCHEDULER-DEBUG] VM added to pending",
+				"vm", vmStatus.Name,
+				"host", vm.Host,
+				"phase", vmStatus.Phase,
+				"cost", vmCost,
+				"started", vmStatus.MarkedStarted(),
+				"completed", vmStatus.MarkedCompleted(),
+				"numDisks", len(vm.Disks))
 		}
 	}
 	return
@@ -206,35 +256,58 @@ func (r *Scheduler) buildPending() (err error) {
 
 func (r *Scheduler) cost(vm *model.VM, vmStatus *plan.VMStatus) int {
 	useV2vForTransfer, _ := r.Plan.ShouldUseV2vForTransfer()
+	var calculatedCost int
+
 	if useV2vForTransfer {
 		switch vmStatus.Phase {
 		case CreateVM, PostHook, Completed:
 			// In these phases we already have the disk transferred and are left only to create the VM
 			// By setting the cost to 0 other VMs can start migrating
-			return 0
+			calculatedCost = 0
 		default:
-			return 1
+			calculatedCost = 1
 		}
+		r.Log.V(1).Info(
+			"[SCHEDULER-DEBUG] Cost calculated (storage offload)",
+			"vm", vmStatus.Name,
+			"phase", vmStatus.Phase,
+			"cost", calculatedCost,
+			"useV2vForTransfer", useV2vForTransfer)
 	} else {
+		finishedCount := r.finishedDisks(vmStatus)
 		switch vmStatus.Phase {
 		case CreateVM, PostHook, Completed, CopyingPaused, ConvertGuest, CreateGuestConversionPod:
 			// The warm/remote migrations this is done on already transferred disks,
 			// and we can start other VM migrations at these point.
 			// By setting the cost to 0 other VMs can start migrating
-			return 0
+			calculatedCost = 0
 		default:
 			// CDI transfers the disks in parallel by different pods
-			return len(vm.Disks) - r.finishedDisks(vmStatus)
+			calculatedCost = len(vm.Disks) - finishedCount
 		}
+		r.Log.V(1).Info(
+			"[SCHEDULER-DEBUG] Cost calculated (CDI)",
+			"vm", vmStatus.Name,
+			"phase", vmStatus.Phase,
+			"totalDisks", len(vm.Disks),
+			"finishedDisks", finishedCount,
+			"cost", calculatedCost,
+			"useV2vForTransfer", useV2vForTransfer)
 	}
+
+	return calculatedCost
 }
 
 // finishedDisks returns a number of the disks that have completed the disk transfer
 // This can reduce the migration time as VMs with one large disks and many small disks won't halt the scheduler
 func (r *Scheduler) finishedDisks(vmStatus *plan.VMStatus) int {
 	var resp = 0
+	var diskTransferStepFound = false
+	var totalTasksInDiskTransfer = 0
 	for _, step := range vmStatus.Pipeline {
 		if step.Name == DiskTransfer {
+			diskTransferStepFound = true
+			totalTasksInDiskTransfer = len(step.Tasks)
 			for _, task := range step.Tasks {
 				if task.Phase == Completed {
 					resp += 1
@@ -242,6 +315,12 @@ func (r *Scheduler) finishedDisks(vmStatus *plan.VMStatus) int {
 			}
 		}
 	}
+	r.Log.V(1).Info(
+		"[SCHEDULER-DEBUG] Finished disks calculation",
+		"vm", vmStatus.Name,
+		"diskTransferStepFound", diskTransferStepFound,
+		"totalTasksInDiskTransferStep", totalTasksInDiskTransfer,
+		"finishedDisks", resp)
 	return resp
 }
 
@@ -250,17 +329,57 @@ func (r *Scheduler) finishedDisks(vmStatus *plan.VMStatus) int {
 func (r *Scheduler) schedulable() (schedulable map[string][]*pendingVM) {
 	schedulable = make(map[string][]*pendingVM)
 	for host, vms := range r.pending {
+		r.Log.V(1).Info(
+			"[SCHEDULER-DEBUG] Evaluating host schedulability",
+			"host", host,
+			"pendingVMs", len(vms),
+			"inFlight", r.inFlight[host],
+			"maxInFlight", r.MaxInFlight)
+
 		if r.inFlight[host] >= r.MaxInFlight {
+			r.Log.V(1).Info(
+				"[SCHEDULER-DEBUG] Host at capacity, skipping",
+				"host", host,
+				"inFlight", r.inFlight[host],
+				"maxInFlight", r.MaxInFlight)
 			continue
 		}
 		for i := range vms {
-			if vms[i].cost+r.inFlight[host] <= r.MaxInFlight {
+			normalCheck := vms[i].cost+r.inFlight[host] <= r.MaxInFlight
+			exceptionCheck := vms[i].cost > r.MaxInFlight && r.inFlight[host] == 0
+
+			if normalCheck {
 				schedulable[host] = append(schedulable[host], vms[i])
+				r.Log.V(1).Info(
+					"[SCHEDULER-DEBUG] VM schedulable (normal check)",
+					"vm", vms[i].status.Name,
+					"host", host,
+					"vmCost", vms[i].cost,
+					"inFlight", r.inFlight[host],
+					"totalWouldBe", vms[i].cost+r.inFlight[host],
+					"maxInFlight", r.MaxInFlight)
 			}
 			// In case there is VM with more disks than the MaxInFlight MTV will migrate it, if there are no other VMs
 			// being migrated at that time.
-			if vms[i].cost > r.MaxInFlight && r.inFlight[host] == 0 {
+			if exceptionCheck {
 				schedulable[host] = append(schedulable[host], vms[i])
+				r.Log.Info(
+					"[SCHEDULER-DEBUG] VM schedulable (EXCEPTION - cost > maxInFlight)",
+					"vm", vms[i].status.Name,
+					"host", host,
+					"vmCost", vms[i].cost,
+					"inFlight", r.inFlight[host],
+					"maxInFlight", r.MaxInFlight)
+			}
+			if !normalCheck && !exceptionCheck {
+				r.Log.V(1).Info(
+					"[SCHEDULER-DEBUG] VM NOT schedulable",
+					"vm", vms[i].status.Name,
+					"host", host,
+					"vmCost", vms[i].cost,
+					"inFlight", r.inFlight[host],
+					"totalWouldBe", vms[i].cost+r.inFlight[host],
+					"maxInFlight", r.MaxInFlight)
 			}
 		}
 	}

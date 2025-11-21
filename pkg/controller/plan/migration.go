@@ -102,12 +102,27 @@ func (r *Migration) Run() (reQ time.Duration, err error) {
 
 	r.resolveCanceledRefs()
 
-	for _, vm := range r.runningVMs() {
+	runningVMsList := r.runningVMs()
+	r.Log.V(1).Info(
+		"[SCHEDULER-DEBUG] ========== Reconciliation Loop Starting ==========",
+		"plan", r.Plan.Name,
+		"runningVMsCount", len(runningVMsList))
+
+	for _, vm := range runningVMsList {
+		r.Log.V(1).Info(
+			"[SCHEDULER-DEBUG] Processing running VM",
+			"vm", vm.Name,
+			"phase", vm.Phase)
 		err = r.execute(vm)
 		if err != nil {
 			return
 		}
 	}
+
+	r.Log.V(1).Info(
+		"[SCHEDULER-DEBUG] Finished processing running VMs, starting scheduler loop",
+		"plan", r.Plan.Name)
+
 	for {
 		var hasNext bool
 		var vm *plan.VMStatus
@@ -1379,6 +1394,14 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				Durable:  true,
 			})
 	}
+
+	r.Log.V(1).Info(
+		"[SCHEDULER-DEBUG] Execute completed for VM",
+		"vm", vm.String(),
+		"phaseAfterExecute", vm.Phase,
+		"started", vm.MarkedStarted(),
+		"completed", vm.MarkedCompleted(),
+		"running", vm.Running())
 
 	return
 }
