@@ -86,6 +86,8 @@ const (
 	DynamicScriptsMountPath = "/mnt/dynamic_scripts"
 	// Annotation to specify current number of retries for getting parent backing
 	ParentBackingRetriesAnnotation = "parentBackingRetries"
+	// Descheduler eviction annotation
+	AnnDeschedulerEvict = "descheduler.alpha.kubernetes.io/evict"
 )
 
 // Labels
@@ -1617,6 +1619,23 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) 
 		if _, ok := object.Spec.Template.ObjectMeta.Annotations[ann]; !ok {
 			object.Spec.Template.ObjectMeta.Annotations[ann] = ""
 		}
+	}
+
+	// Add descheduler eviction annotation if enabled
+	// For VMware VMs: automatically enable if DRS was enabled on the source VM
+	// For other providers or manual override: use Plan.Spec.EnableDescheduler
+	enableDescheduler := r.Plan.Spec.EnableDescheduler
+	if r.Source.Provider.Type() == api.VSphere && !enableDescheduler {
+		// Check if the source VM had DRS enabled
+		virtualMachine := &model.VM{}
+		if err = r.Context.Source.Inventory.Find(virtualMachine, vm.Ref); err == nil {
+			if virtualMachine.DRSEnabled {
+				enableDescheduler = true
+			}
+		}
+	}
+	if enableDescheduler {
+		object.Spec.Template.ObjectMeta.Annotations[AnnDeschedulerEvict] = "true"
 	}
 
 	var configmaps []core.ConfigMap

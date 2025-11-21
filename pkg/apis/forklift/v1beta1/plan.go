@@ -233,6 +233,17 @@ type PlanSpec struct {
 	// - false: No inspection is performed before disk transfer.
 	// +kubebuilder:default:=true
 	RunPreflightInspection bool `json:"runPreflightInspection,omitempty"`
+	// EnableDescheduler controls whether to enable the descheduler for migrated VMs.
+	// When enabled, the descheduler.alpha.kubernetes.io/evict annotation is added to the VirtualMachine,
+	// allowing the OpenShift descheduler to rebalance VM workloads across the cluster.
+	// This is similar to VMware DRS (Distributed Resource Scheduler) functionality.
+	// For VMware source VMs:
+	//   - If the source VM had DRS enabled in VMware, this will be automatically set to true
+	//   - Otherwise it will be set to false unless explicitly overridden in the Plan
+	// For other source providers:
+	//   - Defaults to false unless explicitly set to true in the Plan
+	// +optional
+	EnableDescheduler bool `json:"enableDescheduler,omitempty"`
 }
 
 // Find a planned VM.

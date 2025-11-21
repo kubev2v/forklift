@@ -151,6 +151,7 @@ const (
 	fToolsRunningStatus = "guest.toolsRunningStatus"
 	// fToolsVersionStatus is deprecated since vSphere API 5.1; use fToolsVersionStatus2 for more detailed status
 	fToolsVersionStatus = "guest.toolsVersionStatus2"
+	fDRSBehavior        = "config.drsConfig.defaultVmBehavior"
 )
 
 // Selections
@@ -850,6 +851,7 @@ func (r *Collector) vmPathSet() []string {
 		fToolsStatus,
 		fToolsRunningStatus,
 		fToolsVersionStatus,
+		fDRSBehavior,
 	}
 
 	apiVer := strings.Split(r.client.ServiceContent.About.ApiVersion, ".")

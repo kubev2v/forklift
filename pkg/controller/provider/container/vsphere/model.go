@@ -815,6 +815,12 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				if b, cast := p.Val.(bool); cast {
 					v.model.NestedHVEnabled = b
 				}
+			case fDRSBehavior:
+				// DRS defaultVmBehavior can be: manual, partiallyAutomated, fullyAutomated
+				// We consider DRS enabled if it's partiallyAutomated or fullyAutomated
+				if s, cast := p.Val.(string); cast {
+					v.model.DRSEnabled = (s == "partiallyAutomated" || s == "fullyAutomated")
+				}
 			case fGuestDisk:
 				if disks, cast := p.Val.(types.ArrayOfGuestDiskInfo); cast {
 					var diskMountPoints []model.DiskMountPoint

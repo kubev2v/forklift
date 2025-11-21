@@ -256,6 +256,7 @@ type VM struct {
 	ToolsVersionStatus string `json:"toolsVersionStatus2"`
 	DiskEnableUuid     bool   `json:"diskEnableUuid"`
 	NestedHVEnabled    bool   `json:"nestedHVEnabled"`
+	DRSEnabled         bool   `json:"drsEnabled"`
 }
 
 // Build the resource using the model.
@@ -295,6 +296,7 @@ func (r *VM) With(m *model.VM) {
 	r.ToolsVersionStatus = m.ToolsVersionStatus
 	r.DiskEnableUuid = m.DiskEnableUuid
 	r.NestedHVEnabled = m.NestedHVEnabled
+	r.DRSEnabled = m.DRSEnabled
 }
 
 // Build self link (URI).
