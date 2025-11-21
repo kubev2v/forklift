@@ -2400,14 +2400,13 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 
 	switch r.Source.Provider.Type() {
 	case api.Ova:
-		var pvName string
-		pvName, err = r.CreatePvForNfs()
+		pv := r.BuildPVForNFS(vm)
+		pv, err = r.EnsurePVForNFS(pv)
 		if err != nil {
 			return
 		}
-		pvcNamePrefix := getEntityPrefixName("pvc", r.Source.Provider.Name, r.Plan.Name)
-		var pvcName string
-		pvcName, err = r.CreatePvcForNfs(pvcNamePrefix, pvName, vm.ID)
+		pvc := r.BuildPVCForNFS(pv, vm)
+		pvc, err = r.EnsurePVCForNFS(pvc)
 		if err != nil {
 			return
 		}
@@ -2417,7 +2416,7 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 			Name: "store-pv",
 			VolumeSource: core.VolumeSource{
 				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
-					ClaimName: pvcName,
+					ClaimName: pvc.Name,
 				},
 			},
 		})
@@ -3043,18 +3042,44 @@ func GetOvaPvcListNfs(dClient client.Client, planID string, planNamespace string
 	return
 }
 
-func (r *KubeVirt) CreatePvForNfs() (pvName string, err error) {
+func (r *KubeVirt) EnsurePVForNFS(pv *core.PersistentVolume) (out *core.PersistentVolume, err error) {
+	list := &core.PersistentVolumeList{}
+	err = r.Destination.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(pv.Labels),
+		},
+	)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	if len(list.Items) > 0 {
+		out = &list.Items[0]
+	} else {
+		err = r.Destination.Create(context.TODO(), pv)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+		r.Log.Info("Created NFS PV for virt-v2v pod.", "pv", pv.Name)
+		out = pv
+	}
+	return
+}
+
+func (r *KubeVirt) BuildPVForNFS(vm *plan.VMStatus) (pv *core.PersistentVolume) {
 	sourceProvider := r.Source.Provider
 	splitted := strings.Split(sourceProvider.Spec.URL, ":")
 	nfsServer := splitted[0]
 	nfsPath := splitted[1]
 	pvcNamePrefix := getEntityPrefixName("pv", r.Source.Provider.Name, r.Plan.Name)
 
-	labels := map[string]string{"provider": r.Plan.Provider.Source.Name, "app": "forklift", "migration": r.Migration.Name, "plan": string(r.Plan.UID), "ova": OvaPVLabel}
-	pv := &core.PersistentVolume{
+	pv = &core.PersistentVolume{
 		ObjectMeta: meta.ObjectMeta{
 			GenerateName: pvcNamePrefix,
-			Labels:       labels,
+			Labels:       r.nfsPVLabels(vm.ID),
 		},
 		Spec: core.PersistentVolumeSpec{
 			Capacity: core.ResourceList{
@@ -3071,23 +3096,44 @@ func (r *KubeVirt) CreatePvForNfs() (pvName string, err error) {
 			},
 		},
 	}
-	err = r.Destination.Create(context.TODO(), pv)
-	if err != nil {
-		r.Log.Error(err, "Failed to create OVA plan PV")
-		return
-	}
-	pvName = pv.Name
 	return
 }
 
-func (r *KubeVirt) CreatePvcForNfs(pvcNamePrefix, pvName, vmID string) (pvcName string, err error) {
+func (r *KubeVirt) EnsurePVCForNFS(pvc *core.PersistentVolumeClaim) (out *core.PersistentVolumeClaim, err error) {
+	list := &core.PersistentVolumeClaimList{}
+	err = r.Destination.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(pvc.Labels),
+		},
+	)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	if len(list.Items) > 0 {
+		out = &list.Items[0]
+	} else {
+		err = r.Destination.Create(context.TODO(), pvc)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+		r.Log.Info("Created NFS PVC for virt-v2v pod.", "pvc", path.Join(pvc.Namespace, pvc.Name))
+		out = pvc
+	}
+	return
+}
+
+func (r *KubeVirt) BuildPVCForNFS(pv *core.PersistentVolume, vm *plan.VMStatus) (pvc *core.PersistentVolumeClaim) {
 	sc := ""
-	labels := map[string]string{"provider": r.Plan.Provider.Source.Name, "app": "forklift", "migration": string(r.Migration.UID), "plan": string(r.Plan.UID), "ova": OvaPVCLabel, kVM: vmID}
-	pvc := &core.PersistentVolumeClaim{
+	pvcNamePrefix := getEntityPrefixName("pvc", r.Source.Provider.Name, r.Plan.Name)
+	pvc = &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
 			GenerateName: pvcNamePrefix,
 			Namespace:    r.Plan.Spec.TargetNamespace,
-			Labels:       labels,
+			Labels:       r.nfsPVCLabels(vm.ID),
 		},
 		Spec: core.PersistentVolumeClaimSpec{
 			Resources: core.VolumeResourceRequirements{
@@ -3098,18 +3144,33 @@ func (r *KubeVirt) CreatePvcForNfs(pvcNamePrefix, pvName, vmID string) (pvcName 
 			AccessModes: []core.PersistentVolumeAccessMode{
 				core.ReadOnlyMany,
 			},
-			VolumeName:       pvName,
+			VolumeName:       pv.Name,
 			StorageClassName: &sc,
 		},
 	}
-	err = r.Destination.Create(context.TODO(), pvc)
-	if err != nil {
-		r.Log.Error(err, "Failed to create OVA plan PVC")
-		return
-	}
-
-	pvcName = pvc.Name
 	return
+}
+
+func (r *KubeVirt) nfsPVLabels(vmID string) map[string]string {
+	return map[string]string{
+		"provider":  r.Plan.Provider.Source.Name,
+		"app":       "forklift",
+		"migration": r.Migration.Name,
+		"plan":      string(r.Plan.UID),
+		"ova":       OvaPVLabel,
+		kVM:         vmID,
+	}
+}
+
+func (r *KubeVirt) nfsPVCLabels(vmID string) map[string]string {
+	return map[string]string{
+		"provider":  r.Plan.Provider.Source.Name,
+		"app":       "forklift",
+		"migration": string(r.Migration.UID),
+		"plan":      string(r.Plan.UID),
+		"ova":       OvaPVCLabel,
+		kVM:         vmID,
+	}
 }
 
 func getEntityPrefixName(resourceType, providerName, planName string) string {
