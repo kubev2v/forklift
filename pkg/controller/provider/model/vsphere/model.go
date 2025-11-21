@@ -331,6 +331,7 @@ type VM struct {
 	ToolsVersionStatus       string           `sql:""`
 	DiskEnableUuid           bool             `sql:""`
 	NestedHVEnabled          bool             `sql:""`
+	DRSEnabled               bool             `sql:""`
 }
 
 // Determine if current revision has been validated.
