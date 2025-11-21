@@ -677,6 +677,10 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				} else { //Also sync the snapshot status upon deletion
 					v.model.Snapshot = model.Ref{}
 				}
+				// MTV-3537: When snapshots are created/deleted, VMware may not send
+				// fExtraConfig updates even though the effective CBT status might have changed.
+				// We need to explicitly refresh CBT status by re-processing ExtraConfig.
+				// This will be handled after all properties are processed if ctkPerDisk has data.
 			case fChangeTracking:
 				if b, cast := p.Val.(bool); cast {
 					v.model.ChangeTrackingEnabled = b
@@ -1105,6 +1109,17 @@ func (v *VmAdapter) getDiskGuestInfo(deviceKey int32) *model.DiskMountPoint {
 
 // Update virtual disk devices.
 func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
+	// MTV-3537: Preserve CBT status from existing disks before rebuilding the array.
+	// When snapshots are created/deleted, VMware sends fDevices updates but not fExtraConfig,
+	// so we need to preserve the CBT status that was previously set from ExtraConfig.
+	oldCBTStatus := make(map[string]bool)
+	for _, disk := range v.model.Disks {
+		// Create a unique key for each disk based on its file path
+		if disk.File != "" {
+			oldCBTStatus[disk.File] = disk.ChangeTrackingEnabled
+		}
+	}
+
 	disks := []model.Disk{}
 	for _, dev := range devArray.VirtualDevice {
 		switch dev.(type) {
@@ -1147,6 +1162,10 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 				if backing.Parent != nil {
 					md.ParentFile = backing.Parent.FileName
 				}
+				// MTV-3537: Restore CBT status from previous disk state if available
+				if cbtStatus, found := oldCBTStatus[md.File]; found {
+					md.ChangeTrackingEnabled = cbtStatus
+				}
 				disks = append(disks, md)
 			case *types.VirtualDiskFlatVer2BackingInfo:
 				md := model.Disk{
@@ -1171,6 +1190,10 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 						ID:   datastoreId,
 					}
 				}
+				// MTV-3537: Restore CBT status from previous disk state if available
+				if cbtStatus, found := oldCBTStatus[md.File]; found {
+					md.ChangeTrackingEnabled = cbtStatus
+				}
 				disks = append(disks, md)
 			case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
 				md := model.Disk{
@@ -1193,6 +1216,10 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 						ID:   datastoreId,
 					}
 				}
+				// MTV-3537: Restore CBT status from previous disk state if available
+				if cbtStatus, found := oldCBTStatus[md.File]; found {
+					md.ChangeTrackingEnabled = cbtStatus
+				}
 				disks = append(disks, md)
 			case *types.VirtualDiskRawDiskVer2BackingInfo:
 				md := model.Disk{
@@ -1205,6 +1232,10 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					RDM:            true,
 					Bus:            bus,
 					WinDriveLetter: winDriveLetter,
+				}
+				// MTV-3537: Restore CBT status from previous disk state if available
+				if cbtStatus, found := oldCBTStatus[md.File]; found {
+					md.ChangeTrackingEnabled = cbtStatus
 				}
 				disks = append(disks, md)
 			}

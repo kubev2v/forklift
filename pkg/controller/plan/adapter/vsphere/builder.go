@@ -667,12 +667,19 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 				vmRef.String()))
 		return
 	}
-	if r.Plan.IsWarm() && !vm.ChangeTrackingEnabled {
-		err = liberr.New(
-			fmt.Sprintf(
-				"Changed Block Tracking (CBT) is disabled for VM %s",
-				vmRef.String()))
-		return
+	// MTV-3537: Check per-disk CBT status for warm migrations.
+	// Don't use vm.ChangeTrackingEnabled as it can be stale when snapshots exist.
+	if r.Plan.IsWarm() {
+		for _, disk := range vm.Disks {
+			if !disk.ChangeTrackingEnabled {
+				err = liberr.New(
+					fmt.Sprintf(
+						"Changed Block Tracking (CBT) is disabled for disk %s on VM %s",
+						disk.File,
+						vmRef.String()))
+				return
+			}
+		}
 	}
 	if !r.Context.Plan.Spec.MigrateSharedDisks {
 		sharedPVCs, missingDiskPVCs, err := findSharedPVCs(r.Destination.Client, vm, r.Plan.Spec.TargetNamespace)
