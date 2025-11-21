@@ -94,6 +94,23 @@ type PlanSpec struct {
 	// https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#affinity-and-anti-affinity
 	// +structType=atomic
 	ConvertorAffinity *core.Affinity `json:"convertorAffinity,omitempty"`
+	// ConvertorTempStorageClass specifies the storage class to use for temporary conversion storage.
+	// When specified, virt-v2v convertor pods will use a temporary PVC from this storage class
+	// instead of using the node's ephemeral storage for the conversion scratch space.
+	// This is useful for:
+	//   - Large VM migrations (10+ TB disks) where fstrim operations create large overlays
+	//   - OVA imports that require full uncompressed disk copies in temporary storage
+	//   - Nodes with limited ephemeral storage that may cause pod eviction due to storage pressure
+	// The temporary PVC is automatically created and deleted with the convertor pod.
+	// +optional
+	ConvertorTempStorageClass string `json:"convertorTempStorageClass,omitempty"`
+	// ConvertorTempStorageSize specifies the size of the temporary conversion storage PVC.
+	// Only used when ConvertorTempStorageClass is specified.
+	// Should be sized according to the largest disk in the migration plan.
+	// Recommended minimum: size of the largest VM disk being migrated.
+	// Format: standard Kubernetes resource quantity (e.g., "30Gi", "1Ti")
+	// +optional
+	ConvertorTempStorageSize string `json:"convertorTempStorageSize,omitempty"`
 	// Providers.
 	Provider provider.Pair `json:"provider"`
 	// Resource mapping.

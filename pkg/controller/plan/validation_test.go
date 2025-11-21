@@ -347,6 +347,121 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			gomega.Expect(plan.Status.FindCondition(TransferNetNotValid).Reason).To(gomega.Equal(NotFound))
 		})
 	})
+
+	ginkgo.Describe("validateConvertorTempStorage", func() {
+		ginkgo.It("should pass when both fields are set", func() {
+			secret := createSecret(sourceSecretName, sourceNamespace, false)
+			source := createProvider(sourceName, sourceNamespace, "https://source", api.OpenShift, &core.ObjectReference{Name: sourceSecretName, Namespace: sourceNamespace})
+			destination := createProvider(destName, destNamespace, "", api.OpenShift, &core.ObjectReference{})
+			plan := createPlan(testPlanName, testNamespace, source, destination)
+			plan.Spec.ConvertorTempStorageClass = "fast-ssd"
+			plan.Spec.ConvertorTempStorageSize = "50Gi"
+			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+
+			reconciler = createFakeReconciler(secret, plan, source, destination)
+			err := reconciler.validateConvertorTempStorage(plan)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(NotValid)).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("should pass when neither field is set", func() {
+			secret := createSecret(sourceSecretName, sourceNamespace, false)
+			source := createProvider(sourceName, sourceNamespace, "https://source", api.OpenShift, &core.ObjectReference{Name: sourceSecretName, Namespace: sourceNamespace})
+			destination := createProvider(destName, destNamespace, "", api.OpenShift, &core.ObjectReference{})
+			plan := createPlan(testPlanName, testNamespace, source, destination)
+			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+
+			reconciler = createFakeReconciler(secret, plan, source, destination)
+			err := reconciler.validateConvertorTempStorage(plan)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(NotValid)).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("should fail when only storage class is set", func() {
+			secret := createSecret(sourceSecretName, sourceNamespace, false)
+			source := createProvider(sourceName, sourceNamespace, "https://source", api.OpenShift, &core.ObjectReference{Name: sourceSecretName, Namespace: sourceNamespace})
+			destination := createProvider(destName, destNamespace, "", api.OpenShift, &core.ObjectReference{})
+			plan := createPlan(testPlanName, testNamespace, source, destination)
+			plan.Spec.ConvertorTempStorageClass = "fast-ssd"
+			plan.Spec.ConvertorTempStorageSize = ""
+			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+
+			reconciler = createFakeReconciler(secret, plan, source, destination)
+			err := reconciler.validateConvertorTempStorage(plan)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(NotValid)).To(gomega.BeTrue())
+			condition := plan.Status.FindCondition(NotValid)
+			gomega.Expect(condition).NotTo(gomega.BeNil())
+			gomega.Expect(condition.Message).To(gomega.ContainSubstring("Both ConvertorTempStorageClass and ConvertorTempStorageSize must be specified together"))
+		})
+
+		ginkgo.It("should fail when only storage size is set", func() {
+			secret := createSecret(sourceSecretName, sourceNamespace, false)
+			source := createProvider(sourceName, sourceNamespace, "https://source", api.OpenShift, &core.ObjectReference{Name: sourceSecretName, Namespace: sourceNamespace})
+			destination := createProvider(destName, destNamespace, "", api.OpenShift, &core.ObjectReference{})
+			plan := createPlan(testPlanName, testNamespace, source, destination)
+			plan.Spec.ConvertorTempStorageClass = ""
+			plan.Spec.ConvertorTempStorageSize = "50Gi"
+			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+
+			reconciler = createFakeReconciler(secret, plan, source, destination)
+			err := reconciler.validateConvertorTempStorage(plan)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(NotValid)).To(gomega.BeTrue())
+			condition := plan.Status.FindCondition(NotValid)
+			gomega.Expect(condition).NotTo(gomega.BeNil())
+			gomega.Expect(condition.Message).To(gomega.ContainSubstring("Both ConvertorTempStorageClass and ConvertorTempStorageSize must be specified together"))
+		})
+
+		ginkgo.It("should fail when storage size is invalid", func() {
+			secret := createSecret(sourceSecretName, sourceNamespace, false)
+			source := createProvider(sourceName, sourceNamespace, "https://source", api.OpenShift, &core.ObjectReference{Name: sourceSecretName, Namespace: sourceNamespace})
+			destination := createProvider(destName, destNamespace, "", api.OpenShift, &core.ObjectReference{})
+			plan := createPlan(testPlanName, testNamespace, source, destination)
+			plan.Spec.ConvertorTempStorageClass = "fast-ssd"
+			plan.Spec.ConvertorTempStorageSize = "invalid-size"
+			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+
+			reconciler = createFakeReconciler(secret, plan, source, destination)
+			err := reconciler.validateConvertorTempStorage(plan)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(NotValid)).To(gomega.BeTrue())
+			condition := plan.Status.FindCondition(NotValid)
+			gomega.Expect(condition).NotTo(gomega.BeNil())
+			gomega.Expect(condition.Message).To(gomega.ContainSubstring("is not a valid Kubernetes resource quantity"))
+		})
+
+		ginkgo.It("should pass with valid size formats", func() {
+			secret := createSecret(sourceSecretName, sourceNamespace, false)
+			source := createProvider(sourceName, sourceNamespace, "https://source", api.OpenShift, &core.ObjectReference{Name: sourceSecretName, Namespace: sourceNamespace})
+			destination := createProvider(destName, destNamespace, "", api.OpenShift, &core.ObjectReference{})
+			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+
+			validSizes := []string{"50Gi", "1Ti", "100Mi", "500G", "2T"}
+			for _, size := range validSizes {
+				plan := createPlan(testPlanName, testNamespace, source, destination)
+				plan.Spec.ConvertorTempStorageClass = "fast-ssd"
+				plan.Spec.ConvertorTempStorageSize = size
+
+				reconciler = createFakeReconciler(secret, plan, source, destination)
+				err := reconciler.validateConvertorTempStorage(plan)
+
+				gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Size %s should be valid", size)
+				gomega.Expect(plan.Status.HasCondition(NotValid)).To(gomega.BeFalse(), "Size %s should not cause validation error", size)
+			}
+		})
+	})
 })
 
 // Mock validator for testing GuestToolsIssue aggregation
