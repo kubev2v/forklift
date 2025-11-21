@@ -30,11 +30,13 @@ func ErrorHandler() gin.HandlerFunc {
 			return
 		}
 		err := ctx.Errors.Last()
-		if errors.Is(err.Err, &BadRequestError{}) {
+		badRequest := &BadRequestError{}
+		if errors.As(err, &badRequest) {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		if errors.Is(err.Err, &ConflictError{}) {
+		conflict := &ConflictError{}
+		if errors.As(err, &conflict) {
 			ctx.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return
 		}
