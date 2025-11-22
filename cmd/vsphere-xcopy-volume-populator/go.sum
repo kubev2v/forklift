@@ -74,10 +74,6 @@ github.com/dell/gopowerstore v1.19.0 h1:iXWqHm2ct3dbLvDnRgzHDb5aCf8Zwx1mToPV6feN
 github.com/dell/gopowerstore v1.19.0/go.mod h1:ZEF/MMMvPk/JdPeKIUGZFXd+AgQxVqCw/NePpV3QcHc=
 github.com/dell/goscaleio v1.20.0 h1:/g0zxlJiGzw5AZEqxjgwaYVc4fmv+DBoAU2PPueZxxE=
 github.com/dell/goscaleio v1.20.0/go.mod h1:XAHq2m2QNJH2l9gu47gQX2m6HjZZlzc1LIa0lrWvSkA=
-github.com/dell/gopowerstore v1.19.0 h1:iXWqHm2ct3dbLvDnRgzHDb5aCf8Zwx1mToPV6feN/H0=
-github.com/dell/gopowerstore v1.19.0/go.mod h1:ZEF/MMMvPk/JdPeKIUGZFXd+AgQxVqCw/NePpV3QcHc=
-github.com/dell/goscaleio v1.20.0 h1:/g0zxlJiGzw5AZEqxjgwaYVc4fmv+DBoAU2PPueZxxE=
-github.com/dell/goscaleio v1.20.0/go.mod h1:XAHq2m2QNJH2l9gu47gQX2m6HjZZlzc1LIa0lrWvSkA=
 github.com/devans10/pugo/flasharray v0.0.0-20241116160615-6bb8c469c9a0 h1:iywqp5xOufeydKSioTnPN8MctrbDmdLjatSHV80j/z8=
 github.com/devans10/pugo/flasharray v0.0.0-20241116160615-6bb8c469c9a0/go.mod h1:7dF4rgfqItyj4bkbwZkwp/Ul+bM4lku/CQvS9OIYF4o=
 github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815/go.mod h1:WwZ+bS3ebgob9U8Nd0kOddGdZWjyMGR8Wziv+TBNwSE=
@@ -514,8 +510,8 @@ gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15/go.mod h1:Co6ibVJAznAaIkqp8
 gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c h1:Hei/4ADfdWqJk1ZMxUNpqntNwaWcugrBjAiHlqqRiVk=
 gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c/go.mod h1:JHkPIbrfpd72SG/EVd6muEfDQjcINNoR0C8j2r3qZ4Q=
-gopkg.in/evanphx/json-patch.v4 v4.12.0 h1:n6jtcsulIzXPJaxegRbvFNNrZDjbij7ny3gmSPG+6V4=
-gopkg.in/evanphx/json-patch.v4 v4.12.0/go.mod h1:p8EYWUEYMpynmqDbY58zCKCFZw8pRWMG4EsWvDvM72M=
+gopkg.in/evanphx/json-patch.v4 v4.13.0 h1:czT3CmqEaQ1aanPc5SdlgQrrEIb8w/wwCvWWnfEbYzo=
+gopkg.in/evanphx/json-patch.v4 v4.13.0/go.mod h1:p8EYWUEYMpynmqDbY58zCKCFZw8pRWMG4EsWvDvM72M=
 gopkg.in/fsnotify.v1 v1.4.7/go.mod h1:Tz8NjZHkW78fSQdbUxIjBTcgA1z1m8ZHf0WmKUhAMys=
 gopkg.in/inf.v0 v0.9.1 h1:73M5CoZyi3ZLMOyDlQh031Cx6N9NDJ2Vvfl76EDAgDc=
 gopkg.in/inf.v0 v0.9.1/go.mod h1:cWUDdTG/fYaXco+Dcufb5Vnc6Gp2YChqWtbxRZE0mXw=
