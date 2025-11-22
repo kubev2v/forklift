@@ -143,7 +143,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	}
 	uniqueUIDs := make(map[string]bool)
 	hbaUIDs := []string{}
-
+	hbaUIDsNamesMap := make(map[string]string)
 	isSciniRequired := false
 	if sciniAware, ok := p.StorageApi.(SciniAware); ok {
 		if sciniAware.SciniRequired() {
@@ -180,6 +180,10 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 			for key, field := range a {
 				klog.Infof("  %s: %v", key, field)
 			}
+			hbaName, hasHbaName := a["HBAName"]
+			if !hasHbaName {
+				continue
+			}
 			driver, hasDriver := a["Driver"]
 			if !hasDriver {
 				// irrelevant adapter
@@ -206,6 +210,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 				if _, exists := uniqueUIDs[id]; !exists {
 					uniqueUIDs[id] = true
 					hbaUIDs = append(hbaUIDs, id)
+					hbaUIDsNamesMap[id] = hbaName[0]
 					klog.Infof("Storage Adapter UID: %s (Driver: %s)", id, drv)
 				}
 			}
@@ -300,15 +305,10 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		}
 		// unmap devices appear dead in ESX right after they are unmapped, now
 		// clean them
-		_, errClean := p.VSphereClient.RunEsxCommand(
-			context.Background(),
-			host,
-			[]string{"storage", "core", "adapter", "rescan", "-t", "delete", "-a", "1"})
-		if errClean != nil {
-			klog.Errorf("failed to delete dead devices: %s", err)
-		} else {
-			klog.Info("rescan to delete dead devices completed")
-		}
+		klog.Infof("about to delete dead devices")
+		klog.Infof("taking a short nap to let the ESX settle down")
+		time.Sleep(5 * time.Second)
+		deleteDeadDevices(p.VSphereClient, host, hbaUIDs, hbaUIDsNamesMap)
 	}()
 
 	// Execute the clone using the unified task handling approach
@@ -379,4 +379,35 @@ func rescan(client vmware.Client, host *object.HostSystem, targetLUN string) err
 	} else {
 		return fmt.Errorf("failed to find device %s: %w", targetLUN, err)
 	}
+}
+
+func deleteDeadDevices(client vmware.Client, host *object.HostSystem, hbaUIDs []string, hbaUIDsNamesMap map[string]string) error {
+	failedDevices := []string{}
+	for _, adapter := range hbaUIDs {
+		adapterName, ok := hbaUIDsNamesMap[adapter]
+		if !ok {
+			adapterName = adapter
+		}
+		klog.Infof("deleting dead devices for adapter %s", adapterName)
+		success := false
+		for i := 0; i < rescanRetries; i++ {
+			_, errClean := client.RunEsxCommand(
+				context.Background(),
+				host,
+				[]string{"storage", "core", "adapter", "rescan", "-t", "delete", "-A", adapterName})
+			if errClean == nil {
+				klog.Infof("rescan to delete dead devices completed for adapter %s", adapter)
+				success = true
+				break // finsihed with current adapter, move to the next one
+			}
+			time.Sleep(rescanSleepInterval)
+		}
+		if !success {
+			failedDevices = append(failedDevices, adapter)
+		}
+	}
+	if len(failedDevices) > 0 {
+		klog.Warningf("failed to delete dead devices for adapters %s", failedDevices)
+	}
+	return nil
 }
