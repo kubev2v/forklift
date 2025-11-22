@@ -440,6 +440,22 @@ spec:
                 description: 'ConfigMap name for vSphere OS mappings (default: forklift-vsphere-osmap)'
                 example: custom-vsphere-osmap
                 type: string
+              populator_container_limits_cpu:
+                description: 'Populator CPU limit (default: 1000m)'
+                example: 2000m
+                type: string
+              populator_container_limits_memory:
+                description: 'Populator memory limit (default: 1Gi)'
+                example: 2Gi
+                type: string
+              populator_container_requests_cpu:
+                description: 'Populator CPU request (default: 100m)'
+                example: 200m
+                type: string
+              populator_container_requests_memory:
+                description: 'Populator memory request (default: 512Mi)'
+                example: 300Mi
+                type: string
             type: object
           status:
             description: Status defines the observed state of ForkliftController
@@ -7456,6 +7472,26 @@ spec:
       - description: OVA Proxy route timeout (default 360s)
         displayName: OVA Proxy Route Timeout
         path: ova_proxy_route_timeout
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Populator CPU limit (default 1000m)
+        displayName: Populator CPU Limit
+        path: populator_container_limits_cpu
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Populator memory limit (default 1Gi)
+        displayName: Populator Memory Limit
+        path: populator_container_limits_memory
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Populator CPU request (default 100m)
+        displayName: Populator CPU Request
+        path: populator_container_requests_cpu
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Populator memory request (default 512Mi)
+        displayName: Populator Memory Request
+        path: populator_container_requests_memory
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Log verbosity level (default 3)
