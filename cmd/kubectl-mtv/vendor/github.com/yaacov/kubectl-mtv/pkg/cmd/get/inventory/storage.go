@@ -13,18 +13,18 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
-// ListStorage queries the provider's storage inventory and displays the results
-func ListStorage(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
+// ListStorageWithInsecure queries the provider's storage inventory and displays the results with optional insecure TLS skip verification
+func ListStorageWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
 	if watchMode {
 		return watch.Watch(func() error {
-			return listStorageOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+			return listStorageOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query, insecureSkipTLS)
 		}, 10*time.Second)
 	}
 
-	return listStorageOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return listStorageOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query, insecureSkipTLS)
 }
 
-func listStorageOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listStorageOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -32,7 +32,7 @@ func listStorageOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Con
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to determine which storage resource to fetch
 	providerType, err := providerClient.GetProviderType()

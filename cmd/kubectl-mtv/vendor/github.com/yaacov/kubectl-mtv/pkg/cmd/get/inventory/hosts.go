@@ -13,18 +13,18 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
-// ListHosts queries the provider's host inventory and displays the results
-func ListHosts(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
+// ListHostsWithInsecure queries the provider's host inventory with optional insecure TLS skip verification
+func ListHostsWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
 	if watchMode {
 		return watch.Watch(func() error {
-			return listHostsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+			return listHostsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query, insecureSkipTLS)
 		}, 10*time.Second)
 	}
 
-	return listHostsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return listHostsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query, insecureSkipTLS)
 }
 
-func listHostsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listHostsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -32,7 +32,7 @@ func listHostsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Confi
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to verify host support
 	providerType, err := providerClient.GetProviderType()

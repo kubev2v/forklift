@@ -95,6 +95,11 @@ func validateNetworkPairs(pairStr, defaultNamespace string) error {
 // If namespace is omitted, the provided defaultNamespace will be used
 // Special target values: "default" for pod networking, "ignored" to ignore the source network
 func parseNetworkPairs(ctx context.Context, pairStr, defaultNamespace string, configFlags *genericclioptions.ConfigFlags, sourceProvider, inventoryURL string) ([]forkliftv1beta1.NetworkPair, error) {
+	return parseNetworkPairsWithInsecure(ctx, pairStr, defaultNamespace, configFlags, sourceProvider, inventoryURL, false)
+}
+
+// parseNetworkPairsWithInsecure parses network pairs with optional insecure TLS skip verification
+func parseNetworkPairsWithInsecure(ctx context.Context, pairStr, defaultNamespace string, configFlags *genericclioptions.ConfigFlags, sourceProvider, inventoryURL string, insecureSkipTLS bool) ([]forkliftv1beta1.NetworkPair, error) {
 	if pairStr == "" {
 		return nil, nil
 	}
@@ -122,7 +127,7 @@ func parseNetworkPairs(ctx context.Context, pairStr, defaultNamespace string, co
 		targetPart := strings.TrimSpace(parts[1])
 
 		// Resolve source network name to ID
-		sourceNetworkRefs, err := resolveNetworkNameToID(ctx, configFlags, sourceProvider, defaultNamespace, inventoryURL, sourceName)
+		sourceNetworkRefs, err := resolveNetworkNameToIDWithInsecure(ctx, configFlags, sourceProvider, defaultNamespace, inventoryURL, sourceName, insecureSkipTLS)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve source network '%s': %v", sourceName, err)
 		}
@@ -178,8 +183,8 @@ func parseNetworkPairs(ctx context.Context, pairStr, defaultNamespace string, co
 	return pairs, nil
 }
 
-// createNetworkMapping creates a new network mapping
-func createNetworkMapping(configFlags *genericclioptions.ConfigFlags, name, namespace, sourceProvider, targetProvider, networkPairs, inventoryURL string) error {
+// createNetworkMappingWithInsecure creates a new network mapping with optional insecure TLS skip verification
+func createNetworkMappingWithInsecure(configFlags *genericclioptions.ConfigFlags, name, namespace, sourceProvider, targetProvider, networkPairs, inventoryURL string, insecureSkipTLS bool) error {
 	dynamicClient, err := client.GetDynamicClient(configFlags)
 	if err != nil {
 		return fmt.Errorf("failed to get client: %v", err)
@@ -192,7 +197,7 @@ func createNetworkMapping(configFlags *genericclioptions.ConfigFlags, name, name
 	// Parse network pairs if provided
 	var mappingPairs []forkliftv1beta1.NetworkPair
 	if networkPairs != "" {
-		mappingPairs, err = parseNetworkPairs(context.TODO(), networkPairs, namespace, configFlags, sourceProvider, inventoryURL)
+		mappingPairs, err = parseNetworkPairsWithInsecure(context.TODO(), networkPairs, namespace, configFlags, sourceProvider, inventoryURL, insecureSkipTLS)
 		if err != nil {
 			return fmt.Errorf("failed to parse network pairs: %v", err)
 		}

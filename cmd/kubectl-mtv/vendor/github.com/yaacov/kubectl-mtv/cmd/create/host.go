@@ -15,9 +15,8 @@ import (
 )
 
 // NewHostCmd creates the host creation command
-func NewHostCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
+func NewHostCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	var provider string
-	var inventoryURL string
 	var username, password string
 	var existingSecret string
 	var ipAddress string
@@ -64,9 +63,10 @@ Examples:
 			}
 
 			namespace := client.ResolveNamespace(kubeConfigFlags)
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(cmd.Context(), kubeConfigFlags, namespace)
-			}
+
+			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
+			inventoryURL := globalConfig.GetInventoryURL()
+			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
 			providerHasESXIEndpoint, _, err := host.CheckProviderESXIEndpoint(cmd.Context(), kubeConfigFlags, provider, namespace)
 			if err != nil {
@@ -102,19 +102,20 @@ Examples:
 			hostIDs := args
 
 			opts := host.CreateHostOptions{
-				HostIDs:             hostIDs,
-				Namespace:           namespace,
-				Provider:            provider,
-				ConfigFlags:         kubeConfigFlags,
-				InventoryURL:        inventoryURL,
-				Username:            username,
-				Password:            password,
-				ExistingSecret:      existingSecret,
-				IPAddress:           ipAddress,
-				NetworkAdapterName:  networkAdapterName,
-				HostInsecureSkipTLS: hostInsecureSkipTLS,
-				CACert:              cacert,
-				HostSpec:            hostSpec,
+				HostIDs:                  hostIDs,
+				Namespace:                namespace,
+				Provider:                 provider,
+				ConfigFlags:              kubeConfigFlags,
+				InventoryURL:             inventoryURL,
+				InventoryInsecureSkipTLS: inventoryInsecureSkipTLS,
+				Username:                 username,
+				Password:                 password,
+				ExistingSecret:           existingSecret,
+				IPAddress:                ipAddress,
+				NetworkAdapterName:       networkAdapterName,
+				HostInsecureSkipTLS:      hostInsecureSkipTLS,
+				CACert:                   cacert,
+				HostSpec:                 hostSpec,
 			}
 
 			return host.Create(cmd.Context(), opts)
@@ -122,7 +123,6 @@ Examples:
 	}
 
 	cmd.Flags().StringVarP(&provider, "provider", "p", "", "Provider name (must be a vSphere provider)")
-	cmd.Flags().StringVar(&inventoryURL, "inventory-url", os.Getenv("MTV_INVENTORY_URL"), "Base URL for the inventory service")
 	cmd.Flags().StringVarP(&username, "username", "u", "", "Username for host authentication (required if --existing-secret not provided)")
 	cmd.Flags().StringVar(&password, "password", "", "Password for host authentication (required if --existing-secret not provided)")
 	cmd.Flags().StringVar(&existingSecret, "existing-secret", "", "Name of existing secret to use for host authentication")

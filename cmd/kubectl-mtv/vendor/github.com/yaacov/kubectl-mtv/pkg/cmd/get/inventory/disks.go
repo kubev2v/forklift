@@ -12,18 +12,18 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
-// ListDisks queries the provider's disk inventory and displays the results
-func ListDisks(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
+// ListDisksWithInsecure queries the provider's disk inventory with optional insecure TLS skip verification
+func ListDisksWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
 	if watchMode {
 		return watch.Watch(func() error {
-			return listDisksOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+			return listDisksOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query, insecureSkipTLS)
 		}, 10*time.Second)
 	}
 
-	return listDisksOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return listDisksOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query, insecureSkipTLS)
 }
 
-func listDisksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listDisksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -31,7 +31,7 @@ func listDisksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Confi
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to verify disk support
 	providerType, err := providerClient.GetProviderType()

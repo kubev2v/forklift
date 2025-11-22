@@ -135,6 +135,11 @@ func calculateTotalDiskCapacity(vm map[string]interface{}) float64 {
 
 // FetchVMsByQuery fetches VMs from inventory based on a query string and returns them as plan VM structs
 func FetchVMsByQuery(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL, query string) ([]planv1beta1.VM, error) {
+	return FetchVMsByQueryWithInsecure(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, query, false)
+}
+
+// FetchVMsByQueryWithInsecure fetches VMs from inventory based on a query string and returns them as plan VM structs with optional insecure TLS skip verification
+func FetchVMsByQueryWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL, query string, insecureSkipTLS bool) ([]planv1beta1.VM, error) {
 	// Validate inputs early
 	if providerName == "" {
 		return nil, fmt.Errorf("provider name cannot be empty")
@@ -156,7 +161,7 @@ func FetchVMsByQuery(ctx context.Context, kubeConfigFlags *genericclioptions.Con
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to verify VM support
 	providerType, err := providerClient.GetProviderType()
@@ -223,17 +228,18 @@ func FetchVMsByQuery(ctx context.Context, kubeConfigFlags *genericclioptions.Con
 }
 
 // ListVMs queries the provider's VM inventory and displays the results
-func ListVMs(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, extendedOutput bool, query string, watchMode bool) error {
+// ListVMsWithInsecure queries the provider's VM inventory and displays the results with optional insecure TLS skip verification
+func ListVMsWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, extendedOutput bool, query string, watchMode bool, insecureSkipTLS bool) error {
 	if watchMode {
 		return watch.Watch(func() error {
-			return listVMsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, extendedOutput, query)
+			return listVMsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, extendedOutput, query, insecureSkipTLS)
 		}, 10*time.Second)
 	}
 
-	return listVMsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, extendedOutput, query)
+	return listVMsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, extendedOutput, query, insecureSkipTLS)
 }
 
-func listVMsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, extendedOutput bool, query string) error {
+func listVMsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, extendedOutput bool, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -241,7 +247,7 @@ func listVMsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigF
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to verify VM support
 	providerType, err := providerClient.GetProviderType()

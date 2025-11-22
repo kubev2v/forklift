@@ -12,18 +12,18 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
-// ListDatastores queries the provider's datastore inventory and displays the results
-func ListDatastores(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
+// ListDatastoresWithInsecure queries the provider's datastore inventory with optional insecure TLS skip verification
+func ListDatastoresWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
 	if watchMode {
 		return watch.Watch(func() error {
-			return listDatastoresOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+			return listDatastoresOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query, insecureSkipTLS)
 		}, 10*time.Second)
 	}
 
-	return listDatastoresOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return listDatastoresOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query, insecureSkipTLS)
 }
 
-func listDatastoresOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listDatastoresOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -31,7 +31,7 @@ func listDatastoresOnce(ctx context.Context, kubeConfigFlags *genericclioptions.
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to verify datastore support
 	providerType, err := providerClient.GetProviderType()
