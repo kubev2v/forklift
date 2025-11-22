@@ -115,6 +115,9 @@ def clone_operation(source_vmdk, target_lun):
         with open(os.path.join(tmp_dir, "rdmfile"), "w") as rdmfile_file:
             rdmfile_file.write(f"{rdmfile}\n")
 
+        with open(os.path.join(tmp_dir, "targetLun"), "w") as target_lun_file:
+            target_lun_file.write(f"{os.path.basename(target_lun)}")
+
         result = {"taskId": task_id, "pid": task.pid, "operation": "clone"}
         
         stdout_file.close()
@@ -163,6 +166,13 @@ def status_operation(task_id):
                 exit_code = f.read().strip()
         except FileNotFoundError:
             pass
+
+        try:
+            with open(os.path.join(tmp_dir, "targetLun"), "r") as target_lun_file:
+                target_lun = target_lun_file.read()
+            xcopy_used, xclone_writes = was_xcopy_used(target_lun)
+        except FileNotFoundError:
+            pass
         
         result = {
             "taskId": task_id,
@@ -170,7 +180,9 @@ def status_operation(task_id):
             "exitCode": exit_code,
             "lastLine": last_line,
             "stdErr": stderr_content,
-            "operation": "status"
+            "operation": "status",
+            "xcopyUsed": xcopy_used,
+            "xcloneWrites": xclone_writes
         }
         
         logging.info(f"Status check for task {task_id}: {result}")
@@ -268,6 +280,32 @@ def parse_ssh_original_command():
     else:
         raise ValueError(f"Unauthorized operation: {operation}")
 
+def was_xcopy_used(target_lun):
+    stats_path = f"/storage/scsifw/devices/{target_lun.strip()}/stats"
+
+    try:
+        target_lun_stats = subprocess.run(
+            ["vsish", "-r", "-e", "cat", stats_path],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Error: Unable to read stats for device {target_lun}")
+        raise e
+
+    write_ops = 0
+    for statistic in target_lun_stats.stdout.splitlines():
+        if "clonewriteops" in statistic.lower():
+            try:
+                write_ops = int(statistic.split(':')[1], 16)
+            except ValueError:
+                logging.error(f"Error: Unable to parse statistic: {statistic.split(':')[1]}")
+                write_ops = 0
+            break
+
+    return write_ops > 0, str(write_ops)
+    
 def main():
     """Main entry point that handles SSH_ORIGINAL_COMMAND or command line arguments"""
     # Check for version argument first
