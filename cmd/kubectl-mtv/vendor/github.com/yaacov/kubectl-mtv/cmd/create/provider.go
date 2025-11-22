@@ -40,6 +40,20 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 		Short:        "Create a new provider",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			// Fetch dynamic provider types from the cluster
+			dynamicTypes, err := client.GetDynamicProviderTypes(kubeConfigFlags)
+			if err != nil {
+				// Log the error but don't fail - we can still work with static types
+				// This allows the command to work even if there are cluster connectivity issues
+				// as long as the user is using a static provider type
+				cmd.PrintErrf("Warning: failed to fetch dynamic provider types: %v\n", err)
+			} else {
+				// Set the dynamic types in the flag
+				providerType.SetDynamicTypes(dynamicTypes)
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get name from positional argument
 			name := args[0]

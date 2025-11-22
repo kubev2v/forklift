@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
@@ -75,6 +76,12 @@ var (
 		Resource: "forkliftcontrollers",
 	}
 
+	DynamicProvidersGVR = schema.GroupVersionResource{
+		Group:    Group,
+		Version:  Version,
+		Resource: "dynamicproviders",
+	}
+
 	// SecretGVR is used to access secrets in the cluster
 	SecretsGVR = schema.GroupVersionResource{
 		Group:    "",
@@ -129,6 +136,12 @@ func GetKubernetesClientset(configFlags *genericclioptions.ConfigFlags) (*kubern
 
 // GetAuthenticatedTransport returns an HTTP transport configured with Kubernetes authentication
 func GetAuthenticatedTransport(configFlags *genericclioptions.ConfigFlags) (http.RoundTripper, error) {
+	return GetAuthenticatedTransportWithInsecure(configFlags, false)
+}
+
+// GetAuthenticatedTransportWithInsecure returns an HTTP transport configured with Kubernetes authentication
+// and optional insecure TLS skip verification
+func GetAuthenticatedTransportWithInsecure(configFlags *genericclioptions.ConfigFlags, insecureSkipTLS bool) (http.RoundTripper, error) {
 	config, err := configFlags.ToRESTConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get REST config: %v", err)
@@ -140,12 +153,35 @@ func GetAuthenticatedTransport(configFlags *genericclioptions.ConfigFlags) (http
 		return nil, fmt.Errorf("failed to create authenticated transport: %v", err)
 	}
 
+	// If insecure skip TLS is enabled, wrap the transport with custom TLS config
+	if insecureSkipTLS {
+		if httpTransport, ok := transport.(*http.Transport); ok {
+			// Clone the transport and modify TLS config
+			newTransport := httpTransport.Clone()
+			if newTransport.TLSClientConfig == nil {
+				newTransport.TLSClientConfig = &tls.Config{
+					MinVersion: tls.VersionTLS12,
+				}
+			} else if newTransport.TLSClientConfig.MinVersion == 0 {
+				newTransport.TLSClientConfig.MinVersion = tls.VersionTLS12
+			}
+			newTransport.TLSClientConfig.InsecureSkipVerify = true
+			return newTransport, nil
+		}
+	}
+
 	return transport, nil
 }
 
 // GetAuthenticatedHTTPClient returns an HTTP client configured with Kubernetes authentication
 func GetAuthenticatedHTTPClient(configFlags *genericclioptions.ConfigFlags, baseURL string) (*HTTPClient, error) {
-	transport, err := GetAuthenticatedTransport(configFlags)
+	return GetAuthenticatedHTTPClientWithInsecure(configFlags, baseURL, false)
+}
+
+// GetAuthenticatedHTTPClientWithInsecure returns an HTTP client configured with Kubernetes authentication
+// and optional insecure TLS skip verification
+func GetAuthenticatedHTTPClientWithInsecure(configFlags *genericclioptions.ConfigFlags, baseURL string, insecureSkipTLS bool) (*HTTPClient, error) {
+	transport, err := GetAuthenticatedTransportWithInsecure(configFlags, insecureSkipTLS)
 	if err != nil {
 		return nil, err
 	}
@@ -367,4 +403,41 @@ func (c *HTTPClient) Get(path string) ([]byte, error) {
 	}
 
 	return body, nil
+}
+
+// GetDynamicProviderTypes fetches all DynamicProvider types from the cluster.
+// Returns an empty slice if the CRD is not available (fails gracefully).
+func GetDynamicProviderTypes(configFlags *genericclioptions.ConfigFlags) ([]string, error) {
+	dynamicClient, err := GetDynamicClient(configFlags)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get dynamic client: %v", err)
+	}
+
+	ctx := context.Background()
+
+	// Try to list DynamicProvider resources
+	list, err := dynamicClient.Resource(DynamicProvidersGVR).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		// Check if it's a "not found" error (CRD doesn't exist)
+		if strings.Contains(err.Error(), "not found") ||
+			strings.Contains(err.Error(), "the server could not find the requested resource") {
+			// Fail gracefully - DynamicProvider CRD is not installed
+			return []string{}, nil
+		}
+		return nil, fmt.Errorf("failed to list DynamicProviders: %v", err)
+	}
+
+	// Extract the types from each DynamicProvider
+	types := make([]string, 0, len(list.Items))
+	for _, item := range list.Items {
+		providerType, found, err := unstructured.NestedString(item.Object, "spec", "type")
+		if err != nil {
+			continue // Skip items with errors
+		}
+		if found && providerType != "" {
+			types = append(types, providerType)
+		}
+	}
+
+	return types, nil
 }

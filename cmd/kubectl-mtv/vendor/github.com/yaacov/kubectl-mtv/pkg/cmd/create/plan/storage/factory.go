@@ -34,10 +34,10 @@ import (
 // StorageMapperInterface defines the interface that all provider-specific storage mappers must implement
 type StorageMapperInterface interface {
 	// GetSourceStorages extracts storage information from the source provider for the specified VMs
-	GetSourceStorages(configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, planVMNames []string) ([]ref.Ref, error)
+	GetSourceStorages(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, planVMNames []string, insecureSkipTLS bool) ([]ref.Ref, error)
 
 	// GetTargetStorages extracts available storage information from the target provider
-	GetTargetStorages(configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string) ([]forkliftv1beta1.DestinationStorage, error)
+	GetTargetStorages(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, insecureSkipTLS bool) ([]forkliftv1beta1.DestinationStorage, error)
 
 	// CreateStoragePairs creates storage mapping pairs based on source storages, target storages, and optional default storage class
 	CreateStoragePairs(sourceStorages []ref.Ref, targetStorages []forkliftv1beta1.DestinationStorage, defaultTargetStorageClass string) ([]forkliftv1beta1.StoragePair, error)
@@ -53,6 +53,7 @@ type StorageMapperOptions struct {
 	TargetProviderNamespace   string
 	ConfigFlags               *genericclioptions.ConfigFlags
 	InventoryURL              string
+	InventoryInsecureSkipTLS  bool
 	PlanVMNames               []string
 	DefaultTargetStorageClass string
 }
@@ -79,7 +80,7 @@ func CreateStorageMap(ctx context.Context, opts StorageMapperOptions) (string, e
 	klog.V(4).Infof("DEBUG: Target storage fetcher created for provider: %s", opts.TargetProvider)
 
 	// Fetch source storages
-	sourceStorages, err := sourceFetcher.FetchSourceStorages(ctx, opts.ConfigFlags, opts.SourceProvider, sourceProviderNamespace, opts.InventoryURL, opts.PlanVMNames)
+	sourceStorages, err := sourceFetcher.FetchSourceStorages(ctx, opts.ConfigFlags, opts.SourceProvider, sourceProviderNamespace, opts.InventoryURL, opts.PlanVMNames, opts.InventoryInsecureSkipTLS)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch source storages: %v", err)
 	}
@@ -89,7 +90,7 @@ func CreateStorageMap(ctx context.Context, opts StorageMapperOptions) (string, e
 	var targetStorages []forkliftv1beta1.DestinationStorage
 	if opts.DefaultTargetStorageClass == "" {
 		klog.V(4).Infof("DEBUG: Fetching target storages from target provider: %s", opts.TargetProvider)
-		targetStorages, err = targetFetcher.FetchTargetStorages(ctx, opts.ConfigFlags, opts.TargetProvider, targetProviderNamespace, opts.InventoryURL)
+		targetStorages, err = targetFetcher.FetchTargetStorages(ctx, opts.ConfigFlags, opts.TargetProvider, targetProviderNamespace, opts.InventoryURL, opts.InventoryInsecureSkipTLS)
 		if err != nil {
 			return "", fmt.Errorf("failed to fetch target storages: %v", err)
 		}

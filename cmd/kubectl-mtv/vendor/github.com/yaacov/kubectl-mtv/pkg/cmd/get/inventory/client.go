@@ -12,17 +12,24 @@ import (
 
 // ProviderClient provides a unified client for all provider types
 type ProviderClient struct {
-	configFlags  *genericclioptions.ConfigFlags
-	provider     *unstructured.Unstructured
-	inventoryURL string
+	configFlags     *genericclioptions.ConfigFlags
+	provider        *unstructured.Unstructured
+	inventoryURL    string
+	insecureSkipTLS bool
 }
 
 // NewProviderClient creates a new provider client
 func NewProviderClient(configFlags *genericclioptions.ConfigFlags, provider *unstructured.Unstructured, inventoryURL string) *ProviderClient {
+	return NewProviderClientWithInsecure(configFlags, provider, inventoryURL, false)
+}
+
+// NewProviderClientWithInsecure creates a new provider client with optional insecure TLS skip verification
+func NewProviderClientWithInsecure(configFlags *genericclioptions.ConfigFlags, provider *unstructured.Unstructured, inventoryURL string, insecureSkipTLS bool) *ProviderClient {
 	return &ProviderClient{
-		configFlags:  configFlags,
-		provider:     provider,
-		inventoryURL: inventoryURL,
+		configFlags:     configFlags,
+		provider:        provider,
+		inventoryURL:    inventoryURL,
+		insecureSkipTLS: insecureSkipTLS,
 	}
 }
 
@@ -40,10 +47,10 @@ func (pc *ProviderClient) GetResource(resourcePath string) (interface{}, error) 
 	}
 
 	// Log the inventory fetch request
-	klog.V(2).Infof("Fetching inventory from provider %s/%s (type=%s, uid=%s) - path: %s, baseURL: %s",
-		providerNamespace, providerName, providerType, providerUID, resourcePath, pc.inventoryURL)
+	klog.V(2).Infof("Fetching inventory from provider %s/%s (type=%s, uid=%s) - path: %s, baseURL: %s, insecure=%v",
+		providerNamespace, providerName, providerType, providerUID, resourcePath, pc.inventoryURL, pc.insecureSkipTLS)
 
-	result, err := client.FetchProviderInventory(pc.configFlags, pc.inventoryURL, pc.provider, resourcePath)
+	result, err := client.FetchProviderInventoryWithInsecure(pc.configFlags, pc.inventoryURL, pc.provider, resourcePath, pc.insecureSkipTLS)
 
 	if err != nil {
 		klog.V(1).Infof("Failed to fetch inventory from provider %s/%s - path: %s, error: %v",

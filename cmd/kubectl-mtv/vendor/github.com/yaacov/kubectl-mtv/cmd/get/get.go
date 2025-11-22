@@ -11,6 +11,8 @@ type GlobalConfigGetter interface {
 	GetVerbosity() int
 	GetAllNamespaces() bool
 	GetUseUTC() bool
+	GetInventoryURL() string
+	GetInventoryInsecureSkipTLS() bool
 	GetKubeConfigFlags() *genericclioptions.ConfigFlags
 }
 

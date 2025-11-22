@@ -37,6 +37,7 @@ type CreatePlanOptions struct {
 	NetworkMapping            string
 	StorageMapping            string
 	InventoryURL              string
+	InventoryInsecureSkipTLS  bool
 	DefaultTargetNetwork      string
 	DefaultTargetStorageClass string
 	PlanSpec                  forkliftv1beta1.PlanSpec
@@ -186,18 +187,19 @@ func Create(ctx context.Context, opts CreatePlanOptions) error {
 				targetProviderRef = fmt.Sprintf("%s/%s", opts.TargetProviderNamespace, opts.TargetProvider)
 			}
 			err := mapping.CreateStorageWithOptions(mapping.StorageCreateOptions{
-				ConfigFlags:          opts.ConfigFlags,
-				Name:                 storageMapName,
-				Namespace:            opts.Namespace,
-				SourceProvider:       sourceProviderRef,
-				TargetProvider:       targetProviderRef,
-				StoragePairs:         opts.StoragePairs,
-				InventoryURL:         opts.InventoryURL,
-				DefaultVolumeMode:    opts.DefaultVolumeMode,
-				DefaultAccessMode:    opts.DefaultAccessMode,
-				DefaultOffloadPlugin: opts.DefaultOffloadPlugin,
-				DefaultOffloadSecret: opts.DefaultOffloadSecret,
-				DefaultOffloadVendor: opts.DefaultOffloadVendor,
+				ConfigFlags:              opts.ConfigFlags,
+				Name:                     storageMapName,
+				Namespace:                opts.Namespace,
+				SourceProvider:           sourceProviderRef,
+				TargetProvider:           targetProviderRef,
+				StoragePairs:             opts.StoragePairs,
+				InventoryURL:             opts.InventoryURL,
+				InventoryInsecureSkipTLS: opts.InventoryInsecureSkipTLS,
+				DefaultVolumeMode:        opts.DefaultVolumeMode,
+				DefaultAccessMode:        opts.DefaultAccessMode,
+				DefaultOffloadPlugin:     opts.DefaultOffloadPlugin,
+				DefaultOffloadSecret:     opts.DefaultOffloadSecret,
+				DefaultOffloadVendor:     opts.DefaultOffloadVendor,
 				// Offload secret creation options
 				OffloadVSphereUsername: opts.OffloadVSphereUsername,
 				OffloadVSpherePassword: opts.OffloadVSpherePassword,
@@ -501,7 +503,7 @@ func validateVMs(ctx context.Context, configFlags *genericclioptions.ConfigFlags
 	}
 
 	// Fetch source VMs inventory
-	sourceVMsInventory, err := client.FetchProviderInventory(configFlags, opts.InventoryURL, sourceProvider, "vms")
+	sourceVMsInventory, err := client.FetchProviderInventoryWithInsecure(configFlags, opts.InventoryURL, sourceProvider, "vms", opts.InventoryInsecureSkipTLS)
 	if err != nil {
 		return fmt.Errorf("failed to fetch source VMs inventory: %v", err)
 	}

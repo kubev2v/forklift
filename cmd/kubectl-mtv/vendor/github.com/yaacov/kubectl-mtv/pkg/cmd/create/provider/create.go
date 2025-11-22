@@ -58,8 +58,9 @@ func Create(configFlags *genericclioptions.ConfigFlags, providerType, name, name
 	case "openstack":
 		providerResource, secretResource, err = openstack.CreateProvider(configFlags, options)
 	default:
-		// If the provider type is not recognized, return an error
-		return fmt.Errorf("unsupported provider type: %s", providerType)
+		// For dynamic provider types, use generic provider creation
+		// This allows support for DynamicProvider CRs defined in the cluster
+		providerResource, secretResource, err = generic.CreateProvider(configFlags, options, providerType)
 	}
 
 	// Handle any errors that occurred during provider creation

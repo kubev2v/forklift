@@ -2,7 +2,6 @@ package get
 
 import (
 	"context"
-	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -17,7 +16,6 @@ import (
 // NewProviderCmd creates the get provider command
 func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() GlobalConfigGetter) *cobra.Command {
 	outputFormatFlag := flags.NewOutputFormatTypeFlag()
-	var inventoryURL string
 
 	cmd := &cobra.Command{
 		Use:               "provider [NAME]",
@@ -40,10 +38,8 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalCon
 				providerName = args[0]
 			}
 
-			// If inventoryURL is empty, try to discover it
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(ctx, config.GetKubeConfigFlags(), namespace)
-			}
+			// Get inventory URL from global config (auto-discovers if needed)
+			inventoryURL := config.GetInventoryURL()
 
 			// Log the operation being performed
 			if providerName != "" {
@@ -58,7 +54,6 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalCon
 	}
 
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", "Output format (table, json, yaml)")
-	cmd.Flags().StringVarP(&inventoryURL, "inventory-url", "i", os.Getenv("MTV_INVENTORY_URL"), "Base URL for the inventory service")
 
 	// Add completion for output format flag
 	if err := cmd.RegisterFlagCompletionFunc("output", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

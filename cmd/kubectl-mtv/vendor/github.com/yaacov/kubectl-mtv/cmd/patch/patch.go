@@ -5,8 +5,15 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
+// GlobalConfigGetter interface for getting global configuration
+type GlobalConfigGetter interface {
+	GetInventoryURL() string
+	GetInventoryInsecureSkipTLS() bool
+	GetKubeConfigFlags() *genericclioptions.ConfigFlags
+}
+
 // NewPatchCmd creates the patch command with subcommands
-func NewPatchCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
+func NewPatchCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "patch",
 		Short:        "Patch resources",
@@ -19,7 +26,7 @@ func NewPatchCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command 
 	}
 
 	// Add subcommands
-	cmd.AddCommand(NewMappingCmd(kubeConfigFlags))
+	cmd.AddCommand(NewMappingCmd(kubeConfigFlags, globalConfig))
 	cmd.AddCommand(NewProviderCmd(kubeConfigFlags))
 	cmd.AddCommand(NewPlanCmd(kubeConfigFlags))
 	cmd.AddCommand(NewPlanVMCmd(kubeConfigFlags))

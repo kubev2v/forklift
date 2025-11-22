@@ -8,6 +8,8 @@ import (
 // GlobalConfigGetter defines the interface for getting global configuration
 type GlobalConfigGetter interface {
 	GetVerbosity() int
+	GetInventoryURL() string
+	GetInventoryInsecureSkipTLS() bool
 }
 
 // NewCreateCmd creates the create command with all its subcommands
@@ -20,9 +22,9 @@ func NewCreateCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig G
 	}
 
 	cmd.AddCommand(NewProviderCmd(kubeConfigFlags))
-	cmd.AddCommand(NewPlanCmd(kubeConfigFlags))
-	cmd.AddCommand(NewMappingCmd(kubeConfigFlags))
-	cmd.AddCommand(NewHostCmd(kubeConfigFlags))
+	cmd.AddCommand(NewPlanCmd(kubeConfigFlags, globalConfig))
+	cmd.AddCommand(NewMappingCmd(kubeConfigFlags, globalConfig))
+	cmd.AddCommand(NewHostCmd(kubeConfigFlags, globalConfig))
 	cmd.AddCommand(NewHookCmd(kubeConfigFlags))
 	cmd.AddCommand(NewVddkCmd(globalConfig))
 

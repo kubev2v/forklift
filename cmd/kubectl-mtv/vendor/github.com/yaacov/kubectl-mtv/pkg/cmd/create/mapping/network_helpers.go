@@ -13,8 +13,8 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 )
 
-// resolveOpenShiftNetworkNameToID resolves network name for OpenShift provider
-func resolveOpenShiftNetworkNameToID(configFlags *genericclioptions.ConfigFlags, inventoryURL string, provider *unstructured.Unstructured, networkName string) ([]ref.Ref, error) {
+// resolveOpenShiftNetworkNameToIDWithInsecure resolves network name for OpenShift provider with optional insecure TLS skip verification
+func resolveOpenShiftNetworkNameToIDWithInsecure(configFlags *genericclioptions.ConfigFlags, inventoryURL string, provider *unstructured.Unstructured, networkName string, insecureSkipTLS bool) ([]ref.Ref, error) {
 	// If networkName is empty, return an empty ref
 	if networkName == "" {
 		return nil, fmt.Errorf("network name cannot be empty")
@@ -40,7 +40,7 @@ func resolveOpenShiftNetworkNameToID(configFlags *genericclioptions.ConfigFlags,
 	}
 
 	// Fetch NetworkAttachmentDefinitions from OpenShift
-	networksInventory, err := client.FetchProviderInventory(configFlags, inventoryURL, provider, "networkattachmentdefinitions?detail=4")
+	networksInventory, err := client.FetchProviderInventoryWithInsecure(configFlags, inventoryURL, provider, "networkattachmentdefinitions?detail=4", insecureSkipTLS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch networks inventory: %v", err)
 	}
@@ -89,10 +89,10 @@ func resolveOpenShiftNetworkNameToID(configFlags *genericclioptions.ConfigFlags,
 	return matchingRefs, nil
 }
 
-// resolveVirtualizationNetworkNameToID resolves network name for virtualization providers (VMware, oVirt, OpenStack)
-func resolveVirtualizationNetworkNameToID(configFlags *genericclioptions.ConfigFlags, inventoryURL string, provider *unstructured.Unstructured, networkName string) ([]ref.Ref, error) {
+// resolveVirtualizationNetworkNameToIDWithInsecure resolves network name for virtualization providers (VMware, oVirt, OpenStack) with optional insecure TLS skip verification
+func resolveVirtualizationNetworkNameToIDWithInsecure(configFlags *genericclioptions.ConfigFlags, inventoryURL string, provider *unstructured.Unstructured, networkName string, insecureSkipTLS bool) ([]ref.Ref, error) {
 	// Fetch networks from virtualization providers
-	networksInventory, err := client.FetchProviderInventory(configFlags, inventoryURL, provider, "networks?detail=4")
+	networksInventory, err := client.FetchProviderInventoryWithInsecure(configFlags, inventoryURL, provider, "networks?detail=4", insecureSkipTLS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch networks inventory: %v", err)
 	}
@@ -128,8 +128,8 @@ func resolveVirtualizationNetworkNameToID(configFlags *genericclioptions.ConfigF
 	return matchingRefs, nil
 }
 
-// resolveNetworkNameToID resolves a network name to its ref.Ref by querying the provider inventory
-func resolveNetworkNameToID(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL, networkName string) ([]ref.Ref, error) {
+// resolveNetworkNameToIDWithInsecure resolves a network name to its ref.Ref by querying the provider inventory with optional insecure TLS skip verification
+func resolveNetworkNameToIDWithInsecure(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL, networkName string, insecureSkipTLS bool) ([]ref.Ref, error) {
 	// Get source provider
 	provider, err := inventory.GetProviderByName(ctx, configFlags, providerName, namespace)
 	if err != nil {
@@ -144,10 +144,10 @@ func resolveNetworkNameToID(ctx context.Context, configFlags *genericclioptions.
 
 	switch providerType {
 	case "openshift":
-		return resolveOpenShiftNetworkNameToID(configFlags, inventoryURL, provider, networkName)
+		return resolveOpenShiftNetworkNameToIDWithInsecure(configFlags, inventoryURL, provider, networkName, insecureSkipTLS)
 	case "vsphere", "ovirt", "openstack", "ova":
-		return resolveVirtualizationNetworkNameToID(configFlags, inventoryURL, provider, networkName)
+		return resolveVirtualizationNetworkNameToIDWithInsecure(configFlags, inventoryURL, provider, networkName, insecureSkipTLS)
 	default:
-		return resolveVirtualizationNetworkNameToID(configFlags, inventoryURL, provider, networkName)
+		return resolveVirtualizationNetworkNameToIDWithInsecure(configFlags, inventoryURL, provider, networkName, insecureSkipTLS)
 	}
 }

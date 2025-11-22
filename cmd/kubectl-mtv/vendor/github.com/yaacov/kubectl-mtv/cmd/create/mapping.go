@@ -1,8 +1,6 @@
 package create
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -11,7 +9,7 @@ import (
 )
 
 // NewMappingCmd creates the mapping creation command with subcommands
-func NewMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
+func NewMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "mapping",
 		Short:        "Create a new mapping",
@@ -20,17 +18,16 @@ func NewMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comman
 	}
 
 	// Add subcommands for network and storage
-	cmd.AddCommand(newNetworkMappingCmd(kubeConfigFlags))
-	cmd.AddCommand(newStorageMappingCmd(kubeConfigFlags))
+	cmd.AddCommand(newNetworkMappingCmd(kubeConfigFlags, globalConfig))
+	cmd.AddCommand(newStorageMappingCmd(kubeConfigFlags, globalConfig))
 
 	return cmd
 }
 
 // newNetworkMappingCmd creates the network mapping subcommand
-func newNetworkMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
+func newNetworkMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	var sourceProvider, targetProvider string
 	var networkPairs string
-	var inventoryURL string
 
 	cmd := &cobra.Command{
 		Use:          "network NAME",
@@ -45,28 +42,25 @@ func newNetworkMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra
 			// Resolve the appropriate namespace based on context and flags
 			namespace := client.ResolveNamespace(kubeConfigFlags)
 
-			// If inventoryURL is empty, try to discover it
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(cmd.Context(), kubeConfigFlags, namespace)
-			}
+			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
+			inventoryURL := globalConfig.GetInventoryURL()
+			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
-			return mapping.CreateNetwork(kubeConfigFlags, name, namespace, sourceProvider, targetProvider, networkPairs, inventoryURL)
+			return mapping.CreateNetworkWithInsecure(kubeConfigFlags, name, namespace, sourceProvider, targetProvider, networkPairs, inventoryURL, inventoryInsecureSkipTLS)
 		},
 	}
 
 	cmd.Flags().StringVarP(&sourceProvider, "source", "S", "", "Source provider name")
 	cmd.Flags().StringVarP(&targetProvider, "target", "T", "", "Target provider name")
 	cmd.Flags().StringVar(&networkPairs, "network-pairs", "", "Network mapping pairs in format 'source:target-namespace/target-network', 'source:target-network', 'source:default', or 'source:ignored' (comma-separated)")
-	cmd.Flags().StringVarP(&inventoryURL, "inventory-url", "i", os.Getenv("MTV_INVENTORY_URL"), "Base URL for the inventory service")
 
 	return cmd
 }
 
 // newStorageMappingCmd creates the storage mapping subcommand
-func newStorageMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
+func newStorageMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	var sourceProvider, targetProvider string
 	var storagePairs string
-	var inventoryURL string
 	var defaultVolumeMode string
 	var defaultAccessMode string
 	var defaultOffloadPlugin string
@@ -92,24 +86,24 @@ func newStorageMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra
 			// Resolve the appropriate namespace based on context and flags
 			namespace := client.ResolveNamespace(kubeConfigFlags)
 
-			// If inventoryURL is empty, try to discover it
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(cmd.Context(), kubeConfigFlags, namespace)
-			}
+			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
+			inventoryURL := globalConfig.GetInventoryURL()
+			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
 			return mapping.CreateStorageWithOptions(mapping.StorageCreateOptions{
-				ConfigFlags:          kubeConfigFlags,
-				Name:                 name,
-				Namespace:            namespace,
-				SourceProvider:       sourceProvider,
-				TargetProvider:       targetProvider,
-				StoragePairs:         storagePairs,
-				InventoryURL:         inventoryURL,
-				DefaultVolumeMode:    defaultVolumeMode,
-				DefaultAccessMode:    defaultAccessMode,
-				DefaultOffloadPlugin: defaultOffloadPlugin,
-				DefaultOffloadSecret: defaultOffloadSecret,
-				DefaultOffloadVendor: defaultOffloadVendor,
+				ConfigFlags:              kubeConfigFlags,
+				Name:                     name,
+				Namespace:                namespace,
+				SourceProvider:           sourceProvider,
+				TargetProvider:           targetProvider,
+				StoragePairs:             storagePairs,
+				InventoryURL:             inventoryURL,
+				InventoryInsecureSkipTLS: inventoryInsecureSkipTLS,
+				DefaultVolumeMode:        defaultVolumeMode,
+				DefaultAccessMode:        defaultAccessMode,
+				DefaultOffloadPlugin:     defaultOffloadPlugin,
+				DefaultOffloadSecret:     defaultOffloadSecret,
+				DefaultOffloadVendor:     defaultOffloadVendor,
 				// Offload secret creation options
 				OffloadVSphereUsername: offloadVSphereUsername,
 				OffloadVSpherePassword: offloadVSpherePassword,
@@ -131,7 +125,6 @@ func newStorageMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra
 	cmd.Flags().StringVar(&defaultOffloadPlugin, "default-offload-plugin", "", "Default offload plugin type for all storage pairs (vsphere)")
 	cmd.Flags().StringVar(&defaultOffloadSecret, "default-offload-secret", "", "Existing offload secret name to use (creates new secret if not provided and offload credentials given)")
 	cmd.Flags().StringVar(&defaultOffloadVendor, "default-offload-vendor", "", "Default offload plugin vendor for all storage pairs (flashsystem|vantara|ontap|primera3par|pureFlashArray|powerflex|powermax|powerstore|infinibox)")
-	cmd.Flags().StringVarP(&inventoryURL, "inventory-url", "i", os.Getenv("MTV_INVENTORY_URL"), "Base URL for the inventory service")
 
 	// Offload secret creation flags
 	cmd.Flags().StringVar(&offloadVSphereUsername, "offload-vsphere-username", "", "vSphere username for offload secret (creates new secret if no --default-offload-secret provided)")

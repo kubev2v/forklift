@@ -34,10 +34,10 @@ import (
 // NetworkMapperInterface defines the interface for network mapping operations
 type NetworkMapperInterface interface {
 	// GetSourceNetworks extracts network information from the source provider for the specified VMs
-	GetSourceNetworks(configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, planVMNames []string) ([]ref.Ref, error)
+	GetSourceNetworks(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, planVMNames []string, insecureSkipTLS bool) ([]ref.Ref, error)
 
 	// GetTargetNetworks extracts available network information from the target provider
-	GetTargetNetworks(configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string) ([]forkliftv1beta1.DestinationNetwork, error)
+	GetTargetNetworks(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, insecureSkipTLS bool) ([]forkliftv1beta1.DestinationNetwork, error)
 
 	// CreateNetworkPairs creates network mapping pairs based on source networks, target networks, and optional default network
 	CreateNetworkPairs(sourceNetworks []ref.Ref, targetNetworks []forkliftv1beta1.DestinationNetwork, defaultTargetNetwork string, namespace string) ([]forkliftv1beta1.NetworkPair, error)
@@ -45,16 +45,17 @@ type NetworkMapperInterface interface {
 
 // NetworkMapperOptions contains common options for network mapping
 type NetworkMapperOptions struct {
-	Name                    string
-	Namespace               string
-	SourceProvider          string
-	SourceProviderNamespace string
-	TargetProvider          string
-	TargetProviderNamespace string
-	ConfigFlags             *genericclioptions.ConfigFlags
-	InventoryURL            string
-	PlanVMNames             []string
-	DefaultTargetNetwork    string
+	Name                     string
+	Namespace                string
+	SourceProvider           string
+	SourceProviderNamespace  string
+	TargetProvider           string
+	TargetProviderNamespace  string
+	ConfigFlags              *genericclioptions.ConfigFlags
+	InventoryURL             string
+	InventoryInsecureSkipTLS bool
+	PlanVMNames              []string
+	DefaultTargetNetwork     string
 }
 
 // GetSourceNetworkFetcher returns the appropriate source network fetcher based on provider type
@@ -208,7 +209,7 @@ func CreateNetworkMap(ctx context.Context, opts NetworkMapperOptions) (string, e
 	klog.V(4).Infof("DEBUG: Target fetcher created for provider: %s", opts.TargetProvider)
 
 	// Fetch source networks
-	sourceNetworks, err := sourceFetcher.FetchSourceNetworks(ctx, opts.ConfigFlags, opts.SourceProvider, sourceProviderNamespace, opts.InventoryURL, opts.PlanVMNames)
+	sourceNetworks, err := sourceFetcher.FetchSourceNetworks(ctx, opts.ConfigFlags, opts.SourceProvider, sourceProviderNamespace, opts.InventoryURL, opts.PlanVMNames, opts.InventoryInsecureSkipTLS)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch source networks: %v", err)
 	}
@@ -218,7 +219,7 @@ func CreateNetworkMap(ctx context.Context, opts NetworkMapperOptions) (string, e
 	var targetNetworks []forkliftv1beta1.DestinationNetwork
 	if opts.DefaultTargetNetwork == "" || (opts.DefaultTargetNetwork != "default" && opts.DefaultTargetNetwork != "") {
 		klog.V(4).Infof("DEBUG: Fetching target networks from target provider: %s", opts.TargetProvider)
-		targetNetworks, err = targetFetcher.FetchTargetNetworks(ctx, opts.ConfigFlags, opts.TargetProvider, targetProviderNamespace, opts.InventoryURL)
+		targetNetworks, err = targetFetcher.FetchTargetNetworks(ctx, opts.ConfigFlags, opts.TargetProvider, targetProviderNamespace, opts.InventoryURL, opts.InventoryInsecureSkipTLS)
 		if err != nil {
 			return "", fmt.Errorf("failed to fetch target networks: %v", err)
 		}

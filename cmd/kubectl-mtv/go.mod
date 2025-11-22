@@ -4,7 +4,7 @@ go 1.24.0
 
 toolchain go1.24.4
 
-require github.com/yaacov/kubectl-mtv v0.1.48
+require github.com/yaacov/kubectl-mtv v0.1.50
 
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
