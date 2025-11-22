@@ -74,10 +74,6 @@ github.com/dell/gopowerstore v1.19.0 h1:iXWqHm2ct3dbLvDnRgzHDb5aCf8Zwx1mToPV6feN
 github.com/dell/gopowerstore v1.19.0/go.mod h1:ZEF/MMMvPk/JdPeKIUGZFXd+AgQxVqCw/NePpV3QcHc=
 github.com/dell/goscaleio v1.20.0 h1:/g0zxlJiGzw5AZEqxjgwaYVc4fmv+DBoAU2PPueZxxE=
 github.com/dell/goscaleio v1.20.0/go.mod h1:XAHq2m2QNJH2l9gu47gQX2m6HjZZlzc1LIa0lrWvSkA=
-github.com/dell/gopowerstore v1.19.0 h1:iXWqHm2ct3dbLvDnRgzHDb5aCf8Zwx1mToPV6feN/H0=
-github.com/dell/gopowerstore v1.19.0/go.mod h1:ZEF/MMMvPk/JdPeKIUGZFXd+AgQxVqCw/NePpV3QcHc=
-github.com/dell/goscaleio v1.20.0 h1:/g0zxlJiGzw5AZEqxjgwaYVc4fmv+DBoAU2PPueZxxE=
-github.com/dell/goscaleio v1.20.0/go.mod h1:XAHq2m2QNJH2l9gu47gQX2m6HjZZlzc1LIa0lrWvSkA=
 github.com/devans10/pugo/flasharray v0.0.0-20241116160615-6bb8c469c9a0 h1:iywqp5xOufeydKSioTnPN8MctrbDmdLjatSHV80j/z8=
 github.com/devans10/pugo/flasharray v0.0.0-20241116160615-6bb8c469c9a0/go.mod h1:7dF4rgfqItyj4bkbwZkwp/Ul+bM4lku/CQvS9OIYF4o=
 github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815/go.mod h1:WwZ+bS3ebgob9U8Nd0kOddGdZWjyMGR8Wziv+TBNwSE=
@@ -314,8 +310,8 @@ github.com/sirupsen/logrus v1.4.1/go.mod h1:ni0Sbl8bgC9z8RoU9G6nDWqqs/fq4eDPysMB
 github.com/sirupsen/logrus v1.9.3 h1:dueUQJ1C2q9oE3F7wvmSGAaVtTmUizReu6fjN8uqzbQ=
 github.com/sirupsen/logrus v1.9.3/go.mod h1:naHLuLoDiP4jHNo9R0sCBMtWGeIprob74mVsIT4qYEQ=
 github.com/spf13/afero v1.2.2/go.mod h1:9ZxEEn6pIJ8Rxe320qSDBk6AsU0r9pR7Q4OcevTdifk=
-github.com/spf13/afero v1.11.0 h1:WJQKhtpdm3v2IzqG8VMqrr6Rf3UYpEF239Jy9wNepM8=
-github.com/spf13/afero v1.11.0/go.mod h1:GH9Y3pIexgf1MTIWtNGyogA5MwRIDXGUr+hbWNoBjkY=
+github.com/spf13/afero v1.15.0 h1:b/YBCLWAJdFWJTN9cLhiXXcD7mzKn9Dm86dNnfyQw1I=
+github.com/spf13/afero v1.15.0/go.mod h1:NC2ByUVxtQs4b3sIUphxK0NioZnmxgyCrfzeuq8lxMg=
 github.com/spf13/pflag v1.0.5 h1:iy+VFUOCP1a+8yFto/drg2CJ5u0yRoB7fZw3DKv/JXA=
 github.com/spf13/pflag v1.0.5/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An2Bg=
 github.com/stoewer/go-strcase v1.2.0/go.mod h1:IBiWB2sKIp3wVVQ3Y035++gc+knqhUQag1KpM8ahLw8=
