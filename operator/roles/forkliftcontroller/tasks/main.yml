@@ -290,11 +290,13 @@
     k8s:
       state: present
       definition: "{{ lookup('template', 'controller/buildconfig-vddk.yml.j2') }}"
+    when: not k8s_cluster|bool
 
   - name: "Create VDDK ImageStream"
     k8s:
       state: present
       definition: "{{ lookup('template', 'controller/imagestream-vddk.yml.j2') }}"
+    when: not k8s_cluster|bool
 
   - when: not feature_ui_plugin|bool
     name: "Cleanup {{ ui_plugin_service_name }} if disabled"
