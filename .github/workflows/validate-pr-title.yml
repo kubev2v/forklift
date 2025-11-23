@@ -1,0 +1,60 @@
+name: Validate PR Title
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  validate-pr-title:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Validate PR title format
+      env:
+        PR_TITLE: ${{ github.event.pull_request.title }}
+      run: |
+        # Expected formats (with optional [release-x.y] prefix):
+        # 1. [release-x.y] CAPITAL-LETTERS-NUMBERS | description text
+        # 2. [release-x.y] chore(type): description
+        # 3. [release-x.y] fix(type): description
+        # The [release-x.y] prefix is optional for all formats
+        
+        # Optional version prefix pattern: [release-x.y] where x and y are integers
+        VERSION_PREFIX='(\[release-[0-9]+\.[0-9]+\] )?'
+        
+        JIRA_PATTERN="^${VERSION_PREFIX}[A-Z]+-[0-9]+ \| .+$"
+        CHORE_PATTERN="^${VERSION_PREFIX}chore\(.+\): .+$"
+        FIX_PATTERN="^${VERSION_PREFIX}fix\(.+\): .+$"
+        
+        if [[ "$PR_TITLE" =~ $JIRA_PATTERN ]] || [[ "$PR_TITLE" =~ $CHORE_PATTERN ]] || [[ "$PR_TITLE" =~ $FIX_PATTERN ]]; then
+          echo "Success: PR title format is valid!"
+          echo "Title: $PR_TITLE"
+        else
+          echo "Error: PR title does not match the required format!"
+          echo ""
+          echo "Current title: $PR_TITLE"
+          echo ""
+          echo "Required format (choose one):"
+          echo "  1. [release-x.y] <JIRA-TICKET> | <description>"
+          echo "  2. [release-x.y] chore(<type>): <description>"
+          echo "  3. [release-x.y] fix(<type>): <description>"
+          echo ""
+          echo "Note: The [release-x.y] prefix is optional for all formats"
+          echo ""
+          echo "Where:"
+          echo "  - release-x.y: Optional version prefix (e.g., [release-2.10])"
+          echo "  - JIRA-TICKET: Capital letters followed by dash and numbers (e.g., MTV-123)"
+          echo "  - type: Type of the chore or fix (any text)"
+          echo "  - description: Descriptive text about the change"
+          echo ""
+          echo "Valid examples:"
+          echo "  - MTV-123 | RFE: solves issue"
+          echo "  - [release-2.10] MTV-123 | RFE: solves issue"
+          echo "  - chore(deps): update dependencies"
+          echo "  - [release-2.10] chore(deps): update dependencies"
+          echo "  - fix(validation): correct regex pattern"
+          echo "  - [release-2.10] fix(validation): correct regex pattern"
+          echo ""
+          exit 1
+        fi
+
