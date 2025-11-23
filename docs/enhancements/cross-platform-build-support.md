@@ -224,7 +224,7 @@ Individual targets for each component:
 - `push-vsphere-xcopy-volume-populator-image-manifest`
 - `push-ova-provider-server-image-manifest`
 - `push-cli-download-image-manifest`
-- `push-ova-proxy-image-manifest`
+- `push-forklift-proxy-image-manifest`
 - `push-operator-bundle-image-manifest`
 - `push-operator-index-image-manifest`
 

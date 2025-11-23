@@ -162,15 +162,15 @@ def load_tasks_variables(tasks_file):
         'metric_interval',
         'metric_port_name',
         'metrics_rule_name',
-        # OVA Proxy configuration
-        'ova_proxy_container_name',
-        'ova_proxy_certificate_name',
-        'ova_proxy_issuer_name',
-        'ova_proxy_route_name',
-        'ova_proxy_route_timeout',
-        'ova_proxy_service_name',
-        'ova_proxy_subapp_name',
-        'ova_proxy_tls_secret_name',
+        # Forklift Proxy configuration
+        'forklift_proxy_container_name',
+        'forklift_proxy_certificate_name',
+        'forklift_proxy_issuer_name',
+        'forklift_proxy_route_name',
+        'forklift_proxy_route_timeout',
+        'forklift_proxy_service_name',
+        'forklift_proxy_subapp_name',
+        'forklift_proxy_tls_secret_name',
         # Additional internal variables that should not be CRD properties  
         'app_namespace',
         'forklift_resources',
@@ -197,7 +197,7 @@ def validate_forklift_controller_crd(crd_file, tasks_file):
     allowed_crd_only_properties = {
         'inventory_route_timeout',
         'metric_interval',
-        'ova_proxy_route_timeout',
+        'forklift_proxy_route_timeout',
         'ovirt_osmap_configmap_name',
         'validation_extra_volume_mountpath',
         'validation_extra_volume_name',
