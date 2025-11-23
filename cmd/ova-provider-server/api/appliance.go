@@ -120,6 +120,12 @@ func (h ApplianceHandler) Upload(ctx *gin.Context) {
 		ctx.AbortWithStatus(http.StatusForbidden)
 		return
 	}
+	err := h.writable()
+	if err != nil {
+		err = &BadRequestError{err.Error()}
+		_ = ctx.Error(err)
+		return
+	}
 	input, err := ctx.FormFile(ApplianceField)
 	if err != nil {
 		err = &BadRequestError{err.Error()}
@@ -280,6 +286,20 @@ func (h ApplianceHandler) fullPath(filename string) string {
 		h.OVAStoragePath,
 		fmt.Sprintf("%s%s", DirectoryPrefix, string2hash(filename)),
 		filename)
+}
+
+func (h ApplianceHandler) writable() error {
+	check := pathlib.Join(h.OVAStoragePath, ".writeable")
+	f, err := os.OpenFile(check, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	if err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return nil
+		}
+		return err
+	}
+	_ = f.Close()
+	_ = os.Remove(check)
+	return nil
 }
 
 func string2hash(s string) string {
