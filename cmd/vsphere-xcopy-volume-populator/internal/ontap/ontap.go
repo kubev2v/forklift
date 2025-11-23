@@ -68,7 +68,8 @@ func NewNetappClonner(hostname, username, password string) (NetappClonner, error
 
 	client, err := api.NewRestClientFromOntapConfig(context.TODO(), &config)
 	if err != nil {
-		return NetappClonner{}, err
+		klog.V(2).Infof("ONTAP client initialization error details: %v", err)
+		return NetappClonner{}, fmt.Errorf("please recheck storage password or SVM name in the storage secret.")
 	}
 
 	nc := NetappClonner{api: client}
