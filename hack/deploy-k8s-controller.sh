@@ -46,7 +46,9 @@ then
     echo "   kubectl port-forward -n $NAMESPACE service/forklift-inventory 8443:8443"
     echo ""
     echo "   # In another terminal, set the inventory URL and use kubectl-mtv:"
-    echo "   export INVENTORY_URL=https://localhost:8443"
+    echo "   export MTV_INVENTORY_URL=https://localhost:8443"
+    echo "   export MTV_INVENTORY_INSECURE_SKIP_TLS=true"
+    echo ""
     echo "   kubectl-mtv get provider"
 else
     echo "Error: Failed to deploy ForkliftController in namespace: $NAMESPACE" >&2
