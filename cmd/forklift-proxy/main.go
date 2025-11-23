@@ -10,7 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-logr/logr"
-	"github.com/kubev2v/forklift/cmd/ova-proxy/settings"
+	"github.com/kubev2v/forklift/cmd/forklift-proxy/settings"
 	"github.com/kubev2v/forklift/pkg/apis"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/lib/logging"

@@ -133,10 +133,10 @@ spec:
                 type: string
                 description: "Must-gather debugging image"
                 example: "quay.io/kubev2v/forklift-must-gather:latest"
-              ova_proxy_fqin:
+              forklift_proxy_fqin:
                 type: string
-                description: "OVA inventory proxy image"
-                example: "quay.io/kubev2v/forklift-ova-proxy:latest"
+                description: "Forklift inventory proxy image"
+                example: "quay.io/kubev2v/forklift-proxy:latest"
 
               # Controller Resource Configuration
               controller_container_limits_cpu:
@@ -401,26 +401,26 @@ spec:
                 description: "OVA memory request (default: 150Mi)"
                 example: "300Mi"
 
-              # OVA Proxy Settings
-              ova_proxy_container_limits_cpu:
+              # Forklift Proxy Settings
+              forklift_proxy_container_limits_cpu:
                 type: string
-                description: "OVA Proxy CPU limit (default: 1000m)"
+                description: "Forklift Proxy CPU limit (default: 1000m)"
                 example: "2000m"
-              ova_proxy_container_limits_memory:
+              forklift_proxy_container_limits_memory:
                 type: string
-                description: "OVA Proxy memory limit (default: 1Gi)"
+                description: "Forklift Proxy memory limit (default: 1Gi)"
                 example: "2Gi"
-              ova_proxy_container_requests_cpu:
+              forklift_proxy_container_requests_cpu:
                 type: string
-                description: "OVA Proxy CPU request (default: 250m)"
+                description: "Forklift Proxy CPU request (default: 250m)"
                 example: "200m"
-              ova_proxy_container_requests_memory:
+              forklift_proxy_container_requests_memory:
                 type: string
-                description: "OVA Proxy memory request (default: 512Mi)"
+                description: "Forklift Proxy memory request (default: 512Mi)"
                 example: "300Mi"
-              ova_proxy_route_timeout:
+              forklift_proxy_route_timeout:
                 type: string
-                description: "OVA Proxy route timeout (default: 360s)"
+                description: "Forklift Proxy route timeout (default: 360s)"
                 example: "600s"
 
               # Logging & General Settings

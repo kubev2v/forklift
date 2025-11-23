@@ -74,8 +74,8 @@ spec:
           value: ${OPENSTACK_POPULATOR_IMAGE}
         - name: OVA_PROVIDER_SERVER_IMAGE
           value: ${OVA_PROVIDER_SERVER_IMAGE}
-        - name: OVA_PROXY_IMAGE
-          value: ${OVA_PROXY_IMAGE}
+        - name: FORKLIFT_PROXY_IMAGE
+          value: ${FORKLIFT_PROXY_IMAGE}
         - name: OVIRT_OS_MAP
           value: ${OVIRT_OS_MAP}
         - name: VSPHERE_OS_MAP
