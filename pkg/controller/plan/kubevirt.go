@@ -3044,7 +3044,7 @@ func GetOvaPvcListNfs(dClient client.Client, planID string, planNamespace string
 
 func (r *KubeVirt) EnsurePVForNFS(pv *core.PersistentVolume) (out *core.PersistentVolume, err error) {
 	list := &core.PersistentVolumeList{}
-	err = r.Destination.List(
+	err = r.Destination.Client.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
@@ -3058,7 +3058,7 @@ func (r *KubeVirt) EnsurePVForNFS(pv *core.PersistentVolume) (out *core.Persiste
 	if len(list.Items) > 0 {
 		out = &list.Items[0]
 	} else {
-		err = r.Destination.Create(context.TODO(), pv)
+		err = r.Destination.Client.Create(context.TODO(), pv)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -3101,11 +3101,12 @@ func (r *KubeVirt) BuildPVForNFS(vm *plan.VMStatus) (pv *core.PersistentVolume) 
 
 func (r *KubeVirt) EnsurePVCForNFS(pvc *core.PersistentVolumeClaim) (out *core.PersistentVolumeClaim, err error) {
 	list := &core.PersistentVolumeClaimList{}
-	err = r.Destination.List(
+	err = r.Destination.Client.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
 			LabelSelector: k8slabels.SelectorFromSet(pvc.Labels),
+			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
 	if err != nil {
@@ -3115,7 +3116,7 @@ func (r *KubeVirt) EnsurePVCForNFS(pvc *core.PersistentVolumeClaim) (out *core.P
 	if len(list.Items) > 0 {
 		out = &list.Items[0]
 	} else {
-		err = r.Destination.Create(context.TODO(), pvc)
+		err = r.Destination.Client.Create(context.TODO(), pvc)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
