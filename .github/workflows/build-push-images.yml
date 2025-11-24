@@ -56,9 +56,9 @@ jobs:
           - name: virt-v2v
             file: build/virt-v2v/Containerfile-upstream-fssupport
             repo: forklift-virt-v2v-fssupport
-          - name: vsphere-xcopy-volume-populator
-            file: build/vsphere-xcopy-volume-populator/Containerfile
-            repo: vsphere-xcopy-volume-populator
+          - name: vsphere-copy-offload-populator
+            file: build/vsphere-copy-offload-populator/Containerfile
+            repo: vsphere-copy-offload-populator
     runs-on: ubuntu-latest
     steps:
       - name: Checkout forklift
