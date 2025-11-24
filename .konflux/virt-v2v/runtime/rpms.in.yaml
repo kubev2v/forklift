@@ -2,9 +2,15 @@ packages:
   - virt-v2v
   - virtio-win
   - catatonit
+  - kernel-6.12.0-95.el10
+  - kernel-modules-core-6.12.0-95.el10
+  - kernel-core-6.12.0-95.el10
+  - kernel-modules-6.12.0-95.el10
+  - libguestfs-fssupport-10.1-3.el10
 contentOrigin:
   repofiles:
     - ./redhat.repo
+    - ./brew.repo
 context:
   containerfile:
     file: ../../../build/virt-v2v/Containerfile-downstream
