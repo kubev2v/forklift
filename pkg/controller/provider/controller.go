@@ -180,7 +180,6 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		return
 	} else {
 		r.catalog.add(request, provider)
-
 	}
 
 	defer func() {
@@ -207,6 +206,14 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	// Begin staging conditions.
 	provider.Status.Phase = Staging
 	provider.Status.BeginStagingConditions()
+
+	defer func() {
+		if err == nil {
+			if err = r.updateProviderStatus(provider); err != nil {
+				err = liberr.Wrap(err)
+			}
+		}
+	}()
 
 	if provider.Type() == api.Ova && provider.DeletionTimestamp == nil {
 		if !provider.HasReconciled() {
@@ -246,9 +253,6 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	// Validations.
 	err = r.validate(provider)
 	if err != nil {
-		if err = r.updateProviderStatus(provider); err != nil {
-			r.Log.Error(err, "failed to update provider status")
-		}
 		return
 	}
 
@@ -283,11 +287,6 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	// End staging conditions.
 	provider.Status.EndStagingConditions()
 
-	if err = r.updateProviderStatus(provider); err != nil {
-		r.Log.Error(err, "failed to update provider status")
-		return
-	}
-
 	// Update the DB.
 	err = r.updateProvider(provider)
 	if err != nil {
@@ -316,6 +315,7 @@ func (r *Reconciler) updateProviderStatus(provider *api.Provider) error {
 	provider.Status.ObservedGeneration = provider.Generation
 
 	if err := r.Status().Update(context.TODO(), provider); err != nil {
+		r.Log.Error(err, "Failed to update provider status", "provider", provider)
 		return err
 	}
 
