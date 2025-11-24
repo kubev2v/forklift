@@ -1,5 +1,5 @@
 [rhel-brewroot-libguestfs-fssupport-rpms]
-name = Red Hat Brew Root with libguestfs-fssupport RPMs
+name = Buildroot 10.2 for Red Hat Enterprise Linux 10
 baseurl = https://download-01.beak-001.prod.iad2.dc.redhat.com/rhel-10/nightly/BUILDROOT-10/BUILDROOT-10.2-RHEL-10-20250924.0/compose/Buildroot/x86_64/os/
 enabled = 1
 gpgcheck = 1
@@ -7,7 +7,7 @@ gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 sslverify = 0
 
 [rhel-brewroot-libguestfs-fssupport-srpms]
-name = Red Hat Brew Root with libguestfs-fssupport sRPMs
+name = Buildroot 10.2 for Red Hat Enterprise Linux 10
 baseurl = https://download-01.beak-001.prod.iad2.dc.redhat.com/rhel-10/nightly/BUILDROOT-10/BUILDROOT-10.2-RHEL-10-20250924.0/compose/Buildroot/source/tree/
 enabled = 1
 gpgcheck = 1
@@ -15,16 +15,16 @@ gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 sslverify = 0
 
 [rhel-baseos-kernel-rpms]
-name = Red Hat Brew with kernel RPMs
-baseurl = https://download.eng.brq.redhat.com/rhel-10/composes/RHEL-10/RHEL-10.1-20250614.0/compose/BaseOS/x86_64/os/
+name = Red Hat Enterprise Linux 10.1
+baseurl = https://download-01.beak-001.prod.iad2.dc.redhat.com/rhel-10/nightly/RHEL-10/RHEL-10.1-20250614.0/compose/BaseOS/x86_64/os/
 enabled = 1
 gpgcheck = 1
 gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 sslverify = 0
 
 [rhel-baseos-kernel-srpms]
-name = Red Hat Brew with kernel sRPMs
-baseurl = https://download.eng.brq.redhat.com/rhel-10/composes/RHEL-10/RHEL-10.1-20250614.0/compose/BaseOS/source/tree/
+name = Red Hat Enterprise Linux 10.1
+baseurl = https://download-01.beak-001.prod.iad2.dc.redhat.com/rhel-10/nightly/RHEL-10/RHEL-10.1-20250614.0/compose/BaseOS/source/tree/
 enabled = 1
 gpgcheck = 1
 gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
