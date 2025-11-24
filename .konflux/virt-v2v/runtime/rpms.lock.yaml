@@ -942,20 +942,20 @@ arches:
     name: kbd-misc
     evr: 2.6.4-7.el10
     sourcerpm: kbd-2.6.4-7.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/k/kernel-core-6.12.0-124.11.1.el10_1.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/k/kernel-core-6.12.0-124.13.1.el10_1.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 19290729
-    checksum: sha256:400913dd929e77dc480e59bfc16d725806a892320cc1ea454352b74bad7c9c50
+    size: 19293025
+    checksum: sha256:16cdead66ab3828005e0d3d0df43133936d1899937a74bed99fe3f514e9f5acb
     name: kernel-core
-    evr: 6.12.0-124.11.1.el10_1
-    sourcerpm: kernel-6.12.0-124.11.1.el10_1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/k/kernel-modules-core-6.12.0-124.11.1.el10_1.x86_64.rpm
+    evr: 6.12.0-124.13.1.el10_1
+    sourcerpm: kernel-6.12.0-124.13.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/k/kernel-modules-core-6.12.0-124.13.1.el10_1.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 31067741
-    checksum: sha256:8d81db40b972f25d543d0d8b7ab527861226e99862724c0ad416ee3c8bfc6277
+    size: 31067657
+    checksum: sha256:9ede697af5d07994a9b53902d16916c838aacc808d0fc3dd239f00297e033081
     name: kernel-modules-core
-    evr: 6.12.0-124.11.1.el10_1
-    sourcerpm: kernel-6.12.0-124.11.1.el10_1.src.rpm
+    evr: 6.12.0-124.13.1.el10_1
+    sourcerpm: kernel-6.12.0-124.13.1.el10_1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/k/kmod-31-12.el10.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
     size: 139642
@@ -2090,12 +2090,12 @@ arches:
     checksum: sha256:5904753dfb0f575825d54e6001419c6a39bac8b4b43e5360bf37feb9a020946c
     name: kbd
     evr: 2.6.4-7.el10
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/k/kernel-6.12.0-124.11.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/k/kernel-6.12.0-124.13.1.el10_1.src.rpm
     repoid: rhel-10-for-x86_64-baseos-source-rpms
-    size: 156108022
-    checksum: sha256:18644bd3a803d7c29a1330bbb96790c4be6d325abb90a41e4cf57dc814990e6e
+    size: 156115843
+    checksum: sha256:9966bfd3c60d155f7f4c084474399901442f41cf559ead8df52458fe595860cf
     name: kernel
-    evr: 6.12.0-124.11.1.el10_1
+    evr: 6.12.0-124.13.1.el10_1
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/k/kmod-31-12.el10.src.rpm
     repoid: rhel-10-for-x86_64-baseos-source-rpms
     size: 623740
