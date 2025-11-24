@@ -43,7 +43,7 @@ require (
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
 	kubevirt.io/api v1.6.0-beta.0.0.20250702170314-dd941825f5d3
-	kubevirt.io/containerized-data-importer-api v1.60.3-0.20241105012228-50fbed985de9
+	kubevirt.io/containerized-data-importer-api v1.63.1-0.20251115214221-0b4e9b5c9c59
 	libvirt.org/go/libvirt v1.10009.1
 	libvirt.org/go/libvirtxml v1.11009.0
 	modernc.org/sqlite v1.39.1
