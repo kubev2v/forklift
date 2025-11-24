@@ -9,7 +9,7 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression:
       event == "push" && target_branch
-      == "release-2.10" && ( ".tekton/virt-v2v-2-10-*.yaml".pathChanged() ||
+      == "disabled" && ( ".tekton/virt-v2v-2-10-*.yaml".pathChanged() ||
       ".konflux/virt-v2v/rpms.lock.yaml".pathChanged() ||
       "build/virt-v2v/Containerfile-downstream".pathChanged() ||
       "pkg/virt-v2v/***".pathChanged() ||
