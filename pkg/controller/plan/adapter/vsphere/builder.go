@@ -1464,7 +1464,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 
 				// Update DataSourceRef to point to the volume populator
 				pvc.Spec.DataSourceRef.Name = populatorName
-
+				diskSecretName := fmt.Sprintf("%s-%d", secretName, diskIndex)
 				pvcs = append(pvcs, &pvc)
 				vp := api.VSphereXcopyVolumePopulator{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1483,16 +1483,11 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					Spec: api.VSphereXcopyVolumePopulatorSpec{
 						VmId:                 vmRef.ID,
 						VmdkPath:             baseVolume(disk.File, r.Plan.IsWarm()),
-						SecretName:           secretName,
+						SecretName:           diskSecretName,
 						StorageVendorProduct: string(storageVendorProduct),
 					},
 				}
 
-				// Ensure a Secret combining Vsphere and Storage secrets
-				err = r.mergeSecrets(secretName, namespace, storageVendorSecretRef, r.Source.Provider.Namespace)
-				if err != nil {
-					return nil, fmt.Errorf("failed to merge secrets for popoulators %w", err)
-				}
 				if !r.isPVCExistsInList(&pvc, pvcList) {
 					r.Log.Info("Creating pvc", "pvc", pvc)
 					err = r.Destination.Client.Create(context.TODO(), &pvc, &client.CreateOptions{})
@@ -1516,6 +1511,11 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					// Update the populator's owner reference with the actual PVC UID
 					vp.OwnerReferences[0].UID = createdPVC.UID
 
+					err = r.mergeSecrets(secretName, namespace, storageVendorSecretRef, r.Source.Provider.Namespace, diskSecretName, createdPVC)
+					if err != nil {
+						return nil, fmt.Errorf("failed to merge secrets for popoulators %w", err)
+					}
+
 					// Should probably check these separately
 					r.Log.Info("Ensuring a populator service account")
 					err = r.ensurePopulatorServiceAccount(namespace)
@@ -1527,6 +1527,25 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					if err != nil {
 						return nil, err
 					}
+				}
+			}
+		}
+		if len(pvcs) > 0 {
+			secret := &core.Secret{}
+			err = r.Destination.Client.Get(context.TODO(), client.ObjectKey{
+				Namespace: r.Plan.Spec.TargetNamespace,
+				Name:      secretName,
+			}, secret)
+			if err != nil {
+				return nil, err
+			}
+			err := controllerutil.SetOwnerReference(pvcs[0], secret, r.Scheme())
+			if err != nil {
+				r.Log.Error(err, "Failed to set pvc as owner reference for migration secret '%s'", secret.Name)
+			} else {
+				err = r.Destination.Client.Update(context.TODO(), secret)
+				if err != nil {
+					r.Log.Error(err, "Failed to update migration secret '%s' with owner reference", secret.Name)
 				}
 			}
 		}
@@ -1902,12 +1921,24 @@ func (r *Builder) getNetworkNameTemplate(vm *model.VM) string {
 }
 
 // MergeSecrets merges the storage vendor secret into the migration secret
-func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendorSecret, storageVendorSecretNS string) error {
-	dst := &core.Secret{}
+func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendorSecret, storageVendorSecretNS, diskSecretName string, pvc *core.PersistentVolumeClaim) error {
+	baseMigrationSecret := &core.Secret{}
 	if err := r.Destination.Get(context.Background(), client.ObjectKey{
 		Name:      migrationSecret,
-		Namespace: migrationSecretNS}, dst); err != nil {
-		return fmt.Errorf("failed to get migration secret: %w", err)
+		Namespace: migrationSecretNS}, baseMigrationSecret); err != nil {
+		return fmt.Errorf("failed to get base migration secret: %w", err)
+	}
+
+	dst := &core.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      diskSecretName,
+			Namespace: migrationSecretNS,
+		},
+		Data: make(map[string][]byte),
+	}
+
+	for key, value := range baseMigrationSecret.Data {
+		dst.Data[key] = value
 	}
 
 	src := &core.Secret{}
@@ -1918,7 +1949,6 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 		return fmt.Errorf("failed to get storage secret: %w", err)
 	}
 
-	// Merge the data from storage secret into migration secret
 	if dst.Data == nil {
 		dst.Data = make(map[string][]byte)
 	}
@@ -1929,7 +1959,6 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 		dst.Data[key] = value
 	}
 
-	// copy the keys into the keys the populator needs
 	for key, value := range dst.Data {
 		switch key {
 		case "url":
@@ -1964,9 +1993,12 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 		}
 	}
 
-	// Update secret1 with the merged data.
-	if err := r.Destination.Update(context.Background(), dst); err != nil {
-		return fmt.Errorf("failed to update secret1: %w", err)
+	if err := controllerutil.SetOwnerReference(pvc, dst, r.Scheme()); err != nil {
+		return fmt.Errorf("failed to set owner reference: %w", err)
+	}
+
+	if err := r.Destination.Create(context.Background(), dst); err != nil {
+		return fmt.Errorf("failed to create disk secret: %w", err)
 	}
 
 	return nil
