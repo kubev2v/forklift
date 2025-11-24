@@ -18,7 +18,6 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -100,7 +99,7 @@ var _ = Describe("ProxyServer", func() {
 			DeferCleanup(backend.Close)
 
 			ns, name := "konveyor", "provider"
-			provider := NewProvider(ns, name, &corev1.ObjectReference{
+			provider := NewProvider(ns, name, &api.ServiceEndpoint{
 				Name:      "svc-name",
 				Namespace: "svc-ns",
 			})
@@ -156,7 +155,7 @@ func NewSpyClient(objs ...client.Object) *SpyClient {
 	return &SpyClient{Client: base}
 }
 
-func NewProvider(ns, name string, svc *corev1.ObjectReference) *api.Provider {
+func NewProvider(ns, name string, svc *api.ServiceEndpoint) *api.Provider {
 	return &api.Provider{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "forklift.konveyor.io/v1beta1",

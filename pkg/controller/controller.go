@@ -17,6 +17,8 @@ limitations under the License.
 package controller
 
 import (
+	"github.com/kubev2v/forklift/pkg/controller/dynamicprovider"
+	"github.com/kubev2v/forklift/pkg/controller/dynamicserver"
 	"github.com/kubev2v/forklift/pkg/controller/hook"
 	"github.com/kubev2v/forklift/pkg/controller/host"
 	"github.com/kubev2v/forklift/pkg/controller/map/network"
@@ -44,12 +46,15 @@ var MainControllers = []AddFunction{
 	storage.Add,
 	host.Add,
 	hook.Add,
+	dynamicprovider.Add, // Needed to populate the registry for plan adapters/schedulers
 }
 
 // List of Inventory controllers
 var InventoryControllers = []AddFunction{
 	provider.Add,
 	ova.Add,
+	dynamicprovider.Add,
+	dynamicserver.Add,
 }
 
 // Add controllers to the manager based on role.

@@ -33,6 +33,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/provider/container"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
+	dynamicregistry "github.com/kubev2v/forklift/pkg/controller/provider/web/dynamic"
 	"github.com/kubev2v/forklift/pkg/controller/validation/policy"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
@@ -208,10 +209,10 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	provider.Status.Phase = Staging
 	provider.Status.BeginStagingConditions()
 
+	// Handle OVA provider server deployment
 	if provider.Type() == api.Ova && provider.DeletionTimestamp == nil {
 		if !provider.HasReconciled() {
-			// the provider has changed, so delete the old
-			// so we can redeploy.
+			// Provider has changed, delete the old server to redeploy
 			err = r.DeleteOVAProviderServer(ctx, provider)
 			if err != nil {
 				return
@@ -223,13 +224,24 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		}
 	}
 
-	// although the way we deploy OVA servers has changed, we will
-	// leave this for now to ensure legacy PVs are cleaned up
-	if provider.DeletionTimestamp != nil && k8sutil.ContainsFinalizer(provider, api.OvaProviderFinalizer) {
-		err = r.removeVolumeOfOVAServer(provider)
+	// Handle dynamic provider server deployment
+	if dynamicregistry.Registry.IsDynamic(string(provider.Type())) && provider.DeletionTimestamp == nil {
+		if !provider.HasReconciled() {
+			// Provider has changed, delete the old server to redeploy
+			err = r.DeleteDynamicProviderServer(ctx, provider)
+			if err != nil {
+				return
+			}
+		}
+		err = r.EnsureDynamicProviderServer(ctx, provider)
 		if err != nil {
 			return
 		}
+	}
+
+	// Cleanup for OVA providers
+	if provider.DeletionTimestamp != nil && k8sutil.ContainsFinalizer(provider, api.OvaProviderFinalizer) {
+		// OVA provider servers are managed by the OVA controller
 		err = r.DeleteOVAProviderServer(ctx, provider)
 		if err != nil {
 			return
@@ -237,7 +249,21 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		clonedProvider := provider.DeepCopy()
 		k8sutil.RemoveFinalizer(provider, api.OvaProviderFinalizer)
 		if pErr := r.Patch(context.TODO(), provider, client.MergeFrom(clonedProvider)); pErr != nil {
-			r.Log.Error(pErr, "Failed to remove finalizer", "provider", provider)
+			r.Log.Error(pErr, "Failed to remove OVA finalizer", "provider", provider)
+			err = pErr
+			return
+		}
+	}
+
+	// Cleanup for dynamic providers
+	if provider.DeletionTimestamp != nil && k8sutil.ContainsFinalizer(provider, api.DynamicProviderFinalizer) {
+		// Dynamic provider servers are managed by the DynamicProviderServer controller
+		// with blocking owner references, so they'll be cleaned up automatically.
+		// Just remove the finalizer.
+		clonedProvider := provider.DeepCopy()
+		k8sutil.RemoveFinalizer(provider, api.DynamicProviderFinalizer)
+		if pErr := r.Patch(context.TODO(), provider, client.MergeFrom(clonedProvider)); pErr != nil {
+			r.Log.Error(pErr, "Failed to remove dynamic finalizer", "provider", provider)
 			err = pErr
 			return
 		}
@@ -401,12 +427,19 @@ func (r *Reconciler) getSecret(provider *api.Provider) (*v1.Secret, error) {
 	if provider.IsHost() {
 		return secret, nil
 	}
+
 	ref := provider.Spec.Secret
 	key := client.ObjectKey{
 		Namespace: ref.Namespace,
 		Name:      ref.Name,
 	}
 	err := r.Get(context.TODO(), key, secret)
+
+	// For dynamic providers, missing secrets are OK (validation already checked this)
+	if k8serr.IsNotFound(err) && dynamicregistry.Registry.IsDynamic(string(provider.Type())) {
+		return &v1.Secret{}, nil
+	}
+
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -441,6 +474,8 @@ func (r *Catalog) get(request reconcile.Request) (p *api.Provider, found bool) {
 	return
 }
 
+// removeVolumeOfOVAServer is currently unused but kept for potential future use
+// nolint:unused
 func (r *Reconciler) removeVolumeOfOVAServer(provider *api.Provider) error {
 	labelSelector := labels.SelectorFromSet(labels.Set{
 		"subapp":   "ova-server",

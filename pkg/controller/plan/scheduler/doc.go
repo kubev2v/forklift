@@ -4,11 +4,13 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/plan/scheduler/dynamic"
 	"github.com/kubev2v/forklift/pkg/controller/plan/scheduler/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/plan/scheduler/openstack"
 	"github.com/kubev2v/forklift/pkg/controller/plan/scheduler/ova"
 	"github.com/kubev2v/forklift/pkg/controller/plan/scheduler/ovirt"
 	"github.com/kubev2v/forklift/pkg/controller/plan/scheduler/vsphere"
+	dynamicregistry "github.com/kubev2v/forklift/pkg/controller/provider/web/dynamic"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/settings"
 )
@@ -49,7 +51,15 @@ func New(ctx *plancontext.Context) (scheduler Scheduler, err error) {
 			MaxInFlight: settings.Settings.MaxInFlight,
 		}
 	default:
-		err = liberr.New("provider not supported.")
+		// Check if this is a registered dynamic provider
+		if dynamicregistry.Registry.IsDynamic(string(ctx.Plan.Provider.Source.Type())) {
+			scheduler = &dynamic.Scheduler{
+				Context:     ctx,
+				MaxInFlight: settings.Settings.MaxInFlight,
+			}
+		} else {
+			err = liberr.New("provider not supported.")
+		}
 	}
 
 	return

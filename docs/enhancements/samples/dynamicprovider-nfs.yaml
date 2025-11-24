@@ -1,0 +1,22 @@
+apiVersion: forklift.konveyor.io/v1beta1
+kind: DynamicProvider
+metadata:
+  name: nfs-provider-type
+  namespace: openshift-mtv
+spec:
+  type: nfs
+  image: quay.io/konveyor/forklift-ova-provider-server:latest
+  port: 8080
+  features:
+    requiresConversion: true
+    supportsCustomBuilder: false
+    supportedMigrationTypes:
+      - cold
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 512Mi
+      cpu: 500m
+

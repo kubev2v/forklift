@@ -4,34 +4,35 @@ import "strconv"
 
 // vm struct
 type VM struct {
-	Name                  string
-	OvaPath               string
-	OvaSource             string
-	OsType                string
-	RevisionValidated     int64
-	PolicyVersion         int
-	UUID                  string
-	Firmware              string
-	SecureBoot            bool
-	CpuAffinity           []int32
-	CpuHotAddEnabled      bool
-	CpuHotRemoveEnabled   bool
-	MemoryHotAddEnabled   bool
-	FaultToleranceEnabled bool
-	CpuCount              int32
-	CoresPerSocket        int32
-	MemoryMB              int32
-	MemoryUnits           string
-	CpuUnits              string
-	BalloonedMemory       int32
-	IpAddress             string
-	NumaNodeAffinity      []string
-	StorageUsed           int64
-	ChangeTrackingEnabled bool
-	Devices               []Device
-	NICs                  []NIC
-	Disks                 []VmDisk
-	Networks              []VmNetwork
+	ID                    string      `json:"id"` // Maps to UUID for dynamic inventory
+	Name                  string      `json:"name"`
+	OvaPath               string      `json:"ovaPath"`
+	OvaSource             string      `json:"ovaSource"`
+	OsType                string      `json:"osType"`
+	RevisionValidated     int64       `json:"revisionValidated"`
+	PolicyVersion         int         `json:"policyVersion"`
+	UUID                  string      `json:"uuid"` // Keep for backwards compatibility
+	Firmware              string      `json:"firmware"`
+	SecureBoot            bool        `json:"secureBoot"`
+	CpuAffinity           []int32     `json:"cpuAffinity"`
+	CpuHotAddEnabled      bool        `json:"cpuHotAddEnabled"`
+	CpuHotRemoveEnabled   bool        `json:"cpuHotRemoveEnabled"`
+	MemoryHotAddEnabled   bool        `json:"memoryHotAddEnabled"`
+	FaultToleranceEnabled bool        `json:"faultToleranceEnabled"`
+	CpuCount              int32       `json:"cpuCount"` // Maps to cpus for change detection
+	CoresPerSocket        int32       `json:"coresPerSocket"`
+	MemoryMB              int32       `json:"memoryMB"` // Maps to memory for change detection
+	MemoryUnits           string      `json:"memoryUnits"`
+	CpuUnits              string      `json:"cpuUnits"`
+	BalloonedMemory       int32       `json:"balloonedMemory"`
+	IpAddress             string      `json:"ipAddress"`
+	NumaNodeAffinity      []string    `json:"numaNodeAffinity"`
+	StorageUsed           int64       `json:"storageUsed"`
+	ChangeTrackingEnabled bool        `json:"changeTrackingEnabled"`
+	Devices               []Device    `json:"devices"`
+	NICs                  []NIC       `json:"nics"`
+	Disks                 []VmDisk    `json:"disks"`
+	Networks              []VmNetwork `json:"networks"`
 }
 
 func (r *VM) ApplyVirtualConfig(configs []VirtualConfig) {
@@ -66,15 +67,15 @@ func (r *VM) apply(key string, value string) {
 
 // Virtual Disk.
 type VmDisk struct {
-	ID                      string
-	Name                    string
-	FilePath                string
-	Capacity                int64
-	CapacityAllocationUnits string
-	DiskId                  string
-	FileRef                 string
-	Format                  string
-	PopulatedSize           int64
+	ID                      string `json:"id"` // Maps to DiskId for dynamic inventory
+	Name                    string `json:"name"`
+	FilePath                string `json:"filePath"`
+	Capacity                int64  `json:"capacity"`
+	CapacityAllocationUnits string `json:"capacityAllocationUnits"`
+	DiskId                  string `json:"diskId"` // Keep for backwards compatibility
+	FileRef                 string `json:"fileRef"`
+	Format                  string `json:"format"`
+	PopulatedSize           int64  `json:"populatedSize"`
 }
 
 // Virtual Device.
@@ -93,12 +94,12 @@ type Conf struct {
 type NIC struct {
 	Name    string `json:"name"`
 	MAC     string `json:"mac"`
-	Network string
-	Config  []Conf
+	Network string `json:"network"`
+	Config  []Conf `json:"config"`
 }
 
 type VmNetwork struct {
-	Name        string
-	Description string
-	ID          string
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
