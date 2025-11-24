@@ -267,6 +267,8 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 				Category: Critical,
 				Message:  err.Error(),
 			})
+			err = nil
+			//nolint:nilerr
 			return
 		}
 		provider.Status.Fingerprint = util.Fingerprint(crt)
