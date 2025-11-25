@@ -13,6 +13,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/ovirt"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	ec2web "github.com/kubev2v/forklift/pkg/provider/ec2/inventory/web"
 )
 
 // Common parameters
@@ -96,6 +97,14 @@ func NewClient(provider *api.Provider) (client Client, err error) {
 			finder:   &ova.Finder{},
 			restClient: base.RestClient{
 				Resolver: &ova.Resolver{Provider: provider},
+			},
+		}
+	case api.EC2:
+		client = &ProviderClient{
+			provider: provider,
+			finder:   &ec2web.Finder{},
+			restClient: base.RestClient{
+				Resolver: &ec2web.Resolver{Provider: provider},
 			},
 		}
 	default:

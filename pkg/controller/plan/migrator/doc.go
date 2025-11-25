@@ -9,6 +9,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/plan/migrator/base"
 	"github.com/kubev2v/forklift/pkg/controller/plan/migrator/ocp"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
+	ec2migrator "github.com/kubev2v/forklift/pkg/provider/ec2/controller/migrator"
 )
 
 type Migrator = base.Migrator
@@ -20,6 +21,11 @@ func New(context *plancontext.Context) (migrator Migrator, err error) {
 	switch context.Source.Provider.Type() {
 	case api.OpenShift:
 		migrator, err = ocp.New(context)
+		if err != nil {
+			return
+		}
+	case api.EC2:
+		migrator, err = ec2migrator.New(context)
 		if err != nil {
 			return
 		}

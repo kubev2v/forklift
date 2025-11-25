@@ -82,10 +82,27 @@ const (
 	qemuGroup = 107
 )
 
-type empty struct{}
+// stringSet is a set of strings implemented as a map
+type stringSet map[string]struct{}
 
-type stringSet struct {
-	set map[string]empty
+// newStringSet creates a new string set
+func newStringSet() stringSet {
+	return make(stringSet)
+}
+
+// add adds a string to the set
+func (s stringSet) add(key string) {
+	s[key] = struct{}{}
+}
+
+// remove removes a string from the set
+func (s stringSet) remove(key string) {
+	delete(s, key)
+}
+
+// len returns the number of elements in the set
+func (s stringSet) len() int {
+	return len(s)
 }
 
 var (
@@ -105,10 +122,90 @@ var (
 			resource:           api.VSphereXcopyVolumePopulatorResource,
 			regexKey:           "vsphere_xcopy_volume_populator",
 		},
+		api.Ec2VolumePopulatorKind: {
+			storageResourceKey: "snapshot_id",
+			resource:           api.Ec2VolumePopulatorResource,
+			regexKey:           "ec2_volume_populator",
+		},
+	}
+)
+
+// progressMonitor manages progress monitoring goroutines with thread safety
+type progressMonitor struct {
+	mu        sync.RWMutex
+	monitored map[types.UID]context.CancelFunc
+}
+
+// newProgressMonitor creates a new progress monitor
+func newProgressMonitor() *progressMonitor {
+	return &progressMonitor{
+		monitored: make(map[types.UID]context.CancelFunc),
+	}
+}
+
+// startMonitoring starts monitoring progress for a PVC
+func (m *progressMonitor) startMonitoring(ctx context.Context, pvcUID types.UID, pod *corev1.Pod, pvc *corev1.PersistentVolumeClaim, cr *unstructured.Unstructured, c *controller) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Check if already monitoring
+	if _, exists := m.monitored[pvcUID]; exists {
+		return
 	}
 
-	monitoredPVCs = map[string]interface{}{}
-)
+	monitorCtx, cancel := context.WithCancel(ctx)
+	m.monitored[pvcUID] = cancel
+
+	go func() {
+		defer func() {
+			m.mu.Lock()
+			delete(m.monitored, pvcUID)
+			m.mu.Unlock()
+		}()
+
+		c.recorder.Eventf(pod, corev1.EventTypeWarning, reasonPopulatorProgress, "Starting to monitor progress for PVC %s", pvc.Name)
+
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-monitorCtx.Done():
+				return
+			case <-ticker.C:
+				if err := c.updateProgress(pod, pvc, cr); err != nil {
+					klog.V(5).Info("Failed to update progress", err)
+					continue
+				}
+
+				// Check if pod is still running
+				currentPod, err := c.podLister.Pods(pod.Namespace).Get(pod.Name)
+				if err != nil || currentPod.Status.Phase != corev1.PodRunning {
+					return
+				}
+			}
+		}
+	}()
+}
+
+// stopMonitoring stops monitoring progress for a PVC
+func (m *progressMonitor) stopMonitoring(pvcUID types.UID) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if cancel, exists := m.monitored[pvcUID]; exists {
+		cancel()
+		delete(m.monitored, pvcUID)
+	}
+}
+
+// isMonitored checks if a PVC is being monitored
+func (m *progressMonitor) isMonitored(pvcUID types.UID) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	_, exists := m.monitored[pvcUID]
+	return exists
+}
 
 type populatorResource struct {
 	storageResourceKey string
@@ -135,14 +232,15 @@ type controller struct {
 	unstLister        dynamiclister.Lister
 	unstSynced        cache.InformerSynced
 	mu                sync.Mutex
-	notifyMap         map[string]*stringSet
-	cleanupMap        map[string]*stringSet
+	notifyMap         map[string]stringSet
+	cleanupMap        map[string]stringSet
 	workqueue         workqueue.TypedRateLimitingInterface[string]
 	populatorArgs     func(bool, *unstructured.Unstructured, corev1.PersistentVolumeClaim) ([]string, error)
 	gk                schema.GroupKind
 	metrics           *metricsManager
 	recorder          record.EventRecorder
 	httpClient        *http.Client
+	progressMon       *progressMonitor
 }
 
 func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, prefix string,
@@ -203,13 +301,14 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 		scSynced:          scInformer.Informer().HasSynced,
 		unstLister:        dynamiclister.New(unstInformer.GetIndexer(), gvr),
 		unstSynced:        unstInformer.HasSynced,
-		notifyMap:         make(map[string]*stringSet),
-		cleanupMap:        make(map[string]*stringSet),
+		notifyMap:         make(map[string]stringSet),
+		cleanupMap:        make(map[string]stringSet),
 		workqueue:         workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
 		populatorArgs:     populatorArgs,
 		gk:                gk,
 		metrics:           initMetrics(),
 		recorder:          getRecorder(kubeClient, prefix+"-"+controllerNameSuffix),
+		progressMon:       newProgressMonitor(),
 	}
 
 	c.metrics.startListener(httpEndpoint, metricsPath)
@@ -322,16 +421,16 @@ func (c *controller) addNotification(keyToCall, objType, namespace, name string)
 	defer c.mu.Unlock()
 	s := c.notifyMap[key]
 	if s == nil {
-		s = &stringSet{make(map[string]empty)}
+		s = newStringSet()
 		c.notifyMap[key] = s
 	}
-	s.set[keyToCall] = empty{}
+	s.add(keyToCall)
 	s = c.cleanupMap[keyToCall]
 	if s == nil {
-		s = &stringSet{make(map[string]empty)}
+		s = newStringSet()
 		c.cleanupMap[keyToCall] = s
 	}
-	s.set[key] = empty{}
+	s.add(key)
 }
 
 func (c *controller) cleanupNotifications(keyToCall string) {
@@ -341,13 +440,13 @@ func (c *controller) cleanupNotifications(keyToCall string) {
 	if s == nil {
 		return
 	}
-	for key := range s.set {
+	for key := range s {
 		t := c.notifyMap[key]
 		if t == nil {
 			continue
 		}
-		delete(t.set, keyToCall)
-		if 0 == len(t.set) {
+		t.remove(keyToCall)
+		if t.len() == 0 {
 			delete(c.notifyMap, key)
 		}
 	}
@@ -385,7 +484,7 @@ func (c *controller) handleMapped(obj interface{}, objType string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if s, ok := c.notifyMap[key]; ok {
-		for k := range s.set {
+		for k := range s {
 			c.workqueue.Add(k)
 		}
 	}
@@ -539,6 +638,15 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 
 	var waitForFirstConsumer bool
 	var nodeName string
+
+	// Check if we should skip WaitForFirstConsumer logic
+	skipWaitForFirstConsumer := false
+	if pvc.Annotations != nil {
+		if _, found := pvc.Annotations["forklift.konveyor.io/storage.bind.immediate.requested"]; found {
+			skipWaitForFirstConsumer = true
+		}
+	}
+
 	if pvc.Spec.StorageClassName != nil {
 		storageClassName := *pvc.Spec.StorageClassName
 
@@ -559,11 +667,13 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 		}
 
 		if storageClass.VolumeBindingMode != nil && storagev1.VolumeBindingWaitForFirstConsumer == *storageClass.VolumeBindingMode {
-			waitForFirstConsumer = true
-			nodeName = pvc.Annotations[annSelectedNode]
-			if nodeName == "" {
-				// Wait for the PVC to get a node name before continuing
-				return nil
+			if !skipWaitForFirstConsumer {
+				waitForFirstConsumer = true
+				nodeName = pvc.Annotations[annSelectedNode]
+				if nodeName == "" {
+					// Wait for the PVC to get a node name before continuing
+					return nil
+				}
 			}
 		}
 	}
@@ -634,7 +744,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 				},
 				Spec: makePopulatePodSpec(pvcPrimeName, secretName),
 			}
-			if c.gk.Kind == api.VSphereXcopyVolumePopulatorKind {
+			if c.gk.Kind == api.VSphereXcopyVolumePopulatorKind || c.gk.Kind == api.Ec2VolumePopulatorKind {
 				pod.Spec.ServiceAccountName = "populator"
 			}
 			pod.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName = pvcPrimeName
@@ -696,31 +806,9 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 			// We'll get called again later when the pod exists
 			return nil
 		} else {
-			if pod.Status.PodIP != "" {
-				if _, ok := monitoredPVCs[string(pvc.UID)]; !ok {
-					monitoredPVCs[string(pvc.UID)] = true
-					go func() {
-						c.recorder.Eventf(pod, corev1.EventTypeWarning, reasonPopulatorProgress, "Starting to monitor progress for PVC %s", pvc.Name)
-						for {
-							err = c.updateProgress(pod, pvc, crInstance)
-							if err != nil {
-								klog.V(5).Info("Failed to update progress", err)
-								continue
-							}
-
-							pod, err = c.podLister.Pods(populatorNamespace).Get(pod.Name)
-							if err != nil {
-								break
-							}
-							if pod.Status.Phase != corev1.PodRunning {
-								break
-							}
-
-							// TODO make configurable?
-							time.Sleep(5 * time.Second)
-						}
-					}()
-				}
+			// Start progress monitoring if pod has an IP and is not already monitored
+			if pod.Status.PodIP != "" && !c.progressMon.isMonitored(pvc.UID) {
+				c.progressMon.startMonitoring(ctx, pvc.UID, pod, pvc, crInstance, c)
 			}
 		}
 
@@ -832,7 +920,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 	c.cleanupNotifications(key)
 
 	// Stop progress monitoring
-	delete(monitoredPVCs, string(pvc.UID))
+	c.progressMon.stopMonitoring(pvc.UID)
 
 	return nil
 }
@@ -937,8 +1025,9 @@ func makePopulatePodSpec(pvcPrimeName, secretName string) corev1.PodSpec {
 	return corev1.PodSpec{
 		Containers: []corev1.Container{
 			{
-				Name:  populatorContainerName,
-				Ports: []corev1.ContainerPort{{Name: "metrics", ContainerPort: 8443}},
+				Name:            populatorContainerName,
+				ImagePullPolicy: corev1.PullAlways,
+				Ports:           []corev1.ContainerPort{{Name: "metrics", ContainerPort: 8443}},
 				SecurityContext: &corev1.SecurityContext{
 					AllowPrivilegeEscalation: ptr.To(false),
 					RunAsNonRoot:             ptr.To(true),

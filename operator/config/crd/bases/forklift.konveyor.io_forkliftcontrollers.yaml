@@ -121,6 +121,10 @@ spec:
                 type: string
                 description: "OpenStack populator image"
                 example: "quay.io/kubev2v/openstack-populator:latest"
+              populator_ec2_image_fqin:
+                type: string
+                description: "EC2 populator image"
+                example: "quay.io/kubev2v/ec2-populator:latest"
               populator_vsphere_xcopy_volume_image_fqin:
                 type: string
                 description: "vSphere xcopy populator image"

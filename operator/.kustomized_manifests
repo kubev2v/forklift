@@ -118,6 +118,9 @@ spec:
               controller_max_concurrent_reconciles:
                 description: 'Max concurrent reconciles (default: 10)'
                 x-kubernetes-int-or-string: true
+              controller_max_parent_backing_retries:
+                description: 'Max retries when getting parent disks (default: 10)'
+                x-kubernetes-int-or-string: true
               controller_max_vm_inflight:
                 description: 'Max concurrent VM migrations (default: 20)'
                 x-kubernetes-int-or-string: true
@@ -327,6 +330,10 @@ spec:
               populator_controller_image_fqin:
                 description: Volume populator controller image
                 example: quay.io/kubev2v/populator-controller:latest
+                type: string
+              populator_ec2_image_fqin:
+                description: EC2 populator image
+                example: quay.io/kubev2v/ec2-populator:latest
                 type: string
               populator_openstack_image_fqin:
                 description: OpenStack populator image
@@ -6793,6 +6800,8 @@ spec:
           value: ${OVIRT_POPULATOR_IMAGE}
         - name: OPENSTACK_POPULATOR_IMAGE
           value: ${OPENSTACK_POPULATOR_IMAGE}
+        - name: EC2_POPULATOR_IMAGE
+          value: ${EC2_POPULATOR_IMAGE}
         - name: OVA_PROVIDER_SERVER_IMAGE
           value: ${OVA_PROVIDER_SERVER_IMAGE}
         - name: OVA_PROXY_IMAGE

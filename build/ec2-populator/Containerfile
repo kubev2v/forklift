@@ -1,0 +1,27 @@
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest AS builder
+RUN microdnf -y install \
+    git \
+    golang \
+    make \
+    tar && \
+    microdnf clean all
+
+WORKDIR /workspace
+
+# Copy the go.mod and go.sum files
+COPY go.mod go.sum ./
+
+# Copy the source code
+COPY cmd/ec2-populator/ cmd/ec2-populator/
+COPY pkg/ pkg/
+
+# Build
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o ec2-populator cmd/ec2-populator/ec2-populator.go
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+WORKDIR /
+COPY --from=builder /workspace/ec2-populator .
+USER 1001
+
+ENTRYPOINT ["/ec2-populator"]
+
