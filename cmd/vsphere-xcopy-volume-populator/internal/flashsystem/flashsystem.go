@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/fcutil"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
 	"k8s.io/klog/v2"
 )
@@ -28,20 +28,19 @@ type ExtractedMapping struct {
 	IsSet       bool   `json:"isSet"`
 }
 
-// extractWWPNsFromFCFormat extracts individual WWPNs from fc.WWPN1:WWPN2 format
+// extractWWPNsFromFCFormat extracts individual WWPNs from fc.WWNN:WWPN format
 // Uses the second part (after colon) as the real WWPN
 func extractWWPNsFromFCFormat(fcStrings []string) []string {
-	// expected string format: fc.20000000c9ffe71a:10000000c9ffe71a
 	var wwpns []string
 	for _, fcStr := range fcStrings {
 		if strings.HasPrefix(fcStr, "fc.") {
-			// Remove "fc." prefix and split by ":"
-			parts := strings.Split(strings.TrimPrefix(fcStr, "fc."), ":")
-			// Use the SECOND part (after colon) - this is the real WWPN
-			if len(parts) > 1 && len(parts[1]) == 16 && regexp.MustCompile(`^[0-9a-fA-F]+$`).MatchString(parts[1]) {
-				wwpns = append(wwpns, parts[1])
-				klog.Infof("Extracted WWPN (second half): %s from %s", parts[1], fcStr)
+			wwpn, err := fcutil.ExtractWWPN(fcStr)
+			if err != nil {
+				klog.Warningf("Failed to extract WWPN from %s: %v", fcStr, err)
+				continue
 			}
+			wwpns = append(wwpns, wwpn)
+			klog.Infof("Extracted WWPN: %s from %s", wwpn, fcStr)
 		}
 	}
 	return wwpns
