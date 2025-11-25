@@ -83,7 +83,16 @@ test_supported_el7 if {
 	count(results) == 0
 }
 
-test_supported_el7_by_guestName if {
+test_supported_rhel9_by_guestName if {
+	mock_vm := {
+		"name": "test",
+		"guestName": "Red Hat Enterprise Linux 9 (64-bit)",
+	}
+	results = concerns with input as mock_vm
+	count(results) == 0
+}
+
+test_supported_el7_by_vmwareTools_guestName if {
 	mock_vm := {
 		"name": "test",
 		"guestNameFromVmwareTools": "Red Hat Enterprise Linux 7 (64-bit)",
