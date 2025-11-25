@@ -72,8 +72,8 @@ require (
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f // indirect
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 // indirect
-	kubevirt.io/api v1.6.0-beta.0.0.20250702170314-dd941825f5d3 // indirect
-	kubevirt.io/containerized-data-importer-api v1.60.3-0.20241105012228-50fbed985de9 // indirect
+	kubevirt.io/api v1.6.3 // indirect
+	kubevirt.io/containerized-data-importer-api v1.63.1-0.20251115214221-0b4e9b5c9c59 // indirect
 	kubevirt.io/controller-lifecycle-operator-sdk/api v0.0.0-20220329064328-f3cc58c6ed90 // indirect
 	sigs.k8s.io/controller-runtime v0.20.4 // indirect
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
