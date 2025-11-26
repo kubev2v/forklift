@@ -12,6 +12,7 @@ const PROVIDER_ID = "60002ac"
 
 type Primera3ParClonner struct {
 	client Primera3ParClient
+	populator.AdapterIdHandlerImpl
 }
 
 func NewPrimera3ParClonner(storageHostname, storageUsername, storagePassword string, sslSkipVerify bool) (Primera3ParClonner, error) {
@@ -23,7 +24,7 @@ func NewPrimera3ParClonner(storageHostname, storageUsername, storagePassword str
 
 // EnsureClonnerIgroup creates or update an initiator group with the clonnerIqn
 func (c *Primera3ParClonner) EnsureClonnerIgroup(initiatorGroup string, adapterIds []string) (populator.MappingContext, error) {
-	hostNames, err := c.client.EnsureHostsWithIds(adapterIds)
+	nameAdapterIdMap, err := c.client.EnsureHostsWithIds(adapterIds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to ensure host with IQN: %w", err)
 	}
@@ -33,12 +34,13 @@ func (c *Primera3ParClonner) EnsureClonnerIgroup(initiatorGroup string, adapterI
 		return nil, fmt.Errorf("failed to ensure host set: %w", err)
 	}
 
-	for _, hostName := range hostNames {
+	for hostName, adapterId := range nameAdapterIdMap {
 		klog.Infof("adding host %s, to initiatorGroup: %s", hostName, initiatorGroup)
 		err = c.client.AddHostToHostSet(initiatorGroup, hostName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to add host to host set: %w", err)
 		}
+		c.AddAdapterID(adapterId)
 	}
 	return nil, nil
 }

@@ -23,6 +23,7 @@ const (
 
 type VantaraCloner struct {
 	api VantaraStorageAPI
+	populator.AdapterIdHandlerImpl
 }
 
 func NewVantaraClonner(hostname, username, password string) (VantaraCloner, error) {
@@ -173,6 +174,7 @@ func (v *VantaraCloner) EnsureClonnerIgroup(xcopyInitiatorGroup string, hbaUIDs 
 	var hostGroupIds = make([]string, len(ret))
 	for i, login := range ret {
 		hostGroupIds[i] = login.HostGroupId
+		v.AddAdapterID(login.MatchedAdapterID)
 	}
 	klog.Infof("HostGroupIDs: %s", hostGroupIds)
 	return populator.MappingContext{"hostGroupIds": hostGroupIds}, nil

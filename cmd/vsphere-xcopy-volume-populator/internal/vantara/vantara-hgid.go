@@ -7,13 +7,14 @@ import (
 )
 
 type Logins struct {
-	HostGroupId     string `json:"hostGroupId"`
-	Islogin         string `json:"isLogin"`
-	LoginWWN        string `json:"loginWwn"`
-	WWNNickName     string `json:"wwnNickName"`
-	IscsiNickName   string `json:"iscsiNickName"`
-	IscsiTargetName string `json:"iscsiTargetName"`
-	LoginIscsiName  string `json:"loginIscsiName"`
+	HostGroupId      string `json:"hostGroupId"`
+	Islogin          string `json:"isLogin"`
+	LoginWWN         string `json:"loginWwn"`
+	WWNNickName      string `json:"wwnNickName"`
+	IscsiNickName    string `json:"iscsiNickName"`
+	IscsiTargetName  string `json:"iscsiTargetName"`
+	LoginIscsiName   string `json:"loginIscsiName"`
+	MatchedAdapterID string `json:"matchedAdapterId"`
 }
 
 type DataEntry struct {
@@ -42,13 +43,14 @@ func FindHostGroupIDs(jsonData JSONData, hbaUIDs []string) []Logins {
 					}
 					if login.LoginWWN == wwnn {
 						output := Logins{
-							HostGroupId:     login.HostGroupId,
-							Islogin:         login.Islogin,
-							LoginWWN:        login.LoginWWN,
-							WWNNickName:     login.WWNNickName,
-							IscsiNickName:   "",
-							IscsiTargetName: "",
-							LoginIscsiName:  "",
+							HostGroupId:      login.HostGroupId,
+							Islogin:          login.Islogin,
+							LoginWWN:         login.LoginWWN,
+							WWNNickName:      login.WWNNickName,
+							IscsiNickName:    "",
+							IscsiTargetName:  "",
+							LoginIscsiName:   "",
+							MatchedAdapterID: uid,
 						}
 						results = append(results, output)
 					}

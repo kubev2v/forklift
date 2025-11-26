@@ -1,6 +1,8 @@
 package populator
 
 import (
+	"errors"
+
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
 )
 
@@ -14,11 +16,18 @@ type StorageApi interface {
 	VMDKCapable
 }
 
+
 // StorageResolver resolves a PersistentVolume to LUN details
 // This interface is embedded by VVolCapable, RDMCapable, and VMDKCapable
 type StorageResolver interface {
 	// ResolvePVToLUN resolves PersistentVolume to LUN details
 	ResolvePVToLUN(persistentVolume PersistentVolume) (LUN, error)
+}
+
+// AdapterIdHandler defines methods for tracking adapter IDs
+type AdapterIdHandler interface {
+	GetAdaptersID() ([]string, error)
+	AddAdapterID(adapterID string)
 }
 
 // VVolCapable defines storage that can perform VVol operations
@@ -38,8 +47,8 @@ type RDMCapable interface {
 // StorageMapper handles initiator group mapping for VMDK/Xcopy operations
 type StorageMapper interface {
 	// EnsureClonnerIgroup creates or updates an initiator group with the clonnerIqn
-	EnsureClonnerIgroup(initiatorGroup string, clonnerIqn []string) (MappingContext, error)
-	// Map is responsible for mapping an initiator group to a LUN
+	EnsureClonnerIgroup(initiatorGroup string, adapterIds []string) (MappingContext, error)
+	// Map is responsible to mapping an initiator group to a LUN
 	Map(initatorGroup string, targetLUN LUN, context MappingContext) (LUN, error)
 	// UnMap is responsible for unmapping an initiator group from a LUN
 	UnMap(initatorGroup string, targetLUN LUN, context MappingContext) error
@@ -52,6 +61,7 @@ type StorageMapper interface {
 type VMDKCapable interface {
 	StorageMapper
 	StorageResolver
+	AdapterIdHandler
 }
 
 // MappingContext holds context information for mapping operations
@@ -60,4 +70,22 @@ type MappingContext map[string]any
 // SciniAware indicates that a storage requires scini module (PowerFlex)
 type SciniAware interface {
 	SciniRequired() bool
+}
+
+type AdapterIdHandlerImpl struct {
+	adaptersID []string
+}
+
+func (a *AdapterIdHandlerImpl) GetAdaptersID() ([]string, error) {
+	if len(a.adaptersID) == 0 {
+		return nil, errors.New("adapters ID are not set")
+	}
+	return a.adaptersID, nil
+}
+
+func (a *AdapterIdHandlerImpl) AddAdapterID(adapterID string) {
+	if len(a.adaptersID) == 0 {
+		a.adaptersID = make([]string, 0)
+	}
+	a.adaptersID = append(a.adaptersID, adapterID)
 }

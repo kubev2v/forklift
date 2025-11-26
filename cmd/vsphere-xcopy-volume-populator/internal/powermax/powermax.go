@@ -25,6 +25,7 @@ type PowermaxClonner struct {
 	storageGroupID string
 	hostID         string
 	maskingViewID  string
+	populator.AdapterIdHandlerImpl
 }
 
 // CurrentMappedGroups implements populator.StorageApi.
@@ -147,6 +148,7 @@ h:
 			for _, filteredInit := range filteredInitiators {
 				if strings.HasSuffix(filteredInit, initiator) {
 					p.hostID = hostId
+					p.AddAdapterID(filteredInit)
 					break h
 				}
 			}

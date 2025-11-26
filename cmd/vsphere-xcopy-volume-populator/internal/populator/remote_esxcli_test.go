@@ -117,3 +117,139 @@ var _ = Describe("rescan", func() {
 		})
 	})
 })
+
+var _ = Describe("AdapterIdHandlerImpl", func() {
+	var handler AdapterIdHandlerImpl
+
+	BeforeEach(func() {
+		handler = AdapterIdHandlerImpl{}
+	})
+
+	Describe("GetAdaptersID", func() {
+		Context("when no adapters have been added", func() {
+			It("should return an error", func() {
+				ids, err := handler.GetAdaptersID()
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(Equal("adapters ID are not set"))
+				Expect(ids).To(BeNil())
+			})
+		})
+
+		Context("when adapters have been added", func() {
+			It("should return all added adapters", func() {
+				handler.AddAdapterID("fc.2000000000000001:2100000000000001")
+				handler.AddAdapterID("fc.2000000000000002:2100000000000002")
+				handler.AddAdapterID("fc.2000000000000003:2100000000000003")
+
+				ids, err := handler.GetAdaptersID()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(ids).To(HaveLen(3))
+				Expect(ids[0]).To(Equal("fc.2000000000000001:2100000000000001"))
+				Expect(ids[1]).To(Equal("fc.2000000000000002:2100000000000002"))
+				Expect(ids[2]).To(Equal("fc.2000000000000003:2100000000000003"))
+			})
+
+			It("should return consistent results on multiple calls", func() {
+				handler.AddAdapterID("adapter1")
+				handler.AddAdapterID("adapter2")
+
+				ids1, err1 := handler.GetAdaptersID()
+				Expect(err1).NotTo(HaveOccurred())
+
+				ids2, err2 := handler.GetAdaptersID()
+				Expect(err2).NotTo(HaveOccurred())
+
+				Expect(ids1).To(Equal(ids2))
+			})
+		})
+	})
+
+	Describe("AddAdapterID", func() {
+		Context("when adding a single adapter", func() {
+			It("should store the adapter ID", func() {
+				handler.AddAdapterID("fc.2000000000000001:2100000000000001")
+
+				ids, err := handler.GetAdaptersID()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(ids).To(HaveLen(1))
+				Expect(ids[0]).To(Equal("fc.2000000000000001:2100000000000001"))
+			})
+		})
+
+		Context("when adding multiple adapters", func() {
+			It("should store all adapters in order", func() {
+				adapters := []string{
+					"fc.2000000000000001:2100000000000001",
+					"fc.2000000000000002:2100000000000002",
+					"fc.2000000000000003:2100000000000003",
+				}
+
+				for _, adapter := range adapters {
+					handler.AddAdapterID(adapter)
+				}
+
+				ids, err := handler.GetAdaptersID()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(ids).To(Equal(adapters))
+			})
+		})
+
+		Context("when adding different adapter types", func() {
+			It("should handle FC adapters", func() {
+				handler.AddAdapterID("fc.2000000000000001:2100000000000001")
+
+				ids, err := handler.GetAdaptersID()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(ids).To(HaveLen(1))
+				Expect(ids[0]).To(Equal("fc.2000000000000001:2100000000000001"))
+			})
+
+			It("should handle iSCSI adapters", func() {
+				handler.AddAdapterID("iqn.1998-01.com.vmware:esxi-host1-12345678")
+
+				ids, err := handler.GetAdaptersID()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(ids).To(HaveLen(1))
+				Expect(ids[0]).To(Equal("iqn.1998-01.com.vmware:esxi-host1-12345678"))
+			})
+
+			It("should handle NVMe adapters", func() {
+				handler.AddAdapterID("nqn.2014-08.org.nvmexpress:uuid:12345678-1234-1234-1234-123456789abc")
+
+				ids, err := handler.GetAdaptersID()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(ids).To(HaveLen(1))
+				Expect(ids[0]).To(Equal("nqn.2014-08.org.nvmexpress:uuid:12345678-1234-1234-1234-123456789abc"))
+			})
+
+			It("should handle mixed adapter types", func() {
+				handler.AddAdapterID("fc.2000000000000001:2100000000000001")
+				handler.AddAdapterID("iqn.1998-01.com.vmware:esxi-host1-12345678")
+				handler.AddAdapterID("nqn.2014-08.org.nvmexpress:uuid:12345678-1234-1234-1234-123456789abc")
+
+				ids, err := handler.GetAdaptersID()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(ids).To(HaveLen(3))
+				Expect(ids[0]).To(Equal("fc.2000000000000001:2100000000000001"))
+				Expect(ids[1]).To(Equal("iqn.1998-01.com.vmware:esxi-host1-12345678"))
+				Expect(ids[2]).To(Equal("nqn.2014-08.org.nvmexpress:uuid:12345678-1234-1234-1234-123456789abc"))
+			})
+		})
+
+		Context("when adding duplicate adapters", func() {
+			It("should allow duplicates (no deduplication)", func() {
+				adapterID := "fc.2000000000000001:2100000000000001"
+				handler.AddAdapterID(adapterID)
+				handler.AddAdapterID(adapterID)
+				handler.AddAdapterID(adapterID)
+
+				ids, err := handler.GetAdaptersID()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(ids).To(HaveLen(3))
+				Expect(ids[0]).To(Equal(adapterID))
+				Expect(ids[1]).To(Equal(adapterID))
+				Expect(ids[2]).To(Equal(adapterID))
+			})
+		})
+	})
+})
