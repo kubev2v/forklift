@@ -329,5 +329,11 @@ func NewPowerstoreClonner(hostname, username, password string, sslSkipVerify boo
 		return PowerstoreClonner{}, fmt.Errorf("failed to create PowerStore client: %w", err)
 	}
 
+	ctx := context.Background()
+	_, err = client.GetCluster(ctx)
+	if err != nil {
+		return PowerstoreClonner{}, fmt.Errorf("failed to authenticate with PowerStore backend %s: %w", hostname, err)
+	}
+
 	return PowerstoreClonner{Client: client}, nil
 }
