@@ -305,10 +305,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		}
 		// unmap devices appear dead in ESX right after they are unmapped, now
 		// clean them
-		klog.Infof("about to delete dead devices")
-		klog.Infof("taking a short nap to let the ESX settle down")
-		time.Sleep(5 * time.Second)
-		deleteDeadDevices(p.VSphereClient, host, hbaUIDs, hbaUIDsNamesMap)
+		p.deleteDeadDevices(p.VSphereClient, host, hbaUIDsNamesMap)
 	}()
 
 	// Execute the clone using the unified task handling approach
@@ -381,14 +378,21 @@ func rescan(client vmware.Client, host *object.HostSystem, targetLUN string) err
 	}
 }
 
-func deleteDeadDevices(client vmware.Client, host *object.HostSystem, hbaUIDs []string, hbaUIDsNamesMap map[string]string) error {
-	failedDevices := []string{}
-	for _, adapter := range hbaUIDs {
-		adapterName, ok := hbaUIDsNamesMap[adapter]
-		if !ok {
-			adapterName = adapter
-		}
-		klog.Infof("deleting dead devices for adapter %s", adapterName)
+func (p *RemoteEsxcliPopulator) deleteDeadDevices(client vmware.Client, host *object.HostSystem, hbaUIDsNamesMap map[string]string) error {
+	adapterIDs, err := p.StorageApi.GetAdaptersID()
+	if err != nil {
+		klog.Errorf("failed to get adapter IDs: %s", err)
+		return err
+	}
+	klog.Infof("deleting dead devices for adapters %s", adapterIDs)
+	klog.Infof("about to delete dead devices")
+	klog.Infof("taking a short nap to let the ESX settle down")
+	time.Sleep(5 * time.Second)
+	adaptersNames := make([]string, len(adapterIDs))
+	for i, adapterID := range adapterIDs {
+		adaptersNames[i] = hbaUIDsNamesMap[adapterID]
+	}
+	for _, adapterName := range adaptersNames {
 		success := false
 		for i := 0; i < rescanRetries; i++ {
 			_, errClean := client.RunEsxCommand(
@@ -396,18 +400,15 @@ func deleteDeadDevices(client vmware.Client, host *object.HostSystem, hbaUIDs []
 				host,
 				[]string{"storage", "core", "adapter", "rescan", "-t", "delete", "-A", adapterName})
 			if errClean == nil {
-				klog.Infof("rescan to delete dead devices completed for adapter %s", adapter)
+				klog.Infof("rescan to delete dead devices completed for adapter %s", adapterName)
 				success = true
 				break // finsihed with current adapter, move to the next one
 			}
 			time.Sleep(rescanSleepInterval)
 		}
 		if !success {
-			failedDevices = append(failedDevices, adapter)
+			return fmt.Errorf("failed to delete dead devices for adapter %s", adapterName)
 		}
-	}
-	if len(failedDevices) > 0 {
-		klog.Warningf("failed to delete dead devices for adapters %s", failedDevices)
 	}
 	return nil
 }

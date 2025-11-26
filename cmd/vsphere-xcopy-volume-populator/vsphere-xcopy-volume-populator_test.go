@@ -109,6 +109,7 @@ var _ = Describe("Populator", func() {
 				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any()).Return(nil, nil)
 				storageClient.EXPECT().ResolvePVToLUN(populator.PersistentVolume{Name: "pvc-12345"}).Return(populator.LUN{NAA: "616263"}, nil)
 				storageClient.EXPECT().CurrentMappedGroups(populator.LUN{NAA: "616263"}, nil).Return(nil, fmt.Errorf("some error"))
+				storageClient.EXPECT().GetAdaptersID().Return([]string{"iqn.test"}, nil).AnyTimes()
 			},
 			want: fmt.Errorf("failed to fetch the current initiator groups of the lun : some error"),
 		}),
@@ -142,6 +143,7 @@ var _ = Describe("Populator", func() {
 					Return([]esx.Values{{"message": {`{"exitCode": "0"}`}}}, nil)
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"vmkfstools", "taskClean", "-i", "1"}).Return(nil, nil)
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "adapter", "rescan", "-t", "delete", "-A", "vmhbatest"}).Return(nil, nil)
+				storageClient.EXPECT().GetAdaptersID().Return([]string{"iqn.test"}, nil)
 			},
 			want: nil,
 		}),
