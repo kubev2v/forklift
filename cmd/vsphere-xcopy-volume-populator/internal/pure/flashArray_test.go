@@ -24,7 +24,7 @@ func TestFcUIDToWWPN(t *testing.T) {
 			fcUid:         "fc.2020202020202020",
 			expectedWwpn:  "",
 			expectError:   true,
-			errorContains: "not in the expected fc.WWNN:WWPN format",
+			errorContains: "not in expected fc.WWNN:WWPN format",
 		},
 		{
 			name:          "invalid prefix",
@@ -38,19 +38,19 @@ func TestFcUIDToWWPN(t *testing.T) {
 			fcUid:         "fc.2020202020202020:",
 			expectedWwpn:  "",
 			expectError:   true,
-			errorContains: "not in the expected fc.WWNN:WWPN format",
+			errorContains: "empty WWNN or WWPN",
 		},
 		{
 			name:          "odd length wwpn",
 			fcUid:         "fc.2020202020202020:12345",
 			expectedWwpn:  "",
 			expectError:   true,
-			errorContains: "length isn't even",
+			errorContains: "odd length",
 		},
 		{
 			name:         "lowercase input",
-			fcUid:        "fc.2020202020202020:2a2b2c2d2e2f2g2h",
-			expectedWwpn: "2A:2B:2C:2D:2E:2F:2G:2H",
+			fcUid:        "fc.2020202020202020:2a2b2c2d2e2f2021",
+			expectedWwpn: "2A:2B:2C:2D:2E:2F:20:21", // NOSONAR
 			expectError:  false,
 		},
 		{

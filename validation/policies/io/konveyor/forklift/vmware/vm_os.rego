@@ -36,6 +36,14 @@ is_supported if {
     contains(lower_name, lower_substring)
 }
 
+is_supported if {
+    is_string(input.guestName)
+    lower_name := lower(input.guestName)
+    some i
+    lower_substring := lower(supported_os_name_substrings[i])
+    contains(lower_name, lower_substring)
+}
+
 has_unsupported_os if {
     has_guest_id_or_name
     not is_supported

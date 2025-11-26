@@ -616,13 +616,8 @@ mockgen-install:
 
 opa-bin:
 ifeq (, $(shell command -v opa))
-	@{ \
-	set -e ;\
-	mkdir -p ${HOME}/.local/bin ; \
-	curl -sL -o ${HOME}/.local/bin/opa https://openpolicyagent.org/downloads/v0.65.0/opa_linux_amd64_static ; \
-	chmod 755 ${HOME}/.local/bin/opa ;\
-	}
-OPA=${HOME}/.local/bin/opa
+	GOBIN=$(GOBIN) go install github.com/open-policy-agent/opa@v1.8.0
+OPA=$(GOBIN)/opa
 else
 OPA=$(shell which opa)
 endif
