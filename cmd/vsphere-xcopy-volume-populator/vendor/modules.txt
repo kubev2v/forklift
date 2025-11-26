@@ -21,8 +21,8 @@ github.com/coreos/go-systemd/v22/dbus
 # github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 ## explicit
 github.com/davecgh/go-spew/spew
-# github.com/elastic/go-sysinfo v1.14.2
-## explicit; go 1.21
+# github.com/elastic/go-sysinfo v1.15.4
+## explicit; go 1.23.0
 github.com/elastic/go-sysinfo
 github.com/elastic/go-sysinfo/internal/registry
 github.com/elastic/go-sysinfo/providers/aix
@@ -31,8 +31,8 @@ github.com/elastic/go-sysinfo/providers/linux
 github.com/elastic/go-sysinfo/providers/shared
 github.com/elastic/go-sysinfo/providers/windows
 github.com/elastic/go-sysinfo/types
-# github.com/elastic/go-windows v1.0.0
-## explicit
+# github.com/elastic/go-windows v1.0.2
+## explicit; go 1.18
 github.com/elastic/go-windows
 # github.com/emicklei/go-restful/v3 v3.11.0
 ## explicit; go 1.13
