@@ -71,6 +71,7 @@ const (
 	ESXiCloneMethod        = "esxiCloneMethod"
 )
 
+const DynamicProviderFinalizer = "forklift/dynamic-provider"
 const OvaProviderFinalizer = "forklift/ova-provider"
 
 // Defines the desired state of Provider.
@@ -85,6 +86,81 @@ type ProviderSpec struct {
 	Secret core.ObjectReference `json:"secret" ref:"Secret"`
 	// Provider settings.
 	Settings map[string]string `json:"settings,omitempty"`
+	// Volumes to mount in the provider's plugin server pod.
+	// These are NOT created by the controller - they must already exist or be inline sources.
+	// Supports any standard Kubernetes VolumeSource (NFS, existing PVC, ConfigMap, Secret, etc.).
+	// Use this for mounting existing data sources like NFS shares with VM files or config data.
+	// For dynamic storage that the controller should create, use DynamicProvider.spec.storages instead.
+	// +optional
+	Volumes []ProviderVolume `json:"volumes,omitempty"`
+	// Node selector for scheduling the provider server pod.
+	// Only applies to dynamic provider servers.
+	// +optional
+	ServerNodeSelector map[string]string `json:"serverNodeSelector,omitempty"`
+	// Affinity rules for scheduling the provider server pod.
+	// Only applies to dynamic provider servers.
+	// +optional
+	ServerAffinity *core.Affinity `json:"serverAffinity,omitempty"`
+}
+
+// ProviderVolume defines a volume to mount in the provider's plugin server pod.
+// This is a reference to an existing volume source or inline volume definition.
+// The controller does NOT create any resources for these volumes - they must already exist
+// (for PVCs, ConfigMaps, Secrets) or be inline definitions (NFS, HostPath, etc.).
+// Think of this as equivalent to volumes[] in a Pod spec.
+type ProviderVolume struct {
+	// Name of the volume. Must be unique within the provider.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Path where the volume should be mounted in the container.
+	// +kubebuilder:validation:Required
+	MountPath string `json:"mountPath"`
+
+	// Subpath within the volume to mount (optional).
+	// +optional
+	SubPath string `json:"subPath,omitempty"`
+
+	// Mount as read-only if true, read-write otherwise (defaults to false).
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty"`
+
+	// Standard Kubernetes VolumeSource - can be any type supported by Kubernetes.
+	// Common examples: nfs, persistentVolumeClaim, configMap, secret, emptyDir.
+	// This is embedded directly in the Pod spec - no separate resources are created.
+	// +kubebuilder:validation:Required
+	VolumeSource core.VolumeSource `json:"source"`
+}
+
+// ProviderFeatures defines feature flags for dynamic providers.
+// Dynamic providers declare their capabilities via these flags.
+type ProviderFeatures struct {
+	// Indicates if this provider requires guest OS conversion during migration.
+	// When true, virt-v2v conversion pods are created for disk format conversion.
+	// +optional
+	RequiresConversion bool `json:"requiresConversion,omitempty"`
+	// Supported migration types for this provider.
+	// Valid values: "cold", "warm", "live", "conversion"
+	// If empty, defaults to ["cold"]
+	// +optional
+	SupportedMigrationTypes []MigrationType `json:"supportedMigrationTypes,omitempty"`
+	// Indicates if this provider implements a custom VM spec builder.
+	// When true, the controller calls POST /vms/{id}/build-spec to get the VM spec.
+	// When false, the controller uses the generic builder.
+	// +optional
+	SupportsCustomBuilder bool `json:"supportsCustomBuilder,omitempty"`
+}
+
+// ServiceEndpoint contains connection information for a provider service endpoint.
+// This is used to tell the proxy where to forward requests for this provider.
+type ServiceEndpoint struct {
+	// Name of the service.
+	Name string `json:"name"`
+	// Namespace of the service.
+	Namespace string `json:"namespace"`
+	// Port of the service (defaults to 8080 if not specified).
+	// +optional
+	Port *int32 `json:"port,omitempty"`
 }
 
 // ProviderStatus defines the observed state of Provider
@@ -100,9 +176,13 @@ type ProviderStatus struct {
 	// Fingerprint.
 	// +optional
 	Fingerprint string `json:"fingerprint,omitempty"`
-	// Provider service reference
+	// Service endpoint for this provider.
+	// Used by the proxy to forward inventory and migration requests.
 	// +optional
-	Service *core.ObjectReference `json:"service,omitempty"`
+	Service *ServiceEndpoint `json:"service,omitempty"`
+	// Feature flags for dynamic providers.
+	// +optional
+	Features *ProviderFeatures `json:"features,omitempty"`
 }
 
 // +genclient
@@ -165,7 +245,15 @@ func (p *Provider) HasReconciled() bool {
 
 // This provider requires VM guest conversion.
 func (p *Provider) RequiresConversion() bool {
-	return p.Type() == VSphere || p.Type() == Ova
+	// Check if this is a static provider type that requires conversion
+	if p.Type() == VSphere || p.Type() == Ova {
+		return true
+	}
+	// For dynamic providers, check the feature flags
+	if p.Status.Features != nil {
+		return p.Status.Features.RequiresConversion
+	}
+	return false
 }
 
 // This provider support the vddk aio parameters.

@@ -97,21 +97,21 @@
       definition: "{{ lookup('template', 'controller/controller-scc.yml.j2') }}"
     when: not k8s_cluster|bool
 
-  - name: "Setup OVA inventory proxy deployment"
+  - name: "Setup Forklift proxy deployment"
     k8s:
       state: present
-      definition: "{{ lookup('template', 'ova-proxy/deployment.yml.j2') }}"
+      definition: "{{ lookup('template', 'forklift-proxy/deployment.yml.j2') }}"
 
-  - name: "Setup OVA inventory proxy service"
+  - name: "Setup Forklift proxy service"
     k8s:
       state: present
-      definition: "{{ lookup('template', 'ova-proxy/service.yml.j2') }}"
+      definition: "{{ lookup('template', 'forklift-proxy/service.yml.j2') }}"
 
   - when: not k8s_cluster|bool
-    name: "Setup OVA inventory proxy route"
+    name: "Setup Forklift proxy route"
     k8s:
       state: present
-      definition: "{{ lookup('template', 'ova-proxy/route.yml.j2') }}"
+      definition: "{{ lookup('template', 'forklift-proxy/route.yml.j2') }}"
 
   - when: not k8s_cluster|bool
     block:
@@ -170,10 +170,10 @@
       k8s:
         state: present
         definition: "{{ lookup('template', 'controller/ca.yml.j2') }}"
-    - name: "Configure OVA inventory proxy certificate on K8s"
+    - name: "Configure Forklift proxy certificate on K8s"
       k8s:
         state: present
-        definition: "{{ lookup('template', 'ova-proxy/ca.yml.j2') }}"
+        definition: "{{ lookup('template', 'forklift-proxy/ca.yml.j2') }}"
 
   - name: "Setup api service"
     k8s:

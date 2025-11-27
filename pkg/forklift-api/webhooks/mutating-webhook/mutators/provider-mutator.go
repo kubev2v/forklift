@@ -7,7 +7,6 @@ import (
 	"github.com/kubev2v/forklift/pkg/forklift-api/webhooks/util"
 	admissionv1 "k8s.io/api/admission/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	k8sutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 type ProviderMutator struct {
@@ -81,9 +80,9 @@ func (mutator *ProviderMutator) setSdkEndpointIfNeeded() bool {
 }
 
 func (mutator *ProviderMutator) setFinalizers() bool {
-	var changed bool
-	if mutator.provider.Type() == api.Ova {
-		changed = k8sutil.AddFinalizer(&(mutator.provider), api.OvaProviderFinalizer)
-	}
-	return changed
+	// Finalizers are no longer needed - cleanup is handled automatically via owner references:
+	// - Dynamic providers: DynamicProviderServer controller manages cleanup with blocking owner references
+	// - OVA providers: OVAProviderServer controller manages cleanup with blocking owner references
+	// The provider controller removes any legacy finalizers that may still exist
+	return false
 }

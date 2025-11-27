@@ -21,7 +21,17 @@ func (r Reconciler) EnsureOVAProviderServer(ctx context.Context, provider *api.P
 		err = liberr.Wrap(err)
 		return
 	}
-	provider.Status.Service = server.Status.Service
+
+	// Convert ObjectReference to ServiceEndpoint
+	if server.Status.Service != nil {
+		servicePort := int32(8080) // Default OVA server port
+		provider.Status.Service = &api.ServiceEndpoint{
+			Name:      server.Status.Service.Name,
+			Namespace: server.Status.Service.Namespace,
+			Port:      &servicePort,
+		}
+	}
+
 	cnd := server.Status.FindCondition(ova.ApplianceManagementEnabled)
 	if cnd != nil {
 		provider.Status.SetCondition(*cnd)

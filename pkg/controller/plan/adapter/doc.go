@@ -3,11 +3,13 @@ package adapter
 import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
+	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/dynamic"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/openstack"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/ova"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/ovirt"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/vsphere"
+	dynamicregistry "github.com/kubev2v/forklift/pkg/controller/provider/web/dynamic"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 )
 
@@ -33,7 +35,12 @@ func New(provider *api.Provider) (adapter Adapter, err error) {
 	case api.Ova:
 		adapter = &ova.Adapter{}
 	default:
-		err = liberr.New("provider not supported.")
+		// Check if this is a registered dynamic provider
+		if dynamicregistry.Registry.IsDynamic(string(provider.Type())) {
+			adapter = &dynamic.Adapter{}
+		} else {
+			err = liberr.New("provider not supported.")
+		}
 	}
 
 	return

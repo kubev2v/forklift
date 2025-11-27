@@ -1,0 +1,58 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ app_name }}
+    subapp: {{ forklift_proxy_subapp_name }}
+  name: {{ forklift_proxy_service_name }}
+  namespace: {{ app_namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ app_name }}
+      subapp: {{ forklift_proxy_subapp_name }}
+  template:
+    metadata:
+      labels:
+        app: {{ app_name }}
+        subapp: {{ forklift_proxy_subapp_name }}
+    spec:
+      serviceAccountName: {{ controller_service_name }}
+      containers:
+      - name: main
+        command:
+        - /usr/local/bin/forklift-proxy
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: PORT
+          value: "8443"
+        - name: TLS_CERTIFICATE
+          value: "/var/run/secrets/{{ forklift_proxy_tls_secret_name }}/tls.crt"
+        - name: TLS_KEY
+          value: /var/run/secrets/{{ forklift_proxy_tls_secret_name }}/tls.key
+        image: {{ forklift_proxy_fqin }}
+        imagePullPolicy: {{ image_pull_policy }}
+        resources:
+          limits:
+            cpu: {{ forklift_proxy_container_limits_cpu }}
+            memory: {{ forklift_proxy_container_limits_memory }}
+          requests:
+            cpu: {{ forklift_proxy_container_requests_cpu }}
+            memory: {{ forklift_proxy_container_requests_memory }}
+        ports:
+        - name: api
+          containerPort: 8443
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /var/run/secrets/{{ forklift_proxy_tls_secret_name }}
+          name: {{ forklift_proxy_tls_secret_name }}
+      terminationGracePeriodSeconds: 10
+      volumes:
+      - name: {{ forklift_proxy_tls_secret_name }}
+        secret:
+          defaultMode: 420
+          secretName: {{ forklift_proxy_tls_secret_name }}

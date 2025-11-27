@@ -11,6 +11,7 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/base"
 	"github.com/kubev2v/forklift/pkg/controller/provider/container"
+	dynamicregistry "github.com/kubev2v/forklift/pkg/controller/provider/web/dynamic"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libref "github.com/kubev2v/forklift/pkg/lib/ref"
@@ -110,11 +111,26 @@ func (r *Reconciler) validate(provider *api.Provider) error {
 
 // Validate types.
 func (r *Reconciler) validateType(provider *api.Provider) error {
+	// Check if it's a static provider type
 	for _, p := range api.ProviderTypes {
 		if p == provider.Type() {
 			return nil
 		}
 	}
+
+	// Check if it's a registered dynamic provider type
+	if dynamicregistry.Registry.IsDynamic(string(provider.Type())) {
+		return nil
+	}
+
+	// Not a valid type - fail validation
+	// Build combined list of all valid types (static + dynamic)
+	validTypes := make([]string, 0, len(api.ProviderTypes))
+	for _, t := range api.ProviderTypes {
+		validTypes = append(validTypes, string(t))
+	}
+	dynamicTypes := dynamicregistry.Registry.GetTypes()
+	validTypes = append(validTypes, dynamicTypes...)
 
 	provider.Status.Phase = ValidationFailed
 	provider.Status.SetCondition(
@@ -123,10 +139,31 @@ func (r *Reconciler) validateType(provider *api.Provider) error {
 			Status:   True,
 			Reason:   NotSupported,
 			Category: Critical,
-			Message:  fmt.Sprintf("The `type` must be: %s", api.ProviderTypes),
+			Message:  fmt.Sprintf("The `type` must be one of: %v", validTypes),
 		})
 
 	return nil
+}
+
+// getSecretByRef retrieves a secret by ObjectReference.
+// Returns the secret and a boolean indicating if it was found.
+// Sets appropriate validation conditions on the provider if not found.
+func (r *Reconciler) getSecretByRef(ref core.ObjectReference, provider *api.Provider, notFoundCnd libcnd.Condition) (*core.Secret, bool, error) {
+	secret := &core.Secret{}
+	key := client.ObjectKey{
+		Namespace: ref.Namespace,
+		Name:      ref.Name,
+	}
+	err := r.Get(context.TODO(), key, secret)
+	if k8serrors.IsNotFound(err) {
+		provider.Status.Phase = ValidationFailed
+		provider.Status.SetCondition(notFoundCnd)
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, liberr.Wrap(err)
+	}
+	return secret, true, nil
 }
 
 // Validate the URL.
@@ -201,43 +238,69 @@ func (r *Reconciler) validateConnectionStatus(provider *api.Provider, secret *co
 // Validate secret (ref).
 //  1. The references is complete.
 //  2. The secret exists.
-//  3. the content of the secret is valid.
+//  3. the content of the secret is valid (static providers only).
 func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret, err error) {
 	if provider.IsHost() {
 		return
 	}
-	// NotSet
+
+	ref := provider.Spec.Secret
+	isDynamic := dynamicregistry.Registry.IsDynamic(string(provider.Type()))
+
+	// a. If dynamic provider and no secret reference → OK
+	if isDynamic && !libref.RefSet(&ref) {
+		log.V(3).Info("No secret provided for dynamic provider - authentication will be handled by provider server",
+			"provider", provider.Name,
+			"type", provider.Type())
+		return
+	}
+
+	// b. Check if secret reference is set (required for static providers)
+	if !libref.RefSet(&ref) {
+		provider.Status.Phase = ValidationFailed
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     SecretNotValid,
+			Status:   True,
+			Reason:   NotSet,
+			Category: Critical,
+			Message:  "The `secret` is not valid.",
+		})
+		return
+	}
+
+	// c. Get secret, error if not found
+	notFoundCnd := libcnd.Condition{
+		Type:     SecretNotValid,
+		Status:   True,
+		Reason:   NotFound,
+		Category: Critical,
+		Message:  "The referenced secret cannot be found.",
+	}
+	var found bool
+	secret, found, err = r.getSecretByRef(ref, provider, notFoundCnd)
+	if err != nil {
+		return
+	}
+	if !found {
+		return
+	}
+
+	// d. For dynamic providers, we're done (secret exists, contents validated by provider server)
+	if isDynamic {
+		log.V(3).Info("Secret found for dynamic provider - will be mounted to provider server",
+			"provider", provider.Name,
+			"secret", secret.Name)
+		return
+	}
+
+	// e. Continue to validate secret contents for static providers
 	newCnd := libcnd.Condition{
 		Type:     SecretNotValid,
 		Status:   True,
-		Reason:   NotSet,
 		Category: Critical,
 		Message:  "The `secret` is not valid.",
+		Items:    []string{},
 	}
-	ref := provider.Spec.Secret
-	if !libref.RefSet(&ref) {
-		provider.Status.Phase = ValidationFailed
-		provider.Status.SetCondition(newCnd)
-		return
-	}
-	// NotFound
-	secret = &core.Secret{}
-	key := client.ObjectKey{
-		Namespace: ref.Namespace,
-		Name:      ref.Name,
-	}
-	err = r.Get(context.TODO(), key, secret)
-	if k8serrors.IsNotFound(err) {
-		err = nil
-		newCnd.Reason = NotFound
-		provider.Status.Phase = ValidationFailed
-		provider.Status.SetCondition(newCnd)
-		return
-	}
-	if err != nil {
-		err = liberr.Wrap(err)
-	}
-	// DataErr
 	keyList := []string{}
 	switch provider.Type() {
 	case api.OpenShift:
@@ -311,7 +374,25 @@ func (r *Reconciler) testConnection(provider *api.Provider, secret *core.Secret)
 	if provider.Status.HasBlockerCondition() {
 		return nil
 	}
+
+	// For dynamic providers, skip the upfront connection test.
+	// The connection test is performed by the provider server via the /test_connection endpoint.
+	// This happens later when the dynamic collector's Test() method is called.
+	// Dynamic providers handle their own authentication (with or without secrets).
+	if dynamicregistry.Registry.IsDynamic(string(provider.Type())) {
+		return nil
+	}
+
+	// For static providers, test connection using the traditional collectors
 	rl := container.Build(nil, provider, secret)
+	if rl == nil {
+		// This shouldn't happen for known static provider types
+		log.Error(nil, "Failed to build collector for provider",
+			"provider", provider.Name,
+			"type", provider.Type())
+		return nil
+	}
+
 	status, err := rl.Test()
 	if err == nil {
 		log.Info(

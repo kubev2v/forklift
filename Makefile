@@ -103,7 +103,7 @@ POPULATOR_CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/populator-controller:$
 OVIRT_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/ovirt-populator:$(REGISTRY_TAG)
 OPENSTACK_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/openstack-populator:$(REGISTRY_TAG)
 OVA_PROVIDER_SERVER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-provider-server:$(REGISTRY_TAG)
-OVA_PROXY_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-proxy:$(REGISTRY_TAG)
+FORKLIFT_PROXY_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-proxy:$(REGISTRY_TAG)
 CLI_DOWNLOAD_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-cli-download:$(REGISTRY_TAG)
 VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/vsphere-xcopy-volume-populator:$(REGISTRY_TAG)
 
@@ -332,7 +332,7 @@ build-operator-bundle-image: check_container_runtime
 		--build-arg UI_PLUGIN_IMAGE=$(UI_PLUGIN_IMAGE) \
 		--build-arg CLI_DOWNLOAD_IMAGE=$(CLI_DOWNLOAD_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg OVA_PROVIDER_SERVER_IMAGE=$(OVA_PROVIDER_SERVER_IMAGE)$(PLATFORM_SUFFIX) \
-		--build-arg OVA_PROXY_IMAGE=$(OVA_PROXY_IMAGE)$(PLATFORM_SUFFIX)
+		--build-arg FORKLIFT_PROXY_IMAGE=$(FORKLIFT_PROXY_IMAGE)$(PLATFORM_SUFFIX)
 
 push-operator-bundle-image: build-operator-bundle-image
 	$(CONTAINER_CMD) push $(OPERATOR_BUNDLE_IMAGE)$(PLATFORM_SUFFIX)
@@ -407,11 +407,11 @@ build-cli-download-image: check_container_runtime
 push-cli-download-image: build-cli-download-image
 	$(CONTAINER_CMD) push $(CLI_DOWNLOAD_IMAGE)$(PLATFORM_SUFFIX)
 
-build-ova-proxy-image: check_container_runtime
-	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(OVA_PROXY_IMAGE)$(PLATFORM_SUFFIX) -f build/ova-proxy/Containerfile .
+build-forklift-proxy-image: check_container_runtime
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(FORKLIFT_PROXY_IMAGE)$(PLATFORM_SUFFIX) -f build/forklift-proxy/Containerfile .
 
-push-ova-proxy-image: build-ova-proxy-image
-	$(CONTAINER_CMD) push $(OVA_PROXY_IMAGE)$(PLATFORM_SUFFIX)
+push-forklift-proxy-image: build-forklift-proxy-image
+	$(CONTAINER_CMD) push $(FORKLIFT_PROXY_IMAGE)$(PLATFORM_SUFFIX)
 
 build-all-images: build-api-image \
                   build-controller-image \
@@ -424,7 +424,7 @@ build-all-images: build-api-image \
                   build-vsphere-xcopy-volume-populator-image\
                   build-ova-provider-server-image \
                   build-cli-download-image \
-                  build-ova-proxy-image \
+                  build-forklift-proxy-image \
                   build-operator-bundle-image \
                   build-operator-index-image
 
@@ -439,7 +439,7 @@ push-all-images:  push-api-image \
                   push-vsphere-xcopy-volume-populator-image\
                   push-ova-provider-server-image \
                   push-cli-download-image \
-                  push-ova-proxy-image \
+                  push-forklift-proxy-image \
                   push-operator-bundle-image \
 				  push-operator-index-image            
 
@@ -520,12 +520,12 @@ push-cli-download-image-manifest:
 		$(CLI_DOWNLOAD_IMAGE)-arm64
 	$(CONTAINER_CMD) manifest push $(CLI_DOWNLOAD_IMAGE)
 
-push-ova-proxy-image-manifest:
-	$(CONTAINER_CMD) manifest rm $(OVA_PROXY_IMAGE) || true
-	$(CONTAINER_CMD) manifest create $(OVA_PROXY_IMAGE) \
-		$(OVA_PROXY_IMAGE)-amd64 \
-		$(OVA_PROXY_IMAGE)-arm64
-	$(CONTAINER_CMD) manifest push $(OVA_PROXY_IMAGE)
+push-forklift-proxy-image-manifest:
+	$(CONTAINER_CMD) manifest rm $(FORKLIFT_PROXY_IMAGE) || true
+	$(CONTAINER_CMD) manifest create $(FORKLIFT_PROXY_IMAGE) \
+		$(FORKLIFT_PROXY_IMAGE)-amd64 \
+		$(FORKLIFT_PROXY_IMAGE)-arm64
+	$(CONTAINER_CMD) manifest push $(FORKLIFT_PROXY_IMAGE)
 
 push-operator-bundle-image-manifest:
 	$(CONTAINER_CMD) manifest rm $(OPERATOR_BUNDLE_IMAGE) || true
@@ -552,7 +552,7 @@ push-all-images-manifest: push-controller-image-manifest \
                           push-vsphere-xcopy-volume-populator-image-manifest \
                           push-ova-provider-server-image-manifest \
                           push-cli-download-image-manifest \
-                          push-ova-proxy-image-manifest \
+                          push-forklift-proxy-image-manifest \
                           push-operator-bundle-image-manifest \
                           push-operator-index-image-manifest
 

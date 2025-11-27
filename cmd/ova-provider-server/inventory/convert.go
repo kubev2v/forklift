@@ -119,6 +119,7 @@ func ConvertToVmStruct(envelope []ova.Envelope, ovaPath []string) []ova.VM {
 				id = vmIDmap.GetUUID(newVM, ovaPath[i])
 			}
 			newVM.UUID = id
+			newVM.ID = id // Set ID field for dynamic inventory compatibility
 
 			vms = append(vms, newVM)
 		}

@@ -1,0 +1,19 @@
+apiVersion: forklift.konveyor.io/v1beta1
+kind: Provider
+metadata:
+  name: nfs-demo-provider
+  namespace: openshift-mtv
+spec:
+  type: nfs
+  url: nfs://nas.example.com/ova
+  secret: {}  # No credentials needed for NFS
+  
+  volumes:
+    - name: nfs-ova-storage
+      mountPath: /ova  # OVA server expects this path
+      source:
+        nfs:
+          server: nas.example.com
+          path: /exports/ova
+          readOnly: true
+
