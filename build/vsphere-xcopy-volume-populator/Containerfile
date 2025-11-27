@@ -22,12 +22,11 @@ FROM registry.access.redhat.com/ubi9-minimal:9.6-1752587672
 COPY --from=builder /usr/src/app/cmd/vsphere-xcopy-volume-populator/bin/vsphere-xcopy-volume-populator \
     /bin/vsphere-xcopy-volume-populator
 
+COPY --from=builder /usr/src/app/cmd/vsphere-xcopy-volume-populator/bin/vib-installer \
+    /bin/vib-installer
+
 COPY --from=builder /usr/src/app/cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper/vmkfstools-wrapper.vib \
     /bin/vmkfstools-wrapper.vib
-COPY --from=builder /usr/src/app/cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper/vib-install-playbook.yaml \
-    /bin/vib-install-playbook.yaml
-COPY --from=builder /usr/src/app/cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper/esxi_hosts.yaml \
-    /bin/esxi_hosts.yaml
 
 ENTRYPOINT ["/bin/vsphere-xcopy-volume-populator"]
 
