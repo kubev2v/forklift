@@ -24,6 +24,11 @@ spec:
         prometheus.forklift.konveyor.io: "true" 
       annotations:
         configHash: "{{ (inventory_volume_path | string) }}"
+{% if controller_transfer_network is defined %}
+        k8s.v1.cni.cncf.io/networks: "{{ controller_transfer_network }}"
+{% else %}
+        k8s.v1.cni.cncf.io/networks: null
+{% endif %}
     spec:
       serviceAccountName: {{ controller_service_name }}
       containers:
