@@ -1,0 +1,105 @@
+---
+# PreHook: Install cloud-init on the VM before migration
+# This prepares the VM for cloud-native operations in OpenShift Virtualization
+
+- name: PreHook - Setup SSH and load MTV metadata
+  hosts: localhost
+  gather_facts: yes
+  tasks:
+    - name: Load migration Plan metadata
+      include_vars:
+        file: plan.yml
+        name: plan
+
+    - name: Load VM workload metadata
+      include_vars:
+        file: workload.yml
+        name: workload
+
+    - name: Get current user info for SSH setup
+      getent:
+        database: passwd
+        key: "{{ ansible_user_id }}"
+        split: ':'
+
+    - name: Ensure SSH directory exists
+      file:
+        path: ~/.ssh
+        state: directory
+        mode: 0750
+      environment:
+        HOME: "{{ ansible_facts.getent_passwd[ansible_user_id][4] }}"
+
+    - name: Retrieve SSH credentials from Kubernetes Secret
+      k8s_info:
+        api_version: v1
+        kind: Secret
+        name: vm-ssh-credentials
+        namespace: konveyor-forklift
+      register: ssh_credentials
+
+    - name: Create SSH private key file
+      copy:
+        dest: ~/.ssh/mtv_migration_key
+        content: "{{ ssh_credentials.resources[0].data.key | b64decode }}"
+        mode: 0600
+
+    - name: Add target VM to Ansible inventory
+      add_host:
+        name: "{{ workload.vm.ipaddress }}"
+        ansible_user: root
+        ansible_ssh_private_key_file: ~/.ssh/mtv_migration_key
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+        groups: target_vms
+
+- name: Install cloud-init on target VM
+  hosts: target_vms
+  gather_facts: yes
+  tasks:
+    - name: Install cloud-init package (RHEL/CentOS)
+      dnf:
+        name:
+          - cloud-init
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Install cloud-init package (Debian/Ubuntu)
+      apt:
+        name:
+          - cloud-init
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Enable cloud-init services
+      systemd:
+        name: "{{ item }}"
+        enabled: yes
+      loop:
+        - cloud-init-local
+        - cloud-init
+        - cloud-config
+        - cloud-final
+      ignore_errors: yes
+
+    - name: Create cloud-init config directory
+      file:
+        path: /etc/cloud/cloud.cfg.d
+        state: directory
+        mode: 0755
+
+    - name: Configure cloud-init datasource for OpenShift
+      copy:
+        dest: /etc/cloud/cloud.cfg.d/99-openshift.cfg
+        content: |
+          # OpenShift Virtualization datasource configuration
+          datasource_list: [ NoCloud, ConfigDrive, None ]
+          datasource:
+            NoCloud:
+              fs_label: cidata
+        mode: 0644
+
+    - name: Log completion
+      debug:
+        msg: "cloud-init installation completed successfully on {{ inventory_hostname }}"
+
