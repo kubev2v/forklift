@@ -38,7 +38,13 @@ build: fmt vet
 	PATH=$(PATH) \
 	go build \
 	-ldflags="-w -s -X github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator.VibVersion=$(VIB_VERSION)" \
-	-o bin/vsphere-xcopy-volume-populator
+	-o bin/vsphere-xcopy-volume-populator \
+	vsphere-xcopy-volume-populator.go
+	PATH="$(PATH)" \
+	go build \
+	-ldflags="-w -s" \
+	-o bin/vib-installer \
+	cmd/vib-installer.go
 
 MOCKGEN := $(shell which mockgen 2>/dev/null)
 install-mockgen:
