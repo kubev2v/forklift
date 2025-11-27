@@ -74,6 +74,7 @@ const (
 	Succeeded                       = "Succeeded"
 	Failed                          = "Failed"
 	Canceled                        = "Canceled"
+	ConversionHasWarnings           = "ConversionHasWarnings"
 	Deleted                         = "Deleted"
 	Paused                          = "Paused"
 	Archived                        = "Archived"
