@@ -478,15 +478,50 @@ Provider specific entries in the secret shall be documented below:
   standard error reasons and vanish after the next try. If the popoulator fails the migration
   can be restarted. We may want to restart/retry that populator or restart the migration.
 
-- VIB issues
-  If the vib is installed but the /etc/init.d/hostd did not restart then the vmkfstools namespace in esxcli is either not updated or doesn't exist. If it doesn't exist, it means that is the first time usage, probably right after the first use.
-  The error returned by the remote esxcli invocation is:
+### VIB Issues
+
+- **Issue**: VIB installed but vmkfstools namespace not available
+
+  If the VIB is installed but `/etc/init.d/hostd` did not restart, the vmkfstools namespace in esxcli is either not updated or doesn't exist. This typically occurs on first-time usage, right after installation.
+
+  **Error message:**
   ```
   CLI Fault: The object or item referred to could not be found. <obj xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="urn:vim25" versionId="5.0" xsi:type="LocalizedMethodFault"><fault xsi:type="NotFound"></fault><localizedMessage>The object or item referred to could not be found.</localizedMessage></obj>
   ```
-  
-    resolution: ssh into the ESXi and run `/etc/init.d/hostd restart`. Wait for few seconds till the ESX renews the connection with vSphere.
 
+  **Resolution**: SSH into the ESXi host and run `/etc/init.d/hostd restart`. Wait a few seconds for the ESX to renew its connection with vSphere.
+
+- **Issue**: Running multiple VIB operations in parallel on the same host
+
+  Running multiple VIB operations in parallel might cause memory issues. VIB operation costs and limits are computed internally per ESXi specs.
+
+  **Error message:**
+  ```
+  about to run esxcli command [software vib get -n vmkfstools-wrapper]
+  CLI Fault: EsxCLI.CLIFault.summary <obj xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="urn:vim25" versionId="5.0" xsi:type="LocalizedMethodFault"><fault xsi:type="VimEsxCLICLIFault"><errMsg>Got no data from process.
+  Command &quot;LANG=en_US.UTF-8 /usr/lib/vmware/esxcli-software vib.get  -n &quot;vmkfstools-wrapper&quot; &quot;
+  exited with error code: 1</errMsg></fault><localizedMessage>EsxCLI.CLIFault.summary</localizedMessage></obj>
+  E1107 05:32:10.626268       1 client.go:60] Failed to run esxcli command: <nil> EsxCLI.CLIFault.summary *esx.Fault
+  ```
+
+  **Resolution**: Restart the migration with fewer VMs per host.
+
+- **Issue**: tmpfs full on ESXi host
+
+  The esxcli-wrapper can fail if tmpfs is too full, as this process's memory is allocated from tmpfs.
+
+  **Error message:**
+  ```
+  <?xml version="1.0"?>
+  <o>
+      <structure typeName="result">
+          <field name="status"><string>error</string></field>
+          <field name="message"><string>Error starting clone: [Errno 28] No space left on device</string></field>
+      </structure>
+  </o>
+  ```
+
+  **Resolution**: Clean `/tmp` on the ESXi host.
 ## SSH Method
 - **Error**: `manual SSH key configuration required` or `failed to connect via SSH`
   
