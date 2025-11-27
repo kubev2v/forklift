@@ -155,6 +155,10 @@ spec:
                 type: string
                 description: "Controller memory request (default: 350Mi)"
                 example: "500Mi"
+              controller_transfer_network:
+                type: string
+                description: "Optional NAD name for controller pod transfer network (format: 'namespace/network-name')"
+                example: "openshift-mtv/transfer-network"
 
               # Inventory Resource Configuration
               inventory_container_limits_cpu:
