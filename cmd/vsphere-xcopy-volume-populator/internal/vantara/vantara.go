@@ -23,6 +23,7 @@ const (
 
 type VantaraCloner struct {
 	api VantaraStorageAPI
+	populator.AdapterIdHandlerImpl
 }
 
 func NewVantaraClonner(hostname, username, password string) (VantaraCloner, error) {
