@@ -6,7 +6,9 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/provider"
 	"github.com/kubev2v/forklift/pkg/controller/base"
-	"github.com/kubev2v/forklift/pkg/lib/condition"
+	vspheremodel "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
+	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -109,6 +111,162 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 		})
 	})
 })
+
+var _ = ginkgo.Describe("vmUsesVddk", func() {
+	var (
+		reconciler *Reconciler
+	)
+
+	ginkgo.BeforeEach(func() {
+		reconciler = createFakeReconciler()
+	})
+
+	// Helper to create a vsphere.VM with disks
+	createVSphereVM := func(name string, diskDatastores []string) *vsphere.VM {
+		disks := []vspheremodel.Disk{}
+		for i, dsID := range diskDatastores {
+			disks = append(disks, vspheremodel.Disk{
+				Key: int32(i + 2000),
+				Datastore: vspheremodel.Ref{
+					ID: dsID,
+				},
+			})
+		}
+		return &vsphere.VM{
+			VM1: vsphere.VM1{
+				VM0: vsphere.VM0{
+					ID:   name + "-id",
+					Path: name,
+				},
+				Disks: disks,
+			},
+		}
+	}
+
+	// Helper to create a StorageMap
+	createStorageMap := func(datastorePairs []struct {
+		datastoreID string
+		hasOffload  bool
+	}) *api.StorageMap {
+		pairs := []api.StoragePair{}
+		for _, pair := range datastorePairs {
+			sp := api.StoragePair{
+				Source: ref.Ref{
+					ID: pair.datastoreID,
+				},
+				Destination: api.DestinationStorage{
+					StorageClass: "test-storage-class",
+				},
+			}
+			if pair.hasOffload {
+				sp.OffloadPlugin = &api.OffloadPlugin{
+					VSphereXcopyPluginConfig: &api.VSphereXcopyPluginConfig{
+						StorageVendorProduct: api.StorageVendorProduct("test-vendor"),
+					},
+				}
+			}
+			pairs = append(pairs, sp)
+		}
+		return &api.StorageMap{
+			Spec: api.StorageMapSpec{
+				Map: pairs,
+			},
+		}
+	}
+
+	// Tests for VDDK usage detection
+	ginkgo.DescribeTable("should correctly identify if VM uses VDDK",
+		func(vmName string, diskDatastores []string, storageMapPairs []struct {
+			datastoreID string
+			hasOffload  bool
+		}, expectedUsesVddk bool) {
+			storageMap := createStorageMap(storageMapPairs)
+			vsphereVM := createVSphereVM(vmName, diskDatastores)
+
+			usesVddk, err := reconciler.vmUsesVddk(storageMap, vsphereVM, vmName)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(usesVddk).To(gomega.Equal(expectedUsesVddk))
+		},
+		ginkgo.Entry("one pure VDDK disk",
+			"vm1",
+			[]string{"ds1"},
+			[]struct {
+				datastoreID string
+				hasOffload  bool
+			}{
+				{datastoreID: "ds1", hasOffload: false},
+			},
+			true, // uses VDDK
+		),
+		ginkgo.Entry("one pure offload disk",
+			"vm1",
+			[]string{"ds1"},
+			[]struct {
+				datastoreID string
+				hasOffload  bool
+			}{
+				{datastoreID: "ds1", hasOffload: true},
+			},
+			false, // doesn't use VDDK (uses offload)
+		),
+		ginkgo.Entry("multiple pure VDDK disks",
+			"vm1",
+			[]string{"ds1", "ds2"},
+			[]struct {
+				datastoreID string
+				hasOffload  bool
+			}{
+				{datastoreID: "ds1", hasOffload: false},
+				{datastoreID: "ds2", hasOffload: false},
+			},
+			true, // uses VDDK
+		),
+		ginkgo.Entry("multiple pure offload disks",
+			"vm1",
+			[]string{"ds1", "ds2"},
+			[]struct {
+				datastoreID string
+				hasOffload  bool
+			}{
+				{datastoreID: "ds1", hasOffload: true},
+				{datastoreID: "ds2", hasOffload: true},
+			},
+			false, // doesn't use VDDK (uses offload)
+		),
+		ginkgo.Entry("mixed VM with both VDDK and offload disks",
+			"vm1",
+			[]string{"ds1", "ds2"},
+			[]struct {
+				datastoreID string
+				hasOffload  bool
+			}{
+				{datastoreID: "ds1", hasOffload: false}, // VDDK
+				{datastoreID: "ds2", hasOffload: true},  // Offload
+			},
+			true, // uses VDDK (because at least one disk uses VDDK)
+		),
+	)
+})
+
+// Mock validator for testing GuestToolsIssue aggregation
+type guestToolsResponse struct {
+	ok  bool
+	msg string
+	err error
+}
+
+type mockGuestToolsValidator struct {
+	responses map[string]guestToolsResponse
+}
+
+func (m *mockGuestToolsValidator) GuestToolsInstalled(vmRef ref.Ref) (ok bool, err error) {
+	if response, exists := m.responses[vmRef.Name]; exists {
+		return response.ok, response.err
+	}
+	// Default: tools are OK
+	return true, nil
+}
 
 //nolint:errcheck
 func createFakeReconciler(objects ...runtime.Object) *Reconciler {
