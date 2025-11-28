@@ -93,6 +93,7 @@ const (
 	VMPowerStateUnsupported         = "VMPowerStateUnsupported"
 	VMMigrationTypeUnsupported      = "VMMigrationTypeUnsupported"
 	GuestToolsIssue                 = "GuestToolsIssue"
+	VDDKAndOffloadMixedUsage        = "VDDKAndOffloadMixedUsage"
 )
 
 // Categories
@@ -136,6 +137,22 @@ const (
 const (
 	Shareable = "shareable"
 )
+
+// +k8s:enum
+type diskType string
+
+const (
+	DiskTypeVDDK    diskType = "VDDK"
+	DiskTypeOffload diskType = "Offload"
+)
+
+// DiskMigrationInfo tracks migration type for individual disks
+type diskMigrationInfo struct {
+	VMName      string
+	DiskKey     int32
+	DatastoreID string
+	Type        diskType `json:"Type"`
+}
 
 // Validate the plan resource.
 func (r *Reconciler) validate(plan *api.Plan) error {
@@ -201,6 +218,10 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	}
 
 	if err = r.validateVddkImage(plan); err != nil {
+		return err
+	}
+
+	if err = r.validateVddkAndOffloadMixedUsage(plan); err != nil {
 		return err
 	}
 
@@ -1842,4 +1863,206 @@ func (r *Reconciler) IsValidTargetName(targetName string) error {
 	}
 
 	return nil
+}
+
+func (r *Reconciler) validateVddkAndOffloadMixedUsage(plan *api.Plan) error {
+	source := plan.Referenced.Provider.Source
+	if source == nil {
+		return nil
+	}
+
+	if source.Type() != api.VSphere {
+		return nil
+	}
+
+	if !settings.Settings.Features.CopyOffload {
+		return nil
+	}
+
+	inventory, pErr := web.NewClient(source)
+	if pErr != nil {
+		return liberr.Wrap(pErr)
+	}
+
+	// validation of mixed usage of VDDK and copy offload on the plan level
+	var (
+		pureVddkVms    []string
+		pureOffloadVms []string
+		mixedVms       []string
+		diskDetails    []diskMigrationInfo // Track individual disk info
+	)
+
+	for _, vm := range plan.Spec.VMs {
+		ref := &vm.Ref
+		if ref.NotSet() {
+			continue
+		}
+
+		v, pErr := inventory.VM(ref)
+		if pErr != nil {
+			// Skip if VM not found, other validations will catch this
+			continue
+		}
+
+		vsphereVM, ok := v.(*vsphere.VM)
+		if !ok {
+			continue
+		}
+
+		storageMap := plan.Referenced.Map.Storage
+		if storageMap == nil {
+			continue
+		}
+
+		// Get detailed disk information
+		vmDiskDetails, curVMHasOffload, curVMHasVddk, _ := r.checkDiskMigrationTypesDetailed(storageMap, vsphereVM, vm.Name)
+		diskDetails = append(diskDetails, vmDiskDetails...)
+
+		if curVMHasOffload && curVMHasVddk {
+			mixedVms = append(mixedVms, vm.Name)
+		} else if curVMHasOffload {
+			pureOffloadVms = append(pureOffloadVms, vm.Name)
+		} else if curVMHasVddk {
+			pureVddkVms = append(pureVddkVms, vm.Name)
+		}
+	}
+
+	basicMessage := "Copy offload is enabled. Each migration plan can use one migration strategy, either VDDK or copy offload. Check your storage map and VMs to ensure they are using the same migration strategy."
+	message := ""
+	items := []string{}
+
+	if len(mixedVms) > 0 {
+		// All VMs in the plan are using mixed usage of VDDK and copy offload with no pure strategies
+		if len(pureVddkVms) == 0 && len(pureOffloadVms) == 0 {
+			message = basicMessage + " The following VMs are planned to use mixed usage of VDDK and copy offload: " + strings.Join(mixedVms, ", ") + "."
+			for _, vmName := range mixedVms {
+				var vddkDisks, offloadDisks []string
+				for _, disk := range diskDetails {
+					if disk.VMName == vmName {
+						if disk.Type == "VDDK" {
+							vddkDisks = append(vddkDisks, fmt.Sprintf("disk-%d", disk.DiskKey))
+						} else {
+							offloadDisks = append(offloadDisks, fmt.Sprintf("disk-%d", disk.DiskKey))
+						}
+					}
+				}
+				items = append(items, fmt.Sprintf("VM: %s | VDDK disks: [%s] | Offload disks: [%s]",
+					vmName, strings.Join(vddkDisks, ", "), strings.Join(offloadDisks, ", ")))
+			}
+		} else if len(pureVddkVms) > 0 && len(pureOffloadVms) > 0 {
+			// Some VMs are mixed and there is at least one pure VDDK and one pure offload VM
+			message = basicMessage + " The following VMs are planned to use VDDK: " + strings.Join(pureVddkVms, ", ") +
+				". The following VMs are planned to use copy offload: " + strings.Join(pureOffloadVms, ", ") +
+				". The following VMs are planned to use mixed usage of VDDK and copy offload: " + strings.Join(mixedVms, ", ") + "."
+			for _, vmName := range pureVddkVms {
+				items = append(items, fmt.Sprintf("VM: %s (VDDK)", vmName))
+			}
+			for _, vmName := range pureOffloadVms {
+				items = append(items, fmt.Sprintf("VM: %s (Offload)", vmName))
+			}
+			for _, vmName := range mixedVms {
+				items = append(items, fmt.Sprintf("VM: %s (Mixed)", vmName))
+			}
+		} else {
+			// Case: Mixed VMs exist with some pure VMs (but not both types)
+			// This should always block because mixed VMs are invalid
+			var pureVMs []string
+			if len(pureVddkVms) > 0 {
+				pureVMs = pureVddkVms
+				message = basicMessage + " The following VMs are planned to use VDDK: " + strings.Join(pureVddkVms, ", ") +
+					". The following VMs are planned to use mixed usage of VDDK and copy offload: " + strings.Join(mixedVms, ", ") + "."
+			} else if len(pureOffloadVms) > 0 {
+				pureVMs = pureOffloadVms
+				message = basicMessage + " The following VMs are planned to use copy offload: " + strings.Join(pureOffloadVms, ", ") +
+					". The following VMs are planned to use mixed usage of VDDK and copy offload: " + strings.Join(mixedVms, ", ") + "."
+			}
+
+			for _, vmName := range pureVMs {
+				if len(pureVddkVms) > 0 {
+					items = append(items, fmt.Sprintf("VM: %s (VDDK)", vmName))
+				} else {
+					items = append(items, fmt.Sprintf("VM: %s (Offload)", vmName))
+				}
+			}
+			for _, vmName := range mixedVms {
+				var vddkDisks, offloadDisks []string
+				for _, disk := range diskDetails {
+					if disk.VMName == vmName {
+						if disk.Type == "VDDK" {
+							vddkDisks = append(vddkDisks, fmt.Sprintf("disk-%d", disk.DiskKey))
+						} else {
+							offloadDisks = append(offloadDisks, fmt.Sprintf("disk-%d", disk.DiskKey))
+						}
+					}
+				}
+				items = append(items, fmt.Sprintf("VM: %s | VDDK disks: [%s] | Offload disks: [%s]",
+					vmName, strings.Join(vddkDisks, ", "), strings.Join(offloadDisks, ", ")))
+			}
+		}
+	} else if len(pureVddkVms) > 0 && len(pureOffloadVms) > 0 {
+		message = basicMessage + " The following VMs are planned to use VDDK: " + strings.Join(pureVddkVms, ", ") +
+			". The following VMs are planned to use copy offload: " + strings.Join(pureOffloadVms, ", ") + "."
+		for _, vmName := range pureVddkVms {
+			items = append(items, fmt.Sprintf("VM: %s (VDDK)", vmName))
+		}
+		for _, vmName := range pureOffloadVms {
+			items = append(items, fmt.Sprintf("VM: %s (Offload)", vmName))
+		}
+	}
+
+	if message != "" {
+		r.Log.V(1).Info("VDDK/Offload mixed usage detected",
+			"mixedVMs", mixedVms,
+			"pureVddkVMs", pureVddkVms,
+			"pureOffloadVMs", pureOffloadVms,
+			"diskDetails", diskDetails,
+		)
+
+		mixedUsage := libcnd.Condition{
+			Type:     VDDKAndOffloadMixedUsage,
+			Status:   True,
+			Reason:   NotSupported,
+			Category: api.CategoryCritical,
+			Message:  message,
+			Items:    items,
+		}
+		plan.Status.SetCondition(mixedUsage)
+	}
+	return nil
+}
+
+// checkDiskMigrationTypesDetailed returns detailed disk information along with VM-level flags
+func (r *Reconciler) checkDiskMigrationTypesDetailed(storageMap *api.StorageMap, vsphereVM *vsphere.VM, vmName string) ([]diskMigrationInfo, bool, bool, error) {
+	hasOffloadDisks := false
+	hasVddkDisks := false
+	diskDetails := []diskMigrationInfo{}
+
+	for _, disk := range vsphereVM.Disks {
+		var mapping *api.StoragePair
+		for i := range storageMap.Spec.Map {
+			m := &storageMap.Spec.Map[i]
+			if m.Source.ID == disk.Datastore.ID {
+				mapping = m
+				break
+			}
+		}
+
+		var diskType diskType
+		if mapping != nil && mapping.OffloadPlugin != nil && mapping.OffloadPlugin.VSphereXcopyPluginConfig != nil {
+			hasOffloadDisks = true
+			diskType = DiskTypeOffload
+		} else {
+			hasVddkDisks = true
+			diskType = DiskTypeVDDK
+		}
+
+		diskDetails = append(diskDetails, diskMigrationInfo{
+			VMName:      vmName,
+			DiskKey:     disk.Key,
+			DatastoreID: disk.Datastore.ID,
+			Type:        diskType,
+		})
+	}
+
+	return diskDetails, hasOffloadDisks, hasVddkDisks, nil
 }

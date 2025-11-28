@@ -8,6 +8,8 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/provider"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	"github.com/kubev2v/forklift/pkg/controller/base"
+	vspheremodel "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	ginkgo "github.com/onsi/ginkgo/v2"
@@ -348,6 +350,202 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 	})
 })
 
+var _ = ginkgo.Describe("checkDiskMigrationTypesDetailed", func() {
+	var (
+		reconciler *Reconciler
+	)
+
+	ginkgo.BeforeEach(func() {
+		reconciler = createFakeReconciler()
+	})
+
+	// Helper to create a vsphere.VM with disks
+	createVSphereVM := func(name string, diskDatastores []string) *vsphere.VM {
+		disks := []vspheremodel.Disk{}
+		for i, dsID := range diskDatastores {
+			disks = append(disks, vspheremodel.Disk{
+				Key: int32(i + 2000),
+				Datastore: vspheremodel.Ref{
+					ID: dsID,
+				},
+			})
+		}
+		return &vsphere.VM{
+			VM1: vsphere.VM1{
+				VM0: vsphere.VM0{
+					ID:   name + "-id",
+					Path: name,
+				},
+				Disks: disks,
+			},
+		}
+	}
+
+	// Helper to create a StorageMap
+	createStorageMap := func(datastorePairs []struct {
+		datastoreID string
+		hasOffload  bool
+	}) *api.StorageMap {
+		pairs := []api.StoragePair{}
+		for _, pair := range datastorePairs {
+			sp := api.StoragePair{
+				Source: ref.Ref{
+					ID: pair.datastoreID,
+				},
+				Destination: api.DestinationStorage{
+					StorageClass: "test-storage-class",
+				},
+			}
+			if pair.hasOffload {
+				sp.OffloadPlugin = &api.OffloadPlugin{
+					VSphereXcopyPluginConfig: &api.VSphereXcopyPluginConfig{
+						StorageVendorProduct: api.StorageVendorProduct("test-vendor"),
+					},
+				}
+			}
+			pairs = append(pairs, sp)
+		}
+		return &api.StorageMap{
+			Spec: api.StorageMapSpec{
+				Map: pairs,
+			},
+		}
+	}
+
+	// SHOULD PASS cases - these return hasOffload=false,hasVddk=true OR hasOffload=true,hasVddk=false (not both)
+	ginkgo.DescribeTable("should identify pure disk types correctly",
+		func(vmName string, diskDatastores []string, storageMapPairs []struct {
+			datastoreID string
+			hasOffload  bool
+		}, expectedHasOffload, expectedHasVddk bool) {
+			storageMap := createStorageMap(storageMapPairs)
+			vsphereVM := createVSphereVM(vmName, diskDatastores)
+
+			diskDetails, hasOffload, hasVddk, err := reconciler.checkDiskMigrationTypesDetailed(storageMap, vsphereVM, vmName)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(hasOffload).To(gomega.Equal(expectedHasOffload))
+			gomega.Expect(hasVddk).To(gomega.Equal(expectedHasVddk))
+			gomega.Expect(len(diskDetails)).To(gomega.Equal(len(diskDatastores)))
+		},
+		ginkgo.Entry("one pure VDDK disk",
+			"vm1",
+			[]string{"ds1"},
+			[]struct {
+				datastoreID string
+				hasOffload  bool
+			}{
+				{datastoreID: "ds1", hasOffload: false},
+			},
+			false, // hasOffload
+			true,  // hasVddk
+		),
+		ginkgo.Entry("one pure offload disk",
+			"vm1",
+			[]string{"ds1"},
+			[]struct {
+				datastoreID string
+				hasOffload  bool
+			}{
+				{datastoreID: "ds1", hasOffload: true},
+			},
+			true,  // hasOffload
+			false, // hasVddk
+		),
+		ginkgo.Entry("multiple pure VDDK disks",
+			"vm1",
+			[]string{"ds1", "ds2"},
+			[]struct {
+				datastoreID string
+				hasOffload  bool
+			}{
+				{datastoreID: "ds1", hasOffload: false},
+				{datastoreID: "ds2", hasOffload: false},
+			},
+			false, // hasOffload
+			true,  // hasVddk
+		),
+		ginkgo.Entry("multiple pure offload disks",
+			"vm1",
+			[]string{"ds1", "ds2"},
+			[]struct {
+				datastoreID string
+				hasOffload  bool
+			}{
+				{datastoreID: "ds1", hasOffload: true},
+				{datastoreID: "ds2", hasOffload: true},
+			},
+			true,  // hasOffload
+			false, // hasVddk
+		),
+	)
+
+	// SHOULD FAIL cases - these return both hasOffload=true AND hasVddk=true
+	ginkgo.DescribeTable("should identify mixed disk types correctly",
+		func(vmName string, diskDatastores []string, storageMapPairs []struct {
+			datastoreID string
+			hasOffload  bool
+		}) {
+			storageMap := createStorageMap(storageMapPairs)
+			vsphereVM := createVSphereVM(vmName, diskDatastores)
+
+			diskDetails, hasOffload, hasVddk, err := reconciler.checkDiskMigrationTypesDetailed(storageMap, vsphereVM, vmName)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(hasOffload).To(gomega.BeTrue(), "should detect offload disks")
+			gomega.Expect(hasVddk).To(gomega.BeTrue(), "should detect VDDK disks")
+			gomega.Expect(len(diskDetails)).To(gomega.Equal(len(diskDatastores)))
+
+			// Verify disk details contain both types
+			hasOffloadInDetails := false
+			hasVddkInDetails := false
+			for _, disk := range diskDetails {
+				if disk.Type == DiskTypeOffload {
+					hasOffloadInDetails = true
+				} else if disk.Type == DiskTypeVDDK {
+					hasVddkInDetails = true
+				}
+			}
+			gomega.Expect(hasOffloadInDetails).To(gomega.BeTrue())
+			gomega.Expect(hasVddkInDetails).To(gomega.BeTrue())
+		},
+		ginkgo.Entry("mixed VM with both VDDK and offload disks",
+			"vm1",
+			[]string{"ds1", "ds2"},
+			[]struct {
+				datastoreID string
+				hasOffload  bool
+			}{
+				{datastoreID: "ds1", hasOffload: false}, // VDDK
+				{datastoreID: "ds2", hasOffload: true},  // Offload
+			},
+		),
+		ginkgo.Entry("mixed VM with multiple disks of each type",
+			"vm1",
+			[]string{"ds1", "ds2", "ds3", "ds4"},
+			[]struct {
+				datastoreID string
+				hasOffload  bool
+			}{
+				{datastoreID: "ds1", hasOffload: false}, // VDDK
+				{datastoreID: "ds2", hasOffload: true},  // Offload
+				{datastoreID: "ds3", hasOffload: false}, // VDDK
+				{datastoreID: "ds4", hasOffload: true},  // Offload
+			},
+		),
+	)
+})
+
+var _ = ginkgo.Describe("validateVddkAndOffloadMixedUsage condition logic", func() {
+	// This is a placeholder for future tests
+	// Note: This test would need mocking of web.NewClient
+	// For now, we test the core logic via checkDiskMigrationTypesDetailed above
+	// Full integration test would require dependency injection or build tags
+	ginkgo.It("should set condition when mixed VMs detected", ginkgo.Pending, func() {
+		// TODO: Requires mocking web.NewClient
+	})
+})
+
 // Mock validator for testing GuestToolsIssue aggregation
 type guestToolsResponse struct {
 	ok  bool
@@ -359,7 +557,7 @@ type mockGuestToolsValidator struct {
 	responses map[string]guestToolsResponse
 }
 
-func (m *mockGuestToolsValidator) GuestToolsInstalled(vmRef ref.Ref) (bool, error) {
+func (m *mockGuestToolsValidator) GuestToolsInstalled(vmRef ref.Ref) (ok bool, err error) {
 	if response, exists := m.responses[vmRef.Name]; exists {
 		return response.ok, response.err
 	}
