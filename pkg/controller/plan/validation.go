@@ -92,6 +92,7 @@ const (
 	VMPowerStateUnsupported         = "VMPowerStateUnsupported"
 	VMMigrationTypeUnsupported      = "VMMigrationTypeUnsupported"
 	GuestToolsIssue                 = "GuestToolsIssue"
+	VDDKAndOffloadMixedUsage        = "VDDKAndOffloadMixedUsage"
 )
 
 // Categories
@@ -762,10 +763,24 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "LUKS keys and Clevis cannot be configured together; Clevis will be used.",
 		Items:    []string{},
 	}
+	vddkAndOffloadMixedUsage := libcnd.Condition{
+		Type:     VDDKAndOffloadMixedUsage,
+		Status:   True,
+		Reason:   NotSupported,
+		Category: api.CategoryCritical,
+		Message:  "Copy offload is enabled. MTV does not support mixed copy methods. Each migration plan can use one migration strategy, either VDDK or copy offload. Check your storage map and VMs to ensure they are using the same migration strategy.",
+		Items:    []string{},
+	}
 
 	var sharedDisksConditions []libcnd.Condition
 	setOf := map[string]bool{}
 	setOfTargetName := map[string]bool{}
+
+	// Check if plan uses storage offload (vSphere only)
+	source := plan.Referenced.Provider.Source
+	checkMixedUsage := source != nil && source.Type() == api.VSphere && settings.Settings.Features.CopyOffload
+	planUsesOffload := checkMixedUsage && plan.IsUsingOffloadPlugin()
+
 	//
 	// Referenced VMs.
 	for i := range plan.Spec.VMs {
@@ -852,6 +867,23 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 				}
 				if len(pvcs) != len(vm.Disks) {
 					missingPvcForOnlyConversion.Items = append(missingPvcForOnlyConversion.Items, ref.String())
+				}
+			}
+		}
+
+		// Check for mixed VDDK/Offload usage (vSphere only)
+		// If plan uses offload, add VMs with VDDK disks to the condition
+		if planUsesOffload {
+			if vsphereVM, ok := v.(*vsphere.VM); ok {
+				storageMap := plan.Referenced.Map.Storage
+				if storageMap != nil {
+					curVMHasVddk, err := r.vmUsesVddk(storageMap, vsphereVM, vm.Name)
+					if err != nil {
+						return err
+					}
+					if curVMHasVddk {
+						vddkAndOffloadMixedUsage.Items = append(vddkAndOffloadMixedUsage.Items, ref.String())
+					}
 				}
 			}
 		}
@@ -1169,6 +1201,12 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	if len(luksAndClevisIncompatibility.Items) > 0 {
 		plan.Status.SetCondition(luksAndClevisIncompatibility)
 	}
+
+	// Set the condition if any VMs with VDDK disks were found when plan uses offload
+	if len(vddkAndOffloadMixedUsage.Items) > 0 {
+		plan.Status.SetCondition(vddkAndOffloadMixedUsage)
+	}
+
 	return nil
 }
 
@@ -1869,4 +1907,19 @@ func (r *Reconciler) validateConversionTempStorage(plan *api.Plan) error {
 	}
 
 	return nil
+}
+
+// vmUsesVddk checks if the VM requires VDDK for migration (i.e., if any disk doesn't use storage offload)
+func (r *Reconciler) vmUsesVddk(storageMap *api.StorageMap, vsphereVM *vsphere.VM, vmName string) (bool, error) {
+	for _, disk := range vsphereVM.Disks {
+		mapping, found := storageMap.FindStorage(disk.Datastore.ID)
+		if !found {
+			continue // Another validation will handle this
+		}
+		if mapping.OffloadPlugin == nil || mapping.OffloadPlugin.VSphereXcopyPluginConfig == nil {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
