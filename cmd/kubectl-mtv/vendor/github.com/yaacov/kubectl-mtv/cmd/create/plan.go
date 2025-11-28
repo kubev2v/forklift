@@ -47,11 +47,10 @@ func parseKeyValuePairs(pairs []string, fieldName string) (map[string]string, er
 }
 
 // NewPlanCmd creates the plan creation command
-func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
+func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	var name, sourceProvider, targetProvider string
 	var networkMapping, storageMapping string
 	var vmNamesQuaryOrFile string
-	var inventoryURL string
 	var defaultTargetNetwork, defaultTargetStorageClass string
 	var networkPairs, storagePairs string
 	var preHook, postHook string
@@ -94,10 +93,9 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 			// Resolve the appropriate namespace based on context and flags
 			namespace := client.ResolveNamespace(kubeConfigFlags)
 
-			// If inventoryURL is empty, try to discover it
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(cmd.Context(), kubeConfigFlags, namespace)
-			}
+			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
+			inventoryURL := globalConfig.GetInventoryURL()
+			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
 			// Validate that existing mapping flags and mapping pair flags are not used together
 			if networkMapping != "" && networkPairs != "" {
@@ -135,7 +133,7 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 				fmt.Printf("Fetching VMs from provider '%s' using query: %s\n", sourceProviderName, query)
 
 				var err error
-				vmList, err = inventory.FetchVMsByQuery(cmd.Context(), kubeConfigFlags, sourceProviderName, sourceProviderNamespace, inventoryURL, query)
+				vmList, err = inventory.FetchVMsByQueryWithInsecure(cmd.Context(), kubeConfigFlags, sourceProviderName, sourceProviderNamespace, inventoryURL, query, inventoryInsecureSkipTLS)
 				if err != nil {
 					return fmt.Errorf("failed to fetch VMs using query: %v", err)
 				}
@@ -341,6 +339,7 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 				StorageMapping:            storageMapping,
 				ConfigFlags:               kubeConfigFlags,
 				InventoryURL:              inventoryURL,
+				InventoryInsecureSkipTLS:  inventoryInsecureSkipTLS,
 				DefaultTargetNetwork:      defaultTargetNetwork,
 				DefaultTargetStorageClass: defaultTargetStorageClass,
 				PlanSpec:                  planSpec,
@@ -405,7 +404,6 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	cmd.Flags().StringVar(&planSpec.VolumeNameTemplate, "volume-name-template", "", "VolumeNameTemplate is a template for generating volume interface names in the target virtual machine. Variables: {{.PVCName}}, {{.VolumeIndex}}")
 	cmd.Flags().StringVar(&planSpec.NetworkNameTemplate, "network-name-template", "", "NetworkNameTemplate is a template for generating network interface names in the target virtual machine. Variables: {{.NetworkName}}, {{.NetworkNamespace}}, {{.NetworkType}}, {{.NetworkIndex}}")
 	cmd.Flags().BoolVar(&planSpec.MigrateSharedDisks, "migrate-shared-disks", true, "Determines if the plan should migrate shared disks")
-	cmd.Flags().StringVarP(&inventoryURL, "inventory-url", "i", os.Getenv("MTV_INVENTORY_URL"), "Base URL for the inventory service")
 	cmd.Flags().BoolVar(&planSpec.Archived, "archived", false, "Whether this plan should be archived")
 	cmd.Flags().BoolVar(&planSpec.PVCNameTemplateUseGenerateName, "pvc-name-template-use-generate-name", true, "Use generateName instead of name for PVC name template")
 	cmd.Flags().BoolVar(&planSpec.DeleteGuestConversionPod, "delete-guest-conversion-pod", false, "Delete guest conversion pod after successful migration")

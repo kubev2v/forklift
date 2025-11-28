@@ -5,6 +5,7 @@ import (
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
+	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/ec2"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/generic"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/openshift"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/openstack"
@@ -19,7 +20,14 @@ import (
 // Create creates a new provider
 func Create(configFlags *genericclioptions.ConfigFlags, providerType, name, namespace, secret string,
 	url, username, password, cacert string, insecureSkipTLS bool, vddkInitImage, sdkEndpoint string, token string,
-	domainName, projectName, regionName string, useVddkAioOptimization bool, vddkBufSizeIn64K, vddkBufCount int) error {
+	domainName, projectName, regionName string, useVddkAioOptimization bool, vddkBufSizeIn64K, vddkBufCount int,
+	ec2Region, ec2TargetRegion, ec2TargetAZ string) error {
+	// For EC2 provider, use regionName (from --provider-region-name) if ec2Region is empty
+	// This allows using --provider-region-name for EC2 regions as shown in documentation
+	if providerType == "ec2" && ec2Region == "" && regionName != "" {
+		ec2Region = regionName
+	}
+
 	// Create provider options
 	options := providerutil.ProviderOptions{
 		Name:                   name,
@@ -39,6 +47,9 @@ func Create(configFlags *genericclioptions.ConfigFlags, providerType, name, name
 		UseVddkAioOptimization: useVddkAioOptimization,
 		VddkBufSizeIn64K:       vddkBufSizeIn64K,
 		VddkBufCount:           vddkBufCount,
+		EC2Region:              ec2Region,
+		EC2TargetRegion:        ec2TargetRegion,
+		EC2TargetAZ:            ec2TargetAZ,
 	}
 
 	var providerResource *forkliftv1beta1.Provider
@@ -57,9 +68,12 @@ func Create(configFlags *genericclioptions.ConfigFlags, providerType, name, name
 		providerResource, secretResource, err = generic.CreateProvider(configFlags, options, "ovirt")
 	case "openstack":
 		providerResource, secretResource, err = openstack.CreateProvider(configFlags, options)
+	case "ec2":
+		providerResource, secretResource, err = ec2.CreateProvider(configFlags, options)
 	default:
-		// If the provider type is not recognized, return an error
-		return fmt.Errorf("unsupported provider type: %s", providerType)
+		// For dynamic provider types, use generic provider creation
+		// This allows support for DynamicProvider CRs defined in the cluster
+		providerResource, secretResource, err = generic.CreateProvider(configFlags, options, providerType)
 	}
 
 	// Handle any errors that occurred during provider creation

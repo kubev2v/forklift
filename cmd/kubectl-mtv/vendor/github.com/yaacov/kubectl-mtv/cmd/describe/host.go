@@ -11,7 +11,7 @@ import (
 )
 
 // NewHostCmd creates the host description command
-func NewHostCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() get.GlobalConfigGetter) *cobra.Command {
+func NewHostCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig get.GlobalConfigGetter) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "host NAME",
 		Short:             "Describe a migration host",
@@ -23,11 +23,11 @@ func NewHostCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig 
 			name := args[0]
 
 			// Get the global configuration
-			config := getGlobalConfig()
 
 			// Resolve the appropriate namespace based on context and flags
-			namespace := client.ResolveNamespace(config.GetKubeConfigFlags())
-			return host.Describe(cmd.Context(), config.GetKubeConfigFlags(), name, namespace, config.GetUseUTC())
+			namespace := client.ResolveNamespace(globalConfig.GetKubeConfigFlags())
+			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
+			return host.Describe(cmd.Context(), globalConfig.GetKubeConfigFlags(), name, namespace, globalConfig.GetUseUTC(), inventoryInsecureSkipTLS)
 		},
 	}
 
