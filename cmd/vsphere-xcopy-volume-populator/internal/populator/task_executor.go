@@ -31,13 +31,13 @@ type TaskStatus struct {
 // TaskExecutor abstracts the transport-specific operations for task execution
 type TaskExecutor interface {
 	// StartClone initiates the clone operation and returns task information
-	StartClone(ctx context.Context, host *object.HostSystem, sourcePath, targetLUN string) (*TaskInfo, error)
+	StartClone(ctx context.Context, host *object.HostSystem, datastore, sourcePath, targetLUN string) (*TaskInfo, error)
 
 	// GetTaskStatus retrieves the current status of the specified task
-	GetTaskStatus(ctx context.Context, host *object.HostSystem, taskId string) (*TaskStatus, error)
+	GetTaskStatus(ctx context.Context, host *object.HostSystem, datastore, taskId string) (*TaskStatus, error)
 
 	// CleanupTask cleans up task artifacts
-	CleanupTask(ctx context.Context, host *object.HostSystem, taskId string) error
+	CleanupTask(ctx context.Context, host *object.HostSystem, datastore, taskId string) error
 }
 
 // ParseProgress extracts progress percentage from vmkfstools output
@@ -65,9 +65,9 @@ func ParseProgress(lastLine string) int {
 }
 
 // ExecuteCloneTask handles the unified task execution logic
-func ExecuteCloneTask(ctx context.Context, executor TaskExecutor, host *object.HostSystem, sourcePath, targetLUN string, progress chan<- uint) error {
+func ExecuteCloneTask(ctx context.Context, executor TaskExecutor, host *object.HostSystem, datastore, sourcePath, targetLUN string, progress chan<- uint) error {
 	// Start the clone task
-	task, err := executor.StartClone(ctx, host, sourcePath, targetLUN)
+	task, err := executor.StartClone(ctx, host, datastore, sourcePath, targetLUN)
 	if err != nil {
 		return fmt.Errorf("failed to start clone task: %w", err)
 	}
@@ -77,7 +77,7 @@ func ExecuteCloneTask(ctx context.Context, executor TaskExecutor, host *object.H
 	// Cleanup task artifacts when done
 	if task.TaskId != "" {
 		defer func() {
-			err := executor.CleanupTask(ctx, host, task.TaskId)
+			err := executor.CleanupTask(ctx, host, datastore, task.TaskId)
 			if err != nil {
 				klog.Errorf("Failed cleaning up task artifacts: %v", err)
 			}
@@ -86,7 +86,7 @@ func ExecuteCloneTask(ctx context.Context, executor TaskExecutor, host *object.H
 
 	// Poll for task completion
 	for {
-		taskStatus, err := executor.GetTaskStatus(ctx, host, task.TaskId)
+		taskStatus, err := executor.GetTaskStatus(ctx, host, datastore, task.TaskId)
 		if err != nil {
 			return fmt.Errorf("failed to get task status: %w", err)
 		}
