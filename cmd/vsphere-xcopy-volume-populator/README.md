@@ -1,5 +1,31 @@
 # vSphere XCOPY Volume-Populator
 
+## Table of Contents
+
+- [Forklift Controller](#forklift-controller)
+- [Populator Controller](#populator-controller)
+- [VSphereXcopyVolumePopulator Resource](#vspherexcopyvolumepopoulator-resource)
+- [vmkfstools-wrapper](#vmkfstools-wrapper)
+- [Setup Copy Offload](#setup-copy-offload)
+- [Supported Storage Providers](#supported-storage-providers)
+- [Secret with Storage Provider Credentials](#secret-with-storage-provider-credentials)
+  - [Hitachi Vantara](#hitachi-vantara)
+  - [NetApp ONTAP](#netapp-ontap)
+  - [Pure FlashArray](#pure-flasharray)
+  - [Dell PowerMax](#dell-powermax)
+  - [Dell PowerFlex](#dell-powerflex)
+- [Limitations](#limitations)
+- [Matching PVC with DataStores](#matching-pvc-with-datastores-to-deduce-copy-offload-support)
+- [vSphere User Privileges](#vsphere-user-privileges)
+- [Clone Methods: VIB vs SSH](#clone-methods-vib-vs-ssh)
+  - [Configuring Clone Method](#configuring-clone-method)
+  - [VIB Method Setup](#vib-method-setup)
+  - [SSH Method Setup](#ssh-method-setup)
+- [Troubleshooting](#troubleshooting)
+  - [vSphere/ESXi](#vsphereesxi)
+  - [SSH Method](#ssh-method)
+  - [NetApp](#netapp)
+
 ## Forklift Controller
 When the feature flag `feature_copy_offload` is true (off by default), the controller
 consult the storagemaps offload plugin configuration, to decided if VM disk from
@@ -59,13 +85,91 @@ The folder vmkfstools-wrapper has a script to create a VIB to wrap the vmkfstool
 to be a proxy perform vmkfstools commands and more.
 The VIB should be installed on every ESXi that is connected to the datastores which
 are holds migratable VMs.
-See vmkfstools-wrapper/README.md for the installation of the tool using ansible
+
+## Setup Copy Offload
+
+1. Set the feature flag:
+   ```bash
+   oc patch forkliftcontrollers.forklift.konveyor.io forklift-controller --type merge -p '{"spec": {"feature_copy_offload": "true"}}' -n openshift-mtv
+   ```
+
+2. Set the volume-populator image (should be unnecessary in 2.8.5):
+   ```bash
+   oc set env -n openshift-mtv deployment forklift-volume-populator-controller --all VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE=quay.io/kubev2v/vsphere-xcopy-volume-populator
+   ```
+
+3. Create a `StorageMap` according to [this section](#matching-pvc)
+
+4. Create a plan and make sure to edit the mapping section and set the name to the `StorageMap` previously created.
+
+   Here is how the mapping part looks in a `Plan`:
+   ```yaml
+   apiVersion: forklift.konveyor.io/v1beta1
+   kind: Plan
+   metadata:
+     name: my-plan
+   spec:
+     map:
+       storage:
+         apiVersion: forklift.konveyor.io/v1beta1
+         kind: StorageMap
+         name: copy-offload  # <-- This points to the StorageMap configured previously
+         namespace: openshift-mtv
+   ```
+
 
 ## Storage Provider
 If a storage provider wants their storage to be supported, they need
 to implement a go package named after their product, and mutate main
 package so their specific code path is initialized.
 See [internal/populator/storage.go](internal/populator/storage.go)
+
+## Secret with Storage Provider Credentials
+
+Create a secret where the migration provider is setup, usually openshift-mtv
+and put the credentials of the storage system. All of the providers are required
+to have a secret with the following fields:
+
+| Key | Value | Mandatory | Default |
+| --- | --- | --- | --- |
+| STORAGE_HOSTNAME | ip/hostname | y | |
+| STORAGE_USERNAME | string | y | |
+| STORAGE_PASSWORD | string | y | |
+| STORAGE_SKIP_SSL_VERIFICATION | true/false | n | false |
+
+Provider-specific entries in the secret are documented below:
+
+### Hitachi Vantara
+
+See [README](internal/vantara/README.md)
+
+### NetApp ONTAP
+
+| Key | Value | Description |
+| --- | --- | --- |
+| ONTAP_SVM | string | the SVM to use in all the client interactions. Can be taken from trident.netapp.io/v1/TridentBackend.config.ontap_config.svm resource field. |
+
+
+### Pure FlashArray
+
+| Key | Value | Description |
+| --- | --- | --- |
+| PURE_CLUSTER_PREFIX | string | Cluster prefix is set in the StorageCluster resource. Get it with  `printf "px_%.8s" $(oc get storagecluster -A -o=jsonpath='{.items[?(@.spec.cloudStorage.provider=="pure")].status.clusterUid}')` |
+
+### Dell PowerMax
+
+| Key | Value | Description |
+| --- | --- | --- |
+| POWERMAX_SYMMETRIX_ID | string | the symmetrix id of the storage array. Can be taken from the ConfigMap under the 'powermax' namespace, which the CSI driver uses. |
+| POWERMAX_PORT_GROUP_NAME | string | the port group to use for masking view creation. |
+
+### Dell PowerFlex
+
+| Key | Value | Description |
+| --- | --- | --- |
+| POWERFLEX_SYSTEM_ID | string | the system id of the storage array. Can be taken from `vxflexos-config` from the `vxflexos` namespace or the openshift-operators namespace. |
+
+
 
 ## Limitations
 - A migration plan cannot mix VDDK mappings with copy-offload mappings.
@@ -134,45 +238,28 @@ spec:
 6. vsphere provider name
 7. vsphere provider id
 
-# vSphere User Privileges
+## vSphere User Privileges
 
 The vSphere user requires a role with the following privileges (a role named `StorageOffloader` is recommended):
 
-* Global
-  * Settings
-* Datastore
-  * Browse datastore
-  * Low level file operations
-* Host
-   Configuration
-     * Advanced settings
-     * Query patch
-     * Storage partition configuration
+- Global
+  - Settings
+- Datastore
+  - Browse datastore
+  - Low level file operations
+- Host → Configuration
+  - Advanced settings
+  - Query patch
+  - Storage partition configuration
 
-# Secret with storage provider credentials
-
-Create a secret where the migration provider is setup, usually openshift-mtv
-and put the credentials of the storage system. All of the provider are required
-to have a secret with those required fields
-
-| Key | Value | Mandatory | Default |
-| --- | --- | --- | --- |
-| STORAGE_HOSTNAME | ip/hostname | y | |
-| STORAGE_USERNAME | string | y | |
-| STORAGE_PASSWORD | string | y | |
-| STORAGE_SKIP_SSL_VERIFICATION | true/false | n | false |
-
-# Clone Methods: VIB vs SSH
+## Clone Methods: VIB vs SSH
 
 The vsphere-xcopy-volume-populator supports two methods for executing vmkfstools clone operations on ESXi hosts:
 
-## VIB Method (Default)
-Uses a custom VIB (vSphere Installation Bundle) installed on ESXi hosts to expose vmkfstools operations via the vSphere API.
+- **VIB Method (Default)**: Uses a custom VIB (vSphere Installation Bundle) installed on ESXi hosts to expose vmkfstools operations via the vSphere API.
+- **SSH Method**: Uses SSH to directly execute vmkfstools commands on ESXi hosts. This method is useful when VIB installation is not possible or preferred.
 
-## SSH Method
-Uses SSH to directly execute vmkfstools commands on ESXi hosts. This method is useful when VIB installation is not possible or preferred.
-
-## Configuring Clone Method
+### Configuring Clone Method
 
 The clone method is configured in the Provider settings using the `esxiCloneMethod` key:
 
@@ -192,11 +279,58 @@ spec:
     esxiCloneMethod: "vib"  # or "ssh". The default is "vib"
 ```
 
-# SSH Method Setup
+### VIB Method Setup
+
+The VIB (vSphere Installation Bundle) must be installed on every ESXi host that will participate in copy-offload operations.
+This is only required when using the VIB clone method (`esxiCloneMethod: "vib"` in Provider settings, which is the default).
+
+### Prerequisites
+
+- Podman or Docker installed on your local machine
+- SSH access to ESXi hosts (root user)
+- SSH private key for ESXi authentication (can reuse the same key as SSH clone method)
+- vSphere credentials (optional, for auto-discovery of ESXi hosts)
+
+### Installation Using Container Image
+
+The easiest way to install the VIB is using the `vib-installer` utility included in the container image.
+
+**Auto-discover ESXi hosts from vSphere:**
+
+```bash
+podman run -it --rm \
+  --entrypoint /bin/vib-installer \
+  -v $HOME/.ssh/id_rsa:/tmp/esxi_key:Z \
+  -e GOVMOMI_USERNAME='administrator@vsphere.local' \
+  -e GOVMOMI_PASSWORD='your-password' \
+  -e GOVMOMI_HOSTNAME='vcenter.example.com' \
+  -e GOVMOMI_INSECURE='true' \
+  quay.io/kubev2v/vsphere-xcopy-volume-populator:devel-amd64 \
+  --ssh-key-file /tmp/esxi_key \
+  --datacenter MyDatacenter
+```
+
+**Or specify ESXi hosts manually:**
+
+```bash
+podman run -it --rm \
+  --entrypoint /bin/vib-installer \
+  -v $HOME/.ssh/id_rsa:/tmp/esxi_key:Z \
+  quay.io/kubev2v/vsphere-xcopy-volume-populator:devel-amd64 \
+  --ssh-key-file /tmp/esxi_key \
+  --esxi-hosts 'esxi1.example.com,esxi2.example.com,esxi3.example.com'
+```
+
+Run `vib-installer --help` for all available flags. Flags match the main populator naming conventions and support environment variables (e.g., `SSH_KEY_FILE`, `ESXI_HOSTS`, `GOVMOMI_USERNAME`).
+
+**Note**: For alternative installation methods using Ansible, see [vmkfstools-wrapper/README.md](vmkfstools-wrapper/README.md)
+
+
+### SSH Method Setup
 
 When using the SSH method (`esxiCloneMethod: "ssh"`), SSH keys are **automatically generated** during the Provider reconciliation process. No manual key generation is required.
 
-## 1. Automatic SSH Key Generation
+#### Automatic SSH Key Generation
 
 SSH keys are automatically generated and stored when you create or update a vSphere Provider:
 
@@ -204,7 +338,7 @@ SSH keys are automatically generated and stored when you create or update a vSph
 - Keys are stored in **separate Kubernetes secrets** in the Provider's namespace
 - Keys are **automatically injected** into migration pods as needed
 
-## 2. SSH Secret Names
+#### SSH Secret Names
 
 SSH keys are stored in secrets with predictable names based on your vSphere Provider Name:
 
@@ -217,7 +351,7 @@ SSH keys are stored in secrets with predictable names based on your vSphere Prov
 - `offload-ssh-keys-vcenter-example-private`
 - `offload-ssh-keys-vcenter-example-public`
 
-## 3. Finding Your SSH Secrets
+#### Finding Your SSH Secrets
 
 To find the SSH secrets for your vSphere Provider:
 
@@ -232,7 +366,7 @@ oc get secret offload-ssh-keys-vcenter-example-private -o yaml -n openshift-mtv
 oc get secret offload-ssh-keys-vcenter-example-public -o yaml -n openshift-mtv
 ```
 
-## 4. Optional: Customizing SSH Keys
+#### Optional: Customizing SSH Keys
 
 If you need to replace the auto-generated keys with your own:
 
@@ -251,7 +385,7 @@ oc create secret generic offload-ssh-keys-vcenter-example-public \
   --dry-run=client -o yaml | oc replace -f - -n openshift-mtv
 ```
 
-## 5. SSH Timeout Configuration
+#### SSH Timeout Configuration
 
 You can configure the SSH timeout by adding it to your Provider secret (the main storage credentials secret):
 
@@ -260,9 +394,10 @@ You can configure the SSH timeout by adding it to your Provider secret (the main
 oc patch secret vsphere-credentials -p '{"data":{"SSH_TIMEOUT_SECONDS":"'$(echo -n "60" | base64)'"}}' -n openshift-mtv
 ```
 
-## 6. ESXi Host Requirements
+#### ESXi Host Requirements
 
-### SSH Service
+**SSH Service**
+
 SSH must be enabled on ESXi hosts for the SSH method to work:
 
 ```bash
@@ -274,7 +409,8 @@ vim-cmd hostsvc/start_ssh
 # Host → Configure → Services → SSH Client → Start
 ```
 
-### SSH Setup Requirements
+**SSH Setup Requirements**
+
 The SSH method requires:
 1. **SSH service must be manually enabled** on ESXi hosts (see commands above)
 2. **Manual SSH key deployment** - the system will provide instructions in logs if keys need to be installed
@@ -282,7 +418,7 @@ The SSH method requires:
 
 **Important**: SSH service enablement and initial key deployment must be done manually. The system will detect missing keys and provide step-by-step instructions in the logs.
 
-## 7. Manual SSH Key Installation
+#### Manual SSH Key Installation
 
 You can prepare your hosts for the SSH method by manually adding the restricted SSH key to your ESXi hosts using the following steps. 
 
@@ -290,7 +426,7 @@ You can prepare your hosts for the SSH method by manually adding the restricted 
 
 If you want to configure SSH keys prior to the first migration:
 
-### Step 1: Extract the Public Key
+**Step 1: Extract the Public Key**
 
 First, get the public key from the auto-generated secret:
 
@@ -306,7 +442,7 @@ oc get secret offload-ssh-keys-vcenter-example-public \
 cat esxi_public_key.pub
 ```
 
-### Step 2: Prepare the Restricted Key Entry
+**Step 2: Prepare the Restricted Key Entry**
 
 The system requires command restrictions for security. Create the restricted key entry:
 
@@ -320,7 +456,7 @@ echo 'command="python /vmfs/volumes/datastore1/secure-vmkfstools-wrapper.py",no-
 cat restricted_key.pub
 ```
 
-### Step 3: Install the Key on ESXi Host
+**Step 3: Install the Key on ESXi Host**
 
 Connect to each ESXi host and install the key:
 
@@ -333,7 +469,7 @@ ssh root@esxi-host-ip
 vi /etc/ssh/keys-root/authorized_keys
 ```
 
-### Step 4: Alternative - One-Command Installation
+**Step 4: Alternative - One-Command Installation**
 
 If you have network access from your local machine to the ESXi host:
 
@@ -343,7 +479,7 @@ cat restricted_key.pub | ssh root@esxi-host-ip \
   'cat >> /etc/ssh/keys-root/authorized_keys'
 ```
 
-### Step 5: Verify Installation
+**Step 5: Verify Installation**
 
 Test the SSH key installation:
 
@@ -363,7 +499,7 @@ ssh -i esxi_private_key root@esxi-host-ip
 # Try a test command (should be restricted to the secure script)
 ```
 
-### Step 6: Cleanup Local Files
+**Step 6: Cleanup Local Files**
 
 After installation, clean up the key files:
 
@@ -372,25 +508,25 @@ After installation, clean up the key files:
 rm -f esxi_public_key.pub restricted_key.pub esxi_private_key
 ```
 
-### Important Notes
+**Important Notes**
 
 - The public key must include command restrictions for security
 - The command path in the restrictions must match the secure script path: `/vmfs/volumes/{datastore-name}/secure-vmkfstools-wrapper.py`
 - Each ESXi host in your migration environment needs the key installed
 - SSH service must be enabled on all target ESXi hosts
 
-## 8. Security Considerations
+#### Security Considerations
 
-### SSH Key Security
+**SSH Key Security**
 - Store SSH private keys securely in Kubernetes secrets
 - Use separate key pairs for different environments
 - Rotate keys periodically
 - Consider using shorter-lived keys for enhanced security
 
-### ESXi Access Control
+**ESXi Access Control**
 - Commands are restricted to vmkfstools operations only
 
-## 9. SSH Method Advantages
+#### SSH Method Advantages
 
 - **No VIB Installation**: Doesn't require custom VIB deployment on ESXi hosts
 - **Standard SSH**: Uses standard ESXi SSH service (no custom components)
@@ -398,66 +534,10 @@ rm -f esxi_public_key.pub restricted_key.pub esxi_private_key
 - **Compatibility**: Works with any ESXi version that supports SSH
 - **Flexibility**: Easier to troubleshoot and monitor SSH connections
 
-Provider specific entries in the secret shall be documented below:
 
-## Hitachi Vantara
-- see [README](internal/vantara/README.md)
+## Troubleshooting
 
-## NetApp ONTAP
-
-| Key | Value | Description |
-| --- | --- | --- |
-| ONTAP_SVM | string | the SVM to use in all the client interactions. Can be taken from trident.netapp.io/v1/TridentBackend.config.ontap_config.svm resource field. |
-
-
-## Pure FlashArray
-
-| Key | Value | Description |
-| --- | --- | --- |
-| PURE_CLUSTER_PREFIX | string | Cluster prefix is set in the StorageCluster resource. Get it with  `printf "px_%.8s" $(oc get storagecluster -A -o=jsonpath='{.items[?(@.spec.cloudStorage.provider=="pure")].status.clusterUid}')` |
-
-
-## Dell PowerMax
-
-| Key | Value | Description |
-| --- | --- | --- |
-| POWERMAX_SYMMETRIX_ID | string | the symmetrix id of the storage array. Can be taken from the ConfigMap under the 'powermax' namespace, which the CSI driver uses. |
-| POWERMAX_PORT_GROUP_NAME | string | the port group to use for masking view creation. |
-
-
-## Dell PowerFlex
-
-| Key | Value | Description |
-| --- | --- | --- |
-| POWERFLEX_SYSTEM_ID | string | the system id of the storage array. Can be taken from `vxflexos-config` from the `vxflexos` namespace or the openshift-operators namespace. |
-
-
-# Setup copy offload
-- Set the feature flag
-  `oc patch forkliftcontrollers.forklift.konveyor.io forklift-controller --type merge -p '{"spec": {"feature_copy_offload": "true"}}' -n openshift-mtv`
-- Set the volume-populator image (should be unnecessary in 2.8.5)
-  `oc set env -n openshift-mtv deployment forklift-volume-populator-controller --all VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE=quay.io/kubev2v/vsphere-xcopy-volume-populator`
-- Create a `StorageMap` according to [this section](#matching-pvc)
-- Create a plan and make sure to edit the mapping section and set the name to the `StorageMap` previously created
-  Here is how the mapping part looks in a `Plan`:
-  ```yaml
-
-    apiVersion: forklift.konveyor.io/v1beta1
-    kind: Plan
-    metadata:
-      name: my-plan
-    spec:
-      map:
-        storage:
-          apiVersion: forklift.konveyor.io/v1beta1
-          kind: StorageMap
-          name: copy-offload  # <-- This points to the StorageMap configured previously
-          namespace: openshift-mtv
-  ```
-
-# Troubleshooting
-
-## vSphere/ESXi
+### vSphere/ESXi
 - Sometimes remote ESXi execution can fail with SOAP error with no apparent root cause message
   Since VSphere is invoking some SOAP/Rest endpoints on the ESXi, those can fail because of 
   standard error reasons and vanish after the next try. If the popoulator fails the migration
@@ -472,8 +552,9 @@ Provider specific entries in the secret shall be documented below:
   
     resolution: ssh into the ESXi and run `/etc/init.d/hostd restart`. Wait for few seconds till the ESX renews the connection with vSphere.
 
-## SSH Method
-- **Error**: `manual SSH key configuration required` or `failed to connect via SSH`
+### SSH Method
+
+**Error**: `manual SSH key configuration required` or `failed to connect via SSH`
   
   **Causes and Solutions**:
   1. **SSH service disabled**: Manually enable SSH on the ESXi host using the commands in section 6
@@ -520,14 +601,17 @@ Provider specific entries in the secret shall be documented below:
   3. Once keys are installed, use secure key-based authentication with command restrictions
   4. Restrict commands to vmkfstools operations only
 
-## NetApp
-- Error `cannot derive SVM to use; please specify SVM in config file`
-  This is a configuration issue with Ontap and could be fixed by specifying a default
-  SVM using vserver commands on the ontap server:
-  ```
-  # show current config for an SVM
-  vserver show -vserver ${NAME_OF_SVM}
-  ...
-  ```
-  Try to set a mgmt interface for the SVM and put that hostname in the STORAGE_HOSTNAME
+### NetApp
+
+**Error**: `cannot derive SVM to use; please specify SVM in config file`
+
+This is a configuration issue with Ontap and could be fixed by specifying a default SVM using vserver commands on the ontap server:
+
+```bash
+# show current config for an SVM
+vserver show -vserver ${NAME_OF_SVM}
+...
+```
+
+Try to set a mgmt interface for the SVM and put that hostname in the STORAGE_HOSTNAME
 
