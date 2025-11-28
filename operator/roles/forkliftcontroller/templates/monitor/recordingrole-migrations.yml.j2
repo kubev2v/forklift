@@ -8,7 +8,7 @@ spec:
   groups:
   - name: mtv-migrations
     rules:
-    - record: cluster:mtv_migrations_status_total:max
+    - record: cluster:mtv_migrations_status_total:sum
       expr: max by(status, provider, mode, target) (mtv_migrations_status_total)
       labels:
         app: {{ app_name }}
