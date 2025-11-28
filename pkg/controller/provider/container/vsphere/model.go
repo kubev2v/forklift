@@ -358,15 +358,23 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 							}
 							return
 						}
+						// Extract all IPv6 addresses
+						var ipv6Addresses []string
+						if nic.Spec.Ip.IpV6Config != nil {
+							for _, ipv6 := range nic.Spec.Ip.IpV6Config.IpV6Address {
+								ipv6Addresses = append(ipv6Addresses, ipv6.IpAddress)
+							}
+						}
 						network.VNICs = append(
 							network.VNICs,
 							model.VNIC{
-								Key:        nic.Key,
-								PortGroup:  nic.Portgroup,
-								DPortGroup: dGroup(),
-								IpAddress:  nic.Spec.Ip.IpAddress,
-								SubnetMask: nic.Spec.Ip.SubnetMask,
-								MTU:        nic.Spec.Mtu,
+								Key:         nic.Key,
+								PortGroup:   nic.Portgroup,
+								DPortGroup:  dGroup(),
+								IpAddress:   nic.Spec.Ip.IpAddress,
+								SubnetMask:  nic.Spec.Ip.SubnetMask,
+								IpV6Address: ipv6Addresses,
+								MTU:         nic.Spec.Mtu,
 							})
 					}
 					sort.Slice(
