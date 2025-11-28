@@ -1,6 +1,7 @@
 package populator
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -41,7 +42,7 @@ var _ = Describe("rescan", func() {
 			listCmd := []string{"storage", "core", "device", "list", "-d", targetLUN}
 			mockClient.EXPECT().RunEsxCommand(gomock.Any(), host, gomock.Eq(listCmd)).Return(nil, nil)
 
-			err := rescan(mockClient, host, targetLUN)
+			err := rescan(context.Background(), mockClient, host, targetLUN)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
@@ -57,7 +58,7 @@ var _ = Describe("rescan", func() {
 				mockClient.EXPECT().RunEsxCommand(gomock.Any(), host, gomock.Eq(listCmd)).Return(nil, nil),
 			)
 
-			err := rescan(mockClient, host, targetLUN)
+			err := rescan(context.Background(), mockClient, host, targetLUN)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
@@ -70,7 +71,7 @@ var _ = Describe("rescan", func() {
 			mockClient.EXPECT().RunEsxCommand(gomock.Any(), host, gomock.Eq(listCmd)).Return(nil, errors.New("device not found")).Times(rescanRetries + 1)
 			mockClient.EXPECT().RunEsxCommand(gomock.Any(), host, gomock.Eq(rescanCmd)).Return(nil, nil).Times(rescanRetries)
 
-			err := rescan(mockClient, host, targetLUN)
+			err := rescan(context.Background(), mockClient, host, targetLUN)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to find device"))
 		})
@@ -84,7 +85,7 @@ var _ = Describe("rescan", func() {
 			mockClient.EXPECT().RunEsxCommand(gomock.Any(), host, gomock.Eq(listCmd)).Return(nil, errors.New("device not found")).Times(rescanRetries + 1)
 			mockClient.EXPECT().RunEsxCommand(gomock.Any(), host, gomock.Eq(rescanCmd)).Return(nil, errors.New("rescan failed")).Times(rescanRetries)
 
-			err := rescan(mockClient, host, targetLUN)
+			err := rescan(context.Background(), mockClient, host, targetLUN)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to find device"))
 		})
@@ -100,7 +101,7 @@ var _ = Describe("rescan", func() {
 			mockClient.EXPECT().RunEsxCommand(gomock.Any(), host, gomock.Eq(rescanCmd)).Return(nil, errors.New("rescan failed")).Times(2)
 			mockClient.EXPECT().RunEsxCommand(gomock.Any(), host, gomock.Eq(rescanCmd)).Return(nil, nil).Times(1)
 
-			err := rescan(mockClient, host, targetLUN)
+			err := rescan(context.Background(), mockClient, host, targetLUN)
 			Expect(err).ToNot(HaveOccurred())
 		})
 		It("should retry even when scan fails and eventually succeed if device found", func() {
@@ -111,7 +112,7 @@ var _ = Describe("rescan", func() {
 			mockClient.EXPECT().RunEsxCommand(gomock.Any(), host, gomock.Eq(listCmd)).Return(nil, nil).Times(1)
 			mockClient.EXPECT().RunEsxCommand(gomock.Any(), host, gomock.Eq(rescanCmd)).Return(nil, errors.New("rescan failed")).Times(3)
 
-			err := rescan(mockClient, host, targetLUN)
+			err := rescan(context.Background(), mockClient, host, targetLUN)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
