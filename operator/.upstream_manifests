@@ -331,6 +331,10 @@ spec:
                 description: Volume populator controller image
                 example: quay.io/kubev2v/populator-controller:latest
                 type: string
+              populator_ec2_image_fqin:
+                description: EC2 populator image
+                example: quay.io/kubev2v/ec2-populator:latest
+                type: string
               populator_openstack_image_fqin:
                 description: OpenStack populator image
                 example: quay.io/kubev2v/openstack-populator:latest
@@ -6796,6 +6800,8 @@ spec:
           value: ${OVIRT_POPULATOR_IMAGE}
         - name: OPENSTACK_POPULATOR_IMAGE
           value: ${OPENSTACK_POPULATOR_IMAGE}
+        - name: EC2_POPULATOR_IMAGE
+          value: ${EC2_POPULATOR_IMAGE}
         - name: OVA_PROVIDER_SERVER_IMAGE
           value: ${OVA_PROVIDER_SERVER_IMAGE}
         - name: OVA_PROXY_IMAGE
@@ -7626,6 +7632,8 @@ spec:
     name: virt_v2v
   - image: ${OPENSTACK_POPULATOR_IMAGE}
     name: openstack_populator
+  - image: ${EC2_POPULATOR_IMAGE}
+    name: ec2_populator
   - image: ${UI_PLUGIN_IMAGE}
     name: ui_plugin
   - image: ${OVA_PROVIDER_SERVER_IMAGE}

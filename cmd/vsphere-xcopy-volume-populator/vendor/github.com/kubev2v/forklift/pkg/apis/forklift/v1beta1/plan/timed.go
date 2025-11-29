@@ -26,7 +26,6 @@ func (r *Timed) MarkStarted() {
 
 // Mark as completed.
 func (r *Timed) MarkCompleted() {
-	r.MarkStarted()
 	if r.Completed == nil {
 		r.Completed = r.now()
 	}

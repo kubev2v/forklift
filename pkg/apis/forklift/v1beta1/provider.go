@@ -40,6 +40,8 @@ const (
 	OpenStack ProviderType = "openstack"
 	// OVA
 	Ova ProviderType = "ova"
+	// EC2
+	EC2 ProviderType = "ec2"
 )
 
 var ProviderTypes = []ProviderType{
@@ -48,6 +50,7 @@ var ProviderTypes = []ProviderType{
 	OVirt,
 	OpenStack,
 	Ova,
+	EC2,
 }
 
 func (t ProviderType) String() string {
@@ -69,6 +72,8 @@ const (
 	UseVddkAioOptimization = "useVddkAioOptimization"
 	VddkConfig             = "vddkConfig"
 	ESXiCloneMethod        = "esxiCloneMethod"
+	TargetAZ               = "target-az"
+	TargetRegion           = "target-region"
 )
 
 const OvaProviderFinalizer = "forklift/ova-provider"
