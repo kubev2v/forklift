@@ -15,7 +15,7 @@ ARG UI_PLUGIN_IMAGE="quay.io/kubev2v/forklift-console-plugin:latest"
 ARG CLI_DOWNLOAD_IMAGE="quay.io/kubev2v/forklift-cli-download:latest"
 ARG OVA_PROVIDER_SERVER_IMAGE="quay.io/kubev2v/forklift-ova-provider-server:latest"
 ARG VALIDATION_IMAGE="quay.io/kubev2v/forklift-validation:latest"
-ARG OVA_PROXY_IMAGE="quay.io/kubev2v/forklift-ova-proxy:latest"
+ARG FORKLIFT_PROXY_IMAGE="quay.io/kubev2v/forklift-proxy:latest"
 
 COPY ./operator /repo
 WORKDIR /repo

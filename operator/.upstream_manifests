@@ -221,6 +221,30 @@ spec:
                 - "true"
                 - "false"
                 type: string
+              forklift_proxy_container_limits_cpu:
+                description: 'Forklift Proxy CPU limit (default: 1000m)'
+                example: 2000m
+                type: string
+              forklift_proxy_container_limits_memory:
+                description: 'Forklift Proxy memory limit (default: 1Gi)'
+                example: 2Gi
+                type: string
+              forklift_proxy_container_requests_cpu:
+                description: 'Forklift Proxy CPU request (default: 250m)'
+                example: 200m
+                type: string
+              forklift_proxy_container_requests_memory:
+                description: 'Forklift Proxy memory request (default: 512Mi)'
+                example: 300Mi
+                type: string
+              forklift_proxy_fqin:
+                description: Forklift inventory proxy image
+                example: quay.io/kubev2v/forklift-proxy:latest
+                type: string
+              forklift_proxy_route_timeout:
+                description: 'Forklift Proxy route timeout (default: 360s)'
+                example: 600s
+                type: string
               hooks_container_limits_cpu:
                 description: 'Hooks CPU limit (default: 1000m)'
                 example: 2000m
@@ -298,30 +322,6 @@ spec:
               ova_provider_server_fqin:
                 description: OVA provider server image
                 example: quay.io/kubev2v/ova-provider-server:latest
-                type: string
-              ova_proxy_container_limits_cpu:
-                description: 'OVA Proxy CPU limit (default: 1000m)'
-                example: 2000m
-                type: string
-              ova_proxy_container_limits_memory:
-                description: 'OVA Proxy memory limit (default: 1Gi)'
-                example: 2Gi
-                type: string
-              ova_proxy_container_requests_cpu:
-                description: 'OVA Proxy CPU request (default: 250m)'
-                example: 200m
-                type: string
-              ova_proxy_container_requests_memory:
-                description: 'OVA Proxy memory request (default: 512Mi)'
-                example: 300Mi
-                type: string
-              ova_proxy_fqin:
-                description: OVA inventory proxy image
-                example: quay.io/kubev2v/forklift-ova-proxy:latest
-                type: string
-              ova_proxy_route_timeout:
-                description: 'OVA Proxy route timeout (default: 360s)'
-                example: 600s
                 type: string
               ovirt_osmap_configmap_name:
                 description: 'ConfigMap name for oVirt OS mappings (default: forklift-ovirt-osmap)'
@@ -6798,8 +6798,8 @@ spec:
           value: ${OPENSTACK_POPULATOR_IMAGE}
         - name: OVA_PROVIDER_SERVER_IMAGE
           value: ${OVA_PROVIDER_SERVER_IMAGE}
-        - name: OVA_PROXY_IMAGE
-          value: ${OVA_PROXY_IMAGE}
+        - name: FORKLIFT_PROXY_IMAGE
+          value: ${FORKLIFT_PROXY_IMAGE}
         - name: OVIRT_OS_MAP
           value: ${OVIRT_OS_MAP}
         - name: VSPHERE_OS_MAP
@@ -7118,9 +7118,9 @@ spec:
         path: must_gather_image_fqin
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
-      - description: OVA inventory proxy image
-        displayName: OVA Proxy Image
-        path: ova_proxy_fqin
+      - description: Forklift inventory proxy image
+        displayName: Forklift Proxy Image
+        path: forklift_proxy_fqin
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Controller CPU limit (default 500m)
@@ -7433,29 +7433,29 @@ spec:
         path: ova_container_requests_memory
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
-      - description: OVA Proxy CPU limit (default 1000m)
-        displayName: OVA Proxy CPU Limit
-        path: ova_proxy_container_limits_cpu
+      - description: Forklift Proxy CPU limit (default 1000m)
+        displayName: Forklift Proxy CPU Limit
+        path: forklift_proxy_container_limits_cpu
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
-      - description: OVA Proxy memory limit (default 1Gi)
-        displayName: OVA Proxy Memory Limit
-        path: ova_proxy_container_limits_memory
+      - description: Forklift Proxy memory limit (default 1Gi)
+        displayName: Forklift Proxy Memory Limit
+        path: forklift_proxy_container_limits_memory
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
-      - description: OVA Proxy CPU request (default 250m)
-        displayName: OVA Proxy CPU Request
-        path: ova_proxy_container_requests_cpu
+      - description: Forklift Proxy CPU request (default 250m)
+        displayName: Forklift Proxy CPU Request
+        path: forklift_proxy_container_requests_cpu
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
-      - description: OVA Proxy memory request (default 512Mi)
-        displayName: OVA Proxy Memory Request
-        path: ova_proxy_container_requests_memory
+      - description: Forklift Proxy memory request (default 512Mi)
+        displayName: Forklift Proxy Memory Request
+        path: forklift_proxy_container_requests_memory
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
-      - description: OVA Proxy route timeout (default 360s)
-        displayName: OVA Proxy Route Timeout
-        path: ova_proxy_route_timeout
+      - description: Forklift Proxy route timeout (default 360s)
+        displayName: Forklift Proxy Route Timeout
+        path: forklift_proxy_route_timeout
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Log verbosity level (default 3)
@@ -7630,8 +7630,8 @@ spec:
     name: ui_plugin
   - image: ${OVA_PROVIDER_SERVER_IMAGE}
     name: ova_provider_server
-  - image: ${OVA_PROXY_IMAGE}
-    name: ova_proxy
+  - image: ${FORKLIFT_PROXY_IMAGE}
+    name: forklift_proxy
   - image: ${VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE}
     name: vsphere_xcopy_volume_populator
   version: ${MTV_VERSION}

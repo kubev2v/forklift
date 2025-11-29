@@ -26,9 +26,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-func TestOVAProxy(t *testing.T) {
+func TestForkliftProxy(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "OVA Proxy Suite")
+	RunSpecs(t, "Forklift Proxy Suite")
 }
 
 func init() {

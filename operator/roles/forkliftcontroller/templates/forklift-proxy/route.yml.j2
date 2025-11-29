@@ -1,0 +1,19 @@
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ forklift_proxy_route_name }}
+  namespace: {{ app_namespace }}
+  annotations:
+    haproxy.router.openshift.io/timeout: {{ forklift_proxy_route_timeout | default('360s', true) }}
+  labels:
+    app: {{ app_name }}
+    subapp: {{ forklift_proxy_subapp_name }}
+    service: {{ forklift_proxy_service_name }}
+spec:
+  to:
+    kind: Service
+    name: {{ forklift_proxy_service_name }}
+  tls:
+    termination: reencrypt
+    insecureEdgeTerminationPolicy: Redirect
