@@ -19,6 +19,7 @@ type VM struct {
 	PolicyVersion         int      `json:"PolicyVersion"`
 	UUID                  string   `json:"UUID"`
 	Firmware              string   `json:"Firmware"`
+	SecureBoot            bool     `json:"SecureBoot"`
 	CpuAffinity           []int32  `json:"CpuAffinity"`
 	CpuHotAddEnabled      bool     `json:"CpuHotAddEnabled"`
 	CpuHotRemoveEnabled   bool     `json:"CpuHotRemoveEnabled"`
@@ -74,6 +75,7 @@ func (r *VM) ApplyTo(m *model.VM) {
 	m.PolicyVersion = r.PolicyVersion
 	m.UUID = r.UUID
 	m.Firmware = r.Firmware
+	m.SecureBoot = r.SecureBoot
 	m.CpuAffinity = r.CpuAffinity
 	m.CpuHotAddEnabled = r.CpuHotAddEnabled
 	m.CpuHotRemoveEnabled = r.CpuHotRemoveEnabled
