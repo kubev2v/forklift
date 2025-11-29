@@ -195,6 +195,7 @@ def validate_forklift_controller_crd(crd_file, tasks_file):
     # Properties that are allowed to be in CRD even if not directly used in tasks
     # These are valid CRD fields that may be used indirectly or are configuration values
     allowed_crd_only_properties = {
+        'controller_transfer_network',
         'inventory_route_timeout',
         'metric_interval',
         'ova_proxy_route_timeout',
