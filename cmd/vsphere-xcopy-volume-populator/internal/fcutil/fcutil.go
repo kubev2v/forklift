@@ -10,8 +10,9 @@ import (
 // and returns the WWNN and WWPN separately (unformatted hex strings).
 //
 // Example:
-//   input: "fc.2000000000000001:2100000000000001"
-//   output: wwnn="2000000000000001", wwpn="2100000000000001", err=nil
+//
+//	input: "fc.2000000000000001:2100000000000001"
+//	output: wwnn="2000000000000001", wwpn="2100000000000001", err=nil
 //
 // The returned WWNN and WWPN are uppercase hex strings without formatting.
 func ParseFCAdapter(fcID string) (wwnn, wwpn string, err error) {
@@ -55,8 +56,9 @@ func ParseFCAdapter(fcID string) (wwnn, wwpn string, err error) {
 // FormatWWNWithColons formats a WWN hex string by inserting colons every 2 characters.
 //
 // Example:
-//   input: "2100000000000001"
-//   output: "21:00:00:00:00:00:00:01"
+//
+//	input: "2100000000000001"
+//	output: "21:00:00:00:00:00:00:01"
 //
 // The input should be an uppercase hex string with even length.
 // If the input has odd length, the last character will be in its own segment.
@@ -80,12 +82,14 @@ func FormatWWNWithColons(wwn string) string {
 // This is useful for comparing WWNs from different sources that may use different formatting.
 //
 // Example:
-//   input: "21:00:00:00:00:00:00:01"
-//   output: "2100000000000001"
+//
+//	input: "21:00:00:00:00:00:00:01"
+//	output: "2100000000000001"
 //
 // Example:
-//   input: "21-00-00-00-00-00-00-01"
-//   output: "2100000000000001"
+//
+//	input: "21-00-00-00-00-00-00-01"
+//	output: "2100000000000001"
 func NormalizeWWN(wwn string) string {
 	cleaned := strings.ReplaceAll(wwn, ":", "")
 	cleaned = strings.ReplaceAll(cleaned, "-", "")
@@ -99,8 +103,9 @@ func NormalizeWWN(wwn string) string {
 // This is the most common operation needed by storage backends.
 //
 // Example:
-//   input: "fc.2000000000000001:2100000000000001"
-//   output: "21:00:00:00:00:00:00:01"
+//
+//	input: "fc.2000000000000001:2100000000000001"
+//	output: "21:00:00:00:00:00:00:01"
 func ExtractAndFormatWWPN(fcID string) (string, error) {
 	_, wwpn, err := ParseFCAdapter(fcID)
 	if err != nil {
@@ -112,8 +117,9 @@ func ExtractAndFormatWWPN(fcID string) (string, error) {
 // ExtractWWPN extracts the WWPN from an ESX FC adapter ID without formatting.
 //
 // Example:
-//   input: "fc.2000000000000001:2100000000000001"
-//   output: "2100000000000001"
+//
+//	input: "fc.2000000000000001:2100000000000001"
+//	output: "2100000000000001"
 func ExtractWWPN(fcID string) (string, error) {
 	_, wwpn, err := ParseFCAdapter(fcID)
 	return wwpn, err
@@ -123,8 +129,9 @@ func ExtractWWPN(fcID string) (string, error) {
 // Returns true if the WWNs are equivalent.
 //
 // Example:
-//   CompareWWNs("21:00:00:00:00:00:00:01", "2100000000000001") // returns true
-//   CompareWWNs("21-00-00-00-00-00-00-01", "21:00:00:00:00:00:00:01") // returns true
+//
+//	CompareWWNs("21:00:00:00:00:00:00:01", "2100000000000001") // returns true
+//	CompareWWNs("21-00-00-00-00-00-00-01", "21:00:00:00:00:00:00:01") // returns true
 func CompareWWNs(wwn1, wwn2 string) bool {
 	return NormalizeWWN(wwn1) == NormalizeWWN(wwn2)
 }
