@@ -128,3 +128,24 @@ test_supported_windows_2025_by_guestName if {
 	results = concerns with input as mock_vm
 	count(results) == 0
 }
+
+# Test that guestNameFromVmwareTools takes precedence when non-empty
+test_guestNameFromVmwareTools_takes_precedence_when_non_empty if {
+	mock_vm := {
+		"guestNameFromVmwareTools": "Red Hat Enterprise Linux 9 (64-bit)",
+		"guestName": "Red Hat Enterprise Linux 6 (64-bit)",
+	}
+	results = concerns with input as mock_vm
+	# Should NOT raise flag because guestNameFromVmwareTools indicates supported OS. guestName should be ignored
+	count(results) == 0
+}
+
+# Test that guestName doesn't takes precedence when non-empty
+test_guestName_not_takes_precedence_when_non_empty if {
+	mock_vm := {
+		"guestNameFromVmwareTools": "Red Hat Enterprise Linux 6 (64-bit)",
+		"guestName": "Red Hat Enterprise Linux 9 (64-bit)",
+	}
+	results = concerns with input as mock_vm
+	count(results) == 1
+}
