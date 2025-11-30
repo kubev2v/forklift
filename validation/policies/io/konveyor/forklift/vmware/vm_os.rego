@@ -38,6 +38,17 @@ is_supported if {
 
 is_supported if {
     is_string(input.guestName)
+    not is_string(input.guestNameFromVmwareTools)
+    lower_name := lower(input.guestName)
+    some i
+    lower_substring := lower(supported_os_name_substrings[i])
+    contains(lower_name, lower_substring)
+}
+
+is_supported if {
+    is_string(input.guestName)
+    is_string(input.guestNameFromVmwareTools)
+    input.guestNameFromVmwareTools == ""
     lower_name := lower(input.guestName)
     some i
     lower_substring := lower(supported_os_name_substrings[i])
@@ -55,6 +66,18 @@ has_guest_id_or_name if {
 
 has_guest_id_or_name if {
     is_string(input.guestNameFromVmwareTools)
+    input.guestNameFromVmwareTools != ""
+}
+
+has_guest_id_or_name if {
+    is_string(input.guestName)
+    not is_string(input.guestNameFromVmwareTools)
+}
+
+has_guest_id_or_name if {
+    is_string(input.guestName)
+    is_string(input.guestNameFromVmwareTools)
+    input.guestNameFromVmwareTools == ""
 }
 
 concerns contains flag if {
