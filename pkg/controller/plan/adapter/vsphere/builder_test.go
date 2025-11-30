@@ -31,7 +31,7 @@ const ManualOrigin = string(types.NetIpConfigInfoIpAddressOriginManual)
 
 var _ = Describe("vSphere builder", func() {
 	Context("PopulatorVolumes", func() {
-		It("should merge the provider secret with the storage secret", func() {
+		It("should created new secret with the provider secret and the storage secret data", func() {
 			builder := createBuilder(
 				&core.Secret{
 					ObjectMeta: meta.ObjectMeta{Name: "storage-test-secret", Namespace: "test"},
@@ -57,13 +57,19 @@ var _ = Describe("vSphere builder", func() {
 						"public-key": []byte("fake-public-key"),
 					},
 				},
+				&core.PersistentVolumeClaim{
+					ObjectMeta: meta.ObjectMeta{Name: "test-pvc", Namespace: "test"},
+				},
 			)
 
 			// Execute
-			err := builder.mergeSecrets("migration-test-secret", "test", "storage-test-secret", "test")
+			pvc := &core.PersistentVolumeClaim{
+				ObjectMeta: meta.ObjectMeta{Name: "test-pvc", Namespace: "test"},
+			}
+			err := builder.mergeSecrets("migration-test-secret", "test", "storage-test-secret", "test", "merged-test-secret", pvc)
 			underTest := core.Secret{}
 			errGet := builder.Destination.Get(context.Background(), client.ObjectKey{
-				Name:      "migration-test-secret",
+				Name:      "merged-test-secret",
 				Namespace: "test"}, &underTest)
 
 			// Assert
@@ -74,7 +80,8 @@ var _ = Describe("vSphere builder", func() {
 			Expect(underTest.Data).To(HaveKeyWithValue("providerkey", []byte("providerval")))
 			Expect(underTest.Data).To(HaveKey("SSH_PRIVATE_KEY"))
 			Expect(underTest.Data).To(HaveKey("SSH_PUBLIC_KEY"))
-
+			Expect(underTest.OwnerReferences).To(HaveLen(1))
+			Expect(underTest.OwnerReferences[0].Name).To(Equal("test-pvc"))
 		})
 		It("should set default access mode to ReadWriteMany for block volumes", func() {
 			// Setup
