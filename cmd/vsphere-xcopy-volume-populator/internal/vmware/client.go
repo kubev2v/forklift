@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/xml"
 	"net/url"
-	"reflect"
 	"strings"
 
 	"fmt"
@@ -57,17 +56,20 @@ func (c *VSphereClient) RunEsxCommand(ctx context.Context, host *object.HostSyst
 	klog.Infof("about to run esxcli command %s", command)
 	res, err := executor.Run(ctx, command)
 	if err != nil {
-		klog.Errorf("Failed to run esxcli command: %+v %s %s", res, err, reflect.TypeOf(err))
+		klog.Errorf("Failed to run esxcli command %v: %s", command, err)
 		if fault, ok := err.(*esx.Fault); ok {
-			fmt.Printf("CLI Fault: %+v\n", fault.MessageDetail())
+			if parsedFault, parseErr := ErrToFault(fault); parseErr == nil {
+				klog.Errorf("ESX CLI Fault - Type: %s, Messages: %v", parsedFault.Type, parsedFault.ErrMsgs)
+			} else {
+				klog.Errorf("Failed to parse fault details: %v", parseErr)
+			}
 		}
-
 		return nil, err
 	}
 	for _, valueMap := range res.Values {
 		message, _ := valueMap["message"]
 		status, statusExists := valueMap["status"]
-		klog.Infof("esxcli result message %s, status %v", message, status)
+		klog.Infof("esxcli result %v, message %s, status %v", valueMap, message, status)
 		if statusExists && strings.Join(status, "") != "0" {
 			return nil, fmt.Errorf("Failed to invoke vmkfstools: %v", message)
 		}

@@ -54,7 +54,7 @@ install-mockgen:
 test-copy-using-cli: build
 	bin/vsphere-xcopy-volume-populator \
 		--source-vm-id=vm-100838 \
-		--source-vmdk="[eco-iscsi-ds3] vm-1-1-test-rename/vm-1-1-test-rename_2.vmdk" \
+		--source-vmdk="[eco-iscsi-ds2] rgolan-vm-1/rgolan-vm-1.vmdk" \
 		--owner-name=test-cli \
 		--target-namespace=default \
 		--storage-vendor-product=ontap \
