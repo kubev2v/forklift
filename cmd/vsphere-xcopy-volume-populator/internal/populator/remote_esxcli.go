@@ -9,6 +9,7 @@ import (
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
 	"github.com/vmware/govmomi/object"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
 
@@ -175,11 +176,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 
 	if !isSciniRequired {
 		klog.Infof("scini is not required for the storage api")
-		for i, a := range r {
-			klog.Infof("Adapter [%d]: %+v", i, a)
-			for key, field := range a {
-				klog.Infof("  %s: %v", key, field)
-			}
+		for _, a := range r {
 			hbaName, hasHbaName := a["HBAName"]
 			if !hasHbaName {
 				continue
@@ -291,10 +288,29 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 			mappingContext["UnmapAllSdc"] = true
 			mappingContext[CleanupXcopyInitiatorGroup] = true
 		}
+
+		klog.Errorf("cleaning up lun %s:", lun.NAA)
+		// set device state to off and prevents any i/o to it
+		_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "set", "--state", "off", "-d", lun.NAA})
+		if err != nil {
+			klog.Errorf("failed to set state off for device %s: %s", lun.Name, err)
+		} else {
+			// Wait for the device state to become "off" using exponential backoff
+			err = waitForDeviceStateOff(p.VSphereClient, host, lun.NAA)
+			if err != nil {
+				klog.Errorf("timeout waiting for device %s to reach off state: %s", lun.Name, err)
+			}
+		}
+		_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "detached", "remove", "-d", lun.NAA})
+		if err != nil {
+			klog.Errorf("failed to remove device from detached list %s: %s", lun.Name, err)
+		}
+		// finaly after the kernel have it detached and not having any i/o we can unmap
 		errUnmap := p.StorageApi.UnMap(xcopyInitiatorGroup, lun, mappingContext)
 		if errUnmap != nil {
 			klog.Errorf("failed in unmap during cleanup, lun %s: %s", lun.Name, errUnmap)
 		}
+
 		// map the LUN back to the original OCP worker
 		klog.Infof("about to map the volume back to the originalInitiatorGroups, which are: %s", originalInitiatorGroups)
 		for _, group := range originalInitiatorGroups {
@@ -354,12 +370,50 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	return ExecuteCloneTask(context.Background(), executor, host, vmDisk.Path(), targetLUN, progress)
 }
 
+// waitForDeviceStateOff waits for the device state to become "off" using exponential backoff
+func waitForDeviceStateOff(client vmware.Client, host *object.HostSystem, deviceNAA string) error {
+	backoff := wait.Backoff{
+		Duration: 1 * time.Second,
+		Factor:   2.0,
+		Jitter:   0.1,
+		Steps:    10, // Max retries
+	}
+
+	return wait.ExponentialBackoff(backoff, func() (bool, error) {
+		result, err := client.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", deviceNAA})
+		if err != nil {
+			klog.V(2).Infof("failed to check device %s state: %v", deviceNAA, err)
+			return false, nil // Retry on error
+		}
+
+		if result != nil && len(result) > 0 && result[0] != nil && len(result[0]["Status"]) > 0 {
+			status := result[0]["Status"][0]
+			klog.V(2).Infof("device %s status: %s", deviceNAA, status)
+			if status == "off" {
+				klog.Infof("device %s state is now off", deviceNAA)
+				return true, nil // Success
+			}
+		}
+
+		return false, nil // Retry
+	})
+}
+
 // After mapping a volume the ESX needs a rescan to see the device. ESXs can opt-in to do it automatically
 func rescan(client vmware.Client, host *object.HostSystem, targetLUN string) error {
 	for i := 1; i <= rescanRetries; i++ {
-		_, err := client.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", targetLUN})
+		result, err := client.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", targetLUN})
 		if err == nil {
-			klog.Infof("found device %s", targetLUN)
+			status := ""
+			if result != nil && result[0] != nil && len(result[0]["Status"]) > 0 {
+				status = result[0]["Status"][0]
+			}
+			klog.Infof("found device %s with status %v", targetLUN, status)
+			if status == "off" {
+				klog.Infof("try to remove the device from the detached list (this can happen if restarting this pod or using the same volume)")
+				_, err = client.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "detached", "remove", "-d", targetLUN})
+				continue
+			}
 			return nil
 		} else {
 			_, err = client.RunEsxCommand(
