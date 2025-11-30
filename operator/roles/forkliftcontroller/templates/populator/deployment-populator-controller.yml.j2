@@ -28,6 +28,8 @@ spec:
             value: {{ populator_ovirt_image_fqin }}
           - name: OPENSTACK_POPULATOR_IMAGE
             value: {{ populator_openstack_image_fqin }}
+          - name: EC2_POPULATOR_IMAGE
+            value: {{ populator_ec2_image_fqin }}
 {% if feature_copy_offload|bool %}
           - name: VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE
             value: {{ populator_vsphere_xcopy_volume_image_fqin }}

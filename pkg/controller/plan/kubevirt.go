@@ -862,6 +862,7 @@ func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, e
 	} else {
 		labelSelector[kMigration] = string(r.Migration.UID)
 	}
+
 	err = r.Destination.Client.List(
 		context.TODO(),
 		pvcsList,

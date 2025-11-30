@@ -9,6 +9,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/ovirt"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/vsphere"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	ec2adapter "github.com/kubev2v/forklift/pkg/provider/ec2/controller/adapter"
 )
 
 type Adapter = base.Adapter
@@ -32,6 +33,8 @@ func New(provider *api.Provider) (adapter Adapter, err error) {
 		adapter = &ocp.Adapter{}
 	case api.Ova:
 		adapter = &ova.Adapter{}
+	case api.EC2:
+		adapter = ec2adapter.New()
 	default:
 		err = liberr.New("provider not supported.")
 	}

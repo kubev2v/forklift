@@ -17,6 +17,8 @@ relatedImages:
     image: ${VIRT_V2V_IMAGE}
   - name: openstack_populator
     image: ${OPENSTACK_POPULATOR_IMAGE}
+  - name: ec2_populator
+    image: ${EC2_POPULATOR_IMAGE}
   - name: ui_plugin
     image: ${UI_PLUGIN_IMAGE}
   - name: ova_provider_server

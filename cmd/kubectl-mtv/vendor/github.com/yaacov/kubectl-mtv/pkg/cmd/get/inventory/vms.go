@@ -166,7 +166,7 @@ func FetchVMsByQuery(ctx context.Context, kubeConfigFlags *genericclioptions.Con
 
 	// Verify provider supports VM inventory before fetching
 	switch providerType {
-	case "ovirt", "vsphere", "openstack", "ova", "openshift":
+	case "ovirt", "vsphere", "openstack", "ova", "openshift", "ec2":
 		// Provider supports VMs, continue
 	default:
 		return nil, fmt.Errorf("provider type '%s' does not support VM inventory", providerType)
@@ -252,7 +252,7 @@ func listVMsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigF
 	// Fetch VM inventory from the provider based on provider type
 	var data interface{}
 	switch providerType {
-	case "ovirt", "vsphere", "openstack", "ova", "openshift":
+	case "ovirt", "vsphere", "openstack", "ova", "openshift", "ec2":
 		data, err = providerClient.GetVMs(4)
 	default:
 		return fmt.Errorf("provider type '%s' does not support VM inventory", providerType)
