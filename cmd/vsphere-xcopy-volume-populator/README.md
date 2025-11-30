@@ -93,14 +93,9 @@ are holds migratable VMs.
    oc patch forkliftcontrollers.forklift.konveyor.io forklift-controller --type merge -p '{"spec": {"feature_copy_offload": "true"}}' -n openshift-mtv
    ```
 
-2. Set the volume-populator image (should be unnecessary in 2.8.5):
-   ```bash
-   oc set env -n openshift-mtv deployment forklift-volume-populator-controller --all VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE=quay.io/kubev2v/vsphere-xcopy-volume-populator
-   ```
+2. Create a `StorageMap` according to [this section](#matching-pvc)
 
-3. Create a `StorageMap` according to [this section](#matching-pvc)
-
-4. Create a plan and make sure to edit the mapping section and set the name to the `StorageMap` previously created.
+3. Create a plan and make sure to edit the mapping section and set the name to the `StorageMap` previously created.
 
    Here is how the mapping part looks in a `Plan`:
    ```yaml
@@ -476,25 +471,13 @@ cat restricted_key.pub
 Connect to each ESXi host and install the key:
 
 ```bash
-# SSH to the ESXi host as root
-ssh root@esxi-host-ip
-
-# Add the restricted public key to authorized_keys
-# Copy the content from restricted_key.pub and paste it into the file
-vi /etc/ssh/keys-root/authorized_keys
-```
-
-**Step 4: Alternative - One-Command Installation**
-
-If you have network access from your local machine to the ESXi host:
-
-```bash
+# If you have network access from your local machine to the ESXi host:
 # Copy the restricted key directly (replace with your ESXi IP)
 cat restricted_key.pub | ssh root@esxi-host-ip \
   'cat >> /etc/ssh/keys-root/authorized_keys'
 ```
 
-**Step 5: Verify Installation**
+**Step 4: Verify Installation**
 
 Test the SSH key installation:
 
@@ -514,7 +497,7 @@ ssh -i esxi_private_key root@esxi-host-ip
 # Try a test command (should be restricted to the secure script)
 ```
 
-**Step 6: Cleanup Local Files**
+**Step 5: Cleanup Local Files**
 
 After installation, clean up the key files:
 
