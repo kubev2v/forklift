@@ -204,6 +204,14 @@ spec:
           value: "{{ ova_container_requests_cpu }}"
         - name: OVA_CONTAINER_REQUESTS_MEMORY
           value: "{{ ova_container_requests_memory }}"
+        - name: POPULATOR_CONTAINER_LIMITS_CPU
+          value: "{{ populator_container_limits_cpu }}"
+        - name: POPULATOR_CONTAINER_LIMITS_MEMORY
+          value: "{{ populator_container_limits_memory }}"
+        - name: POPULATOR_CONTAINER_REQUESTS_CPU
+          value: "{{ populator_container_requests_cpu }}"
+        - name: POPULATOR_CONTAINER_REQUESTS_MEMORY
+          value: "{{ populator_container_requests_memory }}"
         envFrom:
         - configMapRef:
             name: {{ controller_configmap_name }}

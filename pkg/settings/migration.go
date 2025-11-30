@@ -12,42 +12,54 @@ import (
 
 // Environment variables.
 const (
-	MaxVmInFlight                  = "MAX_VM_INFLIGHT"
-	HookRetry                      = "HOOK_RETRY"
-	ImporterRetry                  = "IMPORTER_RETRY"
-	VirtV2vImage                   = "VIRT_V2V_IMAGE"
-	vddkImage                      = "VDDK_IMAGE"
-	PrecopyInterval                = "PRECOPY_INTERVAL"
-	VirtV2vDontRequestKVM          = "VIRT_V2V_DONT_REQUEST_KVM"
-	SnapshotRemovalTimeout         = "SNAPSHOT_REMOVAL_TIMEOUT"
-	SnapshotStatusCheckRate        = "SNAPSHOT_STATUS_CHECK_RATE"
-	CDIExportTokenTTL              = "CDI_EXPORT_TOKEN_TTL"
-	FileSystemOverhead             = "FILESYSTEM_OVERHEAD"
-	BlockOverhead                  = "BLOCK_OVERHEAD"
-	CleanupRetries                 = "CLEANUP_RETRIES"
-	DvStatusCheckRetries           = "DV_STATUS_CHECK_RETRIES"
-	SnapshotRemovalCheckRetries    = "SNAPSHOT_REMOVAL_CHECK_RETRIES"
-	OvirtOsConfigMap               = "OVIRT_OS_MAP"
-	VsphereOsConfigMap             = "VSPHERE_OS_MAP"
-	VirtCustomizeConfigMap         = "VIRT_CUSTOMIZE_MAP"
-	VddkJobActiveDeadline          = "VDDK_JOB_ACTIVE_DEADLINE"
-	VirtV2vExtraArgs               = "VIRT_V2V_EXTRA_ARGS"
-	VirtV2vExtraConfConfigMap      = "VIRT_V2V_EXTRA_CONF_CONFIG_MAP"
-	VirtV2vContainerLimitsCpu      = "VIRT_V2V_CONTAINER_LIMITS_CPU"
-	VirtV2vContainerLimitsMemory   = "VIRT_V2V_CONTAINER_LIMITS_MEMORY"
-	VirtV2vContainerRequestsCpu    = "VIRT_V2V_CONTAINER_REQUESTS_CPU"
-	VirtV2vContainerRequestsMemory = "VIRT_V2V_CONTAINER_REQUESTS_MEMORY"
-	HooksContainerLimitsCpu        = "HOOKS_CONTAINER_LIMITS_CPU"
-	HooksContainerLimitsMemory     = "HOOKS_CONTAINER_LIMITS_MEMORY"
-	HooksContainerRequestsCpu      = "HOOKS_CONTAINER_REQUESTS_CPU"
-	HooksContainerRequestsMemory   = "HOOKS_CONTAINER_REQUESTS_MEMORY"
-	OvaContainerLimitsCpu          = "OVA_CONTAINER_LIMITS_CPU"
-	OvaContainerLimitsMemory       = "OVA_CONTAINER_LIMITS_MEMORY"
-	OvaContainerRequestsCpu        = "OVA_CONTAINER_REQUESTS_CPU"
-	OvaContainerRequestsMemory     = "OVA_CONTAINER_REQUESTS_MEMORY"
-	TlsConnectionTimeout           = "TLS_CONNECTION_TIMEOUT"
-	MaxConcurrentReconciles        = "MAX_CONCURRENT_RECONCILES"
-	MaxParentBackingRetries        = "MAX_PARENT_BACKING_RETRIES"
+	MaxVmInFlight                    = "MAX_VM_INFLIGHT"
+	HookRetry                        = "HOOK_RETRY"
+	ImporterRetry                    = "IMPORTER_RETRY"
+	VirtV2vImage                     = "VIRT_V2V_IMAGE"
+	vddkImage                        = "VDDK_IMAGE"
+	PrecopyInterval                  = "PRECOPY_INTERVAL"
+	VirtV2vDontRequestKVM            = "VIRT_V2V_DONT_REQUEST_KVM"
+	SnapshotRemovalTimeout           = "SNAPSHOT_REMOVAL_TIMEOUT"
+	SnapshotStatusCheckRate          = "SNAPSHOT_STATUS_CHECK_RATE"
+	CDIExportTokenTTL                = "CDI_EXPORT_TOKEN_TTL"
+	FileSystemOverhead               = "FILESYSTEM_OVERHEAD"
+	BlockOverhead                    = "BLOCK_OVERHEAD"
+	CleanupRetries                   = "CLEANUP_RETRIES"
+	DvStatusCheckRetries             = "DV_STATUS_CHECK_RETRIES"
+	SnapshotRemovalCheckRetries      = "SNAPSHOT_REMOVAL_CHECK_RETRIES"
+	OvirtOsConfigMap                 = "OVIRT_OS_MAP"
+	VsphereOsConfigMap               = "VSPHERE_OS_MAP"
+	VirtCustomizeConfigMap           = "VIRT_CUSTOMIZE_MAP"
+	VddkJobActiveDeadline            = "VDDK_JOB_ACTIVE_DEADLINE"
+	VirtV2vExtraArgs                 = "VIRT_V2V_EXTRA_ARGS"
+	VirtV2vExtraConfConfigMap        = "VIRT_V2V_EXTRA_CONF_CONFIG_MAP"
+	VirtV2vContainerLimitsCpu        = "VIRT_V2V_CONTAINER_LIMITS_CPU"
+	VirtV2vContainerLimitsMemory     = "VIRT_V2V_CONTAINER_LIMITS_MEMORY"
+	VirtV2vContainerRequestsCpu      = "VIRT_V2V_CONTAINER_REQUESTS_CPU"
+	VirtV2vContainerRequestsMemory   = "VIRT_V2V_CONTAINER_REQUESTS_MEMORY"
+	HooksContainerLimitsCpu          = "HOOKS_CONTAINER_LIMITS_CPU"
+	HooksContainerLimitsMemory       = "HOOKS_CONTAINER_LIMITS_MEMORY"
+	HooksContainerRequestsCpu        = "HOOKS_CONTAINER_REQUESTS_CPU"
+	HooksContainerRequestsMemory     = "HOOKS_CONTAINER_REQUESTS_MEMORY"
+	OvaContainerLimitsCpu            = "OVA_CONTAINER_LIMITS_CPU"
+	OvaContainerLimitsMemory         = "OVA_CONTAINER_LIMITS_MEMORY"
+	OvaContainerRequestsCpu          = "OVA_CONTAINER_REQUESTS_CPU"
+	OvaContainerRequestsMemory       = "OVA_CONTAINER_REQUESTS_MEMORY"
+	PopulatorContainerLimitsCpu      = "POPULATOR_CONTAINER_LIMITS_CPU"
+	PopulatorContainerLimitsMemory   = "POPULATOR_CONTAINER_LIMITS_MEMORY"
+	PopulatorContainerRequestsCpu    = "POPULATOR_CONTAINER_REQUESTS_CPU"
+	PopulatorContainerRequestsMemory = "POPULATOR_CONTAINER_REQUESTS_MEMORY"
+	TlsConnectionTimeout             = "TLS_CONNECTION_TIMEOUT"
+	MaxConcurrentReconciles          = "MAX_CONCURRENT_RECONCILES"
+	MaxParentBackingRetries          = "MAX_PARENT_BACKING_RETRIES"
+)
+
+// Default values for populator container resources
+var (
+	DefaultPopulatorContainerLimitsCpu      = resource.NewQuantity(1000, resource.DecimalSI)
+	DefaultPopulatorContainerLimitsMemory   = resource.NewQuantity(1024, resource.BinarySI)
+	DefaultPopulatorContainerRequestsCpu    = resource.NewQuantity(100, resource.DecimalSI)
+	DefaultPopulatorContainerRequestsMemory = resource.NewQuantity(512, resource.BinarySI)
 )
 
 // Migration settings
@@ -91,19 +103,23 @@ type Migration struct {
 	// Additional arguments for virt-v2v
 	VirtV2vExtraArgs string
 	// Additional configuration for virt-v2v
-	VirtV2vExtraConfConfigMap      string
-	VirtV2vContainerLimitsCpu      string
-	VirtV2vContainerLimitsMemory   string
-	VirtV2vContainerRequestsCpu    string
-	VirtV2vContainerRequestsMemory string
-	HooksContainerLimitsCpu        string
-	HooksContainerLimitsMemory     string
-	HooksContainerRequestsCpu      string
-	HooksContainerRequestsMemory   string
-	OvaContainerLimitsCpu          string
-	OvaContainerLimitsMemory       string
-	OvaContainerRequestsCpu        string
-	OvaContainerRequestsMemory     string
+	VirtV2vExtraConfConfigMap        string
+	VirtV2vContainerLimitsCpu        string
+	VirtV2vContainerLimitsMemory     string
+	VirtV2vContainerRequestsCpu      string
+	VirtV2vContainerRequestsMemory   string
+	HooksContainerLimitsCpu          string
+	HooksContainerLimitsMemory       string
+	HooksContainerRequestsCpu        string
+	HooksContainerRequestsMemory     string
+	OvaContainerLimitsCpu            string
+	OvaContainerLimitsMemory         string
+	OvaContainerRequestsCpu          string
+	OvaContainerRequestsMemory       string
+	PopulatorContainerLimitsCpu      resource.Quantity
+	PopulatorContainerLimitsMemory   resource.Quantity
+	PopulatorContainerRequestsCpu    resource.Quantity
+	PopulatorContainerRequestsMemory resource.Quantity
 	// VDDK image for guest conversion
 	VddkImage string
 	// TlsConnectionTimeout is the timeout for TLS connections in seconds
@@ -261,6 +277,38 @@ func (r *Migration) Load() (err error) {
 		r.OvaContainerRequestsMemory = val
 	} else {
 		r.OvaContainerRequestsMemory = "512Mi"
+	}
+	if val, found := os.LookupEnv(PopulatorContainerLimitsCpu); found {
+		r.PopulatorContainerLimitsCpu, err = resource.ParseQuantity(val)
+		if err != nil {
+			return fmt.Errorf("invalid Populator CPU limit %q: %w", val, err)
+		}
+	} else {
+		r.PopulatorContainerLimitsCpu = *DefaultPopulatorContainerLimitsCpu
+	}
+	if val, found := os.LookupEnv(PopulatorContainerLimitsMemory); found {
+		r.PopulatorContainerLimitsMemory, err = resource.ParseQuantity(val)
+		if err != nil {
+			return fmt.Errorf("invalid Populator memory limit %q: %w", val, err)
+		}
+	} else {
+		r.PopulatorContainerLimitsMemory = *DefaultPopulatorContainerLimitsMemory
+	}
+	if val, found := os.LookupEnv(PopulatorContainerRequestsCpu); found {
+		r.PopulatorContainerRequestsCpu, err = resource.ParseQuantity(val)
+		if err != nil {
+			return fmt.Errorf("invalid Populator CPU request %q: %w", val, err)
+		}
+	} else {
+		r.PopulatorContainerRequestsCpu = *DefaultPopulatorContainerRequestsCpu
+	}
+	if val, found := os.LookupEnv(PopulatorContainerRequestsMemory); found {
+		r.PopulatorContainerRequestsMemory, err = resource.ParseQuantity(val)
+		if err != nil {
+			return fmt.Errorf("invalid Populator memory request %q: %w", val, err)
+		}
+	} else {
+		r.PopulatorContainerRequestsMemory = *DefaultPopulatorContainerRequestsMemory
 	}
 	r.MaxConcurrentReconciles, err = getPositiveEnvLimit(MaxConcurrentReconciles, 10)
 	if err != nil {

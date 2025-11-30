@@ -422,6 +422,25 @@ spec:
                 type: string
                 description: "OVA Proxy route timeout (default: 360s)"
                 example: "600s"
+              
+              # Volume Populator Settings
+              populator_container_limits_cpu:
+                type: string
+                description: "Volume Populator CPU limit (default: 1000m)"
+                example: "2000m"
+              populator_container_limits_memory:
+                type: string
+                description: "Volume Populator memory limit (default: 1Gi)"
+                example: "2Gi"
+              populator_container_requests_cpu:
+                type: string
+                description: "Volume Populator CPU request (default: 100m)"
+                example: "200m"
+              populator_container_requests_memory:
+                type: string
+                description: "Volume Populator memory request (default: 512Mi)"
+                example: "300Mi"
+
 
               # Logging & General Settings
               controller_log_level:

@@ -8,6 +8,7 @@ import (
 
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	populator_machinery "github.com/kubev2v/forklift/pkg/lib-volume-populator/populator-machinery"
+	"github.com/kubev2v/forklift/pkg/settings"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -67,9 +68,13 @@ func main() {
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 	// Metrics args
 	flag.StringVar(&metricsPath, "metrics-path", "/metrics", "The HTTP path where prometheus metrics will be exposed. Default is `/metrics`.")
-
 	klog.InitFlags(nil)
 	flag.Parse()
+
+	resources, err := getResources()
+	if err != nil {
+		klog.Fatalf("Failed to parse resources: %v", err)
+	}
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
@@ -91,7 +96,7 @@ func main() {
 		metricsEndpoint := populator.metricsEndpoint
 		go func() {
 			populator_machinery.RunController(masterURL, kubeconfig, imageName, metricsEndpoint, metricsPath,
-				prefix, gk, gvr, mountPath, devicePath, controllerFunc)
+				prefix, gk, gvr, mountPath, devicePath, controllerFunc, resources)
 			<-stop
 		}()
 	}
@@ -158,4 +163,21 @@ func getVolumePath(rawBlock bool) string {
 	} else {
 		return mountPath + "disk.img"
 	}
+}
+
+func getResources() (*corev1.ResourceRequirements, error) {
+	cpuLimit := settings.Settings.Migration.PopulatorContainerLimitsCpu
+	memoryLimit := settings.Settings.Migration.PopulatorContainerLimitsMemory
+	cpuRequest := settings.Settings.Migration.PopulatorContainerRequestsCpu
+	memoryRequest := settings.Settings.Migration.PopulatorContainerRequestsMemory
+	return &corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    cpuLimit,
+			corev1.ResourceMemory: memoryLimit,
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    cpuRequest,
+			corev1.ResourceMemory: memoryRequest,
+		},
+	}, nil
 }
