@@ -121,6 +121,20 @@ func (p *PowermaxClonner) EnsureClonnerIgroup(_ string, clonnerIqn []string) (po
 
 	klog.Infof("storage group %s", p.storageGroupID)
 
+	// Fetch port group to determine protocol type
+	portGroup, err := p.client.GetPortGroupByID(ctx, p.symmetrixID, p.portGroup)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get port group %s: %w", p.portGroup, err)
+	}
+	klog.Infof("port group %s has protocol: %s", p.portGroup, portGroup.PortGroupProtocol)
+
+	// Filter initiators based on port group protocol
+	filteredInitiators := filterInitiatorsByProtocol(clonnerIqn, portGroup.PortGroupProtocol)
+	if len(filteredInitiators) == 0 {
+		return nil, fmt.Errorf("no initiators matching protocol %s found in %v", portGroup.PortGroupProtocol, clonnerIqn)
+	}
+	klog.Infof("filtered initiators for protocol %s: %v", portGroup.PortGroupProtocol, filteredInitiators)
+
 	hosts, err := p.client.GetHostList(ctx, p.symmetrixID)
 h:
 	for _, hostId := range hosts.HostIDs {
@@ -130,8 +144,8 @@ h:
 		}
 		klog.Infof("host ID %s and initiators %v", host.HostID, host.Initiators)
 		for _, initiator := range host.Initiators {
-			for _, iqn := range clonnerIqn {
-				if strings.HasSuffix(iqn, initiator) {
+			for _, filteredInit := range filteredInitiators {
+				if strings.HasSuffix(filteredInit, initiator) {
 					p.hostID = hostId
 					break h
 				}
@@ -139,9 +153,9 @@ h:
 		}
 	}
 	if p.hostID != "" {
-		klog.Infof("host ID %s", p.hostID)
+		klog.Infof("found host ID %s matching protocol %s", p.hostID, portGroup.PortGroupProtocol)
 	} else {
-		klog.Infof("cant find host mathching initiators %v", clonnerIqn)
+		klog.Infof("cannot find host matching filtered initiators %v", filteredInitiators)
 	}
 
 	klog.Infof("port group ID %s", p.portGroup)
@@ -284,4 +298,33 @@ func generateRandomString(length int) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(bytes), nil
+}
+
+// filterInitiatorsByProtocol filters the initiator list based on the port group protocol
+// iSCSI protocol requires IQN format initiators (e.g., "iqn.1994-05.com.redhat:...")
+// SCSI_FC protocol requires FC WWN format initiators (e.g., "10000000c9a12345:10000000c9a12346")
+func filterInitiatorsByProtocol(initiators []string, protocol string) []string {
+	var filtered []string
+
+	for _, initiator := range initiators {
+		switch protocol {
+		case "iSCSI":
+			// iSCSI initiators start with "iqn."
+			if strings.HasPrefix(strings.ToLower(initiator), "iqn.") {
+				filtered = append(filtered, initiator)
+			}
+		case "SCSI_FC":
+			// FC initiators are in WWNN:WWPN format (hex pairs separated by colon)
+			// They don't start with "iqn." and typically contain colons
+			if !strings.HasPrefix(strings.ToLower(initiator), "iqn.") && strings.Contains(initiator, ":") {
+				filtered = append(filtered, initiator)
+			}
+		default:
+			klog.Warningf("Unknown protocol %s, skipping initiator filtering", protocol)
+			// For unknown protocols, return all initiators
+			return initiators
+		}
+	}
+
+	return filtered
 }
