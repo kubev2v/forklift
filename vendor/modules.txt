@@ -1180,7 +1180,7 @@ kubevirt.io/api/export
 kubevirt.io/api/export/v1alpha1
 kubevirt.io/api/instancetype
 kubevirt.io/api/instancetype/v1beta1
-# kubevirt.io/containerized-data-importer-api v1.63.1-0.20251115214221-0b4e9b5c9c59
+# kubevirt.io/containerized-data-importer-api v1.63.1
 ## explicit; go 1.23.0
 kubevirt.io/containerized-data-importer-api/pkg/apis/core
 kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1
