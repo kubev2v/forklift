@@ -19,6 +19,7 @@ const (
 type PowerflexClonner struct {
 	Client   *goscaleio.Client
 	systemId string
+	populator.AdapterIdHandlerImpl
 }
 
 // CurrentMappedGroups implements populator.StorageApi.
@@ -68,6 +69,7 @@ func (p *PowerflexClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn
 		if slices.Contains(clonnerIqn, sdc.SdcGUID) {
 			klog.Infof("found compatible SDC: %+v", sdc)
 			mappingContext[sdcIDContextKey] = sdc.ID
+			p.AddAdapterID(sdc.SdcGUID)
 			return mappingContext, nil
 		}
 	}

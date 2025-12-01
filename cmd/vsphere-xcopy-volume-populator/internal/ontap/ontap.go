@@ -15,6 +15,7 @@ const OntapProviderID = "600a0980"
 
 type NetappClonner struct {
 	api api.OntapAPI
+	populator.AdapterIdHandlerImpl
 }
 
 // Map the targetLUN to the initiator group.
@@ -47,6 +48,7 @@ func (c *NetappClonner) EnsureClonnerIgroup(initiatorGroup string, adapterIds []
 			continue
 		}
 		atLeastOneAdded = true
+		c.AddAdapterID(adapterId)
 	}
 	if !atLeastOneAdded {
 		return nil, fmt.Errorf("failed adding any host to igroup")

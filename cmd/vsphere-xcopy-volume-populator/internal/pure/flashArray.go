@@ -17,6 +17,7 @@ const FlashProviderID = "624a9370"
 type FlashArrayClonner struct {
 	client        *flasharray.Client
 	clusterPrefix string
+	populator.AdapterIdHandlerImpl
 }
 
 const ClusterPrefixEnv = "PURE_CLUSTER_PREFIX"
@@ -55,6 +56,7 @@ func (f *FlashArrayClonner) EnsureClonnerIgroup(initiatorGroup string, esxAdapte
 		klog.Infof("checking host %s, iqns: %v, wwns: %v", h.Name, h.Iqn, h.Wwn)
 		for _, iqn := range h.Iqn {
 			if slices.Contains(esxAdapters, iqn) {
+				f.AddAdapterID(iqn)
 				klog.Infof("adding host to group %v", h.Name)
 				return populator.MappingContext{"hosts": []string{h.Name}}, nil
 			}
@@ -74,6 +76,7 @@ func (f *FlashArrayClonner) EnsureClonnerIgroup(initiatorGroup string, esxAdapte
 				klog.Infof("comparing ESX adapter WWPN %s with Pure host WWN %s", adapterWWPN, wwn)
 				if fcutil.CompareWWNs(adapterWWPN, wwn) {
 					klog.Infof("match found. Adding host %s to mapping context.", h.Name)
+					f.AddAdapterID(hostAdapter)
 					return populator.MappingContext{"hosts": []string{h.Name}}, nil
 				}
 			}

@@ -246,6 +246,7 @@ func (c *FlashSystemAPIClient) handleAPIError(statusCode int, body, url string) 
 // FlashSystemClonner implements the populator.StorageApi interface.
 type FlashSystemClonner struct {
 	api *FlashSystemAPIClient
+	populator.AdapterIdHandlerImpl
 }
 
 // NewFlashSystemClonner creates a new FlashSystemClonner.
@@ -318,9 +319,10 @@ func (c *FlashSystemClonner) EnsureClonnerIgroup(hostName string, clonnerIdentif
 		}
 
 		// Store the actual FlashSystem host name for use in Map/UnMap operations
-		// Note: created_host is not set (defaults to false) since we're using an existing host
+		// Note:created_host is not set (defaults to false) since we're using an existing host
 		ctx[HostNameKey] = hostDetails.Name
 		ctx[HostIdKey] = hostDetails.ID
+		c.AddAdapterID(hostDetails.ID)
 		klog.Infof("Using existing host '%s' with ID '%s'", hostDetails.Name, hostDetails.ID)
 		return ctx, nil
 	}
