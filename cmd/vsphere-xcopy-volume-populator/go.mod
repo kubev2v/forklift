@@ -10,7 +10,7 @@ require (
 	github.com/dell/goscaleio v1.20.0
 	github.com/devans10/pugo/flasharray v0.0.0-20241116160615-6bb8c469c9a0
 	github.com/infinidat/infinibox-csi-driver v0.0.0-20251022203528-1f6913cf29cb
-	github.com/kubev2v/forklift v0.0.0-20250813102318-c4b25b22d0b5
+	github.com/kubev2v/forklift v0.0.0-20251201013611-d4d1610e79df
 	github.com/netapp/trident v0.0.0-20240628081112-cb68cb389d9d
 	github.com/onsi/ginkgo/v2 v2.25.1
 	github.com/onsi/gomega v1.38.2
