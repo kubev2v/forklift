@@ -164,6 +164,11 @@ spec:
               controller_tls_connection_timeout_sec:
                 description: 'TLS connection timeout seconds (default: 5)'
                 x-kubernetes-int-or-string: true
+              controller_transfer_network:
+                description: 'Optional NAD name for controller pod transfer network
+                  (format: ''namespace/network-name'')'
+                example: openshift-mtv/transfer-network
+                type: string
               controller_vddk_job_active_deadline_sec:
                 description: 'VDDK job timeout in seconds (default: 300)'
                 x-kubernetes-int-or-string: true
@@ -334,6 +339,22 @@ spec:
                 description: 'ConfigMap name for oVirt OS mappings (default: forklift-ovirt-osmap)'
                 example: custom-ovirt-osmap
                 type: string
+              populator_container_limits_cpu:
+                description: 'Volume Populator CPU limit (default: 1000m)'
+                example: 2000m
+                type: string
+              populator_container_limits_memory:
+                description: 'Volume Populator memory limit (default: 1Gi)'
+                example: 2Gi
+                type: string
+              populator_container_requests_cpu:
+                description: 'Volume Populator CPU request (default: 100m)'
+                example: 200m
+                type: string
+              populator_container_requests_memory:
+                description: 'Volume Populator memory request (default: 512Mi)'
+                example: 300Mi
+                type: string
               populator_controller_image_fqin:
                 description: Volume populator controller image
                 example: quay.io/kubev2v/populator-controller:latest
@@ -446,22 +467,6 @@ spec:
               vsphere_osmap_configmap_name:
                 description: 'ConfigMap name for vSphere OS mappings (default: forklift-vsphere-osmap)'
                 example: custom-vsphere-osmap
-                type: string
-              populator_container_limits_cpu:
-                description: 'Populator CPU limit (default: 1000m)'
-                example: 2000m
-                type: string
-              populator_container_limits_memory:
-                description: 'Populator memory limit (default: 1Gi)'
-                example: 2Gi
-                type: string
-              populator_container_requests_cpu:
-                description: 'Populator CPU request (default: 100m)'
-                example: 200m
-                type: string
-              populator_container_requests_memory:
-                description: 'Populator memory request (default: 512Mi)'
-                example: 300Mi
                 type: string
             type: object
           status:
@@ -7493,23 +7498,23 @@ spec:
         path: ova_proxy_route_timeout
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
-      - description: Populator CPU limit (default 1000m)
-        displayName: Populator CPU Limit
+      - description: Volume Populator CPU limit (default 1000m)
+        displayName: Volume Populator CPU Limit
         path: populator_container_limits_cpu
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
-      - description: Populator memory limit (default 1Gi)
-        displayName: Populator Memory Limit
+      - description: Volume Populator memory limit (default 1Gi)
+        displayName: Volume Populator Memory Limit
         path: populator_container_limits_memory
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
-      - description: Populator CPU request (default 100m)
-        displayName: Populator CPU Request
+      - description: Volume Populator CPU request (default 100m)
+        displayName: Volume Populator CPU Request
         path: populator_container_requests_cpu
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
-      - description: Populator memory request (default 512Mi)
-        displayName: Populator Memory Request
+      - description: Volume Populator memory request (default 512Mi)
+        displayName: Volume Populator Memory Request
         path: populator_container_requests_memory
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden

@@ -164,6 +164,11 @@ spec:
               controller_tls_connection_timeout_sec:
                 description: 'TLS connection timeout seconds (default: 5)'
                 x-kubernetes-int-or-string: true
+              controller_transfer_network:
+                description: 'Optional NAD name for controller pod transfer network
+                  (format: ''namespace/network-name'')'
+                example: openshift-mtv/transfer-network
+                type: string
               controller_vddk_job_active_deadline_sec:
                 description: 'VDDK job timeout in seconds (default: 300)'
                 x-kubernetes-int-or-string: true
