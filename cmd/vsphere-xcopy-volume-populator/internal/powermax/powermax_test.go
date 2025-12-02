@@ -69,8 +69,59 @@ func TestEnsureClonnerIgroup(t *testing.T) {
 		clonnerIqn := []string{"iqn.1994-05.com.redhat:rhv-host"}
 
 		mockClient.EXPECT().GetStorageGroup(context.TODO(), "123", gomock.Not(gomock.Nil())).Return(&v100.StorageGroup{}, nil)
+		mockClient.EXPECT().GetPortGroupByID(context.TODO(), "123", "456").Return(&v100.PortGroup{PortGroupProtocol: "iSCSI"}, nil)
 		mockClient.EXPECT().GetHostList(context.TODO(), "123").Return(&v100.HostList{HostIDs: []string{"host1"}}, nil)
 		mockClient.EXPECT().GetHostByID(context.TODO(), "123", "host1").Return(&v100.Host{Initiators: []string{"iqn.1994-05.com.redhat:rhv-host"}}, nil)
+
+		mappingContext, err := clonner.EnsureClonnerIgroup(initiatorGroup, clonnerIqn)
+		g.Expect(err).ToNot(gomega.HaveOccurred())
+		g.Expect(mappingContext).ToNot(gomega.BeNil())
+	})
+
+	t.Run("should fail when port group protocol is SCSI_FC but only iSCSI initiators are provided", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockClient := NewMockPmax(ctrl)
+
+		clonner := PowermaxClonner{
+			client:      mockClient,
+			symmetrixID: "123",
+			portGroup:   "fc-port-group",
+		}
+
+		initiatorGroup := "test-ig"
+		// Only iSCSI initiators provided
+		clonnerIqn := []string{"iqn.1994-05.com.redhat:rhv-host"}
+
+		mockClient.EXPECT().GetStorageGroup(context.TODO(), "123", gomock.Not(gomock.Nil())).Return(&v100.StorageGroup{}, nil)
+		// Port group is configured for Fibre Channel
+		mockClient.EXPECT().GetPortGroupByID(context.TODO(), "123", "fc-port-group").Return(&v100.PortGroup{PortGroupProtocol: "SCSI_FC"}, nil)
+
+		mappingContext, err := clonner.EnsureClonnerIgroup(initiatorGroup, clonnerIqn)
+		g.Expect(err).To(gomega.HaveOccurred())
+		g.Expect(err.Error()).To(gomega.ContainSubstring("no initiators matching protocol SCSI_FC"))
+		g.Expect(mappingContext).To(gomega.BeNil())
+	})
+
+	t.Run("should succeed when port group protocol is SCSI_FC and FC initiators are provided", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockClient := NewMockPmax(ctrl)
+
+		clonner := PowermaxClonner{
+			client:      mockClient,
+			symmetrixID: "123",
+			portGroup:   "fc-port-group",
+		}
+
+		initiatorGroup := "test-ig"
+		// FC initiators in WWNN:WWPN format
+		clonnerIqn := []string{"10000000c9a12345:10000000c9a12346"}
+
+		mockClient.EXPECT().GetStorageGroup(context.TODO(), "123", gomock.Not(gomock.Nil())).Return(&v100.StorageGroup{}, nil)
+		mockClient.EXPECT().GetPortGroupByID(context.TODO(), "123", "fc-port-group").Return(&v100.PortGroup{PortGroupProtocol: "SCSI_FC"}, nil)
+		mockClient.EXPECT().GetHostList(context.TODO(), "123").Return(&v100.HostList{HostIDs: []string{"host1"}}, nil)
+		mockClient.EXPECT().GetHostByID(context.TODO(), "123", "host1").Return(&v100.Host{Initiators: []string{"10000000c9a12345:10000000c9a12346"}}, nil)
 
 		mappingContext, err := clonner.EnsureClonnerIgroup(initiatorGroup, clonnerIqn)
 		g.Expect(err).ToNot(gomega.HaveOccurred())
