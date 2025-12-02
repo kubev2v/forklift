@@ -1985,9 +1985,9 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 	}
 	// Disable AppArmor for virt-v2v container to allow mount operations
 	// This is required for libguestfs to remount the root filesystem
-	// if !settings.Settings.OpenShift {
-	// 	annotations["container.apparmor.security.beta.kubernetes.io/virt-v2v"] = "unconfined"
-	// }
+	if !settings.Settings.OpenShift {
+		annotations["container.apparmor.security.beta.kubernetes.io/virt-v2v"] = "unconfined"
+	}
 	var seccompProfile core.SeccompProfile
 	if settings.Settings.OpenShift {
 		unshare := "profiles/unshare.json"
@@ -1997,7 +1997,7 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 		}
 	} else {
 		seccompProfile = core.SeccompProfile{
-			Type: core.SeccompProfileTypeRuntimeDefault,
+			Type: core.SeccompProfileTypeUnconfined,
 		}
 	}
 	// pod
