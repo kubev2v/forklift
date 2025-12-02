@@ -108,6 +108,13 @@ spec:
               controller_filesystem_overhead:
                 description: 'Filesystem overhead percentage (default: 10)'
                 x-kubernetes-int-or-string: true
+              controller_host_lease_duration_seconds:
+                description: 'Host lease duration in seconds (default: 10)'
+                x-kubernetes-int-or-string: true
+              controller_host_lease_namespace:
+                description: 'Namespace for host lease objects (default: openshift-mtv)'
+                example: openshift-mtv
+                type: string
               controller_image_fqin:
                 description: Controller pod image
                 example: quay.io/kubev2v/forklift-controller:latest
@@ -6232,6 +6239,18 @@ rules:
   - '*'
   verbs:
   - '*'
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
 - apiGroups:
   - ""
   resources:
