@@ -58,6 +58,7 @@ type RemoteEsxcliPopulator struct {
 	SSHPublicKey  []byte
 	UseSSHMethod  bool
 	SSHTimeout    time.Duration
+	PreferFCAdapters bool
 }
 
 func NewWithRemoteEsxcli(storageApi StorageApi, vsphereHostname, vsphereUsername, vspherePassword string) (Populator, error) {
@@ -70,10 +71,11 @@ func NewWithRemoteEsxcli(storageApi StorageApi, vsphereHostname, vsphereUsername
 		StorageApi:    storageApi,
 		UseSSHMethod:  false,            // VIB method
 		SSHTimeout:    30 * time.Second, // Default timeout (not used for VIB method)
+		PreferFCAdapters: false,
 	}, nil
 }
 
-func NewWithRemoteEsxcliSSH(storageApi StorageApi, vsphereHostname, vsphereUsername, vspherePassword string, sshPrivateKey, sshPublicKey []byte, sshTimeoutSeconds int) (Populator, error) {
+func NewWithRemoteEsxcliSSH(storageApi StorageApi, vsphereHostname, vsphereUsername, vspherePassword string, sshPrivateKey, sshPublicKey []byte, sshTimeoutSeconds int, preferFCAdapters bool) (Populator, error) {
 	c, err := vmware.NewClient(vsphereHostname, vsphereUsername, vspherePassword)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vmware client: %w", err)
@@ -88,10 +90,11 @@ func NewWithRemoteEsxcliSSH(storageApi StorageApi, vsphereHostname, vsphereUsern
 		SSHPublicKey:  sshPublicKey,
 		UseSSHMethod:  true,
 		SSHTimeout:    time.Duration(sshTimeoutSeconds) * time.Second,
+		PreferFCAdapters: preferFCAdapters,
 	}, nil
 }
 
-func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint, quit chan error) (errFinal error) {
+func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, preferFCAdapters bool, progress chan<- uint, quit chan error) (errFinal error) {
 	// isn't it better to not call close the channel from the caller?
 	defer func() {
 		r := recover()
@@ -136,7 +139,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		if err != nil {
 			return fmt.Errorf("failed to ensure VIB is installed: %w", err)
 		}
-	}
+	
 
 	// for iSCSI add the host to the group using IQN. Is there something else for FC?
 	r, err := p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "adapter", "list"})
@@ -220,6 +223,12 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		klog.Infof("no valid HBA UIDs found for host %s", host)
 		return fmt.Errorf("no valid HBA UIDs found for host %s", host)
 	}
+	slices.SortFunc(hbaUIDs, func(a, b string) int {
+		if preferFCAdapters {
+			return strings.Compare(b, a)
+		}
+		return strings.Compare(a, b)
+	})
 	mappingContext, err := p.StorageApi.EnsureClonnerIgroup(xcopyInitiatorGroup, hbaUIDs)
 	if err != nil {
 		return fmt.Errorf("failed to add the ESX HBA UID %s to the initiator group %w", hbaUIDs, err)
