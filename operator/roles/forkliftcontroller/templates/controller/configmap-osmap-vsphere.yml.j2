@@ -8,22 +8,54 @@ metadata:
     app: {{ app_name }}
     service: {{ controller_service_name }}
 data:
-  centos7_64Guest: "centos.7"
-  centos7Guest: "centos.7"
-  centos8_64Guest: "centos.stream8"
-  centos9_64Guest: "centos.stream9"
+  genericLinuxGuest: "linux"
+
+  ubuntu64Guest: "ubuntu"
+  ubuntuGuest: "ubuntu"
+
   fedora64Guest: "fedora"
   fedoraGuest: "fedora"
+
+  centos7_64Guest: "centos.7"
+  centos8_64Guest: "centos.stream8"
+  centos9_64Guest: "centos.stream9"
+
   rhel7_64Guest: "rhel.7"
   rhel7Guest: "rhel.7"
   rhel8_64Guest: "rhel.8"
   rhel9_64Guest: "rhel.9"
-  ubuntu64Guest: "ubuntu"
-  ubuntuGuest: "ubuntu"
+  rhel10_64Guest: "rhel.10"
+
+  sles10_64Guest: "sles"
+  sles11_64Guest: "sles"
+  sles12_64Guest: "sles"
+  sles15_64Guest: "sles"
+  sles16_64Guest: "sles"
+  opensuse64Guest: "opensuse.leap"
+
+  debian4_64Guest: "debian"
+  debian5_64Guest: "debian"
+  debian6_64Guest: "debian"
+  debian7_64Guest: "debian"
+  debian8_64Guest: "debian"
+  debian9_64Guest: "debian"
+  debian10_64Guest: "debian"
+  debian11_64Guest: "debian"
+  debian12_64Guest: "debian"
+  debian13_64Guest: "debian"
+
+  windows7_64Guest: "windows.7"
+  windows8_64Guest: "windows.8"
+  windows8_64Guest: "windows.8"
+  # This is not typo, VMware naming maps windows9 to windows 10
   windows9_64Guest: "windows.10"
-  windows9Guest: "windows.10"
-  windows9Server64Guest: "windows.10"
   windows11_64Guest: "windows.11"
+  windows12_64Guest: "windows.12"
+
+  windows7Server64Guest: "windows.2k8"
+  windows8Server64Guest: "windows.2k12"
+  windows9Server64Guest: "windows.2k16"
   windows2019srv_64Guest: "windows.2k19"
-  windows2019srvNext_64Guest: "windows.2k19"
-  windows2022srvNext_64Guest: "windows.2k22"
+  # VMware naming of newer windows is the previous version and `Next`
+  windows2019srvNext_64Guest: "windows.2k22"
+  windows2022srvNext_64Guest: "windows.2k25"
