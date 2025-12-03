@@ -53,12 +53,6 @@ func (f *FlashArrayClonner) EnsureClonnerIgroup(initiatorGroup string, esxAdapte
 	}
 	for _, h := range hosts {
 		klog.Infof("checking host %s, iqns: %v, wwns: %v", h.Name, h.Iqn, h.Wwn)
-		for _, iqn := range h.Iqn {
-			if slices.Contains(esxAdapters, iqn) {
-				klog.Infof("adding host to group %v", h.Name)
-				return populator.MappingContext{"hosts": []string{h.Name}}, nil
-			}
-		}
 		for _, wwn := range h.Wwn {
 			for _, hostAdapter := range esxAdapters {
 				if !strings.HasPrefix(hostAdapter, "fc.") {
@@ -78,6 +72,13 @@ func (f *FlashArrayClonner) EnsureClonnerIgroup(initiatorGroup string, esxAdapte
 				}
 			}
 		}
+		for _, iqn := range h.Iqn {
+			if slices.Contains(esxAdapters, iqn) {
+				klog.Infof("adding host to group %v", h.Name)
+				return populator.MappingContext{"hosts": []string{h.Name}}, nil
+			}
+		}
+
 	}
 	return nil, fmt.Errorf("no hosts found matching any of the provided IQNs/FC adapters: %v", esxAdapters)
 }
