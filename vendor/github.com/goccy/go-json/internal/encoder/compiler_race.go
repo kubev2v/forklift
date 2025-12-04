@@ -10,7 +10,6 @@ import (
 var setsMu sync.RWMutex
 
 func CompileToGetCodeSet(ctx *RuntimeContext, typeptr uintptr) (*OpcodeSet, error) {
-	initEncoder()
 	if typeptr > typeAddr.MaxTypeAddr || typeptr < typeAddr.BaseTypeAddr {
 		codeSet, err := compileToGetCodeSetSlowPath(typeptr)
 		if err != nil {

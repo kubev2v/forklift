@@ -350,9 +350,9 @@ func (z *ioDecReader) unreadn1() {
 
 // bytesDecReader is a decReader that reads off a byte slice with zero copying
 //
-// Note: we do not try to convert index'ing out of bounds to an io error.
+// Note: we do not try to convert index'ing out of bounds to an io.EOF.
 // instead, we let it bubble up to the exported Encode/Decode method
-// and recover it as an io error.
+// and recover it as an io.EOF.
 //
 // Every function here MUST defensively check bounds either explicitly
 // or via a bounds check.

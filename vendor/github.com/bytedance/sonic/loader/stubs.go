@@ -17,6 +17,7 @@
 package loader
 
 import (
+    `sync`
     _ `unsafe`
 )
 
@@ -24,5 +25,16 @@ import (
 //goland:noinspection GoUnusedGlobalVariable
 var lastmoduledatap *moduledata
 
+var moduledataMux sync.Mutex
+
+func registerModule(mod *moduledata) {
+    moduledataMux.Lock()
+    lastmoduledatap.next = mod
+    lastmoduledatap = mod
+    moduledataMux.Unlock()
+}
+
 //go:linkname moduledataverify1 runtime.moduledataverify1
 func moduledataverify1(_ *moduledata)
+
+

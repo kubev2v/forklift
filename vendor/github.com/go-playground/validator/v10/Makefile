@@ -1,9 +1,9 @@
-GOCMD=go
+GOCMD=GO111MODULE=on go
 
 linters-install:
 	@golangci-lint --version >/dev/null 2>&1 || { \
 		echo "installing linting tools..."; \
-		curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s v2.0.2; \
+		curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s v1.41.1; \
 	}
 
 lint: linters-install
@@ -13,6 +13,6 @@ test:
 	$(GOCMD) test -cover -race ./...
 
 bench:
-	$(GOCMD) test -run=NONE -bench=. -benchmem ./...
+	$(GOCMD) test -bench=. -benchmem ./...
 
 .PHONY: test lint linters-install

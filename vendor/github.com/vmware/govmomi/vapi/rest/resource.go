@@ -1,6 +1,18 @@
-// © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
-// SPDX-License-Identifier: Apache-2.0
+/*
+Copyright (c) 2019 VMware, Inc. All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 
 package rest
 
@@ -23,12 +35,6 @@ type Resource struct {
 
 func (r *Resource) String() string {
 	return r.u.String()
-}
-
-// WithSubpath appends the provided subpath to the URL.Path
-func (r *Resource) WithSubpath(subpath string) *Resource {
-	r.u.Path += "/" + subpath
-	return r
 }
 
 // WithID appends id to the URL.Path
@@ -77,7 +83,7 @@ func (r *Resource) WithPathEncodedParam(name string, value string) *Resource {
 
 // Request returns a new http.Request for the given method.
 // An optional body can be provided for POST and PATCH methods.
-func (r *Resource) Request(method string, body ...any) *http.Request {
+func (r *Resource) Request(method string, body ...interface{}) *http.Request {
 	rdr := io.MultiReader() // empty body by default
 	if len(body) != 0 {
 		rdr = encode(body[0])
@@ -98,7 +104,7 @@ func (e errorReader) Read([]byte) (int, error) {
 }
 
 // encode body as JSON, deferring any errors until io.Reader is used.
-func encode(body any) io.Reader {
+func encode(body interface{}) io.Reader {
 	var b bytes.Buffer
 	err := json.NewEncoder(&b).Encode(body)
 	if err != nil {

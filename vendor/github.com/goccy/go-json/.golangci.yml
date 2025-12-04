@@ -56,9 +56,6 @@ linters:
     - cyclop
     - containedctx
     - revive
-    - nosnakecase
-    - exhaustruct
-    - depguard
 
 issues:
   exclude-rules:

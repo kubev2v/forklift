@@ -5,7 +5,3 @@ count.out
 test
 profile.out
 tmp.out
-
-# Develop tools
-.idea/
-.vscode/

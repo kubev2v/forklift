@@ -17,11 +17,14 @@
 package ast
 
 import (
-	"sync"
-	"unicode/utf8"
+    `sync`
+    `unicode/utf8`
 
-	"github.com/bytedance/sonic/internal/rt"
-    "github.com/bytedance/sonic/option"
+    `github.com/bytedance/sonic/internal/rt`
+)
+
+const (
+    _MaxBuffer = 1024    // 1KB buffer size
 )
 
 func quoteString(e *[]byte, s string) {
@@ -29,7 +32,7 @@ func quoteString(e *[]byte, s string) {
     start := 0
     for i := 0; i < len(s); {
         if b := s[i]; b < utf8.RuneSelf {
-            if rt.SafeSet[b] {
+            if safeSet[b] {
                 i++
                 continue
             }
@@ -53,8 +56,8 @@ func quoteString(e *[]byte, s string) {
                 // user-controlled strings are rendered into JSON
                 // and served to some browsers.
                 *e = append(*e, `u00`...)
-                *e = append(*e, rt.Hex[b>>4])
-                *e = append(*e, rt.Hex[b&0xF])
+                *e = append(*e, hex[b>>4])
+                *e = append(*e, hex[b&0xF])
             }
             i++
             start = i
@@ -75,7 +78,7 @@ func quoteString(e *[]byte, s string) {
                 *e = append(*e, s[start:i]...)
             }
             *e = append(*e, `\u202`...)
-            *e = append(*e, rt.Hex[c&0xF])
+            *e = append(*e, hex[c&0xF])
             i += size
             start = i
             continue
@@ -91,24 +94,16 @@ func quoteString(e *[]byte, s string) {
 var bytesPool   = sync.Pool{}
 
 func (self *Node) MarshalJSON() ([]byte, error) {
-	if self == nil {
-		return bytesNull, nil
-	}
-
     buf := newBuffer()
     err := self.encode(buf)
     if err != nil {
         freeBuffer(buf)
         return nil, err
     }
-    var ret []byte
-    if !rt.CanSizeResue(cap(*buf)) {
-        ret = *buf
-    } else {
-        ret = make([]byte, len(*buf))
-        copy(ret, *buf)
-        freeBuffer(buf)
-    }
+
+    ret := make([]byte, len(*buf))
+    copy(ret, *buf)
+    freeBuffer(buf)
     return ret, err
 }
 
@@ -116,24 +111,21 @@ func newBuffer() *[]byte {
     if ret := bytesPool.Get(); ret != nil {
         return ret.(*[]byte)
     } else {
-        buf := make([]byte, 0, option.DefaultAstBufferSize)
+        buf := make([]byte, 0, _MaxBuffer)
         return &buf
     }
 }
 
 func freeBuffer(buf *[]byte) {
-    if !rt.CanSizeResue(cap(*buf)) {
-        return
-    }
     *buf = (*buf)[:0]
     bytesPool.Put(buf)
 }
 
 func (self *Node) encode(buf *[]byte) error {
-    if self.isRaw() {
+    if self.IsRaw() {
         return self.encodeRaw(buf)
     }
-    switch int(self.itype()) {
+    switch self.Type() {
         case V_NONE  : return ErrNotExist
         case V_ERROR : return self.Check()
         case V_NULL  : return self.encodeNull(buf)
@@ -149,21 +141,16 @@ func (self *Node) encode(buf *[]byte) error {
 }
 
 func (self *Node) encodeRaw(buf *[]byte) error {
-    lock := self.rlock()
-    if !self.isRaw() {
-        self.runlock()
-        return self.encode(buf)
-    }
-    raw := self.toString()
-    if lock {
-        self.runlock()
+    raw, err := self.Raw()
+    if err != nil {
+        return err
     }
     *buf = append(*buf, raw...)
     return nil
 }
 
 func (self *Node) encodeNull(buf *[]byte) error {
-    *buf = append(*buf, strNull...)
+    *buf = append(*buf, bytesNull...)
     return nil
 }
 
@@ -178,18 +165,18 @@ func (self *Node) encodeFalse(buf *[]byte) error {
 }
 
 func (self *Node) encodeNumber(buf *[]byte) error {
-    str := self.toString()
+    str := rt.StrFrom(self.p, self.v)
     *buf = append(*buf, str...)
     return nil
 }
 
 func (self *Node) encodeString(buf *[]byte) error {
-    if self.l == 0 {
+    if self.v == 0 {
         *buf = append(*buf, '"', '"')
         return nil
     }
 
-    quote(buf, self.toString())
+    quote(buf, rt.StrFrom(self.p, self.v))
     return nil
 }
 
@@ -208,17 +195,16 @@ func (self *Node) encodeArray(buf *[]byte) error {
     
     *buf = append(*buf, '[')
 
-    var started bool
-    for i := 0; i < nb; i++ {
-        n := self.nodeAt(i)
-        if !n.Exists() {
-            continue
-        }
-        if started {
-            *buf = append(*buf, ',')
-        }
-        started = true
-        if err := n.encode(buf); err != nil {
+    var p = (*Node)(self.p)
+    err := p.encode(buf)
+    if err != nil {
+        return err
+    }
+    for i := 1; i < nb; i++ {
+        *buf = append(*buf, ',')
+        p = p.unsafe_next()
+        err := p.encode(buf)
+        if err != nil {
             return err
         }
     }
@@ -254,17 +240,16 @@ func (self *Node) encodeObject(buf *[]byte) error {
     
     *buf = append(*buf, '{')
 
-    var started bool
-    for i := 0; i < nb; i++ {
-        n := self.pairAt(i)
-        if n == nil || !n.Value.Exists() {
-            continue
-        }
-        if started {
-            *buf = append(*buf, ',')
-        }
-        started = true
-        if err := n.encode(buf); err != nil {
+    var p = (*Pair)(self.p)
+    err := p.encode(buf)
+    if err != nil {
+        return err
+    }
+    for i := 1; i < nb; i++ {
+        *buf = append(*buf, ',')
+        p = p.unsafe_next()
+        err := p.encode(buf)
+        if err != nil {
             return err
         }
     }

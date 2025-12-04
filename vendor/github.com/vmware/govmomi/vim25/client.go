@@ -1,22 +1,38 @@
-// © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
-// SPDX-License-Identifier: Apache-2.0
+/*
+Copyright (c) 2015-2023 VMware, Inc. All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 
 package vim25
 
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"path"
 	"strings"
 
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
+	"github.com/vmware/govmomi/vim25/xml"
 )
 
 const (
 	Namespace = "vim25"
-	Version   = "9.0.0.0"
+	Version   = "8.0.2.0"
 	Path      = "/sdk"
 )
 
@@ -70,6 +86,42 @@ func NewClient(ctx context.Context, rt soap.RoundTripper) (*Client, error) {
 	}
 
 	return &c, nil
+}
+
+// UseServiceVersion sets soap.Client.Version to the current version of the service endpoint via /sdk/vimServiceVersions.xml
+func (c *Client) UseServiceVersion(kind ...string) error {
+	ns := "vim"
+	if len(kind) != 0 {
+		ns = kind[0]
+	}
+
+	u := c.URL()
+	u.Path = path.Join(Path, ns+"ServiceVersions.xml")
+
+	res, err := c.Get(u.String())
+	if err != nil {
+		return err
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("http.Get(%s): %s", u.Path, err)
+	}
+
+	v := struct {
+		Namespace *string `xml:"namespace>name"`
+		Version   *string `xml:"namespace>version"`
+	}{
+		&c.Namespace,
+		&c.Version,
+	}
+
+	err = xml.NewDecoder(res.Body).Decode(&v)
+	_ = res.Body.Close()
+	if err != nil {
+		return fmt.Errorf("xml.Decode(%s): %s", u.Path, err)
+	}
+
+	return nil
 }
 
 // RoundTrip dispatches to the RoundTripper field.

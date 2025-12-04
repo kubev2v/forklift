@@ -1,12 +1,23 @@
-// © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
-// SPDX-License-Identifier: Apache-2.0
+/*
+Copyright (c) 2015 VMware, Inc. All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 
 package object
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/task"
@@ -32,63 +43,18 @@ func NewTask(c *vim25.Client, ref types.ManagedObjectReference) *Task {
 	return &t
 }
 
-// Wait waits for a task to complete.
-// NOTE: This method create a thread-safe PropertyCollector instance per-call, so it is thread safe.
-// The downside of this approach is the additional resource usage on the vCenter side for each call.
 func (t *Task) Wait(ctx context.Context) error {
 	_, err := t.WaitForResult(ctx, nil)
 	return err
 }
 
-// WaitForResult wait for a task to complete.
-// NOTE: This method create a thread-safe PropertyCollector instance per-call, so it is thread safe.
-// The downside of this approach is the additional resource usage on the vCenter side for each call.
-func (t *Task) WaitForResult(ctx context.Context, s ...progress.Sinker) (taskInfo *types.TaskInfo, result error) {
-	var pr progress.Sinker
-	if len(s) == 1 {
-		pr = s[0]
-	}
-	p, err := property.DefaultCollector(t.c).Create(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// Attempt to destroy the collector using the background context, as the
-	// specified context may have timed out or have been canceled.
-	defer func() {
-		if err := p.Destroy(context.Background()); err != nil {
-			if result == nil {
-				result = err
-			} else {
-				result = fmt.Errorf(
-					"destroy property collector failed with %s after failing to wait for updates: %w",
-					err,
-					result)
-			}
-		}
-	}()
-
-	return task.WaitEx(ctx, t.Reference(), p, pr)
-}
-
-// WaitEx waits for a task to complete.
-// NOTE: This method use the same PropertyCollector instance in each call, thus reducing resource usage on the vCenter side.
-// The downside of this approach is that this method is not thread safe.
-func (t *Task) WaitEx(ctx context.Context) error {
-	_, err := t.WaitForResultEx(ctx, nil)
-	return err
-}
-
-// WaitForResultEx waits for a task to complete.
-// NOTE: This method use the same PropertyCollector instance in each call, thus reducing resource usage on the vCenter side.
-// The downside of this approach is that this method is not thread safe.
-func (t *Task) WaitForResultEx(ctx context.Context, s ...progress.Sinker) (*types.TaskInfo, error) {
+func (t *Task) WaitForResult(ctx context.Context, s ...progress.Sinker) (*types.TaskInfo, error) {
 	var pr progress.Sinker
 	if len(s) == 1 {
 		pr = s[0]
 	}
 	p := property.DefaultCollector(t.c)
-	return task.WaitEx(ctx, t.Reference(), p, pr)
+	return task.Wait(ctx, t.Reference(), p, pr)
 }
 
 func (t *Task) Cancel(ctx context.Context) error {
