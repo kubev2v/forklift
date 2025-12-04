@@ -14,28 +14,13 @@ import (
 // Unified progress pattern that handles both VIB and SSH output formats
 var progressPattern = regexp.MustCompile(`(\d+)\%`)
 
-// TaskInfo represents information about a started clone task
-type TaskInfo struct {
-	TaskId string
-	Pid    int
-}
-
-// TaskStatus represents the current status of a clone task
-type TaskStatus struct {
-	TaskId    string
-	ExitCode  string
-	Stderr    string
-	LastLine  string
-	XcopyUsed bool
-}
-
 // TaskExecutor abstracts the transport-specific operations for task execution
 type TaskExecutor interface {
 	// StartClone initiates the clone operation and returns task information
-	StartClone(ctx context.Context, host *object.HostSystem, sourcePath, targetLUN string) (*TaskInfo, error)
+	StartClone(ctx context.Context, host *object.HostSystem, sourcePath, targetLUN string) (*vmkfstoolsTask, error)
 
 	// GetTaskStatus retrieves the current status of the specified task
-	GetTaskStatus(ctx context.Context, host *object.HostSystem, taskId string) (*TaskStatus, error)
+	GetTaskStatus(ctx context.Context, host *object.HostSystem, taskId string) (*vmkfstoolsTask, error)
 
 	// CleanupTask cleans up task artifacts
 	CleanupTask(ctx context.Context, host *object.HostSystem, taskId string) error
@@ -64,7 +49,7 @@ func ParseProgress(lastLine string) (int, error) {
 	return -1, nil
 }
 
-func UpdateTaskStatus(ctx context.Context, task *TaskInfo, executor TaskExecutor, host *object.HostSystem, taskId string, progress chan<- uint64, xcopyUsed chan<- int) (*TaskStatus, error) {
+func updateTaskStatus(ctx context.Context, task *vmkfstoolsTask, executor TaskExecutor, host *object.HostSystem, progress chan<- uint64, xcopyUsed chan<- int) (*vmkfstoolsTask, error) {
 	taskStatus, err := executor.GetTaskStatus(ctx, host, task.TaskId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get task status: %w", err)
@@ -109,7 +94,7 @@ func ExecuteCloneTask(ctx context.Context, executor TaskExecutor, host *object.H
 
 	// Poll for task completion
 	for {
-		taskStatus, err := UpdateTaskStatus(ctx, task, executor, host, task.TaskId, progress, xcopyUsed)
+		taskStatus, err := updateTaskStatus(ctx, task, executor, host, progress, xcopyUsed)
 		if err != nil {
 			return fmt.Errorf("failed to update task status: %w", err)
 		}
@@ -117,7 +102,7 @@ func ExecuteCloneTask(ctx context.Context, executor TaskExecutor, host *object.H
 		// Check for task completion
 		if taskStatus != nil && taskStatus.ExitCode != "" {
 			time.Sleep(taskPollingInterval)
-			taskStatus, err := UpdateTaskStatus(ctx, task, executor, host, task.TaskId, progress, xcopyUsed)
+			taskStatus, err := updateTaskStatus(ctx, task, executor, host, progress, xcopyUsed)
 			if err != nil {
 				return fmt.Errorf("failed to update task status: %w", err)
 			}
