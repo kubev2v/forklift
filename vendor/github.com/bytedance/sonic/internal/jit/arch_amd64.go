@@ -17,10 +17,8 @@
 package jit
 
 import (
-	"unsafe"
-
-	"github.com/twitchyliquid64/golang-asm/asm/arch"
-	"github.com/twitchyliquid64/golang-asm/obj"
+    `github.com/twitchyliquid64/golang-asm/asm/arch`
+    `github.com/twitchyliquid64/golang-asm/obj`
 )
 
 var (
@@ -32,13 +30,6 @@ func As(op string) obj.As {
         return ret
     } else {
         panic("invalid instruction: " + op)
-    }
-}
-
-func ImmPtr(imm unsafe.Pointer) obj.Addr {
-    return obj.Addr {
-        Type   : obj.TYPE_CONST,
-        Offset : int64(uintptr(imm)),
     }
 }
 

@@ -17,10 +17,10 @@
 package resolver
 
 import (
-	"fmt"
-	"reflect"
-	"strings"
-	"sync"
+    `fmt`
+    `reflect`
+    `strings`
+    `sync`
 )
 
 type FieldOpts int
@@ -29,7 +29,6 @@ type OffsetType int
 const (
     F_omitempty FieldOpts = 1 << iota
     F_stringize
-    F_omitzero
 )
 
 const (
@@ -48,7 +47,6 @@ type FieldMeta struct {
     Path []Offset
     Opts FieldOpts
     Type reflect.Type
-    IsZero func(reflect.Value) bool
 }
 
 func (self *FieldMeta) String() string {
@@ -119,25 +117,19 @@ func resolveFields(vt reflect.Type) []FieldMeta {
 
     /* convert each field */
     for _, fv := range tfv.list {
-        /* add to result */
-        ret = append(ret, FieldMeta{})
-        fm := &ret[len(ret)-1]
-
         item := vt
         path := []Offset(nil)
+        opts := FieldOpts(0)
 
         /* check for "string" */
         if fv.quoted {
-            fm.Opts |= F_stringize
+            opts |= F_stringize
         }
 
         /* check for "omitempty" */
         if fv.omitEmpty {
-            fm.Opts |= F_omitempty
+            opts |= F_omitempty
         }
-
-        /* handle the "omitzero" */
-        handleOmitZero(fv, fm)
 
         /* dump the field path */
         for _, i := range fv.index {
@@ -169,9 +161,13 @@ func resolveFields(vt reflect.Type) []FieldMeta {
             path[idx].Kind = F_offset
         }
 
-        fm.Type = fvt
-        fm.Path = path
-        fm.Name = fv.name
+        /* add to result */
+        ret = append(ret, FieldMeta {
+            Type: fvt,
+            Opts: opts,
+            Path: path,
+            Name: fv.name,
+        })
     }
 
     /* optimize the offsets */

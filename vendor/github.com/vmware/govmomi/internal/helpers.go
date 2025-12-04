@@ -1,21 +1,29 @@
-// © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
-// SPDX-License-Identifier: Apache-2.0
+/*
+Copyright (c) 2020-2023 VMware, Inc. All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 
 package internal
 
 import (
 	"context"
-	"encoding/xml"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
-	"slices"
-	"strings"
 
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/mo"
@@ -41,15 +49,6 @@ func InventoryPath(entities []mo.ManagedEntity) string {
 	}
 
 	return val
-}
-
-var vsanFS = []string{
-	string(types.HostFileSystemVolumeFileSystemTypeVsan),
-	string(types.HostFileSystemVolumeFileSystemTypeVVOL),
-}
-
-func IsDatastoreVSAN(ds mo.Datastore) bool {
-	return slices.Contains(vsanFS, ds.Summary.Type)
 }
 
 func HostSystemManagementIPs(config []types.VirtualNicManagerNetConfig) []net.IP {
@@ -139,32 +138,4 @@ func HostGatewayTransferURL(u *url.URL, hostMoref types.ManagedObjectReference) 
 	oldPath := turl.Path
 	turl.Path = fmt.Sprintf("/hgw/%s%s", hostMoref.Value, oldPath)
 	return &turl
-}
-
-func (arg ReflectManagedMethodExecuterSoapArgument) Value() []string {
-	if arg.Val == "" {
-		return nil
-	}
-
-	d := xml.NewDecoder(strings.NewReader(arg.Val))
-	var val []string
-
-	for {
-		t, err := d.Token()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			panic(err)
-		}
-		if c, ok := t.(xml.CharData); ok {
-			val = append(val, string(c))
-		}
-	}
-
-	return val
-}
-
-func EsxcliName(name string) string {
-	return strings.ReplaceAll(strings.Title(name), ".", "")
 }

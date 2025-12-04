@@ -1,5 +1,4 @@
-//go:build (!amd64 && !arm64) || go1.25 || !go1.17 || (arm64 && !go1.20)
-// +build !amd64,!arm64 go1.25 !go1.17 arm64,!go1.20
+// +build !amd64 go1.21
 
 /*
 * Copyright 2023 ByteDance Inc.
@@ -15,38 +14,28 @@
 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 * See the License for the specific language governing permissions and
 * limitations under the License.
- */
+*/
 
 package decoder
 
 import (
-	"bytes"
-	"encoding/json"
-	"io"
-	"reflect"
-	"unsafe"
-
-	"github.com/bytedance/sonic/internal/decoder/consts"
-	"github.com/bytedance/sonic/internal/native/types"
-	"github.com/bytedance/sonic/option"
-	"github.com/bytedance/sonic/internal/compat"
+     `encoding/json`
+     `bytes`
+     `reflect`
+     `github.com/bytedance/sonic/internal/native/types`
+     `github.com/bytedance/sonic/option`
+     `io`
 )
 
-func init() {
-     compat.Warn("sonic/decoder")
-}
-
 const (
-     _F_use_int64       = consts.F_use_int64
-     _F_disable_urc     = consts.F_disable_unknown
-     _F_disable_unknown = consts.F_disable_unknown
-     _F_copy_string     = consts.F_copy_string
- 
-     _F_use_number      = consts.F_use_number
-     _F_validate_string = consts.F_validate_string
-     _F_allow_control   = consts.F_allow_control
-     _F_no_validate_json = consts.F_no_validate_json
-     _F_case_sensitive  = consts.F_case_sensitive
+     _F_use_int64 = iota
+     _F_use_number
+     _F_disable_urc
+     _F_disable_unknown
+     _F_copy_string
+     _F_validate_string
+
+     _F_allow_control = 31
 )
 
 type Options uint64
@@ -58,8 +47,6 @@ const (
      OptionDisableUnknown   Options = 1 << _F_disable_unknown
      OptionCopyString       Options = 1 << _F_copy_string
      OptionValidateString   Options = 1 << _F_validate_string
-     OptionNoValidateJSON   Options = 1 << _F_no_validate_json
-     OptionCaseSensitive    Options = 1 << _F_case_sensitive
 )
 
 func (self *Decoder) SetOptions(opts Options) {
@@ -119,10 +106,10 @@ func (self *Decoder) CheckTrailings() error {
 func (self *Decoder) Decode(val interface{}) error {
     r := bytes.NewBufferString(self.s)
    dec := json.NewDecoder(r)
-   if (self.f & uint64(OptionUseNumber)) != 0  {
+   if (self.f | uint64(OptionUseNumber)) != 0  {
        dec.UseNumber()
    }
-   if (self.f & uint64(OptionDisableUnknown)) != 0  {
+   if (self.f | uint64(OptionDisableUnknown)) != 0  {
        dec.DisallowUnknownFields()
    }
    return dec.Decode(val)
@@ -176,26 +163,34 @@ func Pretouch(vt reflect.Type, opts ...option.CompileOption) error {
      return nil
 }
 
-type StreamDecoder = json.Decoder
+type StreamDecoder struct {
+   r       io.Reader
+   buf     []byte
+   scanp   int
+   scanned int64
+   err     error
+   Decoder
+}
 
 // NewStreamDecoder adapts to encoding/json.NewDecoder API.
 //
 // NewStreamDecoder returns a new decoder that reads from r.
 func NewStreamDecoder(r io.Reader) *StreamDecoder {
-   return json.NewDecoder(r)
+   return &StreamDecoder{r : r}
 }
 
-// SyntaxError represents json syntax error
-type SyntaxError json.SyntaxError
-
-// Description
-func (s SyntaxError) Description() string {
-     return (*json.SyntaxError)(unsafe.Pointer(&s)).Error()
+// Decode decodes input stream into val with corresponding data. 
+// Redundantly bytes may be read and left in its buffer, and can be used at next call.
+// Either io error from underlying io.Reader (except io.EOF) 
+// or syntax error from data will be recorded and stop subsequently decoding.
+func (self *StreamDecoder) Decode(val interface{}) (err error) {
+   dec := json.NewDecoder(self.r)
+   if (self.f | uint64(OptionUseNumber)) != 0  {
+       dec.UseNumber()
+   }
+   if (self.f | uint64(OptionDisableUnknown)) != 0  {
+       dec.DisallowUnknownFields()
+   }
+   return dec.Decode(val)
 }
-// Error
-func (s SyntaxError) Error() string {
-     return (*json.SyntaxError)(unsafe.Pointer(&s)).Error()
-}
 
-// MismatchTypeError represents mismatching between json and object
-type MismatchTypeError json.UnmarshalTypeError

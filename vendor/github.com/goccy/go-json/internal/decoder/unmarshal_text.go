@@ -147,7 +147,7 @@ func (d *unmarshalTextDecoder) DecodePath(ctx *RuntimeContext, cursor, depth int
 	return nil, 0, fmt.Errorf("json: unmarshal text decoder does not support decode path")
 }
 
-func unquoteBytes(s []byte) (t []byte, ok bool) { //nolint: nonamedreturns
+func unquoteBytes(s []byte) (t []byte, ok bool) {
 	length := len(s)
 	if length < 2 || s[0] != '"' || s[length-1] != '"' {
 		return

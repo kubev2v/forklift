@@ -12,8 +12,6 @@ import (
 
 // BindWith binds the passed struct pointer using the specified binding engine.
 // See the binding package.
-//
-// Deprecated: Use MustBindWith or ShouldBindWith.
 func (c *Context) BindWith(obj any, b binding.Binding) error {
 	log.Println(`BindWith(\"any, binding.Binding\") error is going to
 	be deprecated, please check issue #662 and either use MustBindWith() if you
