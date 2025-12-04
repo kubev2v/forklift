@@ -27,7 +27,7 @@ vet:
 
 .PHONY: test
 test: fmt vet
-	#go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
+	go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
 .PHONY: generate
 generate:
@@ -60,6 +60,7 @@ test-copy-using-cli: build
 		--storage-vendor-product=ontap \
 		--secret-name=populator-secret \
 		--owner-uid=tshefi40g \
+		--esxi-clone-method=ssh \
 		--kubeconfig=$$KUBECONFIG
 
 test-flashsystem: build

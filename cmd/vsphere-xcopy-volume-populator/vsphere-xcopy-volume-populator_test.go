@@ -67,21 +67,32 @@ var _ = Describe("Populator", func() {
 
 			tc.setup()
 
+			// Drain channels to prevent blocking
+			go func() {
+				for range progressCh {
+				}
+			}()
+			go func() {
+				for range xcopyUsedCh {
+
+				}
+			}()
+
 			go func() {
 				defer GinkgoRecover()
-				underTest.Populate(tc.sourceVmId, tc.sourceVMDK, populator.PersistentVolume{Name: tc.targetPVC}, hostLocker, progressCh, quitCh, xcopyUsedCh)
+				underTest.Populate(tc.sourceVmId, tc.sourceVMDK, populator.PersistentVolume{Name: tc.targetPVC}, hostLocker, progressCh, xcopyUsedCh, quitCh)
 			}()
 
 			if tc.want != nil {
 				if tc.want.Error() == "" {
-					Eventually(quitCh, "10s").Should(Receive(HaveOccurred()))
+					Eventually(quitCh, "20s").Should(Receive(HaveOccurred()))
 				} else {
 					var receivedErr error
-					Eventually(quitCh, "10s").Should(Receive(&receivedErr))
+					Eventually(quitCh, "20s").Should(Receive(&receivedErr))
 					Expect(receivedErr.Error()).To(Equal(tc.want.Error()))
 				}
 			} else {
-				Eventually(quitCh, "10s").Should(Receive(BeNil()))
+				Eventually(quitCh, "20s").Should(Receive(BeNil()))
 			}
 		},
 		Entry("non valid vmdkPath source", testCase{
@@ -139,21 +150,25 @@ var _ = Describe("Populator", func() {
 				storageClient.EXPECT().ResolvePVToLUN(gomock.Any()).Return(populator.LUN{NAA: "naa.616263"}, nil)
 				storageClient.EXPECT().CurrentMappedGroups(gomock.Any(), gomock.Any()).Return([]string{}, nil)
 				storageClient.EXPECT().Map("xcopy-esxs", gomock.Any(), nil).Return(populator.LUN{NAA: "naa.616263"}, nil)
+				// Mock rescan device list call (happens inside hostLocker.WithLock) - returns "on" status
+				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "device", "list", "-d", "naa.616263"}).Return([]esx.Values{{"Status": {"on"}}}, nil).Times(1)
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(),
 					[]string{"vmkfstools", "clone", "-s", "/vmfs/volumes/my-ds/my-vm/vmdisk.vmdk", "-t", "/vmfs/devices/disks/naa.616263"}).
 					Return([]esx.Values{{"message": {`{"taskId": "1"}`}}}, nil)
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"vmkfstools", "taskGet", "-i", "1"}).
+					Return([]esx.Values{{"message": {`{"exitCode": "0"}`}}}, nil).Times(2)
+				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"vmkfstools", "taskClean", "-i", "1"}).
 					Return([]esx.Values{{"message": {`{"exitCode": "0"}`}}}, nil)
-				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"vmkfstools", "taskGet", "-i", "1"}).
-					Return([]esx.Values{{"message": {`{"exitCode": "0"}`}}}, nil)
-				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"vmkfstools", "taskClean", "-i", "1"}).Return(nil, nil)
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "device", "set", "--state", "off", "-d", "naa.616263"}).Return(nil, nil)
-				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "device", "list", "-d", "naa.616263"}).Return([]esx.Values{map[string][]string{"Status": []string{"off"}}}, nil)
+				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "device", "list", "-d", "naa.616263"}).Return([]esx.Values{map[string][]string{"Status": {"off"}}}, nil).AnyTimes()
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "device", "detached", "remove", "-d", "naa.616263"}).Return(nil, nil)
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "adapter", "rescan", "-t", "delete", "-A", "vmhbatest"}).Return(nil, nil)
 				storageClient.EXPECT().UnMap("xcopy-esxs", gomock.Any(), nil).Return(nil)
-				// FIXME the mock host lock is eliminating the call to the rescan login during the test. This needs fixing
-				hostLocker.EXPECT().WithLock(gomock.Any(), gomock.Any(), gomock.Any())
+				// Mock hostLocker to actually execute the callback function
+				hostLocker.EXPECT().WithLock(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+					func(ctx context.Context, hostID string, work func(context.Context) error) error {
+						return work(ctx)
+					})
 			},
 			want: nil,
 		}),

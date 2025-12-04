@@ -13,7 +13,7 @@ import shlex
 TMP_PREFIX = "/tmp/vmkfstools-wrapper-{}"
 
 # Version information for debugging
-SCRIPT_VERSION = "0.0.2"
+SCRIPT_VERSION = "0.0.5"
 
 XML = """<?xml version="1.0" ?>
 <output xmlns="http://www.vmware.com/Products/ESX/5.0/esxcli/">
@@ -36,8 +36,7 @@ def validate_path(path):
     # Only allow paths in specific safe directories for ESXi operations
     allowed_prefixes = [
         '/vmfs/volumes/',      # Datastore volumes (source VMDK files)
-        '/vmfs/devices/disks/', # ESXi disk devices (target devices for cloning)
-        '/tmp/'
+        '/vmfs/devices/disks/' # ESXi disk devices (target devices for cloning)
     ]
     if not any(path.startswith(prefix) for prefix in allowed_prefixes):
         raise ValueError(f"Path not in allowed directories: {path}")
@@ -141,6 +140,9 @@ def taskGet(args):
                   "exitCode": "1", "lastLine": line.rstrip(), "stdErr": e}
         print(XML.format("1", json.dumps(result)))
         return
+
+    # Default to None if we can't determine xcopy usage
+    xcopy_used = None
     try:
         with open(os.path.join(tmp_dir, "targetLun"), "r") as target_lun_file:
             target_lun = target_lun_file.read()
@@ -148,9 +150,7 @@ def taskGet(args):
         # Log xclone_writes for debugging, but don't expose in result
         logging.info(f"XCOPY used: {xcopy_used}, clone write ops: {xclone_writes}")
     except Exception as e:
-        result = {"taskId": args.task_id[0], "pid": int(pid),
-                  "exitCode": "1", "lastLine": line.rstrip(), "stdErr": e}
-        print(XML.format("1", json.dumps(result)))
+        logging.warning(f"Failed to determine xcopy usage: {e}, defaulting to False")
 
     result = {"taskId": args.task_id[0], "pid": int(pid),
             "exitCode": exitcode, "lastLine": line.rstrip(),
@@ -232,8 +232,27 @@ def was_xcopy_used(target_lun):
 
     return write_ops > 0, str(write_ops)
 
+def version():
+    print(XML.format("0", json.dumps({"version":SCRIPT_VERSION})))
+    return
 
 def main():
+    # Setup logging first, before any logging calls
+    logging.basicConfig(
+            level=logging.INFO,
+            handlers=[
+                logging.FileHandler('/var/log/vmkfstools-wrapper.log'),
+                logging.StreamHandler()
+            ],
+            format='%(asctime)s - %(levelname)s - %(message)s')
+
+    # For SSH restricted command execution, parse SSH_ORIGINAL_COMMAND
+    ssh_command = os.environ.get('SSH_ORIGINAL_COMMAND', '').strip()
+    if ssh_command:
+        logging.info(f"Received SSH_ORIGINAL_COMMAND: {ssh_command}")
+        # Convert SSH command to sys.argv format for argparse
+        sys.argv = ['vmkfstools_wrapper.py'] + ssh_command.split()
+
     parser = argparse.ArgumentParser(description="vmkfstools-wrapper")
 
     parser.add_argument("--clone", action="store_true",
@@ -256,11 +275,14 @@ def main():
     parser.add_argument("-i", "--task-id", type=str, nargs=1,
                         metavar="task_id", default=None,
                         help="id of task to get")
-    args = parser.parse_args()
-    logging.basicConfig(filename='/var/log/vmkfstools-wrapper.log',
-                        level=logging.INFO,
-                        format='%(asctime)s - %(levelname)s - %(message)s')
 
+    parser.add_argument("-v", "--version", action="store_true",
+                        help="version")
+
+    args = parser.parse_args()
+
+    if args.version:
+        version()
     if args.clone and args.source_vmdk is not None and args.target_lun is not None:
         clone(args)
     elif args.task_get:

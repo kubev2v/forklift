@@ -10,7 +10,6 @@ import (
 	"os"
 	"path"
 	"strings"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/client-go/util/cert"
@@ -202,11 +201,11 @@ func main() {
 	}
 
 	progressCh := make(chan uint64)
-	xcopyUsedCh := make(chan int)
+	xCopyUsedCh := make(chan int)
 	quitCh := make(chan error)
 
 	hll := populator.NewHostLeaseLocker(clientSet)
-	go p.Populate(sourceVmId, sourceVMDKFile, pv, hll, progressCh, quitCh, xcopyUsedCh)
+	go p.Populate(sourceVmId, sourceVMDKFile, pv, hll, progressCh, xCopyUsedCh, quitCh)
 
 	for {
 		select {
@@ -218,7 +217,7 @@ func main() {
 			} else if float64(p) > metric.Counter.GetValue() {
 				progressCounter.WithLabelValues(ownerUID).Add(float64(p) - metric.Counter.GetValue())
 			}
-		case c := <-xcopyUsedCh:
+		case c := <-xCopyUsedCh:
 			klog.Infof(" xcopy used reported: %d", c)
 			metric := dto.Metric{}
 			if err := xcopyUsedGauge.WithLabelValues(ownerUID).Write(&metric); err != nil {
@@ -232,8 +231,6 @@ func main() {
 				klog.Fatal(q)
 			}
 
-			klog.Infof("sleeping for 5 minutes after a successfult copy")
-			time.Sleep(5 * time.Minute)
 			return
 		}
 	}

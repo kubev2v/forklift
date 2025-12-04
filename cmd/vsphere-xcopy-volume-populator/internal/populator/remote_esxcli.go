@@ -32,11 +32,6 @@ const (
 	CloneMethodVIB CloneMethod = "vib"
 )
 
-type vmkfstoolsClone struct {
-	Pid    int    `json:"pid"`
-	TaskId string `json:"taskId"`
-}
-
 type vmkfstoolsTask struct {
 	Pid       int    `json:"pid"`
 	ExitCode  string `json:"exitCode"`
@@ -92,7 +87,7 @@ func NewWithRemoteEsxcliSSH(storageApi StorageApi, vsphereHostname, vsphereUsern
 	}, nil
 }
 
-func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, quit chan error, xcopyUsed chan<- int) (errFinal error) {
+func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) (errFinal error) {
 	// isn't it better to not call close the channel from the caller?
 	defer func() {
 		r := recover()
@@ -422,7 +417,7 @@ func rescan(ctx context.Context, client vmware.Client, host *object.HostSystem, 
 				status = result[0]["Status"][0]
 			}
 			klog.Infof("found device %s with status %v", targetLUN, status)
-			if status == "off" {
+			if status == "off" || status == "dead timeout" {
 				klog.Infof("try to remove the device from the detached list (this can happen if restarting this pod or using the same volume)")
 				_, err = client.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "detached", "remove", "-d", targetLUN})
 				continue
