@@ -21,7 +21,6 @@ import (
     `sync`
     _ `unsafe`
 
-    `github.com/bytedance/sonic/internal/rt`
     `github.com/twitchyliquid64/golang-asm/asm/arch`
     `github.com/twitchyliquid64/golang-asm/obj`
     `github.com/twitchyliquid64/golang-asm/objabi`
@@ -38,6 +37,10 @@ type Backend struct {
 var (
     _progPool sync.Pool
 )
+
+//go:nosplit
+//go:linkname throw runtime.throw
+func throw(_ string)
 
 func newProg() *obj.Prog {
     if val := _progPool.Get(); val == nil {
@@ -68,7 +71,7 @@ func newLinkContext(arch *obj.LinkArch) (ret *obj.Link) {
 }
 
 func diagLinkContext(str string, args ...interface{}) {
-    rt.Throw(fmt.Sprintf(str, args...))
+    throw(fmt.Sprintf(str, args...))
 }
 
 func (self *Backend) New() (ret *obj.Prog) {

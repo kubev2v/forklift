@@ -45,11 +45,6 @@ func generatePreflightHeaders(c Config) http.Header {
 		value := strconv.FormatInt(int64(c.MaxAge/time.Second), 10)
 		headers.Set("Access-Control-Max-Age", value)
 	}
-
-	if c.AllowPrivateNetwork {
-		headers.Set("Access-Control-Allow-Private-Network", "true")
-	}
-
 	if c.AllowAllOrigins {
 		headers.Set("Access-Control-Allow-Origin", "*")
 	} else {

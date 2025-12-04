@@ -1399,10 +1399,6 @@ func NewDecoderString(s string, h Handle) *Decoder {
 	return NewDecoderBytes(bytesView(s), h)
 }
 
-func (d *Decoder) HandleName() string {
-	return d.hh.Name()
-}
-
 func (d *Decoder) r() *decRd {
 	return &d.decRd
 }
@@ -1584,9 +1580,14 @@ func (d *Decoder) MustDecode(v interface{}) {
 	d.calls--
 }
 
-// Release is a no-op.
+// Release releases shared (pooled) resources.
 //
-// Deprecated: Pooled resources are not used with a Decoder.
+// It is important to call Release() when done with a Decoder, so those resources
+// are released instantly for use by subsequently created Decoders.
+//
+// By default, Release() is automatically called unless the option ExplicitRelease is set.
+//
+// Deprecated: Release is a no-op as pooled resources are not used with an Decoder.
 // This method is kept for compatibility reasons only.
 func (d *Decoder) Release() {
 }

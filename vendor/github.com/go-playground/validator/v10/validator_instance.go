@@ -21,9 +21,7 @@ const (
 	tagKeySeparator       = "="
 	structOnlyTag         = "structonly"
 	noStructLevelTag      = "nostructlevel"
-	omitzero              = "omitzero"
 	omitempty             = "omitempty"
-	omitnil               = "omitnil"
 	isdefault             = "isdefault"
 	requiredWithoutAllTag = "required_without_all"
 	requiredWithoutTag    = "required_without"
@@ -55,8 +53,6 @@ var (
 	timeDurationType = reflect.TypeOf(time.Duration(0))
 	timeType         = reflect.TypeOf(time.Time{})
 
-	byteSliceType = reflect.TypeOf([]byte{})
-
 	defaultCField = &cField{namesEqual: true}
 )
 
@@ -75,27 +71,25 @@ type CustomTypeFunc func(field reflect.Value) interface{}
 type TagNameFunc func(field reflect.StructField) string
 
 type internalValidationFuncWrapper struct {
-	fn                 FuncCtx
-	runValidationOnNil bool
+	fn                FuncCtx
+	runValidatinOnNil bool
 }
 
 // Validate contains the validator settings and cache
 type Validate struct {
-	tagName                string
-	pool                   *sync.Pool
-	tagNameFunc            TagNameFunc
-	structLevelFuncs       map[reflect.Type]StructLevelFuncCtx
-	customFuncs            map[reflect.Type]CustomTypeFunc
-	aliases                map[string]string
-	validations            map[string]internalValidationFuncWrapper
-	transTagFunc           map[ut.Translator]map[string]TranslationFunc // map[<locale>]map[<tag>]TranslationFunc
-	rules                  map[reflect.Type]map[string]string
-	tagCache               *tagCache
-	structCache            *structCache
-	hasCustomFuncs         bool
-	hasTagNameFunc         bool
-	requiredStructEnabled  bool
-	privateFieldValidation bool
+	tagName          string
+	pool             *sync.Pool
+	hasCustomFuncs   bool
+	hasTagNameFunc   bool
+	tagNameFunc      TagNameFunc
+	structLevelFuncs map[reflect.Type]StructLevelFuncCtx
+	customFuncs      map[reflect.Type]CustomTypeFunc
+	aliases          map[string]string
+	validations      map[string]internalValidationFuncWrapper
+	transTagFunc     map[ut.Translator]map[string]TranslationFunc // map[<locale>]map[<tag>]TranslationFunc
+	rules            map[reflect.Type]map[string]string
+	tagCache         *tagCache
+	structCache      *structCache
 }
 
 // New returns a new instance of 'validate' with sane defaults.
@@ -103,7 +97,7 @@ type Validate struct {
 // It caches information about your struct and validations,
 // in essence only parsing your validation tags once per struct type.
 // Using multiple instances neglects the benefit of caching.
-func New(options ...Option) *Validate {
+func New() *Validate {
 
 	tc := new(tagCache)
 	tc.m.Store(make(map[string]*cTag))
@@ -150,9 +144,6 @@ func New(options ...Option) *Validate {
 		},
 	}
 
-	for _, o := range options {
-		o(v)
-	}
 	return v
 }
 
@@ -246,7 +237,7 @@ func (v *Validate) registerValidation(tag string, fn FuncCtx, bakedIn bool, nilC
 	if !bakedIn && (ok || strings.ContainsAny(tag, restrictedTagChars)) {
 		panic(fmt.Sprintf(restrictedTagErr, tag))
 	}
-	v.validations[tag] = internalValidationFuncWrapper{fn: fn, runValidationOnNil: nilCheckable}
+	v.validations[tag] = internalValidationFuncWrapper{fn: fn, runValidatinOnNil: nilCheckable}
 	return nil
 }
 
@@ -677,7 +668,7 @@ func (v *Validate) VarWithValue(field interface{}, other interface{}, tag string
 }
 
 // VarWithValueCtx validates a single variable, against another variable/field's value using tag style validation and
-// allows passing of contextual validation information via context.Context.
+// allows passing of contextual validation validation information via context.Context.
 // eg.
 // s1 := "abcd"
 // s2 := "abcd"

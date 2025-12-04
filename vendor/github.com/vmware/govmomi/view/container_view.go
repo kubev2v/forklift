@@ -1,6 +1,18 @@
-// © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
-// SPDX-License-Identifier: Apache-2.0
+/*
+Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 
 package view
 
@@ -24,7 +36,7 @@ func NewContainerView(c *vim25.Client, ref types.ManagedObjectReference) *Contai
 }
 
 // Retrieve populates dst as property.Collector.Retrieve does, for all entities in the view of types specified by kind.
-func (v ContainerView) Retrieve(ctx context.Context, kind []string, ps []string, dst any, pspec ...types.PropertySpec) error {
+func (v ContainerView) Retrieve(ctx context.Context, kind []string, ps []string, dst interface{}, pspec ...types.PropertySpec) error {
 	pc := property.DefaultCollector(v.Client())
 
 	ospec := types.ObjectSpec{
@@ -79,7 +91,7 @@ func (v ContainerView) Retrieve(ctx context.Context, kind []string, ps []string,
 }
 
 // RetrieveWithFilter populates dst as Retrieve does, but only for entities matching the given filter.
-func (v ContainerView) RetrieveWithFilter(ctx context.Context, kind []string, ps []string, dst any, filter property.Match) error {
+func (v ContainerView) RetrieveWithFilter(ctx context.Context, kind []string, ps []string, dst interface{}, filter property.Filter) error {
 	if len(filter) == 0 {
 		return v.Retrieve(ctx, kind, ps, dst)
 	}
@@ -91,7 +103,7 @@ func (v ContainerView) RetrieveWithFilter(ctx context.Context, kind []string, ps
 		return err
 	}
 
-	objs := filter.ObjectContent(content)
+	objs := filter.MatchObjectContent(content)
 
 	pc := property.DefaultCollector(v.Client())
 
@@ -99,10 +111,10 @@ func (v ContainerView) RetrieveWithFilter(ctx context.Context, kind []string, ps
 }
 
 // Find returns object references for entities of type kind, matching the given filter.
-func (v ContainerView) Find(ctx context.Context, kind []string, filter property.Match) ([]types.ManagedObjectReference, error) {
+func (v ContainerView) Find(ctx context.Context, kind []string, filter property.Filter) ([]types.ManagedObjectReference, error) {
 	if len(filter) == 0 {
 		// Ensure we have at least 1 filter to avoid retrieving all properties.
-		filter = property.Match{"name": "*"}
+		filter = property.Filter{"name": "*"}
 	}
 
 	var content []types.ObjectContent
@@ -112,14 +124,14 @@ func (v ContainerView) Find(ctx context.Context, kind []string, filter property.
 		return nil, err
 	}
 
-	return filter.ObjectContent(content), nil
+	return filter.MatchObjectContent(content), nil
 }
 
 // FindAny returns object references for entities of type kind, matching any property the given filter.
-func (v ContainerView) FindAny(ctx context.Context, kind []string, filter property.Match) ([]types.ManagedObjectReference, error) {
+func (v ContainerView) FindAny(ctx context.Context, kind []string, filter property.Filter) ([]types.ManagedObjectReference, error) {
 	if len(filter) == 0 {
 		// Ensure we have at least 1 filter to avoid retrieving all properties.
-		filter = property.Match{"name": "*"}
+		filter = property.Filter{"name": "*"}
 	}
 
 	var content []types.ObjectContent
@@ -129,5 +141,5 @@ func (v ContainerView) FindAny(ctx context.Context, kind []string, filter proper
 		return nil, err
 	}
 
-	return filter.AnyObjectContent(content), nil
+	return filter.MatchAnyObjectContent(content), nil
 }

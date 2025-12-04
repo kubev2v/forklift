@@ -17,8 +17,6 @@
 package utf8
 
 import (
-	`runtime`
-
     `github.com/bytedance/sonic/internal/rt`
     `github.com/bytedance/sonic/internal/native/types`
     `github.com/bytedance/sonic/internal/native`
@@ -29,7 +27,7 @@ func CorrectWith(dst []byte, src []byte, repl string) []byte {
     sstr := rt.Mem2Str(src)
     sidx := 0
 
-    /* state machine records the invalid positions */
+    /* state machine records the invalid postions */
     m := types.NewStateMachine()
     m.Sp = 0 // invalid utf8 numbers
 
@@ -64,18 +62,10 @@ func CorrectWith(dst []byte, src []byte, repl string) []byte {
 
 // Validate is a simd-accelereated drop-in replacement for the standard library's utf8.Valid.
 func Validate(src []byte) bool {
-	if src == nil {
-		return true
-	}
     return ValidateString(rt.Mem2Str(src))
 }
 
 // ValidateString as Validate, but for string.
 func ValidateString(src string) bool {
-	if src == "" {
-		return true
-	}
-    ret := native.ValidateUTF8Fast(&src) == 0
-	runtime.KeepAlive(src)
-	return ret
+    return native.ValidateUTF8Fast(&src) == 0
 }

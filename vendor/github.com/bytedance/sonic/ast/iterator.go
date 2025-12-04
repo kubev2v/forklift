@@ -17,48 +17,30 @@
 package ast
 
 import (
-	"fmt"
+    `fmt`
 
-	"github.com/bytedance/sonic/internal/caching"
-	"github.com/bytedance/sonic/internal/native/types"
+    `github.com/bytedance/sonic/internal/native/types`
 )
 
 type Pair struct {
-    hash  uint64
     Key   string
     Value Node
 }
 
-func NewPair(key string, val Node) Pair {
-    return Pair{
-        hash: caching.StrHash(key),
-        Key: key,
-        Value: val,
-    }
-}
-
 // Values returns iterator for array's children traversal
 func (self *Node) Values() (ListIterator, error) {
-    if err := self.should(types.V_ARRAY); err != nil {
+    if err := self.should(types.V_ARRAY, "an array"); err != nil {
         return ListIterator{}, err
     }
-    return self.values(), nil
-}
-
-func (self *Node) values() ListIterator {
-    return ListIterator{Iterator{p: self}}
+    return ListIterator{Iterator{p: self}}, nil
 }
 
 // Properties returns iterator for object's children traversal
 func (self *Node) Properties() (ObjectIterator, error) {
-    if err := self.should(types.V_OBJECT); err != nil {
+    if err := self.should(types.V_OBJECT, "an object"); err != nil {
         return ObjectIterator{}, err
     }
-    return self.properties(), nil
-}
-
-func (self *Node) properties() ObjectIterator {
-    return ObjectIterator{Iterator{p: self}}
+    return ObjectIterator{Iterator{p: self}}, nil
 }
 
 type Iterator struct {
@@ -100,54 +82,26 @@ type ObjectIterator struct {
     Iterator
 }
 
-func (self *ListIterator) next() *Node {
-next_start:
-    if !self.HasNext() {
-        return nil
-    } else {
-        n := self.p.nodeAt(self.i)
-        self.i++
-        if !n.Exists() {
-            goto next_start
-        }
-        return n
-    }
-}
-
 // Next scans through children of underlying V_ARRAY, 
 // copies each child to v, and returns .HasNext().
 func (self *ListIterator) Next(v *Node) bool {
-    n := self.next()
-    if n == nil {
-        return false
-    }
-    *v = *n
-    return true
-}
-
-func (self *ObjectIterator) next() *Pair {
-next_start:
     if !self.HasNext() {
-        return nil
+        return false
     } else {
-        n := self.p.pairAt(self.i)
-        self.i++
-        if n == nil || !n.Value.Exists() {
-            goto next_start
-        }
-        return n
+        *v, self.i = *self.p.nodeAt(self.i), self.i + 1
+        return true
     }
 }
 
 // Next scans through children of underlying V_OBJECT, 
 // copies each child to v, and returns .HasNext().
 func (self *ObjectIterator) Next(p *Pair) bool {
-    n := self.next()
-    if n == nil {
+    if !self.HasNext() {
         return false
+    } else {
+        *p, self.i = *self.p.pairAt(self.i), self.i + 1
+        return true
     }
-    *p = *n
-    return true
 }
 
 // Sequence represents scanning path of single-layer nodes.
@@ -173,44 +127,38 @@ type Scanner func(path Sequence, node *Node) bool
 // ForEach scans one V_OBJECT node's children from JSON head to tail, 
 // and pass the Sequence and Node of corresponding JSON value.
 //
-// Especially, if the node is not V_ARRAY or V_OBJECT,
+// Especailly, if the node is not V_ARRAY or V_OBJECT, 
 // the node itself will be returned and Sequence.Index == -1.
-// 
-// NOTICE: A unsetted node WON'T trigger sc, but its index still counts into Path.Index
 func (self *Node) ForEach(sc Scanner) error {
-    if err := self.checkRaw(); err != nil {
-        return err
-    }
     switch self.itype() {
     case types.V_ARRAY:
-        iter, err := self.Values()
+        ns, err := self.UnsafeArray()
         if err != nil {
             return err
         }
-        v := iter.next()
-        for v != nil {
-            if !sc(Sequence{iter.i-1, nil}, v) {
-                return nil
+        for i := range ns {
+            if !sc(Sequence{i, nil}, &ns[i]) {
+                return err
             }
-            v = iter.next()
         }
     case types.V_OBJECT:
-        iter, err := self.Properties()
+        ns, err := self.UnsafeMap()
         if err != nil {
             return err
         }
-        v := iter.next()
-        for v != nil {
-            if !sc(Sequence{iter.i-1, &v.Key}, &v.Value) {
-                return nil
+        for i := range ns {
+            if !sc(Sequence{i, &ns[i].Key}, &ns[i].Value) {
+                return err
             }
-            v = iter.next()
         }
     default:
-        if self.Check() != nil {
-            return self
-        }
         sc(Sequence{-1, nil}, self)
     }
-    return nil
+    return self.Check()
+}
+
+type PairSlice []Pair
+
+func (self PairSlice) Sort() {
+    radixQsort(self, 0, maxDepth(len(self)))
 }

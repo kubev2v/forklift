@@ -1,5 +1,5 @@
-//go:build !windows
-// +build !windows
+//go:build darwin || linux
+// +build darwin linux
 
 /**
  * Copyright 2023 ByteDance Inc.

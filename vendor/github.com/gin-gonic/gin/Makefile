@@ -42,7 +42,6 @@ fmt-check:
 		exit 1; \
 	fi;
 
-.PHONY: vet
 vet:
 	$(GO) vet $(VETPACKAGES)
 

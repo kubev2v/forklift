@@ -1,6 +1,18 @@
-// © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
-// SPDX-License-Identifier: Apache-2.0
+/*
+Copyright (c) 2015-2016 VMware, Inc. All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 
 package object
 
@@ -93,33 +105,25 @@ func (d Datastore) Path(path string) string {
 	}).String()
 }
 
-// NewDatastoreURL constructs a url.URL with the given file path for datastore access over HTTP.
-func NewDatastoreURL(base url.URL, dcPath, dsName, path string) *url.URL {
-	scheme := base.Scheme
+// NewURL constructs a url.URL with the given file path for datastore access over HTTP.
+func (d Datastore) NewURL(path string) *url.URL {
+	u := d.c.URL()
+
+	scheme := u.Scheme
 	// In rare cases where vCenter and ESX are accessed using different schemes.
 	if overrideScheme := os.Getenv("GOVMOMI_DATASTORE_ACCESS_SCHEME"); overrideScheme != "" {
 		scheme = overrideScheme
 	}
 
-	base.Scheme = scheme
-	base.Path = fmt.Sprintf("/folder/%s", path)
-	base.RawQuery = url.Values{
-		"dcPath": []string{dcPath},
-		"dsName": []string{dsName},
-	}.Encode()
-
-	return &base
-}
-
-// NewURL constructs a url.URL with the given file path for datastore access over HTTP.
-// The Datastore object is used to derive url, dcPath and dsName params to NewDatastoreURL.
-// For dcPath, Datastore.DatacenterPath must be set and for dsName, Datastore.InventoryPath.
-// This is the case when the object.Datastore instance is created by Finder.
-// Otherwise, Datastore.FindInventoryPath should be called first, to set DatacenterPath
-// and InventoryPath.
-func (d Datastore) NewURL(path string) *url.URL {
-	u := d.c.URL()
-	return NewDatastoreURL(*u, d.DatacenterPath, d.Name(), path)
+	return &url.URL{
+		Scheme: scheme,
+		Host:   u.Host,
+		Path:   fmt.Sprintf("/folder/%s", path),
+		RawQuery: url.Values{
+			"dcPath": []string{d.DatacenterPath},
+			"dsName": []string{d.Name()},
+		}.Encode(),
+	}
 }
 
 func (d Datastore) Browser(ctx context.Context) (*HostDatastoreBrowser, error) {
