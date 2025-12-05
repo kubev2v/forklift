@@ -1,12 +1,10 @@
 module github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator
 
-go 1.24.0
-
-toolchain go1.24.4
+go 1.25
 
 require (
 	github.com/dell/gopowermax/v2 v2.9.0
-	github.com/dell/gopowerstore v1.19.0
+	github.com/dell/gopowerstore v1.20.1
 	github.com/dell/goscaleio v1.20.0
 	github.com/devans10/pugo/flasharray v0.0.0-20241116160615-6bb8c469c9a0
 	github.com/infinidat/infinibox-csi-driver v0.0.0-20251022203528-1f6913cf29cb
@@ -14,7 +12,7 @@ require (
 	github.com/netapp/trident v0.0.0-20240628081112-cb68cb389d9d
 	github.com/onsi/ginkgo/v2 v2.25.1
 	github.com/onsi/gomega v1.38.2
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/vmware/govmomi v0.50.0
 	go.uber.org/mock v0.5.2
 	golang.org/x/crypto v0.41.0
