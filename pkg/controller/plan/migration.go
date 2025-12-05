@@ -1600,9 +1600,35 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 			}
 			conditions := dv.Conditions()
 			switch dv.Status.Phase {
-			case cdi.Succeeded, cdi.Paused:
+			case cdi.Succeeded:
 				completed++
 				r.setTaskCompleted(task)
+			case cdi.Paused:
+				pvc := &core.PersistentVolumeClaim{}
+				err = r.Destination.Client.Get(context.TODO(), types.NamespacedName{
+					Namespace: r.Plan.Spec.TargetNamespace,
+					Name:      dv.Status.ClaimName,
+				}, pvc)
+				if err != nil {
+					log.Error(
+						err,
+						"Could not get PVC for DataVolume.",
+						"vm",
+						vm.String(),
+						"dv",
+						path.Join(dv.Namespace, dv.Name))
+					continue
+				}
+				snapshot := vm.Warm.Precopies[len(vm.Warm.Precopies)-1].Snapshot
+				annotation := fmt.Sprintf("%s.%s", base.AnnCheckpointsCopied, snapshot)
+				if _, copied := pvc.Annotations[annotation]; copied {
+					completed++
+					r.setTaskCompleted(task)
+				} else {
+					pending++
+					task.Phase = api.StepPending
+					task.Reason = "Waiting for checkpoint to be applied"
+				}
 			case cdi.Pending, cdi.ImportScheduled:
 				pending++
 				task.Phase = api.StepPending
