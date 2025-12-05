@@ -305,9 +305,6 @@ spec:
               controller_cleanup_retries:
                 x-kubernetes-int-or-string: true
                 description: "Cleanup retry count (default: 10)"
-              controller_dv_status_check_retries:
-                x-kubernetes-int-or-string: true
-                description: "DataVolume status check retries (default: 10)"
               controller_snapshot_removal_check_retries:
                 x-kubernetes-int-or-string: true
                 description: "Snapshot removal retries (default: 20)"

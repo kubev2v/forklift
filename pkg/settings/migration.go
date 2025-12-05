@@ -25,7 +25,6 @@ const (
 	FileSystemOverhead               = "FILESYSTEM_OVERHEAD"
 	BlockOverhead                    = "BLOCK_OVERHEAD"
 	CleanupRetries                   = "CLEANUP_RETRIES"
-	DvStatusCheckRetries             = "DV_STATUS_CHECK_RETRIES"
 	SnapshotRemovalCheckRetries      = "SNAPSHOT_REMOVAL_CHECK_RETRIES"
 	OvirtOsConfigMap                 = "OVIRT_OS_MAP"
 	VsphereOsConfigMap               = "VSPHERE_OS_MAP"
@@ -90,8 +89,6 @@ type Migration struct {
 	BlockOverhead int64
 	// Cleanup retries
 	CleanupRetries int
-	// DvStatusCheckRetries retries
-	DvStatusCheckRetries int
 	// SnapshotRemovalCheckRetries retries
 	SnapshotRemovalCheckRetries int
 	// oVirt OS config map name
@@ -162,9 +159,6 @@ func (r *Migration) Load() (err error) {
 		return liberr.Wrap(fmt.Errorf("failed to find environment variable %s", VirtCustomizeConfigMap))
 	}
 	if r.CleanupRetries, err = getPositiveEnvLimit(CleanupRetries, 10); err != nil {
-		return liberr.Wrap(err)
-	}
-	if r.DvStatusCheckRetries, err = getPositiveEnvLimit(DvStatusCheckRetries, 10); err != nil {
 		return liberr.Wrap(err)
 	}
 	if r.SnapshotRemovalCheckRetries, err = getPositiveEnvLimit(SnapshotRemovalCheckRetries, 20); err != nil {

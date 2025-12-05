@@ -43,9 +43,8 @@ const (
 )
 
 const (
-	TransferCompleted              = "Transfer completed."
-	PopulatorPodPrefix             = "populate-"
-	DvStatusCheckRetriesAnnotation = "dvStatusCheckRetries"
+	TransferCompleted  = "Transfer completed."
+	PopulatorPodPrefix = "populate-"
 	// TODO: ImageConversion and DiskTransferV2v step names remain here
 	// until remaining cold/warm migration flow details can be
 	// moved into base migrators.
@@ -1052,51 +1051,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				}
 				r.NextPhase(vm)
 			}
-		case api.PhaseWaitForDataVolumesStatus, api.PhaseWaitForFinalDataVolumesStatus:
-			step, found := vm.FindStep(r.migrator.Step(vm))
-			if !found {
-				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
-				break
-			}
-
-			dvs, err := r.kubevirt.getDVs(vm)
-			if err != nil {
-				step.AddError(err.Error())
-				err = nil
-				break
-			}
-			if !r.hasPausedDv(dvs) {
-				r.NextPhase(vm)
-				// Reset for next precopy
-				step.Annotations[DvStatusCheckRetriesAnnotation] = "1"
-			} else {
-				var retries int
-				retriesAnnotation := step.Annotations[DvStatusCheckRetriesAnnotation]
-				if retriesAnnotation == "" {
-					step.Annotations[DvStatusCheckRetriesAnnotation] = "1"
-				} else {
-					retries, err = strconv.Atoi(retriesAnnotation)
-					if err != nil {
-						step.AddError(err.Error())
-						err = nil
-						break
-					}
-					if retries >= settings.Settings.DvStatusCheckRetries {
-						// Do not fail the step as this can happen when the user runs the warm migration but the VM is already shutdown
-						// In that case we don't create any delta and don't change the CDI DV status.
-						r.Log.Info(
-							"DataVolume status check exceeded the retry limit."+
-								"If this causes the problems with the snapshot removal in the CDI please bump the controller_dv_status_check_retries.",
-							"vm",
-							vm.String())
-						r.NextPhase(vm)
-						// Reset for next precopy
-						step.Annotations[DvStatusCheckRetriesAnnotation] = "1"
-					} else {
-						step.Annotations[DvStatusCheckRetriesAnnotation] = strconv.Itoa(retries + 1)
-					}
-				}
-			}
 		case api.PhaseStoreInitialSnapshotDeltas, api.PhaseStoreSnapshotDeltas:
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
@@ -1131,9 +1085,9 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 
 			switch vm.Phase {
 			case api.PhaseAddCheckpoint:
-				vm.Phase = api.PhaseWaitForDataVolumesStatus
+				vm.Phase = api.PhaseCopyDisks
 			case api.PhaseAddFinalCheckpoint:
-				vm.Phase = api.PhaseWaitForFinalDataVolumesStatus
+				vm.Phase = api.PhaseFinalize
 			}
 		case api.PhaseStorePowerState:
 			step, found := vm.FindStep(r.migrator.Step(vm))
@@ -1381,15 +1335,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 	}
 
 	return
-}
-
-func (r *Migration) hasPausedDv(dvs []ExtendedDataVolume) bool {
-	for _, dv := range dvs {
-		if dv.Status.Phase == Paused {
-			return true
-		}
-	}
-	return false
 }
 
 func (r *Migration) resetPrecopyTasks(vm *plan.VMStatus, step *plan.Step) {
