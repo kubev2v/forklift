@@ -901,7 +901,9 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			step.MarkStarted()
 			step.Phase = api.StepRunning
 
-			if r.builder.SupportsVolumePopulators() {
+			warmJumpStartDone := r.builder.SupportsVolumePopulators() && r.Plan.IsWarm() && vm.Warm.Successes > 0
+
+			if r.builder.SupportsVolumePopulators() && !warmJumpStartDone {
 				err = r.updatePopulatorCopyProgress(vm, step)
 			} else {
 				// Fallback to non-volume populator path
