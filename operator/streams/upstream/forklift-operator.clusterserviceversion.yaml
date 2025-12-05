@@ -439,11 +439,6 @@ spec:
           path: controller_cleanup_retries
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:hidden
-        - description: DataVolume status check retries (default 10)
-          displayName: DV Status Check Retries
-          path: controller_dv_status_check_retries
-          x-descriptors:
-          - urn:alm:descriptor:com.tectonic.ui:hidden
         - description: Snapshot removal retries (default 20)
           displayName: Snapshot Removal Check Retries
           path: controller_snapshot_removal_check_retries

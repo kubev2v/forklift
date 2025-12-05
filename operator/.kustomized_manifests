@@ -102,9 +102,6 @@ spec:
                 description: 'Controller memory request (default: 350Mi)'
                 example: 500Mi
                 type: string
-              controller_dv_status_check_retries:
-                description: 'DataVolume status check retries (default: 10)'
-                x-kubernetes-int-or-string: true
               controller_filesystem_overhead:
                 description: 'Filesystem overhead percentage (default: 10)'
                 x-kubernetes-int-or-string: true
@@ -7682,11 +7679,6 @@ spec:
       - description: Cleanup retry count (default 10)
         displayName: Cleanup Retries
         path: controller_cleanup_retries
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:hidden
-      - description: DataVolume status check retries (default 10)
-        displayName: DV Status Check Retries
-        path: controller_dv_status_check_retries
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Snapshot removal retries (default 20)

@@ -90,10 +90,6 @@ spec:
         - name: CLEANUP_RETRIES
           value: "{{ controller_cleanup_retries }}"
 {% endif %}
-{% if controller_dv_status_check_retries is number %}
-        - name: DV_STATUS_CHECK_RETRIES
-          value: "{{ controller_dv_status_check_retries }}"
-{% endif %}
 {% if controller_snapshot_removal_check_retries is number %}
         - name: SNAPSHOT_REMOVAL_CHECK_RETRIES
           value: "{{ controller_snapshot_removal_check_retries }}"

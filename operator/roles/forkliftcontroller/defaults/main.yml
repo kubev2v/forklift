@@ -39,7 +39,6 @@ controller_precopy_interval: 60
 controller_snapshot_removal_timeout_minuts: 120
 controller_snapshot_status_check_rate_seconds: 10
 controller_cleanup_retries: 10
-controller_dv_status_check_retries: 10
 controller_snapshot_removal_check_retries: 20
 controller_vsphere_incremental_backup: true
 controller_ovirt_warm_migration: true

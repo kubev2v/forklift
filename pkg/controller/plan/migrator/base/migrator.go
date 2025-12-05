@@ -254,7 +254,7 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 		step = DiskAllocation
 	case api.PhaseCopyDisks, api.PhaseCopyingPaused, api.PhaseRemovePreviousSnapshot, api.PhaseWaitForPreviousSnapshotRemoval,
 		api.PhaseCreateSnapshot, api.PhaseWaitForSnapshot, api.PhaseStoreSnapshotDeltas, api.PhaseAddCheckpoint,
-		api.PhaseConvertOpenstackSnapshot, api.PhaseWaitForDataVolumesStatus:
+		api.PhaseConvertOpenstackSnapshot:
 		step = DiskTransfer
 	case api.PhaseCreateDataVolumes:
 		// This phase should be present in DiskTransfer step only when executing Preflight Inspection to avoid UI pipeline artifacts.
@@ -266,7 +266,7 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 		}
 	case api.PhaseRemovePenultimateSnapshot, api.PhaseWaitForPenultimateSnapshotRemoval, api.PhaseCreateFinalSnapshot,
 		api.PhaseWaitForFinalSnapshot, api.PhaseAddFinalCheckpoint, api.PhaseFinalize, api.PhaseRemoveFinalSnapshot,
-		api.PhaseWaitForFinalSnapshotRemoval, api.PhaseWaitForFinalDataVolumesStatus:
+		api.PhaseWaitForFinalSnapshotRemoval:
 		step = Cutover
 	case api.PhaseCreateGuestConversionPod, api.PhaseConvertGuest:
 		step = ImageConversion
@@ -302,7 +302,6 @@ func (r *BaseMigrator) warmItinerary() *libitr.Itinerary {
 			{Name: api.PhasePreflightInspection, All: RunInspection},
 			{Name: api.PhaseCreateDataVolumes},
 			// Precopy loop start
-			{Name: api.PhaseWaitForDataVolumesStatus},
 			{Name: api.PhaseCopyDisks},
 			{Name: api.PhaseCopyingPaused},
 			{Name: api.PhaseRemovePreviousSnapshot, All: VSphere},
@@ -320,7 +319,6 @@ func (r *BaseMigrator) warmItinerary() *libitr.Itinerary {
 			{Name: api.PhaseCreateFinalSnapshot},
 			{Name: api.PhaseWaitForFinalSnapshot},
 			{Name: api.PhaseAddFinalCheckpoint},
-			{Name: api.PhaseWaitForFinalDataVolumesStatus},
 			{Name: api.PhaseFinalize},
 			{Name: api.PhaseRemoveFinalSnapshot, All: VSphere},
 			{Name: api.PhaseWaitForFinalSnapshotRemoval, All: VSphere},
