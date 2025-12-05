@@ -1,5 +1,5 @@
 /*
- Copyright © 2020 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2020-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -103,15 +103,15 @@ type StoragePool struct {
 
 // FbaCap FBA storage pool capacity
 type FbaCap struct {
-	Provisioned *provisioned `json:"provisioned"`
+	Provisioned *Provisioned `json:"provisioned"`
 }
 
 // CkdCap CKD storage pool capacity
 type CkdCap struct {
-	Provisioned *provisioned `json:"provisioned"`
+	Provisioned *Provisioned `json:"provisioned"`
 }
 
-type provisioned struct {
+type Provisioned struct {
 	UsableUsedInTB float64 `json:"used_tb"`
 	UsableTotInTB  float64 `json:"effective_capacity_tb"`
 	//	EffectiveUsedCapacityPercent float64 `json:"provisioned_percent"`
