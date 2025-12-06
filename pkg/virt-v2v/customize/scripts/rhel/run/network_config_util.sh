@@ -3,6 +3,7 @@
 # Global variables with default values
 V2V_MAP_FILE="${V2V_MAP_FILE:-/tmp/macToIP}"
 NETWORK_SCRIPTS_DIR="${NETWORK_SCRIPTS_DIR:-/etc/sysconfig/network-scripts}"
+NETWORK_SCRIPTS_DIR_SUSE="${NETWORK_SCRIPTS_DIR_SUSE:-/etc/sysconfig/network}"
 NETWORK_CONNECTIONS_DIR="${NETWORK_CONNECTIONS_DIR:-/etc/NetworkManager/system-connections}"
 NM_LEASES_DIR="${NM_LEASES_DIR:-/var/lib/NetworkManager}"
 DHCLIENT_LEASES_DIR="${DHCLIENT_LEASES_DIR:-/var/lib/dhclient}"
@@ -27,9 +28,9 @@ if [ ! -f "$V2V_MAP_FILE" ]; then
     exit 0
 fi
 
-# Check if udev rules file exists
-if [ -f "$UDEV_RULES_FILE" ]; then
-    log "File $UDEV_RULES_FILE already exists. Exiting."
+# Check if udev rules file exists and is not empty
+if [ -f "$UDEV_RULES_FILE" ] && [ -s "$UDEV_RULES_FILE" ]; then
+    log "File $UDEV_RULES_FILE already exists and is not empty. Exiting."
     exit 0
 fi
 
@@ -78,10 +79,18 @@ get_device_from_ifcfg() {
 }
 
 # Create udev rules based on the macToip mapping + ifcfg network scripts
+# Supports both RHEL (/etc/sysconfig/network-scripts/) and SUSE (/etc/sysconfig/network/)
+# Automatically detects which path exists and uses it (RHEL path takes precedence)
 udev_from_ifcfg() {
-    # Check if the network scripts directory exists
-    if [ ! -d "$NETWORK_SCRIPTS_DIR" ]; then
-        log "Warning: Directory $NETWORK_SCRIPTS_DIR does not exist."
+    local SCRIPTS_DIR=""
+
+    # Detect the correct path: RHEL/CentOS vs SUSE
+    if [ -d "$NETWORK_SCRIPTS_DIR" ]; then
+        SCRIPTS_DIR="$NETWORK_SCRIPTS_DIR"
+    elif [ -d "$NETWORK_SCRIPTS_DIR_SUSE" ]; then
+        SCRIPTS_DIR="$NETWORK_SCRIPTS_DIR_SUSE"
+    else
+        log "Info: no ifcfg directory found (checked $NETWORK_SCRIPTS_DIR and $NETWORK_SCRIPTS_DIR_SUSE)."
         return 0
     fi
 
@@ -98,16 +107,23 @@ udev_from_ifcfg() {
         fi
 
         # Find the matching network script file
-        IFCFG=$(grep -l "IPADDR=.*$S_IP.*$" "$NETWORK_SCRIPTS_DIR"/*)
+        IFCFG=$(grep -l "IPADDR=.*$S_IP" "$SCRIPTS_DIR"/ifcfg-* 2>/dev/null)
         if [ -z "$IFCFG" ]; then
-            log "Info: no ifcg config file name found for $S_IP."
+            log "Info: no ifcfg config file found for $S_IP in $SCRIPTS_DIR."
             continue
         fi
 
-        # Source the matching file, if found
+        # Extract device name from ifcfg file
+        # RHEL/CentOS: typically has DEVICE= or HWADDR= inside the file
+        # SUSE: device name is encoded in the filename itself (ifcfg-eth0 -> eth0)
         DEVICE=$(get_device_from_ifcfg "$IFCFG" "$S_HW")
         if [ -z "$DEVICE" ]; then
-            log "Info: no interface name found to $S_IP in $IFCFG."
+            # SUSE style: extract device name from filename (ifcfg-eth0 -> eth0)
+            DEVICE=$(basename "$IFCFG" | sed 's/^ifcfg-//')
+        fi
+
+        if [ -z "$DEVICE" ] || [ "$DEVICE" = "lo" ]; then
+            log "Info: no valid interface name found in $IFCFG."
             continue
         fi
 

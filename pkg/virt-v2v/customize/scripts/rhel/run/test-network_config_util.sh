@@ -15,6 +15,7 @@ test_dir() {
     # Paths for the test
     export V2V_MAP_FILE="$TEST_DIR/tmp/macToIP"
     export NETWORK_SCRIPTS_DIR="$TEST_DIR/etc/sysconfig/network-scripts"
+    export NETWORK_SCRIPTS_DIR_SUSE="$TEST_DIR/etc/sysconfig/network"
     export NETWORK_CONNECTIONS_DIR="$TEST_DIR/etc/NetworkManager/system-connections"
     export UDEV_RULES_FILE="$TEST_DIR/etc/udev/rules.d/70-persistent-net.rules"
     export SYSTEMD_NETWORK_DIR="$TEST_DIR/run/systemd/network"
