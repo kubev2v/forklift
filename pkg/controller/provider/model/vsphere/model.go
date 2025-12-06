@@ -241,12 +241,13 @@ type PNIC struct {
 }
 
 type VNIC struct {
-	Key        string `json:"key"`
-	PortGroup  string `json:"portGroup"`
-	DPortGroup string `json:"dPortGroup"`
-	IpAddress  string `json:"ipAddress"`
-	SubnetMask string `json:"subnetMask"`
-	MTU        int32  `json:"mtu"`
+	Key         string   `json:"key"`
+	PortGroup   string   `json:"portGroup"`
+	DPortGroup  string   `json:"dPortGroup"`
+	IpAddress   string   `json:"ipAddress"`
+	SubnetMask  string   `json:"subnetMask"`
+	IpV6Address []string `json:"ipV6Address"`
+	MTU         int32    `json:"mtu"`
 }
 
 type PortGroup struct {
