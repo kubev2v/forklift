@@ -3,6 +3,8 @@ package populator
 import (
 	"context"
 	"errors"
+	"slices"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -24,6 +26,7 @@ var _ = Describe("rescan", func() {
 		mockClient *vmware_mocks.MockClient
 		host       *object.HostSystem
 		targetLUN  string
+		preferFCAdapters bool
 	)
 
 	BeforeEach(func() {
@@ -31,6 +34,7 @@ var _ = Describe("rescan", func() {
 		mockClient = vmware_mocks.NewMockClient(ctrl)
 		host = &object.HostSystem{} // A dummy host system
 		targetLUN = "naa.1234567890"
+		preferFCAdapters = false
 	})
 
 	AfterEach(func() {
@@ -114,6 +118,18 @@ var _ = Describe("rescan", func() {
 
 			err := rescan(context.Background(), mockClient, host, targetLUN)
 			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+	Context("when preferFCAdapters is true", func() {
+		It("should sort the HBA UIDs in ascending order", func() {
+			hbaUIDs := []string{"fc.1234567890", "iqn.1234567890", "iqn.234567891"}
+			slices.SortFunc(hbaUIDs, func(a, b string) int {
+				if preferFCAdapters {
+					return strings.Compare(b, a)
+				}
+				return strings.Compare(a, b)
+			})
+			Expect(hbaUIDs).To(Equal([]string{"fc.1234567890", "iqn.1234567890", "iqn.234567891"}))
 		})
 	})
 })

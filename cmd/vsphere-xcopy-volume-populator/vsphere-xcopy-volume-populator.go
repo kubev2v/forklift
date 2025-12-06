@@ -59,7 +59,7 @@ var (
 	vspherePassword            string
 	esxiCloneMethod            string
 	sshTimeoutSeconds          int
-
+	preferFCAdapters           bool
 	// kube args
 	httpEndpoint string
 	metricsPath  string
@@ -182,7 +182,7 @@ func main() {
 		}
 		klog.Infof("Debug: SSH keys retrieved, private key length: %d, public key length: %d", len(sshPrivateKey), len(sshPublicKey))
 
-		sshP, err := populator.NewWithRemoteEsxcliSSH(storageApi, vsphereHostname, vsphereUsername, vspherePassword, sshPrivateKey, sshPublicKey, sshTimeoutSeconds)
+		sshP, err := populator.NewWithRemoteEsxcliSSH(storageApi, vsphereHostname, vsphereUsername, vspherePassword, sshPrivateKey, sshPublicKey, sshTimeoutSeconds, preferFCAdapters)
 		if err != nil {
 			klog.Fatalf("Failed to create %s-based remote esxcli populator: %s", method, err)
 		}
@@ -204,8 +204,7 @@ func main() {
 	quitCh := make(chan error)
 
 	hll := populator.NewHostLeaseLocker(clientSet)
-	go p.Populate(sourceVmId, sourceVMDKFile, pv, hll, progressCh, quitCh)
-
+	go p.Populate(sourceVmId, sourceVMDKFile, pv, hll, preferFCAdapter, progressCh, quitCh)
 	for {
 		select {
 		case p := <-progressCh:
@@ -300,6 +299,7 @@ func handleArgs() {
 	flag.IntVar(&sshTimeoutSeconds, "ssh-timeout-seconds", 30, "SSH timeout in seconds for ESXi operations (default: 30)")
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+	flag.BoolVar(&preferFCAdapters, "prefer-fc-adapters", false, "prefer FC adapters over iSCSI adapters")
 	// Metrics args
 	flag.StringVar(&httpEndpoint, "http-endpoint", "", "The TCP network address where the HTTP server for diagnostics, including metrics and leader election health check, will listen (example: `:8080`). The default is empty string, which means the server is disabled.")
 	flag.StringVar(&metricsPath, "metrics-path", "/metrics", "The HTTP path where prometheus metrics will be exposed. Default is `/metrics`.")
