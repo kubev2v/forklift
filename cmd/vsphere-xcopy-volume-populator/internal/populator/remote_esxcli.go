@@ -374,7 +374,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	}
 
 	// Use unified task execution
-	return ExecuteCloneTask(context.Background(), executor, host, vmDisk.Path(), targetLUN, progress)
+	return ExecuteCloneTask(context.Background(), executor, host, vmDisk.Datastore, vmDisk.Path(), targetLUN, progress)
 }
 
 // waitForDeviceStateOff waits for the device state to become "off" using exponential backoff
