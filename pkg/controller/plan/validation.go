@@ -93,6 +93,7 @@ const (
 	VMPowerStateUnsupported         = "VMPowerStateUnsupported"
 	VMMigrationTypeUnsupported      = "VMMigrationTypeUnsupported"
 	GuestToolsIssue                 = "GuestToolsIssue"
+	VDDKAndOffloadMixedUsage        = "VDDKAndOffloadMixedUsage"
 )
 
 // Categories
@@ -201,6 +202,10 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	}
 
 	if err = r.validateVddkImage(plan); err != nil {
+		return err
+	}
+
+	if err = r.validateVddkAndOffloadMixedUsage(plan); err != nil {
 		return err
 	}
 
@@ -1834,6 +1839,86 @@ func (r *Reconciler) IsValidTargetName(targetName string) error {
 	errs := k8svalidation.IsDNS1123Subdomain(targetName)
 	if len(errs) > 0 {
 		return liberr.New("Target name is not a valid k8s subdomain", "errors", errs)
+	}
+
+	return nil
+}
+
+func (r *Reconciler) validateVddkAndOffloadMixedUsage(plan *api.Plan) error {
+	source := plan.Referenced.Provider.Source
+	if source == nil {
+		return nil
+	}
+
+	if source.Type() != api.VSphere {
+		return nil
+	}
+
+	if !settings.Settings.Features.CopyOffload {
+		return nil
+	}
+
+	mixedUsage := libcnd.Condition{
+		Type:     VDDKAndOffloadMixedUsage,
+		Status:   True,
+		Reason:   NotSupported,
+		Category: api.CategoryCritical,
+		Message:  "VM has mixed disk migration methods (VDDK and copy offload). All disks in a VM must use the same migration method.",
+		Items:    []string{},
+	}
+
+	inventory, pErr := web.NewClient(source)
+	if pErr != nil {
+		return liberr.Wrap(pErr)
+	}
+
+	// validation of mixed usage of VDDK and copy offload on the plan level
+	hasVddkDisks := false
+	hasOffloadDisks := false
+	for _, vm := range plan.Spec.VMs {
+		ref := &vm.Ref
+		if ref.NotSet() {
+			continue
+		}
+
+		v, pErr := inventory.VM(ref)
+		if pErr != nil {
+			// Skip if VM not found, other validations will catch this
+			continue
+		}
+
+		vsphereVM, ok := v.(*vsphere.VM)
+		if !ok {
+			continue
+		}
+
+		storageMap := plan.Referenced.Map.Storage
+		if storageMap == nil {
+			continue
+		}
+
+		for _, disk := range vsphereVM.Disks {
+			var mapping *api.StoragePair
+			for i := range storageMap.Spec.Map {
+				m := &storageMap.Spec.Map[i]
+				if m.Source.ID == disk.Datastore.ID {
+					mapping = m
+					break
+				}
+			}
+
+			// Check if this disk uses copy offload (matches SupportsVolumePopulators logic)
+			if mapping != nil && mapping.OffloadPlugin != nil && mapping.OffloadPlugin.VSphereXcopyPluginConfig != nil {
+				hasOffloadDisks = true
+			} else {
+				hasVddkDisks = true
+			}
+		}
+
+		if hasVddkDisks && hasOffloadDisks {
+			plan.Status.SetCondition(mixedUsage)
+			return nil
+		}
 	}
 
 	return nil
