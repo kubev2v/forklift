@@ -7,6 +7,7 @@ import (
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -15,13 +16,34 @@ func ensureNamespace(plan *api.Plan, client client.Client) error {
 	ns := &core.Namespace{
 		ObjectMeta: meta.ObjectMeta{
 			Name: plan.Spec.TargetNamespace,
+			Labels: map[string]string{
+				"pod-security.kubernetes.io/enforce": "privileged",
+				"pod-security.kubernetes.io/audit":   "privileged",
+				"pod-security.kubernetes.io/warn":    "privileged",
+			},
 		},
 	}
 	err := client.Create(context.TODO(), ns)
-	if err != nil && k8serr.IsAlreadyExists(err) {
-		err = nil
+	if err != nil {
+		if k8serr.IsAlreadyExists(err) {
+			// Update the namespace labels if it already exists
+			existingNs := &core.Namespace{}
+			if getErr := client.Get(context.TODO(), types.NamespacedName{Name: plan.Spec.TargetNamespace}, existingNs); getErr == nil {
+				if existingNs.Labels == nil {
+					existingNs.Labels = make(map[string]string)
+				}
+				existingNs.Labels["pod-security.kubernetes.io/enforce"] = "privileged"
+				existingNs.Labels["pod-security.kubernetes.io/audit"] = "privileged"
+				existingNs.Labels["pod-security.kubernetes.io/warn"] = "privileged"
+				if updateErr := client.Update(context.TODO(), existingNs); updateErr != nil {
+					return updateErr
+				}
+			}
+			return nil
+		}
+		return err
 	}
-	return err
+	return nil
 }
 
 // Ensure the config map exists on the destination
