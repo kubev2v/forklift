@@ -29,7 +29,6 @@ import (
 	"github.com/openshift/library-go/pkg/template/templateprocessing"
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -676,7 +675,7 @@ func (r *KubeVirt) vddkConfigMap(labels map[string]string) (*core.ConfigMap, err
 	}
 	configMap := core.ConfigMap{
 		Data: data,
-		ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: meta.ObjectMeta{
 			GenerateName: genVddkConfConfigMapName(r.Plan),
 			Namespace:    r.Plan.Spec.TargetNamespace,
 			Labels:       labels,
@@ -2021,16 +2020,16 @@ func (r *KubeVirt) guestConversionPod(vm *plan.VMStatus, vmVolumes []cnv.Volume,
 						{
 							Weight: 100,
 							PodAffinityTerm: core.PodAffinityTerm{
-								NamespaceSelector: &metav1.LabelSelector{},
+								NamespaceSelector: &meta.LabelSelector{},
 								TopologyKey:       "kubernetes.io/hostname",
-								LabelSelector: &metav1.LabelSelector{
-									MatchExpressions: []metav1.LabelSelectorRequirement{
+								LabelSelector: &meta.LabelSelector{
+									MatchExpressions: []meta.LabelSelectorRequirement{
 										{
 											Key: kApp,
 											Values: []string{
 												"virt-v2v",
 											},
-											Operator: metav1.LabelSelectorOpIn,
+											Operator: meta.LabelSelectorOpIn,
 										},
 									},
 								},
