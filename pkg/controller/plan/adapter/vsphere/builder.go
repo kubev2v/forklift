@@ -1443,7 +1443,6 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				if v != nil && v.Warm != nil {
 					pvc.Annotations[planbase.AnnEndpoint] = r.Source.Provider.Spec.URL
 					pvc.Annotations[planbase.AnnImportBackingFile] = baseVolume(disk.File, r.Plan.IsWarm())
-					pvc.Annotations[planbase.AnnSecret] = secretName
 					pvc.Annotations[planbase.AnnUUID] = vm.UUID
 					pvc.Annotations[planbase.AnnThumbprint] = r.Source.Provider.Status.Fingerprint
 					pvc.Annotations[planbase.AnnVddkInitImageURL] = settings.GetVDDKImage(r.Source.Provider.Spec.Settings)
@@ -1466,6 +1465,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				// Update DataSourceRef to point to the volume populator
 				pvc.Spec.DataSourceRef.Name = populatorName
 				diskSecretName := fmt.Sprintf("%s-%d", secretName, diskIndex)
+				pvc.Annotations[planbase.AnnSecret] = diskSecretName
 				pvcs = append(pvcs, &pvc)
 				vp := api.VSphereXcopyVolumePopulator{
 					ObjectMeta: metav1.ObjectMeta{
