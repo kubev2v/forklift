@@ -21,6 +21,56 @@
       volume_populator_state: "present"
     when: feature_volume_populator|bool
 
+  - name: "Set version-aware feature_network_policies default based on OCP version"
+    block:
+      - name: "Extract OpenShift cluster version"
+        k8s_info:
+          api_version: config.openshift.io/v1
+          kind: ClusterVersion
+          name: version
+        register: cluster_version_info
+        ignore_errors: yes
+        failed_when: false
+        # Query ClusterVersion resource to find the installed OpenShift version
+        # This allows us to determine the OCP version at runtime
+
+      - name: "Extract OCP version from ClusterVersion results"
+        set_fact:
+          # Determine OpenShift version from ClusterVersion resource
+          # Processing steps:
+          #   1. cluster_version_info.resources | default([]) - Get ClusterVersion resources
+          #   2. map(attribute='status.history') | first | default([]) - Extract history from first resource
+          #   3. selectattr('state', 'equalto', 'Completed') - Filter to completed versions
+          #   4. map(attribute='version') - Extract version strings
+          #   5. first - Take the first (most recent) completed version
+          #   6. default('unknown') - Fallback if version not found
+          # Result: OCP version string (e.g., "4.21.3") or "unknown" if not found
+          detected_ocp_version: >-
+            {{ cluster_version_info.resources
+               | default([])
+               | map(attribute='status.history')
+               | first
+               | default([])
+               | selectattr('state', 'equalto', 'Completed')
+               | map(attribute='version')
+               | first
+               | default('unknown') }}
+        failed_when: false
+
+      - name: "Set feature_network_policies based on OCP version"
+        set_fact:
+          # Enable feature if OCP version meets or exceeds minimum threshold
+          # Uses ansible.builtin.version test for semantic version comparison
+          # Example: "4.21.3" >= "4.21.0" -> true, "4.19.0" >= "4.21.0" -> false
+          feature_network_policies: >-
+            {{ 'true' if (detected_ocp_version != 'unknown' and 
+               detected_ocp_version is ansible.builtin.version(network_policies_min_ocp_version, '>=')) 
+               else 'false' }}
+        failed_when: false
+    when: not (feature_network_policies | default('false') | bool)
+    # Only set version-aware default if user hasn't explicitly enabled it in ForkliftController CR
+    # If user sets feature_network_policies: "true" in CR, that takes precedence
+
   - name: "Load cluster API groups"
     set_fact:
       api_groups: "{{ lookup('k8s', cluster_info='api_groups') }}"
