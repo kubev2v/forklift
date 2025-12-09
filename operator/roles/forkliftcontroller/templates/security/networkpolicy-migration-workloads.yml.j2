@@ -1,10 +1,6 @@
 # Network policies for virt-v2v conversion workloads
 # Applies to virt-v2v pods used by VMware and OVA migrations for guest conversion
 #
-# NFS Configuration:
-# - Default: NFSv4 (port 2049 TCP/UDP only)
-# - NFSv3: Set nfs_v3_support=true to enable ports 111 (rpcbind) and 20048 (mountd)
-# - Note: NFSv3 mountd port may vary depending on server configuration
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -26,14 +22,14 @@ spec:
     - podSelector:
         matchLabels:
           control-plane: controller-manager
-    # all ports allowed (ports omitted)
+    ports: []  # All ports allowed
   egress:
   # Allow communication with controller
   - to:
     - podSelector:
         matchLabels:
           control-plane: controller-manager
-    # All ports allowed (ports omitted)
+    ports: []  # All ports allowed
   # Allow external provider access (vSphere + OVA)
   - ports:
     - protocol: TCP
@@ -44,8 +40,9 @@ spec:
       port: 8443  # vSphere API HTTPS Development
     - protocol: TCP
       port: 902   # vSphere NFC storage transfer
+    # Optional: allow TCP 8080 only if OVA/image sources are served over HTTP on nonstandard ports
     - protocol: TCP
-      port: 8080  # OVA downloads HTTP
+      port: 8080  
   # Allow DNS resolution
   - ports:
     - protocol: UDP
@@ -73,12 +70,12 @@ spec:
     - podSelector:
         matchLabels:
           control-plane: controller-manager
-    # All ports allowed (ports omitted)
-  # Allow OVA file access from migration workloads
+    ports: []  # All ports allowed
+  # Allow OVA file access from virt-v2v pods
   - from:
     - podSelector:
         matchLabels:
-          forklift.app: migration-workload
+          forklift.app: virt-v2v
     ports:
     - protocol: TCP
       port: 8080  # OVA server HTTP port
@@ -88,7 +85,7 @@ spec:
     - podSelector:
         matchLabels:
           control-plane: controller-manager
-    # All ports allowed (ports omitted)
+    ports: []  # All ports allowed
   # OVA server serves files from NFS storage, no external HTTP/HTTPS needed
   # Allow DNS resolution
   - ports:
@@ -96,25 +93,7 @@ spec:
       port: 53
     - protocol: TCP
       port: 53
-  # Allow NFS storage access
-  # NFSv4: Port 2049 TCP/UDP (default configuration)
-  # NFSv3: Add ports 111 (rpcbind) and mountd if needed
-  - ports:
-    - protocol: TCP
-      port: 2049  # NFS (NFSv4/NFSv3 data)
-    - protocol: UDP
-      port: 2049  # NFS (NFSv4/NFSv3 data)
-{% if nfs_v3_support|default(false)|bool %}
-    # NFSv3 additional ports (enable with nfs_v3_support: true)
-    - protocol: TCP
-      port: 111   # rpcbind
-    - protocol: UDP
-      port: 111   # rpcbind
-    - protocol: TCP
-      port: 20048 # mountd (default port, may vary)
-    - protocol: UDP
-      port: 20048 # mountd (default port, may vary)
-{% endif %}
+
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -136,7 +115,7 @@ spec:
     - podSelector:
         matchLabels:
           control-plane: controller-manager
-    # All ports allowed (ports omitted)
+    ports: []  # All ports allowed
   # Allow monitoring access to metrics
   - from:
     - namespaceSelector:
@@ -151,7 +130,7 @@ spec:
     - podSelector:
         matchLabels:
           control-plane: controller-manager
-    # All ports allowed (ports omitted)
+    ports: []  # All ports allowed
   # Allow oVirt API and imageio access
   - ports:
     - protocol: TCP
@@ -185,7 +164,7 @@ spec:
     - podSelector:
         matchLabels:
           control-plane: controller-manager
-    # All ports allowed (ports omitted)
+    ports: []  # All ports allowed
   # Allow monitoring access to metrics
   - from:
     - namespaceSelector:
@@ -200,35 +179,11 @@ spec:
     - podSelector:
         matchLabels:
           control-plane: controller-manager
-    # All ports allowed (ports omitted)
-  # Allow OpenStack API access
-  - ports:
-    - protocol: TCP
-      port: 80    # HTTP for OpenStack APIs
-    - protocol: TCP
-      port: 443   # HTTPS for OpenStack APIs
-    - protocol: TCP
-      port: 5000  # Keystone (Identity service)
-    - protocol: TCP
-      port: 8774  # Nova (Compute service)
-    - protocol: TCP
-      port: 8776  # Cinder (Block Storage service)
-    - protocol: TCP
-      port: 9696  # Neutron (Network service)
-    - protocol: TCP
-      port: 13000 # Custom OpenStack service port
-    - protocol: TCP
-      port: 13292 # Custom OpenStack service port
-    - protocol: TCP
-      port: 13774 # Custom OpenStack service port
-    - protocol: TCP
-      port: 13776 # Custom OpenStack service port
-  # Allow DNS resolution
-  - ports:
-    - protocol: UDP
-      port: 53    # DNS resolution
-    - protocol: TCP
-      port: 53    # DNS resolution
+    ports: []  # All ports allowed
+  # Allow all egress - OpenStack uses dynamic service discovery with unpredictable ports
+  # OpenStack deployments can use custom ports for any service (Keystone, Nova, Cinder, Neutron, etc.)
+  # Attempting to list all possible ports would be incomplete and cause migration failures
+  - {}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -250,7 +205,7 @@ spec:
     - podSelector:
         matchLabels:
           control-plane: controller-manager
-    # All ports allowed (ports omitted)
+    ports: []  # All ports allowed
   # Allow monitoring access to metrics
   - from:
     - namespaceSelector:
@@ -265,7 +220,7 @@ spec:
     - podSelector:
         matchLabels:
           control-plane: controller-manager
-    # All ports allowed (ports omitted)
+    ports: []  # All ports allowed
   # Allow vSphere API and NFC access
   - ports:
     - protocol: TCP
@@ -309,7 +264,10 @@ spec:
     - podSelector:
         matchLabels:
           control-plane: controller-manager
-    # All ports allowed (ports omitted)
+    ports: []  # All ports allowed
   egress:
   # Image converter works with locally mounted PVCs - no network storage access needed
   # No external egress required
+
+
+
