@@ -14,44 +14,9 @@ spec:
       operator: In
       values: ["PreHook", "PostHook"]
   policyTypes:
+  - Ingress
   - Egress
+  # No ingress rules
   egress:
-  # Service Discovery and Authentication
-  - ports:
-    - protocol: UDP
-      port: 53  # DNS - Service discovery
-    - protocol: TCP
-      port: 53  # DNS - Service discovery
-  
-  # Forklift Platform Communication
-  - to:
-    - podSelector:
-        matchLabels:
-          app: {{ app_name }}
-          control-plane: controller-manager
-    ports:
-    - protocol: TCP
-      port: 8443  # Controller inventory - Status updates
-  - to:
-    - podSelector:
-        matchLabels:
-          service: {{ api_service_name }}
-    ports:
-    - protocol: TCP
-      port: 8443  # API - Resource access
-  
-  # Kubernetes Operations
-  - ports:
-    - protocol: TCP
-      port: 6443  # K8s API - Custom operations
-  
-  # External Dependencies
-  - ports:
-    - protocol: TCP
-      port: 443  # HTTPS - Git repos, packages
-    - protocol: TCP
-      port: 80  # HTTP - Package repositories
-  
-  # Internal Cluster Access
-  - to:
-    - namespaceSelector: {}  # All namespaces - Custom integrations
+  # Allow all egress
+  - {}
