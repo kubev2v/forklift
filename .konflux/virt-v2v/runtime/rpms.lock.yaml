@@ -942,6 +942,34 @@ arches:
     name: kbd-misc
     evr: 2.6.4-7.el10
     sourcerpm: kbd-2.6.4-7.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/k/kernel-6.12.0-124.8.1.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 1419749
+    checksum: sha256:0a55c16f69fd44ffcd86d439437608262c28bc4510880afb072ddb9ad9cf5623
+    name: kernel
+    evr: 6.12.0-124.8.1.el10_1
+    sourcerpm: kernel-6.12.0-124.8.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/k/kernel-core-6.12.0-124.8.1.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 19259781
+    checksum: sha256:83265595aa3b85aad7132856264f497b36af09e414749b0b742f57424960b17f
+    name: kernel-core
+    evr: 6.12.0-124.8.1.el10_1
+    sourcerpm: kernel-6.12.0-124.8.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/k/kernel-modules-6.12.0-124.8.1.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 42511385
+    checksum: sha256:0b0ffbf435f8316cc87cfb0eb8d19458f755997dfbafd8b49d086db5026c3564
+    name: kernel-modules
+    evr: 6.12.0-124.8.1.el10_1
+    sourcerpm: kernel-6.12.0-124.8.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/k/kernel-modules-core-6.12.0-124.8.1.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 31019077
+    checksum: sha256:3071f1e80f4e0adcf4c0ead00136e4d55534d732b37d4b19d26dbc1d2d2863d6
+    name: kernel-modules-core
+    evr: 6.12.0-124.8.1.el10_1
+    sourcerpm: kernel-6.12.0-124.8.1.el10_1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/k/kmod-31-12.el10.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
     size: 139642
@@ -1607,41 +1635,6 @@ arches:
     name: zstd
     evr: 1.5.5-9.el10
     sourcerpm: zstd-1.5.5-9.el10.src.rpm
-  - url: https://download-01.beak-001.prod.iad2.dc.redhat.com/rhel-10/nightly/BUILDROOT-10/BUILDROOT-10.2-RHEL-10-20250924.0/compose/Buildroot/x86_64/os/Packages/libguestfs-fssupport-10.1-3.el10.x86_64.rpm
-    repoid: rhel-brewroot-libguestfs-fssupport-rpms
-    size: 26376136
-    checksum: sha256:e839ec2aa5c57f7ae4a7945088e8538ffa55e71e5d72154438e3e7d6b35064d0
-    name: libguestfs-fssupport
-    evr: 10.1-3.el10
-    sourcerpm: libguestfs-fssupport-10.1-3.el10.src.rpm
-  - url: https://download-01.beak-001.prod.iad2.dc.redhat.com/rhel-10/nightly/RHEL-10/RHEL-10.1-20250614.0/compose/BaseOS/x86_64/os/Packages/kernel-6.12.0-95.el10.x86_64.rpm
-    repoid: rhel-baseos-kernel-rpms
-    size: 649461
-    checksum: sha256:b4ff4ab9d72b82852f2b3158a2db58d32945ddda49fe03b91bdbf5cdf7f759f5
-    name: kernel
-    evr: 6.12.0-95.el10
-    sourcerpm: kernel-6.12.0-95.el10.src.rpm
-  - url: https://download-01.beak-001.prod.iad2.dc.redhat.com/rhel-10/nightly/RHEL-10/RHEL-10.1-20250614.0/compose/BaseOS/x86_64/os/Packages/kernel-core-6.12.0-95.el10.x86_64.rpm
-    repoid: rhel-baseos-kernel-rpms
-    size: 18445977
-    checksum: sha256:b09988836fe508fef52d4270d16791534f91eafc15ac40d3bfb3176742e7cd7e
-    name: kernel-core
-    evr: 6.12.0-95.el10
-    sourcerpm: kernel-6.12.0-95.el10.src.rpm
-  - url: https://download-01.beak-001.prod.iad2.dc.redhat.com/rhel-10/nightly/RHEL-10/RHEL-10.1-20250614.0/compose/BaseOS/x86_64/os/Packages/kernel-modules-6.12.0-95.el10.x86_64.rpm
-    repoid: rhel-baseos-kernel-rpms
-    size: 40971317
-    checksum: sha256:e5c746b3212082327b5591eac389799cbe444af734c8cba796755e4f6b9c9a68
-    name: kernel-modules
-    evr: 6.12.0-95.el10
-    sourcerpm: kernel-6.12.0-95.el10.src.rpm
-  - url: https://download-01.beak-001.prod.iad2.dc.redhat.com/rhel-10/nightly/RHEL-10/RHEL-10.1-20250614.0/compose/BaseOS/x86_64/os/Packages/kernel-modules-core-6.12.0-95.el10.x86_64.rpm
-    repoid: rhel-baseos-kernel-rpms
-    size: 29916661
-    checksum: sha256:b1bdfe12e16f3aff711370b45e09217afc0acdc60559d228778afc0edd329539
-    name: kernel-modules-core
-    evr: 6.12.0-95.el10
-    sourcerpm: kernel-6.12.0-95.el10.src.rpm
   source:
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/a/augeas-1.14.2-0.3.20250224git6ee1282.el10.src.rpm
     repoid: rhel-10-for-x86_64-appstream-source-rpms
@@ -2111,6 +2104,12 @@ arches:
     checksum: sha256:5904753dfb0f575825d54e6001419c6a39bac8b4b43e5360bf37feb9a020946c
     name: kbd
     evr: 2.6.4-7.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/k/kernel-6.12.0-124.8.1.el10_1.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 158631452
+    checksum: sha256:f1624f513910e718baa1a41a71e03103a600f4f09b8d88abd9f489aa12147960
+    name: kernel
+    evr: 6.12.0-124.8.1.el10_1
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/k/kmod-31-12.el10.src.rpm
     repoid: rhel-10-for-x86_64-baseos-source-rpms
     size: 623740
@@ -2543,16 +2542,4 @@ arches:
     checksum: sha256:3c453a23e181066ee5a664aad1f0a282090d0edb2b84bc76e120ddff0a00a870
     name: zstd
     evr: 1.5.5-9.el10
-  - url: https://download-01.beak-001.prod.iad2.dc.redhat.com/rhel-10/nightly/BUILDROOT-10/BUILDROOT-10.2-RHEL-10-20250924.0/compose/Buildroot/source/tree/Packages/libguestfs-fssupport-10.1-3.el10.src.rpm
-    repoid: rhel-brewroot-libguestfs-fssupport-srpms
-    size: 3833152
-    checksum: sha256:ef93fea7121a9a2b4448170f8584dbf8cf6285db72d76e7164265b44d087a473
-    name: libguestfs-fssupport
-    evr: 10.1-3.el10
-  - url: https://download-01.beak-001.prod.iad2.dc.redhat.com/rhel-10/nightly/RHEL-10/RHEL-10.1-20250614.0/compose/BaseOS/source/tree/Packages/kernel-6.12.0-95.el10.src.rpm
-    repoid: rhel-baseos-kernel-srpms
-    size: 152583148
-    checksum: sha256:dd3fd2811934aa3c1cd9d0e5cb7ef8546326bc9781c0e685fcee80d9754db01e
-    name: kernel
-    evr: 6.12.0-95.el10
   module_metadata: []
