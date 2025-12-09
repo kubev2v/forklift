@@ -14,20 +14,6 @@ spec:
       app: forklift
   policyTypes:
   - Egress
-{% if not k8s_cluster|bool %}
-  - Ingress
-{% endif %}
-{% if not k8s_cluster|bool %}
-  ingress:
-  # Allow monitoring access
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          kubernetes.io/metadata.name: openshift-monitoring
-    ports:
-    - protocol: TCP
-      port: 2112  # Conversion pod metrics
-{% endif %}
   egress:
   # Allow Kubernetes API access (critical for operator functionality)
   - ports:

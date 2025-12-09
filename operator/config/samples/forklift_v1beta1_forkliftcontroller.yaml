@@ -12,7 +12,4 @@ spec:
   # When enabled, a baseline default‑deny (Ingress+Egress) policy is applied and
   # Forklift policies explicitly allow required traffic.
   feature_network_policies: "false"
-  # Enable NFSv3 support in NetworkPolicies. Set to "true" to allow rpcbind/mountd ports.
-  # Default: NFSv4 only (2049). NFSv3 also requires 111 (rpcbind) and a fixed mountd port (commonly 20048).
-  # Ensure the NFS server config sets a fixed rpc.mountd port that matches the policy.
-  # nfs_v3_support: "false"
+
