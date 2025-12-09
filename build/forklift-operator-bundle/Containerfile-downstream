@@ -11,7 +11,7 @@ ARG DEFAULT_CHANNEL
 ARG REGISTRY
 ARG OCP_VERSIONS
 
-ARG API_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-api-rhel9@sha256:e09bb881501153edfb28f813cafb31f6df3ae86ca4d42452221d498f057de707"
+ARG API_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-api-rhel9@sha256:dc83d831e91f2fe9006002afb4f3a3523a106eb0d4cf2b8605fcc051c047c09c"
 
 ARG CONTROLLER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-controller-rhel9@sha256:11fbfcf0c426d95b8e712986700c5d8d3a4056bd02fa5f17778ea791f0d57745"
 
