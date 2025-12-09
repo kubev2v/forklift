@@ -39,7 +39,11 @@ spec:
             kubernetes.io/metadata.name: openshift-monitoring
       ports:
       - protocol: TCP
-        port: 2112  # Conversion pod metrics
+        port: 8081  # Main container metrics
+      - protocol: TCP
+        port: 8082  # Inventory container metrics
+      - protocol: TCP
+        port: 2112  # Controller metrics (Prometheus endpoint)
     {% endif %}
   egress:
     # Allow all egress - controller needs to communicate with external providers
