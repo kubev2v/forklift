@@ -2,12 +2,12 @@ package populator
 
 import (
 	"context"
-	_ "embed"
 	"fmt"
 	"os"
 	"time"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper"
 	"github.com/vmware/govmomi/object"
 	"k8s.io/klog/v2"
 )
@@ -15,11 +15,6 @@ import (
 const (
 	secureScriptName = "secure-vmkfstools-wrapper"
 )
-
-// embeddedSecureScript contains the Python script content from the embedded file
-//
-//go:embed secure-vmkfstools-wrapper.py
-var embeddedSecureScript []byte
 
 // writeSecureScriptToTemp writes the embedded script to a temporary file
 func writeSecureScriptToTemp() (string, error) {
@@ -29,7 +24,7 @@ func writeSecureScriptToTemp() (string, error) {
 	}
 	defer tempFile.Close()
 
-	_, err = tempFile.Write(embeddedSecureScript)
+	_, err = tempFile.Write(vmkfstoolswrapper.Script)
 	if err != nil {
 		os.Remove(tempFile.Name())
 		return "", fmt.Errorf("failed to write script content: %w", err)

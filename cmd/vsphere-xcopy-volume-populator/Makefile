@@ -53,13 +53,14 @@ install-mockgen:
 # pre-requisits: ensure a PVC exists.
 test-copy-using-cli: build
 	bin/vsphere-xcopy-volume-populator \
-		--source-vm-id=vm-100838 \
-		--source-vmdk="[eco-iscsi-ds2] rgolan-vm-1/rgolan-vm-1.vmdk" \
-		--owner-name=test-cli \
+		--source-vm-id=vm-92749 \
+		--source-vmdk="[eco-iscsi-ds3] tshefi_40G/tshefi_40G.vmdk" \
+		--owner-name=tshefi40g \
 		--target-namespace=default \
 		--storage-vendor-product=ontap \
 		--secret-name=populator-secret \
-		--owner-uid=test-cli \
+		--owner-uid=tshefi40g \
+		--esxi-clone-method=ssh \
 		--kubeconfig=$$KUBECONFIG
 
 test-flashsystem: build

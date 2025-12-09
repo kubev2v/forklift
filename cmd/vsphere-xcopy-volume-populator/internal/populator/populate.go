@@ -11,7 +11,7 @@ type Populator interface {
 	// the sourceVMDKFile.
 	// persistentVolume is a slim version of k8s PersistentVolume created by the CSI driver,
 	// to help identify its underlying LUN in the storage system.
-	Populate(vmId string, sourceVMDKFile string, persistentVolume PersistentVolume, hostLocker Hostlocker, progress chan<- uint, quit chan error) error
+	Populate(vmId string, sourceVMDKFile string, persistentVolume PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) error
 }
 
 //go:generate go run go.uber.org/mock/mockgen -destination=mocks/hostlocker_mock.go -package=mocks . Hostlocker

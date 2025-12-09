@@ -20,7 +20,7 @@ func NewVIBTaskExecutor(client vmware.Client) TaskExecutor {
 	}
 }
 
-func (e *VIBTaskExecutor) StartClone(ctx context.Context, host *object.HostSystem, sourcePath, targetLUN string) (*TaskInfo, error) {
+func (e *VIBTaskExecutor) StartClone(ctx context.Context, host *object.HostSystem, sourcePath, targetLUN string) (*vmkfstoolsTask, error) {
 	r, err := e.VSphereClient.RunEsxCommand(ctx, host, []string{"vmkfstools", "clone", "-s", sourcePath, "-t", targetLUN})
 	if err != nil {
 		klog.Infof("error during copy, response from esxcli %+v", r)
@@ -33,19 +33,16 @@ func (e *VIBTaskExecutor) StartClone(ctx context.Context, host *object.HostSyste
 		response += l.Value("message")
 	}
 
-	v := vmkfstoolsClone{}
-	err = json.Unmarshal([]byte(response), &v)
+	t := vmkfstoolsTask{}
+	err = json.Unmarshal([]byte(response), &t)
 	if err != nil {
 		return nil, err
 	}
 
-	return &TaskInfo{
-		TaskId: v.TaskId,
-		Pid:    v.Pid,
-	}, nil
+	return &t, nil
 }
 
-func (e *VIBTaskExecutor) GetTaskStatus(ctx context.Context, host *object.HostSystem, taskId string) (*TaskStatus, error) {
+func (e *VIBTaskExecutor) GetTaskStatus(ctx context.Context, host *object.HostSystem, taskId string) (*vmkfstoolsTask, error) {
 	r, err := e.VSphereClient.RunEsxCommand(ctx, host, []string{"vmkfstools", "taskGet", "-i", taskId})
 	if err != nil {
 		return nil, err
@@ -57,21 +54,16 @@ func (e *VIBTaskExecutor) GetTaskStatus(ctx context.Context, host *object.HostSy
 		response += l.Value("message")
 	}
 
-	v := vmkfstoolsTask{}
-	err = json.Unmarshal([]byte(response), &v)
+	t := vmkfstoolsTask{}
+	err = json.Unmarshal([]byte(response), &t)
 	if err != nil {
 		klog.Errorf("failed to unmarshal response from esxcli %+v", r)
 		return nil, err
 	}
 
-	klog.Infof("response from esxcli %+v", v)
+	klog.Infof("response from esxcli %+v", t)
 
-	return &TaskStatus{
-		TaskId:   v.TaskId,
-		ExitCode: v.ExitCode,
-		Stderr:   v.Stderr,
-		LastLine: v.LastLine,
-	}, nil
+	return &t, nil
 }
 
 func (e *VIBTaskExecutor) CleanupTask(ctx context.Context, host *object.HostSystem, taskId string) error {
