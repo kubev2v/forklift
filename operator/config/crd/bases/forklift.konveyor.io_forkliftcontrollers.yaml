@@ -83,6 +83,10 @@ spec:
                 type: string
                 enum: ["true", "false"]
                 description: "Enable network policies for security (default: false)"
+              network_policies_min_ocp_version:
+                type: string
+                description: "Minimum OCP version to auto-enable network policies (default: 4.21.0)"
+                example: "4.21.0"
 
               # Container Images
               controller_image_fqin:
