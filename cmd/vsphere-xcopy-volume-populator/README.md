@@ -55,11 +55,11 @@ spec:
 
 ## vmkfstools-wrapper
 An ESXi CLI extension that exposes the vmkfstools clone operation to API interaction.
-The folder vmkfstools-wrapper has a script to create a VIB to wrap the vmkfstools-wrapper.sh
-to be a proxy perform vmkfstools commands and more.
+The folder vmkfstools-wrapper has a script to create a VIB to wrap the vmkfstools_wrapper.py
+to be a proxy to perform vmkfstools commands and more.
 The VIB should be installed on every ESXi that is connected to the datastores which
 are holds migratable VMs.
-See vmkfstools-wrapper/README.md for the installation of the tool using ansible
+Alternative, that wrapper can be invoked using SSH. See [SSH Method](#ssh-method)
 
 ## Storage Provider
 If a storage provider wants their storage to be supported, they need

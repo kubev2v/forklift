@@ -32,17 +32,13 @@ const (
 	CloneMethodVIB CloneMethod = "vib"
 )
 
-type vmkfstoolsClone struct {
-	Pid    int    `json:"pid"`
-	TaskId string `json:"taskId"`
-}
-
 type vmkfstoolsTask struct {
-	Pid      int    `json:"pid"`
-	ExitCode string `json:"exitCode"`
-	Stderr   string `json:"stdErr"`
-	LastLine string `json:"lastLine"`
-	TaskId   string `json:"taskId"`
+	Pid       int    `json:"pid"`
+	ExitCode  string `json:"exitCode"`
+	Stderr    string `json:"stdErr"`
+	LastLine  string `json:"lastLine"`
+	XcopyUsed bool   `json:"xcopyUsed"`
+	TaskId    string `json:"taskId"`
 }
 
 type EsxCli interface {
@@ -91,7 +87,7 @@ func NewWithRemoteEsxcliSSH(storageApi StorageApi, vsphereHostname, vsphereUsern
 	}, nil
 }
 
-func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint, quit chan error) (errFinal error) {
+func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) (errFinal error) {
 	// isn't it better to not call close the channel from the caller?
 	defer func() {
 		r := recover()
@@ -374,7 +370,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	}
 
 	// Use unified task execution
-	return ExecuteCloneTask(context.Background(), executor, host, vmDisk.Path(), targetLUN, progress)
+	return ExecuteCloneTask(context.Background(), executor, host, vmDisk.Path(), targetLUN, progress, xcopyUsed)
 }
 
 // waitForDeviceStateOff waits for the device state to become "off" using exponential backoff
@@ -421,7 +417,7 @@ func rescan(ctx context.Context, client vmware.Client, host *object.HostSystem, 
 				status = result[0]["Status"][0]
 			}
 			klog.Infof("found device %s with status %v", targetLUN, status)
-			if status == "off" {
+			if status == "off" || status == "dead timeout" {
 				klog.Infof("try to remove the device from the detached list (this can happen if restarting this pod or using the same volume)")
 				_, err = client.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "detached", "remove", "-d", targetLUN})
 				continue
