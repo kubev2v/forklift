@@ -15,11 +15,13 @@ import (
 // SSHTaskExecutor implements TaskExecutor for the SSH method
 type SSHTaskExecutor struct {
 	sshClient vmware.SSHClient
+	taskPaths map[string]string
 }
 
 func NewSSHTaskExecutor(sshClient vmware.SSHClient) TaskExecutor {
 	return &SSHTaskExecutor{
 		sshClient: sshClient,
+		taskPaths: make(map[string]string),
 	}
 }
 
@@ -36,7 +38,11 @@ func (e *SSHTaskExecutor) StartClone(_ context.Context, _ *object.HostSystem, so
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse clone response: %w", err)
 	}
-
+	c, err := parseTaskPathResponse(output)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse task path response: %w", err)
+	}
+	e.taskPaths[t.TaskId] = c.TaskPath
 	klog.Infof("Started vmkfstools clone task %s with PID %d", t.TaskId, t.Pid)
 	return t, nil
 }
@@ -44,7 +50,11 @@ func (e *SSHTaskExecutor) StartClone(_ context.Context, _ *object.HostSystem, so
 func (e *SSHTaskExecutor) GetTaskStatus(_ context.Context, _ *object.HostSystem, taskId string) (*vmkfstoolsTask, error) {
 	klog.V(2).Infof("Getting task status for %s", taskId)
 
-	output, err := e.sshClient.ExecuteCommand("--task-get", "-i", taskId)
+	taskPath, ok := e.taskPaths[taskId]
+	if !ok {
+		return nil, fmt.Errorf("task path not found for task id %s", taskId)
+	}
+	output, err := e.sshClient.ExecuteCommand("--task-get", "-p", taskPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get task status: %w", err)
 	}
@@ -63,7 +73,11 @@ func (e *SSHTaskExecutor) GetTaskStatus(_ context.Context, _ *object.HostSystem,
 func (e *SSHTaskExecutor) CleanupTask(ctx context.Context, host *object.HostSystem, taskId string) error {
 	klog.Infof("Cleaning up task %s", taskId)
 
-	output, err := e.sshClient.ExecuteCommand("--task-clean", "-i", taskId)
+	taskPath, ok := e.taskPaths[taskId]
+	if !ok {
+		return fmt.Errorf("task path not found for task id %s", taskId)
+	}
+	output, err := e.sshClient.ExecuteCommand("--task-clean", "-p", taskPath)
 	if err != nil {
 		return fmt.Errorf("failed to cleanup task: %w", err)
 	}
@@ -96,14 +110,14 @@ type Field struct {
 }
 
 // parseTaskResponse parses the XML response from the script
-func parseTaskResponse(xmlOutput string) (*vmkfstoolsTask, error) {
+func parseXmlResponse(xmlOutput string) (string, string, error) {
 	// Parse the XML response to extract the JSON result
 	// Expected format: XML with status and message fields
 	// The message field contains JSON with task information
 
 	var response XMLResponse
 	if err := xml.Unmarshal([]byte(xmlOutput), &response); err != nil {
-		return nil, fmt.Errorf("failed to parse XML response: %w", err)
+		return "", "", fmt.Errorf("failed to parse XML response: %w", err)
 	}
 
 	// Find status and message fields
@@ -118,21 +132,27 @@ func parseTaskResponse(xmlOutput string) (*vmkfstoolsTask, error) {
 	}
 
 	if status == "" {
-		return nil, fmt.Errorf("status field not found in XML response")
+		return "", "", fmt.Errorf("status field not found in XML response")
 	}
 
 	if message == "" {
-		return nil, fmt.Errorf("message field not found in XML response")
+		return "", "", fmt.Errorf("message field not found in XML response")
 	}
 
 	// Check if operation was successful (script returns "0" for success)
 	if status != "0" {
-		return nil, fmt.Errorf("operation failed with status %s: %s", status, message)
+		return "", "", fmt.Errorf("operation failed with status %s: %s", status, message)
 	}
+	return status, message, nil
+}
 
+func parseTaskResponse(xmlOutput string) (*vmkfstoolsTask, error) {
 	// Parse the JSON message to extract task information
 	task := &vmkfstoolsTask{}
-
+	_, message, err := parseXmlResponse(xmlOutput)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse XML response: %w", err)
+	}
 	// Try to parse as JSON first
 	if err := json.Unmarshal([]byte(message), task); err != nil {
 		// If JSON parsing fails, check if it's a simple text message (e.g., for cleanup operations)
@@ -147,4 +167,20 @@ func parseTaskResponse(xmlOutput string) (*vmkfstoolsTask, error) {
 	}
 
 	return task, nil
+}
+
+func parseTaskPathResponse(xmlOutput string) (*vmkfstoolsTaskPath, error) {
+	taskPath := &vmkfstoolsTaskPath{}
+	status, message, err := parseXmlResponse(xmlOutput)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse XML response: %w", err)
+	}
+	if status != "0" {
+		return nil, fmt.Errorf("operation failed with status %s: %s", status, message)
+	}
+	// Try to parse as JSON fist
+	if err := json.Unmarshal([]byte(message), taskPath); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	}
+	return taskPath, nil
 }

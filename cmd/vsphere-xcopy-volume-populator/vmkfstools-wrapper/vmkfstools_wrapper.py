@@ -1,6 +1,7 @@
 #!/bin/python
 
 import argparse
+import errno
 import json
 import logging
 import os
@@ -9,9 +10,9 @@ import uuid
 import re
 import sys
 import shlex
+import shutil
 
-TMP_PREFIX = "/tmp/vmkfstools-wrapper-{}"
-
+VMDK_DEFAULT = "/vmfs/volumes/"
 # Version information for debugging
 SCRIPT_VERSION = "0.0.5"
 
@@ -64,15 +65,15 @@ def clone(args):
         logging.error(f"Path validation failed: {ve}")
         print(XML.format("1", f"Path validation error: {ve}"))
         raise
-
+    root_file_path = extract_file_path(source)
     task_id = uuid.uuid4()
-    tmp_dir = TMP_PREFIX.format(task_id)
-    os.makedirs(tmp_dir, mode=0o750, exist_ok=True)
+    task_dir = f"{root_file_path}/vmkfstools-wrapper-{task_id}"
+    os.makedirs(task_dir, mode=0o750, exist_ok=True)
     rdmfile = f"{args.source_vmdk}-rdmdisk-{os.getpid()}"
 
-    stdout_file = open(os.path.join(tmp_dir, "out"), "w")
-    stderr_file = open(os.path.join(tmp_dir, "err"), "w")
-    vmkfstools_cmdline = f"trap 'echo -n $? > {shlex.quote(f'{tmp_dir}/exitcode')}' EXIT;" \
+    stdout_file = open(os.path.join(task_dir, "out"), "w")
+    stderr_file = open(os.path.join(task_dir, "err"), "w")
+    vmkfstools_cmdline = f"trap 'echo -n $? > {shlex.quote(f'{task_dir}/exitcode')}' EXIT;" \
         f"/bin/vmkfstools " \
         f"-i {source} " \
         f"-d rdm:{target} {shlex.quote(rdmfile)}"
@@ -87,23 +88,23 @@ def clone(args):
             close_fds=True,
         )
 
-        with open(os.path.join(tmp_dir, "pid"), "w") as pid_file:
+        with open(os.path.join(task_dir, "pid"), "w") as pid_file:
             pid_file.write(str(task.pid))
 
-        with open(os.path.join(tmp_dir, "rdmfile"), "w") as rdmfile_file:
+        with open(os.path.join(task_dir, "rdmfile"), "w") as rdmfile_file:
             rdmfile_file.write(f"{rdmfile}\n")
 
-        with open(os.path.join(tmp_dir, "targetLun"), "w") as target_lun_file:
+        with open(os.path.join(task_dir, "targetLun"), "w") as target_lun_file:
             target_lun_file.write(f"{os.path.basename(target)}")
 
-        result = {"taskId": str(task_id),  "pid": int(task.pid)}
+        result = {"taskId": str(task_id), "pid": int(task.pid), "taskPath": task_dir}
         print(XML.format("0", json.dumps(result)))
 
 
     except Exception as e:
-        errno = getattr(e, 'errno', None)
-        if errno == errno.ENOSPC:
-            print(XML.format("28", f"Error running subprocess: {e} tmpfs free space is low"))
+        err_code = getattr(e, 'errno', None)
+        if err_code == errno.ENOSPC:
+            print(XML.format("28", f"Error running subprocess: {e} free space is low: check /var/log/vmkernel.log for more details"))
         else:
             print(XML.format("1", f"Error running subprocess: {e}"))
         raise
@@ -113,38 +114,69 @@ def clone(args):
         stderr_file.close()
 
 
-def taskGet(args):
-    tmp_dir = TMP_PREFIX.format(args.task_id[0])
+def get_last_line(f):
+    with open(f.name, "rb") as file_handle:
+        # Seek to end of file
+        file_handle.seek(0, 2)
+        file_size = file_handle.tell()
 
-    if not os.path.isdir(tmp_dir):
-        result = {"taskId": args.task_id[0], "error": f"Task directory {tmp_dir} not found"}
+        if file_size > 0:
+            chunk_size = min(4096, file_size)
+            file_handle.seek(-chunk_size, 2)
+            content = file_handle.read()
+
+            last_cr = content.rfind(b'\r')
+            if last_cr != -1:
+                line = content[last_cr + 1:].decode('utf-8', errors='replace')
+            else:
+                last_nl = content.rfind(b'\n')
+                if last_nl != -1:
+                    line = content[last_nl + 1:].decode('utf-8', errors='replace')
+                else:
+                    line = content.decode('utf-8', errors='replace')
+            return line
+
+    return ""
+
+
+def taskGet(args):
+    if not args.task_path:
+        result = {"error": "-p (task-path) is required for task-get"}
         print(XML.format("1", json.dumps(result)))
         return
 
-    with open(os.path.join(tmp_dir, "pid"), "r") as f:
+    task_dir = args.task_path[0]
+
+    # Extract taskId from directory name (e.g., vmkfstools-wrapper-<uuid>)
+    task_id = os.path.basename(task_dir).replace("vmkfstools-wrapper-", "")
+
+    if not os.path.isdir(task_dir):
+        result = {"taskId": task_id, "error": f"Task directory {task_dir} not found"}
+        print(XML.format("1", json.dumps(result)))
+        return
+
+    with open(os.path.join(task_dir, "pid"), "r") as f:
         pid = f.read()
-    with open(os.path.join(tmp_dir, "out"), "r") as f:
-        line = ""
-        for line in f:
-            pass
-    with open(os.path.join(tmp_dir, "err"), "r") as f:
+    with open(os.path.join(task_dir, "out"), "r") as f:
+        line = get_last_line(f)
+    with open(os.path.join(task_dir, "err"), "r") as f:
         ste = f.read()
     # it could be that the task is still running, hense no exit code
     try:
-        with open(os.path.join(tmp_dir, "exitcode"), "r") as f:
+        with open(os.path.join(task_dir, "exitcode"), "r") as f:
             exitcode = f.read()
     except FileNotFoundError:
         exitcode = ""
     except Exception as e:
-        result = {"taskId": args.task_id[0], "pid": int(pid),
-                  "exitCode": "1", "lastLine": line.rstrip(), "stdErr": e}
+        result = {"taskId": task_id, "pid": int(pid),
+                  "exitCode": "1", "lastLine": line.rstrip(), "stdErr": str(e)}
         print(XML.format("1", json.dumps(result)))
         return
 
     # Default to None if we can't determine xcopy usage
     xcopy_used = None
     try:
-        with open(os.path.join(tmp_dir, "targetLun"), "r") as target_lun_file:
+        with open(os.path.join(task_dir, "targetLun"), "r") as target_lun_file:
             target_lun = target_lun_file.read()
         xcopy_used, xclone_writes = was_xcopy_used(target_lun)
         # Log xclone_writes for debugging, but don't expose in result
@@ -152,42 +184,61 @@ def taskGet(args):
     except Exception as e:
         logging.warning(f"Failed to determine xcopy usage: {e}, defaulting to False")
 
-    result = {"taskId": args.task_id[0], "pid": int(pid),
+    result = {"taskId": task_id, "pid": int(pid),
             "exitCode": exitcode, "lastLine": line.rstrip(),
             "xcopyUsed": xcopy_used, "stdErr": ste}
     print(XML.format("0", json.dumps(result)))
 
 def taskClean(args):
-    tmp_dir = TMP_PREFIX.format(args.task_id[0])
-
-    if not os.path.isdir(tmp_dir):
-        result = {"taskId": args.task_id[0], "error": f"Task directory {tmp_dir} not found"}
+    if not args.task_path:
+        result = {"error": "-p (task-path) is required for task-clean"}
         print(XML.format("1", json.dumps(result)))
         return
 
-    with open(os.path.join(tmp_dir, "rdmfile"), "r") as rdmfile_file:
-        rdmfile = rdmfile_file.read()
-        rdmfile = rdmfile.rstrip()
-        if rdmfile != "":
-            rdmdisk_file = extract_rdmdisk_file(rdmfile)
-            logging.info(f"removing {rdmfile} and {rdmdisk_file}")
-            try:
-                os.remove(rdmdisk_file)
-                logging.info(f"removed {rdmdisk_file}")
-                os.remove(rdmfile)
-                logging.info(f"removed {rdmfile}")
-            except Exception as e:
-                logging.info(f"failed to remove files {e}")
-                print(XML.format("1", f"failed to remove files {e}"))
-                return
+    task_dir = args.task_path[0]
+
+    # Extract taskId from directory name (e.g., vmkfstools-wrapper-<uuid>)
+    task_id = os.path.basename(task_dir).replace("vmkfstools-wrapper-", "")
+
+    if not os.path.isdir(task_dir):
+        result = {"taskId": task_id, "error": f"Task directory {task_dir} not found"}
+        print(XML.format("1", json.dumps(result)))
+        return
+
+    rdmfile_path = os.path.join(task_dir, "rdmfile")
+    # Attempt to remove rdmdisk_file
+    if os.path.exists(rdmfile_path):
+        try:
+            with open(rdmfile_path, "r") as rdmfile_file:
+                rdmfile = rdmfile_file.read().rstrip()
+                if rdmfile != "" and os.path.exists(rdmfile):
+                    rdmdisk_file = extract_rdmdisk_file(rdmfile)
+                    if rdmdisk_file and os.path.exists(rdmdisk_file):
+                        logging.info(f"removing rdmdisk file {rdmdisk_file}")
+                        try:
+                            os.remove(rdmdisk_file)
+                            logging.info(f"removed rdmdisk file {rdmdisk_file}")
+                        except Exception as e:
+                            logging.warning(f"failed to remove {rdmdisk_file}: {e}")
+                    try:
+                        logging.info(f"removing rdmfile {rdmfile}")
+                        os.remove(rdmfile)
+                        logging.info(f"removed rdmfile {rdmfile}")
+                    except Exception as e:
+                        logging.warning(f"failed to remove {rdmfile}: {e}")
+        except Exception as e:
+            logging.warning(f"failed to process rdmfile: {e}")
     try:
-        os.rmdir(tmp_dir)
-        logging.info(f"removed task directory {tmp_dir}")
+        shutil.rmtree(task_dir)
+        logging.info(f"removed task directory {task_dir}")
     except Exception as e:
-        logging.info(f"failed to remove task directory {e}")
+        logging.error(f"failed to remove task directory {task_dir}: {e}")
         print(XML.format("1", f"failed to remove task directory {e}"))
         return
+
     print(XML.format("0", ""))
+
+
 
 
 def extract_rdmdisk_file(rdm_file):
@@ -232,6 +283,21 @@ def was_xcopy_used(target_lun):
 
     return write_ops > 0, str(write_ops)
 
+
+def extract_file_path(vmdk_path: str):
+    if vmdk_path.startswith(VMDK_DEFAULT):
+        parts = vmdk_path.split('/')
+        try:
+            volumes_idx = parts.index('volumes')
+            volume_root = '/'.join(parts[:volumes_idx + 2])
+            return volume_root
+        except (ValueError, IndexError):
+            logging.warning(f"Could not extract volume root from {vmdk_path}, using /tmp")
+            return '/tmp'
+    else:
+        logging.warning(f"Path {vmdk_path} does not start with {VMDK_DEFAULT}, using /tmp")
+        return '/tmp'
+
 def version():
     print(XML.format("0", json.dumps({"version":SCRIPT_VERSION})))
     return
@@ -272,9 +338,9 @@ def main():
     parser.add_argument("--task-clean", action="store_true",
                         help="clean task")
 
-    parser.add_argument("-i", "--task-id", type=str, nargs=1,
-                        metavar="task_id", default=None,
-                        help="id of task to get")
+    parser.add_argument("-p", "--task-path", type=str, nargs=1,
+                        metavar="task_path", default=None,
+                        help="path of task to get")
 
     parser.add_argument("-v", "--version", action="store_true",
                         help="version")

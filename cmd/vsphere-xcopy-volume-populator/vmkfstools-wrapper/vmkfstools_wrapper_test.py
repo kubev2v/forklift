@@ -34,27 +34,27 @@ class TestVmkfstoolsWrapper(unittest.TestCase):
             main()
             mocked_clone.assert_called_once_with(
                 Namespace(clone=True, source_vmdk="foo", target_lun="bar",
-                          task_get=False, task_clean=False, task_id=None,
+                          task_get=False, task_clean=False, task_path=None,
                           version=False))
 
-    @patch('sys.argv', ['vmkfstools_wrapper', '--task-get', '-i', 'foo'])
+    @patch('sys.argv', ['vmkfstools_wrapper', '--task-get', '-p', '/tmp/task-foo'])
     def test_task_get(self):
         with patch('os.makedirs') as _, \
                 patch('vmkfstools_wrapper.taskGet') as mocked_get:
             main()
             mocked_get.assert_called_once_with(
                 Namespace(clone=False, source_vmdk=None, target_lun=None,
-                          task_get=True, task_clean=False, task_id=['foo'],
+                          task_get=True, task_clean=False, task_path=['/tmp/task-foo'],
                           version=False))
 
-    @patch('sys.argv', ['vmkfstools_wrapper', '--task-clean', '-i', 'foo'])
+    @patch('sys.argv', ['vmkfstools_wrapper', '--task-clean', '-p', '/tmp/task-foo'])
     def test_task_clean(self):
         with patch('os.makedirs') as _, \
                 patch('vmkfstools_wrapper.taskClean') as mocked_task_clean:
             main()
             mocked_task_clean.assert_called_once_with(
                 Namespace(clone=False, source_vmdk=None, target_lun=None,
-                          task_get=False, task_clean=True, task_id=['foo'],
+                          task_get=False, task_clean=True, task_path=['/tmp/task-foo'],
                           version=False))
 
 

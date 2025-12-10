@@ -33,8 +33,8 @@
       <command path="vmkfstools.taskGet">
          <description>Get a clone task status</description>
          <input-spec>
-            <parameter name="id" type="string" required="true" shortname="i">
-               <description>Task ID</description>
+            <parameter name="path" type="string" required="true" shortname="p">
+               <description>Full path to task directory (e.g., /vmfs/volumes/iscsi1/vmkfstools-wrapper-abc-123)</description>
             </parameter>
          </input-spec>
          <output-spec>
@@ -46,13 +46,13 @@
          <format-parameters>
             <formatter>simple</formatter>
          </format-parameters>
-         <execute>/opt/redhat/vmkfstools-wrapper --task-get -i $val{id}</execute>
+         <execute>/opt/redhat/vmkfstools-wrapper --task-get -p $val{path}</execute>
       </command>
       <command path="vmkfstools.taskClean">
          <description>Clean task artifacts</description>
          <input-spec>
-            <parameter name="id" type="string" required="true" shortname="i">
-               <description>Task ID</description>
+            <parameter name="path" type="string" required="true" shortname="p">
+               <description>Full path to task directory (e.g., /vmfs/volumes/iscsi1/vmkfstools-wrapper-abc-123)</description>
             </parameter>
          </input-spec>
          <output-spec>
@@ -64,7 +64,7 @@
          <format-parameters>
             <formatter>simple</formatter>
          </format-parameters>
-         <execute>/opt/redhat/vmkfstools-wrapper --task-clean -i $val{id}</execute>
+         <execute>/opt/redhat/vmkfstools-wrapper --task-clean -p $val{path}</execute>
       </command>
 
    </commands>
