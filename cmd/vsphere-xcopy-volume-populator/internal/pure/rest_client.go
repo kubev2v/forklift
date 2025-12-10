@@ -518,6 +518,49 @@ func (c *RestClient) GetVolume(volumeName string) (*Volume, error) {
 	return &volumesResponse.Items[0], nil
 }
 
+// GetVolumeById gets information about a specific volume by its ID
+func (c *RestClient) GetVolumeById(volumeId string) (*Volume, error) {
+	baseURL := fmt.Sprintf("https://%s/api/%s/volumes", c.hostname, c.apiV2)
+
+	params := url.Values{}
+	params.Set("ids", volumeId)
+
+	finalURL := baseURL + "?" + params.Encode()
+
+	req, err := http.NewRequest("GET", finalURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create get volume request: %w", err)
+	}
+
+	req.Header.Set("x-auth-token", c.authToken)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send get volume request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read get volume response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("get volume request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var volumesResponse VolumesResponse
+	if err := json.Unmarshal(body, &volumesResponse); err != nil {
+		return nil, fmt.Errorf("failed to parse get volume response: %w", err)
+	}
+
+	if len(volumesResponse.Items) == 0 {
+		return nil, fmt.Errorf("volume Id not found: %s", volumeId)
+	}
+
+	return &volumesResponse.Items[0], nil
+}
+
 // ListVolumes lists all volumes on the Pure FlashArray
 func (c *RestClient) ListVolumes() ([]Volume, error) {
 	url := fmt.Sprintf("https://%s/api/%s/volumes", c.hostname, c.apiV2)

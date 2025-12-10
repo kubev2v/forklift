@@ -129,6 +129,7 @@ func (f *FlashArrayClonner) Map(
 // UnMap is responsible to unmapping an initiator group from a populator.LUN
 func (f *FlashArrayClonner) UnMap(initatorGroup string, targetLUN populator.LUN, context populator.MappingContext) error {
 	hosts, ok := context["hosts"]
+
 	if ok {
 		hs, ok := hosts.([]string)
 		if ok && len(hs) > 0 {
@@ -154,17 +155,22 @@ func (f *FlashArrayClonner) CurrentMappedGroups(targetLUN populator.LUN, context
 
 // ResolvePVToLUN resolves a PersistentVolume to Pure FlashArray LUN details
 func (f *FlashArrayClonner) ResolvePVToLUN(pv populator.PersistentVolume) (populator.LUN, error) {
-	klog.Infof("Resolving target volume for PV %s", pv.Name)
-
-	volumeName := fmt.Sprintf("%s-%s", f.clusterPrefix, pv.Name)
-	klog.Infof("Target volume name: %s", volumeName)
-
-	v, err := f.restClient.GetVolume(volumeName)
+	pvVolumeHandle := pv.VolumeHandle
+	v, err := f.restClient.GetVolumeById(pvVolumeHandle)
 	if err != nil {
-		return populator.LUN{}, fmt.Errorf("failed to get target volume from Pure FlashArray: %w", err)
+		if strings.Contains(err.Error(), "Volume does not exist.") {
+			klog.Errorf("Volume with handle %s does not exist: %v. Trying with Volume Name", pvVolumeHandle, err)
+			volumeName := fmt.Sprintf("%s-%s", f.clusterPrefix, pv.Name)
+			v, err = f.restClient.GetVolume(volumeName)
+			if err != nil {
+				return populator.LUN{}, fmt.Errorf("failed to get volume by name %s: %w", volumeName, err)
+			}
+		}
 	}
+
 	klog.Infof("volume %+v\n", v)
 	l := populator.LUN{Name: v.Name, SerialNumber: v.Serial, NAA: fmt.Sprintf("naa.%s%s", FlashProviderID, strings.ToLower(v.Serial))}
+
 	return l, nil
 }
 
