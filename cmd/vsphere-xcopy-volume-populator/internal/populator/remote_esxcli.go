@@ -32,6 +32,10 @@ const (
 	CloneMethodVIB CloneMethod = "vib"
 )
 
+type vmkfstoolsTaskPath struct {
+	TaskPath string `json:"taskPath"`
+}
+
 type vmkfstoolsTask struct {
 	Pid       int    `json:"pid"`
 	ExitCode  string `json:"exitCode"`
