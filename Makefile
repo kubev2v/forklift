@@ -215,6 +215,13 @@ build-virt-v2v-image: check_container_runtime
 push-virt-v2v-image: build-virt-v2v-image
 	$(CONTAINER_CMD) push $(VIRT_V2V_IMAGE)
 
+build-virt-v2v-fedora-image: check_container_runtime
+    $(eval VIRT_V2V_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-virt-v2v:$(REGISTRY_TAG))
+    $(CONTAINER_CMD) build -t $(VIRT_V2V_IMAGE) -f build/virt-v2v/Containerfile-upstream-fedora .
+
+push-virt-v2v-fedora-image: build-virt-v2v-fedora-image
+    $(CONTAINER_CMD) push $(VIRT_V2V_IMAGE)
+
 build-operator-bundle-image: check_container_runtime
 	$(CONTAINER_CMD) build \
 		-t $(OPERATOR_BUNDLE_IMAGE) \
