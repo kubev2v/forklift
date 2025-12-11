@@ -26,6 +26,7 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vantara"
 
 	forklift "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/lib/vsphere_offload"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 
@@ -311,7 +312,7 @@ func handleArgs() {
 
 	if showVersion {
 		fmt.Println(os.Args[0], version)
-		fmt.Printf("VIB version: %s\n", populator.VibVersion)
+		fmt.Printf("VIB version: %s\n", vsphere_offload.VibVersion)
 		os.Exit(0)
 	}
 

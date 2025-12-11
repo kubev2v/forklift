@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
-
+	"github.com/kubev2v/forklift/pkg/lib/vsphere_offload"
+	"github.com/kubev2v/forklift/pkg/lib/vsphere_offload/vmware"
 	"github.com/vmware/govmomi/object"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
@@ -98,13 +98,10 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	}
 
 	var cloneMethod CloneMethod
-	klog.Infof("Debug: UseSSHMethod field value: %t", p.UseSSHMethod)
 	if p.UseSSHMethod {
 		cloneMethod = CloneMethodSSH
-		klog.Infof("Debug: Set cloneMethod to SSH")
 	} else {
 		cloneMethod = CloneMethodVIB
-		klog.Infof("Debug: Set cloneMethod to VIB")
 	}
 
 	klog.Infof(
@@ -117,14 +114,6 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		return err
 	}
 	klog.Infof("Got ESXi host: %s", host)
-
-	// Only ensure VIB if using VIB method
-	if !p.UseSSHMethod {
-		err = ensureVib(p.VSphereClient, host, vmDisk.Datastore, VibVersion)
-		if err != nil {
-			return fmt.Errorf("failed to ensure VIB is installed: %w", err)
-		}
-	}
 
 	// for iSCSI add the host to the group using IQN. Is there something else for FC?
 	r, err := p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "adapter", "list"})
@@ -355,7 +344,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		}
 
 		// Get host IP
-		hostIP, err := vmware.GetHostIPAddress(sshSetupCtx, host)
+		hostIP, err := vsphere_offload.GetHostIPAddress(sshSetupCtx, host)
 		if err != nil {
 			return fmt.Errorf("failed to get host IP address: %w", err)
 		}
