@@ -8,7 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Replace pkg/errors with Go 1.13 native errors #18.
+
 ### Changed
+
+- go.mod - Require Go 1.18 or newer. #27
 
 ### Deprecated
 
@@ -17,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Security
+
+## [1.0.1] - 2019-08-28
+
+### Security
+
+- Load DLLs only from Windows system directory.
 
 ## [1.0.0] - 2019-04-26
 
@@ -30,5 +40,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - EnumProcesses
 - Add GetProcessHandleCount to kernel32. #7
 
-[Unreleased]: https://github.com/elastic/go-windows/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/elastic/go-windows/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/elastic/go-windows/v1.0.1
 [1.0.0]: https://github.com/elastic/go-windows/v1.0.0
