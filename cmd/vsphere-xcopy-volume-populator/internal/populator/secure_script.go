@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
-	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper"
+	vmkfstoolswrapper "github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper"
 	"github.com/vmware/govmomi/object"
 	"k8s.io/klog/v2"
 )
@@ -40,7 +40,7 @@ func ensureSecureScript(ctx context.Context, client vmware.Client, esx *object.H
 	// ALWAYS force re-upload to ensure latest version
 	klog.Infof("Force uploading secure script to ensure latest version")
 
-	dc, err := getHostDC(esx)
+	dc, err := provider.getHostDC(esx)
 	if err != nil {
 		return "", err
 	}

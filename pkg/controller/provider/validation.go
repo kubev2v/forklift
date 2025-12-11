@@ -5,9 +5,10 @@ import (
 	"crypto/x509"
 	"fmt"
 	"net/http"
-	"net/url"
+	liburl "net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/base"
@@ -18,6 +19,12 @@ import (
 	"github.com/kubev2v/forklift/pkg/lib/inventory/model"
 	libref "github.com/kubev2v/forklift/pkg/lib/ref"
 	"github.com/kubev2v/forklift/pkg/lib/util"
+	"github.com/vmware/govmomi"
+	"github.com/vmware/govmomi/cli/esx"
+	"github.com/vmware/govmomi/object"
+	"github.com/vmware/govmomi/session"
+	"github.com/vmware/govmomi/vim25"
+	"github.com/vmware/govmomi/vim25/soap"
 	core "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,6 +46,14 @@ const (
 	ConnectionInsecure      = "ConnectionInsecure"
 	SSHReady                = "SSHReady"
 	SSHNotReady             = "SSHNotReady"
+	VIBReady                = "VIBReady"
+	VIBNotReady             = "VIBNotReady"
+)
+
+// VIB validation caching
+const (
+	VIBLastCheckAnnotation = "forklift.konveyor.io/vib-last-check"
+	VIBCacheDuration       = 15 * time.Minute
 )
 
 // Categories
@@ -102,6 +117,12 @@ func (r *Reconciler) validate(provider *api.Provider) error {
 
 	// Validate SSH readiness for vSphere providers when SSH method is enabled
 	err = r.validateSSHReadiness(provider, secret)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// Validate VIB readiness for vSphere providers when VIB method is enabled
+	err = r.validateVIBReadiness(provider, secret)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -171,7 +192,7 @@ func (r *Reconciler) validateURL(provider *api.Provider) error {
 		}
 		return nil
 	}
-	_, err := url.Parse(provider.Spec.URL)
+	_, err := liburl.Parse(provider.Spec.URL)
 	if err != nil {
 		provider.Status.Phase = ValidationFailed
 		provider.Status.SetCondition(
@@ -263,8 +284,8 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 
 		r.validateConnectionStatus(provider, secret)
 
-		var providerUrl *url.URL
-		providerUrl, err = url.Parse(provider.Spec.URL)
+		var providerUrl *liburl.URL
+		providerUrl, err = liburl.Parse(provider.Spec.URL)
 		if err != nil {
 			return
 		}
@@ -420,31 +441,39 @@ type hostInfo struct {
 	ip   string
 }
 
-// getHostsForSSHValidation retrieves the list of hosts to test for SSH readiness
+// getHostsForOffloadValidation retrieves the list of hosts to test for offload readiness
 // Returns a slice of hostInfo with name and IP, or sets a condition and returns nil on error
-func (r *Reconciler) getHostsForSSHValidation(provider *api.Provider) []hostInfo {
+func (r *Reconciler) getHostsForOffloadValidation(provider *api.Provider, method string) []hostInfo {
 	sdkEndpoint := provider.Spec.Settings[api.SDK]
 	isDirectESXi := (sdkEndpoint == api.ESXI)
-
-	r.Log.Info("SSH validation: provider connection type",
+	var offloadNotReady string
+	switch method {
+		case api.ESXiCloneMethodSSH:
+			offloadNotReady = SSHNotReady
+		case api.ESXiCloneMethodVIB:
+			offloadNotReady = VIBNotReady
+		default:
+			return nil
+	}
+	r.Log.Info("%s validation: provider connection type", method,
 		"provider", provider.Name,
 		"sdkEndpoint", sdkEndpoint,
 		"isDirectESXi", isDirectESXi)
 
 	if isDirectESXi {
 		// For direct ESXi connections, extract IP from provider URL
-		r.Log.Info("SSH validation: direct ESXi connection detected, extracting IP from provider URL",
+		r.Log.Info("%s validation: direct ESXi connection detected, extracting IP from provider URL", method,
 			"provider", provider.Name,
 			"providerURL", provider.Spec.URL)
 
-		providerURL, err := url.Parse(provider.Spec.URL)
+		providerURL, err := liburl.Parse(provider.Spec.URL)
 		if err != nil {
 			provider.Status.SetCondition(libcnd.Condition{
-				Type:     SSHNotReady,
+				Type:     offloadNotReady,
 				Status:   True,
 				Reason:   "InvalidProviderURL",
 				Category: Warn,
-				Message:  fmt.Sprintf("Cannot validate SSH readiness (checked because 'esxiCloneMethod' setting is set to 'ssh'): failed to parse provider URL: %v", err),
+				Message:  fmt.Sprintf("Cannot validate %s readiness: failed to parse provider URL: %v", method, err),
 			})
 			return nil
 		}
@@ -453,16 +482,16 @@ func (r *Reconciler) getHostsForSSHValidation(provider *api.Provider) []hostInfo
 		hostIP := providerURL.Hostname()
 		if hostIP == "" {
 			provider.Status.SetCondition(libcnd.Condition{
-				Type:     SSHNotReady,
+				Type:     offloadNotReady,
 				Status:   True,
 				Reason:   "NoHostIPInURL",
 				Category: Warn,
-				Message:  fmt.Sprintf("Cannot validate SSH readiness (checked because 'esxiCloneMethod' setting is set to 'ssh'): no host/IP found in provider URL: %s", provider.Spec.URL),
+				Message:  fmt.Sprintf("Cannot validate %s readiness (checked because 'esxiCloneMethod' setting is set to '%s'): no host/IP found in provider URL: %s", method, method, provider.Spec.URL),
 			})
 			return nil
 		}
 
-		r.Log.Info("SSH validation: extracted IP from provider URL",
+		r.Log.Info("%s validation: extracted IP from provider URL", method,
 			"provider", provider.Name,
 			"hostIP", hostIP)
 
@@ -471,11 +500,11 @@ func (r *Reconciler) getHostsForSSHValidation(provider *api.Provider) []hostInfo
 	}
 
 	// For vCenter connections, get ESXi hosts from inventory
-	r.Log.Info("SSH validation: vCenter connection, getting hosts from inventory", "provider", provider.Name, "namespace", provider.Namespace)
+	r.Log.Info("%s validation: vCenter connection, getting hosts from inventory", method, "provider", provider.Name, "namespace", provider.Namespace)
 
 	collector, found := r.container.Get(provider)
 	if !found {
-		r.Log.Error(nil, "SSH validation: collector not found", "provider", provider.Name)
+		r.Log.Error(nil, "%s validation: collector not found", method, "provider", provider.Name)
 		return nil
 	}
 
@@ -485,36 +514,36 @@ func (r *Reconciler) getHostsForSSHValidation(provider *api.Provider) []hostInfo
 	listOptions := model.ListOptions{Detail: model.MaxDetail}
 	err := db.List(&inventoryHosts, listOptions)
 	if err != nil {
-		r.Log.Error(err, "SSH validation: failed to list hosts from inventory", "provider", provider.Name)
+		r.Log.Error(err, "%s validation: failed to list hosts from inventory", method, "provider", provider.Name)
 		provider.Status.SetCondition(libcnd.Condition{
-			Type:     SSHNotReady,
+			Type:     offloadNotReady,
 			Status:   True,
 			Reason:   "HostListError",
 			Category: Warn,
-			Message:  fmt.Sprintf("Cannot validate SSH readiness (checked because 'esxiCloneMethod' setting is set to 'ssh'): failed to list hosts from inventory: %v", err),
+			Message:  fmt.Sprintf("Cannot validate %s readiness: failed to list hosts from inventory: %v", method, err),
 		})
 		return nil
 	}
 
-	r.Log.Info("SSH validation: found hosts in inventory",
+	r.Log.Info("%s validation: found hosts in inventory", method,
 		"provider", provider.Name,
 		"hostCount", len(inventoryHosts))
 
 	if len(inventoryHosts) == 0 {
-		r.Log.Info("SSH validation: no hosts in inventory", "provider", provider.Name)
+		r.Log.Info("%s validation: no hosts with IP address found in inventory", method, "provider", provider.Name)
 		provider.Status.SetCondition(libcnd.Condition{
-			Type:     SSHNotReady,
+			Type:     offloadNotReady,
 			Status:   True,
 			Reason:   "NoHostsFound",
 			Category: Warn,
-			Message:  "Cannot validate SSH readiness (checked because 'esxiCloneMethod' setting is set to 'ssh'): no ESXi hosts found in inventory.",
+			Message:  fmt.Sprintf("Cannot validate %s readiness (checked because 'esxiCloneMethod' setting is set to '%s'): no ESXi hosts found in inventory.", method, method),
 		})
 		return nil
 	}
 
 	// Load Host CRDs to check for migration network IPs (optional override)
 	hostCRDIPs := r.loadHostIPs(provider)
-	r.Log.Info("SSH validation: loaded Host resources for migration network",
+	r.Log.Info("%s validation: loaded Host resources for migration network", method,
 		"provider", provider.Name,
 		"hostCRDCount", len(hostCRDIPs))
 
@@ -530,14 +559,14 @@ func (r *Reconciler) getHostsForSSHValidation(provider *api.Provider) []hostInfo
 		// First check if there's a Host CRD with IpAddress (migration network)
 		if ip, found := hostCRDIPs[invHost.ID]; found && ip != "" {
 			hostIP = ip
-			r.Log.V(3).Info("SSH validation: using Host IpAddress (migration network)",
+			r.Log.V(3).Info("%s validation: using Host IpAddress (migration network)", method,
 				"hostName", invHost.Name,
 				"hostID", invHost.ID,
 				"ipAddress", hostIP)
 		} else if len(invHost.ManagementIPs) > 0 {
 			// Fall back to ManagementIPs from inventory
 			hostIP = invHost.ManagementIPs[0]
-			r.Log.V(3).Info("SSH validation: using ManagementIP from inventory",
+			r.Log.V(3).Info("%s validation: using ManagementIP from inventory", method,
 				"hostName", invHost.Name,
 				"hostID", invHost.ID,
 				"ipAddress", hostIP)
@@ -548,26 +577,26 @@ func (r *Reconciler) getHostsForSSHValidation(provider *api.Provider) []hostInfo
 			hostsToTest = append(hostsToTest, hostInfo{id: invHost.ID, name: invHost.Name, ip: hostIP})
 		} else {
 			hostsWithoutIP++
-			r.Log.V(3).Info("SSH validation: host has no IP",
+			r.Log.V(3).Info("%s validation: host has no IP", method,
 				"hostName", invHost.Name,
 				"hostID", invHost.ID)
 		}
 	}
 
-	r.Log.Info("SSH validation: host summary",
+	r.Log.Info("%s validation: host summary", method,
 		"provider", provider.Name,
 		"totalHosts", len(inventoryHosts),
 		"hostsWithIP", hostsWithIP,
 		"hostsWithoutIP", hostsWithoutIP)
 
 	if hostsWithIP == 0 {
-		r.Log.Error(nil, "SSH validation: no hosts with IP found", "provider", provider.Name)
+		r.Log.Error(nil, "%s validation: no hosts with IP found", method, "provider", provider.Name)
 		provider.Status.SetCondition(libcnd.Condition{
-			Type:     SSHNotReady,
+			Type:     offloadNotReady,
 			Status:   True,
 			Reason:   "NoHostIP",
 			Category: Warn,
-			Message:  fmt.Sprintf("Cannot validate SSH readiness (checked because 'esxiCloneMethod' setting is set to 'ssh'): no ESXi hosts with IP address found (found %d hosts total).", len(inventoryHosts)),
+			Message:  fmt.Sprintf("Cannot validate %s readiness (checked because 'esxiCloneMethod' setting is set to '%s'): no ESXi hosts with IP address found (found %d hosts total).", method, method, len(inventoryHosts)),
 		})
 		return nil
 	}
@@ -576,7 +605,7 @@ func (r *Reconciler) getHostsForSSHValidation(provider *api.Provider) []hostInfo
 }
 
 // loadHostIPs loads Host CRDs for the provider and returns a map of host ID/Name to IpAddress
-func (r *Reconciler) loadHostIPs(provider *api.Provider) map[string]string {
+func (r *Reconciler) loadHostIPs(provider *api.Provider, method string) map[string]string {
 	result := make(map[string]string)
 
 	hostList := &api.HostList{}
@@ -588,7 +617,7 @@ func (r *Reconciler) loadHostIPs(provider *api.Provider) map[string]string {
 		},
 	)
 	if err != nil {
-		r.Log.V(3).Info("SSH validation: failed to list Host resources", "error", err)
+		r.Log.V(3).Info("%s validation: failed to list Host resources", method, "error", err)
 		return result
 	}
 
@@ -743,7 +772,7 @@ func (r *Reconciler) validateSSHReadiness(provider *api.Provider, secret *core.S
 		"privateKeyPreview", privateKeyPreview)
 
 	// Get list of hosts to test based on provider connection type
-	hostsToTest := r.getHostsForSSHValidation(provider)
+	hostsToTest := r.getHostsForOffloadValidation(provider, api.ESXiCloneMethodSSH)
 	if hostsToTest == nil {
 		// Error condition already set by getHostsForSSHValidation
 		return nil
@@ -889,4 +918,321 @@ func (r *Reconciler) validateSSHReadiness(provider *api.Provider, secret *core.S
 // This matches the exact implementation from the populator's testSSHConnectivity
 func (r *Reconciler) testSSHConnectivity(hostIP string, privateKey []byte) bool {
 	return util.TestSSHConnectivity(context.Background(), hostIP, privateKey, r.Log)
+}
+
+// validateVIBReadiness validates VIB readiness for migration plans using xcopy volume populators
+func (r *Reconciler) validateVIBReadiness(provider *api.Provider, secret *core.Secret) error {
+	r.Log.Info(">>>>>>>>>>>>>>>>>>>>>> DEBUG: PROVIDER VIB VALIDATION ENTRY",
+		"provider", provider.Name,
+		"providerType", provider.Type())
+
+	// Only validate VIB for vSphere providers
+	if provider.Type() != api.VSphere {
+		r.Log.Info(">>>>>>>>>>>>>>>>>>>>>> DEBUG: PROVIDER VIB VALIDATION SKIPPED - Not vSphere",
+			"provider", provider.Name,
+			"providerType", provider.Type())
+		return nil
+	}
+
+	// Skip VIB validation if inventory is not ready yet
+	inventoryCondition := provider.Status.FindCondition(InventoryCreated)
+	if inventoryCondition == nil || inventoryCondition.Status != True {
+		r.Log.Info(">>>>>>>>>>>>>>>>>>>>>> DEBUG: PROVIDER VIB VALIDATION SKIPPED - Inventory not ready",
+			"provider", provider.Name,
+			"hasInventoryCondition", inventoryCondition != nil)
+		return nil
+	}
+
+	// Check if ESXiCloneMethod is set - VIB is default when not set or not set to "ssh"
+	esxiCloneMethod, methodSet := provider.Spec.Settings[api.ESXiCloneMethod]
+	useVIBMethod := !methodSet || esxiCloneMethod != api.ESXiCloneMethodSSH
+
+	r.Log.Info(">>>>>>>>>>>>>>>>>>>>>> DEBUG: PROVIDER VIB VALIDATION - Clone method check",
+		"provider", provider.Name,
+		"esxiCloneMethod", esxiCloneMethod,
+		"methodSet", methodSet,
+		"useVIBMethod", useVIBMethod)
+
+	if !useVIBMethod {
+		r.Log.Info(">>>>>>>>>>>>>>>>>>>>>> DEBUG: PROVIDER VIB VALIDATION SKIPPED - SSH method in use",
+			"provider", provider.Name,
+			"esxiCloneMethod", esxiCloneMethod)
+		// VIB method not enabled, remove any existing VIB readiness conditions
+		provider.Status.DeleteCondition(VIBReady)
+		provider.Status.DeleteCondition(VIBNotReady)
+		return nil
+	}
+
+	// Check cache - skip validation if we checked recently (within VIBCacheDuration)
+	if r.shouldSkipVIBCheck(provider) {
+		r.Log.Info(">>>>>>>>>>>>>>>>>>>>>> DEBUG: PROVIDER VIB VALIDATION SKIPPED - Cache valid (within 15 min)",
+			"provider", provider.Name,
+			"cacheDuration", VIBCacheDuration.String())
+		return nil
+	}
+
+	r.Log.Info(">>>>>>>>>>>>>>>>>>>>>> DEBUG: PROVIDER VIB VALIDATION STARTING - Cache expired or first run",
+		"provider", provider.Name,
+		"namespace", provider.Namespace)
+
+	// Get provider credentials from secret
+	username := string(secret.Data["user"])
+	password := string(secret.Data["password"])
+	if username == "" || password == "" {
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     VIBNotReady,
+			Status:   True,
+			Reason:   "ProviderCredentialsInvalid",
+			Category: Warn,
+			Message:  "Cannot validate VIB readiness: provider credentials not found in secret",
+		})
+		return nil
+	}
+
+	// Get list of hosts to test (reuse SSH host discovery logic)
+	hostsToTest := r.getHostsForVIBValidation(provider)
+	if hostsToTest == nil {
+		r.Log.Info(">>>>>>>>>>>>>>>>>>>>>> DEBUG: PROVIDER VIB VALIDATION FAILED - No hosts to test",
+			"provider", provider.Name)
+		// Error condition already set by getHostsForVIBValidation
+		return nil
+	}
+
+	r.Log.Info(">>>>>>>>>>>>>>>>>>>>>> DEBUG: PROVIDER VIB VALIDATION - Found hosts to test",
+		"provider", provider.Name,
+		"hostCount", len(hostsToTest))
+
+	// Test VIB installation on ALL hosts (don't stop early)
+	failedHosts := []string{}
+	successHosts := []string{}
+
+	// Test all hosts to provide complete status
+	for i := range hostsToTest {
+		host := &hostsToTest[i]
+		if host.ip == "" {
+			r.Log.Info(">>>>>>>>>>>>>>>>>>>>>> DEBUG: PROVIDER VIB VALIDATION - Host has no IP",
+				"provider", provider.Name,
+				"hostName", host.name)
+			failedHosts = append(failedHosts, fmt.Sprintf("%s (no management IP)", host.name))
+			continue
+		}
+
+		r.Log.Info(">>>>>>>>>>>>>>>>>>>>>> DEBUG: PROVIDER VIB VALIDATION - Testing host",
+			"provider", provider.Name,
+			"hostName", host.name,
+			"hostIP", host.ip,
+			"hostIndex", i+1,
+			"totalHosts", len(hostsToTest))
+
+		vibInstalled, err := r.checkVIBOnHost(host.ip, username, password)
+
+		r.Log.Info(">>>>>>>>>>>>>>>>>>>>>> DEBUG: PROVIDER VIB VALIDATION - Host test result",
+			"provider", provider.Name,
+			"hostName", host.name,
+			"hostIP", host.ip,
+			"vibInstalled", vibInstalled,
+			"error", err)
+
+		// Store as "id|name|ip" so Plan can parse and reformat
+		itemStr := fmt.Sprintf("%s|%s|%s", host.id, host.name, host.ip)
+		if vibInstalled {
+			successHosts = append(successHosts, itemStr)
+		} else {
+			if err != nil {
+				itemStr = fmt.Sprintf("%s (error: %v)", itemStr, err)
+			}
+			failedHosts = append(failedHosts, itemStr)
+		}
+	}
+
+	r.Log.Info(">>>>>>>>>>>>>>>>>>>>>> DEBUG: PROVIDER VIB VALIDATION - All hosts tested",
+		"provider", provider.Name,
+		"successCount", len(successHosts),
+		"failedCount", len(failedHosts),
+		"successHosts", successHosts,
+		"failedHosts", failedHosts)
+
+	// Update the last check timestamp
+	r.updateVIBCheckTimestamp(provider)
+
+	// If all hosts passed, remove all VIB conditions - everything is working fine
+	if len(failedHosts) == 0 {
+		r.Log.Info(">>>>>>>>>>>>>>>>>>>>>> DEBUG: PROVIDER VIB VALIDATION SUCCESS - All hosts have VIB",
+			"provider", provider.Name,
+			"hostCount", len(hostsToTest))
+		provider.Status.DeleteCondition(VIBReady)
+		provider.Status.DeleteCondition(VIBNotReady)
+		return nil
+	}
+
+	// Handle successful hosts - set advisory condition only if there's a mix (some passed, some failed)
+	if len(successHosts) > 0 {
+		r.Log.Info(">>>>>>>>>>>>>>>>>>>>>> DEBUG: PROVIDER VIB VALIDATION - Setting VIBReady condition (mixed results)",
+			"provider", provider.Name,
+			"successCount", len(successHosts))
+
+		var successSuggestion strings.Builder
+		successSuggestion.WriteString("ESXi hosts with VIB (vmkfstools-wrapper) validated:\n\n")
+		for _, item := range successHosts {
+			// Parse "id|name|ip" format for human-readable display
+			parts := strings.Split(item, "|")
+			if len(parts) == 3 {
+				successSuggestion.WriteString(fmt.Sprintf("  - %s (%s)\n", parts[1], parts[2]))
+			} else {
+				successSuggestion.WriteString(fmt.Sprintf("  - %s\n", item))
+			}
+		}
+		successSuggestion.WriteString("\nTo use the xcopy volume populator, ensure your VMs are located on these ESXi hosts before starting the migration.\n")
+
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:       VIBReady,
+			Status:     True,
+			Reason:     "VIBValidated",
+			Category:   Advisory,
+			Message:    "VIB (vmkfstools-wrapper) validated on ESXi hosts (checked because 'esxiCloneMethod' is not set to 'ssh'). See the suggestion field in the Provider's YAML for the list of available ESXi hosts.",
+			Suggestion: successSuggestion.String(),
+			Items:      successHosts,
+		})
+	} else {
+		provider.Status.DeleteCondition(VIBReady)
+	}
+
+	// Handle failed hosts - set warning condition
+	r.Log.Info(">>>>>>>>>>>>>>>>>>>>>> DEBUG: PROVIDER VIB VALIDATION - Setting VIBNotReady condition",
+		"provider", provider.Name,
+		"failedCount", len(failedHosts))
+
+	var failSuggestion strings.Builder
+	failSuggestion.WriteString("HOSTS REQUIRING VIB INSTALLATION:\n\n")
+	for _, item := range failedHosts {
+		// Parse "id|name|ip" format for human-readable display
+		parts := strings.Split(item, "|")
+		if len(parts) == 3 {
+			failSuggestion.WriteString(fmt.Sprintf("  - %s (%s)\n", parts[1], parts[2]))
+		} else {
+			failSuggestion.WriteString(fmt.Sprintf("  - %s\n", item))
+		}
+	}
+	failSuggestion.WriteString("\n")
+
+	failSuggestion.WriteString("INSTALLATION INSTRUCTIONS:\n\n")
+	failSuggestion.WriteString("The vmkfstools-wrapper VIB is required for xcopy volume populator.\n")
+	failSuggestion.WriteString("Please install it on the ESXi hosts listed above.\n\n")
+	failSuggestion.WriteString("For installation instructions, refer to the forklift documentation.\n")
+
+	provider.Status.SetCondition(libcnd.Condition{
+		Type:       VIBNotReady,
+		Status:     True,
+		Reason:     "VIBNotInstalled",
+		Category:   Warn,
+		Message:    "VIB readiness validation issue (checked because 'esxiCloneMethod' is not set to 'ssh'). See the suggestion field in the Provider's YAML for details.",
+		Suggestion: failSuggestion.String(),
+		Items:      failedHosts,
+	})
+
+	r.Log.Info(">>>>>>>>>>>>>>>>>>>>>> DEBUG: PROVIDER VIB VALIDATION COMPLETE - Conditions set",
+		"provider", provider.Name)
+
+	return nil
+}
+
+
+// updateVIBCheckTimestamp updates the last VIB check timestamp annotation on the provider
+func (r *Reconciler) updateVIBCheckTimestamp(provider *api.Provider) {
+	if provider.Annotations == nil {
+		provider.Annotations = make(map[string]string)
+	}
+
+	timestamp := time.Now().Format(time.RFC3339)
+	provider.Annotations[VIBLastCheckAnnotation] = timestamp
+
+	r.Log.V(2).Info("VIB validation: updated last check timestamp",
+		"provider", provider.Name,
+		"timestamp", timestamp)
+}
+
+
+	// Build vSphere SDK URL for the ESXi host
+	url := &liburl.URL{
+		Scheme: "https",
+		Host:   hostIP,
+		Path:   "/sdk",
+		User:   liburl.UserPassword(username, password),
+	}
+
+	// Create SOAP client
+	soapClient := soap.NewClient(url, true) // insecure=true to skip cert validation
+
+	// Create vim25 client
+	vimClient, err := vim25.NewClient(ctx, soapClient)
+	if err != nil {
+		return false, fmt.Errorf("failed to create vim25 client: %w", err)
+	}
+
+	// Create govmomi client
+	client := &govmomi.Client{
+		SessionManager: session.NewManager(vimClient),
+		Client:         vimClient,
+	}
+
+	// Login to the ESXi host
+	err = client.Login(ctx, url.User)
+	if err != nil {
+		return false, fmt.Errorf("failed to login to ESXi host: %w", err)
+	}
+	defer client.Logout(ctx)
+
+	// Find the host system by IP using SearchIndex
+	searchIndex := object.NewSearchIndex(client.Client)
+	hostRef, err := searchIndex.FindByIp(ctx, nil, hostIP, false)
+	if err != nil || hostRef == nil {
+		return false, fmt.Errorf("failed to find host by IP %s: %w", hostIP, err)
+	}
+
+	host := object.NewHostSystem(client.Client, hostRef.Reference())
+
+	// Create ESX executor to run esxcli commands
+	executor, err := esx.NewExecutor(ctx, client.Client, host.Reference())
+	if err != nil {
+		return false, fmt.Errorf("failed to create ESX executor: %w", err)
+	}
+
+	// Run: esxcli software vib get -n vmkfstools-wrapper
+	// This is the same command used in the populator's getViBVersion
+	command := []string{"software", "vib", "get", "-n", vibName}
+
+	r.Log.V(3).Info("VIB check: running esxcli command",
+		"hostIP", hostIP,
+		"command", strings.Join(command, " "))
+
+	res, err := executor.Run(ctx, command)
+	if err != nil {
+		// Check if this is a "VIB not found" error (same logic as populator)
+		if fault, ok := err.(*esx.Fault); ok {
+			// Check both Message and Detail for NoMatchError
+			if strings.Contains(fault.MessageDetail(), "[NoMatchError]") {
+				r.Log.V(3).Info("VIB check: VIB not installed",
+					"hostIP", hostIP,
+					"vibName", vibName)
+				return false, nil
+			}
+		}
+		return false, fmt.Errorf("failed to run esxcli command: %w", err)
+	}
+
+	// Parse version from result
+	if len(res.Values) > 0 {
+		version := res.Values[0].Value("Version")
+		r.Log.V(3).Info("VIB check: VIB found",
+			"hostIP", hostIP,
+			"vibName", vibName,
+			"version", version)
+		return true, nil
+	}
+
+	// No result returned - VIB not installed
+	r.Log.V(3).Info("VIB check: VIB not found (no results)",
+		"hostIP", hostIP,
+		"vibName", vibName)
+	return false, nil
 }

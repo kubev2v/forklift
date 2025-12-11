@@ -1,11 +1,11 @@
-package populator
+package provider
 
 import (
 	"context"
 	"fmt"
 	"strings"
 
-	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
+	"github.com/kubev2v/forklift/cmd/vspheredd-xcopy-volume-populator/internal/vmware"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"

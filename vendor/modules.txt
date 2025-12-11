@@ -464,6 +464,7 @@ github.com/ugorji/go/codec
 # github.com/vmware/govmomi v0.50.0
 ## explicit; go 1.23.0
 github.com/vmware/govmomi
+github.com/vmware/govmomi/cli/esx
 github.com/vmware/govmomi/fault
 github.com/vmware/govmomi/find
 github.com/vmware/govmomi/history
