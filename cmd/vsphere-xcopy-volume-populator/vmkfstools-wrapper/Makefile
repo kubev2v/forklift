@@ -3,7 +3,7 @@ SHELL := /bin/bash
 include version.mk
 
 test:
-	python vmkfstools_wrapper_test.py
+	python3 vmkfstools_wrapper_test.py
 
 build: test
 	VIB_VERSION=${VIB_VERSION} ./create-vib.sh 
