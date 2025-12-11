@@ -136,12 +136,11 @@ func (DataVolumeSourceHTTP) SwaggerDoc() map[string]string {
 
 func (DataVolumeSourceImageIO) SwaggerDoc() map[string]string {
 	return map[string]string{
-		"":                   "DataVolumeSourceImageIO provides the parameters to create a Data Volume from an imageio source",
-		"url":                "URL is the URL of the ovirt-engine",
-		"diskId":             "DiskID provides id of a disk to be imported",
-		"secretRef":          "SecretRef provides the secret reference needed to access the ovirt-engine",
-		"certConfigMap":      "CertConfigMap provides a reference to the CA cert",
-		"insecureSkipVerify": "InsecureSkipVerify is a flag to skip certificate verification",
+		"":              "DataVolumeSourceImageIO provides the parameters to create a Data Volume from an imageio source",
+		"url":           "URL is the URL of the ovirt-engine",
+		"diskId":        "DiskID provides id of a disk to be imported",
+		"secretRef":     "SecretRef provides the secret reference needed to access the ovirt-engine",
+		"certConfigMap": "CertConfigMap provides a reference to the CA cert",
 	}
 }
 
@@ -191,7 +190,7 @@ func (DataVolumeCondition) SwaggerDoc() map[string]string {
 
 func (StorageProfile) SwaggerDoc() map[string]string {
 	return map[string]string{
-		"": "StorageProfile provides a CDI specific recommendation for storage parameters\n+genclient\n+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object\n+kubebuilder:object:root=true\n+kubebuilder:storageversion\n+kubebuilder:resource:scope=Cluster\n+kubebuilder:subresource:status",
+		"": "StorageProfile provides a CDI specific recommendation for storage parameters\n+genclient\n+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object\n+kubebuilder:object:root=true\n+kubebuilder:storageversion\n+kubebuilder:resource:scope=Cluster",
 	}
 }
 
@@ -295,7 +294,6 @@ func (DataImportCronSpec) SwaggerDoc() map[string]string {
 		"importsToKeep":     "Number of import PVCs to keep when garbage collecting. Default is 3.\n+optional",
 		"managedDataSource": "ManagedDataSource specifies the name of the corresponding DataSource this cron will manage.\nDataSource has to be in the same namespace.",
 		"retentionPolicy":   "RetentionPolicy specifies whether the created DataVolumes and DataSources are retained when their DataImportCron is deleted. Default is RatainAll.\n+optional",
-		"createdBy":         "CreatedBy is the JSON-marshaled UserInfo of the user who created this DataImportCron.\nThis field is set by the mutating webhook and cannot be set by users.\n+optional",
 	}
 }
 
