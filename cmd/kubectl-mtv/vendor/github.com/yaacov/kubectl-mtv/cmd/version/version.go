@@ -8,12 +8,13 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
+	"github.com/yaacov/kubectl-mtv/cmd/get"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/version"
 	"github.com/yaacov/kubectl-mtv/pkg/util/flags"
 )
 
 // NewVersionCmd creates the version command
-func NewVersionCmd(clientVersion string, kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
+func NewVersionCmd(clientVersion string, kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig get.GlobalConfigGetter) *cobra.Command {
 	outputFormatFlag := flags.NewOutputFormatTypeFlag()
 
 	cmd := &cobra.Command{
@@ -25,8 +26,8 @@ func NewVersionCmd(clientVersion string, kubeConfigFlags *genericclioptions.Conf
 			ctx, cancel := context.WithTimeout(cmd.Context(), 20*time.Second)
 			defer cancel()
 
-			// Get version information
-			versionInfo := version.GetVersionInfo(ctx, clientVersion, kubeConfigFlags)
+			// Get version information (globalConfig handles inventory URL and insecure flag)
+			versionInfo := version.GetVersionInfo(ctx, clientVersion, kubeConfigFlags, globalConfig)
 
 			// Format and output the version information
 			output, err := versionInfo.FormatOutput(outputFormatFlag.GetValue())

@@ -23,7 +23,7 @@ func NewOvirtNetworkFetcher() *OvirtNetworkFetcher {
 }
 
 // FetchSourceNetworks extracts network references from oVirt VMs
-func (f *OvirtNetworkFetcher) FetchSourceNetworks(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, planVMNames []string) ([]ref.Ref, error) {
+func (f *OvirtNetworkFetcher) FetchSourceNetworks(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, planVMNames []string, insecureSkipTLS bool) ([]ref.Ref, error) {
 	klog.V(4).Infof("oVirt fetcher - extracting source networks for provider: %s", providerName)
 
 	// Get the provider object
@@ -33,7 +33,7 @@ func (f *OvirtNetworkFetcher) FetchSourceNetworks(ctx context.Context, configFla
 	}
 
 	// Fetch networks inventory first to create ID-to-network mapping
-	networksInventory, err := client.FetchProviderInventory(configFlags, inventoryURL, provider, "networks?detail=4")
+	networksInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "networks?detail=4", insecureSkipTLS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch networks inventory: %v", err)
 	}
@@ -61,7 +61,7 @@ func (f *OvirtNetworkFetcher) FetchSourceNetworks(ctx context.Context, configFla
 	}
 
 	// Fetch NIC profiles to map profile IDs to network IDs
-	nicProfilesInventory, err := client.FetchProviderInventory(configFlags, inventoryURL, provider, "nicprofiles?detail=4")
+	nicProfilesInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "nicprofiles?detail=4", insecureSkipTLS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch NIC profiles inventory: %v", err)
 	}
@@ -84,7 +84,7 @@ func (f *OvirtNetworkFetcher) FetchSourceNetworks(ctx context.Context, configFla
 	}
 
 	// Fetch VMs inventory to get network references from VMs
-	vmsInventory, err := client.FetchProviderInventory(configFlags, inventoryURL, provider, "vms?detail=4")
+	vmsInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "vms?detail=4", insecureSkipTLS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch VMs inventory: %v", err)
 	}
@@ -146,7 +146,7 @@ func (f *OvirtNetworkFetcher) FetchSourceNetworks(ctx context.Context, configFla
 }
 
 // FetchTargetNetworks is not supported for oVirt as target - only OpenShift is supported as target
-func (f *OvirtNetworkFetcher) FetchTargetNetworks(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string) ([]forkliftv1beta1.DestinationNetwork, error) {
+func (f *OvirtNetworkFetcher) FetchTargetNetworks(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, insecureSkipTLS bool) ([]forkliftv1beta1.DestinationNetwork, error) {
 	klog.V(4).Infof("oVirt provider does not support target network fetching - only OpenShift is supported as target")
 	return nil, fmt.Errorf("oVirt provider does not support target network fetching - only OpenShift is supported as migration target")
 }

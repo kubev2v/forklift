@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/get/mapping"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
@@ -14,7 +13,7 @@ import (
 )
 
 // NewMappingCmd creates the get mapping command with subcommands
-func NewMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() GlobalConfigGetter) *cobra.Command {
+func NewMappingCmd(globalConfig GlobalConfigGetter) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "mapping",
 		Short:        "Get mappings",
@@ -27,15 +26,16 @@ func NewMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConf
 	}
 
 	// Add subcommands for network and storage
-	cmd.AddCommand(newGetNetworkMappingCmd(kubeConfigFlags, getGlobalConfig))
-	cmd.AddCommand(newGetStorageMappingCmd(kubeConfigFlags, getGlobalConfig))
+	cmd.AddCommand(newGetNetworkMappingCmd(globalConfig))
+	cmd.AddCommand(newGetStorageMappingCmd(globalConfig))
 
 	return cmd
 }
 
 // newGetNetworkMappingCmd creates the get network mapping subcommand
-func newGetNetworkMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() GlobalConfigGetter) *cobra.Command {
+func newGetNetworkMappingCmd(globalConfig GlobalConfigGetter) *cobra.Command {
 	outputFormatFlag := flags.NewOutputFormatTypeFlag()
+	var watch bool
 
 	cmd := &cobra.Command{
 		Use:          "network [NAME]",
@@ -44,11 +44,17 @@ func newGetNetworkMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, get
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.MappingNameCompletion(kubeConfigFlags, "network")(cmd, args, toComplete)
+			return completion.MappingNameCompletion(globalConfig.GetKubeConfigFlags(), "network")(cmd, args, toComplete)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			config := getGlobalConfig()
-			namespace := client.ResolveNamespaceWithAllFlag(config.GetKubeConfigFlags(), config.GetAllNamespaces())
+			ctx := cmd.Context()
+			if !watch {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+				defer cancel()
+			}
+
+			namespace := client.ResolveNamespaceWithAllFlag(globalConfig.GetKubeConfigFlags(), globalConfig.GetAllNamespaces())
 
 			// Get optional mapping name from arguments
 			var mappingName string
@@ -58,19 +64,18 @@ func newGetNetworkMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, get
 
 			// Log the operation being performed
 			if mappingName != "" {
-				logNamespaceOperation("Getting network mapping", namespace, config.GetAllNamespaces())
+				logNamespaceOperation("Getting network mapping", namespace, globalConfig.GetAllNamespaces())
 			} else {
-				logNamespaceOperation("Getting network mappings", namespace, config.GetAllNamespaces())
+				logNamespaceOperation("Getting network mappings", namespace, globalConfig.GetAllNamespaces())
 			}
 			logOutputFormat(outputFormatFlag.GetValue())
 
-			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-			defer cancel()
-			return mapping.List(ctx, config.GetKubeConfigFlags(), "network", namespace, outputFormatFlag.GetValue(), mappingName, config.GetUseUTC())
+			return mapping.List(ctx, globalConfig.GetKubeConfigFlags(), "network", namespace, watch, outputFormatFlag.GetValue(), mappingName, globalConfig.GetUseUTC())
 		},
 	}
 
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", "Output format (table, json, yaml)")
+	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
 
 	// Add completion for output format flag
 	if err := cmd.RegisterFlagCompletionFunc("output", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -83,8 +88,9 @@ func newGetNetworkMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, get
 }
 
 // newGetStorageMappingCmd creates the get storage mapping subcommand
-func newGetStorageMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() GlobalConfigGetter) *cobra.Command {
+func newGetStorageMappingCmd(globalConfig GlobalConfigGetter) *cobra.Command {
 	outputFormatFlag := flags.NewOutputFormatTypeFlag()
+	var watch bool
 
 	cmd := &cobra.Command{
 		Use:          "storage [NAME]",
@@ -93,11 +99,17 @@ func newGetStorageMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, get
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.MappingNameCompletion(kubeConfigFlags, "storage")(cmd, args, toComplete)
+			return completion.MappingNameCompletion(globalConfig.GetKubeConfigFlags(), "storage")(cmd, args, toComplete)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			config := getGlobalConfig()
-			namespace := client.ResolveNamespaceWithAllFlag(config.GetKubeConfigFlags(), config.GetAllNamespaces())
+			ctx := cmd.Context()
+			if !watch {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+				defer cancel()
+			}
+
+			namespace := client.ResolveNamespaceWithAllFlag(globalConfig.GetKubeConfigFlags(), globalConfig.GetAllNamespaces())
 
 			// Get optional mapping name from arguments
 			var mappingName string
@@ -107,19 +119,18 @@ func newGetStorageMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, get
 
 			// Log the operation being performed
 			if mappingName != "" {
-				logNamespaceOperation("Getting storage mapping", namespace, config.GetAllNamespaces())
+				logNamespaceOperation("Getting storage mapping", namespace, globalConfig.GetAllNamespaces())
 			} else {
-				logNamespaceOperation("Getting storage mappings", namespace, config.GetAllNamespaces())
+				logNamespaceOperation("Getting storage mappings", namespace, globalConfig.GetAllNamespaces())
 			}
 			logOutputFormat(outputFormatFlag.GetValue())
 
-			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-			defer cancel()
-			return mapping.List(ctx, config.GetKubeConfigFlags(), "storage", namespace, outputFormatFlag.GetValue(), mappingName, config.GetUseUTC())
+			return mapping.List(ctx, globalConfig.GetKubeConfigFlags(), "storage", namespace, watch, outputFormatFlag.GetValue(), mappingName, globalConfig.GetUseUTC())
 		},
 	}
 
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", "Output format (table, json, yaml)")
+	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
 
 	// Add completion for output format flag
 	if err := cmd.RegisterFlagCompletionFunc("output", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

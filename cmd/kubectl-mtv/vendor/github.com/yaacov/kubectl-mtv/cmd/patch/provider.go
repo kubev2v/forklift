@@ -15,21 +15,13 @@ import (
 
 // NewProviderCmd creates the patch provider command
 func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
-	// Provider credential flags (editable)
-	var url, username, password, cacert, token string
-	var insecureSkipTLS bool
-	var vddkInitImage string
-
-	// VSphere VDDK specific flags (editable)
-	var useVddkAioOptimization bool
-	var vddkBufSizeIn64K, vddkBufCount int
-
-	// OpenStack specific flags (editable)
-	var domainName, projectName, regionName string
+	opts := provider.PatchProviderOptions{
+		ConfigFlags: kubeConfigFlags,
+	}
 
 	// Check if MTV_VDDK_INIT_IMAGE environment variable is set
 	if envVddkInitImage := os.Getenv("MTV_VDDK_INIT_IMAGE"); envVddkInitImage != "" {
-		vddkInitImage = envVddkInitImage
+		opts.VddkInitImage = envVddkInitImage
 	}
 
 	cmd := &cobra.Command{
@@ -41,48 +33,55 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 		ValidArgsFunction: completion.ProviderNameCompletion(kubeConfigFlags),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get name from positional argument
-			name := args[0]
+			opts.Name = args[0]
 
 			// Resolve the appropriate namespace based on context and flags
-			namespace := client.ResolveNamespace(kubeConfigFlags)
+			opts.Namespace = client.ResolveNamespace(kubeConfigFlags)
 
 			// Check if cacert starts with @ and load from file if so
-			if strings.HasPrefix(cacert, "@") {
-				filePath := cacert[1:]
+			if strings.HasPrefix(opts.CACert, "@") {
+				filePath := opts.CACert[1:]
 				fileContent, err := os.ReadFile(filePath)
 				if err != nil {
 					return fmt.Errorf("failed to read CA certificate file '%s': %v", filePath, err)
 				}
-				cacert = string(fileContent)
+				opts.CACert = string(fileContent)
 			}
 
-			return provider.PatchProvider(kubeConfigFlags, name, namespace,
-				url, username, password, cacert, insecureSkipTLS, vddkInitImage, token,
-				domainName, projectName, regionName, useVddkAioOptimization, vddkBufSizeIn64K, vddkBufCount,
-				cmd.Flag("provider-insecure-skip-tls").Changed, cmd.Flag("use-vddk-aio-optimization").Changed)
+			// Set flag change tracking
+			opts.InsecureSkipTLSChanged = cmd.Flag("provider-insecure-skip-tls").Changed
+			opts.UseVddkAioOptimizationChanged = cmd.Flag("use-vddk-aio-optimization").Changed
+
+			return provider.PatchProvider(opts)
 		},
 	}
 
 	// Editable provider flags
-	cmd.Flags().StringVarP(&url, "url", "U", "", "Provider URL")
-	cmd.Flags().StringVarP(&username, "username", "u", "", "Provider credentials username")
-	cmd.Flags().StringVarP(&password, "password", "p", "", "Provider credentials password")
-	cmd.Flags().StringVar(&cacert, "cacert", "", "Provider CA certificate (use @filename to load from file)")
-	cmd.Flags().BoolVar(&insecureSkipTLS, "provider-insecure-skip-tls", false, "Skip TLS verification when connecting to the provider")
+	cmd.Flags().StringVarP(&opts.URL, "url", "U", "", "Provider URL")
+	cmd.Flags().StringVarP(&opts.Username, "username", "u", "", "Provider credentials username")
+	cmd.Flags().StringVarP(&opts.Password, "password", "p", "", "Provider credentials password")
+	cmd.Flags().StringVar(&opts.CACert, "cacert", "", "Provider CA certificate (use @filename to load from file)")
+	cmd.Flags().BoolVar(&opts.InsecureSkipTLS, "provider-insecure-skip-tls", false, "Skip TLS verification when connecting to the provider")
 
 	// OpenShift specific flags
-	cmd.Flags().StringVarP(&token, "token", "T", "", "Provider authentication token (used for openshift provider)")
+	cmd.Flags().StringVarP(&opts.Token, "token", "T", "", "Provider authentication token (used for openshift provider)")
 
 	// VSphere specific flags (editable VDDK settings)
-	cmd.Flags().StringVar(&vddkInitImage, "vddk-init-image", "", "Virtual Disk Development Kit (VDDK) container init image path")
-	cmd.Flags().BoolVar(&useVddkAioOptimization, "use-vddk-aio-optimization", false, "Enable VDDK AIO optimization for vSphere provider")
-	cmd.Flags().IntVar(&vddkBufSizeIn64K, "vddk-buf-size-in-64k", 0, "VDDK buffer size in 64K units (VixDiskLib.nfcAio.Session.BufSizeIn64K)")
-	cmd.Flags().IntVar(&vddkBufCount, "vddk-buf-count", 0, "VDDK buffer count (VixDiskLib.nfcAio.Session.BufCount)")
+	cmd.Flags().StringVar(&opts.VddkInitImage, "vddk-init-image", "", "Virtual Disk Development Kit (VDDK) container init image path")
+	cmd.Flags().BoolVar(&opts.UseVddkAioOptimization, "use-vddk-aio-optimization", false, "Enable VDDK AIO optimization for vSphere provider")
+	cmd.Flags().IntVar(&opts.VddkBufSizeIn64K, "vddk-buf-size-in-64k", 0, "VDDK buffer size in 64K units (VixDiskLib.nfcAio.Session.BufSizeIn64K)")
+	cmd.Flags().IntVar(&opts.VddkBufCount, "vddk-buf-count", 0, "VDDK buffer count (VixDiskLib.nfcAio.Session.BufCount)")
 
 	// OpenStack specific flags
-	cmd.Flags().StringVar(&domainName, "provider-domain-name", "", "OpenStack domain name")
-	cmd.Flags().StringVar(&projectName, "provider-project-name", "", "OpenStack project name")
-	cmd.Flags().StringVar(&regionName, "provider-region-name", "", "OpenStack region name")
+	cmd.Flags().StringVar(&opts.DomainName, "provider-domain-name", "", "OpenStack domain name")
+	cmd.Flags().StringVar(&opts.ProjectName, "provider-project-name", "", "OpenStack project name")
+	cmd.Flags().StringVar(&opts.RegionName, "provider-region-name", "", "OpenStack region name")
+	cmd.Flags().StringVar(&opts.RegionName, "region", "", "Region name (alias for --provider-region-name, also used for EC2)")
+
+	// EC2 specific flags
+	cmd.Flags().StringVar(&opts.EC2Region, "ec2-region", "", "EC2 region")
+	cmd.Flags().StringVar(&opts.EC2TargetRegion, "target-region", "", "EC2 target region for migrations (defaults to provider region)")
+	cmd.Flags().StringVar(&opts.EC2TargetAZ, "target-az", "", "EC2 target availability zone for migrations (defaults to target-region + 'a')")
 
 	return cmd
 }

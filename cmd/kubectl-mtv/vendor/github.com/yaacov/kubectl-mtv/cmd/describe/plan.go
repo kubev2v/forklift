@@ -14,7 +14,7 @@ import (
 )
 
 // NewPlanCmd creates the plan description command
-func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() get.GlobalConfigGetter) *cobra.Command {
+func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig get.GlobalConfigGetter) *cobra.Command {
 	var withVMs bool
 	var vmName string
 	var watch bool
@@ -30,7 +30,6 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig 
 			name := args[0]
 
 			// Get the global configuration
-			config := getGlobalConfig()
 
 			// Validate that --with-vms and --vm are mutually exclusive
 			if withVMs && vmName != "" {
@@ -38,15 +37,15 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig 
 			}
 
 			// Resolve the appropriate namespace based on context and flags
-			namespace := client.ResolveNamespace(config.GetKubeConfigFlags())
+			namespace := client.ResolveNamespace(globalConfig.GetKubeConfigFlags())
 
 			// If --vm flag is provided, switch to VM description behavior
 			if vmName != "" {
-				return vm.DescribeVM(config.GetKubeConfigFlags(), name, namespace, vmName, watch, config.GetUseUTC())
+				return vm.DescribeVM(globalConfig.GetKubeConfigFlags(), name, namespace, vmName, watch, globalConfig.GetUseUTC())
 			}
 
 			// Default behavior: describe plan
-			return plan.Describe(config.GetKubeConfigFlags(), name, namespace, withVMs, config.GetUseUTC())
+			return plan.Describe(globalConfig.GetKubeConfigFlags(), name, namespace, withVMs, globalConfig.GetUseUTC())
 		},
 	}
 

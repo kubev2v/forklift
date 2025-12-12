@@ -37,6 +37,7 @@ type CreatePlanOptions struct {
 	NetworkMapping            string
 	StorageMapping            string
 	InventoryURL              string
+	InventoryInsecureSkipTLS  bool
 	DefaultTargetNetwork      string
 	DefaultTargetStorageClass string
 	PlanSpec                  forkliftv1beta1.PlanSpec
@@ -186,18 +187,19 @@ func Create(ctx context.Context, opts CreatePlanOptions) error {
 				targetProviderRef = fmt.Sprintf("%s/%s", opts.TargetProviderNamespace, opts.TargetProvider)
 			}
 			err := mapping.CreateStorageWithOptions(mapping.StorageCreateOptions{
-				ConfigFlags:          opts.ConfigFlags,
-				Name:                 storageMapName,
-				Namespace:            opts.Namespace,
-				SourceProvider:       sourceProviderRef,
-				TargetProvider:       targetProviderRef,
-				StoragePairs:         opts.StoragePairs,
-				InventoryURL:         opts.InventoryURL,
-				DefaultVolumeMode:    opts.DefaultVolumeMode,
-				DefaultAccessMode:    opts.DefaultAccessMode,
-				DefaultOffloadPlugin: opts.DefaultOffloadPlugin,
-				DefaultOffloadSecret: opts.DefaultOffloadSecret,
-				DefaultOffloadVendor: opts.DefaultOffloadVendor,
+				ConfigFlags:              opts.ConfigFlags,
+				Name:                     storageMapName,
+				Namespace:                opts.Namespace,
+				SourceProvider:           sourceProviderRef,
+				TargetProvider:           targetProviderRef,
+				StoragePairs:             opts.StoragePairs,
+				InventoryURL:             opts.InventoryURL,
+				InventoryInsecureSkipTLS: opts.InventoryInsecureSkipTLS,
+				DefaultVolumeMode:        opts.DefaultVolumeMode,
+				DefaultAccessMode:        opts.DefaultAccessMode,
+				DefaultOffloadPlugin:     opts.DefaultOffloadPlugin,
+				DefaultOffloadSecret:     opts.DefaultOffloadSecret,
+				DefaultOffloadVendor:     opts.DefaultOffloadVendor,
 				// Offload secret creation options
 				OffloadVSphereUsername: opts.OffloadVSphereUsername,
 				OffloadVSpherePassword: opts.OffloadVSpherePassword,
@@ -501,9 +503,15 @@ func validateVMs(ctx context.Context, configFlags *genericclioptions.ConfigFlags
 	}
 
 	// Fetch source VMs inventory
-	sourceVMsInventory, err := client.FetchProviderInventory(configFlags, opts.InventoryURL, sourceProvider, "vms")
+	sourceVMsInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, opts.InventoryURL, sourceProvider, "vms", opts.InventoryInsecureSkipTLS)
 	if err != nil {
 		return fmt.Errorf("failed to fetch source VMs inventory: %v", err)
+	}
+
+	// Extract objects from EC2 envelope
+	providerType, found, err := unstructured.NestedString(sourceProvider.Object, "spec", "type")
+	if err == nil && found && providerType == "ec2" {
+		sourceVMsInventory = inventory.ExtractEC2Objects(sourceVMsInventory)
 	}
 
 	sourceVMsArray, ok := sourceVMsInventory.([]interface{})
@@ -570,7 +578,16 @@ func validateVMs(ctx context.Context, configFlags *genericclioptions.ConfigFlags
 				planVM.ID = vmID
 				validVMs = append(validVMs, planVM)
 			} else {
-				fmt.Printf("Warning: VM with name '%s' not found in source provider, removing from plan\n", planVM.Name)
+				// Fallback: check if the provided name is actually a VM ID
+				if vmName, existsAsID := vmIDToNameMap[planVM.Name]; existsAsID {
+					// The provided "name" is actually an ID
+					planVM.ID = planVM.Name
+					planVM.Name = vmName
+					validVMs = append(validVMs, planVM)
+					fmt.Printf("Info: VM ID '%s' found in source provider (name: '%s')\n", planVM.ID, planVM.Name)
+				} else {
+					fmt.Printf("Warning: VM with name '%s' not found in source provider, removing from plan\n", planVM.Name)
+				}
 			}
 		}
 	}
