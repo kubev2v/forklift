@@ -23,7 +23,7 @@ RUN mkdir /disks && \
         virt-v2v && \
     dnf clean all
 
-RUN dnf install -y https://kojihub.stream.centos.org/kojifiles/packages/virtio-win/1.9.40/1.el9/noarch/virtio-win-1.9.40-1.el9.noarch.rpm
+RUN dnf install -y https://kojihub.stream.centos.org/kojifiles/packages/virtio-win/1.9.45/1.el10/noarch/virtio-win-1.9.45-1.el10.noarch.rpm
 
 
 # Missing `libguestfs-winsupport` in the Fedora packages, this is not needed for Fedora as the v2v uses ntfs-3g
