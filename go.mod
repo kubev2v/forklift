@@ -1,6 +1,6 @@
 module github.com/kubev2v/forklift
 
-go 1.24.0
+go 1.24.9
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
@@ -85,7 +85,7 @@ require (
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/google/pprof v0.0.0-20250317173921-a4b03ec1a45e // indirect
+	github.com/google/pprof v0.0.0-20251213031049-b05bdaca462f // indirect
 	github.com/hashicorp/go-uuid v1.0.3 // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
