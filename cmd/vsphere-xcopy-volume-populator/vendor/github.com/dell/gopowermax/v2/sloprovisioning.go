@@ -1,5 +1,5 @@
 /*
- Copyright © 2020 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2020-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -39,6 +39,7 @@ const (
 	XVolume                = "/volume"
 	XStorageGroup          = "/storagegroup"
 	XPortGroup             = "/portgroup"
+	XPort                  = "/port"
 	XInitiator             = "/initiator"
 	XHost                  = "/host"
 	XHostGroup             = "/hostgroup"
@@ -50,7 +51,7 @@ const (
 
 // TimeSpent - Calculates and prints time spent for a caller function
 func (c *Client) TimeSpent(functionName string, startTime time.Time) {
-	if logResponseTimes {
+	if c.opts.logResponseTimes {
 		if functionName == "" {
 			pc, _, _, ok := runtime.Caller(1)
 			details := runtime.FuncForPC(pc)
@@ -2050,4 +2051,25 @@ func (c *Client) UpdateHostGroupHosts(ctx context.Context, symID string, hostGro
 		}
 	}
 	return updatedHostGroup, nil
+}
+
+// GetPortListByProtocol returns a list of ports associated with a given protocol for a specified Symmetrix array.
+func (c *Client) GetPortListByProtocol(ctx context.Context, symID string, protocol string) (*types.PortList, error) {
+	if _, err := c.IsAllowedArray(symID); err != nil {
+		return nil, err
+	}
+	portList := &types.PortList{}
+	URL := c.urlPrefix() + SLOProvisioningX + SymmetrixX + symID + XPort
+	if protocol != "" {
+		URL = URL + "?enabled_protocol=" + protocol
+	}
+	ctx, cancel := c.GetTimeoutContext(ctx)
+	defer cancel()
+	err := c.api.Get(ctx, URL, c.getDefaultHeaders(), portList)
+	if err != nil {
+		log.Error("GetSymmetrixPortList failed: " + err.Error())
+		return nil, err
+	}
+
+	return portList, nil
 }
