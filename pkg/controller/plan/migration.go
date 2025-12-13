@@ -1726,6 +1726,9 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 	case core.PodSucceeded:
 		step.MarkCompleted()
 		step.Progress.Completed = step.Progress.Total
+		for _, task := range step.Tasks {
+			task.Progress.Completed = task.Progress.Total
+		}
 	case core.PodFailed:
 		step.MarkCompleted()
 		step.AddError("Guest conversion failed. See pod logs for details.")
