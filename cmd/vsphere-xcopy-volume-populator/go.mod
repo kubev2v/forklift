@@ -12,7 +12,7 @@ require (
 	github.com/infinidat/infinibox-csi-driver v0.0.0-20251022203528-1f6913cf29cb
 	github.com/kubev2v/forklift v0.0.0-20251201013611-d4d1610e79df
 	github.com/netapp/trident v0.0.0-20240628081112-cb68cb389d9d
-	github.com/onsi/ginkgo/v2 v2.25.1
+	github.com/onsi/ginkgo/v2 v2.27.3
 	github.com/onsi/gomega v1.38.2
 	github.com/stretchr/testify v1.10.0
 	github.com/vmware/govmomi v0.50.0
@@ -49,9 +49,9 @@ require (
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
-	go.uber.org/automaxprocs v1.6.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	golang.org/x/mod v0.27.0 // indirect
 	golang.org/x/oauth2 v0.29.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250115164207-1a7da9e5054f // indirect
