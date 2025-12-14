@@ -32,8 +32,8 @@ github.com/dell/gopowermax/v2/types/v100
 ## explicit; go 1.24
 github.com/dell/gopowerstore
 github.com/dell/gopowerstore/api
-# github.com/dell/goscaleio v1.20.0
-## explicit; go 1.24
+# github.com/dell/goscaleio v1.21.0
+## explicit; go 1.25
 github.com/dell/goscaleio
 github.com/dell/goscaleio/api
 github.com/dell/goscaleio/log
@@ -346,7 +346,7 @@ github.com/spf13/pflag
 # github.com/stretchr/objx v0.5.2
 ## explicit; go 1.20
 github.com/stretchr/objx
-# github.com/stretchr/testify v1.10.0
+# github.com/stretchr/testify v1.11.0
 ## explicit; go 1.17
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/assert/yaml
