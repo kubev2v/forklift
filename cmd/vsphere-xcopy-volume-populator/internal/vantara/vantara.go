@@ -49,7 +49,7 @@ func getStorageEnvVars() (map[string]interface{}, error) {
 
 	storageEnvVars := map[string]interface{}{
 		"storageId":    os.Getenv("STORAGE_ID"),
-		"restServerIP": os.Getenv("STORAGE_URL"),
+		"restServerIP": os.Getenv("STORAGE_HOSTNAME"),
 		"port":         os.Getenv("STORAGE_PORT"),
 		"userID":       os.Getenv("STORAGE_USERNAME"),
 		"password":     os.Getenv("STORAGE_PASSWORD"),
