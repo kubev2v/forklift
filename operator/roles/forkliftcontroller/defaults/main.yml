@@ -53,6 +53,7 @@ controller_block_overhead: 0
 controller_vddk_job_active_deadline_sec: 300
 controller_tls_connection_timeout_sec: 5
 controller_max_concurrent_reconciles: 10
+controller_max_parent_backing_retries: 10
 profiler_volume_path: "/var/cache/profiler"
 
 inventory_volume_path: "/var/cache/inventory"
