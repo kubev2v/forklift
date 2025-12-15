@@ -700,6 +700,39 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 					}
 				}
 			}
+
+			// Validate CustomizationScripts ConfigMap if specified
+			if r.Plan.Spec.CustomizationScripts != nil {
+				configMapName := r.Plan.Spec.CustomizationScripts.Name
+				configMapNamespace := r.Plan.Spec.CustomizationScripts.Namespace
+				if configMapNamespace == "" {
+					configMapNamespace = r.Plan.Spec.TargetNamespace
+				}
+
+				configMap := &core.ConfigMap{}
+				err = r.Destination.Client.Get(
+					context.TODO(),
+					client.ObjectKey{
+						Namespace: configMapNamespace,
+						Name:      configMapName,
+					},
+					configMap,
+				)
+				if err != nil {
+					if k8serr.IsNotFound(err) {
+						errMsg := fmt.Sprintf("CustomizationScripts ConfigMap '%s' not found in namespace '%s'",
+							configMapName, configMapNamespace)
+						r.Log.Error(fmt.Errorf(errMsg), "Failed to find customization scripts ConfigMap")
+						step.AddError(errMsg)
+						err = nil
+						break
+					}
+					step.AddError(err.Error())
+					err = nil
+					break
+				}
+			}
+
 			r.NextPhase(vm)
 		case api.PhasePreHook, api.PhasePostHook:
 			runner := HookRunner{Context: r.Context}
