@@ -10,7 +10,7 @@ feature_copy_offload: false
 feature_ocp_live_migration: false
 feature_vmware_system_serial_number: true
 feature_cli_download: true
-feature_ova_appliance_management: false
+feature_ovf_appliance_management: false
 
 k8s_cluster: false
 feature_auth_required: true
@@ -159,6 +159,12 @@ ova_container_limits_cpu: "1000m"
 ova_container_limits_memory: "1Gi"
 ova_container_requests_cpu: "100m"
 ova_container_requests_memory: "512Mi"
+
+hyperv_provider_server_fqin: "{{ lookup( 'env', 'HYPERV_PROVIDER_SERVER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_HYPERV_PROVIDER_SERVER') }}"
+hyperv_container_limits_cpu: "1000m"
+hyperv_container_limits_memory: "1Gi"
+hyperv_container_requests_cpu: "100m"
+hyperv_container_requests_memory: "512Mi"
 
 populator_container_limits_cpu: "1000m"
 populator_container_limits_memory: "1Gi"

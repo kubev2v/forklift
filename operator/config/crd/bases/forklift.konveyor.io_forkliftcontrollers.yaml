@@ -63,10 +63,10 @@ spec:
                 type: string
                 enum: ["true", "false"]
                 description: "Enable OCP live migration (default: false)"
-              feature_ova_appliance_management:
+              feature_ovf_appliance_management:
                 type: string
                 enum: [ "true", "false" ]
-                description: "Enable OVA appliance management endpoints (default: false)"
+                description: "Enable OVF-based appliance management endpoints (OVA, HyperV)  (default: false)"
               feature_vmware_system_serial_number:
                 type: string
                 enum: ["true", "false"]
@@ -129,6 +129,10 @@ spec:
                 type: string
                 description: "OVA provider server image"
                 example: "quay.io/kubev2v/ova-provider-server:latest"
+              hyperv_provider_server_fqin:
+                type: string
+                description: "HyperV provider server image"
+                example: "quay.io/kubev2v/forklift-hyperv-provider-server:latest"
               must_gather_image_fqin:
                 type: string
                 description: "Must-gather debugging image"
@@ -410,6 +414,24 @@ spec:
               ova_container_requests_memory:
                 type: string
                 description: "OVA memory request (default: 150Mi)"
+                example: "300Mi"
+
+              # HyperV Settings
+              hyperv_container_limits_cpu:
+                type: string
+                description: "HyperV CPU limit (default: 1000m)"
+                example: "2000m"
+              hyperv_container_limits_memory:
+                type: string
+                description: "HyperV memory limit (default: 1Gi)"
+                example: "2Gi"
+              hyperv_container_requests_cpu:
+                type: string
+                description: "HyperV CPU request (default: 100m)"
+                example: "200m"
+              hyperv_container_requests_memory:
+                type: string
+                description: "HyperV memory request (default: 512Mi)"
                 example: "300Mi"
 
               # OVA Proxy Settings

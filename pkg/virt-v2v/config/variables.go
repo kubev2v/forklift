@@ -220,7 +220,7 @@ func (s *AppConfig) validate() error {
 				}
 			}
 		default:
-			return fmt.Errorf("invalid variable '%s', the valid option is 'ova' or 'vSphere'", EnvSourceName)
+			return fmt.Errorf("invalid variable '%s', the valid options are 'ova' or 'vSphere'", EnvSourceName)
 		}
 	}
 	return nil

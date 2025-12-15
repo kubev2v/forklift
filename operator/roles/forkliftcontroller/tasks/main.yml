@@ -113,6 +113,77 @@
       state: present
       definition: "{{ lookup('template', 'ova-proxy/route.yml.j2') }}"
 
+  # Install Red Hat's CIFS/SMB CSI Driver Operator from cluster catalog
+  # This replaces manual deployment of SMB CSI driver components
+  - name: "Check if SMB CSI Driver Operator is available in cluster catalog"
+    k8s_info:
+      api_version: packages.operators.coreos.com/v1
+      kind: PackageManifest
+      name: smb-csi-driver-operator
+      namespace: openshift-marketplace
+    register: smb_operator_catalog
+    ignore_errors: yes
+
+  - name: "Check if SMB CSI Driver Operator is already installed"
+    k8s_info:
+      api_version: operators.coreos.com/v1alpha1
+      kind: Subscription
+      name: smb-csi-driver-operator
+      namespace: openshift-cluster-csi-drivers
+    register: smb_operator_installed
+    when: smb_operator_catalog.resources | length > 0
+
+  - name: "Install SMB CSI Driver Operator from cluster catalog"
+    when:
+      - smb_operator_catalog.resources | length > 0
+      - smb_operator_installed.resources | default([]) | length == 0
+    block:
+      - name: "Create Subscription for SMB CSI Driver Operator"
+        k8s:
+          state: present
+          definition: "{{ lookup('template', 'smb-csi/operator-subscription.yml.j2') }}"
+
+      - name: "Wait for SMB CSI Driver Operator to be ready"
+        k8s_info:
+          api_version: operators.coreos.com/v1alpha1
+          kind: ClusterServiceVersion
+          namespace: openshift-cluster-csi-drivers
+        register: csv_list
+        until: >
+          csv_list.resources |
+          selectattr('metadata.name', 'match', '^smb-csi-driver-operator\..*') |
+          selectattr('status.phase', 'equalto', 'Succeeded') |
+          list | length > 0
+        retries: 30
+        delay: 10
+
+
+      - name: "Wait for ClusterCSIDriver CRD to be available"
+        k8s_info:
+          api_version: apiextensions.k8s.io/v1
+          kind: CustomResourceDefinition
+          name: clustercsidrivers.operator.openshift.io
+        register: crd_result
+        until: crd_result.resources | length > 0
+        retries: 30
+        delay: 5
+      - name: "Create ClusterCSIDriver CR for SMB"
+        k8s:
+          state: present
+          definition: "{{ lookup('template', 'smb-csi/clustercsidriver.yml.j2') }}"
+
+  - name: "Log SMB CSI installation status"
+    debug:
+      msg: >
+        {% if smb_operator_catalog.resources | length == 0 %}
+        SMB CSI Driver Operator not available in cluster catalog (OpenShift < 4.20).
+        HyperV provider will not be available.
+        {% elif smb_operator_installed.resources | default([]) | length > 0 %}
+        SMB CSI Driver Operator already installed.
+        {% else %}
+        SMB CSI Driver Operator installed successfully from cluster catalog.
+        {% endif %}
+
   - when: not k8s_cluster|bool
     block:
     - name: "Setup metrics service"
