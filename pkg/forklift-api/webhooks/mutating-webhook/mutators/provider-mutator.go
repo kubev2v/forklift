@@ -82,8 +82,11 @@ func (mutator *ProviderMutator) setSdkEndpointIfNeeded() bool {
 
 func (mutator *ProviderMutator) setFinalizers() bool {
 	var changed bool
-	if mutator.provider.Type() == api.Ova {
+	switch mutator.provider.Type() {
+	case api.Ova:
 		changed = k8sutil.AddFinalizer(&(mutator.provider), api.OvaProviderFinalizer)
+	case api.HyperV:
+		changed = k8sutil.AddFinalizer(&(mutator.provider), api.HyperVProviderFinalizer)
 	}
 	return changed
 }

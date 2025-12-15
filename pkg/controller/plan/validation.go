@@ -89,7 +89,7 @@ const (
 	ValidatingVDDK                  = "ValidatingVDDK"
 	VDDKInitImageNotReady           = "VDDKInitImageNotReady"
 	VDDKInitImageUnavailable        = "VDDKInitImageUnavailable"
-	UnsupportedOvaSource            = "UnsupportedOvaSource"
+	UnsupportedOVFExportSource      = "UnsupportedOVFExportSource"
 	VMPowerStateUnsupported         = "VMPowerStateUnsupported"
 	VMMigrationTypeUnsupported      = "VMMigrationTypeUnsupported"
 	GuestToolsIssue                 = "GuestToolsIssue"
@@ -696,11 +696,11 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "Duplicate targetName.",
 		Items:    []string{},
 	}
-	unsupportedOvaSource := libcnd.Condition{
-		Type:     UnsupportedOvaSource,
+	unsupportedOVFExportSource := libcnd.Condition{
+		Type:     UnsupportedOVFExportSource,
 		Status:   True,
 		Category: api.CategoryWarn,
-		Message:  "OVA appears to have been exported from an unsupported source, and may have issues during import.",
+		Message:  "VM appears to have been exported from an unsupported OVF source, and may have issues during import.",
 		Items:    []string{},
 	}
 	powerStateUnsupported := libcnd.Condition{
@@ -836,7 +836,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			for _, concern := range ova.Concerns {
 				// match label from ova/export_source.rego
 				if concern.Id == "ova.source.unsupported" {
-					unsupportedOvaSource.Items = append(unsupportedOvaSource.Items, ref.String())
+					unsupportedOVFExportSource.Items = append(unsupportedOVFExportSource.Items, ref.String())
 				}
 			}
 		}
@@ -1155,8 +1155,8 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	if len(targetNameNotUnique.Items) > 0 {
 		plan.Status.SetCondition(targetNameNotUnique)
 	}
-	if len(unsupportedOvaSource.Items) > 0 {
-		plan.Status.SetCondition(unsupportedOvaSource)
+	if len(unsupportedOVFExportSource.Items) > 0 {
+		plan.Status.SetCondition(unsupportedOVFExportSource)
 	}
 	if len(powerStateUnsupported.Items) > 0 {
 		plan.Status.SetCondition(powerStateUnsupported)
