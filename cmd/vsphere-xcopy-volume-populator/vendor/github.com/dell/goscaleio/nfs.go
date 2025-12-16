@@ -125,3 +125,21 @@ func (s *System) PingNAS(id string, ipaddress string) error {
 
 	return nil
 }
+
+func (s *System) IsNFSEnabled() (bool, error) {
+	path := "/rest/v1/nfs-servers?select=*"
+	var servers []types.NFSServer
+
+	err := s.client.getJSONWithRetry(http.MethodGet, path, nil, &servers)
+	if err != nil {
+		return false, err
+	}
+
+	for _, server := range servers {
+		if server.IsNFSv3Enabled || server.IsNFSv4Enabled {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
