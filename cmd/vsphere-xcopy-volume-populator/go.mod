@@ -12,8 +12,8 @@ require (
 	github.com/infinidat/infinibox-csi-driver v0.0.0-20251022203528-1f6913cf29cb
 	github.com/kubev2v/forklift v0.0.0-20251201013611-d4d1610e79df
 	github.com/netapp/trident v0.0.0-20240628081112-cb68cb389d9d
-	github.com/onsi/ginkgo/v2 v2.25.1
-	github.com/onsi/gomega v1.38.2
+	github.com/onsi/ginkgo/v2 v2.25.3
+	github.com/onsi/gomega v1.38.3
 	github.com/stretchr/testify v1.10.0
 	github.com/vmware/govmomi v0.50.0
 	go.uber.org/mock v0.5.2

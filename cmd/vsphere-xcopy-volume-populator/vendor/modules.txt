@@ -262,7 +262,7 @@ github.com/netapp/trident/utils/version
 # github.com/oklog/ulid v1.3.1
 ## explicit
 github.com/oklog/ulid
-# github.com/onsi/ginkgo/v2 v2.25.1
+# github.com/onsi/ginkgo/v2 v2.25.3
 ## explicit; go 1.23.0
 github.com/onsi/ginkgo/v2
 github.com/onsi/ginkgo/v2/config
@@ -284,7 +284,7 @@ github.com/onsi/ginkgo/v2/internal/parallel_support
 github.com/onsi/ginkgo/v2/internal/testingtproxy
 github.com/onsi/ginkgo/v2/reporters
 github.com/onsi/ginkgo/v2/types
-# github.com/onsi/gomega v1.38.2
+# github.com/onsi/gomega v1.38.3
 ## explicit; go 1.23.0
 github.com/onsi/gomega
 github.com/onsi/gomega/format
