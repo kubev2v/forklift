@@ -187,7 +187,7 @@ func (r *Reconciler) validateURL(provider *api.Provider) error {
 	return nil
 }
 
-func (r *Reconciler) validateConnectionStatus(provider *api.Provider, secret *core.Secret) {
+func (r *Reconciler) validateConnectionStatus(provider *api.Provider, secret *core.Secret) bool {
 	if base.GetInsecureSkipVerifyFlag(secret) {
 		provider.Status.SetCondition(libcnd.Condition{
 			Type:     ConnectionInsecure,
@@ -196,18 +196,28 @@ func (r *Reconciler) validateConnectionStatus(provider *api.Provider, secret *co
 			Category: Warn,
 			Message:  "TLS is susceptible to machine-in-the-middle attacks when certificate verification is skipped.",
 		})
-	} else {
-		_, err := base.VerifyTLSConnection(provider.Spec.URL, secret)
-		if err != nil {
-			provider.Status.SetCondition(libcnd.Condition{
-				Type:     ConnectionTestFailed,
-				Status:   True,
-				Reason:   Tested,
-				Category: Critical,
-				Message:  err.Error(),
-			})
-		}
+		return true
 	}
+
+	// Check if cacert is provided when TLS verification is enabled
+	if len(secret.Data["cacert"]) == 0 {
+		// Return false to signal caller to skip further validation (GetTlsCertificate)
+		// The keyList validation will handle the error
+		return false
+	}
+
+	// Verify TLS connection with provided cacert
+	_, err := base.VerifyTLSConnection(provider.Spec.URL, secret)
+	if err != nil {
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     ConnectionTestFailed,
+			Status:   True,
+			Reason:   Tested,
+			Category: Critical,
+			Message:  err.Error(),
+		})
+	}
+	return true
 }
 
 // Validate secret (ref).
@@ -261,7 +271,11 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 			"password",
 		}
 
-		r.validateConnectionStatus(provider, secret)
+		// validateConnectionStatus returns false if cacert is missing
+		if !r.validateConnectionStatus(provider, secret) {
+			keyList = append(keyList, "cacert")
+			break
+		}
 
 		var providerUrl *url.URL
 		providerUrl, err = url.Parse(provider.Spec.URL)
