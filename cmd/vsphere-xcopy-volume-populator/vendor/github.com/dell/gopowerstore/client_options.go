@@ -19,6 +19,8 @@
 package gopowerstore
 
 import (
+	"time"
+
 	"github.com/dell/gopowerstore/api"
 )
 
@@ -38,7 +40,7 @@ func NewClientOptions() *ClientOptions {
 // ClientOptions struct provide additional options for api client configuration
 type ClientOptions struct {
 	insecure       *bool // skip https cert check
-	defaultTimeout *int64
+	defaultTimeout *time.Duration
 	rateLimit      *int
 	// define field name in context which will be used for tracing
 	requestIDKey *api.ContextKey
@@ -53,7 +55,7 @@ func (co *ClientOptions) Insecure() bool {
 }
 
 // DefaultTimeout returns http client default timeout
-func (co *ClientOptions) DefaultTimeout() int64 {
+func (co *ClientOptions) DefaultTimeout() time.Duration {
 	if co.defaultTimeout == nil {
 		return clientOptionsDefaultTimeout
 	}
@@ -83,7 +85,7 @@ func (co *ClientOptions) SetInsecure(value bool) *ClientOptions {
 }
 
 // SetDefaultTimeout sets default http client timeout value
-func (co *ClientOptions) SetDefaultTimeout(value int64) *ClientOptions {
+func (co *ClientOptions) SetDefaultTimeout(value time.Duration) *ClientOptions {
 	co.defaultTimeout = &value
 	return co
 }

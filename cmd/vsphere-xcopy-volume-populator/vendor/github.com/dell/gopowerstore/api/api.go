@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -41,7 +42,11 @@ import (
 	"time"
 )
 
-var debug = false
+var (
+	debug              = false
+	systemCertPoolFunc = x509.SystemCertPool
+	errSysCerts        = errors.New("unable to initialize certificate pool from system")
+)
 
 const (
 	paginationHeader = "content-range"
@@ -147,7 +152,7 @@ type ClientIMPL struct {
 	username          string
 	password          string
 	httpClient        *http.Client
-	defaultTimeout    int64
+	defaultTimeout    time.Duration
 	requestIDKey      ContextKey
 	customHTTPHeaders *SafeHeader
 	logger            Logger
@@ -158,7 +163,7 @@ type ClientIMPL struct {
 
 // New creates and initialize API client
 func New(apiURL string, username string,
-	password string, insecure bool, defaultTimeout int64, rateLimit int, requestIDKey ContextKey,
+	password string, insecure bool, defaultTimeout time.Duration, rateLimit int, requestIDKey ContextKey,
 ) (*ClientIMPL, error) {
 	debug, _ = strconv.ParseBool(os.Getenv("GOPOWERSTORE_DEBUG"))
 	if apiURL == "" || username == "" || password == "" {
@@ -171,12 +176,26 @@ func New(apiURL string, username string,
 		client = &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: insecure, // #nosec G402
+					InsecureSkipVerify: true, // #nosec G402
 				},
 			},
 		}
 	} else {
-		client = &http.Client{}
+		pool, err := systemCertPoolFunc()
+		if err != nil {
+			log.Fatalf("failed to get system cert pool: %v", err)
+			return nil, fmt.Errorf("failed to get system cert pool: %w", err)
+		}
+		client = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					RootCAs:            pool,
+					InsecureSkipVerify: false,
+					CipherSuites:       GetSecuredCipherSuites(),
+					MinVersion:         tls.VersionTLS12,
+				},
+			},
+		}
 	}
 
 	// Set cookie jar to enable session management via auth_cookie
@@ -208,6 +227,23 @@ func New(apiURL string, username string,
 	clientImpl.login(context.Background()) // #nosec G104
 
 	return clientImpl, nil
+}
+
+// MockClient returns default client for testing purposes
+func MockClient(defaultTimeout time.Duration, rateLimit int, requestIDKey ContextKey,
+) *ClientIMPL {
+	debug, _ = strconv.ParseBool(os.Getenv("GOPOWERSTORE_DEBUG"))
+	client := &http.Client{}
+	throttle := NewTimeoutSemaphore(defaultTimeout, rateLimit, &defaultLogger{})
+	clientImpl := &ClientIMPL{
+		httpClient:        client,
+		defaultTimeout:    defaultTimeout,
+		requestIDKey:      requestIDKey,
+		logger:            &defaultLogger{},
+		apiThrottle:       throttle,
+		customHTTPHeaders: NewSafeHeader(),
+	}
+	return clientImpl
 }
 
 const errorSeverity = "Error"
@@ -463,7 +499,7 @@ func (c *ClientIMPL) setupContext(ctx context.Context) (context.Context, *func()
 	_, timeoutIsSet := ctx.Deadline()
 	if !timeoutIsSet {
 		var f func()
-		ctx, f = context.WithTimeout(ctx, time.Duration(c.defaultTimeout)*time.Second)
+		ctx, f = context.WithTimeout(ctx, c.defaultTimeout)
 		return ctx, &f
 	}
 	return ctx, nil
@@ -515,4 +551,13 @@ var sensitiveDataRegexp = regexp.MustCompile(
 
 func replaceSensitiveHeaderInfo(dump []byte) string {
 	return sensitiveDataRegexp.ReplaceAllString(string(dump), "$1$3******")
+}
+
+// GetSecuredCipherSuites returns a set of secure cipher suites.
+func GetSecuredCipherSuites() (suites []uint16) {
+	securedSuite := tls.CipherSuites()
+	for _, v := range securedSuite {
+		suites = append(suites, v.ID)
+	}
+	return suites
 }

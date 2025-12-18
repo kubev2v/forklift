@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2020-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2020-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,8 +27,10 @@ import (
 )
 
 const (
-	nasURL = "nas_server"
-	fsURL  = "file_system"
+	nasURL              = "nas_server"
+	fsURL               = "file_system"
+	jobsURL             = "job"
+	jobStatusInProgress = "IN_PROGRESS"
 )
 
 func getNASDefaultQueryParams(c Client) api.QueryParamsEncoder {
@@ -44,6 +46,11 @@ func getFSDefaultQueryParams(c Client) api.QueryParamsEncoder {
 func getNfsServerDefaultQueryParams(c Client) api.QueryParamsEncoder {
 	nfsServer := NFSServerInstance{}
 	return c.APIClient().QueryParamsWithFields(&nfsServer)
+}
+
+func getJobDefaultQueryParams(c Client) api.QueryParamsEncoder {
+	job := Job{}
+	return c.APIClient().QueryParamsWithFields(&job)
 }
 
 // GetNASServers query and return all NAS servers
@@ -173,6 +180,53 @@ func (c *ClientIMPL) DeleteNAS(ctx context.Context, id string) (resp EmptyRespon
 		},
 		&resp)
 	return resp, WrapErr(err)
+}
+
+// ListFS returns a list of Filesystems
+func (c *ClientIMPL) ListFS(ctx context.Context) (resp []FileSystem, err error) {
+	err = c.readPaginatedData(func(offset int) (api.RespMeta, error) {
+		var page []FileSystem
+		qp := getFSDefaultQueryParams(c)
+		qp.RawArg("filesystem_type", fmt.Sprintf("not.eq.%s", FileSystemTypeEnumSnapshot))
+		qp.Order("name")
+		qp.Offset(offset).Limit(paginationDefaultPageSize)
+		meta, err := c.APIClient().Query(
+			ctx,
+			RequestConfig{
+				Method:      "GET",
+				Endpoint:    fsURL,
+				QueryParams: qp,
+			},
+			&page)
+		err = WrapErr(err)
+		if err == nil {
+			resp = append(resp, page...)
+		}
+		return meta, err
+	})
+	return resp, err
+}
+
+// GetInProgressJobsByFsName query and return all jobs that are in progress by name of the filesystem involved
+func (c *ClientIMPL) GetInProgressJobsByFsName(ctx context.Context, name string) (resp []Job, err error) {
+	var jobList []Job
+	qp := getJobDefaultQueryParams(c)
+	qp.RawArg("resource_name", fmt.Sprintf("eq.%s", name))
+	qp.RawArg("state", fmt.Sprintf("eq.%s", jobStatusInProgress))
+	qp.RawArg("resource_type", "eq.file_system")
+	_, err = c.APIClient().Query(
+		ctx,
+		RequestConfig{
+			Method:      "GET",
+			Endpoint:    jobsURL,
+			QueryParams: qp,
+		},
+		&jobList)
+	err = WrapErr(err)
+	if err != nil {
+		return resp, err
+	}
+	return jobList, err
 }
 
 // GetFSByName query and return specific FS by name
@@ -406,7 +460,7 @@ func (c *ClientIMPL) GetFsByFilter(ctx context.Context, filter map[string]string
 
 func GetNASFields(arrayVerion float32) []string {
 	var fields []string
-	fields = []string{"id", "description", "name", "current_node_id", "operational_status", "current_preferred_IPv4_interface_id", "current_preferred_IPv6_interface_id", "nfs_servers", "file_systems", "health_details", "preferred_node_id", "default_unix_user", "default_windows_user", "current_unix_directory_service", "is_username_translation_enabled", "is_auto_user_mapping_enabled", "production_IPv4_interface_id", "production_IPv6_interface_id", "backup_IPv4_interface_id", "backup_IPv6_interface_id", "protection_policy_id", "file_events_publishing_mode", "is_replication_destination", "is_production_mode_enabled", "operational_status_l10n", "current_unix_directory_service_l10n", "file_events_publishing_mode_l10n"}
+	fields = []string{"id", "description", "name", "current_node_id", "operational_status", "current_preferred_IPv4_interface_id", "current_preferred_IPv6_interface_id", "nfs_servers(id,is_nfsv3_enabled,is_nfsv4_enabled)", "file_systems", "health_details", "preferred_node_id", "default_unix_user", "default_windows_user", "current_unix_directory_service", "is_username_translation_enabled", "is_auto_user_mapping_enabled", "production_IPv4_interface_id", "production_IPv6_interface_id", "backup_IPv4_interface_id", "backup_IPv6_interface_id", "protection_policy_id", "file_events_publishing_mode", "is_replication_destination", "is_production_mode_enabled", "operational_status_l10n", "current_unix_directory_service_l10n", "file_events_publishing_mode_l10n"}
 
 	if arrayVerion > 3.6 {
 		fields = append(fields, "is_dr_test")
