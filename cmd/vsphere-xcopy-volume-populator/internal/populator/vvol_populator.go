@@ -8,14 +8,14 @@ import (
 )
 
 type VvolPopulator struct {
-	VSphereClient vmware.Client
-	StorageApi    VVolCapable
+	vSphereClient vmware.Client
+	storageApi    VVolCapable
 }
 
 func NewVvolPopulator(storageApi VVolCapable, vmwareClient vmware.Client) (Populator, error) {
 	return &VvolPopulator{
-		VSphereClient: vmwareClient,
-		StorageApi:    storageApi,
+		vSphereClient: vmwareClient,
+		storageApi:    storageApi,
 	}, nil
 }
 
@@ -37,7 +37,7 @@ func (p *VvolPopulator) Populate(vmId string, sourceVMDKFile string, pv Persiste
 
 	// Try using vSphere API to discover source volume first (preferred method)
 	klog.Infof("VVol Populator: Starting VVol copy operation...")
-	err := p.StorageApi.VvolCopy(p.VSphereClient, vmId, sourceVMDKFile, pv, progress)
+	err := p.storageApi.VvolCopy(p.vSphereClient, vmId, sourceVMDKFile, pv, progress)
 	if err != nil {
 		klog.Errorf("VVol Populator: discovery of source volume using vSphere API failed: %v", err)
 		return fmt.Errorf("failed to copy VMDK using VVol storage API: %w", err)
