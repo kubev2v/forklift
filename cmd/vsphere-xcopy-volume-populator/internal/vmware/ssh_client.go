@@ -139,13 +139,27 @@ func (c *ESXiSSHClient) ExecuteCommand(datastore, sshCommand string, args ...str
 		return "", fmt.Errorf("SSH command timed out after 60 seconds: %s", fullCommand)
 	}
 
-	if cmdErr != nil {
-		klog.Warningf("SSH command failed: %s, output: %s, error: %v", fullCommand, string(output), cmdErr)
-		return string(output), cmdErr
+	outputStr := string(output)
+
+	// Check if the output indicates old SSH key format (using Python .py instead of shell .sh)
+	if strings.Contains(outputStr, ".py") || strings.Contains(outputStr, "python") {
+		errMsg := fmt.Sprintf("SSH key uses old format with Python wrapper (.py). "+
+			"The system now requires the new format using shell wrapper (.sh). "+
+			"Please update the SSH key on host %s by removing the old key entry from "+
+			"/etc/ssh/keys-root/authorized_keys and adding the new format. "+
+			"See README for migration instructions. "+
+			"Command output: %s", c.hostname, outputStr)
+		klog.Errorf("Old SSH key format detected: %s", errMsg)
+		return "", fmt.Errorf("%s", errMsg)
 	}
 
-	klog.V(2).Infof("SSH command succeeded: %s, output: %s", fullCommand, string(output))
-	return string(output), nil
+	if cmdErr != nil {
+		klog.Warningf("SSH command failed: %s, output: %s, error: %v", fullCommand, outputStr, cmdErr)
+		return outputStr, cmdErr
+	}
+
+	klog.V(2).Infof("SSH command succeeded: %s, output: %s", fullCommand, outputStr)
+	return outputStr, nil
 }
 
 func (c *ESXiSSHClient) Close() error {

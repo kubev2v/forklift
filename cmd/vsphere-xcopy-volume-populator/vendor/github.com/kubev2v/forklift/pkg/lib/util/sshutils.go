@@ -70,7 +70,7 @@ func GenerateSSHPublicSecretName(providerName string) (string, error) {
 // TestSSHConnectivity tests if we can connect via SSH and execute a restricted command.
 // It takes a context, hostIP, privateKey, optional testDatastore, and a logger.
 // If testDatastore is empty, it performs a simple connectivity test expecting "SSH_OK" response.
-// If testDatastore is provided, it will try to call the Python wrapper on that datastore.
+// If testDatastore is provided, it will try to call the shell wrapper on that datastore.
 // Returns true if SSH connectivity is working, false otherwise.
 func TestSSHConnectivity(ctx context.Context, hostIP string, privateKey []byte, log logging.LevelLogger) bool {
 	log.V(3).Info("Testing SSH connectivity to host", "hostIP", hostIP)

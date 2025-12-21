@@ -21,7 +21,7 @@ const (
 
 // writeSecureScriptToTemp writes the embedded script to a temporary file
 func writeSecureScriptToTemp() (string, error) {
-	tempFile, err := os.CreateTemp("", "secure-vmkfstools-wrapper-*.py")
+	tempFile, err := os.CreateTemp("", "secure-vmkfstools-wrapper-*")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file: %w", err)
 	}

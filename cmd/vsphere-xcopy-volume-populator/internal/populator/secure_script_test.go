@@ -16,6 +16,7 @@ import (
 	vmware_mocks "github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware/mocks"
 )
  
+
 var _ = Describe("uploadScript", func() {
 	var (
 		ctrl       *gomock.Controller
@@ -121,7 +122,6 @@ var _ = Describe("writeSecureScriptToTemp", func() {
 		// Note: The file will be cleaned up by the defer in the function
 		// but we can check it exists before that
 		Expect(tempPath).To(ContainSubstring("secure-vmkfstools-wrapper"))
-		Expect(tempPath).To(ContainSubstring(".py"))
 	})
 
 	It("should write script content to the file", func() {
