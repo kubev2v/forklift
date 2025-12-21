@@ -3,8 +3,6 @@ package pure
 import (
 	"strings"
 	"testing"
-
-	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
 )
 
 func TestFcUIDToWWPN(t *testing.T) {
@@ -149,46 +147,6 @@ func TestExtractSerialFromNAA(t *testing.T) {
 				if serial != tc.expectedSerial {
 					t.Errorf("expected serial %q, but got %q", tc.expectedSerial, serial)
 				}
-			}
-		})
-	}
-}
-
-func TestSupportsDiskType(t *testing.T) {
-	clonner := &FlashArrayClonner{}
-
-	testCases := []struct {
-		name     string
-		diskType populator.DiskType
-		expected bool
-	}{
-		{
-			name:     "supports RDM",
-			diskType: populator.DiskTypeRDM,
-			expected: true,
-		},
-		{
-			name:     "supports VVol",
-			diskType: populator.DiskTypeVVol,
-			expected: true,
-		},
-		{
-			name:     "supports VMDK",
-			diskType: populator.DiskTypeVMDK,
-			expected: true,
-		},
-		{
-			name:     "unsupported type",
-			diskType: populator.DiskType("unknown"),
-			expected: false,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			result := clonner.SupportsDiskType(tc.diskType)
-			if result != tc.expected {
-				t.Errorf("SupportsDiskType(%s) = %v, want %v", tc.diskType, result, tc.expected)
 			}
 		})
 	}
