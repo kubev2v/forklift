@@ -12,13 +12,9 @@ type VvolPopulator struct {
 	StorageApi    VVolCapable
 }
 
-func NewVvolPopulator(storageApi VVolCapable, vsphereHostname, vsphereUsername, vspherePassword string) (Populator, error) {
-	c, err := vmware.NewClient(vsphereHostname, vsphereUsername, vspherePassword)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create vmware client: %w", err)
-	}
+func NewVvolPopulator(storageApi VVolCapable, vmwareClient vmware.Client) (Populator, error) {
 	return &VvolPopulator{
-		VSphereClient: c,
+		VSphereClient: vmwareClient,
 		StorageApi:    storageApi,
 	}, nil
 }
