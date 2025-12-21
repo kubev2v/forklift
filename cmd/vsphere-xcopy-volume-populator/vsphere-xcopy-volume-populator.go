@@ -149,17 +149,6 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	// Create populator selector
-	selector, err := populator.NewPopulatorSelector(
-		storageApi,
-		vsphereHostname,
-		vsphereUsername,
-		vspherePassword,
-	)
-	if err != nil {
-		klog.Fatalf("Failed to create populator selector: %s", err)
-	}
-
 	// Prepare SSH config if needed
 	var sshConfig *populator.SSHConfig
 	methodStr := strings.ToLower(strings.TrimSpace(esxiCloneMethod))
@@ -178,16 +167,18 @@ func main() {
 	}
 
 	// Select the appropriate populator based on disk type
-	p, selectedDiskType, err := selector.SelectPopulator(
-		context.Background(),
+	p, err := populator.NewPopulator(
+		storageApi,
+		vsphereHostname,
+		vsphereUsername,
+		vspherePassword,
 		sourceVmId,
 		sourceVMDKFile,
 		sshConfig,
 	)
 	if err != nil {
-		klog.Fatalf("Failed to select populator: %s", err)
+		klog.Fatalf("Failed to initialize populator: %s", err)
 	}
-	klog.Infof("Selected populator for disk type: %s", selectedDiskType)
 
 	pv, err := getPv(clientSet, targetNamespace, ownerName)
 	if err != nil {

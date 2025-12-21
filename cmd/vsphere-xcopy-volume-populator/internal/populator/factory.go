@@ -22,45 +22,28 @@ type SSHConfig struct {
 	TimeoutSeconds int
 }
 
-// PopulatorSelector selects the appropriate populator based on disk type
-type PopulatorSelector struct {
-	storageApi    StorageApi
-	vsphereClient vmware.Client
-}
-
-// NewPopulatorSelector creates a new PopulatorSelector
-func NewPopulatorSelector(
+// NewPopulator creates a new PopulatorSelector
+func NewPopulator(
 	storageApi StorageApi,
 	vsphereHostname string,
 	vsphereUsername string,
 	vspherePassword string,
-) (*PopulatorSelector, error) {
+	vmId string,
+	vmdkPath string,
+	sshConfig *SSHConfig,
+) (Populator, error) {
 	// Create vSphere client for type detection
 	vsphereClient, err := vmware.NewClient(vsphereHostname, vsphereUsername, vspherePassword)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vSphere client: %w", err)
 	}
 
-	return &PopulatorSelector{
-		storageApi:    storageApi,
-		vsphereClient: vsphereClient,
-	}, nil
-}
+	ctx := context.Background()
 
-// SelectPopulator determines the appropriate populator based on disk type
-// Falls back to VMDK/Xcopy if the detected type's method is not available
-func (s *PopulatorSelector) SelectPopulator(
-	ctx context.Context,
-	vmId string,
-	vmdkPath string,
-	sshConfig *SSHConfig,
-) (Populator, DiskType, error) {
-
-	// Step 1: Detect disk type using vSphere API
-	diskType, err := detectDiskType(ctx, s.vsphereClient, vmId, vmdkPath)
+	diskType, err := detectDiskType(ctx, vsphereClient, vmId, vmdkPath)
 	if err != nil {
 		klog.Warningf("Failed to detect disk type: %v, using VMDK/Xcopy", err)
-		return s.createVMDKPopulator(sshConfig)
+		return createVMDKPopulator(storageApi, vsphereClient, sshConfig)
 	}
 
 	klog.Infof("Detected disk type: %s", diskType)
@@ -68,56 +51,48 @@ func (s *PopulatorSelector) SelectPopulator(
 	// Step 2: Try to use optimized method for detected disk type
 	switch diskType {
 	case DiskTypeVVol:
-		if canUse(s.storageApi, DiskTypeVVol) {
+		if canUse(storageApi, DiskTypeVVol) {
 			klog.Infof("VVol method is available, using VVol populator")
-			if pop, err := s.createVVolPopulator(); err == nil {
-				return pop, DiskTypeVVol, nil
-			} else {
-				klog.Warningf("Failed to create VVol populator: %v", err)
-			}
+			return createVVolPopulator(storageApi, vsphereClient)
 		}
 
 	case DiskTypeRDM:
-		if canUse(s.storageApi, DiskTypeRDM) {
+		if canUse(storageApi, DiskTypeRDM) {
 			klog.Infof("RDM method is available, using RDM populator")
-			if pop, err := s.createRDMPopulator(); err == nil {
-				return pop, DiskTypeRDM, nil
-			} else {
-				klog.Warningf("Failed to create RDM populator: %v", err)
-			}
+			return createRDMPopulator(storageApi, vsphereClient)
 		}
 	}
 
 	// Default: Use VMDK/Xcopy (always works)
 	klog.Infof("Using VMDK/Xcopy populator")
-	return s.createVMDKPopulator(sshConfig)
+	return createVMDKPopulator(storageApi, vsphereClient, sshConfig)
 }
 
 // createVVolPopulator creates VVol populator
-func (s *PopulatorSelector) createVVolPopulator() (Populator, error) {
-	vvolApi, ok := s.storageApi.(VVolCapable)
+func createVVolPopulator(storageApi StorageApi, vmwareClient vmware.Client) (Populator, error) {
+	vvolApi, ok := storageApi.(VVolCapable)
 	if !ok {
 		return nil, fmt.Errorf("storage API does not implement VVolCapable")
 	}
 
-	return NewVvolPopulator(vvolApi, s.vsphereClient)
+	return NewVvolPopulator(vvolApi, vmwareClient)
 }
 
 // createRDMPopulator creates RDM populator
-func (s *PopulatorSelector) createRDMPopulator() (Populator, error) {
-	rdmApi, ok := s.storageApi.(RDMCapable)
+func createRDMPopulator(storageApi StorageApi, vmwareClient vmware.Client) (Populator, error) {
+	rdmApi, ok := storageApi.(RDMCapable)
 	if !ok {
 		return nil, fmt.Errorf("storage API does not implement RDMCapable")
 	}
 
-	return NewRDMPopulator(rdmApi, s.vsphereClient)
+	return NewRDMPopulator(rdmApi, vmwareClient)
 }
 
 // createVMDKPopulator creates VMDK/Xcopy populator (default/fallback)
-func (s *PopulatorSelector) createVMDKPopulator(sshConfig *SSHConfig) (Populator, DiskType, error) {
-	vmdkApi, ok := s.storageApi.(VMDKCapable)
+func createVMDKPopulator(storageApi StorageApi, vmwareClient vmware.Client, sshConfig *SSHConfig) (Populator, error) {
+	vmdkApi, ok := storageApi.(VMDKCapable)
 	if !ok {
-		return nil, "", fmt.Errorf("storage API does not implement VMDKCapable (required)")
+		return nil, fmt.Errorf("storage API does not implement VMDKCapable (required)")
 	}
 
 	var pop Populator
@@ -129,19 +104,19 @@ func (s *PopulatorSelector) createVMDKPopulator(sshConfig *SSHConfig) (Populator
 			timeout = 30
 		}
 		pop, err = NewWithRemoteEsxcliSSH(vmdkApi,
-			s.vsphereClient,
+			vmwareClient,
 			sshConfig.PrivateKey,
 			sshConfig.PublicKey,
 			timeout)
 	} else {
-		pop, err = NewWithRemoteEsxcli(vmdkApi, s.vsphereClient)
+		pop, err = NewWithRemoteEsxcli(vmdkApi, vmwareClient)
 	}
 
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to create VMDK/Xcopy populator: %w", err)
+		return nil, fmt.Errorf("failed to create VMDK/Xcopy populator: %w", err)
 	}
 
-	return pop, DiskTypeVMDK, nil
+	return pop, nil
 }
 
 // canUse checks if a disk type method is enabled and supported
