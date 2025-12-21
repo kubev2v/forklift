@@ -70,7 +70,3 @@ type MappingContext map[string]any
 type SciniAware interface {
 	SciniRequired() bool
 }
-
-// Legacy aliases for backward compatibility
-type VvolStorageApi = VVolCapable
-type EsxiStorageApi = VMDKCapable

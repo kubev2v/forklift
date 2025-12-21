@@ -3,11 +3,17 @@ package populator
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
 	"k8s.io/klog/v2"
 )
+
+var settings = populatorSettings{
+	VVolDisabled: os.Getenv("DISABLE_VVOL_METHOD") == "true",
+	RDMDisabled:  os.Getenv("DISABLE_RDM_METHOD") == "true",
+}
 
 // SSHConfig holds SSH configuration for VMDK/Xcopy populator
 type SSHConfig struct {
@@ -20,7 +26,6 @@ type SSHConfig struct {
 // PopulatorSelector selects the appropriate populator based on disk type
 type PopulatorSelector struct {
 	storageApi      StorageApi
-	settings        *PopulatorSettings
 	typeDetector    DiskTypeDetector
 	vsphereClient   vmware.Client
 	vsphereHostname string
@@ -31,7 +36,6 @@ type PopulatorSelector struct {
 // NewPopulatorSelector creates a new PopulatorSelector
 func NewPopulatorSelector(
 	storageApi StorageApi,
-	settings *PopulatorSettings,
 	vsphereHostname string,
 	vsphereUsername string,
 	vspherePassword string,
@@ -44,7 +48,6 @@ func NewPopulatorSelector(
 
 	return &PopulatorSelector{
 		storageApi:      storageApi,
-		settings:        settings,
 		typeDetector:    NewVSphereTypeDetector(),
 		vsphereClient:   vsphereClient,
 		vsphereHostname: vsphereHostname,
@@ -120,9 +123,9 @@ func (s *PopulatorSelector) isMethodAvailable(diskType DiskType) bool {
 func (s *PopulatorSelector) isMethodEnabled(diskType DiskType) bool {
 	switch diskType {
 	case DiskTypeVVol:
-		return !s.settings.VVolDisabled
+		return !settings.VVolDisabled
 	case DiskTypeRDM:
-		return !s.settings.RDMDisabled
+		return !settings.RDMDisabled
 	case DiskTypeVMDK:
 		return true // Cannot be disabled - always the fallback
 	default:
