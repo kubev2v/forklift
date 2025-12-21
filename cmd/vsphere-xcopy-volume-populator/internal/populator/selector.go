@@ -25,11 +25,8 @@ type SSHConfig struct {
 
 // PopulatorSelector selects the appropriate populator based on disk type
 type PopulatorSelector struct {
-	storageApi      StorageApi
-	vsphereClient   vmware.Client
-	vsphereHostname string
-	vsphereUsername string
-	vspherePassword string
+	storageApi    StorageApi
+	vsphereClient vmware.Client
 }
 
 // NewPopulatorSelector creates a new PopulatorSelector
@@ -46,11 +43,8 @@ func NewPopulatorSelector(
 	}
 
 	return &PopulatorSelector{
-		storageApi:      storageApi,
-		vsphereClient:   vsphereClient,
-		vsphereHostname: vsphereHostname,
-		vsphereUsername: vsphereUsername,
-		vspherePassword: vspherePassword,
+		storageApi:    storageApi,
+		vsphereClient: vsphereClient,
 	}, nil
 }
 
@@ -107,7 +101,7 @@ func (s *PopulatorSelector) createVVolPopulator() (Populator, error) {
 		return nil, fmt.Errorf("storage API does not implement VVolCapable")
 	}
 
-	return NewVvolPopulator(vvolApi, s.vsphereHostname, s.vsphereUsername, s.vspherePassword)
+	return NewVvolPopulator(vvolApi, s.vsphereClient)
 }
 
 // createRDMPopulator creates RDM populator
@@ -117,7 +111,7 @@ func (s *PopulatorSelector) createRDMPopulator() (Populator, error) {
 		return nil, fmt.Errorf("storage API does not implement RDMCapable")
 	}
 
-	return NewRDMPopulator(rdmApi, s.vsphereHostname, s.vsphereUsername, s.vspherePassword)
+	return NewRDMPopulator(rdmApi, s.vsphereClient)
 }
 
 // createVMDKPopulator creates VMDK/Xcopy populator (default/fallback)
@@ -136,17 +130,12 @@ func (s *PopulatorSelector) createVMDKPopulator(sshConfig *SSHConfig) (Populator
 			timeout = 30
 		}
 		pop, err = NewWithRemoteEsxcliSSH(vmdkApi,
-			s.vsphereHostname,
-			s.vsphereUsername,
-			s.vspherePassword,
+			s.vsphereClient,
 			sshConfig.PrivateKey,
 			sshConfig.PublicKey,
 			timeout)
 	} else {
-		pop, err = NewWithRemoteEsxcli(vmdkApi,
-			s.vsphereHostname,
-			s.vsphereUsername,
-			s.vspherePassword)
+		pop, err = NewWithRemoteEsxcli(vmdkApi, s.vsphereClient)
 	}
 
 	if err != nil {

@@ -14,13 +14,9 @@ type RDMPopulator struct {
 }
 
 // NewRDMPopulator creates a new RDM populator
-func NewRDMPopulator(storageApi RDMCapable, vsphereHostname, vsphereUsername, vspherePassword string) (Populator, error) {
-	c, err := vmware.NewClient(vsphereHostname, vsphereUsername, vspherePassword)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create vmware client: %w", err)
-	}
+func NewRDMPopulator(storageApi RDMCapable, vmwareClient vmware.Client) (Populator, error) {
 	return &RDMPopulator{
-		VSphereClient: c,
+		VSphereClient: vmwareClient,
 		StorageApi:    storageApi,
 	}, nil
 }
