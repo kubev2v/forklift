@@ -9,15 +9,15 @@ import (
 
 // RDMPopulator handles population of RDM-backed disks
 type RDMPopulator struct {
-	VSphereClient vmware.Client
-	StorageApi    RDMCapable
+	vSphereClient vmware.Client
+	storageApi    RDMCapable
 }
 
 // NewRDMPopulator creates a new RDM populator
 func NewRDMPopulator(storageApi RDMCapable, vmwareClient vmware.Client) (Populator, error) {
 	return &RDMPopulator{
-		VSphereClient: vmwareClient,
-		StorageApi:    storageApi,
+		vSphereClient: vmwareClient,
+		storageApi:    storageApi,
 	}, nil
 }
 
@@ -40,7 +40,7 @@ func (p *RDMPopulator) Populate(vmId string, sourceVMDKFile string, pv Persisten
 
 	// Perform the RDM copy operation
 	klog.Infof("RDM Populator: Starting RDM copy operation...")
-	err := p.StorageApi.RDMCopy(p.VSphereClient, vmId, sourceVMDKFile, pv, progress)
+	err := p.storageApi.RDMCopy(p.vSphereClient, vmId, sourceVMDKFile, pv, progress)
 	if err != nil {
 		klog.Errorf("RDM Populator: RDM copy operation failed: %v", err)
 		return fmt.Errorf("failed to copy RDM disk: %w", err)
