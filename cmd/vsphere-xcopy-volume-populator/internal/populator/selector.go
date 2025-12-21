@@ -26,7 +26,6 @@ type SSHConfig struct {
 // PopulatorSelector selects the appropriate populator based on disk type
 type PopulatorSelector struct {
 	storageApi      StorageApi
-	typeDetector    DiskTypeDetector
 	vsphereClient   vmware.Client
 	vsphereHostname string
 	vsphereUsername string
@@ -48,7 +47,6 @@ func NewPopulatorSelector(
 
 	return &PopulatorSelector{
 		storageApi:      storageApi,
-		typeDetector:    NewVSphereTypeDetector(),
 		vsphereClient:   vsphereClient,
 		vsphereHostname: vsphereHostname,
 		vsphereUsername: vsphereUsername,
@@ -66,7 +64,7 @@ func (s *PopulatorSelector) SelectPopulator(
 ) (Populator, DiskType, error) {
 
 	// Step 1: Detect disk type using vSphere API
-	diskType, err := s.typeDetector.DetectDiskType(ctx, s.vsphereClient, vmId, vmdkPath)
+	diskType, err := detectDiskType(ctx, s.vsphereClient, vmId, vmdkPath)
 	if err != nil {
 		klog.Warningf("Failed to detect disk type: %v, using VMDK/Xcopy", err)
 		return s.createVMDKPopulator(sshConfig)
@@ -135,22 +133,19 @@ func (s *PopulatorSelector) isMethodEnabled(diskType DiskType) bool {
 
 // isMethodSupported queries storage to see if it supports the disk type
 func (s *PopulatorSelector) isMethodSupported(diskType DiskType) bool {
-	// VMDK is always supported if storage implements VMDKCapable
-	if diskType == DiskTypeVMDK {
-		_, ok := s.storageApi.(VMDKCapable)
+	switch diskType {
+	case DiskTypeVVol:
+		_, ok := s.storageApi.(VVolCapable)
 		return ok
+	case DiskTypeRDM:
+		_, ok := s.storageApi.(RDMCapable)
+		return ok
+	case DiskTypeVMDK:
+		return true // storageApi embeds VMDKCapable and is our default
+	default:
+		klog.V(2).Infof("Storage does not implement DiskTypeCapable, assuming no support for %s", diskType)
+		return false // unexpected and unsupported behaviour
 	}
-
-	// Check if storage implements DiskTypeCapable interface
-	if capable, ok := s.storageApi.(DiskTypeCapable); ok {
-		supported := capable.SupportsDiskType(diskType)
-		klog.V(2).Infof("Storage DiskTypeCapable.SupportsDiskType(%s) = %v", diskType, supported)
-		return supported
-	}
-
-	// If DiskTypeCapable not implemented, assume no support
-	klog.V(2).Infof("Storage does not implement DiskTypeCapable, assuming no support for %s", diskType)
-	return false
 }
 
 // createVVolPopulator creates VVol populator

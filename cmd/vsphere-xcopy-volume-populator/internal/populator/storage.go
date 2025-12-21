@@ -9,18 +9,9 @@ const (
 	CleanupXcopyInitiatorGroup = "cleanupXcopyInitiatorGroup"
 )
 
-// StorageApi is the base marker interface for all storage implementations
-//
 //go:generate go run go.uber.org/mock/mockgen -destination=mocks/storage_mock_client.go -package=storage_mocks . StorageApi
-type StorageApi interface{}
-
-// DiskTypeCapable allows storage implementations to declare which disk types they support.
-// If a storage does NOT implement this interface, it is assumed to support NOTHING
-// (will fall back to VMDK/Xcopy via interface casting).
-type DiskTypeCapable interface {
-	// SupportsDiskType returns true if this storage supports the given disk type optimization
-	// diskType: DiskTypeVVol, DiskTypeRDM, or DiskTypeVMDK
-	SupportsDiskType(diskType DiskType) bool
+type StorageApi interface {
+	VMDKCapable
 }
 
 // StorageResolver resolves a PersistentVolume to LUN details
