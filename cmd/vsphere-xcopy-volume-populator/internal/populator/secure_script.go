@@ -7,18 +7,18 @@ import (
 	"time"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
-	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper"
+	vmkfstoolswrapper "github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper"
 	"github.com/vmware/govmomi/object"
 	"k8s.io/klog/v2"
 )
 
 const (
-	secureScriptName = "secure-vmkfstools-wrapper"
+	scriptName = "secure-vmkfstools-wrapper"
 )
 
 // writeSecureScriptToTemp writes the embedded script to a temporary file
 func writeSecureScriptToTemp() (string, error) {
-	tempFile, err := os.CreateTemp("", "secure-vmkfstools-wrapper-*.py")
+	tempFile, err := os.CreateTemp("", "secure-vmkfstools-wrapper-*")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file: %w", err)
 	}
@@ -34,6 +34,7 @@ func writeSecureScriptToTemp() (string, error) {
 }
 
 // ensureSecureScript ensures the secure script is uploaded and available on the target ESX
+// Returns the script path
 func ensureSecureScript(ctx context.Context, client vmware.Client, esx *object.HostSystem, datastore string) (string, error) {
 	klog.Infof("ensuring secure script on ESXi %s", esx.Name())
 
@@ -49,7 +50,6 @@ func ensureSecureScript(ctx context.Context, client vmware.Client, esx *object.H
 	if err != nil {
 		return "", fmt.Errorf("failed to upload the secure script to ESXi %s: %w", esx.Name(), err)
 	}
-	// Script will execute directly from datastore - no need for shell commands
 	klog.Infof("uploaded secure script to ESXi %s at %s - ready for execution", esx.Name(), scriptPath)
 
 	return scriptPath, nil
@@ -71,7 +71,6 @@ func uploadScript(ctx context.Context, client vmware.Client, dc *object.Datacent
 	}
 	defer os.Remove(tempScriptPath) // Clean up temp file
 
-	scriptName := fmt.Sprintf("%s.py", secureScriptName)
 	klog.Infof("Uploading embedded script to datastore as %s", scriptName)
 
 	// Upload the file with timeout

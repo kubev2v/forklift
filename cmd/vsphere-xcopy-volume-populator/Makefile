@@ -35,9 +35,10 @@ generate:
 
 .PHONY: build
 build: fmt vet
+	$(eval SCRIPT_VERSION := $(shell sh vmkfstools-wrapper/vmkfstools_wrapper.sh --version --output simple))
 	PATH="$(PATH)" \
 	go build \
-	-ldflags="-w -s -X github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator.VibVersion=$(VIB_VERSION)" \
+	-ldflags="-w -s -X github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator.VibVersion=$(VIB_VERSION) -X github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper.Version=$(SCRIPT_VERSION)" \
 	-o bin/vsphere-xcopy-volume-populator \
 	vsphere-xcopy-volume-populator.go
 	PATH="$(PATH)" \
@@ -133,7 +134,7 @@ test-copy-using-cli-powerstore: build
 	bin/vsphere-xcopy-volume-populator \
 		--source-vm-id="rhel9" \
 		--source-vmdk="[iscsi1] rhel9/rhel9.vmdk" \
-		--owner-name=test8-rhel9-disk-0-cf5cdf1f  \
+		--owner-name=vib--rhel-disk-0-ed03d7d8 \
 		--target-namespace=default \
 		--storage-vendor-product=powerstore \
 		--secret-name=powerstore-secret \
