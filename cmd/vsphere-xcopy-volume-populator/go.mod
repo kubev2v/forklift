@@ -112,7 +112,7 @@ require (
 	github.com/spf13/afero v1.11.0 // indirect
 	github.com/vishvananda/netlink v1.3.1-0.20250206174618-62fb240731fa // indirect
 	github.com/vishvananda/netns v0.0.4 // indirect
-	github.com/zcalusic/sysinfo v1.1.2 // indirect
+	github.com/zcalusic/sysinfo v1.1.3 // indirect
 	go.mongodb.org/mongo-driver v1.17.2 // indirect
 	go.opentelemetry.io/otel v1.34.0 // indirect
 	go.opentelemetry.io/otel/metric v1.34.0 // indirect

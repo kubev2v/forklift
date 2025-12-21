@@ -398,7 +398,7 @@ github.com/vmware/govmomi/vim25/xml
 # github.com/x448/float16 v0.8.4
 ## explicit; go 1.11
 github.com/x448/float16
-# github.com/zcalusic/sysinfo v1.1.2
+# github.com/zcalusic/sysinfo v1.1.3
 ## explicit; go 1.22
 github.com/zcalusic/sysinfo
 github.com/zcalusic/sysinfo/cpuid
