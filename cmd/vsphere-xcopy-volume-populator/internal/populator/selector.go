@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
 	"k8s.io/klog/v2"
@@ -143,14 +142,6 @@ func (s *PopulatorSelector) createVMDKPopulator(sshConfig *SSHConfig) (Populator
 	}
 
 	return pop, DiskTypeVMDK, nil
-}
-
-// GetSSHTimeout returns the SSH timeout duration
-func GetSSHTimeout(timeoutSeconds int) time.Duration {
-	if timeoutSeconds <= 0 {
-		return 30 * time.Second
-	}
-	return time.Duration(timeoutSeconds) * time.Second
 }
 
 // canUse checks if a disk type method is enabled and supported
