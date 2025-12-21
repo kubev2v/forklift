@@ -75,7 +75,7 @@ func (s *PopulatorSelector) SelectPopulator(
 	// Step 2: Try to use optimized method for detected disk type
 	switch diskType {
 	case DiskTypeVVol:
-		if s.isMethodAvailable(DiskTypeVVol) {
+		if canUse(s.storageApi, DiskTypeVVol) {
 			klog.Infof("VVol method is available, using VVol populator")
 			if pop, err := s.createVVolPopulator(); err == nil {
 				return pop, DiskTypeVVol, nil
@@ -85,7 +85,7 @@ func (s *PopulatorSelector) SelectPopulator(
 		}
 
 	case DiskTypeRDM:
-		if s.isMethodAvailable(DiskTypeRDM) {
+		if canUse(s.storageApi, DiskTypeRDM) {
 			klog.Infof("RDM method is available, using RDM populator")
 			if pop, err := s.createRDMPopulator(); err == nil {
 				return pop, DiskTypeRDM, nil
@@ -98,54 +98,6 @@ func (s *PopulatorSelector) SelectPopulator(
 	// Default: Use VMDK/Xcopy (always works)
 	klog.Infof("Using VMDK/Xcopy populator")
 	return s.createVMDKPopulator(sshConfig)
-}
-
-// isMethodAvailable checks if a method is both enabled and supported
-func (s *PopulatorSelector) isMethodAvailable(diskType DiskType) bool {
-	// Check if enabled in settings
-	if !s.isMethodEnabled(diskType) {
-		klog.V(2).Infof("Method %s is disabled in settings", diskType)
-		return false
-	}
-
-	// Check if storage supports it
-	if !s.isMethodSupported(diskType) {
-		klog.V(2).Infof("Storage does not support method %s", diskType)
-		return false
-	}
-
-	return true
-}
-
-// isMethodEnabled checks settings - methods are enabled unless explicitly disabled
-func (s *PopulatorSelector) isMethodEnabled(diskType DiskType) bool {
-	switch diskType {
-	case DiskTypeVVol:
-		return !settings.VVolDisabled
-	case DiskTypeRDM:
-		return !settings.RDMDisabled
-	case DiskTypeVMDK:
-		return true // Cannot be disabled - always the fallback
-	default:
-		return false
-	}
-}
-
-// isMethodSupported queries storage to see if it supports the disk type
-func (s *PopulatorSelector) isMethodSupported(diskType DiskType) bool {
-	switch diskType {
-	case DiskTypeVVol:
-		_, ok := s.storageApi.(VVolCapable)
-		return ok
-	case DiskTypeRDM:
-		_, ok := s.storageApi.(RDMCapable)
-		return ok
-	case DiskTypeVMDK:
-		return true // storageApi embeds VMDKCapable and is our default
-	default:
-		klog.V(2).Infof("Storage does not implement DiskTypeCapable, assuming no support for %s", diskType)
-		return false // unexpected and unsupported behaviour
-	}
 }
 
 // createVVolPopulator creates VVol populator
@@ -210,4 +162,26 @@ func GetSSHTimeout(timeoutSeconds int) time.Duration {
 		return 30 * time.Second
 	}
 	return time.Duration(timeoutSeconds) * time.Second
+}
+
+// canUse checks if a disk type method is enabled and supported
+func canUse(storageApi StorageApi, diskType DiskType) bool {
+	switch diskType {
+	case DiskTypeVVol:
+		if settings.VVolDisabled {
+			return false
+		}
+		_, ok := storageApi.(VVolCapable)
+		return ok
+
+	case DiskTypeRDM:
+		if settings.RDMDisabled {
+			return false
+		}
+		_, ok := storageApi.(RDMCapable)
+		return ok
+
+	default:
+		return false
+	}
 }
