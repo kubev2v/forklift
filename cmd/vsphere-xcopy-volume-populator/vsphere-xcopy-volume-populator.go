@@ -149,13 +149,9 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	// Load populator settings from environment
-	settings := populator.NewPopulatorSettingsFromEnv()
-
 	// Create populator selector
 	selector, err := populator.NewPopulatorSelector(
 		storageApi,
-		settings,
 		vsphereHostname,
 		vsphereUsername,
 		vspherePassword,
