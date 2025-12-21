@@ -38,8 +38,8 @@ github.com/dell/goscaleio
 github.com/dell/goscaleio/api
 github.com/dell/goscaleio/log
 github.com/dell/goscaleio/types/v1
-# github.com/elastic/go-sysinfo v1.14.2
-## explicit; go 1.21
+# github.com/elastic/go-sysinfo v1.15.4
+## explicit; go 1.23.0
 github.com/elastic/go-sysinfo
 github.com/elastic/go-sysinfo/internal/registry
 github.com/elastic/go-sysinfo/providers/aix
@@ -48,8 +48,8 @@ github.com/elastic/go-sysinfo/providers/linux
 github.com/elastic/go-sysinfo/providers/shared
 github.com/elastic/go-sysinfo/providers/windows
 github.com/elastic/go-sysinfo/types
-# github.com/elastic/go-windows v1.0.0
-## explicit
+# github.com/elastic/go-windows v1.0.2
+## explicit; go 1.18
 github.com/elastic/go-windows
 # github.com/emicklei/go-restful/v3 v3.12.2
 ## explicit; go 1.13
