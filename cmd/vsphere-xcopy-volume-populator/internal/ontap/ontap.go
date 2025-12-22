@@ -16,7 +16,6 @@ import (
 const OntapProviderID = "600a0980"
 
 // Ensure NetappClonner implements required interfaces
-var _ populator.DiskTypeCapable = &NetappClonner{}
 var _ populator.RDMCapable = &NetappClonner{}
 var _ populator.VMDKCapable = &NetappClonner{}
 
@@ -119,20 +118,6 @@ func (c *NetappClonner) CurrentMappedGroups(targetLUN populator.LUN, _ populator
 		return nil, fmt.Errorf("Failed to get mapped luns by path %s: %w ", targetLUN.Name, err)
 	}
 	return lunMappedIgroups, nil
-}
-
-// SupportsDiskType returns true if this storage supports the given disk type optimization
-func (c *NetappClonner) SupportsDiskType(diskType populator.DiskType) bool {
-	switch diskType {
-	case populator.DiskTypeRDM:
-		return true // Ontap supports RDM optimization
-	case populator.DiskTypeVMDK:
-		return true // Ontap supports VMDK/Xcopy fallback
-	case populator.DiskTypeVVol:
-		return false // Ontap doesn't support VVol optimization
-	default:
-		return false
-	}
 }
 
 // RDMCopy performs a copy operation for RDM-backed disks using NetApp storage APIs

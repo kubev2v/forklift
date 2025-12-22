@@ -21,7 +21,6 @@ import (
 const FlashProviderID = "624a9370"
 
 // Ensure FlashArrayClonner implements required interfaces
-var _ populator.DiskTypeCapable = &FlashArrayClonner{}
 var _ populator.RDMCapable = &FlashArrayClonner{}
 var _ populator.VVolCapable = &FlashArrayClonner{}
 var _ populator.VMDKCapable = &FlashArrayClonner{}
@@ -258,20 +257,6 @@ func (f *FlashArrayClonner) matchesVMDKPath(fileName string, vmDisk populator.VM
 	fileBase := filepath.Base(fileName)
 	targetBase := filepath.Base(vmDisk.VmdkFile)
 	return fileBase == targetBase
-}
-
-// SupportsDiskType returns true if this storage supports the given disk type optimization
-func (f *FlashArrayClonner) SupportsDiskType(diskType populator.DiskType) bool {
-	switch diskType {
-	case populator.DiskTypeRDM:
-		return true // Pure FlashArray supports RDM optimization
-	case populator.DiskTypeVMDK:
-		return true // Pure FlashArray supports VMDK/Xcopy fallback
-	case populator.DiskTypeVVol:
-		return true // Pure FlashArray supports VVol optimization
-	default:
-		return false
-	}
 }
 
 // RDMCopy performs a copy operation for RDM-backed disks using Pure FlashArray APIs
