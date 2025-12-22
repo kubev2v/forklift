@@ -364,7 +364,7 @@ func (c *RestClient) CopyVolume(sourceVolumeName, targetVolumeName string) error
 // ListHosts lists all local hosts on the Pure FlashArray
 func (c *RestClient) ListHosts() ([]Host, error) {
 	// Filter for local hosts only to avoid selecting remote hosts in active cluster setups
-	url := fmt.Sprintf("https://%s/api/%s/hosts?filter=is_local=true", c.hostname, c.apiV2)
+	url := fmt.Sprintf("https://%s/api/%s/hosts?filter=is_local", c.hostname, c.apiV2)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
