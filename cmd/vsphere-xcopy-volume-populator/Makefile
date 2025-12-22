@@ -50,9 +50,9 @@ test-copy-using-cli: build
 		--source-vm-id=vm-92749 \
 		--source-vmdk="[eco-iscsi-ds3] tshefi_40G/tshefi_40G.vmdk" \
 		--owner-name=tshefi40g \
-		--target-namespace=default \
+		--target-namespace=openshift-mtv \
 		--storage-vendor-product=ontap \
-		--secret-name=populator-secret \
+		--secret-name=ontap \
 		--owner-uid=tshefi40g \
 		--esxi-clone-method=ssh \
 		--kubeconfig=$$KUBECONFIG
