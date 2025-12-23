@@ -8,7 +8,6 @@ require (
 	github.com/dell/gopowermax/v2 v2.9.0
 	github.com/dell/gopowerstore v1.19.0
 	github.com/dell/goscaleio v1.20.0
-	github.com/devans10/pugo/flasharray v0.0.0-20241116160615-6bb8c469c9a0
 	github.com/infinidat/infinibox-csi-driver v0.0.0-20251022203528-1f6913cf29cb
 	github.com/kubev2v/forklift v0.0.0-20250813102318-c4b25b22d0b5
 	github.com/netapp/trident v0.0.0-20240628081112-cb68cb389d9d
@@ -125,7 +124,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	howett.net/plist v0.0.0-20181124034731-591f970eefbb // indirect
 	k8s.io/mount-utils v0.32.8 // indirect
-	k8s.io/utils v0.0.0-20250321185631-1f6e0b77f77e // indirect
+	k8s.io/utils v0.0.0-20251222233032-718f0e51e6d2 // indirect
 )
 
 replace github.com/kubev2v/forklift => ../../

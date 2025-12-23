@@ -38,9 +38,6 @@ github.com/dell/goscaleio
 github.com/dell/goscaleio/api
 github.com/dell/goscaleio/log
 github.com/dell/goscaleio/types/v1
-# github.com/devans10/pugo/flasharray v0.0.0-20241116160615-6bb8c469c9a0
-## explicit; go 1.12
-github.com/devans10/pugo/flasharray
 # github.com/elastic/go-sysinfo v1.14.2
 ## explicit; go 1.21
 github.com/elastic/go-sysinfo
@@ -916,8 +913,8 @@ k8s.io/kube-openapi/pkg/validation/spec
 # k8s.io/mount-utils v0.32.8
 ## explicit; go 1.23.0
 k8s.io/mount-utils
-# k8s.io/utils v0.0.0-20250321185631-1f6e0b77f77e
-## explicit; go 1.18
+# k8s.io/utils v0.0.0-20251222233032-718f0e51e6d2
+## explicit; go 1.23
 k8s.io/utils/clock
 k8s.io/utils/clock/testing
 k8s.io/utils/exec
