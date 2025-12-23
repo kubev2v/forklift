@@ -320,7 +320,7 @@ podman run -it --rm \
   -e GOVMOMI_PASSWORD='your-password' \
   -e GOVMOMI_HOSTNAME='vcenter.example.com' \
   -e GOVMOMI_INSECURE='true' \
-  quay.io/kubev2v/vsphere-xcopy-volume-populator:devel-amd64 \
+  $( oc get deploy -n openshift-mtv forklift-volume-populator-controller -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE")].value}') \
   --ssh-key-file /tmp/esxi_key \
   --datacenter MyDatacenter
 ```
@@ -331,7 +331,7 @@ podman run -it --rm \
 podman run -it --rm \
   --entrypoint /bin/vib-installer \
   -v $HOME/.ssh/id_rsa:/tmp/esxi_key:Z \
-  quay.io/kubev2v/vsphere-xcopy-volume-populator:devel-amd64 \
+  $( oc get deploy -n openshift-mtv forklift-volume-populator-controller -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE")].value}') \
   --ssh-key-file /tmp/esxi_key \
   --esxi-hosts 'esxi1.example.com,esxi2.example.com,esxi3.example.com'
 ```
