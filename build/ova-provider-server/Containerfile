@@ -8,8 +8,19 @@ ENV GOCACHE=/go-build/cache
 RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -ldflags="-w -s" -o ova-provider-server github.com/kubev2v/forklift/cmd/ova-provider-server
 
 FROM registry.access.redhat.com/ubi9-minimal:9.6-1752587672
+
 # Required to be able to get files from within the pod
-RUN microdnf -y install tar && microdnf clean all
+# Update packages to address security vulnerabilities (CVE fixes)
+# Use dnf --security if available (full UBI), otherwise microdnf update (minimal UBI)
+RUN if command -v dnf &> /dev/null; then \
+        dnf install -y tar && \
+        dnf update -y --security && \
+        dnf clean all; \
+    else \
+        microdnf -y install tar && \
+        microdnf update -y && \
+        microdnf clean all; \
+    fi
 
 COPY --from=builder /app/ova-provider-server /usr/local/bin/ova-provider-server
 ENTRYPOINT ["/usr/local/bin/ova-provider-server"]
