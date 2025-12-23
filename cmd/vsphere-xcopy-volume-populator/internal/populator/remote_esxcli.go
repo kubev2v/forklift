@@ -56,29 +56,21 @@ type RemoteEsxcliPopulator struct {
 	SSHTimeout    time.Duration
 }
 
-func NewWithRemoteEsxcli(storageApi VMDKCapable, vsphereHostname, vsphereUsername, vspherePassword string) (Populator, error) {
-	c, err := vmware.NewClient(vsphereHostname, vsphereUsername, vspherePassword)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create vmware client: %w", err)
-	}
+func NewWithRemoteEsxcli(storageApi VMDKCapable, vmwareClient vmware.Client) (Populator, error) {
 	return &RemoteEsxcliPopulator{
-		VSphereClient: c,
+		VSphereClient: vmwareClient,
 		StorageApi:    storageApi,
 		UseSSHMethod:  false,            // VIB method
 		SSHTimeout:    30 * time.Second, // Default timeout (not used for VIB method)
 	}, nil
 }
 
-func NewWithRemoteEsxcliSSH(storageApi VMDKCapable, vsphereHostname, vsphereUsername, vspherePassword string, sshPrivateKey, sshPublicKey []byte, sshTimeoutSeconds int) (Populator, error) {
-	c, err := vmware.NewClient(vsphereHostname, vsphereUsername, vspherePassword)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create vmware client: %w", err)
-	}
+func NewWithRemoteEsxcliSSH(storageApi VMDKCapable, vmwareClient vmware.Client, sshPrivateKey, sshPublicKey []byte, sshTimeoutSeconds int) (Populator, error) {
 	if len(sshPrivateKey) == 0 || len(sshPublicKey) == 0 {
 		return nil, fmt.Errorf("ssh key material must be non-empty")
 	}
 	return &RemoteEsxcliPopulator{
-		VSphereClient: c,
+		VSphereClient: vmwareClient,
 		StorageApi:    storageApi,
 		SSHPrivateKey: sshPrivateKey,
 		SSHPublicKey:  sshPublicKey,
