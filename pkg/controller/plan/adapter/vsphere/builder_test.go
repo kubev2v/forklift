@@ -264,6 +264,26 @@ var _ = Describe("vSphere builder", func() {
 		})
 	})
 
+	Context("formatHostAddress", func() {
+		DescribeTable("should format addresses correctly", func(address string, expected string) {
+			result := formatHostAddress(address)
+			Expect(result).To(Equal(expected))
+		},
+			Entry("IPv4 address (no brackets)",
+				"192.168.1.100",
+				"192.168.1.100",
+			),
+			Entry("IPv6 address (add brackets)",
+				"2001:db8::1",
+				"[2001:db8::1]",
+			),
+			Entry("Invalid/Hostname (no change)",
+				"not-an-ip",
+				"not-an-ip",
+			),
+		)
+	})
+
 	builder := createBuilder()
 	DescribeTable("should", func(vm *model.VM, outputMap string) {
 		Expect(builder.mapMacStaticIps(vm)).Should(Equal(outputMap))
@@ -599,3 +619,165 @@ func createBuilder(objs ...runtime.Object) *Builder {
 		},
 	}
 }
+
+var _ = Describe("getHostAddress", func() {
+	var (
+		host *model.Host
+	)
+
+	BeforeEach(func() {
+		// Create a host with both IPv4 and IPv6 addresses
+		host = &model.Host{
+			Resource: model.Resource{Name: "test-host.example.com"},
+			Network: vsphere.HostNetwork{
+				VNICs: []vsphere.VNIC{
+					{
+						PortGroup: ManagementNetwork,
+						IpAddress: "10.6.46.28",
+						IpV6Address: []string{
+							"fe80::1",              // link-local (should be filtered)
+							"2620:52:9:162e::abcd", // global IPv6
+						},
+					},
+				},
+			},
+		}
+	})
+
+	Context("when provider URL uses IPv4", func() {
+		It("should return IPv4 address", func() {
+			provider := &v1beta1.Provider{
+				Spec: v1beta1.ProviderSpec{
+					URL: "https://10.6.46.248/sdk",
+				},
+			}
+			result := getHostAddress(host, provider)
+			Expect(result).To(Equal("10.6.46.28"))
+		})
+	})
+
+	Context("when provider URL uses IPv6", func() {
+		It("should return IPv6 address in brackets", func() {
+			provider := &v1beta1.Provider{
+				Spec: v1beta1.ProviderSpec{
+					URL: "https://[2620:52:9:162e::1]/sdk",
+				},
+			}
+			result := getHostAddress(host, provider)
+			Expect(result).To(Equal("[2620:52:9:162e::abcd]"))
+		})
+	})
+
+	Context("when provider URL uses hostname", func() {
+		It("should return available address (IPv4 preferred as default)", func() {
+			provider := &v1beta1.Provider{
+				Spec: v1beta1.ProviderSpec{
+					URL: "https://vcenter.example.com/sdk",
+				},
+			}
+			result := getHostAddress(host, provider)
+			Expect(result).To(Equal("10.6.46.28"))
+		})
+	})
+
+	Context("when provider URL uses IPv4 but host only has IPv6", func() {
+		BeforeEach(func() {
+			host.Network.VNICs[0].IpAddress = "" // Remove IPv4
+		})
+
+		It("should fallback to IPv6", func() {
+			provider := &v1beta1.Provider{
+				Spec: v1beta1.ProviderSpec{
+					URL: "https://10.6.46.248/sdk",
+				},
+			}
+			result := getHostAddress(host, provider)
+			Expect(result).To(Equal("[2620:52:9:162e::abcd]"))
+		})
+	})
+
+	Context("when provider URL uses IPv6 but host only has IPv4", func() {
+		BeforeEach(func() {
+			host.Network.VNICs[0].IpV6Address = []string{} // Remove IPv6
+		})
+
+		It("should fallback to IPv4", func() {
+			provider := &v1beta1.Provider{
+				Spec: v1beta1.ProviderSpec{
+					URL: "https://[2620:52:9:162e::1]/sdk",
+				},
+			}
+			result := getHostAddress(host, provider)
+			Expect(result).To(Equal("10.6.46.28"))
+		})
+	})
+
+	Context("when host has no IP addresses", func() {
+		BeforeEach(func() {
+			host.Network.VNICs[0].IpAddress = ""
+			host.Network.VNICs[0].IpV6Address = []string{}
+		})
+
+		It("should return hostname", func() {
+			provider := &v1beta1.Provider{
+				Spec: v1beta1.ProviderSpec{
+					URL: "https://vcenter.example.com/sdk",
+				},
+			}
+			result := getHostAddress(host, provider)
+			Expect(result).To(Equal("test-host.example.com"))
+		})
+	})
+
+	Context("when host has link-local IPv6 only", func() {
+		BeforeEach(func() {
+			host.Network.VNICs[0].IpAddress = ""
+			host.Network.VNICs[0].IpV6Address = []string{"fe80::1"} // link-local only
+		})
+
+		It("should return hostname (link-local filtered out)", func() {
+			provider := &v1beta1.Provider{
+				Spec: v1beta1.ProviderSpec{
+					URL: "https://vcenter.example.com/sdk",
+				},
+			}
+			result := getHostAddress(host, provider)
+			Expect(result).To(Equal("test-host.example.com"))
+		})
+	})
+
+	Context("when provider URL is malformed", func() {
+		It("should return available address (IPv4 as default)", func() {
+			provider := &v1beta1.Provider{
+				Spec: v1beta1.ProviderSpec{
+					URL: "not-a-valid-url",
+				},
+			}
+			result := getHostAddress(host, provider)
+			// When preference is unknown, returns IPv4 (current default behavior)
+			Expect(result).To(Equal("10.6.46.28"))
+		})
+	})
+
+	Context("when host has multiple management network VNICs", func() {
+		BeforeEach(func() {
+			host.Network.VNICs = append(host.Network.VNICs, vsphere.VNIC{
+				PortGroup: ManagementNetwork,
+				IpAddress: "10.6.46.29", // Another IPv4
+				IpV6Address: []string{
+					"2620:52:9:162e::def0", // Another IPv6
+				},
+			})
+		})
+
+		It("should use the first valid address of matching family", func() {
+			provider := &v1beta1.Provider{
+				Spec: v1beta1.ProviderSpec{
+					URL: "https://10.6.46.248/sdk",
+				},
+			}
+			result := getHostAddress(host, provider)
+			Expect(result).To(Equal("10.6.46.28")) // First IPv4
+		})
+	})
+})

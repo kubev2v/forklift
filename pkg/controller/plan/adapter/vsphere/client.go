@@ -449,7 +449,7 @@ func (r *Client) getClient(vm *model.VM, hosts util.HostsFunc) (client *vim25.Cl
 }
 
 func (r *Client) getHostClient(hostDef *v1beta1.Host, host *model.Host) (client *vim25.Client, err error) {
-	url, err := liburl.Parse("https://" + hostDef.Spec.IpAddress + "/sdk")
+	url, err := liburl.Parse("https://" + formatHostAddress(hostDef.Spec.IpAddress) + "/sdk")
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
