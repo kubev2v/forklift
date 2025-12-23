@@ -105,6 +105,10 @@ func (api *BlockStorageAPI) Lun(objectID string) string {
 	return api.Luns() + "/" + objectID
 }
 
+func (api *BlockStorageAPI) Snapshotpair() string {
+	return api.BaseURL + api.ObjectURL + "/snapshots"
+}
+
 func (api *BlockStorageAPI) APIVersion() string {
 	return fmt.Sprintf("https://%s:%s/ConfigurationManager/configuration/version", api.GumIPAddr, api.Port)
 }

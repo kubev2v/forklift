@@ -1,14 +1,20 @@
 package vantara
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
-	"k8s.io/klog/v2"
-
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
+	"github.com/vmware/govmomi/find"
+	"github.com/vmware/govmomi/property"
+	"github.com/vmware/govmomi/vim25/mo"
+	"github.com/vmware/govmomi/vim25/types"
+	"k8s.io/klog/v2"
 )
 
 type VantaraCloner struct {
@@ -226,4 +232,151 @@ func getLunIdFromPorts(ports []PortMapping, portId string, hostGroupNumber strin
 		}
 	}
 	return "", fmt.Errorf("LUN not found for port %s, hostGroup %s", portId, hostGroupNumber)
+}
+
+// VvolCopy performs a direct copy operation using vSphere API to discover source volume
+func (v *VantaraCloner) VvolCopy(vsphereClient vmware.Client, vmId string, sourceVMDKFile string, persistentVolume populator.PersistentVolume, progress chan<- uint) error {
+	klog.Infof("Starting VVol copy operation for VM %s", vmId)
+
+	// Parse the VMDK path
+	vmDisk, err := populator.ParseVmdkPath(sourceVMDKFile)
+	if err != nil {
+		return fmt.Errorf("failed to parse VMDK path: %w", err)
+	}
+
+	// Resolve target volume details
+	targetLUN, err := v.ResolvePVToLUN(persistentVolume)
+	if err != nil {
+		return fmt.Errorf("failed to resolve target volume: %w", err)
+	}
+
+	// Try to get source volume from vSphere API
+	sourceVolumeID, err := v.getSourceVolume(vsphereClient, vmId, vmDisk)
+	if err != nil {
+		return fmt.Errorf("failed to get source volume from vSphere: %w", err)
+	}
+
+	klog.Infof("Copying from source volume %s to target volume %s", sourceVolumeID, targetLUN.Name)
+
+	// Get target volume pool ID
+	LDEV := v.ShowLdev(targetLUN)
+	klog.Infof("Target LDEV: %v", LDEV)
+
+	// Perform the copy operation
+	err = v.performVolumeCopy(sourceVolumeID, LDEV, progress)
+	if err != nil {
+		return fmt.Errorf("copy operation failed: %w", err)
+	}
+
+	klog.Infof("VVol copy operation completed successfully")
+	return nil
+}
+
+// getSourceVolume find the vantara volume name for a VMDK
+func (v *VantaraCloner) getSourceVolume(vsphereClient vmware.Client, vmId string, vmDisk populator.VMDisk) (string, error) {
+	ctx := context.Background()
+
+	// Get VM object from vSphere
+	finder := find.NewFinder(vsphereClient.(*vmware.VSphereClient).Client.Client, true)
+	vm, err := finder.VirtualMachine(ctx, vmId)
+	if err != nil {
+		return "", fmt.Errorf("failed to get VM: %w", err)
+	}
+
+	// Get VM hardware configuration
+	var vmObject mo.VirtualMachine
+	pc := property.DefaultCollector(vsphereClient.(*vmware.VSphereClient).Client.Client)
+	err = pc.RetrieveOne(ctx, vm.Reference(), []string{"config.hardware.device"}, &vmObject)
+	if err != nil {
+		return "", fmt.Errorf("failed to get VM hardware config: %w", err)
+	}
+
+	// Look through VM's virtual disks to find VVol backing
+	if vmObject.Config == nil || vmObject.Config.Hardware.Device == nil {
+		return "", fmt.Errorf("VM config or hardware devices not found")
+	}
+
+	for _, device := range vmObject.Config.Hardware.Device {
+		if disk, ok := device.(*types.VirtualDisk); ok {
+			if backing, ok := disk.Backing.(*types.VirtualDiskFlatVer2BackingInfo); ok {
+				// Check if this is a VVol backing and matches our target VMDK
+				if backing.BackingObjectId != "" && v.matchesVMDKPath(backing.FileName, vmDisk) {
+					klog.Infof("Found VVol backing for VMDK %s with ID %s", vmDisk.VmdkFile, backing.BackingObjectId)
+
+					// Use REST client to find the volume by VVol ID
+					volumeID, err := v.api.FindVolumeByVVolID(backing.BackingObjectId)
+					if err != nil {
+						klog.Warningf("Failed to find volume by VVol ID %s: %v", backing.BackingObjectId, err)
+						continue
+					}
+
+					return volumeID, nil
+				}
+			}
+		}
+	}
+
+	return "", fmt.Errorf("VVol backing for VMDK %s not found", vmDisk.VmdkFile)
+}
+
+// matchesVMDKPath checks if a vSphere VVol filename matches the target VMDK
+func (f *VantaraCloner) matchesVMDKPath(fileName string, vmDisk populator.VMDisk) bool {
+	fileBase := filepath.Base(fileName)
+	targetBase := filepath.Base(vmDisk.VmdkFile)
+	return fileBase == targetBase
+}
+
+// performVolumeCopy executes the volume copy operation on Vantara
+func (v *VantaraCloner) performVolumeCopy(sourceVolumeId string, ldev map[string]interface{}, progress chan<- uint) error {
+	ldevID, err := extractStringField(ldev, "ldevId")
+	if err != nil {
+		return fmt.Errorf("invalid target LDEV id: %w", err)
+	}
+
+	poolID, err := extractStringField(ldev, "poolId")
+	if err != nil {
+		return fmt.Errorf("invalid target LDEV pool id: %w", err)
+	}
+
+	// Perform the copy operation using Vantara API
+	v.api.VantaraObj["snapshotGroupName"] = "ss-copy-" + sourceVolumeId + "-to-" + ldevID
+	v.api.VantaraObj["snapshotPoolId"] = poolID
+	v.api.VantaraObj["sourceLdevId"] = sourceVolumeId
+	v.api.VantaraObj["targetLdevId"] = ldevID
+	_, err = v.api.VantaraStorage(CLONELDEV)
+	if err != nil {
+		return fmt.Errorf("Vantara CopyVolume failed: %w", err)
+	}
+
+	progress <- 100
+	return nil
+}
+
+func extractStringField(data map[string]interface{}, key string) (string, error) {
+	val, ok := data[key]
+	if !ok {
+		return "", fmt.Errorf("field %q not found in LDEV data", key)
+	}
+
+	switch v := val.(type) {
+	case string:
+		if strings.TrimSpace(v) == "" {
+			return "", fmt.Errorf("field %q is empty", key)
+		}
+		return v, nil
+	case json.Number:
+		return v.String(), nil
+	case fmt.Stringer:
+		s := v.String()
+		if strings.TrimSpace(s) == "" {
+			return "", fmt.Errorf("field %q is empty", key)
+		}
+		return s, nil
+	default:
+		s := fmt.Sprintf("%v", v)
+		if strings.TrimSpace(s) == "" || s == "<nil>" {
+			return "", fmt.Errorf("field %q could not be converted to string", key)
+		}
+		return s, nil
+	}
 }
