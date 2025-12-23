@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"k8s.io/klog/v2"
@@ -207,6 +208,24 @@ func (v *VantaraStorageAPI) VantaraStorage(actionType string) (map[string]interf
 			klog.Errorf("Failed to get port details: %v", err)
 			return nil, err
 		}
+	case CLONELDEV:
+		url = api.Snapshotpair()
+		body["snapshotGroupName"] = v.VantaraObj["snapshotGroupName"].(string)
+		body["snapshotPoolId"] = v.VantaraObj["snapshotPoolId"].(string)
+		body["pvolLdevId"] = v.VantaraObj["sourceLdevId"].(string)
+		body["svolLdevId"] = v.VantaraObj["targetLdevId"].(string)
+		body["isClone"] = "true"
+		body["canCascade"] = "true"
+		body["clonesAutomation"] = "true"
+		body["copySpeed"] = "faster"
+		bodyJson, _ := json.Marshal(body)
+		klog.Infof("Body: %s", string(bodyJson))
+		_, err = api.InvokeAsyncCommand("POST", url, body, headers)
+		if err != nil {
+			klog.Errorf("Failed to create clone: %v", err)
+			return nil, err
+		}
+
 	default:
 	}
 
@@ -214,4 +233,22 @@ func (v *VantaraStorageAPI) VantaraStorage(actionType string) (map[string]interf
 	klog.Infof("Response: %s", string(jsonData))
 	return r, nil
 
+}
+
+func (v *VantaraStorageAPI) FindVolumeByVVolID(vvolID string) (string, error) {
+	if len(vvolID) < 4 {
+		return "", errors.New("VVol ID is too short")
+	}
+
+	// Extract the last 4 characters
+	last4 := vvolID[len(vvolID)-4:]
+
+	// Parse as hexadecimal to uint64
+	value, err := strconv.ParseUint(last4, 16, 64)
+	if err != nil {
+		return "", err
+	}
+
+	// Convert to decimal string and return
+	return strconv.FormatUint(value, 10), nil
 }
