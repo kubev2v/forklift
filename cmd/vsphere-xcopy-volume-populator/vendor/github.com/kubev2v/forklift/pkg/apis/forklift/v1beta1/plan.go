@@ -379,17 +379,6 @@ func (r *Plan) ShouldRunPreflightInspection() bool {
 		r.Spec.RunPreflightInspection
 }
 
-// IsUsingOffloadPlugin determines if any of the mappings is using storage offload
-func (r *Plan) IsUsingOffloadPlugin() bool {
-	dsMapIn := r.Map.Storage.Spec.Map
-	for _, m := range dsMapIn {
-		if m.OffloadPlugin != nil && m.OffloadPlugin.VSphereXcopyPluginConfig != nil {
-			return true
-		}
-	}
-	return false
-}
-
 // PVCNameTemplateData contains fields used in naming templates.
 type PVCNameTemplateData struct {
 	VmName         string `json:"vmName"`
