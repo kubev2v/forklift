@@ -165,7 +165,7 @@ See [README](internal/vantara/README.md)
 
 | Key | Value | Description |
 | --- | --- | --- |
-| PURE_CLUSTER_PREFIX | string | Cluster prefix is set in the StorageCluster resource. Get it with  `printf "px_%.8s" $(oc get storagecluster -A -o=jsonpath='{.items[?(@.spec.cloudStorage.provider=="pure")].status.clusterUid}')` |
+| PURE_CLUSTER_PREFIX | string | Cluster prefix is set in the StorageCluster resource. Get it with  `oc get storagecluster -A -o=jsonpath='{.items[0].status.clusterUid}'| head -c 8` |
 
 ### Dell PowerMax
 
