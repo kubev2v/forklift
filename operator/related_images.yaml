@@ -21,6 +21,8 @@ relatedImages:
     image: ${UI_PLUGIN_IMAGE}
   - name: ova_provider_server
     image: ${OVA_PROVIDER_SERVER_IMAGE}
+  - name: hyperv_provider_server
+    image: ${HYPERV_PROVIDER_SERVER_IMAGE}
   - name: ova_proxy
     image: ${OVA_PROXY_IMAGE}
   - name: vsphere_xcopy_volume_populator

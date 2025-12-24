@@ -2,6 +2,7 @@ package container
 
 import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/controller/provider/container/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/provider/container/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/provider/container/openstack"
 	"github.com/kubev2v/forklift/pkg/controller/provider/container/ova"
@@ -29,6 +30,8 @@ func Build(
 		return openstack.New(db, provider, secret)
 	case api.Ova:
 		return ova.New(db, provider, secret)
+	case api.HyperV:
+		return hyperv.New(db, provider, secret)
 	}
 
 	return nil

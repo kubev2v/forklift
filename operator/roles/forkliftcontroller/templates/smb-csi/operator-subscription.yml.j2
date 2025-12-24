@@ -1,0 +1,28 @@
+---
+# NOTE: openshift-cluster-csi-drivers is the standard OpenShift namespace for cluster-level CSI drivers
+# The namespace should already exist, but we ensure it is present
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-cluster-csi-drivers
+---
+# OperatorGroup for cluster-scoped operators
+# Empty targetNamespaces means AllNamespaces mode (required for CSI drivers)
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: openshift-cluster-csi-drivers
+  namespace: openshift-cluster-csi-drivers
+spec: {}
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: smb-csi-driver-operator
+  namespace: openshift-cluster-csi-drivers
+spec:
+  channel: stable
+  name: smb-csi-driver-operator
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Automatic

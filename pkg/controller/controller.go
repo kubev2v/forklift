@@ -19,6 +19,7 @@ package controller
 import (
 	"github.com/kubev2v/forklift/pkg/controller/hook"
 	"github.com/kubev2v/forklift/pkg/controller/host"
+	"github.com/kubev2v/forklift/pkg/controller/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/map/network"
 	"github.com/kubev2v/forklift/pkg/controller/map/storage"
 	"github.com/kubev2v/forklift/pkg/controller/migration"
@@ -50,6 +51,7 @@ var MainControllers = []AddFunction{
 var InventoryControllers = []AddFunction{
 	provider.Add,
 	ova.Add,
+	hyperv.Add,
 }
 
 // Add controllers to the manager based on role.
