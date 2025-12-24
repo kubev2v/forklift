@@ -1,0 +1,154 @@
+---
+# PostHook: Install node_exporter monitoring after migration completes
+# This sets up Prometheus-compatible monitoring on the migrated VM
+
+- name: PostHook - Setup SSH and load MTV metadata
+  hosts: localhost
+  gather_facts: yes
+  tasks:
+    - name: Load migration Plan metadata
+      include_vars:
+        file: plan.yml
+        name: plan
+
+    - name: Load VM workload metadata
+      include_vars:
+        file: workload.yml
+        name: workload
+
+    - name: Get current user info for SSH setup
+      getent:
+        database: passwd
+        key: "{{ ansible_user_id }}"
+        split: ':'
+
+    - name: Ensure SSH directory exists
+      file:
+        path: ~/.ssh
+        state: directory
+        mode: 0750
+      environment:
+        HOME: "{{ ansible_facts.getent_passwd[ansible_user_id][4] }}"
+
+    - name: Retrieve SSH credentials from Kubernetes Secret
+      k8s_info:
+        api_version: v1
+        kind: Secret
+        name: vm-ssh-credentials
+        namespace: konveyor-forklift
+      register: ssh_credentials
+
+    - name: Create SSH private key file
+      copy:
+        dest: ~/.ssh/mtv_migration_key
+        content: "{{ ssh_credentials.resources[0].data.key | b64decode }}"
+        mode: 0600
+
+    - name: Add target VM to Ansible inventory
+      add_host:
+        name: "{{ workload.vm.ipaddress }}"
+        ansible_user: root
+        ansible_ssh_private_key_file: ~/.ssh/mtv_migration_key
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+        groups: target_vms
+
+- name: Install monitoring on target VM
+  hosts: target_vms
+  gather_facts: yes
+  vars:
+    node_exporter_version: "1.7.0"
+    node_exporter_port: 9100
+  tasks:
+    - name: Create node_exporter user
+      user:
+        name: node_exporter
+        shell: /sbin/nologin
+        system: yes
+        create_home: no
+
+    - name: Download node_exporter
+      get_url:
+        url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+        dest: /tmp/node_exporter.tar.gz
+        mode: 0644
+
+    - name: Extract node_exporter
+      unarchive:
+        src: /tmp/node_exporter.tar.gz
+        dest: /tmp/
+        remote_src: yes
+
+    - name: Install node_exporter binary
+      copy:
+        src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
+        dest: /usr/local/bin/node_exporter
+        owner: node_exporter
+        group: node_exporter
+        mode: 0755
+        remote_src: yes
+
+    - name: Create node_exporter systemd service
+      copy:
+        dest: /etc/systemd/system/node_exporter.service
+        content: |
+          [Unit]
+          Description=Node Exporter
+          Documentation=https://prometheus.io/docs/guides/node-exporter/
+          After=network-online.target
+          
+          [Service]
+          Type=simple
+          User=node_exporter
+          Group=node_exporter
+          ExecStart=/usr/local/bin/node_exporter \
+            --web.listen-address=:{{ node_exporter_port }}
+          
+          SyslogIdentifier=node_exporter
+          Restart=always
+          RestartSec=5
+          
+          [Install]
+          WantedBy=multi-user.target
+        mode: 0644
+
+    - name: Reload systemd daemon
+      systemd:
+        daemon_reload: yes
+
+    - name: Enable and start node_exporter
+      systemd:
+        name: node_exporter
+        state: started
+        enabled: yes
+
+    - name: Open firewall port for node_exporter (firewalld)
+      firewalld:
+        port: "{{ node_exporter_port }}/tcp"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      when: ansible_facts.services['firewalld.service'] is defined
+      ignore_errors: yes
+
+    - name: Open firewall port for node_exporter (ufw)
+      ufw:
+        rule: allow
+        port: "{{ node_exporter_port }}"
+        proto: tcp
+      when: ansible_facts.services['ufw.service'] is defined
+      ignore_errors: yes
+
+    - name: Verify node_exporter is running
+      uri:
+        url: "http://localhost:{{ node_exporter_port }}/metrics"
+        method: GET
+        status_code: 200
+      register: metrics_check
+      retries: 3
+      delay: 5
+      until: metrics_check.status == 200
+
+    - name: Log completion
+      debug:
+        msg: "node_exporter monitoring installed successfully on {{ inventory_hostname }}:{{ node_exporter_port }}"
+
