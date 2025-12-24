@@ -124,7 +124,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	howett.net/plist v0.0.0-20181124034731-591f970eefbb // indirect
 	k8s.io/mount-utils v0.32.8 // indirect
-	k8s.io/utils v0.0.0-20250321185631-1f6e0b77f77e // indirect
+	k8s.io/utils v0.0.0-20251222233032-718f0e51e6d2 // indirect
 )
 
 replace github.com/kubev2v/forklift => ../../
