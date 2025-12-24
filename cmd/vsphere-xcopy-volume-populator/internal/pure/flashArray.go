@@ -33,7 +33,7 @@ type FlashArrayClonner struct {
 const ClusterPrefixEnv = "PURE_CLUSTER_PREFIX"
 const helpMessage = `clusterPrefix is missing and PURE_CLUSTER_PREFIX is not set.
 Use this to extract the value:
-oc get storagecluster -A -o=jsonpath='{.items[0].status.clusterUid}'| head -c 8
+printf "px_%s" $(oc get storagecluster -A -o=jsonpath='{.items[0].status.clusterUid}'| head -c 8)
 `
 
 func NewFlashArrayClonner(hostname, username, password string, skipSSLVerification bool, clusterPrefix string) (FlashArrayClonner, error) {
