@@ -23,29 +23,27 @@ supported_os_name_substrings := [
 supported_os_regex := `.*(rhel7guest|rhel7_64guest|rhel8guest|rhel8_64guest|rhel9guest|rhel9_64guest|rhel10guest|rhel10_64guest|windows10.*guest|windows11.*guest|windows2016.*guest|windows2019.*guest|windows2022.*guest|windows2025.*guest).*`
 
 is_supported if {
+    # 1. Check guestId against regex
     is_string(input.guestId)
     lower_id := lower(input.guestId)
     regex.match(supported_os_regex, lower_id)
-}
-
-is_supported if {
+} else if {
+    # 2. Check guestNameFromVmwareTools
     is_string(input.guestNameFromVmwareTools)
     lower_name := lower(input.guestNameFromVmwareTools)
     some i
     lower_substring := lower(supported_os_name_substrings[i])
     contains(lower_name, lower_substring)
-}
-
-is_supported if {
+} else if {
+    # 3. Check guestName if guestNameFromVmwareTools is missing
     is_string(input.guestName)
     not is_string(input.guestNameFromVmwareTools)
     lower_name := lower(input.guestName)
     some i
     lower_substring := lower(supported_os_name_substrings[i])
     contains(lower_name, lower_substring)
-}
-
-is_supported if {
+} else if {
+    # 4. Check guestName if guestNameFromVmwareTools exists but is empty
     is_string(input.guestName)
     is_string(input.guestNameFromVmwareTools)
     input.guestNameFromVmwareTools == ""
@@ -54,6 +52,7 @@ is_supported if {
     lower_substring := lower(supported_os_name_substrings[i])
     contains(lower_name, lower_substring)
 }
+
 
 has_unsupported_os if {
     has_guest_id_or_name
@@ -62,23 +61,18 @@ has_unsupported_os if {
 
 has_guest_id_or_name if {
     is_string(input.guestId)
-}
-
-has_guest_id_or_name if {
+} else if {
     is_string(input.guestNameFromVmwareTools)
     input.guestNameFromVmwareTools != ""
-}
-
-has_guest_id_or_name if {
+} else if {
     is_string(input.guestName)
     not is_string(input.guestNameFromVmwareTools)
-}
-
-has_guest_id_or_name if {
+} else if {
     is_string(input.guestName)
     is_string(input.guestNameFromVmwareTools)
     input.guestNameFromVmwareTools == ""
 }
+
 
 concerns contains flag if {
     has_unsupported_os
