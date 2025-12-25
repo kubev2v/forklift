@@ -84,6 +84,24 @@ const (
 	TemplateNAALabel      = "volume.csi.k8s.io/affinity-source-naa"
 )
 
+var labelValueSanitizer = regexp.MustCompile(`[^A-Za-z0-9\-_.]`)
+
+func sanitizeLabelValue(value string) string {
+	if value == "" {
+		return value
+	}
+	// Replace invalid characters with underscores
+	sanitized := labelValueSanitizer.ReplaceAllString(value, "_")
+	// Trim non-alphanumeric characters from start and end
+	sanitized = strings.TrimLeftFunc(sanitized, func(r rune) bool {
+		return !((r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9'))
+	})
+	sanitized = strings.TrimRightFunc(sanitized, func(r rune) bool {
+		return !((r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9'))
+	})
+	return sanitized
+}
+
 // Operating Systems
 const (
 	DefaultWindows = "win10"
@@ -1384,7 +1402,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					// we need uniqness and a value which is less than 64 chars, hence using vmRef.id + disk.key
 					"vmdkKey":        fmt.Sprint(disk.Key),
 					"vmID":           vmRef.ID,
-					TemplateNAALabel: naa,
+					TemplateNAALabel: sanitizeLabelValue(naa),
 				}
 
 				r.Log.Info("target namespace for migration", "namespace", namespace)
