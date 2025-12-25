@@ -48,6 +48,7 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 	ginkgo.BeforeEach(func() {
 		reconciler = &Reconciler{
 			base.Reconciler{},
+			nil,
 		}
 		fakeClientSet = fake.NewSimpleClientset()
 	})
@@ -387,6 +388,7 @@ func createFakeReconciler(objects ...runtime.Object) *Reconciler {
 			Client: client,
 			Log:    planValidationLog,
 		},
+		client,
 	}
 }
 
