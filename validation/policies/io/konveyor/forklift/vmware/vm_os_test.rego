@@ -8,7 +8,8 @@ test_unsupported_el6_64 if {
 		"guestId": "rhel6_64Guest",
 	}
 	results = concerns with input as mock_vm
-	count(results) == 1
+	some c in results
+    c.id == "vmware.os.unsupported"
 }
 
 test_unsupported_el6_64_by_guestName if {
@@ -17,7 +18,8 @@ test_unsupported_el6_64_by_guestName if {
 		"guestNameFromVmwareTools": "Red Hat Enterprise Linux 6 (64-bit)",
 	}
 	results = concerns with input as mock_vm
-	count(results) == 1
+	some c in results
+    c.id == "vmware.os.unsupported"
 }
 
 test_unsupported_el6 if {
@@ -26,7 +28,8 @@ test_unsupported_el6 if {
 		"guestId": "rhel6Guest",
 	}
 	results = concerns with input as mock_vm
-	count(results) == 1
+	some c in results
+    c.id == "vmware.os.unsupported"
 }
 
 test_unsupported_el6_by_guestName if {
@@ -35,7 +38,8 @@ test_unsupported_el6_by_guestName if {
 		"guestNameFromVmwareTools": "Red Hat Enterprise Linux 6 (32-bit)",
 	}
 	results = concerns with input as mock_vm
-	count(results) == 1
+	some c in results
+    c.id == "vmware.os.unsupported"
 }
 
 test_unsupported_photonOS if {
@@ -147,5 +151,6 @@ test_guestName_not_takes_precedence_when_non_empty if {
 		"guestName": "Red Hat Enterprise Linux 9 (64-bit)",
 	}
 	results = concerns with input as mock_vm
-	count(results) == 1
+	some c in results
+    c.id == "vmware.os.unsupported"
 }
