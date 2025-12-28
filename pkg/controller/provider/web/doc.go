@@ -2,6 +2,7 @@ package web
 
 import (
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/openstack"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/ova"
@@ -36,5 +37,8 @@ func All(container *container.Container) (all []libweb.RequestHandler) {
 	all = append(
 		all,
 		ova.Handlers(container)...)
+	all = append(
+		all,
+		hyperv.Handlers(container)...)
 	return
 }

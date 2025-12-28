@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/openstack"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/ova"
@@ -130,6 +131,7 @@ func (h ProviderHandler) List(ctx *gin.Context) {
 		Handler: base.Handler{
 			Container: h.Container,
 		},
+		Config: ova.Config,
 	}
 	status, err = ovaHandler.Prepare(ctx)
 	if status != http.StatusOK {
@@ -146,12 +148,35 @@ func (h ProviderHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
+	// HyperV
+	hypervHandler := &hyperv.ProviderHandler{
+		Handler: base.Handler{
+			Container: h.Container,
+		},
+		Config: hyperv.Config,
+	}
+	status, err = hypervHandler.Prepare(ctx)
+	if status != http.StatusOK {
+		ctx.Status(status)
+		base.SetForkliftError(ctx, err)
+		return
+	}
+	hypervList, err := hypervHandler.ListContent(ctx)
+	if err != nil {
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
 	r := Provider{
 		string(api.OpenShift): ocpList,
 		string(api.VSphere):   vSphereList,
 		string(api.OVirt):     oVirtList,
 		string(api.OpenStack): openStackList,
 		string(api.Ova):       ovaList,
+		string(api.HyperV):    hypervList,
 	}
 
 	content := r

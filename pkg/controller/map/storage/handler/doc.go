@@ -48,7 +48,7 @@ func New(
 			client,
 			channel,
 			provider)
-	case api.Ova:
+	case api.Ova, api.HyperV:
 		h, err = ova.New(
 			client,
 			channel,
