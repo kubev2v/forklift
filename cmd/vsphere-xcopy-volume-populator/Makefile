@@ -12,7 +12,7 @@ endif
 
 PATH := $(shell go env GOPATH)/bin:$(PATH)
 
-include ../../pkg/lib/vsphere_offload/vmkfstool-wrapper-version.mk
+include vmkfstools-wrapper/version.mk
 
 .PHONY: all
 all: build

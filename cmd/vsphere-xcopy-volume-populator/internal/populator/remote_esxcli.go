@@ -327,7 +327,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 
 		// Extract script filename for cleanup
 		scriptName := fmt.Sprintf("%s-%s.py", secureScriptName, scriptUUID.String())
-		dc, errDC := getHostDC(host)
+		dc, errDC := vsphere_offload.GetHostDC(sshSetupCtx, host)
 		if errDC == nil {
 			// Cleanup script file when done (best-effort, non-blocking)
 			defer func() {
@@ -338,7 +338,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		}
 
 		// Enable SSH access (pass full path for logging, but UUID is what matters)
-		err = vmware.EnableSSHAccess(sshSetupCtx, p.VSphereClient, host, p.SSHPrivateKey, p.SSHPublicKey, scriptPath)
+		err = vsphere_offload.EnableSSHAccess(sshSetupCtx, p.VSphereClient, host, p.SSHPrivateKey, p.SSHPublicKey, scriptPath)
 		if err != nil {
 			return fmt.Errorf("failed to enable SSH access: %w", err)
 		}
@@ -349,7 +349,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 			return fmt.Errorf("failed to get host IP address: %w", err)
 		}
 
-		sshClient := vmware.NewSSHClient(scriptUUID.String())
+		sshClient := vsphere_offload.NewSSHClient()
 		err = sshClient.Connect(context.Background(), hostIP, "root", p.SSHPrivateKey)
 		if err != nil {
 			return fmt.Errorf("failed to connect via SSH: %w", err)

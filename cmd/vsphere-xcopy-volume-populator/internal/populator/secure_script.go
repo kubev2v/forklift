@@ -7,15 +7,10 @@ import (
 	"strings"
 	"time"
 
-<<<<<<< HEAD
 	"github.com/google/uuid"
-	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
-	vmkfstoolswrapper "github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper"
-=======
 	vmkfstoolswrapper "github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper"
 	"github.com/kubev2v/forklift/pkg/lib/vsphere_offload"
 	"github.com/kubev2v/forklift/pkg/lib/vsphere_offload/vmware"
->>>>>>> ca335b490 (  Move VIB validation from populator to provider)
 	"github.com/vmware/govmomi/object"
 	"k8s.io/klog/v2"
 )
