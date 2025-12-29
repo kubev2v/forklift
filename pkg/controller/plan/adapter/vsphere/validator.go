@@ -619,7 +619,25 @@ func (r *Validator) ChangeTrackingEnabled(vmRef ref.Ref) (bool, error) {
 	if err != nil {
 		return false, liberr.Wrap(err, "vm", vmRef)
 	}
-	return vm.ChangeTrackingEnabled, nil
+
+	// MTV-3537: Check per-disk CBT status, not VM-level flag.
+	// The VM-level ChangeTrackingEnabled flag can become stale when snapshots
+	// are created/deleted because VMware sends fDevices updates but not fExtraConfig updates.
+	// The per-disk CBT status is preserved across these events (see model.go updateDisks()).
+	if len(vm.Disks) == 0 {
+		// No disks means no CBT check needed
+		return true, nil
+	}
+
+	for _, disk := range vm.Disks {
+		if !disk.ChangeTrackingEnabled {
+			// At least one disk doesn't have CBT enabled
+			return false, nil
+		}
+	}
+
+	// All disks have CBT enabled
+	return true, nil
 }
 
 // getPlanVM get the plan VM for the given vsphere VM by looping over plan.Spec.VMs
