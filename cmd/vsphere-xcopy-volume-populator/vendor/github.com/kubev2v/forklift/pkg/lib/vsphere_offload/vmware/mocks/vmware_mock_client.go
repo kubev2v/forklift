@@ -13,8 +13,10 @@ import (
 	context "context"
 	reflect "reflect"
 
+	vmware "github.com/kubev2v/forklift/pkg/lib/vsphere_offload/vmware"
 	esx "github.com/vmware/govmomi/cli/esx"
 	object "github.com/vmware/govmomi/object"
+	types "github.com/vmware/govmomi/vim25/types"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -99,4 +101,33 @@ func (m *MockClient) RunEsxCommand(arg0 context.Context, arg1 *object.HostSystem
 func (mr *MockClientMockRecorder) RunEsxCommand(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RunEsxCommand", reflect.TypeOf((*MockClient)(nil).RunEsxCommand), arg0, arg1, arg2)
+}
+
+// GetVMDiskBacking mocks base method.
+func (m *MockClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkPath string) (*vmware.DiskBacking, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetVMDiskBacking", ctx, vmId, vmdkPath)
+	ret0, _ := ret[0].(*vmware.DiskBacking)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetVMDiskBacking indicates an expected call of GetVMDiskBacking.
+func (mr *MockClientMockRecorder) GetVMDiskBacking(ctx, vmId, vmdkPath any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVMDiskBacking", reflect.TypeOf((*MockClient)(nil).GetVMDiskBacking), ctx, vmId, vmdkPath)
+}
+
+// Helper function to create a mock HostSystem for testing
+// Sets up the inventory path so that Name() returns the expected name
+func CreateMockHost(name string) *object.HostSystem {
+	ref := types.ManagedObjectReference{
+		Type:  "HostSystem",
+		Value: name,
+	}
+	host := object.NewHostSystem(nil, ref)
+	// Set inventory path so Name() returns the expected name
+	// Use a path like "/dc1/host/name" - Name() will extract just "name"
+	host.SetInventoryPath("/dc1/host/" + name)
+	return host
 }

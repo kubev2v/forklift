@@ -50,9 +50,9 @@ const (
 
 // CSI driver names
 const (
-	SMBCSIDriverName 		= "smb.csi.k8s.io"
-	VIBReady                = "VIBReady"
-	VIBNotReady             = "VIBNotReady"
+	SMBCSIDriverName = "smb.csi.k8s.io"
+	VIBReady         = "VIBReady"
+	VIBNotReady      = "VIBNotReady"
 )
 
 // Categories
@@ -122,6 +122,9 @@ func (r *Reconciler) validate(provider *api.Provider) error {
 
 	// Validate SMB CSI driver for HyperV providers
 	err = r.validateSMBCSI(provider)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
 	// Validate VIB readiness for vSphere providers when VIB method is enabled
 	err = r.validateVIBReadiness(provider, secret)
 	if err != nil {
@@ -984,6 +987,9 @@ func (r *Reconciler) validateSMBCSI(provider *api.Provider) error {
 
 	// SMB CSI driver is installed - remove any previous condition
 	provider.Status.DeleteCondition(SMBCSIDriverNotReady)
+	return nil
+}
+
 // validateVIBReadiness validates VIB readiness for migration plans using xcopy volume populators
 func (r *Reconciler) validateVIBReadiness(provider *api.Provider, secret *core.Secret) error {
 	r.Log.Info("VIB validation: starting validateVIBReadiness", "provider", provider.Name)
@@ -997,33 +1003,29 @@ func (r *Reconciler) validateVIBReadiness(provider *api.Provider, secret *core.S
 		return nil
 	}
 
-	esxiCloneMethod, methodSet := provider.Spec.Settings[api.ESXiCloneMethod]
-	useVIBMethod := !methodSet || esxiCloneMethod != api.ESXiCloneMethodSSH
-
-	if !useVIBMethod {
+	if !provider.UseVIBMethod() {
 		provider.Status.DeleteCondition(VIBReady)
 		provider.Status.DeleteCondition(VIBNotReady)
 		return nil
 	}
 
-	if vsphere_offload.ShouldSkipVIBCheck(provider.Annotations) {
-		r.Log.Info("VIB validation: skipping due to cache", "provider", provider.Name, "vib-last-check", provider.Annotations[vsphere_offload.VIBLastCheckAnnotation])
+	// Check if we should skip VIB validation based on the last check time
+	// Use either VIBReady or VIBNotReady condition's LastTransitionTime (whichever exists)
+	var lastCheckTime time.Time
+	if vibReadyCond := provider.Status.FindCondition(VIBReady); vibReadyCond != nil {
+		lastCheckTime = vibReadyCond.LastTransitionTime.Time
+	} else if vibNotReadyCond := provider.Status.FindCondition(VIBNotReady); vibNotReadyCond != nil {
+		lastCheckTime = vibNotReadyCond.LastTransitionTime.Time
+	}
+
+	if vsphere_offload.ShouldSkipVIBCheck(lastCheckTime) {
+		r.Log.Info("VIB validation: skipping due to cache", "provider", provider.Name, "vib-last-check", lastCheckTime)
 		provider.Status.StageCondition(VIBReady, VIBNotReady)
 		r.Log.Info("VIB validation: staged VIB conditions during cache skip", "provider", provider.Name)
 		return nil
 	}
 	username := string(secret.Data["user"])
 	password := string(secret.Data["password"])
-	if username == "" || password == "" {
-		provider.Status.SetCondition(libcnd.Condition{
-			Type:     VIBNotReady,
-			Status:   True,
-			Reason:   "ProviderCredentialsInvalid",
-			Category: Warn,
-			Message:  "Cannot validate VIB readiness: provider credentials not found in secret",
-		})
-		return nil
-	}
 	client, err := vmware.NewClient(provider.Spec.URL, username, password)
 	if err != nil {
 		r.Log.Error(err, "VIB validation: failed to create vmware client", "url", provider.Spec.URL)
@@ -1033,6 +1035,7 @@ func (r *Reconciler) validateVIBReadiness(provider *api.Provider, secret *core.S
 			Reason:   "VMwareClientFailed",
 			Category: Warn,
 			Message:  fmt.Sprintf("Failed to create VMware client for VIB validation: %v", err),
+			Durable:  true,
 		})
 		return nil
 	}
@@ -1058,6 +1061,7 @@ func (r *Reconciler) validateVIBWithClient(provider *api.Provider, client vmware
 			Reason:   "HostDiscoveryFailed",
 			Category: Warn,
 			Message:  fmt.Sprintf("Failed to retrieve ESXi hosts for VIB validation: %v", err),
+			Durable:  true,
 		})
 		return nil
 	}
@@ -1069,6 +1073,7 @@ func (r *Reconciler) validateVIBWithClient(provider *api.Provider, client vmware
 			Reason:   "NoHostsFound",
 			Category: Warn,
 			Message:  "Cannot validate VIB readiness: no ESXi hosts found in vSphere inventory",
+			Durable:  true,
 		})
 		return nil
 	}
@@ -1093,14 +1098,19 @@ func (r *Reconciler) validateVIBWithClient(provider *api.Provider, client vmware
 		}
 	}
 
-	if provider.Annotations == nil {
-		provider.Annotations = make(map[string]string)
-	}
-	provider.Annotations[vsphere_offload.VIBLastCheckAnnotation] = time.Now().Format(time.RFC3339)
-
 	if len(failedHosts) == 0 {
-		r.Log.Info("VIB validation: all hosts passed, removing VIB conditions", "provider", provider.Name)
-		provider.Status.DeleteCondition(VIBReady)
+		r.Log.Info("VIB validation: all hosts passed, setting VIBReady condition", "provider", provider.Name)
+		// Include validation timestamp in message to ensure Equal() returns false and LastTransitionTime updates
+		now := time.Now().UTC()
+		message := fmt.Sprintf("All ESXi hosts have the required VIB installed (validated at %s).", now.Format("2006-01-02T15:04:05Z"))
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     VIBReady,
+			Status:   True,
+			Reason:   "AllHostsReady",
+			Category: Required,
+			Message:  message,
+			Durable:  true,
+		})
 		provider.Status.DeleteCondition(VIBNotReady)
 		return nil
 	}
@@ -1126,6 +1136,7 @@ func (r *Reconciler) validateVIBWithClient(provider *api.Provider, client vmware
 		Message:    "VIB readiness validation issue (checked because 'esxiCloneMethod' is not set to 'ssh'). See the suggestion field in the Provider's YAML for details.",
 		Suggestion: failSuggestion.String(),
 		Items:      failedHosts,
+		Durable:    true,
 	})
 
 	if len(successHosts) > 0 {

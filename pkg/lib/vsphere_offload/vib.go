@@ -15,9 +15,8 @@ import (
 )
 
 const (
-	vibName                = "vmkfstools-wrapper"
-	VIBLastCheckAnnotation = "forklift.konveyor.io/vib-last-check"
-	VIBCacheDuration       = 15 * time.Minute
+	vibName          = "vmkfstools-wrapper"
+	VIBCacheDuration = 15 * time.Minute
 )
 
 // VibVersion is set by ldflags
@@ -41,19 +40,14 @@ func (d *DefaultVIBEnsurer) EnsureVib(ctx context.Context, client vmware.Client,
 // EnsureVib will fetch the vib version and in case needed will install it
 // on the target ESX
 func EnsureVib(ctx context.Context, client vmware.Client, esx *object.HostSystem, localVibPath string) error {
-	klog.Infof("ensuring vib version on ESXi %s: %s", esx.Name(), VibVersion)
-
 	version, err := getVIBVersion(ctx, client, esx)
 	if err != nil {
 		return fmt.Errorf("failed to get the VIB version from ESXi %s: %w", esx.Name(), err)
 	}
 
-	klog.Infof("current vib version on ESXi %s: %s", esx.Name(), version)
 	if version == VibVersion {
-		klog.Infof("VIB version on ESXi %s is the same as the desired version: %s, skipping installation", esx.Name(), VibVersion)
 		return nil
 	}
-	klog.Infof("VIB version on ESXi %s is not the same as the desired version: %s, installing it", esx.Name(), VibVersion)
 	dc, err := GetHostDC(ctx, esx)
 	if err != nil {
 		return err
@@ -202,17 +196,10 @@ func installVib(ctx context.Context, client vmware.Client, esx *object.HostSyste
 }
 
 // ShouldSkipVIBCheck checks if VIB validation should be skipped based on cache duration
-func ShouldSkipVIBCheck(annotations map[string]string) bool {
-	if annotations == nil {
+// Returns true if the condition was last updated less than VIBCacheDuration ago
+func ShouldSkipVIBCheck(lastTransitionTime time.Time) bool {
+	if lastTransitionTime.IsZero() {
 		return false
 	}
-	timestamp, ok := annotations[VIBLastCheckAnnotation]
-	if !ok {
-		return false
-	}
-	lastCheckTime, err := time.Parse(time.RFC3339, timestamp)
-	if err != nil {
-		return false
-	}
-	return time.Since(lastCheckTime) < VIBCacheDuration
+	return time.Since(lastTransitionTime) < VIBCacheDuration
 }
