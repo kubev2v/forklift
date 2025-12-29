@@ -5,15 +5,14 @@ COPY --chown=1001:0 ./ ./
 ENV GOFLAGS="-mod=vendor -tags=strictfipsruntime"
 ENV GOEXPERIMENT=strictfipsruntime
 ENV GOCACHE=/go-build/cache
-ARG VIB_VERSION
-RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -buildvcs=false -ldflags="-w -s -X github.com/kubev2v/forklift/pkg/lib/vsphere_offload.VibVersion=${VIB_VERSION}" -o manager github.com/kubev2v/forklift/cmd/forklift-controller
+RUN --mount=type=cache,target=${GOCACHE},uid=1001 make forklift-controller
 
 FROM registry.access.redhat.com/ubi9-minimal:9.6-1752587672
 # RUN microdnf -y update && microdnf -y clean all
 # Required to be able to get files from within the pod
 RUN microdnf -y install tar && microdnf clean all
 
-COPY --from=builder /app/manager /usr/local/bin/forklift-controller
+COPY --from=builder /app/bin/forklift-controller /usr/local/bin/forklift-controller
 COPY --from=builder /app/cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper/vmkfstools-wrapper.vib /bin/vmkfstools-wrapper.vib
 ENTRYPOINT ["/usr/local/bin/forklift-controller"]
 
