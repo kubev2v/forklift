@@ -356,9 +356,6 @@ github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8
 # github.com/klauspost/cpuid/v2 v2.2.10
 ## explicit; go 1.22
 github.com/klauspost/cpuid/v2
-# github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator v0.0.0-20251225100848-13df2aac8df7
-## explicit; go 1.24.0
-github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware
 # github.com/leodido/go-urn v1.4.0
 ## explicit; go 1.18
 github.com/leodido/go-urn
@@ -1261,7 +1258,6 @@ k8s.io/client-go/util/exec
 k8s.io/client-go/util/flowcontrol
 k8s.io/client-go/util/homedir
 k8s.io/client-go/util/keyutil
-k8s.io/client-go/util/retry
 k8s.io/client-go/util/watchlist
 k8s.io/client-go/util/workqueue
 # k8s.io/component-base v0.32.5

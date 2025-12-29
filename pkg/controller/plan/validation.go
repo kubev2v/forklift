@@ -226,6 +226,9 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 
 	// Validate conversion temp storage configuration
 	if err = r.validateConversionTempStorage(plan); err != nil {
+		return err
+	}
+
 	// Validate VIB readiness for plans using xcopy with VIB-enabled providers
 	if err = r.validateVIBReadiness(plan); err != nil {
 		return err

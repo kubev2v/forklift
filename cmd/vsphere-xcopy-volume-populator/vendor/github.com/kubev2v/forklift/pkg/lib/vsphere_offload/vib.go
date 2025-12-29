@@ -15,14 +15,27 @@ import (
 )
 
 const (
-	vibName                = "vmkfstools-wrapper"
-	vibLocation            = "/bin/vmkfstools-wrapper.vib"
-	VIBLastCheckAnnotation = "forklift.konveyor.io/vib-last-check"
-	VIBCacheDuration       = 15 * time.Minute
+	vibName          = "vmkfstools-wrapper"
+	VIBCacheDuration = 15 * time.Minute
 )
 
 // VibVersion is set by ldflags
 var VibVersion = "x.x.x"
+
+//go:generate go run go.uber.org/mock/mockgen -destination=mocks/vib_ensurer_mock.go -package=vsphere_offload_mocks . VIBEnsurer
+
+// VIBEnsurer interface for ensuring VIB installation on ESXi hosts
+type VIBEnsurer interface {
+	EnsureVib(ctx context.Context, client vmware.Client, esx *object.HostSystem, localVibPath string) error
+}
+
+// DefaultVIBEnsurer is the production implementation
+type DefaultVIBEnsurer struct{}
+
+// EnsureVib implements VIBEnsurer interface
+func (d *DefaultVIBEnsurer) EnsureVib(ctx context.Context, client vmware.Client, esx *object.HostSystem, localVibPath string) error {
+	return EnsureVib(ctx, client, esx, localVibPath)
+}
 
 // EnsureVib will fetch the vib version and in case needed will install it
 // on the target ESX
@@ -185,7 +198,11 @@ func installVib(ctx context.Context, client vmware.Client, esx *object.HostSyste
 			if msg, ok := r[0]["Message"]; ok && len(msg) > 0 {
 				message = msg[0]
 			}
-			return fmt.Errorf("VIB installation was skipped by ESXi: %s (VIBsSkipped: %v)", message, vibsSkipped)
+			skippedVib := ""
+			if len(vibsSkipped) > 0 {
+				skippedVib = vibsSkipped[0]
+			}
+			return fmt.Errorf("VIB installation was skipped by ESXi (host already has '%s' installed, desired version is '%s'). ESXi message: %s", skippedVib, VibVersion, message)
 		}
 
 		if vibsInstalled, ok := r[0]["VIBsInstalled"]; ok && len(vibsInstalled) > 0 {
@@ -198,28 +215,11 @@ func installVib(ctx context.Context, client vmware.Client, esx *object.HostSyste
 	return nil
 }
 
-// UpdateVIBCheckTimestamp updates the last VIB check timestamp annotation on the provider
-func UpdateVIBCheckTimestamp(annotations *map[string]string) {
-	if annotations == nil {
-		*annotations = make(map[string]string)
-	}
-
-	timestamp := time.Now().Format(time.RFC3339)
-	(*annotations)[VIBLastCheckAnnotation] = timestamp
-}
-
 // ShouldSkipVIBCheck checks if VIB validation should be skipped based on cache duration
-func ShouldSkipVIBCheck(annotations map[string]string) bool {
-	if annotations == nil {
+// Returns true if the condition was last updated less than VIBCacheDuration ago
+func ShouldSkipVIBCheck(lastTransitionTime time.Time) bool {
+	if lastTransitionTime.IsZero() {
 		return false
 	}
-	timestamp, ok := annotations[VIBLastCheckAnnotation]
-	if !ok {
-		return false
-	}
-	lastCheckTime, err := time.Parse(time.RFC3339, timestamp)
-	if err != nil {
-		return false
-	}
-	return time.Since(lastCheckTime) < VIBCacheDuration
+	return time.Since(lastTransitionTime) < VIBCacheDuration
 }

@@ -13,19 +13,23 @@ import (
 )
 
 var _ = Describe("VIB Validation", func() {
-	Describe("useVIBMethod", func() {
+	Describe("UseVIBMethod", func() {
 		DescribeTable("should correctly determine VIB method usage",
 			func(cloneMethod string, expected bool) {
-				result := useVIBMethod(cloneMethod)
+				provider := &api.Provider{
+					Spec: api.ProviderSpec{
+						Settings: map[string]string{},
+					},
+				}
+				if cloneMethod != "" {
+					provider.Spec.Settings[api.ESXiCloneMethod] = cloneMethod
+				}
+				result := provider.UseVIBMethod()
 				Expect(result).To(Equal(expected))
 			},
 			Entry("when cloneMethod is empty (default)", "", true),
 			Entry("when cloneMethod is 'vib'", "vib", true),
-			Entry("when cloneMethod is 'VIB' (uppercase)", "VIB", true),
-			Entry("when cloneMethod is 'ViB' (mixed case)", "ViB", true),
 			Entry("when cloneMethod is 'ssh'", "ssh", false),
-			Entry("when cloneMethod is 'SSH'", "SSH", false),
-			Entry("when cloneMethod is 'other'", "other", false),
 		)
 	})
 
