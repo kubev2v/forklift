@@ -249,6 +249,11 @@ const (
 	Ignored = "ignored"
 )
 
+// Multus namespace for globally accessible NADs
+const (
+	MultusDefaultNamespace = "default"
+)
+
 // Default properties
 var DefaultProperties = map[string]string{
 	CpuPolicy:       CpuPolicyShared,
@@ -722,6 +727,13 @@ func (r *Builder) processNIC(
 	} else if networkPair.Destination.Type == Multus {
 		destNADName = networkPair.Destination.Name
 		destNADNamespace = networkPair.Destination.Namespace
+
+		// If namespace is not specified in the NetworkMap, it means the NAD
+		// should be in the default namespace (globally accessible NADs)
+		if destNADNamespace == "" {
+			destNADNamespace = MultusDefaultNamespace
+		}
+
 		destIdentifier = path.Join(destNADNamespace, destNADName)
 
 		// If this Multus NAD has already been used, auto-generate a new one
