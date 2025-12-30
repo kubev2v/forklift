@@ -212,7 +212,8 @@ type Validator interface {
 	// Validate whether the migration type is supported by this provider.
 	MigrationType() bool
 	// Validate that no more than one of a VM's networks is mapped to the pod network.
-	PodNetwork(vmRef ref.Ref) (bool, error)
+	// Returns ok (validation result), msg (provider-specific message), err (error accessing VM)
+	PodNetwork(vmRef ref.Ref) (ok bool, msg string, err error)
 	// Validate that we have information about static IPs for every virtual NIC
 	StaticIPs(vmRef ref.Ref) (bool, error)
 	// Validate if the UDN subnet matches the VM IP

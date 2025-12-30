@@ -1,6 +1,8 @@
 package openstack
 
 import (
+	"strconv"
+
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
@@ -116,7 +118,7 @@ func (r *Validator) MacConflicts(vmRef ref.Ref) ([]planbase.MacConflict, error) 
 		if nics, ok := vmAddresses.([]interface{}); ok {
 			for _, nic := range nics {
 				if m, ok := nic.(map[string]interface{}); ok {
-					if macAddress, ok := m["OS-EXT-IPS-MAC:mac_addr"]; ok {
+					if macAddress, ok := m[OSExtIPsMacAddr]; ok {
 						macStr, ok := macAddress.(string)
 						if !ok {
 							continue // Skip if MAC address is not a string
@@ -162,10 +164,13 @@ func (r *Validator) MigrationType() bool {
 }
 
 // Validate that no more than one of a VM's networks is mapped to the pod network.
-func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
+// For OpenStack, this validates that networks mapped to pod networking don't have
+// multiple NICs (identified by different MAC addresses).
+func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, msg string, err error) {
 	if r.Plan.Referenced.Map.Network == nil {
-		return
+		return true, "", nil
 	}
+
 	vm := &model.Workload{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
@@ -173,20 +178,111 @@ func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
 		return
 	}
 
+	// Count unique NICs per network (by MAC address)
+	networkUniqueNICs := r.countUniqueNICsPerNetwork(vm, vmRef)
+
+	// Count total NICs mapped to pod networking
+	podNetworkNICCount, podNetworks := r.countPodNetworkNICs(networkUniqueNICs, vmRef)
+
+	// Validate: pod networking supports maximum 1 NIC
+	if podNetworkNICCount > 1 {
+		msg = r.buildValidationMessage(podNetworks, networkUniqueNICs)
+		return false, msg, nil
+	}
+
+	return true, "", nil
+}
+
+// countUniqueNICsPerNetwork counts unique NICs (by MAC) for each network
+func (r *Validator) countUniqueNICsPerNetwork(vm *model.Workload, vmRef ref.Ref) map[string]int {
+	networkUniqueNICs := make(map[string]int)
+
+	for networkName, addresses := range vm.Addresses {
+		networkID := r.findNetworkID(vm.Networks, networkName)
+		if networkID == "" {
+			continue
+		}
+
+		seenMACs := make(map[string]bool)
+		if nics, ok := addresses.([]interface{}); ok {
+			for _, nicEntry := range nics {
+				if m, ok := nicEntry.(map[string]interface{}); ok {
+					// Skip floating IPs
+					if ipType, ok := m[OSExtIPsType]; ok && ipType.(string) == "floating" {
+						continue
+					}
+					// Count unique MACs
+					if macAddress, ok := m[OSExtIPsMacAddr]; ok {
+						if macAddr := macAddress.(string); macAddr != "" {
+							seenMACs[macAddr] = true
+						}
+					}
+				}
+			}
+		}
+		networkUniqueNICs[networkID] = len(seenMACs)
+	}
+
+	return networkUniqueNICs
+}
+
+// findNetworkID finds the network ID for a given network name
+func (r *Validator) findNetworkID(networks []model.Network, networkName string) string {
+	for _, network := range networks {
+		if network.Name == networkName {
+			return network.ID
+		}
+	}
+	return ""
+}
+
+// countPodNetworkNICs counts total NICs mapped to pod networking
+func (r *Validator) countPodNetworkNICs(networkUniqueNICs map[string]int, vmRef ref.Ref) (int, []api.NetworkPair) {
 	mapping := r.Plan.Referenced.Map.Network.Spec.Map
-	podMapped := 0
+	podNetworkNICCount := 0
+	var podNetworks []api.NetworkPair
+
 	for i := range mapping {
 		mapped := &mapping[i]
-		ref := mapped.Source
-		for _, network := range vm.Networks {
-			if ref.ID == network.ID && mapped.Destination.Type == "Pod" {
-				podMapped++
-			}
+		if mapped.Destination.Type != Pod {
+			continue
+		}
+
+		nicCount := networkUniqueNICs[mapped.Source.ID]
+		podNetworkNICCount += nicCount
+		podNetworks = append(podNetworks, *mapped)
+	}
+
+	return podNetworkNICCount, podNetworks
+}
+
+// buildValidationMessage creates a detailed error message for validation failure
+func (r *Validator) buildValidationMessage(podNetworks []api.NetworkPair, networkUniqueNICs map[string]int) string {
+	var networkDetails []string
+	for _, mapped := range podNetworks {
+		nicCount := networkUniqueNICs[mapped.Source.ID]
+		if nicCount > 1 {
+			networkDetails = append(networkDetails,
+				mapped.Source.Name+" ("+strconv.Itoa(nicCount)+" NICs with different MAC addresses)")
+		} else if nicCount == 1 {
+			networkDetails = append(networkDetails,
+				mapped.Source.Name+" (1 NIC)")
 		}
 	}
 
-	ok = podMapped <= 1
-	return
+	var detailMsg string
+	if len(networkDetails) > 0 {
+		detailMsg = "Networks mapped to pod: " + networkDetails[0]
+		for i := 1; i < len(networkDetails); i++ {
+			detailMsg += ", " + networkDetails[i]
+		}
+		detailMsg += ". "
+	}
+
+	return "For OpenStack VMs, this can occur when a single network has multiple NICs (different MAC addresses). " +
+		detailMsg +
+		"Pod networking supports only 1 interface per VM. " +
+		"Please map networks with multiple NICs to Multus networking instead."
 }
 
 // NO-OP
