@@ -7535,26 +7535,26 @@ spec:
         path: ova_proxy_route_timeout
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
-        - description: Volume Populator CPU limit (default 1000m)
-          displayName: Volume Populator CPU Limit
-          path: populator_container_limits_cpu
-          x-descriptors:
-          - urn:alm:descriptor:com.tectonic.ui:hidden
-        - description: Volume Populator memory limit (default 1Gi)
-          displayName: Volume Populator Memory Limit
-          path: populator_container_limits_memory
-          x-descriptors:
-          - urn:alm:descriptor:com.tectonic.ui:hidden
-        - description: Volume Populator CPU request (default 100m)
-          displayName: Volume Populator CPU Request
-          path: populator_container_requests_cpu
-          x-descriptors:
-          - urn:alm:descriptor:com.tectonic.ui:hidden
-        - description: Volume Populator memory request (default 512Mi)
-          displayName: Volume Populator Memory Request
-          path: populator_container_requests_memory
-          x-descriptors:
-          - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Volume Populator CPU limit (default 1000m)
+        displayName: Volume Populator CPU Limit
+        path: populator_container_limits_cpu
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Volume Populator memory limit (default 1Gi)
+        displayName: Volume Populator Memory Limit
+        path: populator_container_limits_memory
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Volume Populator CPU request (default 100m)
+        displayName: Volume Populator CPU Request
+        path: populator_container_requests_cpu
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Volume Populator memory request (default 512Mi)
+        displayName: Volume Populator Memory Request
+        path: populator_container_requests_memory
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Log verbosity level (default 3)
         displayName: Controller Log Level
         path: controller_log_level

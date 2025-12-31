@@ -11,9 +11,9 @@ ARG DEFAULT_CHANNEL
 ARG REGISTRY
 ARG OCP_VERSIONS
 
-ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:6cca1e4ef2be152e7821ccce20b8023c51bc075eef37486ec1cfd8c9c0f7298c"
+ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:52fa6e23917fa4d17e1e9df51644f951ad275201d78ded5af6bb0fc217198378"
 
-ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:26eb893f68d5aa1970790cc36c8d4f0c271b7dffbe718c2c6dc30262914f165a"
+ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:ab77f56f12203fef59a35bf9e0c9b3868930c5297b227060991b384e70adf189"
 
 ARG MUST_GATHER_IMAGE="registry.redhat.io/mtv-candidate/mtv-must-gather-rhel8@sha256:eb54f632bd158f1c3674b16126f5361c9a24df0571d0a52a1a354ab0a7329d8a"
 
@@ -29,7 +29,7 @@ ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhv-populator-rh
 
 ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-populator-controller-rhel9@sha256:247840cded5b553e27637ee49b583e36f03ef5111a6c9041e7450f593ae6fe49"
 
-ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:7c88c191f7b3ef9cfd61cbb667fcc1d852c0b6752ebc17826faf8e61d941723c"
+ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:8f5c67cb634311a19d04b44cb41ea82febb206d04e6c226b03db0f6a42e992c9"
 
 ARG CLI_DOWNLOAD_IMAGE="registry.redhat.io/mtv-candidate/mtv-cli-download-rhel9@sha256:70560f03a3b88bd1c77f02a8e4431fd2024b7ef0d808796b99d1a8c91b82882a"
 
@@ -37,7 +37,7 @@ ARG VALIDATION_IMAGE="registry.redhat.io/mtv-candidate/mtv-validation-rhel9@sha2
 
 ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel10@sha256:4c7bdd85779491c19dc6b119b222b42aea6e1bc53fd54f141780f9f220409195"
 
-ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:ce70c8ad870a75233a7fc927aa689a5fcf2207696884dbb454725310f73892a6"
+ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:de4c8f11ebc4585f34eeaf22e5ab5c91f92e83aecbc0cb360feadb86ae9de625"
 
 USER root
 
