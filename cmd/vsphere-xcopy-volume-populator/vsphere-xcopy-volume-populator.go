@@ -368,6 +368,12 @@ func validateStorageAuthentication(token, username, password string) error {
 
 func startMetricsServer(certFile, keyFile string) {
 	go func() {
+		// Allow disabling metrics server via environment variable for testing
+		if os.Getenv("DISABLE_METRICS_SERVER") == "true" {
+			klog.Info("Metrics server disabled via DISABLE_METRICS_SERVER environment variable")
+			return
+		}
+
 		http.Handle("/metrics", promhttp.Handler())
 		cfg := tls.Config{MinVersion: tls.VersionTLS12}
 		server := http.Server{
