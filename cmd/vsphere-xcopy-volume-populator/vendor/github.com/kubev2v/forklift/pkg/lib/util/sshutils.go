@@ -18,9 +18,10 @@ const (
 
 	// RestrictedSSHCommandTemplate is the inline shell command used in SSH authorized_keys
 	// to restrict SSH access and route commands to the Python wrapper based on datastore.
-	// Format: DS=<datastore>;CMD=<operation> <args...>
+	// Format: DS=<datastore>;UUID=<uuid>;CMD=<operation> <args...>
 	// When DS is empty, it returns a simple success response for connectivity testing without calling the wrapper.
-	RestrictedSSHCommandTemplate = `sh -c 'DS=$(echo \"$SSH_ORIGINAL_COMMAND\" | sed -n \"s/^DS=\\([^;]*\\);.*/\\1/p\"); CMD=$(echo \"$SSH_ORIGINAL_COMMAND\" | sed -n \"s/^DS=[^;]*;CMD=\\(.*\\)/\\1/p\"); if [ -z \"$DS\" ]; then echo \"SSH_OK\"; else SSH_ORIGINAL_COMMAND=\"$CMD\" exec python /vmfs/volumes/$DS/secure-vmkfstools-wrapper.py; fi'`
+	// UUID is used to identify the specific script file: secure-vmkfstools-wrapper-{UUID}.py
+	RestrictedSSHCommandTemplate = `sh -c 'DS=$(echo \"$SSH_ORIGINAL_COMMAND\" | sed -n \"s/^DS=\\([^;]*\\);.*/\\1/p\"); UUID=$(echo \"$SSH_ORIGINAL_COMMAND\" | sed -n \"s/^DS=[^;]*;UUID=\\([^;]*\\);.*/\\1/p\"); CMD=$(echo \"$SSH_ORIGINAL_COMMAND\" | sed -n \"s/^DS=[^;]*;UUID=[^;]*;CMD=\\(.*\\)/\\1/p\"); if [ -z \"$DS\" ]; then echo \"SSH_OK\"; else SSH_ORIGINAL_COMMAND=\"$CMD\" exec python /vmfs/volumes/$DS/secure-vmkfstools-wrapper-$UUID.py; fi'`
 )
 
 // SanitizeProviderName converts provider name to a valid Kubernetes secret name
@@ -121,7 +122,7 @@ func TestSSHConnectivity(ctx context.Context, hostIP string, privateKey []byte, 
 	log.V(3).Info("Connected to SSH server", "hostIP", hostIP)
 
 	// Try to execute a simple test command using the structured format
-	// Format: DS=<datastore>;CMD=status test-task-id
+	// Format: DS=<datastore>;UUID=<uuid>;CMD=status test-task-id
 	// When DS is empty, the shell wrapper will return "SSH_OK" without calling Python
 	session, err := sshClient.NewSession()
 	if err != nil {
@@ -131,7 +132,9 @@ func TestSSHConnectivity(ctx context.Context, hostIP string, privateKey []byte, 
 	defer session.Close()
 
 	// Execute the status command with the provided datastore (or empty for connectivity test mode)
-	testCommand := "DS=;CMD=status test-task-id"
+	// Format: DS=<datastore>;UUID=<uuid>;CMD=<command>
+	// For connectivity test, DS and UUID are empty
+	testCommand := "DS=;UUID=;CMD=status test-task-id"
 	output, err := session.CombinedOutput(testCommand)
 
 	log.V(3).Info("SSH test command output", "hostIP", hostIP, "command", testCommand, "output", string(output), "error", err)
