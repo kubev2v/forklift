@@ -1426,6 +1426,20 @@ func (r *KubeVirt) DeletePopulatedPVCs(vm *plan.VMStatus) error {
 	return nil
 }
 
+// Deletes only the prime PVCs, leaving the target PVCs intact
+func (r *KubeVirt) DeletePrimePVCs(vm *plan.VMStatus) error {
+	pvcs, err := r.getPVCs(vm.Ref)
+	if err != nil {
+		return err
+	}
+	for _, pvc := range pvcs {
+		if err = r.deleteCorrespondingPrimePVC(pvc, vm); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *KubeVirt) deleteCorrespondingPrimePVC(pvc *core.PersistentVolumeClaim, vm *plan.VMStatus) error {
 	primePVC := core.PersistentVolumeClaim{}
 	err := r.Destination.Client.Get(context.TODO(), client.ObjectKey{Namespace: r.Plan.Spec.TargetNamespace, Name: fmt.Sprintf("prime-%s", string(pvc.UID))}, &primePVC)
@@ -1435,6 +1449,12 @@ func (r *KubeVirt) deleteCorrespondingPrimePVC(pvc *core.PersistentVolumeClaim, 
 	case err == nil:
 		err = r.DeleteObject(&primePVC, vm, "Deleted prime PVC.", "pvc")
 		if err != nil && !k8serr.IsNotFound(err) {
+			return err
+		}
+		primePVCCopy := primePVC.DeepCopy()
+		primePVC.Finalizers = nil
+		patch := client.MergeFrom(primePVCCopy)
+		if err = r.Destination.Client.Patch(context.TODO(), &primePVC, patch); err != nil {
 			return err
 		}
 	}
