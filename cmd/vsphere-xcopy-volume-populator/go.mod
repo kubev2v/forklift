@@ -1,8 +1,6 @@
 module github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator
 
-go 1.24.0
-
-toolchain go1.24.4
+go 1.24.9
 
 require (
 	github.com/dell/gopowermax/v2 v2.9.0
@@ -35,7 +33,7 @@ require (
 	github.com/google/gnostic-models v0.6.9 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/google/pprof v0.0.0-20250403155104-27863c87afa6 // indirect
+	github.com/google/pprof v0.0.0-20251213031049-b05bdaca462f // indirect
 	github.com/hashicorp/go-version v1.7.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.6 // indirect
