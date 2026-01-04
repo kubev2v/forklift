@@ -1,6 +1,7 @@
 #!/bin/python
 
 import argparse
+import errno
 import json
 import logging
 import os
@@ -9,6 +10,7 @@ import uuid
 import re
 import sys
 import shlex
+import shutil
 
 TMP_PREFIX = "/tmp/vmkfstools-wrapper-{}"
 
@@ -36,7 +38,8 @@ def validate_path(path):
     # Only allow paths in specific safe directories for ESXi operations
     allowed_prefixes = [
         '/vmfs/volumes/',      # Datastore volumes (source VMDK files)
-        '/vmfs/devices/disks/' # ESXi disk devices (target devices for cloning)
+        '/vmfs/devices/disks/', # ESXi disk devices (target devices for cloning)
+        '/tmp/'              # Temporary directory for task execution
     ]
     if not any(path.startswith(prefix) for prefix in allowed_prefixes):
         raise ValueError(f"Path not in allowed directories: {path}")
@@ -96,14 +99,14 @@ def clone(args):
         with open(os.path.join(tmp_dir, "targetLun"), "w") as target_lun_file:
             target_lun_file.write(f"{os.path.basename(target)}")
 
-        result = {"taskId": str(task_id),  "pid": int(task.pid)}
+        result = {"taskId": str(task_id), "pid": int(task.pid)}
         print(XML.format("0", json.dumps(result)))
 
 
     except Exception as e:
-        errno = getattr(e, 'errno', None)
-        if errno == errno.ENOSPC:
-            print(XML.format("28", f"Error running subprocess: {e} tmpfs free space is low"))
+        err_code = getattr(e, 'errno', None)
+        if err_code == errno.ENOSPC:
+            print(XML.format("28", f"Error running subprocess: {e} free space is low: check /var/log/vmkernel.log for more details"))
         else:
             print(XML.format("1", f"Error running subprocess: {e}"))
         raise
@@ -111,6 +114,31 @@ def clone(args):
     finally:
         stdout_file.close()
         stderr_file.close()
+
+
+def get_last_line(f):
+    with open(f.name, "rb") as file_handle:
+        # Seek to end of file
+        file_handle.seek(0, 2)
+        file_size = file_handle.tell()
+
+        if file_size > 0:
+            chunk_size = min(4096, file_size)
+            file_handle.seek(-chunk_size, 2)
+            content = file_handle.read()
+
+            last_cr = content.rfind(b'\r')
+            if last_cr != -1:
+                line = content[last_cr + 1:].decode('utf-8', errors='replace')
+            else:
+                last_nl = content.rfind(b'\n')
+                if last_nl != -1:
+                    line = content[last_nl + 1:].decode('utf-8', errors='replace')
+                else:
+                    line = content.decode('utf-8', errors='replace')
+            return line
+
+    return ""
 
 
 def taskGet(args):
@@ -124,9 +152,7 @@ def taskGet(args):
     with open(os.path.join(tmp_dir, "pid"), "r") as f:
         pid = f.read()
     with open(os.path.join(tmp_dir, "out"), "r") as f:
-        line = ""
-        for line in f:
-            pass
+        line = get_last_line(f)
     with open(os.path.join(tmp_dir, "err"), "r") as f:
         ste = f.read()
     # it could be that the task is still running, hense no exit code
@@ -137,7 +163,7 @@ def taskGet(args):
         exitcode = ""
     except Exception as e:
         result = {"taskId": args.task_id[0], "pid": int(pid),
-                  "exitCode": "1", "lastLine": line.rstrip(), "stdErr": e}
+                  "exitCode": "1", "lastLine": line.rstrip(), "stdErr": str(e)}
         print(XML.format("1", json.dumps(result)))
         return
 
@@ -165,29 +191,41 @@ def taskClean(args):
         print(XML.format("1", json.dumps(result)))
         return
 
-    with open(os.path.join(tmp_dir, "rdmfile"), "r") as rdmfile_file:
-        rdmfile = rdmfile_file.read()
-        rdmfile = rdmfile.rstrip()
-        if rdmfile != "":
-            rdmdisk_file = extract_rdmdisk_file(rdmfile)
-            logging.info(f"removing {rdmfile} and {rdmdisk_file}")
-            try:
-                os.remove(rdmdisk_file)
-                logging.info(f"removed {rdmdisk_file}")
-                os.remove(rdmfile)
-                logging.info(f"removed {rdmfile}")
-            except Exception as e:
-                logging.info(f"failed to remove files {e}")
-                print(XML.format("1", f"failed to remove files {e}"))
-                return
+    rdmfile_path = os.path.join(tmp_dir, "rdmfile")
+    # Attempt to remove rdmdisk_file
+    if os.path.exists(rdmfile_path):
+        try:
+            with open(rdmfile_path, "r") as rdmfile_file:
+                rdmfile = rdmfile_file.read().rstrip()
+                if rdmfile != "" and os.path.exists(rdmfile):
+                    rdmdisk_file = extract_rdmdisk_file(rdmfile)
+                    if rdmdisk_file and os.path.exists(rdmdisk_file):
+                        logging.info(f"removing rdmdisk file {rdmdisk_file}")
+                        try:
+                            os.remove(rdmdisk_file)
+                            logging.info(f"removed rdmdisk file {rdmdisk_file}")
+                        except Exception as e:
+                            logging.warning(f"failed to remove {rdmdisk_file}: {e}")
+                    try:
+                        logging.info(f"removing rdmfile {rdmfile}")
+                        os.remove(rdmfile)
+                        logging.info(f"removed rdmfile {rdmfile}")
+                    except Exception as e:
+                        logging.warning(f"failed to remove {rdmfile}: {e}")
+        except Exception as e:
+            logging.warning(f"failed to process rdmfile: {e}")
     try:
-        os.rmdir(tmp_dir)
+        validate_path(tmp_dir)
+        shutil.rmtree(tmp_dir)
         logging.info(f"removed task directory {tmp_dir}")
     except Exception as e:
-        logging.info(f"failed to remove task directory {e}")
+        logging.error(f"failed to remove task directory {tmp_dir}: {e}")
         print(XML.format("1", f"failed to remove task directory {e}"))
         return
+
     print(XML.format("0", ""))
+
+
 
 
 def extract_rdmdisk_file(rdm_file):
