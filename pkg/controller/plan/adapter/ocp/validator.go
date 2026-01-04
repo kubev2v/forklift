@@ -97,7 +97,7 @@ func (r *Validator) MaintenanceMode(vmRef ref.Ref) (bool, error) {
 }
 
 // PodNetwork implements base.Validator
-func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
+func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, msg string, err error) {
 	if r.Plan.Referenced.Map.Network == nil {
 		return
 	}

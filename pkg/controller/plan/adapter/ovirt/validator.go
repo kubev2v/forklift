@@ -126,7 +126,7 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 }
 
 // Validate that no more than one of a VM's networks is mapped to the pod network.
-func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
+func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, msg string, err error) {
 	if r.Plan.Referenced.Map.Network == nil {
 		return
 	}
