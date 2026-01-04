@@ -18,7 +18,7 @@ const (
 
 // writeSecureScriptToTemp writes the embedded script to a temporary file
 func writeSecureScriptToTemp() (string, error) {
-	tempFile, err := os.CreateTemp("", "secure-vmkfstools-wrapper-*.py")
+	tempFile, err := os.CreateTemp("", "secure-vmkfstools-wrapper-*.sh")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file: %w", err)
 	}
@@ -71,7 +71,7 @@ func uploadScript(ctx context.Context, client vmware.Client, dc *object.Datacent
 	}
 	defer os.Remove(tempScriptPath) // Clean up temp file
 
-	scriptName := fmt.Sprintf("%s.py", secureScriptName)
+	scriptName := fmt.Sprintf("%s.sh", secureScriptName)
 	klog.Infof("Uploading embedded script to datastore as %s", scriptName)
 
 	// Upload the file with timeout
