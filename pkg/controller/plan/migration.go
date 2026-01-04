@@ -402,6 +402,13 @@ func (r *Migration) deletePopulatorPVCs(vm *plan.VMStatus) (err error) {
 	return
 }
 
+func (r *Migration) deletePrimePVCs(vm *plan.VMStatus) (err error) {
+	if r.builder.SupportsVolumePopulators() {
+		err = r.kubevirt.DeletePrimePVCs(vm)
+	}
+	return
+}
+
 // Delete left over migration resources associated with a VM.
 func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool) error {
 	// If the migration fails and the DeleteVmOnFailMigration is enabled, clean up the VM.
@@ -416,6 +423,9 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool) error
 		if err := r.kubevirt.DeleteDataVolumes(vm); failOnErr(err) {
 			return err
 		}
+	}
+	if err := r.deletePrimePVCs(vm); failOnErr(err) {
+		return err
 	}
 
 	if err := r.deleteImporterPods(vm); failOnErr(err) {
@@ -1378,6 +1388,13 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				Message:  "The VM migration has FAILED.",
 				Durable:  true,
 			})
+	}
+
+	// Clean up prime PVCs after migration completes (success or failure)
+	if vm.Phase == api.PhaseCompleted {
+		if err := r.deletePrimePVCs(vm); err != nil {
+			r.Log.Error(err, "Failed to delete prime PVCs after migration completed.", "vm", vm.String())
+		}
 	}
 
 	return
