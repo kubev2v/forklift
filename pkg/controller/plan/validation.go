@@ -760,6 +760,14 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	for i := range plan.Spec.VMs {
 		vm := &plan.Spec.VMs[i]
 		ref := &vm.Ref
+
+		// Skip VMs that have already succeeded - no validation needed
+		if status, found := plan.Status.Migration.FindVM(*ref); found {
+			if status.HasCondition(api.ConditionSucceeded) {
+				continue
+			}
+		}
+
 		if ref.NotSet() {
 			plan.Status.SetCondition(libcnd.Condition{
 				Type:     VMRefNotValid,
