@@ -54,6 +54,13 @@ var populators = map[string]populator{
 		imageVar:        "VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE",
 		metricsEndpoint: ":8082",
 	},
+	"ec2": {
+		kind:            "Ec2VolumePopulator",
+		resource:        "ec2volumepopulators",
+		controllerFunc:  getEc2PopulatorPodArgs,
+		imageVar:        "EC2_POPULATOR_IMAGE",
+		metricsEndpoint: ":8083",
+	},
 }
 
 func main() {
@@ -70,11 +77,6 @@ func main() {
 	flag.StringVar(&metricsPath, "metrics-path", "/metrics", "The HTTP path where prometheus metrics will be exposed. Default is `/metrics`.")
 	klog.InitFlags(nil)
 	flag.Parse()
-
-	resources, err := getResources()
-	if err != nil {
-		klog.Fatalf("Failed to parse resources: %v", err)
-	}
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
@@ -110,15 +112,14 @@ func getOvirtPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured, _ cor
 		return nil, err
 	}
 
-	var args []string
-	args = append(args, "--volume-path="+getVolumePath(rawBlock))
-	args = append(args, "--secret-name="+ovirtVolumePopulator.Spec.EngineSecretName)
-	args = append(args, "--disk-id="+ovirtVolumePopulator.Spec.DiskID)
-	args = append(args, "--engine-url="+ovirtVolumePopulator.Spec.EngineURL)
-	args = append(args, "--cr-name="+ovirtVolumePopulator.Name)
-	args = append(args, "--cr-namespace="+ovirtVolumePopulator.Namespace)
-
-	return args, nil
+	return []string{
+		"--volume-path=" + getVolumePath(rawBlock),
+		"--secret-name=" + ovirtVolumePopulator.Spec.EngineSecretName,
+		"--disk-id=" + ovirtVolumePopulator.Spec.DiskID,
+		"--engine-url=" + ovirtVolumePopulator.Spec.EngineURL,
+		"--cr-name=" + ovirtVolumePopulator.Name,
+		"--cr-namespace=" + ovirtVolumePopulator.Namespace,
+	}, nil
 }
 
 func getOpenstackPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured, _ corev1.PersistentVolumeClaim) ([]string, error) {
@@ -127,15 +128,15 @@ func getOpenstackPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured, _
 	if nil != err {
 		return nil, err
 	}
-	args := []string{}
-	args = append(args, "--volume-path="+getVolumePath(rawBlock))
-	args = append(args, "--endpoint="+openstackPopulator.Spec.IdentityURL)
-	args = append(args, "--secret-name="+openstackPopulator.Spec.SecretName)
-	args = append(args, "--image-id="+openstackPopulator.Spec.ImageID)
-	args = append(args, "--cr-name="+openstackPopulator.Name)
-	args = append(args, "--cr-namespace="+openstackPopulator.Namespace)
 
-	return args, nil
+	return []string{
+		"--volume-path=" + getVolumePath(rawBlock),
+		"--endpoint=" + openstackPopulator.Spec.IdentityURL,
+		"--secret-name=" + openstackPopulator.Spec.SecretName,
+		"--image-id=" + openstackPopulator.Spec.ImageID,
+		"--cr-name=" + openstackPopulator.Name,
+		"--cr-namespace=" + openstackPopulator.Namespace,
+	}, nil
 }
 
 func getVXPopulatorPodArgs(_ bool, u *unstructured.Unstructured, pvc corev1.PersistentVolumeClaim) ([]string, error) {
@@ -144,7 +145,8 @@ func getVXPopulatorPodArgs(_ bool, u *unstructured.Unstructured, pvc corev1.Pers
 	if nil != err {
 		return nil, err
 	}
-	args := []string{
+
+	return []string{
 		"--source-vm-id=" + xcopy.Spec.VmId,
 		"--source-vmdk=" + xcopy.Spec.VmdkPath,
 		"--target-namespace=" + xcopy.GetNamespace(),
@@ -153,8 +155,26 @@ func getVXPopulatorPodArgs(_ bool, u *unstructured.Unstructured, pvc corev1.Pers
 		"--owner-name=" + pvc.Name,
 		"--secret-name=" + xcopy.Spec.SecretName,
 		"--storage-vendor-product=" + xcopy.Spec.StorageVendorProduct,
+	}, nil
+}
+
+func getEc2PopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured, _ corev1.PersistentVolumeClaim) ([]string, error) {
+	var ec2Populator v1beta1.Ec2VolumePopulator
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &ec2Populator)
+	if err != nil {
+		return nil, err
 	}
-	return args, nil
+
+	// EC2 populator creates PVs via AWS API, doesn't need volume-path
+	// (unlike oVirt/OpenStack populators that copy data to mounted volumes)
+	return []string{
+		"--region=" + ec2Populator.Spec.Region,
+		"--target-availability-zone=" + ec2Populator.Spec.TargetAvailabilityZone,
+		"--secret-name=" + ec2Populator.Spec.SecretName,
+		"--snapshot-id=" + ec2Populator.Spec.SnapshotID,
+		"--cr-name=" + ec2Populator.Name,
+		"--cr-namespace=" + ec2Populator.Namespace,
+	}, nil
 }
 
 func getVolumePath(rawBlock bool) string {

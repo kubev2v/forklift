@@ -102,6 +102,7 @@ OPERATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator:$(REGISTRY_TAG)
 POPULATOR_CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/populator-controller:$(REGISTRY_TAG)
 OVIRT_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/ovirt-populator:$(REGISTRY_TAG)
 OPENSTACK_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/openstack-populator:$(REGISTRY_TAG)
+EC2_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/ec2-populator:$(REGISTRY_TAG)
 OVA_PROVIDER_SERVER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-provider-server:$(REGISTRY_TAG)
 OVA_PROXY_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-proxy:$(REGISTRY_TAG)
 CLI_DOWNLOAD_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-cli-download:$(REGISTRY_TAG)
@@ -328,6 +329,7 @@ build-operator-bundle-image: check_container_runtime
 		--build-arg POPULATOR_CONTROLLER_IMAGE=$(POPULATOR_CONTROLLER_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg OVIRT_POPULATOR_IMAGE=$(OVIRT_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg OPENSTACK_POPULATOR_IMAGE=$(OPENSTACK_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) \
+		--build-arg EC2_POPULATOR_IMAGE=$(EC2_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg MUST_GATHER_IMAGE=$(MUST_GATHER_IMAGE) \
 		--build-arg UI_PLUGIN_IMAGE=$(UI_PLUGIN_IMAGE) \
 		--build-arg CLI_DOWNLOAD_IMAGE=$(CLI_DOWNLOAD_IMAGE)$(PLATFORM_SUFFIX) \
@@ -389,6 +391,12 @@ build-openstack-populator-image: check_container_runtime
 push-openstack-populator-image: build-openstack-populator-image
 	$(CONTAINER_CMD) push $(OPENSTACK_POPULATOR_IMAGE)$(PLATFORM_SUFFIX)
 
+build-ec2-populator-image: check_container_runtime
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(EC2_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) -f build/ec2-populator/Containerfile .
+
+push-ec2-populator-image: build-ec2-populator-image
+	$(CONTAINER_CMD) push $(EC2_POPULATOR_IMAGE)$(PLATFORM_SUFFIX)
+
 build-vsphere-xcopy-volume-populator-image: check_container_runtime
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) -f build/vsphere-xcopy-volume-populator/Containerfile .
 
@@ -420,8 +428,9 @@ build-all-images: build-api-image \
                   build-virt-v2v-image \
                   build-populator-controller-image \
                   build-ovirt-populator-image \
-                  build-openstack-populator-image\
-                  build-vsphere-xcopy-volume-populator-image\
+                  build-openstack-populator-image \
+                  build-ec2-populator-image \
+                  build-vsphere-xcopy-volume-populator-image \
                   build-ova-provider-server-image \
                   build-cli-download-image \
                   build-ova-proxy-image \
@@ -435,8 +444,9 @@ push-all-images:  push-api-image \
                   push-virt-v2v-image \
                   push-populator-controller-image \
                   push-ovirt-populator-image \
-                  push-openstack-populator-image\
-                  push-vsphere-xcopy-volume-populator-image\
+                  push-openstack-populator-image \
+                  push-ec2-populator-image \
+                  push-vsphere-xcopy-volume-populator-image \
                   push-ova-provider-server-image \
                   push-cli-download-image \
                   push-ova-proxy-image \
@@ -499,6 +509,13 @@ push-openstack-populator-image-manifest:
 		$(OPENSTACK_POPULATOR_IMAGE)-arm64
 	$(CONTAINER_CMD) manifest push $(OPENSTACK_POPULATOR_IMAGE)
 
+push-ec2-populator-image-manifest:
+	$(CONTAINER_CMD) manifest rm $(EC2_POPULATOR_IMAGE) || true
+	$(CONTAINER_CMD) manifest create $(EC2_POPULATOR_IMAGE) \
+		$(EC2_POPULATOR_IMAGE)-amd64 \
+		$(EC2_POPULATOR_IMAGE)-arm64
+	$(CONTAINER_CMD) manifest push $(EC2_POPULATOR_IMAGE)
+
 push-vsphere-xcopy-volume-populator-image-manifest:
 	$(CONTAINER_CMD) manifest rm $(VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE) || true
 	$(CONTAINER_CMD) manifest create $(VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE) \
@@ -549,6 +566,7 @@ push-all-images-manifest: push-controller-image-manifest \
                           push-populator-controller-image-manifest \
                           push-ovirt-populator-image-manifest \
                           push-openstack-populator-image-manifest \
+                          push-ec2-populator-image-manifest \
                           push-vsphere-xcopy-volume-populator-image-manifest \
                           push-ova-provider-server-image-manifest \
                           push-cli-download-image-manifest \
