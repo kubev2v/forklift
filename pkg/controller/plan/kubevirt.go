@@ -83,6 +83,8 @@ const (
 	DynamicScriptsVolumeName = "scripts-volume-mount"
 	// DynamicScriptsMountPath is the mount path for first-boot scripts.
 	DynamicScriptsMountPath = "/mnt/dynamic_scripts"
+	// Annotation to specify current number of retries for getting parent backing
+	ParentBackingRetriesAnnotation = "parentBackingRetries"
 )
 
 // Labels
@@ -105,6 +107,14 @@ const (
 	kDV = "isDV"
 	// Populator secret
 	kPopulator = "isPopulator"
+	// Resource label
+	kResource = "resource"
+)
+
+// Resource labels
+const (
+	ResourceVMConfig   = "vm-config"
+	ResourceVDDKConfig = "vddk-config"
 )
 
 // User
@@ -144,6 +154,25 @@ type KubeVirt struct {
 	*plancontext.Context
 	// Builder
 	Builder adapter.Builder
+	// Ensurer
+	Ensurer adapter.Ensurer
+}
+
+// CNINetworkConfig represents a CNI network configuration parsed from a NetworkAttachmentDefinition.
+// This includes the IPAM configuration with routes for determining default gateway.
+type CNINetworkConfig struct {
+	IPAM CNIIPAMConfig `json:"ipam"`
+}
+
+// CNIIPAMConfig represents the IPAM section of a CNI network configuration.
+type CNIIPAMConfig struct {
+	Routes []CNIRoute `json:"routes"`
+}
+
+// CNIRoute represents a single route entry in the CNI IPAM configuration.
+type CNIRoute struct {
+	Dst string `json:"dst"` // Destination network in CIDR notation (e.g., "0.0.0.0/0" for default route)
+	GW  string `json:"gw"`  // Gateway IP address
 }
 
 // Build a VirtualMachineMap.
@@ -988,7 +1017,7 @@ func (r *KubeVirt) getListOptionsNamespaced() (listOptions *client.ListOptions) 
 }
 
 // Ensure the guest conversion/inspection (virt-v2v) pod exists on the destination.
-func (r *KubeVirt) EnsureVirtV2vPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvcs []*core.PersistentVolumeClaim, podType int) (err error) {
+func (r *KubeVirt) EnsureVirtV2vPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvcs []*core.PersistentVolumeClaim, podType int, step *plan.Step) (err error) {
 	labels := r.vmLabels(vm.Ref)
 	v2vSecret, err := r.ensureSecret(vm.Ref, r.secretDataSetterForCDI(vm.Ref), labels)
 	if err != nil {
@@ -1016,8 +1045,12 @@ func (r *KubeVirt) EnsureVirtV2vPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvc
 	if podType == VirtV2vConversionPod {
 		vmVolumes = vmCr.Spec.Template.Spec.Volumes
 	}
-	newPod, err := r.getVirtV2vPod(vm, vmVolumes, libvirtConfigMap, vddkConfigMap, pvcs, v2vSecret, podType)
+	newPod, err := r.getVirtV2vPod(vm, vmVolumes, libvirtConfigMap, vddkConfigMap, pvcs, v2vSecret, podType, step)
 	if err != nil {
+		return
+	}
+	if newPod == nil {
+		r.Log.Info("Couldn't prepare virt-v2v pod for vm.", "vm", vm.String())
 		return
 	}
 
@@ -1209,6 +1242,21 @@ func (r *KubeVirt) DeletePVCConsumerPod(vm *plan.VMStatus) (err error) {
 	}
 	for _, object := range list.Items {
 		err = r.DeleteObject(&object, vm, "Deleted PVC consumer pod.", "pod")
+		if err != nil {
+			return err
+		}
+	}
+	return
+}
+
+// Delete the inspection pod.
+func (r *KubeVirt) DeletePreflightInspectionPod(vm *plan.VMStatus) (err error) {
+	list, err := r.GetPodsWithLabels(r.inspectionLabels(vm.Ref))
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for _, object := range list.Items {
+		err := r.DeleteObject(&object, vm, "Deleted preflight inspection pod.", "pod")
 		if err != nil {
 			return err
 		}
@@ -1421,13 +1469,13 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 		}
 	}
 
-	if r.Plan.Spec.Warm || !r.Destination.Provider.IsHost() || r.Plan.IsSourceProviderOCP() {
+	if r.Plan.IsWarm() || !r.Destination.Provider.IsHost() || r.Plan.IsSourceProviderOCP() {
 		// Set annotation for WFFC storage classes. Note that we create data volumes while
 		// running a cold migration to the local cluster only when the source is either OpenShift
 		// or vSphere, and in the latter case the conversion pod acts as the first-consumer
 		annotations[planbase.AnnBindImmediate] = "true"
 	}
-	if r.Plan.Spec.Warm && r.Builder.SupportsVolumePopulators(vm.Ref) {
+	if r.Plan.IsWarm() && r.Builder.SupportsVolumePopulators() {
 		// For storage offload, tie DataVolume to pre-imported PVC
 		annotations[planbase.AnnAllowClaimAdoption] = "true"
 		annotations[planbase.AnnPrePopulated] = "true"
@@ -1441,7 +1489,7 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 			Annotations: annotations,
 		},
 	}
-	if !(r.Builder.SupportsVolumePopulators(vm.Ref) && r.Plan.Spec.Warm) {
+	if !(r.Builder.SupportsVolumePopulators() && r.Plan.IsWarm()) {
 		// For storage offload warm migrations, the template should have already
 		// been applied to the PVC that will be adopted by this DataVolume, so
 		// only add generateName for other migration types.
@@ -1568,6 +1616,27 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) 
 		if _, ok := object.Spec.Template.ObjectMeta.Annotations[ann]; !ok {
 			object.Spec.Template.ObjectMeta.Annotations[ann] = ""
 		}
+	}
+
+	var configmaps []core.ConfigMap
+	configmaps, err = r.Builder.ConfigMaps(vm.Ref)
+	if err != nil {
+		return
+	}
+	err = r.Ensurer.SharedConfigMaps(vm, configmaps)
+	if err != nil {
+		return
+	}
+
+	var secrets []core.Secret
+	secrets, err = r.Builder.Secrets(vm.Ref)
+	if err != nil {
+		return
+
+	}
+	err = r.Ensurer.SharedSecrets(vm, secrets)
+	if err != nil {
+		return
 	}
 
 	err = r.Builder.VirtualMachine(vm.Ref, &object.Spec, pvcs, vm.InstanceType != "", sortVolumesByLibvirt)
@@ -1955,7 +2024,7 @@ func (r *KubeVirt) getConvertorAffinity() *core.Affinity {
 	}
 }
 
-func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, libvirtConfigMap *core.ConfigMap, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, v2vSecret *core.Secret, podType int) (pod *core.Pod, err error) {
+func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, libvirtConfigMap *core.ConfigMap, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, v2vSecret *core.Secret, podType int, step *plan.Step) (pod *core.Pod, err error) {
 	volumes, volumeMounts, volumeDevices, err := r.podVolumeMounts(vmVolumes, libvirtConfigMap, vddkConfigmap, pvcs, vm, podType)
 	if err != nil {
 		return
@@ -2109,26 +2178,16 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, libv
 		// Add inspection pod specific settings
 		podName = r.getGeneratedName(vm) + "inspection-"
 		containerName = "virt-v2v-inspection"
-		environment = append(environment,
-			core.EnvVar{
-				Name:  "V2V_remoteInspection",
-				Value: "true",
-			})
 
-		// Get VM model and data from inventory
-		virtualMachine := &model.VM{}
-		err = r.Context.Source.Inventory.Find(virtualMachine, vm.Ref)
+		var success bool
+		environment, success, err = r.buildInspectionPodEnvironment(environment, vm, step)
 		if err != nil {
-			err = liberr.Wrap(err, "vm", vm.Ref.String())
-			return
+			return nil, err
 		}
 
-		// Add disks to be inspected
-		for i, disk := range virtualMachine.Disks {
-			environment = append(environment, core.EnvVar{
-				Name:  fmt.Sprintf("V2V_remoteInspectDisk_%d", i),
-				Value: disk.ParentFile,
-			})
+		if !success {
+			// This is intentional and it means that pod was not created and no error occured (yet), e.g. retry
+			return nil, nil //nolint:nilnil
 		}
 	}
 
@@ -2210,6 +2269,68 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, libv
 	r.setKvmOnPodSpec(&pod.Spec)
 
 	return
+}
+
+// Build the inspection pod environment
+func (r *KubeVirt) buildInspectionPodEnvironment(env []core.EnvVar, vm *plan.VMStatus, step *plan.Step) (newEnv []core.EnvVar, success bool, err error) {
+	newEnv = append(env,
+		core.EnvVar{
+			Name:  "V2V_remoteInspection",
+			Value: "true",
+		})
+
+	// Get VM model and data from inventory
+	virtualMachine := &model.VM{}
+	err = r.Context.Source.Inventory.Find(virtualMachine, vm.Ref)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vm.Ref.String())
+		return
+	}
+
+	var retries int
+	var limitExceeded bool
+	if step.Annotations == nil {
+		step.Annotations = make(map[string]string)
+	}
+	retriesAnnotation := step.Annotations[ParentBackingRetriesAnnotation]
+	if retriesAnnotation == "" {
+		step.Annotations[ParentBackingRetriesAnnotation] = "1"
+	} else {
+		retries, err = strconv.Atoi(retriesAnnotation)
+		if err != nil {
+			return
+		}
+		limitExceeded = retries > settings.Settings.MaxParentBackingRetries
+	}
+
+	// Add disks to be inspected
+	for i, disk := range virtualMachine.Disks {
+		// If parent disk is empty then fail with error message
+		if disk.ParentFile != "" {
+			newEnv = append(newEnv, core.EnvVar{
+				Name:  fmt.Sprintf("V2V_remoteInspectDisk_%d", i),
+				Value: disk.ParentFile,
+			})
+		} else if limitExceeded {
+			// If retry limit was exceeded then collect all the failing disks and put them as a step errors
+			errMsg := fmt.Sprintf("Parent disk of %s was not found. This is possibly an environment issue. Please investigate if a precopy snapshot has a parent backing.", disk.File)
+			step.AddError(errMsg)
+			err = liberr.New(errMsg)
+			r.Log.Error(err, "Failed to get parent backing of VM disk.", "vm", vm.Ref.String())
+		} else {
+			// Retry on the next run and log the missing parent disk
+			retries += 1
+			step.Annotations[ParentBackingRetriesAnnotation] = strconv.Itoa(retries)
+			errMsg := fmt.Sprintf("Parent disk of %s was not found, will retry on next attempt", disk.File)
+			r.Log.Info(errMsg,
+				"vm", vm.Ref.String())
+			return
+		}
+	}
+	if limitExceeded {
+		return
+	}
+	return newEnv, true, nil
 }
 
 func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, libvirtConfigMap *core.ConfigMap, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, vm *plan.VMStatus, podType int) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, err error) {
@@ -2519,6 +2640,7 @@ func (r *KubeVirt) ensureConfigMap(vmRef ref.Ref) (configMap *core.ConfigMap, er
 	if err != nil {
 		return
 	}
+
 	list := &core.ConfigMapList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
@@ -2751,6 +2873,7 @@ func (r *KubeVirt) inspectionLabels(vmRef ref.Ref) (labels map[string]string) {
 func (r *KubeVirt) vmLabels(vmRef ref.Ref) (labels map[string]string) {
 	labels = r.planLabels()
 	labels[kVM] = vmRef.ID
+	labels[kResource] = ResourceVMConfig
 	return
 }
 
@@ -2759,6 +2882,7 @@ func (r *KubeVirt) vmLabels(vmRef ref.Ref) (labels map[string]string) {
 func (r *KubeVirt) vddkLabels() (labels map[string]string) {
 	labels = r.planLabels()
 	labels[kUse] = VddkConf
+	labels[kResource] = ResourceVDDKConfig
 	return
 }
 
@@ -2769,11 +2893,56 @@ func (r *KubeVirt) vmAllButMigrationLabels(vmRef ref.Ref) (labels map[string]str
 	return
 }
 
-// setTransferNetwork sets the transfer network annotation on the DataVolume so
-// that it can be used by the importer pod. If the `forklift.konveyor.io/route` annotation
-// is present on the referenced NAD, then it will be used with the `k8s.v1.cni.cncf.io/networks` annotation
-// to set the default route. If not, this will fall back to setting the `v1.multus-cni.io/default-network` annotation
-// with the namespaced name of the NAD.
+// guessTransferNetworkDefaultRoute determines the default gateway IP address for the transfer network
+// by checking the NetworkAttachmentDefinition in the following priority order:
+//
+//  1. Checks the AnnForkliftNetworkRoute annotation on the NAD
+//  2. Parses the NAD's spec.config JSON and looks for the default route (0.0.0.0/0 or ::/0)
+//     in the ipam.routes array, extracting the gateway IP from the matching route entry
+//
+// Returns:
+//   - route: The gateway IP address as a string (e.g., "192.168.1.1")
+//   - found: true if a route was found, false otherwise
+func (r *KubeVirt) guessTransferNetworkDefaultRoute(netAttachDef *k8snet.NetworkAttachmentDefinition) (route string, found bool) {
+	// First, try to get the default route from the annotation.
+	route, found = netAttachDef.Annotations[AnnForkliftNetworkRoute]
+	if found {
+		return route, true
+	}
+
+	// If the route annotation is not set, try to get the default route from the gw config value.
+	// Parse the Config string which is a JSON string containing network configuration.
+	if netAttachDef.Spec.Config != "" {
+		var config CNINetworkConfig
+		err := json.Unmarshal([]byte(netAttachDef.Spec.Config), &config)
+		if err != nil {
+			// If we can't parse the config, just return not found
+			return "", false
+		}
+
+		// Look for the default route (0.0.0.0/0 or ::/0) in the routes
+		for _, r := range config.IPAM.Routes {
+			if r.Dst == "0.0.0.0/0" || r.Dst == "::/0" {
+				return r.GW, true
+			}
+		}
+	}
+
+	return "", false
+}
+
+// setTransferNetwork configures the transfer network for the DataVolume's importer pod
+// by setting appropriate annotations based on whether a default gateway route can be determined.
+//
+// Behavior:
+//   - If a default gateway is found (via annotation or NAD config): Sets the
+//     k8s.v1.cni.cncf.io/networks annotation with the gateway to configure routing
+//   - If no default gateway is found: Falls back to setting the legacy
+//     v1.multus-cni.io/default-network annotation with the NAD's namespaced name
+//
+// The default gateway is discovered by checking the NAD annotation and IPAM config
+// (see guessTransferNetworkDefaultRoute for details).
+//
 // FIXME: the codepath using the multus annotation should be phased out.
 func (r *KubeVirt) setTransferNetwork(annotations map[string]string) (err error) {
 	key := client.ObjectKey{
@@ -2787,7 +2956,7 @@ func (r *KubeVirt) setTransferNetwork(annotations map[string]string) (err error)
 		return
 	}
 
-	route, found := netAttachDef.Annotations[AnnForkliftNetworkRoute]
+	route, found := r.guessTransferNetworkDefaultRoute(netAttachDef)
 	if found {
 		nse := k8snet.NetworkSelectionElement{
 			Namespace: key.Namespace,
@@ -2798,7 +2967,7 @@ func (r *KubeVirt) setTransferNetwork(annotations map[string]string) (err error)
 			nse.GatewayRequest = []net.IP{ip}
 		} else {
 			err = liberr.New(
-				"Transfer network default route annotation is not a valid IP address.",
+				"Transfer network default route is not a valid IP address.",
 				"route", route)
 			return
 		}

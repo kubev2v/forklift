@@ -14,6 +14,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/client-go/util/cert"
 
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/flashsystem"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/infinibox"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/ontap"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/powerflex"
@@ -87,6 +89,12 @@ func main() {
 			klog.Fatalf("failed to initialize Ontap storage mapper with %s", err)
 		}
 		storageApi = &sm
+	case forklift.StorageVendorProductFlashSystem:
+		sm, err := flashsystem.NewFlashSystemClonner(storageHostname, storageUsername, storagePassword, storageSkipSSLVerification == "true")
+		if err != nil {
+			klog.Fatalf("failed to initialize flashsystem storage mapper with %s", err)
+		}
+		storageApi = &sm
 	case forklift.StorageVendorProductPrimera3Par:
 		sm, err := primera3par.NewPrimera3ParClonner(
 			storageHostname, storageUsername, storagePassword, storageSkipSSLVerification == "true")
@@ -123,6 +131,13 @@ func main() {
 			klog.Fatalf("failed to initialize PowerStore clonner with %s", err)
 		}
 		storageApi = &sm
+	case forklift.StorageVendorProductInfinibox:
+		sm, err := infinibox.NewInfiniboxClonner(
+			storageHostname, storageUsername, storagePassword, storageSkipSSLVerification == "true")
+		if err != nil {
+			klog.Fatalf("failed to initialize Infinibox clonner with %s", err)
+		}
+		storageApi = &sm
 	default:
 		klog.Fatalf("Unsupported storage vendor %s use one of %v",
 			storageVendor, forklift.StorageVendorProducts())
@@ -134,45 +149,35 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	var p populator.Populator
-
-	// Determine clone method - default to VIB unless SSH is explicitly set
+	// Prepare SSH config if needed
+	var sshConfig *populator.SSHConfig
 	methodStr := strings.ToLower(strings.TrimSpace(esxiCloneMethod))
-	var method populator.CloneMethod
-
-	switch methodStr {
-	case "", string(populator.CloneMethodVIB):
-		method = populator.CloneMethodVIB
-	case string(populator.CloneMethodSSH):
-		method = populator.CloneMethodSSH
-	default:
-		klog.Fatalf("Invalid ESXI_CLONE_METHOD: '%s'. Valid values are: '' (default), '%s', '%s'", methodStr, populator.CloneMethodVIB, populator.CloneMethodSSH)
-	}
-
-	useVibMethod := method != populator.CloneMethodSSH
-
-	if useVibMethod {
-		klog.Infof("Using %s method for ESXi cloning", method)
-		vibP, err := populator.NewWithRemoteEsxcli(storageApi, vsphereHostname, vsphereUsername, vspherePassword)
-		if err != nil {
-			klog.Fatalf("Failed to create %s-based remote esxcli populator: %s", method, err)
-		}
-		p = vibP
-	} else {
-		klog.Infof("Using %s method for ESXi cloning", method)
-		// Get SSH keys from environment variables set by provider controller
+	if methodStr == string(populator.CloneMethodSSH) {
 		sshPrivateKey, sshPublicKey, err := getSSHKeysFromEnvironment()
 		if err != nil {
 			klog.Fatalf("Failed to get SSH keys from environment: %s", err)
 		}
-		klog.Infof("Debug: SSH keys retrieved, private key length: %d, public key length: %d", len(sshPrivateKey), len(sshPublicKey))
-
-		sshP, err := populator.NewWithRemoteEsxcliSSH(storageApi, vsphereHostname, vsphereUsername, vspherePassword, sshPrivateKey, sshPublicKey, sshTimeoutSeconds)
-		if err != nil {
-			klog.Fatalf("Failed to create %s-based remote esxcli populator: %s", method, err)
+		klog.Infof("SSH keys retrieved, private key length: %d, public key length: %d", len(sshPrivateKey), len(sshPublicKey))
+		sshConfig = &populator.SSHConfig{
+			UseSSH:         true,
+			PrivateKey:     sshPrivateKey,
+			PublicKey:      sshPublicKey,
+			TimeoutSeconds: sshTimeoutSeconds,
 		}
-		klog.Infof("Debug: SSH populator created successfully")
-		p = sshP
+	}
+
+	// Select the appropriate populator based on disk type
+	p, err := populator.NewPopulator(
+		storageApi,
+		vsphereHostname,
+		vsphereUsername,
+		vspherePassword,
+		sourceVmId,
+		sourceVMDKFile,
+		sshConfig,
+	)
+	if err != nil {
+		klog.Fatalf("Failed to initialize populator: %s", err)
 	}
 
 	pv, err := getPv(clientSet, targetNamespace, ownerName)
@@ -180,15 +185,17 @@ func main() {
 		klog.Fatalf("Failed to fetch the volume handle details from the target pvc %s: %s", ownerName, err)
 	}
 
-	progressCounter, err := setupTracing()
+	progressCounter, xcopyUsedGauge, err := setupTracingMetrics()
 	if err != nil {
 		klog.Fatal(err)
 	}
 
-	progressCh := make(chan uint)
+	progressCh := make(chan uint64)
+	xCopyUsedCh := make(chan int)
 	quitCh := make(chan error)
 
-	go p.Populate(sourceVmId, sourceVMDKFile, pv, progressCh, quitCh)
+	hll := populator.NewHostLeaseLocker(clientSet)
+	go p.Populate(sourceVmId, sourceVMDKFile, pv, hll, progressCh, xCopyUsedCh, quitCh)
 
 	for {
 		select {
@@ -200,11 +207,20 @@ func main() {
 			} else if float64(p) > metric.Counter.GetValue() {
 				progressCounter.WithLabelValues(ownerUID).Add(float64(p) - metric.Counter.GetValue())
 			}
+		case c := <-xCopyUsedCh:
+			klog.Infof(" xcopy used reported: %d", c)
+			metric := dto.Metric{}
+			if err := xcopyUsedGauge.WithLabelValues(ownerUID).Write(&metric); err != nil {
+				klog.Error("failed to write to the xcopy used gauge", err)
+			} else {
+				xcopyUsedGauge.WithLabelValues(ownerUID).Set(float64(c))
+			}
 		case q := <-quitCh:
 			klog.Infof("channel quit %s", q)
 			if q != nil {
 				klog.Fatal(q)
 			}
+
 			return
 		}
 	}
@@ -271,7 +287,7 @@ func handleArgs() {
 	flag.StringVar(&secretName, "secret-name", "", "Secret name the populator controller uses it to mount env vars from it. Not for use internally")
 	flag.StringVar(&sourceVmId, "source-vm-id", "", "VM object id in vsphere")
 	flag.StringVar(&sourceVMDKFile, "source-vmdk", "", "File name to populate")
-	flag.StringVar(&storageVendor, "storage-vendor-product", os.Getenv("STORAGE_VENDOR"), "The storage vendor to work with. Current values: [vantara, ontap, primera3par]")
+	flag.StringVar(&storageVendor, "storage-vendor-product", os.Getenv("STORAGE_VENDOR"), "The storage vendor to work with. Current values: [vantara, ontap, primera3par, flashsystem]")
 	flag.StringVar(&targetNamespace, "target-namespace", "", "Contents to populate file with")
 	flag.StringVar(&storageHostname, "storage-hostname", os.Getenv("STORAGE_HOSTNAME"), "The storage vendor api hostname")
 	flag.StringVar(&storageUsername, "storage-username", os.Getenv("STORAGE_USERNAME"), "The storage vendor api username")
@@ -324,40 +340,43 @@ func handleArgs() {
 	}
 }
 
-func setupTracing() (*prometheus.CounterVec, error) {
+func startMetricsServer(certFile, keyFile string) {
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		cfg := tls.Config{MinVersion: tls.VersionTLS12}
+		server := http.Server{
+			Addr:      ":8443",
+			TLSConfig: &cfg,
+		}
+		klog.Info("Starting metrics server")
+		if err := server.ListenAndServeTLS(certFile, keyFile); err != nil {
+			klog.Fatal("Error starting Prometheus endpoint: ", err)
+		}
+	}()
+}
+
+func setupTracingMetrics() (*prometheus.CounterVec, *prometheus.GaugeVec, error) {
 	certsDirectory, err := os.MkdirTemp("", "certsdir")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	certBytes, keyBytes, err := cert.GenerateSelfSignedCertKey("", nil, nil)
 	if err != nil {
-		return nil, fmt.Errorf("Error generating cert for prometheus")
+		return nil, nil, fmt.Errorf("Error generating cert for prometheus: %w", err)
 	}
 
 	certFile := path.Join(certsDirectory, "tls.crt")
 	if err = os.WriteFile(certFile, certBytes, 0600); err != nil {
-		return nil, fmt.Errorf("Error writing cert file: %w", err)
+		return nil, nil, fmt.Errorf("Error writing cert file: %w", err)
 	}
 
 	keyFile := path.Join(certsDirectory, "tls.key")
 	if err = os.WriteFile(keyFile, keyBytes, 0600); err != nil {
-		return nil, fmt.Errorf("Error writing key file: %w", err)
+		return nil, nil, fmt.Errorf("Error writing key file: %w", err)
 	}
 
-	go func() {
-		http.Handle("/metrics", promhttp.Handler())
-		// use minimum TLS 1.2
-		cfg := tls.Config{MinVersion: tls.VersionTLS12}
-		server := http.Server{
-			Addr:      ":8443",
-			TLSConfig: &cfg}
-		klog.Info("Staring metrics server")
-		if err := server.ListenAndServeTLS(certFile, keyFile); err != nil {
-			klog.Fatal("Error starting prometheus endpoint: ", err)
-		}
-	}()
-
+	// Register metrics
 	progressCounter := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "vsphere_xcopy_volume_populator_progress",
@@ -365,12 +384,26 @@ func setupTracing() (*prometheus.CounterVec, error) {
 		},
 		[]string{"ownerUID"},
 	)
+
+	xcopyUsedGauge := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "vsphere_xcopy_volume_populator_xcopy_used",
+			Help: "Indicates whether XCOPY was used for cloning (0=no, 1=yes)",
+		},
+		[]string{"ownerUID"},
+	)
+
+	// Register both to the default registry
 	if err := prometheus.Register(progressCounter); err != nil {
-		return nil, fmt.Errorf("Prometheus progress gauge not registered: %w", err)
+		return nil, nil, fmt.Errorf("Progress counter not registered: %w", err)
+	}
+	if err := prometheus.Register(xcopyUsedGauge); err != nil {
+		return nil, nil, fmt.Errorf("XCOPY used gauge not registered: %w", err)
 	}
 
-	return progressCounter, nil
+	startMetricsServer(certFile, keyFile)
 
+	return progressCounter, xcopyUsedGauge, nil
 }
 
 // getSSHKeysFromEnvironment retrieves SSH keys from environment variables set by the provider controller

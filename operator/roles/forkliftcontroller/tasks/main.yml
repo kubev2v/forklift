@@ -97,6 +97,22 @@
       definition: "{{ lookup('template', 'controller/controller-scc.yml.j2') }}"
     when: not k8s_cluster|bool
 
+  - name: "Setup OVA inventory proxy deployment"
+    k8s:
+      state: present
+      definition: "{{ lookup('template', 'ova-proxy/deployment.yml.j2') }}"
+
+  - name: "Setup OVA inventory proxy service"
+    k8s:
+      state: present
+      definition: "{{ lookup('template', 'ova-proxy/service.yml.j2') }}"
+
+  - when: not k8s_cluster|bool
+    name: "Setup OVA inventory proxy route"
+    k8s:
+      state: present
+      definition: "{{ lookup('template', 'ova-proxy/route.yml.j2') }}"
+
   - when: not k8s_cluster|bool
     block:
     - name: "Setup metrics service"
@@ -154,6 +170,10 @@
       k8s:
         state: present
         definition: "{{ lookup('template', 'controller/ca.yml.j2') }}"
+    - name: "Configure OVA inventory proxy certificate on K8s"
+      k8s:
+        state: present
+        definition: "{{ lookup('template', 'ova-proxy/ca.yml.j2') }}"
 
   - name: "Setup api service"
     k8s:
@@ -260,11 +280,6 @@
       k8s:
         state: "{{ cli_download_state }}"
         definition: "{{ lookup('template', 'cli-download/console-cli-download-kubectl-mtv.yml.j2') }}"
-
-    - name: "Setup ConsoleCLIDownload for kubectl-mtv MCP"
-      k8s:
-        state: "{{ cli_download_state }}"
-        definition: "{{ lookup('template', 'cli-download/console-cli-download-mcp.yml.j2') }}"
 
   - name: "Create controller service-account token Secret for download vddk tar"
     k8s:

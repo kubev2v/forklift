@@ -55,17 +55,68 @@ spec:
 
 ## vmkfstools-wrapper
 An ESXi CLI extension that exposes the vmkfstools clone operation to API interaction.
-The folder vmkfstools-wrapper has a script to create a VIB to wrap the vmkfstools-wrapper.sh
-to be a proxy perform vmkfstools commands and more.
+The folder vmkfstools-wrapper has a script to create a VIB to wrap the vmkfstools_wrapper.py
+to be a proxy to perform vmkfstools commands and more.
 The VIB should be installed on every ESXi that is connected to the datastores which
 are holds migratable VMs.
-See vmkfstools-wrapper/README.md for the installation of the tool using ansible
+Alternative, that wrapper can be invoked using SSH. See [SSH Method](#ssh-method)
 
 ## Storage Provider
 If a storage provider wants their storage to be supported, they need
 to implement a go package named after their product, and mutate main
 package so their specific code path is initialized.
 See [internal/populator/storage.go](internal/populator/storage.go)
+
+## Secret with Storage Provider Credentials
+
+Create a secret where the migration provider is setup, usually openshift-mtv
+and put the credentials of the storage system. All of the providers are required
+to have a secret with the following fields:
+
+| Key | Value | Mandatory | Default |
+| --- | --- | --- | --- |
+| STORAGE_HOSTNAME | ip/hostname | y | |
+| STORAGE_USERNAME | string | y | |
+| STORAGE_PASSWORD | string | y | |
+| STORAGE_SKIP_SSL_VERIFICATION | true/false | n | false |
+
+Provider-specific entries in the secret are documented below:
+
+### Hitachi Vantara
+
+See [README](internal/vantara/README.md)
+
+### NetApp ONTAP
+
+| Key | Value | Description |
+| --- | --- | --- |
+| ONTAP_SVM | string | the SVM to use in all the client interactions. Can be taken from trident.netapp.io/v1/TridentBackend.config.ontap_config.svm resource field. |
+
+
+### Pure FlashArray
+
+| Key | Value | Description |
+| --- | --- | --- |
+| PURE_CLUSTER_PREFIX | string | Cluster prefix is set in the StorageCluster resource. Get it with  `printf "px_%s" $(oc get storagecluster -A -o=jsonpath='{.items[0].status.clusterUid}'| head -c 8)` |
+
+### Dell PowerMax
+
+| Key | Value | Description |
+| --- | --- | --- |
+| POWERMAX_SYMMETRIX_ID | string | the symmetrix id of the storage array. Can be taken from the ConfigMap under the 'powermax' namespace, which the CSI driver uses. |
+| POWERMAX_PORT_GROUP_NAME | string | the port group to use for masking view creation. |
+
+### Dell PowerFlex
+
+| Key | Value | Description |
+| --- | --- | --- |
+| POWERFLEX_SYSTEM_ID | string | the system id of the storage array. Can be taken from `vxflexos-config` from the `vxflexos` namespace or the openshift-operators namespace. |
+
+
+## Host Lease Management
+
+To prevent overloading ESXi hosts during concurrent migrations, the vsphere-xcopy-volume-populator uses a distributed lease mechanism based on Kubernetes Lease objects.
+This ensures that heavy operations like storage rescans are serialized per ESXi host. For more details on its configuration, behavior, and monitoring, refer to the [Host Lease Management documentation](docs/copy-offload-lease-management.md).
 
 ## Limitations
 - A migration plan cannot mix VDDK mappings with copy-offload mappings.
@@ -74,7 +125,7 @@ See [internal/populator/storage.go](internal/populator/storage.go)
   in the plan must **either** include copy-offload details (secret + product)
   **or** none of them must; otherwise the plan will fail.
 
-This volume populator implementation is specific for performing XCOPY from a source vmdk 
+This volume populator implementation is specific for performing XCOPY from a source vmdk
 descriptor disk file to a target PVC; this also works if the underlying disk is
 vVol or RDM. The way it works is by performing the XCOPY using vmkfstools on the target ESXi.
 
@@ -422,6 +473,7 @@ Provider specific entries in the secret shall be documented below:
 | Key | Value | Description |
 | --- | --- | --- |
 | POWERMAX_SYMMETRIX_ID | string | the symmetrix id of the storage array. Can be taken from the ConfigMap under the 'powermax' namespace, which the CSI driver uses. |
+| POWERMAX_PORT_GROUP_NAME | string | the port group to use for masking view creation. |
 
 
 ## Dell PowerFlex

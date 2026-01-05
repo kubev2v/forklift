@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/fcutil"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
 	"k8s.io/klog/v2"
 )
@@ -234,8 +235,7 @@ func (p *Primera3ParClientWsImpl) createHost(hostname, adapterId string) error {
 	return nil
 }
 func sanitizeWWN(raw string) string {
-	cleaned := strings.ReplaceAll(strings.ReplaceAll(raw, ":", ""), "-", "")
-	return strings.ToUpper(cleaned)
+	return fcutil.NormalizeWWN(raw)
 }
 
 func (p *Primera3ParClientWsImpl) GetSessionKey() (string, error) {

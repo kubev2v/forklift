@@ -1,45 +1,48 @@
-FROM registry.redhat.io/ubi9/go-toolset:1.24.4-1752083840 AS envsubst
+FROM quay.io/konflux-ci/yq AS tools
 
 FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel9@sha256:2e8ded84e20ba61e6dd10c99b95d1831f9852d87f47badb9535ee3ced22506a7 AS builder
 
 ARG EVENT_TITLE
 
-ARG VERSION
+ARG MTV_VERSION
 ARG RELEASE
 ARG CHANNEL
 ARG DEFAULT_CHANNEL
 ARG REGISTRY
 ARG OCP_VERSIONS
 
-ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:3006ee4c5e963de3850c83b544e02da0d5802f90b44b86cb49ec92db966daf43"
+ARG API_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-api-rhel9@sha256:dc5623f13e9c844114fdc0f8be542b5716d1969565ba1daf4e8353e74605fedf"
 
-ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:26fba943f34fa8baf776821662194a9d3e6ae0625bb94d3b3d74b5c9718cbcbe"
+ARG CONTROLLER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-controller-rhel9@sha256:abfce001a3acd86f38f48442bf4b0e421b2bf5f8eb676665e402bb32e36bbe78"
 
-ARG MUST_GATHER_IMAGE="registry.redhat.io/mtv-candidate/mtv-must-gather-rhel8@sha256:739f287fc4dee80888ce372feca9b7e01da50ab6cae0396595a944bf9b7b6b10"
+ARG MUST_GATHER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-must-gather-rhel8@sha256:6b1cf79c54d30b1e25c0ad9ec5684b17be2649196d7014cf56e2396a6482fef0"
 
-ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-openstack-populator-rhel9@sha256:2224f474b472a911e9ac9508936a5cb4dd26191640f37d41da7360b138fb963f"
+ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-openstack-populator-rhel9@sha256:1dc57f978cd2a94940286d3f89465bda4fea5acae8731ad1ca1c6abf78cd559a"
 
-ARG OPERATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhel9-operator@sha256:306832877ac80c6a19e858c1a38a60437fb8be3754920f02f493743bd7fae7f1"
+ARG OPERATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-rhel9-operator@sha256:2e56b56d32c5459dae795d1ce41747653de9d3299126182fc67a1156220fc308"
 
-ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/mtv-candidate/mtv-ova-provider-server-rhel9@sha256:b7125fc0244b347f98d81fa029f1cebb03c43c0b6f8c69e1fcbc32c3a8cf7773"
+ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-ova-provider-server-rhel9@sha256:c80b0833e0b487ce5469dc2647300ee34222cfa6a6f7e6be65a8472ec0afe47e"
 
-ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhv-populator-rhel8@sha256:2e0254577c66cb4c00cc7c1d98b1d4732c1fbbb0b1f631cfc39d74f8ae9cbfde"
+ARG OVA_PROXY_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-ova-proxy-rhel9@sha256:0b2cc323dd29a06a286861b5599ce220baaafe04bddf2fa6e3b4dc113de395dd"
 
-ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-populator-controller-rhel9@sha256:c71d71f807d9631bf2baa54200fc69accb3311f9c83d07ed083f08a32e62d863"
+ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-rhv-populator-rhel8@sha256:40ada3fbd50568f10c58be9a96853ed7637145eeaee2153851dbe918817c88fc"
 
-ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:3541c357e3672ac99e9cf6099224ecb8da508d44d7e46f761715ff8da588c7ec"
+ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-populator-controller-rhel9@sha256:b64f7ec5dddf55e794c6a79403d68e051e145e8ee00fa23ecbf49e4e45a01fa2"
 
-ARG CLI_DOWNLOAD_IMAGE="registry.redhat.io/mtv-candidate/mtv-cli-download-rhel9@sha256:f866ce146aa1dc222be1a0f6144a2815662c1b80b2338d87238ce67534d07443"
+ARG UI_PLUGIN_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-console-plugin-rhel9@sha256:295dd05b9b28dda5061be4db34a3c46ba2e7f00df8c91cf93bc9f4bed61d2859"
 
-ARG VALIDATION_IMAGE="registry.redhat.io/mtv-candidate/mtv-validation-rhel9@sha256:8fec2c15a89e3708d24891dc5dc82cee5b19fc5964894bec3e4e8f4290226600"
+ARG CLI_DOWNLOAD_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-cli-download-rhel9@sha256:4e32190b9315d0edef5e7043779deeccdb8ca69b496a963ca84573fc438836fb"
 
-ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel9@sha256:aa083f37b3cadcb4f5172eabe1ef55d5b6f731d3286f9fba0fbbfa548a65fd89"
+ARG VALIDATION_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-validation-rhel9@sha256:c281c78e4cb83b71a4b6b74ca35e098049f98c42266fc1c67565a16be37fcabf"
 
-ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:0312dd52c69eeb8ae75480a7519f569db0d1801bd97c8d7b2b3284ee53c42e59"
+ARG VIRT_V2V_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel10@sha256:3d927816fbd65ad819444432c6d80907143944e0fba525826edc10c8ca568849"
+
+ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:7d31498484a1cb685b29ba83059e71604ffd53d0ed661125196d70975e3a71d6"
 
 USER root
 
-COPY --from=envsubst /usr/bin/envsubst /usr/bin/envsubst
+COPY --from=tools /usr/bin/envsubst /usr/bin/envsubst
+COPY --from=tools /usr/bin/yq /usr/bin/yq
 
 COPY ./operator /repo
 COPY ./build/forklift-operator-bundle/images.conf /repo/images.conf
@@ -54,22 +57,28 @@ RUN source ./images.conf && \
     -q \
     --overwrite \
     --extra-service-accounts forklift-controller,forklift-api,forklift-populator-controller \
-    --version $VERSION \
+    --version $MTV_VERSION \
     --channels $CHANNEL \
     --default-channel $DEFAULT_CHANNEL \
     --output-dir build
 
+# CSV from operator-sdk does not contain `relatedImages` which causes issues in diconnected environments.
+# Load relatedImages object from "operator/related_images.yaml", append it to generated CSV spec and envsubst the ENV variables for specific images
+# MTV-3558
+RUN yq eval -i 'load("related_images.yaml").relatedImages as $images | .spec.relatedImages = $images' build/manifests/mtv-operator.clusterserviceversion.yaml
+RUN envsubst < build/manifests/mtv-operator.clusterserviceversion.yaml > temp.yaml && cp temp.yaml build/manifests/mtv-operator.clusterserviceversion.yaml
 USER 1001
 
 FROM scratch
 
-ARG VERSION
+ARG MTV_VERSION
 ARG RELEASE
 ARG CHANNEL
 ARG DEFAULT_CHANNEL
 ARG REGISTRY
 ARG OCP_VERSIONS
 ARG REVISION
+ARG CPE
 
 COPY --from=builder /repo/build/manifests /manifests/
 COPY --from=builder /repo/build/metadata /metadata/
@@ -107,11 +116,10 @@ LABEL operators.operatorframework.io.test.mediatype.v1=scorecard+v1
 # Main labels
 LABEL \
     com.redhat.component="mtv-operator-bundle-container" \
-    cpe="cpe:/a:redhat:migration_toolkit_virtualization:2.9::el9" \
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:${CPE}::el9" \
     name="${REGISTRY}/mtv-operator-bundle" \
     License="Apache License 2.0" \
     io.k8s.display-name="Migration Toolkit for Virtualization" \
-
     io.openshift.tags="migration" \
     io.k8s.description="Migration Toolkit for Virtualization - Operator Bundle" \
     summary="Migration Toolkit for Virtualization - Operator Bundle" \
@@ -121,5 +129,5 @@ LABEL \
     url="https://github.com/kubev2v/forklift" \
     distribution-scope="public" \
     release=$RELEASE \
-    version=$VERSION \
+    version=$MTV_VERSION \
     revision="$REVISION"

@@ -267,6 +267,8 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 				Category: Critical,
 				Message:  err.Error(),
 			})
+			err = nil
+			//nolint:nilerr
 			return
 		}
 		provider.Status.Fingerprint = util.Fingerprint(crt)
@@ -391,21 +393,6 @@ func (r *Reconciler) inventoryCreated(provider *api.Provider) error {
 	}
 
 	return nil
-}
-
-func (r *Reconciler) handleServerCreationFailure(provider *api.Provider, err error) {
-	provider.Status.Phase = ConnectionFailed
-	msg := fmt.Sprint("The OVA provider server creation failed: ", err)
-	provider.Status.SetCondition(
-		libcnd.Condition{
-			Type:     ConnectionFailed,
-			Status:   True,
-			Category: Critical,
-			Message:  msg,
-		})
-	if updateErr := r.Status().Update(context.TODO(), provider.DeepCopy()); updateErr != nil {
-		log.Error(updateErr, "Failed to update provider status")
-	}
 }
 
 func isValidNFSPath(nfsPath string) bool {

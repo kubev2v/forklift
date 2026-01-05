@@ -58,6 +58,8 @@ type Migration struct {
 	*plancontext.Context
 	// Builder
 	builder adapter.Builder
+	// Ensurer
+	ensurer adapter.Ensurer
 	// kubevirt.
 	kubevirt KubeVirt
 	// Source client.
@@ -159,6 +161,10 @@ func (r *Migration) init() (err error) {
 	if err != nil {
 		return
 	}
+	r.ensurer, err = adapter.Ensurer(r.Context)
+	if err != nil {
+		return
+	}
 	r.destinationClient, err = adapter.DestinationClient(r.Context)
 	if err != nil {
 		return
@@ -166,6 +172,7 @@ func (r *Migration) init() (err error) {
 	r.kubevirt = KubeVirt{
 		Context: r.Context,
 		Builder: r.builder,
+		Ensurer: r.ensurer,
 	}
 	r.scheduler, err = scheduler.New(r.Context)
 	if err != nil {
@@ -389,7 +396,7 @@ func markStartedStepsCompleted(vm *plan.VMStatus) {
 }
 
 func (r *Migration) deletePopulatorPVCs(vm *plan.VMStatus) (err error) {
-	if r.builder.SupportsVolumePopulators(vm.Ref) {
+	if r.builder.SupportsVolumePopulators() {
 		err = r.kubevirt.DeletePopulatedPVCs(vm)
 	}
 	return
@@ -418,6 +425,9 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool) error
 		return err
 	}
 	if err := r.kubevirt.DeleteGuestConversionPod(vm); failOnErr(err) {
+		return err
+	}
+	if err := r.kubevirt.DeletePreflightInspectionPod(vm); failOnErr(err) {
 		return err
 	}
 	if err := r.kubevirt.DeleteSecret(vm); failOnErr(err) {
@@ -724,7 +734,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				}
 			}
 
-			if r.builder.SupportsVolumePopulators(vm.Ref) {
+			if r.builder.SupportsVolumePopulators() {
 				var pvcs []*core.PersistentVolumeClaim
 				if pvcs, err = r.kubevirt.PopulatorVolumes(vm.Ref); err != nil {
 					if !errors.As(err, &web.ProviderNotReadyError{}) {
@@ -752,9 +762,8 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				r.Log.Info("PreTransferActions hook isn't ready yet")
 				return
 			}
-
 			// Create DataVolumes unless this is a cold migration using storage offload
-			if r.Plan.Spec.Warm || !r.builder.SupportsVolumePopulators(vm.Ref) {
+			if r.Plan.IsWarm() || !r.builder.SupportsVolumePopulators() {
 				var dataVolumes []cdi.DataVolume
 				dataVolumes, err = r.kubevirt.DataVolumes(vm)
 				if err != nil {
@@ -788,7 +797,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 
 			// Wait for the DataVolume to adopt the PVC before proceeding
-			if r.builder.SupportsVolumePopulators(vm.Ref) && r.Plan.Spec.Warm {
+			if r.builder.SupportsVolumePopulators() && r.Plan.IsWarm() {
 				var pvcs []*core.PersistentVolumeClaim
 				pvcs, err = r.kubevirt.getPVCs(vm.Ref)
 				if err != nil {
@@ -893,7 +902,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			step.MarkStarted()
 			step.Phase = api.StepRunning
 
-			if r.builder.SupportsVolumePopulators(vm.Ref) {
+			if r.builder.SupportsVolumePopulators() {
 				err = r.updatePopulatorCopyProgress(vm, step)
 			} else {
 				// Fallback to non-volume populator path
@@ -905,7 +914,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				break
 			}
 			if step.MarkedCompleted() && !step.HasError() {
-				if r.Plan.Spec.Warm {
+				if r.Plan.IsWarm() {
 					now := meta.Now()
 					next := meta.NewTime(now.Add(time.Duration(Settings.PrecopyInterval) * time.Minute))
 					n := len(vm.Warm.Precopies)
@@ -1206,7 +1215,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			step.MarkStarted()
 			step.Phase = api.StepRunning
 			var ready bool
-			if ready, err = r.ensureGuestConversionPod(vm); err != nil {
+			if ready, err = r.ensureGuestConversionPod(vm, step); err != nil {
 				step.AddError(err.Error())
 				err = nil
 				break
@@ -1260,7 +1269,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 
 			// Create inspection pod if missing
 			var ready bool
-			if ready, err = r.ensureGuestInspectionPod(vm); err != nil {
+			if ready, err = r.ensureGuestInspectionPod(vm, step); err != nil {
 				step.AddError(err.Error())
 				err = nil
 				break
@@ -1354,6 +1363,13 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 
 	} else if vm.Error != nil {
 		vm.Phase = api.PhaseCompleted
+
+		// Failed warm migration can't follow its planned itinerary to snapshot removal phase
+		// so we remove the snapshot here to prevent an orphaned snapshot.
+		if r.Plan.IsWarm() && !vm.HasCondition(api.ConditionFailed) {
+			r.removeLastWarmSnapshot(vm)
+		}
+
 		vm.SetCondition(
 			libcnd.Condition{
 				Type:     api.ConditionFailed,
@@ -1448,7 +1464,7 @@ func (r *Migration) end() (completed bool, err error) {
 }
 
 // Ensure the guest conversion pod is present.
-func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (ready bool, err error) {
+func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus, step *plan.Step) (ready bool, err error) {
 	if r.vmMap == nil {
 		r.vmMap, err = r.kubevirt.VirtualMachineMap()
 		if err != nil {
@@ -1469,7 +1485,7 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (ready bool, err
 		}
 	}
 
-	err = r.kubevirt.EnsureVirtV2vPod(vm, &vmCr, pvcs, VirtV2vConversionPod)
+	err = r.kubevirt.EnsureVirtV2vPod(vm, &vmCr, pvcs, VirtV2vConversionPod, step)
 	if err != nil {
 		return
 	}
@@ -1485,17 +1501,19 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus) (ready bool, err
 }
 
 // Ensure the guest inspection pod is present.
-func (r *Migration) ensureGuestInspectionPod(vm *plan.VMStatus) (ready bool, err error) {
+func (r *Migration) ensureGuestInspectionPod(vm *plan.VMStatus, step *plan.Step) (ready bool, err error) {
 	var vmCr VirtualMachine
 	var pvcs []*core.PersistentVolumeClaim
 	// pass empty vmCr and pvcs because they are not used when getting inspection pod
-	err = r.kubevirt.EnsureVirtV2vPod(vm, &vmCr, pvcs, VirtV2vInspectionPod)
+	err = r.kubevirt.EnsureVirtV2vPod(vm, &vmCr, pvcs, VirtV2vInspectionPod, step)
 	if err != nil {
 		return
 	}
-
-	ready = true
-	return
+	// When inspection pod does not exist, something went wrong while creating, most likely the parent backing was missing
+	if pod, err := r.getInspectionPod(vm); pod == nil {
+		return false, err
+	}
+	return true, err
 }
 
 // Get pod that has inspection label
@@ -1666,7 +1684,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 					continue
 				}
 
-				if r.Plan.Spec.Warm && len(importer.Status.ContainerStatuses) > 0 {
+				if r.Plan.IsWarm() && len(importer.Status.ContainerStatuses) > 0 {
 					vm.Warm.Failures = int(importer.Status.ContainerStatuses[0].RestartCount)
 				}
 				if restartLimitExceeded(importer) {
@@ -1708,6 +1726,9 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 	case core.PodSucceeded:
 		step.MarkCompleted()
 		step.Progress.Completed = step.Progress.Total
+		for _, task := range step.Tasks {
+			task.Progress.Completed = task.Progress.Total
+		}
 	case core.PodFailed:
 		step.MarkCompleted()
 		step.AddError("Guest conversion failed. See pod logs for details.")

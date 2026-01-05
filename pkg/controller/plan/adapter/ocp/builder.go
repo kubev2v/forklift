@@ -10,6 +10,7 @@ import (
 
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
+	"k8s.io/apimachinery/pkg/types"
 	export "kubevirt.io/api/export/v1alpha1"
 
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -17,12 +18,12 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
 	ocpclient "github.com/kubev2v/forklift/pkg/lib/client/openshift"
 	core "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
 	cnv "kubevirt.io/api/core/v1"
@@ -100,6 +101,9 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *v1.Secret, configMap *v1.Co
 
 		size := pvc.Spec.Resources.Requests["storage"]
 		dataVolume := dvTemplate.DeepCopy()
+		// The dvTemplate contains GenerateName which will create a PVC with different name than the original PVC
+		dataVolume.GenerateName = ""
+		dataVolume.Name = pvc.Name
 		dataVolume.Annotations[planbase.AnnDiskSource] = fmt.Sprintf("%s/%s", pvc.Namespace, pvc.Name)
 
 		url := getExportURL(volume.Formats)
@@ -263,201 +267,139 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 
 	targetVmSpec := sourceVm.Spec.DeepCopy()
 	object.Template = targetVmSpec.Template
-	r.mapDisks(sourceVm, targetVmSpec, persistentVolumeClaims, vmRef)
 	r.mapNetworks(sourceVm, targetVmSpec)
 
 	return nil
 }
 
-func (r *Builder) mapDisks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim, vmRef ref.Ref) {
-	diskMap := createDiskMap(sourceVm, vmRef)
-	configMaps, secrets := r.createEnvMaps(sourceVm, vmRef)
-
-	// Clear original disks and volumes, will be required for other mapped devices later
-	targetVmSpec.Template.Spec.Domain.Devices.Disks = []cnv.Disk{}
-	targetVmSpec.Template.Spec.Volumes = []cnv.Volume{}
-
-	r.mapPVCsToTarget(targetVmSpec, persistentVolumeClaims, diskMap)
-	r.mapConfigMapsToTarget(targetVmSpec, configMaps)
-	r.mapSecretsToTarget(targetVmSpec, secrets)
-	r.mapDeviceDisks(targetVmSpec, sourceVm, diskMap)
-}
-
-// FIXME: The map does not contain all possible disk configuration
-// We should go through the missing and implement them or warn around them
-func (r *Builder) isDiskInDiskMap(disk *cnv.Disk, diskMap map[string]*cnv.Disk) bool {
-	for _, val := range diskMap {
-		if disk.Name == val.Name {
-			return true
-		}
+// ConfigMaps builds CRs for each of the ConfigMaps that the source VM depends upon.
+// Migration labels are set to track when they were first created, but since these may be
+// used by more than one VM they are not labeled with the VM id.
+func (r *Builder) ConfigMaps(vmRef ref.Ref) (list []core.ConfigMap, err error) {
+	virtualMachine := &model.VM{}
+	err = r.Source.Inventory.Find(virtualMachine, vmRef)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef.String())
+		return
 	}
-	return false
-}
-
-func (r *Builder) mapDeviceDisks(targetVmSpec *cnv.VirtualMachineSpec, sourceVm *cnv.VirtualMachine, diskMap map[string]*cnv.Disk) {
-	for _, disk := range sourceVm.Spec.Template.Spec.Domain.Devices.Disks {
-		if r.isDiskInDiskMap(&disk, diskMap) {
-			targetVmSpec.Template.Spec.Domain.Devices.Disks = append(targetVmSpec.Template.Spec.Domain.Devices.Disks, *disk.DeepCopy())
-		}
-	}
-}
-
-func createDiskMap(sourceVm *cnv.VirtualMachine, vmRef ref.Ref) map[string]*cnv.Disk {
-	diskMap := make(map[string]*cnv.Disk)
-
-	for _, disk := range sourceVm.Spec.Template.Spec.Domain.Devices.Disks {
-		currentDisk := disk
-		for _, vol := range sourceVm.Spec.Template.Spec.Volumes {
-			if vol.Name != disk.Name {
-				continue
-			}
-
-			var key string
-			switch {
-			case vol.PersistentVolumeClaim != nil:
-				key = pvcSourceName(vmRef.Namespace, vol.PersistentVolumeClaim.ClaimName)
-			case vol.DataVolume != nil:
-				key = pvcSourceName(vmRef.Namespace, vol.DataVolume.Name)
-			case vol.ConfigMap != nil:
-				key = vol.ConfigMap.Name
-			case vol.Secret != nil:
-				key = vol.Secret.SecretName
-			}
-
-			diskMap[key] = &currentDisk
-			break
-		}
-	}
-
-	return diskMap
-}
-
-func (r *Builder) mapPVCsToTarget(targetVmSpec *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim, diskMap map[string]*cnv.Disk) {
-	for _, volume := range persistentVolumeClaims {
-		if disk, ok := diskMap[volume.Annotations[planbase.AnnDiskSource]]; ok {
-			targetVolume := cnv.Volume{
-				Name: disk.Name,
-				VolumeSource: cnv.VolumeSource{
-					PersistentVolumeClaim: &cnv.PersistentVolumeClaimVolumeSource{
-						PersistentVolumeClaimVolumeSource: core.PersistentVolumeClaimVolumeSource{
-							ClaimName: volume.Name,
-						},
-					},
-				},
-			}
-			targetVmSpec.Template.Spec.Volumes = append(targetVmSpec.Template.Spec.Volumes, targetVolume)
-		}
-	}
-}
-
-type envMap struct {
-	envResource interface{}
-	volName     string
-}
-
-func (r *Builder) createEnvMaps(sourceVm *cnv.VirtualMachine, vmRef ref.Ref) (map[string]*envMap, map[string]*envMap) {
-	configMaps := make(map[string]*envMap)
-	secrets := make(map[string]*envMap)
-
-	for _, envVol := range sourceVm.Spec.Template.Spec.Volumes {
+	sources := []types.NamespacedName{}
+	for _, vol := range virtualMachine.Object.Spec.Template.Spec.Volumes {
 		switch {
-		case envVol.ConfigMap != nil:
-			configMap := &core.ConfigMap{}
-			err := r.sourceClient.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: envVol.ConfigMap.Name}, configMap)
-			if err != nil {
-				r.Log.Error(err, "Failed to get ConfigMap", "namespace", vmRef.Namespace, "name", envVol.ConfigMap.Name)
-				continue
+		case vol.ConfigMap != nil:
+			key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.ConfigMap.Name}
+			sources = append(sources, key)
+		case vol.Sysprep != nil:
+			if vol.Sysprep.ConfigMap != nil {
+				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.Sysprep.ConfigMap.Name}
+				sources = append(sources, key)
 			}
-			configMaps[envVol.ConfigMap.Name] = &envMap{
-				envResource: configMap,
-				volName:     envVol.Name,
-			}
-
-		case envVol.Secret != nil:
-			secret := &core.Secret{}
-			err := r.sourceClient.Get(context.Background(), client.ObjectKey{Namespace: vmRef.Namespace, Name: envVol.Secret.SecretName}, secret)
-			if err != nil {
-				r.Log.Error(err, "Failed to get Secret", "namespace", vmRef.Namespace, "name", envVol.Secret.SecretName)
-				continue
-			}
-			secrets[envVol.Secret.SecretName] = &envMap{
-				envResource: secret,
-				volName:     envVol.Name,
-			}
+		default:
+			continue
 		}
 	}
-
-	return configMaps, secrets
+	for _, key := range sources {
+		source := &core.ConfigMap{}
+		err = r.sourceClient.Get(context.Background(), key, source)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+		target := core.ConfigMap{}
+		target.Name = source.Name
+		target.Namespace = r.Plan.Spec.TargetNamespace
+		target.Data = source.Data
+		target.BinaryData = source.BinaryData
+		target.Immutable = source.Immutable
+		target.SetLabels(source.GetLabels())
+		r.Labeler.SetLabels(&target, r.Labeler.MigrationLabels())
+		target.SetAnnotations(source.GetAnnotations())
+		r.Labeler.SetAnnotation(&target, planbase.AnnSource, key.String())
+		list = append(list, target)
+	}
+	return
 }
 
-func (r *Builder) mapConfigMapsToTarget(targetVmSpec *cnv.VirtualMachineSpec, configMaps map[string]*envMap) {
-	for _, configMap := range configMaps {
-		// Create configmap on destination cluster
-		sourceConfigMap := configMap.envResource.(*core.ConfigMap)
-		targetConfigMap := &core.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:        sourceConfigMap.Name,
-				Namespace:   r.Plan.Spec.TargetNamespace,
-				Labels:      sourceConfigMap.Labels,
-				Annotations: sourceConfigMap.Annotations,
-			},
-			Data: sourceConfigMap.Data,
-		}
-		err := r.Destination.Client.Create(context.Background(), targetConfigMap)
-		if err != nil {
-			if !errors.IsAlreadyExists(err) {
-				r.Log.Error(err, "Failed to create ConfigMap", "namespace", r.Plan.Spec.TargetNamespace, "name", targetConfigMap.Name)
-				continue
+// Secrets builds CRs for each of the Secrets that the source VM depends upon.
+// Migration labels are set to track when they were first created, but since these may be
+// used by more than one VM they are not labeled with the VM id.
+func (r *Builder) Secrets(vmRef ref.Ref) (list []core.Secret, err error) {
+	virtualMachine := &model.VM{}
+	err = r.Source.Inventory.Find(virtualMachine, vmRef)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef.String())
+		return
+	}
+	sources := []types.NamespacedName{}
+	for _, cred := range virtualMachine.Object.Spec.Template.Spec.AccessCredentials {
+		switch {
+		case cred.SSHPublicKey != nil:
+			if cred.SSHPublicKey.Source.Secret != nil {
+				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: cred.SSHPublicKey.Source.Secret.SecretName}
+				sources = append(sources, key)
+			}
+		case cred.UserPassword != nil:
+			if cred.UserPassword.Source.Secret != nil {
+				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: cred.UserPassword.Source.Secret.SecretName}
+				sources = append(sources, key)
 			}
 		}
-
-		configMapVolume := cnv.Volume{
-			Name: configMap.volName,
-			VolumeSource: cnv.VolumeSource{
-				ConfigMap: &cnv.ConfigMapVolumeSource{
-					LocalObjectReference: core.LocalObjectReference{
-						Name: targetConfigMap.Name,
-					},
-				},
-			},
-		}
-
-		targetVmSpec.Template.Spec.Volumes = append(targetVmSpec.Template.Spec.Volumes, configMapVolume)
 	}
-}
-
-func (r *Builder) mapSecretsToTarget(targetVmSpec *cnv.VirtualMachineSpec, secrets map[string]*envMap) {
-	for _, secret := range secrets {
-		// Create secret on destination cluster
-		sourceSecret := secret.envResource.(*core.Secret)
-		targetSecret := &core.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:        sourceSecret.Name,
-				Namespace:   r.Plan.Spec.TargetNamespace,
-				Labels:      sourceSecret.Labels,
-				Annotations: sourceSecret.Annotations,
-			},
-			Data: sourceSecret.Data,
-		}
-		err := r.Destination.Client.Create(context.Background(), targetSecret)
-		if err != nil {
-			if !errors.IsAlreadyExists(err) {
-				r.Log.Error(err, "Failed to create Secret", "namespace", r.Plan.Spec.TargetNamespace, "name", targetSecret.Name)
-				continue
+	for _, vol := range virtualMachine.Object.Spec.Template.Spec.Volumes {
+		switch {
+		case vol.Secret != nil:
+			key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.Secret.SecretName}
+			sources = append(sources, key)
+		case vol.CloudInitNoCloud != nil:
+			if vol.CloudInitNoCloud.UserDataSecretRef != nil {
+				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.CloudInitNoCloud.UserDataSecretRef.Name}
+				sources = append(sources, key)
 			}
+			if vol.CloudInitNoCloud.NetworkDataSecretRef != nil {
+				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.CloudInitNoCloud.NetworkDataSecretRef.Name}
+				sources = append(sources, key)
+			}
+		case vol.CloudInitConfigDrive != nil:
+			if vol.CloudInitConfigDrive.UserDataSecretRef != nil {
+				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.CloudInitConfigDrive.UserDataSecretRef.Name}
+				sources = append(sources, key)
+			}
+			if vol.CloudInitConfigDrive.NetworkDataSecretRef != nil {
+				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.CloudInitConfigDrive.NetworkDataSecretRef.Name}
+				sources = append(sources, key)
+			}
+		case vol.Sysprep != nil:
+			if vol.Sysprep.Secret != nil {
+				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.Sysprep.Secret.Name}
+				sources = append(sources, key)
+			}
+		case vol.ContainerDisk != nil:
+			if vol.ContainerDisk.ImagePullSecret != "" {
+				key := types.NamespacedName{Namespace: virtualMachine.Namespace, Name: vol.ContainerDisk.ImagePullSecret}
+				sources = append(sources, key)
+			}
+		default:
+			continue
 		}
-
-		secretVolume := cnv.Volume{
-			Name: secret.volName,
-			VolumeSource: cnv.VolumeSource{
-				Secret: &cnv.SecretVolumeSource{
-					SecretName: targetSecret.Name,
-				},
-			},
-		}
-
-		targetVmSpec.Template.Spec.Volumes = append(targetVmSpec.Template.Spec.Volumes, secretVolume)
 	}
+	for _, key := range sources {
+		source := &core.Secret{}
+		err = r.sourceClient.Get(context.Background(), key, source)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+		target := core.Secret{}
+		target.Name = source.Name
+		target.Namespace = r.Plan.Spec.TargetNamespace
+		target.Data = source.Data
+		target.Immutable = source.Immutable
+		target.SetLabels(source.GetLabels())
+		r.Labeler.SetLabels(&target, r.Labeler.MigrationLabels())
+		target.SetAnnotations(source.GetAnnotations())
+		r.Labeler.SetAnnotation(&target, planbase.AnnSource, key.String())
+		list = append(list, target)
+	}
+	return
 }
 
 func (r *Builder) mapNetworks(sourceVm *cnv.VirtualMachine, targetVmSpec *cnv.VirtualMachineSpec) {
@@ -650,11 +592,7 @@ func createDataVolumeSpec(size resource.Quantity, storageClassName, url, configM
 	}
 }
 
-func pvcSourceName(namespace, name string) string {
-	return fmt.Sprintf("%s/%s", namespace, name)
-}
-
-func (r *Builder) SupportsVolumePopulators(vmRef ref.Ref) bool {
+func (r *Builder) SupportsVolumePopulators() bool {
 	return false
 }
 

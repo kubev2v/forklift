@@ -15,9 +15,10 @@ RUN microdnf -y install tar && microdnf clean all
 COPY --from=builder /app/openstack-populator /usr/local/bin/openstack-populator
 ENTRYPOINT ["/usr/local/bin/openstack-populator"]
 
-ARG VERSION
+ARG MTV_VERSION
 ARG REGISTRY
 ARG REVISION
+ARG CPE
 
 LABEL \
     com.redhat.component="mtv-openstack-populator-container" \
@@ -30,6 +31,6 @@ LABEL \
     description="Migration Toolkit for Virtualization - OpenStack Populator" \
     vendor="Red Hat, Inc." \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
-    version="$VERSION" \
+    version="$MTV_VERSION" \
     revision="$REVISION" \
-    cpe="cpe:/a:redhat:migration_toolkit_virtualization:2.9::el9"
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:${CPE}::el9"

@@ -45,6 +45,7 @@ const (
 	MigrationTypeNotValid           = "MigrationTypeNotValid"
 	NamespaceNotValid               = "NamespaceNotValid"
 	TransferNetNotValid             = "TransferNetworkNotValid"
+	TransferNetMissingDefaultRoute  = "TransferNetworkMissingDefaultRoute"
 	NetRefNotValid                  = "NetworkMapRefNotValid"
 	NetMapNotReady                  = "NetworkMapNotReady"
 	NetMapPreservingIPsOnPodNetwork = "NetMapPreservingIPsOnPodNetwork"
@@ -307,7 +308,7 @@ func (r *Reconciler) ensureSecretForProvider(plan *api.Plan) error {
 
 // Validate that warm migration is supported from the source provider.
 func (r *Reconciler) validateWarmMigration(ctx *plancontext.Context) (err error) {
-	if !ctx.Plan.Spec.Warm {
+	if !ctx.Plan.IsWarm() {
 		return
 	}
 	provider := ctx.Plan.Referenced.Provider.Source
@@ -464,7 +465,7 @@ func (r *Reconciler) validateNetworkMap(plan *api.Plan) (err error) {
 	}
 	// Check if we are preserving static IPs and give warning if we are mapping to Pod Network.
 	// The Pod network has different subnet than the source provider so the VMs might not be accessible.
-	if plan.Spec.PreserveStaticIPs {
+	if plan.Referenced.Provider.Source.SupportsPreserveStaticIps() && plan.Spec.PreserveStaticIPs {
 		var hasMappingToPodNetwork bool
 		for _, networkMap := range mp.Spec.Map {
 			if networkMap.Destination.Type == Pod {
@@ -1021,8 +1022,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			}
 		}
 		// Warm migration.
-		isWarmMigration := plan.Spec.Warm || plan.Spec.Type == api.MigrationWarm
-		if isWarmMigration {
+		if plan.IsWarm() {
 			enabled, err := validator.ChangeTrackingEnabled(*ref)
 			if err != nil {
 				return err
@@ -1214,6 +1214,13 @@ func (r *Reconciler) validateTransferNetwork(plan *api.Plan) (err error) {
 		Reason:   NotValid,
 		Message:  "Transfer network default route annotation is not a valid IP address.",
 	}
+	missingDefaultRoute := libcnd.Condition{
+		Type:     TransferNetMissingDefaultRoute,
+		Status:   True,
+		Category: api.CategoryWarn,
+		Reason:   NotValid,
+		Message:  "Transfer network missing default route annotation.",
+	}
 	key := client.ObjectKey{
 		Namespace: plan.Spec.TransferNetwork.Namespace,
 		Name:      plan.Spec.TransferNetwork.Name,
@@ -1231,6 +1238,7 @@ func (r *Reconciler) validateTransferNetwork(plan *api.Plan) (err error) {
 	}
 	route, found := netAttachDef.Annotations[AnnForkliftNetworkRoute]
 	if !found {
+		plan.Status.SetCondition(missingDefaultRoute)
 		return
 	}
 	ip := net.ParseIP(route)
@@ -1366,7 +1374,7 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 		}
 		err = r.validateVddkImageJob(job, plan)
 	}
-	if plan.Spec.Warm && vddkImage == "" {
+	if plan.IsWarm() && vddkImage == "" {
 		plan.Status.SetCondition(libcnd.Condition{
 			Type:     VDDKInitImageUnavailable,
 			Status:   True,
@@ -1375,7 +1383,7 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 			Message:  "VDDK image not set on the provider, this is required for the warm migration",
 		})
 	}
-	if plan.Spec.SkipGuestConversion && vddkImage == "" {
+	if plan.Spec.SkipGuestConversion && vddkImage == "" && !plan.IsUsingOffloadPlugin() {
 		plan.Status.SetCondition(libcnd.Condition{
 			Type:     VDDKInitImageUnavailable,
 			Status:   True,

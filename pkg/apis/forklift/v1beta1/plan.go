@@ -278,6 +278,13 @@ type Plan struct {
 	Referenced `json:"-"`
 }
 
+// IsWarm returns true if the plan is a warm migration.
+// Supports both the deprecated 'warm: true' field (for backward compatibility)
+// and the current 'type: warm' field.
+func (p *Plan) IsWarm() bool {
+	return p.Spec.Warm || p.Spec.Type == MigrationWarm
+}
+
 // If the plan calls for the vm to be cold migrated to the local cluster, we can
 // just use virt-v2v directly to convert the vm while copying data over. In other
 // cases, we use CDI to transfer disks to the destination cluster and then use
@@ -296,7 +303,7 @@ func (p *Plan) ShouldUseV2vForTransfer() (bool, error) {
 	case VSphere:
 		// The virt-v2v transferes all disks attached to the VM. If we want to skip the shared disks so we don't transfer
 		// them multiple times we need to manage the transfer using KubeVirt CDI DataVolumes and v2v-in-place.
-		return !p.Spec.Warm && // The Warm Migraiton needs to use CDI to manage the snapshot delta
+		return !p.IsWarm() && // The Warm Migraiton needs to use CDI to manage the snapshot delta
 				destination.IsHost() && // We can't monitor progress from the guest converison pod on the remote clusters
 				p.Spec.MigrateSharedDisks && // virt-v2v migrates all disks, to skip shared we need to control the disk selection
 				!p.Spec.SkipGuestConversion && // virt-v2v always converts the guest, to perform RawCopyMode we need to copy just disks via CDI
@@ -366,11 +373,21 @@ func (r *Plan) IsSourceProviderOCP() bool {
 func (r *Plan) IsSourceProviderVSphere() bool { return r.Provider.Source.Type() == VSphere }
 
 func (r *Plan) ShouldRunPreflightInspection() bool {
-	isWarm := r.Spec.Type == MigrationWarm || r.Spec.Warm
 	return r.IsSourceProviderVSphere() &&
-		isWarm &&
+		r.IsWarm() &&
 		!r.Spec.SkipGuestConversion &&
 		r.Spec.RunPreflightInspection
+}
+
+// IsUsingOffloadPlugin determines if any of the mappings is using storage offload
+func (r *Plan) IsUsingOffloadPlugin() bool {
+	dsMapIn := r.Map.Storage.Spec.Map
+	for _, m := range dsMapIn {
+		if m.OffloadPlugin != nil && m.OffloadPlugin.VSphereXcopyPluginConfig != nil {
+			return true
+		}
+	}
+	return false
 }
 
 // PVCNameTemplateData contains fields used in naming templates.

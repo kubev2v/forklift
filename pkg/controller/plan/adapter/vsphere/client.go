@@ -151,10 +151,20 @@ func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, data
 	changeIds := previous.DeltaMap()
 	for i := range datavolumes {
 		dv := &datavolumes[i]
-		dv.Spec.Checkpoints = append(dv.Spec.Checkpoints, cdi.DataVolumeCheckpoint{
-			Current:  current.Snapshot,
-			Previous: changeIds[dv.Spec.Source.VDDK.BackingFile],
-		})
+		alreadyExists := false
+		for _, checkpoint := range dv.Spec.Checkpoints {
+			if checkpoint.Current == current.Snapshot {
+				r.Log.V(1).Info("Snapshot already exists in DataVolume checkpoints list", "vmRef", vmRef, "DataVolume", dv.Name, "checkpoints", dv.Spec.Checkpoints)
+				alreadyExists = true
+				break
+			}
+		}
+		if !alreadyExists {
+			dv.Spec.Checkpoints = append(dv.Spec.Checkpoints, cdi.DataVolumeCheckpoint{
+				Current:  current.Snapshot,
+				Previous: changeIds[dv.Spec.Source.VDDK.BackingFile],
+			})
+		}
 		dv.Spec.FinalCheckpoint = final
 	}
 	return
@@ -566,4 +576,59 @@ func (r *Client) thumbprint() string {
 func (r *Client) DetachDisks(vmRef ref.Ref) (err error) {
 	// no-op
 	return
+}
+
+func (r *Client) getNAAFromDatastore(ctx context.Context, datastoreRef ref.Ref) (string, error) {
+	ds := &model.Datastore{}
+	err := r.Source.Inventory.Find(ds, datastoreRef)
+	if err != nil {
+		return "", liberr.Wrap(err, "datastore", datastoreRef.String())
+	}
+
+	if r.client == nil {
+		if err := r.connect(); err != nil {
+			return "", liberr.Wrap(err, "failed to connect to vSphere")
+		}
+	}
+
+	properties := []string{"info"}
+	var dsMo mo.Datastore
+	err = property.DefaultCollector(r.client.Client).RetrieveOne(
+		ctx,
+		types.ManagedObjectReference{
+			Type:  "Datastore",
+			Value: datastoreRef.ID,
+		},
+		properties,
+		&dsMo,
+	)
+	if err != nil {
+		return "", liberr.Wrap(err, "failed to retrieve datastore properties")
+	}
+
+	dsinfo := dsMo.Info
+	vmfsInfo, ok := dsinfo.(*types.VmfsDatastoreInfo)
+	if !ok {
+		return "", liberr.New(
+			fmt.Sprintf("datastore '%s' is not a VMFS datastore (Type: %T)", ds.Name, dsMo.Info.GetDatastoreInfo()),
+		)
+	}
+
+	if len(vmfsInfo.Vmfs.Extent) == 0 {
+		return "", liberr.New(
+			fmt.Sprintf("VMFS datastore '%s' has no associated extents/devices", ds.Name),
+		)
+	}
+
+	// The DiskName field contains the NAA ID (e.g., "naa.600508b1001c1234567890abcdef1234")
+	naaID := vmfsInfo.Vmfs.Extent[0].DiskName
+
+	r.Log.Info("Retrieved NAA ID for datastore",
+		"datastore", ds.Name,
+		"naaID", naaID,
+		"vmfsVersion", vmfsInfo.Vmfs.Version,
+		"vmfsUUID", vmfsInfo.Vmfs.Uuid,
+		"extentCount", len(vmfsInfo.Vmfs.Extent))
+
+	return naaID, nil
 }

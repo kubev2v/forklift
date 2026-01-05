@@ -63,6 +63,10 @@ spec:
                 type: string
                 enum: ["true", "false"]
                 description: "Enable OCP live migration (default: false)"
+              feature_ova_appliance_management:
+                type: string
+                enum: [ "true", "false" ]
+                description: "Enable OVA appliance management endpoints (default: false)"
               feature_vmware_system_serial_number:
                 type: string
                 enum: ["true", "false"]
@@ -129,6 +133,10 @@ spec:
                 type: string
                 description: "Must-gather debugging image"
                 example: "quay.io/kubev2v/forklift-must-gather:latest"
+              ova_proxy_fqin:
+                type: string
+                description: "OVA inventory proxy image"
+                example: "quay.io/kubev2v/forklift-ova-proxy:latest"
 
               # Controller Resource Configuration
               controller_container_limits_cpu:
@@ -165,6 +173,10 @@ spec:
                 type: string
                 description: "Inventory memory request (default: 500Mi)"
                 example: "1Gi"
+              inventory_route_timeout:
+                type: string
+                description: "Inventory route timeout (default: 360s)"
+                example: "600s"
 
               # API Resource Configuration
               api_container_limits_cpu:
@@ -238,51 +250,72 @@ spec:
                 description: "Validation memory request (default: 50Mi)"
                 example: "100Mi"
               validation_policy_agent_search_interval:
-                type: string
+                x-kubernetes-int-or-string: true
                 description: "Policy agent search interval in seconds (default: 120)"
-                pattern: "^[1-9][0-9]*$"
+              validation_extra_volume_name:
+                type: string
+                description: "Volume name for extra validation rules (default: validation-extra-rules)"
+                example: "custom-validation-rules"
+              validation_extra_volume_mountpath:
+                type: string
+                description: "Mount path for extra validation rules (default: /usr/share/opa/policies/extra)"
+                example: "/custom/validation/path"
+
+              # ConfigMap Names
+              ovirt_osmap_configmap_name:
+                type: string
+                description: "ConfigMap name for oVirt OS mappings (default: forklift-ovirt-osmap)"
+                example: "custom-ovirt-osmap"
+              vsphere_osmap_configmap_name:
+                type: string
+                description: "ConfigMap name for vSphere OS mappings (default: forklift-vsphere-osmap)"
+                example: "custom-vsphere-osmap"
+              virt_customize_configmap_name:
+                type: string
+                description: "ConfigMap name for virt-customize configuration (default: forklift-virt-customize)"
+                example: "custom-virt-customize"
 
               # Migration Settings & Timeouts
               controller_max_vm_inflight:
-                type: string
+                x-kubernetes-int-or-string: true
                 description: "Max concurrent VM migrations (default: 20)"
-                pattern: "^[1-9][0-9]*$"
               controller_precopy_interval:
-                type: string
+                x-kubernetes-int-or-string: true
                 description: "Precopy interval in minutes (default: 60)"
-                pattern: "^[1-9][0-9]*$"
+              controller_host_lease_namespace:
+                type: string
+                description: "Namespace for host lease objects (default: openshift-mtv)"
+                example: "openshift-mtv"
+              controller_host_lease_duration_seconds:
+                x-kubernetes-int-or-string: true
+                description: "Host lease duration in seconds (default: 10)"
               controller_max_concurrent_reconciles:
-                type: string
+                x-kubernetes-int-or-string: true
                 description: "Max concurrent reconciles (default: 10)"
-                pattern: "^[1-9][0-9]*$"
               controller_snapshot_removal_timeout_minuts:
-                type: string
+                x-kubernetes-int-or-string: true
                 description: "Snapshot removal timeout in minutes (default: 120)"
-                pattern: "^[1-9][0-9]*$"
               controller_snapshot_status_check_rate_seconds:
-                type: string
+                x-kubernetes-int-or-string: true
                 description: "Snapshot status check rate in seconds (default: 10)"
-                pattern: "^[1-9][0-9]*$"
               controller_cleanup_retries:
-                type: string
+                x-kubernetes-int-or-string: true
                 description: "Cleanup retry count (default: 10)"
-                pattern: "^[1-9][0-9]*$"
               controller_dv_status_check_retries:
-                type: string
+                x-kubernetes-int-or-string: true
                 description: "DataVolume status check retries (default: 10)"
-                pattern: "^[1-9][0-9]*$"
               controller_snapshot_removal_check_retries:
-                type: string
+                x-kubernetes-int-or-string: true
                 description: "Snapshot removal retries (default: 20)"
-                pattern: "^[1-9][0-9]*$"
               controller_vddk_job_active_deadline_sec:
-                type: string
+                x-kubernetes-int-or-string: true
                 description: "VDDK job timeout in seconds (default: 300)"
-                pattern: "^[1-9][0-9]*$"
               controller_tls_connection_timeout_sec:
-                type: string
+                x-kubernetes-int-or-string: true
                 description: "TLS connection timeout seconds (default: 5)"
-                pattern: "^[1-9][0-9]*$"
+              controller_max_parent_backing_retries:
+                x-kubernetes-int-or-string: true
+                description: "Max retries when getting parent disks (default: 10)"
 
               # Migration Feature-Specific Settings
               controller_vsphere_incremental_backup:
@@ -304,13 +337,11 @@ spec:
 
               # Storage & Performance Settings
               controller_filesystem_overhead:
-                type: string
+                x-kubernetes-int-or-string: true
                 description: "Filesystem overhead percentage (default: 10)"
-                pattern: "^(0|[1-9][0-9]?|100)$"
               controller_block_overhead:
-                type: string
+                x-kubernetes-int-or-string: true
                 description: "Block overhead in bytes (default: 0)"
-                pattern: "^[0-9]+$"
 
               # Virt-v2v Settings
               virt_v2v_container_limits_cpu:
@@ -377,11 +408,32 @@ spec:
                 description: "OVA memory request (default: 150Mi)"
                 example: "300Mi"
 
+              # OVA Proxy Settings
+              ova_proxy_container_limits_cpu:
+                type: string
+                description: "OVA Proxy CPU limit (default: 1000m)"
+                example: "2000m"
+              ova_proxy_container_limits_memory:
+                type: string
+                description: "OVA Proxy memory limit (default: 1Gi)"
+                example: "2Gi"
+              ova_proxy_container_requests_cpu:
+                type: string
+                description: "OVA Proxy CPU request (default: 250m)"
+                example: "200m"
+              ova_proxy_container_requests_memory:
+                type: string
+                description: "OVA Proxy memory request (default: 512Mi)"
+                example: "300Mi"
+              ova_proxy_route_timeout:
+                type: string
+                description: "OVA Proxy route timeout (default: 360s)"
+                example: "600s"
+
               # Logging & General Settings
               controller_log_level:
-                type: string
+                x-kubernetes-int-or-string: true
                 description: "Log verbosity level (default: 3)"
-                pattern: "^([0-9]|10)$"
               image_pull_policy:
                 type: string
                 enum: ["Always", "IfNotPresent", "Never"]
@@ -390,6 +442,12 @@ spec:
                 type: string
                 enum: ["true", "false"]
                 description: "Whether running on Kubernetes (vs OpenShift) (default: false)"
+              
+              # Metrics Settings
+              metric_interval:
+                type: string
+                description: "Metrics scrape interval (default: 30s)"
+                example: "60s"
               
             additionalProperties: true
           status:

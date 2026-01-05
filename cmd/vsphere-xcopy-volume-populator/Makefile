@@ -29,9 +29,9 @@ vet:
 test: fmt vet
 	go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
-.PHONY: generate 
+.PHONY: generate
 generate:
-	go generate ./...
+	GOFLAGS="-mod=mod" go generate ./...
 
 .PHONY: build
 build: fmt vet
@@ -47,15 +47,27 @@ install-mockgen:
 # pre-requisits: ensure a PVC exists.
 test-copy-using-cli: build
 	bin/vsphere-xcopy-volume-populator \
-		--source-vm-id=vm-100838 \
-		--source-vmdk="[eco-iscsi-ds3] vm-1-1-test-rename/vm-1-1-test-rename_2.vmdk" \
-		--owner-name=test-cli \
-		--target-namespace=default \
+		--source-vm-id=vm-92749 \
+		--source-vmdk="[eco-iscsi-ds3] tshefi_40G/tshefi_40G.vmdk" \
+		--owner-name=tshefi40g \
+		--target-namespace=openshift-mtv \
 		--storage-vendor-product=ontap \
+		--secret-name=ontap \
+		--owner-uid=tshefi40g \
+		--esxi-clone-method=ssh \
+		--kubeconfig=$$KUBECONFIG
+
+test-flashsystem: build
+	bin/vsphere-xcopy-volume-populator \
+		--source-vm-id=vm-3006 \
+		--source-vmdk="[TEST_DS] migtest/migtest.vmdk" \
+		--owner-name=test-cli \
+		--target-namespace=redhat-test \
+		--storage-vendor-product=flashsystem \
+		--storage-skip-ssl-verification=true \
 		--secret-name=populator-secret \
 		--owner-uid=test-cli \
 		--kubeconfig=$$KUBECONFIG
-
 
 test-copy-using-cli-3par: build
 	bin/vsphere-xcopy-volume-populator \
@@ -72,12 +84,14 @@ test-copy-using-cli-pureflasharray: build
 	bin/vsphere-xcopy-volume-populator \
 		--source-vm-id="vm-67218" \
 		--source-vmdk="[eco-iscsi-pure] vm-6/vm-6.vmdk" \
-		--owner-name=test-pure-vm-6-22ab1d65 \
-		--owner-uid=test-pure-vm-6-22ab1d65 \
+		--owner-name=test-vm-6 \
+		--owner-uid=test-vm-6 \
 		--target-namespace=default \
 		--storage-vendor-product=pureFlashArray \
 		--secret-name=populator-secret \
-		--kubeconfig=$$KUBECONFIG
+		--kubeconfig=$$KUBECONFIG \
+		--esxi-clone-method=ssh
+
 
 test-copy-using-cli-powerflex: build
 	GOSCALEIO_DEBUG=1 bin/vsphere-xcopy-volume-populator \
@@ -88,6 +102,7 @@ test-copy-using-cli-powerflex: build
 		--storage-vendor-product=powerflex \
 		--secret-name=populator-secret \
 		--kubeconfig=$$KUBECONFIG
+
 test-copy-using-cli-powermax: build
 	GOSCALEIO_DEBUG=1 bin/vsphere-xcopy-volume-populator \
 		--source-vm-id="vm-1060" \
@@ -96,6 +111,26 @@ test-copy-using-cli-powermax: build
 		--target-namespace=default \
 		--storage-vendor-product=powermax \
 		--secret-name=populator-secret \
+		--kubeconfig=$$KUBECONFIG
+
+test-copy-using-cli-infinibox: build
+	bin/vsphere-xcopy-volume-populator \
+		--source-vm-id="vm-143076" \
+		--source-vmdk="[eco-iscsi-ds3] test-infinidat/test-infinidat.vmdk" \
+		--owner-name=iscsi-block-pvc  \
+		--target-namespace=infinidat-testing \
+		--storage-vendor-product=infinibox \
+		--secret-name=populator-secret \
+		--kubeconfig=$$KUBECONFIG
+
+test-copy-using-cli-powerstore: build
+	bin/vsphere-xcopy-volume-populator \
+		--source-vm-id="rhel9" \
+		--source-vmdk="[iscsi1] rhel9/rhel9.vmdk" \
+		--owner-name=test8-rhel9-disk-0-cf5cdf1f  \
+		--target-namespace=default \
+		--storage-vendor-product=powerstore \
+		--secret-name=powerstore-secret \
 		--kubeconfig=$$KUBECONFIG
 .PHONY: vmkfstools-wrapper
 vmkfstools-wrapper:

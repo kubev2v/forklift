@@ -10,6 +10,7 @@ feature_copy_offload: false
 feature_ocp_live_migration: false
 feature_vmware_system_serial_number: true
 feature_cli_download: true
+feature_ova_appliance_management: false
 
 k8s_cluster: false
 feature_auth_required: true
@@ -45,11 +46,14 @@ controller_ovirt_warm_migration: true
 controller_retain_precopy_importer_pods: false
 controller_static_udn_ip_addresses: false
 controller_max_vm_inflight: 20
+controller_host_lease_namespace: "openshift-mtv"
+controller_host_lease_duration_seconds: 10
 controller_filesystem_overhead: 10
 controller_block_overhead: 0
 controller_vddk_job_active_deadline_sec: 300
 controller_tls_connection_timeout_sec: 5
 controller_max_concurrent_reconciles: 10
+controller_max_parent_backing_retries: 10
 profiler_volume_path: "/var/cache/profiler"
 
 inventory_volume_path: "/var/cache/inventory"
@@ -155,6 +159,20 @@ ova_container_limits_cpu: "1000m"
 ova_container_limits_memory: "1Gi"
 ova_container_requests_cpu: "100m"
 ova_container_requests_memory: "512Mi"
+
+ova_proxy_fqin: "{{ lookup( 'env', 'OVA_PROXY_IMAGE') or lookup( 'env', 'RELATED_IMAGE_OVA_PROXY') }}"
+ova_proxy_container_name: "{{ app_name }}-ova-proxy"
+ova_proxy_service_name: "{{ app_name }}-ova-proxy"
+ova_proxy_route_name: "{{ ova_proxy_service_name }}"
+ova_proxy_route_timeout: "360s"
+ova_proxy_subapp_name: "ova-proxy"
+ova_proxy_container_limits_cpu: "1000m"
+ova_proxy_container_limits_memory: "1Gi"
+ova_proxy_container_requests_cpu: "250m"
+ova_proxy_container_requests_memory: "512Mi"
+ova_proxy_tls_secret_name: "{{ ova_proxy_service_name }}-serving-cert"
+ova_proxy_issuer_name: "{{ ova_proxy_service_name }}-issuer"
+ova_proxy_certificate_name: "{{ ova_proxy_service_name }}-certificate"
 
 metric_service_name: "{{ app_name }}-metrics"
 metric_servicemonitor_name: "{{ app_name }}-metrics"

@@ -22,6 +22,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/map/network"
 	"github.com/kubev2v/forklift/pkg/controller/map/storage"
 	"github.com/kubev2v/forklift/pkg/controller/migration"
+	"github.com/kubev2v/forklift/pkg/controller/ova"
 	"github.com/kubev2v/forklift/pkg/controller/plan"
 	"github.com/kubev2v/forklift/pkg/controller/provider"
 	"github.com/kubev2v/forklift/pkg/settings"
@@ -48,6 +49,7 @@ var MainControllers = []AddFunction{
 // List of Inventory controllers
 var InventoryControllers = []AddFunction{
 	provider.Add,
+	ova.Add,
 }
 
 // Add controllers to the manager based on role.

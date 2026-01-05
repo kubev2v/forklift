@@ -1,0 +1,684 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    capabilities: Seamless Upgrades
+    categories: OpenShift Optional
+    certified: "true"
+    containerImage: ${OPERATOR_IMAGE}
+    createdAt: ${DATE}
+    description: Facilitates migration of VM workloads to OpenShift Virtualization
+    features.operators.openshift.io/cnf: "false"
+    features.operators.openshift.io/cni: "false"
+    features.operators.openshift.io/csi: "false"
+    features.operators.openshift.io/disconnected: "false"
+    features.operators.openshift.io/fips-compliant: "true"
+    features.operators.openshift.io/fipsmode: "true"
+    features.operators.openshift.io/proxy-aware: "false"
+    features.operators.openshift.io/tls-profiles: "false"
+    features.operators.openshift.io/token-auth-aws: "false"
+    features.operators.openshift.io/token-auth-azure: "false"
+    features.operators.openshift.io/token-auth-gcp: "false"
+    operatorframework.io/initialization-resource: |-
+      {
+        "apiVersion": "forklift.konveyor.io/v1beta1",
+        "kind": "ForkliftController",
+        "metadata": {
+          "name": "forklift-controller",
+          "namespace": "openshift-mtv"
+        },
+        "spec": {
+          "feature_ui_plugin": "true",
+          "feature_validation": "true",
+          "feature_volume_populator": "true"
+        }
+      }
+    operatorframework.io/suggested-namespace: openshift-mtv
+    operators.openshift.io/valid-subscription: '["OpenShift Kubernetes Engine", "OpenShift Container Platform", "OpenShift Platform Plus"]'
+    repository: https://github.com/kubev2v/forklift
+    support: Red Hat
+  name: mtv-operator.v${MTV_VERSION}
+  namespace: openshift-mtv
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+      - description: VM migration controller
+        displayName: ForkliftController
+        kind: ForkliftController
+        name: forkliftcontrollers.forklift.konveyor.io
+        specDescriptors:
+          - description: Enable UI plugin (default true)
+            displayName: Enable UI Plugin
+            path: feature_ui_plugin
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:radio:true
+              - urn:alm:descriptor:com.tectonic.ui:radio:false
+          - description: Enable validation service (default true)
+            displayName: Enable Validation Service
+            path: feature_validation
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:radio:true
+              - urn:alm:descriptor:com.tectonic.ui:radio:false
+          - description: Enable volume populators (default true)
+            displayName: Enable Volume Populators
+            path: feature_volume_populator
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:radio:true
+              - urn:alm:descriptor:com.tectonic.ui:radio:false
+          - description: Enable copy offload plugins (default false)
+            displayName: Enable Copy Offload Plugins
+            path: feature_copy_offload
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:radio:true
+              - urn:alm:descriptor:com.tectonic.ui:radio:false
+          - description: Enable OCP live migration (default false)
+            displayName: Enable OCP Live Migration
+            path: feature_ocp_live_migration
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:radio:true
+              - urn:alm:descriptor:com.tectonic.ui:radio:false
+          - description: Use VMware system serial numbers (default true)
+            displayName: Use VMware System Serial Numbers
+            path: feature_vmware_system_serial_number
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:radio:true
+              - urn:alm:descriptor:com.tectonic.ui:radio:false
+          - description: Require authentication (default true)
+            displayName: Require Authentication
+            path: feature_auth_required
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:radio:true
+              - urn:alm:descriptor:com.tectonic.ui:radio:false
+          - description: Enable CLI download service (default true)
+            displayName: Enable CLI Download Service
+            path: feature_cli_download
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:radio:true
+              - urn:alm:descriptor:com.tectonic.ui:radio:false
+          - description: Enable OVA appliance management endpoints (default false)
+            displayName: Enable OVA Appliance Management
+            path: feature_ova_appliance_management
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:radio:true
+              - urn:alm:descriptor:com.tectonic.ui:radio:false
+          - description: Controller pod image
+            displayName: Controller Image
+            path: controller_image_fqin
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Virt-v2v conversion image used by migration pods
+            displayName: Virt-v2v Image
+            path: virt_v2v_image_fqin
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: VDDK image for VMware disk access
+            displayName: VDDK Image
+            path: vddk_image
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: API service image
+            displayName: API Image
+            path: api_image_fqin
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: CLI download service image
+            displayName: CLI Download Image
+            path: cli_download_image_fqin
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: UI plugin image
+            displayName: UI Plugin Image
+            path: ui_plugin_image_fqin
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Validation service image
+            displayName: Validation Image
+            path: validation_image_fqin
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Volume populator controller image
+            displayName: Populator Controller Image
+            path: populator_controller_image_fqin
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: oVirt populator image
+            displayName: oVirt Populator Image
+            path: populator_ovirt_image_fqin
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: OpenStack populator image
+            displayName: OpenStack Populator Image
+            path: populator_openstack_image_fqin
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: vSphere xcopy populator image
+            displayName: vSphere Populator Image
+            path: populator_vsphere_xcopy_volume_image_fqin
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: OVA provider server image
+            displayName: OVA Provider Server Image
+            path: ova_provider_server_fqin
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Must-gather debugging image
+            displayName: Must-gather Image
+            path: must_gather_image_fqin
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: OVA inventory proxy image
+            displayName: OVA Proxy Image
+            path: ova_proxy_fqin
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Controller CPU limit (default 500m)
+            displayName: Controller CPU Limit
+            path: controller_container_limits_cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Controller memory limit (default 800Mi)
+            displayName: Controller Memory Limit
+            path: controller_container_limits_memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Controller CPU request (default 100m)
+            displayName: Controller CPU Request
+            path: controller_container_requests_cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Controller memory request (default 350Mi)
+            displayName: Controller Memory Request
+            path: controller_container_requests_memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Inventory CPU limit (default 1000m)
+            displayName: Inventory CPU Limit
+            path: inventory_container_limits_cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Inventory memory limit (default 1Gi)
+            displayName: Inventory Memory Limit
+            path: inventory_container_limits_memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Inventory CPU request (default 500m)
+            displayName: Inventory CPU Request
+            path: inventory_container_requests_cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Inventory memory request (default 500Mi)
+            displayName: Inventory Memory Request
+            path: inventory_container_requests_memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Inventory route timeout (default 360s)
+            displayName: Inventory Route Timeout
+            path: inventory_route_timeout
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: API service CPU limit (default 1000m)
+            displayName: API CPU Limit
+            path: api_container_limits_cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: API service memory limit (default 1Gi)
+            displayName: API Memory Limit
+            path: api_container_limits_memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: API service CPU request (default 100m)
+            displayName: API CPU Request
+            path: api_container_requests_cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: API service memory request (default 150Mi)
+            displayName: API Memory Request
+            path: api_container_requests_memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: CLI download service CPU limit (default 100m)
+            displayName: CLI Download CPU Limit
+            path: cli_download_container_limits_cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: CLI download service memory limit (default 128Mi)
+            displayName: CLI Download Memory Limit
+            path: cli_download_container_limits_memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: CLI download service CPU request (default 50m)
+            displayName: CLI Download CPU Request
+            path: cli_download_container_requests_cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: CLI download service memory request (default 64Mi)
+            displayName: CLI Download Memory Request
+            path: cli_download_container_requests_memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: UI plugin CPU limit (default 100m)
+            displayName: UI Plugin CPU Limit
+            path: ui_plugin_container_limits_cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: UI plugin memory limit (default 800Mi)
+            displayName: UI Plugin Memory Limit
+            path: ui_plugin_container_limits_memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: UI plugin CPU request (default 100m)
+            displayName: UI Plugin CPU Request
+            path: ui_plugin_container_requests_cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: UI plugin memory request (default 150Mi)
+            displayName: UI Plugin Memory Request
+            path: ui_plugin_container_requests_memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Validation CPU limit (default 1000m)
+            displayName: Validation CPU Limit
+            path: validation_container_limits_cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Validation memory limit (default 300Mi)
+            displayName: Validation Memory Limit
+            path: validation_container_limits_memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Validation CPU request (default 400m)
+            displayName: Validation CPU Request
+            path: validation_container_requests_cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Validation memory request (default 50Mi)
+            displayName: Validation Memory Request
+            path: validation_container_requests_memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Policy agent search interval in seconds (default 120)
+            displayName: Policy Agent Search Interval
+            path: validation_policy_agent_search_interval
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Volume name for extra validation rules (default validation-extra-rules)
+            displayName: Validation Extra Volume Name
+            path: validation_extra_volume_name
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Mount path for extra validation rules (default /usr/share/opa/policies/extra)
+            displayName: Validation Extra Volume Mount Path
+            path: validation_extra_volume_mountpath
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: ConfigMap name for oVirt OS mappings (default forklift-ovirt-osmap)
+            displayName: oVirt OS Map ConfigMap Name
+            path: ovirt_osmap_configmap_name
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: ConfigMap name for vSphere OS mappings (default forklift-vsphere-osmap)
+            displayName: vSphere OS Map ConfigMap Name
+            path: vsphere_osmap_configmap_name
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: ConfigMap name for virt-customize configuration (default forklift-virt-customize)
+            displayName: Virt-Customize ConfigMap Name
+            path: virt_customize_configmap_name
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Max concurrent VM migrations (default 20)
+            displayName: Max VM Inflight
+            path: controller_max_vm_inflight
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Precopy interval in minutes (default 60)
+            displayName: Precopy Interval
+            path: controller_precopy_interval
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Max concurrent reconciles (default 10)
+            displayName: Max Concurrent Reconciles
+            path: controller_max_concurrent_reconciles
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Snapshot removal timeout in minutes (default 120)
+            displayName: Snapshot Removal Timeout
+            path: controller_snapshot_removal_timeout_minuts
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Snapshot status check rate in seconds (default 10)
+            displayName: Snapshot Status Check Rate
+            path: controller_snapshot_status_check_rate_seconds
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Cleanup retry count (default 10)
+            displayName: Cleanup Retries
+            path: controller_cleanup_retries
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: DataVolume status check retries (default 10)
+            displayName: DV Status Check Retries
+            path: controller_dv_status_check_retries
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Snapshot removal retries (default 20)
+            displayName: Snapshot Removal Check Retries
+            path: controller_snapshot_removal_check_retries
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: VDDK job timeout in seconds (default 300)
+            displayName: VDDK Job Active Deadline
+            path: controller_vddk_job_active_deadline_sec
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: TLS connection timeout seconds (default 5)
+            displayName: TLS Connection Timeout
+            path: controller_tls_connection_timeout_sec
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Use vSphere incremental backup (default true)
+            displayName: vSphere Incremental Backup
+            path: controller_vsphere_incremental_backup
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Enable oVirt warm migration (default true)
+            displayName: oVirt Warm Migration
+            path: controller_ovirt_warm_migration
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Retain precopy pods (default false)
+            displayName: Retain Precopy Importer Pods
+            path: controller_retain_precopy_importer_pods
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Enable static udn IP addresses feature (default false)
+            displayName: Static UDN IP Addresses
+            path: controller_static_udn_ip_addresses
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Filesystem overhead percentage (default 10)
+            displayName: Filesystem Overhead
+            path: controller_filesystem_overhead
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Block overhead in bytes (default 0)
+            displayName: Block Overhead
+            path: controller_block_overhead
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: virt-v2v CPU limit (default 4000m)
+            displayName: Virt-v2v CPU Limit
+            path: virt_v2v_container_limits_cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: virt-v2v memory limit (default 8Gi)
+            displayName: Virt-v2v Memory Limit
+            path: virt_v2v_container_limits_memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: virt-v2v CPU request (default 1000m)
+            displayName: Virt-v2v CPU Request
+            path: virt_v2v_container_requests_cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: virt-v2v memory request (default 1Gi)
+            displayName: Virt-v2v Memory Request
+            path: virt_v2v_container_requests_memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Don't request KVM for virt-v2v
+            displayName: Virt-v2v Don't Request KVM
+            path: virt_v2v_dont_request_kvm
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Additional arguments for virt-v2v
+            displayName: Virt-v2v Extra Args
+            path: virt_v2v_extra_args
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: ConfigMap name containing extra virt-v2v configuration
+            displayName: Virt-v2v Extra Config ConfigMap
+            path: virt_v2v_extra_conf_config_map
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Hooks CPU limit (default 1000m)
+            displayName: Hooks CPU Limit
+            path: hooks_container_limits_cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Hooks memory limit (default 1Gi)
+            displayName: Hooks Memory Limit
+            path: hooks_container_limits_memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Hooks CPU request (default 100m)
+            displayName: Hooks CPU Request
+            path: hooks_container_requests_cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Hooks memory request (default 150Mi)
+            displayName: Hooks Memory Request
+            path: hooks_container_requests_memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: OVA CPU limit (default 1000m)
+            displayName: OVA CPU Limit
+            path: ova_container_limits_cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: OVA memory limit (default 1Gi)
+            displayName: OVA Memory Limit
+            path: ova_container_limits_memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: OVA CPU request (default 100m)
+            displayName: OVA CPU Request
+            path: ova_container_requests_cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: OVA memory request (default 150Mi)
+            displayName: OVA Memory Request
+            path: ova_container_requests_memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: OVA Proxy CPU limit (default 1000m)
+            displayName: OVA Proxy CPU Limit
+            path: ova_proxy_container_limits_cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: OVA Proxy memory limit (default 1Gi)
+            displayName: OVA Proxy Memory Limit
+            path: ova_proxy_container_limits_memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: OVA Proxy CPU request (default 250m)
+            displayName: OVA Proxy CPU Request
+            path: ova_proxy_container_requests_cpu
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: OVA Proxy memory request (default 512Mi)
+            displayName: OVA Proxy Memory Request
+            path: ova_proxy_container_requests_memory
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: OVA Proxy route timeout (default 360s)
+            displayName: OVA Proxy Route Timeout
+            path: ova_proxy_route_timeout
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Log verbosity level (default 3)
+            displayName: Controller Log Level
+            path: controller_log_level
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Image pull policy (default Always)
+            displayName: Image Pull Policy
+            path: image_pull_policy
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Whether running on Kubernetes (vs OpenShift) (default false)
+            displayName: K8s Cluster
+            path: k8s_cluster
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+          - description: Metrics scrape interval (default 30s)
+            displayName: Metric Interval
+            path: metric_interval
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:hidden
+        version: v1beta1
+      - description: Hook schema for the hooks API
+        displayName: Hook
+        kind: Hook
+        name: hooks.forklift.konveyor.io
+        version: v1beta1
+      - description: VM host
+        displayName: Host
+        kind: Host
+        name: hosts.forklift.konveyor.io
+        version: v1beta1
+      - description: VM migration
+        displayName: Migration
+        kind: Migration
+        name: migrations.forklift.konveyor.io
+        version: v1beta1
+      - description: VM network map
+        displayName: NetworkMap
+        kind: NetworkMap
+        name: networkmaps.forklift.konveyor.io
+        version: v1beta1
+      - description: OpenStack Volume Populator
+        displayName: OpenstackVolumePopulator
+        kind: OpenstackVolumePopulator
+        name: openstackvolumepopulators.forklift.konveyor.io
+        version: v1beta1
+      - description: OVA Provider Server
+        displayName: OVAProviderServer
+        kind: OVAProviderServer
+        name: ovaproviderservers.forklift.konveyor.io
+        version: v1beta1
+      - description: oVirt Volume Populator
+        displayName: OvirtVolumePopulator
+        kind: OvirtVolumePopulator
+        name: ovirtvolumepopulators.forklift.konveyor.io
+        version: v1beta1
+      - description: VM migration plan
+        displayName: Plan
+        kind: Plan
+        name: plans.forklift.konveyor.io
+        version: v1beta1
+      - description: VM provider
+        displayName: Provider
+        kind: Provider
+        name: providers.forklift.konveyor.io
+        version: v1beta1
+      - description: VM storage map
+        displayName: StorageMap
+        kind: StorageMap
+        name: storagemaps.forklift.konveyor.io
+        version: v1beta1
+      - description: VSphere Xcopy Volume Populator
+        displayName: VSphereXcopyVolumePopulator
+        kind: VSphereXcopyVolumePopulator
+        name: vspherexcopyvolumepopulators.forklift.konveyor.io
+        version: v1beta1
+  description: |
+    The Migration Toolkit for Virtualization Operator manages the deployment and life cycle of Migration Toolkit for Virtualization on [OpenShift](https://www.openshift.com/) Container Platform.
+
+    ### Installation
+
+    OpenShift Virtualization must be installed on an OpenShift migration target cluster before you can use MTV to transfer any VMs to that cluster
+
+    Once you have successfully installed the Operator, proceed to deploy components by creating the required ForkliftController CR.
+
+    By default, the Operator installs the following components on a target cluster:
+
+    * Controller, to coordinate migration processes.
+    * UI, the web console to manage migrations.
+    * Validation, a service to validate migration workflows.
+
+    ### Compatibility
+
+    Migration Toolkit for Virtualization 2.9 is supported on OpenShift 4.17, 4.18 and 4.19
+
+    Migration Toolkit for Virtualization 2.10 is supported on OpenShift 4.18, 4.19 and 4.20
+
+    More information on compatibility in the [MTV Lifecycle document](https://access.redhat.com/support/policy/updates/migration-toolkit-for-virtualization).
+
+    ### Documentation
+    Documentation can be found on the [Red Hat Customer Portal](https://access.redhat.com/documentation/en-us/migration_toolkit_for_virtualization/).
+
+    ### Getting help
+    If you encounter any issues while using Migration Toolkit for Virtualization Operator, create a [support case](https://access.redhat.com/support/cases/) for bugs, enhancements, or other requests.
+
+    ### Contributing
+    You can contribute by:
+
+    * Creating a case in the [Red Hat Customer Portal](https://access.redhat.com/support/cases/) with any issues you find using Migration Toolkit for Application and its Operator.
+    * Fixing issues by opening Pull Requests in the [KubeV2V](https://github.com/kubev2v/) under Forklift Projects.
+    * Improving Forklift upstream [documentation](https://github.com/kubev2v/forklift-documentation/).
+  displayName: Migration Toolkit for Virtualization Operator
+  icon:
+    - base64data: PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzOCIgaGVpZ2h0PSIzOCIgdmlld0JveD0iMCAwIDM4IDM4Ij48ZGVmcz48c3R5bGU+LmF7ZmlsbDojZTAwO308L3N0eWxlPjwvZGVmcz48cGF0aCBkPSJNMjgsMi4yNUE3Ljc1ODcsNy43NTg3LDAsMCwxLDM1Ljc1LDEwVjI4QTcuNzU4Nyw3Ljc1ODcsMCwwLDEsMjgsMzUuNzVIMTBBNy43NTg3LDcuNzU4NywwLDAsMSwyLjI1LDI4VjEwQTcuNzU4Nyw3Ljc1ODcsMCwwLDEsMTAsMi4yNUgyOE0yOCwxSDEwYTksOSwwLDAsMC05LDlWMjhhOSw5LDAsMCwwLDksOUgyOGE5LDksMCwwLDAsOS05VjEwYTksOSwwLDAsMC05LTlaIi8+PHBhdGggZD0iTTI3LDE1LjkxMzFIMTYuODE3OGwuNzc4OS0uNzc4M2EuNjI1Ni42MjU2LDAsMSwwLS44ODQ4LS44ODQ4bC0xLjg0NjcsMS44NDY3YS42MjU5LjYyNTksMCwwLDAsLjAwMS44ODQ3bDEuODQ2NywxLjg0NTdhLjYyNDkuNjI0OSwwLDEsMCwuODgyOC0uODg0N2wtLjc4LS43NzkzSDI2LjM3NVYyNi4zNzVIMTcuMTYzMVYyNC44OWEuNjI1LjYyNSwwLDAsMC0xLjI1LDBWMjdhLjYyNTYuNjI1NiwwLDAsMCwuNjI1LjYyNUgyN0EuNjI1Ni42MjU2LDAsMCwwLDI3LjYyNSwyN1YxNi41MzgxQS42MjU2LjYyNTYsMCwwLDAsMjcsMTUuOTEzMVoiLz48cGF0aCBjbGFzcz0iYSIgZD0iTTIzLjEzMzgsMjEuMDE4NmwtMS44NDY3LTEuODQ1N2EuNjI0OS42MjQ5LDAsMSwwLS44ODI4Ljg4NDdsLjc4Ljc3OTNIMTEuNjI1VjExLjYyNWg5LjIxMTlWMTMuMTFhLjYyNS42MjUsMCwwLDAsMS4yNSwwVjExYS42MjU2LjYyNTYsMCwwLDAtLjYyNS0uNjI1SDExYS42MjU2LjYyNTYsMCwwLDAtLjYyNS42MjVWMjEuNDYxOWEuNjI1Ni42MjU2LDAsMCwwLC42MjUuNjI1SDIxLjE4MjJsLS43Nzg5Ljc3ODNhLjYyNTYuNjI1NiwwLDAsMCwuODg0OC44ODQ4bDEuODQ2Ny0xLjg0NjdhLjYyNTkuNjI1OSwwLDAsMC0uMDAxLS44ODQ3WiIvPjwvc3ZnPg==
+      mediatype: image/svg+xml
+  install:
+    spec:
+      deployments: null
+    strategy: deployment
+  installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: false
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+  keywords:
+    - migration
+    - forklift
+    - konveyor
+    - mtv
+  links:
+    - name: Migration Toolkit for Virtualization Documentation
+      url: https://access.redhat.com/documentation/en-us/migration_toolkit_for_virtualization
+    - name: Forklift Operator
+      url: https://github.com/kubev2v/forklift
+  maintainers:
+    - email: openshift-operators@redhat.com
+      name: Red Hat
+  maturity: stable
+  minKubeVersion: 1.27.0
+  provider:
+    name: Red Hat
+  relatedImages:
+    - image: ${OPERATOR_IMAGE}
+      name: forklift-operator
+    - image: ${CONTROLLER_IMAGE}
+      name: controller
+    - image: ${MUST_GATHER_IMAGE}
+      name: must_gather
+    - image: ${VALIDATION_IMAGE}
+      name: validation
+    - image: ${API_IMAGE}
+      name: api
+    - image: ${POPULATOR_CONTROLLER_IMAGE}
+      name: populator_controller
+    - image: ${OVIRT_POPULATOR_IMAGE}
+      name: rhv_populator
+    - image: ${VIRT_V2V_IMAGE}
+      name: virt_v2v
+    - image: ${OPENSTACK_POPULATOR_IMAGE}
+      name: openstack_populator
+    - image: ${UI_PLUGIN_IMAGE}
+      name: ui_plugin
+    - image: ${OVA_PROVIDER_SERVER_IMAGE}
+      name: ova_provider_server
+    - image: ${OVA_PROXY_IMAGE}
+      name: ova_proxy
+    - image: ${VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE}
+      name: vsphere_xcopy_volume_populator
+    - image: ${CLI_DOWNLOAD_IMAGE}
+      name: cli_download
+  version: ${MTV_VERSION}

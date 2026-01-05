@@ -19,9 +19,10 @@ COPY --from=mtv-opa /tmp/opa /usr/bin/opa
 
 ENTRYPOINT ["/usr/bin/entrypoint.sh"]
 
-ARG VERSION
+ARG MTV_VERSION
 ARG REGISTRY
 ARG REVISION
+ARG CPE
 
 LABEL \
     com.redhat.component="mtv-validation-container" \
@@ -34,7 +35,7 @@ LABEL \
     description="Migration Toolkit for Virtualization - Validation Service" \
     vendor="Red Hat, Inc." \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
-    version="$VERSION" \
+    version="$MTV_VERSION" \
     revision="$REVISION" \
-    cpe="cpe:/a:redhat:migration_toolkit_virtualization:2.9::el9"
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:${CPE}::el9"
 

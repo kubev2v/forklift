@@ -7,8 +7,13 @@ import os
 import subprocess
 import uuid
 import re
+import sys
+import shlex
 
 TMP_PREFIX = "/tmp/vmkfstools-wrapper-{}"
+
+# Version information for debugging
+SCRIPT_VERSION = "0.0.5"
 
 XML = """<?xml version="1.0" ?>
 <output xmlns="http://www.vmware.com/Products/ESX/5.0/esxcli/">
@@ -20,20 +25,57 @@ XML = """<?xml version="1.0" ?>
 """
 
 
+def validate_path(path):
+    """Validate that path is safe and within expected directories"""
+    # Log which version is running for debugging
+    logging.info(f"vmkfstools-wrapper version {SCRIPT_VERSION} validating path: {path}")
+
+    # Normalize the path to prevent bypasses
+    path = os.path.normpath(path)
+
+    # Only allow paths in specific safe directories for ESXi operations
+    allowed_prefixes = [
+        '/vmfs/volumes/',      # Datastore volumes (source VMDK files)
+        '/vmfs/devices/disks/' # ESXi disk devices (target devices for cloning)
+    ]
+    if not any(path.startswith(prefix) for prefix in allowed_prefixes):
+        raise ValueError(f"Path not in allowed directories: {path}")
+
+    # Prevent path traversal attacks
+    if '..' in path or '//' in path:
+        raise ValueError(f"Invalid path detected: {path}")
+
+    logging.info(f"Path validation passed for: {path}")
+    return path
+
+
 def clone(args):
-    source = args.source_vmdk
-    target = args.target_lun
+    # Validate inputs for security
+    try:
+        logging.info("Validating source VMDK path...")
+        source = shlex.quote(validate_path(args.source_vmdk))
+        logging.info("Source VMDK path validation passed")
+
+        logging.info("Validating target LUN path...")
+        target = shlex.quote(validate_path(args.target_lun))
+        logging.info("Target LUN path validation passed")
+    except ValueError as ve:
+        # Path validation errors
+        logging.error(f"Path validation failed: {ve}")
+        print(XML.format("1", f"Path validation error: {ve}"))
+        raise
+
     task_id = uuid.uuid4()
     tmp_dir = TMP_PREFIX.format(task_id)
     os.makedirs(tmp_dir, mode=0o750, exist_ok=True)
-    rdmfile = f"{source}-rdmdisk-{os.getpid()}"
+    rdmfile = f"{args.source_vmdk}-rdmdisk-{os.getpid()}"
 
     stdout_file = open(os.path.join(tmp_dir, "out"), "w")
     stderr_file = open(os.path.join(tmp_dir, "err"), "w")
-    vmkfstools_cmdline = f"trap 'echo -n $? > {tmp_dir}/exitcode' EXIT;" \
+    vmkfstools_cmdline = f"trap 'echo -n $? > {shlex.quote(f'{tmp_dir}/exitcode')}' EXIT;" \
         f"/bin/vmkfstools " \
         f"-i {source} " \
-        f"-d rdm:{target} {rdmfile}"
+        f"-d rdm:{target} {shlex.quote(rdmfile)}"
     logging.info(f"about to run {vmkfstools_cmdline}")
     try:
         task = subprocess.Popen(
@@ -50,6 +92,9 @@ def clone(args):
 
         with open(os.path.join(tmp_dir, "rdmfile"), "w") as rdmfile_file:
             rdmfile_file.write(f"{rdmfile}\n")
+
+        with open(os.path.join(tmp_dir, "targetLun"), "w") as target_lun_file:
+            target_lun_file.write(f"{os.path.basename(target)}")
 
         result = {"taskId": str(task_id),  "pid": int(task.pid)}
         print(XML.format("0", json.dumps(result)))
@@ -85,10 +130,21 @@ def taskGet(args):
         print(XML.format("1", json.dumps(result)))
         return
 
-    result = {"taskId": args.task_id[0], "pid": int(pid),
-              "exitCode": exitcode, "lastLine": line.rstrip(), "stdErr": ste}
-    print(XML.format("0", json.dumps(result)))
+    # Default to None if we can't determine xcopy usage
+    xcopy_used = None
+    try:
+        with open(os.path.join(tmp_dir, "targetLun"), "r") as target_lun_file:
+            target_lun = target_lun_file.read()
+        xcopy_used, xclone_writes = was_xcopy_used(target_lun)
+        # Log xclone_writes for debugging, but don't expose in result
+        logging.info(f"XCOPY used: {xcopy_used}, clone write ops: {xclone_writes}")
+    except Exception as e:
+        logging.warning(f"Failed to determine xcopy usage: {e}, defaulting to False")
 
+    result = {"taskId": args.task_id[0], "pid": int(pid),
+            "exitCode": exitcode, "lastLine": line.rstrip(),
+            "xcopyUsed": xcopy_used, "stdErr": ste}
+    print(XML.format("0", json.dumps(result)))
 
 def taskClean(args):
     tmp_dir = TMP_PREFIX.format(args.task_id[0])
@@ -122,8 +178,57 @@ def extract_rdmdisk_file(rdm_file):
         logging.error(e)
     return ""
 
+def was_xcopy_used(target_lun):
+    stats_path = f"/storage/scsifw/devices/{target_lun.strip()}/stats"
+
+    try:
+        target_lun_stats = subprocess.run(
+            ["vsish", "-r", "-e", "cat", stats_path],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+
+        logging.info(f"vshish stats {target_lun_stats}")
+    except subprocess.CalledProcessError as e:
+        # don't panic, just warn we can't extract xcopy info
+        logging.error(f"Error: Unable to read XCOPY stats for device {target_lun} with path {stats_path}")
+        return False, "0"
+        
+
+    write_ops = 0
+    for statistic in target_lun_stats.stdout.splitlines():
+        if "clonewriteops" in statistic.lower():
+            try:
+                write_ops = int(statistic.split(':')[1], 16)
+            except ValueError:
+                logging.error(f"Error: Unable to parse statistic: {statistic.split(':')[1]}")
+                write_ops = 0
+            break
+
+    return write_ops > 0, str(write_ops)
+
+def version():
+    print(XML.format("0", json.dumps({"version":SCRIPT_VERSION})))
+    return
 
 def main():
+    # Setup logging first, before any logging calls
+    logging.basicConfig(
+            level=logging.INFO,
+            handlers=[
+                logging.FileHandler('/var/log/vmkfstools-wrapper.log'),
+                logging.StreamHandler()
+            ],
+            format='%(asctime)s - %(levelname)s - %(message)s')
+
+    # For SSH restricted command execution, parse SSH_ORIGINAL_COMMAND
+    ssh_command = os.environ.get('SSH_ORIGINAL_COMMAND', '').strip()
+    if ssh_command:
+        logging.info(f"Received SSH_ORIGINAL_COMMAND: {ssh_command}")
+        # Convert SSH command to sys.argv format for argparse
+        sys.argv = ['vmkfstools_wrapper.py'] + ssh_command.split()
+
     parser = argparse.ArgumentParser(description="vmkfstools-wrapper")
 
     parser.add_argument("--clone", action="store_true",
@@ -146,11 +251,14 @@ def main():
     parser.add_argument("-i", "--task-id", type=str, nargs=1,
                         metavar="task_id", default=None,
                         help="id of task to get")
-    args = parser.parse_args()
-    logging.basicConfig(filename='/var/log/vmkfstools-wrapper.log',
-                        level=logging.INFO,
-                        format='%(asctime)s - %(levelname)s - %(message)s')
 
+    parser.add_argument("-v", "--version", action="store_true",
+                        help="version")
+
+    args = parser.parse_args()
+
+    if args.version:
+        version()
     if args.clone and args.source_vmdk is not None and args.target_lun is not None:
         clone(args)
     elif args.task_get:

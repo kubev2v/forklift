@@ -2,6 +2,10 @@ packages:
   - virt-v2v
   - virtio-win
   - catatonit
+  - kernel-6.12.0-124.8.1.el10_1
+  - kernel-modules-core-6.12.0-124.8.1.el10_1
+  - kernel-core-6.12.0-124.8.1.el10_1
+  - kernel-modules-6.12.0-124.8.1.el10_1
 contentOrigin:
   repofiles:
     - ./redhat.repo

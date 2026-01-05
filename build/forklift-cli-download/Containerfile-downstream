@@ -1,16 +1,34 @@
+# Build stage
+FROM registry.redhat.io/ubi9/go-toolset:1.24.4-1752083840 AS builder
+
+USER 0
+WORKDIR /app
+COPY --chown=1001:0 ./ ./
+ENV GOFLAGS="-mod=vendor -tags=strictfipsruntime"
+ENV GOEXPERIMENT=strictfipsruntime
+ENV GOCACHE=/go-build/cache
+
+# Change to kubectl-mtv directory and build all platform binaries
+WORKDIR /app/cmd/kubectl-mtv
+RUN --mount=type=cache,target=${GOCACHE},uid=1001 make build-all
+
+# Nginx serving stage  
 FROM registry.redhat.io/ubi9/nginx-126:1-1756959223
-# COPY build/forklift-cli-download/artifacts /opt/app-root/src/
-RUN cp /cachi2/output/deps/generic/* /opt/app-root/src/
+
+# Copy binaries directly from build stage
+COPY --from=builder /app/cmd/kubectl-mtv/bin /opt/app-root/src/
+
 EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]
 
-ARG VERSION
+ARG MTV_VERSION
 ARG REGISTRY
 ARG REVISION
+ARG CPE
 
 LABEL \
     com.redhat.component="mtv-cli-download-container" \
-    cpe="cpe:/a:redhat:migration_toolkit_virtualization:2.9::el9" \
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:${CPE}::el9" \
     name="${REGISTRY}/mtv-cli-download-rhel9" \
     license="Apache License 2.0" \
     io.k8s.display-name="Migration Toolkit for Virtualization" \
@@ -20,5 +38,5 @@ LABEL \
     summary="Migration Toolkit for Virtualization - CLI Download Service" \
     vendor="Red Hat, Inc." \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
-    version="$VERSION" \
+    version="$MTV_VERSION" \
     revision="$REVISION"

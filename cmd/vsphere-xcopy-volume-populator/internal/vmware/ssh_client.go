@@ -2,8 +2,6 @@ package vmware
 
 import (
 	"context"
-	"encoding/json"
-	"encoding/xml"
 	"fmt"
 	"net"
 	"strings"
@@ -14,47 +12,10 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// SSHOperation represents the type of SSH operation
-type SSHOperation string
-
-const (
-	SSHOperationClone   SSHOperation = "clone"
-	SSHOperationStatus  SSHOperation = "status"
-	SSHOperationCleanup SSHOperation = "cleanup"
-)
-
-type VmkfstoolsTask struct {
-	TaskId   string `json:"taskId"`
-	Pid      int    `json:"pid"`
-	ExitCode string `json:"exitCode"`
-	LastLine string `json:"lastLine"`
-	Stderr   string `json:"stdErr"`
-}
-
-// XMLResponse represents the XML response structure
-type XMLResponse struct {
-	XMLName   xml.Name  `xml:"o"`
-	Structure Structure `xml:"structure"`
-}
-
-// Structure represents the structure element in the XML response
-type Structure struct {
-	TypeName string  `xml:"typeName,attr"`
-	Fields   []Field `xml:"field"`
-}
-
-// Field represents a field in the XML response
-type Field struct {
-	Name   string `xml:"name,attr"`
-	String string `xml:"string"`
-}
-
 // SSHClient interface for SSH operations
 type SSHClient interface {
 	Connect(ctx context.Context, hostname, username string, privateKey []byte) error
-	StartVmkfstoolsClone(sourceVMDK, targetLUN string) (*VmkfstoolsTask, error)
-	GetTaskStatus(taskId string) (*VmkfstoolsTask, error)
-	CleanupTask(taskId string) error
+	ExecuteCommand(sshCommand string, args ...string) (string, error)
 	Close() error
 }
 
@@ -114,7 +75,7 @@ func (c *ESXiSSHClient) Connect(ctx context.Context, hostname, username string, 
 }
 
 // executeCommand executes a command using the SSH_ORIGINAL_COMMAND pattern
-func (c *ESXiSSHClient) executeCommand(sshCommand string, args ...string) (string, error) {
+func (c *ESXiSSHClient) ExecuteCommand(sshCommand string, args ...string) (string, error) {
 	if c.sshClient == nil {
 		return "", fmt.Errorf("SSH client not connected")
 	}
@@ -174,64 +135,6 @@ func (c *ESXiSSHClient) executeCommand(sshCommand string, args ...string) (strin
 	return string(output), nil
 }
 
-func (c *ESXiSSHClient) StartVmkfstoolsClone(sourceVMDK, targetLUN string) (*VmkfstoolsTask, error) {
-	klog.Infof("Starting vmkfstools clone: source=%s, target=%s", sourceVMDK, targetLUN)
-
-	output, err := c.executeCommand(string(SSHOperationClone), sourceVMDK, targetLUN)
-	if err != nil {
-		return nil, fmt.Errorf("failed to start clone: %w", err)
-	}
-
-	klog.Infof("Received output from script: %s", output)
-
-	// Parse the XML response from the script
-	task, err := parseTaskResponse(output)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse clone response: %w", err)
-	}
-
-	klog.Infof("Started vmkfstools clone task %s with PID %d", task.TaskId, task.Pid)
-	return task, nil
-}
-
-func (c *ESXiSSHClient) GetTaskStatus(taskId string) (*VmkfstoolsTask, error) {
-	klog.V(2).Infof("Getting task status for %s", taskId)
-
-	output, err := c.executeCommand(string(SSHOperationStatus), taskId)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get task status: %w", err)
-	}
-
-	// Parse the XML response from the script
-	task, err := parseTaskResponse(output)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse status response: %w", err)
-	}
-
-	klog.V(2).Infof("Task %s status: PID=%d, ExitCode=%s, LastLine=%s",
-		taskId, task.Pid, task.ExitCode, task.LastLine)
-
-	return task, nil
-}
-
-func (c *ESXiSSHClient) CleanupTask(taskId string) error {
-	klog.Infof("Cleaning up task %s", taskId)
-
-	output, err := c.executeCommand(string(SSHOperationCleanup), taskId)
-	if err != nil {
-		return fmt.Errorf("failed to cleanup task: %w", err)
-	}
-
-	// Parse response to ensure cleanup was successful
-	_, err = parseTaskResponse(output)
-	if err != nil {
-		klog.Warningf("Cleanup response parsing failed (task may still be cleaned): %v", err)
-	}
-
-	klog.Infof("Cleaned up task %s", taskId)
-	return nil
-}
-
 func (c *ESXiSSHClient) Close() error {
 	if c.sshClient != nil {
 		err := c.sshClient.Close()
@@ -240,60 +143,6 @@ func (c *ESXiSSHClient) Close() error {
 		return err
 	}
 	return nil
-}
-
-// parseTaskResponse parses the XML response from the script
-func parseTaskResponse(xmlOutput string) (*VmkfstoolsTask, error) {
-	// Parse the XML response to extract the JSON result
-	// Expected format: XML with status and message fields
-	// The message field contains JSON with task information
-
-	var response XMLResponse
-	if err := xml.Unmarshal([]byte(xmlOutput), &response); err != nil {
-		return nil, fmt.Errorf("failed to parse XML response: %w", err)
-	}
-
-	// Find status and message fields
-	var status, message string
-	for _, field := range response.Structure.Fields {
-		switch field.Name {
-		case "status":
-			status = field.String
-		case "message":
-			message = field.String
-		}
-	}
-
-	if status == "" {
-		return nil, fmt.Errorf("status field not found in XML response")
-	}
-
-	if message == "" {
-		return nil, fmt.Errorf("message field not found in XML response")
-	}
-
-	// Check if operation was successful
-	if status != "success" {
-		return nil, fmt.Errorf("operation failed with status %s: %s", status, message)
-	}
-
-	// Parse the JSON message to extract task information
-	task := &VmkfstoolsTask{}
-
-	// Try to parse as JSON first
-	if err := json.Unmarshal([]byte(message), task); err != nil {
-		// If JSON parsing fails, check if it's a simple text message (e.g., for cleanup operations)
-		// In this case, we return a minimal task structure
-		klog.V(2).Infof("Message is not JSON, treating as plain text: %s", message)
-
-		// For non-JSON messages (like cleanup confirmations), return a basic task
-		// The caller should check the original status for success/failure
-		return &VmkfstoolsTask{
-			LastLine: message, // Store the text message in LastLine for reference
-		}, nil
-	}
-
-	return task, nil
 }
 
 // EnableSSHAccess enables SSH service on ESXi host and provides manual SSH key installation instructions
@@ -320,7 +169,7 @@ func EnableSSHAccess(ctx context.Context, vmwareClient Client, host *object.Host
 		pythonCommand, publicKeyStr)
 
 	// Step 7: Test SSH connectivity first (using private key for authentication)
-	if testSSHConnectivity(ctx, hostIP, privateKey, "test") {
+	if testSSHConnectivity(ctx, hostIP, privateKey) {
 		klog.Infof("SSH connectivity test passed - keys already configured correctly")
 		return nil
 	}
@@ -340,7 +189,7 @@ func EnableSSHAccess(ctx context.Context, vmwareClient Client, host *object.Host
 }
 
 // testSSHConnectivity tests if we can connect via SSH and execute a restricted command
-func testSSHConnectivity(ctx context.Context, hostIP string, privateKey []byte, testCommand string) bool {
+func testSSHConnectivity(ctx context.Context, hostIP string, privateKey []byte) bool {
 	klog.Infof("Testing SSH connectivity to %s", hostIP)
 
 	client := NewSSHClient()
@@ -356,7 +205,7 @@ func testSSHConnectivity(ctx context.Context, hostIP string, privateKey []byte, 
 
 	// Try to execute a simple test command - this will test if the restricted command setup is working
 	// We expect this to fail with a "task not found" type error, which indicates SSH restrictions are working correctly
-	output, err := client.(*ESXiSSHClient).executeCommand(string(SSHOperationStatus), "test-task-id")
+	output, err := client.(*ESXiSSHClient).ExecuteCommand("--version")
 
 	klog.Infof("SSH test command output: '%s'", output)
 	klog.Infof("SSH test command error: %v", err)
