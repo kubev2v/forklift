@@ -73,6 +73,53 @@
       state: present
       definition: "{{ lookup('template', 'api/service-services.yml.j2') }}"
 
+  - name: "Build transfer network annotation with default route for controller and API"
+    when: controller_transfer_network is defined
+    block:
+      - name: "Validate transfer network format"
+        assert:
+          that:
+            - controller_transfer_network is search('/')
+          fail_msg: "controller_transfer_network must be in 'namespace/name' format (e.g., 'openshift-mtv/br-eno8403')"
+
+      - name: "Parse transfer network namespace and name"
+        set_fact:
+          transfer_network_namespace: "{{ controller_transfer_network.split('/')[0] }}"
+          transfer_network_name: "{{ controller_transfer_network.split('/')[1] }}"
+
+      - name: "Fetch NetworkAttachmentDefinition for transfer network"
+        k8s_info:
+          api_version: k8s.cni.cncf.io/v1
+          kind: NetworkAttachmentDefinition
+          name: "{{ transfer_network_name }}"
+          namespace: "{{ transfer_network_namespace }}"
+        register: transfer_nad
+
+      - name: "Fail if NAD not found"
+        fail:
+          msg: "NetworkAttachmentDefinition '{{ transfer_network_name }}' not found in namespace '{{ transfer_network_namespace }}'"
+        when: transfer_nad.resources | length == 0
+
+      - name: "Extract default route from NAD annotation"
+        set_fact:
+          transfer_network_default_route: "{{ (transfer_nad.resources[0].metadata.annotations | default({}))['forklift.konveyor.io/route'] | default('') }}"
+
+      - name: "Build transfer network annotation with default-route"
+        set_fact:
+          controller_transfer_network:
+            - name: "{{ transfer_network_name }}"
+              namespace: "{{ transfer_network_namespace }}"
+              default-route:
+                - "{{ transfer_network_default_route }}"
+        when: transfer_network_default_route | length > 0
+
+      - name: "Build transfer network annotation without default-route"
+        set_fact:
+          controller_transfer_network:
+            - name: "{{ transfer_network_name }}"
+              namespace: "{{ transfer_network_namespace }}"
+        when: transfer_network_default_route | length == 0
+
   - name: "Setup controller deployment"
     k8s:
       state : present
