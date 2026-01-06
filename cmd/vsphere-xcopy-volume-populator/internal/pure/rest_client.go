@@ -101,7 +101,9 @@ type HostConnectionRequest struct {
 }
 
 // NewRestClient creates a new REST client for Pure FlashArray
-func NewRestClient(hostname, username, password string, skipSSLVerify bool) (*RestClient, error) {
+// If apiToken is provided (non-empty), it will be used directly, skipping username/password authentication
+// If apiToken is empty, username and password will be used to obtain an API token
+func NewRestClient(hostname, username, password, apiToken string, skipSSLVerify bool) (*RestClient, error) {
 	client := &RestClient{
 		hostname: hostname,
 		httpClient: &http.Client{
@@ -119,9 +121,17 @@ func NewRestClient(hostname, username, password string, skipSSLVerify bool) (*Re
 		return nil, fmt.Errorf("failed to detect API versions: %w", err)
 	}
 
-	// Step 2: Get API token using latest 1.x API (only 1.x supports this)
-	if err := client.getAPIToken(username, password); err != nil {
-		return nil, fmt.Errorf("failed to get API token: %w", err)
+	// Step 2: Get API token - either use provided token or obtain via username/password
+	if apiToken != "" {
+		// Use provided API token directly
+		klog.Infof("Pure REST Client: Using provided API token for authentication")
+		client.apiToken = apiToken
+	} else {
+		// Get API token using latest 1.x API (only 1.x supports this)
+		klog.Infof("Pure REST Client: Using username/password authentication to obtain API token")
+		if err := client.getAPIToken(username, password); err != nil {
+			return nil, fmt.Errorf("failed to get API token: %w", err)
+		}
 	}
 
 	// Step 3: Get auth token using latest 2.x API

@@ -144,9 +144,14 @@ to have a secret with the following fields:
 | Key | Value | Mandatory | Default |
 | --- | --- | --- | --- |
 | STORAGE_HOSTNAME | ip/hostname | y | |
-| STORAGE_USERNAME | string | y | |
-| STORAGE_PASSWORD | string | y | |
+| STORAGE_USERNAME | string | y* | |
+| STORAGE_PASSWORD | string | y* | |
+| STORAGE_TOKEN | string | n** | |
 | STORAGE_SKIP_SSL_VERIFICATION | true/false | n | false |
+
+\* For most storage vendors, `STORAGE_USERNAME` and `STORAGE_PASSWORD` are required. Pure FlashArray is an exception - see below.
+
+\*\* `STORAGE_TOKEN` is only supported by Pure FlashArray. When provided, it replaces the need for username/password authentication.
 
 Provider-specific entries in the secret are documented below:
 
@@ -163,9 +168,74 @@ See [README](internal/vantara/README.md)
 
 ### Pure FlashArray
 
-| Key | Value | Description |
-| --- | --- | --- |
-| PURE_CLUSTER_PREFIX | string | Cluster prefix is set in the StorageCluster resource. Get it with  `printf "px_%s" $(oc get storagecluster -A -o=jsonpath='{.items[0].status.clusterUid}'| head -c 8)` |
+Pure FlashArray supports two mutually exclusive authentication methods:
+
+#### Token-Based Authentication (Recommended)
+
+Token-based authentication allows you to reuse the same credentials as your Pure CSI driver deployment.
+
+| Key | Value | Description | Required |
+| --- | --- | --- | --- |
+| STORAGE_TOKEN | string | API token for Pure FlashArray authentication. Can be extracted from the Pure CSI driver secret. | Yes (if using token auth) |
+| PURE_CLUSTER_PREFIX | string | Cluster prefix is set in the StorageCluster resource. Get it with  `printf "px_%s" $(oc get storagecluster -A -o=jsonpath='{.items[0].status.clusterUid}'| head -c 8)` | Yes |
+
+**How to obtain the token from Pure CSI driver:**
+
+The Pure CSI driver stores the API token in a secret, typically named `pure-provisioner-secret` or similar. To extract the token:
+
+```bash
+# Find the Pure CSI driver secret
+oc get secrets -n <pure-csi-namespace> | grep pure
+
+# Extract the API token (adjust secret name and key as needed)
+oc get secret pure-provisioner-secret -n <pure-csi-namespace> -o jsonpath='{.data.PureAPIToken}' | base64 -d
+```
+
+**Example secret with token authentication:**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pure-flasharray-secret
+  namespace: openshift-mtv
+type: Opaque
+stringData:
+  STORAGE_HOSTNAME: "flasharray.example.com"
+  STORAGE_TOKEN: "your-api-token-here"
+  PURE_CLUSTER_PREFIX: "px_12345678"
+```
+
+#### Username/Password Authentication (Legacy)
+
+If you prefer username/password authentication or don't have access to the API token:
+
+| Key | Value | Description | Required |
+| --- | --- | --- | --- |
+| STORAGE_USERNAME | string | Username for Pure FlashArray management API | Yes (if using username/password auth) |
+| STORAGE_PASSWORD | string | Password for Pure FlashArray management API | Yes (if using username/password auth) |
+| PURE_CLUSTER_PREFIX | string | Cluster prefix is set in the StorageCluster resource. Get it with  `printf "px_%s" $(oc get storagecluster -A -o=jsonpath='{.items[0].status.clusterUid}'| head -c 8)` | Yes |
+
+**Example secret with username/password authentication:**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pure-flasharray-secret
+  namespace: openshift-mtv
+type: Opaque
+stringData:
+  STORAGE_HOSTNAME: "flasharray.example.com"
+  STORAGE_USERNAME: "pureuser"
+  STORAGE_PASSWORD: "your-password-here"
+  PURE_CLUSTER_PREFIX: "px_12345678"
+```
+
+**Important Notes:**
+- Authentication methods are mutually exclusive: if `STORAGE_TOKEN` is provided, it will be used and `STORAGE_USERNAME`/`STORAGE_PASSWORD` are ignored
+- If `STORAGE_TOKEN` is not provided, both `STORAGE_USERNAME` and `STORAGE_PASSWORD` must be set
+- Token-based authentication is recommended as it allows credential reuse with the Pure CSI driver
 
 ### Dell PowerMax
 
