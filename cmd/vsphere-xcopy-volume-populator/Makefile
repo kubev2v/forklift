@@ -94,9 +94,9 @@ test-copy-using-cli-pureflasharray: build
 		--owner-uid=test-vm-6 \
 		--target-namespace=default \
 		--storage-vendor-product=pureFlashArray \
-		--secret-name=populator-secret \
+		--secret-name=pure \
 		--kubeconfig=$$KUBECONFIG \
-		--esxi-clone-method=ssh
+		--esxi-clone-method=vib
 
 
 test-copy-using-cli-powerflex: build
