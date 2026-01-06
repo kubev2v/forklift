@@ -224,29 +224,29 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 		})
 	})
 
-	ginkgo.Describe("ConvertorTempStorage plan spec", func() {
-		ginkgo.It("should read ConvertorTempStorageClass and ConvertorTempStorageSize from plan spec", func() {
+	ginkgo.Describe("ConversionTempStorage plan spec", func() {
+		ginkgo.It("should read ConversionTempStorageClass and ConversionTempStorageSize from plan spec", func() {
 			plan := createPlanKubevirt(nil)
-			plan.Spec.ConvertorTempStorageClass = "fast-ssd"
-			plan.Spec.ConvertorTempStorageSize = "100Gi"
+			plan.Spec.ConversionTempStorageClass = "fast-ssd"
+			plan.Spec.ConversionTempStorageSize = "100Gi"
 
 			kubevirt := createKubeVirt()
 			kubevirt.Plan = plan
 
-			Expect(kubevirt.Plan.Spec.ConvertorTempStorageClass).To(Equal("fast-ssd"))
-			Expect(kubevirt.Plan.Spec.ConvertorTempStorageSize).To(Equal("100Gi"))
+			Expect(kubevirt.Plan.Spec.ConversionTempStorageClass).To(Equal("fast-ssd"))
+			Expect(kubevirt.Plan.Spec.ConversionTempStorageSize).To(Equal("100Gi"))
 		})
 
-		ginkgo.It("should handle empty ConvertorTempStorage fields", func() {
+		ginkgo.It("should handle empty ConversionTempStorage fields", func() {
 			plan := createPlanKubevirt(nil)
-			plan.Spec.ConvertorTempStorageClass = ""
-			plan.Spec.ConvertorTempStorageSize = ""
+			plan.Spec.ConversionTempStorageClass = ""
+			plan.Spec.ConversionTempStorageSize = ""
 
 			kubevirt := createKubeVirt()
 			kubevirt.Plan = plan
 
-			Expect(kubevirt.Plan.Spec.ConvertorTempStorageClass).To(Equal(""))
-			Expect(kubevirt.Plan.Spec.ConvertorTempStorageSize).To(Equal(""))
+			Expect(kubevirt.Plan.Spec.ConversionTempStorageClass).To(Equal(""))
+			Expect(kubevirt.Plan.Spec.ConversionTempStorageSize).To(Equal(""))
 		})
 	})
 

@@ -224,8 +224,8 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		return err
 	}
 
-	// Validate convertor temp storage configuration
-	if err = r.validateConvertorTempStorage(plan); err != nil {
+	// Validate conversion temp storage configuration
+	if err = r.validateConversionTempStorage(plan); err != nil {
 		return err
 	}
 
@@ -1857,9 +1857,9 @@ func (r *Reconciler) IsValidTargetName(targetName string) error {
 	return nil
 }
 
-func (r *Reconciler) validateConvertorTempStorage(plan *api.Plan) error {
-	storageClass := plan.Spec.ConvertorTempStorageClass
-	storageSize := plan.Spec.ConvertorTempStorageSize
+func (r *Reconciler) validateConversionTempStorage(plan *api.Plan) error {
+	storageClass := plan.Spec.ConversionTempStorageClass
+	storageSize := plan.Spec.ConversionTempStorageSize
 
 	// If neither is set, that's fine
 	if storageClass == "" && storageSize == "" {
@@ -1868,29 +1868,29 @@ func (r *Reconciler) validateConvertorTempStorage(plan *api.Plan) error {
 
 	// If only one is set, that's an error
 	if storageClass == "" || storageSize == "" {
-		convertorTempStorageIncomplete := libcnd.Condition{
+		conversionTempStorageIncomplete := libcnd.Condition{
 			Type:     NotValid,
 			Status:   True,
 			Category: api.CategoryCritical,
-			Message:  "Both ConvertorTempStorageClass and ConvertorTempStorageSize must be specified together.",
+			Message:  "Both ConversionTempStorageClass and ConversionTempStorageSize must be specified together.",
 			Items:    []string{},
 		}
-		plan.Status.SetCondition(convertorTempStorageIncomplete)
+		plan.Status.SetCondition(conversionTempStorageIncomplete)
 		return nil
 	}
 
 	// Validate that storageSize is a valid Kubernetes resource quantity
 	_, err := resource.ParseQuantity(storageSize)
 	if err != nil {
-		convertorTempStorageSizeInvalid := libcnd.Condition{
+		conversionTempStorageSizeInvalid := libcnd.Condition{
 			Type:     NotValid,
 			Status:   True,
 			Category: api.CategoryCritical,
-			Message:  fmt.Sprintf("ConvertorTempStorageSize '%s' is not a valid Kubernetes resource quantity: %v", storageSize, err),
+			Message:  fmt.Sprintf("ConversionTempStorageSize '%s' is not a valid Kubernetes resource quantity: %v", storageSize, err),
 			Items:    []string{},
 		}
-		plan.Status.SetCondition(convertorTempStorageSizeInvalid)
-		r.Log.Info("Convertor temp storage size is invalid", "error", err.Error(), "size", storageSize, "plan", plan.Name, "namespace", plan.Namespace)
+		plan.Status.SetCondition(conversionTempStorageSizeInvalid)
+		r.Log.Info("Conversion temp storage size is invalid", "error", err.Error(), "size", storageSize, "plan", plan.Name, "namespace", plan.Namespace)
 		return nil
 	}
 

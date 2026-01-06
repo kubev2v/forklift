@@ -2099,10 +2099,12 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 	})
 
 	// Add temporary conversion storage if configured
-	if r.Plan.Spec.ConvertorTempStorageClass != "" && r.Plan.Spec.ConvertorTempStorageSize != "" {
+	if r.Plan.Spec.ConversionTempStorageClass != "" && r.Plan.Spec.ConversionTempStorageSize != "" {
 		// Use Generic Ephemeral Volume for temporary conversion storage
 		// This creates a temporary PVC that is automatically deleted with the pod
-		storageClass := r.Plan.Spec.ConvertorTempStorageClass
+		storageClass := r.Plan.Spec.ConversionTempStorageClass
+		// VolumeMode must be Filesystem since we mount it at /var/tmp/virt-v2v for use as a filesystem.
+		// Without this, Kubernetes may default to block mode which cannot be mounted as a filesystem.
 		volumeMode := core.PersistentVolumeFilesystem
 		volumes = append(volumes, core.Volume{
 			Name: "conversion-temp-storage",
@@ -2117,7 +2119,7 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 							VolumeMode:       &volumeMode,
 							Resources: core.VolumeResourceRequirements{
 								Requests: core.ResourceList{
-									core.ResourceStorage: resource.MustParse(r.Plan.Spec.ConvertorTempStorageSize),
+									core.ResourceStorage: resource.MustParse(r.Plan.Spec.ConversionTempStorageSize),
 								},
 							},
 						},
