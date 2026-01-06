@@ -177,6 +177,11 @@ def load_tasks_variables(tasks_file):
         'ui_plugin_console_name',
         'ui_plugin_service_name', 
         'validation_service_name',
+        # Transfer network temporary/internal variables (not user-facing)
+        'transfer_network_namespace',
+        'transfer_network_name',
+        'transfer_network_default_route',
+        'transfer_nad',
     }
     
     return variables - ansible_builtin - excluded_fields
