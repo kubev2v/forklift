@@ -1,6 +1,0 @@
-plugin: vmware.vmware.esxi_hosts
-# hostname: load from ENV  
-# username: load from ENV
-# password: load from ENV
-validate_certs: false
-use_extra_vars: true
