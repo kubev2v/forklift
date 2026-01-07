@@ -78,7 +78,6 @@ const (
 	Deleted                         = "Deleted"
 	Paused                          = "Paused"
 	Archived                        = "Archived"
-	UnsupportedDisks                = "UnsupportedDisks"
 	InvalidDiskSizes                = "InvalidDiskSizes"
 	MacConflicts                    = "MacConflicts"
 	MissingPvcForOnlyConversion     = "MissingPvcForOnlyConversion"
@@ -727,14 +726,6 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "VMware Tools issues detected. This may impact migration performance, guest OS detection, and network configuration. Ensure VMware Tools are properly installed and running before migration. If this is an encrypted VM, please turn the VM off manually before migration.",
 		Items:    []string{},
 	}
-	unsupportedDisks := libcnd.Condition{
-		Type:     UnsupportedDisks,
-		Status:   True,
-		Reason:   NotSupported,
-		Category: api.CategoryCritical,
-		Message:  "%s disks are not supported for migration.",
-		Items:    []string{},
-	}
 	invalidDiskSizes := libcnd.Condition{
 		Type:     InvalidDiskSizes,
 		Status:   True,
@@ -943,20 +934,6 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		if !ok {
 			guestToolsIssue.Items = append(guestToolsIssue.Items, ref.String())
 		}
-		unsupported, err := validator.UnSupportedDisks(*ref)
-		if err != nil {
-			return err
-		}
-		if len(unsupported) > 0 {
-			unsupportedDisks.Items = append(unsupportedDisks.Items, ref.String())
-
-			// Append detailed message
-			unsupportedDisks.Message = fmt.Sprintf(
-				unsupportedDisks.Message,
-				strings.ToUpper(strings.Join(unsupported, ", ")),
-			)
-		}
-
 		invalidSizes, err := validator.InvalidDiskSizes(*ref)
 		if err != nil {
 			return err
@@ -1174,9 +1151,6 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(guestToolsIssue.Items) > 0 {
 		plan.Status.SetCondition(guestToolsIssue)
-	}
-	if len(unsupportedDisks.Items) > 0 {
-		plan.Status.SetCondition(unsupportedDisks)
 	}
 	if len(invalidDiskSizes.Items) > 0 {
 		plan.Status.SetCondition(invalidDiskSizes)

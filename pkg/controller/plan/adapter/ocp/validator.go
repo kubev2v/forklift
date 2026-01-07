@@ -175,11 +175,6 @@ func (r *Validator) MigrationType() bool {
 }
 
 // NOOP
-func (r *Validator) UnSupportedDisks(vmRef ref.Ref) ([]string, error) {
-	return []string{}, nil
-}
-
-// NOOP
 func (r *Validator) InvalidDiskSizes(vmRef ref.Ref) ([]string, error) {
 	return []string{}, nil
 }

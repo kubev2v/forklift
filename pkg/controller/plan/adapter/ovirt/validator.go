@@ -20,11 +20,6 @@ type Validator struct {
 	*plancontext.Context
 }
 
-// NOOP
-func (r *Validator) UnSupportedDisks(vmRef ref.Ref) ([]string, error) {
-	return []string{}, nil
-}
-
 func (r *Validator) InvalidDiskSizes(vmRef ref.Ref) ([]string, error) {
 	vm := &model.Workload{}
 	err := r.Source.Inventory.Find(vm, vmRef)
