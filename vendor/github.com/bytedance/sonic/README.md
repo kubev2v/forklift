@@ -6,7 +6,7 @@ A blazingly fast JSON serializing &amp; deserializing library, accelerated by JI
 
 ## Requirement
 
-- Go: 1.17~1.24
+- Go: 1.18~1.25
   - Notice: Go1.24.0 is not supported due to the [issue](https://github.com/golang/go/issues/71672), please use higher go version or add build tag `--ldflags="-checklinkname=0"` 
 - OS: Linux / MacOS / Windows
 - CPU: AMD64 / (ARM64, need go1.20 above)
@@ -385,12 +385,12 @@ See [ast/visitor.go](https://github.com/bytedance/sonic/blob/main/ast/visitor.go
 
 ## Compatibility
 
-For developers who want to use sonic to meet diffirent scenarios, we provide some integrated configs as `sonic.API`
+For developers who want to use sonic to meet different scenarios, we provide some integrated configs as `sonic.API`
 
 - `ConfigDefault`: the sonic's default config (`EscapeHTML=false`,`SortKeys=false`...) to run sonic fast meanwhile ensure security.
 - `ConfigStd`: the std-compatible config (`EscapeHTML=true`,`SortKeys=true`...)
 - `ConfigFastest`: the fastest config (`NoQuoteTextMarshaler=true`) to run on sonic as fast as possible.
-Sonic **DOES NOT** ensure to support all environments, due to the difficulty of developing high-performance codes. On non-sonic-supporting environment, the implementation will fall back to `encoding/json`. Thus beflow configs will all equal to `ConfigStd`.
+Sonic **DOES NOT** ensure to support all environments, due to the difficulty of developing high-performance codes. On non-sonic-supporting environment, the implementation will fall back to `encoding/json`. Thus below configs will all equal to `ConfigStd`.
 
 ## Tips
 
