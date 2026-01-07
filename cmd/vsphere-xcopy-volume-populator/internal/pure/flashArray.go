@@ -33,16 +33,20 @@ type FlashArrayClonner struct {
 const ClusterPrefixEnv = "PURE_CLUSTER_PREFIX"
 const helpMessage = `clusterPrefix is missing and PURE_CLUSTER_PREFIX is not set.
 Use this to extract the value:
-printf "px_%.8s" $(oc get storagecluster -A -o=jsonpath='{.items[?(@.spec.cloudStorage.provider=="pure")].status.clusterUid}')
+printf "px_%s" $(oc get storagecluster -A -o=jsonpath='{.items[0].status.clusterUid}'| head -c 8)
 `
 
-func NewFlashArrayClonner(hostname, username, password string, skipSSLVerification bool, clusterPrefix string) (FlashArrayClonner, error) {
+// NewFlashArrayClonner creates a new FlashArrayClonner
+// Authentication is mutually exclusive:
+// - If apiToken is provided (non-empty), it will be used for authentication (username/password ignored)
+// - If apiToken is empty, username and password will be used for authentication
+func NewFlashArrayClonner(hostname, username, password, apiToken string, skipSSLVerification bool, clusterPrefix string) (FlashArrayClonner, error) {
 	if clusterPrefix == "" {
 		return FlashArrayClonner{}, errors.New(helpMessage)
 	}
 
 	// Create the REST client for all operations
-	restClient, err := NewRestClient(hostname, username, password, skipSSLVerification)
+	restClient, err := NewRestClient(hostname, username, password, apiToken, skipSSLVerification)
 	if err != nil {
 		return FlashArrayClonner{}, fmt.Errorf("failed to create REST client: %w", err)
 	}

@@ -64,6 +64,7 @@ func Add(mgr manager.Manager) error {
 			Client:        mgr.GetClient(),
 			Log:           log,
 		},
+		APIReader: mgr.GetAPIReader(),
 	}
 	cnt, err := controller.New(
 		Name,
@@ -160,6 +161,7 @@ var _ reconcile.Reconciler = &Reconciler{}
 // Reconciles a Plan object.
 type Reconciler struct {
 	base.Reconciler
+	APIReader client.Reader
 }
 
 // Reconcile a Plan CR.
@@ -180,7 +182,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 
 	// Fetch the CR.
 	plan := &api.Plan{}
-	err = r.Get(context.TODO(), request.NamespacedName, plan)
+	err = r.APIReader.Get(context.TODO(), request.NamespacedName, plan)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
 			r.Log.Info("Plan deleted.")
@@ -195,6 +197,14 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	// Don't reconcile if the plan is archived.
 	if plan.Spec.Archived && plan.Status.HasCondition(Archived) {
 		r.Log.Info("Aborting reconcile of archived plan.")
+		return
+	}
+
+	// Don't reconcile succeeded plans unless they need archiving.
+	if plan.Status.HasCondition(Succeeded) && !plan.Spec.Archived {
+		r.Log.V(1).Info("Skipping reconcile of succeeded plan.", "plan", plan.Name)
+		result.RequeueAfter = 0
+		err = nil
 		return
 	}
 
