@@ -9,6 +9,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/provider/container/vsphere"
 	libcontainer "github.com/kubev2v/forklift/pkg/lib/inventory/container"
 	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
+	ec2collector "github.com/kubev2v/forklift/pkg/provider/ec2/inventory/collector"
 	core "k8s.io/api/core/v1"
 )
 
@@ -29,6 +30,8 @@ func Build(
 		return openstack.New(db, provider, secret)
 	case api.Ova:
 		return ova.New(db, provider, secret)
+	case api.EC2:
+		return ec2collector.New(db, provider, secret)
 	}
 
 	return nil
