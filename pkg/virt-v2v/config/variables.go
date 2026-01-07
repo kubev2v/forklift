@@ -36,6 +36,7 @@ const (
 const (
 	OVA     = "ova"
 	VSPHERE = "vSphere"
+	EC2     = "ec2"
 )
 
 // Disk globs

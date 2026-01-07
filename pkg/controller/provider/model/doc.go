@@ -7,6 +7,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/ova"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/ovirt"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	ec2model "github.com/kubev2v/forklift/pkg/provider/ec2/inventory/model"
 )
 
 // All models.
@@ -32,6 +33,10 @@ func Models(provider *api.Provider) (all []interface{}) {
 		all = append(
 			all,
 			ova.All()...)
+	case api.EC2:
+		all = append(
+			all,
+			ec2model.All()...)
 	}
 
 	return
