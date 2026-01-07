@@ -16,8 +16,11 @@ github.com/beorn7/perks/quantile
 # github.com/blang/semver/v4 v4.0.0
 ## explicit; go 1.14
 github.com/blang/semver/v4
-# github.com/bytedance/sonic v1.13.2
-## explicit; go 1.17
+# github.com/bytedance/gopkg v0.1.3
+## explicit; go 1.18
+github.com/bytedance/gopkg/lang/dirtmake
+# github.com/bytedance/sonic v1.14.2
+## explicit; go 1.18
 github.com/bytedance/sonic
 github.com/bytedance/sonic/ast
 github.com/bytedance/sonic/decoder
@@ -33,6 +36,7 @@ github.com/bytedance/sonic/internal/decoder/optdec
 github.com/bytedance/sonic/internal/encoder
 github.com/bytedance/sonic/internal/encoder/alg
 github.com/bytedance/sonic/internal/encoder/ir
+github.com/bytedance/sonic/internal/encoder/prim
 github.com/bytedance/sonic/internal/encoder/vars
 github.com/bytedance/sonic/internal/encoder/vm
 github.com/bytedance/sonic/internal/encoder/x86
@@ -50,7 +54,7 @@ github.com/bytedance/sonic/internal/utils
 github.com/bytedance/sonic/option
 github.com/bytedance/sonic/unquote
 github.com/bytedance/sonic/utf8
-# github.com/bytedance/sonic/loader v0.3.0
+# github.com/bytedance/sonic/loader v0.4.0
 ## explicit; go 1.16
 github.com/bytedance/sonic/loader
 github.com/bytedance/sonic/loader/internal/abi
