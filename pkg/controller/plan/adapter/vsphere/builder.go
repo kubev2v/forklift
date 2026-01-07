@@ -945,12 +945,12 @@ func (r *Builder) sortedDisksByBusses(disks []vsphere.Disk, buses []string) []vs
 }
 
 func (r *Builder) sortedDisksAsLibvirt(disks []vsphere.Disk) []vsphere.Disk {
-	var buses = []string{container.SCSI, container.SATA, container.IDE}
+	var buses = []string{container.SCSI, container.SATA, container.IDE, container.NVME}
 	return r.sortedDisksByBusses(disks, buses)
 }
 
 func (r *Builder) sortedDisksAsVmware(disks []vsphere.Disk) []vsphere.Disk {
-	var buses = []string{container.SATA, container.IDE, container.SCSI}
+	var buses = []string{container.SATA, container.IDE, container.SCSI, container.NVME}
 	return r.sortedDisksByBusses(disks, buses)
 }
 
@@ -1381,9 +1381,12 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				labels := map[string]string{
 					"migration": string(r.Migration.UID),
 					// we need uniqness and a value which is less than 64 chars, hence using vmRef.id + disk.key
-					"vmdkKey":        fmt.Sprint(disk.Key),
-					"vmID":           vmRef.ID,
-					TemplateNAALabel: naa,
+					"vmdkKey": fmt.Sprint(disk.Key),
+					"vmID":    vmRef.ID,
+				}
+				// Only add the NAA label if it's a valid Kubernetes label value
+				if errs := k8svalidation.IsValidLabelValue(naa); len(errs) == 0 {
+					labels[TemplateNAALabel] = naa
 				}
 
 				r.Log.Info("target namespace for migration", "namespace", namespace)
