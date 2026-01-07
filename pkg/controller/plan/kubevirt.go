@@ -2098,6 +2098,47 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 		MountPath: "/etc/secret",
 	})
 
+	// Add temporary conversion storage if configured
+	if r.Plan.Spec.ConversionTempStorageClass != "" && r.Plan.Spec.ConversionTempStorageSize != "" {
+		// Use Generic Ephemeral Volume for temporary conversion storage
+		// This creates a temporary PVC that is automatically deleted with the pod
+		storageClass := r.Plan.Spec.ConversionTempStorageClass
+		// VolumeMode must be Filesystem since we mount it at /var/tmp/virt-v2v for use as a filesystem.
+		// Without this, Kubernetes may default to block mode which cannot be mounted as a filesystem.
+		volumeMode := core.PersistentVolumeFilesystem
+		volumes = append(volumes, core.Volume{
+			Name: "conversion-temp-storage",
+			VolumeSource: core.VolumeSource{
+				Ephemeral: &core.EphemeralVolumeSource{
+					VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
+						Spec: core.PersistentVolumeClaimSpec{
+							AccessModes: []core.PersistentVolumeAccessMode{
+								core.ReadWriteOnce,
+							},
+							StorageClassName: &storageClass,
+							VolumeMode:       &volumeMode,
+							Resources: core.VolumeResourceRequirements{
+								Requests: core.ResourceList{
+									core.ResourceStorage: resource.MustParse(r.Plan.Spec.ConversionTempStorageSize),
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+		volumeMounts = append(volumeMounts, core.VolumeMount{
+			Name:      "conversion-temp-storage",
+			MountPath: "/var/tmp/virt-v2v",
+		})
+		// Tell virt-v2v to use the custom scratch directory
+		environment = append(environment,
+			core.EnvVar{
+				Name:  "TMPDIR",
+				Value: "/var/tmp/virt-v2v",
+			})
+	}
+
 	if !useV2vForTransfer || r.IsCopyOffload(pvcs) {
 		environment = append(environment,
 			core.EnvVar{

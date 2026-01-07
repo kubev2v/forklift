@@ -223,6 +223,11 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		return err
 	}
 
+	// Validate conversion temp storage configuration
+	if err = r.validateConversionTempStorage(plan); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -1821,6 +1826,46 @@ func (r *Reconciler) IsValidTargetName(targetName string) error {
 	errs := k8svalidation.IsDNS1123Subdomain(targetName)
 	if len(errs) > 0 {
 		return liberr.New("Target name is not a valid k8s subdomain", "errors", errs)
+	}
+
+	return nil
+}
+
+func (r *Reconciler) validateConversionTempStorage(plan *api.Plan) error {
+	storageClass := plan.Spec.ConversionTempStorageClass
+	storageSize := plan.Spec.ConversionTempStorageSize
+
+	// If neither is set, that's fine
+	if storageClass == "" && storageSize == "" {
+		return nil
+	}
+
+	// If only one is set, that's an error
+	if storageClass == "" || storageSize == "" {
+		conversionTempStorageIncomplete := libcnd.Condition{
+			Type:     NotValid,
+			Status:   True,
+			Category: api.CategoryCritical,
+			Message:  "Both ConversionTempStorageClass and ConversionTempStorageSize must be specified together.",
+			Items:    []string{},
+		}
+		plan.Status.SetCondition(conversionTempStorageIncomplete)
+		return nil
+	}
+
+	// Validate that storageSize is a valid Kubernetes resource quantity
+	_, err := resource.ParseQuantity(storageSize)
+	if err != nil {
+		conversionTempStorageSizeInvalid := libcnd.Condition{
+			Type:     NotValid,
+			Status:   True,
+			Category: api.CategoryCritical,
+			Message:  fmt.Sprintf("ConversionTempStorageSize '%s' is not a valid Kubernetes resource quantity: %v", storageSize, err),
+			Items:    []string{},
+		}
+		plan.Status.SetCondition(conversionTempStorageSizeInvalid)
+		r.Log.Info("Conversion temp storage size is invalid", "error", err.Error(), "size", storageSize, "plan", plan.Name, "namespace", plan.Namespace)
+		return nil
 	}
 
 	return nil
