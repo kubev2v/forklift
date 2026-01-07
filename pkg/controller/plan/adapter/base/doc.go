@@ -227,8 +227,6 @@ type Validator interface {
 	PowerState(vmRef ref.Ref) (bool, error)
 	// Validate that the VM is inherently compatible with the migration type.
 	VMMigrationType(vmRef ref.Ref) (bool, error)
-	// Validate that the VM disks are supported.
-	UnSupportedDisks(vmRef ref.Ref) ([]string, error)
 	// Validate that the VM disks have valid sizes (> 0).
 	InvalidDiskSizes(vmRef ref.Ref) ([]string, error)
 	// Validate that the VM MAC addresses don't conflict with existing destination VMs.
