@@ -282,27 +282,6 @@ func (r *Validator) findRunningVms(vms []model.VM) []string {
 	return resp
 }
 
-func (r *Validator) UnSupportedDisks(vmRef ref.Ref) ([]string, error) {
-	vm := &model.VM{}
-	err := r.Source.Inventory.Find(vm, vmRef)
-	if err != nil {
-		return nil, liberr.Wrap(err, "vm", vmRef)
-	}
-
-	unsupported := []string{}
-	unsupportedBuses := map[string]bool{
-		"nvme": true,
-	}
-
-	for _, disk := range vm.Disks {
-		if unsupportedBuses[disk.Bus] {
-			unsupported = append(unsupported, disk.Bus)
-		}
-	}
-
-	return unsupported, nil
-}
-
 func (r *Validator) InvalidDiskSizes(vmRef ref.Ref) ([]string, error) {
 	vm := &model.VM{}
 	err := r.Source.Inventory.Find(vm, vmRef)

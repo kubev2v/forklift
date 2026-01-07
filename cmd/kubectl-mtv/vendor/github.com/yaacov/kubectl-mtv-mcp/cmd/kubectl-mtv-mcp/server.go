@@ -14,7 +14,8 @@ func CreateReadServer() *mcp.Server {
 	// Register read-only tools
 	mcp.AddTool(server, tools.GetListResourcesTool(), tools.HandleListResources)
 	mcp.AddTool(server, tools.GetListInventoryTool(), tools.HandleListInventory)
-	mcp.AddTool(server, tools.GetGetLogsTool(), tools.HandleGetLogs)
+	mcp.AddTool(server, tools.GetQueryPodsTool(), tools.HandleQueryPods)
+	mcp.AddTool(server, tools.GetQueryLogsTool(), tools.HandleQueryLogs)
 	mcp.AddTool(server, tools.GetGetMigrationStorageTool(), tools.HandleGetMigrationStorage)
 	mcp.AddTool(server, tools.GetGetPlanVmsTool(), tools.HandleGetPlanVms)
 
