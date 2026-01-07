@@ -63,7 +63,7 @@ spec:
                 type: string
                 enum: ["true", "false"]
                 description: "Enable OCP live migration (default: false)"
-              feature_ovf_appliance_management:
+              feature_ova_appliance_management:
                 type: string
                 enum: [ "true", "false" ]
                 description: "Enable OVF-based appliance management endpoints (OVA, HyperV)  (default: false)"

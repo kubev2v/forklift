@@ -131,12 +131,6 @@ func (r *Builder) PersistentVolume(provider *api.Provider, secret *core.Secret) 
 				},
 			},
 			PersistentVolumeReclaimPolicy: core.PersistentVolumeReclaimRetain,
-			// Mount options enforce read-only permissions at the SMB mount level.
-			// Ownership (uid/gid) is handled by pod security context
-			MountOptions: []string{
-				"dir_mode=0555",
-				"file_mode=0444",
-			},
 		},
 	}
 	return

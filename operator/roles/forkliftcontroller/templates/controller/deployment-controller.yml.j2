@@ -262,7 +262,7 @@ spec:
           value: {{ ova_provider_server_fqin }}
         - name: HYPERV_PROVIDER_SERVER_IMAGE
           value: {{ hyperv_provider_server_fqin }}
-{% if feature_ovf_appliance_management|bool %}
+{% if feature_ova_appliance_management|bool %}
         - name: FEATURE_OVF_APPLIANCE_MANAGEMENT
           value: "true"
 {% endif %}

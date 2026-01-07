@@ -3396,10 +3396,6 @@ func (r *KubeVirt) BuildPVForSMB(vm *plan.VMStatus) (pv *core.PersistentVolume) 
 					},
 				},
 			},
-			MountOptions: []string{
-				"dir_mode=0555",
-				"file_mode=0444",
-			},
 		},
 	}
 	return

@@ -101,7 +101,7 @@ spec:
         - urn:alm:descriptor:com.tectonic.ui:radio:false
       - description: Enable OVA appliance management endpoints (default false)
         displayName: Enable OVA Appliance Management
-        path: feature_ovf_appliance_management
+        path: feature_ova_appliance_management
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:radio:true
         - urn:alm:descriptor:com.tectonic.ui:radio:false
