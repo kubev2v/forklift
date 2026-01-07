@@ -77,7 +77,6 @@ const (
 	Deleted                         = "Deleted"
 	Paused                          = "Paused"
 	Archived                        = "Archived"
-	UnsupportedDisks                = "UnsupportedDisks"
 	InvalidDiskSizes                = "InvalidDiskSizes"
 	MacConflicts                    = "MacConflicts"
 	MissingPvcForOnlyConversion     = "MissingPvcForOnlyConversion"
@@ -712,12 +711,12 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "VM is incompatible with the selected migration type.",
 		Items:    []string{},
 	}
-	unsupportedDisks := libcnd.Condition{
-		Type:     UnsupportedDisks,
+	guestToolsIssue := libcnd.Condition{
+		Type:     GuestToolsIssue,
 		Status:   True,
-		Reason:   NotSupported,
+		Reason:   NotValid,
 		Category: api.CategoryCritical,
-		Message:  "%s disks are not supported for migration.",
+		Message:  "VMware Tools issues detected. This may impact migration performance, guest OS detection, and network configuration. Ensure VMware Tools are properly installed and running before migration. If this is an encrypted VM, please turn the VM off manually before migration.",
 		Items:    []string{},
 	}
 	invalidDiskSizes := libcnd.Condition{
@@ -920,20 +919,14 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		if vm.LUKS.Name != "" && vm.NbdeClevis {
 			luksAndClevisIncompatibility.Items = append(luksAndClevisIncompatibility.Items, ref.String())
 		}
-		unsupported, err := validator.UnSupportedDisks(*ref)
+		// Guest tools validation (provider-specific)
+		ok, err = validator.GuestToolsInstalled(*ref)
 		if err != nil {
 			return err
 		}
-		if len(unsupported) > 0 {
-			unsupportedDisks.Items = append(unsupportedDisks.Items, ref.String())
-
-			// Append detailed message
-			unsupportedDisks.Message = fmt.Sprintf(
-				unsupportedDisks.Message,
-				strings.ToUpper(strings.Join(unsupported, ", ")),
-			)
+		if !ok {
+			guestToolsIssue.Items = append(guestToolsIssue.Items, ref.String())
 		}
-
 		invalidSizes, err := validator.InvalidDiskSizes(*ref)
 		if err != nil {
 			return err
@@ -1149,8 +1142,8 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	if len(vmMigrationTypeUnsupported.Items) > 0 {
 		plan.Status.SetCondition(vmMigrationTypeUnsupported)
 	}
-	if len(unsupportedDisks.Items) > 0 {
-		plan.Status.SetCondition(unsupportedDisks)
+	if len(guestToolsIssue.Items) > 0 {
+		plan.Status.SetCondition(guestToolsIssue)
 	}
 	if len(invalidDiskSizes.Items) > 0 {
 		plan.Status.SetCondition(invalidDiskSizes)
