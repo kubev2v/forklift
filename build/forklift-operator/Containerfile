@@ -1,6 +1,9 @@
 FROM quay.io/operator-framework/ansible-operator:main
 
 USER root
+# SECURITY: Fix CVE-2025-66418 in urllib3
+RUN pip3 install --upgrade 'urllib3>=2.6.0' 'brotli>=1.2.0' && pip3 cache purge
+
 # RUN dnf -y update && dnf clean all
 # RUN rm -rf /var/cache/yum /var/cache/dnf
 # Trying to overcome the bug within OCP4.15 and k8s collections (https://issues.redhat.com/browse/MTV-947)
