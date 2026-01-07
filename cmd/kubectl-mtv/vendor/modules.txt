@@ -95,7 +95,7 @@ github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8
 # github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 ## explicit
 github.com/kballard/go-shellquote
-# github.com/kubev2v/forklift v0.0.0-20260105102741-cb6683549bb8 => ../../
+# github.com/kubev2v/forklift v0.0.0-20260107115151-44b2ef7770b9 => ../../
 ## explicit; go 1.24.0
 github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1
 github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan
