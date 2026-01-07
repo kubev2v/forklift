@@ -945,12 +945,12 @@ func (r *Builder) sortedDisksByBusses(disks []vsphere.Disk, buses []string) []vs
 }
 
 func (r *Builder) sortedDisksAsLibvirt(disks []vsphere.Disk) []vsphere.Disk {
-	var buses = []string{container.SCSI, container.SATA, container.IDE}
+	var buses = []string{container.SCSI, container.NVME, container.SATA, container.IDE}
 	return r.sortedDisksByBusses(disks, buses)
 }
 
 func (r *Builder) sortedDisksAsVmware(disks []vsphere.Disk) []vsphere.Disk {
-	var buses = []string{container.SATA, container.IDE, container.SCSI}
+	var buses = []string{container.SATA, container.NVME, container.IDE, container.SCSI}
 	return r.sortedDisksByBusses(disks, buses)
 }
 
