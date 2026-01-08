@@ -72,6 +72,11 @@ func (r *Validator) UdnStaticIPs(vmRef ref.Ref, client client.Client) (ok bool, 
 	return true, nil
 }
 
+// NOOP
+func (r *Validator) UnSupportedDisks(vmRef ref.Ref) ([]string, error) {
+	return []string{}, nil
+}
+
 func (r *Validator) InvalidDiskSizes(vmRef ref.Ref) ([]string, error) {
 	vm := &model.Workload{}
 	err := r.Source.Inventory.Find(vm, vmRef)
