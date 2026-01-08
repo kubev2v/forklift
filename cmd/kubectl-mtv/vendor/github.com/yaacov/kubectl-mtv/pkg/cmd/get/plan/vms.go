@@ -3,7 +3,6 @@ package plan
 import (
 	"context"
 	"fmt"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -53,7 +52,7 @@ func ListVMs(ctx context.Context, configFlags *genericclioptions.ConfigFlags, na
 	if watchMode {
 		return watch.Watch(func() error {
 			return listVMsOnce(ctx, configFlags, name, namespace)
-		}, 20*time.Second)
+		}, watch.DefaultInterval)
 	}
 
 	return listVMsOnce(ctx, configFlags, name, namespace)

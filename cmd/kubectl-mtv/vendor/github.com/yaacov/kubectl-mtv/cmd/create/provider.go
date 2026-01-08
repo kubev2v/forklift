@@ -30,6 +30,11 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 	// OpenStack specific flags
 	var domainName, projectName, regionName string
 
+	// EC2 specific flags
+	var ec2Region, ec2TargetRegion, ec2TargetAZ string
+	var ec2TargetAccessKeyID, ec2TargetSecretKey string
+	var autoTargetCredentials bool
+
 	// Check if MTV_VDDK_INIT_IMAGE environment variable is set
 	if envVddkInitImage := os.Getenv("MTV_VDDK_INIT_IMAGE"); envVddkInitImage != "" {
 		vddkInitImage = envVddkInitImage
@@ -40,6 +45,20 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 		Short:        "Create a new provider",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			// Fetch dynamic provider types from the cluster
+			dynamicTypes, err := client.GetDynamicProviderTypes(kubeConfigFlags)
+			if err != nil {
+				// Log the error but don't fail - we can still work with static types
+				// This allows the command to work even if there are cluster connectivity issues
+				// as long as the user is using a static provider type
+				cmd.PrintErrf("Warning: failed to fetch dynamic provider types: %v\n", err)
+			} else {
+				// Set the dynamic types in the flag
+				providerType.SetDynamicTypes(dynamicTypes)
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get name from positional argument
 			name := args[0]
@@ -59,11 +78,12 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 
 			return provider.Create(kubeConfigFlags, providerType.GetValue(), name, namespace, secret,
 				url, username, password, cacert, insecureSkipTLS, vddkInitImage, sdkEndpointType.GetValue(), token,
-				domainName, projectName, regionName, useVddkAioOptimization, vddkBufSizeIn64K, vddkBufCount)
+				domainName, projectName, regionName, useVddkAioOptimization, vddkBufSizeIn64K, vddkBufCount,
+				ec2Region, ec2TargetRegion, ec2TargetAZ, ec2TargetAccessKeyID, ec2TargetSecretKey, autoTargetCredentials)
 		},
 	}
 
-	cmd.Flags().VarP(providerType, "type", "t", "Provider type (openshift, vsphere, ovirt, openstack, ova)")
+	cmd.Flags().VarP(providerType, "type", "t", "Provider type (openshift, vsphere, ovirt, openstack, ova, ec2)")
 	cmd.Flags().StringVar(&secret, "secret", "", "Secret containing provider credentials")
 
 	// Provider credential flags
@@ -87,6 +107,15 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 	cmd.Flags().StringVar(&domainName, "provider-domain-name", "", "OpenStack domain name")
 	cmd.Flags().StringVar(&projectName, "provider-project-name", "", "OpenStack project name")
 	cmd.Flags().StringVar(&regionName, "provider-region-name", "", "OpenStack region name")
+	cmd.Flags().StringVar(&regionName, "region", "", "Region name (alias for --provider-region-name, also used for EC2)")
+
+	// EC2 specific flags
+	cmd.Flags().StringVar(&ec2Region, "ec2-region", "", "EC2 region (required for EC2 provider)")
+	cmd.Flags().StringVar(&ec2TargetRegion, "target-region", "", "EC2 target region for migrations (defaults to provider region)")
+	cmd.Flags().StringVar(&ec2TargetAZ, "target-az", "", "EC2 target availability zone for migrations (defaults to target-region + 'a')")
+	cmd.Flags().StringVar(&ec2TargetAccessKeyID, "target-access-key-id", "", "Target AWS account access key ID (for cross-account migrations)")
+	cmd.Flags().StringVar(&ec2TargetSecretKey, "target-secret-access-key", "", "Target AWS account secret access key (for cross-account migrations)")
+	cmd.Flags().BoolVar(&autoTargetCredentials, "auto-target-credentials", false, "Automatically fetch target AWS credentials from cluster (kube-system/aws-creds) and target-az from worker nodes")
 
 	// Add completion for provider type flag
 	if err := cmd.RegisterFlagCompletionFunc("type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

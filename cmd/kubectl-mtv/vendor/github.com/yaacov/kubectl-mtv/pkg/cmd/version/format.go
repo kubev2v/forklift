@@ -51,7 +51,11 @@ func (info Info) formatTable() string {
 
 	// Inventory information - combine URL and status
 	if info.InventoryStatus == "available" {
-		output += fmt.Sprintf("MTV Inventory: %s\n", info.InventoryURL)
+		if info.InventoryInsecure {
+			output += fmt.Sprintf("MTV Inventory: %s (insecure)\n", info.InventoryURL)
+		} else {
+			output += fmt.Sprintf("MTV Inventory: %s\n", info.InventoryURL)
+		}
 	} else {
 		output += fmt.Sprintf("MTV Inventory: %s\n", info.InventoryStatus)
 	}

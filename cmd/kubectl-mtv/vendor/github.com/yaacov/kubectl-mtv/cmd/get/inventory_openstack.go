@@ -14,8 +14,7 @@ import (
 )
 
 // NewInventoryInstanceCmd creates the get inventory instance command
-func NewInventoryInstanceCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() GlobalConfigGetter) *cobra.Command {
-	var inventoryURL string
+func NewInventoryInstanceCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	outputFormatFlag := flags.NewOutputFormatTypeFlag()
 	var query string
 	var watch bool
@@ -36,21 +35,19 @@ func NewInventoryInstanceCmd(kubeConfigFlags *genericclioptions.ConfigFlags, get
 			}
 
 			provider := args[0]
-			config := getGlobalConfig()
-			namespace := client.ResolveNamespaceWithAllFlag(config.GetKubeConfigFlags(), config.GetAllNamespaces())
 
-			logNamespaceOperation("Getting instances from provider", namespace, config.GetAllNamespaces())
+			namespace := client.ResolveNamespaceWithAllFlag(globalConfig.GetKubeConfigFlags(), globalConfig.GetAllNamespaces())
+
+			logNamespaceOperation("Getting instances from provider", namespace, globalConfig.GetAllNamespaces())
 			logOutputFormat(outputFormatFlag.GetValue())
 
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(ctx, config.GetKubeConfigFlags(), namespace)
-			}
+			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
+			inventoryURL := globalConfig.GetInventoryURL()
+			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
-			return inventory.ListInstances(ctx, config.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch)
+			return inventory.ListInstancesWithInsecure(ctx, globalConfig.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch, inventoryInsecureSkipTLS)
 		},
 	}
-
-	cmd.Flags().StringVar(&inventoryURL, "inventory-url", "", "Inventory service URL")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", "Output format (table, json, yaml)")
 	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
@@ -66,8 +63,7 @@ func NewInventoryInstanceCmd(kubeConfigFlags *genericclioptions.ConfigFlags, get
 }
 
 // NewInventoryImageCmd creates the get inventory image command
-func NewInventoryImageCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() GlobalConfigGetter) *cobra.Command {
-	var inventoryURL string
+func NewInventoryImageCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	outputFormatFlag := flags.NewOutputFormatTypeFlag()
 	var query string
 	var watch bool
@@ -88,21 +84,19 @@ func NewInventoryImageCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlo
 			}
 
 			provider := args[0]
-			config := getGlobalConfig()
-			namespace := client.ResolveNamespaceWithAllFlag(config.GetKubeConfigFlags(), config.GetAllNamespaces())
 
-			logNamespaceOperation("Getting images from provider", namespace, config.GetAllNamespaces())
+			namespace := client.ResolveNamespaceWithAllFlag(globalConfig.GetKubeConfigFlags(), globalConfig.GetAllNamespaces())
+
+			logNamespaceOperation("Getting images from provider", namespace, globalConfig.GetAllNamespaces())
 			logOutputFormat(outputFormatFlag.GetValue())
 
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(ctx, config.GetKubeConfigFlags(), namespace)
-			}
+			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
+			inventoryURL := globalConfig.GetInventoryURL()
+			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
-			return inventory.ListImages(ctx, config.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch)
+			return inventory.ListImagesWithInsecure(ctx, globalConfig.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch, inventoryInsecureSkipTLS)
 		},
 	}
-
-	cmd.Flags().StringVar(&inventoryURL, "inventory-url", "", "Inventory service URL")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", "Output format (table, json, yaml)")
 	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
@@ -118,8 +112,7 @@ func NewInventoryImageCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlo
 }
 
 // NewInventoryFlavorCmd creates the get inventory flavor command
-func NewInventoryFlavorCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() GlobalConfigGetter) *cobra.Command {
-	var inventoryURL string
+func NewInventoryFlavorCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	outputFormatFlag := flags.NewOutputFormatTypeFlag()
 	var query string
 	var watch bool
@@ -140,21 +133,19 @@ func NewInventoryFlavorCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGl
 			}
 
 			provider := args[0]
-			config := getGlobalConfig()
-			namespace := client.ResolveNamespaceWithAllFlag(config.GetKubeConfigFlags(), config.GetAllNamespaces())
 
-			logNamespaceOperation("Getting flavors from provider", namespace, config.GetAllNamespaces())
+			namespace := client.ResolveNamespaceWithAllFlag(globalConfig.GetKubeConfigFlags(), globalConfig.GetAllNamespaces())
+
+			logNamespaceOperation("Getting flavors from provider", namespace, globalConfig.GetAllNamespaces())
 			logOutputFormat(outputFormatFlag.GetValue())
 
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(ctx, config.GetKubeConfigFlags(), namespace)
-			}
+			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
+			inventoryURL := globalConfig.GetInventoryURL()
+			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
-			return inventory.ListFlavors(ctx, config.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch)
+			return inventory.ListFlavorsWithInsecure(ctx, globalConfig.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch, inventoryInsecureSkipTLS)
 		},
 	}
-
-	cmd.Flags().StringVar(&inventoryURL, "inventory-url", "", "Inventory service URL")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", "Output format (table, json, yaml)")
 	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
@@ -170,8 +161,7 @@ func NewInventoryFlavorCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGl
 }
 
 // NewInventoryProjectCmd creates the get inventory project command
-func NewInventoryProjectCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() GlobalConfigGetter) *cobra.Command {
-	var inventoryURL string
+func NewInventoryProjectCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	outputFormatFlag := flags.NewOutputFormatTypeFlag()
 	var query string
 	var watch bool
@@ -192,21 +182,19 @@ func NewInventoryProjectCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getG
 			}
 
 			provider := args[0]
-			config := getGlobalConfig()
-			namespace := client.ResolveNamespaceWithAllFlag(config.GetKubeConfigFlags(), config.GetAllNamespaces())
 
-			logNamespaceOperation("Getting projects from provider", namespace, config.GetAllNamespaces())
+			namespace := client.ResolveNamespaceWithAllFlag(globalConfig.GetKubeConfigFlags(), globalConfig.GetAllNamespaces())
+
+			logNamespaceOperation("Getting projects from provider", namespace, globalConfig.GetAllNamespaces())
 			logOutputFormat(outputFormatFlag.GetValue())
 
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(ctx, config.GetKubeConfigFlags(), namespace)
-			}
+			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
+			inventoryURL := globalConfig.GetInventoryURL()
+			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
-			return inventory.ListProjects(ctx, config.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch)
+			return inventory.ListProjectsWithInsecure(ctx, globalConfig.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch, inventoryInsecureSkipTLS)
 		},
 	}
-
-	cmd.Flags().StringVar(&inventoryURL, "inventory-url", "", "Inventory service URL")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", "Output format (table, json, yaml)")
 	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
@@ -222,8 +210,7 @@ func NewInventoryProjectCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getG
 }
 
 // NewInventoryVolumeCmd creates the get inventory volume command
-func NewInventoryVolumeCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() GlobalConfigGetter) *cobra.Command {
-	var inventoryURL string
+func NewInventoryVolumeCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	outputFormatFlag := flags.NewOutputFormatTypeFlag()
 	var query string
 	var watch bool
@@ -244,21 +231,19 @@ func NewInventoryVolumeCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGl
 			}
 
 			provider := args[0]
-			config := getGlobalConfig()
-			namespace := client.ResolveNamespaceWithAllFlag(config.GetKubeConfigFlags(), config.GetAllNamespaces())
 
-			logNamespaceOperation("Getting volumes from provider", namespace, config.GetAllNamespaces())
+			namespace := client.ResolveNamespaceWithAllFlag(globalConfig.GetKubeConfigFlags(), globalConfig.GetAllNamespaces())
+
+			logNamespaceOperation("Getting volumes from provider", namespace, globalConfig.GetAllNamespaces())
 			logOutputFormat(outputFormatFlag.GetValue())
 
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(ctx, config.GetKubeConfigFlags(), namespace)
-			}
+			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
+			inventoryURL := globalConfig.GetInventoryURL()
+			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
-			return inventory.ListVolumes(ctx, config.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch)
+			return inventory.ListVolumesWithInsecure(ctx, globalConfig.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch, inventoryInsecureSkipTLS)
 		},
 	}
-
-	cmd.Flags().StringVar(&inventoryURL, "inventory-url", "", "Inventory service URL")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", "Output format (table, json, yaml)")
 	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
@@ -274,8 +259,7 @@ func NewInventoryVolumeCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGl
 }
 
 // NewInventoryVolumeTypeCmd creates the get inventory volumetype command
-func NewInventoryVolumeTypeCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() GlobalConfigGetter) *cobra.Command {
-	var inventoryURL string
+func NewInventoryVolumeTypeCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	outputFormatFlag := flags.NewOutputFormatTypeFlag()
 	var query string
 	var watch bool
@@ -296,21 +280,19 @@ func NewInventoryVolumeTypeCmd(kubeConfigFlags *genericclioptions.ConfigFlags, g
 			}
 
 			provider := args[0]
-			config := getGlobalConfig()
-			namespace := client.ResolveNamespaceWithAllFlag(config.GetKubeConfigFlags(), config.GetAllNamespaces())
 
-			logNamespaceOperation("Getting volume types from provider", namespace, config.GetAllNamespaces())
+			namespace := client.ResolveNamespaceWithAllFlag(globalConfig.GetKubeConfigFlags(), globalConfig.GetAllNamespaces())
+
+			logNamespaceOperation("Getting volume types from provider", namespace, globalConfig.GetAllNamespaces())
 			logOutputFormat(outputFormatFlag.GetValue())
 
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(ctx, config.GetKubeConfigFlags(), namespace)
-			}
+			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
+			inventoryURL := globalConfig.GetInventoryURL()
+			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
-			return inventory.ListVolumeTypes(ctx, config.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch)
+			return inventory.ListVolumeTypesWithInsecure(ctx, globalConfig.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch, inventoryInsecureSkipTLS)
 		},
 	}
-
-	cmd.Flags().StringVar(&inventoryURL, "inventory-url", "", "Inventory service URL")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", "Output format (table, json, yaml)")
 	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
@@ -326,8 +308,7 @@ func NewInventoryVolumeTypeCmd(kubeConfigFlags *genericclioptions.ConfigFlags, g
 }
 
 // NewInventorySnapshotCmd creates the get inventory snapshot command
-func NewInventorySnapshotCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() GlobalConfigGetter) *cobra.Command {
-	var inventoryURL string
+func NewInventorySnapshotCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	outputFormatFlag := flags.NewOutputFormatTypeFlag()
 	var query string
 	var watch bool
@@ -348,21 +329,19 @@ func NewInventorySnapshotCmd(kubeConfigFlags *genericclioptions.ConfigFlags, get
 			}
 
 			provider := args[0]
-			config := getGlobalConfig()
-			namespace := client.ResolveNamespaceWithAllFlag(config.GetKubeConfigFlags(), config.GetAllNamespaces())
 
-			logNamespaceOperation("Getting snapshots from provider", namespace, config.GetAllNamespaces())
+			namespace := client.ResolveNamespaceWithAllFlag(globalConfig.GetKubeConfigFlags(), globalConfig.GetAllNamespaces())
+
+			logNamespaceOperation("Getting snapshots from provider", namespace, globalConfig.GetAllNamespaces())
 			logOutputFormat(outputFormatFlag.GetValue())
 
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(ctx, config.GetKubeConfigFlags(), namespace)
-			}
+			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
+			inventoryURL := globalConfig.GetInventoryURL()
+			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
-			return inventory.ListSnapshots(ctx, config.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch)
+			return inventory.ListSnapshotsWithInsecure(ctx, globalConfig.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch, inventoryInsecureSkipTLS)
 		},
 	}
-
-	cmd.Flags().StringVar(&inventoryURL, "inventory-url", "", "Inventory service URL")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", "Output format (table, json, yaml)")
 	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
@@ -378,8 +357,7 @@ func NewInventorySnapshotCmd(kubeConfigFlags *genericclioptions.ConfigFlags, get
 }
 
 // NewInventorySubnetCmd creates the get inventory subnet command
-func NewInventorySubnetCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() GlobalConfigGetter) *cobra.Command {
-	var inventoryURL string
+func NewInventorySubnetCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	outputFormatFlag := flags.NewOutputFormatTypeFlag()
 	var query string
 	var watch bool
@@ -400,21 +378,19 @@ func NewInventorySubnetCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGl
 			}
 
 			provider := args[0]
-			config := getGlobalConfig()
-			namespace := client.ResolveNamespaceWithAllFlag(config.GetKubeConfigFlags(), config.GetAllNamespaces())
 
-			logNamespaceOperation("Getting subnets from provider", namespace, config.GetAllNamespaces())
+			namespace := client.ResolveNamespaceWithAllFlag(globalConfig.GetKubeConfigFlags(), globalConfig.GetAllNamespaces())
+
+			logNamespaceOperation("Getting subnets from provider", namespace, globalConfig.GetAllNamespaces())
 			logOutputFormat(outputFormatFlag.GetValue())
 
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(ctx, config.GetKubeConfigFlags(), namespace)
-			}
+			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
+			inventoryURL := globalConfig.GetInventoryURL()
+			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
-			return inventory.ListSubnets(ctx, config.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch)
+			return inventory.ListSubnetsWithInsecure(ctx, globalConfig.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch, inventoryInsecureSkipTLS)
 		},
 	}
-
-	cmd.Flags().StringVar(&inventoryURL, "inventory-url", "", "Inventory service URL")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", "Output format (table, json, yaml)")
 	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")

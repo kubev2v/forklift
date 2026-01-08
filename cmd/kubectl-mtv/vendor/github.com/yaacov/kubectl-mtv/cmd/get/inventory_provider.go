@@ -14,8 +14,7 @@ import (
 )
 
 // NewInventoryProviderCmd creates the get inventory provider command
-func NewInventoryProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() GlobalConfigGetter) *cobra.Command {
-	var inventoryURL string
+func NewInventoryProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	outputFormatFlag := flags.NewOutputFormatTypeFlag()
 	var query string
 	var watch bool
@@ -40,25 +39,22 @@ func NewInventoryProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags, get
 				providerName = args[0]
 			}
 
-			config := getGlobalConfig()
-			namespace := client.ResolveNamespaceWithAllFlag(config.GetKubeConfigFlags(), config.GetAllNamespaces())
+			namespace := client.ResolveNamespaceWithAllFlag(globalConfig.GetKubeConfigFlags(), globalConfig.GetAllNamespaces())
 
 			if providerName != "" {
-				logNamespaceOperation("Getting inventory from provider", namespace, config.GetAllNamespaces())
+				logNamespaceOperation("Getting inventory from provider", namespace, globalConfig.GetAllNamespaces())
 			} else {
-				logNamespaceOperation("Getting inventory from all providers", namespace, config.GetAllNamespaces())
+				logNamespaceOperation("Getting inventory from all providers", namespace, globalConfig.GetAllNamespaces())
 			}
 			logOutputFormat(outputFormatFlag.GetValue())
 
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(ctx, config.GetKubeConfigFlags(), namespace)
-			}
+			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
+			inventoryURL := globalConfig.GetInventoryURL()
+			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
-			return inventory.ListProviders(ctx, config.GetKubeConfigFlags(), providerName, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch)
+			return inventory.ListProvidersWithInsecure(ctx, globalConfig.GetKubeConfigFlags(), providerName, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch, inventoryInsecureSkipTLS)
 		},
 	}
-
-	cmd.Flags().StringVar(&inventoryURL, "inventory-url", "", "Inventory service URL")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", "Output format (table, json, yaml)")
 	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")

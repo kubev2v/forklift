@@ -11,7 +11,7 @@ import (
 )
 
 // NewHookCmd creates the hook description command
-func NewHookCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() get.GlobalConfigGetter) *cobra.Command {
+func NewHookCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig get.GlobalConfigGetter) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "hook NAME",
 		Short:             "Describe a migration hook",
@@ -23,11 +23,10 @@ func NewHookCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig 
 			name := args[0]
 
 			// Get the global configuration
-			config := getGlobalConfig()
 
 			// Resolve the appropriate namespace based on context and flags
-			namespace := client.ResolveNamespace(config.GetKubeConfigFlags())
-			return hook.Describe(config.GetKubeConfigFlags(), name, namespace, config.GetUseUTC())
+			namespace := client.ResolveNamespace(globalConfig.GetKubeConfigFlags())
+			return hook.Describe(globalConfig.GetKubeConfigFlags(), name, namespace, globalConfig.GetUseUTC())
 		},
 	}
 
