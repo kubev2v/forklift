@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi8/go-toolset:1.24.4-1752591614 AS builder
+FROM registry.redhat.io/ubi8/go-toolset:1.25.3-1766363546 AS builder
 USER 0
 ENV GOPATH=$APP_ROOT
 WORKDIR /app

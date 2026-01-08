@@ -1,5 +1,5 @@
 // © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
+// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 package simulator
@@ -44,6 +44,11 @@ var refValueMap = map[string]string{
 // Map returns simulator.Context.Map from the given ctx
 func Map(ctx context.Context) *Registry {
 	return ctx.(*Context).Map
+}
+
+// ServiceFromContext returns the simulator Service from the given ctx
+func ServiceFromContext(ctx context.Context) *Service {
+	return ctx.(*Context).svc
 }
 
 // RegisterObject interface supports callbacks when objects are created, updated and deleted from the Registry

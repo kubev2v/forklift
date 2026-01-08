@@ -21,8 +21,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	// ServiceImportPluralName is the plural name of ServiceImport
+	ServiceImportPluralName = "serviceimports"
+	// ServiceImportKindName is the kind name of ServiceImport
+	ServiceImportKindName = "ServiceImport"
+	// ServiceImportFullName is the full name of ServiceImport
+	ServiceImportFullName = ServiceImportPluralName + "." + GroupName
+)
+
+// ServiceImportVersionedName is the versioned name of ServiceImport
+var ServiceImportVersionedName = ServiceImportKindName + "/" + GroupVersion.Version
+
 // +genclient
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:shortName={svcim,svcimport}
 
 // ServiceImport describes a service imported from clusters in a ClusterSet.
 type ServiceImport struct {
@@ -53,7 +66,7 @@ type ServiceImportSpec struct {
 	// +listType=atomic
 	Ports []ServicePort `json:"ports"`
 	// ip will be used as the VIP for this service when type is ClusterSetIP.
-	// +kubebuilder:validation:MaxItems:=1
+	// +kubebuilder:validation:MaxItems:=2
 	// +optional
 	IPs []string `json:"ips,omitempty"`
 	// type defines the type of this service.
@@ -89,10 +102,17 @@ type ServicePort struct {
 	Protocol v1.Protocol `json:"protocol,omitempty"`
 
 	// The application protocol for this port.
+	// This is used as a hint for implementations to offer richer behavior for protocols that they understand.
 	// This field follows standard Kubernetes label syntax.
-	// Un-prefixed names are reserved for IANA standard service names (as per
-	// RFC-6335 and http://www.iana.org/assignments/service-names).
-	// Non-standard protocols should use prefixed names such as
+	// Valid values are either:
+	//
+	// * Un-prefixed protocol names - reserved for IANA standard service names (as per
+	// RFC-6335 and https://www.iana.org/assignments/service-names).
+	//
+	// * Kubernetes-defined prefixed names:
+	//   * 'kubernetes.io/h2c' - HTTP/2 over cleartext as described in https://www.rfc-editor.org/rfc/rfc7540
+	//
+	// * Other protocols should use implementation-defined prefixed names such as
 	// mycompany.com/my-custom-protocol.
 	// Field can be enabled with ServiceAppProtocol feature gate.
 	// +optional
@@ -112,6 +132,12 @@ type ServiceImportStatus struct {
 	// +listType=map
 	// +listMapKey=cluster
 	Clusters []ClusterStatus `json:"clusters,omitempty"`
+	// +optional
+	// +patchStrategy=merge
+	// +patchMergeKey=type
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 // ClusterStatus contains service configuration mapped to a specific source cluster
@@ -133,3 +159,59 @@ type ServiceImportList struct {
 	// +listType=set
 	Items []ServiceImport `json:"items"`
 }
+
+// ServiceImportConditionType is a type of condition associated with a
+// ServiceImport. This type should be used with the ServiceImportStatus.Conditions
+// field.
+type ServiceImportConditionType string
+
+// ServiceImportConditionReason defines the set of reasons that explain why a
+// particular ServiceImport condition type has been raised.
+type ServiceImportConditionReason string
+
+// NewServiceImportCondition creates a new ServiceImport condition
+func NewServiceImportCondition(t ServiceImportConditionType, status metav1.ConditionStatus, reason ServiceImportConditionReason, msg string) metav1.Condition {
+	return metav1.Condition{
+		Type:               string(t),
+		Status:             status,
+		Reason:             string(reason),
+		Message:            msg,
+		LastTransitionTime: metav1.Now(),
+	}
+}
+
+const (
+	// ServiceImportConditionReady is true when the Service Import is ready.
+	//
+	//
+	// Possible reasons for this condition to be true are:
+	//
+	// * "Ready"
+	//
+	// Possible reasons for this condition to be False are:
+	//
+	// * "Pending"
+	// * "IPFamilyNotSupported"
+	//
+	// Possible reasons for this condition to be Unknown are:
+	//
+	// * "Pending"
+	//
+	// Controllers may raise this condition with other reasons,
+	// but should prefer to use the reasons listed above to improve
+	// interoperability.
+	ServiceImportConditionReady ServiceImportConditionType = "Ready"
+
+	// ServiceImportReasonReady is used with the "Ready" condition when the
+	// condition is True.
+	ServiceImportReasonReady ServiceImportConditionReason = "Ready"
+
+	// ServiceImportReasonPending is used with the "Ready" condition when
+	// the ServiceImport is in the process of being created or updated.
+	ServiceImportReasonPending ServiceImportConditionReason = "Pending"
+
+	// ServiceImportReasonIPFamilyNotSupported is used with the "Ready"
+	// condition when the service can not be imported due to IP families
+	// mismatch.
+	ServiceImportReasonIPFamilyNotSupported ServiceImportConditionReason = "IPFamilyNotSupported"
+)
