@@ -11,6 +11,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+var activePlanStatuses = make(map[string]struct{})
+
 // Calculate Plans metrics every 10 seconds
 func RecordPlanMetrics(c client.Client) {
 	go func() {
@@ -96,6 +98,15 @@ func RecordPlanMetrics(c client.Client) {
 			for key, value := range plansCounterMap {
 				parts := strings.Split(key, "|")
 				planStatusGauge.With(prometheus.Labels{"status": parts[0], "provider": parts[1], "mode": parts[2], "target": parts[3]}).Set(value)
+				activePlanStatuses[key] = struct{}{}
+			}
+
+			for planStatus := range activePlanStatuses {
+				if _, exists := plansCounterMap[planStatus]; !exists {
+					parts := strings.Split(planStatus, "|")
+					planStatusGauge.With(prometheus.Labels{"status": parts[0], "provider": parts[1], "mode": parts[2], "target": parts[3]}).Set(0)
+					delete(activePlanStatuses, planStatus)
+				}
 			}
 		}
 	}()
