@@ -20,7 +20,6 @@ build: fmt vet
 .PHONY: build-linux
 build-linux: fmt vet
 	GOOS=linux GOARCH=amd64 go build $(PROD_LDFLAGS) -o bin/kubectl-mtv-linux-amd64
-	GOOS=linux GOARCH=arm64 go build $(PROD_LDFLAGS) -o bin/kubectl-mtv-linux-arm64
 
 .PHONY: build-windows
 build-windows: fmt vet
@@ -29,7 +28,6 @@ build-windows: fmt vet
 .PHONY: build-darwin
 build-darwin: fmt vet
 	GOOS=darwin GOARCH=amd64 go build $(PROD_LDFLAGS) -o bin/kubectl-mtv-darwin-amd64
-	GOOS=darwin GOARCH=arm64 go build $(PROD_LDFLAGS) -o bin/kubectl-mtv-darwin-arm64
 
 .PHONY: build-all
 build-all: build-linux build-windows build-darwin
