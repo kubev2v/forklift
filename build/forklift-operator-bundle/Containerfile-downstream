@@ -15,7 +15,7 @@ ARG API_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-api-rhel9
 
 ARG CONTROLLER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-controller-rhel9@sha256:5772df113430cdbc70165edbcf5b1b9d122a8cbcd58013aab518758c3a258b58"
 
-ARG MUST_GATHER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-must-gather-rhel8@sha256:e5b9ae28cf0f7dd03e6bab2d6ada8c9a92da8917a08bbb755f885f44d3773a29"
+ARG MUST_GATHER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-must-gather-rhel8@sha256:a4a384bf56954fa43042c3e957ac2862a42f6984f908d8d146f9cccd35032707"
 
 ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-openstack-populator-rhel9@sha256:1dc57f978cd2a94940286d3f89465bda4fea5acae8731ad1ca1c6abf78cd559a"
 
