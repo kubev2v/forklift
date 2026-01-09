@@ -65,10 +65,17 @@ func (trees methodTrees) get(method string) *node {
 	return nil
 }
 
+func min(a, b int) int {
+	if a <= b {
+		return a
+	}
+	return b
+}
+
 func longestCommonPrefix(a, b string) int {
 	i := 0
-	max_ := min(len(a), len(b))
-	for i < max_ && a[i] == b[i] {
+	max := min(len(a), len(b))
+	for i < max && a[i] == b[i] {
 		i++
 	}
 	return i
@@ -198,7 +205,7 @@ walk:
 			}
 
 			// Check if a child with the next path byte exists
-			for i, max_ := 0, len(n.indices); i < max_; i++ {
+			for i, max := 0, len(n.indices); i < max; i++ {
 				if c == n.indices[i] {
 					parentFullPathIndex += len(n.path)
 					i = n.incrementChildPrio(i)
@@ -234,7 +241,7 @@ walk:
 				// Wildcard conflict
 				pathSeg := path
 				if n.nType != catchAll {
-					pathSeg, _, _ = strings.Cut(pathSeg, "/")
+					pathSeg = strings.SplitN(pathSeg, "/", 2)[0]
 				}
 				prefix := fullPath[:strings.Index(fullPath, pathSeg)] + n.path
 				panic("'" + pathSeg +
@@ -262,19 +269,7 @@ walk:
 // Returns -1 as index, if no wildcard was found.
 func findWildcard(path string) (wildcard string, i int, valid bool) {
 	// Find start
-	escapeColon := false
 	for start, c := range []byte(path) {
-		if escapeColon {
-			escapeColon = false
-			if c == ':' {
-				continue
-			}
-			panic("invalid escape string in path '" + path + "'")
-		}
-		if c == '\\' {
-			escapeColon = true
-			continue
-		}
 		// A wildcard starts with ':' (param) or '*' (catch-all)
 		if c != ':' && c != '*' {
 			continue
@@ -358,7 +353,7 @@ func (n *node) insertChild(path string, fullPath string, handlers HandlersChain)
 		if len(n.path) > 0 && n.path[len(n.path)-1] == '/' {
 			pathSeg := ""
 			if len(n.children) != 0 {
-				pathSeg, _, _ = strings.Cut(n.children[0].path, "/")
+				pathSeg = strings.SplitN(n.children[0].path, "/", 2)[0]
 			}
 			panic("catch-all wildcard '" + path +
 				"' in new path '" + fullPath +
@@ -369,7 +364,7 @@ func (n *node) insertChild(path string, fullPath string, handlers HandlersChain)
 
 		// currently fixed width 1 for '/'
 		i--
-		if i < 0 || path[i] != '/' {
+		if path[i] != '/' {
 			panic("no / before catch-all in path '" + fullPath + "'")
 		}
 
@@ -383,7 +378,7 @@ func (n *node) insertChild(path string, fullPath string, handlers HandlersChain)
 		}
 
 		n.addChild(child)
-		n.indices = "/"
+		n.indices = string('/')
 		n = child
 		n.priority++
 
@@ -775,7 +770,7 @@ walk: // Outer loop for walking the tree
 				// Runes are up to 4 byte long,
 				// -4 would definitely be another rune.
 				var off int
-				for max_ := min(npLen, 3); off < max_; off++ {
+				for max := min(npLen, 3); off < max; off++ {
 					if i := npLen - off; utf8.RuneStart(oldPath[i]) {
 						// read rune from cached path
 						rv, _ = utf8.DecodeRuneInString(oldPath[i:])

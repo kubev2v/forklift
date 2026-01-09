@@ -1,5 +1,5 @@
 // © Broadcom. All Rights Reserved.
-// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
+// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 package simulator
@@ -25,6 +25,11 @@ type OptionManager struct {
 	// mirror is an array to keep in sync with OptionManager.Settings. Necessary because we use append.
 	// uni-directional - changes made to the mirrored array are not reflected back to Settings
 	mirror *[]types.BaseOptionValue
+}
+
+func asOptionManager(ctx *Context, obj mo.Reference) (*OptionManager, bool) {
+	om, ok := ctx.Map.Get(obj.Reference()).(*OptionManager)
+	return om, ok
 }
 
 // NewOptionManager constructs the type. If mirror is non-nil it takes precedence over settings, and settings is ignored.

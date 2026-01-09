@@ -24,6 +24,7 @@ type InvalidValidationError struct {
 
 // Error returns InvalidValidationError message
 func (e *InvalidValidationError) Error() string {
+
 	if e.Type == nil {
 		return "validator: (nil)"
 	}
@@ -40,9 +41,11 @@ type ValidationErrors []FieldError
 // All information to create an error message specific to your application is contained within
 // the FieldError found within the ValidationErrors array
 func (ve ValidationErrors) Error() string {
+
 	buff := bytes.NewBufferString("")
 
 	for i := 0; i < len(ve); i++ {
+
 		buff.WriteString(ve[i].Error())
 		buff.WriteString("\n")
 	}
@@ -52,6 +55,7 @@ func (ve ValidationErrors) Error() string {
 
 // Translate translates all of the ValidationErrors
 func (ve ValidationErrors) Translate(ut ut.Translator) ValidationErrorsTranslations {
+
 	trans := make(ValidationErrorsTranslations)
 
 	var fe *fieldError
@@ -105,24 +109,22 @@ type FieldError interface {
 	// StructNamespace returns the namespace for the field error, with the field's
 	// actual name.
 	//
-	// eg. "User.FirstName" see Namespace for comparison
+	// eq. "User.FirstName" see Namespace for comparison
 	//
 	// NOTE: this field can be blank when validating a single primitive field
 	// using validate.Field(...) as there is no way to extract its name
 	StructNamespace() string
 
-	// Field returns the field's name with the tag name taking precedence over the
+	// Field returns the fields name with the tag name taking precedence over the
 	// field's actual name.
 	//
-	// `RegisterTagNameFunc` must be registered to get tag value.
-	//
-	// eg. JSON name "fname"
+	// eq. JSON name "fname"
 	// see StructField for comparison
 	Field() string
 
 	// StructField returns the field's actual name from the struct, when able to determine.
 	//
-	// eg.  "FirstName"
+	// eq.  "FirstName"
 	// see Field for comparison
 	StructField() string
 
@@ -202,6 +204,7 @@ func (fe *fieldError) StructNamespace() string {
 // Field returns the field's name with the tag name taking precedence over the
 // field's actual name.
 func (fe *fieldError) Field() string {
+
 	return fe.ns[len(fe.ns)-int(fe.fieldLen):]
 	// // return fe.field
 	// fld := fe.ns[len(fe.ns)-int(fe.fieldLen):]

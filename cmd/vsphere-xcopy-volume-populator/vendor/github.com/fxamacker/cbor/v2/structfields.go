@@ -239,7 +239,8 @@ func appendFields(
 // a nonexportable anonymous field of struct type.
 // Nonexportable anonymous field of struct type can contain exportable fields.
 func isFieldExportable(f reflect.StructField, fk reflect.Kind) bool { //nolint:gocritic // ignore hugeParam
-	return f.IsExported() || (f.Anonymous && fk == reflect.Struct)
+	exportable := f.PkgPath == ""
+	return exportable || (f.Anonymous && fk == reflect.Struct)
 }
 
 type embeddedFieldNullPtrFunc func(reflect.Value) (reflect.Value, error)

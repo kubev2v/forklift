@@ -87,7 +87,7 @@ func (cors *cors) applyCors(c *gin.Context) {
 		return
 	}
 
-	if c.Request.Method == http.MethodOptions {
+	if c.Request.Method == "OPTIONS" {
 		cors.handlePreflight(c)
 		defer c.AbortWithStatus(cors.optionsResponseStatusCode)
 	} else {

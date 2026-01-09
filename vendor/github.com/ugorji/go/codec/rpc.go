@@ -4,11 +4,10 @@
 package codec
 
 import (
+	"bufio"
 	"errors"
 	"io"
-	"net"
 	"net/rpc"
-	"sync/atomic"
 )
 
 var (
@@ -29,44 +28,57 @@ type RPCOptions struct {
 	// RPCNoBuffer configures whether we attempt to buffer reads and writes during RPC calls.
 	//
 	// Set RPCNoBuffer=true to turn buffering off.
-	//
 	// Buffering can still be done if buffered connections are passed in, or
 	// buffering is configured on the handle.
-	//
-	// Deprecated: Buffering should be configured at the Handle or by using a buffer Reader.
-	// Setting this has no effect anymore (after v1.2.12 - authored 2025-05-06)
 	RPCNoBuffer bool
 }
 
 // rpcCodec defines the struct members and common methods.
 type rpcCodec struct {
-	c   io.Closer
-	r   io.Reader
-	w   io.Writer
-	f   ioFlusher
-	nc  net.Conn
+	c io.Closer
+	r io.Reader
+	w io.Writer
+	f ioFlusher
+
 	dec *Decoder
 	enc *Encoder
 	h   Handle
 
-	cls atomic.Pointer[clsErr]
+	cls atomicClsErr
 }
 
-func newRPCCodec(conn io.ReadWriteCloser, h Handle) *rpcCodec {
-	nc, _ := conn.(net.Conn)
-	f, _ := conn.(ioFlusher)
-	rc := &rpcCodec{
-		h:   h,
-		c:   conn,
-		w:   conn,
-		r:   conn,
-		f:   f,
-		nc:  nc,
-		enc: NewEncoder(conn, h),
-		dec: NewDecoder(conn, h),
+func newRPCCodec(conn io.ReadWriteCloser, h Handle) rpcCodec {
+	return newRPCCodec2(conn, conn, conn, h)
+}
+
+func newRPCCodec2(r io.Reader, w io.Writer, c io.Closer, h Handle) rpcCodec {
+	bh := h.getBasicHandle()
+	// if the writer can flush, ensure we leverage it, else
+	// we may hang waiting on read if write isn't flushed.
+	// var f ioFlusher
+	f, ok := w.(ioFlusher)
+	if !bh.RPCNoBuffer {
+		if bh.WriterBufferSize <= 0 {
+			if !ok { // a flusher means there's already a buffer
+				bw := bufio.NewWriter(w)
+				f, w = bw, bw
+			}
+		}
+		if bh.ReaderBufferSize <= 0 {
+			if _, ok = w.(ioBuffered); !ok {
+				r = bufio.NewReader(r)
+			}
+		}
 	}
-	rc.cls.Store(new(clsErr))
-	return rc
+	return rpcCodec{
+		c:   c,
+		w:   w,
+		r:   r,
+		f:   f,
+		h:   h,
+		enc: NewEncoder(w, h),
+		dec: NewDecoder(r, h),
+	}
 }
 
 func (c *rpcCodec) write(obj ...interface{}) (err error) {
@@ -104,16 +116,10 @@ func (c *rpcCodec) write(obj ...interface{}) (err error) {
 func (c *rpcCodec) read(obj interface{}) (err error) {
 	err = c.ready()
 	if err == nil {
-		// Setting ReadDeadline should not be necessary,
-		// especially since it only works for net.Conn (not generic ioReadCloser).
-		// if c.nc != nil {
-		// 	c.nc.SetReadDeadline(time.Now().Add(1 * time.Second))
-		// }
-
-		// Note: If nil is passed in, we should read and discard
+		//If nil is passed in, we should read and discard
 		if obj == nil {
 			// return c.dec.Decode(&obj)
-			err = panicToErr(c.dec, func() { c.dec.swallow() })
+			err = c.dec.swallowErr()
 		} else {
 			err = c.dec.Decode(obj)
 		}
@@ -123,11 +129,11 @@ func (c *rpcCodec) read(obj interface{}) (err error) {
 
 func (c *rpcCodec) Close() (err error) {
 	if c.c != nil {
-		cls := c.cls.Load()
+		cls := c.cls.load()
 		if !cls.closed {
-			// writing to same pointer could lead to a data race (always make new one)
-			cls = &clsErr{closed: true, err: c.c.Close()}
-			c.cls.Store(cls)
+			cls.err = c.c.Close()
+			cls.closed = true
+			c.cls.store(cls)
 		}
 		err = cls.err
 	}
@@ -138,8 +144,8 @@ func (c *rpcCodec) ready() (err error) {
 	if c.c == nil {
 		err = errRpcNoConn
 	} else {
-		cls := c.cls.Load()
-		if cls != nil && cls.closed {
+		cls := c.cls.load()
+		if cls.closed {
 			if err = cls.err; err == nil {
 				err = errRpcIsClosed
 			}
@@ -155,7 +161,7 @@ func (c *rpcCodec) ReadResponseBody(body interface{}) error {
 // -------------------------------------
 
 type goRpcCodec struct {
-	*rpcCodec
+	rpcCodec
 }
 
 func (c *goRpcCodec) WriteRequest(r *rpc.Request, body interface{}) error {

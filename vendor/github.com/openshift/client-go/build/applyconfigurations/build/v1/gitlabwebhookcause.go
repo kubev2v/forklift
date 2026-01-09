@@ -2,13 +2,13 @@
 
 package v1
 
-// GitLabWebHookCauseApplyConfiguration represents a declarative configuration of the GitLabWebHookCause type for use
+// GitLabWebHookCauseApplyConfiguration represents an declarative configuration of the GitLabWebHookCause type for use
 // with apply.
 type GitLabWebHookCauseApplyConfiguration struct {
 	CommonWebHookCauseApplyConfiguration `json:",inline"`
 }
 
-// GitLabWebHookCauseApplyConfiguration constructs a declarative configuration of the GitLabWebHookCause type for use with
+// GitLabWebHookCauseApplyConfiguration constructs an declarative configuration of the GitLabWebHookCause type for use with
 // apply.
 func GitLabWebHookCause() *GitLabWebHookCauseApplyConfiguration {
 	return &GitLabWebHookCauseApplyConfiguration{}
@@ -18,7 +18,7 @@ func GitLabWebHookCause() *GitLabWebHookCauseApplyConfiguration {
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Revision field is set to the value of the last call.
 func (b *GitLabWebHookCauseApplyConfiguration) WithRevision(value *SourceRevisionApplyConfiguration) *GitLabWebHookCauseApplyConfiguration {
-	b.CommonWebHookCauseApplyConfiguration.Revision = value
+	b.Revision = value
 	return b
 }
 
@@ -26,6 +26,6 @@ func (b *GitLabWebHookCauseApplyConfiguration) WithRevision(value *SourceRevisio
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Secret field is set to the value of the last call.
 func (b *GitLabWebHookCauseApplyConfiguration) WithSecret(value string) *GitLabWebHookCauseApplyConfiguration {
-	b.CommonWebHookCauseApplyConfiguration.Secret = &value
+	b.Secret = &value
 	return b
 }

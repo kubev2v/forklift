@@ -7,8 +7,6 @@ package render
 import (
 	"html/template"
 	"net/http"
-
-	"github.com/gin-gonic/gin/internal/fs"
 )
 
 // Delims represents a set of Left and Right delimiters for HTML template rendering.
@@ -33,12 +31,10 @@ type HTMLProduction struct {
 
 // HTMLDebug contains template delims and pattern and function with file list.
 type HTMLDebug struct {
-	Files      []string
-	Glob       string
-	FileSystem http.FileSystem
-	Patterns   []string
-	Delims     Delims
-	FuncMap    template.FuncMap
+	Files   []string
+	Glob    string
+	Delims  Delims
+	FuncMap template.FuncMap
 }
 
 // HTML contains template reference and its name with given interface object.
@@ -67,7 +63,6 @@ func (r HTMLDebug) Instance(name string, data any) Render {
 		Data:     data,
 	}
 }
-
 func (r HTMLDebug) loadTemplate() *template.Template {
 	if r.FuncMap == nil {
 		r.FuncMap = template.FuncMap{}
@@ -78,11 +73,7 @@ func (r HTMLDebug) loadTemplate() *template.Template {
 	if r.Glob != "" {
 		return template.Must(template.New("").Delims(r.Delims.Left, r.Delims.Right).Funcs(r.FuncMap).ParseGlob(r.Glob))
 	}
-	if r.FileSystem != nil && len(r.Patterns) > 0 {
-		return template.Must(template.New("").Delims(r.Delims.Left, r.Delims.Right).Funcs(r.FuncMap).ParseFS(
-			fs.FileSystem{FileSystem: r.FileSystem}, r.Patterns...))
-	}
-	panic("the HTML debug render was created without files or glob pattern or file system with patterns")
+	panic("the HTML debug render was created without files or glob pattern")
 }
 
 // Render (HTML) executes template and writes its result with custom ContentType for response.

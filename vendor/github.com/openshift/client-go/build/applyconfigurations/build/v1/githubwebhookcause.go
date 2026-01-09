@@ -2,14 +2,14 @@
 
 package v1
 
-// GitHubWebHookCauseApplyConfiguration represents a declarative configuration of the GitHubWebHookCause type for use
+// GitHubWebHookCauseApplyConfiguration represents an declarative configuration of the GitHubWebHookCause type for use
 // with apply.
 type GitHubWebHookCauseApplyConfiguration struct {
 	Revision *SourceRevisionApplyConfiguration `json:"revision,omitempty"`
 	Secret   *string                           `json:"secret,omitempty"`
 }
 
-// GitHubWebHookCauseApplyConfiguration constructs a declarative configuration of the GitHubWebHookCause type for use with
+// GitHubWebHookCauseApplyConfiguration constructs an declarative configuration of the GitHubWebHookCause type for use with
 // apply.
 func GitHubWebHookCause() *GitHubWebHookCauseApplyConfiguration {
 	return &GitHubWebHookCauseApplyConfiguration{}
