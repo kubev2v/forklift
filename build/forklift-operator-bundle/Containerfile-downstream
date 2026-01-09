@@ -19,7 +19,7 @@ ARG MUST_GATHER_IMAGE="registry.redhat.io/mtv-candidate/mtv-must-gather-rhel8@sh
 
 ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-openstack-populator-rhel9@sha256:01f0908710ed00dda2bda636f85ddf94cd3de270bedc5a257b6b472a4ae2f620"
 
-ARG OPERATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhel9-operator@sha256:eae99d29e1733a420a5a5c51137843cb20e47463ac845ecd1df208b22b05fbdd"
+ARG OPERATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhel9-operator@sha256:df3408ea7e41ff40e74b6186bf534f443039809d5c773f2de21daadeeff0f1d7"
 
 ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/mtv-candidate/mtv-ova-provider-server-rhel9@sha256:9225e1f756da3496c0191213bf69e799219668dc9a1cb130dac792d03630215d"
 
