@@ -1,5 +1,5 @@
 // © Broadcom. All Rights Reserved.
-// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
+// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 package simulator
@@ -680,19 +680,12 @@ func (m *Model) CreateInfrastructure(ctx *Context) error {
 			}
 		}
 
-		opaqueNetworkIDs := make([]string, m.OpaqueNetwork)
-		for npg := 0; npg < m.PortgroupNSX+m.OpaqueNetwork; npg++ {
+		for npg := 0; npg < m.PortgroupNSX; npg++ {
 			name := m.fmtName(dcName+"_NSXPG", npg)
 			spec := types.DVPortgroupConfigSpec{
 				Name:        name,
 				Type:        string(types.DistributedVirtualPortgroupPortgroupTypeEarlyBinding),
 				BackingType: string(types.DistributedVirtualPortgroupBackingTypeNsx),
-			}
-
-			if npg >= m.PortgroupNSX {
-				// Save the LogicalSwitchUuid so we can create the matching opaque network later.
-				spec.LogicalSwitchUuid = uuid.New().String()
-				opaqueNetworkIDs[npg-m.PortgroupNSX] = spec.LogicalSwitchUuid
 			}
 
 			task, err := dvs.AddPortgroup(ctx, []types.DVPortgroupConfigSpec{spec})
@@ -704,18 +697,15 @@ func (m *Model) CreateInfrastructure(ctx *Context) error {
 			}
 		}
 
-		if len(opaqueNetworkIDs) > 0 {
-			// Must use simulator methods directly for OpaqueNetwork
-			networkFolder := ctx.Map.Get(folders.NetworkFolder.Reference()).(*Folder)
+		// Must use simulator methods directly for OpaqueNetwork
+		networkFolder := ctx.Map.Get(folders.NetworkFolder.Reference()).(*Folder)
 
-			for i, networkID := range opaqueNetworkIDs {
-				var summary types.OpaqueNetworkSummary
-				summary.Name = m.fmtName(dcName+"_NSX", i)
-				summary.OpaqueNetworkId = networkID
-				err := networkFolder.AddOpaqueNetwork(ctx, summary)
-				if err != nil {
-					return err
-				}
+		for i := 0; i < m.OpaqueNetwork; i++ {
+			var summary types.OpaqueNetworkSummary
+			summary.Name = m.fmtName(dcName+"_NSX", i)
+			err := networkFolder.AddOpaqueNetwork(ctx, summary)
+			if err != nil {
+				return err
 			}
 		}
 

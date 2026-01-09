@@ -11,11 +11,9 @@ import (
 
 const defaultMemory = 32 << 20
 
-type (
-	formBinding          struct{}
-	formPostBinding      struct{}
-	formMultipartBinding struct{}
-)
+type formBinding struct{}
+type formPostBinding struct{}
+type formMultipartBinding struct{}
 
 func (formBinding) Name() string {
 	return "form"

@@ -7,7 +7,7 @@ package render
 import (
 	"net/http"
 
-	"github.com/goccy/go-yaml"
+	"gopkg.in/yaml.v3"
 )
 
 // YAML contains the given interface object.

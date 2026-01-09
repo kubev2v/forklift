@@ -403,11 +403,6 @@ func (in *PreferenceRequirements) DeepCopyInto(out *PreferenceRequirements) {
 		*out = new(MemoryPreferenceRequirement)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.Architecture != nil {
-		in, out := &in.Architecture, &out.Architecture
-		*out = new(string)
-		**out = **in
-	}
 	return
 }
 
@@ -658,11 +653,6 @@ func (in *VirtualMachineInstancetypeSpec) DeepCopyInto(out *VirtualMachineInstan
 		*out = new(v1.IOThreadsPolicy)
 		**out = **in
 	}
-	if in.IOThreads != nil {
-		in, out := &in.IOThreads, &out.IOThreads
-		*out = new(v1.DiskIOThreads)
-		(*in).DeepCopyInto(*out)
-	}
 	if in.LaunchSecurity != nil {
 		in, out := &in.LaunchSecurity, &out.LaunchSecurity
 		*out = new(v1.LaunchSecurity)
@@ -807,11 +797,6 @@ func (in *VirtualMachinePreferenceSpec) DeepCopyInto(out *VirtualMachinePreferen
 		for key, val := range *in {
 			(*out)[key] = val
 		}
-	}
-	if in.PreferredArchitecture != nil {
-		in, out := &in.PreferredArchitecture, &out.PreferredArchitecture
-		*out = new(string)
-		**out = **in
 	}
 	return
 }

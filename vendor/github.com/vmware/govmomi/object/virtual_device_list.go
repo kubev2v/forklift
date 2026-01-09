@@ -1,5 +1,5 @@
 // © Broadcom. All Rights Reserved.
-// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
+// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 package object
@@ -237,10 +237,6 @@ func (l VirtualDeviceList) FindSCSIController(name string) (*types.VirtualSCSICo
 	return c.(types.BaseVirtualSCSIController).GetVirtualSCSIController(), nil
 }
 
-var alias = map[string]string{
-	"lsilogicsas": "lsilogic-sas",
-}
-
 // CreateSCSIController creates a new SCSI controller of type name if given, otherwise defaults to lsilogic.
 func (l VirtualDeviceList) CreateSCSIController(name string) (types.BaseVirtualDevice, error) {
 	ctypes := SCSIControllerTypes()
@@ -252,8 +248,7 @@ func (l VirtualDeviceList) CreateSCSIController(name string) (types.BaseVirtualD
 	}
 
 	found := ctypes.Select(func(device types.BaseVirtualDevice) bool {
-		kind := l.Type(device)
-		return kind == name || kind == alias[name]
+		return l.Type(device) == name
 	})
 
 	if len(found) == 0 {

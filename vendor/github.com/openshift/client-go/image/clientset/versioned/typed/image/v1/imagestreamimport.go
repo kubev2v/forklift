@@ -3,12 +3,12 @@
 package v1
 
 import (
-	context "context"
+	"context"
 
-	imagev1 "github.com/openshift/api/image/v1"
+	v1 "github.com/openshift/api/image/v1"
 	scheme "github.com/openshift/client-go/image/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	gentype "k8s.io/client-go/gentype"
+	rest "k8s.io/client-go/rest"
 )
 
 // ImageStreamImportsGetter has a method to return a ImageStreamImportInterface.
@@ -19,24 +19,33 @@ type ImageStreamImportsGetter interface {
 
 // ImageStreamImportInterface has methods to work with ImageStreamImport resources.
 type ImageStreamImportInterface interface {
-	Create(ctx context.Context, imageStreamImport *imagev1.ImageStreamImport, opts metav1.CreateOptions) (*imagev1.ImageStreamImport, error)
+	Create(ctx context.Context, imageStreamImport *v1.ImageStreamImport, opts metav1.CreateOptions) (*v1.ImageStreamImport, error)
 	ImageStreamImportExpansion
 }
 
 // imageStreamImports implements ImageStreamImportInterface
 type imageStreamImports struct {
-	*gentype.Client[*imagev1.ImageStreamImport]
+	client rest.Interface
+	ns     string
 }
 
 // newImageStreamImports returns a ImageStreamImports
 func newImageStreamImports(c *ImageV1Client, namespace string) *imageStreamImports {
 	return &imageStreamImports{
-		gentype.NewClient[*imagev1.ImageStreamImport](
-			"imagestreamimports",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *imagev1.ImageStreamImport { return &imagev1.ImageStreamImport{} },
-		),
+		client: c.RESTClient(),
+		ns:     namespace,
 	}
+}
+
+// Create takes the representation of a imageStreamImport and creates it.  Returns the server's representation of the imageStreamImport, and an error, if there is any.
+func (c *imageStreamImports) Create(ctx context.Context, imageStreamImport *v1.ImageStreamImport, opts metav1.CreateOptions) (result *v1.ImageStreamImport, err error) {
+	result = &v1.ImageStreamImport{}
+	err = c.client.Post().
+		Namespace(c.ns).
+		Resource("imagestreamimports").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(imageStreamImport).
+		Do(ctx).
+		Into(result)
+	return
 }

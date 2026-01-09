@@ -3,10 +3,10 @@
 package internal
 
 import (
-	fmt "fmt"
-	sync "sync"
+	"fmt"
+	"sync"
 
-	typed "sigs.k8s.io/structured-merge-diff/v6/typed"
+	typed "sigs.k8s.io/structured-merge-diff/v4/typed"
 )
 
 func Parser() *typed.Parser {
@@ -53,6 +53,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: dockerImageMetadata
       type:
         namedType: __untyped_atomic_
+      default: {}
     - name: dockerImageMetadataVersion
       type:
         scalar: string
@@ -276,9 +277,11 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastProbeTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+      default: {}
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+      default: {}
     - name: message
       type:
         scalar: string
@@ -321,6 +324,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: created
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+      default: {}
     - name: dockerImageReference
       type:
         scalar: string
@@ -343,6 +347,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+      default: {}
     - name: message
       type:
         scalar: string
@@ -477,6 +482,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: creationTimestamp
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+      default: {}
     - name: deletionGracePeriodSeconds
       type:
         scalar: numeric

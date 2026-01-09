@@ -7,6 +7,7 @@ package sse
 import (
 	"bytes"
 	"io"
+	"io/ioutil"
 )
 
 type decoder struct {
@@ -21,8 +22,7 @@ func Decode(r io.Reader) ([]Event, error) {
 func (d *decoder) dispatchEvent(event Event, data string) {
 	dataLength := len(data)
 	if dataLength > 0 {
-		// If the data buffer's last character is a U+000A LINE FEED (LF) character,
-		// then remove the last character from the data buffer.
+		//If the data buffer's last character is a U+000A LINE FEED (LF) character, then remove the last character from the data buffer.
 		data = data[:dataLength-1]
 		dataLength--
 	}
@@ -37,13 +37,13 @@ func (d *decoder) dispatchEvent(event Event, data string) {
 }
 
 func (d *decoder) decode(r io.Reader) ([]Event, error) {
-	buf, err := io.ReadAll(r)
+	buf, err := ioutil.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
 
 	var currentEvent Event
-	dataBuffer := new(bytes.Buffer)
+	var dataBuffer *bytes.Buffer = new(bytes.Buffer)
 	// TODO (and unit tests)
 	// Lines must be separated by either a U+000D CARRIAGE RETURN U+000A LINE FEED (CRLF) character pair,
 	// a single U+000A LINE FEED (LF) character,
@@ -96,8 +96,7 @@ func (d *decoder) decode(r io.Reader) ([]Event, error) {
 			currentEvent.Id = string(value)
 		case "retry":
 			// If the field value consists of only characters in the range U+0030 DIGIT ZERO (0) to U+0039 DIGIT NINE (9),
-			// then interpret the field value as an integer in base ten, and set the event stream's
-			// reconnection time to that integer.
+			// then interpret the field value as an integer in base ten, and set the event stream's reconnection time to that integer.
 			// Otherwise, ignore the field.
 			currentEvent.Id = string(value)
 		case "data":
@@ -106,7 +105,7 @@ func (d *decoder) decode(r io.Reader) ([]Event, error) {
 			// then append a single U+000A LINE FEED (LF) character to the data buffer.
 			dataBuffer.WriteString("\n")
 		default:
-			// Otherwise. The field is ignored.
+			//Otherwise. The field is ignored.
 			continue
 		}
 	}

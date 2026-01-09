@@ -2,9 +2,9 @@ package v1
 
 import (
 	"encoding/json"
-	"net"
-
+	"errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"net"
 )
 
 // +genclient
@@ -177,6 +177,9 @@ func (nse *NetworkSelectionElement) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &netSelectionElement); err != nil {
 		return err
 	}
+	if len(netSelectionElement.IPRequest) > 0 && netSelectionElement.IPAMClaimReference != "" {
+		return TooManyIPSources
+	}
 	*nse = NetworkSelectionElement(netSelectionElement)
 	return nil
 }
@@ -195,3 +198,5 @@ type NoK8sNetworkError struct {
 }
 
 func (e *NoK8sNetworkError) Error() string { return string(e.Message) }
+
+var TooManyIPSources = errors.New("cannot provide a static IP and a reference of an IPAM claim in the same network selection element")

@@ -17,6 +17,7 @@ func (headerBinding) Name() string {
 }
 
 func (headerBinding) Bind(req *http.Request, obj any) error {
+
 	if err := mapHeader(obj, req.Header); err != nil {
 		return err
 	}

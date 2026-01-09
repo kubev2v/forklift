@@ -107,6 +107,7 @@ func (v *validate) ExtractType(field reflect.Value) (reflect.Value, reflect.Kind
 
 // ReportError reports an error just by passing the field and tag information
 func (v *validate) ReportError(field interface{}, fieldName, structFieldName, tag, param string) {
+
 	fv, kind, _ := v.extractTypeInternal(reflect.ValueOf(field), false)
 
 	if len(structFieldName) == 0 {
@@ -122,6 +123,7 @@ func (v *validate) ReportError(field interface{}, fieldName, structFieldName, ta
 	}
 
 	if kind == reflect.Invalid {
+
 		v.errs = append(v.errs,
 			&fieldError{
 				v:              v.v,
@@ -147,7 +149,7 @@ func (v *validate) ReportError(field interface{}, fieldName, structFieldName, ta
 			structNs:       v.str2,
 			fieldLen:       uint8(len(fieldName)),
 			structfieldLen: uint8(len(structFieldName)),
-			value:          getValue(fv),
+			value:          fv.Interface(),
 			param:          param,
 			kind:           kind,
 			typ:            fv.Type(),
@@ -159,9 +161,11 @@ func (v *validate) ReportError(field interface{}, fieldName, structFieldName, ta
 //
 // NOTE: this function prepends the current namespace to the relative ones.
 func (v *validate) ReportValidationErrors(relativeNamespace, relativeStructNamespace string, errs ValidationErrors) {
+
 	var err *fieldError
 
 	for i := 0; i < len(errs); i++ {
+
 		err = errs[i].(*fieldError)
 		err.ns = string(append(append(v.ns, relativeNamespace...), err.ns...))
 		err.structNs = string(append(append(v.actualNs, relativeStructNamespace...), err.structNs...))

@@ -1,6 +1,6 @@
 module github.com/kubev2v/forklift
 
-go 1.25.3
+go 1.24.6
 
 require (
 	github.com/agnivade/levenshtein v1.2.1 // indirect

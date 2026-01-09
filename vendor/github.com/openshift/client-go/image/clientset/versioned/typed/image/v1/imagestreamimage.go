@@ -3,12 +3,12 @@
 package v1
 
 import (
-	context "context"
+	"context"
 
 	imagev1 "github.com/openshift/api/image/v1"
 	scheme "github.com/openshift/client-go/image/clientset/versioned/scheme"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	gentype "k8s.io/client-go/gentype"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	rest "k8s.io/client-go/rest"
 )
 
 // ImageStreamImagesGetter has a method to return a ImageStreamImageInterface.
@@ -19,24 +19,33 @@ type ImageStreamImagesGetter interface {
 
 // ImageStreamImageInterface has methods to work with ImageStreamImage resources.
 type ImageStreamImageInterface interface {
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*imagev1.ImageStreamImage, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*imagev1.ImageStreamImage, error)
 	ImageStreamImageExpansion
 }
 
 // imageStreamImages implements ImageStreamImageInterface
 type imageStreamImages struct {
-	*gentype.Client[*imagev1.ImageStreamImage]
+	client rest.Interface
+	ns     string
 }
 
 // newImageStreamImages returns a ImageStreamImages
 func newImageStreamImages(c *ImageV1Client, namespace string) *imageStreamImages {
 	return &imageStreamImages{
-		gentype.NewClient[*imagev1.ImageStreamImage](
-			"imagestreamimages",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *imagev1.ImageStreamImage { return &imagev1.ImageStreamImage{} },
-		),
+		client: c.RESTClient(),
+		ns:     namespace,
 	}
+}
+
+// Get takes name of the imageStreamImage, and returns the corresponding imageStreamImage object, and an error if there is any.
+func (c *imageStreamImages) Get(ctx context.Context, name string, options v1.GetOptions) (result *imagev1.ImageStreamImage, err error) {
+	result = &imagev1.ImageStreamImage{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("imagestreamimages").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do(ctx).
+		Into(result)
+	return
 }

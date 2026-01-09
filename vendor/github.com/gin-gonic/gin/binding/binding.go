@@ -84,7 +84,6 @@ var (
 	YAML          BindingBody = yamlBinding{}
 	Uri           BindingUri  = uriBinding{}
 	Header        Binding     = headerBinding{}
-	Plain         BindingBody = plainBinding{}
 	TOML          BindingBody = tomlBinding{}
 )
 

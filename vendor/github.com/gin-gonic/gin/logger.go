@@ -44,7 +44,7 @@ type LoggerConfig struct {
 	// Optional. Default value is gin.DefaultWriter.
 	Output io.Writer
 
-	// SkipPaths is a URL path array which logs are not written.
+	// SkipPaths is an url path array which logs are not written.
 	// Optional.
 	SkipPaths []string
 
@@ -82,7 +82,7 @@ type LogFormatterParams struct {
 	// BodySize is the size of the Response Body
 	BodySize int
 	// Keys are the keys set on the request's context.
-	Keys map[any]any
+	Keys map[string]any
 }
 
 // StatusCodeColor is the ANSI color for appropriately logging http status code to a terminal.

@@ -96,7 +96,6 @@ type ReporterConfig struct {
 	ForceNewlines  bool
 
 	JSONReport     string
-	GoJSONReport   string
 	JUnitReport    string
 	TeamcityReport string
 }
@@ -113,7 +112,7 @@ func (rc ReporterConfig) Verbosity() VerbosityLevel {
 }
 
 func (rc ReporterConfig) WillGenerateReport() bool {
-	return rc.JSONReport != "" || rc.GoJSONReport != "" || rc.JUnitReport != "" || rc.TeamcityReport != ""
+	return rc.JSONReport != "" || rc.JUnitReport != "" || rc.TeamcityReport != ""
 }
 
 func NewDefaultReporterConfig() ReporterConfig {
@@ -360,8 +359,6 @@ var ReporterConfigFlags = GinkgoFlags{
 
 	{KeyPath: "R.JSONReport", Name: "json-report", UsageArgument: "filename.json", SectionKey: "output",
 		Usage: "If set, Ginkgo will generate a JSON-formatted test report at the specified location."},
-	{KeyPath: "R.GoJSONReport", Name: "gojson-report", UsageArgument: "filename.json", SectionKey: "output",
-		Usage: "If set, Ginkgo will generate a Go JSON-formatted test report at the specified location."},
 	{KeyPath: "R.JUnitReport", Name: "junit-report", UsageArgument: "filename.xml", SectionKey: "output", DeprecatedName: "reportFile", DeprecatedDocLink: "improved-reporting-infrastructure",
 		Usage: "If set, Ginkgo will generate a conformant junit test report in the specified file."},
 	{KeyPath: "R.TeamcityReport", Name: "teamcity-report", UsageArgument: "filename", SectionKey: "output",

@@ -42,8 +42,6 @@ type Suite struct {
 	config            types.SuiteConfig
 	deadline          time.Time
 
-	currentConstructionNodeReport *types.ConstructionNodeReport
-
 	skipAll              bool
 	report               types.Report
 	currentSpecReport    types.SpecReport
@@ -205,14 +203,6 @@ func (suite *Suite) PushNode(node Node) error {
 						err = types.GinkgoErrors.CaughtPanicDuringABuildPhase(e, node.CodeLocation)
 					}
 				}()
-
-				// Ensure that code running in the body of the container node
-				// has access to information about the current container node(s).
-				suite.currentConstructionNodeReport = constructionNodeReportForTreeNode(suite.tree)
-				defer func() {
-					suite.currentConstructionNodeReport = nil
-				}()
-
 				node.Body(nil)
 				return err
 			}()
@@ -340,16 +330,6 @@ func (suite *Suite) By(text string, callback ...func()) error {
 		panic("just one callback per By, please")
 	}
 	return nil
-}
-
-func (suite *Suite) CurrentConstructionNodeReport() types.ConstructionNodeReport {
-	suite.selectiveLock.Lock()
-	defer suite.selectiveLock.Unlock()
-	report := suite.currentConstructionNodeReport
-	if report == nil {
-		panic("CurrentConstructionNodeReport may only be called during construction of the spec tree")
-	}
-	return *report
 }
 
 /*

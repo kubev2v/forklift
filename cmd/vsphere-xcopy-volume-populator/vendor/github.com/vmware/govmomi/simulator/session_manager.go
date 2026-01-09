@@ -1,5 +1,5 @@
 // © Broadcom. All Rights Reserved.
-// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
+// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 package simulator
@@ -43,6 +43,9 @@ func (m *SessionManager) init(*Registry) {
 }
 
 var (
+	// SessionIdleTimeout duration used to expire idle sessions
+	SessionIdleTimeout time.Duration
+
 	sessionMutex sync.Mutex
 
 	// secureCookies enables Set-Cookie.Secure=true
@@ -192,9 +195,6 @@ func (s *SessionManager) Logout(ctx *Context, _ *types.Logout) soap.HasFault {
 	session := ctx.Session
 	s.delSession(session.Key)
 	pc := ctx.Map.content().PropertyCollector
-
-	ctx.Session.Registry.m.Lock()
-	defer ctx.Session.Registry.m.Unlock()
 
 	for ref, obj := range ctx.Session.Registry.objects {
 		if ref == pc {
@@ -358,12 +358,12 @@ func (c *Context) mapSession() {
 	}
 }
 
-func (m *SessionManager) expiredSession(id string, now time.Time, timeout time.Duration) bool {
+func (m *SessionManager) expiredSession(id string, now time.Time) bool {
 	expired := true
 
 	s, ok := m.getSession(id)
 	if ok {
-		expired = now.Sub(s.LastActiveTime) > timeout
+		expired = now.Sub(s.LastActiveTime) > SessionIdleTimeout
 		if expired {
 			m.delSession(id)
 		}
@@ -372,29 +372,23 @@ func (m *SessionManager) expiredSession(id string, now time.Time, timeout time.D
 	return expired
 }
 
-// SessionIdleWatch starts a goroutine that calls func expired() at timeout intervals.
+// SessionIdleWatch starts a goroutine that calls func expired() at SessionIdleTimeout intervals.
 // The goroutine exits if the func returns true.
-func SessionIdleWatch(ctx *Context, id string, expired func(string, time.Time, time.Duration) bool) {
-	opt := ctx.Map.OptionManager().find("config.vmacore.soap.sessionTimeout")
-	if opt == nil {
+func SessionIdleWatch(ctx context.Context, id string, expired func(string, time.Time) bool) {
+	if SessionIdleTimeout == 0 {
 		return
 	}
 
-	timeout, err := time.ParseDuration(opt.Value.(string))
-	if err != nil {
-		panic(err)
-	}
-
 	go func() {
-		for t := time.NewTimer(timeout); ; {
+		for t := time.NewTimer(SessionIdleTimeout); ; {
 			select {
 			case <-ctx.Done():
 				return
 			case now := <-t.C:
-				if expired(id, now, timeout) {
+				if expired(id, now) {
 					return
 				}
-				t.Reset(timeout)
+				t.Reset(SessionIdleTimeout)
 			}
 		}
 	}()
@@ -426,7 +420,7 @@ func (c *Context) SetSession(session Session, login bool) {
 			Locale:    session.Locale,
 		})
 
-		SessionIdleWatch(c, session.Key, m.expiredSession)
+		SessionIdleWatch(c.Context, session.Key, m.expiredSession)
 	}
 }
 

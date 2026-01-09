@@ -3,13 +3,16 @@
 package v1
 
 import (
-	context "context"
+	"context"
+	json "encoding/json"
+	"fmt"
 
-	apiimagev1 "github.com/openshift/api/image/v1"
-	imagev1 "github.com/openshift/client-go/image/applyconfigurations/image/v1"
+	imagev1 "github.com/openshift/api/image/v1"
+	v1 "github.com/openshift/client-go/image/applyconfigurations/image/v1"
 	scheme "github.com/openshift/client-go/image/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	gentype "k8s.io/client-go/gentype"
+	types "k8s.io/apimachinery/pkg/types"
+	rest "k8s.io/client-go/rest"
 )
 
 // ImageStreamMappingsGetter has a method to return a ImageStreamMappingInterface.
@@ -20,35 +23,57 @@ type ImageStreamMappingsGetter interface {
 
 // ImageStreamMappingInterface has methods to work with ImageStreamMapping resources.
 type ImageStreamMappingInterface interface {
-	Apply(ctx context.Context, imageStreamMapping *imagev1.ImageStreamMappingApplyConfiguration, opts metav1.ApplyOptions) (result *apiimagev1.ImageStreamMapping, err error)
-	Create(ctx context.Context, imageStreamMapping *apiimagev1.ImageStreamMapping, opts metav1.CreateOptions) (*metav1.Status, error)
+	Apply(ctx context.Context, imageStreamMapping *v1.ImageStreamMappingApplyConfiguration, opts metav1.ApplyOptions) (result *imagev1.ImageStreamMapping, err error)
+	Create(ctx context.Context, imageStreamMapping *imagev1.ImageStreamMapping, opts metav1.CreateOptions) (*metav1.Status, error)
 
 	ImageStreamMappingExpansion
 }
 
 // imageStreamMappings implements ImageStreamMappingInterface
 type imageStreamMappings struct {
-	*gentype.ClientWithApply[*apiimagev1.ImageStreamMapping, *imagev1.ImageStreamMappingApplyConfiguration]
+	client rest.Interface
+	ns     string
 }
 
 // newImageStreamMappings returns a ImageStreamMappings
 func newImageStreamMappings(c *ImageV1Client, namespace string) *imageStreamMappings {
 	return &imageStreamMappings{
-		gentype.NewClientWithApply[*apiimagev1.ImageStreamMapping, *imagev1.ImageStreamMappingApplyConfiguration](
-			"imagestreammappings",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *apiimagev1.ImageStreamMapping { return &apiimagev1.ImageStreamMapping{} },
-		),
+		client: c.RESTClient(),
+		ns:     namespace,
 	}
 }
 
+// Apply takes the given apply declarative configuration, applies it and returns the applied imageStreamMapping.
+func (c *imageStreamMappings) Apply(ctx context.Context, imageStreamMapping *v1.ImageStreamMappingApplyConfiguration, opts metav1.ApplyOptions) (result *imagev1.ImageStreamMapping, err error) {
+	if imageStreamMapping == nil {
+		return nil, fmt.Errorf("imageStreamMapping provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(imageStreamMapping)
+	if err != nil {
+		return nil, err
+	}
+	name := imageStreamMapping.Name
+	if name == nil {
+		return nil, fmt.Errorf("imageStreamMapping.Name must be provided to Apply")
+	}
+	result = &imagev1.ImageStreamMapping{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("imagestreammappings").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
 // Create takes the representation of a imageStreamMapping and creates it.  Returns the server's representation of the status, and an error, if there is any.
-func (c *imageStreamMappings) Create(ctx context.Context, imageStreamMapping *apiimagev1.ImageStreamMapping, opts metav1.CreateOptions) (result *metav1.Status, err error) {
+func (c *imageStreamMappings) Create(ctx context.Context, imageStreamMapping *imagev1.ImageStreamMapping, opts metav1.CreateOptions) (result *metav1.Status, err error) {
 	result = &metav1.Status{}
-	err = c.GetClient().Post().
-		Namespace(c.GetNamespace()).
+	err = c.client.Post().
+		Namespace(c.ns).
 		Resource("imagestreammappings").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(imageStreamMapping).
