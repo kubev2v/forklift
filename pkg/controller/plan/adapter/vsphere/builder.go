@@ -904,11 +904,13 @@ func (r *Builder) mapFirmware(vm *model.VM, object *cnv.VirtualMachineSpec) {
 			EFI: &cnv.EFI{
 				SecureBoot: &vm.SecureBoot,
 			}}
+		// SecureBoot requires SMM to be enabled or KubeVirt webhook rejects the VM.
 		if vm.SecureBoot {
-			object.Template.Spec.Domain.Features = &cnv.Features{
-				SMM: &cnv.FeatureState{
-					Enabled: &vm.SecureBoot,
-				},
+			if object.Template.Spec.Domain.Features == nil {
+				object.Template.Spec.Domain.Features = &cnv.Features{}
+			}
+			object.Template.Spec.Domain.Features.SMM = &cnv.FeatureState{
+				Enabled: ptr.To(true),
 			}
 		}
 	default:
