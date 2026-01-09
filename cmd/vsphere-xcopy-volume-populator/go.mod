@@ -1,6 +1,6 @@
 module github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator
 
-go 1.22.0
+go 1.24.0
 
 require (
 	github.com/netapp/trident v0.0.0-20240628081112-cb68cb389d9d
@@ -30,7 +30,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.28.0 // indirect
 	golang.org/x/crypto v0.28.0 // indirect
 	golang.org/x/oauth2 v0.22.0 // indirect
-	golang.org/x/time v0.5.0 // indirect
+	golang.org/x/time v0.14.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/api v0.28.10 // indirect
