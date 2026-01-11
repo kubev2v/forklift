@@ -132,6 +132,17 @@ type PlanSpec struct {
 	// Preserve static IPs of VMs in vSphere
 	// +kubebuilder:default:=true
 	PreserveStaticIPs bool `json:"preserveStaticIPs,omitempty"`
+	// SkipZoneNodeSelector controls whether to skip adding a zone-based node selector to
+	// migrated VMs. By default, the migration automatically reads the availability zone from
+	// the source provider's spec.settings.target-az configuration and adds a node selector
+	// (topology.kubernetes.io/zone=<target-az>) to the target VM. This ensures VMs are
+	// scheduled on nodes in the same zone as their EBS volumes, which is required for
+	// volume attachment by the CSI driver.
+	// Currently supported for EC2 provider only.
+	// - false (default): Add zone-based node selector using value from provider's spec.settings.target-az
+	// - true: Skip adding zone-based node selector
+	// +optional
+	SkipZoneNodeSelector bool `json:"skipZoneNodeSelector,omitempty"`
 	// Deprecated: this field will be deprecated in 2.8.
 	DiskBus cnv.DiskBus `json:"diskBus,omitempty"`
 	// PVCNameTemplate is a template for generating PVC names for VM disks.

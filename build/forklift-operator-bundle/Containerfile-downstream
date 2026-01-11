@@ -11,9 +11,9 @@ ARG DEFAULT_CHANNEL
 ARG REGISTRY
 ARG OCP_VERSIONS
 
-ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:45c48c8bd63eadb655ada06df9bec4e6c32db30317c1f00e855bc270feb6dc54"
+ARG API_IMAGE="registry.redhat.io/mtv-candidate/mtv-api-rhel9@sha256:ae1e59e1cab9ac1a5eaf0e48b81fb5b5502a2a5d5d3efd491feffdc878b2331b"
 
-ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:fa6e5ff6b82b95126c9623fca895f49598b92622f1ba38c7974d25396114dcf0"
+ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:cae147661b35d706f98569e85d2a02772bee5e30e9a98c6e80982aa6b0b29fbd"
 
 ARG MUST_GATHER_IMAGE="registry.redhat.io/mtv-candidate/mtv-must-gather-rhel8@sha256:e149c18a53f1037aa5f0879a0a12463aabd0e60f02c907e0b4553af94d95857e"
 
@@ -29,15 +29,15 @@ ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhv-populator-rh
 
 ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-populator-controller-rhel9@sha256:35312db76b0fb0c919de5ad49cbd300f35472d06141eb0e50f6b874dea1fbba2"
 
-ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:10041667468af75a324f48ee7c3ff2c6771a0d614f13e517558f0ae54790ae5c"
+ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:aedaf63776f840fd8e03cfdbf9bdb92e962184b700792eee14f3e8947a2dcd68"
 
-ARG CLI_DOWNLOAD_IMAGE="registry.redhat.io/mtv-candidate/mtv-cli-download-rhel9@sha256:96e749110606c10fc20a87dfb7f9985d02fcbb72835847420fc5c7a5f7a14d8d"
+ARG CLI_DOWNLOAD_IMAGE="registry.redhat.io/mtv-candidate/mtv-cli-download-rhel9@sha256:f3d424fa2bda7a560d3f4da31ec5884d1bbe15790711537458901f1cead7bfa6"
 
 ARG VALIDATION_IMAGE="registry.redhat.io/mtv-candidate/mtv-validation-rhel9@sha256:4137b8a118cc753ffced7ca30ac8914fd1ef0ecf6fd7945a7e77045237f1494e"
 
 ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel10@sha256:fd31d97ebcafc5e12634a9060efae99c5de163d5148794771ce664b2ffbaa740"
 
-ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:003b562b570c9fb90c2fdfafb4570eee4019d6eb66474f55ea6abbb949661f22"
+ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:be8809a13f3e90db3e3db73fbf855f2cdaf624f665f61e587a9b2897873e760e"
 
 USER root
 
