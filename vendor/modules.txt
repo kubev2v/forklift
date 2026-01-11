@@ -192,8 +192,8 @@ github.com/gorilla/websocket
 # github.com/hashicorp/go-uuid v1.0.3
 ## explicit
 github.com/hashicorp/go-uuid
-# github.com/imdario/mergo v0.3.7
-## explicit
+# github.com/imdario/mergo v0.3.16
+## explicit; go 1.13
 github.com/imdario/mergo
 # github.com/josharian/intern v1.0.0
 ## explicit; go 1.5
