@@ -94,6 +94,12 @@ func RecordPlanMetrics(c client.Client) {
 				if m.Status.HasCondition(Executing) {
 					key = fmt.Sprintf("%s|%s|%s|%s", Executing, provider, mode, target)
 					plansCounterMap[key]++
+
+					// If plan is executing, create an alert metric
+					phase = Executing
+					alertKey := fmt.Sprintf("%s|%s|%s|%s", key, planUID, planName, phase)
+					activePlanAlertStatuses[alertKey] = struct{}{}
+					planAlertsMap[alertKey] = struct{}{}
 				}
 				if m.Status.HasCondition(Running) {
 					key = fmt.Sprintf("%s|%s|%s|%s", Running, provider, mode, target)

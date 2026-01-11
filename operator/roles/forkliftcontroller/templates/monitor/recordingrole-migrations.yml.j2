@@ -12,3 +12,38 @@ spec:
       expr: max by(status, provider, mode, target) (mtv_migrations_status_total)
       labels:
         app: {{ app_name }}
+    - record: mtv_migration_net_throughput
+      expr: |
+        sum by (plan_id, plan_name) (
+          label_replace(
+            sum by (pod) (
+              rate(container_network_transmit_bytes_total{interface!="lo"}[2m]) +
+              rate(container_network_receive_bytes_total{interface!="lo"}[2m])
+            )
+            * on (pod) group_left(label_plan)
+            (
+              kube_pod_labels{label_plan!="", label_forklift_app!~"virt-v2v.*"}
+            ),
+            "plan_id", "$1", "label_plan", "(.*)"
+          )
+        ) * on (plan_id) group_left(plan_name) label_replace(
+          group by (plan, plan_name) (mtv_plan_alert_status{status!="Failed", mode=~"Warm"}),
+          "plan_id", "$1", "plan", "(.*)"
+        )
+        or
+        sum by (plan_id, plan_name) (
+          label_replace(
+            sum by (pod) (
+              rate(container_network_transmit_bytes_total{interface!="lo"}[2m]) +
+              rate(container_network_receive_bytes_total{interface!="lo"}[2m])
+            )
+            * on (pod) group_left(label_plan)
+            (
+              kube_pod_labels{label_plan!="", label_forklift_app!~"virt-v2v-inspector"}
+            ),
+            "plan_id", "$1", "label_plan", "(.*)"
+          )
+        ) * on (plan_id) group_left(plan_name) label_replace(
+          group by (plan, plan_name) (mtv_plan_alert_status{status!="Failed", mode=~"Cold"}),
+          "plan_id", "$1", "plan", "(.*)"
+        )
