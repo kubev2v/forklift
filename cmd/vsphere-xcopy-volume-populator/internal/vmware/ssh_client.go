@@ -26,10 +26,13 @@ type ESXiSSHClient struct {
 	username   string
 	sshClient  *ssh.Client
 	privateKey []byte
+	scriptUUID string // UUID of the uploaded script file
 }
 
-func NewSSHClient() SSHClient {
-	return &ESXiSSHClient{}
+func NewSSHClient(scriptUUID string) SSHClient {
+	return &ESXiSSHClient{
+		scriptUUID: scriptUUID,
+	}
 }
 
 func (c *ESXiSSHClient) Connect(ctx context.Context, hostname, username string, privateKey []byte) error {
@@ -77,7 +80,7 @@ func (c *ESXiSSHClient) Connect(ctx context.Context, hostname, username string, 
 }
 
 // ExecuteCommand executes a command using the SSH_ORIGINAL_COMMAND pattern
-// Uses structured format: DS=<datastore>;CMD=<operation> <args...>
+// Uses structured format: DS=<datastore>;UUID=<uuid>;CMD=<operation> <args...>
 // If datastore is empty, only tests connectivity without calling the wrapper
 func (c *ESXiSSHClient) ExecuteCommand(datastore, sshCommand string, args ...string) (string, error) {
 	if c.sshClient == nil {
@@ -97,9 +100,11 @@ func (c *ESXiSSHClient) ExecuteCommand(datastore, sshCommand string, args ...str
 		cmdPart = fmt.Sprintf("%s %s", sshCommand, strings.Join(args, " "))
 	}
 
-	// Build structured command: DS=<datastore>;CMD=<command>
-	// For connectivity tests, datastore can be empty
-	fullCommand := fmt.Sprintf("DS=%s;CMD=%s", datastore, cmdPart)
+	// Build structured command: DS=<datastore>;UUID=<uuid>;CMD=<command>
+	// For connectivity tests, datastore can be empty (UUID will also be empty)
+	// UUID identifies the specific script file to execute
+	uuidPart := c.scriptUUID
+	fullCommand := fmt.Sprintf("DS=%s;UUID=%s;CMD=%s", datastore, uuidPart, cmdPart)
 
 	klog.V(2).Infof("Executing SSH command: %s", fullCommand)
 
@@ -186,9 +191,14 @@ func EnableSSHAccess(ctx context.Context, vmwareClient Client, host *object.Host
 	}
 
 	// Step 8: Manual SSH key installation required for all ESXi versions
+	// The restrictedPublicKey already contains the UUID-based template from util.RestrictedSSHCommandTemplate
 	klog.Errorf("Manual SSH key installation required. Please add the following line to /etc/ssh/keys-root/authorized_keys on the ESXi host:")
 	klog.Errorf("")
 	klog.Errorf("  %s", restrictedPublicKey)
+	klog.Errorf("")
+	klog.Errorf("This command uses UUID-based script execution to prevent race conditions.")
+	klog.Errorf("The template extracts UUID from commands (DS=<datastore>;UUID=<uuid>;CMD=<command>)")
+	klog.Errorf("and executes: /vmfs/volumes/$DS/secure-vmkfstools-wrapper-$UUID.py")
 	klog.Errorf("")
 	klog.Errorf("Steps to manually configure SSH key:")
 	klog.Errorf("1. SSH to the ESXi host: ssh root@%s", hostIP)
