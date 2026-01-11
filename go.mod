@@ -34,7 +34,7 @@ require (
 	github.com/prometheus/common v0.55.0
 	github.com/vmware/govmomi v0.50.0
 	go.uber.org/mock v0.4.0
-	go.uber.org/zap v1.27.0
+	go.uber.org/zap v1.27.1
 	golang.org/x/crypto v0.41.0
 	golang.org/x/net v0.43.0
 	gopkg.in/yaml.v2 v2.4.0

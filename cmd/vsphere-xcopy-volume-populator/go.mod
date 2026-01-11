@@ -49,7 +49,7 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
-	go.uber.org/zap v1.27.0 // indirect
+	go.uber.org/zap v1.27.1 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/oauth2 v0.29.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
