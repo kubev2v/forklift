@@ -138,6 +138,7 @@ var osMap = map[string]string{
 	"win2000ProGuest":            "win2k",
 	"win2000ServGuest":           "win2k",
 	"windows7Guest":              "win7",
+	"windows7_64Guest":           "win7",
 	"windows7Server64Guest":      "win2k8r2",
 	"windows8_64Guest":           "win8",
 	"windows8Guest":              "win8",
