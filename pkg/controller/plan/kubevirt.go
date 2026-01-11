@@ -108,6 +108,8 @@ const (
 	kDV = "isDV"
 	// Populator secret
 	kPopulator = "isPopulator"
+	// V2V conversion secret
+	kV2V = "isV2V"
 	// Resource label
 	kResource = "resource"
 )
@@ -1020,6 +1022,7 @@ func (r *KubeVirt) getListOptionsNamespaced() (listOptions *client.ListOptions) 
 // Ensure the guest conversion/inspection (virt-v2v) pod exists on the destination.
 func (r *KubeVirt) EnsureVirtV2vPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvcs []*core.PersistentVolumeClaim, podType int, step *plan.Step) (err error) {
 	labels := r.vmLabels(vm.Ref)
+	labels[kV2V] = "true"
 	v2vSecret, err := r.ensureSecret(vm.Ref, r.secretDataSetterForCDI(vm.Ref), labels)
 	if err != nil {
 		return
@@ -2717,6 +2720,8 @@ func (r *KubeVirt) ensureSecret(vmRef ref.Ref, setSecretData func(*core.Secret) 
 	}
 	if len(list.Items) > 0 {
 		secret = &list.Items[0]
+		// Copy Data because Builder.Secret() puts credentials (accessKeyId, secretKey) there, not in StringData.
+		secret.Data = newSecret.Data
 		secret.StringData = newSecret.StringData
 		err = r.Destination.Client.Update(context.TODO(), secret)
 		if err != nil {
