@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
-
+	"net/http"
+	
 	"github.com/dell/gopowerstore"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/fcutil"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
@@ -315,6 +316,10 @@ func NewPowerstoreClonner(hostname, username, password string, sslSkipVerify boo
 		return PowerstoreClonner{}, fmt.Errorf("failed to create PowerStore client: %w", err)
 	}
 
+	client.SetCustomHTTPHeaders(http.Header{
+		"Application-Type": { "MTV" },
+	})
+	
 	ctx := context.Background()
 	_, err = client.GetCluster(ctx)
 	if err != nil {
