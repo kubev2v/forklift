@@ -142,6 +142,7 @@ type Host struct {
 	Status             string             `sql:""`
 	InMaintenanceMode  bool               `sql:""`
 	ManagementServerIp string             `sql:""`
+	ManagementIPs      []string           `sql:""`
 	Thumbprint         string             `sql:""`
 	Timezone           string             `sql:""`
 	CpuSockets         int16              `sql:""`
@@ -242,6 +243,7 @@ type PNIC struct {
 
 type VNIC struct {
 	Key        string `json:"key"`
+	Device     string `json:"device"`
 	PortGroup  string `json:"portGroup"`
 	DPortGroup string `json:"dPortGroup"`
 	IpAddress  string `json:"ipAddress"`

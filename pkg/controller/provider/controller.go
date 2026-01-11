@@ -42,7 +42,7 @@ import (
 	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	libref "github.com/kubev2v/forklift/pkg/lib/ref"
-	"github.com/kubev2v/forklift/pkg/lib/sshkeys"
+	"github.com/kubev2v/forklift/pkg/lib/util"
 	"github.com/kubev2v/forklift/pkg/settings"
 	"golang.org/x/crypto/ssh"
 	v1 "k8s.io/api/core/v1"
@@ -475,11 +475,11 @@ func (r *Reconciler) ensureSSHKeys(provider *api.Provider) error {
 	}
 
 	// Check if SSH keys already exist
-	privateSecretName, err := sshkeys.GenerateSSHPrivateSecretName(providerName)
+	privateSecretName, err := util.GenerateSSHPrivateSecretName(providerName)
 	if err != nil {
 		return fmt.Errorf("failed to generate SSH private secret name: %w", err)
 	}
-	publicSecretName, err := sshkeys.GenerateSSHPublicSecretName(providerName)
+	publicSecretName, err := util.GenerateSSHPublicSecretName(providerName)
 	if err != nil {
 		return fmt.Errorf("failed to generate SSH public secret name: %w", err)
 	}
@@ -544,7 +544,7 @@ func (r *Reconciler) getSSHKeySecret(namespace, secretName string) (*v1.Secret, 
 
 // storeSSHKeySecret creates or updates an SSH key secret
 func (r *Reconciler) storeSSHKeySecret(namespace, secretName, keyName string, keyData []byte, provider *api.Provider) error {
-	providerLabel, err := sshkeys.SanitizeProviderName(provider.Name)
+	providerLabel, err := util.SanitizeProviderName(provider.Name)
 	if err != nil {
 		return fmt.Errorf("failed to sanitize provider name for secret label: %w", err)
 	}

@@ -6,6 +6,7 @@ import (
 
 	"encoding/json"
 	"encoding/xml"
+
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
 	"github.com/vmware/govmomi/object"
 
@@ -23,9 +24,9 @@ func NewSSHTaskExecutor(sshClient vmware.SSHClient) TaskExecutor {
 	}
 }
 
-func (e *SSHTaskExecutor) StartClone(_ context.Context, _ *object.HostSystem, sourcePath, targetLUN string) (*vmkfstoolsTask, error) {
-	klog.Infof("Starting vmkfstools clone: source=%s, target=%s", sourcePath, targetLUN)
-	output, err := e.sshClient.ExecuteCommand("--clone", "-s", sourcePath, "-t", targetLUN)
+func (e *SSHTaskExecutor) StartClone(_ context.Context, _ *object.HostSystem, datastore, sourcePath, targetLUN string) (*vmkfstoolsTask, error) {
+	klog.Infof("Starting vmkfstools clone: datastore=%s, source=%s, target=%s", datastore, sourcePath, targetLUN)
+	output, err := e.sshClient.ExecuteCommand(datastore, "--clone", "-s", sourcePath, "-t", targetLUN)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start clone: %w", err)
 	}
@@ -41,10 +42,10 @@ func (e *SSHTaskExecutor) StartClone(_ context.Context, _ *object.HostSystem, so
 	return t, nil
 }
 
-func (e *SSHTaskExecutor) GetTaskStatus(_ context.Context, _ *object.HostSystem, taskId string) (*vmkfstoolsTask, error) {
-	klog.V(2).Infof("Getting task status for %s", taskId)
+func (e *SSHTaskExecutor) GetTaskStatus(_ context.Context, _ *object.HostSystem, datastore, taskId string) (*vmkfstoolsTask, error) {
+	klog.V(2).Infof("Getting task status for %s (datastore=%s)", taskId, datastore)
 
-	output, err := e.sshClient.ExecuteCommand("--task-get", "-i", taskId)
+	output, err := e.sshClient.ExecuteCommand(datastore, "--task-get", "-i", taskId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get task status: %w", err)
 	}
@@ -60,10 +61,10 @@ func (e *SSHTaskExecutor) GetTaskStatus(_ context.Context, _ *object.HostSystem,
 	return t, nil
 }
 
-func (e *SSHTaskExecutor) CleanupTask(ctx context.Context, host *object.HostSystem, taskId string) error {
-	klog.Infof("Cleaning up task %s", taskId)
+func (e *SSHTaskExecutor) CleanupTask(_ context.Context, _ *object.HostSystem, datastore, taskId string) error {
+	klog.Infof("Cleaning up task %s (datastore=%s)", taskId, datastore)
 
-	output, err := e.sshClient.ExecuteCommand("--task-clean", "-i", taskId)
+	output, err := e.sshClient.ExecuteCommand(datastore, "--task-clean", "-i", taskId)
 	if err != nil {
 		return fmt.Errorf("failed to cleanup task: %w", err)
 	}

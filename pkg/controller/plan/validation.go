@@ -217,6 +217,11 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		return err
 	}
 
+	// Validate SSH readiness for plans using xcopy with SSH-enabled providers
+	if err = r.validateSSHReadiness(plan); err != nil {
+		return err
+	}
+
 	return nil
 }
 
