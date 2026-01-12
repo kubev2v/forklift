@@ -720,10 +720,10 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				)
 				if err != nil {
 					if k8serr.IsNotFound(err) {
-						errMsg := fmt.Sprintf("CustomizationScripts ConfigMap '%s' not found in namespace '%s'",
+						errMsg := fmt.Errorf("CustomizationScripts ConfigMap '%s' not found in namespace '%s'",
 							configMapName, configMapNamespace)
-						r.Log.Error(fmt.Errorf(errMsg), "Failed to find customization scripts ConfigMap")
-						step.AddError(errMsg)
+						r.Log.Error(errMsg, "Failed to find customization scripts ConfigMap")
+						step.AddError(errMsg.Error())
 						err = nil
 						break
 					}
