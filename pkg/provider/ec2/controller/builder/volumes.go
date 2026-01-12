@@ -14,87 +14,12 @@ import (
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
 const (
 	// EBSCSIDriver is the CSI driver name for AWS EBS volumes.
 	EBSCSIDriver = "ebs.csi.aws.com"
 )
-
-// DataVolumes builds CDI DataVolume specs for an EC2 instance's EBS volumes.
-// Creates blank DataVolumes with proper sizing and storage class mapping for each block device.
-// Note: EC2 provider uses direct volume creation instead of DataVolumes for migration.
-func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume, vddkConfigMap *core.ConfigMap) ([]cdi.DataVolume, error) {
-	region, err := r.getRegion()
-	if err != nil {
-		r.log.Error(err, "Failed to get AWS region", "vm", vmRef.Name)
-		return nil, liberr.Wrap(err)
-	}
-
-	awsInstance, err := inventory.GetAWSInstance(r.Source.Inventory, vmRef)
-	if err != nil {
-		return nil, err
-	}
-
-	name := inventory.GetInstanceName(awsInstance)
-
-	var dataVolumes []cdi.DataVolume
-
-	devices, found := inventory.GetBlockDevices(awsInstance)
-	if !found {
-		return dataVolumes, nil
-	}
-
-	for i, dev := range devices {
-		volumeID := inventory.ExtractEBSVolumeID(dev)
-		if volumeID == "" {
-			continue
-		}
-
-		sizeGiB := inventory.GetVolumeSize(r.Source.Inventory, volumeID)
-		if sizeGiB == 0 {
-			sizeGiB = 10
-		}
-
-		volumeType := inventory.GetVolumeType(r.Source.Inventory, volumeID)
-		storageClass := r.findStorageMapping(volumeType)
-
-		diskName := fmt.Sprintf("disk%d", i)
-		dvName := fmt.Sprintf("%s-%s", name, diskName)
-
-		dv := cdi.DataVolume{
-			ObjectMeta: meta.ObjectMeta{
-				Name:      dvName,
-				Namespace: r.Plan.Spec.TargetNamespace,
-				Labels:    r.Labeler.VMLabels(vmRef),
-				Annotations: map[string]string{
-					"forklift.konveyor.io/disk-source":                 "ec2",
-					"forklift.konveyor.io/volume-id":                   volumeID,
-					"forklift.konveyor.io/region":                      region,
-					"cdi.kubevirt.io/storage.bind.immediate.requested": "true",
-				},
-			},
-			Spec: cdi.DataVolumeSpec{
-				Source: &cdi.DataVolumeSource{
-					Blank: &cdi.DataVolumeBlankImage{},
-				},
-				Storage: &cdi.StorageSpec{
-					Resources: core.VolumeResourceRequirements{
-						Requests: core.ResourceList{
-							core.ResourceStorage: resource.MustParse(fmt.Sprintf("%dGi", sizeGiB)),
-						},
-					},
-					StorageClassName: &storageClass,
-				},
-			},
-		}
-
-		dataVolumes = append(dataVolumes, dv)
-	}
-
-	return dataVolumes, nil
-}
 
 // GetVolumeSize retrieves EBS volume size in GiB from inventory, trying volume first then snapshot.
 // Falls back to 100 GiB default if both lookups fail. Handles int64/float64 JSON type variations.
@@ -161,15 +86,6 @@ func (r *Builder) calculatePVCSize(volumeSizeBytes int64, volumeMode *core.Persi
 	)
 
 	return resource.NewQuantity(sizeWithOverhead, resource.BinarySI)
-}
-
-// ResolveDataVolumeIdentifier extracts the EBS volume ID from a DataVolume's annotations.
-// Used to map DataVolumes back to their source EBS volumes during migration.
-func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
-	if dv.ObjectMeta.Annotations != nil {
-		return dv.ObjectMeta.Annotations["forklift.konveyor.io/volume-id"]
-	}
-	return ""
 }
 
 // ResolvePersistentVolumeClaimIdentifier extracts the EBS volume ID from a PVC's annotations.

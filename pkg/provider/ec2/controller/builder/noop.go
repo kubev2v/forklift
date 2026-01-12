@@ -4,6 +4,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	core "k8s.io/api/core/v1"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
 // ConfigMap is a no-op for EC2 - VM configuration derived from EC2 instance metadata, not ConfigMaps.
@@ -40,4 +41,14 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 func (r *Builder) PreferenceName(vmRef ref.Ref, configMap *core.ConfigMap) (name string, err error) {
 	err = liberr.New("preferences are not used by this provider")
 	return
+}
+
+// DataVolumes is a no-op for EC2 - uses direct PV/PVC creation from EBS volumes instead of CDI DataVolumes.
+func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume, vddkConfigMap *core.ConfigMap) ([]cdi.DataVolume, error) {
+	return nil, nil
+}
+
+// ResolveDataVolumeIdentifier is a no-op for EC2 - EC2 doesn't create DataVolumes, so nothing to resolve.
+func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
+	return ""
 }
