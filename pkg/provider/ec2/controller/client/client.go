@@ -9,7 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
-	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
@@ -118,16 +117,6 @@ func (r *Client) Close() {
 	r.sourceClient = nil
 	r.targetClient = nil
 	r.crossAccount = false
-}
-
-// Disconnect is a no-op for EC2 - AWS SDK clients are stateless, no persistent connections.
-func (r *Client) Disconnect() error {
-	return nil
-}
-
-// DetachDisks is a no-op for EC2 - snapshots created from attached volumes after instance shutdown.
-func (r *Client) DetachDisks(vmRef ref.Ref) error {
-	return nil
 }
 
 // getSourceClient returns the source account EC2 client for snapshot and power operations.

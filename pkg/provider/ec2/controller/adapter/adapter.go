@@ -43,11 +43,9 @@ func (r *Adapter) Validator(ctx *plancontext.Context) (base.Validator, error) {
 }
 
 // Client returns EC2-specific client for instance operations: power management, snapshots, volumes.
-// Wrapped in NoopClient to provide no-op implementations for unsupported warm migration methods.
+// EC2 only supports cold migration, so warm migration methods (SetCheckpoints, GetSnapshotDeltas) are no-ops.
 func (r *Adapter) Client(ctx *plancontext.Context) (base.Client, error) {
-	return &NoopClient{
-		Client: &client.Client{Context: ctx},
-	}, nil
+	return &client.Client{Context: ctx}, nil
 }
 
 // DestinationClient returns destination client for managing direct volume ownership.

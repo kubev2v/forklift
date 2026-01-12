@@ -15,7 +15,7 @@ import (
 // Returns a map of volumeID -> snapshotID.
 func (r *Migrator) getSnapshotIDs(vm *planapi.VMStatus) (map[string]string, error) {
 	ec2Client := r.getEC2Client()
-	return ec2Client.Client.GetSnapshotsForVM(vm.Ref)
+	return ec2Client.GetSnapshotsForVM(vm.Ref)
 }
 
 // createSnapshots creates EBS snapshots for all volumes attached to the VM.
@@ -60,7 +60,7 @@ func (r *Migrator) waitForSnapshots(vm *planapi.VMStatus) (bool, error) {
 
 	// Get snapshot IDs from AWS tags
 	ec2Client := r.getEC2Client()
-	snapshotIDString, err := ec2Client.Client.GetSnapshotIDsForVM(vm.Ref)
+	snapshotIDString, err := ec2Client.GetSnapshotIDsForVM(vm.Ref)
 	if err != nil {
 		r.log.Error(err, "Failed to get snapshot IDs from AWS", "vm", vm.Name)
 		return false, liberr.Wrap(err)
@@ -107,7 +107,7 @@ func (r *Migrator) shareSnapshots(vm *planapi.VMStatus) (bool, error) {
 	ec2Client := r.getEC2Client()
 
 	// Skip if not cross-account mode
-	if !ec2Client.Client.IsCrossAccount() {
+	if !ec2Client.IsCrossAccount() {
 		r.log.Info("Same-account mode, skipping snapshot sharing", "vm", vm.Name)
 		return true, nil
 	}
@@ -115,7 +115,7 @@ func (r *Migrator) shareSnapshots(vm *planapi.VMStatus) (bool, error) {
 	r.log.Info("Sharing snapshots with target account", "vm", vm.Name)
 
 	// Get target account ID
-	targetAccountID, err := ec2Client.Client.GetTargetAccountID()
+	targetAccountID, err := ec2Client.GetTargetAccountID()
 	if err != nil {
 		r.log.Error(err, "Failed to get target account ID", "vm", vm.Name)
 		return false, liberr.Wrap(err)
@@ -126,7 +126,7 @@ func (r *Migrator) shareSnapshots(vm *planapi.VMStatus) (bool, error) {
 		"targetAccountID", targetAccountID)
 
 	// Get snapshot IDs from AWS tags
-	snapshotMap, err := ec2Client.Client.GetSnapshotsForVM(vm.Ref)
+	snapshotMap, err := ec2Client.GetSnapshotsForVM(vm.Ref)
 	if err != nil {
 		r.log.Error(err, "Failed to get snapshots from AWS", "vm", vm.Name)
 		return false, liberr.Wrap(err)
@@ -146,7 +146,7 @@ func (r *Migrator) shareSnapshots(vm *planapi.VMStatus) (bool, error) {
 			"volumeID", volumeID,
 			"targetAccountID", targetAccountID)
 
-		err := ec2Client.Client.ShareSnapshot(snapshotID, targetAccountID)
+		err := ec2Client.ShareSnapshot(snapshotID, targetAccountID)
 		if err != nil {
 			r.log.Error(err, "Failed to share snapshot",
 				"vm", vm.Name,
@@ -190,7 +190,7 @@ func (r *Migrator) cleanupSnapshots(vm *planapi.VMStatus) {
 	ec2Client := r.getEC2Client()
 
 	// Get snapshot IDs from AWS tags
-	snapshotIDString, err := ec2Client.Client.GetSnapshotIDsForVM(vm.Ref)
+	snapshotIDString, err := ec2Client.GetSnapshotIDsForVM(vm.Ref)
 	if err != nil {
 		r.log.Info("Failed to query snapshots from AWS", "vm", vm.Name, "error", err)
 		return
@@ -238,7 +238,7 @@ func (r *Migrator) cleanupCreatedVolumes(vm *planapi.VMStatus) {
 		"volumeCount", len(volumeIDs))
 
 	ec2Client := r.getEC2Client()
-	err = ec2Client.Client.RemoveVolumes(vm.Ref, volumeIDs)
+	err = ec2Client.RemoveVolumes(vm.Ref, volumeIDs)
 	if err != nil {
 		r.log.Error(err, "Failed to remove created volumes", "vm", vm.Name)
 		r.log.Info("Continuing despite volume cleanup error", "vm", vm.Name)
@@ -262,7 +262,7 @@ func (r *Migrator) markSnapshotStepRunning(vm *planapi.VMStatus) error {
 // Returns true if snapshots are found (tagged with VM name), skipping redundant creation.
 func (r *Migrator) snapshotsAlreadyCreated(vm *planapi.VMStatus) bool {
 	ec2Client := r.getEC2Client()
-	snapshotMap, err := ec2Client.Client.GetSnapshotsForVM(vm.Ref)
+	snapshotMap, err := ec2Client.GetSnapshotsForVM(vm.Ref)
 	if err == nil && len(snapshotMap) > 0 {
 		r.log.Info("Snapshots already exist in AWS, skipping creation",
 			"vm", vm.Name,

@@ -11,6 +11,7 @@ import (
 	migbase "github.com/kubev2v/forklift/pkg/controller/plan/migrator/base"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	ec2adapter "github.com/kubev2v/forklift/pkg/provider/ec2/controller/adapter"
+	ec2client "github.com/kubev2v/forklift/pkg/provider/ec2/controller/client"
 	ec2ensurer "github.com/kubev2v/forklift/pkg/provider/ec2/controller/ensurer"
 )
 
@@ -57,12 +58,12 @@ func New(ctx *plancontext.Context) (migbase.Migrator, error) {
 		return nil, err
 	}
 
-	noopCli, ok := client.(*ec2adapter.NoopClient)
+	ec2Cli, ok := client.(*ec2client.Client)
 	if !ok {
-		return nil, fmt.Errorf("failed to type assert client to *ec2adapter.NoopClient, got %T", client)
+		return nil, fmt.Errorf("failed to type assert client to *ec2client.Client, got %T", client)
 	}
 
-	if err = noopCli.Client.Connect(); err != nil {
+	if err = ec2Cli.Connect(); err != nil {
 		log.Error(err, "Failed to connect EC2 client")
 		return nil, err
 	}
@@ -119,6 +120,6 @@ func (r *Migrator) getEnsurer() *ec2ensurer.Ensurer {
 }
 
 // getEC2Client returns the EC2-specific client for direct AWS API operations.
-func (r *Migrator) getEC2Client() *ec2adapter.NoopClient {
-	return r.adpClient.(*ec2adapter.NoopClient)
+func (r *Migrator) getEC2Client() *ec2client.Client {
+	return r.adpClient.(*ec2client.Client)
 }
