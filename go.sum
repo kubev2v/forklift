@@ -888,8 +888,8 @@ kubevirt.io/api v1.6.0-beta.0.0.20250702170314-dd941825f5d3 h1:7DeToiNAgDlkShV0X
 kubevirt.io/api v1.6.0-beta.0.0.20250702170314-dd941825f5d3/go.mod h1:NU90RB72PMMTfN6jN5ca1HLyBqW7aj6RypJlF9QYNhc=
 kubevirt.io/containerized-data-importer-api v1.63.1-0.20251115214221-0b4e9b5c9c59 h1:dEVxWfRRNzrUzQKYjKQ9Olv2zAdnD+8hz5Y11vKvq88=
 kubevirt.io/containerized-data-importer-api v1.63.1-0.20251115214221-0b4e9b5c9c59/go.mod h1:VGp35wxpLXU18b7cnEpmcThI3AjcZUSfg/Zfql44U4o=
-kubevirt.io/controller-lifecycle-operator-sdk/api v0.0.0-20220329064328-f3cc58c6ed90 h1:QMrd0nKP0BGbnxTqakhDZAUhGKxPiPiN5gSDqKUmGGc=
-kubevirt.io/controller-lifecycle-operator-sdk/api v0.0.0-20220329064328-f3cc58c6ed90/go.mod h1:018lASpFYBsYN6XwmA2TIrPCx6e0gviTd/ZNtSitKgc=
+kubevirt.io/controller-lifecycle-operator-sdk/api v0.2.4 h1:fZYvD3/Vnitfkx6IJxjLAk8ugnZQ7CXVYcRfkSKmuZY=
+kubevirt.io/controller-lifecycle-operator-sdk/api v0.2.4/go.mod h1:018lASpFYBsYN6XwmA2TIrPCx6e0gviTd/ZNtSitKgc=
 libvirt.org/go/libvirt v1.10009.1 h1:Z79EnxEVE190MeULGoq1GY0tb+O18FpYzUNYDHgkrN8=
 libvirt.org/go/libvirt v1.10009.1/go.mod h1:1WiFE8EjZfq+FCVog+rvr1yatKbKZ9FaFMZgEqxEJqQ=
 libvirt.org/go/libvirtxml v1.11009.0 h1:uWJ8FKxqJkX80nVIJ3vsSCNg7hcc8SvNonnKwGPeRx8=
