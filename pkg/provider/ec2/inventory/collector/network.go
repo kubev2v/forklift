@@ -39,10 +39,8 @@ func (r *Collector) collectNetworks(ctx context.Context) error {
 			m.CIDR = *awsVpc.CidrBlock
 		}
 
-		if err := m.SetObject(awsVpc); err != nil {
-			r.log.Error(err, "Failed to marshal VPC", "vpcId", m.UID)
-			continue
-		}
+		// VPCs don't populate the Subnet Object field (only subnets do)
+		// The Object field remains zero-valued for VPCs
 
 		// Check if record exists and has changed
 		existing := &model.Network{}
@@ -100,10 +98,8 @@ func (r *Collector) collectNetworks(ctx context.Context) error {
 			m.CIDR = *awsSubnet.CidrBlock
 		}
 
-		if err := m.SetObject(awsSubnet); err != nil {
-			r.log.Error(err, "Failed to marshal Subnet", "subnetId", m.UID)
-			continue
-		}
+		// Store complete AWS subnet object
+		m.Object = awsSubnet
 
 		// Check if record exists and has changed
 		existing := &model.Network{}

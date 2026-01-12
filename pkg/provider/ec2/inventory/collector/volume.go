@@ -41,11 +41,8 @@ func (r *Collector) collectVolumes(ctx context.Context) error {
 			m.Size = int64(*awsVolume.Size) // Size in GiB
 		}
 
-		// Store complete AWS volume as JSON
-		if err := m.SetObject(awsVolume); err != nil {
-			r.log.Error(err, "Failed to marshal volume", "volumeId", m.UID)
-			continue
-		}
+		// Store complete AWS volume object
+		m.Object = awsVolume
 
 		// Check if record exists and has changed
 		existing := &model.Volume{}

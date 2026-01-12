@@ -1,7 +1,6 @@
 package model
 
 import (
-	"encoding/json"
 	"reflect"
 
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -19,17 +18,14 @@ const (
 // Base Model
 //
 
-// Base model with indexed fields + JSON object storage for flexible schema.
-// Indexes essential fields for efficient queries, preserves complete AWS data in Object field.
+// Base model with indexed fields for efficient queries.
+// Each resource type adds its own typed Object field.
 type Base struct {
 	UID      string `sql:"pk"`                             // Primary key - AWS resource ID
 	Name     string `sql:"d0,index(name)"`                 // Resource name
 	Kind     string `sql:"d0,index(kind)"`                 // Resource type (Instance, Volume, Network, Storage)
 	Provider string `sql:"d0,index(provider)"`             // Provider UID
 	Revision int64  `sql:"incremented,d0,index(revision)"` // Change tracking for updates
-
-	// Complete AWS object as JSON - stores full AWS API response
-	Object string `sql:"d0"` // JSON-encoded full object
 }
 
 //
@@ -46,29 +42,27 @@ func (m *Base) String() string {
 	return m.UID
 }
 
-// tagsContainer is used to extract AWS tags from the JSON object.
-// AWS resources store tags as an array of {Key, Value} objects.
-type tagsContainer struct {
-	Tags []struct {
-		Key   *string `json:"Key"`
-		Value *string `json:"Value"`
-	} `json:"Tags"`
+//
+// Resource-Specific Models
+//
+
+// Instance represents an EC2 instance (virtual machine).
+// Extends Base with additional indexed fields and typed AWS object.
+type Instance struct {
+	Base
+	InstanceType string            `sql:"d0,index(instanceType)"` // t2.micro, m5.large, etc.
+	State        string            `sql:"d0,index(state)"`        // running, stopped, terminated, etc.
+	Platform     string            `sql:"d0,index(platform)"`     // Linux, Windows, etc.
+	Object       ec2types.Instance `sql:"d0"`                     // Complete AWS Instance object
 }
 
-// Labels returns AWS tags as labels.
-// Extracts tags from the stored JSON object and converts them to libmodel.Labels.
-func (m *Base) Labels() libmodel.Labels {
-	var container tagsContainer
-	if err := json.Unmarshal([]byte(m.Object), &container); err != nil {
+// Labels returns AWS tags as labels for label-based filtering.
+func (m *Instance) Labels() libmodel.Labels {
+	if len(m.Object.Tags) == 0 {
 		return nil
 	}
-
-	if len(container.Tags) == 0 {
-		return nil
-	}
-
-	labels := make(libmodel.Labels, len(container.Tags))
-	for _, tag := range container.Tags {
+	labels := make(libmodel.Labels, len(m.Object.Tags))
+	for _, tag := range m.Object.Tags {
 		if tag.Key != nil && tag.Value != nil {
 			labels[*tag.Key] = *tag.Value
 		}
@@ -76,83 +70,51 @@ func (m *Base) Labels() libmodel.Labels {
 	return labels
 }
 
-// GetObject returns the stored AWS object.
-// Unmarshals the JSON Object field.
-func (m *Base) GetObject(obj interface{}) error {
-	return json.Unmarshal([]byte(m.Object), obj)
-}
-
-// SetObject stores an AWS object as JSON.
-// Marshals the provided object and stores it in the Object field.
-func (m *Base) SetObject(obj interface{}) error {
-	jsonBytes, err := json.Marshal(obj)
-	if err != nil {
-		return err
-	}
-	m.Object = string(jsonBytes)
-	return nil
-}
-
-// HasChanged checks if the model's data content has changed.
-// Compares name, kind, and object content (skips revision since it's a tracking field).
-// Returns true if any actual data differs.
-func (m *Base) HasChanged(new *Base) bool {
-	// Quick check: indexed fields that represent actual data
-	if m.Name != new.Name || m.Kind != new.Kind {
-		return true
-	}
-
-	// Deep check: JSON object content (handles key ordering differences)
-	var oldObj, newObj map[string]interface{}
-
-	if err := json.Unmarshal([]byte(m.Object), &oldObj); err != nil {
-		// Fallback to string comparison if unmarshal fails
-		return m.Object != new.Object
-	}
-
-	if err := json.Unmarshal([]byte(new.Object), &newObj); err != nil {
-		// Fallback to string comparison if unmarshal fails
-		return m.Object != new.Object
-	}
-
-	return !reflect.DeepEqual(oldObj, newObj)
-}
-
-//
-// Resource-Specific Models
-//
-
-// Instance represents an EC2 instance (virtual machine).
-// Extends Base with additional indexed fields for efficient querying.
-type Instance struct {
-	Base
-	InstanceType string `sql:"d0,index(instanceType)"` // t2.micro, m5.large, etc.
-	State        string `sql:"d0,index(state)"`        // running, stopped, terminated, etc.
-	Platform     string `sql:"d0,index(platform)"`     // Linux, Windows, etc.
-}
-
+// GetDetails returns the instance details for API responses.
 func (m *Instance) GetDetails() (*InstanceDetails, error) {
-	details := &InstanceDetails{}
-	err := m.GetObject(details)
-	if err != nil {
-		return nil, err
+	details := &InstanceDetails{
+		Instance: m.Object,
+		ID:       m.UID,
+		Name:     m.Name,
+		Kind:     m.Kind,
+		Provider: m.Provider,
+		Revision: m.Revision,
 	}
-	details.ID = m.UID
-	details.Name = m.Name
-	details.Kind = m.Kind
-	details.Provider = m.Provider
-	details.Revision = m.Revision
+
+	// Convert AWS BlockDeviceMappings to our simplified type
+	for _, bdm := range m.Object.BlockDeviceMappings {
+		mapping := InstanceBlockDeviceMapping{
+			DeviceName: bdm.DeviceName,
+		}
+		if bdm.Ebs != nil {
+			mapping.Ebs = &EbsInstanceBlockDevice{
+				VolumeId: bdm.Ebs.VolumeId,
+			}
+		}
+		details.BlockDeviceMappings = append(details.BlockDeviceMappings, mapping)
+	}
+
+	// Convert AWS NetworkInterfaces to our simplified type
+	for _, nic := range m.Object.NetworkInterfaces {
+		iface := InstanceNetworkInterface{
+			SubnetId:   nic.SubnetId,
+			MacAddress: nic.MacAddress,
+		}
+		details.NetworkInterfaces = append(details.NetworkInterfaces, iface)
+	}
+
 	return details, nil
 }
 
-// HasChanged checks if the instance has changed by comparing base fields and instance-specific fields.
+// HasChanged checks if the instance has changed.
 func (m *Instance) HasChanged(new *Instance) bool {
-	if m.Base.HasChanged(&new.Base) {
+	if m.Name != new.Name || m.Kind != new.Kind {
 		return true
 	}
-	return m.InstanceType != new.InstanceType ||
-		m.State != new.State ||
-		m.Platform != new.Platform
+	if m.InstanceType != new.InstanceType || m.State != new.State || m.Platform != new.Platform {
+		return true
+	}
+	return !reflect.DeepEqual(m.Object, new.Object)
 }
 
 type InstanceDetails struct {
@@ -166,52 +128,69 @@ type InstanceDetails struct {
 	Revision            int64                        `json:"revision"`
 }
 
+// InstanceBlockDeviceMapping represents a simplified block device mapping.
 type InstanceBlockDeviceMapping struct {
 	DeviceName  *string                 `json:"DeviceName,omitempty"`
 	Ebs         *EbsInstanceBlockDevice `json:"Ebs,omitempty"`
 	VirtualName *string                 `json:"VirtualName,omitempty"`
 }
 
+// EbsInstanceBlockDevice contains EBS-specific block device info.
 type EbsInstanceBlockDevice struct {
 	VolumeId *string `json:"VolumeId,omitempty"`
 }
 
+// InstanceNetworkInterface represents a simplified network interface.
 type InstanceNetworkInterface struct {
 	SubnetId   *string `json:"SubnetId,omitempty"`
 	MacAddress *string `json:"MacAddress,omitempty"`
 }
 
 // Volume represents an EBS volume (block storage).
-// Extends Base with volume-specific indexed fields.
+// Extends Base with volume-specific indexed fields and typed AWS object.
 type Volume struct {
 	Base
-	VolumeType string `sql:"d0,index(volumeType)"` // gp2, gp3, io1, io2, st1, sc1, etc.
-	State      string `sql:"d0,index(state)"`      // available, in-use, creating, deleting, etc.
-	Size       int64  `sql:"d0,index(size)"`       // Size in GB
+	VolumeType string          `sql:"d0,index(volumeType)"` // gp2, gp3, io1, io2, st1, sc1, etc.
+	State      string          `sql:"d0,index(state)"`      // available, in-use, creating, deleting, etc.
+	Size       int64           `sql:"d0,index(size)"`       // Size in GB
+	Object     ec2types.Volume `sql:"d0"`                   // Complete AWS Volume object
 }
 
-func (m *Volume) GetDetails() (*VolumeDetails, error) {
-	details := &VolumeDetails{}
-	err := m.GetObject(details)
-	if err != nil {
-		return nil, err
+// Labels returns AWS tags as labels for label-based filtering.
+func (m *Volume) Labels() libmodel.Labels {
+	if len(m.Object.Tags) == 0 {
+		return nil
 	}
-	details.ID = m.UID
-	details.Name = m.Name
-	details.Kind = m.Kind
-	details.Provider = m.Provider
-	details.Revision = m.Revision
-	return details, nil
+	labels := make(libmodel.Labels, len(m.Object.Tags))
+	for _, tag := range m.Object.Tags {
+		if tag.Key != nil && tag.Value != nil {
+			labels[*tag.Key] = *tag.Value
+		}
+	}
+	return labels
 }
 
-// HasChanged checks if the volume has changed by comparing base fields and volume-specific fields.
+// GetDetails returns the volume details for API responses.
+func (m *Volume) GetDetails() (*VolumeDetails, error) {
+	return &VolumeDetails{
+		Volume:   m.Object,
+		ID:       m.UID,
+		Name:     m.Name,
+		Kind:     m.Kind,
+		Provider: m.Provider,
+		Revision: m.Revision,
+	}, nil
+}
+
+// HasChanged checks if the volume has changed.
 func (m *Volume) HasChanged(new *Volume) bool {
-	if m.Base.HasChanged(&new.Base) {
+	if m.Name != new.Name || m.Kind != new.Kind {
 		return true
 	}
-	return m.VolumeType != new.VolumeType ||
-		m.State != new.State ||
-		m.Size != new.Size
+	if m.VolumeType != new.VolumeType || m.State != new.State || m.Size != new.Size {
+		return true
+	}
+	return !reflect.DeepEqual(m.Object, new.Object)
 }
 
 type VolumeDetails struct {
@@ -224,34 +203,53 @@ type VolumeDetails struct {
 }
 
 // Network represents VPC/Subnet networking resources.
-// Stores both VPCs and Subnets with network-specific indexed fields.
+// Stores Subnets with network-specific indexed fields and typed AWS object.
+// VPCs are stored with minimal data (no full object) since subnets are primary for migration.
 type Network struct {
 	Base
-	NetworkType string `sql:"d0,index(networkType)"` // vpc, subnet
-	CIDR        string `sql:"d0,index(cidr)"`        // CIDR block (e.g., 10.0.0.0/16)
+	NetworkType string          `sql:"d0,index(networkType)"` // vpc, subnet
+	CIDR        string          `sql:"d0,index(cidr)"`        // CIDR block (e.g., 10.0.0.0/16)
+	Object      ec2types.Subnet `sql:"d0"`                    // Complete AWS Subnet object (for subnets)
 }
 
-func (m *Network) GetDetails() (*NetworkDetails, error) {
-	details := &NetworkDetails{}
-	err := m.GetObject(details)
-	if err != nil {
-		return nil, err
+// Labels returns AWS tags as labels for label-based filtering.
+// For subnets, uses tags from the typed Object.
+// For VPCs, labels are not available (would require separate VPC object storage).
+func (m *Network) Labels() libmodel.Labels {
+	// Only subnets have the typed Object populated
+	if m.NetworkType != "subnet" || len(m.Object.Tags) == 0 {
+		return nil
 	}
-	details.ID = m.UID
-	details.Name = m.Name
-	details.Kind = m.Kind
-	details.Provider = m.Provider
-	details.Revision = m.Revision
-	return details, nil
+	labels := make(libmodel.Labels, len(m.Object.Tags))
+	for _, tag := range m.Object.Tags {
+		if tag.Key != nil && tag.Value != nil {
+			labels[*tag.Key] = *tag.Value
+		}
+	}
+	return labels
 }
 
-// HasChanged checks if the network has changed by comparing base fields and network-specific fields.
+// GetDetails returns the network details for API responses.
+func (m *Network) GetDetails() (*NetworkDetails, error) {
+	return &NetworkDetails{
+		Subnet:   m.Object,
+		ID:       m.UID,
+		Name:     m.Name,
+		Kind:     m.Kind,
+		Provider: m.Provider,
+		Revision: m.Revision,
+	}, nil
+}
+
+// HasChanged checks if the network has changed.
 func (m *Network) HasChanged(new *Network) bool {
-	if m.Base.HasChanged(&new.Base) {
+	if m.Name != new.Name || m.Kind != new.Kind {
 		return true
 	}
-	return m.NetworkType != new.NetworkType ||
-		m.CIDR != new.CIDR
+	if m.NetworkType != new.NetworkType || m.CIDR != new.CIDR {
+		return true
+	}
+	return !reflect.DeepEqual(m.Object, new.Object)
 }
 
 type NetworkDetails struct {
@@ -265,32 +263,50 @@ type NetworkDetails struct {
 
 // Storage represents EBS volume types (analogous to storage classes).
 // Used for mapping source volume types to target storage classes.
-// The Object field contains volume type details (IOPS limits, throughput, etc.).
+// Uses a custom StorageData struct since this is not an AWS API object.
 type Storage struct {
 	Base
-	VolumeType string `sql:"d0,index(volumeType)"` // gp2, gp3, io1, io2, st1, sc1, etc.
+	VolumeType string      `sql:"d0,index(volumeType)"` // gp2, gp3, io1, io2, st1, sc1, etc.
+	Object     StorageData `sql:"d0"`                   // Volume type details
 }
 
+// StorageData contains EBS volume type characteristics.
+type StorageData struct {
+	Type          string `json:"type"`
+	Description   string `json:"description"`
+	MaxIOPS       int32  `json:"maxIOPS"`
+	MaxThroughput int32  `json:"maxThroughput"`
+}
+
+// Labels returns nil since storage types don't have AWS tags.
+func (m *Storage) Labels() libmodel.Labels {
+	return nil
+}
+
+// GetDetails returns the storage details for API responses.
 func (m *Storage) GetDetails() (*StorageDetails, error) {
-	details := &StorageDetails{}
-	err := m.GetObject(details)
-	if err != nil {
-		return nil, err
-	}
-	details.ID = m.UID
-	details.Name = m.Name
-	details.Kind = m.Kind
-	details.Provider = m.Provider
-	details.Revision = m.Revision
-	return details, nil
+	return &StorageDetails{
+		ID:            m.UID,
+		Name:          m.Name,
+		Kind:          m.Kind,
+		Provider:      m.Provider,
+		Revision:      m.Revision,
+		Type:          m.Object.Type,
+		Description:   m.Object.Description,
+		MaxIOPS:       m.Object.MaxIOPS,
+		MaxThroughput: m.Object.MaxThroughput,
+	}, nil
 }
 
-// HasChanged checks if the storage has changed by comparing base fields and storage-specific fields.
+// HasChanged checks if the storage has changed.
 func (m *Storage) HasChanged(new *Storage) bool {
-	if m.Base.HasChanged(&new.Base) {
+	if m.Name != new.Name || m.Kind != new.Kind {
 		return true
 	}
-	return m.VolumeType != new.VolumeType
+	if m.VolumeType != new.VolumeType {
+		return true
+	}
+	return !reflect.DeepEqual(m.Object, new.Object)
 }
 
 type StorageDetails struct {
