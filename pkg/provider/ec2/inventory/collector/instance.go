@@ -43,11 +43,8 @@ func (r *Collector) collectInstances(ctx context.Context) error {
 		}
 		m.Platform = getPlatform(awsInstance.Platform, awsInstance.PlatformDetails)
 
-		// Store complete AWS instance as JSON
-		if err := m.SetObject(awsInstance); err != nil {
-			r.log.Error(err, "Failed to marshal instance", "instanceId", m.UID)
-			continue
-		}
+		// Store complete AWS instance object
+		m.Object = awsInstance
 
 		// Check if record exists and has changed
 		existing := &model.Instance{}

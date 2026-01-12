@@ -39,17 +39,12 @@ func (r *Collector) collectStorageTypes(ctx context.Context) error {
 		m.Provider = string(r.provider.UID)
 		m.VolumeType = volType.Type
 
-		// Store volume type details as JSON (includes human-readable description)
-		details := map[string]interface{}{
-			"type":          volType.Type,
-			"description":   volType.Description,
-			"maxIOPS":       volType.MaxIOPS,
-			"maxThroughput": volType.MaxThroughput,
-		}
-
-		if err := m.SetObject(details); err != nil {
-			r.log.Error(err, "Failed to marshal storage type", "type", volType.Type)
-			continue
+		// Store volume type details
+		m.Object = model.StorageData{
+			Type:          volType.Type,
+			Description:   volType.Description,
+			MaxIOPS:       volType.MaxIOPS,
+			MaxThroughput: volType.MaxThroughput,
 		}
 
 		// Check if record exists and has changed
