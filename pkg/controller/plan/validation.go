@@ -764,6 +764,8 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 
 	var sharedDisksConditions []libcnd.Condition
+	// Track VM IDs that pass shared disk validation to clear old conditions
+	sharedDisksValidatedVMs := make(map[string]bool)
 	setOf := map[string]bool{}
 	setOfTargetName := map[string]bool{}
 	//
@@ -992,6 +994,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			}
 			sharedDisks.Type = fmt.Sprintf("%s-%s", sharedDisks.Type, ref.ID)
 			sharedDisksConditions = append(sharedDisksConditions, sharedDisks)
+		} else {
+			// Validation passed - mark this VM as validated so we can clear any old conditions
+			sharedDisksValidatedVMs[ref.ID] = true
 		}
 		if settings.Settings.StaticUdnIpAddresses && plan.Spec.PreserveStaticIPs && plan.DestinationHasUdnNetwork(r.Client) {
 			ok, err = validator.UdnStaticIPs(*ref, ctx.Destination.Client)
@@ -1117,6 +1122,15 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(missingStaticIPs.Items) > 0 {
 		plan.Status.SetCondition(missingStaticIPs)
+	}
+	// Clear shared disk conditions for VMs that now pass validation
+	// (e.g., when disk sharing status changes from Multi-Write to nosharing on vCenter)
+	for vmID := range sharedDisksValidatedVMs {
+		// Clear both SharedWarnDisks and SharedDisks conditions for this VM
+		plan.Status.DeleteCondition(
+			fmt.Sprintf("%s-%s", SharedWarnDisks, vmID),
+			fmt.Sprintf("%s-%s", SharedDisks, vmID),
+		)
 	}
 	if len(sharedDisksConditions) > 0 {
 		plan.Status.SetCondition(sharedDisksConditions...)
