@@ -577,6 +577,9 @@ spec:
                     status:
                       description: The condition status [true,false].
                       type: string
+                    suggestion:
+                      description: A suggested action or resolution for the condition.
+                      type: string
                     type:
                       description: The condition type.
                       type: string
@@ -793,6 +796,9 @@ spec:
                     status:
                       description: The condition status [true,false].
                       type: string
+                    suggestion:
+                      description: A suggested action or resolution for the condition.
+                      type: string
                     type:
                       description: The condition type.
                       type: string
@@ -986,6 +992,9 @@ spec:
                     status:
                       description: The condition status [true,false].
                       type: string
+                    suggestion:
+                      description: A suggested action or resolution for the condition.
+                      type: string
                     type:
                       description: The condition type.
                       type: string
@@ -1041,6 +1050,10 @@ spec:
                             type: string
                           status:
                             description: The condition status [true,false].
+                            type: string
+                          suggestion:
+                            description: A suggested action or resolution for the
+                              condition.
                             type: string
                           type:
                             description: The condition type.
@@ -1715,6 +1728,9 @@ spec:
                     status:
                       description: The condition status [true,false].
                       type: string
+                    suggestion:
+                      description: A suggested action or resolution for the condition.
+                      type: string
                     type:
                       description: The condition type.
                       type: string
@@ -1988,6 +2004,9 @@ spec:
                       type: string
                     status:
                       description: The condition status [true,false].
+                      type: string
+                    suggestion:
+                      description: A suggested action or resolution for the condition.
                       type: string
                     type:
                       description: The condition type.
@@ -3514,6 +3533,18 @@ spec:
                 default: false
                 description: Determines if the plan should skip the guest conversion.
                 type: boolean
+              skipZoneNodeSelector:
+                description: |-
+                  SkipZoneNodeSelector controls whether to skip adding a zone-based node selector to
+                  migrated VMs. By default, the migration automatically reads the availability zone from
+                  the source provider's spec.settings.target-az configuration and adds a node selector
+                  (topology.kubernetes.io/zone=<target-az>) to the target VM. This ensures VMs are
+                  scheduled on nodes in the same zone as their EBS volumes, which is required for
+                  volume attachment by the CSI driver.
+                  Currently supported for EC2 provider only.
+                  - false (default): Add zone-based node selector using value from provider's spec.settings.target-az
+                  - true: Skip adding zone-based node selector
+                type: boolean
               targetAffinity:
                 description: |-
                   TargetAffinity allows specifying hard- and soft-affinity for VMs.
@@ -4809,6 +4840,9 @@ spec:
                     status:
                       description: The condition status [true,false].
                       type: string
+                    suggestion:
+                      description: A suggested action or resolution for the condition.
+                      type: string
                     type:
                       description: The condition type.
                       type: string
@@ -4860,6 +4894,10 @@ spec:
                                 type: string
                               status:
                                 description: The condition status [true,false].
+                                type: string
+                              suggestion:
+                                description: A suggested action or resolution for
+                                  the condition.
                                 type: string
                               type:
                                 description: The condition type.
@@ -5066,6 +5104,10 @@ spec:
                                 type: string
                               status:
                                 description: The condition status [true,false].
+                                type: string
+                              suggestion:
+                                description: A suggested action or resolution for
+                                  the condition.
                                 type: string
                               type:
                                 description: The condition type.
@@ -5669,6 +5711,9 @@ spec:
                     status:
                       description: The condition status [true,false].
                       type: string
+                    suggestion:
+                      description: A suggested action or resolution for the condition.
+                      type: string
                     type:
                       description: The condition type.
                       type: string
@@ -6003,6 +6048,9 @@ spec:
                       type: string
                     status:
                       description: The condition status [true,false].
+                      type: string
+                    suggestion:
+                      description: A suggested action or resolution for the condition.
                       type: string
                     type:
                       description: The condition type.

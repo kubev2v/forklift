@@ -54,6 +54,13 @@ func (s Server) Start() error {
 func (s Server) vmHandler(w http.ResponseWriter, r *http.Request) {
 	yamlFilePath, err := s.getVmYamlFile(s.AppConfig.Workdir)
 	if yamlFilePath == "" {
+		// For in-place conversions (especially disk mode used by EC2), virt-v2v-in-place
+		// doesn't generate a YAML output file. This is expected behavior.
+		// Return 204 No Content to indicate there's no VM config to return.
+		if s.AppConfig.IsInPlace {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		fmt.Println("Error: YAML file path is empty.")
 		http.Error(w, "YAML file path is empty", http.StatusInternalServerError)
 		return

@@ -130,6 +130,11 @@
         state: present
         definition: "{{ lookup('template', 'monitor/recordingrole-migrations.yml.j2') }}"
 
+    - name: "Setup migration alerting rules"
+      k8s:
+        state: present
+        definition: "{{ lookup('template', 'monitor/alerting-rule.yml.j2') }}"
+
     - name: "Add monitoring label to namespace"
       k8s:
         state: present
