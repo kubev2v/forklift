@@ -37,7 +37,7 @@ ARG VALIDATION_IMAGE="registry.redhat.io/mtv-candidate/mtv-validation-rhel9@sha2
 
 ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel10@sha256:176236e27b0f213a45ceea750c3a518be8f42e4916d89211c2959727acef3fa7"
 
-ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:cad2d6ed3798ab31f7dc1fd81dc79f800c307fc7e2a6497604bf441fbd9b3292"
+ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:f89380bdbc09da40e83b8bd2cf2d07a9cd89b57aed2824d03d6a78b2f1e728d5"
 
 USER root
 
