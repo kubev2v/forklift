@@ -96,6 +96,17 @@ func RecordPlanMetrics(c client.Client) {
 					plansCounterMap[key]++
 
 					// If plan is executing, create an alert metric
+					var totalDataTransferred float64
+					for _, vm := range m.Status.Migration.VMs {
+						for _, step := range vm.Pipeline {
+							if step.Name == "DiskTransferV2v" || step.Name == "DiskTransfer" {
+								for _, task := range step.Tasks {
+									totalDataTransferred += float64(task.Progress.Completed) * 1024 * 1024 // convert to Bytes
+								}
+							}
+						}
+					}
+					dataTransferredGauge.With(prometheus.Labels{"provider": provider, "mode": mode, "target": target, "plan": planUID}).Set(totalDataTransferred)
 					phase = Executing
 					alertKey := fmt.Sprintf("%s|%s|%s|%s", key, planUID, planName, phase)
 					activePlanAlertStatuses[alertKey] = struct{}{}

@@ -27,7 +27,7 @@ spec:
             "plan_id", "$1", "label_plan", "(.*)"
           )
         ) * on (plan_id) group_left(plan_name) label_replace(
-          group by (plan, plan_name) (mtv_plan_alert_status{status!="Failed", mode=~"Warm"}),
+          group by (plan, plan_name) (mtv_plan_alert_status{status="Executing", mode=~"Warm"}),
           "plan_id", "$1", "plan", "(.*)"
         )
         or
@@ -44,6 +44,14 @@ spec:
             "plan_id", "$1", "label_plan", "(.*)"
           )
         ) * on (plan_id) group_left(plan_name) label_replace(
-          group by (plan, plan_name) (mtv_plan_alert_status{status!="Failed", mode=~"Cold"}),
+          group by (plan, plan_name) (mtv_plan_alert_status{status="Executing", mode=~"Cold"}),
           "plan_id", "$1", "plan", "(.*)"
+        )
+    - record: mtv_migration_storage_throughput
+      expr: |
+        sum by (plan_id, plan_name) (
+          label_replace((
+            rate(mtv_migration_data_transferred_bytes[2m])
+            * on(plan) group_left(plan_name) mtv_plan_alert_status{status="Executing"}
+          ), "plan_id", "$1", "plan", "(.*)")
         )
