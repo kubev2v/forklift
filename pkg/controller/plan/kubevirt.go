@@ -2535,18 +2535,32 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 		}
 	}
 
-	_, exists, err := r.findConfigMapInNamespace(Settings.VirtCustomizeConfigMap, r.Plan.Spec.TargetNamespace)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	if exists {
+	// Use plan-level ConfigMap if specified
+	if r.Plan.Spec.CustomizationScripts != nil {
+		configMapName := r.Plan.Spec.CustomizationScripts.Name
+		configMapNamespace := r.Plan.Spec.CustomizationScripts.Namespace
+		if configMapNamespace == "" {
+			configMapNamespace = r.Plan.Spec.TargetNamespace
+		}
+
+		var exists bool
+		_, exists, err = r.findConfigMapInNamespace(configMapName, configMapNamespace)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+		if !exists {
+			err = liberr.New(
+				fmt.Sprintf("CustomizationScripts ConfigMap %s not found in namespace %s",
+					configMapName, configMapNamespace))
+			return
+		}
 		volumes = append(volumes, core.Volume{
 			Name: DynamicScriptsVolumeName,
 			VolumeSource: core.VolumeSource{
 				ConfigMap: &core.ConfigMapVolumeSource{
 					LocalObjectReference: core.LocalObjectReference{
-						Name: Settings.VirtCustomizeConfigMap,
+						Name: configMapName,
 					},
 				},
 			},
