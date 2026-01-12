@@ -82,7 +82,7 @@ def load_tasks_variables(tasks_file):
         'validation_state', 'ui_plugin_state', 'volume_populator_state',
         'resource_kind', 'feature_label', 'loop_var',
         # Jinja expression components (false positives)
-        'first', 'last', 'not', 'in', 'and', 'or', 'is', 'defined', 'undefined',
+        'first', 'last', 'not', 'in', 'and', 'or', 'is', 'defined', 'undefined', 'false', 'true',
         'gitVersion', 'kubernetes', 'default', 'selectattr', 'equalto', 'map',
         'attribute', 'version', 'state', 'Completed', 'history', 'status',
         'resources', 'bool', 'lookup', 'template', 'present', 'absent'
@@ -182,6 +182,8 @@ def load_tasks_variables(tasks_file):
         'transfer_network_name',
         'transfer_network_default_route',
         'transfer_nad',
+        'controller_transfer_network_is_json_string',
+        'controller_transfer_network_parsed',
     }
     
     return variables - ansible_builtin - excluded_fields
