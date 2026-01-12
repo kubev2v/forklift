@@ -876,12 +876,16 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			if !ok {
 				unmappedNetwork.Items = append(unmappedNetwork.Items, ref.String())
 			}
-			ok, err = validator.PodNetwork(*ref)
+			ok, providerMsg, err := validator.PodNetwork(*ref)
 			if err != nil {
 				return err
 			}
 			if !ok {
 				multiplePodNetworkMappings.Items = append(multiplePodNetworkMappings.Items, ref.String())
+				// Append provider-specific message if provided
+				if providerMsg != "" {
+					multiplePodNetworkMappings.Message += " " + providerMsg
+				}
 			}
 		}
 		if plan.Referenced.Map.Storage != nil {
