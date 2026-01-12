@@ -279,6 +279,9 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 
 	targetVmSpec := sourceVm.Spec.DeepCopy()
 	object.Template = targetVmSpec.Template
+	// Preserve DataVolumeTemplates from source VM to maintain user workflows
+	// that may expect the VM's DataVolume to be present
+	object.DataVolumeTemplates = targetVmSpec.DataVolumeTemplates
 	r.mapNetworks(sourceVm, targetVmSpec)
 
 	return nil
