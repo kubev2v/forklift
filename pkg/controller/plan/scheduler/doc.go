@@ -44,7 +44,7 @@ func New(ctx *plancontext.Context) (scheduler Scheduler, err error) {
 			Context:     ctx,
 			MaxInFlight: settings.Settings.MaxInFlight,
 		}
-	case api.Ova:
+	case api.Ova, api.HyperV:
 		scheduler = &ova.Scheduler{
 			Context:     ctx,
 			MaxInFlight: settings.Settings.MaxInFlight,

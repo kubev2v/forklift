@@ -28,6 +28,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/plan/util"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
+	ctrlutil "github.com/kubev2v/forklift/pkg/controller/util"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libref "github.com/kubev2v/forklift/pkg/lib/ref"
@@ -51,6 +52,12 @@ import (
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+)
+
+// CSI Drivers
+const (
+	// SMBCSIDriver is the CSI driver name for SMB shares (used by HyperV provider)
+	SMBCSIDriver = "smb.csi.k8s.io"
 )
 
 // Annotations
@@ -130,8 +137,10 @@ const (
 
 // Labels
 const (
-	OvaPVCLabel = "nfs-pvc"
-	OvaPVLabel  = "nfs-pv"
+	OvaPVCLabel    = "nfs-pvc"
+	OvaPVLabel     = "nfs-pv"
+	HyperVPVCLabel = "smb-pvc"
+	HyperVPVLabel  = "smb-pv"
 )
 
 // Vddk v2v conf
@@ -147,6 +156,11 @@ const (
 const (
 	VirtV2vConversionPod = 0
 	VirtV2vInspectionPod = 1
+)
+
+// PV size
+const (
+	PVSize = "1Gi"
 )
 
 // Map of VirtualMachines keyed by vmID.
@@ -1083,12 +1097,29 @@ func (r *KubeVirt) EnsureVirtV2vPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvc
 	return
 }
 
+// EnsureOVAVirtV2VPVCStatus checks if the provider storage PVC is ready.
+// Works for both OVA (NFS) and HyperV (SMB) PVCs.
 func (r *KubeVirt) EnsureOVAVirtV2VPVCStatus(vmID string) (ready bool, err error) {
 	pvcs := &core.PersistentVolumeClaimList{}
-	pvcLabels := map[string]string{
-		"migration": string(r.Migration.UID),
-		"ova":       OvaPVCLabel,
-		kVM:         vmID,
+
+	// Build labels based on provider type
+	var pvcLabels map[string]string
+	switch r.Source.Provider.Type() {
+	case api.Ova:
+		pvcLabels = map[string]string{
+			"migration": string(r.Migration.UID),
+			"ova":       OvaPVCLabel,
+			kVM:         vmID,
+		}
+	case api.HyperV:
+		pvcLabels = map[string]string{
+			"migration": string(r.Migration.UID),
+			"hyperv":    HyperVPVCLabel,
+			kVM:         vmID,
+		}
+	default:
+		// Should not happen, but handle gracefully
+		return false, nil
 	}
 
 	err = r.Destination.Client.List(
@@ -1107,9 +1138,10 @@ func (r *KubeVirt) EnsureOVAVirtV2VPVCStatus(vmID string) (ready bool, err error
 	// In case we have leftovers for the PVCs from previous runs, and we get more than one PVC in the list,
 	// we will filter by the creation timestamp.
 	if len(pvcs.Items) > 1 {
-		for _, pvcVirtV2v := range pvcs.Items {
+		for i := range pvcs.Items {
+			pvcVirtV2v := &pvcs.Items[i]
 			if pvcVirtV2v.CreationTimestamp.Time.After(r.Migration.CreationTimestamp.Time) {
-				pvc = &pvcVirtV2v
+				pvc = pvcVirtV2v
 			}
 		}
 		if pvc == nil {
@@ -1196,7 +1228,7 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 	defer resp.Body.Close()
 
 	switch r.Source.Provider.Type() {
-	case api.Ova:
+	case api.Ova, api.HyperV:
 		vmConf, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return liberr.Wrap(err)
@@ -2479,37 +2511,51 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 	}
 
 	switch r.Source.Provider.Type() {
-	case api.Ova:
-		pv := r.BuildPVForNFS(vm)
-		pv, err = r.EnsurePVForNFS(pv)
-		if err != nil {
-			return
+	case api.Ova, api.HyperV:
+		var pvc *core.PersistentVolumeClaim
+		var volumeName, mountPath string
+
+		if r.Source.Provider.Type() == api.Ova {
+			// OVA: Static NFS PV/PVC
+			pv := r.BuildPVForNFS(vm)
+			pv, err = r.EnsurePVForNFS(pv)
+			if err != nil {
+				return
+			}
+			pvc = r.BuildPVCForNFS(pv, vm)
+			volumeName = "store-pv"
+			mountPath = "/ova"
+		} else {
+			// HyperV: Static SMB CSI PV/PVC
+			pv := r.BuildPVForSMB(vm)
+			pv, err = r.EnsurePVForSMB(pv)
+			if err != nil {
+				return
+			}
+			pvc = r.BuildPVCForSMB(pv, vm)
+			volumeName = "hyperv-storage"
+			mountPath = "/hyperv"
 		}
-		pvc := r.BuildPVCForNFS(pv, vm)
-		pvc, err = r.EnsurePVCForNFS(pvc)
+
+		// Ensure PVC exists (common logic)
+		pvc, err = r.EnsureProviderStoragePVC(pvc, r.Source.Provider.Type())
 		if err != nil {
 			return
 		}
 
-		//path from disk
+		// Mount provider storage (common pattern)
 		volumes = append(volumes, core.Volume{
-			Name: "store-pv",
+			Name: volumeName,
 			VolumeSource: core.VolumeSource{
 				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
 					ClaimName: pvc.Name,
 				},
 			},
 		})
-		mounts = append(mounts,
-			core.VolumeMount{
-				Name:      VddkVolumeName,
-				MountPath: "/opt",
-			},
-			core.VolumeMount{
-				Name:      "store-pv",
-				MountPath: "/ova",
-			},
-		)
+		mounts = append(mounts, core.VolumeMount{
+			Name:      volumeName,
+			MountPath: mountPath,
+		})
 	case api.VSphere:
 		mounts = append(mounts,
 			core.VolumeMount{
@@ -3089,18 +3135,14 @@ func (r *KubeVirt) EnsurePersistentVolume(vmRef ref.Ref, persistentVolumes []cor
 	return
 }
 
-func GetOvaPvListNfs(dClient client.Client, planID string) (pvs *core.PersistentVolumeList, found bool, err error) {
+// getPvListByLabels is a generic helper function to get PVs by labels.
+func getPvListByLabels(dClient client.Client, labels map[string]string) (pvs *core.PersistentVolumeList, found bool, err error) {
 	pvs = &core.PersistentVolumeList{}
-	pvLabels := map[string]string{
-		"plan": planID,
-		"ova":  OvaPVLabel,
-	}
-
 	err = dClient.List(
 		context.TODO(),
 		pvs,
 		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(pvLabels),
+			LabelSelector: k8slabels.SelectorFromSet(labels),
 		},
 	)
 	if err != nil {
@@ -3113,19 +3155,15 @@ func GetOvaPvListNfs(dClient client.Client, planID string) (pvs *core.Persistent
 	return
 }
 
-func GetOvaPvcListNfs(dClient client.Client, planID string, planNamespace string) (pvcs *core.PersistentVolumeClaimList, found bool, err error) {
+// getPvcListByLabels is a generic helper function to get PVCs by labels in a namespace.
+func getPvcListByLabels(dClient client.Client, labels map[string]string, namespace string) (pvcs *core.PersistentVolumeClaimList, found bool, err error) {
 	pvcs = &core.PersistentVolumeClaimList{}
-	pvcLabels := map[string]string{
-		"plan": planID,
-		"ova":  OvaPVCLabel,
-	}
-
 	err = dClient.List(
 		context.TODO(),
 		pvcs,
 		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(pvcLabels),
-			Namespace:     planNamespace,
+			LabelSelector: k8slabels.SelectorFromSet(labels),
+			Namespace:     namespace,
 		},
 	)
 	if err != nil {
@@ -3136,6 +3174,40 @@ func GetOvaPvcListNfs(dClient client.Client, planID string, planNamespace string
 		return
 	}
 	return
+}
+
+func GetOvaPvListNfs(dClient client.Client, planID string) (pvs *core.PersistentVolumeList, found bool, err error) {
+	labels := map[string]string{
+		"plan": planID,
+		"ova":  OvaPVLabel,
+	}
+	return getPvListByLabels(dClient, labels)
+}
+
+func GetOvaPvcListNfs(dClient client.Client, planID string, planNamespace string) (pvcs *core.PersistentVolumeClaimList, found bool, err error) {
+	labels := map[string]string{
+		"plan": planID,
+		"ova":  OvaPVCLabel,
+	}
+	return getPvcListByLabels(dClient, labels, planNamespace)
+}
+
+// GetHyperVPvcListSmb returns HyperV SMB PVCs for a plan.
+func GetHyperVPvcListSmb(dClient client.Client, planID string, planNamespace string) (pvcs *core.PersistentVolumeClaimList, found bool, err error) {
+	labels := map[string]string{
+		"plan":   planID,
+		"hyperv": HyperVPVCLabel,
+	}
+	return getPvcListByLabels(dClient, labels, planNamespace)
+}
+
+// GetHyperVPvListSmb returns HyperV SMB PVs for a plan.
+func GetHyperVPvListSmb(dClient client.Client, planID string) (pvs *core.PersistentVolumeList, found bool, err error) {
+	labels := map[string]string{
+		"plan":   planID,
+		"hyperv": HyperVPVLabel,
+	}
+	return getPvListByLabels(dClient, labels)
 }
 
 func (r *KubeVirt) EnsurePVForNFS(pv *core.PersistentVolume) (out *core.PersistentVolume, err error) {
@@ -3179,7 +3251,7 @@ func (r *KubeVirt) BuildPVForNFS(vm *plan.VMStatus) (pv *core.PersistentVolume) 
 		},
 		Spec: core.PersistentVolumeSpec{
 			Capacity: core.ResourceList{
-				core.ResourceStorage: resource.MustParse("1Gi"),
+				core.ResourceStorage: resource.MustParse(PVSize),
 			},
 			AccessModes: []core.PersistentVolumeAccessMode{
 				core.ReadOnlyMany,
@@ -3195,7 +3267,9 @@ func (r *KubeVirt) BuildPVForNFS(vm *plan.VMStatus) (pv *core.PersistentVolume) 
 	return
 }
 
-func (r *KubeVirt) EnsurePVCForNFS(pvc *core.PersistentVolumeClaim) (out *core.PersistentVolumeClaim, err error) {
+// EnsureProviderStoragePVC returns existing PVC if found by labels, creates if not found (OVA NFS or HyperV SMB).
+func (r *KubeVirt) EnsureProviderStoragePVC(pvc *core.PersistentVolumeClaim, providerType api.ProviderType) (out *core.PersistentVolumeClaim, err error) {
+	// Query k8s for existing PVC matching labels (plan, migration, vmID)
 	list := &core.PersistentVolumeClaimList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
@@ -3209,18 +3283,31 @@ func (r *KubeVirt) EnsurePVCForNFS(pvc *core.PersistentVolumeClaim) (out *core.P
 		err = liberr.Wrap(err)
 		return
 	}
+
+	// Reuse existing PVC if found
 	if len(list.Items) > 0 {
 		out = &list.Items[0]
 	} else {
+		// Create PVC in k8s (triggers CSI provisioning for SMB)
 		err = r.Destination.Client.Create(context.TODO(), pvc)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
 		}
-		r.Log.Info("Created NFS PVC for virt-v2v pod.", "pvc", path.Join(pvc.Namespace, pvc.Name))
+		storageType := "NFS"
+		if providerType == api.HyperV {
+			storageType = "SMB"
+		}
+		r.Log.Info(fmt.Sprintf("Created %s PVC for virt-v2v pod.", storageType), "pvc", path.Join(pvc.Namespace, pvc.Name))
 		out = pvc
 	}
 	return
+}
+
+// EnsurePVCForNFS is deprecated, use EnsureProviderStoragePVC instead.
+// Kept for backwards compatibility with existing code paths.
+func (r *KubeVirt) EnsurePVCForNFS(pvc *core.PersistentVolumeClaim) (out *core.PersistentVolumeClaim, err error) {
+	return r.EnsureProviderStoragePVC(pvc, api.Ova)
 }
 
 func (r *KubeVirt) BuildPVCForNFS(pv *core.PersistentVolume, vm *plan.VMStatus) (pvc *core.PersistentVolumeClaim) {
@@ -3235,7 +3322,7 @@ func (r *KubeVirt) BuildPVCForNFS(pv *core.PersistentVolume, vm *plan.VMStatus) 
 		Spec: core.PersistentVolumeClaimSpec{
 			Resources: core.VolumeResourceRequirements{
 				Requests: core.ResourceList{
-					core.ResourceStorage: resource.MustParse("1Gi"),
+					core.ResourceStorage: resource.MustParse(PVSize),
 				},
 			},
 			AccessModes: []core.PersistentVolumeAccessMode{
@@ -3272,6 +3359,125 @@ func (r *KubeVirt) nfsPVCLabels(vmID string) map[string]string {
 
 func getEntityPrefixName(resourceType, providerName, planName string) string {
 	return fmt.Sprintf("ova-store-%s-%s-%s-", resourceType, providerName, planName)
+}
+
+// BuildPVForSMB creates a static PV for HyperV using SMB CSI driver.
+func (r *KubeVirt) BuildPVForSMB(vm *plan.VMStatus) (pv *core.PersistentVolume) {
+	sourceProvider := r.Source.Provider
+	smbSource := ctrlutil.ParseSMBSource(sourceProvider.Spec.URL)
+	pvNamePrefix := fmt.Sprintf("hyperv-store-pv-%s-%s-", r.Source.Provider.Name, r.Plan.Name)
+
+	// Get secret reference from provider
+	secretName := sourceProvider.Spec.Secret.Name
+	secretNamespace := sourceProvider.Spec.Secret.Namespace
+
+	pv = &core.PersistentVolume{
+		ObjectMeta: meta.ObjectMeta{
+			GenerateName: pvNamePrefix,
+			Labels:       r.smbPVLabels(vm.ID),
+		},
+		Spec: core.PersistentVolumeSpec{
+			Capacity: core.ResourceList{
+				core.ResourceStorage: resource.MustParse(PVSize),
+			},
+			AccessModes: []core.PersistentVolumeAccessMode{
+				core.ReadOnlyMany,
+			},
+			PersistentVolumeSource: core.PersistentVolumeSource{
+				CSI: &core.CSIPersistentVolumeSource{
+					Driver:       SMBCSIDriver,
+					VolumeHandle: fmt.Sprintf("hyperv-%s-%s-%s", r.Source.Provider.Name, r.Plan.Name, vm.ID),
+					VolumeAttributes: map[string]string{
+						"source": smbSource,
+					},
+					NodeStageSecretRef: &core.SecretReference{
+						Name:      secretName,
+						Namespace: secretNamespace,
+					},
+				},
+			},
+		},
+	}
+	return
+}
+
+// EnsurePVForSMB ensures the static PV exists for HyperV SMB.
+func (r *KubeVirt) EnsurePVForSMB(pv *core.PersistentVolume) (out *core.PersistentVolume, err error) {
+	list := &core.PersistentVolumeList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(pv.Labels),
+		},
+	)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	if len(list.Items) > 0 {
+		out = &list.Items[0]
+	} else {
+		err = r.Destination.Client.Create(context.TODO(), pv)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+		r.Log.Info("Created SMB PV for virt-v2v pod.", "pv", pv.Name)
+		out = pv
+	}
+	return
+}
+
+// BuildPVCForSMB creates a PVC bound to a static SMB PV for HyperV.
+func (r *KubeVirt) BuildPVCForSMB(pv *core.PersistentVolume, vm *plan.VMStatus) (pvc *core.PersistentVolumeClaim) {
+	sc := ""
+	pvcNamePrefix := fmt.Sprintf("hyperv-pvc-%s-%s-", r.Source.Provider.Name, r.Plan.Name)
+	pvc = &core.PersistentVolumeClaim{
+		ObjectMeta: meta.ObjectMeta{
+			GenerateName: pvcNamePrefix,
+			Namespace:    r.Plan.Spec.TargetNamespace,
+			Labels:       r.smbPVCLabels(vm.ID),
+		},
+		Spec: core.PersistentVolumeClaimSpec{
+			Resources: core.VolumeResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceStorage: resource.MustParse(PVSize),
+				},
+			},
+			AccessModes: []core.PersistentVolumeAccessMode{
+				core.ReadOnlyMany,
+			},
+			VolumeName:       pv.Name,
+			StorageClassName: &sc,
+		},
+	}
+	return
+}
+
+// smbPVLabels returns labels for HyperV SMB PV.
+func (r *KubeVirt) smbPVLabels(vmID string) map[string]string {
+	return map[string]string{
+		"provider":  r.Plan.Provider.Source.Name,
+		"app":       "forklift",
+		"migration": r.Migration.Name,
+		"plan":      string(r.Plan.UID),
+		"hyperv":    HyperVPVLabel,
+		kVM:         vmID,
+	}
+}
+
+// smbPVCLabels returns labels for HyperV SMB PVC.
+func (r *KubeVirt) smbPVCLabels(vmID string) map[string]string {
+	return map[string]string{
+		"provider":  r.Plan.Provider.Source.Name,
+		"app":       "forklift",
+		"migration": string(r.Migration.UID),
+		"plan":      string(r.Plan.UID),
+		"hyperv":    HyperVPVCLabel,
+		kVM:         vmID,
+	}
 }
 
 // Ensure the PV exist on the destination.

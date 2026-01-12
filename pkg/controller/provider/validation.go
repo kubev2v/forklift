@@ -171,6 +171,20 @@ func (r *Reconciler) validateURL(provider *api.Provider) error {
 		}
 		return nil
 	}
+	if provider.Type() == api.HyperV {
+		if !isValidSMBPath(provider.Spec.URL) {
+			provider.Status.Phase = ValidationFailed
+			provider.Status.SetCondition(
+				libcnd.Condition{
+					Type:     UrlNotValid,
+					Status:   True,
+					Reason:   Malformed,
+					Category: Critical,
+					Message:  "The SMB path is malformed. Expected format: //server/share, \\\\server\\share, or smb://server/share",
+				})
+		}
+		return nil
+	}
 	_, err := url.Parse(provider.Spec.URL)
 	if err != nil {
 		provider.Status.Phase = ValidationFailed
@@ -316,6 +330,11 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 	case api.Ova:
 		keyList = []string{
 			"url",
+		}
+	case api.HyperV:
+		keyList = []string{
+			"username",
+			"password",
 		}
 	}
 	for _, key := range keyList {
@@ -901,4 +920,16 @@ func (r *Reconciler) validateSSHReadiness(provider *api.Provider, secret *core.S
 // This matches the exact implementation from the populator's testSSHConnectivity
 func (r *Reconciler) testSSHConnectivity(hostIP string, privateKey []byte) bool {
 	return util.TestSSHConnectivity(context.Background(), hostIP, privateKey, r.Log)
+}
+
+func isValidSMBPath(smbPath string) bool {
+	// Normalize Windows UNC paths to //server/share format
+	normalized := smbPath
+	normalized = regexp.MustCompile(`\\`).ReplaceAllString(normalized, "/")
+
+	// Accept smb://server/share, //server/share, or \\server\share formats
+	// Must have at least server and share name
+	smbRegex := `^(smb:)?\/\/[^\/\s]+\/[^\/\s].*$`
+	re := regexp.MustCompile(smbRegex)
+	return re.MatchString(normalized)
 }

@@ -350,7 +350,7 @@ func (p *Plan) ShouldUseV2vForTransfer() (bool, error) {
 				!p.Spec.SkipGuestConversion && // virt-v2v always converts the guest, to perform RawCopyMode we need to copy just disks via CDI
 				p.Spec.Type != MigrationOnlyConversion, // For only v2v-in-place conversion, we don't want to populate disks by v2v
 			nil
-	case Ova:
+	case Ova, HyperV:
 		return true, nil
 	default:
 		return false, nil

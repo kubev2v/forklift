@@ -3,6 +3,7 @@ package adapter
 import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
+	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/openstack"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/ova"
@@ -35,6 +36,8 @@ func New(provider *api.Provider) (adapter Adapter, err error) {
 		adapter = &ova.Adapter{}
 	case api.EC2:
 		adapter = ec2adapter.New()
+	case api.HyperV:
+		adapter = &hyperv.Adapter{}
 	default:
 		err = liberr.New("provider not supported.")
 	}

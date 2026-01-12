@@ -281,9 +281,9 @@ func (r *Migration) Archive() {
 	}
 
 	switch r.Plan.Provider.Source.Type() {
-	case api.Ova:
-		if err := r.deletePvcPvForOva(); err != nil {
-			r.Log.Error(err, "Failed to clean up the PVC and PV for the OVA plan")
+	case api.Ova, api.HyperV:
+		if err := r.deleteProviderStorage(); err != nil {
+			r.Log.Error(err, "Failed to clean up the PVC and PV for the provider storage")
 		}
 	case api.VSphere:
 		if err := r.deleteValidateVddkJob(); err != nil {
@@ -493,43 +493,78 @@ func (r *Migration) deleteImporterPods(vm *plan.VMStatus) (err error) {
 	return
 }
 
-func (r *Migration) deletePvcPvForOva() (err error) {
-	pvcs, _, err := GetOvaPvcListNfs(r.Destination.Client, r.Plan.Name, r.Plan.Spec.TargetNamespace)
-	if err != nil {
-		r.Log.Error(err, "Failed to get the plan PVCs")
-		return
-	}
-	// The PVCs was already deleted
-	if len(pvcs.Items) == 0 {
+// deleteProviderStorage deletes PVCs and PVs used for provider storage (OVA NFS or HyperV SMB).
+// This does NOT delete VM disk PVCs - only the provider server storage resources.
+func (r *Migration) deleteProviderStorage() (err error) {
+	providerType := r.Plan.Provider.Source.Type()
+
+	// Delete PVCs based on provider type
+	var getPVCsFunc func(client.Client, string, string) (*core.PersistentVolumeClaimList, bool, error)
+	switch providerType {
+	case api.Ova:
+		getPVCsFunc = GetOvaPvcListNfs
+	case api.HyperV:
+		getPVCsFunc = GetHyperVPvcListSmb
+	default:
+		// No provider storage to clean up
 		return
 	}
 
-	for _, pvc := range pvcs.Items {
-		err = r.Destination.Client.Delete(context.TODO(), &pvc)
+	// Delete provider storage PVCs
+	err = r.deleteProviderPVCs(getPVCsFunc, string(providerType))
+	if err != nil {
+		return
+	}
+
+	// Delete PVs (both OVA and HyperV use explicit static PVs)
+	// OVA uses NFS, HyperV uses SMB CSI driver with static PVs
+	var getPVsFunc func(client.Client, string) (*core.PersistentVolumeList, bool, error)
+	switch providerType {
+	case api.Ova:
+		getPVsFunc = GetOvaPvListNfs
+	case api.HyperV:
+		getPVsFunc = GetHyperVPvListSmb
+	default:
+		return
+	}
+
+	return r.deleteProviderPVs(getPVsFunc, string(providerType))
+}
+
+// deleteProviderPVs is a helper function that gets and deletes PVs for a provider type.
+func (r *Migration) deleteProviderPVs(getPVs func(client.Client, string) (*core.PersistentVolumeList, bool, error), pvType string) error {
+	pvList, _, err := getPVs(r.Destination.Client, string(r.Plan.UID))
+	if err != nil {
+		r.Log.Error(err, "Failed to get "+pvType+" PVs")
+		return err
+	}
+
+	for _, pv := range pvList.Items {
+		err := r.Destination.Client.Delete(context.TODO(), &pv)
 		if err != nil {
-			r.Log.Error(err, "Failed to delete the plan PVC", pvc)
-			return
+			r.Log.Error(err, "Failed to delete "+pvType+" PV", "pv", pv.Name)
+			return err
 		}
 	}
+	return nil
+}
 
-	pvs, _, err := GetOvaPvListNfs(r.Destination.Client, string(r.Plan.UID))
+// deleteProviderPVCs is a helper function that gets and deletes PVCs for a provider type.
+func (r *Migration) deleteProviderPVCs(getPVCs func(client.Client, string, string) (*core.PersistentVolumeClaimList, bool, error), pvcType string) error {
+	pvcList, _, err := getPVCs(r.Destination.Client, r.Plan.Name, r.Plan.Spec.TargetNamespace)
 	if err != nil {
-		r.Log.Error(err, "Failed to get the plan PVs")
-		return
-	}
-	// The PVs was already deleted
-	if len(pvs.Items) == 0 {
-		return
+		r.Log.Error(err, "Failed to get "+pvcType+" PVCs")
+		return err
 	}
 
-	for _, pv := range pvs.Items {
-		err = r.Destination.Client.Delete(context.TODO(), &pv)
+	for _, pvc := range pvcList.Items {
+		err := r.Destination.Client.Delete(context.TODO(), &pvc)
 		if err != nil {
-			r.Log.Error(err, "Failed to delete the plan PV", pv)
-			return
+			r.Log.Error(err, "Failed to delete "+pvcType+" PVC", "pvc", pvc.Name)
+			return err
 		}
 	}
-	return
+	return nil
 }
 
 func (r *Migration) deleteConfigMap() (err error) {
@@ -1273,7 +1308,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 
 			switch r.Source.Provider.Type() {
-			case api.Ova, api.VSphere, api.EC2:
+			case api.Ova, api.VSphere, api.HyperV, api.EC2:
 				// fetch config from the conversion pod
 				pod, err := r.kubevirt.GetGuestConversionPod(vm)
 				if err != nil {
@@ -1524,7 +1559,7 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus, step *plan.Step)
 	}
 
 	switch r.Source.Provider.Type() {
-	case api.Ova:
+	case api.Ova, api.HyperV:
 		ready, err = r.kubevirt.EnsureOVAVirtV2VPVCStatus(vm.ID)
 	case api.EC2, api.VSphere:
 		ready = true
@@ -1829,7 +1864,7 @@ func (r *Migration) updateConversionProgressV2vMonitor(pod *core.Pod, step *plan
 		}
 	}
 	step.ReflectTasks()
-	if step.Name == ImageConversion && someProgress && r.Source.Provider.Type() != api.Ova {
+	if step.Name == ImageConversion && someProgress && r.Source.Provider.Type() == api.VSphere {
 		// Disk copying has already started. Transition from
 		// ConvertGuest to CopyDisksVirtV2V .
 		step.MarkCompleted()
