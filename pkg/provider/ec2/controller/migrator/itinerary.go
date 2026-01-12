@@ -86,7 +86,7 @@ func (p *EC2Predicate) Evaluate(flag libitr.Flag) (bool, error) {
 	if flag&CrossAccountFlag != 0 {
 		if p.migrator != nil {
 			ec2Client := p.migrator.getEC2Client()
-			return ec2Client.Client.IsCrossAccount(), nil
+			return ec2Client.IsCrossAccount(), nil
 		}
 		return false, nil
 	}

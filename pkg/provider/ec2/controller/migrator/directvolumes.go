@@ -15,7 +15,7 @@ import (
 // Returns a map of originalVolumeID -> newVolumeID.
 func (r *Migrator) getVolumeIDs(vm *planapi.VMStatus) (map[string]string, error) {
 	ec2Client := r.getEC2Client()
-	return ec2Client.Client.GetCreatedVolumesForVM(vm.Ref)
+	return ec2Client.GetCreatedVolumesForVM(vm.Ref)
 }
 
 // createVolumes creates EBS volumes from snapshots in the target AZ.
@@ -69,7 +69,7 @@ func (r *Migrator) createVolumes(vm *planapi.VMStatus) (bool, error) {
 			"originalVolumeID", originalVolumeID,
 			"snapshotID", snapshotID)
 
-		newVolumeID, err := ec2Client.Client.CreateVolumeFromSnapshot(vm.Ref, originalVolumeID, snapshotID)
+		newVolumeID, err := ec2Client.CreateVolumeFromSnapshot(vm.Ref, originalVolumeID, snapshotID)
 		if err != nil {
 			r.log.Error(err, "Failed to create volume from snapshot",
 				"vm", vm.Name,
@@ -124,7 +124,7 @@ func (r *Migrator) waitForVolumes(vm *planapi.VMStatus) (bool, error) {
 	ec2Client := r.getEC2Client()
 
 	// Check if all volumes are ready
-	ready, err := ec2Client.Client.CheckVolumesReady(vm.Ref, volumeIDs)
+	ready, err := ec2Client.CheckVolumesReady(vm.Ref, volumeIDs)
 	if err != nil {
 		r.log.Error(err, "Failed to check volume status", "vm", vm.Name)
 		return false, liberr.Wrap(err)
