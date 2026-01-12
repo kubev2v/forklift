@@ -94,6 +94,26 @@ type PlanSpec struct {
 	// https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#affinity-and-anti-affinity
 	// +structType=atomic
 	ConvertorAffinity *core.Affinity `json:"convertorAffinity,omitempty"`
+	// ConversionTempStorageClass specifies the storage class to use for temporary conversion storage.
+	// When specified, virt-v2v conversion pods will use a temporary PVC from this storage class
+	// instead of using the node's ephemeral storage for the conversion scratch space.
+	// This is useful for:
+	//   - Large VM migrations (10+ TB disks) where fstrim operations create large overlays
+	//   - OVA imports that require full uncompressed disk copies in temporary storage
+	//   - Nodes with limited ephemeral storage that may cause pod eviction due to storage pressure
+	// The temporary PVC is automatically created and deleted with the conversion pod.
+	// +optional
+	ConversionTempStorageClass string `json:"conversionTempStorageClass,omitempty"`
+	// ConversionTempStorageSize specifies the size of the temporary conversion storage PVC.
+	// Only used when ConversionTempStorageClass is specified.
+	// User specification allows for buffer space beyond the largest disk size to accommodate:
+	//   - Temporary files during conversion
+	//   - Multiple concurrent conversions
+	//   - OVA imports requiring full uncompressed copies
+	// Recommended minimum: size of the largest VM disk being migrated.
+	// Format: standard Kubernetes resource quantity (e.g., "30Gi", "1Ti")
+	// +optional
+	ConversionTempStorageSize string `json:"conversionTempStorageSize,omitempty"`
 	// Providers.
 	Provider provider.Pair `json:"provider"`
 	// Resource mapping.
@@ -112,6 +132,17 @@ type PlanSpec struct {
 	// Preserve static IPs of VMs in vSphere
 	// +kubebuilder:default:=true
 	PreserveStaticIPs bool `json:"preserveStaticIPs,omitempty"`
+	// SkipZoneNodeSelector controls whether to skip adding a zone-based node selector to
+	// migrated VMs. By default, the migration automatically reads the availability zone from
+	// the source provider's spec.settings.target-az configuration and adds a node selector
+	// (topology.kubernetes.io/zone=<target-az>) to the target VM. This ensures VMs are
+	// scheduled on nodes in the same zone as their EBS volumes, which is required for
+	// volume attachment by the CSI driver.
+	// Currently supported for EC2 provider only.
+	// - false (default): Add zone-based node selector using value from provider's spec.settings.target-az
+	// - true: Skip adding zone-based node selector
+	// +optional
+	SkipZoneNodeSelector bool `json:"skipZoneNodeSelector,omitempty"`
 	// Deprecated: this field will be deprecated in 2.8.
 	DiskBus cnv.DiskBus `json:"diskBus,omitempty"`
 	// PVCNameTemplate is a template for generating PVC names for VM disks.
@@ -233,6 +264,16 @@ type PlanSpec struct {
 	// - false: No inspection is performed before disk transfer.
 	// +kubebuilder:default:=true
 	RunPreflightInspection bool `json:"runPreflightInspection,omitempty"`
+	// CustomizationScripts references a ConfigMap containing customization scripts
+	// to run during guest conversion. The ConfigMap must exist in the specified
+	// namespace and contain script files with keys following these patterns:
+	//   - Windows: [0-9]+_win_firstboot_[description_text].ps1
+	//   - Linux: [0-9]+_linux_(run|firstboot)_[description_text].sh
+	// Scripts are mounted at /mnt/dynamic_scripts in the conversion pod and
+	// executed by virt-customize. The number at the start of the key determines the
+	// execution order. If not specified, no custom scripts are injected.
+	// +optional
+	CustomizationScripts *core.ObjectReference `json:"customizationScripts,omitempty"`
 }
 
 // Find a planned VM.
@@ -309,7 +350,7 @@ func (p *Plan) ShouldUseV2vForTransfer() (bool, error) {
 				!p.Spec.SkipGuestConversion && // virt-v2v always converts the guest, to perform RawCopyMode we need to copy just disks via CDI
 				p.Spec.Type != MigrationOnlyConversion, // For only v2v-in-place conversion, we don't want to populate disks by v2v
 			nil
-	case Ova:
+	case Ova, HyperV:
 		return true, nil
 	default:
 		return false, nil
