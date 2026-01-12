@@ -19,7 +19,9 @@ import (
 	libref "github.com/kubev2v/forklift/pkg/lib/ref"
 	"github.com/kubev2v/forklift/pkg/lib/util"
 	core "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -39,6 +41,12 @@ const (
 	ConnectionInsecure      = "ConnectionInsecure"
 	SSHReady                = "SSHReady"
 	SSHNotReady             = "SSHNotReady"
+	SMBCSIDriverNotReady    = "SMBCSIDriverNotReady"
+)
+
+// CSI driver names
+const (
+	SMBCSIDriverName = "smb.csi.k8s.io"
 )
 
 // Categories
@@ -102,6 +110,12 @@ func (r *Reconciler) validate(provider *api.Provider) error {
 
 	// Validate SSH readiness for vSphere providers when SSH method is enabled
 	err = r.validateSSHReadiness(provider, secret)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// Validate SMB CSI driver for HyperV providers
+	err = r.validateSMBCSI(provider)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -932,4 +946,36 @@ func isValidSMBPath(smbPath string) bool {
 	smbRegex := `^(smb:)?\/\/[^\/\s]+\/[^\/\s].*$`
 	re := regexp.MustCompile(smbRegex)
 	return re.MatchString(normalized)
+}
+
+// validateSMBCSI validates that the SMB CSI driver is installed for HyperV providers.
+// HyperV migrations require the SMB CSI driver (smb.csi.k8s.io) to mount SMB shares.
+func (r *Reconciler) validateSMBCSI(provider *api.Provider) error {
+	// Only validate SMB CSI for HyperV providers
+	if provider.Type() != api.HyperV {
+		return nil
+	}
+
+	// Check if SMB CSI driver exists
+	csiDriver := &storagev1.CSIDriver{}
+	err := r.Get(context.TODO(), types.NamespacedName{Name: SMBCSIDriverName}, csiDriver)
+	if k8serrors.IsNotFound(err) {
+		provider.Status.Phase = ValidationFailed
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     SMBCSIDriverNotReady,
+			Status:   True,
+			Category: Critical,
+			Reason:   NotFound,
+			Message: "SMB CSI driver (smb.csi.k8s.io) is not installed. " +
+				"Install the CIFS/SMB CSI Driver Operator.",
+		})
+		return nil
+	}
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// SMB CSI driver is installed - remove any previous condition
+	provider.Status.DeleteCondition(SMBCSIDriverNotReady)
+	return nil
 }
