@@ -28,7 +28,10 @@ function check_deps() {
 
 function get_target_version() {
   if [[ -z "$TARGET_VERSION" ]]; then
-    read -p "Enter the target release version (e.g., 2.10.x, 2.11.0): " TARGET_VERSION
+
+  TARGET_VERSION=$(curl -s -H "Authorization: Bearer $JIRA_CLI_KEY" \
+        https://issues.redhat.com/rest/api/2/project/MTV/versions \
+        | jq  ' .[] | select(.released == false)|.name'  | fzf --prompt "Choose the target release version: ")
   fi
   
   if [[ -z "$TARGET_VERSION" ]]; then
@@ -44,7 +47,7 @@ function select_epic() {
   echo "Fetching active epics for version '$TARGET_VERSION'..."
   
   # JQL to find Epics in the target version that are not "Done"
-  JQL="project = '$PROJECT' AND type = Epic AND fixVersion = '$TARGET_VERSION' AND status != Done AND labels in ($DEFAULT_LABELS)"
+  JQL="project = '$PROJECT' AND type = Epic AND status != Done AND labels in ($DEFAULT_LABELS)"
   
   EPICS=$(jira epic list -q "$JQL" --plain --columns "KEY,SUMMARY" --no-headers)
   

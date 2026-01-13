@@ -4,7 +4,7 @@
 # untriaged issues into new or existing Epics in an interactive way.
 
 # --- Configuration ---
-PROJECTS="MTV,ECOPROJECT" # Comma-separated list of projects to search
+PROJECTS="MTV" # Comma-separated list of projects to search
 TRIAGE_LABELS="mtv-copy-offload,mtv-storage-offload" # Comma-separated list of labels
 OUTPUT_FILE="untriaged_tickets.txt"
 # You can add more versions here as they become relevant
