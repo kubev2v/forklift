@@ -23,21 +23,27 @@ jobs:
           - name: forklift-api
             file: build/forklift-api/Containerfile
             repo: forklift-api
+          - name: forklift-cli-download
+            file: build/forklift-cli-download/Containerfile
+            repo: forklift-cli-download
           - name: forklift-controller
             file: build/forklift-controller/Containerfile
             repo: forklift-controller
           - name: forklift-operator
             file: build/forklift-operator/Containerfile
             repo: forklift-operator
-          - name: openstack-populator
-            file: build/openstack-populator/Containerfile
-            repo: openstack-populator
+          - name: hyperv-provider-server
+            file: build/hyperv-provider-server/Containerfile
+            repo: forklift-hyperv-provider-server
           - name: openstack-populator
             file: build/openstack-populator/Containerfile
             repo: openstack-populator
           - name: forklift-ova-provider-server
             file: build/ova-provider-server/Containerfile
             repo: forklift-ova-provider-server
+          - name: ova-proxy
+            file: build/ova-proxy/Containerfile
+            repo: forklift-ova-proxy
           - name: ovirt-populator
             file: build/ovirt-populator/Containerfile-upstream
             repo: ovirt-populator
