@@ -264,6 +264,16 @@ type PlanSpec struct {
 	// - false: No inspection is performed before disk transfer.
 	// +kubebuilder:default:=true
 	RunPreflightInspection bool `json:"runPreflightInspection,omitempty"`
+	// CustomizationScripts references a ConfigMap containing customization scripts
+	// to run during guest conversion. The ConfigMap must exist in the specified
+	// namespace and contain script files with keys following these patterns:
+	//   - Windows: [0-9]+_win_firstboot_[description_text].ps1
+	//   - Linux: [0-9]+_linux_(run|firstboot)_[description_text].sh
+	// Scripts are mounted at /mnt/dynamic_scripts in the conversion pod and
+	// executed by virt-customize. The number at the start of the key determines the
+	// execution order. If not specified, no custom scripts are injected.
+	// +optional
+	CustomizationScripts *core.ObjectReference `json:"customizationScripts,omitempty"`
 }
 
 // Find a planned VM.
@@ -340,7 +350,7 @@ func (p *Plan) ShouldUseV2vForTransfer() (bool, error) {
 				!p.Spec.SkipGuestConversion && // virt-v2v always converts the guest, to perform RawCopyMode we need to copy just disks via CDI
 				p.Spec.Type != MigrationOnlyConversion, // For only v2v-in-place conversion, we don't want to populate disks by v2v
 			nil
-	case Ova:
+	case Ova, HyperV:
 		return true, nil
 	default:
 		return false, nil
