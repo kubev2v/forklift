@@ -2272,10 +2272,19 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 		}
 	}
 
+	// Get provider-specific conversion pod configuration
+	providerConfig, err := r.Builder.ConversionPodConfig(vm.Ref)
+	if err != nil {
+		return nil, err
+	}
+
 	var podName string
 	var containerName string
-	// pod labels - start with user-defined labels, then system conversion labels override them
+	// pod labels - merge order: provider config -> user labels -> system labels (system overrides all)
 	podLabels := make(map[string]string)
+	if providerConfig.Labels != nil {
+		maps.Copy(podLabels, providerConfig.Labels)
+	}
 	switch podType {
 	case VirtV2vConversionPod:
 		if r.Plan.Spec.ConvertorLabels != nil {
@@ -2302,10 +2311,21 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 		}
 	}
 
-	// pod node selector
+	// pod annotations - merge provider config after system annotations
+	if providerConfig.Annotations != nil {
+		maps.Copy(annotations, providerConfig.Annotations)
+	}
+
+	// pod node selector - merge provider config with user settings (user takes precedence)
 	var podNodeSelector map[string]string
-	if r.Plan.Spec.ConvertorNodeSelector != nil {
+	if providerConfig.NodeSelector != nil {
 		podNodeSelector = make(map[string]string)
+		maps.Copy(podNodeSelector, providerConfig.NodeSelector)
+	}
+	if r.Plan.Spec.ConvertorNodeSelector != nil {
+		if podNodeSelector == nil {
+			podNodeSelector = make(map[string]string)
+		}
 		maps.Copy(podNodeSelector, r.Plan.Spec.ConvertorNodeSelector)
 	}
 

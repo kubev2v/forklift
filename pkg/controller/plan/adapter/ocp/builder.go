@@ -655,3 +655,9 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 	// do nothing
 	return
 }
+
+// ConversionPodConfig returns provider-specific configuration for the virt-v2v conversion pod.
+// OCP provider does not require any special configuration.
+func (r *Builder) ConversionPodConfig(_ ref.Ref) (*planbase.ConversionPodConfigResult, error) {
+	return &planbase.ConversionPodConfigResult{}, nil
+}

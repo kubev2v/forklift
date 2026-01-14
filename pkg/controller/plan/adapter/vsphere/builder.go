@@ -2253,3 +2253,9 @@ func (r *Builder) isPVCExistsInList(pvc *core.PersistentVolumeClaim, pvcList *co
 	}
 	return false
 }
+
+// ConversionPodConfig returns provider-specific configuration for the virt-v2v conversion pod.
+// vSphere provider does not require any special configuration.
+func (r *Builder) ConversionPodConfig(_ ref.Ref) (*planbase.ConversionPodConfigResult, error) {
+	return &planbase.ConversionPodConfigResult{}, nil
+}

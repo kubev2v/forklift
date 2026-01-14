@@ -103,6 +103,21 @@ const (
 
 var VolumePopulatorNotSupportedError = liberr.New("provider does not support volume populators")
 
+// ConversionPodConfigResult contains provider-specific configuration for the virt-v2v conversion pod.
+// All fields are optional - nil means no provider-specific configuration for that aspect.
+type ConversionPodConfigResult struct {
+	// NodeSelector specifies provider-required node selection constraints.
+	// These are merged with (but can be overridden by) Plan.Spec.ConvertorNodeSelector.
+	NodeSelector map[string]string
+
+	// Labels specifies provider-specific labels to add to the conversion pod.
+	// These are merged with (but can be overridden by) Plan.Spec.ConvertorLabels.
+	Labels map[string]string
+
+	// Annotations specifies provider-specific annotations to add to the conversion pod.
+	Annotations map[string]string
+}
+
 // Adapter API.
 // Constructs provider-specific implementations
 // of the Builder, Client, and Validator.
@@ -161,6 +176,10 @@ type Builder interface {
 	ConfigMaps(vmRef ref.Ref) (list []core.ConfigMap, err error)
 	// Build VM Secrets
 	Secrets(vmRef ref.Ref) (list []core.Secret, err error)
+	// ConversionPodConfig returns provider-specific configuration for the virt-v2v conversion pod.
+	// Returns an empty struct if no provider-specific configuration is needed.
+	// The returned config is merged with user settings from Plan.Spec (user settings take precedence).
+	ConversionPodConfig(vmRef ref.Ref) (*ConversionPodConfigResult, error)
 }
 
 // Client API.

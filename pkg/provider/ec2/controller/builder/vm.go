@@ -599,3 +599,26 @@ func (r *Builder) detectOS(awsInstance *model.InstanceDetails) string {
 	// Default to Linux
 	return DefaultLinux
 }
+
+// ConversionPodConfig returns zone-based configuration for the virt-v2v conversion pod.
+// This ensures the conversion pod runs on a node in the same AZ as the EBS volumes,
+// which is required for volume attachment by the EBS CSI driver.
+func (r *Builder) ConversionPodConfig(_ ref.Ref) (*planbase.ConversionPodConfigResult, error) {
+	if r.Plan.Spec.SkipZoneNodeSelector {
+		r.log.V(1).Info("Skipping zone node selector for conversion pod (SkipZoneNodeSelector=true)")
+		return &planbase.ConversionPodConfigResult{}, nil
+	}
+
+	az, err := r.getTargetAZ()
+	if err != nil {
+		r.log.Info("Could not get target AZ, skipping conversion pod zone selector", "error", err.Error())
+		return &planbase.ConversionPodConfigResult{}, nil
+	}
+
+	r.log.Info("Setting zone-based node selector for conversion pod", "targetAZ", az)
+	return &planbase.ConversionPodConfigResult{
+		NodeSelector: map[string]string{
+			TopologyZoneLabel: az,
+		},
+	}, nil
+}

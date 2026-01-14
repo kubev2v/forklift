@@ -133,13 +133,15 @@ spec:
 
 ## Availability Zone Node Selection
 
-By default, EC2 migrations automatically add a node selector to migrated VMs to ensure they run on nodes in the same availability zone as their EBS volumes. This is required because EBS volumes can only be attached to EC2 instances (and thus OpenShift nodes) in the same AZ.
+By default, EC2 migrations automatically add a node selector to both the migrated VMs and the virt-v2v conversion pods to ensure they run on nodes in the same availability zone as their EBS volumes. This is required because EBS volumes can only be attached to EC2 instances (and thus OpenShift nodes) in the same AZ.
 
 ### How It Works
 
 1. The provider's `spec.settings.target-az` defines where EBS volumes are created
-2. During migration, a node selector `topology.kubernetes.io/zone=<target-az>` is automatically added to the target VM
-3. Kubernetes schedules the VM on a node in that AZ, ensuring volume attachment succeeds
+2. During migration:
+   - A node selector `topology.kubernetes.io/zone=<target-az>` is automatically added to the target VM
+   - The same node selector is merged into `Plan.Spec.ConvertorNodeSelector` for the virt-v2v conversion pod
+3. Kubernetes schedules both the conversion pod and VM on nodes in that AZ, ensuring volume attachment succeeds
 
 ### Disabling Zone Node Selection
 
@@ -152,8 +154,18 @@ kubectl patch plan migrate-from-ec2 --type=merge -p '{"spec":{"skipZoneNodeSelec
 
 | `skipZoneNodeSelector` | Behavior |
 |------------------------|----------|
-| `false` (default) | Adds `topology.kubernetes.io/zone=<target-az>` node selector to VMs |
+| `false` (default) | Adds `topology.kubernetes.io/zone=<target-az>` node selector to VMs and conversion pods |
 | `true` | No zone-based node selector added |
+
+### Overriding Zone Selection
+
+You can override the zone node selector for conversion pods by explicitly setting `convertorNodeSelector` in the Plan. User-specified values take precedence over the automatic zone selector:
+
+```yaml
+spec:
+  convertorNodeSelector:
+    topology.kubernetes.io/zone: us-east-1b  # Override automatic zone selection
+```
 
 ## Requirements
 
