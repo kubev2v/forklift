@@ -1,32 +1,38 @@
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: forkliftcontroller-migrator-role
+  name: forklift-migrator-role
 rules:
-- apiGroups:
-  - forklift.konveyor.io
-  resources:
-  - '*'
-  verbs:
-  - '*'
 - apiGroups:
   - ""
   resources:
   - events
-  - namespaces
-  - persistentvolumes
-  - persistentvolumeclaims
-  - services
   verbs:
   - get
   - list
   - watch
+- apiGroups:
+    - batch
+  resources:
+    - jobs
+  verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
 - apiGroups:
   - ""
   resources:
   - pods
   - secrets
   - configmaps
+  - services
+  - namespaces
+  - persistentvolumes
+  - persistentvolumeclaims
   verbs:
   - get
   - list
@@ -64,6 +70,7 @@ rules:
   - create
   - update
   - patch
+  - delete
 - apiGroups:
   - kubevirt.io
   resources:
@@ -112,6 +119,18 @@ rules:
   resources:
   - virtualmachinepreferences
   - virtualmachineinstancetypes
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - multicluster.x-k8s.io
+  resources:
+  - serviceexports
   verbs:
   - get
   - list

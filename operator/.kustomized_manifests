@@ -6812,6 +6812,148 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
+  name: forklift-migrator-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - secrets
+  - configmaps
+  - services
+  - namespaces
+  - persistentvolumes
+  - persistentvolumeclaims
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - k8s.cni.cncf.io
+  resources:
+  - network-attachment-definitions
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - storageclasses
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - kubevirt.io
+  resources:
+  - virtualmachines
+  - virtualmachines/finalizers
+  - virtualmachineinstancemigrations
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - kubevirt.io
+  resources:
+  - kubevirts
+  - virtualmachineinstances
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - cdi.kubevirt.io
+  resources:
+  - datavolumes
+  - datavolumes/finalizers
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - export.kubevirt.io
+  resources:
+  - virtualmachineexports
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - instancetype.kubevirt.io
+  resources:
+  - virtualmachineclusterpreferences
+  - virtualmachineclusterinstancetypes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - instancetype.kubevirt.io
+  resources:
+  - virtualmachinepreferences
+  - virtualmachineinstancetypes
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - multicluster.x-k8s.io
+  resources:
+  - serviceexports
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
   name: forklift-populator-controller-role
 rules:
 - apiGroups:
