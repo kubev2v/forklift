@@ -3,9 +3,9 @@ package powerstore
 import (
 	"context"
 	"fmt"
-	"strings"
 	"net/http"
-	
+	"strings"
+
 	"github.com/dell/gopowerstore"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/fcutil"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
@@ -16,10 +16,12 @@ const (
 	hostIDContextKey      string = "hostID"
 	esxLogicalHostNameKey string = "esxLogicalHostName"
 	esxRealHostNameKey    string = "esxRealHostName"
+	adapterIdContextKey   string = "adapterId"
 )
 
 type PowerstoreClonner struct {
 	Client gopowerstore.Client
+	populator.AdapterIdHandlerImpl
 }
 
 // CurrentMappedGroups implements populator.StorageApi.
@@ -53,8 +55,6 @@ func (p *PowerstoreClonner) CurrentMappedGroups(targetLUN populator.LUN, mapping
 
 // EnsureClonnerIgroup implements populator.StorageApi.
 func (p *PowerstoreClonner) EnsureClonnerIgroup(initiatorGroup string, adapterIds []string) (populator.MappingContext, error) {
-	klog.Infof("ensuring initiator group %s for adapters %v", initiatorGroup, adapterIds)
-
 	ctx := context.Background()
 	mappingContext := make(map[string]any)
 
@@ -62,9 +62,9 @@ func (p *PowerstoreClonner) EnsureClonnerIgroup(initiatorGroup string, adapterId
 	if err != nil {
 		return nil, fmt.Errorf("failed to get initiator groups: %w", err)
 	}
-	found, mappingContext, err := getHostByInitiator(adapterIds, &hosts, initiatorGroup)
+	found, mappingContext, err := p.getHostByInitiator(adapterIds, &hosts, initiatorGroup)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get host by initiator: %w", err)
+		klog.Errorf("failed to get host by initiator: %v", err)
 	}
 	if found {
 		return mappingContext, nil
@@ -74,60 +74,15 @@ func (p *PowerstoreClonner) EnsureClonnerIgroup(initiatorGroup string, adapterId
 		return nil, fmt.Errorf("failed to get host groups: %w", err)
 	}
 	for _, hostGroup := range hostGroups {
-		found, mappingContext, err = getHostByInitiator(adapterIds, &hostGroup.Hosts, initiatorGroup)
+		found, mappingContext, err := p.getHostByInitiator(adapterIds, &hostGroup.Hosts, initiatorGroup)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get host by initiator: %w", err)
+			klog.Errorf("failed to get host by initiator: %v", err)
 		}
 		if found {
 			return mappingContext, nil
 		}
 	}
-	// if no host group found or host, create new host group
-
-	host, err := p.Client.GetHostByName(ctx, initiatorGroup)
-	if err != nil {
-		klog.Infof("initiator group %s not found, creating new initiator group", initiatorGroup)
-		osType := gopowerstore.OSTypeEnumESXi
-		inits := make([]gopowerstore.InitiatorCreateModify, 0, len(adapterIds))
-		for _, a := range adapterIds {
-			pt, err := detectPortType(a)
-			if err != nil {
-				return nil, fmt.Errorf("failed to detect port type for adapter %s: %w", a, err)
-			}
-			portName, err := extractAdapterIdByPortType(a, pt)
-			if err != nil {
-				return nil, fmt.Errorf("failed to modify WWN by type for adapter %s: %w", a, err)
-			}
-			inits = append(inits, gopowerstore.InitiatorCreateModify{
-				PortName: &portName,
-				PortType: &pt,
-			})
-		}
-		createParams := &gopowerstore.HostCreate{
-			Name:       &initiatorGroup,
-			OsType:     &osType,
-			Initiators: &inits,
-		}
-
-		createResp, err := p.Client.CreateHost(ctx, createParams)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create initiator group %s: %w", initiatorGroup, err)
-		}
-
-		host, err = p.Client.GetHost(ctx, createResp.ID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get created initiator group %s: %w", createResp.ID, err)
-		}
-
-		klog.Infof("Successfully created initiator group %s with ID %s", initiatorGroup, host.ID)
-	} else {
-		klog.Infof("Found existing initiator group %s with ID %s", initiatorGroup, host.ID)
-	}
-
-	mappingContext = createMappingContext(&host, initiatorGroup)
-
-	klog.Infof("Successfully ensured initiator group %s with %d adapters", initiatorGroup, len(adapterIds))
-	return mappingContext, nil
+	return nil, fmt.Errorf("no host found with adapter IDs %v", adapterIds)
 }
 
 func extractAdapterIdByPortType(adapterId string, portType gopowerstore.InitiatorProtocolTypeEnum) (string, error) {
@@ -139,7 +94,6 @@ func extractAdapterIdByPortType(adapterId string, portType gopowerstore.Initiato
 		if err != nil {
 			return "", fmt.Errorf("failed to extract and format WWPN for adapter %s: %w", adapterId, err)
 		}
-		wwpn = strings.ToLower(wwpn)
 		return wwpn, nil
 	case gopowerstore.InitiatorProtocolTypeEnumNVME:
 		return adapterId, nil
@@ -147,22 +101,22 @@ func extractAdapterIdByPortType(adapterId string, portType gopowerstore.Initiato
 	return "", fmt.Errorf("invalid port type: %s", portType)
 }
 
-func getHostByInitiator(adapterIds []string, hosts *[]gopowerstore.Host, initiatorGroup string) (bool, populator.MappingContext, error) {
+func (p *PowerstoreClonner) getHostByInitiator(adapterIds []string, hosts *[]gopowerstore.Host, initiatorGroup string) (bool, populator.MappingContext, error) {
 	for _, host := range *hosts {
 		for _, initiator := range host.Initiators {
 			for _, adapterId := range adapterIds {
 				portType, err := detectPortType(adapterId)
 				if err != nil {
-					return false, populator.MappingContext{}, fmt.Errorf("failed to detect port type for adapter %s: %w", adapterId, err)
+					klog.Errorf("failed to detect port type for adapter %s: %v", adapterId, err)
 				}
 				formattedAdapterId, err := extractAdapterIdByPortType(adapterId, portType)
 				if err != nil {
-					return false, populator.MappingContext{}, fmt.Errorf("failed to extract adapter ID by port type for adapter %s: %w", adapterId, err)
+					klog.Errorf("failed to modify WWN by type for adapter %s: %v", adapterId, err)
 				}
 				if initiator.PortName == formattedAdapterId {
 					klog.Infof("Found existing initiator group %s with ID %s name %s port name %s", initiatorGroup, host.ID, host.Name, initiator.PortName)
-					mappingContext := createMappingContext(&host, initiatorGroup)
-					return true, mappingContext, nil
+					p.AddAdapterID(adapterId)
+					return true, createMappingContext(&host, initiatorGroup), nil
 				}
 			}
 		}
@@ -317,9 +271,9 @@ func NewPowerstoreClonner(hostname, username, password string, sslSkipVerify boo
 	}
 
 	client.SetCustomHTTPHeaders(http.Header{
-		"Application-Type": { "MTV" },
+		"Application-Type": {"MTV"},
 	})
-	
+
 	ctx := context.Background()
 	_, err = client.GetCluster(ctx)
 	if err != nil {

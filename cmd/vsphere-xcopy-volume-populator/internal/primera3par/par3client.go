@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -23,7 +25,7 @@ type Primera3ParClient interface {
 	GetSessionKey() (string, error)
 	EnsureLunMapped(initiatorGroup string, targetLUN populator.LUN) (populator.LUN, error)
 	LunUnmap(ctx context.Context, initiatorGroupName string, lunName string) error
-	EnsureHostsWithIds(adapterIds []string) ([]string, error)
+	EnsureHostsWithIds(adapterIds []string) (map[string]string, error)
 	EnsureHostSetExists(hostSetName string) error
 	AddHostToHostSet(hostSetName string, hostName string) error
 	GetLunDetailsByVolumeName(lunName string, lun populator.LUN) (populator.LUN, error)
@@ -89,15 +91,15 @@ func NewPrimera3ParClientWsImpl(storageHostname, storageUsername, storagePasswor
 // EnsureHostsWithIds We return a list of host names that are connected to the adapters provided. If a host already exists we find it,
 // if it does not, we crate a new one. When we create a new host it will always have one path, but an existing host may
 // aggregate several.
-func (p *Primera3ParClientWsImpl) EnsureHostsWithIds(adapterIds []string) ([]string, error) {
-	hostnames := make([]string, len(adapterIds))
+func (p *Primera3ParClientWsImpl) EnsureHostsWithIds(adapterIds []string) (map[string]string, error) {
+	nameAdapterIdMap := make(map[string]string)
 	for _, adapterId := range adapterIds {
 		hostName, err := p.getHostByAdapterId(adapterId)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get host by adapterId: %w", err)
 		}
 		if hostName != "" {
-			hostnames = append(hostnames, hostName)
+			nameAdapterIdMap[hostName] = adapterId
 			continue
 		}
 		hostName = uuid.New().String()
@@ -107,10 +109,11 @@ func (p *Primera3ParClientWsImpl) EnsureHostsWithIds(adapterIds []string) ([]str
 			return nil, err
 		}
 
-		hostnames = append(hostnames, hostName)
+		nameAdapterIdMap[hostName] = adapterId
 	}
+	hostnames := slices.Collect(maps.Keys(nameAdapterIdMap))
 	hostnames = cleanHostnames(hostnames)
-	return hostnames, nil
+	return nameAdapterIdMap, nil
 }
 
 func cleanHostnames(hosts []string) []string {

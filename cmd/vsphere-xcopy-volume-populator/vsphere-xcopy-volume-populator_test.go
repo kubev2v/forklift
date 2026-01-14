@@ -126,6 +126,7 @@ var _ = Describe("Populator", func() {
 				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any()).Return(nil, nil)
 				storageClient.EXPECT().ResolvePVToLUN(populator.PersistentVolume{Name: "pvc-12345"}).Return(populator.LUN{NAA: "616263"}, nil)
 				storageClient.EXPECT().CurrentMappedGroups(populator.LUN{NAA: "616263"}, nil).Return(nil, fmt.Errorf("some error"))
+				storageClient.EXPECT().GetAdaptersID().Return([]string{"iqn.test"}, nil).AnyTimes()
 			},
 			want: fmt.Errorf("failed to fetch the current initiator groups of the lun : some error"),
 		}),
@@ -163,6 +164,7 @@ var _ = Describe("Populator", func() {
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "device", "list", "-d", "naa.616263"}).Return([]esx.Values{map[string][]string{"Status": {"off"}}}, nil).AnyTimes()
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "device", "detached", "remove", "-d", "naa.616263"}).Return(nil, nil)
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "adapter", "rescan", "-t", "delete", "-A", "vmhbatest"}).Return(nil, nil)
+				storageClient.EXPECT().GetAdaptersID().Return([]string{"iqn.test"}, nil)
 				storageClient.EXPECT().UnMap("xcopy-esxs", gomock.Any(), nil).Return(nil)
 				// Mock hostLocker to actually execute the callback function
 				hostLocker.EXPECT().WithLock(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(

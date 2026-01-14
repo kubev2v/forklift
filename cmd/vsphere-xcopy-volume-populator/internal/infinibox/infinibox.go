@@ -19,6 +19,7 @@ const (
 
 type InfiniboxClonner struct {
 	api iboxapi.Client
+	populator.AdapterIdHandlerImpl
 }
 
 func (c *InfiniboxClonner) Map(initiatorGroup string, targetLUN populator.LUN, mappingContext populator.MappingContext) (populator.LUN, error) {
@@ -103,6 +104,7 @@ func (c *InfiniboxClonner) EnsureClonnerIgroup(initiatorGroup string, adapterIds
 			for _, adapterId := range adapterIds {
 				if port.Address == adapterId {
 					klog.Infof("Found host %s with adapter ID %s", host.Name, adapterId)
+					c.AddAdapterID(adapterId)
 					return createMappingContext(&host, initiatorGroup), nil
 				}
 			}

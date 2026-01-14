@@ -90,7 +90,7 @@ func createRDMPopulator(storageApi StorageApi, vmwareClient vmware.Client) (Popu
 
 // createVMDKPopulator creates VMDK/Xcopy populator (default/fallback)
 func createVMDKPopulator(storageApi StorageApi, vmwareClient vmware.Client, sshConfig *SSHConfig) (Populator, error) {
-	vmdkApi, ok := storageApi.(VMDKCapable)
+	_, ok := storageApi.(VMDKCapable)
 	if !ok {
 		return nil, fmt.Errorf("storage API does not implement VMDKCapable (required)")
 	}
@@ -103,13 +103,13 @@ func createVMDKPopulator(storageApi StorageApi, vmwareClient vmware.Client, sshC
 		if timeout == 0 {
 			timeout = 30
 		}
-		pop, err = NewWithRemoteEsxcliSSH(vmdkApi,
+		pop, err = NewWithRemoteEsxcliSSH(storageApi,
 			vmwareClient,
 			sshConfig.PrivateKey,
 			sshConfig.PublicKey,
 			timeout)
 	} else {
-		pop, err = NewWithRemoteEsxcli(vmdkApi, vmwareClient)
+		pop, err = NewWithRemoteEsxcli(storageApi, vmwareClient)
 	}
 
 	if err != nil {

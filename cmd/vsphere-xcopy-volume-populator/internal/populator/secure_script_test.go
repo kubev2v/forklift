@@ -15,7 +15,7 @@ import (
 
 	vmware_mocks "github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware/mocks"
 )
- 
+
 var _ = Describe("uploadScript", func() {
 	var (
 		ctrl       *gomock.Controller

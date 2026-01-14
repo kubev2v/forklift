@@ -40,6 +40,18 @@ func (m *MockStorageApi) EXPECT() *MockStorageApiMockRecorder {
 	return m.recorder
 }
 
+// AddAdapterID mocks base method.
+func (m *MockStorageApi) AddAdapterID(adapterID string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "AddAdapterID", adapterID)
+}
+
+// AddAdapterID indicates an expected call of AddAdapterID.
+func (mr *MockStorageApiMockRecorder) AddAdapterID(adapterID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddAdapterID", reflect.TypeOf((*MockStorageApi)(nil).AddAdapterID), adapterID)
+}
+
 // CurrentMappedGroups mocks base method.
 func (m *MockStorageApi) CurrentMappedGroups(targetLUN populator.LUN, context populator.MappingContext) ([]string, error) {
 	m.ctrl.T.Helper()
@@ -56,18 +68,33 @@ func (mr *MockStorageApiMockRecorder) CurrentMappedGroups(targetLUN, context any
 }
 
 // EnsureClonnerIgroup mocks base method.
-func (m *MockStorageApi) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn []string) (populator.MappingContext, error) {
+func (m *MockStorageApi) EnsureClonnerIgroup(initiatorGroup string, adapterIds []string) (populator.MappingContext, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EnsureClonnerIgroup", initiatorGroup, clonnerIqn)
+	ret := m.ctrl.Call(m, "EnsureClonnerIgroup", initiatorGroup, adapterIds)
 	ret0, _ := ret[0].(populator.MappingContext)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // EnsureClonnerIgroup indicates an expected call of EnsureClonnerIgroup.
-func (mr *MockStorageApiMockRecorder) EnsureClonnerIgroup(initiatorGroup, clonnerIqn any) *gomock.Call {
+func (mr *MockStorageApiMockRecorder) EnsureClonnerIgroup(initiatorGroup, adapterIds any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureClonnerIgroup", reflect.TypeOf((*MockStorageApi)(nil).EnsureClonnerIgroup), initiatorGroup, clonnerIqn)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureClonnerIgroup", reflect.TypeOf((*MockStorageApi)(nil).EnsureClonnerIgroup), initiatorGroup, adapterIds)
+}
+
+// GetAdaptersID mocks base method.
+func (m *MockStorageApi) GetAdaptersID() ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAdaptersID")
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetAdaptersID indicates an expected call of GetAdaptersID.
+func (mr *MockStorageApiMockRecorder) GetAdaptersID() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAdaptersID", reflect.TypeOf((*MockStorageApi)(nil).GetAdaptersID))
 }
 
 // Map mocks base method.

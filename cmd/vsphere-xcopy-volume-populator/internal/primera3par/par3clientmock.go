@@ -31,17 +31,17 @@ func (m *MockPrimera3ParClient) GetSessionKey() (string, error) {
 	return m.SessionKey, nil
 }
 
-func (m *MockPrimera3ParClient) EnsureHostsWithIds(iqn []string) ([]string, error) {
+func (m *MockPrimera3ParClient) EnsureHostsWithIds(iqn []string) (map[string]string, error) {
 	for hostName, existingIQN := range m.Hosts {
 		if existingIQN == iqn[0] {
-			return []string{hostName}, nil
+			return map[string]string{hostName: iqn[0]}, nil
 		}
 	}
 
 	hostName := fmt.Sprintf("mock-host-%s", iqn)
 	m.Hosts[hostName] = iqn[0]
 	log.Printf("Mock: Created host %s with IQN %s", hostName, iqn)
-	return []string{hostName}, nil
+	return map[string]string{hostName: iqn[0]}, nil
 }
 
 func (m *MockPrimera3ParClient) EnsureHostSetExists(hostSetName string) error {
