@@ -1656,8 +1656,104 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 			conditions := dv.Conditions()
 			switch dv.Status.Phase {
 			case cdi.Succeeded, cdi.Paused:
-				completed++
-				r.setTaskCompleted(task)
+				// Before marking as completed, verify that the PVC is bound and
+				// the importer pod (if it exists) is not pending. This prevents
+				// marking disk transfer as completed when the importer pod is
+				// still waiting for PVC provisioning (e.g., due to CSI driver issues).
+				canMarkCompleted := true
+				if dv.Status.ClaimName != "" {
+					pvc := &core.PersistentVolumeClaim{}
+					err = r.Destination.Client.Get(context.TODO(), types.NamespacedName{
+						Namespace: r.Plan.Spec.TargetNamespace,
+						Name:      dv.Status.ClaimName,
+					}, pvc)
+					if err != nil {
+						log.Error(
+							err,
+							"Could not get PVC for DataVolume to verify completion.",
+							"vm",
+							vm.String(),
+							"dv",
+							path.Join(dv.Namespace, dv.Name))
+						canMarkCompleted = false
+					} else {
+						// Check if PVC is bound
+						if pvc.Status.Phase != core.ClaimBound {
+							log.Info(
+								"DataVolume is Succeeded but PVC is not bound, not marking as completed.",
+								"vm",
+								vm.String(),
+								"dv",
+								path.Join(dv.Namespace, dv.Name),
+								"pvcPhase",
+								pvc.Status.Phase)
+							canMarkCompleted = false
+						} else {
+							// Check prime PVC if it exists (importer pod uses prime PVC)
+							primePVC := &core.PersistentVolumeClaim{}
+							err = r.Destination.Client.Get(context.TODO(), types.NamespacedName{
+								Namespace: r.Plan.Spec.TargetNamespace,
+								Name:      fmt.Sprintf("prime-%s", pvc.UID),
+							}, primePVC)
+							if err != nil {
+								if !k8serr.IsNotFound(err) {
+									log.Error(
+										err,
+										"Could not get prime PVC for DataVolume to verify completion.",
+										"vm",
+										vm.String(),
+										"dv",
+										path.Join(dv.Namespace, dv.Name))
+									// If prime PVC doesn't exist, that's okay - importer may not be using it
+								}
+							} else if primePVC.Status.Phase != core.ClaimBound {
+								log.Info(
+									"DataVolume is Succeeded but prime PVC is not bound, not marking as completed.",
+									"vm",
+									vm.String(),
+									"dv",
+									path.Join(dv.Namespace, dv.Name),
+									"primePVCPhase",
+									primePVC.Status.Phase)
+								canMarkCompleted = false
+							} else {
+								// Check if importer pod exists and is not pending
+								importer, found, kErr := r.kubevirt.GetImporterPod(*primePVC)
+								if kErr != nil {
+									log.Error(
+										kErr,
+										"Could not get CDI importer pod for DataVolume to verify completion.",
+										"vm",
+										vm.String(),
+										"dv",
+										path.Join(dv.Namespace, dv.Name))
+									// Don't block completion if we can't check the pod
+								} else if found && importer != nil {
+									if importer.Status.Phase == core.PodPending {
+										log.Info(
+											"DataVolume is Succeeded but importer pod is pending, not marking as completed.",
+											"vm",
+											vm.String(),
+											"dv",
+											path.Join(dv.Namespace, dv.Name),
+											"pod",
+											path.Join(importer.Namespace, importer.Name))
+										canMarkCompleted = false
+									}
+								}
+							}
+						}
+					}
+				}
+				if canMarkCompleted {
+					completed++
+					r.setTaskCompleted(task)
+				} else {
+					// Mark as pending instead of completed
+					pending++
+					task.Phase = api.StepPending
+					task.Reason = "DataVolume shows Succeeded but PVC is not bound or importer pod is pending"
+				}
 			case cdi.Pending, cdi.ImportScheduled:
 				pending++
 				task.Phase = api.StepPending
@@ -1760,6 +1856,19 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 					msg, _ := terminationMessage(importer)
 					task.AddError(msg)
 				}
+			default:
+				// Handle unknown/empty phases - treat as pending
+				log.Info(
+					"DataVolume has unknown or empty phase, treating as pending.",
+					"vm",
+					vm.String(),
+					"dv",
+					path.Join(dv.Namespace, dv.Name),
+					"phase",
+					dv.Status.Phase)
+				pending++
+				task.Phase = api.StepPending
+				task.Reason = fmt.Sprintf("DataVolume phase is unknown or empty: %s", dv.Status.Phase)
 			}
 		}
 	}
