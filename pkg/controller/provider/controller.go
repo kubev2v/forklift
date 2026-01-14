@@ -330,41 +330,60 @@ func (r *Reconciler) updateProvider(provider *api.Provider) (err error) {
 
 // Update the container.
 func (r *Reconciler) updateContainer(provider *api.Provider) (err error) {
-	if _, found := r.container.Get(provider); found {
-		if provider.HasReconciled() {
-			r.Log.V(1).Info(
-				"Provider not reconciled, postponing.")
-			return
-		}
-	}
-	if provider.Status.HasBlockerCondition() ||
-		!provider.Status.HasCondition(ConnectionTestSucceeded) {
-		r.Log.V(1).Info(
-			"Provider not ready, postponing.")
-		return
-	}
-	log.Info("Update container.")
-	if current, found := r.container.Get(provider); found {
-		current.Shutdown()
-		_ = current.DB().Close(true)
-		r.Log.V(2).Info(
-			"Shutdown found collector.")
-	}
-	db := r.getDB(provider)
+	// Get the secret first to check if credentials have changed
 	secret, err := r.getSecret(provider)
 	if err != nil {
 		return
 	}
+	secretChanged := secret.ResourceVersion != provider.Status.SecretResourceVersion
+
+	if !secretChanged {
+		if _, found := r.container.Get(provider); found {
+			// Don't update if provider hasn't changed
+			if provider.HasReconciled() {
+				r.Log.V(1).Info(
+					"Provider already reconciled and secret unchanged, postponing.")
+				return
+			}
+		}
+
+		// Only build a new collector if connection test succeeded
+		if provider.Status.HasBlockerCondition() ||
+			!provider.Status.HasCondition(ConnectionTestSucceeded) {
+			r.Log.V(1).Info(
+				"Provider not ready, postponing.")
+			return
+		}
+
+	} else {
+		r.Log.V(1).Info(
+			"Detected Secret change.",
+			"old", provider.Status.SecretResourceVersion,
+			"new", secret.ResourceVersion)
+	}
+
+	log.Info("Update container.")
+	db := r.getDB(provider)
 	err = db.Open(true)
 	if err != nil {
 		return
 	}
 
 	collector := container.Build(db, provider, secret)
-	err = r.container.Add(collector)
+	// `Replace` is necessary to remove stale collectors if the secret has changed.
+	old, found, err := r.container.Replace(collector)
 	if err != nil {
 		return
 	}
+	if found {
+		_ = old.DB().Close(true)
+		r.Log.V(2).Info("Replaced collector.")
+	} else {
+		r.Log.V(2).Info("Added new collector.")
+	}
+
+	// Update the secret ResourceVersion in status to track for future changes
+	provider.Status.SecretResourceVersion = secret.ResourceVersion
 
 	r.Log.V(2).Info(
 		"Data collector added/started.")
