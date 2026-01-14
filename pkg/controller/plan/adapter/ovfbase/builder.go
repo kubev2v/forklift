@@ -559,3 +559,9 @@ func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskNam
 	err = planbase.VolumePopulatorNotSupportedError
 	return
 }
+
+// ConversionPodConfig returns provider-specific configuration for the virt-v2v conversion pod.
+// OVF/OVA provider does not require any special configuration.
+func (r *Builder) ConversionPodConfig(_ ref.Ref) (*planbase.ConversionPodConfigResult, error) {
+	return &planbase.ConversionPodConfigResult{}, nil
+}
