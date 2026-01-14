@@ -20,6 +20,11 @@ type Validator struct {
 	*plancontext.Context
 }
 
+// NOOP
+func (r *Validator) UnSupportedDisks(vmRef ref.Ref) ([]string, error) {
+	return []string{}, nil
+}
+
 func (r *Validator) isLunMissingSize(da model.XDiskAttachment) bool {
 	for _, lun := range da.Disk.Lun.LogicalUnits.LogicalUnit {
 		if lun.Size <= 0 {
