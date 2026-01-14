@@ -19,6 +19,13 @@ const (
 	DiskRoot       = DisksRoot + "/:" + DiskParam
 )
 
+type StorageType string
+
+const (
+	LunStorageType   StorageType = "lun"
+	ImageStorageType StorageType = "image"
+)
+
 // Disk handler.
 type DiskHandler struct {
 	Handler
@@ -173,4 +180,9 @@ func (r *Disk) Content(detail int) interface{} {
 	}
 
 	return r
+}
+
+// is the disk LUN
+func (r *Disk) IsLun() bool {
+	return r.StorageType == string(LunStorageType)
 }
