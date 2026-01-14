@@ -6003,6 +6003,11 @@ spec:
               phase:
                 description: Current life cycle phase of the provider.
                 type: string
+              secretResourceVersion:
+                description: |-
+                  The ResourceVersion of the secret referenced by this provider.
+                  Used to detect when credentials have been rotated.
+                type: string
               service:
                 description: Provider service reference
                 properties:
