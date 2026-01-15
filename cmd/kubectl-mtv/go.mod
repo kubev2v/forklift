@@ -2,7 +2,7 @@ module github.com/kubev2v/forklift/cmd/kubectl-mtv
 
 go 1.24.0
 
-toolchain go1.24.4
+toolchain go1.25.6
 
 require github.com/yaacov/kubectl-mtv v0.1.48
 

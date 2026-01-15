@@ -2,7 +2,7 @@ module github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator
 
 go 1.24.0
 
-toolchain go1.24.4
+toolchain go1.25.6
 
 require (
 	github.com/dell/gopowermax/v2 v2.9.0
