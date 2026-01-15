@@ -282,9 +282,136 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	// Preserve DataVolumeTemplates from source VM to maintain user workflows
 	// that may expect the VM's DataVolume to be present
 	object.DataVolumeTemplates = targetVmSpec.DataVolumeTemplates
+
+	// Sanitize DataVolumeTemplates to prevent conflicts with Forklift-created DataVolumes:
+	// 1. Match template names to the PVC names (Forklift creates DataVolumes with Name = pvc.Name)
+	// 2. Clear spec.source to prevent KubeVirt from trying to create new DataVolumes with invalid sources
+	// 3. Ensure namespace is set correctly (will be set by KubeVirt to match VM namespace)
+	// 4. Update volume references to match renamed DataVolumeTemplates
+	r.sanitizeDataVolumeTemplates(vmRef, object.DataVolumeTemplates, object)
+
 	r.mapNetworks(sourceVm, targetVmSpec)
 
 	return nil
+}
+
+// sanitizeDataVolumeTemplates ensures DataVolumeTemplates are compatible with Forklift-created DataVolumes.
+// Forklift creates DataVolumes with Name = pvc.Name, so templates must match these names.
+// We also clear spec.source to prevent KubeVirt from trying to create new DataVolumes with invalid source URLs.
+// Additionally, we update volume references to match any renamed DataVolumeTemplates.
+func (r *Builder) sanitizeDataVolumeTemplates(vmRef ref.Ref, templates []cnv.DataVolumeTemplateSpec, object *cnv.VirtualMachineSpec) {
+	// Build a map of volume name -> PVC name from VM volumes
+	// This allows us to match DataVolumeTemplates to the PVCs that Forklift will create DataVolumes for
+	volumeToPVCName := make(map[string]string)
+	sourceVm, err := r.getSourceVmFromDefinition(vmRef)
+	if err != nil {
+		r.Log.Error(err, "Failed to get source VM for DataVolumeTemplate sanitization")
+		return
+	}
+
+	for _, vol := range sourceVm.Spec.Template.Spec.Volumes {
+		var pvcName string
+		switch {
+		case vol.PersistentVolumeClaim != nil:
+			// Volume references PVC directly
+			pvcName = vol.PersistentVolumeClaim.ClaimName
+		case vol.DataVolume != nil:
+			// Volume references DataVolume - need to find the PVC it creates
+			// In OCP, DataVolumes typically create PVCs with the same name as the DataVolume
+			// But we need to check the actual PVC name from the source
+			dv := &cdi.DataVolume{}
+			err := r.sourceClient.Get(context.TODO(), client.ObjectKey{
+				Namespace: vmRef.Namespace,
+				Name:      vol.DataVolume.Name,
+			}, dv)
+			if err != nil {
+				r.Log.V(1).Info("Could not find source DataVolume, using DataVolume name as PVC name",
+					"dataVolume", vol.DataVolume.Name, "error", err)
+				pvcName = vol.DataVolume.Name
+			} else {
+				// Use the actual PVC name that the DataVolume created
+				if dv.Status.ClaimName != "" {
+					pvcName = dv.Status.ClaimName
+				} else {
+					// Fallback: DataVolume name typically matches PVC name
+					pvcName = vol.DataVolume.Name
+				}
+			}
+		default:
+			continue
+		}
+		if pvcName != "" {
+			volumeToPVCName[vol.Name] = pvcName
+		}
+	}
+
+	// Track template name changes so we can update volume references
+	templateNameMap := make(map[string]string) // old name -> new name
+
+	// Sanitize each template
+	for i := range templates {
+		template := &templates[i]
+		oldName := template.Name
+
+		// Find the corresponding PVC name by matching template to VM volumes
+		// DataVolumeTemplates are referenced by volumes via vol.DataVolume.Name matching template name
+		var targetPVCName string
+		for volName, pvcName := range volumeToPVCName {
+			// Check if any volume references this template by name
+			for _, vol := range sourceVm.Spec.Template.Spec.Volumes {
+				if vol.Name == volName && vol.DataVolume != nil && vol.DataVolume.Name == template.Name {
+					targetPVCName = pvcName
+					break
+				}
+			}
+			if targetPVCName != "" {
+				break
+			}
+		}
+
+		// If we found a matching PVC name, update the template name to match
+		// Forklift creates DataVolumes with Name = pvc.Name, so template must match
+		if targetPVCName != "" && template.Name != targetPVCName {
+			template.Name = targetPVCName
+			template.GenerateName = ""
+			templateNameMap[oldName] = targetPVCName
+			r.Log.V(1).Info("Updated DataVolumeTemplate name to match Forklift-created DataVolume",
+				"oldName", oldName, "newName", template.Name, "pvcName", targetPVCName)
+		} else {
+			// If we can't find a match, clear GenerateName to use explicit Name
+			// and log a warning
+			if template.GenerateName != "" {
+				r.Log.Info("DataVolumeTemplate has GenerateName but no matching volume found, "+
+					"template may not match Forklift-created DataVolume",
+					"generateName", template.GenerateName, "templateName", template.Name)
+				template.GenerateName = ""
+			}
+		}
+
+		// Clear spec.source to prevent KubeVirt from trying to create new DataVolumes
+		// with source URLs/namespaces that don't exist on the destination cluster.
+		// Forklift has already created the DataVolumes, so templates should not have source specs.
+		template.Spec.Source = nil
+
+		// Ensure namespace is empty - KubeVirt will set it to match the VM namespace
+		template.Namespace = ""
+	}
+
+	// Update volume references to match renamed DataVolumeTemplates
+	// Volumes that reference DataVolumes by name need to be updated if the template name changed
+	if len(templateNameMap) > 0 && object.Template != nil {
+		for i := range object.Template.Spec.Volumes {
+			vol := &object.Template.Spec.Volumes[i]
+			if vol.DataVolume != nil {
+				if newName, renamed := templateNameMap[vol.DataVolume.Name]; renamed {
+					oldDVName := vol.DataVolume.Name
+					vol.DataVolume.Name = newName
+					r.Log.V(1).Info("Updated volume DataVolume reference to match renamed template",
+						"volumeName", vol.Name, "oldDVName", oldDVName, "newDVName", newName)
+				}
+			}
+		}
+	}
 }
 
 // ConfigMaps builds CRs for each of the ConfigMaps that the source VM depends upon.
