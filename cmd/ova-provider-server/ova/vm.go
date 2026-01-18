@@ -12,6 +12,7 @@ type VM struct {
 	PolicyVersion         int
 	UUID                  string
 	Firmware              string
+	SecureBoot            bool
 	CpuAffinity           []int32
 	CpuHotAddEnabled      bool
 	CpuHotRemoveEnabled   bool
@@ -49,6 +50,11 @@ func (r *VM) apply(key string, value string) {
 	switch key {
 	case "firmware":
 		r.Firmware = value
+	case "bootOptions.efiSecureBootEnabled":
+		r.SecureBoot, _ = strconv.ParseBool(value)
+	case "uefi.secureBoot.enabled":
+		// Legacy key used in some vSphere and Workstation/Fusion OVAs
+		r.SecureBoot, _ = strconv.ParseBool(value)
 	case "memoryHotAddEnabled":
 		r.MemoryHotAddEnabled, _ = strconv.ParseBool(value)
 	case "cpuHotAddEnabled":
