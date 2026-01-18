@@ -24,12 +24,12 @@ var log = logging.WithName("ec2|client")
 // Supports both same-account and cross-account migrations.
 // In cross-account mode, sourceClient handles snapshots/power, targetClient handles volumes.
 type Client struct {
-	*plancontext.Context            // Plan context with provider config, secrets, K8s client
-	sourceClient         EC2API     // Source account client (snapshots, power operations)
-	targetClient         EC2API     // Target account client (volume operations), same as source in same-account mode
-	targetConfig         aws.Config // Target account AWS config (for STS calls)
-	region               string     // AWS region (e.g., "us-east-1")
-	crossAccount         bool       // True if cross-account mode is enabled
+	*plancontext.Context        // Plan context with provider config, secrets, K8s client
+	sourceClient         EC2API // Source account client (snapshots, power operations)
+	targetClient         EC2API // Target account client (volume operations), same as source in same-account mode
+	targetSTS            STSAPI // Target account STS client (for GetCallerIdentity)
+	region               string // AWS region (e.g., "us-east-1")
+	crossAccount         bool   // True if cross-account mode is enabled
 }
 
 // Connect initializes AWS EC2 clients with credentials from provider secret.
@@ -70,13 +70,13 @@ func (r *Client) Connect() error {
 			return liberr.Wrap(err, "failed to create target AWS config")
 		}
 		r.targetClient = ec2.NewFromConfig(targetCfg)
-		r.targetConfig = targetCfg
+		r.targetSTS = sts.NewFromConfig(targetCfg)
 		r.crossAccount = true
 		log.Info("EC2 client connected (cross-account mode)", "region", region)
 	} else {
 		// Same-account mode - target = source
 		r.targetClient = r.sourceClient
-		r.targetConfig = cfg
+		r.targetSTS = sts.NewFromConfig(cfg)
 		r.crossAccount = false
 		log.Info("EC2 client connected (same-account mode)", "region", region)
 	}
@@ -91,8 +91,10 @@ func (r *Client) IsCrossAccount() bool {
 
 // GetTargetAccountID retrieves the AWS account ID for the target account using STS.
 func (r *Client) GetTargetAccountID() (string, error) {
-	stsClient := sts.NewFromConfig(r.targetConfig)
-	result, err := stsClient.GetCallerIdentity(context.Background(), &sts.GetCallerIdentityInput{})
+	if r.targetSTS == nil {
+		return "", fmt.Errorf("target STS client not initialized")
+	}
+	result, err := r.targetSTS.GetCallerIdentity(context.Background(), &sts.GetCallerIdentityInput{})
 	if err != nil {
 		log.Error(err, "Failed to get target account ID")
 		return "", liberr.Wrap(err)
@@ -144,6 +146,11 @@ func (r *Client) SetSourceClient(client EC2API) {
 // SetTargetClient sets the target EC2 client. Used for testing with mock clients.
 func (r *Client) SetTargetClient(client EC2API) {
 	r.targetClient = client
+}
+
+// SetTargetSTS sets the target STS client. Used for testing with mock clients.
+func (r *Client) SetTargetSTS(client STSAPI) {
+	r.targetSTS = client
 }
 
 // createAWSConfig creates AWS SDK config with static credentials or default credential chain (IAM role).
