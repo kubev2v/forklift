@@ -1,5 +1,9 @@
 FROM registry.redhat.io/openshift4/ose-ansible-rhel9-operator:v4.18.0-202504021503.p0.gbd5e2c9.assembly.stream.el9
 
+USER root
+# SECURITY: Fix CVE-2025-66418  in urllib3
+RUN pip3 install --upgrade 'urllib3>=2.6.0' 'brotli>=1.2.0' && pip3 cache purge
+
 USER 1001
 WORKDIR /app
 COPY operator/watches.yaml watches.yaml
