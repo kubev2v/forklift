@@ -19,6 +19,16 @@ RUN make vmkfstools-wrapper
 
 FROM registry.access.redhat.com/ubi9-minimal:9.6-1752587672
 
+# Update packages to address security vulnerabilities (CVE fixes)
+# Use dnf --security if available (full UBI), otherwise microdnf update (minimal UBI)
+RUN if command -v dnf &> /dev/null; then \
+        dnf update -y --security && \
+        dnf clean all; \
+    else \
+        microdnf update -y && \
+        microdnf clean all; \
+    fi
+
 COPY --from=builder /usr/src/app/cmd/vsphere-xcopy-volume-populator/bin/vsphere-xcopy-volume-populator \
     /bin/vsphere-xcopy-volume-populator
 
