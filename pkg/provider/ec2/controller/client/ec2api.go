@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
 // EC2API defines the EC2 operations used by the migration client.
@@ -27,5 +28,15 @@ type EC2API interface {
 	DeleteVolume(ctx context.Context, params *ec2.DeleteVolumeInput, optFns ...func(*ec2.Options)) (*ec2.DeleteVolumeOutput, error)
 }
 
+// STSAPI defines the STS operations used by the migration client.
+// This interface allows for mocking AWS STS calls in unit tests.
+// The real AWS SDK sts.Client implements this interface.
+type STSAPI interface {
+	GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error)
+}
+
 // Compile-time check to ensure *ec2.Client implements EC2API
 var _ EC2API = (*ec2.Client)(nil)
+
+// Compile-time check to ensure *sts.Client implements STSAPI
+var _ STSAPI = (*sts.Client)(nil)
