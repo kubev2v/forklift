@@ -24,12 +24,12 @@ var log = logging.WithName("ec2|client")
 // Supports both same-account and cross-account migrations.
 // In cross-account mode, sourceClient handles snapshots/power, targetClient handles volumes.
 type Client struct {
-	*plancontext.Context             // Plan context with provider config, secrets, K8s client
-	sourceClient         *ec2.Client // Source account client (snapshots, power operations)
-	targetClient         *ec2.Client // Target account client (volume operations), same as source in same-account mode
-	targetConfig         aws.Config  // Target account AWS config (for STS calls)
-	region               string      // AWS region (e.g., "us-east-1")
-	crossAccount         bool        // True if cross-account mode is enabled
+	*plancontext.Context            // Plan context with provider config, secrets, K8s client
+	sourceClient         EC2API     // Source account client (snapshots, power operations)
+	targetClient         EC2API     // Target account client (volume operations), same as source in same-account mode
+	targetConfig         aws.Config // Target account AWS config (for STS calls)
+	region               string     // AWS region (e.g., "us-east-1")
+	crossAccount         bool       // True if cross-account mode is enabled
 }
 
 // Connect initializes AWS EC2 clients with credentials from provider secret.
@@ -120,7 +120,7 @@ func (r *Client) Close() {
 }
 
 // getSourceClient returns the source account EC2 client for snapshot and power operations.
-func (r *Client) getSourceClient() (*ec2.Client, error) {
+func (r *Client) getSourceClient() (EC2API, error) {
 	if r.sourceClient == nil {
 		return nil, fmt.Errorf("source EC2 client not initialized")
 	}
@@ -129,11 +129,21 @@ func (r *Client) getSourceClient() (*ec2.Client, error) {
 
 // getTargetClient returns the target account EC2 client for volume operations.
 // In same-account mode, this returns the same client as getSourceClient.
-func (r *Client) getTargetClient() (*ec2.Client, error) {
+func (r *Client) getTargetClient() (EC2API, error) {
 	if r.targetClient == nil {
 		return nil, fmt.Errorf("target EC2 client not initialized")
 	}
 	return r.targetClient, nil
+}
+
+// SetSourceClient sets the source EC2 client. Used for testing with mock clients.
+func (r *Client) SetSourceClient(client EC2API) {
+	r.sourceClient = client
+}
+
+// SetTargetClient sets the target EC2 client. Used for testing with mock clients.
+func (r *Client) SetTargetClient(client EC2API) {
+	r.targetClient = client
 }
 
 // createAWSConfig creates AWS SDK config with static credentials or default credential chain (IAM role).

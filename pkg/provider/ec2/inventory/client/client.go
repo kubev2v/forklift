@@ -23,7 +23,7 @@ const (
 
 // Client wraps AWS SDK client
 type Client struct {
-	ec2Client *ec2.Client
+	ec2Client EC2API
 	region    string
 }
 
@@ -105,6 +105,20 @@ func createAWSConfig(ctx context.Context, region, accessKeyID, secretAccessKey s
 // Used by inventory collector to discover available resources in the configured region.
 func (c *Client) GetRegion() string {
 	return c.region
+}
+
+// SetEC2Client sets the EC2 API client. Used for testing with mock clients.
+func (c *Client) SetEC2Client(client EC2API) {
+	c.ec2Client = client
+}
+
+// NewWithClient creates a new Client with a custom EC2API implementation.
+// Used for testing with mock clients.
+func NewWithClient(ec2Client EC2API, region string) *Client {
+	return &Client{
+		ec2Client: ec2Client,
+		region:    region,
+	}
 }
 
 // DescribeInstances fetches all EC2 instances in the configured region.
