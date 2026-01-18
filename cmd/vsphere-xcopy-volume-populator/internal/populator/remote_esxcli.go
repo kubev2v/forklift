@@ -146,8 +146,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	// as the possible clonner identifier
 	if isSciniRequired {
 		klog.Infof("scini is required for the storage api")
-		sciModule, errScini := p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"system", "module", "parameters", "list", "-m", "scini"})
-		err = errScini
+		sciModule, err := p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"system", "module", "parameters", "list", "-m", "scini"})
 		if err != nil {
 			klog.Infof("failed to fetch the scini module parameters %s: ", err)
 			return err
@@ -330,26 +329,14 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		defer sshCancel()
 
 		// Setup secure script
-		scriptPath, scriptUUID, err := ensureSecureScript(sshSetupCtx, p.VSphereClient, host, vmDisk.Datastore)
+		finalScriptPath, err := ensureSecureScript(sshSetupCtx, p.VSphereClient, host, vmDisk.Datastore)
 		if err != nil {
 			return fmt.Errorf("failed to ensure secure script: %w", err)
 		}
-		klog.V(2).Infof("Secure script ready: %s (UUID: %s)", scriptPath, scriptUUID.String())
+		klog.V(2).Infof("Secure script ready at path: %s", finalScriptPath)
 
-		// Extract script filename for cleanup
-		scriptName := fmt.Sprintf("%s-%s.py", secureScriptName, scriptUUID.String())
-		dc, errDC := getHostDC(host)
-		if errDC == nil {
-			// Cleanup script file when done (best-effort, non-blocking)
-			defer func() {
-				cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), contextTimeout)
-				defer cleanupCancel()
-				cleanupSecureScript(cleanupCtx, p.VSphereClient, dc, vmDisk.Datastore, scriptName)
-			}()
-		}
-
-		// Enable SSH access (pass full path for logging, but UUID is what matters)
-		err = vmware.EnableSSHAccess(sshSetupCtx, p.VSphereClient, host, p.SSHPrivateKey, p.SSHPublicKey, scriptPath)
+		// Enable SSH access
+		err = vmware.EnableSSHAccess(sshSetupCtx, p.VSphereClient, host, p.SSHPrivateKey, p.SSHPublicKey, finalScriptPath)
 		if err != nil {
 			return fmt.Errorf("failed to enable SSH access: %w", err)
 		}
@@ -360,14 +347,15 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 			return fmt.Errorf("failed to get host IP address: %w", err)
 		}
 
-		sshClient := vmware.NewSSHClient(scriptUUID.String())
+		// Create SSH client with background context (no timeout for long-running operations)
+		sshClient := vmware.NewSSHClient()
 		err = sshClient.Connect(context.Background(), hostIP, "root", p.SSHPrivateKey)
 		if err != nil {
 			return fmt.Errorf("failed to connect via SSH: %w", err)
 		}
 		defer sshClient.Close()
 
-		klog.V(2).Infof("SSH connection established with restricted commands (script UUID: %s)", scriptUUID.String())
+		klog.V(2).Infof("SSH connection established with restricted commands")
 		executor = NewSSHTaskExecutor(sshClient)
 	} else {
 		executor = NewVIBTaskExecutor(p.VSphereClient)
