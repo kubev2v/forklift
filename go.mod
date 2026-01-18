@@ -156,4 +156,4 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.3 // indirect
 )
 
-replace github.com/gophercloud/gophercloud => github.com/kubev2v/gophercloud v0.0.0-20230629135522-9d701a75c760
+replace github.com/gophercloud/gophercloud => github.com/kubev2v/gophercloud v0.0.0-20230629001046-b98471812a77

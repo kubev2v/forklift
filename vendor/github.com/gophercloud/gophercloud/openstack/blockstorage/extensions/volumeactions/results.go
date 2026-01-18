@@ -35,12 +35,6 @@ type SetImageMetadataResult struct {
 	gophercloud.ErrResult
 }
 
-// UnsetImageMetadataResult contains the response body and error from an UnsetImageMetadata
-// request.
-type UnsetImageMetadataResult struct {
-	gophercloud.ErrResult
-}
-
 // SetBootableResult contains the response body and error from a SetBootable
 // request.
 type SetBootableResult struct {
