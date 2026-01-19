@@ -154,10 +154,10 @@ var _ = Describe("Populator", func() {
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "device", "list", "-d", "naa.616263"}).Return([]esx.Values{{"Status": {"on"}}}, nil).Times(1)
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(),
 					[]string{"vmkfstools", "clone", "-s", "/vmfs/volumes/my-ds/my-vm/vmdisk.vmdk", "-t", "/vmfs/devices/disks/naa.616263"}).
-					Return([]esx.Values{{"message": {`{"taskId": "1"}`}}}, nil)
-				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"vmkfstools", "taskGet", "-i", "1"}).
-					Return([]esx.Values{{"message": {`{"exitCode": "0"}`}}}, nil).Times(2)
-				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"vmkfstools", "taskClean", "-i", "1"}).
+					Return([]esx.Values{{"message": {`{"taskId": "1", "taskPath": "/vmfs/volumes/my-ds/vmkfstools-wrapper-1"}`}}}, nil)
+				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"vmkfstools", "taskGet", "-p", "/vmfs/volumes/my-ds/vmkfstools-wrapper-1"}).
+					Return([]esx.Values{{"message": {`{"taskId": "1", "exitCode": "0"}`}}}, nil).Times(2)
+				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"vmkfstools", "taskClean", "-p", "/vmfs/volumes/my-ds/vmkfstools-wrapper-1"}).
 					Return([]esx.Values{{"message": {`{"exitCode": "0"}`}}}, nil)
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "device", "set", "--state", "off", "-d", "naa.616263"}).Return(nil, nil)
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "device", "list", "-d", "naa.616263"}).Return([]esx.Values{map[string][]string{"Status": {"off"}}}, nil).AnyTimes()
