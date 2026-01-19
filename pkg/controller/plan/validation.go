@@ -764,8 +764,6 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 
 	var sharedDisksConditions []libcnd.Condition
-	// Track VM IDs that pass shared disk validation to clear old conditions
-	sharedDisksValidatedVMs := make(map[string]bool)
 	setOf := map[string]bool{}
 	setOfTargetName := map[string]bool{}
 	//
@@ -976,6 +974,24 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		if err != nil {
 			return err
 		}
+		// Log validation result for debugging inventory state
+		if ok {
+			// Check if there was a previous shared disk condition that will be cleared
+			hasSharedDiskCondition := plan.Status.HasCondition(
+				fmt.Sprintf("%s-%s", SharedWarnDisks, ref.ID),
+				fmt.Sprintf("%s-%s", SharedDisks, ref.ID))
+			if hasSharedDiskCondition {
+				r.Log.V(3).Info("Shared disk validation passed - existing condition will be cleared by condition staging",
+					"vm", ref.String(),
+					"vmID", ref.ID)
+			}
+		} else {
+			r.Log.V(3).Info("Shared disk validation failed",
+				"vm", ref.String(),
+				"vmID", ref.ID,
+				"category", category,
+				"message", msg)
+		}
 		if !ok {
 			sharedDisks := libcnd.Condition{
 				Type:     SharedWarnDisks,
@@ -994,10 +1010,20 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			}
 			sharedDisks.Type = fmt.Sprintf("%s-%s", sharedDisks.Type, ref.ID)
 			sharedDisksConditions = append(sharedDisksConditions, sharedDisks)
-		} else {
-			// Validation passed - mark this VM as validated so we can clear any old conditions
-			sharedDisksValidatedVMs[ref.ID] = true
 		}
+		// Note: If validation passes (!ok == false), the condition is not added to sharedDisksConditions.
+		// The condition staging mechanism (BeginStagingConditions/EndStagingConditions) will automatically
+		// remove any existing shared disk conditions for this VM since they are not durable and won't be
+		// re-added during this validation cycle.
+		//
+		// IMPORTANT: All validations are calculated from the current inventory state. Inventory updates
+		// DO include disk sharing status changes (see pkg/controller/provider/container/vsphere/model.go:1178
+		// where backing.Sharing is mapped to the Shared field). When disk sharing status changes on
+		// vCenter (e.g., from Multi-Write to nosharing), the property collector detects the change in
+		// config.hardware.device, updates the inventory model, and triggers plan reconciliation.
+		// Validation then reads the updated state from inventory, so if validation passes, it means
+		// the inventory reflects that the disk is no longer shared. The condition staging mechanism
+		// automatically removes conditions that aren't re-added, so no explicit deletion is needed.
 		if settings.Settings.StaticUdnIpAddresses && plan.Spec.PreserveStaticIPs && plan.DestinationHasUdnNetwork(r.Client) {
 			ok, err = validator.UdnStaticIPs(*ref, ctx.Destination.Client)
 			if err != nil {
@@ -1122,15 +1148,6 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(missingStaticIPs.Items) > 0 {
 		plan.Status.SetCondition(missingStaticIPs)
-	}
-	// Clear shared disk conditions for VMs that now pass validation
-	// (e.g., when disk sharing status changes from Multi-Write to nosharing on vCenter)
-	for vmID := range sharedDisksValidatedVMs {
-		// Clear both SharedWarnDisks and SharedDisks conditions for this VM
-		plan.Status.DeleteCondition(
-			fmt.Sprintf("%s-%s", SharedWarnDisks, vmID),
-			fmt.Sprintf("%s-%s", SharedDisks, vmID),
-		)
 	}
 	if len(sharedDisksConditions) > 0 {
 		plan.Status.SetCondition(sharedDisksConditions...)
