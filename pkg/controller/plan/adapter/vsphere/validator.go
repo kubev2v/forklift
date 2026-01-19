@@ -20,10 +20,8 @@ import (
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/validation"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
-	"github.com/kubev2v/forklift/pkg/templateutil"
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
-	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -142,25 +140,6 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 	return
 }
 
-// isValidTemplate executes the template with test data and validates the output.
-func isValidTemplate(templateStr string, testData interface{}) (string, error) {
-	// Execute the template with test data
-	result, err := templateutil.ExecuteTemplate(templateStr, testData)
-	if err != nil {
-		return "", liberr.Wrap(err, "template", templateStr)
-	}
-
-	// Trim whitespace from the result
-	result = strings.TrimSpace(result)
-
-	// Empty output is not valid
-	if result == "" {
-		return "", liberr.New("Template output is empty", "template", templateStr)
-	}
-
-	return result, nil
-}
-
 // Validate that the PVC name template is valid
 func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (ok bool, err error) {
 	vm := &model.VM{}
@@ -178,7 +157,7 @@ func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (ok b
 	targetVmName := r.getPlanVMTargetName(vm)
 
 	for i, disk := range vm.Disks {
-		testData := api.PVCNameTemplateData{
+		testData := api.VSpherePVCNameTemplateData{
 			VmName:         vm.Name,
 			TargetVmName:   targetVmName,
 			PlanName:       r.Plan.Name,
@@ -189,16 +168,10 @@ func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (ok b
 			WinDriveLetter: disk.WinDriveLetter,
 		}
 
-		result, err := isValidTemplate(pvcNameTemplate, testData)
-		if err != nil {
-			return false, err
-		}
-
-		// Validate that template output is a valid k8s label
-		errs := k8svalidation.IsDNS1123Label(result)
-		if len(errs) > 0 {
-			errMsg := fmt.Sprintf("Template output is invalid k8s label [%s]", result)
-			return false, liberr.New(errMsg, errs)
+		// Use shared template validation utility
+		_, templateErr := planbase.ValidatePVCNameTemplate(pvcNameTemplate, testData)
+		if templateErr != nil {
+			return false, templateErr
 		}
 	}
 

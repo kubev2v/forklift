@@ -392,8 +392,66 @@ func (r *KubeVirt) FeatureGate(feature string) (enabled bool) {
 	return
 }
 
-// NO-OP
+// PVCNameTemplate validates that the PVC name template is valid for the given VM
 func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (ok bool, err error) {
-	ok = true
-	return
+	if pvcNameTemplate == "" {
+		return true, nil
+	}
+
+	// Get the VM from source
+	vm := &cnv.VirtualMachine{}
+	err = r.sourceClient.Get(context.TODO(), k8sclient.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vm)
+	if err != nil {
+		err = liberr.Wrap(err, VM_NOT_FOUND, "vm", vmRef.String())
+		return
+	}
+
+	// Get target VM name (either from VM status NewName or source VM name)
+	targetVmName := vmRef.Name
+	if r.Plan != nil && r.Plan.Status.Migration.VMs != nil {
+		for _, vmStatus := range r.Plan.Status.Migration.VMs {
+			if vmStatus.ID == vmRef.ID && vmStatus.NewName != "" {
+				targetVmName = vmStatus.NewName
+				break
+			}
+		}
+	}
+
+	// Test template with sample data for each disk
+	diskIndex := 0
+	for _, vol := range vm.Spec.Template.Spec.Volumes {
+		var pvcName, pvcNamespace string
+		switch {
+		case vol.PersistentVolumeClaim != nil:
+			pvcName = vol.PersistentVolumeClaim.ClaimName
+			pvcNamespace = vmRef.Namespace
+		case vol.DataVolume != nil:
+			pvcName = vol.DataVolume.Name
+			pvcNamespace = vmRef.Namespace
+		default:
+			// Skip non-PVC volumes
+			continue
+		}
+
+		testData := api.OCPPVCNameTemplateData{
+			VmName:             vmRef.Name,
+			TargetVmName:       targetVmName,
+			PlanName:           r.Plan.Name,
+			DiskIndex:          diskIndex,
+			SourcePVCName:      pvcName,
+			SourcePVCNamespace: pvcNamespace,
+		}
+
+		// Use shared template validation utility
+		_, templateErr := planbase.ValidatePVCNameTemplate(pvcNameTemplate, testData)
+		if templateErr != nil {
+			return false, templateErr
+		}
+
+		diskIndex++
+	}
+
+	r.log.Info("PVC name template is valid", "plan", r.Plan.Name, "namespace", r.Plan.Namespace, "vm", vmRef.String(), "pvcNameTemplate", pvcNameTemplate)
+
+	return true, nil
 }
