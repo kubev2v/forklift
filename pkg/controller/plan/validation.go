@@ -92,6 +92,7 @@ const (
 	VMPowerStateUnsupported         = "VMPowerStateUnsupported"
 	VMMigrationTypeUnsupported      = "VMMigrationTypeUnsupported"
 	GuestToolsIssue                 = "GuestToolsIssue"
+	VDDKAndOffloadMixedUsage        = "VDDKAndOffloadMixedUsage"
 )
 
 // Categories
@@ -135,6 +136,21 @@ const (
 const (
 	Shareable = "shareable"
 )
+
+type diskType string
+
+const (
+	DiskTypeVDDK    diskType = "VDDK"
+	DiskTypeOffload diskType = "Offload"
+)
+
+// DiskMigrationInfo tracks migration type for individual disks
+type diskMigrationInfo struct {
+	VMName      string
+	DiskKey     int32
+	DatastoreID string
+	Type        diskType `json:"Type"`
+}
 
 // Validate the plan resource.
 func (r *Reconciler) validate(plan *api.Plan) error {
@@ -762,10 +778,24 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "LUKS keys and Clevis cannot be configured together; Clevis will be used.",
 		Items:    []string{},
 	}
+	vddkAndOffloadMixedUsage := libcnd.Condition{
+		Type:     VDDKAndOffloadMixedUsage,
+		Status:   True,
+		Reason:   NotSupported,
+		Category: api.CategoryCritical,
+		Message:  "Copy offload is enabled. MTV does not support mixed copy methods. Each migration plan can use one migration strategy, either VDDK or copy offload. Check your storage map and VMs to ensure they are using the same migration strategy.",
+		Items:    []string{},
+	}
 
 	var sharedDisksConditions []libcnd.Condition
 	setOf := map[string]bool{}
 	setOfTargetName := map[string]bool{}
+
+	// Check if plan uses storage offload (vSphere only)
+	source := plan.Referenced.Provider.Source
+	checkMixedUsage := source != nil && source.Type() == api.VSphere && settings.Settings.Features.CopyOffload
+	planUsesOffload := checkMixedUsage && r.planIsUsingStorageOffload(plan.Referenced.Map.Storage)
+
 	//
 	// Referenced VMs.
 	for i := range plan.Spec.VMs {
@@ -852,6 +882,20 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 				}
 				if len(pvcs) != len(vm.Disks) {
 					missingPvcForOnlyConversion.Items = append(missingPvcForOnlyConversion.Items, ref.String())
+				}
+			}
+		}
+
+		// Check for mixed VDDK/Offload usage (vSphere only)
+		// If plan uses offload, add VMs with VDDK disks to the condition
+		if planUsesOffload {
+			if vsphereVM, ok := v.(*vsphere.VM); ok {
+				storageMap := plan.Referenced.Map.Storage
+				if storageMap != nil {
+					_, _, curVMHasVddk, _ := r.checkDiskMigrationTypesDetailed(storageMap, vsphereVM, vm.Name)
+					if curVMHasVddk {
+						vddkAndOffloadMixedUsage.Items = append(vddkAndOffloadMixedUsage.Items, ref.String())
+					}
 				}
 			}
 		}
@@ -1169,6 +1213,12 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	if len(luksAndClevisIncompatibility.Items) > 0 {
 		plan.Status.SetCondition(luksAndClevisIncompatibility)
 	}
+
+	// Set the condition if any VMs with VDDK disks were found when plan uses offload
+	if len(vddkAndOffloadMixedUsage.Items) > 0 {
+		plan.Status.SetCondition(vddkAndOffloadMixedUsage)
+	}
+
 	return nil
 }
 
@@ -1869,4 +1919,58 @@ func (r *Reconciler) validateConversionTempStorage(plan *api.Plan) error {
 	}
 
 	return nil
+}
+
+// getStorageMappingForDatastore finds the storage mapping for a given datastore ID
+func (r *Reconciler) getStorageMappingForDatastore(storageMap *api.StorageMap, datastoreID string) *api.StoragePair {
+	for i := range storageMap.Spec.Map {
+		m := &storageMap.Spec.Map[i]
+		if m.Source.ID == datastoreID {
+			return m
+		}
+	}
+	return nil
+}
+
+// planIsUsingStorageOffload checks if the storage map has any offload plugin configured
+func (r *Reconciler) planIsUsingStorageOffload(storageMap *api.StorageMap) bool {
+	if storageMap == nil {
+		return false
+	}
+	for i := range storageMap.Spec.Map {
+		m := &storageMap.Spec.Map[i]
+		if m.OffloadPlugin != nil && m.OffloadPlugin.VSphereXcopyPluginConfig != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// checkDiskMigrationTypesDetailed returns detailed disk information along with VM-level flags
+func (r *Reconciler) checkDiskMigrationTypesDetailed(storageMap *api.StorageMap, vsphereVM *vsphere.VM, vmName string) ([]diskMigrationInfo, bool, bool, error) {
+	hasOffloadDisks := false
+	hasVddkDisks := false
+	diskDetails := []diskMigrationInfo{}
+
+	for _, disk := range vsphereVM.Disks {
+		mapping := r.getStorageMappingForDatastore(storageMap, disk.Datastore.ID)
+
+		var diskType diskType
+		if mapping != nil && mapping.OffloadPlugin != nil && mapping.OffloadPlugin.VSphereXcopyPluginConfig != nil {
+			hasOffloadDisks = true
+			diskType = DiskTypeOffload
+		} else {
+			hasVddkDisks = true
+			diskType = DiskTypeVDDK
+		}
+
+		diskDetails = append(diskDetails, diskMigrationInfo{
+			VMName:      vmName,
+			DiskKey:     disk.Key,
+			DatastoreID: disk.Datastore.ID,
+			Type:        diskType,
+		})
+	}
+
+	return diskDetails, hasOffloadDisks, hasVddkDisks, nil
 }
