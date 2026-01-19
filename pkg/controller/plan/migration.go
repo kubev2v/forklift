@@ -1606,6 +1606,135 @@ func (r *Migration) setTaskCompleted(task *plan.Task) {
 	task.MarkCompleted()
 }
 
+// verifyDataVolumeCompletion checks if a DataVolume that reports Succeeded phase
+// is actually ready for completion by verifying:
+// - The main PVC is bound
+// - The prime PVC (if it exists) is bound
+// - The importer pod (if it exists) is not pending
+//
+// This prevents marking disk transfer as completed when CDI incorrectly reports
+// Succeeded phase (e.g., when the importer pod is still waiting for PVC provisioning
+// due to CSI driver issues).
+//
+// Returns true if the DataVolume can be marked as completed, false otherwise.
+// Also returns a reason string explaining why completion was blocked (if applicable).
+func (r *Migration) verifyDataVolumeCompletion(dv *cdi.DataVolume, vm *plan.VMStatus) (canComplete bool, reason string) {
+	// If no claim name, we can't verify - allow completion
+	if dv.Status.ClaimName == "" {
+		r.Log.V(4).Info("DataVolume has no ClaimName, allowing completion",
+			"vm", vm.String(),
+			"dv", path.Join(dv.Namespace, dv.Name),
+			"dvPhase", dv.Status.Phase)
+		return true, ""
+	}
+
+	// Get the main PVC
+	pvc := &core.PersistentVolumeClaim{}
+	err := r.Destination.Client.Get(context.TODO(), types.NamespacedName{
+		Namespace: r.Plan.Spec.TargetNamespace,
+		Name:      dv.Status.ClaimName,
+	}, pvc)
+	if err != nil {
+		r.Log.Error(err, "Could not get PVC for DataVolume to verify completion",
+			"vm", vm.String(),
+			"dv", path.Join(dv.Namespace, dv.Name),
+			"dvPhase", dv.Status.Phase,
+			"pvcName", dv.Status.ClaimName)
+		return false, fmt.Sprintf("Could not get PVC: %v", err)
+	}
+
+	// Log diagnostic information about CDI state
+	podPhaseAnnotation := pvc.Annotations[base.AnnPodPhase]
+	r.Log.V(3).Info("Verifying DataVolume completion state",
+		"vm", vm.String(),
+		"dv", path.Join(dv.Namespace, dv.Name),
+		"dvPhase", dv.Status.Phase,
+		"pvcPhase", pvc.Status.Phase,
+		"podPhaseAnnotation", podPhaseAnnotation)
+
+	// Check if main PVC is bound
+	if pvc.Status.Phase != core.ClaimBound {
+		r.Log.Info("DataVolume reports Succeeded but main PVC is not bound",
+			"vm", vm.String(),
+			"dv", path.Join(dv.Namespace, dv.Name),
+			"dvPhase", dv.Status.Phase,
+			"pvcPhase", pvc.Status.Phase,
+			"podPhaseAnnotation", podPhaseAnnotation)
+		return false, fmt.Sprintf("Main PVC is not bound (phase: %s)", pvc.Status.Phase)
+	}
+
+	// Check prime PVC if it exists (importer pod uses prime PVC)
+	primePVC := &core.PersistentVolumeClaim{}
+	err = r.Destination.Client.Get(context.TODO(), types.NamespacedName{
+		Namespace: r.Plan.Spec.TargetNamespace,
+		Name:      fmt.Sprintf("prime-%s", pvc.UID),
+	}, primePVC)
+	if err != nil {
+		if !k8serr.IsNotFound(err) {
+			r.Log.Error(err, "Could not get prime PVC for DataVolume to verify completion",
+				"vm", vm.String(),
+				"dv", path.Join(dv.Namespace, dv.Name),
+				"dvPhase", dv.Status.Phase)
+			return false, fmt.Sprintf("Could not get prime PVC: %v", err)
+		}
+		// Prime PVC doesn't exist - that's okay, importer may not be using it
+		r.Log.V(4).Info("Prime PVC does not exist, skipping prime PVC check",
+			"vm", vm.String(),
+			"dv", path.Join(dv.Namespace, dv.Name))
+		return true, ""
+	}
+
+	// Prime PVC exists - check if it's bound
+	if primePVC.Status.Phase != core.ClaimBound {
+		r.Log.Info("DataVolume reports Succeeded but prime PVC is not bound",
+			"vm", vm.String(),
+			"dv", path.Join(dv.Namespace, dv.Name),
+			"dvPhase", dv.Status.Phase,
+			"primePVCPhase", primePVC.Status.Phase,
+			"podPhaseAnnotation", podPhaseAnnotation)
+		return false, fmt.Sprintf("Prime PVC is not bound (phase: %s)", primePVC.Status.Phase)
+	}
+
+	// Check if importer pod exists and is not pending
+	importer, found, kErr := r.kubevirt.GetImporterPod(*primePVC)
+	if kErr != nil {
+		r.Log.Error(kErr, "Could not get CDI importer pod for DataVolume to verify completion",
+			"vm", vm.String(),
+			"dv", path.Join(dv.Namespace, dv.Name),
+			"dvPhase", dv.Status.Phase)
+		// Don't block completion if we can't check the pod - this is a transient issue
+		return true, ""
+	}
+
+	if !found || importer == nil {
+		// No importer pod found - that's okay, it may have completed and been cleaned up
+		r.Log.V(4).Info("No importer pod found, allowing completion",
+			"vm", vm.String(),
+			"dv", path.Join(dv.Namespace, dv.Name))
+		return true, ""
+	}
+
+	// Check if importer pod is pending
+	if importer.Status.Phase == core.PodPending {
+		r.Log.Info("DataVolume reports Succeeded but importer pod is pending",
+			"vm", vm.String(),
+			"dv", path.Join(dv.Namespace, dv.Name),
+			"dvPhase", dv.Status.Phase,
+			"podPhase", importer.Status.Phase,
+			"podPhaseAnnotation", podPhaseAnnotation,
+			"pod", path.Join(importer.Namespace, importer.Name))
+		return false, fmt.Sprintf("Importer pod is pending (pod: %s/%s)", importer.Namespace, importer.Name)
+	}
+
+	// All checks passed
+	r.Log.V(3).Info("DataVolume completion verified successfully",
+		"vm", vm.String(),
+		"dv", path.Join(dv.Namespace, dv.Name),
+		"dvPhase", dv.Status.Phase,
+		"podPhase", importer.Status.Phase)
+	return true, ""
+}
+
 // Update the progress of the appropriate disk copy step. (DiskTransfer, Cutover)
 func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err error) {
 	var pendingReason string
@@ -1660,91 +1789,10 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 				// the importer pod (if it exists) is not pending. This prevents
 				// marking disk transfer as completed when the importer pod is
 				// still waiting for PVC provisioning (e.g., due to CSI driver issues).
-				canMarkCompleted := true
-				if dv.Status.ClaimName != "" {
-					pvc := &core.PersistentVolumeClaim{}
-					err = r.Destination.Client.Get(context.TODO(), types.NamespacedName{
-						Namespace: r.Plan.Spec.TargetNamespace,
-						Name:      dv.Status.ClaimName,
-					}, pvc)
-					if err != nil {
-						log.Error(
-							err,
-							"Could not get PVC for DataVolume to verify completion.",
-							"vm",
-							vm.String(),
-							"dv",
-							path.Join(dv.Namespace, dv.Name))
-						canMarkCompleted = false
-					} else {
-						// Check if PVC is bound
-						if pvc.Status.Phase != core.ClaimBound {
-							log.Info(
-								"DataVolume is Succeeded but PVC is not bound, not marking as completed.",
-								"vm",
-								vm.String(),
-								"dv",
-								path.Join(dv.Namespace, dv.Name),
-								"pvcPhase",
-								pvc.Status.Phase)
-							canMarkCompleted = false
-						} else {
-							// Check prime PVC if it exists (importer pod uses prime PVC)
-							primePVC := &core.PersistentVolumeClaim{}
-							err = r.Destination.Client.Get(context.TODO(), types.NamespacedName{
-								Namespace: r.Plan.Spec.TargetNamespace,
-								Name:      fmt.Sprintf("prime-%s", pvc.UID),
-							}, primePVC)
-							if err != nil {
-								if !k8serr.IsNotFound(err) {
-									log.Error(
-										err,
-										"Could not get prime PVC for DataVolume to verify completion.",
-										"vm",
-										vm.String(),
-										"dv",
-										path.Join(dv.Namespace, dv.Name))
-									// If prime PVC doesn't exist, that's okay - importer may not be using it
-								}
-							} else if primePVC.Status.Phase != core.ClaimBound {
-								log.Info(
-									"DataVolume is Succeeded but prime PVC is not bound, not marking as completed.",
-									"vm",
-									vm.String(),
-									"dv",
-									path.Join(dv.Namespace, dv.Name),
-									"primePVCPhase",
-									primePVC.Status.Phase)
-								canMarkCompleted = false
-							} else {
-								// Check if importer pod exists and is not pending
-								importer, found, kErr := r.kubevirt.GetImporterPod(*primePVC)
-								if kErr != nil {
-									log.Error(
-										kErr,
-										"Could not get CDI importer pod for DataVolume to verify completion.",
-										"vm",
-										vm.String(),
-										"dv",
-										path.Join(dv.Namespace, dv.Name))
-									// Don't block completion if we can't check the pod
-								} else if found && importer != nil {
-									if importer.Status.Phase == core.PodPending {
-										log.Info(
-											"DataVolume is Succeeded but importer pod is pending, not marking as completed.",
-											"vm",
-											vm.String(),
-											"dv",
-											path.Join(dv.Namespace, dv.Name),
-											"pod",
-											path.Join(importer.Namespace, importer.Name))
-										canMarkCompleted = false
-									}
-								}
-							}
-						}
-					}
-				}
+				// This also helps diagnose cases where CDI incorrectly sets the
+				// DataVolume phase to Succeeded (e.g., based on pod phase annotation
+				// even when the pod is still pending).
+				canMarkCompleted, reason := r.verifyDataVolumeCompletion(dv.DataVolume, vm)
 				if canMarkCompleted {
 					completed++
 					r.setTaskCompleted(task)
@@ -1752,7 +1800,11 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 					// Mark as pending instead of completed
 					pending++
 					task.Phase = api.StepPending
-					task.Reason = "DataVolume shows Succeeded but PVC is not bound or importer pod is pending"
+					if reason != "" {
+						task.Reason = fmt.Sprintf("DataVolume shows %s but verification failed: %s", dv.Status.Phase, reason)
+					} else {
+						task.Reason = fmt.Sprintf("DataVolume shows %s but PVC is not bound or importer pod is pending", dv.Status.Phase)
+					}
 				}
 			case cdi.Pending, cdi.ImportScheduled:
 				pending++
