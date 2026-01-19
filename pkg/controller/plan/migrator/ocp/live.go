@@ -715,7 +715,7 @@ func (r *LiveMigrator) RequiresLocalPreference(vm *planapi.VMStatus) (required b
 		return
 	}
 	required = virtualMachine.Object.Spec.Preference != nil &&
-		!strings.EqualFold(virtualMachine.Object.Spec.Preference.Kind, kubevirtapi.ClusterSingularPreferenceResourceName)
+		strings.EqualFold(virtualMachine.Object.Spec.Preference.Kind, kubevirtapi.SingularPreferenceResourceName)
 	return
 }
 
@@ -729,7 +729,7 @@ func (r *LiveMigrator) RequiresClusterPreference(vm *planapi.VMStatus) (required
 		return
 	}
 	required = virtualMachine.Object.Spec.Preference != nil &&
-		strings.EqualFold(virtualMachine.Object.Spec.Preference.Kind, kubevirtapi.ClusterSingularPreferenceResourceName)
+		!strings.EqualFold(virtualMachine.Object.Spec.Preference.Kind, kubevirtapi.SingularPreferenceResourceName)
 	return
 }
 
@@ -743,7 +743,7 @@ func (r *LiveMigrator) RequiresLocalInstanceType(vm *planapi.VMStatus) (required
 		return
 	}
 	required = virtualMachine.Object.Spec.Instancetype != nil &&
-		!strings.EqualFold(virtualMachine.Object.Spec.Instancetype.Kind, kubevirtapi.ClusterSingularResourceName)
+		strings.EqualFold(virtualMachine.Object.Spec.Instancetype.Kind, kubevirtapi.SingularResourceName)
 	return
 }
 
@@ -757,7 +757,7 @@ func (r *LiveMigrator) RequiresClusterInstanceType(vm *planapi.VMStatus) (requir
 		return
 	}
 	required = virtualMachine.Object.Spec.Instancetype != nil &&
-		strings.EqualFold(virtualMachine.Object.Spec.Instancetype.Kind, kubevirtapi.ClusterSingularResourceName)
+		!strings.EqualFold(virtualMachine.Object.Spec.Instancetype.Kind, kubevirtapi.SingularResourceName)
 	return
 }
 
