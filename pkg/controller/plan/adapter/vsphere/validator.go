@@ -351,12 +351,12 @@ func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, m
 	if err != nil {
 		return false, msg, "", liberr.Wrap(err, "vm", vmRef)
 	}
-	
+
 	// Log disk sharing status from inventory for debugging
 	sharedDisks := []string{}
 	for _, disk := range vm.Disks {
 		if disk.Shared {
-			sharedDisks = append(sharedDisks, fmt.Sprintf("%s (file: %s)", disk.Key, disk.File))
+			sharedDisks = append(sharedDisks, fmt.Sprintf("%d (file: %s)", disk.Key, disk.File))
 		}
 	}
 	if len(sharedDisks) > 0 {
@@ -369,7 +369,7 @@ func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, m
 			"vm", vmRef.String(),
 			"totalDisks", len(vm.Disks))
 	}
-	
+
 	// Warm migration
 	if vm.HasSharedDisk() && r.Plan.IsWarm() {
 		return false, "The shared disks cannot be used with warm migration", "", nil
