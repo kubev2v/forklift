@@ -1169,6 +1169,11 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 				}
 				disks = append(disks, md)
 			case *types.VirtualDiskFlatVer2BackingInfo:
+				// Update disk sharing status from vSphere backing.Sharing property.
+				// When disk sharing status changes on vCenter (e.g., Multi-Write to nosharing),
+				// the property collector will detect the change in config.hardware.device and
+				// trigger a VM model update, which will update this Shared field.
+				// Plan validation will then read this updated state from inventory.
 				md := model.Disk{
 					Key:            disk.Key,
 					UnitNumber:     *disk.UnitNumber,
