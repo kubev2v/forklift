@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
+	vmkfstoolswrapper "github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper"
 
 	"github.com/vmware/govmomi/object"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -356,6 +357,12 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		defer sshClient.Close()
 
 		klog.V(2).Infof("SSH connection established with restricted commands")
+		// Valdate the uploaded script version matches the embedded script version
+		err = vmware.CheckScriptVersion(sshClient, vmDisk.Datastore, vmkfstoolswrapper.Version, p.SSHPublicKey)
+		if err != nil {
+			return fmt.Errorf("script version check failed: %w", err)
+		}
+
 		executor = NewSSHTaskExecutor(sshClient)
 	} else {
 		executor = NewVIBTaskExecutor(p.VSphereClient)
