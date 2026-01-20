@@ -14,8 +14,6 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var xcopyInitiatorGroup = "xcopy-esxs"
-
 const (
 	taskPollingInterval = 5 * time.Second
 	rescanSleepInterval = 5 * time.Second
@@ -117,6 +115,10 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		return err
 	}
 	klog.Infof("Got ESXi host: %s", host)
+
+	hostID := strings.ReplaceAll(strings.ToLower(host.String()), ":", "-")
+	xcopyInitiatorGroup := fmt.Sprintf("xcopy-%s", hostID)
+	klog.Infof("Using per-host initiator group: %s", xcopyInitiatorGroup)
 
 	// Only ensure VIB if using VIB method
 	if !p.UseSSHMethod {
