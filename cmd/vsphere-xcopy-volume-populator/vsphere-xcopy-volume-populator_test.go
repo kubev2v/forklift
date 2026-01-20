@@ -149,7 +149,7 @@ var _ = Describe("Populator", func() {
 				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any()).Return(nil, nil)
 				storageClient.EXPECT().ResolvePVToLUN(gomock.Any()).Return(populator.LUN{NAA: "naa.616263"}, nil)
 				storageClient.EXPECT().CurrentMappedGroups(gomock.Any(), gomock.Any()).Return([]string{}, nil)
-				storageClient.EXPECT().Map("xcopy-esxs", gomock.Any(), nil).Return(populator.LUN{NAA: "naa.616263"}, nil)
+				storageClient.EXPECT().Map(gomock.Any(), gomock.Any(), nil).Return(populator.LUN{NAA: "naa.616263"}, nil)
 				// Mock rescan device list call (happens inside hostLocker.WithLock) - returns "on" status
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "device", "list", "-d", "naa.616263"}).Return([]esx.Values{{"Status": {"on"}}}, nil).Times(1)
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(),
@@ -163,7 +163,7 @@ var _ = Describe("Populator", func() {
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "device", "list", "-d", "naa.616263"}).Return([]esx.Values{map[string][]string{"Status": {"off"}}}, nil).AnyTimes()
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "device", "detached", "remove", "-d", "naa.616263"}).Return(nil, nil)
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "adapter", "rescan", "-t", "delete", "-A", "vmhbatest"}).Return(nil, nil)
-				storageClient.EXPECT().UnMap("xcopy-esxs", gomock.Any(), nil).Return(nil)
+				storageClient.EXPECT().UnMap(gomock.Any(), gomock.Any(), nil).Return(nil)
 				// Mock hostLocker to actually execute the callback function
 				hostLocker.EXPECT().WithLock(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 					func(ctx context.Context, hostID string, work func(context.Context) error) error {
