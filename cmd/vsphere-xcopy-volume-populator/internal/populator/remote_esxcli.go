@@ -2,13 +2,17 @@ package populator
 
 import (
 	"context"
+	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"slices"
 	"strings"
 	"time"
 
+	version "github.com/hashicorp/go-version"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
-
+	vmkfstoolswrapper "github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper"
+	"github.com/kubev2v/forklift/pkg/lib/util"
 	"github.com/vmware/govmomi/object"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
@@ -37,7 +41,7 @@ type vmkfstoolsTask struct {
 	ExitCode  string `json:"exitCode"`
 	Stderr    string `json:"stdErr"`
 	LastLine  string `json:"lastLine"`
-	XcopyUsed bool   `json:"xcopyUsed"`
+	XcopyUsed *bool  `json:"xcopyUsed"` // nil means unknown/not determined
 	TaskId    string `json:"taskId"`
 }
 
@@ -356,6 +360,12 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		defer sshClient.Close()
 
 		klog.V(2).Infof("SSH connection established with restricted commands")
+		// Valdate the uploaded script version matches the embedded script version
+		err = checkScriptVersion(sshClient, vmDisk.Datastore, vmkfstoolswrapper.Version, p.SSHPublicKey)
+		if err != nil {
+			return fmt.Errorf("script version check failed: %w", err)
+		}
+
 		executor = NewSSHTaskExecutor(sshClient)
 	} else {
 		executor = NewVIBTaskExecutor(p.VSphereClient)
@@ -475,5 +485,84 @@ func deleteDeadDevices(client vmware.Client, host *object.HostSystem, hbaUIDs []
 	if len(failedDevices) > 0 {
 		klog.Warningf("failed to delete dead devices for adapters %s", failedDevices)
 	}
+	return nil
+}
+
+func checkScriptVersion(sshClient vmware.SSHClient, datastore, embeddedVersion string, publicKey []byte) error {
+	output, err := sshClient.ExecuteCommand(datastore, "--version")
+	if err != nil {
+		return fmt.Errorf("old script format detected (likely Python-based). Update script on datastore %s to version %s or newer: %w", datastore, embeddedVersion, err)
+	}
+
+	var resp XMLResponse
+	if err := xml.Unmarshal([]byte(output), &resp); err != nil {
+		return fmt.Errorf("failed to parse version response: %w", err)
+	}
+
+	var status, message string
+	for _, f := range resp.Structure.Fields {
+		switch f.Name {
+		case "status":
+			status = f.String
+		case "message":
+			message = f.String
+		}
+	}
+	if status != "0" || message == "" {
+		return fmt.Errorf("version command failed: status=%s, message=%s", status, message)
+	}
+
+	var versionInfo struct {
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal([]byte(message), &versionInfo); err != nil {
+		return fmt.Errorf("failed to parse version JSON: %w", err)
+	}
+
+	scriptVer, err := version.NewVersion(versionInfo.Version)
+	if err != nil {
+		return fmt.Errorf("invalid script version format %s: %w", versionInfo.Version, err)
+	}
+
+	embeddedVer, err := version.NewVersion(embeddedVersion)
+	if err != nil {
+		return fmt.Errorf("invalid embedded version format %s: %w", embeddedVersion, err)
+	}
+
+	if scriptVer.LessThan(embeddedVer) {
+		publicKeyStr := string(publicKey)
+		restrictedPublicKey := fmt.Sprintf(`command="%s",no-port-forwarding,no-agent-forwarding,no-X11-forwarding %s`,
+			util.RestrictedSSHCommandTemplate, publicKeyStr)
+
+		klog.Errorf("Version mismatch detected!")
+		klog.Errorf("  - Just uploaded script version: %s", embeddedVersion)
+		klog.Errorf("  - SSH returned version: %s", versionInfo.Version)
+		klog.Errorf("")
+		klog.Errorf("This indicates the SSH key is executing a different script file.")
+		klog.Errorf("Most likely cause: You are using the old Python-based SSH key format")
+		klog.Errorf("which executes a file with .py extension or UUID in the filename.")
+		klog.Errorf("")
+		klog.Errorf("The new shell-based format executes:")
+		klog.Errorf("  /vmfs/volumes/%s/secure-vmkfstools-wrapper (no extension)", datastore)
+		klog.Errorf("")
+		klog.Errorf("To fix this issue:")
+		klog.Errorf("1. SSH to the ESXi host")
+		klog.Errorf("2. Edit /etc/ssh/keys-root/authorized_keys: vi /etc/ssh/keys-root/authorized_keys")
+		klog.Errorf("3. Find the line containing the old Python wrapper")
+		klog.Errorf("4. DELETE the line containing .py extension or UUID in filename")
+		klog.Errorf("   Examples of old format to remove:")
+		klog.Errorf("     - Lines ending with: secure-vmkfstools-wrapper.py")
+		klog.Errorf("     - Lines ending with: secure-vmkfstools-wrapper-$UUID.py")
+		klog.Errorf("5. Add the following NEW SSH key line:")
+		klog.Errorf("")
+		klog.Errorf("  %s", restrictedPublicKey)
+		klog.Errorf("")
+		klog.Errorf("6. Save and exit")
+		klog.Errorf("7. Retry the operation")
+
+		return fmt.Errorf("version mismatch: uploaded %s but SSH returned %s - old SSH key format detected",
+			embeddedVersion, versionInfo.Version)
+	}
+
 	return nil
 }
