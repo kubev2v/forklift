@@ -15,7 +15,7 @@ const (
 	FeatureCopyOffload               = "FEATURE_COPY_OFFLOAD"
 	FeatureOCPLiveMigration          = "FEATURE_OCP_LIVE_MIGRATION"
 	FeatureVmwareSystemSerialNumber  = "FEATURE_VMWARE_SYSTEM_SERIAL_NUMBER"
-	FeatureOVAApplianceManagement    = "FEATURE_OVA_APPLIANCE_MANAGEMENT"
+	FeatureOVFApplianceManagement    = "FEATURE_OVF_APPLIANCE_MANAGEMENT"
 )
 
 // OpenShift version where the FeatureVmwareSystemSerialNumber feature is supported:
@@ -51,8 +51,8 @@ type Features struct {
 	UdnSupportsMac bool
 	// Whether to create VMs with MAC address with the User Defined Network
 	StaticUdnIpAddresses bool
-	// Whether to enable support for appliance management endpoints for the OVA provider.
-	OVAApplianceManagement bool
+	// Whether to enable support for appliance management endpoints for OVF-based providers (OVA, HyperV).
+	OVFApplianceManagement bool
 	// Whether CDI supports InsecureSkipVerify for ImageIO data sources (CNV 4.21+)
 	InsecureSkipVerifySupported bool
 }
@@ -90,6 +90,6 @@ func (r *Features) Load() (err error) {
 	r.VmwareSystemSerialNumber = getEnvBool(FeatureVmwareSystemSerialNumber, true) && r.isOpenShiftVersionAboveMinimum(ocpMinForVmwareSystemSerial)
 	r.UdnSupportsMac = r.isOpenShiftVersionAboveMinimum(ocpMinForUdnMacSupport)
 	r.InsecureSkipVerifySupported = r.isOpenShiftVersionAboveMinimum(ocpMinForInsecureSkipVerify)
-	r.OVAApplianceManagement = getEnvBool(FeatureOVAApplianceManagement, false)
+	r.OVFApplianceManagement = getEnvBool(FeatureOVFApplianceManagement, false)
 	return
 }

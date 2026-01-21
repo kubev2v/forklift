@@ -17,10 +17,10 @@ const (
 	SSHKeysSecretPrefix = "offload-ssh-keys"
 
 	// RestrictedSSHCommandTemplate is the inline shell command used in SSH authorized_keys
-	// to restrict SSH access and route commands to the Python wrapper based on datastore.
+	// to restrict SSH access and route commands to the shell wrapper based on datastore.
 	// Format: DS=<datastore>;CMD=<operation> <args...>
 	// When DS is empty, it returns a simple success response for connectivity testing without calling the wrapper.
-	RestrictedSSHCommandTemplate = `sh -c 'DS=$(echo \"$SSH_ORIGINAL_COMMAND\" | sed -n \"s/^DS=\\([^;]*\\);.*/\\1/p\"); CMD=$(echo \"$SSH_ORIGINAL_COMMAND\" | sed -n \"s/^DS=[^;]*;CMD=\\(.*\\)/\\1/p\"); if [ -z \"$DS\" ]; then echo \"SSH_OK\"; else SSH_ORIGINAL_COMMAND=\"$CMD\" exec python /vmfs/volumes/$DS/secure-vmkfstools-wrapper.py; fi'`
+	RestrictedSSHCommandTemplate = `sh -c 'DS=$(echo \"$SSH_ORIGINAL_COMMAND\" | sed -n \"s/^DS=\\([^;]*\\);.*/\\1/p\"); CMD=$(echo \"$SSH_ORIGINAL_COMMAND\" | sed -n \"s/^DS=[^;]*;CMD=\\(.*\\)/\\1/p\"); if [ -z \"$DS\" ]; then echo \"SSH_OK\"; else SSH_ORIGINAL_COMMAND=\"$CMD\" exec sh /vmfs/volumes/$DS/secure-vmkfstools-wrapper; fi'`
 )
 
 // SanitizeProviderName converts provider name to a valid Kubernetes secret name
@@ -69,7 +69,7 @@ func GenerateSSHPublicSecretName(providerName string) (string, error) {
 // TestSSHConnectivity tests if we can connect via SSH and execute a restricted command.
 // It takes a context, hostIP, privateKey, optional testDatastore, and a logger.
 // If testDatastore is empty, it performs a simple connectivity test expecting "SSH_OK" response.
-// If testDatastore is provided, it will try to call the Python wrapper on that datastore.
+// If testDatastore is provided, it will try to call the shell wrapper on that datastore.
 // Returns true if SSH connectivity is working, false otherwise.
 func TestSSHConnectivity(ctx context.Context, hostIP string, privateKey []byte, log logging.LevelLogger) bool {
 	log.V(3).Info("Testing SSH connectivity to host", "hostIP", hostIP)
@@ -122,7 +122,7 @@ func TestSSHConnectivity(ctx context.Context, hostIP string, privateKey []byte, 
 
 	// Try to execute a simple test command using the structured format
 	// Format: DS=<datastore>;CMD=status test-task-id
-	// When DS is empty, the shell wrapper will return "SSH_OK" without calling Python
+	// When DS is empty, the shell wrapper will return "SSH_OK" without calling the wrapper
 	session, err := sshClient.NewSession()
 	if err != nil {
 		log.V(2).Info("SSH connectivity test failed to create session", "hostIP", hostIP, "error", err)
@@ -131,6 +131,8 @@ func TestSSHConnectivity(ctx context.Context, hostIP string, privateKey []byte, 
 	defer session.Close()
 
 	// Execute the status command with the provided datastore (or empty for connectivity test mode)
+	// Format: DS=<datastore>;CMD=<command>
+	// For connectivity test, DS is empty
 	testCommand := "DS=;CMD=status test-task-id"
 	output, err := session.CombinedOutput(testCommand)
 
