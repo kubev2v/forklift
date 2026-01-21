@@ -2,6 +2,7 @@ package ocp
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
 	"path"
@@ -11,6 +12,7 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	ocp "github.com/kubev2v/forklift/pkg/lib/client/openshift"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	fb "github.com/kubev2v/forklift/pkg/lib/filebacked"
 	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
@@ -26,6 +28,70 @@ import (
 const (
 	RetryDelay = time.Second * 5
 )
+
+var (
+	// ErrNotImplemented is returned by NilDB methods as they are not implemented.
+	ErrNotImplemented = fmt.Errorf("not implemented")
+)
+
+// NilDB is a no-op implementation of the DB interface.
+// Used by the OCP collector which doesn't require database operations.
+type NilDB struct{}
+
+func (n *NilDB) Open(bool) error {
+	return ErrNotImplemented
+}
+
+func (n *NilDB) Close(bool) error {
+	return ErrNotImplemented
+}
+
+func (n *NilDB) Execute(sql string) (sql.Result, error) {
+	return nil, ErrNotImplemented
+}
+
+func (n *NilDB) Get(libmodel.Model) error {
+	return ErrNotImplemented
+}
+
+func (n *NilDB) List(interface{}, libmodel.ListOptions) error {
+	return ErrNotImplemented
+}
+
+func (n *NilDB) Find(interface{}, libmodel.ListOptions) (fb.Iterator, error) {
+	return nil, ErrNotImplemented
+}
+
+func (n *NilDB) Count(libmodel.Model, libmodel.Predicate) (int64, error) {
+	return 0, ErrNotImplemented
+}
+
+func (n *NilDB) Begin(...string) (*libmodel.Tx, error) {
+	return nil, ErrNotImplemented
+}
+
+func (n *NilDB) With(fn func(*libmodel.Tx) error, labels ...string) error {
+	return ErrNotImplemented
+}
+
+func (n *NilDB) Insert(libmodel.Model) error {
+	return ErrNotImplemented
+}
+
+func (n *NilDB) Update(libmodel.Model, ...libmodel.Predicate) error {
+	return ErrNotImplemented
+}
+
+func (n *NilDB) Delete(libmodel.Model) error {
+	return ErrNotImplemented
+}
+
+func (n *NilDB) Watch(libmodel.Model, libmodel.EventHandler) (*libmodel.Watch, error) {
+	return nil, ErrNotImplemented
+}
+
+func (n *NilDB) EndWatch(watch *libmodel.Watch) {
+}
 
 // Cluster.
 type Cluster interface {
@@ -82,7 +148,7 @@ func (r *Collector) Owner() meta.Object {
 
 // Get the DB.
 func (r *Collector) DB() libmodel.DB {
-	return nil
+	return &NilDB{}
 }
 
 // Get the Client.
