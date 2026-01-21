@@ -81,7 +81,7 @@ spec:
 
 ## vmkfstools-wrapper
 An ESXi CLI extension that exposes the vmkfstools clone operation to API interaction.
-The folder vmkfstools-wrapper has a script to create a VIB to wrap the vmkfstools_wrapper.py
+The folder vmkfstools-wrapper has a script to create a VIB to wrap the vmkfstools_wrapper.sh
 to be a proxy to perform vmkfstools commands and more.
 The VIB should be installed on every ESXi that is connected to the datastores which
 are holds migratable VMs.
@@ -535,7 +535,7 @@ The system requires command restrictions for security. Create the restricted key
 ```bash
 # The public key needs to be prefixed with command restrictions
 # The system now uses dynamic datastore routing - a single key works for all datastores
-echo 'command="sh -c '\''DS=$(echo \"$SSH_ORIGINAL_COMMAND\" | sed -n \"s|.*/vmfs/volumes/\\([^/]*\\)/.*|\\1|p\"); exec python /vmfs/volumes/$DS/secure-vmkfstools-wrapper.py'\''",no-port-forwarding,no-agent-forwarding,no-X11-forwarding '$(cat esxi_public_key.pub) > restricted_key.pub
+echo 'command="sh -c '\''DS=$(echo \"$SSH_ORIGINAL_COMMAND\" | sed -n \"s|.*/vmfs/volumes/\\([^/]*\\)/.*|\\1|p\"); exec sh /vmfs/volumes/$DS/secure-vmkfstools-wrapper.sh'\''",no-port-forwarding,no-agent-forwarding,no-X11-forwarding '$(cat esxi_public_key.pub) > restricted_key.pub
 
 # View the final restricted key
 cat restricted_key.pub
