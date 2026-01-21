@@ -40,6 +40,11 @@ const (
 	OpenStack ProviderType = "openstack"
 	// OVA
 	Ova ProviderType = "ova"
+	// EC2
+	EC2 ProviderType = "ec2"
+
+	// HyperV
+	HyperV ProviderType = "hyperv"
 )
 
 var ProviderTypes = []ProviderType{
@@ -48,6 +53,8 @@ var ProviderTypes = []ProviderType{
 	OVirt,
 	OpenStack,
 	Ova,
+	EC2,
+	HyperV,
 }
 
 func (t ProviderType) String() string {
@@ -78,6 +85,7 @@ const (
 )
 
 const OvaProviderFinalizer = "forklift/ova-provider"
+const HyperVProviderFinalizer = "forklift/hyperv-provider"
 
 // Defines the desired state of Provider.
 type ProviderSpec struct {
@@ -171,7 +179,7 @@ func (p *Provider) HasReconciled() bool {
 
 // This provider requires VM guest conversion.
 func (p *Provider) RequiresConversion() bool {
-	return p.Type() == VSphere || p.Type() == Ova
+	return p.Type() == VSphere || p.Type() == Ova || p.Type() == HyperV || p.Type() == EC2
 }
 
 // This provider support the vddk aio parameters.
