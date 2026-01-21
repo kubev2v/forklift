@@ -29,7 +29,7 @@ ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/migration-toolkit-virtualizat
 
 ARG UI_PLUGIN_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-console-plugin-rhel9@sha256:5d385ba67a8d8158790da4511586c190a24a194e2ccb10fcb7182b658a59c624"
 
-ARG VALIDATION_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-validation-rhel9@sha256:6f4630d109cc942d19f885ab83f52a55a82b7582abacd522981ae217c3bfeaac"
+ARG VALIDATION_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-validation-rhel9@sha256:45f60e1dbd38452d10c49fe21e679b3847c4837a624a4ea8f6f90cf3c74ab236"
 
 ARG VIRT_V2V_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel9@sha256:09a26092c7d4ec035210975b85280beac10f9a6429dfb4877d5e7aa8b38fe471"
 
