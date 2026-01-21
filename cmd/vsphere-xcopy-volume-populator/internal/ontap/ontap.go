@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/fcutil"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
 	drivers "github.com/netapp/trident/storage_drivers"
 	"github.com/netapp/trident/storage_drivers/ontap/api"
@@ -44,7 +46,19 @@ func (c *NetappClonner) EnsureClonnerIgroup(initiatorGroup string, adapterIds []
 	atLeastOneAdded := false
 
 	for _, adapterId := range adapterIds {
-		err = c.api.EnsureIgroupAdded(context.Background(), initiatorGroup, adapterId)
+		// Convert FC initiators from ESXi format (fc.WWNN:WWPN) to ONTAP format (colon-separated WWPN)
+		ontapInitiator := adapterId
+		if strings.HasPrefix(adapterId, "fc.") {
+			converted, convErr := fcutil.ExtractAndFormatWWPN(adapterId)
+			if convErr != nil {
+				klog.Warningf("Failed to convert FC adapter %s to ONTAP format: %s", adapterId, convErr)
+				continue
+			}
+			klog.Infof("Converted FC adapter %s to ONTAP format: %s", adapterId, converted)
+			ontapInitiator = converted
+		}
+
+		err = c.api.EnsureIgroupAdded(context.Background(), initiatorGroup, ontapInitiator)
 		if err != nil {
 			klog.Warningf("failed adding host to igroup %s", err)
 			continue
