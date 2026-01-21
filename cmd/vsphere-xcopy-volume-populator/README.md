@@ -165,6 +165,24 @@ See [README](internal/vantara/README.md)
 | --- | --- | --- |
 | ONTAP_SVM | string | the SVM to use in all the client interactions. Can be taken from trident.netapp.io/v1/TridentBackend.config.ontap_config.svm resource field. |
 
+### HPE Primera/3PAR
+
+**Important**: For HPE Primera/3PAR, the `STORAGE_HOSTNAME` must include the full URL with protocol and the 3PAR's Web Services API (WSAPI) port. Use the 3PAR command `cli% showwsapi` to determine the correct WSAPI port. 3PAR systems default to port `8080` for both HTTP and HTTPS connections, Primera and Alletra 9000/MP default to port `443` (SSL/HTTPS). Depending on configured certificates you may need to skip SSL verification.
+
+**Example secret:**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hpe-3par-secret
+  namespace: openshift-mtv
+type: Opaque
+stringData:
+  STORAGE_HOSTNAME: "https://192.168.1.1:8080"
+  STORAGE_USERNAME: "admin"
+  STORAGE_PASSWORD: "your-password"
+```
 
 ### Pure FlashArray
 
@@ -237,19 +255,18 @@ stringData:
 - If `STORAGE_TOKEN` is not provided, both `STORAGE_USERNAME` and `STORAGE_PASSWORD` must be set
 - Token-based authentication is recommended as it allows credential reuse with the Pure CSI driver
 
-### Dell PowerMax
-
-| Key | Value | Description |
-| --- | --- | --- |
-| POWERMAX_SYMMETRIX_ID | string | the symmetrix id of the storage array. Can be taken from the ConfigMap under the 'powermax' namespace, which the CSI driver uses. |
-| POWERMAX_PORT_GROUP_NAME | string | the port group to use for masking view creation. |
-
 ### Dell PowerFlex
 
 | Key | Value | Description |
 | --- | --- | --- |
 | POWERFLEX_SYSTEM_ID | string | the system id of the storage array. Can be taken from `vxflexos-config` from the `vxflexos` namespace or the openshift-operators namespace. |
 
+### Dell PowerMax
+
+| Key | Value | Description |
+| --- | --- | --- |
+| POWERMAX_SYMMETRIX_ID | string | the symmetrix id of the storage array. Can be taken from the ConfigMap under the 'powermax' namespace, which the CSI driver uses. |
+| POWERMAX_PORT_GROUP_NAME | string | the port group to use for masking view creation. |
 
 ## Host Lease Management
 
