@@ -2,7 +2,9 @@ package vsphere
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,7 +19,6 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"github.com/google/uuid"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
@@ -1168,6 +1169,9 @@ func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
 
 // Return a stable identifier for a PersistentDataVolume.
 func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string {
+	if source, ok := pvc.Annotations[planbase.AnnDiskSource]; ok {
+		return baseVolume(source, r.Plan.IsWarm())
+	}
 	return baseVolume(pvc.Annotations[planbase.AnnImportBackingFile], r.Plan.IsWarm())
 }
 
@@ -1429,17 +1433,15 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				if err := r.setColdMigrationDefaultPVCName(&pvc.ObjectMeta, vm, diskIndex, disk); err != nil {
 					r.Log.Info("Failed to set PVC name from template for populator volume, using default name", "error", err)
 				}
-
-				// PVC name is the name of the populator, and we can't use generateName for the populator
-				// if generateName is used, we need to remove it and set a deterministic name
 				if pvc.ObjectMeta.GenerateName != "" {
-					// For GenerateName, use the generateName prefix as the populator name
-					pvc.ObjectMeta.Name = strings.TrimSuffix(pvc.ObjectMeta.GenerateName, "-") + "-" + uuid.New().String()[:8]
+					suffix := r.generatePopulatorSuffix(string(r.Migration.UID), vmRef.ID, disk.Key, disk.File, diskIndex)
+					pvc.ObjectMeta.Name = strings.TrimSuffix(pvc.ObjectMeta.GenerateName, "-") + "-" + suffix
 					pvc.ObjectMeta.GenerateName = ""
 				}
 
 				// populator name is the name of the populator, and we can't use generateName for the populator
 				populatorName := pvc.ObjectMeta.Name
+				r.Log.V(2).Info("Initial populator name from new PVC", "populatorName", populatorName, "pvcName", pvc.ObjectMeta.Name)
 
 				// For warm migration, add annotations to jump-start the DataVolume
 				v := r.getPlanVMStatus(vm)
@@ -1491,46 +1493,42 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 						StorageVendorProduct: string(storageVendorProduct),
 					},
 				}
-
+				createdPVC := &core.PersistentVolumeClaim{}
+				// Check if a PVC was created for the current disk
 				if !r.isPVCExistsInList(&pvc, pvcList) {
 					r.Log.Info("Creating pvc", "pvc", pvc)
 					err = r.Destination.Client.Create(context.TODO(), &pvc, &client.CreateOptions{})
 					if err != nil {
 						if k8serr.IsAlreadyExists(err) {
+							r.Log.Info("PVC already exists in Kubernetes, skipping", "pvcName", pvc.ObjectMeta.Name)
 							continue
 						}
 						return nil, err
 					}
+				}
+				// Fetch the PVC back to get the UID assigned by Kubernetes
+				err = r.Destination.Client.Get(context.TODO(), client.ObjectKey{
+					Namespace: pvc.Namespace,
+					Name:      pvc.Name,
+				}, createdPVC)
+				if err != nil {
+					return nil, err
+				}
 
-					// Fetch the PVC back to get the UID assigned by Kubernetes
-					createdPVC := &core.PersistentVolumeClaim{}
-					err = r.Destination.Client.Get(context.TODO(), client.ObjectKey{
-						Namespace: pvc.Namespace,
-						Name:      pvc.Name,
-					}, createdPVC)
-					if err != nil {
-						return nil, err
-					}
+				vp.OwnerReferences[0].UID = createdPVC.UID
+				err = r.mergeSecrets(secretName, namespace, storageVendorSecretRef, r.Source.Provider.Namespace, diskSecretName, createdPVC)
+				if err != nil {
+					return nil, fmt.Errorf("failed to merge secrets for popoulators %w", err)
+				}
 
-					// Update the populator's owner reference with the actual PVC UID
-					vp.OwnerReferences[0].UID = createdPVC.UID
-
-					err = r.mergeSecrets(secretName, namespace, storageVendorSecretRef, r.Source.Provider.Namespace, diskSecretName, createdPVC)
-					if err != nil {
-						return nil, fmt.Errorf("failed to merge secrets for popoulators %w", err)
-					}
-
-					// Should probably check these separately
-					r.Log.Info("Ensuring a populator service account")
-					err = r.ensurePopulatorServiceAccount(namespace)
-					if err != nil {
-						return nil, err
-					}
-					r.Log.Info("Creating the populator resource", "VSphereXcopyVolumePopulator", vp)
-					err = r.Destination.Client.Create(context.TODO(), &vp, &client.CreateOptions{})
-					if err != nil {
-						return nil, err
-					}
+				r.Log.Info("Ensuring a populator service account")
+				err = r.ensurePopulatorServiceAccount(namespace)
+				if err != nil {
+					return nil, err
+				}
+				err = r.ensureXCopyVolumePopulator(&vp)
+				if err != nil {
+					return nil, err
 				}
 			}
 		}
@@ -1600,15 +1598,26 @@ func (r *Builder) getVolumePopulator(vmId, vmdkKey string) (api.VSphereXcopyVolu
 	}
 	if len(list.Items) == 0 {
 		return api.VSphereXcopyVolumePopulator{},
-			k8serr.NewNotFound(
-				api.SchemeGroupVersion.WithResource("VSphereXcopyVolumePopulator").GroupResource(), vmdkKey)
+			liberr.New(
+				"No VSphereXcopyVolumePopulator CR found - populator may not have been created or was deleted",
+				"namespace", r.Plan.Spec.TargetNamespace,
+				"migration", string(r.Migration.UID),
+				"vmID", vmId,
+				"vmdkKey", vmdkKey)
 	}
 	if len(list.Items) > 1 {
+		names := make([]string, len(list.Items))
+		for i, item := range list.Items {
+			names[i] = item.Name
+		}
 		return api.VSphereXcopyVolumePopulator{},
 			liberr.New(
-				"Multiple VSphereXcopyVolumePopulator CRs found for the same VMDK disk (with special chars replaced with _)",
-				"vmdkKey",
-				vmdkKey)
+				"Multiple VSphereXcopyVolumePopulator CRs found for the same VMDK disk",
+				"namespace", r.Plan.Spec.TargetNamespace,
+				"migration", string(r.Migration.UID),
+				"vmID", vmId,
+				"vmdkKey", vmdkKey,
+				"populators", strings.Join(names, ", "))
 	}
 	return list.Items[0], nil
 }
@@ -2246,12 +2255,49 @@ func (r *Builder) addSSHKeysToSecret(secret *core.Secret) error {
 }
 
 func (r *Builder) isPVCExistsInList(pvc *core.PersistentVolumeClaim, pvcList *core.PersistentVolumeClaimList) bool {
-	for _, item := range pvcList.Items {
-		if r.ResolvePersistentVolumeClaimIdentifier(pvc) == r.ResolvePersistentVolumeClaimIdentifier(&item) {
-			return true
+	return r.findExistingPVCInList(pvc, pvcList) != nil
+}
+
+func (r *Builder) findExistingPVCInList(pvc *core.PersistentVolumeClaim, pvcList *core.PersistentVolumeClaimList) *core.PersistentVolumeClaim {
+	pvcIdentifier := r.ResolvePersistentVolumeClaimIdentifier(pvc)
+	if pvcIdentifier == "" {
+		return nil
+	}
+	for i := range pvcList.Items {
+		item := &pvcList.Items[i]
+		if r.ResolvePersistentVolumeClaimIdentifier(item) == pvcIdentifier {
+			return item
 		}
 	}
-	return false
+	return nil
+}
+
+func (r *Builder) generatePopulatorSuffix(migrationUID, vmID string, diskKey int32, diskFile string, diskIndex int) string {
+	input := fmt.Sprintf("%s-%s-%d-%s-%d", migrationUID, vmID, diskKey, diskFile, diskIndex)
+	hash := sha256.Sum256([]byte(input))
+	return hex.EncodeToString(hash[:])[:8]
+}
+
+func (r *Builder) ensureXCopyVolumePopulator(vp *api.VSphereXcopyVolumePopulator) error {
+	existingPopulator := &api.VSphereXcopyVolumePopulator{}
+	err := r.Destination.Client.Get(context.TODO(), client.ObjectKey{
+		Namespace: vp.Namespace,
+		Name:      vp.Name,
+	}, existingPopulator)
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			r.Log.Info("Creating the populator resource", "VSphereXcopyVolumePopulator", vp.Name, "namespace", vp.Namespace)
+			err = r.Destination.Client.Create(context.TODO(), vp, &client.CreateOptions{})
+			if err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	} else {
+		r.Log.Info("Populator already exists", "populator", vp.Name, "namespace", vp.Namespace)
+	}
+	return nil
 }
 
 // ConversionPodConfig returns provider-specific configuration for the virt-v2v conversion pod.
