@@ -227,7 +227,7 @@ def main():
     if ssh_command:
         logging.info(f"Received SSH_ORIGINAL_COMMAND: {ssh_command}")
         # Convert SSH command to sys.argv format for argparse
-        sys.argv = ['vmkfstools_wrapper.py'] + ssh_command.split()
+        sys.argv = ['vmkfstools_wrapper.sh'] + ssh_command.split()
 
     parser = argparse.ArgumentParser(description="vmkfstools-wrapper")
 

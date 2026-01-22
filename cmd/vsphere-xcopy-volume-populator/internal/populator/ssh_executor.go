@@ -18,6 +18,24 @@ type SSHTaskExecutor struct {
 	sshClient vmware.SSHClient
 }
 
+// XMLResponse represents the XML response structure from vmkfstools-wrapper script
+type XMLResponse struct {
+	XMLName   xml.Name  `xml:"output"`
+	Structure Structure `xml:"structure"`
+}
+
+// Structure represents the structure element in the XML response
+type Structure struct {
+	TypeName string  `xml:"typeName,attr"`
+	Fields   []Field `xml:"field"`
+}
+
+// Field represents a field in the XML response
+type Field struct {
+	Name   string `xml:"name,attr"`
+	String string `xml:"string"`
+}
+
 func NewSSHTaskExecutor(sshClient vmware.SSHClient) TaskExecutor {
 	return &SSHTaskExecutor{
 		sshClient: sshClient,
@@ -76,24 +94,6 @@ func (e *SSHTaskExecutor) CleanupTask(_ context.Context, _ *object.HostSystem, d
 
 	klog.Infof("Cleaned up task %s", taskId)
 	return nil
-}
-
-// XMLResponse represents the XML response structure
-type XMLResponse struct {
-	XMLName   xml.Name  `xml:"output"`
-	Structure Structure `xml:"structure"`
-}
-
-// Structure represents the structure element in the XML response
-type Structure struct {
-	TypeName string  `xml:"typeName,attr"`
-	Fields   []Field `xml:"field"`
-}
-
-// Field represents a field in the XML response
-type Field struct {
-	Name   string `xml:"name,attr"`
-	String string `xml:"string"`
 }
 
 // parseTaskResponse parses the XML response from the script

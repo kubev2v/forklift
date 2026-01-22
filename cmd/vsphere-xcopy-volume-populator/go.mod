@@ -8,6 +8,7 @@ require (
 	github.com/dell/gopowermax/v2 v2.9.0
 	github.com/dell/gopowerstore v1.19.0
 	github.com/dell/goscaleio v1.20.0
+	github.com/hashicorp/go-version v1.7.0
 	github.com/infinidat/infinibox-csi-driver v0.0.0-20251022203528-1f6913cf29cb
 	github.com/kubev2v/forklift v0.0.0-20250813102318-c4b25b22d0b5
 	github.com/netapp/trident v0.0.0-20240628081112-cb68cb389d9d
@@ -48,7 +49,6 @@ require (
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/pprof v0.0.0-20250403155104-27863c87afa6 // indirect
-	github.com/hashicorp/go-version v1.7.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.7 // indirect
 	github.com/moby/sys/userns v0.1.0 // indirect
