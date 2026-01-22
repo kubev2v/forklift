@@ -36,6 +36,7 @@ type BaseAssembler struct {
     i        int
     f        func()
     c        []byte
+    Pcdata   loader.Pcdata
     o        sync.Once
     pb       *Backend
     xrefs    map[string][]*obj.Prog
@@ -69,18 +70,6 @@ func (self *BaseAssembler) NOPn(n int) {
         for ; n >= i; n -= i {
             self.Byte(_NOPS[i - 1][:i]...)
         }
-    }
-}
-
-func (self *BaseAssembler) StorePtr(ptr int64, to obj.Addr, tmp obj.Addr) {
-    if (to.Type != obj.TYPE_MEM) || (tmp.Type != obj.TYPE_REG) {
-        panic("must store imm to memory, tmp must be register")
-    }
-    if (ptr >> 32) != 0 {
-        self.Emit("MOVQ", Imm(ptr), tmp)
-        self.Emit("MOVQ", tmp, to)
-    } else {
-        self.Emit("MOVQ", Imm(ptr), to);
     }
 }
 
@@ -224,7 +213,7 @@ var jitLoader = loader.Loader{
 
 func (self *BaseAssembler) Load(name string, frameSize int, argSize int, argStackmap []bool, localStackmap []bool) loader.Function {
     self.build()
-    return jitLoader.LoadOne(self.c, name, frameSize, argSize, argStackmap, localStackmap)
+    return jitLoader.LoadOne(self.c, name, frameSize, argSize, argStackmap, localStackmap, self.Pcdata)
 }
 
 /** Assembler Stages **/
@@ -277,5 +266,5 @@ func (self *BaseAssembler) validate() {
 }
 
 func (self *BaseAssembler) assemble() {
-    self.c = self.pb.Assemble()
+    self.c, self.Pcdata = self.pb.Assemble()
 }
