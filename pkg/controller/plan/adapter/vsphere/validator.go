@@ -541,9 +541,6 @@ func (r *Validator) StaticIPs(vmRef ref.Ref) (ok bool, err error) {
 		return
 	}
 
-	if vm.PowerState != string(types.VirtualMachinePowerStatePoweredOn) {
-		return
-	}
 	for _, guestNetwork := range vm.GuestNetworks {
 		found := false
 		for _, nic := range vm.NICs {
