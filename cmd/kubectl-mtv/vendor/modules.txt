@@ -245,11 +245,12 @@ github.com/yaacov/kubectl-mtv/pkg/util/flags
 github.com/yaacov/kubectl-mtv/pkg/util/output
 github.com/yaacov/kubectl-mtv/pkg/util/query
 github.com/yaacov/kubectl-mtv/pkg/util/watch
-# github.com/yaacov/kubectl-mtv-mcp v0.0.5
+# github.com/yaacov/kubectl-mtv-mcp v0.0.7
 ## explicit; go 1.23.0
 github.com/yaacov/kubectl-mtv-mcp/cmd/kubectl-mtv-mcp
-github.com/yaacov/kubectl-mtv-mcp/cmd/kubectl-mtv-mcp/tools
 github.com/yaacov/kubectl-mtv-mcp/pkg/mtvmcp
+github.com/yaacov/kubectl-mtv-mcp/pkg/mtvmcp/discovery
+github.com/yaacov/kubectl-mtv-mcp/pkg/mtvmcp/tools
 # github.com/yaacov/tree-search-language/v6 v6.0.8
 ## explicit; go 1.23
 github.com/yaacov/tree-search-language/v6/pkg/parser

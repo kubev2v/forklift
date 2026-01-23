@@ -230,8 +230,8 @@ github.com/yaacov/karl-interpreter v0.0.1 h1:gq+j69BBBj0Lv6SwOfvWou0fsfySpyfPyl1
 github.com/yaacov/karl-interpreter v0.0.1/go.mod h1:5QRw50uhYw3KMQRU38D3ir9IobE7lIpU4DwlHWNXjmI=
 github.com/yaacov/kubectl-mtv v0.1.48 h1:lMauRApETz9FfKuoW/8oGqsmet6SbaSfnsQIjdq523o=
 github.com/yaacov/kubectl-mtv v0.1.48/go.mod h1:wbRfgYutgXp1p3z3OMFLwt0hiAFu9BKbeoK+tKukIuw=
-github.com/yaacov/kubectl-mtv-mcp v0.0.5 h1:Wu1vqRFIP2CubXI+W5Ty43rbkGEDlTTrCaz04aeb6OU=
-github.com/yaacov/kubectl-mtv-mcp v0.0.5/go.mod h1:CsrSv94cLIanhzbO09oEDnPFRyrPgDoNqMgErN+3oKU=
+github.com/yaacov/kubectl-mtv-mcp v0.0.7 h1:0GCfYpHT7AA/BKnQqCbhepWXxu2dwrTDwIyZE6uOJdc=
+github.com/yaacov/kubectl-mtv-mcp v0.0.7/go.mod h1:CsrSv94cLIanhzbO09oEDnPFRyrPgDoNqMgErN+3oKU=
 github.com/yaacov/tree-search-language/v6 v6.0.8 h1:BnrvqOOh/VS84EH0MSKaZHZEBTYOf6tAMUCdzOdOxuU=
 github.com/yaacov/tree-search-language/v6 v6.0.8/go.mod h1:ZXSpcgyyUZswjeC/OOYBnrvUWhhENumaV4+Xeg59NFk=
 github.com/yosida95/uritemplate/v3 v3.0.2 h1:Ed3Oyj9yrmi9087+NczuL5BwkIc4wvTb5zIM+UJPGz4=
