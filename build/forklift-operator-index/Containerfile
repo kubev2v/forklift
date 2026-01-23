@@ -1,7 +1,7 @@
 # The OPM 1.53.0 has problem, once there will be new version with the fix we can bump to latest.
 # https://github.com/operator-framework/operator-registry/pull/1664
 # Ref: https://redhat-internal.slack.com/archives/C074JM28DTP/p1746458556603619
-FROM quay.io/operator-framework/opm:v1.56.0 AS opm
+FROM quay.io/operator-framework/opm:v1.62.0 AS opm
 FROM registry.access.redhat.com/ubi9-minimal:9.6-1752587672 AS builder
 ARG CHANNELS="development"
 ARG DEFAULT_CHANNEL="development"
@@ -23,7 +23,7 @@ RUN mkdir -p /etc/containers && \
 RUN cat catalog/operator.yml | envsubst > operator.yaml
 RUN opm render ${OPERATOR_BUNDLE_IMAGE} ${OPM_OPTS} -o yaml >> operator.yaml
 
-FROM quay.io/operator-framework/opm:v1.56.0
+FROM quay.io/operator-framework/opm:v1.62.0
 
 COPY --from=builder /app/operator.yaml /configs/operator.yaml
 
