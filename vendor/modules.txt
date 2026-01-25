@@ -105,8 +105,8 @@ github.com/gabriel-vasile/mimetype/internal/scan
 # github.com/gin-contrib/cors v1.7.5
 ## explicit; go 1.23.0
 github.com/gin-contrib/cors
-# github.com/gin-contrib/sse v1.0.0
-## explicit; go 1.13
+# github.com/gin-contrib/sse v1.1.0
+## explicit; go 1.23
 github.com/gin-contrib/sse
 # github.com/gin-gonic/gin v1.10.0
 ## explicit; go 1.20
