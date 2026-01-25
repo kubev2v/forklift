@@ -88,15 +88,21 @@
             - 'namespace/name' format (e.g., 'openshift-mtv/br-eno8403')
             - a JSON string representing a list of transfer networks
 
+      - name: "Detect if controller_transfer_network looks like JSON"
+        set_fact:
+          controller_transfer_network_is_json_string: "{{ controller_transfer_network | trim | regex_search('^[\\[\\{]') is not none }}"
+
       - name: "Try parsing controller_transfer_network as JSON"
+        when: controller_transfer_network_is_json_string
         set_fact:
           controller_transfer_network_parsed: "{{ controller_transfer_network | from_json }}"
         failed_when: false
-        register: parse_json_result
+        register: json_parse_result
 
-      - name: "Detect if controller_transfer_network is JSON"
+      - name: "Verify JSON parsing succeeded"
+        when: controller_transfer_network_is_json_string
         set_fact:
-          controller_transfer_network_is_json_string: "{{ not parse_json_result.failed }}"
+          controller_transfer_network_is_json_string: "{{ json_parse_result is not failed }}"
 
       - name: "Use parsed JSON if provided"
         when: controller_transfer_network_is_json_string
