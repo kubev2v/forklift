@@ -8,6 +8,7 @@ import (
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/provider/ec2/controller/builder"
+	"github.com/kubev2v/forklift/pkg/provider/ec2/controller/inventory"
 	core "k8s.io/api/core/v1"
 )
 
@@ -177,8 +178,34 @@ func (r *Migrator) createPVsAndPVCs(vm *planapi.VMStatus) (bool, error) {
 	var pvs []*core.PersistentVolume
 	volumeInfos := make(map[string]*builder.VolumeInfo)
 
-	index := 0
-	for originalVolumeID, newVolumeID := range volumeMapping {
+	// Get the AWS instance to iterate over BlockDeviceMappings in the correct order.
+	// This ensures the disk-index annotation matches the order that mapDisks uses
+	// when attaching disks to the VM spec.
+	awsInstance, err := inventory.GetAWSInstance(ec2Builder.Source.Inventory, vm.Ref)
+	if err != nil {
+		r.log.Error(err, "Failed to get AWS instance from inventory", "vm", vm.Name)
+		return false, liberr.Wrap(err)
+	}
+
+	blockDevices, _ := inventory.GetBlockDevices(awsInstance)
+
+	// Iterate over BlockDeviceMappings to preserve disk order from the source VM.
+	// The volumeMapping map is only used for lookups, not iteration order.
+	// Using the slice index directly preserves the source block device position.
+	for i, dev := range blockDevices {
+		if dev.Ebs == nil || dev.Ebs.VolumeId == nil {
+			continue
+		}
+
+		originalVolumeID := *dev.Ebs.VolumeId
+		newVolumeID, found := volumeMapping[originalVolumeID]
+		if !found {
+			r.log.Info("No new volume found for original volume, skipping",
+				"vm", vm.Name,
+				"originalVolumeID", originalVolumeID)
+			continue
+		}
+
 		snapshotID := snapshotMap[originalVolumeID]
 
 		// Get volume size from inventory
@@ -196,8 +223,8 @@ func (r *Migrator) createPVsAndPVCs(vm *planapi.VMStatus) (bool, error) {
 		}
 		volumeInfos[originalVolumeID] = volumeInfo
 
-		// Build PVC spec
-		pvc, err := ec2Builder.BuildDirectPVC(vm.Ref, volumeInfo, index)
+		// Build PVC spec with index matching the BlockDeviceMappings position
+		pvc, err := ec2Builder.BuildDirectPVC(vm.Ref, volumeInfo, i)
 		if err != nil {
 			r.log.Error(err, "Failed to build PVC spec",
 				"vm", vm.Name,
@@ -205,7 +232,6 @@ func (r *Migrator) createPVsAndPVCs(vm *planapi.VMStatus) (bool, error) {
 			return false, liberr.Wrap(err)
 		}
 		pvcs = append(pvcs, pvc)
-		index++
 	}
 
 	// Create PVCs first to get their generated names
