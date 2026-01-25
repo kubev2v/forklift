@@ -1769,7 +1769,7 @@ func (r *Builder) setPVCNameFromTemplate(objectMeta *metav1.ObjectMeta, vm *mode
 		targetVmName = planVMStatus.NewName
 	} else {
 		// Best-effort DNS1123-safe fallback
-		targetVmName = utils.ChangeVmName(vmName)
+		targetVmName = utils.SanitizeLabel(vmName)
 	}
 
 	// Create template data

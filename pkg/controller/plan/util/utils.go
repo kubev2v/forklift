@@ -1,6 +1,8 @@
 package util
 
 import (
+	"fmt"
+	"hash/fnv"
 	"math"
 	"math/rand"
 	"regexp"
@@ -70,8 +72,8 @@ func GetDeviceNumber(deviceString string) int {
 
 type HostsFunc func() (map[string]*api.Host, error)
 
-// ChangeVmName changes VM name to match DNS1123 RFC convention.
-func ChangeVmName(currName string) string {
+// SanitizeLabel ensures a string is a valid Kubernetes DNS-1123 label.
+func SanitizeLabel(currName string) string {
 	var validParts []string
 	const labelMax = validation.DNS1123LabelMaxLength
 
@@ -126,10 +128,17 @@ func ChangeVmName(currName string) string {
 
 	// Handle case where name is empty after all processing
 	if newName == "" {
-		newName = "vm-" + GenerateRandomSuffix()
+		//This keeps names stable even when the sanitized name is empty
+		newName = "vm-" + fnv32String(currName)
 	}
 
 	return newName
+}
+
+func fnv32String(s string) string {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(s))
+	return fmt.Sprintf("%x", h.Sum32())
 }
 
 // GenerateRandomSuffix generates a random string of length four, consisting of lowercase letters and digits.

@@ -12,8 +12,12 @@ import (
 	ginkgo "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -303,3 +307,43 @@ func createKubeVirtWithTransferNetwork(nad *k8snet.NetworkAttachmentDefinition, 
 	kubevirt.Plan = createPlanKubevirt(transferNetwork)
 	return kubevirt
 }
+
+var _ = ginkgo.Describe("Duplicate PVC Prevention", func() {
+	ginkgo.It("providerStorageName generates deterministic valid DNS1123 names", func() {
+		name1 := providerStorageName("ova-store-pvc", "ova-provider", "plan-uid-123", "vm-47")
+		name2 := providerStorageName("ova-store-pvc", "ova-provider", "plan-uid-123", "vm-47")
+		Expect(name1).To(Equal(name2))
+
+		nameOtherVM := providerStorageName("ova-store-pvc", "ova-provider", "plan-uid-123", "vm-48")
+		Expect(name1).NotTo(Equal(nameOtherVM))
+
+		errs := validation.IsDNS1123Label(name1)
+		Expect(errs).To(BeEmpty())
+
+		longName := providerStorageName("ova-store-pvc", "very-long-provider-name-exceeds", "very-long-plan-uid-1234567890", "vm-long-id")
+		Expect(len(longName)).To(BeNumerically("<=", validation.DNS1123LabelMaxLength))
+	})
+
+	ginkgo.It("ResolveAlreadyExists retrieves existing resource on AlreadyExists error", func() {
+		existingPVC := &v1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "existing-pvc",
+				Namespace: "test",
+				Labels:    map[string]string{"app": "forklift"},
+			},
+		}
+		kubevirt := createKubeVirt(existingPVC)
+
+		notFoundErr := k8serr.NewNotFound(schema.GroupResource{Resource: "pvc"}, "test-pvc")
+		pvc := &v1.PersistentVolumeClaim{}
+		handled, _ := kubevirt.ResolveAlreadyExists(notFoundErr, client.ObjectKey{Name: "test-pvc", Namespace: "test"}, pvc)
+		Expect(handled).To(BeFalse())
+
+		alreadyExistsErr := k8serr.NewAlreadyExists(schema.GroupResource{Resource: "persistentvolumeclaims"}, "existing-pvc")
+		pvc = &v1.PersistentVolumeClaim{}
+		handled, outErr := kubevirt.ResolveAlreadyExists(alreadyExistsErr, client.ObjectKey{Name: "existing-pvc", Namespace: "test"}, pvc)
+		Expect(handled).To(BeTrue())
+		Expect(outErr).ToNot(HaveOccurred())
+		Expect(pvc.Name).To(Equal("existing-pvc"))
+	})
+})
