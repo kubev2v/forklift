@@ -12,7 +12,7 @@ import (
 )
 
 func (r *KubeVirt) changeVmNameDNS1123(vmName string, vmNamespace string) (generatedName string, err error) {
-	generatedName = util.ChangeVmName(vmName)
+	generatedName = util.SanitizeLabel(vmName)
 	nameExist, errName := r.checkIfVmNameExistsInNamespace(generatedName, vmNamespace)
 	if errName != nil {
 		err = liberr.Wrap(errName)
