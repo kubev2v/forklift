@@ -14,13 +14,18 @@ const (
 	regionTableOffset2     = 0x40000
 	regionTableSignature   = 0x69676572
 	metadataTableSignature = uint64(0x617461646174656d)
+	vhdxfileSignature      = "vhdxfile"
 )
 
+// metadataRegionGUID identifies the metadata region in the VHDX region table.
+// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-vhdx/194899ee-6504-44d5-a9aa-a2b566c2c419
 var metadataRegionGUID = []byte{
 	0x06, 0xA2, 0x7C, 0x8B, 0x90, 0x47, 0x9A, 0x4B,
 	0xB8, 0xFE, 0x57, 0x5F, 0x05, 0x0F, 0x88, 0x6E,
 }
 
+// virtualDiskSizeGUID identifies the Virtual Disk Size metadata item.
+// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-vhdx/ef27fead-4178-4756-8d0f-dc76edd7e76d
 var virtualDiskSizeGUID = []byte{
 	0x24, 0x42, 0xA5, 0x2F, 0x1B, 0xCD, 0x76, 0x48,
 	0xB2, 0x11, 0x5D, 0xBE, 0xD8, 0x3B, 0xF4, 0xB8,
@@ -55,7 +60,6 @@ type metadataTableEntry struct {
 	Reserved uint32
 }
 
-// GetVHDXVirtualSize reads the virtual disk size from a VHDX file
 func GetVHDXVirtualSize(path string) (uint64, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -68,7 +72,7 @@ func GetVHDXVirtualSize(path string) (uint64, error) {
 	if _, err := f.Read(sig); err != nil {
 		return 0, fmt.Errorf("read signature: %w", err)
 	}
-	if string(sig) != "vhdxfile" {
+	if string(sig) != vhdxfileSignature {
 		return 0, errors.New("not a valid VHDX file: invalid signature")
 	}
 
