@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi9:9.6-1747219013 AS winlegacyiso
+FROM registry.redhat.io/ubi9:9.7-1769417801 AS winlegacyiso
 
 RUN rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 RUN yum install -y --setopt=install_weak_deps=False virtio-win-1.9.4-2.el7.2
