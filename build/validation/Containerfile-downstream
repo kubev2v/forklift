@@ -9,7 +9,7 @@ COPY .konflux/validation/go.sum go.sum
 
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /tmp/opa github.com/open-policy-agent/opa
 
-FROM registry.redhat.io/ubi9-minimal:9.6-1752587672
+FROM registry.redhat.io/ubi9-minimal:9.7-1769056855
 WORKDIR /app
 COPY --chown=1001:0 ./ ./
 
