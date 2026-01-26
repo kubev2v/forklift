@@ -10,9 +10,11 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/client-go/util/cert"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/flashsystem"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/infinibox"
@@ -29,6 +31,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -38,6 +41,11 @@ import (
 )
 
 var version = "unknown"
+
+const (
+	// PVC label keys
+	MigrationLabelKey = "migration"
+)
 
 var (
 	crName                     string
@@ -69,7 +77,8 @@ var (
 
 	showVersion bool
 
-	clientSet *kubernetes.Clientset
+	clientSet      *kubernetes.Clientset
+	forkliftClient client.Client // Controller-runtime client for Forklift CRs
 )
 
 func main() {
@@ -181,7 +190,13 @@ func main() {
 		klog.Fatalf("Failed to initialize populator: %s", err)
 	}
 
-	pv, err := getPv(clientSet, targetNamespace, ownerName)
+	// Fetch PVC once - used by both getPv() and migration metadata extraction
+	pvc, err := clientSet.CoreV1().PersistentVolumeClaims(targetNamespace).Get(context.Background(), ownerName, metav1.GetOptions{})
+	if err != nil {
+		klog.Fatalf("Failed to fetch PVC %s/%s: %v", targetNamespace, ownerName, err)
+	}
+
+	pv, err := getPv(clientSet, targetNamespace, pvc)
 	if err != nil {
 		klog.Fatalf("Failed to fetch the volume handle details from the target pvc %s: %s", ownerName, err)
 	}
@@ -198,6 +213,7 @@ func main() {
 	hll := populator.NewHostLeaseLocker(clientSet)
 	go p.Populate(sourceVmId, sourceVMDKFile, pv, hll, progressCh, xCopyUsedCh, quitCh)
 
+	var xcopyUsedValue int
 	for {
 		select {
 		case p := <-progressCh:
@@ -209,6 +225,7 @@ func main() {
 				progressCounter.WithLabelValues(ownerUID).Add(float64(p) - metric.Counter.GetValue())
 			}
 		case c := <-xCopyUsedCh:
+			xcopyUsedValue = c
 			klog.Infof(" xcopy used reported: %d", c)
 			metric := dto.Metric{}
 			if err := xcopyUsedGauge.WithLabelValues(ownerUID).Write(&metric); err != nil {
@@ -220,6 +237,32 @@ func main() {
 			klog.Infof("channel quit %s", q)
 			if q != nil {
 				klog.Fatal(q)
+			}
+
+			// Tag volume with migration metadata after successful population
+			if taggingStorage, supportsTagging := storageApi.(populator.VolumeTaggingSupport); supportsTagging {
+				if forkliftClient == nil {
+					if err := initForkliftClient(); err != nil {
+						klog.Warningf("Failed to initialize Forklift client: %v (skipping volume tagging)", err)
+						return
+					}
+				}
+
+				// Extract migration UID from PVC labels
+				migrationUID := ""
+				if pvc.Labels != nil {
+					migrationUID = pvc.Labels[MigrationLabelKey]
+				}
+				migrationType := getMigrationType(migrationUID)
+
+				// Determine copy method based on xcopy usage
+				copyMethod := "volumecopy"
+				if xcopyUsedValue == 1 {
+					copyMethod = "xcopy"
+				}
+				if err := taggingStorage.TagVolume(pv.Name, pv.VolumeHandle, migrationType, copyMethod, migrationUID, sourceVmId); err != nil {
+					klog.Warningf("Failed to tag volume %s with migration metadata: %v", pv.Name, err)
+				}
 			}
 
 			return
@@ -239,15 +282,95 @@ func newKubeClient(masterURL string, kubeconfig string) (*kubernetes.Clientset, 
 	return kubernetes.NewForConfig(coreCfg)
 }
 
+// initForkliftClient initializes the controller-runtime client
+// This client is used to access Migration and Plan custom resources
+func initForkliftClient() error {
+	cfg, err := rest.InClusterConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get in-cluster config: %w", err)
+	}
+
+	// Register Forklift scheme
+	s := runtime.NewScheme()
+	if err := forklift.SchemeBuilder.AddToScheme(s); err != nil {
+		return fmt.Errorf("failed to add forklift scheme: %w", err)
+	}
+
+	// Create controller-runtime client
+	forkliftClient, err = client.New(cfg, client.Options{Scheme: s})
+	if err != nil {
+		return fmt.Errorf("failed to create controller-runtime client: %w", err)
+	}
+
+	return nil
+}
+
+// getMigrationType fetches migration type from the Migration UID
+// RBAC Requirements:
+//   - list permission on migrations.forklift.konveyor.io (cluster-scoped)
+//   - get permission on plans.forklift.konveyor.io (namespace-scoped)
+func getMigrationType(migrationUID string) string {
+	if migrationUID == "" {
+		klog.V(2).Infof("Migration UID is empty, cannot determine migration type")
+		return ""
+	}
+
+	// Check if forklift client was initialized
+	if forkliftClient == nil {
+		klog.V(2).Infof("Forklift client not initialized, cannot determine migration type")
+		return ""
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	migrationList := &forklift.MigrationList{}
+	if err := forkliftClient.List(ctx, migrationList); err != nil {
+		klog.Warningf("Failed to list Migrations: %v", err)
+		return ""
+	}
+
+	var migration *forklift.Migration
+	for i := range migrationList.Items {
+		if string(migrationList.Items[i].UID) == migrationUID {
+			migration = &migrationList.Items[i]
+			break
+		}
+	}
+
+	if migration == nil {
+		klog.Warningf("Migration with UID %s not found", migrationUID)
+		return ""
+	}
+
+	// Get the Plan from the Migration's reference
+	planRef := migration.Spec.Plan
+	plan := &forklift.Plan{}
+	planKey := client.ObjectKey{
+		Namespace: planRef.Namespace,
+		Name:      planRef.Name,
+	}
+	if err := forkliftClient.Get(ctx, planKey, plan); err != nil {
+		klog.Warningf("Failed to get Plan %s/%s: %v", planRef.Namespace, planRef.Name, err)
+		return ""
+	}
+
+	// Determine migration type (warm vs cold)
+	migrationType := "cold"
+	if plan.IsWarm() {
+		migrationType = "warm"
+	}
+
+	klog.Infof("Detected migration type for Migration UID %s: type=%s", migrationUID, migrationType)
+
+	return migrationType
+}
+
 // getPv extract the volume handle from the PVC. To detect the volume of the said targetPVC we need
 // to locate the created volume on the PVC. There is a  chance where the volume details are listed on the
 // "prime-{ORIG_PVC_NAME}" PVC because when the controller pod is handling it, the pvc prime should be bounded
 // to popoulator pod. However it is not guarnteed to be bounded at that stage and it may take time
-func getPv(kubeClient *kubernetes.Clientset, targetNamespace, targetPVC string) (populator.PersistentVolume, error) {
-	pvc, err := kubeClient.CoreV1().PersistentVolumeClaims(targetNamespace).Get(context.Background(), targetPVC, metav1.GetOptions{})
-	if err != nil {
-		return populator.PersistentVolume{}, fmt.Errorf("failed to fetch the the target persistent volume claim %q %w", pvc.Name, err)
-	}
+func getPv(kubeClient *kubernetes.Clientset, targetNamespace string, pvc *corev1.PersistentVolumeClaim) (populator.PersistentVolume, error) {
 	var volumeName string
 	if pvc.Spec.VolumeName != "" {
 		volumeName = pvc.Spec.VolumeName
