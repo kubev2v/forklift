@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9-minimal:9.6-1752587672
+FROM registry.access.redhat.com/ubi9-minimal:9.7-1769056855
 ARG TARGETARCH=amd64
 RUN curl -L https://github.com/open-policy-agent/opa/releases/download/v1.8.0/opa_linux_${TARGETARCH}_static > /usr/bin/opa
 RUN chmod +x /usr/bin/opa

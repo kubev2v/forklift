@@ -7,7 +7,7 @@ ENV GOEXPERIMENT=strictfipsruntime
 ENV GOCACHE=/go-build/cache
 RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -buildvcs=false -ldflags="-w -s" -o manager github.com/kubev2v/forklift/cmd/forklift-controller
 
-FROM registry.access.redhat.com/ubi9-minimal:9.6-1752587672
+FROM registry.access.redhat.com/ubi9-minimal:9.7-1769056855
 # RUN microdnf -y update && microdnf -y clean all
 # Required to be able to get files from within the pod
 RUN microdnf -y install tar && microdnf clean all

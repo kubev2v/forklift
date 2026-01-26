@@ -2,7 +2,7 @@
 # https://github.com/operator-framework/operator-registry/pull/1664
 # Ref: https://redhat-internal.slack.com/archives/C074JM28DTP/p1746458556603619
 FROM quay.io/operator-framework/opm:v1.56.0 AS opm
-FROM registry.access.redhat.com/ubi9-minimal:9.6-1752587672 AS builder
+FROM registry.access.redhat.com/ubi9-minimal:9.7-1769056855 AS builder
 ARG CHANNELS="development"
 ARG DEFAULT_CHANNEL="development"
 ARG VERSION="99.0.0"

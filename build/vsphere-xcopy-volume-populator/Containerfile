@@ -14,7 +14,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 RUN make vmkfstools-wrapper
 
-FROM registry.access.redhat.com/ubi9-minimal:9.6-1752587672
+FROM registry.access.redhat.com/ubi9-minimal:9.7-1769056855
 
 COPY --from=builder /usr/src/app/cmd/vsphere-xcopy-volume-populator/bin/vsphere-xcopy-volume-populator \
     /bin/vsphere-xcopy-volume-populator
