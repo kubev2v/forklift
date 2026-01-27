@@ -12,7 +12,7 @@ WORKDIR /app/cmd/kubectl-mtv
 RUN --mount=type=cache,target=${GOCACHE},uid=1001 make build-all
 
 # Nginx serving stage  
-FROM registry.access.redhat.com/ubi9/nginx-126:1-1756959223
+FROM registry.access.redhat.com/ubi9/nginx-126:1-1769459018
 
 # Copy binaries directly from build stage
 COPY --from=builder /app/cmd/kubectl-mtv/bin /opt/app-root/src/
