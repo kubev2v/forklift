@@ -139,7 +139,7 @@ spec:
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:radio:true
           - urn:alm:descriptor:com.tectonic.ui:radio:false
-        - description: Enable copy offload plugins (default false)
+        - description: Enable copy offload plugins (default true)
           displayName: Enable Copy Offload Plugins
           path: feature_copy_offload
           x-descriptors:
