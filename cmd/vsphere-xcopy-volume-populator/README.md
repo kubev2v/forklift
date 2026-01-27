@@ -11,6 +11,7 @@
 - [Secret with Storage Provider Credentials](#secret-with-storage-provider-credentials)
   - [Hitachi Vantara](#hitachi-vantara)
   - [NetApp ONTAP](#netapp-ontap)
+  - [HPE Primera/3PAR](#hpe-primera3par)
   - [Pure FlashArray](#pure-flasharray)
   - [Dell PowerMax](#dell-powermax)
   - [Dell PowerFlex](#dell-powerflex)
