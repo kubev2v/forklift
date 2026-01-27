@@ -27,7 +27,7 @@
   - [NetApp](#netapp)
 
 ## Forklift Controller
-When the feature flag `feature_copy_offload` is true (off by default), the controller
+When the feature flag `feature_copy_offload` is true (on by default), the controller
 consult the storagemaps offload plugin configuration, to decided if VM disk from
 VMWare could be copied by the storage backend(offloaded) into the newly created PVC.
 When the controller creates the PVC for the v2v pod it will also create
@@ -89,9 +89,18 @@ Alternative, that wrapper can be invoked using SSH. See [SSH Method](#ssh-method
 
 ## Setup Copy Offload
 
-1. Set the feature flag:
+1. Verify the feature flag is enabled (it is enabled by default):
    ```bash
+   oc get forkliftcontrollers.forklift.konveyor.io forklift-controller -n openshift-mtv -o jsonpath='{.spec.feature_copy_offload}'
+   ```
+
+   If you need to explicitly enable or disable it:
+   ```bash
+   # To enable (if not already enabled)
    oc patch forkliftcontrollers.forklift.konveyor.io forklift-controller --type merge -p '{"spec": {"feature_copy_offload": "true"}}' -n openshift-mtv
+
+   # To disable (if you want to opt-out)
+   oc patch forkliftcontrollers.forklift.konveyor.io forklift-controller --type merge -p '{"spec": {"feature_copy_offload": "false"}}' -n openshift-mtv
    ```
 
 2. Create a `StorageMap` according to [this section](#matching-pvc)
