@@ -7,12 +7,6 @@ ENV GOEXPERIMENT=strictfipsruntime
 
 RUN GOOS=linux GOARCH=amd64 make build test
 
-# We need python for running a test during build process
-# This is not used for actually running the populator in production
-USER root
-RUN dnf install -y python
-USER 1001
-
 RUN make vmkfstools-wrapper
 
 FROM registry.redhat.io/ubi9-minimal:9.6-1752587672

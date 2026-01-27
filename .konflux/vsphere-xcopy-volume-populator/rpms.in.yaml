@@ -1,5 +1,4 @@
-packages:
-  - python
+packages: []
 contentOrigin:
   repofiles:
     - ./ubi.repo
