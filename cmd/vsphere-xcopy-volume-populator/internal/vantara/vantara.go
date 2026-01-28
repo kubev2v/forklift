@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
@@ -235,7 +236,7 @@ func getLunIdFromPorts(ports []PortMapping, portId string, hostGroupNumber strin
 }
 
 // VvolCopy performs a direct copy operation using vSphere API to discover source volume
-func (v *VantaraCloner) VvolCopy(vsphereClient vmware.Client, vmId string, sourceVMDKFile string, persistentVolume populator.PersistentVolume, progress chan<- uint) error {
+func (v *VantaraCloner) VvolCopy(vsphereClient vmware.Client, vmId string, sourceVMDKFile string, persistentVolume populator.PersistentVolume, progress chan<- uint64) error {
 	klog.Infof("Starting VVol copy operation for VM %s", vmId)
 
 	// Parse the VMDK path
@@ -327,7 +328,7 @@ func (f *VantaraCloner) matchesVMDKPath(fileName string, vmDisk populator.VMDisk
 }
 
 // performVolumeCopy executes the volume copy operation on Vantara
-func (v *VantaraCloner) performVolumeCopy(sourceVolumeId string, ldev map[string]interface{}, progress chan<- uint) error {
+func (v *VantaraCloner) performVolumeCopy(sourceVolumeId string, ldev map[string]interface{}, progress chan<- uint64) error {
 	ldevID, err := extractStringField(ldev, "ldevId")
 	if err != nil {
 		return fmt.Errorf("invalid target LDEV id: %w", err)
@@ -339,7 +340,7 @@ func (v *VantaraCloner) performVolumeCopy(sourceVolumeId string, ldev map[string
 	}
 
 	// Perform the copy operation using Vantara API
-	v.api.VantaraObj["snapshotGroupName"] = "ss-copy-" + sourceVolumeId + "-to-" + ldevID
+	v.api.VantaraObj["snapshotGroupName"] = "mtv-ss-copy-" + sourceVolumeId + "-to-" + ldevID
 	v.api.VantaraObj["snapshotPoolId"] = poolID
 	v.api.VantaraObj["sourceLdevId"] = sourceVolumeId
 	v.api.VantaraObj["targetLdevId"] = ldevID
@@ -347,7 +348,45 @@ func (v *VantaraCloner) performVolumeCopy(sourceVolumeId string, ldev map[string
 	if err != nil {
 		return fmt.Errorf("Vantara CopyVolume failed: %w", err)
 	}
-
+	// wait for creation of clone pair
+	waittime := 5 // seconds
+	maxcount := 30
+	count := 0
+	found := false
+	for {
+		if count >= maxcount {
+			return fmt.Errorf("timeout waiting for clone pair to be created")
+		}
+		if count > 0 {
+			time.Sleep(time.Duration(waittime) * time.Second)
+		}
+		count++
+		r, err := v.api.VantaraStorage(GETCLONEPAIRS)
+		if err != nil {
+			return fmt.Errorf("Vantara GetClonePairs failed: %w", err)
+		}
+		dataAny, ok := r["data"]
+		if !ok || dataAny == nil {
+			klog.Infof("Waiting... (no data field yet)")
+			continue
+		}
+		for _, item := range dataAny.([]interface{}) {
+			clonePair, ok := item.(map[string]interface{})
+			if !ok {
+				klog.Infof("Waiting... (invalid clone pair data)")
+				continue
+			}
+			if fmt.Sprint(clonePair["status"]) == "PSUP" {
+				klog.Infof("Clone pair created: %v", clonePair)
+				found = true
+				break
+			}
+		}
+		if found {
+			break
+		}
+		klog.Infof("Waiting for clone pair to be created...")
+	}
 	progress <- 100
 	return nil
 }
