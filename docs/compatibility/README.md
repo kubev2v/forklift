@@ -2,7 +2,7 @@
 
 | Metadata | Value |
 |----------|-------|
-| **Last Updated** | January 22, 2026 |
+| **Last Updated** | January 27, 2026 |
 | **Applies To** | Forklift v2.11 |
 | **Maintainer** | Forklift Team |
 | **Update Policy** | Update when provider support changes or new features are added |
@@ -35,6 +35,10 @@ Forklift supports migration from the following source platforms:
 - [Plan Fields](./plan-fields.md) - Migration plan specification fields and provider support
 - [VM Fields](./vm-fields.md) - Per-VM configuration options within a plan
 - [Migration Features](./migration-features.md) - Migration types, guest conversion, and storage features
+
+### Provider-Specific Guides
+
+- [EC2 Bill of Materials](./ec2-bill-of-materials.md) - AWS API calls, resources, and cost estimation for EC2 migrations
 
 ### Operator Configuration
 
