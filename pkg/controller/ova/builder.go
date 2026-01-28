@@ -191,6 +191,19 @@ func (r *Builder) PodSpec(provider *api.Provider, pvc *core.PersistentVolumeClai
 					},
 				},
 				SecurityContext: r.securityContext(),
+				ReadinessProbe: &core.Probe{
+					ProbeHandler: core.ProbeHandler{
+						HTTPGet: &core.HTTPGetAction{
+							Path: "/test_connection",
+							Port: intstr.FromInt32(8080),
+						},
+					},
+					InitialDelaySeconds: 5,
+					PeriodSeconds:       3,
+					TimeoutSeconds:      2,
+					SuccessThreshold:    1,
+					FailureThreshold:    3,
+				},
 				VolumeMounts: []core.VolumeMount{
 					{
 						Name:      NFSVolumeMountName,
