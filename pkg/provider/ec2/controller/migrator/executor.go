@@ -138,6 +138,8 @@ func (r *Migrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 		r.NextPhase(vm)
 	case api.PhaseCompleted:
 		ok = true
+		vm.MarkCompleted()
+		r.log.Info("EC2 migration completed", "vm", vm.Name)
 	default:
 		err = liberr.New(fmt.Sprintf("Unknown phase: %s", vm.Phase))
 	}
