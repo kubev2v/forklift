@@ -79,7 +79,7 @@ func (api *BlockStorageAPI) APIVersion() string {
 	return fmt.Sprintf("https://%s:%s/ConfigurationManager/configuration/version", api.GumIPAddr, api.Port)
 }
 
-func MakeHTTPRequest(methodType, url string, body, headers map[string]string, authType, authValue string) (map[string]interface{}, error) {
+func MakeHTTPRequest(methodType, url string, body map[string]interface{}, headers map[string]string, authType, authValue string) (map[string]interface{}, error) {
 	klog.Infof("Making HTTP request:")
 	klog.Infof("Method: %s", methodType)
 	klog.Infof("URL: %s", url)
@@ -180,7 +180,7 @@ func CheckAPIVersion(apiVersion string, requiredMajorVersion, requiredMinorVersi
 	return nil
 }
 
-func (api *BlockStorageAPI) InvokeAsyncCommand(methodType, url string, body, headers map[string]string) (string, error) {
+func (api *BlockStorageAPI) InvokeAsyncCommand(methodType, url string, body map[string]interface{}, headers map[string]string) (string, error) {
 
 	result, err := MakeHTTPRequest(methodType, url, body, headers, "session", headers["Authorization"])
 	if err != nil {
@@ -189,6 +189,7 @@ func (api *BlockStorageAPI) InvokeAsyncCommand(methodType, url string, body, hea
 	klog.Infof("Request was accepted. JOB URL: %v", result["self"])
 
 	status := "Initializing"
+	state := ""
 	retryCount := 1
 	waitTime := 1 // FIRST_WAIT_TIME
 
@@ -204,6 +205,11 @@ func (api *BlockStorageAPI) InvokeAsyncCommand(methodType, url string, body, hea
 			return "", err
 		}
 		status = jobResult["status"].(string)
+		state = jobResult["state"].(string)
+		if state == "Failed" {
+			jobError := jobResult["error"].(map[string]interface{})
+			klog.Infof("Async job state: %s with error: %v", state, jobError)
+		}
 		klog.Infof("Status: %s", status)
 		if waitTime*2 < 120 {
 			waitTime *= 2

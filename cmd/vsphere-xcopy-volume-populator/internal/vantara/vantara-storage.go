@@ -88,8 +88,9 @@ func (v *VantaraStorageAPI) VantaraStorage(actionType string) (map[string]interf
 		"Accept":              "application/json",
 		"Response-Job-Status": "Completed",
 	}
-	body := map[string]string{}
+	body := map[string]interface{}{}
 	sessionId := "0"
+	isSkipDiscard := false
 	var err error
 	var decodedIp, userCreds string
 
@@ -134,14 +135,16 @@ func (v *VantaraStorageAPI) VantaraStorage(actionType string) (map[string]interf
 	klog.Infof("Session generated successfully: %v", r)
 	// Discard session after the function returns
 	defer func() {
-		url = api.DiscardSession(sessionId)
-		resp, err := MakeHTTPRequest("DELETE", url, body, headers, "session", headers["Authorization"])
-		if err != nil {
-			klog.Errorf("Failed to discard session: %v", err)
-			return
+		if !isSkipDiscard {
+			url = api.DiscardSession(sessionId)
+			resp, err := MakeHTTPRequest("DELETE", url, body, headers, "session", headers["Authorization"])
+			if err != nil {
+				klog.Errorf("Failed to discard session: %v", err)
+				return
+			}
+			klog.Infof("Session discarded successfully: %v", resp)
+			klog.Flush()
 		}
-		klog.Infof("Session discarded successfully: %v", resp)
-		klog.Flush()
 	}()
 
 	token := r["token"].(string)
@@ -223,6 +226,17 @@ func (v *VantaraStorageAPI) VantaraStorage(actionType string) (map[string]interf
 		_, err = api.InvokeAsyncCommand("POST", url, body, headers)
 		if err != nil {
 			klog.Errorf("Failed to create clone: %v", err)
+			return nil, err
+		}
+		isSkipDiscard = true
+
+	case GETCLONEPAIRS:
+		snapshotGroupName := v.VantaraObj["snapshotGroupName"].(string)
+		pvolLdevId := v.VantaraObj["sourceLdevId"].(string)
+		url = api.Snapshotpair() + "?pvolLdevId=" + pvolLdevId + "&snapshotGroupName=" + snapshotGroupName
+		r, err = MakeHTTPRequest("GET", url, body, headers, "session", headers["Authorization"])
+		if err != nil {
+			klog.Errorf("Failed to get clone pairs: %v", err)
 			return nil, err
 		}
 
