@@ -13,15 +13,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+
+	"github.com/infinidat/infinibox-csi-driver/common"
 )
 
-func (iboxClient *IboxClient) GetMaxFileSystems() (cnt int, err error) {
-	const functionName = "GetMaxFileSystems"
-
+func (client *IboxClient) GetMaxFileSystems(ctx context.Context) (cnt int, err error) {
 	type ParameterResult struct {
 		Result struct {
 			NasMaxFilesystemsInSystem int `json:"nas.max_filesystems_in_system"`
@@ -32,86 +34,84 @@ func (iboxClient *IboxClient) GetMaxFileSystems() (cnt int, err error) {
 		} `json:"metadata"`
 	}
 
-	url := fmt.Sprintf("%s%s", iboxClient.Creds.URL, "api/rest/config/limits")
-	iboxClient.Log.V(TRACE_LEVEL).Info(functionName, "URL", url)
+	url := fmt.Sprintf("%s%s", client.Creds.URL, "api/rest/config/limits")
+	slog.Log(ctx, common.LevelTrace, "info", "URL", url)
 
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return 0, fmt.Errorf("%s - NewRequest - error %w", functionName, err)
+		return 0, common.Errorf("newRequest - error: %w url: %s", err, url)
 	}
 
 	values := req.URL.Query()
 	values.Add("fields", "nas.max_filesystems_in_system")
 	req.URL.RawQuery = values.Encode()
 
-	SetAuthHeader(req, iboxClient.Creds)
+	SetAuthHeader(req, client.Creds)
 
-	resp, err := iboxClient.HTTPClient.Do(req)
+	resp, err := client.HTTPClient.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("%s - Do - error %w", functionName, err)
+		return 0, common.Errorf("do - error: %w url: %s", err, url)
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			iboxClient.Log.V(INFO_LEVEL).Error(err, functionName, "error in Close()", err.Error())
+			slog.Error("error in Close()", "error", err.Error())
 		}
 	}()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return 0, fmt.Errorf("%s - ReadAll - error %w", functionName, err)
+		return 0, common.Errorf("readAll - error: %w url: %s", err, url)
 	}
 	var responseObject ParameterResult
 	err = json.Unmarshal(bodyBytes, &responseObject)
 	if err != nil {
-		return 0, fmt.Errorf("%s - Unmarshal - error %w", functionName, err)
+		return 0, common.Errorf("unmarshal - error: %w url: %s", err, url)
 	}
 	return responseObject.Result.NasMaxFilesystemsInSystem, nil
 }
 
-func (iboxClient *IboxClient) GetMaxTreeqPerFs() (cnt int, err error) {
-	const functionName = "GetMaxTreeqPerFs"
-
+func (client *IboxClient) GetMaxTreeqPerFs(ctx context.Context) (cnt int, err error) {
 	type ParameterResult struct {
 		Result struct {
 			NasTreeqMaxCountPerFilesystem int `json:"nas.treeq_max_count_per_filesystem"`
 		} `json:"result"`
-		Error    interface{} `json:"error"`
+		Error    any `json:"error"`
 		Metadata struct {
 			Ready bool `json:"ready"`
 		} `json:"metadata"`
 	}
 
-	url := fmt.Sprintf("%s%s", iboxClient.Creds.URL, "api/rest/config/limits")
-	iboxClient.Log.V(TRACE_LEVEL).Info(functionName, "URL", url)
+	url := fmt.Sprintf("%s%s", client.Creds.URL, "api/rest/config/limits")
+	slog.Log(ctx, common.LevelTrace, "info", "URL", url)
 
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return 0, fmt.Errorf("%s - NewRequest - error %w", functionName, err)
+		return 0, common.Errorf("newRequest - error: %w url: %s", err, url)
 	}
 
 	values := req.URL.Query()
 	values.Add("fields", "nas.treeq_max_count_per_filesystem")
 	req.URL.RawQuery = values.Encode()
 
-	SetAuthHeader(req, iboxClient.Creds)
+	SetAuthHeader(req, client.Creds)
 
-	resp, err := iboxClient.HTTPClient.Do(req)
+	resp, err := client.HTTPClient.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("%s - Do - error %w", functionName, err)
+		return 0, common.Errorf("do - error: %w url: %s", err, url)
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			iboxClient.Log.V(INFO_LEVEL).Error(err, functionName, "error in Close()", err.Error())
+			slog.Error("Close()", "error", err.Error())
 		}
 	}()
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return 0, fmt.Errorf("%s - ReadAll - error %w", functionName, err)
+		return 0, common.Errorf("readAll - error: %w url: %s", err, url)
 	}
 	var responseObject ParameterResult
 	err = json.Unmarshal(bodyBytes, &responseObject)
 	if err != nil {
-		return 0, fmt.Errorf("%s - Unmarshal - error %w", functionName, err)
+		return 0, common.Errorf("unmarshal - error: %w url: %s", err, url)
 	}
 	return responseObject.Result.NasTreeqMaxCountPerFilesystem, nil
 }
