@@ -26,20 +26,34 @@ function check_deps() {
   fi
 }
 
+function get_versions() {
+  echo "Fetching versions..."
+  VERSIONS=$(curl -s -H "Authorization: Bearer $JIRA_CLI_KEY" \
+        https://issues.redhat.com/rest/api/2/project/MTV/versions)
+}
+
 function get_target_version() {
   if [[ -z "$TARGET_VERSION" ]]; then
-
-  TARGET_VERSION=$(curl -s -H "Authorization: Bearer $JIRA_CLI_KEY" \
-        https://issues.redhat.com/rest/api/2/project/MTV/versions \
-        | jq  ' .[] | select(.released == false)|.name'  | fzf --prompt "Choose the target release version: ")
+    TARGET_VERSION=$(echo "$VERSIONS" | jq  ' .[] | select(.released == false)|.name'  | fzf --prompt "Choose the target release version: ")
   fi
-  
+
   if [[ -z "$TARGET_VERSION" ]]; then
     echo "No version selected. Exiting."
     exit 1
   fi
-  
+
   echo "Using target version: $TARGET_VERSION"
+}
+
+function get_affected_version() {
+  AFFECTED_VERSION=$(echo "$VERSIONS" | jq  ' .[] | .name'  | fzf --prompt "Choose the affected version: ")
+
+  if [[ -z "$AFFECTED_VERSION" ]]; then
+    echo "No affected version selected. Exiting."
+    exit 1
+  fi
+
+  echo "Using affected version: $AFFECTED_VERSION"
 }
 
 
@@ -88,13 +102,14 @@ function get_issue_details() {
 function create_ticket() {
   echo
   echo "--- Creating Jira Issue ---"
-  echo "Project:      $PROJECT"
-  echo "Version:      $TARGET_VERSION"
-  echo "Epic:         $EPIC_KEY"
-  echo "Type:         $ISSUE_TYPE"
-  echo "Title:        $ISSUE_TITLE"
-  echo "Labels:       $DEFAULT_LABELS"
-  echo "Component:    $DEFAULT_COMPONENT"
+  echo "Project:         $PROJECT"
+  echo "Target Version:  $TARGET_VERSION"
+  echo "Affects Version: $AFFECTED_VERSION"
+  echo "Epic:            $EPIC_KEY"
+  echo "Type:            $ISSUE_TYPE"
+  echo "Title:           $ISSUE_TITLE"
+  echo "Labels:          $DEFAULT_LABELS"
+  echo "Component:       $DEFAULT_COMPONENT"
   echo "---------------------------"
   
   read -p "Proceed to create this issue? (y/N) " confirm
@@ -108,7 +123,8 @@ function create_ticket() {
     --type="$ISSUE_TYPE" \
     --summary="$ISSUE_TITLE" \
     --parent="$EPIC_KEY" \
-    --fix-version="$TARGET_VERSION" \
+    --custom customfield_12319940="$TARGET_VERSION" \
+    --affects-version="$AFFECTED_VERSION" \
     --label="$DEFAULT_LABELS" \
     --component="$DEFAULT_COMPONENT" \
     --web
@@ -117,7 +133,9 @@ function create_ticket() {
 # --- Main ---
 
 check_deps
+get_versions
 get_target_version
+get_affected_version
 select_epic
 get_issue_details
 create_ticket
