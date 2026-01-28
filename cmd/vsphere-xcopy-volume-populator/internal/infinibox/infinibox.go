@@ -3,9 +3,11 @@ package infinibox
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/infinidat/infinibox-csi-driver/iboxapi"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/fcutil"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
 	"k8s.io/klog/v2"
 )
@@ -101,9 +103,21 @@ func (c *InfiniboxClonner) EnsureClonnerIgroup(initiatorGroup string, adapterIds
 	for _, host := range hosts {
 		for _, port := range host.Ports {
 			for _, adapterId := range adapterIds {
-				if port.Address == adapterId {
-					klog.Infof("Found host %s with adapter ID %s", host.Name, adapterId)
-					return createMappingContext(&host, initiatorGroup), nil
+				if strings.HasPrefix(adapterId, "fc.") {
+					wwpn, err := fcutil.ExtractWWPN(adapterId)
+					if err != nil {
+						klog.Warningf("Failed to extract WWPN from adapter ID %s: %v", adapterId, err)
+						continue
+					}
+					if fcutil.CompareWWNs(wwpn, port.Address) {
+						klog.Infof("Found host %s with adapter ID %s (port address: %s)", host.Name, adapterId, port.Address)
+						return createMappingContext(&host, initiatorGroup), nil
+					}
+				} else {
+					if port.Address == adapterId {
+						klog.Infof("Found host %s with adapter ID %s (port address: %s)", host.Name, adapterId, port.Address)
+						return createMappingContext(&host, initiatorGroup), nil
+					}
 				}
 			}
 		}

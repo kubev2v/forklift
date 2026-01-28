@@ -88,6 +88,12 @@ func (r *Reconciler) validateSSHReadiness(plan *api.Plan) error {
 // planUsesVSphereXcopyPopulator checks if a plan uses VSphere xcopy volume populators
 func (r *Reconciler) planUsesVSphereXcopyPopulator(plan *api.Plan) bool {
 	// Check storage mappings for VSphereXcopyPluginConfig
+	if plan.Referenced.Map.Storage == nil {
+		return false
+	}
+	if plan.Referenced.Map.Storage.Spec.Map == nil {
+		return false
+	}
 	dsMapIn := plan.Referenced.Map.Storage.Spec.Map
 	for _, mapping := range dsMapIn {
 		if mapping.OffloadPlugin != nil && mapping.OffloadPlugin.VSphereXcopyPluginConfig != nil {

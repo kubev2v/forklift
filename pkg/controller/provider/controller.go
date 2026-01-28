@@ -134,6 +134,13 @@ func Add(mgr manager.Manager) error {
 		log.Trace(err)
 		return err
 	}
+	err = cnt.Watch(
+		source.Kind(mgr.GetCache(), &api.HyperVProviderServer{},
+			libref.TypedHandler[*api.HyperVProviderServer](&api.Provider{})))
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
 	return nil
 }
 
@@ -215,38 +222,27 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		}
 	}()
 
-	if provider.Type() == api.Ova && provider.DeletionTimestamp == nil {
-		if !provider.HasReconciled() {
-			// the provider has changed, so delete the old
-			// so we can redeploy.
-			err = r.DeleteOVAProviderServer(ctx, provider)
+	// Provider server lifecycle management (OVA, HyperV)
+	if provider.Type() == api.Ova || provider.Type() == api.HyperV {
+		if provider.DeletionTimestamp == nil {
+			// Ensure provider server exists
+			if !provider.HasReconciled() {
+				// Provider has changed, delete old deployment to redeploy
+				err = r.deleteProviderServer(ctx, provider)
+				if err != nil {
+					return
+				}
+			}
+			err = r.ensureProviderServer(ctx, provider)
 			if err != nil {
 				return
 			}
-		}
-		err = r.EnsureOVAProviderServer(ctx, provider)
-		if err != nil {
-			return
-		}
-	}
-
-	// although the way we deploy OVA servers has changed, we will
-	// leave this for now to ensure legacy PVs are cleaned up
-	if provider.DeletionTimestamp != nil && k8sutil.ContainsFinalizer(provider, api.OvaProviderFinalizer) {
-		err = r.removeVolumeOfOVAServer(provider)
-		if err != nil {
-			return
-		}
-		err = r.DeleteOVAProviderServer(ctx, provider)
-		if err != nil {
-			return
-		}
-		clonedProvider := provider.DeepCopy()
-		k8sutil.RemoveFinalizer(provider, api.OvaProviderFinalizer)
-		if pErr := r.Patch(context.TODO(), provider, client.MergeFrom(clonedProvider)); pErr != nil {
-			r.Log.Error(pErr, "Failed to remove finalizer", "provider", provider)
-			err = pErr
-			return
+		} else {
+			// Cleanup during provider deletion
+			err = r.cleanupProviderServer(ctx, provider)
+			if err != nil {
+				return
+			}
 		}
 	}
 
@@ -334,41 +330,60 @@ func (r *Reconciler) updateProvider(provider *api.Provider) (err error) {
 
 // Update the container.
 func (r *Reconciler) updateContainer(provider *api.Provider) (err error) {
-	if _, found := r.container.Get(provider); found {
-		if provider.HasReconciled() {
-			r.Log.V(1).Info(
-				"Provider not reconciled, postponing.")
-			return
-		}
-	}
-	if provider.Status.HasBlockerCondition() ||
-		!provider.Status.HasCondition(ConnectionTestSucceeded) {
-		r.Log.V(1).Info(
-			"Provider not ready, postponing.")
-		return
-	}
-	log.Info("Update container.")
-	if current, found := r.container.Get(provider); found {
-		current.Shutdown()
-		_ = current.DB().Close(true)
-		r.Log.V(2).Info(
-			"Shutdown found collector.")
-	}
-	db := r.getDB(provider)
+	// Get the secret first to check if credentials have changed
 	secret, err := r.getSecret(provider)
 	if err != nil {
 		return
 	}
+	secretChanged := secret.ResourceVersion != provider.Status.SecretResourceVersion
+
+	if !secretChanged {
+		if _, found := r.container.Get(provider); found {
+			// Don't update if provider hasn't changed
+			if provider.HasReconciled() {
+				r.Log.V(1).Info(
+					"Provider already reconciled and secret unchanged, postponing.")
+				return
+			}
+		}
+
+		// Only build a new collector if connection test succeeded
+		if provider.Status.HasBlockerCondition() ||
+			!provider.Status.HasCondition(ConnectionTestSucceeded) {
+			r.Log.V(1).Info(
+				"Provider not ready, postponing.")
+			return
+		}
+
+	} else {
+		r.Log.V(1).Info(
+			"Detected Secret change.",
+			"old", provider.Status.SecretResourceVersion,
+			"new", secret.ResourceVersion)
+	}
+
+	log.Info("Update container.")
+	db := r.getDB(provider)
 	err = db.Open(true)
 	if err != nil {
 		return
 	}
 
 	collector := container.Build(db, provider, secret)
-	err = r.container.Add(collector)
+	// `Replace` is necessary to remove stale collectors if the secret has changed.
+	old, found, err := r.container.Replace(collector)
 	if err != nil {
 		return
 	}
+	if found {
+		_ = old.DB().Close(true)
+		r.Log.V(2).Info("Replaced collector.")
+	} else {
+		r.Log.V(2).Info("Added new collector.")
+	}
+
+	// Update the secret ResourceVersion in status to track for future changes
+	provider.Status.SecretResourceVersion = secret.ResourceVersion
 
 	r.Log.V(2).Info(
 		"Data collector added/started.")
@@ -579,6 +594,74 @@ func (r *Reconciler) storeSSHKeySecret(namespace, secretName, keyName string, ke
 	err = r.Create(context.TODO(), secret)
 	if err != nil && !k8serr.IsAlreadyExists(err) {
 		return fmt.Errorf("failed to create secret %s: %w", secretName, err)
+	}
+
+	return nil
+}
+
+// ensureProviderServer ensures the provider server deployment exists for OVA/HyperV providers.
+func (r *Reconciler) ensureProviderServer(ctx context.Context, provider *api.Provider) error {
+	switch provider.Type() {
+	case api.Ova:
+		return r.EnsureOVAProviderServer(ctx, provider)
+	case api.HyperV:
+		return r.EnsureHyperVProviderServer(ctx, provider)
+	}
+	return nil
+}
+
+// deleteProviderServer deletes the provider server deployment for OVA/HyperV providers.
+func (r *Reconciler) deleteProviderServer(ctx context.Context, provider *api.Provider) error {
+	switch provider.Type() {
+	case api.Ova:
+		return r.DeleteOVAProviderServer(ctx, provider)
+	case api.HyperV:
+		return r.DeleteHyperVProviderServer(ctx, provider)
+	}
+	return nil
+}
+
+// cleanupProviderServer handles cleanup during provider deletion, including finalizer removal.
+func (r *Reconciler) cleanupProviderServer(ctx context.Context, provider *api.Provider) error {
+	var finalizer string
+	var legacyCleanup func(*api.Provider) error
+
+	switch provider.Type() {
+	case api.Ova:
+		finalizer = api.OvaProviderFinalizer
+		// Legacy OVA PV cleanup (for PVs created before OVAProviderServer CR pattern)
+		// Searches for PVs with old labels (provider name instead of UID)
+		legacyCleanup = r.removeVolumeOfOVAServer
+	case api.HyperV:
+		finalizer = api.HyperVProviderFinalizer
+		legacyCleanup = nil // HyperV uses SMB CSI, no legacy cleanup needed
+	default:
+		return nil
+	}
+
+	// Check if finalizer exists
+	if !k8sutil.ContainsFinalizer(provider, finalizer) {
+		return nil
+	}
+
+	// Legacy cleanup (OVA only)
+	if legacyCleanup != nil {
+		if err := legacyCleanup(provider); err != nil {
+			return err
+		}
+	}
+
+	// Delete provider server
+	if err := r.deleteProviderServer(ctx, provider); err != nil {
+		return err
+	}
+
+	// Remove finalizer
+	clonedProvider := provider.DeepCopy()
+	k8sutil.RemoveFinalizer(provider, finalizer)
+	if err := r.Patch(context.TODO(), provider, client.MergeFrom(clonedProvider)); err != nil {
+		r.Log.Error(err, "Failed to remove finalizer", "provider", provider)
+		return err
 	}
 
 	return nil

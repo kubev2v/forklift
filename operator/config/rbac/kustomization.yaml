@@ -14,6 +14,7 @@ resources:
 - forklift-controller_service_account.yaml
 - forklift-controller_role.yaml
 - forklift-controller_role_binding.yaml
+- forklift-controller_migrator_role.yml
 
 # forklift-api service account
 - api/service_account.yaml

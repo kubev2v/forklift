@@ -103,6 +103,7 @@ POPULATOR_CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/populator-controller:$
 OVIRT_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/ovirt-populator:$(REGISTRY_TAG)
 OPENSTACK_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/openstack-populator:$(REGISTRY_TAG)
 OVA_PROVIDER_SERVER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-provider-server:$(REGISTRY_TAG)
+HYPERV_PROVIDER_SERVER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-hyperv-provider-server:$(REGISTRY_TAG)
 OVA_PROXY_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-proxy:$(REGISTRY_TAG)
 CLI_DOWNLOAD_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-cli-download:$(REGISTRY_TAG)
 VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/vsphere-xcopy-volume-populator:$(REGISTRY_TAG)
@@ -332,6 +333,7 @@ build-operator-bundle-image: check_container_runtime
 		--build-arg UI_PLUGIN_IMAGE=$(UI_PLUGIN_IMAGE) \
 		--build-arg CLI_DOWNLOAD_IMAGE=$(CLI_DOWNLOAD_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg OVA_PROVIDER_SERVER_IMAGE=$(OVA_PROVIDER_SERVER_IMAGE)$(PLATFORM_SUFFIX) \
+		--build-arg HYPERV_PROVIDER_SERVER_IMAGE=$(HYPERV_PROVIDER_SERVER_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg OVA_PROXY_IMAGE=$(OVA_PROXY_IMAGE)$(PLATFORM_SUFFIX)
 
 push-operator-bundle-image: build-operator-bundle-image
@@ -401,6 +403,12 @@ build-ova-provider-server-image: check_container_runtime
 push-ova-provider-server-image: build-ova-provider-server-image
 	$(CONTAINER_CMD) push $(OVA_PROVIDER_SERVER_IMAGE)$(PLATFORM_SUFFIX)
 
+build-hyperv-provider-server-image: check_container_runtime
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(HYPERV_PROVIDER_SERVER_IMAGE)$(PLATFORM_SUFFIX) -f build/hyperv-provider-server/Containerfile .
+
+push-hyperv-provider-server-image: build-hyperv-provider-server-image
+	$(CONTAINER_CMD) push $(HYPERV_PROVIDER_SERVER_IMAGE)$(PLATFORM_SUFFIX)
+
 build-cli-download-image: check_container_runtime
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(CLI_DOWNLOAD_IMAGE)$(PLATFORM_SUFFIX) -f build/forklift-cli-download/Containerfile .
 
@@ -423,6 +431,7 @@ build-all-images: build-api-image \
                   build-openstack-populator-image\
                   build-vsphere-xcopy-volume-populator-image\
                   build-ova-provider-server-image \
+                  build-hyperv-provider-server-image \
                   build-cli-download-image \
                   build-ova-proxy-image \
                   build-operator-bundle-image \
@@ -438,6 +447,7 @@ push-all-images:  push-api-image \
                   push-openstack-populator-image\
                   push-vsphere-xcopy-volume-populator-image\
                   push-ova-provider-server-image \
+                  push-hyperv-provider-server-image \
                   push-cli-download-image \
                   push-ova-proxy-image \
                   push-operator-bundle-image \
@@ -513,6 +523,13 @@ push-ova-provider-server-image-manifest:
 		$(OVA_PROVIDER_SERVER_IMAGE)-arm64
 	$(CONTAINER_CMD) manifest push $(OVA_PROVIDER_SERVER_IMAGE)
 
+push-hyperv-provider-server-image-manifest:
+	$(CONTAINER_CMD) manifest rm $(HYPERV_PROVIDER_SERVER_IMAGE) || true
+	$(CONTAINER_CMD) manifest create $(HYPERV_PROVIDER_SERVER_IMAGE) \
+		$(HYPERV_PROVIDER_SERVER_IMAGE)-amd64 \
+		$(HYPERV_PROVIDER_SERVER_IMAGE)-arm64
+	$(CONTAINER_CMD) manifest push $(HYPERV_PROVIDER_SERVER_IMAGE)
+
 push-cli-download-image-manifest:
 	$(CONTAINER_CMD) manifest rm $(CLI_DOWNLOAD_IMAGE) || true
 	$(CONTAINER_CMD) manifest create $(CLI_DOWNLOAD_IMAGE) \
@@ -551,6 +568,7 @@ push-all-images-manifest: push-controller-image-manifest \
                           push-openstack-populator-image-manifest \
                           push-vsphere-xcopy-volume-populator-image-manifest \
                           push-ova-provider-server-image-manifest \
+                          push-hyperv-provider-server-image-manifest \
                           push-cli-download-image-manifest \
                           push-ova-proxy-image-manifest \
                           push-operator-bundle-image-manifest \

@@ -78,7 +78,6 @@ const (
 	Deleted                         = "Deleted"
 	Paused                          = "Paused"
 	Archived                        = "Archived"
-	UnsupportedDisks                = "UnsupportedDisks"
 	InvalidDiskSizes                = "InvalidDiskSizes"
 	MacConflicts                    = "MacConflicts"
 	MissingPvcForOnlyConversion     = "MissingPvcForOnlyConversion"
@@ -89,10 +88,11 @@ const (
 	ValidatingVDDK                  = "ValidatingVDDK"
 	VDDKInitImageNotReady           = "VDDKInitImageNotReady"
 	VDDKInitImageUnavailable        = "VDDKInitImageUnavailable"
-	UnsupportedOvaSource            = "UnsupportedOvaSource"
+	UnsupportedOVFExportSource      = "UnsupportedOVFExportSource"
 	VMPowerStateUnsupported         = "VMPowerStateUnsupported"
 	VMMigrationTypeUnsupported      = "VMMigrationTypeUnsupported"
 	GuestToolsIssue                 = "GuestToolsIssue"
+	VDDKAndOffloadMixedUsage        = "VDDKAndOffloadMixedUsage"
 )
 
 // Categories
@@ -221,6 +221,11 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 
 	// Validate SSH readiness for plans using xcopy with SSH-enabled providers
 	if err = r.validateSSHReadiness(plan); err != nil {
+		return err
+	}
+
+	// Validate conversion temp storage configuration
+	if err = r.validateConversionTempStorage(plan); err != nil {
 		return err
 	}
 
@@ -696,11 +701,11 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "Duplicate targetName.",
 		Items:    []string{},
 	}
-	unsupportedOvaSource := libcnd.Condition{
-		Type:     UnsupportedOvaSource,
+	unsupportedOVFExportSource := libcnd.Condition{
+		Type:     UnsupportedOVFExportSource,
 		Status:   True,
 		Category: api.CategoryWarn,
-		Message:  "OVA appears to have been exported from an unsupported source, and may have issues during import.",
+		Message:  "VM appears to have been exported from an unsupported OVF source, and may have issues during import.",
 		Items:    []string{},
 	}
 	powerStateUnsupported := libcnd.Condition{
@@ -725,14 +730,6 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Reason:   NotValid,
 		Category: api.CategoryCritical,
 		Message:  "VMware Tools issues detected. This may impact migration performance, guest OS detection, and network configuration. Ensure VMware Tools are properly installed and running before migration. If this is an encrypted VM, please turn the VM off manually before migration.",
-		Items:    []string{},
-	}
-	unsupportedDisks := libcnd.Condition{
-		Type:     UnsupportedDisks,
-		Status:   True,
-		Reason:   NotSupported,
-		Category: api.CategoryCritical,
-		Message:  "%s disks are not supported for migration.",
 		Items:    []string{},
 	}
 	invalidDiskSizes := libcnd.Condition{
@@ -766,15 +763,37 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "LUKS keys and Clevis cannot be configured together; Clevis will be used.",
 		Items:    []string{},
 	}
+	vddkAndOffloadMixedUsage := libcnd.Condition{
+		Type:     VDDKAndOffloadMixedUsage,
+		Status:   True,
+		Reason:   NotSupported,
+		Category: api.CategoryCritical,
+		Message:  "Copy offload is enabled. MTV does not support mixed copy methods. Each migration plan can use one migration strategy, either VDDK or copy offload. Check your storage map and VMs to ensure they are using the same migration strategy.",
+		Items:    []string{},
+	}
 
 	var sharedDisksConditions []libcnd.Condition
 	setOf := map[string]bool{}
 	setOfTargetName := map[string]bool{}
+
+	// Check if plan uses storage offload (vSphere only)
+	source := plan.Referenced.Provider.Source
+	checkMixedUsage := source != nil && source.Type() == api.VSphere && settings.Settings.Features.CopyOffload
+	planUsesOffload := checkMixedUsage && plan.IsUsingOffloadPlugin()
+
 	//
 	// Referenced VMs.
 	for i := range plan.Spec.VMs {
 		vm := &plan.Spec.VMs[i]
 		ref := &vm.Ref
+
+		// Skip VMs that have already succeeded - no validation needed
+		if status, found := plan.Status.Migration.FindVM(*ref); found {
+			if status.HasCondition(api.ConditionSucceeded) {
+				continue
+			}
+		}
+
 		if ref.NotSet() {
 			plan.Status.SetCondition(libcnd.Condition{
 				Type:     VMRefNotValid,
@@ -836,7 +855,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			for _, concern := range ova.Concerns {
 				// match label from ova/export_source.rego
 				if concern.Id == "ova.source.unsupported" {
-					unsupportedOvaSource.Items = append(unsupportedOvaSource.Items, ref.String())
+					unsupportedOVFExportSource.Items = append(unsupportedOVFExportSource.Items, ref.String())
 				}
 			}
 		}
@@ -848,6 +867,23 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 				}
 				if len(pvcs) != len(vm.Disks) {
 					missingPvcForOnlyConversion.Items = append(missingPvcForOnlyConversion.Items, ref.String())
+				}
+			}
+		}
+
+		// Check for mixed VDDK/Offload usage (vSphere only)
+		// If plan uses offload, add VMs with VDDK disks to the condition
+		if planUsesOffload {
+			if vsphereVM, ok := v.(*vsphere.VM); ok {
+				storageMap := plan.Referenced.Map.Storage
+				if storageMap != nil {
+					curVMHasVddk, err := r.vmUsesVddk(storageMap, vsphereVM, vm.Name)
+					if err != nil {
+						return err
+					}
+					if curVMHasVddk {
+						vddkAndOffloadMixedUsage.Items = append(vddkAndOffloadMixedUsage.Items, ref.String())
+					}
 				}
 			}
 		}
@@ -935,20 +971,6 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		if !ok {
 			guestToolsIssue.Items = append(guestToolsIssue.Items, ref.String())
 		}
-		unsupported, err := validator.UnSupportedDisks(*ref)
-		if err != nil {
-			return err
-		}
-		if len(unsupported) > 0 {
-			unsupportedDisks.Items = append(unsupportedDisks.Items, ref.String())
-
-			// Append detailed message
-			unsupportedDisks.Message = fmt.Sprintf(
-				unsupportedDisks.Message,
-				strings.ToUpper(strings.Join(unsupported, ", ")),
-			)
-		}
-
 		invalidSizes, err := validator.InvalidDiskSizes(*ref)
 		if err != nil {
 			return err
@@ -1155,8 +1177,8 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	if len(targetNameNotUnique.Items) > 0 {
 		plan.Status.SetCondition(targetNameNotUnique)
 	}
-	if len(unsupportedOvaSource.Items) > 0 {
-		plan.Status.SetCondition(unsupportedOvaSource)
+	if len(unsupportedOVFExportSource.Items) > 0 {
+		plan.Status.SetCondition(unsupportedOVFExportSource)
 	}
 	if len(powerStateUnsupported.Items) > 0 {
 		plan.Status.SetCondition(powerStateUnsupported)
@@ -1166,9 +1188,6 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(guestToolsIssue.Items) > 0 {
 		plan.Status.SetCondition(guestToolsIssue)
-	}
-	if len(unsupportedDisks.Items) > 0 {
-		plan.Status.SetCondition(unsupportedDisks)
 	}
 	if len(invalidDiskSizes.Items) > 0 {
 		plan.Status.SetCondition(invalidDiskSizes)
@@ -1182,6 +1201,12 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	if len(luksAndClevisIncompatibility.Items) > 0 {
 		plan.Status.SetCondition(luksAndClevisIncompatibility)
 	}
+
+	// Set the condition if any VMs with VDDK disks were found when plan uses offload
+	if len(vddkAndOffloadMixedUsage.Items) > 0 {
+		plan.Status.SetCondition(vddkAndOffloadMixedUsage)
+	}
+
 	return nil
 }
 
@@ -1842,4 +1867,59 @@ func (r *Reconciler) IsValidTargetName(targetName string) error {
 	}
 
 	return nil
+}
+
+func (r *Reconciler) validateConversionTempStorage(plan *api.Plan) error {
+	storageClass := plan.Spec.ConversionTempStorageClass
+	storageSize := plan.Spec.ConversionTempStorageSize
+
+	// If neither is set, that's fine
+	if storageClass == "" && storageSize == "" {
+		return nil
+	}
+
+	// If only one is set, that's an error
+	if storageClass == "" || storageSize == "" {
+		conversionTempStorageIncomplete := libcnd.Condition{
+			Type:     NotValid,
+			Status:   True,
+			Category: api.CategoryCritical,
+			Message:  "Both ConversionTempStorageClass and ConversionTempStorageSize must be specified together.",
+			Items:    []string{},
+		}
+		plan.Status.SetCondition(conversionTempStorageIncomplete)
+		return nil
+	}
+
+	// Validate that storageSize is a valid Kubernetes resource quantity
+	_, err := resource.ParseQuantity(storageSize)
+	if err != nil {
+		conversionTempStorageSizeInvalid := libcnd.Condition{
+			Type:     NotValid,
+			Status:   True,
+			Category: api.CategoryCritical,
+			Message:  fmt.Sprintf("ConversionTempStorageSize '%s' is not a valid Kubernetes resource quantity: %v", storageSize, err),
+			Items:    []string{},
+		}
+		plan.Status.SetCondition(conversionTempStorageSizeInvalid)
+		r.Log.Info("Conversion temp storage size is invalid", "error", err.Error(), "size", storageSize, "plan", plan.Name, "namespace", plan.Namespace)
+		return nil
+	}
+
+	return nil
+}
+
+// vmUsesVddk checks if the VM requires VDDK for migration (i.e., if any disk doesn't use storage offload)
+func (r *Reconciler) vmUsesVddk(storageMap *api.StorageMap, vsphereVM *vsphere.VM, vmName string) (bool, error) {
+	for _, disk := range vsphereVM.Disks {
+		mapping, found := storageMap.FindStorage(disk.Datastore.ID)
+		if !found {
+			continue // Another validation will handle this
+		}
+		if mapping.OffloadPlugin == nil || mapping.OffloadPlugin.VSphereXcopyPluginConfig == nil {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }

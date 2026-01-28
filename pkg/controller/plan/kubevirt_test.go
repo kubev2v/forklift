@@ -224,6 +224,32 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 		})
 	})
 
+	ginkgo.Describe("ConversionTempStorage plan spec", func() {
+		ginkgo.It("should read ConversionTempStorageClass and ConversionTempStorageSize from plan spec", func() {
+			plan := createPlanKubevirt(nil)
+			plan.Spec.ConversionTempStorageClass = "fast-ssd"
+			plan.Spec.ConversionTempStorageSize = "100Gi"
+
+			kubevirt := createKubeVirt()
+			kubevirt.Plan = plan
+
+			Expect(kubevirt.Plan.Spec.ConversionTempStorageClass).To(Equal("fast-ssd"))
+			Expect(kubevirt.Plan.Spec.ConversionTempStorageSize).To(Equal("100Gi"))
+		})
+
+		ginkgo.It("should handle empty ConversionTempStorage fields", func() {
+			plan := createPlanKubevirt(nil)
+			plan.Spec.ConversionTempStorageClass = ""
+			plan.Spec.ConversionTempStorageSize = ""
+
+			kubevirt := createKubeVirt()
+			kubevirt.Plan = plan
+
+			Expect(kubevirt.Plan.Spec.ConversionTempStorageClass).To(Equal(""))
+			Expect(kubevirt.Plan.Spec.ConversionTempStorageSize).To(Equal(""))
+		})
+	})
+
 })
 
 func createKubeVirt(objs ...runtime.Object) *KubeVirt {

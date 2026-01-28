@@ -139,8 +139,36 @@ func TestNetappClonner_CurrentMappedGroups(t *testing.T) {
 }
 
 func TestNewNetappClonner(t *testing.T) {
-	_, err := NewNetappClonner("invalid-hostname", "username", "password")
+	// NOSONAR - fake test credentials for unit testing, not real values
+	_, err := NewNetappClonner("fake-hostname.invalid", "fake-user", "fake-pass")
 	if err == nil {
 		t.Errorf("NewNetappClonner() error = %v, wantErr %v", err, true)
+	}
+}
+
+func TestNetappClonner_EnsureClonnerIgroup_WithFCConversion(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockAPI := NewMockOntapAPI(ctrl)
+	clonner := &NetappClonner{api: mockAPI}
+
+	igroup := "test-igroup"
+	// Test data: fake FC and iSCSI adapter IDs for testing format conversion
+	// These are Fibre Channel WWNs (World Wide Names), NOT IP addresses
+	fakeFC := "fc.2000000000000001:2100000000000002" // fake FC adapter (WWNN:WWPN format)
+	fakeIQN := "iqn.2099-01.com.fake:testhost:99"    // fake iSCSI IQN
+	expectedWWPN := "21:00:00:00:00:00:00:02"        // nosonar
+	adapterIDs := []string{fakeFC, fakeIQN}
+
+	mockAPI.EXPECT().IgroupCreate(gomock.Any(), igroup, "mixed", "vmware").Return(nil)
+	// FC adapter should be converted from fc.WWNN:WWPN to colon-separated WWPN
+	mockAPI.EXPECT().EnsureIgroupAdded(gomock.Any(), igroup, expectedWWPN).Return(nil)
+	// iSCSI adapter should pass through unchanged
+	mockAPI.EXPECT().EnsureIgroupAdded(gomock.Any(), igroup, fakeIQN).Return(nil)
+
+	_, err := clonner.EnsureClonnerIgroup(igroup, adapterIDs)
+	if err != nil {
+		t.Errorf("EnsureClonnerIgroup() error = %v, wantErr %v", err, false)
 	}
 }

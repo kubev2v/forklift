@@ -83,8 +83,6 @@ const (
 	PhaseStoreInitialSnapshotDeltas        = "StoreInitialSnapshotDeltas"
 	PhaseStorePowerState                   = "StorePowerState"
 	PhaseStoreSnapshotDeltas               = "StoreSnapshotDeltas"
-	PhaseWaitForDataVolumesStatus          = "WaitForDataVolumesStatus"
-	PhaseWaitForFinalDataVolumesStatus     = "WaitForFinalDataVolumesStatus"
 	PhaseWaitForFinalSnapshot              = "WaitForFinalSnapshot"
 	PhaseWaitForFinalSnapshotRemoval       = "WaitForFinalSnapshotRemoval"
 	PhaseWaitForInitialSnapshot            = "WaitForInitialSnapshot"

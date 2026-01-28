@@ -1363,3 +1363,9 @@ func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskNam
 	taskName = image.Name
 	return
 }
+
+// ConversionPodConfig returns provider-specific configuration for the virt-v2v conversion pod.
+// OpenStack provider does not require any special configuration.
+func (r *Builder) ConversionPodConfig(_ ref.Ref) (*planbase.ConversionPodConfigResult, error) {
+	return &planbase.ConversionPodConfigResult{}, nil
+}

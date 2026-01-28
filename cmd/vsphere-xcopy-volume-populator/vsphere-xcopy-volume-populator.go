@@ -53,6 +53,7 @@ var (
 	storageHostname            string
 	storageUsername            string
 	storagePassword            string
+	storageToken               string
 	storageSkipSSLVerification string
 	vsphereHostname            string
 	vsphereUsername            string
@@ -104,7 +105,7 @@ func main() {
 		storageApi = &sm
 	case forklift.StorageVendorProductPureFlashArray:
 		sm, err := pure.NewFlashArrayClonner(
-			storageHostname, storageUsername, storagePassword, storageSkipSSLVerification == "true", os.Getenv(pure.ClusterPrefixEnv))
+			storageHostname, storageUsername, storagePassword, storageToken, storageSkipSSLVerification == "true", os.Getenv(pure.ClusterPrefixEnv))
 		if err != nil {
 			klog.Fatalf("failed to initialize Pure FlashArray clonner with %s", err)
 		}
@@ -292,6 +293,7 @@ func handleArgs() {
 	flag.StringVar(&storageHostname, "storage-hostname", os.Getenv("STORAGE_HOSTNAME"), "The storage vendor api hostname")
 	flag.StringVar(&storageUsername, "storage-username", os.Getenv("STORAGE_USERNAME"), "The storage vendor api username")
 	flag.StringVar(&storagePassword, "storage-password", os.Getenv("STORAGE_PASSWORD"), "The storage vendor api password")
+	flag.StringVar(&storageToken, "storage-token", os.Getenv("STORAGE_TOKEN"), "The storage vendor api token (alternative to username/password)")
 	flag.StringVar(&storageSkipSSLVerification, "storage-skip-ssl-verification", os.Getenv("STORAGE_SKIP_SSL_VERIFICATION"), "skip the storage ssl verification")
 	flag.StringVar(&vsphereHostname, "vsphere-hostname", os.Getenv("GOVMOMI_HOSTNAME"), "vSphere's API hostname")
 	flag.StringVar(&vsphereUsername, "vsphere-username", os.Getenv("GOVMOMI_USERNAME"), "vSphere's API username")
@@ -327,17 +329,41 @@ func handleArgs() {
 				missingFlags = true
 				klog.Errorf("missing value for mandatory flag --%s", f.Name)
 			}
-		case "storage-hostname", "storage-username", "storage-password",
-			"vsphere-hostname", "vsphere-username", "vsphere-password":
+		case "storage-hostname", "vsphere-hostname", "vsphere-username", "vsphere-password":
 			if f.Value.String() == "" {
 				missingFlags = true
 				klog.Errorf("missing value for flag --%s", f.Name)
 			}
 		}
 	})
+
+	// Validate storage authentication: either token or username/password
+	if err := validateStorageAuthentication(storageToken, storageUsername, storagePassword); err != nil {
+		missingFlags = true
+		klog.Error(err)
+	}
+
 	if missingFlags {
 		os.Exit(2)
 	}
+}
+
+// validateStorageAuthentication validates that either token or username/password credentials are provided
+// Returns nil if valid, error if invalid
+func validateStorageAuthentication(token, username, password string) error {
+	if token != "" {
+		// Token-based authentication: only token is required
+		klog.Infof("Using token-based authentication for storage")
+		return nil
+	}
+
+	// Username/password authentication: both username and password are required
+	if username == "" || password == "" {
+		return fmt.Errorf("either STORAGE_TOKEN or both STORAGE_USERNAME and STORAGE_PASSWORD must be provided")
+	}
+
+	klog.Infof("Using username/password authentication for storage")
+	return nil
 }
 
 func startMetricsServer(certFile, keyFile string) {

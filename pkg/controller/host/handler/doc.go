@@ -9,6 +9,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/host/handler/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/watch/handler"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	ec2handler "github.com/kubev2v/forklift/pkg/provider/ec2/controller/handler"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
@@ -48,11 +49,15 @@ func New(
 			client,
 			channel,
 			provider)
-	case api.Ova:
+	case api.Ova, api.HyperV:
 		h, err = ova.New(
 			client,
 			channel,
 			provider)
+	case api.EC2:
+		// EC2 provider does not support host-level operations
+		// Return a no-op handler that satisfies the interface
+		h = &ec2handler.NoOpHostHandler{}
 	default:
 		err = liberr.New("provider not supported.")
 	}

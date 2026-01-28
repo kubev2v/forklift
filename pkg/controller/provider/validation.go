@@ -19,7 +19,9 @@ import (
 	libref "github.com/kubev2v/forklift/pkg/lib/ref"
 	"github.com/kubev2v/forklift/pkg/lib/util"
 	core "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -39,6 +41,12 @@ const (
 	ConnectionInsecure      = "ConnectionInsecure"
 	SSHReady                = "SSHReady"
 	SSHNotReady             = "SSHNotReady"
+	SMBCSIDriverNotReady    = "SMBCSIDriverNotReady"
+)
+
+// CSI driver names
+const (
+	SMBCSIDriverName = "smb.csi.k8s.io"
 )
 
 // Categories
@@ -102,6 +110,12 @@ func (r *Reconciler) validate(provider *api.Provider) error {
 
 	// Validate SSH readiness for vSphere providers when SSH method is enabled
 	err = r.validateSSHReadiness(provider, secret)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// Validate SMB CSI driver for HyperV providers
+	err = r.validateSMBCSI(provider)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -171,6 +185,20 @@ func (r *Reconciler) validateURL(provider *api.Provider) error {
 		}
 		return nil
 	}
+	if provider.Type() == api.HyperV {
+		if !isValidSMBPath(provider.Spec.URL) {
+			provider.Status.Phase = ValidationFailed
+			provider.Status.SetCondition(
+				libcnd.Condition{
+					Type:     UrlNotValid,
+					Status:   True,
+					Reason:   Malformed,
+					Category: Critical,
+					Message:  "The SMB path is malformed. Expected format: //server/share, \\\\server\\share, or smb://server/share",
+				})
+		}
+		return nil
+	}
 	_, err := url.Parse(provider.Spec.URL)
 	if err != nil {
 		provider.Status.Phase = ValidationFailed
@@ -187,8 +215,8 @@ func (r *Reconciler) validateURL(provider *api.Provider) error {
 	return nil
 }
 
-func (r *Reconciler) validateConnectionStatus(provider *api.Provider, secret *core.Secret) {
-	if base.GetInsecureSkipVerifyFlag(secret) {
+func (r *Reconciler) validateConnectionStatus(provider *api.Provider, secret *core.Secret, insecureSkipVerify bool) {
+	if insecureSkipVerify {
 		provider.Status.SetCondition(libcnd.Condition{
 			Type:     ConnectionInsecure,
 			Status:   True,
@@ -196,17 +224,19 @@ func (r *Reconciler) validateConnectionStatus(provider *api.Provider, secret *co
 			Category: Warn,
 			Message:  "TLS is susceptible to machine-in-the-middle attacks when certificate verification is skipped.",
 		})
-	} else {
-		_, err := base.VerifyTLSConnection(provider.Spec.URL, secret)
-		if err != nil {
-			provider.Status.SetCondition(libcnd.Condition{
-				Type:     ConnectionTestFailed,
-				Status:   True,
-				Reason:   Tested,
-				Category: Critical,
-				Message:  err.Error(),
-			})
-		}
+		return
+	}
+
+	// Verify TLS connection with provided cacert
+	_, err := base.VerifyTLSConnection(provider.Spec.URL, secret)
+	if err != nil {
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     ConnectionTestFailed,
+			Status:   True,
+			Reason:   Tested,
+			Category: Critical,
+			Message:  err.Error(),
+		})
 	}
 }
 
@@ -261,7 +291,17 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 			"password",
 		}
 
-		r.validateConnectionStatus(provider, secret)
+		// Check insecure flag once and use it for both validation and connection status
+		insecureSkipVerify := base.GetInsecureSkipVerifyFlag(secret)
+
+		// Validate required keys based on TLS settings
+		if !insecureSkipVerify && len(secret.Data["cacert"]) == 0 {
+			keyList = append(keyList, "cacert")
+			break
+		}
+
+		// Validate connection status
+		r.validateConnectionStatus(provider, secret, insecureSkipVerify)
 
 		var providerUrl *url.URL
 		providerUrl, err = url.Parse(provider.Spec.URL)
@@ -304,6 +344,11 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 	case api.Ova:
 		keyList = []string{
 			"url",
+		}
+	case api.HyperV:
+		keyList = []string{
+			"username",
+			"password",
 		}
 	}
 	for _, key := range keyList {
@@ -889,4 +934,48 @@ func (r *Reconciler) validateSSHReadiness(provider *api.Provider, secret *core.S
 // This matches the exact implementation from the populator's testSSHConnectivity
 func (r *Reconciler) testSSHConnectivity(hostIP string, privateKey []byte) bool {
 	return util.TestSSHConnectivity(context.Background(), hostIP, privateKey, r.Log)
+}
+
+func isValidSMBPath(smbPath string) bool {
+	// Normalize Windows UNC paths to //server/share format
+	normalized := smbPath
+	normalized = regexp.MustCompile(`\\`).ReplaceAllString(normalized, "/")
+
+	// Accept smb://server/share, //server/share, or \\server\share formats
+	// Must have at least server and share name
+	smbRegex := `^(smb:)?\/\/[^\/\s]+\/[^\/\s].*$`
+	re := regexp.MustCompile(smbRegex)
+	return re.MatchString(normalized)
+}
+
+// validateSMBCSI validates that the SMB CSI driver is installed for HyperV providers.
+// HyperV migrations require the SMB CSI driver (smb.csi.k8s.io) to mount SMB shares.
+func (r *Reconciler) validateSMBCSI(provider *api.Provider) error {
+	// Only validate SMB CSI for HyperV providers
+	if provider.Type() != api.HyperV {
+		return nil
+	}
+
+	// Check if SMB CSI driver exists
+	csiDriver := &storagev1.CSIDriver{}
+	err := r.Get(context.TODO(), types.NamespacedName{Name: SMBCSIDriverName}, csiDriver)
+	if k8serrors.IsNotFound(err) {
+		provider.Status.Phase = ValidationFailed
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     SMBCSIDriverNotReady,
+			Status:   True,
+			Category: Critical,
+			Reason:   NotFound,
+			Message: "SMB CSI driver (smb.csi.k8s.io) is not installed. " +
+				"Install the CIFS/SMB CSI Driver Operator.",
+		})
+		return nil
+	}
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// SMB CSI driver is installed - remove any previous condition
+	provider.Status.DeleteCondition(SMBCSIDriverNotReady)
+	return nil
 }

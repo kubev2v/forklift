@@ -90,7 +90,7 @@ func NextPhase(migrator Migrator, vm *plan.VMStatus) {
 		if currentStep.Name != nextStep.Name {
 			currentStep.MarkCompleted()
 			currentStep.Phase = api.StepCompleted
-			nextStep.MarkedStarted()
+			nextStep.MarkStarted()
 			nextStep.Phase = api.StepRunning
 		}
 	}

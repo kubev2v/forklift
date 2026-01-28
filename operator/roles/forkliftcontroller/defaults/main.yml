@@ -6,7 +6,7 @@ app_namespace: "{{ lookup( 'env', 'WATCH_NAMESPACE') or 'konveyor-forklift' }}"
 feature_ui_plugin: true
 feature_validation: true
 feature_volume_populator: true
-feature_copy_offload: false
+feature_copy_offload: true
 feature_ocp_live_migration: false
 feature_vmware_system_serial_number: true
 feature_cli_download: true
@@ -39,7 +39,6 @@ controller_precopy_interval: 60
 controller_snapshot_removal_timeout_minuts: 120
 controller_snapshot_status_check_rate_seconds: 10
 controller_cleanup_retries: 10
-controller_dv_status_check_retries: 10
 controller_snapshot_removal_check_retries: 20
 controller_vsphere_incremental_backup: true
 controller_ovirt_warm_migration: true
@@ -159,6 +158,12 @@ ova_container_limits_cpu: "1000m"
 ova_container_limits_memory: "1Gi"
 ova_container_requests_cpu: "100m"
 ova_container_requests_memory: "512Mi"
+
+hyperv_provider_server_fqin: "{{ lookup( 'env', 'HYPERV_PROVIDER_SERVER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_HYPERV_PROVIDER_SERVER') }}"
+hyperv_container_limits_cpu: "1000m"
+hyperv_container_limits_memory: "1Gi"
+hyperv_container_requests_cpu: "100m"
+hyperv_container_requests_memory: "512Mi"
 
 populator_container_limits_cpu: "1000m"
 populator_container_limits_memory: "1Gi"

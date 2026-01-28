@@ -129,6 +129,35 @@ func (c *Conversion) RunVirtV2vInPlace() error {
 	return v2vCmd.Run()
 }
 
+// RunVirtV2vInPlaceDisk runs virt-v2v-in-place using disk mode (-i disk).
+// This is used for providers like EC2 that don't have libvirt and where
+// the disks are already populated and mounted as block devices or files.
+func (c *Conversion) RunVirtV2vInPlaceDisk() error {
+	if len(c.Disks) == 0 {
+		return fmt.Errorf("no disks found for in-place conversion")
+	}
+
+	v2vCmdBuilder := c.CommandBuilder.New("virt-v2v-in-place").
+		AddFlag("-v").
+		AddFlag("-x").
+		AddArg("-i", "disk")
+
+	err := c.addCommonArgs(v2vCmdBuilder)
+	if err != nil {
+		return err
+	}
+
+	// Add all disks as positional arguments
+	for _, disk := range c.Disks {
+		v2vCmdBuilder.AddPositional(disk.Link)
+	}
+
+	v2vCmd := v2vCmdBuilder.Build()
+	v2vCmd.SetStdout(os.Stdout)
+	v2vCmd.SetStderr(os.Stderr)
+	return v2vCmd.Run()
+}
+
 func (c *Conversion) addVirtV2vArgs(cmd utils.CommandBuilder) (err error) {
 	cmd.AddFlag("-v").
 		AddFlag("-x").

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"net/http"
 	"os"
@@ -17,13 +18,42 @@ var COPY_DISK_RE = regexp.MustCompile(`^.*Copying disk (\d+)/(\d+)`)
 var DISK_PROGRESS_RE = regexp.MustCompile(`.+ (\d+)% \[[*-]+\]`)
 var FINISHED_RE = regexp.MustCompile(`^\[[ .0-9]*\] Finishing off`)
 
+// dropCR drops a terminal \r from the data.
+func dropCR(data []byte) []byte {
+	if len(data) > 0 && data[len(data)-1] == '\r' {
+		return data[0 : len(data)-1]
+	}
+	return data
+}
+
+// Function to replace the default bufio.ScanLines
+// We need this because output from virt-v2v contains a progress bar which uses \r
+// Default function only considers \n as a line terminator so the progress bar
+// and the whole progress is acumulated into one buffer and considered as one line
+// Add \r as a line separator
+func ScanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	if atEOF && len(data) == 0 {
+		return 0, nil, nil
+	}
+	if i := bytes.IndexAny(data, "\r\n"); i >= 0 {
+		// We have a full newline/carriagereturn-terminated line.
+		return i + 1, dropCR(data[0:i]), nil
+	}
+	// If we're at EOF, we have a final, non-terminated line. Return it.
+	if atEOF {
+		return len(data), dropCR(data), nil
+	}
+	// Request more data.
+	return 0, nil, nil
+}
+
 // Here is a scan function that imposes limit on returned line length. virt-v2v
 // writes some overly long lines that don't fit into the internal buffer of
 // Scanner. We could just provide bigger buffer, but it is hard to guess what
 // size is large enough. Instead we just claim that line ends when it reaches
 // buffer size.
 func LimitedScanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
-	advance, token, err = bufio.ScanLines(data, atEOF)
+	advance, token, err = ScanLines(data, atEOF)
 	if token != nil || err != nil {
 		return
 	}

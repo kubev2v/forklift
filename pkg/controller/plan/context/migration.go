@@ -70,12 +70,18 @@ type Context struct {
 func (r *Context) build() (err error) {
 	r.Map.Network = r.Plan.Referenced.Map.Network
 	if r.Map.Network == nil {
-		err = liberr.Wrap(NotEnoughDataError{})
+		err = liberr.Wrap(NotEnoughDataError{},
+			"Network map not found.",
+			"name", r.Plan.Spec.Map.Network.Name,
+			"namespace", r.Plan.Spec.Map.Network.Namespace)
 		return
 	}
 	r.Map.Storage = r.Plan.Referenced.Map.Storage
 	if r.Map.Storage == nil && r.Plan.Spec.Type != api.MigrationOnlyConversion {
-		err = liberr.Wrap(NotEnoughDataError{})
+		err = liberr.Wrap(NotEnoughDataError{},
+			"Storage map not found.",
+			"name", r.Plan.Spec.Map.Storage.Name,
+			"namespace", r.Plan.Spec.Map.Storage.Namespace)
 		return
 	}
 	err = r.Source.build(r)
@@ -125,7 +131,10 @@ type Source struct {
 func (r *Source) build(ctx *Context) (err error) {
 	r.Provider = ctx.Plan.Referenced.Provider.Source
 	if r.Provider == nil {
-		err = liberr.Wrap(NotEnoughDataError{})
+		err = liberr.Wrap(NotEnoughDataError{},
+			"Source provider not found.",
+			"name", ctx.Plan.Spec.Provider.Source.Name,
+			"namespace", ctx.Plan.Spec.Provider.Source.Namespace)
 		return
 	}
 
@@ -171,7 +180,10 @@ type Destination struct {
 func (r *Destination) build(ctx *Context) (err error) {
 	r.Provider = ctx.Plan.Referenced.Provider.Destination
 	if r.Provider == nil {
-		err = liberr.Wrap(NotEnoughDataError{})
+		err = liberr.Wrap(NotEnoughDataError{},
+			"Destination provider not found.",
+			"name", ctx.Plan.Spec.Provider.Destination.Name,
+			"namespace", ctx.Plan.Spec.Provider.Destination.Namespace)
 		return
 	}
 	if !r.Provider.IsHost() {

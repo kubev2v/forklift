@@ -11,6 +11,7 @@
 - [Secret with Storage Provider Credentials](#secret-with-storage-provider-credentials)
   - [Hitachi Vantara](#hitachi-vantara)
   - [NetApp ONTAP](#netapp-ontap)
+  - [HPE Primera/3PAR](#hpe-primera3par)
   - [Pure FlashArray](#pure-flasharray)
   - [Dell PowerMax](#dell-powermax)
   - [Dell PowerFlex](#dell-powerflex)
@@ -27,7 +28,7 @@
   - [NetApp](#netapp)
 
 ## Forklift Controller
-When the feature flag `feature_copy_offload` is true (off by default), the controller
+When the feature flag `feature_copy_offload` is true (on by default), the controller
 consult the storagemaps offload plugin configuration, to decided if VM disk from
 VMWare could be copied by the storage backend(offloaded) into the newly created PVC.
 When the controller creates the PVC for the v2v pod it will also create
@@ -81,7 +82,7 @@ spec:
 
 ## vmkfstools-wrapper
 An ESXi CLI extension that exposes the vmkfstools clone operation to API interaction.
-The folder vmkfstools-wrapper has a script to create a VIB to wrap the vmkfstools_wrapper.py
+The folder vmkfstools-wrapper has a script to create a VIB to wrap the vmkfstools_wrapper.sh
 to be a proxy to perform vmkfstools commands and more.
 The VIB should be installed on every ESXi that is connected to the datastores which
 are holds migratable VMs.
@@ -89,9 +90,18 @@ Alternative, that wrapper can be invoked using SSH. See [SSH Method](#ssh-method
 
 ## Setup Copy Offload
 
-1. Set the feature flag:
+1. Verify the feature flag is enabled (it is enabled by default):
    ```bash
+   oc get forkliftcontrollers.forklift.konveyor.io forklift-controller -n openshift-mtv -o jsonpath='{.spec.feature_copy_offload}'
+   ```
+
+   If you need to explicitly enable or disable it:
+   ```bash
+   # To enable (if not already enabled)
    oc patch forkliftcontrollers.forklift.konveyor.io forklift-controller --type merge -p '{"spec": {"feature_copy_offload": "true"}}' -n openshift-mtv
+
+   # To disable (if you want to opt-out)
+   oc patch forkliftcontrollers.forklift.konveyor.io forklift-controller --type merge -p '{"spec": {"feature_copy_offload": "false"}}' -n openshift-mtv
    ```
 
 2. Create a `StorageMap` according to [this section](#matching-pvc)
@@ -144,9 +154,14 @@ to have a secret with the following fields:
 | Key | Value | Mandatory | Default |
 | --- | --- | --- | --- |
 | STORAGE_HOSTNAME | ip/hostname | y | |
-| STORAGE_USERNAME | string | y | |
-| STORAGE_PASSWORD | string | y | |
+| STORAGE_USERNAME | string | y* | |
+| STORAGE_PASSWORD | string | y* | |
+| STORAGE_TOKEN | string | n** | |
 | STORAGE_SKIP_SSL_VERIFICATION | true/false | n | false |
+
+\* For most storage vendors, `STORAGE_USERNAME` and `STORAGE_PASSWORD` are required. Pure FlashArray is an exception - see below.
+
+\*\* `STORAGE_TOKEN` is only supported by Pure FlashArray. When provided, it replaces the need for username/password authentication.
 
 Provider-specific entries in the secret are documented below:
 
@@ -160,19 +175,95 @@ See [README](internal/vantara/README.md)
 | --- | --- | --- |
 | ONTAP_SVM | string | the SVM to use in all the client interactions. Can be taken from trident.netapp.io/v1/TridentBackend.config.ontap_config.svm resource field. |
 
+### HPE Primera/3PAR
+
+**Important**: For HPE Primera/3PAR, the `STORAGE_HOSTNAME` must include the full URL with protocol and the 3PAR's Web Services API (WSAPI) port. Use the 3PAR command `cli% showwsapi` to determine the correct WSAPI port. 3PAR systems default to port `8080` for both HTTP and HTTPS connections, Primera and Alletra 9000/MP default to port `443` (SSL/HTTPS). Depending on configured certificates you may need to skip SSL verification.
+
+**Example secret:**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hpe-3par-secret
+  namespace: openshift-mtv
+type: Opaque
+stringData:
+  STORAGE_HOSTNAME: "https://192.168.1.1:8080"
+  STORAGE_USERNAME: "admin"
+  STORAGE_PASSWORD: "your-password"
+```
 
 ### Pure FlashArray
 
-| Key | Value | Description |
-| --- | --- | --- |
-| PURE_CLUSTER_PREFIX | string | Cluster prefix is set in the StorageCluster resource. Get it with  `printf "px_%.8s" $(oc get storagecluster -A -o=jsonpath='{.items[?(@.spec.cloudStorage.provider=="pure")].status.clusterUid}')` |
+Pure FlashArray supports two mutually exclusive authentication methods:
 
-### Dell PowerMax
+#### Token-Based Authentication (Recommended)
 
-| Key | Value | Description |
-| --- | --- | --- |
-| POWERMAX_SYMMETRIX_ID | string | the symmetrix id of the storage array. Can be taken from the ConfigMap under the 'powermax' namespace, which the CSI driver uses. |
-| POWERMAX_PORT_GROUP_NAME | string | the port group to use for masking view creation. |
+Token-based authentication allows you to reuse the same credentials as your Pure CSI driver deployment.
+
+| Key | Value | Description | Required |
+| --- | --- | --- | --- |
+| STORAGE_TOKEN | string | API token for Pure FlashArray authentication. Can be extracted from the Pure CSI driver secret. | Yes (if using token auth) |
+| PURE_CLUSTER_PREFIX | string | Cluster prefix is set in the StorageCluster resource. Get it with  `printf "px_%s" $(oc get storagecluster -A -o=jsonpath='{.items[0].status.clusterUid}'| head -c 8)` | Yes |
+
+**How to obtain the token from Pure CSI driver:**
+
+The Pure CSI driver stores the API token in a secret, typically named `pure-provisioner-secret` or similar. To extract the token:
+
+```bash
+# Find the Pure CSI driver secret
+oc get secrets -n <pure-csi-namespace> | grep pure
+
+# Extract the API token (adjust secret name and key as needed)
+oc get secret pure-provisioner-secret -n <pure-csi-namespace> -o jsonpath='{.data.PureAPIToken}' | base64 -d
+```
+
+**Example secret with token authentication:**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pure-flasharray-secret
+  namespace: openshift-mtv
+type: Opaque
+stringData:
+  STORAGE_HOSTNAME: "flasharray.example.com"
+  STORAGE_TOKEN: "your-api-token-here"
+  PURE_CLUSTER_PREFIX: "px_12345678"
+```
+
+#### Username/Password Authentication (Legacy)
+
+If you prefer username/password authentication or don't have access to the API token:
+
+| Key | Value | Description | Required |
+| --- | --- | --- | --- |
+| STORAGE_USERNAME | string | Username for Pure FlashArray management API | Yes (if using username/password auth) |
+| STORAGE_PASSWORD | string | Password for Pure FlashArray management API | Yes (if using username/password auth) |
+| PURE_CLUSTER_PREFIX | string | Cluster prefix is set in the StorageCluster resource. Get it with  `printf "px_%s" $(oc get storagecluster -A -o=jsonpath='{.items[0].status.clusterUid}'| head -c 8)` | Yes |
+
+**Example secret with username/password authentication:**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pure-flasharray-secret
+  namespace: openshift-mtv
+type: Opaque
+stringData:
+  STORAGE_HOSTNAME: "flasharray.example.com"
+  STORAGE_USERNAME: "pureuser"
+  STORAGE_PASSWORD: "your-password-here"
+  PURE_CLUSTER_PREFIX: "px_12345678"
+```
+
+**Important Notes:**
+- Authentication methods are mutually exclusive: if `STORAGE_TOKEN` is provided, it will be used and `STORAGE_USERNAME`/`STORAGE_PASSWORD` are ignored
+- If `STORAGE_TOKEN` is not provided, both `STORAGE_USERNAME` and `STORAGE_PASSWORD` must be set
+- Token-based authentication is recommended as it allows credential reuse with the Pure CSI driver
 
 ### Dell PowerFlex
 
@@ -180,6 +271,12 @@ See [README](internal/vantara/README.md)
 | --- | --- | --- |
 | POWERFLEX_SYSTEM_ID | string | the system id of the storage array. Can be taken from `vxflexos-config` from the `vxflexos` namespace or the openshift-operators namespace. |
 
+### Dell PowerMax
+
+| Key | Value | Description |
+| --- | --- | --- |
+| POWERMAX_SYMMETRIX_ID | string | the symmetrix id of the storage array. Can be taken from the ConfigMap under the 'powermax' namespace, which the CSI driver uses. |
+| POWERMAX_PORT_GROUP_NAME | string | the port group to use for masking view creation. |
 
 ## Host Lease Management
 
@@ -320,7 +417,7 @@ podman run -it --rm \
   -e GOVMOMI_PASSWORD='your-password' \
   -e GOVMOMI_HOSTNAME='vcenter.example.com' \
   -e GOVMOMI_INSECURE='true' \
-  quay.io/kubev2v/vsphere-xcopy-volume-populator:devel-amd64 \
+  $( oc get deploy -n openshift-mtv forklift-volume-populator-controller -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE")].value}') \
   --ssh-key-file /tmp/esxi_key \
   --datacenter MyDatacenter
 ```
@@ -331,7 +428,7 @@ podman run -it --rm \
 podman run -it --rm \
   --entrypoint /bin/vib-installer \
   -v $HOME/.ssh/id_rsa:/tmp/esxi_key:Z \
-  quay.io/kubev2v/vsphere-xcopy-volume-populator:devel-amd64 \
+  $( oc get deploy -n openshift-mtv forklift-volume-populator-controller -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE")].value}') \
   --ssh-key-file /tmp/esxi_key \
   --esxi-hosts 'esxi1.example.com,esxi2.example.com,esxi3.example.com'
 ```
@@ -465,7 +562,7 @@ The system requires command restrictions for security. Create the restricted key
 ```bash
 # The public key needs to be prefixed with command restrictions
 # The system now uses dynamic datastore routing - a single key works for all datastores
-echo 'command="sh -c '\''DS=$(echo \"$SSH_ORIGINAL_COMMAND\" | sed -n \"s|.*/vmfs/volumes/\\([^/]*\\)/.*|\\1|p\"); exec python /vmfs/volumes/$DS/secure-vmkfstools-wrapper.py'\''",no-port-forwarding,no-agent-forwarding,no-X11-forwarding '$(cat esxi_public_key.pub) > restricted_key.pub
+echo 'command="sh -c '\''DS=$(echo \"$SSH_ORIGINAL_COMMAND\" | sed -n \"s|.*/vmfs/volumes/\\([^/]*\\)/.*|\\1|p\"); exec sh /vmfs/volumes/$DS/secure-vmkfstools-wrapper.sh'\''",no-port-forwarding,no-agent-forwarding,no-X11-forwarding '$(cat esxi_public_key.pub) > restricted_key.pub
 
 # View the final restricted key
 cat restricted_key.pub

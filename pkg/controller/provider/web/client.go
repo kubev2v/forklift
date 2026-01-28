@@ -7,12 +7,14 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/openstack"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/ova"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/ovirt"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	ec2web "github.com/kubev2v/forklift/pkg/provider/ec2/inventory/web"
 )
 
 // Common parameters
@@ -93,9 +95,25 @@ func NewClient(provider *api.Provider) (client Client, err error) {
 	case api.Ova:
 		client = &ProviderClient{
 			provider: provider,
-			finder:   &ova.Finder{},
+			finder:   ova.NewFinder(),
 			restClient: base.RestClient{
 				Resolver: &ova.Resolver{Provider: provider},
+			},
+		}
+	case api.EC2:
+		client = &ProviderClient{
+			provider: provider,
+			finder:   &ec2web.Finder{},
+			restClient: base.RestClient{
+				Resolver: &ec2web.Resolver{Provider: provider},
+			},
+		}
+	case api.HyperV:
+		client = &ProviderClient{
+			provider: provider,
+			finder:   hyperv.NewFinder(),
+			restClient: base.RestClient{
+				Resolver: &hyperv.Resolver{Provider: provider},
 			},
 		}
 	default:

@@ -1,0 +1,33 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ app_name }}-alerting-rules
+  namespace: {{ app_namespace }}
+spec:
+  groups:
+  - name: {{ app_name }}-alerts
+    rules:
+    - alert: MigrationSucceeded
+      expr: mtv_plan_alert_status{status="Succeeded"}
+      annotations:
+          summary: Migration plan {% raw %}"{{ $labels.plan_name }}"{% endraw %} succeeded
+          description: Migration plan {% raw %}"{{ $labels.plan_name }}"{% endraw %} succeeded
+      labels:
+        app: {{ app_name }}
+        type: migration-succeeded
+        severity: info
+    - alert: MigrationFailed
+      expr: mtv_plan_alert_status{status="Failed"}
+      annotations:
+          summary: Migration plan failed
+          description: |
+              {% raw %}{{ $labels.mode }} migration plan
+              "{{ $labels.plan_name }}"
+              with {{ $labels.provider }} provider
+              failed on {{ $labels.phase }}{% endraw %} phase.
+      labels:
+        app: {{ app_name }}
+        type: migration-failed
+        severity: critical
+

@@ -33,16 +33,20 @@ type FlashArrayClonner struct {
 const ClusterPrefixEnv = "PURE_CLUSTER_PREFIX"
 const helpMessage = `clusterPrefix is missing and PURE_CLUSTER_PREFIX is not set.
 Use this to extract the value:
-printf "px_%.8s" $(oc get storagecluster -A -o=jsonpath='{.items[?(@.spec.cloudStorage.provider=="pure")].status.clusterUid}')
+printf "px_%s" $(oc get storagecluster -A -o=jsonpath='{.items[0].status.clusterUid}'| head -c 8)
 `
 
-func NewFlashArrayClonner(hostname, username, password string, skipSSLVerification bool, clusterPrefix string) (FlashArrayClonner, error) {
+// NewFlashArrayClonner creates a new FlashArrayClonner
+// Authentication is mutually exclusive:
+// - If apiToken is provided (non-empty), it will be used for authentication (username/password ignored)
+// - If apiToken is empty, username and password will be used for authentication
+func NewFlashArrayClonner(hostname, username, password, apiToken string, skipSSLVerification bool, clusterPrefix string) (FlashArrayClonner, error) {
 	if clusterPrefix == "" {
 		return FlashArrayClonner{}, errors.New(helpMessage)
 	}
 
 	// Create the REST client for all operations
-	restClient, err := NewRestClient(hostname, username, password, skipSSLVerification)
+	restClient, err := NewRestClient(hostname, username, password, apiToken, skipSSLVerification)
 	if err != nil {
 		return FlashArrayClonner{}, fmt.Errorf("failed to create REST client: %w", err)
 	}
@@ -125,6 +129,7 @@ func (f *FlashArrayClonner) Map(
 // UnMap is responsible to unmapping an initiator group from a populator.LUN
 func (f *FlashArrayClonner) UnMap(initatorGroup string, targetLUN populator.LUN, context populator.MappingContext) error {
 	hosts, ok := context["hosts"]
+
 	if ok {
 		hs, ok := hosts.([]string)
 		if ok && len(hs) > 0 {
@@ -150,17 +155,22 @@ func (f *FlashArrayClonner) CurrentMappedGroups(targetLUN populator.LUN, context
 
 // ResolvePVToLUN resolves a PersistentVolume to Pure FlashArray LUN details
 func (f *FlashArrayClonner) ResolvePVToLUN(pv populator.PersistentVolume) (populator.LUN, error) {
-	klog.Infof("Resolving target volume for PV %s", pv.Name)
-
-	volumeName := fmt.Sprintf("%s-%s", f.clusterPrefix, pv.Name)
-	klog.Infof("Target volume name: %s", volumeName)
-
-	v, err := f.restClient.GetVolume(volumeName)
+	pvVolumeHandle := pv.VolumeHandle
+	v, err := f.restClient.GetVolumeById(pvVolumeHandle)
 	if err != nil {
-		return populator.LUN{}, fmt.Errorf("failed to get target volume from Pure FlashArray: %w", err)
+		if strings.Contains(err.Error(), "Volume does not exist.") {
+			klog.Errorf("Volume with handle %s does not exist: %v. Trying with Volume Name", pvVolumeHandle, err)
+			volumeName := fmt.Sprintf("%s-%s", f.clusterPrefix, pv.Name)
+			v, err = f.restClient.GetVolume(volumeName)
+			if err != nil {
+				return populator.LUN{}, fmt.Errorf("failed to get volume by name %s: %w", volumeName, err)
+			}
+		}
 	}
+
 	klog.Infof("volume %+v\n", v)
 	l := populator.LUN{Name: v.Name, SerialNumber: v.Serial, NAA: fmt.Sprintf("naa.%s%s", FlashProviderID, strings.ToLower(v.Serial))}
+
 	return l, nil
 }
 

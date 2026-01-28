@@ -101,7 +101,9 @@ type HostConnectionRequest struct {
 }
 
 // NewRestClient creates a new REST client for Pure FlashArray
-func NewRestClient(hostname, username, password string, skipSSLVerify bool) (*RestClient, error) {
+// If apiToken is provided (non-empty), it will be used directly, skipping username/password authentication
+// If apiToken is empty, username and password will be used to obtain an API token
+func NewRestClient(hostname, username, password, apiToken string, skipSSLVerify bool) (*RestClient, error) {
 	client := &RestClient{
 		hostname: hostname,
 		httpClient: &http.Client{
@@ -119,9 +121,17 @@ func NewRestClient(hostname, username, password string, skipSSLVerify bool) (*Re
 		return nil, fmt.Errorf("failed to detect API versions: %w", err)
 	}
 
-	// Step 2: Get API token using latest 1.x API (only 1.x supports this)
-	if err := client.getAPIToken(username, password); err != nil {
-		return nil, fmt.Errorf("failed to get API token: %w", err)
+	// Step 2: Get API token - either use provided token or obtain via username/password
+	if apiToken != "" {
+		// Use provided API token directly
+		klog.Infof("Pure REST Client: Using provided API token for authentication")
+		client.apiToken = apiToken
+	} else {
+		// Get API token using latest 1.x API (only 1.x supports this)
+		klog.Infof("Pure REST Client: Using username/password authentication to obtain API token")
+		if err := client.getAPIToken(username, password); err != nil {
+			return nil, fmt.Errorf("failed to get API token: %w", err)
+		}
 	}
 
 	// Step 3: Get auth token using latest 2.x API
@@ -503,6 +513,49 @@ func (c *RestClient) GetVolume(volumeName string) (*Volume, error) {
 
 	if len(volumesResponse.Items) == 0 {
 		return nil, fmt.Errorf("volume not found: %s", volumeName)
+	}
+
+	return &volumesResponse.Items[0], nil
+}
+
+// GetVolumeById gets information about a specific volume by its ID
+func (c *RestClient) GetVolumeById(volumeId string) (*Volume, error) {
+	baseURL := fmt.Sprintf("https://%s/api/%s/volumes", c.hostname, c.apiV2)
+
+	params := url.Values{}
+	params.Set("ids", volumeId)
+
+	finalURL := baseURL + "?" + params.Encode()
+
+	req, err := http.NewRequest("GET", finalURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create get volume request: %w", err)
+	}
+
+	req.Header.Set("x-auth-token", c.authToken)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send get volume request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read get volume response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("get volume request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var volumesResponse VolumesResponse
+	if err := json.Unmarshal(body, &volumesResponse); err != nil {
+		return nil, fmt.Errorf("failed to parse get volume response: %w", err)
+	}
+
+	if len(volumesResponse.Items) == 0 {
+		return nil, fmt.Errorf("volume Id not found: %s", volumeId)
 	}
 
 	return &volumesResponse.Items[0], nil

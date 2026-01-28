@@ -134,13 +134,15 @@ func (c *ESXiSSHClient) ExecuteCommand(datastore, sshCommand string, args ...str
 		return "", fmt.Errorf("SSH command timed out after 60 seconds: %s", fullCommand)
 	}
 
+	outputStr := string(output)
+
 	if cmdErr != nil {
-		klog.Warningf("SSH command failed: %s, output: %s, error: %v", fullCommand, string(output), cmdErr)
-		return string(output), cmdErr
+		klog.Warningf("SSH command failed: %s, output: %s, error: %v", fullCommand, outputStr, cmdErr)
+		return outputStr, cmdErr
 	}
 
-	klog.V(2).Infof("SSH command succeeded: %s, output: %s", fullCommand, string(output))
-	return string(output), nil
+	klog.V(2).Infof("SSH command succeeded: %s, output: %s", fullCommand, outputStr)
+	return outputStr, nil
 }
 
 func (c *ESXiSSHClient) Close() error {
@@ -189,6 +191,9 @@ func EnableSSHAccess(ctx context.Context, vmwareClient Client, host *object.Host
 	klog.Errorf("Manual SSH key installation required. Please add the following line to /etc/ssh/keys-root/authorized_keys on the ESXi host:")
 	klog.Errorf("")
 	klog.Errorf("  %s", restrictedPublicKey)
+	klog.Errorf("")
+	klog.Errorf("The template extracts datastore from commands (DS=<datastore>;CMD=<command>)")
+	klog.Errorf("and executes: /vmfs/volumes/$DS/secure-vmkfstools-wrapper")
 	klog.Errorf("")
 	klog.Errorf("Steps to manually configure SSH key:")
 	klog.Errorf("1. SSH to the ESXi host: ssh root@%s", hostIP)

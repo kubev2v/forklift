@@ -12,6 +12,7 @@ const (
 	Running   = "Running"
 	Pending   = "Pending"
 	Canceled  = "Canceled"
+	Completed = "Completed"
 	Blocked   = "Blocked"
 	Ready     = "Ready"
 	Deleted   = "Deleted"
@@ -51,6 +52,28 @@ var (
 			"provider",
 			"mode",
 			"target",
+		},
+	)
+
+	// 'status' - [Succeeded, Failed]
+	// 'provider' - [oVirt, VSphere, Openstack, OVA, Openshift]
+	// 'mode' - [Cold, Warm]
+	// 'target' - [Local, Remote]
+	// 'plan' - [Id]
+	// 'plan_name' - [Plan name]
+	// 'phase' - [Plan phase]
+	planAlertStatusGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "mtv_plan_alert_status",
+		Help: "VM Migration plan statuses for alerting",
+	},
+		[]string{
+			"status",
+			"provider",
+			"mode",
+			"target",
+			"plan",
+			"plan_name",
+			"phase",
 		},
 	)
 

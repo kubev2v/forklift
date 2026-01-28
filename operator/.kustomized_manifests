@@ -102,9 +102,6 @@ spec:
                 description: 'Controller memory request (default: 350Mi)'
                 example: 500Mi
                 type: string
-              controller_dv_status_check_retries:
-                description: 'DataVolume status check retries (default: 10)'
-                x-kubernetes-int-or-string: true
               controller_filesystem_overhead:
                 description: 'Filesystem overhead percentage (default: 10)'
                 x-kubernetes-int-or-string: true
@@ -191,7 +188,7 @@ spec:
                 - "false"
                 type: string
               feature_copy_offload:
-                description: 'Enable copy offload plugins (default: false)'
+                description: 'Enable copy offload plugins (default: true)'
                 enum:
                 - "true"
                 - "false"
@@ -203,8 +200,8 @@ spec:
                 - "false"
                 type: string
               feature_ova_appliance_management:
-                description: 'Enable OVA appliance management endpoints (default:
-                  false)'
+                description: 'Enable OVF-based appliance management endpoints (OVA,
+                  HyperV)  (default: false)'
                 enum:
                 - "true"
                 - "false"
@@ -248,6 +245,26 @@ spec:
               hooks_container_requests_memory:
                 description: 'Hooks memory request (default: 150Mi)'
                 example: 300Mi
+                type: string
+              hyperv_container_limits_cpu:
+                description: 'HyperV CPU limit (default: 1000m)'
+                example: 2000m
+                type: string
+              hyperv_container_limits_memory:
+                description: 'HyperV memory limit (default: 1Gi)'
+                example: 2Gi
+                type: string
+              hyperv_container_requests_cpu:
+                description: 'HyperV CPU request (default: 100m)'
+                example: 200m
+                type: string
+              hyperv_container_requests_memory:
+                description: 'HyperV memory request (default: 512Mi)'
+                example: 300Mi
+                type: string
+              hyperv_provider_server_fqin:
+                description: HyperV provider server image
+                example: quay.io/kubev2v/forklift-hyperv-provider-server:latest
                 type: string
               image_pull_policy:
                 description: 'Image pull policy (default: Always)'
@@ -825,6 +842,197 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.3
+  name: hypervproviderservers.forklift.konveyor.io
+spec:
+  group: forklift.konveyor.io
+  names:
+    kind: HyperVProviderServer
+    listKind: HyperVProviderServerList
+    plural: hypervproviderservers
+    singular: hypervproviderserver
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: PHASE
+      type: string
+    - jsonPath: .status.service.name
+      name: SERVICE
+      type: string
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: HyperVProviderServerSpec defines the desired state of HyperVProviderServer.
+            properties:
+              provider:
+                description: Provider reference.
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+            required:
+            - provider
+            type: object
+          status:
+            description: HyperVProviderServerStatus defines the observed state of
+              HyperVProviderServer.
+            properties:
+              conditions:
+                description: List of conditions.
+                items:
+                  description: Condition
+                  properties:
+                    category:
+                      description: The condition category.
+                      type: string
+                    durable:
+                      description: The condition is durable - never un-staged.
+                      type: boolean
+                    items:
+                      description: A list of items referenced in the `Message`.
+                      items:
+                        type: string
+                      type: array
+                    lastTransitionTime:
+                      description: When the last status transition occurred.
+                      format: date-time
+                      type: string
+                    message:
+                      description: The human readable description of the condition.
+                      type: string
+                    reason:
+                      description: The reason for the condition or transition.
+                      type: string
+                    status:
+                      description: The condition status [true,false].
+                      type: string
+                    suggestion:
+                      description: A suggested action or resolution for the condition.
+                      type: string
+                    type:
+                      description: The condition type.
+                      type: string
+                  required:
+                  - category
+                  - lastTransitionTime
+                  - status
+                  - type
+                  type: object
+                type: array
+              phase:
+                description: Phase of the HyperV provider server.
+                type: string
+              service:
+                description: Service reference.
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.3
   name: migrations.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -1229,9 +1437,14 @@ spec:
                           - .NetworkType: type of the network ("Multus" or "Pod")
                           - .NetworkIndex: sequential index of the network interface (0-based)
                         The template can be used to customize network interface names based on target network configuration.
+
+                        Provider support:
+                          - VMware (vSphere): Supported. Network interface names can be customized.
+                          - OpenShift: Not supported. Network interface names are preserved from the source VM.
+
                         Note:
                           - This template will override at the plan level template
-                          - If not specified on VM level and on Plan leverl, default naming conventions will be used
+                          - If not specified on VM level and on Plan level, default naming conventions will be used
                         Examples:
                           "net-{{.NetworkIndex}}"
                           "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
@@ -1375,21 +1588,24 @@ spec:
                       description: "PVCNameTemplate is a template for generating PVC
                         names for VM disks.\nGenerated names must be valid DNS-1123
                         labels (lowercase alphanumerics, '-' allowed, max 63 chars).\nIt
-                        follows Go template syntax and has access to the following
-                        variables:\n  - .VmName: name of the VM in the source cluster
-                        (original source name)\n  - .TargetVmName: final VM name in
-                        the target cluster (may equal .VmName if no rename/normalization)\n
-                        \ - .PlanName: name of the migration plan\n  - .DiskIndex:
-                        initial volume index of the disk\n  - .WinDriveLetter: Windows
-                        drive letter (lowercase, if applicable, e.g. \"c\", requires
-                        guest agent)\n  - .RootDiskIndex: index of the root disk\n
-                        \ - .Shared: true if the volume is shared by multiple VMs,
-                        false otherwise\n  - .FileName: name of the file in the source
-                        provider (VMware only, filename includes the .vmdk suffix)\nNote:\n
-                        \ This template overrides the plan level template.\nExamples:\n
-                        \ \"{{.TargetVmName}}-disk-{{.DiskIndex}}\"\n  \"{{if eq .DiskIndex
-                        .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}\"\n
-                        \ \"{{if .Shared}}shared-{{end}}{{.VmName | lower}}-{{.DiskIndex}}\"\nSee:\n\t
+                        follows Go template syntax and has access to provider-specific
+                        variables.\n\nCommon variables (all providers):\n  - .VmName:
+                        name of the VM in the source cluster (original source name)\n
+                        \ - .TargetVmName: final VM name in the target cluster (may
+                        equal .VmName if no rename/normalization)\n  - .PlanName:
+                        name of the migration plan\n  - .DiskIndex: initial volume
+                        index of the disk\n\nVMware (vSphere) specific variables:\n
+                        \ - .WinDriveLetter: Windows drive letter (lowercase, if applicable,
+                        e.g. \"c\", requires guest agent)\n  - .RootDiskIndex: index
+                        of the root disk\n  - .Shared: true if the volume is shared
+                        by multiple VMs, false otherwise\n  - .FileName: name of the
+                        file in the source provider (filename includes the .vmdk suffix)\n\nOpenShift
+                        specific variables:\n  - .SourcePVCName: name of the PVC in
+                        the source cluster\n  - .SourcePVCNamespace: namespace of
+                        the PVC in the source cluster\n\nNote:\n  This template overrides
+                        the plan level template.\nExamples:\n  \"{{.TargetVmName}}-disk-{{.DiskIndex}}\"\n
+                        \ \"{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}\"
+                        (VMware)\n  \"{{.TargetVmName}}-{{.SourcePVCName}}\" (OpenShift)\nSee:\n\t
                         https://github.com/kubev2v/forklift/tree/main/pkg/templateutil
                         for template functions."
                       type: string
@@ -1429,9 +1645,14 @@ spec:
                         It follows Go template syntax and has access to the following variables:
                           - .PVCName: name of the PVC mounted to the VM using this volume
                           - .VolumeIndex: sequential index of the volume interface (0-based)
+
+                        Provider support:
+                          - VMware (vSphere): Supported. Default naming is "vol-{index}".
+                          - OpenShift: Not supported. Volume names are preserved from the source VM.
+
                         Note:
                           - This template will override at the plan level template
-                          - If not specified on VM level and on Plan leverl, default naming conventions will be used
+                          - If not specified on VM level and on Plan level, default naming conventions will be used
                         Examples:
                           "disk-{{.VolumeIndex}}"
                           "pvc-{{.PVCName}}"
@@ -2236,6 +2457,28 @@ spec:
               archived:
                 description: Whether this plan should be archived.
                 type: boolean
+              conversionTempStorageClass:
+                description: |-
+                  ConversionTempStorageClass specifies the storage class to use for temporary conversion storage.
+                  When specified, virt-v2v conversion pods will use a temporary PVC from this storage class
+                  instead of using the node's ephemeral storage for the conversion scratch space.
+                  This is useful for:
+                    - Large VM migrations (10+ TB disks) where fstrim operations create large overlays
+                    - OVA imports that require full uncompressed disk copies in temporary storage
+                    - Nodes with limited ephemeral storage that may cause pod eviction due to storage pressure
+                  The temporary PVC is automatically created and deleted with the conversion pod.
+                type: string
+              conversionTempStorageSize:
+                description: |-
+                  ConversionTempStorageSize specifies the size of the temporary conversion storage PVC.
+                  Only used when ConversionTempStorageClass is specified.
+                  User specification allows for buffer space beyond the largest disk size to accommodate:
+                    - Temporary files during conversion
+                    - Multiple concurrent conversions
+                    - OVA imports requiring full uncompressed copies
+                  Recommended minimum: size of the largest VM disk being migrated.
+                  Format: standard Kubernetes resource quantity (e.g., "30Gi", "1Ti")
+                type: string
               convertorAffinity:
                 description: |-
                   ConvertorAffinity allows specifying hard- and soft-affinity for virt-v2v convertor pods.
@@ -3184,6 +3427,57 @@ spec:
                   See Pod NodeSelector documentation for more details,
                   https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector
                 type: object
+              customizationScripts:
+                description: |-
+                  CustomizationScripts references a ConfigMap containing customization scripts
+                  to run during guest conversion. The ConfigMap must exist in the specified
+                  namespace and contain script files with keys following these patterns:
+                    - Windows: [0-9]+_win_firstboot_[description_text].ps1
+                    - Linux: [0-9]+_linux_(run|firstboot)_[description_text].sh
+                  Scripts are mounted at /mnt/dynamic_scripts in the conversion pod and
+                  executed by virt-customize. The number at the start of the key determines the
+                  execution order. If not specified, no custom scripts are injected.
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
               deleteGuestConversionPod:
                 description: |-
                   DeleteGuestConversionPod determines if the guest conversion pod should be deleted after successful migration.
@@ -3332,9 +3626,14 @@ spec:
                     - .NetworkType: type of the network ("Multus" or "Pod")
                     - .NetworkIndex: sequential index of the network interface (0-based)
                   The template can be used to customize network interface names based on target network configuration.
+
+                  Provider support:
+                    - VMware (vSphere): Supported. Network interface names can be customized.
+                    - OpenShift: Not supported. Network interface names are preserved from the source VM.
+
                   Note:
                     - This template can be overridden at the individual VM level
-                    - If not specified on VM level and on Plan leverl, default naming conventions will be used
+                    - If not specified on VM level and on Plan level, default naming conventions will be used
                   Examples:
                     "net-{{.NetworkIndex}}"
                     "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
@@ -3444,19 +3743,26 @@ spec:
                 description: "PVCNameTemplate is a template for generating PVC names
                   for VM disks.\nGenerated names must be valid DNS-1123 labels (lowercase
                   alphanumerics, '-' allowed, max 63 chars).\nIt follows Go template
-                  syntax and has access to the following variables:\n  - .VmName:
-                  name of the VM in the source cluster (original source name)\n  -
-                  .TargetVmName: final VM name in the target cluster (may equal .VmName
-                  if no rename/normalization)\n  - .PlanName: name of the migration
-                  plan\n  - .DiskIndex: initial volume index of the disk\n  - .WinDriveLetter:
-                  Windows drive letter (lowercase, if applicable, e.g. \"c\", requires
-                  guest agent)\n  - .RootDiskIndex: index of the root disk\n  - .Shared:
-                  true if the volume is shared by multiple VMs, false otherwise\n
-                  \ - .FileName: name of the file in the source provider (VMware only,
-                  filename includes the .vmdk suffix)\nNote:\n  This template can
-                  be overridden at the individual VM level.\nExamples:\n  \"{{.TargetVmName}}-disk-{{.DiskIndex}}\"\n
-                  \ \"{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}\"\n
-                  \ \"{{if .Shared}}shared-{{end}}{{.VmName | lower}}-{{.DiskIndex}}\"\nSee:\n\t
+                  syntax and has access to provider-specific variables.\n\nCommon
+                  variables (all providers):\n  - .VmName: name of the VM in the source
+                  cluster (original source name)\n  - .TargetVmName: final VM name
+                  in the target cluster (may equal .VmName if no rename/normalization)\n
+                  \ - .PlanName: name of the migration plan\n  - .DiskIndex: initial
+                  volume index of the disk\n\nVMware (vSphere) specific variables:\n
+                  \ - .WinDriveLetter: Windows drive letter (lowercase, if applicable,
+                  e.g. \"c\", requires guest agent)\n  - .RootDiskIndex: index of
+                  the root disk\n  - .Shared: true if the volume is shared by multiple
+                  VMs, false otherwise\n  - .FileName: name of the file in the source
+                  provider (filename includes the .vmdk suffix)\n\nOpenShift specific
+                  variables:\n  - .SourcePVCName: name of the PVC in the source cluster\n
+                  \ - .SourcePVCNamespace: namespace of the PVC in the source cluster\n\nDefault
+                  behavior when not set:\n  - VMware: generates names like \"{{trunc
+                  4 .PlanName}}-{{trunc 4 .VmName}}-disk-{{.DiskIndex}}\"\n  - OpenShift:
+                  uses the original source PVC name (\"{{.SourcePVCName}}\")\n\nNote:\n
+                  \ This template can be overridden at the individual VM level.\nExamples:\n
+                  \ \"{{.TargetVmName}}-disk-{{.DiskIndex}}\"\n  \"{{if eq .DiskIndex
+                  .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}\" (VMware)\n
+                  \ \"{{.TargetVmName}}-{{.SourcePVCName}}\" (OpenShift)\nSee:\n\t
                   https://github.com/kubev2v/forklift/tree/main/pkg/templateutil for
                   template functions."
                 type: string
@@ -3464,12 +3770,19 @@ spec:
                 default: true
                 description: |-
                   PVCNameTemplateUseGenerateName indicates if the PVC name template should use generateName instead of name.
-                  Setting this to false will use the name field of the PVCNameTemplate.
-                  This is useful when using a template that generates a name without a suffix.
-                  For example, if the template is "{{.VmName}}-disk-{{.DiskIndex}}", setting this to false will result in
-                  the PVC name being "{{.VmName}}-disk-{{.DiskIndex}}", which may not be unique.
-                  but will be more predictable.
-                  **DANGER** When set to false, the generated PVC name may not be unique and may cause conflicts.
+                  This field controls whether the template output is used as an exact name or as a prefix for generated names.
+
+                  Provider-specific behavior:
+
+                  VMware (vSphere):
+                    - true (default): Template output is used as generateName prefix, Kubernetes adds a random suffix
+                      (e.g., "my-vm-disk-0-" becomes "my-vm-disk-0-abc12")
+                    - false: Template output is used as the exact PVC name
+                      **DANGER**: May cause conflicts if the generated name is not unique
+
+                  OpenShift:
+                    - This field is ignored. The template output is always used as the exact PVC name.
+                    - Default template "{{.SourcePVCName}}" preserves source PVC names which are typically unique.
                 type: boolean
               runPreflightInspection:
                 default: true
@@ -3481,6 +3794,18 @@ spec:
               skipGuestConversion:
                 default: false
                 description: Determines if the plan should skip the guest conversion.
+                type: boolean
+              skipZoneNodeSelector:
+                description: |-
+                  SkipZoneNodeSelector controls whether to skip adding a zone-based node selector to
+                  migrated VMs. By default, the migration automatically reads the availability zone from
+                  the source provider's spec.settings.target-az configuration and adds a node selector
+                  (topology.kubernetes.io/zone=<target-az>) to the target VM. This ensures VMs are
+                  scheduled on nodes in the same zone as their EBS volumes, which is required for
+                  volume attachment by the CSI driver.
+                  Currently supported for EC2 provider only.
+                  - false (default): Add zone-based node selector using value from provider's spec.settings.target-az
+                  - true: Skip adding zone-based node selector
                 type: boolean
               targetAffinity:
                 description: |-
@@ -4654,9 +4979,14 @@ spec:
                           - .NetworkType: type of the network ("Multus" or "Pod")
                           - .NetworkIndex: sequential index of the network interface (0-based)
                         The template can be used to customize network interface names based on target network configuration.
+
+                        Provider support:
+                          - VMware (vSphere): Supported. Network interface names can be customized.
+                          - OpenShift: Not supported. Network interface names are preserved from the source VM.
+
                         Note:
                           - This template will override at the plan level template
-                          - If not specified on VM level and on Plan leverl, default naming conventions will be used
+                          - If not specified on VM level and on Plan level, default naming conventions will be used
                         Examples:
                           "net-{{.NetworkIndex}}"
                           "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
@@ -4665,21 +4995,24 @@ spec:
                       description: "PVCNameTemplate is a template for generating PVC
                         names for VM disks.\nGenerated names must be valid DNS-1123
                         labels (lowercase alphanumerics, '-' allowed, max 63 chars).\nIt
-                        follows Go template syntax and has access to the following
-                        variables:\n  - .VmName: name of the VM in the source cluster
-                        (original source name)\n  - .TargetVmName: final VM name in
-                        the target cluster (may equal .VmName if no rename/normalization)\n
-                        \ - .PlanName: name of the migration plan\n  - .DiskIndex:
-                        initial volume index of the disk\n  - .WinDriveLetter: Windows
-                        drive letter (lowercase, if applicable, e.g. \"c\", requires
-                        guest agent)\n  - .RootDiskIndex: index of the root disk\n
-                        \ - .Shared: true if the volume is shared by multiple VMs,
-                        false otherwise\n  - .FileName: name of the file in the source
-                        provider (VMware only, filename includes the .vmdk suffix)\nNote:\n
-                        \ This template overrides the plan level template.\nExamples:\n
-                        \ \"{{.TargetVmName}}-disk-{{.DiskIndex}}\"\n  \"{{if eq .DiskIndex
-                        .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}\"\n
-                        \ \"{{if .Shared}}shared-{{end}}{{.VmName | lower}}-{{.DiskIndex}}\"\nSee:\n\t
+                        follows Go template syntax and has access to provider-specific
+                        variables.\n\nCommon variables (all providers):\n  - .VmName:
+                        name of the VM in the source cluster (original source name)\n
+                        \ - .TargetVmName: final VM name in the target cluster (may
+                        equal .VmName if no rename/normalization)\n  - .PlanName:
+                        name of the migration plan\n  - .DiskIndex: initial volume
+                        index of the disk\n\nVMware (vSphere) specific variables:\n
+                        \ - .WinDriveLetter: Windows drive letter (lowercase, if applicable,
+                        e.g. \"c\", requires guest agent)\n  - .RootDiskIndex: index
+                        of the root disk\n  - .Shared: true if the volume is shared
+                        by multiple VMs, false otherwise\n  - .FileName: name of the
+                        file in the source provider (filename includes the .vmdk suffix)\n\nOpenShift
+                        specific variables:\n  - .SourcePVCName: name of the PVC in
+                        the source cluster\n  - .SourcePVCNamespace: namespace of
+                        the PVC in the source cluster\n\nNote:\n  This template overrides
+                        the plan level template.\nExamples:\n  \"{{.TargetVmName}}-disk-{{.DiskIndex}}\"\n
+                        \ \"{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}\"
+                        (VMware)\n  \"{{.TargetVmName}}-{{.SourcePVCName}}\" (OpenShift)\nSee:\n\t
                         https://github.com/kubev2v/forklift/tree/main/pkg/templateutil
                         for template functions."
                       type: string
@@ -4712,9 +5045,14 @@ spec:
                         It follows Go template syntax and has access to the following variables:
                           - .PVCName: name of the PVC mounted to the VM using this volume
                           - .VolumeIndex: sequential index of the volume interface (0-based)
+
+                        Provider support:
+                          - VMware (vSphere): Supported. Default naming is "vol-{index}".
+                          - OpenShift: Not supported. Volume names are preserved from the source VM.
+
                         Note:
                           - This template will override at the plan level template
-                          - If not specified on VM level and on Plan leverl, default naming conventions will be used
+                          - If not specified on VM level and on Plan level, default naming conventions will be used
                         Examples:
                           "disk-{{.VolumeIndex}}"
                           "pvc-{{.PVCName}}"
@@ -4727,9 +5065,14 @@ spec:
                   It follows Go template syntax and has access to the following variables:
                     - .PVCName: name of the PVC mounted to the VM using this volume
                     - .VolumeIndex: sequential index of the volume interface (0-based)
+
+                  Provider support:
+                    - VMware (vSphere): Supported. Default naming is "vol-{index}".
+                    - OpenShift: Not supported. Volume names are preserved from the source VM.
+
                   Note:
                     - This template can be overridden at the individual VM level
-                    - If not specified on VM level and on Plan leverl, default naming conventions will be used
+                    - If not specified on VM level and on Plan level, default naming conventions will be used
                   Examples:
                     "disk-{{.VolumeIndex}}"
                     "pvc-{{.PVCName}}"
@@ -5220,9 +5563,14 @@ spec:
                               - .NetworkType: type of the network ("Multus" or "Pod")
                               - .NetworkIndex: sequential index of the network interface (0-based)
                             The template can be used to customize network interface names based on target network configuration.
+
+                            Provider support:
+                              - VMware (vSphere): Supported. Network interface names can be customized.
+                              - OpenShift: Not supported. Network interface names are preserved from the source VM.
+
                             Note:
                               - This template will override at the plan level template
-                              - If not specified on VM level and on Plan leverl, default naming conventions will be used
+                              - If not specified on VM level and on Plan level, default naming conventions will be used
                             Examples:
                               "net-{{.NetworkIndex}}"
                               "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
@@ -5368,21 +5716,24 @@ spec:
                             PVC names for VM disks.\nGenerated names must be valid
                             DNS-1123 labels (lowercase alphanumerics, '-' allowed,
                             max 63 chars).\nIt follows Go template syntax and has
-                            access to the following variables:\n  - .VmName: name
-                            of the VM in the source cluster (original source name)\n
-                            \ - .TargetVmName: final VM name in the target cluster
-                            (may equal .VmName if no rename/normalization)\n  - .PlanName:
-                            name of the migration plan\n  - .DiskIndex: initial volume
-                            index of the disk\n  - .WinDriveLetter: Windows drive
-                            letter (lowercase, if applicable, e.g. \"c\", requires
+                            access to provider-specific variables.\n\nCommon variables
+                            (all providers):\n  - .VmName: name of the VM in the source
+                            cluster (original source name)\n  - .TargetVmName: final
+                            VM name in the target cluster (may equal .VmName if no
+                            rename/normalization)\n  - .PlanName: name of the migration
+                            plan\n  - .DiskIndex: initial volume index of the disk\n\nVMware
+                            (vSphere) specific variables:\n  - .WinDriveLetter: Windows
+                            drive letter (lowercase, if applicable, e.g. \"c\", requires
                             guest agent)\n  - .RootDiskIndex: index of the root disk\n
                             \ - .Shared: true if the volume is shared by multiple
                             VMs, false otherwise\n  - .FileName: name of the file
-                            in the source provider (VMware only, filename includes
-                            the .vmdk suffix)\nNote:\n  This template overrides the
-                            plan level template.\nExamples:\n  \"{{.TargetVmName}}-disk-{{.DiskIndex}}\"\n
-                            \ \"{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}\"\n
-                            \ \"{{if .Shared}}shared-{{end}}{{.VmName | lower}}-{{.DiskIndex}}\"\nSee:\n\t
+                            in the source provider (filename includes the .vmdk suffix)\n\nOpenShift
+                            specific variables:\n  - .SourcePVCName: name of the PVC
+                            in the source cluster\n  - .SourcePVCNamespace: namespace
+                            of the PVC in the source cluster\n\nNote:\n  This template
+                            overrides the plan level template.\nExamples:\n  \"{{.TargetVmName}}-disk-{{.DiskIndex}}\"\n
+                            \ \"{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}\"
+                            (VMware)\n  \"{{.TargetVmName}}-{{.SourcePVCName}}\" (OpenShift)\nSee:\n\t
                             https://github.com/kubev2v/forklift/tree/main/pkg/templateutil
                             for template functions."
                           type: string
@@ -5422,9 +5773,14 @@ spec:
                             It follows Go template syntax and has access to the following variables:
                               - .PVCName: name of the PVC mounted to the VM using this volume
                               - .VolumeIndex: sequential index of the volume interface (0-based)
+
+                            Provider support:
+                              - VMware (vSphere): Supported. Default naming is "vol-{index}".
+                              - OpenShift: Not supported. Volume names are preserved from the source VM.
+
                             Note:
                               - This template will override at the plan level template
-                              - If not specified on VM level and on Plan leverl, default naming conventions will be used
+                              - If not specified on VM level and on Plan level, default naming conventions will be used
                             Examples:
                               "disk-{{.VolumeIndex}}"
                               "pvc-{{.PVCName}}"
@@ -5670,6 +6026,11 @@ spec:
                 type: integer
               phase:
                 description: Current life cycle phase of the provider.
+                type: string
+              secretResourceVersion:
+                description: |-
+                  The ResourceVersion of the secret referenced by this provider.
+                  Used to detect when credentials have been rotated.
                 type: string
               service:
                 description: Provider service reference
@@ -6366,6 +6727,7 @@ rules:
   - storage.k8s.io
   resources:
   - storageclasses
+  - csidrivers
   verbs:
   - get
   - list
@@ -6514,6 +6876,148 @@ rules:
   - get
   - list
   - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: forklift-migrator-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - secrets
+  - configmaps
+  - services
+  - namespaces
+  - persistentvolumes
+  - persistentvolumeclaims
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - k8s.cni.cncf.io
+  resources:
+  - network-attachment-definitions
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - storageclasses
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - kubevirt.io
+  resources:
+  - virtualmachines
+  - virtualmachines/finalizers
+  - virtualmachineinstancemigrations
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - kubevirt.io
+  resources:
+  - kubevirts
+  - virtualmachineinstances
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - cdi.kubevirt.io
+  resources:
+  - datavolumes
+  - datavolumes/finalizers
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - export.kubevirt.io
+  resources:
+  - virtualmachineexports
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - instancetype.kubevirt.io
+  resources:
+  - virtualmachineclusterpreferences
+  - virtualmachineclusterinstancetypes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - instancetype.kubevirt.io
+  resources:
+  - virtualmachinepreferences
+  - virtualmachineinstancetypes
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - multicluster.x-k8s.io
+  resources:
+  - serviceexports
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -6874,6 +7378,8 @@ spec:
           value: ${OPENSTACK_POPULATOR_IMAGE}
         - name: OVA_PROVIDER_SERVER_IMAGE
           value: ${OVA_PROVIDER_SERVER_IMAGE}
+        - name: HYPERV_PROVIDER_SERVER_IMAGE
+          value: ${HYPERV_PROVIDER_SERVER_IMAGE}
         - name: OVA_PROXY_IMAGE
           value: ${OVA_PROXY_IMAGE}
         - name: OVIRT_OS_MAP
@@ -7094,7 +7600,7 @@ spec:
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:radio:true
         - urn:alm:descriptor:com.tectonic.ui:radio:false
-      - description: Enable copy offload plugins (default false)
+      - description: Enable copy offload plugins (default true)
         displayName: Enable Copy Offload Plugins
         path: feature_copy_offload
         x-descriptors:
@@ -7385,11 +7891,6 @@ spec:
         path: controller_cleanup_retries
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
-      - description: DataVolume status check retries (default 10)
-        displayName: DV Status Check Retries
-        path: controller_dv_status_check_retries
-        x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Snapshot removal retries (default 20)
         displayName: Snapshot Removal Check Retries
         path: controller_snapshot_removal_check_retries
@@ -7535,26 +8036,26 @@ spec:
         path: ova_proxy_route_timeout
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
-        - description: Volume Populator CPU limit (default 1000m)
-          displayName: Volume Populator CPU Limit
-          path: populator_container_limits_cpu
-          x-descriptors:
-          - urn:alm:descriptor:com.tectonic.ui:hidden
-        - description: Volume Populator memory limit (default 1Gi)
-          displayName: Volume Populator Memory Limit
-          path: populator_container_limits_memory
-          x-descriptors:
-          - urn:alm:descriptor:com.tectonic.ui:hidden
-        - description: Volume Populator CPU request (default 100m)
-          displayName: Volume Populator CPU Request
-          path: populator_container_requests_cpu
-          x-descriptors:
-          - urn:alm:descriptor:com.tectonic.ui:hidden
-        - description: Volume Populator memory request (default 512Mi)
-          displayName: Volume Populator Memory Request
-          path: populator_container_requests_memory
-          x-descriptors:
-          - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Volume Populator CPU limit (default 1000m)
+        displayName: Volume Populator CPU Limit
+        path: populator_container_limits_cpu
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Volume Populator memory limit (default 1Gi)
+        displayName: Volume Populator Memory Limit
+        path: populator_container_limits_memory
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Volume Populator CPU request (default 100m)
+        displayName: Volume Populator CPU Request
+        path: populator_container_requests_cpu
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Volume Populator memory request (default 512Mi)
+        displayName: Volume Populator Memory Request
+        path: populator_container_requests_memory
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Log verbosity level (default 3)
         displayName: Controller Log Level
         path: controller_log_level

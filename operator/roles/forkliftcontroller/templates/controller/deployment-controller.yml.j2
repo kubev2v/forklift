@@ -25,7 +25,7 @@ spec:
       annotations:
         configHash: "{{ (inventory_volume_path | string) }}"
 {% if controller_transfer_network is defined %}
-        k8s.v1.cni.cncf.io/networks: "{{ controller_transfer_network }}"
+        k8s.v1.cni.cncf.io/networks: {{ controller_transfer_network | to_json }}
 {% else %}
         k8s.v1.cni.cncf.io/networks: null
 {% endif %}
@@ -89,10 +89,6 @@ spec:
 {% if controller_cleanup_retries is number %}
         - name: CLEANUP_RETRIES
           value: "{{ controller_cleanup_retries }}"
-{% endif %}
-{% if controller_dv_status_check_retries is number %}
-        - name: DV_STATUS_CHECK_RETRIES
-          value: "{{ controller_dv_status_check_retries }}"
 {% endif %}
 {% if controller_snapshot_removal_check_retries is number %}
         - name: SNAPSHOT_REMOVAL_CHECK_RETRIES
@@ -260,8 +256,10 @@ spec:
           value: '8082'
         - name: OVA_PROVIDER_SERVER_IMAGE
           value: {{ ova_provider_server_fqin }}
+        - name: HYPERV_PROVIDER_SERVER_IMAGE
+          value: {{ hyperv_provider_server_fqin }}
 {% if feature_ova_appliance_management|bool %}
-        - name: FEATURE_OVA_APPLIANCE_MANAGEMENT
+        - name: FEATURE_OVF_APPLIANCE_MANAGEMENT
           value: "true"
 {% endif %}
 {% if feature_validation|bool %}

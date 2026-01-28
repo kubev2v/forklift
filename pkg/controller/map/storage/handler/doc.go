@@ -9,6 +9,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/map/storage/handler/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/watch/handler"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	ec2handler "github.com/kubev2v/forklift/pkg/provider/ec2/controller/handler"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
@@ -48,8 +49,13 @@ func New(
 			client,
 			channel,
 			provider)
-	case api.Ova:
+	case api.Ova, api.HyperV:
 		h, err = ova.New(
+			client,
+			channel,
+			provider)
+	case api.EC2:
+		h, err = ec2handler.NewStorageHandler(
 			client,
 			channel,
 			provider)

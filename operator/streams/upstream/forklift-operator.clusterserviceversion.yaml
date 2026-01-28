@@ -139,7 +139,7 @@ spec:
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:radio:true
           - urn:alm:descriptor:com.tectonic.ui:radio:false
-        - description: Enable copy offload plugins (default false)
+        - description: Enable copy offload plugins (default true)
           displayName: Enable Copy Offload Plugins
           path: feature_copy_offload
           x-descriptors:
@@ -437,11 +437,6 @@ spec:
         - description: Cleanup retry count (default 10)
           displayName: Cleanup Retries
           path: controller_cleanup_retries
-          x-descriptors:
-          - urn:alm:descriptor:com.tectonic.ui:hidden
-        - description: DataVolume status check retries (default 10)
-          displayName: DV Status Check Retries
-          path: controller_dv_status_check_retries
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:hidden
         - description: Snapshot removal retries (default 20)

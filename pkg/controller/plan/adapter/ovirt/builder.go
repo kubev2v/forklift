@@ -1022,3 +1022,9 @@ func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskNam
 	taskName = pvc.Annotations[planbase.AnnDiskSource]
 	return
 }
+
+// ConversionPodConfig returns provider-specific configuration for the virt-v2v conversion pod.
+// oVirt provider does not require any special configuration.
+func (r *Builder) ConversionPodConfig(_ ref.Ref) (*planbase.ConversionPodConfigResult, error) {
+	return &planbase.ConversionPodConfigResult{}, nil
+}

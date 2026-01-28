@@ -46,3 +46,65 @@ test_valid_capacity if {
 	results := concerns with input as test_input
 	count(results) == 0
 }
+
+test_lun_valid_capacity if {
+    test_input := {"diskAttachments": [{
+       "id": "disk-lun-valid",
+       "interface": "virtio_scsi",
+       "disk": {
+          "storageType": "lun",
+          "lun": {
+             "logicalUnits": {
+                "logicalUnit": [
+                   {"size": 1024},
+                   {"size": 2048}
+                ]
+             }
+          }
+       },
+    }]}
+
+    results := concerns with input as test_input
+    count(results) == 0
+}
+
+test_lun_invalid_capacity_zero if {
+    test_input := {"diskAttachments": [{
+       "id": "disk-lun-zero",
+       "interface": "virtio_scsi",
+       "disk": {
+          "storageType": "lun",
+          "lun": {
+             "logicalUnits": {
+                "logicalUnit": [
+                   {"size": 1024},
+                   {"size": 0}
+                ]
+             }
+          }
+       },
+    }]}
+
+    results := concerns with input as test_input
+    count(results) == 1
+}
+
+test_lun_invalid_capacity_missing_or_negative if {
+    test_input := {"diskAttachments": [{
+       "id": "disk-lun-neg",
+       "interface": "virtio_scsi",
+       "disk": {
+          "storageType": "lun",
+          "lun": {
+             "logicalUnits": {
+                "logicalUnit": [
+                   {"size": -500}
+                ]
+             }
+          }
+       },
+    }]}
+
+    results := concerns with input as test_input
+    count(results) == 1
+}

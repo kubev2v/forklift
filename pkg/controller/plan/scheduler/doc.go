@@ -10,6 +10,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/plan/scheduler/ovirt"
 	"github.com/kubev2v/forklift/pkg/controller/plan/scheduler/vsphere"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	ec2scheduler "github.com/kubev2v/forklift/pkg/provider/ec2/controller/scheduler"
 	"github.com/kubev2v/forklift/pkg/settings"
 )
 
@@ -43,8 +44,13 @@ func New(ctx *plancontext.Context) (scheduler Scheduler, err error) {
 			Context:     ctx,
 			MaxInFlight: settings.Settings.MaxInFlight,
 		}
-	case api.Ova:
+	case api.Ova, api.HyperV:
 		scheduler = &ova.Scheduler{
+			Context:     ctx,
+			MaxInFlight: settings.Settings.MaxInFlight,
+		}
+	case api.EC2:
+		scheduler = &ec2scheduler.Scheduler{
 			Context:     ctx,
 			MaxInFlight: settings.Settings.MaxInFlight,
 		}
