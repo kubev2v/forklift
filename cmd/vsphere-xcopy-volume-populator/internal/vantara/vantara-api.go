@@ -202,6 +202,7 @@ func (api *BlockStorageAPI) InvokeAsyncCommand(methodType, url string, body, hea
 	klog.Infof("Request was accepted. JOB URL: %v", result["self"])
 
 	status := "Initializing"
+	state := ""
 	retryCount := 1
 	waitTime := 1 // FIRST_WAIT_TIME
 
@@ -217,6 +218,11 @@ func (api *BlockStorageAPI) InvokeAsyncCommand(methodType, url string, body, hea
 			return "", err
 		}
 		status = jobResult["status"].(string)
+		state = jobResult["state"].(string)
+		if state == "Failed" {
+			jobError := jobResult["error"].(map[string]interface{})
+			klog.Infof("Async job state: %s with error: %v", state, jobError)
+		}
 		klog.Infof("Status: %s", status)
 		if waitTime*2 < 120 {
 			waitTime *= 2
