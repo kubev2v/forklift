@@ -2003,27 +2003,6 @@ func (r *Reconciler) validatePodSecurity(plan *api.Plan) error {
 			"plan", plan.Name)
 	}
 
-	// For OpenShift, also check if restricted-v2 SCC is indicated
-	// The restricted-v2 SCC typically sets specific annotations on the namespace
-	if settings.Settings.OpenShift && !isRestricted {
-		// Check for restricted-v2 SCC indicator
-		// When restricted-v2 SCC is used, the namespace may have specific annotations
-		// or the enforce label may be set to restricted
-		if ns.Annotations["openshift.io/sa.scc.uid-range"] != "" {
-			// Check if the UID range indicates restricted (restricted-v2 uses specific ranges)
-			// restricted-v2 typically uses UID ranges like 1000790000-1000799999
-			uidRange := ns.Annotations["openshift.io/sa.scc.uid-range"]
-			if strings.Contains(uidRange, "100079") {
-				// This looks like restricted-v2 SCC range
-				isRestricted = true
-				r.Log.Info("Detected restricted-v2 SCC from namespace annotation",
-					"namespace", controllerNamespace,
-					"uidRange", uidRange,
-					"plan", plan.Name)
-			}
-		}
-	}
-
 	// If restricted policies detected, add a warning condition (non-blocking)
 	if isRestricted {
 		restrictedPodSecurity := libcnd.Condition{
