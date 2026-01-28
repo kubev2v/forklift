@@ -7,7 +7,7 @@
 # Example: TARGET_VERSION="MTV 2.6"
 TARGET_VERSION=""
 PROJECT=MTV
-DEFAULT_LABELS="mtv-copy-offload"
+DEFAULT_LABELS="mtv-copy-offload,mtv-storage-offload"
 DEFAULT_COMPONENT="Storage Offload"
 ISSUE_TYPES=("Story" "Bug" "Task")
 
@@ -34,7 +34,7 @@ function get_versions() {
 
 function get_target_version() {
   if [[ -z "$TARGET_VERSION" ]]; then
-    TARGET_VERSION=$(echo "$VERSIONS" | jq  ' .[] | select(.released == false)|.name'  | fzf --prompt "Choose the target release version: ")
+    TARGET_VERSION=$(echo "$VERSIONS" | jq -r ' .[] | select(.released == false)|.name'  | fzf --prompt "Choose the target release version: ")
   fi
 
   if [[ -z "$TARGET_VERSION" ]]; then
@@ -46,7 +46,7 @@ function get_target_version() {
 }
 
 function get_affected_version() {
-  AFFECTED_VERSION=$(echo "$VERSIONS" | jq  ' .[] | .name'  | fzf --prompt "Choose the affected version: ")
+  AFFECTED_VERSION=$(echo "$VERSIONS" | jq -r ' .[] | .name'  | fzf --prompt "Choose the affected version: ")
 
   if [[ -z "$AFFECTED_VERSION" ]]; then
     echo "No affected version selected. Exiting."
@@ -103,7 +103,7 @@ function create_ticket() {
   echo
   echo "--- Creating Jira Issue ---"
   echo "Project:         $PROJECT"
-  echo "Target Version:  $TARGET_VERSION"
+  echo "Fix Version:     $TARGET_VERSION"
   echo "Affects Version: $AFFECTED_VERSION"
   echo "Epic:            $EPIC_KEY"
   echo "Type:            $ISSUE_TYPE"
@@ -111,23 +111,37 @@ function create_ticket() {
   echo "Labels:          $DEFAULT_LABELS"
   echo "Component:       $DEFAULT_COMPONENT"
   echo "---------------------------"
-  
+
   read -p "Proceed to create this issue? (y/N) " confirm
   if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
     echo "Aborted."
     exit 0
   fi
-  
-  jira issue create \
+
+  # Create the issue and capture the key
+  ISSUE_KEY=$(jira issue create \
     -p"$PROJECT" \
     --type="$ISSUE_TYPE" \
     --summary="$ISSUE_TITLE" \
-    --parent="$EPIC_KEY" \
-    --custom customfield_12319940="$TARGET_VERSION" \
+    --fix-version="$TARGET_VERSION" \
     --affects-version="$AFFECTED_VERSION" \
     --label="$DEFAULT_LABELS" \
     --component="$DEFAULT_COMPONENT" \
-    --web
+    --no-input | grep -oE "$PROJECT-[0-9]+")
+
+  if [[ -z "$ISSUE_KEY" ]]; then
+    echo "Error: Failed to create issue"
+    exit 1
+  fi
+
+  echo "Created issue: $ISSUE_KEY"
+
+  # Add issue to epic
+  echo "Adding issue to epic $EPIC_KEY..."
+  jira epic add "$EPIC_KEY" "$ISSUE_KEY"
+
+  # Open in browser
+  jira issue view "$ISSUE_KEY" --web
 }
 
 # --- Main ---
