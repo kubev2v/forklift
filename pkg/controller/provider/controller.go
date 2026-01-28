@@ -215,6 +215,9 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	provider.Status.BeginStagingConditions()
 
 	defer func() {
+		// This must be called before updateProviderStatus to clean up unstaged conditions
+		provider.Status.EndStagingConditions()
+
 		if err == nil {
 			if err = r.updateProviderStatus(provider); err != nil {
 				err = liberr.Wrap(err)
@@ -279,9 +282,6 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 				Message:  "The provider is ready.",
 			})
 	}
-
-	// End staging conditions.
-	provider.Status.EndStagingConditions()
 
 	// Update the DB.
 	err = r.updateProvider(provider)
