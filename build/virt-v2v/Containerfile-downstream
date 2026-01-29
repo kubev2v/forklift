@@ -3,7 +3,7 @@ FROM registry.redhat.io/ubi9:9.6-1747219013 AS winlegacyiso
 RUN rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 RUN yum install -y --setopt=install_weak_deps=False virtio-win-1.9.4-2.el7.2
 
-FROM registry.redhat.io/ubi10:10.1-1762952713 AS appliance
+FROM registry.redhat.io/ubi10:10.1-1769662757 AS appliance
 
 RUN dnf update -y && \
     dnf install -y --setopt=install_weak_deps=False \
@@ -35,7 +35,7 @@ RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-monitor github
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o image-converter github.com/kubev2v/forklift/cmd/image-converter
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-wrapper github.com/kubev2v/forklift/cmd/virt-v2v
 
-FROM registry.redhat.io/ubi10:10.1-1762952713 AS runtime
+FROM registry.redhat.io/ubi10:10.1-1769662757 AS runtime
 
 COPY --chown=1001:0 ./libguestfs-fssupport-10.1-4.el10_1.* ./
 
