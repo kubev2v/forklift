@@ -5,14 +5,19 @@ COPY --chown=1001:0 ./ ./
 ENV GOFLAGS="-mod=vendor -tags=strictfipsruntime"
 ENV GOEXPERIMENT=strictfipsruntime
 ENV GOCACHE=/go-build/cache
+# Build Linux binary for container
 RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -ldflags="-w -s" -o hyperv-provider-server github.com/kubev2v/forklift/cmd/hyperv-provider-server
+# Build Windows OVF generator (lightweight standalone tool for customer extraction)
+RUN --mount=type=cache,target=${GOCACHE},uid=1001 GOOS=windows GOARCH=amd64 go build -ldflags="-w -s" -o ovf-generator.exe github.com/kubev2v/forklift/cmd/ovf-generator
 
 FROM registry.access.redhat.com/ubi9-minimal:9.6-1752587672
 # Required to be able to get files from within the pod
 RUN microdnf -y install tar && microdnf clean all
 
-
+# Linux binary for server
 COPY --from=builder /app/hyperv-provider-server /usr/local/bin/hyperv-provider-server
+# Windows OVF generator for customer extraction (lightweight standalone tool)
+COPY --from=builder /app/ovf-generator.exe /usr/share/forklift/tools/ovf-generator.exe
 USER 1001
 
 
