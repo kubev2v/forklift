@@ -347,17 +347,94 @@ func isWindows(vm *model.VM) bool {
 	return strings.Contains(vm.GuestID, WindowsPrefix) || strings.Contains(vm.GuestName, WindowsPrefix)
 }
 
-// Retrieve the IP address of an ESXI host from its Management Network VNIC or fall back to the hostname.
-func getHostAddress(host *model.Host) string {
+// Extract provider IP family detection
+func isProviderHostnameIPv6(provider *api.Provider) bool {
+	if providerURL, err := liburl.Parse(provider.Spec.URL); err == nil {
+		if ip := net.ParseIP(providerURL.Hostname()); ip != nil {
+			return ip.To4() == nil
+		}
+	}
+	return false
+}
+
+// Extract host IP collection
+// extractHostIPv4Address extracts the IPv4 address from the host's Management Network vNIC.
+func extractHostIPv4Address(host *model.Host) string {
 	for _, vnic := range host.Network.VNICs {
-		if vnic.PortGroup == ManagementNetwork {
-			if vnic.IpAddress != "" && net.ParseIP(vnic.IpAddress) != nil {
-				return vnic.IpAddress // Return the IP address if found
+		if vnic.PortGroup != ManagementNetwork {
+			continue
+		}
+		if vnic.IpAddress != "" {
+			if ip := net.ParseIP(vnic.IpAddress); ip != nil && ip.To4() != nil {
+				return vnic.IpAddress
 			}
 		}
 	}
-	// otherwise fall back to the host name
-	return host.Name
+	return ""
+}
+
+// extractHostIPv6Address extracts the first non-link-local IPv6 address from the host's Management Network vNIC.
+func extractHostIPv6Address(host *model.Host) string {
+	for _, vnic := range host.Network.VNICs {
+		if vnic.PortGroup != ManagementNetwork {
+			continue
+		}
+		for _, ipv6 := range vnic.IpV6Address {
+			if ipv6 == "" {
+				continue
+			}
+			if ip := net.ParseIP(ipv6); ip != nil && !ip.IsLinkLocalUnicast() {
+				return ipv6
+			}
+		}
+	}
+	return ""
+}
+
+// extractHostAddresses extracts IPv4 and IPv6 addresses from the host's Management Network vNIC.
+func extractHostAddresses(host *model.Host) (ipv4Address, ipv6Address string) {
+	return extractHostIPv4Address(host), extractHostIPv6Address(host)
+}
+
+// Retrieve the IP address of an ESXI host from its Management Network VNIC
+// or fall back to the hostname.
+// IPv6 addresses are wrapped in brackets for URL compatibility.
+func getHostAddress(host *model.Host, provider *api.Provider) string {
+	providerUsesIPv6 := isProviderHostnameIPv6(provider)
+	ipv4Address, ipv6Address := extractHostAddresses(host)
+
+	switch {
+	// Provider uses IPv6 and host has a usable IPv6 address
+	// Match the provider's IP family preference.
+	case providerUsesIPv6 && ipv6Address != "":
+		return formatHostAddress(ipv6Address)
+	// Provider uses IPv4 and host has a usable IPv4 address
+	// Match the provider's IP family preference.
+	case !providerUsesIPv6 && ipv4Address != "":
+		return formatHostAddress(ipv4Address)
+	// Provider's preferred IP family not available, but host has IPv6
+	// Fall back to IPv6 (e.g., provider uses IPv4 but host lacks IPv4)
+	case ipv6Address != "":
+		return formatHostAddress(ipv6Address)
+	// Provider's preferred IP family not available, but host has IPv4
+	// Fall back to IPv4 (e.g., provider uses IPv6 but host lacks IPv6)
+	case ipv4Address != "":
+		return formatHostAddress(ipv4Address)
+	// No IP addresses available, use hostname
+	default:
+		return host.Name
+	}
+}
+
+// formatHostAddress wraps IPv6 addresses in brackets for URL compatibility.
+func formatHostAddress(address string) string {
+	ip := net.ParseIP(address)
+	if ip != nil && ip.To4() == nil {
+		// IPv6 address - wrap in brackets
+		return "[" + address + "]"
+	}
+	// IPv4 address or hostname - return as-is
+	return address
 }
 
 func (r *Builder) getSourceDetails(vm *model.VM, sourceSecret *core.Secret) (libvirtURL liburl.URL, fingerprint string, err error) {
@@ -382,7 +459,7 @@ func (r *Builder) getSourceDetails(vm *model.VM, sourceSecret *core.Secret) (lib
 		}
 		libvirtURL = liburl.URL{
 			Scheme:   "esx",
-			Host:     hostDef.Spec.IpAddress,
+			Host:     formatHostAddress(hostDef.Spec.IpAddress),
 			User:     liburl.User(string(hostSecret.Data["user"])),
 			Path:     "",
 			RawQuery: sslVerify,
@@ -397,7 +474,7 @@ func (r *Builder) getSourceDetails(vm *model.VM, sourceSecret *core.Secret) (lib
 	} else if r.Source.Provider.Spec.Settings[api.SDK] == api.ESXI {
 		libvirtURL = liburl.URL{
 			Scheme:   "esx",
-			Host:     getHostAddress(host),
+			Host:     getHostAddress(host, r.Source.Provider),
 			User:     liburl.User(string(sourceSecret.Data["user"])),
 			Path:     "",
 			RawQuery: sslVerify,
@@ -503,7 +580,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 	if hostDef, found := r.hosts[hostID]; found {
 		hostURL := liburl.URL{
 			Scheme: "https",
-			Host:   hostDef.Spec.IpAddress,
+			Host:   formatHostAddress(hostDef.Spec.IpAddress),
 			Path:   vim25.Path,
 		}
 		url = hostURL.String()
