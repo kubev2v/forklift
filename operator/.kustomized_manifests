@@ -314,6 +314,11 @@ spec:
                 description: Must-gather debugging image
                 example: quay.io/kubev2v/forklift-must-gather:latest
                 type: string
+              network_policies_min_ocp_version:
+                description: 'Minimum OCP version to auto-enable network policies
+                  (default: 4.21.0)'
+                example: 4.21.0
+                type: string
               ova_container_limits_cpu:
                 description: 'OVA CPU limit (default: 1000m)'
                 example: 2000m
