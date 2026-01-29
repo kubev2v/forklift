@@ -1,36 +1,59 @@
 package vantara
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
-
-	"k8s.io/klog/v2"
+	"time"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
-)
-
-const decode = true
-
-// Action types
-const (
-	GETLDEV        = "getLdev"
-	ADDPATH        = "addPath"
-	DELETEPATH     = "deletePath"
-	GETPORTDETAILS = "getPortDetails"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
+	"github.com/vmware/govmomi/find"
+	"github.com/vmware/govmomi/property"
+	"github.com/vmware/govmomi/vim25/mo"
+	"github.com/vmware/govmomi/vim25/types"
+	"k8s.io/klog/v2"
 )
 
 type VantaraCloner struct {
-	api VantaraStorageAPI
+	client          VantaraClient
+	envHostGroupIds []string
 }
 
 func NewVantaraClonner(hostname, username, password string) (VantaraCloner, error) {
-	vantaraObj := make(VantaraObject)
-	envStorage, _ := getStorageEnvVars()
-	v := getNewVantaraStorageAPIfromEnv(envStorage, vantaraObj)
+	envStorage, err := getStorageEnvVars()
+	if err != nil {
+		return VantaraCloner{}, fmt.Errorf("failed to get storage env vars: %w", err)
+	}
 
-	return VantaraCloner{api: *v}, nil
+	// Extract IP from hostname
+	decodedIP, err := extractIPAddress(envStorage["restServerIP"].(string))
+	if err != nil {
+		return VantaraCloner{}, fmt.Errorf("failed to extract IP address: %w", err)
+	}
+
+	client := NewBlockStorageAPI(
+		decodedIP,
+		envStorage["port"].(string),
+		envStorage["storageId"].(string),
+		envStorage["userID"].(string),
+		envStorage["password"].(string),
+	)
+
+	// Establish initial connection
+	if err := client.Connect(); err != nil {
+		return VantaraCloner{}, fmt.Errorf("failed to connect to Vantara storage: %w", err)
+	}
+
+	return VantaraCloner{
+		client:          client,
+		envHostGroupIds: envStorage["hostGroupIds"].([]string),
+	}, nil
 }
 
 func getStorageEnvVars() (map[string]interface{}, error) {
@@ -66,42 +89,22 @@ func getStorageEnvVars() (map[string]interface{}, error) {
 	return storageEnvVars, nil
 }
 
-func getNewVantaraStorageAPIfromEnv(envVars map[string]interface{}, vantaraObj VantaraObject) *VantaraStorageAPI {
-	vantaraObj["envHostGroupIds"] = envVars["hostGroupIds"].([]string)
-	return NewVantaraStorageAPI(envVars["storageId"].(string), envVars["restServerIP"].(string), envVars["port"].(string), envVars["userID"].(string), envVars["password"].(string), vantaraObj)
-}
-
 func (v *VantaraCloner) CurrentMappedGroups(lun populator.LUN, context populator.MappingContext) ([]string, error) {
-	LDEV := v.ShowLdev(lun)
-	klog.Infof("LDEV: %+v", LDEV) // LDEV is a map[string]interface{}
-
-	// Ensure LDEV["ports"] is of type []interface{}
-	rawPorts, ok := LDEV["ports"].([]interface{})
-	if !ok {
-		return nil, fmt.Errorf("invalid type for LDEV['ports'], expected []interface{}")
+	ldevResp, err := v.client.GetLdev(lun.LDeviceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get LDEV: %w", err)
 	}
 
-	hgids := []string{}
-	for _, rawPort := range rawPorts {
-		portMap, ok := rawPort.(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("invalid type for port, expected map[string]interface{}")
-		}
+	klog.Infof("LDEV: %+v", ldevResp)
 
-		portID, _ := portMap["portId"].(string)
-
-		var hostGroupNumber string
-		if hgn, ok := portMap["hostGroupNumber"].(float64); ok {
-			hostGroupNumber = fmt.Sprintf("%d", int(hgn))
-		} else if hgnStr, ok := portMap["hostGroupNumber"].(string); ok {
-			hostGroupNumber = hgnStr
-		} else {
-			return nil, fmt.Errorf("invalid type for port['hostGroupNumber']")
-		}
-
-		hgids = append(hgids, portID+","+hostGroupNumber)
-		klog.Infof("portID: %s, hostGroupNumber: %s", portID, hostGroupNumber)
+	hgids := make([]string, 0, len(ldevResp.Ports))
+	for _, port := range ldevResp.Ports {
+		hostGroupNumber := fmt.Sprintf("%d", int(port.HostGroupNumber))
+		hgid := fmt.Sprintf("%s,%s", port.PortId, hostGroupNumber)
+		hgids = append(hgids, hgid)
+		klog.V(2).Infof("Found mapping: portID=%s, hostGroupNumber=%s", port.PortId, hostGroupNumber)
 	}
+
 	return hgids, nil
 }
 
@@ -132,69 +135,268 @@ func (v *VantaraCloner) ResolvePVToLUN(pv populator.PersistentVolume) (populator
 }
 
 func (v *VantaraCloner) GetNaaID(lun populator.LUN) populator.LUN {
-	LDEV := v.ShowLdev(lun)
-	ldevnaaid := LDEV["naaId"].(string)
-	lun.ProviderID = ldevnaaid[:6]
-	lun.SerialNumber = ldevnaaid[6:]
-	lun.NAA = fmt.Sprintf("naa.%s", ldevnaaid)
+	ldevResp, err := v.client.GetLdev(lun.LDeviceID)
+	if err != nil {
+		klog.Errorf("Failed to get LDEV NAA ID: %v", err)
+		return lun
+	}
+	lun.ProviderID = ldevResp.NaaId[:6]
+	lun.SerialNumber = ldevResp.NaaId[6:]
+	lun.NAA = fmt.Sprintf("naa.%s", ldevResp.NaaId)
 	return lun
 }
 
 func (v *VantaraCloner) EnsureClonnerIgroup(xcopyInitiatorGroup string, hbaUIDs []string) (populator.MappingContext, error) {
-	if v.api.VantaraObj["envHostGroupIds"] != nil {
-		hgids := v.api.VantaraObj["envHostGroupIds"].([]string)
-		klog.Infof("HostGroupIDs used from environment variable: %s", hgids)
-		return populator.MappingContext{"hostGroupIds": hgids}, nil
+	if len(v.envHostGroupIds) > 0 {
+		klog.Infof("Using host group IDs from environment: %v", v.envHostGroupIds)
+		return populator.MappingContext{"hostGroupIds": v.envHostGroupIds}, nil
 	}
 
-	// Get the host group IDs from the storage
-	klog.Infof("Fetching host group IDs from storage")
-	var r map[string]interface{}
-
-	r, _ = v.api.VantaraStorage(GETPORTDETAILS)
-
-	jsonBytes, err := json.Marshal(r)
+	// Get port details from storage
+	klog.Info("Fetching host group IDs from storage")
+	portDetails, err := v.client.GetPortDetails()
 	if err != nil {
-		klog.Errorf("Error marshalling map to JSON: %s", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to get port details: %w", err)
 	}
 
-	var jsonData JSONData
-	if err := json.Unmarshal(jsonBytes, &jsonData); err != nil {
-		klog.Errorf("Error parsing JSON: %s", err)
-		return nil, err
-	}
+	// Convert to JSONData format for compatibility with existing FindHostGroupIDs function
+	jsonData := JSONData{Data: portDetails.Data}
+	logins := FindHostGroupIDs(jsonData, hbaUIDs)
 
-	ret := FindHostGroupIDs(jsonData, hbaUIDs)
+	jsonBytes, _ := json.MarshalIndent(logins, "", "  ")
+	klog.Infof("Found logins: %s", string(jsonBytes))
 
-	jsonBytes, _ = json.MarshalIndent(ret, "", "  ")
-	klog.Infof("HostGroupIDs: %s", string(jsonBytes))
-
-	var hostGroupIds = make([]string, len(ret))
-	for i, login := range ret {
+	hostGroupIds := make([]string, len(logins))
+	for i, login := range logins {
 		hostGroupIds[i] = login.HostGroupId
 	}
-	klog.Infof("HostGroupIDs: %s", hostGroupIds)
+
+	klog.Infof("Host group IDs: %v", hostGroupIds)
 	return populator.MappingContext{"hostGroupIds": hostGroupIds}, nil
 }
 
 func (v *VantaraCloner) Map(xcopyInitiatorGroup string, lun populator.LUN, context populator.MappingContext) (populator.LUN, error) {
-	v.api.VantaraObj["ldevId"] = lun.LDeviceID
-	v.api.VantaraObj["hostGroupIds"] = context["hostGroupIds"].([]string)
-	_, _ = v.api.VantaraStorage(ADDPATH)
+	hostGroupIds := context["hostGroupIds"].([]string)
+
+	for _, hostGroupId := range hostGroupIds {
+		parts := strings.SplitN(hostGroupId, ",", 2)
+		if len(parts) != 2 {
+			return populator.LUN{}, fmt.Errorf("invalid hostGroupId format: %s", hostGroupId)
+		}
+		portId := parts[0]
+		hostGroupNumber := parts[1]
+
+		if err := v.client.AddPath(lun.LDeviceID, portId, hostGroupNumber); err != nil {
+			return populator.LUN{}, fmt.Errorf("failed to add path %s: %w", hostGroupId, err)
+		}
+	}
+
+	// Get NAA ID after mapping
 	lun = v.GetNaaID(lun)
 	return lun, nil
 }
 
 func (v *VantaraCloner) UnMap(xcopyInitiatorGroup string, lun populator.LUN, context populator.MappingContext) error {
-	v.api.VantaraObj["ldevId"] = lun.LDeviceID
-	v.api.VantaraObj["hostGroupIds"] = context["hostGroupIds"].([]string)
-	_, _ = v.api.VantaraStorage(DELETEPATH)
+	hostGroupIds := context["hostGroupIds"].([]string)
+
+	// First get the LDEV to find LUN IDs
+	ldevResp, err := v.client.GetLdev(lun.LDeviceID)
+	if err != nil {
+		return fmt.Errorf("failed to get LDEV info: %w", err)
+	}
+
+	for _, hostGroupId := range hostGroupIds {
+		parts := strings.SplitN(hostGroupId, ",", 2)
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid hostGroupId format: %s", hostGroupId)
+		}
+		portId := parts[0]
+		hostGroupNumber := parts[1]
+
+		// Find the LUN ID for this port/hostgroup combination
+		lunId, err := getLunIdFromPorts(ldevResp.Ports, portId, hostGroupNumber)
+		if err != nil {
+			return fmt.Errorf("failed to get LUN ID for %s: %w", hostGroupId, err)
+		}
+
+		if err := v.client.DeletePath(lun.LDeviceID, portId, hostGroupNumber, lunId); err != nil {
+			return fmt.Errorf("failed to delete path %s: %w", hostGroupId, err)
+		}
+	}
+
 	return nil
 }
 
-func (v *VantaraCloner) ShowLdev(lun populator.LUN) map[string]interface{} {
-	v.api.VantaraObj["ldevId"] = lun.LDeviceID
-	r, _ := v.api.VantaraStorage(GETLDEV)
-	return r
+// getLunIdFromPorts finds the LUN ID for a specific port and host group combination
+func getLunIdFromPorts(ports []PortMapping, portId string, hostGroupNumber string) (string, error) {
+	for _, port := range ports {
+		if port.PortId == portId && fmt.Sprintf("%d", int(port.HostGroupNumber)) == hostGroupNumber {
+			return fmt.Sprintf("%d", int(port.Lun)), nil
+		}
+	}
+	return "", fmt.Errorf("LUN not found for port %s, hostGroup %s", portId, hostGroupNumber)
+}
+
+// VvolCopy performs a direct copy operation using vSphere API to discover source volume
+func (v *VantaraCloner) VvolCopy(vsphereClient vmware.Client, vmId string, sourceVMDKFile string, persistentVolume populator.PersistentVolume, progress chan<- uint64) error {
+	klog.Infof("Starting VVol copy operation for VM %s", vmId)
+
+	// Parse the VMDK path
+	vmDisk, err := populator.ParseVmdkPath(sourceVMDKFile)
+	if err != nil {
+		return fmt.Errorf("failed to parse VMDK path: %w", err)
+	}
+
+	// Resolve target volume details
+	targetLUN, err := v.ResolvePVToLUN(persistentVolume)
+	if err != nil {
+		return fmt.Errorf("failed to resolve target volume: %w", err)
+	}
+
+	// Try to get source volume from vSphere API
+	sourceVolumeID, err := v.getSourceVolume(vsphereClient, vmId, vmDisk)
+	if err != nil {
+		return fmt.Errorf("failed to get source volume from vSphere: %w", err)
+	}
+
+	klog.Infof("Copying from source volume %s to target volume %s", sourceVolumeID, targetLUN.Name)
+
+	// Get target volume pool ID
+	ldevResp, err := v.client.GetLdev(targetLUN.LDeviceID)
+	klog.Infof("Target LDEV: %v", ldevResp)
+
+	// Perform the copy operation
+	err = v.performVolumeCopy(sourceVolumeID, ldevResp, progress)
+	if err != nil {
+		return fmt.Errorf("copy operation failed: %w", err)
+	}
+
+	klog.Infof("VVol copy operation completed successfully")
+	return nil
+}
+
+// getSourceVolume find the vantara volume name for a VMDK
+func (v *VantaraCloner) getSourceVolume(vsphereClient vmware.Client, vmId string, vmDisk populator.VMDisk) (string, error) {
+	ctx := context.Background()
+
+	// Get VM object from vSphere
+	finder := find.NewFinder(vsphereClient.(*vmware.VSphereClient).Client.Client, true)
+	vm, err := finder.VirtualMachine(ctx, vmId)
+	if err != nil {
+		return "", fmt.Errorf("failed to get VM: %w", err)
+	}
+
+	// Get VM hardware configuration
+	var vmObject mo.VirtualMachine
+	pc := property.DefaultCollector(vsphereClient.(*vmware.VSphereClient).Client.Client)
+	err = pc.RetrieveOne(ctx, vm.Reference(), []string{"config.hardware.device"}, &vmObject)
+	if err != nil {
+		return "", fmt.Errorf("failed to get VM hardware config: %w", err)
+	}
+
+	// Look through VM's virtual disks to find VVol backing
+	if vmObject.Config == nil || vmObject.Config.Hardware.Device == nil {
+		return "", fmt.Errorf("VM config or hardware devices not found")
+	}
+
+	for _, device := range vmObject.Config.Hardware.Device {
+		if disk, ok := device.(*types.VirtualDisk); ok {
+			if backing, ok := disk.Backing.(*types.VirtualDiskFlatVer2BackingInfo); ok {
+				// Check if this is a VVol backing and matches our target VMDK
+				if backing.BackingObjectId != "" && v.matchesVMDKPath(backing.FileName, vmDisk) {
+					klog.Infof("Found VVol backing for VMDK %s with ID %s", vmDisk.VmdkFile, backing.BackingObjectId)
+
+					// Use REST client to find the volume by VVol ID
+					volumeID, err := v.findVolumeByVVolID(backing.BackingObjectId)
+					if err != nil {
+						klog.Warningf("Failed to find volume by VVol ID %s: %v", backing.BackingObjectId, err)
+						continue
+					}
+
+					return volumeID, nil
+				}
+			}
+		}
+	}
+
+	return "", fmt.Errorf("VVol backing for VMDK %s not found", vmDisk.VmdkFile)
+}
+
+// matchesVMDKPath checks if a vSphere VVol filename matches the target VMDK
+func (f *VantaraCloner) matchesVMDKPath(fileName string, vmDisk populator.VMDisk) bool {
+	fileBase := filepath.Base(fileName)
+	targetBase := filepath.Base(vmDisk.VmdkFile)
+	return fileBase == targetBase
+}
+
+// performVolumeCopy executes the volume copy operation on Vantara
+func (v *VantaraCloner) performVolumeCopy(sourceVolumeId string, ldevResp *LdevResponse, progress chan<- uint64) error {
+
+	ldevId := fmt.Sprintf("%d", int(ldevResp.LdevId))
+	poolID := fmt.Sprintf("%d", int(ldevResp.PoolId))
+
+	// Perform the copy operation using Vantara API
+	snapshotGroupName := "mtv-ss-copy-" + sourceVolumeId + "-to-" + ldevId
+	copySpeed := "faster"
+
+	err := v.client.CreateCloneLdev(snapshotGroupName, poolID, sourceVolumeId, ldevId, copySpeed)
+	if err != nil {
+		return fmt.Errorf("Vantara CopyVolume failed: %w", err)
+	}
+	// wait for creation of clone pair
+	waittime := 5 // seconds
+	maxcount := 30
+	count := 0
+	found := false
+	for {
+		if count >= maxcount {
+			return fmt.Errorf("timeout waiting for clone pair to be created")
+		}
+		if count > 0 {
+			time.Sleep(time.Duration(waittime) * time.Second)
+		}
+		count++
+		respPairs, err := v.client.GetClonePairs(snapshotGroupName, sourceVolumeId)
+		if err != nil {
+			klog.Infof("Waiting... (no data field yet)")
+			continue
+		}
+		dataAny := interface{}(respPairs.Data)
+		for _, item := range dataAny.([]interface{}) {
+			clonePair, ok := item.(map[string]interface{})
+			if !ok {
+				klog.Infof("Waiting... (invalid clone pair data)")
+				continue
+			}
+			if fmt.Sprint(clonePair["status"]) == "PSUP" {
+				klog.Infof("Clone pair created: %v", clonePair)
+				found = true
+				break
+			}
+		}
+		if found {
+			break
+		}
+		klog.Infof("Waiting for clone pair to be created...")
+	}
+	progress <- 100
+	return nil
+}
+
+func (v *VantaraCloner) findVolumeByVVolID(vvolID string) (string, error) {
+	if len(vvolID) < 4 {
+		return "", errors.New("VVol ID is too short")
+	}
+
+	// Extract the last 4 characters
+	last4 := vvolID[len(vvolID)-4:]
+
+	// Parse as hexadecimal to uint64
+	value, err := strconv.ParseUint(last4, 16, 64)
+	if err != nil {
+		return "", err
+	}
+
+	// Convert to decimal string and return
+	return strconv.FormatUint(value, 10), nil
 }
