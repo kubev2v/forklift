@@ -262,7 +262,7 @@ func (v *VantaraCloner) VvolCopy(vsphereClient vmware.Client, vmId string, sourc
 	klog.Infof("Copying from source volume %s to target volume %s", sourceVolumeID, targetLUN.Name)
 
 	// Get target volume pool ID
-	ldevResp, _ := v.client.GetLdev(targetLUN.LDeviceID)
+	ldevResp, err := v.client.GetLdev(targetLUN.LDeviceID)
 	klog.Infof("Target LDEV: %v", ldevResp)
 
 	// Perform the copy operation

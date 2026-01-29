@@ -298,7 +298,7 @@ func TestDeletePath(t *testing.T) {
 				json.NewEncoder(w).Encode(map[string]interface{}{
 					"status": "Completed",
 					"state":  "Succeeded",
-					"errror": nil,
+					"error":  nil,
 				})
 			} else {
 				jobCompleted = true
