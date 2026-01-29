@@ -244,11 +244,15 @@ func TestAddPath(t *testing.T) {
 			if jobCompleted {
 				json.NewEncoder(w).Encode(map[string]interface{}{
 					"status": "Completed",
+					"state":  "Succeeded",
+					"error":  nil,
 				})
 			} else {
 				jobCompleted = true
 				json.NewEncoder(w).Encode(map[string]interface{}{
 					"status": "Initializing",
+					"state":  "Queued",
+					"error":  nil,
 				})
 			}
 		}
@@ -293,11 +297,15 @@ func TestDeletePath(t *testing.T) {
 			if jobCompleted {
 				json.NewEncoder(w).Encode(map[string]interface{}{
 					"status": "Completed",
+					"state":  "Succeeded",
+					"errror": nil,
 				})
 			} else {
 				jobCompleted = true
 				json.NewEncoder(w).Encode(map[string]interface{}{
 					"status": "Initializing",
+					"state":  "Queued",
+					"error":  nil,
 				})
 			}
 		}
