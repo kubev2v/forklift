@@ -2,7 +2,6 @@ package plan
 
 import (
 	"fmt"
-	"strings"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
@@ -27,17 +26,10 @@ func (r *Reconciler) validateVIBReadiness(plan *api.Plan) error {
 		return nil
 	}
 
-	// Only validate VIB readiness for plans using VSphere xcopy volume populators
+	// Only validate VIB readiness for plans using VSphere xcopy volume populators and VIB method enabled
 	usesXcopy := r.planUsesVSphereXcopyPopulator(plan)
-	if !usesXcopy {
+	if !usesXcopy || !sourceProvider.UseVIBMethod() {
 		// Remove any existing VIB readiness conditions since xcopy is not used
-		plan.Status.DeleteCondition(VIBReady)
-		plan.Status.DeleteCondition(VIBNotReady)
-		return nil
-	}
-	// Check ESXiCloneMethod setting - VIB is the default when not set or explicitly set to "vib"
-	if !useVIBMethod(sourceProvider.Spec.Settings[api.ESXiCloneMethod]) {
-		// Remove any existing VIB readiness conditions since VIB method is not enabled
 		plan.Status.DeleteCondition(VIBReady)
 		plan.Status.DeleteCondition(VIBNotReady)
 		return nil
@@ -89,9 +81,4 @@ func formatVIBHostItems(providerItems []string) []string {
 	result := make([]string, 0, len(providerItems))
 	result = append(result, providerItems...)
 	return result
-}
-
-func useVIBMethod(cloneMethod string) bool {
-	// VIB is the default method when not specified
-	return cloneMethod == "" || strings.EqualFold(cloneMethod, "vib")
 }
