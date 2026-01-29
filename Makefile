@@ -4,6 +4,8 @@ GOBIN ?= $(GOPATH)/bin
 # GO111MODULE is enabled by default in modern Go; uncomment to force
 # GO111MODULE = on
 
+include pkg/lib/vsphere_offload/vmkfstool-wrapper-version.mk
+
 ENVTEST_K8S_VERSION = 1.31.0
 ENVTEST_VERSION ?= release-0.19
 
@@ -275,7 +277,7 @@ install: manifests kubectl
 ##@ Container Images
 
 build-controller-image: check_container_runtime
-	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(CONTROLLER_IMAGE)$(PLATFORM_SUFFIX) -f build/forklift-controller/Containerfile .
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) --build-arg VIB_VERSION=$(VIB_VERSION) -t $(CONTROLLER_IMAGE)$(PLATFORM_SUFFIX) -f build/forklift-controller/Containerfile .
 
 push-controller-image: build-controller-image
 	$(CONTAINER_CMD) push $(CONTROLLER_IMAGE)$(PLATFORM_SUFFIX)

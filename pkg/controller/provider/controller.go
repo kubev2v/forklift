@@ -50,6 +50,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	k8sutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -216,7 +217,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 
 	defer func() {
 		if err == nil {
-			if err = r.updateProviderStatus(provider); err != nil {
+			if err = r.updateProvider(provider); err != nil {
 				err = liberr.Wrap(err)
 			}
 		}
@@ -281,7 +282,9 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	}
 
 	// End staging conditions.
+	r.Log.V(1).Info("Provider reconcile: about to end staging conditions", "provider", provider.Name, "currentConditions", len(provider.Status.Conditions.List))
 	provider.Status.EndStagingConditions()
+	r.Log.V(1).Info("Provider reconcile: ended staging conditions", "provider", provider.Name, "remainingConditions", len(provider.Status.Conditions.List))
 
 	// Update the DB.
 	err = r.updateProvider(provider)
@@ -303,29 +306,70 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	return
 }
 
-func (r *Reconciler) updateProviderStatus(provider *api.Provider) error {
-	// Record events.
-	r.Record(provider, provider.Status.Conditions)
+func (r *Reconciler) updateProvider(provider *api.Provider) (err error) {
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		serverProvider := &api.Provider{}
+		if err := r.Get(context.TODO(), client.ObjectKey{
+			Namespace: provider.Namespace,
+			Name:      provider.Name,
+		}, serverProvider); err != nil {
+			return err
+		}
 
-	// Apply changes.
-	provider.Status.ObservedGeneration = provider.Generation
-
-	if err := r.Status().Update(context.TODO(), provider); err != nil {
-		r.Log.Error(err, "Failed to update provider status", "provider", provider)
-		return err
+		if !mapsEqual(serverProvider.Annotations, provider.Annotations) {
+			clonedProvider := serverProvider.DeepCopy()
+			clonedProvider.Annotations = provider.Annotations
+			return r.Patch(context.TODO(), clonedProvider, client.MergeFrom(serverProvider))
+		}
+		return nil
+	})
+	if err != nil {
+		r.Log.Error(err, "Failed to update provider annotations after retries", "provider", provider)
+		return liberr.Wrap(err)
 	}
 
-	return nil
-}
+	r.Record(provider, provider.Status.Conditions)
 
-// Update the provider.
-func (r *Reconciler) updateProvider(provider *api.Provider) (err error) {
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		serverProvider := &api.Provider{}
+		if err := r.Get(context.TODO(), client.ObjectKey{
+			Namespace: provider.Namespace,
+			Name:      provider.Name,
+		}, serverProvider); err != nil {
+			return err
+		}
+
+		serverProvider.Status.Phase = provider.Status.Phase
+		serverProvider.Status.Conditions = provider.Status.Conditions
+		serverProvider.Status.Fingerprint = provider.Status.Fingerprint
+		serverProvider.Status.ObservedGeneration = provider.Generation
+
+		return r.Status().Update(context.TODO(), serverProvider)
+	})
+	if err != nil {
+		r.Log.Error(err, "Failed to update provider status after retries", "provider", provider)
+		return liberr.Wrap(err)
+	}
+
 	collector, found := r.container.Get(provider)
 	if found {
 		*(collector.Owner().(*api.Provider)) = *provider
 	}
 
-	return
+	return nil
+}
+
+// mapsEqual compares two string maps for equality
+func mapsEqual(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if b[k] != v {
+			return false
+		}
+	}
+	return true
 }
 
 // Update the container.
