@@ -85,7 +85,10 @@ def load_tasks_variables(tasks_file):
         'first', 'last', 'not', 'in', 'and', 'or', 'is', 'defined', 'undefined', 'false', 'true',
         'gitVersion', 'kubernetes', 'default', 'selectattr', 'equalto', 'map',
         'attribute', 'version', 'state', 'Completed', 'history', 'status',
-        'resources', 'bool', 'lookup', 'template', 'present', 'absent'
+        'resources', 'bool', 'lookup', 'template', 'present', 'absent',
+        # Boolean literals - filter out false positives from 'failed_when: false'
+        # (when_pattern regex incorrectly matches 'failed_when:' substring)
+        'true', 'false'
     }
     
     # Also filter out the calculated/derived variables that shouldn't be in CRD

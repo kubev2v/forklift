@@ -36,7 +36,8 @@ metadata:
         "spec": {
           "feature_ui_plugin": "true",
           "feature_validation": "true",
-          "feature_volume_populator": "true"
+          "feature_volume_populator": "true",
+          "feature_network_policies": "false"
         }
       }
 spec:
