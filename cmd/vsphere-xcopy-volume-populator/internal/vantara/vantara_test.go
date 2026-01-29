@@ -67,6 +67,14 @@ func (m *mockVantaraClient) GetPortDetails() (*PortDetailsResponse, error) {
 	return m.getPortDetailsResp, m.getPortDetailsErr
 }
 
+func (m *mockVantaraClient) CreateCloneLdev(snapshotGroupName string, snapshotPoolId string, pvolLdevId string, svolLdevId string, copySpeed string) error {
+	return nil
+}
+
+func (m *mockVantaraClient) GetClonePairs(snapshotGroupName string, pvolLdevId string) (*ClonePairResponse, error) {
+	return &ClonePairResponse{}, nil
+}
+
 // TestResolvePVToLUN tests PV to LUN resolution
 func TestResolvePVToLUN(t *testing.T) {
 	cloner := VantaraCloner{
