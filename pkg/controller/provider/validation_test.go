@@ -164,7 +164,7 @@ var _ = Describe("VIB Validation", func() {
 				condition := provider.Status.FindCondition(VIBNotReady)
 				Expect(condition).ToNot(BeNil())
 				Expect(condition.Status).To(Equal(libcnd.True))
-				Expect(condition.Reason).To(Equal("ProviderCredentialsInvalid"))
+				Expect(condition.Reason).To(Equal("VMwareClientFailed"))
 			})
 		})
 
@@ -204,8 +204,11 @@ var _ = Describe("VIB Validation", func() {
 				err := reconciler.validateVIBWithClient(provider, mockClient, mockVibEnsurer)
 				Expect(err).ToNot(HaveOccurred())
 
-				// When all hosts pass, both VIB conditions should be deleted
-				Expect(provider.Status.HasCondition(VIBReady)).To(BeFalse())
+				// When all hosts pass, VIBReady should be set with the successful hosts in Items
+				Expect(provider.Status.HasCondition(VIBReady)).To(BeTrue())
+				vibReadyCond := provider.Status.FindCondition(VIBReady)
+				Expect(vibReadyCond).ToNot(BeNil())
+				Expect(vibReadyCond.Items).ToNot(BeEmpty())
 				Expect(provider.Status.HasCondition(VIBNotReady)).To(BeFalse())
 			})
 		})
@@ -258,8 +261,11 @@ var _ = Describe("VIB Validation", func() {
 				err := reconciler.validateVIBWithClient(provider, mockClient, mockVibEnsurer)
 				Expect(err).ToNot(HaveOccurred())
 
-				// When all hosts pass, both VIB conditions should be deleted
-				Expect(provider.Status.HasCondition(VIBReady)).To(BeFalse())
+				// When all hosts pass, VIBReady should be set with the successful hosts in Items
+				Expect(provider.Status.HasCondition(VIBReady)).To(BeTrue())
+				vibReadyCond := provider.Status.FindCondition(VIBReady)
+				Expect(vibReadyCond).ToNot(BeNil())
+				Expect(vibReadyCond.Items).ToNot(BeEmpty())
 				Expect(provider.Status.HasCondition(VIBNotReady)).To(BeFalse())
 			})
 		})
