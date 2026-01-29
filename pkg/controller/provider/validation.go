@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/base"
@@ -18,6 +19,9 @@ import (
 	"github.com/kubev2v/forklift/pkg/lib/inventory/model"
 	libref "github.com/kubev2v/forklift/pkg/lib/ref"
 	"github.com/kubev2v/forklift/pkg/lib/util"
+	"github.com/kubev2v/forklift/pkg/lib/vsphere_offload"
+	"github.com/kubev2v/forklift/pkg/lib/vsphere_offload/vmware"
+
 	core "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -47,6 +51,8 @@ const (
 // CSI driver names
 const (
 	SMBCSIDriverName = "smb.csi.k8s.io"
+	VIBReady         = "VIBReady"
+	VIBNotReady      = "VIBNotReady"
 )
 
 // Categories
@@ -116,6 +122,11 @@ func (r *Reconciler) validate(provider *api.Provider) error {
 
 	// Validate SMB CSI driver for HyperV providers
 	err = r.validateSMBCSI(provider)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	// Validate VIB readiness for vSphere providers when VIB method is enabled
+	err = r.validateVIBReadiness(provider, secret)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -470,7 +481,6 @@ type hostInfo struct {
 func (r *Reconciler) getHostsForSSHValidation(provider *api.Provider) []hostInfo {
 	sdkEndpoint := provider.Spec.Settings[api.SDK]
 	isDirectESXi := (sdkEndpoint == api.ESXI)
-
 	r.Log.Info("SSH validation: provider connection type",
 		"provider", provider.Name,
 		"sdkEndpoint", sdkEndpoint,
@@ -878,7 +888,7 @@ func (r *Reconciler) validateSSHReadiness(provider *api.Provider, secret *core.S
 			if len(parts) == 3 {
 				successSuggestion.WriteString(fmt.Sprintf("  - %s (%s)\n", parts[1], parts[2]))
 			} else {
-				successSuggestion.WriteString(fmt.Sprintf("  - %s\n", item))
+				successSuggestion.WriteString(fmt.Sprintf(" - %s\n", item))
 			}
 		}
 		successSuggestion.WriteString("\nTo use the xcopy volume populator, ensure your VMs are located on these ESXi hosts before starting the migration.\n")
@@ -905,7 +915,7 @@ func (r *Reconciler) validateSSHReadiness(provider *api.Provider, secret *core.S
 		if len(parts) == 3 {
 			failSuggestion.WriteString(fmt.Sprintf("  - %s (%s)\n", parts[1], parts[2]))
 		} else {
-			failSuggestion.WriteString(fmt.Sprintf("  - %s\n", item))
+			failSuggestion.WriteString(fmt.Sprintf(" - %s\n", item))
 		}
 	}
 	failSuggestion.WriteString("\n")
@@ -977,5 +987,177 @@ func (r *Reconciler) validateSMBCSI(provider *api.Provider) error {
 
 	// SMB CSI driver is installed - remove any previous condition
 	provider.Status.DeleteCondition(SMBCSIDriverNotReady)
+	return nil
+}
+
+// validateVIBReadiness validates VIB readiness for migration plans using xcopy volume populators
+func (r *Reconciler) validateVIBReadiness(provider *api.Provider, secret *core.Secret) error {
+	r.Log.Info("VIB validation: starting validateVIBReadiness", "provider", provider.Name)
+	// Only validate VIB for vSphere providers
+	if provider.Type() != api.VSphere {
+		return nil
+	}
+
+	inventoryCondition := provider.Status.FindCondition(InventoryCreated)
+	if inventoryCondition == nil || inventoryCondition.Status != True {
+		return nil
+	}
+
+	esxiCloneMethod, methodSet := provider.Spec.Settings[api.ESXiCloneMethod]
+	useVIBMethod := !methodSet || esxiCloneMethod != api.ESXiCloneMethodSSH
+
+	if !useVIBMethod {
+		provider.Status.DeleteCondition(VIBReady)
+		provider.Status.DeleteCondition(VIBNotReady)
+		return nil
+	}
+
+	// Check if we should skip VIB validation based on the last check time
+	// Use either VIBReady or VIBNotReady condition's LastTransitionTime (whichever exists)
+	var lastCheckTime time.Time
+	if vibReadyCond := provider.Status.FindCondition(VIBReady); vibReadyCond != nil {
+		lastCheckTime = vibReadyCond.LastTransitionTime.Time
+	} else if vibNotReadyCond := provider.Status.FindCondition(VIBNotReady); vibNotReadyCond != nil {
+		lastCheckTime = vibNotReadyCond.LastTransitionTime.Time
+	}
+
+	if vsphere_offload.ShouldSkipVIBCheck(lastCheckTime) {
+		r.Log.Info("VIB validation: skipping due to cache", "provider", provider.Name, "vib-last-check", lastCheckTime)
+		provider.Status.StageCondition(VIBReady, VIBNotReady)
+		r.Log.Info("VIB validation: staged VIB conditions during cache skip", "provider", provider.Name)
+		return nil
+	}
+	username := string(secret.Data["user"])
+	password := string(secret.Data["password"])
+	if username == "" || password == "" {
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     VIBNotReady,
+			Status:   True,
+			Reason:   "ProviderCredentialsInvalid",
+			Category: Warn,
+			Message:  "Cannot validate VIB readiness: provider credentials not found in secret",
+		})
+		return nil
+	}
+	client, err := vmware.NewClient(provider.Spec.URL, username, password)
+	if err != nil {
+		r.Log.Error(err, "VIB validation: failed to create vmware client", "url", provider.Spec.URL)
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     VIBNotReady,
+			Status:   True,
+			Reason:   "VMwareClientFailed",
+			Category: Warn,
+			Message:  fmt.Sprintf("Failed to create VMware client for VIB validation: %v", err),
+		})
+		return nil
+	}
+	defer func() {
+		if vsClient, ok := client.(*vmware.VSphereClient); ok {
+			if err := vsClient.Logout(context.TODO()); err != nil {
+				r.Log.V(1).Info("Failed to logout vSphere client", "error", err)
+			}
+		}
+	}()
+
+	return r.validateVIBWithClient(provider, client, &vsphere_offload.DefaultVIBEnsurer{})
+}
+
+// validateVIBWithClient performs VIB validation using the provided client and VIB ensurer (for testing)
+func (r *Reconciler) validateVIBWithClient(provider *api.Provider, client vmware.Client, vibEnsurer vsphere_offload.VIBEnsurer) error {
+	hostsToTest, err := client.GetAllHosts(context.TODO())
+	if err != nil {
+		r.Log.Error(err, "VIB validation: failed to get all hosts")
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     VIBNotReady,
+			Status:   True,
+			Reason:   "HostDiscoveryFailed",
+			Category: Warn,
+			Message:  fmt.Sprintf("Failed to retrieve ESXi hosts for VIB validation: %v", err),
+		})
+		return nil
+	}
+	if len(hostsToTest) == 0 {
+		r.Log.Info("VIB validation: no hosts found in vSphere inventory")
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     VIBNotReady,
+			Status:   True,
+			Reason:   "NoHostsFound",
+			Category: Warn,
+			Message:  "Cannot validate VIB readiness: no ESXi hosts found in vSphere inventory",
+		})
+		return nil
+	}
+
+	failedHosts := []string{}
+	successHosts := []string{}
+
+	for i := range hostsToTest {
+		host := hostsToTest[i]
+
+		err := vibEnsurer.EnsureVib(context.TODO(), client, host, "/bin/vmkfstools-wrapper.vib")
+		itemStr := host.Name()
+		if err == nil {
+			successHosts = append(successHosts, itemStr)
+		} else {
+			r.Log.Error(err, "VIB validation failed",
+				"provider", provider.Name,
+				"hostName", host.Name())
+			// Always append error information to failed hosts
+			itemStr = fmt.Sprintf("%s (error: %v)", itemStr, err)
+			failedHosts = append(failedHosts, itemStr)
+		}
+	}
+
+	if len(failedHosts) == 0 {
+		r.Log.Info("VIB validation: all hosts passed, removing VIB conditions", "provider", provider.Name)
+		provider.Status.DeleteCondition(VIBReady)
+		provider.Status.DeleteCondition(VIBNotReady)
+		return nil
+	}
+
+	var failSuggestion strings.Builder
+	failSuggestion.WriteString("HOSTS REQUIRING VIB INSTALLATION:\n\n")
+	for _, item := range failedHosts {
+		failSuggestion.WriteString("  - " + item + "\n")
+	}
+	failSuggestion.WriteString("\n")
+
+	failSuggestion.WriteString("INSTALLATION INSTRUCTIONS:\n\n")
+	failSuggestion.WriteString("The automatic installation of vmkfstools-wrapper VIB on some ESXi hosts failed \n")
+	failSuggestion.WriteString("Please install it manually on the ESXi hosts listed above.\n\n")
+	failSuggestion.WriteString("For installation instructions, refer to the forklift documentation.\n")
+
+	r.Log.Info("VIB validation: setting VIBNotReady condition", "provider", provider.Name, "failedHosts", len(failedHosts), "successHosts", len(successHosts))
+	provider.Status.SetCondition(libcnd.Condition{
+		Type:       VIBNotReady,
+		Status:     True,
+		Reason:     "VIBNotInstalled",
+		Category:   Warn,
+		Message:    "VIB readiness validation issue (checked because 'esxiCloneMethod' is not set to 'ssh'). See the suggestion field in the Provider's YAML for details.",
+		Suggestion: failSuggestion.String(),
+		Items:      failedHosts,
+	})
+
+	if len(successHosts) > 0 {
+		var successSuggestion strings.Builder
+		successSuggestion.WriteString("ESXi hosts with VIB (vmkfstools-wrapper) validated:\n\n")
+		for _, item := range successHosts {
+			successSuggestion.WriteString("  - " + item + "\n")
+		}
+		successSuggestion.WriteString("\nTo use the xcopy volume populator, ensure your VMs are located on these ESXi hosts before starting the migration.\n")
+
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:       VIBReady,
+			Status:     True,
+			Reason:     "VIBValidated",
+			Category:   Advisory,
+			Message:    "VIB (vmkfstools-wrapper) validated on ESXi hosts (checked because 'esxiCloneMethod' is not set to 'ssh'). See the suggestion field in the Provider's YAML for the list of available ESXi hosts.",
+			Suggestion: successSuggestion.String(),
+			Items:      successHosts,
+		})
+	} else {
+		provider.Status.DeleteCondition(VIBReady)
+	}
+
 	return nil
 }

@@ -6,8 +6,7 @@ import (
 
 	"encoding/json"
 	"encoding/xml"
-
-	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
+	"github.com/kubev2v/forklift/pkg/lib/vsphere_offload"
 	"github.com/vmware/govmomi/object"
 
 	"k8s.io/klog/v2"
@@ -15,7 +14,7 @@ import (
 
 // SSHTaskExecutor implements TaskExecutor for the SSH method
 type SSHTaskExecutor struct {
-	sshClient vmware.SSHClient
+	sshClient vsphere_offload.SSHClient
 }
 
 // XMLResponse represents the XML response structure from vmkfstools-wrapper script
@@ -36,7 +35,7 @@ type Field struct {
 	String string `xml:"string"`
 }
 
-func NewSSHTaskExecutor(sshClient vmware.SSHClient) TaskExecutor {
+func NewSSHTaskExecutor(sshClient vsphere_offload.SSHClient) TaskExecutor {
 	return &SSHTaskExecutor{
 		sshClient: sshClient,
 	}
