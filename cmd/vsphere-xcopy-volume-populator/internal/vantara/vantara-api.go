@@ -202,7 +202,7 @@ func (api *BlockStorageAPI) InvokeAsyncCommand(methodType, url string, body, hea
 	klog.Infof("Request was accepted. JOB URL: %v", result["self"])
 
 	status := "Initializing"
-	state := ""
+	state := "Queued"
 	retryCount := 1
 	waitTime := 1 // FIRST_WAIT_TIME
 
