@@ -376,6 +376,60 @@ func (api *BlockStorageAPI) DeletePath(ldevId string, portId string, hostGroupNu
 	return nil
 }
 
+// CreateCloneLdev creates a clone LDEV from a snapshot
+func (api *BlockStorageAPI) CreateCloneLdev(snapshotGroupName string, snapshotPoolId string, pvolLdevId string, svolLdevId string, copySpeed string) error {
+	if err := api.ensureConnected(); err != nil {
+		return err
+	}
+
+	url := api.Snapshotpair()
+	headers := api.sessionHeaders()
+	headers["Response-Job-Status"] = "Completed"
+
+	body := map[string]string{
+		"snapshotGroupName": snapshotGroupName,
+		"snapshotPoolId":    snapshotPoolId,
+		"primaryLdevId":     pvolLdevId,
+		"secondaryLdevId":   svolLdevId,
+		"isClone":           "true",
+		"canCascade":        "true",
+		"clonesAutomation":  "true",
+		"copySpeed":         copySpeed,
+	}
+	bodyJson, _ := json.Marshal(body)
+	klog.V(2).Infof("CreateCloneLdev request body: %s", string(bodyJson))
+
+	_, err := api.InvokeAsyncCommand("POST", url, body, headers)
+	if err != nil {
+		return fmt.Errorf("failed to create clone LDEV from snapshot: %w", err)
+	}
+
+	return nil
+}
+
+// GetCloneLdev creates a clone LDEV from a snapshot
+func (api *BlockStorageAPI) GetClonePairs(snapshotGroupName, pvolLdevId string) (*ClonePairResponse, error) {
+	if err := api.ensureConnected(); err != nil {
+		return nil, err
+	}
+
+	url := api.Snapshotpair() + fmt.Sprintf("?snapshotGroupName=%s&pvolLdevId=%s", snapshotGroupName, pvolLdevId)
+	headers := api.sessionHeaders()
+	r, err := api.makeHTTPRequest("GET", url, nil, headers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get clone LDEV from snapshot: %w", err)
+	}
+
+	// Convert map to typed struct
+	var clonePair ClonePairResponse
+	jsonBytes, _ := json.Marshal(r)
+	if err := json.Unmarshal(jsonBytes, &clonePair); err != nil {
+		return nil, fmt.Errorf("failed to parse clone LDEV response: %w", err)
+	}
+
+	return &clonePair, nil
+}
+
 // GetPortDetails retrieves port login details
 func (api *BlockStorageAPI) GetPortDetails() (*PortDetailsResponse, error) {
 	if err := api.ensureConnected(); err != nil {

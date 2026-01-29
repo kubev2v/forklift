@@ -3,9 +3,11 @@ package vantara
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -260,11 +262,11 @@ func (v *VantaraCloner) VvolCopy(vsphereClient vmware.Client, vmId string, sourc
 	klog.Infof("Copying from source volume %s to target volume %s", sourceVolumeID, targetLUN.Name)
 
 	// Get target volume pool ID
-	LDEV := v.ShowLdev(targetLUN)
-	klog.Infof("Target LDEV: %v", LDEV)
+	ldevResp, _ := v.client.GetLdev(targetLUN.LDeviceID)
+	klog.Infof("Target LDEV: %v", ldevResp)
 
 	// Perform the copy operation
-	err = v.performVolumeCopy(sourceVolumeID, LDEV, progress)
+	err = v.performVolumeCopy(sourceVolumeID, ldevResp, progress)
 	if err != nil {
 		return fmt.Errorf("copy operation failed: %w", err)
 	}
@@ -305,7 +307,7 @@ func (v *VantaraCloner) getSourceVolume(vsphereClient vmware.Client, vmId string
 					klog.Infof("Found VVol backing for VMDK %s with ID %s", vmDisk.VmdkFile, backing.BackingObjectId)
 
 					// Use REST client to find the volume by VVol ID
-					volumeID, err := v.api.FindVolumeByVVolID(backing.BackingObjectId)
+					volumeID, err := v.findVolumeByVVolID(backing.BackingObjectId)
 					if err != nil {
 						klog.Warningf("Failed to find volume by VVol ID %s: %v", backing.BackingObjectId, err)
 						continue
@@ -328,23 +330,16 @@ func (f *VantaraCloner) matchesVMDKPath(fileName string, vmDisk populator.VMDisk
 }
 
 // performVolumeCopy executes the volume copy operation on Vantara
-func (v *VantaraCloner) performVolumeCopy(sourceVolumeId string, ldev map[string]interface{}, progress chan<- uint64) error {
-	ldevID, err := extractStringField(ldev, "ldevId")
-	if err != nil {
-		return fmt.Errorf("invalid target LDEV id: %w", err)
-	}
+func (v *VantaraCloner) performVolumeCopy(sourceVolumeId string, ldevResp *LdevResponse, progress chan<- uint64) error {
 
-	poolID, err := extractStringField(ldev, "poolId")
-	if err != nil {
-		return fmt.Errorf("invalid target LDEV pool id: %w", err)
-	}
+	ldevId := fmt.Sprintf("%d", int(ldevResp.LdevId))
+	poolID := fmt.Sprintf("%d", int(ldevResp.PoolId))
 
 	// Perform the copy operation using Vantara API
-	v.api.VantaraObj["snapshotGroupName"] = "mtv-ss-copy-" + sourceVolumeId + "-to-" + ldevID
-	v.api.VantaraObj["snapshotPoolId"] = poolID
-	v.api.VantaraObj["sourceLdevId"] = sourceVolumeId
-	v.api.VantaraObj["targetLdevId"] = ldevID
-	_, err = v.api.VantaraStorage(CLONELDEV)
+	snapshotGroupName := "mtv-ss-copy-" + sourceVolumeId + "-to-" + ldevId
+	copySpeed := "faster"
+
+	err := v.client.CreateCloneLdev(snapshotGroupName, poolID, sourceVolumeId, ldevId, copySpeed)
 	if err != nil {
 		return fmt.Errorf("Vantara CopyVolume failed: %w", err)
 	}
@@ -361,15 +356,12 @@ func (v *VantaraCloner) performVolumeCopy(sourceVolumeId string, ldev map[string
 			time.Sleep(time.Duration(waittime) * time.Second)
 		}
 		count++
-		r, err := v.api.VantaraStorage(GETCLONEPAIRS)
+		respPairs, err := v.client.GetClonePairs(snapshotGroupName, sourceVolumeId)
 		if err != nil {
-			return fmt.Errorf("Vantara GetClonePairs failed: %w", err)
-		}
-		dataAny, ok := r["data"]
-		if !ok || dataAny == nil {
 			klog.Infof("Waiting... (no data field yet)")
 			continue
 		}
+		dataAny := interface{}(respPairs.Data)
 		for _, item := range dataAny.([]interface{}) {
 			clonePair, ok := item.(map[string]interface{})
 			if !ok {
@@ -391,31 +383,20 @@ func (v *VantaraCloner) performVolumeCopy(sourceVolumeId string, ldev map[string
 	return nil
 }
 
-func extractStringField(data map[string]interface{}, key string) (string, error) {
-	val, ok := data[key]
-	if !ok {
-		return "", fmt.Errorf("field %q not found in LDEV data", key)
+func (v *VantaraCloner) findVolumeByVVolID(vvolID string) (string, error) {
+	if len(vvolID) < 4 {
+		return "", errors.New("VVol ID is too short")
 	}
 
-	switch v := val.(type) {
-	case string:
-		if strings.TrimSpace(v) == "" {
-			return "", fmt.Errorf("field %q is empty", key)
-		}
-		return v, nil
-	case json.Number:
-		return v.String(), nil
-	case fmt.Stringer:
-		s := v.String()
-		if strings.TrimSpace(s) == "" {
-			return "", fmt.Errorf("field %q is empty", key)
-		}
-		return s, nil
-	default:
-		s := fmt.Sprintf("%v", v)
-		if strings.TrimSpace(s) == "" || s == "<nil>" {
-			return "", fmt.Errorf("field %q could not be converted to string", key)
-		}
-		return s, nil
+	// Extract the last 4 characters
+	last4 := vvolID[len(vvolID)-4:]
+
+	// Parse as hexadecimal to uint64
+	value, err := strconv.ParseUint(last4, 16, 64)
+	if err != nil {
+		return "", err
 	}
+
+	// Convert to decimal string and return
+	return strconv.FormatUint(value, 10), nil
 }
