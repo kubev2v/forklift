@@ -15,8 +15,7 @@ import (
 )
 
 const (
-	vibName          = "vmkfstools-wrapper"
-	VIBCacheDuration = 15 * time.Minute
+	vibName = "vmkfstools-wrapper"
 )
 
 // VibVersion is set by ldflags
@@ -32,14 +31,8 @@ type VIBEnsurer interface {
 // DefaultVIBEnsurer is the production implementation
 type DefaultVIBEnsurer struct{}
 
-// EnsureVib implements VIBEnsurer interface
+// EnsureVib implements VIBEnsurer interface - fetches the vib version and installs it if needed
 func (d *DefaultVIBEnsurer) EnsureVib(ctx context.Context, client vmware.Client, esx *object.HostSystem, localVibPath string) error {
-	return EnsureVib(ctx, client, esx, localVibPath)
-}
-
-// EnsureVib will fetch the vib version and in case needed will install it
-// on the target ESX
-func EnsureVib(ctx context.Context, client vmware.Client, esx *object.HostSystem, localVibPath string) error {
 	version, err := getVIBVersion(ctx, client, esx)
 	if err != nil {
 		return fmt.Errorf("failed to get the VIB version from ESXi %s: %w", esx.Name(), err)
@@ -196,10 +189,10 @@ func installVib(ctx context.Context, client vmware.Client, esx *object.HostSyste
 }
 
 // ShouldSkipVIBCheck checks if VIB validation should be skipped based on cache duration
-// Returns true if the condition was last updated less than VIBCacheDuration ago
-func ShouldSkipVIBCheck(lastTransitionTime time.Time) bool {
+// Returns true if the condition was last updated less than cacheDuration ago
+func ShouldSkipVIBCheck(lastTransitionTime time.Time, cacheDuration time.Duration) bool {
 	if lastTransitionTime.IsZero() {
 		return false
 	}
-	return time.Since(lastTransitionTime) < VIBCacheDuration
+	return time.Since(lastTransitionTime) < cacheDuration
 }

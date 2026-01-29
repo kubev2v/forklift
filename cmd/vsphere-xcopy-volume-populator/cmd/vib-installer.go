@@ -158,7 +158,8 @@ func installVIBOnHost(ctx context.Context, client vmware.Client, config *Config,
 	hostName := host.Name()
 	logInfo("[%s] Starting VIB installation using vSphere API...", hostName)
 
-	err := vsphere_offload.EnsureVib(ctx, client, host, config.VIBPath)
+	ensurer := &vsphere_offload.DefaultVIBEnsurer{}
+	err := ensurer.EnsureVib(ctx, client, host, config.VIBPath)
 	if err != nil {
 		logError("[%s] VIB installation failed: %v", hostName, err)
 		return InstallationResult{Host: hostName, Success: false, Error: err}
