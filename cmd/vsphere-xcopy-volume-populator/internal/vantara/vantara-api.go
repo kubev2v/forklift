@@ -389,8 +389,8 @@ func (api *BlockStorageAPI) CreateCloneLdev(snapshotGroupName string, snapshotPo
 	body := map[string]string{
 		"snapshotGroupName": snapshotGroupName,
 		"snapshotPoolId":    snapshotPoolId,
-		"primaryLdevId":     pvolLdevId,
-		"secondaryLdevId":   svolLdevId,
+		"pvolLdevId":        pvolLdevId,
+		"svolLdevId":        svolLdevId,
 		"isClone":           "true",
 		"canCascade":        "true",
 		"clonesAutomation":  "true",

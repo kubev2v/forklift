@@ -330,16 +330,16 @@ func (f *VantaraCloner) matchesVMDKPath(fileName string, vmDisk populator.VMDisk
 }
 
 // performVolumeCopy executes the volume copy operation on Vantara
-func (v *VantaraCloner) performVolumeCopy(sourceVolumeId string, ldevResp *LdevResponse, progress chan<- uint64) error {
+func (v *VantaraCloner) performVolumeCopy(sourceLdevId string, ldevResp *LdevResponse, progress chan<- uint64) error {
 
-	ldevId := fmt.Sprintf("%d", int(ldevResp.LdevId))
+	targetLdevId := fmt.Sprintf("%d", int(ldevResp.LdevId))
 	poolID := fmt.Sprintf("%d", int(ldevResp.PoolId))
 
 	// Perform the copy operation using Vantara API
-	snapshotGroupName := "mtv-ss-copy-" + sourceVolumeId + "-to-" + ldevId
+	snapshotGroupName := "mtv-ss-copy-" + sourceLdevId + "-to-" + targetLdevId
 	copySpeed := "faster"
 
-	err := v.client.CreateCloneLdev(snapshotGroupName, poolID, sourceVolumeId, ldevId, copySpeed)
+	err := v.client.CreateCloneLdev(snapshotGroupName, poolID, sourceLdevId, targetLdevId, copySpeed)
 	if err != nil {
 		return fmt.Errorf("Vantara CopyVolume failed: %w", err)
 	}
@@ -356,20 +356,14 @@ func (v *VantaraCloner) performVolumeCopy(sourceVolumeId string, ldevResp *LdevR
 			time.Sleep(time.Duration(waittime) * time.Second)
 		}
 		count++
-		respPairs, err := v.client.GetClonePairs(snapshotGroupName, sourceVolumeId)
-		if err != nil {
-			klog.Infof("Waiting... (no data field yet)")
+		respPairs, err := v.client.GetClonePairs(snapshotGroupName, sourceLdevId)
+		if err != nil || len(respPairs.Data) == 0 {
+			klog.Infof("Waiting... (no clone pair yet)")
 			continue
 		}
-		dataAny := interface{}(respPairs.Data)
-		for _, item := range dataAny.([]interface{}) {
-			clonePair, ok := item.(map[string]interface{})
-			if !ok {
-				klog.Infof("Waiting... (invalid clone pair data)")
-				continue
-			}
-			if fmt.Sprint(clonePair["status"]) == "PSUP" {
-				klog.Infof("Clone pair created: %v", clonePair)
+		for _, cp := range respPairs.Data {
+			if cp.Status == "PSUP" {
+				klog.Infof("Clone pair created: %+v", cp)
 				found = true
 				break
 			}
