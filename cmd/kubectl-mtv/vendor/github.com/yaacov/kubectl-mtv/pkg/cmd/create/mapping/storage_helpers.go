@@ -3,6 +3,7 @@ package mapping
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -13,9 +14,9 @@ import (
 )
 
 // resolveVSphereStorageNameToID resolves storage name for VMware vSphere provider
-func resolveVSphereStorageNameToID(configFlags *genericclioptions.ConfigFlags, inventoryURL string, provider *unstructured.Unstructured, storageName string) ([]ref.Ref, error) {
+func resolveVSphereStorageNameToID(ctx context.Context, configFlags *genericclioptions.ConfigFlags, inventoryURL string, provider *unstructured.Unstructured, storageName string, insecureSkipTLS bool) ([]ref.Ref, error) {
 	// Fetch datastores from VMware vSphere
-	storageInventory, err := client.FetchProviderInventory(configFlags, inventoryURL, provider, "datastores?detail=4")
+	storageInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "datastores?detail=4", insecureSkipTLS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch storage inventory: %v", err)
 	}
@@ -52,9 +53,9 @@ func resolveVSphereStorageNameToID(configFlags *genericclioptions.ConfigFlags, i
 }
 
 // resolveOvirtStorageNameToID resolves storage name for oVirt provider
-func resolveOvirtStorageNameToID(configFlags *genericclioptions.ConfigFlags, inventoryURL string, provider *unstructured.Unstructured, storageName string) ([]ref.Ref, error) {
+func resolveOvirtStorageNameToID(ctx context.Context, configFlags *genericclioptions.ConfigFlags, inventoryURL string, provider *unstructured.Unstructured, storageName string, insecureSkipTLS bool) ([]ref.Ref, error) {
 	// Fetch storage domains from oVirt
-	storageInventory, err := client.FetchProviderInventory(configFlags, inventoryURL, provider, "storagedomains?detail=4")
+	storageInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "storagedomains?detail=4", insecureSkipTLS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch storage inventory: %v", err)
 	}
@@ -91,7 +92,7 @@ func resolveOvirtStorageNameToID(configFlags *genericclioptions.ConfigFlags, inv
 }
 
 // resolveOpenStackStorageNameToID resolves storage name for OpenStack provider
-func resolveOpenStackStorageNameToID(configFlags *genericclioptions.ConfigFlags, inventoryURL string, provider *unstructured.Unstructured, storageName string) ([]ref.Ref, error) {
+func resolveOpenStackStorageNameToID(ctx context.Context, configFlags *genericclioptions.ConfigFlags, inventoryURL string, provider *unstructured.Unstructured, storageName string, insecureSkipTLS bool) ([]ref.Ref, error) {
 	// Handle '__DEFAULT__' as a special case - return ref with type 'default'
 	if storageName == "__DEFAULT__" {
 		return []ref.Ref{{
@@ -100,7 +101,7 @@ func resolveOpenStackStorageNameToID(configFlags *genericclioptions.ConfigFlags,
 	}
 
 	// Fetch storage types from OpenStack
-	storageInventory, err := client.FetchProviderInventory(configFlags, inventoryURL, provider, "volumetypes?detail=4")
+	storageInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "volumetypes?detail=4", insecureSkipTLS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch storage inventory: %v", err)
 	}
@@ -137,9 +138,9 @@ func resolveOpenStackStorageNameToID(configFlags *genericclioptions.ConfigFlags,
 }
 
 // resolveOVAStorageNameToID resolves storage name for OVA provider
-func resolveOVAStorageNameToID(configFlags *genericclioptions.ConfigFlags, inventoryURL string, provider *unstructured.Unstructured, storageName string) ([]ref.Ref, error) {
+func resolveOVAStorageNameToID(ctx context.Context, configFlags *genericclioptions.ConfigFlags, inventoryURL string, provider *unstructured.Unstructured, storageName string, insecureSkipTLS bool) ([]ref.Ref, error) {
 	// Fetch storage from OVA
-	storageInventory, err := client.FetchProviderInventory(configFlags, inventoryURL, provider, "storages?detail=4")
+	storageInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "storages?detail=4", insecureSkipTLS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch storage inventory: %v", err)
 	}
@@ -176,7 +177,7 @@ func resolveOVAStorageNameToID(configFlags *genericclioptions.ConfigFlags, inven
 }
 
 // resolveStorageNameToID resolves a storage name to its ref.Ref by querying the provider inventory
-func resolveStorageNameToID(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL, storageName string) ([]ref.Ref, error) {
+func resolveStorageNameToID(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL, storageName string, insecureSkipTLS bool) ([]ref.Ref, error) {
 	// Get source provider
 	provider, err := inventory.GetProviderByName(ctx, configFlags, providerName, namespace)
 	if err != nil {
@@ -196,17 +197,19 @@ func resolveStorageNameToID(ctx context.Context, configFlags *genericclioptions.
 		return []ref.Ref{{
 			Name: storageName,
 		}}, nil
+	case "ec2":
+		return resolveEC2StorageNameToID(ctx, configFlags, inventoryURL, provider, storageName, insecureSkipTLS)
 	case "vsphere":
-		return resolveVSphereStorageNameToID(configFlags, inventoryURL, provider, storageName)
+		return resolveVSphereStorageNameToID(ctx, configFlags, inventoryURL, provider, storageName, insecureSkipTLS)
 	case "ovirt":
-		return resolveOvirtStorageNameToID(configFlags, inventoryURL, provider, storageName)
+		return resolveOvirtStorageNameToID(ctx, configFlags, inventoryURL, provider, storageName, insecureSkipTLS)
 	case "openstack":
-		return resolveOpenStackStorageNameToID(configFlags, inventoryURL, provider, storageName)
+		return resolveOpenStackStorageNameToID(ctx, configFlags, inventoryURL, provider, storageName, insecureSkipTLS)
 	case "ova":
-		return resolveOVAStorageNameToID(configFlags, inventoryURL, provider, storageName)
+		return resolveOVAStorageNameToID(ctx, configFlags, inventoryURL, provider, storageName, insecureSkipTLS)
 	default:
 		// Default to generic storage endpoint for unknown providers
-		storageInventory, err := client.FetchProviderInventory(configFlags, inventoryURL, provider, "storages?detail=4")
+		storageInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "storages?detail=4", insecureSkipTLS)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch storage inventory: %v", err)
 		}
@@ -240,4 +243,56 @@ func resolveStorageNameToID(ctx context.Context, configFlags *genericclioptions.
 
 		return matchingRefs, nil
 	}
+}
+
+// resolveEC2StorageNameToID resolves storage name for EC2 provider
+func resolveEC2StorageNameToID(ctx context.Context, configFlags *genericclioptions.ConfigFlags, inventoryURL string, provider *unstructured.Unstructured, storageName string, insecureSkipTLS bool) ([]ref.Ref, error) {
+	// Fetch EBS volume types from EC2
+	storageInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "storages?detail=4", insecureSkipTLS)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch storage inventory: %v", err)
+	}
+
+	// Extract objects from EC2 envelope
+	storageInventory = inventory.ExtractEC2Objects(storageInventory)
+
+	storageArray, ok := storageInventory.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("unexpected data format: expected array for storage inventory")
+	}
+
+	// Search for the storage by type (gp2, gp3, io1, io2, st1, sc1, standard)
+	// Use case-insensitive matching and deduplicate results
+	var matchingRefs []ref.Ref
+	seen := make(map[string]struct{})
+	storageNameLower := strings.ToLower(storageName)
+
+	for _, item := range storageArray {
+		storage, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		// EC2 storage uses "type" field for EBS volume types
+		volumeType, _ := storage["type"].(string)
+
+		// Case-insensitive match
+		if strings.ToLower(volumeType) == storageNameLower {
+			// Deduplicate - only add if not seen before
+			if _, exists := seen[volumeType]; exists {
+				continue
+			}
+			seen[volumeType] = struct{}{}
+
+			matchingRefs = append(matchingRefs, ref.Ref{
+				Name: volumeType,
+			})
+		}
+	}
+
+	if len(matchingRefs) == 0 {
+		return nil, fmt.Errorf("EBS volume type '%s' not found in EC2 provider inventory", storageName)
+	}
+
+	return matchingRefs, nil
 }

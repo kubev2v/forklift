@@ -15,22 +15,43 @@ import (
 )
 
 // NewPlanCmd creates the plan start command
-func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() get.GlobalConfigGetter) *cobra.Command {
+func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig get.GlobalConfigGetter) *cobra.Command {
 	var cutoverTimeStr string
 	var all bool
 
 	cmd := &cobra.Command{
-		Use:               "plan [NAME...] [--all]",
-		Short:             "Start one or more migration plans",
+		Use:   "plan [NAME...] [--all]",
+		Short: "Start one or more migration plans",
+		Long: `Start one or more migration plans.
+
+For cold migrations, the migration begins immediately. For warm migrations,
+you can optionally specify a cutover time; if not provided, cutover defaults
+to 1 hour from the start time.
+
+The plan must be in a 'Ready' state to be started.`,
+		Example: `  # Start a migration plan
+  kubectl-mtv start plan my-migration
+
+  # Start multiple plans
+  kubectl-mtv start plan plan1 plan2 plan3
+
+  # Start all plans in the namespace
+  kubectl-mtv start plan --all
+
+  # Start with scheduled cutover (warm migration)
+  kubectl-mtv start plan my-migration --cutover 2026-12-31T23:00:00Z
+
+  # Start warm migration with cutover in 2 hours (Linux)
+  kubectl-mtv start plan my-migration --cutover "$(date -d '+2 hours' --iso-8601=sec)"`,
 		Args:              flags.ValidateAllFlagArgs(func() bool { return all }, 1),
 		SilenceUsage:      true,
 		ValidArgsFunction: completion.PlanNameCompletion(kubeConfigFlags),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Get the global configuration
-			config := getGlobalConfig()
+			// Cache kubeconfig flags for reuse throughout the function
+			cfg := globalConfig.GetKubeConfigFlags()
 
 			// Resolve the appropriate namespace based on context and flags
-			namespace := client.ResolveNamespace(config.GetKubeConfigFlags())
+			namespace := client.ResolveNamespace(cfg)
 
 			var cutoverTime *time.Time
 			if cutoverTimeStr != "" {
@@ -46,12 +67,12 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig 
 			if all {
 				// Get all plan names from the namespace
 				var err error
-				planNames, err = client.GetAllPlanNames(cmd.Context(), config.GetKubeConfigFlags(), namespace)
+				planNames, err = client.GetAllPlanNames(cmd.Context(), cfg, namespace)
 				if err != nil {
 					return fmt.Errorf("failed to get all plan names: %v", err)
 				}
 				if len(planNames) == 0 {
-					fmt.Printf("No plans found in namespace %s\n", namespace)
+					fmt.Fprintf(cmd.OutOrStdout(), "No plans found in namespace %s\n", namespace)
 					return nil
 				}
 			} else {
@@ -60,9 +81,8 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig 
 
 			// Loop over each plan name and start it
 			for _, name := range planNames {
-				err := plan.Start(config.GetKubeConfigFlags(), name, namespace, cutoverTime, config.GetUseUTC())
-				if err != nil {
-					return err
+				if err := plan.Start(cfg, name, namespace, cutoverTime, globalConfig.GetUseUTC()); err != nil {
+					return fmt.Errorf("failed to start plan %q: %w", name, err)
 				}
 			}
 			return nil

@@ -67,7 +67,7 @@ type StoragePairOptions struct {
 }
 
 // parseStoragePairsWithOptions parses storage pairs with additional options for VolumeMode, AccessMode, and OffloadPlugin
-func parseStoragePairsWithOptions(ctx context.Context, pairStr, defaultNamespace string, configFlags *genericclioptions.ConfigFlags, sourceProvider, inventoryURL string, defaultVolumeMode, defaultAccessMode, defaultOffloadPlugin, defaultOffloadSecret, defaultOffloadVendor string) ([]forkliftv1beta1.StoragePair, error) {
+func parseStoragePairsWithOptions(ctx context.Context, pairStr, defaultNamespace string, configFlags *genericclioptions.ConfigFlags, sourceProvider, inventoryURL string, defaultVolumeMode, defaultAccessMode, defaultOffloadPlugin, defaultOffloadSecret, defaultOffloadVendor string, insecureSkipTLS bool) ([]forkliftv1beta1.StoragePair, error) {
 	options := StoragePairOptions{
 		DefaultVolumeMode:    defaultVolumeMode,
 		DefaultAccessMode:    defaultAccessMode,
@@ -76,11 +76,11 @@ func parseStoragePairsWithOptions(ctx context.Context, pairStr, defaultNamespace
 		DefaultOffloadVendor: defaultOffloadVendor,
 	}
 
-	return parseStoragePairsInternal(pairStr, defaultNamespace, configFlags, sourceProvider, inventoryURL, &options)
+	return parseStoragePairsInternal(pairStr, defaultNamespace, configFlags, sourceProvider, inventoryURL, &options, insecureSkipTLS)
 }
 
 // parseStoragePairsInternal is the internal implementation that handles the parsing logic
-func parseStoragePairsInternal(pairStr, defaultNamespace string, configFlags *genericclioptions.ConfigFlags, sourceProvider, inventoryURL string, options *StoragePairOptions) ([]forkliftv1beta1.StoragePair, error) {
+func parseStoragePairsInternal(pairStr, defaultNamespace string, configFlags *genericclioptions.ConfigFlags, sourceProvider, inventoryURL string, options *StoragePairOptions, insecureSkipTLS bool) ([]forkliftv1beta1.StoragePair, error) {
 	if pairStr == "" {
 		return nil, nil
 	}
@@ -181,7 +181,7 @@ func parseStoragePairsInternal(pairStr, defaultNamespace string, configFlags *ge
 		}
 
 		// Resolve source storage name to ID
-		sourceStorageRefs, err := resolveStorageNameToID(context.TODO(), configFlags, sourceProvider, defaultNamespace, inventoryURL, sourceName)
+		sourceStorageRefs, err := resolveStorageNameToID(context.TODO(), configFlags, sourceProvider, defaultNamespace, inventoryURL, sourceName, insecureSkipTLS)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve source storage '%s': %v", sourceName, err)
 		}
@@ -232,7 +232,7 @@ func parseStoragePairsInternal(pairStr, defaultNamespace string, configFlags *ge
 }
 
 // createStorageMappingWithOptions creates a new storage mapping with additional options for VolumeMode, AccessMode, and OffloadPlugin
-func createStorageMappingWithOptions(ctx context.Context, configFlags *genericclioptions.ConfigFlags, name, namespace, sourceProvider, targetProvider, storagePairs, inventoryURL string, defaultVolumeMode, defaultAccessMode, defaultOffloadPlugin, defaultOffloadSecret, defaultOffloadVendor string) error {
+func createStorageMappingWithOptions(ctx context.Context, configFlags *genericclioptions.ConfigFlags, name, namespace, sourceProvider, targetProvider, storagePairs, inventoryURL string, defaultVolumeMode, defaultAccessMode, defaultOffloadPlugin, defaultOffloadSecret, defaultOffloadVendor string, insecureSkipTLS bool) error {
 	dynamicClient, err := client.GetDynamicClient(configFlags)
 	if err != nil {
 		return fmt.Errorf("failed to get client: %v", err)
@@ -245,7 +245,7 @@ func createStorageMappingWithOptions(ctx context.Context, configFlags *genericcl
 	// Parse storage pairs if provided
 	var mappingPairs []forkliftv1beta1.StoragePair
 	if storagePairs != "" {
-		mappingPairs, err = parseStoragePairsWithOptions(ctx, storagePairs, namespace, configFlags, sourceProvider, inventoryURL, defaultVolumeMode, defaultAccessMode, defaultOffloadPlugin, defaultOffloadSecret, defaultOffloadVendor)
+		mappingPairs, err = parseStoragePairsWithOptions(ctx, storagePairs, namespace, configFlags, sourceProvider, inventoryURL, defaultVolumeMode, defaultAccessMode, defaultOffloadPlugin, defaultOffloadSecret, defaultOffloadVendor, insecureSkipTLS)
 		if err != nil {
 			return fmt.Errorf("failed to parse storage pairs: %v", err)
 		}
@@ -322,7 +322,7 @@ func createStorageMappingWithOptionsAndSecret(ctx context.Context, opts StorageC
 	err = createStorageMappingWithOptions(ctx, opts.ConfigFlags, opts.Name, opts.Namespace,
 		opts.SourceProvider, opts.TargetProvider, opts.StoragePairs, opts.InventoryURL,
 		opts.DefaultVolumeMode, opts.DefaultAccessMode, opts.DefaultOffloadPlugin,
-		opts.DefaultOffloadSecret, opts.DefaultOffloadVendor)
+		opts.DefaultOffloadSecret, opts.DefaultOffloadVendor, opts.InventoryInsecureSkipTLS)
 
 	if err != nil {
 		// Clean up the created secret if mapping creation fails

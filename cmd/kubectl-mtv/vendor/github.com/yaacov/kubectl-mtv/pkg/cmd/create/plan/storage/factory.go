@@ -16,12 +16,14 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers"
+	ec2Fetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers/ec2"
 	openshiftFetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers/openshift"
 	openstackFetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers/openstack"
 	ovaFetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers/ova"
 	ovirtFetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers/ovirt"
 	vsphereFetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers/vsphere"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/mapper"
+	ec2Mapper "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/mapper/ec2"
 	openshiftMapper "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/mapper/openshift"
 	openstackMapper "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/mapper/openstack"
 	ovaMapper "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/mapper/ova"
@@ -34,10 +36,10 @@ import (
 // StorageMapperInterface defines the interface that all provider-specific storage mappers must implement
 type StorageMapperInterface interface {
 	// GetSourceStorages extracts storage information from the source provider for the specified VMs
-	GetSourceStorages(configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, planVMNames []string) ([]ref.Ref, error)
+	GetSourceStorages(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, planVMNames []string, insecureSkipTLS bool) ([]ref.Ref, error)
 
 	// GetTargetStorages extracts available storage information from the target provider
-	GetTargetStorages(configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string) ([]forkliftv1beta1.DestinationStorage, error)
+	GetTargetStorages(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, insecureSkipTLS bool) ([]forkliftv1beta1.DestinationStorage, error)
 
 	// CreateStoragePairs creates storage mapping pairs based on source storages, target storages, and optional default storage class
 	CreateStoragePairs(sourceStorages []ref.Ref, targetStorages []forkliftv1beta1.DestinationStorage, defaultTargetStorageClass string) ([]forkliftv1beta1.StoragePair, error)
@@ -53,6 +55,7 @@ type StorageMapperOptions struct {
 	TargetProviderNamespace   string
 	ConfigFlags               *genericclioptions.ConfigFlags
 	InventoryURL              string
+	InventoryInsecureSkipTLS  bool
 	PlanVMNames               []string
 	DefaultTargetStorageClass string
 }
@@ -64,7 +67,7 @@ func CreateStorageMap(ctx context.Context, opts StorageMapperOptions) (string, e
 
 	// Get source storage fetcher using the provider's namespace
 	sourceProviderNamespace := client.GetProviderNamespace(opts.SourceProviderNamespace, opts.Namespace)
-	sourceFetcher, err := GetSourceStorageFetcher(ctx, opts.ConfigFlags, opts.SourceProvider, sourceProviderNamespace)
+	sourceFetcher, err := GetSourceStorageFetcher(ctx, opts.ConfigFlags, opts.SourceProvider, sourceProviderNamespace, opts.InventoryInsecureSkipTLS)
 	if err != nil {
 		return "", fmt.Errorf("failed to get source storage fetcher: %v", err)
 	}
@@ -72,14 +75,14 @@ func CreateStorageMap(ctx context.Context, opts StorageMapperOptions) (string, e
 
 	// Get target storage fetcher using the provider's namespace
 	targetProviderNamespace := client.GetProviderNamespace(opts.TargetProviderNamespace, opts.Namespace)
-	targetFetcher, err := GetTargetStorageFetcher(ctx, opts.ConfigFlags, opts.TargetProvider, targetProviderNamespace)
+	targetFetcher, err := GetTargetStorageFetcher(ctx, opts.ConfigFlags, opts.TargetProvider, targetProviderNamespace, opts.InventoryInsecureSkipTLS)
 	if err != nil {
 		return "", fmt.Errorf("failed to get target storage fetcher: %v", err)
 	}
 	klog.V(4).Infof("DEBUG: Target storage fetcher created for provider: %s", opts.TargetProvider)
 
 	// Fetch source storages
-	sourceStorages, err := sourceFetcher.FetchSourceStorages(ctx, opts.ConfigFlags, opts.SourceProvider, sourceProviderNamespace, opts.InventoryURL, opts.PlanVMNames)
+	sourceStorages, err := sourceFetcher.FetchSourceStorages(ctx, opts.ConfigFlags, opts.SourceProvider, sourceProviderNamespace, opts.InventoryURL, opts.PlanVMNames, opts.InventoryInsecureSkipTLS)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch source storages: %v", err)
 	}
@@ -89,7 +92,7 @@ func CreateStorageMap(ctx context.Context, opts StorageMapperOptions) (string, e
 	var targetStorages []forkliftv1beta1.DestinationStorage
 	if opts.DefaultTargetStorageClass == "" {
 		klog.V(4).Infof("DEBUG: Fetching target storages from target provider: %s", opts.TargetProvider)
-		targetStorages, err = targetFetcher.FetchTargetStorages(ctx, opts.ConfigFlags, opts.TargetProvider, targetProviderNamespace, opts.InventoryURL)
+		targetStorages, err = targetFetcher.FetchTargetStorages(ctx, opts.ConfigFlags, opts.TargetProvider, targetProviderNamespace, opts.InventoryURL, opts.InventoryInsecureSkipTLS)
 		if err != nil {
 			return "", fmt.Errorf("failed to fetch target storages: %v", err)
 		}
@@ -99,7 +102,7 @@ func CreateStorageMap(ctx context.Context, opts StorageMapperOptions) (string, e
 	}
 
 	// Get provider-specific storage mapper
-	storageMapper, sourceProviderType, targetProviderType, err := GetStorageMapper(ctx, opts.ConfigFlags, opts.SourceProvider, sourceProviderNamespace, opts.TargetProvider, targetProviderNamespace)
+	storageMapper, sourceProviderType, targetProviderType, err := GetStorageMapper(ctx, opts.ConfigFlags, opts.SourceProvider, sourceProviderNamespace, opts.TargetProvider, targetProviderNamespace, opts.InventoryInsecureSkipTLS)
 	if err != nil {
 		return "", fmt.Errorf("failed to get storage mapper: %v", err)
 	}
@@ -190,7 +193,7 @@ func createStorageMap(opts StorageMapperOptions, storagePairs []forkliftv1beta1.
 }
 
 // GetSourceStorageFetcher returns the appropriate source storage fetcher based on provider type
-func GetSourceStorageFetcher(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace string) (fetchers.SourceStorageFetcher, error) {
+func GetSourceStorageFetcher(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace string, insecureSkipTLS bool) (fetchers.SourceStorageFetcher, error) {
 	// Get the provider object to determine its type
 	provider, err := inventory.GetProviderByName(ctx, configFlags, providerName, namespace)
 	if err != nil {
@@ -198,7 +201,8 @@ func GetSourceStorageFetcher(ctx context.Context, configFlags *genericclioptions
 	}
 
 	// Create a provider client to get the provider type
-	providerClient := inventory.NewProviderClient(configFlags, provider, "")
+	// Note: GetProviderType() only reads from CRD spec (no HTTPS calls), but we pass insecureSkipTLS for consistency
+	providerClient := inventory.NewProviderClientWithInsecure(configFlags, provider, "", insecureSkipTLS)
 	providerType, err := providerClient.GetProviderType()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get provider type: %v", err)
@@ -208,6 +212,9 @@ func GetSourceStorageFetcher(ctx context.Context, configFlags *genericclioptions
 
 	// Return the appropriate fetcher based on provider type
 	switch providerType {
+	case "ec2":
+		klog.V(4).Infof("DEBUG: Using EC2 source storage fetcher for %s", providerName)
+		return ec2Fetcher.NewEC2StorageFetcher(), nil
 	case "openstack":
 		klog.V(4).Infof("DEBUG: Using OpenStack source storage fetcher for %s", providerName)
 		return openstackFetcher.NewOpenStackStorageFetcher(), nil
@@ -229,7 +236,7 @@ func GetSourceStorageFetcher(ctx context.Context, configFlags *genericclioptions
 }
 
 // GetTargetStorageFetcher returns the appropriate target storage fetcher based on provider type
-func GetTargetStorageFetcher(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace string) (fetchers.TargetStorageFetcher, error) {
+func GetTargetStorageFetcher(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace string, insecureSkipTLS bool) (fetchers.TargetStorageFetcher, error) {
 	// Get the provider object to determine its type
 	provider, err := inventory.GetProviderByName(ctx, configFlags, providerName, namespace)
 	if err != nil {
@@ -237,7 +244,8 @@ func GetTargetStorageFetcher(ctx context.Context, configFlags *genericclioptions
 	}
 
 	// Create a provider client to get the provider type
-	providerClient := inventory.NewProviderClient(configFlags, provider, "")
+	// Note: GetProviderType() only reads from CRD spec (no HTTPS calls), but we pass insecureSkipTLS for consistency
+	providerClient := inventory.NewProviderClientWithInsecure(configFlags, provider, "", insecureSkipTLS)
 	providerType, err := providerClient.GetProviderType()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get provider type: %v", err)
@@ -247,6 +255,11 @@ func GetTargetStorageFetcher(ctx context.Context, configFlags *genericclioptions
 
 	// Return the appropriate fetcher based on provider type
 	switch providerType {
+	case "ec2":
+		// Note: EC2 is typically used as a source provider for migrations to OpenShift/Kubernetes.
+		// EC2 as a migration target is not a common use case, but we provide the fetcher for interface completeness.
+		klog.V(4).Infof("DEBUG: Using EC2 target storage fetcher for %s (note: EC2 is typically a source, not target)", providerName)
+		return ec2Fetcher.NewEC2StorageFetcher(), nil
 	case "openstack":
 		klog.V(4).Infof("DEBUG: Using OpenStack target storage fetcher for %s", providerName)
 		return openstackFetcher.NewOpenStackStorageFetcher(), nil
@@ -268,14 +281,15 @@ func GetTargetStorageFetcher(ctx context.Context, configFlags *genericclioptions
 }
 
 // GetStorageMapper returns the appropriate storage mapper based on source provider type
-func GetStorageMapper(ctx context.Context, configFlags *genericclioptions.ConfigFlags, sourceProviderName, sourceProviderNamespace, targetProviderName, targetProviderNamespace string) (mapper.StorageMapper, string, string, error) {
+func GetStorageMapper(ctx context.Context, configFlags *genericclioptions.ConfigFlags, sourceProviderName, sourceProviderNamespace, targetProviderName, targetProviderNamespace string, insecureSkipTLS bool) (mapper.StorageMapper, string, string, error) {
 	// Get source provider type
 	sourceProvider, err := inventory.GetProviderByName(ctx, configFlags, sourceProviderName, sourceProviderNamespace)
 	if err != nil {
 		return nil, "", "", fmt.Errorf("failed to get source provider: %v", err)
 	}
 
-	sourceProviderClient := inventory.NewProviderClient(configFlags, sourceProvider, "")
+	// Note: GetProviderType() only reads from CRD spec (no HTTPS calls), but we pass insecureSkipTLS for consistency
+	sourceProviderClient := inventory.NewProviderClientWithInsecure(configFlags, sourceProvider, "", insecureSkipTLS)
 	sourceProviderType, err := sourceProviderClient.GetProviderType()
 	if err != nil {
 		return nil, "", "", fmt.Errorf("failed to get source provider type: %v", err)
@@ -287,7 +301,8 @@ func GetStorageMapper(ctx context.Context, configFlags *genericclioptions.Config
 		return nil, "", "", fmt.Errorf("failed to get target provider: %v", err)
 	}
 
-	targetProviderClient := inventory.NewProviderClient(configFlags, targetProvider, "")
+	// Note: GetProviderType() only reads from CRD spec (no HTTPS calls), but we pass insecureSkipTLS for consistency
+	targetProviderClient := inventory.NewProviderClientWithInsecure(configFlags, targetProvider, "", insecureSkipTLS)
 	targetProviderType, err := targetProviderClient.GetProviderType()
 	if err != nil {
 		return nil, "", "", fmt.Errorf("failed to get target provider type: %v", err)
@@ -298,6 +313,9 @@ func GetStorageMapper(ctx context.Context, configFlags *genericclioptions.Config
 
 	// Return the appropriate mapper based on source provider type
 	switch sourceProviderType {
+	case "ec2":
+		klog.V(4).Infof("DEBUG: Using EC2 storage mapper for source %s", sourceProviderName)
+		return ec2Mapper.NewEC2StorageMapper(), sourceProviderType, targetProviderType, nil
 	case "openstack":
 		klog.V(4).Infof("DEBUG: Using OpenStack storage mapper for source %s", sourceProviderName)
 		return openstackMapper.NewOpenStackStorageMapper(), sourceProviderType, targetProviderType, nil

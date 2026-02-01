@@ -17,8 +17,20 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 	var all bool
 
 	cmd := &cobra.Command{
-		Use:               "provider [NAME...] [--all]",
-		Short:             "Delete one or more providers",
+		Use:   "provider [NAME...] [--all]",
+		Short: "Delete one or more providers",
+		Long: `Delete one or more MTV providers.
+
+Deleting a provider removes its connection to the source or target environment.
+Ensure no migration plans reference the provider before deletion.`,
+		Example: `  # Delete a provider
+  kubectl-mtv delete provider vsphere-prod
+
+  # Delete multiple providers
+  kubectl-mtv delete provider provider1 provider2
+
+  # Delete all providers in namespace
+  kubectl-mtv delete provider --all`,
 		Args:              flags.ValidateAllFlagArgs(func() bool { return all }, 1),
 		SilenceUsage:      true,
 		ValidArgsFunction: completion.ProviderNameCompletion(kubeConfigFlags),

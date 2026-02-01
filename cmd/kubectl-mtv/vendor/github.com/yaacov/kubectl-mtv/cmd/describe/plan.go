@@ -14,14 +14,29 @@ import (
 )
 
 // NewPlanCmd creates the plan description command
-func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() get.GlobalConfigGetter) *cobra.Command {
+func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig get.GlobalConfigGetter) *cobra.Command {
 	var withVMs bool
 	var vmName string
 	var watch bool
 
 	cmd := &cobra.Command{
-		Use:               "plan NAME",
-		Short:             "Describe a migration plan",
+		Use:   "plan NAME",
+		Short: "Describe a migration plan",
+		Long: `Display detailed information about a migration plan.
+
+Shows plan configuration, status, conditions, and optionally the list of VMs.
+Use --vm to see detailed status of a specific VM in the plan.`,
+		Example: `  # Describe a plan
+  kubectl-mtv describe plan my-migration
+
+  # Describe a plan including VM list
+  kubectl-mtv describe plan my-migration --with-vms
+
+  # Describe a specific VM in the plan
+  kubectl-mtv describe plan my-migration --vm web-server
+
+  # Watch VM status with live updates
+  kubectl-mtv describe plan my-migration --vm web-server -w`,
 		Args:              cobra.ExactArgs(1),
 		SilenceUsage:      true,
 		ValidArgsFunction: completion.PlanNameCompletion(kubeConfigFlags),
@@ -30,7 +45,6 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig 
 			name := args[0]
 
 			// Get the global configuration
-			config := getGlobalConfig()
 
 			// Validate that --with-vms and --vm are mutually exclusive
 			if withVMs && vmName != "" {
@@ -38,15 +52,15 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig 
 			}
 
 			// Resolve the appropriate namespace based on context and flags
-			namespace := client.ResolveNamespace(config.GetKubeConfigFlags())
+			namespace := client.ResolveNamespace(globalConfig.GetKubeConfigFlags())
 
 			// If --vm flag is provided, switch to VM description behavior
 			if vmName != "" {
-				return vm.DescribeVM(config.GetKubeConfigFlags(), name, namespace, vmName, watch, config.GetUseUTC())
+				return vm.DescribeVM(globalConfig.GetKubeConfigFlags(), name, namespace, vmName, watch, globalConfig.GetUseUTC())
 			}
 
 			// Default behavior: describe plan
-			return plan.Describe(config.GetKubeConfigFlags(), name, namespace, withVMs, config.GetUseUTC())
+			return plan.Describe(globalConfig.GetKubeConfigFlags(), name, namespace, withVMs, globalConfig.GetUseUTC())
 		},
 	}
 

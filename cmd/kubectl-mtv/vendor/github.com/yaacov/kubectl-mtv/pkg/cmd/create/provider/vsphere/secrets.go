@@ -2,12 +2,10 @@ package vsphere
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	forkliftv1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -65,6 +63,16 @@ func setSecretOwnership(configFlags *genericclioptions.ConfigFlags, provider *fo
 		return fmt.Errorf("failed to create kubernetes client: %v", err)
 	}
 
+	// Get the current secret to safely append owner reference
+	currentSecret, err := k8sClient.CoreV1().Secrets(secret.Namespace).Get(
+		context.Background(),
+		secret.Name,
+		metav1.GetOptions{},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to get secret for ownership update: %v", err)
+	}
+
 	// Create the owner reference
 	ownerRef := metav1.OwnerReference{
 		APIVersion: provider.APIVersion,
@@ -73,29 +81,24 @@ func setSecretOwnership(configFlags *genericclioptions.ConfigFlags, provider *fo
 		UID:        provider.UID,
 	}
 
-	// Patch secret to add the owner reference
-	patch := map[string]interface{}{
-		"metadata": map[string]interface{}{
-			"ownerReferences": []metav1.OwnerReference{ownerRef},
-		},
+	// Check if this provider is already an owner to avoid duplicates
+	for _, existingOwner := range currentSecret.OwnerReferences {
+		if existingOwner.UID == provider.UID {
+			return nil // Already an owner, nothing to do
+		}
 	}
 
-	// Convert patch to JSON bytes
-	patchBytes, err := json.Marshal(patch)
-	if err != nil {
-		return fmt.Errorf("failed to marshal patch data: %v", err)
-	}
+	// Append the new owner reference to existing ones
+	currentSecret.OwnerReferences = append(currentSecret.OwnerReferences, ownerRef)
 
-	// Apply the patch to the secret
-	_, err = k8sClient.CoreV1().Secrets(secret.Namespace).Patch(
+	// Update the secret with the new owner reference
+	_, err = k8sClient.CoreV1().Secrets(secret.Namespace).Update(
 		context.Background(),
-		secret.Name,
-		types.MergePatchType,
-		patchBytes,
-		metav1.PatchOptions{},
+		currentSecret,
+		metav1.UpdateOptions{},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to patch secret with owner reference: %v", err)
+		return fmt.Errorf("failed to update secret with owner reference: %v", err)
 	}
 
 	return nil

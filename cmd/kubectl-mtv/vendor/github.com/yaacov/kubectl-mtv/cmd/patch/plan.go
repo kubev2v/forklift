@@ -58,9 +58,23 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	var runPreflightInspectionChanged bool
 
 	cmd := &cobra.Command{
-		Use:               "plan PLAN_NAME",
-		Short:             "Patch a migration plan",
-		Long:              `Patch various fields of an existing migration plan without modifying its VMs.`,
+		Use:   "plan PLAN_NAME",
+		Short: "Patch a migration plan",
+		Long: `Patch an existing migration plan without modifying its VM list.
+
+Use this to update plan settings like migration type, transfer network,
+target labels, node selectors, or convertor pod configuration.`,
+		Example: `  # Change migration type to warm
+  kubectl-mtv patch plan my-migration --migration-type warm
+
+  # Update transfer network
+  kubectl-mtv patch plan my-migration --transfer-network my-namespace/migration-net
+
+  # Add target labels to migrated VMs
+  kubectl-mtv patch plan my-migration --target-labels env=prod,team=platform
+
+  # Configure convertor pod scheduling
+  kubectl-mtv patch plan my-migration --convertor-node-selector node-role=worker`,
 		Args:              cobra.ExactArgs(1),
 		SilenceUsage:      true,
 		ValidArgsFunction: completion.PlanNameCompletion(kubeConfigFlags),
@@ -138,35 +152,35 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&transferNetwork, "transfer-network", "", "Network to use for transferring VM data. Supports 'namespace/network-name' or just 'network-name' (uses plan namespace)")
-	cmd.Flags().StringVar(&installLegacyDrivers, "install-legacy-drivers", "", "Install legacy drivers (true/false)")
-	cmd.Flags().Var(migrationTypeFlag, "migration-type", "Migration type: cold, warm, live, or conversion (supersedes --warm flag)")
+	cmd.Flags().StringVar(&installLegacyDrivers, "install-legacy-drivers", "", "Install legacy Windows drivers (true/false, leave empty for auto-detection) "+flags.ProvidersConversion)
+	cmd.Flags().Var(migrationTypeFlag, "migration-type", "Migration type: cold, warm, live, or conversion "+flags.MigrationTypeSupport)
 	cmd.Flags().StringSliceVar(&targetLabels, "target-labels", []string{}, "Target VM labels in format key=value (can be specified multiple times)")
 	cmd.Flags().StringSliceVar(&targetNodeSelector, "target-node-selector", []string{}, "Target node selector in format key=value (can be specified multiple times)")
-	cmd.Flags().BoolVar(&useCompatibilityMode, "use-compatibility-mode", false, "Use compatibility mode for migration")
+	cmd.Flags().BoolVar(&useCompatibilityMode, "use-compatibility-mode", false, "Use compatibility devices (SATA bus, E1000E NIC) when skipGuestConversion is true "+flags.ProvidersVSphereEC2)
 	cmd.Flags().StringVar(&targetAffinity, "target-affinity", "", "Target affinity using KARL syntax (e.g. 'REQUIRE pods(app=database) on node')")
 	cmd.Flags().StringVar(&targetNamespace, "target-namespace", "", "Target namespace for migrated VMs")
 	cmd.Flags().StringVar(&targetPowerState, "target-power-state", "", "Target power state for VMs after migration: 'on', 'off', or 'auto' (default: match source VM power state)")
 
-	// Convertor-related flags
-	cmd.Flags().StringSliceVar(&convertorLabels, "convertor-labels", nil, "Labels to be added to virt-v2v convertor pods (e.g., key1=value1,key2=value2)")
-	cmd.Flags().StringSliceVar(&convertorNodeSelector, "convertor-node-selector", nil, "Node selector to constrain convertor pod scheduling (e.g., key1=value1,key2=value2)")
-	cmd.Flags().StringVar(&convertorAffinity, "convertor-affinity", "", "Convertor affinity to constrain convertor pod scheduling using KARL syntax (e.g. 'REQUIRE pods(app=storage) on node')")
+	// Convertor-related flags (only apply to providers requiring guest conversion)
+	cmd.Flags().StringSliceVar(&convertorLabels, "convertor-labels", nil, "Labels to be added to virt-v2v convertor pods (e.g., key1=value1,key2=value2) "+flags.ProvidersConversion)
+	cmd.Flags().StringSliceVar(&convertorNodeSelector, "convertor-node-selector", nil, "Node selector to constrain convertor pod scheduling (e.g., key1=value1,key2=value2) "+flags.ProvidersConversion)
+	cmd.Flags().StringVar(&convertorAffinity, "convertor-affinity", "", "Convertor affinity to constrain convertor pod scheduling using KARL syntax "+flags.ProvidersConversion)
 
 	// Plan metadata and configuration flags
 	cmd.Flags().StringVar(&description, "description", "", "Plan description")
-	cmd.Flags().BoolVar(&preserveClusterCPUModel, "preserve-cluster-cpu-model", false, "Preserve the CPU model and flags the VM runs with in its oVirt cluster")
-	cmd.Flags().BoolVar(&preserveStaticIPs, "preserve-static-ips", false, "Preserve static IPs of VMs in vSphere (set to false to disable)")
-	cmd.Flags().StringVar(&pvcNameTemplate, "pvc-name-template", "", "Template for generating PVC names for VM disks. Variables: {{.VmName}}, {{.PlanName}}, {{.DiskIndex}}, {{.WinDriveLetter}}, {{.RootDiskIndex}}, {{.Shared}}, {{.FileName}}")
-	cmd.Flags().StringVar(&volumeNameTemplate, "volume-name-template", "", "Template for generating volume interface names in the target VM. Variables: {{.PVCName}}, {{.VolumeIndex}}")
-	cmd.Flags().StringVar(&networkNameTemplate, "network-name-template", "", "Template for generating network interface names in the target VM. Variables: {{.NetworkName}}, {{.NetworkNamespace}}, {{.NetworkType}}, {{.NetworkIndex}}")
-	cmd.Flags().BoolVar(&migrateSharedDisks, "migrate-shared-disks", true, "Determines if the plan should migrate shared disks")
+	cmd.Flags().BoolVar(&preserveClusterCPUModel, "preserve-cluster-cpu-model", false, "Preserve the CPU model and flags the VM runs with in its cluster "+flags.ProvidersOVirt)
+	cmd.Flags().BoolVar(&preserveStaticIPs, "preserve-static-ips", false, "Preserve static IP configurations during migration "+flags.ProvidersVSphere)
+	cmd.Flags().StringVar(&pvcNameTemplate, "pvc-name-template", "", "Template for generating PVC names for VM disks. Variables: {{.VmName}}, {{.PlanName}}, {{.DiskIndex}}, {{.WinDriveLetter}}, {{.RootDiskIndex}}, {{.Shared}}, {{.FileName}} "+flags.ProvidersVSphereOpenShift)
+	cmd.Flags().StringVar(&volumeNameTemplate, "volume-name-template", "", "Template for generating volume interface names in the target VM. Variables: {{.PVCName}}, {{.VolumeIndex}} "+flags.ProvidersVSphere)
+	cmd.Flags().StringVar(&networkNameTemplate, "network-name-template", "", "Template for generating network interface names in the target VM. Variables: {{.NetworkName}}, {{.NetworkNamespace}}, {{.NetworkType}}, {{.NetworkIndex}} "+flags.ProvidersVSphere)
+	cmd.Flags().BoolVar(&migrateSharedDisks, "migrate-shared-disks", true, "Migrate disks shared between multiple VMs "+flags.ProvidersVSphereOVirt)
 	cmd.Flags().BoolVar(&archived, "archived", false, "Whether this plan should be archived")
-	cmd.Flags().BoolVar(&pvcNameTemplateUseGenerateName, "pvc-name-template-use-generate-name", true, "Use generateName instead of name for PVC name template")
-	cmd.Flags().BoolVar(&deleteGuestConversionPod, "delete-guest-conversion-pod", false, "Delete guest conversion pod after successful migration")
+	cmd.Flags().BoolVar(&pvcNameTemplateUseGenerateName, "pvc-name-template-use-generate-name", true, "Use generateName instead of name for PVC name template "+flags.ProvidersVSphere)
+	cmd.Flags().BoolVar(&deleteGuestConversionPod, "delete-guest-conversion-pod", false, "Delete guest conversion pod after successful migration "+flags.ProvidersConversion)
 	cmd.Flags().BoolVar(&deleteVmOnFailMigration, "delete-vm-on-fail-migration", false, "Delete target VM when migration fails")
-	cmd.Flags().BoolVar(&skipGuestConversion, "skip-guest-conversion", false, "Skip the guest conversion process")
-	cmd.Flags().BoolVar(&warm, "warm", false, "Enable warm migration (use --migration-type=warm instead)")
-	cmd.Flags().BoolVar(&runPreflightInspection, "run-preflight-inspection", true, "Run preflight inspection on VM base disks before starting disk transfer (applies only to warm migrations from VMware)")
+	cmd.Flags().BoolVar(&skipGuestConversion, "skip-guest-conversion", false, "Skip the guest conversion process (raw disk copy mode) "+flags.ProvidersVSphereEC2)
+	cmd.Flags().BoolVar(&warm, "warm", false, "Enable warm migration (use --migration-type=warm instead) "+flags.ProvidersVSphereOVirt)
+	cmd.Flags().BoolVar(&runPreflightInspection, "run-preflight-inspection", true, "Run preflight inspection on VM base disks before starting disk transfer "+flags.CombineHints(flags.ProvidersVSphere, flags.MigrationWarm))
 
 	// Add completion for migration type flag
 	if err := cmd.RegisterFlagCompletionFunc("migration-type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -242,10 +256,10 @@ func NewPlanVMCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command
 	cmd.Flags().StringVar(&targetName, "target-name", "", "Custom name for the VM in the target cluster")
 	cmd.Flags().StringVar(&rootDisk, "root-disk", "", "The primary disk to boot from")
 	cmd.Flags().StringVar(&instanceType, "instance-type", "", "Override the VM's instance type in the target")
-	cmd.Flags().StringVar(&pvcNameTemplate, "pvc-name-template", "", "Go template for naming PVCs for this VM's disks. Variables: {{.VmName}}, {{.PlanName}}, {{.DiskIndex}}, {{.WinDriveLetter}}, {{.RootDiskIndex}}, {{.Shared}}, {{.FileName}}")
-	cmd.Flags().StringVar(&volumeNameTemplate, "volume-name-template", "", "Go template for naming volume interfaces. Variables: {{.PVCName}}, {{.VolumeIndex}}")
-	cmd.Flags().StringVar(&networkNameTemplate, "network-name-template", "", "Go template for naming network interfaces. Variables: {{.NetworkName}}, {{.NetworkNamespace}}, {{.NetworkType}}, {{.NetworkIndex}}")
-	cmd.Flags().StringVar(&luksSecret, "luks-secret", "", "Kubernetes Secret name containing LUKS disk decryption keys")
+	cmd.Flags().StringVar(&pvcNameTemplate, "pvc-name-template", "", "Go template for naming PVCs for this VM's disks. Variables: {{.VmName}}, {{.PlanName}}, {{.DiskIndex}}, {{.WinDriveLetter}}, {{.RootDiskIndex}}, {{.Shared}}, {{.FileName}} "+flags.ProvidersVSphereOpenShift)
+	cmd.Flags().StringVar(&volumeNameTemplate, "volume-name-template", "", "Go template for naming volume interfaces. Variables: {{.PVCName}}, {{.VolumeIndex}} "+flags.ProvidersVSphere)
+	cmd.Flags().StringVar(&networkNameTemplate, "network-name-template", "", "Go template for naming network interfaces. Variables: {{.NetworkName}}, {{.NetworkNamespace}}, {{.NetworkType}}, {{.NetworkIndex}} "+flags.ProvidersVSphere)
+	cmd.Flags().StringVar(&luksSecret, "luks-secret", "", "Kubernetes Secret name containing LUKS disk decryption keys "+flags.ProvidersVSphereOVirt)
 	cmd.Flags().StringVar(&targetPowerState, "target-power-state", "", "Target power state for this VM after migration: 'on', 'off', or 'auto' (default: match source VM power state)")
 
 	// Hook-related flags

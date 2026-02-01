@@ -19,8 +19,24 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	var all bool
 
 	cmd := &cobra.Command{
-		Use:               "plan [NAME...] [--all]",
-		Short:             "Set the cutover time for one or more warm migration plans",
+		Use:   "plan [NAME...] [--all]",
+		Short: "Set the cutover time for one or more warm migration plans",
+		Long: `Trigger cutover for warm migration plans.
+
+Cutover stops the source VMs and performs the final sync to complete the migration.
+Use this to manually trigger cutover for warm migrations, or to reschedule
+a cutover time. If no cutover time is specified, it defaults to immediately.`,
+		Example: `  # Trigger immediate cutover
+  kubectl-mtv cutover plan my-warm-migration
+
+  # Schedule cutover for a specific time
+  kubectl-mtv cutover plan my-warm-migration --cutover 2026-12-31T23:00:00Z
+
+  # Cutover all warm migration plans
+  kubectl-mtv cutover plan --all
+
+  # Cutover multiple plans
+  kubectl-mtv cutover plan plan1 plan2 plan3`,
 		Args:              flags.ValidateAllFlagArgs(func() bool { return all }, 1),
 		SilenceUsage:      true,
 		ValidArgsFunction: completion.PlanNameCompletion(kubeConfigFlags),

@@ -15,21 +15,24 @@ type MTVOperatorInfo struct {
 	Version   string
 	Namespace string
 	Found     bool
+	Error     string
 }
 
 // GetMTVOperatorInfo discovers information about the MTV Operator installation
 // by examining the providers.forklift.konveyor.io CRD annotations.
-// Returns operator version, namespace, and whether the operator was found.
+// Returns operator version, namespace, whether the operator was found, and any error.
 func GetMTVOperatorInfo(ctx context.Context, configFlags *genericclioptions.ConfigFlags) MTVOperatorInfo {
 	info := MTVOperatorInfo{
 		Version:   "unknown",
 		Namespace: "",
 		Found:     false,
+		Error:     "",
 	}
 
 	// Try to get dynamic client
 	dynamicClient, err := GetDynamicClient(configFlags)
 	if err != nil {
+		info.Error = err.Error()
 		return info
 	}
 
@@ -42,6 +45,13 @@ func GetMTVOperatorInfo(ctx context.Context, configFlags *genericclioptions.Conf
 
 	crd, err := dynamicClient.Resource(crdGVR).Get(ctx, "providers.forklift.konveyor.io", metav1.GetOptions{})
 	if err != nil {
+		// Check if this is a "not found" error vs other errors
+		if strings.Contains(err.Error(), "not found") {
+			// CRD not found means operator is not installed - not an error
+			return info
+		}
+		// Other errors (auth, network, etc.) should be reported
+		info.Error = err.Error()
 		return info
 	}
 

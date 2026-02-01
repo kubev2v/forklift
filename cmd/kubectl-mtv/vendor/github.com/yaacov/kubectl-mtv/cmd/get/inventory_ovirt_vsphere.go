@@ -14,16 +14,26 @@ import (
 )
 
 // NewInventoryHostCmd creates the get inventory host command
-func NewInventoryHostCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() GlobalConfigGetter) *cobra.Command {
-	var inventoryURL string
+func NewInventoryHostCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	outputFormatFlag := flags.NewOutputFormatTypeFlag()
 	var query string
 	var watch bool
 
 	cmd := &cobra.Command{
-		Use:               "host PROVIDER",
-		Short:             "Get hosts from a provider (ovirt, vsphere)",
-		Long:              `Get hosts from a provider (ovirt, vsphere)`,
+		Use:   "host PROVIDER",
+		Short: "Get hosts from a provider " + flags.ProvidersVSphereOVirt,
+		Long: `Get hypervisor hosts from a provider's inventory.
+
+Lists ESXi hosts (vSphere) or hypervisor hosts (oVirt) from the source provider.
+Host information is useful for planning migrations and understanding the source environment.`,
+		Example: `  # List all hosts from a vSphere provider
+  kubectl-mtv get inventory host vsphere-prod
+
+  # Filter hosts by cluster
+  kubectl-mtv get inventory host vsphere-prod -q "where cluster = 'production'"
+
+  # Output as JSON
+  kubectl-mtv get inventory host vsphere-prod -o json`,
 		Args:              cobra.ExactArgs(1),
 		SilenceUsage:      true,
 		ValidArgsFunction: completion.ProviderNameCompletion(kubeConfigFlags),
@@ -36,21 +46,19 @@ func NewInventoryHostCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlob
 			}
 
 			provider := args[0]
-			config := getGlobalConfig()
-			namespace := client.ResolveNamespaceWithAllFlag(config.GetKubeConfigFlags(), config.GetAllNamespaces())
 
-			logNamespaceOperation("Getting hosts from provider", namespace, config.GetAllNamespaces())
+			namespace := client.ResolveNamespaceWithAllFlag(globalConfig.GetKubeConfigFlags(), globalConfig.GetAllNamespaces())
+
+			logNamespaceOperation("Getting hosts from provider", namespace, globalConfig.GetAllNamespaces())
 			logOutputFormat(outputFormatFlag.GetValue())
 
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(ctx, config.GetKubeConfigFlags(), namespace)
-			}
+			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
+			inventoryURL := globalConfig.GetInventoryURL()
+			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
-			return inventory.ListHosts(ctx, config.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch)
+			return inventory.ListHostsWithInsecure(ctx, globalConfig.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch, inventoryInsecureSkipTLS)
 		},
 	}
-
-	cmd.Flags().StringVar(&inventoryURL, "inventory-url", "", "Inventory service URL")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", "Output format (table, json, yaml)")
 	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
@@ -66,16 +74,26 @@ func NewInventoryHostCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlob
 }
 
 // NewInventoryDataCenterCmd creates the get inventory datacenter command
-func NewInventoryDataCenterCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() GlobalConfigGetter) *cobra.Command {
-	var inventoryURL string
+func NewInventoryDataCenterCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	outputFormatFlag := flags.NewOutputFormatTypeFlag()
 	var query string
 	var watch bool
 
 	cmd := &cobra.Command{
-		Use:               "datacenter PROVIDER",
-		Short:             "Get datacenters from a provider (ovirt, vsphere)",
-		Long:              `Get datacenters from a provider (ovirt, vsphere)`,
+		Use:   "datacenter PROVIDER",
+		Short: "Get datacenters from a provider " + flags.ProvidersVSphereOVirt,
+		Long: `Get datacenters from a provider's inventory.
+
+Lists datacenters from vSphere or oVirt providers. Datacenters are the top-level
+organizational units that contain clusters, hosts, and VMs.`,
+		Example: `  # List all datacenters from a vSphere provider
+  kubectl-mtv get inventory datacenter vsphere-prod
+
+  # Filter datacenters by name
+  kubectl-mtv get inventory datacenter vsphere-prod -q "where name ~= 'DC*'"
+
+  # Output as YAML
+  kubectl-mtv get inventory datacenter vsphere-prod -o yaml`,
 		Args:              cobra.ExactArgs(1),
 		SilenceUsage:      true,
 		ValidArgsFunction: completion.ProviderNameCompletion(kubeConfigFlags),
@@ -88,21 +106,19 @@ func NewInventoryDataCenterCmd(kubeConfigFlags *genericclioptions.ConfigFlags, g
 			}
 
 			provider := args[0]
-			config := getGlobalConfig()
-			namespace := client.ResolveNamespaceWithAllFlag(config.GetKubeConfigFlags(), config.GetAllNamespaces())
 
-			logNamespaceOperation("Getting datacenters from provider", namespace, config.GetAllNamespaces())
+			namespace := client.ResolveNamespaceWithAllFlag(globalConfig.GetKubeConfigFlags(), globalConfig.GetAllNamespaces())
+
+			logNamespaceOperation("Getting datacenters from provider", namespace, globalConfig.GetAllNamespaces())
 			logOutputFormat(outputFormatFlag.GetValue())
 
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(ctx, config.GetKubeConfigFlags(), namespace)
-			}
+			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
+			inventoryURL := globalConfig.GetInventoryURL()
+			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
-			return inventory.ListDataCenters(ctx, config.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch)
+			return inventory.ListDataCentersWithInsecure(ctx, globalConfig.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch, inventoryInsecureSkipTLS)
 		},
 	}
-
-	cmd.Flags().StringVar(&inventoryURL, "inventory-url", "", "Inventory service URL")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", "Output format (table, json, yaml)")
 	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
@@ -118,16 +134,26 @@ func NewInventoryDataCenterCmd(kubeConfigFlags *genericclioptions.ConfigFlags, g
 }
 
 // NewInventoryClusterCmd creates the get inventory cluster command
-func NewInventoryClusterCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() GlobalConfigGetter) *cobra.Command {
-	var inventoryURL string
+func NewInventoryClusterCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	outputFormatFlag := flags.NewOutputFormatTypeFlag()
 	var query string
 	var watch bool
 
 	cmd := &cobra.Command{
-		Use:               "cluster PROVIDER",
-		Short:             "Get clusters from a provider (ovirt, vsphere)",
-		Long:              `Get clusters from a provider (ovirt, vsphere)`,
+		Use:   "cluster PROVIDER",
+		Short: "Get clusters from a provider " + flags.ProvidersVSphereOVirt,
+		Long: `Get clusters from a provider's inventory.
+
+Lists compute clusters from vSphere or oVirt providers. Clusters group hosts
+together and define resource pools for VMs.`,
+		Example: `  # List all clusters from a vSphere provider
+  kubectl-mtv get inventory cluster vsphere-prod
+
+  # Filter clusters by datacenter
+  kubectl-mtv get inventory cluster vsphere-prod -q "where datacenter = 'DC1'"
+
+  # Output as JSON
+  kubectl-mtv get inventory cluster vsphere-prod -o json`,
 		Args:              cobra.ExactArgs(1),
 		SilenceUsage:      true,
 		ValidArgsFunction: completion.ProviderNameCompletion(kubeConfigFlags),
@@ -140,21 +166,19 @@ func NewInventoryClusterCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getG
 			}
 
 			provider := args[0]
-			config := getGlobalConfig()
-			namespace := client.ResolveNamespaceWithAllFlag(config.GetKubeConfigFlags(), config.GetAllNamespaces())
 
-			logNamespaceOperation("Getting clusters from provider", namespace, config.GetAllNamespaces())
+			namespace := client.ResolveNamespaceWithAllFlag(globalConfig.GetKubeConfigFlags(), globalConfig.GetAllNamespaces())
+
+			logNamespaceOperation("Getting clusters from provider", namespace, globalConfig.GetAllNamespaces())
 			logOutputFormat(outputFormatFlag.GetValue())
 
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(ctx, config.GetKubeConfigFlags(), namespace)
-			}
+			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
+			inventoryURL := globalConfig.GetInventoryURL()
+			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
-			return inventory.ListClusters(ctx, config.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch)
+			return inventory.ListClustersWithInsecure(ctx, globalConfig.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch, inventoryInsecureSkipTLS)
 		},
 	}
-
-	cmd.Flags().StringVar(&inventoryURL, "inventory-url", "", "Inventory service URL")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", "Output format (table, json, yaml)")
 	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
@@ -170,16 +194,26 @@ func NewInventoryClusterCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getG
 }
 
 // NewInventoryDiskCmd creates the get inventory disk command
-func NewInventoryDiskCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() GlobalConfigGetter) *cobra.Command {
-	var inventoryURL string
+func NewInventoryDiskCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	outputFormatFlag := flags.NewOutputFormatTypeFlag()
 	var query string
 	var watch bool
 
 	cmd := &cobra.Command{
-		Use:               "disk PROVIDER",
-		Short:             "Get disks from a provider (ovirt, vsphere)",
-		Long:              `Get disks from a provider (ovirt, vsphere)`,
+		Use:   "disk PROVIDER",
+		Short: "Get disks from a provider " + flags.ProvidersVSphereOVirt,
+		Long: `Get disks from a provider's inventory.
+
+Lists virtual disks from vSphere or oVirt providers. Disk information includes
+size, storage location, and attachment to VMs.`,
+		Example: `  # List all disks from an oVirt provider
+  kubectl-mtv get inventory disk ovirt-prod
+
+  # Filter disks by size (greater than 100GB)
+  kubectl-mtv get inventory disk vsphere-prod -q "where capacity > 107374182400"
+
+  # Output as JSON
+  kubectl-mtv get inventory disk vsphere-prod -o json`,
 		Args:              cobra.ExactArgs(1),
 		SilenceUsage:      true,
 		ValidArgsFunction: completion.ProviderNameCompletion(kubeConfigFlags),
@@ -192,21 +226,19 @@ func NewInventoryDiskCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlob
 			}
 
 			provider := args[0]
-			config := getGlobalConfig()
-			namespace := client.ResolveNamespaceWithAllFlag(config.GetKubeConfigFlags(), config.GetAllNamespaces())
 
-			logNamespaceOperation("Getting disks from provider", namespace, config.GetAllNamespaces())
+			namespace := client.ResolveNamespaceWithAllFlag(globalConfig.GetKubeConfigFlags(), globalConfig.GetAllNamespaces())
+
+			logNamespaceOperation("Getting disks from provider", namespace, globalConfig.GetAllNamespaces())
 			logOutputFormat(outputFormatFlag.GetValue())
 
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(ctx, config.GetKubeConfigFlags(), namespace)
-			}
+			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
+			inventoryURL := globalConfig.GetInventoryURL()
+			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
-			return inventory.ListDisks(ctx, config.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch)
+			return inventory.ListDisksWithInsecure(ctx, globalConfig.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch, inventoryInsecureSkipTLS)
 		},
 	}
-
-	cmd.Flags().StringVar(&inventoryURL, "inventory-url", "", "Inventory service URL")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", "Output format (table, json, yaml)")
 	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")

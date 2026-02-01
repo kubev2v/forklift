@@ -3,7 +3,6 @@ package inventory
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -12,18 +11,18 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
-// ListDataCenters queries the provider's datacenter inventory and displays the results
-func ListDataCenters(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
+// ListDataCentersWithInsecure queries the provider's datacenter inventory with optional insecure TLS skip verification
+func ListDataCentersWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
 	if watchMode {
 		return watch.Watch(func() error {
-			return listDataCentersOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
-		}, 10*time.Second)
+			return listDataCentersOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query, insecureSkipTLS)
+		}, watch.DefaultInterval)
 	}
 
-	return listDataCentersOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return listDataCentersOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query, insecureSkipTLS)
 }
 
-func listDataCentersOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listDataCentersOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -31,7 +30,7 @@ func listDataCentersOnce(ctx context.Context, kubeConfigFlags *genericclioptions
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to verify datacenter support
 	providerType, err := providerClient.GetProviderType()
@@ -51,7 +50,7 @@ func listDataCentersOnce(ctx context.Context, kubeConfigFlags *genericclioptions
 	var data interface{}
 	switch providerType {
 	case "ovirt", "vsphere":
-		data, err = providerClient.GetDataCenters(4)
+		data, err = providerClient.GetDataCenters(ctx, 4)
 	default:
 		return fmt.Errorf("provider type '%s' does not support datacenter inventory", providerType)
 	}

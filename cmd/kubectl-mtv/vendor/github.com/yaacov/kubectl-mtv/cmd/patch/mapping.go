@@ -1,8 +1,6 @@
 package patch
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -12,7 +10,7 @@ import (
 )
 
 // NewMappingCmd creates the mapping patch command with subcommands
-func NewMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
+func NewMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "mapping",
 		Short:        "Patch mappings",
@@ -25,16 +23,15 @@ func NewMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comman
 	}
 
 	// Add subcommands for network and storage
-	cmd.AddCommand(newPatchNetworkMappingCmd(kubeConfigFlags))
-	cmd.AddCommand(newPatchStorageMappingCmd(kubeConfigFlags))
+	cmd.AddCommand(newPatchNetworkMappingCmd(kubeConfigFlags, globalConfig))
+	cmd.AddCommand(newPatchStorageMappingCmd(kubeConfigFlags, globalConfig))
 
 	return cmd
 }
 
 // newPatchNetworkMappingCmd creates the patch network mapping subcommand
-func newPatchNetworkMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
+func newPatchNetworkMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	var addPairs, updatePairs, removePairs string
-	var inventoryURL string
 
 	cmd := &cobra.Command{
 		Use:               "network NAME",
@@ -50,10 +47,8 @@ func newPatchNetworkMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *
 			// Resolve the appropriate namespace based on context and flags
 			namespace := client.ResolveNamespace(kubeConfigFlags)
 
-			// If inventoryURL is empty, try to discover it
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(cmd.Context(), kubeConfigFlags, namespace)
-			}
+			// Get inventory URL from global config (auto-discovers if needed)
+			inventoryURL := globalConfig.GetInventoryURL()
 
 			return mapping.PatchNetwork(kubeConfigFlags, name, namespace, addPairs, updatePairs, removePairs, inventoryURL)
 		},
@@ -62,15 +57,13 @@ func newPatchNetworkMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *
 	cmd.Flags().StringVar(&addPairs, "add-pairs", "", "Network pairs to add in format 'source:target-namespace/target-network', 'source:target-network', 'source:default', or 'source:ignored' (comma-separated)")
 	cmd.Flags().StringVar(&updatePairs, "update-pairs", "", "Network pairs to update in format 'source:target-namespace/target-network', 'source:target-network', 'source:default', or 'source:ignored' (comma-separated)")
 	cmd.Flags().StringVar(&removePairs, "remove-pairs", "", "Source network names to remove from mapping (comma-separated)")
-	cmd.Flags().StringVarP(&inventoryURL, "inventory-url", "i", os.Getenv("MTV_INVENTORY_URL"), "Base URL for the inventory service")
 
 	return cmd
 }
 
 // newPatchStorageMappingCmd creates the patch storage mapping subcommand
-func newPatchStorageMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
+func newPatchStorageMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	var addPairs, updatePairs, removePairs string
-	var inventoryURL string
 	var defaultVolumeMode string
 	var defaultAccessMode string
 	var defaultOffloadPlugin string
@@ -91,13 +84,12 @@ func newPatchStorageMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *
 			// Resolve the appropriate namespace based on context and flags
 			namespace := client.ResolveNamespace(kubeConfigFlags)
 
-			// If inventoryURL is empty, try to discover it
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(cmd.Context(), kubeConfigFlags, namespace)
-			}
+			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
+			inventoryURL := globalConfig.GetInventoryURL()
+			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
 			return mapping.PatchStorageWithOptions(kubeConfigFlags, name, namespace, addPairs, updatePairs,
-				removePairs, inventoryURL, defaultVolumeMode, defaultAccessMode,
+				removePairs, inventoryURL, inventoryInsecureSkipTLS, defaultVolumeMode, defaultAccessMode,
 				defaultOffloadPlugin, defaultOffloadSecret, defaultOffloadVendor)
 		},
 	}
@@ -110,7 +102,6 @@ func newPatchStorageMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *
 	cmd.Flags().StringVar(&defaultOffloadPlugin, "default-offload-plugin", "", "Default offload plugin type for new/updated storage pairs (vsphere)")
 	cmd.Flags().StringVar(&defaultOffloadSecret, "default-offload-secret", "", "Default offload plugin secret name for new/updated storage pairs")
 	cmd.Flags().StringVar(&defaultOffloadVendor, "default-offload-vendor", "", "Default offload plugin vendor for new/updated storage pairs (flashsystem|vantara|ontap|primera3par|pureFlashArray|powerflex|powermax|powerstore|infinibox)")
-	cmd.Flags().StringVarP(&inventoryURL, "inventory-url", "i", os.Getenv("MTV_INVENTORY_URL"), "Base URL for the inventory service")
 
 	// Add completion for volume mode flag
 	if err := cmd.RegisterFlagCompletionFunc("default-volume-mode", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

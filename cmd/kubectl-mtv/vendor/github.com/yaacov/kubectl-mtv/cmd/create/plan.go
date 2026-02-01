@@ -47,11 +47,10 @@ func parseKeyValuePairs(pairs []string, fieldName string) (map[string]string, er
 }
 
 // NewPlanCmd creates the plan creation command
-func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
+func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	var name, sourceProvider, targetProvider string
 	var networkMapping, storageMapping string
 	var vmNamesQuaryOrFile string
-	var inventoryURL string
 	var defaultTargetNetwork, defaultTargetStorageClass string
 	var networkPairs, storagePairs string
 	var preHook, postHook string
@@ -83,8 +82,50 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	var convertorAffinity string
 
 	cmd := &cobra.Command{
-		Use:          "plan NAME",
-		Short:        "Create a migration plan",
+		Use:   "plan NAME",
+		Short: "Create a migration plan",
+		Long: `Create a migration plan to move VMs from a source provider to OpenShift.
+
+A plan defines which VMs to migrate, the source and target providers, and
+network/storage mappings. VMs can be specified as:
+  - Comma-separated names: --vms "vm1,vm2,vm3"
+  - TSL query: --vms "where name ~= 'prod-*' and cpuCount <= 8"
+  - YAML/JSON file: --vms @vms.yaml
+
+Network and storage mappings can be created inline using --network-pairs and
+--storage-pairs, or reference existing mapping resources with --network-mapping
+and --storage-mapping.`,
+		Example: `  # Create a plan with specific VMs
+  kubectl-mtv create plan my-migration \
+    --source vsphere-prod \
+    --target host \
+    --vms "web-server,db-server" \
+    --network-pairs "VM Network:default" \
+    --storage-pairs "datastore1:standard"
+
+  # Create a plan using VM query
+  kubectl-mtv create plan batch-migration \
+    --source vsphere-prod \
+    --target host \
+    --vms "where name ~= 'legacy-*'" \
+    --default-target-network default \
+    --default-target-storage-class standard
+
+  # Create a warm migration plan with scheduled cutover
+  kubectl-mtv create plan warm-migration \
+    --source vsphere-prod \
+    --target host \
+    --vms "critical-vm" \
+    --migration-type warm
+
+  # Create a plan from VM file
+  kubectl-mtv get inventory vm vsphere-prod -o planvms > vms.yaml
+  kubectl-mtv create plan file-migration \
+    --source vsphere-prod \
+    --target host \
+    --vms @vms.yaml \
+    --default-target-network default \
+    --default-target-storage-class standard`,
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -94,10 +135,9 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 			// Resolve the appropriate namespace based on context and flags
 			namespace := client.ResolveNamespace(kubeConfigFlags)
 
-			// If inventoryURL is empty, try to discover it
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(cmd.Context(), kubeConfigFlags, namespace)
-			}
+			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
+			inventoryURL := globalConfig.GetInventoryURL()
+			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
 			// Validate that existing mapping flags and mapping pair flags are not used together
 			if networkMapping != "" && networkPairs != "" {
@@ -135,7 +175,7 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 				fmt.Printf("Fetching VMs from provider '%s' using query: %s\n", sourceProviderName, query)
 
 				var err error
-				vmList, err = inventory.FetchVMsByQuery(cmd.Context(), kubeConfigFlags, sourceProviderName, sourceProviderNamespace, inventoryURL, query)
+				vmList, err = inventory.FetchVMsByQueryWithInsecure(cmd.Context(), kubeConfigFlags, sourceProviderName, sourceProviderNamespace, inventoryURL, query, inventoryInsecureSkipTLS)
 				if err != nil {
 					return fmt.Errorf("failed to fetch VMs using query: %v", err)
 				}
@@ -341,6 +381,7 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 				StorageMapping:            storageMapping,
 				ConfigFlags:               kubeConfigFlags,
 				InventoryURL:              inventoryURL,
+				InventoryInsecureSkipTLS:  inventoryInsecureSkipTLS,
 				DefaultTargetNetwork:      defaultTargetNetwork,
 				DefaultTargetStorageClass: defaultTargetStorageClass,
 				PlanSpec:                  planSpec,
@@ -377,19 +418,19 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	// Storage enhancement flags
 	cmd.Flags().StringVar(&defaultVolumeMode, "default-volume-mode", "", "Default volume mode for storage pairs (Filesystem|Block)")
 	cmd.Flags().StringVar(&defaultAccessMode, "default-access-mode", "", "Default access mode for storage pairs (ReadWriteOnce|ReadWriteMany|ReadOnlyMany)")
-	cmd.Flags().StringVar(&defaultOffloadPlugin, "default-offload-plugin", "", "Default offload plugin type for storage pairs (vsphere)")
-	cmd.Flags().StringVar(&defaultOffloadSecret, "default-offload-secret", "", "Existing offload secret name to use (creates new secret if not provided and offload credentials given)")
-	cmd.Flags().StringVar(&defaultOffloadVendor, "default-offload-vendor", "", "Default offload plugin vendor for storage pairs (flashsystem|vantara|ontap|primera3par|pureFlashArray|powerflex|powermax|powerstore|infinibox)")
+	cmd.Flags().StringVar(&defaultOffloadPlugin, "default-offload-plugin", "", "Default offload plugin type for storage pairs (vsphere) "+flags.ProvidersVSphere)
+	cmd.Flags().StringVar(&defaultOffloadSecret, "default-offload-secret", "", "Existing offload secret name to use for storage offload "+flags.ProvidersVSphere)
+	cmd.Flags().StringVar(&defaultOffloadVendor, "default-offload-vendor", "", "Default offload plugin vendor for storage pairs (flashsystem|vantara|ontap|primera3par|pureFlashArray|powerflex|powermax|powerstore|infinibox) "+flags.ProvidersVSphere)
 
-	// Offload secret creation flags
-	cmd.Flags().StringVar(&offloadVSphereUsername, "offload-vsphere-username", "", "vSphere username for offload secret (creates new secret if no --default-offload-secret provided)")
-	cmd.Flags().StringVar(&offloadVSpherePassword, "offload-vsphere-password", "", "vSphere password for offload secret")
-	cmd.Flags().StringVar(&offloadVSphereURL, "offload-vsphere-url", "", "vSphere vCenter URL for offload secret")
-	cmd.Flags().StringVar(&offloadStorageUsername, "offload-storage-username", "", "Storage array username for offload secret")
-	cmd.Flags().StringVar(&offloadStoragePassword, "offload-storage-password", "", "Storage array password for offload secret")
-	cmd.Flags().StringVar(&offloadStorageEndpoint, "offload-storage-endpoint", "", "Storage array management endpoint URL for offload secret")
-	cmd.Flags().StringVar(&offloadCACert, "offload-cacert", "", "CA certificate for offload secret (use @filename to load from file)")
-	cmd.Flags().BoolVar(&offloadInsecureSkipTLS, "offload-insecure-skip-tls", false, "Skip TLS verification for offload connections")
+	// Offload secret creation flags (storage offload/XCOPY is vSphere-only)
+	cmd.Flags().StringVar(&offloadVSphereUsername, "offload-vsphere-username", "", "vSphere username for offload secret (creates new secret if no --default-offload-secret provided) "+flags.ProvidersVSphere)
+	cmd.Flags().StringVar(&offloadVSpherePassword, "offload-vsphere-password", "", "vSphere password for offload secret "+flags.ProvidersVSphere)
+	cmd.Flags().StringVar(&offloadVSphereURL, "offload-vsphere-url", "", "vSphere vCenter URL for offload secret "+flags.ProvidersVSphere)
+	cmd.Flags().StringVar(&offloadStorageUsername, "offload-storage-username", "", "Storage array username for offload secret "+flags.ProvidersVSphere)
+	cmd.Flags().StringVar(&offloadStoragePassword, "offload-storage-password", "", "Storage array password for offload secret "+flags.ProvidersVSphere)
+	cmd.Flags().StringVar(&offloadStorageEndpoint, "offload-storage-endpoint", "", "Storage array management endpoint URL for offload secret "+flags.ProvidersVSphere)
+	cmd.Flags().StringVar(&offloadCACert, "offload-cacert", "", "CA certificate for offload secret (use @filename to load from file) "+flags.ProvidersVSphere)
+	cmd.Flags().BoolVar(&offloadInsecureSkipTLS, "offload-insecure-skip-tls", false, "Skip TLS verification for offload connections "+flags.ProvidersVSphere)
 
 	cmd.Flags().StringVar(&vmNamesQuaryOrFile, "vms", "", "List of VM names (comma-separated), path to YAML/JSON file (prefix with @), or query string (prefix with 'where ')")
 	cmd.Flags().StringVar(&preHook, "pre-hook", "", "Pre-migration hook to add to all VMs in the plan")
@@ -399,34 +440,33 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	cmd.Flags().StringVar(&planSpec.Description, "description", "", "Plan description")
 	cmd.Flags().StringVar(&planSpec.TargetNamespace, "target-namespace", "", "Target namespace")
 	cmd.Flags().StringVar(&transferNetwork, "transfer-network", "", "The network attachment definition for disk transfer. Supports 'namespace/network-name' or just 'network-name' (uses plan namespace)")
-	cmd.Flags().BoolVar(&planSpec.PreserveClusterCPUModel, "preserve-cluster-cpu-model", false, "Preserve the CPU model and flags the VM runs with in its oVirt cluster")
-	cmd.Flags().BoolVar(&planSpec.PreserveStaticIPs, "preserve-static-ips", true, "Preserve static IPs of VMs in vSphere (default: true)")
-	cmd.Flags().StringVar(&planSpec.PVCNameTemplate, "pvc-name-template", "", "PVCNameTemplate is a template for generating PVC names for VM disks. Variables: {{.VmName}}, {{.PlanName}}, {{.DiskIndex}}, {{.WinDriveLetter}}, {{.RootDiskIndex}}, {{.Shared}}, {{.FileName}}")
-	cmd.Flags().StringVar(&planSpec.VolumeNameTemplate, "volume-name-template", "", "VolumeNameTemplate is a template for generating volume interface names in the target virtual machine. Variables: {{.PVCName}}, {{.VolumeIndex}}")
-	cmd.Flags().StringVar(&planSpec.NetworkNameTemplate, "network-name-template", "", "NetworkNameTemplate is a template for generating network interface names in the target virtual machine. Variables: {{.NetworkName}}, {{.NetworkNamespace}}, {{.NetworkType}}, {{.NetworkIndex}}")
-	cmd.Flags().BoolVar(&planSpec.MigrateSharedDisks, "migrate-shared-disks", true, "Determines if the plan should migrate shared disks")
-	cmd.Flags().StringVarP(&inventoryURL, "inventory-url", "i", os.Getenv("MTV_INVENTORY_URL"), "Base URL for the inventory service")
+	cmd.Flags().BoolVar(&planSpec.PreserveClusterCPUModel, "preserve-cluster-cpu-model", false, "Preserve the CPU model and flags the VM runs with in its cluster "+flags.ProvidersOVirt)
+	cmd.Flags().BoolVar(&planSpec.PreserveStaticIPs, "preserve-static-ips", true, "Preserve static IP configurations during migration "+flags.ProvidersVSphere)
+	cmd.Flags().StringVar(&planSpec.PVCNameTemplate, "pvc-name-template", "", "Template for generating PVC names for VM disks. Variables: {{.VmName}}, {{.PlanName}}, {{.DiskIndex}}, {{.WinDriveLetter}}, {{.RootDiskIndex}}, {{.Shared}}, {{.FileName}} "+flags.ProvidersVSphereOpenShift)
+	cmd.Flags().StringVar(&planSpec.VolumeNameTemplate, "volume-name-template", "", "Template for generating volume interface names in the target VM. Variables: {{.PVCName}}, {{.VolumeIndex}} "+flags.ProvidersVSphere)
+	cmd.Flags().StringVar(&planSpec.NetworkNameTemplate, "network-name-template", "", "Template for generating network interface names in the target VM. Variables: {{.NetworkName}}, {{.NetworkNamespace}}, {{.NetworkType}}, {{.NetworkIndex}} "+flags.ProvidersVSphere)
+	cmd.Flags().BoolVar(&planSpec.MigrateSharedDisks, "migrate-shared-disks", true, "Migrate disks shared between multiple VMs "+flags.ProvidersVSphereOVirt)
 	cmd.Flags().BoolVar(&planSpec.Archived, "archived", false, "Whether this plan should be archived")
-	cmd.Flags().BoolVar(&planSpec.PVCNameTemplateUseGenerateName, "pvc-name-template-use-generate-name", true, "Use generateName instead of name for PVC name template")
-	cmd.Flags().BoolVar(&planSpec.DeleteGuestConversionPod, "delete-guest-conversion-pod", false, "Delete guest conversion pod after successful migration")
+	cmd.Flags().BoolVar(&planSpec.PVCNameTemplateUseGenerateName, "pvc-name-template-use-generate-name", true, "Use generateName instead of name for PVC name template "+flags.ProvidersVSphere)
+	cmd.Flags().BoolVar(&planSpec.DeleteGuestConversionPod, "delete-guest-conversion-pod", false, "Delete guest conversion pod after successful migration "+flags.ProvidersConversion)
 	cmd.Flags().BoolVar(&planSpec.DeleteVmOnFailMigration, "delete-vm-on-fail-migration", false, "Delete target VM when migration fails")
-	cmd.Flags().BoolVar(&planSpec.SkipGuestConversion, "skip-guest-conversion", false, "Skip the guest conversion process")
-	cmd.Flags().BoolVar(&planSpec.RunPreflightInspection, "run-preflight-inspection", true, "Run preflight inspection on VM base disks before starting disk transfer (applies only to warm migrations from VMware)")
-	cmd.Flags().StringVar(&installLegacyDrivers, "install-legacy-drivers", "", "Install legacy Windows drivers (true/false, leave empty for auto-detection)")
-	cmd.Flags().VarP(migrationTypeFlag, "migration-type", "m", "Migration type: cold, warm, live, or conversion (supersedes --warm flag)")
+	cmd.Flags().BoolVar(&planSpec.SkipGuestConversion, "skip-guest-conversion", false, "Skip the guest conversion process (raw disk copy mode) "+flags.ProvidersVSphereEC2)
+	cmd.Flags().BoolVar(&planSpec.RunPreflightInspection, "run-preflight-inspection", true, "Run preflight inspection on VM base disks before starting disk transfer "+flags.CombineHints(flags.ProvidersVSphere, flags.MigrationWarm))
+	cmd.Flags().StringVar(&installLegacyDrivers, "install-legacy-drivers", "", "Install legacy Windows drivers (true/false, leave empty for auto-detection) "+flags.ProvidersConversion)
+	cmd.Flags().VarP(migrationTypeFlag, "migration-type", "m", "Migration type: cold, warm, live, or conversion "+flags.MigrationTypeSupport)
 	cmd.Flags().StringVarP(&defaultTargetNetwork, "default-target-network", "N", "", "Default target network for network mapping. Use 'default' for pod networking, 'namespace/network-name', or just 'network-name' (uses plan namespace)")
 	cmd.Flags().StringVar(&defaultTargetStorageClass, "default-target-storage-class", "", "Default target storage class for storage mapping")
-	cmd.Flags().BoolVar(&useCompatibilityMode, "use-compatibility-mode", true, "Use compatibility devices (SATA bus, E1000E NIC) when skipGuestConversion is true to ensure bootability")
+	cmd.Flags().BoolVar(&useCompatibilityMode, "use-compatibility-mode", true, "Use compatibility devices (SATA bus, E1000E NIC) when skipGuestConversion is true "+flags.ProvidersVSphereEC2)
 	cmd.Flags().StringSliceVarP(&targetLabels, "target-labels", "L", nil, "Target labels to be added to the VM (e.g., key1=value1,key2=value2)")
 	cmd.Flags().StringSliceVar(&targetNodeSelector, "target-node-selector", nil, "Target node selector to constrain VM scheduling (e.g., key1=value1,key2=value2)")
-	cmd.Flags().BoolVar(&planSpec.Warm, "warm", false, "Enable warm migration (can also be set with --migration-type=warm)")
+	cmd.Flags().BoolVar(&planSpec.Warm, "warm", false, "Enable warm migration (use --migration-type=warm instead) "+flags.ProvidersVSphereOVirt)
 	cmd.Flags().StringVar(&targetAffinity, "target-affinity", "", "Target affinity to constrain VM scheduling using KARL syntax (e.g. 'REQUIRE pods(app=database) on node')")
 	cmd.Flags().StringVar(&targetPowerState, "target-power-state", "", "Target power state for VMs after migration: 'on', 'off', or 'auto' (default: match source VM power state)")
 
-	// Convertor-related flags
-	cmd.Flags().StringSliceVar(&convertorLabels, "convertor-labels", nil, "Labels to be added to virt-v2v convertor pods (e.g., key1=value1,key2=value2)")
-	cmd.Flags().StringSliceVar(&convertorNodeSelector, "convertor-node-selector", nil, "Node selector to constrain convertor pod scheduling (e.g., key1=value1,key2=value2)")
-	cmd.Flags().StringVar(&convertorAffinity, "convertor-affinity", "", "Convertor affinity to constrain convertor pod scheduling using KARL syntax (e.g. 'REQUIRE pods(app=storage) on node')")
+	// Convertor-related flags (only apply to providers requiring guest conversion)
+	cmd.Flags().StringSliceVar(&convertorLabels, "convertor-labels", nil, "Labels to be added to virt-v2v convertor pods (e.g., key1=value1,key2=value2) "+flags.ProvidersConversion)
+	cmd.Flags().StringSliceVar(&convertorNodeSelector, "convertor-node-selector", nil, "Node selector to constrain convertor pod scheduling (e.g., key1=value1,key2=value2) "+flags.ProvidersConversion)
+	cmd.Flags().StringVar(&convertorAffinity, "convertor-affinity", "", "Convertor affinity to constrain convertor pod scheduling using KARL syntax "+flags.ProvidersConversion)
 
 	// Add completion for storage enhancement flags
 	if err := cmd.RegisterFlagCompletionFunc("default-volume-mode", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

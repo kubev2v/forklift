@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -12,15 +13,19 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
-	cmd "github.com/yaacov/kubectl-mtv-mcp/cmd/kubectl-mtv-mcp"
+	"github.com/yaacov/kubectl-mtv/pkg/mcp/discovery"
+	"github.com/yaacov/kubectl-mtv/pkg/mcp/tools"
+	"github.com/yaacov/kubectl-mtv/pkg/mcp/util"
+	"github.com/yaacov/kubectl-mtv/pkg/version"
 )
 
 var (
-	sse      bool
-	port     string
-	host     string
-	certFile string
-	keyFile  string
+	sse          bool
+	port         string
+	host         string
+	certFile     string
+	keyFile      string
+	outputFormat string
 )
 
 // NewMCPServerCmd creates the mcp-server command
@@ -41,8 +46,16 @@ Security:
   --cert-file:   Path to TLS certificate file (enables TLS when both cert and key provided)
   --key-file:    Path to TLS private key file (enables TLS when both cert and key provided)
 
-Authentication:
-  Authorization bearer token header is automatically passed through to the kubectl-mtv-mcp server.
+SSE Mode Authentication (HTTP Headers):
+  In SSE mode, the following HTTP headers are supported for Kubernetes authentication:
+
+  Authorization: Bearer <token>
+    Kubernetes authentication token. Passed to kubectl via --token flag.
+
+  X-Kubernetes-Server: <url>
+    Kubernetes API server URL. Passed to kubectl via --server flag.
+
+  If headers are not provided, the server falls back to the default kubeconfig behavior.
 
 Quick Setup for AI Assistants:
 
@@ -52,6 +65,15 @@ Cursor IDE: Settings → MCP → Add Server (Name: kubectl-mtv, Command: kubectl
 Manual Claude config: Add to claude_desktop_config.json:
   "kubectl-mtv": {"command": "kubectl", "args": ["mtv", "mcp-server"]}`,
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
+			// Validate output format - only "json" and "text" are supported in MCP mode
+			validFormats := map[string]bool{"json": true, "text": true}
+			if !validFormats[outputFormat] {
+				return fmt.Errorf("invalid --output-format value %q: must be one of: json, text", outputFormat)
+			}
+
+			// Set the output format for MCP responses
+			util.SetOutputFormat(outputFormat)
+
 			// Create a context that listens for interrupt signals
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -66,7 +88,12 @@ Manual Claude config: Add to claude_desktop_config.json:
 
 				// Create MCP handler
 				handler := mcp.NewSSEHandler(func(req *http.Request) *mcp.Server {
-					return cmd.CreateReadServer()
+					server, err := createMCPServer()
+					if err != nil {
+						log.Printf("Failed to create server: %v", err)
+						return nil
+					}
+					return server
 				}, nil)
 
 				server := &http.Server{
@@ -111,7 +138,10 @@ Manual Claude config: Add to claude_desktop_config.json:
 			}
 
 			// Stdio mode - default behavior
-			server := cmd.CreateReadServer()
+			server, err := createMCPServer()
+			if err != nil {
+				return fmt.Errorf("failed to create server: %w", err)
+			}
 
 			log.Println("Starting kubectl-mtv MCP server in stdio mode")
 			log.Println("Server is ready and listening for MCP protocol messages on stdin/stdout")
@@ -142,6 +172,29 @@ Manual Claude config: Add to claude_desktop_config.json:
 	mcpCmd.Flags().StringVar(&host, "host", "127.0.0.1", "Host address to bind to for SSE mode")
 	mcpCmd.Flags().StringVar(&certFile, "cert-file", "", "Path to TLS certificate file (enables TLS when used with --key-file)")
 	mcpCmd.Flags().StringVar(&keyFile, "key-file", "", "Path to TLS private key file (enables TLS when used with --cert-file)")
+	mcpCmd.Flags().StringVar(&outputFormat, "output-format", "json", "Default output format for commands: json or text")
 
 	return mcpCmd
+}
+
+// createMCPServer creates the MCP server with dynamically discovered tools.
+// Discovery happens at startup using kubectl-mtv help --machine.
+func createMCPServer() (*mcp.Server, error) {
+	ctx := context.Background()
+	registry, err := discovery.NewRegistry(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to discover commands: %w", err)
+	}
+
+	server := mcp.NewServer(&mcp.Implementation{
+		Name:    "kubectl-mtv",
+		Version: version.ClientVersion,
+	}, nil)
+
+	// Register the three dynamic tools
+	mcp.AddTool(server, tools.GetMTVReadTool(registry), tools.HandleMTVRead(registry))
+	mcp.AddTool(server, tools.GetMTVWriteTool(registry), tools.HandleMTVWrite(registry))
+	mcp.AddTool(server, tools.GetKubectlDebugTool(), tools.HandleKubectlDebug)
+
+	return server, nil
 }

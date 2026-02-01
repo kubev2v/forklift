@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -14,18 +13,18 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
-// ListProviders queries the providers and displays their inventory information
-func ListProviders(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
+// ListProvidersWithInsecure queries the providers and displays their inventory information with optional insecure TLS skip verification
+func ListProvidersWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
 	if watchMode {
 		return watch.Watch(func() error {
-			return listProvidersOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
-		}, 10*time.Second)
+			return listProvidersOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query, insecureSkipTLS)
+		}, watch.DefaultInterval)
 	}
 
-	return listProvidersOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return listProvidersOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query, insecureSkipTLS)
 }
 
-func listProvidersOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listProvidersOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// If inventoryURL is empty, try to discover it from an OpenShift Route
 	if inventoryURL == "" {
 		inventoryURL = client.DiscoverInventoryURL(ctx, kubeConfigFlags, namespace)
@@ -41,13 +40,13 @@ func listProvidersOnce(ctx context.Context, kubeConfigFlags *genericclioptions.C
 
 	if providerName != "" {
 		// Get specific provider by name with detail=4
-		providersData, err = client.FetchSpecificProviderWithDetail(ctx, kubeConfigFlags, inventoryURL, providerName, 4)
+		providersData, err = client.FetchSpecificProviderWithDetailAndInsecure(ctx, kubeConfigFlags, inventoryURL, providerName, 4, insecureSkipTLS)
 		if err != nil {
 			return fmt.Errorf("failed to get provider inventory: %v", err)
 		}
 	} else {
 		// Get all providers with detail=4
-		providersData, err = client.FetchProvidersWithDetail(kubeConfigFlags, inventoryURL, 4)
+		providersData, err = client.FetchProvidersWithDetailAndInsecure(ctx, kubeConfigFlags, inventoryURL, 4, insecureSkipTLS)
 		if err != nil {
 			return fmt.Errorf("failed to fetch providers inventory: %v", err)
 		}

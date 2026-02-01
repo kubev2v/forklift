@@ -249,7 +249,7 @@ func updateUnstructuredStoragePairsBySource(existingPairs []interface{}, newPair
 }
 
 // patchStorageMappingWithOptions patches an existing storage mapping with additional options for VolumeMode, AccessMode, and OffloadPlugin
-func patchStorageMappingWithOptions(configFlags *genericclioptions.ConfigFlags, name, namespace, addPairs, updatePairs, removePairs, inventoryURL string, defaultVolumeMode, defaultAccessMode, defaultOffloadPlugin, defaultOffloadSecret, defaultOffloadVendor string) error {
+func patchStorageMappingWithOptions(configFlags *genericclioptions.ConfigFlags, name, namespace, addPairs, updatePairs, removePairs, inventoryURL string, inventoryInsecureSkipTLS bool, defaultVolumeMode, defaultAccessMode, defaultOffloadPlugin, defaultOffloadSecret, defaultOffloadVendor string) error {
 	klog.V(2).Infof("Patching storage mapping '%s' in namespace '%s' with enhanced options", name, namespace)
 
 	dynamicClient, err := client.GetDynamicClient(configFlags)
@@ -302,16 +302,17 @@ func patchStorageMappingWithOptions(configFlags *genericclioptions.ConfigFlags, 
 	if addPairs != "" {
 		klog.V(2).Infof("Adding storage pairs to mapping: %s", addPairs)
 		newPairs, err := mapping.ParseStoragePairsWithOptions(mapping.StorageParseOptions{
-			PairStr:              addPairs,
-			DefaultNamespace:     sourceProviderNamespace,
-			ConfigFlags:          configFlags,
-			SourceProvider:       sourceProviderName,
-			InventoryURL:         inventoryURL,
-			DefaultVolumeMode:    defaultVolumeMode,
-			DefaultAccessMode:    defaultAccessMode,
-			DefaultOffloadPlugin: defaultOffloadPlugin,
-			DefaultOffloadSecret: defaultOffloadSecret,
-			DefaultOffloadVendor: defaultOffloadVendor,
+			PairStr:                  addPairs,
+			DefaultNamespace:         sourceProviderNamespace,
+			ConfigFlags:              configFlags,
+			SourceProvider:           sourceProviderName,
+			InventoryURL:             inventoryURL,
+			InventoryInsecureSkipTLS: inventoryInsecureSkipTLS,
+			DefaultVolumeMode:        defaultVolumeMode,
+			DefaultAccessMode:        defaultAccessMode,
+			DefaultOffloadPlugin:     defaultOffloadPlugin,
+			DefaultOffloadSecret:     defaultOffloadSecret,
+			DefaultOffloadVendor:     defaultOffloadVendor,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to parse add-pairs: %v", err)
@@ -348,16 +349,17 @@ func patchStorageMappingWithOptions(configFlags *genericclioptions.ConfigFlags, 
 	if updatePairs != "" {
 		klog.V(2).Infof("Updating storage pairs in mapping: %s", updatePairs)
 		updatePairsList, err := mapping.ParseStoragePairsWithOptions(mapping.StorageParseOptions{
-			PairStr:              updatePairs,
-			DefaultNamespace:     sourceProviderNamespace,
-			ConfigFlags:          configFlags,
-			SourceProvider:       sourceProviderName,
-			InventoryURL:         inventoryURL,
-			DefaultVolumeMode:    defaultVolumeMode,
-			DefaultAccessMode:    defaultAccessMode,
-			DefaultOffloadPlugin: defaultOffloadPlugin,
-			DefaultOffloadSecret: defaultOffloadSecret,
-			DefaultOffloadVendor: defaultOffloadVendor,
+			PairStr:                  updatePairs,
+			DefaultNamespace:         sourceProviderNamespace,
+			ConfigFlags:              configFlags,
+			SourceProvider:           sourceProviderName,
+			InventoryURL:             inventoryURL,
+			InventoryInsecureSkipTLS: inventoryInsecureSkipTLS,
+			DefaultVolumeMode:        defaultVolumeMode,
+			DefaultAccessMode:        defaultAccessMode,
+			DefaultOffloadPlugin:     defaultOffloadPlugin,
+			DefaultOffloadSecret:     defaultOffloadSecret,
+			DefaultOffloadVendor:     defaultOffloadVendor,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to parse update-pairs: %v", err)
