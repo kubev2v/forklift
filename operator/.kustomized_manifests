@@ -471,8 +471,8 @@ spec:
                 - "false"
                 type: string
               virt_v2v_extra_args:
-                description: Additional arguments for virt-v2v
-                example: --debug-overlays
+                description: Additional arguments for virt-v2v conversion
+                example: --parallel 4
                 type: string
               virt_v2v_extra_conf_config_map:
                 description: ConfigMap name containing extra virt-v2v configuration
@@ -480,6 +480,10 @@ spec:
               virt_v2v_image_fqin:
                 description: Virt-v2v conversion image used by migration pods
                 example: quay.io/kubev2v/forklift-virt-v2v:latest
+                type: string
+              virt_v2v_inspector_extra_args:
+                description: Additional arguments for virt-v2v-inspector
+                example: --root first
                 type: string
               vsphere_osmap_configmap_name:
                 description: 'ConfigMap name for vSphere OS mappings (default: forklift-vsphere-osmap)'
@@ -7961,9 +7965,14 @@ spec:
         path: virt_v2v_dont_request_kvm
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
-      - description: Additional arguments for virt-v2v
+      - description: Additional arguments for virt-v2v conversion
         displayName: Virt-v2v Extra Args
         path: virt_v2v_extra_args
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Additional arguments for virt-v2v-inspector
+        displayName: Virt-v2v Inspector Extra Args
+        path: virt_v2v_inspector_extra_args
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: ConfigMap name containing extra virt-v2v configuration

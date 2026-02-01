@@ -299,6 +299,10 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 			Name:  "V2V_extra_args",
 			Value: settings.Settings.Migration.VirtV2vExtraArgs,
 		},
+		core.EnvVar{
+			Name:  "V2V_inspector_extra_args",
+			Value: settings.Settings.Migration.VirtV2vInspectorExtraArgs,
+		},
 	)
 	if macsToIps != "" {
 		env = append(env, core.EnvVar{

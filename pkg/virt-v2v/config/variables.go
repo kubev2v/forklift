@@ -17,6 +17,7 @@ const (
 	EnvFingerprintName            = "V2V_fingerprint"
 	EnvInPlaceName                = "V2V_inPlace"
 	EnvExtraArgsName              = "V2V_extra_args"
+	EnvInspectorExtraArgsName     = "V2V_inspector_extra_args"
 	EnvNewNameName                = "V2V_NewName"
 	EnvVmNameName                 = "V2V_vmName"
 	EnvRootDiskName               = "V2V_RootDisk"
@@ -69,6 +70,8 @@ type AppConfig struct {
 	IsInPlace bool
 	// V2V_extra_args
 	ExtraArgs []string
+	// V2V_inspector_extra_args
+	InspectorExtraArgs []string
 	// LOCAL_MIGRATION
 	IsLocalMigration bool
 	// V2V_NewName
@@ -112,6 +115,7 @@ type AppConfig struct {
 
 func (s *AppConfig) Load() (err error) {
 	s.ExtraArgs = s.getExtraArgs()
+	s.InspectorExtraArgs = s.getInspectorExtraArgs()
 	flag.BoolVar(&s.IsLocalMigration, "local-migration", s.getEnvBool(EnvLocalMigrationName, true), "Migration is in local or remote cluster")
 	flag.BoolVar(&s.IsInPlace, "in-place", s.getEnvBool(EnvInPlaceName, false), "Run virt-v2v-in-place on already populated disks")
 	flag.BoolVar(&s.NbdeClevis, "nbde-clevis", s.getEnvBool(EnvNbdeClevis, false), "virt-v2v should unencrypt the disks via clevis client")
@@ -150,6 +154,17 @@ func (s *AppConfig) getExtraArgs() []string {
 	var extraArgs []string
 	if envExtraArgs, found := os.LookupEnv(EnvExtraArgsName); found && envExtraArgs != "" {
 		if err := json.Unmarshal([]byte(envExtraArgs), &extraArgs); err != nil {
+			return nil
+		}
+	}
+	return extraArgs
+}
+
+func (s *AppConfig) getInspectorExtraArgs() []string {
+	var extraArgs []string
+	if envExtraArgs, found := os.LookupEnv(EnvInspectorExtraArgsName); found && envExtraArgs != "" {
+		if err := json.Unmarshal([]byte(envExtraArgs), &extraArgs); err != nil {
+			fmt.Printf("Failed to parse %s: %v\n", EnvInspectorExtraArgsName, err)
 			return nil
 		}
 	}

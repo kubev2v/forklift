@@ -371,8 +371,12 @@ spec:
                 description: "Don't request KVM for virt-v2v"
               virt_v2v_extra_args:
                 type: string
-                description: "Additional arguments for virt-v2v"
-                example: "--debug-overlays"
+                description: "Additional arguments for virt-v2v conversion"
+                example: "--parallel 4"
+              virt_v2v_inspector_extra_args:
+                type: string
+                description: "Additional arguments for virt-v2v-inspector"
+                example: "--root first"
               virt_v2v_extra_conf_config_map:
                 type: string
                 description: "ConfigMap name containing extra virt-v2v configuration"
