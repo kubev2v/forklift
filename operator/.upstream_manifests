@@ -200,7 +200,8 @@ spec:
                 - "false"
                 type: string
               feature_ova_appliance_management:
-                description: 'Enable OVF-based appliance management endpoints (OVA, HyperV) (default: false)'
+                description: 'Enable OVF-based appliance management endpoints (OVA,
+                  HyperV)  (default: false)'
                 enum:
                 - "true"
                 - "false"
@@ -244,6 +245,26 @@ spec:
               hooks_container_requests_memory:
                 description: 'Hooks memory request (default: 150Mi)'
                 example: 300Mi
+                type: string
+              hyperv_container_limits_cpu:
+                description: 'HyperV CPU limit (default: 1000m)'
+                example: 2000m
+                type: string
+              hyperv_container_limits_memory:
+                description: 'HyperV memory limit (default: 1Gi)'
+                example: 2Gi
+                type: string
+              hyperv_container_requests_cpu:
+                description: 'HyperV CPU request (default: 100m)'
+                example: 200m
+                type: string
+              hyperv_container_requests_memory:
+                description: 'HyperV memory request (default: 512Mi)'
+                example: 300Mi
+                type: string
+              hyperv_provider_server_fqin:
+                description: HyperV provider server image
+                example: quay.io/kubev2v/forklift-hyperv-provider-server:latest
                 type: string
               image_pull_policy:
                 description: 'Image pull policy (default: Always)'
@@ -450,8 +471,8 @@ spec:
                 - "false"
                 type: string
               virt_v2v_extra_args:
-                description: Additional arguments for virt-v2v
-                example: --debug-overlays
+                description: Additional arguments for virt-v2v conversion
+                example: --parallel 4
                 type: string
               virt_v2v_extra_conf_config_map:
                 description: ConfigMap name containing extra virt-v2v configuration
@@ -459,6 +480,10 @@ spec:
               virt_v2v_image_fqin:
                 description: Virt-v2v conversion image used by migration pods
                 example: quay.io/kubev2v/forklift-virt-v2v:latest
+                type: string
+              virt_v2v_inspector_extra_args:
+                description: Additional arguments for virt-v2v-inspector
+                example: --root first
                 type: string
               vsphere_osmap_configmap_name:
                 description: 'ConfigMap name for vSphere OS mappings (default: forklift-vsphere-osmap)'
@@ -940,6 +965,9 @@ spec:
                       type: string
                     status:
                       description: The condition status [true,false].
+                      type: string
+                    suggestion:
+                      description: A suggested action or resolution for the condition.
                       type: string
                     type:
                       description: The condition type.
@@ -6703,6 +6731,7 @@ rules:
   - storage.k8s.io
   resources:
   - storageclasses
+  - csidrivers
   verbs:
   - get
   - list
@@ -7604,7 +7633,7 @@ spec:
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:radio:true
         - urn:alm:descriptor:com.tectonic.ui:radio:false
-      - description: Enable OVF-based appliance management endpoints (OVA, HyperV) (default false)
+      - description: Enable OVA appliance management endpoints (default false)
         displayName: Enable OVA Appliance Management
         path: feature_ova_appliance_management
         x-descriptors:
@@ -7935,9 +7964,14 @@ spec:
         path: virt_v2v_dont_request_kvm
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
-      - description: Additional arguments for virt-v2v
+      - description: Additional arguments for virt-v2v conversion
         displayName: Virt-v2v Extra Args
         path: virt_v2v_extra_args
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Additional arguments for virt-v2v-inspector
+        displayName: Virt-v2v Inspector Extra Args
+        path: virt_v2v_inspector_extra_args
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: ConfigMap name containing extra virt-v2v configuration

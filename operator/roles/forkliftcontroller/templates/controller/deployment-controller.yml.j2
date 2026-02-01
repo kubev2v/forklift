@@ -179,6 +179,8 @@ spec:
 {% endif %}
         - name: VIRT_V2V_EXTRA_ARGS
           value: "{{ virt_v2v_extra_args }}"
+        - name: VIRT_V2V_INSPECTOR_EXTRA_ARGS
+          value: "{{ virt_v2v_inspector_extra_args }}"
         - name: VIRT_V2V_EXTRA_CONF_CONFIG_MAP
           value: "{{ virt_v2v_extra_conf_config_map }}"
         - name: VIRT_V2V_CONTAINER_LIMITS_CPU
