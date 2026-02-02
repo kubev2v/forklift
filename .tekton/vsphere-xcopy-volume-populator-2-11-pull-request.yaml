@@ -9,7 +9,10 @@ metadata:
     pipelinesascode.tekton.dev/cancel-in-progress: "true"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
-      == "release-2.11"
+      == "release-2.11" && ( ".tekton/vsphere-xcopy-volume-populator-2-11-*.yaml".pathChanged() ||
+      ".konflux/vsphere-xcopy-volume-populator/rpms.lock.yaml".pathChanged() ||
+      "build/vsphere-xcopy-volume-populator/Containerfile-downstream".pathChanged() ||
+      "cmd/vsphere-xcopy-volume-populator/***".pathChanged() )
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: forklift-operator-2-11
@@ -31,6 +34,17 @@ spec:
     value: build/vsphere-xcopy-volume-populator/Containerfile-downstream
   - name: path-context
     value: .
+  - name: hermetic
+    value: "true"
+  - name: build-source-image
+    value: "true"
+  - name: prefetch-input
+    value: '[{"type": "rpm", "path": ".konflux/vsphere-xcopy-volume-populator"}]'
+  - name: build-args-file
+    value: build/release.conf
+  - name: build-args
+    value:
+      - "REVISION={{revision}}"
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
@@ -180,6 +194,8 @@ spec:
         value: $(params.output-image).prefetch
       - name: ociArtifactExpiresAfter
         value: $(params.image-expires-after)
+      - name: dev-package-managers
+        value: "true"
       runAfter:
       - clone-repository
       taskRef:

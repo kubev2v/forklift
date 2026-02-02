@@ -9,7 +9,9 @@ metadata:
     pipelinesascode.tekton.dev/cancel-in-progress: "true"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
-      == "release-2.11"
+      == "release-2.11" && ( ".tekton/validation-2-11-*.yaml".pathChanged() ||
+      "build/validation/Containerfile-downstream".pathChanged() ||
+      "validation/***".pathChanged() )
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: forklift-operator-2-11
@@ -31,6 +33,17 @@ spec:
     value: build/validation/Containerfile-downstream
   - name: path-context
     value: .
+  - name: build-source-image
+    value: "true"
+  - name: hermetic
+    value: "true"
+  - name: prefetch-input
+    value: '[{"type": "gomod", "path": ".konflux/validation"}]'
+  - name: build-args-file
+    value: build/release.conf
+  - name: build-args
+    value:
+      - "REVISION={{revision}}"
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.

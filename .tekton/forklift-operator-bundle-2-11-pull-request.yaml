@@ -9,7 +9,12 @@ metadata:
     pipelinesascode.tekton.dev/cancel-in-progress: "true"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
-      == "release-2.11"
+      == "release-2.11" && ( "operator/config/manifests/***".pathChanged() ||
+      ".tekton/forklift-operator-bundle-*.yaml".pathChanged() ||
+      "build/forklift-operator-bundle/Containerfile-downstream".pathChanged() ||
+      "build/forklift-operator-bundle/images.conf".pathChanged() ||
+      "operator/export-vars.sh".pathChanged() ||
+      "operator/related_images.yaml".pathChanged() )
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: forklift-operator-2-11
@@ -31,6 +36,18 @@ spec:
     value: build/forklift-operator-bundle/Containerfile-downstream
   - name: path-context
     value: .
+  - name: build-source-image
+    value: "true"
+  - name: hermetic
+    value: "true"
+  - name: prefetch-input
+    value: '[{"type": "gomod", "path": ".konflux/forklift-operator-bundle"}]'
+  - name: build-args-file
+    value: build/release.conf
+  - name: build-args
+    value:
+      - "EVENT_TITLE={{body.pull_request.title}}"
+      - "REVISION={{revision}}"
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
