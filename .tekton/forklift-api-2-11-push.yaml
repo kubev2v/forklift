@@ -4,22 +4,24 @@ metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/kubev2v/forklift?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: "{{revision}}"
-    build.appstudio.redhat.com/pull_request_number: "{{pull_request_number}}"
     build.appstudio.redhat.com/target_branch: "{{target_branch}}"
-    pipelinesascode.tekton.dev/cancel-in-progress: "true"
+    pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression:
-      event == "pull_request" && target_branch
-      == "main" && ( ".tekton/ova-provider-server-dev-preview-*.yaml".pathChanged() ||
-      ".konflux/ova-provider-server/rpms.lock.yaml".pathChanged() ||
-      "build/ova-provider-server/Containerfile-downstream".pathChanged() ||
-      "cmd/ova-provider-server/***".pathChanged() )
+      event == "push" && target_branch
+      == "release-2.11" && ( ".tekton/forklift-api-2-11-*.yaml".pathChanged() ||
+      ".konflux/forklift-api/rpms.lock.yaml".pathChanged() ||
+      "build/forklift-api/Containerfile-downstream".pathChanged() ||
+      "pkg/forklift-api/***".pathChanged() ||
+      "pkg/controller/***".pathChanged() ||
+      "pkg/lib/***".pathChanged() ||
+      "cmd/forklift-api/***".pathChanged() )
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: forklift-operator-dev-preview
-    appstudio.openshift.io/component: ova-provider-server-dev-preview
+    appstudio.openshift.io/application: forklift-operator-2-11
+    appstudio.openshift.io/component: forklift-api-2-11
     pipelines.appstudio.openshift.io/type: build
-  name: ova-provider-server-dev-preview-on-pull-request
+  name: forklift-api-2-11-on-push
   namespace: rh-mtv-1-tenant
 spec:
   params:
@@ -28,17 +30,15 @@ spec:
     - name: revision
       value: "{{revision}}"
     - name: output-image
-      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/ova-provider-server-dev-preview:on-pr-{{revision}}
-    - name: image-expires-after
-      value: 5d
+      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-2-11/forklift-api-2-11:{{revision}}
     - name: dockerfile
-      value: build/ova-provider-server/Containerfile-downstream
+      value: build/forklift-api/Containerfile-downstream
     - name: path-context
       value: .
     - name: build-source-image
       value: "true"
     - name: prefetch-input
-      value: '[{"type": "rpm", "path": ".konflux/ova-provider-server"}]'
+      value: '[{"type": "rpm", "path": ".konflux/forklift-api"}]'
     - name: build-args-file
       value: build/release.conf
     - name: build-args
@@ -622,7 +622,7 @@ spec:
       - name: netrc
         optional: true
   taskRunTemplate:
-    serviceAccountName: build-pipeline-ova-provider-server-dev-preview
+    serviceAccountName: build-pipeline-forklift-api-2-11
   workspaces:
     - name: git-auth
       secret:

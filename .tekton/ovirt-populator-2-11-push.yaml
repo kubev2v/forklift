@@ -9,16 +9,16 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression:
       event == "push" && target_branch
-      == "main" && ( ".tekton/ovirt-populator-dev-preview-*.yaml".pathChanged() ||
+      == "release-2.11" && ( ".tekton/ovirt-populator-2-11-*.yaml".pathChanged() ||
       ".konflux/ovirt-populator/rpms.lock.yaml".pathChanged() ||
       "build/ovirt-populator/Containerfile-downstream".pathChanged() ||
       "cmd/ovirt-populator/***".pathChanged() )
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: forklift-operator-dev-preview
-    appstudio.openshift.io/component: ovirt-populator-dev-preview
+    appstudio.openshift.io/application: forklift-operator-2-11
+    appstudio.openshift.io/component: ovirt-populator-2-11
     pipelines.appstudio.openshift.io/type: build
-  name: ovirt-populator-dev-preview-on-push
+  name: ovirt-populator-2-11-on-push
   namespace: rh-mtv-1-tenant
 spec:
   params:
@@ -27,7 +27,7 @@ spec:
     - name: revision
       value: "{{revision}}"
     - name: output-image
-      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/ovirt-populator-dev-preview:{{revision}}
+      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-2-11/ovirt-populator-2-11:{{revision}}
     - name: dockerfile
       value: build/ovirt-populator/Containerfile-downstream
     - name: path-context
@@ -619,7 +619,7 @@ spec:
       - name: netrc
         optional: true
   taskRunTemplate:
-    serviceAccountName: build-pipeline-ovirt-populator-dev-preview
+    serviceAccountName: build-pipeline-ovirt-populator-2-11
   workspaces:
     - name: git-auth
       secret:

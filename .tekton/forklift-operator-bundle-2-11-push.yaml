@@ -4,22 +4,22 @@ metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/kubev2v/forklift?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: "{{revision}}"
-    build.appstudio.redhat.com/pull_request_number: "{{pull_request_number}}"
     build.appstudio.redhat.com/target_branch: "{{target_branch}}"
-    pipelinesascode.tekton.dev/cancel-in-progress: "true"
+    pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression:
-      event == "pull_request" && target_branch
-      == "main" && ( ".tekton/ovirt-populator-dev-preview-*.yaml".pathChanged() ||
-      ".konflux/ovirt-populator/rpms.lock.yaml".pathChanged() ||
-      "build/ovirt-populator/Containerfile-downstream".pathChanged() ||
-      "cmd/ovirt-populator/***".pathChanged() )
+      event == "push" && target_branch
+      == "release-2.11" && ( "operator/config/manifests/***".pathChanged() ||
+      ".tekton/forklift-operator-bundle-*.yaml".pathChanged() ||
+      "build/forklift-operator-bundle/Containerfile-downstream".pathChanged() ||
+      "build/forklift-operator-bundle/images.conf".pathChanged() ||
+      "operator/export-vars.sh".pathChanged() )
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: forklift-operator-dev-preview
-    appstudio.openshift.io/component: ovirt-populator-dev-preview
+    appstudio.openshift.io/application: forklift-operator-2-11
+    appstudio.openshift.io/component: forklift-operator-bundle-2-11
     pipelines.appstudio.openshift.io/type: build
-  name: ovirt-populator-dev-preview-on-pull-request
+  name: forklift-operator-bundle-2-11-on-push
   namespace: rh-mtv-1-tenant
 spec:
   params:
@@ -28,21 +28,20 @@ spec:
     - name: revision
       value: "{{revision}}"
     - name: output-image
-      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/ovirt-populator-dev-preview:on-pr-{{revision}}
-    - name: image-expires-after
-      value: 5d
+      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-2-11/forklift-operator-bundle-2-11:{{revision}}
     - name: dockerfile
-      value: build/ovirt-populator/Containerfile-downstream
+      value: build/forklift-operator-bundle/Containerfile-downstream
     - name: path-context
       value: .
     - name: build-source-image
       value: "true"
     - name: prefetch-input
-      value: '[{"type": "rpm", "path": ".konflux/ovirt-populator"}]'
+      value: '[{"type": "gomod", "path": ".konflux/forklift-operator-bundle"}]'
     - name: build-args-file
       value: build/release.conf
     - name: build-args
       value:
+        - "EVENT_TITLE={{body.head_commit.message}}"
         - "REVISION={{revision}}"
   pipelineSpec:
     description: |
@@ -200,10 +199,6 @@ spec:
             value: $(params.output-image).prefetch
           - name: ociArtifactExpiresAfter
             value: $(params.image-expires-after)
-          - name: dev-package-managers
-            value: "true"
-          - name: ACTIVATION_KEY
-            value: activation-key-rhel8
         runAfter:
           - clone-repository
         taskRef:
@@ -560,6 +555,8 @@ spec:
             value: $(tasks.build-image-index.results.IMAGE_URL)
           - name: IMAGE_DIGEST
             value: $(tasks.build-image-index.results.IMAGE_DIGEST)
+          - name: ADDITIONAL_TAGS
+            value: ["tag1", "tag2"]
         runAfter:
           - build-image-index
         taskRef:
@@ -622,7 +619,7 @@ spec:
       - name: netrc
         optional: true
   taskRunTemplate:
-    serviceAccountName: build-pipeline-ovirt-populator-dev-preview
+    serviceAccountName: build-pipeline-forklift-operator-bundle-2-11
   workspaces:
     - name: git-auth
       secret:
