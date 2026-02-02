@@ -140,11 +140,6 @@ github.com/kubev2v/forklift/pkg/lib/itinerary
 # github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 ## explicit
 github.com/liggitt/tabwriter
-# github.com/mailru/easyjson v0.7.7
-## explicit; go 1.12
-github.com/mailru/easyjson/buffer
-github.com/mailru/easyjson/jlexer
-github.com/mailru/easyjson/jwriter
 # github.com/moby/term v0.5.2
 ## explicit; go 1.18
 github.com/moby/term
@@ -278,11 +273,12 @@ github.com/yaacov/kubectl-mtv/pkg/util/flags
 github.com/yaacov/kubectl-mtv/pkg/util/output
 github.com/yaacov/kubectl-mtv/pkg/util/query
 github.com/yaacov/kubectl-mtv/pkg/util/watch
-# github.com/yaacov/kubectl-mtv-mcp v0.0.6
+# github.com/yaacov/kubectl-mtv-mcp v0.0.7
 ## explicit; go 1.23.0
 github.com/yaacov/kubectl-mtv-mcp/cmd/kubectl-mtv-mcp
-github.com/yaacov/kubectl-mtv-mcp/cmd/kubectl-mtv-mcp/tools
 github.com/yaacov/kubectl-mtv-mcp/pkg/mtvmcp
+github.com/yaacov/kubectl-mtv-mcp/pkg/mtvmcp/discovery
+github.com/yaacov/kubectl-mtv-mcp/pkg/mtvmcp/tools
 # github.com/yaacov/tree-search-language/v6 v6.0.8
 ## explicit; go 1.23
 github.com/yaacov/tree-search-language/v6/pkg/parser
