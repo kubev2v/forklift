@@ -9,14 +9,19 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression:
       event == "push" && target_branch
-      == "main" && ("build/forklift-cli-download/Containerfile-downstream".pathChanged() ||
-      "cmd/kubectl-mtv/***".pathChanged())
+      == "release-2.11" && ( ".tekton/forklift-controller-2-11-*.yaml".pathChanged() ||
+      ".konflux/forklift-controller/rpms.lock.yaml".pathChanged() ||
+      "build/forklift-controller/Containerfile-downstream".pathChanged() ||
+      "pkg/controller/***".pathChanged() ||
+      "pkg/forklift-api/***".pathChanged() ||
+      "pkg/lib/***".pathChanged() ||
+      "cmd/forklift-controller/***".pathChanged() )
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: forklift-operator-dev-preview
-    appstudio.openshift.io/component: forklift-cli-download-dev-preview
+    appstudio.openshift.io/application: forklift-operator-2-11
+    appstudio.openshift.io/component: forklift-controller-2-11
     pipelines.appstudio.openshift.io/type: build
-  name: forklift-cli-download-dev-preview-on-push
+  name: forklift-controller-2-11-on-push
   namespace: rh-mtv-1-tenant
 spec:
   params:
@@ -25,13 +30,15 @@ spec:
     - name: revision
       value: "{{revision}}"
     - name: output-image
-      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-cli-download-dev-preview:{{revision}}
+      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-2-11/forklift-controller-2-11:{{revision}}
     - name: dockerfile
-      value: build/forklift-cli-download/Containerfile-downstream
+      value: build/forklift-controller/Containerfile-downstream
     - name: path-context
       value: .
     - name: build-source-image
       value: "true"
+    - name: prefetch-input
+      value: '[{"type": "rpm", "path": ".konflux/forklift-controller"}]'
     - name: build-args-file
       value: build/release.conf
     - name: build-args
@@ -43,6 +50,20 @@ spec:
 
       _Uses `buildah` to create a container image leveraging [trusted artifacts](https://konflux-ci.dev/architecture/ADR/0036-trusted-artifacts.html). It also optionally creates a source image and runs some build-time tests. Information is shared between tasks using OCI artifacts instead of PVCs. EC will pass the [`trusted_task.trusted`](https://conforma.dev/docs/policy/packages/release_trusted_task.html#trusted_task__trusted) policy as long as all data used to build the artifact is generated from trusted tasks.
       This pipeline is pushed as a Tekton bundle to [quay.io](https://quay.io/repository/konflux-ci/tekton-catalog/pipeline-docker-build-oci-ta?tab=tags)_
+    finally:
+      - name: show-sbom
+        params:
+          - name: IMAGE_URL
+            value: $(tasks.build-image-index.results.IMAGE_URL)
+        taskRef:
+          params:
+            - name: name
+              value: show-sbom
+            - name: bundle
+              value: quay.io/konflux-ci/tekton-catalog/task-show-sbom:0.1@sha256:e2c1b4eac642f32e91f3bc5d3cb48c5c70888aaf45c3650d9ea34573de7a7fd5
+            - name: kind
+              value: task
+          resolver: bundles
     params:
       - description: Source Repository URL
         name: git-url
@@ -79,7 +100,7 @@ spec:
         name: hermetic
         type: string
       - default: ""
-        description: Build dependencies to be prefetched
+        description: Build dependencies to be prefetched by Cachi2
         name: prefetch-input
         type: string
       - default: ""
@@ -87,7 +108,6 @@ spec:
           Image tag expiration time, time values could be something like
           1h, 2d, 3w for hours, days, and weeks, respectively.
         name: image-expires-after
-        type: string
       - default: "false"
         description: Build a source image.
         name: build-source-image
@@ -180,6 +200,10 @@ spec:
             value: $(params.output-image).prefetch
           - name: ociArtifactExpiresAfter
             value: $(params.image-expires-after)
+          - name: dev-package-managers
+            value: "true"
+          - name: ACTIVATION_KEY
+            value: activation-key-rhel9
         runAfter:
           - clone-repository
         taskRef:
@@ -598,7 +622,7 @@ spec:
       - name: netrc
         optional: true
   taskRunTemplate:
-    serviceAccountName: build-pipeline-forklift-cli-download-dev-preview
+    serviceAccountName: build-pipeline-forklift-controller-2-11
   workspaces:
     - name: git-auth
       secret:

@@ -2,25 +2,22 @@ apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
   annotations:
-    build.appstudio.openshift.io/repo: https://gitlab.cee.redhat.com/mtv/forklift/-/tree/{{revision}}
+    build.appstudio.openshift.io/repo: https://github.com/kubev2v/forklift?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
+    build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
-    pipelinesascode.tekton.dev/cancel-in-progress: "false"
+    pipelinesascode.tekton.dev/cancel-in-progress: "true"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "main" && ( ".tekton/virt-v2v-int-dev-preview-*.yaml".pathChanged() ||
-      ".konflux/virt-v2v/rpms.lock.yaml".pathChanged() ||
-      "build/virt-v2v/Containerfile-downstream".pathChanged() ||
-      "pkg/virt-v2v/***".pathChanged() ||
-      "cmd/virt-v2v/***".pathChanged() ||
-      "cmd/virt-v2v-monitor/***".pathChanged() )
+    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
+      == "release-2.11" && ( ".tekton/forklift-ova-proxy-2-11-*.yaml".pathChanged() ||
+      "build/ova-proxy/Containerfile-downstream".pathChanged())
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: forklift-operator-int-dev-preview
-    appstudio.openshift.io/component: virt-v2v-int-dev-preview
+    appstudio.openshift.io/application: forklift-operator-2-11
+    appstudio.openshift.io/component: forklift-ova-proxy-2-11
     pipelines.appstudio.openshift.io/type: build
-  name: virt-v2v-int-dev-preview-on-push
-  namespace: rh-mtv-btrfs-tenant
+  name: forklift-ova-proxy-2-11-on-pull-request
+  namespace: rh-mtv-1-tenant
 spec:
   params:
   - name: git-url
@@ -28,33 +25,18 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/rh-mtv-btrfs-tenant/forklift-operator-int-dev-preview/virt-v2v-int-dev-preview:{{revision}}
+    value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-2-11/forklift-ova-proxy-2-11:on-pr-{{revision}}
+  - name: image-expires-after
+    value: 5d
   - name: dockerfile
-    value: build/virt-v2v/Containerfile-downstream
+    value: build/ova-proxy/Containerfile-downstream
   - name: path-context
     value: .
-  - name: build-source-image
-    value: "true"
-  - name: prefetch-input
-    value: '[{"type": "rpm", "path": ".konflux/virt-v2v/appliance"}, {"type": "rpm", "path": ".konflux/virt-v2v/runtime"}, {"type": "rpm", "path": ".konflux/virt-v2v/winlegacyiso"}, {"type": "rpm", "path": ".konflux/virt-v2v/builder"}]'
   - name: build-args-file
     value: build/release.conf
   - name: build-args
     value:
-    - "REVISION={{revision}}"
-  taskRunSpecs:
-  - pipelineTaskName: prefetch-dependencies
-    computeResources:
-      requests:
-        memory: 4Gi
-      limits:
-        memory: 4Gi
-  - pipelineTaskName: build-source-image
-    computeResources:
-      requests:
-        memory: 4Gi
-      limits:
-        memory: 4Gi
+      - "REVISION={{revision}}"
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
@@ -103,7 +85,7 @@ spec:
         1h, 2d, 3w for hours, days, and weeks, respectively.
       name: image-expires-after
       type: string
-    - default: "false"
+    - default: "true"
       description: Build a source image.
       name: build-source-image
       type: string
@@ -199,10 +181,6 @@ spec:
         value: $(params.output-image).prefetch
       - name: ociArtifactExpiresAfter
         value: $(params.image-expires-after)
-      - name: dev-package-managers
-        value: "true"
-      - name: ACTIVATION_KEY
-        value: activation-key-rhel10
       runAfter:
       - clone-repository
       taskRef:
@@ -625,7 +603,7 @@ spec:
     - name: netrc
       optional: true
   taskRunTemplate:
-    serviceAccountName: build-pipeline-virt-v2v-int-dev-preview
+    serviceAccountName: build-pipeline-forklift-ova-proxy-2-11
   workspaces:
   - name: git-auth
     secret:

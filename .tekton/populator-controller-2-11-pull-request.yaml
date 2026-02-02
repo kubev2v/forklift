@@ -10,16 +10,16 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression:
       event == "pull_request" && target_branch
-      == "main" && ( ".tekton/forklift-operator-dev-preview-*.yaml".pathChanged() ||
-      "build/forklift-operator/Containerfile-downstream".pathChanged() ||
-      "operator/roles/***".pathChanged() ||
-      "operator/watches.yaml".pathChanged() )
+      == "release-2.11" && ( ".tekton/populator-controller-2-11-*.yaml".pathChanged() ||
+      ".konflux/populator-controller/rpms.lock.yaml".pathChanged() ||
+      "build/populator-controller/Containerfile-downstream".pathChanged() ||
+      "cmd/populator-controller/***".pathChanged() )
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: forklift-operator-dev-preview
-    appstudio.openshift.io/component: forklift-operator-dev-preview
+    appstudio.openshift.io/application: forklift-operator-2-11
+    appstudio.openshift.io/component: populator-controller-2-11
     pipelines.appstudio.openshift.io/type: build
-  name: forklift-operator-dev-preview-on-pull-request
+  name: populator-controller-2-11-on-pull-request
   namespace: rh-mtv-1-tenant
 spec:
   params:
@@ -28,15 +28,17 @@ spec:
     - name: revision
       value: "{{revision}}"
     - name: output-image
-      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-operator-dev-preview:on-pr-{{revision}}
+      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-2-11/populator-controller-2-11:on-pr-{{revision}}
     - name: image-expires-after
       value: 5d
     - name: dockerfile
-      value: build/forklift-operator/Containerfile-downstream
+      value: build/populator-controller/Containerfile-downstream
     - name: path-context
       value: .
     - name: build-source-image
       value: "true"
+    - name: prefetch-input
+      value: '[{"type": "rpm", "path": ".konflux/populator-controller"}]'
     - name: build-args-file
       value: build/release.conf
     - name: build-args
@@ -198,6 +200,10 @@ spec:
             value: $(params.output-image).prefetch
           - name: ociArtifactExpiresAfter
             value: $(params.image-expires-after)
+          - name: dev-package-managers
+            value: "true"
+          - name: ACTIVATION_KEY
+            value: activation-key-rhel9
         runAfter:
           - clone-repository
         taskRef:
@@ -616,7 +622,7 @@ spec:
       - name: netrc
         optional: true
   taskRunTemplate:
-    serviceAccountName: build-pipeline-forklift-operator-dev-preview
+    serviceAccountName: build-pipeline-populator-controller-2-11
   workspaces:
     - name: git-auth
       secret:

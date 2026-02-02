@@ -10,17 +10,16 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression:
       event == "pull_request" && target_branch
-      == "main" && ( "operator/config/manifests/***".pathChanged() ||
-      ".tekton/forklift-operator-bundle-*.yaml".pathChanged() ||
-      "build/forklift-operator-bundle/Containerfile-downstream".pathChanged() ||
-      "build/forklift-operator-bundle/images.conf".pathChanged() ||
-      "operator/export-vars.sh".pathChanged() )
+      == "release-2.11" && ( ".tekton/forklift-operator-2-11-*.yaml".pathChanged() ||
+      "build/forklift-operator/Containerfile-downstream".pathChanged() ||
+      "operator/roles/***".pathChanged() ||
+      "operator/watches.yaml".pathChanged() )
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: forklift-operator-dev-preview
-    appstudio.openshift.io/component: forklift-operator-bundle-dev-preview
+    appstudio.openshift.io/application: forklift-operator-2-11
+    appstudio.openshift.io/component: forklift-operator-2-11
     pipelines.appstudio.openshift.io/type: build
-  name: forklift-operator-bundle-dev-preview-on-pull-request
+  name: forklift-operator-2-11-on-pull-request
   namespace: rh-mtv-1-tenant
 spec:
   params:
@@ -29,22 +28,19 @@ spec:
     - name: revision
       value: "{{revision}}"
     - name: output-image
-      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-operator-bundle-dev-preview:on-pr-{{revision}}
+      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-2-11/forklift-operator-2-11:on-pr-{{revision}}
     - name: image-expires-after
       value: 5d
     - name: dockerfile
-      value: build/forklift-operator-bundle/Containerfile-downstream
+      value: build/forklift-operator/Containerfile-downstream
     - name: path-context
       value: .
     - name: build-source-image
       value: "true"
-    - name: prefetch-input
-      value: '[{"type": "gomod", "path": ".konflux/forklift-operator-bundle"}]'
     - name: build-args-file
       value: build/release.conf
     - name: build-args
       value:
-        - "EVENT_TITLE={{body.pull_request.title}}"
         - "REVISION={{revision}}"
   pipelineSpec:
     description: |
@@ -202,10 +198,6 @@ spec:
             value: $(params.output-image).prefetch
           - name: ociArtifactExpiresAfter
             value: $(params.image-expires-after)
-          - name: dev-package-managers
-            value: "true"
-          - name: ACTIVATION_KEY
-            value: activation-key-rhel9
         runAfter:
           - clone-repository
         taskRef:
@@ -624,7 +616,7 @@ spec:
       - name: netrc
         optional: true
   taskRunTemplate:
-    serviceAccountName: build-pipeline-forklift-operator-bundle-dev-preview
+    serviceAccountName: build-pipeline-forklift-operator-2-11
   workspaces:
     - name: git-auth
       secret:

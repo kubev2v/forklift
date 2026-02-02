@@ -10,7 +10,7 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression:
       event == "pull_request" && target_branch
-      == "main" && ( ".tekton/forklift-api-dev-preview-*.yaml".pathChanged() ||
+      == "release-2.11" && ( ".tekton/forklift-api-2-11-*.yaml".pathChanged() ||
       ".konflux/forklift-api/rpms.lock.yaml".pathChanged() ||
       "build/forklift-api/Containerfile-downstream".pathChanged() ||
       "pkg/forklift-api/***".pathChanged() ||
@@ -19,10 +19,10 @@ metadata:
       "cmd/forklift-api/***".pathChanged() )
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: forklift-operator-dev-preview
-    appstudio.openshift.io/component: forklift-api-dev-preview
+    appstudio.openshift.io/application: forklift-operator-2-11
+    appstudio.openshift.io/component: forklift-api-2-11
     pipelines.appstudio.openshift.io/type: build
-  name: forklift-api-dev-preview-on-pull-request
+  name: forklift-api-2-11-on-pull-request
   namespace: rh-mtv-1-tenant
 spec:
   params:
@@ -31,7 +31,7 @@ spec:
     - name: revision
       value: "{{revision}}"
     - name: output-image
-      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dev-preview/forklift-api-dev-preview:on-pr-{{revision}}
+      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-2-11/forklift-api-2-11:on-pr-{{revision}}
     - name: image-expires-after
       value: 5d
     - name: dockerfile
@@ -625,7 +625,7 @@ spec:
       - name: netrc
         optional: true
   taskRunTemplate:
-    serviceAccountName: build-pipeline-forklift-api-dev-preview
+    serviceAccountName: build-pipeline-forklift-api-2-11
   workspaces:
     - name: git-auth
       secret:
