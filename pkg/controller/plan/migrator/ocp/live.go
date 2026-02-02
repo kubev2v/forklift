@@ -1475,9 +1475,14 @@ func (r *Builder) targetPvc(source *model.PersistentVolumeClaim, storage api.Des
 	}
 	if storage.AccessMode != "" {
 		pvc.Spec.AccessModes = []core.PersistentVolumeAccessMode{storage.AccessMode}
+	} else if len(source.Object.Spec.AccessModes) > 0 {
+		// Preserve source access mode when mapping does not specify one (e.g. avoid RWO→RWX flip).
+		pvc.Spec.AccessModes = source.Object.Spec.AccessModes
 	}
 	if storage.VolumeMode != "" {
 		pvc.Spec.VolumeMode = &storage.VolumeMode
+	} else if source.Object.Spec.VolumeMode != nil {
+		pvc.Spec.VolumeMode = source.Object.Spec.VolumeMode
 	}
 	return
 }
@@ -1515,9 +1520,18 @@ func (r *Builder) targetDataVolume(source *model.DataVolume, pvc *model.Persiste
 	}
 	if storage.AccessMode != "" {
 		dv.Spec.Storage.AccessModes = []core.PersistentVolumeAccessMode{storage.AccessMode}
+	} else if source.Object.Spec.Storage != nil && len(source.Object.Spec.Storage.AccessModes) > 0 {
+		dv.Spec.Storage.AccessModes = source.Object.Spec.Storage.AccessModes
+	} else if len(pvc.Object.Spec.AccessModes) > 0 {
+		// Preserve source PVC access mode when mapping does not specify one (e.g. avoid RWO→RWX flip).
+		dv.Spec.Storage.AccessModes = pvc.Object.Spec.AccessModes
 	}
 	if storage.VolumeMode != "" {
 		dv.Spec.Storage.VolumeMode = &storage.VolumeMode
+	} else if source.Object.Spec.Storage != nil && source.Object.Spec.Storage.VolumeMode != nil {
+		dv.Spec.Storage.VolumeMode = source.Object.Spec.Storage.VolumeMode
+	} else if pvc.Object.Spec.VolumeMode != nil {
+		dv.Spec.Storage.VolumeMode = pvc.Object.Spec.VolumeMode
 	}
 	return
 }
