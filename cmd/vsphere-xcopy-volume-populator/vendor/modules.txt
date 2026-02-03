@@ -191,7 +191,7 @@ github.com/kubev2v/forklift/pkg/lib/itinerary
 github.com/kubev2v/forklift/pkg/lib/logging
 github.com/kubev2v/forklift/pkg/lib/util
 github.com/kubev2v/forklift/pkg/settings
-# github.com/mailru/easyjson v0.9.0
+# github.com/mailru/easyjson v0.9.1
 ## explicit; go 1.20
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
