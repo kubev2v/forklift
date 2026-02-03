@@ -1,5 +1,5 @@
-//go:build (amd64 && go1.17 && !go1.25) || (arm64 && go1.20 && !go1.25)
-// +build amd64,go1.17,!go1.25 arm64,go1.20,!go1.25
+//go:build (amd64 && go1.17 && !go1.27) || (arm64 && go1.20 && !go1.27)
+// +build amd64,go1.17,!go1.27 arm64,go1.20,!go1.27
 
 /*
  * Copyright 2021 ByteDance Inc.
@@ -17,7 +17,6 @@
  * limitations under the License.
  */
 
-//go:generate make
 package sonic
 
 import (
@@ -89,6 +88,9 @@ func (cfg Config) Froze() API {
     }
     if cfg.ValidateString {
         api.decoderOpts |= decoder.OptionValidateString
+    }
+    if cfg.CaseSensitive {
+        api.decoderOpts |= decoder.OptionCaseSensitive
     }
     return api
 }
