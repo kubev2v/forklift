@@ -16,6 +16,8 @@ import (
 
 	//	"infinibox-csi-driver/api/client"
 
+	"context"
+
 	"github.com/stretchr/testify/mock"
 )
 
@@ -29,148 +31,153 @@ type MockAPIClient struct {
 }
 
 // GetAllPools mock
-func (m *MockAPIService) GetPoolByName(name string) (*PoolResult, error) {
-	args := m.Called(name)
+func (m *MockAPIService) GetPoolByName(ctx context.Context, name string) (*PoolResult, error) {
+	args := m.Called(ctx, name)
 	resp, _ := args.Get(0).(*PoolResult)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) GetPoolByID(id int) (*PoolResult, error) {
-	args := m.Called(id)
+func (m *MockAPIService) GetPoolByID(ctx context.Context, id int) (*PoolResult, error) {
+	args := m.Called(ctx, id)
 	resp, _ := args.Get(0).(*PoolResult)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) GetHostByName(name string) (*Host, error) {
-	args := m.Called(name)
+func (m *MockAPIService) GetHostByName(ctx context.Context, name string) (*Host, error) {
+	args := m.Called(ctx, name)
 	resp, _ := args.Get(0).(*Host)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) GetSystem() (*SystemDetails, error) {
-	args := m.Called()
+func (m *MockAPIService) GetSystem(ctx context.Context) (*SystemDetails, error) {
+	args := m.Called(ctx)
 	resp, _ := args.Get(0).(*SystemDetails)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-// DeleteHost mock
-func (m *MockAPIService) DeleteHost(hostID int) (*Host, error) {
-	args := m.Called(hostID)
+func (m *MockAPIService) DeleteHost(ctx context.Context, hostID int) (*Host, error) {
+	args := m.Called(ctx, hostID)
 	resp, _ := args.Get(0).(*Host)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) GetMetadata(objectID int) ([]GetMetadataResult, error) {
-	args := m.Called(objectID)
+func (m *MockAPIService) GetMetadata(ctx context.Context, objectID int) ([]GetMetadataResult, error) {
+	args := m.Called(ctx, objectID)
 	resp, _ := args.Get(0).([]GetMetadataResult)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) GetAllLunByHost(hostID int) ([]LunInfo, error) {
-	args := m.Called(hostID)
+func (m *MockAPIService) GetAllLunByHost(ctx context.Context, hostID int) ([]LunInfo, error) {
+	args := m.Called(ctx, hostID)
 	resp, _ := args.Get(0).([]LunInfo)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) PutMetadata(objectID int, metadata map[string]interface{}) (*PutMetadataResponse, error) {
-	args := m.Called(objectID, metadata)
+func (m *MockAPIService) PutMetadata(ctx context.Context, objectID int, metadata map[string]any) (*PutMetadataResponse, error) {
+	args := m.Called(ctx, objectID, metadata)
 	res, _ := args.Get(0).(PutMetadataResponse)
 	err, _ := args.Get(1).(error)
 	return &res, err
 }
 
-func (m *MockAPIService) DeleteMetadata(objectID int) (*DeleteMetadataResponse, error) {
-	args := m.Called(objectID)
+func (m *MockAPIService) DeleteMetadata(ctx context.Context, objectID int) (*DeleteMetadataResponse, error) {
+	args := m.Called(ctx, objectID)
 	res, _ := args.Get(0).(DeleteMetadataResponse)
 	err, _ := args.Get(1).(error)
 	return &res, err
 }
 
-func (m *MockAPIService) CreateVolume(request CreateVolumeRequest) (*Volume, error) {
-	args := m.Called(request)
+func (m *MockAPIService) CreateVolume(ctx context.Context, request CreateVolumeRequest) (*Volume, error) {
+	args := m.Called(ctx, request)
 	res, _ := args.Get(0).(*Volume)
 	err, _ := args.Get(1).(error)
 	return res, err
 }
-func (m *MockAPIService) CreateHost(name string) (*Host, error) {
-	args := m.Called(name)
+func (m *MockAPIService) PromoteSnapshot(ctx context.Context, snapshotID int) (*Volume, error) {
+	args := m.Called(ctx, snapshotID)
+	res, _ := args.Get(0).(*Volume)
+	err, _ := args.Get(1).(error)
+	return res, err
+}
+func (m *MockAPIService) CreateHost(ctx context.Context, name string) (*Host, error) {
+	args := m.Called(ctx, name)
 	res, _ := args.Get(0).(*Host)
 	err, _ := args.Get(1).(error)
 	return res, err
 }
 
-func (m *MockAPIService) DeleteVolume(objectID int) (*DeleteVolumeResponse, error) {
-	args := m.Called(objectID)
+func (m *MockAPIService) DeleteVolume(ctx context.Context, objectID int) (*DeleteVolumeResponse, error) {
+	args := m.Called(ctx, objectID)
 	res, _ := args.Get(0).(DeleteVolumeResponse)
 	err, _ := args.Get(1).(error)
 	return &res, err
 }
 
-func (m *MockAPIService) GetVolumeByName(volumeName string) (*Volume, error) {
-	args := m.Called(volumeName)
+func (m *MockAPIService) GetVolumeByName(ctx context.Context, volumeName string) (*Volume, error) {
+	args := m.Called(ctx, volumeName)
 	resp, _ := args.Get(0).(*Volume)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) UpdateVolume(volumeID int, volume Volume) (*Volume, error) {
-	args := m.Called(volumeID, volume)
+func (m *MockAPIService) UpdateVolume(ctx context.Context, volumeID int, volume Volume) (*Volume, error) {
+	args := m.Called(ctx, volumeID, volume)
 	res, _ := args.Get(0).(Volume)
 	err, _ := args.Get(1).(error)
 	return &res, err
 }
 
-func (m *MockAPIService) GetVolume(volumeID int) (*Volume, error) {
-	args := m.Called(volumeID)
+func (m *MockAPIService) GetVolume(ctx context.Context, volumeID int) (*Volume, error) {
+	args := m.Called(ctx, volumeID)
 	resp, _ := args.Get(0).(*Volume)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) GetFileSystemByID(fsID int) (*FileSystem, error) {
-	args := m.Called(fsID)
+func (m *MockAPIService) GetFileSystemByID(ctx context.Context, fsID int) (*FileSystem, error) {
+	args := m.Called(ctx, fsID)
 	resp, _ := args.Get(0).(*FileSystem)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) GetExportByID(fsID int) (*Export, error) {
-	args := m.Called(fsID)
+func (m *MockAPIService) GetExportByID(ctx context.Context, fsID int) (*Export, error) {
+	args := m.Called(ctx, fsID)
 	resp, _ := args.Get(0).(*Export)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) GetExportsByFileSystemID(fsID int) ([]Export, error) {
-	args := m.Called(fsID)
+func (m *MockAPIService) GetExportsByFileSystemID(ctx context.Context, fsID int) ([]Export, error) {
+	args := m.Called(ctx, fsID)
 	resp, _ := args.Get(0).([]Export)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) DeleteExport(exportID int) (*Export, error) {
-	args := m.Called(exportID)
+func (m *MockAPIService) DeleteExport(ctx context.Context, exportID int) (*Export, error) {
+	args := m.Called(ctx, exportID)
 	resp, _ := args.Get(0).(*Export)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) CreateExport(request CreateExportRequest) (*Export, error) {
-	args := m.Called(request)
+func (m *MockAPIService) CreateExport(ctx context.Context, request CreateExportRequest) (*Export, error) {
+	args := m.Called(ctx, request)
 	res, _ := args.Get(0).(Export)
 	err, _ := args.Get(1).(error)
 	return &res, err
 }
 
-func (m *MockAPIService) CreateFileSystem(request CreateFileSystemRequest) (*FileSystem, error) {
-	args := m.Called(request)
+func (m *MockAPIService) CreateFileSystem(ctx context.Context, request CreateFileSystemRequest) (*FileSystem, error) {
+	args := m.Called(ctx, request)
 	var resp FileSystem
 	if args.Get(0) != nil {
 		resp, _ = args.Get(0).(FileSystem)
@@ -182,230 +189,230 @@ func (m *MockAPIService) CreateFileSystem(request CreateFileSystemRequest) (*Fil
 	return &resp, err
 }
 
-func (m *MockAPIService) GetFileSystemByName(name string) (*FileSystem, error) {
-	args := m.Called(name)
+func (m *MockAPIService) GetFileSystemByName(ctx context.Context, name string) (*FileSystem, error) {
+	args := m.Called(ctx, name)
 	resp, _ := args.Get(0).(*FileSystem)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) GetFileSystemsByPool(poolID int, fsPrefix string) ([]FileSystem, error) {
-	args := m.Called(poolID, fsPrefix)
+func (m *MockAPIService) GetFileSystemsByPool(ctx context.Context, poolID int, fsPrefix string) ([]FileSystem, error) {
+	args := m.Called(ctx, poolID, fsPrefix)
 	resp, _ := args.Get(0).([]FileSystem)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
-func (m *MockAPIService) GetFileSystemsByParentID(parentID int) ([]FileSystem, error) {
-	args := m.Called(parentID)
+func (m *MockAPIService) GetFileSystemsByParentID(ctx context.Context, parentID int) ([]FileSystem, error) {
+	args := m.Called(ctx, parentID)
 	resp, _ := args.Get(0).([]FileSystem)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) GetNtpStatus() ([]NtpStatus, error) {
-	args := m.Called()
+func (m *MockAPIService) GetNtpStatus(ctx context.Context) ([]NtpStatus, error) {
+	args := m.Called(ctx)
 	resp, _ := args.Get(0).([]NtpStatus)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) GetMaxTreeqPerFs() (int, error) {
-	args := m.Called()
+func (m *MockAPIService) GetMaxTreeqPerFs(ctx context.Context) (int, error) {
+	args := m.Called(ctx)
 	resp, _ := args.Get(0).(int)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) GetFCPorts() ([]FCNode, error) {
-	args := m.Called()
+func (m *MockAPIService) GetFCPorts(ctx context.Context) ([]FCNode, error) {
+	args := m.Called(ctx)
 	resp, _ := args.Get(0).([]FCNode)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) GetNetworkSpaceByName(name string) (*NetworkSpace, error) {
-	args := m.Called(name)
+func (m *MockAPIService) GetNetworkSpaceByName(ctx context.Context, name string) (*NetworkSpace, error) {
+	args := m.Called(ctx, name)
 	resp, _ := args.Get(0).(*NetworkSpace)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) DeleteFileSystem(fsID int) error {
-	args := m.Called(fsID)
+func (m *MockAPIService) DeleteFileSystem(ctx context.Context, fsID int) error {
+	args := m.Called(ctx, fsID)
 	err, _ := args.Get(0).(error)
 	return err
 }
 
-func (m *MockAPIService) UpdateFileSystem(fsID int, fs FileSystem) (*FileSystem, error) {
-	args := m.Called(fsID, fs)
+func (m *MockAPIService) UpdateFileSystem(ctx context.Context, fsID int, fs FileSystem) (*FileSystem, error) {
+	args := m.Called(ctx, fsID, fs)
 	res, _ := args.Get(0).(FileSystem)
 	err, _ := args.Get(1).(error)
 	return &res, err
 }
 
-func (m *MockAPIService) GetTreeqByName(fsID int, name string) (*Treeq, error) {
-	args := m.Called(fsID, name)
+func (m *MockAPIService) GetTreeqByName(ctx context.Context, fsID int, name string) (*Treeq, error) {
+	args := m.Called(ctx, fsID, name)
 	resp, _ := args.Get(0).(*Treeq)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) GetTreeq(fsID int, treeqID int) (*Treeq, error) {
-	args := m.Called(fsID, treeqID)
+func (m *MockAPIService) GetTreeq(ctx context.Context, fsID int, treeqID int) (*Treeq, error) {
+	args := m.Called(ctx, fsID, treeqID)
 	resp, _ := args.Get(0).(*Treeq)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) DeleteTreeq(fsID, treeqID int) (*Treeq, error) {
-	args := m.Called(fsID, treeqID)
+func (m *MockAPIService) DeleteTreeq(ctx context.Context, fsID, treeqID int) (*Treeq, error) {
+	args := m.Called(ctx, fsID, treeqID)
 	resp, _ := args.Get(0).(*Treeq)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) CreateTreeq(fsID int, treeqRequest CreateTreeqRequest) (*Treeq, error) {
-	args := m.Called(fsID, treeqRequest)
+func (m *MockAPIService) CreateTreeq(ctx context.Context, fsID int, treeqRequest CreateTreeqRequest) (*Treeq, error) {
+	args := m.Called(ctx, fsID, treeqRequest)
 	resp, _ := args.Get(0).(*Treeq)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) UpdateTreeq(fsID, treeqID int, updateRequest UpdateTreeqRequest) (*Treeq, error) {
-	args := m.Called(fsID, treeqID, updateRequest)
+func (m *MockAPIService) UpdateTreeq(ctx context.Context, fsID, treeqID int, updateRequest UpdateTreeqRequest) (*Treeq, error) {
+	args := m.Called(ctx, fsID, treeqID, updateRequest)
 	resp, _ := args.Get(0).(Treeq)
 	err, _ := args.Get(1).(error)
 	return &resp, err
 }
 
-func (m *MockAPIService) GetTreeqsByFileSystem(fsID int) ([]Treeq, error) {
-	args := m.Called(fsID)
+func (m *MockAPIService) GetTreeqsByFileSystem(ctx context.Context, fsID int) ([]Treeq, error) {
+	args := m.Called(ctx, fsID)
 	resp, _ := args.Get(0).([]Treeq)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) CreateSnapshotVolume(snapshotParam CreateSnapshotVolumeRequest) (*Snapshot, error) {
-	args := m.Called(snapshotParam)
+func (m *MockAPIService) CreateSnapshotVolume(ctx context.Context, snapshotParam CreateSnapshotVolumeRequest) (*Snapshot, error) {
+	args := m.Called(ctx, snapshotParam)
 	resp, _ := args.Get(0).(Snapshot)
 	err, _ := args.Get(1).(error)
 	return &resp, err
 }
 
-func (m *MockAPIService) GetVolumesByParentID(parentID int) ([]Volume, error) {
-	args := m.Called(parentID)
+func (m *MockAPIService) GetVolumesByParentID(ctx context.Context, parentID int) ([]Volume, error) {
+	args := m.Called(ctx, parentID)
 	resp, _ := args.Get(0).([]Volume)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) MapVolumeToHost(hostID, volumeID, lun int) (*LunInfo, error) {
-	args := m.Called(hostID, volumeID, lun)
+func (m *MockAPIService) MapVolumeToHost(ctx context.Context, hostID, volumeID, lun int) (*LunInfo, error) {
+	args := m.Called(ctx, hostID, volumeID, lun)
 	resp, _ := args.Get(0).(LunInfo)
 	err, _ := args.Get(1).(error)
 	return &resp, err
 }
 
-func (m *MockAPIService) GetLunByHostVolume(hostID, volumeID int) (*LunInfo, error) {
-	args := m.Called(hostID, volumeID)
+func (m *MockAPIService) GetLunByHostVolume(ctx context.Context, hostID, volumeID int) (*LunInfo, error) {
+	args := m.Called(ctx, hostID, volumeID)
 	resp, _ := args.Get(0).(LunInfo)
 	err, _ := args.Get(1).(error)
 	return &resp, err
 }
 
-func (m *MockAPIService) UnMapVolumeFromHost(hostID, volumeID int) (*UnMapVolumeFromHostResponse, error) {
-	args := m.Called(hostID, volumeID)
+func (m *MockAPIService) UnMapVolumeFromHost(ctx context.Context, hostID, volumeID int) (*UnMapVolumeFromHostResponse, error) {
+	args := m.Called(ctx, hostID, volumeID)
 	resp, _ := args.Get(0).(UnMapVolumeFromHostResponse)
 	err, _ := args.Get(1).(error)
 	return &resp, err
 }
 
-func (m *MockAPIService) GetConsistencyGroup(cgID int) (*ConsistencyGroupInfo, error) {
-	args := m.Called(cgID)
+func (m *MockAPIService) GetConsistencyGroup(ctx context.Context, cgID int) (*ConsistencyGroupInfo, error) {
+	args := m.Called(ctx, cgID)
 	resp, _ := args.Get(0).(ConsistencyGroupInfo)
 	err, _ := args.Get(1).(error)
 	return &resp, err
 }
 
-func (m *MockAPIService) DeleteConsistencyGroup(cgID int) error {
-	args := m.Called(cgID)
+func (m *MockAPIService) DeleteConsistencyGroup(ctx context.Context, cgID int) error {
+	args := m.Called(ctx, cgID)
 	err, _ := args.Get(0).(error)
 	return err
 }
 
-func (m *MockAPIService) GetConsistencyGroupByName(name string) (*ConsistencyGroupInfo, error) {
-	args := m.Called(name)
+func (m *MockAPIService) GetConsistencyGroupByName(ctx context.Context, name string) (*ConsistencyGroupInfo, error) {
+	args := m.Called(ctx, name)
 	resp, _ := args.Get(0).(ConsistencyGroupInfo)
 	err, _ := args.Get(1).(error)
 	return &resp, err
 }
 
-func (m *MockAPIService) CreateSnapshotGroup(req CreateSnapshotGroupRequest) (*ConsistencyGroupInfo, error) {
-	args := m.Called(req)
+func (m *MockAPIService) CreateSnapshotGroup(ctx context.Context, req CreateSnapshotGroupRequest) (*ConsistencyGroupInfo, error) {
+	args := m.Called(ctx, req)
 	resp, _ := args.Get(0).(ConsistencyGroupInfo)
 	err, _ := args.Get(1).(error)
 	return &resp, err
 }
-func (m *MockAPIService) GetMembersByCGID(cgID int) ([]MemberInfo, error) {
-	args := m.Called(cgID)
+func (m *MockAPIService) GetMembersByCGID(ctx context.Context, cgID int) ([]MemberInfo, error) {
+	args := m.Called(ctx, cgID)
 	resp, _ := args.Get(0).([]MemberInfo)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
-func (m *MockAPIService) AddMemberToSnapshotGroup(volumeID, cgID int) error {
-	args := m.Called(volumeID, cgID)
+func (m *MockAPIService) AddMemberToSnapshotGroup(ctx context.Context, volumeID, cgID int) error {
+	args := m.Called(ctx, volumeID, cgID)
 	err, _ := args.Get(0).(error)
 	return err
 }
-func (m *MockAPIService) CreateConsistencyGroup(req CreateConsistencyGroupRequest) (*ConsistencyGroupInfo, error) {
-	args := m.Called(req)
+func (m *MockAPIService) CreateConsistencyGroup(ctx context.Context, req CreateConsistencyGroupRequest) (*ConsistencyGroupInfo, error) {
+	args := m.Called(ctx, req)
 	resp, _ := args.Get(0).(ConsistencyGroupInfo)
 	err, _ := args.Get(1).(error)
 	return &resp, err
 }
 
-func (m *MockAPIService) GetLinks() ([]Link, error) {
-	args := m.Called()
+func (m *MockAPIService) GetLinks(ctx context.Context) ([]Link, error) {
+	args := m.Called(ctx)
 	resp, _ := args.Get(0).([]Link)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) CreateReplica(req CreateReplicaRequest) (*Replica, error) {
-	args := m.Called(req)
+func (m *MockAPIService) CreateReplica(ctx context.Context, req CreateReplicaRequest) (*Replica, error) {
+	args := m.Called(ctx, req)
 	resp, _ := args.Get(0).(Replica)
 	err, _ := args.Get(1).(error)
 	return &resp, err
 }
 
-func (m *MockAPIService) GetReplicas() ([]Replica, error) {
-	args := m.Called()
+func (m *MockAPIService) GetReplicas(ctx context.Context) ([]Replica, error) {
+	args := m.Called(ctx)
 	resp, _ := args.Get(0).([]Replica)
 	err, _ := args.Get(1).(error)
 	return resp, err
 }
 
-func (m *MockAPIService) DeleteReplica(replicaID int) error {
-	args := m.Called(replicaID)
+func (m *MockAPIService) DeleteReplica(ctx context.Context, replicaID int) error {
+	args := m.Called(ctx, replicaID)
 	err, _ := args.Get(0).(error)
 	return err
 }
 
-func (m *MockAPIService) GetReplica(id int) (*Replica, error) {
-	args := m.Called(id)
+func (m *MockAPIService) GetReplica(ctx context.Context, id int) (*Replica, error) {
+	args := m.Called(ctx, id)
 	resp, _ := args.Get(0).(Replica)
 	err, _ := args.Get(1).(error)
 	return &resp, err
 }
 
-func (m *MockAPIService) UpdateExportPermissions(export Export, exportPathRef ExportPathRef) (*Export, error) {
-	args := m.Called(export, exportPathRef)
+func (m *MockAPIService) UpdateExportPermissions(ctx context.Context, export Export, exportPathRef ExportPathRef) (*Export, error) {
+	args := m.Called(ctx, export, exportPathRef)
 	res, _ := args.Get(0).(Export)
 	err, _ := args.Get(1).(error)
 	return &res, err
 }
-func (m *MockAPIService) CreateFileSystemSnapshot(params FileSystemSnapshot) (*FileSystemSnapshotResponse, error) {
-	args := m.Called(params)
+func (m *MockAPIService) CreateFileSystemSnapshot(ctx context.Context, params FileSystemSnapshot) (*FileSystemSnapshotResponse, error) {
+	args := m.Called(ctx, params)
 	resp, _ := args.Get(0).(FileSystemSnapshotResponse)
 	err, _ := args.Get(1).(error)
 	return &resp, err
