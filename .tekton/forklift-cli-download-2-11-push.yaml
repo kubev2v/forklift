@@ -8,7 +8,8 @@ metadata:
     pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "release-2.11"
+      == "release-2.11" && ("build/forklift-cli-download/Containerfile-downstream".pathChanged() ||
+      "cmd/kubectl-mtv/***".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: forklift-operator-2-11
@@ -28,6 +29,15 @@ spec:
     value: build/forklift-cli-download/Containerfile-downstream
   - name: path-context
     value: .
+  - name: build-source-image
+    value: "true"
+  - name: hermetic
+    value: "true"
+  - name: build-args-file
+    value: build/release.conf
+  - name: build-args
+    value:
+      - "REVISION={{revision}}"
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.

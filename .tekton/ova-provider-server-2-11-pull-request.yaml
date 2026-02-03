@@ -9,7 +9,10 @@ metadata:
     pipelinesascode.tekton.dev/cancel-in-progress: "true"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
-      == "release-2.11"
+      == "release-2.11" && ( ".tekton/ova-provider-server-2-11-*.yaml".pathChanged() ||
+      ".konflux/ova-provider-server/rpms.lock.yaml".pathChanged() ||
+      "build/ova-provider-server/Containerfile-downstream".pathChanged() ||
+      "cmd/ova-provider-server/***".pathChanged() )
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: forklift-operator-2-11
@@ -31,6 +34,17 @@ spec:
     value: build/ova-provider-server/Containerfile-downstream
   - name: path-context
     value: .
+  - name: build-source-image
+    value: "true"
+  - name: hermetic
+    value: "true"
+  - name: prefetch-input
+    value: '[{"type": "rpm", "path": ".konflux/ova-provider-server"}]'
+  - name: build-args-file
+    value: build/release.conf
+  - name: build-args
+    value:
+      - "REVISION={{revision}}"
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
@@ -180,6 +194,10 @@ spec:
         value: $(params.output-image).prefetch
       - name: ociArtifactExpiresAfter
         value: $(params.image-expires-after)
+      - name: dev-package-managers
+        value: "true"
+      - name: ACTIVATION_KEY
+        value: activation-key-rhel9
       runAfter:
       - clone-repository
       taskRef:
