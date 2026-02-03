@@ -31,6 +31,7 @@ const (
 	VirtCustomizeConfigMap           = "VIRT_CUSTOMIZE_MAP"
 	VddkJobActiveDeadline            = "VDDK_JOB_ACTIVE_DEADLINE"
 	VirtV2vExtraArgs                 = "VIRT_V2V_EXTRA_ARGS"
+	VirtV2vInspectorExtraArgs        = "VIRT_V2V_INSPECTOR_EXTRA_ARGS"
 	VirtV2vExtraConfConfigMap        = "VIRT_V2V_EXTRA_CONF_CONFIG_MAP"
 	VirtV2vContainerLimitsCpu        = "VIRT_V2V_CONTAINER_LIMITS_CPU"
 	VirtV2vContainerLimitsMemory     = "VIRT_V2V_CONTAINER_LIMITS_MEMORY"
@@ -105,6 +106,8 @@ type Migration struct {
 	VddkJobActiveDeadline int
 	// Additional arguments for virt-v2v
 	VirtV2vExtraArgs string
+	// Additional arguments for virt-v2v-inspector
+	VirtV2vInspectorExtraArgs string
 	// Additional configuration for virt-v2v
 	VirtV2vExtraConfConfigMap        string
 	VirtV2vContainerLimitsCpu        string
@@ -216,6 +219,14 @@ func (r *Migration) Load() (err error) {
 			r.VirtV2vExtraArgs = string(encoded)
 		} else {
 			return liberr.Wrap(err)
+		}
+	}
+	r.VirtV2vInspectorExtraArgs = "[]"
+	if val, found := os.LookupEnv(VirtV2vInspectorExtraArgs); found && len(val) > 0 {
+		if encoded, jsonErr := json.Marshal(strings.Fields(val)); jsonErr == nil {
+			r.VirtV2vInspectorExtraArgs = string(encoded)
+		} else {
+			return liberr.Wrap(jsonErr)
 		}
 	}
 	if val, found := os.LookupEnv(VirtV2vExtraConfConfigMap); found {
