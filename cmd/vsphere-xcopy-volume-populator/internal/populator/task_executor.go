@@ -63,7 +63,8 @@ func updateTaskStatus(ctx context.Context, task *vmkfstoolsTask, executor TaskEx
 	}
 
 	// Report xcopyUsed as 0 or 1
-	if taskStatus.XcopyUsed {
+	// nil means unknown/not determined, treat as 0 (not used)
+	if taskStatus.XcopyUsed != nil && *taskStatus.XcopyUsed {
 		xcopyUsed <- 1
 	} else {
 		xcopyUsed <- 0
