@@ -1,17 +1,46 @@
 {
-    "packageRules": [
-      {
-        "matchBaseBranches": ["/^release.*/"],
-        "matchManagers": ["dockerfile", "rpm", "gomod"],
-        "enabled": false
-      }
-    ],
-    "autoApprove": true,
-    "tekton": {
-        "automerge": true,
-        "automergeStrategy": "rebase",
-        "automergeType": "pr",
-        "enabled": true,
-        "platformAutomerge": true
+  "packageRules": [
+    {
+      "matchBaseBranches": [
+        "/^release.*/",
+        "main"
+      ],
+      "matchManagers": [
+        "gomod",
+        "dockerfile"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
+      "groupName": "all non-major dependencies",
+      "automerge": true
+    },
+    {
+      "matchBaseBranches": [
+        "main"
+      ],
+      "matchManagers": [
+        "gomod",
+        "dockerfile"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "groupName": "all go major dependencies"
     }
+  ],
+  "autoApprove": true,
+  "tekton": {
+    "fileMatch": [
+      "\\.tekton/.*\\.yaml$"
+    ],
+    "automerge": true,
+    "automergeStrategy": "rebase",
+    "automergeType": "pr",
+    "enabled": true,
+    "platformAutomerge": true
+  }
 }
