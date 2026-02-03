@@ -10,7 +10,7 @@ require (
 	github.com/dell/goscaleio v1.20.0
 	github.com/hashicorp/go-version v1.7.0
 	github.com/infinidat/infinibox-csi-driver v0.0.0-20251022203528-1f6913cf29cb
-	github.com/kubev2v/forklift v0.0.0-20251201013611-d4d1610e79df
+	github.com/kubev2v/forklift v0.0.0-20260203062257-a18ca60d7db1
 	github.com/netapp/trident v0.0.0-20240628081112-cb68cb389d9d
 	github.com/onsi/ginkgo/v2 v2.25.1
 	github.com/onsi/gomega v1.38.2

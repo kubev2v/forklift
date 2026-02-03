@@ -179,7 +179,7 @@ github.com/kubernetes-csi/csi-proxy/client/apiversion
 github.com/kubernetes-csi/csi-proxy/client/groups/filesystem/v1
 github.com/kubernetes-csi/csi-proxy/client/groups/smb/v1
 github.com/kubernetes-csi/csi-proxy/client/groups/volume/v1
-# github.com/kubev2v/forklift v0.0.0-20251201013611-d4d1610e79df => ../../
+# github.com/kubev2v/forklift v0.0.0-20260203062257-a18ca60d7db1 => ../../
 ## explicit; go 1.24.0
 github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1
 github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan
