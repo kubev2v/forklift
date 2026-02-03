@@ -4,6 +4,8 @@ GOBIN ?= $(GOPATH)/bin
 # GO111MODULE is enabled by default in modern Go; uncomment to force
 # GO111MODULE = on
 
+include cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper/version.mk
+
 ENVTEST_K8S_VERSION = 1.31.0
 ENVTEST_VERSION ?= release-0.19
 
@@ -182,7 +184,12 @@ integration-test: generate fmt vet manifests envtest
 
 # Build forklift-controller binary
 forklift-controller: generate fmt vet
-	go build -o bin/forklift-controller github.com/kubev2v/forklift/cmd/forklift-controller
+	go build -ldflags="-w -s -X github.com/kubev2v/forklift/pkg/lib/vsphere_offload.VibVersion=$(VIB_VERSION)" -o bin/forklift-controller github.com/kubev2v/forklift/cmd/forklift-controller
+
+# Build forklift-controller for container builds (skips vet which requires libvirt-devel for virt-v2v package)
+# CI runs full vet separately with proper dependencies installed
+forklift-controller-build: generate fmt
+	go build -ldflags="-w -s -X github.com/kubev2v/forklift/pkg/lib/vsphere_offload.VibVersion=$(VIB_VERSION)" -o bin/forklift-controller github.com/kubev2v/forklift/cmd/forklift-controller
 
 # Ensure temporary directories for forklift services
 .PHONY: ensure-temp-dirs

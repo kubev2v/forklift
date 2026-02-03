@@ -119,6 +119,10 @@ type ProviderStatus struct {
 	// Provider service reference
 	// +optional
 	Service *core.ObjectReference `json:"service,omitempty"`
+	// The ResourceVersion of the secret referenced by this provider.
+	// Used to detect when credentials have been rotated.
+	// +optional
+	SecretResourceVersion string `json:"secretResourceVersion,omitempty"`
 }
 
 // +genclient
@@ -195,4 +199,11 @@ func (p *Provider) UseVddkAioOptimization() bool {
 		return false
 	}
 	return parseBool
+}
+
+// This provider uses VIB clone method (default unless explicitly set to SSH).
+func (p *Provider) UseVIBMethod() bool {
+	esxiCloneMethod, methodSet := p.Spec.Settings[ESXiCloneMethod]
+	// VIB is the default: use it if not set, or if explicitly set to something other than "ssh"
+	return !methodSet || esxiCloneMethod != ESXiCloneMethodSSH
 }

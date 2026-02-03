@@ -11,7 +11,7 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 	"go.uber.org/mock/gomock"
 
-	vmware_mocks "github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware/mocks"
+	vmware_mocks "github.com/kubev2v/forklift/pkg/lib/vsphere_offload/vmware/mocks"
 )
 
 var _ = Describe("uploadScript", func() {

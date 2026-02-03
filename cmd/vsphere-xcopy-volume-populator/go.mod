@@ -10,14 +10,13 @@ require (
 	github.com/dell/goscaleio v1.20.0
 	github.com/hashicorp/go-version v1.7.0
 	github.com/infinidat/infinibox-csi-driver v0.0.0-20251022203528-1f6913cf29cb
-	github.com/kubev2v/forklift v0.0.0-20251201013611-d4d1610e79df
+	github.com/kubev2v/forklift v0.0.0-20251216181914-60c25dd712d6
 	github.com/netapp/trident v0.0.0-20240628081112-cb68cb389d9d
 	github.com/onsi/ginkgo/v2 v2.25.1
 	github.com/onsi/gomega v1.38.2
 	github.com/stretchr/testify v1.10.0
-	github.com/vmware/govmomi v0.50.0
+	github.com/vmware/govmomi v0.52.0
 	go.uber.org/mock v0.5.2
-	golang.org/x/crypto v0.41.0
 	k8s.io/api v0.32.8
 	k8s.io/apimachinery v0.32.8
 	k8s.io/client-go v0.32.8
@@ -51,6 +50,7 @@ require (
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	golang.org/x/crypto v0.41.0 // indirect
 	golang.org/x/oauth2 v0.29.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250115164207-1a7da9e5054f // indirect

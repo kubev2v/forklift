@@ -229,6 +229,11 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		return err
 	}
 
+	// Validate VIB readiness for plans using xcopy with VIB-enabled providers
+	if err = r.validateVIBReadiness(plan); err != nil {
+		return err
+	}
+
 	return nil
 }
 

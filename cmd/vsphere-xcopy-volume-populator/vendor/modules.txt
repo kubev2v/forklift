@@ -179,7 +179,7 @@ github.com/kubernetes-csi/csi-proxy/client/apiversion
 github.com/kubernetes-csi/csi-proxy/client/groups/filesystem/v1
 github.com/kubernetes-csi/csi-proxy/client/groups/smb/v1
 github.com/kubernetes-csi/csi-proxy/client/groups/volume/v1
-# github.com/kubev2v/forklift v0.0.0-20251201013611-d4d1610e79df => ../../
+# github.com/kubev2v/forklift v0.0.0-20251216181914-60c25dd712d6 => ../../
 ## explicit; go 1.24.0
 github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1
 github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan
@@ -190,6 +190,9 @@ github.com/kubev2v/forklift/pkg/lib/error
 github.com/kubev2v/forklift/pkg/lib/itinerary
 github.com/kubev2v/forklift/pkg/lib/logging
 github.com/kubev2v/forklift/pkg/lib/util
+github.com/kubev2v/forklift/pkg/lib/vsphere_offload
+github.com/kubev2v/forklift/pkg/lib/vsphere_offload/vmware
+github.com/kubev2v/forklift/pkg/lib/vsphere_offload/vmware/mocks
 github.com/kubev2v/forklift/pkg/settings
 # github.com/mailru/easyjson v0.9.0
 ## explicit; go 1.20
@@ -355,7 +358,7 @@ github.com/vishvananda/netlink/nl
 # github.com/vishvananda/netns v0.0.4
 ## explicit; go 1.17
 github.com/vishvananda/netns
-# github.com/vmware/govmomi v0.50.0
+# github.com/vmware/govmomi v0.52.0
 ## explicit; go 1.23.0
 github.com/vmware/govmomi
 github.com/vmware/govmomi/cli/esx
@@ -395,6 +398,7 @@ github.com/vmware/govmomi/vim25/progress
 github.com/vmware/govmomi/vim25/soap
 github.com/vmware/govmomi/vim25/types
 github.com/vmware/govmomi/vim25/xml
+github.com/vmware/govmomi/vmdk
 # github.com/x448/float16 v0.8.4
 ## explicit; go 1.11
 github.com/x448/float16
