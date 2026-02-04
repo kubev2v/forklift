@@ -1,5 +1,4 @@
 # Ignore Git files
-.git
 .github/
 
 # Ignore all test-related files
