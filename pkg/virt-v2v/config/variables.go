@@ -164,7 +164,6 @@ func (s *AppConfig) getInspectorExtraArgs() []string {
 	var extraArgs []string
 	if envExtraArgs, found := os.LookupEnv(EnvInspectorExtraArgsName); found && envExtraArgs != "" {
 		if err := json.Unmarshal([]byte(envExtraArgs), &extraArgs); err != nil {
-			fmt.Printf("Failed to parse %s: %v\n", EnvInspectorExtraArgsName, err)
 			return nil
 		}
 	}
