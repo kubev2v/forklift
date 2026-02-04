@@ -24,6 +24,7 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/primera3par"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/pure"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vantara"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/version"
 
 	forklift "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/prometheus/client_golang/prometheus"
@@ -36,8 +37,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 )
-
-var version = "unknown"
 
 var (
 	crName                     string
@@ -74,6 +73,7 @@ var (
 
 func main() {
 	handleArgs()
+	klog.Info(version.Get())
 
 	var storageApi populator.StorageApi
 	product := forklift.StorageVendorProduct(storageVendor)
@@ -310,8 +310,7 @@ func handleArgs() {
 	flag.Parse()
 
 	if showVersion {
-		fmt.Println(os.Args[0], version)
-		fmt.Printf("VIB version: %s\n", populator.VibVersion)
+		klog.Info(version.Get())
 		os.Exit(0)
 	}
 
