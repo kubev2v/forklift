@@ -218,7 +218,7 @@ func (r *Migration) Load() (err error) {
 		if encoded, jsonErr := json.Marshal(strings.Fields(val)); jsonErr == nil {
 			r.VirtV2vExtraArgs = string(encoded)
 		} else {
-			return liberr.Wrap(err)
+			return liberr.Wrap(jsonErr)
 		}
 	}
 	r.VirtV2vInspectorExtraArgs = "[]"
