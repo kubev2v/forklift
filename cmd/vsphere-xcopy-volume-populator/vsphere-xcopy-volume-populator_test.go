@@ -10,6 +10,7 @@ import (
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
 	populator_mocks "github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator/mocks"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/version"
 	vmware_mocks "github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware/mocks"
 	"github.com/vmware/govmomi/cli/esx"
 	"github.com/vmware/govmomi/object"
@@ -108,7 +109,7 @@ var _ = Describe("Populator", func() {
 			targetPVC:  "pvc-12345",
 			setup: func() {
 				vmwareClient.EXPECT().GetEsxByVm(context.Background(), gomock.Any()).Return(dummyHost, nil)
-				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"software", "vib", "get", "-n", "vmkfstools-wrapper"}).Return([]esx.Values{{"Version": {populator.VibVersion}}}, nil)
+				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"software", "vib", "get", "-n", "vmkfstools-wrapper"}).Return([]esx.Values{{"Version": {version.VibVersion}}}, nil)
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "adapter", "list"}).Return([]esx.Values{{"HBAName": {"vmhbatest"}, "UID": {"iqn.test"}, "LinkState": {"link-up"}, "Driver": {"iscsi"}}}, nil)
 				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any()).Return(nil, nil)
 				storageClient.EXPECT().ResolvePVToLUN(populator.PersistentVolume{Name: "pvc-12345"}).Return(populator.LUN{}, fmt.Errorf("some error")).Times(1)
@@ -121,7 +122,7 @@ var _ = Describe("Populator", func() {
 			targetPVC:  "pvc-12345",
 			setup: func() {
 				vmwareClient.EXPECT().GetEsxByVm(context.Background(), gomock.Any()).Return(dummyHost, nil)
-				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"software", "vib", "get", "-n", "vmkfstools-wrapper"}).Return([]esx.Values{{"Version": {populator.VibVersion}}}, nil)
+				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"software", "vib", "get", "-n", "vmkfstools-wrapper"}).Return([]esx.Values{{"Version": {version.VibVersion}}}, nil)
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "adapter", "list"}).Return([]esx.Values{{"HBAName": {"vmhbatest"}, "UID": {"iqn.test"}, "LinkState": {"link-up"}, "Driver": {"iscsi"}}}, nil)
 				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any()).Return(nil, nil)
 				storageClient.EXPECT().ResolvePVToLUN(populator.PersistentVolume{Name: "pvc-12345"}).Return(populator.LUN{NAA: "616263"}, nil)
@@ -144,7 +145,7 @@ var _ = Describe("Populator", func() {
 			targetPVC:  "pvc-12345",
 			setup: func() {
 				vmwareClient.EXPECT().GetEsxByVm(context.Background(), gomock.Any()).Return(dummyHost, nil)
-				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"software", "vib", "get", "-n", "vmkfstools-wrapper"}).Return([]esx.Values{{"Version": {populator.VibVersion}}}, nil)
+				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"software", "vib", "get", "-n", "vmkfstools-wrapper"}).Return([]esx.Values{{"Version": {version.VibVersion}}}, nil)
 				vmwareClient.EXPECT().RunEsxCommand(context.Background(), gomock.Any(), []string{"storage", "core", "adapter", "list"}).Return([]esx.Values{{"HBAName": {"vmhbatest"}, "UID": {"iqn.test"}, "LinkState": {"link-up"}, "Driver": {"iscsi"}}}, nil)
 				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any()).Return(nil, nil)
 				storageClient.EXPECT().ResolvePVToLUN(gomock.Any()).Return(populator.LUN{NAA: "naa.616263"}, nil)
