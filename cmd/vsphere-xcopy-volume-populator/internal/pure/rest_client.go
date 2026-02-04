@@ -13,8 +13,24 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/version"
 	"k8s.io/klog/v2"
 )
+
+// userAgent is the User-Agent string sent with all HTTP requests
+var userAgent = "pure/forklift/" + version.Version
+
+// userAgentTransport wraps an http.RoundTripper and adds User-Agent header to all requests
+type userAgentTransport struct {
+	base http.RoundTripper
+}
+
+func (t *userAgentTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Clone the request to avoid modifying the original per RoundTripper contract
+	req = req.Clone(req.Context())
+	req.Header.Set("User-Agent", userAgent)
+	return t.base.RoundTrip(req)
+}
 
 // RestClient provides REST API access to Pure FlashArray
 type RestClient struct {
@@ -104,15 +120,23 @@ type HostConnectionRequest struct {
 // If apiToken is provided (non-empty), it will be used directly, skipping username/password authentication
 // If apiToken is empty, username and password will be used to obtain an API token
 func NewRestClient(hostname, username, password, apiToken string, skipSSLVerify bool) (*RestClient, error) {
+	// Create base transport with TLS config
+	baseTransport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: skipSSLVerify,
+		},
+	}
+
+	// Wrap with User-Agent transport
+	transport := &userAgentTransport{
+		base: baseTransport,
+	}
+
 	client := &RestClient{
 		hostname: hostname,
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: skipSSLVerify,
-				},
-			},
+			Timeout:   30 * time.Second,
+			Transport: transport,
 		},
 	}
 
