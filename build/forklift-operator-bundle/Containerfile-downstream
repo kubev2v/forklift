@@ -23,7 +23,7 @@ ARG OPERATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhel9-operator@sha256:c
 
 ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/mtv-candidate/mtv-ova-provider-server-rhel9@sha256:2ca5f6ba8496499719c0aa18abbfbb8adc8cc1236218f85d0282c443d3e8cb01"
 
-ARG OVA_PROXY_IMAGE="registry.redhat.io/mtv-candidate/mtv-ova-proxy-rhel9@sha256:8ddcc3910569cec67cc42c655e291bfac4cf28207216b86d175f7801b3563b2c"
+ARG OVA_PROXY_IMAGE="registry.redhat.io/mtv-candidate/mtv-ova-proxy-rhel9@sha256:eff94abcd8bc3b3f9aceb928f7932974e8c183e6dac26b9cdaf196db1179d873"
 
 ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhv-populator-rhel8@sha256:4d2219d9f37459a0b1584a833a202d721fc9002b799b27c49272bf81b7eff8db"
 
