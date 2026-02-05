@@ -1395,12 +1395,10 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				}
 
 				namespace := r.Plan.Spec.TargetNamespace
-				labels := map[string]string{
-					"migration": string(r.Migration.UID),
-					// we need uniqness and a value which is less than 64 chars, hence using vmRef.id + disk.key
+				// we need uniqueness and a value which is less than 64 chars, hence using vmRef.id + disk.key
+				labels := r.Labeler.VMLabelsWithExtra(vmRef, map[string]string{
 					"vmdkKey": fmt.Sprint(disk.Key),
-					"vmID":    vmRef.ID,
-				}
+				})
 				// Only add the NAA label if it's a valid Kubernetes label value
 				if errs := k8svalidation.IsValidLabelValue(naa); len(errs) == 0 {
 					labels[TemplateNAALabel] = naa

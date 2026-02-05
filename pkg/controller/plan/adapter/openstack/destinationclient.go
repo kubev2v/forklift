@@ -67,7 +67,7 @@ func (r *DestinationClient) getPopulatorCrList() (populatorCrList v1beta1.Openst
 		&populatorCrList,
 		&client.ListOptions{
 			Namespace:     r.Plan.Spec.TargetNamespace,
-			LabelSelector: labels.SelectorFromSet(map[string]string{"migration": string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID)}),
+			LabelSelector: labels.SelectorFromSet(map[string]string{"migration": r.ActiveMigrationUID()}),
 		})
 	return
 }
@@ -103,7 +103,7 @@ func (r *DestinationClient) findPVCByCR(cr *v1beta1.OpenstackVolumePopulator) (p
 		&client.ListOptions{
 			Namespace: r.Plan.Spec.TargetNamespace,
 			LabelSelector: labels.SelectorFromSet(map[string]string{
-				"migration": string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID),
+				"migration": r.ActiveMigrationUID(),
 				"imageID":   cr.Spec.ImageID,
 			}),
 		})

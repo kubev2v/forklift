@@ -10,12 +10,12 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/openstack"
 )
 
-func OpenstackVolumePopulator(image *openstack.Image, sourceUrl *url.URL, transferNetwork *core.ObjectReference, targetNamespace, secretName, vmId, migrationId string) *api.OpenstackVolumePopulator {
+func OpenstackVolumePopulator(image *openstack.Image, sourceUrl *url.URL, transferNetwork *core.ObjectReference, targetNamespace, secretName, planId, vmId, migrationId string) *api.OpenstackVolumePopulator {
 	return &api.OpenstackVolumePopulator{
 		ObjectMeta: meta.ObjectMeta{
 			Name:      image.Name,
 			Namespace: targetNamespace,
-			Labels:    map[string]string{"vmID": vmId, "migration": migrationId},
+			Labels:    map[string]string{"plan": planId, "vmID": vmId, "migration": migrationId},
 		},
 		Spec: api.OpenstackVolumePopulatorSpec{
 			IdentityURL:     sourceUrl.String(),

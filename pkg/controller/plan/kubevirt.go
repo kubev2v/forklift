@@ -127,6 +127,13 @@ const (
 	ResourceVDDKConfig = "vddk-config"
 )
 
+// Finalizers
+const (
+	// PopulatorPVCFinalizer is the finalizer added by the volume populator controller
+	// to protect PVCs during population. Must be removed when archiving.
+	PopulatorPVCFinalizer = "forklift.konveyor.io/populate-target-protection"
+)
+
 // User
 const (
 	// Qemu user
@@ -876,7 +883,7 @@ func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, e
 			return nil, fmt.Errorf("failed to parse the VM for only conversion mode, we need to UUID to prevent accidental overwrites, stopping migration")
 		}
 	} else {
-		labelSelector[kMigration] = string(r.Migration.UID)
+		labelSelector[kMigration] = r.ActiveMigrationUID()
 	}
 	err = r.Destination.Client.List(
 		context.TODO(),
@@ -1476,18 +1483,67 @@ func (r *KubeVirt) deleteCorrespondingPrimePVC(pvc *core.PersistentVolumeClaim, 
 	return nil
 }
 
+// DeletePrimePVCs deletes only the prime-* PVCs for a VM (not the disk PVCs).
+// Prime PVCs are temporary PVCs created by the volume populator controller and
+// should be cleaned up after migration completes, even for successful VMs.
+func (r *KubeVirt) DeletePrimePVCs(vm *plan.VMStatus) error {
+	pvcs, err := r.getPVCs(vm.Ref)
+	if err != nil {
+		return err
+	}
+	for _, pvc := range pvcs {
+		if err = r.deleteCorrespondingPrimePVC(pvc, vm); err != nil {
+			r.Log.Error(err, "Failed to delete prime PVC.", "pvc", pvc.Name, "vm", vm.String())
+		}
+	}
+	return nil
+}
+
 func (r *KubeVirt) deletePopulatedPVC(pvc *core.PersistentVolumeClaim, vm *plan.VMStatus) error {
 	err := r.DeleteObject(pvc, vm, "Deleted PVC.", "pvc")
 	switch {
 	case err != nil && !k8serr.IsNotFound(err):
 		return err
 	case err == nil:
+		// Remove all finalizers to allow the PVC to be deleted
 		pvcCopy := pvc.DeepCopy()
 		pvc.Finalizers = nil
 		patch := client.MergeFrom(pvcCopy)
 		if err = r.Destination.Client.Patch(context.TODO(), pvc, patch); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// removePopulatorFinalizerFromPVC removes the populator finalizer from a PVC.
+// This should be called when archiving a plan to allow users to delete preserved PVCs.
+func (r *KubeVirt) removePopulatorFinalizerFromPVC(pvc *core.PersistentVolumeClaim) error {
+	// Check if finalizer exists
+	hasFinalizer := false
+	for _, f := range pvc.Finalizers {
+		if f == PopulatorPVCFinalizer {
+			hasFinalizer = true
+			break
+		}
+	}
+	if !hasFinalizer {
+		return nil
+	}
+
+	// Remove the finalizer
+	pvcCopy := pvc.DeepCopy()
+	var newFinalizers []string
+	for _, f := range pvc.Finalizers {
+		if f != PopulatorPVCFinalizer {
+			newFinalizers = append(newFinalizers, f)
+		}
+	}
+	pvc.Finalizers = newFinalizers
+	patch := client.MergeFrom(pvcCopy)
+	if err := r.Destination.Client.Patch(context.TODO(), pvc, patch); err != nil {
+		r.Log.Error(err, "Failed to remove populator finalizer from PVC.", "pvc", pvc.Name)
+		return err
 	}
 	return nil
 }
@@ -1503,10 +1559,12 @@ func (r *KubeVirt) DeletePopulatorPods(vm *plan.VMStatus) (err error) {
 
 // Get populator pods that belong to a VM's migration.
 func (r *KubeVirt) getPopulatorPods() (pods []core.Pod, err error) {
-	migrationPods, err := r.GetPodsWithLabels(map[string]string{kMigration: string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID)})
+	migrationUID := r.ActiveMigrationUID()
+	migrationPods, err := r.GetPodsWithLabels(map[string]string{kMigration: migrationUID})
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
+
 	for _, pod := range migrationPods.Items {
 		if strings.HasPrefix(pod.Name, PopulatorPodPrefix) {
 			pods = append(pods, pod)
@@ -2861,6 +2919,21 @@ func (r *KubeVirt) planLabels() map[string]string {
 	}
 }
 
+// Labels for plan only (no migration or VM).
+func (r *KubeVirt) planOnlyLabels() map[string]string {
+	return map[string]string{
+		kPlan: string(r.Plan.GetUID()),
+	}
+}
+
+// Labels for a specific migration.
+func (r *KubeVirt) migrationOnlyLabels(migrationUID string) map[string]string {
+	return map[string]string{
+		kPlan:      string(r.Plan.GetUID()),
+		kMigration: migrationUID,
+	}
+}
+
 // Label for a PVC consumer pod.
 func (r *KubeVirt) consumerLabels(vmRef ref.Ref, filterOutMigrationLabel bool) (labels map[string]string) {
 	if filterOutMigrationLabel {
@@ -3098,17 +3171,6 @@ func vmOwnerReference(vm *cnv.VirtualMachine) (ref meta.OwnerReference) {
 		BlockOwnerDeletion: &blockOwnerDeletion,
 		Controller:         &isController,
 	}
-	return
-}
-
-func (r *KubeVirt) setPopulatorPodLabels(pod core.Pod, migrationId string) (err error) {
-	podCopy := pod.DeepCopy()
-	if pod.Labels == nil {
-		pod.Labels = make(map[string]string)
-	}
-	pod.Labels[kMigration] = migrationId
-	patch := client.MergeFrom(podCopy)
-	err = r.Destination.Client.Patch(context.TODO(), &pod, patch)
 	return
 }
 
@@ -3597,6 +3659,326 @@ func (r *KubeVirt) IsCopyOffload(pvcs []*core.PersistentVolumeClaim) bool {
 		}
 	}
 	return false
+}
+
+// DeleteAllPlanPods deletes all pods associated with this plan.
+func (r *KubeVirt) DeleteAllPlanPods() error {
+	selector := k8slabels.SelectorFromSet(r.planOnlyLabels())
+	list := &core.PodList{}
+	err := r.Destination.Client.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: selector,
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for i := range list.Items {
+		pod := &list.Items[i]
+		err = r.Destination.Client.Delete(context.TODO(), pod)
+		if err != nil && !k8serr.IsNotFound(err) {
+			r.Log.Error(err, "Failed to delete pod during plan cleanup.", "pod", pod.Name)
+		} else if err == nil {
+			r.Log.Info("Deleted pod during plan cleanup.", "pod", pod.Name)
+		}
+	}
+	return nil
+}
+
+// DeleteAllPlanSecrets deletes all secrets associated with this plan.
+func (r *KubeVirt) DeleteAllPlanSecrets() error {
+	selector := k8slabels.SelectorFromSet(r.planOnlyLabels())
+	list := &core.SecretList{}
+	err := r.Destination.Client.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: selector,
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for i := range list.Items {
+		secret := &list.Items[i]
+		// Only delete secrets that have the 'resource' label (migration temp secrets)
+		// VM-dependency secrets (OCP-to-OCP) don't have this label and should be preserved
+		if _, hasResourceLabel := secret.Labels[kResource]; !hasResourceLabel {
+			continue
+		}
+		err = r.Destination.Client.Delete(context.TODO(), secret)
+		if err != nil && !k8serr.IsNotFound(err) {
+			r.Log.Error(err, "Failed to delete secret during plan cleanup.", "secret", secret.Name)
+		} else if err == nil {
+			r.Log.Info("Deleted secret during plan cleanup.", "secret", secret.Name)
+		}
+	}
+	return nil
+}
+
+// DeleteAllPlanConfigMaps deletes all configmaps associated with this plan.
+func (r *KubeVirt) DeleteAllPlanConfigMaps() error {
+	selector := k8slabels.SelectorFromSet(r.planOnlyLabels())
+	list := &core.ConfigMapList{}
+	err := r.Destination.Client.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: selector,
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for i := range list.Items {
+		cm := &list.Items[i]
+		// Only delete configmaps that have the 'resource' label (migration temp configmaps)
+		// VM-dependency configmaps (OCP-to-OCP) don't have this label and should be preserved
+		if _, hasResourceLabel := cm.Labels[kResource]; !hasResourceLabel {
+			continue
+		}
+		err = r.Destination.Client.Delete(context.TODO(), cm)
+		if err != nil && !k8serr.IsNotFound(err) {
+			r.Log.Error(err, "Failed to delete configmap during plan cleanup.", "configmap", cm.Name)
+		} else if err == nil {
+			r.Log.Info("Deleted configmap during plan cleanup.", "configmap", cm.Name)
+		}
+	}
+	return nil
+}
+
+// DeleteAllPlanJobs deletes all jobs associated with this plan.
+func (r *KubeVirt) DeleteAllPlanJobs() error {
+	selector := k8slabels.SelectorFromSet(r.planOnlyLabels())
+	list := &batch.JobList{}
+	err := r.Destination.Client.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: selector,
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for i := range list.Items {
+		job := &list.Items[i]
+		background := meta.DeletePropagationBackground
+		opts := &client.DeleteOptions{PropagationPolicy: &background}
+		err = r.Destination.Client.Delete(context.TODO(), job, opts)
+		if err != nil && !k8serr.IsNotFound(err) {
+			r.Log.Error(err, "Failed to delete job during plan cleanup.", "job", job.Name)
+		} else if err == nil {
+			r.Log.Info("Deleted job during plan cleanup.", "job", job.Name)
+		}
+	}
+	return nil
+}
+
+// DeleteAllPlanPopulatorCRs deletes all populator CRs associated with this plan.
+// This includes OvirtVolumePopulator, OpenstackVolumePopulator, and VSphereXcopyVolumePopulator.
+func (r *KubeVirt) DeleteAllPlanPopulatorCRs() error {
+	selector := k8slabels.SelectorFromSet(r.planOnlyLabels())
+	opts := &client.ListOptions{
+		LabelSelector: selector,
+		Namespace:     r.Plan.Spec.TargetNamespace,
+	}
+
+	var listErrors []error
+
+	// Delete OvirtVolumePopulator CRs
+	ovirtList := &api.OvirtVolumePopulatorList{}
+	if err := r.Destination.Client.List(context.TODO(), ovirtList, opts); err != nil {
+		listErr := liberr.Wrap(err, "failed to list OvirtVolumePopulator CRs", "namespace", r.Plan.Spec.TargetNamespace)
+		r.Log.Error(listErr, "Failed to list OvirtVolumePopulator CRs during plan cleanup.")
+		listErrors = append(listErrors, listErr)
+	} else {
+		for i := range ovirtList.Items {
+			cr := &ovirtList.Items[i]
+			if err := r.Destination.Client.Delete(context.TODO(), cr); err != nil && !k8serr.IsNotFound(err) {
+				r.Log.Error(err, "Failed to delete OvirtVolumePopulator during plan cleanup.", "name", cr.Name)
+			} else if err == nil {
+				r.Log.Info("Deleted OvirtVolumePopulator during plan cleanup.", "name", cr.Name)
+			}
+		}
+	}
+
+	// Delete OpenstackVolumePopulator CRs
+	openstackList := &api.OpenstackVolumePopulatorList{}
+	if err := r.Destination.Client.List(context.TODO(), openstackList, opts); err != nil {
+		listErr := liberr.Wrap(err, "failed to list OpenstackVolumePopulator CRs", "namespace", r.Plan.Spec.TargetNamespace)
+		r.Log.Error(listErr, "Failed to list OpenstackVolumePopulator CRs during plan cleanup.")
+		listErrors = append(listErrors, listErr)
+	} else {
+		for i := range openstackList.Items {
+			cr := &openstackList.Items[i]
+			if err := r.Destination.Client.Delete(context.TODO(), cr); err != nil && !k8serr.IsNotFound(err) {
+				r.Log.Error(err, "Failed to delete OpenstackVolumePopulator during plan cleanup.", "name", cr.Name)
+			} else if err == nil {
+				r.Log.Info("Deleted OpenstackVolumePopulator during plan cleanup.", "name", cr.Name)
+			}
+		}
+	}
+
+	// Delete VSphereXcopyVolumePopulator CRs
+	vsphereList := &api.VSphereXcopyVolumePopulatorList{}
+	if err := r.Destination.Client.List(context.TODO(), vsphereList, opts); err != nil {
+		listErr := liberr.Wrap(err, "failed to list VSphereXcopyVolumePopulator CRs", "namespace", r.Plan.Spec.TargetNamespace)
+		r.Log.Error(listErr, "Failed to list VSphereXcopyVolumePopulator CRs during plan cleanup.")
+		listErrors = append(listErrors, listErr)
+	} else {
+		for i := range vsphereList.Items {
+			cr := &vsphereList.Items[i]
+			if err := r.Destination.Client.Delete(context.TODO(), cr); err != nil && !k8serr.IsNotFound(err) {
+				r.Log.Error(err, "Failed to delete VSphereXcopyVolumePopulator during plan cleanup.", "name", cr.Name)
+			} else if err == nil {
+				r.Log.Info("Deleted VSphereXcopyVolumePopulator during plan cleanup.", "name", cr.Name)
+			}
+		}
+	}
+
+	return errors.Join(listErrors...)
+}
+
+// RemoveAllPlanPVCFinalizers removes the populator finalizer from all PVCs
+// associated with this plan. This allows PVCs to be deleted by users after archive.
+func (r *KubeVirt) RemoveAllPlanPVCFinalizers() error {
+	selector := k8slabels.SelectorFromSet(r.planOnlyLabels())
+	list := &core.PersistentVolumeClaimList{}
+	err := r.Destination.Client.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: selector,
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for i := range list.Items {
+		pvc := &list.Items[i]
+		if err := r.removePopulatorFinalizerFromPVC(pvc); err != nil {
+			r.Log.Error(err, "Failed to remove finalizer from PVC during plan cleanup.", "pvc", pvc.Name)
+		}
+	}
+	return nil
+}
+
+// DeleteMigrationVMs deletes all VMs for a specific migration.
+func (r *KubeVirt) DeleteMigrationVMs(migrationUID string) error {
+	selector := k8slabels.SelectorFromSet(r.migrationOnlyLabels(migrationUID))
+	list := &cnv.VirtualMachineList{}
+	err := r.Destination.Client.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: selector,
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for i := range list.Items {
+		vm := &list.Items[i]
+		foreground := meta.DeletePropagationForeground
+		opts := &client.DeleteOptions{PropagationPolicy: &foreground}
+		err = r.Destination.Client.Delete(context.TODO(), vm, opts)
+		if err != nil && !k8serr.IsNotFound(err) {
+			r.Log.Error(err, "Failed to delete VM during migration cleanup.", "vm", vm.Name, "migration", migrationUID)
+		} else if err == nil {
+			r.Log.Info("Deleted VM during migration cleanup.", "vm", vm.Name, "migration", migrationUID)
+		}
+	}
+	return nil
+}
+
+// DeleteMigrationDataVolumes deletes all DataVolumes for a specific migration.
+func (r *KubeVirt) DeleteMigrationDataVolumes(migrationUID string) error {
+	selector := k8slabels.SelectorFromSet(r.migrationOnlyLabels(migrationUID))
+	list := &cdi.DataVolumeList{}
+	err := r.Destination.Client.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: selector,
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for i := range list.Items {
+		dv := &list.Items[i]
+		err = r.Destination.Client.Delete(context.TODO(), dv)
+		if err != nil && !k8serr.IsNotFound(err) {
+			r.Log.Error(err, "Failed to delete DataVolume during migration cleanup.", "datavolume", dv.Name, "migration", migrationUID)
+		} else if err == nil {
+			r.Log.Info("Deleted DataVolume during migration cleanup.", "datavolume", dv.Name, "migration", migrationUID)
+		}
+	}
+	return nil
+}
+
+// DeleteMigrationPVCs deletes all PVCs for a specific migration.
+func (r *KubeVirt) DeleteMigrationPVCs(migrationUID string) error {
+	selector := k8slabels.SelectorFromSet(r.migrationOnlyLabels(migrationUID))
+	list := &core.PersistentVolumeClaimList{}
+	err := r.Destination.Client.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: selector,
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for i := range list.Items {
+		pvc := &list.Items[i]
+		err = r.Destination.Client.Delete(context.TODO(), pvc)
+		if err != nil && !k8serr.IsNotFound(err) {
+			r.Log.Error(err, "Failed to delete PVC during migration cleanup.", "pvc", pvc.Name, "migration", migrationUID)
+		} else if err == nil {
+			r.Log.Info("Deleted PVC during migration cleanup.", "pvc", pvc.Name, "migration", migrationUID)
+		}
+	}
+	return nil
+}
+
+// DeleteMigrationPods deletes all pods for a specific migration.
+// Note: Uses only migration label since populator pods don't have the plan label.
+func (r *KubeVirt) DeleteMigrationPods(migrationUID string) error {
+	selector := k8slabels.SelectorFromSet(map[string]string{kMigration: migrationUID})
+	list := &core.PodList{}
+	err := r.Destination.Client.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: selector,
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	for i := range list.Items {
+		pod := &list.Items[i]
+		err = r.Destination.Client.Delete(context.TODO(), pod)
+		if err != nil && !k8serr.IsNotFound(err) {
+			r.Log.Error(err, "Failed to delete pod during migration cleanup.", "pod", pod.Name, "migration", migrationUID)
+		}
+	}
+	return nil
 }
 
 // determineRunStrategy determines the appropriate run strategy based on the target power state configuration

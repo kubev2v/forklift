@@ -2,6 +2,7 @@
 package plan
 
 import (
+	"context"
 	"encoding/json"
 
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
@@ -302,4 +303,172 @@ func createKubeVirtWithTransferNetwork(nad *k8snet.NetworkAttachmentDefinition, 
 	kubevirt := createKubeVirt(nad)
 	kubevirt.Plan = createPlanKubevirt(transferNetwork)
 	return kubevirt
+}
+
+var _ = ginkgo.Describe("Plan cleanup functions", func() {
+	ginkgo.Describe("planOnlyLabels", func() {
+		ginkgo.It("should return only plan label", func() {
+			kubevirt := createKubeVirtWithPlanUID("test-plan-uid")
+			labels := kubevirt.planOnlyLabels()
+			Expect(labels).To(HaveLen(1))
+			Expect(labels).To(HaveKeyWithValue("plan", "test-plan-uid"))
+		})
+	})
+
+	ginkgo.Describe("migrationOnlyLabels", func() {
+		ginkgo.It("should return plan and migration labels", func() {
+			kubevirt := createKubeVirtWithPlanUID("test-plan-uid")
+			labels := kubevirt.migrationOnlyLabels("test-migration-uid")
+			Expect(labels).To(HaveLen(2))
+			Expect(labels).To(HaveKeyWithValue("plan", "test-plan-uid"))
+			Expect(labels).To(HaveKeyWithValue("migration", "test-migration-uid"))
+		})
+	})
+
+	ginkgo.Describe("DeleteAllPlanPods", func() {
+		ginkgo.It("should delete pods with plan label", func() {
+			pod1 := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod1",
+					Namespace: "test-ns",
+					Labels: map[string]string{
+						"plan": "test-plan-uid",
+					},
+				},
+			}
+			pod2 := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod2",
+					Namespace: "test-ns",
+					Labels: map[string]string{
+						"plan": "other-plan-uid",
+					},
+				},
+			}
+
+			kubevirt := createKubeVirtWithPlanUIDAndObjects("test-plan-uid", "test-ns", pod1, pod2)
+			err := kubevirt.DeleteAllPlanPods()
+			Expect(err).ToNot(HaveOccurred())
+
+			// Verify pod1 was deleted, pod2 remains
+			podList := &v1.PodList{}
+			kubevirt.Destination.Client.List(context.TODO(), podList)
+			Expect(podList.Items).To(HaveLen(1))
+			Expect(podList.Items[0].Name).To(Equal("pod2"))
+		})
+	})
+
+	ginkgo.Describe("DeleteAllPlanSecrets", func() {
+		ginkgo.It("should delete secrets with plan and resource labels", func() {
+			// secret1 has plan label AND resource label - should be deleted
+			secret1 := &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "secret1",
+					Namespace: "test-ns",
+					Labels: map[string]string{
+						"plan":     "test-plan-uid",
+						"resource": "vm-config",
+					},
+				},
+			}
+			// secret2 has different plan - should be preserved
+			secret2 := &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "secret2",
+					Namespace: "test-ns",
+					Labels: map[string]string{
+						"plan":     "other-plan-uid",
+						"resource": "vm-config",
+					},
+				},
+			}
+			// secret3 has plan label but NO resource label (VM-dependency secret) - should be preserved
+			secret3 := &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "secret3",
+					Namespace: "test-ns",
+					Labels: map[string]string{
+						"plan": "test-plan-uid",
+					},
+				},
+			}
+
+			kubevirt := createKubeVirtWithPlanUIDAndObjects("test-plan-uid", "test-ns", secret1, secret2, secret3)
+			err := kubevirt.DeleteAllPlanSecrets()
+			Expect(err).ToNot(HaveOccurred())
+
+			// Verify secret1 was deleted, secret2 and secret3 remain
+			secretList := &v1.SecretList{}
+			kubevirt.Destination.Client.List(context.TODO(), secretList)
+			Expect(secretList.Items).To(HaveLen(2))
+			names := []string{secretList.Items[0].Name, secretList.Items[1].Name}
+			Expect(names).To(ContainElements("secret2", "secret3"))
+		})
+	})
+
+	ginkgo.Describe("DeleteMigrationPVCs", func() {
+		ginkgo.It("should delete PVCs with specific migration label", func() {
+			pvc1 := &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pvc1",
+					Namespace: "test-ns",
+					Labels: map[string]string{
+						"plan":      "test-plan-uid",
+						"migration": "migration-uid-1",
+					},
+				},
+			}
+			pvc2 := &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pvc2",
+					Namespace: "test-ns",
+					Labels: map[string]string{
+						"plan":      "test-plan-uid",
+						"migration": "migration-uid-2",
+					},
+				},
+			}
+
+			kubevirt := createKubeVirtWithPlanUIDAndObjects("test-plan-uid", "test-ns", pvc1, pvc2)
+			err := kubevirt.DeleteMigrationPVCs("migration-uid-1")
+			Expect(err).ToNot(HaveOccurred())
+
+			// Verify pvc1 was deleted (migration-uid-1), pvc2 remains (migration-uid-2)
+			pvcList := &v1.PersistentVolumeClaimList{}
+			kubevirt.Destination.Client.List(context.TODO(), pvcList)
+			Expect(pvcList.Items).To(HaveLen(1))
+			Expect(pvcList.Items[0].Name).To(Equal("pvc2"))
+		})
+	})
+})
+
+func createKubeVirtWithPlanUID(planUID string) *KubeVirt {
+	kubevirt := createKubeVirt()
+	kubevirt.Plan.UID = "test-plan-uid"
+	return kubevirt
+}
+
+func createKubeVirtWithPlanUIDAndObjects(planUID string, namespace string, objs ...runtime.Object) *KubeVirt {
+	scheme := runtime.NewScheme()
+	_ = v1.AddToScheme(scheme)
+	_ = k8snet.AddToScheme(scheme)
+	v1beta1.SchemeBuilder.AddToScheme(scheme)
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithRuntimeObjects(objs...).
+		Build()
+	plan := createPlanKubevirt(nil)
+	plan.UID = "test-plan-uid"
+	plan.Spec.TargetNamespace = namespace
+	return &KubeVirt{
+		Context: &plancontext.Context{
+			Destination: plancontext.Destination{
+				Client: client,
+			},
+			Log:       KubeVirtLog,
+			Migration: createMigration(),
+			Plan:      plan,
+			Client:    client,
+		},
+	}
 }

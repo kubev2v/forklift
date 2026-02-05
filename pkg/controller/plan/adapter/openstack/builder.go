@@ -1051,11 +1051,9 @@ func (r *Builder) createVolumePopulatorCR(image model.Image, secretName, vmId st
 		ObjectMeta: meta.ObjectMeta{
 			GenerateName: fmt.Sprintf("%s-", image.Name),
 			Namespace:    r.Plan.Spec.TargetNamespace,
-			Labels: map[string]string{
-				"vmID":      vmId,
-				"migration": getMigrationID(r.Context),
-				"imageID":   image.ID,
-			},
+			Labels: r.Labeler.VMLabelsWithExtra(ref.Ref{ID: vmId}, map[string]string{
+				"imageID": image.ID,
+			}),
 		},
 		Spec: api.OpenstackVolumePopulatorSpec{
 			IdentityURL:     r.Source.Provider.Spec.URL,
@@ -1224,11 +1222,9 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image,
 			GenerateName: fmt.Sprintf("%s-", image.ID),
 			Namespace:    r.Plan.Spec.TargetNamespace,
 			Annotations:  annotations,
-			Labels: map[string]string{
-				"migration": getMigrationID(r.Context),
-				"imageID":   image.ID,
-				"vmID":      vmID,
-			},
+			Labels: r.Labeler.VMLabelsWithExtra(ref.Ref{ID: vmID}, map[string]string{
+				"imageID": image.ID,
+			}),
 		},
 		Spec: core.PersistentVolumeClaimSpec{
 			AccessModes: accessModes,
@@ -1316,7 +1312,7 @@ func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.Persi
 			images = append(images, image)
 		}
 	}
-	migrationID := string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID)
+	migrationID := r.ActiveMigrationUID()
 	for _, image := range images {
 		populatorCr, err := r.getVolumePopulatorCR(image.ID)
 		if err != nil {

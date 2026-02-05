@@ -594,28 +594,31 @@ func createBuilder(objs ...runtime.Object) *Builder {
 		WithScheme(scheme).
 		WithRuntimeObjects(objs...).
 		Build()
-	return &Builder{
-		Context: &plancontext.Context{
-			Destination: plancontext.Destination{
-				Client: client,
-			},
-			Source: plancontext.Source{
-				Provider: &v1beta1.Provider{
-					ObjectMeta: meta.ObjectMeta{Name: "test-vsphere-provider", Namespace: "test"},
-					Spec: v1beta1.ProviderSpec{
-						Type: (*v1beta1.ProviderType)(ptr.To("vsphere")),
-						URL:  "test-vsphere-provider",
-					},
-				},
-				Inventory: nil,
-				Secret: &core.Secret{
-					ObjectMeta: meta.ObjectMeta{Name: "test-provider-secret", Namespace: "test"},
-				},
-			},
-			Plan:      createPlan(),
-			Migration: &v1beta1.Migration{ObjectMeta: meta.ObjectMeta{UID: k8stypes.UID("123")}},
-			Log:       builderLog,
-			Client:    client,
+	ctx := &plancontext.Context{
+		Destination: plancontext.Destination{
+			Client: client,
 		},
+		Source: plancontext.Source{
+			Provider: &v1beta1.Provider{
+				ObjectMeta: meta.ObjectMeta{Name: "test-vsphere-provider", Namespace: "test"},
+				Spec: v1beta1.ProviderSpec{
+					Type: (*v1beta1.ProviderType)(ptr.To("vsphere")),
+					URL:  "test-vsphere-provider",
+				},
+			},
+			Inventory: nil,
+			Secret: &core.Secret{
+				ObjectMeta: meta.ObjectMeta{Name: "test-provider-secret", Namespace: "test"},
+			},
+		},
+		Plan:      createPlan(),
+		Migration: &v1beta1.Migration{ObjectMeta: meta.ObjectMeta{UID: k8stypes.UID("123")}},
+		Log:       builderLog,
+		Client:    client,
+	}
+	// Initialize the Labeler (normally done in Context.build())
+	ctx.Labeler = plancontext.Labeler{Context: ctx}
+	return &Builder{
+		Context: ctx,
 	}
 }

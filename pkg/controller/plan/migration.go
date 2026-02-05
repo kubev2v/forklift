@@ -26,10 +26,8 @@ import (
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/settings"
-	batchv1 "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
@@ -268,6 +266,14 @@ func (r *Migration) begin() (err error) {
 
 // Archive the plan.
 // Best effort to remove any retained migration resources.
+// Uses a three-tier cleanup strategy:
+//   - Tier 1: Delete all temporary resources (always safe to delete):
+//     Pods (by migration label), secrets, configmaps, jobs, populator CRs (by plan label),
+//     and remove PVC finalizers.
+//   - Tier 2: Clean up previous migrations (all but the last one):
+//     Delete ALL VMs, DataVolumes, and PVCs unconditionally - they're obsolete.
+//   - Tier 3: Handle the active (last) migration with VM status logic:
+//     Preserve successful VMs, delete failed VMs only if DeleteVmOnFailMigration is enabled.
 func (r *Migration) Archive() {
 	defer func() {
 		if r.provider != nil {
@@ -279,31 +285,95 @@ func (r *Migration) Archive() {
 		return
 	}
 
+	// Provider-specific cleanup: OVA/HyperV provider storage (PVCs + cluster-scoped PVs)
+	// This is NOT covered by Tier 1 because PVs are cluster-scoped resources
 	switch r.Plan.Provider.Source.Type() {
 	case api.Ova, api.HyperV:
 		if err := r.deleteProviderStorage(); err != nil {
 			r.Log.Error(err, "Failed to clean up the PVC and PV for the provider storage")
 		}
-	case api.VSphere:
-		if err := r.deleteValidateVddkJob(); err != nil {
-			r.Log.Error(err, "Failed to clean up validate-VDDK job(s)")
+	}
+
+	// Tier 1: Delete all temporary resources (always safe)
+	// Delete populator CRs FIRST to stop the populator controller from recreating pods
+	if err := r.kubevirt.DeleteAllPlanPopulatorCRs(); err != nil {
+		r.Log.Error(err, "Failed to delete plan populator CRs during archive")
+	}
+
+	// Now delete pods - populator controller won't recreate them since CRs are gone
+	for _, historyItem := range r.Plan.Status.Migration.History {
+		migrationUID := string(historyItem.Migration.UID)
+		if err := r.kubevirt.DeleteMigrationPods(migrationUID); err != nil {
+			r.Log.Error(err, "Failed to delete pods for migration", "migration", migrationUID)
 		}
-		if err := r.deleteConfigMap(); err != nil {
-			r.Log.Error(err, "Failed to clean up vddk configmap")
+	}
+	if err := r.kubevirt.DeleteAllPlanSecrets(); err != nil {
+		r.Log.Error(err, "Failed to delete plan secrets during archive")
+	}
+	if err := r.kubevirt.DeleteAllPlanConfigMaps(); err != nil {
+		r.Log.Error(err, "Failed to delete plan configmaps during archive")
+	}
+	if err := r.kubevirt.DeleteAllPlanJobs(); err != nil {
+		r.Log.Error(err, "Failed to delete plan jobs during archive")
+	}
+	if err := r.kubevirt.RemoveAllPlanPVCFinalizers(); err != nil {
+		r.Log.Error(err, "Failed to remove finalizers from plan PVCs during archive")
+	}
+
+	// Tier 2: Clean up previous migrations (all but the last one)
+	// Delete ALL resources unconditionally - they're obsolete
+	history := r.Plan.Status.Migration.History
+	for i := 0; i < len(history)-1; i++ {
+		migrationUID := string(history[i].Migration.UID)
+		r.Log.Info("Cleaning up previous migration resources.", "migration", migrationUID)
+		if err := r.kubevirt.DeleteMigrationVMs(migrationUID); err != nil {
+			r.Log.Error(err, "Failed to delete VMs for previous migration", "migration", migrationUID)
+		}
+		if err := r.kubevirt.DeleteMigrationDataVolumes(migrationUID); err != nil {
+			r.Log.Error(err, "Failed to delete DataVolumes for previous migration", "migration", migrationUID)
+		}
+		if err := r.kubevirt.DeleteMigrationPVCs(migrationUID); err != nil {
+			r.Log.Error(err, "Failed to delete PVCs for previous migration", "migration", migrationUID)
 		}
 	}
 
+	// Tier 3: Handle the active (last) migration with VM status logic
 	for _, vm := range r.Plan.Status.Migration.VMs {
-		dontFailOnError := func(err error) bool {
-			if err != nil {
-				r.Log.Error(liberr.Wrap(err),
-					"Couldn't clean up VM while archiving plan.",
-					"vm",
-					vm.String())
+		// For failed VMs with DeleteVmOnFailMigration enabled, delete the resources
+		if !vm.HasCondition(api.ConditionSucceeded) && (r.Plan.Spec.DeleteVmOnFailMigration || vm.DeleteVmOnFailMigration) {
+			dontFailOnError := func(err error) bool {
+				if err != nil {
+					r.Log.Error(liberr.Wrap(err),
+						"Couldn't clean up failed VM while archiving plan.",
+						"vm", vm.String())
+				}
+				return false
 			}
-			return false
+			if err := r.kubevirt.DeleteVM(vm); dontFailOnError(err) {
+				continue
+			}
+			if err := r.deletePopulatorPVCs(vm); dontFailOnError(err) {
+				continue
+			}
+			if err := r.kubevirt.DeleteDataVolumes(vm); dontFailOnError(err) {
+				continue
+			}
 		}
-		_ = r.cleanup(vm, dontFailOnError)
+
+		// VM-specific cleanup
+		if r.Plan.Provider.Destination.IsHost() {
+			if err := r.destinationClient.DeletePopulatorDataSource(vm); err != nil {
+				r.Log.Error(err, "Failed to delete populator data source", "vm", vm.String())
+			}
+		}
+		// Delete prime PVCs (temporary populator PVCs) for all VMs - they're not needed after migration
+		if err := r.kubevirt.DeletePrimePVCs(vm); err != nil {
+			r.Log.Error(err, "Failed to delete prime PVCs", "vm", vm.String())
+		}
+		if err := r.deleteImporterPods(vm); err != nil {
+			r.Log.Error(err, "Failed to delete importer pods", "vm", vm.String())
+		}
+		r.removeLastWarmSnapshot(vm)
 		r.migrator.Complete(vm)
 	}
 }
@@ -332,9 +402,6 @@ func (r *Migration) SetPopulatorDataSourceLabels() {
 		if err != nil {
 			r.Log.Error(err, "Couldn't set the labels.", "vm", vm.String())
 		}
-		migrationID := string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID)
-		// populator pods
-		r.setPopulatorPodsWithLabels(vm, migrationID)
 	}
 }
 
@@ -564,61 +631,6 @@ func (r *Migration) deleteProviderPVCs(getPVCs func(client.Client, string, strin
 		}
 	}
 	return nil
-}
-
-func (r *Migration) deleteConfigMap() (err error) {
-	selector := labels.SelectorFromSet(map[string]string{
-		kPlan: string(r.Plan.UID),
-		kUse:  VddkConf,
-	})
-	list := &core.ConfigMapList{}
-	err = r.Destination.Client.List(
-		context.TODO(),
-		list,
-		&client.ListOptions{
-			LabelSelector: selector,
-			Namespace:     r.Plan.Spec.TargetNamespace,
-		},
-	)
-	if err != nil {
-		return
-	}
-	for _, configmap := range list.Items {
-		background := meta.DeletePropagationBackground
-		opts := &client.DeleteOptions{PropagationPolicy: &background}
-		err = r.Destination.Client.Delete(context.TODO(), &configmap, opts)
-		if err != nil {
-			r.Log.Error(err, "Failed to delete vddk-config", "configmap", configmap)
-		} else {
-			r.Log.Info("ConfigMap vddk-config deleted", "configmap", configmap.Name)
-		}
-	}
-	return
-}
-
-func (r *Migration) deleteValidateVddkJob() (err error) {
-	selector := labels.SelectorFromSet(map[string]string{"plan": string(r.Plan.UID)})
-	jobs := &batchv1.JobList{}
-	err = r.Destination.Client.List(
-		context.TODO(),
-		jobs,
-		&client.ListOptions{
-			LabelSelector: selector,
-			Namespace:     r.Plan.Spec.TargetNamespace,
-		},
-	)
-	if err != nil {
-		return
-	}
-	for _, job := range jobs.Items {
-		background := meta.DeletePropagationBackground
-		opts := &client.DeleteOptions{PropagationPolicy: &background}
-		err = r.Destination.Client.Delete(context.TODO(), &job, opts)
-		if err != nil {
-			r.Log.Error(err, "Failed to delete validate-vddk job", "job", job)
-		}
-	}
-	return
 }
 
 // Best effort attempt to resolve canceled refs.
@@ -1942,26 +1954,6 @@ func (r *Migration) isPopulatorPodFailed(givenPvcId string) bool {
 		break
 	}
 	return false
-}
-
-func (r *Migration) setPopulatorPodsWithLabels(vm *plan.VMStatus, migrationID string) {
-	podList, err := r.kubevirt.GetPodsWithLabels(map[string]string{})
-	if err != nil {
-		return
-	}
-	for _, pod := range podList.Items {
-		if strings.HasPrefix(pod.Name, PopulatorPodPrefix) {
-			// it's populator pod
-			if _, ok := pod.Labels["migration"]; !ok {
-				// un-labeled pod, we need to set it
-				err = r.kubevirt.setPopulatorPodLabels(pod, migrationID)
-				if err != nil {
-					r.Log.Error(err, "couldn't update the Populator pod labels.", "vm", vm.String(), "migration", migrationID, "pod", pod.Name)
-					continue
-				}
-			}
-		}
-	}
 }
 
 // Retrieve the termination message from a pod's first container.
