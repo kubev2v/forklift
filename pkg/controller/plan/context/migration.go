@@ -100,6 +100,17 @@ func (r *Context) build() (err error) {
 	return
 }
 
+// ActiveMigrationUID returns the UID of the active migration.
+// During execution the Migration is set on the context; during archive
+// it is intentionally empty so we fall back to the plan's history.
+func (r *Context) ActiveMigrationUID() string {
+	if r.Migration != nil && r.Migration.UID != "" {
+		return string(r.Migration.UID)
+	}
+	snapshot := r.Plan.Status.Migration.ActiveSnapshot()
+	return string(snapshot.Migration.UID)
+}
+
 // Set the migration.
 // This will update the logger context.
 func (r *Context) SetMigration(migration *api.Migration) {
