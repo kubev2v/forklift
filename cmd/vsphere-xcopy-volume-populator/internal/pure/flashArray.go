@@ -20,6 +20,20 @@ import (
 
 const FlashProviderID = "624a9370"
 
+// Volume tagging constants for Forklift migrations
+const (
+	TagNamespace         = "openshift-forklift"
+	TagKeyCopyMethod     = "copyMethod"
+	TagKeySourceProvider = "sourceProvider"
+	TagKeyTargetProvider = "targetProvider"
+	TagKeyMigrationType  = "migrationType"
+	TagKeyMigrationUID   = "migrationUID" // Groups volumes from the same migration together (globally unique)
+	TagKeySourceVMID     = "sourceVmId"   // vSphere MoRef (unique within migration)
+
+	SourceProvider = "vsphere"
+	TargetProvider = "kubevirt"
+)
+
 // Ensure FlashArrayClonner implements required interfaces
 var _ populator.RDMCapable = &FlashArrayClonner{}
 var _ populator.VVolCapable = &FlashArrayClonner{}
@@ -126,6 +140,37 @@ func (f *FlashArrayClonner) Map(
 	return populator.LUN{}, fmt.Errorf("connection failed for all hosts in context")
 }
 
+func createForkliftTag(key, value string) VolumeTag {
+	return VolumeTag{
+		Key:       key,
+		Value:     value,
+		Namespace: TagNamespace,
+		Copyable:  false,
+	}
+}
+
+// This implements the VolumeTaggingSupport interface
+func (f *FlashArrayClonner) TagVolume(volumeName string, volumeHandle string, migrationType string, copyMethod string, migrationUID string, vmID string) error {
+	if f.restClient == nil {
+		return fmt.Errorf("REST client not initialized")
+	}
+
+	// Build tags array for batch endpoint
+	tags := []VolumeTag{
+		createForkliftTag(TagKeyCopyMethod, copyMethod),
+		createForkliftTag(TagKeySourceProvider, SourceProvider),
+		createForkliftTag(TagKeyTargetProvider, TargetProvider),
+		createForkliftTag(TagKeyMigrationType, migrationType),
+		createForkliftTag(TagKeyMigrationUID, migrationUID),
+		createForkliftTag(TagKeySourceVMID, vmID),
+	}
+
+	klog.Infof("Tagging FlashArray volume %s (ID: %s) with migration metadata: source=%s, target=%s, type=%s, copyMethod=%s, migrationUID=%s, sourceVmId=%s",
+		volumeName, volumeHandle, SourceProvider, TargetProvider, migrationType, copyMethod, migrationUID, vmID)
+
+	return f.restClient.SetVolumeTagsBatch(volumeHandle, volumeName, tags)
+}
+
 // UnMap is responsible to unmapping an initiator group from a populator.LUN
 func (f *FlashArrayClonner) UnMap(initatorGroup string, targetLUN populator.LUN, context populator.MappingContext) error {
 	hosts, ok := context["hosts"]
@@ -169,7 +214,12 @@ func (f *FlashArrayClonner) ResolvePVToLUN(pv populator.PersistentVolume) (popul
 	}
 
 	klog.Infof("volume %+v\n", v)
-	l := populator.LUN{Name: v.Name, SerialNumber: v.Serial, NAA: fmt.Sprintf("naa.%s%s", FlashProviderID, strings.ToLower(v.Serial))}
+	l := populator.LUN{
+		Name:         v.Name,
+		SerialNumber: v.Serial,
+		NAA:          fmt.Sprintf("naa.%s%s", FlashProviderID, strings.ToLower(v.Serial)),
+		VolumeHandle: pvVolumeHandle,
+	}
 
 	return l, nil
 }

@@ -14,6 +14,11 @@ type StorageApi interface {
 	VMDKCapable
 }
 
+// VolumeTaggingSupport is an optional interface for storage vendors that support volume tagging
+type VolumeTaggingSupport interface {
+	TagVolume(volumeName string, volumeHandle string, migrationType string, copyMethod string, migrationUID string, vmID string) error
+}
+
 // StorageResolver resolves a PersistentVolume to LUN details
 // This interface is embedded by VVolCapable, RDMCapable, and VMDKCapable
 type StorageResolver interface {
