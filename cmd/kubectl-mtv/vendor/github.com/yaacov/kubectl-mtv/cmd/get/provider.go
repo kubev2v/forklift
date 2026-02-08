@@ -2,7 +2,6 @@ package get
 
 import (
 	"context"
-	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -15,24 +14,42 @@ import (
 )
 
 // NewProviderCmd creates the get provider command
-func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() GlobalConfigGetter) *cobra.Command {
+func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	outputFormatFlag := flags.NewOutputFormatTypeFlag()
-	var inventoryURL string
+	var watch bool
 
 	cmd := &cobra.Command{
-		Use:               "provider [NAME]",
-		Short:             "Get providers",
-		Long:              `Get providers`,
+		Use:   "provider [NAME]",
+		Short: "Get providers",
+		Long: `Get MTV providers from the cluster.
+
+Providers represent source (oVirt, vSphere, OpenStack, OVA, EC2) or target (OpenShift)
+environments for VM migrations. Lists all providers or retrieves details for a specific one.`,
+		Example: `  # List all providers
+  kubectl-mtv get provider
+
+  # List providers across all namespaces
+  kubectl-mtv get provider -A
+
+  # Get provider details in YAML format
+  kubectl-mtv get provider vsphere-prod -o yaml
+
+  # Watch provider status changes
+  kubectl-mtv get provider -w`,
 		Args:              cobra.MaximumNArgs(1),
 		SilenceUsage:      true,
 		ValidArgsFunction: completion.ProviderNameCompletion(kubeConfigFlags),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Create context with 30s timeout
-			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-			defer cancel()
+			ctx := cmd.Context()
+			if !watch {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+				defer cancel()
+			}
 
-			config := getGlobalConfig()
-			namespace := client.ResolveNamespaceWithAllFlag(config.GetKubeConfigFlags(), config.GetAllNamespaces())
+			kubeConfigFlags := globalConfig.GetKubeConfigFlags()
+			allNamespaces := globalConfig.GetAllNamespaces()
+			namespace := client.ResolveNamespaceWithAllFlag(kubeConfigFlags, allNamespaces)
 
 			// Get optional provider name from arguments
 			var providerName string
@@ -40,25 +57,24 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalCon
 				providerName = args[0]
 			}
 
-			// If inventoryURL is empty, try to discover it
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(ctx, config.GetKubeConfigFlags(), namespace)
-			}
+			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
+			inventoryURL := globalConfig.GetInventoryURL()
+			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
 			// Log the operation being performed
 			if providerName != "" {
-				logNamespaceOperation("Getting provider", namespace, config.GetAllNamespaces())
+				logNamespaceOperation("Getting provider", namespace, allNamespaces)
 			} else {
-				logNamespaceOperation("Getting providers", namespace, config.GetAllNamespaces())
+				logNamespaceOperation("Getting providers", namespace, allNamespaces)
 			}
 			logOutputFormat(outputFormatFlag.GetValue())
 
-			return provider.List(ctx, config.GetKubeConfigFlags(), namespace, inventoryURL, outputFormatFlag.GetValue(), providerName, config.GetUseUTC())
+			return provider.List(ctx, kubeConfigFlags, namespace, inventoryURL, watch, outputFormatFlag.GetValue(), providerName, inventoryInsecureSkipTLS)
 		},
 	}
 
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", "Output format (table, json, yaml)")
-	cmd.Flags().StringVarP(&inventoryURL, "inventory-url", "i", os.Getenv("MTV_INVENTORY_URL"), "Base URL for the inventory service")
+	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
 
 	// Add completion for output format flag
 	if err := cmd.RegisterFlagCompletionFunc("output", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

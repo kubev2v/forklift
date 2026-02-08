@@ -14,7 +14,7 @@ import (
 )
 
 // Describe describes a migration host
-func Describe(ctx context.Context, configFlags *genericclioptions.ConfigFlags, name, namespace string, useUTC bool) error {
+func Describe(ctx context.Context, configFlags *genericclioptions.ConfigFlags, name, namespace string, useUTC bool, insecureSkipTLS bool) error {
 	c, err := client.GetDynamicClient(configFlags)
 	if err != nil {
 		return fmt.Errorf("failed to get client: %v", err)
@@ -75,7 +75,7 @@ func Describe(ctx context.Context, configFlags *genericclioptions.ConfigFlags, n
 	}
 
 	// Network Adapters Information from Provider Inventory
-	if err := displayNetworkAdapters(ctx, configFlags, host, namespace); err != nil {
+	if err := displayNetworkAdapters(ctx, configFlags, host, namespace, insecureSkipTLS); err != nil {
 		// Log the error but don't fail the command - network adapter info is supplementary
 		fmt.Printf("\n%s: %v\n", output.Bold("Network Adapters Info"), output.Red("Failed to fetch"))
 	}
@@ -138,7 +138,7 @@ func Describe(ctx context.Context, configFlags *genericclioptions.ConfigFlags, n
 }
 
 // displayNetworkAdapters fetches and displays network adapter information from provider inventory
-func displayNetworkAdapters(ctx context.Context, configFlags *genericclioptions.ConfigFlags, host *unstructured.Unstructured, namespace string) error {
+func displayNetworkAdapters(ctx context.Context, configFlags *genericclioptions.ConfigFlags, host *unstructured.Unstructured, namespace string, insecureSkipTLS bool) error {
 	// Extract host ID and provider name from host resource
 	hostID, found, _ := unstructured.NestedString(host.Object, "spec", "id")
 	if !found || hostID == "" {
@@ -163,7 +163,7 @@ func displayNetworkAdapters(ctx context.Context, configFlags *genericclioptions.
 
 	// Create provider client with inventory URL discovery
 	inventoryURL := client.DiscoverInventoryURL(ctx, configFlags, namespace)
-	providerClient := inventory.NewProviderClient(configFlags, provider, inventoryURL)
+	providerClient := inventory.NewProviderClientWithInsecure(configFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to verify host support
 	providerType, err := providerClient.GetProviderType()
@@ -177,7 +177,7 @@ func displayNetworkAdapters(ctx context.Context, configFlags *genericclioptions.
 	}
 
 	// Fetch specific host data from provider inventory
-	hostData, err := providerClient.GetHost(hostID, 4) // detail level 4 for full info
+	hostData, err := providerClient.GetHost(ctx, hostID, 4) // detail level 4 for full info
 	if err != nil {
 		return fmt.Errorf("failed to fetch host inventory data: %v", err)
 	}

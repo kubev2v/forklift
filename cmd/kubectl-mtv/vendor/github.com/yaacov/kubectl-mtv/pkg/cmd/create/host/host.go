@@ -23,19 +23,20 @@ import (
 // This includes provider information, authentication details, network configuration,
 // and TLS settings for host connections.
 type CreateHostOptions struct {
-	HostIDs             []string
-	Namespace           string
-	Provider            string
-	ConfigFlags         *genericclioptions.ConfigFlags
-	InventoryURL        string
-	Username            string
-	Password            string
-	ExistingSecret      string
-	IPAddress           string
-	NetworkAdapterName  string
-	HostInsecureSkipTLS bool
-	CACert              string
-	HostSpec            forkliftv1beta1.HostSpec
+	HostIDs                  []string
+	Namespace                string
+	Provider                 string
+	ConfigFlags              *genericclioptions.ConfigFlags
+	InventoryURL             string
+	InventoryInsecureSkipTLS bool
+	Username                 string
+	Password                 string
+	ExistingSecret           string
+	IPAddress                string
+	NetworkAdapterName       string
+	HostInsecureSkipTLS      bool
+	CACert                   string
+	HostSpec                 forkliftv1beta1.HostSpec
 }
 
 // Create creates new migration hosts for vSphere providers.
@@ -52,7 +53,7 @@ func Create(ctx context.Context, opts CreateHostOptions) error {
 
 	// Fetch available hosts from provider inventory to validate requested host names
 	// and extract network adapter information for IP resolution
-	availableHosts, err := getProviderHosts(ctx, opts.ConfigFlags, opts.Provider, opts.Namespace, opts.InventoryURL)
+	availableHosts, err := getProviderHosts(ctx, opts.ConfigFlags, opts.Provider, opts.Namespace, opts.InventoryURL, opts.InventoryInsecureSkipTLS)
 	if err != nil {
 		return fmt.Errorf("failed to get provider hosts: %v", err)
 	}
@@ -157,17 +158,17 @@ func validateAndGetProvider(ctx context.Context, configFlags *genericclioptions.
 
 // getProviderHosts retrieves the list of available ESXi hosts from the provider's inventory.
 // This information is used to validate host names and extract network adapter details.
-func getProviderHosts(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string) ([]map[string]interface{}, error) {
+func getProviderHosts(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, insecureSkipTLS bool) ([]map[string]interface{}, error) {
 	provider, err := inventory.GetProviderByName(ctx, configFlags, providerName, namespace)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create a new provider client
-	providerClient := inventory.NewProviderClient(configFlags, provider, inventoryURL)
+	providerClient := inventory.NewProviderClientWithInsecure(configFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Fetch hosts inventory
-	data, err := providerClient.GetHosts(4)
+	data, err := providerClient.GetHosts(ctx, 4)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch host inventory: %v", err)
 	}
