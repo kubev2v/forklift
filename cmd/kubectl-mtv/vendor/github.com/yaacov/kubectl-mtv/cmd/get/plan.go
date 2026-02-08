@@ -15,15 +15,41 @@ import (
 )
 
 // NewPlanCmd creates the get plan command
-func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() GlobalConfigGetter) *cobra.Command {
+func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	outputFormatFlag := flags.NewOutputFormatTypeFlag()
 	var watch bool
 	var vms bool
+	var disk bool
 
 	cmd := &cobra.Command{
-		Use:               "plan [NAME]",
-		Short:             "Get migration plans",
-		Long:              `Get migration plans`,
+		Use:   "plan [NAME]",
+		Short: "Get migration plans",
+		Long: `Get migration plans from the cluster.
+
+Lists all plans in the namespace, or retrieves details for a specific plan.
+Use --vms to see the migration status of individual VMs within a plan.
+Use --disk to see the disk transfer status with individual disk details.
+Use both --vms and --disk together to see VMs with their disk details.`,
+		Example: `  # List all plans in current namespace
+  kubectl-mtv get plan
+
+  # List plans across all namespaces
+  kubectl-mtv get plan -A
+
+  # Get a specific plan in JSON format
+  kubectl-mtv get plan my-migration -o json
+
+  # Watch plan status changes
+  kubectl-mtv get plan my-migration -w
+
+  # Get VM migration status within a plan
+  kubectl-mtv get plan my-migration --vms
+
+  # Get disk transfer status within a plan
+  kubectl-mtv get plan my-migration --disk
+
+  # Get both VM and disk transfer status
+  kubectl-mtv get plan my-migration --vms --disk`,
 		Args:              cobra.MaximumNArgs(1),
 		SilenceUsage:      true,
 		ValidArgsFunction: completion.PlanNameCompletion(kubeConfigFlags),
@@ -35,13 +61,26 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig 
 				defer cancel()
 			}
 
-			config := getGlobalConfig()
-			namespace := client.ResolveNamespaceWithAllFlag(config.GetKubeConfigFlags(), config.GetAllNamespaces())
+			kubeConfigFlags := globalConfig.GetKubeConfigFlags()
+			allNamespaces := globalConfig.GetAllNamespaces()
+			namespace := client.ResolveNamespaceWithAllFlag(kubeConfigFlags, allNamespaces)
 
 			// Get optional plan name from arguments
 			var planName string
 			if len(args) > 0 {
 				planName = args[0]
+			}
+
+			// If both --vms and --disk flags are used, show combined view
+			if vms && disk {
+				if planName == "" {
+					return fmt.Errorf("plan NAME is required when using --vms and --disk flags")
+				}
+				// Log the operation being performed
+				logNamespaceOperation("Getting plan VMs with disk details", namespace, allNamespaces)
+				logOutputFormat(outputFormatFlag.GetValue())
+
+				return plan.ListVMsWithDisks(ctx, kubeConfigFlags, planName, namespace, watch)
 			}
 
 			// If --vms flag is used, switch to ListVMs behavior
@@ -50,29 +89,42 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig 
 					return fmt.Errorf("plan NAME is required when using --vms flag")
 				}
 				// Log the operation being performed
-				logNamespaceOperation("Getting plan VMs", namespace, config.GetAllNamespaces())
+				logNamespaceOperation("Getting plan VMs", namespace, allNamespaces)
 				logOutputFormat(outputFormatFlag.GetValue())
 
-				return plan.ListVMs(ctx, config.GetKubeConfigFlags(), planName, namespace, watch)
+				return plan.ListVMs(ctx, kubeConfigFlags, planName, namespace, watch)
+			}
+
+			// If --disk flag is used, switch to ListDisks behavior
+			if disk {
+				if planName == "" {
+					return fmt.Errorf("plan NAME is required when using --disk flag")
+				}
+				// Log the operation being performed
+				logNamespaceOperation("Getting plan disk transfers", namespace, allNamespaces)
+				logOutputFormat(outputFormatFlag.GetValue())
+
+				return plan.ListDisks(ctx, kubeConfigFlags, planName, namespace, watch)
 			}
 
 			// Default behavior: list plans
 
 			// Log the operation being performed
 			if planName != "" {
-				logNamespaceOperation("Getting plan", namespace, config.GetAllNamespaces())
+				logNamespaceOperation("Getting plan", namespace, allNamespaces)
 			} else {
-				logNamespaceOperation("Getting plans", namespace, config.GetAllNamespaces())
+				logNamespaceOperation("Getting plans", namespace, allNamespaces)
 			}
 			logOutputFormat(outputFormatFlag.GetValue())
 
-			return plan.List(ctx, config.GetKubeConfigFlags(), namespace, watch, outputFormatFlag.GetValue(), planName, config.GetUseUTC())
+			return plan.List(ctx, kubeConfigFlags, namespace, watch, outputFormatFlag.GetValue(), planName, globalConfig.GetUseUTC())
 		},
 	}
 
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", "Output format (table, json, yaml)")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
 	cmd.Flags().BoolVar(&vms, "vms", false, "Get VMs status in the migration plan (requires plan NAME)")
+	cmd.Flags().BoolVar(&disk, "disk", false, "Get disk transfer status in the migration plan (requires plan NAME)")
 
 	// Add completion for output format flag
 	if err := cmd.RegisterFlagCompletionFunc("output", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
