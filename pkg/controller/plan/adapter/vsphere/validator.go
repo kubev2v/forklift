@@ -413,18 +413,18 @@ func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, m
 	return true, "", "", nil
 }
 
-func (r *Validator) getUdnSubnet(client client.Client) (string, error) {
+func (r *Validator) getUdnSubnets(client client.Client) ([]string, error) {
 	key := k8sclient.ObjectKey{
 		Name: r.Plan.Spec.TargetNamespace,
 	}
 	namespace := &core.Namespace{}
 	err := client.Get(context.TODO(), key, namespace)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	_, hasUdnLabel := namespace.ObjectMeta.Labels[namespaceLabelPrimaryUDN]
 	if !hasUdnLabel {
-		return "", nil
+		return nil, nil
 	}
 
 	nadList := &k8snet.NetworkAttachmentDefinitionList{}
@@ -435,7 +435,7 @@ func (r *Validator) getUdnSubnet(client client.Client) (string, error) {
 
 	err = client.List(context.TODO(), nadList, listOpts...)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	for _, nad := range nadList.Items {
 		var networkConfig ocpmodel.NetworkConfig
@@ -445,10 +445,10 @@ func (r *Validator) getUdnSubnet(client client.Client) (string, error) {
 			continue
 		}
 		if networkConfig.IsUnsupportedUdn() && networkConfig.AllowPersistentIPs {
-			return networkConfig.Subnets, nil
+			return strings.Split(networkConfig.Subnets, ","), nil
 		}
 	}
-	return "", nil
+	return nil, nil
 }
 func (r *Validator) getSourceNetworkForPodNetworkTarget(vmRef ref.Ref) (net *model.Network, err error) {
 	vm := &model.Workload{}
@@ -501,8 +501,8 @@ func (r *Validator) UdnStaticIPs(vmRef ref.Ref, client client.Client) (ok bool, 
 		return
 	}
 
-	udnSubnet, err := r.getUdnSubnet(client)
-	if udnSubnet == "" {
+	udnSubnets, err := r.getUdnSubnets(client)
+	if udnSubnets == nil {
 		// No UDN subnet configured, validation passes
 		return true, nil
 	}
@@ -511,18 +511,20 @@ func (r *Validator) UdnStaticIPs(vmRef ref.Ref, client client.Client) (ok bool, 
 	}
 	for _, guestNetwork := range vm.GuestNetworks {
 		if guestNetwork.Network == sourceNetwork.Name {
-			// Validate the NAD
-			_, ipNet, err := net.ParseCIDR(udnSubnet)
-			if err != nil {
-				return false, liberr.Wrap(err, "udnSubnet", udnSubnet)
+			for _, subnet := range udnSubnets {
+				// Validate the NAD
+				_, ipNet, err := net.ParseCIDR(subnet)
+				if err != nil {
+					return false, liberr.Wrap(err, "udnSubnet", subnet)
+				}
+				ip := net.ParseIP(guestNetwork.IP)
+				if ip == nil {
+					// Invalid IP in guest network
+					r.Log.V(4).Info("Invalid IP in guest network", "vm", vmRef.String(), "ip", guestNetwork.IP)
+					return false, nil
+				}
+				return ipNet.Contains(ip), nil
 			}
-			ip := net.ParseIP(guestNetwork.IP)
-			if ip == nil {
-				// Invalid IP in guest network
-				r.Log.V(4).Info("Invalid IP in guest network", "vm", vmRef.String(), "ip", guestNetwork.IP)
-				return false, nil
-			}
-			return ipNet.Contains(ip), nil
 		}
 	}
 	return true, nil
