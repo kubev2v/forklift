@@ -59,6 +59,7 @@ spec:
                 type: string
                 enum: ["true", "false"]
                 description: "Enable copy offload plugins (default: true)"
+                default: "true"
               feature_ocp_live_migration:
                 type: string
                 enum: ["true", "false"]
