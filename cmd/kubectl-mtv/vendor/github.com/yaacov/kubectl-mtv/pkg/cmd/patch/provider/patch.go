@@ -14,26 +14,61 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/klog/v2"
 
+	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/ec2"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 )
 
+// PatchProviderOptions contains the options for patching a provider
+type PatchProviderOptions struct {
+	ConfigFlags *genericclioptions.ConfigFlags
+	Name        string
+	Namespace   string
+
+	// Credentials
+	URL      string
+	Username string
+	Password string
+	CACert   string
+	Token    string
+
+	// Flags
+	InsecureSkipTLS        bool
+	InsecureSkipTLSChanged bool
+
+	// vSphere VDDK settings
+	VddkInitImage                 string
+	UseVddkAioOptimization        bool
+	UseVddkAioOptimizationChanged bool
+	VddkBufSizeIn64K              int
+	VddkBufCount                  int
+
+	// OpenStack settings
+	DomainName  string
+	ProjectName string
+	RegionName  string
+
+	// EC2 settings
+	EC2Region             string
+	EC2TargetRegion       string
+	EC2TargetAZ           string
+	EC2TargetAccessKeyID  string
+	EC2TargetSecretKey    string
+	AutoTargetCredentials bool
+}
+
 // PatchProvider patches an existing provider
-func PatchProvider(configFlags *genericclioptions.ConfigFlags, name, namespace string,
-	url, username, password, cacert string, insecureSkipTLS bool, vddkInitImage, token string,
-	domainName, projectName, regionName string, useVddkAioOptimization bool, vddkBufSizeIn64K, vddkBufCount int,
-	insecureSkipTLSChanged, useVddkAioOptimizationChanged bool) error {
+func PatchProvider(opts PatchProviderOptions) error {
+	klog.V(2).Infof("Patching provider '%s' in namespace '%s'", opts.Name, opts.Namespace)
 
-	klog.V(2).Infof("Patching provider '%s' in namespace '%s'", name, namespace)
-
-	dynamicClient, err := client.GetDynamicClient(configFlags)
+	dynamicClient, err := client.GetDynamicClient(opts.ConfigFlags)
 	if err != nil {
 		return fmt.Errorf("failed to get client: %v", err)
 	}
 
 	// Get the existing provider
-	existingProvider, err := dynamicClient.Resource(client.ProvidersGVR).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	existingProvider, err := dynamicClient.Resource(client.ProvidersGVR).Namespace(opts.Namespace).Get(context.TODO(), opts.Name, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to get provider '%s': %v", name, err)
+		return fmt.Errorf("failed to get provider '%s': %v", opts.Name, err)
 	}
 
 	// Get provider type using unstructured operations
@@ -47,14 +82,29 @@ func PatchProvider(configFlags *genericclioptions.ConfigFlags, name, namespace s
 
 	klog.V(3).Infof("Current provider type: %s", providerType)
 
+	// For EC2 provider, use regionName (from --provider-region-name) if ec2Region is empty
+	// This allows using --provider-region-name for EC2 regions as shown in documentation
+	if providerType == "ec2" && opts.EC2Region == "" && opts.RegionName != "" {
+		opts.EC2Region = opts.RegionName
+	}
+
+	// Auto-fetch target credentials and target-az from cluster if requested (EC2 only)
+	if providerType == "ec2" && opts.AutoTargetCredentials {
+		if err := ec2.AutoPopulateTargetOptions(opts.ConfigFlags, &opts.EC2TargetAccessKeyID, &opts.EC2TargetSecretKey, &opts.EC2TargetAZ, &opts.EC2TargetRegion); err != nil {
+			return err
+		}
+	}
+
 	// Track if we need to update credentials
-	needsCredentialUpdate := username != "" || password != "" || token != "" || cacert != "" ||
-		domainName != "" || projectName != "" || regionName != ""
+	// Note: AutoTargetCredentials for EC2 providers will populate EC2TargetAccessKeyID and EC2TargetSecretKey above
+	needsCredentialUpdate := opts.Username != "" || opts.Password != "" || opts.Token != "" || opts.CACert != "" ||
+		opts.DomainName != "" || opts.ProjectName != "" || opts.RegionName != "" || opts.EC2Region != "" ||
+		opts.EC2TargetAccessKeyID != "" || opts.EC2TargetSecretKey != "" || opts.InsecureSkipTLSChanged
 
 	// Get and validate secret ownership if credentials need updating
 	var secret *corev1.Secret
 	if needsCredentialUpdate {
-		secret, err = getAndValidateSecret(configFlags, existingProvider)
+		secret, err = getAndValidateSecret(opts.ConfigFlags, existingProvider)
 		if err != nil {
 			return err
 		}
@@ -65,10 +115,10 @@ func PatchProvider(configFlags *genericclioptions.ConfigFlags, name, namespace s
 	providerUpdated := false
 
 	// Update URL if provided
-	if url != "" {
+	if opts.URL != "" {
 		currentURL, _, _ := unstructured.NestedString(existingProvider.Object, "spec", "url")
-		klog.V(2).Infof("Updating provider URL from '%s' to '%s'", currentURL, url)
-		patchSpec["url"] = url
+		klog.V(2).Infof("Updating provider URL from '%s' to '%s'", currentURL, opts.URL)
+		patchSpec["url"] = opts.URL
 		providerUpdated = true
 	}
 
@@ -84,35 +134,51 @@ func PatchProvider(configFlags *genericclioptions.ConfigFlags, name, namespace s
 		}
 	}
 
-	// Update insecureSkipTLS setting
-	if insecureSkipTLSChanged {
-		currentSettings["insecureSkipVerify"] = fmt.Sprintf("%t", insecureSkipTLS)
-		klog.V(2).Infof("Updated insecureSkipTLS setting to %t", insecureSkipTLS)
-		providerUpdated = true
-	}
-
 	// Update VDDK settings for vSphere providers
 	if providerType == "vsphere" {
-		if vddkInitImage != "" {
-			klog.V(2).Infof("Updating VDDK init image to '%s'", vddkInitImage)
-			currentSettings["vddkInitImage"] = vddkInitImage
+		if opts.VddkInitImage != "" {
+			klog.V(2).Infof("Updating VDDK init image to '%s'", opts.VddkInitImage)
+			currentSettings["vddkInitImage"] = opts.VddkInitImage
 			providerUpdated = true
 		}
 
-		if useVddkAioOptimizationChanged {
-			currentSettings["useVddkAioOptimization"] = fmt.Sprintf("%t", useVddkAioOptimization)
-			klog.V(2).Infof("Updated VDDK AIO optimization to %t", useVddkAioOptimization)
+		if opts.UseVddkAioOptimizationChanged {
+			currentSettings["useVddkAioOptimization"] = fmt.Sprintf("%t", opts.UseVddkAioOptimization)
+			klog.V(2).Infof("Updated VDDK AIO optimization to %t", opts.UseVddkAioOptimization)
 			providerUpdated = true
 		}
 
 		// Update VDDK configuration if buffer settings are provided
-		if vddkBufSizeIn64K > 0 || vddkBufCount > 0 {
+		if opts.VddkBufSizeIn64K > 0 || opts.VddkBufCount > 0 {
 			// Get existing vddkConfig or create new one
 			existingConfig := currentSettings["vddkConfig"]
-			updatedConfig := updateVddkConfig(existingConfig, vddkBufSizeIn64K, vddkBufCount)
+			updatedConfig := updateVddkConfig(existingConfig, opts.VddkBufSizeIn64K, opts.VddkBufCount)
 
 			currentSettings["vddkConfig"] = updatedConfig
 			klog.V(2).Infof("Updated VDDK configuration: %s", updatedConfig)
+			providerUpdated = true
+		}
+	}
+
+	// Update EC2 settings for EC2 providers
+	if providerType == "ec2" {
+		if opts.EC2TargetRegion != "" {
+			klog.V(2).Infof("Updating EC2 target-region to '%s'", opts.EC2TargetRegion)
+			currentSettings["target-region"] = opts.EC2TargetRegion
+			providerUpdated = true
+
+			// If no explicit target AZ is provided in this patch, apply the documented default "<target-region>a"
+			if opts.EC2TargetAZ == "" {
+				defaultAZ := opts.EC2TargetRegion + "a"
+				klog.V(2).Infof("No EC2 target-az provided, defaulting to '%s'", defaultAZ)
+				currentSettings["target-az"] = defaultAZ
+				providerUpdated = true
+			}
+		}
+
+		if opts.EC2TargetAZ != "" {
+			klog.V(2).Infof("Updating EC2 target-az to '%s'", opts.EC2TargetAZ)
+			currentSettings["target-az"] = opts.EC2TargetAZ
 			providerUpdated = true
 		}
 	}
@@ -125,8 +191,10 @@ func PatchProvider(configFlags *genericclioptions.ConfigFlags, name, namespace s
 	// Update credentials if provided and secret is owned by provider
 	secretUpdated := false
 	if needsCredentialUpdate && secret != nil {
-		secretUpdated, err = updateSecretCredentials(configFlags, secret, providerType,
-			username, password, cacert, token, domainName, projectName, regionName)
+		secretUpdated, err = updateSecretCredentials(opts.ConfigFlags, secret, providerType,
+			opts.Username, opts.Password, opts.CACert, opts.Token, opts.DomainName, opts.ProjectName, opts.RegionName,
+			opts.EC2Region, opts.EC2TargetAccessKeyID, opts.EC2TargetSecretKey,
+			opts.InsecureSkipTLS, opts.InsecureSkipTLSChanged)
 		if err != nil {
 			return fmt.Errorf("failed to update credentials: %v", err)
 		}
@@ -145,9 +213,9 @@ func PatchProvider(configFlags *genericclioptions.ConfigFlags, name, namespace s
 		}
 
 		// Apply the patch
-		_, err = dynamicClient.Resource(client.ProvidersGVR).Namespace(namespace).Patch(
+		_, err = dynamicClient.Resource(client.ProvidersGVR).Namespace(opts.Namespace).Patch(
 			context.TODO(),
-			name,
+			opts.Name,
 			types.MergePatchType,
 			patchBytes,
 			metav1.PatchOptions{},
@@ -159,12 +227,12 @@ func PatchProvider(configFlags *genericclioptions.ConfigFlags, name, namespace s
 
 	// Provide user feedback
 	if providerUpdated || secretUpdated {
-		fmt.Printf("provider/%s patched\n", name)
+		fmt.Printf("provider/%s patched\n", opts.Name)
 		if secretUpdated {
-			klog.V(2).Infof("Updated credentials for provider '%s'", name)
+			klog.V(2).Infof("Updated credentials for provider '%s'", opts.Name)
 		}
 	} else {
-		fmt.Printf("provider/%s unchanged (no updates specified)\n", name)
+		fmt.Printf("provider/%s unchanged (no updates specified)\n", opts.Name)
 	}
 
 	return nil
@@ -229,7 +297,8 @@ func getAndValidateSecret(configFlags *genericclioptions.ConfigFlags, provider *
 
 // updateSecretCredentials updates the secret with new credential values
 func updateSecretCredentials(configFlags *genericclioptions.ConfigFlags, secret *corev1.Secret, providerType string,
-	username, password, cacert, token, domainName, projectName, regionName string) (bool, error) {
+	username, password, cacert, token, domainName, projectName, regionName, ec2Region, ec2TargetAccessKeyID, ec2TargetSecretKey string,
+	insecureSkipTLS, insecureSkipTLSChanged bool) (bool, error) {
 
 	updated := false
 
@@ -283,12 +352,50 @@ func updateSecretCredentials(configFlags *genericclioptions.ConfigFlags, secret 
 			klog.V(2).Infof("Updated OpenStack region name")
 			updated = true
 		}
+	case "ec2":
+		if username != "" {
+			secret.Data["accessKeyId"] = []byte(username)
+			klog.V(2).Infof("Updated EC2 access key ID")
+			updated = true
+		}
+		if password != "" {
+			secret.Data["secretAccessKey"] = []byte(password)
+			klog.V(2).Infof("Updated EC2 secret access key")
+			updated = true
+		}
+		if ec2Region != "" {
+			secret.Data["region"] = []byte(ec2Region)
+			klog.V(2).Infof("Updated EC2 region")
+			updated = true
+		}
+		if ec2TargetAccessKeyID != "" {
+			secret.Data["targetAccessKeyId"] = []byte(ec2TargetAccessKeyID)
+			klog.V(2).Infof("Updated EC2 target account access key ID (cross-account)")
+			updated = true
+		}
+		if ec2TargetSecretKey != "" {
+			secret.Data["targetSecretAccessKey"] = []byte(ec2TargetSecretKey)
+			klog.V(2).Infof("Updated EC2 target account secret access key (cross-account)")
+			updated = true
+		}
 	}
 
 	// Update CA certificate for all types (if applicable)
 	if cacert != "" {
 		secret.Data["cacert"] = []byte(cacert)
 		klog.V(2).Infof("Updated CA certificate")
+		updated = true
+	}
+
+	// Update insecureSkipVerify for all types (if changed)
+	if insecureSkipTLSChanged {
+		if insecureSkipTLS {
+			secret.Data["insecureSkipVerify"] = []byte("true")
+		} else {
+			// Remove the key if insecureSkipTLS is false
+			delete(secret.Data, "insecureSkipVerify")
+		}
+		klog.V(2).Infof("Updated insecureSkipVerify to %t", insecureSkipTLS)
 		updated = true
 	}
 

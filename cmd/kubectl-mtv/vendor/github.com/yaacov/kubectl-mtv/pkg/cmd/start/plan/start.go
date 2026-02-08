@@ -2,7 +2,9 @@ package plan
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -11,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"sigs.k8s.io/yaml"
 
 	forkliftv1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/get/plan/status"
@@ -18,8 +21,8 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/util/output"
 )
 
-// Start starts a migration plan
-func Start(configFlags *genericclioptions.ConfigFlags, name, namespace string, cutoverTime *time.Time, useUTC bool) error {
+// Start starts a migration plan or outputs the Migration CR if dry-run is enabled
+func Start(configFlags *genericclioptions.ConfigFlags, name, namespace string, cutoverTime *time.Time, useUTC bool, dryRun bool, outputFormat string) error {
 	c, err := client.GetDynamicClient(configFlags)
 	if err != nil {
 		return fmt.Errorf("failed to get client: %v", err)
@@ -66,13 +69,13 @@ func Start(configFlags *genericclioptions.ConfigFlags, name, namespace string, c
 
 	// Handle cutover time based on plan type
 	if !warm && cutoverTime != nil {
-		fmt.Printf("Warning: Cutover time is specified but plan '%s' is not a warm migration. Ignoring cutover time.\n", name)
+		fmt.Fprintf(os.Stderr, "Warning: Cutover time is specified but plan '%s' is not a warm migration. Ignoring cutover time.\n", name)
 		cutoverTime = nil
 	} else if warm && cutoverTime == nil {
 		// For warm migrations without specified cutover, default to now + 1 hour
 		defaultTime := time.Now().Add(1 * time.Hour)
 		cutoverTime = &defaultTime
-		fmt.Printf("Warning: No cutover time specified for warm migration. Setting default cutover time to %s (1 hour from now).\n", output.FormatTimestamp(*cutoverTime, useUTC))
+		fmt.Fprintf(os.Stderr, "Warning: No cutover time specified for warm migration. Setting default cutover time to %s (1 hour from now).\n", output.FormatTimestamp(*cutoverTime, useUTC))
 	}
 
 	// Extract the plan's UID
@@ -110,6 +113,11 @@ func Start(configFlags *genericclioptions.ConfigFlags, name, namespace string, c
 		migration.Spec.Cutover = &metaTime
 	}
 
+	// Handle dry-run mode
+	if dryRun {
+		return OutputMigrationCR(migration, outputFormat)
+	}
+
 	// Convert Migration object to Unstructured
 	unstructuredMigration, err := runtime.DefaultUnstructuredConverter.ToUnstructured(migration)
 	if err != nil {
@@ -123,9 +131,41 @@ func Start(configFlags *genericclioptions.ConfigFlags, name, namespace string, c
 		return fmt.Errorf("failed to create migration: %v", err)
 	}
 
-	fmt.Printf("Migration started for plan '%s' in namespace '%s'\n", name, namespace)
+	fmt.Fprintf(os.Stderr, "Migration started for plan '%s' in namespace '%s'\n", name, namespace)
 	if warm && cutoverTime != nil {
-		fmt.Printf("Cutover scheduled for: %s\n", output.FormatTimestamp(*cutoverTime, useUTC))
+		fmt.Fprintf(os.Stderr, "Cutover scheduled for: %s\n", output.FormatTimestamp(*cutoverTime, useUTC))
 	}
+	return nil
+}
+
+// OutputMigrationCR serializes a Migration CR to the specified format and outputs it to stdout
+func OutputMigrationCR(migration *forkliftv1beta1.Migration, outputFormat string) error {
+	if migration == nil {
+		return fmt.Errorf("migration CR is nil")
+	}
+
+	var output []byte
+	var err error
+
+	switch outputFormat {
+	case "yaml":
+		output, err = yaml.Marshal(migration)
+		if err != nil {
+			return fmt.Errorf("failed to marshal Migration to YAML: %v", err)
+		}
+		// Always prefix YAML with document separator for proper multi-document format
+		fmt.Print("---\n")
+		fmt.Print(string(output))
+		return nil
+	case "json":
+		output, err = json.MarshalIndent(migration, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal Migration to JSON: %v", err)
+		}
+	default:
+		return fmt.Errorf("unsupported output format: %s", outputFormat)
+	}
+
+	fmt.Print(string(output))
 	return nil
 }

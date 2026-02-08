@@ -24,7 +24,7 @@ func NewVSphereStorageFetcher() *VSphereStorageFetcher {
 }
 
 // FetchSourceStorages extracts storage references from VSphere VMs
-func (f *VSphereStorageFetcher) FetchSourceStorages(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, planVMNames []string) ([]ref.Ref, error) {
+func (f *VSphereStorageFetcher) FetchSourceStorages(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, planVMNames []string, insecureSkipTLS bool) ([]ref.Ref, error) {
 	klog.V(4).Infof("VSphere storage fetcher - extracting source storages for provider: %s", providerName)
 
 	// Get the provider object
@@ -34,7 +34,7 @@ func (f *VSphereStorageFetcher) FetchSourceStorages(ctx context.Context, configF
 	}
 
 	// Fetch datastores inventory first to create ID-to-datastore mapping
-	datastoresInventory, err := client.FetchProviderInventory(configFlags, inventoryURL, provider, "datastores?detail=4")
+	datastoresInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "datastores?detail=4", insecureSkipTLS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch datastores inventory: %v", err)
 	}
@@ -62,7 +62,7 @@ func (f *VSphereStorageFetcher) FetchSourceStorages(ctx context.Context, configF
 	}
 
 	// Fetch VMs inventory to get datastore references from VMs
-	vmsInventory, err := client.FetchProviderInventory(configFlags, inventoryURL, provider, "vms?detail=4")
+	vmsInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "vms?detail=4", insecureSkipTLS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch VMs inventory: %v", err)
 	}
@@ -141,7 +141,7 @@ func (f *VSphereStorageFetcher) FetchSourceStorages(ctx context.Context, configF
 }
 
 // FetchTargetStorages is not supported for VSphere as target - only OpenShift is supported as target
-func (f *VSphereStorageFetcher) FetchTargetStorages(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string) ([]forkliftv1beta1.DestinationStorage, error) {
+func (f *VSphereStorageFetcher) FetchTargetStorages(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, insecureSkipTLS bool) ([]forkliftv1beta1.DestinationStorage, error) {
 	klog.V(4).Infof("VSphere provider does not support target storage fetching - only OpenShift is supported as target")
 	return nil, fmt.Errorf("VSphere provider does not support target storage fetching - only OpenShift is supported as migration target")
 }
