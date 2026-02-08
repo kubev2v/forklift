@@ -17,8 +17,20 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	var all bool
 
 	cmd := &cobra.Command{
-		Use:               "plan [NAME...] [--all]",
-		Short:             "Un-archive one or more migration plans",
+		Use:   "plan [NAME...] [--all]",
+		Short: "Unarchive one or more migration plans",
+		Long: `Unarchive one or more migration plans.
+
+Unarchiving restores a previously archived plan, allowing it to be started again.
+This is useful if you need to retry a migration or make changes to an archived plan.`,
+		Example: `  # Unarchive a plan
+  kubectl-mtv unarchive plan my-migration
+
+  # Unarchive multiple plans
+  kubectl-mtv unarchive plan plan1 plan2 plan3
+
+  # Unarchive all archived plans in the namespace
+  kubectl-mtv unarchive plan --all`,
 		Args:              flags.ValidateAllFlagArgs(func() bool { return all }, 1),
 		SilenceUsage:      true,
 		ValidArgsFunction: completion.PlanNameCompletion(kubeConfigFlags),
@@ -53,7 +65,7 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVar(&all, "all", false, "Un-archive all migration plans in the namespace")
+	cmd.Flags().BoolVar(&all, "all", false, "Unarchive all migration plans in the namespace")
 
 	return cmd
 }

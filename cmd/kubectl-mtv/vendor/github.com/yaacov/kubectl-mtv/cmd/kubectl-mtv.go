@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -15,19 +17,28 @@ import (
 	"github.com/yaacov/kubectl-mtv/cmd/delete"
 	"github.com/yaacov/kubectl-mtv/cmd/describe"
 	"github.com/yaacov/kubectl-mtv/cmd/get"
+	"github.com/yaacov/kubectl-mtv/cmd/health"
+	"github.com/yaacov/kubectl-mtv/cmd/help"
 	"github.com/yaacov/kubectl-mtv/cmd/mcpserver"
 	"github.com/yaacov/kubectl-mtv/cmd/patch"
+	"github.com/yaacov/kubectl-mtv/cmd/settings"
 	"github.com/yaacov/kubectl-mtv/cmd/start"
 	"github.com/yaacov/kubectl-mtv/cmd/unarchive"
 	"github.com/yaacov/kubectl-mtv/cmd/version"
+	"github.com/yaacov/kubectl-mtv/pkg/util/client"
+	pkgversion "github.com/yaacov/kubectl-mtv/pkg/version"
 )
 
 // GlobalConfig holds global configuration flags that are passed to all subcommands
 type GlobalConfig struct {
-	Verbosity       int
-	AllNamespaces   bool
-	UseUTC          bool
-	KubeConfigFlags *genericclioptions.ConfigFlags
+	Verbosity                int
+	AllNamespaces            bool
+	UseUTC                   bool
+	InventoryURL             string
+	InventoryInsecureSkipTLS bool
+	KubeConfigFlags          *genericclioptions.ConfigFlags
+	discoveredInventoryURL   string // cached discovered URL
+	inventoryURLResolved     bool   // flag to track if we've attempted discovery
 }
 
 // GetVerbosity returns the verbosity level
@@ -43,6 +54,49 @@ func (g *GlobalConfig) GetAllNamespaces() bool {
 // GetUseUTC returns whether to format times in UTC
 func (g *GlobalConfig) GetUseUTC() bool {
 	return g.UseUTC
+}
+
+// GetInventoryURL returns the inventory service URL, auto-discovering if necessary
+// This method will automatically discover the URL from OpenShift routes if:
+// 1. No URL was provided via flag or environment variable
+// 2. Discovery hasn't been attempted yet
+func (g *GlobalConfig) GetInventoryURL() string {
+	// If explicitly set via flag or env var, return it
+	if g.InventoryURL != "" {
+		return g.InventoryURL
+	}
+
+	// Return cached discovered URL if we already tried discovery
+	if g.inventoryURLResolved {
+		return g.discoveredInventoryURL
+	}
+
+	// Mark as resolved to avoid repeated attempts
+	g.inventoryURLResolved = true
+
+	// Attempt auto-discovery from OpenShift routes
+	// Note: This uses the default namespace from kubeconfig
+	namespace := ""
+	if g.KubeConfigFlags.Namespace != nil && *g.KubeConfigFlags.Namespace != "" {
+		namespace = *g.KubeConfigFlags.Namespace
+	}
+
+	// Use context.Background() for discovery as we don't have a command context here
+	discoveredURL := client.DiscoverInventoryURL(context.Background(), g.KubeConfigFlags, namespace)
+
+	if discoveredURL != "" {
+		klog.V(2).Infof("Auto-discovered inventory URL: %s", discoveredURL)
+		g.discoveredInventoryURL = discoveredURL
+	} else {
+		klog.V(2).Info("No inventory URL provided and auto-discovery failed (this is expected on non-OpenShift clusters)")
+	}
+
+	return g.discoveredInventoryURL
+}
+
+// GetInventoryInsecureSkipTLS returns whether to skip TLS verification for inventory service
+func (g *GlobalConfig) GetInventoryInsecureSkipTLS() bool {
+	return g.InventoryInsecureSkipTLS
 }
 
 // GetKubeConfigFlags returns the Kubernetes configuration flags
@@ -68,17 +122,15 @@ func GetGlobalConfig() *GlobalConfig {
 	return globalConfig
 }
 
-// getGlobalConfigGetter returns the global configuration as an interface to avoid circular imports
-func getGlobalConfigGetter() get.GlobalConfigGetter {
-	return globalConfig
-}
-
 // Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() error {
 	return rootCmd.Execute()
 }
 
 func init() {
+	// Export clientVersion to pkg/version for use by other packages
+	pkgversion.ClientVersion = clientVersion
+
 	kubeConfigFlags = genericclioptions.NewConfigFlags(true)
 
 	// Initialize global configuration
@@ -110,24 +162,36 @@ A kubectl plugin for migrating VMs from oVirt, VMware, OpenStack, and OVA files 
 	rootCmd.PersistentFlags().IntVarP(&globalConfig.Verbosity, "verbose", "v", 0, "verbose output level (0=silent, 1=info, 2=debug, 3=trace)")
 	rootCmd.PersistentFlags().BoolVarP(&globalConfig.AllNamespaces, "all-namespaces", "A", false, "list resources across all namespaces")
 	rootCmd.PersistentFlags().BoolVar(&globalConfig.UseUTC, "use-utc", false, "format timestamps in UTC instead of local timezone")
+	rootCmd.PersistentFlags().StringVarP(&globalConfig.InventoryURL, "inventory-url", "i", os.Getenv("MTV_INVENTORY_URL"), "Base URL for the inventory service")
+	rootCmd.PersistentFlags().BoolVar(&globalConfig.InventoryInsecureSkipTLS, "inventory-insecure-skip-tls", os.Getenv("MTV_INVENTORY_INSECURE_SKIP_TLS") == "true", "Skip TLS verification for inventory service connections")
 
 	// Add standard commands for various resources - directly using package functions
-	rootCmd.AddCommand(get.NewGetCmd(kubeConfigFlags, getGlobalConfigGetter))
+	rootCmd.AddCommand(get.NewGetCmd(kubeConfigFlags, globalConfig))
 	rootCmd.AddCommand(delete.NewDeleteCmd(kubeConfigFlags))
 	rootCmd.AddCommand(create.NewCreateCmd(kubeConfigFlags, globalConfig))
-	rootCmd.AddCommand(describe.NewDescribeCmd(kubeConfigFlags, getGlobalConfigGetter))
-	rootCmd.AddCommand(patch.NewPatchCmd(kubeConfigFlags))
+	rootCmd.AddCommand(describe.NewDescribeCmd(kubeConfigFlags, globalConfig))
+	rootCmd.AddCommand(patch.NewPatchCmd(kubeConfigFlags, globalConfig))
 
 	// Plan commands - directly using package functions
-	rootCmd.AddCommand(start.NewStartCmd(kubeConfigFlags, getGlobalConfigGetter))
+	rootCmd.AddCommand(start.NewStartCmd(kubeConfigFlags, globalConfig))
 	rootCmd.AddCommand(cancel.NewCancelCmd(kubeConfigFlags))
 	rootCmd.AddCommand(cutover.NewCutoverCmd(kubeConfigFlags))
 	rootCmd.AddCommand(archive.NewArchiveCmd(kubeConfigFlags))
 	rootCmd.AddCommand(unarchive.NewUnArchiveCmd(kubeConfigFlags))
 
 	// Version command - directly using package function
-	rootCmd.AddCommand(version.NewVersionCmd(clientVersion, kubeConfigFlags))
+	rootCmd.AddCommand(version.NewVersionCmd(clientVersion, kubeConfigFlags, globalConfig))
+
+	// Health command - check MTV system health
+	rootCmd.AddCommand(health.NewHealthCmd(kubeConfigFlags, globalConfig))
+
+	// Settings command - view and manage ForkliftController settings
+	rootCmd.AddCommand(settings.NewSettingsCmd(kubeConfigFlags, globalConfig))
 
 	// MCP Server command - start the Model Context Protocol server
 	rootCmd.AddCommand(mcpserver.NewMCPServerCmd())
+
+	// Help command - replace default Cobra help with our enhanced version
+	// that supports machine-readable output for MCP server integration
+	rootCmd.SetHelpCommand(help.NewHelpCmd(rootCmd, clientVersion))
 }

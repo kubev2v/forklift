@@ -19,9 +19,27 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	var cleanAll bool
 
 	cmd := &cobra.Command{
-		Use:               "plan [NAME...] [--all] [--skip-archive] [--clean-all]",
-		Short:             "Delete one or more migration plans",
-		Long:              "Delete one or more migration plans. By default, plans are archived before deletion. Use --skip-archive to skip archiving and delete immediately. Use --clean-all to archive, delete VMs on failed migration, then delete.",
+		Use:   "plan [NAME...] [--all] [--skip-archive] [--clean-all]",
+		Short: "Delete one or more migration plans",
+		Long: `Delete one or more migration plans.
+
+By default, plans are archived before deletion to preserve history. Use
+--skip-archive to delete immediately without archiving. Use --clean-all
+to also clean up any target VMs created from failed migrations.`,
+		Example: `  # Delete a plan (archives first)
+  kubectl-mtv delete plan my-migration
+
+  # Delete immediately without archiving
+  kubectl-mtv delete plan my-migration --skip-archive
+
+  # Delete plan and clean up failed migration VMs
+  kubectl-mtv delete plan my-migration --clean-all
+
+  # Delete multiple plans
+  kubectl-mtv delete plan plan1 plan2 plan3
+
+  # Delete all plans in namespace
+  kubectl-mtv delete plan --all`,
 		Args:              flags.ValidateAllFlagArgs(func() bool { return all }, 1),
 		SilenceUsage:      true,
 		ValidArgsFunction: completion.PlanNameCompletion(kubeConfigFlags),
