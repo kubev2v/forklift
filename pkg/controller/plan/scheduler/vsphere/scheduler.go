@@ -223,7 +223,13 @@ func (r *Scheduler) cost(vm *model.VM, vmStatus *plan.VMStatus) int {
 			// By setting the cost to 0 other VMs can start migrating
 			return 0
 		default:
-			// CDI transfers the disks in parallel by different pods
+			// CDI transfers the disks in parallel by different pods.
+			// This calculation represents the number of disks being transferred,
+			// which is used for any disk parallel migration: warm, storage offload,
+			// raw copy, anything with CDI -> anything except v2v.
+			// For storage offload, PhaseCreateDataVolumes is where populator pods
+			// start copying disks, and the cost should reflect the number of disks
+			// being transferred, not just count as 1 VM.
 			return len(vm.Disks) - r.finishedDisks(vmStatus)
 		}
 	}
