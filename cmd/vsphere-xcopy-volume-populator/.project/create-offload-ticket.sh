@@ -34,7 +34,7 @@ function get_versions() {
 
 function get_target_version() {
   if [[ -z "$TARGET_VERSION" ]]; then
-    TARGET_VERSION=$(echo "$VERSIONS" | jq  ' .[] | select(.released == false)|.name'  | fzf --prompt "Choose the target release version: ")
+    TARGET_VERSION=$(echo "$VERSIONS" | jq  -r ' .[] | select(.released == false)|.name'  | fzf --prompt "Choose the target release version: ")
   fi
 
   if [[ -z "$TARGET_VERSION" ]]; then
@@ -46,7 +46,7 @@ function get_target_version() {
 }
 
 function get_affected_version() {
-  AFFECTED_VERSION=$(echo "$VERSIONS" | jq  ' .[] | .name'  | fzf --prompt "Choose the affected version: ")
+  AFFECTED_VERSION=$(echo "$VERSIONS" | jq  -r ' .[] | .name'  | fzf --prompt "Choose the affected version: ")
 
   if [[ -z "$AFFECTED_VERSION" ]]; then
     echo "No affected version selected. Exiting."
