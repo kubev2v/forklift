@@ -12,6 +12,7 @@ import (
 
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/output"
+	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
 // extractProviderName gets a provider name from the mapping spec
@@ -49,8 +50,8 @@ func createMappingItem(mapping unstructured.Unstructured, mappingType string, us
 	return item
 }
 
-// List lists network and storage mappings
-func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, mappingType, namespace, outputFormat string, mappingName string, useUTC bool) error {
+// ListMappings lists network and storage mappings without watch functionality
+func ListMappings(ctx context.Context, configFlags *genericclioptions.ConfigFlags, mappingType, namespace, outputFormat string, mappingName string, useUTC bool) error {
 	return listMappings(ctx, configFlags, mappingType, namespace, outputFormat, mappingName, useUTC)
 }
 
@@ -308,4 +309,11 @@ func listMappings(ctx context.Context, configFlags *genericclioptions.ConfigFlag
 		}
 		return tablePrinter.Print()
 	}
+}
+
+// List lists network and storage mappings with optional watch mode
+func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, mappingType, namespace string, watchMode bool, outputFormat string, mappingName string, useUTC bool) error {
+	return watch.WrapWithWatch(watchMode, outputFormat, func() error {
+		return ListMappings(ctx, configFlags, mappingType, namespace, outputFormat, mappingName, useUTC)
+	}, watch.DefaultInterval)
 }

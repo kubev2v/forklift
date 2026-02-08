@@ -15,6 +15,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
@@ -75,6 +76,12 @@ var (
 		Resource: "forkliftcontrollers",
 	}
 
+	DynamicProvidersGVR = schema.GroupVersionResource{
+		Group:    Group,
+		Version:  Version,
+		Resource: "dynamicproviders",
+	}
+
 	// SecretGVR is used to access secrets in the cluster
 	SecretsGVR = schema.GroupVersionResource{
 		Group:    "",
@@ -128,13 +135,61 @@ func GetKubernetesClientset(configFlags *genericclioptions.ConfigFlags) (*kubern
 }
 
 // GetAuthenticatedTransport returns an HTTP transport configured with Kubernetes authentication
-func GetAuthenticatedTransport(configFlags *genericclioptions.ConfigFlags) (http.RoundTripper, error) {
+func GetAuthenticatedTransport(ctx context.Context, configFlags *genericclioptions.ConfigFlags) (http.RoundTripper, error) {
+	return GetAuthenticatedTransportWithInsecure(ctx, configFlags, false)
+}
+
+// GetAuthenticatedTransportWithInsecure returns an HTTP transport configured with Kubernetes authentication
+// and optional insecure TLS skip verification
+func GetAuthenticatedTransportWithInsecure(ctx context.Context, configFlags *genericclioptions.ConfigFlags, insecureSkipTLS bool) (http.RoundTripper, error) {
 	config, err := configFlags.ToRESTConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get REST config: %v", err)
 	}
 
+	// Handle client certificate authentication (common in Kind/minikube clusters)
+	// The MTV inventory service expects bearer tokens, not client certificates
+	if NeedsBearerTokenForInventory(config) {
+		klog.V(5).Infof("Detected client certificate authentication without bearer token")
+
+		if token, ok := GetServiceAccountTokenForInventory(ctx, configFlags, config); ok {
+			config.BearerToken = token
+		} else {
+			klog.V(5).Infof("WARNING: Could not retrieve service account token, client certificate auth may not work with inventory service")
+		}
+	}
+
+	// Debug logging for authentication
+	if config.BearerToken != "" {
+		klog.V(5).Infof("Using bearer token authentication (token length: %d)", len(config.BearerToken))
+	} else if config.BearerTokenFile != "" {
+		klog.V(5).Infof("Using bearer token file: %s", config.BearerTokenFile)
+	} else if config.CertData != nil || config.CertFile != "" {
+		klog.V(5).Infof("Using client certificate authentication")
+	} else if config.KeyData != nil || config.KeyFile != "" {
+		klog.V(5).Infof("Using client key authentication")
+	} else if config.Username != "" {
+		klog.V(5).Infof("Using basic authentication with username: %s", config.Username)
+	} else if config.ExecProvider != nil {
+		klog.V(5).Infof("Using exec auth provider: %s", config.ExecProvider.Command)
+	} else if config.AuthProvider != nil {
+		klog.V(5).Infof("Using auth provider: %s", config.AuthProvider.Name)
+	} else {
+		klog.V(5).Infof("WARNING: No authentication credentials found in REST config!")
+		klog.V(5).Infof("  BearerToken: %v, CertData: %v, CertFile: %s", config.BearerToken != "", config.CertData != nil, config.CertFile)
+		klog.V(5).Infof("  Username: %s, ExecProvider: %v, AuthProvider: %v", config.Username, config.ExecProvider != nil, config.AuthProvider != nil)
+	}
+
+	// If insecure skip TLS is enabled, modify the REST config before creating transport
+	if insecureSkipTLS {
+		config.TLSClientConfig.Insecure = true
+		config.TLSClientConfig.CAFile = ""
+		config.TLSClientConfig.CAData = nil
+		klog.V(5).Infof("TLS certificate verification disabled (insecure mode)")
+	}
+
 	// Create a transport wrapper that adds authentication
+	// This must be done AFTER modifying the TLS config so the transport is created correctly
 	transport, err := rest.TransportFor(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create authenticated transport: %v", err)
@@ -143,9 +198,10 @@ func GetAuthenticatedTransport(configFlags *genericclioptions.ConfigFlags) (http
 	return transport, nil
 }
 
-// GetAuthenticatedHTTPClient returns an HTTP client configured with Kubernetes authentication
-func GetAuthenticatedHTTPClient(configFlags *genericclioptions.ConfigFlags, baseURL string) (*HTTPClient, error) {
-	transport, err := GetAuthenticatedTransport(configFlags)
+// GetAuthenticatedHTTPClientWithInsecure returns an HTTP client configured with Kubernetes authentication
+// and optional insecure TLS skip verification
+func GetAuthenticatedHTTPClientWithInsecure(ctx context.Context, configFlags *genericclioptions.ConfigFlags, baseURL string, insecureSkipTLS bool) (*HTTPClient, error) {
+	transport, err := GetAuthenticatedTransportWithInsecure(ctx, configFlags, insecureSkipTLS)
 	if err != nil {
 		return nil, err
 	}
@@ -325,8 +381,10 @@ func NewHTTPClient(baseURL string, transport http.RoundTripper) *HTTPClient {
 	}
 }
 
-// Get performs an HTTP GET request to the specified path with credentials
-func (c *HTTPClient) Get(path string) ([]byte, error) {
+// GetWithContext performs a context-aware HTTP GET request to the specified path with credentials.
+// This method respects context cancellation and deadlines, making it suitable for long-running
+// requests or requests that need to be cancelled (e.g., on SIGINT).
+func (c *HTTPClient) GetWithContext(ctx context.Context, path string) ([]byte, error) {
 	// Split the path into path part and query part
 	parts := strings.SplitN(path, "?", 2)
 	pathPart := parts[0]
@@ -342,14 +400,25 @@ func (c *HTTPClient) Get(path string) ([]byte, error) {
 		fullURL = fullURL + "?" + parts[1]
 	}
 
-	// Create the request
-	req, err := http.NewRequest(http.MethodGet, fullURL, nil)
+	// Create a context-aware request
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %v", err)
 	}
 
-	// Execute the request
+	// Debug: Log request details (auth is injected by the Kubernetes transport)
+	klog.V(5).Infof("Making HTTP request to: %s", fullURL)
+
+	// Execute the request (transport will add auth headers)
 	resp, err := c.httpClient.Do(req)
+
+	// Debug: Log response details
+	if err == nil {
+		klog.V(5).Infof("Response status: %d %s", resp.StatusCode, resp.Status)
+	} else {
+		klog.V(5).Infof("Request failed: %v", err)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %v", err)
 	}
@@ -367,4 +436,41 @@ func (c *HTTPClient) Get(path string) ([]byte, error) {
 	}
 
 	return body, nil
+}
+
+// GetDynamicProviderTypes fetches all DynamicProvider types from the cluster.
+// Returns an empty slice if the CRD is not available (fails gracefully).
+func GetDynamicProviderTypes(configFlags *genericclioptions.ConfigFlags) ([]string, error) {
+	dynamicClient, err := GetDynamicClient(configFlags)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get dynamic client: %v", err)
+	}
+
+	ctx := context.Background()
+
+	// Try to list DynamicProvider resources
+	list, err := dynamicClient.Resource(DynamicProvidersGVR).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		// Check if it's a "not found" error (CRD doesn't exist)
+		if strings.Contains(err.Error(), "not found") ||
+			strings.Contains(err.Error(), "the server could not find the requested resource") {
+			// Fail gracefully - DynamicProvider CRD is not installed
+			return []string{}, nil
+		}
+		return nil, fmt.Errorf("failed to list DynamicProviders: %v", err)
+	}
+
+	// Extract the types from each DynamicProvider
+	types := make([]string, 0, len(list.Items))
+	for _, item := range list.Items {
+		providerType, found, err := unstructured.NestedString(item.Object, "spec", "type")
+		if err != nil {
+			continue // Skip items with errors
+		}
+		if found && providerType != "" {
+			types = append(types, providerType)
+		}
+	}
+
+	return types, nil
 }

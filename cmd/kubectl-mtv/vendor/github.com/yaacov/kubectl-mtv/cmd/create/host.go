@@ -12,12 +12,12 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/host"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/completion"
+	"github.com/yaacov/kubectl-mtv/pkg/util/flags"
 )
 
 // NewHostCmd creates the host creation command
-func NewHostCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
+func NewHostCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	var provider string
-	var inventoryURL string
 	var username, password string
 	var existingSecret string
 	var ipAddress string
@@ -30,7 +30,7 @@ func NewHostCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "host NAME [NAME...]",
-		Short: "Create migration hosts for vSphere providers",
+		Short: "Create migration hosts " + flags.ProvidersVSphere,
 		Long: `Create migration hosts for vSphere providers. Hosts enable direct data transfer from ESXi hosts, bypassing vCenter for improved performance.
 
 By creating host resources, Forklift can utilize ESXi host interfaces directly for network transfer to OpenShift, provided the OpenShift worker nodes and ESXi host interfaces have network connectivity. This is particularly beneficial when users want to control which specific ESXi interface is used for migration, even without direct access to ESXi host credentials.
@@ -64,9 +64,10 @@ Examples:
 			}
 
 			namespace := client.ResolveNamespace(kubeConfigFlags)
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(cmd.Context(), kubeConfigFlags, namespace)
-			}
+
+			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
+			inventoryURL := globalConfig.GetInventoryURL()
+			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
 			providerHasESXIEndpoint, _, err := host.CheckProviderESXIEndpoint(cmd.Context(), kubeConfigFlags, provider, namespace)
 			if err != nil {
@@ -102,19 +103,20 @@ Examples:
 			hostIDs := args
 
 			opts := host.CreateHostOptions{
-				HostIDs:             hostIDs,
-				Namespace:           namespace,
-				Provider:            provider,
-				ConfigFlags:         kubeConfigFlags,
-				InventoryURL:        inventoryURL,
-				Username:            username,
-				Password:            password,
-				ExistingSecret:      existingSecret,
-				IPAddress:           ipAddress,
-				NetworkAdapterName:  networkAdapterName,
-				HostInsecureSkipTLS: hostInsecureSkipTLS,
-				CACert:              cacert,
-				HostSpec:            hostSpec,
+				HostIDs:                  hostIDs,
+				Namespace:                namespace,
+				Provider:                 provider,
+				ConfigFlags:              kubeConfigFlags,
+				InventoryURL:             inventoryURL,
+				InventoryInsecureSkipTLS: inventoryInsecureSkipTLS,
+				Username:                 username,
+				Password:                 password,
+				ExistingSecret:           existingSecret,
+				IPAddress:                ipAddress,
+				NetworkAdapterName:       networkAdapterName,
+				HostInsecureSkipTLS:      hostInsecureSkipTLS,
+				CACert:                   cacert,
+				HostSpec:                 hostSpec,
 			}
 
 			return host.Create(cmd.Context(), opts)
@@ -122,7 +124,6 @@ Examples:
 	}
 
 	cmd.Flags().StringVarP(&provider, "provider", "p", "", "Provider name (must be a vSphere provider)")
-	cmd.Flags().StringVar(&inventoryURL, "inventory-url", os.Getenv("MTV_INVENTORY_URL"), "Base URL for the inventory service")
 	cmd.Flags().StringVarP(&username, "username", "u", "", "Username for host authentication (required if --existing-secret not provided)")
 	cmd.Flags().StringVar(&password, "password", "", "Password for host authentication (required if --existing-secret not provided)")
 	cmd.Flags().StringVar(&existingSecret, "existing-secret", "", "Name of existing secret to use for host authentication")

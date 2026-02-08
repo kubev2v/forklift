@@ -90,7 +90,7 @@ Examples:
 		},
 	}
 
-	cmd.Flags().StringVarP(&image, "image", "i", "quay.io/kubev2v/hook-runner", "Container image URL to run (default: quay.io/kubev2v/hook-runner)")
+	cmd.Flags().StringVar(&image, "image", "quay.io/kubev2v/hook-runner", "Container image URL to run (default: quay.io/kubev2v/hook-runner)")
 	cmd.Flags().StringVar(&serviceAccount, "service-account", "", "Service account to use for the hook (optional)")
 	cmd.Flags().StringVar(&playbook, "playbook", "", "Ansible playbook content, or use @filename to read from file (optional)")
 	cmd.Flags().Int64Var(&deadline, "deadline", 0, "Hook deadline in seconds (optional)")
