@@ -66,10 +66,10 @@ test-copy-using-cli: build
 
 test-flashsystem: build
 	bin/vsphere-xcopy-volume-populator \
-		--source-vm-id=vm-3006 \
-		--source-vmdk="[TEST_DS] migtest/migtest.vmdk" \
-		--owner-name=test-cli \
-		--target-namespace=redhat-test \
+		--source-vm-id=vm-48244 \
+		--source-vmdk="[BorisO-tmp] BorisO-tmp/BorisO-tmp_3.vmdk" \
+		--owner-name=test-cli2 \
+		--target-namespace=flashsystem-test \
 		--storage-vendor-product=flashsystem \
 		--storage-skip-ssl-verification=true \
 		--secret-name=populator-secret \
