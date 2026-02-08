@@ -15,9 +15,12 @@ import (
 // NewMappingCmd creates the mapping deletion command with subcommands
 func NewMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:          "mapping",
-		Short:        "Delete mappings",
-		Long:         `Delete network and storage mappings`,
+		Use:   "mapping",
+		Short: "Delete mappings",
+		Long: `Delete network and storage mappings.
+
+Mappings define how source resources translate to target resources. Use
+'mapping network' or 'mapping storage' to delete specific mapping types.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// If no subcommand is specified, show help
@@ -37,8 +40,16 @@ func newDeleteNetworkMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags) 
 	var all bool
 
 	cmd := &cobra.Command{
-		Use:          "network [NAME...] [--all]",
-		Short:        "Delete one or more network mappings",
+		Use:   "network [NAME...] [--all]",
+		Short: "Delete one or more network mappings",
+		Long: `Delete one or more network mappings.
+
+Ensure no migration plans reference the mapping before deletion.`,
+		Example: `  # Delete a network mapping
+  kubectl-mtv delete mapping network my-net-map
+
+  # Delete all network mappings
+  kubectl-mtv delete mapping network --all`,
 		Args:         flags.ValidateAllFlagArgs(func() bool { return all }, 1),
 		SilenceUsage: true,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -85,8 +96,16 @@ func newDeleteStorageMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags) 
 	var all bool
 
 	cmd := &cobra.Command{
-		Use:          "storage [NAME...] [--all]",
-		Short:        "Delete one or more storage mappings",
+		Use:   "storage [NAME...] [--all]",
+		Short: "Delete one or more storage mappings",
+		Long: `Delete one or more storage mappings.
+
+Ensure no migration plans reference the mapping before deletion.`,
+		Example: `  # Delete a storage mapping
+  kubectl-mtv delete mapping storage my-storage-map
+
+  # Delete all storage mappings
+  kubectl-mtv delete mapping storage --all`,
 		Args:         flags.ValidateAllFlagArgs(func() bool { return all }, 1),
 		SilenceUsage: true,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

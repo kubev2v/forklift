@@ -17,8 +17,21 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	var all bool
 
 	cmd := &cobra.Command{
-		Use:               "plan [NAME...] [--all]",
-		Short:             "Archive one or more migration plans",
+		Use:   "plan [NAME...] [--all]",
+		Short: "Archive one or more migration plans",
+		Long: `Archive one or more migration plans.
+
+Archiving a plan marks it as completed and stops any ongoing operations.
+Archived plans are retained for historical reference but cannot be started.
+Use 'unarchive' to restore a plan if needed.`,
+		Example: `  # Archive a completed plan
+  kubectl-mtv archive plan my-migration
+
+  # Archive multiple plans
+  kubectl-mtv archive plan plan1 plan2 plan3
+
+  # Archive all plans in the namespace
+  kubectl-mtv archive plan --all`,
 		Args:              flags.ValidateAllFlagArgs(func() bool { return all }, 1),
 		SilenceUsage:      true,
 		ValidArgsFunction: completion.PlanNameCompletion(kubeConfigFlags),

@@ -20,8 +20,18 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	var vmNamesOrFile string
 
 	cmd := &cobra.Command{
-		Use:               "plan NAME",
-		Short:             "Cancel specific VMs in a running migration plan",
+		Use:   "plan NAME",
+		Short: "Cancel specific VMs in a running migration plan",
+		Long: `Cancel specific VMs in a running migration plan.
+
+This command allows you to stop the migration of selected VMs while allowing
+other VMs in the plan to continue. VMs to cancel can be specified as a
+comma-separated list or read from a file.`,
+		Example: `  # Cancel specific VMs in a plan
+  kubectl-mtv cancel plan my-migration --vms "vm1,vm2"
+
+  # Cancel VMs from a file
+  kubectl-mtv cancel plan my-migration --vms @failed-vms.yaml`,
 		Args:              cobra.ExactArgs(1),
 		SilenceUsage:      true,
 		ValidArgsFunction: completion.PlanNameCompletion(kubeConfigFlags),
