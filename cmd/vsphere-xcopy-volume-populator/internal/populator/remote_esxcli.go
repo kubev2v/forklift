@@ -9,7 +9,8 @@ import (
 	"strings"
 	"time"
 
-	version "github.com/hashicorp/go-version"
+	hversion "github.com/hashicorp/go-version"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/version"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
 	vmkfstoolswrapper "github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper"
 	"github.com/kubev2v/forklift/pkg/lib/util"
@@ -126,7 +127,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 
 	// Only ensure VIB if using VIB method
 	if !p.UseSSHMethod {
-		err = ensureVib(p.VSphereClient, host, vmDisk.Datastore, VibVersion)
+		err = ensureVib(p.VSphereClient, host, vmDisk.Datastore, version.VibVersion)
 		if err != nil {
 			return fmt.Errorf("failed to ensure VIB is installed: %w", err)
 		}
@@ -521,12 +522,12 @@ func checkScriptVersion(sshClient vmware.SSHClient, datastore, embeddedVersion s
 		return fmt.Errorf("failed to parse version JSON: %w", err)
 	}
 
-	scriptVer, err := version.NewVersion(versionInfo.Version)
+	scriptVer, err := hversion.NewVersion(versionInfo.Version)
 	if err != nil {
 		return fmt.Errorf("invalid script version format %s: %w", versionInfo.Version, err)
 	}
 
-	embeddedVer, err := version.NewVersion(embeddedVersion)
+	embeddedVer, err := hversion.NewVersion(embeddedVersion)
 	if err != nil {
 		return fmt.Errorf("invalid embedded version format %s: %w", embeddedVersion, err)
 	}
