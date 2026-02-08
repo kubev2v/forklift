@@ -1,6 +1,6 @@
 FROM registry.redhat.io/ubi9/go-toolset:1.23.6-1745588370 AS envsubst
 
-FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel9@sha256:2a659b5ec1c8510f224dd6aadee896c2f4e4396cd72a719fb6688c411ca7be21 AS builder
+FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel9@sha256:8ff0cb8587bbca8809490ff59a67496599b6c0cc8e4ca88451481a265f17e581 AS builder
 
 ARG EVENT_TITLE
 
