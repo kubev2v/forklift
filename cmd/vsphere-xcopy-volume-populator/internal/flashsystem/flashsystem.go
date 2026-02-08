@@ -77,6 +77,12 @@ type HostPort struct {
 	IQN      string `json:"iscsi_name"`
 }
 
+// FlashSystemInfo represents the system-level settings from lssystem
+type FlashSystemInfo struct {
+	VdiskProtectionEnabled string `json:"vdisk_protection_enabled"`
+	VdiskProtectionTime    string `json:"vdisk_protection_time"`
+}
+
 // FlashSystemAPIClient handles communication with the FlashSystem REST API.
 type FlashSystemAPIClient struct {
 	ManagementIP string
@@ -243,17 +249,52 @@ func (c *FlashSystemAPIClient) handleAPIError(statusCode int, body, url string) 
 	}
 }
 
+// GetSystemInfo retrieves system-level settings including volume protection configuration
+func (c *FlashSystemAPIClient) GetSystemInfo() (*FlashSystemInfo, error) {
+	klog.Infof("Fetching system info using lssystem")
+	respBytes, status, err := c.makeRequest("POST", "/lssystem", map[string]string{})
+	if err != nil || status != http.StatusOK {
+		return nil, fmt.Errorf("failed to get system info: %w, status: %d", err, status)
+	}
+
+	var sysInfo FlashSystemInfo
+	if err := json.Unmarshal(respBytes, &sysInfo); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal system info: %w", err)
+	}
+
+	klog.Infof("System info: vdisk_protection_enabled=%s, vdisk_protection_time=%s",
+		sysInfo.VdiskProtectionEnabled, sysInfo.VdiskProtectionTime)
+	return &sysInfo, nil
+}
+
 // FlashSystemClonner implements the populator.StorageApi interface.
 type FlashSystemClonner struct {
 	api *FlashSystemAPIClient
 }
 
 // NewFlashSystemClonner creates a new FlashSystemClonner.
+// It checks that vdisk protection is disabled on the FlashSystem; if protection is enabled,
+// it returns an error because it must be off for Virtual Machines (see README, section IBM FlashSystem).
 func NewFlashSystemClonner(managementIP, username, password string, sslSkipVerify bool) (FlashSystemClonner, error) {
 	client, err := NewFlashSystemAPIClient(managementIP, username, password, sslSkipVerify)
 	if err != nil {
 		return FlashSystemClonner{}, fmt.Errorf("failed to create FlashSystem API client: %w", err)
 	}
+
+	sysInfo, err := client.GetSystemInfo()
+	if err != nil {
+		return FlashSystemClonner{}, fmt.Errorf("failed to query FlashSystem system info (required to check vdisk protection): %w", err)
+	}
+
+	protectionEnabled := sysInfo.VdiskProtectionEnabled == "yes"
+	klog.Infof("FlashSystem volume protection settings: enabled=%v, protection_time=%s minutes",
+		protectionEnabled, sysInfo.VdiskProtectionTime)
+
+	if protectionEnabled {
+		klog.Error("vdisk protection must be off on the IBM FlashSystem; read about it in the README in the section 'IBM FlashSystem'")
+		return FlashSystemClonner{}, fmt.Errorf("vdisk protection is enabled on the IBM FlashSystem; it must be disabled")
+	}
+
 	return FlashSystemClonner{api: client}, nil
 }
 

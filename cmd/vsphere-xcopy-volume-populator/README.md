@@ -138,7 +138,7 @@ The `storageVendorProduct` field in the `StorageMap` identifies which storage pr
 | Dell            | `powermax`                   | [Link](#dell-powermax) |
 | Dell            | `powerstore`                 | |
 | Infinidat       | `infinibox`                  | |
-| IBM             | `flashsystem`                | |
+| IBM             | `flashsystem`                | [Link](#ibm-flashsystem) |
 
 If a storage provider wants their storage to be supported, they need
 to implement a go package named after their product, and mutate main
@@ -277,6 +277,20 @@ stringData:
 | --- | --- | --- |
 | POWERMAX_SYMMETRIX_ID | string | the symmetrix id of the storage array. Can be taken from the ConfigMap under the 'powermax' namespace, which the CSI driver uses. |
 | POWERMAX_PORT_GROUP_NAME | string | the port group to use for masking view creation. |
+
+### IBM FlashSystem
+
+Prior to using IBM FlashSystem with the volume populator (and with Virtual Machines on Red Hat OpenShift in general), **vdisk protection must be disabled** on the connected IBM FlashSystem—either globally or for the specific child pools in use.
+
+If vdisk protection is enabled, the populator will exit with an error and log that protection must be off.
+
+You can disable it on the array with the following command, please do so only after careful consideration.
+
+```bash
+chsystem -vdiskprotectionenabled no
+```
+
+For the full requirement and VM configuration details, see the IBM documentation: [Configuring a Virtual Machine on Red Hat OpenShift](https://www.ibm.com/docs/en/stg-block-csi-driver/1.13.0?topic=configuration-configuring-virtual-machine-openshift).
 
 ## Host Lease Management
 
