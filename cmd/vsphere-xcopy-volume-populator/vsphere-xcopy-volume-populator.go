@@ -288,7 +288,7 @@ func handleArgs() {
 	flag.StringVar(&secretName, "secret-name", "", "Secret name the populator controller uses it to mount env vars from it. Not for use internally")
 	flag.StringVar(&sourceVmId, "source-vm-id", "", "VM object id in vsphere")
 	flag.StringVar(&sourceVMDKFile, "source-vmdk", "", "File name to populate")
-	flag.StringVar(&storageVendor, "storage-vendor-product", os.Getenv("STORAGE_VENDOR"), "The storage vendor to work with. Current values: [vantara, ontap, primera3par, flashsystem]")
+	flag.StringVar(&storageVendor, "storage-vendor-product", os.Getenv("STORAGE_VENDOR"), "The storage vendor to work with. Current values: [flashsystem, infinibox, ontap, powerflex, powermax, powerstore, primera3par, pureFlashArray, vantara]")
 	flag.StringVar(&targetNamespace, "target-namespace", "", "Contents to populate file with")
 	flag.StringVar(&storageHostname, "storage-hostname", os.Getenv("STORAGE_HOSTNAME"), "The storage vendor api hostname")
 	flag.StringVar(&storageUsername, "storage-username", os.Getenv("STORAGE_USERNAME"), "The storage vendor api username")
