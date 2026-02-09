@@ -62,6 +62,14 @@ type VolumeTagsResponse struct {
 	TotalItemCount     *int            `json:"total_item_count"`
 }
 
+// VolumeTag represents a tag to be applied to a volume
+type VolumeTag struct {
+	Namespace string `json:"namespace"`
+	Key       string `json:"key"`
+	Value     string `json:"value"`
+	Copyable  bool   `json:"copyable"`
+}
+
 // CopyVolumeRequest represents the request for copying a volume
 type CopyVolumeRequest struct {
 	Source struct {
@@ -670,4 +678,65 @@ func compareVersions(v1, v2 string) int {
 	}
 
 	return 0
+}
+
+func (c *RestClient) SetVolumeTagsBatch(volumeId, volumeName string, tags []VolumeTag) error {
+	// Try to tag by volume ID first
+	err := c.setVolumeTagsBatchByIdentifier("resource_ids", volumeId, tags)
+	if err != nil {
+		if strings.Contains(err.Error(), "does not exist") || strings.Contains(err.Error(), "not found") {
+			klog.Warningf("Failed to tag volume by ID %s: %v. Trying with volume name %s", volumeId, err, volumeName)
+			// Fall back to tagging by name
+			err = c.setVolumeTagsBatchByIdentifier("resource_names", volumeName, tags)
+			if err != nil {
+				return fmt.Errorf("failed to tag volume by name %s: %w", volumeName, err)
+			}
+			klog.Infof("Pure REST Client: Successfully tagged volume by name: %s with %d tags", volumeName, len(tags))
+			return nil
+		}
+		return fmt.Errorf("failed to tag volume by ID %s: %w", volumeId, err)
+	}
+
+	klog.Infof("Pure REST Client: Successfully tagged volume by ID: %s with %d tags", volumeId, len(tags))
+	return nil
+}
+
+// setVolumeTagsBatchByIdentifier is a helper function that sets tags using either resource_ids or resource_names
+func (c *RestClient) setVolumeTagsBatchByIdentifier(paramName, paramValue string, tags []VolumeTag) error {
+	q := url.Values{}
+	q.Set(paramName, paramValue)
+
+	url := fmt.Sprintf("https://%s/api/%s/volumes/tags/batch?%s", c.hostname, c.apiV2, q.Encode())
+
+	jsonData, err := json.Marshal(tags)
+	if err != nil {
+		return fmt.Errorf("failed to marshal tag request: %w", err)
+	}
+
+	klog.V(2).Infof("Pure REST Client: Setting tags with %s=%s: %s", paramName, paramValue, string(jsonData))
+
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to create tag request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-auth-token", c.authToken)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send tag request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read tag response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("tag request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
 }
