@@ -3,7 +3,6 @@ package ocp
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	pathlib "path"
 
 	"github.com/gin-gonic/gin"
@@ -283,9 +282,13 @@ func (h Handler) NetworkAttachmentDefinitions(ctx *gin.Context, provider *api.Pr
 		// Validate that restricted providers can only access allowed namespaces, then search only the requested namespace
 		if provider != nil && provider.IsRestrictedHost() {
 			if requestedNS != provider.GetNamespace() && requestedNS != core.NamespaceDefault {
-				return nil, liberr.New(fmt.Sprintf(
-					"Namespace %q not allowed for restricted provider. Allowed namespaces: [%q, %q]",
-					requestedNS, provider.GetNamespace(), core.NamespaceDefault))
+				log.Info(
+					"Namespace not allowed for restricted provider, returning empty result.",
+					"namespace", requestedNS,
+					"allowed", []string{provider.GetNamespace(), core.NamespaceDefault})
+				// Clear the error so that the request can continue
+				h.clearError(ref.ToKind(&net.NetworkAttachmentDefinition{}))
+				return
 			}
 		}
 		namespacesToQuery = []string{requestedNS}
