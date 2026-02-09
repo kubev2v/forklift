@@ -13,7 +13,7 @@ ARG OCP_VERSIONS
 
 ARG API_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-api-rhel9@sha256:15cdadef9a7cb43be69842b7f696566c92f6db42bef10547d3d6ba6ed81ef343"
 
-ARG CONTROLLER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-controller-rhel9@sha256:0ec8dc8da4965b003a782bae65dcddeacc9d26f016bcac0f4244e21954961e0b"
+ARG CONTROLLER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-controller-rhel9@sha256:6c63204ee8f0a52bf107aa385368367741d8e52d085abee9c133654ba97e9646"
 
 ARG MUST_GATHER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-must-gather-rhel8@sha256:884a5cb6facd1fa94336c66e94ba3bc58d6c481b17bff3ca908cb348101fa77f"
 
@@ -35,7 +35,7 @@ ARG CLI_DOWNLOAD_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-
 
 ARG VALIDATION_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-validation-rhel9@sha256:2a8bd1495c9ca467d3a599c8287edf32805a9f5b5f67d06eec4e6518c7377b28"
 
-ARG VIRT_V2V_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel10@sha256:712f92267606e66909a77ec84252ee1a2bb7367a82bc907af840796fbc9f3f41"
+ARG VIRT_V2V_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel10@sha256:d962b48836b884248f13378c4ac3c95b7503c794ed4a20c42ee926ec15598638"
 
 ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:8b664c71dae460417e7cc8b217c8feeed65b3cbebb9d1ac9b80c5dc960db86f5"
 
