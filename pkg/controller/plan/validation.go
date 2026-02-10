@@ -1503,7 +1503,13 @@ func (r *Reconciler) validateVddkImageJob(job *batchv1.Job, plan *api.Plan) (err
 	if len(pods.Items) > 0 {
 		pod := pods.Items[0]
 		if len(pod.Status.InitContainerStatuses) == 0 {
-			return liberr.New("Validation pod doesn't contain expected init container", "pod", pod)
+			// Pod exists but init container statuses haven't been populated yet.
+			// This is normal when the pod was just created. Log it and
+			// let the next reconcile check again.
+			r.Log.Info("Validation pod init container statuses not yet available, will requeue",
+				"pod", pod.Name, "phase", pod.Status.Phase)
+			plan.Status.SetCondition(vddkValidationInProgress)
+			return
 		}
 		waiting := pod.Status.InitContainerStatuses[0].State.Waiting
 		if waiting != nil {
