@@ -53,8 +53,7 @@ func (r *ProxyServer) Run() (err error) {
 	if err != nil {
 		return
 	}
-	gin.SetMode(gin.ReleaseMode)
-	router := gin.Default()
+	router := logging.GinEngine()
 	router.Any(ProviderRoute, r.Proxy)
 	if r.TLS.Enabled {
 		err = router.RunTLS(r.address(), r.TLS.Certificate, r.TLS.Key)
