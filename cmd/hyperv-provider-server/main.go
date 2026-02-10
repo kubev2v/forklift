@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 
-	"github.com/gin-gonic/gin"
 	"github.com/kubev2v/forklift/cmd/provider-common/api"
 	"github.com/kubev2v/forklift/cmd/provider-common/auth"
 	"github.com/kubev2v/forklift/cmd/provider-common/inventory"
@@ -36,7 +35,7 @@ func main() {
 	}
 	log.Info("Started", "settings", Settings)
 
-	router := gin.Default()
+	router := logging.GinEngine()
 	router.Use(api.ErrorHandler())
 
 	inventoryHandler := api.InventoryHandler{
