@@ -98,6 +98,57 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
+  name: forklift-hyperv-server-policy
+  namespace: {{ app_namespace }}
+  labels:
+    app: {{ app_name }}
+spec:
+  podSelector:
+    matchLabels:
+      subapp: hyperv-server
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow controller communication
+  - from:
+    - podSelector:
+        matchLabels:
+          control-plane: controller-manager
+    ports: []  # All ports allowed
+  # Allow inventory access from virt-v2v pods
+  - from:
+    - podSelector:
+        matchLabels:
+          forklift.app: virt-v2v
+    ports:
+    - protocol: TCP
+      port: 8080  # HyperV server HTTP API port
+  egress:
+  # Allow communication with controller
+  - to:
+    - podSelector:
+        matchLabels:
+          control-plane: controller-manager
+    ports: []  # All ports allowed
+  # Allow WinRM access to external HyperV/Windows server
+  - ports:
+    - protocol: TCP
+      port: 5986  # WinRM HTTPS
+  # Allow SMB access to external HyperV/Windows server
+  - ports:
+    - protocol: TCP
+      port: 445   # SMB over TCP
+  # Allow DNS resolution
+  - ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+---      
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
   name: forklift-ovirt-populator-policy
   namespace: {{ app_namespace }}
   labels:
@@ -257,7 +308,6 @@ spec:
       forklift.app: image-converter
   policyTypes:
   - Ingress
-  - Egress
   ingress:
   # Allow controller communication
   - from:
@@ -265,9 +315,3 @@ spec:
         matchLabels:
           control-plane: controller-manager
     ports: []  # All ports allowed
-  egress:
-  # Image converter works with locally mounted PVCs - no network storage access needed
-  # No external egress required
-
-
-
