@@ -1644,9 +1644,17 @@ func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskNam
 
 // getPlanVM get the plan VM for the given vsphere VM
 func (r *Builder) getPlanVM(vm *model.VM) *plan.VM {
-	for _, planVM := range r.Plan.Spec.VMs {
-		if planVM.ID == vm.ID {
-			return &planVM
+	for i := range r.Plan.Spec.VMs {
+		planVM := &r.Plan.Spec.VMs[i]
+		if planVM.ID != "" && planVM.ID == vm.ID {
+			return planVM
+		}
+	}
+	// Fallback: match by Name when the spec VM has no ID
+	for i := range r.Plan.Spec.VMs {
+		planVM := &r.Plan.Spec.VMs[i]
+		if planVM.ID == "" && planVM.Name != "" && planVM.Name == vm.Name {
+			return planVM
 		}
 	}
 
@@ -1660,7 +1668,13 @@ func (r *Builder) getPlanVMStatus(vm *model.VM) *plan.VMStatus {
 	}
 
 	for _, planVMStatus := range r.Plan.Status.Migration.VMs {
-		if planVMStatus.ID == vm.ID {
+		if planVMStatus.ID != "" && planVMStatus.ID == vm.ID {
+			return planVMStatus
+		}
+	}
+	// Fallback: match by Name when the status VM has no ID
+	for _, planVMStatus := range r.Plan.Status.Migration.VMs {
+		if planVMStatus.ID == "" && planVMStatus.Name != "" && planVMStatus.Name == vm.Name {
 			return planVMStatus
 		}
 	}
@@ -1847,18 +1861,13 @@ func (r *Builder) setNetworkNameFromTemplate(vm *model.VM, mapped *api.NetworkPa
 
 // GetPVCNameTemplate returns the PVC name template
 func (r *Builder) getPVCNameTemplate(vm *model.VM) string {
-	// Get plan VM
+	// Check VM-level template first
 	planVM := r.getPlanVM(vm)
-	if planVM == nil {
-		return ""
-	}
-
-	// if vm.PVCNameTemplate is set, use it
-	if planVM.PVCNameTemplate != "" {
+	if planVM != nil && planVM.PVCNameTemplate != "" {
 		return planVM.PVCNameTemplate
 	}
 
-	// if planSpec.PVCNameTemplate is set, use it
+	// Check Plan-level template
 	if r.Plan.Spec.PVCNameTemplate != "" {
 		return r.Plan.Spec.PVCNameTemplate
 	}
@@ -1902,18 +1911,13 @@ func (r *Builder) getPlanVMSafeName(vm *model.VM) string {
 
 // getVolumeNameTemplate returns the volume name template
 func (r *Builder) getVolumeNameTemplate(vm *model.VM) string {
-	// Get plan VM
+	// Check VM-level template first
 	planVM := r.getPlanVM(vm)
-	if planVM == nil {
-		return ""
-	}
-
-	// if vm.VolumeNameTemplate is set, use it
-	if planVM.VolumeNameTemplate != "" {
+	if planVM != nil && planVM.VolumeNameTemplate != "" {
 		return planVM.VolumeNameTemplate
 	}
 
-	// if planSpec.VolumeNameTemplate is set, use it
+	// Check Plan-level template
 	if r.Plan.Spec.VolumeNameTemplate != "" {
 		return r.Plan.Spec.VolumeNameTemplate
 	}
@@ -1923,18 +1927,13 @@ func (r *Builder) getVolumeNameTemplate(vm *model.VM) string {
 
 // getNetworkNameTemplate returns the network name template
 func (r *Builder) getNetworkNameTemplate(vm *model.VM) string {
-	// Get plan VM
+	// Check VM-level template first
 	planVM := r.getPlanVM(vm)
-	if planVM == nil {
-		return ""
-	}
-
-	// if vm.NetworkNameTemplate is set, use it
-	if planVM.NetworkNameTemplate != "" {
+	if planVM != nil && planVM.NetworkNameTemplate != "" {
 		return planVM.NetworkNameTemplate
 	}
 
-	// if planSpec.NetworkNameTemplate is set, use it
+	// Check Plan-level template
 	if r.Plan.Spec.NetworkNameTemplate != "" {
 		return r.Plan.Spec.NetworkNameTemplate
 	}
