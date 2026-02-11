@@ -627,3 +627,100 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 	// do nothing
 	return
 }
+
+// ConversionPodConfig returns provider-specific configuration for the virt-v2v conversion pod.
+// OCP provider does not require any special configuration.
+func (r *Builder) ConversionPodConfig(_ ref.Ref) (*planbase.ConversionPodConfigResult, error) {
+	return &planbase.ConversionPodConfigResult{}, nil
+}
+
+// getPlanVM returns the plan VM for the given vmRef
+func (r *Builder) getPlanVM(vmRef ref.Ref) *planapi.VM {
+	for i := range r.Plan.Spec.VMs {
+		planVM := &r.Plan.Spec.VMs[i]
+		if planVM.ID != "" && planVM.ID == vmRef.ID {
+			return planVM
+		}
+	}
+	// Fallback: match by Name when the spec VM has no ID
+	for i := range r.Plan.Spec.VMs {
+		planVM := &r.Plan.Spec.VMs[i]
+		if planVM.ID == "" && planVM.Name != "" && planVM.Name == vmRef.Name {
+			return planVM
+		}
+	}
+	return nil
+}
+
+// getPlanVMStatus returns the plan VM status for the given vmRef
+func (r *Builder) getPlanVMStatus(vmRef ref.Ref) *planapi.VMStatus {
+	if r.Plan == nil || r.Plan.Status.Migration.VMs == nil {
+		return nil
+	}
+	for _, planVMStatus := range r.Plan.Status.Migration.VMs {
+		if planVMStatus.ID != "" && planVMStatus.ID == vmRef.ID {
+			return planVMStatus
+		}
+	}
+	// Fallback: match by Name when the status VM has no ID
+	for _, planVMStatus := range r.Plan.Status.Migration.VMs {
+		if planVMStatus.ID == "" && planVMStatus.Name != "" && planVMStatus.Name == vmRef.Name {
+			return planVMStatus
+		}
+	}
+	return nil
+}
+
+// getPVCNameTemplate returns the PVC name template for the given vmRef
+// Returns the VM-level template if set, otherwise the Plan-level template.
+// If neither is set, returns the default template "{{.SourcePVCName}}" which preserves
+// the original PVC name (backward compatible behavior).
+func (r *Builder) getPVCNameTemplate(vmRef ref.Ref) string {
+	// Check VM-level template first
+	planVM := r.getPlanVM(vmRef)
+	if planVM != nil && planVM.PVCNameTemplate != "" {
+		return planVM.PVCNameTemplate
+	}
+
+	// Check Plan-level template
+	if r.Plan.Spec.PVCNameTemplate != "" {
+		return r.Plan.Spec.PVCNameTemplate
+	}
+
+	// Default template that preserves original PVC name
+	return "{{.SourcePVCName}}"
+}
+
+// executeTemplate executes a Go template with the given data
+func (r *Builder) executeTemplate(templateText string, templateData any) (string, error) {
+	return templateutil.ExecuteTemplate(templateText, templateData)
+}
+
+// setPVCNameFromTemplate generates a PVC name using the configured template
+func (r *Builder) setPVCNameFromTemplate(vmRef ref.Ref, sourcePVC *core.PersistentVolumeClaim, diskIndex int) (string, error) {
+	pvcNameTemplate := r.getPVCNameTemplate(vmRef)
+
+	// Get target VM name
+	targetVmName := vmRef.Name
+	planVMStatus := r.getPlanVMStatus(vmRef)
+	if planVMStatus != nil && planVMStatus.NewName != "" {
+		targetVmName = planVMStatus.NewName
+	}
+
+	// Create template data
+	templateData := v1beta1.OCPPVCNameTemplateData{
+		VmName:             vmRef.Name,
+		TargetVmName:       targetVmName,
+		PlanName:           r.Plan.Name,
+		DiskIndex:          diskIndex,
+		SourcePVCName:      sourcePVC.Name,
+		SourcePVCNamespace: sourcePVC.Namespace,
+	}
+
+	generatedName, err := r.executeTemplate(pvcNameTemplate, &templateData)
+	if err != nil {
+		return "", liberr.Wrap(err, "failed to execute PVC name template")
+	}
+
+	return generatedName, nil
+}
