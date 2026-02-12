@@ -93,15 +93,55 @@ func NewNetappClonner(hostname, username, password string) (NetappClonner, error
 	return nc, nil
 }
 
-func (c *NetappClonner) ResolvePVToLUN(pv populator.PersistentVolume) (populator.LUN, error) {
-	// trident sets internalName attribute on a volume, and that is the real volume name in the system
-	internalName, ok := pv.VolumeAttributes["internalName"]
+// parseInternalIDToLunPath converts internalID format to LUN path format.
+// internalID format: /svm/{svm}/flexvol/{flexvol}/lun/{lun}
+// LUN path format: /vol/{flexvol}/{lun}
+func parseInternalIDToLunPath(internalID string) (string, error) {
+	// Find the flexvol section
+	_, reminder, ok := strings.Cut(internalID, "/flexvol/")
 	if !ok {
-		return populator.LUN{}, fmt.Errorf("intenalName attribute is missing on the PersistentVolume %s", pv.Name)
+		return "", fmt.Errorf("invalid internalID format: missing /flexvol/ in %s", internalID)
 	}
-	l, err := c.api.LunGetByName(context.Background(), fmt.Sprintf("/vol/%s/lun0", internalName))
+
+	// Validate that the remainder contains /lun/
+	if !strings.Contains(reminder, "/lun/") {
+		return "", fmt.Errorf("invalid internalID format: missing /lun/ in %s", internalID)
+	}
+
+	flexVol, lunName, ok := strings.Cut(reminder, "/lun/")
+	if !ok {
+		return "", fmt.Errorf("invalid internalID format: missing /lun/ in %s", internalID)
+	}
+
+	// Prepend "/vol/" to convert the format
+	return fmt.Sprintf("/vol/%s/%s", flexVol, lunName), nil
+}
+
+func (c *NetappClonner) ResolvePVToLUN(pv populator.PersistentVolume) (populator.LUN, error) {
+	var lunPath string
+
+	// Check for ontap-san-economy storage class (has internalID with full path)
+	if internalID, ok := pv.VolumeAttributes["internalID"]; ok {
+		klog.Infof("PV %s has internalID, using economy storage class path resolution", pv.Name)
+		parsedPath, err := parseInternalIDToLunPath(internalID)
+		if err != nil {
+			return populator.LUN{}, fmt.Errorf("failed to parse internalID for PV %s: %w", pv.Name, err)
+		}
+		lunPath = parsedPath
+		klog.Infof("Parsed LUN path from internalID: %s", lunPath)
+	} else {
+		// Standard ontap-san storage class - uses dedicated FlexVol with lun0
+		internalName, ok := pv.VolumeAttributes["internalName"]
+		if !ok {
+			return populator.LUN{}, fmt.Errorf("neither internalID nor internalName attribute found on PersistentVolume %s", pv.Name)
+		}
+		lunPath = fmt.Sprintf("/vol/%s/lun0", internalName)
+		klog.Infof("Using standard storage class LUN path: %s", lunPath)
+	}
+
+	l, err := c.api.LunGetByName(context.Background(), lunPath)
 	if err != nil {
-		return populator.LUN{}, err
+		return populator.LUN{}, fmt.Errorf("failed to get LUN at path %s: %w", lunPath, err)
 	}
 
 	klog.Infof("found lun %s with serial %s", l.Name, l.SerialNumber)

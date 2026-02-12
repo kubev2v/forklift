@@ -68,6 +68,59 @@ func TestNetappClonner_EnsureClonnerIgroup(t *testing.T) {
 	}
 }
 
+func TestParseInternalIDToLunPath(t *testing.T) {
+	tests := []struct {
+		name       string
+		internalID string
+		want       string
+		wantErr    bool
+	}{
+		{
+			name:       "valid ontap-san-economy internalID",
+			internalID: "/svm/vserver-ecosystem-mtv/flexvol/trident_lun_pool_copy_offload_cluster_ASVRVZBSPB/lun/copy_offload_cluster_pvc_5c9d270a_11c8_4c36_9f12_f0d5f69870cf",
+			want:       "/vol/trident_lun_pool_copy_offload_cluster_ASVRVZBSPB/copy_offload_cluster_pvc_5c9d270a_11c8_4c36_9f12_f0d5f69870cf",
+			wantErr:    false,
+		},
+		{
+			name:       "simple valid internalID",
+			internalID: "/svm/mysvm/flexvol/myflexvol/lun/mylun",
+			want:       "/vol/myflexvol/mylun",
+			wantErr:    false,
+		},
+		{
+			name:       "invalid internalID - missing flexvol",
+			internalID: "/svm/mysvm/lun/mylun",
+			want:       "",
+			wantErr:    true,
+		},
+		{
+			name:       "invalid internalID - missing lun",
+			internalID: "/svm/mysvm/flexvol/myflexvol",
+			want:       "",
+			wantErr:    true,
+		},
+		{
+			name:       "invalid internalID - empty",
+			internalID: "",
+			want:       "",
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseInternalIDToLunPath(tt.internalID)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseInternalIDToLunPath() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("parseInternalIDToLunPath() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestNetappClonner_ResolvePVToLUN(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -88,6 +141,37 @@ func TestNetappClonner_ResolvePVToLUN(t *testing.T) {
 	}
 
 	mockAPI.EXPECT().LunGetByName(gomock.Any(), lunPath).Return(expectedLUN, nil)
+
+	lun, err := clonner.ResolvePVToLUN(pv)
+	if err != nil {
+		t.Errorf("ResolvePVToLUN() error = %v, wantErr %v", err, false)
+	}
+	if lun.Name != expectedLUN.Name {
+		t.Errorf("ResolvePVToLUN() = %v, want %v", lun.Name, expectedLUN.Name)
+	}
+}
+
+func TestNetappClonner_ResolvePVToLUN_EconomyStorageClass(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockAPI := NewMockOntapAPI(ctrl)
+	clonner := &NetappClonner{api: mockAPI}
+
+	pv := populator.PersistentVolume{
+		Name: "test-pv-economy",
+		VolumeAttributes: map[string]string{
+			"internalName": "copy_offload_cluster_pvc_5c9d270a_11c8_4c36_9f12_f0d5f69870cf",
+			"internalID":   "/svm/vserver-ecosystem-mtv/flexvol/trident_lun_pool_copy_offload_cluster_ASVRVZBSPB/lun/copy_offload_cluster_pvc_5c9d270a_11c8_4c36_9f12_f0d5f69870cf",
+		},
+	}
+	expectedPath := "/vol/trident_lun_pool_copy_offload_cluster_ASVRVZBSPB/copy_offload_cluster_pvc_5c9d270a_11c8_4c36_9f12_f0d5f69870cf"
+	expectedLUN := &api.Lun{
+		Name:         expectedPath,
+		SerialNumber: "test-serial-economy",
+	}
+
+	mockAPI.EXPECT().LunGetByName(gomock.Any(), expectedPath).Return(expectedLUN, nil)
 
 	lun, err := clonner.ResolvePVToLUN(pv)
 	if err != nil {
