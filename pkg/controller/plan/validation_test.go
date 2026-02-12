@@ -244,6 +244,7 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			reconciler := createFakeReconciler(nad)
 			plan := &api.Plan{
 				Spec: api.PlanSpec{
+					TargetNamespace: "test-ns",
 					TransferNetwork: &core.ObjectReference{
 						Namespace: "test-ns",
 						Name:      "test-nad",
@@ -270,6 +271,7 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			reconciler := createFakeReconciler(nad)
 			plan := &api.Plan{
 				Spec: api.PlanSpec{
+					TargetNamespace: "test-ns",
 					TransferNetwork: &core.ObjectReference{
 						Namespace: "test-ns",
 						Name:      "test-nad",
@@ -293,6 +295,7 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			reconciler := createFakeReconciler(nad)
 			plan := &api.Plan{
 				Spec: api.PlanSpec{
+					TargetNamespace: "test-ns",
 					TransferNetwork: &core.ObjectReference{
 						Namespace: "test-ns",
 						Name:      "test-nad",
@@ -319,6 +322,7 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			reconciler := createFakeReconciler(nad)
 			plan := &api.Plan{
 				Spec: api.PlanSpec{
+					TargetNamespace: "test-ns",
 					TransferNetwork: &core.ObjectReference{
 						Namespace: "test-ns",
 						Name:      "test-nad",
@@ -330,6 +334,36 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(plan.Status.HasCondition(TransferNetNotValid)).To(gomega.BeTrue())
 			gomega.Expect(plan.Status.FindCondition(TransferNetNotValid).Reason).To(gomega.Equal(NotValid))
+		})
+
+		ginkgo.It("should set error when transfer network is in different namespace than target", func() {
+			nad := &k8snet.NetworkAttachmentDefinition{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-nad",
+					Namespace: "openshift-mtv",
+					Annotations: map[string]string{
+						AnnForkliftNetworkRoute: "192.168.1.1",
+					},
+				},
+			}
+
+			reconciler := createFakeReconciler(nad)
+			plan := &api.Plan{
+				Spec: api.PlanSpec{
+					TargetNamespace: "mtv-test",
+					TransferNetwork: &core.ObjectReference{
+						Namespace: "openshift-mtv",
+						Name:      "test-nad",
+					},
+				},
+			}
+
+			err := reconciler.validateTransferNetwork(plan)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(TransferNetNotValid)).To(gomega.BeTrue())
+			gomega.Expect(plan.Status.FindCondition(TransferNetNotValid).Reason).To(gomega.Equal(NotValid))
+			gomega.Expect(plan.Status.FindCondition(TransferNetNotValid).Message).To(
+				gomega.ContainSubstring("different namespace"))
 		})
 
 		ginkgo.It("should set error when NAD does not exist", func() {
