@@ -170,6 +170,13 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		return err
 	}
 
+	// If critical conditions were found (e.g. missing network/storage maps),
+	// context may not be available, skip the validations that require context.
+	// The blocker conditions have already been set, reconciler will not try to execute the plan.
+	if plan.Status.HasBlockerCondition() {
+		return nil
+	}
+
 	var ctx *plancontext.Context
 	ctx, err = plancontext.New(r, plan, r.Log)
 	if err != nil {
