@@ -778,8 +778,9 @@ var _ = Describe("Conversion", func() {
 				Expect(err).ToNot(HaveOccurred())
 				// First disk should be updated
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
-				// Second disk should keep original path (warning logged)
-				Expect(result).To(ContainSubstring("/original/path/disk2.vmdk"))
+				// Extra disks beyond available are removed from output
+				Expect(result).ToNot(ContainSubstring("/original/path/disk2.vmdk"))
+				Expect(result).ToNot(ContainSubstring("sdb"))
 			},
 		)
 	})
