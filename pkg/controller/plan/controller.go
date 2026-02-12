@@ -36,6 +36,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -193,6 +194,35 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	defer func() {
 		r.Log.V(2).Info("Conditions.", "all", plan.Status.Conditions)
 	}()
+
+	if plan.DeletionTimestamp != nil {
+		r.Log.Info("Plan being deleted, running cleanup.")
+		// Populate plan.Referenced so archive() can reach the destination cluster.
+		// Fails when the provider is already deleted, but archive() tolerates that.
+		if validateErr := r.validate(plan); validateErr != nil {
+			r.Log.V(1).Info("Validation failed during deletion cleanup (non-fatal).", "error", validateErr)
+		}
+		// Best-effort cleanup of migration resources.
+		r.archive(plan)
+		// Always remove the finalizer so Kubernetes can delete the CR.
+		patch := client.MergeFrom(plan.DeepCopy())
+		controllerutil.RemoveFinalizer(plan, api.PlanFinalizer)
+		if err = r.Client.Patch(context.TODO(), plan, patch); err != nil {
+			r.Log.Error(err, "Failed to remove plan finalizer.")
+			result.RequeueAfter = base.SlowReQ
+		}
+		return
+	}
+
+	// Ensure finalizer is present so cleanup runs on deletion.
+	if !controllerutil.ContainsFinalizer(plan, api.PlanFinalizer) {
+		patch := client.MergeFrom(plan.DeepCopy())
+		controllerutil.AddFinalizer(plan, api.PlanFinalizer)
+		if err = r.Client.Patch(context.TODO(), plan, patch); err != nil {
+			r.Log.Error(err, "Failed to add plan finalizer.")
+			return
+		}
+	}
 
 	// Don't reconcile if the plan is archived.
 	if plan.Spec.Archived && plan.Status.HasCondition(Archived) {
