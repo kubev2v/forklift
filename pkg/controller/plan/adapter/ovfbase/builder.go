@@ -64,7 +64,7 @@ const (
 // OVA disk backing file.
 var backingFilePattern = regexp.MustCompile(`-\d\d\d\d\d\d.vmdk`)
 
-// Builder for OVF-based providers (OVA and HyperV).
+// Builder for OVF-based providers.
 type Builder struct {
 	*plancontext.Context
 }
@@ -83,7 +83,6 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		return
 	}
 
-	// Both OVA and HyperV use the same OVA mode with OVF directory path
 	// virt-v2v -i ova reads the OVF file and finds the disk references
 	env = append(
 		env,

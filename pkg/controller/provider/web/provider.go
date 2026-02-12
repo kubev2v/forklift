@@ -153,7 +153,7 @@ func (h ProviderHandler) List(ctx *gin.Context) {
 		Handler: base.Handler{
 			Container: h.Container,
 		},
-		Config: hyperv.Config,
+		Config: hyperv.DefaultConfig,
 	}
 	status, err = hypervHandler.Prepare(ctx)
 	if status != http.StatusOK {
