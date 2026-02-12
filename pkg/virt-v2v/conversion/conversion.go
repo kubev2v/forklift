@@ -400,6 +400,22 @@ func (c *Conversion) GetDomainXML() (string, error) {
 	return modifiedXML, nil
 }
 
+func updateDiskSource(disk *libvirtxml.DomainDisk, path string) bool {
+	if disk.Source == nil {
+		return false
+	}
+
+	switch {
+	case disk.Source.File != nil:
+		disk.Source.File.File = path
+	case disk.Source.Block != nil:
+		disk.Source.Block.Dev = path
+	default:
+		return false
+	}
+	return true
+}
+
 // modify the domain XML to use the local disk paths for in-place conversions
 func (c *Conversion) updateDiskPaths(domainXML string) (string, error) {
 	fmt.Printf("Updating disk paths: found %d disks\n", len(c.Disks))
@@ -408,28 +424,19 @@ func (c *Conversion) updateDiskPaths(domainXML string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to parse domain XML: %w", err)
 	}
-
-	for i, domainDisk := range domain.Devices.Disks {
+	updatedDisks := []libvirtxml.DomainDisk{}
+	for i, disk := range domain.Devices.Disks {
 		if i >= len(c.Disks) {
 			fmt.Printf("WARNING: disk %d in domain XML but only %d disks available\n", i, len(c.Disks))
-			continue
+			break
 		}
 
-		if domainDisk.Source == nil {
-			fmt.Printf("skipping disk %d: no source defined\n", i)
-			continue
-		}
-
-		if domainDisk.Source.File != nil {
-			domainDisk.Source.File.File = c.Disks[i].Link
-			fmt.Printf("Updated disk %d file source to: %s\n", i, c.Disks[i].Link)
-		} else if domainDisk.Source.Block != nil {
-			domainDisk.Source.Block.Dev = c.Disks[i].Link
-			fmt.Printf("Updated disk %d block source to: %s\n", i, c.Disks[i].Link)
-		} else {
-			fmt.Printf("WARNING: skipping disk %d: unsupported source type\n", i)
+		newPath := c.Disks[i].Link
+		if updated := updateDiskSource(&disk, newPath); updated {
+			updatedDisks = append(updatedDisks, disk)
 		}
 	}
+	domain.Devices.Disks = updatedDisks
 
 	modifiedXML, err := domain.Marshal()
 	if err != nil {
