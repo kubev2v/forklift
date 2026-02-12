@@ -1333,6 +1333,9 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		return
 	}
 
+	if !r.Context.Plan.Spec.MigrateSharedDisks {
+		vm.RemoveSharedDisks()
+	}
 	// Get sorted disks to maintain consistent indexing with other parts of the system
 	sortedDisks := r.sortedDisksAsVmware(vm.Disks)
 
