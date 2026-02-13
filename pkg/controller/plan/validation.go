@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 
@@ -93,6 +94,7 @@ const (
 	VMMigrationTypeUnsupported      = "VMMigrationTypeUnsupported"
 	GuestToolsIssue                 = "GuestToolsIssue"
 	VDDKAndOffloadMixedUsage        = "VDDKAndOffloadMixedUsage"
+	RestrictedPodSecurity           = "RestrictedPodSecurity"
 )
 
 // Categories
@@ -234,6 +236,12 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	// Validate conversion temp storage configuration
 	if err = r.validateConversionTempStorage(plan); err != nil {
 		return err
+	}
+
+	// Validate pod security policies (non-blocking warning)
+	if err = r.validatePodSecurity(plan); err != nil {
+		// Log error but don't block validation
+		r.Log.V(1).Info("Failed to validate pod security policies", "error", err)
 	}
 
 	return nil
@@ -1911,6 +1919,85 @@ func (r *Reconciler) validateConversionTempStorage(plan *api.Plan) error {
 		plan.Status.SetCondition(conversionTempStorageSizeInvalid)
 		r.Log.Info("Conversion temp storage size is invalid", "error", err.Error(), "size", storageSize, "plan", plan.Name, "namespace", plan.Namespace)
 		return nil
+	}
+
+	return nil
+}
+
+// validatePodSecurity checks if the controller namespace has restrictive pod security policies
+// that may cause migration failures. This is a non-blocking warning.
+func (r *Reconciler) validatePodSecurity(plan *api.Plan) error {
+	// Get controller namespace from environment variable
+	// POD_NAMESPACE should be set via fieldRef in the deployment template
+	controllerNamespace := os.Getenv("POD_NAMESPACE")
+	if controllerNamespace == "" {
+		// Fallback to settings if available (loaded from POD_NAMESPACE env var)
+		controllerNamespace = settings.Settings.Inventory.Namespace
+	}
+	if controllerNamespace == "" {
+		// Can't check if we don't know the controller namespace
+		// POD_NAMESPACE should be set via fieldRef.fieldPath: metadata.namespace in the deployment
+		r.Log.Info("Skipping pod security check: POD_NAMESPACE not set in controller pod",
+			"plan", plan.Name,
+			"planNamespace", plan.GetNamespace())
+		return nil
+	}
+
+	// Log which namespace we're checking (for debugging)
+	r.Log.Info("Checking pod security policy for controller namespace",
+		"controllerNamespace", controllerNamespace,
+		"plan", plan.Name,
+		"planNamespace", plan.GetNamespace())
+
+	// Read the namespace object
+	ns := &core.Namespace{}
+	err := r.Client.Get(context.TODO(), client.ObjectKey{Name: controllerNamespace}, ns)
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			// Namespace not found, skip check
+			r.Log.Info("Skipping pod security check: namespace not found",
+				"namespace", controllerNamespace)
+			return nil
+		}
+		return liberr.Wrap(err, "failed to get controller namespace", "namespace", controllerNamespace)
+	}
+
+	// Check pod-security.kubernetes.io/enforce label
+	enforceLabel := ns.Labels["pod-security.kubernetes.io/enforce"]
+	isRestricted := false
+
+	r.Log.Info("Checking pod security policy",
+		"namespace", controllerNamespace,
+		"enforceLabel", enforceLabel,
+		"plan", plan.Name)
+
+	if enforceLabel == "restricted" {
+		isRestricted = true
+		r.Log.Info("Detected restricted pod security policy from namespace label",
+			"namespace", controllerNamespace,
+			"label", "pod-security.kubernetes.io/enforce",
+			"value", enforceLabel,
+			"plan", plan.Name)
+	}
+
+	// If restricted policies detected, add a warning condition (non-blocking)
+	if isRestricted {
+		restrictedPodSecurity := libcnd.Condition{
+			Type:     RestrictedPodSecurity,
+			Status:   True,
+			Category: Warn, // Non-blocking warning
+			Message:  fmt.Sprintf("Namespace '%s' where MTV is installed may be restricted, causing migration to fail. Disable SCC label synchronization and apply the privileged label.", controllerNamespace),
+			Items:    []string{},
+		}
+		plan.Status.SetCondition(restrictedPodSecurity)
+		r.Log.Info("Restricted pod security policy detected - warning condition added",
+			"namespace", controllerNamespace,
+			"plan", plan.Name)
+	} else {
+		r.Log.Info("No restricted pod security policy detected",
+			"namespace", controllerNamespace,
+			"enforceLabel", enforceLabel,
+			"plan", plan.Name)
 	}
 
 	return nil
