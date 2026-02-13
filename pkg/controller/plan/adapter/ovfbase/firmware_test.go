@@ -88,6 +88,30 @@ func TestMapFirmware(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:       "OVF 'efi' value should map to EFI bootloader (not BIOS)",
+			firmware:   "efi",
+			secureBoot: false,
+			expectedBootloader: &cnv.Bootloader{
+				EFI: &cnv.EFI{
+					SecureBoot: boolPtr(false),
+				},
+			},
+			expectedSMM: nil,
+		},
+		{
+			name:       "OVF 'efi' with SecureBoot enabled",
+			firmware:   "efi",
+			secureBoot: true,
+			expectedBootloader: &cnv.Bootloader{
+				EFI: &cnv.EFI{
+					SecureBoot: boolPtr(true),
+				},
+			},
+			expectedSMM: &cnv.FeatureState{
+				Enabled: boolPtr(true),
+			},
+		},
 	}
 
 	for _, tt := range tests {
