@@ -244,6 +244,7 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			reconciler := createFakeReconciler(nad)
 			plan := &api.Plan{
 				Spec: api.PlanSpec{
+					TargetNamespace: "test-ns",
 					TransferNetwork: &core.ObjectReference{
 						Namespace: "test-ns",
 						Name:      "test-nad",
@@ -270,6 +271,7 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			reconciler := createFakeReconciler(nad)
 			plan := &api.Plan{
 				Spec: api.PlanSpec{
+					TargetNamespace: "test-ns",
 					TransferNetwork: &core.ObjectReference{
 						Namespace: "test-ns",
 						Name:      "test-nad",
@@ -293,6 +295,7 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			reconciler := createFakeReconciler(nad)
 			plan := &api.Plan{
 				Spec: api.PlanSpec{
+					TargetNamespace: "test-ns",
 					TransferNetwork: &core.ObjectReference{
 						Namespace: "test-ns",
 						Name:      "test-nad",
@@ -319,6 +322,7 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			reconciler := createFakeReconciler(nad)
 			plan := &api.Plan{
 				Spec: api.PlanSpec{
+					TargetNamespace: "test-ns",
 					TransferNetwork: &core.ObjectReference{
 						Namespace: "test-ns",
 						Name:      "test-nad",
@@ -330,6 +334,36 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(plan.Status.HasCondition(TransferNetNotValid)).To(gomega.BeTrue())
 			gomega.Expect(plan.Status.FindCondition(TransferNetNotValid).Reason).To(gomega.Equal(NotValid))
+		})
+
+		ginkgo.It("should set error when transfer network is in different namespace than target", func() {
+			nad := &k8snet.NetworkAttachmentDefinition{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-nad",
+					Namespace: "openshift-mtv",
+					Annotations: map[string]string{
+						AnnForkliftNetworkRoute: "192.168.1.1",
+					},
+				},
+			}
+
+			reconciler := createFakeReconciler(nad)
+			plan := &api.Plan{
+				Spec: api.PlanSpec{
+					TargetNamespace: "mtv-test",
+					TransferNetwork: &core.ObjectReference{
+						Namespace: "openshift-mtv",
+						Name:      "test-nad",
+					},
+				},
+			}
+
+			err := reconciler.validateTransferNetwork(plan)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(TransferNetNotValid)).To(gomega.BeTrue())
+			gomega.Expect(plan.Status.FindCondition(TransferNetNotValid).Reason).To(gomega.Equal(NotValid))
+			gomega.Expect(plan.Status.FindCondition(TransferNetNotValid).Message).To(
+				gomega.ContainSubstring("different namespace"))
 		})
 
 		ginkgo.It("should set error when NAD does not exist", func() {
@@ -702,3 +736,186 @@ func createPlan(name, namespace string, source, destination *api.Provider) *api.
 		},
 	}
 }
+
+var _ = ginkgo.Describe("Template Validation", func() {
+	var reconciler *Reconciler
+
+	ginkgo.BeforeEach(func() {
+		reconciler = createFakeReconciler()
+	})
+
+	ginkgo.Describe("IsValidVolumeNameTemplate", func() {
+		ginkgo.It("should pass with empty template", func() {
+			err := reconciler.IsValidVolumeNameTemplate("")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should pass with valid simple template", func() {
+			err := reconciler.IsValidVolumeNameTemplate("disk-{{.VolumeIndex}}")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should pass with template using PVCName", func() {
+			err := reconciler.IsValidVolumeNameTemplate("vol-{{.PVCName}}")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should fail with invalid template syntax", func() {
+			err := reconciler.IsValidVolumeNameTemplate("disk-{{.InvalidField}}")
+			gomega.Expect(err).To(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should fail with unclosed template braces", func() {
+			err := reconciler.IsValidVolumeNameTemplate("disk-{{.VolumeIndex")
+			gomega.Expect(err).To(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should fail when output is not valid DNS label", func() {
+			// Template that produces output starting with hyphen
+			err := reconciler.IsValidVolumeNameTemplate("-{{.PVCName}}")
+			gomega.Expect(err).To(gomega.HaveOccurred())
+		})
+	})
+
+	ginkgo.Describe("IsValidNetworkNameTemplate", func() {
+		ginkgo.It("should pass with empty template", func() {
+			err := reconciler.IsValidNetworkNameTemplate("")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should pass with valid simple template", func() {
+			err := reconciler.IsValidNetworkNameTemplate("net-{{.NetworkIndex}}")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should pass with template using NetworkName", func() {
+			err := reconciler.IsValidNetworkNameTemplate("{{.NetworkName}}")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should fail with invalid template syntax", func() {
+			err := reconciler.IsValidNetworkNameTemplate("net-{{.InvalidField}}")
+			gomega.Expect(err).To(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should fail with unclosed template braces", func() {
+			err := reconciler.IsValidNetworkNameTemplate("net-{{.NetworkIndex")
+			gomega.Expect(err).To(gomega.HaveOccurred())
+		})
+	})
+
+	ginkgo.Describe("IsValidTargetName", func() {
+		ginkgo.It("should pass with empty target name", func() {
+			err := reconciler.IsValidTargetName("")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should pass with valid DNS subdomain name", func() {
+			err := reconciler.IsValidTargetName("my-vm-name")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should pass with name containing dots", func() {
+			err := reconciler.IsValidTargetName("my.vm.name")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should fail with name starting with hyphen", func() {
+			err := reconciler.IsValidTargetName("-invalid-name")
+			gomega.Expect(err).To(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should fail with name containing uppercase", func() {
+			err := reconciler.IsValidTargetName("Invalid-Name")
+			gomega.Expect(err).To(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should fail with name containing spaces", func() {
+			err := reconciler.IsValidTargetName("invalid name")
+			gomega.Expect(err).To(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should fail with name containing underscores", func() {
+			err := reconciler.IsValidTargetName("invalid_name")
+			gomega.Expect(err).To(gomega.HaveOccurred())
+		})
+	})
+
+	ginkgo.Describe("validateVolumeNameTemplate", func() {
+		ginkgo.It("should not set condition for empty template", func() {
+			plan := &api.Plan{
+				Spec: api.PlanSpec{
+					VolumeNameTemplate: "",
+				},
+			}
+			err := reconciler.validateVolumeNameTemplate(plan)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(NotValid)).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("should not set condition for valid template", func() {
+			plan := &api.Plan{
+				Spec: api.PlanSpec{
+					VolumeNameTemplate: "disk-{{.VolumeIndex}}",
+				},
+			}
+			err := reconciler.validateVolumeNameTemplate(plan)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(NotValid)).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("should set condition for invalid template", func() {
+			plan := &api.Plan{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-plan",
+					Namespace: "test-ns",
+				},
+				Spec: api.PlanSpec{
+					VolumeNameTemplate: "{{.InvalidField}}",
+				},
+			}
+			err := reconciler.validateVolumeNameTemplate(plan)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(NotValid)).To(gomega.BeTrue())
+		})
+	})
+
+	ginkgo.Describe("validateNetworkNameTemplate", func() {
+		ginkgo.It("should not set condition for empty template", func() {
+			plan := &api.Plan{
+				Spec: api.PlanSpec{
+					NetworkNameTemplate: "",
+				},
+			}
+			err := reconciler.validateNetworkNameTemplate(plan)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(NotValid)).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("should not set condition for valid template", func() {
+			plan := &api.Plan{
+				Spec: api.PlanSpec{
+					NetworkNameTemplate: "net-{{.NetworkIndex}}",
+				},
+			}
+			err := reconciler.validateNetworkNameTemplate(plan)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(NotValid)).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("should set condition for invalid template", func() {
+			plan := &api.Plan{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-plan",
+					Namespace: "test-ns",
+				},
+				Spec: api.PlanSpec{
+					NetworkNameTemplate: "{{.InvalidField}}",
+				},
+			}
+			err := reconciler.validateNetworkNameTemplate(plan)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(NotValid)).To(gomega.BeTrue())
+		})
+	})
+})

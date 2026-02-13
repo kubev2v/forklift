@@ -3,6 +3,10 @@
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
+# The build version which relies on release engineering setting tags that starts with 'v' like v2.10.4
+VERSION := $(shell git describe --always --tags --match 'v*' 2>/dev/null || echo "v0.0.0-dev")
+SCRIPT_VERSION := $(shell sh vmkfstools-wrapper/vmkfstools_wrapper.sh --version --output simple)
+
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -33,19 +37,23 @@ test: fmt vet
 generate:
 	GOFLAGS="-mod=mod" go generate ./...
 
+LDFLAGS := -w -s \
+		   -X 'github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/version.Version=$(VERSION)' \
+		   -X 'github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/version.VibVersion=$(VIB_VERSION)' \
+		   -X 'github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper.Version=$(SCRIPT_VERSION)'
 .PHONY: build
 build: fmt vet
 	$(eval SCRIPT_VERSION := $(shell sh vmkfstools-wrapper/vmkfstools_wrapper.sh --version --output simple))
 	PATH="$(PATH)" \
 	go build \
-	-ldflags="-w -s -X github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator.VibVersion=$(VIB_VERSION) -X github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper.Version=$(SCRIPT_VERSION)" \
-	-o bin/vsphere-xcopy-volume-populator \
-	vsphere-xcopy-volume-populator.go
+	    -ldflags="$(LDFLAGS)" \
+	    -o bin/vsphere-xcopy-volume-populator \
+	    vsphere-xcopy-volume-populator.go
 	PATH="$(PATH)" \
-	go build \
-	-ldflags="-w -s" \
-	-o bin/vib-installer \
-	cmd/vib-installer.go
+	    go build \
+	    -ldflags="-w -s" \
+	    -o bin/vib-installer \
+	    cmd/vib-installer.go
 
 MOCKGEN := $(shell which mockgen 2>/dev/null)
 install-mockgen:
@@ -66,10 +74,10 @@ test-copy-using-cli: build
 
 test-flashsystem: build
 	bin/vsphere-xcopy-volume-populator \
-		--source-vm-id=vm-3006 \
-		--source-vmdk="[TEST_DS] migtest/migtest.vmdk" \
-		--owner-name=test-cli \
-		--target-namespace=redhat-test \
+		--source-vm-id=vm-48244 \
+		--source-vmdk="[BorisO-tmp] BorisO-tmp/BorisO-tmp_3.vmdk" \
+		--owner-name=test-cli2 \
+		--target-namespace=flashsystem-test \
 		--storage-vendor-product=flashsystem \
 		--storage-skip-ssl-verification=true \
 		--secret-name=populator-secret \

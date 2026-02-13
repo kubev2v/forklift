@@ -508,9 +508,14 @@ spec:
           path: virt_v2v_dont_request_kvm
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:hidden
-        - description: Additional arguments for virt-v2v
+        - description: Additional arguments for virt-v2v conversion
           displayName: Virt-v2v Extra Args
           path: virt_v2v_extra_args
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:hidden
+        - description: Additional arguments for virt-v2v-inspector
+          displayName: Virt-v2v Inspector Extra Args
+          path: virt_v2v_inspector_extra_args
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:hidden
         - description: ConfigMap name containing extra virt-v2v configuration

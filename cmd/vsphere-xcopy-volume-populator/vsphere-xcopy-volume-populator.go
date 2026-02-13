@@ -24,6 +24,7 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/primera3par"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/pure"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vantara"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/version"
 
 	forklift "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/prometheus/client_golang/prometheus"
@@ -36,8 +37,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 )
-
-var version = "unknown"
 
 var (
 	crName                     string
@@ -74,6 +73,7 @@ var (
 
 func main() {
 	handleArgs()
+	klog.Info(version.Get())
 
 	var storageApi populator.StorageApi
 	product := forklift.StorageVendorProduct(storageVendor)
@@ -288,7 +288,7 @@ func handleArgs() {
 	flag.StringVar(&secretName, "secret-name", "", "Secret name the populator controller uses it to mount env vars from it. Not for use internally")
 	flag.StringVar(&sourceVmId, "source-vm-id", "", "VM object id in vsphere")
 	flag.StringVar(&sourceVMDKFile, "source-vmdk", "", "File name to populate")
-	flag.StringVar(&storageVendor, "storage-vendor-product", os.Getenv("STORAGE_VENDOR"), "The storage vendor to work with. Current values: [vantara, ontap, primera3par, flashsystem]")
+	flag.StringVar(&storageVendor, "storage-vendor-product", os.Getenv("STORAGE_VENDOR"), "The storage vendor to work with. Current values: [flashsystem, infinibox, ontap, powerflex, powermax, powerstore, primera3par, pureFlashArray, vantara]")
 	flag.StringVar(&targetNamespace, "target-namespace", "", "Contents to populate file with")
 	flag.StringVar(&storageHostname, "storage-hostname", os.Getenv("STORAGE_HOSTNAME"), "The storage vendor api hostname")
 	flag.StringVar(&storageUsername, "storage-username", os.Getenv("STORAGE_USERNAME"), "The storage vendor api username")
@@ -310,8 +310,7 @@ func handleArgs() {
 	flag.Parse()
 
 	if showVersion {
-		fmt.Println(os.Args[0], version)
-		fmt.Printf("VIB version: %s\n", populator.VibVersion)
+		klog.Info(version.Get())
 		os.Exit(0)
 	}
 

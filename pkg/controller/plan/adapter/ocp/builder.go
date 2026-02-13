@@ -710,7 +710,14 @@ func (r *Builder) ConversionPodConfig(_ ref.Ref) (*planbase.ConversionPodConfigR
 func (r *Builder) getPlanVM(vmRef ref.Ref) *planapi.VM {
 	for i := range r.Plan.Spec.VMs {
 		planVM := &r.Plan.Spec.VMs[i]
-		if planVM.ID == vmRef.ID {
+		if planVM.ID != "" && planVM.ID == vmRef.ID {
+			return planVM
+		}
+	}
+	// Fallback: match by Name when the spec VM has no ID
+	for i := range r.Plan.Spec.VMs {
+		planVM := &r.Plan.Spec.VMs[i]
+		if planVM.ID == "" && planVM.Name != "" && planVM.Name == vmRef.Name {
 			return planVM
 		}
 	}
@@ -723,7 +730,13 @@ func (r *Builder) getPlanVMStatus(vmRef ref.Ref) *planapi.VMStatus {
 		return nil
 	}
 	for _, planVMStatus := range r.Plan.Status.Migration.VMs {
-		if planVMStatus.ID == vmRef.ID {
+		if planVMStatus.ID != "" && planVMStatus.ID == vmRef.ID {
+			return planVMStatus
+		}
+	}
+	// Fallback: match by Name when the status VM has no ID
+	for _, planVMStatus := range r.Plan.Status.Migration.VMs {
+		if planVMStatus.ID == "" && planVMStatus.Name != "" && planVMStatus.Name == vmRef.Name {
 			return planVMStatus
 		}
 	}
