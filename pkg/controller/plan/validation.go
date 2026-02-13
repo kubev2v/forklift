@@ -497,6 +497,7 @@ func (r *Reconciler) validateNetworkMap(plan *api.Plan) (err error) {
 		for _, networkMap := range mp.Spec.Map {
 			if networkMap.Destination.Type == Pod {
 				hasMappingToPodNetwork = true
+				break
 			}
 		}
 		// The UDNs can be valid network for which there are additional validations to check the subnet ranges per VM
@@ -653,7 +654,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Status:   True,
 		Reason:   MissingGuestInfo,
 		Category: api.CategoryWarn,
-		Message:  "Guest information on vNICs is missing, cannot preserve static IPs. If this machine has static IP, make sure VMware tools are installed and the VM is running.",
+		Message:  missingStaticIPsMessage(plan),
 		Items:    []string{},
 	}
 	vmIpDoesNotMatchUdnSubnet := libcnd.Condition{
@@ -1480,6 +1481,20 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 	}
 
 	return
+}
+
+func missingStaticIPsMessage(plan *api.Plan) string {
+	guestTools := "guest tools"
+	source := plan.Referenced.Provider.Source
+	if source != nil {
+		switch source.Type() {
+		case api.VSphere:
+			guestTools = "VMware Tools"
+		case api.HyperV:
+			guestTools = "Hyper-V Integration Services"
+		}
+	}
+	return fmt.Sprintf("Guest information on vNICs is missing, cannot preserve static IPs. Make sure %s is installed and the VM is running.", guestTools)
 }
 
 func jobExceedsDeadline(job *batchv1.Job) bool {

@@ -189,6 +189,11 @@ func (c *Conversion) addVirtV2vArgs(cmd utils.CommandBuilder) (err error) {
 		}
 	case config.OVA:
 		c.virtV2vOVAArgs(cmd)
+	case config.HYPERV:
+		err = c.virtV2vHyperVArgs(cmd)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -249,6 +254,26 @@ func (c *Conversion) addVirtV2vVsphereArgsForInspection(cmd utils.CommandBuilder
 func (c *Conversion) virtV2vOVAArgs(cmd utils.CommandBuilder) {
 	cmd.AddArg("-i", "ova")
 	cmd.AddPositional(c.DiskPath)
+}
+
+func (c *Conversion) virtV2vHyperVArgs(cmd utils.CommandBuilder) error {
+	cmd.AddArg("-i", "disk")
+	if err := c.addCommonArgs(cmd); err != nil {
+		return err
+	}
+	// Add disk paths as positional arguments (comma-separated in DiskPath)
+	var addedDisks int
+	for _, diskPath := range strings.Split(c.DiskPath, ",") {
+		diskPath = strings.TrimSpace(diskPath)
+		if diskPath != "" {
+			cmd.AddPositional(diskPath)
+			addedDisks++
+		}
+	}
+	if addedDisks == 0 {
+		return fmt.Errorf("no valid disk paths provided for HyperV conversion")
+	}
+	return nil
 }
 
 func (c *Conversion) RunVirtV2v() error {

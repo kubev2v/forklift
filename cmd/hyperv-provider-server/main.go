@@ -4,10 +4,9 @@ import (
 	"fmt"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kubev2v/forklift/cmd/hyperv-provider-server/collector"
+	"github.com/kubev2v/forklift/cmd/hyperv-provider-server/handler"
 	"github.com/kubev2v/forklift/cmd/provider-common/api"
-	"github.com/kubev2v/forklift/cmd/provider-common/auth"
-	"github.com/kubev2v/forklift/cmd/provider-common/inventory"
-	"github.com/kubev2v/forklift/cmd/provider-common/ovf"
 	"github.com/kubev2v/forklift/cmd/provider-common/settings"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 )
@@ -29,35 +28,40 @@ func main() {
 	// Set the logger name for the API package
 	api.SetLogger("hyperv|api")
 
+	// Load common settings
 	err = Settings.Load()
 	if err != nil {
 		log.Error(err, "failed to load settings")
 		panic(err)
 	}
-	log.Info("Started", "settings", Settings)
 
+	// Load HyperV-specific settings
+	err = Settings.LoadHyperV()
+	if err != nil {
+		log.Error(err, "failed to load HyperV settings")
+		panic(err)
+	}
+
+	log.Info("Started",
+		"provider", Settings.Provider.Name,
+		"namespace", Settings.Provider.Namespace,
+		"hypervUrl", Settings.HyperV.URL,
+		"smbUrl", Settings.HyperV.SMBUrl,
+		"smbMountPath", Settings.CatalogPath,
+		"refreshInterval", Settings.HyperV.RefreshInterval)
+
+	hvCollector := collector.NewCollector(Settings)
+	go hvCollector.Start()
+
+	// Setup HTTP router
 	router := gin.Default()
 	router.Use(api.ErrorHandler())
 
-	inventoryHandler := api.InventoryHandler{
-		Settings:     Settings,
-		ProviderType: inventory.ProviderTypeHyperV,
+	inventoryHandler := handler.InventoryHandler{
+		Collector: hvCollector,
 	}
 	inventoryHandler.AddRoutes(router)
 
-	if Settings.ApplianceEndpoints {
-		appliances := api.ApplianceHandler{
-			StoragePath:   Settings.CatalogPath,
-			AuthRequired:  Settings.Auth.Required,
-			FileExtension: ovf.ExtOVF,
-			Auth: auth.NewProviderAuth(
-				Settings.Provider.Namespace,
-				Settings.Provider.Name,
-				Settings.Provider.Verb,
-				Settings.Auth.TTL),
-		}
-		appliances.AddRoutes(router)
-	}
-
+	log.Info("Starting HTTP server", "port", Settings.Port)
 	err = router.Run(fmt.Sprintf(":%s", Settings.Port))
 }
