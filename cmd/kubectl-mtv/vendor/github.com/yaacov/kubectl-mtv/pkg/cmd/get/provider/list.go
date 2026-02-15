@@ -14,7 +14,84 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/providerutil"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/output"
+	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
+
+// getProviderRelevantFields returns the fields that are relevant for display
+func getProviderRelevantFields(providerType string) map[string]string {
+	// Map field names to their inventory resource types for counting
+	// All providers show VMS and NETWORKS columns
+	return map[string]string{
+		"vmCount":      "vms",
+		"networkCount": "networks",
+	}
+}
+
+// normalizeProviderInventory ensures all relevant fields exist for a provider
+// and attempts to count missing fields from inventory if possible
+func normalizeProviderInventory(ctx context.Context, configFlags *genericclioptions.ConfigFlags, baseURL string, provider *unstructured.Unstructured, item map[string]interface{}, insecureSkipTLS bool) {
+	providerType, _, _ := unstructured.NestedString(provider.Object, "spec", "type")
+	providerName := provider.GetName()
+
+	// Get relevant fields for this provider type
+	relevantFields := getProviderRelevantFields(providerType)
+
+	// Process each relevant field
+	for fieldName, resourceType := range relevantFields {
+		// Skip if field already has a value
+		if _, exists := item[fieldName]; exists {
+			continue
+		}
+
+		// If we have inventory URL and resource type, try to count
+		if baseURL != "" && resourceType != "" {
+			count := countProviderResources(ctx, configFlags, baseURL, provider, resourceType, insecureSkipTLS)
+			if count >= 0 {
+				item[fieldName] = count
+				klog.V(4).Infof("Counted %d %s for %s provider %s", count, resourceType, providerType, providerName)
+			} else {
+				// Counting failed, but this is a relevant field - set to 0
+				item[fieldName] = 0
+				klog.V(4).Infof("Failed to count %s for %s provider %s, defaulting to 0", resourceType, providerType, providerName)
+			}
+		} else {
+			// No inventory URL or cannot count this resource type - set to 0
+			item[fieldName] = 0
+		}
+	}
+
+	// For fields that are NOT relevant to this provider, don't add them (leave undefined)
+	// The table printer will show empty cells for undefined fields
+}
+
+// getDynamicInventoryColumns returns consistent inventory columns for all provider types
+func getDynamicInventoryColumns(providerTypes map[string]bool) []output.Header {
+	// Always return the same essential columns for all providers
+	// This ensures consistent table headers
+	return []output.Header{
+		{DisplayName: "VMS", JSONPath: "vmCount"},
+		{DisplayName: "NETWORKS", JSONPath: "networkCount"},
+	}
+}
+
+// countProviderResources counts resources (vms or networks) for any provider type
+// Returns -1 if counting fails
+func countProviderResources(ctx context.Context, configFlags *genericclioptions.ConfigFlags, baseURL string, provider *unstructured.Unstructured, resourceType string, insecureSkipTLS bool) int {
+	// Fetch the resource collection from the provider
+	data, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, baseURL, provider, resourceType, insecureSkipTLS)
+	if err != nil {
+		klog.V(4).Infof("Failed to fetch %s for provider: %v", resourceType, err)
+		return -1
+	}
+
+	// Count the items in the response
+	if dataSlice, ok := data.([]interface{}); ok {
+		return len(dataSlice)
+	}
+
+	klog.V(4).Infof("Unexpected data format when counting %s for provider", resourceType)
+	return -1
+}
 
 // getProviders retrieves all providers from the given namespace
 func getProviders(ctx context.Context, dynamicClient dynamic.Interface, namespace string) (*unstructured.UnstructuredList, error) {
@@ -62,8 +139,8 @@ func getSpecificProvider(ctx context.Context, dynamicClient dynamic.Interface, n
 	}
 }
 
-// List lists providers
-func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace string, baseURL string, outputFormat string, providerName string, useUTC bool) error {
+// ListProviders lists providers without watch functionality
+func ListProviders(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace string, baseURL string, outputFormat string, providerName string, insecureSkipTLS bool) error {
 	c, err := client.GetDynamicClient(configFlags)
 	if err != nil {
 		return fmt.Errorf("failed to get client: %v", err)
@@ -104,7 +181,8 @@ func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, names
 	// Fetch bulk provider inventory data
 	var bulkProviderData map[string][]map[string]interface{}
 	if baseURL != "" {
-		if bulk, err := client.FetchProviders(configFlags, baseURL); err == nil && bulk != nil {
+		// Detail level 1: includes basic inventory counts (vmCount, hostCount, etc.) without full resource lists
+		if bulk, err := client.FetchProvidersWithDetailAndInsecure(ctx, configFlags, baseURL, 1, insecureSkipTLS); err == nil && bulk != nil {
 			if bulkMap, ok := bulk.(map[string]interface{}); ok {
 				bulkProviderData = make(map[string][]map[string]interface{})
 				// Parse bulk data for each provider type
@@ -229,6 +307,10 @@ func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, names
 			}
 		}
 
+		// Normalize inventory data: ensure all relevant fields exist for this provider type
+		// and try to count missing fields from inventory if possible
+		normalizeProviderInventory(ctx, configFlags, baseURL, provider, item, insecureSkipTLS)
+
 		// Add the item to the list
 		items = append(items, item)
 	}
@@ -266,7 +348,7 @@ func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, names
 			headers = append(headers, output.Header{DisplayName: "NAMESPACE", JSONPath: "metadata.namespace"})
 		}
 
-		// Add remaining columns
+		// Add common columns
 		headers = append(headers,
 			output.Header{DisplayName: "TYPE", JSONPath: "spec.type"},
 			output.Header{DisplayName: "URL", JSONPath: "spec.url"},
@@ -274,9 +356,20 @@ func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, names
 			output.Header{DisplayName: "CONNECTED", JSONPath: "conditionStatuses.ConnectionStatus"},
 			output.Header{DisplayName: "INVENTORY", JSONPath: "conditionStatuses.InventoryStatus"},
 			output.Header{DisplayName: "READY", JSONPath: "conditionStatuses.ReadyStatus"},
-			output.Header{DisplayName: "VMS", JSONPath: "vmCount"},
-			output.Header{DisplayName: "HOSTS", JSONPath: "hostCount"},
 		)
+
+		// Determine which provider types are present
+		providerTypes := make(map[string]bool)
+		for _, item := range items {
+			if spec, ok := item["spec"].(map[string]interface{}); ok {
+				if providerType, ok := spec["type"].(string); ok {
+					providerTypes[providerType] = true
+				}
+			}
+		}
+
+		// Add dynamic columns based on provider types present
+		headers = append(headers, getDynamicInventoryColumns(providerTypes)...)
 
 		tablePrinter := output.NewTablePrinter().WithHeaders(headers...).AddItems(items)
 
@@ -292,4 +385,11 @@ func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, names
 	}
 
 	return nil
+}
+
+// List lists providers with optional watch mode
+func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace string, baseURL string, watchMode bool, outputFormat string, providerName string, insecureSkipTLS bool) error {
+	return watch.WrapWithWatch(watchMode, outputFormat, func() error {
+		return ListProviders(ctx, configFlags, namespace, baseURL, outputFormat, providerName, insecureSkipTLS)
+	}, watch.DefaultInterval)
 }

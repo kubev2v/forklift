@@ -13,6 +13,7 @@ import (
 
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/output"
+	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
 // extractHookImage gets the image from the hook spec
@@ -91,8 +92,8 @@ func createHookItem(hook unstructured.Unstructured, useUTC bool) map[string]inte
 	return item
 }
 
-// List lists hooks
-func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace, outputFormat string, hookName string, useUTC bool) error {
+// ListHooks lists hooks without watch functionality
+func ListHooks(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace, outputFormat string, hookName string, useUTC bool) error {
 	dynamicClient, err := client.GetDynamicClient(configFlags)
 	if err != nil {
 		return fmt.Errorf("failed to get client: %v", err)
@@ -245,4 +246,11 @@ func GetHookPlaybookContent(hook unstructured.Unstructured) (string, error) {
 	}
 
 	return string(decoded), nil
+}
+
+// List lists hooks with optional watch mode
+func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace string, watchMode bool, outputFormat string, hookName string, useUTC bool) error {
+	return watch.WrapWithWatch(watchMode, outputFormat, func() error {
+		return ListHooks(ctx, configFlags, namespace, outputFormat, hookName, useUTC)
+	}, watch.DefaultInterval)
 }
