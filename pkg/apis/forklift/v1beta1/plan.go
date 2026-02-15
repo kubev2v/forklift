@@ -42,6 +42,8 @@ const (
 	MigrationOnlyConversion MigrationType = "conversion"
 )
 
+const PlanFinalizer = "forklift/plan"
+
 const (
 	// namespaceLabelPrimaryUDN is the label key used to identify namespaces with primary user-defined networks
 	namespaceLabelPrimaryUDN = "k8s.ovn.org/primary-user-defined-network"
