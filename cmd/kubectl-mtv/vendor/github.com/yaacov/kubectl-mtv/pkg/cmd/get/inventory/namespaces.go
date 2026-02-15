@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -13,18 +12,18 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
-// ListNamespaces queries the provider's namespace inventory and displays the results
-func ListNamespaces(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
+// ListNamespacesWithInsecure queries the provider's namespace inventory with optional insecure TLS skip verification
+func ListNamespacesWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
 	if watchMode {
 		return watch.Watch(func() error {
-			return listNamespacesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
-		}, 10*time.Second)
+			return listNamespacesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query, insecureSkipTLS)
+		}, watch.DefaultInterval)
 	}
 
-	return listNamespacesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return listNamespacesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query, insecureSkipTLS)
 }
 
-func listNamespacesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listNamespacesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -32,7 +31,7 @@ func listNamespacesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to verify namespace support
 	providerType, err := providerClient.GetProviderType()
@@ -44,9 +43,9 @@ func listNamespacesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.
 	var data interface{}
 	switch providerType {
 	case "openshift":
-		data, err = providerClient.GetNamespaces(4)
+		data, err = providerClient.GetNamespaces(ctx, 4)
 	case "openstack":
-		data, err = providerClient.GetProjects(4)
+		data, err = providerClient.GetProjects(ctx, 4)
 	default:
 		return fmt.Errorf("provider type '%s' does not support namespace inventory", providerType)
 	}
