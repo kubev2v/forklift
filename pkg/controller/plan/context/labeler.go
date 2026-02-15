@@ -35,3 +35,14 @@ func (r *Labeler) VMLabels(vmRef ref.Ref) map[string]string {
 	labels[LabelVM] = vmRef.ID
 	return labels
 }
+
+// VMLabelsWithExtra returns the standard VM labels (plan, migration, vmID) plus any additional
+// provider-specific labels. This allows providers to add labels like diskID, imageID, vmdkKey, etc.
+// while ensuring the core labels (plan, migration, vmID) are always present.
+func (r *Labeler) VMLabelsWithExtra(vmRef ref.Ref, extraLabels map[string]string) map[string]string {
+	labels := r.VMLabels(vmRef)
+	for k, v := range extraLabels {
+		labels[k] = v
+	}
+	return labels
+}
