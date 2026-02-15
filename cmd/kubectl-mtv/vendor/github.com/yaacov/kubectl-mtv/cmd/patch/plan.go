@@ -1,6 +1,8 @@
 package patch
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -44,6 +46,9 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	var warm bool
 	var runPreflightInspection bool
 
+	// Plan name (required)
+	var planName string
+
 	// Boolean tracking for flag changes
 	var useCompatibilityModeChanged bool
 	var preserveClusterCPUModelChanged bool
@@ -58,15 +63,37 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	var runPreflightInspectionChanged bool
 
 	cmd := &cobra.Command{
-		Use:               "plan PLAN_NAME",
-		Short:             "Patch a migration plan",
-		Long:              `Patch various fields of an existing migration plan without modifying its VMs.`,
-		Args:              cobra.ExactArgs(1),
-		SilenceUsage:      true,
-		ValidArgsFunction: completion.PlanNameCompletion(kubeConfigFlags),
+		Use:   "plan",
+		Short: "Patch a migration plan",
+		Long: `Patch an existing migration plan without modifying its VM list.
+
+Use this to update plan settings like migration type, transfer network,
+target labels, node selectors, or convertor pod configuration.
+
+Affinity Syntax (KARL):
+  The --target-affinity and --convertor-affinity flags use KARL syntax:
+    --target-affinity "REQUIRE pods(app=database) on node"
+    --convertor-affinity "PREFER pods(app=cache) on zone weight=80"
+  Rule types: REQUIRE, PREFER, AVOID, REPEL. Topology: node, zone, region, rack.
+  Run 'kubectl-mtv help karl' for the full syntax reference.`,
+		Example: `  # Change migration type to warm
+  kubectl-mtv patch plan --plan-name my-migration --migration-type warm
+
+  # Update transfer network
+  kubectl-mtv patch plan --plan-name my-migration --transfer-network my-namespace/migration-net
+
+  # Add target labels to migrated VMs
+  kubectl-mtv patch plan --plan-name my-migration --target-labels env=prod,team=platform
+
+  # Configure convertor pod scheduling
+  kubectl-mtv patch plan --plan-name my-migration --convertor-node-selector node-role=worker`,
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Get plan name from positional argument
-			planName := args[0]
+			// Validate required --plan-name flag
+			if planName == "" {
+				return fmt.Errorf("--plan-name is required")
+			}
 
 			// Resolve the appropriate namespace based on context and flags
 			namespace := client.ResolveNamespace(kubeConfigFlags)
@@ -137,36 +164,38 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 		},
 	}
 
+	cmd.Flags().StringVar(&planName, "plan-name", "", "Plan name")
+	_ = cmd.MarkFlagRequired("plan-name")
 	cmd.Flags().StringVar(&transferNetwork, "transfer-network", "", "Network to use for transferring VM data. Supports 'namespace/network-name' or just 'network-name' (uses plan namespace)")
-	cmd.Flags().StringVar(&installLegacyDrivers, "install-legacy-drivers", "", "Install legacy drivers (true/false)")
-	cmd.Flags().Var(migrationTypeFlag, "migration-type", "Migration type: cold, warm, live, or conversion (supersedes --warm flag)")
+	cmd.Flags().StringVar(&installLegacyDrivers, "install-legacy-drivers", "", "Install legacy Windows drivers (true/false, leave empty for auto-detection)")
+	cmd.Flags().Var(migrationTypeFlag, "migration-type", "Migration type: cold, warm, live, or conversion")
 	cmd.Flags().StringSliceVar(&targetLabels, "target-labels", []string{}, "Target VM labels in format key=value (can be specified multiple times)")
 	cmd.Flags().StringSliceVar(&targetNodeSelector, "target-node-selector", []string{}, "Target node selector in format key=value (can be specified multiple times)")
-	cmd.Flags().BoolVar(&useCompatibilityMode, "use-compatibility-mode", false, "Use compatibility mode for migration")
+	cmd.Flags().BoolVar(&useCompatibilityMode, "use-compatibility-mode", false, "Use compatibility devices (SATA bus, E1000E NIC) when skipGuestConversion is true")
 	cmd.Flags().StringVar(&targetAffinity, "target-affinity", "", "Target affinity using KARL syntax (e.g. 'REQUIRE pods(app=database) on node')")
 	cmd.Flags().StringVar(&targetNamespace, "target-namespace", "", "Target namespace for migrated VMs")
 	cmd.Flags().StringVar(&targetPowerState, "target-power-state", "", "Target power state for VMs after migration: 'on', 'off', or 'auto' (default: match source VM power state)")
 
-	// Convertor-related flags
+	// Convertor-related flags (only apply to providers requiring guest conversion)
 	cmd.Flags().StringSliceVar(&convertorLabels, "convertor-labels", nil, "Labels to be added to virt-v2v convertor pods (e.g., key1=value1,key2=value2)")
 	cmd.Flags().StringSliceVar(&convertorNodeSelector, "convertor-node-selector", nil, "Node selector to constrain convertor pod scheduling (e.g., key1=value1,key2=value2)")
-	cmd.Flags().StringVar(&convertorAffinity, "convertor-affinity", "", "Convertor affinity to constrain convertor pod scheduling using KARL syntax (e.g. 'REQUIRE pods(app=storage) on node')")
+	cmd.Flags().StringVar(&convertorAffinity, "convertor-affinity", "", "Convertor affinity to constrain convertor pod scheduling using KARL syntax")
 
 	// Plan metadata and configuration flags
 	cmd.Flags().StringVar(&description, "description", "", "Plan description")
-	cmd.Flags().BoolVar(&preserveClusterCPUModel, "preserve-cluster-cpu-model", false, "Preserve the CPU model and flags the VM runs with in its oVirt cluster")
-	cmd.Flags().BoolVar(&preserveStaticIPs, "preserve-static-ips", false, "Preserve static IPs of VMs in vSphere (set to false to disable)")
+	cmd.Flags().BoolVar(&preserveClusterCPUModel, "preserve-cluster-cpu-model", false, "Preserve the CPU model and flags the VM runs with in its cluster")
+	cmd.Flags().BoolVar(&preserveStaticIPs, "preserve-static-ips", false, "Preserve static IP configurations during migration")
 	cmd.Flags().StringVar(&pvcNameTemplate, "pvc-name-template", "", "Template for generating PVC names for VM disks. Variables: {{.VmName}}, {{.PlanName}}, {{.DiskIndex}}, {{.WinDriveLetter}}, {{.RootDiskIndex}}, {{.Shared}}, {{.FileName}}")
 	cmd.Flags().StringVar(&volumeNameTemplate, "volume-name-template", "", "Template for generating volume interface names in the target VM. Variables: {{.PVCName}}, {{.VolumeIndex}}")
 	cmd.Flags().StringVar(&networkNameTemplate, "network-name-template", "", "Template for generating network interface names in the target VM. Variables: {{.NetworkName}}, {{.NetworkNamespace}}, {{.NetworkType}}, {{.NetworkIndex}}")
-	cmd.Flags().BoolVar(&migrateSharedDisks, "migrate-shared-disks", true, "Determines if the plan should migrate shared disks")
+	cmd.Flags().BoolVar(&migrateSharedDisks, "migrate-shared-disks", true, "Migrate disks shared between multiple VMs")
 	cmd.Flags().BoolVar(&archived, "archived", false, "Whether this plan should be archived")
 	cmd.Flags().BoolVar(&pvcNameTemplateUseGenerateName, "pvc-name-template-use-generate-name", true, "Use generateName instead of name for PVC name template")
 	cmd.Flags().BoolVar(&deleteGuestConversionPod, "delete-guest-conversion-pod", false, "Delete guest conversion pod after successful migration")
 	cmd.Flags().BoolVar(&deleteVmOnFailMigration, "delete-vm-on-fail-migration", false, "Delete target VM when migration fails")
-	cmd.Flags().BoolVar(&skipGuestConversion, "skip-guest-conversion", false, "Skip the guest conversion process")
+	cmd.Flags().BoolVar(&skipGuestConversion, "skip-guest-conversion", false, "Skip the guest conversion process (raw disk copy mode)")
 	cmd.Flags().BoolVar(&warm, "warm", false, "Enable warm migration (use --migration-type=warm instead)")
-	cmd.Flags().BoolVar(&runPreflightInspection, "run-preflight-inspection", true, "Run preflight inspection on VM base disks before starting disk transfer (applies only to warm migrations from VMware)")
+	cmd.Flags().BoolVar(&runPreflightInspection, "run-preflight-inspection", true, "Run preflight inspection on VM base disks before starting disk transfer")
 
 	// Add completion for migration type flag
 	if err := cmd.RegisterFlagCompletionFunc("migration-type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -189,11 +218,17 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 		panic(err)
 	}
 
+	_ = cmd.RegisterFlagCompletionFunc("plan-name", completion.PlanNameCompletion(kubeConfigFlags))
+
 	return cmd
 }
 
 // NewPlanVMCmd creates the patch planvm command
 func NewPlanVMCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
+	// Plan and VM names (required)
+	var planName string
+	var vmName string
+
 	// VM-specific fields that can be patched
 	var targetName string
 	var rootDisk string
@@ -215,16 +250,19 @@ func NewPlanVMCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command
 	var deleteVmOnFailMigrationChanged bool
 
 	cmd := &cobra.Command{
-		Use:               "planvm PLAN_NAME VM_NAME",
-		Short:             "Patch a specific VM within a migration plan",
-		Long:              `Patch VM-specific fields for a VM within a migration plan's VM list.`,
-		Args:              cobra.ExactArgs(2),
-		SilenceUsage:      true,
-		ValidArgsFunction: completion.PlanNameCompletion(kubeConfigFlags),
+		Use:          "planvm",
+		Short:        "Patch a specific VM within a migration plan",
+		Long:         `Patch VM-specific fields for a VM within a migration plan's VM list.`,
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Get arguments
-			planName := args[0]
-			vmName := args[1]
+			// Validate required flags
+			if planName == "" {
+				return fmt.Errorf("--plan-name is required")
+			}
+			if vmName == "" {
+				return fmt.Errorf("--vm-name is required")
+			}
 
 			// Resolve the appropriate namespace based on context and flags
 			namespace := client.ResolveNamespace(kubeConfigFlags)
@@ -237,6 +275,11 @@ func NewPlanVMCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command
 				addPreHook, addPostHook, removeHook, clearHooks, deleteVmOnFailMigration, deleteVmOnFailMigrationChanged)
 		},
 	}
+
+	cmd.Flags().StringVar(&planName, "plan-name", "", "Plan name")
+	_ = cmd.MarkFlagRequired("plan-name")
+	cmd.Flags().StringVar(&vmName, "vm-name", "", "VM name")
+	_ = cmd.MarkFlagRequired("vm-name")
 
 	// VM-specific flags
 	cmd.Flags().StringVar(&targetName, "target-name", "", "Custom name for the VM in the target cluster")
@@ -276,6 +319,8 @@ func NewPlanVMCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command
 	}); err != nil {
 		panic(err)
 	}
+
+	_ = cmd.RegisterFlagCompletionFunc("plan-name", completion.PlanNameCompletion(kubeConfigFlags))
 
 	return cmd
 }
