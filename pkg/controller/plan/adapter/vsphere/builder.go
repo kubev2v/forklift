@@ -174,6 +174,8 @@ var legacyIdentifiers = []string{
 // vSphere disk backing file.
 var backingFilePattern = regexp.MustCompile(`-\d\d\d\d\d\d.vmdk`)
 
+var sanitizeNameRx = regexp.MustCompile(`[^a-zA-Z0-9_.-]+`)
+
 // vSphere builder.
 type Builder struct {
 	*plancontext.Context
@@ -2315,4 +2317,118 @@ func (r *Builder) ensureXCopyVolumePopulator(vp *api.VSphereXcopyVolumePopulator
 // vSphere provider does not require any special configuration.
 func (r *Builder) ConversionPodConfig(_ ref.Ref) (*planbase.ConversionPodConfigResult, error) {
 	return &planbase.ConversionPodConfigResult{}, nil
+}
+
+// SourceVMLabelsAndAnnotations converts vSphere tags to labels and custom attributes to annotations.
+func (r *Builder) SourceVMLabelsAndAnnotations(vmRef ref.Ref, tagMapping *api.TagMapping) (labels map[string]string, annotations map[string]string, sanitizationReport map[string]string, err error) {
+	vm := &model.VM{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef.String())
+		return
+	}
+
+	labels = make(map[string]string)
+	annotations = make(map[string]string)
+	sanitizationReport = make(map[string]string)
+
+	// Tags to labels
+	labelOriginalKeys := make(map[string]string)
+	for _, tag := range vm.Tags {
+		if tagMapping != nil && len(tagMapping.LabelTags) > 0 {
+			if !isInLabelTags(tag.Name, tagMapping.LabelTags) {
+				continue
+			}
+		}
+
+		originalKey := tag.Name
+		key := sanitizeForK8sMetadata(originalKey)
+		if key == "" {
+			continue
+		}
+
+		if key != originalKey {
+			sanitizationReport[fmt.Sprintf("tag.name.%s", originalKey)] = key
+		}
+
+		if existingOriginal, exists := labelOriginalKeys[key]; exists {
+			r.Log.Info("Tag key collision, later tag overwrites earlier",
+				"sanitizedKey", key,
+				"previousTag", existingOriginal,
+				"currentTag", originalKey)
+			sanitizationReport[fmt.Sprintf("tag.collision.%s", key)] = fmt.Sprintf("%s overwrites %s", originalKey, existingOriginal)
+		}
+		labelOriginalKeys[key] = originalKey
+
+		originalValue := tag.Description
+		value := sanitizeForK8sMetadata(originalValue)
+		if value != originalValue && originalValue != "" {
+			sanitizationReport[fmt.Sprintf("tag.value.%s", originalKey)] = value
+		}
+
+		labels[key] = value
+	}
+
+	// Custom attributes to annotations
+	annotationOriginalKeys := make(map[string]string)
+	for _, cv := range vm.CustomValues {
+		for _, def := range vm.CustomDef {
+			if def.Key == cv.Key {
+				originalName := def.Name
+				sanitizedName := sanitizeForK8sMetadata(originalName)
+				if sanitizedName != originalName {
+					sanitizationReport[fmt.Sprintf("customAttribute.name.%s", originalName)] = sanitizedName
+				}
+
+				key := fmt.Sprintf("vsphere.forklift.konveyor.io/%s", sanitizedName)
+				if existingOriginal, exists := annotationOriginalKeys[key]; exists {
+					r.Log.Info("Custom attribute key collision, later attribute overwrites earlier",
+						"sanitizedKey", key,
+						"previousAttribute", existingOriginal,
+						"currentAttribute", originalName)
+					sanitizationReport[fmt.Sprintf("customAttribute.collision.%s", sanitizedName)] = fmt.Sprintf("%s overwrites %s", originalName, existingOriginal)
+				}
+				annotationOriginalKeys[key] = originalName
+
+				annotations[key] = cv.Value
+				break
+			}
+		}
+	}
+
+	return
+}
+
+func isInLabelTags(tagName string, labelTags []string) bool {
+	for _, lt := range labelTags {
+		if strings.EqualFold(tagName, lt) {
+			return true
+		}
+	}
+	return false
+}
+
+func isValidK8sMetadataValue(s string) bool {
+	if s == "" {
+		return true
+	}
+	errs := k8svalidation.IsValidLabelValue(s)
+	return len(errs) == 0
+}
+
+// sanitizeForK8sMetadata makes a string safe for use as a K8s label key/value.
+func sanitizeForK8sMetadata(s string) string {
+	if s == "" {
+		return ""
+	}
+	if isValidK8sMetadataValue(s) {
+		return s
+	}
+	sanitized := sanitizeNameRx.ReplaceAllString(s, "_")
+	sanitized = strings.Trim(sanitized, "_.-")
+	if len(sanitized) > 63 {
+		sanitized = sanitized[:63]
+		sanitized = strings.TrimRight(sanitized, "_.-")
+	}
+	return sanitized
 }
