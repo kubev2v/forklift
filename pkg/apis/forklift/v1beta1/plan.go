@@ -305,6 +305,18 @@ type PlanSpec struct {
 	// execution order. If not specified, no custom scripts are injected.
 	// +optional
 	CustomizationScripts *core.ObjectReference `json:"customizationScripts,omitempty"`
+	// TagMapping configures how vSphere tags are converted to Kubernetes labels on the destination VM.
+	// If not specified, all tags become labels (default behavior).
+	// If specified with LabelTags, only those tags become labels; others are ignored.
+	// Custom attributes always become annotations regardless of this setting.
+	// Example:
+	//   tagMapping:
+	//     labelTags:
+	//       - owner
+	//       - cost-center
+	//       - environment
+	// +optional
+	TagMapping *TagMapping `json:"tagMapping,omitempty"`
 }
 
 // Find a planned VM.
@@ -510,4 +522,11 @@ type NetworkNameTemplateData struct {
 	NetworkType string `json:"networkType,omitempty"`
 	// NetworkIndex is the sequential index of the network interface (0-based)
 	NetworkIndex int `json:"networkIndex,omitempty"`
+}
+
+type TagMapping struct {
+	// LabelTags filters which vSphere tags become labels (case-insensitive).
+	// Empty means all tags become labels.
+	// +optional
+	LabelTags []string `json:"labelTags,omitempty"`
 }

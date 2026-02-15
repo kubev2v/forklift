@@ -1008,6 +1008,46 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 						SortNICsByGuestNetworkOrder(&v.model)
 					}
 				}
+			case fAvailableField:
+				if customFields, cast := p.Val.(types.ArrayOfCustomFieldDef); cast {
+					customDef := []model.CustomFieldDef{}
+					for _, f := range customFields.CustomFieldDef {
+						customDef = append(customDef, model.CustomFieldDef{
+							Name:              f.Name,
+							Key:               f.Key,
+							ManagedObjectType: f.ManagedObjectType,
+						})
+					}
+
+					if len(customDef) > 0 {
+						v.model.CustomDef = customDef
+					}
+				}
+			case fCustomValue:
+				customValues := []model.CustomFieldValue{}
+				switch cv := p.Val.(type) {
+				case []types.BaseCustomFieldValue:
+					for _, field := range cv {
+						if strVal, ok := field.(*types.CustomFieldStringValue); ok {
+							customValues = append(customValues, model.CustomFieldValue{
+								Key:   strVal.Key,
+								Value: strVal.Value,
+							})
+						}
+					}
+				case types.ArrayOfCustomFieldValue:
+					for _, field := range cv.CustomFieldValue {
+						if strVal, ok := field.(*types.CustomFieldStringValue); ok {
+							customValues = append(customValues, model.CustomFieldValue{
+								Key:   strVal.Key,
+								Value: strVal.Value,
+							})
+						}
+					}
+				}
+				if len(customValues) > 0 {
+					v.model.CustomValues = customValues
+				}
 			}
 		}
 	}

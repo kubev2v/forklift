@@ -1,6 +1,7 @@
 package builder
 
 import (
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	core "k8s.io/api/core/v1"
@@ -51,4 +52,9 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 // ResolveDataVolumeIdentifier is a no-op for EC2 - EC2 doesn't create DataVolumes, so nothing to resolve.
 func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
 	return ""
+}
+
+// NO-OP
+func (r *Builder) SourceVMLabelsAndAnnotations(vmRef ref.Ref, tagMapping *api.TagMapping) (labels map[string]string, annotations map[string]string, sanitizationReport map[string]string, err error) {
+	return
 }

@@ -21,6 +21,8 @@ import (
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/session"
+	"github.com/vmware/govmomi/vapi/rest"
+	"github.com/vmware/govmomi/vapi/tags"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/soap"
@@ -152,6 +154,8 @@ const (
 	fToolsRunningStatus = "guest.toolsRunningStatus"
 	// fToolsVersionStatus is deprecated since vSphere API 5.1; use fToolsVersionStatus2 for more detailed status
 	fToolsVersionStatus = "guest.toolsVersionStatus2"
+	fAvailableField     = "availableField"
+	fCustomValue        = "customValue"
 )
 
 // Selections
@@ -283,11 +287,17 @@ type Collector struct {
 	// logger.
 	log logging.LevelLogger
 	// client.
-	client *govmomi.Client
+	client     *govmomi.Client
+	restClient *rest.Client
 	// cancel function.
 	cancel func()
 	// has parity.
 	parity bool
+}
+
+type VMWithTags struct {
+	VMName string
+	Tags   []model.Tag
 }
 
 // New collector.
@@ -526,6 +536,83 @@ func (r *Collector) getUpdates(ctx context.Context) error {
 	return nil
 }
 
+func (r *Collector) getVMsWithTags(ctx context.Context) (map[string][]model.Tag, error) {
+	tagManager := tags.NewManager(r.restClient)
+	allTags, err := tagManager.GetTags(ctx)
+	if err != nil {
+		r.log.Error(err, "Failed to retrieve tags")
+		return nil, err
+	}
+
+	if len(allTags) == 0 {
+		return make(map[string][]model.Tag), nil
+	}
+
+	tagIDs := make([]string, len(allTags))
+	for i, tag := range allTags {
+		tagIDs[i] = tag.ID
+	}
+
+	attachedObjectsList, err := tagManager.GetAttachedObjectsOnTags(ctx, tagIDs)
+	if err != nil {
+		r.log.Error(err, "Failed to retrieve attached objects for tags", "tagCount", len(tagIDs))
+		return nil, err
+	}
+
+	vmTagsMap := make(map[string][]model.Tag)
+
+	for _, attached := range attachedObjectsList {
+		if attached.Tag == nil {
+			r.log.Info("Skipping tag with nil details", "tagID", attached.TagID)
+			continue
+		}
+
+		tagDetails := model.Tag{
+			ID:          attached.Tag.ID,
+			Description: attached.Tag.Description,
+			Name:        attached.Tag.Name,
+			CategoryID:  attached.Tag.CategoryID,
+			UsedBy:      attached.Tag.UsedBy,
+		}
+
+		for _, resource := range attached.ObjectIDs {
+			if resource.Reference().Type == VirtualMachine {
+				vmID := resource.Reference().Value
+				vmTagsMap[vmID] = append(vmTagsMap[vmID], tagDetails)
+			}
+		}
+	}
+
+	return vmTagsMap, nil
+}
+
+func (r *Collector) updateVMWithTags(tx *libmodel.Tx, vmID string, vmTagsMap map[string][]model.Tag) error {
+	vm := &model.VM{
+		Base: model.Base{
+			ID: vmID,
+		},
+	}
+	err := tx.Get(vm)
+	if err != nil {
+		r.log.Error(err, "Failed to retrieve VM from DB", "VMID", vm.ID)
+		return err
+	}
+
+	if tags, found := vmTagsMap[vm.ID]; found {
+		if !tagsEqual(tags, vm.Tags) {
+			vm.Tags = make([]model.Tag, len(tags))
+			copy(vm.Tags, tags)
+			err = tx.Update(vm)
+			if err != nil {
+				r.log.Error(err, "Failed to update VM with tags", "VMID", vm.ID)
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 // Add model watches.
 func (r *Collector) watch() (list []*libmodel.Watch) {
 	// Cluster
@@ -586,6 +673,13 @@ func (r *Collector) connect(ctx context.Context) (status int, err error) {
 		return
 	}
 
+	r.restClient = rest.NewClient(r.client.Client)
+	userInfo := liburl.UserPassword(r.user(), r.password())
+	err = r.restClient.Login(ctx, userInfo)
+	if err != nil {
+		return 0, liberr.Wrap(err)
+	}
+
 	return http.StatusOK, nil
 }
 
@@ -626,6 +720,10 @@ func (r *Collector) buildClient(ctx context.Context) (*govmomi.Client, error) {
 
 // Close connections.
 func (r *Collector) close() {
+	if r.restClient != nil {
+		_ = r.restClient.Logout(context.TODO())
+		r.restClient = nil
+	}
 	if r.client != nil {
 		_ = r.client.Logout(context.TODO())
 		r.client.CloseIdleConnections()
@@ -852,6 +950,8 @@ func (r *Collector) vmPathSet() []string {
 		fToolsStatus,
 		fToolsRunningStatus,
 		fToolsVersionStatus,
+		fAvailableField,
+		fCustomValue,
 	}
 
 	apiVer := strings.Split(r.client.ServiceContent.About.ApiVersion, ".")
@@ -865,6 +965,11 @@ func (r *Collector) vmPathSet() []string {
 
 // Apply updates.
 func (r *Collector) apply(ctx context.Context, tx *libmodel.Tx, updates []types.ObjectUpdate) (err error) {
+
+	var vmTagsMap map[string][]model.Tag
+	var vmTagsErr error
+	var vmTagsFetched bool
+
 	for _, u := range updates {
 		switch string(u.Kind) {
 		case Enter:
@@ -877,6 +982,25 @@ func (r *Collector) apply(ctx context.Context, tx *libmodel.Tx, updates []types.
 		if err != nil {
 			err = liberr.Wrap(err)
 			break
+		}
+
+		if u.Obj.Type == VirtualMachine {
+			if !vmTagsFetched {
+				vmTagsMap, vmTagsErr = r.getVMsWithTags(ctx)
+				if vmTagsErr != nil {
+					r.log.Error(vmTagsErr, "Failed to retrieve VMs with tags")
+				}
+				vmTagsFetched = true
+			}
+
+			if vmTagsErr == nil {
+				err = r.updateVMWithTags(tx, u.Obj.Value, vmTagsMap)
+				if err != nil {
+					r.log.Error(err, "Failed to update VM tags")
+					err = liberr.Wrap(err)
+					break
+				}
+			}
 		}
 	}
 
@@ -1088,4 +1212,46 @@ func (r Collector) applyLeave(tx *libmodel.Tx, u types.ObjectUpdate) error {
 	}
 
 	return nil
+}
+
+func tagsEqual(a, b []model.Tag) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	tagMap := make(map[string]model.Tag)
+	for _, tag := range a {
+		tagMap[tag.ID] = tag
+	}
+
+	for _, tag := range b {
+		if existingTag, found := tagMap[tag.ID]; !found {
+			return false
+		} else if !tagsAreSame(existingTag, tag) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func tagsAreSame(t1, t2 model.Tag) bool {
+	if t1.Name != t2.Name || t1.Description != t2.Description ||
+		t1.CategoryID != t2.CategoryID {
+		return false
+	}
+	if len(t1.UsedBy) != len(t2.UsedBy) {
+		return false
+	}
+	usedBySet := make(map[string]struct{}, len(t1.UsedBy))
+	for _, u := range t1.UsedBy {
+		usedBySet[u] = struct{}{}
+	}
+	for _, u := range t2.UsedBy {
+		if _, exists := usedBySet[u]; !exists {
+			return false
+		}
+	}
+
+	return true
 }
