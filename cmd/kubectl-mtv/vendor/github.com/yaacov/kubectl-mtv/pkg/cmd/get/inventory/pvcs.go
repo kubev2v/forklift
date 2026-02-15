@@ -3,7 +3,6 @@ package inventory
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -12,18 +11,18 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
-// ListPersistentVolumeClaims queries the provider's persistent volume claim inventory and displays the results
-func ListPersistentVolumeClaims(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
+// ListPersistentVolumeClaimsWithInsecure queries the provider's persistent volume claim inventory with optional insecure TLS skip verification
+func ListPersistentVolumeClaimsWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
 	if watchMode {
 		return watch.Watch(func() error {
-			return listPersistentVolumeClaimsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
-		}, 10*time.Second)
+			return listPersistentVolumeClaimsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query, insecureSkipTLS)
+		}, watch.DefaultInterval)
 	}
 
-	return listPersistentVolumeClaimsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return listPersistentVolumeClaimsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query, insecureSkipTLS)
 }
 
-func listPersistentVolumeClaimsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listPersistentVolumeClaimsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -31,7 +30,7 @@ func listPersistentVolumeClaimsOnce(ctx context.Context, kubeConfigFlags *generi
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to verify PVC support
 	providerType, err := providerClient.GetProviderType()
@@ -61,7 +60,7 @@ func listPersistentVolumeClaimsOnce(ctx context.Context, kubeConfigFlags *generi
 	var data interface{}
 	switch providerType {
 	case "openshift":
-		data, err = providerClient.GetPersistentVolumeClaims(4)
+		data, err = providerClient.GetPersistentVolumeClaims(ctx, 4)
 	default:
 		return fmt.Errorf("provider type '%s' does not support persistent volume claim inventory", providerType)
 	}

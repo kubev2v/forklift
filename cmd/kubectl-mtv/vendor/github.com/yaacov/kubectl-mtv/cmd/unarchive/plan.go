@@ -1,6 +1,7 @@
 package unarchive
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -9,24 +10,42 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/archive/plan"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/completion"
-	"github.com/yaacov/kubectl-mtv/pkg/util/flags"
 )
 
 // NewPlanCmd creates the plan unarchive command
 func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	var all bool
+	var planNames []string
 
 	cmd := &cobra.Command{
-		Use:               "plan [NAME...] [--all]",
-		Short:             "Un-archive one or more migration plans",
-		Args:              flags.ValidateAllFlagArgs(func() bool { return all }, 1),
-		SilenceUsage:      true,
-		ValidArgsFunction: completion.PlanNameCompletion(kubeConfigFlags),
+		Use:   "plan",
+		Short: "Unarchive one or more migration plans",
+		Long: `Unarchive one or more migration plans.
+
+Unarchiving restores a previously archived plan, allowing it to be started again.
+This is useful if you need to retry a migration or make changes to an archived plan.`,
+		Example: `  # Unarchive a plan
+  kubectl-mtv unarchive plan --name my-migration
+
+  # Unarchive multiple plans
+  kubectl-mtv unarchive plans --name plan1,plan2,plan3
+
+  # Unarchive all archived plans in the namespace
+  kubectl-mtv unarchive plans --all`,
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Validate mutual exclusivity of --name and --all
+			if all && len(planNames) > 0 {
+				return errors.New("cannot use --name with --all")
+			}
+			if !all && len(planNames) == 0 {
+				return errors.New("must specify --name or --all")
+			}
+
 			// Resolve the appropriate namespace based on context and flags
 			namespace := client.ResolveNamespace(kubeConfigFlags)
 
-			var planNames []string
 			if all {
 				// Get all plan names from the namespace
 				var err error
@@ -38,8 +57,6 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 					fmt.Printf("No plans found in namespace %s\n", namespace)
 					return nil
 				}
-			} else {
-				planNames = args
 			}
 
 			// Loop over each plan name and unarchive it
@@ -53,7 +70,12 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVar(&all, "all", false, "Un-archive all migration plans in the namespace")
+	cmd.Flags().StringSliceVarP(&planNames, "name", "M", nil, "Plan name(s) to unarchive (comma-separated, e.g. \"plan1,plan2\")")
+	cmd.Flags().StringSliceVar(&planNames, "names", nil, "Alias for --name")
+	_ = cmd.Flags().MarkHidden("names")
+	cmd.Flags().BoolVar(&all, "all", false, "Unarchive all migration plans in the namespace")
+
+	_ = cmd.RegisterFlagCompletionFunc("name", completion.PlanNameCompletion(kubeConfigFlags))
 
 	return cmd
 }

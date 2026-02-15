@@ -58,10 +58,10 @@ type VolumeMetricsParam struct {
 	SystemID                       string   `json:"systemId"`
 	StartDate                      int64    `json:"startDate"`
 	EndDate                        int64    `json:"endDate"`
-	VolumeStartRange               string   `json:"volumeStartRange"`
-	VolumeEndRange                 string   `json:"volumeEndRange"`
+	VolumeStartRange               string   `json:"volumeStartRange,omitempty"`
+	VolumeEndRange                 string   `json:"volumeEndRange,omitempty"`
 	DataFormat                     string   `json:"dataFormat"`
-	CommaSeparatedStorageGroupList string   `json:"commaSeparatedStorageGroupList"`
+	CommaSeparatedStorageGroupList string   `json:"commaSeparatedStorageGroupList,omitempty"`
 	Metrics                        []string `json:"metrics"`
 }
 
