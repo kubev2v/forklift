@@ -246,14 +246,7 @@ func ListPlans(ctx context.Context, configFlags *genericclioptions.ConfigFlags, 
 
 // List lists migration plans with optional watch mode
 func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace string, watchMode bool, outputFormat string, planName string, useUTC bool) error {
-	if watchMode {
-		if outputFormat != "table" {
-			return fmt.Errorf("watch mode only supports table output format")
-		}
-		return watch.Watch(func() error {
-			return ListPlans(ctx, configFlags, namespace, outputFormat, planName, useUTC)
-		}, 15*time.Second)
-	}
-
-	return ListPlans(ctx, configFlags, namespace, outputFormat, planName, useUTC)
+	return watch.WrapWithWatch(watchMode, outputFormat, func() error {
+		return ListPlans(ctx, configFlags, namespace, outputFormat, planName, useUTC)
+	}, watch.DefaultInterval)
 }
