@@ -593,7 +593,7 @@ func (r *Validator) getPlanVMTargetName(vm *model.VM) string {
 	}
 
 	// Otherwise, clean the VM name
-	return util.ChangeVmName(vm.Name)
+	return util.SanitizeLabel(vm.Name)
 }
 
 // Validate that VM has no pre-existing snapshots for warm migration
