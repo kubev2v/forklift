@@ -11,16 +11,19 @@ feature_ocp_live_migration: true
 feature_vmware_system_serial_number: true
 feature_cli_download: true
 feature_ova_appliance_management: false
+# NetworkPolicies: auto-enabled on OCP >= network_policies_min_ocp_version (see tasks/main.yml)
+feature_network_policies: false
+network_policies_min_ocp_version: "4.21.0"
 
 k8s_cluster: false
 feature_auth_required: true
 image_pull_policy: Always
-forklift_operator_version: "latest"
 forklift_resources:
   - Deployment
   - ConfigMap
   - Service
   - Route
+  - NetworkPolicy
 
 controller_image_fqin: "{{ lookup( 'env', 'CONTROLLER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_CONTROLLER') }}"
 controller_configmap_name: "{{ controller_service_name }}-config"
