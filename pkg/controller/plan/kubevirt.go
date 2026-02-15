@@ -1372,7 +1372,7 @@ func (r *KubeVirt) GetPodsWithLabels(podLabels map[string]string) (pods *core.Po
 
 // Deletes an object from destination cluster associated with the VM.
 func (r *KubeVirt) DeleteObject(object client.Object, vm *plan.VMStatus, message, objType string, options ...client.DeleteOption) (err error) {
-	err = r.Destination.Client.Delete(context.TODO(), object)
+	err = r.Destination.Client.Delete(context.TODO(), object, options...)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
 			err = nil
@@ -1394,22 +1394,30 @@ func (r *KubeVirt) DeleteObject(object client.Object, vm *plan.VMStatus, message
 
 // Delete any hook jobs that belong to a VM migration.
 func (r *KubeVirt) DeleteHookJobs(vm *plan.VMStatus) (err error) {
-	vmLabels := r.vmAllButMigrationLabels(vm.Ref)
+	// Build labels that match hook jobs (plan + vmID + resource:hook-config)
+	labels := map[string]string{
+		kPlan:     string(r.Plan.UID),
+		kVM:       vm.Ref.ID,
+		kResource: ResourceHookConfig,
+	}
+
 	list := &batch.JobList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(vmLabels),
-			Namespace:     r.Plan.Spec.TargetNamespace,
+			LabelSelector: k8slabels.SelectorFromSet(labels),
+			Namespace:     r.Plan.Namespace,
 		},
 	)
+
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
 	for _, object := range list.Items {
-		err = r.DeleteObject(&object, vm, "Deleted hook job.", "job")
+		err = r.DeleteObject(&object, vm, "Deleted hook job.", "job",
+			client.PropagationPolicy(meta.DeletePropagationForeground))
 		if err != nil {
 			return err
 		}
