@@ -2,6 +2,7 @@ package model
 
 import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/controller/provider/model/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/openstack"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/ovf"
@@ -29,10 +30,14 @@ func Models(provider *api.Provider) (all []interface{}) {
 		all = append(
 			all,
 			openstack.All()...)
-	case api.Ova, api.HyperV:
+	case api.Ova:
 		all = append(
 			all,
 			ovf.All()...)
+	case api.HyperV:
+		all = append(
+			all,
+			hyperv.All()...)
 	case api.EC2:
 		all = append(
 			all,

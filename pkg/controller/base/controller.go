@@ -27,6 +27,9 @@ const (
 	LongReQ = time.Second * 30
 )
 
+// HyperV WinRM HTTPS port
+const WinRMPortHTTPS = 5986
+
 // Base reconciler.
 type Reconciler struct {
 	record.EventRecorder

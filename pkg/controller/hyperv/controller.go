@@ -203,7 +203,7 @@ func (r *Reconciler) Deploy(ctx context.Context, hyperv *api.HyperVProviderServe
 		return
 	}
 
-	deployment := build.Deployment(provider, pvc)
+	deployment := build.Deployment(provider, secret, pvc)
 	err = ensure.Deployment(ctx, deployment)
 	if err != nil {
 		return
