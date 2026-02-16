@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -12,6 +13,7 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/base"
+	hvutil "github.com/kubev2v/forklift/pkg/controller/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/ova"
 	"github.com/kubev2v/forklift/pkg/controller/provider/container"
 	vsphere "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
@@ -191,7 +193,7 @@ func (r *Reconciler) validateURL(provider *api.Provider) error {
 		return nil
 	}
 	if provider.Type() == api.HyperV {
-		if !isValidSMBPath(provider.Spec.URL) {
+		if provider.Spec.URL == "" {
 			provider.Status.Phase = ValidationFailed
 			provider.Status.SetCondition(
 				libcnd.Condition{
@@ -199,7 +201,7 @@ func (r *Reconciler) validateURL(provider *api.Provider) error {
 					Status:   True,
 					Reason:   Malformed,
 					Category: Critical,
-					Message:  "The SMB path is malformed. Expected format: //server/share, \\\\server\\share, or smb://server/share",
+					Message:  "The Hyper-V host address is required (e.g., '192.168.1.100')",
 				})
 		}
 		return nil
@@ -220,7 +222,7 @@ func (r *Reconciler) validateURL(provider *api.Provider) error {
 	return nil
 }
 
-func (r *Reconciler) validateConnectionStatus(provider *api.Provider, secret *core.Secret, insecureSkipVerify bool) {
+func (r *Reconciler) validateTLSConnection(provider *api.Provider, secret *core.Secret, tlsURL string, insecureSkipVerify bool) {
 	if insecureSkipVerify {
 		provider.Status.SetCondition(libcnd.Condition{
 			Type:     ConnectionInsecure,
@@ -232,8 +234,7 @@ func (r *Reconciler) validateConnectionStatus(provider *api.Provider, secret *co
 		return
 	}
 
-	// Verify TLS connection with provided cacert
-	_, err := base.VerifyTLSConnection(provider.Spec.URL, secret)
+	_, err := base.VerifyTLSConnection(tlsURL, secret)
 	if err != nil {
 		provider.Status.SetCondition(libcnd.Condition{
 			Type:     ConnectionTestFailed,
@@ -243,6 +244,30 @@ func (r *Reconciler) validateConnectionStatus(provider *api.Provider, secret *co
 			Message:  err.Error(),
 		})
 	}
+}
+
+// buildTLSURL constructs https://host:port for non-standard HTTPS ports.
+func buildTLSURL(addr string, port int) string {
+	addr = strings.TrimSpace(addr)
+
+	addr = strings.TrimPrefix(addr, "https://")
+	addr = strings.TrimPrefix(addr, "http://")
+
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		// No port - check for IPv6 brackets
+		if strings.HasPrefix(addr, "[") && strings.HasSuffix(addr, "]") {
+			host = addr[1 : len(addr)-1]
+		} else {
+			host = addr
+		}
+	}
+
+	// Handle IPv6 addresses
+	if strings.Contains(host, ":") {
+		return fmt.Sprintf("https://[%s]:%d", host, port)
+	}
+	return fmt.Sprintf("https://%s:%d", host, port)
 }
 
 // Validate secret (ref).
@@ -306,7 +331,7 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 		}
 
 		// Validate connection status
-		r.validateConnectionStatus(provider, secret, insecureSkipVerify)
+		r.validateTLSConnection(provider, secret, provider.Spec.URL, insecureSkipVerify)
 
 		var providerUrl *url.URL
 		providerUrl, err = url.Parse(provider.Spec.URL)
@@ -352,9 +377,33 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 		}
 	case api.HyperV:
 		keyList = []string{
-			"username",
-			"password",
+			hvutil.SecretFieldUsername,
+			hvutil.SecretFieldPassword,
+			hvutil.SecretFieldSMBUrl,
 		}
+
+		if smbUrl, found := secret.Data[hvutil.SecretFieldSMBUrl]; found {
+			if !isValidSMBPath(string(smbUrl)) {
+				provider.Status.Phase = ValidationFailed
+				provider.Status.SetCondition(
+					libcnd.Condition{
+						Type:     SecretNotValid,
+						Status:   True,
+						Reason:   DataErr,
+						Category: Critical,
+						Message:  "The smbUrl in secret is malformed. Expected format: //server/share, \\\\server\\share, or smb://server/share",
+					})
+				break
+			}
+		}
+
+		insecureSkipVerify := base.GetInsecureSkipVerifyFlag(secret)
+		if !insecureSkipVerify && len(secret.Data["cacert"]) == 0 {
+			keyList = append(keyList, "cacert")
+			break
+		}
+		tlsURL := buildTLSURL(provider.Spec.URL, base.WinRMPortHTTPS)
+		r.validateTLSConnection(provider, secret, tlsURL, insecureSkipVerify)
 	}
 	for _, key := range keyList {
 		if _, found := secret.Data[key]; !found {
@@ -1097,7 +1146,6 @@ func isValidSMBPath(smbPath string) bool {
 // validateSMBCSI validates that the SMB CSI driver is installed for HyperV providers.
 // HyperV migrations require the SMB CSI driver (smb.csi.k8s.io) to mount SMB shares.
 func (r *Reconciler) validateSMBCSI(provider *api.Provider) error {
-	// Only validate SMB CSI for HyperV providers
 	if provider.Type() != api.HyperV {
 		return nil
 	}

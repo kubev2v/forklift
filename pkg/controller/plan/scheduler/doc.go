@@ -4,6 +4,7 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/plan/scheduler/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/plan/scheduler/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/plan/scheduler/openstack"
 	"github.com/kubev2v/forklift/pkg/controller/plan/scheduler/ova"
@@ -44,8 +45,13 @@ func New(ctx *plancontext.Context) (scheduler Scheduler, err error) {
 			Context:     ctx,
 			MaxInFlight: settings.Settings.MaxInFlight,
 		}
-	case api.Ova, api.HyperV:
+	case api.Ova:
 		scheduler = &ova.Scheduler{
+			Context:     ctx,
+			MaxInFlight: settings.Settings.MaxInFlight,
+		}
+	case api.HyperV:
+		scheduler = &hyperv.Scheduler{
 			Context:     ctx,
 			MaxInFlight: settings.Settings.MaxInFlight,
 		}
