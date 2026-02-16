@@ -15,7 +15,7 @@ import (
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
-// Client for OVF-based provider communication (OVA and HyperV).
+// Client for OVF-based provider communication
 type Client struct {
 	*plancontext.Context
 	URL    string

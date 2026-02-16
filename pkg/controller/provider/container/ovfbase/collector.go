@@ -1,5 +1,5 @@
-// Package ovfbase provides shared collector logic for OVF-based providers (OVA and HyperV).
-// Both providers use the same data model and collector logic, differing only in logging prefix.
+// Package ovfbase provides collector logic for OVA providers.
+// OVA providers use the OVF data model and collector logic for parsing OVF descriptors.
 package ovfbase
 
 import (
@@ -35,7 +35,7 @@ const (
 	Refresh = "refresh"
 )
 
-// OVF-based data collector (shared by OVA and HyperV providers).
+// OVA data collector.
 type Collector struct {
 	// Provider
 	provider *api.Provider
@@ -55,12 +55,11 @@ type Collector struct {
 	phase string
 	// List of watches.
 	watches []*libmodel.Watch
-	// Provider type prefix for logging (e.g., "ova", "hyperv")
+	// Provider type prefix for logging (e.g., "ova")
 	prefix string
 }
 
 // New creates a collector with the specified logging prefix.
-// prefix should be "ova" or "hyperv" for proper log identification.
 func New(db libmodel.DB, provider *api.Provider, secret *core.Secret, prefix string) (r *Collector) {
 	log := logging.WithName("collector|"+prefix).WithValues(
 		"provider",

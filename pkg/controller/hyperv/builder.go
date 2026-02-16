@@ -21,7 +21,7 @@ var Settings = &settings.Settings
 const (
 	MainContainer      = "main"
 	SMBVolumeMountName = "smb"
-	SMBVolumeMountPath = "/hyperv"
+	SMBVolumeMountPath = SMBMountPath
 	QEMUGroup          = 107
 	PVSize             = "1Gi"
 	SMBCSIDriver       = "smb.csi.k8s.io"
@@ -44,6 +44,13 @@ const (
 	CatalogPath        = "CATALOG_PATH"
 	ApplianceEndpoints = "APPLIANCE_ENDPOINTS"
 	AuthRequired       = "AUTH_REQUIRED"
+	HyperVUrl          = "HYPERV_URL"
+)
+
+// Volume names
+const (
+	SecretVolumeName      = "provider-secret"
+	SecretVolumeMountPath = "/etc/secret"
 )
 
 const (
@@ -100,8 +107,15 @@ func (r *Builder) ProviderServer(provider *api.Provider) (server *api.HyperVProv
 
 // PersistentVolume builds a static PV for SMB CSI driver.
 func (r *Builder) PersistentVolume(provider *api.Provider, secret *core.Secret) (pv *core.PersistentVolume) {
-
-	smbSource := util.ParseSMBSource(provider.Spec.URL)
+	if secret == nil {
+		return nil
+	}
+	smbUrlBytes, ok := secret.Data[SecretFieldSMBUrl]
+	if !ok || len(smbUrlBytes) == 0 {
+		return nil
+	}
+	smbUrl := string(smbUrlBytes)
+	smbSource := util.ParseSMBSource(smbUrl)
 	secretName := secret.Name
 	secretNamespace := secret.Namespace
 
@@ -165,7 +179,7 @@ func (r *Builder) PersistentVolumeClaim(provider *api.Provider, pv *core.Persist
 // Forklift's namespace, so they will not have an owner reference to the parent Provider CR
 // unless the Provider is created in Forklift's namespace.
 // (Owner references cannot point to cross-namespace resources.)
-func (r *Builder) Deployment(provider *api.Provider, pvc *core.PersistentVolumeClaim) (deployment *appsv1.Deployment) {
+func (r *Builder) Deployment(provider *api.Provider, secret *core.Secret, pvc *core.PersistentVolumeClaim) (deployment *appsv1.Deployment) {
 	deployment = &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: r.prefix(provider),
@@ -181,14 +195,14 @@ func (r *Builder) Deployment(provider *api.Provider, pvc *core.PersistentVolumeC
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: r.Labeler.ServerLabels(provider, r.HyperVProviderServer),
 				},
-				Spec: r.PodSpec(provider, pvc),
+				Spec: r.PodSpec(provider, secret, pvc),
 			},
 		},
 	}
 	return
 }
 
-func (r *Builder) PodSpec(provider *api.Provider, pvc *core.PersistentVolumeClaim) (spec core.PodSpec) {
+func (r *Builder) PodSpec(provider *api.Provider, secret *core.Secret, pvc *core.PersistentVolumeClaim) (spec core.PodSpec) {
 	spec = core.PodSpec{
 		Containers: []core.Container{
 			{
@@ -214,6 +228,11 @@ func (r *Builder) PodSpec(provider *api.Provider, pvc *core.PersistentVolumeClai
 						MountPath: SMBVolumeMountPath,
 						ReadOnly:  true,
 					},
+					{
+						Name:      SecretVolumeName,
+						MountPath: SecretVolumeMountPath,
+						ReadOnly:  true,
+					},
 				},
 				Env: []core.EnvVar{
 					{
@@ -236,6 +255,43 @@ func (r *Builder) PodSpec(provider *api.Provider, pvc *core.PersistentVolumeClai
 						Name:  AuthRequired,
 						Value: "true",
 					},
+					{
+						Name:  HyperVUrl,
+						Value: provider.Spec.URL,
+					},
+					{
+						Name: "SMB_URL",
+						ValueFrom: &core.EnvVarSource{
+							SecretKeyRef: &core.SecretKeySelector{
+								LocalObjectReference: core.LocalObjectReference{
+									Name: secret.Name,
+								},
+								Key: SecretFieldSMBUrl,
+							},
+						},
+					},
+					{
+						Name: "HYPERV_USERNAME",
+						ValueFrom: &core.EnvVarSource{
+							SecretKeyRef: &core.SecretKeySelector{
+								LocalObjectReference: core.LocalObjectReference{
+									Name: secret.Name,
+								},
+								Key: SecretFieldUsername,
+							},
+						},
+					},
+					{
+						Name: "HYPERV_PASSWORD",
+						ValueFrom: &core.EnvVarSource{
+							SecretKeyRef: &core.SecretKeySelector{
+								LocalObjectReference: core.LocalObjectReference{
+									Name: secret.Name,
+								},
+								Key: SecretFieldPassword,
+							},
+						},
+					},
 				},
 			},
 		},
@@ -246,6 +302,14 @@ func (r *Builder) PodSpec(provider *api.Provider, pvc *core.PersistentVolumeClai
 					PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
 						ClaimName: pvc.Name,
 						ReadOnly:  true,
+					},
+				},
+			},
+			{
+				Name: SecretVolumeName,
+				VolumeSource: core.VolumeSource{
+					Secret: &core.SecretVolumeSource{
+						SecretName: secret.Name,
 					},
 				},
 			},
