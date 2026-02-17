@@ -1302,6 +1302,23 @@ func (r *Reconciler) validateTransferNetwork(plan *api.Plan) (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
+
+	if plan.Spec.TransferNetwork.Namespace != plan.Spec.TargetNamespace &&
+		plan.Spec.TransferNetwork.Namespace != core.NamespaceDefault {
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     TransferNetNotValid,
+			Status:   True,
+			Category: api.CategoryCritical,
+			Reason:   NotValid,
+			Message: fmt.Sprintf(
+				"Transfer network %s/%s is in a different namespace than the target namespace %s. "+
+					"Pods cannot reference network attachment definitions across namespaces.",
+				plan.Spec.TransferNetwork.Namespace,
+				plan.Spec.TransferNetwork.Name,
+				plan.Spec.TargetNamespace),
+		})
+		return
+	}
 	route, found := netAttachDef.Annotations[AnnForkliftNetworkRoute]
 	if !found {
 		plan.Status.SetCondition(missingDefaultRoute)
