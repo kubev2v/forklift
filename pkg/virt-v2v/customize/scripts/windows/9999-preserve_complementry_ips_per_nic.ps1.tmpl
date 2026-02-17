@@ -2,39 +2,140 @@
 $startdate = Get-Date
 $adapters = @()
 While (-Not $adapters -and $startdate.AddMinutes(5) -gt (Get-Date)) {
-    Start-Sleep -Seconds 5
-    $adapters = Get-NetAdapter -Physical | Where DriverFileName -eq "netkvm.sys"
-    Write-Host "Waiting for netkvm.sys adapters..."
+	Start-Sleep -Seconds 5
+	$adapters = Get-NetAdapter -Physical | Where DriverFileName -eq "netkvm.sys"
+	Write-Host "Waiting for netkvm.sys adapters..."
 }
 
-# Define MACs and IPs for each adapter
+# ============================================================================
+# Step 2: Define network configurations from template
+# ============================================================================
+# The Go template fills this array dynamically before execution with network config from the source VM.
+# Each entry has MAC address, IPs (IPv4/IPv6), and DNS servers.
+# ============================================================================
 $networkConfigs = @(
 {{- range $i, $cfg := . }}
     @{
         MAC = '{{ lower $cfg.MAC }}'
         IPs = @{{ formatIPs $cfg.IPs }}
-        PrefixLength = {{ (index $cfg.IPs 0).PrefixLength }}
         DNS = @{{ formatDNS $cfg }}
     }{{ if ne (add $i 1) (len $) }},{{ end }}
 {{- end }}
 )
 
 
-
-
-# Apply settings
+# ============================================================================
+# Step 3: Apply network configurations to each adapter
+# ============================================================================
+# For each network configuration, we:
+# 1. Find the adapter by MAC address
+# 2. Configure all IP addresses (IPv4 and IPv6) on that adapter
+# 3. Set up default routes (gateways)
+# 4. Configure DNS servers
+# ============================================================================
 foreach ($config in $networkConfigs) {
-    $adapter = Get-NetAdapter -Physical | Where-Object { $_.MacAddress -eq $config.MAC }
+    # ========================================================================
+    # Step 3a: Find the network adapter by MAC address
+    # ========================================================================
+    # MAC addresses are used as the stable identifier because adapter names
+    # may change after migration
+    # ========================================================================
+    $normalizedConfigMAC = $config.MAC.ToUpper() -replace '[:-]', '-'
+    $adapter = Get-NetAdapter -Physical | Where-Object { $_.MacAddress -eq $normalizedConfigMAC }
 
     if ($adapter) {
         $ifindex = $adapter.ifIndex
         $name = $adapter.Name
         Write-Host "Configuring adapter '$name' ($($config.MAC))"
 
+        # Track which gateways we've already added to avoid duplicates
+        $addedGateways = @{}
+
+        # ====================================================================
+        # Step 3b: Configure IP addresses on the adapter
+        # ====================================================================
+        # This section configures all static IP addresses (both IPv4 and IPv6)
+        # on the network adapter. Each IP may have its own gateway.
+        # ====================================================================
         foreach ($ip in $config.IPs) {
-            Write-Host "Setting IP $ip on '$name'"
-            New-NetIPAddress -InterfaceIndex $ifindex -IPAddress $ip -PrefixLength $config.PrefixLength
-            Set-DnsClientServerAddress -InterfaceIndex $ifindex -ServerAddresses $config.DNS
+            Write-Host "Setting IP $($ip.IPAddress) on '$name'"
+            
+            # Check if the IP already exists (to avoid duplicate errors)
+            $existing = Get-NetIPAddress -IPAddress $ip.IPAddress -InterfaceIndex $ifindex -ErrorAction SilentlyContinue
+            if (-not $existing) {
+                # Add the IP address with its prefix length
+                try {
+                    New-NetIPAddress -InterfaceIndex $ifindex -IPAddress $ip.IPAddress -PrefixLength $ip.PrefixLength -ErrorAction Stop
+                } catch {
+                    Write-Warning "Failed to add IP $($ip.IPAddress): $_"
+                    continue
+                }
+            }
+
+            # ================================================================
+            # Step 3c: Configure gateway/default route
+            # ================================================================
+            # Add default route for this IP's gateway if present.
+            # - IPv4: 0.0.0.0/0 route
+            # - IPv6: ::/0 route
+            # Track gateways to avoid adding duplicate default routes.
+            # ================================================================
+            if ($ip.Gateway -and $ip.Gateway -ne '') {
+                $gw = $ip.Gateway
+
+                if (-not $addedGateways.ContainsKey($gw)) {
+                    # Determine if gateway is IPv4 or IPv6 and add appropriate default route
+                    if ($gw -match '^(\d{1,3}\.){3}\d{1,3}$') {
+                        # IPv4 default route
+                        $existingRoute = Get-NetRoute -DestinationPrefix "0.0.0.0/0" -InterfaceIndex $ifindex -NextHop $gw -ErrorAction SilentlyContinue
+                        if (-not $existingRoute) {
+                            Write-Host "Adding IPv4 default route via $gw"
+                            try {
+                                New-NetRoute -DestinationPrefix "0.0.0.0/0" -InterfaceIndex $ifindex -NextHop $gw -ErrorAction Stop | Out-Null
+                            } catch {
+                                Write-Warning "Failed to add IPv4 default route via $gw : $_"
+                            }
+                        } else {
+                            Write-Host "IPv4 default route via $gw already exists"
+                        }
+                    } elseif ($gw -match ':') {
+                        # IPv6 default route
+                        $existingRoute = Get-NetRoute -DestinationPrefix "::/0" -InterfaceIndex $ifindex -NextHop $gw -ErrorAction SilentlyContinue
+                        if (-not $existingRoute) {
+                            Write-Host "Adding IPv6 default route via $gw"
+                            try {
+                                New-NetRoute -DestinationPrefix "::/0" -InterfaceIndex $ifindex -NextHop $gw -ErrorAction Stop | Out-Null
+                            } catch {
+                                Write-Warning "Failed to add IPv6 default route via $gw : $_"
+                            }
+                        } else {
+                            Write-Host "IPv6 default route via $gw already exists"
+                        }
+                    }
+                    $addedGateways[$gw] = $true
+                }
+            }
+        }
+
+        # ====================================================================
+        # Step 3d: Configure DNS servers
+        # ====================================================================
+        # Set DNS servers for this adapter. DNS servers can be IPv4 or IPv6.
+        # Filter out blank entries and skip if no valid DNS servers provided.
+        # ====================================================================
+        $dnsServers = @()
+        if ($config.DNS) {
+            $dnsServers = $config.DNS | Where-Object { $_ -and $_.Trim() -ne '' }
+        }
+        if ($dnsServers.Count -gt 0) {
+            try {
+                Set-DnsClientServerAddress -InterfaceIndex $ifindex -ServerAddresses $dnsServers
+                Write-Host "DNS servers configured: $($dnsServers -join ', ')"
+            } catch {
+                Write-Warning "Failed to set DNS servers for '$name': $_"
+            }
+        } else {
+            Write-Host "No DNS servers supplied for '$name'; leaving existing DNS configuration in place."
         }
     } else {
         Write-Warning "Adapter with MAC $($config.MAC) not found"

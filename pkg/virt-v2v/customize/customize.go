@@ -60,7 +60,7 @@ func formatIPs(ips []IPEntry) string {
 	var b strings.Builder
 	b.WriteString("(\n")
 	for i, ip := range ips {
-		b.WriteString("'" + ip.IP + "'")
+		b.WriteString(fmt.Sprintf("    @{ IPAddress = '%s'; Gateway = '%s'; PrefixLength = %s }", ip.IP, ip.Gateway, ip.PrefixLength))
 		if i < len(ips)-1 {
 			b.WriteString(",")
 		}
@@ -73,9 +73,19 @@ func formatIPs(ips []IPEntry) string {
 func formatDNS(dns []string) string {
 	var b strings.Builder
 	b.WriteString("(\n")
-	for i, ip := range dns {
+
+	// Filter out blank/empty DNS entries
+	var validDNS []string
+	for _, ip := range dns {
+		trimmed := strings.TrimSpace(ip)
+		if trimmed != "" {
+			validDNS = append(validDNS, trimmed)
+		}
+	}
+
+	for i, ip := range validDNS {
 		b.WriteString("'" + ip + "'")
-		if i < len(dns)-1 {
+		if i < len(validDNS)-1 {
 			b.WriteString(",")
 		}
 		b.WriteString("\n")
@@ -166,7 +176,7 @@ func (c *Customize) addDisksToCustomize(cmdBuilder utils.CommandBuilder) {
 
 // In case of multiple IP's per NIC on windows there is an existing setup script that assign only primary IP's
 // With this function and its corresponding template we will inject all the complementry IP's to the NICs
-func (c *Customize) injectComplementryStaticIPTemplate(templatePath, outputPath string) error {
+func (c *Customize) injectComplementaryStaticIPTemplate(templatePath, outputPath string) error {
 
 	tmplContent, err := os.ReadFile(templatePath)
 	if err != nil {
@@ -183,14 +193,18 @@ func (c *Customize) injectComplementryStaticIPTemplate(templatePath, outputPath 
 		}
 		mac := strings.ReplaceAll(parts[0], ":", "-") // Windows format
 		ipParts := strings.Split(parts[1], ",")
-		if len(ipParts) < 5 {
+		// Require at least IP, gateway, and prefix (DNS is optional)
+		if len(ipParts) < 3 {
 			continue
 		}
 
 		ip := ipParts[0]
 		gw := ipParts[1]
 		prefix := ipParts[2]
-		dns := ipParts[3:]
+		dns := []string{}
+		if len(ipParts) > 3 {
+			dns = ipParts[3:]
+		}
 
 		ipEntry := IPEntry{
 			IP:           ip,
@@ -225,7 +239,7 @@ func (c *Customize) injectComplementryStaticIPTemplate(templatePath, outputPath 
 		},
 	}
 
-	tmpl, err := template.New("preserveComplementryStaticIpScript").Funcs(funcMap).Parse(string(tmplContent))
+	tmpl, err := template.New("preserveComplementaryStaticIpScript").Funcs(funcMap).Parse(string(tmplContent))
 	if err != nil {
 		return fmt.Errorf("failed to parse template: %w", err)
 	}
@@ -316,9 +330,9 @@ func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) {
 		if c.appConfig.MultipleIpsPerNicName != "" {
 			preserveIpsTemplate := filepath.Join(windowsScriptsPath, "9999-preserve_complementry_ips_per_nic.ps1.tmpl")
 			preserveMultipleNicsPath := filepath.Join(windowsScriptsPath, "9999-preserve_complementry_ips_per_nic.ps1")
-			err := c.injectComplementryStaticIPTemplate(preserveIpsTemplate, preserveMultipleNicsPath)
+			err := c.injectComplementaryStaticIPTemplate(preserveIpsTemplate, preserveMultipleNicsPath)
 			if err != nil {
-				fmt.Printf("Error injecting Complementry StaticIP's template: %v", err)
+				fmt.Printf("Error injecting Complementary StaticIP's template: %v", err)
 			}
 			uploadPreserveMultipleIpPath = c.formatUpload(preserveMultipleNicsPath, WinFirstbootScriptsPath)
 		}
