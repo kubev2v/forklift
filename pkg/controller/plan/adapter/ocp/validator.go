@@ -112,16 +112,61 @@ func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
 			vmRef.String())
 		return
 	}
-	mapping := r.Plan.Referenced.Map.Network.Spec.Map
+
 	podMapped := 0
-	for i := range mapping {
-		mapped := &mapping[i]
-		if mapped.Destination.Type == Pod {
-			podMapped++
+	for _, net := range vm.Spec.Template.Spec.Networks {
+		if net.Pod != nil {
+			pair, found := r.Plan.Referenced.Map.Network.FindNetworkByType(Pod)
+			if found && pair.Destination.Type == Pod {
+				podMapped++
+			}
+		} else if net.Multus != nil {
+			name, namespace := ocpclient.GetNetworkNameAndNamespace(net.Multus.NetworkName, &vmRef)
+			pair, found := r.Plan.Referenced.Map.Network.FindNetworkByNameAndNamespace(namespace, name)
+			if found && pair.Destination.Type == Pod {
+				podMapped++
+			}
 		}
 	}
 
 	ok = podMapped <= 1
+	return
+}
+
+// DuplicateNAD validates that no two VM NICs are mapped to the same Multus NAD.
+func (r *Validator) DuplicateNAD(vmRef ref.Ref) (ok bool, err error) {
+	if r.Plan.Referenced.Map.Network == nil {
+		return
+	}
+
+	vm := &cnv.VirtualMachine{}
+	err = r.sourceClient.Get(context.TODO(), k8sclient.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vm)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef.String())
+		return
+	}
+
+	nadCount := map[string]int{}
+	for _, net := range vm.Spec.Template.Spec.Networks {
+		if net.Pod != nil || net.Multus == nil {
+			continue
+		}
+		name, namespace := ocpclient.GetNetworkNameAndNamespace(net.Multus.NetworkName, &vmRef)
+		pair, found := r.Plan.Referenced.Map.Network.FindNetworkByNameAndNamespace(namespace, name)
+		if !found || pair.Destination.Type != Multus {
+			continue
+		}
+		nadKey := fmt.Sprintf("%s/%s", pair.Destination.Namespace, pair.Destination.Name)
+		nadCount[nadKey]++
+	}
+
+	ok = true
+	for _, count := range nadCount {
+		if count > 1 {
+			ok = false
+			break
+		}
+	}
 	return
 }
 

@@ -1,6 +1,8 @@
 package ovfbase
 
 import (
+	"fmt"
+
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
@@ -134,7 +136,7 @@ func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
 		network := &model.Network{}
 		fErr := r.Source.Inventory.Find(network, ref)
 		if fErr != nil {
-			err = fErr
+			err = liberr.Wrap(fErr, "vm", vmRef.String(), "network", ref.String())
 			return
 		}
 		for _, nic := range vm.NICs {
@@ -145,6 +147,49 @@ func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
 	}
 
 	ok = podMapped <= 1
+	return
+}
+
+// Validate that no two VM NICs are mapped to the same Multus NAD.
+func (r *Validator) DuplicateNAD(vmRef ref.Ref) (ok bool, err error) {
+	if r.Plan.Referenced.Map.Network == nil {
+		return
+	}
+	vm := &model.Workload{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef.String())
+		return
+	}
+
+	mapping := r.Plan.Referenced.Map.Network.Spec.Map
+	nadCount := map[string]int{}
+	for i := range mapping {
+		mapped := &mapping[i]
+		if mapped.Destination.Type != Multus {
+			continue
+		}
+		networkRef := mapped.Source
+		network := &model.Network{}
+		fErr := r.Source.Inventory.Find(network, networkRef)
+		if fErr != nil {
+			err = liberr.Wrap(fErr, "network", networkRef.String())
+			return
+		}
+		nadKey := fmt.Sprintf("%s/%s", mapped.Destination.Namespace, mapped.Destination.Name)
+		for _, nic := range vm.NICs {
+			if nic.Network == network.Name {
+				nadCount[nadKey]++
+			}
+		}
+	}
+
+	for _, count := range nadCount {
+		if count > 1 {
+			return
+		}
+	}
+	ok = true
 	return
 }
 
