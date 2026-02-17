@@ -60,6 +60,7 @@ const (
 	VMStorageNotMapped              = "VMStorageNotMapped"
 	VMStorageNotSupported           = "VMStorageNotSupported"
 	VMMultiplePodNetworkMappings    = "VMMultiplePodNetworkMappings"
+	VMDuplicateNADMappings          = "VMDuplicateNADMappings"
 	VMMissingGuestIPs               = "VMMissingGuestIPs"
 	VMIpNotMatchingUdnSubnet        = "VMIpNotMatchingUdnSubnet"
 	VMMissingChangedBlockTracking   = "VMMissingChangedBlockTracking"
@@ -672,6 +673,14 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "VM has more than one interface mapped to the pod network.",
 		Items:    []string{},
 	}
+	duplicateNADMappings := libcnd.Condition{
+		Type:     VMDuplicateNADMappings,
+		Status:   True,
+		Reason:   NotValid,
+		Category: api.CategoryCritical,
+		Message:  "VM has multiple NICs mapped to the same network attachment definition.",
+		Items:    []string{},
+	}
 	missingStaticIPs := libcnd.Condition{
 		Type:     VMMissingGuestIPs,
 		Status:   True,
@@ -954,6 +963,13 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			if !ok {
 				multiplePodNetworkMappings.Items = append(multiplePodNetworkMappings.Items, ref.String())
 			}
+			ok, err = validator.DuplicateNAD(*ref)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				duplicateNADMappings.Items = append(duplicateNADMappings.Items, ref.String())
+			}
 		}
 		if plan.Referenced.Map.Storage != nil {
 			ok, err := validator.StorageMapped(*ref)
@@ -1185,6 +1201,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(multiplePodNetworkMappings.Items) > 0 {
 		plan.Status.SetCondition(multiplePodNetworkMappings)
+	}
+	if len(duplicateNADMappings.Items) > 0 {
+		plan.Status.SetCondition(duplicateNADMappings)
 	}
 	if len(missingStaticIPs.Items) > 0 {
 		plan.Status.SetCondition(missingStaticIPs)
