@@ -21,6 +21,11 @@ func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
 	return true, nil
 }
 
+// DuplicateNAD validates duplicate NAD mappings (not applicable for EC2).
+func (r *Validator) DuplicateNAD(vmRef ref.Ref) (ok bool, err error) {
+	return true, nil
+}
+
 // ChangeTrackingEnabled validates change tracking.
 func (r *Validator) ChangeTrackingEnabled(vmRef ref.Ref) (bool, error) {
 	return true, nil

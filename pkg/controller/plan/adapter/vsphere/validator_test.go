@@ -21,8 +21,9 @@ var ErrNotImplemented = errors.New("not implemented")
 
 // Mock inventory struct and methods for testing
 type mockInventory struct {
-	ds model.Datastore
-	vm model.VM
+	ds       model.Datastore
+	vm       model.VM
+	networks map[string]model.Network // keyed by ID
 }
 
 // defaultVM returns a VM with sensible defaults for testing
@@ -68,6 +69,14 @@ func (m *mockInventory) Find(resource interface{}, ref ref.Ref) error {
 		if ref.Name == "missing_from_inventory" {
 			return base.NotFoundError{}
 		}
+	case *model.Network:
+		if m.networks != nil {
+			if net, ok := m.networks[ref.ID]; ok {
+				*res = net
+				return nil
+			}
+		}
+		return base.NotFoundError{}
 	case *model.VM:
 		if ref.Name == "missing_from_inventory" {
 			return base.NotFoundError{}
@@ -378,6 +387,220 @@ var _ = Describe("vsphere validation tests", func() {
 			// Error cases
 			Entry("when VM is missing from inventory", "missing_from_inventory", false, true),
 		)
+	})
+
+	Describe("DuplicateNAD", func() {
+		It("should return false (zero-value) when network map is nil", func() {
+			plan := createPlan()
+			// no network map set
+			ctx := plancontext.Context{
+				Plan:   plan,
+				Source: plancontext.Source{Inventory: &mockInventory{}},
+			}
+			validator := &Validator{Context: &ctx}
+			ok, err := validator.DuplicateNAD(ref.Ref{Name: "test"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ok).To(BeFalse()) // zero-value return when map is nil
+		})
+
+		It("should return ok when no duplicate NADs exist", func() {
+			plan := createPlan()
+			plan.Referenced.Map.Network = &v1beta1.NetworkMap{
+				Spec: v1beta1.NetworkMapSpec{
+					Map: []v1beta1.NetworkPair{
+						{
+							Source: ref.Ref{ID: "net-1"},
+							Destination: v1beta1.DestinationNetwork{
+								Type:      "multus",
+								Namespace: "ns1",
+								Name:      "nad-a",
+							},
+						},
+						{
+							Source: ref.Ref{ID: "net-2"},
+							Destination: v1beta1.DestinationNetwork{
+								Type:      "multus",
+								Namespace: "ns1",
+								Name:      "nad-b",
+							},
+						},
+					},
+				},
+			}
+			ctx := plancontext.Context{
+				Plan: plan,
+				Source: plancontext.Source{Inventory: &mockInventory{
+					vm: model.VM{
+						VM1: model.VM1{
+							VM0: model.VM0{ID: "vm-1", Name: "test"},
+						},
+						NICs: []vsphere.NIC{
+							{Network: vsphere.Ref{ID: "net-1"}, MAC: "aa:bb:cc:dd:ee:01"},
+							{Network: vsphere.Ref{ID: "net-2"}, MAC: "aa:bb:cc:dd:ee:02"},
+						},
+					},
+					networks: map[string]model.Network{
+						"net-1": {Resource: model.Resource{ID: "net-1"}},
+						"net-2": {Resource: model.Resource{ID: "net-2"}},
+					},
+				}},
+			}
+			validator := &Validator{Context: &ctx}
+			ok, err := validator.DuplicateNAD(ref.Ref{Name: "test"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ok).To(BeTrue())
+		})
+
+		It("should detect duplicate when two NICs on same source network map to same NAD", func() {
+			plan := createPlan()
+			plan.Referenced.Map.Network = &v1beta1.NetworkMap{
+				Spec: v1beta1.NetworkMapSpec{
+					Map: []v1beta1.NetworkPair{
+						{
+							Source: ref.Ref{ID: "net-1"},
+							Destination: v1beta1.DestinationNetwork{
+								Type:      "multus",
+								Namespace: "ns1",
+								Name:      "nad-a",
+							},
+						},
+					},
+				},
+			}
+			ctx := plancontext.Context{
+				Plan: plan,
+				Source: plancontext.Source{Inventory: &mockInventory{
+					vm: model.VM{
+						VM1: model.VM1{
+							VM0: model.VM0{ID: "vm-1", Name: "test"},
+						},
+						NICs: []vsphere.NIC{
+							{Network: vsphere.Ref{ID: "net-1"}, MAC: "aa:bb:cc:dd:ee:01"},
+							{Network: vsphere.Ref{ID: "net-1"}, MAC: "aa:bb:cc:dd:ee:02"},
+						},
+					},
+					networks: map[string]model.Network{
+						"net-1": {Resource: model.Resource{ID: "net-1"}},
+					},
+				}},
+			}
+			validator := &Validator{Context: &ctx}
+			ok, err := validator.DuplicateNAD(ref.Ref{Name: "test"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ok).To(BeFalse())
+		})
+
+		It("should detect duplicate when two different source networks map to same NAD", func() {
+			plan := createPlan()
+			plan.Referenced.Map.Network = &v1beta1.NetworkMap{
+				Spec: v1beta1.NetworkMapSpec{
+					Map: []v1beta1.NetworkPair{
+						{
+							Source: ref.Ref{ID: "net-1"},
+							Destination: v1beta1.DestinationNetwork{
+								Type:      "multus",
+								Namespace: "ns1",
+								Name:      "nad-a",
+							},
+						},
+						{
+							Source: ref.Ref{ID: "net-2"},
+							Destination: v1beta1.DestinationNetwork{
+								Type:      "multus",
+								Namespace: "ns1",
+								Name:      "nad-a",
+							},
+						},
+					},
+				},
+			}
+			ctx := plancontext.Context{
+				Plan: plan,
+				Source: plancontext.Source{Inventory: &mockInventory{
+					vm: model.VM{
+						VM1: model.VM1{
+							VM0: model.VM0{ID: "vm-1", Name: "test"},
+						},
+						NICs: []vsphere.NIC{
+							{Network: vsphere.Ref{ID: "net-1"}, MAC: "aa:bb:cc:dd:ee:01"},
+							{Network: vsphere.Ref{ID: "net-2"}, MAC: "aa:bb:cc:dd:ee:02"},
+						},
+					},
+					networks: map[string]model.Network{
+						"net-1": {Resource: model.Resource{ID: "net-1"}},
+						"net-2": {Resource: model.Resource{ID: "net-2"}},
+					},
+				}},
+			}
+			validator := &Validator{Context: &ctx}
+			ok, err := validator.DuplicateNAD(ref.Ref{Name: "test"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ok).To(BeFalse())
+		})
+
+		It("should skip pod and ignored destinations", func() {
+			plan := createPlan()
+			plan.Referenced.Map.Network = &v1beta1.NetworkMap{
+				Spec: v1beta1.NetworkMapSpec{
+					Map: []v1beta1.NetworkPair{
+						{
+							Source: ref.Ref{ID: "net-1"},
+							Destination: v1beta1.DestinationNetwork{
+								Type: "pod",
+							},
+						},
+						{
+							Source: ref.Ref{ID: "net-2"},
+							Destination: v1beta1.DestinationNetwork{
+								Type: "pod",
+							},
+						},
+						{
+							Source: ref.Ref{ID: "net-3"},
+							Destination: v1beta1.DestinationNetwork{
+								Type: "ignored",
+							},
+						},
+					},
+				},
+			}
+			ctx := plancontext.Context{
+				Plan: plan,
+				Source: plancontext.Source{Inventory: &mockInventory{
+					vm: model.VM{
+						VM1: model.VM1{
+							VM0: model.VM0{ID: "vm-1", Name: "test"},
+						},
+						NICs: []vsphere.NIC{
+							{Network: vsphere.Ref{ID: "net-1"}, MAC: "aa:bb:cc:dd:ee:01"},
+							{Network: vsphere.Ref{ID: "net-2"}, MAC: "aa:bb:cc:dd:ee:02"},
+							{Network: vsphere.Ref{ID: "net-3"}, MAC: "aa:bb:cc:dd:ee:03"},
+						},
+					},
+				}},
+			}
+			validator := &Validator{Context: &ctx}
+			ok, err := validator.DuplicateNAD(ref.Ref{Name: "test"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ok).To(BeTrue())
+		})
+
+		It("should return error when VM not found", func() {
+			plan := createPlan()
+			plan.Referenced.Map.Network = &v1beta1.NetworkMap{
+				Spec: v1beta1.NetworkMapSpec{
+					Map: []v1beta1.NetworkPair{},
+				},
+			}
+			ctx := plancontext.Context{
+				Plan:   plan,
+				Source: plancontext.Source{Inventory: &mockInventory{}},
+			}
+			validator := &Validator{Context: &ctx}
+			ok, err := validator.DuplicateNAD(ref.Ref{Name: "missing_from_inventory"})
+			Expect(err).To(HaveOccurred())
+			Expect(ok).To(BeFalse())
+		})
 	})
 })
 
