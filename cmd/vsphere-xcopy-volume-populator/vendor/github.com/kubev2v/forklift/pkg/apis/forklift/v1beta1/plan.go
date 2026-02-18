@@ -305,12 +305,27 @@ type PlanSpec struct {
 	// execution order. If not specified, no custom scripts are injected.
 	// +optional
 	CustomizationScripts *core.ObjectReference `json:"customizationScripts,omitempty"`
+	// VirtV2vImage overrides the global virt-v2v container image for this plan.
+	// When set, virt-v2v pods created by this plan will use this image instead
+	// of the cluster-wide VIRT_V2V_IMAGE setting.
+	// Use this to run different virt-v2v builds for specific migration scenarios
+	VirtV2vImage string `json:"virtV2vImage,omitempty"`
 }
 
 // Find a planned VM.
 func (r *PlanSpec) FindVM(ref ref.Ref) (v *plan.VM, found bool) {
-	for _, vm := range r.VMs {
-		if vm.ID == ref.ID {
+	for i := range r.VMs {
+		vm := r.VMs[i]
+		if vm.ID != "" && vm.ID == ref.ID {
+			found = true
+			v = &vm
+			return
+		}
+	}
+	// Fallback: match by Name when the spec VM has no ID
+	for i := range r.VMs {
+		vm := r.VMs[i]
+		if vm.ID == "" && vm.Name != "" && vm.Name == ref.Name {
 			found = true
 			v = &vm
 			return

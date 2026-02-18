@@ -378,7 +378,8 @@ func (c *FlashSystemAPIClient) StartFlashCopyMapping(mappingID string) error {
 var _ populator.RDMCapable = &FlashSystemClonner{}
 
 type FlashSystemClonner struct {
-	api *FlashSystemAPIClient
+	api            *FlashSystemAPIClient
+	initiatorGroup string
 }
 
 // NewFlashSystemClonner creates a new FlashSystemClonner.
@@ -390,8 +391,17 @@ func NewFlashSystemClonner(managementIP, username, password string, sslSkipVerif
 	return FlashSystemClonner{api: client}, nil
 }
 
+func (c *FlashSystemClonner) MapTarget(targetLUN populator.LUN, context populator.MappingContext) (populator.LUN, error) {
+	return c.Map(c.initiatorGroup, targetLUN, context)
+}
+
+func (c *FlashSystemClonner) UnmapTarget(targetLUN populator.LUN, context populator.MappingContext) error {
+	return c.UnMap(c.initiatorGroup, targetLUN, context)
+}
+
 // EnsureSingleHost creates or finds a single host with the given identifiers.
 func (c *FlashSystemClonner) EnsureClonnerIgroup(hostName string, clonnerIdentifiers []string) (populator.MappingContext, error) {
+	c.initiatorGroup = hostName
 	klog.Infof("Ensuring single host '%s' exists with identifiers: %v", hostName, clonnerIdentifiers)
 	ctx := make(populator.MappingContext)
 

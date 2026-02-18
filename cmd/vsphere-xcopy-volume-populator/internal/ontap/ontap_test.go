@@ -56,11 +56,11 @@ func TestNetappClonner_EnsureClonnerIgroup(t *testing.T) {
 	clonner := &NetappClonner{api: mockAPI}
 
 	igroup := "test-igroup"
-	adapterIDs := []string{"adapter1", "adapter2"}
+	adapterIDs := []string{"iqn.adapter1", "iqn.adapter2"}
 
-	mockAPI.EXPECT().IgroupCreate(gomock.Any(), igroup, "mixed", "vmware").Return(nil)
-	mockAPI.EXPECT().EnsureIgroupAdded(gomock.Any(), igroup, "adapter1").Return(nil)
-	mockAPI.EXPECT().EnsureIgroupAdded(gomock.Any(), igroup, "adapter2").Return(nil)
+	mockAPI.EXPECT().IgroupCreate(gomock.Any(), igroup+"-iscsi", "iscsi", "vmware").Return(nil)
+	mockAPI.EXPECT().EnsureIgroupAdded(gomock.Any(), igroup+"-iscsi", "iqn.adapter1").Return(nil)
+	mockAPI.EXPECT().EnsureIgroupAdded(gomock.Any(), igroup+"-iscsi", "iqn.adapter2").Return(nil)
 
 	_, err := clonner.EnsureClonnerIgroup(igroup, adapterIDs)
 	if err != nil {
@@ -245,11 +245,11 @@ func TestNetappClonner_EnsureClonnerIgroup_WithFCConversion(t *testing.T) {
 	expectedWWPN := "21:00:00:00:00:00:00:02"        // nosonar
 	adapterIDs := []string{fakeFC, fakeIQN}
 
-	mockAPI.EXPECT().IgroupCreate(gomock.Any(), igroup, "mixed", "vmware").Return(nil)
+	mockAPI.EXPECT().IgroupCreate(gomock.Any(), igroup+"-fcp", "fcp", "vmware").Return(nil)
 	// FC adapter should be converted from fc.WWNN:WWPN to colon-separated WWPN
-	mockAPI.EXPECT().EnsureIgroupAdded(gomock.Any(), igroup, expectedWWPN).Return(nil)
+	mockAPI.EXPECT().EnsureIgroupAdded(gomock.Any(), igroup+"-fcp", expectedWWPN).Return(nil)
 	// iSCSI adapter should pass through unchanged
-	mockAPI.EXPECT().EnsureIgroupAdded(gomock.Any(), igroup, fakeIQN).Return(nil)
+	mockAPI.EXPECT().EnsureIgroupAdded(gomock.Any(), igroup+"-fcp", fakeIQN).Return(nil)
 
 	_, err := clonner.EnsureClonnerIgroup(igroup, adapterIDs)
 	if err != nil {
