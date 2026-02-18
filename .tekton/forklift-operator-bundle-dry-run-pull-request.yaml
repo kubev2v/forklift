@@ -1,22 +1,23 @@
 # Dry-run bundle: downstream-based (Containerfile-dry-run uses .downstream_manifests + relatedImages).
-# Test staged components only (registry.stage.redhat.io + release.conf). Does not replace upstream or downstream.
-# Output: forklift-operator-bundle-dry-run-2-10:{{revision}}
+# Runs on pull_request to main only—validates staged builds of dev-preview (registry.stage.redhat.io + release.conf).
+# Output: forklift-operator-bundle-dry-run:on-pr-{{revision}}
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/kubev2v/forklift?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: "{{revision}}"
+    build.appstudio.redhat.com/pull_request_number: "{{pull_request_number}}"
     build.appstudio.redhat.com/target_branch: "{{target_branch}}"
-    pipelinesascode.tekton.dev/cancel-in-progress: "false"
+    pipelinesascode.tekton.dev/cancel-in-progress: "true"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "release-2.10" && ( "operator/.downstream_manifests".pathChanged() || "operator/related_images.yaml".pathChanged() || "operator/config/manifests/***".pathChanged() || ".tekton/forklift-operator-bundle-dry-run-*.yaml".pathChanged() || "build/forklift-operator-bundle/Containerfile-dry-run".pathChanged() || "build/release.conf".pathChanged() )
+    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch == "main" && ( "operator/.downstream_manifests".pathChanged() || "operator/related_images.yaml".pathChanged() || "operator/config/manifests/***".pathChanged() || ".tekton/forklift-operator-bundle-dry-run*.yaml".pathChanged() || "build/forklift-operator-bundle/Containerfile-dry-run".pathChanged() || "build/release.conf".pathChanged() )
   creationTimestamp:
   labels:
-    appstudio.openshift.io/application: forklift-operator-2-10
-    appstudio.openshift.io/component: forklift-operator-bundle-dry-run-2-10
+    appstudio.openshift.io/application: forklift-operator-dry-run
+    appstudio.openshift.io/component: forklift-operator-bundle-dry-run
     pipelines.appstudio.openshift.io/type: build
-  name: forklift-operator-bundle-dry-run-2-10-on-push
+  name: forklift-operator-bundle-dry-run-on-pull-request
   namespace: rh-mtv-1-tenant
 spec:
   params:
@@ -25,7 +26,9 @@ spec:
     - name: revision
       value: "{{revision}}"
     - name: output-image
-      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-2-10/forklift-operator-bundle-dry-run-2-10:{{revision}}
+      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-dry-run/forklift-operator-bundle-dry-run:on-pr-{{revision}}
+    - name: image-expires-after
+      value: 5d
     - name: dockerfile
       value: build/forklift-operator-bundle/Containerfile-dry-run
     - name: path-context
@@ -57,7 +60,7 @@ spec:
     description: |
       Dry-run: downstream-based bundle ( .downstream_manifests + relatedImages ) with staged
       component images (registry.stage.redhat.io + release.conf). For upstream use Containerfile;
-      for production downstream use Containerfile-downstream.
+      for production downstream use Containerfile-downstream. Runs on pull_request to main only (validates staged builds of dev-preview).
     finally:
       - name: show-sbom
         params:
@@ -364,7 +367,7 @@ spec:
       - name: netrc
         optional: true
   taskRunTemplate:
-    serviceAccountName: build-pipeline-forklift-operator-bundle-2-10
+    serviceAccountName: build-pipeline-forklift-operator-bundle-dry-run
   workspaces:
     - name: git-auth
       secret:
