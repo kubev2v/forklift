@@ -1985,6 +1985,23 @@ func (r *Reconciler) validateConversionTempStorage(plan *api.Plan) error {
 		return nil
 	}
 
+	// Validate that the StorageClass exists in the cluster (conversion runs on destination/target)
+	sc := &storagev1.StorageClass{}
+	if err := r.Client.Get(context.Background(), client.ObjectKey{Name: storageClass}, sc); err != nil {
+		if k8serr.IsNotFound(err) {
+			plan.Status.SetCondition(libcnd.Condition{
+				Type:     NotValid,
+				Status:   True,
+				Category: api.CategoryCritical,
+				Message:  fmt.Sprintf("ConversionTempStorageClass %q not found in the cluster. The conversion PVC will remain Pending and the migration will hang.", storageClass),
+				Items:    []string{},
+			})
+			r.Log.Info("Conversion temp storage class not found", "storageClass", storageClass, "plan", plan.Name, "namespace", plan.Namespace)
+			return nil
+		}
+		return liberr.Wrap(err, "failed to get StorageClass", "storageClass", storageClass)
+	}
+
 	// Check CSIStorageCapacity when available: block migration if storage class
 	// reports insufficient capacity for the requested conversion temp volume size.
 	if err := r.validateConversionTempStorageCapacity(plan, storageClass, requestedQty); err != nil {
