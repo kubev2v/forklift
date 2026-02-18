@@ -115,7 +115,7 @@ type Migration struct {
 	// Memory (in MB) allocated for the virt-v2v conversion appliance
 	VirtV2vMemSize int
 	// Number of virtual CPUs used for the virt-v2v conversion appliance
-	VirtV2vSmp             int
+	VirtV2vSmp                       int
 	VirtV2vContainerLimitsCpu        string
 	VirtV2vContainerLimitsMemory     string
 	VirtV2vContainerRequestsCpu      string

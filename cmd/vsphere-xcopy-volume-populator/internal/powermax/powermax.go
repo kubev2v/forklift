@@ -27,6 +27,14 @@ type PowermaxClonner struct {
 	maskingViewID  string
 }
 
+func (p *PowermaxClonner) MapTarget(targetLUN populator.LUN, mappingContext populator.MappingContext) (populator.LUN, error) {
+	return p.Map(p.initiatorID, targetLUN, mappingContext)
+}
+
+func (p *PowermaxClonner) UnmapTarget(targetLUN populator.LUN, mappingContext populator.MappingContext) error {
+	return p.UnMap(p.initiatorID, targetLUN, mappingContext)
+}
+
 // CurrentMappedGroups implements populator.StorageApi.
 func (p *PowermaxClonner) CurrentMappedGroups(targetLUN populator.LUN, mappingContext populator.MappingContext) ([]string, error) {
 	ctx := context.TODO()

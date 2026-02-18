@@ -28,6 +28,8 @@ var _ populator.VMDKCapable = &FlashArrayClonner{}
 type FlashArrayClonner struct {
 	restClient    *RestClient
 	clusterPrefix string
+	// TODO use this instead of mappingContext[hosts]
+	initiatorHostOrGroup string
 }
 
 const ClusterPrefixEnv = "PURE_CLUSTER_PREFIX"
@@ -124,6 +126,14 @@ func (f *FlashArrayClonner) Map(
 		return targetLUN, nil
 	}
 	return populator.LUN{}, fmt.Errorf("connection failed for all hosts in context")
+}
+
+func (f *FlashArrayClonner) MapTarget(targetLUN populator.LUN, context populator.MappingContext) (populator.LUN, error) {
+	return f.Map(f.initiatorHostOrGroup, targetLUN, context)
+}
+
+func (f *FlashArrayClonner) UnmapTarget(targetLUN populator.LUN, context populator.MappingContext) error {
+	return f.UnMap(f.initiatorHostOrGroup, targetLUN, context)
 }
 
 // UnMap is responsible to unmapping an initiator group from a populator.LUN

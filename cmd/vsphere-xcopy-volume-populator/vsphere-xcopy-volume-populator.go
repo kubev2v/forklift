@@ -186,6 +186,7 @@ func main() {
 		klog.Fatalf("Failed to fetch the volume handle details from the target pvc %s: %s", ownerName, err)
 	}
 
+	klog.InfoS("populator", "stage", "setupTracing")
 	progressCounter, xcopyUsedGauge, err := setupTracingMetrics()
 	if err != nil {
 		klog.Fatal(err)
@@ -200,6 +201,7 @@ func main() {
 	log.Info("copy-offload started")
 
 	hll := populator.NewHostLeaseLocker(clientSet)
+	klog.InfoS("populator", "stage", "starting")
 	go p.Populate(sourceVmId, sourceVMDKFile, pv, hll, progressCh, xCopyUsedCh, quitCh)
 
 	for {
@@ -314,6 +316,7 @@ func handleArgs() {
 	flag.Parse()
 
 	if showVersion {
+		klog.InfoS("populator", "version", version.Version, "vib", version.VibVersion)
 		klog.Info(version.Get())
 		os.Exit(0)
 	}

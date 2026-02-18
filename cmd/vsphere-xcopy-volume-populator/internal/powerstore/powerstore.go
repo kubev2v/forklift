@@ -19,7 +19,16 @@ const (
 )
 
 type PowerstoreClonner struct {
-	Client gopowerstore.Client
+	Client         gopowerstore.Client
+	initiatorGroup string
+}
+
+func (p *PowerstoreClonner) MapTarget(targetLUN populator.LUN, mappingContext populator.MappingContext) (populator.LUN, error) {
+	return p.Map(p.initiatorGroup, targetLUN, mappingContext)
+}
+
+func (p *PowerstoreClonner) UnmapTarget(targetLUN populator.LUN, mappingContext populator.MappingContext) error {
+	return p.UnMap(p.initiatorGroup, targetLUN, mappingContext)
 }
 
 // CurrentMappedGroups implements populator.StorageApi.
@@ -53,6 +62,7 @@ func (p *PowerstoreClonner) CurrentMappedGroups(targetLUN populator.LUN, mapping
 
 // EnsureClonnerIgroup implements populator.StorageApi.
 func (p *PowerstoreClonner) EnsureClonnerIgroup(initiatorGroup string, adapterIds []string) (populator.MappingContext, error) {
+	p.initiatorGroup = initiatorGroup
 	klog.Infof("ensuring initiator group %s for adapters %v", initiatorGroup, adapterIds)
 
 	ctx := context.Background()
