@@ -640,7 +640,7 @@ rm -f esxi_public_key.pub restricted_key.pub esxi_private_key
 
 ### vSphere/ESXi
 - Sometimes remote ESXi execution can fail with SOAP error with no apparent root cause message
-  Since VSphere is invoking some SOAP/Rest endpoints on the ESXi, those can fail because of 
+  Since VSphere is invoking some SOAP/Rest endpoints on the ESXi, those can fail because of
   standard error reasons and vanish after the next try. If the popoulator fails the migration
   can be restarted. We may want to restart/retry that populator or restart the migration.
 
@@ -650,8 +650,49 @@ rm -f esxi_public_key.pub restricted_key.pub esxi_private_key
   ```
   CLI Fault: The object or item referred to could not be found. <obj xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="urn:vim25" versionId="5.0" xsi:type="LocalizedMethodFault"><fault xsi:type="NotFound"></fault><localizedMessage>The object or item referred to could not be found.</localizedMessage></obj>
   ```
-  
+
     resolution: ssh into the ESXi and run `/etc/init.d/hostd restart`. Wait for few seconds till the ESX renews the connection with vSphere.
+
+- **Error**: Migration failures with multiple disks 
+
+  **Cause**: ESXi has a configurable limit on the number of SCSI LUN IDs it will discover during storage rescans, controlled by the `Disk.MaxLUN` parameter (default: 1024). During copy-offload migrations, each VM disk creates a new PVC that provisions a new LUN on the storage array. When the total number of LUN IDs (existing LUNs + newly created LUNs for migration) approaches or exceeds the Disk.MaxLUN value, newly created LUNs with higher LUN IDs become invisible to the ESXi host. This causes vmkfstools clone operations to fail because the target LUN cannot be discovered during storage rescans.
+
+  **Symptoms**:
+  - Migration failures increase as the number of disks per VM increases
+  - Inconsistent behavior - migrations sometimes succeed, sometimes fail for the same VMs
+  - Failures are more common when:
+    - Migrating VMs with 10+ disks
+    - Running multiple concurrent migrations (e.g., 4 VMs with 5+ disks each)
+    - Storage array already has many existing LUNs consuming lower LUN IDs
+
+  **Why This Happens**:
+  2. ESXi must perform storage rescans to discover newly created LUNs for XCOPY operations
+  3. Disk.MaxLUN determines which LUN IDs the scan attempts to discover (default: LUN IDs 0-1023)
+  4. If a new LUN gets assigned ID ≥ 1024, it's invisible to ESXi
+
+  **Resolution**: Increase the `Disk.MaxLUN` value on each ESXi host to allow discovery of higher LUN IDs.
+
+  **How to Configure**:
+
+  1. Navigate to: **vSphere Web Client → Host → Configure → System → Advanced System Settings**
+  2. Search for: `Disk.MaxLUN`
+  3. Edit the value:
+     - Current default: `1024` (LUN IDs 0-1023)
+     - Recommended for copy-offload: `2048` or higher
+     - Maximum supported: `16384` (LUN IDs 0-16383)
+  4. Click **OK**
+  5. Reboot the host (recommended for the change to take full effect)
+
+  **Important Notes**:
+  - Storage arrays vary in LUN ID allocation: NetApp ONTAP uses sequential from 0 (higher risk), Pure FlashArray starts at 254 descending (lower initial risk, jumps to 255+ after 254 LUNs), Dell PowerStore uses sequential with wraparound (moderate risk). Mature arrays with many existing LUNs are at higher risk.
+  - This change should be applied to **all ESXi hosts** that will participate in copy-offload migrations
+  - Higher values extend storage rescan times slightly
+  - The value specifies the LUN ID *after* the last one you want to discover (e.g., to discover LUN IDs 0-2047, set Disk.MaxLUN to 2048)
+  - **Caution**: If reducing Disk.MaxLUN from a previously higher value, ensure no LUNs with IDs above the new value are in use
+
+  **References**:
+  - [Broadcom KB 342823: Changing the Disk.MaxLUN parameter on ESXi Hosts](https://knowledge.broadcom.com/external/article/342823/changing-the-diskmaxlun-parameter-on-esx.html)
+  - [Broadcom KB 323129: Troubleshooting LUN connectivity issues on ESXi hosts](https://knowledge.broadcom.com/external/article/323129/troubleshooting-lun-connectivity-issues.html)
 
 ### SSH Method
 
