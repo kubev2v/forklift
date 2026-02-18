@@ -42,6 +42,9 @@ const (
 	MigrationOnlyConversion MigrationType = "conversion"
 )
 
+// PlanConversionTempStorageFinalizer is used to clean up conversion temp storage PVCs when a Plan is deleted.
+const PlanConversionTempStorageFinalizer = "forklift/plan-conversion-temp-storage"
+
 const (
 	// namespaceLabelPrimaryUDN is the label key used to identify namespaces with primary user-defined networks
 	namespaceLabelPrimaryUDN = "k8s.ovn.org/primary-user-defined-network"
