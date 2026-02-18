@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/version"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
@@ -18,13 +19,10 @@ const (
 	vibLocation = "/bin/vmkfstools-wrapper.vib"
 )
 
-// VibVersion is set by ldflags
-var VibVersion = "x.x.x"
-
 // ensure vib will fetch the vib version and in case needed will install it
 // on the target ESX
 func ensureVib(client vmware.Client, esx *object.HostSystem, datastore string, desiredVibVersion string) error {
-	klog.Infof("ensuring vib version on ESXi %s: %s", esx.Name(), VibVersion)
+	klog.Infof("ensuring vib version on ESXi %s: %s", esx.Name(), version.VibVersion)
 
 	version, err := getViBVersion(client, esx)
 	if err != nil {
@@ -50,7 +48,7 @@ func ensureVib(client vmware.Client, esx *object.HostSystem, datastore string, d
 	if err != nil {
 		return fmt.Errorf("failed to install the VIB on ESXi %s: %w", esx.Name(), err)
 	}
-	klog.Infof("installed vib on ESXi %s version %s", esx.Name(), VibVersion)
+	klog.Infof("installed vib on ESXi %s version %s", esx.Name(), version)
 	return nil
 }
 
