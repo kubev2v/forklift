@@ -15,6 +15,9 @@ import (
 	"k8s.io/klog/v2"
 )
 
+const VantaraProviderID = "60060e80" // Vantara's NAA prefix
+const LengthNAAID = 32
+
 type VantaraCloner struct {
 	client          VantaraClient
 	envHostGroupIds []string
@@ -347,4 +350,97 @@ func (v *VantaraCloner) findVolumeByVVolID(vvolID string) (string, error) {
 
 	// Convert to decimal string and return
 	return strconv.FormatUint(value, 10), nil
+}
+
+// RDMCopy performs a copy operation for RDM-backed disks using Vantara APIs
+func (v *VantaraCloner) RDMCopy(vsphereClient vmware.Client, vmId string, sourceVMDKFile string, persistentVolume populator.PersistentVolume, progress chan<- uint64) error {
+	klog.Infof("Vantara RDM Copy: Starting RDM copy operation for VM %s", vmId)
+
+	// Get disk backing info to find the RDM device
+	backing, err := vsphereClient.GetVMDiskBacking(context.Background(), vmId, sourceVMDKFile)
+	if err != nil {
+		return fmt.Errorf("failed to get RDM disk backing info: %w", err)
+	}
+
+	if !backing.IsRDM {
+		return fmt.Errorf("disk %s is not an RDM disk", sourceVMDKFile)
+	}
+
+	klog.Infof("Vantara RDM Copy: Found RDM device: %s", backing.DeviceName)
+
+	// Resolve the source LUN from the RDM device name
+	sourceLUN, err := v.resolveRDMToLUN(backing.DeviceName)
+	if err != nil {
+		return fmt.Errorf("failed to resolve RDM device to source LUN: %w", err)
+	}
+
+	// Resolve the target PV to LUN
+	targetLUN, err := v.ResolvePVToLUN(persistentVolume)
+	if err != nil {
+		return fmt.Errorf("failed to resolve target volume: %w", err)
+	}
+
+	klog.Infof("Vantara RDM Copy: Copying from source LUN %s to target LUN %s", sourceLUN.LDeviceID, targetLUN.LDeviceID)
+
+	// Report progress start
+	progress <- 10
+
+	// Perform the copy operation using Vantara API
+	// Get target volume pool ID
+	ldevResp, err := v.client.GetLdev(targetLUN.LDeviceID)
+	klog.Infof("Target LDEV: %v", ldevResp)
+
+	// Perform the copy operation
+	err = v.performVolumeCopy(sourceLUN.LDeviceID, ldevResp, progress)
+	if err != nil {
+		return fmt.Errorf("copy operation failed: %w", err)
+	}
+
+	// Report progress complete
+	progress <- 100
+
+	klog.Infof("Vantara RDM Copy: Copy operation completed successfully")
+	return nil
+}
+
+// resolveRDMToLUN resolves an RDM device name to a Vantara LDEV ID
+func (v *VantaraCloner) resolveRDMToLUN(deviceName string) (populator.LUN, error) {
+
+	deviceName = strings.ToLower(deviceName)
+	start := strings.Index(deviceName, VantaraProviderID)
+	if start == -1 {
+		fmt.Println("target not found")
+		return populator.LUN{}, fmt.Errorf("target not found")
+	}
+
+	if start+LengthNAAID > len(deviceName) {
+		fmt.Println("string too short")
+		return populator.LUN{}, fmt.Errorf("device name too short")
+	}
+
+	naaDevice := deviceName[start : start+LengthNAAID]
+
+	ldevIdHex := naaDevice[len(naaDevice)-4:]           // Get last 4 characters for hex ID
+	ldevId, err := strconv.ParseUint(ldevIdHex, 16, 64) // Convert hex ID to decimal string
+	if err != nil {
+		return populator.LUN{}, fmt.Errorf("failed to parse LDEV ID from device name %s: %w", deviceName, err)
+	}
+
+	ldevIds := strconv.FormatUint(ldevId, 10)
+	ldevResp, err := v.client.GetLdev(ldevIds)
+	if err != nil {
+		return populator.LUN{}, fmt.Errorf("failed to get LDEV info for device name %s: %w", deviceName, err)
+	}
+
+	naa := strings.ToLower(ldevResp.NaaId)
+
+	if naaDevice != naa {
+		return populator.LUN{}, fmt.Errorf("device name %s does not match LDEV NAA ID %s", naaDevice, naa)
+	}
+
+	return populator.LUN{
+		LDeviceID: ldevIds,
+		NAA:       naa,
+	}, nil
+
 }
