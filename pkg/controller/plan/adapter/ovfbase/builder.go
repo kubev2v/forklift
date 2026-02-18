@@ -28,6 +28,7 @@ import (
 // Firmware types
 const (
 	BIOS = "bios"
+	EFI  = "efi"
 	UEFI = "uefi"
 )
 
@@ -337,8 +338,8 @@ func (r *Builder) mapFirmware(vm *model.VM, vmRef ref.Ref, object *cnv.VirtualMa
 	}
 
 	switch virtV2VFirmware {
-	case UEFI:
-		// For UEFI firmware, use the SecureBoot value from the VM
+	case EFI, UEFI:
+		// For EFI/UEFI firmware, use the SecureBoot value from the VM
 		firmware.Bootloader = &cnv.Bootloader{
 			EFI: &cnv.EFI{
 				SecureBoot: &vm.SecureBoot,
