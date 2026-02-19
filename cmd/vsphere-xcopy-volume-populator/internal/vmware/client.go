@@ -64,16 +64,15 @@ func (c *VSphereClient) RunEsxCommand(ctx context.Context, host *object.HostSyst
 		return nil, err
 	}
 
-	// Invoke esxcli command
-	klog.Infof("about to run esxcli command %s", command)
+	log := klog.FromContext(ctx).WithName("esxcli")
+	commandStr := strings.Join(command, " ")
+	log.Info("running esxcli command", "command", commandStr)
 	res, err := executor.Run(ctx, command)
 	if err != nil {
-		klog.Errorf("Failed to run esxcli command %v: %s", command, err)
+		log.Error(err, "esxcli command failed", "command", commandStr)
 		if fault, ok := err.(*esx.Fault); ok {
 			if parsedFault, parseErr := ErrToFault(fault); parseErr == nil {
-				klog.Errorf("ESX CLI Fault - Type: %s, Messages: %v", parsedFault.Type, parsedFault.ErrMsgs)
-			} else {
-				klog.Errorf("Failed to parse fault details: %v", parseErr)
+				log.V(2).Info("ESX CLI fault", "type", parsedFault.Type, "messages", parsedFault.ErrMsgs)
 			}
 		}
 		return nil, err
@@ -81,7 +80,7 @@ func (c *VSphereClient) RunEsxCommand(ctx context.Context, host *object.HostSyst
 	for _, valueMap := range res.Values {
 		message, _ := valueMap["message"]
 		status, statusExists := valueMap["status"]
-		klog.Infof("esxcli result %v, message %s, status %v", valueMap, message, status)
+		log.V(2).Info("esxcli result", "message", message, "status", status)
 		if statusExists && strings.Join(status, "") != "0" {
 			return nil, fmt.Errorf("Failed to invoke vmkfstools: %v", message)
 		}
@@ -106,7 +105,7 @@ func (c *VSphereClient) GetEsxByVm(ctx context.Context, vmId string) (*object.Ho
 			}
 		} else {
 			vm = result
-			fmt.Printf("found vm %v\n", vm)
+			klog.FromContext(ctx).WithName("esxcli").V(2).Info("found VM", "vm", vm.Reference().Value)
 			break
 		}
 	}
@@ -146,6 +145,7 @@ func (c *VSphereClient) GetDatastore(ctx context.Context, dc *object.Datacenter,
 
 // GetVMDiskBacking retrieves disk backing information to determine disk type
 func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkPath string) (*DiskBacking, error) {
+	log := klog.FromContext(ctx).WithName("esxcli")
 	finder := find.NewFinder(c.Client.Client, true)
 	datacenters, err := finder.DatacenterList(ctx, "*")
 	if err != nil {
@@ -204,7 +204,7 @@ func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkP
 
 			// Check for VVol backing
 			if backing.BackingObjectId != "" {
-				klog.V(2).Infof("Disk %s is VVol-backed (BackingObjectId: %s)", vmdkPath, backing.BackingObjectId)
+				log.V(2).Info("disk is VVol-backed", "vmdk", vmdkPath, "backing_object_id", backing.BackingObjectId)
 				return &DiskBacking{
 					VVolId:     backing.BackingObjectId,
 					IsRDM:      false,
@@ -213,7 +213,7 @@ func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkP
 			}
 
 			// Regular VMDK
-			klog.V(2).Infof("Disk %s is VMDK-backed", vmdkPath)
+			log.V(2).Info("disk is VMDK-backed", "vmdk", vmdkPath)
 			return &DiskBacking{
 				VVolId:     "",
 				IsRDM:      false,
@@ -229,7 +229,7 @@ func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkP
 				}
 			}
 
-			klog.V(2).Infof("Disk %s is RDM-backed (DeviceName: %s)", vmdkPath, backing.DeviceName)
+			log.V(2).Info("disk is RDM-backed", "vmdk", vmdkPath, "device", backing.DeviceName)
 			return &DiskBacking{
 				VVolId:     "",
 				IsRDM:      true,
@@ -239,7 +239,7 @@ func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkP
 	}
 
 	// If we couldn't find the disk, return default VMDK type
-	klog.V(2).Infof("Could not find specific disk %s, assuming VMDK type", vmdkPath)
+	log.V(2).Info("disk not found, assuming VMDK type", "vmdk", vmdkPath)
 	return &DiskBacking{
 		VVolId:     "",
 		IsRDM:      false,

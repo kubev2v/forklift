@@ -42,28 +42,31 @@ func NewSSHTaskExecutor(sshClient vmware.SSHClient) TaskExecutor {
 	}
 }
 
-func (e *SSHTaskExecutor) StartClone(_ context.Context, _ *object.HostSystem, datastore, sourcePath, targetLUN string) (*vmkfstoolsTask, error) {
-	klog.Infof("Starting vmkfstools clone: datastore=%s, source=%s, target=%s", datastore, sourcePath, targetLUN)
-	output, err := e.sshClient.ExecuteCommand(datastore, "--clone", "-s", sourcePath, "-t", targetLUN)
+func (e *SSHTaskExecutor) StartClone(ctx context.Context, _ *object.HostSystem, datastore, sourcePath, targetLUN string) (*vmkfstoolsTask, error) {
+	log := klog.FromContext(ctx)
+	cloningCtx := klog.NewContext(ctx, log.WithName("cloning"))
+	log.Info("starting clone via SSH", "datastore", datastore, "source", sourcePath, "target", targetLUN)
+
+	output, err := e.sshClient.ExecuteCommand(cloningCtx, datastore, "--clone", "-s", sourcePath, "-t", targetLUN)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start clone: %w", err)
 	}
-
-	klog.Infof("Received output from script: %s", output)
 
 	t, err := parseTaskResponse(output)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse clone response: %w", err)
 	}
 
-	klog.Infof("Started vmkfstools clone task %s with PID %d", t.TaskId, t.Pid)
+	log.V(2).Info("clone task started via SSH", "task_id", t.TaskId, "pid", t.Pid)
 	return t, nil
 }
 
-func (e *SSHTaskExecutor) GetTaskStatus(_ context.Context, _ *object.HostSystem, datastore, taskId string) (*vmkfstoolsTask, error) {
-	klog.V(2).Infof("Getting task status for %s (datastore=%s)", taskId, datastore)
+func (e *SSHTaskExecutor) GetTaskStatus(ctx context.Context, _ *object.HostSystem, datastore, taskId string) (*vmkfstoolsTask, error) {
+	log := klog.FromContext(ctx)
+	cloningCtx := klog.NewContext(ctx, log.WithName("cloning"))
+	log.V(2).Info("getting task status", "task_id", taskId, "datastore", datastore)
 
-	output, err := e.sshClient.ExecuteCommand(datastore, "--task-get", "-i", taskId)
+	output, err := e.sshClient.ExecuteCommand(cloningCtx, datastore, "--task-get", "-i", taskId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get task status: %w", err)
 	}
@@ -73,26 +76,27 @@ func (e *SSHTaskExecutor) GetTaskStatus(_ context.Context, _ *object.HostSystem,
 		return nil, fmt.Errorf("failed to parse status response: %w", err)
 	}
 
-	klog.V(2).Infof("Task %s status: PID=%d, ExitCode=%s, LastLine=%s",
-		taskId, t.Pid, t.ExitCode, t.LastLine)
+	log.V(2).Info("task status", "task_id", taskId, "pid", t.Pid, "exit_code", t.ExitCode, "last_line", t.LastLine)
 
 	return t, nil
 }
 
-func (e *SSHTaskExecutor) CleanupTask(_ context.Context, _ *object.HostSystem, datastore, taskId string) error {
-	klog.Infof("Cleaning up task %s (datastore=%s)", taskId, datastore)
+func (e *SSHTaskExecutor) CleanupTask(ctx context.Context, _ *object.HostSystem, datastore, taskId string) error {
+	log := klog.FromContext(ctx)
+	cloningCtx := klog.NewContext(ctx, log.WithName("cloning"))
+	log.Info("cleaning up task", "task_id", taskId, "datastore", datastore)
 
-	output, err := e.sshClient.ExecuteCommand(datastore, "--task-clean", "-i", taskId)
+	output, err := e.sshClient.ExecuteCommand(cloningCtx, datastore, "--task-clean", "-i", taskId)
 	if err != nil {
 		return fmt.Errorf("failed to cleanup task: %w", err)
 	}
 
 	_, err = parseTaskResponse(output)
 	if err != nil {
-		klog.Warningf("Cleanup response parsing failed (task may still be cleaned): %v", err)
+		log.V(2).Info("cleanup response parse failed (task may still be cleaned)", "err", err)
 	}
 
-	klog.Infof("Cleaned up task %s", taskId)
+	log.Info("cleaned up task", "task_id", taskId)
 	return nil
 }
 

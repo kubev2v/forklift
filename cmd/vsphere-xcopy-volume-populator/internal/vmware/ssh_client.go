@@ -17,7 +17,7 @@ import (
 // SSHClient interface for SSH operations
 type SSHClient interface {
 	Connect(ctx context.Context, hostname, username string, privateKey []byte) error
-	ExecuteCommand(datastore, sshCommand string, args ...string) (string, error)
+	ExecuteCommand(ctx context.Context, datastore, sshCommand string, args ...string) (string, error)
 	Close() error
 }
 
@@ -72,14 +72,14 @@ func (c *ESXiSSHClient) Connect(ctx context.Context, hostname, username string, 
 		return fmt.Errorf("failed to establish SSH client connection: %w", err)
 	}
 	c.sshClient = ssh.NewClient(cc, chans, reqs)
-	klog.Infof("Connected to SSH server %s", hostname)
+	klog.FromContext(ctx).WithName("ssh").Info("connected to SSH server", "host", hostname)
 	return nil
 }
 
 // ExecuteCommand executes a command using the SSH_ORIGINAL_COMMAND pattern
 // Uses structured format: DS=<datastore>;CMD=<operation> <args...>
 // If datastore is empty, only tests connectivity without calling the wrapper
-func (c *ESXiSSHClient) ExecuteCommand(datastore, sshCommand string, args ...string) (string, error) {
+func (c *ESXiSSHClient) ExecuteCommand(ctx context.Context, datastore, sshCommand string, args ...string) (string, error) {
 	if c.sshClient == nil {
 		return "", fmt.Errorf("SSH client not connected")
 	}
@@ -101,10 +101,11 @@ func (c *ESXiSSHClient) ExecuteCommand(datastore, sshCommand string, args ...str
 	// For connectivity tests, datastore can be empty
 	fullCommand := fmt.Sprintf("DS=%s;CMD=%s", datastore, cmdPart)
 
-	klog.V(2).Infof("Executing SSH command: %s", fullCommand)
+	log := klog.FromContext(ctx).WithName("ssh")
+	log.V(2).Info("executing SSH command", "command", fullCommand)
 
 	// Create a context with timeout for the command execution
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	runCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
 	// Channel to receive the command result
@@ -128,7 +129,7 @@ func (c *ESXiSSHClient) ExecuteCommand(datastore, sshCommand string, args ...str
 	case result := <-resultChan:
 		output = result.output
 		cmdErr = result.err
-	case <-ctx.Done():
+	case <-runCtx.Done():
 		// Command timed out, try to close the session
 		session.Close()
 		return "", fmt.Errorf("SSH command timed out after 60 seconds: %s", fullCommand)
@@ -137,11 +138,11 @@ func (c *ESXiSSHClient) ExecuteCommand(datastore, sshCommand string, args ...str
 	outputStr := string(output)
 
 	if cmdErr != nil {
-		klog.Warningf("SSH command failed: %s, output: %s, error: %v", fullCommand, outputStr, cmdErr)
+		log.Info("SSH command failed", "command", fullCommand, "output", outputStr, "err", cmdErr)
 		return outputStr, cmdErr
 	}
 
-	klog.V(2).Infof("SSH command succeeded: %s, output: %s", fullCommand, outputStr)
+	log.V(2).Info("SSH command succeeded", "command", fullCommand, "output", outputStr)
 	return outputStr, nil
 }
 
@@ -149,7 +150,8 @@ func (c *ESXiSSHClient) Close() error {
 	if c.sshClient != nil {
 		err := c.sshClient.Close()
 		c.sshClient = nil
-		klog.Infof("Closed SSH connection to %s", c.hostname)
+		// No ctx available at Close; use base logger so we still show "ssh"
+		klog.Background().WithName("copy-offload").WithName("ssh").Info("SSH connection closed", "host", c.hostname)
 		return err
 	}
 	return nil
@@ -158,49 +160,43 @@ func (c *ESXiSSHClient) Close() error {
 // EnableSSHAccess enables SSH service on ESXi host and provides manual SSH key installation instructions
 func EnableSSHAccess(ctx context.Context, vmwareClient Client, host *object.HostSystem, privateKey, publicKey []byte, scriptPath string) error {
 	publicKeyStr := strings.TrimSpace(string(publicKey))
+	log := klog.Background().WithName("copy-offload").WithName("ssh")
 
-	klog.Infof("Enabling SSH access on ESXi host %s", host.Name())
+	log.Info("enabling SSH access on ESXi host", "host", host.Name())
+	ctx = klog.NewContext(ctx, log)
 
-	// Step 1: Get host IP address for SSH connectivity testing
 	hostIP, err := GetHostIPAddress(ctx, host)
 	if err != nil {
 		return fmt.Errorf("failed to get host IP address: %w", err)
 	}
 
-	// Step 2: Check ESXi version
 	version, err := getESXiVersion(vmwareClient, host, ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get ESXi version: %w", err)
 	}
-	klog.Infof("ESXi version %s detected", version)
+	log.Info("ESXi version detected", "version", version)
 
-	// Use the shared restricted SSH command template
 	restrictedPublicKey := fmt.Sprintf(`command="%s",no-port-forwarding,no-agent-forwarding,no-X11-forwarding %s`,
 		util.RestrictedSSHCommandTemplate, publicKeyStr)
 
-	// Step 7: Test SSH connectivity first (using private key for authentication)
-	// Pass empty datastore for connectivity test - the wrapper won't be called
-	// Create a logger adapter from klog to logging.LevelLogger
-	log := logging.WithName("ssh-setup")
-	if util.TestSSHConnectivity(ctx, hostIP, privateKey, log) {
-		klog.Infof("SSH connectivity test passed - keys already configured correctly")
+	sshSetupLog := logging.WithName("ssh-setup")
+	if util.TestSSHConnectivity(ctx, hostIP, privateKey, sshSetupLog) {
+		log.Info("SSH connectivity test passed, keys already configured")
 		return nil
 	}
 
-	// Step 8: Manual SSH key installation required for all ESXi versions
-	klog.Errorf("Manual SSH key installation required. Please add the following line to /etc/ssh/keys-root/authorized_keys on the ESXi host:")
-	klog.Errorf("")
-	klog.Errorf("  %s", restrictedPublicKey)
-	klog.Errorf("")
-	klog.Errorf("The template extracts datastore from commands (DS=<datastore>;CMD=<command>)")
-	klog.Errorf("and executes: /vmfs/volumes/$DS/secure-vmkfstools-wrapper")
-	klog.Errorf("")
-	klog.Errorf("Steps to manually configure SSH key:")
-	klog.Errorf("1. SSH to the ESXi host: ssh root@%s", hostIP)
-	klog.Errorf("2. Edit the authorized_keys file: vi /etc/ssh/keys-root/authorized_keys")
-	klog.Errorf("3. Add the above line to the file")
-	klog.Errorf("4. Save and exit")
-	klog.Errorf("5. Restart the operation")
+	instructions := fmt.Sprintf(`Manual SSH key installation required. Add this line to /etc/ssh/keys-root/authorized_keys on the ESXi host:
+
+  %s
+
+The template extracts datastore from commands (DS=<datastore>;CMD=<command>) and executes: /vmfs/volumes/$DS/secure-vmkfstools-wrapper
+
+Steps:
+1. SSH to the ESXi host: ssh root@%s
+2. Edit: vi /etc/ssh/keys-root/authorized_keys
+3. Add the line above, save and exit
+4. Restart the operation`, restrictedPublicKey, hostIP)
+	log.Error(fmt.Errorf("manual SSH key configuration required"), "SSH key setup", "instructions", instructions)
 	return fmt.Errorf("manual SSH key configuration required for ESXi %s - see logs for instructions", version)
 }
 
