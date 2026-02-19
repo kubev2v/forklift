@@ -20,6 +20,9 @@ const (
 	DefaultAlignBlockSize = 1024 * 1024
 )
 
+// KubeVirt resource kind used in owner references and type metadata.
+const VirtualMachineKind = "VirtualMachine"
+
 // RootDisk prefix for boot order.
 const (
 	diskPrefix = "/dev/sd"

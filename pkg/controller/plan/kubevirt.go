@@ -101,6 +101,10 @@ const (
 	kMigration = "migration"
 	// plan label (value=UID)
 	kPlan = "plan"
+	// plan name label (value=Plan.Name)
+	kPlanName = "plan-name"
+	// plan namespace label (value=Plan.Namespace)
+	kPlanNamespace = "plan-namespace"
 	// VM label (value=vmID)
 	kVM = "vmID"
 	// VM UUID label
@@ -1954,7 +1958,7 @@ func (r *KubeVirt) emptyVm(vm *plan.VMStatus) (virtualMachine *cnv.VirtualMachin
 	virtualMachine = &cnv.VirtualMachine{
 		TypeMeta: meta.TypeMeta{
 			APIVersion: "v1",
-			Kind:       "VirtualMachine",
+			Kind:       util.VirtualMachineKind,
 		},
 		ObjectMeta: meta.ObjectMeta{
 			Namespace: r.Plan.Spec.TargetNamespace,
@@ -2856,8 +2860,10 @@ func (r *KubeVirt) secret(vmRef ref.Ref, setSecretData func(*core.Secret) error,
 // Labels for plan and migration.
 func (r *KubeVirt) planLabels() map[string]string {
 	return map[string]string{
-		kMigration: string(r.Migration.UID),
-		kPlan:      string(r.Plan.GetUID()),
+		kMigration:     string(r.Migration.UID),
+		kPlan:          string(r.Plan.GetUID()),
+		kPlanName:      r.Plan.Name,
+		kPlanNamespace: r.Plan.Namespace,
 	}
 }
 
@@ -3092,7 +3098,7 @@ func vmOwnerReference(vm *cnv.VirtualMachine) (ref meta.OwnerReference) {
 	isController := false
 	ref = meta.OwnerReference{
 		APIVersion:         "kubevirt.io/v1",
-		Kind:               "VirtualMachine",
+		Kind:               util.VirtualMachineKind,
 		Name:               vm.Name,
 		UID:                vm.UID,
 		BlockOwnerDeletion: &blockOwnerDeletion,
@@ -3357,23 +3363,27 @@ func (r *KubeVirt) BuildPVCForNFS(pv *core.PersistentVolume, vm *plan.VMStatus) 
 
 func (r *KubeVirt) nfsPVLabels(vmID string) map[string]string {
 	return map[string]string{
-		"provider":  r.Plan.Provider.Source.Name,
-		"app":       "forklift",
-		"migration": r.Migration.Name,
-		"plan":      string(r.Plan.UID),
-		"ova":       OvaPVLabel,
-		kVM:         vmID,
+		"provider":     r.Plan.Provider.Source.Name,
+		"app":          "forklift",
+		"migration":    r.Migration.Name,
+		"plan":         string(r.Plan.UID),
+		kPlanName:      r.Plan.Name,
+		kPlanNamespace: r.Plan.Namespace,
+		"ova":          OvaPVLabel,
+		kVM:            vmID,
 	}
 }
 
 func (r *KubeVirt) nfsPVCLabels(vmID string) map[string]string {
 	return map[string]string{
-		"provider":  r.Plan.Provider.Source.Name,
-		"app":       "forklift",
-		"migration": string(r.Migration.UID),
-		"plan":      string(r.Plan.UID),
-		"ova":       OvaPVCLabel,
-		kVM:         vmID,
+		"provider":     r.Plan.Provider.Source.Name,
+		"app":          "forklift",
+		"migration":    string(r.Migration.UID),
+		"plan":         string(r.Plan.UID),
+		kPlanName:      r.Plan.Name,
+		kPlanNamespace: r.Plan.Namespace,
+		"ova":          OvaPVCLabel,
+		kVM:            vmID,
 	}
 }
 
@@ -3479,24 +3489,28 @@ func (r *KubeVirt) BuildPVCForSMB(pv *core.PersistentVolume, vm *plan.VMStatus) 
 // smbPVLabels returns labels for HyperV SMB PV.
 func (r *KubeVirt) smbPVLabels(vmID string) map[string]string {
 	return map[string]string{
-		"provider":  r.Plan.Provider.Source.Name,
-		"app":       "forklift",
-		"migration": r.Migration.Name,
-		"plan":      string(r.Plan.UID),
-		"hyperv":    HyperVPVLabel,
-		kVM:         vmID,
+		"provider":     r.Plan.Provider.Source.Name,
+		"app":          "forklift",
+		"migration":    r.Migration.Name,
+		"plan":         string(r.Plan.UID),
+		kPlanName:      r.Plan.Name,
+		kPlanNamespace: r.Plan.Namespace,
+		"hyperv":       HyperVPVLabel,
+		kVM:            vmID,
 	}
 }
 
 // smbPVCLabels returns labels for HyperV SMB PVC.
 func (r *KubeVirt) smbPVCLabels(vmID string) map[string]string {
 	return map[string]string{
-		"provider":  r.Plan.Provider.Source.Name,
-		"app":       "forklift",
-		"migration": string(r.Migration.UID),
-		"plan":      string(r.Plan.UID),
-		"hyperv":    HyperVPVCLabel,
-		kVM:         vmID,
+		"provider":     r.Plan.Provider.Source.Name,
+		"app":          "forklift",
+		"migration":    string(r.Migration.UID),
+		"plan":         string(r.Plan.UID),
+		kPlanName:      r.Plan.Name,
+		kPlanNamespace: r.Plan.Namespace,
+		"hyperv":       HyperVPVCLabel,
+		kVM:            vmID,
 	}
 }
 
