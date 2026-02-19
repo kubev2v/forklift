@@ -193,6 +193,12 @@ spec:
                 - "true"
                 - "false"
                 type: string
+              feature_network_policies:
+                description: 'Enable network policies for security (default: false)'
+                enum:
+                - "true"
+                - "false"
+                type: string
               feature_ocp_live_migration:
                 description: 'Enable OCP live migration (default: false)'
                 enum:
@@ -307,6 +313,11 @@ spec:
               must_gather_image_fqin:
                 description: Must-gather debugging image
                 example: quay.io/kubev2v/forklift-must-gather:latest
+                type: string
+              network_policies_min_ocp_version:
+                description: 'Minimum OCP version to auto-enable network policies
+                  (default: 4.21.0)'
+                example: 4.21.0
                 type: string
               ova_container_limits_cpu:
                 description: 'OVA CPU limit (default: 1000m)'
@@ -7255,6 +7266,18 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - networkpolicies
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -7320,7 +7343,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: forklift-operator
-  namespace: konveyor-forklift
+  namespace: forklift-operator-system
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -7429,6 +7452,7 @@ metadata:
   name: forklift-controller
   namespace: openshift-mtv
 spec:
+  feature_network_policies: "false"
   feature_ui_plugin: "true"
   feature_validation: "true"
   feature_volume_populator: "true"
@@ -7574,7 +7598,8 @@ metadata:
         "spec": {
           "feature_ui_plugin": "true",
           "feature_validation": "true",
-          "feature_volume_populator": "true"
+          "feature_volume_populator": "true",
+          "feature_network_policies": "false"
         }
       }
     operatorframework.io/suggested-namespace: openshift-mtv
