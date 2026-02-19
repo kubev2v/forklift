@@ -241,3 +241,25 @@ func TestVmAdapter_getDiskGuestInfo(t *testing.T) {
 		})
 	}
 }
+
+func TestHasDiskPrefix(t *testing.T) {
+	tests := []struct {
+		key      string
+		expected bool
+	}{
+		{"scsi0:0.ctkEnabled", true},
+		{"SCSI0:0.ctkEnabled", true},
+		{"SATA1:2.ctkEnabled", true},
+		{"ide0:0.ctkEnabled", true},
+		{"nvme0:1.ctkEnabled", true},
+		{"ctkEnabled", false},
+		{"other0:0.ctkEnabled", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			if got := hasDiskPrefix(tt.key); got != tt.expected {
+				t.Errorf("hasDiskPrefix(%q) = %v, want %v", tt.key, got, tt.expected)
+			}
+		})
+	}
+}
