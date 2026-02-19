@@ -30,6 +30,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/templateutil"
 	batchv1 "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1953,7 +1954,7 @@ func (r *Reconciler) validateConversionTempStorage(plan *api.Plan) error {
 	}
 
 	// Validate that storageSize is a valid Kubernetes resource quantity
-	_, err := resource.ParseQuantity(storageSize)
+	requestedQty, err := resource.ParseQuantity(storageSize)
 	if err != nil {
 		conversionTempStorageSizeInvalid := libcnd.Condition{
 			Type:     NotValid,
@@ -1967,6 +1968,72 @@ func (r *Reconciler) validateConversionTempStorage(plan *api.Plan) error {
 		return nil
 	}
 
+	// Check CSIStorageCapacity when available: block migration if storage class
+	// reports insufficient capacity for the requested conversion temp volume size.
+	if err := r.validateConversionTempStorageCapacity(plan, storageClass, requestedQty); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateConversionTempStorageCapacity checks CSIStorageCapacity for the given
+// storage class. If any entry reports capacity sufficient for the requested size
+// (MaximumVolumeSize or Capacity >= requested), the check passes. If entries exist
+// but none have sufficient capacity, a blocking condition is set. If no entries
+// exist for the storage class, an advisory warning is set.
+func (r *Reconciler) validateConversionTempStorageCapacity(plan *api.Plan, storageClassName string, requested resource.Quantity) error {
+	ctx := context.Background()
+	list := &storagev1.CSIStorageCapacityList{}
+	if err := r.Client.List(ctx, list, client.InNamespace(core.NamespaceAll)); err != nil {
+		r.Log.Info("Could not list CSIStorageCapacity (capacity check skipped)", "error", err.Error(), "storageClass", storageClassName)
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     NotValid,
+			Status:   True,
+			Category: api.CategoryAdvisory,
+			Message:  fmt.Sprintf("Storage capacity for ConversionTempStorageClass %q could not be verified. Ensure sufficient space is available.", storageClassName),
+			Items:    []string{},
+		})
+		return nil
+	}
+
+	var matching []storagev1.CSIStorageCapacity
+	for i := range list.Items {
+		if list.Items[i].StorageClassName == storageClassName {
+			matching = append(matching, list.Items[i])
+		}
+	}
+
+	if len(matching) == 0 {
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     NotValid,
+			Status:   True,
+			Category: api.CategoryAdvisory,
+			Message:  fmt.Sprintf("No capacity information found for ConversionTempStorageClass %q. Ensure sufficient space is available.", storageClassName),
+			Items:    []string{},
+		})
+		return nil
+	}
+
+	for _, cap := range matching {
+		// Prefer MaximumVolumeSize (largest single volume); fall back to Capacity (available space).
+		if cap.MaximumVolumeSize != nil && cap.MaximumVolumeSize.Cmp(requested) >= 0 {
+			return nil
+		}
+		if cap.MaximumVolumeSize == nil && cap.Capacity != nil && cap.Capacity.Cmp(requested) >= 0 {
+			return nil
+		}
+	}
+
+	// Have capacity info but no entry can satisfy the requested size
+	plan.Status.SetCondition(libcnd.Condition{
+		Type:     NotValid,
+		Status:   True,
+		Category: api.CategoryCritical,
+		Message:  fmt.Sprintf("Insufficient space in storage class %q for conversion temp storage (requested %s). Migration may fail.", storageClassName, requested.String()),
+		Items:    []string{},
+	})
+	r.Log.Info("Conversion temp storage capacity insufficient", "storageClass", storageClassName, "requested", requested.String(), "plan", plan.Name, "namespace", plan.Namespace)
 	return nil
 }
 

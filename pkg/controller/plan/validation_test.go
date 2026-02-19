@@ -15,6 +15,8 @@ import (
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	core "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/version"
@@ -472,7 +474,12 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 
-			reconciler = createFakeReconciler(secret, plan, source, destination)
+			csiCap := &storagev1.CSIStorageCapacity{
+				ObjectMeta:       meta.ObjectMeta{Name: "fast-ssd-cap", Namespace: "kube-system"},
+				StorageClassName: "fast-ssd",
+				Capacity:         ptr.To(resource.MustParse("100Gi")),
+			}
+			reconciler = createFakeReconciler(secret, plan, source, destination, csiCap)
 			err := reconciler.validateConversionTempStorage(plan)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -554,12 +561,19 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			gomega.Expect(condition.Message).To(gomega.ContainSubstring("is not a valid Kubernetes resource quantity"))
 		})
 
-		ginkgo.It("should pass with valid size formats", func() {
+		ginkgo.It("should pass with valid size formats when CSIStorageCapacity has sufficient capacity", func() {
 			secret := createSecret(sourceSecretName, sourceNamespace, false)
 			source := createProvider(sourceName, sourceNamespace, "https://source", api.OpenShift, &core.ObjectReference{Name: sourceSecretName, Namespace: sourceNamespace})
 			destination := createProvider(destName, destNamespace, "", api.OpenShift, &core.ObjectReference{})
 			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+
+			// Seed CSIStorageCapacity so capacity check passes (2Ti >= all requested sizes)
+			csiCap := &storagev1.CSIStorageCapacity{
+				ObjectMeta:       meta.ObjectMeta{Name: "fast-ssd-cap", Namespace: "kube-system"},
+				StorageClassName: "fast-ssd",
+				Capacity:         ptr.To(resource.MustParse("2Ti")),
+			}
 
 			validSizes := []string{"50Gi", "1Ti", "100Mi", "500G", "2T"}
 			for _, size := range validSizes {
@@ -567,12 +581,41 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 				plan.Spec.ConversionTempStorageClass = "fast-ssd"
 				plan.Spec.ConversionTempStorageSize = size
 
-				reconciler = createFakeReconciler(secret, plan, source, destination)
+				reconciler = createFakeReconciler(secret, plan, source, destination, csiCap)
 				err := reconciler.validateConversionTempStorage(plan)
 
 				gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Size %s should be valid", size)
-				gomega.Expect(plan.Status.HasCondition(NotValid)).To(gomega.BeFalse(), "Size %s should not cause validation error", size)
+				gomega.Expect(plan.Status.HasBlockerCondition()).To(gomega.BeFalse(), "Size %s should not cause blocking validation error", size)
 			}
+		})
+
+		ginkgo.It("should block when CSIStorageCapacity reports insufficient capacity", func() {
+			secret := createSecret(sourceSecretName, sourceNamespace, false)
+			source := createProvider(sourceName, sourceNamespace, "https://source", api.OpenShift, &core.ObjectReference{Name: sourceSecretName, Namespace: sourceNamespace})
+			destination := createProvider(destName, destNamespace, "", api.OpenShift, &core.ObjectReference{})
+			plan := createPlan(testPlanName, testNamespace, source, destination)
+			plan.Spec.ConversionTempStorageClass = "ocs-storagecluster-ceph-rbd"
+			plan.Spec.ConversionTempStorageSize = "1Ti"
+			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+
+			// Only 70Gi available - not enough for 1Ti
+			csiCap := &storagev1.CSIStorageCapacity{
+				ObjectMeta:       meta.ObjectMeta{Name: "ceph-cap", Namespace: "openshift-storage"},
+				StorageClassName: "ocs-storagecluster-ceph-rbd",
+				Capacity:         ptr.To(resource.MustParse("70Gi")),
+			}
+
+			reconciler = createFakeReconciler(secret, plan, source, destination, csiCap)
+			err := reconciler.validateConversionTempStorage(plan)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasBlockerCondition()).To(gomega.BeTrue())
+			cnd := plan.Status.FindCondition(NotValid)
+			gomega.Expect(cnd).NotTo(gomega.BeNil())
+			gomega.Expect(cnd.Category).To(gomega.Equal(api.CategoryCritical))
+			gomega.Expect(cnd.Message).To(gomega.ContainSubstring("Insufficient space"))
+			gomega.Expect(cnd.Message).To(gomega.ContainSubstring("1Ti"))
 		})
 	})
 })
@@ -741,6 +784,7 @@ func createFakeReconciler(objects ...runtime.Object) *Reconciler {
 	scheme := runtime.NewScheme()
 	_ = core.AddToScheme(scheme)
 	_ = k8snet.AddToScheme(scheme)
+	_ = storagev1.AddToScheme(scheme)
 	api.SchemeBuilder.AddToScheme(scheme)
 
 	client := fakeClient.NewClientBuilder().
