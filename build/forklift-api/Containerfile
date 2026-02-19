@@ -9,7 +9,10 @@ RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -buildvcs=false -ldfl
 
 FROM registry.access.redhat.com/ubi9-minimal:9.6-1752587672
 # Required to be able to get files from within the pod
-RUN microdnf -y install tar && microdnf clean all
+RUN microdnf -y install tar && \
+    # Update packages to address security vulnerabilities (CVE fixes)
+    microdnf update -y && \
+    microdnf clean all
 COPY --from=builder /app/forklift-api /usr/local/bin/forklift-api
 
 ENTRYPOINT ["/usr/local/bin/forklift-api"]

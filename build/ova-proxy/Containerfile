@@ -9,6 +9,11 @@ RUN echo $(ls)
 RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -buildvcs=false -ldflags="-w -s" -o proxy github.com/kubev2v/forklift/cmd/ova-proxy
 
 FROM registry.access.redhat.com/ubi9-minimal:9.6-1752587672
+
+# Update packages to address security vulnerabilities (CVE fixes)
+RUN microdnf update -y && \
+    microdnf clean all
+
 COPY --from=builder /app/proxy /usr/local/bin/ova-proxy
 ENTRYPOINT ["/usr/local/bin/ova-proxy"]
 
