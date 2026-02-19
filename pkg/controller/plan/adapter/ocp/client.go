@@ -194,7 +194,7 @@ func (r *Client) PreTransferActions(vmRef ref.Ref) (ready bool, err error) {
 				TTLDuration: tokenTTLDuration,
 				Source: core.TypedLocalObjectReference{
 					APIGroup: &apiGroup,
-					Kind:     "VirtualMachine",
+					Kind:     util.VirtualMachineKind,
 					Name:     vmRef.Name,
 				},
 			},

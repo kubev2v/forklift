@@ -26,14 +26,20 @@ import (
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/controller/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/plan/util"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	libref "github.com/kubev2v/forklift/pkg/lib/ref"
 	metrics "github.com/kubev2v/forklift/pkg/monitoring/metrics/forklift-controller"
 	"github.com/kubev2v/forklift/pkg/settings"
+	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/storage/names"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -185,8 +191,10 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	err = r.APIReader.Get(context.TODO(), request.NamespacedName, plan)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
-			r.Log.Info("Plan deleted.")
+			r.Log.Info("Plan deleted, cleaning up orphaned resources.")
+			r.cleanupOrphanedResources(request.Name, request.Namespace)
 			err = nil
+			return
 		}
 		return
 	}
@@ -769,4 +777,73 @@ func (r *Reconciler) postpone() (postpone bool, err error) {
 	}
 
 	return
+}
+
+// cleanupOrphanedResources removes migration resources left behind when a Plan
+// is deleted. Resources are found by plan-name and plan-namespace labels.
+func (r *Reconciler) cleanupOrphanedResources(planName, planNamespace string) {
+	labels := client.MatchingLabels{
+		kPlanName:      planName,
+		kPlanNamespace: planNamespace,
+	}
+
+	r.deleteOrphanedResources(&core.PersistentVolumeClaimList{}, labels, "PVC", true)
+	r.deleteOrphanedResources(&cdi.DataVolumeList{}, labels, "DataVolume", true)
+	r.deleteOrphanedResources(&core.PodList{}, labels, "Pod", false)
+	r.deleteOrphanedResources(&core.SecretList{}, labels, "Secret", false)
+	r.deleteOrphanedResources(&core.ConfigMapList{}, labels, "ConfigMap", false)
+	r.deleteOrphanedResources(&core.PersistentVolumeList{}, labels, "PV", false)
+
+	r.Log.Info(
+		"Orphaned resource cleanup completed.",
+		"plan", planName,
+		"namespace", planNamespace)
+}
+
+// deleteOrphanedResources lists resources matching labels and deletes them.
+// When preserveVMOwned is true, resources owned by a VirtualMachine are preserved.
+func (r *Reconciler) deleteOrphanedResources(list client.ObjectList, labels client.MatchingLabels, kind string, preserveVMOwned bool) {
+	if err := r.List(context.TODO(), list, labels); err != nil {
+		r.Log.Error(err, "Failed to list resources for cleanup.", "kind", kind)
+		return
+	}
+	_ = apimeta.EachListItem(list, func(obj runtime.Object) error {
+		resource, ok := obj.(client.Object)
+		if !ok {
+			r.Log.Error(nil, "Unexpected object type during cleanup.", "kind", kind)
+			return nil
+		}
+		// Preserve resources already owned by a migrated VirtualMachine.
+		if preserveVMOwned && hasVMOwner(resource.GetOwnerReferences()) {
+			r.Log.V(1).Info(
+				"Skipping resource owned by VirtualMachine.",
+				"kind", kind,
+				"name", resource.GetName(),
+				"namespace", resource.GetNamespace())
+			return nil
+		}
+		if err := r.Delete(context.TODO(), resource); err != nil {
+			if !k8serr.IsNotFound(err) {
+				r.Log.Error(err, "Failed to delete resource.",
+					"kind", kind,
+					"name", resource.GetName(),
+					"namespace", resource.GetNamespace())
+			}
+		} else {
+			r.Log.Info("Deleted orphaned resource.",
+				"kind", kind,
+				"name", resource.GetName(),
+				"namespace", resource.GetNamespace())
+		}
+		return nil
+	})
+}
+
+func hasVMOwner(owners []meta.OwnerReference) bool {
+	for _, owner := range owners {
+		if owner.Kind == util.VirtualMachineKind {
+			return true
+		}
+	}
+	return false
 }
