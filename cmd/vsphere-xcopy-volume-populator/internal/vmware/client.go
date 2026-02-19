@@ -64,16 +64,13 @@ func (c *VSphereClient) RunEsxCommand(ctx context.Context, host *object.HostSyst
 		return nil, err
 	}
 
-	// Invoke esxcli command
-	klog.Infof("about to run esxcli command %s", command)
+	klog.InfoS("running esxcli command", "command", command)
 	res, err := executor.Run(ctx, command)
 	if err != nil {
-		klog.Errorf("Failed to run esxcli command %v: %s", command, err)
+		klog.ErrorS(err, "esxcli command failed", "command", command)
 		if fault, ok := err.(*esx.Fault); ok {
 			if parsedFault, parseErr := ErrToFault(fault); parseErr == nil {
-				klog.Errorf("ESX CLI Fault - Type: %s, Messages: %v", parsedFault.Type, parsedFault.ErrMsgs)
-			} else {
-				klog.Errorf("Failed to parse fault details: %v", parseErr)
+				klog.V(2).Info("ESX CLI fault", "type", parsedFault.Type, "messages", parsedFault.ErrMsgs)
 			}
 		}
 		return nil, err
@@ -81,7 +78,7 @@ func (c *VSphereClient) RunEsxCommand(ctx context.Context, host *object.HostSyst
 	for _, valueMap := range res.Values {
 		message, _ := valueMap["message"]
 		status, statusExists := valueMap["status"]
-		klog.Infof("esxcli result %v, message %s, status %v", valueMap, message, status)
+		klog.V(2).Info("esxcli result", "message", message, "status", status)
 		if statusExists && strings.Join(status, "") != "0" {
 			return nil, fmt.Errorf("Failed to invoke vmkfstools: %v", message)
 		}
@@ -106,7 +103,7 @@ func (c *VSphereClient) GetEsxByVm(ctx context.Context, vmId string) (*object.Ho
 			}
 		} else {
 			vm = result
-			fmt.Printf("found vm %v\n", vm)
+			klog.V(2).Info("found VM", "vm", vm.Reference().Value)
 			break
 		}
 	}

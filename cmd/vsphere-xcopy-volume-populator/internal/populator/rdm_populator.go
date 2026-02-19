@@ -23,29 +23,27 @@ func NewRDMPopulator(storageApi RDMCapable, vmwareClient vmware.Client) (Populat
 
 // Populate performs the RDM copy operation
 func (p *RDMPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) (errFinal error) {
+	log := klog.Background().WithName("copy-offload").WithName("rdm")
 	defer func() {
 		r := recover()
 		if r != nil {
-			klog.Infof("RDM Populator: recovered from panic: %v", r)
+			log.Info("recovered from panic", "panic", r)
 		}
-		klog.Infof("RDM Populator: exiting with final error: %v", errFinal)
+		log.Info("RDM copy exiting", "err", errFinal)
 		quit <- errFinal
 	}()
 
-	klog.Infof("RDM Populator: Starting copy operation")
-	klog.Infof("RDM Populator: VM ID: %s, Source VMDK: %s, Target: %s", vmId, sourceVMDKFile, pv.Name)
+	log.Info("RDM copy started", "vm", vmId, "source", sourceVMDKFile, "target", pv.Name)
 
 	// RDM copy does not use xcopy
 	xcopyUsed <- 0
 
-	// Perform the RDM copy operation
-	klog.Infof("RDM Populator: Starting RDM copy operation...")
 	err := p.storageApi.RDMCopy(p.vSphereClient, vmId, sourceVMDKFile, pv, progress)
 	if err != nil {
-		klog.Errorf("RDM Populator: RDM copy operation failed: %v", err)
+		log.Error(err, "RDM copy failed")
 		return fmt.Errorf("failed to copy RDM disk: %w", err)
 	}
 
-	klog.Infof("RDM Populator: Copy operation completed successfully")
+	log.Info("RDM copy finished")
 	return nil
 }

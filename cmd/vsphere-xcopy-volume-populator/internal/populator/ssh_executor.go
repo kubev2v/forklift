@@ -43,20 +43,20 @@ func NewSSHTaskExecutor(sshClient vmware.SSHClient) TaskExecutor {
 }
 
 func (e *SSHTaskExecutor) StartClone(_ context.Context, _ *object.HostSystem, datastore, sourcePath, targetLUN string) (*vmkfstoolsTask, error) {
-	klog.Infof("Starting vmkfstools clone: datastore=%s, source=%s, target=%s", datastore, sourcePath, targetLUN)
+	log := klog.Background().WithName("copy-offload").WithName("xcopy").WithName("clone")
+	log.Info("starting clone via SSH", "datastore", datastore, "source", sourcePath, "target", targetLUN)
+
 	output, err := e.sshClient.ExecuteCommand(datastore, "--clone", "-s", sourcePath, "-t", targetLUN)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start clone: %w", err)
 	}
-
-	klog.Infof("Received output from script: %s", output)
 
 	t, err := parseTaskResponse(output)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse clone response: %w", err)
 	}
 
-	klog.Infof("Started vmkfstools clone task %s with PID %d", t.TaskId, t.Pid)
+	log.V(2).Info("clone task started via SSH", "task_id", t.TaskId, "pid", t.Pid)
 	return t, nil
 }
 
@@ -80,7 +80,8 @@ func (e *SSHTaskExecutor) GetTaskStatus(_ context.Context, _ *object.HostSystem,
 }
 
 func (e *SSHTaskExecutor) CleanupTask(_ context.Context, _ *object.HostSystem, datastore, taskId string) error {
-	klog.Infof("Cleaning up task %s (datastore=%s)", taskId, datastore)
+	log := klog.Background().WithName("copy-offload").WithName("xcopy").WithName("clone")
+	log.Info("cleaning up task", "task_id", taskId, "datastore", datastore)
 
 	output, err := e.sshClient.ExecuteCommand(datastore, "--task-clean", "-i", taskId)
 	if err != nil {
@@ -89,10 +90,10 @@ func (e *SSHTaskExecutor) CleanupTask(_ context.Context, _ *object.HostSystem, d
 
 	_, err = parseTaskResponse(output)
 	if err != nil {
-		klog.Warningf("Cleanup response parsing failed (task may still be cleaned): %v", err)
+		log.V(2).Info("cleanup response parse failed (task may still be cleaned)", "err", err)
 	}
 
-	klog.Infof("Cleaned up task %s", taskId)
+	log.Info("cleaned up task", "task_id", taskId)
 	return nil
 }
 

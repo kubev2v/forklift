@@ -11,6 +11,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/go-logr/logr"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/client-go/util/cert"
 
@@ -23,6 +24,7 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/powerstore"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/primera3par"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/pure"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/stagelog"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vantara"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/version"
 
@@ -74,6 +76,9 @@ var (
 func main() {
 	handleArgs()
 	klog.Info(version.Get())
+
+	// Use stage sink so logger name (WithName) appears as [stage] at the start of each line
+	klog.SetLoggerWithOptions(logr.New(stagelog.NewStageSink(os.Stderr)), klog.ContextualLogger(true))
 
 	var storageApi populator.StorageApi
 	product := forklift.StorageVendorProduct(storageVendor)
@@ -195,13 +200,18 @@ func main() {
 	xCopyUsedCh := make(chan int)
 	quitCh := make(chan error)
 
+	// Contextual logger for this copy-offload run; stage (WithName) appears as [stage] via stagelog sink
+	log := klog.Background().WithName("copy-offload").WithValues("pvc", ownerName, "source_vmdk", sourceVMDKFile)
+	cloneLog := log.WithName("cloning")
+	log.Info("copy-offload started")
+
 	hll := populator.NewHostLeaseLocker(clientSet)
 	go p.Populate(sourceVmId, sourceVMDKFile, pv, hll, progressCh, xCopyUsedCh, quitCh)
 
 	for {
 		select {
 		case p := <-progressCh:
-			klog.Infof(" progress reported %d%%", p)
+			cloneLog.Info(fmt.Sprintf("clone progress %d%%", p))
 			metric := dto.Metric{}
 			if err := progressCounter.WithLabelValues(ownerUID).Write(&metric); err != nil {
 				klog.Error(err)
@@ -209,19 +219,19 @@ func main() {
 				progressCounter.WithLabelValues(ownerUID).Add(float64(p) - metric.Counter.GetValue())
 			}
 		case c := <-xCopyUsedCh:
-			klog.Infof(" xcopy used reported: %d", c)
+			cloneLog.Info(fmt.Sprintf("xcopy used: %d", c))
 			metric := dto.Metric{}
 			if err := xcopyUsedGauge.WithLabelValues(ownerUID).Write(&metric); err != nil {
-				klog.Error("failed to write to the xcopy used gauge", err)
+				log.Error(err, "failed to write xcopy used gauge")
 			} else {
 				xcopyUsedGauge.WithLabelValues(ownerUID).Set(float64(c))
 			}
 		case q := <-quitCh:
-			klog.Infof("channel quit %s", q)
 			if q != nil {
+				log.Error(q, "copy-offload failed")
 				klog.Fatal(q)
 			}
-
+			log.Info("copy-offload finished")
 			return
 		}
 	}

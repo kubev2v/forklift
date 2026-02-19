@@ -110,7 +110,7 @@ func getViBVersion(client vmware.Client, esxi *object.HostSystem) (string, error
 		return "", err
 	}
 
-	klog.Infof("reply from get vib %v", r)
+	klog.V(2).Info("VIB get result", "response", r)
 	return r[0].Value("Version"), err
 }
 
@@ -132,6 +132,6 @@ func installVib(client vmware.Client, esx *object.HostSystem, vibPath string) er
 		return err
 	}
 
-	klog.Infof("reply from get vib %v", r)
+	klog.V(2).Info("VIB install result", "response", r)
 	return nil
 }
