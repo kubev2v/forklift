@@ -83,13 +83,17 @@ func NewWithRemoteEsxcliSSH(storageApi VMDKCapable, vmwareClient vmware.Client, 
 }
 
 func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) (errFinal error) {
-	// isn't it better to not call close the channel from the caller?
+	log := klog.Background().WithName("copy-offload").WithName("xcopy")
+	setupLog := log.WithName("setup")
+	mapLog := log.WithName("map-volume")
+	rescanLog := log.WithName("rescan")
+	cloneLog := log.WithName("clone")
+	cleanupLog := log.WithName("cleanup")
+
 	defer func() {
 		r := recover()
 		if r != nil {
-			klog.Infof("recovered %v", r)
-			// if we paniced we must return with an error. Otherwise, the pod will exit with 0 and will
-			// continue to convertion, and will likely fail, if the copy wasn't completed.
+			log.Info("recovered from panic", "panic", r)
 			quit <- fmt.Errorf("recovered failure: %v", r)
 			return
 		}
@@ -101,40 +105,34 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	}
 
 	var cloneMethod CloneMethod
-	klog.Infof("Debug: UseSSHMethod field value: %t", p.UseSSHMethod)
 	if p.UseSSHMethod {
 		cloneMethod = CloneMethodSSH
-		klog.Infof("Debug: Set cloneMethod to SSH")
 	} else {
 		cloneMethod = CloneMethodVIB
-		klog.Infof("Debug: Set cloneMethod to VIB")
 	}
+	setupLog.Info("VMDK/Xcopy populate started", "method", cloneMethod, "source", sourceVMDKFile, "target", pv.Name)
 
-	klog.Infof(
-		"Starting populate via remote esxcli vmkfstools (%s), source vmdk=%s, pv=%v",
-		cloneMethod,
-		sourceVMDKFile,
-		pv)
-	host, err := p.VSphereClient.GetEsxByVm(context.Background(), vmId)
+	setupCtx := klog.NewContext(context.Background(), setupLog)
+	host, err := p.VSphereClient.GetEsxByVm(setupCtx, vmId)
 	if err != nil {
 		return err
 	}
-	klog.Infof("Got ESXi host: %s", host)
+	setupLog.Info("ESXi host", "host", host.String())
 
 	hostID := strings.ReplaceAll(strings.ToLower(host.String()), ":", "-")
 	xcopyInitiatorGroup := fmt.Sprintf("xcopy-%s", hostID)
-	klog.Infof("Using per-host initiator group: %s", xcopyInitiatorGroup)
+	setupLog.Info("initiator group", "group", xcopyInitiatorGroup)
 
 	// Only ensure VIB if using VIB method
 	if !p.UseSSHMethod {
-		err = ensureVib(p.VSphereClient, host, vmDisk.Datastore, version.VibVersion)
+		err = ensureVib(setupCtx, p.VSphereClient, host, vmDisk.Datastore, version.VibVersion)
 		if err != nil {
 			return fmt.Errorf("failed to ensure VIB is installed: %w", err)
 		}
 	}
 
 	// for iSCSI add the host to the group using IQN. Is there something else for FC?
-	r, err := p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "adapter", "list"})
+	r, err := p.VSphereClient.RunEsxCommand(setupCtx, host, []string{"storage", "core", "adapter", "list"})
 	if err != nil {
 		return err
 	}
@@ -152,26 +150,26 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	// using any iqn/wwn to identity the host. Instead extract the SdcGuid
 	// as the possible clonner identifier
 	if isSciniRequired {
-		klog.Infof("scini is required for the storage api")
-		sciModule, err := p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"system", "module", "parameters", "list", "-m", "scini"})
+		setupLog.V(2).Info("scini required for storage api")
+		sciModule, err := p.VSphereClient.RunEsxCommand(setupCtx, host, []string{"system", "module", "parameters", "list", "-m", "scini"})
 		if err != nil {
-			klog.Infof("failed to fetch the scini module parameters %s: ", err)
+			setupLog.Info("failed to fetch scini module parameters", "err", err)
 			return err
 		}
 		for _, moduleFields := range sciModule {
 
 			if slices.Contains(moduleFields["Name"], "IoctlIniGuidStr") {
-				klog.Infof("scini guid %v", moduleFields["Value"])
+				setupLog.V(2).Info("scini guid", "value", moduleFields["Value"])
 				for _, s := range moduleFields["Value"] {
 					hbaUIDs = append(hbaUIDs, strings.ToUpper(s))
 				}
-				klog.Infof("Scini hbas found: %+v", hbaUIDs)
+				setupLog.Info("scini HBAs found", "hbas", hbaUIDs)
 			}
 		}
 	}
 
 	if !isSciniRequired {
-		klog.Infof("scini is not required for the storage api")
+		setupLog.V(2).Info("scini not required for storage api")
 		for _, a := range r {
 			hbaName, hasHbaName := a["HBAName"]
 			if !hasHbaName {
@@ -204,15 +202,15 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 					uniqueUIDs[id] = true
 					hbaUIDs = append(hbaUIDs, id)
 					hbaUIDsNamesMap[id] = hbaName[0]
-					klog.Infof("Storage Adapter UID: %s (Driver: %s)", id, drv)
+					setupLog.V(2).Info("storage adapter", "uid", id, "driver", drv)
 				}
 			}
 		}
-		klog.Infof("HBA UIDs found: %+v", hbaUIDs)
+		setupLog.Info("HBA UIDs found", "count", len(hbaUIDs), "uids", hbaUIDs)
 	}
 
 	if len(hbaUIDs) == 0 {
-		klog.Infof("no valid HBA UIDs found for host %s", host)
+		setupLog.Info("no valid HBA UIDs found", "host", host.String())
 		return fmt.Errorf("no valid HBA UIDs found for host %s", host)
 	}
 	mappingContext, err := p.StorageApi.EnsureClonnerIgroup(xcopyInitiatorGroup, hbaUIDs)
@@ -229,17 +227,16 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	if err != nil {
 		return fmt.Errorf("failed to fetch the current initiator groups of the lun %s: %w", lun.Name, err)
 	}
-	klog.Infof("Current initiator groups the LUN %s is mapped to %+v", lun.IQN, originalInitiatorGroups)
+	setupLog.V(2).Info("current initiator groups for LUN", "lun", lun.IQN, "groups", originalInitiatorGroups)
 
 	if isSciniRequired {
 		sdcId, ok := mappingContext["sdcId"]
 		if !ok {
-			klog.Infof("sdcId is required but not found in mappingContext")
+			setupLog.Info("sdcId required but not in mappingContext")
 			return fmt.Errorf("sdcId is required but not found in mappingContext")
-		} else {
-			xcopyInitiatorGroup = sdcId.(string)
-			klog.Infof("sdcId found in mappingContext: %s", sdcId)
 		}
+		xcopyInitiatorGroup = sdcId.(string)
+		setupLog.V(2).Info("sdcId from mappingContext", "sdcId", sdcId)
 	}
 
 	fullCleanUpAttempted := false
@@ -256,77 +253,74 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 				}
 				errUnmap := p.StorageApi.UnMap(xcopyInitiatorGroup, lun, mappingContext)
 				if errUnmap != nil {
-					klog.Infof("failed to unmap all initiator groups during partial cleanup: %s", errUnmap)
+					setupLog.Info("partial cleanup: failed to unmap", "err", errUnmap)
 				}
 			} else {
-				klog.V(2).Infof("Skipping cleanup unmap as LUN was not successfully resolved")
+				setupLog.V(2).Info("skipping partial cleanup unmap (LUN not resolved)")
 			}
 		}
 	}()
 
+	mapLog.Info("mapping volume to initiator group", "initiator_group", xcopyInitiatorGroup, "lun", lun.Name)
 	lun, err = p.StorageApi.Map(xcopyInitiatorGroup, lun, mappingContext)
 	if err != nil {
 		return fmt.Errorf("failed to map lun %s to initiator group %s: %w", lun, xcopyInitiatorGroup, err)
 	}
 
 	targetLUN := fmt.Sprintf("/vmfs/devices/disks/%s", lun.NAA)
-	klog.Infof("resolved lun with IQN %s to lun %s", lun.IQN, targetLUN)
+	mapLog.Info("volume mapped to initiator group", "initiator_group", xcopyInitiatorGroup, "device", targetLUN)
 
 	leaseHostID := strings.ReplaceAll(strings.ToLower(host.String()), ":", "-")
+	rescanLog.Info("rescanning host for device", "device", lun.NAA)
 	err = hostLocker.WithLock(context.Background(), leaseHostID,
 		func(ctx context.Context) error {
 			return rescan(ctx, p.VSphereClient, host, lun.NAA)
 		},
 	)
-
 	if err != nil {
 		return fmt.Errorf("failed to find the device %s after scanning: %w", targetLUN, err)
 	}
+	rescanLog.Info("device visible on ESXi", "device", targetLUN)
 
 	defer func() {
-		klog.Infof("cleaning up - unmap and rescan to clean dead devices")
+		cleanupLog.Info("cleanup started: unmap and remove device")
 		fullCleanUpAttempted = true
+		cleanupCtx := klog.NewContext(context.Background(), cleanupLog)
 		if mappingContext != nil {
 			mappingContext["UnmapAllSdc"] = true
 			mappingContext[CleanupXcopyInitiatorGroup] = true
 		}
 
-		klog.Errorf("cleaning up lun %s:", lun.NAA)
 		// set device state to off and prevents any i/o to it
-		_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "set", "--state", "off", "-d", lun.NAA})
+		_, err = p.VSphereClient.RunEsxCommand(cleanupCtx, host, []string{"storage", "core", "device", "set", "--state", "off", "-d", lun.NAA})
 		if err != nil {
-			klog.Errorf("failed to set state off for device %s: %s", lun.Name, err)
+			cleanupLog.Info("failed to set device state off", "device", lun.Name, "err", err)
 		} else {
-			// Wait for the device state to become "off" using exponential backoff
-			err = waitForDeviceStateOff(p.VSphereClient, host, lun.NAA)
+			err = waitForDeviceStateOff(cleanupCtx, p.VSphereClient, host, lun.NAA)
 			if err != nil {
-				klog.Errorf("timeout waiting for device %s to reach off state: %s", lun.Name, err)
+				cleanupLog.Info("timeout waiting for device off", "device", lun.Name, "err", err)
 			}
 		}
-		_, err = p.VSphereClient.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "detached", "remove", "-d", lun.NAA})
+		_, err = p.VSphereClient.RunEsxCommand(cleanupCtx, host, []string{"storage", "core", "device", "detached", "remove", "-d", lun.NAA})
 		if err != nil {
-			klog.Errorf("failed to remove device from detached list %s: %s", lun.Name, err)
+			cleanupLog.Info("failed to remove device from detached list", "device", lun.Name, "err", err)
 		}
-		// finaly after the kernel have it detached and not having any i/o we can unmap
 		errUnmap := p.StorageApi.UnMap(xcopyInitiatorGroup, lun, mappingContext)
 		if errUnmap != nil {
-			klog.Errorf("failed in unmap during cleanup, lun %s: %s", lun.Name, errUnmap)
+			cleanupLog.Info("failed to unmap during cleanup", "lun", lun.Name, "err", errUnmap)
 		}
 
-		// map the LUN back to the original OCP worker
-		klog.Infof("about to map the volume back to the originalInitiatorGroups, which are: %s", originalInitiatorGroups)
+		cleanupLog.V(2).Info("mapping volume back to original initiator groups", "groups", originalInitiatorGroups)
 		for _, group := range originalInitiatorGroups {
 			_, errMap := p.StorageApi.Map(group, lun, mappingContext)
 			if errMap != nil {
-				klog.Warningf("failed to map the volume back the original holder - this may cause problems: %v", errMap)
+				cleanupLog.Info("failed to map volume back to original holder", "group", group, "err", errMap)
 			}
 		}
-		// unmap devices appear dead in ESX right after they are unmapped, now
-		// clean them
-		klog.Infof("about to delete dead devices")
-		klog.Infof("taking a short nap to let the ESX settle down")
+		cleanupLog.V(2).Info("deleting dead devices after short delay")
 		time.Sleep(5 * time.Second)
-		deleteDeadDevices(p.VSphereClient, host, hbaUIDs, hbaUIDsNamesMap)
+		deleteDeadDevices(cleanupCtx, p.VSphereClient, host, hbaUIDs, hbaUIDsNamesMap)
+		cleanupLog.Info("cleanup finished")
 	}()
 
 	// Execute the clone using the unified task handling approach
@@ -340,7 +334,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		if err != nil {
 			return fmt.Errorf("failed to ensure secure script: %w", err)
 		}
-		klog.V(2).Infof("Secure script ready at path: %s", finalScriptPath)
+		setupLog.V(2).Info("secure script ready", "path", finalScriptPath)
 
 		// Enable SSH access
 		err = vmware.EnableSSHAccess(sshSetupCtx, p.VSphereClient, host, p.SSHPrivateKey, p.SSHPublicKey, finalScriptPath)
@@ -354,17 +348,18 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 			return fmt.Errorf("failed to get host IP address: %w", err)
 		}
 
-		// Create SSH client with background context (no timeout for long-running operations)
+		// Create SSH client; pass setup context so SSH logs show under setup.ssh
 		sshClient := vmware.NewSSHClient()
-		err = sshClient.Connect(context.Background(), hostIP, "root", p.SSHPrivateKey)
+		err = sshClient.Connect(sshSetupCtx, hostIP, "root", p.SSHPrivateKey)
 		if err != nil {
 			return fmt.Errorf("failed to connect via SSH: %w", err)
 		}
 		defer sshClient.Close()
 
-		klog.V(2).Infof("SSH connection established with restricted commands")
-		// Valdate the uploaded script version matches the embedded script version
-		err = checkScriptVersion(sshClient, vmDisk.Datastore, vmkfstoolswrapper.Version, p.SSHPublicKey)
+		setupLog.V(2).Info("SSH connection established with restricted commands")
+		// Validate the uploaded script version matches the embedded script version
+		scriptVersionCtx := klog.NewContext(sshSetupCtx, setupLog)
+		err = checkScriptVersion(scriptVersionCtx, sshClient, vmDisk.Datastore, vmkfstoolswrapper.Version, p.SSHPublicKey)
 		if err != nil {
 			return fmt.Errorf("script version check failed: %w", err)
 		}
@@ -374,12 +369,13 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		executor = NewVIBTaskExecutor(p.VSphereClient)
 	}
 
-	// Use unified task execution
-	return ExecuteCloneTask(context.Background(), executor, host, vmDisk.Datastore, vmDisk.Path(), targetLUN, progress, xcopyUsed)
+	// Use unified task execution (clone context so all clone/SSH logs show under clone)
+	cloneCtx := klog.NewContext(context.Background(), cloneLog)
+	return ExecuteCloneTask(cloneCtx, executor, host, vmDisk.Datastore, vmDisk.Path(), targetLUN, progress, xcopyUsed)
 }
 
 // waitForDeviceStateOff waits for the device state to become "off" using exponential backoff
-func waitForDeviceStateOff(client vmware.Client, host *object.HostSystem, deviceNAA string) error {
+func waitForDeviceStateOff(ctx context.Context, client vmware.Client, host *object.HostSystem, deviceNAA string) error {
 	backoff := wait.Backoff{
 		Duration: 1 * time.Second,
 		Factor:   2.0,
@@ -387,97 +383,89 @@ func waitForDeviceStateOff(client vmware.Client, host *object.HostSystem, device
 		Steps:    10, // Max retries
 	}
 
+	log := klog.FromContext(ctx)
 	return wait.ExponentialBackoff(backoff, func() (bool, error) {
-		result, err := client.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", deviceNAA})
+		result, err := client.RunEsxCommand(ctx, host, []string{"storage", "core", "device", "list", "-d", deviceNAA})
 		if err != nil {
-			klog.V(2).Infof("failed to check device %s state: %v", deviceNAA, err)
-			return false, nil // Retry on error
+			log.V(2).Info("device state check failed", "device", deviceNAA, "err", err)
+			return false, nil
 		}
 
 		if len(result) > 0 && result[0] != nil && len(result[0]["Status"]) > 0 {
 			status := result[0]["Status"][0]
-			klog.V(2).Infof("device %s status: %s", deviceNAA, status)
+			log.V(2).Info("device status", "device", deviceNAA, "status", status)
 			if status == "off" {
-				klog.Infof("device %s state is now off", deviceNAA)
-				return true, nil // Success
+				log.V(2).Info("device state is off", "device", deviceNAA)
+				return true, nil
 			}
 		}
 
-		return false, nil // Retry
+		return false, nil
 	})
 }
 
 // After mapping a volume the ESX needs a rescan to see the device. ESXs can opt-in to do it automatically
 func rescan(ctx context.Context, client vmware.Client, host *object.HostSystem, targetLUN string) error {
+	log := klog.Background().WithName("copy-offload").WithName("xcopy").WithName("rescan")
+	ctx = klog.NewContext(ctx, log)
 	for i := 1; i <= rescanRetries; i++ {
-		// Check if we should abort (lease was lost)
 		if ctx.Err() != nil {
 			return fmt.Errorf("rescan aborted (lease lost): %w", ctx.Err())
 		}
 
-		result, err := client.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", targetLUN})
+		result, err := client.RunEsxCommand(ctx, host, []string{"storage", "core", "device", "list", "-d", targetLUN})
 		if err == nil {
 			status := ""
 			if result != nil && result[0] != nil && len(result[0]["Status"]) > 0 {
 				status = result[0]["Status"][0]
 			}
-			klog.Infof("found device %s with status %v", targetLUN, status)
+			log.V(2).Info("device list", "device", targetLUN, "status", status)
 			if status == "off" || status == "dead timeout" {
-				klog.Infof("try to remove the device from the detached list (this can happen if restarting this pod or using the same volume)")
-				_, err = client.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "detached", "remove", "-d", targetLUN})
+				log.V(2).Info("removing device from detached list (restart or same volume)")
+				_, _ = client.RunEsxCommand(ctx, host, []string{"storage", "core", "device", "detached", "remove", "-d", targetLUN})
 				continue
 			}
 			return nil
-		} else {
-			_, err = client.RunEsxCommand(
-				context.Background(), host, []string{"storage", "core", "adapter", "rescan", "-t", "add", "-a", "1"})
-			if err != nil {
-				klog.Errorf("failed to rescan for adapters, attempt %d/%d due to: %s", i, rescanRetries, err)
-			}
+		}
+		_, err = client.RunEsxCommand(ctx, host, []string{"storage", "core", "adapter", "rescan", "-t", "add", "-a", "1"})
+		if err != nil {
+			log.Info("rescan attempt failed", "attempt", i, "max", rescanRetries, "err", err)
+		}
 
-			// Sleep but respect context cancellation
-			select {
-			case <-time.After(rescanSleepInterval):
-				// Continue to next iteration
-			case <-ctx.Done():
-				return fmt.Errorf("rescan aborted during retry sleep (lease lost): %w", ctx.Err())
-			}
+		select {
+		case <-time.After(rescanSleepInterval):
+		case <-ctx.Done():
+			return fmt.Errorf("rescan aborted during retry sleep (lease lost): %w", ctx.Err())
 		}
 	}
 
-	// Check one more time before final attempt
 	if ctx.Err() != nil {
 		return fmt.Errorf("rescan aborted before final attempt (lease lost): %w", ctx.Err())
 	}
 
-	// last check after the last rescan
-	_, err := client.RunEsxCommand(context.Background(), host, []string{"storage", "core", "device", "list", "-d", targetLUN})
+	_, err := client.RunEsxCommand(ctx, host, []string{"storage", "core", "device", "list", "-d", targetLUN})
 	if err == nil {
-		klog.Infof("found device %s", targetLUN)
+		log.Info("found device", "device", targetLUN)
 		return nil
-	} else {
-		return fmt.Errorf("failed to find device %s: %w", targetLUN, err)
 	}
+	return fmt.Errorf("failed to find device %s: %w", targetLUN, err)
 }
 
-func deleteDeadDevices(client vmware.Client, host *object.HostSystem, hbaUIDs []string, hbaUIDsNamesMap map[string]string) error {
+func deleteDeadDevices(ctx context.Context, client vmware.Client, host *object.HostSystem, hbaUIDs []string, hbaUIDsNamesMap map[string]string) error {
+	log := klog.FromContext(ctx)
 	failedDevices := []string{}
 	for _, adapter := range hbaUIDs {
 		adapterName, ok := hbaUIDsNamesMap[adapter]
 		if !ok {
 			adapterName = adapter
 		}
-		klog.Infof("deleting dead devices for adapter %s", adapterName)
+		log.V(2).Info("deleting dead devices for adapter", "adapter", adapterName)
 		success := false
 		for i := 0; i < rescanRetries; i++ {
-			_, errClean := client.RunEsxCommand(
-				context.Background(),
-				host,
-				[]string{"storage", "core", "adapter", "rescan", "-t", "delete", "-A", adapterName})
+			_, errClean := client.RunEsxCommand(ctx, host, []string{"storage", "core", "adapter", "rescan", "-t", "delete", "-A", adapterName})
 			if errClean == nil {
-				klog.Infof("rescan to delete dead devices completed for adapter %s", adapter)
 				success = true
-				break // finsihed with current adapter, move to the next one
+				break
 			}
 			time.Sleep(rescanSleepInterval)
 		}
@@ -486,13 +474,13 @@ func deleteDeadDevices(client vmware.Client, host *object.HostSystem, hbaUIDs []
 		}
 	}
 	if len(failedDevices) > 0 {
-		klog.Warningf("failed to delete dead devices for adapters %s", failedDevices)
+		log.V(0).Info("failed to delete dead devices for some adapters", "adapters", failedDevices, "severity", "warning")
 	}
 	return nil
 }
 
-func checkScriptVersion(sshClient vmware.SSHClient, datastore, embeddedVersion string, publicKey []byte) error {
-	output, err := sshClient.ExecuteCommand(datastore, "--version")
+func checkScriptVersion(ctx context.Context, sshClient vmware.SSHClient, datastore, embeddedVersion string, publicKey []byte) error {
+	output, err := sshClient.ExecuteCommand(ctx, datastore, "--version")
 	if err != nil {
 		return fmt.Errorf("old script format detected (likely Python-based). Update script on datastore %s to version %s or newer: %w", datastore, embeddedVersion, err)
 	}
@@ -537,31 +525,33 @@ func checkScriptVersion(sshClient vmware.SSHClient, datastore, embeddedVersion s
 		restrictedPublicKey := fmt.Sprintf(`command="%s",no-port-forwarding,no-agent-forwarding,no-X11-forwarding %s`,
 			util.RestrictedSSHCommandTemplate, publicKeyStr)
 
-		klog.Errorf("Version mismatch detected!")
-		klog.Errorf("  - Just uploaded script version: %s", embeddedVersion)
-		klog.Errorf("  - SSH returned version: %s", versionInfo.Version)
-		klog.Errorf("")
-		klog.Errorf("This indicates the SSH key is executing a different script file.")
-		klog.Errorf("Most likely cause: You are using the old Python-based SSH key format")
-		klog.Errorf("which executes a file with .py extension or UUID in the filename.")
-		klog.Errorf("")
-		klog.Errorf("The new shell-based format executes:")
-		klog.Errorf("  /vmfs/volumes/%s/secure-vmkfstools-wrapper (no extension)", datastore)
-		klog.Errorf("")
-		klog.Errorf("To fix this issue:")
-		klog.Errorf("1. SSH to the ESXi host")
-		klog.Errorf("2. Edit /etc/ssh/keys-root/authorized_keys: vi /etc/ssh/keys-root/authorized_keys")
-		klog.Errorf("3. Find the line containing the old Python wrapper")
-		klog.Errorf("4. DELETE the line containing .py extension or UUID in filename")
-		klog.Errorf("   Examples of old format to remove:")
-		klog.Errorf("     - Lines ending with: secure-vmkfstools-wrapper.py")
-		klog.Errorf("     - Lines ending with: secure-vmkfstools-wrapper-$UUID.py")
-		klog.Errorf("5. Add the following NEW SSH key line:")
-		klog.Errorf("")
-		klog.Errorf("  %s", restrictedPublicKey)
-		klog.Errorf("")
-		klog.Errorf("6. Save and exit")
-		klog.Errorf("7. Retry the operation")
+		instructions := fmt.Sprintf(`Version mismatch detected!
+  - Just uploaded script version: %s
+  - SSH returned version: %s
+
+This indicates the SSH key is executing a different script file.
+Most likely cause: You are using the old Python-based SSH key format
+which executes a file with .py extension or UUID in the filename.
+
+The new shell-based format executes:
+  /vmfs/volumes/%s/secure-vmkfstools-wrapper (no extension)
+
+To fix this issue:
+1. SSH to the ESXi host
+2. Edit /etc/ssh/keys-root/authorized_keys: vi /etc/ssh/keys-root/authorized_keys
+3. Find the line containing the old Python wrapper
+4. DELETE the line containing .py extension or UUID in filename
+   Examples of old format to remove:
+     - Lines ending with: secure-vmkfstools-wrapper.py
+     - Lines ending with: secure-vmkfstools-wrapper-$UUID.py
+5. Add the following NEW SSH key line:
+
+  %s
+
+6. Save and exit
+7. Retry the operation`, embeddedVersion, versionInfo.Version, datastore, restrictedPublicKey)
+		setupLog := klog.Background().WithName("copy-offload").WithName("xcopy").WithName("setup")
+		setupLog.Error(fmt.Errorf("version mismatch: uploaded %s, SSH returned %s", embeddedVersion, versionInfo.Version), "script version mismatch", "instructions", instructions)
 
 		return fmt.Errorf("version mismatch: uploaded %s but SSH returned %s - old SSH key format detected",
 			embeddedVersion, versionInfo.Version)

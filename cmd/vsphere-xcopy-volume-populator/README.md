@@ -284,7 +284,7 @@ Prior to using IBM FlashSystem with the volume populator (and with Virtual Machi
 
 If vdisk protection is enabled, the populator will exit with an error and log that protection must be off.
 
-Choose one of the following options with careful consideration:
+You may use one of the following options with careful consideration:
 
 **Option 1 — Disable globally (entire system)**
 
