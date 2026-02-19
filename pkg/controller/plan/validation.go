@@ -30,6 +30,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/templateutil"
 	batchv1 "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1942,6 +1943,23 @@ func (r *Reconciler) validateConversionTempStorage(plan *api.Plan) error {
 		plan.Status.SetCondition(conversionTempStorageSizeInvalid)
 		r.Log.Info("Conversion temp storage size is invalid", "error", err.Error(), "size", storageSize, "plan", plan.Name, "namespace", plan.Namespace)
 		return nil
+	}
+
+	// Validate that the StorageClass exists in the cluster (conversion runs on destination/target)
+	sc := &storagev1.StorageClass{}
+	if err := r.Client.Get(context.Background(), client.ObjectKey{Name: storageClass}, sc); err != nil {
+		if k8serr.IsNotFound(err) {
+			plan.Status.SetCondition(libcnd.Condition{
+				Type:     NotValid,
+				Status:   True,
+				Category: api.CategoryCritical,
+				Message:  fmt.Sprintf("ConversionTempStorageClass %q not found in the cluster. The conversion PVC will remain Pending and the migration will hang.", storageClass),
+				Items:    []string{},
+			})
+			r.Log.Info("Conversion temp storage class not found", "storageClass", storageClass, "plan", plan.Name, "namespace", plan.Namespace)
+			return nil
+		}
+		return liberr.Wrap(err, "failed to get StorageClass", "storageClass", storageClass)
 	}
 
 	return nil

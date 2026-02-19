@@ -15,6 +15,7 @@ import (
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	core "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/version"
@@ -385,7 +386,7 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 	})
 
 	ginkgo.Describe("validateConversionTempStorage", func() {
-		ginkgo.It("should pass when both fields are set", func() {
+		ginkgo.It("should pass when both fields are set and StorageClass exists", func() {
 			secret := createSecret(sourceSecretName, sourceNamespace, false)
 			source := createProvider(sourceName, sourceNamespace, "https://source", api.OpenShift, &core.ObjectReference{Name: sourceSecretName, Namespace: sourceNamespace})
 			destination := createProvider(destName, destNamespace, "", api.OpenShift, &core.ObjectReference{})
@@ -395,7 +396,8 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 
-			reconciler = createFakeReconciler(secret, plan, source, destination)
+			sc := &storagev1.StorageClass{ObjectMeta: meta.ObjectMeta{Name: "fast-ssd"}, Provisioner: "kubernetes.io/fake"}
+			reconciler = createFakeReconciler(secret, plan, source, destination, sc)
 			err := reconciler.validateConversionTempStorage(plan)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -477,25 +479,49 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			gomega.Expect(condition.Message).To(gomega.ContainSubstring("is not a valid Kubernetes resource quantity"))
 		})
 
-		ginkgo.It("should pass with valid size formats", func() {
+		ginkgo.It("should pass with valid size formats when StorageClass exists", func() {
 			secret := createSecret(sourceSecretName, sourceNamespace, false)
 			source := createProvider(sourceName, sourceNamespace, "https://source", api.OpenShift, &core.ObjectReference{Name: sourceSecretName, Namespace: sourceNamespace})
 			destination := createProvider(destName, destNamespace, "", api.OpenShift, &core.ObjectReference{})
 			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 
+			sc := &storagev1.StorageClass{ObjectMeta: meta.ObjectMeta{Name: "fast-ssd"}, Provisioner: "kubernetes.io/fake"}
 			validSizes := []string{"50Gi", "1Ti", "100Mi", "500G", "2T"}
 			for _, size := range validSizes {
 				plan := createPlan(testPlanName, testNamespace, source, destination)
 				plan.Spec.ConversionTempStorageClass = "fast-ssd"
 				plan.Spec.ConversionTempStorageSize = size
 
-				reconciler = createFakeReconciler(secret, plan, source, destination)
+				reconciler = createFakeReconciler(secret, plan, source, destination, sc)
 				err := reconciler.validateConversionTempStorage(plan)
 
 				gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Size %s should be valid", size)
 				gomega.Expect(plan.Status.HasCondition(NotValid)).To(gomega.BeFalse(), "Size %s should not cause validation error", size)
 			}
+		})
+
+		ginkgo.It("should block when ConversionTempStorageClass does not exist", func() {
+			secret := createSecret(sourceSecretName, sourceNamespace, false)
+			source := createProvider(sourceName, sourceNamespace, "https://source", api.OpenShift, &core.ObjectReference{Name: sourceSecretName, Namespace: sourceNamespace})
+			destination := createProvider(destName, destNamespace, "", api.OpenShift, &core.ObjectReference{})
+			plan := createPlan(testPlanName, testNamespace, source, destination)
+			plan.Spec.ConversionTempStorageClass = "error-sc"
+			plan.Spec.ConversionTempStorageSize = "150Gi"
+			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+
+			// No StorageClass "error-sc" in fake client -> should block
+			reconciler = createFakeReconciler(secret, plan, source, destination)
+			err := reconciler.validateConversionTempStorage(plan)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasBlockerCondition()).To(gomega.BeTrue())
+			cnd := plan.Status.FindCondition(NotValid)
+			gomega.Expect(cnd).NotTo(gomega.BeNil())
+			gomega.Expect(cnd.Category).To(gomega.Equal(api.CategoryCritical))
+			gomega.Expect(cnd.Message).To(gomega.ContainSubstring("not found"))
+			gomega.Expect(cnd.Message).To(gomega.ContainSubstring("error-sc"))
 		})
 	})
 })
@@ -664,6 +690,7 @@ func createFakeReconciler(objects ...runtime.Object) *Reconciler {
 	scheme := runtime.NewScheme()
 	_ = core.AddToScheme(scheme)
 	_ = k8snet.AddToScheme(scheme)
+	_ = storagev1.AddToScheme(scheme)
 	api.SchemeBuilder.AddToScheme(scheme)
 
 	client := fakeClient.NewClientBuilder().
