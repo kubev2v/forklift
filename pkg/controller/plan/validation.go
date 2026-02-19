@@ -95,6 +95,7 @@ const (
 	GuestToolsIssue                 = "GuestToolsIssue"
 	VDDKAndOffloadMixedUsage        = "VDDKAndOffloadMixedUsage"
 	RestrictedPodSecurity           = "RestrictedPodSecurity"
+	NetMapDestinationNADNotValid    = "NetMapDestinationNADNotValid"
 )
 
 // Categories
@@ -510,6 +511,28 @@ func (r *Reconciler) validateNetworkMap(plan *api.Plan) (err error) {
 		}
 	}
 
+	for _, pair := range mp.Spec.Map {
+		if pair.Destination.Type != Multus {
+			continue
+		}
+
+		if pair.Destination.Namespace != plan.Spec.TargetNamespace &&
+			pair.Destination.Namespace != core.NamespaceDefault {
+			plan.Status.SetCondition(libcnd.Condition{
+				Type:     NetMapDestinationNADNotValid,
+				Status:   True,
+				Category: api.CategoryCritical,
+				Reason:   NotValid,
+				Message: fmt.Sprintf(
+					"Destination NAD %s/%s must be in either the target namespace (%s) or the default namespace. "+
+						"Pods cannot reference network attachment definitions from other namespaces.",
+					pair.Destination.Namespace,
+					pair.Destination.Name,
+					plan.Spec.TargetNamespace),
+			})
+			return
+		}
+	}
 	plan.Referenced.Map.Network = mp
 
 	return
