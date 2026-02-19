@@ -384,6 +384,83 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 		})
 	})
 
+	ginkgo.Describe("validateNetworkMap destination NAD", func() {
+		nadName := "test-nad"
+		targetNS := "target-ns"
+		wrongNS := "wrong-ns"
+
+		newNetMap := func(pairs ...api.NetworkPair) *api.NetworkMap {
+			nm := &api.NetworkMap{
+				ObjectMeta: meta.ObjectMeta{Name: "test-netmap", Namespace: testNamespace},
+				Spec:       api.NetworkMapSpec{Map: pairs},
+			}
+			nm.Status.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			return nm
+		}
+		newPlan := func(ns string) *api.Plan {
+			p := &api.Plan{
+				ObjectMeta: meta.ObjectMeta{Name: "test-plan", Namespace: testNamespace},
+				Spec: api.PlanSpec{
+					TargetNamespace: ns,
+				},
+				Referenced: api.Referenced{
+					Provider: struct {
+						Source      *api.Provider
+						Destination *api.Provider
+					}{Source: &api.Provider{}},
+				},
+			}
+			p.Spec.Map.Network = core.ObjectReference{Name: "test-netmap", Namespace: testNamespace}
+			return p
+		}
+
+		ginkgo.It("should block when destination NAD is in wrong namespace", func() {
+			nm := newNetMap(api.NetworkPair{
+				Destination: api.DestinationNetwork{Type: "multus", Namespace: wrongNS, Name: nadName},
+			})
+			plan := newPlan(targetNS)
+			r := createFakeReconciler(nm)
+			err := r.validateNetworkMap(plan)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(NetMapDestinationNADNotValid)).To(gomega.BeTrue())
+			gomega.Expect(plan.Status.FindCondition(NetMapDestinationNADNotValid).Message).To(
+				gomega.ContainSubstring("must be in either the target namespace"))
+		})
+
+		ginkgo.It("should pass when destination NAD is in target namespace", func() {
+			nm := newNetMap(api.NetworkPair{
+				Destination: api.DestinationNetwork{Type: "multus", Namespace: targetNS, Name: nadName},
+			})
+			plan := newPlan(targetNS)
+			r := createFakeReconciler(nm)
+			err := r.validateNetworkMap(plan)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(NetMapDestinationNADNotValid)).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("should pass when destination NAD is in default namespace", func() {
+			nm := newNetMap(api.NetworkPair{
+				Destination: api.DestinationNetwork{Type: "multus", Namespace: "default", Name: nadName},
+			})
+			plan := newPlan(targetNS)
+			r := createFakeReconciler(nm)
+			err := r.validateNetworkMap(plan)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(NetMapDestinationNADNotValid)).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("should skip non-Multus destinations", func() {
+			nm := newNetMap(api.NetworkPair{
+				Destination: api.DestinationNetwork{Type: "pod"},
+			})
+			plan := newPlan(targetNS)
+			r := createFakeReconciler(nm)
+			err := r.validateNetworkMap(plan)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(NetMapDestinationNADNotValid)).To(gomega.BeFalse())
+		})
+	})
+
 	ginkgo.Describe("validateConversionTempStorage", func() {
 		ginkgo.It("should pass when both fields are set", func() {
 			secret := createSecret(sourceSecretName, sourceNamespace, false)
