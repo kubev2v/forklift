@@ -20,29 +20,27 @@ func NewVvolPopulator(storageApi VVolCapable, vmwareClient vmware.Client) (Popul
 }
 
 func (p *VvolPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) (errFinal error) {
+	log := klog.Background().WithName("copy-offload").WithName("vvol")
 	defer func() {
 		r := recover()
 		if r != nil {
-			klog.Infof("VVol Populator: recovered from panic: %v", r)
+			log.Info("recovered from panic", "panic", r)
 		}
-		klog.Infof("VVol Populator: exiting with final error: %v", errFinal)
+		log.Info("VVol copy exiting", "err", errFinal)
 		quit <- errFinal
 	}()
 
-	klog.Infof("VVol Populator: Starting copy operation")
-	klog.Infof("VVol Populator: VM ID: %s, Source VMDK: %s, Target: %s", vmId, sourceVMDKFile, pv.Name)
+	log.Info("VVol copy started", "vm", vmId, "source", sourceVMDKFile, "target", pv.Name)
 
 	// VVol copy does not use xcopy
 	xcopyUsed <- 0
 
-	// Try using vSphere API to discover source volume first (preferred method)
-	klog.Infof("VVol Populator: Starting VVol copy operation...")
 	err := p.storageApi.VvolCopy(p.vSphereClient, vmId, sourceVMDKFile, pv, progress)
 	if err != nil {
-		klog.Errorf("VVol Populator: discovery of source volume using vSphere API failed: %v", err)
+		log.Error(err, "VVol copy failed (source volume discovery)")
 		return fmt.Errorf("failed to copy VMDK using VVol storage API: %w", err)
 	}
 
-	klog.Infof("VVol Populator: Copy operation completed successfully")
+	log.Info("VVol copy finished")
 	return nil
 }
