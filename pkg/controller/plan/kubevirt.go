@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"maps"
 	"math/rand"
@@ -46,6 +47,7 @@ import (
 	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation"
 	cnv "kubevirt.io/api/core/v1"
 	instancetypeapi "kubevirt.io/api/instancetype"
 	instancetype "kubevirt.io/api/instancetype/v1beta1"
@@ -692,11 +694,12 @@ func (r *KubeVirt) PopulatorVolumes(vmRef ref.Ref) (pvcs []*core.PersistentVolum
 // Ensure the DataVolumes exist on the destination.
 func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVolume) (err error) {
 	dataVolumeList := &cdi.DataVolumeList{}
+
 	err = r.Destination.Client.List(
 		context.TODO(),
 		dataVolumeList,
 		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(r.vmLabels(vm.Ref)),
+			LabelSelector: k8slabels.SelectorFromSet(r.vmAllButMigrationLabels(vm.Ref)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		})
 	if err != nil {
@@ -716,6 +719,12 @@ func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVo
 				path.Join(
 					dv.Namespace,
 					dv.Name),
+				"vm",
+				vm.String())
+		} else {
+			r.Log.Info("Reusing existing DataVolume.",
+				"dv",
+				r.Builder.ResolveDataVolumeIdentifier(&dv),
 				"vm",
 				vm.String())
 		}
@@ -3231,30 +3240,20 @@ func GetHyperVPvListSmb(dClient client.Client, planID string) (pvs *core.Persist
 }
 
 func (r *KubeVirt) EnsurePVForNFS(pv *core.PersistentVolume) (out *core.PersistentVolume, err error) {
-	list := &core.PersistentVolumeList{}
-	err = r.Destination.Client.List(
-		context.TODO(),
-		list,
-		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(pv.Labels),
-		},
+	existing := &core.PersistentVolume{}
+	err = r.ensureResourceExists(
+		client.ObjectKey{Name: pv.Name},
+		existing,
+		func() error { return r.Destination.Client.Create(context.TODO(), pv) },
+		"Created NFS PV for virt-v2v pod.",
 	)
 	if err != nil {
-		err = liberr.Wrap(err)
-		return
+		return nil, err
 	}
-	if len(list.Items) > 0 {
-		out = &list.Items[0]
-	} else {
-		err = r.Destination.Client.Create(context.TODO(), pv)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-		r.Log.Info("Created NFS PV for virt-v2v pod.", "pv", pv.Name)
-		out = pv
+	if existing.Name != "" {
+		return existing, nil
 	}
-	return
+	return pv, nil
 }
 
 func (r *KubeVirt) BuildPVForNFS(vm *plan.VMStatus) (pv *core.PersistentVolume) {
@@ -3262,12 +3261,12 @@ func (r *KubeVirt) BuildPVForNFS(vm *plan.VMStatus) (pv *core.PersistentVolume) 
 	splitted := strings.Split(sourceProvider.Spec.URL, ":")
 	nfsServer := splitted[0]
 	nfsPath := splitted[1]
-	pvcNamePrefix := getEntityPrefixName("pv", r.Source.Provider.Name, r.Plan.Name)
+	pvName := providerStorageName("ova-store-pv", r.Source.Provider.Name, string(r.Plan.UID), vm.ID)
 
 	pv = &core.PersistentVolume{
 		ObjectMeta: meta.ObjectMeta{
-			GenerateName: pvcNamePrefix,
-			Labels:       r.nfsPVLabels(vm.ID),
+			Name:   pvName,
+			Labels: r.nfsPVLabels(vm.ID),
 		},
 		Spec: core.PersistentVolumeSpec{
 			Capacity: core.ResourceList{
@@ -3287,41 +3286,27 @@ func (r *KubeVirt) BuildPVForNFS(vm *plan.VMStatus) (pv *core.PersistentVolume) 
 	return
 }
 
-// EnsureProviderStoragePVC returns existing PVC if found by labels, creates if not found (OVA NFS or HyperV SMB).
+// EnsureProviderStoragePVC returns existing PVC if found, creates if not found (OVA NFS or HyperV SMB).
 func (r *KubeVirt) EnsureProviderStoragePVC(pvc *core.PersistentVolumeClaim, providerType api.ProviderType) (out *core.PersistentVolumeClaim, err error) {
-	// Query k8s for existing PVC matching labels (plan, migration, vmID)
-	list := &core.PersistentVolumeClaimList{}
-	err = r.Destination.Client.List(
-		context.TODO(),
-		list,
-		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(pvc.Labels),
-			Namespace:     r.Plan.Spec.TargetNamespace,
-		},
-	)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
+	createMsg := "Created NFS PVC for virt-v2v pod."
+	if providerType == api.HyperV {
+		createMsg = "Created SMB PVC for virt-v2v pod."
 	}
 
-	// Reuse existing PVC if found
-	if len(list.Items) > 0 {
-		out = &list.Items[0]
-	} else {
-		// Create PVC in k8s (triggers CSI provisioning for SMB)
-		err = r.Destination.Client.Create(context.TODO(), pvc)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-		storageType := "NFS"
-		if providerType == api.HyperV {
-			storageType = "SMB"
-		}
-		r.Log.Info(fmt.Sprintf("Created %s PVC for virt-v2v pod.", storageType), "pvc", path.Join(pvc.Namespace, pvc.Name))
-		out = pvc
+	existing := &core.PersistentVolumeClaim{}
+	err = r.ensureResourceExists(
+		client.ObjectKey{Namespace: pvc.Namespace, Name: pvc.Name},
+		existing,
+		func() error { return r.Destination.Client.Create(context.TODO(), pvc) },
+		createMsg,
+	)
+	if err != nil {
+		return nil, err
 	}
-	return
+	if existing.Name != "" {
+		return existing, nil
+	}
+	return pvc, nil
 }
 
 // EnsurePVCForNFS is deprecated, use EnsureProviderStoragePVC instead.
@@ -3332,12 +3317,12 @@ func (r *KubeVirt) EnsurePVCForNFS(pvc *core.PersistentVolumeClaim) (out *core.P
 
 func (r *KubeVirt) BuildPVCForNFS(pv *core.PersistentVolume, vm *plan.VMStatus) (pvc *core.PersistentVolumeClaim) {
 	sc := ""
-	pvcNamePrefix := getEntityPrefixName("pvc", r.Source.Provider.Name, r.Plan.Name)
+	pvcName := providerStorageName("ova-store-pvc", r.Source.Provider.Name, string(r.Plan.UID), vm.ID)
 	pvc = &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
-			GenerateName: pvcNamePrefix,
-			Namespace:    r.Plan.Spec.TargetNamespace,
-			Labels:       r.nfsPVCLabels(vm.ID),
+			Name:      pvcName,
+			Namespace: r.Plan.Spec.TargetNamespace,
+			Labels:    r.nfsPVCLabels(vm.ID),
 		},
 		Spec: core.PersistentVolumeClaimSpec{
 			Resources: core.VolumeResourceRequirements{
@@ -3377,15 +3362,77 @@ func (r *KubeVirt) nfsPVCLabels(vmID string) map[string]string {
 	}
 }
 
-func getEntityPrefixName(resourceType, providerName, planName string) string {
-	return fmt.Sprintf("ova-store-%s-%s-%s-", resourceType, providerName, planName)
+// Use Plan UID (not Name) to ensure the same PVC name across migration retries.
+// Migration UID changes on retry, but Plan UID remains constant for a plan execution.
+func providerStorageName(prefix, providerName, planUID, vmID string) string {
+	base := fmt.Sprintf("%s-%s-%s-%s",
+		prefix,
+		util.SanitizeLabel(providerName),
+		util.SanitizeLabel(planUID),
+		util.SanitizeLabel(vmID),
+	)
+	if len(base) <= validation.DNS1123LabelMaxLength {
+		return base
+	}
+
+	// Create the suffix (max 9 chars: "-ffffffff")
+	suffix := fmt.Sprintf("-%x", fnv32(base))
+	max := validation.DNS1123LabelMaxLength - len(suffix)
+	// Trim the base to fit and remove trailing "-" so we don't get "--"
+	trimmed := strings.Trim(base[:max], "-.")
+	return trimmed + suffix
+}
+
+func fnv32(s string) uint32 {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(s))
+	return h.Sum32()
+}
+
+func (r *KubeVirt) ResolveAlreadyExists(err error, key client.ObjectKey, obj client.Object) (handled bool, outErr error) {
+	if !k8serr.IsAlreadyExists(err) || key.Name == "" {
+		return false, nil
+	}
+	getErr := r.Destination.Client.Get(context.TODO(), key, obj)
+	if getErr != nil {
+		return true, liberr.Wrap(getErr)
+	}
+	return true, nil
+}
+
+func (r *KubeVirt) ensureResourceExists(key client.ObjectKey, obj client.Object, createFn func() error, createMsg string) error {
+	err := r.Destination.Client.Get(context.TODO(), key, obj)
+	if err == nil {
+		r.Log.Info("Reusing existing resource.", "name", key.Name)
+		return nil
+	}
+	if !k8serr.IsNotFound(err) {
+		return liberr.Wrap(err)
+	}
+
+	err = createFn()
+	if err == nil {
+		r.Log.Info(createMsg, "name", key.Name)
+		return nil
+	}
+
+	if k8serr.IsAlreadyExists(err) {
+		getErr := r.Destination.Client.Get(context.TODO(), key, obj)
+		if getErr != nil {
+			return liberr.Wrap(getErr)
+		}
+		r.Log.Info("Reusing existing resource.", "name", key.Name)
+		return nil
+	}
+
+	return liberr.Wrap(err)
 }
 
 // BuildPVForSMB creates a static PV for HyperV using SMB CSI driver.
 func (r *KubeVirt) BuildPVForSMB(vm *plan.VMStatus) (pv *core.PersistentVolume) {
 	sourceProvider := r.Source.Provider
 	smbSource := ctrlutil.ParseSMBSource(sourceProvider.Spec.URL)
-	pvNamePrefix := fmt.Sprintf("hyperv-store-pv-%s-%s-", r.Source.Provider.Name, r.Plan.Name)
+	pvName := providerStorageName("hyperv-store-pv", r.Source.Provider.Name, string(r.Plan.UID), vm.ID)
 
 	// Get secret reference from provider
 	secretName := sourceProvider.Spec.Secret.Name
@@ -3393,8 +3440,8 @@ func (r *KubeVirt) BuildPVForSMB(vm *plan.VMStatus) (pv *core.PersistentVolume) 
 
 	pv = &core.PersistentVolume{
 		ObjectMeta: meta.ObjectMeta{
-			GenerateName: pvNamePrefix,
-			Labels:       r.smbPVLabels(vm.ID),
+			Name:   pvName,
+			Labels: r.smbPVLabels(vm.ID),
 		},
 		Spec: core.PersistentVolumeSpec{
 			Capacity: core.ResourceList{
@@ -3423,42 +3470,31 @@ func (r *KubeVirt) BuildPVForSMB(vm *plan.VMStatus) (pv *core.PersistentVolume) 
 
 // EnsurePVForSMB ensures the static PV exists for HyperV SMB.
 func (r *KubeVirt) EnsurePVForSMB(pv *core.PersistentVolume) (out *core.PersistentVolume, err error) {
-	list := &core.PersistentVolumeList{}
-	err = r.Destination.Client.List(
-		context.TODO(),
-		list,
-		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(pv.Labels),
-		},
+	existing := &core.PersistentVolume{}
+	err = r.ensureResourceExists(
+		client.ObjectKey{Name: pv.Name},
+		existing,
+		func() error { return r.Destination.Client.Create(context.TODO(), pv) },
+		"Created SMB PV for virt-v2v pod.",
 	)
 	if err != nil {
-		err = liberr.Wrap(err)
-		return
+		return nil, err
 	}
-
-	if len(list.Items) > 0 {
-		out = &list.Items[0]
-	} else {
-		err = r.Destination.Client.Create(context.TODO(), pv)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-		r.Log.Info("Created SMB PV for virt-v2v pod.", "pv", pv.Name)
-		out = pv
+	if existing.Name != "" {
+		return existing, nil
 	}
-	return
+	return pv, nil
 }
 
 // BuildPVCForSMB creates a PVC bound to a static SMB PV for HyperV.
 func (r *KubeVirt) BuildPVCForSMB(pv *core.PersistentVolume, vm *plan.VMStatus) (pvc *core.PersistentVolumeClaim) {
 	sc := ""
-	pvcNamePrefix := fmt.Sprintf("hyperv-pvc-%s-%s-", r.Source.Provider.Name, r.Plan.Name)
+	pvcName := providerStorageName("hyperv-store-pvc", r.Source.Provider.Name, string(r.Plan.UID), vm.ID)
 	pvc = &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
-			GenerateName: pvcNamePrefix,
-			Namespace:    r.Plan.Spec.TargetNamespace,
-			Labels:       r.smbPVCLabels(vm.ID),
+			Name:      pvcName,
+			Namespace: r.Plan.Spec.TargetNamespace,
+			Labels:    r.smbPVCLabels(vm.ID),
 		},
 		Spec: core.PersistentVolumeClaimSpec{
 			Resources: core.VolumeResourceRequirements{
