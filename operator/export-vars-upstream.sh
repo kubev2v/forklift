@@ -2,7 +2,8 @@
 
 declare -A images
 
-# The image refrences below will get updated by Konflux everytime there is a new image.
+# Default image refs (e.g. from Konflux staged builds). When building the upstream bundle
+# with explicit image build-args, those are used instead.
 
 images[API_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/forklift-api@sha256:35f0675e518528d911fcc3d36b343ededd9782fe0a5b7284a229dd9a0afc9656
 
@@ -28,11 +29,17 @@ images[VALIDATION_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-
 
 images[VIRT_V2V_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/virt-v2v@sha256:9a8548cf4439121ceaa7a8d626d6c6f1f9280f63b2daf471d24fd62c8185a3f4
 
-# Chage the repository of the images to match the repository they would be pushed
-# to during a release.
+images[OVA_PROXY_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/forklift-ova-proxy@sha256:0000000000000000000000000000000000000000000000000000000000000000
 
+images[VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/vsphere-xcopy-volume-populator@sha256:0000000000000000000000000000000000000000000000000000000000000000
+
+# Use build-arg image refs when set; otherwise transform to quay.io/kubev2v for upstream release.
 for k in "${!images[@]}"; do
-    image="${images[$k]}"
-    new_image="${image/redhat-user-workloads\/rh-mtv-1-tenant\/forklift-operator/kubev2v}"
-    export "$k=$new_image"
+    default="${images[$k]}"
+    if [[ -n "${!k}" ]]; then
+        export "$k=${!k}"
+    else
+        new_image="${default/redhat-user-workloads\/rh-mtv-1-tenant\/forklift-operator/kubev2v}"
+        export "$k=$new_image"
+    fi
 done
