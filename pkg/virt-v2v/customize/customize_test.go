@@ -476,18 +476,18 @@ var _ = Describe("Customize", func() {
 
 	Describe("formatIPs", func() {
 		It("formats single IP", func() {
-			ips := []IPEntry{{IP: "192.168.1.1"}}
+			ips := []IPEntry{{IP: "192.168.1.1", Gateway: "192.168.1.254", PrefixLength: "24"}}
 			result := formatIPs(ips)
-			Expect(result).To(Equal("(\n'192.168.1.1'\n)"))
+			Expect(result).To(Equal("(\n    @{ IPAddress = '192.168.1.1'; Gateway = '192.168.1.254'; PrefixLength = 24 }\n)"))
 		})
 
 		It("formats multiple IPs", func() {
 			ips := []IPEntry{
-				{IP: "192.168.1.1"},
-				{IP: "192.168.1.2"},
+				{IP: "192.168.1.1", Gateway: "192.168.1.254", PrefixLength: "24"},
+				{IP: "2001:db8::100", Gateway: "2001:db8::1", PrefixLength: "64"},
 			}
 			result := formatIPs(ips)
-			Expect(result).To(Equal("(\n'192.168.1.1',\n'192.168.1.2'\n)"))
+			Expect(result).To(Equal("(\n    @{ IPAddress = '192.168.1.1'; Gateway = '192.168.1.254'; PrefixLength = 24 },\n    @{ IPAddress = '2001:db8::100'; Gateway = '2001:db8::1'; PrefixLength = 64 }\n)"))
 		})
 
 		It("handles empty IPs", func() {
