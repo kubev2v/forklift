@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi10/go-toolset:1.24-1752559364 AS builder
+FROM registry.redhat.io/ubi10/go-toolset:1.25.7-1771417345 AS builder
 WORKDIR /app
 COPY --chown=1001:0 ./ ./
 ENV GOFLAGS="-mod=vendor -tags=strictfipsruntime"
