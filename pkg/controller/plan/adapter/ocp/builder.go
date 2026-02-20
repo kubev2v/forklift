@@ -796,3 +796,8 @@ func (r *Builder) setPVCNameFromTemplate(vmRef ref.Ref, sourcePVC *core.Persiste
 
 	return generatedName, nil
 }
+
+// NO-OP
+func (r *Builder) SourceVMLabelsAndAnnotations(vmRef ref.Ref, tagMapping *v1beta1.TagMapping) (labels map[string]string, annotations map[string]string, sanitizationReport map[string]string, err error) {
+	return
+}

@@ -1664,10 +1664,33 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) 
 
 	//Add the original name and ID info to the VM annotations
 	if len(vm.NewName) > 0 {
-		annotations := make(map[string]string)
-		annotations[AnnDisplayName] = vm.Name
-		annotations[AnnOriginalID] = vm.ID
-		object.ObjectMeta.Annotations = annotations
+		if object.ObjectMeta.Annotations == nil {
+			object.ObjectMeta.Annotations = make(map[string]string)
+		}
+		object.ObjectMeta.Annotations[AnnDisplayName] = vm.Name
+		object.ObjectMeta.Annotations[AnnOriginalID] = vm.ID
+	}
+
+	sourceLabels, sourceAnnotations, sanitizationReport, err := r.Builder.SourceVMLabelsAndAnnotations(vm.Ref, r.Plan.Spec.TagMapping)
+	if err != nil {
+		r.Log.Error(err, "Failed to get source VM labels/annotations", "vm", vm.String())
+	} else {
+		maps.Copy(object.ObjectMeta.Labels, sourceLabels)
+		if object.ObjectMeta.Annotations == nil {
+			object.ObjectMeta.Annotations = make(map[string]string)
+		}
+		maps.Copy(object.ObjectMeta.Annotations, sourceAnnotations)
+		if len(sanitizationReport) > 0 {
+			reportJSON, jsonErr := json.Marshal(sanitizationReport)
+			if jsonErr != nil {
+				r.Log.Error(jsonErr, "Failed to marshal sanitization report",
+					"vm", object.Name,
+					"namespace", object.Namespace,
+					"annotation", planbase.AnnSanitizedMetadata)
+			} else {
+				object.ObjectMeta.Annotations[planbase.AnnSanitizedMetadata] = string(reportJSON)
+			}
+		}
 	}
 
 	// Assign the determined run strategy to the object

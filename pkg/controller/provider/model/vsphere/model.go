@@ -291,49 +291,52 @@ type Datastore struct {
 
 type VM struct {
 	Base
-	Folder                   string           `sql:"d0,index(folder)"`
-	Host                     string           `sql:"d0,index(host)"`
-	RevisionValidated        int64            `sql:"d0,index(revisionValidated)"`
-	PolicyVersion            int              `sql:"d0,index(policyVersion)"`
-	UUID                     string           `sql:""`
-	Firmware                 string           `sql:""`
-	PowerState               string           `sql:""`
-	ConnectionState          string           `sql:""`
-	CpuAffinity              []int32          `sql:""`
-	CpuHotAddEnabled         bool             `sql:""`
-	CpuHotRemoveEnabled      bool             `sql:""`
-	MemoryHotAddEnabled      bool             `sql:""`
-	FaultToleranceEnabled    bool             `sql:""`
-	CpuCount                 int32            `sql:""`
-	CoresPerSocket           int32            `sql:""`
-	MemoryMB                 int32            `sql:""`
-	GuestName                string           `sql:""`
-	GuestNameFromVmwareTools string           `sql:""`
-	HostName                 string           `sql:""`
-	GuestID                  string           `sql:""`
-	BalloonedMemory          int32            `sql:""`
-	IpAddress                string           `sql:""`
-	NumaNodeAffinity         []string         `sql:""`
-	StorageUsed              int64            `sql:""`
-	Snapshot                 Ref              `sql:""`
-	IsTemplate               bool             `sql:""`
-	ChangeTrackingEnabled    bool             `sql:""`
-	TpmEnabled               bool             `sql:""`
-	Devices                  []Device         `sql:""`
-	NICs                     []NIC            `sql:""`
-	Disks                    []Disk           `sql:""`
-	Controllers              []Controller     `sql:""`
-	Networks                 []Ref            `sql:""`
-	Concerns                 []Concern        `sql:""`
-	GuestNetworks            []GuestNetwork   `sql:""`
-	GuestDisks               []DiskMountPoint `sql:""`
-	GuestIpStacks            []GuestIpStack   `sql:""`
-	SecureBoot               bool             `sql:""`
-	ToolsStatus              string           `sql:""`
-	ToolsRunningStatus       string           `sql:""`
-	ToolsVersionStatus       string           `sql:""`
-	DiskEnableUuid           bool             `sql:""`
-	NestedHVEnabled          bool             `sql:""`
+	Folder                   string             `sql:"d0,index(folder)"`
+	Host                     string             `sql:"d0,index(host)"`
+	RevisionValidated        int64              `sql:"d0,index(revisionValidated)"`
+	PolicyVersion            int                `sql:"d0,index(policyVersion)"`
+	UUID                     string             `sql:""`
+	Firmware                 string             `sql:""`
+	PowerState               string             `sql:""`
+	ConnectionState          string             `sql:""`
+	CpuAffinity              []int32            `sql:""`
+	CpuHotAddEnabled         bool               `sql:""`
+	CpuHotRemoveEnabled      bool               `sql:""`
+	MemoryHotAddEnabled      bool               `sql:""`
+	FaultToleranceEnabled    bool               `sql:""`
+	CpuCount                 int32              `sql:""`
+	CoresPerSocket           int32              `sql:""`
+	MemoryMB                 int32              `sql:""`
+	GuestName                string             `sql:""`
+	GuestNameFromVmwareTools string             `sql:""`
+	HostName                 string             `sql:""`
+	GuestID                  string             `sql:""`
+	BalloonedMemory          int32              `sql:""`
+	IpAddress                string             `sql:""`
+	NumaNodeAffinity         []string           `sql:""`
+	StorageUsed              int64              `sql:""`
+	Snapshot                 Ref                `sql:""`
+	IsTemplate               bool               `sql:""`
+	ChangeTrackingEnabled    bool               `sql:""`
+	TpmEnabled               bool               `sql:""`
+	Devices                  []Device           `sql:""`
+	NICs                     []NIC              `sql:""`
+	Disks                    []Disk             `sql:""`
+	Controllers              []Controller       `sql:""`
+	Networks                 []Ref              `sql:""`
+	Concerns                 []Concern          `sql:""`
+	GuestNetworks            []GuestNetwork     `sql:""`
+	GuestDisks               []DiskMountPoint   `sql:""`
+	GuestIpStacks            []GuestIpStack     `sql:""`
+	SecureBoot               bool               `sql:""`
+	ToolsStatus              string             `sql:""`
+	ToolsRunningStatus       string             `sql:""`
+	ToolsVersionStatus       string             `sql:""`
+	DiskEnableUuid           bool               `sql:""`
+	NestedHVEnabled          bool               `sql:""`
+	CustomDef                []CustomFieldDef   `sql:""`
+	CustomValues             []CustomFieldValue `sql:""`
+	Tags                     []Tag              `sql:""`
 }
 
 // Determine if current revision has been validated.
@@ -423,4 +426,23 @@ type DiskMountPoint struct {
 	//
 	// For example NTFS or ext3.
 	FilesystemType string `xml:"filesystemType,omitempty" json:"filesystemType,omitempty"`
+}
+
+type CustomFieldDef struct {
+	Name              string `json:"name"`
+	Key               int32  `json:"key"`
+	ManagedObjectType string `json:"managedObjectType,omitempty"`
+}
+
+type CustomFieldValue struct {
+	Key   int32  `json:"key"`
+	Value string `json:"value"`
+}
+
+type Tag struct {
+	ID          string   `json:"id"`
+	Description string   `json:"description"`
+	Name        string   `json:"name"`
+	CategoryID  string   `json:"categoryID"`
+	UsedBy      []string `json:"usedBy"`
 }
