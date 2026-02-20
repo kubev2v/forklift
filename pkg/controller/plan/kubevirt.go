@@ -1942,7 +1942,12 @@ func (r *KubeVirt) vmTemplate(vm *plan.VMStatus) (virtualMachine *cnv.VirtualMac
 	virtualMachine.Namespace = r.Plan.Spec.TargetNamespace
 	virtualMachine.Spec.Template.Spec.Volumes = []cnv.Volume{}
 	virtualMachine.Spec.Template.Spec.Networks = []cnv.Network{}
-	virtualMachine.Spec.DataVolumeTemplates = []cnv.DataVolumeTemplateSpec{}
+	// Preserve DataVolumeTemplates for OCP source VMs to maintain user workflows
+	// that may expect the VM's DataVolume to be present. The OCP builder will
+	// set them from the source VM spec if they exist.
+	if !r.Plan.IsSourceProviderOCP() {
+		virtualMachine.Spec.DataVolumeTemplates = []cnv.DataVolumeTemplateSpec{}
+	}
 	delete(virtualMachine.Annotations, AnnKubevirtValidations)
 
 	ok = true
