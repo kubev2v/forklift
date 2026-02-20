@@ -1,6 +1,6 @@
-// Package ovfbase provides shared web handlers for OVF-based providers (OVA and HyperV).
-// Both providers use the same data model (ova/model.go) and share identical handler logic.
-// The only differences are the URL paths and provider type checks.
+// Package ovfbase provides web handlers for OVA providers.
+// OVA providers use the OVF data model (ova/model.go) with disk/storage/network entities
+// parsed from OVF descriptors.
 package ovfbase
 
 import (
@@ -12,7 +12,7 @@ import (
 
 // Config holds provider-specific configuration for handlers.
 type Config struct {
-	// ProviderType is the API provider type (api.Ova or api.HyperV)
+	// ProviderType is the API provider type (api.Ova)
 	ProviderType api.ProviderType
 	// Root is the base URL path for this provider's routes
 	Root string

@@ -2,6 +2,7 @@ package handler
 
 import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/controller/map/storage/handler/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/map/storage/handler/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/map/storage/handler/openstack"
 	"github.com/kubev2v/forklift/pkg/controller/map/storage/handler/ova"
@@ -49,8 +50,13 @@ func New(
 			client,
 			channel,
 			provider)
-	case api.Ova, api.HyperV:
+	case api.Ova:
 		h, err = ova.New(
+			client,
+			channel,
+			provider)
+	case api.HyperV:
+		h, err = hyperv.New(
 			client,
 			channel,
 			provider)

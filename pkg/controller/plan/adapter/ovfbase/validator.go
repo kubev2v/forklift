@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// Validator for OVF-based providers (OVA and HyperV).
+// Validator for OVF-based providers.
 type Validator struct {
 	*plancontext.Context
 }

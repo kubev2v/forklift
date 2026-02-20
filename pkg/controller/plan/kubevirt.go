@@ -21,6 +21,7 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	hvutil "github.com/kubev2v/forklift/pkg/controller/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	inspectionparser "github.com/kubev2v/forklift/pkg/controller/plan/adapter/vsphere"
@@ -1097,9 +1098,9 @@ func (r *KubeVirt) EnsureVirtV2vPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvc
 	return
 }
 
-// EnsureOVAVirtV2VPVCStatus checks if the provider storage PVC is ready.
+// EnsureProviderVirtV2VPVCStatus checks if the provider storage PVC is ready.
 // Works for both OVA (NFS) and HyperV (SMB) PVCs.
-func (r *KubeVirt) EnsureOVAVirtV2VPVCStatus(vmID string) (ready bool, err error) {
+func (r *KubeVirt) EnsureProviderVirtV2VPVCStatus(vmID string) (ready bool, err error) {
 	pvcs := &core.PersistentVolumeClaimList{}
 
 	// Build labels based on provider type
@@ -2222,13 +2223,11 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 			})
 	}
 
-	if vm.NewName != "" {
-		environment = append(environment,
-			core.EnvVar{
-				Name:  "V2V_NewName",
-				Value: vm.NewName,
-			})
-	}
+	environment = append(environment,
+		core.EnvVar{
+			Name:  "V2V_NewName",
+			Value: r.getNewVMName(vm),
+		})
 
 	environment = append(environment,
 		core.EnvVar{
@@ -3384,7 +3383,8 @@ func getEntityPrefixName(resourceType, providerName, planName string) string {
 // BuildPVForSMB creates a static PV for HyperV using SMB CSI driver.
 func (r *KubeVirt) BuildPVForSMB(vm *plan.VMStatus) (pv *core.PersistentVolume) {
 	sourceProvider := r.Source.Provider
-	smbSource := ctrlutil.ParseSMBSource(sourceProvider.Spec.URL)
+	smbUrl := hvutil.SMBUrl(r.Source.Secret)
+	smbSource := ctrlutil.ParseSMBSource(smbUrl)
 	pvNamePrefix := fmt.Sprintf("hyperv-store-pv-%s-%s-", r.Source.Provider.Name, r.Plan.Name)
 
 	// Get secret reference from provider
