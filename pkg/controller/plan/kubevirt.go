@@ -1343,6 +1343,43 @@ func (r *KubeVirt) DeleteGuestConversionPod(vm *plan.VMStatus) (err error) {
 	return
 }
 
+// conversionTempStoragePVCSuffix is the suffix of PVC names created for conversion/inspection temp storage (ephemeral volumes).
+const conversionTempStoragePVCSuffix = "-conversion-temp-storage"
+
+// DeleteConversionTempStoragePVCs deletes any conversion temp storage PVCs belonging to this plan.
+// When conversionTempStorageClass is set, inspection and conversion pods use ephemeral PVCs; in some
+// cases (e.g. warm migration, plan delete) these PVCs can be left behind. This cleans them up on archive.
+func (r *KubeVirt) DeleteConversionTempStoragePVCs() (err error) {
+	if r.Plan.Spec.ConversionTempStorageClass == "" {
+		return nil
+	}
+	list := &core.PersistentVolumeClaimList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{Namespace: r.Plan.Spec.TargetNamespace},
+	)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	planPrefix := r.Plan.Name + "-"
+	for i := range list.Items {
+		pvc := &list.Items[i]
+		if strings.HasPrefix(pvc.Name, planPrefix) && strings.HasSuffix(pvc.Name, conversionTempStoragePVCSuffix) {
+			if err = r.Destination.Client.Delete(context.TODO(), pvc); err != nil {
+				if k8serr.IsNotFound(err) {
+					err = nil
+				} else {
+					return liberr.Wrap(err)
+				}
+			} else {
+				r.Log.Info("Deleted conversion temp storage PVC.", "pvc", path.Join(pvc.Namespace, pvc.Name))
+			}
+		}
+	}
+	return nil
+}
+
 // Gets pods associated with the VM.
 func (r *KubeVirt) GetPods(vm *plan.VMStatus) (pods *core.PodList, err error) {
 	return r.GetPodsWithLabels(r.vmAllButMigrationLabels(vm.Ref))

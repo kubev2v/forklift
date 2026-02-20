@@ -20,6 +20,7 @@ import (
 	"context"
 	"path"
 	"sort"
+	"strings"
 	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -32,10 +33,12 @@ import (
 	libref "github.com/kubev2v/forklift/pkg/lib/ref"
 	metrics "github.com/kubev2v/forklift/pkg/monitoring/metrics/forklift-controller"
 	"github.com/kubev2v/forklift/pkg/settings"
+	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/storage/names"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -194,6 +197,39 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		r.Log.V(2).Info("Conditions.", "all", plan.Status.Conditions)
 	}()
 
+	// Handle plan deletion: run conversion temp storage cleanup finalizer then remove it.
+	if plan.DeletionTimestamp != nil {
+		if controllerutil.ContainsFinalizer(plan, api.PlanConversionTempStorageFinalizer) {
+			if err = r.deleteConversionTempStoragePVCs(plan); err != nil {
+				r.Log.Error(err, "Failed to delete conversion temp storage PVCs during plan deletion")
+				return
+			}
+			cloned := plan.DeepCopy()
+			controllerutil.RemoveFinalizer(cloned, api.PlanConversionTempStorageFinalizer)
+			if err = r.Patch(context.TODO(), cloned, client.MergeFrom(plan)); err != nil {
+				r.Log.Error(err, "Failed to remove conversion temp storage finalizer from plan")
+				return
+			}
+			r.Log.Info("Removed conversion temp storage finalizer from plan.")
+		}
+		return
+	}
+
+	// Ensure finalizer is present when conversion temp storage is used, so we clean up on delete.
+	if plan.Spec.ConversionTempStorageClass != "" {
+		cloned := plan.DeepCopy()
+		if controllerutil.AddFinalizer(cloned, api.PlanConversionTempStorageFinalizer) {
+			if err = r.Patch(context.TODO(), cloned, client.MergeFrom(plan)); err != nil {
+				r.Log.Error(err, "Failed to add conversion temp storage finalizer to plan")
+				return
+			}
+			// Refresh plan so subsequent logic sees the finalizer.
+			if err = r.APIReader.Get(context.TODO(), request.NamespacedName, plan); err != nil {
+				return
+			}
+		}
+	}
+
 	// Don't reconcile if the plan is archived.
 	if plan.Spec.Archived && plan.Status.HasCondition(Archived) {
 		r.Log.Info("Aborting reconcile of archived plan.")
@@ -320,6 +356,31 @@ func (r *Reconciler) setPopulatorDataSourceLabels(plan *api.Plan) {
 			plan.Spec = planCopy.Spec
 		}
 	}
+}
+
+// deleteConversionTempStoragePVCs deletes PVCs created for conversion/inspection temp storage
+// (name prefix plan.Name+"-", suffix "-conversion-temp-storage"). Used when the plan is deleted
+// so the finalizer can clean up without building the full plan context.
+func (r *Reconciler) deleteConversionTempStoragePVCs(plan *api.Plan) error {
+	const suffix = "-conversion-temp-storage"
+	list := &core.PersistentVolumeClaimList{}
+	if err := r.Client.List(context.TODO(), list, &client.ListOptions{Namespace: plan.Spec.TargetNamespace}); err != nil {
+		return liberr.Wrap(err)
+	}
+	planPrefix := plan.Name + "-"
+	for i := range list.Items {
+		pvc := &list.Items[i]
+		if strings.HasPrefix(pvc.Name, planPrefix) && strings.HasSuffix(pvc.Name, suffix) {
+			if err := r.Client.Delete(context.TODO(), pvc); err != nil {
+				if k8serr.IsNotFound(err) {
+					continue
+				}
+				return liberr.Wrap(err)
+			}
+			r.Log.Info("Deleted conversion temp storage PVC.", "pvc", path.Join(pvc.Namespace, pvc.Name))
+		}
+	}
+	return nil
 }
 
 // Archive the plan.
