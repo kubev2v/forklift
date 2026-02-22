@@ -73,6 +73,48 @@ type Volume struct {
 	NGUID                 string                 `json:"nguid"`
 }
 
+// SystemInfo : simplified system information
+type SystemInfo struct {
+	ID string `json:"id"`
+}
+
+// VolumeEnhanced : simplified volume information
+type VolumeEnhanced struct {
+	ID                   string           `json:"id,omitempty"`
+	Type                 string           `json:"type,omitempty"`
+	System               SystemInfo       `json:"system,omitempty"`
+	Identifier           string           `json:"identifier,omitempty"`
+	StorageGroups        []StorageGroupID `json:"storage_groups,omitempty"`
+	MaskingViews         []MaskingViewID  `json:"masking_views,omitempty"`
+	CapCyl               float64          `json:"cap_cyl,omitempty"`
+	VolumeHostPaths      []VolumeHostPath `json:"volume_host_paths,omitempty"`
+	NumberOfMaskingViews int              `json:"num_of_masking_views,omitempty"`
+	SRP                  Srp              `json:"srp,omitempty"`
+}
+
+type VolumeHostPath struct {
+	ID string `json:"id,omitempty"`
+}
+
+type Srp struct {
+	ID string `json:"id,omitempty"`
+}
+
+// Volumev1 : simplified volume information
+type Volumev1 struct {
+	Volumes []VolumeEnhanced `json:"volumes,omitempty"`
+}
+
+// StorageGroupName holds group name in which volume exists
+type StorageGroupID struct {
+	StorageGroupID string `json:"id"`
+}
+
+// MaskingViewID holds group name in which volume exists
+type MaskingViewID struct {
+	MaskingViewID string `json:"id"`
+}
+
 // StorageGroupName holds group name in which volume exists
 type StorageGroupName struct {
 	StorageGroupName       string `json:"storage_group_name"`
