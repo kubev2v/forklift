@@ -1,18 +1,6 @@
-/*
-Copyright (c) 2015-2024 VMware, Inc. All Rights Reserved.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// © Broadcom. All Rights Reserved.
+// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
+// SPDX-License-Identifier: Apache-2.0
 
 package object
 
@@ -62,6 +50,7 @@ func EthernetCardTypes() VirtualDeviceList {
 	return VirtualDeviceList([]types.BaseVirtualDevice{
 		&types.VirtualE1000{},
 		&types.VirtualE1000e{},
+		&types.VirtualVmxnet{},
 		&types.VirtualVmxnet2{},
 		&types.VirtualVmxnet3{},
 		&types.VirtualVmxnet3Vrdma{},
@@ -249,6 +238,10 @@ func (l VirtualDeviceList) FindSCSIController(name string) (*types.VirtualSCSICo
 	return c.(types.BaseVirtualSCSIController).GetVirtualSCSIController(), nil
 }
 
+var alias = map[string]string{
+	"lsilogicsas": "lsilogic-sas",
+}
+
 // CreateSCSIController creates a new SCSI controller of type name if given, otherwise defaults to lsilogic.
 func (l VirtualDeviceList) CreateSCSIController(name string) (types.BaseVirtualDevice, error) {
 	ctypes := SCSIControllerTypes()
@@ -260,7 +253,8 @@ func (l VirtualDeviceList) CreateSCSIController(name string) (types.BaseVirtualD
 	}
 
 	found := ctypes.Select(func(device types.BaseVirtualDevice) bool {
-		return l.Type(device) == name
+		kind := l.Type(device)
+		return kind == name || kind == alias[name]
 	})
 
 	if len(found) == 0 {
