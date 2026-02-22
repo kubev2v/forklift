@@ -12,6 +12,7 @@ import (
 
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/output"
+	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
 // extractProviderName gets a provider name from the mapping spec
@@ -27,6 +28,32 @@ func extractProviderName(mapping unstructured.Unstructured, providerType string)
 	return ""
 }
 
+// extractMappingStatus extracts the Ready status from a mapping's status.conditions.
+func extractMappingStatus(mapping unstructured.Unstructured) string {
+	conditions, found, _ := unstructured.NestedSlice(mapping.Object, "status", "conditions")
+	if !found || len(conditions) == 0 {
+		return ""
+	}
+
+	for _, condition := range conditions {
+		condMap, ok := condition.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		condType, _ := condMap["type"].(string)
+		if condType == "Ready" {
+			if status, ok := condMap["status"].(string); ok {
+				if status == "True" {
+					return "Ready"
+				}
+				return "Not Ready"
+			}
+		}
+	}
+
+	return ""
+}
+
 // createMappingItem creates a standardized mapping item for output
 func createMappingItem(mapping unstructured.Unstructured, mappingType string, useUTC bool) map[string]interface{} {
 	item := map[string]interface{}{
@@ -35,6 +62,7 @@ func createMappingItem(mapping unstructured.Unstructured, mappingType string, us
 		"type":      mappingType,
 		"source":    extractProviderName(mapping, "source"),
 		"target":    extractProviderName(mapping, "destination"),
+		"status":    extractMappingStatus(mapping),
 		"created":   output.FormatTimestamp(mapping.GetCreationTimestamp().Time, useUTC),
 		"object":    mapping.Object, // Include the original object
 	}
@@ -49,8 +77,8 @@ func createMappingItem(mapping unstructured.Unstructured, mappingType string, us
 	return item
 }
 
-// List lists network and storage mappings
-func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, mappingType, namespace, outputFormat string, mappingName string, useUTC bool) error {
+// ListMappings lists network and storage mappings without watch functionality
+func ListMappings(ctx context.Context, configFlags *genericclioptions.ConfigFlags, mappingType, namespace, outputFormat string, mappingName string, useUTC bool) error {
 	return listMappings(ctx, configFlags, mappingType, namespace, outputFormat, mappingName, useUTC)
 }
 
@@ -297,6 +325,7 @@ func listMappings(ctx context.Context, configFlags *genericclioptions.ConfigFlag
 			output.Header{DisplayName: "TYPE", JSONPath: "type"},
 			output.Header{DisplayName: "SOURCE", JSONPath: "source"},
 			output.Header{DisplayName: "TARGET", JSONPath: "target"},
+			output.Header{DisplayName: "STATUS", JSONPath: "status", ColorFunc: output.ColorizeStatus},
 			output.Header{DisplayName: "OWNER", JSONPath: "owner"},
 			output.Header{DisplayName: "CREATED", JSONPath: "created"},
 		)
@@ -308,4 +337,11 @@ func listMappings(ctx context.Context, configFlags *genericclioptions.ConfigFlag
 		}
 		return tablePrinter.Print()
 	}
+}
+
+// List lists network and storage mappings with optional watch mode
+func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, mappingType, namespace string, watchMode bool, outputFormat string, mappingName string, useUTC bool) error {
+	return watch.WrapWithWatch(watchMode, outputFormat, func() error {
+		return ListMappings(ctx, configFlags, mappingType, namespace, outputFormat, mappingName, useUTC)
+	}, watch.DefaultInterval)
 }

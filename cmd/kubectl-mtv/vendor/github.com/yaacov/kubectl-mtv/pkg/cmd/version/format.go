@@ -41,19 +41,27 @@ func (info Info) formatYAML() (string, error) {
 func (info Info) formatTable() string {
 	output := fmt.Sprintf("kubectl-mtv version: %s\n", info.ClientVersion)
 
-	// Operator information - use status to decide how to print
-	if info.OperatorStatus == "installed" {
-		output += fmt.Sprintf("MTV Operator: %s\n", info.OperatorVersion)
-		output += fmt.Sprintf("MTV Namespace: %s\n", info.OperatorNamespace)
-	} else {
-		output += fmt.Sprintf("MTV Operator: %s\n", info.OperatorStatus)
+	// Operator information - only print if we have status
+	if info.OperatorStatus != "" {
+		if info.OperatorStatus == "installed" {
+			output += fmt.Sprintf("MTV Operator: %s\n", info.OperatorVersion)
+			output += fmt.Sprintf("MTV Namespace: %s\n", info.OperatorNamespace)
+		} else {
+			output += fmt.Sprintf("MTV Operator: %s\n", info.OperatorStatus)
+		}
 	}
 
-	// Inventory information - combine URL and status
-	if info.InventoryStatus == "available" {
-		output += fmt.Sprintf("MTV Inventory: %s\n", info.InventoryURL)
-	} else {
-		output += fmt.Sprintf("MTV Inventory: %s\n", info.InventoryStatus)
+	// Inventory information - only print if we have status
+	if info.InventoryStatus != "" {
+		if info.InventoryStatus == "available" {
+			if info.InventoryInsecure {
+				output += fmt.Sprintf("MTV Inventory: %s (insecure)\n", info.InventoryURL)
+			} else {
+				output += fmt.Sprintf("MTV Inventory: %s\n", info.InventoryURL)
+			}
+		} else {
+			output += fmt.Sprintf("MTV Inventory: %s\n", info.InventoryStatus)
+		}
 	}
 
 	return output

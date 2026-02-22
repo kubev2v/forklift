@@ -3,7 +3,6 @@ package inventory
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -12,18 +11,16 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
-// ListInstances queries the provider's instance inventory and displays the results
-func ListInstances(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
-	if watchMode {
-		return watch.Watch(func() error {
-			return listInstancesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
-		}, 10*time.Second)
-	}
+// ListInstancesWithInsecure queries the provider's instance inventory with optional insecure TLS skip verification
+func ListInstancesWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
+	sq := watch.NewSafeQuery(query)
 
-	return listInstancesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return watch.WrapWithWatchAndQuery(watchMode, outputFormat, func() error {
+		return listInstancesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, sq.Get(), insecureSkipTLS)
+	}, watch.DefaultInterval, sq.Set, query)
 }
 
-func listInstancesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listInstancesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -31,7 +28,7 @@ func listInstancesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.C
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to verify instance support
 	providerType, err := providerClient.GetProviderType()
@@ -43,7 +40,7 @@ func listInstancesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.C
 	defaultHeaders := []output.Header{
 		{DisplayName: "NAME", JSONPath: "name"},
 		{DisplayName: "ID", JSONPath: "id"},
-		{DisplayName: "STATUS", JSONPath: "status"},
+		{DisplayName: "STATUS", JSONPath: "status", ColorFunc: output.ColorizeStatus},
 		{DisplayName: "FLAVOR", JSONPath: "flavor.name"},
 		{DisplayName: "IMAGE", JSONPath: "image.name"},
 		{DisplayName: "PROJECT", JSONPath: "project.name"},
@@ -53,7 +50,7 @@ func listInstancesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.C
 	var data interface{}
 	switch providerType {
 	case "openstack":
-		data, err = providerClient.GetInstances(4)
+		data, err = providerClient.GetInstances(ctx, 4)
 	default:
 		return fmt.Errorf("provider type '%s' does not support instance inventory", providerType)
 	}
@@ -91,18 +88,16 @@ func listInstancesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.C
 	}
 }
 
-// ListImages queries the provider's image inventory and displays the results
-func ListImages(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
-	if watchMode {
-		return watch.Watch(func() error {
-			return listImagesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
-		}, 10*time.Second)
-	}
+// ListImagesWithInsecure queries the provider's image inventory with optional insecure TLS skip verification
+func ListImagesWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
+	sq := watch.NewSafeQuery(query)
 
-	return listImagesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return watch.WrapWithWatchAndQuery(watchMode, outputFormat, func() error {
+		return listImagesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, sq.Get(), insecureSkipTLS)
+	}, watch.DefaultInterval, sq.Set, query)
 }
 
-func listImagesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listImagesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -110,7 +105,7 @@ func listImagesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Conf
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to verify image support
 	providerType, err := providerClient.GetProviderType()
@@ -122,7 +117,7 @@ func listImagesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Conf
 	defaultHeaders := []output.Header{
 		{DisplayName: "NAME", JSONPath: "name"},
 		{DisplayName: "ID", JSONPath: "id"},
-		{DisplayName: "STATUS", JSONPath: "status"},
+		{DisplayName: "STATUS", JSONPath: "status", ColorFunc: output.ColorizeStatus},
 		{DisplayName: "SIZE", JSONPath: "sizeHuman"},
 		{DisplayName: "VISIBILITY", JSONPath: "visibility"},
 	}
@@ -131,7 +126,7 @@ func listImagesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Conf
 	var data interface{}
 	switch providerType {
 	case "openstack":
-		data, err = providerClient.GetImages(4)
+		data, err = providerClient.GetImages(ctx, 4)
 	default:
 		return fmt.Errorf("provider type '%s' does not support image inventory", providerType)
 	}
@@ -172,18 +167,16 @@ func listImagesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Conf
 	}
 }
 
-// ListFlavors queries the provider's flavor inventory and displays the results
-func ListFlavors(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
-	if watchMode {
-		return watch.Watch(func() error {
-			return listFlavorsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
-		}, 10*time.Second)
-	}
+// ListFlavorsWithInsecure queries the provider's flavor inventory with optional insecure TLS skip verification
+func ListFlavorsWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
+	sq := watch.NewSafeQuery(query)
 
-	return listFlavorsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return watch.WrapWithWatchAndQuery(watchMode, outputFormat, func() error {
+		return listFlavorsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, sq.Get(), insecureSkipTLS)
+	}, watch.DefaultInterval, sq.Set, query)
 }
 
-func listFlavorsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listFlavorsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -191,7 +184,7 @@ func listFlavorsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Con
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to verify flavor support
 	providerType, err := providerClient.GetProviderType()
@@ -213,7 +206,7 @@ func listFlavorsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Con
 	var data interface{}
 	switch providerType {
 	case "openstack":
-		data, err = providerClient.GetFlavors(4)
+		data, err = providerClient.GetFlavors(ctx, 4)
 	default:
 		return fmt.Errorf("provider type '%s' does not support flavor inventory", providerType)
 	}
@@ -255,17 +248,16 @@ func listFlavorsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Con
 }
 
 // ListProjects queries the provider's project inventory and displays the results
-func ListProjects(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
-	if watchMode {
-		return watch.Watch(func() error {
-			return listProjectsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
-		}, 10*time.Second)
-	}
+// ListProjectsWithInsecure queries the provider's project inventory with optional insecure TLS skip verification
+func ListProjectsWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
+	sq := watch.NewSafeQuery(query)
 
-	return listProjectsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return watch.WrapWithWatchAndQuery(watchMode, outputFormat, func() error {
+		return listProjectsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, sq.Get(), insecureSkipTLS)
+	}, watch.DefaultInterval, sq.Set, query)
 }
 
-func listProjectsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listProjectsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -273,7 +265,7 @@ func listProjectsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Co
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to verify project support
 	providerType, err := providerClient.GetProviderType()
@@ -286,14 +278,14 @@ func listProjectsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Co
 		{DisplayName: "NAME", JSONPath: "name"},
 		{DisplayName: "ID", JSONPath: "id"},
 		{DisplayName: "DESCRIPTION", JSONPath: "description"},
-		{DisplayName: "ENABLED", JSONPath: "enabled"},
+		{DisplayName: "ENABLED", JSONPath: "enabled", ColorFunc: output.ColorizeBooleanString},
 	}
 
 	// Fetch projects inventory from the provider
 	var data interface{}
 	switch providerType {
 	case "openstack":
-		data, err = providerClient.GetProjects(4)
+		data, err = providerClient.GetProjects(ctx, 4)
 	default:
 		return fmt.Errorf("provider type '%s' does not support project inventory", providerType)
 	}
@@ -331,18 +323,16 @@ func listProjectsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Co
 	}
 }
 
-// ListVolumes queries the provider's volume inventory and displays the results
-func ListVolumes(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
-	if watchMode {
-		return watch.Watch(func() error {
-			return listVolumesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
-		}, 10*time.Second)
-	}
+// ListVolumesWithInsecure queries the provider's volume inventory with optional insecure TLS skip verification
+func ListVolumesWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
+	sq := watch.NewSafeQuery(query)
 
-	return listVolumesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return watch.WrapWithWatchAndQuery(watchMode, outputFormat, func() error {
+		return listVolumesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, sq.Get(), insecureSkipTLS)
+	}, watch.DefaultInterval, sq.Set, query)
 }
 
-func listVolumesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listVolumesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -350,7 +340,7 @@ func listVolumesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Con
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to verify volume support
 	providerType, err := providerClient.GetProviderType()
@@ -362,17 +352,17 @@ func listVolumesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Con
 	defaultHeaders := []output.Header{
 		{DisplayName: "NAME", JSONPath: "name"},
 		{DisplayName: "ID", JSONPath: "id"},
-		{DisplayName: "STATUS", JSONPath: "status"},
+		{DisplayName: "STATUS", JSONPath: "status", ColorFunc: output.ColorizeStatus},
 		{DisplayName: "SIZE", JSONPath: "sizeHuman"},
 		{DisplayName: "TYPE", JSONPath: "volumeType"},
-		{DisplayName: "BOOTABLE", JSONPath: "bootable"},
+		{DisplayName: "BOOTABLE", JSONPath: "bootable", ColorFunc: output.ColorizeBooleanString},
 	}
 
 	// Fetch volumes inventory from the provider
 	var data interface{}
 	switch providerType {
 	case "openstack":
-		data, err = providerClient.GetVolumes(4)
+		data, err = providerClient.GetVolumes(ctx, 4)
 	default:
 		return fmt.Errorf("provider type '%s' does not support volume inventory", providerType)
 	}
@@ -413,18 +403,16 @@ func listVolumesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Con
 	}
 }
 
-// ListVolumeTypes queries the provider's volume type inventory and displays the results
-func ListVolumeTypes(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
-	if watchMode {
-		return watch.Watch(func() error {
-			return listVolumeTypesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
-		}, 10*time.Second)
-	}
+// ListVolumeTypesWithInsecure queries the provider's volume type inventory with optional insecure TLS skip verification
+func ListVolumeTypesWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
+	sq := watch.NewSafeQuery(query)
 
-	return listVolumeTypesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return watch.WrapWithWatchAndQuery(watchMode, outputFormat, func() error {
+		return listVolumeTypesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, sq.Get(), insecureSkipTLS)
+	}, watch.DefaultInterval, sq.Set, query)
 }
 
-func listVolumeTypesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listVolumeTypesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -432,7 +420,7 @@ func listVolumeTypesOnce(ctx context.Context, kubeConfigFlags *genericclioptions
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to verify volume type support
 	providerType, err := providerClient.GetProviderType()
@@ -452,7 +440,7 @@ func listVolumeTypesOnce(ctx context.Context, kubeConfigFlags *genericclioptions
 	var data interface{}
 	switch providerType {
 	case "openstack":
-		data, err = providerClient.GetVolumeTypes(4)
+		data, err = providerClient.GetVolumeTypes(ctx, 4)
 	default:
 		return fmt.Errorf("provider type '%s' does not support volume type inventory", providerType)
 	}
@@ -490,18 +478,16 @@ func listVolumeTypesOnce(ctx context.Context, kubeConfigFlags *genericclioptions
 	}
 }
 
-// ListSnapshots queries the provider's snapshot inventory and displays the results
-func ListSnapshots(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
-	if watchMode {
-		return watch.Watch(func() error {
-			return listSnapshotsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
-		}, 10*time.Second)
-	}
+// ListSnapshotsWithInsecure queries the provider's snapshot inventory with optional insecure TLS skip verification
+func ListSnapshotsWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
+	sq := watch.NewSafeQuery(query)
 
-	return listSnapshotsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return watch.WrapWithWatchAndQuery(watchMode, outputFormat, func() error {
+		return listSnapshotsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, sq.Get(), insecureSkipTLS)
+	}, watch.DefaultInterval, sq.Set, query)
 }
 
-func listSnapshotsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listSnapshotsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -509,7 +495,7 @@ func listSnapshotsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.C
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to verify snapshot support
 	providerType, err := providerClient.GetProviderType()
@@ -521,7 +507,7 @@ func listSnapshotsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.C
 	defaultHeaders := []output.Header{
 		{DisplayName: "NAME", JSONPath: "name"},
 		{DisplayName: "ID", JSONPath: "id"},
-		{DisplayName: "STATUS", JSONPath: "status"},
+		{DisplayName: "STATUS", JSONPath: "status", ColorFunc: output.ColorizeStatus},
 		{DisplayName: "SIZE", JSONPath: "sizeHuman"},
 		{DisplayName: "VOLUME-ID", JSONPath: "volumeID"},
 	}
@@ -530,7 +516,7 @@ func listSnapshotsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.C
 	var data interface{}
 	switch providerType {
 	case "openstack":
-		data, err = providerClient.GetSnapshots(4)
+		data, err = providerClient.GetSnapshots(ctx, 4)
 	default:
 		return fmt.Errorf("provider type '%s' does not support snapshot inventory", providerType)
 	}
@@ -571,18 +557,16 @@ func listSnapshotsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.C
 	}
 }
 
-// ListSubnets queries the provider's subnet inventory and displays the results
-func ListSubnets(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
-	if watchMode {
-		return watch.Watch(func() error {
-			return listSubnetsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
-		}, 10*time.Second)
-	}
+// ListSubnetsWithInsecure queries the provider's subnet inventory with optional insecure TLS skip verification
+func ListSubnetsWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
+	sq := watch.NewSafeQuery(query)
 
-	return listSubnetsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return watch.WrapWithWatchAndQuery(watchMode, outputFormat, func() error {
+		return listSubnetsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, sq.Get(), insecureSkipTLS)
+	}, watch.DefaultInterval, sq.Set, query)
 }
 
-func listSubnetsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listSubnetsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -590,7 +574,7 @@ func listSubnetsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Con
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to verify subnet support
 	providerType, err := providerClient.GetProviderType()
@@ -606,14 +590,14 @@ func listSubnetsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Con
 		{DisplayName: "CIDR", JSONPath: "cidr"},
 		{DisplayName: "IP-VERSION", JSONPath: "ipVersion"},
 		{DisplayName: "GATEWAY", JSONPath: "gatewayIP"},
-		{DisplayName: "DHCP", JSONPath: "enableDHCP"},
+		{DisplayName: "DHCP", JSONPath: "enableDHCP", ColorFunc: output.ColorizeBooleanString},
 	}
 
 	// Fetch subnets inventory from the provider
 	var data interface{}
 	switch providerType {
 	case "openstack":
-		data, err = providerClient.GetSubnets(4)
+		data, err = providerClient.GetSubnets(ctx, 4)
 	default:
 		return fmt.Errorf("provider type '%s' does not support subnet inventory", providerType)
 	}

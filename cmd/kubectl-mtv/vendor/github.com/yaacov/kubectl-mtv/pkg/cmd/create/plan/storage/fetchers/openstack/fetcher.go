@@ -24,7 +24,7 @@ func NewOpenStackStorageFetcher() *OpenStackStorageFetcher {
 }
 
 // FetchSourceStorages extracts storage references from OpenStack VMs
-func (f *OpenStackStorageFetcher) FetchSourceStorages(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, planVMNames []string) ([]ref.Ref, error) {
+func (f *OpenStackStorageFetcher) FetchSourceStorages(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, planVMNames []string, insecureSkipTLS bool) ([]ref.Ref, error) {
 	klog.V(4).Infof("OpenStack storage fetcher - extracting source storages for provider: %s", providerName)
 
 	// Get the provider object
@@ -34,7 +34,7 @@ func (f *OpenStackStorageFetcher) FetchSourceStorages(ctx context.Context, confi
 	}
 
 	// Fetch volume types inventory first to create ID-to-volumeType mapping
-	volumeTypesInventory, err := client.FetchProviderInventory(configFlags, inventoryURL, provider, "volumetypes?detail=4")
+	volumeTypesInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "volumetypes?detail=4", insecureSkipTLS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch volume types inventory: %v", err)
 	}
@@ -66,7 +66,7 @@ func (f *OpenStackStorageFetcher) FetchSourceStorages(ctx context.Context, confi
 	}
 
 	// Fetch VMs inventory to get volume IDs from VMs
-	vmsInventory, err := client.FetchProviderInventory(configFlags, inventoryURL, provider, "vms?detail=4")
+	vmsInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "vms?detail=4", insecureSkipTLS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch VMs inventory: %v", err)
 	}
@@ -111,7 +111,7 @@ func (f *OpenStackStorageFetcher) FetchSourceStorages(ctx context.Context, confi
 		}
 	}
 
-	volumesInventory, err := client.FetchProviderInventory(configFlags, inventoryURL, provider, "volumes?detail=4")
+	volumesInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "volumes?detail=4", insecureSkipTLS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch volumes inventory: %v", err)
 	}
@@ -187,7 +187,7 @@ func (f *OpenStackStorageFetcher) FetchSourceStorages(ctx context.Context, confi
 }
 
 // FetchTargetStorages is not supported for OpenStack as target - only OpenShift is supported as target
-func (f *OpenStackStorageFetcher) FetchTargetStorages(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string) ([]forkliftv1beta1.DestinationStorage, error) {
+func (f *OpenStackStorageFetcher) FetchTargetStorages(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, insecureSkipTLS bool) ([]forkliftv1beta1.DestinationStorage, error) {
 	klog.V(4).Infof("OpenStack provider does not support target storage fetching - only OpenShift is supported as target")
 	return nil, fmt.Errorf("OpenStack provider does not support target storage fetching - only OpenShift is supported as migration target")
 }

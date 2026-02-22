@@ -151,7 +151,7 @@ func (gc *GatewayClient) NewTokenGeneration() (string, error) {
 	// parse the response
 	switch {
 	case resp == nil:
-		return "", errNilReponse
+		return "", errNilResponse
 	case !(resp.StatusCode >= 200 && resp.StatusCode <= 299):
 		return "", ParseJSONError(resp)
 	}
@@ -201,7 +201,7 @@ func (gc *GatewayClient) GetVersion() (string, error) {
 	// parse the response
 	switch {
 	case resp == nil:
-		return "", errNilReponse
+		return "", errNilResponse
 	case !(resp.StatusCode >= 200 && resp.StatusCode <= 299):
 		return "", fmt.Errorf("error response: %s", resp.Status)
 	}
