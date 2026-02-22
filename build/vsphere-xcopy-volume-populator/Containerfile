@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/go-toolset:1.22.9-1739801907 AS builder
+FROM registry.access.redhat.com/ubi9/go-toolset:1.25.7-1771417345 AS builder
 USER root
 WORKDIR /usr/src/app
 
