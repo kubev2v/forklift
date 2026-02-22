@@ -6,3 +6,4 @@ c.out
 *.swo
 *~
 
+vendor/

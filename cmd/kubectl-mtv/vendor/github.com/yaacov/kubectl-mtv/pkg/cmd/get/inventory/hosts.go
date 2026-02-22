@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -13,18 +12,16 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
-// ListHosts queries the provider's host inventory and displays the results
-func ListHosts(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
-	if watchMode {
-		return watch.Watch(func() error {
-			return listHostsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
-		}, 10*time.Second)
-	}
+// ListHostsWithInsecure queries the provider's host inventory with optional insecure TLS skip verification
+func ListHostsWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
+	sq := watch.NewSafeQuery(query)
 
-	return listHostsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return watch.WrapWithWatchAndQuery(watchMode, outputFormat, func() error {
+		return listHostsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, sq.Get(), insecureSkipTLS)
+	}, watch.DefaultInterval, sq.Set, query)
 }
 
-func listHostsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listHostsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -32,7 +29,7 @@ func listHostsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Confi
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to verify host support
 	providerType, err := providerClient.GetProviderType()
@@ -43,8 +40,8 @@ func listHostsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Confi
 	// Fetch hosts inventory from the provider based on provider type
 	var data interface{}
 	switch providerType {
-	case "ovirt", "vsphere":
-		data, err = providerClient.GetHosts(4)
+	case "ovirt", "vsphere", "hyperv":
+		data, err = providerClient.GetHosts(ctx, 4)
 	default:
 		return fmt.Errorf("provider type '%s' does not support host inventory", providerType)
 	}
@@ -100,12 +97,12 @@ func listHostsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Confi
 		defaultHeaders := []output.Header{
 			{DisplayName: "NAME", JSONPath: "name"},
 			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "STATUS", JSONPath: "status"},
+			{DisplayName: "STATUS", JSONPath: "status", ColorFunc: output.ColorizeStatus},
 			{DisplayName: "VERSION", JSONPath: "productVersion"},
 			{DisplayName: "MGMT IP", JSONPath: "managementServerIp"},
 			{DisplayName: "CORES", JSONPath: "cpuCores"},
 			{DisplayName: "SOCKETS", JSONPath: "cpuSockets"},
-			{DisplayName: "MAINTENANCE", JSONPath: "inMaintenance"},
+			{DisplayName: "MAINTENANCE", JSONPath: "inMaintenance", ColorFunc: output.ColorizeBooleanString},
 		}
 		return output.PrintTableWithQuery(hosts, defaultHeaders, queryOpts, emptyMessage)
 	}

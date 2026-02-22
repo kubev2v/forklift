@@ -221,8 +221,8 @@ func ListPlans(ctx context.Context, configFlags *genericclioptions.ConfigFlags, 
 		output.Header{DisplayName: "SOURCE", JSONPath: "source"},
 		output.Header{DisplayName: "TARGET", JSONPath: "target"},
 		output.Header{DisplayName: "VMS", JSONPath: "vms"},
-		output.Header{DisplayName: "READY", JSONPath: "ready"},
-		output.Header{DisplayName: "STATUS", JSONPath: "status"},
+		output.Header{DisplayName: "READY", JSONPath: "ready", ColorFunc: output.ColorizeConditionStatus},
+		output.Header{DisplayName: "STATUS", JSONPath: "status", ColorFunc: output.ColorizeStatus},
 		output.Header{DisplayName: "PROGRESS", JSONPath: "progress"},
 		output.Header{DisplayName: "CUTOVER", JSONPath: "cutover"},
 		output.Header{DisplayName: "ARCHIVED", JSONPath: "archived"},
@@ -246,14 +246,7 @@ func ListPlans(ctx context.Context, configFlags *genericclioptions.ConfigFlags, 
 
 // List lists migration plans with optional watch mode
 func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace string, watchMode bool, outputFormat string, planName string, useUTC bool) error {
-	if watchMode {
-		if outputFormat != "table" {
-			return fmt.Errorf("watch mode only supports table output format")
-		}
-		return watch.Watch(func() error {
-			return ListPlans(ctx, configFlags, namespace, outputFormat, planName, useUTC)
-		}, 15*time.Second)
-	}
-
-	return ListPlans(ctx, configFlags, namespace, outputFormat, planName, useUTC)
+	return watch.WrapWithWatch(watchMode, outputFormat, func() error {
+		return ListPlans(ctx, configFlags, namespace, outputFormat, planName, useUTC)
+	}, watch.DefaultInterval)
 }

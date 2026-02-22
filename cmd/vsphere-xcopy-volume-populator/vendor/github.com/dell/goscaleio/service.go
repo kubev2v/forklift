@@ -457,7 +457,7 @@ func (gc *GatewayClient) GetServiceDetailsByID(deploymentID string, newToken boo
 		// parse the response
 		switch {
 		case resp == nil:
-			return nil, errNilReponse
+			return nil, errNilResponse
 		case !(resp.StatusCode >= 200 && resp.StatusCode <= 299):
 			return nil, ParseJSONError(resp)
 		}

@@ -1,6 +1,7 @@
 package delete
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -9,24 +10,30 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/delete/hook"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/completion"
-	"github.com/yaacov/kubectl-mtv/pkg/util/flags"
 )
 
 // NewHookCmd creates the delete hook command
 func NewHookCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	var all bool
+	var hookNames []string
 
 	cmd := &cobra.Command{
-		Use:               "hook [NAME...] [--all]",
-		Short:             "Delete one or more migration hooks",
-		Args:              flags.ValidateAllFlagArgs(func() bool { return all }, 1),
-		SilenceUsage:      true,
-		ValidArgsFunction: completion.HookResourceNameCompletion(kubeConfigFlags),
+		Use:          "hook",
+		Short:        "Delete one or more migration hooks",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Validate --all and --name are mutually exclusive
+			if all && len(hookNames) > 0 {
+				return errors.New("cannot use --name with --all")
+			}
+			if !all && len(hookNames) == 0 {
+				return errors.New("either --name or --all is required")
+			}
+
 			// Resolve the appropriate namespace based on context and flags
 			namespace := client.ResolveNamespace(kubeConfigFlags)
 
-			var hookNames []string
 			if all {
 				// Get all hook names from the namespace
 				var err error
@@ -38,8 +45,6 @@ func NewHookCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 					fmt.Printf("No hooks found in namespace %s\n", namespace)
 					return nil
 				}
-			} else {
-				hookNames = args
 			}
 
 			// Loop over each hook name and delete it
@@ -54,6 +59,11 @@ func NewHookCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&all, "all", false, "Delete all migration hooks in the namespace")
+	cmd.Flags().StringSliceVarP(&hookNames, "name", "M", nil, "Hook name(s) to delete (comma-separated, e.g. \"hook1,hook2\")")
+	cmd.Flags().StringSliceVar(&hookNames, "names", nil, "Alias for --name")
+	_ = cmd.Flags().MarkHidden("names")
+
+	_ = cmd.RegisterFlagCompletionFunc("name", completion.HookResourceNameCompletion(kubeConfigFlags))
 
 	return cmd
 }
