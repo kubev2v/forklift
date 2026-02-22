@@ -8,25 +8,25 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/get/inventory"
+	"github.com/yaacov/kubectl-mtv/pkg/cmd/help"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/completion"
 	"github.com/yaacov/kubectl-mtv/pkg/util/flags"
 )
 
 // NewInventoryProviderCmd creates the get inventory provider command
-func NewInventoryProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() GlobalConfigGetter) *cobra.Command {
-	var inventoryURL string
+func NewInventoryProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	outputFormatFlag := flags.NewOutputFormatTypeFlag()
 	var query string
 	var watch bool
+	var providerName string
 
 	cmd := &cobra.Command{
-		Use:               "provider [PROVIDER_NAME]",
-		Short:             "Get inventory information from providers",
-		Long:              `Get inventory information from providers including resource counts and provider status`,
-		Args:              cobra.MaximumNArgs(1),
-		SilenceUsage:      true,
-		ValidArgsFunction: completion.ProviderNameCompletion(kubeConfigFlags),
+		Use:          "provider",
+		Short:        "Get inventory information from providers",
+		Long:         `Get inventory information from providers including resource counts and provider status`,
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 			if !watch {
@@ -35,34 +35,32 @@ func NewInventoryProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags, get
 				defer cancel()
 			}
 
-			var providerName string
-			if len(args) > 0 {
-				providerName = args[0]
-			}
-
-			config := getGlobalConfig()
-			namespace := client.ResolveNamespaceWithAllFlag(config.GetKubeConfigFlags(), config.GetAllNamespaces())
+			namespace := client.ResolveNamespaceWithAllFlag(globalConfig.GetKubeConfigFlags(), globalConfig.GetAllNamespaces())
 
 			if providerName != "" {
-				logNamespaceOperation("Getting inventory from provider", namespace, config.GetAllNamespaces())
+				logNamespaceOperation("Getting inventory from provider", namespace, globalConfig.GetAllNamespaces())
 			} else {
-				logNamespaceOperation("Getting inventory from all providers", namespace, config.GetAllNamespaces())
+				logNamespaceOperation("Getting inventory from all providers", namespace, globalConfig.GetAllNamespaces())
 			}
 			logOutputFormat(outputFormatFlag.GetValue())
 
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(ctx, config.GetKubeConfigFlags(), namespace)
-			}
+			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
+			inventoryURL := globalConfig.GetInventoryURL()
+			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
-			return inventory.ListProviders(ctx, config.GetKubeConfigFlags(), providerName, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch)
+			return inventory.ListProvidersWithInsecure(ctx, globalConfig.GetKubeConfigFlags(), providerName, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch, inventoryInsecureSkipTLS)
 		},
 	}
-
-	cmd.Flags().StringVar(&inventoryURL, "inventory-url", "", "Inventory service URL")
+	cmd.Flags().StringVarP(&providerName, "name", "M", "", "Provider name")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", "Output format (table, json, yaml)")
-	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter")
+	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter using TSL syntax (e.g. \"where name ~= 'prod-.*'\")")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
+	help.MarkMCPHidden(cmd, "watch")
 
+	// Add completion for name and output format flags
+	if err := cmd.RegisterFlagCompletionFunc("name", completion.ProviderNameCompletion(kubeConfigFlags)); err != nil {
+		panic(err)
+	}
 	// Add completion for output format flag
 	if err := cmd.RegisterFlagCompletionFunc("output", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return outputFormatFlag.GetValidValues(), cobra.ShellCompDirectiveNoFileComp

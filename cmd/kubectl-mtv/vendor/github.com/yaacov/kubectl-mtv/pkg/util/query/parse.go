@@ -94,6 +94,22 @@ func parseOrderByClause(orderByClause string, selectOpts []SelectOption) []Order
 	return orderOpts
 }
 
+// validQueryPrefixes lists the keyword prefixes that start a valid TSL query clause.
+// Used by hasQueryKeywordPrefix to detect bare filter expressions.
+var validQueryPrefixes = []string{"select ", "where ", "order by ", "sort by ", "limit "}
+
+// hasQueryKeywordPrefix checks if the query starts with a recognized TSL keyword.
+// Case-insensitive check against select, where, order by, sort by, and limit.
+func hasQueryKeywordPrefix(query string) bool {
+	lower := strings.ToLower(strings.TrimSpace(query))
+	for _, prefix := range validQueryPrefixes {
+		if strings.HasPrefix(lower, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 // ParseQueryString parses a query string into its component parts
 func ParseQueryString(query string) (*QueryOptions, error) {
 	options := &QueryOptions{
@@ -102,6 +118,14 @@ func ParseQueryString(query string) (*QueryOptions, error) {
 
 	if query == "" {
 		return options, nil
+	}
+
+	// Heuristic: if the query doesn't start with a valid keyword prefix
+	// (select, where, order by, sort by, limit), assume it's a bare filter
+	// expression and prepend "where " to make it a valid query.
+	// This helps LLMs and users who write "cpuCount > 4" instead of "where cpuCount > 4".
+	if !hasQueryKeywordPrefix(query) {
+		query = "where " + query
 	}
 
 	// Validate query syntax before parsing

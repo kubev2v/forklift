@@ -156,7 +156,11 @@ func (l *Lexer) scanToken() error {
 	case '%':
 		l.addToken(PERCENT, "%")
 	case '=':
-		l.addToken(EQ, "=")
+		if l.match('=') {
+			l.addToken(EQ, "==")
+		} else {
+			l.addToken(EQ, "=")
+		}
 	case '<':
 		if l.match('=') {
 			l.addToken(LE, "<=")
