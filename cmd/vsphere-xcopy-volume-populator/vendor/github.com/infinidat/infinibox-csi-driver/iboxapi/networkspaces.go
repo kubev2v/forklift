@@ -13,9 +13,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -76,19 +78,18 @@ type GetNetworkSpaceByNameResponse struct {
 	Error    Error          `json:"error"`
 }
 
-func (iboxClient *IboxClient) GetNetworkSpaceByName(netspaceName string) (networkSpace *NetworkSpace, err error) {
-	const functionName = "GetNetworkSpaceByName"
-	url := fmt.Sprintf("%s%s", iboxClient.Creds.URL, "api/rest/network/spaces")
-	iboxClient.Log.V(TRACE_LEVEL).Info(functionName, "URL", url, "net space Name", netspaceName)
+func (client *IboxClient) GetNetworkSpaceByName(ctx context.Context, netspaceName string) (networkSpace *NetworkSpace, err error) {
+	url := fmt.Sprintf("%s%s", client.Creds.URL, "api/rest/network/spaces")
+	slog.Log(ctx, common.LevelTrace, "info", "URL", url, "net space Name", netspaceName)
 
 	pageSize := common.IBOXDefaultQueryPageSize
 	totalPages := 1 // start with 1, update after first query.
 	for page := 1; page <= totalPages; page++ {
-		iboxClient.Log.V(TRACE_LEVEL).Info(functionName, "page", page, "totalPages", totalPages)
+		slog.Log(ctx, common.LevelTrace, "info", "page", page, "totalPages", totalPages)
 
-		req, err := http.NewRequest(http.MethodGet, url, nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
-			return nil, fmt.Errorf("%s - NewRequest - error %w", functionName, err)
+			return nil, common.Errorf("newRequest - error: %w url: %s", err, url)
 		}
 
 		values := req.URL.Query()
@@ -97,38 +98,36 @@ func (iboxClient *IboxClient) GetNetworkSpaceByName(netspaceName string) (networ
 		values.Add(PARAMETER_PAGE, strconv.Itoa(page))
 		req.URL.RawQuery = values.Encode()
 
-		SetAuthHeader(req, iboxClient.Creds)
+		SetAuthHeader(req, client.Creds)
 
-		resp, err := iboxClient.HTTPClient.Do(req)
+		resp, err := client.HTTPClient.Do(req)
 		if err != nil {
-			return nil, fmt.Errorf("%s - Do - error %w", functionName, err)
+			return nil, common.Errorf("do - error: %w url: %s", err, url)
 		}
 		defer func() {
 			if err := resp.Body.Close(); err != nil {
-				iboxClient.Log.V(INFO_LEVEL).Error(err, functionName, "error in Close()", err.Error())
+				slog.Error("error in Close()", "error", err.Error())
 			}
 		}()
 		bodyBytes, err := io.ReadAll(resp.Body)
 		if err != nil {
-			return nil, fmt.Errorf("%s - ReadAll - error %w", functionName, err)
+			return nil, common.Errorf("readAll - error: %w url: %s", err, url)
 		}
-		var responseObject GetNetworkSpaceByNameResponse
-		err = json.Unmarshal(bodyBytes, &responseObject)
+		var response GetNetworkSpaceByNameResponse
+		err = json.Unmarshal(bodyBytes, &response)
 		if err != nil {
-			return nil, fmt.Errorf("%s - Unmarshal - error %w", functionName, err)
+			return nil, common.Errorf("unmarshal - error: %w url: %s", err, url)
 		}
-		if responseObject.Error.Code != "" {
-			// TODO check for NOT FOUND?  return ErrNotFound for callers?
-			return nil, fmt.Errorf("%s - ibox API - error code %s message %s", functionName, responseObject.Error.Code, responseObject.Error.Message)
+		if response.Error.Code != "" {
+			return nil, common.Errorf("ibox API - error: %v url: %s", response.Error, url)
 		}
-		if len(responseObject.Result) > 0 {
-			networkSpace = &responseObject.Result[0]
-		} else {
-			return nil, &APIError{Code: IBOXAPI_RESOURCE_NOT_FOUND_ERROR, Err: fmt.Errorf("%s - netspace name '%s' not found", functionName, netspaceName)}
+		if len(response.Result) == 0 {
+			return nil, ErrNotFound
 		}
+		networkSpace = &response.Result[0]
 
 		if page == 1 {
-			totalPages = responseObject.Metadata.PagesTotal
+			totalPages = response.Metadata.PagesTotal
 		}
 	}
 

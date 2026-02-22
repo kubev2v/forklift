@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -43,18 +42,16 @@ func countNetworkSubnets(network map[string]interface{}) int {
 	return len(subnetsArray)
 }
 
-// ListNetworks queries the provider's network inventory and displays the results
-func ListNetworks(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
-	if watchMode {
-		return watch.Watch(func() error {
-			return listNetworksOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
-		}, 10*time.Second)
-	}
+// ListNetworksWithInsecure queries the provider's network inventory and displays the results with optional insecure TLS skip verification
+func ListNetworksWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
+	sq := watch.NewSafeQuery(query)
 
-	return listNetworksOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return watch.WrapWithWatchAndQuery(watchMode, outputFormat, func() error {
+		return listNetworksOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, sq.Get(), insecureSkipTLS)
+	}, watch.DefaultInterval, sq.Set, query)
 }
 
-func listNetworksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listNetworksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -62,7 +59,7 @@ func listNetworksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Co
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to determine resource path and headers
 	providerType, err := providerClient.GetProviderType()
@@ -84,10 +81,19 @@ func listNetworksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Co
 		defaultHeaders = []output.Header{
 			{DisplayName: "NAME", JSONPath: "name"},
 			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "STATUS", JSONPath: "status"},
-			{DisplayName: "SHARED", JSONPath: "shared"},
-			{DisplayName: "ADMIN-UP", JSONPath: "adminStateUp"},
+			{DisplayName: "STATUS", JSONPath: "status", ColorFunc: output.ColorizeStatus},
+			{DisplayName: "SHARED", JSONPath: "shared", ColorFunc: output.ColorizeBooleanString},
+			{DisplayName: "ADMIN-UP", JSONPath: "adminStateUp", ColorFunc: output.ColorizeBooleanString},
 			{DisplayName: "SUBNETS", JSONPath: "subnetsCount"},
+		}
+	case "ec2":
+		defaultHeaders = []output.Header{
+			{DisplayName: "NAME", JSONPath: "name"},
+			{DisplayName: "ID", JSONPath: "id"},
+			{DisplayName: "TYPE", JSONPath: "networkType"},
+			{DisplayName: "CIDR", JSONPath: "CidrBlock"},
+			{DisplayName: "STATE", JSONPath: "State", ColorFunc: output.ColorizeStatus},
+			{DisplayName: "DEFAULT", JSONPath: "IsDefault", ColorFunc: output.ColorizeBooleanString},
 		}
 	default:
 		defaultHeaders = []output.Header{
@@ -105,13 +111,18 @@ func listNetworksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Co
 	switch providerType {
 	case "openshift":
 		// For OpenShift, get network attachment definitions
-		data, err = providerClient.GetResourceCollection("networkattachmentdefinitions", 4)
+		data, err = providerClient.GetResourceCollection(ctx, "networkattachmentdefinitions", 4)
 	default:
 		// For other providers, get networks
-		data, err = providerClient.GetNetworks(4)
+		data, err = providerClient.GetNetworks(ctx, 4)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to fetch network inventory: %v", err)
+	}
+
+	// Extract objects from EC2 envelope
+	if providerType == "ec2" {
+		data = ExtractEC2Objects(data)
 	}
 
 	// Verify data is an array
@@ -133,6 +144,11 @@ func listNetworksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Co
 			// Add subnets count (for OpenStack)
 			if providerType == "openstack" {
 				network["subnetsCount"] = countNetworkSubnets(network)
+			}
+
+			// Process EC2 networks (extract name from tags, set ID and type)
+			if providerType == "ec2" {
+				processEC2Network(network)
 			}
 
 			networks = append(networks, network)

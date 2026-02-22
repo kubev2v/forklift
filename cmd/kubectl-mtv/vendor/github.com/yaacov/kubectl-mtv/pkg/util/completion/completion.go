@@ -194,8 +194,9 @@ func MappingNameCompletion(configFlags *genericclioptions.ConfigFlags, mappingTy
 	}
 }
 
-// HostNameCompletion provides completion for host names from provider inventory
-func HostNameCompletion(configFlags *genericclioptions.ConfigFlags, providerName, toComplete string) ([]string, cobra.ShellCompDirective) {
+// HostIDCompletion provides completion for host inventory IDs from provider inventory.
+// These are vSphere managed object IDs (e.g. "host-8"), not display names or IP addresses.
+func HostIDCompletion(configFlags *genericclioptions.ConfigFlags, providerName, toComplete string) ([]string, cobra.ShellCompDirective) {
 	if providerName == "" {
 		return []string{"Provider not specified"}, cobra.ShellCompDirectiveError
 	}
@@ -220,8 +221,9 @@ func HostNameCompletion(configFlags *genericclioptions.ConfigFlags, providerName
 	}
 
 	// Get available hosts
-	providerClient := inventory.NewProviderClient(configFlags, provider, inventoryURL)
-	data, err := providerClient.GetHosts(4)
+	// Note: Completion functions use insecure=false as a safe default
+	providerClient := inventory.NewProviderClientWithInsecure(configFlags, provider, inventoryURL, false)
+	data, err := providerClient.GetHosts(context.Background(), 4)
 	if err != nil {
 		return []string{fmt.Sprintf("Error fetching hosts: %v", err)}, cobra.ShellCompDirectiveError
 	}
@@ -274,8 +276,9 @@ func HostIPAddressCompletion(configFlags *genericclioptions.ConfigFlags, provide
 	}
 
 	// Get available hosts
-	providerClient := inventory.NewProviderClient(configFlags, provider, inventoryURL)
-	data, err := providerClient.GetHosts(4)
+	// Note: Completion functions use insecure=false as a safe default
+	providerClient := inventory.NewProviderClientWithInsecure(configFlags, provider, inventoryURL, false)
+	data, err := providerClient.GetHosts(context.Background(), 4)
 	if err != nil {
 		return []string{fmt.Sprintf("Error fetching hosts: %v", err)}, cobra.ShellCompDirectiveError
 	}
@@ -351,8 +354,9 @@ func HostNetworkAdapterCompletion(configFlags *genericclioptions.ConfigFlags, pr
 	}
 
 	// Get available hosts
-	providerClient := inventory.NewProviderClient(configFlags, provider, inventoryURL)
-	data, err := providerClient.GetHosts(4)
+	// Note: Completion functions use insecure=false as a safe default
+	providerClient := inventory.NewProviderClientWithInsecure(configFlags, provider, inventoryURL, false)
+	data, err := providerClient.GetHosts(context.Background(), 4)
 	if err != nil {
 		return []string{fmt.Sprintf("Error fetching hosts: %v", err)}, cobra.ShellCompDirectiveError
 	}

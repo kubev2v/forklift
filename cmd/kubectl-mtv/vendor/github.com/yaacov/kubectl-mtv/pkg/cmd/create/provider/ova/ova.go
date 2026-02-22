@@ -3,6 +3,7 @@ package ova
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +29,37 @@ func validateProviderOptions(options providerutil.ProviderOptions) error {
 		return fmt.Errorf("provider URL is required")
 	}
 
+	// Validate that OVA URLs are in NFS format (server:path)
+	// OVA providers only support NFS URLs, not file://, http://, or https://
+	if !isValidNFSURL(options.URL) {
+		return fmt.Errorf("OVA provider URL must be in NFS format (server:path), e.g., 'nfs.example.com:/path/to/ova-files' or '192.168.1.100:/exports/vm-images'")
+	}
+
 	return nil
+}
+
+// isValidNFSURL checks if the URL is in valid NFS format (server:path)
+func isValidNFSURL(url string) bool {
+	// NFS URLs should not have protocol prefixes and should contain a colon
+	// Examples: "nfs.example.com:/path" or "192.168.1.100:/exports/vms"
+
+	// Reject URLs with protocol prefixes
+	if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") ||
+		strings.HasPrefix(url, "file://") || strings.HasPrefix(url, "nfs://") {
+		return false
+	}
+
+	// Must contain exactly one colon and have content on both sides
+	parts := strings.Split(url, ":")
+	if len(parts) != 2 {
+		return false
+	}
+
+	// Both server and path parts must be non-empty
+	server := strings.TrimSpace(parts[0])
+	path := strings.TrimSpace(parts[1])
+
+	return server != "" && path != ""
 }
 
 // cleanupCreatedResources deletes any resources created during the provider creation process
