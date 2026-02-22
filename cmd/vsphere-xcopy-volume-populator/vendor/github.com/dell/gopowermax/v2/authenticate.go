@@ -1,5 +1,5 @@
 /*
- Copyright © 2020 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2020-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -37,17 +37,25 @@ type Client struct {
 	version        string
 	symmetrixID    string
 	contextTimeout time.Duration
+	opts           clientOpts
+	headers        clientHeaders
+}
+
+type clientOpts struct {
+	logResponseTimes bool
+}
+
+type clientHeaders struct {
+	accept          string
+	contentType     string
+	applicationType string
 }
 
 var (
-	errNilReponse    = errors.New("nil response from API")
-	errBodyRead      = errors.New("error reading body")
-	errNoLink        = errors.New("Error: problem finding link")
-	debug, _         = strconv.ParseBool(os.Getenv("X_CSI_POWERMAX_DEBUG"))
-	accHeader        string
-	conHeader        string
-	applicationType  string
-	logResponseTimes bool
+	errNilReponse = errors.New("nil response from API")
+	errBodyRead   = errors.New("error reading body")
+	errNoLink     = errors.New("Error: problem finding link")
+	debug, _      = strconv.ParseBool(os.Getenv("X_CSI_POWERMAX_DEBUG"))
 	// PmaxTimeout is the timeout value for pmax calls.
 	// If Unisphere fails to answer within this period, an error will be returned.
 	defaultPmaxTimeout = 10 * time.Minute
@@ -139,7 +147,7 @@ func NewClientWithArgs(
 	useCerts bool,
 	certFile string,
 ) (client Pmax, err error) {
-	logResponseTimes, _ = strconv.ParseBool(os.Getenv("X_CSI_POWERMAX_RESPONSE_TIMES"))
+	setLogResponseTimes, _ := strconv.ParseBool(os.Getenv("X_CSI_POWERMAX_RESPONSE_TIMES"))
 
 	contextTimeout := defaultPmaxTimeout
 	if timeoutStr := os.Getenv("X_CSI_UNISPHERE_TIMEOUT"); timeoutStr != "" {
@@ -157,7 +165,7 @@ func NewClientWithArgs(
 		"useCerts":         useCerts,
 		"version":          DefaultAPIVersion,
 		"debug":            debug,
-		"logResponseTimes": logResponseTimes,
+		"logResponseTimes": setLogResponseTimes,
 	}
 
 	doLog(log.WithFields(fields).Debug, "pmax client init")
@@ -174,17 +182,13 @@ func NewClientWithArgs(
 		CertFile: certFile,
 	}
 
-	if applicationType != "" {
-		log.Debug(fmt.Sprintf("Application type already set to: %s, Resetting it to: %s",
-			applicationType, applicationName))
-	}
-	applicationType = applicationName
-
 	ac, err := api.New(endpoint, opts, debug)
 	if err != nil {
 		doLog(log.WithError(err).Error, "Unable to create HTTP client")
 		return nil, err
 	}
+
+	acceptHeader := fmt.Sprintf("%s;version=%s", api.HeaderValContentTypeJSON, DefaultAPIVersion)
 
 	client = &Client{
 		api: ac,
@@ -194,11 +198,15 @@ func NewClientWithArgs(
 		allowedArrays:  []string{},
 		version:        DefaultAPIVersion,
 		contextTimeout: contextTimeout,
+		opts: clientOpts{
+			logResponseTimes: setLogResponseTimes,
+		},
+		headers: clientHeaders{
+			accept:          acceptHeader,
+			contentType:     acceptHeader,
+			applicationType: applicationName,
+		},
 	}
-
-	accHeader = api.HeaderValContentTypeJSON
-	accHeader = fmt.Sprintf("%s;version=%s", api.HeaderValContentTypeJSON, DefaultAPIVersion)
-	conHeader = accHeader
 
 	return client, nil
 }
@@ -218,11 +226,11 @@ func (c *Client) SetContextTimeout(timeout time.Duration) Pmax {
 
 func (c *Client) getDefaultHeaders() map[string]string {
 	headers := make(map[string]string)
-	headers["Accept"] = accHeader
-	if applicationType != "" {
-		headers["Application-Type"] = applicationType
+	headers["Accept"] = c.headers.accept
+	if c.headers.applicationType != "" {
+		headers["Application-Type"] = c.headers.applicationType
 	}
-	headers["Content-Type"] = conHeader
+	headers["Content-Type"] = c.headers.contentType
 	basicAuthString := basicAuth(c.configConnect.Username, c.configConnect.Password)
 	headers["Authorization"] = "Basic " + basicAuthString
 	if c.symmetrixID != "" {

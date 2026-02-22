@@ -12,6 +12,7 @@ import (
 
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/output"
+	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
 // extractProviderName gets the provider name from the host spec
@@ -99,8 +100,8 @@ func createHostItem(host unstructured.Unstructured, useUTC bool) map[string]inte
 	return item
 }
 
-// List lists hosts
-func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace, outputFormat string, hostName string, useUTC bool) error {
+// ListHosts lists hosts without watch functionality
+func ListHosts(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace, outputFormat string, hostName string, useUTC bool) error {
 	dynamicClient, err := client.GetDynamicClient(configFlags)
 	if err != nil {
 		return fmt.Errorf("failed to get client: %v", err)
@@ -192,12 +193,19 @@ func printHostTable(items []map[string]interface{}) error {
 	printer := output.NewTablePrinter()
 
 	// Create headers using Header struct
+	colorFuncs := map[string]func(string) string{
+		"STATUS": output.ColorizeStatus,
+	}
 	var tableHeaders []output.Header
 	for _, header := range headers {
-		tableHeaders = append(tableHeaders, output.Header{
+		h := output.Header{
 			DisplayName: header,
 			JSONPath:    strings.ToLower(strings.ReplaceAll(header, " ", "")),
-		})
+		}
+		if cf, ok := colorFuncs[header]; ok {
+			h.ColorFunc = cf
+		}
+		tableHeaders = append(tableHeaders, h)
 	}
 
 	printer.WithHeaders(tableHeaders...)
@@ -216,4 +224,11 @@ func printHostTable(items []map[string]interface{}) error {
 	}
 
 	return printer.Print()
+}
+
+// List lists hosts with optional watch mode
+func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace string, watchMode bool, outputFormat string, hostName string, useUTC bool) error {
+	return watch.WrapWithWatch(watchMode, outputFormat, func() error {
+		return ListHosts(ctx, configFlags, namespace, outputFormat, hostName, useUTC)
+	}, watch.DefaultInterval)
 }

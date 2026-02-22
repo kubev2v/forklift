@@ -31,61 +31,42 @@ func parseProviderReference(providerRef, defaultNamespace string) (name, namespa
 	return name, namespace
 }
 
-// validateNetworkPairs validates network mapping pairs for duplicate targets.
-// Network mapping constraints:
-// - Pod networking ("default") can only be mapped once
-// - Specific NADs (Network Attachment Definitions) can only be mapped once
-// - "ignored" targets can be used multiple times (valid for unused networks)
-func validateNetworkPairs(pairStr, defaultNamespace string) error {
+// validateNetworkPairsTargets validates network mapping pairs for duplicate pod network targets.
+// This is a pre-validation that can be done before resolution.
+// Network mapping constraints for targets:
+// - Pod networking ("default") can only be mapped once (only one source can use pod networking)
+// - NAD targets can be used multiple times (multiple sources can map to the same NAD)
+// - "ignored" targets can be used multiple times
+func validateNetworkPairsTargets(pairStr string) error {
 	if pairStr == "" {
 		return nil
 	}
 
-	// Track target networks to detect duplicates
-	targetsSeen := make(map[string]bool)
+	// Track if pod networking (default) has already been used
+	podNetworkUsed := false
+
 	pairList := strings.Split(pairStr, ",")
 
-	for _, pairStr := range pairList {
-		pairStr = strings.TrimSpace(pairStr)
-		if pairStr == "" {
+	for _, pair := range pairList {
+		pair = strings.TrimSpace(pair)
+		if pair == "" {
 			continue
 		}
 
-		parts := strings.SplitN(pairStr, ":", 2)
+		parts := strings.SplitN(pair, ":", 2)
 		if len(parts) != 2 {
 			continue // Skip malformed pairs, let parseNetworkPairs handle the error
 		}
 
 		targetPart := strings.TrimSpace(parts[1])
 
-		// Skip validation for ignored targets (they can be used multiple times)
-		if strings.ToLower(targetPart) == "ignored" {
-			continue
-		}
-
-		// Normalize target name for comparison
-		var normalizedTarget string
-		if strings.Contains(targetPart, "/") {
-			// namespace/name format - use as-is but normalize to lowercase
-			normalizedTarget = strings.ToLower(targetPart)
-		} else if targetPart == "default" {
-			// Pod networking
-			normalizedTarget = "default"
-		} else {
-			// Name-only format, normalize with default namespace
-			normalizedTarget = strings.ToLower(fmt.Sprintf("%s/%s", defaultNamespace, targetPart))
-		}
-
-		// Check for duplicate targets
-		if targetsSeen[normalizedTarget] {
-			// Provide specific error messages for common cases
-			if targetPart == "default" {
-				return fmt.Errorf("invalid network mapping: Pod network ('default') can only be mapped once. Found duplicate mapping to 'default' in '%s'. Use 'source:ignored' for additional sources that don't need network access", pairStr)
+		// Check for duplicate pod networking target
+		if targetPart == "default" {
+			if podNetworkUsed {
+				return fmt.Errorf("invalid network mapping: Pod network ('default') can only be mapped once. Found duplicate mapping to 'default' in '%s'. Use 'source:ignored' for additional sources that don't need network access", pair)
 			}
-			return fmt.Errorf("invalid network mapping: Target network '%s' can only be mapped once. Found duplicate mapping to '%s' in '%s'. Use 'source:ignored' for sources that don't need this network or map to different targets", targetPart, targetPart, pairStr)
+			podNetworkUsed = true
 		}
-
-		targetsSeen[normalizedTarget] = true
 	}
 
 	return nil
@@ -95,17 +76,25 @@ func validateNetworkPairs(pairStr, defaultNamespace string) error {
 // If namespace is omitted, the provided defaultNamespace will be used
 // Special target values: "default" for pod networking, "ignored" to ignore the source network
 func parseNetworkPairs(ctx context.Context, pairStr, defaultNamespace string, configFlags *genericclioptions.ConfigFlags, sourceProvider, inventoryURL string) ([]forkliftv1beta1.NetworkPair, error) {
+	return parseNetworkPairsWithInsecure(ctx, pairStr, defaultNamespace, configFlags, sourceProvider, inventoryURL, false)
+}
+
+// parseNetworkPairsWithInsecure parses network pairs with optional insecure TLS skip verification
+func parseNetworkPairsWithInsecure(ctx context.Context, pairStr, defaultNamespace string, configFlags *genericclioptions.ConfigFlags, sourceProvider, inventoryURL string, insecureSkipTLS bool) ([]forkliftv1beta1.NetworkPair, error) {
 	if pairStr == "" {
 		return nil, nil
 	}
 
-	// Validate network pairs for duplicate targets before processing
-	if err := validateNetworkPairs(pairStr, defaultNamespace); err != nil {
+	// Validate target constraints before processing (pod network can only be mapped once)
+	if err := validateNetworkPairsTargets(pairStr); err != nil {
 		return nil, err
 	}
 
 	var pairs []forkliftv1beta1.NetworkPair
 	pairList := strings.Split(pairStr, ",")
+
+	// Track source network IDs to detect duplicates
+	sourceIDsSeen := make(map[string]string) // ID -> source name (for error messages)
 
 	for _, pairStr := range pairList {
 		pairStr = strings.TrimSpace(pairStr)
@@ -122,9 +111,17 @@ func parseNetworkPairs(ctx context.Context, pairStr, defaultNamespace string, co
 		targetPart := strings.TrimSpace(parts[1])
 
 		// Resolve source network name to ID
-		sourceNetworkRefs, err := resolveNetworkNameToID(ctx, configFlags, sourceProvider, defaultNamespace, inventoryURL, sourceName)
+		sourceNetworkRefs, err := resolveNetworkNameToIDWithInsecure(ctx, configFlags, sourceProvider, defaultNamespace, inventoryURL, sourceName, insecureSkipTLS)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve source network '%s': %v", sourceName, err)
+		}
+
+		// Check for duplicate source network IDs
+		for _, sourceRef := range sourceNetworkRefs {
+			if existingName, exists := sourceIDsSeen[sourceRef.ID]; exists {
+				return nil, fmt.Errorf("invalid network mapping: Source network ID '%s' is mapped multiple times (via '%s' and '%s'). Each source network can only be mapped once", sourceRef.ID, existingName, sourceName)
+			}
+			sourceIDsSeen[sourceRef.ID] = sourceName
 		}
 
 		// Parse target part which can be just a name or namespace/name
@@ -178,8 +175,8 @@ func parseNetworkPairs(ctx context.Context, pairStr, defaultNamespace string, co
 	return pairs, nil
 }
 
-// createNetworkMapping creates a new network mapping
-func createNetworkMapping(configFlags *genericclioptions.ConfigFlags, name, namespace, sourceProvider, targetProvider, networkPairs, inventoryURL string) error {
+// createNetworkMappingWithInsecure creates a new network mapping with optional insecure TLS skip verification
+func createNetworkMappingWithInsecure(configFlags *genericclioptions.ConfigFlags, name, namespace, sourceProvider, targetProvider, networkPairs, inventoryURL string, insecureSkipTLS bool) error {
 	dynamicClient, err := client.GetDynamicClient(configFlags)
 	if err != nil {
 		return fmt.Errorf("failed to get client: %v", err)
@@ -192,7 +189,7 @@ func createNetworkMapping(configFlags *genericclioptions.ConfigFlags, name, name
 	// Parse network pairs if provided
 	var mappingPairs []forkliftv1beta1.NetworkPair
 	if networkPairs != "" {
-		mappingPairs, err = parseNetworkPairs(context.TODO(), networkPairs, namespace, configFlags, sourceProvider, inventoryURL)
+		mappingPairs, err = parseNetworkPairsWithInsecure(context.TODO(), networkPairs, namespace, configFlags, sourceProvider, inventoryURL, insecureSkipTLS)
 		if err != nil {
 			return fmt.Errorf("failed to parse network pairs: %v", err)
 		}
