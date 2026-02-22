@@ -3,7 +3,6 @@ package inventory
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -12,18 +11,16 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
-// ListDisks queries the provider's disk inventory and displays the results
-func ListDisks(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
-	if watchMode {
-		return watch.Watch(func() error {
-			return listDisksOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
-		}, 10*time.Second)
-	}
+// ListDisksWithInsecure queries the provider's disk inventory with optional insecure TLS skip verification
+func ListDisksWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
+	sq := watch.NewSafeQuery(query)
 
-	return listDisksOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return watch.WrapWithWatchAndQuery(watchMode, outputFormat, func() error {
+		return listDisksOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, sq.Get(), insecureSkipTLS)
+	}, watch.DefaultInterval, sq.Set, query)
 }
 
-func listDisksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listDisksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -31,7 +28,7 @@ func listDisksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Confi
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to verify disk support
 	providerType, err := providerClient.GetProviderType()
@@ -50,6 +47,13 @@ func listDisksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Confi
 			{DisplayName: "SIZE", JSONPath: "sizeHuman"},
 			{DisplayName: "VM-COUNT", JSONPath: "vmCount"},
 		}
+	case "hyperv":
+		defaultHeaders = []output.Header{
+			{DisplayName: "NAME", JSONPath: "name"},
+			{DisplayName: "ID", JSONPath: "id"},
+			{DisplayName: "SIZE", JSONPath: "provisionedSizeHuman"},
+			{DisplayName: "PATH", JSONPath: "filePath"},
+		}
 	default:
 		defaultHeaders = []output.Header{
 			{DisplayName: "NAME", JSONPath: "name"},
@@ -58,7 +62,7 @@ func listDisksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Confi
 			{DisplayName: "SIZE", JSONPath: "provisionedSizeHuman"},
 			{DisplayName: "ACTUAL-SIZE", JSONPath: "actualSizeHuman"},
 			{DisplayName: "TYPE", JSONPath: "storageType"},
-			{DisplayName: "STATUS", JSONPath: "status"},
+			{DisplayName: "STATUS", JSONPath: "status", ColorFunc: output.ColorizeStatus},
 		}
 	}
 
@@ -66,11 +70,13 @@ func listDisksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Confi
 	var data interface{}
 	switch providerType {
 	case "ovirt":
-		data, err = providerClient.GetDisks(4)
+		data, err = providerClient.GetDisks(ctx, 4)
 	case "openstack":
-		data, err = providerClient.GetVolumes(4)
+		data, err = providerClient.GetVolumes(ctx, 4)
 	case "ova":
-		data, err = providerClient.GetOVAFiles(4)
+		data, err = providerClient.GetOVAFiles(ctx, 4)
+	case "hyperv":
+		data, err = providerClient.GetDisks(ctx, 4)
 	default:
 		return fmt.Errorf("provider type '%s' does not support disk inventory", providerType)
 	}
@@ -79,8 +85,8 @@ func listDisksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Confi
 		return fmt.Errorf("failed to get disks from provider: %v", err)
 	}
 
-	// Process data to add human-readable sizes for oVirt
-	if providerType == "ovirt" {
+	// Process data to add human-readable sizes for oVirt and HyperV
+	if providerType == "ovirt" || providerType == "hyperv" {
 		data = addHumanReadableSizes(data)
 	}
 

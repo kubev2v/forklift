@@ -8,7 +8,7 @@ import (
 )
 
 // NewDescribeCmd creates the describe command with all its subcommands
-func NewDescribeCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalConfig func() get.GlobalConfigGetter) *cobra.Command {
+func NewDescribeCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig get.GlobalConfigGetter) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "describe",
 		Short:        "Describe resources",
@@ -16,10 +16,21 @@ func NewDescribeCmd(kubeConfigFlags *genericclioptions.ConfigFlags, getGlobalCon
 		SilenceUsage: true,
 	}
 
-	cmd.AddCommand(NewPlanCmd(kubeConfigFlags, getGlobalConfig))
-	cmd.AddCommand(NewHostCmd(kubeConfigFlags, getGlobalConfig))
-	cmd.AddCommand(NewHookCmd(kubeConfigFlags, getGlobalConfig))
-	cmd.AddCommand(NewMappingCmd(kubeConfigFlags, getGlobalConfig))
+	planCmd := NewPlanCmd(kubeConfigFlags, globalConfig)
+	planCmd.Aliases = []string{"plans"}
+	cmd.AddCommand(planCmd)
+
+	hostCmd := NewHostCmd(kubeConfigFlags, globalConfig)
+	hostCmd.Aliases = []string{"hosts"}
+	cmd.AddCommand(hostCmd)
+
+	hookCmd := NewHookCmd(kubeConfigFlags, globalConfig)
+	hookCmd.Aliases = []string{"hooks"}
+	cmd.AddCommand(hookCmd)
+
+	mappingCmd := NewMappingCmd(globalConfig)
+	mappingCmd.Aliases = []string{"mappings"}
+	cmd.AddCommand(mappingCmd)
 
 	return cmd
 }

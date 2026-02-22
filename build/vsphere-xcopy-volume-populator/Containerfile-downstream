@@ -15,7 +15,7 @@ USER 1001
 
 RUN make vmkfstools-wrapper
 
-FROM registry.redhat.io/ubi9-minimal:9.6-1752587672
+FROM registry.redhat.io/ubi9-minimal:9.7-1771346502
 
 COPY --from=builder /src/cmd/vsphere-xcopy-volume-populator/bin/vsphere-xcopy-volume-populator \
     /bin/vsphere-xcopy-volume-populator

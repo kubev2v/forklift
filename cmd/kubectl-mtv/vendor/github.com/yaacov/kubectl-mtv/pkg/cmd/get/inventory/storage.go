@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -13,18 +12,16 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
-// ListStorage queries the provider's storage inventory and displays the results
-func ListStorage(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
-	if watchMode {
-		return watch.Watch(func() error {
-			return listStorageOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
-		}, 10*time.Second)
-	}
+// ListStorageWithInsecure queries the provider's storage inventory and displays the results with optional insecure TLS skip verification
+func ListStorageWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
+	sq := watch.NewSafeQuery(query)
 
-	return listStorageOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return watch.WrapWithWatchAndQuery(watchMode, outputFormat, func() error {
+		return listStorageOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, sq.Get(), insecureSkipTLS)
+	}, watch.DefaultInterval, sq.Set, query)
 }
 
-func listStorageOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listStorageOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -32,7 +29,7 @@ func listStorageOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Con
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to determine which storage resource to fetch
 	providerType, err := providerClient.GetProviderType()
@@ -47,8 +44,15 @@ func listStorageOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Con
 		defaultHeaders = []output.Header{
 			{DisplayName: "NAME", JSONPath: "name"},
 			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "DEFAULT", JSONPath: "object.metadata.annotations[storageclass.kubernetes.io/is-default-class]"},
-			{DisplayName: "VIRT-DEFAULT", JSONPath: "object.metadata.annotations[storageclass.kubevirt.io/is-default-virt-class]"},
+			{DisplayName: "DEFAULT", JSONPath: "object.metadata.annotations[storageclass.kubernetes.io/is-default-class]", ColorFunc: output.ColorizeBooleanString},
+			{DisplayName: "VIRT-DEFAULT", JSONPath: "object.metadata.annotations[storageclass.kubevirt.io/is-default-virt-class]", ColorFunc: output.ColorizeBooleanString},
+		}
+	case "ec2":
+		defaultHeaders = []output.Header{
+			{DisplayName: "TYPE", JSONPath: "type"},
+			{DisplayName: "DESCRIPTION", JSONPath: "description"},
+			{DisplayName: "MAX-IOPS", JSONPath: "maxIOPS"},
+			{DisplayName: "MAX-THROUGHPUT", JSONPath: "maxThroughput"},
 		}
 	default:
 		defaultHeaders = []output.Header{
@@ -57,7 +61,7 @@ func listStorageOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Con
 			{DisplayName: "TYPE", JSONPath: "type"},
 			{DisplayName: "CAPACITY", JSONPath: "capacityHuman"},
 			{DisplayName: "FREE", JSONPath: "freeHuman"},
-			{DisplayName: "MAINTENANCE", JSONPath: "maintenance"},
+			{DisplayName: "MAINTENANCE", JSONPath: "maintenance", ColorFunc: output.ColorizeBooleanString},
 		}
 	}
 
@@ -65,22 +69,29 @@ func listStorageOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Con
 	var data interface{}
 	switch providerType {
 	case "ovirt":
-		data, err = providerClient.GetStorageDomains(4)
+		data, err = providerClient.GetStorageDomains(ctx, 4)
 	case "vsphere":
-		data, err = providerClient.GetDatastores(4)
+		data, err = providerClient.GetDatastores(ctx, 4)
 	case "ova":
-		data, err = providerClient.GetResourceCollection("storages", 4)
+		data, err = providerClient.GetResourceCollection(ctx, "storages", 4)
 	case "openstack":
-		data, err = providerClient.GetVolumeTypes(4)
+		data, err = providerClient.GetVolumeTypes(ctx, 4)
 	case "openshift":
-		data, err = providerClient.GetStorageClasses(4)
+		data, err = providerClient.GetStorageClasses(ctx, 4)
+	case "ec2":
+		data, err = providerClient.GetResourceCollection(ctx, "storages", 4)
 	default:
 		// For other providers, use generic storage resource
-		data, err = providerClient.GetResourceCollection("storages", 4)
+		data, err = providerClient.GetResourceCollection(ctx, "storages", 4)
 	}
 
 	if err != nil {
 		return fmt.Errorf("failed to fetch storage inventory: %v", err)
+	}
+
+	// Extract objects from EC2 envelope
+	if providerType == "ec2" {
+		data = ExtractEC2Objects(data)
 	}
 
 	// Verify data is an array

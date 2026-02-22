@@ -5,9 +5,9 @@ package parser
 
 import __yyfmt__ "fmt"
 
-// Global variables for the parser
-//
 //line parser.y:2
+
+// Global variables for the parser
 var parseResult *Node
 var parseError error
 var currentLexer *Lexer

@@ -134,29 +134,7 @@ func Describe(configFlags *genericclioptions.ConfigFlags, name, namespace string
 
 		// Conditions
 		if conditions, found, _ := unstructured.NestedSlice(hook.Object, "status", "conditions"); found {
-			fmt.Printf("%s\n", output.Bold("Conditions:"))
-			for _, condition := range conditions {
-				if condMap, ok := condition.(map[string]interface{}); ok {
-					condType, _ := condMap["type"].(string)
-					condStatus, _ := condMap["status"].(string)
-					reason, _ := condMap["reason"].(string)
-					message, _ := condMap["message"].(string)
-					lastTransitionTime, _ := condMap["lastTransitionTime"].(string)
-
-					fmt.Printf("  %s: %s", output.Bold(condType), output.ColorizeStatus(condStatus))
-					if reason != "" {
-						fmt.Printf(" (%s)", reason)
-					}
-					fmt.Println()
-
-					if message != "" {
-						fmt.Printf("    %s\n", message)
-					}
-					if lastTransitionTime != "" {
-						fmt.Printf("    Last Transition: %s\n", lastTransitionTime)
-					}
-				}
-			}
+			output.PrintConditions(conditions)
 		}
 
 		// Other status fields
