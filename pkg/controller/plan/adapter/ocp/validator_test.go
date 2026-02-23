@@ -5,6 +5,7 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -98,29 +99,7 @@ func newFakeClient(objs ...runtime.Object) *fake.ClientBuilder {
 	return fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...)
 }
 
-func TestDuplicateNAD_NilNetworkMap(t *testing.T) {
-	vm := &cnv.VirtualMachine{
-		ObjectMeta: metav1.ObjectMeta{Name: "test-vm", Namespace: "test-ns"},
-	}
-	client := newFakeClient(vm).Build()
-
-	validator := &Validator{
-		log:          logging.WithName("test").WithValues("test", "dup-nad"),
-		sourceClient: client,
-		Context: &plancontext.Context{
-			Plan: &api.Plan{},
-		},
-	}
-	ok, err := validator.DuplicateNAD(ref.Ref{Name: "test-vm", Namespace: "test-ns"})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if ok {
-		t.Errorf("expected ok=false (zero-value return when map is nil), got true")
-	}
-}
-
-func TestDuplicateNAD_NoDuplicates(t *testing.T) {
+func TestNICNetworkRefs_NoDuplicates(t *testing.T) {
 	vm := &cnv.VirtualMachine{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-vm", Namespace: "test-ns"},
 		Spec: cnv.VirtualMachineSpec{
@@ -153,20 +132,28 @@ func TestDuplicateNAD_NoDuplicates(t *testing.T) {
 	}
 
 	validator := &Validator{
-		log:          logging.WithName("test").WithValues("test", "dup-nad"),
+		log:          logging.WithName("test").WithValues("test", "nic-refs"),
 		sourceClient: client,
 		Context:      &plancontext.Context{Plan: plan},
 	}
-	ok, err := validator.DuplicateNAD(ref.Ref{Name: "test-vm", Namespace: "test-ns"})
+	nicRefs, err := validator.NICNetworkRefs(ref.Ref{Name: "test-vm", Namespace: "test-ns"})
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if !ok {
-		t.Errorf("expected ok=true (no duplicates), got false")
+	if len(nicRefs) != 2 {
+		t.Fatalf("expected 2 NIC refs, got %d", len(nicRefs))
+	}
+
+	foundNadDup, foundPodDup := planbase.ValidateNetworkDuplicates(nicRefs, plan.Referenced.Map.Network)
+	if foundNadDup {
+		t.Errorf("expected no NAD duplicates, got foundNadDup=true")
+	}
+	if foundPodDup {
+		t.Errorf("expected no pod duplicates, got foundPodDup=true")
 	}
 }
 
-func TestDuplicateNAD_TwoNICsSameNAD(t *testing.T) {
+func TestNICNetworkRefs_TwoNICsSameNAD(t *testing.T) {
 	vm := &cnv.VirtualMachine{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-vm", Namespace: "test-ns"},
 		Spec: cnv.VirtualMachineSpec{
@@ -199,21 +186,22 @@ func TestDuplicateNAD_TwoNICsSameNAD(t *testing.T) {
 	}
 
 	validator := &Validator{
-		log:          logging.WithName("test").WithValues("test", "dup-nad"),
+		log:          logging.WithName("test").WithValues("test", "nic-refs"),
 		sourceClient: client,
 		Context:      &plancontext.Context{Plan: plan},
 	}
-	ok, err := validator.DuplicateNAD(ref.Ref{Name: "test-vm", Namespace: "test-ns"})
+	nicRefs, err := validator.NICNetworkRefs(ref.Ref{Name: "test-vm", Namespace: "test-ns"})
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if ok {
-		t.Errorf("expected ok=false (two NICs map to same NAD), got true")
+
+	foundNadDup, _ := planbase.ValidateNetworkDuplicates(nicRefs, plan.Referenced.Map.Network)
+	if !foundNadDup {
+		t.Errorf("expected NAD duplicate detected, got foundNadDup=false")
 	}
 }
 
-func TestDuplicateNAD_TwoNICsSameSourceNetwork(t *testing.T) {
-	// Two NICs on the same source network → both map to same destination NAD
+func TestNICNetworkRefs_TwoNICsSameSourceNetwork(t *testing.T) {
 	vm := &cnv.VirtualMachine{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-vm", Namespace: "test-ns"},
 		Spec: cnv.VirtualMachineSpec{
@@ -242,22 +230,22 @@ func TestDuplicateNAD_TwoNICsSameSourceNetwork(t *testing.T) {
 	}
 
 	validator := &Validator{
-		log:          logging.WithName("test").WithValues("test", "dup-nad"),
+		log:          logging.WithName("test").WithValues("test", "nic-refs"),
 		sourceClient: client,
 		Context:      &plancontext.Context{Plan: plan},
 	}
-	ok, err := validator.DuplicateNAD(ref.Ref{Name: "test-vm", Namespace: "test-ns"})
+	nicRefs, err := validator.NICNetworkRefs(ref.Ref{Name: "test-vm", Namespace: "test-ns"})
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if ok {
-		t.Errorf("expected ok=false (two NICs on same source network → same NAD), got true")
+
+	foundNadDup, _ := planbase.ValidateNetworkDuplicates(nicRefs, plan.Referenced.Map.Network)
+	if !foundNadDup {
+		t.Errorf("expected NAD duplicate detected (two NICs on same source network), got foundNadDup=false")
 	}
 }
 
-func TestDuplicateNAD_VMOnlyUsesOneOfDuplicateMappings(t *testing.T) {
-	// Plan has two source networks mapping to the same NAD, but the VM only uses one.
-	// This should pass — it's per-VM, not per-plan.
+func TestNICNetworkRefs_VMOnlyUsesOneOfDuplicateMappings(t *testing.T) {
 	vm := &cnv.VirtualMachine{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-vm", Namespace: "test-ns"},
 		Spec: cnv.VirtualMachineSpec{
@@ -289,20 +277,22 @@ func TestDuplicateNAD_VMOnlyUsesOneOfDuplicateMappings(t *testing.T) {
 	}
 
 	validator := &Validator{
-		log:          logging.WithName("test").WithValues("test", "dup-nad"),
+		log:          logging.WithName("test").WithValues("test", "nic-refs"),
 		sourceClient: client,
 		Context:      &plancontext.Context{Plan: plan},
 	}
-	ok, err := validator.DuplicateNAD(ref.Ref{Name: "test-vm", Namespace: "test-ns"})
+	nicRefs, err := validator.NICNetworkRefs(ref.Ref{Name: "test-vm", Namespace: "test-ns"})
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if !ok {
-		t.Errorf("expected ok=true (VM only uses one of the duplicate mappings), got false")
+
+	foundNadDup, _ := planbase.ValidateNetworkDuplicates(nicRefs, plan.Referenced.Map.Network)
+	if foundNadDup {
+		t.Errorf("expected no NAD duplicate (VM only uses one of the duplicate mappings), got foundNadDup=true")
 	}
 }
 
-func TestDuplicateNAD_SkipsPodAndIgnored(t *testing.T) {
+func TestNICNetworkRefs_PodAndMultus(t *testing.T) {
 	vm := &cnv.VirtualMachine{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-vm", Namespace: "test-ns"},
 		Spec: cnv.VirtualMachineSpec{
@@ -335,39 +325,37 @@ func TestDuplicateNAD_SkipsPodAndIgnored(t *testing.T) {
 	}
 
 	validator := &Validator{
-		log:          logging.WithName("test").WithValues("test", "dup-nad"),
+		log:          logging.WithName("test").WithValues("test", "nic-refs"),
 		sourceClient: client,
 		Context:      &plancontext.Context{Plan: plan},
 	}
-	ok, err := validator.DuplicateNAD(ref.Ref{Name: "test-vm", Namespace: "test-ns"})
+	nicRefs, err := validator.NICNetworkRefs(ref.Ref{Name: "test-vm", Namespace: "test-ns"})
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if !ok {
-		t.Errorf("expected ok=true (pod networks should not count), got false")
+	if len(nicRefs) != 2 {
+		t.Fatalf("expected 2 NIC refs (pod + multus), got %d", len(nicRefs))
+	}
+
+	foundNadDup, foundPodDup := planbase.ValidateNetworkDuplicates(nicRefs, plan.Referenced.Map.Network)
+	if foundNadDup {
+		t.Errorf("expected no NAD duplicate (single multus NAD), got foundNadDup=true")
+	}
+	if foundPodDup {
+		t.Errorf("expected no pod duplicate (single pod network), got foundPodDup=true")
 	}
 }
 
-func TestDuplicateNAD_VMNotFound(t *testing.T) {
+func TestNICNetworkRefs_VMNotFound(t *testing.T) {
 	client := newFakeClient().Build()
 
-	plan := &api.Plan{}
-	plan.Referenced.Map.Network = &api.NetworkMap{
-		Spec: api.NetworkMapSpec{
-			Map: []api.NetworkPair{},
-		},
-	}
-
 	validator := &Validator{
-		log:          logging.WithName("test").WithValues("test", "dup-nad"),
+		log:          logging.WithName("test").WithValues("test", "nic-refs"),
 		sourceClient: client,
-		Context:      &plancontext.Context{Plan: plan},
+		Context:      &plancontext.Context{Plan: &api.Plan{}},
 	}
-	ok, err := validator.DuplicateNAD(ref.Ref{Name: "nonexistent", Namespace: "test-ns"})
+	_, err := validator.NICNetworkRefs(ref.Ref{Name: "nonexistent", Namespace: "test-ns"})
 	if err == nil {
 		t.Errorf("expected error for missing VM, got nil")
-	}
-	if ok {
-		t.Errorf("expected ok=false for missing VM, got true")
 	}
 }

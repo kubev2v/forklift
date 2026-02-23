@@ -1,8 +1,6 @@
 package openstack
 
 import (
-	"fmt"
-
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
@@ -158,68 +156,18 @@ func (r *Validator) MigrationType() bool {
 	}
 }
 
-// Validate that no more than one of a VM's networks is mapped to the pod network.
-func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
-	if r.Plan.Referenced.Map.Network == nil {
-		return
-	}
+// NICNetworkRefs returns one source-network ref per VM network attachment.
+func (r *Validator) NICNetworkRefs(vmRef ref.Ref) (refs []ref.Ref, err error) {
 	vm := &model.Workload{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
-
-	mapping := r.Plan.Referenced.Map.Network.Spec.Map
-	podMapped := 0
-	for i := range mapping {
-		mapped := &mapping[i]
-		ref := mapped.Source
-		for _, network := range vm.Networks {
-			if ref.ID == network.ID && mapped.Destination.Type == "Pod" {
-				podMapped++
-			}
-		}
+	refs = make([]ref.Ref, 0, len(vm.Networks))
+	for _, network := range vm.Networks {
+		refs = append(refs, ref.Ref{ID: network.ID})
 	}
-
-	ok = podMapped <= 1
-	return
-}
-
-// Validate that no two VM NICs are mapped to the same Multus NAD.
-func (r *Validator) DuplicateNAD(vmRef ref.Ref) (ok bool, err error) {
-	if r.Plan.Referenced.Map.Network == nil {
-		return
-	}
-	vm := &model.Workload{}
-	err = r.Source.Inventory.Find(vm, vmRef)
-	if err != nil {
-		err = liberr.Wrap(err, "vm", vmRef.String())
-		return
-	}
-
-	mapping := r.Plan.Referenced.Map.Network.Spec.Map
-	nadCount := map[string]int{}
-	for i := range mapping {
-		mapped := &mapping[i]
-		if mapped.Destination.Type != Multus {
-			continue
-		}
-		networkRef := mapped.Source
-		nadKey := fmt.Sprintf("%s/%s", mapped.Destination.Namespace, mapped.Destination.Name)
-		for _, network := range vm.Networks {
-			if networkRef.ID == network.ID {
-				nadCount[nadKey]++
-			}
-		}
-	}
-
-	for _, count := range nadCount {
-		if count > 1 {
-			return
-		}
-	}
-	ok = true
 	return
 }
 
