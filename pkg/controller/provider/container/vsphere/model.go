@@ -1034,7 +1034,7 @@ func isCBTEnabledForDisks(ctkPerDisk map[string]bool, disks []model.Disk) {
 		// then subtract it from the ControllerKey. For example, 16001 → controllerIndex 1 (16001 - 16000).
 		baseKey := (disk.ControllerKey / 100) * 100
 		controllerIndex := disk.ControllerKey - baseKey
-		deviceKey := fmt.Sprintf("%s%d:%d", disk.Bus, controllerIndex, disk.UnitNumber)
+		deviceKey := strings.ToLower(fmt.Sprintf("%s%d:%d", disk.Bus, controllerIndex, disk.UnitNumber))
 
 		if ctkPerDisk[deviceKey] {
 			disk.ChangeTrackingEnabled = true
