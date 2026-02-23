@@ -96,75 +96,24 @@ func (r *Validator) MaintenanceMode(vmRef ref.Ref) (bool, error) {
 	return true, nil
 }
 
-// PodNetwork implements base.Validator
-func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
-	if r.Plan.Referenced.Map.Network == nil {
-		return
-	}
-
+// NICNetworkRefs returns one source-network ref per VM NIC.
+func (r *Validator) NICNetworkRefs(vmRef ref.Ref) (refs []ref.Ref, err error) {
 	vm := &cnv.VirtualMachine{}
 	err = r.sourceClient.Get(context.TODO(), k8sclient.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vm)
 	if err != nil {
-		err = liberr.Wrap(
-			err,
-			VM_NOT_FOUND,
-			"vm",
-			vmRef.String())
+		err = liberr.Wrap(err, VM_NOT_FOUND, "vm", vmRef.String())
 		return
 	}
-
-	podMapped := 0
+	if vm.Spec.Template == nil {
+		return
+	}
+	refs = make([]ref.Ref, 0, len(vm.Spec.Template.Spec.Networks))
 	for _, net := range vm.Spec.Template.Spec.Networks {
 		if net.Pod != nil {
-			pair, found := r.Plan.Referenced.Map.Network.FindNetworkByType(Pod)
-			if found && pair.Destination.Type == Pod {
-				podMapped++
-			}
+			refs = append(refs, ref.Ref{Type: Pod})
 		} else if net.Multus != nil {
 			name, namespace := ocpclient.GetNetworkNameAndNamespace(net.Multus.NetworkName, &vmRef)
-			pair, found := r.Plan.Referenced.Map.Network.FindNetworkByNameAndNamespace(namespace, name)
-			if found && pair.Destination.Type == Pod {
-				podMapped++
-			}
-		}
-	}
-
-	ok = podMapped <= 1
-	return
-}
-
-// DuplicateNAD validates that no two VM NICs are mapped to the same Multus NAD.
-func (r *Validator) DuplicateNAD(vmRef ref.Ref) (ok bool, err error) {
-	if r.Plan.Referenced.Map.Network == nil {
-		return
-	}
-
-	vm := &cnv.VirtualMachine{}
-	err = r.sourceClient.Get(context.TODO(), k8sclient.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vm)
-	if err != nil {
-		err = liberr.Wrap(err, "vm", vmRef.String())
-		return
-	}
-
-	nadCount := map[string]int{}
-	for _, net := range vm.Spec.Template.Spec.Networks {
-		if net.Pod != nil || net.Multus == nil {
-			continue
-		}
-		name, namespace := ocpclient.GetNetworkNameAndNamespace(net.Multus.NetworkName, &vmRef)
-		pair, found := r.Plan.Referenced.Map.Network.FindNetworkByNameAndNamespace(namespace, name)
-		if !found || pair.Destination.Type != Multus {
-			continue
-		}
-		nadKey := fmt.Sprintf("%s/%s", pair.Destination.Namespace, pair.Destination.Name)
-		nadCount[nadKey]++
-	}
-
-	ok = true
-	for _, count := range nadCount {
-		if count > 1 {
-			ok = false
-			break
+			refs = append(refs, ref.Ref{Name: name, Namespace: namespace})
 		}
 	}
 	return
