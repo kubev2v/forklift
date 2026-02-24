@@ -425,16 +425,20 @@ func (c *Conversion) updateDiskPaths(domainXML string) (string, error) {
 		return "", fmt.Errorf("failed to parse domain XML: %w", err)
 	}
 	updatedDisks := []libvirtxml.DomainDisk{}
-	for i, disk := range domain.Devices.Disks {
-		if i >= len(c.Disks) {
-			fmt.Printf("WARNING: disk %d in domain XML but only %d disks available\n", i, len(c.Disks))
+	diskIdx := 0
+	for _, disk := range domain.Devices.Disks {
+		if diskIdx >= len(c.Disks) {
+			fmt.Printf("WARNING: disk %d in domain XML but only %d disks available\n", diskIdx, len(c.Disks))
 			break
 		}
-
-		newPath := c.Disks[i].Link
+		if disk.Device == "cdrom" {
+			continue
+		}
+		newPath := c.Disks[diskIdx].Link
 		if updated := updateDiskSource(&disk, newPath); updated {
 			updatedDisks = append(updatedDisks, disk)
 		}
+		diskIdx++
 	}
 	domain.Devices.Disks = updatedDisks
 
