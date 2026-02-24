@@ -94,13 +94,15 @@ func (h VMHandler) Get(ctx *gin.Context) {
 // REST Resource.
 type VM struct {
 	Resource
-	Object cnv.VirtualMachine `json:"object"`
+	Object   cnv.VirtualMachine          `json:"object"`
+	Instance *cnv.VirtualMachineInstance `json:"instance,omitempty"`
 }
 
 // Set fields with the specified object.
 func (r *VM) With(m *model.VM) {
 	r.Resource.With(&m.Base)
 	r.Object = m.Object
+	r.Instance = m.Instance
 }
 
 // Build self link (URI).

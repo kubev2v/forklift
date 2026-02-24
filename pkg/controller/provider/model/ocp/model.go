@@ -148,12 +148,17 @@ func (m *ClusterInstanceType) With(i *instancetype.VirtualMachineClusterInstance
 // VM
 type VM struct {
 	Base
-	Object cnv.VirtualMachine `sql:""`
+	Object   cnv.VirtualMachine          `sql:""`
+	Instance *cnv.VirtualMachineInstance `sql:""`
 }
 
 func (m *VM) With(v *cnv.VirtualMachine) {
 	m.Base.With(v)
 	m.Object = *v
+}
+
+func (m *VM) WithVMI(vmi *cnv.VirtualMachineInstance) {
+	m.Instance = vmi
 }
 
 // PersistentVolumeClaim
