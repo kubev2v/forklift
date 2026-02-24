@@ -287,7 +287,6 @@ func (c *Customize) runCmd(builder utils.CommandBuilder) error {
 func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) {
 	windowsScriptsPath := filepath.Join(c.appConfig.Workdir, "scripts", "windows")
 	initPath := filepath.Join(windowsScriptsPath, "9999-run-mtv-ps-scripts.bat")
-	restoreScriptPath := filepath.Join(windowsScriptsPath, "9999-restore_config.ps1")
 
 	// Upload scripts to the windows
 	uploadPreserveIpPath := ""
@@ -295,7 +294,6 @@ func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) {
 	uploadPreserveMultipleIpPath := ""
 	if c.appConfig.VirtIoWinLegacyDrivers != "" {
 		initPath = filepath.Join(windowsScriptsPath, "9999-run-mtv-ps-scripts-legacy.bat")
-		restoreScriptPath = filepath.Join(windowsScriptsPath, "9999-restore_config-legacy.ps1")
 
 		if c.appConfig.StaticIPs != "" {
 			networkConfigtemplate := filepath.Join(windowsScriptsPath, "9999-network-config.ps1.tmpl")
@@ -323,9 +321,8 @@ func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) {
 			uploadPreserveMultipleIpPath = c.formatUpload(preserveMultipleNicsPath, WinFirstbootScriptsPath)
 		}
 	}
-	uploadScriptPath := c.formatUpload(restoreScriptPath, WinFirstbootScriptsPath)
 	uploadInitPath := c.formatUpload(initPath, WinFirstbootScriptsPath)
-	cmdBuilder.AddArgs("--upload", uploadScriptPath, uploadPreserveIpPath, uploadInitPath, uploadRemoveDuplicatesPath, uploadPreserveMultipleIpPath)
+	cmdBuilder.AddArgs("--upload", uploadPreserveIpPath, uploadInitPath, uploadRemoveDuplicatesPath, uploadPreserveMultipleIpPath)
 }
 
 func (c *Customize) addWinDynamicScripts(cmdBuilder utils.CommandBuilder, dir string) error {
