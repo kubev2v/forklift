@@ -2,6 +2,7 @@ package flashsystem
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -10,14 +11,22 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/fcutil"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
 	"k8s.io/klog/v2"
 )
 
 // FlashSystemProviderIDPrefix is the standard NAA prefix for IBM LUNs.
 const FlashSystemProviderIDPrefix = "naa.6005076"
 const HostIdKey = "hostId"
+
+const flashCopyMappingNamePrefixLen = 10 // first N characters of source/target used in mapping name
+// defaultFlashCopyRate: 50=2MB/s (very slow), 100=64MB/s, 130=512MB/s, 150=2GB/s. We use 100 for reasonable speed.
+// TODO: Consider which default to use and the impact it has.
+const defaultFlashCopyRate = 100
+
 const HostNameKey = "hostName"
 const HostCreatedKey = "hostCreated"
 
@@ -267,7 +276,113 @@ func (c *FlashSystemAPIClient) GetSystemInfo() (*FlashSystemInfo, error) {
 	return &sysInfo, nil
 }
 
+// FlashCopyMapping represents one entry from lsfcmap (list FlashCopy mappings).
+type FlashCopyMapping struct {
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	SourceVDiskName string `json:"source_vdisk_name"`
+	TargetVDiskName string `json:"target_vdisk_name"`
+	Status          string `json:"status"`
+}
+
+// ListFlashCopyMappings returns all FlashCopy mappings. Used to find an existing mapping by source/target.
+func (c *FlashSystemAPIClient) ListFlashCopyMappings() ([]FlashCopyMapping, error) {
+	respBytes, status, err := c.makeRequest("POST", "/lsfcmap", map[string]string{})
+	if err != nil {
+		return nil, fmt.Errorf("lsfcmap request failed: %w", err)
+	}
+	if status != http.StatusOK {
+		return nil, fmt.Errorf("lsfcmap failed with status %d: %s", status, string(respBytes))
+	}
+	var mappings []FlashCopyMapping
+	if err := json.Unmarshal(respBytes, &mappings); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal lsfcmap response: %w", err)
+	}
+	return mappings, nil
+}
+
+// FindFlashCopyMappingBySourceTarget returns the mapping id for a FlashCopy from sourceName to targetName, or "" if not found.
+func (c *FlashSystemAPIClient) FindFlashCopyMappingBySourceTarget(sourceName, targetName string) (string, error) {
+	mappings, err := c.ListFlashCopyMappings()
+	if err != nil {
+		return "", err
+	}
+	for _, m := range mappings {
+		if m.SourceVDiskName == sourceName && m.TargetVDiskName == targetName {
+			return m.ID, nil
+		}
+	}
+	return "", nil
+}
+
+// CreateFlashCopyMapping creates a FlashCopy mapping from source to target with autodelete enabled.
+func (c *FlashSystemAPIClient) CreateFlashCopyMapping(sourceName, targetName, mappingName string, copyRate int) (mappingID string, statusCode int, err error) {
+	if copyRate <= 0 || copyRate > 150 {
+		copyRate = defaultFlashCopyRate
+	}
+	payload := map[string]interface{}{
+		"source":     sourceName,
+		"target":     targetName,
+		"name":       mappingName,
+		"copyrate":   copyRate,
+		"autodelete": true,
+	}
+	klog.Infof("Creating FlashCopy mapping %s: %s -> %s", mappingName, sourceName, targetName)
+	respBytes, status, err := c.makeRequest("POST", "/mkfcmap", payload)
+	if err != nil {
+		return "", status, fmt.Errorf("failed to create FlashCopy mapping: %w", err)
+	}
+	if status != http.StatusOK {
+		return "", status, fmt.Errorf("mkfcmap failed with status %d: %s", status, string(respBytes))
+	}
+	var result struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(respBytes, &result); err != nil {
+		return "", status, fmt.Errorf("failed to parse mkfcmap response for mapping id: %w", err)
+	}
+	if result.ID == "" {
+		return "", status, fmt.Errorf("mkfcmap response did not contain mapping id: %s", string(respBytes))
+	}
+	klog.Infof("FlashCopy mapping %s created successfully (id=%s)", mappingName, result.ID)
+	return result.ID, status, nil
+}
+
+// PrestartFlashCopyMapping prepares a FlashCopy mapping so it can be started. REST: POST /prestartfcmap/{id}.
+func (c *FlashSystemAPIClient) PrestartFlashCopyMapping(mappingID string) error {
+	path := "/prestartfcmap/" + mappingID
+	payload := map[string]bool{"restore": true}
+	klog.Infof("Preparing FlashCopy mapping id %s", mappingID)
+	respBytes, status, err := c.makeRequest("POST", path, payload)
+	if err != nil {
+		return fmt.Errorf("failed to prepare FlashCopy mapping: %w", err)
+	}
+	if status != http.StatusOK {
+		return fmt.Errorf("prestartfcmap failed with status %d: %s", status, string(respBytes))
+	}
+	klog.Infof("FlashCopy mapping id %s prepared successfully", mappingID)
+	return nil
+}
+
+// StartFlashCopyMapping starts a FlashCopy mapping by id. REST: POST /startfcmap/{id}.
+func (c *FlashSystemAPIClient) StartFlashCopyMapping(mappingID string) error {
+	path := "/startfcmap/" + mappingID
+	klog.Infof("Starting FlashCopy mapping id %s", mappingID)
+	respBytes, status, err := c.makeRequest("POST", path, nil)
+	if err != nil {
+		return fmt.Errorf("failed to start FlashCopy mapping: %w", err)
+	}
+	if status != http.StatusOK {
+		return fmt.Errorf("startfcmap failed with status %d: %s", status, string(respBytes))
+	}
+	klog.Infof("FlashCopy mapping id %s started successfully (autodelete will remove it at 100%%)", mappingID)
+	return nil
+}
+
 // FlashSystemClonner implements the populator.StorageApi interface.
+// It supports RDM copy via FlashCopy (in addition to VMDK/XCOPY). VVol is not implemented yet.
+var _ populator.RDMCapable = &FlashSystemClonner{}
+
 type FlashSystemClonner struct {
 	api *FlashSystemAPIClient
 }
@@ -772,6 +887,171 @@ func (c *FlashSystemClonner) ResolvePVToLUN(pv populator.PersistentVolume) (popu
 	vdisk := vdisks[0]
 	klog.Infof("Found matching volume: '%s' (ID: %s) for PV '%s'", vdisk.Name, vdisk.ID, pv.Name)
 	return c.createLUNFromVDisk(vdisk, pv.VolumeHandle)
+}
+
+// getVDiskByUID returns a volume by its vdisk_UID (NAA without "naa." prefix).
+func (c *FlashSystemClonner) getVDiskByUID(uid string) (*FlashSystemVolume, error) {
+	filterPayload := map[string]string{
+		"filtervalue": fmt.Sprintf("vdisk_UID=%s", uid),
+	}
+	vdisksBytes, status, err := c.api.makeRequest("POST", "/lsvdisk", filterPayload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get vdisk by UID %s: %w", uid, err)
+	}
+	if status != http.StatusOK {
+		return nil, fmt.Errorf("lsvdisk failed with status %d: %s", status, string(vdisksBytes))
+	}
+	var vdisks []FlashSystemVolume
+	if err := json.Unmarshal(vdisksBytes, &vdisks); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal lsvdisk response: %w", err)
+	}
+	if len(vdisks) == 0 {
+		return nil, fmt.Errorf("no volume found with vdisk_UID %s", uid)
+	}
+	if len(vdisks) > 1 {
+		return nil, fmt.Errorf("multiple volumes (%d) found for vdisk_UID %s", len(vdisks), uid)
+	}
+	return &vdisks[0], nil
+}
+
+// RDMCopy performs a copy from an RDM-backed disk to the target PVC volume using FlashCopy.
+func (c *FlashSystemClonner) RDMCopy(vsphereClient vmware.Client, vmId string, sourceVMDKFile string, persistentVolume populator.PersistentVolume, progress chan<- uint64) error {
+	log := klog.Background().WithName("copy-offload").WithName("rdm")
+	ctx := klog.NewContext(context.Background(), log)
+	log.Info("RDM copy started", "vm", vmId)
+
+	backing, err := vsphereClient.GetVMDiskBacking(ctx, vmId, sourceVMDKFile)
+	if err != nil {
+		return fmt.Errorf("failed to get RDM disk backing: %w", err)
+	}
+	if !backing.IsRDM {
+		return fmt.Errorf("disk %s is not an RDM disk", sourceVMDKFile)
+	}
+
+	if backing.LunUuid == "" {
+		return fmt.Errorf("RDM backing has no LunUuid; cannot resolve volume (need vSphere LunUuid for lsvdisk vdisk_UID)")
+	}
+	log.Info("resolving source by LunUuid", "lun_uuid", backing.LunUuid)
+	resolveCtx := klog.NewContext(ctx, log.WithName("resolve"))
+	sourceLUN, err := c.resolveRDMToLUN(resolveCtx, backing.LunUuid)
+	if err != nil {
+		return fmt.Errorf("failed to resolve RDM LunUuid to source LUN: %w", err)
+	}
+
+	targetLUN, err := c.ResolvePVToLUN(persistentVolume)
+	if err != nil {
+		return fmt.Errorf("failed to resolve target volume: %w", err)
+	}
+
+	log.Info("copying via FlashCopy", "source", sourceLUN.Name, "target", targetLUN.Name)
+	progress <- 10
+	flashcopyCtx := klog.NewContext(ctx, log.WithName("flashcopy"))
+	if err := c.performFlashCopy(flashcopyCtx, sourceLUN, targetLUN, progress); err != nil {
+		return err
+	}
+	log.Info("RDM copy completed successfully")
+	return nil
+}
+
+// rdmLunUuidToVdiskUID returns the IBM vdisk_UID from vSphere's RDM LunUuid.
+// VMware encodes LunUuid as: <10 hex prefix><32 hex NAA>[optional suffix]. IBM vdisk_UID is the 32-char NAA.
+func rdmLunUuidToVdiskUID(lunUuid string) (string, error) {
+	vmwareRDMLunUuidNAAOffset := 10
+	vmwareRDMNAALength := 32
+	minLen := vmwareRDMLunUuidNAAOffset + vmwareRDMNAALength
+	if len(lunUuid) < minLen {
+		return "", fmt.Errorf("LunUuid too short for NAA extraction (need %d chars, got %d)", minLen, len(lunUuid))
+	}
+	naa := lunUuid[vmwareRDMLunUuidNAAOffset:minLen]
+	return naa, nil
+}
+
+// resolveRDMToLUN resolves the vSphere RDM LunUuid to an IBM FlashSystem LUN.
+func (c *FlashSystemClonner) resolveRDMToLUN(ctx context.Context, lunUuid string) (populator.LUN, error) {
+	log := klog.FromContext(ctx)
+	vdiskUID, err := rdmLunUuidToVdiskUID(lunUuid)
+	if err != nil {
+		return populator.LUN{}, err
+	}
+	log.V(2).Info("lunUuid to vdisk_UID", "lun_uuid", lunUuid, "vdisk_uid", vdiskUID)
+	vdisk, err := c.getVDiskByUID(vdiskUID)
+	if err != nil {
+		return populator.LUN{}, fmt.Errorf("could not find volume for LunUuid (vdisk_UID %s): %w", vdiskUID, err)
+	}
+	log.Info("resolved LunUuid to volume", "vdisk_uid", vdiskUID, "volume", vdisk.Name)
+	return c.createLUNFromVDisk(*vdisk, "naa."+strings.ToLower(vdisk.VdiskUID))
+}
+
+func firstN(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n]
+}
+
+// performFlashCopy creates a FlashCopy mapping with autodelete and starts it.
+// The target is immediately usable (redirect-on-read); the array will remove the mapping when copy reaches 100%.
+// Mapping name format: mp_<first10_source>_<first10_target>_<uuid> to avoid collisions and stay within IBM's 63-char limit.
+func (c *FlashSystemClonner) performFlashCopy(ctx context.Context, sourceLUN, targetLUN populator.LUN, progress chan<- uint64) error {
+	log := klog.FromContext(ctx)
+	sourceRef := sourceLUN.VolumeHandle
+	if sourceRef == "" {
+		sourceRef = sourceLUN.Name
+	}
+	targetRef := targetLUN.VolumeHandle
+	if targetRef == "" {
+		targetRef = targetLUN.Name
+	}
+	srcPart := firstN(sourceRef, flashCopyMappingNamePrefixLen)
+	tgtPart := firstN(targetRef, flashCopyMappingNamePrefixLen)
+	mappingName := fmt.Sprintf("mp_%s_%s_%s", srcPart, tgtPart, uuid.New().String())
+
+	log.Info("creating FlashCopy mapping", "source", sourceRef, "target", targetRef)
+	mappingID, statusCode, err := c.api.CreateFlashCopyMapping(sourceRef, targetRef, mappingName, defaultFlashCopyRate)
+	if err == nil {
+		if err := c.api.PrestartFlashCopyMapping(mappingID); err != nil {
+			return fmt.Errorf("PrestartFlashCopyMapping failed: %w", err)
+		}
+		if err := c.api.StartFlashCopyMapping(mappingID); err != nil {
+			return fmt.Errorf("StartFlashCopyMapping failed: %w", err)
+		}
+		progress <- 100
+		return nil
+	}
+	// Mapping may already exist (e.g. retry or previous run). Find by source/target and start it.
+	if statusCode == http.StatusConflict {
+		existingID, findErr := c.api.FindFlashCopyMappingBySourceTarget(sourceRef, targetRef)
+		if findErr != nil {
+			return fmt.Errorf("FlashCopy mapping conflict and could not list existing mappings: %w", findErr)
+		}
+		if existingID == "" {
+			return fmt.Errorf("FlashCopy mapping conflict (target may be in use) and no matching mapping found: %w", err)
+		}
+		log.Info("using existing FlashCopy mapping", "mapping_id", existingID, "source", sourceRef, "target", targetRef)
+		if prestartErr := c.api.PrestartFlashCopyMapping(existingID); prestartErr != nil {
+			log.Info("PrestartFlashCopyMapping for existing mapping failed (may already be prepared)", "err", prestartErr)
+		}
+		if startErr := c.api.StartFlashCopyMapping(existingID); startErr != nil {
+			// Mapping may already be in copying state (e.g. from first run still running). Treat as success.
+			if isFlashCopyAlreadyCopying(startErr) {
+				log.Info("FlashCopy mapping already in copying state; considering copy in progress", "mapping_id", existingID)
+			} else {
+				return fmt.Errorf("StartFlashCopyMapping failed for existing mapping: %w", startErr)
+			}
+		}
+		progress <- 100
+		return nil
+	}
+	return fmt.Errorf("CreateFlashCopyMapping failed: %w", err)
+}
+
+// isFlashCopyAlreadyCopying returns true if the error indicates the mapping is already copying (CMMVC5907E / CMMVC5903E).
+func isFlashCopyAlreadyCopying(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "CMMVC5907E") || strings.Contains(msg, "CMMVC5903E")
 }
 
 // getHostPorts gets host ports directly from the API

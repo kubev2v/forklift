@@ -36,6 +36,8 @@ type DiskBacking struct {
 	IsRDM bool
 	// DeviceName is the underlying device name
 	DeviceName string
+	// LunUuid is the unique LUN identifier (SCSI 83h / NAA). Use this for storage resolution; required for RDM.
+	LunUuid string
 }
 
 type VSphereClient struct {
@@ -229,11 +231,12 @@ func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkP
 				}
 			}
 
-			log.V(2).Info("disk is RDM-backed", "vmdk", vmdkPath, "device", backing.DeviceName)
+			log.V(2).Info("disk is RDM-backed", "vmdk", vmdkPath, "device", backing.DeviceName, "lunUuid", backing.LunUuid)
 			return &DiskBacking{
 				VVolId:     "",
 				IsRDM:      true,
 				DeviceName: backing.DeviceName,
+				LunUuid:    backing.LunUuid,
 			}, nil
 		}
 	}
