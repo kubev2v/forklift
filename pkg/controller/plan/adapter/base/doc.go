@@ -1,6 +1,7 @@
 package base
 
 import (
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
@@ -14,6 +15,9 @@ import (
 
 // Annotations
 const (
+	// JSON map of original → sanitized label/annotation keys on the destination VM.
+	AnnSanitizedMetadata = "forklift.konveyor.io/sanitized-metadata"
+
 	// Used on DataVolume, contains disk source -- e.g. backing file in
 	// VMware or disk ID in oVirt.
 	AnnDiskSource = "forklift.konveyor.io/disk-source"
@@ -180,6 +184,9 @@ type Builder interface {
 	// Returns an empty struct if no provider-specific configuration is needed.
 	// The returned config is merged with user settings from Plan.Spec (user settings take precedence).
 	ConversionPodConfig(vmRef ref.Ref) (*ConversionPodConfigResult, error)
+	// SourceVMLabelsAndAnnotations returns provider-specific labels and annotations
+	// derived from source VM metadata (e.g. vSphere tags and custom attributes).
+	SourceVMLabelsAndAnnotations(vmRef ref.Ref, tagMapping *api.TagMapping) (labels map[string]string, annotations map[string]string, sanitizationReport map[string]string, err error)
 }
 
 // Client API.
