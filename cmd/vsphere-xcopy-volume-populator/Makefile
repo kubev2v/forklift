@@ -84,6 +84,18 @@ test-flashsystem: build
 		--owner-uid=test-cli \
 		--kubeconfig=$$KUBECONFIG
 
+test-flashsystem-rdm: build
+	bin/vsphere-xcopy-volume-populator \
+		--source-vm-id=vm-49579 \
+		--source-vmdk="[BorisO-tmp] boris_rdm/boris_rdm.vmdk" \
+		--owner-name=test-cli-rdm \
+		--target-namespace=flashsystem-test \
+		--storage-vendor-product=flashsystem \
+		--storage-skip-ssl-verification=true \
+		--secret-name=populator-secret \
+		--owner-uid=test-cli \
+		--kubeconfig=$$KUBECONFIG
+
 test-copy-using-cli-3par: build
 	bin/vsphere-xcopy-volume-populator \
 		--source-vmdk="[eco-iscsi-ds1] vm-8/vm-8.vmdk" \
