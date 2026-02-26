@@ -39,32 +39,31 @@ func NewPopulator(
 	}
 
 	ctx := context.Background()
+	log := klog.Background().WithName("copy-offload").WithName("setup")
 
 	diskType, err := detectDiskType(ctx, vsphereClient, vmId, vmdkPath)
 	if err != nil {
-		klog.Warningf("Failed to detect disk type: %v, using VMDK/Xcopy", err)
+		log.Info("disk type detection failed, using VMDK/Xcopy", "err", err)
 		return createVMDKPopulator(storageApi, vsphereClient, sshConfig)
 	}
 
-	klog.Infof("Detected disk type: %s", diskType)
+	log.Info("disk type detected", "type", diskType)
 
-	// Step 2: Try to use optimized method for detected disk type
 	switch diskType {
 	case DiskTypeVVol:
 		if canUse(storageApi, DiskTypeVVol) {
-			klog.Infof("VVol method is available, using VVol populator")
+			log.Info("using VVol populator")
 			return createVVolPopulator(storageApi, vsphereClient)
 		}
 
 	case DiskTypeRDM:
 		if canUse(storageApi, DiskTypeRDM) {
-			klog.Infof("RDM method is available, using RDM populator")
+			log.Info("using RDM populator")
 			return createRDMPopulator(storageApi, vsphereClient)
 		}
 	}
 
-	// Default: Use VMDK/Xcopy (always works)
-	klog.Infof("Using VMDK/Xcopy populator")
+	log.Info("using VMDK/Xcopy populator")
 	return createVMDKPopulator(storageApi, vsphereClient, sshConfig)
 }
 

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/version"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
@@ -20,17 +19,19 @@ const (
 )
 
 // ensure vib will fetch the vib version and in case needed will install it
-// on the target ESX
-func ensureVib(client vmware.Client, esx *object.HostSystem, datastore string, desiredVibVersion string) error {
-	klog.Infof("ensuring vib version on ESXi %s: %s", esx.Name(), version.VibVersion)
+// on the target ESX. Caller should pass a context; vib adds its logger to it for RunEsxCommand.
+func ensureVib(ctx context.Context, client vmware.Client, esx *object.HostSystem, datastore string, desiredVibVersion string) error {
+	log := klog.Background().WithName("copy-offload").WithName("vib")
+	ctx = klog.NewContext(ctx, log)
+	log.Info("ensuring VIB version on ESXi", "host", esx.Name(), "desired_version", desiredVibVersion)
 
-	version, err := getViBVersion(client, esx)
+	currentVersion, err := getViBVersion(ctx, client, esx)
 	if err != nil {
 		return fmt.Errorf("failed to get the VIB version from ESXi %s: %w", esx.Name(), err)
 	}
 
-	klog.Infof("current vib version on ESXi %s: %s", esx.Name(), version)
-	if version == desiredVibVersion {
+	log.Info("current VIB version on ESXi", "host", esx.Name(), "version", currentVersion)
+	if currentVersion == desiredVibVersion {
 		return nil
 	}
 
@@ -42,13 +43,13 @@ func ensureVib(client vmware.Client, esx *object.HostSystem, datastore string, d
 	if err != nil {
 		return fmt.Errorf("failed to upload the VIB to ESXi %s: %w", esx.Name(), err)
 	}
-	klog.Infof("uploaded vib to ESXi %s", esx.Name())
+	log.Info("uploaded VIB to ESXi", "host", esx.Name())
 
-	err = installVib(client, esx, vibPath)
+	err = installVib(ctx, client, esx, vibPath)
 	if err != nil {
 		return fmt.Errorf("failed to install the VIB on ESXi %s: %w", esx.Name(), err)
 	}
-	klog.Infof("installed vib on ESXi %s version %s", esx.Name(), version)
+	log.Info("installed VIB on ESXi", "host", esx.Name(), "version", desiredVibVersion)
 	return nil
 }
 
@@ -92,8 +93,8 @@ func getHostDC(esx *object.HostSystem) (*object.Datacenter, error) {
 	return nil, fmt.Errorf("could not determine datacenter for host '%s'.", esx.Name())
 }
 
-func getViBVersion(client vmware.Client, esxi *object.HostSystem) (string, error) {
-	r, err := client.RunEsxCommand(context.Background(), esxi, []string{"software", "vib", "get", "-n", vibName})
+func getViBVersion(ctx context.Context, client vmware.Client, esxi *object.HostSystem) (string, error) {
+	r, err := client.RunEsxCommand(ctx, esxi, []string{"software", "vib", "get", "-n", vibName})
 	if err != nil {
 		vFault, conversonErr := vmware.ErrToFault(err)
 		if conversonErr != nil {
@@ -110,7 +111,7 @@ func getViBVersion(client vmware.Client, esxi *object.HostSystem) (string, error
 		return "", err
 	}
 
-	klog.Infof("reply from get vib %v", r)
+	klog.FromContext(ctx).V(2).Info("VIB get result", "response", r)
 	return r[0].Value("Version"), err
 }
 
@@ -126,12 +127,12 @@ func uploadVib(client vmware.Client, dc *object.Datacenter, datastore string) (s
 	return fmt.Sprintf("/vmfs/volumes/%s/%s", datastore, vibName+".vib"), nil
 }
 
-func installVib(client vmware.Client, esx *object.HostSystem, vibPath string) error {
-	r, err := client.RunEsxCommand(context.Background(), esx, []string{"software", "vib", "install", "-f", "1", "-v", vibPath})
+func installVib(ctx context.Context, client vmware.Client, esx *object.HostSystem, vibPath string) error {
+	r, err := client.RunEsxCommand(ctx, esx, []string{"software", "vib", "install", "-f", "1", "-v", vibPath})
 	if err != nil {
 		return err
 	}
 
-	klog.Infof("reply from get vib %v", r)
+	klog.FromContext(ctx).V(2).Info("VIB install result", "response", r)
 	return nil
 }

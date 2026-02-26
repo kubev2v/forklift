@@ -195,13 +195,17 @@ func main() {
 	xCopyUsedCh := make(chan int)
 	quitCh := make(chan error)
 
+	log := klog.Background().WithName("copy-offload").WithValues("pvc", ownerName, "source_vmdk", sourceVMDKFile)
+	cloneLog := log.WithName("xcopy").WithName("clone")
+	log.Info("copy-offload started")
+
 	hll := populator.NewHostLeaseLocker(clientSet)
 	go p.Populate(sourceVmId, sourceVMDKFile, pv, hll, progressCh, xCopyUsedCh, quitCh)
 
 	for {
 		select {
 		case p := <-progressCh:
-			klog.Infof(" progress reported %d%%", p)
+			cloneLog.Info("clone progress", "progress", p)
 			metric := dto.Metric{}
 			if err := progressCounter.WithLabelValues(ownerUID).Write(&metric); err != nil {
 				klog.Error(err)
@@ -209,19 +213,19 @@ func main() {
 				progressCounter.WithLabelValues(ownerUID).Add(float64(p) - metric.Counter.GetValue())
 			}
 		case c := <-xCopyUsedCh:
-			klog.Infof(" xcopy used reported: %d", c)
+			cloneLog.Info("xcopy", "xcopyUsed", c)
 			metric := dto.Metric{}
 			if err := xcopyUsedGauge.WithLabelValues(ownerUID).Write(&metric); err != nil {
-				klog.Error("failed to write to the xcopy used gauge", err)
+				log.Error(err, "failed to write xcopy used gauge")
 			} else {
 				xcopyUsedGauge.WithLabelValues(ownerUID).Set(float64(c))
 			}
 		case q := <-quitCh:
-			klog.Infof("channel quit %s", q)
 			if q != nil {
+				log.Error(q, "copy-offload failed")
 				klog.Fatal(q)
 			}
-
+			log.Info("copy-offload finished")
 			return
 		}
 	}
