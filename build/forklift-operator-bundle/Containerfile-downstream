@@ -11,33 +11,33 @@ ARG DEFAULT_CHANNEL
 ARG REGISTRY
 ARG OCP_VERSIONS
 
-ARG API_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-api-rhel9@sha256:31891a98f9f84bdf88726db1ebd087411359556becaae9b7cc5e589ea1b0c3ec"
+ARG API_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-api-rhel9@sha256:9bb50f5f24a657ae3bdec6426be76a57b12aaed48ce0bdcbe7809124dc785118"
 
-ARG CONTROLLER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-controller-rhel9@sha256:4787d71af1ff7ea44f00839ac12d28921399d47ed534a8b760557b244b3b6050"
+ARG CONTROLLER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-controller-rhel9@sha256:deb78b54e3d7dda251908147219cdfb480239d3f707462281a93c7fc6bfa4ec9"
 
-ARG MUST_GATHER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-must-gather-rhel8@sha256:3475c3495047cfe44a57d6c08648c31a7be4be54b16fe28cfe002b536e1de1f4"
+ARG MUST_GATHER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-must-gather-rhel8@sha256:3cb4cc4bfffff35dc9c7a6825f8bd626916d958dbe9c64b1ab661a07fde2fc72"
 
-ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-openstack-populator-rhel9@sha256:fc2f8747728d5df02f14746aba1ecf74a8f178c7b26bcd4c19383b28799cb287"
+ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-openstack-populator-rhel9@sha256:8ae1f3a90d8d7364e9f2c640fe8be269db140279ca6f2dc1486cff81adacbbc5"
 
-ARG OPERATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-rhel9-operator@sha256:cc1f439767a90b38d380a94e1e0dde8ed1099f56ee839b510bcb11ec1e1e1731"
+ARG OPERATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-rhel9-operator@sha256:85114965f449c46f1433710af1c4ce4c9f63aae4d52e47d83d0cf94e2ab427d4"
 
 ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-ova-provider-server-rhel9@sha256:acbfeb50bce1bd325abbc19326665cbfa288272c1a673a9a7d5f90396665be6f"
 
-ARG OVA_PROXY_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-ova-proxy-rhel9@sha256:bbf01a955aad1cc4ba189573412ec6e7679a540737216c821d2617263e08068e"
+ARG OVA_PROXY_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-ova-proxy-rhel9@sha256:d296cd990ffc86dbfd5791c64f8d82ce983f70853f44d23c4b05de1407bac79a"
 
 ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-rhv-populator-rhel8@sha256:794bb8fdb8cdcf98c2813fdc6620040ef65330792946fa03e050abf28df22c55"
 
 ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-populator-controller-rhel9@sha256:6940a0dee7f6c5143d942a2f3f0505b7b991bd6063ae07596c82d274c38febd2"
 
-ARG UI_PLUGIN_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-console-plugin-rhel9@sha256:6162f9be608bc0572f4955c26159595e4bb655cf27cac84f62eb163ccd7f0327"
+ARG UI_PLUGIN_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-console-plugin-rhel9@sha256:a03405ad9f93d9c99325c15f91d9abafcbf94dcc6e25c14177b0ee1919247267"
 
 ARG CLI_DOWNLOAD_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-cli-download-rhel9@sha256:c3661150c3c976d434cf4ded429d8dffc08f1066b8615018a4e0e87918c798eb"
 
-ARG VALIDATION_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-validation-rhel9@sha256:253c684955488d1b75e6e263157959c87acb6ab0615944f8c7348442bd9540b0"
+ARG VALIDATION_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-validation-rhel9@sha256:ecf93e0b37303579976b200e89b3f277177225cf44b8eea71c448a873a2ce589"
 
 ARG VIRT_V2V_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel10@sha256:b9cec20d54450f72668477590b3f003bba7b36bde6f310aae0f7054cd685e2b2"
 
-ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:4856980cf11c99d1952089337029b1f78c510737db5bae9791f0e51699fe1e14"
+ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:70de0edf45202481561d346691226d5fce1f829175a29e783ec489b4d3fec093"
 
 USER root
 
