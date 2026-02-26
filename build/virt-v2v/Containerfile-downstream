@@ -31,9 +31,9 @@ COPY --chown=1001:0 ./ ./
 ENV GOFLAGS="-mod=vendor -tags=strictfipsruntime"
 ENV GOEXPERIMENT=strictfipsruntime
 
-RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-monitor github.com/kubev2v/forklift/cmd/virt-v2v-monitor
-RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o image-converter github.com/kubev2v/forklift/cmd/image-converter
-RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o virt-v2v-wrapper github.com/kubev2v/forklift/cmd/virt-v2v
+RUN GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o virt-v2v-monitor github.com/kubev2v/forklift/cmd/virt-v2v-monitor
+RUN GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o image-converter github.com/kubev2v/forklift/cmd/image-converter
+RUN GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o virt-v2v-wrapper github.com/kubev2v/forklift/cmd/virt-v2v
 
 FROM registry.redhat.io/ubi10:10.1-1762952713 AS runtime
 
