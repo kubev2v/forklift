@@ -26,9 +26,9 @@ ENV GOFLAGS="-mod=vendor -tags=strictfipsruntime"
 ENV GOEXPERIMENT=strictfipsruntime
 ENV GOCACHE=/go-build/cache
 
-RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -ldflags="-w -s" -o virt-v2v-monitor github.com/kubev2v/forklift/cmd/virt-v2v-monitor
-RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -ldflags="-w -s" -o image-converter github.com/kubev2v/forklift/cmd/image-converter
-RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -ldflags="-w -s" -o virt-v2v-wrapper github.com/kubev2v/forklift/cmd/virt-v2v
+RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -buildvcs=false -ldflags="-w -s" -o virt-v2v-monitor github.com/kubev2v/forklift/cmd/virt-v2v-monitor
+RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -buildvcs=false -ldflags="-w -s" -o image-converter github.com/kubev2v/forklift/cmd/image-converter
+RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -buildvcs=false -ldflags="-w -s" -o virt-v2v-wrapper github.com/kubev2v/forklift/cmd/virt-v2v
 
 FROM registry.access.redhat.com/ubi9:9.6-1754586119
 
