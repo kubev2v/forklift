@@ -22,6 +22,7 @@ import (
 //go:generate go run go.uber.org/mock/mockgen -destination=mocks/vmware_mock_client.go -package=vmware_mocks . Client
 type Client interface {
 	GetEsxByVm(ctx context.Context, vmName string) (*object.HostSystem, error)
+	GetEsxById(ctx context.Context, hostId string) (*object.HostSystem, error)
 	RunEsxCommand(ctx context.Context, host *object.HostSystem, command []string) ([]esx.Values, error)
 	GetDatastore(ctx context.Context, dc *object.Datacenter, datastore string) (*object.Datastore, error)
 	// GetVMDiskBacking returns disk backing information for detecting disk type (VVol, RDM, VMDK)
@@ -106,7 +107,7 @@ func (c *VSphereClient) GetEsxByVm(ctx context.Context, vmId string) (*object.Ho
 			}
 		} else {
 			vm = result
-			fmt.Printf("found vm %v\n", vm)
+			klog.Infof("found vm %v\n", vm)
 			break
 		}
 	}
@@ -144,14 +145,29 @@ func (c *VSphereClient) GetDatastore(ctx context.Context, dc *object.Datacenter,
 	return ds, nil
 }
 
-// GetVMDiskBacking retrieves disk backing information to determine disk type
-func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkPath string) (*DiskBacking, error) {
+func (c *VSphereClient) GetEsxById(ctx context.Context, hostId string) (*object.HostSystem, error) {
 	finder := find.NewFinder(c.Client.Client, true)
 	datacenters, err := finder.DatacenterList(ctx, "*")
 	if err != nil {
 		return nil, fmt.Errorf("failed getting datacenters: %w", err)
 	}
+	for _, dc := range datacenters {
+		finder.SetDatacenter(dc)
+		host, err := finder.HostSystem(ctx, hostId)
+		if err != nil {
+			if _, ok := err.(*find.NotFoundError); !ok {
+				return nil, fmt.Errorf("error searching for Host in Datacenter '%s': %w", dc.Name(), err)
+			}
+		} else {
+			klog.Infof("found host %v\n", host)
+			return host, nil
+		}
+	}
+	return nil, fmt.Errorf("didn't find any host with id %s", hostId)
+}
 
+// GetVMDiskBacking retrieves disk backing information to determine disk type
+func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkPath string) (*DiskBacking, error) {
 	var vm *object.VirtualMachine
 	for _, dc := range datacenters {
 		finder.SetDatacenter(dc)

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"net"
 	liburl "net/url"
 	"path"
@@ -1384,6 +1385,10 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				storageClass := mapped.Destination.StorageClass
 				r.Log.Info(fmt.Sprintf("getting storage mapping by storage class %q and datastore %v datastore name %s datastore", storageClass, disk.Datastore, disk.Datastore))
 				vsphereInstance := r.Context.Plan.Provider.Source.GetName()
+				migrationHosts := r.Plan.Spec.DedicatedOffloadMigrationHosts
+				if len(migrationHosts) == 0 {
+					migrationHosts = r.Source.Provider.Spec.DedicatedOffloadMigrationHosts
+				}
 				storageVendorProduct := mapped.OffloadPlugin.VSphereXcopyPluginConfig.StorageVendorProduct
 				storageVendorSecretRef := mapped.OffloadPlugin.VSphereXcopyPluginConfig.SecretRef
 
@@ -1484,6 +1489,16 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				diskSecretName := fmt.Sprintf("%s-%d", secretName, diskIndex)
 				pvc.Annotations[planbase.AnnSecret] = diskSecretName
 				pvcs = append(pvcs, &pvc)
+
+				migrationHost := ""
+				if len(migrationHosts) > 0 {
+					// randomly select one
+					// rgolan todo - preffer the current host of the VM if in the list 
+					i := rand.Intn(len(migrationHosts))
+					migrationHost = migrationHosts[i]
+					// a stable method could be: hash(vm.id) % len(migrationHosts)
+					// h := hash.fnv.New32a() ; h.Write([]byte(vm.id) ; h.Sum32() % len(migrationHosts)
+				}
 				vp := api.VSphereXcopyVolumePopulator{
 					ObjectMeta: metav1.ObjectMeta{
 						OwnerReferences: []metav1.OwnerReference{
@@ -1503,6 +1518,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 						VmdkPath:             baseVolume(disk.File, r.Plan.IsWarm()),
 						SecretName:           diskSecretName,
 						StorageVendorProduct: string(storageVendorProduct),
+						MigrationHost:        migrationHost,
 					},
 				}
 				createdPVC := &core.PersistentVolumeClaim{}

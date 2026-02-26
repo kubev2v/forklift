@@ -660,6 +660,35 @@ rm -f esxi_public_key.pub restricted_key.pub esxi_private_key
 - **Compatibility**: Works with any ESXi version that supports SSH
 - **Flexibility**: Easier to troubleshoot and monitor SSH connections
 
+## Dedicated Migration Hosts for Copy Offload
+		
+For more granular control over the copy offload process, you can designate specific ESXi hosts to handle the data
+transfer operations. This can be useful for isolating the migration workload, ensuring that only hosts with
+the `vmkfstools-wrapper` are used, or for adhering to specific network and security policies.
+		
+When this feature is configured, the volume populator will only select a host from the dedicated list to map the
+target PVC's LUN and execute the `vmkfstools` XCOPY command. The chosen host must have access to the datastore of the
+source VMDK. If the setting is omitted, the populator will select any suitable ESXi host that has access to the
+required storage.
+		
+		
+### Configuration
+
+To specify dedicated hosts, edit your vSphere `Provider` resource and add the `dedicatedOffloadMigrationHosts` key to
+the `spec.settings` map. The value should be a comma-separated list of ESXi hostnames as they appear in vCenter.
+		
+**Example `Provider` configuration:**
+		
+```yaml
+apiVersion: forklift.konveyor.io/v1beta1
+kind: Provider
+metadata:
+  name: my-vsphere-provider
+  namespace: openshift-mtv
+spec:
+  # ... 
+  dedicatedOffloadMigrationHosts: "host-1234,host-5678"
+```
 
 ## Troubleshooting
 

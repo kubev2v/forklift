@@ -1078,6 +1078,14 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              dedicatedOffloadMigrationHosts:
+                description: |-
+                  DedicatedOffloadMigrationHosts is a list of ESXi host IDs dedicated
+                  to storage offload (XCOPY) migrations. Overrides the provider-level
+                  setting if set.
+                items:
+                  type: string
+                type: array
               deleteGuestConversionPod:
                 description: |-
                   DeleteGuestConversionPod determines if the guest conversion pod should be deleted after successful migration.
