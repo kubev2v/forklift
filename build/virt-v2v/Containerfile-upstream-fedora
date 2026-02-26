@@ -7,9 +7,9 @@ COPY --chown=1001:0 ./ ./
 ENV GOFLAGS="-mod=vendor -tags=strictfipsruntime"
 ENV GOEXPERIMENT=strictfipsruntime
 
-RUN go build -ldflags="-w -s" -o virt-v2v-monitor ./cmd/virt-v2v-monitor/virt-v2v-monitor.go
-RUN go build -ldflags="-w -s" -o image-converter ./cmd/image-converter/image-converter.go
-RUN go build -ldflags="-w -s" -o virt-v2v-wrapper ./cmd/virt-v2v/entrypoint.go
+RUN go build -buildvcs=false -ldflags="-w -s" -o virt-v2v-monitor ./cmd/virt-v2v-monitor/virt-v2v-monitor.go
+RUN go build -buildvcs=false -ldflags="-w -s" -o image-converter ./cmd/image-converter/image-converter.go
+RUN go build -buildvcs=false -ldflags="-w -s" -o virt-v2v-wrapper ./cmd/virt-v2v/entrypoint.go
 
 # Main container
 FROM quay.io/fedora/fedora:41

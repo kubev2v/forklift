@@ -5,7 +5,7 @@ COPY --chown=1001:0 ./ ./
 ENV GOFLAGS="-mod=vendor -tags=strictfipsruntime"
 ENV GOEXPERIMENT=strictfipsruntime
 ENV GOCACHE=/go-build/cache
-RUN --mount=type=cache,target=${GOCACHE},uid=1001 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o hyperv-provider-server github.com/kubev2v/forklift/cmd/hyperv-provider-server
+RUN --mount=type=cache,target=${GOCACHE},uid=1001 GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o hyperv-provider-server github.com/kubev2v/forklift/cmd/hyperv-provider-server
 
 FROM registry.redhat.io/ubi9-minimal:9.6-1752587672
 
