@@ -437,6 +437,16 @@ spec:
         path: virt_v2v_container_requests_memory
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Memory (in MB) allocated for the virt-v2v conversion appliance
+        displayName: Virt-v2v Memory Size
+        path: virt_v2v_memsize
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Number of virtual CPUs for the virt-v2v conversion appliance
+        displayName: Virt-v2v SMP
+        path: virt_v2v_smp
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Don't request KVM for virt-v2v
         displayName: Virt-v2v Don't Request KVM
         path: virt_v2v_dont_request_kvm

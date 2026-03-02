@@ -73,6 +73,13 @@ func (c *Conversion) addCommonArgs(cmd utils.CommandBuilder) error {
 		cmd.AddArg("--root", "first")
 	}
 
+	if c.MemSize > 0 {
+		cmd.AddArg("--memsize", fmt.Sprintf("%d", c.MemSize))
+	}
+	if c.Smp > 0 {
+		cmd.AddArg("--smp", fmt.Sprintf("%d", c.Smp))
+	}
+
 	// Add the mapping to the virt-v2v, used mainly in the windows when migrating VMs with static IP
 	if c.StaticIPs != "" {
 		for _, mac := range strings.Split(c.StaticIPs, "_") {

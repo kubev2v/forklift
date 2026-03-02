@@ -2229,6 +2229,20 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 				Value: vm.NewName,
 			})
 	}
+	if settings.Settings.Migration.VirtV2vMemSize > 0 {
+		environment = append(environment,
+			core.EnvVar{
+				Name:  "V2V_memSize",
+				Value: strconv.Itoa(settings.Settings.Migration.VirtV2vMemSize),
+			})
+	}
+	if settings.Settings.Migration.VirtV2vSmp > 0 {
+		environment = append(environment,
+			core.EnvVar{
+				Name:  "V2V_smp",
+				Value: strconv.Itoa(settings.Settings.Migration.VirtV2vSmp),
+			})
+	}
 
 	environment = append(environment,
 		core.EnvVar{
