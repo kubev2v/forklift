@@ -163,10 +163,20 @@ vSphere and oVirt support migrating shared disks (attached to multiple VMs):
 
 ```yaml
 spec:
-  migrateSharedDisks: true  # default
+  migrateSharedDisks: true  # plan-level default
 ```
 
 Set to `false` to skip shared disks and avoid duplicate transfers.
+
+This can also be configured per-VM to override the plan-level setting:
+
+```yaml
+spec:
+  migrateSharedDisks: true  # plan-level default
+  vms:
+    - id: vm-123
+      migrateSharedDisks: false  # skip shared disks for this VM only
+```
 
 ### LUKS Encryption
 

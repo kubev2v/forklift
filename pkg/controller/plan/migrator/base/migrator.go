@@ -382,7 +382,7 @@ type BasePredicate struct {
 
 // Evaluate predicate flags.
 func (r *BasePredicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
-	useV2vForTransfer, vErr := r.context.Plan.ShouldUseV2vForTransfer()
+	useV2vForTransfer, vErr := r.context.Plan.ShouldUseV2vForTransfer(r.vm.Ref)
 	if vErr != nil {
 		err = vErr
 		return
