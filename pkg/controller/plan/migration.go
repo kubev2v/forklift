@@ -1779,7 +1779,7 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 			break
 		}
 
-		useV2vForTransfer, err := r.Context.Plan.ShouldUseV2vForTransfer()
+		useV2vForTransfer, err := r.Context.Plan.ShouldUseV2vForTransfer(vm.Ref)
 		switch {
 		case err != nil:
 			return liberr.Wrap(err)

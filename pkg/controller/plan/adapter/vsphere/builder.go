@@ -207,7 +207,7 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
-	if !r.Context.Plan.Spec.MigrateSharedDisks {
+	if !r.shouldMigrateSharedDisks(vm) {
 		vm.RemoveSharedDisks()
 	}
 	macsToIps := ""
@@ -500,7 +500,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
-	if !r.Context.Plan.Spec.MigrateSharedDisks {
+	if !r.shouldMigrateSharedDisks(vm) {
 		vm.RemoveSharedDisks()
 	}
 	url := r.Source.Provider.Spec.URL
@@ -573,7 +573,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 
 		storageClass := mapped.Destination.StorageClass
 		var dvSource cdi.DataVolumeSource
-		useV2vForTransfer, vErr := r.Context.Plan.ShouldUseV2vForTransfer()
+		useV2vForTransfer, vErr := r.Context.Plan.ShouldUseV2vForTransfer(vmRef)
 		if vErr != nil {
 			err = vErr
 			return
@@ -686,7 +686,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 				vmRef.String()))
 		return
 	}
-	if !r.Context.Plan.Spec.MigrateSharedDisks {
+	if !r.shouldMigrateSharedDisks(vm) {
 		sharedPVCs, missingDiskPVCs, err := findSharedPVCs(r.Destination.Client, vm, r.Plan.Spec.TargetNamespace)
 		if err != nil {
 			return liberr.Wrap(err)
@@ -1100,7 +1100,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
-	if !r.Context.Plan.Spec.MigrateSharedDisks {
+	if !r.shouldMigrateSharedDisks(vm) {
 		vm.RemoveSharedDisks()
 	}
 	for _, disk := range vm.Disks {
@@ -1346,7 +1346,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		return
 	}
 
-	if !r.Context.Plan.Spec.MigrateSharedDisks {
+	if !r.shouldMigrateSharedDisks(vm) {
 		vm.RemoveSharedDisks()
 	}
 	// Get sorted disks to maintain consistent indexing with other parts of the system
@@ -1662,6 +1662,15 @@ func (r *Builder) getPlanVM(vm *model.VM) *plan.VM {
 	}
 
 	return nil
+}
+
+// shouldMigrateSharedDisks returns whether shared disks should be migrated for the given VM.
+// VM-level setting takes precedence; falls back to plan-level setting.
+func (r *Builder) shouldMigrateSharedDisks(vm *model.VM) bool {
+	if planVM := r.getPlanVM(vm); planVM != nil && planVM.MigrateSharedDisks != nil {
+		return *planVM.MigrateSharedDisks
+	}
+	return r.Context.Plan.Spec.MigrateSharedDisks
 }
 
 // getPlanVMStatus get the plan VM status for the given vsphere VM
