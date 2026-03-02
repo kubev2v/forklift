@@ -48,6 +48,9 @@ spec:
 
       # Cleanup
       deleteVmOnFailMigration: false
+
+      # Shared disks
+      migrateSharedDisks: false
 ```
 
 ---
@@ -269,6 +272,32 @@ vms:
 
 ---
 
+## Shared Disks
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `migrateSharedDisks` | *bool | `nil` (inherit plan) | Whether to migrate shared disks for this VM |
+
+When set, this overrides the plan-level `migrateSharedDisks` setting for this specific VM. When not set (nil), the plan-level value is used.
+
+### Support Matrix
+
+| Field | vSphere | oVirt | OpenStack | OpenShift | OVA | EC2 | HyperV |
+|-------|:-------:|:-----:|:---------:|:---------:|:---:|:---:|:------:|
+| `migrateSharedDisks` | Yes | No | No | No | No | No | No |
+
+### Example
+
+```yaml
+vms:
+  - id: vm-123
+    migrateSharedDisks: false  # Skip shared disks for this VM
+  - id: vm-456
+    migrateSharedDisks: true   # Migrate shared disks for this VM
+```
+
+---
+
 ## Complete Field Reference
 
 | Field | vSphere | oVirt | OpenStack | OpenShift | OVA | EC2 | HyperV |
@@ -292,5 +321,7 @@ vms:
 | `nbdeClevis` | Yes | Yes | - | - | - | - | - |
 | **Cleanup** | | | | | | | |
 | `deleteVmOnFailMigration` | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| **Shared Disks** | | | | | | | |
+| `migrateSharedDisks` | Yes | - | - | - | - | - | - |
 
 **Legend:** Req = Required, Yes = Supported, Opt = Optional, - = Not supported

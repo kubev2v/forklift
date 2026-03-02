@@ -126,6 +126,13 @@ type VM struct {
 	//
 	// +optional
 	DeleteVmOnFailMigration bool `json:"deleteVmOnFailMigration,omitempty"`
+	// MigrateSharedDisks controls whether shared disks are included in the migration for this VM.
+	// When nil (default), the plan-level migrateSharedDisks value is used.
+	// When explicitly set to true, shared disks are migrated for this VM.
+	// When explicitly set to false, shared disks are skipped for this VM.
+	//
+	// +optional
+	MigrateSharedDisks *bool `json:"migrateSharedDisks,omitempty"`
 }
 
 // Find a Hook for the specified step.

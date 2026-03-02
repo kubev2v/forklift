@@ -310,6 +310,11 @@ func (in *VM) DeepCopyInto(out *VM) {
 		copy(*out, *in)
 	}
 	out.LUKS = in.LUKS
+	if in.MigrateSharedDisks != nil {
+		in, out := &in.MigrateSharedDisks, &out.MigrateSharedDisks
+		*out = new(bool)
+		**out = **in
+	}
 	if in.EnableNestedVirtualization != nil {
 		in, out := &in.EnableNestedVirtualization, &out.EnableNestedVirtualization
 		*out = new(bool)

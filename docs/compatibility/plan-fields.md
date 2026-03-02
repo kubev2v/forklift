@@ -221,7 +221,7 @@ Templates for customizing resource names. See [Template Support Matrix](../templ
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `migrateSharedDisks` | bool | `true` | Migrate disks shared between VMs |
+| `migrateSharedDisks` | bool | `true` | Migrate disks shared between VMs (can be overridden per-VM) |
 | `preserveStaticIPs` | bool | `true` | Preserve VM static IP configuration |
 | `preserveClusterCPUModel` | bool | `false` | Preserve oVirt cluster CPU model |
 | `transferNetwork` | ObjectRef | - | Network for disk transfer traffic |

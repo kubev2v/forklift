@@ -205,7 +205,7 @@ func (r *Scheduler) buildPending() (err error) {
 }
 
 func (r *Scheduler) cost(vm *model.VM, vmStatus *plan.VMStatus) int {
-	useV2vForTransfer, _ := r.Plan.ShouldUseV2vForTransfer()
+	useV2vForTransfer, _ := r.Plan.ShouldUseV2vForTransfer(vmStatus.Ref)
 	if useV2vForTransfer {
 		switch vmStatus.Phase {
 		case CreateVM, PostHook, Completed:
