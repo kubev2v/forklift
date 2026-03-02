@@ -485,6 +485,16 @@ spec:
                 description: Additional arguments for virt-v2v-inspector
                 example: --root first
                 type: string
+              virt_v2v_memsize:
+                description: 'Memory (in MB) allocated for the virt-v2v conversion
+                  appliance (default: virt-v2v chooses)'
+                example: 4096
+                type: integer
+              virt_v2v_smp:
+                description: 'Number of virtual CPUs for the virt-v2v conversion appliance
+                  (default: virt-v2v chooses)'
+                example: 8
+                type: integer
               vsphere_osmap_configmap_name:
                 description: 'ConfigMap name for vSphere OS mappings (default: forklift-vsphere-osmap)'
                 example: custom-vsphere-osmap
@@ -7966,6 +7976,16 @@ spec:
       - description: virt-v2v memory request (default 1Gi)
         displayName: Virt-v2v Memory Request
         path: virt_v2v_container_requests_memory
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Memory (in MB) allocated for the virt-v2v conversion appliance
+        displayName: Virt-v2v Memory Size
+        path: virt_v2v_memsize
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Number of virtual CPUs for the virt-v2v conversion appliance
+        displayName: Virt-v2v SMP
+        path: virt_v2v_smp
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Don't request KVM for virt-v2v

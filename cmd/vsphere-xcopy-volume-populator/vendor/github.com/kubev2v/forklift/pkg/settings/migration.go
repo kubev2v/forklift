@@ -33,6 +33,8 @@ const (
 	VirtV2vExtraArgs                 = "VIRT_V2V_EXTRA_ARGS"
 	VirtV2vInspectorExtraArgs        = "VIRT_V2V_INSPECTOR_EXTRA_ARGS"
 	VirtV2vExtraConfConfigMap        = "VIRT_V2V_EXTRA_CONF_CONFIG_MAP"
+	VirtV2vMemSize                   = "VIRT_V2V_MEMSIZE"
+	VirtV2vSmp                       = "VIRT_V2V_SMP"
 	VirtV2vContainerLimitsCpu        = "VIRT_V2V_CONTAINER_LIMITS_CPU"
 	VirtV2vContainerLimitsMemory     = "VIRT_V2V_CONTAINER_LIMITS_MEMORY"
 	VirtV2vContainerRequestsCpu      = "VIRT_V2V_CONTAINER_REQUESTS_CPU"
@@ -109,7 +111,11 @@ type Migration struct {
 	// Additional arguments for virt-v2v-inspector
 	VirtV2vInspectorExtraArgs string
 	// Additional configuration for virt-v2v
-	VirtV2vExtraConfConfigMap        string
+	VirtV2vExtraConfConfigMap string
+	// Memory (in MB) allocated for the virt-v2v conversion appliance
+	VirtV2vMemSize int
+	// Number of virtual CPUs used for the virt-v2v conversion appliance
+	VirtV2vSmp             int
 	VirtV2vContainerLimitsCpu        string
 	VirtV2vContainerLimitsMemory     string
 	VirtV2vContainerRequestsCpu      string
@@ -231,6 +237,12 @@ func (r *Migration) Load() (err error) {
 	}
 	if val, found := os.LookupEnv(VirtV2vExtraConfConfigMap); found {
 		r.VirtV2vExtraConfConfigMap = val
+	}
+	if r.VirtV2vMemSize, err = getNonNegativeEnvLimit(VirtV2vMemSize, 0); err != nil {
+		return liberr.Wrap(err)
+	}
+	if r.VirtV2vSmp, err = getNonNegativeEnvLimit(VirtV2vSmp, 0); err != nil {
+		return liberr.Wrap(err)
 	}
 	// Containers configurations
 	if val, found := os.LookupEnv(VirtV2vContainerLimitsCpu); found {

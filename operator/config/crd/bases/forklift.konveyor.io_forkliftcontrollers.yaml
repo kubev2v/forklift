@@ -380,6 +380,14 @@ spec:
               virt_v2v_extra_conf_config_map:
                 type: string
                 description: "ConfigMap name containing extra virt-v2v configuration"
+              virt_v2v_memsize:
+                type: integer
+                description: "Memory (in MB) allocated for the virt-v2v conversion appliance (default: virt-v2v chooses)"
+                example: 4096
+              virt_v2v_smp:
+                type: integer
+                description: "Number of virtual CPUs for the virt-v2v conversion appliance (default: virt-v2v chooses)"
+                example: 8
 
               # Hooks Settings
               hooks_container_limits_cpu:

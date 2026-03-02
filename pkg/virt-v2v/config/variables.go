@@ -32,6 +32,8 @@ const (
 	EnvMultipleIpsPerNicName      = "V2V_multipleIPsPerNic"
 	EnvRemoteInspection           = "V2V_remoteInspection"
 	EnvRemoteInspectionDisk       = "V2V_remoteInspectDisk_"
+	EnvMemSizeName                = "V2V_memSize"
+	EnvSmpName                    = "V2V_smp"
 )
 
 const (
@@ -99,6 +101,10 @@ type AppConfig struct {
 	IsRemoteInspection bool
 	// RemoteInspectionDisks
 	RemoteInspectionDisks []string
+	// V2V_memSize
+	MemSize int
+	// V2V_smp
+	Smp int
 
 	// V2V_multipleIPsPerNic
 	MultipleIpsPerNicName string
@@ -140,6 +146,8 @@ func (s *AppConfig) Load() (err error) {
 	flag.StringVar(&s.HostName, "hostname", os.Getenv(EnvHostName), "Hostname of the vm")
 	flag.StringVar(&s.MultipleIpsPerNicName, "multiple-ips-per-nic", os.Getenv(EnvMultipleIpsPerNicName), "Multiple IPs per NIC")
 	flag.BoolVar(&s.IsRemoteInspection, "remote-inspection", s.getEnvBool(EnvRemoteInspection, false), "Run virt-v2v-inspection on remote disks")
+	flag.IntVar(&s.MemSize, "memsize", s.getEnvInt(EnvMemSizeName, 0), "Amount of memory (in MB) allocated for the conversion appliance")
+	flag.IntVar(&s.Smp, "smp", s.getEnvInt(EnvSmpName, 0), "Number of virtual CPUs used for the conversion appliance")
 	s.RemoteInspectionDisks = s.getRemoteInspectionDisks()
 	flag.Parse()
 
@@ -182,6 +190,16 @@ func (s *AppConfig) getRemoteInspectionDisks() []string {
 	}
 
 	return disks
+}
+
+func (s *AppConfig) getEnvInt(name string, def int) int {
+	if val, found := os.LookupEnv(name); found {
+		parsed, err := strconv.Atoi(val)
+		if err == nil {
+			return parsed
+		}
+	}
+	return def
 }
 
 // Get boolean.
