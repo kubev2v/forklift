@@ -2118,7 +2118,7 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 	nonRoot := true
 	allowPrivilageEscalation := false
 	// virt-v2v image
-	useV2vForTransfer, vErr := r.Context.Plan.ShouldUseV2vForTransfer()
+	useV2vForTransfer, vErr := r.Context.Plan.ShouldUseV2vForTransfer(vm.Ref)
 	if vErr != nil {
 		err = vErr
 		return
