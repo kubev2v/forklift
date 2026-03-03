@@ -1080,11 +1080,12 @@ func (r *Ensurer) EnsureOwnerReferences(vm *planapi.VMStatus) (err error) {
 	}
 	for i := range dvs.Items {
 		dv := &dvs.Items[i]
+		original := dv.DeepCopy()
 		err = r.Labeler.SetBlockingOwnerReference(r.Scheme(), target, dv)
 		if err != nil {
 			return
 		}
-		err = r.Destination.Client.Update(context.Background(), dv)
+		err = r.Destination.Client.Patch(context.Background(), dv, client.MergeFrom(original))
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -1104,11 +1105,12 @@ func (r *Ensurer) EnsureOwnerReferences(vm *planapi.VMStatus) (err error) {
 	}
 	for i := range pvcs.Items {
 		pvc := &pvcs.Items[i]
+		original := pvc.DeepCopy()
 		err = r.Labeler.SetBlockingOwnerReference(r.Scheme(), target, pvc)
 		if err != nil {
 			return
 		}
-		err = r.Destination.Client.Update(context.Background(), pvc)
+		err = r.Destination.Client.Patch(context.Background(), pvc, client.MergeFrom(original))
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
