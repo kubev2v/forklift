@@ -1308,6 +1308,13 @@ func (r *Builder) VirtualMachine(vm *planapi.VMStatus) (object *cnv.VirtualMachi
 			RunStrategy:  &waitAsReceiver,
 		},
 	}
+	// A DataVolumeTemplate may have a namespace set, and if so, it needs
+	// to be updated to match the target namespace otherwise migration will fail.
+	for i := range object.Spec.DataVolumeTemplates {
+		dvt := &object.Spec.DataVolumeTemplates[i]
+		dvt.Namespace = r.Plan.Spec.TargetNamespace
+	}
+
 	key := types.NamespacedName{Namespace: vm.Namespace, Name: source.Name}
 	object.Name = source.Name
 	object.Namespace = r.Plan.Spec.TargetNamespace
