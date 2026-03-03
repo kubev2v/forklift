@@ -10,6 +10,7 @@ metadata:
     containerImage: ${OPERATOR_IMAGE}
     createdAt: ${DATE}
     repository: https://github.com/kubev2v/forklift
+    operators.openshift.io/must-gather-image: ${MUST_GATHER_IMAGE}
     operators.openshift.io/valid-subscription: '["OpenShift Kubernetes Engine", "OpenShift Container Platform", "OpenShift Platform Plus"]'
     certified: ${CSV_CERTIFIED}
     support: ${CSV_SUPPORT}
