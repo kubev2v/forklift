@@ -586,7 +586,23 @@ func (r *Collector) connect(ctx context.Context) (status int, err error) {
 		return
 	}
 
+	if err = r.validateServerType(); err != nil {
+		r.close()
+		return
+	}
 	return http.StatusOK, nil
+}
+
+func (r *Collector) validateServerType() error {
+	sdkEndpoint := r.provider.Spec.Settings[api.SDK]
+	isVC := r.client.IsVC()
+	if sdkEndpoint == api.VCenter && !isVC {
+		return liberr.New("provider sdkEndpoint is set to vCenter but the URL points to an ESXi host")
+	}
+	if sdkEndpoint == api.ESXI && isVC {
+		return liberr.New("provider sdkEndpoint is set to ESXi but the URL points to a vCenter server")
+	}
+	return nil
 }
 
 // Build the client.

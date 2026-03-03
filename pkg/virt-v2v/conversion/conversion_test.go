@@ -783,6 +783,204 @@ var _ = Describe("Conversion", func() {
 				Expect(result).ToNot(ContainSubstring("sdb"))
 			},
 		)
+
+		It("skips cdrom devices and updates only regular disks",
+			func() {
+				conversion.Disks = []*Disk{
+					{Link: "/var/tmp/v2v/vm-sda"},
+				}
+
+				domainXML := `<domain type='kvm'>
+  <name>test-vm</name>
+  <devices>
+    <disk type='file' device='cdrom'>
+      <source file='/original/path/cdrom.iso'/>
+      <target dev='hda' bus='ide'/>
+    </disk>
+    <disk type='file' device='disk'>
+      <source file='/original/path/disk1.vmdk'/>
+      <target dev='sda' bus='scsi'/>
+    </disk>
+  </devices>
+</domain>`
+
+				result, err := conversion.updateDiskPaths(domainXML)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
+				Expect(result).ToNot(ContainSubstring("cdrom.iso"))
+				Expect(result).ToNot(ContainSubstring("cdrom"))
+			},
+		)
+
+		It("skips cdrom between regular disks without affecting disk index",
+			func() {
+				conversion.Disks = []*Disk{
+					{Link: "/var/tmp/v2v/vm-sda"},
+					{Link: "/var/tmp/v2v/vm-sdb"},
+				}
+
+				domainXML := `<domain type='kvm'>
+  <name>test-vm</name>
+  <devices>
+    <disk type='file' device='disk'>
+      <source file='/original/path/disk1.vmdk'/>
+      <target dev='sda' bus='scsi'/>
+    </disk>
+    <disk type='file' device='cdrom'>
+      <source file='/original/path/cdrom.iso'/>
+      <target dev='hda' bus='ide'/>
+    </disk>
+    <disk type='file' device='disk'>
+      <source file='/original/path/disk2.vmdk'/>
+      <target dev='sdb' bus='scsi'/>
+    </disk>
+  </devices>
+</domain>`
+
+				result, err := conversion.updateDiskPaths(domainXML)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
+				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sdb"))
+				Expect(result).ToNot(ContainSubstring("cdrom.iso"))
+				Expect(result).ToNot(ContainSubstring("cdrom"))
+				Expect(result).ToNot(ContainSubstring("/original/path/disk1.vmdk"))
+				Expect(result).ToNot(ContainSubstring("/original/path/disk2.vmdk"))
+			},
+		)
+
+		It("handles only cdrom devices with no regular disks",
+			func() {
+				conversion.Disks = []*Disk{}
+
+				domainXML := `<domain type='kvm'>
+  <name>test-vm</name>
+  <devices>
+    <disk type='file' device='cdrom'>
+      <source file='/original/path/cdrom1.iso'/>
+      <target dev='hda' bus='ide'/>
+    </disk>
+    <disk type='file' device='cdrom'>
+      <source file='/original/path/cdrom2.iso'/>
+      <target dev='hdb' bus='ide'/>
+    </disk>
+  </devices>
+</domain>`
+
+				result, err := conversion.updateDiskPaths(domainXML)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).ToNot(ContainSubstring("cdrom1.iso"))
+				Expect(result).ToNot(ContainSubstring("cdrom2.iso"))
+				Expect(result).ToNot(ContainSubstring("cdrom"))
+			},
+		)
+
+		It("skips cdrom at the end after regular disks",
+			func() {
+				conversion.Disks = []*Disk{
+					{Link: "/var/tmp/v2v/vm-sda"},
+				}
+
+				domainXML := `<domain type='kvm'>
+  <name>test-vm</name>
+  <devices>
+    <disk type='file' device='disk'>
+      <source file='/original/path/disk1.vmdk'/>
+      <target dev='sda' bus='scsi'/>
+    </disk>
+    <disk type='file' device='cdrom'>
+      <source file='/original/path/cdrom.iso'/>
+      <target dev='hda' bus='ide'/>
+    </disk>
+  </devices>
+</domain>`
+
+				result, err := conversion.updateDiskPaths(domainXML)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
+				Expect(result).ToNot(ContainSubstring("cdrom.iso"))
+				Expect(result).ToNot(ContainSubstring("cdrom"))
+			},
+		)
+
+		It("skips multiple cdroms interspersed with multiple disks",
+			func() {
+				conversion.Disks = []*Disk{
+					{Link: "/var/tmp/v2v/vm-sda"},
+					{Link: "/var/tmp/v2v/vm-sdb"},
+					{Link: "/var/tmp/v2v/vm-sdc"},
+				}
+
+				domainXML := `<domain type='kvm'>
+  <name>test-vm</name>
+  <devices>
+    <disk type='file' device='cdrom'>
+      <source file='/original/path/cdrom1.iso'/>
+      <target dev='hda' bus='ide'/>
+    </disk>
+    <disk type='file' device='disk'>
+      <source file='/original/path/disk1.vmdk'/>
+      <target dev='sda' bus='scsi'/>
+    </disk>
+    <disk type='file' device='cdrom'>
+      <source file='/original/path/cdrom2.iso'/>
+      <target dev='hdb' bus='ide'/>
+    </disk>
+    <disk type='file' device='disk'>
+      <source file='/original/path/disk2.vmdk'/>
+      <target dev='sdb' bus='scsi'/>
+    </disk>
+    <disk type='file' device='disk'>
+      <source file='/original/path/disk3.vmdk'/>
+      <target dev='sdc' bus='scsi'/>
+    </disk>
+    <disk type='file' device='cdrom'>
+      <source file='/original/path/cdrom3.iso'/>
+      <target dev='hdc' bus='ide'/>
+    </disk>
+  </devices>
+</domain>`
+
+				result, err := conversion.updateDiskPaths(domainXML)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
+				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sdb"))
+				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sdc"))
+				Expect(result).ToNot(ContainSubstring("cdrom"))
+				Expect(result).ToNot(ContainSubstring(".iso"))
+			},
+		)
+
+		It("handles more XML disks than available when cdroms are present",
+			func() {
+				conversion.Disks = []*Disk{
+					{Link: "/var/tmp/v2v/vm-sda"},
+				}
+
+				domainXML := `<domain type='kvm'>
+  <name>test-vm</name>
+  <devices>
+    <disk type='file' device='cdrom'>
+      <source file='/original/path/cdrom.iso'/>
+      <target dev='hda' bus='ide'/>
+    </disk>
+    <disk type='file' device='disk'>
+      <source file='/original/path/disk1.vmdk'/>
+      <target dev='sda' bus='scsi'/>
+    </disk>
+    <disk type='file' device='disk'>
+      <source file='/original/path/disk2.vmdk'/>
+      <target dev='sdb' bus='scsi'/>
+    </disk>
+  </devices>
+</domain>`
+
+				result, err := conversion.updateDiskPaths(domainXML)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
+				Expect(result).ToNot(ContainSubstring("cdrom"))
+				Expect(result).ToNot(ContainSubstring("/original/path/disk2.vmdk"))
+			},
+		)
 	})
 
 	Describe("addVirtV2vVsphereArgsForInspection", func() {

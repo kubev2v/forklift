@@ -1080,11 +1080,12 @@ func (r *Ensurer) EnsureOwnerReferences(vm *planapi.VMStatus) (err error) {
 	}
 	for i := range dvs.Items {
 		dv := &dvs.Items[i]
+		original := dv.DeepCopy()
 		err = r.Labeler.SetBlockingOwnerReference(r.Scheme(), target, dv)
 		if err != nil {
 			return
 		}
-		err = r.Destination.Client.Update(context.Background(), dv)
+		err = r.Destination.Client.Patch(context.Background(), dv, client.MergeFrom(original))
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -1104,11 +1105,12 @@ func (r *Ensurer) EnsureOwnerReferences(vm *planapi.VMStatus) (err error) {
 	}
 	for i := range pvcs.Items {
 		pvc := &pvcs.Items[i]
+		original := pvc.DeepCopy()
 		err = r.Labeler.SetBlockingOwnerReference(r.Scheme(), target, pvc)
 		if err != nil {
 			return
 		}
-		err = r.Destination.Client.Update(context.Background(), pvc)
+		err = r.Destination.Client.Patch(context.Background(), pvc, client.MergeFrom(original))
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -1308,6 +1310,13 @@ func (r *Builder) VirtualMachine(vm *planapi.VMStatus) (object *cnv.VirtualMachi
 			RunStrategy:  &waitAsReceiver,
 		},
 	}
+	// A DataVolumeTemplate may have a namespace set, and if so, it needs
+	// to be updated to match the target namespace otherwise migration will fail.
+	for i := range object.Spec.DataVolumeTemplates {
+		dvt := &object.Spec.DataVolumeTemplates[i]
+		dvt.Namespace = r.Plan.Spec.TargetNamespace
+	}
+
 	key := types.NamespacedName{Namespace: vm.Namespace, Name: source.Name}
 	object.Name = source.Name
 	object.Namespace = r.Plan.Spec.TargetNamespace

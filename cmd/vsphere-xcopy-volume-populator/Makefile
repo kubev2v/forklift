@@ -69,7 +69,7 @@ test-copy-using-cli: build
 		--storage-vendor-product=ontap \
 		--secret-name=ontap \
 		--owner-uid=tshefi40g \
-		--esxi-clone-method=ssh \
+		--esxi-clone-method=vib \
 		--kubeconfig=$$KUBECONFIG
 
 test-flashsystem: build

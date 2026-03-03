@@ -1621,7 +1621,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 						path.Join(dv.Namespace, dv.Name))
 					continue
 				}
-				snapshot := vm.Warm.Precopies[len(vm.Warm.Precopies)-1].Snapshot
+				snapshot := dv.Spec.Checkpoints[len(dv.Spec.Checkpoints)-1].Current
 				annotation := fmt.Sprintf("%s.%s", base.AnnCheckpointsCopied, snapshot)
 				if _, copied := pvc.Annotations[annotation]; copied {
 					completed++

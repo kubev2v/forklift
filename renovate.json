@@ -1,6 +1,13 @@
 {
   "packageRules": [
     {
+      "description": "Disable go updates for .konflux directory",
+      "matchFileNames": [
+        ".konflux/**"
+      ],
+      "enabled": false
+    },
+    {
       "matchBaseBranches": [
         "/^release.*/",
         "main"

@@ -229,7 +229,7 @@ func (r *Client) Close() {
 // the snapshot ID hasn't been created yet.
 func (r *Client) getSnapshotCorrelationID(vmRef ref.Ref, snapshot *string) (correlationID string, err error) {
 	var vm *planapi.VMStatus
-	for _, vmstatus := range r.Migration.Status.VMs {
+	for _, vmstatus := range r.Plan.Status.Migration.VMs {
 		if vmstatus.ID == vmRef.ID {
 			vm = vmstatus
 			break

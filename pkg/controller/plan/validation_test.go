@@ -464,7 +464,7 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 	})
 
 	ginkgo.Describe("validateConversionTempStorage", func() {
-		ginkgo.It("should pass when both fields are set", func() {
+		ginkgo.It("should pass when both fields are set and StorageClass exists", func() {
 			secret := createSecret(sourceSecretName, sourceNamespace, false)
 			source := createProvider(sourceName, sourceNamespace, "https://source", api.OpenShift, &core.ObjectReference{Name: sourceSecretName, Namespace: sourceNamespace})
 			destination := createProvider(destName, destNamespace, "", api.OpenShift, &core.ObjectReference{})
@@ -474,12 +474,13 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 
+			sc := &storagev1.StorageClass{ObjectMeta: meta.ObjectMeta{Name: "fast-ssd"}, Provisioner: "kubernetes.io/fake"}
 			csiCap := &storagev1.CSIStorageCapacity{
 				ObjectMeta:       meta.ObjectMeta{Name: "fast-ssd-cap", Namespace: "kube-system"},
 				StorageClassName: "fast-ssd",
 				Capacity:         ptr.To(resource.MustParse("100Gi")),
 			}
-			reconciler = createFakeReconciler(secret, plan, source, destination, csiCap)
+			reconciler = createFakeReconciler(secret, plan, source, destination, sc, csiCap)
 			err := reconciler.validateConversionTempStorage(plan)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -561,32 +562,54 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			gomega.Expect(condition.Message).To(gomega.ContainSubstring("is not a valid Kubernetes resource quantity"))
 		})
 
-		ginkgo.It("should pass with valid size formats when CSIStorageCapacity has sufficient capacity", func() {
+		ginkgo.It("should pass with valid size formats when StorageClass exists and CSIStorageCapacity has sufficient capacity", func() {
 			secret := createSecret(sourceSecretName, sourceNamespace, false)
 			source := createProvider(sourceName, sourceNamespace, "https://source", api.OpenShift, &core.ObjectReference{Name: sourceSecretName, Namespace: sourceNamespace})
 			destination := createProvider(destName, destNamespace, "", api.OpenShift, &core.ObjectReference{})
 			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 
-			// Seed CSIStorageCapacity so capacity check passes (2Ti >= all requested sizes)
+			sc := &storagev1.StorageClass{ObjectMeta: meta.ObjectMeta{Name: "fast-ssd"}, Provisioner: "kubernetes.io/fake"}
 			csiCap := &storagev1.CSIStorageCapacity{
 				ObjectMeta:       meta.ObjectMeta{Name: "fast-ssd-cap", Namespace: "kube-system"},
 				StorageClassName: "fast-ssd",
 				Capacity:         ptr.To(resource.MustParse("2Ti")),
 			}
-
 			validSizes := []string{"50Gi", "1Ti", "100Mi", "500G", "2T"}
 			for _, size := range validSizes {
 				plan := createPlan(testPlanName, testNamespace, source, destination)
 				plan.Spec.ConversionTempStorageClass = "fast-ssd"
 				plan.Spec.ConversionTempStorageSize = size
 
-				reconciler = createFakeReconciler(secret, plan, source, destination, csiCap)
+				reconciler = createFakeReconciler(secret, plan, source, destination, sc, csiCap)
 				err := reconciler.validateConversionTempStorage(plan)
 
 				gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Size %s should be valid", size)
 				gomega.Expect(plan.Status.HasBlockerCondition()).To(gomega.BeFalse(), "Size %s should not cause blocking validation error", size)
 			}
+		})
+
+		ginkgo.It("should block when ConversionTempStorageClass does not exist", func() {
+			secret := createSecret(sourceSecretName, sourceNamespace, false)
+			source := createProvider(sourceName, sourceNamespace, "https://source", api.OpenShift, &core.ObjectReference{Name: sourceSecretName, Namespace: sourceNamespace})
+			destination := createProvider(destName, destNamespace, "", api.OpenShift, &core.ObjectReference{})
+			plan := createPlan(testPlanName, testNamespace, source, destination)
+			plan.Spec.ConversionTempStorageClass = "error-sc"
+			plan.Spec.ConversionTempStorageSize = "150Gi"
+			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+
+			// No StorageClass "error-sc" in fake client -> should block
+			reconciler = createFakeReconciler(secret, plan, source, destination)
+			err := reconciler.validateConversionTempStorage(plan)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasBlockerCondition()).To(gomega.BeTrue())
+			cnd := plan.Status.FindCondition(NotValid)
+			gomega.Expect(cnd).NotTo(gomega.BeNil())
+			gomega.Expect(cnd.Category).To(gomega.Equal(api.CategoryCritical))
+			gomega.Expect(cnd.Message).To(gomega.ContainSubstring("not found"))
+			gomega.Expect(cnd.Message).To(gomega.ContainSubstring("error-sc"))
 		})
 
 		ginkgo.It("should block when CSIStorageCapacity reports insufficient capacity", func() {
@@ -599,14 +622,14 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			source.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 			destination.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 
+			sc := &storagev1.StorageClass{ObjectMeta: meta.ObjectMeta{Name: "ocs-storagecluster-ceph-rbd"}, Provisioner: "kubernetes.io/fake"}
 			// Only 70Gi available - not enough for 1Ti
 			csiCap := &storagev1.CSIStorageCapacity{
 				ObjectMeta:       meta.ObjectMeta{Name: "ceph-cap", Namespace: "openshift-storage"},
 				StorageClassName: "ocs-storagecluster-ceph-rbd",
 				Capacity:         ptr.To(resource.MustParse("70Gi")),
 			}
-
-			reconciler = createFakeReconciler(secret, plan, source, destination, csiCap)
+			reconciler = createFakeReconciler(secret, plan, source, destination, sc, csiCap)
 			err := reconciler.validateConversionTempStorage(plan)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())

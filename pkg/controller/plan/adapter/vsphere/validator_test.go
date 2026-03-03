@@ -7,6 +7,7 @@ import (
 	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
@@ -21,8 +22,9 @@ var ErrNotImplemented = errors.New("not implemented")
 
 // Mock inventory struct and methods for testing
 type mockInventory struct {
-	ds model.Datastore
-	vm model.VM
+	ds       model.Datastore
+	vm       model.VM
+	networks map[string]model.Network // keyed by ID
 }
 
 // defaultVM returns a VM with sensible defaults for testing
@@ -68,6 +70,14 @@ func (m *mockInventory) Find(resource interface{}, ref ref.Ref) error {
 		if ref.Name == "missing_from_inventory" {
 			return base.NotFoundError{}
 		}
+	case *model.Network:
+		if m.networks != nil {
+			if net, ok := m.networks[ref.ID]; ok {
+				*res = net
+				return nil
+			}
+		}
+		return base.NotFoundError{}
 	case *model.VM:
 		if ref.Name == "missing_from_inventory" {
 			return base.NotFoundError{}
@@ -378,6 +388,205 @@ var _ = Describe("vsphere validation tests", func() {
 			// Error cases
 			Entry("when VM is missing from inventory", "missing_from_inventory", false, true),
 		)
+	})
+
+	Describe("NICNetworkRefs + ValidateNetworkDuplicates", func() {
+		It("should return no refs for VM with no NICs", func() {
+			plan := createPlan()
+			ctx := plancontext.Context{
+				Plan: plan,
+				Source: plancontext.Source{Inventory: &mockInventory{
+					vm: model.VM{
+						VM1: model.VM1{VM0: model.VM0{ID: "vm-1", Name: "test"}},
+					},
+				}},
+			}
+			validator := &Validator{Context: &ctx}
+			nicRefs, err := validator.NICNetworkRefs(ref.Ref{Name: "test"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(nicRefs).To(BeEmpty())
+		})
+
+		It("should return ok when no duplicate NADs exist", func() {
+			plan := createPlan()
+			plan.Referenced.Map.Network = &v1beta1.NetworkMap{
+				Spec: v1beta1.NetworkMapSpec{
+					Map: []v1beta1.NetworkPair{
+						{
+							Source: ref.Ref{ID: "net-1"},
+							Destination: v1beta1.DestinationNetwork{
+								Type:      "multus",
+								Namespace: "ns1",
+								Name:      "nad-a",
+							},
+						},
+						{
+							Source: ref.Ref{ID: "net-2"},
+							Destination: v1beta1.DestinationNetwork{
+								Type:      "multus",
+								Namespace: "ns1",
+								Name:      "nad-b",
+							},
+						},
+					},
+				},
+			}
+			ctx := plancontext.Context{
+				Plan: plan,
+				Source: plancontext.Source{Inventory: &mockInventory{
+					vm: model.VM{
+						VM1: model.VM1{
+							VM0: model.VM0{ID: "vm-1", Name: "test"},
+						},
+						NICs: []vsphere.NIC{
+							{Network: vsphere.Ref{ID: "net-1"}, MAC: "aa:bb:cc:dd:ee:01"},
+							{Network: vsphere.Ref{ID: "net-2"}, MAC: "aa:bb:cc:dd:ee:02"},
+						},
+					},
+				}},
+			}
+			validator := &Validator{Context: &ctx}
+			nicRefs, err := validator.NICNetworkRefs(ref.Ref{Name: "test"})
+			Expect(err).NotTo(HaveOccurred())
+			foundNadDup, foundPodDup := planbase.ValidateNetworkDuplicates(nicRefs, plan.Referenced.Map.Network)
+			Expect(foundNadDup).To(BeFalse())
+			Expect(foundPodDup).To(BeFalse())
+		})
+
+		It("should detect duplicate when two NICs on same source network map to same NAD", func() {
+			plan := createPlan()
+			plan.Referenced.Map.Network = &v1beta1.NetworkMap{
+				Spec: v1beta1.NetworkMapSpec{
+					Map: []v1beta1.NetworkPair{
+						{
+							Source: ref.Ref{ID: "net-1"},
+							Destination: v1beta1.DestinationNetwork{
+								Type:      "multus",
+								Namespace: "ns1",
+								Name:      "nad-a",
+							},
+						},
+					},
+				},
+			}
+			ctx := plancontext.Context{
+				Plan: plan,
+				Source: plancontext.Source{Inventory: &mockInventory{
+					vm: model.VM{
+						VM1: model.VM1{
+							VM0: model.VM0{ID: "vm-1", Name: "test"},
+						},
+						NICs: []vsphere.NIC{
+							{Network: vsphere.Ref{ID: "net-1"}, MAC: "aa:bb:cc:dd:ee:01"},
+							{Network: vsphere.Ref{ID: "net-1"}, MAC: "aa:bb:cc:dd:ee:02"},
+						},
+					},
+				}},
+			}
+			validator := &Validator{Context: &ctx}
+			nicRefs, err := validator.NICNetworkRefs(ref.Ref{Name: "test"})
+			Expect(err).NotTo(HaveOccurred())
+			foundNadDup, _ := planbase.ValidateNetworkDuplicates(nicRefs, plan.Referenced.Map.Network)
+			Expect(foundNadDup).To(BeTrue())
+		})
+
+		It("should detect duplicate when two different source networks map to same NAD", func() {
+			plan := createPlan()
+			plan.Referenced.Map.Network = &v1beta1.NetworkMap{
+				Spec: v1beta1.NetworkMapSpec{
+					Map: []v1beta1.NetworkPair{
+						{
+							Source: ref.Ref{ID: "net-1"},
+							Destination: v1beta1.DestinationNetwork{
+								Type:      "multus",
+								Namespace: "ns1",
+								Name:      "nad-a",
+							},
+						},
+						{
+							Source: ref.Ref{ID: "net-2"},
+							Destination: v1beta1.DestinationNetwork{
+								Type:      "multus",
+								Namespace: "ns1",
+								Name:      "nad-a",
+							},
+						},
+					},
+				},
+			}
+			ctx := plancontext.Context{
+				Plan: plan,
+				Source: plancontext.Source{Inventory: &mockInventory{
+					vm: model.VM{
+						VM1: model.VM1{
+							VM0: model.VM0{ID: "vm-1", Name: "test"},
+						},
+						NICs: []vsphere.NIC{
+							{Network: vsphere.Ref{ID: "net-1"}, MAC: "aa:bb:cc:dd:ee:01"},
+							{Network: vsphere.Ref{ID: "net-2"}, MAC: "aa:bb:cc:dd:ee:02"},
+						},
+					},
+				}},
+			}
+			validator := &Validator{Context: &ctx}
+			nicRefs, err := validator.NICNetworkRefs(ref.Ref{Name: "test"})
+			Expect(err).NotTo(HaveOccurred())
+			foundNadDup, _ := planbase.ValidateNetworkDuplicates(nicRefs, plan.Referenced.Map.Network)
+			Expect(foundNadDup).To(BeTrue())
+		})
+
+		It("should detect multiple pod networks via foundPodDup", func() {
+			plan := createPlan()
+			plan.Referenced.Map.Network = &v1beta1.NetworkMap{
+				Spec: v1beta1.NetworkMapSpec{
+					Map: []v1beta1.NetworkPair{
+						{
+							Source:      ref.Ref{ID: "net-1"},
+							Destination: v1beta1.DestinationNetwork{Type: "pod"},
+						},
+						{
+							Source:      ref.Ref{ID: "net-2"},
+							Destination: v1beta1.DestinationNetwork{Type: "pod"},
+						},
+						{
+							Source:      ref.Ref{ID: "net-3"},
+							Destination: v1beta1.DestinationNetwork{Type: "ignored"},
+						},
+					},
+				},
+			}
+			ctx := plancontext.Context{
+				Plan: plan,
+				Source: plancontext.Source{Inventory: &mockInventory{
+					vm: model.VM{
+						VM1: model.VM1{
+							VM0: model.VM0{ID: "vm-1", Name: "test"},
+						},
+						NICs: []vsphere.NIC{
+							{Network: vsphere.Ref{ID: "net-1"}, MAC: "aa:bb:cc:dd:ee:01"},
+							{Network: vsphere.Ref{ID: "net-2"}, MAC: "aa:bb:cc:dd:ee:02"},
+							{Network: vsphere.Ref{ID: "net-3"}, MAC: "aa:bb:cc:dd:ee:03"},
+						},
+					},
+				}},
+			}
+			validator := &Validator{Context: &ctx}
+			nicRefs, err := validator.NICNetworkRefs(ref.Ref{Name: "test"})
+			Expect(err).NotTo(HaveOccurred())
+			foundNadDup, foundPodDup := planbase.ValidateNetworkDuplicates(nicRefs, plan.Referenced.Map.Network)
+			Expect(foundNadDup).To(BeFalse())
+			Expect(foundPodDup).To(BeTrue()) // two NICs mapped to pod
+		})
+
+		It("should return error when VM not found", func() {
+			ctx := plancontext.Context{
+				Plan:   createPlan(),
+				Source: plancontext.Source{Inventory: &mockInventory{}},
+			}
+			validator := &Validator{Context: &ctx}
+			_, err := validator.NICNetworkRefs(ref.Ref{Name: "missing_from_inventory"})
+			Expect(err).To(HaveOccurred())
+		})
 	})
 })
 

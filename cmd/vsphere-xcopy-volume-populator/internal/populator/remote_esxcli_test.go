@@ -129,7 +129,7 @@ func (s *stubSSHClient) Connect(ctx context.Context, hostname, username string, 
 	return nil
 }
 
-func (s *stubSSHClient) ExecuteCommand(datastore, sshCommand string, args ...string) (string, error) {
+func (s *stubSSHClient) ExecuteCommand(_ context.Context, datastore, sshCommand string, args ...string) (string, error) {
 	return s.executeResponse, s.executeError
 }
 
@@ -160,7 +160,7 @@ var _ = Describe("checkScriptVersion", func() {
     </structure>
 </output>`
 
-			err := checkScriptVersion(client, datastore, "0.3.0", publicKey)
+			err := checkScriptVersion(context.Background(), client, datastore, "0.3.0", publicKey)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
@@ -175,7 +175,7 @@ var _ = Describe("checkScriptVersion", func() {
     </structure>
 </output>`
 
-			err := checkScriptVersion(client, datastore, "0.3.0", publicKey)
+			err := checkScriptVersion(context.Background(), client, datastore, "0.3.0", publicKey)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
@@ -190,7 +190,7 @@ var _ = Describe("checkScriptVersion", func() {
     </structure>
 </output>`
 
-			err := checkScriptVersion(client, datastore, "0.3.0", publicKey)
+			err := checkScriptVersion(context.Background(), client, datastore, "0.3.0", publicKey)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("version mismatch"))
 			Expect(err.Error()).To(ContainSubstring("uploaded 0.3.0 but SSH returned 0.2.0"))
@@ -202,7 +202,7 @@ var _ = Describe("checkScriptVersion", func() {
 		It("should return error indicating old script format", func() {
 			client.executeError = fmt.Errorf("command failed: file not found")
 
-			err := checkScriptVersion(client, datastore, "0.3.0", publicKey)
+			err := checkScriptVersion(context.Background(), client, datastore, "0.3.0", publicKey)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("old script format detected"))
 			Expect(err.Error()).To(ContainSubstring("Python-based"))
@@ -213,7 +213,7 @@ var _ = Describe("checkScriptVersion", func() {
 		It("should return parsing error", func() {
 			client.executeResponse = "not valid XML"
 
-			err := checkScriptVersion(client, datastore, "0.3.0", publicKey)
+			err := checkScriptVersion(context.Background(), client, datastore, "0.3.0", publicKey)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to parse version response"))
 		})
@@ -229,7 +229,7 @@ var _ = Describe("checkScriptVersion", func() {
     </structure>
 </output>`
 
-			err := checkScriptVersion(client, datastore, "0.3.0", publicKey)
+			err := checkScriptVersion(context.Background(), client, datastore, "0.3.0", publicKey)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("version command failed"))
 		})
@@ -245,7 +245,7 @@ var _ = Describe("checkScriptVersion", func() {
     </structure>
 </output>`
 
-			err := checkScriptVersion(client, datastore, "0.3.0", publicKey)
+			err := checkScriptVersion(context.Background(), client, datastore, "0.3.0", publicKey)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to parse version JSON"))
 		})
@@ -262,7 +262,7 @@ var _ = Describe("checkScriptVersion", func() {
     </structure>
 </output>`, scriptVersion)
 
-				err := checkScriptVersion(client, datastore, embeddedVersion, publicKey)
+				err := checkScriptVersion(context.Background(), client, datastore, embeddedVersion, publicKey)
 				if shouldSucceed {
 					Expect(err).ToNot(HaveOccurred(), "Expected version %s >= %s to succeed", scriptVersion, embeddedVersion)
 				} else {
@@ -287,7 +287,7 @@ var _ = Describe("checkScriptVersion", func() {
     </structure>
 </output>`
 
-			err := checkScriptVersion(client, datastore, "0.3.0", publicKey)
+			err := checkScriptVersion(context.Background(), client, datastore, "0.3.0", publicKey)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("invalid script version format"))
 		})
@@ -301,7 +301,7 @@ var _ = Describe("checkScriptVersion", func() {
     </structure>
 </output>`
 
-			err := checkScriptVersion(client, datastore, "invalid-version", publicKey)
+			err := checkScriptVersion(context.Background(), client, datastore, "invalid-version", publicKey)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("invalid embedded version format"))
 		})

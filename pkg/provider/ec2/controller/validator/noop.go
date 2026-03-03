@@ -16,9 +16,9 @@ func (r *Validator) MaintenanceMode(vmRef ref.Ref) (ok bool, err error) {
 	return true, nil
 }
 
-// PodNetwork validates pod network (not applicable for EC2).
-func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
-	return true, nil
+// NICNetworkRefs returns NIC network references (not applicable for EC2).
+func (r *Validator) NICNetworkRefs(vmRef ref.Ref) ([]ref.Ref, error) {
+	return nil, nil
 }
 
 // ChangeTrackingEnabled validates change tracking.

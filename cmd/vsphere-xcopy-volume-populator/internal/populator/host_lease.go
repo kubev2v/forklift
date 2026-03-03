@@ -79,7 +79,8 @@ func (h *HostLeaseLocker) WithLock(ctx context.Context, hostID string, work func
 	if err != nil {
 		lockHolderIdentity = "populator-" + uuid.New().String()
 	}
-	klog.Infof("This populator's identity is: %s", lockHolderIdentity)
+	log := klog.Background().WithName("copy-offload").WithName("lease")
+	log.V(2).Info("populator identity", "identity", lockHolderIdentity)
 
 	// 2. Get the lease client
 	leaseClient := h.clientset.CoordinationV1().Leases(h.namespace)
@@ -124,7 +125,7 @@ func (h *HostLeaseLocker) WithLock(ctx context.Context, hostID string, work func
 			createdLease, err := leaseClient.Create(ctx, lease, metav1.CreateOptions{})
 			if err == nil {
 				// Successfully created the lease - we have a slot!
-				klog.Infof("Acquired lease slot %d for host %s", slot, hostID)
+				log.Info("lease acquired", "slot", slot, "host", hostID)
 				return h.executeWorkWithLease(ctx, leaseClient, createdLease, hostID, slot, work)
 			}
 
@@ -141,7 +142,7 @@ func (h *HostLeaseLocker) WithLock(ctx context.Context, hostID string, work func
 					return fmt.Errorf("failed to get existing lease for host %s slot %d (API error - not retrying): %w", hostID, slot, getErr)
 				}
 				// Lease was deleted between create and get - try this slot again
-				klog.V(2).Infof("Lease %s was deleted, trying to acquire it", leaseName)
+				log.V(2).Info("lease was deleted, retrying slot", "lease", leaseName)
 				// Retry this slot immediately by continuing the loop
 				slot--
 				continue
@@ -150,7 +151,7 @@ func (h *HostLeaseLocker) WithLock(ctx context.Context, hostID string, work func
 			// Check if the lease is expired
 			if h.isLeaseExpired(existingLease) {
 				// Lease is expired - try to take it over
-				klog.Infof("Lease %s (slot %d) is expired, attempting to take it over", leaseName, slot)
+				log.Info("lease expired, attempting takeover", "lease", leaseName, "slot", slot)
 				existingLease.Spec.HolderIdentity = &lockHolderIdentity
 				now := metav1.NewMicroTime(time.Now())
 				existingLease.Spec.AcquireTime = &now
@@ -159,23 +160,23 @@ func (h *HostLeaseLocker) WithLock(ctx context.Context, hostID string, work func
 				updatedLease, updateErr := leaseClient.Update(ctx, existingLease, metav1.UpdateOptions{})
 				if updateErr == nil {
 					// Successfully took over the expired lease
-					klog.Infof("Acquired expired lease slot %d for host %s", slot, hostID)
+					log.Info("lease acquired (expired takeover)", "slot", slot, "host", hostID)
 					return h.executeWorkWithLease(ctx, leaseClient, updatedLease, hostID, slot, work)
 				}
 				// Update failed (likely someone else took it or conflict) - try next slot
-				klog.V(2).Infof("Failed to take over expired lease slot %d (conflict), trying next slot: %v", slot, updateErr)
+				log.V(2).Info("failed to take over expired lease", "slot", slot, "err", updateErr)
 			} else {
 				// Lease is held by someone else
 				holder := "unknown"
 				if existingLease.Spec.HolderIdentity != nil {
 					holder = *existingLease.Spec.HolderIdentity
 				}
-				klog.V(2).Infof("Lease slot %d for host %s is held by %s, trying next slot", slot, hostID, holder)
+				log.V(2).Info("lease slot held by another", "slot", slot, "host", hostID, "holder", holder)
 			}
 		}
 
 		// All slots are taken - wait and retry
-		klog.Infof("All %d lease slots for host %s are taken, waiting %v before retry", h.maxConcurrentHolders, hostID, h.retryInterval)
+		log.Info("all lease slots taken, waiting before retry", "slots", h.maxConcurrentHolders, "host", hostID, "wait", h.retryInterval)
 
 		select {
 		case <-time.After(h.retryInterval):
@@ -204,7 +205,8 @@ func (h *HostLeaseLocker) executeWorkWithLease(
 	slot int,
 	work func(context.Context) error,
 ) error {
-	klog.Infof("Successfully acquired lock slot %d for host %s", slot, hostID)
+	log := klog.Background().WithName("copy-offload").WithName("lease")
+	log.Info("lease acquired", "slot", slot, "host", hostID)
 
 	// Create a context for the work that we can cancel if renewal fails
 	workCtx, workCancel := context.WithCancel(ctx)
@@ -232,7 +234,7 @@ func (h *HostLeaseLocker) executeWorkWithLease(
 
 				updatedLease, err := leaseClient.Update(renewCtx, lease, metav1.UpdateOptions{})
 				if err != nil {
-					klog.Errorf("Failed to renew lease slot %d for host %s: %v", slot, hostID, err)
+					log.Error(err, "failed to renew lease", "slot", slot, "host", hostID)
 
 					// Cancel the work context immediately - we've lost the lock!
 					workCancel()
@@ -244,7 +246,7 @@ func (h *HostLeaseLocker) executeWorkWithLease(
 					return
 				}
 				lease = updatedLease
-				klog.V(2).Infof("Renewed lease slot %d for host %s", slot, hostID)
+				log.V(2).Info("lease renewed", "slot", slot, "host", hostID)
 
 			case <-renewCtx.Done():
 				// Work completed or context canceled
@@ -269,19 +271,19 @@ func (h *HostLeaseLocker) executeWorkWithLease(
 		}
 		// Add context to help debugging
 		if errors.Is(workCtx.Err(), context.Canceled) {
-			klog.Warningf("Work for slot %d host %s was cancelled due to lease renewal failure", slot, hostID)
+			log.Info("work cancelled due to lease renewal failure", "slot", slot, "host", hostID)
 		}
 	default:
 	}
 
-	klog.Infof("Work complete for slot %d host %s", slot, hostID)
+	log.Info("lease released", "slot", slot, "host", hostID)
 
 	// Note: We intentionally do NOT delete the lease explicitly.
 	// The lease will auto-expire after leaseDuration (10s), at which point
 	// other pods can acquire it. This is simpler and more reliable than
 	// explicit deletion, which can fail silently. The 10-second delay is
 	// acceptable given typical operation durations (30-300s per disk).
-	klog.V(2).Infof("Lease for slot %d host %s will auto-expire in %v", slot, hostID, h.leaseDuration)
+	log.V(2).Info("lease will auto-expire", "slot", slot, "host", hostID, "duration", h.leaseDuration)
 
 	return workErr
 }

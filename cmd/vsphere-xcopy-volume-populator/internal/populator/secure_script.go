@@ -36,10 +36,9 @@ func writeSecureScriptToTemp() (string, error) {
 // ensureSecureScript ensures the secure script is uploaded and available on the target ESX
 // Returns the script path
 func ensureSecureScript(ctx context.Context, client vmware.Client, esx *object.HostSystem, datastore string) (string, error) {
-	klog.Infof("ensuring secure script on ESXi %s", esx.Name())
-
-	// ALWAYS force re-upload to ensure latest version
-	klog.Infof("Force uploading secure script to ensure latest version")
+	log := klog.Background().WithName("copy-offload").WithName("secure-script")
+	log.Info("ensuring secure script on ESXi", "host", esx.Name())
+	log.Info("force uploading secure script to ensure latest version")
 
 	dc, err := getHostDC(esx)
 	if err != nil {
@@ -50,7 +49,7 @@ func ensureSecureScript(ctx context.Context, client vmware.Client, esx *object.H
 	if err != nil {
 		return "", fmt.Errorf("failed to upload the secure script to ESXi %s: %w", esx.Name(), err)
 	}
-	klog.Infof("uploaded secure script to ESXi %s at %s - ready for execution", esx.Name(), scriptPath)
+	log.Info("uploaded secure script to ESXi", "host", esx.Name(), "path", scriptPath)
 
 	return scriptPath, nil
 }
@@ -71,7 +70,8 @@ func uploadScript(ctx context.Context, client vmware.Client, dc *object.Datacent
 	}
 	defer os.Remove(tempScriptPath) // Clean up temp file
 
-	klog.Infof("Uploading embedded script to datastore as %s", scriptName)
+	log := klog.Background().WithName("copy-offload").WithName("secure-script")
+	log.Info("uploading embedded script to datastore", "script", scriptName)
 
 	// Upload the file with timeout
 	upCtx, upCancel := context.WithTimeout(ctx, 30*time.Second)
@@ -81,6 +81,6 @@ func uploadScript(ctx context.Context, client vmware.Client, dc *object.Datacent
 	}
 
 	datastorePath := fmt.Sprintf("/vmfs/volumes/%s/%s", datastore, scriptName)
-	klog.Infof("Successfully uploaded embedded script to datastore path: %s", datastorePath)
+	log.Info("uploaded embedded script to datastore", "path", datastorePath)
 	return datastorePath, nil
 }
