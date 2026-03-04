@@ -1007,7 +1007,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 					"vmID":      vm.ID,
 					"app":       "forklift",
 				}
-				r.converter = adapter.NewConverter(&r.Context.Destination, r.Log.WithName("converter"), labels)
+				r.converter = adapter.NewConverter(&r.Context.Destination, r.Log.WithName("converter"), labels, getVirtV2vImage(r.Plan))
 				r.converter.FilterFn = func(pvc *core.PersistentVolumeClaim) bool {
 					val, ok := pvc.Annotations[base.AnnRequiresConversion]
 					return ok && val == "true"
