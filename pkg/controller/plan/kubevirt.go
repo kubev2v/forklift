@@ -2435,7 +2435,7 @@ func (r *KubeVirt) buildInspectionPodEnvironment(env []core.EnvVar, vm *plan.VMS
 	}
 
 	// Add disks to be inspected
-	for i, disk := range virtualMachine.Disks {
+	for i, disk := range virtualMachine.SortedDisksAsLibvirt() {
 		// If parent disk is empty then fail with error message
 		if disk.ParentFile != "" {
 			newEnv = append(newEnv, core.EnvVar{
