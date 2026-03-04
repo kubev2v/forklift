@@ -6,7 +6,6 @@ import (
 
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
-	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	batchv1 "k8s.io/api/batch/v1"
@@ -25,17 +24,19 @@ type PVCConverter interface {
 }
 
 type Converter struct {
-	Destination *plancontext.Destination
-	Log         logging.LevelLogger
-	Labels      map[string]string
-	FilterFn    filterFn
+	Destination  *plancontext.Destination
+	Log          logging.LevelLogger
+	Labels       map[string]string
+	FilterFn     filterFn
+	VirtV2vImage string
 }
 
-func NewConverter(destination *plancontext.Destination, logger logging.LevelLogger, labels map[string]string) *Converter {
+func NewConverter(destination *plancontext.Destination, logger logging.LevelLogger, labels map[string]string, virtV2vImage string) *Converter {
 	return &Converter{
-		Destination: destination,
-		Log:         logger,
-		Labels:      labels,
+		Destination:  destination,
+		Log:          logger,
+		Labels:       labels,
+		VirtV2vImage: virtV2vImage,
 	}
 }
 
@@ -119,7 +120,7 @@ func (c *Converter) ensureJob(pvc *v1.PersistentVolumeClaim, dv *cdi.DataVolume,
 	}
 
 	// Job doesn't exist, create it
-	job := createConvertJob(pvc, dv, srcFormat, dstFormat, c.Labels)
+	job := createConvertJob(pvc, dv, srcFormat, dstFormat, c.Labels, c.VirtV2vImage)
 	c.Log.Info("Creating convert job", "pvc", pvc.Name, "srcFormat", srcFormat, "dstFormat", dstFormat)
 	err = c.Destination.Client.Create(context.Background(), job)
 	if err != nil {
@@ -129,7 +130,7 @@ func (c *Converter) ensureJob(pvc *v1.PersistentVolumeClaim, dv *cdi.DataVolume,
 	return job, nil
 }
 
-func createConvertJob(pvc *v1.PersistentVolumeClaim, dv *cdi.DataVolume, srcFormat, dstFormat string, labels map[string]string) *batchv1.Job {
+func createConvertJob(pvc *v1.PersistentVolumeClaim, dv *cdi.DataVolume, srcFormat, dstFormat string, labels map[string]string, virtV2vImage string) *batchv1.Job {
 	if labels == nil {
 		labels = make(map[string]string)
 	}
@@ -156,7 +157,7 @@ func createConvertJob(pvc *v1.PersistentVolumeClaim, dv *cdi.DataVolume, srcForm
 					},
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
-						makeConversionContainer(pvc, srcFormat, dstFormat),
+						makeConversionContainer(pvc, srcFormat, dstFormat, virtV2vImage),
 					},
 					Volumes: []v1.Volume{
 						{
@@ -182,7 +183,7 @@ func createConvertJob(pvc *v1.PersistentVolumeClaim, dv *cdi.DataVolume, srcForm
 	}
 }
 
-func makeConversionContainer(pvc *v1.PersistentVolumeClaim, srcFormat, dstFormat string) v1.Container {
+func makeConversionContainer(pvc *v1.PersistentVolumeClaim, srcFormat, dstFormat, virtV2vImage string) v1.Container {
 	var volumeMode v1.PersistentVolumeMode
 	if pvc.Spec.VolumeMode == nil {
 		volumeMode = v1.PersistentVolumeFilesystem
@@ -201,7 +202,7 @@ func makeConversionContainer(pvc *v1.PersistentVolumeClaim, srcFormat, dstFormat
 
 	container := v1.Container{
 		Name:  "convert",
-		Image: base.Settings.VirtV2vImage,
+		Image: virtV2vImage,
 		SecurityContext: &v1.SecurityContext{
 			AllowPrivilegeEscalation: ptr.To(false),
 			Capabilities: &v1.Capabilities{

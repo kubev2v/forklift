@@ -1809,7 +1809,7 @@ func createVddkCheckJob(plan *api.Plan) *batchv1.Job {
 									core.ResourceMemory: resource.MustParse("500Mi"),
 								},
 							},
-							Image: Settings.Migration.VirtV2vImage,
+							Image: getVirtV2vImage(plan),
 							SecurityContext: &core.SecurityContext{
 								AllowPrivilegeEscalation: ptr.To(false),
 								Capabilities: &core.Capabilities{
