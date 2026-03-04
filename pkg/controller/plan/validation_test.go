@@ -1062,4 +1062,68 @@ var _ = ginkgo.Describe("Template Validation", func() {
 			gomega.Expect(plan.Status.HasCondition(NotValid)).To(gomega.BeTrue())
 		})
 	})
+
+	ginkgo.Describe("createVddkCheckJob image selection", func() {
+		const globalImage = "quay.io/kubev2v/forklift-virt-v2v:latest"
+		const vddkImage = "quay.io/kubev2v/vddk:latest"
+
+		newPlanWithVddkProvider := func() *api.Plan {
+			return &api.Plan{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-plan",
+					Namespace: testNamespace,
+					UID:       "test-uid",
+				},
+				Spec: api.PlanSpec{
+					TargetNamespace: testNamespace,
+				},
+				Referenced: api.Referenced{
+					Provider: struct {
+						Source      *api.Provider
+						Destination *api.Provider
+					}{
+						Source: &api.Provider{
+							ObjectMeta: meta.ObjectMeta{Name: "vsphere-src"},
+							Spec: api.ProviderSpec{
+								Settings: map[string]string{
+									api.VDDK: vddkImage,
+								},
+							},
+						},
+					},
+				},
+			}
+		}
+
+		ginkgo.BeforeEach(func() {
+			Settings.Migration.VirtV2vImage = globalImage
+		})
+
+		ginkgo.It("should use global virt-v2v image when plan has no override", func() {
+			p := newPlanWithVddkProvider()
+			job := createVddkCheckJob(p)
+
+			validatorContainer := job.Spec.Template.Spec.Containers[0]
+			gomega.Expect(validatorContainer.Image).To(gomega.Equal(globalImage))
+		})
+
+		ginkgo.It("should use per-plan virt-v2v image when set", func() {
+			perPlanImage := "quay.io/kubev2v/forklift-virt-v2v:custom-build"
+			p := newPlanWithVddkProvider()
+			p.Spec.VirtV2vImage = perPlanImage
+			job := createVddkCheckJob(p)
+
+			validatorContainer := job.Spec.Template.Spec.Containers[0]
+			gomega.Expect(validatorContainer.Image).To(gomega.Equal(perPlanImage))
+		})
+
+		ginkgo.It("should fall back to global image when plan override is empty string", func() {
+			p := newPlanWithVddkProvider()
+			p.Spec.VirtV2vImage = ""
+			job := createVddkCheckJob(p)
+
+			validatorContainer := job.Spec.Template.Spec.Containers[0]
+			gomega.Expect(validatorContainer.Image).To(gomega.Equal(globalImage))
+		})
+	})
 })
