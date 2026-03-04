@@ -13,7 +13,6 @@ import (
 	"path"
 	"regexp"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -26,7 +25,6 @@ import (
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	utils "github.com/kubev2v/forklift/pkg/controller/plan/util"
-	container "github.com/kubev2v/forklift/pkg/controller/provider/container/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
@@ -559,7 +557,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 
 	// Sort disks by bus, so we can match the disk index to the boot order.
 	// Important: need to match order in mapDisks method
-	disks := r.sortedDisksAsVmware(vm.Disks)
+	disks := vm.SortedDisksAsVmware()
 
 	for diskIndex, disk := range disks {
 		mapped, found := dsMap[disk.Datastore.ID]
@@ -923,53 +921,15 @@ func (r *Builder) mapFirmware(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.Firmware = firmware
 }
 
-func (r *Builder) filterDisksWithBus(disks []vsphere.Disk, bus string) []vsphere.Disk {
-	var resp []vsphere.Disk
-	for _, disk := range disks {
-		if disk.Bus == bus {
-			resp = append(resp, disk)
-		}
-	}
-	return resp
-}
-
-// The disks are first sorted by the buses going in order SCSI, SATA and IDE and within the controller the
-// disks are sorted by the key. This needs to be done because the virt-v2v outputs the files in an order,
-// which it gets from libvirt. The libvirt orders the devices starting with SCSI, SATA and IDE.
-// When we were sorting by the keys the order was IDE, SATA and SCSI. This cause that some PVs were populated by
-// incorrect disks.
-// https://github.com/libvirt/libvirt/blob/master/src/vmx/vmx.c#L1713
-func (r *Builder) sortedDisksByBusses(disks []vsphere.Disk, buses []string) []vsphere.Disk {
-	var resp []vsphere.Disk
-	for _, bus := range buses {
-		disksWithBus := r.filterDisksWithBus(disks, bus)
-		sort.Slice(disksWithBus, func(i, j int) bool {
-			return disksWithBus[i].Key < disksWithBus[j].Key
-		})
-		resp = append(resp, disksWithBus...)
-	}
-	return resp
-}
-
-func (r *Builder) sortedDisksAsLibvirt(disks []vsphere.Disk) []vsphere.Disk {
-	var buses = []string{container.SCSI, container.SATA, container.IDE, container.NVME}
-	return r.sortedDisksByBusses(disks, buses)
-}
-
-func (r *Builder) sortedDisksAsVmware(disks []vsphere.Disk) []vsphere.Disk {
-	var buses = []string{container.SATA, container.IDE, container.SCSI, container.NVME}
-	return r.sortedDisksByBusses(disks, buses)
-}
-
 func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims []*core.PersistentVolumeClaim, object *cnv.VirtualMachineSpec, sortByLibvirt bool) error {
 	var kVolumes []cnv.Volume
 	var kDisks []cnv.Disk
 	var disks []vsphere.Disk
 
 	if sortByLibvirt {
-		disks = r.sortedDisksAsLibvirt(vm.Disks)
+		disks = vm.SortedDisksAsLibvirt()
 	} else {
-		disks = r.sortedDisksAsVmware(vm.Disks)
+		disks = vm.SortedDisksAsVmware()
 	}
 	pvcMap := make(map[string]*core.PersistentVolumeClaim)
 	for i := range persistentVolumeClaims {
@@ -1346,7 +1306,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		vm.RemoveSharedDisks()
 	}
 	// Get sorted disks to maintain consistent indexing with other parts of the system
-	sortedDisks := r.sortedDisksAsVmware(vm.Disks)
+	sortedDisks := vm.SortedDisksAsVmware()
 
 	dsMapIn := r.Context.Map.Storage.Spec.Map
 	dsNaaMap := make(map[string]string)
