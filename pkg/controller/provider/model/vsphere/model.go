@@ -28,6 +28,15 @@ const (
 	ProtocolTCP          ProtocolType = "TCP"          // Generic TCP-based adapter
 )
 
+// Bus types
+const (
+	NVME = "nvme"
+	USB  = "usb"
+	SATA = "sata"
+	SCSI = "scsi"
+	IDE  = "ide"
+)
+
 // Errors
 var NotFound = libmodel.NotFound
 
