@@ -12,13 +12,13 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 )
 
-// Bus types
+// Bus types — re-exported from the model package for backward compatibility.
 const (
-	NVME = "nvme"
-	USB  = "usb"
-	SATA = "sata"
-	SCSI = "scsi"
-	IDE  = "ide"
+	NVME = model.NVME
+	USB  = model.USB
+	SATA = model.SATA
+	SCSI = model.SCSI
+	IDE  = model.IDE
 )
 
 // Model adapter.
