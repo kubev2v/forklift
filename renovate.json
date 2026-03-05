@@ -13,7 +13,35 @@
         "main"
       ],
       "matchManagers": [
-        "gomod",
+        "gomod"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
+      "groupName": "all go non-major dependencies",
+      "automerge": true
+    },
+    {
+      "matchBaseBranches": [
+        "main"
+      ],
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "groupName": "all go major dependencies"
+    },
+    {
+      "matchBaseBranches": [
+        "/^release.*/",
+        "main"
+      ],
+      "matchManagers": [
         "dockerfile"
       ],
       "matchUpdateTypes": [
@@ -22,7 +50,7 @@
         "pin",
         "digest"
       ],
-      "groupName": "all non-major dependencies",
+      "groupName": "all dockerfile non-major dependencies",
       "automerge": true
     },
     {
@@ -30,13 +58,12 @@
         "main"
       ],
       "matchManagers": [
-        "gomod",
         "dockerfile"
       ],
       "matchUpdateTypes": [
         "major"
       ],
-      "groupName": "all go major dependencies"
+      "groupName": "all dockerfile major dependencies"
     }
   ],
   "autoApprove": true,
