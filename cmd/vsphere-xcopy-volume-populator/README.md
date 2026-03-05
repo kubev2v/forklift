@@ -138,7 +138,7 @@ The `storageVendorProduct` field in the `StorageMap` identifies which storage pr
 | Dell            | `powermax`                   | [Link](#dell-powermax) |
 | Dell            | `powerstore`                 | |
 | Infinidat       | `infinibox`                  | |
-| IBM             | `flashsystem`                | |
+| IBM             | `flashsystem`                | [Link](#ibm-flashsystem) |
 
 If a storage provider wants their storage to be supported, they need
 to implement a go package named after their product, and mutate main
