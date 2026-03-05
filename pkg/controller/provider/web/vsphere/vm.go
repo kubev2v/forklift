@@ -233,7 +233,7 @@ func (r *VM1) filterDisksWithBus(disks []model.Disk, bus string) []model.Disk {
 // which it gets from libvirt. The libvirt orders the devices starting with SCSI, SATA and IDE.
 // When we were sorting by the keys the order was IDE, SATA and SCSI. This cause that some PVs were populated by
 // incorrect disks.
-// https://github.com/libvirt/libvirt/blob/master/src/vmx/vmx.c#L1713
+// https://github.com/libvirt/libvirt/blob/d7b3be8ca35ffcbbece2c65120ab3ac9ec3dff0c/src/vmx/vmx.c#L1730
 func (r *VM1) sortedDisksByBusses(disks []model.Disk, buses []string) []model.Disk {
 	var resp []model.Disk
 	for _, bus := range buses {
