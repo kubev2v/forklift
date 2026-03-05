@@ -85,6 +85,21 @@ func (mr *MockStorageApiMockRecorder) Map(initatorGroup, targetLUN, context any)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Map", reflect.TypeOf((*MockStorageApi)(nil).Map), initatorGroup, targetLUN, context)
 }
 
+// MapTarget mocks base method.
+func (m *MockStorageApi) MapTarget(targetLUN populator.LUN, context populator.MappingContext) (populator.LUN, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MapTarget", targetLUN, context)
+	ret0, _ := ret[0].(populator.LUN)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// MapTarget indicates an expected call of MapTarget.
+func (mr *MockStorageApiMockRecorder) MapTarget(targetLUN, context any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MapTarget", reflect.TypeOf((*MockStorageApi)(nil).MapTarget), targetLUN, context)
+}
+
 // ResolvePVToLUN mocks base method.
 func (m *MockStorageApi) ResolvePVToLUN(persistentVolume populator.PersistentVolume) (populator.LUN, error) {
 	m.ctrl.T.Helper()
@@ -112,4 +127,18 @@ func (m *MockStorageApi) UnMap(initatorGroup string, targetLUN populator.LUN, co
 func (mr *MockStorageApiMockRecorder) UnMap(initatorGroup, targetLUN, context any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnMap", reflect.TypeOf((*MockStorageApi)(nil).UnMap), initatorGroup, targetLUN, context)
+}
+
+// UnmapTarget mocks base method.
+func (m *MockStorageApi) UnmapTarget(targetLUN populator.LUN, context populator.MappingContext) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UnmapTarget", targetLUN, context)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UnmapTarget indicates an expected call of UnmapTarget.
+func (mr *MockStorageApiMockRecorder) UnmapTarget(targetLUN, context any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnmapTarget", reflect.TypeOf((*MockStorageApi)(nil).UnmapTarget), targetLUN, context)
 }

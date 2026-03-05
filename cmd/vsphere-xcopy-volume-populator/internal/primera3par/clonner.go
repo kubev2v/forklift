@@ -11,7 +11,8 @@ import (
 const PROVIDER_ID = "60002ac"
 
 type Primera3ParClonner struct {
-	client Primera3ParClient
+	client         Primera3ParClient
+	initiatorGroup string
 }
 
 func NewPrimera3ParClonner(storageHostname, storageUsername, storagePassword string, sslSkipVerify bool) (Primera3ParClonner, error) {
@@ -23,6 +24,7 @@ func NewPrimera3ParClonner(storageHostname, storageUsername, storagePassword str
 
 // EnsureClonnerIgroup creates or update an initiator group with the clonnerIqn
 func (c *Primera3ParClonner) EnsureClonnerIgroup(initiatorGroup string, adapterIds []string) (populator.MappingContext, error) {
+	c.initiatorGroup = initiatorGroup
 	hostNames, err := c.client.EnsureHostsWithIds(adapterIds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to ensure host with IQN: %w", err)
@@ -45,6 +47,14 @@ func (c *Primera3ParClonner) EnsureClonnerIgroup(initiatorGroup string, adapterI
 
 func (p *Primera3ParClonner) GetNaaID(lun populator.LUN) populator.LUN {
 	return lun
+}
+
+func (c *Primera3ParClonner) MapTarget(targetLUN populator.LUN, mappingContext populator.MappingContext) (populator.LUN, error) {
+	return c.Map(c.initiatorGroup, targetLUN, mappingContext)
+}
+
+func (c *Primera3ParClonner) UnmapTarget(targetLUN populator.LUN, mappingContext populator.MappingContext) error {
+	return c.UnMap(c.initiatorGroup, targetLUN, mappingContext)
 }
 
 // Map is responsible to mapping an initiator group to a LUN

@@ -106,7 +106,11 @@ type Migration struct {
 	// Additional arguments for virt-v2v
 	VirtV2vExtraArgs string
 	// Additional configuration for virt-v2v
-	VirtV2vExtraConfConfigMap        string
+	VirtV2vExtraConfConfigMap string
+	// Memory (in MB) allocated for the virt-v2v conversion appliance
+	VirtV2vMemSize int
+	// Number of virtual CPUs used for the virt-v2v conversion appliance
+	VirtV2vSmp                       int
 	VirtV2vContainerLimitsCpu        string
 	VirtV2vContainerLimitsMemory     string
 	VirtV2vContainerRequestsCpu      string

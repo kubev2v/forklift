@@ -42,7 +42,7 @@ LDFLAGS := -w -s \
 		   -X 'github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/version.VibVersion=$(VIB_VERSION)' \
 		   -X 'github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper.Version=$(SCRIPT_VERSION)'
 .PHONY: build
-build: fmt vet
+build:
 	$(eval SCRIPT_VERSION := $(shell sh vmkfstools-wrapper/vmkfstools_wrapper.sh --version --output simple))
 	PATH="$(PATH)" \
 	go build \

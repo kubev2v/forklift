@@ -3,6 +3,7 @@ package powerflex
 import (
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/dell/goscaleio"
@@ -19,13 +20,15 @@ const (
 type PowerflexClonner struct {
 	Client   *goscaleio.Client
 	systemId string
+	sdcId    string
 }
 
 // CurrentMappedGroups implements populator.StorageApi.
 func (p *PowerflexClonner) CurrentMappedGroups(targetLUN populator.LUN, mappingContext populator.MappingContext) ([]string, error) {
 	klog.Infof("getting current mapping to volume %+v", targetLUN)
-	klog.Infof("going to sleep to give csi time")
-	time.Sleep(20 * time.Second)
+	csiGraceSeconds := 20
+	klog.Infof("PowerFlex CSI may be slow to refresh data. Sleeping for %d seconds.", csiGraceSeconds)
+	time.Sleep(time.Second * time.Duration(csiGraceSeconds))
 	v, err := p.Client.GetVolume("", "", "", targetLUN.Name, false)
 	if err != nil {
 		return nil, err
@@ -37,8 +40,8 @@ func (p *PowerflexClonner) CurrentMappedGroups(targetLUN populator.LUN, mappingC
 
 	klog.Infof("current mapping %+v", v[0].MappedSdcInfo)
 	if len(v[0].MappedSdcInfo) == 0 {
-		klog.Errorf("found 0 Mapped SDC Info for target volume %+v", targetLUN)
-		return []string{}, fmt.Errorf("found 0 Mapped SDC Info for target volume %+v", targetLUN)
+		// although shouldn't happen we should not break the flow here.
+		klog.Infof("found 0 Mapped SDC Info for target volume %+v", targetLUN)
 	}
 	for _, sdcInfo := range v[0].MappedSdcInfo {
 		currentMappedSdcs = append(currentMappedSdcs, sdcInfo.SdcID)
@@ -64,14 +67,25 @@ func (p *PowerflexClonner) EnsureClonnerIgroup(initiatorGroup string, clonnerIqn
 		if sdc.OSType != "Esx" {
 			continue
 		}
-		klog.Infof("Comparing with sdc %+v", sdc)
-		if slices.Contains(clonnerIqn, sdc.SdcGUID) {
+		klog.Infof("Comparing clonner iqn/wwn %s with sdc guid %v", clonnerIqn, sdc.SdcGUID)
+		if slices.ContainsFunc(clonnerIqn, func(e string) bool {
+			return strings.EqualFold(e, sdc.SdcGUID)
+		}) {
 			klog.Infof("found compatible SDC: %+v", sdc)
 			mappingContext[sdcIDContextKey] = sdc.ID
+			p.sdcId = sdc.ID
 			return mappingContext, nil
 		}
 	}
 	return mappingContext, fmt.Errorf("could not find the SDC adapter on ESXI")
+}
+
+func (p *PowerflexClonner) MapTarget(targetLUN populator.LUN, mappingContext populator.MappingContext) (populator.LUN, error) {
+	return p.Map(p.sdcId, targetLUN, mappingContext)
+}
+
+func (p *PowerflexClonner) UnmapTarget(targetLUN populator.LUN, mappingContext populator.MappingContext) error {
+	return p.UnMap(p.sdcId, targetLUN, mappingContext)
 }
 
 func (p *PowerflexClonner) Map(initiatorGroup string, targetLUN populator.LUN, mappingContext populator.MappingContext) (populator.LUN, error) {
