@@ -9,7 +9,7 @@ const (
 	CleanupXcopyInitiatorGroup = "cleanupXcopyInitiatorGroup"
 )
 
-//go:generate go run go.uber.org/mock/mockgen -destination=mocks/storage_mock_client.go -package=storage_mocks . StorageApi
+//go:generate go run go.uber.org/mock/mockgen -destination=mocks/storage_mock_client.go -package=mocks . StorageApi
 type StorageApi interface {
 	VMDKCapable
 }
@@ -39,6 +39,10 @@ type RDMCapable interface {
 type StorageMapper interface {
 	// EnsureClonnerIgroup creates or updates an initiator group with the clonnerIqn
 	EnsureClonnerIgroup(initiatorGroup string, clonnerIqn []string) (MappingContext, error)
+	// MapTarget maps the LUN to the clonner group (internalized).
+	MapTarget(targetLUN LUN, context MappingContext) (LUN, error)
+	// UnmapTarget unmaps the LUN from the clonner group (internalized).
+	UnmapTarget(targetLUN LUN, context MappingContext) error
 	// Map is responsible for mapping an initiator group to a LUN
 	Map(initatorGroup string, targetLUN LUN, context MappingContext) (LUN, error)
 	// UnMap is responsible for unmapping an initiator group from a LUN

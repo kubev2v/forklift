@@ -23,6 +23,7 @@ import (
 type VantaraCloner struct {
 	client          VantaraClient
 	envHostGroupIds []string
+	initiatorGroup  string
 }
 
 func NewVantaraClonner(hostname, username, password string) (VantaraCloner, error) {
@@ -54,6 +55,14 @@ func NewVantaraClonner(hostname, username, password string) (VantaraCloner, erro
 		client:          client,
 		envHostGroupIds: envStorage["hostGroupIds"].([]string),
 	}, nil
+}
+
+func (v *VantaraCloner) MapTarget(targetLUN populator.LUN, context populator.MappingContext) (populator.LUN, error) {
+	return v.Map(v.initiatorGroup, targetLUN, context)
+}
+
+func (v *VantaraCloner) UnmapTarget(targetLUN populator.LUN, context populator.MappingContext) error {
+	return v.UnMap(v.initiatorGroup, targetLUN, context)
 }
 
 func getStorageEnvVars() (map[string]interface{}, error) {
@@ -147,6 +156,7 @@ func (v *VantaraCloner) GetNaaID(lun populator.LUN) populator.LUN {
 }
 
 func (v *VantaraCloner) EnsureClonnerIgroup(xcopyInitiatorGroup string, hbaUIDs []string) (populator.MappingContext, error) {
+	v.initiatorGroup = xcopyInitiatorGroup
 	if len(v.envHostGroupIds) > 0 {
 		klog.Infof("Using host group IDs from environment: %v", v.envHostGroupIds)
 		return populator.MappingContext{"hostGroupIds": v.envHostGroupIds}, nil

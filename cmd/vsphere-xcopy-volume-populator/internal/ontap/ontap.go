@@ -19,7 +19,8 @@ const OntapProviderID = "600a0980"
 var _ populator.VMDKCapable = &NetappClonner{}
 
 type NetappClonner struct {
-	api api.OntapAPI
+	api                  api.OntapAPI
+	initiatorHostOrGroup string
 }
 
 // Map the targetLUN to the initiator group.
@@ -35,9 +36,33 @@ func (c *NetappClonner) UnMap(initatorGroup string, targetLUN populator.LUN, _ p
 	return c.api.LunUnmap(context.TODO(), initatorGroup, targetLUN.Name)
 }
 
+func (c *NetappClonner) MapTarget(targetLUN populator.LUN, context populator.MappingContext) (populator.LUN, error) {
+	return c.Map(c.initiatorHostOrGroup, targetLUN, context)
+}
+
+func (c *NetappClonner) UnmapTarget(targetLUN populator.LUN, context populator.MappingContext) error {
+	return c.UnMap(c.initiatorHostOrGroup, targetLUN, context)
+}
+
 func (c *NetappClonner) EnsureClonnerIgroup(initiatorGroup string, adapterIds []string) (populator.MappingContext, error) {
+	// Detect protocol from adapters to avoid mixed protocol groups
+	protocol := "mixed"
+	for _, id := range adapterIds {
+		if strings.HasPrefix(id, "fc.") || strings.HasPrefix(id, "20") {
+			protocol = "fcp" // NetApp uses 'fcp' for Fibre Channel protocol
+			break
+		}
+		if strings.HasPrefix(id, "iqn.") || strings.HasPrefix(id, "eui.") || strings.HasPrefix(id, "nqn.") {
+			protocol = "iscsi"
+			break
+		}
+	}
+
+	// Append protocol suffix to avoid mixed protocol igroup errors
+	c.initiatorHostOrGroup = initiatorGroup + "-" + protocol
+
 	// esxs needs "vmware" as the group protocol.
-	err := c.api.IgroupCreate(context.Background(), initiatorGroup, "mixed", "vmware")
+	err := c.api.IgroupCreate(context.Background(), c.initiatorHostOrGroup, protocol, "vmware")
 	if err != nil {
 		// TODO ignore if exists error? with ontap there is no error
 		return nil, fmt.Errorf("failed adding igroup %w", err)
@@ -58,9 +83,13 @@ func (c *NetappClonner) EnsureClonnerIgroup(initiatorGroup string, adapterIds []
 			ontapInitiator = converted
 		}
 
-		err = c.api.EnsureIgroupAdded(context.Background(), initiatorGroup, ontapInitiator)
+		err = c.api.EnsureIgroupAdded(context.Background(), c.initiatorHostOrGroup, ontapInitiator)
 		if err != nil {
 			klog.Warningf("failed adding host to igroup %s", err)
+			if strings.Contains(err.Error(), "[409]") {
+				// duplicate initiator in a group
+				atLeastOneAdded = true
+			}
 			continue
 		}
 		atLeastOneAdded = true

@@ -58,6 +58,21 @@ func (mr *MockClientMockRecorder) GetDatastore(ctx, dc, datastore any) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDatastore", reflect.TypeOf((*MockClient)(nil).GetDatastore), ctx, dc, datastore)
 }
 
+// GetDatastoreActiveAdapters mocks base method.
+func (m *MockClient) GetDatastoreActiveAdapters(ctx context.Context, host *object.HostSystem, datastoreName string) ([]vmware.HostAdapter, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDatastoreActiveAdapters", ctx, host, datastoreName)
+	ret0, _ := ret[0].([]vmware.HostAdapter)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDatastoreActiveAdapters indicates an expected call of GetDatastoreActiveAdapters.
+func (mr *MockClientMockRecorder) GetDatastoreActiveAdapters(ctx, host, datastoreName any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDatastoreActiveAdapters", reflect.TypeOf((*MockClient)(nil).GetDatastoreActiveAdapters), ctx, host, datastoreName)
+}
+
 // GetEsxByVm mocks base method.
 func (m *MockClient) GetEsxByVm(ctx context.Context, vmName string) (*object.HostSystem, error) {
 	m.ctrl.T.Helper()
@@ -73,6 +88,21 @@ func (mr *MockClientMockRecorder) GetEsxByVm(ctx, vmName any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEsxByVm", reflect.TypeOf((*MockClient)(nil).GetEsxByVm), ctx, vmName)
 }
 
+// GetVMDiskBacking mocks base method.
+func (m *MockClient) GetVMDiskBacking(ctx context.Context, vmId, vmdkPath string) (*vmware.DiskBacking, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetVMDiskBacking", ctx, vmId, vmdkPath)
+	ret0, _ := ret[0].(*vmware.DiskBacking)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetVMDiskBacking indicates an expected call of GetVMDiskBacking.
+func (mr *MockClientMockRecorder) GetVMDiskBacking(ctx, vmId, vmdkPath any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVMDiskBacking", reflect.TypeOf((*MockClient)(nil).GetVMDiskBacking), ctx, vmId, vmdkPath)
+}
+
 // RunEsxCommand mocks base method.
 func (m *MockClient) RunEsxCommand(ctx context.Context, host *object.HostSystem, command []string) ([]esx.Values, error) {
 	m.ctrl.T.Helper()
@@ -86,19 +116,4 @@ func (m *MockClient) RunEsxCommand(ctx context.Context, host *object.HostSystem,
 func (mr *MockClientMockRecorder) RunEsxCommand(ctx, host, command any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RunEsxCommand", reflect.TypeOf((*MockClient)(nil).RunEsxCommand), ctx, host, command)
-}
-
-// GetVMDiskBacking mocks base method.
-func (m *MockClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkPath string) (*vmware.DiskBacking, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetVMDiskBacking", ctx, vmId, vmdkPath)
-	ret0, _ := ret[0].(*vmware.DiskBacking)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetVMDiskBacking indicates an expected call of GetVMDiskBacking.
-func (mr *MockClientMockRecorder) GetVMDiskBacking(ctx, vmId, vmdkPath any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVMDiskBacking", reflect.TypeOf((*MockClient)(nil).GetVMDiskBacking), ctx, vmId, vmdkPath)
 }

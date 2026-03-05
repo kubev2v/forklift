@@ -20,7 +20,16 @@ const (
 )
 
 type InfiniboxClonner struct {
-	api iboxapi.Client
+	api            iboxapi.Client
+	initiatorGroup string
+}
+
+func (c *InfiniboxClonner) MapTarget(targetLUN populator.LUN, context populator.MappingContext) (populator.LUN, error) {
+	return c.Map(c.initiatorGroup, targetLUN, context)
+}
+
+func (c *InfiniboxClonner) UnmapTarget(targetLUN populator.LUN, context populator.MappingContext) error {
+	return c.UnMap(c.initiatorGroup, targetLUN, context)
 }
 
 func (c *InfiniboxClonner) Map(initiatorGroup string, targetLUN populator.LUN, mappingContext populator.MappingContext) (populator.LUN, error) {
@@ -95,6 +104,7 @@ func (c *InfiniboxClonner) UnMap(initiatorGroup string, targetLUN populator.LUN,
 }
 
 func (c *InfiniboxClonner) EnsureClonnerIgroup(initiatorGroup string, adapterIds []string) (populator.MappingContext, error) {
+	c.initiatorGroup = initiatorGroup
 	hosts, err := c.api.GetAllHosts()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all hosts: %w", err)

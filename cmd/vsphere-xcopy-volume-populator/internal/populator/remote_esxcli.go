@@ -131,113 +131,31 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		}
 	}
 
-	// for iSCSI add the host to the group using IQN. Is there something else for FC?
-	r, err := p.VSphereClient.RunEsxCommand(setupCtx, host, []string{"storage", "core", "adapter", "list"})
+	// Filter HBA UIDs based on datastore active adapters
+	var dsActiveAdapters []vmware.HostAdapter
+	dsActiveAdapters, err = p.VSphereClient.GetDatastoreActiveAdapters(context.Background(), host, vmDisk.Datastore)
+	initiators := []string{}
+	setupLog.Info("Datastore active adapters", "datastore",vmDisk.Datastore, "activeAdapters", dsActiveAdapters)
+	for _, a := range dsActiveAdapters {
+		initiators = append(initiators, a.Id)
+	}
+	mappingContext, err := p.StorageApi.EnsureClonnerIgroup(xcopyInitiatorGroup, initiators)
 	if err != nil {
-		return err
-	}
-	uniqueUIDs := make(map[string]bool)
-	hbaUIDs := []string{}
-	hbaUIDsNamesMap := make(map[string]string)
-	isSciniRequired := false
-	if sciniAware, ok := p.StorageApi.(SciniAware); ok {
-		if sciniAware.SciniRequired() {
-			isSciniRequired = true
-		}
+		return fmt.Errorf("failed to add the ESX HBA UID %s to the initiator group %w", initiators, err)
 	}
 
-	// powerflex handling - scini is the powerflex kernel module and is not
-	// using any iqn/wwn to identity the host. Instead extract the SdcGuid
-	// as the possible clonner identifier
-	if isSciniRequired {
-		setupLog.V(2).Info("scini required for storage api")
-		sciModule, err := p.VSphereClient.RunEsxCommand(setupCtx, host, []string{"system", "module", "parameters", "list", "-m", "scini"})
-		if err != nil {
-			setupLog.Info("failed to fetch scini module parameters", "err", err)
-			return err
-		}
-		for _, moduleFields := range sciModule {
-
-			if slices.Contains(moduleFields["Name"], "IoctlIniGuidStr") {
-				setupLog.V(2).Info("scini guid", "value", moduleFields["Value"])
-				for _, s := range moduleFields["Value"] {
-					hbaUIDs = append(hbaUIDs, strings.ToUpper(s))
-				}
-				setupLog.Info("scini HBAs found", "hbas", hbaUIDs)
-			}
-		}
-	}
-
-	if !isSciniRequired {
-		setupLog.V(2).Info("scini not required for storage api")
-		for _, a := range r {
-			hbaName, hasHbaName := a["HBAName"]
-			if !hasHbaName {
-				continue
-			}
-			driver, hasDriver := a["Driver"]
-			if !hasDriver {
-				// irrelevant adapter
-				continue
-			}
-
-			// 'esxcli storage core adapter list' returns LinkState field
-			// 'esxcli iscsi adapater list' returns State field
-			linkState, hasLink := a["LinkState"]
-			uid, hasUID := a["UID"]
-
-			if !hasDriver || !hasLink || !hasUID || len(driver) == 0 || len(linkState) == 0 || len(uid) == 0 {
-				continue
-			}
-
-			drv := driver[0]
-			link := linkState[0]
-			id := uid[0]
-			id = strings.ToLower(strings.TrimSpace(id))
-			// Check if the UID is FC, iSCSI or NVMe-oF
-			isTargetUID := strings.HasPrefix(id, "fc.") || strings.HasPrefix(id, "iqn.") || strings.HasPrefix(id, "nqn.")
-
-			if (link == "link-up" || link == "online") && isTargetUID {
-				if _, exists := uniqueUIDs[id]; !exists {
-					uniqueUIDs[id] = true
-					hbaUIDs = append(hbaUIDs, id)
-					hbaUIDsNamesMap[id] = hbaName[0]
-					setupLog.V(2).Info("storage adapter", "uid", id, "driver", drv)
-				}
-			}
-		}
-		setupLog.Info("HBA UIDs found", "count", len(hbaUIDs), "uids", hbaUIDs)
-	}
-
-	if len(hbaUIDs) == 0 {
-		setupLog.Info("no valid HBA UIDs found", "host", host.String())
-		return fmt.Errorf("no valid HBA UIDs found for host %s", host)
-	}
-	mappingContext, err := p.StorageApi.EnsureClonnerIgroup(xcopyInitiatorGroup, hbaUIDs)
-	if err != nil {
-		return fmt.Errorf("failed to add the ESX HBA UID %s to the initiator group %w", hbaUIDs, err)
-	}
-
+	setupLog.Info("resolving PV to LUN", "pv", pv.Name)
 	lun, err := p.StorageApi.ResolvePVToLUN(pv)
 	if err != nil {
 		return err
 	}
 
+	setupLog.Info("checking current mapped groups of LUN", "lun", lun.Name)
 	originalInitiatorGroups, err := p.StorageApi.CurrentMappedGroups(lun, mappingContext)
 	if err != nil {
 		return fmt.Errorf("failed to fetch the current initiator groups of the lun %s: %w", lun.Name, err)
 	}
 	setupLog.V(2).Info("current initiator groups for LUN", "lun", lun.IQN, "groups", originalInitiatorGroups)
-
-	if isSciniRequired {
-		sdcId, ok := mappingContext["sdcId"]
-		if !ok {
-			setupLog.Info("sdcId required but not in mappingContext")
-			return fmt.Errorf("sdcId is required but not found in mappingContext")
-		}
-		xcopyInitiatorGroup = sdcId.(string)
-		setupLog.V(2).Info("sdcId from mappingContext", "sdcId", sdcId)
-	}
 
 	fullCleanUpAttempted := false
 
@@ -251,7 +169,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 				if mappingContext != nil {
 					mappingContext["UnmapAllSdc"] = false
 				}
-				errUnmap := p.StorageApi.UnMap(xcopyInitiatorGroup, lun, mappingContext)
+				errUnmap := p.StorageApi.UnmapTarget(lun, mappingContext)
 				if errUnmap != nil {
 					setupLog.Info("partial cleanup: failed to unmap", "err", errUnmap)
 				}
@@ -262,7 +180,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	}()
 
 	mapLog.Info("mapping volume to initiator group", "initiator_group", xcopyInitiatorGroup, "lun", lun.Name)
-	lun, err = p.StorageApi.Map(xcopyInitiatorGroup, lun, mappingContext)
+	lun, err = p.StorageApi.MapTarget(lun, mappingContext)
 	if err != nil {
 		return fmt.Errorf("failed to map lun %s to initiator group %s: %w", lun, xcopyInitiatorGroup, err)
 	}
@@ -305,7 +223,9 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		if err != nil {
 			cleanupLog.Info("failed to remove device from detached list", "device", lun.Name, "err", err)
 		}
-		errUnmap := p.StorageApi.UnMap(xcopyInitiatorGroup, lun, mappingContext)
+		// finaly after the kernel have it detached and not having any i/o we can unmap
+		mapLog.Info("volume unmapped from initiatorgroup", "initiator_group", xcopyInitiatorGroup, "device", targetLUN)
+		errUnmap := p.StorageApi.UnmapTarget(lun, mappingContext)
 		if errUnmap != nil {
 			cleanupLog.Info("failed to unmap during cleanup", "lun", lun.Name, "err", errUnmap)
 		}
@@ -319,7 +239,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		}
 		cleanupLog.V(2).Info("deleting dead devices after short delay")
 		time.Sleep(5 * time.Second)
-		deleteDeadDevices(cleanupCtx, p.VSphereClient, host, hbaUIDs, hbaUIDsNamesMap)
+		deleteDeadDevices(cleanupCtx, p.VSphereClient, host, dsActiveAdapters)
 		cleanupLog.Info("cleanup finished")
 	}()
 
@@ -451,26 +371,26 @@ func rescan(ctx context.Context, client vmware.Client, host *object.HostSystem, 
 	return fmt.Errorf("failed to find device %s: %w", targetLUN, err)
 }
 
-func deleteDeadDevices(ctx context.Context, client vmware.Client, host *object.HostSystem, hbaUIDs []string, hbaUIDsNamesMap map[string]string) error {
+func deleteDeadDevices(ctx context.Context, client vmware.Client, host *object.HostSystem, hostAdapters []vmware.HostAdapter) error {
 	log := klog.FromContext(ctx)
 	failedDevices := []string{}
-	for _, adapter := range hbaUIDs {
-		adapterName, ok := hbaUIDsNamesMap[adapter]
-		if !ok {
-			adapterName = adapter
-		}
-		log.V(2).Info("deleting dead devices for adapter", "adapter", adapterName)
+	for _, adapter := range hostAdapters {
+		log.V(2).Info("deleting dead devices for adapter","adapter", adapter.Name)
 		success := false
-		for i := 0; i < rescanRetries; i++ {
-			_, errClean := client.RunEsxCommand(ctx, host, []string{"storage", "core", "adapter", "rescan", "-t", "delete", "-A", adapterName})
+		for range rescanRetries {
+			_, errClean := client.RunEsxCommand(
+				context.Background(),
+				host,
+				[]string{"storage", "core", "adapter", "rescan", "-t", "delete", "-A", adapter.Name})
 			if errClean == nil {
+				log.Info("rescan to delete dead devices completed for adapter", "adapter", adapter.Name)
 				success = true
 				break
 			}
 			time.Sleep(rescanSleepInterval)
 		}
 		if !success {
-			failedDevices = append(failedDevices, adapter)
+			failedDevices = append(failedDevices, adapter.Name)
 		}
 	}
 	if len(failedDevices) > 0 {
