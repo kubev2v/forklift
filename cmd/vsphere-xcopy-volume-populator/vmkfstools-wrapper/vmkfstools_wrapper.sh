@@ -3,7 +3,7 @@
 set -e
 
 TMP_PREFIX="/tmp/vmkfstools-wrapper-"
-SCRIPT_VERSION="0.3.0"
+SCRIPT_VERSION="0.3.1"
 LOGIN_TAG="vmkfstools-wrapper"
 
 xml_output() {
@@ -101,6 +101,46 @@ validate_path() {
     return 0
 }
 
+wait_for_shared_lock() {
+    local vmdk_path="$1"
+    local max_retries=5
+    local wait_seconds=5
+
+    local attempt=0
+    while [ ${attempt} -lt ${max_retries} ]; do
+        local lock_output
+        lock_output=$(/bin/vmkfstools -D "${vmdk_path}" 2>&1)
+        local lock_mode
+        lock_mode=$(echo "${lock_output}" | grep -o 'mode [0-9]*' | head -1 | awk '{print $2}')
+
+        if [ -z "${lock_mode}" ]; then
+            log_error "Failed to parse lock mode from vmkfstools -D output: ${lock_output}"
+            return 1
+        fi
+
+        case "${lock_mode}" in
+            0|2|3)
+                log_info "VMDK lock mode is ${lock_mode} (acceptable), proceeding"
+                return 0
+                ;;
+            1)
+                attempt=$((attempt + 1))
+                log_warning "VMDK has exclusive lock (mode 1), retry ${attempt}/${max_retries} in ${wait_seconds}s"
+                if [ ${attempt} -lt ${max_retries} ]; then
+                    sleep ${wait_seconds}
+                fi
+                ;;
+            *)
+                log_error "Unknown lock mode: ${lock_mode}"
+                return 1
+                ;;
+        esac
+    done
+
+    log_error "VMDK still has exclusive lock after ${max_retries} retries"
+    return 1
+}
+
 # vmkfstools uses \r (carriage return) for progress updates on same line
 # Read last 4096 bytes and extract text after final \r
 get_last_line() {
@@ -168,6 +208,12 @@ clone() {
         return 1
     }
     log_info "Source VMDK path validation passed"
+
+    log_info "Checking VMDK lock status..."
+    if ! wait_for_shared_lock "${source}"; then
+        xml_output "1" "Source VMDK has an exclusive lock and did not transition to shared lock"
+        return 1
+    fi
 
     log_info "Validating target LUN path..."
     local target
