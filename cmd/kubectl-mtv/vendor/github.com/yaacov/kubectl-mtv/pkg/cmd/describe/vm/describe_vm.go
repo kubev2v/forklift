@@ -154,9 +154,13 @@ func describeVMOnce(configFlags *genericclioptions.ConfigFlags, name, namespace,
 		fmt.Print("\n", output.ColorizedSeparator(105, output.YellowColor))
 
 		fmt.Printf("\n%s\n", output.Bold("Conditions:"))
-		headers := []string{"TYPE", "STATUS", "CATEGORY", "MESSAGE"}
-		colWidths := []int{15, 10, 15, 50}
-		rows := make([][]string, 0, len(conditions))
+		tableHeaders := []output.Header{
+			{DisplayName: "TYPE", JSONPath: "type", ColorFunc: output.Bold},
+			{DisplayName: "STATUS", JSONPath: "status", ColorFunc: output.ColorizeConditionStatus},
+			{DisplayName: "CATEGORY", JSONPath: "category"},
+			{DisplayName: "MESSAGE", JSONPath: "message"},
+		}
+		items := make([]map[string]interface{}, 0, len(conditions))
 
 		for _, c := range conditions {
 			condition, ok := c.(map[string]interface{})
@@ -165,23 +169,25 @@ func describeVMOnce(configFlags *genericclioptions.ConfigFlags, name, namespace,
 			}
 
 			condType, _, _ := unstructured.NestedString(condition, "type")
-			status, _, _ := unstructured.NestedString(condition, "status")
+			condStatus, _, _ := unstructured.NestedString(condition, "status")
 			category, _, _ := unstructured.NestedString(condition, "category")
 			message, _, _ := unstructured.NestedString(condition, "message")
 
-			// Apply color to status
-			switch status {
-			case "True":
-				status = output.Green(status)
-			case "False":
-				status = output.Red(status)
-			}
-
-			rows = append(rows, []string{output.Bold(condType), status, category, message})
+			items = append(items, map[string]interface{}{
+				"type":     condType,
+				"status":   condStatus,
+				"category": category,
+				"message":  message,
+			})
 		}
 
-		if len(rows) > 0 {
-			planutil.PrintTable(headers, rows, colWidths)
+		if len(items) > 0 {
+			output.NewTablePrinter().
+				WithHeaders(tableHeaders...).
+				WithColumnWidths([]int{15, 10, 15, 50}).
+				WithSeparator("-").
+				AddItems(items).
+				Print()
 		}
 	}
 
@@ -235,9 +241,15 @@ func describeVMOnce(configFlags *genericclioptions.ConfigFlags, name, namespace,
 			tasks, exists, _ := unstructured.NestedSlice(phase, "tasks")
 			if exists && len(tasks) > 0 {
 				fmt.Printf("\n%s\n", output.Bold("Tasks:"))
-				headers := []string{"NAME", "PHASE", "PROGRESS", "STARTED", "COMPLETED"}
-				colWidths := []int{40, 10, 15, 20, 20}
-				rows := make([][]string, 0, len(tasks))
+				taskHeaders := []output.Header{
+					{DisplayName: "NAME", JSONPath: "name"},
+					{DisplayName: "PHASE", JSONPath: "phase", ColorFunc: output.ColorizeStatus},
+					{DisplayName: "PROGRESS", JSONPath: "progress", ColorFunc: output.ColorizeProgress},
+					{DisplayName: "STARTED", JSONPath: "started"},
+					{DisplayName: "COMPLETED", JSONPath: "completed"},
+				}
+				taskColWidths := []int{40, 10, 15, 20, 20}
+				taskItems := make([]map[string]interface{}, 0, len(tasks))
 
 				for _, t := range tasks {
 					task, ok := t.(map[string]interface{})
@@ -246,8 +258,7 @@ func describeVMOnce(configFlags *genericclioptions.ConfigFlags, name, namespace,
 					}
 
 					taskName, _, _ := unstructured.NestedString(task, "name")
-					// Truncate task name if longer than column width
-					taskName = truncateString(taskName, colWidths[0])
+					taskName = truncateString(taskName, taskColWidths[0])
 
 					taskPhase, _, _ := unstructured.NestedString(task, "phase")
 					taskStarted, _, _ := unstructured.NestedString(task, "started")
@@ -260,30 +271,25 @@ func describeVMOnce(configFlags *genericclioptions.ConfigFlags, name, namespace,
 						total, _, _ := unstructured.NestedInt64(progressMap, "total")
 						if total > 0 {
 							percentage := float64(completed) / float64(total) * 100
-							progressText := fmt.Sprintf("%.1f%%", percentage)
-
-							if percentage >= 100 {
-								progress = output.Green(progressText)
-							} else if percentage >= 75 {
-								progress = output.Blue(progressText)
-							} else if percentage >= 25 {
-								progress = output.Yellow(progressText)
-							} else {
-								progress = output.Cyan(progressText)
-							}
+							progress = fmt.Sprintf("%.1f%%", percentage)
 						}
 					}
 
-					rows = append(rows, []string{
-						taskName,
-						output.ColorizeStatus(taskPhase),
-						progress,
-						planutil.FormatTime(taskStarted, useUTC),
-						planutil.FormatTime(taskCompleted, useUTC),
+					taskItems = append(taskItems, map[string]interface{}{
+						"name":      taskName,
+						"phase":     taskPhase,
+						"progress":  progress,
+						"started":   planutil.FormatTime(taskStarted, useUTC),
+						"completed": planutil.FormatTime(taskCompleted, useUTC),
 					})
 				}
 
-				planutil.PrintTable(headers, rows, colWidths)
+				output.NewTablePrinter().
+					WithHeaders(taskHeaders...).
+					WithColumnWidths(taskColWidths).
+					WithSeparator("-").
+					AddItems(taskItems).
+					Print()
 			}
 		}
 	}
