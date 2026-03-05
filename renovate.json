@@ -68,8 +68,8 @@
   ],
   "autoApprove": true,
   "tekton": {
-    "fileMatch": [
-      "\\.tekton/.*\\.yaml$"
+    "managerFilePatterns": [
+      "/\\.tekton/.*\\.yaml$/"
     ],
     "automerge": true,
     "automergeStrategy": "rebase",
