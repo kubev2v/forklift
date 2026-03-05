@@ -592,7 +592,7 @@ var _ = Describe("Customize", func() {
 			mockFileSystem.EXPECT().Stat(appConfig.DynamicScriptsDir).Return(nil, os.ErrNotExist)
 
 			// addWinFirstbootScripts
-			mockCommandBuilder.EXPECT().AddArgs("--upload", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArgs("--upload", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockCommandBuilder)
 
 			for _, disk := range disks {
 				mockCommandBuilder.EXPECT().AddArg("--add", disk).Return(mockCommandBuilder)
@@ -617,7 +617,7 @@ var _ = Describe("Customize", func() {
 			mockCommandBuilder.EXPECT().AddArg("--format", "raw").Return(mockCommandBuilder)
 
 			mockFileSystem.EXPECT().Stat(appConfig.DynamicScriptsDir).Return(nil, os.ErrNotExist)
-			mockCommandBuilder.EXPECT().AddArgs("--upload", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArgs("--upload", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockCommandBuilder)
 
 			for _, disk := range disks {
 				mockCommandBuilder.EXPECT().AddArg("--add", disk).Return(mockCommandBuilder)
@@ -654,7 +654,7 @@ var _ = Describe("Customize", func() {
 			mockCommandBuilder.EXPECT().AddArg("--upload", gomock.Any()).Return(mockCommandBuilder)
 
 			// addWinFirstbootScripts
-			mockCommandBuilder.EXPECT().AddArgs("--upload", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArgs("--upload", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockCommandBuilder)
 
 			for _, disk := range disks {
 				mockCommandBuilder.EXPECT().AddArg("--add", disk).Return(mockCommandBuilder)
@@ -864,6 +864,126 @@ var _ = Describe("Customize", func() {
 			err := customize.customizeLinux()
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to read scripts directory"))
+		})
+	})
+
+	Describe("injectStaticIPTemplate", func() {
+		It("renders template with StaticIPs input", func() {
+			appConfig.StaticIPs = "00:11:22:33:44:55:ip:10.0.0.5,10.0.0.1,24,8.8.8.8"
+
+			dir, err := os.MkdirTemp("", "tmpl-test")
+			Expect(err).ToNot(HaveOccurred())
+			defer os.RemoveAll(dir)
+
+			tmplPath := filepath.Join(dir, "test.ps1.tmpl")
+			outPath := filepath.Join(dir, "test.ps1")
+
+			tmplContent := `$inputString = "{{.InputString}}"`
+			err = os.WriteFile(tmplPath, []byte(tmplContent), 0644)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = customize.injectStaticIPTemplate(tmplPath, outPath)
+			Expect(err).ToNot(HaveOccurred())
+
+			rendered, err := os.ReadFile(outPath)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(string(rendered)).To(Equal(`$inputString = "00:11:22:33:44:55:ip:10.0.0.5,10.0.0.1,24,8.8.8.8"`))
+		})
+
+		It("renders template with empty gateway and DNS fields", func() {
+			appConfig.StaticIPs = "00:11:22:33:44:55:ip:10.0.0.5,,24,,"
+
+			dir, err := os.MkdirTemp("", "tmpl-test")
+			Expect(err).ToNot(HaveOccurred())
+			defer os.RemoveAll(dir)
+
+			tmplPath := filepath.Join(dir, "test.ps1.tmpl")
+			outPath := filepath.Join(dir, "test.ps1")
+
+			tmplContent := `$inputString = "{{.InputString}}"`
+			err = os.WriteFile(tmplPath, []byte(tmplContent), 0644)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = customize.injectStaticIPTemplate(tmplPath, outPath)
+			Expect(err).ToNot(HaveOccurred())
+
+			rendered, err := os.ReadFile(outPath)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(string(rendered)).To(ContainSubstring("10.0.0.5,,24,,"))
+		})
+
+		It("returns error when template file does not exist", func() {
+			err := customize.injectStaticIPTemplate("/nonexistent/template.tmpl", "/tmp/out.ps1")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to read template"))
+		})
+	})
+
+	Describe("addWinFirstbootScripts with StaticIPs", func() {
+		It("sets verify network upload path when template injection succeeds", func() {
+			dir, err := os.MkdirTemp("", "win-scripts")
+			Expect(err).ToNot(HaveOccurred())
+			defer os.RemoveAll(dir)
+
+			appConfig.Workdir = dir
+			appConfig.StaticIPs = "00:11:22:33:44:55:ip:10.0.0.5,10.0.0.1,24,8.8.8.8"
+
+			scriptsDir := filepath.Join(dir, "scripts", "windows")
+			err = os.MkdirAll(scriptsDir, 0755)
+			Expect(err).ToNot(HaveOccurred())
+
+			tmplContent := `$inputString = "{{.InputString}}"`
+			err = os.WriteFile(filepath.Join(scriptsDir, "9999-verify-network-config.ps1.tmpl"), []byte(tmplContent), 0644)
+			Expect(err).ToNot(HaveOccurred())
+
+			batContent := "@echo off"
+			err = os.WriteFile(filepath.Join(scriptsDir, "9999-run-mtv-ps-scripts.bat"), []byte(batContent), 0644)
+			Expect(err).ToNot(HaveOccurred())
+
+			routesContent := "# remove duplicates"
+			err = os.WriteFile(filepath.Join(scriptsDir, "9999-remove_duplicate_persistent_routes.ps1"), []byte(routesContent), 0644)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Expect AddArgs to be called with non-empty verify path
+			mockCommandBuilder.EXPECT().AddArgs("--upload", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				Do(func(flag string, values ...string) {
+					// values[4] is uploadVerifyNetworkPath — should be non-empty
+					Expect(values[4]).ToNot(BeEmpty(), "verify network upload path should be set")
+					Expect(values[4]).To(ContainSubstring("9999-verify-network-config.ps1"))
+				}).
+				Return(mockCommandBuilder)
+
+			customize.addWinFirstbootScripts(mockCommandBuilder)
+		})
+
+		It("leaves verify network upload path empty when template is missing", func() {
+			dir, err := os.MkdirTemp("", "win-scripts-fail")
+			Expect(err).ToNot(HaveOccurred())
+			defer os.RemoveAll(dir)
+
+			appConfig.Workdir = dir
+			appConfig.StaticIPs = "00:11:22:33:44:55:ip:10.0.0.5,10.0.0.1,24,8.8.8.8"
+
+			scriptsDir := filepath.Join(dir, "scripts", "windows")
+			err = os.MkdirAll(scriptsDir, 0755)
+			Expect(err).ToNot(HaveOccurred())
+
+			batContent := "@echo off"
+			err = os.WriteFile(filepath.Join(scriptsDir, "9999-run-mtv-ps-scripts.bat"), []byte(batContent), 0644)
+			Expect(err).ToNot(HaveOccurred())
+
+			routesContent := "# remove duplicates"
+			err = os.WriteFile(filepath.Join(scriptsDir, "9999-remove_duplicate_persistent_routes.ps1"), []byte(routesContent), 0644)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Template file is missing — verify path should be empty
+			mockCommandBuilder.EXPECT().AddArgs("--upload", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				Do(func(flag string, values ...string) {
+					Expect(values[4]).To(BeEmpty(), "verify network upload path should be empty when template fails")
+				}).
+				Return(mockCommandBuilder)
+
+			customize.addWinFirstbootScripts(mockCommandBuilder)
 		})
 	})
 

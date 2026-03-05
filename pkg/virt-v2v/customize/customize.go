@@ -299,30 +299,39 @@ func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) {
 			networkConfigtemplate := filepath.Join(windowsScriptsPath, "9999-network-config.ps1.tmpl")
 			networkConfigScript := filepath.Join(windowsScriptsPath, "9999-network-config.ps1")
 
-			err := c.injectStaticIPTemplate(networkConfigtemplate, networkConfigScript)
-			if err != nil {
-				fmt.Printf("Error injecting static IP template: %v", err)
+			if err := c.injectStaticIPTemplate(networkConfigtemplate, networkConfigScript); err != nil {
+				fmt.Printf("Error injecting static IP template: %v\n", err)
+			} else {
+				uploadPreserveIpPath = c.formatUpload(networkConfigScript, WinFirstbootScriptsPath)
 			}
-			uploadPreserveIpPath = c.formatUpload(networkConfigScript, WinFirstbootScriptsPath)
 		}
 	}
 
+	uploadVerifyNetworkPath := ""
 	if c.appConfig.StaticIPs != "" {
 		removeDuplicatesPersistentRoutesPath := filepath.Join(windowsScriptsPath, "9999-remove_duplicate_persistent_routes.ps1")
 		uploadRemoveDuplicatesPath = c.formatUpload(removeDuplicatesPersistentRoutesPath, WinFirstbootScriptsPath)
 
+		verifyNetworkTemplate := filepath.Join(windowsScriptsPath, "9999-verify-network-config.ps1.tmpl")
+		verifyNetworkScript := filepath.Join(windowsScriptsPath, "9999-verify-network-config.ps1")
+		if err := c.injectStaticIPTemplate(verifyNetworkTemplate, verifyNetworkScript); err != nil {
+			fmt.Printf("Error injecting verify network config template: %v\n", err)
+		} else {
+			uploadVerifyNetworkPath = c.formatUpload(verifyNetworkScript, WinFirstbootScriptsPath)
+		}
+
 		if c.appConfig.MultipleIpsPerNicName != "" {
 			preserveIpsTemplate := filepath.Join(windowsScriptsPath, "9999-preserve_complementry_ips_per_nic.ps1.tmpl")
 			preserveMultipleNicsPath := filepath.Join(windowsScriptsPath, "9999-preserve_complementry_ips_per_nic.ps1")
-			err := c.injectComplementryStaticIPTemplate(preserveIpsTemplate, preserveMultipleNicsPath)
-			if err != nil {
-				fmt.Printf("Error injecting Complementry StaticIP's template: %v", err)
+			if err := c.injectComplementryStaticIPTemplate(preserveIpsTemplate, preserveMultipleNicsPath); err != nil {
+				fmt.Printf("Error injecting Complementry StaticIP's template: %v\n", err)
+			} else {
+				uploadPreserveMultipleIpPath = c.formatUpload(preserveMultipleNicsPath, WinFirstbootScriptsPath)
 			}
-			uploadPreserveMultipleIpPath = c.formatUpload(preserveMultipleNicsPath, WinFirstbootScriptsPath)
 		}
 	}
 	uploadInitPath := c.formatUpload(initPath, WinFirstbootScriptsPath)
-	cmdBuilder.AddArgs("--upload", uploadPreserveIpPath, uploadInitPath, uploadRemoveDuplicatesPath, uploadPreserveMultipleIpPath)
+	cmdBuilder.AddArgs("--upload", uploadPreserveIpPath, uploadInitPath, uploadRemoveDuplicatesPath, uploadPreserveMultipleIpPath, uploadVerifyNetworkPath)
 }
 
 func (c *Customize) addWinDynamicScripts(cmdBuilder utils.CommandBuilder, dir string) error {
