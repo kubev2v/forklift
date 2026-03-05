@@ -1231,12 +1231,13 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 	}
 	defer resp.Body.Close()
 
+	vmConf, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
 	switch r.Source.Provider.Type() {
 	case api.Ova, api.HyperV:
-		vmConf, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
 		if vm.Firmware, err = util.GetFirmwareFromYaml(vmConf); err != nil {
 			return liberr.Wrap(err)
 		}
@@ -1249,6 +1250,13 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 			return liberr.Wrap(err)
 		}
 		r.Log.Info("Setting the vm OS ", vm.OperatingSystem, "vmId", vm.ID)
+	}
+
+	if bootDiskIndex, bootOrderErr := util.GetDiskBootOrderFromYaml(vmConf); bootOrderErr != nil {
+		r.Log.Error(bootOrderErr, "Failed to extract boot order from virt-v2v output", "vmId", vm.ID)
+	} else if bootDiskIndex >= 0 {
+		vm.DetectedBootDisk = &bootDiskIndex
+		r.Log.Info("Detected boot disk from virt-v2v output", "bootDiskIndex", bootDiskIndex, "vmId", vm.ID)
 	}
 
 	// Fetch warnings before shutting down
