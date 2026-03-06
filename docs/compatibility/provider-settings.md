@@ -167,11 +167,9 @@ kubectl get nodes -o jsonpath='{.items[*].metadata.labels.topology\.kubernetes\.
 
 ## Hyper-V
 
-Hyper-V providers have no additional settings.
-
-| Setting | Values | Default | Description |
-|---------|--------|---------|-------------|
-| (none) | - | - | No provider-specific settings |
+| Setting | Required | Values | Default | Description |
+|---------|----------|--------|---------|-------------|
+| `winrmPort` | No | Port number | `5986` | WinRM HTTPS port on the Hyper-V host |
 
 ---
 
@@ -186,5 +184,6 @@ Hyper-V providers have no additional settings.
 | `esxiCloneMethod` | Yes | - | - | - | - | - | - |
 | `target-az` | - | - | - | - | - | **Req** | - |
 | `target-region` | - | - | - | - | - | Opt | - |
+| `winrmPort` | - | - | - | - | - | - | Opt |
 
 **Legend:** Yes = Supported, Opt = Optional, **Req** = Required, - = Not applicable

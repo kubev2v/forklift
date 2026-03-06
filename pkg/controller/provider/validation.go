@@ -402,7 +402,7 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 			keyList = append(keyList, "cacert")
 			break
 		}
-		tlsURL := buildTLSURL(provider.Spec.URL, base.WinRMPortHTTPS)
+		tlsURL := buildTLSURL(provider.Spec.URL, hvutil.WinRMPort(provider.Spec.Settings))
 		r.validateTLSConnection(provider, secret, tlsURL, insecureSkipVerify)
 	}
 	for _, key := range keyList {

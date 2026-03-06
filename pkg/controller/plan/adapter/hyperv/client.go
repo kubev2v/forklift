@@ -42,8 +42,9 @@ func (r *Client) connect() (driver.HyperVDriver, error) {
 
 	username, password := hvutil.HyperVCredentials(r.Source.Secret)
 	host := r.Source.Provider.Spec.URL
+	port := hvutil.WinRMPort(r.Source.Provider.Spec.Settings)
 
-	drv := driver.NewWinRMDriver(host, driver.WinRMPortHTTPS, username, password, true, nil)
+	drv := driver.NewWinRMDriver(host, port, username, password, true, nil)
 	if err := drv.Connect(); err != nil {
 		return nil, fmt.Errorf("WinRM connect failed: %w", err)
 	}

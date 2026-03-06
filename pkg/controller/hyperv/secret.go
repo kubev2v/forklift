@@ -1,7 +1,14 @@
 package hyperv
 
 import (
+	"strconv"
+
+	"github.com/kubev2v/forklift/pkg/lib/hyperv/driver"
 	core "k8s.io/api/core/v1"
+)
+
+const (
+	SettingWinRMPort = "winrmPort"
 )
 
 // Secret field names for HyperV provider.
@@ -53,4 +60,14 @@ func SMBCredentials(secret *core.Secret) (username, password string) {
 // SMBUrl returns the SMB share URL from the secret.
 func SMBUrl(secret *core.Secret) string {
 	return string(secret.Data[SecretFieldSMBUrl])
+}
+
+// WinRMPort returns the WinRM port from provider settings, falling back to the default (5986).
+func WinRMPort(settings map[string]string) int {
+	if s, ok := settings[SettingWinRMPort]; ok && s != "" {
+		if port, err := strconv.Atoi(s); err == nil && port > 0 {
+			return port
+		}
+	}
+	return driver.WinRMPortHTTPS
 }
