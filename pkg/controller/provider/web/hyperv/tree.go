@@ -19,9 +19,8 @@ type TreeHandler struct {
 	Handler
 }
 
-// HyperV has a flat topology,
-// so tree endpoints are not registered
 func (h *TreeHandler) AddRoutes(e *gin.Engine) {
+	// HyperV has a flat topology — no tree endpoints.
 }
 
 // List not supported.

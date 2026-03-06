@@ -61,6 +61,18 @@ func (r *Handler) Deleted(e libweb.Event) {
 	}
 }
 
+func referencesNetwork(mp *api.NetworkMap, models []*hyperv.Network) bool {
+	for _, pair := range mp.Spec.Map {
+		ref := pair.Source
+		for _, network := range models {
+			if ref.ID == network.ID || ref.Name == network.Name {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (r *Handler) changed(models ...*hyperv.Network) {
 	log.V(3).Info(
 		"Network changed.",
@@ -75,24 +87,10 @@ func (r *Handler) changed(models ...*hyperv.Network) {
 	}
 	for i := range list.Items {
 		mp := &list.Items[i]
-		ref := mp.Spec.Provider.Source
-		if !r.MatchProvider(ref) {
+		if !r.MatchProvider(mp.Spec.Provider.Source) {
 			continue
 		}
-		referenced := false
-		for _, pair := range mp.Spec.Map {
-			ref := pair.Source
-			for _, network := range models {
-				if ref.ID == network.ID || ref.Name == network.Name {
-					referenced = true
-					break
-				}
-			}
-			if referenced {
-				break
-			}
-		}
-		if referenced {
+		if referencesNetwork(mp, models) {
 			log.V(3).Info(
 				"Queue reconcile event.",
 				"map",

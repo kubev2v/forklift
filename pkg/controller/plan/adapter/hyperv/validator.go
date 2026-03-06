@@ -86,28 +86,19 @@ func (r *Validator) MaintenanceMode(_ ref.Ref) (bool, error) {
 	return true, nil
 }
 
-func (r *Validator) PodNetwork(vmRef ref.Ref) (bool, error) {
+// NICNetworkRefs returns one source-network ref per VM NIC.
+func (r *Validator) NICNetworkRefs(vmRef ref.Ref) (refs []ref.Ref, err error) {
 	vm := &hyperv.VM{}
-	err := r.Source.Inventory.Find(vm, vmRef)
+	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
-		return false, liberr.Wrap(err, "vm", vmRef.String())
+		err = liberr.Wrap(err, "vm", vmRef.String())
+		return
 	}
-
-	if r.Context.Map.Network == nil {
-		return true, nil
-	}
-
-	podNetCount := 0
+	refs = make([]ref.Ref, 0, len(vm.NICs))
 	for _, nic := range vm.NICs {
-		for _, pair := range r.Context.Map.Network.Spec.Map {
-			if pair.Source.ID == nic.Network.ID {
-				if pair.Destination.Type == "pod" {
-					podNetCount++
-				}
-			}
-		}
+		refs = append(refs, ref.Ref{ID: nic.Network.ID})
 	}
-	return podNetCount <= 1, nil
+	return
 }
 
 func (r *Validator) StaticIPs(vmRef ref.Ref) (bool, error) {
@@ -156,8 +147,18 @@ func (r *Validator) ChangeTrackingEnabled(_ ref.Ref) (bool, error) {
 	return true, nil
 }
 
-// NO-OP
-func (r *Validator) HasSnapshot(_ ref.Ref) (bool, string, string, error) {
+func (r *Validator) HasSnapshot(vmRef ref.Ref) (bool, string, string, error) {
+	vm := &hyperv.VM{}
+	err := r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		return false, "", "", liberr.Wrap(err, "vm", vmRef.String())
+	}
+	if vm.HasCheckpoint {
+		return false,
+			"VM has pre-existing checkpoints (snapshots) which should be removed before migration",
+			"Warning",
+			nil
+	}
 	return true, "", "", nil
 }
 

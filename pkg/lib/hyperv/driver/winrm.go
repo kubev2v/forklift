@@ -10,7 +10,7 @@ import (
 	"time"
 	"unicode/utf16"
 
-	ps "github.com/kubev2v/forklift/cmd/hyperv-provider-server/powershell"
+	ps "github.com/kubev2v/forklift/pkg/lib/hyperv/powershell"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	"github.com/masterzen/winrm"
 )

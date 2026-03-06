@@ -442,6 +442,14 @@ spec:
                 type: string
                 description: "HyperV memory request (default: 512Mi)"
                 example: "300Mi"
+              controller_hyperv_refresh_interval:
+                type: string
+                description: "HyperV inventory refresh interval as a Go duration (default: 10s)"
+                example: "30s"
+              controller_hyperv_validation_timeout:
+                type: string
+                description: "Timeout for HyperV SMB disk validation HTTP calls as a Go duration (default: 30s)"
+                example: "60s"
 
               # OVA Proxy Settings
               ova_proxy_container_limits_cpu:

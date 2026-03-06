@@ -2,14 +2,12 @@ package hyperv
 
 import (
 	"context"
-	"strconv"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/base"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -24,8 +22,7 @@ import (
 )
 
 const (
-	Name           = "hyperv-server"
-	FeatureEnabled = "FeatureEnabled"
+	Name = "hyperv-server"
 )
 
 var log = logging.WithName(Name)
@@ -148,7 +145,7 @@ func (r *Reconciler) RemoveFinalizer(ctx context.Context, hyperv *api.HyperVProv
 	return
 }
 
-// Deploy creates the HyperV provider server deployment.
+// Deploy creates the HyperV provider server deployment (SMB mount pod only).
 func (r *Reconciler) Deploy(ctx context.Context, hyperv *api.HyperVProviderServer) (err error) {
 	provider := &api.Provider{}
 	err = r.Get(
@@ -191,6 +188,10 @@ func (r *Reconciler) Deploy(ctx context.Context, hyperv *api.HyperVProviderServe
 
 	// Create static PV for SMB CSI driver
 	pv := build.PersistentVolume(provider, secret)
+	if pv == nil {
+		err = liberr.New("secret is missing the smbUrl field required for SMB PV")
+		return
+	}
 	pv, err = ensure.PersistentVolume(ctx, pv)
 	if err != nil {
 		return
@@ -209,23 +210,12 @@ func (r *Reconciler) Deploy(ctx context.Context, hyperv *api.HyperVProviderServe
 		return
 	}
 
-	// Create service for inventory access
 	service := build.Service(provider)
 	service, err = ensure.Service(ctx, service)
 	if err != nil {
 		return
 	}
 
-	if r.managementEndpoints(deployment) {
-		hyperv.Status.SetCondition(
-			libcnd.Condition{
-				Type:     ApplianceManagementEnabled,
-				Status:   libcnd.True,
-				Reason:   FeatureEnabled,
-				Category: libcnd.Advisory,
-				Message:  "HyperV appliance management endpoints are enabled for this provider.",
-			})
-	}
 	hyperv.Status.Service = &v1.ObjectReference{
 		Kind:      "Service",
 		Namespace: service.Namespace,
@@ -236,7 +226,6 @@ func (r *Reconciler) Deploy(ctx context.Context, hyperv *api.HyperVProviderServe
 }
 
 // Teardown deletes the HyperV provider server resources.
-// SMB CSI will automatically delete the PV when the PVC is deleted.
 func (r *Reconciler) Teardown(ctx context.Context, hyperv *api.HyperVProviderServer) (err error) {
 	provider := &api.Provider{}
 	err = r.Get(
@@ -248,18 +237,13 @@ func (r *Reconciler) Teardown(ctx context.Context, hyperv *api.HyperVProviderSer
 		provider,
 	)
 	if err != nil {
-		// If the Provider CR no longer exists, proceed with best-effort teardown using labels
-		// carried by the HyperVProviderServer. This allows finalizer removal and prevents
-		// orphaned Deployments/Services/PVCs from sticking around.
 		if k8serrors.IsNotFound(err) {
-			// Synthesize a minimal provider carrying the UID and names used in labels/selectors.
 			provider = &api.Provider{}
 			provider.Namespace = hyperv.Spec.Provider.Namespace
 			provider.Name = hyperv.Spec.Provider.Name
 			if uid, ok := hyperv.Labels[LabelProvider]; ok {
 				provider.UID = types.UID(uid)
 			}
-			// Do not return an error; continue with deletion using synthesized provider.
 		} else {
 			log.Error(err, "Failed to get provider CR.")
 			err = liberr.Wrap(err)
@@ -273,6 +257,7 @@ func (r *Reconciler) Teardown(ctx context.Context, hyperv *api.HyperVProviderSer
 		Log:                  r.Log,
 	}
 
+	// Clean up any legacy Service from pre-consolidation deployments
 	err = del.Service(ctx, provider)
 	if err != nil {
 		return
@@ -281,26 +266,13 @@ func (r *Reconciler) Teardown(ctx context.Context, hyperv *api.HyperVProviderSer
 	if err != nil {
 		return
 	}
-	// Delete PVC
 	err = del.PersistentVolumeClaim(ctx, provider)
 	if err != nil {
 		return
 	}
-	// Delete static PV
 	err = del.PersistentVolume(ctx, provider)
 	if err != nil {
 		return
 	}
 	return
-}
-
-func (r *Reconciler) managementEndpoints(deployment *appsv1.Deployment) bool {
-	for _, container := range deployment.Spec.Template.Spec.Containers {
-		for _, env := range container.Env {
-			if env.Name == ApplianceEndpoints {
-				return env.Value == strconv.FormatBool(true)
-			}
-		}
-	}
-	return false
 }
