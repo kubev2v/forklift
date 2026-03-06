@@ -1,0 +1,107 @@
+# Dry-run bundle: same as downstream but with staged component images only.
+# Uses .downstream_manifests + related_images injection; image refs from
+# registry.stage.redhat.io (or build-args). Requires build/release.conf.
+# Does not replace Containerfile (upstream) or Containerfile-downstream.
+FROM quay.io/konflux-ci/yq AS tools
+
+FROM registry.redhat.io/openshift4/ose-operator-sdk-rhel9@sha256:2e8ded84e20ba61e6dd10c99b95d1831f9852d87f47badb9535ee3ced22506a7 AS builder
+
+ARG MTV_VERSION
+ARG RELEASE
+ARG CHANNEL
+ARG DEFAULT_CHANNEL
+ARG REGISTRY
+ARG OCP_VERSIONS
+ARG REVISION
+ARG CPE
+
+# Staged component images (defaults: registry.stage.redhat.io; override via build-args for a specific tag/revision)
+ARG API_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-api-rhel9:latest"
+ARG CONTROLLER_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-controller-rhel9:latest"
+ARG MUST_GATHER_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-must-gather-rhel8:latest"
+ARG OPENSTACK_POPULATOR_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-openstack-populator-rhel9:latest"
+ARG OPERATOR_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-rhel9-operator:latest"
+ARG OVA_PROVIDER_SERVER_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-ova-provider-server-rhel9:latest"
+ARG OVA_PROXY_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-ova-proxy-rhel9:latest"
+ARG OVIRT_POPULATOR_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-rhv-populator-rhel8:latest"
+ARG POPULATOR_CONTROLLER_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-populator-controller-rhel9:latest"
+ARG UI_PLUGIN_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-console-plugin-rhel9:latest"
+ARG CLI_DOWNLOAD_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-cli-download-rhel9:latest"
+ARG VALIDATION_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-validation-rhel9:latest"
+ARG VIRT_V2V_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel10:latest"
+ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.stage.redhat.io/migration-toolkit-virtualization/mtv-vsphere-xcopy-volume-populator-rhel9:latest"
+
+USER root
+
+COPY --from=tools /usr/bin/envsubst /usr/bin/envsubst
+COPY --from=tools /usr/bin/yq /usr/bin/yq
+
+COPY ./operator /repo
+WORKDIR /repo
+
+# Same as downstream: mtv-operator project name, .downstream_manifests, operator-sdk generate bundle
+RUN cp PROJECT PROJECT.template && PROJECT_NAME=mtv-operator envsubst < PROJECT.template > PROJECT
+RUN cat .downstream_manifests \
+    | envsubst \
+    | operator-sdk generate bundle \
+    -q \
+    --overwrite \
+    --extra-service-accounts forklift-controller,forklift-api,forklift-populator-controller \
+    --version $MTV_VERSION \
+    --channels $CHANNEL \
+    --default-channel $DEFAULT_CHANNEL \
+    --output-dir build
+
+# Same as downstream: inject relatedImages for disconnected environments (MTV-3558)
+RUN yq eval -i 'load("related_images.yaml").relatedImages as $images | .spec.relatedImages = $images' build/manifests/mtv-operator.clusterserviceversion.yaml
+RUN envsubst < build/manifests/mtv-operator.clusterserviceversion.yaml > temp.yaml && cp temp.yaml build/manifests/mtv-operator.clusterserviceversion.yaml
+USER 1001
+
+FROM scratch
+
+ARG MTV_VERSION
+ARG RELEASE
+ARG CHANNEL
+ARG DEFAULT_CHANNEL
+ARG REGISTRY
+ARG OCP_VERSIONS
+ARG REVISION
+ARG CPE
+
+COPY --from=builder /repo/build/manifests /manifests/
+COPY --from=builder /repo/build/metadata /metadata/
+
+LABEL com.redhat.delivery.operator.bundle=true
+LABEL com.redhat.openshift.versions=$OCP_VERSIONS
+LABEL com.redhat.delivery.backport=false
+
+LABEL operators.operatorframework.io.bundle.mediatype.v1=registry+v1
+LABEL operators.operatorframework.io.bundle.manifests.v1=manifests/
+LABEL operators.operatorframework.io.bundle.metadata.v1=metadata/
+LABEL operators.operatorframework.io.bundle.package.v1=mtv-operator
+LABEL operators.operatorframework.io.bundle.channels.v1=$CHANNEL
+LABEL operators.operatorframework.io.bundle.channel.default.v1=$DEFAULT_CHANNEL
+
+LABEL operators.operatorframework.io.metrics.builder=operator-sdk-v1.22.0+git
+LABEL operators.operatorframework.io.metrics.mediatype.v1=metrics+v1
+LABEL operators.operatorframework.io.metrics.project_layout=ansible.sdk.operatorframework.io/v1
+LABEL operators.operatorframework.io.test.config.v1=tests/scorecard/
+LABEL operators.operatorframework.io.test.mediatype.v1=scorecard+v1
+
+LABEL \
+    com.redhat.component="mtv-operator-bundle-container" \
+    cpe="cpe:/a:redhat:migration_toolkit_virtualization:${CPE}::el9" \
+    name="${REGISTRY}/mtv-operator-bundle" \
+    License="Apache License 2.0" \
+    io.k8s.display-name="Migration Toolkit for Virtualization" \
+    io.openshift.tags="migration" \
+    io.k8s.description="Migration Toolkit for Virtualization - Operator Bundle" \
+    summary="Migration Toolkit for Virtualization - Operator Bundle" \
+    maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+    description="Migration Toolkit for Virtualization - Operator Bundle" \
+    vendor="Red Hat, Inc." \
+    url="https://github.com/kubev2v/forklift" \
+    distribution-scope="public" \
+    release=$RELEASE \
+    version=$MTV_VERSION \
+    revision="$REVISION"
