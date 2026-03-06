@@ -2,7 +2,6 @@ package hyperv
 
 import (
 	"fmt"
-	"strconv"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/util"
@@ -35,27 +34,6 @@ const (
 	LabelProviderServer = "hyperv-server"
 	SubappHyperVServer  = "hyperv-server"
 	AppForklift         = "forklift"
-)
-
-// Env vars
-const (
-	ProviderNamespace  = "PROVIDER_NAMESPACE"
-	ProviderName       = "PROVIDER_NAME"
-	CatalogPath        = "CATALOG_PATH"
-	ApplianceEndpoints = "APPLIANCE_ENDPOINTS"
-	AuthRequired       = "AUTH_REQUIRED"
-	HyperVUrl          = "HYPERV_URL"
-)
-
-// Volume names
-const (
-	SecretVolumeName      = "provider-secret"
-	SecretVolumeMountPath = "/etc/secret"
-)
-
-const (
-	SettingApplianceManagement = "applianceManagement"
-	ApplianceManagementEnabled = "ApplianceManagementEnabled"
 )
 
 type Labeler struct {
@@ -175,10 +153,8 @@ func (r *Builder) PersistentVolumeClaim(provider *api.Provider, pv *core.Persist
 	return
 }
 
-// Deployment builds a deployment for a HyperV provider server. HyperV provider servers are deployed in
-// Forklift's namespace, so they will not have an owner reference to the parent Provider CR
-// unless the Provider is created in Forklift's namespace.
-// (Owner references cannot point to cross-namespace resources.)
+// Deployment builds a deployment for the SMB mount pod.
+// The pod runs a minimal sleep binary that keeps the SMB CSI volume mounted.
 func (r *Builder) Deployment(provider *api.Provider, secret *core.Secret, pvc *core.PersistentVolumeClaim) (deployment *appsv1.Deployment) {
 	deployment = &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -211,6 +187,9 @@ func (r *Builder) PodSpec(provider *api.Provider, secret *core.Secret, pvc *core
 				Ports: []core.ContainerPort{
 					{ContainerPort: 8080, Protocol: core.ProtocolTCP},
 				},
+				Env: []core.EnvVar{
+					{Name: "CATALOG_PATH", Value: SMBVolumeMountPath},
+				},
 				Resources: core.ResourceRequirements{
 					Requests: core.ResourceList{
 						core.ResourceCPU:    resource.MustParse(Settings.Providers.HyperV.Resources.CPU.Request),
@@ -228,70 +207,6 @@ func (r *Builder) PodSpec(provider *api.Provider, secret *core.Secret, pvc *core
 						MountPath: SMBVolumeMountPath,
 						ReadOnly:  true,
 					},
-					{
-						Name:      SecretVolumeName,
-						MountPath: SecretVolumeMountPath,
-						ReadOnly:  true,
-					},
-				},
-				Env: []core.EnvVar{
-					{
-						Name:  ProviderName,
-						Value: provider.Name,
-					},
-					{
-						Name:  ProviderNamespace,
-						Value: provider.Namespace,
-					},
-					{
-						Name:  CatalogPath,
-						Value: r.smbMountPath(),
-					},
-					{
-						Name:  ApplianceEndpoints,
-						Value: r.applianceEndpoints(provider),
-					},
-					{
-						Name:  AuthRequired,
-						Value: "true",
-					},
-					{
-						Name:  HyperVUrl,
-						Value: provider.Spec.URL,
-					},
-					{
-						Name: "SMB_URL",
-						ValueFrom: &core.EnvVarSource{
-							SecretKeyRef: &core.SecretKeySelector{
-								LocalObjectReference: core.LocalObjectReference{
-									Name: secret.Name,
-								},
-								Key: SecretFieldSMBUrl,
-							},
-						},
-					},
-					{
-						Name: "HYPERV_USERNAME",
-						ValueFrom: &core.EnvVarSource{
-							SecretKeyRef: &core.SecretKeySelector{
-								LocalObjectReference: core.LocalObjectReference{
-									Name: secret.Name,
-								},
-								Key: SecretFieldUsername,
-							},
-						},
-					},
-					{
-						Name: "HYPERV_PASSWORD",
-						ValueFrom: &core.EnvVarSource{
-							SecretKeyRef: &core.SecretKeySelector{
-								LocalObjectReference: core.LocalObjectReference{
-									Name: secret.Name,
-								},
-								Key: SecretFieldPassword,
-							},
-						},
-					},
 				},
 			},
 		},
@@ -305,14 +220,21 @@ func (r *Builder) PodSpec(provider *api.Provider, secret *core.Secret, pvc *core
 					},
 				},
 			},
-			{
-				Name: SecretVolumeName,
-				VolumeSource: core.VolumeSource{
-					Secret: &core.SecretVolumeSource{
-						SecretName: secret.Name,
-					},
-				},
-			},
+		},
+	}
+	return
+}
+
+func (r *Builder) securityContext() (sc *core.SecurityContext) {
+	sc = &core.SecurityContext{
+		AllowPrivilegeEscalation: ptr.To(false),
+		Capabilities: &core.Capabilities{
+			Drop: []core.Capability{"ALL"},
+		},
+		RunAsGroup:   ptr.To(int64(QEMUGroup)),
+		RunAsNonRoot: ptr.To(true),
+		SeccompProfile: &core.SeccompProfile{
+			Type: core.SeccompProfileTypeRuntimeDefault,
 		},
 	}
 	return
@@ -341,31 +263,6 @@ func (r *Builder) Service(provider *api.Provider) (svc *core.Service) {
 	return
 }
 
-func (r *Builder) securityContext() (sc *core.SecurityContext) {
-	sc = &core.SecurityContext{
-		AllowPrivilegeEscalation: ptr.To(false),
-		Capabilities: &core.Capabilities{
-			Drop: []core.Capability{"ALL"},
-		},
-		RunAsGroup:   ptr.To(int64(QEMUGroup)),
-		RunAsNonRoot: ptr.To(true),
-		SeccompProfile: &core.SeccompProfile{
-			Type: core.SeccompProfileTypeRuntimeDefault,
-		},
-	}
-	return
-}
-
-func (r *Builder) applianceEndpoints(provider *api.Provider) string {
-	gateEnabled := Settings.Features.OVFApplianceManagement
-	providerEnabled, _ := strconv.ParseBool(provider.Spec.Settings[SettingApplianceManagement])
-	return strconv.FormatBool(gateEnabled && providerEnabled)
-}
-
 func (r *Builder) containerImage() string {
 	return Settings.Providers.HyperV.ContainerImage
-}
-
-func (r *Builder) smbMountPath() string {
-	return SMBVolumeMountPath
 }

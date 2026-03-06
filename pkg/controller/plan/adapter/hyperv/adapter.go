@@ -23,11 +23,7 @@ func (r *Adapter) Validator(ctx *plancontext.Context) (base.Validator, error) {
 }
 
 func (r *Adapter) Client(ctx *plancontext.Context) (base.Client, error) {
-	c := &Client{Context: ctx}
-	if err := c.connect(); err != nil {
-		return nil, err
-	}
-	return c, nil
+	return &Client{Context: ctx}, nil
 }
 
 func (r *Adapter) DestinationClient(ctx *plancontext.Context) (base.DestinationClient, error) {

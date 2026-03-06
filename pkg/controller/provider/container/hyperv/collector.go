@@ -24,16 +24,26 @@ const (
 	RetryInterval = 5 * time.Second
 	// Default refresh interval.
 	DefaultRefreshInterval = 10 * time.Second
+	// Default timeout for HTTP calls to the provider-server sidecar.
+	DefaultValidationTimeout = 30 * time.Second
 	// Env var to override refresh interval.
 	EnvRefreshInterval = "HYPERV_REFRESH_INTERVAL"
+	// Env var to override the SMB disk validation HTTP timeout.
+	EnvValidationTimeout = "HYPERV_VALIDATION_TIMEOUT"
 )
 
 var RefreshInterval = DefaultRefreshInterval
+var ValidationTimeout = DefaultValidationTimeout
 
 func init() {
 	if s := os.Getenv(EnvRefreshInterval); s != "" {
 		if d, err := time.ParseDuration(s); err == nil && d > 0 {
 			RefreshInterval = d
+		}
+	}
+	if s := os.Getenv(EnvValidationTimeout); s != "" {
+		if d, err := time.ParseDuration(s); err == nil && d > 0 {
+			ValidationTimeout = d
 		}
 	}
 }
@@ -85,7 +95,7 @@ type Collector struct {
 	log logging.LevelLogger
 	// has parity.
 	parity bool
-	// REST client.
+	// WinRM client.
 	client *Client
 	// cancel function.
 	cancel func()
@@ -214,7 +224,7 @@ func (r *Collector) run(ctx *Context) (err error) {
 		}
 	}()
 
-	// Connect to provider server
+	// Connect directly to HyperV host via WinRM using Secret credentials
 	err = r.client.Connect(r.provider)
 	if err != nil {
 		return

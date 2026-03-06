@@ -153,7 +153,7 @@ func (r *Builder) mapInput(object *cnv.VirtualMachineSpec) {
 		{
 			Type: "tablet",
 			Name: "tablet",
-			Bus:  cnv.InputBusUSB,
+			Bus:  cnv.InputBusVirtio,
 		},
 	}
 }
@@ -186,16 +186,14 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) {
 		}
 
 		switch mapped.Destination.Type {
-		case Pod:
-			kNetwork.Pod = &cnv.PodNetwork{}
-			kInterface.Masquerade = &cnv.InterfaceMasquerade{}
 		case Multus:
 			kNetwork.Multus = &cnv.MultusNetwork{
 				NetworkName: path.Join(mapped.Destination.Namespace, mapped.Destination.Name),
 			}
 			kInterface.Bridge = &cnv.InterfaceBridge{}
+		case Pod:
+			fallthrough
 		default:
-			// Default to Pod network if type is unknown
 			kNetwork.Pod = &cnv.PodNetwork{}
 			kInterface.Masquerade = &cnv.InterfaceMasquerade{}
 		}
@@ -373,25 +371,11 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 				core.EnvVar{Name: "V2V_staticIPs", Value: macsToIps},
 			)
 		}
-
-		// Check for multiple IPs per NIC on Windows
-		if isWindows(vm) {
-			macIPCount := make(map[string]int)
-			for _, gn := range vm.GuestNetworks {
-				// Only count manual (static) IPv4 addresses
-				if gn.Origin == hyperv.OriginManual && net.ParseIP(gn.IP).To4() != nil {
-					macIPCount[gn.MAC]++
-				}
-			}
-			for _, count := range macIPCount {
-				if count > 1 {
-					env = append(env, core.EnvVar{
-						Name:  "V2V_multipleIPsPerNic",
-						Value: "true",
-					})
-					break
-				}
-			}
+		if hasMultipleStaticIPsPerNIC(vm) {
+			env = append(env, core.EnvVar{
+				Name:  "V2V_multipleIPsPerNic",
+				Value: "true",
+			})
 		}
 	}
 
@@ -400,6 +384,24 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 	}
 
 	return
+}
+
+func hasMultipleStaticIPsPerNIC(vm *model.VM) bool {
+	if !isWindows(vm) {
+		return false
+	}
+	macIPCount := make(map[string]int)
+	for _, gn := range vm.GuestNetworks {
+		if gn.Origin == hyperv.OriginManual && net.ParseIP(gn.IP).To4() != nil {
+			macIPCount[gn.MAC]++
+		}
+	}
+	for _, count := range macIPCount {
+		if count > 1 {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *Builder) mapMacStaticIps(vm *model.VM) string {

@@ -2,9 +2,12 @@ package hyperv
 
 import (
 	"errors"
+	"strings"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	hvutil "github.com/kubev2v/forklift/pkg/controller/hyperv"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/hyperv"
+	types "github.com/kubev2v/forklift/pkg/controller/provider/model/hyperv/types"
 	fb "github.com/kubev2v/forklift/pkg/lib/filebacked"
 	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
 )
@@ -47,15 +50,14 @@ type NetworkAdapter struct {
 
 // List the collection.
 func (r *NetworkAdapter) List(ctx *Context, provider *api.Provider) (itr fb.Iterator, err error) {
-	networkList := []Network{}
-	err = ctx.client.List("networks", &networkList)
+	networkList, err := ctx.client.ListNetworks()
 	if err != nil {
 		return
 	}
 	list := fb.NewList()
 	for i := range networkList {
 		m := &model.Network{}
-		networkList[i].ApplyTo(m)
+		applyNetworkTo(&networkList[i], m)
 		list.Append(m)
 	}
 	itr = list.Iter()
@@ -63,8 +65,7 @@ func (r *NetworkAdapter) List(ctx *Context, provider *api.Provider) (itr fb.Iter
 }
 
 func (r *NetworkAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
-	networkList := []Network{}
-	err = ctx.client.List("networks", &networkList)
+	networkList, err := ctx.client.ListNetworks()
 	if err != nil {
 		return
 	}
@@ -77,12 +78,12 @@ func (r *NetworkAdapter) GetUpdates(ctx *Context) (updates []Updater, err error)
 			err = tx.Get(m)
 			if err != nil {
 				if errors.Is(err, libmodel.NotFound) {
-					network.ApplyTo(m)
+					applyNetworkTo(network, m)
 					err = tx.Insert(m)
 				}
 				return
 			}
-			network.ApplyTo(m)
+			applyNetworkTo(network, m)
 			err = tx.Update(m)
 			return
 		}
@@ -100,8 +101,7 @@ func (r *NetworkAdapter) DeleteUnexisting(ctx *Context) (deletions []Updater, er
 		}
 		return
 	}
-	serverList := []Network{}
-	err = ctx.client.List("networks", &serverList)
+	serverList, err := ctx.client.ListNetworks()
 	if err != nil {
 		return
 	}
@@ -133,15 +133,14 @@ type StorageAdapter struct {
 
 // List the collection.
 func (r *StorageAdapter) List(ctx *Context, provider *api.Provider) (itr fb.Iterator, err error) {
-	storageList := []Storage{}
-	err = ctx.client.List("storages", &storageList)
+	storageList, err := ctx.client.ListStorages()
 	if err != nil {
 		return
 	}
 	list := fb.NewList()
 	for i := range storageList {
 		m := &model.Storage{}
-		storageList[i].ApplyTo(m)
+		applyStorageTo(&storageList[i], m)
 		list.Append(m)
 	}
 	itr = list.Iter()
@@ -149,8 +148,7 @@ func (r *StorageAdapter) List(ctx *Context, provider *api.Provider) (itr fb.Iter
 }
 
 func (r *StorageAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
-	storageList := []Storage{}
-	err = ctx.client.List("storages", &storageList)
+	storageList, err := ctx.client.ListStorages()
 	if err != nil {
 		return
 	}
@@ -163,12 +161,12 @@ func (r *StorageAdapter) GetUpdates(ctx *Context) (updates []Updater, err error)
 			err = tx.Get(m)
 			if err != nil {
 				if errors.Is(err, libmodel.NotFound) {
-					stor.ApplyTo(m)
+					applyStorageTo(stor, m)
 					err = tx.Insert(m)
 				}
 				return
 			}
-			stor.ApplyTo(m)
+			applyStorageTo(stor, m)
 			err = tx.Update(m)
 			return
 		}
@@ -186,8 +184,7 @@ func (r *StorageAdapter) DeleteUnexisting(ctx *Context) (deletions []Updater, er
 		}
 		return
 	}
-	serverList := []Storage{}
-	err = ctx.client.List("storages", &serverList)
+	serverList, err := ctx.client.ListStorages()
 	if err != nil {
 		return
 	}
@@ -219,15 +216,14 @@ type DiskAdapter struct {
 
 // List the collection.
 func (r *DiskAdapter) List(ctx *Context, provider *api.Provider) (itr fb.Iterator, err error) {
-	diskList := []Disk{}
-	err = ctx.client.List("disks", &diskList)
+	diskList, err := ctx.client.ListDisks()
 	if err != nil {
 		return
 	}
 	list := fb.NewList()
 	for i := range diskList {
 		m := &model.Disk{}
-		diskList[i].ApplyTo(m)
+		applyDiskTo(&diskList[i], m)
 		list.Append(m)
 	}
 	itr = list.Iter()
@@ -235,8 +231,7 @@ func (r *DiskAdapter) List(ctx *Context, provider *api.Provider) (itr fb.Iterato
 }
 
 func (r *DiskAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
-	diskList := []Disk{}
-	err = ctx.client.List("disks", &diskList)
+	diskList, err := ctx.client.ListDisks()
 	if err != nil {
 		return
 	}
@@ -249,12 +244,12 @@ func (r *DiskAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 			err = tx.Get(m)
 			if err != nil {
 				if errors.Is(err, libmodel.NotFound) {
-					disk.ApplyTo(m)
+					applyDiskTo(disk, m)
 					err = tx.Insert(m)
 				}
 				return
 			}
-			disk.ApplyTo(m)
+			applyDiskTo(disk, m)
 			err = tx.Update(m)
 			return
 		}
@@ -272,8 +267,7 @@ func (r *DiskAdapter) DeleteUnexisting(ctx *Context) (deletions []Updater, err e
 		}
 		return
 	}
-	serverList := []Disk{}
-	err = ctx.client.List("disks", &serverList)
+	serverList, err := ctx.client.ListDisks()
 	if err != nil {
 		return
 	}
@@ -305,15 +299,14 @@ type VMAdapter struct {
 
 // List the collection.
 func (r *VMAdapter) List(ctx *Context, provider *api.Provider) (itr fb.Iterator, err error) {
-	vmList := []VM{}
-	err = ctx.client.List("vms", &vmList)
+	vmList, err := ctx.client.ListVMs()
 	if err != nil {
 		return
 	}
 	list := fb.NewList()
 	for i := range vmList {
 		m := &model.VM{}
-		vmList[i].ApplyTo(m)
+		applyVMTo(&vmList[i], m)
 		list.Append(m)
 	}
 	itr = list.Iter()
@@ -322,8 +315,7 @@ func (r *VMAdapter) List(ctx *Context, provider *api.Provider) (itr fb.Iterator,
 
 // Get updates since last sync.
 func (r *VMAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
-	vmList := []VM{}
-	err = ctx.client.List("vms", &vmList)
+	vmList, err := ctx.client.ListVMs()
 	if err != nil {
 		return
 	}
@@ -335,7 +327,7 @@ func (r *VMAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 			}
 			if err = tx.Get(m); err != nil {
 				if errors.Is(err, libmodel.NotFound) {
-					vm.ApplyTo(m)
+					applyVMTo(vm, m)
 					err = tx.Insert(m)
 				}
 				return
@@ -344,7 +336,7 @@ func (r *VMAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
 			// (KVP Exchange only works when VM is running)
 			existingGuestNetworks := m.GuestNetworks
 			existingGuestOS := m.GuestOS
-			vm.ApplyTo(m)
+			applyVMTo(vm, m)
 			if len(m.GuestNetworks) == 0 && len(existingGuestNetworks) > 0 {
 				m.GuestNetworks = existingGuestNetworks
 			}
@@ -368,8 +360,7 @@ func (r *VMAdapter) DeleteUnexisting(ctx *Context) (deletions []Updater, err err
 		}
 		return
 	}
-	serverList := []VM{}
-	err = ctx.client.List("vms", &serverList)
+	serverList, err := ctx.client.ListVMs()
 	if err != nil {
 		return
 	}
@@ -392,4 +383,146 @@ func (r *VMAdapter) DeleteUnexisting(ctx *Context) (deletions []Updater, err err
 		}
 	}
 	return
+}
+
+// Apply VM to (update) the model.
+func applyVMTo(r *types.VM, m *model.VM) {
+	m.ID = r.UUID
+	m.Name = r.Name
+	m.UUID = r.UUID
+	m.PowerState = r.PowerState
+	m.CpuCount = int32(r.CpuCount)
+	m.MemoryMB = int32(r.MemoryMB)
+	m.Firmware = r.Firmware
+	m.GuestOS = r.GuestOS
+	m.TpmEnabled = r.TpmEnabled
+	m.SecureBoot = r.SecureBoot
+	m.HasCheckpoint = r.HasCheckpoint
+	addVMDisks(r, m)
+	addVMNICs(r, m)
+	addVMGuestNetworks(r, m)
+	addVMConcerns(r, m)
+	SortNICsByGuestNetworkOrder(m)
+}
+
+func addVMDisks(r *types.VM, m *model.VM) {
+	m.Disks = nil
+	for _, d := range r.Disks {
+		diskName := d.ID
+		if d.WindowsPath != "" {
+			parts := strings.Split(d.WindowsPath, "\\")
+			if len(parts) > 0 {
+				diskName = parts[len(parts)-1]
+			}
+		}
+		m.Disks = append(m.Disks, model.Disk{
+			Base: model.Base{
+				ID:   d.ID,
+				Name: diskName,
+			},
+			WindowsPath: d.WindowsPath,
+			SMBPath:     d.SMBPath,
+			Datastore: model.Ref{
+				Kind: "Storage",
+				ID:   hvutil.StorageIDDefault,
+			},
+			Capacity:   d.Capacity,
+			Format:     d.Format,
+			RCTEnabled: d.RCTEnabled,
+		})
+	}
+}
+
+func addVMNICs(r *types.VM, m *model.VM) {
+	m.NICs = nil
+	networkSet := make(map[string]bool)
+	for _, n := range r.NICs {
+		m.NICs = append(m.NICs, model.NIC{
+			Name:        n.Name,
+			MAC:         n.MAC,
+			DeviceIndex: n.DeviceIndex,
+			Network: model.Ref{
+				Kind: "Network",
+				ID:   n.NetworkUUID,
+			},
+			NetworkName: n.NetworkName,
+		})
+		if n.NetworkUUID != "" {
+			networkSet[n.NetworkUUID] = true
+		}
+	}
+	m.Networks = nil
+	for uuid := range networkSet {
+		m.Networks = append(m.Networks, model.Ref{
+			Kind: "Network",
+			ID:   uuid,
+		})
+	}
+}
+
+func addVMGuestNetworks(r *types.VM, m *model.VM) {
+	m.GuestNetworks = nil
+	for _, gn := range r.GuestNetworks {
+		m.GuestNetworks = append(m.GuestNetworks, model.GuestNetwork{
+			MAC:          gn.MAC,
+			IP:           gn.IP,
+			DeviceIndex:  gn.DeviceIndex,
+			Origin:       gn.Origin,
+			PrefixLength: gn.PrefixLength,
+			DNS:          gn.DNS,
+			Gateway:      gn.Gateway,
+		})
+	}
+}
+
+func addVMConcerns(r *types.VM, m *model.VM) {
+	m.Concerns = nil
+	for _, c := range r.Concerns {
+		m.Concerns = append(m.Concerns, model.Concern{
+			Category:   c.Category,
+			Label:      c.Label,
+			Assessment: c.Message,
+		})
+	}
+}
+
+// Apply Disk to (update) the model.
+func applyDiskTo(r *types.Disk, m *model.Disk) {
+	diskName := r.ID
+	if r.WindowsPath != "" {
+		parts := strings.Split(r.WindowsPath, "\\")
+		if len(parts) > 0 {
+			diskName = parts[len(parts)-1]
+		}
+	}
+	m.ID = r.ID
+	m.Name = diskName
+	m.WindowsPath = r.WindowsPath
+	m.SMBPath = r.SMBPath
+	m.Capacity = r.Capacity
+	m.Format = r.Format
+	m.RCTEnabled = r.RCTEnabled
+	m.Datastore = model.Ref{
+		Kind: "Storage",
+		ID:   hvutil.StorageIDDefault,
+	}
+}
+
+// Apply Network to (update) the model.
+func applyNetworkTo(r *types.Network, m *model.Network) {
+	m.ID = r.UUID
+	m.Name = r.Name
+	m.UUID = r.UUID
+	m.SwitchName = r.Name
+	m.SwitchType = r.SwitchType
+}
+
+// Apply Storage to (update) the model.
+func applyStorageTo(r *types.Storage, m *model.Storage) {
+	m.ID = r.ID
+	m.Name = r.Name
+	m.Type = r.Type
+	m.Path = r.Path
+	m.Capacity = r.Capacity
+	m.Free = r.Free
 }

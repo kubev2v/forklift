@@ -22,10 +22,6 @@ func (r Reconciler) EnsureHyperVProviderServer(ctx context.Context, provider *ap
 		return
 	}
 	provider.Status.Service = server.Status.Service
-	cnd := server.Status.FindCondition(hyperv.ApplianceManagementEnabled)
-	if cnd != nil {
-		provider.Status.SetCondition(*cnd)
-	}
 	return
 }
 
