@@ -1,0 +1,67 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-libs-11.5.0-4.1.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 5504089
+    checksum: sha256:449f1f6b8a46f756dbb19c12c599133f41c7f969b4064e357c49020e3980208c
+    name: libvirt-libs
+    evr: 11.5.0-4.1.el10_1
+    sourcerpm: libvirt-11.5.0-4.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/c/cyrus-sasl-gssapi-2.1.28-29.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 28091
+    checksum: sha256:5d3819633283fdf56dfe268afb947f695f9cffd7d6764d08c9efe351cf31a14e
+    name: cyrus-sasl-gssapi
+    evr: 2.1.28-29.el10
+    sourcerpm: cyrus-sasl-2.1.28-29.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libnl3-3.11.0-1.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 374208
+    checksum: sha256:f43e83ce1afebac43eb81dc348829516fb97dce8b0e05ad76a1d06af4342e5f4
+    name: libnl3
+    evr: 3.11.0-1.el10
+    sourcerpm: libnl3-3.11.0-1.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/n/numactl-libs-2.0.19-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 31884
+    checksum: sha256:a96428a27c534ca9992fd9baea5d5068167d53a8fb7a01eafea820a29dd1cef7
+    name: numactl-libs
+    evr: 2.0.19-2.el10
+    sourcerpm: numactl-2.0.19-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/codeready-builder/os/Packages/l/libvirt-devel-11.5.0-4.1.el10_1.x86_64.rpm
+    repoid: codeready-builder-for-rhel-10-x86_64-rpms
+    size: 215096
+    checksum: sha256:4b37dd5743139e2df129548e758a99eace57b0680cc542357c6533f3c77ace74
+    name: libvirt-devel
+    evr: 11.5.0-4.1.el10_1
+    sourcerpm: libvirt-11.5.0-4.1.el10_1.src.rpm
+  source:
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/l/libvirt-11.5.0-4.1.el10_1.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 10181500
+    checksum: sha256:57bc381750268cd7f24596f1acfef15009e46b37c2930b9d25e713d1cdcad91c
+    name: libvirt
+    evr: 11.5.0-4.1.el10_1
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/c/cyrus-sasl-2.1.28-29.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 3988047
+    checksum: sha256:0b9523e5525995fae588298cc04dcdaf6c173334b608a13ed4f2647cc74bba83
+    name: cyrus-sasl
+    evr: 2.1.28-29.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libnl3-3.11.0-1.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 5089028
+    checksum: sha256:3da5f6833d136beefc1a8c2644a571ec7ce4916588aacd3b01afda037e2cc90a
+    name: libnl3
+    evr: 3.11.0-1.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/n/numactl-2.0.19-2.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 251570
+    checksum: sha256:f1f7cbcef8e9d58a3f23357f01ddd6d7fae28944ea6800528a12bcdaca9f0d5f
+    name: numactl
+    evr: 2.0.19-2.el10
+  module_metadata: []

@@ -1,0 +1,2545 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/a/amd-gpu-firmware-20251111-19.1.el10_1.noarch.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 29642141
+    checksum: sha256:081a89985c0dc9fa356d172cb19849b0c3b0e6e5ce0a5629e55dd6ffe691675f
+    name: amd-gpu-firmware
+    evr: 20251111-19.1.el10_1
+    sourcerpm: linux-firmware-20251111-19.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/a/augeas-libs-1.14.2-0.3.20250224git6ee1282.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 441427
+    checksum: sha256:d755ae2ced147d3488c5aa6dd695a754203b2a3d9fd74a65ff8299f9d803a6bc
+    name: augeas-libs
+    evr: 1.14.2-0.3.20250224git6ee1282.el10
+    sourcerpm: augeas-1.14.2-0.3.20250224git6ee1282.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/c/capstone-5.0.1-6.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 1032903
+    checksum: sha256:82ef4d88ce24162c34ed2f942cf3a5d58ff18de0d2a460e065f77b71a341f958
+    name: capstone
+    evr: 5.0.1-6.el10
+    sourcerpm: capstone-5.0.1-6.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/c/catatonit-0.2.1-1.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 314586
+    checksum: sha256:ca94fdd9a8bd1cddea6e44d606683221fa8373168f36f8c404f364e347c37600
+    name: catatonit
+    evr: 5:0.2.1-1.el10
+    sourcerpm: catatonit-0.2.1-1.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/c/checkpolicy-3.9-1.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 377613
+    checksum: sha256:8e3ea8256d5e693d3644d47fcbfd6902c96a3e37b855ad5a9dfe9713daa9f65d
+    name: checkpolicy
+    evr: 3.9-1.el10
+    sourcerpm: checkpolicy-3.9-1.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/c/clevis-21-8.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 61748
+    checksum: sha256:f83825b64988654e4396792a0dadafe60a7a0c5bd9ec3c328ffb34bb740eadee
+    name: clevis
+    evr: 21-8.el10
+    sourcerpm: clevis-21-8.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/c/clevis-luks-21-8.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 40395
+    checksum: sha256:043982f4bed4a86bc9fe6055056bfde53ed09c4679480cf667208270bb3a6ae9
+    name: clevis-luks
+    evr: 21-8.el10
+    sourcerpm: clevis-21-8.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/c/clevis-pin-tpm2-0.5.3-8.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 941166
+    checksum: sha256:7fe9fe198f0dec509af822d22a65fa1068f7a5470b0ea7a6c4383d9d6d5f514f
+    name: clevis-pin-tpm2
+    evr: 0.5.3-8.el10
+    sourcerpm: clevis-pin-tpm2-0.5.3-8.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/d/dnsmasq-2.90-4.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 378700
+    checksum: sha256:e6a244057640b9f96fa4454fe712fd836789475826a5f50020ab47576f34f57a
+    name: dnsmasq
+    evr: 2.90-4.el10
+    sourcerpm: dnsmasq-2.90-4.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/e/edk2-ovmf-20250523-2.el10.noarch.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 8918301
+    checksum: sha256:c77a2f74f70c49faa4103f47ca1a6a7e5be4b871d400c065d7af4a74dfb2a80e
+    name: edk2-ovmf
+    evr: 20250523-2.el10
+    sourcerpm: edk2-20250523-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/g/gnupg2-smime-2.4.5-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 267738
+    checksum: sha256:5cb18d1dfa97bebeaebdf8cc9575e2e5796a15ac3351728d8681132903fa5671
+    name: gnupg2-smime
+    evr: 2.4.5-2.el10
+    sourcerpm: gnupg2-2.4.5-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/g/gnutls-dane-3.8.10-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 41084
+    checksum: sha256:f25402c1a0998389237a58e694ab18905c274dd098e7ec7292fad7011c071f9a
+    name: gnutls-dane
+    evr: 3.8.10-2.el10
+    sourcerpm: gnutls-3.8.10-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/g/gnutls-utils-3.8.10-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 320987
+    checksum: sha256:ce80b955cc111bbb95a9947a625a19708129dbe06c1164548b012eddb8dc2053
+    name: gnutls-utils
+    evr: 3.8.10-2.el10
+    sourcerpm: gnutls-3.8.10-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/g/guestfs-tools-1.54.0-3.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 4792340
+    checksum: sha256:e2a72dd4caa7e4e497e9cd51cbe462e6826536b01b9b032a6eb4b360ac49d6f3
+    name: guestfs-tools
+    evr: 1.54.0-3.el10
+    sourcerpm: guestfs-tools-1.54.0-3.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/h/hexedit-1.6-8.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 46412
+    checksum: sha256:b1dc882aeda544ce548fe1efba4b33337c8a6574aa7065a10d1460ea41d411be
+    name: hexedit
+    evr: 1.6-8.el10
+    sourcerpm: hexedit-1.6-8.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/h/hivex-libs-1.3.24-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 48762
+    checksum: sha256:0fe4957f81b2a67252523652182cf96ca59688b6e645761b53a99bc69f127623
+    name: hivex-libs
+    evr: 1.3.24-2.el10
+    sourcerpm: hivex-1.3.24-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/i/intel-gpu-firmware-20251111-19.1.el10_1.noarch.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 9320902
+    checksum: sha256:454fa6db2fe8d1a0389cc88a709012d519cb0b391386a24893d2189827470d89
+    name: intel-gpu-firmware
+    evr: 20251111-19.1.el10_1
+    sourcerpm: linux-firmware-20251111-19.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/i/ipxe-roms-qemu-20240119-5.gitde8a0821.el10.noarch.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 874350
+    checksum: sha256:551c871d97e44a117202c20cca8c5e764bafd2bafebfd99d5ab1a0443ed5f96e
+    name: ipxe-roms-qemu
+    evr: 20240119-5.gitde8a0821.el10
+    sourcerpm: ipxe-20240119-5.gitde8a0821.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/j/jose-14-102.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 74379
+    checksum: sha256:dde4bc476687ac38bdbdd2c559ad4f3b913c13538a318bbc7a2fa489e1ff39e9
+    name: jose
+    evr: 14-102.el10
+    sourcerpm: jose-14-102.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libfdt-1.7.0-12.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 37698
+    checksum: sha256:9057de5fec13d7c60ee96519901df58f7eeb91916242e1dbcdb3e3bad7cb77f2
+    name: libfdt
+    evr: 1.7.0-12.el10
+    sourcerpm: dtc-1.7.0-12.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libguestfs-1.56.1-3.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 1199234
+    checksum: sha256:efabfe6d07adf116f86588a2309afd8cf969720ff708d1f6b70c794e959f74e9
+    name: libguestfs
+    evr: 1:1.56.1-3.el10
+    sourcerpm: libguestfs-1.56.1-3.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libguestfs-appliance-1.56.1-3.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 2559265
+    checksum: sha256:437bed0a1b1d646ba57e2cb00632113d43e618de1dca882183ffe0364194f486
+    name: libguestfs-appliance
+    evr: 1:1.56.1-3.el10
+    sourcerpm: libguestfs-1.56.1-3.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libguestfs-winsupport-10.0-5.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 2510656
+    checksum: sha256:2f731fd30af4796b3dfac04de136672c4e2bb82d6a68efadf40b4d5a3e834794
+    name: libguestfs-winsupport
+    evr: 10.0-5.el10
+    sourcerpm: libguestfs-winsupport-10.0-5.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libguestfs-xfs-1.56.1-3.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 12070
+    checksum: sha256:23f0e39cb7bb6a6021ade92f6052cfd6ceaa0a62d1bde5ea7765d6509722cf09
+    name: libguestfs-xfs
+    evr: 1:1.56.1-3.el10
+    sourcerpm: libguestfs-1.56.1-3.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libjose-14-102.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 69460
+    checksum: sha256:5d9479de374fa611c5e677ad3168f3dff35cf63b98d34c3c3561acd983078371
+    name: libjose
+    evr: 14-102.el10
+    sourcerpm: jose-14-102.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libluksmeta-9-26.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 28320
+    checksum: sha256:b059a1ac54192dbb1dcd5587c008f311de6ce6f909d168e6357c1cb0889c347a
+    name: libluksmeta
+    evr: 9-26.el10
+    sourcerpm: luksmeta-9-26.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libnbd-1.22.2-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 180330
+    checksum: sha256:eb12976dfaca3168ee89a984be5812238d472523b9bd2f13ccb26a489b76f6ee
+    name: libnbd
+    evr: 1.22.2-2.el10
+    sourcerpm: libnbd-1.22.2-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libosinfo-1.11.0-8.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 328669
+    checksum: sha256:4b06c6fc48809b182769bb101bad22ff81af9893bbb3bc151b38705b6367a4c2
+    name: libosinfo
+    evr: 1.11.0-8.el10
+    sourcerpm: libosinfo-1.11.0-8.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libsecret-0.21.2-8.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 200659
+    checksum: sha256:ea707416cb6ae8c28908e13293e770cf1f3cae021b815fc5ff95001d2863017d
+    name: libsecret
+    evr: 0.21.2-8.el10
+    sourcerpm: libsecret-0.21.2-8.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libslirp-4.7.0-10.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 79183
+    checksum: sha256:daf70234cc5c1732ee7f047b7296322ae9ee59ae95420787c207267bb3eb1383
+    name: libslirp
+    evr: 4.7.0-10.el10
+    sourcerpm: libslirp-4.7.0-10.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libsoup3-3.6.5-3.el10_1.7.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 404933
+    checksum: sha256:4d3c72051ce887701a24d997906b210cef6739151cf845812581926fbff949d6
+    name: libsoup3
+    evr: 3.6.5-3.el10_1.7
+    sourcerpm: libsoup3-3.6.5-3.el10_1.7.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libtpms-0.9.6-11.el10_0.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 189851
+    checksum: sha256:d1d3a4d6f2839fbc39e32fca4d2bf963a214fa292e9e2ed3247d86d24960addc
+    name: libtpms
+    evr: 0.9.6-11.el10_0
+    sourcerpm: libtpms-0.9.6-11.el10_0.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-client-11.5.0-4.2.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 459867
+    checksum: sha256:e000f19fbf6e0a5e2591c54e539e9096dbca0b6e9e71f53ca51dfaf452874c29
+    name: libvirt-client
+    evr: 11.5.0-4.2.el10_1
+    sourcerpm: libvirt-11.5.0-4.2.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-daemon-common-11.5.0-4.2.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 147975
+    checksum: sha256:8e5a8bf9d2410ea38c290d55a7e22cc0e55fdc9bfbd2839b5b9e7f47d141117f
+    name: libvirt-daemon-common
+    evr: 11.5.0-4.2.el10_1
+    sourcerpm: libvirt-11.5.0-4.2.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-daemon-config-network-11.5.0-4.2.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 25027
+    checksum: sha256:586305a5779a5d9438177ad751f00cd9b6a57247f4e5b4674f53d5781edc36c4
+    name: libvirt-daemon-config-network
+    evr: 11.5.0-4.2.el10_1
+    sourcerpm: libvirt-11.5.0-4.2.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-daemon-driver-network-11.5.0-4.2.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 274239
+    checksum: sha256:2a56541ea1a93270b8f5c79349ba5e193c0b35eaf68bb45a23c4b2f6e4ab72ec
+    name: libvirt-daemon-driver-network
+    evr: 11.5.0-4.2.el10_1
+    sourcerpm: libvirt-11.5.0-4.2.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-daemon-driver-qemu-11.5.0-4.2.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 1048779
+    checksum: sha256:122bf7e4f35d1e34f128839a844b220a541682352b67c7500dd67e71ff040b44
+    name: libvirt-daemon-driver-qemu
+    evr: 11.5.0-4.2.el10_1
+    sourcerpm: libvirt-11.5.0-4.2.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-daemon-driver-secret-11.5.0-4.2.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 216905
+    checksum: sha256:862a2a25576508ed668b9c46a6fa3853c038fd9a33dab2d37adea40cca00b963
+    name: libvirt-daemon-driver-secret
+    evr: 11.5.0-4.2.el10_1
+    sourcerpm: libvirt-11.5.0-4.2.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-daemon-driver-storage-core-11.5.0-4.2.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 274403
+    checksum: sha256:0dcf8e49f45ccedff93803b42032450fec27b343c767cab60190ee17f508c81b
+    name: libvirt-daemon-driver-storage-core
+    evr: 11.5.0-4.2.el10_1
+    sourcerpm: libvirt-11.5.0-4.2.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-daemon-log-11.5.0-4.2.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 65845
+    checksum: sha256:ca9575cdda4566ff2b2a380e96f5df829ccd62a1ab9ea6c2ac2b24a603956f97
+    name: libvirt-daemon-log
+    evr: 11.5.0-4.2.el10_1
+    sourcerpm: libvirt-11.5.0-4.2.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-libs-11.5.0-4.2.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 5477430
+    checksum: sha256:cdbbd0b7f9a4c8f71e8880097e53981c276c90b571accf941125cfa7939310b2
+    name: libvirt-libs
+    evr: 11.5.0-4.2.el10_1
+    sourcerpm: libvirt-11.5.0-4.2.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libxcrypt-compat-4.4.36-10.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 95333
+    checksum: sha256:8d03847721056594866a98db5f28bb9c3d4ee81cce2ccdfa9253738662594132
+    name: libxcrypt-compat
+    evr: 4.4.36-10.el10
+    sourcerpm: libxcrypt-4.4.36-10.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libxslt-1.1.39-8.el10_0.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 194150
+    checksum: sha256:add89db45e883cbce3a20363f44fb775d11811581c61b82b9012f6cd42fdd6d7
+    name: libxslt
+    evr: 1.1.39-8.el10_0
+    sourcerpm: libxslt-1.1.39-8.el10_0.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/luksmeta-9-26.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 23749
+    checksum: sha256:fc0f39c3adf800ba429d97296282d6762c938fe75f3ee8221d57cfd8afceb1e7
+    name: luksmeta
+    evr: 9-26.el10
+    sourcerpm: luksmeta-9-26.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/m/memstrack-0.2.5-6.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 53495
+    checksum: sha256:13a40cd8c463d41bd4782a1bdbc5ea19a5c9e8926b66eb35025c5a72453a8349
+    name: memstrack
+    evr: 0.2.5-6.el10
+    sourcerpm: memstrack-0.2.5-6.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/m/mingw-srvany-redistributable-1.1-10.el10.noarch.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 55121
+    checksum: sha256:5c73bc35897e027257b77cbc56d8af5651a16a56fe7aa86b7ebbd4410030ea72
+    name: mingw-srvany-redistributable
+    evr: 1.1-10.el10
+    sourcerpm: mingw-srvany-1.1-10.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/n/nbdkit-1.44.1-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 9689
+    checksum: sha256:3fbbf001ad021e25e6177d9487ea71f78f1f4391d3359162ebecbc3d0c4193d9
+    name: nbdkit
+    evr: 1.44.1-2.el10
+    sourcerpm: nbdkit-1.44.1-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/n/nbdkit-basic-filters-1.44.1-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 379860
+    checksum: sha256:7c75c7f8f153296ddc132847dd7ccecbf9a15df69d590913c971a6037b4d6bba
+    name: nbdkit-basic-filters
+    evr: 1.44.1-2.el10
+    sourcerpm: nbdkit-1.44.1-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/n/nbdkit-basic-plugins-1.44.1-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 213454
+    checksum: sha256:f8ef47d534d76f165a161c49dfa4266d69adf5a7612261bc0f8febb63020d680
+    name: nbdkit-basic-plugins
+    evr: 1.44.1-2.el10
+    sourcerpm: nbdkit-1.44.1-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/n/nbdkit-curl-plugin-1.44.1-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 45071
+    checksum: sha256:e4fbf0323d1a7c3dbd75a65cc6fb98ed644ef8091beb3886bd38b18a6768a85a
+    name: nbdkit-curl-plugin
+    evr: 1.44.1-2.el10
+    sourcerpm: nbdkit-1.44.1-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/n/nbdkit-nbd-plugin-1.44.1-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 39546
+    checksum: sha256:9a3e27dcf488c060d92d5428850318e414e3c81eb95992de5de748617cae06de
+    name: nbdkit-nbd-plugin
+    evr: 1.44.1-2.el10
+    sourcerpm: nbdkit-1.44.1-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/n/nbdkit-selinux-1.44.1-2.el10.noarch.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 28844
+    checksum: sha256:b2c9f68a43e9a9223a4103e81ca33edc6f6a3e047440ac5f8b5a6c0b140ba88c
+    name: nbdkit-selinux
+    evr: 1.44.1-2.el10
+    sourcerpm: nbdkit-1.44.1-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/n/nbdkit-server-1.44.1-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 139387
+    checksum: sha256:6f8e6318fe3bbcbb2a9cb7b82622e10f555ee0f62428a46b9c5c72312fa6ffcf
+    name: nbdkit-server
+    evr: 1.44.1-2.el10
+    sourcerpm: nbdkit-1.44.1-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/n/nbdkit-ssh-plugin-1.44.1-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 34210
+    checksum: sha256:3792548cf42c07787b85513b04578b9c597c17acecc8f45a543874277ce9881a
+    name: nbdkit-ssh-plugin
+    evr: 1.44.1-2.el10
+    sourcerpm: nbdkit-1.44.1-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/n/nbdkit-vddk-plugin-1.44.1-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 57233
+    checksum: sha256:140b2d188eccf43aa501ee8802b771e32405cca53515d75d40a2dac7d42725fa
+    name: nbdkit-vddk-plugin
+    evr: 1.44.1-2.el10
+    sourcerpm: nbdkit-1.44.1-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/n/nvidia-gpu-firmware-20251111-19.1.el10_1.noarch.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 104216606
+    checksum: sha256:e47d27fa3e099bcaa0803a1158ba343310306d51fb8748b2eb6d57af86551350
+    name: nvidia-gpu-firmware
+    evr: 20251111-19.1.el10_1
+    sourcerpm: linux-firmware-20251111-19.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/o/osinfo-db-20250606-1.el10.noarch.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 577757
+    checksum: sha256:5dd80fd9c9536556cec946cb54be4d2bff5c3a120b5bceba9f37d6908523abc2
+    name: osinfo-db
+    evr: 20250606-1.el10
+    sourcerpm: osinfo-db-20250606-1.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/o/osinfo-db-tools-1.11.0-8.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 80346
+    checksum: sha256:d22ac02e88999727d1c9e88a86c4239e395b7261e8eeedc409f088e952283394
+    name: osinfo-db-tools
+    evr: 1.11.0-8.el10
+    sourcerpm: osinfo-db-tools-1.11.0-8.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/p/passt-0^20250512.g8ec1341-4.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 271741
+    checksum: sha256:2573d78055f977d18a96c10f83daf52fb351d58b9f72c2c040a53d27e3df2d54
+    name: passt
+    evr: 0^20250512.g8ec1341-4.el10_1
+    sourcerpm: passt-0^20250512.g8ec1341-4.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/p/passt-selinux-0^20250512.g8ec1341-4.el10_1.noarch.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 28500
+    checksum: sha256:3517f7ea44f34531cbc200c892d99d4c6ca8ccc29563c447b84818d319cfc04c
+    name: passt-selinux
+    evr: 0^20250512.g8ec1341-4.el10_1
+    sourcerpm: passt-0^20250512.g8ec1341-4.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/p/pinentry-1.3.1-1.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 117628
+    checksum: sha256:9656d557b5ece896a538459347e20c88a78e81560630f8bc1220b686b0a361bd
+    name: pinentry
+    evr: 1.3.1-1.el10
+    sourcerpm: pinentry-1.3.1-1.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/p/pixman-0.43.4-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 294657
+    checksum: sha256:8e3e3f0d0ae1d827e5f9de15d729f9ce46689472d187208ad41ee2719d7518c9
+    name: pixman
+    evr: 0.43.4-2.el10
+    sourcerpm: pixman-0.43.4-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/p/policycoreutils-python-utils-3.9-1.el10.noarch.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 47653
+    checksum: sha256:2442cf3c9733923e80888c9de5ee0b685fac5e08944d2589d5d9527fb2bac9af
+    name: policycoreutils-python-utils
+    evr: 3.9-1.el10
+    sourcerpm: policycoreutils-3.9-1.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/p/python3-audit-4.0.3-4.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 72521
+    checksum: sha256:f33456418f816e135ba5cbead1befc4a00b46966234b9d33d2a944d37fd5b27c
+    name: python3-audit
+    evr: 4.0.3-4.el10
+    sourcerpm: audit-4.0.3-4.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/p/python3-distro-1.9.0-5.el10.noarch.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 53039
+    checksum: sha256:524164de99c24b044ee7f87a82946a6f666a42c90e9f992e491922a48423a7e7
+    name: python3-distro
+    evr: 1.9.0-5.el10
+    sourcerpm: python-distro-1.9.0-5.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/p/python3-libselinux-3.9-1.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 205393
+    checksum: sha256:f76ec7f4ebee63764a7fd3793be613a683b8d42b8625fa4f97634fed7601ba8d
+    name: python3-libselinux
+    evr: 3.9-1.el10
+    sourcerpm: libselinux-3.9-1.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/p/python3-libsemanage-3.9-1.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 82462
+    checksum: sha256:ed157e48fec8ecc84c1d11eea1522018c55292ed3fc170561f3b2a2fa67b406b
+    name: python3-libsemanage
+    evr: 3.9-1.el10
+    sourcerpm: libsemanage-3.9-1.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/p/python3-policycoreutils-3.9-1.el10.noarch.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 2317588
+    checksum: sha256:534b0e66807bf8f6df2e6431c2c9308d361f81dab564859f766331ba2dae74e2
+    name: python3-policycoreutils
+    evr: 3.9-1.el10
+    sourcerpm: policycoreutils-3.9-1.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/q/qemu-img-10.0.0-14.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 2481199
+    checksum: sha256:a67b5216997852aca46647c4977136c622414078f6a2564e4c51376e150c2486
+    name: qemu-img
+    evr: 18:10.0.0-14.el10_1
+    sourcerpm: qemu-kvm-10.0.0-14.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/q/qemu-kvm-common-10.0.0-14.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 689855
+    checksum: sha256:8e6a421ed9813860680ab6116f9371b0f564e02b36bca244e2ca711c5d3f72ff
+    name: qemu-kvm-common
+    evr: 18:10.0.0-14.el10_1
+    sourcerpm: qemu-kvm-10.0.0-14.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/q/qemu-kvm-core-10.0.0-14.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 4855698
+    checksum: sha256:1d4b0388570fb5f0bbd31a2a69bbb0a0c2277b1ccc45bf7cc0ca62f675aee01b
+    name: qemu-kvm-core
+    evr: 18:10.0.0-14.el10_1
+    sourcerpm: qemu-kvm-10.0.0-14.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/s/scrub-2.6.1-11.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 48276
+    checksum: sha256:5f63a317f5f8e99ad088d838eaee026e04a0b842978280890dfe4cc50bcc544f
+    name: scrub
+    evr: 2.6.1-11.el10
+    sourcerpm: scrub-2.6.1-11.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/s/seabios-bin-1.16.3-7.el10.noarch.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 103959
+    checksum: sha256:fe42dc4bca23577d6ddc0a4359f33c6abaabdbba593e8cf8486410ab03c0a037
+    name: seabios-bin
+    evr: 1.16.3-7.el10
+    sourcerpm: seabios-1.16.3-7.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/s/seavgabios-bin-1.16.3-7.el10.noarch.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 36474
+    checksum: sha256:c4fbd19d25314a23e81a432a9106f2c3e719675b9d0861ac381770ce015c173e
+    name: seavgabios-bin
+    evr: 1.16.3-7.el10
+    sourcerpm: seabios-1.16.3-7.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/s/supermin-5.3.5-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 969933
+    checksum: sha256:5b583fe97cbecfea89347447af1cf421983359496cd57fdfa0f066d514471394
+    name: supermin
+    evr: 5.3.5-2.el10
+    sourcerpm: supermin-5.3.5-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/s/swtpm-0.9.0-5.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 32076
+    checksum: sha256:dfc2afc611438e4c878d4b1b0292c2423177e6a67dc93c836e2bbe613b92b987
+    name: swtpm
+    evr: 0.9.0-5.el10
+    sourcerpm: swtpm-0.9.0-5.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/s/swtpm-libs-0.9.0-5.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 52555
+    checksum: sha256:fa312e3f2afb3ab0a3acb0535b61b788052ce3b18182bf49e696eb3909578126
+    name: swtpm-libs
+    evr: 0.9.0-5.el10
+    sourcerpm: swtpm-0.9.0-5.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/s/swtpm-selinux-0.9.0-5.el10.noarch.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 25055
+    checksum: sha256:0bddee27023629f0676e620bd7fc15abcfd571645e5329096c6d644b685a75be
+    name: swtpm-selinux
+    evr: 0.9.0-5.el10
+    sourcerpm: swtpm-0.9.0-5.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/s/swtpm-tools-0.9.0-5.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 118469
+    checksum: sha256:8f9ddcad92c63743c2122becfab6a909bb1949cd1dd2cc3c405bfe22a5eecf61
+    name: swtpm-tools
+    evr: 0.9.0-5.el10
+    sourcerpm: swtpm-0.9.0-5.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/u/unbound-anchor-1.20.0-15.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 35467
+    checksum: sha256:bddb030bcda7d2d544c21ec026b42fa23b0d91c8477f28c48725cac58f6114d0
+    name: unbound-anchor
+    evr: 1.20.0-15.el10_1
+    sourcerpm: unbound-1.20.0-15.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/u/unbound-libs-1.20.0-15.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 560290
+    checksum: sha256:28cc61ad4156347ce1dedf98d32ecadc72c569dbad65d621844583494626960d
+    name: unbound-libs
+    evr: 1.20.0-15.el10_1
+    sourcerpm: unbound-1.20.0-15.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/v/virt-v2v-2.8.1-13.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 3709813
+    checksum: sha256:ebdc56da2464e2f987c15037e51a2a9930a850796b41a2d0181d2241f8a4dc9d
+    name: virt-v2v
+    evr: 1:2.8.1-13.el10_1
+    sourcerpm: virt-v2v-2.8.1-13.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/v/virtio-win-1.9.49-0.el10_1.noarch.rpm
+    repoid: rhel-10-for-x86_64-appstream-rpms
+    size: 286153825
+    checksum: sha256:ad2cc12984356742cfc96be7f8913893768a099d1cf25b54a20dffd91ba001b5
+    name: virtio-win
+    evr: 1.9.49-0.el10_1
+    sourcerpm: virtio-win-1.9.49-0.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/a/acl-2.3.2-4.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 83041
+    checksum: sha256:e321bd43596a024289406bd8fd4d589019ca0c23f77b58419fb8827b0f89f920
+    name: acl
+    evr: 2.3.2-4.el10
+    sourcerpm: acl-2.3.2-4.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/a/amd-ucode-firmware-20251111-19.1.el10_1.noarch.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 477608
+    checksum: sha256:6a13bb088885d182640536c57a6faa6ba2f6b1a57ba0f2d10d6d0f726de25efd
+    name: amd-ucode-firmware
+    evr: 20251111-19.1.el10_1
+    sourcerpm: linux-firmware-20251111-19.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/a/atheros-firmware-20251111-19.1.el10_1.noarch.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 43177506
+    checksum: sha256:78335fd831ffb7ff3d331fb71dbc4a0db9d1b466424ae8b4ce1f3a2cac299613
+    name: atheros-firmware
+    evr: 20251111-19.1.el10_1
+    sourcerpm: linux-firmware-20251111-19.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/b/binutils-2.41-58.el10_1.2.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 6709343
+    checksum: sha256:7059ffc674a7709755c63265dd505262374684b6d88992b6b0e853d2c14a7caa
+    name: binutils
+    evr: 2.41-58.el10_1.2
+    sourcerpm: binutils-2.41-58.el10_1.2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/b/binutils-gold-2.41-58.el10_1.2.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 816566
+    checksum: sha256:276d2e51c7cea1c21363a2c44d099a158188e8bee1e7fc8779ec89145d72fa37
+    name: binutils-gold
+    evr: 2.41-58.el10_1.2
+    sourcerpm: binutils-2.41-58.el10_1.2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/b/brcmfmac-firmware-20251111-19.1.el10_1.noarch.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 10115770
+    checksum: sha256:4fb7a876340df5903c1709c92566018669b036cf75cf56fa709d7295da425055
+    name: brcmfmac-firmware
+    evr: 20251111-19.1.el10_1
+    sourcerpm: linux-firmware-20251111-19.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/b/bzip2-1.0.8-25.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 59954
+    checksum: sha256:cd92b2d19a41f31e44d96f05feae0d5cfc0dad8cda3852062d2134832d044daa
+    name: bzip2
+    evr: 1.0.8-25.el10
+    sourcerpm: bzip2-1.0.8-25.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/c/cirrus-audio-firmware-20251111-19.1.el10_1.noarch.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 2430059
+    checksum: sha256:197cb8f21ccce011ed61960c6835876410c6f1078430d6cb3708581e4dfc9650
+    name: cirrus-audio-firmware
+    evr: 20251111-19.1.el10_1
+    sourcerpm: linux-firmware-20251111-19.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/c/cpio-2.15-3.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 303102
+    checksum: sha256:95a8f859d25a9db3902f2cb3ae39c5cc979b7ea4f81cbfccd76585b95614035b
+    name: cpio
+    evr: 2.15-3.el10
+    sourcerpm: cpio-2.15-3.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/c/cryptsetup-2.7.5-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 344352
+    checksum: sha256:e81d3c035e1cebb0d8b69675d2e2b099792a4175ea043f964c3d9199a386a577
+    name: cryptsetup
+    evr: 2.7.5-2.el10
+    sourcerpm: cryptsetup-2.7.5-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/c/cryptsetup-libs-2.7.5-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 552188
+    checksum: sha256:0faaad16d8ff77144bd9bef889b4048491914ad75526987e6606b92f0a2f1589
+    name: cryptsetup-libs
+    evr: 2.7.5-2.el10
+    sourcerpm: cryptsetup-2.7.5-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/c/cyrus-sasl-gssapi-2.1.28-29.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 28091
+    checksum: sha256:5d3819633283fdf56dfe268afb947f695f9cffd7d6764d08c9efe351cf31a14e
+    name: cyrus-sasl-gssapi
+    evr: 2.1.28-29.el10
+    sourcerpm: cyrus-sasl-2.1.28-29.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/c/cyrus-sasl-lib-2.1.28-29.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 108545
+    checksum: sha256:24e828190ace074a593f254693a25e92fb417556d8bc843ce06de5131927d34b
+    name: cyrus-sasl-lib
+    evr: 2.1.28-29.el10
+    sourcerpm: cyrus-sasl-2.1.28-29.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/d/device-mapper-1.02.206-3.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 143516
+    checksum: sha256:5c474b5f1c6d3d639299a560c1a437f7370bc9480ba07718b5f638bb6a8b90dd
+    name: device-mapper
+    evr: 10:1.02.206-3.el10
+    sourcerpm: lvm2-2.03.32-3.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/d/device-mapper-event-1.02.206-3.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 36303
+    checksum: sha256:2d1355c6afd40ab00174686ba0173d08544dcc7fbe8087a85149b9573e770815
+    name: device-mapper-event
+    evr: 10:1.02.206-3.el10
+    sourcerpm: lvm2-2.03.32-3.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/d/device-mapper-event-libs-1.02.206-3.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 33182
+    checksum: sha256:4ca32a4f11e348a06259214a347fec88695cea83942f8a60ca7a601b3177fffb
+    name: device-mapper-event-libs
+    evr: 10:1.02.206-3.el10
+    sourcerpm: lvm2-2.03.32-3.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/d/device-mapper-libs-1.02.206-3.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 186267
+    checksum: sha256:1899f480df3e7c8460760a8f6207b0e6f773dacd000bc4fcf3d025f2d3adc07d
+    name: device-mapper-libs
+    evr: 10:1.02.206-3.el10
+    sourcerpm: lvm2-2.03.32-3.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/d/device-mapper-persistent-data-1.1.0-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 1198162
+    checksum: sha256:7e953fb72532c50d5b732ad5ee39fcd771db916b6a3967e2ede71b551d30c53f
+    name: device-mapper-persistent-data
+    evr: 1.1.0-2.el10
+    sourcerpm: device-mapper-persistent-data-1.1.0-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/d/dhcpcd-10.0.6-7.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 234563
+    checksum: sha256:7dd7e3fa0067d92b7a10635a2f197825d9ed7faa71a0b9898b93cf4402b5cf64
+    name: dhcpcd
+    evr: 10.0.6-7.el10
+    sourcerpm: dhcpcd-10.0.6-7.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/d/diffutils-3.10-8.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 423166
+    checksum: sha256:a8e3e08d2fd19a3ef513875aa379a35e5e424272dbf4e0aad5702bb0c49bd95f
+    name: diffutils
+    evr: 3.10-8.el10
+    sourcerpm: diffutils-3.10-8.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/d/dosfstools-4.2-12.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 166004
+    checksum: sha256:d346ebcd5478fd73eea05a28170c7f4ddb860285daa8e39d2838a530be7abb5f
+    name: dosfstools
+    evr: 4.2-12.el10
+    sourcerpm: dosfstools-4.2-12.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/d/dracut-107-3.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 491752
+    checksum: sha256:d96cb4c1fe7344eafefc742bfcfb7f741bf62bcd356ee2c1040d6f11e59ef971
+    name: dracut
+    evr: 107-3.el10
+    sourcerpm: dracut-107-3.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/d/duktape-2.7.0-10.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 177334
+    checksum: sha256:c3fe0c924c409401917031ef1f6b36638d50723d7909a50fdf70c1d293e01e6b
+    name: duktape
+    evr: 2.7.0-10.el10
+    sourcerpm: duktape-2.7.0-10.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/e/e2fsprogs-1.47.1-4.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 1109332
+    checksum: sha256:24f5934aa52c3297d7fd0e8d56a6fd2c1c974aaa0766690f7120b9826bc0185d
+    name: e2fsprogs
+    evr: 1.47.1-4.el10
+    sourcerpm: e2fsprogs-1.47.1-4.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/e/e2fsprogs-libs-1.47.1-4.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 231574
+    checksum: sha256:d5a42e491cede41d4c13b513ccad580cade510b9e15db87123c25a1ce22e1dea
+    name: e2fsprogs-libs
+    evr: 1.47.1-4.el10
+    sourcerpm: e2fsprogs-1.47.1-4.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/e/elfutils-debuginfod-client-0.193-1.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 48345
+    checksum: sha256:f3bf8eb3f2caf92855f79a81e35e62dc8f868787f17d23987f4f730a19260eec
+    name: elfutils-debuginfod-client
+    evr: 0.193-1.el10
+    sourcerpm: elfutils-0.193-1.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/f/file-5.45-8.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 50295
+    checksum: sha256:4814e52bb66fca4092066e69a07b076e01686252fa6a347a68eceb55bd49a44d
+    name: file
+    evr: 5.45-8.el10
+    sourcerpm: file-5.45-8.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/f/fuse-2.9.9-25.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 87825
+    checksum: sha256:ba8ff6019876d6e0c28c46755c77bb86957061718747d3b7d3a9c7766de448ab
+    name: fuse
+    evr: 2.9.9-25.el10
+    sourcerpm: fuse-2.9.9-25.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/f/fuse-common-3.16.2-5.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 10204
+    checksum: sha256:22c65ef7f7b3cbed86b80d72f7069ea90b5743ebea0909e45670edb0b16f0940
+    name: fuse-common
+    evr: 3.16.2-5.el10
+    sourcerpm: fuse3-3.16.2-5.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/f/fuse-libs-2.9.9-25.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 103888
+    checksum: sha256:1200dedab34a78b3d8dece9826de14f67e0c402495e6b3c973bb0c4069e3a0f2
+    name: fuse-libs
+    evr: 2.9.9-25.el10
+    sourcerpm: fuse-2.9.9-25.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/f/fuse3-libs-3.16.2-5.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 99163
+    checksum: sha256:beaea21f048e0ead5fffce0d8a572ead7a6bc3ed1fdef2fe53e90c5d64ac6b64
+    name: fuse3-libs
+    evr: 3.16.2-5.el10
+    sourcerpm: fuse3-3.16.2-5.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/g/gettext-0.22.5-6.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 1152510
+    checksum: sha256:436867faedcf9d2ed67e0e3874faedb6550c7638d9e801d1ca79ca02051fc576
+    name: gettext
+    evr: 0.22.5-6.el10
+    sourcerpm: gettext-0.22.5-6.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/g/gettext-envsubst-0.22.5-6.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 41238
+    checksum: sha256:16f1a10720fbf2895e12e3ee6858bca7e39997a588cc949ce72a72d4ec35f3da
+    name: gettext-envsubst
+    evr: 0.22.5-6.el10
+    sourcerpm: gettext-0.22.5-6.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/g/gettext-libs-0.22.5-6.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 688077
+    checksum: sha256:3806441df354feedcd2751fe780b28e8bb6d2cc7781a0dcc251f906dbfb4747d
+    name: gettext-libs
+    evr: 0.22.5-6.el10
+    sourcerpm: gettext-0.22.5-6.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/g/gettext-runtime-0.22.5-6.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 129556
+    checksum: sha256:b907fb14809134f17be177fb744c3454b713142283a67c6389cea13f90b88bce
+    name: gettext-runtime
+    evr: 0.22.5-6.el10
+    sourcerpm: gettext-0.22.5-6.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/g/glib-networking-2.80.0-3.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 212911
+    checksum: sha256:79235f0386f9c409eed69f6c1f841d43d72a97a63b72083ab2bc6afedd550af8
+    name: glib-networking
+    evr: 2.80.0-3.el10
+    sourcerpm: glib-networking-2.80.0-3.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/g/glibc-gconv-extra-2.39-58.el10_1.2.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 1762954
+    checksum: sha256:472f1e40e800afe117dfbeb15d6479be08c98ee5ae7afb28e59a02cf209519ae
+    name: glibc-gconv-extra
+    evr: 2.39-58.el10_1.2
+    sourcerpm: glibc-2.39-58.el10_1.2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/g/gnupg2-2.4.5-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 2840853
+    checksum: sha256:0881f22fa98da739f18d3fc15a876bb9da0126778f0f5aae26d366aec7a0fac1
+    name: gnupg2
+    evr: 2.4.5-2.el10
+    sourcerpm: gnupg2-2.4.5-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/g/groff-base-1.23.0-10.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 1182753
+    checksum: sha256:fe7aaba08cf90b86523b7435aa4caaf08942ec82b04129e44435a3013555c6b3
+    name: groff-base
+    evr: 1.23.0-10.el10
+    sourcerpm: groff-1.23.0-10.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/g/gsettings-desktop-schemas-47.1-3.el10_0.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 802938
+    checksum: sha256:60935d665b9bd86bc83fc0b29ff4fa179776f25e13db3f01c1c1361f31e44d26
+    name: gsettings-desktop-schemas
+    evr: 47.1-3.el10_0
+    sourcerpm: gsettings-desktop-schemas-47.1-3.el10_0.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/g/gssproxy-0.9.2-10.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 121061
+    checksum: sha256:0dafe1a5f06c632b919e14645219c02c68284d4466ffb784ef64cf0575c69abd
+    name: gssproxy
+    evr: 0.9.2-10.el10
+    sourcerpm: gssproxy-0.9.2-10.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/h/hwdata-0.379-10.6.el10.noarch.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 1740303
+    checksum: sha256:78a238a31611cc196f9035a50cf318f1f5fb861b98445107fb28245e69bb4cc2
+    name: hwdata
+    evr: 0.379-10.6.el10
+    sourcerpm: hwdata-0.379-10.6.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/i/inih-58-3.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 21314
+    checksum: sha256:ebecd05a40a047a283d1536674da276a5a485aeab221e58ea4b67deb03b1a547
+    name: inih
+    evr: 58-3.el10
+    sourcerpm: inih-58-3.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/i/intel-audio-firmware-20251111-19.1.el10_1.noarch.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 3460684
+    checksum: sha256:f1d7ec15f9d573ce21e8c3cdfe3ea369919aed6b01ebe77d6cec7ed7897eb182
+    name: intel-audio-firmware
+    evr: 20251111-19.1.el10_1
+    sourcerpm: linux-firmware-20251111-19.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/i/iproute-tc-6.14.0-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 460353
+    checksum: sha256:b4ce4359331372f4ea033f77a4b1126cdee701de4b559d43be20c4375a68dff3
+    name: iproute-tc
+    evr: 6.14.0-2.el10
+    sourcerpm: iproute-6.14.0-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/i/iptables-libs-1.8.11-11.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 458915
+    checksum: sha256:989991dbfee7aeeb3e4aad19c4a90ad6c99e5936edea83bf2b5546e230cc435a
+    name: iptables-libs
+    evr: 1.8.11-11.el10
+    sourcerpm: iptables-1.8.11-11.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/j/jansson-2.14-3.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 49616
+    checksum: sha256:b5d6eeea14961f64ece8b3bbefeb53a61424822ccbaedb833f7fc7e50f6707c5
+    name: jansson
+    evr: 2.14-3.el10
+    sourcerpm: jansson-2.14-3.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/j/jq-1.7.1-11.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 206578
+    checksum: sha256:83eae38b8fc0c3255a12ea0301ae9f53d4dca505cb19ed93c223a1178ecf5494
+    name: jq
+    evr: 1.7.1-11.el10
+    sourcerpm: jq-1.7.1-11.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/k/kbd-2.6.4-7.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 421026
+    checksum: sha256:7dd10412d5aa4602247175ed60ff4709b470272cf0d9d51aba59b1a56cbcf1e1
+    name: kbd
+    evr: 2.6.4-7.el10
+    sourcerpm: kbd-2.6.4-7.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/k/kbd-legacy-2.6.4-7.el10.noarch.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 610872
+    checksum: sha256:da78727e75401c470d9f123df02a3a6b7e8d75fc82662d04e2eb0bb726771259
+    name: kbd-legacy
+    evr: 2.6.4-7.el10
+    sourcerpm: kbd-2.6.4-7.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/k/kbd-misc-2.6.4-7.el10.noarch.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 1778264
+    checksum: sha256:fd0633cd6c97ab3f2f41ce98aefbe8e5bd058cc97516428730d420ded2fdc48d
+    name: kbd-misc
+    evr: 2.6.4-7.el10
+    sourcerpm: kbd-2.6.4-7.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/k/kernel-6.12.0-124.8.1.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 1419749
+    checksum: sha256:0a55c16f69fd44ffcd86d439437608262c28bc4510880afb072ddb9ad9cf5623
+    name: kernel
+    evr: 6.12.0-124.8.1.el10_1
+    sourcerpm: kernel-6.12.0-124.8.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/k/kernel-core-6.12.0-124.8.1.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 19259781
+    checksum: sha256:83265595aa3b85aad7132856264f497b36af09e414749b0b742f57424960b17f
+    name: kernel-core
+    evr: 6.12.0-124.8.1.el10_1
+    sourcerpm: kernel-6.12.0-124.8.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/k/kernel-modules-6.12.0-124.8.1.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 42511385
+    checksum: sha256:0b0ffbf435f8316cc87cfb0eb8d19458f755997dfbafd8b49d086db5026c3564
+    name: kernel-modules
+    evr: 6.12.0-124.8.1.el10_1
+    sourcerpm: kernel-6.12.0-124.8.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/k/kernel-modules-core-6.12.0-124.8.1.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 31019077
+    checksum: sha256:3071f1e80f4e0adcf4c0ead00136e4d55534d732b37d4b19d26dbc1d2d2863d6
+    name: kernel-modules-core
+    evr: 6.12.0-124.8.1.el10_1
+    sourcerpm: kernel-6.12.0-124.8.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/k/kmod-31-12.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 139642
+    checksum: sha256:be0647f612d1c19c89c9124b51e1057eaa8fa85d3b2dd8feaaa34b3bb89188a6
+    name: kmod
+    evr: 31-12.el10
+    sourcerpm: kmod-31-12.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/k/kmod-libs-31-12.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 71144
+    checksum: sha256:62f568e862e577e3b9f0b1c0f505fdc9fc1fcbab3b5c587b9e40d97d2289df81
+    name: kmod-libs
+    evr: 31-12.el10
+    sourcerpm: kmod-31-12.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/k/kpartx-0.9.9-12.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 50406
+    checksum: sha256:dc89c7f06bb65d219286fa8c81654c67c36691786c49848acf0a8c57a5f94346
+    name: kpartx
+    evr: 0.9.9-12.el10_1
+    sourcerpm: device-mapper-multipath-0.9.9-12.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/less-661-3.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 199873
+    checksum: sha256:7a785313031788418857f3ef6a82617ad5527e56153174ac44482f74289d1f33
+    name: less
+    evr: 661-3.el10
+    sourcerpm: less-661-3.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libaio-0.3.111-22.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 27459
+    checksum: sha256:16fed83c62b96e581cc73d786d78816c61c78cbb0f307bcf12e1f27fa3745583
+    name: libaio
+    evr: 0.3.111-22.el10
+    sourcerpm: libaio-0.3.111-22.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libassuan-2.5.6-6.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 73193
+    checksum: sha256:cd48f3f30fd39373d00d82f22848d8e92717929fcb94f78f5d10093f2cdf2ce6
+    name: libassuan
+    evr: 2.5.6-6.el10
+    sourcerpm: libassuan-2.5.6-6.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libbasicobjects-0.1.1-58.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 29127
+    checksum: sha256:3bea72ba917efe168e3d75b6a0ef60dccfbf4a94e2ca2f85a190ffcd69e931a4
+    name: libbasicobjects
+    evr: 0.1.1-58.el10
+    sourcerpm: ding-libs-0.6.2-58.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libbrotli-1.1.0-6.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 357542
+    checksum: sha256:d0efaa4027187b9894a4a1da10985e09522605d56a5c46eae5d52d03d8db3ba6
+    name: libbrotli
+    evr: 1.1.0-6.el10
+    sourcerpm: brotli-1.1.0-6.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libcbor-0.11.0-3.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 37307
+    checksum: sha256:fdf8446ec31ab2efddc92e0164946192bcec3b8290a3a810aa01418cdc3522c8
+    name: libcbor
+    evr: 0.11.0-3.el10
+    sourcerpm: libcbor-0.11.0-3.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libcollection-0.7.0-58.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 48064
+    checksum: sha256:a03eaa4a90c42f1781b31fad90940caa2c6043803d98695c4cac267a88fe4f1b
+    name: libcollection
+    evr: 0.7.0-58.el10
+    sourcerpm: ding-libs-0.6.2-58.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libconfig-1.7.3-10.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 77867
+    checksum: sha256:792da0100cb5ef7593cef729fc5bced4db8bee6b29b3e22cf1766aa841f67426
+    name: libconfig
+    evr: 1.7.3-10.el10
+    sourcerpm: libconfig-1.7.3-10.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libedit-3.1-52.20230828cvs.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 110822
+    checksum: sha256:d984e5aa4856820528bd2829f086c2f3883173b91daa0a304af215e3a0c6a6be
+    name: libedit
+    evr: 3.1-52.20230828cvs.el10
+    sourcerpm: libedit-3.1-52.20230828cvs.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libev-4.33-14.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 57016
+    checksum: sha256:cf17732ff8cc32308ef598243e90d981a57d203388812c896a3fe2d19e6c68b7
+    name: libev
+    evr: 4.33-14.el10
+    sourcerpm: libev-4.33-14.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libevent-2.1.12-16.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 271480
+    checksum: sha256:0cfcc4c1b669d1b334e416230aa3b3e1a91531b96892e52e724242a89d1e75fa
+    name: libevent
+    evr: 2.1.12-16.el10
+    sourcerpm: libevent-2.1.12-16.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libfido2-1.14.0-7.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 102913
+    checksum: sha256:132ad4a76f742a97a670255869b9422e38dfa5a6885c474963242d4a0c50a088
+    name: libfido2
+    evr: 1.14.0-7.el10
+    sourcerpm: libfido2-1.14.0-7.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libgcrypt-1.11.0-5.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 603055
+    checksum: sha256:8df67cb1f6e950e27164a01879ab9ae28d61f88deba46d1f20ae9ccea94800c9
+    name: libgcrypt
+    evr: 1.11.0-5.el10
+    sourcerpm: libgcrypt-1.11.0-5.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libgpg-error-1.50-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 246237
+    checksum: sha256:dfffc63b5361a4bc85ab44de6f5ef4ad188f595aca4c3417478cd51463a15533
+    name: libgpg-error
+    evr: 1.50-2.el10
+    sourcerpm: libgpg-error-1.50-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libini_config-1.3.1-58.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 71686
+    checksum: sha256:bf54a7f0135c151980097b75a43acd104c300811e8ac492b7eaf487e60560356
+    name: libini_config
+    evr: 1.3.1-58.el10
+    sourcerpm: ding-libs-0.6.2-58.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libkcapi-1.5.0-3.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 52125
+    checksum: sha256:a25793d05e0cb17802e2a66aa5b4dca7ea26edb915c3109fbdfadab94e542cce
+    name: libkcapi
+    evr: 1.5.0-3.el10
+    sourcerpm: libkcapi-1.5.0-3.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libkcapi-hasher-1.5.0-3.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 30280
+    checksum: sha256:7fea4046411c861eca2802fd833e8a0b703cd94fa96c81c99eee97c3512a767c
+    name: libkcapi-hasher
+    evr: 1.5.0-3.el10
+    sourcerpm: libkcapi-1.5.0-3.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libkcapi-hmaccalc-1.5.0-3.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 11567
+    checksum: sha256:87da9485f292704daa3a12f8680b53c28f64bfaff6fc079294506aeaabe8ff8d
+    name: libkcapi-hmaccalc
+    evr: 1.5.0-3.el10
+    sourcerpm: libkcapi-1.5.0-3.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libksba-1.6.7-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 167004
+    checksum: sha256:b6f586b627a8e0aa6aab1d390b372806c6abace9335e6db57a41b3805c6eb9e2
+    name: libksba
+    evr: 1.6.7-2.el10
+    sourcerpm: libksba-1.6.7-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libnetfilter_conntrack-1.0.9-12.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 62319
+    checksum: sha256:65bca16a66f3505bf1758fb3930c5b3a70c8d03f3487cec18d482809911f4826
+    name: libnetfilter_conntrack
+    evr: 1.0.9-12.el10
+    sourcerpm: libnetfilter_conntrack-1.0.9-12.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libnfnetlink-1.0.2-3.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 32991
+    checksum: sha256:2dbcc359e7750c6cc633718ed168805b6f96453f6cb052669ecd1f82ba8f4abc
+    name: libnfnetlink
+    evr: 1.0.2-3.el10
+    sourcerpm: libnfnetlink-1.0.2-3.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libnfsidmap-2.8.3-0.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 64929
+    checksum: sha256:a66b545c33b4176283b912cabd879be9dbe95fe2de341cbdcef8da2c0b65197b
+    name: libnfsidmap
+    evr: 1:2.8.3-0.el10
+    sourcerpm: nfs-utils-2.8.3-0.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libnftnl-1.2.8-4.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 86541
+    checksum: sha256:ef6ccdc28bf016acf870407654852e4a09a3b7c05bfb7a84f2cb761284b4b423
+    name: libnftnl
+    evr: 1.2.8-4.el10_1
+    sourcerpm: libnftnl-1.2.8-4.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libnl3-3.11.0-1.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 374208
+    checksum: sha256:f43e83ce1afebac43eb81dc348829516fb97dce8b0e05ad76a1d06af4342e5f4
+    name: libnl3
+    evr: 3.11.0-1.el10
+    sourcerpm: libnl3-3.11.0-1.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libnvme-1.13-1.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 117163
+    checksum: sha256:39db67f6e6f994b6cf2d394dcfbf300fde1ff2094d354dc0bb4f8c89da0f7a58
+    name: libnvme
+    evr: 1.13-1.el10
+    sourcerpm: libnvme-1.13-1.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libpath_utils-0.2.1-58.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 32301
+    checksum: sha256:1ae44c3c0caf2ed28d656ce0486b8f59cf797db5b4f4ec879ffb37262ead33d3
+    name: libpath_utils
+    evr: 0.2.1-58.el10
+    sourcerpm: ding-libs-0.6.2-58.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libpipeline-1.5.7-7.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 56257
+    checksum: sha256:fdb6af8f4c4c2c0a90d451e919bddc49d22d473e8e4323eb693adbdbcce6571a
+    name: libpipeline
+    evr: 1.5.7-7.el10
+    sourcerpm: libpipeline-1.5.7-7.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libpng-1.6.40-8.el10_1.1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 122121
+    checksum: sha256:911a2b1a5578fb7f52d46c202341358a3a7815402310f3a8309757e16ab22ec2
+    name: libpng
+    evr: 2:1.6.40-8.el10_1.1
+    sourcerpm: libpng-1.6.40-8.el10_1.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libproxy-0.5.5-4.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 54193
+    checksum: sha256:4362bb16472989c9f342ff06c379b3332c09d279911ddf5ce00a0025affa3dc8
+    name: libproxy
+    evr: 0.5.5-4.el10
+    sourcerpm: libproxy-0.5.5-4.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libpsl-0.21.5-6.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 68382
+    checksum: sha256:788a2a36172ce893fe7ab6fec513eff4dc6c5d36737c25efec6bbf0253138ca6
+    name: libpsl
+    evr: 0.21.5-6.el10
+    sourcerpm: libpsl-0.21.5-6.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libref_array-0.1.5-58.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 30811
+    checksum: sha256:37da7cb4168e5152f5d95afc308a4d8a7ad62e974c2f909f8fcff4d6ae78c2ca
+    name: libref_array
+    evr: 0.1.5-58.el10
+    sourcerpm: ding-libs-0.6.2-58.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libselinux-utils-3.9-1.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 130470
+    checksum: sha256:49c0853ceedff2adf4b3dc7aec28526f1013983460ae9355ea7e8c16524e99e8
+    name: libselinux-utils
+    evr: 3.9-1.el10
+    sourcerpm: libselinux-3.9-1.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libss-1.47.1-4.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 33273
+    checksum: sha256:bdcfbb5ab79c23d6b84e26ddaa496443b338ddca0c36f95028cf29d4b75c313e
+    name: libss
+    evr: 1.47.1-4.el10
+    sourcerpm: e2fsprogs-1.47.1-4.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libssh-0.11.1-5.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 239050
+    checksum: sha256:51a3ec3ca0bf3c401ca4e479fe9e935b6995730edb1fa9b9c518901146390cfa
+    name: libssh
+    evr: 0.11.1-5.el10_1
+    sourcerpm: libssh-0.11.1-5.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libssh-config-0.11.1-5.el10_1.noarch.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 8775
+    checksum: sha256:240e7bc0b97105539be81f5ccc9adbc270ae8ca073d08fc30eefa47eb6ac57ac
+    name: libssh-config
+    evr: 0.11.1-5.el10_1
+    sourcerpm: libssh-0.11.1-5.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libtirpc-1.3.5-1.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 100203
+    checksum: sha256:ebfd3d0faba7cb8c5d627991d54328026cf789601440ab926a6adf75aa5e14b2
+    name: libtirpc
+    evr: 1.3.5-1.el10
+    sourcerpm: libtirpc-1.3.5-1.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/liburing-2.5-5.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 43865
+    checksum: sha256:d78bd579da01e156d0dbbe7a670e396b6a3c658eb2aab6b305fca7189c5d3721
+    name: liburing
+    evr: 2.5-5.el10
+    sourcerpm: liburing-2.5-5.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libusb1-1.0.28-1.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 79657
+    checksum: sha256:03fc25a4c2219d831746c9e4fb0f53e26cce2486813ab8b5327e9668cb3bf489
+    name: libusb1
+    evr: 1.0.28-1.el10
+    sourcerpm: libusb1-1.0.28-1.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libverto-libev-0.3.2-10.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 15358
+    checksum: sha256:7b5f9dcd670917a6c1438fd4deaa042bcbc8e67ce0f316ce26c78acd76658dcf
+    name: libverto-libev
+    evr: 0.3.2-10.el10
+    sourcerpm: libverto-0.3.2-10.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/linux-firmware-20251111-19.1.el10_1.noarch.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 56928744
+    checksum: sha256:00b1685d27662e1233898a46cda746c9103fd155cc6a3b1929fc7114be65c15c
+    name: linux-firmware
+    evr: 20251111-19.1.el10_1
+    sourcerpm: linux-firmware-20251111-19.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/linux-firmware-whence-20251111-19.1.el10_1.noarch.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 114242
+    checksum: sha256:6a3d02a20b60309c5fb5fba73643c5f4353a59e905ca7416c4ed8be2b19d2176
+    name: linux-firmware-whence
+    evr: 20251111-19.1.el10_1
+    sourcerpm: linux-firmware-20251111-19.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/lsscsi-0.32-15.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 66515
+    checksum: sha256:0156c24c98d45c65f686d2bdd4b5c7a043b529bf76f72ecee27f2e1e5739f319
+    name: lsscsi
+    evr: 0.32-15.el10
+    sourcerpm: lsscsi-0.32-15.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/lvm2-2.03.32-3.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 1628079
+    checksum: sha256:4e9634f20c50c6d3dbaebec3bead752ddbecdc0fe41d01547995685c7f3c24e2
+    name: lvm2
+    evr: 10:2.03.32-3.el10
+    sourcerpm: lvm2-2.03.32-3.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/lvm2-libs-2.03.32-3.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 1047438
+    checksum: sha256:d1f000403095ce930e443d830c0f3d67e632e507d2d9865aaebd8146ed455c2d
+    name: lvm2-libs
+    evr: 10:2.03.32-3.el10
+    sourcerpm: lvm2-2.03.32-3.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/lzo-2.10-14.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 71534
+    checksum: sha256:e5ffa85a0120ffe37de4ca383debf78c22ab808bb2b25006f008e22c1065dd2e
+    name: lzo
+    evr: 2.10-14.el10
+    sourcerpm: lzo-2.10-14.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/lzop-1.04-16.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 60759
+    checksum: sha256:58f38b44584067d9a1820a3f5074f02b49b9e6c1d6d1374727dcb3ec1c583f31
+    name: lzop
+    evr: 1.04-16.el10
+    sourcerpm: lzop-1.04-16.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/m/man-db-2.12.0-10.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 1382168
+    checksum: sha256:1069b16fce5774a00db39f4e53186c9df387c13c3cf2aaf4f18befbb0c08b086
+    name: man-db
+    evr: 2.12.0-10.el10
+    sourcerpm: man-db-2.12.0-10.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/m/mdadm-4.4-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 459406
+    checksum: sha256:dcecfedf470b29b085a59c42051016d3fc1e8d5ecf9e13503369d397db40be57
+    name: mdadm
+    evr: 4.4-2.el10
+    sourcerpm: mdadm-4.4-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/m/mt7xxx-firmware-20251111-19.1.el10_1.noarch.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 20461998
+    checksum: sha256:da240ea24ab5f3faa8096ef45813ba536b42d9e1be725105e89aa158dc52c10e
+    name: mt7xxx-firmware
+    evr: 20251111-19.1.el10_1
+    sourcerpm: linux-firmware-20251111-19.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/n/nettle-3.10.1-1.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 576560
+    checksum: sha256:c8244a7368ad81cd327ad7eeaed2ff4d63bede6b2491b4c5e303600d44852dff
+    name: nettle
+    evr: 3.10.1-1.el10
+    sourcerpm: nettle-3.10.1-1.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/n/nfs-utils-2.8.3-0.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 496933
+    checksum: sha256:6693fcf063cfdd1deecbc80748048af0345eaaa6984ae058c59e2cd98561129e
+    name: nfs-utils
+    evr: 1:2.8.3-0.el10
+    sourcerpm: nfs-utils-2.8.3-0.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/n/nftables-1.1.1-6.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 447191
+    checksum: sha256:28e86d157d974bd487324dd477fd7418306d7f4e8a13b87cafde2f94875c03d3
+    name: nftables
+    evr: 1:1.1.1-6.el10_1
+    sourcerpm: nftables-1.1.1-6.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/n/npth-1.6-21.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 27877
+    checksum: sha256:928bfce204f95b55f964ebcb61b00eed2eefab910b1e6305f484b4489c8ec8f4
+    name: npth
+    evr: 1.6-21.el10
+    sourcerpm: npth-1.6-21.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/n/numactl-libs-2.0.19-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 31884
+    checksum: sha256:a96428a27c534ca9992fd9baea5d5068167d53a8fb7a01eafea820a29dd1cef7
+    name: numactl-libs
+    evr: 2.0.19-2.el10
+    sourcerpm: numactl-2.0.19-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/n/numad-0.5-46.20150602git.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 41579
+    checksum: sha256:010724f00ccc51ea88c1a3b62faf1e784b06bc2c5b8e1ec896ec8234f25d1d5c
+    name: numad
+    evr: 0.5-46.20150602git.el10
+    sourcerpm: numad-0.5-46.20150602git.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/n/nxpwireless-firmware-20251111-19.1.el10_1.noarch.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 1003518
+    checksum: sha256:5673319268876617b4c731898d21b579b337041e406d650f772844edda3b3e6b
+    name: nxpwireless-firmware
+    evr: 20251111-19.1.el10_1
+    sourcerpm: linux-firmware-20251111-19.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/o/oniguruma-6.9.9-7.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 224700
+    checksum: sha256:d7820e6e436dffd0e75cecd8143de947f19319c38aa67ef7cea672db2ec0a9e2
+    name: oniguruma
+    evr: 6.9.9-7.el10
+    sourcerpm: oniguruma-6.9.9-7.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/o/openldap-2.6.9-1.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 245450
+    checksum: sha256:f88148da9e577523ebf32b7f53f9a83ae75a76c75a9a011d6d9fc76c3005a2e8
+    name: openldap
+    evr: 2.6.9-1.el10
+    sourcerpm: openldap-2.6.9-1.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/o/openssh-9.9p1-12.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 359221
+    checksum: sha256:b216643e62a1c55d33e8beb94a9db7a40377121b76f45ef7deb91930dc5ffd0f
+    name: openssh
+    evr: 9.9p1-12.el10_1
+    sourcerpm: openssh-9.9p1-12.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/o/openssh-clients-9.9p1-12.el10_1.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 779690
+    checksum: sha256:693bce2d3cc006c704a5795eec86a826e794647a48ad079338dbcb96ac2bcb9d
+    name: openssh-clients
+    evr: 9.9p1-12.el10_1
+    sourcerpm: openssh-9.9p1-12.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/p/parted-3.6-7.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 601197
+    checksum: sha256:320a8e0df78398aa9caa74ca218b0a2d3b1a97b7be2c31cd8a5cf7dc3ab5e880
+    name: parted
+    evr: 3.6-7.el10
+    sourcerpm: parted-3.6-7.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/p/pcsc-lite-2.2.3-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 104386
+    checksum: sha256:bcf6f408f59fe75e768c55434cdb35ca2674fe1d92406f8c88a6748572fd38dd
+    name: pcsc-lite
+    evr: 2.2.3-2.el10
+    sourcerpm: pcsc-lite-2.2.3-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/p/pcsc-lite-ccid-1.6.0-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 135166
+    checksum: sha256:0899862076f267c4e0c7160df38fe3f260ffc9aac97ebbc6ff292bd0ce28e7e8
+    name: pcsc-lite-ccid
+    evr: 1.6.0-2.el10
+    sourcerpm: pcsc-lite-ccid-1.6.0-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/p/pcsc-lite-libs-2.2.3-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 35683
+    checksum: sha256:7053a07759df7f20ace336649b97ef15e45076c5e871132be1073086f515f4f4
+    name: pcsc-lite-libs
+    evr: 2.2.3-2.el10
+    sourcerpm: pcsc-lite-2.2.3-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/p/pigz-2.8-7.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 102231
+    checksum: sha256:04aaec5c6ed4b32de0ec6b61e52f2bb0a4d92a591e1189871c7a6592611322c1
+    name: pigz
+    evr: 2.8-7.el10
+    sourcerpm: pigz-2.8-7.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/p/policycoreutils-3.9-1.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 231952
+    checksum: sha256:c3684f228288d579fdd49b9f483d1495a19221a06a6293d79a2fcb4bd95a6f12
+    name: policycoreutils
+    evr: 3.9-1.el10
+    sourcerpm: policycoreutils-3.9-1.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/p/polkit-125-4.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 166099
+    checksum: sha256:e7ebf7d59a4b0017668742b73715def3fd38bd52067cb2cc2ad46f659aaf3cdf
+    name: polkit
+    evr: 125-4.el10
+    sourcerpm: polkit-125-4.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/p/polkit-libs-125-4.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 69034
+    checksum: sha256:51f8d2847adec8572f93f53c15e98db2dbf78c7eaa937b9febc5773881cbc46f
+    name: polkit-libs
+    evr: 125-4.el10
+    sourcerpm: polkit-125-4.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/p/polkit-pkla-compat-0.1-30.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 53203
+    checksum: sha256:f152c3d40e00ad3f7bac583ad56e1556d3f5ad12ef46f380d8bcd498633f9c8a
+    name: polkit-pkla-compat
+    evr: 0.1-30.el10
+    sourcerpm: polkit-pkla-compat-0.1-30.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/p/procps-ng-4.0.4-8.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 382603
+    checksum: sha256:e2e365ea34660c1e100cd904c456e5989c7ba24c17991c73fdda7bbc79f90cab
+    name: procps-ng
+    evr: 4.0.4-8.el10
+    sourcerpm: procps-ng-4.0.4-8.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/p/protobuf-c-1.5.0-6.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 36258
+    checksum: sha256:0cff5ff938dc67b343fe1102c0337bd7707741c41390ec3cd9ad2022181431eb
+    name: protobuf-c
+    evr: 1.5.0-6.el10
+    sourcerpm: protobuf-c-1.5.0-6.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/p/publicsuffix-list-dafsa-20240107-5.el10.noarch.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 61540
+    checksum: sha256:53b2a71e7240613288d9d4922d2c1886f785637d981f9498c0caadda77a686ee
+    name: publicsuffix-list-dafsa
+    evr: 20240107-5.el10
+    sourcerpm: publicsuffix-list-20240107-5.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/p/python3-setools-4.5.1-5.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 760458
+    checksum: sha256:a321ca8a1d64c165786afd73bc38b1a5b1c1355d89f7a03c3776e4e56b0bab97
+    name: python3-setools
+    evr: 4.5.1-5.el10
+    sourcerpm: setools-4.5.1-5.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/p/python3-setuptools-69.0.3-12.el10_0.noarch.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 1658419
+    checksum: sha256:820393ba86601e0bb0b79d27c1603cf8ae5ac05287628f9d4e628f4382ce2e29
+    name: python3-setuptools
+    evr: 69.0.3-12.el10_0
+    sourcerpm: python-setuptools-69.0.3-12.el10_0.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/q/quota-4.09-9.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 206200
+    checksum: sha256:0ce2ca06ffa6da76fb2be42391de66c320503ef105a1efa410c795e9ca68d4ee
+    name: quota
+    evr: 1:4.09-9.el10
+    sourcerpm: quota-4.09-9.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/q/quota-nls-4.09-9.el10.noarch.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 81280
+    checksum: sha256:e4d15257ce8b5bb1e5d5f31f103078603a7ba2984099e1a392a11bc79a715b78
+    name: quota-nls
+    evr: 1:4.09-9.el10
+    sourcerpm: quota-4.09-9.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/r/realtek-firmware-20251111-19.1.el10_1.noarch.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 6041329
+    checksum: sha256:3cd54a7e58413aadbe3fab43398f5b789a2ae3167c63c7f9c9cf052c6528ec5c
+    name: realtek-firmware
+    evr: 20251111-19.1.el10_1
+    sourcerpm: linux-firmware-20251111-19.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/r/rpcbind-1.2.7-3.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 64011
+    checksum: sha256:1dc5816d4368e900b3265c6a7ae8ad610ad8c9a54c90bc5fe6e1a9be61a65598
+    name: rpcbind
+    evr: 1.2.7-3.el10
+    sourcerpm: rpcbind-1.2.7-3.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/r/rpm-plugin-selinux-4.19.1.1-20.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 17502
+    checksum: sha256:1dbf0dafaac1537d072e572ac5de8da00154fac8a97ff148a710d028981f106c
+    name: rpm-plugin-selinux
+    evr: 4.19.1.1-20.el10
+    sourcerpm: rpm-4.19.1.1-20.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/s/selinux-policy-42.1.7-1.el10.noarch.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 50732
+    checksum: sha256:a19916d89c65f2ce51b8b04f362dd7cb0dcee4a5140397a91b5c743e5e2cf552
+    name: selinux-policy
+    evr: 42.1.7-1.el10
+    sourcerpm: selinux-policy-42.1.7-1.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/s/selinux-policy-targeted-42.1.7-1.el10.noarch.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 6513838
+    checksum: sha256:9c58ce9a6a4e598e73087fd278d19c62779b30cb2822b9d58727856cd2386780
+    name: selinux-policy-targeted
+    evr: 42.1.7-1.el10
+    sourcerpm: selinux-policy-42.1.7-1.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/s/snappy-1.1.10-7.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 41519
+    checksum: sha256:cfe440caefeff78ae30aa4d188d069caaec162040ff0575916e5fa1f1dc458e8
+    name: snappy
+    evr: 1.1.10-7.el10
+    sourcerpm: snappy-1.1.10-7.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/s/systemd-container-257-13.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 667529
+    checksum: sha256:e417605cacd611dff34515d7e8f0e4c44e27010a6721d4fb1fd3f246a244c1b8
+    name: systemd-container
+    evr: 257-13.el10
+    sourcerpm: systemd-257-13.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/s/systemd-udev-257-13.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 2363070
+    checksum: sha256:8d4836830308292f8e47630d51eb5e4628314548359c90fd813763e501490652
+    name: systemd-udev
+    evr: 257-13.el10
+    sourcerpm: systemd-257-13.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/t/tiwilink-firmware-20251111-19.1.el10_1.noarch.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 4893720
+    checksum: sha256:b105e9101fb8c5be4449b9a77b5f62e7de0e5a19911abf38301348c58705b32c
+    name: tiwilink-firmware
+    evr: 20251111-19.1.el10_1
+    sourcerpm: linux-firmware-20251111-19.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/t/tpm2-tools-5.7-4.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 878185
+    checksum: sha256:af3256b239325699b2dbe1be1feb89fc76f055173dcfb6d45ed80c95dc2cb7cb
+    name: tpm2-tools
+    evr: 5.7-4.el10
+    sourcerpm: tpm2-tools-5.7-4.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/t/tpm2-tss-fapi-4.1.3-5.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 364190
+    checksum: sha256:6c338d05e9b29ba9f50a0c417efcd6b392af18daa27b97efbbd26625afc0dcd3
+    name: tpm2-tss-fapi
+    evr: 4.1.3-5.el10
+    sourcerpm: tpm2-tss-4.1.3-5.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/u/unzip-6.0-69.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 194487
+    checksum: sha256:74e180814ef67113a55ce7faad2d9f8b48e180aeb1dade0f18d0d00b7fed229a
+    name: unzip
+    evr: 6.0-69.el10
+    sourcerpm: unzip-6.0-69.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/u/userspace-rcu-0.14.0-7.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 122297
+    checksum: sha256:f07c0090217c8fd6f5fd6f5a66ae8340fcc343e84cd788ed640c0d78dedd8177
+    name: userspace-rcu
+    evr: 0.14.0-7.el10
+    sourcerpm: userspace-rcu-0.14.0-7.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/x/xfsprogs-6.11.0-2.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 1228827
+    checksum: sha256:eaa809bdc67c62cf0d2f2fd1fb496d384e582e31605a5f22c80ed7b060efc3d8
+    name: xfsprogs
+    evr: 6.11.0-2.el10
+    sourcerpm: xfsprogs-6.11.0-2.el10.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/x/xz-5.6.2-4.el10_0.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 492542
+    checksum: sha256:a2d6042c76e8b78e7a0551f9ed870e4aeae1b769ee261bb0bd7f981d8a9c4b2e
+    name: xz
+    evr: 1:5.6.2-4.el10_0
+    sourcerpm: xz-5.6.2-4.el10_0.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/z/zstd-1.5.5-9.el10.x86_64.rpm
+    repoid: rhel-10-for-x86_64-baseos-rpms
+    size: 479397
+    checksum: sha256:5e88efcb985ea6d4a43e147178e751771eb6ad94260b1816068e318a91d61e3d
+    name: zstd
+    evr: 1.5.5-9.el10
+    sourcerpm: zstd-1.5.5-9.el10.src.rpm
+  source:
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/a/augeas-1.14.2-0.3.20250224git6ee1282.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 8370431
+    checksum: sha256:64e56e1e4bfc62dde10a71a28ce0a4d5101b90ac106f5c922693654e6fee5bf2
+    name: augeas
+    evr: 1.14.2-0.3.20250224git6ee1282.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/c/capstone-5.0.1-6.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 7570849
+    checksum: sha256:ae9b305c6fc106ddf158aba617ba5ed190e7dc01d9e2f077a7e8428005e9b98d
+    name: capstone
+    evr: 5.0.1-6.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/c/catatonit-0.2.1-1.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 38020
+    checksum: sha256:039ad40db1795913a86e4bc5124c3f9fcd7ad4e95a330c7d92b133885041e1e4
+    name: catatonit
+    evr: 5:0.2.1-1.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/c/checkpolicy-3.9-1.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 162547
+    checksum: sha256:b41d73cc9701a7cc4fcf470fa8511629be45d17592768ea296e4de3e7ecb0c83
+    name: checkpolicy
+    evr: 3.9-1.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/c/clevis-21-8.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 125525
+    checksum: sha256:75e0a22bc85992292ee352d9f094c958b6bfc61db51e16ab0873176a50b2d554
+    name: clevis
+    evr: 21-8.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/c/clevis-pin-tpm2-0.5.3-8.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 6518256
+    checksum: sha256:f31a02c912015d8fe45fe952c988a8a72e8619359a03bc0883d89b80e53a90b2
+    name: clevis-pin-tpm2
+    evr: 0.5.3-8.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/d/dnsmasq-2.90-4.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 637053
+    checksum: sha256:3ed7d403edbc6f8ac03f08b9ea445cc988d57f75592ab71a683bca920e70107e
+    name: dnsmasq
+    evr: 2.90-4.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/d/dtc-1.7.0-12.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 199556
+    checksum: sha256:4e52130b0b5438b31ad5afd6242f699ceb075469d06dadd0677fdd7f912ed79b
+    name: dtc
+    evr: 1.7.0-12.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/e/edk2-20250523-2.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 115867931
+    checksum: sha256:e2d7438c58ca5dda76d4a6ceda504c5ddd8247b9c6b4e3f530f3d05a030bce76
+    name: edk2
+    evr: 20250523-2.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/g/guestfs-tools-1.54.0-3.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 16116924
+    checksum: sha256:196edd265fcb1cc3a92ae7c1139a21ee783cf54dc2538dc30156b9fb2fad202d
+    name: guestfs-tools
+    evr: 1.54.0-3.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/h/hexedit-1.6-8.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 61059
+    checksum: sha256:ff53961eaaa544123ee4a67e30cd768bd6ae486c741bbe8d007071cdd663b225
+    name: hexedit
+    evr: 1.6-8.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/h/hivex-1.3.24-2.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 803908
+    checksum: sha256:d7120f45d1f2585755f7d60325dbe0ea0f588df67f36e727755670e6787e3dde
+    name: hivex
+    evr: 1.3.24-2.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/i/ipxe-20240119-5.gitde8a0821.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 2845753
+    checksum: sha256:df7e568dfb381984afca86bcbc36942edc8b8aef5f5d316e880a4a365541a213
+    name: ipxe
+    evr: 20240119-5.gitde8a0821.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/j/jose-14-102.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 785417
+    checksum: sha256:232e407b4d393fc136b8e72a9276bc2a77f2394d137aef1d660d239eb8283bff
+    name: jose
+    evr: 14-102.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/l/libguestfs-1.56.1-3.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 19165825
+    checksum: sha256:9415ca0a7f674959acf1380a5e1d7b997d35ece6f66cf95370dcdc1b50c9859a
+    name: libguestfs
+    evr: 1:1.56.1-3.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/l/libguestfs-winsupport-10.0-5.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 1396272
+    checksum: sha256:a7969798074001aae7186c843eaf97536aac0a9cac90b84d622f05b0a1aa7f13
+    name: libguestfs-winsupport
+    evr: 10.0-5.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/l/libnbd-1.22.2-2.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 1731797
+    checksum: sha256:f719da6588839fc5398c0e9db5092e7917671b41fa6048cfab91a8e8b6c56220
+    name: libnbd
+    evr: 1.22.2-2.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/l/libosinfo-1.11.0-8.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 324406
+    checksum: sha256:b607f1ef352e624e86fd43a4cccf742094b8675b61fb12d8bfddb88c844afe57
+    name: libosinfo
+    evr: 1.11.0-8.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/l/libsecret-0.21.2-8.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 221294
+    checksum: sha256:066c81d152a18564cc5329e94bc609fa7efa132f4e1c04855c5346286ca0b162
+    name: libsecret
+    evr: 0.21.2-8.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/l/libslirp-4.7.0-10.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 133472
+    checksum: sha256:1b9bdf4df62f549c8c7e82eece51a5aba0e6e9f6380ed2ea22d88792473a5e7b
+    name: libslirp
+    evr: 4.7.0-10.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/l/libsoup3-3.6.5-3.el10_1.7.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 1605755
+    checksum: sha256:dd0f34cfd38aaae6e3489faa16d731a07b88a7ea4b70e940a28cdc5bb5e0e684
+    name: libsoup3
+    evr: 3.6.5-3.el10_1.7
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/l/libtpms-0.9.6-11.el10_0.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 1298930
+    checksum: sha256:7c8ec33e4e179bd7c3f3595d19d4b5b935dd2531f4bb1687a8acb35a2d7263ab
+    name: libtpms
+    evr: 0.9.6-11.el10_0
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/l/libvirt-11.5.0-4.2.el10_1.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 10198192
+    checksum: sha256:1f23dc0dae41cb82d45e994cedb4d60cc3016f1b40572ebcf3869ae25433c91f
+    name: libvirt
+    evr: 11.5.0-4.2.el10_1
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/l/libxslt-1.1.39-8.el10_0.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 1622605
+    checksum: sha256:1ee17396ad79b21302dae579a8e21c9c995d29ba68d24355a2904c09fb5738c9
+    name: libxslt
+    evr: 1.1.39-8.el10_0
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/l/luksmeta-9-26.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 295540
+    checksum: sha256:daff0d224118fb627443f5c80dc09cddf9b7a3323ea979924da6d143a21881cc
+    name: luksmeta
+    evr: 9-26.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/m/memstrack-0.2.5-6.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 70226
+    checksum: sha256:77f892117aec18a348955ee93a14672cab966b9969a120bc02f8017f9d321d8f
+    name: memstrack
+    evr: 0.2.5-6.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/m/mingw-srvany-1.1-10.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 42631
+    checksum: sha256:3ef6e9550af78571a1c17b1d30e6d39d78aae4f6c5a754b065f31b67904df095
+    name: mingw-srvany
+    evr: 1.1-10.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/n/nbdkit-1.44.1-2.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 2826234
+    checksum: sha256:607c69861b39c3ce096683bc3a0a042b2eac3ed752416f27b88b65154bc54fff
+    name: nbdkit
+    evr: 1.44.1-2.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/o/osinfo-db-20250606-1.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 182087
+    checksum: sha256:1b374f320fa2b28aaefb26d105b608bf50b8fff84c3d1875035c412fcb976afe
+    name: osinfo-db
+    evr: 20250606-1.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/o/osinfo-db-tools-1.11.0-8.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 79684
+    checksum: sha256:e5fbded24638979575468af8ece2a9f37076707fe919f6af5feaf0ad5373f3ce
+    name: osinfo-db-tools
+    evr: 1.11.0-8.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/p/passt-0^20250512.g8ec1341-4.el10_1.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 303218
+    checksum: sha256:80e74633d95073215b9e20ce5574cfa2fb7f9163f915dfbf4e40d52772b41810
+    name: passt
+    evr: 0^20250512.g8ec1341-4.el10_1
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/p/pinentry-1.3.1-1.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 656811
+    checksum: sha256:b2ae615b4ff4466aa3570cec4b6f9934a9ce48a111ae6640cf8872dd65374d32
+    name: pinentry
+    evr: 1.3.1-1.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/p/pixman-0.43.4-2.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 663084
+    checksum: sha256:f43aa62b80317ce8ee58db42e2dad67694d27fb376a3159619425c87cc0be0b7
+    name: pixman
+    evr: 0.43.4-2.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/p/python-distro-1.9.0-5.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 85164
+    checksum: sha256:4f14d3c7e57698f086688d18170d3f042ea4f319b4e63e89aa726905a89fcbb8
+    name: python-distro
+    evr: 1.9.0-5.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/q/qemu-kvm-10.0.0-14.el10_1.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 136251336
+    checksum: sha256:545baa494c4618a07005730873b88dd946e970a312a6640502913ee485a5c547
+    name: qemu-kvm
+    evr: 18:10.0.0-14.el10_1
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/s/scrub-2.6.1-11.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 402974
+    checksum: sha256:db6b5d8a2011df296a6ef26dd5002fcc6df76d4b783420a4093a3bae16df1e78
+    name: scrub
+    evr: 2.6.1-11.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/s/seabios-1.16.3-7.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 660590
+    checksum: sha256:b641fe5c764d523fe0f3ca7e5f3d0d561fc974135b29a8b5dfe71a1647f5ba53
+    name: seabios
+    evr: 1.16.3-7.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/s/supermin-5.3.5-2.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 286388
+    checksum: sha256:40524d44e7914b94e223b7bc8ce7d4ee693675fca73a04b93dbd6f6eccfdfc53
+    name: supermin
+    evr: 5.3.5-2.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/s/swtpm-0.9.0-5.el10.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 408639
+    checksum: sha256:831771414ecdb203deedc3ca941abcd7225b1cc0c52a8b5fd546d8fa846243b2
+    name: swtpm
+    evr: 0.9.0-5.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/u/unbound-1.20.0-15.el10_1.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 6669244
+    checksum: sha256:cb0faefdd6f70672e8851acd55db1887aecab230837c5513b454034862228181
+    name: unbound
+    evr: 1.20.0-15.el10_1
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/v/virt-v2v-2.8.1-13.el10_1.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 7387623
+    checksum: sha256:e08fbf013ae4b3d908fea6fed988872da940a01f764242e05d4c929a2b5071ef
+    name: virt-v2v
+    evr: 1:2.8.1-13.el10_1
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/v/virtio-win-1.9.49-0.el10_1.src.rpm
+    repoid: rhel-10-for-x86_64-appstream-source-rpms
+    size: 264890008
+    checksum: sha256:2edfe9b9bdfe5ebb38b9655a532cc11ef3c4f3da80b8d7ae2d748a293aa97037
+    name: virtio-win
+    evr: 1.9.49-0.el10_1
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/a/acl-2.3.2-4.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 640143
+    checksum: sha256:ee10fdf587f9ae0dadeab848fa2ec9e3092d3eae9a14e056e9cf4b8899ddd08f
+    name: acl
+    evr: 2.3.2-4.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/a/audit-4.0.3-4.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 679032
+    checksum: sha256:da3ffffe1ca116e14f6077affc2edddd01409b591601bf98eef7ee1d6590ad4a
+    name: audit
+    evr: 4.0.3-4.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/b/binutils-2.41-58.el10_1.2.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 27845423
+    checksum: sha256:795a341f029b08870873d9509b864fdcb9667a199dc41d51329b4c8e5480b9fa
+    name: binutils
+    evr: 2.41-58.el10_1.2
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/b/brotli-1.1.0-6.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 534633
+    checksum: sha256:300f85345dbbe80e7703d7a03b9c45c4837d85cc186567d069b32127bc10563a
+    name: brotli
+    evr: 1.1.0-6.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/b/bzip2-1.0.8-25.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 853873
+    checksum: sha256:1a222ad5c504f7a3313fa785fc4174f58f872d61f3a098e92e0de9dd11401fdc
+    name: bzip2
+    evr: 1.0.8-25.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/c/cpio-2.15-3.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 1706696
+    checksum: sha256:20afb808d1547d95476b0a902fd1c5eb98efb72903cdd4632595c6b1aa62c7d0
+    name: cpio
+    evr: 2.15-3.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/c/cryptsetup-2.7.5-2.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 11752375
+    checksum: sha256:21465cbb93f8968609590274d7610a0ebc9eeae5c78ef89686b5ab37ad4ec7da
+    name: cryptsetup
+    evr: 2.7.5-2.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/c/cyrus-sasl-2.1.28-29.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 3988047
+    checksum: sha256:0b9523e5525995fae588298cc04dcdaf6c173334b608a13ed4f2647cc74bba83
+    name: cyrus-sasl
+    evr: 2.1.28-29.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/d/device-mapper-multipath-0.9.9-12.el10_1.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 778664
+    checksum: sha256:3796d9c34bc76a8e3743deafecaa86b993ff20f61d223b6d03835a4bca8e7343
+    name: device-mapper-multipath
+    evr: 0.9.9-12.el10_1
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/d/device-mapper-persistent-data-1.1.0-2.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 28928076
+    checksum: sha256:c692dc1212585c6db72cf9b4d08d857b664d396bffe98f3a62ca76b048e18c12
+    name: device-mapper-persistent-data
+    evr: 1.1.0-2.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/d/dhcpcd-10.0.6-7.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 298366
+    checksum: sha256:dc5d1b7e1aa703160655ffda1126cab37c1e894b13270cf389f95a06e0f972e0
+    name: dhcpcd
+    evr: 10.0.6-7.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/d/diffutils-3.10-8.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 1669652
+    checksum: sha256:607f7cc4e8b319205e70760fa791777b65084bf21df4ba86c75b68ead279bd34
+    name: diffutils
+    evr: 3.10-8.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/d/ding-libs-0.6.2-58.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 992630
+    checksum: sha256:732e2da374f055c36ccbe28422df11af7a34b577524ca367cc627791e78d4596
+    name: ding-libs
+    evr: 0.6.2-58.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/d/dosfstools-4.2-12.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 356093
+    checksum: sha256:62487656aa0c49631d70eaa22d56454fb88814ed077a04fd11537cce2a6b2c18
+    name: dosfstools
+    evr: 4.2-12.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/d/dracut-107-3.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 687662
+    checksum: sha256:941eb47d2de025894cae4c54889d87c64ce4b404ac1dd220a69f5bfbf9bc9333
+    name: dracut
+    evr: 107-3.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/d/duktape-2.7.0-10.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 1044413
+    checksum: sha256:cedaf723710eb8b03f442f7be8e1da7d4567800ff016e5ea0b7d4fc5282b743a
+    name: duktape
+    evr: 2.7.0-10.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/e/e2fsprogs-1.47.1-4.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 7689808
+    checksum: sha256:4b79a5bac5f7825392ff9e8fd5ca438e8b93b1eeba43d79f9a16dcda0a895bd1
+    name: e2fsprogs
+    evr: 1.47.1-4.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/e/elfutils-0.193-1.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 12083183
+    checksum: sha256:94e5c33f721d47137fee7e6397eb2d84648b06d4effd84e59af50df58bc9752a
+    name: elfutils
+    evr: 0.193-1.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/f/file-5.45-8.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 1334019
+    checksum: sha256:c864aa6f8aca08d50487099e8efc1dadf61cf32382f7a743b19f589db34bc208
+    name: file
+    evr: 5.45-8.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/f/fuse-2.9.9-25.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 1859050
+    checksum: sha256:b52d481e0e1721af8cad1b26cf76ab5861867a8f112ac79ce7e479adcb2a0e1e
+    name: fuse
+    evr: 2.9.9-25.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/f/fuse3-3.16.2-5.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 14168039
+    checksum: sha256:0e53c17dc1c66c78a3ee5512437c4751776197e2bcd21d9b0ae6e30d803cb593
+    name: fuse3
+    evr: 3.16.2-5.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/g/gettext-0.22.5-6.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 26824367
+    checksum: sha256:ff7d2bfda0dddc42523799c906feb1fe02655034bb50365ecdf924612c4a2f47
+    name: gettext
+    evr: 0.22.5-6.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/g/glib-networking-2.80.0-3.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 323815
+    checksum: sha256:b92ff4fa4c3ab7aa7ee5e83ae835ebffc47f1171668f80ffbfb92d50f08d5497
+    name: glib-networking
+    evr: 2.80.0-3.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/g/glibc-2.39-58.el10_1.2.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 19960777
+    checksum: sha256:4cf3f1c3538487fe0ef23fd92d00d1fd169541cdd8855df4ae1a734a387b15c4
+    name: glibc
+    evr: 2.39-58.el10_1.2
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/g/gnupg2-2.4.5-2.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 7975583
+    checksum: sha256:9a6b3728c63fc51c9c7a1530ec3f36c2bcff7bf14df15769b0f663e46e4375d2
+    name: gnupg2
+    evr: 2.4.5-2.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/g/gnutls-3.8.10-2.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 57683690
+    checksum: sha256:c85545244e12e0a850568f0c08302937d0705ab90bce62a88a9ee677e8cfdbc2
+    name: gnutls
+    evr: 3.8.10-2.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/g/groff-1.23.0-10.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 7488146
+    checksum: sha256:f8ea1ed393624627a44e6b1fa87c3feda1a938ba204c86b85022bd47833392cc
+    name: groff
+    evr: 1.23.0-10.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/g/gsettings-desktop-schemas-47.1-3.el10_0.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 842012
+    checksum: sha256:9e08044ec577ebb09fdde96970bc703e377ed814a0a4012c9ce2a8be9eb61402
+    name: gsettings-desktop-schemas
+    evr: 47.1-3.el10_0
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/g/gssproxy-0.9.2-10.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 638430
+    checksum: sha256:98441df481c3844cc4556e70ae4f7b5d4d5984261c7d22ed4d6f6a839e841834
+    name: gssproxy
+    evr: 0.9.2-10.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/h/hwdata-0.379-10.6.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 2587417
+    checksum: sha256:6dd508528c22bf043f8700c68e32a48cead4670dc10212f1963a6d0d370f2fbd
+    name: hwdata
+    evr: 0.379-10.6.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/i/inih-58-3.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 37319
+    checksum: sha256:cba14ceec6d845e288e6aeefacff7ffdc5c06c5541bc5a0b45ba5e729ebd053d
+    name: inih
+    evr: 58-3.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/i/iproute-6.14.0-2.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 962304
+    checksum: sha256:4129010c2a6bd9c370c54c56e14f1580dc3f5af4d8e12da16b24ddc1884d1d7b
+    name: iproute
+    evr: 6.14.0-2.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/i/iptables-1.8.11-11.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 782316
+    checksum: sha256:c3cbbe2b54632687578edbca5e6653e1c257c60950112366393d0cb9ab85aeea
+    name: iptables
+    evr: 1.8.11-11.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/j/jansson-2.14-3.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 461609
+    checksum: sha256:5715b494471c7d28ee7dbac67ea1b1fdb6ab711e032dab9b2a062ee9c330de20
+    name: jansson
+    evr: 2.14-3.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/j/jq-1.7.1-11.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 1346682
+    checksum: sha256:45f3b4bf3da05b20d12ff95a2711d36a98e715f753d03f70c10edabb17802c4a
+    name: jq
+    evr: 1.7.1-11.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/k/kbd-2.6.4-7.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 1591014
+    checksum: sha256:5904753dfb0f575825d54e6001419c6a39bac8b4b43e5360bf37feb9a020946c
+    name: kbd
+    evr: 2.6.4-7.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/k/kernel-6.12.0-124.8.1.el10_1.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 158631452
+    checksum: sha256:f1624f513910e718baa1a41a71e03103a600f4f09b8d88abd9f489aa12147960
+    name: kernel
+    evr: 6.12.0-124.8.1.el10_1
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/k/kmod-31-12.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 623740
+    checksum: sha256:16e7cda5be95899fb50254bf38ec349f0d2e7ab15900ee970193cd408e48df90
+    name: kmod
+    evr: 31-12.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/less-661-3.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 630059
+    checksum: sha256:4bf400256a10a8d052ee7abffdc43cba7d40f72a3d3f8f73da69f877676f2644
+    name: less
+    evr: 661-3.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libaio-0.3.111-22.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 78442
+    checksum: sha256:bb080bc3ad3083159730f63b3c9297cb2626b13b4f0092bcd81a3dd546a5608c
+    name: libaio
+    evr: 0.3.111-22.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libassuan-2.5.6-6.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 609571
+    checksum: sha256:fa7c4b3be940ce391bd9ec70849167c54af78e226a198b613f26bca3d119cd31
+    name: libassuan
+    evr: 2.5.6-6.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libcbor-0.11.0-3.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 310997
+    checksum: sha256:feda16e8a2762d0c470cb49eb91de6ef1c3623cc8da02127d17ae9bf163d0c11
+    name: libcbor
+    evr: 0.11.0-3.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libconfig-1.7.3-10.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 1072427
+    checksum: sha256:d1aeae6934594a7e3f557133c5c78d3ccdc5e59097e8eca6ca38eb7496f73e96
+    name: libconfig
+    evr: 1.7.3-10.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libedit-3.1-52.20230828cvs.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 565695
+    checksum: sha256:3ae3bffbac4d27d6b41deede6c1246391f0174e1f06f2afceac5c041bf92a8ec
+    name: libedit
+    evr: 3.1-52.20230828cvs.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libev-4.33-14.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 600611
+    checksum: sha256:b5c846c2d0fe8a5ac8bcd87be725a78885e651e9b78bdbc692866c3578f906c5
+    name: libev
+    evr: 4.33-14.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libevent-2.1.12-16.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 1144998
+    checksum: sha256:5e59fb2304228caf5238d5b603ac5151cc990299f5cd8e736cef230e73c6f785
+    name: libevent
+    evr: 2.1.12-16.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libfido2-1.14.0-7.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 903585
+    checksum: sha256:c4c5e3b25ef13eb5996c318dd2dcaa3ed01c36c9baf58926198df00abdeccc6b
+    name: libfido2
+    evr: 1.14.0-7.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libgcrypt-1.11.0-5.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 4278463
+    checksum: sha256:cc23729344691b71a5886ddf2b1606e42d042a166795700dc8a34b6b8b24affe
+    name: libgcrypt
+    evr: 1.11.0-5.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libgpg-error-1.50-2.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 1123806
+    checksum: sha256:5b34fa7e2dff6ceb5dedffe5e91a2271e8984c73de18c3f3f009aa0996a774b2
+    name: libgpg-error
+    evr: 1.50-2.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libkcapi-1.5.0-3.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 383867
+    checksum: sha256:ce0f39ff6eb41d1d0afebd41a9b3aee44750e6d183bc4d74b7d839ea7cb37f6c
+    name: libkcapi
+    evr: 1.5.0-3.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libksba-1.6.7-2.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 743465
+    checksum: sha256:1ae0438446eeb45cf43f15210e2d4118b68c61880f1209f543508b5ea0029a70
+    name: libksba
+    evr: 1.6.7-2.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libnetfilter_conntrack-1.0.9-12.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 409892
+    checksum: sha256:764049711bfd4f5bb0059a7f2a0457200d822191bf29005739567d733bb5ab0b
+    name: libnetfilter_conntrack
+    evr: 1.0.9-12.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libnfnetlink-1.0.2-3.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 324632
+    checksum: sha256:5bcb3863e6a85003901d6ac2798ec2e05739da962dcab4858139878ef6aeff2d
+    name: libnfnetlink
+    evr: 1.0.2-3.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libnftnl-1.2.8-4.el10_1.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 375938
+    checksum: sha256:f7efb15231aa08650e7141499b6b6b92bf591241925302d3e873a3482198b4d3
+    name: libnftnl
+    evr: 1.2.8-4.el10_1
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libnl3-3.11.0-1.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 5089028
+    checksum: sha256:3da5f6833d136beefc1a8c2644a571ec7ce4916588aacd3b01afda037e2cc90a
+    name: libnl3
+    evr: 3.11.0-1.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libnvme-1.13-1.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 796933
+    checksum: sha256:0f5e70b204b15f7c1352c4db630cf555e1d9a39589f5d8171ac3e5ee49a96bfc
+    name: libnvme
+    evr: 1.13-1.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libpipeline-1.5.7-7.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 1003653
+    checksum: sha256:9e2d12d26b6f0b2a5450661f67defde62b553508f5b4a285e6b07122925d8092
+    name: libpipeline
+    evr: 1.5.7-7.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libpng-1.6.40-8.el10_1.1.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 1578456
+    checksum: sha256:73a51a1325eff1ea350a37f16a7002325909b96d46366efd391d52b9c1d00778
+    name: libpng
+    evr: 2:1.6.40-8.el10_1.1
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libproxy-0.5.5-4.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 96570
+    checksum: sha256:6e530abdb887659a13caa883376282c08a88d7fd8365aa0d3b851cbd9800f1e0
+    name: libproxy
+    evr: 0.5.5-4.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libpsl-0.21.5-6.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 7603111
+    checksum: sha256:f6ab75a91f53287a97d365a310a9101a464bd1cc33260403b8c1d3cf6443a13d
+    name: libpsl
+    evr: 0.21.5-6.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libselinux-3.9-1.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 396507
+    checksum: sha256:d916feceaef2c522b93131d215b252fda0796d27867ca45d894d9f78be0303f8
+    name: libselinux
+    evr: 3.9-1.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libsemanage-3.9-1.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 307884
+    checksum: sha256:b97568190bb8a61e16a049760eb5b438217f347b5c5ed9518e5e5e99eab96e02
+    name: libsemanage
+    evr: 3.9-1.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libssh-0.11.1-5.el10_1.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 668948
+    checksum: sha256:31a712dc71e9f85cf44cb93c07f7dac1528fbdd2d2392b9b602c3d91c8200a8f
+    name: libssh
+    evr: 0.11.1-5.el10_1
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libtirpc-1.3.5-1.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 610226
+    checksum: sha256:305c8f1700f706ffde015e15fd4611456523f3a71d1b087ebecc44cb752da27c
+    name: libtirpc
+    evr: 1.3.5-1.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/liburing-2.5-5.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 316531
+    checksum: sha256:c4fc25272a8c6e1cfc6dd1c2518591b4f1aea911f89f5aa7a40aa134c2da7426
+    name: liburing
+    evr: 2.5-5.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libusb1-1.0.28-1.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 681034
+    checksum: sha256:b4724c137c3591c9bf80db9055194db3db94ff9e809a23ff446b0688b6dd99db
+    name: libusb1
+    evr: 1.0.28-1.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libverto-0.3.2-10.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 412293
+    checksum: sha256:f2c4fb59a37d33ab6bd4ca9d2f4d0dccf9a1e47bcd66816c0b437dbb67553496
+    name: libverto
+    evr: 0.3.2-10.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/libxcrypt-4.4.36-10.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 696641
+    checksum: sha256:3eb6dab92ac6918566b6499e71c46af6d70ebe6ca121fe0504aa08ff420c6484
+    name: libxcrypt
+    evr: 4.4.36-10.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/linux-firmware-20251111-19.1.el10_1.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 595692562
+    checksum: sha256:fe0c77f47d156e38ca099fed1f1102502669836005d72d173fe2e87143a05ebd
+    name: linux-firmware
+    evr: 20251111-19.1.el10_1
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/lsscsi-0.32-15.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 222631
+    checksum: sha256:ecf9b0ad0fe099a6060c3061a7900e92dafcc37aadfd9d62993c729db89c7749
+    name: lsscsi
+    evr: 0.32-15.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/lvm2-2.03.32-3.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 3279655
+    checksum: sha256:99ee01534d388e5f705064b005a7303da0a104907a8a9132f3765e62e17b87a6
+    name: lvm2
+    evr: 10:2.03.32-3.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/lzo-2.10-14.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 629993
+    checksum: sha256:71e18fe9db4ae4036e0d3d97cd520620353bdab10ca56ebd4f556257ac439c00
+    name: lzo
+    evr: 2.10-14.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/l/lzop-1.04-16.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 418456
+    checksum: sha256:d023aa0988eda05a821a4250536e14e4c44580d6750f4446374f4b9978c0aac5
+    name: lzop
+    evr: 1.04-16.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/m/man-db-2.12.0-10.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 2305155
+    checksum: sha256:ab20209daa232130573c123e50c5272bcfac6dc462edded31399f4ec9f1f0e49
+    name: man-db
+    evr: 2.12.0-10.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/m/mdadm-4.4-2.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 771910
+    checksum: sha256:345153664a7f817cd0602c5c5478cc8aa6d057ee17f8aa34f9722e4ecf0d9ca3
+    name: mdadm
+    evr: 4.4-2.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/n/nettle-3.10.1-1.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 4767480
+    checksum: sha256:fc358debf911f00e50344239fd18e8c7f769f0c3965da9856f7092db0c2381a4
+    name: nettle
+    evr: 3.10.1-1.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/n/nfs-utils-2.8.3-0.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 895535
+    checksum: sha256:a1886cb745bf52553960fc2847547317c418e7e6010c33a17f0ef0fe87fe6c53
+    name: nfs-utils
+    evr: 1:2.8.3-0.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/n/nftables-1.1.1-6.el10_1.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 1093046
+    checksum: sha256:0f7b851cdbbd1e02fd926df1fc0f9c27268974c11b9f69a91cd3cfc2a84ec19d
+    name: nftables
+    evr: 1:1.1.1-6.el10_1
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/n/npth-1.6-21.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 329882
+    checksum: sha256:cd12d539e0aaa1b2daf84460e4c8bb133206c9228aa0bdfdd3bf2db295b38697
+    name: npth
+    evr: 1.6-21.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/n/numactl-2.0.19-2.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 251570
+    checksum: sha256:f1f7cbcef8e9d58a3f23357f01ddd6d7fae28944ea6800528a12bcdaca9f0d5f
+    name: numactl
+    evr: 2.0.19-2.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/n/numad-0.5-46.20150602git.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 50898
+    checksum: sha256:9092eaedf8f425678cdfaef9baf0a379f833ea3e6f08603af804e0bda1d161ca
+    name: numad
+    evr: 0.5-46.20150602git.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/o/oniguruma-6.9.9-7.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 979497
+    checksum: sha256:27fcade12515365e7362a233fab1621f4aef6e8c21037cdc6421d5f9f43fa58e
+    name: oniguruma
+    evr: 6.9.9-7.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/o/openldap-2.6.9-1.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 6642175
+    checksum: sha256:c51a5a6eefb4b94a5bd377e140710df620a6ffd7373e96e32f0afae9bec8d8ea
+    name: openldap
+    evr: 2.6.9-1.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/o/openssh-9.9p1-12.el10_1.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 2352864
+    checksum: sha256:f79d5f073d8be108a59152f4d2327d0880abfae685482aeceff136b5be55de51
+    name: openssh
+    evr: 9.9p1-12.el10_1
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/p/parted-3.6-7.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 1942999
+    checksum: sha256:2fc964c5b0d023419cd9e281a0ce06cb4844773af6deb54500a241f32b3af80b
+    name: parted
+    evr: 3.6-7.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/p/pcsc-lite-2.2.3-2.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 264504
+    checksum: sha256:9d6d284f34936e6ac04b9dfda3bcce5acf6caafb17161f1970711ae700161f62
+    name: pcsc-lite
+    evr: 2.2.3-2.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/p/pcsc-lite-ccid-1.6.0-2.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 243487
+    checksum: sha256:6aa0e3ec7a54a55e66d414fc43c83606911812fab1786508b334c8ef6e174b97
+    name: pcsc-lite-ccid
+    evr: 1.6.0-2.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/p/pigz-2.8-7.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 142456
+    checksum: sha256:73232aa2684f0ae55ea245e46da652fadae759d12cb1ca2578caec370f70f1f4
+    name: pigz
+    evr: 2.8-7.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/p/policycoreutils-3.9-1.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 8247029
+    checksum: sha256:017f78bf46213050b159bbf6145ad4ae2142e41a109b9c04215e0b2ec6918544
+    name: policycoreutils
+    evr: 3.9-1.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/p/polkit-125-4.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 499397
+    checksum: sha256:063fa59fc10656f5c9db56d10c6450555bad1722b017499a3dbb73db1558fe59
+    name: polkit
+    evr: 125-4.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/p/polkit-pkla-compat-0.1-30.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 314151
+    checksum: sha256:ce125bf2809787b3e3235b1b0976935d2a0e6796c58953f5c190d15873a47bd7
+    name: polkit-pkla-compat
+    evr: 0.1-30.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/p/procps-ng-4.0.4-8.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 1447111
+    checksum: sha256:c729dd3f908499e585aa892d84e6650e4bbf10308375560724c4808107cad347
+    name: procps-ng
+    evr: 4.0.4-8.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/p/protobuf-c-1.5.0-6.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 527499
+    checksum: sha256:19983b8a443af5c0e626261e9d066a140229217c0e3ae6a6fb7d2100b2a762bf
+    name: protobuf-c
+    evr: 1.5.0-6.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/p/publicsuffix-list-20240107-5.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 112025
+    checksum: sha256:fa4f3be7162e7f2f2a8b778f38006d8e7ed23a70f6b4023f6bcdbff6646f0a0e
+    name: publicsuffix-list
+    evr: 20240107-5.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/p/python-setuptools-69.0.3-12.el10_0.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 2295950
+    checksum: sha256:504b848b7a1a2b86dbbdac4cae3120f8262434a0b1baa42f4836a56ecc1eddc3
+    name: python-setuptools
+    evr: 69.0.3-12.el10_0
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/q/quota-4.09-9.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 601625
+    checksum: sha256:7b3b45b2bb6eaa90f3eeba069469de5495b351d8b5154a686c34d69cebc9caf4
+    name: quota
+    evr: 1:4.09-9.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/r/rpcbind-1.2.7-3.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 175262
+    checksum: sha256:486a5e552825c9a9e6e2021e2342316b971cc376db712ec9176181792db08323
+    name: rpcbind
+    evr: 1.2.7-3.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/r/rpm-4.19.1.1-20.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 6005977
+    checksum: sha256:a8cdf3e3d9b992ddb71fb1bcf7572f7730309a14281eb0e5dcce522fbe601d9e
+    name: rpm
+    evr: 4.19.1.1-20.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/s/selinux-policy-42.1.7-1.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 1268058
+    checksum: sha256:e47499778166a6c88d2018cadf68d24340c7339289f52be3426272cba8f0a5f0
+    name: selinux-policy
+    evr: 42.1.7-1.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/s/setools-4.5.1-5.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 379689
+    checksum: sha256:8308942832296da3fafbbdccb0def71e597197b7343a88f46b4d9fd47921b29e
+    name: setools
+    evr: 4.5.1-5.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/s/snappy-1.1.10-7.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 1128771
+    checksum: sha256:337580bb938fbb31a780e0974bc9238a8d056c5a33095209314a3da9c7b1eb80
+    name: snappy
+    evr: 1.1.10-7.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/s/systemd-257-13.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 18499850
+    checksum: sha256:619488f8b734592f49c1ecc17290463e4663a3710bb62bbd9533413f0bb94566
+    name: systemd
+    evr: 257-13.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/t/tpm2-tools-5.7-4.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 1363165
+    checksum: sha256:9dbfe67d9dab81cb19a32c81c1b177f26c1864dfbfef6fb5acd66ea1a1d68b30
+    name: tpm2-tools
+    evr: 5.7-4.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/t/tpm2-tss-4.1.3-5.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 1935937
+    checksum: sha256:81c396177c2ca245d2475302ff5583ba554b92daef27c1e278118944d81c39c2
+    name: tpm2-tss
+    evr: 4.1.3-5.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/u/unzip-6.0-69.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 1469390
+    checksum: sha256:240b6d2e3b9a02eb22aa9d0fc7ef96a6e6044c22d164ffc8d86d3c4f16649547
+    name: unzip
+    evr: 6.0-69.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/u/userspace-rcu-0.14.0-7.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 690743
+    checksum: sha256:85f020b13a5c9c24a0110c6ce3ad44a3d98e32ec671956a767cc4272a7cbbfd8
+    name: userspace-rcu
+    evr: 0.14.0-7.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/x/xfsprogs-6.11.0-2.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 1507075
+    checksum: sha256:389e95b6d9a08297465bce730aec6db98ab03fd59a5cfec6e8d26aa45754149b
+    name: xfsprogs
+    evr: 6.11.0-2.el10
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/x/xz-5.6.2-4.el10_0.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 2400139
+    checksum: sha256:f6af3011922b182211e9a143867ead94dccffd1ea93c52674e7c5e7727c99472
+    name: xz
+    evr: 1:5.6.2-4.el10_0
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/z/zstd-1.5.5-9.el10.src.rpm
+    repoid: rhel-10-for-x86_64-baseos-source-rpms
+    size: 2392292
+    checksum: sha256:3c453a23e181066ee5a664aad1f0a282090d0edb2b84bc76e120ddff0a00a870
+    name: zstd
+    evr: 1.5.5-9.el10
+  module_metadata: []
