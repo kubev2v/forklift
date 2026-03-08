@@ -477,6 +477,13 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	}
 	snapshot.EndStagingConditions()
 
+	// Trigger a one-time event when preflight detects a root disk mismatch.
+	for _, vm := range plan.Status.Migration.VMs {
+		if cnd := vm.FindCondition(RootDiskMismatch); cnd != nil && vm.Phase == api.PhasePreflightInspection {
+			r.EventRecorder.Event(plan, core.EventTypeWarning, cnd.Type, cnd.Message)
+		}
+	}
+
 	// Reflect the active snapshot status on the plan.
 	for _, t := range []string{Executing, Succeeded, Failed, Canceled} {
 		if cnd := snapshot.FindCondition(t); cnd != nil {

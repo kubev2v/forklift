@@ -239,6 +239,11 @@ func (r *Migration) begin() (err error) {
 				err = liberr.Wrap(pErr)
 				return
 			}
+			// When a migration is re-triggered, the VMStatus from the previous run
+			// is reused (found by Ref in Plan.Status.Migration). Its embedded VM
+			// struct may be stale if the user edited spec fields (e.g. rootDisk)
+			// between runs. Overwrite it with the current spec to pick up changes.
+			status.VM = vm
 			r.migrator.Reset(status, pipeline)
 			log.Info(
 				"Pipeline reset.",
@@ -1318,7 +1323,17 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				return
 			}
 
+			if pod.Status.Phase == core.PodRunning && !step.MarkedCompleted() {
+				if err = r.kubevirt.ValidatePreflightInspection(vm, pod, step); err != nil {
+					return
+				}
+			}
+
 			if pod.Status.Phase == core.PodSucceeded {
+				if !step.MarkedCompleted() {
+					step.MarkCompleted()
+					step.Progress.Completed = step.Progress.Total
+				}
 				r.NextPhase(vm)
 			}
 

@@ -234,7 +234,12 @@ func (c *Conversion) addVirtV2vVsphereArgsForInspection(cmd utils.CommandBuilder
 		AddArg("-ip", c.SecretKey).
 		AddArg("--hostname", c.HostName)
 
+	// Force --root first for inspection so the inspector detects the actual
+	// root device rather than being directed to the user-specified rootDisk.
+	savedRootDisk := c.RootDisk
+	c.RootDisk = ""
 	err = c.addCommonArgs(cmd)
+	c.RootDisk = savedRootDisk
 	if err != nil {
 		return err
 	}
@@ -309,7 +314,8 @@ func (c *Conversion) RunCustomize(osinfo utils.InspectionOS) error {
 func (c *Conversion) RunRemoteV2vInspection() (err error) {
 	v2vCmdBuilder := c.CommandBuilder.New("virt-v2v-inspector").
 		AddFlag("-v").
-		AddFlag("-x")
+		AddFlag("-x").
+		AddArg("-O", c.InspectionOutputFile)
 
 	err = c.addVirtV2vRemoteInspectionArgs(v2vCmdBuilder)
 	if err != nil {

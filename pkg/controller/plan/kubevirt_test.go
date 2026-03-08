@@ -300,6 +300,22 @@ func createKubeVirt(objs ...runtime.Object) *KubeVirt {
 	}
 }
 
+var _ = ginkgo.Describe("stripPartitionSuffix", func() {
+	ginkgo.DescribeTable("strips trailing digits from device paths",
+		func(input, expected string) {
+			Expect(stripPartitionSuffix(input)).To(Equal(expected))
+		},
+		ginkgo.Entry("partition /dev/sda1", "/dev/sda1", "/dev/sda"),
+		ginkgo.Entry("partition /dev/sdb2", "/dev/sdb2", "/dev/sdb"),
+		ginkgo.Entry("multi-digit partition /dev/sda12", "/dev/sda12", "/dev/sda"),
+		ginkgo.Entry("no partition suffix /dev/sda", "/dev/sda", "/dev/sda"),
+		ginkgo.Entry("nvme device /dev/nvme0n1p1", "/dev/nvme0n1p1", "/dev/nvme0n1"),
+		ginkgo.Entry("nvme device no partition /dev/nvme0n1", "/dev/nvme0n1", "/dev/nvme0n1"),
+		ginkgo.Entry("nvme multi-digit partition /dev/nvme0n1p12", "/dev/nvme0n1p12", "/dev/nvme0n1"),
+		ginkgo.Entry("empty string", "", ""),
+	)
+})
+
 func createMigration() *v1beta1.Migration {
 	return &v1beta1.Migration{
 		ObjectMeta: metav1.ObjectMeta{

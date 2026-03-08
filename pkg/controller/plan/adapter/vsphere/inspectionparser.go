@@ -71,6 +71,7 @@ type InspectionOS struct {
 	Distro string `xml:"distro"`
 	Osinfo string `xml:"osinfo"`
 	Arch   string `xml:"arch"`
+	Root   string `xml:"root"`
 }
 
 type InspectionV2V struct {
@@ -84,6 +85,16 @@ func ParseInspectionFromString(xmlData string) (InspectionV2V, error) {
 		return InspectionV2V{}, fmt.Errorf("Error unmarshalling XML: %v\n", err)
 	}
 	return xmlConf, nil
+}
+
+// GetRootDeviceFromConfig extracts the detected root device (e.g. "/dev/sda1")
+// from the virt-v2v-inspector XML output.
+func GetRootDeviceFromConfig(vmConfigXML string) (string, error) {
+	inspection, err := ParseInspectionFromString(vmConfigXML)
+	if err != nil {
+		return "", err
+	}
+	return inspection.OS.Root, nil
 }
 
 func GetOperationSystemFromConfig(vmConfigXML string) (string, error) {

@@ -39,6 +39,12 @@ func main() {
 			fmt.Println("Failed to execute virt-v2v-inspector command", err)
 			os.Exit(1)
 		}
+		s := server.Server{AppConfig: env}
+		err = s.Start()
+		if err != nil {
+			fmt.Println("failed to run the server", err)
+			os.Exit(1)
+		}
 	} else {
 		// virt-v2v or virt-v2v-in-place
 		if convert.IsInPlace {

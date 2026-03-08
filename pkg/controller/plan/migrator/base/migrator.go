@@ -257,10 +257,16 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 		api.PhaseConvertOpenstackSnapshot:
 		step = DiskTransfer
 	case api.PhaseCreateDataVolumes:
-		// This phase should be present in DiskTransfer step only when executing Preflight Inspection to avoid UI pipeline artifacts.
-		// If not executing Preflight Inspection, keep the Initialize step.
+		// When preflight inspection runs, this phase belongs to a disk step
+		// rather than Initialize to avoid UI pipeline artifacts.
+		// Warm always uses DiskTransfer (CDI). Cold uses DiskAllocation (v2v)
+		// or DiskTransfer (CDI) depending on the transfer method.
 		if r.Context.Plan.ShouldRunPreflightInspection() {
-			step = DiskTransfer
+			if _, found := status.FindStep(DiskAllocation); found {
+				step = DiskAllocation
+			} else {
+				step = DiskTransfer
+			}
 		} else {
 			step = Initialize
 		}
@@ -340,6 +346,7 @@ func (r *BaseMigrator) coldItinerary() *libitr.Itinerary {
 			{Name: api.PhaseStorePowerState},
 			{Name: api.PhasePowerOffSource},
 			{Name: api.PhaseWaitForPowerOff},
+			{Name: api.PhasePreflightInspection, All: RunInspection},
 			{Name: api.PhaseCreateDataVolumes},
 			{Name: api.PhaseCopyDisks, All: CDIDiskCopy},
 			{Name: api.PhaseAllocateDisks, All: VirtV2vDiskCopy},

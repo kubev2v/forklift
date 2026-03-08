@@ -79,6 +79,7 @@ const (
 	Failed                          = "Failed"
 	Canceled                        = "Canceled"
 	ConversionHasWarnings           = "ConversionHasWarnings"
+	RootDiskMismatch                = "RootDiskMismatch"
 	Deleted                         = "Deleted"
 	Paused                          = "Paused"
 	Archived                        = "Archived"

@@ -290,9 +290,14 @@ type PlanSpec struct {
 	// +optional
 	// +kubebuilder:validation:Enum=on;off;auto
 	TargetPowerState plan.TargetPowerState `json:"targetPowerState,omitempty"`
-	// RunPreflightInspection controls whether an inspection step on VM base disks is performed before starting the first disk transfer. Applies only to warm migrations from VMWare.
-	// - true (default): Inspection step runs before transferring any disks and may fail if it detects the migration would fail.
-	// - false: No inspection is performed before disk transfer.
+	// RunPreflightInspection controls whether an inspection step on VM base
+	// disks is performed before starting the first disk transfer.
+	// For warm migrations from VMware this flag enables/disables the inspection.
+	// For cold migrations the inspection runs automatically when any VM has a
+	// rootDisk override, regardless of this flag, to validate the specified
+	// root disk matches the detected OS disk.
+	// - true (default): Inspection step runs before transferring any disks.
+	// - false: No inspection for warm migrations; rootDisk validation still runs for cold.
 	// +kubebuilder:default:=true
 	RunPreflightInspection bool `json:"runPreflightInspection,omitempty"`
 	// CustomizationScripts references a ConfigMap containing customization scripts
@@ -370,6 +375,16 @@ type Plan struct {
 // and the current 'type: warm' field.
 func (p *Plan) IsWarm() bool {
 	return p.Spec.Warm || p.Spec.Type == MigrationWarm
+}
+
+// HasAnyVMWithRootDisk returns true if any VM in the plan has a RootDisk override set.
+func (p *Plan) HasAnyVMWithRootDisk() bool {
+	for _, vm := range p.Spec.VMs {
+		if vm.RootDisk != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // If the plan calls for the vm to be cold migrated to the local cluster, we can
@@ -464,10 +479,13 @@ func (r *Plan) IsSourceProviderOCP() bool {
 func (r *Plan) IsSourceProviderVSphere() bool { return r.Provider.Source.Type() == VSphere }
 
 func (r *Plan) ShouldRunPreflightInspection() bool {
-	return r.IsSourceProviderVSphere() &&
-		r.IsWarm() &&
-		!r.Spec.SkipGuestConversion &&
-		r.Spec.RunPreflightInspection
+	if r.Spec.SkipGuestConversion || !r.IsSourceProviderVSphere() {
+		return false
+	}
+	if r.IsWarm() && r.Spec.RunPreflightInspection {
+		return true
+	}
+	return r.HasAnyVMWithRootDisk()
 }
 
 // IsUsingOffloadPlugin determines if any of the mappings is using storage offload

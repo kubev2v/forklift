@@ -1302,6 +1302,81 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 	return err
 }
 
+// ValidatePreflightInspection fetches the inspection XML from the running
+// inspection pod, parses the detected root device, and compares it against
+// the user-specified RootDisk.
+func (r *KubeVirt) ValidatePreflightInspection(vm *plan.VMStatus, pod *core.Pod, step *plan.Step) error {
+	if pod == nil || pod.Status.PodIP == "" {
+		return nil
+	}
+
+	inspectionXML, err := r.getInspectionXml(pod)
+	if err != nil {
+		if strings.Contains(err.Error(), "connection refused") {
+			return nil
+		}
+		return err
+	}
+
+	detectedRoot, err := inspectionparser.GetRootDeviceFromConfig(inspectionXML)
+	if err != nil {
+		r.Log.Error(err, "Failed to parse root device from inspection XML", "vmId", vm.ID)
+	}
+
+	if detectedRoot != "" && vm.RootDisk != "" {
+		detectedDisk := stripPartitionSuffix(detectedRoot)
+		specifiedDisk := stripPartitionSuffix(vm.RootDisk)
+		if detectedDisk != specifiedDisk {
+			msg := fmt.Sprintf(
+				"Detected root device %q (disk %s) does not match the specified rootDisk %q. "+
+					"The VM OS may not be on the specified disk.",
+				detectedRoot, detectedDisk, vm.RootDisk)
+			vm.SetCondition(libcnd.Condition{
+				Type:     RootDiskMismatch,
+				Status:   True,
+				Category: Warn,
+				Reason:   "RootDiskMismatch",
+				Message:  msg,
+				Durable:  true,
+			})
+			r.Log.Info("Root disk mismatch detected", "detectedRoot", detectedRoot, "specifiedRootDisk", vm.RootDisk, "vmId", vm.ID)
+		}
+	}
+
+	// Inspection is done, shut down the pod so it transitions to Succeeded and the phase advances.
+	shutdownURL := fmt.Sprintf("http://%s:8080/shutdown", pod.Status.PodIP)
+	resp, err := http.Post(shutdownURL, "application/json", nil)
+	if err == nil {
+		defer resp.Body.Close()
+	} else {
+		if strings.Contains(err.Error(), "EOF") {
+			err = nil
+		}
+	}
+	step.MarkCompleted()
+	step.Progress.Completed = step.Progress.Total
+	return err
+}
+
+// stripPartitionSuffix removes the partition suffix from a device path
+// to get the base disk device.
+func stripPartitionSuffix(device string) string {
+	// NVMe: /dev/nvme0n1p3 -> /dev/nvme0n1
+	if idx := strings.LastIndex(device, "p"); idx > 0 && idx > strings.LastIndex(device, "/") && idx < len(device)-1 {
+		candidate := device[:idx]
+		suffix := device[idx+1:]
+		if strings.TrimRight(candidate, "0123456789") != candidate && strings.TrimLeft(suffix, "0123456789") == "" {
+			return candidate
+		}
+	}
+	// NVMe base devices end in digits that are part of the name, not a partition.
+	if slashIdx := strings.LastIndex(device, "/"); slashIdx >= 0 && strings.HasPrefix(device[slashIdx+1:], "nvme") {
+		return device
+	}
+	// SCSI/virtio: /dev/sda1 -> /dev/sda
+	return strings.TrimRight(device, "0123456789")
+}
+
 // Delete the PVC consumer pod on the destination cluster.
 func (r *KubeVirt) DeletePVCConsumerPod(vm *plan.VMStatus) (err error) {
 	list, err := r.GetPodsWithLabels(r.consumerLabels(vm.Ref, true))
@@ -2462,32 +2537,48 @@ func (r *KubeVirt) buildInspectionPodEnvironment(env []core.EnvVar, vm *plan.VMS
 
 	// Add disks to be inspected
 	for i, disk := range virtualMachine.SortedDisksAsLibvirt() {
-		// If parent disk is empty then fail with error message
-		if disk.ParentFile != "" {
-			newEnv = append(newEnv, core.EnvVar{
-				Name:  fmt.Sprintf("V2V_remoteInspectDisk_%d", i),
-				Value: disk.ParentFile,
-			})
-		} else if limitExceeded {
-			// If retry limit was exceeded then collect all the failing disks and put them as a step errors
-			errMsg := fmt.Sprintf("Parent disk of %s was not found. This is possibly an environment issue. Please investigate if a precopy snapshot has a parent backing.", disk.File)
-			step.AddError(errMsg)
-			err = liberr.New(errMsg)
-			r.Log.Error(err, "Failed to get parent backing of VM disk.", "vm", vm.Ref.String())
-		} else {
-			// Retry on the next run and log the missing parent disk
-			retries += 1
-			step.Annotations[ParentBackingRetriesAnnotation] = strconv.Itoa(retries)
-			errMsg := fmt.Sprintf("Parent disk of %s was not found, will retry on next attempt", disk.File)
-			r.Log.Info(errMsg,
-				"vm", vm.Ref.String())
-			return
+		diskPath := disk.ParentFile
+		if diskPath == "" {
+			if r.Plan.IsWarm() {
+				var hErr error
+				retries, hErr = r.handleMissingParentBacking(disk.File, vm, step, retries, limitExceeded)
+				if !limitExceeded {
+					err = hErr
+					return
+				}
+				if hErr != nil {
+					err = hErr
+				}
+				continue
+			}
+			diskPath = disk.File
 		}
+		newEnv = append(newEnv, core.EnvVar{
+			Name:  fmt.Sprintf("V2V_remoteInspectDisk_%d", i),
+			Value: diskPath,
+		})
 	}
 	if limitExceeded {
 		return
 	}
 	return newEnv, true, nil
+}
+
+// handleMissingParentBacking handles the case where a warm migration disk has
+// no parent backing. It either fails (limit exceeded) or schedules a retry.
+func (r *KubeVirt) handleMissingParentBacking(diskFile string, vm *plan.VMStatus, step *plan.Step, retries int, limitExceeded bool) (int, error) {
+	if limitExceeded {
+		errMsg := fmt.Sprintf("Parent disk of %s was not found. This is possibly an environment issue. Please investigate if a precopy snapshot has a parent backing.", diskFile)
+		step.AddError(errMsg)
+		err := liberr.New(errMsg)
+		r.Log.Error(err, "Failed to get parent backing of VM disk.", "vm", vm.Ref.String())
+		return retries, err
+	}
+	retries++
+	step.Annotations[ParentBackingRetriesAnnotation] = strconv.Itoa(retries)
+	r.Log.Info(fmt.Sprintf("Parent disk of %s was not found, will retry on next attempt", diskFile),
+		"vm", vm.Ref.String())
+	return retries, nil
 }
 
 func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, vm *plan.VMStatus, podType int) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, err error) {
