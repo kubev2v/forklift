@@ -305,11 +305,6 @@ type PlanSpec struct {
 	// execution order. If not specified, no custom scripts are injected.
 	// +optional
 	CustomizationScripts *core.ObjectReference `json:"customizationScripts,omitempty"`
-	// VirtV2vImage overrides the global virt-v2v container image for this plan.
-	// When set, virt-v2v pods created by this plan will use this image instead
-	// of the cluster-wide VIRT_V2V_IMAGE setting.
-	// Use this to run different virt-v2v builds for specific migration scenarios
-	VirtV2vImage string `json:"virtV2vImage,omitempty"`
 }
 
 // Find a planned VM.
