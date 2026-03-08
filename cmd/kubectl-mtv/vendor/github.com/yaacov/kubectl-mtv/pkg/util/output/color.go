@@ -3,7 +3,9 @@ package output
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // ANSI color codes
@@ -26,13 +28,28 @@ const (
 // ansiRegex is a regular expression that matches ANSI color escape codes
 var ansiRegex = regexp.MustCompile("\033\\[[0-9;]*m")
 
+// colorEnabled controls whether ANSI color codes are emitted.
+// Defaults to true; set to false via SetColorEnabled for terminals that
+// don't support colors or when the --no-color flag / NO_COLOR env var is set.
+var colorEnabled = true
+
+// SetColorEnabled globally enables or disables ANSI color output.
+func SetColorEnabled(enabled bool) { colorEnabled = enabled }
+
+// IsColorEnabled reports whether ANSI color output is currently enabled.
+func IsColorEnabled() bool { return colorEnabled }
+
 // Bold returns a bold-formatted string
 func Bold(text string) string {
 	return ColorizedString(text, BoldText)
 }
 
-// ColorizedString returns a string with the specified color applied
+// ColorizedString returns a string with the specified color applied.
+// When color output is disabled, the text is returned unchanged.
 func ColorizedString(text string, color string) string {
+	if !colorEnabled {
+		return text
+	}
 	return color + text + Reset
 }
 
@@ -66,29 +83,62 @@ func StripANSI(text string) string {
 	return ansiRegex.ReplaceAllString(text, "")
 }
 
-// VisibleLength returns the visible length of a string, excluding ANSI color codes
+// VisibleLength returns the visible rune count of a string, excluding ANSI color codes
 func VisibleLength(text string) int {
-	return len(StripANSI(text))
+	return utf8.RuneCountInString(StripANSI(text))
 }
 
-// ColorizeStatus returns a colored string based on status value
+// ColorizeStatus returns a colored string based on status value.
+// Handles migration-phase statuses (Running, Completed, Failed, ...),
+// general resource statuses (Ready, Not Ready, Unknown, ...),
+// and cloud provider states (stopped, available, terminated, ...).
 func ColorizeStatus(status string) string {
 	status = strings.TrimSpace(status)
 	switch strings.ToLower(status) {
-	case "running":
+	case "running", "executing", "in-use":
 		return Blue(status)
-	case "executing":
-		return Blue(status)
-	case "completed":
+	case "completed", "succeeded", "ready", "available", "bound":
 		return Green(status)
-	case "pending":
+	case "pending", "stopped", "stopping", "creating", "unknown":
 		return Yellow(status)
-	case "failed":
+	case "failed", "not ready", "terminated", "shutting-down", "deleting", "error", "lost":
 		return Red(status)
 	case "canceled":
 		return Cyan(status)
 	default:
 		return status
+	}
+}
+
+// ColorizeCategory returns a colored string based on condition category.
+func ColorizeCategory(category string) string {
+	category = strings.TrimSpace(category)
+	switch strings.ToLower(category) {
+	case "critical", "error":
+		return Red(category)
+	case "warn":
+		return Yellow(category)
+	case "advisory", "information", "required":
+		return Green(category)
+	default:
+		return category
+	}
+}
+
+// ColorizePowerState returns a colored string based on VM power state.
+// Handles both descriptive states (Running/Stopped) and short forms (On/Off)
+// as set by augmentVMInfo's powerStateHuman field.
+func ColorizePowerState(state string) string {
+	state = strings.TrimSpace(state)
+	switch strings.ToLower(state) {
+	case "running", "on":
+		return Green(state)
+	case "stopped", "off":
+		return Yellow(state)
+	case "not found":
+		return Red(state)
+	default:
+		return state
 	}
 }
 
@@ -103,6 +153,93 @@ func ColorizeBoolean(b bool) string {
 		return Green(fmt.Sprintf("%t", b))
 	}
 	return fmt.Sprintf("%t", b)
+}
+
+// ColorizeConditionStatus returns a colored string for Kubernetes condition status values
+func ColorizeConditionStatus(status string) string {
+	switch strings.TrimSpace(status) {
+	case "True":
+		return Green(status)
+	case "False":
+		return Red(status)
+	default:
+		return status
+	}
+}
+
+// ColorizeBooleanString returns a colored string for string representations of booleans
+func ColorizeBooleanString(val string) string {
+	switch strings.ToLower(strings.TrimSpace(val)) {
+	case "true", "yes":
+		return Green(val)
+	case "false", "no":
+		return Red(val)
+	default:
+		return val
+	}
+}
+
+// ColorizeProgress returns a colored string based on percentage thresholds.
+// Expects strings like "85.0%" or "100.0%".
+func ColorizeProgress(progress string) string {
+	trimmed := strings.TrimSpace(progress)
+	numStr := strings.TrimRight(trimmed, "%")
+	pct, err := strconv.ParseFloat(strings.TrimSpace(numStr), 64)
+	if err != nil {
+		return progress
+	}
+	if pct >= 100 {
+		return Green(progress)
+	} else if pct >= 75 {
+		return Blue(progress)
+	} else if pct >= 25 {
+		return Yellow(progress)
+	}
+	return Cyan(progress)
+}
+
+// TruncateANSI truncates text to maxWidth visible characters while preserving
+// ANSI color codes. Appends "..." and a Reset code when truncation occurs.
+func TruncateANSI(text string, maxWidth int) string {
+	if maxWidth <= 0 {
+		return ""
+	}
+	if VisibleLength(text) <= maxWidth {
+		return text
+	}
+
+	truncWidth := maxWidth - 3
+	if truncWidth < 0 {
+		truncWidth = 0
+	}
+
+	var result strings.Builder
+	visCount := 0
+	runes := []rune(text)
+	i := 0
+
+	for i < len(runes) && visCount < truncWidth {
+		if runes[i] == '\033' {
+			for i < len(runes) {
+				result.WriteRune(runes[i])
+				if runes[i] == 'm' {
+					i++
+					break
+				}
+				i++
+			}
+			continue
+		}
+		result.WriteRune(runes[i])
+		visCount++
+		i++
+	}
+
+	result.WriteString(Reset)
+	if truncWidth < maxWidth {
+		result.WriteString("...")
+	}
+	return result.String()
 }
 
 // ColorizedSeparator returns a separator line with the specified color
