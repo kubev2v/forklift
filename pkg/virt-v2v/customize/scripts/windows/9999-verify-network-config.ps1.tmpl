@@ -1,0 +1,101 @@
+# Safety-net script: re-applies static IP configuration when virt-v2v's
+# firstboot script (2500-0006) fails due to ghost adapter retention.
+#
+# After migration, Windows may retain "ghost" network adapters from the
+# source hypervisor. Each adapter has an ifIndex (integer ID) that is
+# shared between two layers:
+#
+#   Get-NetAdapter -Physical
+#     Returns ALL registered adapters, including ghosts whose hardware
+#     is gone but whose registry entries remain.
+#
+#   Get-NetIPInterface 
+#     Returns only adapters that successfully bound to the IP stack.
+#     Ghost adapters never complete this binding, so they are absent.
+#
+# If virt-v2v's firstboot script picks a ghost adapter's ifIndex,
+# New-NetIPAddress fails because the IP stack has no such interface.
+#
+# This script runs after virt-v2v's firstboot and for each expected IP:
+#   1. Skips it if already configured.
+#   2. Queries Get-NetAdapter for the MAC, then filters to only those
+#      ifIndexes that also appear in Get-NetIPInterface.
+#   3. Applies the IP/gateway/DNS on the validated ifIndex.
+
+$inputString = "{{.InputString}}"
+$entries = $inputString.Split("_", [StringSplitOptions]::RemoveEmptyEntries)
+
+foreach ($entry in $entries) {
+    # Expected format: MAC:ip:IP,GW,PREFIX,DNS1,DNS2
+    $parts = $entry -split ':ip:'
+    if ($parts.Count -ne 2) { continue }
+
+    $mac = $parts[0].ToUpper().Replace(":", "-")
+    $config = $parts[1] -split ','
+
+    $ip     = $config[0]
+    $gw     = if ($config.Count -gt 1) { $config[1] } else { $null }
+    $prefix = if ($config.Count -gt 2 -and $config[2]) { [int]$config[2] } else {
+        Write-Warning "No prefix length for $ip, defaulting to /24"
+        24
+    }
+    $dns1   = if ($config.Count -gt 3) { $config[3] } else { $null }
+    $dns2   = if ($config.Count -gt 4) { $config[4] } else { $null }
+
+    if (-not $ip) { continue }
+
+    $existing = Get-NetIPAddress -IPAddress $ip -ErrorAction SilentlyContinue
+    if ($existing) {
+        Write-Host "IP $ip already configured on ifIndex $($existing.InterfaceIndex) - skipping"
+        continue
+    }
+
+    Write-Host "IP $ip not configured - attempting to apply (MAC $mac)"
+
+    # Wait for a ghost-safe adapter (present in both NDIS and IP stack)
+    $adapter = $null
+    $deadline = (Get-Date).AddSeconds(60)
+
+    while (-not $adapter -and (Get-Date) -lt $deadline) {
+        $validIfIndexes = (Get-NetIPInterface).ifIndex
+        $adapter = Get-NetAdapter -Physical |
+            Where-Object { $_.MacAddress -eq $mac -and $_.ifIndex -in $validIfIndexes } |
+            Select-Object -First 1
+
+        if (-not $adapter) { Start-Sleep -Seconds 5 }
+    }
+
+    if (-not $adapter) {
+        Write-Warning "Could not find a valid IP-stack adapter for MAC $mac after waiting - skipping"
+        continue
+    }
+
+    $ifindex = $adapter.ifIndex
+    Write-Host "Found valid adapter '$($adapter.Name)' at ifIndex $ifindex for MAC $mac"
+
+    try {
+        $ipParams = @{
+            InterfaceIndex = $ifindex
+            IPAddress      = $ip
+            PrefixLength   = $prefix
+            ErrorAction    = "Stop"
+        }
+        if (-not [string]::IsNullOrWhiteSpace($gw)) {
+            $ipParams["DefaultGateway"] = $gw
+        }
+        New-NetIPAddress @ipParams | Out-Null
+        Write-Host "IP $ip configured successfully on ifIndex $ifindex"
+    } catch {
+        Write-Warning "New-NetIPAddress failed: $($_.Exception.Message)"
+    }
+
+    $dnsServers = @($dns1, $dns2) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    if ($dnsServers.Count -gt 0) {
+        try {
+            Set-DnsClientServerAddress -InterfaceIndex $ifindex -ServerAddresses $dnsServers -ErrorAction Stop
+            Write-Host "DNS configured on ifIndex $ifindex"
+        } catch {
+            Write-Warning "Set-DnsClientServerAddress failed: $($_.Exception.Message)"
+        }
+    }
+}

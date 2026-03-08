@@ -24,12 +24,15 @@ $networkConfigs = @(
 
 # Apply settings
 foreach ($config in $networkConfigs) {
-    $adapter = Get-NetAdapter -Physical | Where-Object { $_.MacAddress -eq $config.MAC }
+    $validIfIndexes = (Get-NetIPInterface).ifIndex
+    $adapter = Get-NetAdapter -Physical |
+        Where-Object { $_.MacAddress -eq $config.MAC -and $_.ifIndex -in $validIfIndexes } |
+        Select-Object -First 1
 
     if ($adapter) {
         $ifindex = $adapter.ifIndex
         $name = $adapter.Name
-        Write-Host "Configuring adapter '$name' ($($config.MAC))"
+        Write-Host "Configuring adapter '$name' ($($config.MAC)) at ifIndex $ifindex"
 
         foreach ($ip in $config.IPs) {
             Write-Host "Setting IP $ip on '$name'"
@@ -37,6 +40,6 @@ foreach ($config in $networkConfigs) {
             Set-DnsClientServerAddress -InterfaceIndex $ifindex -ServerAddresses $config.DNS
         }
     } else {
-        Write-Warning "Adapter with MAC $($config.MAC) not found"
+        Write-Warning "Adapter with MAC $($config.MAC) not found (or not in IP stack)"
     }
 }
