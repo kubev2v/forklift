@@ -230,8 +230,8 @@ func (r *Client) getVM(vmRef ref.Ref) (vm *libclient.VM, err error) {
 			if r.IsNotFound(err) {
 				err = ResourceNotFoundError
 			}
-			return
 		}
+		return
 	}
 	if vmRef.Name != "" {
 		vms := []libclient.VM{}
@@ -264,8 +264,8 @@ func (r *Client) getImage(imageRef ref.Ref) (image *libclient.Image, err error) 
 			if r.IsNotFound(err) {
 				err = ResourceNotFoundError
 			}
-			return
 		}
+		return
 	}
 	if imageRef.Name != "" {
 		images := []libclient.Image{}
@@ -301,8 +301,8 @@ func (r *Client) getVolume(volumeRef ref.Ref) (volume *libclient.Volume, err err
 			if r.IsNotFound(err) {
 				err = ResourceNotFoundError
 			}
-			return
 		}
+		return
 	}
 	if volumeRef.Name != "" {
 		volumes := []libclient.Volume{}
@@ -420,7 +420,9 @@ func (r *Client) updateImageProperty(vm *libclient.VM, image *libclient.Image) (
 		}
 	}
 	if !found {
-		r.Log.Info("cannot find the original volume id within the metadata", "vm", vm.Name, "image", image.Name)
+		err = liberr.New("cannot find the original volume ID for image",
+			"vm", vm.Name, "image", image.Name)
+		return
 	}
 	return
 }
@@ -484,9 +486,16 @@ func (r *Client) createImageFromVolume(vm *libclient.VM, volumeID string) (image
 		}
 	}
 	// end Workaround
-	imageName := getImageFromVolumeName(r.Context, vm.ID, volume.Metadata[forkliftPropertyOriginalVolumeID])
+	originalVolumeID := volume.Metadata[forkliftPropertyOriginalVolumeID]
+	imageName := getImageFromVolumeName(r.Context, vm.ID, originalVolumeID)
 	image, err = r.UploadImage(imageName, volume.ID)
 	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	imageUpdateOpts := &libclient.ImageUpdateOpts{}
+	imageUpdateOpts.AddImageProperty(forkliftPropertyOriginalVolumeID, originalVolumeID)
+	if err = r.Update(image, imageUpdateOpts); err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
@@ -851,6 +860,7 @@ func (r *Client) ensureImagesFromVolumesReady(vm *libclient.VM) (ready bool, err
 			"vm", vm.Name, "attachedVolumes", vm.AttachedVolumes, "imagesFromVolumes", imagesFromVolumes)
 		return
 	}
+	var cleanupVolumeIDs []string
 	for _, image := range imagesFromVolumes {
 		imageReady, imageReadyErr := r.ensureImageFromVolumeReady(vm, &image)
 		switch {
@@ -872,17 +882,18 @@ func (r *Client) ensureImagesFromVolumesReady(vm *libclient.VM) (ready bool, err
 			}
 			r.Log.Info("the image is ready in the inventory",
 				"vm", vm.Name, "image", image.Name, "properties", image.Properties)
-
-			go func() {
-				// executing this in a non-blocking mode
-				err := r.cleanup(vm, originalVolumeID)
-				if err != nil {
-					r.Log.Error(err, "failed to cleanup snapshot and volume",
-						"vm", vm.Name, "volumeId", originalVolumeID)
-				}
-			}()
+			cleanupVolumeIDs = append(cleanupVolumeIDs, originalVolumeID)
 		}
+	}
 
+	for _, volID := range cleanupVolumeIDs {
+		volID := volID
+		go func() {
+			if cleanupErr := r.cleanup(vm, volID); cleanupErr != nil {
+				r.Log.Error(cleanupErr, "failed to cleanup snapshot and volume",
+					"vm", vm.Name, "volumeId", volID)
+			}
+		}()
 	}
 
 	ready = true
@@ -922,18 +933,24 @@ func (r *Client) ensureImageFromVolumeReady(vm *libclient.VM, image *libclient.I
 		r.Log.Info("the image is still being processed",
 			"vm", vm.Name, "image", image.Name, "status", image.Status)
 	case ImageStatusActive:
-		err = r.updateImageProperty(vm, image)
-		if err != nil {
-			return
+		if _, ok := image.Properties[forkliftPropertyOriginalVolumeID]; !ok {
+			// Property missing: either an in-flight upgrade (try to set it from the
+			// backing volume) or a stale leftover (backing volume gone — delete and rebuild).
+			if updateErr := r.updateImageProperty(vm, image); updateErr != nil {
+				r.Log.Info("deleting stale image that cannot be updated",
+					"vm", vm.Name, "image", image.Name, "error", updateErr)
+				if err = r.Delete(image); err != nil {
+					err = liberr.Wrap(err)
+				}
+				return
+			}
 		}
-		r.Log.Info("the image properties have been updated",
-			"vm", vm.Name, "image", image.Name, "properties", image.Properties)
 		var imageUpToDate bool
 		imageUpToDate, err = r.ensureImageUpToDate(vm, image, vmTypeVolumeBased)
 		if err != nil || !imageUpToDate {
 			return
 		}
-		r.Log.Info("the image properties are in sync, cleaning the image",
+		r.Log.Info("the image properties are in sync",
 			"vm", vm.Name, "image", image.Name, "properties", image.Properties)
 		ready = true
 	default:
@@ -1019,13 +1036,29 @@ func (r *Client) ensureVolumeFromSnapshot(vm *libclient.VM, snapshot *libclient.
 		var image *libclient.Image
 		image, err = r.getImage(ref.Ref{Name: imageName})
 		if err == nil {
-			r.Log.Info("skipping the snapshot creation, the image already exists",
-				"vm", vm.Name, "snapshot", snapshot.Name)
+			if _, ok := image.Properties[forkliftPropertyOriginalVolumeID]; ok {
+				r.Log.Info("skipping the volume creation, the image already exists",
+					"vm", vm.Name, "snapshot", snapshot.Name)
+			} else {
+				r.Log.Info("found stale image without property, deleting before re-creating",
+					"vm", vm.Name, "image", image.Name)
+				if err = r.Delete(image); err != nil {
+					err = liberr.Wrap(err)
+					return
+				}
+				r.Log.Info("creating the volume from snapshot",
+					"vm", vm.Name, "snapshot", snapshot.Name)
+				_, err = r.createVolumeFromSnapshot(vm, snapshot.ID)
+				if err != nil {
+					err = liberr.Wrap(err)
+					return
+				}
+			}
 		} else {
 			if !errors.Is(err, ResourceNotFoundError) {
 				err = liberr.Wrap(err)
 				r.Log.Error(err, "trying to get the image info from the snapshot",
-					"vm", vm.Name, "image", image.Name)
+					"vm", vm.Name, "image", imageName)
 				return
 			}
 			r.Log.Info("creating the volume from snapshot",
