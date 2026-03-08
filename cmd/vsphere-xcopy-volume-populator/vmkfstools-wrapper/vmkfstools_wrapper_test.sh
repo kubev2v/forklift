@@ -1277,6 +1277,162 @@ test_go_struct_compatibility() {
 }
 
 # ============================================================================
+# GROUP 9: VMDK Lock Checking
+# ============================================================================
+
+test_wait_for_shared_lock() {
+    echo ""
+    echo "=== Testing wait_for_shared_lock ==="
+
+    # Create a test harness that sources the wrapper and overrides /bin/vmkfstools
+    local test_harness="${TEST_TMP_DIR}/lock_test_harness.sh"
+
+    # Test 1: No lock (mode 0) — should succeed immediately
+    cat > "${test_harness}" << 'TESTEOF'
+#!/bin/sh
+# Override vmkfstools by putting a mock first in PATH
+MOCK_DIR="$1"
+VMDK_PATH="$2"
+
+export PATH="${MOCK_DIR}:${PATH}"
+
+# Source logging stubs
+log_info() { :; }
+log_error() { :; }
+log_warning() { :; }
+
+wait_for_shared_lock() {
+    local vmdk_path="$1"
+    local max_retries=5
+    local wait_seconds=0
+
+    local attempt=0
+    while [ ${attempt} -lt ${max_retries} ]; do
+        local lock_output
+        lock_output=$(vmkfstools -D "${vmdk_path}" 2>&1)
+        local lock_mode
+        lock_mode=$(echo "${lock_output}" | grep -o 'mode [0-9]*' | head -1 | awk '{print $2}')
+
+        if [ -z "${lock_mode}" ]; then
+            return 1
+        fi
+
+        case "${lock_mode}" in
+            0|2|3)
+                return 0
+                ;;
+            1)
+                attempt=$((attempt + 1))
+                if [ ${attempt} -lt ${max_retries} ]; then
+                    sleep ${wait_seconds}
+                fi
+                ;;
+            *)
+                return 1
+                ;;
+        esac
+    done
+
+    return 1
+}
+
+wait_for_shared_lock "${VMDK_PATH}"
+TESTEOF
+    chmod +x "${test_harness}"
+
+    # Create mock vmkfstools directory
+    local mock_dir="${TEST_TMP_DIR}/mock_bin"
+    mkdir -p "${mock_dir}"
+
+    # --- Test 1: mode 0 (no lock) ---
+    cat > "${mock_dir}/vmkfstools" << 'MOCKEOF'
+#!/bin/sh
+echo "Lock [type 10c00001 offset 128 v 3, hb offset 3456]"
+echo "Addr <4, 56, 78>, gen 12, region 1 (1) cls host owner 00000000-00000000-0000-000000000000"
+echo "mode 0"
+echo "Opened for: 0 RDONLY, 0 RW, 0 MWRITER"
+MOCKEOF
+    chmod +x "${mock_dir}/vmkfstools"
+
+    sh "${test_harness}" "${mock_dir}" "/vmfs/volumes/ds1/test.vmdk"
+    assert_equals "0" "$?" "wait_for_shared_lock: mode 0 (no lock) succeeds"
+
+    # --- Test 2: mode 2 (shared/read-only lock) ---
+    cat > "${mock_dir}/vmkfstools" << 'MOCKEOF'
+#!/bin/sh
+echo "Lock [type 10c00001 offset 128 v 3, hb offset 3456]"
+echo "Addr <4, 56, 78>, gen 12, region 1 (1) cls host owner aabbccdd-eeff0011-2233-445566778899"
+echo "mode 2"
+echo "Opened for: 1 RDONLY, 0 RW, 0 MWRITER"
+MOCKEOF
+    chmod +x "${mock_dir}/vmkfstools"
+
+    sh "${test_harness}" "${mock_dir}" "/vmfs/volumes/ds1/test.vmdk"
+    assert_equals "0" "$?" "wait_for_shared_lock: mode 2 (shared lock) succeeds"
+
+    # --- Test 3: mode 1 (exclusive lock) — should fail after retries ---
+    cat > "${mock_dir}/vmkfstools" << 'MOCKEOF'
+#!/bin/sh
+echo "Lock [type 10c00001 offset 128 v 3, hb offset 3456]"
+echo "Addr <4, 56, 78>, gen 12, region 1 (1) cls host owner aabbccdd-eeff0011-2233-445566778899"
+echo "mode 1"
+echo "Opened for: 0 RDONLY, 1 RW, 0 MWRITER"
+MOCKEOF
+    chmod +x "${mock_dir}/vmkfstools"
+
+    sh "${test_harness}" "${mock_dir}" "/vmfs/volumes/ds1/test.vmdk"
+    assert_equals "1" "$?" "wait_for_shared_lock: mode 1 (exclusive lock) fails after retries"
+
+    # --- Test 4: mode 3 (multi-writer lock) — should succeed ---
+    cat > "${mock_dir}/vmkfstools" << 'MOCKEOF'
+#!/bin/sh
+echo "Lock [type 10c00001 offset 128 v 3, hb offset 3456]"
+echo "mode 3"
+MOCKEOF
+    chmod +x "${mock_dir}/vmkfstools"
+
+    sh "${test_harness}" "${mock_dir}" "/vmfs/volumes/ds1/test.vmdk"
+    assert_equals "0" "$?" "wait_for_shared_lock: mode 3 (multi-writer) succeeds"
+
+    # --- Test 5: Transition from exclusive (mode 1) to shared (mode 2) ---
+    local call_counter="${TEST_TMP_DIR}/call_counter"
+    echo "0" > "${call_counter}"
+
+    cat > "${mock_dir}/vmkfstools" << MOCKEOF
+#!/bin/sh
+COUNTER_FILE="${call_counter}"
+count=\$(cat "\${COUNTER_FILE}")
+count=\$((count + 1))
+echo "\${count}" > "\${COUNTER_FILE}"
+
+if [ \${count} -le 2 ]; then
+    echo "Lock [type 10c00001 offset 128 v 3, hb offset 3456]"
+    echo "mode 1"
+else
+    echo "Lock [type 10c00001 offset 128 v 3, hb offset 3456]"
+    echo "mode 2"
+fi
+MOCKEOF
+    chmod +x "${mock_dir}/vmkfstools"
+
+    sh "${test_harness}" "${mock_dir}" "/vmfs/volumes/ds1/test.vmdk"
+    assert_equals "0" "$?" "wait_for_shared_lock: transitions from mode 1 to mode 2"
+
+    # --- Test 6: Unparseable output — should fail ---
+    cat > "${mock_dir}/vmkfstools" << 'MOCKEOF'
+#!/bin/sh
+echo "some unexpected output with no mode info"
+MOCKEOF
+    chmod +x "${mock_dir}/vmkfstools"
+
+    sh "${test_harness}" "${mock_dir}" "/vmfs/volumes/ds1/test.vmdk"
+    assert_equals "1" "$?" "wait_for_shared_lock: unparseable output fails"
+
+    # Cleanup
+    rm -rf "${mock_dir}"
+}
+
+# ============================================================================
 # MAIN TEST RUNNER
 # ============================================================================
 main() {
@@ -1330,6 +1486,9 @@ main() {
     # GROUP 8: Integration & Compatibility Tests
     test_task_output_with_special_chars
     test_go_struct_compatibility
+
+    # GROUP 9: VMDK Lock Checking
+    test_wait_for_shared_lock
 
     test_teardown
 
