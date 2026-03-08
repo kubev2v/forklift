@@ -1,4 +1,4 @@
-// +build go1.17,!go1.25
+// +build go1.17,!go1.27
 
 /*
  * Copyright 2021 ByteDance Inc.

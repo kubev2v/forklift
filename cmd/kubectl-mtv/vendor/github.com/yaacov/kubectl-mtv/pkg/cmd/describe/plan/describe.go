@@ -10,174 +10,79 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 
+	planutil "github.com/yaacov/kubectl-mtv/pkg/cmd/get/plan"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/get/plan/status"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
+	"github.com/yaacov/kubectl-mtv/pkg/util/describe"
 	"github.com/yaacov/kubectl-mtv/pkg/util/output"
 )
 
-// Describe describes a migration plan
-func Describe(configFlags *genericclioptions.ConfigFlags, name, namespace string, withVMs bool, useUTC bool) error {
+// Describe describes a migration plan.
+func Describe(configFlags *genericclioptions.ConfigFlags, name, namespace string, withVMs bool, useUTC bool, outputFormat string) error {
 	c, err := client.GetDynamicClient(configFlags)
 	if err != nil {
 		return fmt.Errorf("failed to get client: %v", err)
 	}
 
-	// Get the plan
 	plan, err := c.Resource(client.PlansGVR).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get plan: %v", err)
 	}
 
-	// Print the plan details
-	fmt.Printf("\n%s", output.ColorizedSeparator(105, output.YellowColor))
-	fmt.Printf("\n%s\n", output.Cyan("MIGRATION PLAN"))
+	planDetails, _ := status.GetPlanDetails(c, namespace, plan, client.MigrationsGVR)
 
-	// Basic Information
-	fmt.Printf("%s %s\n", output.Bold("Name:"), output.Yellow(plan.GetName()))
-	fmt.Printf("%s %s\n", output.Bold("Namespace:"), output.Yellow(plan.GetNamespace()))
-	fmt.Printf("%s %s\n", output.Bold("Created:"), output.Yellow(output.FormatTimestamp(plan.GetCreationTimestamp().Time, useUTC)))
+	b := describe.NewBuilder("MIGRATION PLAN")
 
-	// Get archived status
+	// Basic information (implicit first section)
+	b.Field("Name", plan.GetName())
+	b.Field("Namespace", plan.GetNamespace())
+	b.Field("Created", output.FormatTimestamp(plan.GetCreationTimestamp().Time, useUTC))
+
 	archived, exists, _ := unstructured.NestedBool(plan.Object, "spec", "archived")
 	if exists {
-		fmt.Printf("%s %s\n", output.Bold("Archived:"), output.Yellow(fmt.Sprintf("%t", archived)))
+		b.Field("Archived", fmt.Sprintf("%t", archived))
 	} else {
-		fmt.Printf("%s %s\n", output.Bold("Archived:"), output.Yellow("false"))
+		b.Field("Archived", "false")
 	}
 
-	// Plan Details
-	planDetails, _ := status.GetPlanDetails(c, namespace, plan, client.MigrationsGVR)
-	fmt.Printf("%s %s\n", output.Bold("Ready:"), output.ColorizeBoolean(planDetails.IsReady))
-	fmt.Printf("%s %s\n", output.Bold("Status:"), output.ColorizeStatus(planDetails.Status))
+	b.FieldC("Ready", fmt.Sprintf("%t", planDetails.IsReady), output.ColorizeBooleanString)
+	b.FieldC("Status", planDetails.Status, output.ColorizeStatus)
 
-	// Display enhanced spec section
-	displayPlanSpec(plan)
+	// Specification
+	buildSpecSection(b, plan)
 
-	// Display enhanced mappings section
+	// Mappings
 	networkMapping, _, _ := unstructured.NestedString(plan.Object, "spec", "map", "network", "name")
 	storageMapping, _, _ := unstructured.NestedString(plan.Object, "spec", "map", "storage", "name")
 	migrationType, _, _ := unstructured.NestedString(plan.Object, "spec", "type")
-	displayPlanMappings(networkMapping, storageMapping, migrationType)
+	buildMappingsSection(b, networkMapping, storageMapping, migrationType)
 
-	// Running Migration
-	if planDetails.RunningMigration != nil {
-		fmt.Printf("\n%s\n", output.Cyan("RUNNING MIGRATION"))
-		fmt.Printf("%s %s\n", output.Bold("Name:"), output.Yellow(planDetails.RunningMigration.GetName()))
-		fmt.Printf("%s  Total:     %s, Completed: %s\n",
-			output.Bold("Migration Progress:"),
-			output.Blue(fmt.Sprintf("%3d", planDetails.VMStats.Total)),
-			output.Blue(fmt.Sprintf("%3d", planDetails.VMStats.Completed)))
-		fmt.Printf("%s Succeeded: %s, Failed:    %s, Canceled:  %s\n",
-			output.Bold("VM Status:          "),
-			output.Green(fmt.Sprintf("%3d", planDetails.VMStats.Succeeded)),
-			output.Red(fmt.Sprintf("%3d", planDetails.VMStats.Failed)),
-			output.Yellow(fmt.Sprintf("%3d", planDetails.VMStats.Canceled)))
-		printDiskProgress(planDetails.DiskProgress)
+	// Running / Latest migration
+	buildMigrationSection(b, "RUNNING MIGRATION", planDetails.RunningMigration, planDetails)
+	if planDetails.RunningMigration == nil {
+		buildMigrationSection(b, "LATEST MIGRATION", planDetails.LatestMigration, planDetails)
 	}
 
-	// Latest Migration
-	if planDetails.LatestMigration != nil {
-		fmt.Printf("\n%s\n", output.Cyan("LATEST MIGRATION"))
-		fmt.Printf("%s %s\n", output.Bold("Name:"), output.Yellow(planDetails.LatestMigration.GetName()))
-		fmt.Printf("%s  Total:     %s, Completed: %s\n",
-			output.Bold("Migration Progress:"),
-			output.Blue(fmt.Sprintf("%3d", planDetails.VMStats.Total)),
-			output.Blue(fmt.Sprintf("%3d", planDetails.VMStats.Completed)))
-		fmt.Printf("%s Succeeded: %s, Failed:    %s, Canceled:  %s\n",
-			output.Bold("VM Status:          "),
-			output.Green(fmt.Sprintf("%3d", planDetails.VMStats.Succeeded)),
-			output.Red(fmt.Sprintf("%3d", planDetails.VMStats.Failed)),
-			output.Yellow(fmt.Sprintf("%3d", planDetails.VMStats.Canceled)))
-		printDiskProgress(planDetails.DiskProgress)
-	}
+	// Mapping details
+	buildMappingDetailsSectionImpl(b, c, namespace, "NETWORK MAPPING DETAILS", networkMapping, true)
+	buildMappingDetailsSectionImpl(b, c, namespace, "STORAGE MAPPING DETAILS", storageMapping, false)
 
-	// Display network mapping
-	if networkMapping != "" {
-		if err := displayNetworkMapping(c, namespace, networkMapping); err != nil {
-			fmt.Printf("Failed to display network mapping: %v\n", err)
-		}
-	}
+	// Conditions
+	buildConditionsSection(b, plan)
 
-	// Display storage mapping
-	if storageMapping != "" {
-		if err := displayStorageMapping(c, namespace, storageMapping); err != nil {
-			fmt.Printf("Failed to display storage mapping: %v\n", err)
-		}
-	}
-
-	// Display conditions
-	conditions, exists, _ := unstructured.NestedSlice(plan.Object, "status", "conditions")
-	if exists {
-		displayConditions(conditions)
-	}
-
-	// Display VMs if --with-vms flag is set
+	// VMs
 	if withVMs {
-		if err := displayPlanVMs(plan); err != nil {
-			fmt.Printf("Failed to display VMs: %v\n", err)
+		migration := planDetails.RunningMigration
+		if migration == nil {
+			migration = planDetails.LatestMigration
 		}
+		buildVMsSection(b, plan, migration, useUTC)
 	}
 
-	return nil
+	return describe.Print(b.Build(), outputFormat)
 }
 
-// printDiskProgress prints disk transfer progress information
-func printDiskProgress(progress status.ProgressStats) {
-	if progress.Total > 0 {
-		percentage := float64(progress.Completed) / float64(progress.Total) * 100
-		progressText := fmt.Sprintf("%.1f%% (%d/%d GB)",
-			percentage,
-			progress.Completed/(1024),
-			progress.Total/(1024))
-
-		if percentage >= 100 {
-			fmt.Printf("%s       %s\n", output.Bold("Disk Transfer:"), output.Green(progressText))
-		} else {
-			fmt.Printf("%s       %s\n", output.Bold("Disk Transfer:"), output.Yellow(progressText))
-		}
-	}
-}
-
-// displayNetworkMapping prints network mapping details
-func displayNetworkMapping(c dynamic.Interface, namespace, networkMapping string) error {
-	networkMap, err := c.Resource(client.NetworkMapGVR).Namespace(namespace).Get(context.TODO(), networkMapping, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	networkPairs, exists, _ := unstructured.NestedSlice(networkMap.Object, "spec", "map")
-	if exists && len(networkPairs) > 0 {
-		fmt.Printf("\n%s\n", output.Cyan("NETWORK MAPPING DETAILS"))
-		return output.PrintMappingTable(networkPairs, formatPlanMappingEntry)
-	}
-	return nil
-}
-
-// displayStorageMapping prints storage mapping details
-func displayStorageMapping(c dynamic.Interface, namespace, storageMapping string) error {
-	storageMap, err := c.Resource(client.StorageMapGVR).Namespace(namespace).Get(context.TODO(), storageMapping, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	storagePairs, exists, _ := unstructured.NestedSlice(storageMap.Object, "spec", "map")
-	if exists && len(storagePairs) > 0 {
-		fmt.Printf("\n%s\n", output.Cyan("STORAGE MAPPING DETAILS"))
-		return output.PrintMappingTable(storagePairs, formatPlanMappingEntry)
-	}
-	return nil
-}
-
-// displayConditions prints conditions information using shared formatting
-func displayConditions(conditions []interface{}) {
-	if len(conditions) > 0 {
-		fmt.Printf("\n%s\n", output.Cyan("STATUS"))
-		output.PrintConditions(conditions)
-	}
-}
-
-// displayPlanSpec displays the plan specification in a beautified format
-func displayPlanSpec(plan *unstructured.Unstructured) {
+func buildSpecSection(b *describe.Builder, plan *unstructured.Unstructured) {
 	source, _, _ := unstructured.NestedString(plan.Object, "spec", "provider", "source", "name")
 	target, _, _ := unstructured.NestedString(plan.Object, "spec", "provider", "destination", "name")
 	targetNamespace, _, _ := unstructured.NestedString(plan.Object, "spec", "targetNamespace")
@@ -186,143 +91,174 @@ func displayPlanSpec(plan *unstructured.Unstructured) {
 	preserveCPUModel, _, _ := unstructured.NestedBool(plan.Object, "spec", "preserveClusterCPUModel")
 	preserveStaticIPs, _, _ := unstructured.NestedBool(plan.Object, "spec", "preserveStaticIPs")
 
-	// Determine migration type
-	migrationType := "cold" // Default
-	if migrationTypeValue, exists, _ := unstructured.NestedString(plan.Object, "spec", "type"); exists && migrationTypeValue != "" {
-		migrationType = migrationTypeValue
-	} else {
-		// Fall back to legacy 'warm' boolean field
-		if warm, exists, _ := unstructured.NestedBool(plan.Object, "spec", "warm"); exists && warm {
-			migrationType = "warm"
-		}
+	migrationType := "cold"
+	if v, exists, _ := unstructured.NestedString(plan.Object, "spec", "type"); exists && v != "" {
+		migrationType = v
+	} else if warm, exists, _ := unstructured.NestedBool(plan.Object, "spec", "warm"); exists && warm {
+		migrationType = "warm"
 	}
 
-	fmt.Printf("\n%s\n", output.Cyan("SPECIFICATION"))
+	b.Section("SPECIFICATION")
+	b.SubSection("Providers")
+	b.Field("Source", source)
+	b.Field("Target", target)
+	b.EndSubSection()
 
-	// Provider section
-	fmt.Printf("%s\n", output.Bold("Providers:"))
-	fmt.Printf("  %s %s\n", output.Bold("Source:"), output.Yellow(source))
-	fmt.Printf("  %s %s\n", output.Bold("Target:"), output.Yellow(target))
-
-	// Migration settings
-	fmt.Printf("\n%s\n", output.Bold("Migration Settings:"))
-	fmt.Printf("  %s %s\n", output.Bold("Target Namespace:"), output.Yellow(targetNamespace))
-	fmt.Printf("  %s %s\n", output.Bold("Migration Type:"), output.Yellow(migrationType))
+	b.SubSection("Migration Settings")
+	b.Field("Target Namespace", targetNamespace)
+	b.Field("Migration Type", migrationType)
 	if transferNetwork != "" {
-		fmt.Printf("  %s %s\n", output.Bold("Transfer Network:"), output.Yellow(transferNetwork))
+		b.Field("Transfer Network", transferNetwork)
 	}
+	b.EndSubSection()
 
-	// Advanced settings
-	fmt.Printf("\n%s\n", output.Bold("Advanced Settings:"))
-	fmt.Printf("  %s %s\n", output.Bold("Preserve CPU Model:"), output.ColorizeBoolean(preserveCPUModel))
-	fmt.Printf("  %s %s\n", output.Bold("Preserve Static IPs:"), output.ColorizeBoolean(preserveStaticIPs))
+	b.SubSection("Advanced Settings")
+	b.FieldC("Preserve CPU Model", fmt.Sprintf("%t", preserveCPUModel), output.ColorizeBooleanString)
+	b.FieldC("Preserve Static IPs", fmt.Sprintf("%t", preserveStaticIPs), output.ColorizeBooleanString)
+	b.EndSubSection()
 
-	// Description
 	if description != "" {
-		fmt.Printf("\n%s\n", output.Bold("Description:"))
-		fmt.Printf("  %s\n", description)
+		b.Field("Description", description)
 	}
 }
 
-// displayPlanMappings displays the mapping references in a beautified format
-func displayPlanMappings(networkMapping, storageMapping, migrationType string) {
-	fmt.Printf("\n%s\n", output.Cyan("MAPPINGS"))
+func buildMappingsSection(b *describe.Builder, networkMapping, storageMapping, migrationType string) {
+	b.Section("MAPPINGS")
 
 	if networkMapping != "" {
-		fmt.Printf("%s %s\n", output.Bold("Network Mapping:"), output.Yellow(networkMapping))
+		b.Field("Network Mapping", networkMapping)
 	} else {
-		fmt.Printf("%s %s\n", output.Bold("Network Mapping:"), output.Red("Not specified"))
+		b.FieldC("Network Mapping", "Not specified", output.Red)
 	}
 
 	if storageMapping != "" {
-		fmt.Printf("%s %s\n", output.Bold("Storage Mapping:"), output.Yellow(storageMapping))
+		b.Field("Storage Mapping", storageMapping)
+	} else if migrationType == "conversion" {
+		b.FieldC("Storage Mapping", "Not required (conversion-only)", output.Green)
 	} else {
-		// Special message for conversion-only migrations
-		if migrationType == "conversion" {
-			fmt.Printf("%s %s\n", output.Bold("Storage Mapping:"), output.Green("Not required (conversion-only)"))
-		} else {
-			fmt.Printf("%s %s\n", output.Bold("Storage Mapping:"), output.Red("Not specified"))
-		}
+		b.FieldC("Storage Mapping", "Not specified", output.Red)
 	}
 }
 
-// formatPlanMappingEntry formats a single mapping entry (source or destination) as a string
-func formatPlanMappingEntry(entryMap map[string]interface{}, entryType string) string {
-	entry, found, _ := unstructured.NestedMap(entryMap, entryType)
-	if !found {
-		return ""
+func buildMigrationSection(b *describe.Builder, title string, migration *unstructured.Unstructured, details status.PlanDetails) {
+	if migration == nil {
+		return
 	}
 
-	var parts []string
+	b.Section(title)
+	b.Field("Name", migration.GetName())
+	b.Field("Total VMs", fmt.Sprintf("%d", details.VMStats.Total))
+	b.Field("Completed", fmt.Sprintf("%d", details.VMStats.Completed))
+	b.FieldC("Succeeded", fmt.Sprintf("%d", details.VMStats.Succeeded), output.Green)
+	b.FieldC("Failed", fmt.Sprintf("%d", details.VMStats.Failed), colorIfNonZero(details.VMStats.Failed, output.Red))
+	b.FieldC("Canceled", fmt.Sprintf("%d", details.VMStats.Canceled), colorIfNonZero(details.VMStats.Canceled, output.Yellow))
 
-	// Common fields that might be present
-	if id, ok := entry["id"].(string); ok && id != "" {
-		parts = append(parts, fmt.Sprintf("ID: %s", id))
-	}
-
-	if name, ok := entry["name"].(string); ok && name != "" {
-		parts = append(parts, fmt.Sprintf("Name: %s", name))
-	}
-
-	if path, ok := entry["path"].(string); ok && path != "" {
-		parts = append(parts, fmt.Sprintf("Path: %s", path))
-	}
-
-	// For storage mappings
-	if storageClass, ok := entry["storageClass"].(string); ok && storageClass != "" {
-		parts = append(parts, fmt.Sprintf("Storage Class: %s", storageClass))
-	}
-
-	if accessMode, ok := entry["accessMode"].(string); ok && accessMode != "" {
-		parts = append(parts, fmt.Sprintf("Access Mode: %s", accessMode))
-	}
-
-	// For network mappings
-	if vlan, ok := entry["vlan"].(string); ok && vlan != "" {
-		parts = append(parts, fmt.Sprintf("VLAN: %s", vlan))
-	}
-
-	if destType, ok := entry["type"].(string); ok && destType != "" {
-		parts = append(parts, fmt.Sprintf("Type: %s", destType))
-	}
-
-	if namespace, ok := entry["namespace"].(string); ok && namespace != "" {
-		parts = append(parts, fmt.Sprintf("Namespace: %s", namespace))
-	}
-
-	if multus, found, _ := unstructured.NestedMap(entry, "multus"); found {
-		if networkName, ok := multus["networkName"].(string); ok && networkName != "" {
-			parts = append(parts, fmt.Sprintf("Multus Network: %s", networkName))
+	if details.DiskProgress.Total > 0 {
+		pct := float64(details.DiskProgress.Completed) / float64(details.DiskProgress.Total) * 100
+		progressText := fmt.Sprintf("%.1f%% (%d/%d GB)", pct, details.DiskProgress.Completed/1024, details.DiskProgress.Total/1024)
+		colorFn := output.Yellow
+		if pct >= 100 {
+			colorFn = output.Green
 		}
+		b.FieldC("Disk Transfer", progressText, colorFn)
 	}
-
-	// Join all parts with newlines for multi-line cell display
-	return strings.Join(parts, "\n")
 }
 
-// displayPlanVMs displays the VMs from the plan specification with detailed information
-func displayPlanVMs(plan *unstructured.Unstructured) error {
-	specVMs, exists, err := unstructured.NestedSlice(plan.Object, "spec", "vms")
+func buildMappingDetailsSectionImpl(b *describe.Builder, c dynamic.Interface, namespace, title, mappingName string, isNetwork bool) {
+	var gvr = client.StorageMapGVR
+	if isNetwork {
+		gvr = client.NetworkMapGVR
+	}
+
+	m, err := c.Resource(gvr).Namespace(namespace).Get(context.TODO(), mappingName, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to get VMs from plan spec: %v", err)
-	}
-	if !exists || len(specVMs) == 0 {
-		fmt.Printf("\n%s\n", output.Cyan("VIRTUAL MACHINES"))
-		fmt.Printf("%s\n", output.Red("No VMs specified in the plan"))
-		return nil
+		return
 	}
 
-	fmt.Printf("\n%s\n", output.Cyan("VIRTUAL MACHINES"))
-	fmt.Printf("%s %s\n", output.Bold("VM Count:"), output.Blue(fmt.Sprintf("%d", len(specVMs))))
+	pairs, exists, _ := unstructured.NestedSlice(m.Object, "spec", "map")
+	if !exists || len(pairs) == 0 {
+		return
+	}
 
-	// Display each VM with detailed information
+	b.Section(title)
+
+	headers := []describe.TableColumn{
+		{Display: "SOURCE", Key: "source"},
+		{Display: "DESTINATION", Key: "destination"},
+	}
+
+	rows := make([]map[string]string, 0, len(pairs))
+	for _, entry := range pairs {
+		entryMap, ok := entry.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		rows = append(rows, map[string]string{
+			"source":      formatMappingEntry(entryMap, "source"),
+			"destination": formatMappingEntry(entryMap, "destination"),
+		})
+	}
+
+	b.Table(headers, rows)
+}
+
+func buildConditionsSection(b *describe.Builder, plan *unstructured.Unstructured) {
+	conditions, exists, _ := unstructured.NestedSlice(plan.Object, "status", "conditions")
+	if !exists || len(conditions) == 0 {
+		return
+	}
+
+	b.Section("CONDITIONS")
+
+	headers := []describe.TableColumn{
+		{Display: "TYPE", Key: "type"},
+		{Display: "STATUS", Key: "status", ColorFunc: output.ColorizeConditionStatus},
+		{Display: "CATEGORY", Key: "category", ColorFunc: output.ColorizeCategory},
+		{Display: "MESSAGE", Key: "message"},
+	}
+
+	rows := make([]map[string]string, 0, len(conditions))
+	for _, c := range conditions {
+		condMap, ok := c.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		condType, _ := condMap["type"].(string)
+		condStatus, _ := condMap["status"].(string)
+		category, _ := condMap["category"].(string)
+		message, _ := condMap["message"].(string)
+
+		rows = append(rows, map[string]string{
+			"type":     condType,
+			"status":   condStatus,
+			"category": category,
+			"message":  message,
+		})
+	}
+
+	b.Table(headers, rows)
+}
+
+func buildVMsSection(b *describe.Builder, plan *unstructured.Unstructured, migration *unstructured.Unstructured, useUTC bool) {
+	specVMs, exists, err := unstructured.NestedSlice(plan.Object, "spec", "vms")
+	if err != nil || !exists || len(specVMs) == 0 {
+		b.Section("VIRTUAL MACHINES")
+		b.FieldC("Status", "No VMs specified in the plan", output.Red)
+		return
+	}
+
+	// Build a vmID -> status map from the migration's status.vms
+	vmStatusMap := buildVMStatusMap(migration)
+
+	b.Section("VIRTUAL MACHINES")
+	b.Field("VM Count", fmt.Sprintf("%d", len(specVMs)))
+
 	for i, v := range specVMs {
 		vm, ok := v.(map[string]interface{})
 		if !ok {
 			continue
 		}
 
-		// Extract VM fields
 		vmName, _, _ := unstructured.NestedString(vm, "name")
 		vmID, _, _ := unstructured.NestedString(vm, "id")
 		targetName, _, _ := unstructured.NestedString(vm, "targetName")
@@ -332,66 +268,43 @@ func displayPlanVMs(plan *unstructured.Unstructured) error {
 		pvcNameTemplate, _, _ := unstructured.NestedString(vm, "pvcNameTemplate")
 		volumeNameTemplate, _, _ := unstructured.NestedString(vm, "volumeNameTemplate")
 		networkNameTemplate, _, _ := unstructured.NestedString(vm, "networkNameTemplate")
-
-		// Get hooks array
 		hooks, _, _ := unstructured.NestedSlice(vm, "hooks")
-
-		// Get LUKS object reference
 		luks, _, _ := unstructured.NestedMap(vm, "luks")
 
-		// Print VM header with separator
-		fmt.Printf("\n%s", output.ColorizedSeparator(80, output.BlueColor))
-		fmt.Printf("\n%s #%d\n", output.Bold(output.Cyan("VM")), i+1)
+		b.SubSection(fmt.Sprintf("VM #%d", i+1))
 
-		// Basic Information
-		fmt.Printf("%s\n", output.Bold("Basic Information:"))
-		fmt.Printf("  %s %s\n", output.Bold("Name:"), output.Yellow(getStringOrDefault(vmName, "-")))
-		fmt.Printf("  %s %s\n", output.Bold("ID:"), output.Cyan(getStringOrDefault(vmID, "-")))
-
+		b.Field("Name", stringOrDefault(vmName, "-"))
+		b.FieldC("ID", stringOrDefault(vmID, "-"), output.Cyan)
 		if targetName != "" {
-			fmt.Printf("  %s %s\n", output.Bold("Target Name:"), output.Green(targetName))
+			b.FieldC("Target Name", targetName, output.Green)
 		}
 
-		// Configuration
-		hasConfig := instanceType != "" || rootDisk != "" || targetPowerState != ""
-		if hasConfig {
-			fmt.Printf("\n%s\n", output.Bold("Configuration:"))
-			if instanceType != "" {
-				fmt.Printf("  %s %s\n", output.Bold("Instance Type:"), output.Yellow(instanceType))
-			}
-			if rootDisk != "" {
-				fmt.Printf("  %s %s\n", output.Bold("Root Disk:"), output.Blue(rootDisk))
-			}
-			if targetPowerState != "" {
-				powerStateColor := output.Green(targetPowerState)
-				switch targetPowerState {
-				case "off":
-					powerStateColor = output.Red(targetPowerState)
-				case "auto":
-					powerStateColor = output.Yellow(targetPowerState)
-				}
-				fmt.Printf("  %s %s\n", output.Bold("Target Power State:"), powerStateColor)
-			}
+		// Migration status for this VM
+		if vmStatus, ok := vmStatusMap[vmID]; ok {
+			addVMMigrationStatus(b, vmStatus, useUTC)
 		}
 
-		// Name Templates
-		hasTemplates := pvcNameTemplate != "" || volumeNameTemplate != "" || networkNameTemplate != ""
-		if hasTemplates {
-			fmt.Printf("\n%s\n", output.Bold("Name Templates:"))
-			if pvcNameTemplate != "" {
-				fmt.Printf("  %s %s\n", output.Bold("PVC Template:"), output.Cyan(pvcNameTemplate))
-			}
-			if volumeNameTemplate != "" {
-				fmt.Printf("  %s %s\n", output.Bold("Volume Template:"), output.Cyan(volumeNameTemplate))
-			}
-			if networkNameTemplate != "" {
-				fmt.Printf("  %s %s\n", output.Bold("Network Template:"), output.Cyan(networkNameTemplate))
-			}
+		if instanceType != "" {
+			b.Field("Instance Type", instanceType)
+		}
+		if rootDisk != "" {
+			b.FieldC("Root Disk", rootDisk, output.Blue)
+		}
+		if targetPowerState != "" {
+			b.FieldC("Target Power State", targetPowerState, output.ColorizePowerState)
 		}
 
-		// Hooks
+		if pvcNameTemplate != "" {
+			b.Field("PVC Template", pvcNameTemplate)
+		}
+		if volumeNameTemplate != "" {
+			b.Field("Volume Template", volumeNameTemplate)
+		}
+		if networkNameTemplate != "" {
+			b.Field("Network Template", networkNameTemplate)
+		}
+
 		if len(hooks) > 0 {
-			fmt.Printf("\n%s\n", output.Bold("Hooks:"))
 			for j, h := range hooks {
 				hook, ok := h.(map[string]interface{})
 				if !ok {
@@ -399,46 +312,164 @@ func displayPlanVMs(plan *unstructured.Unstructured) error {
 				}
 				hookName, _, _ := unstructured.NestedString(hook, "name")
 				hookKind, _, _ := unstructured.NestedString(hook, "kind")
-				hookNamespace, _, _ := unstructured.NestedString(hook, "namespace")
-
-				fmt.Printf("  %s %d: %s", output.Bold("Hook"), j+1, output.Green(getStringOrDefault(hookName, "-")))
-				if hookKind != "" || hookNamespace != "" {
-					fmt.Printf(" (%s/%s)", getStringOrDefault(hookNamespace, "default"), getStringOrDefault(hookKind, "Hook"))
+				hookNS, _, _ := unstructured.NestedString(hook, "namespace")
+				label := fmt.Sprintf("Hook %d", j+1)
+				val := stringOrDefault(hookName, "-")
+				if hookKind != "" || hookNS != "" {
+					val += fmt.Sprintf(" (%s/%s)", stringOrDefault(hookNS, "default"), stringOrDefault(hookKind, "Hook"))
 				}
-				fmt.Println()
+				b.FieldC(label, val, output.Green)
 			}
 		} else {
-			fmt.Printf("\n%s %s\n", output.Bold("Hooks:"), "None")
+			b.Field("Hooks", "None")
 		}
 
-		// LUKS Configuration
 		if len(luks) > 0 {
-			fmt.Printf("\n%s\n", output.Bold("Disk Encryption (LUKS):"))
 			luksName, _, _ := unstructured.NestedString(luks, "name")
-			luksNamespace, _, _ := unstructured.NestedString(luks, "namespace")
-			luksKind, _, _ := unstructured.NestedString(luks, "kind")
-
 			if luksName != "" {
-				fmt.Printf("  %s %s\n", output.Bold("Secret:"), output.Yellow(luksName))
-				if luksNamespace != "" {
-					fmt.Printf("  %s %s\n", output.Bold("Namespace:"), output.Blue(luksNamespace))
-				}
-				if luksKind != "" {
-					fmt.Printf("  %s %s\n", output.Bold("Kind:"), output.Cyan(luksKind))
-				}
+				b.Field("LUKS Secret", luksName)
 			}
 		} else {
-			fmt.Printf("\n%s %s\n", output.Bold("Disk Encryption:"), "None")
+			b.Field("Disk Encryption", "None")
+		}
+
+		b.EndSubSection()
+	}
+}
+
+// buildVMStatusMap extracts the VM status entries from a migration and returns
+// them as a map keyed by VM ID for quick lookup.
+func buildVMStatusMap(migration *unstructured.Unstructured) map[string]map[string]interface{} {
+	result := make(map[string]map[string]interface{})
+	if migration == nil {
+		return result
+	}
+
+	vms, exists, _ := unstructured.NestedSlice(migration.Object, "status", "vms")
+	if !exists {
+		return result
+	}
+
+	for _, v := range vms {
+		vm, ok := v.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		id, _, _ := unstructured.NestedString(vm, "id")
+		if id != "" {
+			result[id] = vm
+		}
+	}
+	return result
+}
+
+// addVMMigrationStatus appends migration status fields for a single VM.
+func addVMMigrationStatus(b *describe.Builder, vmStatus map[string]interface{}, useUTC bool) {
+	phase, _, _ := unstructured.NestedString(vmStatus, "phase")
+	started, _, _ := unstructured.NestedString(vmStatus, "started")
+	completed, _, _ := unstructured.NestedString(vmStatus, "completed")
+
+	b.FieldC("Migration Phase", stringOrDefault(phase, "Pending"), output.ColorizeStatus)
+
+	if started != "" {
+		b.Field("Migration Started", planutil.FormatTime(started, useUTC))
+	}
+	if completed != "" {
+		b.Field("Migration Completed", planutil.FormatTime(completed, useUTC))
+	}
+
+	// Summarise pipeline progress as a compact line per phase
+	pipeline, exists, _ := unstructured.NestedSlice(vmStatus, "pipeline")
+	if !exists || len(pipeline) == 0 {
+		return
+	}
+
+	headers := []describe.TableColumn{
+		{Display: "STEP", Key: "step"},
+		{Display: "STATUS", Key: "status", ColorFunc: output.ColorizeStatus},
+		{Display: "PROGRESS", Key: "progress", ColorFunc: output.ColorizeProgress},
+	}
+
+	rows := make([]map[string]string, 0, len(pipeline))
+	for _, p := range pipeline {
+		step, ok := p.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		stepName, _, _ := unstructured.NestedString(step, "name")
+		stepPhase, _, _ := unstructured.NestedString(step, "phase")
+
+		progress := "-"
+		if pm, exists, _ := unstructured.NestedMap(step, "progress"); exists {
+			comp, _, _ := unstructured.NestedInt64(pm, "completed")
+			total, _, _ := unstructured.NestedInt64(pm, "total")
+			if total > 0 {
+				progress = fmt.Sprintf("%.1f%%", float64(comp)/float64(total)*100)
+			}
+		}
+
+		rows = append(rows, map[string]string{
+			"step":     stepName,
+			"status":   stepPhase,
+			"progress": progress,
+		})
+	}
+
+	b.Table(headers, rows)
+}
+
+// formatMappingEntry formats a single mapping entry (source or destination) as a string.
+func formatMappingEntry(entryMap map[string]interface{}, entryType string) string {
+	entry, found, _ := unstructured.NestedMap(entryMap, entryType)
+	if !found {
+		return ""
+	}
+
+	var parts []string
+
+	if id, ok := entry["id"].(string); ok && id != "" {
+		parts = append(parts, "ID: "+id)
+	}
+	if name, ok := entry["name"].(string); ok && name != "" {
+		parts = append(parts, "Name: "+name)
+	}
+	if path, ok := entry["path"].(string); ok && path != "" {
+		parts = append(parts, "Path: "+path)
+	}
+	if sc, ok := entry["storageClass"].(string); ok && sc != "" {
+		parts = append(parts, "Storage Class: "+sc)
+	}
+	if am, ok := entry["accessMode"].(string); ok && am != "" {
+		parts = append(parts, "Access Mode: "+am)
+	}
+	if vlan, ok := entry["vlan"].(string); ok && vlan != "" {
+		parts = append(parts, "VLAN: "+vlan)
+	}
+	if dt, ok := entry["type"].(string); ok && dt != "" {
+		parts = append(parts, "Type: "+dt)
+	}
+	if ns, ok := entry["namespace"].(string); ok && ns != "" {
+		parts = append(parts, "Namespace: "+ns)
+	}
+	if multus, found, _ := unstructured.NestedMap(entry, "multus"); found {
+		if nn, ok := multus["networkName"].(string); ok && nn != "" {
+			parts = append(parts, "Multus Network: "+nn)
 		}
 	}
 
-	return nil
+	return strings.Join(parts, ", ")
 }
 
-// getStringOrDefault returns the string value or a default if empty
-func getStringOrDefault(value, defaultValue string) string {
+func stringOrDefault(value, defaultValue string) string {
 	if value == "" {
 		return defaultValue
 	}
 	return value
+}
+
+func colorIfNonZero(n int, colorFn func(string) string) func(string) string {
+	if n > 0 {
+		return colorFn
+	}
+	return nil
 }
