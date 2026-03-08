@@ -949,7 +949,12 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 	var bootDisk int
 	for _, vmConf := range r.Plan.Spec.VMs {
 		if vmConf.ID == vmRef.ID {
-			bootDisk = utils.GetBootDiskNumber(vmConf.RootDisk)
+			if vmConf.RootDisk != "" {
+				bootDisk = utils.GetBootDiskNumber(vmConf.RootDisk)
+			} else if vmStatus := r.getPlanVMStatus(vm); vmStatus != nil &&
+				vmStatus.DetectedBootDisk != nil && *vmStatus.DetectedBootDisk >= 0 {
+				bootDisk = *vmStatus.DetectedBootDisk
+			}
 			break
 		}
 	}

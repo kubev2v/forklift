@@ -353,6 +353,11 @@ func (in *VMStatus) DeepCopyInto(out *VMStatus) {
 		*out = new(Warm)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.DetectedBootDisk != nil {
+		in, out := &in.DetectedBootDisk, &out.DetectedBootDisk
+		*out = new(int)
+		**out = **in
+	}
 	in.Conditions.DeepCopyInto(&out.Conditions)
 }
 
