@@ -293,6 +293,12 @@ func (r *Migration) Archive() {
 		}
 	}
 
+	// Delete conversion temp storage PVCs (inspection + conversion) that may be left behind
+	// when using conversionTempStorageClass (e.g. warm migration archive/delete).
+	if err := r.kubevirt.DeleteConversionTempStoragePVCs(); err != nil {
+		r.Log.Error(err, "Failed to clean up conversion temp storage PVCs")
+	}
+
 	for _, vm := range r.Plan.Status.Migration.VMs {
 		dontFailOnError := func(err error) bool {
 			if err != nil {
