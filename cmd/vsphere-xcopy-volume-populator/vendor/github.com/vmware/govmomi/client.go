@@ -1,5 +1,5 @@
 // © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
+// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 /*
@@ -104,12 +104,12 @@ func (c *Client) PropertyCollector() *property.Collector {
 }
 
 // RetrieveOne dispatches to the Retrieve function on the default property collector.
-func (c *Client) RetrieveOne(ctx context.Context, obj types.ManagedObjectReference, p []string, dst interface{}) error {
+func (c *Client) RetrieveOne(ctx context.Context, obj types.ManagedObjectReference, p []string, dst any) error {
 	return c.PropertyCollector().RetrieveOne(ctx, obj, p, dst)
 }
 
 // Retrieve dispatches to the Retrieve function on the default property collector.
-func (c *Client) Retrieve(ctx context.Context, objs []types.ManagedObjectReference, p []string, dst interface{}) error {
+func (c *Client) Retrieve(ctx context.Context, objs []types.ManagedObjectReference, p []string, dst any) error {
 	return c.PropertyCollector().Retrieve(ctx, objs, p, dst)
 }
 
