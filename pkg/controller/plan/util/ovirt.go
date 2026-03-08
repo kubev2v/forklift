@@ -13,12 +13,12 @@ import (
 )
 
 // Build an OvirtVolumePopulator for XDiskAttachment and source URL
-func OvirtVolumePopulator(da ovirt.XDiskAttachment, sourceUrl *url.URL, transferNetwork *core.ObjectReference, targetNamespace, secretName, vmId, migrationId string) *api.OvirtVolumePopulator {
+func OvirtVolumePopulator(da ovirt.XDiskAttachment, sourceUrl *url.URL, transferNetwork *core.ObjectReference, targetNamespace, secretName, planId, vmId, migrationId string) *api.OvirtVolumePopulator {
 	return &api.OvirtVolumePopulator{
 		ObjectMeta: meta.ObjectMeta{
 			Name:      da.DiskAttachment.ID,
 			Namespace: targetNamespace,
-			Labels:    map[string]string{"vmID": vmId, "migration": migrationId},
+			Labels:    map[string]string{"plan": planId, "vmID": vmId, "migration": migrationId},
 		},
 		Spec: api.OvirtVolumePopulatorSpec{
 			EngineURL:        fmt.Sprintf("https://%s", sourceUrl.Host),

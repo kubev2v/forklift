@@ -666,12 +666,9 @@ func (r *Builder) LunPersistentVolumes(vmRef ref.Ref) (pvs []core.PersistentVolu
 						planbase.AnnDiskSource: da.Disk.ID,
 						"lun":                  "true",
 					},
-					Labels: map[string]string{
-						"volume":    fmt.Sprintf("%v-%v", vm.Name, da.ID),
-						"vmID":      vm.ID,
-						"plan":      string(r.Plan.UID),
-						"migration": string(r.Migration.UID),
-					},
+					Labels: r.Labeler.VMLabelsWithExtra(vmRef, map[string]string{
+						"volume": fmt.Sprintf("%v-%v", vm.Name, da.ID),
+					}),
 				},
 				Spec: core.PersistentVolumeSpec{
 					PersistentVolumeSource: pvSource,
@@ -710,11 +707,7 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 						planbase.AnnDiskSource: da.Disk.ID,
 						"lun":                  "true",
 					},
-					Labels: map[string]string{
-						"vmID":      vm.ID,
-						"plan":      string(r.Plan.UID),
-						"migration": string(r.Migration.UID),
-					},
+					Labels: r.Labeler.VMLabels(vmRef),
 				},
 				Spec: core.PersistentVolumeClaimSpec{
 					AccessModes: []core.PersistentVolumeAccessMode{
@@ -833,7 +826,6 @@ func (r *Builder) getVolumePopulator(diskID string) (populatorCr api.OvirtVolume
 }
 
 func (r *Builder) createVolumePopulatorCR(diskAttachment model.XDiskAttachment, secretName, vmId string) (name string, err error) {
-	migrationId := string(r.Migration.UID)
 	providerURL, err := url.Parse(r.Source.Provider.Spec.URL)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -847,11 +839,9 @@ func (r *Builder) createVolumePopulatorCR(diskAttachment model.XDiskAttachment, 
 		ObjectMeta: meta.ObjectMeta{
 			GenerateName: fmt.Sprintf("%s-", diskAttachment.DiskAttachment.ID),
 			Namespace:    r.Plan.Spec.TargetNamespace,
-			Labels: map[string]string{
-				"vmID":      vmId,
-				"migration": migrationId,
-				"diskID":    diskAttachment.Disk.ID,
-			},
+			Labels: r.Labeler.VMLabelsWithExtra(ref.Ref{ID: vmId}, map[string]string{
+				"diskID": diskAttachment.Disk.ID,
+			}),
 		},
 		Spec: api.OvirtVolumePopulatorSpec{
 			EngineURL:        engineURL.String(),
@@ -919,11 +909,9 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskA
 			GenerateName: fmt.Sprintf("%s-", diskAttachment.DiskAttachment.ID),
 			Namespace:    r.Plan.Spec.TargetNamespace,
 			Annotations:  annotations,
-			Labels: map[string]string{
-				"migration": string(r.Migration.UID),
-				"vmID":      vmID,
-				"diskID":    diskAttachment.Disk.ID,
-			},
+			Labels: r.Labeler.VMLabelsWithExtra(ref.Ref{ID: vmID}, map[string]string{
+				"diskID": diskAttachment.Disk.ID,
+			}),
 		},
 		Spec: core.PersistentVolumeClaimSpec{
 			AccessModes: accessModes,
@@ -990,7 +978,7 @@ func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.Persi
 			diskIds = append(diskIds, pvc.Spec.DataSource.Name)
 		}
 	}
-	migrationID := string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID)
+	migrationID := r.ActiveMigrationUID()
 	for _, id := range diskIds {
 		populatorCr, err := r.getVolumePopulator(id)
 		if err != nil {
