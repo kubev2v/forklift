@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/yaacov/kubectl-mtv/pkg/util/query"
 )
@@ -47,10 +46,15 @@ func PrintTableWithQuery(data interface{}, defaultHeaders []Header, queryOpts *q
 		}
 		printer = NewTablePrinter().
 			WithHeaders(headers...).
-			WithSelectOptions(queryOpts.Select)
+			WithSelectOptions(queryOpts.Select).
+			WithJSONPathRow().
+			WithSeparator("─")
 	} else {
 		// Use the provided default headers
-		printer = NewTablePrinter().WithHeaders(defaultHeaders...)
+		printer = NewTablePrinter().
+			WithHeaders(defaultHeaders...).
+			WithJSONPathRow().
+			WithSeparator("─")
 	}
 
 	if len(items) == 0 && emptyMessage != "" {
@@ -65,18 +69,22 @@ func PrintTableWithQuery(data interface{}, defaultHeaders []Header, queryOpts *q
 type Header struct {
 	DisplayName string
 	JSONPath    string
+	ColorFunc   func(string) string
 }
 
 // TablePrinter prints tabular data with dynamically sized columns
 type TablePrinter struct {
-	headers       []Header
-	items         []map[string]interface{}
-	padding       int
-	minWidth      int
-	writer        io.Writer
-	maxColWidth   int
-	expandedData  map[int]string       // Stores expanded data for each row by index
-	selectOptions []query.SelectOption // Optional: select options for advanced extraction
+	headers         []Header
+	items           []map[string]interface{}
+	padding         int
+	minWidth        int
+	writer          io.Writer
+	maxColWidth     int
+	expandedData    map[int]string       // Stores expanded data for each row by index
+	selectOptions   []query.SelectOption // Optional: select options for advanced extraction
+	separator       string               // if set, printed between header and data rows
+	columnWidths    []int                // if set, overrides auto-calculated widths
+	showJSONPathRow bool                 // if true, prints a row of JSON paths below the header
 }
 
 // NewTablePrinter creates a new TablePrinter
@@ -131,6 +139,24 @@ func (t *TablePrinter) WithExpandedData(index int, data string) *TablePrinter {
 // WithSelectOptions sets the select options for the table printer
 func (t *TablePrinter) WithSelectOptions(selectOptions []query.SelectOption) *TablePrinter {
 	t.selectOptions = selectOptions
+	return t
+}
+
+// WithSeparator sets the character used to draw a separator line between the header and data rows
+func (t *TablePrinter) WithSeparator(char string) *TablePrinter {
+	t.separator = char
+	return t
+}
+
+// WithJSONPathRow enables printing a row of JSON paths below the header row
+func (t *TablePrinter) WithJSONPathRow() *TablePrinter {
+	t.showJSONPathRow = true
+	return t
+}
+
+// WithColumnWidths sets explicit column widths, overriding auto-calculation
+func (t *TablePrinter) WithColumnWidths(widths []int) *TablePrinter {
+	t.columnWidths = widths
 	return t
 }
 
@@ -212,6 +238,10 @@ func (t *TablePrinter) calculateColumnWidths() []int {
 		return []int{}
 	}
 
+	if len(t.columnWidths) == numCols {
+		return t.columnWidths
+	}
+
 	// Initialize widths with minimum values
 	widths := make([]int, numCols)
 	for i := range widths {
@@ -220,9 +250,15 @@ func (t *TablePrinter) calculateColumnWidths() []int {
 
 	// Check header widths
 	for i, header := range t.headers {
-		headerWidth := utf8.RuneCountInString(header.DisplayName)
+		headerWidth := VisibleLength(header.DisplayName)
 		if headerWidth > widths[i] {
 			widths[i] = min(headerWidth, t.maxColWidth)
+		}
+		if t.showJSONPathRow {
+			pathWidth := len(header.JSONPath) + 2 // +2 for surrounding brackets
+			if pathWidth > widths[i] {
+				widths[i] = min(pathWidth, t.maxColWidth)
+			}
 		}
 	}
 
@@ -230,7 +266,7 @@ func (t *TablePrinter) calculateColumnWidths() []int {
 	for _, item := range t.items {
 		for i, header := range t.headers {
 			value := t.extractValue(item, header.JSONPath)
-			cellWidth := utf8.RuneCountInString(value)
+			cellWidth := VisibleLength(value)
 			if cellWidth > widths[i] {
 				widths[i] = min(cellWidth, t.maxColWidth)
 			}
@@ -254,11 +290,27 @@ func (t *TablePrinter) Print() error {
 	}
 	t.printRow(headerRow, widths)
 
+	if t.showJSONPathRow {
+		pathRow := make([]string, len(t.headers))
+		for i, header := range t.headers {
+			pathRow[i] = "[" + header.JSONPath + "]"
+		}
+		t.printRow(pathRow, widths)
+	}
+
+	if t.separator != "" {
+		t.printSeparator(widths)
+	}
+
 	// Print item rows and expanded data if available
 	for i, item := range t.items {
 		row := make([]string, len(t.headers))
 		for j, header := range t.headers {
-			row[j] = t.extractValue(item, header.JSONPath)
+			value := t.extractValue(item, header.JSONPath)
+			if header.ColorFunc != nil {
+				value = header.ColorFunc(value)
+			}
+			row[j] = value
 		}
 		t.printRow(row, widths)
 
@@ -281,7 +333,8 @@ func (t *TablePrinter) PrintEmpty(message string) error {
 	return nil
 }
 
-// printRow prints a single row with the specified column widths
+// printRow prints a single row with the specified column widths.
+// Handles ANSI color codes by using visible length for padding calculations.
 func (t *TablePrinter) printRow(row []string, widths []int) {
 	var sb strings.Builder
 
@@ -290,18 +343,37 @@ func (t *TablePrinter) printRow(row []string, widths []int) {
 			break
 		}
 
-		// Truncate if the cell is too long
 		displayCell := cell
-		if utf8.RuneCountInString(cell) > t.maxColWidth {
-			displayCell = cell[:t.maxColWidth-3] + "..."
+		visLen := VisibleLength(cell)
+
+		if visLen > t.maxColWidth {
+			displayCell = TruncateANSI(cell, t.maxColWidth)
+			visLen = t.maxColWidth
 		}
 
-		// Format with proper padding
-		format := fmt.Sprintf("%%-%ds", widths[i]+t.padding)
-		sb.WriteString(fmt.Sprintf(format, displayCell))
+		targetWidth := widths[i] + t.padding
+		pad := targetWidth - visLen
+		if pad < 0 {
+			pad = 0
+		}
+
+		sb.WriteString(displayCell)
+		sb.WriteString(strings.Repeat(" ", pad))
 	}
 
 	fmt.Fprintln(t.writer, strings.TrimRight(sb.String(), " "))
+}
+
+// printSeparator prints a separator line between the header and data rows.
+func (t *TablePrinter) printSeparator(widths []int) {
+	var sb strings.Builder
+	for i, w := range widths {
+		sb.WriteString(strings.Repeat(t.separator, w))
+		if i < len(widths)-1 {
+			sb.WriteString(strings.Repeat(" ", t.padding))
+		}
+	}
+	fmt.Fprintln(t.writer, sb.String())
 }
 
 // min returns the minimum of two integers
@@ -432,13 +504,13 @@ func PrintConditions(conditions []interface{}) {
 		if condMap, ok := condition.(map[string]interface{}); ok {
 			condType, _ := condMap["type"].(string)
 			condStatus, _ := condMap["status"].(string)
-			reason, _ := condMap["reason"].(string)
+			category, _ := condMap["category"].(string)
 			message, _ := condMap["message"].(string)
 			lastTransitionTime, _ := condMap["lastTransitionTime"].(string)
 
 			fmt.Printf("  %s: %s", Bold(condType), ColorizeStatus(condStatus))
-			if reason != "" {
-				fmt.Printf(" (%s)", reason)
+			if category != "" {
+				fmt.Printf(" (%s)", ColorizeCategory(category))
 			}
 			fmt.Println()
 

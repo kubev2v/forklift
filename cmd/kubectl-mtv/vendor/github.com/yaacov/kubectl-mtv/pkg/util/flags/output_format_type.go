@@ -4,6 +4,9 @@ import (
 	"fmt"
 )
 
+// OutputFormatHelp is the help text for the --output / -o flag across all commands.
+const OutputFormatHelp = "Output format (table, json, yaml, markdown)"
+
 // OutputFormatTypeFlag implements pflag.Value interface for output format type validation
 type OutputFormatTypeFlag struct {
 	value        string
@@ -48,7 +51,7 @@ func (o *OutputFormatTypeFlag) GetValidValues() []string {
 // NewOutputFormatTypeFlag creates a new output format type flag with standard formats
 func NewOutputFormatTypeFlag() *OutputFormatTypeFlag {
 	return &OutputFormatTypeFlag{
-		validFormats: []string{"table", "json", "yaml"},
+		validFormats: []string{"table", "json", "yaml", "markdown"},
 		value:        "table", // default value
 	}
 }

@@ -1,0 +1,7 @@
+site_name: 'gopowermax'
+site_description: 'gopowermax Documentation.'
+docs_dir: docs
+plugins:
+  - techdocs-core
+theme:
+  name: material
