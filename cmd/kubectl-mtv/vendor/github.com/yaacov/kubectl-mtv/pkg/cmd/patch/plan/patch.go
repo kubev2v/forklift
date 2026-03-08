@@ -15,6 +15,7 @@ import (
 
 	"github.com/yaacov/karl-interpreter/pkg/karl"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
+	"github.com/yaacov/kubectl-mtv/pkg/util/flags"
 )
 
 // PatchPlanOptions contains all the options for patching a plan
@@ -38,6 +39,13 @@ type PatchPlanOptions struct {
 	ConvertorLabels       []string
 	ConvertorNodeSelector []string
 	ConvertorAffinity     string
+
+	// Conversion temporary storage fields
+	ConversionTempStorageClass string
+	ConversionTempStorageSize  string
+	SkipZoneNodeSelector       bool
+	CustomizationScripts       string
+	VirtV2vImage               string
 
 	// Additional plan fields
 	Description                    string
@@ -67,6 +75,7 @@ type PatchPlanOptions struct {
 	SkipGuestConversionChanged            bool
 	WarmChanged                           bool
 	RunPreflightInspectionChanged         bool
+	SkipZoneNodeSelectorChanged           bool
 }
 
 // PatchPlan patches an existing migration plan
@@ -297,6 +306,51 @@ func PatchPlan(opts PatchPlanOptions) error {
 		planUpdated = true
 	}
 
+	// Update conversion temporary storage class if provided
+	if opts.ConversionTempStorageClass != "" {
+		patchSpec["conversionTempStorageClass"] = opts.ConversionTempStorageClass
+		klog.V(2).Infof("Updated conversion temp storage class to '%s'", opts.ConversionTempStorageClass)
+		planUpdated = true
+	}
+
+	// Update conversion temporary storage size if provided
+	if opts.ConversionTempStorageSize != "" {
+		patchSpec["conversionTempStorageSize"] = opts.ConversionTempStorageSize
+		klog.V(2).Infof("Updated conversion temp storage size to '%s'", opts.ConversionTempStorageSize)
+		planUpdated = true
+	}
+
+	// Update skip zone node selector if flag was changed
+	if opts.SkipZoneNodeSelectorChanged {
+		patchSpec["skipZoneNodeSelector"] = opts.SkipZoneNodeSelector
+		klog.V(2).Infof("Updated skip zone node selector to %t", opts.SkipZoneNodeSelector)
+		planUpdated = true
+	}
+
+	// Update customization scripts if provided
+	if opts.CustomizationScripts != "" {
+		scriptsNamespace, scriptsName, err := flags.ParseResourceRef(opts.CustomizationScripts, opts.Namespace)
+		if err != nil {
+			return fmt.Errorf("invalid --customization-scripts value: %w", err)
+		}
+
+		patchSpec["customizationScripts"] = map[string]interface{}{
+			"kind":       "ConfigMap",
+			"apiVersion": "v1",
+			"name":       scriptsName,
+			"namespace":  scriptsNamespace,
+		}
+		klog.V(2).Infof("Updated customization scripts to '%s/%s'", scriptsNamespace, scriptsName)
+		planUpdated = true
+	}
+
+	// Update virt-v2v image if provided
+	if opts.VirtV2vImage != "" {
+		patchSpec["virtV2vImage"] = opts.VirtV2vImage
+		klog.V(2).Infof("Updated virt-v2v image to '%s'", opts.VirtV2vImage)
+		planUpdated = true
+	}
+
 	// Update description if provided
 	if opts.Description != "" {
 		patchSpec["description"] = opts.Description
@@ -435,7 +489,8 @@ func PatchPlan(opts PatchPlanOptions) error {
 // PatchPlanVM patches a specific VM within a plan's VM list
 func PatchPlanVM(configFlags *genericclioptions.ConfigFlags, planName, vmName, namespace string,
 	targetName, rootDisk, instanceType, pvcNameTemplate, volumeNameTemplate, networkNameTemplate, luksSecret, targetPowerState string,
-	addPreHook, addPostHook, removeHook string, clearHooks bool, deleteVmOnFailMigration bool, deleteVmOnFailMigrationChanged bool) error {
+	addPreHook, addPostHook, removeHook string, clearHooks bool, deleteVmOnFailMigration bool, deleteVmOnFailMigrationChanged bool,
+	nbdeClevis bool, nbdeClevisChanged bool) error {
 
 	klog.V(2).Infof("Patching VM '%s' in plan '%s'", vmName, planName)
 
@@ -588,6 +643,16 @@ func PatchPlanVM(configFlags *genericclioptions.ConfigFlags, planName, vmName, n
 			return fmt.Errorf("failed to set delete VM on fail migration: %v", err)
 		}
 		klog.V(2).Infof("Updated VM delete on fail migration to %t", deleteVmOnFailMigration)
+		vmUpdated = true
+	}
+
+	// Update NBDE/Clevis if flag was changed
+	if nbdeClevisChanged {
+		err = unstructured.SetNestedField(vmCopy, nbdeClevis, "nbdeClevis")
+		if err != nil {
+			return fmt.Errorf("failed to set nbdeClevis: %v", err)
+		}
+		klog.V(2).Infof("Updated VM NBDE/Clevis to %t", nbdeClevis)
 		vmUpdated = true
 	}
 

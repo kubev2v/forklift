@@ -65,31 +65,47 @@ func cleanupCreatedResources(configFlags *genericclioptions.ConfigFlags, namespa
 
 // setSecretOwnership sets the provider as the owner of the secret
 func setSecretOwnership(configFlags *genericclioptions.ConfigFlags, provider *forkliftv1beta1.Provider, secret *corev1.Secret) error {
-	c, err := client.GetDynamicClient(configFlags)
+	k8sClient, err := client.GetKubernetesClientset(configFlags)
 	if err != nil {
-		return fmt.Errorf("failed to get client: %v", err)
+		return fmt.Errorf("failed to get kubernetes client: %v", err)
 	}
 
-	// Set the provider as the owner of the secret
-	secret.SetOwnerReferences([]metav1.OwnerReference{
-		{
-			APIVersion: provider.APIVersion,
-			Kind:       provider.Kind,
-			Name:       provider.Name,
-			UID:        provider.UID,
-		},
-	})
-
-	// Convert secret to unstructured and update
-	unstructSecret, err := runtime.DefaultUnstructuredConverter.ToUnstructured(secret)
+	// Get the current secret to safely append owner reference
+	currentSecret, err := k8sClient.CoreV1().Secrets(secret.Namespace).Get(
+		context.TODO(),
+		secret.Name,
+		metav1.GetOptions{},
+	)
 	if err != nil {
-		return fmt.Errorf("failed to convert secret to unstructured: %v", err)
+		return fmt.Errorf("failed to get secret for ownership update: %v", err)
 	}
 
-	unstructuredSecret := &unstructured.Unstructured{Object: unstructSecret}
-	_, err = c.Resource(client.SecretsGVR).Namespace(secret.Namespace).Update(context.TODO(), unstructuredSecret, metav1.UpdateOptions{})
+	// Create the owner reference
+	ownerRef := metav1.OwnerReference{
+		APIVersion: provider.APIVersion,
+		Kind:       provider.Kind,
+		Name:       provider.Name,
+		UID:        provider.UID,
+	}
+
+	// Check if this provider is already an owner to avoid duplicates
+	for _, existingOwner := range currentSecret.OwnerReferences {
+		if existingOwner.UID == provider.UID {
+			return nil // Already an owner, nothing to do
+		}
+	}
+
+	// Append the new owner reference to existing ones
+	currentSecret.OwnerReferences = append(currentSecret.OwnerReferences, ownerRef)
+
+	// Update the secret with the new owner reference
+	_, err = k8sClient.CoreV1().Secrets(secret.Namespace).Update(
+		context.TODO(),
+		currentSecret,
+		metav1.UpdateOptions{},
+	)
 	if err != nil {
-		return fmt.Errorf("failed to update secret ownership: %v", err)
+		return fmt.Errorf("failed to update secret with owner reference: %v", err)
 	}
 
 	return nil
