@@ -17,7 +17,7 @@ const (
 	EnvTokenCacheTTL      = "TOKEN_CACHE_TTL"
 )
 
-// ProviderSettings contains common settings for OVF-based provider servers (OVA, HyperV).
+// ProviderSettings contains common settings for OVF-based provider servers.
 type ProviderSettings struct {
 	// Whether the appliance management endpoints are enabled
 	ApplianceEndpoints bool
@@ -29,7 +29,7 @@ type ProviderSettings struct {
 		// How long to cache a valid token review (seconds)
 		TTL int
 	}
-	// Path to appliance directory (OVA catalog or HyperV SMB mount)
+	// Path to appliance directory (OVA catalog)
 	CatalogPath string
 	// Port to serve on
 	Port string
@@ -77,7 +77,6 @@ func (r *ProviderSettings) Load() (err error) {
 	return
 }
 
-// getEnvBool gets a boolean from environment variable.
 func getEnvBool(name string, def bool) bool {
 	boolean := def
 	if s, found := os.LookupEnv(name); found {
@@ -90,7 +89,6 @@ func getEnvBool(name string, def bool) bool {
 	return boolean
 }
 
-// getEnvInt gets an integer from environment variable.
 func getEnvInt(name string, def int) int {
 	if s, found := os.LookupEnv(name); found {
 		parsed, err := strconv.Atoi(s)

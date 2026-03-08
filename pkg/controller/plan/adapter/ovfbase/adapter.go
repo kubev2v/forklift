@@ -6,7 +6,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/plan/ensurer"
 )
 
-// Adapter for OVF-based providers (OVA and HyperV).
+// Adapter for OVF-based providers.
 type Adapter struct{}
 
 // Constructs a builder for OVF-based migrations.

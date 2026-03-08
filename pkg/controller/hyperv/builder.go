@@ -2,7 +2,6 @@ package hyperv
 
 import (
 	"fmt"
-	"strconv"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/util"
@@ -21,7 +20,7 @@ var Settings = &settings.Settings
 const (
 	MainContainer      = "main"
 	SMBVolumeMountName = "smb"
-	SMBVolumeMountPath = "/hyperv"
+	SMBVolumeMountPath = SMBMountPath
 	QEMUGroup          = 107
 	PVSize             = "1Gi"
 	SMBCSIDriver       = "smb.csi.k8s.io"
@@ -35,20 +34,6 @@ const (
 	LabelProviderServer = "hyperv-server"
 	SubappHyperVServer  = "hyperv-server"
 	AppForklift         = "forklift"
-)
-
-// Env vars
-const (
-	ProviderNamespace  = "PROVIDER_NAMESPACE"
-	ProviderName       = "PROVIDER_NAME"
-	CatalogPath        = "CATALOG_PATH"
-	ApplianceEndpoints = "APPLIANCE_ENDPOINTS"
-	AuthRequired       = "AUTH_REQUIRED"
-)
-
-const (
-	SettingApplianceManagement = "applianceManagement"
-	ApplianceManagementEnabled = "ApplianceManagementEnabled"
 )
 
 type Labeler struct {
@@ -100,8 +85,15 @@ func (r *Builder) ProviderServer(provider *api.Provider) (server *api.HyperVProv
 
 // PersistentVolume builds a static PV for SMB CSI driver.
 func (r *Builder) PersistentVolume(provider *api.Provider, secret *core.Secret) (pv *core.PersistentVolume) {
-
-	smbSource := util.ParseSMBSource(provider.Spec.URL)
+	if secret == nil {
+		return nil
+	}
+	smbUrlBytes, ok := secret.Data[SecretFieldSMBUrl]
+	if !ok || len(smbUrlBytes) == 0 {
+		return nil
+	}
+	smbUrl := string(smbUrlBytes)
+	smbSource := util.ParseSMBSource(smbUrl)
 	secretName := secret.Name
 	secretNamespace := secret.Namespace
 
@@ -161,11 +153,9 @@ func (r *Builder) PersistentVolumeClaim(provider *api.Provider, pv *core.Persist
 	return
 }
 
-// Deployment builds a deployment for a HyperV provider server. HyperV provider servers are deployed in
-// Forklift's namespace, so they will not have an owner reference to the parent Provider CR
-// unless the Provider is created in Forklift's namespace.
-// (Owner references cannot point to cross-namespace resources.)
-func (r *Builder) Deployment(provider *api.Provider, pvc *core.PersistentVolumeClaim) (deployment *appsv1.Deployment) {
+// Deployment builds a deployment for the SMB mount pod.
+// The pod runs a minimal sleep binary that keeps the SMB CSI volume mounted.
+func (r *Builder) Deployment(provider *api.Provider, secret *core.Secret, pvc *core.PersistentVolumeClaim) (deployment *appsv1.Deployment) {
 	deployment = &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: r.prefix(provider),
@@ -181,14 +171,14 @@ func (r *Builder) Deployment(provider *api.Provider, pvc *core.PersistentVolumeC
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: r.Labeler.ServerLabels(provider, r.HyperVProviderServer),
 				},
-				Spec: r.PodSpec(provider, pvc),
+				Spec: r.PodSpec(provider, secret, pvc),
 			},
 		},
 	}
 	return
 }
 
-func (r *Builder) PodSpec(provider *api.Provider, pvc *core.PersistentVolumeClaim) (spec core.PodSpec) {
+func (r *Builder) PodSpec(provider *api.Provider, secret *core.Secret, pvc *core.PersistentVolumeClaim) (spec core.PodSpec) {
 	spec = core.PodSpec{
 		Containers: []core.Container{
 			{
@@ -196,6 +186,9 @@ func (r *Builder) PodSpec(provider *api.Provider, pvc *core.PersistentVolumeClai
 				Image: r.containerImage(),
 				Ports: []core.ContainerPort{
 					{ContainerPort: 8080, Protocol: core.ProtocolTCP},
+				},
+				Env: []core.EnvVar{
+					{Name: "CATALOG_PATH", Value: SMBVolumeMountPath},
 				},
 				Resources: core.ResourceRequirements{
 					Requests: core.ResourceList{
@@ -215,28 +208,6 @@ func (r *Builder) PodSpec(provider *api.Provider, pvc *core.PersistentVolumeClai
 						ReadOnly:  true,
 					},
 				},
-				Env: []core.EnvVar{
-					{
-						Name:  ProviderName,
-						Value: provider.Name,
-					},
-					{
-						Name:  ProviderNamespace,
-						Value: provider.Namespace,
-					},
-					{
-						Name:  CatalogPath,
-						Value: r.smbMountPath(),
-					},
-					{
-						Name:  ApplianceEndpoints,
-						Value: r.applianceEndpoints(provider),
-					},
-					{
-						Name:  AuthRequired,
-						Value: "true",
-					},
-				},
 			},
 		},
 		Volumes: []core.Volume{
@@ -249,6 +220,21 @@ func (r *Builder) PodSpec(provider *api.Provider, pvc *core.PersistentVolumeClai
 					},
 				},
 			},
+		},
+	}
+	return
+}
+
+func (r *Builder) securityContext() (sc *core.SecurityContext) {
+	sc = &core.SecurityContext{
+		AllowPrivilegeEscalation: ptr.To(false),
+		Capabilities: &core.Capabilities{
+			Drop: []core.Capability{"ALL"},
+		},
+		RunAsGroup:   ptr.To(int64(QEMUGroup)),
+		RunAsNonRoot: ptr.To(true),
+		SeccompProfile: &core.SeccompProfile{
+			Type: core.SeccompProfileTypeRuntimeDefault,
 		},
 	}
 	return
@@ -277,31 +263,6 @@ func (r *Builder) Service(provider *api.Provider) (svc *core.Service) {
 	return
 }
 
-func (r *Builder) securityContext() (sc *core.SecurityContext) {
-	sc = &core.SecurityContext{
-		AllowPrivilegeEscalation: ptr.To(false),
-		Capabilities: &core.Capabilities{
-			Drop: []core.Capability{"ALL"},
-		},
-		RunAsGroup:   ptr.To(int64(QEMUGroup)),
-		RunAsNonRoot: ptr.To(true),
-		SeccompProfile: &core.SeccompProfile{
-			Type: core.SeccompProfileTypeRuntimeDefault,
-		},
-	}
-	return
-}
-
-func (r *Builder) applianceEndpoints(provider *api.Provider) string {
-	gateEnabled := Settings.Features.OVFApplianceManagement
-	providerEnabled, _ := strconv.ParseBool(provider.Spec.Settings[SettingApplianceManagement])
-	return strconv.FormatBool(gateEnabled && providerEnabled)
-}
-
 func (r *Builder) containerImage() string {
 	return Settings.Providers.HyperV.ContainerImage
-}
-
-func (r *Builder) smbMountPath() string {
-	return SMBVolumeMountPath
 }
