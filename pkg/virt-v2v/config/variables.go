@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -180,16 +181,27 @@ func (s *AppConfig) getInspectorExtraArgs() []string {
 }
 
 func (s *AppConfig) getRemoteInspectionDisks() []string {
-	var disks []string
-
-	envVars := os.Environ()
-
-	for _, envVar := range envVars {
-		if strings.Contains(envVar, EnvRemoteInspectionDisk) {
-			disks = append(disks, strings.Split(envVar, "=")[1])
+	// Create the array filled with disk keys from env variable
+	var keys []string
+	for _, envVar := range os.Environ() {
+		key, _, ok := strings.Cut(envVar, "=")
+		if ok && strings.HasPrefix(key, EnvRemoteInspectionDisk) {
+			keys = append(keys, key)
 		}
 	}
 
+	// Sort the key array
+	sort.Slice(keys, func(i, j int) bool {
+		si, _ := strconv.Atoi(keys[i][len(EnvRemoteInspectionDisk):])
+		sj, _ := strconv.Atoi(keys[j][len(EnvRemoteInspectionDisk):])
+		return si < sj
+	})
+
+	// Get disk names from array
+	disks := make([]string, len(keys))
+	for i, key := range keys {
+		disks[i] = os.Getenv(key)
+	}
 	return disks
 }
 
