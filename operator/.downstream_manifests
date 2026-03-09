@@ -491,6 +491,10 @@ spec:
                 description: Virt-v2v conversion image used by migration pods
                 example: quay.io/kubev2v/forklift-virt-v2v:latest
                 type: string
+              virt_v2v_image_xfs_fqin:
+                description: Virt-v2v XFS conversion image used by migration pods
+                example: quay.io/kubev2v/forklift-virt-v2v-xfs:latest
+                type: string
               virt_v2v_inspector_extra_args:
                 description: Additional arguments for virt-v2v-inspector
                 example: --root first
@@ -1307,6 +1311,10 @@ spec:
 
                         Note: If the Plan-level option is set to true, the VM-level option will be ignored.
                       type: boolean
+                    detectedBootDisk:
+                      description: Boot disk index (0-based) detected by virt-v2v.
+                        nil means undetected.
+                      type: integer
                     error:
                       description: Errors
                       properties:
@@ -5127,6 +5135,15 @@ spec:
                   Whether this is a warm migration.
                   Deprecated: this field will be deprecated in 2.10. Use Type instead.
                 type: boolean
+              xfsCompatibility:
+                default: false
+                description: |-
+                  XfsCompatibility overrides the global virt-v2v container image for this plan.
+                  When set, virt-v2v pods created by this plan will use the XFS compatible image
+                  VIRT_V2V_IMAGE_XFS instead of the cluster-wide VIRT_V2V_IMAGE setting.
+                  Use this to enable XFSv4 compatibility mode for specific plan.
+                  Warning: Enabling XFSv4 support will drop support for BTRFS for the specific plan. Ensure that the plan only selects VMs with supported filesystem.
+                type: boolean
             required:
             - map
             - provider
@@ -5454,6 +5471,10 @@ spec:
 
                             Note: If the Plan-level option is set to true, the VM-level option will be ignored.
                           type: boolean
+                        detectedBootDisk:
+                          description: Boot disk index (0-based) detected by virt-v2v.
+                            nil means undetected.
+                          type: integer
                         error:
                           description: Errors
                           properties:
@@ -7416,6 +7437,8 @@ spec:
           value: ${VALIDATION_IMAGE}
         - name: VIRT_V2V_IMAGE
           value: ${VIRT_V2V_IMAGE}
+        - name: VIRT_V2V_IMAGE_XFS
+          value: ${VIRT_V2V_IMAGE_RHEL9}
         - name: VIRT_V2V_DONT_REQUEST_KVM
           value: ${VIRT_V2V_DONT_REQUEST_KVM}
         - name: SNAPSHOT_REMOVAL_TIMEOUT
@@ -7704,6 +7727,11 @@ spec:
       - description: Virt-v2v conversion image used by migration pods
         displayName: Virt-v2v Image
         path: virt_v2v_image_fqin
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Virt-v2v XFS conversion image used by migration pods
+        displayName: Virt-v2v XFS Image
+        path: virt_v2v_image_xfs_fqin
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: VDDK image for VMware disk access
