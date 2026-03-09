@@ -1371,6 +1371,9 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					labels[TemplateNAALabel] = naa
 				}
 
+				if disk.Shared {
+					labels[Shareable] = "true"
+				}
 				r.Log.Info("target namespace for migration", "namespace", namespace)
 				pvc := core.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{
