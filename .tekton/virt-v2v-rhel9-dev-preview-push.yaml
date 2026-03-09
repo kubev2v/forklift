@@ -31,7 +31,7 @@ spec:
   - name: build-source-image
     value: "true"
   - name: prefetch-input
-    value: '[{"type": "rpm", "path": ".konflux/virt-v2v-rhel9"}]'
+    value: '[{"type": "rpm", "path": ".konflux/virt-v2v-rhel9/appliance"}, {"type": "rpm", "path": ".konflux/virt-v2v-rhel9/runtime"}, {"type": "rpm", "path": ".konflux/virt-v2v-rhel9/winlegacyiso"}, {"type": "rpm", "path": ".konflux/virt-v2v-rhel9/builder"}]'
   - name: build-args-file
     value: build/release.conf
   - name: build-args
