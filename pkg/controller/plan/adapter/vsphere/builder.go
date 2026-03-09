@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	liburl "net/url"
 	"path"
@@ -949,7 +950,12 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 	var bootDisk int
 	for _, vmConf := range r.Plan.Spec.VMs {
 		if vmConf.ID == vmRef.ID {
-			bootDisk = utils.GetBootDiskNumber(vmConf.RootDisk)
+			if vmConf.RootDisk != "" {
+				bootDisk = utils.GetBootDiskNumber(vmConf.RootDisk)
+			} else if vmStatus := r.getPlanVMStatus(vm); vmStatus != nil &&
+				vmStatus.DetectedBootDisk != nil && *vmStatus.DetectedBootDisk >= 0 {
+				bootDisk = *vmStatus.DetectedBootDisk
+			}
 			break
 		}
 	}
@@ -1930,9 +1936,7 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 		Data: make(map[string][]byte),
 	}
 
-	for key, value := range baseMigrationSecret.Data {
-		dst.Data[key] = value
-	}
+	maps.Copy(dst.Data, baseMigrationSecret.Data)
 
 	src := &core.Secret{}
 	if err := r.Destination.Get(context.Background(), client.ObjectKey{
@@ -1998,8 +2002,25 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 		return fmt.Errorf("failed to set owner reference: %w", err)
 	}
 
-	if err := r.Destination.Create(context.Background(), dst); err != nil {
-		return fmt.Errorf("failed to create disk secret: %w", err)
+	existing := &core.Secret{}
+	if err := r.Destination.Get(context.Background(), client.ObjectKey{
+		Name:      diskSecretName,
+		Namespace: migrationSecretNS,
+	}, existing); err != nil {
+		if !k8serr.IsNotFound(err) {
+			return fmt.Errorf("failed to get disk secret: %w", err)
+		}
+		if err := r.Destination.Create(context.Background(), dst); err != nil {
+			return fmt.Errorf("failed to create disk secret: %w", err)
+		}
+	} else {
+		maps.Copy(existing.Data, dst.Data)
+		if err := controllerutil.SetOwnerReference(pvc, existing, r.Scheme()); err != nil {
+			return fmt.Errorf("failed to set owner reference: %w", err)
+		}
+		if err := r.Destination.Update(context.Background(), existing); err != nil {
+			return fmt.Errorf("failed to update disk secret: %w", err)
+		}
 	}
 
 	return nil

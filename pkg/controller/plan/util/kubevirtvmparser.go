@@ -67,7 +67,7 @@ func GetFirmwareFromYaml(yamlData []byte) (string, error) {
 		return "", err
 	}
 
-	if cnvVm.Spec.Template != nil &&
+	if cnvVm != nil && cnvVm.Spec.Template != nil &&
 		cnvVm.Spec.Template.Spec.Domain.Firmware != nil &&
 		cnvVm.Spec.Template.Spec.Domain.Firmware.Bootloader != nil {
 
@@ -81,4 +81,23 @@ func GetFirmwareFromYaml(yamlData []byte) (string, error) {
 
 	log.Info("Firmware type was not detected")
 	return "", nil
+}
+
+func GetDiskBootOrderFromYaml(yamlData []byte) (int, error) {
+	var cnvVm *cnv.VirtualMachine
+	if err := yaml.Unmarshal(yamlData, &cnvVm); err != nil {
+		return -1, err
+	}
+
+	if cnvVm == nil || cnvVm.Spec.Template == nil {
+		return -1, nil
+	}
+
+	for i, disk := range cnvVm.Spec.Template.Spec.Domain.Devices.Disks {
+		if disk.BootOrder != nil && *disk.BootOrder == 1 {
+			return i, nil
+		}
+	}
+
+	return -1, nil
 }

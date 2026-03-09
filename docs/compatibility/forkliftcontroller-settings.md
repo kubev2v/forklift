@@ -93,6 +93,8 @@ Feature gates enable or disable specific Forklift capabilities.
 | `controller_vddk_job_active_deadline_sec` | `300` | seconds | `VDDK_JOB_ACTIVE_DEADLINE` | Deadline for VDDK validation job |
 | `controller_tls_connection_timeout_sec` | `5` | seconds | `TLS_CONNECTION_TIMEOUT` | TLS connection timeout |
 | `controller_cdi_export_token_ttl` | `720` | minutes | `CDI_EXPORT_TOKEN_TTL` | CDI export token TTL |
+| `controller_hyperv_refresh_interval` | `10s` | duration | `HYPERV_REFRESH_INTERVAL` | HyperV inventory refresh interval |
+| `controller_hyperv_validation_timeout` | `30s` | duration | `HYPERV_VALIDATION_TIMEOUT` | Timeout for HyperV SMB disk validation HTTP calls |
 
 ### Retry Settings
 

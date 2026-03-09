@@ -20,3 +20,9 @@ data:
 {% if vddk_image is string and vddk_image|length > 0 %}
   VDDK_IMAGE: "{{ vddk_image }}"
 {% endif %}
+{% if controller_hyperv_refresh_interval is defined %}
+  HYPERV_REFRESH_INTERVAL: "{{ controller_hyperv_refresh_interval }}"
+{% endif %}
+{% if controller_hyperv_validation_timeout is defined %}
+  HYPERV_VALIDATION_TIMEOUT: "{{ controller_hyperv_validation_timeout }}"
+{% endif %}

@@ -1,0 +1,23 @@
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: test-vm-boot-order
+spec:
+  template:
+    spec:
+      domain:
+        devices:
+          disks:
+            - name: disk-0
+              bootOrder: 2
+              disk:
+                bus: virtio
+            - name: disk-1
+              bootOrder: 3
+              disk:
+                bus: virtio
+            - name: disk-2
+              bootOrder: 1
+              disk:
+                bus: virtio

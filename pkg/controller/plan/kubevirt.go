@@ -21,6 +21,7 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	hvutil "github.com/kubev2v/forklift/pkg/controller/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	inspectionparser "github.com/kubev2v/forklift/pkg/controller/plan/adapter/vsphere"
@@ -1101,9 +1102,9 @@ func (r *KubeVirt) EnsureVirtV2vPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvc
 	return
 }
 
-// EnsureOVAVirtV2VPVCStatus checks if the provider storage PVC is ready.
+// EnsureProviderVirtV2VPVCStatus checks if the provider storage PVC is ready.
 // Works for both OVA (NFS) and HyperV (SMB) PVCs.
-func (r *KubeVirt) EnsureOVAVirtV2VPVCStatus(vmID string) (ready bool, err error) {
+func (r *KubeVirt) EnsureProviderVirtV2VPVCStatus(vmID string) (ready bool, err error) {
 	pvcs := &core.PersistentVolumeClaimList{}
 
 	// Build labels based on provider type
@@ -1231,12 +1232,13 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 	}
 	defer resp.Body.Close()
 
+	vmConf, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
 	switch r.Source.Provider.Type() {
 	case api.Ova, api.HyperV:
-		vmConf, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
 		if vm.Firmware, err = util.GetFirmwareFromYaml(vmConf); err != nil {
 			return liberr.Wrap(err)
 		}
@@ -1249,6 +1251,13 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 			return liberr.Wrap(err)
 		}
 		r.Log.Info("Setting the vm OS ", vm.OperatingSystem, "vmId", vm.ID)
+	}
+
+	if bootDiskIndex, bootOrderErr := util.GetDiskBootOrderFromYaml(vmConf); bootOrderErr != nil {
+		r.Log.Error(bootOrderErr, "Failed to extract boot order from virt-v2v output", "vmId", vm.ID)
+	} else if bootDiskIndex >= 0 {
+		vm.DetectedBootDisk = &bootDiskIndex
+		r.Log.Info("Detected boot disk from virt-v2v output", "bootDiskIndex", bootDiskIndex, "vmId", vm.ID)
 	}
 
 	// Fetch warnings before shutting down
@@ -2238,7 +2247,7 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 		environment = append(environment,
 			core.EnvVar{
 				Name:  "V2V_NewName",
-				Value: vm.NewName,
+				Value: r.getNewVMName(vm),
 			})
 	}
 	if settings.Settings.Migration.VirtV2vMemSize > 0 {
@@ -3416,7 +3425,8 @@ func getEntityPrefixName(resourceType, providerName, planName string) string {
 // BuildPVForSMB creates a static PV for HyperV using SMB CSI driver.
 func (r *KubeVirt) BuildPVForSMB(vm *plan.VMStatus) (pv *core.PersistentVolume) {
 	sourceProvider := r.Source.Provider
-	smbSource := ctrlutil.ParseSMBSource(sourceProvider.Spec.URL)
+	smbUrl := hvutil.SMBUrl(r.Source.Secret)
+	smbSource := ctrlutil.ParseSMBSource(smbUrl)
 	pvNamePrefix := fmt.Sprintf("hyperv-store-pv-%s-%s-", r.Source.Provider.Name, r.Plan.Name)
 
 	// Get secret reference from provider
