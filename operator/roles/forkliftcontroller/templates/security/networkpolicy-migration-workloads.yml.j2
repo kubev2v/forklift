@@ -30,7 +30,7 @@ spec:
         matchLabels:
           control-plane: controller-manager
     ports: []  # All ports allowed
-  # Allow external provider access (vSphere + OVA)
+  # Allow external provider access (vSphere, OVA, HyperV)
   - ports:
     - protocol: TCP
       port: 80    # HTTP (Certificate validation, CRL, package repos)
@@ -40,9 +40,10 @@ spec:
       port: 8443  # vSphere API HTTPS Development
     - protocol: TCP
       port: 902   # vSphere NFC storage transfer
-    # Optional: allow TCP 8080 only if OVA/image sources are served over HTTP on nonstandard ports
     - protocol: TCP
-      port: 8080  
+      port: 445   # SMB over TCP (HyperV disk access)
+    - protocol: TCP
+      port: 8080  # OVA/image HTTP sources
   # Allow DNS resolution
   - ports:
     - protocol: UDP
@@ -95,6 +96,45 @@ spec:
       port: 53
 
 ---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: forklift-hyperv-server-policy
+  namespace: {{ app_namespace }}
+  labels:
+    app: {{ app_name }}
+spec:
+  podSelector:
+    matchLabels:
+      subapp: hyperv-server
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow controller communication
+  - from:
+    - podSelector:
+        matchLabels:
+          control-plane: controller-manager
+    ports: []  # All ports allowed
+  egress:
+  # Allow communication with controller
+  - to:
+    - podSelector:
+        matchLabels:
+          control-plane: controller-manager
+    ports: []  # All ports allowed
+  # Allow SMB access to external HyperV/Windows server
+  - ports:
+    - protocol: TCP
+      port: 445   # SMB over TCP
+  # Allow DNS resolution
+  - ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+---      
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -257,7 +297,6 @@ spec:
       forklift.app: image-converter
   policyTypes:
   - Ingress
-  - Egress
   ingress:
   # Allow controller communication
   - from:
@@ -265,9 +304,3 @@ spec:
         matchLabels:
           control-plane: controller-manager
     ports: []  # All ports allowed
-  egress:
-  # Image converter works with locally mounted PVCs - no network storage access needed
-  # No external egress required
-
-
-
