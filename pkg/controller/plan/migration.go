@@ -936,12 +936,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 					return
 				}
 			}
-			// set ownership to populator pods
-			err = r.kubevirt.SetPopulatorPodOwnership(vm)
-			if err != nil {
-				err = liberr.Wrap(err)
-				return
-			}
 			// Removing unnecessary DataVolumes
 			err = r.kubevirt.DeleteDataVolumes(vm)
 			if err != nil {
@@ -1877,6 +1871,8 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 		return
 	}
 
+	taskSeen := make(map[string]bool)
+
 	for _, pvc := range pvcs {
 		if _, ok := pvc.Annotations["lun"]; ok {
 			// skip LUNs
@@ -1893,6 +1889,8 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 		if task, found = step.FindTask(taskName); !found {
 			continue
 		}
+
+		taskSeen[taskName] = true
 
 		if pvc.Status.Phase == core.ClaimBound {
 			task.Phase = api.StepCompleted
@@ -1918,6 +1916,15 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 			}
 		}
 		task.Progress.Completed = newProgress
+	}
+
+	for _, task := range step.Tasks {
+		if task.MarkedCompleted() || task.HasError() {
+			continue
+		}
+		if !taskSeen[task.Name] {
+			task.AddError("PVC is missing; disk transfer cannot continue")
+		}
 	}
 
 	step.ReflectTasks()

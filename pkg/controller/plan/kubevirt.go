@@ -52,7 +52,6 @@ import (
 	instancetype "kubevirt.io/api/instancetype/v1beta1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	k8sutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // CSI Drivers
@@ -1429,37 +1428,6 @@ func (r *KubeVirt) DeleteHookJobs(vm *plan.VMStatus) (err error) {
 			client.PropagationPolicy(meta.DeletePropagationForeground))
 		if err != nil {
 			return err
-		}
-	}
-	return
-}
-
-// Set the Populator Pod Ownership.
-func (r *KubeVirt) SetPopulatorPodOwnership(vm *plan.VMStatus) (err error) {
-	pvcs, err := r.getPVCs(vm.Ref)
-	if err != nil {
-		return
-	}
-	pods, err := r.getPopulatorPods()
-	if err != nil {
-		return
-	}
-	for _, pod := range pods {
-		pvcId := pod.Name[len(PopulatorPodPrefix):]
-		for _, pvc := range pvcs {
-			if string(pvc.UID) != pvcId {
-				continue
-			}
-			podCopy := pod.DeepCopy()
-			err = k8sutil.SetOwnerReference(pvc, &pod, r.Scheme())
-			if err != nil {
-				continue
-			}
-			patch := client.MergeFrom(podCopy)
-			err = r.Destination.Client.Patch(context.TODO(), &pod, patch)
-			if err != nil {
-				break
-			}
 		}
 	}
 	return
