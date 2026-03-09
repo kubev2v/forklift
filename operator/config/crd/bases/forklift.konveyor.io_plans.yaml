@@ -2696,6 +2696,15 @@ spec:
                   Whether this is a warm migration.
                   Deprecated: this field will be deprecated in 2.10. Use Type instead.
                 type: boolean
+              xfsCompatibility:
+                default: false
+                description: |-
+                  XfsCompatibility overrides the global virt-v2v container image for this plan.
+                  When set, virt-v2v pods created by this plan will use the XFS compatible image
+                  VIRT_V2V_IMAGE_XFS instead of the cluster-wide VIRT_V2V_IMAGE setting.
+                  Use this to enable XFSv4 compatibility mode for specific plan.
+                  Warning: Enabling XFSv4 support will drop support for BTRFS for the specific plan. Ensure that the plan only selects VMs with supported filesystem.
+                type: boolean
             required:
             - map
             - provider
