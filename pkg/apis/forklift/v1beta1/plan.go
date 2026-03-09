@@ -317,6 +317,13 @@ type PlanSpec struct {
 	// of the cluster-wide VIRT_V2V_IMAGE setting.
 	// Use this to run different virt-v2v builds for specific migration scenarios
 	VirtV2vImage string `json:"virtV2vImage,omitempty"`
+	// XfsCompatibility overrides the global virt-v2v container image for this plan.
+	// When set, virt-v2v pods created by this plan will use the XFS compatible image
+	// VIRT_V2V_IMAGE_XFS instead of the cluster-wide VIRT_V2V_IMAGE setting.
+	// Use this to enable XFSv4 compatibility mode for specific plan.
+	// Warning: Enabling XFSv4 support will drop support for BTRFS for the specific plan. Ensure that the plan only selects VMs with supported filesystem.
+	// +kubebuilder:default:=false
+	XfsCompatibility bool `json:"xfsCompatibility,omitempty"`
 }
 
 // Find a planned VM.
