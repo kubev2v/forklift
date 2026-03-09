@@ -39,9 +39,11 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 
 	ginkgo.Describe("getVirtV2vImage", func() {
 		const globalImage = "quay.io/kubev2v/forklift-virt-v2v:latest"
+		const xfsImage = "quay.io/kubev2v/forklift-virt-v2v-rhel9:latest"
 
 		ginkgo.BeforeEach(func() {
 			Settings.Migration.VirtV2vImage = globalImage
+			Settings.Migration.VirtV2vImageXFS = xfsImage
 		})
 
 		ginkgo.It("should return the global image when plan has no override", func() {
@@ -60,6 +62,33 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 			p := createPlanKubevirt()
 			p.Spec.VirtV2vImage = ""
 			Expect(getVirtV2vImage(p)).To(Equal(globalImage))
+		})
+
+		ginkgo.It("should return the XFS image when XfsCompatibility is enabled", func() {
+			p := createPlanKubevirt()
+			p.Spec.XfsCompatibility = true
+			Expect(getVirtV2vImage(p)).To(Equal(xfsImage))
+		})
+
+		ginkgo.It("should return the global image when XfsCompatibility is false", func() {
+			p := createPlanKubevirt()
+			p.Spec.XfsCompatibility = false
+			Expect(getVirtV2vImage(p)).To(Equal(globalImage))
+		})
+
+		ginkgo.It("should prioritize VirtV2vImage over XfsCompatibility when both are set", func() {
+			perPlanImage := "quay.io/kubev2v/forklift-virt-v2v:custom-build"
+			p := createPlanKubevirt()
+			p.Spec.VirtV2vImage = perPlanImage
+			p.Spec.XfsCompatibility = true
+			Expect(getVirtV2vImage(p)).To(Equal(perPlanImage))
+		})
+
+		ginkgo.It("should return XFS image when XfsCompatibility is true and VirtV2vImage is empty", func() {
+			p := createPlanKubevirt()
+			p.Spec.VirtV2vImage = ""
+			p.Spec.XfsCompatibility = true
+			Expect(getVirtV2vImage(p)).To(Equal(xfsImage))
 		})
 	})
 })

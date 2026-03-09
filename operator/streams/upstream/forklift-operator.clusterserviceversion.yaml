@@ -186,6 +186,11 @@ spec:
           path: virt_v2v_image_fqin
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:hidden
+        - description: Virt-v2v XFS conversion image used by migration pods
+          displayName: Virt-v2v XFS Image
+          path: virt_v2v_image_xfs_fqin
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:hidden
         - description: VDDK image for VMware disk access
           displayName: VDDK Image
           path: vddk_image
