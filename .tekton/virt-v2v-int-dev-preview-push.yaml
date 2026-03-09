@@ -7,7 +7,7 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "main" && ( ".tekton/virt-v2v-int-dev-preview-*.yaml".pathChanged() || ".konflux/virt-v2v-rhel10/rpms.lock.yaml".pathChanged() || "build/virt-v2v/Containerfile-downstream".pathChanged() || "pkg/virt-v2v/***".pathChanged() || "cmd/virt-v2v/***".pathChanged() || "cmd/virt-v2v-monitor/***".pathChanged() )
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "main" && ( ".tekton/virt-v2v-int-dev-preview-*.yaml".pathChanged() || ".konflux/virt-v2v/rpms.lock.yaml".pathChanged() || "build/virt-v2v/Containerfile-downstream".pathChanged() || "pkg/virt-v2v/***".pathChanged() || "cmd/virt-v2v/***".pathChanged() || "cmd/virt-v2v-monitor/***".pathChanged() )
   creationTimestamp:
   labels:
     appstudio.openshift.io/application: forklift-operator-int-dev-preview
