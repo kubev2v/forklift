@@ -89,6 +89,10 @@ spec:
                 type: string
                 description: "Virt-v2v conversion image used by migration pods"
                 example: "quay.io/kubev2v/forklift-virt-v2v:latest"
+              virt_v2v_image_xfs_fqin:
+                type: string
+                description: "Virt-v2v XFS conversion image used by migration pods"
+                example: "quay.io/kubev2v/forklift-virt-v2v-xfs:latest"
               vddk_image:
                 type: string
                 description: "VDDK image for VMware disk access"

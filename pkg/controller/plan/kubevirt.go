@@ -3627,5 +3627,10 @@ func getVirtV2vImage(plan *api.Plan) string {
 	if plan.Spec.VirtV2vImage != "" {
 		return plan.Spec.VirtV2vImage
 	}
+	if plan.Spec.XfsCompatibility {
+		if Settings.Migration.VirtV2vImageXFS != "" {
+			return Settings.Migration.VirtV2vImageXFS
+		}
+	}
 	return Settings.Migration.VirtV2vImage
 }
