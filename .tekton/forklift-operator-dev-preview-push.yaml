@@ -7,7 +7,7 @@ metadata:
     build.appstudio.redhat.com/target_branch: "{{target_branch}}"
     pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "main" && ( ".tekton/forklift-operator-dev-preview-*.yaml".pathChanged() || "build/forklift-operator/Containerfile-downstream".pathChanged() || "operator/roles/***".pathChanged() || "operator/watches.yaml".pathChanged() )
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "main" && ( ".tekton/forklift-operator-dev-preview-*.yaml".pathChanged() || "build/forklift-operator/Containerfile-downstream".pathChanged() || "operator/roles/***".pathChanged() || "operator/watches.yaml".pathChanged() || "operator/.downstream_manifests".pathChanged() )
   creationTimestamp:
   labels:
     appstudio.openshift.io/application: forklift-operator-dev-preview
