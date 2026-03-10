@@ -5,9 +5,9 @@ metadata:
   name: kubectl-mtv
 spec:
   description: |
-    **DEV PREVIEW** A kubectl plugin that helps users of Forklift migrate virtualization workloads from oVirt,
+    MTV MCP server and kubectl plugin that helps users of Forklift migrate virtualization workloads from oVirt,
     VMware, OpenStack, and OVA files to KubeVirt on Kubernetes.
-  displayName: kubectl-mtv - MTV command line interface
+  displayName: kubectl-mtv - MTV MCP and command line interface
 {% set route_host = ((lookup('k8s', api_version='route.openshift.io/v1', kind='Route', namespace=app_namespace, resource_name=cli_download_route_name) | default({})).status.ingress[0].host | default(cli_download_route_name ~ '-' ~ app_namespace ~ '.apps.cluster.local')) %}
   links:
     - href: "https://{{ route_host }}/kubectl-mtv-linux-amd64"

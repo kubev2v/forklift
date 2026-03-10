@@ -4,35 +4,45 @@ import (
 	"context"
 
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
+	"github.com/yaacov/kubectl-mtv/pkg/util/config"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
 // Info holds all version-related information
 type Info struct {
 	ClientVersion     string `json:"clientVersion" yaml:"clientVersion"`
-	OperatorVersion   string `json:"operatorVersion" yaml:"operatorVersion"`
-	OperatorStatus    string `json:"operatorStatus" yaml:"operatorStatus"`
+	OperatorVersion   string `json:"operatorVersion,omitempty" yaml:"operatorVersion,omitempty"`
+	OperatorStatus    string `json:"operatorStatus,omitempty" yaml:"operatorStatus,omitempty"`
 	OperatorNamespace string `json:"operatorNamespace,omitempty" yaml:"operatorNamespace,omitempty"`
-	InventoryURL      string `json:"inventoryURL" yaml:"inventoryURL"`
-	InventoryStatus   string `json:"inventoryStatus" yaml:"inventoryStatus"`
+	InventoryURL      string `json:"inventoryURL,omitempty" yaml:"inventoryURL,omitempty"`
+	InventoryStatus   string `json:"inventoryStatus,omitempty" yaml:"inventoryStatus,omitempty"`
+	InventoryInsecure bool   `json:"inventoryInsecure,omitempty" yaml:"inventoryInsecure,omitempty"`
 }
 
 // GetInventoryInfo returns information about the MTV inventory service
-func GetInventoryInfo(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags) (string, string) {
-	namespace := client.ResolveNamespace(kubeConfigFlags)
+// Uses the global config which already handles:
+// - Checking MTV_INVENTORY_URL env var
+// - Auto-discovering from OpenShift routes
+// - Caching the result
+func GetInventoryInfo(globalConfig config.InventoryConfigGetter) (string, string, bool) {
+	inventoryURL := globalConfig.GetInventoryURL()
+	insecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
-	// Try to discover inventory URL
-	inventoryURL := client.DiscoverInventoryURL(ctx, kubeConfigFlags, namespace)
 	if inventoryURL != "" {
-		return inventoryURL, "available"
+		return inventoryURL, "available", insecureSkipTLS
 	}
 
-	return "not found", "not available"
+	return "not found", "not available", false
 }
 
 // GetMTVControllerInfo returns information about the MTV Operator
 func GetMTVControllerInfo(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags) (string, string, string) {
 	operatorInfo := client.GetMTVOperatorInfo(ctx, kubeConfigFlags)
+
+	// Check for API/auth/network errors first
+	if operatorInfo.Error != "" {
+		return "unknown", "error: " + operatorInfo.Error, ""
+	}
 
 	if !operatorInfo.Found {
 		return "not found", "not available", ""
@@ -50,12 +60,12 @@ func GetMTVControllerInfo(ctx context.Context, kubeConfigFlags *genericclioption
 }
 
 // GetVersionInfo gathers all version information
-func GetVersionInfo(ctx context.Context, clientVersion string, kubeConfigFlags *genericclioptions.ConfigFlags) Info {
+func GetVersionInfo(ctx context.Context, clientVersion string, kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig config.InventoryConfigGetter) Info {
 	// Get MTV Operator information
 	controllerVersion, controllerStatus, controllerNamespace := GetMTVControllerInfo(ctx, kubeConfigFlags)
 
-	// Get inventory information
-	inventoryURL, inventoryStatus := GetInventoryInfo(ctx, kubeConfigFlags)
+	// Get inventory information from global config
+	inventoryURL, inventoryStatus, inventoryInsecure := GetInventoryInfo(globalConfig)
 
 	return Info{
 		ClientVersion:     clientVersion,
@@ -64,5 +74,6 @@ func GetVersionInfo(ctx context.Context, clientVersion string, kubeConfigFlags *
 		OperatorNamespace: controllerNamespace,
 		InventoryURL:      inventoryURL,
 		InventoryStatus:   inventoryStatus,
+		InventoryInsecure: inventoryInsecure,
 	}
 }
