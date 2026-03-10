@@ -1,0 +1,10 @@
+packages:
+  - virtio-win-1.9.12-4.el7
+contentOrigin:
+  repofiles:
+    - ./redhat.repo
+context:
+  containerfile:
+    file: ../../../build/virt-v2v-rhel9/Containerfile-downstream
+    stageName: winlegacyiso
+arches: [x86_64]
