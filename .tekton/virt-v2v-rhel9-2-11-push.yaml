@@ -25,7 +25,7 @@ spec:
   - name: output-image
     value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-2-11/virt-v2v-rhel9-2-11:{{revision}}
   - name: dockerfile
-    value: build/virt-v2v/Containerfile-downstream
+    value: build/virt-v2v-rhel9/Containerfile-downstream
   - name: path-context
     value: .
   - name: build-source-image
