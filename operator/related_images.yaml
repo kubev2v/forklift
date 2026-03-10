@@ -15,6 +15,8 @@ relatedImages:
     image: ${OVIRT_POPULATOR_IMAGE}
   - name: virt_v2v
     image: ${VIRT_V2V_IMAGE}
+  - name: virt_v2v_rhel9
+    image: ${VIRT_V2V_IMAGE_RHEL9}
   - name: openstack_populator
     image: ${OPENSTACK_POPULATOR_IMAGE}
   - name: ui_plugin
