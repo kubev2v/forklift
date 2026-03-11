@@ -999,13 +999,17 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 		if useCompatibilityModeBus(r.Plan) {
 			bus = cnv.DiskBusSATA
 		}
+		diskDevice := cnv.DiskDevice{
+			Disk: &cnv.DiskTarget{Bus: bus},
+		}
+		if disk.RDM && r.shouldRDMAsLun(vm) {
+			diskDevice = cnv.DiskDevice{
+				LUN: &cnv.LunTarget{Bus: bus},
+			}
+		}
 		kubevirtDisk := cnv.Disk{
-			Name: volumeName,
-			DiskDevice: cnv.DiskDevice{
-				Disk: &cnv.DiskTarget{
-					Bus: bus,
-				},
-			},
+			Name:       volumeName,
+			DiskDevice: diskDevice,
 		}
 		if disk.Shared {
 			kubevirtDisk.Shareable = ptr.To(true)
@@ -1637,6 +1641,15 @@ func (r *Builder) shouldMigrateSharedDisks(vm *model.VM) bool {
 		return *planVM.MigrateSharedDisks
 	}
 	return r.Context.Plan.Spec.MigrateSharedDisks
+}
+
+// shouldRDMAsLun returns whether RDM disks should be mapped as LUN devices for the given VM.
+// VM-level setting takes precedence; falls back to plan-level setting.
+func (r *Builder) shouldRDMAsLun(vm *model.VM) bool {
+	if planVM := r.getPlanVM(vm); planVM != nil && planVM.RDMAsLun != nil {
+		return *planVM.RDMAsLun
+	}
+	return r.Context.Plan.Spec.RDMAsLun
 }
 
 // getPlanVMStatus get the plan VM status for the given vsphere VM
