@@ -218,7 +218,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	r.mapDisks(vm, persistentVolumeClaims, object)
 	r.mapFirmware(vm, &vm.Cluster, object)
 	if !usesInstanceType {
-		r.mapCPU(vm, object)
+		r.mapCPU(vmRef, vm, object)
 		r.mapMemory(vm, object)
 	}
 	r.mapClock(vm, object)
@@ -330,7 +330,7 @@ func (r *Builder) mapMemory(vm *model.Workload, object *cnv.VirtualMachineSpec) 
 	object.Template.Spec.Domain.Memory = &cnv.Memory{Guest: reservation}
 }
 
-func (r *Builder) mapCPU(vm *model.Workload, object *cnv.VirtualMachineSpec) {
+func (r *Builder) mapCPU(vmRef ref.Ref, vm *model.Workload, object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.CPU = &cnv.CPU{
 		Sockets: uint32(vm.CpuSockets),
 		Cores:   uint32(vm.CpuCores),
@@ -344,6 +344,16 @@ func (r *Builder) mapCPU(vm *model.Workload, object *cnv.VirtualMachineSpec) {
 		r.setCpuFlags(vm.CustomCpuModel, object)
 	} else if r.Plan.Spec.PreserveClusterCPUModel {
 		r.setCpuFlags(r.getClusterCpu(vm), object)
+	}
+	if enableNestedVirt := r.NestedVirtualizationSetting(vmRef, false); enableNestedVirt != nil {
+		policy := "optional"
+		if !*enableNestedVirt {
+			policy = "disable"
+		}
+		object.Template.Spec.Domain.CPU.Features = append(object.Template.Spec.Domain.CPU.Features,
+			cnv.CPUFeature{Name: "vmx", Policy: policy},
+			cnv.CPUFeature{Name: "svm", Policy: policy},
+		)
 	}
 }
 
