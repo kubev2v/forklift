@@ -208,6 +208,13 @@ type PlanSpec struct {
 	// When enabled, legacy drivers are exposed to the virt-v2v conversion process via the VIRTIO_WIN environment variable,
 	// which points to the legacy ISO at /usr/local/virtio-win-legacy.iso.
 	InstallLegacyDrivers *bool `json:"installLegacyDrivers,omitempty"`
+	// EnableNestedVirtualization controls whether nested virtualization (vmx/svm CPU features)
+	// is enabled on the target VM.
+	// - nil (default): Auto-detect from source VM settings
+	// - true: Force enable nested virtualization on the target VM regardless of source settings
+	// - false: Force disable nested virtualization on the target VM regardless of source settings
+	// +optional
+	EnableNestedVirtualization *bool `json:"enableNestedVirtualization,omitempty"`
 	// Determines if the plan should skip the guest conversion.
 	// +kubebuilder:default:=false
 	SkipGuestConversion bool `json:"skipGuestConversion,omitempty"`
