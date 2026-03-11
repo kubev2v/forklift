@@ -1101,6 +1101,14 @@ spec:
               diskBus:
                 description: 'Deprecated: this field will be deprecated in 2.8.'
                 type: string
+              enableNestedVirtualization:
+                description: |-
+                  EnableNestedVirtualization controls whether nested virtualization (vmx/svm CPU features)
+                  is enabled on the target VM.
+                  - nil (default): Auto-detect from source VM settings
+                  - true: Force enable nested virtualization on the target VM regardless of source settings
+                  - false: Force disable nested virtualization on the target VM regardless of source settings
+                type: boolean
               installLegacyDrivers:
                 description: |-
                   InstallLegacyDrivers determines whether to install legacy windows drivers in the VM.
@@ -2449,6 +2457,14 @@ spec:
 
                         Note: If the Plan-level option is set to true, the VM-level option will be ignored.
                       type: boolean
+                    enableNestedVirtualization:
+                      description: |-
+                        EnableNestedVirtualization controls whether nested virtualization (vmx/svm CPU features)
+                        is enabled on the target VM.
+                        When nil (default), the plan-level enableNestedVirtualization value is used.
+                        When explicitly set to true, nested virtualization is enabled for this VM.
+                        When explicitly set to false, nested virtualization is disabled for this VM.
+                      type: boolean
                     hooks:
                       description: Enable hooks.
                       items:
@@ -3027,6 +3043,14 @@ spec:
                           description: Boot disk index (0-based) detected by virt-v2v.
                             nil means undetected.
                           type: integer
+                        enableNestedVirtualization:
+                          description: |-
+                            EnableNestedVirtualization controls whether nested virtualization (vmx/svm CPU features)
+                            is enabled on the target VM.
+                            When nil (default), the plan-level enableNestedVirtualization value is used.
+                            When explicitly set to true, nested virtualization is enabled for this VM.
+                            When explicitly set to false, nested virtualization is disabled for this VM.
+                          type: boolean
                         error:
                           description: Errors
                           properties:

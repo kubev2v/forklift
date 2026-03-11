@@ -64,7 +64,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	r.mapInput(object)
 	r.mapTpm(vm, object)
 	r.mapNetworks(vm, object)
-	r.mapCPU(vm, object, usesInstanceType)
+	r.mapCPU(vmRef, vm, object, usesInstanceType)
 	r.mapMemory(vm, object, usesInstanceType)
 
 	return nil
@@ -222,7 +222,7 @@ func (r *Builder) findNetworkMapping(nic hyperv.NIC, netMap []api.NetworkPair) *
 	return nil
 }
 
-func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec, usesInstanceType bool) {
+func (r *Builder) mapCPU(vmRef ref.Ref, vm *model.VM, object *cnv.VirtualMachineSpec, usesInstanceType bool) {
 	if usesInstanceType {
 		return
 	}
@@ -230,6 +230,16 @@ func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec, usesInsta
 		Sockets: 1,
 		Cores:   uint32(vm.CpuCount),
 		Threads: 1,
+	}
+	if enableNestedVirt := r.NestedVirtualizationSetting(vmRef, false); enableNestedVirt != nil {
+		policy := "optional"
+		if !*enableNestedVirt {
+			policy = "disable"
+		}
+		object.Template.Spec.Domain.CPU.Features = append(object.Template.Spec.Domain.CPU.Features,
+			cnv.CPUFeature{Name: "vmx", Policy: policy},
+			cnv.CPUFeature{Name: "svm", Policy: policy},
+		)
 	}
 }
 
