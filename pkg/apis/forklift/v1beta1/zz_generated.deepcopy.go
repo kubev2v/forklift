@@ -1018,6 +1018,11 @@ func (in *PlanSpec) DeepCopyInto(out *PlanSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.EnableNestedVirtualization != nil {
+		in, out := &in.EnableNestedVirtualization, &out.EnableNestedVirtualization
+		*out = new(bool)
+		**out = **in
+	}
 	if in.CustomizationScripts != nil {
 		in, out := &in.CustomizationScripts, &out.CustomizationScripts
 		*out = new(v1.ObjectReference)
