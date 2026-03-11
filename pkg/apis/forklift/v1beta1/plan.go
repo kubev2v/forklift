@@ -237,6 +237,14 @@ type PlanSpec struct {
 	// Determines if the plan should migrate shared disks.
 	// +kubebuilder:default:=true
 	MigrateSharedDisks bool `json:"migrateSharedDisks,omitempty"`
+	// RDMAsLun controls whether RDM (Raw Device Mapping) disks from VMware should be
+	// mapped as LUN devices in the target KubeVirt VM instead of regular disk devices.
+	// When true, RDM disks are attached using lun: {} which allows the guest to execute
+	// arbitrary SCSI command passthrough (SGIO).
+	// This is useful when the source VM uses RDM disks for applications that require
+	// direct SCSI access, such as shared storage clusters or database applications.
+	// +optional
+	RDMAsLun bool `json:"rdmAsLun,omitempty"`
 	// DeleteGuestConversionPod determines if the guest conversion pod should be deleted after successful migration.
 	// Note:
 	//   - If this option is enabled and migration succeeds then the pod will get deleted. However the VM could still not boot and the virt-v2v logs, with additional information, will be deleted alongside guest conversion pod.
