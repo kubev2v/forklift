@@ -1307,6 +1307,10 @@ spec:
 
                         Note: If the Plan-level option is set to true, the VM-level option will be ignored.
                       type: boolean
+                    detectedBootDisk:
+                      description: Boot disk index (0-based) detected by virt-v2v.
+                        nil means undetected.
+                      type: integer
                     error:
                       description: Errors
                       properties:
@@ -5454,6 +5458,10 @@ spec:
 
                             Note: If the Plan-level option is set to true, the VM-level option will be ignored.
                           type: boolean
+                        detectedBootDisk:
+                          description: Boot disk index (0-based) detected by virt-v2v.
+                            nil means undetected.
+                          type: integer
                         error:
                           description: Errors
                           properties:
