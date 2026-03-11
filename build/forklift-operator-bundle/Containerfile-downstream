@@ -11,7 +11,7 @@ ARG DEFAULT_CHANNEL
 ARG REGISTRY
 ARG OCP_VERSIONS
 
-ARG API_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-api-rhel9@sha256:9f54596d7157879014bc25fe81a6f73643ebf24ed401a6a806fcd589be1f6f51"
+ARG API_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-api-rhel9@sha256:9fc9d22b35b2d63db1c707e4e22abb2ad382f9cdf2773bd0af9d54d2e5a86daa"
 
 ARG CONTROLLER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-controller-rhel9@sha256:da88a0d778526e11b4a6c7031b7a97dc51071470075633dba2f9efaa1ae02a84"
 
@@ -35,7 +35,7 @@ ARG CLI_DOWNLOAD_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-
 
 ARG VALIDATION_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-validation-rhel9@sha256:36c3b39f95de2b8d5c4b747cf3d4096f8d1aa060cb591cc14c673c61023d2945"
 
-ARG VIRT_V2V_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel10@sha256:65a7b0a7e84e60fb7eaffd4723cf12b1830653415616e4a968703b8b6c6d8e4c"
+ARG VIRT_V2V_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel10@sha256:b21e6dd37522931db0181312c967c12bc1054924a48eafc95cadc22bb783e9ca"
 
 ARG VIRT_V2V_IMAGE_RHEL9="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel9@sha256:0391043897a15061c1633fe47a48babcb9b2aa70b45900664a91a4f198c8301c"
 
