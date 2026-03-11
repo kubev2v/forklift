@@ -945,7 +945,7 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) (er
 					Name: "main",
 					// For v2v the consumer pod is used only when we execute cold migration with el9.
 					// In that case, we could benefit from pulling the image of the conversion pod, so it will be present on the node.
-					Image:   Settings.Migration.VirtV2vImage,
+					Image:   getVirtV2vImage(r.Plan),
 					Command: []string{"/bin/sh"},
 					Resources: core.ResourceRequirements{
 						Requests: core.ResourceList{
@@ -2242,7 +2242,7 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, libv
 							},
 						},
 					},
-					Image:         Settings.Migration.VirtV2vImage,
+					Image:         getVirtV2vImage(r.Plan),
 					VolumeMounts:  volumeMounts,
 					VolumeDevices: volumeDevices,
 					Ports: []core.ContainerPort{
@@ -3368,4 +3368,11 @@ func (r *KubeVirt) determineRunStrategy(vm *plan.VMStatus) cnv.VirtualMachineRun
 		}
 		return cnv.RunStrategyHalted
 	}
+}
+
+func getVirtV2vImage(plan *api.Plan) string {
+	if plan.Spec.VirtV2vImage != "" {
+		return plan.Spec.VirtV2vImage
+	}
+	return Settings.Migration.VirtV2vImage
 }
