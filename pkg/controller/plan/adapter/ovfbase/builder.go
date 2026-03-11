@@ -201,7 +201,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	r.mapFirmware(vm, vmRef, object)
 	r.mapInput(object)
 	if !usesInstanceType {
-		r.mapCPU(vm, object)
+		r.mapCPU(vmRef, vm, object)
 		err = r.mapMemory(vm, object)
 		if err != nil {
 			return
@@ -305,7 +305,7 @@ func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec) error 
 	return nil
 }
 
-func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec) {
+func (r *Builder) mapCPU(vmRef ref.Ref, vm *model.VM, object *cnv.VirtualMachineSpec) {
 	if vm.CoresPerSocket == 0 {
 		vm.CoresPerSocket = 1
 	}
@@ -313,6 +313,16 @@ func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.CPU = &cnv.CPU{
 		Sockets: uint32(vm.CpuCount / vm.CoresPerSocket),
 		Cores:   uint32(vm.CoresPerSocket),
+	}
+	if enableNestedVirt := r.NestedVirtualizationSetting(vmRef, false); enableNestedVirt != nil {
+		policy := "optional"
+		if !*enableNestedVirt {
+			policy = "disable"
+		}
+		object.Template.Spec.Domain.CPU.Features = append(object.Template.Spec.Domain.CPU.Features,
+			cnv.CPUFeature{Name: "vmx", Policy: policy},
+			cnv.CPUFeature{Name: "svm", Policy: policy},
+		)
 	}
 }
 

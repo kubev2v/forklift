@@ -709,7 +709,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	}
 	r.mapFirmware(vm, object)
 	if !usesInstanceType {
-		r.mapCPU(vm, object)
+		r.mapCPU(vmRef, vm, object)
 		r.mapMemory(vm, object)
 	}
 	r.mapClock(host, object)
@@ -868,23 +868,20 @@ func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.Memory = &cnv.Memory{Guest: reservation}
 }
 
-func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec) {
+func (r *Builder) mapCPU(vmRef ref.Ref, vm *model.VM, object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.CPU = &cnv.CPU{
 		Sockets: uint32(vm.CpuCount / vm.CoresPerSocket),
 		Cores:   uint32(vm.CoresPerSocket),
 	}
-	if vm.NestedHVEnabled {
-		//FIXME: Replace in future with single feature flag for nested virt https://issues.redhat.com/browse/CNV-60150
-		var features []cnv.CPUFeature
-		features = append(features, cnv.CPUFeature{
-			Name:   "vmx",
-			Policy: "optional",
-		})
-		features = append(features, cnv.CPUFeature{
-			Name:   "svm",
-			Policy: "optional",
-		})
-		object.Template.Spec.Domain.CPU.Features = features
+	if enableNestedVirt := r.NestedVirtualizationSetting(vmRef, vm.NestedHVEnabled); enableNestedVirt != nil {
+		policy := "optional"
+		if !*enableNestedVirt {
+			policy = "disable"
+		}
+		object.Template.Spec.Domain.CPU.Features = append(object.Template.Spec.Domain.CPU.Features,
+			cnv.CPUFeature{Name: "vmx", Policy: policy},
+			cnv.CPUFeature{Name: "svm", Policy: policy},
+		)
 	}
 }
 
