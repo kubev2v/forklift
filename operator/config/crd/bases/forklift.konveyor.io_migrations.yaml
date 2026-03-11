@@ -591,6 +591,14 @@ spec:
                         https://github.com/kubev2v/forklift/tree/main/pkg/templateutil
                         for template functions."
                       type: string
+                    rdmAsLun:
+                      description: |-
+                        RDMAsLun controls whether RDM (Raw Device Mapping) disks from VMware should be
+                        mapped as LUN devices in the target KubeVirt VM instead of regular disk devices.
+                        When nil (default), the plan-level rdmAsLun value is used.
+                        When explicitly set to true, RDM disks are attached using lun: {} for this VM.
+                        When explicitly set to false, RDM disks are attached as regular disks for this VM.
+                      type: boolean
                     restorePowerState:
                       description: Source VM power state before migration.
                       type: string
