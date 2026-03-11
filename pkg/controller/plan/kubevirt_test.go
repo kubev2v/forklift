@@ -37,6 +37,31 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 		})
 	})
 
+	ginkgo.Describe("getVirtV2vImage", func() {
+		const globalImage = "quay.io/kubev2v/forklift-virt-v2v:latest"
+
+		ginkgo.BeforeEach(func() {
+			Settings.Migration.VirtV2vImage = globalImage
+		})
+
+		ginkgo.It("should return the global image when plan has no override", func() {
+			p := createPlanKubevirt()
+			Expect(getVirtV2vImage(p)).To(Equal(globalImage))
+		})
+
+		ginkgo.It("should return the per-plan image when set", func() {
+			perPlanImage := "quay.io/kubev2v/forklift-virt-v2v:custom-build"
+			p := createPlanKubevirt()
+			p.Spec.VirtV2vImage = perPlanImage
+			Expect(getVirtV2vImage(p)).To(Equal(perPlanImage))
+		})
+
+		ginkgo.It("should fall back to global image when plan override is empty string", func() {
+			p := createPlanKubevirt()
+			p.Spec.VirtV2vImage = ""
+			Expect(getVirtV2vImage(p)).To(Equal(globalImage))
+		})
+	})
 })
 
 func createKubeVirt(objs ...runtime.Object) *KubeVirt {
