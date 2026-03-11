@@ -169,6 +169,14 @@ type VM struct {
 	//
 	// +optional
 	EnableNestedVirtualization *bool `json:"enableNestedVirtualization,omitempty"`
+	// RDMAsLun controls whether RDM (Raw Device Mapping) disks from VMware should be
+	// mapped as LUN devices in the target KubeVirt VM instead of regular disk devices.
+	// When nil (default), the plan-level rdmAsLun value is used.
+	// When explicitly set to true, RDM disks are attached using lun: {} for this VM.
+	// When explicitly set to false, RDM disks are attached as regular disks for this VM.
+	//
+	// +optional
+	RDMAsLun *bool `json:"rdmAsLun,omitempty"`
 }
 
 // Find a Hook for the specified step.
