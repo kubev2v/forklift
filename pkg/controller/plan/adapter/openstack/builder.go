@@ -261,7 +261,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, vmSpec *cnv.VirtualMachineSpec, 
 	}
 
 	r.mapFirmware(vm, vmSpec)
-	r.mapResources(vm, vmSpec, usesInstanceType)
+	r.mapResources(vmRef, vm, vmSpec, usesInstanceType)
 	r.mapHardwareRng(vm, vmSpec)
 	r.mapInput(vm, vmSpec)
 	r.mapVideo(vm, vmSpec)
@@ -340,7 +340,7 @@ func (r *Builder) mapInput(vm *model.Workload, object *cnv.VirtualMachineSpec) {
 	}
 }
 
-func (r *Builder) mapResources(vm *model.Workload, object *cnv.VirtualMachineSpec, usesInstanceType bool) {
+func (r *Builder) mapResources(vmRef ref.Ref, vm *model.Workload, object *cnv.VirtualMachineSpec, usesInstanceType bool) {
 	if usesInstanceType {
 		return
 	}
@@ -369,6 +369,17 @@ func (r *Builder) mapResources(vm *model.Workload, object *cnv.VirtualMachineSpe
 	object.Template.Spec.Domain.CPU.Sockets = r.getCpuCount(vm, CpuSockets)
 	object.Template.Spec.Domain.CPU.Cores = r.getCpuCount(vm, CpuCores)
 	object.Template.Spec.Domain.CPU.Threads = r.getCpuCount(vm, CpuThreads)
+
+	if enableNestedVirt := r.NestedVirtualizationSetting(vmRef, false); enableNestedVirt != nil {
+		policy := "optional"
+		if !*enableNestedVirt {
+			policy = "disable"
+		}
+		object.Template.Spec.Domain.CPU.Features = append(object.Template.Spec.Domain.CPU.Features,
+			cnv.CPUFeature{Name: "vmx", Policy: policy},
+			cnv.CPUFeature{Name: "svm", Policy: policy},
+		)
+	}
 
 	// TODO Support HugePages
 	memory := resource.NewQuantity(int64(vm.Flavor.RAM)*1024*1024, resource.BinarySI)

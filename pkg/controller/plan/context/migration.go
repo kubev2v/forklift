@@ -5,6 +5,7 @@ import (
 	"path"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	ocp "github.com/kubev2v/forklift/pkg/lib/client/openshift"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
@@ -112,6 +113,19 @@ func (r *Context) SetMigration(migration *api.Migration) {
 		path.Join(
 			migration.Namespace,
 			migration.Name))
+}
+
+func (r *Context) NestedVirtualizationSetting(vmRef ref.Ref, sourceDefault bool) *bool {
+	if vm, found := r.Plan.Spec.FindVM(vmRef); found && vm.EnableNestedVirtualization != nil {
+		return vm.EnableNestedVirtualization
+	}
+	if r.Plan.Spec.EnableNestedVirtualization != nil {
+		return r.Plan.Spec.EnableNestedVirtualization
+	}
+	if sourceDefault {
+		return &sourceDefault
+	}
+	return nil
 }
 
 // Source.

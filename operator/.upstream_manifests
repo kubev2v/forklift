@@ -200,7 +200,8 @@ spec:
                 - "false"
                 type: string
               feature_ova_appliance_management:
-                description: 'Enable OVF-based appliance management endpoints (OVA, HyperV) (default: false)'
+                description: 'Enable OVF-based appliance management endpoints (OVA,
+                  HyperV)  (default: false)'
                 enum:
                 - "true"
                 - "false"
@@ -244,6 +245,26 @@ spec:
               hooks_container_requests_memory:
                 description: 'Hooks memory request (default: 150Mi)'
                 example: 300Mi
+                type: string
+              hyperv_container_limits_cpu:
+                description: 'HyperV CPU limit (default: 1000m)'
+                example: 2000m
+                type: string
+              hyperv_container_limits_memory:
+                description: 'HyperV memory limit (default: 1Gi)'
+                example: 2Gi
+                type: string
+              hyperv_container_requests_cpu:
+                description: 'HyperV CPU request (default: 100m)'
+                example: 200m
+                type: string
+              hyperv_container_requests_memory:
+                description: 'HyperV memory request (default: 512Mi)'
+                example: 300Mi
+                type: string
+              hyperv_provider_server_fqin:
+                description: HyperV provider server image
+                example: quay.io/kubev2v/forklift-hyperv-provider-server:latest
                 type: string
               image_pull_policy:
                 description: 'Image pull policy (default: Always)'
@@ -941,6 +962,9 @@ spec:
                     status:
                       description: The condition status [true,false].
                       type: string
+                    suggestion:
+                      description: A suggested action or resolution for the condition.
+                      type: string
                     type:
                       description: The condition type.
                       type: string
@@ -1258,6 +1282,14 @@ spec:
                         troubleshooting. The source VM is never modified.
 
                         Note: If the Plan-level option is set to true, the VM-level option will be ignored.
+                      type: boolean
+                    enableNestedVirtualization:
+                      description: |-
+                        EnableNestedVirtualization controls whether nested virtualization (vmx/svm CPU features)
+                        is enabled on the target VM.
+                        When nil (default), the plan-level enableNestedVirtualization value is used.
+                        When explicitly set to true, nested virtualization is enabled for this VM.
+                        When explicitly set to false, nested virtualization is disabled for this VM.
                       type: boolean
                     error:
                       description: Errors
@@ -3477,6 +3509,14 @@ spec:
               diskBus:
                 description: 'Deprecated: this field will be deprecated in 2.8.'
                 type: string
+              enableNestedVirtualization:
+                description: |-
+                  EnableNestedVirtualization controls whether nested virtualization (vmx/svm CPU features)
+                  is enabled on the target VM.
+                  - nil (default): Auto-detect from source VM settings
+                  - true: Force enable nested virtualization on the target VM regardless of source settings
+                  - false: Force disable nested virtualization on the target VM regardless of source settings
+                type: boolean
               installLegacyDrivers:
                 description: |-
                   InstallLegacyDrivers determines whether to install legacy windows drivers in the VM.
@@ -4818,6 +4858,14 @@ spec:
 
                         Note: If the Plan-level option is set to true, the VM-level option will be ignored.
                       type: boolean
+                    enableNestedVirtualization:
+                      description: |-
+                        EnableNestedVirtualization controls whether nested virtualization (vmx/svm CPU features)
+                        is enabled on the target VM.
+                        When nil (default), the plan-level enableNestedVirtualization value is used.
+                        When explicitly set to true, nested virtualization is enabled for this VM.
+                        When explicitly set to false, nested virtualization is disabled for this VM.
+                      type: boolean
                     hooks:
                       description: Enable hooks.
                       items:
@@ -5384,6 +5432,14 @@ spec:
                             troubleshooting. The source VM is never modified.
 
                             Note: If the Plan-level option is set to true, the VM-level option will be ignored.
+                          type: boolean
+                        enableNestedVirtualization:
+                          description: |-
+                            EnableNestedVirtualization controls whether nested virtualization (vmx/svm CPU features)
+                            is enabled on the target VM.
+                            When nil (default), the plan-level enableNestedVirtualization value is used.
+                            When explicitly set to true, nested virtualization is enabled for this VM.
+                            When explicitly set to false, nested virtualization is disabled for this VM.
                           type: boolean
                         error:
                           description: Errors
@@ -6703,6 +6759,7 @@ rules:
   - storage.k8s.io
   resources:
   - storageclasses
+  - csidrivers
   verbs:
   - get
   - list
@@ -7612,7 +7669,7 @@ spec:
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:radio:true
         - urn:alm:descriptor:com.tectonic.ui:radio:false
-      - description: Enable OVF-based appliance management endpoints (OVA, HyperV) (default false)
+      - description: Enable OVA appliance management endpoints (default false)
         displayName: Enable OVA Appliance Management
         path: feature_ova_appliance_management
         x-descriptors:
