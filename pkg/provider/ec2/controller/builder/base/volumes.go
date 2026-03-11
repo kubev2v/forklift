@@ -1,4 +1,4 @@
-package builder
+package base
 
 import (
 	"fmt"
@@ -21,51 +21,58 @@ const (
 	EBSCSIDriver = "ebs.csi.aws.com"
 )
 
+// VolumeInfo contains information about an EBS volume for PV/PVC creation.
+type VolumeInfo struct {
+	// EBSVolumeID is the AWS EBS volume ID (e.g., vol-0123456789abcdef0)
+	EBSVolumeID string
+	// OriginalVolumeID is the original source volume ID before snapshot
+	OriginalVolumeID string
+	// SnapshotID is the snapshot ID used to create this volume
+	SnapshotID string
+	// SizeGiB is the volume size in GiB
+	SizeGiB int64
+	// VolumeType is the EBS volume type (e.g., gp3, gp2, io1)
+	VolumeType string
+	// AvailabilityZone is the AZ where the volume was created
+	AvailabilityZone string
+}
+
 // GetVolumeSize retrieves EBS volume size in GiB from inventory, trying volume first then snapshot.
-// Falls back to 100 GiB default if both lookups fail. Handles int64/float64 JSON type variations.
-// This is a public wrapper for getVolumeSize.
-func (r *Builder) GetVolumeSize(volumeID, snapshotID string) int64 {
+// Falls back to 100 GiB default if both lookups fail.
+func (r *Base) GetVolumeSize(volumeID, snapshotID string) int64 {
 	return r.getVolumeSize(volumeID, snapshotID)
 }
 
 // GetVolumeType retrieves the EBS volume type from inventory.
 // Returns an empty string if the volume type cannot be determined.
-func (r *Builder) GetVolumeType(volumeID string) string {
+func (r *Base) GetVolumeType(volumeID string) string {
 	return inventory.GetVolumeType(r.Source.Inventory, volumeID)
 }
 
-// getVolumeSize retrieves EBS volume size in GiB from inventory, trying volume first then snapshot.
-// Falls back to 100 GiB default if both lookups fail.
-func (r *Builder) getVolumeSize(volumeID, snapshotID string) int64 {
-	// First, try to get the size from the original volume
+func (r *Base) getVolumeSize(volumeID, snapshotID string) int64 {
 	if volumeID != "" {
 		sizeGiB := inventory.GetVolumeSize(r.Source.Inventory, volumeID)
 		if sizeGiB > 0 {
-			r.log.Info("Volume size from AWS inventory",
+			r.Log.Info("Volume size from AWS inventory",
 				"volumeId", volumeID,
 				"sizeGiB", sizeGiB)
 			return sizeGiB
 		}
-		r.log.V(1).Info("Volume not found in inventory, trying snapshot", "volumeId", volumeID)
+		r.Log.V(1).Info("Volume not found in inventory, trying snapshot", "volumeId", volumeID)
 	}
 
-	// Fall back to getting size from snapshot
 	if snapshotID != "" {
-		// Note: EC2 provider does not currently store Snapshots in inventory.
-		// If needed, we would add Snapshot support to collector and model.
-		r.log.V(1).Info("Snapshots not currently in inventory, using default 100 GiB", "snapshotId", snapshotID)
+		r.Log.V(1).Info("Snapshots not currently in inventory, using default 100 GiB", "snapshotId", snapshotID)
 	}
 
-	// Default to 100 GiB if both lookups fail
-	r.log.Error(nil, "Failed to get volume or snapshot size from inventory, using default 100 GiB",
+	r.Log.Error(nil, "Failed to get volume or snapshot size from inventory, using default 100 GiB",
 		"volumeId", volumeID,
 		"snapshotId", snapshotID)
 	return 100
 }
 
-// calculatePVCSize calculates PVC size by adding filesystem/block overhead to the aligned volume size.
-// Filesystem mode adds percentage overhead, block mode adds fixed bytes for metadata.
-func (r *Builder) calculatePVCSize(volumeSizeBytes int64, volumeMode *core.PersistentVolumeMode) *resource.Quantity {
+// CalculatePVCSize calculates PVC size by adding filesystem/block overhead to the aligned volume size.
+func (r *Base) CalculatePVCSize(volumeSizeBytes int64, volumeMode *core.PersistentVolumeMode) *resource.Quantity {
 	alignedSize := utils.RoundUp(volumeSizeBytes, utils.DefaultAlignBlockSize)
 
 	var sizeWithOverhead int64
@@ -75,7 +82,7 @@ func (r *Builder) calculatePVCSize(volumeSizeBytes int64, volumeMode *core.Persi
 		sizeWithOverhead = alignedSize + settings.Settings.BlockOverhead
 	}
 
-	r.log.V(1).Info("Calculated PVC size with overhead",
+	r.Log.V(1).Info("Calculated PVC size with overhead",
 		"originalBytes", volumeSizeBytes,
 		"originalGiB", volumeSizeBytes/(1024*1024*1024),
 		"alignedBytes", alignedSize,
@@ -89,37 +96,30 @@ func (r *Builder) calculatePVCSize(volumeSizeBytes int64, volumeMode *core.Persi
 }
 
 // ResolvePersistentVolumeClaimIdentifier extracts the EBS volume ID from a PVC's annotations.
-// Enables tracking which PVC corresponds to which source EBS volume.
-func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string {
+func (r *Base) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVolumeClaim) string {
 	if pvc.ObjectMeta.Annotations != nil {
 		return pvc.ObjectMeta.Annotations["forklift.konveyor.io/volume-id"]
 	}
 	return ""
 }
 
-// PopulatorVolumes is a no-op for EC2 - direct volume creation doesn't use populators.
-// This method is required by the base.Builder interface but not used by EC2 provider.
-func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) ([]*core.PersistentVolumeClaim, error) {
+// PopulatorVolumes is a no-op for EC2.
+func (r *Base) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) ([]*core.PersistentVolumeClaim, error) {
 	return nil, nil
 }
 
-// SetPopulatorDataSourceLabels is a no-op for EC2 - direct volume creation handles labels.
-// This method is required by the base.Builder interface but not used by EC2 provider.
-func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (err error) {
+// SetPopulatorDataSourceLabels is a no-op for EC2.
+func (r *Base) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (err error) {
 	return nil
 }
 
 // SupportsVolumePopulators returns false as EC2 uses direct volume creation.
-// The provider creates EBS volumes from snapshots and PV/PVC pairs directly,
-// without relying on the volume populator controller.
-func (r *Builder) SupportsVolumePopulators() bool {
+func (r *Base) SupportsVolumePopulators() bool {
 	return false
 }
 
-// PopulatorTransferredBytes is a no-op for EC2 - direct volume creation doesn't use populators.
-// This method is required by the base.Builder interface but not used by EC2 provider.
-func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (transferredBytes int64, err error) {
-	// Return full size if bound, 0 otherwise - simple progress tracking
+// PopulatorTransferredBytes is a no-op for EC2.
+func (r *Base) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (transferredBytes int64, err error) {
 	if pvc.Status.Phase == core.ClaimBound {
 		pvcSize := pvc.Spec.Resources.Requests[core.ResourceStorage]
 		return pvcSize.Value(), nil
@@ -127,10 +127,8 @@ func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (tr
 	return 0, nil
 }
 
-// GetPopulatorTaskName is a no-op for EC2 - direct volume creation doesn't use populators.
-// This method is required by the base.Builder interface but not used by EC2 provider.
-func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error) {
-	// Return volume ID from annotations for progress tracking
+// GetPopulatorTaskName is a no-op for EC2.
+func (r *Base) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskName string, err error) {
 	if pvc.Annotations != nil {
 		taskName = pvc.Annotations["forklift.konveyor.io/original-volume-id"]
 	}
@@ -138,8 +136,7 @@ func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskNam
 }
 
 // Tasks creates a progress tracking task for each EBS volume attached to the instance.
-// Each task uses the volume size in MB as the progress total for UI display.
-func (r *Builder) Tasks(vmRef ref.Ref) (tasks []*plan.Task, err error) {
+func (r *Base) Tasks(vmRef ref.Ref) (tasks []*plan.Task, err error) {
 	awsInstance, err := inventory.GetAWSInstance(r.Source.Inventory, vmRef)
 	if err != nil {
 		err = liberr.Wrap(err, "vm", vmRef.String())
@@ -178,32 +175,15 @@ func (r *Builder) Tasks(vmRef ref.Ref) (tasks []*plan.Task, err error) {
 	return
 }
 
-// VolumeInfo contains information about an EBS volume for PV/PVC creation.
-type VolumeInfo struct {
-	// EBSVolumeID is the AWS EBS volume ID (e.g., vol-0123456789abcdef0)
-	EBSVolumeID string
-	// OriginalVolumeID is the original source volume ID before snapshot
-	OriginalVolumeID string
-	// SnapshotID is the snapshot ID used to create this volume
-	SnapshotID string
-	// SizeGiB is the volume size in GiB
-	SizeGiB int64
-	// VolumeType is the EBS volume type (e.g., gp3, gp2, io1)
-	VolumeType string
-	// AvailabilityZone is the AZ where the volume was created
-	AvailabilityZone string
-}
-
 // BuildPersistentVolume creates a PV spec with CSI volume source pointing to an EBS volume.
-// The PV is pre-bound to a PVC using ClaimRef to ensure they bind together.
-func (r *Builder) BuildPersistentVolume(vmRef ref.Ref, volumeInfo *VolumeInfo, pvcName, pvcNamespace string) (*core.PersistentVolume, error) {
-	r.log.Info("Building PersistentVolume for EBS volume",
+func (r *Base) BuildPersistentVolume(vmRef ref.Ref, volumeInfo *VolumeInfo, pvcName, pvcNamespace string) (*core.PersistentVolume, error) {
+	r.Log.Info("Building PersistentVolume for EBS volume",
 		"vm", vmRef.Name,
 		"ebsVolumeID", volumeInfo.EBSVolumeID,
 		"pvcName", pvcName,
 		"pvcNamespace", pvcNamespace)
 
-	storageClass := r.findStorageMapping(volumeInfo.VolumeType)
+	storageClass := r.FindStorageMapping(volumeInfo.VolumeType)
 	blockMode := core.PersistentVolumeBlock
 
 	pvLabels := r.Labeler.VMLabels(vmRef)
@@ -238,7 +218,6 @@ func (r *Builder) BuildPersistentVolume(vmRef ref.Ref, volumeInfo *VolumeInfo, p
 					},
 				},
 			},
-			// Pre-bind to the PVC
 			ClaimRef: &core.ObjectReference{
 				Kind:      "PersistentVolumeClaim",
 				Namespace: pvcNamespace,
@@ -247,7 +226,7 @@ func (r *Builder) BuildPersistentVolume(vmRef ref.Ref, volumeInfo *VolumeInfo, p
 		},
 	}
 
-	r.log.Info("Built PersistentVolume spec",
+	r.Log.Info("Built PersistentVolume spec",
 		"vm", vmRef.Name,
 		"pvGenerateName", pv.GenerateName,
 		"ebsVolumeID", volumeInfo.EBSVolumeID,
@@ -258,25 +237,20 @@ func (r *Builder) BuildPersistentVolume(vmRef ref.Ref, volumeInfo *VolumeInfo, p
 }
 
 // BuildDirectPVC creates a PVC spec that will bind to a pre-created PV.
-// Unlike populator-based PVCs, this PVC does not use DataSourceRef.
-// The PV's ClaimRef ensures they bind together.
-func (r *Builder) BuildDirectPVC(vmRef ref.Ref, volumeInfo *VolumeInfo, index int) (*core.PersistentVolumeClaim, error) {
-	r.log.Info("Building direct PVC for EBS volume",
+func (r *Base) BuildDirectPVC(vmRef ref.Ref, volumeInfo *VolumeInfo, index int) (*core.PersistentVolumeClaim, error) {
+	r.Log.Info("Building direct PVC for EBS volume",
 		"vm", vmRef.Name,
 		"ebsVolumeID", volumeInfo.EBSVolumeID,
 		"originalVolumeID", volumeInfo.OriginalVolumeID,
 		"index", index)
 
-	storageClass := r.findStorageMapping(volumeInfo.VolumeType)
+	storageClass := r.FindStorageMapping(volumeInfo.VolumeType)
 	blockMode := core.PersistentVolumeBlock
 
-	// Calculate PVC size with overhead
 	volumeSizeBytes := volumeInfo.SizeGiB * 1024 * 1024 * 1024
-	pvcSize := r.calculatePVCSize(volumeSizeBytes, &blockMode)
+	pvcSize := r.CalculatePVCSize(volumeSizeBytes, &blockMode)
 
 	pvcLabels := r.Labeler.VMLabels(vmRef)
-	// volume-id label stores the source EC2 volume ID - used by mapDisks in vm.go
-	// to match PVCs to the source instance's BlockDeviceMappings
 	pvcLabels["forklift.konveyor.io/volume-id"] = volumeInfo.OriginalVolumeID
 
 	pvcAnnotations := map[string]string{
@@ -304,11 +278,10 @@ func (r *Builder) BuildDirectPVC(vmRef ref.Ref, volumeInfo *VolumeInfo, index in
 				},
 			},
 			StorageClassName: &storageClass,
-			// No DataSourceRef - we bind to PV via PV's ClaimRef
 		},
 	}
 
-	r.log.Info("Built direct PVC spec",
+	r.Log.Info("Built direct PVC spec",
 		"vm", vmRef.Name,
 		"pvcGenerateName", pvc.GenerateName,
 		"ebsVolumeID", volumeInfo.EBSVolumeID,
