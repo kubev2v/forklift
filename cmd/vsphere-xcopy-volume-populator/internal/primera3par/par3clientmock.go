@@ -128,3 +128,21 @@ func (m *MockPrimera3ParClient) CurrentMappedGroups(volumeName string, mappingCo
 	log.Printf("Mock: CurrentMappedGroups -> Volume %s is mapped to groups: %v", volumeName, groups)
 	return groups, nil
 }
+
+func (m *MockPrimera3ParClient) CopyVolume(sourceVolName string, destVolName string) error {
+	return nil
+}
+
+func (m *MockPrimera3ParClient) GetVolumes() ([]Volume, error) {
+	var result []Volume
+	id := 0
+	for _, lun := range m.Volumes {
+		result = append(result, Volume{
+			Id:   id,
+			Name: lun.Name,
+			WWN:  lun.SerialNumber,
+		})
+		id++
+	}
+	return result, nil
+}
