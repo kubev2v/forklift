@@ -1014,7 +1014,7 @@ func (r *KubeVirt) setKvmOnPodSpec(podSpec *core.PodSpec) {
 		return
 	}
 	switch *r.Plan.Provider.Source.Spec.Type {
-	case api.VSphere, api.Ova:
+	case api.VSphere, api.Ova, api.HyperV:
 		if podSpec.NodeSelector == nil {
 			podSpec.NodeSelector = make(map[string]string)
 		}

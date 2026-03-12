@@ -181,13 +181,16 @@ func (c *Conversion) RunVirtV2vInPlaceDisk() error {
 }
 
 func (c *Conversion) addVirtV2vArgs(cmd utils.CommandBuilder) (err error) {
+	outputName := c.NewVmName
+	// HyperV uses -i disk, so virt-v2v derives -on from the input filename
+	if outputName == "" && c.Source == config.HYPERV {
+		outputName = c.VmName
+	}
 	cmd.AddFlag("-v").
 		AddFlag("-x").
 		AddArg("-o", "kubevirt").
 		AddArg("-os", c.Workdir).
-		// When converting VM with name that do not meet DNS1123 RFC requirements,
-		// it should be changed to supported one to ensure the conversion does not fail.
-		AddArg("-on", c.NewVmName)
+		AddArg("-on", outputName)
 	switch c.Source {
 	case config.VSPHERE:
 		err = c.addVirtV2vVsphereArgs(cmd)
