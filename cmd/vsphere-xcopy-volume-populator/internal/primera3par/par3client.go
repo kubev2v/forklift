@@ -28,6 +28,15 @@ type Primera3ParClient interface {
 	AddHostToHostSet(hostSetName string, hostName string) error
 	GetLunDetailsByVolumeName(lunName string, lun populator.LUN) (populator.LUN, error)
 	CurrentMappedGroups(volumeName string, mappingContext populator.MappingContext) ([]string, error)
+	CopyVolume(sourceVolName string, destVolName string) error
+	GetVolumes() ([]Volume, error)
+}
+
+type Volume struct {
+	Id      int    `json:"id"`
+	Name    string `json:"name"`
+	WWN     string `json:"wwn"`
+	UserCPG string `json:"userCPG"`
 }
 
 type HostsResponse struct {
@@ -165,7 +174,7 @@ func (p *Primera3ParClientWsImpl) getHostByAdapterId(id string) (string, error) 
 }
 
 func (p *Primera3ParClientWsImpl) hostExists(hostname string) (bool, error) {
-	url := fmt.Sprintf("%s/api/v1/hosts/%s", p.BaseURL, hostname)
+	url := fmt.Sprintf("%s/api/v1/hosts/%s", p.BaseURL, url.PathEscape(hostname))
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -479,7 +488,7 @@ func (p *Primera3ParClientWsImpl) GetVLunID(lunName, initiatorGroupName string) 
 
 func (p *Primera3ParClientWsImpl) GetLunDetailsByVolumeName(volumeName string, lun populator.LUN) (populator.LUN, error) {
 	cutVolName := prefixOfString(volumeName, 31)
-	url := fmt.Sprintf("%s/api/v1/volumes/%s", p.BaseURL, cutVolName)
+	url := fmt.Sprintf("%s/api/v1/volumes/%s", p.BaseURL, url.PathEscape(cutVolName))
 
 	reqType := "getVolume"
 	req, err := http.NewRequest("GET", url, nil)
@@ -617,7 +626,7 @@ func (p *Primera3ParClientWsImpl) handleUnauthorizedSessionKey(resp *http.Respon
 }
 
 func (p *Primera3ParClientWsImpl) EnsureHostSetExists(hostSetName string) error {
-	url := fmt.Sprintf("%s/api/v1/hostsets/%s", p.BaseURL, hostSetName)
+	url := fmt.Sprintf("%s/api/v1/hostsets/%s", p.BaseURL, url.PathEscape(hostSetName))
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -667,7 +676,7 @@ func (p *Primera3ParClientWsImpl) setReqHeadersWithSessionKey(req *http.Request)
 }
 
 func (p *Primera3ParClientWsImpl) AddHostToHostSet(hostSetName string, hostName string) error {
-	url := fmt.Sprintf("%s/api/v1/hostsets/%s", p.BaseURL, hostSetName)
+	url := fmt.Sprintf("%s/api/v1/hostsets/%s", p.BaseURL, url.PathEscape(hostSetName))
 
 	requestBody := map[string]interface{}{
 		"action": 1,
@@ -713,4 +722,243 @@ func prefixOfString(s string, length int) string {
 		return string(runes[:length])
 	}
 	return s
+}
+
+func (p *Primera3ParClientWsImpl) GetVolume(volumeName string) (Volume, error) {
+	reqURL := fmt.Sprintf("%s/api/v1/volumes/%s", p.BaseURL, url.PathEscape(volumeName))
+
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return Volume{}, fmt.Errorf("failed to create GetVolume request: %w", err)
+	}
+
+	var vol Volume
+	if err := p.doRequestUnmarshalResponse(req, "GetVolume", &vol); err != nil {
+		return Volume{}, fmt.Errorf("failed to get volume %s: %w", volumeName, err)
+	}
+
+	return vol, nil
+}
+
+func (p *Primera3ParClientWsImpl) renameVolume(oldName, newName string) error {
+	reqURL := fmt.Sprintf("%s/api/v1/volumes/%s", p.BaseURL, url.PathEscape(oldName))
+
+	body, err := json.Marshal(map[string]string{"newName": newName})
+	if err != nil {
+		return fmt.Errorf("failed to encode rename request: %w", err)
+	}
+
+	req, err := http.NewRequest("PUT", reqURL, bytes.NewBuffer(body))
+	if err != nil {
+		return fmt.Errorf("failed to create rename request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := p.doRequest(req, "renameVolume")
+	if err != nil {
+		return fmt.Errorf("renameVolume failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("renameVolume failed with status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	klog.Infof("Renamed volume %s -> %s", oldName, newName)
+	return nil
+}
+
+func (p *Primera3ParClientWsImpl) deleteVolume(volumeName string) error {
+	reqURL := fmt.Sprintf("%s/api/v1/volumes/%s", p.BaseURL, url.PathEscape(volumeName))
+
+	req, err := http.NewRequest("DELETE", reqURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create deleteVolume request: %w", err)
+	}
+
+	resp, err := p.doRequest(req, "deleteVolume")
+	if err != nil {
+		return fmt.Errorf("deleteVolume failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("deleteVolume failed with status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	klog.Infof("Deleted volume %s", volumeName)
+	return nil
+}
+
+func (p *Primera3ParClientWsImpl) CopyVolume(sourceVolName string, destVolName string) error {
+	destName := prefixOfString(destVolName, 31)
+
+	// Get the dest volume's CPG before we move it aside
+	destVol, err := p.GetVolume(destName)
+	if err != nil {
+		return fmt.Errorf("failed to get dest volume details: %w", err)
+	}
+
+	if destVol.UserCPG == "" {
+		return fmt.Errorf("destination volume %s has no userCPG set", destVolName)
+	}
+
+	// createPhysicalCopy requires the dest volume to not exist. Since the dest volume
+	// is CSI-provisioned, we rename it aside (preserving its internal ID/WWN), then
+	// create the physical copy with the original dest name. Finally, delete the old
+	// empty volume. The CSI driver locates volumes by name, so the new volume (with
+	// the source's data) seamlessly takes its place.
+	tempName := prefixOfString("mtv-old-"+destName, 31)
+	klog.Infof("Renaming dest volume %s -> %s (CPG: %s) before physical copy", destName, tempName, destVol.UserCPG)
+	if err := p.renameVolume(destName, tempName); err != nil {
+		return fmt.Errorf("failed to rename dest volume aside: %w", err)
+	}
+
+	reqURL := fmt.Sprintf("%s/api/v1/volumes/%s", p.BaseURL, url.PathEscape(prefixOfString(sourceVolName, 31)))
+
+	requestBody := map[string]interface{}{
+		"action": "createPhysicalCopy",
+		"parameters": map[string]interface{}{
+			"destVolume": destName,
+			"destCPG":    destVol.UserCPG,
+			"online":     true,
+		},
+	}
+
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		return fmt.Errorf("failed to encode JSON for CopyVolume: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return fmt.Errorf("failed to create CopyVolume request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := p.doRequest(req, "CopyVolume")
+	if err != nil {
+		p.rollbackRename(tempName, destName)
+		return fmt.Errorf("CopyVolume failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		p.rollbackRename(tempName, destName)
+		return fmt.Errorf("failed to read CopyVolume response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		p.rollbackRename(tempName, destName)
+		return fmt.Errorf("CopyVolume failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var taskResp struct {
+		TaskID int `json:"taskid"`
+	}
+	if err := json.Unmarshal(body, &taskResp); err != nil {
+		return fmt.Errorf("failed to parse CopyVolume response: %w", err)
+	}
+
+	if taskResp.TaskID != 0 {
+		klog.Infof("CopyVolume started async task %d, polling for completion", taskResp.TaskID)
+		if err := p.waitForTask(taskResp.TaskID); err != nil {
+			return err
+		}
+	}
+
+	// Physical copy succeeded — clean up the old empty volume
+	if err := p.deleteVolume(tempName); err != nil {
+		klog.Warningf("Failed to delete old volume %s (non-fatal): %v", tempName, err)
+	}
+
+	return nil
+}
+
+func (p *Primera3ParClientWsImpl) rollbackRename(tempName, origName string) {
+	klog.Warningf("Rolling back: renaming %s -> %s", tempName, origName)
+	if err := p.renameVolume(tempName, origName); err != nil {
+		klog.Errorf("Rollback rename failed: %v", err)
+	}
+}
+
+// waitForTask polls the 3PAR task API until the task completes or fails.
+// 3PAR task status: 1 = done, 2 = active, 3 = cancelled, 4 = failed.
+func (p *Primera3ParClientWsImpl) waitForTask(taskID int) error {
+	const (
+		taskStatusDone      = 1
+		taskStatusActive    = 2
+		taskStatusCancelled = 3
+		taskStatusFailed    = 4
+		pollInterval        = 5 * time.Second
+		maxWait             = 30 * time.Minute
+	)
+
+	type task3PAR struct {
+		ID         int    `json:"id"`
+		Status     int    `json:"status"`
+		Name       string `json:"name"`
+		FinishTime string `json:"finishTime"`
+	}
+
+	deadline := time.Now().Add(maxWait)
+
+	for {
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timed out waiting for task %d after %v", taskID, maxWait)
+		}
+
+		time.Sleep(pollInterval)
+
+		taskURL := fmt.Sprintf("%s/api/v1/tasks/%d", p.BaseURL, taskID)
+		req, err := http.NewRequest("GET", taskURL, nil)
+		if err != nil {
+			return fmt.Errorf("failed to create task status request: %w", err)
+		}
+
+		var t task3PAR
+		if err := p.doRequestUnmarshalResponse(req, "getTask", &t); err != nil {
+			return fmt.Errorf("failed to get task %d status: %w", taskID, err)
+		}
+
+		switch t.Status {
+		case taskStatusDone:
+			klog.Infof("Task %d completed successfully", taskID)
+			return nil
+		case taskStatusActive:
+			klog.V(2).Infof("Task %d still active, polling again...", taskID)
+			continue
+		case taskStatusCancelled:
+			return fmt.Errorf("task %d was cancelled", taskID)
+		case taskStatusFailed:
+			return fmt.Errorf("task %d failed (name: %s)", taskID, t.Name)
+		default:
+			klog.Warningf("Task %d has unknown status %d, continuing to poll", taskID, t.Status)
+		}
+	}
+}
+
+func (p *Primera3ParClientWsImpl) GetVolumes() ([]Volume, error) {
+	url := fmt.Sprintf("%s/api/v1/volumes", p.BaseURL)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	type GetVolumesResponse struct {
+		Members []Volume `json:"members"`
+	}
+
+	var response GetVolumesResponse
+
+	err = p.doRequestUnmarshalResponse(req, "getVolumes", &response)
+	if err != nil {
+		return nil, err
+	}
+
+	return response.Members, nil
 }

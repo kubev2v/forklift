@@ -28,7 +28,7 @@ function check_deps() {
 
 function get_versions() {
   echo "Fetching versions..."
-  VERSIONS=$(curl -s -H "Authorization: Bearer $JIRA_CLI_KEY" \
+  VERSIONS=$(curl -s -H "Authorization: Bearer $JIRA_API_TOKEN" \
         https://issues.redhat.com/rest/api/2/project/MTV/versions)
 }
 
@@ -127,7 +127,21 @@ function create_ticket() {
     --affects-version="$AFFECTED_VERSION" \
     --label="$DEFAULT_LABELS" \
     --component="$DEFAULT_COMPONENT" \
-    --web
+    --no-input | grep -oE "$PROJECT-[0-9]+")
+
+  if [[ -z "$ISSUE_KEY" ]]; then
+    echo "Error: Failed to create issue"
+    exit 1
+  fi
+
+  echo "Created issue: $ISSUE_KEY"
+
+  # Add issue to epic
+  echo "Adding issue to epic $EPIC_KEY..."
+  jira epic add "$EPIC_KEY" "$ISSUE_KEY"
+
+  # Open in browser
+  jira issue view "$ISSUE_KEY"
 }
 
 # --- Main ---

@@ -107,6 +107,18 @@ test-copy-using-cli-3par: build
 		--storage-skip-ssl-verification=true \
 		--kubeconfig=$$KUBECONFIG
 
+test-copy-using-cli-3par-rdm: build
+	bin/vsphere-xcopy-volume-populator \
+		--source-vm-id="vm-114648" \
+		--source-vmdk="[eco-iscsi-ds1] vm-8/vm-8_1.vmdk" \
+		--owner-name=3par-rdm-100g \
+		--owner-uid=3par-rdm-100g \
+		--target-namespace=default \
+		--storage-vendor-product=primera3par \
+		--secret-name=populator-secret \
+		--storage-skip-ssl-verification=true \
+		--kubeconfig=$$KUBECONFIG
+
 test-copy-using-cli-pureflasharray: build
 	bin/vsphere-xcopy-volume-populator \
 		--source-vm-id="vm-67218" \
@@ -118,6 +130,19 @@ test-copy-using-cli-pureflasharray: build
 		--secret-name=pure \
 		--kubeconfig=$$KUBECONFIG \
 		--esxi-clone-method=vib
+
+test-copy-using-cli-pureflasharray-rdm: build
+	bin/vsphere-xcopy-volume-populator \
+		--source-vm-id="vm-147864" \
+		--source-vmdk="[eco-iscsi-pure] purerdm/purerdm.vmdk" \
+		--owner-name=pure10g \
+		--owner-uid=pure10g \
+		--target-namespace=default \
+		--storage-vendor-product=pureFlashArray \
+		--secret-name=pure \
+		--kubeconfig=$$KUBECONFIG \
+		--esxi-clone-method=vib
+
 
 
 test-copy-using-cli-powerflex: build
