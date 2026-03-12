@@ -48,6 +48,8 @@ spec:
           value: "v1"
         - name: VIRT_V2V_IMAGE
           value: {{ virt_v2v_image_fqin }}
+        - name: VIRT_V2V_IMAGE_XFS
+          value: {{ virt_v2v_image_xfs_fqin }}
         - name: API_PORT
           value: "8443"
         - name: METRICS_PORT
@@ -179,8 +181,18 @@ spec:
 {% endif %}
         - name: VIRT_V2V_EXTRA_ARGS
           value: "{{ virt_v2v_extra_args }}"
+        - name: VIRT_V2V_INSPECTOR_EXTRA_ARGS
+          value: "{{ virt_v2v_inspector_extra_args }}"
         - name: VIRT_V2V_EXTRA_CONF_CONFIG_MAP
           value: "{{ virt_v2v_extra_conf_config_map }}"
+{% if virt_v2v_memsize is defined and virt_v2v_memsize != "" %}
+        - name: VIRT_V2V_MEMSIZE
+          value: "{{ virt_v2v_memsize }}"
+{% endif %}
+{% if virt_v2v_smp is defined and virt_v2v_smp != "" %}
+        - name: VIRT_V2V_SMP
+          value: "{{ virt_v2v_smp }}"
+{% endif %}
         - name: VIRT_V2V_CONTAINER_LIMITS_CPU
           value: "{{ virt_v2v_container_limits_cpu }}"
         - name: VIRT_V2V_CONTAINER_LIMITS_MEMORY

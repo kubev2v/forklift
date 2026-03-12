@@ -32,7 +32,9 @@ type populatorSettings struct {
 }
 
 func detectDiskType(ctx context.Context, client vmware.Client, vmId string, vmdkPath string) (DiskType, error) {
-	klog.V(2).Infof("Detecting disk type for VM %s, disk %s", vmId, vmdkPath)
+	log := klog.Background().WithName("copy-offload").WithName("disk-type")
+	ctx = klog.NewContext(ctx, log)
+	log.V(2).Info("detecting disk type", "vm", vmId, "disk", vmdkPath)
 
 	backing, err := client.GetVMDiskBacking(ctx, vmId, vmdkPath)
 	if err != nil {
@@ -41,13 +43,13 @@ func detectDiskType(ctx context.Context, client vmware.Client, vmId string, vmdk
 
 	switch {
 	case backing.VVolId != "":
-		klog.Infof("Detected VVol disk (VVolId: %s)", backing.VVolId)
+		log.Info("detected VVol disk", "vvolId", backing.VVolId)
 		return DiskTypeVVol, nil
 	case backing.IsRDM:
-		klog.Infof("Detected RDM disk (DeviceName: %s)", backing.DeviceName)
+		log.Info("detected RDM disk", "device", backing.DeviceName)
 		return DiskTypeRDM, nil
 	default:
-		klog.Infof("Detected VMDK disk")
+		log.Info("detected VMDK disk")
 		return DiskTypeVMDK, nil
 	}
 }

@@ -1,0 +1,64 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: https://cdn.redhat.com/content/dist/rhel9/9.6/x86_64/appstream/os/Packages/l/libvirt-libs-10.10.0-7.7.el9_6.x86_64.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 5325120
+    checksum: sha256:aaa2440e2be453e33ddb5480163fe4d7b70fb51efdd3d40542d87d7727af58d9
+    name: libvirt-libs
+    evr: 10.10.0-7.7.el9_6
+    sourcerpm: libvirt-10.10.0-7.7.el9_6.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9.6/x86_64/baseos/os/Packages/c/cyrus-sasl-gssapi-2.1.27-21.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 28739
+    checksum: sha256:ea04812e70f7185355de2cf44ccd03dba237e3671b670cd3c53debd7665bc667
+    name: cyrus-sasl-gssapi
+    evr: 2.1.27-21.el9
+    sourcerpm: cyrus-sasl-2.1.27-21.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9.6/x86_64/baseos/os/Packages/c/cyrus-sasl-lib-2.1.27-21.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 792070
+    checksum: sha256:d92f2383e68062b9ded78afa8814f18d84fee98e09781f541169627272ce85cf
+    name: cyrus-sasl-lib
+    evr: 2.1.27-21.el9
+    sourcerpm: cyrus-sasl-2.1.27-21.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9.6/x86_64/baseos/os/Packages/l/libnl3-3.11.0-1.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 376137
+    checksum: sha256:89728a253a5bf1c8e01c40573f1283d40188e003bdbd4ac565f8b0f05bced55c
+    name: libnl3
+    evr: 3.11.0-1.el9
+    sourcerpm: libnl3-3.11.0-1.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9.6/x86_64/baseos/os/Packages/l/libssh-0.10.4-15.el9_6.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 218637
+    checksum: sha256:7ee387359681560df2ed7df7a18b9ebd7c49b23d24342de891154599f8e6db8a
+    name: libssh
+    evr: 0.10.4-15.el9_6
+    sourcerpm: libssh-0.10.4-15.el9_6.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9.6/x86_64/baseos/os/Packages/l/libssh-config-0.10.4-15.el9_6.noarch.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 7991
+    checksum: sha256:845c662af1f78eee4a1f67977a805b551edc939e21d3b201cb332682b18443fb
+    name: libssh-config
+    evr: 0.10.4-15.el9_6
+    sourcerpm: libssh-0.10.4-15.el9_6.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9.6/x86_64/baseos/os/Packages/n/numactl-libs-2.0.19-1.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 33709
+    checksum: sha256:ce2f00b2527e29f6b389e5899750e2b6eb1e5ce484ddfdcd6f01fa311efe7860
+    name: numactl-libs
+    evr: 2.0.19-1.el9
+    sourcerpm: numactl-2.0.19-1.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9.6/x86_64/codeready-builder/os/Packages/l/libvirt-devel-10.10.0-7.7.el9_6.x86_64.rpm
+    repoid: codeready-builder-for-rhel-9-x86_64-rpms
+    size: 214197
+    checksum: sha256:47f8657312197e50d8da0e7584d4452c731d30c7e78974c44f7911a193fb3ad1
+    name: libvirt-devel
+    evr: 10.10.0-7.7.el9_6
+    sourcerpm: libvirt-10.10.0-7.7.el9_6.src.rpm
+  source: []
+  module_metadata: []

@@ -1,17 +1,80 @@
 {
-    "packageRules": [
-      {
-        "matchBaseBranches": ["/^release.*/"],
-        "matchManagers": ["dockerfile", "rpm", "gomod"],
-        "enabled": false
-      }
-    ],
-    "autoApprove": true,
-    "tekton": {
-        "automerge": true,
-        "automergeStrategy": "rebase",
-        "automergeType": "pr",
-        "enabled": true,
-        "platformAutomerge": true
+  "packageRules": [
+    {
+      "description": "Disable go updates for .konflux directory",
+      "matchFileNames": [
+        ".konflux/**"
+      ],
+      "enabled": false
+    },
+    {
+      "matchBaseBranches": [
+        "/^release.*/",
+        "main"
+      ],
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
+      "groupName": "all go non-major dependencies",
+      "automerge": true
+    },
+    {
+      "matchBaseBranches": [
+        "main"
+      ],
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "groupName": "all go major dependencies"
+    },
+    {
+      "matchBaseBranches": [
+        "/^release.*/",
+        "main"
+      ],
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
+      "groupName": "all dockerfile non-major dependencies",
+      "automerge": true
+    },
+    {
+      "matchBaseBranches": [
+        "main"
+      ],
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "groupName": "all dockerfile major dependencies"
     }
+  ],
+  "autoApprove": true,
+  "tekton": {
+    "managerFilePatterns": [
+      "/\\.tekton/.*\\.yaml$/"
+    ],
+    "automerge": true,
+    "automergeStrategy": "rebase",
+    "automergeType": "pr",
+    "enabled": true,
+    "platformAutomerge": true
+  }
 }

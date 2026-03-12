@@ -145,6 +145,21 @@ type VM struct {
 	//
 	// +optional
 	DeleteVmOnFailMigration bool `json:"deleteVmOnFailMigration,omitempty"`
+	// MigrateSharedDisks controls whether shared disks are included in the migration for this VM.
+	// When nil (default), the plan-level migrateSharedDisks value is used.
+	// When explicitly set to true, shared disks are migrated for this VM.
+	// When explicitly set to false, shared disks are skipped for this VM.
+	//
+	// +optional
+	MigrateSharedDisks *bool `json:"migrateSharedDisks,omitempty"`
+	// EnableNestedVirtualization controls whether nested virtualization (vmx/svm CPU features)
+	// is enabled on the target VM.
+	// When nil (default), the plan-level enableNestedVirtualization value is used.
+	// When explicitly set to true, nested virtualization is enabled for this VM.
+	// When explicitly set to false, nested virtualization is disabled for this VM.
+	//
+	// +optional
+	EnableNestedVirtualization *bool `json:"enableNestedVirtualization,omitempty"`
 }
 
 // Find a Hook for the specified step.
@@ -178,6 +193,8 @@ type VMStatus struct {
 	Firmware string `json:"firmware,omitempty"`
 	// The Operating System detected by virt-v2v.
 	OperatingSystem string `json:"operatingSystem,omitempty"`
+	// Boot disk index (0-based) detected by virt-v2v. nil means undetected.
+	DetectedBootDisk *int `json:"detectedBootDisk,omitempty"`
 	// The new name of the VM after matching DNS1123 requirements.
 	NewName string `json:"newName,omitempty"`
 

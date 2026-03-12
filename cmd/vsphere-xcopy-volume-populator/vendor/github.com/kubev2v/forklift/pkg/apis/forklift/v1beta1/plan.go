@@ -305,12 +305,27 @@ type PlanSpec struct {
 	// execution order. If not specified, no custom scripts are injected.
 	// +optional
 	CustomizationScripts *core.ObjectReference `json:"customizationScripts,omitempty"`
+	// VirtV2vImage overrides the global virt-v2v container image for this plan.
+	// When set, virt-v2v pods created by this plan will use this image instead
+	// of the cluster-wide VIRT_V2V_IMAGE setting.
+	// Use this to run different virt-v2v builds for specific migration scenarios
+	VirtV2vImage string `json:"virtV2vImage,omitempty"`
 }
 
 // Find a planned VM.
 func (r *PlanSpec) FindVM(ref ref.Ref) (v *plan.VM, found bool) {
-	for _, vm := range r.VMs {
-		if vm.ID == ref.ID {
+	for i := range r.VMs {
+		vm := r.VMs[i]
+		if vm.ID != "" && vm.ID == ref.ID {
+			found = true
+			v = &vm
+			return
+		}
+	}
+	// Fallback: match by Name when the spec VM has no ID
+	for i := range r.VMs {
+		vm := r.VMs[i]
+		if vm.ID == "" && vm.Name != "" && vm.Name == ref.Name {
 			found = true
 			v = &vm
 			return
@@ -361,7 +376,7 @@ func (p *Plan) IsWarm() bool {
 // just use virt-v2v directly to convert the vm while copying data over. In other
 // cases, we use CDI to transfer disks to the destination cluster and then use
 // virt-v2v-in-place to convert these disks after cutover.
-func (p *Plan) ShouldUseV2vForTransfer() (bool, error) {
+func (p *Plan) ShouldUseV2vForTransfer(vmRef ref.Ref) (bool, error) {
 	source := p.Referenced.Provider.Source
 	if source == nil {
 		return false, liberr.New("Cannot analyze plan, source provider is missing.")
@@ -373,13 +388,17 @@ func (p *Plan) ShouldUseV2vForTransfer() (bool, error) {
 
 	switch source.Type() {
 	case VSphere:
-		// The virt-v2v transferes all disks attached to the VM. If we want to skip the shared disks so we don't transfer
+		// The virt-v2v transfers all disks attached to the VM. If we want to skip the shared disks so we don't transfer
 		// them multiple times we need to manage the transfer using KubeVirt CDI DataVolumes and v2v-in-place.
-		return !p.IsWarm() && // The Warm Migraiton needs to use CDI to manage the snapshot delta
-				destination.IsHost() && // We can't monitor progress from the guest converison pod on the remote clusters
-				p.Spec.MigrateSharedDisks && // virt-v2v migrates all disks, to skip shared we need to control the disk selection
-				!p.Spec.SkipGuestConversion && // virt-v2v always converts the guest, to perform RawCopyMode we need to copy just disks via CDI
-				p.Spec.Type != MigrationOnlyConversion, // For only v2v-in-place conversion, we don't want to populate disks by v2v
+		migrateSharedDisks := p.Spec.MigrateSharedDisks
+		if vm, found := p.Spec.FindVM(vmRef); found && vm.MigrateSharedDisks != nil {
+			migrateSharedDisks = *vm.MigrateSharedDisks
+		}
+		return !p.IsWarm() &&
+				destination.IsHost() &&
+				migrateSharedDisks &&
+				!p.Spec.SkipGuestConversion &&
+				p.Spec.Type != MigrationOnlyConversion,
 			nil
 	case Ova, HyperV:
 		return true, nil

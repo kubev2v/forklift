@@ -3,6 +3,7 @@ package vsphere
 import (
 	"errors"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -215,6 +216,43 @@ func (r *VM1) Content(detail int) interface{} {
 	}
 
 	return r
+}
+
+func (r *VM1) filterDisksWithBus(disks []model.Disk, bus string) []model.Disk {
+	var resp []model.Disk
+	for _, disk := range disks {
+		if disk.Bus == bus {
+			resp = append(resp, disk)
+		}
+	}
+	return resp
+}
+
+// The disks are first sorted by the buses going in order SCSI, SATA and IDE and within the controller the
+// disks are sorted by the key. This needs to be done because the virt-v2v outputs the files in an order,
+// which it gets from libvirt. The libvirt orders the devices starting with SCSI, SATA and IDE.
+// When we were sorting by the keys the order was IDE, SATA and SCSI. This cause that some PVs were populated by
+// incorrect disks.
+// https://github.com/libvirt/libvirt/blob/d7b3be8ca35ffcbbece2c65120ab3ac9ec3dff0c/src/vmx/vmx.c#L1730
+func (r *VM1) sortedDisksByBusses(disks []model.Disk, buses []string) []model.Disk {
+	var resp []model.Disk
+	for _, bus := range buses {
+		disksWithBus := r.filterDisksWithBus(disks, bus)
+		sort.Slice(disksWithBus, func(i, j int) bool {
+			return disksWithBus[i].Key < disksWithBus[j].Key
+		})
+		resp = append(resp, disksWithBus...)
+	}
+	return resp
+}
+func (r *VM1) SortedDisksAsLibvirt() []model.Disk {
+	var buses = []string{model.SCSI, model.SATA, model.IDE, model.NVME}
+	return r.sortedDisksByBusses(r.Disks, buses)
+}
+
+func (r *VM1) SortedDisksAsVmware() []model.Disk {
+	var buses = []string{model.SATA, model.IDE, model.SCSI, model.NVME}
+	return r.sortedDisksByBusses(r.Disks, buses)
 }
 
 // VM full detail.

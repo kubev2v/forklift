@@ -33,6 +33,7 @@ import (
 	template "github.com/openshift/api/template/v1"
 	"github.com/pkg/profile"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	storagev1 "k8s.io/api/storage/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	cnv "kubevirt.io/api/core/v1"
 	export "kubevirt.io/api/export/v1alpha1"
@@ -111,6 +112,10 @@ func main() {
 	log.Info("setting up scheme")
 	if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "unable to add K8s APIs to scheme")
+		os.Exit(1)
+	}
+	if err := storagev1.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "unable to add storage APIs to scheme")
 		os.Exit(1)
 	}
 	if err := net.AddToScheme(mgr.GetScheme()); err != nil {

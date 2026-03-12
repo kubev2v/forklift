@@ -21,6 +21,7 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	hvutil "github.com/kubev2v/forklift/pkg/controller/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	inspectionparser "github.com/kubev2v/forklift/pkg/controller/plan/adapter/vsphere"
@@ -101,6 +102,10 @@ const (
 	kMigration = "migration"
 	// plan label (value=UID)
 	kPlan = "plan"
+	// plan name label (value=Plan.Name)
+	kPlanName = "plan-name"
+	// plan namespace label (value=Plan.Namespace)
+	kPlanNamespace = "plan-namespace"
 	// VM label (value=vmID)
 	kVM = "vmID"
 	// VM UUID label
@@ -962,7 +967,7 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) (er
 					Name: "main",
 					// For v2v the consumer pod is used only when we execute cold migration with el9.
 					// In that case, we could benefit from pulling the image of the conversion pod, so it will be present on the node.
-					Image:   Settings.Migration.VirtV2vImage,
+					Image:   getVirtV2vImage(r.Plan),
 					Command: []string{"/bin/sh"},
 					Resources: core.ResourceRequirements{
 						Requests: core.ResourceList{
@@ -1097,9 +1102,9 @@ func (r *KubeVirt) EnsureVirtV2vPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvc
 	return
 }
 
-// EnsureOVAVirtV2VPVCStatus checks if the provider storage PVC is ready.
+// EnsureProviderVirtV2VPVCStatus checks if the provider storage PVC is ready.
 // Works for both OVA (NFS) and HyperV (SMB) PVCs.
-func (r *KubeVirt) EnsureOVAVirtV2VPVCStatus(vmID string) (ready bool, err error) {
+func (r *KubeVirt) EnsureProviderVirtV2VPVCStatus(vmID string) (ready bool, err error) {
 	pvcs := &core.PersistentVolumeClaimList{}
 
 	// Build labels based on provider type
@@ -1227,12 +1232,13 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 	}
 	defer resp.Body.Close()
 
+	vmConf, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
 	switch r.Source.Provider.Type() {
 	case api.Ova, api.HyperV:
-		vmConf, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
 		if vm.Firmware, err = util.GetFirmwareFromYaml(vmConf); err != nil {
 			return liberr.Wrap(err)
 		}
@@ -1245,6 +1251,13 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 			return liberr.Wrap(err)
 		}
 		r.Log.Info("Setting the vm OS ", vm.OperatingSystem, "vmId", vm.ID)
+	}
+
+	if bootDiskIndex, bootOrderErr := util.GetDiskBootOrderFromYaml(vmConf); bootOrderErr != nil {
+		r.Log.Error(bootOrderErr, "Failed to extract boot order from virt-v2v output", "vmId", vm.ID)
+	} else if bootDiskIndex >= 0 {
+		vm.DetectedBootDisk = &bootDiskIndex
+		r.Log.Info("Detected boot disk from virt-v2v output", "bootDiskIndex", bootDiskIndex, "vmId", vm.ID)
 	}
 
 	// Fetch warnings before shutting down
@@ -1368,7 +1381,7 @@ func (r *KubeVirt) GetPodsWithLabels(podLabels map[string]string) (pods *core.Po
 
 // Deletes an object from destination cluster associated with the VM.
 func (r *KubeVirt) DeleteObject(object client.Object, vm *plan.VMStatus, message, objType string, options ...client.DeleteOption) (err error) {
-	err = r.Destination.Client.Delete(context.TODO(), object)
+	err = r.Destination.Client.Delete(context.TODO(), object, options...)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
 			err = nil
@@ -1390,22 +1403,30 @@ func (r *KubeVirt) DeleteObject(object client.Object, vm *plan.VMStatus, message
 
 // Delete any hook jobs that belong to a VM migration.
 func (r *KubeVirt) DeleteHookJobs(vm *plan.VMStatus) (err error) {
-	vmLabels := r.vmAllButMigrationLabels(vm.Ref)
+	// Build labels that match hook jobs (plan + vmID + resource:hook-config)
+	labels := map[string]string{
+		kPlan:     string(r.Plan.UID),
+		kVM:       vm.Ref.ID,
+		kResource: ResourceHookConfig,
+	}
+
 	list := &batch.JobList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(vmLabels),
-			Namespace:     r.Plan.Spec.TargetNamespace,
+			LabelSelector: k8slabels.SelectorFromSet(labels),
+			Namespace:     r.Plan.Namespace,
 		},
 	)
+
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
 	for _, object := range list.Items {
-		err = r.DeleteObject(&object, vm, "Deleted hook job.", "job")
+		err = r.DeleteObject(&object, vm, "Deleted hook job.", "job",
+			client.PropagationPolicy(meta.DeletePropagationForeground))
 		if err != nil {
 			return err
 		}
@@ -1954,7 +1975,7 @@ func (r *KubeVirt) emptyVm(vm *plan.VMStatus) (virtualMachine *cnv.VirtualMachin
 	virtualMachine = &cnv.VirtualMachine{
 		TypeMeta: meta.TypeMeta{
 			APIVersion: "v1",
-			Kind:       "VirtualMachine",
+			Kind:       util.VirtualMachineKind,
 		},
 		ObjectMeta: meta.ObjectMeta{
 			Namespace: r.Plan.Spec.TargetNamespace,
@@ -2114,7 +2135,7 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 	nonRoot := true
 	allowPrivilageEscalation := false
 	// virt-v2v image
-	useV2vForTransfer, vErr := r.Context.Plan.ShouldUseV2vForTransfer()
+	useV2vForTransfer, vErr := r.Context.Plan.ShouldUseV2vForTransfer(vm.Ref)
 	if vErr != nil {
 		err = vErr
 		return
@@ -2226,7 +2247,21 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 		environment = append(environment,
 			core.EnvVar{
 				Name:  "V2V_NewName",
-				Value: vm.NewName,
+				Value: r.getNewVMName(vm),
+			})
+	}
+	if settings.Settings.Migration.VirtV2vMemSize > 0 {
+		environment = append(environment,
+			core.EnvVar{
+				Name:  "V2V_memSize",
+				Value: strconv.Itoa(settings.Settings.Migration.VirtV2vMemSize),
+			})
+	}
+	if settings.Settings.Migration.VirtV2vSmp > 0 {
+		environment = append(environment,
+			core.EnvVar{
+				Name:  "V2V_smp",
+				Value: strconv.Itoa(settings.Settings.Migration.VirtV2vSmp),
 			})
 	}
 
@@ -2373,7 +2408,7 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 							},
 						},
 					},
-					Image:         Settings.Migration.VirtV2vImage,
+					Image:         getVirtV2vImage(r.Plan),
 					VolumeMounts:  volumeMounts,
 					VolumeDevices: volumeDevices,
 					Ports: []core.ContainerPort{
@@ -2435,7 +2470,7 @@ func (r *KubeVirt) buildInspectionPodEnvironment(env []core.EnvVar, vm *plan.VMS
 	}
 
 	// Add disks to be inspected
-	for i, disk := range virtualMachine.Disks {
+	for i, disk := range virtualMachine.SortedDisksAsLibvirt() {
 		// If parent disk is empty then fail with error message
 		if disk.ParentFile != "" {
 			newEnv = append(newEnv, core.EnvVar{
@@ -2856,8 +2891,10 @@ func (r *KubeVirt) secret(vmRef ref.Ref, setSecretData func(*core.Secret) error,
 // Labels for plan and migration.
 func (r *KubeVirt) planLabels() map[string]string {
 	return map[string]string{
-		kMigration: string(r.Migration.UID),
-		kPlan:      string(r.Plan.GetUID()),
+		kMigration:     string(r.Migration.UID),
+		kPlan:          string(r.Plan.GetUID()),
+		kPlanName:      r.Plan.Name,
+		kPlanNamespace: r.Plan.Namespace,
 	}
 }
 
@@ -3092,7 +3129,7 @@ func vmOwnerReference(vm *cnv.VirtualMachine) (ref meta.OwnerReference) {
 	isController := false
 	ref = meta.OwnerReference{
 		APIVersion:         "kubevirt.io/v1",
-		Kind:               "VirtualMachine",
+		Kind:               util.VirtualMachineKind,
 		Name:               vm.Name,
 		UID:                vm.UID,
 		BlockOwnerDeletion: &blockOwnerDeletion,
@@ -3357,23 +3394,27 @@ func (r *KubeVirt) BuildPVCForNFS(pv *core.PersistentVolume, vm *plan.VMStatus) 
 
 func (r *KubeVirt) nfsPVLabels(vmID string) map[string]string {
 	return map[string]string{
-		"provider":  r.Plan.Provider.Source.Name,
-		"app":       "forklift",
-		"migration": r.Migration.Name,
-		"plan":      string(r.Plan.UID),
-		"ova":       OvaPVLabel,
-		kVM:         vmID,
+		"provider":     r.Plan.Provider.Source.Name,
+		"app":          "forklift",
+		"migration":    r.Migration.Name,
+		"plan":         string(r.Plan.UID),
+		kPlanName:      r.Plan.Name,
+		kPlanNamespace: r.Plan.Namespace,
+		"ova":          OvaPVLabel,
+		kVM:            vmID,
 	}
 }
 
 func (r *KubeVirt) nfsPVCLabels(vmID string) map[string]string {
 	return map[string]string{
-		"provider":  r.Plan.Provider.Source.Name,
-		"app":       "forklift",
-		"migration": string(r.Migration.UID),
-		"plan":      string(r.Plan.UID),
-		"ova":       OvaPVCLabel,
-		kVM:         vmID,
+		"provider":     r.Plan.Provider.Source.Name,
+		"app":          "forklift",
+		"migration":    string(r.Migration.UID),
+		"plan":         string(r.Plan.UID),
+		kPlanName:      r.Plan.Name,
+		kPlanNamespace: r.Plan.Namespace,
+		"ova":          OvaPVCLabel,
+		kVM:            vmID,
 	}
 }
 
@@ -3384,7 +3425,8 @@ func getEntityPrefixName(resourceType, providerName, planName string) string {
 // BuildPVForSMB creates a static PV for HyperV using SMB CSI driver.
 func (r *KubeVirt) BuildPVForSMB(vm *plan.VMStatus) (pv *core.PersistentVolume) {
 	sourceProvider := r.Source.Provider
-	smbSource := ctrlutil.ParseSMBSource(sourceProvider.Spec.URL)
+	smbUrl := hvutil.SMBUrl(r.Source.Secret)
+	smbSource := ctrlutil.ParseSMBSource(smbUrl)
 	pvNamePrefix := fmt.Sprintf("hyperv-store-pv-%s-%s-", r.Source.Provider.Name, r.Plan.Name)
 
 	// Get secret reference from provider
@@ -3479,24 +3521,28 @@ func (r *KubeVirt) BuildPVCForSMB(pv *core.PersistentVolume, vm *plan.VMStatus) 
 // smbPVLabels returns labels for HyperV SMB PV.
 func (r *KubeVirt) smbPVLabels(vmID string) map[string]string {
 	return map[string]string{
-		"provider":  r.Plan.Provider.Source.Name,
-		"app":       "forklift",
-		"migration": r.Migration.Name,
-		"plan":      string(r.Plan.UID),
-		"hyperv":    HyperVPVLabel,
-		kVM:         vmID,
+		"provider":     r.Plan.Provider.Source.Name,
+		"app":          "forklift",
+		"migration":    r.Migration.Name,
+		"plan":         string(r.Plan.UID),
+		kPlanName:      r.Plan.Name,
+		kPlanNamespace: r.Plan.Namespace,
+		"hyperv":       HyperVPVLabel,
+		kVM:            vmID,
 	}
 }
 
 // smbPVCLabels returns labels for HyperV SMB PVC.
 func (r *KubeVirt) smbPVCLabels(vmID string) map[string]string {
 	return map[string]string{
-		"provider":  r.Plan.Provider.Source.Name,
-		"app":       "forklift",
-		"migration": string(r.Migration.UID),
-		"plan":      string(r.Plan.UID),
-		"hyperv":    HyperVPVCLabel,
-		kVM:         vmID,
+		"provider":     r.Plan.Provider.Source.Name,
+		"app":          "forklift",
+		"migration":    string(r.Migration.UID),
+		"plan":         string(r.Plan.UID),
+		kPlanName:      r.Plan.Name,
+		kPlanNamespace: r.Plan.Namespace,
+		"hyperv":       HyperVPVCLabel,
+		kVM:            vmID,
 	}
 }
 
@@ -3621,4 +3667,16 @@ func (r *KubeVirt) determineRunStrategy(vm *plan.VMStatus) cnv.VirtualMachineRun
 		}
 		return cnv.RunStrategyHalted
 	}
+}
+
+func getVirtV2vImage(plan *api.Plan) string {
+	if plan.Spec.VirtV2vImage != "" {
+		return plan.Spec.VirtV2vImage
+	}
+	if plan.Spec.XfsCompatibility {
+		if Settings.Migration.VirtV2vImageXFS != "" {
+			return Settings.Migration.VirtV2vImageXFS
+		}
+	}
+	return Settings.Migration.VirtV2vImage
 }

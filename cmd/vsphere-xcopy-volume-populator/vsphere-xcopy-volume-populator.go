@@ -24,6 +24,7 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/primera3par"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/pure"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vantara"
+	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/version"
 
 	forklift "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/prometheus/client_golang/prometheus"
@@ -36,8 +37,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 )
-
-var version = "unknown"
 
 var (
 	crName                     string
@@ -74,6 +73,7 @@ var (
 
 func main() {
 	handleArgs()
+	klog.Info(version.Get())
 
 	var storageApi populator.StorageApi
 	product := forklift.StorageVendorProduct(storageVendor)
@@ -186,6 +186,7 @@ func main() {
 		klog.Fatalf("Failed to fetch the volume handle details from the target pvc %s: %s", ownerName, err)
 	}
 
+	klog.InfoS("populator", "stage", "setupTracing")
 	progressCounter, xcopyUsedGauge, err := setupTracingMetrics()
 	if err != nil {
 		klog.Fatal(err)
@@ -195,13 +196,18 @@ func main() {
 	xCopyUsedCh := make(chan int)
 	quitCh := make(chan error)
 
+	log := klog.Background().WithName("copy-offload").WithValues("pvc", ownerName, "source_vmdk", sourceVMDKFile)
+	cloneLog := log.WithName("xcopy").WithName("clone")
+	log.Info("copy-offload started")
+
 	hll := populator.NewHostLeaseLocker(clientSet)
+	klog.InfoS("populator", "stage", "starting")
 	go p.Populate(sourceVmId, sourceVMDKFile, pv, hll, progressCh, xCopyUsedCh, quitCh)
 
 	for {
 		select {
 		case p := <-progressCh:
-			klog.Infof(" progress reported %d%%", p)
+			cloneLog.Info("clone progress", "progress", p)
 			metric := dto.Metric{}
 			if err := progressCounter.WithLabelValues(ownerUID).Write(&metric); err != nil {
 				klog.Error(err)
@@ -209,19 +215,19 @@ func main() {
 				progressCounter.WithLabelValues(ownerUID).Add(float64(p) - metric.Counter.GetValue())
 			}
 		case c := <-xCopyUsedCh:
-			klog.Infof(" xcopy used reported: %d", c)
+			cloneLog.Info("xcopy", "xcopyUsed", c)
 			metric := dto.Metric{}
 			if err := xcopyUsedGauge.WithLabelValues(ownerUID).Write(&metric); err != nil {
-				klog.Error("failed to write to the xcopy used gauge", err)
+				log.Error(err, "failed to write xcopy used gauge")
 			} else {
 				xcopyUsedGauge.WithLabelValues(ownerUID).Set(float64(c))
 			}
 		case q := <-quitCh:
-			klog.Infof("channel quit %s", q)
 			if q != nil {
+				log.Error(q, "copy-offload failed")
 				klog.Fatal(q)
 			}
-
+			log.Info("copy-offload finished")
 			return
 		}
 	}
@@ -288,7 +294,7 @@ func handleArgs() {
 	flag.StringVar(&secretName, "secret-name", "", "Secret name the populator controller uses it to mount env vars from it. Not for use internally")
 	flag.StringVar(&sourceVmId, "source-vm-id", "", "VM object id in vsphere")
 	flag.StringVar(&sourceVMDKFile, "source-vmdk", "", "File name to populate")
-	flag.StringVar(&storageVendor, "storage-vendor-product", os.Getenv("STORAGE_VENDOR"), "The storage vendor to work with. Current values: [vantara, ontap, primera3par, flashsystem]")
+	flag.StringVar(&storageVendor, "storage-vendor-product", os.Getenv("STORAGE_VENDOR"), "The storage vendor to work with. Current values: [flashsystem, infinibox, ontap, powerflex, powermax, powerstore, primera3par, pureFlashArray, vantara]")
 	flag.StringVar(&targetNamespace, "target-namespace", "", "Contents to populate file with")
 	flag.StringVar(&storageHostname, "storage-hostname", os.Getenv("STORAGE_HOSTNAME"), "The storage vendor api hostname")
 	flag.StringVar(&storageUsername, "storage-username", os.Getenv("STORAGE_USERNAME"), "The storage vendor api username")
@@ -310,8 +316,8 @@ func handleArgs() {
 	flag.Parse()
 
 	if showVersion {
-		fmt.Println(os.Args[0], version)
-		fmt.Printf("VIB version: %s\n", populator.VibVersion)
+		klog.InfoS("populator", "version", version.Version, "vib", version.VibVersion)
+		klog.Info(version.Get())
 		os.Exit(0)
 	}
 

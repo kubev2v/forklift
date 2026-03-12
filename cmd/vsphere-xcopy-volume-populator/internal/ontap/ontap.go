@@ -19,7 +19,8 @@ const OntapProviderID = "600a0980"
 var _ populator.VMDKCapable = &NetappClonner{}
 
 type NetappClonner struct {
-	api api.OntapAPI
+	api                  api.OntapAPI
+	initiatorHostOrGroup string
 }
 
 // Map the targetLUN to the initiator group.
@@ -35,9 +36,33 @@ func (c *NetappClonner) UnMap(initatorGroup string, targetLUN populator.LUN, _ p
 	return c.api.LunUnmap(context.TODO(), initatorGroup, targetLUN.Name)
 }
 
+func (c *NetappClonner) MapTarget(targetLUN populator.LUN, context populator.MappingContext) (populator.LUN, error) {
+	return c.Map(c.initiatorHostOrGroup, targetLUN, context)
+}
+
+func (c *NetappClonner) UnmapTarget(targetLUN populator.LUN, context populator.MappingContext) error {
+	return c.UnMap(c.initiatorHostOrGroup, targetLUN, context)
+}
+
 func (c *NetappClonner) EnsureClonnerIgroup(initiatorGroup string, adapterIds []string) (populator.MappingContext, error) {
+	// Detect protocol from adapters to avoid mixed protocol groups
+	protocol := "mixed"
+	for _, id := range adapterIds {
+		if strings.HasPrefix(id, "fc.") || strings.HasPrefix(id, "20") {
+			protocol = "fcp" // NetApp uses 'fcp' for Fibre Channel protocol
+			break
+		}
+		if strings.HasPrefix(id, "iqn.") || strings.HasPrefix(id, "eui.") || strings.HasPrefix(id, "nqn.") {
+			protocol = "iscsi"
+			break
+		}
+	}
+
+	// Append protocol suffix to avoid mixed protocol igroup errors
+	c.initiatorHostOrGroup = initiatorGroup + "-" + protocol
+
 	// esxs needs "vmware" as the group protocol.
-	err := c.api.IgroupCreate(context.Background(), initiatorGroup, "mixed", "vmware")
+	err := c.api.IgroupCreate(context.Background(), c.initiatorHostOrGroup, protocol, "vmware")
 	if err != nil {
 		// TODO ignore if exists error? with ontap there is no error
 		return nil, fmt.Errorf("failed adding igroup %w", err)
@@ -58,9 +83,13 @@ func (c *NetappClonner) EnsureClonnerIgroup(initiatorGroup string, adapterIds []
 			ontapInitiator = converted
 		}
 
-		err = c.api.EnsureIgroupAdded(context.Background(), initiatorGroup, ontapInitiator)
+		err = c.api.EnsureIgroupAdded(context.Background(), c.initiatorHostOrGroup, ontapInitiator)
 		if err != nil {
 			klog.Warningf("failed adding host to igroup %s", err)
+			if strings.Contains(err.Error(), "[409]") {
+				// duplicate initiator in a group
+				atLeastOneAdded = true
+			}
 			continue
 		}
 		atLeastOneAdded = true
@@ -93,15 +122,55 @@ func NewNetappClonner(hostname, username, password string) (NetappClonner, error
 	return nc, nil
 }
 
-func (c *NetappClonner) ResolvePVToLUN(pv populator.PersistentVolume) (populator.LUN, error) {
-	// trident sets internalName attribute on a volume, and that is the real volume name in the system
-	internalName, ok := pv.VolumeAttributes["internalName"]
+// parseInternalIDToLunPath converts internalID format to LUN path format.
+// internalID format: /svm/{svm}/flexvol/{flexvol}/lun/{lun}
+// LUN path format: /vol/{flexvol}/{lun}
+func parseInternalIDToLunPath(internalID string) (string, error) {
+	// Find the flexvol section
+	_, reminder, ok := strings.Cut(internalID, "/flexvol/")
 	if !ok {
-		return populator.LUN{}, fmt.Errorf("intenalName attribute is missing on the PersistentVolume %s", pv.Name)
+		return "", fmt.Errorf("invalid internalID format: missing /flexvol/ in %s", internalID)
 	}
-	l, err := c.api.LunGetByName(context.Background(), fmt.Sprintf("/vol/%s/lun0", internalName))
+
+	// Validate that the remainder contains /lun/
+	if !strings.Contains(reminder, "/lun/") {
+		return "", fmt.Errorf("invalid internalID format: missing /lun/ in %s", internalID)
+	}
+
+	flexVol, lunName, ok := strings.Cut(reminder, "/lun/")
+	if !ok {
+		return "", fmt.Errorf("invalid internalID format: missing /lun/ in %s", internalID)
+	}
+
+	// Prepend "/vol/" to convert the format
+	return fmt.Sprintf("/vol/%s/%s", flexVol, lunName), nil
+}
+
+func (c *NetappClonner) ResolvePVToLUN(pv populator.PersistentVolume) (populator.LUN, error) {
+	var lunPath string
+
+	// Check for ontap-san-economy storage class (has internalID with full path)
+	if internalID, ok := pv.VolumeAttributes["internalID"]; ok {
+		klog.Infof("PV %s has internalID, using economy storage class path resolution", pv.Name)
+		parsedPath, err := parseInternalIDToLunPath(internalID)
+		if err != nil {
+			return populator.LUN{}, fmt.Errorf("failed to parse internalID for PV %s: %w", pv.Name, err)
+		}
+		lunPath = parsedPath
+		klog.Infof("Parsed LUN path from internalID: %s", lunPath)
+	} else {
+		// Standard ontap-san storage class - uses dedicated FlexVol with lun0
+		internalName, ok := pv.VolumeAttributes["internalName"]
+		if !ok {
+			return populator.LUN{}, fmt.Errorf("neither internalID nor internalName attribute found on PersistentVolume %s", pv.Name)
+		}
+		lunPath = fmt.Sprintf("/vol/%s/lun0", internalName)
+		klog.Infof("Using standard storage class LUN path: %s", lunPath)
+	}
+
+	l, err := c.api.LunGetByName(context.Background(), lunPath)
 	if err != nil {
-		return populator.LUN{}, err
+		return populator.LUN{}, fmt.Errorf("failed to get LUN at path %s: %w", lunPath, err)
 	}
 
 	klog.Infof("found lun %s with serial %s", l.Name, l.SerialNumber)

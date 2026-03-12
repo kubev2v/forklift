@@ -12,14 +12,17 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 )
 
-// Bus types
+// Bus types — re-exported from the model package for backward compatibility.
 const (
-	NVME = "nvme"
-	USB  = "usb"
-	SATA = "sata"
-	SCSI = "scsi"
-	IDE  = "ide"
+	NVME = model.NVME
+	USB  = model.USB
+	SATA = model.SATA
+	SCSI = model.SCSI
+	IDE  = model.IDE
 )
+
+// CtkEnabledKey is the VMware ExtraConfig key for Changed Block Tracking (canonical form).
+const CtkEnabledKey = "ctkEnabled"
 
 // Model adapter.
 // Each adapter provides provider-specific management of a model.
@@ -358,16 +361,24 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 							}
 							return
 						}
+						// Extract all IPv6 addresses
+						var ipv6Addresses []string
+						if nic.Spec.Ip.IpV6Config != nil {
+							for _, ipv6 := range nic.Spec.Ip.IpV6Config.IpV6Address {
+								ipv6Addresses = append(ipv6Addresses, ipv6.IpAddress)
+							}
+						}
 						network.VNICs = append(
 							network.VNICs,
 							model.VNIC{
-								Key:        nic.Key,
-								Device:     nic.Device,
-								PortGroup:  nic.Portgroup,
-								DPortGroup: dGroup(),
-								IpAddress:  nic.Spec.Ip.IpAddress,
-								SubnetMask: nic.Spec.Ip.SubnetMask,
-								MTU:        nic.Spec.Mtu,
+								Key:         nic.Key,
+								Device:      nic.Device,
+								PortGroup:   nic.Portgroup,
+								DPortGroup:  dGroup(),
+								IpAddress:   nic.Spec.Ip.IpAddress,
+								IpV6Address: ipv6Addresses,
+								SubnetMask:  nic.Spec.Ip.SubnetMask,
+								MTU:         nic.Spec.Mtu,
 							})
 					}
 					sort.Slice(
@@ -796,7 +807,7 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 							if s, cast := opt.Value.(string); cast {
 								v.model.NumaNodeAffinity = strings.Split(s, ",")
 							}
-						} else if opt.Key == "ctkEnabled" {
+						} else if strings.EqualFold(opt.Key, CtkEnabledKey) {
 							if s, cast := opt.Value.(string); cast {
 								boolVal, err := strconv.ParseBool(s)
 								if err != nil {
@@ -812,15 +823,16 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 								}
 								v.model.DiskEnableUuid = boolVal
 							}
-						} else if hasDiskPrefix(opt.Key) && strings.HasSuffix(opt.Key, ".ctkEnabled") {
-
+						} else if hasDiskPrefix(opt.Key) && strings.HasSuffix(strings.ToLower(opt.Key), "."+strings.ToLower(CtkEnabledKey)) {
 							if s, cast := opt.Value.(string); cast {
 								boolVal, err := strconv.ParseBool(s)
 								if err != nil {
 									return
 								}
 								if boolVal {
-									ctkPerDisk[strings.Split(opt.Key, ".")[0]] = true
+									// Normalize to lowercase so lookup in isCBTEnabledForDisks matches (disk.Bus is lowercase)
+									deviceKey := strings.ToLower(strings.Split(opt.Key, ".")[0])
+									ctkPerDisk[deviceKey] = true
 								}
 							}
 						}
@@ -1006,10 +1018,11 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 }
 
 func hasDiskPrefix(key string) bool {
-	return strings.HasPrefix(key, SCSI) ||
-		strings.HasPrefix(key, SATA) ||
-		strings.HasPrefix(key, IDE) ||
-		strings.HasPrefix(key, NVME)
+	keyLower := strings.ToLower(key)
+	return strings.HasPrefix(keyLower, SCSI) ||
+		strings.HasPrefix(keyLower, SATA) ||
+		strings.HasPrefix(keyLower, IDE) ||
+		strings.HasPrefix(keyLower, NVME)
 }
 
 func isCBTEnabledForDisks(ctkPerDisk map[string]bool, disks []model.Disk) {
@@ -1021,7 +1034,7 @@ func isCBTEnabledForDisks(ctkPerDisk map[string]bool, disks []model.Disk) {
 		// then subtract it from the ControllerKey. For example, 16001 → controllerIndex 1 (16001 - 16000).
 		baseKey := (disk.ControllerKey / 100) * 100
 		controllerIndex := disk.ControllerKey - baseKey
-		deviceKey := fmt.Sprintf("%s%d:%d", disk.Bus, controllerIndex, disk.UnitNumber)
+		deviceKey := strings.ToLower(fmt.Sprintf("%s%d:%d", disk.Bus, controllerIndex, disk.UnitNumber))
 
 		if ctkPerDisk[deviceKey] {
 			disk.ChangeTrackingEnabled = true

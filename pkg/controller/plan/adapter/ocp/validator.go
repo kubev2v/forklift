@@ -96,32 +96,26 @@ func (r *Validator) MaintenanceMode(vmRef ref.Ref) (bool, error) {
 	return true, nil
 }
 
-// PodNetwork implements base.Validator
-func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
-	if r.Plan.Referenced.Map.Network == nil {
-		return
-	}
-
+// NICNetworkRefs returns one source-network ref per VM NIC.
+func (r *Validator) NICNetworkRefs(vmRef ref.Ref) (refs []ref.Ref, err error) {
 	vm := &cnv.VirtualMachine{}
 	err = r.sourceClient.Get(context.TODO(), k8sclient.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vm)
 	if err != nil {
-		err = liberr.Wrap(
-			err,
-			VM_NOT_FOUND,
-			"vm",
-			vmRef.String())
+		err = liberr.Wrap(err, VM_NOT_FOUND, "vm", vmRef.String())
 		return
 	}
-	mapping := r.Plan.Referenced.Map.Network.Spec.Map
-	podMapped := 0
-	for i := range mapping {
-		mapped := &mapping[i]
-		if mapped.Destination.Type == Pod {
-			podMapped++
+	if vm.Spec.Template == nil {
+		return
+	}
+	refs = make([]ref.Ref, 0, len(vm.Spec.Template.Spec.Networks))
+	for _, net := range vm.Spec.Template.Spec.Networks {
+		if net.Pod != nil {
+			refs = append(refs, ref.Ref{Type: Pod})
+		} else if net.Multus != nil {
+			name, namespace := ocpclient.GetNetworkNameAndNamespace(net.Multus.NetworkName, &vmRef)
+			refs = append(refs, ref.Ref{Name: name, Namespace: namespace})
 		}
 	}
-
-	ok = podMapped <= 1
 	return
 }
 

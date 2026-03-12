@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -17,6 +18,7 @@ const (
 	EnvFingerprintName            = "V2V_fingerprint"
 	EnvInPlaceName                = "V2V_inPlace"
 	EnvExtraArgsName              = "V2V_extra_args"
+	EnvInspectorExtraArgsName     = "V2V_inspector_extra_args"
 	EnvNewNameName                = "V2V_NewName"
 	EnvVmNameName                 = "V2V_vmName"
 	EnvRootDiskName               = "V2V_RootDisk"
@@ -31,12 +33,15 @@ const (
 	EnvMultipleIpsPerNicName      = "V2V_multipleIPsPerNic"
 	EnvRemoteInspection           = "V2V_remoteInspection"
 	EnvRemoteInspectionDisk       = "V2V_remoteInspectDisk_"
+	EnvMemSizeName                = "V2V_memSize"
+	EnvSmpName                    = "V2V_smp"
 )
 
 const (
 	OVA     = "ova"
 	VSPHERE = "vSphere"
 	EC2     = "ec2"
+	HYPERV  = "hyperv"
 )
 
 // Disk globs
@@ -69,6 +74,8 @@ type AppConfig struct {
 	IsInPlace bool
 	// V2V_extra_args
 	ExtraArgs []string
+	// V2V_inspector_extra_args
+	InspectorExtraArgs []string
 	// LOCAL_MIGRATION
 	IsLocalMigration bool
 	// V2V_NewName
@@ -96,6 +103,10 @@ type AppConfig struct {
 	IsRemoteInspection bool
 	// RemoteInspectionDisks
 	RemoteInspectionDisks []string
+	// V2V_memSize
+	MemSize int
+	// V2V_smp
+	Smp int
 
 	// V2V_multipleIPsPerNic
 	MultipleIpsPerNicName string
@@ -112,6 +123,7 @@ type AppConfig struct {
 
 func (s *AppConfig) Load() (err error) {
 	s.ExtraArgs = s.getExtraArgs()
+	s.InspectorExtraArgs = s.getInspectorExtraArgs()
 	flag.BoolVar(&s.IsLocalMigration, "local-migration", s.getEnvBool(EnvLocalMigrationName, true), "Migration is in local or remote cluster")
 	flag.BoolVar(&s.IsInPlace, "in-place", s.getEnvBool(EnvInPlaceName, false), "Run virt-v2v-in-place on already populated disks")
 	flag.BoolVar(&s.NbdeClevis, "nbde-clevis", s.getEnvBool(EnvNbdeClevis, false), "virt-v2v should unencrypt the disks via clevis client")
@@ -122,7 +134,7 @@ func (s *AppConfig) Load() (err error) {
 	flag.StringVar(&s.VmName, "vm-name", os.Getenv(EnvVmNameName), "Original VM name")
 	flag.StringVar(&s.RootDisk, "root-disk", os.Getenv(EnvRootDiskName), "Specify which disk should be converted (default \"first\")")
 	flag.StringVar(&s.StaticIPs, "static-ips", os.Getenv(EnvStaticIPsName), "Preserve static IPs, format <mac:network|bridge|ip:out>_<mac:network|bridge|ip:out>")
-	flag.StringVar(&s.DiskPath, "disk-path", os.Getenv(EnvDiskPathName), "Path to the OVA disk")
+	flag.StringVar(&s.DiskPath, "disk-path", os.Getenv(EnvDiskPathName), "Path to disk(s) - single for OVA, comma-separated for HyperV")
 	flag.StringVar(&s.AccessKeyId, "access-key", AccessKeyId, "Path to the Username for the vSphere")
 	flag.StringVar(&s.SecretKey, "secret-key", SecretKey, "Path to the secret to the vSphere")
 	flag.StringVar(&s.Luksdir, "luks-dir", Luksdir, "Directory path containing the luks keys")
@@ -136,6 +148,8 @@ func (s *AppConfig) Load() (err error) {
 	flag.StringVar(&s.HostName, "hostname", os.Getenv(EnvHostName), "Hostname of the vm")
 	flag.StringVar(&s.MultipleIpsPerNicName, "multiple-ips-per-nic", os.Getenv(EnvMultipleIpsPerNicName), "Multiple IPs per NIC")
 	flag.BoolVar(&s.IsRemoteInspection, "remote-inspection", s.getEnvBool(EnvRemoteInspection, false), "Run virt-v2v-inspection on remote disks")
+	flag.IntVar(&s.MemSize, "memsize", s.getEnvInt(EnvMemSizeName, 0), "Amount of memory (in MB) allocated for the conversion appliance")
+	flag.IntVar(&s.Smp, "smp", s.getEnvInt(EnvSmpName, 0), "Number of virtual CPUs used for the conversion appliance")
 	s.RemoteInspectionDisks = s.getRemoteInspectionDisks()
 	flag.Parse()
 
@@ -156,18 +170,49 @@ func (s *AppConfig) getExtraArgs() []string {
 	return extraArgs
 }
 
+func (s *AppConfig) getInspectorExtraArgs() []string {
+	var extraArgs []string
+	if envExtraArgs, found := os.LookupEnv(EnvInspectorExtraArgsName); found && envExtraArgs != "" {
+		if err := json.Unmarshal([]byte(envExtraArgs), &extraArgs); err != nil {
+			return nil
+		}
+	}
+	return extraArgs
+}
+
 func (s *AppConfig) getRemoteInspectionDisks() []string {
-	var disks []string
-
-	envVars := os.Environ()
-
-	for _, envVar := range envVars {
-		if strings.Contains(envVar, EnvRemoteInspectionDisk) {
-			disks = append(disks, strings.Split(envVar, "=")[1])
+	// Create the array filled with disk keys from env variable
+	var keys []string
+	for _, envVar := range os.Environ() {
+		key, _, ok := strings.Cut(envVar, "=")
+		if ok && strings.HasPrefix(key, EnvRemoteInspectionDisk) {
+			keys = append(keys, key)
 		}
 	}
 
+	// Sort the key array
+	sort.Slice(keys, func(i, j int) bool {
+		si, _ := strconv.Atoi(keys[i][len(EnvRemoteInspectionDisk):])
+		sj, _ := strconv.Atoi(keys[j][len(EnvRemoteInspectionDisk):])
+		return si < sj
+	})
+
+	// Get disk names from array
+	disks := make([]string, len(keys))
+	for i, key := range keys {
+		disks[i] = os.Getenv(key)
+	}
 	return disks
+}
+
+func (s *AppConfig) getEnvInt(name string, def int) int {
+	if val, found := os.LookupEnv(name); found {
+		parsed, err := strconv.Atoi(val)
+		if err == nil {
+			return parsed
+		}
+	}
+	return def
 }
 
 // Get boolean.
@@ -188,7 +233,7 @@ func (s *AppConfig) envMissingError(env string) error {
 func (s *AppConfig) validate() error {
 	if !s.IsInPlace {
 		switch s.Source {
-		case OVA:
+		case OVA, HYPERV:
 			if s.DiskPath == "" {
 				return s.envMissingError(EnvDiskPathName)
 			}
@@ -220,7 +265,7 @@ func (s *AppConfig) validate() error {
 				}
 			}
 		default:
-			return fmt.Errorf("invalid variable '%s', the valid options are 'ova' or 'vSphere'", EnvSourceName)
+			return fmt.Errorf("invalid variable '%s', the valid options are 'ova', 'vSphere', or 'hyperv'", EnvSourceName)
 		}
 	}
 	return nil

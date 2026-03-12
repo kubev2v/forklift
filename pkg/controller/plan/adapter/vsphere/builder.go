@@ -8,12 +8,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	liburl "net/url"
 	"path"
 	"regexp"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -26,7 +26,6 @@ import (
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	utils "github.com/kubev2v/forklift/pkg/controller/plan/util"
-	container "github.com/kubev2v/forklift/pkg/controller/provider/container/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
@@ -207,7 +206,7 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
-	if !r.Context.Plan.Spec.MigrateSharedDisks {
+	if !r.shouldMigrateSharedDisks(vm) {
 		vm.RemoveSharedDisks()
 	}
 	macsToIps := ""
@@ -299,6 +298,10 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 			Name:  "V2V_extra_args",
 			Value: settings.Settings.Migration.VirtV2vExtraArgs,
 		},
+		core.EnvVar{
+			Name:  "V2V_inspector_extra_args",
+			Value: settings.Settings.Migration.VirtV2vInspectorExtraArgs,
+		},
 	)
 	if macsToIps != "" {
 		env = append(env, core.EnvVar{
@@ -347,17 +350,15 @@ func isWindows(vm *model.VM) bool {
 	return strings.Contains(vm.GuestID, WindowsPrefix) || strings.Contains(vm.GuestName, WindowsPrefix)
 }
 
-// Retrieve the IP address of an ESXI host from its Management Network VNIC or fall back to the hostname.
-func getHostAddress(host *model.Host) string {
-	for _, vnic := range host.Network.VNICs {
-		if vnic.PortGroup == ManagementNetwork {
-			if vnic.IpAddress != "" && net.ParseIP(vnic.IpAddress) != nil {
-				return vnic.IpAddress // Return the IP address if found
-			}
-		}
+// formatHostAddress wraps IPv6 addresses in brackets for URL compatibility.
+func formatHostAddress(address string) string {
+	ip := net.ParseIP(address)
+	if ip != nil && ip.To4() == nil {
+		// IPv6 address - wrap in brackets
+		return "[" + address + "]"
 	}
-	// otherwise fall back to the host name
-	return host.Name
+	// IPv4 address or hostname - return as-is
+	return address
 }
 
 func (r *Builder) getSourceDetails(vm *model.VM, sourceSecret *core.Secret) (libvirtURL liburl.URL, fingerprint string, err error) {
@@ -382,7 +383,7 @@ func (r *Builder) getSourceDetails(vm *model.VM, sourceSecret *core.Secret) (lib
 		}
 		libvirtURL = liburl.URL{
 			Scheme:   "esx",
-			Host:     hostDef.Spec.IpAddress,
+			Host:     formatHostAddress(hostDef.Spec.IpAddress),
 			User:     liburl.User(string(hostSecret.Data["user"])),
 			Path:     "",
 			RawQuery: sslVerify,
@@ -395,9 +396,16 @@ func (r *Builder) getSourceDetails(vm *model.VM, sourceSecret *core.Secret) (lib
 			fingerprint = host.Thumbprint
 		}
 	} else if r.Source.Provider.Spec.Settings[api.SDK] == api.ESXI {
+		// For ESXi SDK endpoint, use the provider URL directly instead of
+		// extracting management IP from inventory
+		var url *liburl.URL
+		if url, err = liburl.Parse(r.Source.Provider.Spec.URL); err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
 		libvirtURL = liburl.URL{
 			Scheme:   "esx",
-			Host:     getHostAddress(host),
+			Host:     formatHostAddress(url.Hostname()),
 			User:     liburl.User(string(sourceSecret.Data["user"])),
 			Path:     "",
 			RawQuery: sslVerify,
@@ -491,7 +499,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
-	if !r.Context.Plan.Spec.MigrateSharedDisks {
+	if !r.shouldMigrateSharedDisks(vm) {
 		vm.RemoveSharedDisks()
 	}
 	url := r.Source.Provider.Spec.URL
@@ -503,7 +511,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 	if hostDef, found := r.hosts[hostID]; found {
 		hostURL := liburl.URL{
 			Scheme: "https",
-			Host:   hostDef.Spec.IpAddress,
+			Host:   formatHostAddress(hostDef.Spec.IpAddress),
 			Path:   vim25.Path,
 		}
 		url = hostURL.String()
@@ -554,7 +562,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 
 	// Sort disks by bus, so we can match the disk index to the boot order.
 	// Important: need to match order in mapDisks method
-	disks := r.sortedDisksAsVmware(vm.Disks)
+	disks := vm.SortedDisksAsVmware()
 
 	for diskIndex, disk := range disks {
 		mapped, found := dsMap[disk.Datastore.ID]
@@ -564,7 +572,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 
 		storageClass := mapped.Destination.StorageClass
 		var dvSource cdi.DataVolumeSource
-		useV2vForTransfer, vErr := r.Context.Plan.ShouldUseV2vForTransfer()
+		useV2vForTransfer, vErr := r.Context.Plan.ShouldUseV2vForTransfer(vmRef)
 		if vErr != nil {
 			err = vErr
 			return
@@ -677,7 +685,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 				vmRef.String()))
 		return
 	}
-	if !r.Context.Plan.Spec.MigrateSharedDisks {
+	if !r.shouldMigrateSharedDisks(vm) {
 		sharedPVCs, missingDiskPVCs, err := findSharedPVCs(r.Destination.Client, vm, r.Plan.Spec.TargetNamespace)
 		if err != nil {
 			return liberr.Wrap(err)
@@ -705,7 +713,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	}
 	r.mapFirmware(vm, object)
 	if !usesInstanceType {
-		r.mapCPU(vm, object)
+		r.mapCPU(vmRef, vm, object)
 		r.mapMemory(vm, object)
 	}
 	r.mapClock(host, object)
@@ -864,23 +872,20 @@ func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.Memory = &cnv.Memory{Guest: reservation}
 }
 
-func (r *Builder) mapCPU(vm *model.VM, object *cnv.VirtualMachineSpec) {
+func (r *Builder) mapCPU(vmRef ref.Ref, vm *model.VM, object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.CPU = &cnv.CPU{
 		Sockets: uint32(vm.CpuCount / vm.CoresPerSocket),
 		Cores:   uint32(vm.CoresPerSocket),
 	}
-	if vm.NestedHVEnabled {
-		//FIXME: Replace in future with single feature flag for nested virt https://issues.redhat.com/browse/CNV-60150
-		var features []cnv.CPUFeature
-		features = append(features, cnv.CPUFeature{
-			Name:   "vmx",
-			Policy: "optional",
-		})
-		features = append(features, cnv.CPUFeature{
-			Name:   "svm",
-			Policy: "optional",
-		})
-		object.Template.Spec.Domain.CPU.Features = features
+	if enableNestedVirt := r.NestedVirtualizationSetting(vmRef, vm.NestedHVEnabled); enableNestedVirt != nil {
+		policy := "optional"
+		if !*enableNestedVirt {
+			policy = "disable"
+		}
+		object.Template.Spec.Domain.CPU.Features = append(object.Template.Spec.Domain.CPU.Features,
+			cnv.CPUFeature{Name: "vmx", Policy: policy},
+			cnv.CPUFeature{Name: "svm", Policy: policy},
+		)
 	}
 }
 
@@ -918,53 +923,15 @@ func (r *Builder) mapFirmware(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.Firmware = firmware
 }
 
-func (r *Builder) filterDisksWithBus(disks []vsphere.Disk, bus string) []vsphere.Disk {
-	var resp []vsphere.Disk
-	for _, disk := range disks {
-		if disk.Bus == bus {
-			resp = append(resp, disk)
-		}
-	}
-	return resp
-}
-
-// The disks are first sorted by the buses going in order SCSI, SATA and IDE and within the controller the
-// disks are sorted by the key. This needs to be done because the virt-v2v outputs the files in an order,
-// which it gets from libvirt. The libvirt orders the devices starting with SCSI, SATA and IDE.
-// When we were sorting by the keys the order was IDE, SATA and SCSI. This cause that some PVs were populated by
-// incorrect disks.
-// https://github.com/libvirt/libvirt/blob/master/src/vmx/vmx.c#L1713
-func (r *Builder) sortedDisksByBusses(disks []vsphere.Disk, buses []string) []vsphere.Disk {
-	var resp []vsphere.Disk
-	for _, bus := range buses {
-		disksWithBus := r.filterDisksWithBus(disks, bus)
-		sort.Slice(disksWithBus, func(i, j int) bool {
-			return disksWithBus[i].Key < disksWithBus[j].Key
-		})
-		resp = append(resp, disksWithBus...)
-	}
-	return resp
-}
-
-func (r *Builder) sortedDisksAsLibvirt(disks []vsphere.Disk) []vsphere.Disk {
-	var buses = []string{container.SCSI, container.SATA, container.IDE, container.NVME}
-	return r.sortedDisksByBusses(disks, buses)
-}
-
-func (r *Builder) sortedDisksAsVmware(disks []vsphere.Disk) []vsphere.Disk {
-	var buses = []string{container.SATA, container.IDE, container.SCSI, container.NVME}
-	return r.sortedDisksByBusses(disks, buses)
-}
-
 func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims []*core.PersistentVolumeClaim, object *cnv.VirtualMachineSpec, sortByLibvirt bool) error {
 	var kVolumes []cnv.Volume
 	var kDisks []cnv.Disk
 	var disks []vsphere.Disk
 
 	if sortByLibvirt {
-		disks = r.sortedDisksAsLibvirt(vm.Disks)
+		disks = vm.SortedDisksAsLibvirt()
 	} else {
-		disks = r.sortedDisksAsVmware(vm.Disks)
+		disks = vm.SortedDisksAsVmware()
 	}
 	pvcMap := make(map[string]*core.PersistentVolumeClaim)
 	for i := range persistentVolumeClaims {
@@ -980,7 +947,12 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 	var bootDisk int
 	for _, vmConf := range r.Plan.Spec.VMs {
 		if vmConf.ID == vmRef.ID {
-			bootDisk = utils.GetBootDiskNumber(vmConf.RootDisk)
+			if vmConf.RootDisk != "" {
+				bootDisk = utils.GetBootDiskNumber(vmConf.RootDisk)
+			} else if vmStatus := r.getPlanVMStatus(vm); vmStatus != nil &&
+				vmStatus.DetectedBootDisk != nil && *vmStatus.DetectedBootDisk >= 0 {
+				bootDisk = *vmStatus.DetectedBootDisk
+			}
 			break
 		}
 	}
@@ -1091,7 +1063,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
-	if !r.Context.Plan.Spec.MigrateSharedDisks {
+	if !r.shouldMigrateSharedDisks(vm) {
 		vm.RemoveSharedDisks()
 	}
 	for _, disk := range vm.Disks {
@@ -1337,8 +1309,11 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		return
 	}
 
+	if !r.shouldMigrateSharedDisks(vm) {
+		vm.RemoveSharedDisks()
+	}
 	// Get sorted disks to maintain consistent indexing with other parts of the system
-	sortedDisks := r.sortedDisksAsVmware(vm.Disks)
+	sortedDisks := vm.SortedDisksAsVmware()
 
 	dsMapIn := r.Context.Map.Storage.Spec.Map
 	dsNaaMap := make(map[string]string)
@@ -1394,6 +1369,9 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					labels[TemplateNAALabel] = naa
 				}
 
+				if disk.Shared {
+					labels[Shareable] = "true"
+				}
 				r.Log.Info("target namespace for migration", "namespace", namespace)
 				pvc := core.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1518,7 +1496,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				vp.OwnerReferences[0].UID = createdPVC.UID
 				err = r.mergeSecrets(secretName, namespace, storageVendorSecretRef, r.Source.Provider.Namespace, diskSecretName, createdPVC)
 				if err != nil {
-					return nil, fmt.Errorf("failed to merge secrets for popoulators %w", err)
+					return nil, fmt.Errorf("failed to merge secrets for populators %w", err)
 				}
 
 				r.Log.Info("Ensuring a populator service account")
@@ -1635,13 +1613,30 @@ func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskNam
 
 // getPlanVM get the plan VM for the given vsphere VM
 func (r *Builder) getPlanVM(vm *model.VM) *plan.VM {
-	for _, planVM := range r.Plan.Spec.VMs {
-		if planVM.ID == vm.ID {
-			return &planVM
+	for i := range r.Plan.Spec.VMs {
+		planVM := &r.Plan.Spec.VMs[i]
+		if planVM.ID != "" && planVM.ID == vm.ID {
+			return planVM
+		}
+	}
+	// Fallback: match by Name when the spec VM has no ID
+	for i := range r.Plan.Spec.VMs {
+		planVM := &r.Plan.Spec.VMs[i]
+		if planVM.ID == "" && planVM.Name != "" && planVM.Name == vm.Name {
+			return planVM
 		}
 	}
 
 	return nil
+}
+
+// shouldMigrateSharedDisks returns whether shared disks should be migrated for the given VM.
+// VM-level setting takes precedence; falls back to plan-level setting.
+func (r *Builder) shouldMigrateSharedDisks(vm *model.VM) bool {
+	if planVM := r.getPlanVM(vm); planVM != nil && planVM.MigrateSharedDisks != nil {
+		return *planVM.MigrateSharedDisks
+	}
+	return r.Context.Plan.Spec.MigrateSharedDisks
 }
 
 // getPlanVMStatus get the plan VM status for the given vsphere VM
@@ -1651,7 +1646,13 @@ func (r *Builder) getPlanVMStatus(vm *model.VM) *plan.VMStatus {
 	}
 
 	for _, planVMStatus := range r.Plan.Status.Migration.VMs {
-		if planVMStatus.ID == vm.ID {
+		if planVMStatus.ID != "" && planVMStatus.ID == vm.ID {
+			return planVMStatus
+		}
+	}
+	// Fallback: match by Name when the status VM has no ID
+	for _, planVMStatus := range r.Plan.Status.Migration.VMs {
+		if planVMStatus.ID == "" && planVMStatus.Name != "" && planVMStatus.Name == vm.Name {
 			return planVMStatus
 		}
 	}
@@ -1838,18 +1839,13 @@ func (r *Builder) setNetworkNameFromTemplate(vm *model.VM, mapped *api.NetworkPa
 
 // GetPVCNameTemplate returns the PVC name template
 func (r *Builder) getPVCNameTemplate(vm *model.VM) string {
-	// Get plan VM
+	// Check VM-level template first
 	planVM := r.getPlanVM(vm)
-	if planVM == nil {
-		return ""
-	}
-
-	// if vm.PVCNameTemplate is set, use it
-	if planVM.PVCNameTemplate != "" {
+	if planVM != nil && planVM.PVCNameTemplate != "" {
 		return planVM.PVCNameTemplate
 	}
 
-	// if planSpec.PVCNameTemplate is set, use it
+	// Check Plan-level template
 	if r.Plan.Spec.PVCNameTemplate != "" {
 		return r.Plan.Spec.PVCNameTemplate
 	}
@@ -1893,18 +1889,13 @@ func (r *Builder) getPlanVMSafeName(vm *model.VM) string {
 
 // getVolumeNameTemplate returns the volume name template
 func (r *Builder) getVolumeNameTemplate(vm *model.VM) string {
-	// Get plan VM
+	// Check VM-level template first
 	planVM := r.getPlanVM(vm)
-	if planVM == nil {
-		return ""
-	}
-
-	// if vm.VolumeNameTemplate is set, use it
-	if planVM.VolumeNameTemplate != "" {
+	if planVM != nil && planVM.VolumeNameTemplate != "" {
 		return planVM.VolumeNameTemplate
 	}
 
-	// if planSpec.VolumeNameTemplate is set, use it
+	// Check Plan-level template
 	if r.Plan.Spec.VolumeNameTemplate != "" {
 		return r.Plan.Spec.VolumeNameTemplate
 	}
@@ -1914,18 +1905,13 @@ func (r *Builder) getVolumeNameTemplate(vm *model.VM) string {
 
 // getNetworkNameTemplate returns the network name template
 func (r *Builder) getNetworkNameTemplate(vm *model.VM) string {
-	// Get plan VM
+	// Check VM-level template first
 	planVM := r.getPlanVM(vm)
-	if planVM == nil {
-		return ""
-	}
-
-	// if vm.NetworkNameTemplate is set, use it
-	if planVM.NetworkNameTemplate != "" {
+	if planVM != nil && planVM.NetworkNameTemplate != "" {
 		return planVM.NetworkNameTemplate
 	}
 
-	// if planSpec.NetworkNameTemplate is set, use it
+	// Check Plan-level template
 	if r.Plan.Spec.NetworkNameTemplate != "" {
 		return r.Plan.Spec.NetworkNameTemplate
 	}
@@ -1950,9 +1936,7 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 		Data: make(map[string][]byte),
 	}
 
-	for key, value := range baseMigrationSecret.Data {
-		dst.Data[key] = value
-	}
+	maps.Copy(dst.Data, baseMigrationSecret.Data)
 
 	src := &core.Secret{}
 	if err := r.Destination.Get(context.Background(), client.ObjectKey{
@@ -2018,8 +2002,25 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 		return fmt.Errorf("failed to set owner reference: %w", err)
 	}
 
-	if err := r.Destination.Create(context.Background(), dst); err != nil {
-		return fmt.Errorf("failed to create disk secret: %w", err)
+	existing := &core.Secret{}
+	if err := r.Destination.Get(context.Background(), client.ObjectKey{
+		Name:      diskSecretName,
+		Namespace: migrationSecretNS,
+	}, existing); err != nil {
+		if !k8serr.IsNotFound(err) {
+			return fmt.Errorf("failed to get disk secret: %w", err)
+		}
+		if err := r.Destination.Create(context.Background(), dst); err != nil {
+			return fmt.Errorf("failed to create disk secret: %w", err)
+		}
+	} else {
+		maps.Copy(existing.Data, dst.Data)
+		if err := controllerutil.SetOwnerReference(pvc, existing, r.Scheme()); err != nil {
+			return fmt.Errorf("failed to set owner reference: %w", err)
+		}
+		if err := r.Destination.Update(context.Background(), existing); err != nil {
+			return fmt.Errorf("failed to update disk secret: %w", err)
+		}
 	}
 
 	return nil

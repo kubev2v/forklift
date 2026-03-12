@@ -46,7 +46,9 @@ function get_target_version() {
 }
 
 function get_affected_version() {
+
   AFFECTED_VERSION=$(echo "$VERSIONS" | jq -r ' .[] | .name'  | fzf --prompt "Choose the affected version: ")
+
 
   if [[ -z "$AFFECTED_VERSION" ]]; then
     echo "No affected version selected. Exiting."

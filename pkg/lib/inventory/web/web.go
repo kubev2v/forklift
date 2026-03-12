@@ -41,7 +41,7 @@ type WebServer struct {
 // Initializes `gin` with routes and CORS origins.
 // Creates an http server to handle TLS
 func (w *WebServer) Start(middleware ...gin.HandlerFunc) {
-	router := gin.Default()
+	router := logging.GinEngine()
 	router.Use(cors.New(cors.Config{
 		AllowMethods:     []string{"GET"},
 		AllowHeaders:     []string{"Authorization", "Origin"},

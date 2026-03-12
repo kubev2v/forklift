@@ -254,6 +254,18 @@ spec:
 
                         Note: If the Plan-level option is set to true, the VM-level option will be ignored.
                       type: boolean
+                    detectedBootDisk:
+                      description: Boot disk index (0-based) detected by virt-v2v.
+                        nil means undetected.
+                      type: integer
+                    enableNestedVirtualization:
+                      description: |-
+                        EnableNestedVirtualization controls whether nested virtualization (vmx/svm CPU features)
+                        is enabled on the target VM.
+                        When nil (default), the plan-level enableNestedVirtualization value is used.
+                        When explicitly set to true, nested virtualization is enabled for this VM.
+                        When explicitly set to false, nested virtualization is disabled for this VM.
+                      type: boolean
                     error:
                       description: Errors
                       properties:
@@ -380,6 +392,13 @@ spec:
                           type: string
                       type: object
                       x-kubernetes-map-type: atomic
+                    migrateSharedDisks:
+                      description: |-
+                        MigrateSharedDisks controls whether shared disks are included in the migration for this VM.
+                        When nil (default), the plan-level migrateSharedDisks value is used.
+                        When explicitly set to true, shared disks are migrated for this VM.
+                        When explicitly set to false, shared disks are skipped for this VM.
+                      type: boolean
                     name:
                       description: |-
                         An object Name.

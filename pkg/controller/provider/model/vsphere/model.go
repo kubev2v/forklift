@@ -28,6 +28,15 @@ const (
 	ProtocolTCP          ProtocolType = "TCP"          // Generic TCP-based adapter
 )
 
+// Bus types
+const (
+	NVME = "nvme"
+	USB  = "usb"
+	SATA = "sata"
+	SCSI = "scsi"
+	IDE  = "ide"
+)
+
 // Errors
 var NotFound = libmodel.NotFound
 
@@ -242,13 +251,14 @@ type PNIC struct {
 }
 
 type VNIC struct {
-	Key        string `json:"key"`
-	Device     string `json:"device"`
-	PortGroup  string `json:"portGroup"`
-	DPortGroup string `json:"dPortGroup"`
-	IpAddress  string `json:"ipAddress"`
-	SubnetMask string `json:"subnetMask"`
-	MTU        int32  `json:"mtu"`
+	Key         string   `json:"key"`
+	Device      string   `json:"device"`
+	PortGroup   string   `json:"portGroup"`
+	DPortGroup  string   `json:"dPortGroup"`
+	IpAddress   string   `json:"ipAddress"`
+	IpV6Address []string `json:"ipV6Address"`
+	SubnetMask  string   `json:"subnetMask"`
+	MTU         int32    `json:"mtu"`
 }
 
 type PortGroup struct {

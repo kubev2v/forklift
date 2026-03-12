@@ -112,6 +112,16 @@ spec:
                 description: 'Namespace for host lease objects (default: openshift-mtv)'
                 example: openshift-mtv
                 type: string
+              controller_hyperv_refresh_interval:
+                description: 'HyperV inventory refresh interval as a Go duration (default:
+                  10s)'
+                example: 30s
+                type: string
+              controller_hyperv_validation_timeout:
+                description: 'Timeout for HyperV SMB disk validation HTTP calls as
+                  a Go duration (default: 30s)'
+                example: 60s
+                type: string
               controller_image_fqin:
                 description: Controller pod image
                 example: quay.io/kubev2v/forklift-controller:latest
@@ -200,7 +210,8 @@ spec:
                 - "false"
                 type: string
               feature_ova_appliance_management:
-                description: 'Enable OVF-based appliance management endpoints (OVA, HyperV) (default: false)'
+                description: 'Enable OVF-based appliance management endpoints (OVA,
+                  HyperV)  (default: false)'
                 enum:
                 - "true"
                 - "false"
@@ -244,6 +255,26 @@ spec:
               hooks_container_requests_memory:
                 description: 'Hooks memory request (default: 150Mi)'
                 example: 300Mi
+                type: string
+              hyperv_container_limits_cpu:
+                description: 'HyperV CPU limit (default: 1000m)'
+                example: 2000m
+                type: string
+              hyperv_container_limits_memory:
+                description: 'HyperV memory limit (default: 1Gi)'
+                example: 2Gi
+                type: string
+              hyperv_container_requests_cpu:
+                description: 'HyperV CPU request (default: 100m)'
+                example: 200m
+                type: string
+              hyperv_container_requests_memory:
+                description: 'HyperV memory request (default: 512Mi)'
+                example: 300Mi
+                type: string
+              hyperv_provider_server_fqin:
+                description: HyperV provider server image
+                example: quay.io/kubev2v/forklift-hyperv-provider-server:latest
                 type: string
               image_pull_policy:
                 description: 'Image pull policy (default: Always)'
@@ -450,8 +481,8 @@ spec:
                 - "false"
                 type: string
               virt_v2v_extra_args:
-                description: Additional arguments for virt-v2v
-                example: --debug-overlays
+                description: Additional arguments for virt-v2v conversion
+                example: --parallel 4
                 type: string
               virt_v2v_extra_conf_config_map:
                 description: ConfigMap name containing extra virt-v2v configuration
@@ -460,6 +491,24 @@ spec:
                 description: Virt-v2v conversion image used by migration pods
                 example: quay.io/kubev2v/forklift-virt-v2v:latest
                 type: string
+              virt_v2v_image_xfs_fqin:
+                description: Virt-v2v XFS conversion image used by migration pods
+                example: quay.io/kubev2v/forklift-virt-v2v-xfs:latest
+                type: string
+              virt_v2v_inspector_extra_args:
+                description: Additional arguments for virt-v2v-inspector
+                example: --root first
+                type: string
+              virt_v2v_memsize:
+                description: 'Memory (in MB) allocated for the virt-v2v conversion
+                  appliance (default: virt-v2v chooses)'
+                example: 4096
+                type: integer
+              virt_v2v_smp:
+                description: 'Number of virtual CPUs for the virt-v2v conversion appliance
+                  (default: virt-v2v chooses)'
+                example: 8
+                type: integer
               vsphere_osmap_configmap_name:
                 description: 'ConfigMap name for vSphere OS mappings (default: forklift-vsphere-osmap)'
                 example: custom-vsphere-osmap
@@ -941,6 +990,9 @@ spec:
                     status:
                       description: The condition status [true,false].
                       type: string
+                    suggestion:
+                      description: A suggested action or resolution for the condition.
+                      type: string
                     type:
                       description: The condition type.
                       type: string
@@ -1259,6 +1311,18 @@ spec:
 
                         Note: If the Plan-level option is set to true, the VM-level option will be ignored.
                       type: boolean
+                    detectedBootDisk:
+                      description: Boot disk index (0-based) detected by virt-v2v.
+                        nil means undetected.
+                      type: integer
+                    enableNestedVirtualization:
+                      description: |-
+                        EnableNestedVirtualization controls whether nested virtualization (vmx/svm CPU features)
+                        is enabled on the target VM.
+                        When nil (default), the plan-level enableNestedVirtualization value is used.
+                        When explicitly set to true, nested virtualization is enabled for this VM.
+                        When explicitly set to false, nested virtualization is disabled for this VM.
+                      type: boolean
                     error:
                       description: Errors
                       properties:
@@ -1385,6 +1449,13 @@ spec:
                           type: string
                       type: object
                       x-kubernetes-map-type: atomic
+                    migrateSharedDisks:
+                      description: |-
+                        MigrateSharedDisks controls whether shared disks are included in the migration for this VM.
+                        When nil (default), the plan-level migrateSharedDisks value is used.
+                        When explicitly set to true, shared disks are migrated for this VM.
+                        When explicitly set to false, shared disks are skipped for this VM.
+                      type: boolean
                     name:
                       description: |-
                         An object Name.
@@ -3477,6 +3548,14 @@ spec:
               diskBus:
                 description: 'Deprecated: this field will be deprecated in 2.8.'
                 type: string
+              enableNestedVirtualization:
+                description: |-
+                  EnableNestedVirtualization controls whether nested virtualization (vmx/svm CPU features)
+                  is enabled on the target VM.
+                  - nil (default): Auto-detect from source VM settings
+                  - true: Force enable nested virtualization on the target VM regardless of source settings
+                  - false: Force disable nested virtualization on the target VM regardless of source settings
+                type: boolean
               installLegacyDrivers:
                 description: |-
                   InstallLegacyDrivers determines whether to install legacy windows drivers in the VM.
@@ -4803,6 +4882,13 @@ spec:
                   - true (default): Use compatibility devices (SATA bus, E1000E NIC) to ensure bootability
                   - false: Use high-performance VirtIO devices (requires VirtIO drivers already installed in source VM)
                 type: boolean
+              virtV2vImage:
+                description: |-
+                  VirtV2vImage overrides the global virt-v2v container image for this plan.
+                  When set, virt-v2v pods created by this plan will use this image instead
+                  of the cluster-wide VIRT_V2V_IMAGE setting.
+                  Use this to run different virt-v2v builds for specific migration scenarios
+                type: string
               vms:
                 description: List of VMs.
                 items:
@@ -4817,6 +4903,14 @@ spec:
                         troubleshooting. The source VM is never modified.
 
                         Note: If the Plan-level option is set to true, the VM-level option will be ignored.
+                      type: boolean
+                    enableNestedVirtualization:
+                      description: |-
+                        EnableNestedVirtualization controls whether nested virtualization (vmx/svm CPU features)
+                        is enabled on the target VM.
+                        When nil (default), the plan-level enableNestedVirtualization value is used.
+                        When explicitly set to true, nested virtualization is enabled for this VM.
+                        When explicitly set to false, nested virtualization is disabled for this VM.
                       type: boolean
                     hooks:
                       description: Enable hooks.
@@ -4927,6 +5021,13 @@ spec:
                           type: string
                       type: object
                       x-kubernetes-map-type: atomic
+                    migrateSharedDisks:
+                      description: |-
+                        MigrateSharedDisks controls whether shared disks are included in the migration for this VM.
+                        When nil (default), the plan-level migrateSharedDisks value is used.
+                        When explicitly set to true, shared disks are migrated for this VM.
+                        When explicitly set to false, shared disks are skipped for this VM.
+                      type: boolean
                     name:
                       description: |-
                         An object Name.
@@ -5057,6 +5158,15 @@ spec:
                 description: |-
                   Whether this is a warm migration.
                   Deprecated: this field will be deprecated in 2.10. Use Type instead.
+                type: boolean
+              xfsCompatibility:
+                default: false
+                description: |-
+                  XfsCompatibility overrides the global virt-v2v container image for this plan.
+                  When set, virt-v2v pods created by this plan will use the XFS compatible image
+                  VIRT_V2V_IMAGE_XFS instead of the cluster-wide VIRT_V2V_IMAGE setting.
+                  Use this to enable XFSv4 compatibility mode for specific plan.
+                  Warning: Enabling XFSv4 support will drop support for BTRFS for the specific plan. Ensure that the plan only selects VMs with supported filesystem.
                 type: boolean
             required:
             - map
@@ -5385,6 +5495,18 @@ spec:
 
                             Note: If the Plan-level option is set to true, the VM-level option will be ignored.
                           type: boolean
+                        detectedBootDisk:
+                          description: Boot disk index (0-based) detected by virt-v2v.
+                            nil means undetected.
+                          type: integer
+                        enableNestedVirtualization:
+                          description: |-
+                            EnableNestedVirtualization controls whether nested virtualization (vmx/svm CPU features)
+                            is enabled on the target VM.
+                            When nil (default), the plan-level enableNestedVirtualization value is used.
+                            When explicitly set to true, nested virtualization is enabled for this VM.
+                            When explicitly set to false, nested virtualization is disabled for this VM.
+                          type: boolean
                         error:
                           description: Errors
                           properties:
@@ -5511,6 +5633,13 @@ spec:
                               type: string
                           type: object
                           x-kubernetes-map-type: atomic
+                        migrateSharedDisks:
+                          description: |-
+                            MigrateSharedDisks controls whether shared disks are included in the migration for this VM.
+                            When nil (default), the plan-level migrateSharedDisks value is used.
+                            When explicitly set to true, shared disks are migrated for this VM.
+                            When explicitly set to false, shared disks are skipped for this VM.
+                          type: boolean
                         name:
                           description: |-
                             An object Name.
@@ -6703,6 +6832,7 @@ rules:
   - storage.k8s.io
   resources:
   - storageclasses
+  - csidrivers
   verbs:
   - get
   - list
@@ -7218,6 +7348,14 @@ rules:
   - watch
   - update
   - patch
+- apiGroups:
+  - k8s.cni.cncf.io
+  resources:
+  - network-attachment-definitions
+  verbs:
+  - get
+  - list
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -7331,6 +7469,8 @@ spec:
           value: ${VALIDATION_IMAGE}
         - name: VIRT_V2V_IMAGE
           value: ${VIRT_V2V_IMAGE}
+        - name: VIRT_V2V_IMAGE_XFS
+          value: ${VIRT_V2V_IMAGE_RHEL9}
         - name: VIRT_V2V_DONT_REQUEST_KVM
           value: ${VIRT_V2V_DONT_REQUEST_KVM}
         - name: SNAPSHOT_REMOVAL_TIMEOUT
@@ -7541,6 +7681,7 @@ metadata:
         }
       }
     operatorframework.io/suggested-namespace: openshift-mtv
+    operators.openshift.io/must-gather-image: ${MUST_GATHER_IMAGE}
     operators.openshift.io/valid-subscription: '["OpenShift Kubernetes Engine", "OpenShift
       Container Platform", "OpenShift Platform Plus"]'
     repository: https://github.com/kubev2v/forklift
@@ -7604,7 +7745,7 @@ spec:
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:radio:true
         - urn:alm:descriptor:com.tectonic.ui:radio:false
-      - description: Enable OVF-based appliance management endpoints (OVA, HyperV) (default false)
+      - description: Enable OVA appliance management endpoints (default false)
         displayName: Enable OVA Appliance Management
         path: feature_ova_appliance_management
         x-descriptors:
@@ -7618,6 +7759,11 @@ spec:
       - description: Virt-v2v conversion image used by migration pods
         displayName: Virt-v2v Image
         path: virt_v2v_image_fqin
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Virt-v2v XFS conversion image used by migration pods
+        displayName: Virt-v2v XFS Image
+        path: virt_v2v_image_xfs_fqin
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: VDDK image for VMware disk access
@@ -7930,14 +8076,29 @@ spec:
         path: virt_v2v_container_requests_memory
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Memory (in MB) allocated for the virt-v2v conversion appliance
+        displayName: Virt-v2v Memory Size
+        path: virt_v2v_memsize
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Number of virtual CPUs for the virt-v2v conversion appliance
+        displayName: Virt-v2v SMP
+        path: virt_v2v_smp
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Don't request KVM for virt-v2v
         displayName: Virt-v2v Don't Request KVM
         path: virt_v2v_dont_request_kvm
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
-      - description: Additional arguments for virt-v2v
+      - description: Additional arguments for virt-v2v conversion
         displayName: Virt-v2v Extra Args
         path: virt_v2v_extra_args
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Additional arguments for virt-v2v-inspector
+        displayName: Virt-v2v Inspector Extra Args
+        path: virt_v2v_inspector_extra_args
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: ConfigMap name containing extra virt-v2v configuration

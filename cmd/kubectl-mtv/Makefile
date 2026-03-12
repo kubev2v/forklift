@@ -10,7 +10,7 @@ vet:
 	go vet ./...
 
 # Build flags
-PROD_LDFLAGS := -ldflags="-w -s"
+PROD_LDFLAGS := -buildvcs=false -ldflags="-w -s"
 DEV_LDFLAGS := 
 
 .PHONY: build

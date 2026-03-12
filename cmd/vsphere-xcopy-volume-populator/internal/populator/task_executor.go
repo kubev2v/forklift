@@ -38,12 +38,11 @@ func ParseProgress(lastLine string) (int, error) {
 	if len(match) > 1 {
 		progress, err := strconv.Atoi(match[1])
 		if err == nil {
-			klog.Infof("ParseProgress: extracted progress: %d%%", progress)
+			klog.V(2).Infof("ParseProgress: extracted progress: %d%%", progress)
 			return progress, nil
-		} else {
-			klog.Warningf("ParseProgress: failed to parse progress number from %q: %v", match[1], err)
-			return -1, fmt.Errorf("failed to parse progress number from %q: %v", match[1], err)
 		}
+		klog.Warningf("ParseProgress: failed to parse progress from %q: %v", match[1], err)
+		return -1, fmt.Errorf("failed to parse progress number from %q: %v", match[1], err)
 	}
 
 	return -1, nil
@@ -55,7 +54,7 @@ func updateTaskStatus(ctx context.Context, task *vmkfstoolsTask, executor TaskEx
 		return nil, fmt.Errorf("failed to get task status: %w", err)
 	}
 
-	klog.V(2).Infof("Task status: %+v", taskStatus)
+	klog.FromContext(ctx).V(2).Info("task status", "task_status", taskStatus)
 
 	// Report progress if found
 	if progressValue, err := ParseProgress(taskStatus.LastLine); err == nil {
@@ -75,32 +74,31 @@ func updateTaskStatus(ctx context.Context, task *vmkfstoolsTask, executor TaskEx
 
 // ExecuteCloneTask handles the unified task execution logic
 func ExecuteCloneTask(ctx context.Context, executor TaskExecutor, host *object.HostSystem, datastore, sourcePath, targetLUN string, progress chan<- uint64, xcopyUsed chan<- int) error {
-	// Start the clone task
+	log := klog.FromContext(ctx)
+
+	log.Info("starting clone task", "source", sourcePath, "target", targetLUN)
 	task, err := executor.StartClone(ctx, host, datastore, sourcePath, targetLUN)
 	if err != nil {
 		return fmt.Errorf("failed to start clone task: %w", err)
 	}
 
-	klog.Infof("Started clone task %s", task.TaskId)
+	log.Info("clone task started", "task_id", task.TaskId)
 
-	// Cleanup task artifacts when done
 	if task.TaskId != "" {
 		defer func() {
 			err := executor.CleanupTask(ctx, host, datastore, task.TaskId)
 			if err != nil {
-				klog.Errorf("Failed cleaning up task artifacts: %v", err)
+				log.Info("cleanup task artifacts failed", "err", err)
 			}
 		}()
 	}
 
-	// Poll for task completion
 	for {
 		taskStatus, err := updateTaskStatus(ctx, task, executor, host, datastore, progress, xcopyUsed)
 		if err != nil {
 			return fmt.Errorf("failed to update task status: %w", err)
 		}
 
-		// Check for task completion
 		if taskStatus != nil && taskStatus.ExitCode != "" {
 			time.Sleep(taskPollingInterval)
 			taskStatus, err := updateTaskStatus(ctx, task, executor, host, datastore, progress, xcopyUsed)
@@ -108,11 +106,10 @@ func ExecuteCloneTask(ctx context.Context, executor TaskExecutor, host *object.H
 				return fmt.Errorf("failed to update task status: %w", err)
 			}
 			if taskStatus.ExitCode == "0" {
-				klog.Infof("Clone task completed successfully")
+				log.Info("clone task finished")
 				return nil
-			} else {
-				return fmt.Errorf("clone task failed with exit code %s, stderr: %s", taskStatus.ExitCode, taskStatus.Stderr)
 			}
+			return fmt.Errorf("clone task failed with exit code %s, stderr: %s", taskStatus.ExitCode, taskStatus.Stderr)
 		}
 
 		time.Sleep(taskPollingInterval)

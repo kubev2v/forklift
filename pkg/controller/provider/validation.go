@@ -4,13 +4,17 @@ import (
 	"context"
 	"crypto/x509"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/base"
+	hvutil "github.com/kubev2v/forklift/pkg/controller/hyperv"
+	"github.com/kubev2v/forklift/pkg/controller/ova"
 	"github.com/kubev2v/forklift/pkg/controller/provider/container"
 	vsphere "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
@@ -18,9 +22,11 @@ import (
 	"github.com/kubev2v/forklift/pkg/lib/inventory/model"
 	libref "github.com/kubev2v/forklift/pkg/lib/ref"
 	"github.com/kubev2v/forklift/pkg/lib/util"
+	appsv1 "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -42,6 +48,7 @@ const (
 	SSHReady                = "SSHReady"
 	SSHNotReady             = "SSHNotReady"
 	SMBCSIDriverNotReady    = "SMBCSIDriverNotReady"
+	WaitingForService       = "WaitingForService"
 )
 
 // CSI driver names
@@ -186,7 +193,7 @@ func (r *Reconciler) validateURL(provider *api.Provider) error {
 		return nil
 	}
 	if provider.Type() == api.HyperV {
-		if !isValidSMBPath(provider.Spec.URL) {
+		if provider.Spec.URL == "" {
 			provider.Status.Phase = ValidationFailed
 			provider.Status.SetCondition(
 				libcnd.Condition{
@@ -194,7 +201,7 @@ func (r *Reconciler) validateURL(provider *api.Provider) error {
 					Status:   True,
 					Reason:   Malformed,
 					Category: Critical,
-					Message:  "The SMB path is malformed. Expected format: //server/share, \\\\server\\share, or smb://server/share",
+					Message:  "The Hyper-V host address is required (e.g., '192.168.1.100')",
 				})
 		}
 		return nil
@@ -215,7 +222,7 @@ func (r *Reconciler) validateURL(provider *api.Provider) error {
 	return nil
 }
 
-func (r *Reconciler) validateConnectionStatus(provider *api.Provider, secret *core.Secret, insecureSkipVerify bool) {
+func (r *Reconciler) validateTLSConnection(provider *api.Provider, secret *core.Secret, tlsURL string, insecureSkipVerify bool) {
 	if insecureSkipVerify {
 		provider.Status.SetCondition(libcnd.Condition{
 			Type:     ConnectionInsecure,
@@ -227,8 +234,7 @@ func (r *Reconciler) validateConnectionStatus(provider *api.Provider, secret *co
 		return
 	}
 
-	// Verify TLS connection with provided cacert
-	_, err := base.VerifyTLSConnection(provider.Spec.URL, secret)
+	_, err := base.VerifyTLSConnection(tlsURL, secret)
 	if err != nil {
 		provider.Status.SetCondition(libcnd.Condition{
 			Type:     ConnectionTestFailed,
@@ -238,6 +244,30 @@ func (r *Reconciler) validateConnectionStatus(provider *api.Provider, secret *co
 			Message:  err.Error(),
 		})
 	}
+}
+
+// buildTLSURL constructs https://host:port for non-standard HTTPS ports.
+func buildTLSURL(addr string, port int) string {
+	addr = strings.TrimSpace(addr)
+
+	addr = strings.TrimPrefix(addr, "https://")
+	addr = strings.TrimPrefix(addr, "http://")
+
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		// No port - check for IPv6 brackets
+		if strings.HasPrefix(addr, "[") && strings.HasSuffix(addr, "]") {
+			host = addr[1 : len(addr)-1]
+		} else {
+			host = addr
+		}
+	}
+
+	// Handle IPv6 addresses
+	if strings.Contains(host, ":") {
+		return fmt.Sprintf("https://[%s]:%d", host, port)
+	}
+	return fmt.Sprintf("https://%s:%d", host, port)
 }
 
 // Validate secret (ref).
@@ -301,7 +331,7 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 		}
 
 		// Validate connection status
-		r.validateConnectionStatus(provider, secret, insecureSkipVerify)
+		r.validateTLSConnection(provider, secret, provider.Spec.URL, insecureSkipVerify)
 
 		var providerUrl *url.URL
 		providerUrl, err = url.Parse(provider.Spec.URL)
@@ -347,9 +377,33 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 		}
 	case api.HyperV:
 		keyList = []string{
-			"username",
-			"password",
+			hvutil.SecretFieldUsername,
+			hvutil.SecretFieldPassword,
+			hvutil.SecretFieldSMBUrl,
 		}
+
+		if smbUrl, found := secret.Data[hvutil.SecretFieldSMBUrl]; found {
+			if !isValidSMBPath(string(smbUrl)) {
+				provider.Status.Phase = ValidationFailed
+				provider.Status.SetCondition(
+					libcnd.Condition{
+						Type:     SecretNotValid,
+						Status:   True,
+						Reason:   DataErr,
+						Category: Critical,
+						Message:  "The smbUrl in secret is malformed. Expected format: //server/share, \\\\server\\share, or smb://server/share",
+					})
+				break
+			}
+		}
+
+		insecureSkipVerify := base.GetInsecureSkipVerifyFlag(secret)
+		if !insecureSkipVerify && len(secret.Data["cacert"]) == 0 {
+			keyList = append(keyList, "cacert")
+			break
+		}
+		tlsURL := buildTLSURL(provider.Spec.URL, hvutil.WinRMPort(provider.Spec.Settings))
+		r.validateTLSConnection(provider, secret, tlsURL, insecureSkipVerify)
 	}
 	for _, key := range keyList {
 		if _, found := secret.Data[key]; !found {
@@ -370,6 +424,14 @@ func (r *Reconciler) testConnection(provider *api.Provider, secret *core.Secret)
 	if provider.Status.HasBlockerCondition() {
 		return nil
 	}
+
+	// For OVA providers, check if the inventory service pod is ready before testing connection
+	if provider.Type() == api.Ova {
+		if ready := r.checkOVAServiceReady(provider); !ready {
+			return nil
+		}
+	}
+
 	rl := container.Build(nil, provider, secret)
 	status, err := rl.Test()
 	if err == nil {
@@ -418,6 +480,139 @@ func (r *Reconciler) testConnection(provider *api.Provider, secret *core.Secret)
 	}
 
 	return nil
+}
+
+func (r *Reconciler) checkOVAServiceReady(provider *api.Provider) bool {
+	if provider.Status.Service == nil {
+		log.Info("Waiting for OVA inventory service to be created.")
+		provider.Status.SetCondition(
+			libcnd.Condition{
+				Type:     WaitingForService,
+				Status:   True,
+				Reason:   Started,
+				Category: Advisory,
+				Message:  "Waiting for OVA inventory service to be created.",
+			})
+		return false
+	}
+
+	// Service exists, check if the Deployment has ready replicas
+	labeler := ova.Labeler{}
+	deploymentList := &appsv1.DeploymentList{}
+	err := r.List(
+		context.TODO(),
+		deploymentList,
+		&client.ListOptions{
+			LabelSelector: labels.SelectorFromSet(labeler.ProviderLabels(provider)),
+			Namespace:     Settings.Namespace,
+		})
+
+	if err != nil {
+		// If we can't list deployments, log but don't fail - allow connection test to proceed
+		log.Error(err, "Failed to list deployments for OVA provider")
+		return true
+	}
+
+	if len(deploymentList.Items) == 0 {
+		// No deployment found yet, keep waiting
+		log.Info("Waiting for OVA inventory service deployment to be created.")
+		provider.Status.SetCondition(
+			libcnd.Condition{
+				Type:     WaitingForService,
+				Status:   True,
+				Reason:   Started,
+				Category: Advisory,
+				Message:  "Waiting for OVA inventory service deployment to be created.",
+			})
+		return false
+	}
+
+	deployment := &deploymentList.Items[0]
+	if deployment.Status.ReadyReplicas == 0 {
+		// Check if pods are in error state before just waiting
+		podList := &core.PodList{}
+		err := r.List(
+			context.TODO(),
+			podList,
+			&client.ListOptions{
+				LabelSelector: labels.SelectorFromSet(labeler.ProviderLabels(provider)),
+				Namespace:     Settings.Namespace,
+			})
+
+		if err != nil {
+			// If we can't list pods, log but continue waiting
+			log.Error(err, "Failed to list pods for OVA provider")
+		} else if len(podList.Items) > 0 {
+			pod := &podList.Items[0]
+
+			// Check for container errors
+			for _, containerStatus := range pod.Status.ContainerStatuses {
+				if waiting := containerStatus.State.Waiting; waiting != nil {
+					switch waiting.Reason {
+					case "ErrImagePull", "ImagePullBackOff", "InvalidImageName":
+						provider.Status.Phase = ValidationFailed
+						provider.Status.SetCondition(
+							libcnd.Condition{
+								Type:     ConnectionTestFailed,
+								Status:   True,
+								Reason:   Tested,
+								Category: Critical,
+								Message:  fmt.Sprintf("OVA inventory service has image error: %s - %s", waiting.Reason, waiting.Message),
+							})
+						return false
+					case "CrashLoopBackOff", "CreateContainerConfigError", "CreateContainerError":
+						provider.Status.Phase = ValidationFailed
+						provider.Status.SetCondition(
+							libcnd.Condition{
+								Type:     ConnectionTestFailed,
+								Status:   True,
+								Reason:   Tested,
+								Category: Critical,
+								Message:  fmt.Sprintf("OVA inventory service failed to start: %s - %s", waiting.Reason, waiting.Message),
+							})
+						return false
+					}
+				}
+			}
+
+			// Check for pods stuck in pending state (e.g., mount failures)
+			if pod.Status.Phase == core.PodPending {
+				if time.Since(pod.CreationTimestamp.Time) > 2*time.Minute {
+					provider.Status.Phase = ValidationFailed
+					provider.Status.SetCondition(
+						libcnd.Condition{
+							Type:     ConnectionTestFailed,
+							Status:   True,
+							Reason:   Tested,
+							Category: Critical,
+							Message:  fmt.Sprintf("OVA inventory service '%s' has been pending for over 2 minutes. Check pod events for mount or configuration errors.", pod.Name),
+						})
+					return false
+				}
+			}
+		}
+
+		// No errors found, continue waiting
+		log.Info("Waiting for OVA inventory service to become ready.",
+			"deployment", deployment.Name,
+			"replicas", deployment.Status.Replicas,
+			"readyReplicas", deployment.Status.ReadyReplicas)
+		provider.Status.SetCondition(
+			libcnd.Condition{
+				Type:     WaitingForService,
+				Status:   True,
+				Reason:   Started,
+				Category: Advisory,
+				Message:  "Waiting for OVA inventory service to become ready.",
+			})
+		return false
+	}
+
+	// Deployment has ready replicas, proceed with connection test
+	log.Info("OVA inventory service pod is ready, proceeding with connection test.",
+		"deployment", deployment.Name,
+		"readyReplicas", deployment.Status.ReadyReplicas)
+	return true
 }
 
 // Validate inventory created.
@@ -951,7 +1146,6 @@ func isValidSMBPath(smbPath string) bool {
 // validateSMBCSI validates that the SMB CSI driver is installed for HyperV providers.
 // HyperV migrations require the SMB CSI driver (smb.csi.k8s.io) to mount SMB shares.
 func (r *Reconciler) validateSMBCSI(provider *api.Provider) error {
-	// Only validate SMB CSI for HyperV providers
 	if provider.Type() != api.HyperV {
 		return nil
 	}

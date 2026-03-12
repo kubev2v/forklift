@@ -156,31 +156,18 @@ func (r *Validator) MigrationType() bool {
 	}
 }
 
-// Validate that no more than one of a VM's networks is mapped to the pod network.
-func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
-	if r.Plan.Referenced.Map.Network == nil {
-		return
-	}
+// NICNetworkRefs returns one source-network ref per VM network attachment.
+func (r *Validator) NICNetworkRefs(vmRef ref.Ref) (refs []ref.Ref, err error) {
 	vm := &model.Workload{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
-
-	mapping := r.Plan.Referenced.Map.Network.Spec.Map
-	podMapped := 0
-	for i := range mapping {
-		mapped := &mapping[i]
-		ref := mapped.Source
-		for _, network := range vm.Networks {
-			if ref.ID == network.ID && mapped.Destination.Type == "Pod" {
-				podMapped++
-			}
-		}
+	refs = make([]ref.Ref, 0, len(vm.Networks))
+	for _, network := range vm.Networks {
+		refs = append(refs, ref.Ref{ID: network.ID})
 	}
-
-	ok = podMapped <= 1
 	return
 }
 

@@ -550,7 +550,7 @@ func (r *Migration) deleteProviderPVs(getPVs func(client.Client, string) (*core.
 
 // deleteProviderPVCs is a helper function that gets and deletes PVCs for a provider type.
 func (r *Migration) deleteProviderPVCs(getPVCs func(client.Client, string, string) (*core.PersistentVolumeClaimList, bool, error), pvcType string) error {
-	pvcList, _, err := getPVCs(r.Destination.Client, r.Plan.Name, r.Plan.Spec.TargetNamespace)
+	pvcList, _, err := getPVCs(r.Destination.Client, string(r.Plan.UID), r.Plan.Spec.TargetNamespace)
 	if err != nil {
 		r.Log.Error(err, "Failed to get "+pvcType+" PVCs")
 		return err
@@ -1007,7 +1007,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 					"vmID":      vm.ID,
 					"app":       "forklift",
 				}
-				r.converter = adapter.NewConverter(&r.Context.Destination, r.Log.WithName("converter"), labels)
+				r.converter = adapter.NewConverter(&r.Context.Destination, r.Log.WithName("converter"), labels, getVirtV2vImage(r.Plan))
 				r.converter.FilterFn = func(pvc *core.PersistentVolumeClaim) bool {
 					val, ok := pvc.Annotations[base.AnnRequiresConversion]
 					return ok && val == "true"
@@ -1507,7 +1507,7 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus, step *plan.Step)
 
 	switch r.Source.Provider.Type() {
 	case api.Ova, api.HyperV:
-		ready, err = r.kubevirt.EnsureOVAVirtV2VPVCStatus(vm.ID)
+		ready, err = r.kubevirt.EnsureProviderVirtV2VPVCStatus(vm.ID)
 	case api.EC2, api.VSphere:
 		ready = true
 	}
@@ -1621,7 +1621,7 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 						path.Join(dv.Namespace, dv.Name))
 					continue
 				}
-				snapshot := vm.Warm.Precopies[len(vm.Warm.Precopies)-1].Snapshot
+				snapshot := dv.Spec.Checkpoints[len(dv.Spec.Checkpoints)-1].Current
 				annotation := fmt.Sprintf("%s.%s", base.AnnCheckpointsCopied, snapshot)
 				if _, copied := pvc.Annotations[annotation]; copied {
 					completed++
@@ -1779,7 +1779,7 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 			break
 		}
 
-		useV2vForTransfer, err := r.Context.Plan.ShouldUseV2vForTransfer()
+		useV2vForTransfer, err := r.Context.Plan.ShouldUseV2vForTransfer(vm.Ref)
 		switch {
 		case err != nil:
 			return liberr.Wrap(err)

@@ -10,6 +10,7 @@ metadata:
     containerImage: ${OPERATOR_IMAGE}
     createdAt: ${DATE}
     repository: https://github.com/kubev2v/forklift
+    operators.openshift.io/must-gather-image: ${MUST_GATHER_IMAGE}
     operators.openshift.io/valid-subscription: '["OpenShift Kubernetes Engine", "OpenShift Container Platform", "OpenShift Platform Plus"]'
     certified: ${CSV_CERTIFIED}
     support: ${CSV_SUPPORT}
@@ -180,6 +181,11 @@ spec:
         - description: Virt-v2v conversion image used by migration pods
           displayName: Virt-v2v Image
           path: virt_v2v_image_fqin
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:hidden
+        - description: Virt-v2v XFS conversion image used by migration pods
+          displayName: Virt-v2v XFS Image
+          path: virt_v2v_image_xfs_fqin
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:hidden
         - description: VDDK image for VMware disk access
@@ -503,14 +509,29 @@ spec:
           path: virt_v2v_container_requests_memory
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:hidden
+        - description: Memory (in MB) allocated for the virt-v2v conversion appliance
+          displayName: Virt-v2v Memory Size
+          path: virt_v2v_memsize
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:hidden
+        - description: Number of virtual CPUs for the virt-v2v conversion appliance
+          displayName: Virt-v2v SMP
+          path: virt_v2v_smp
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:hidden
         - description: Don't request KVM for virt-v2v
           displayName: Virt-v2v Don't Request KVM
           path: virt_v2v_dont_request_kvm
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:hidden
-        - description: Additional arguments for virt-v2v
+        - description: Additional arguments for virt-v2v conversion
           displayName: Virt-v2v Extra Args
           path: virt_v2v_extra_args
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:hidden
+        - description: Additional arguments for virt-v2v-inspector
+          displayName: Virt-v2v Inspector Extra Args
+          path: virt_v2v_inspector_extra_args
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:hidden
         - description: ConfigMap name containing extra virt-v2v configuration

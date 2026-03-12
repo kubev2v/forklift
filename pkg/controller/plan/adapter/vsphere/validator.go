@@ -85,37 +85,18 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (ok bool, err error) {
 	return
 }
 
-// Validate that no more than one of a VM's networks is mapped to the pod network.
-func (r *Validator) PodNetwork(vmRef ref.Ref) (ok bool, err error) {
-	if r.Plan.Referenced.Map.Network == nil {
-		return
-	}
+// NICNetworkRefs returns one source-network ref per VM NIC.
+func (r *Validator) NICNetworkRefs(vmRef ref.Ref) (refs []ref.Ref, err error) {
 	vm := &model.Workload{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
-
-	mapping := r.Plan.Referenced.Map.Network.Spec.Map
-	podMapped := 0
-	for i := range mapping {
-		mapped := &mapping[i]
-		ref := mapped.Source
-		network := &model.Network{}
-		fErr := r.Source.Inventory.Find(network, ref)
-		if fErr != nil {
-			err = fErr
-			return
-		}
-		for _, nic := range vm.NICs {
-			if nic.Network.ID == network.ID && mapped.Destination.Type == Pod {
-				podMapped++
-			}
-		}
+	refs = make([]ref.Ref, 0, len(vm.NICs))
+	for _, nic := range vm.NICs {
+		refs = append(refs, ref.Ref{ID: nic.Network.ID})
 	}
-
-	ok = podMapped <= 1
 	return
 }
 
@@ -318,6 +299,15 @@ func (r *Validator) sharedDisksRunningVms(vm *model.VM) (runningVms []string, er
 	return r.findRunningVms(sharedDisksVms), nil
 }
 
+// shouldMigrateSharedDisks returns whether shared disks should be migrated for the given model VM.
+// VM-level setting takes precedence; falls back to plan-level setting.
+func (r *Validator) shouldMigrateSharedDisks(vm *model.VM) bool {
+	if planVM := r.getPlanVM(vm); planVM != nil && planVM.MigrateSharedDisks != nil {
+		return *planVM.MigrateSharedDisks
+	}
+	return r.Plan.Spec.MigrateSharedDisks
+}
+
 func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, msg string, category string, err error) {
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
@@ -341,7 +331,7 @@ func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, m
 	}
 
 	// Check existing PVCs
-	if !r.Plan.Spec.MigrateSharedDisks {
+	if !r.shouldMigrateSharedDisks(vm) {
 		_, missingDiskPVCs, err := findSharedPVCs(client, vm, r.Plan.Spec.TargetNamespace)
 		if err != nil {
 			return false, "", "", liberr.Wrap(err, "vm", vm)
@@ -371,9 +361,16 @@ func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, m
 			return false, msg, validation.Warn, nil
 		}
 
-		// Find duplicate shared disk in the plan
+		// Find duplicate shared disk in the plan (only count VMs that will also migrate shared disks)
 		sharedDisksDuplicate := make(map[string]int)
 		for _, duplicateVmRef := range r.Plan.Spec.VMs {
+			migrate := r.Plan.Spec.MigrateSharedDisks
+			if duplicateVmRef.MigrateSharedDisks != nil {
+				migrate = *duplicateVmRef.MigrateSharedDisks
+			}
+			if !migrate {
+				continue
+			}
 			duplicateVm := &model.VM{}
 			err = r.Source.Inventory.Find(duplicateVm, duplicateVmRef.Ref)
 			if err != nil {

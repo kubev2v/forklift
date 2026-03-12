@@ -3,7 +3,6 @@ package ocp
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	pathlib "path"
 
 	"github.com/gin-gonic/gin"
@@ -200,12 +199,36 @@ func (h Handler) VMs(ctx *gin.Context, provider *api.Provider) (vms []*model.VM,
 	}
 	h.clearError(ref.ToKind(&cnv.VirtualMachine{}))
 
+	vmiMap := h.fetchVMIs(client, options)
+
 	for _, obj := range l.Items {
 		m := &model.VM{}
 		m.With(&obj)
+		key := pathlib.Join(obj.Namespace, obj.Name)
+		if vmi, found := vmiMap[key]; found {
+			m.WithVMI(&vmi)
+		}
 		vms = append(vms, m)
 	}
 	return
+}
+
+// fetchVMIs lists VirtualMachineInstances using the given client and options,
+// returning a map keyed by "namespace/name" for correlation with VMs.
+// On failure it logs a warning and returns an empty map so that VM listing
+// can proceed without VMI data (graceful degradation).
+func (h Handler) fetchVMIs(cl ocpclient.Client, options []ocpclient.ListOption) map[string]cnv.VirtualMachineInstance {
+	vmiList := cnv.VirtualMachineInstanceList{}
+	if err := cl.List(context.TODO(), &vmiList, options...); err != nil {
+		log.Info("Unable to list VirtualMachineInstances, returning VMs without instance data", "error", err)
+		return map[string]cnv.VirtualMachineInstance{}
+	}
+	vmiMap := make(map[string]cnv.VirtualMachineInstance, len(vmiList.Items))
+	for _, vmi := range vmiList.Items {
+		key := pathlib.Join(vmi.Namespace, vmi.Name)
+		vmiMap[key] = vmi
+	}
+	return vmiMap
 }
 
 func (h Handler) Namespaces(ctx *gin.Context, provider *api.Provider) (namespaces []model.Namespace, err error) {
@@ -283,9 +306,13 @@ func (h Handler) NetworkAttachmentDefinitions(ctx *gin.Context, provider *api.Pr
 		// Validate that restricted providers can only access allowed namespaces, then search only the requested namespace
 		if provider != nil && provider.IsRestrictedHost() {
 			if requestedNS != provider.GetNamespace() && requestedNS != core.NamespaceDefault {
-				return nil, liberr.New(fmt.Sprintf(
-					"Namespace %q not allowed for restricted provider. Allowed namespaces: [%q, %q]",
-					requestedNS, provider.GetNamespace(), core.NamespaceDefault))
+				log.Info(
+					"Namespace not allowed for restricted provider, returning empty result.",
+					"namespace", requestedNS,
+					"allowed", []string{provider.GetNamespace(), core.NamespaceDefault})
+				// Clear the error so that the request can continue
+				h.clearError(ref.ToKind(&net.NetworkAttachmentDefinition{}))
+				return
 			}
 		}
 		namespacesToQuery = []string{requestedNS}

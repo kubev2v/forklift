@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 
@@ -15,6 +16,7 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	refapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter"
+	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
@@ -29,6 +31,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/templateutil"
 	batchv1 "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,6 +61,7 @@ const (
 	VMStorageNotMapped              = "VMStorageNotMapped"
 	VMStorageNotSupported           = "VMStorageNotSupported"
 	VMMultiplePodNetworkMappings    = "VMMultiplePodNetworkMappings"
+	VMDuplicateNADMappings          = "VMDuplicateNADMappings"
 	VMMissingGuestIPs               = "VMMissingGuestIPs"
 	VMIpNotMatchingUdnSubnet        = "VMIpNotMatchingUdnSubnet"
 	VMMissingChangedBlockTracking   = "VMMissingChangedBlockTracking"
@@ -93,6 +97,8 @@ const (
 	VMMigrationTypeUnsupported      = "VMMigrationTypeUnsupported"
 	GuestToolsIssue                 = "GuestToolsIssue"
 	VDDKAndOffloadMixedUsage        = "VDDKAndOffloadMixedUsage"
+	RestrictedPodSecurity           = "RestrictedPodSecurity"
+	NetMapDestinationNADNotValid    = "NetMapDestinationNADNotValid"
 )
 
 // Categories
@@ -170,6 +176,13 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		return err
 	}
 
+	// If critical conditions were found (e.g. missing network/storage maps),
+	// context may not be available, skip the validations that require context.
+	// The blocker conditions have already been set, reconciler will not try to execute the plan.
+	if plan.Status.HasBlockerCondition() {
+		return nil
+	}
+
 	var ctx *plancontext.Context
 	ctx, err = plancontext.New(r, plan, r.Log)
 	if err != nil {
@@ -227,6 +240,12 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	// Validate conversion temp storage configuration
 	if err = r.validateConversionTempStorage(plan); err != nil {
 		return err
+	}
+
+	// Validate pod security policies (non-blocking warning)
+	if err = r.validatePodSecurity(plan); err != nil {
+		// Log error but don't block validation
+		r.Log.V(1).Info("Failed to validate pod security policies", "error", err)
 	}
 
 	return nil
@@ -482,6 +501,7 @@ func (r *Reconciler) validateNetworkMap(plan *api.Plan) (err error) {
 		for _, networkMap := range mp.Spec.Map {
 			if networkMap.Destination.Type == Pod {
 				hasMappingToPodNetwork = true
+				break
 			}
 		}
 		// The UDNs can be valid network for which there are additional validations to check the subnet ranges per VM
@@ -495,6 +515,28 @@ func (r *Reconciler) validateNetworkMap(plan *api.Plan) (err error) {
 		}
 	}
 
+	for _, pair := range mp.Spec.Map {
+		if pair.Destination.Type != Multus {
+			continue
+		}
+
+		if pair.Destination.Namespace != plan.Spec.TargetNamespace &&
+			pair.Destination.Namespace != core.NamespaceDefault {
+			plan.Status.SetCondition(libcnd.Condition{
+				Type:     NetMapDestinationNADNotValid,
+				Status:   True,
+				Category: api.CategoryCritical,
+				Reason:   NotValid,
+				Message: fmt.Sprintf(
+					"Destination NAD %s/%s must be in either the target namespace (%s) or the default namespace. "+
+						"Pods cannot reference network attachment definitions from other namespaces.",
+					pair.Destination.Namespace,
+					pair.Destination.Name,
+					plan.Spec.TargetNamespace),
+			})
+			return
+		}
+	}
 	plan.Referenced.Map.Network = mp
 
 	return
@@ -633,12 +675,20 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "VM has more than one interface mapped to the pod network.",
 		Items:    []string{},
 	}
+	duplicateNADMappings := libcnd.Condition{
+		Type:     VMDuplicateNADMappings,
+		Status:   True,
+		Reason:   NotValid,
+		Category: api.CategoryCritical,
+		Message:  "Multiple VM NICs use the same Multus NAD name (OVN-Kubernetes uses NAD names as map keys).",
+		Items:    []string{},
+	}
 	missingStaticIPs := libcnd.Condition{
 		Type:     VMMissingGuestIPs,
 		Status:   True,
 		Reason:   MissingGuestInfo,
 		Category: api.CategoryWarn,
-		Message:  "Guest information on vNICs is missing, cannot preserve static IPs. If this machine has static IP, make sure VMware tools are installed and the VM is running.",
+		Message:  missingStaticIPsMessage(plan),
 		Items:    []string{},
 	}
 	vmIpDoesNotMatchUdnSubnet := libcnd.Condition{
@@ -908,12 +958,16 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			if !ok {
 				unmappedNetwork.Items = append(unmappedNetwork.Items, ref.String())
 			}
-			ok, err = validator.PodNetwork(*ref)
-			if err != nil {
-				return err
+			nicRefs, nErr := validator.NICNetworkRefs(*ref)
+			if nErr != nil {
+				return nErr
 			}
-			if !ok {
+			foundNadDup, foundPodDup := planbase.ValidateNetworkDuplicates(nicRefs, plan.Referenced.Map.Network)
+			if foundPodDup {
 				multiplePodNetworkMappings.Items = append(multiplePodNetworkMappings.Items, ref.String())
+			}
+			if foundNadDup {
+				duplicateNADMappings.Items = append(duplicateNADMappings.Items, ref.String())
 			}
 		}
 		if plan.Referenced.Map.Storage != nil {
@@ -1147,6 +1201,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	if len(multiplePodNetworkMappings.Items) > 0 {
 		plan.Status.SetCondition(multiplePodNetworkMappings)
 	}
+	if len(duplicateNADMappings.Items) > 0 {
+		plan.Status.SetCondition(duplicateNADMappings)
+	}
 	if len(missingStaticIPs.Items) > 0 {
 		plan.Status.SetCondition(missingStaticIPs)
 	}
@@ -1285,6 +1342,23 @@ func (r *Reconciler) validateTransferNetwork(plan *api.Plan) (err error) {
 	}
 	if err != nil {
 		err = liberr.Wrap(err)
+		return
+	}
+
+	if plan.Spec.TransferNetwork.Namespace != plan.Spec.TargetNamespace &&
+		plan.Spec.TransferNetwork.Namespace != core.NamespaceDefault {
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     TransferNetNotValid,
+			Status:   True,
+			Category: api.CategoryCritical,
+			Reason:   NotValid,
+			Message: fmt.Sprintf(
+				"Transfer network %s/%s is in a different namespace than the target namespace %s. "+
+					"Pods cannot reference network attachment definitions across namespaces.",
+				plan.Spec.TransferNetwork.Namespace,
+				plan.Spec.TransferNetwork.Name,
+				plan.Spec.TargetNamespace),
+		})
 		return
 	}
 	route, found := netAttachDef.Annotations[AnnForkliftNetworkRoute]
@@ -1450,6 +1524,20 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 	return
 }
 
+func missingStaticIPsMessage(plan *api.Plan) string {
+	guestTools := "guest tools"
+	source := plan.Referenced.Provider.Source
+	if source != nil {
+		switch source.Type() {
+		case api.VSphere:
+			guestTools = "VMware Tools"
+		case api.HyperV:
+			guestTools = "Hyper-V Integration Services"
+		}
+	}
+	return fmt.Sprintf("Guest information on vNICs is missing, cannot preserve static IPs. Make sure %s is installed and the VM is running.", guestTools)
+}
+
 func jobExceedsDeadline(job *batchv1.Job) bool {
 	ActiveDeadlineSeconds := settings.Settings.Migration.VddkJobActiveDeadline
 
@@ -1496,7 +1584,13 @@ func (r *Reconciler) validateVddkImageJob(job *batchv1.Job, plan *api.Plan) (err
 	if len(pods.Items) > 0 {
 		pod := pods.Items[0]
 		if len(pod.Status.InitContainerStatuses) == 0 {
-			return liberr.New("Validation pod doesn't contain expected init container", "pod", pod)
+			// Pod exists but init container statuses haven't been populated yet.
+			// This is normal when the pod was just created. Log it and
+			// let the next reconcile check again.
+			r.Log.Info("Validation pod init container statuses not yet available, will requeue",
+				"pod", pod.Name, "phase", pod.Status.Phase)
+			plan.Status.SetCondition(vddkValidationInProgress)
+			return
 		}
 		waiting := pod.Status.InitContainerStatuses[0].State.Waiting
 		if waiting != nil {
@@ -1730,7 +1824,7 @@ func createVddkCheckJob(plan *api.Plan) *batchv1.Job {
 									core.ResourceMemory: resource.MustParse("500Mi"),
 								},
 							},
-							Image: Settings.Migration.VirtV2vImage,
+							Image: getVirtV2vImage(plan),
 							SecurityContext: &core.SecurityContext{
 								AllowPrivilegeEscalation: ptr.To(false),
 								Capabilities: &core.Capabilities{
@@ -1892,7 +1986,7 @@ func (r *Reconciler) validateConversionTempStorage(plan *api.Plan) error {
 	}
 
 	// Validate that storageSize is a valid Kubernetes resource quantity
-	_, err := resource.ParseQuantity(storageSize)
+	requestedQty, err := resource.ParseQuantity(storageSize)
 	if err != nil {
 		conversionTempStorageSizeInvalid := libcnd.Condition{
 			Type:     NotValid,
@@ -1904,6 +1998,168 @@ func (r *Reconciler) validateConversionTempStorage(plan *api.Plan) error {
 		plan.Status.SetCondition(conversionTempStorageSizeInvalid)
 		r.Log.Info("Conversion temp storage size is invalid", "error", err.Error(), "size", storageSize, "plan", plan.Name, "namespace", plan.Namespace)
 		return nil
+	}
+
+	// Validate that the StorageClass exists in the cluster (conversion runs on destination/target)
+	sc := &storagev1.StorageClass{}
+	if err := r.Client.Get(context.Background(), client.ObjectKey{Name: storageClass}, sc); err != nil {
+		if k8serr.IsNotFound(err) {
+			plan.Status.SetCondition(libcnd.Condition{
+				Type:     NotValid,
+				Status:   True,
+				Category: api.CategoryCritical,
+				Message:  fmt.Sprintf("ConversionTempStorageClass %q not found in the cluster. The conversion PVC will remain Pending and the migration will hang.", storageClass),
+				Items:    []string{},
+			})
+			r.Log.Info("Conversion temp storage class not found", "storageClass", storageClass, "plan", plan.Name, "namespace", plan.Namespace)
+			return nil
+		}
+		return liberr.Wrap(err, "failed to get StorageClass", "storageClass", storageClass)
+	}
+
+	// Check CSIStorageCapacity when available: block migration if storage class
+	// reports insufficient capacity for the requested conversion temp volume size.
+	if err := r.validateConversionTempStorageCapacity(plan, storageClass, requestedQty); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateConversionTempStorageCapacity checks CSIStorageCapacity for the given
+// storage class. If any entry reports capacity sufficient for the requested size
+// (MaximumVolumeSize or Capacity >= requested), the check passes. If entries exist
+// but none have sufficient capacity, a blocking condition is set. If no entries
+// exist for the storage class, an advisory warning is set.
+func (r *Reconciler) validateConversionTempStorageCapacity(plan *api.Plan, storageClassName string, requested resource.Quantity) error {
+	ctx := context.Background()
+	list := &storagev1.CSIStorageCapacityList{}
+	if err := r.Client.List(ctx, list, client.InNamespace(core.NamespaceAll)); err != nil {
+		r.Log.Info("Could not list CSIStorageCapacity (capacity check skipped)", "error", err.Error(), "storageClass", storageClassName)
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     NotValid,
+			Status:   True,
+			Category: api.CategoryAdvisory,
+			Message:  fmt.Sprintf("Storage capacity for ConversionTempStorageClass %q could not be verified. Ensure sufficient space is available.", storageClassName),
+			Items:    []string{},
+		})
+		return nil
+	}
+
+	var matching []storagev1.CSIStorageCapacity
+	for i := range list.Items {
+		if list.Items[i].StorageClassName == storageClassName {
+			matching = append(matching, list.Items[i])
+		}
+	}
+
+	if len(matching) == 0 {
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     NotValid,
+			Status:   True,
+			Category: api.CategoryAdvisory,
+			Message:  fmt.Sprintf("No capacity information found for ConversionTempStorageClass %q. Ensure sufficient space is available.", storageClassName),
+			Items:    []string{},
+		})
+		return nil
+	}
+
+	for _, cap := range matching {
+		// Prefer MaximumVolumeSize (largest single volume); fall back to Capacity (available space).
+		if cap.MaximumVolumeSize != nil && cap.MaximumVolumeSize.Cmp(requested) >= 0 {
+			return nil
+		}
+		if cap.MaximumVolumeSize == nil && cap.Capacity != nil && cap.Capacity.Cmp(requested) >= 0 {
+			return nil
+		}
+	}
+
+	// Have capacity info but no entry can satisfy the requested size
+	plan.Status.SetCondition(libcnd.Condition{
+		Type:     NotValid,
+		Status:   True,
+		Category: api.CategoryCritical,
+		Message:  fmt.Sprintf("Insufficient space in storage class %q for conversion temp storage (requested %s). Migration may fail.", storageClassName, requested.String()),
+		Items:    []string{},
+	})
+	r.Log.Info("Conversion temp storage capacity insufficient", "storageClass", storageClassName, "requested", requested.String(), "plan", plan.Name, "namespace", plan.Namespace)
+	return nil
+}
+
+// validatePodSecurity checks if the controller namespace has restrictive pod security policies
+// that may cause migration failures. This is a non-blocking warning.
+func (r *Reconciler) validatePodSecurity(plan *api.Plan) error {
+	// Get controller namespace from environment variable
+	// POD_NAMESPACE should be set via fieldRef in the deployment template
+	controllerNamespace := os.Getenv("POD_NAMESPACE")
+	if controllerNamespace == "" {
+		// Fallback to settings if available (loaded from POD_NAMESPACE env var)
+		controllerNamespace = settings.Settings.Inventory.Namespace
+	}
+	if controllerNamespace == "" {
+		// Can't check if we don't know the controller namespace
+		// POD_NAMESPACE should be set via fieldRef.fieldPath: metadata.namespace in the deployment
+		r.Log.Info("Skipping pod security check: POD_NAMESPACE not set in controller pod",
+			"plan", plan.Name,
+			"planNamespace", plan.GetNamespace())
+		return nil
+	}
+
+	// Log which namespace we're checking (for debugging)
+	r.Log.Info("Checking pod security policy for controller namespace",
+		"controllerNamespace", controllerNamespace,
+		"plan", plan.Name,
+		"planNamespace", plan.GetNamespace())
+
+	// Read the namespace object
+	ns := &core.Namespace{}
+	err := r.Client.Get(context.TODO(), client.ObjectKey{Name: controllerNamespace}, ns)
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			// Namespace not found, skip check
+			r.Log.Info("Skipping pod security check: namespace not found",
+				"namespace", controllerNamespace)
+			return nil
+		}
+		return liberr.Wrap(err, "failed to get controller namespace", "namespace", controllerNamespace)
+	}
+
+	// Check pod-security.kubernetes.io/enforce label
+	enforceLabel := ns.Labels["pod-security.kubernetes.io/enforce"]
+	isRestricted := false
+
+	r.Log.Info("Checking pod security policy",
+		"namespace", controllerNamespace,
+		"enforceLabel", enforceLabel,
+		"plan", plan.Name)
+
+	if enforceLabel == "restricted" {
+		isRestricted = true
+		r.Log.Info("Detected restricted pod security policy from namespace label",
+			"namespace", controllerNamespace,
+			"label", "pod-security.kubernetes.io/enforce",
+			"value", enforceLabel,
+			"plan", plan.Name)
+	}
+
+	// If restricted policies detected, add a warning condition (non-blocking)
+	if isRestricted {
+		restrictedPodSecurity := libcnd.Condition{
+			Type:     RestrictedPodSecurity,
+			Status:   True,
+			Category: Warn, // Non-blocking warning
+			Message:  fmt.Sprintf("Namespace '%s' where MTV is installed may be restricted, causing migration to fail. Disable SCC label synchronization and apply the privileged label.", controllerNamespace),
+			Items:    []string{},
+		}
+		plan.Status.SetCondition(restrictedPodSecurity)
+		r.Log.Info("Restricted pod security policy detected - warning condition added",
+			"namespace", controllerNamespace,
+			"plan", plan.Name)
+	} else {
+		r.Log.Info("No restricted pod security policy detected",
+			"namespace", controllerNamespace,
+			"enforceLabel", enforceLabel,
+			"plan", plan.Name)
 	}
 
 	return nil
