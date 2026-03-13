@@ -28,7 +28,7 @@ function check_deps() {
 
 function get_versions() {
   echo "Fetching versions..."
-  VERSIONS=$(curl -s -H "Authorization: Bearer $JIRA_CLI_KEY" \
+  VERSIONS=$(curl -s -H "Authorization: Bearer $JIRA_API_TOKEN" \
         https://issues.redhat.com/rest/api/2/project/MTV/versions)
 }
 
@@ -143,7 +143,7 @@ function create_ticket() {
   jira epic add "$EPIC_KEY" "$ISSUE_KEY"
 
   # Open in browser
-  jira issue view "$ISSUE_KEY" --web
+  jira issue view "$ISSUE_KEY"
 }
 
 # --- Main ---
