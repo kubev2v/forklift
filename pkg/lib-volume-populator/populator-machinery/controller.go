@@ -66,7 +66,6 @@ const (
 	populatorPodVolumeName  = "target"
 	populatorPvcPrefix      = "prime"
 	populatedFromAnnoSuffix = "populated-from"
-	pvcFinalizerSuffix      = "populate-target-protection"
 	annSelectedNode         = "volume.kubernetes.io/selected-node"
 	controllerNameSuffix    = "populator"
 
@@ -118,7 +117,6 @@ type populatorResource struct {
 
 type controller struct {
 	populatedFromAnno string
-	pvcFinalizer      string
 	kubeClient        kubernetes.Interface
 	dynamicClient     dynamic.Interface
 	imageName         string
@@ -194,7 +192,6 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 		devicePath:        devicePath,
 		mountPath:         mountPath,
 		populatedFromAnno: prefix + "/" + populatedFromAnnoSuffix,
-		pvcFinalizer:      prefix + "/" + pvcFinalizerSuffix,
 		pvcLister:         pvcInformer.Lister(),
 		pvcSynced:         pvcInformer.Informer().HasSynced,
 		pvLister:          pvInformer.Lister(),
@@ -598,12 +595,6 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 	// If the PVC is unbound, we need to perform the population
 	if "" == pvc.Spec.VolumeName {
 
-		// Ensure the PVC has a finalizer on it so we can clean up the stuff we create
-		err = c.ensureFinalizer(ctx, pvc, c.pvcFinalizer, true)
-		if err != nil {
-			return err
-		}
-
 		// Record start time for populator metric
 		c.metrics.operationStart(pvc.UID)
 
@@ -634,6 +625,14 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 					Namespace:   populatorNamespace,
 					Annotations: annotations,
 					Labels:      labels,
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion: "v1",
+							Kind:       "PersistentVolumeClaim",
+							Name:       pvc.Name,
+							UID:        pvc.UID,
+						},
+					},
 				},
 				Spec: makePopulatePodSpec(pvcPrimeName, secretName),
 			}
@@ -679,6 +678,14 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      pvcPrimeName,
 						Namespace: populatorNamespace,
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "v1",
+								Kind:       "PersistentVolumeClaim",
+								Name:       pvc.Name,
+								UID:        pvc.UID,
+							},
+						},
 					},
 					Spec: corev1.PersistentVolumeClaimSpec{
 						AccessModes:      pvc.Spec.AccessModes,
@@ -735,20 +742,22 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 				// Skip retry logic for VSphere xcopy populator - let it fail immediately
 				if c.gk.Kind == api.VSphereXcopyVolumePopulatorKind {
 					c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPodFailed, "VSphere xcopy populator failed (no retry): Please check the logs of the populator pod, %s/%s", populatorNamespace, pod.Name)
-				} else {
-					restarts, ok := pvc.Annotations[AnnPopulatorReCreations]
-					if !ok {
-						return c.retryFailedPopulator(ctx, pvc, populatorNamespace, pod.Name, 1)
-					}
-					restartsInteger, err := strconv.Atoi(restarts)
-					if err != nil {
-						return err
-					}
-					if restartsInteger < 3 {
-						return c.retryFailedPopulator(ctx, pvc, populatorNamespace, pod.Name, restartsInteger+1)
-					}
-					c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPodFailed, "Populator failed after few (3) attempts: Please check the logs of the populator pod, %s/%s", populatorNamespace, pod.Name)
+					return c.deleteFailedPVC(ctx, pvc)
 				}
+
+				restarts, ok := pvc.Annotations[AnnPopulatorReCreations]
+				if !ok {
+					return c.retryFailedPopulator(ctx, pvc, populatorNamespace, pod.Name, 1)
+				}
+				restartsInteger, err := strconv.Atoi(restarts)
+				if err != nil {
+					return err
+				}
+				if restartsInteger < 3 {
+					return c.retryFailedPopulator(ctx, pvc, populatorNamespace, pod.Name, restartsInteger+1)
+				}
+				c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPodFailed, "Populator failed after few (3) attempts: Please check the logs of the populator pod, %s/%s", populatorNamespace, pod.Name)
+				return c.deleteFailedPVC(ctx, pvc)
 			}
 			// We'll get called again later when the pod succeeds
 			return nil
@@ -828,18 +837,20 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 		}
 	}
 
-	// Make sure the PVC finalizer is gone
-	err = c.ensureFinalizer(ctx, pvc, c.pvcFinalizer, false)
-	if err != nil {
-		return err
-	}
-
 	// Clean up our internal callback maps
 	c.cleanupNotifications(key)
 
 	// Stop progress monitoring
 	delete(monitoredPVCs, string(pvc.UID))
 
+	return nil
+}
+
+func (c *controller) deleteFailedPVC(ctx context.Context, pvc *corev1.PersistentVolumeClaim) error {
+	klog.V(2).Infof("Deleting PVC %s/%s after permanent populator failure", pvc.Namespace, pvc.Name)
+	if err := c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(ctx, pvc.Name, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+		return err
+	}
 	return nil
 }
 
@@ -982,73 +993,6 @@ func makePopulatePodSpec(pvcPrimeName, secretName string) corev1.PodSpec {
 			},
 		},
 	}
-}
-
-func (c *controller) ensureFinalizer(ctx context.Context, pvc *corev1.PersistentVolumeClaim, finalizer string, want bool) error {
-	finalizers := pvc.GetFinalizers()
-	found := false
-	foundIdx := -1
-	for i, v := range finalizers {
-		if finalizer == v {
-			found = true
-			foundIdx = i
-			break
-		}
-	}
-	if found == want {
-		// Nothing to do in this case
-		return nil
-	}
-
-	type patchOp struct {
-		Op    string      `json:"op"`
-		Path  string      `json:"path"`
-		Value interface{} `json:"value,omitempty"`
-	}
-
-	var patch []patchOp
-
-	if want {
-		// Add the finalizer to the end of the list
-		patch = []patchOp{
-			{
-				Op:    "test",
-				Path:  "/metadata/finalizers",
-				Value: finalizers,
-			},
-			{
-				Op:    "add",
-				Path:  "/metadata/finalizers/-",
-				Value: finalizer,
-			},
-		}
-	} else {
-		// Remove the finalizer from the list index where it was found
-		path := fmt.Sprintf("/metadata/finalizers/%d", foundIdx)
-		patch = []patchOp{
-			{
-				Op:    "test",
-				Path:  path,
-				Value: finalizer,
-			},
-			{
-				Op:   "remove",
-				Path: path,
-			},
-		}
-	}
-
-	data, err := json.Marshal(patch)
-	if err != nil {
-		return err
-	}
-	_, err = c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Patch(ctx, pvc.Name, types.JSONPatchType,
-		data, metav1.PatchOptions{})
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (c *controller) checkIntreeStorageClass(pvc *corev1.PersistentVolumeClaim, sc *storagev1.StorageClass) error {
