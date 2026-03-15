@@ -11,6 +11,7 @@ import (
 const (
 	OVAProviderServerImage    = "OVA_PROVIDER_SERVER_IMAGE"
 	HyperVProviderServerImage = "HYPERV_PROVIDER_SERVER_IMAGE"
+	ProviderPendingTimeout    = "PROVIDER_PENDING_TIMEOUT_SECONDS"
 )
 
 // Defaults
@@ -24,6 +25,8 @@ const (
 	DefaultHyperVCPURequest    = "100m"
 	DefaultHyperVMemoryLimit   = "1Gi"
 	DefaultHyperVMemoryRequest = "512Mi"
+
+	DefaultProviderPendingTimeoutSeconds = 120
 )
 
 // ProviderPodConfig defines common configuration for provider server pods
@@ -42,8 +45,9 @@ type ProviderPodConfig struct {
 }
 
 type Providers struct {
-	OVA    ProviderPodConfig
-	HyperV ProviderPodConfig
+	OVA                           ProviderPodConfig
+	HyperV                        ProviderPodConfig
+	ProviderPendingTimeoutSeconds int
 }
 
 func (r *Providers) Load() error {
@@ -84,6 +88,11 @@ func (r *Providers) Load() error {
 		return fmt.Errorf("invalid HyperV memory request %q: %w", r.HyperV.Resources.Memory.Request, err)
 	}
 	r.HyperV.ContainerImage = os.Getenv(HyperVProviderServerImage)
+	timeout, err := getPositiveEnvLimit(ProviderPendingTimeout, DefaultProviderPendingTimeoutSeconds)
+	if err != nil {
+		return err
+	}
+	r.ProviderPendingTimeoutSeconds = timeout
 
 	return nil
 }
