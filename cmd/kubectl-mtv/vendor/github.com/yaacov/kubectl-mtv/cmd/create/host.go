@@ -15,9 +15,9 @@ import (
 )
 
 // NewHostCmd creates the host creation command
-func NewHostCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
+func NewHostCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
+	var hostIDs []string
 	var provider string
-	var inventoryURL string
 	var username, password string
 	var existingSecret string
 	var ipAddress string
@@ -29,33 +29,38 @@ func NewHostCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	var hostSpec forkliftv1beta1.HostSpec
 
 	cmd := &cobra.Command{
-		Use:   "host NAME [NAME...]",
-		Short: "Create migration hosts for vSphere providers",
+		Use:   "host",
+		Short: "Create migration hosts",
 		Long: `Create migration hosts for vSphere providers. Hosts enable direct data transfer from ESXi hosts, bypassing vCenter for improved performance.
 
 By creating host resources, Forklift can utilize ESXi host interfaces directly for network transfer to OpenShift, provided the OpenShift worker nodes and ESXi host interfaces have network connectivity. This is particularly beneficial when users want to control which specific ESXi interface is used for migration, even without direct access to ESXi host credentials.
 
-Only vSphere providers support host creation. Host names must match existing hosts in the provider's inventory.
+Only vSphere providers support host creation. The --host-id flag requires inventory host IDs
+(e.g. "host-8"), NOT display names or IP addresses. Use 'kubectl-mtv get inventory host
+--provider <name>' to list available host IDs.
 
 Examples:
+  # First, discover available host IDs from the provider inventory
+  kubectl-mtv get inventory host --provider my-vsphere-provider
+
   # ESXi endpoint provider with direct IP (no credentials needed - uses provider secret automatically)
-  kubectl-mtv create host my-host --provider my-esxi-provider --ip-address 192.168.1.10
+  kubectl-mtv create host --host-id host-8 --provider my-esxi-provider --ip-address 192.168.1.10
 
   # ESXi endpoint provider with network adapter lookup
-  kubectl-mtv create host my-host --provider my-esxi-provider --network-adapter "Management Network"
+  kubectl-mtv create host --host-id host-8 --provider my-esxi-provider --network-adapter "Management Network"
 
   # Create a host using existing secret and direct IP
-  kubectl-mtv create host my-host --provider my-vsphere-provider --existing-secret my-secret --ip-address 192.168.1.10
+  kubectl-mtv create host --host-id host-8 --provider my-vsphere-provider --existing-secret my-secret --ip-address 192.168.1.10
 
   # Create a host with new credentials and direct IP
-  kubectl-mtv create host my-host --provider my-vsphere-provider --username user --password pass --ip-address 192.168.1.10
+  kubectl-mtv create host --host-id host-8 --provider my-vsphere-provider --username user --password pass --ip-address 192.168.1.10
 
   # Create a host using IP from inventory network adapter
-  kubectl-mtv create host my-host --provider my-vsphere-provider --username user --password pass --network-adapter "Management Network"
+  kubectl-mtv create host --host-id host-8 --provider my-vsphere-provider --username user --password pass --network-adapter "Management Network"
 
   # Create multiple hosts (all use same IP resolution method)
-  kubectl-mtv create host host1 host2 host3 --provider my-vsphere-provider --existing-secret my-secret --network-adapter "Management Network"`,
-		Args:         cobra.MinimumNArgs(1),
+  kubectl-mtv create host --host-id host-8,host-12,host-15 --provider my-vsphere-provider --existing-secret my-secret --network-adapter "Management Network"`,
+		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate input parameters
@@ -64,9 +69,10 @@ Examples:
 			}
 
 			namespace := client.ResolveNamespace(kubeConfigFlags)
-			if inventoryURL == "" {
-				inventoryURL = client.DiscoverInventoryURL(cmd.Context(), kubeConfigFlags, namespace)
-			}
+
+			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
+			inventoryURL := globalConfig.GetInventoryURL()
+			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
 			providerHasESXIEndpoint, _, err := host.CheckProviderESXIEndpoint(cmd.Context(), kubeConfigFlags, provider, namespace)
 			if err != nil {
@@ -99,30 +105,31 @@ Examples:
 				cacert = string(fileContent)
 			}
 
-			hostIDs := args
-
 			opts := host.CreateHostOptions{
-				HostIDs:             hostIDs,
-				Namespace:           namespace,
-				Provider:            provider,
-				ConfigFlags:         kubeConfigFlags,
-				InventoryURL:        inventoryURL,
-				Username:            username,
-				Password:            password,
-				ExistingSecret:      existingSecret,
-				IPAddress:           ipAddress,
-				NetworkAdapterName:  networkAdapterName,
-				HostInsecureSkipTLS: hostInsecureSkipTLS,
-				CACert:              cacert,
-				HostSpec:            hostSpec,
+				HostIDs:                  hostIDs,
+				Namespace:                namespace,
+				Provider:                 provider,
+				ConfigFlags:              kubeConfigFlags,
+				InventoryURL:             inventoryURL,
+				InventoryInsecureSkipTLS: inventoryInsecureSkipTLS,
+				Username:                 username,
+				Password:                 password,
+				ExistingSecret:           existingSecret,
+				IPAddress:                ipAddress,
+				NetworkAdapterName:       networkAdapterName,
+				HostInsecureSkipTLS:      hostInsecureSkipTLS,
+				CACert:                   cacert,
+				HostSpec:                 hostSpec,
 			}
 
 			return host.Create(cmd.Context(), opts)
 		},
 	}
 
+	cmd.Flags().StringSliceVar(&hostIDs, "host-id", nil, "Inventory host ID(s) to create (comma-separated, e.g. \"host-8,host-12\"); use 'get inventory host' to list IDs")
+	cmd.Flags().StringSliceVar(&hostIDs, "host-ids", nil, "Alias for --host-id")
+	_ = cmd.Flags().MarkHidden("host-ids")
 	cmd.Flags().StringVarP(&provider, "provider", "p", "", "Provider name (must be a vSphere provider)")
-	cmd.Flags().StringVar(&inventoryURL, "inventory-url", os.Getenv("MTV_INVENTORY_URL"), "Base URL for the inventory service")
 	cmd.Flags().StringVarP(&username, "username", "u", "", "Username for host authentication (required if --existing-secret not provided)")
 	cmd.Flags().StringVar(&password, "password", "", "Password for host authentication (required if --existing-secret not provided)")
 	cmd.Flags().StringVar(&existingSecret, "existing-secret", "", "Name of existing secret to use for host authentication")
@@ -131,6 +138,9 @@ Examples:
 	cmd.Flags().BoolVar(&hostInsecureSkipTLS, "host-insecure-skip-tls", false, "Skip TLS verification when connecting to the host (only used when creating new secret)")
 	cmd.Flags().StringVar(&cacert, "cacert", "", "CA certificate for host authentication - provide certificate content directly or use @filename to load from file (only used when creating new secret)")
 
+	if err := cmd.MarkFlagRequired("host-id"); err != nil {
+		panic(err)
+	}
 	if err := cmd.MarkFlagRequired("provider"); err != nil {
 		panic(err)
 	}
@@ -139,18 +149,20 @@ Examples:
 		panic(err)
 	}
 
-	cmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return completion.HostNameCompletion(kubeConfigFlags, provider, toComplete)
+	if err := cmd.RegisterFlagCompletionFunc("host-id", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return completion.HostIDCompletion(kubeConfigFlags, provider, toComplete)
+	}); err != nil {
+		panic(err)
 	}
 
 	if err := cmd.RegisterFlagCompletionFunc("ip-address", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return completion.HostIPAddressCompletion(kubeConfigFlags, provider, args, toComplete)
+		return completion.HostIPAddressCompletion(kubeConfigFlags, provider, hostIDs, toComplete)
 	}); err != nil {
 		panic(err)
 	}
 
 	if err := cmd.RegisterFlagCompletionFunc("network-adapter", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return completion.HostNetworkAdapterCompletion(kubeConfigFlags, provider, args, toComplete)
+		return completion.HostNetworkAdapterCompletion(kubeConfigFlags, provider, hostIDs, toComplete)
 	}); err != nil {
 		panic(err)
 	}
