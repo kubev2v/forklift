@@ -211,9 +211,11 @@ rules:
     - update
 - apiGroups:
     - image.openshift.io
+    - ""
   resources:
     - imagestreamtags
     - imagestreams
+    - imagestreams/layers
   verbs:
     - get
     - list
