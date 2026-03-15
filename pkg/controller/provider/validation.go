@@ -48,6 +48,7 @@ const (
 	SSHReady                = "SSHReady"
 	SSHNotReady             = "SSHNotReady"
 	SMBCSIDriverNotReady    = "SMBCSIDriverNotReady"
+	SMBMountFailed          = "SMBMountFailed"
 	WaitingForService       = "WaitingForService"
 )
 
@@ -84,6 +85,16 @@ const (
 	ConnectionFailed = "ConnectionFailed"
 	Ready            = "Ready"
 	Staging          = "Staging"
+)
+
+const (
+	ReasonContainerCreating       = "ContainerCreating"
+	ReasonErrImagePull            = "ErrImagePull"
+	ReasonImagePullBackOff        = "ImagePullBackOff"
+	ReasonInvalidImageName        = "InvalidImageName"
+	ReasonCrashLoopBackOff        = "CrashLoopBackOff"
+	ReasonCreateContainerCfgError = "CreateContainerConfigError"
+	ReasonCreateContainerError    = "CreateContainerError"
 )
 
 // Statuses
@@ -432,6 +443,13 @@ func (r *Reconciler) testConnection(provider *api.Provider, secret *core.Secret)
 		}
 	}
 
+	// For HyperV providers, check if the provider-server pod (SMB mount) is ready
+	if provider.Type() == api.HyperV {
+		if !r.checkHyperVServiceReady(provider) {
+			return nil
+		}
+	}
+
 	rl := container.Build(nil, provider, secret)
 	status, err := rl.Test()
 	if err == nil {
@@ -483,6 +501,8 @@ func (r *Reconciler) testConnection(provider *api.Provider, secret *core.Secret)
 }
 
 func (r *Reconciler) checkOVAServiceReady(provider *api.Provider) bool {
+	pendingTimeout := providerServicePendingTimeout()
+
 	if provider.Status.Service == nil {
 		log.Info("Waiting for OVA inventory service to be created.")
 		provider.Status.SetCondition(
@@ -549,7 +569,7 @@ func (r *Reconciler) checkOVAServiceReady(provider *api.Provider) bool {
 			for _, containerStatus := range pod.Status.ContainerStatuses {
 				if waiting := containerStatus.State.Waiting; waiting != nil {
 					switch waiting.Reason {
-					case "ErrImagePull", "ImagePullBackOff", "InvalidImageName":
+					case ReasonErrImagePull, ReasonImagePullBackOff, ReasonInvalidImageName:
 						provider.Status.Phase = ValidationFailed
 						provider.Status.SetCondition(
 							libcnd.Condition{
@@ -560,7 +580,7 @@ func (r *Reconciler) checkOVAServiceReady(provider *api.Provider) bool {
 								Message:  fmt.Sprintf("OVA inventory service has image error: %s - %s", waiting.Reason, waiting.Message),
 							})
 						return false
-					case "CrashLoopBackOff", "CreateContainerConfigError", "CreateContainerError":
+					case ReasonCrashLoopBackOff, ReasonCreateContainerCfgError, ReasonCreateContainerError:
 						provider.Status.Phase = ValidationFailed
 						provider.Status.SetCondition(
 							libcnd.Condition{
@@ -577,7 +597,7 @@ func (r *Reconciler) checkOVAServiceReady(provider *api.Provider) bool {
 
 			// Check for pods stuck in pending state (e.g., mount failures)
 			if pod.Status.Phase == core.PodPending {
-				if time.Since(pod.CreationTimestamp.Time) > 2*time.Minute {
+				if time.Since(pod.CreationTimestamp.Time) > pendingTimeout {
 					provider.Status.Phase = ValidationFailed
 					provider.Status.SetCondition(
 						libcnd.Condition{
@@ -585,7 +605,7 @@ func (r *Reconciler) checkOVAServiceReady(provider *api.Provider) bool {
 							Status:   True,
 							Reason:   Tested,
 							Category: Critical,
-							Message:  fmt.Sprintf("OVA inventory service '%s' has been pending for over 2 minutes. Check pod events for mount or configuration errors.", pod.Name),
+							Message:  fmt.Sprintf("OVA inventory service '%s' has been pending for over %s. Check pod events for mount or configuration errors.", pod.Name, pendingTimeout),
 						})
 					return false
 				}
@@ -613,6 +633,114 @@ func (r *Reconciler) checkOVAServiceReady(provider *api.Provider) bool {
 		"deployment", deployment.Name,
 		"readyReplicas", deployment.Status.ReadyReplicas)
 	return true
+}
+
+func (r *Reconciler) checkHyperVServiceReady(provider *api.Provider) bool {
+	if provider.Status.Service == nil {
+		setWaitingForService(provider, "Waiting for Hyper-V provider service to be created.")
+		return false
+	}
+
+	pods, err := r.listHyperVProviderPods(provider)
+	if err != nil {
+		log.Error(err, "Failed to list pods for Hyper-V provider")
+		setWaitingForService(provider, "Failed to list Hyper-V provider server pods, will retry.")
+		return false
+	}
+
+	if len(pods) == 0 {
+		setWaitingForService(provider, "Waiting for Hyper-V provider server pod to be created.")
+		return false
+	}
+
+	if msg, stuck := findStuckSMBMount(pods); stuck {
+		log.Info("Hyper-V provider pod appears stuck on SMB mount", "detail", msg)
+		provider.Status.Phase = ValidationFailed
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     SMBMountFailed,
+			Status:   True,
+			Reason:   Tested,
+			Category: Critical,
+			Message:  fmt.Sprintf("Hyper-V provider server SMB mount failed: %s", msg),
+		})
+		return false
+	}
+
+	if !anyPodReady(pods) {
+		setWaitingForService(provider, "Waiting for Hyper-V provider server pod to become ready.")
+		return false
+	}
+
+	provider.Status.DeleteCondition(SMBMountFailed)
+	provider.Status.DeleteCondition(WaitingForService)
+	return true
+}
+
+func (r *Reconciler) listHyperVProviderPods(provider *api.Provider) ([]core.Pod, error) {
+	labeler := hvutil.Labeler{}
+	podList := &core.PodList{}
+	err := r.List(context.TODO(), podList, &client.ListOptions{
+		LabelSelector: labels.SelectorFromSet(labeler.ProviderLabels(provider)),
+		Namespace:     Settings.Namespace,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return podList.Items, nil
+}
+
+func setWaitingForService(provider *api.Provider, message string) {
+	provider.Status.SetCondition(libcnd.Condition{
+		Type:     WaitingForService,
+		Status:   True,
+		Reason:   Started,
+		Category: Advisory,
+		Message:  message,
+	})
+}
+
+func findStuckSMBMount(pods []core.Pod) (string, bool) {
+	for i := range pods {
+		if msg, stuck := smbMountBlocked(&pods[i]); stuck {
+			return msg, true
+		}
+	}
+	return "", false
+}
+
+func anyPodReady(pods []core.Pod) bool {
+	for i := range pods {
+		if isPodReady(&pods[i]) {
+			return true
+		}
+	}
+	return false
+}
+
+func smbMountBlocked(pod *core.Pod) (string, bool) {
+	pendingTimeout := providerServicePendingTimeout()
+
+	// Only flag pods that have been scheduled to a node (NodeName set) — if a
+	// pod is unscheduled, the delay is a scheduling/resource issue, not a mount
+	// failure.
+	if pod.Status.Phase == core.PodPending && pod.Spec.NodeName != "" &&
+		time.Since(pod.CreationTimestamp.Time) > pendingTimeout {
+		return fmt.Sprintf("pod %s has been pending for over %s on node %s, check pod events for mount errors", pod.Name, pendingTimeout, pod.Spec.NodeName), true
+	}
+	return "", false
+}
+
+func providerServicePendingTimeout() time.Duration {
+	return time.Duration(Settings.Providers.ProviderPendingTimeoutSeconds) * time.Second
+}
+
+func isPodReady(pod *core.Pod) bool {
+	for _, c := range pod.Status.Conditions {
+		if c.Type == core.PodReady {
+			return c.Status == core.ConditionTrue
+		}
+	}
+	return false
 }
 
 // Validate inventory created.
