@@ -111,10 +111,10 @@ cli_download_service_name: "{{ app_name }}-cli-download"
 cli_download_route_name: "{{ cli_download_service_name }}"
 cli_download_deployment_name: "{{ cli_download_service_name }}"
 cli_download_container_name: "{{ app_name }}-cli-download"
-cli_download_container_limits_cpu: "100m"
-cli_download_container_limits_memory: "128Mi"
-cli_download_container_requests_cpu: "50m"
-cli_download_container_requests_memory: "64Mi"
+cli_download_container_limits_cpu: "1000m"
+cli_download_container_limits_memory: "1Gi"
+cli_download_container_requests_cpu: "100m"
+cli_download_container_requests_memory: "512Mi"
 cli_download_state: absent
 
 api_image_fqin: "{{ lookup( 'env', 'API_IMAGE') or lookup( 'env', 'RELATED_IMAGE_API') }}"
@@ -139,6 +139,7 @@ populator_vsphere_xcopy_volume_image_fqin: "{{ lookup( 'env', 'VSPHERE_XCOPY_VOL
 must_gather_image_fqin: "{{ lookup( 'env', 'MUST_GATHER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_MUST_GATHER') }}"
 
 virt_v2v_image_fqin: "{{ lookup( 'env', 'VIRT_V2V_IMAGE') or lookup( 'env', 'RELATED_IMAGE_VIRT_V2V') }}"
+virt_v2v_image_xfs_fqin: "{{ lookup( 'env', 'VIRT_V2V_IMAGE_XFS') or lookup( 'env', 'RELATED_IMAGE_VIRT_V2V_XFS') }}"
 virt_v2v_dont_request_kvm: "{{ lookup( 'env', 'VIRT_V2V_DONT_REQUEST_KVM') }}"
 virt_v2v_extra_args: "{{ lookup( 'env', 'VIRT_V2V_EXTRA_ARGS') }}"
 virt_v2v_inspector_extra_args: "{{ lookup( 'env', 'VIRT_V2V_INSPECTOR_EXTRA_ARGS') }}"

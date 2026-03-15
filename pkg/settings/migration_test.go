@@ -238,3 +238,128 @@ func TestMigration_ExtraArgsSeparation(t *testing.T) {
 		}
 	})
 }
+
+// TestMigration_VirtV2vImageXFS tests the loading of the VIRT_V2V_IMAGE_RHEL9 environment
+// variable for XFS compatibility mode. This XFS-compatible image supports XFSv4 filesystems
+// and can be selected per-plan via the XfsCompatibility flag.
+func TestMigration_VirtV2vImageXFS(t *testing.T) {
+	const xfsImage = "quay.io/kubev2v/forklift-virt-v2v-rhel9:latest"
+
+	tests := []struct {
+		name        string
+		envValue    string
+		unsetEnv    bool
+		role        string
+		expectError bool
+		expected    string
+	}{
+		{
+			name:        "loads XFS image when set in non-main role",
+			envValue:    xfsImage,
+			unsetEnv:    false,
+			role:        InventoryRole,
+			expectError: false,
+			expected:    xfsImage,
+		},
+		{
+			name:        "loads XFS image when set in main role",
+			envValue:    xfsImage,
+			unsetEnv:    false,
+			role:        MainRole,
+			expectError: false,
+			expected:    xfsImage,
+		},
+		{
+			name:        "returns error when unset in main role",
+			envValue:    "",
+			unsetEnv:    true,
+			role:        MainRole,
+			expectError: true,
+			expected:    "",
+		},
+		{
+			name:        "allows unset in inventory role",
+			envValue:    "",
+			unsetEnv:    true,
+			role:        InventoryRole,
+			expectError: false,
+			expected:    "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(Roles, tt.role)
+
+			// Set required env vars for MainRole
+			if tt.role == MainRole {
+				t.Setenv(VirtV2vImage, "quay.io/kubev2v/forklift-virt-v2v:latest")
+				t.Setenv(VirtV2vDontRequestKVM, "false")
+				t.Setenv(VirtCustomizeConfigMap, "virt-customize-config")
+				t.Setenv(OvirtOsConfigMap, "ovirt-os-map")
+				t.Setenv(VsphereOsConfigMap, "vsphere-os-map")
+			}
+
+			if !tt.unsetEnv {
+				t.Setenv(VirtV2vImageXFS, tt.envValue)
+			}
+
+			// Load global Settings.Role first since Migration.Load() checks it
+			Settings.Role = Role{}
+			err := Settings.Role.Load()
+			if err != nil {
+				t.Fatalf("Failed to load role: %v", err)
+			}
+
+			var migration Migration
+			err = migration.Load()
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("Load() unexpected error = %v", err)
+				}
+
+				if migration.VirtV2vImageXFS != tt.expected {
+					t.Errorf("VirtV2vImageXFS = %q, want %q",
+						migration.VirtV2vImageXFS, tt.expected)
+				}
+			}
+		})
+	}
+}
+
+// TestMigration_XfsAndStandardImages verifies that both standard and XFS images
+// can be loaded simultaneously and are stored independently.
+func TestMigration_XfsAndStandardImages(t *testing.T) {
+	const (
+		standardImage = "quay.io/kubev2v/forklift-virt-v2v:latest"
+		xfsImage      = "quay.io/kubev2v/forklift-virt-v2v:rhel9-xfs"
+	)
+
+	t.Run("both images load independently", func(t *testing.T) {
+		t.Setenv(Roles, InventoryRole)
+
+		t.Setenv(VirtV2vImage, standardImage)
+		t.Setenv(VirtV2vImageXFS, xfsImage)
+
+		var migration Migration
+		err := migration.Load()
+		if err != nil {
+			t.Fatalf("Load() error = %v", err)
+		}
+
+		if migration.VirtV2vImage != standardImage {
+			t.Errorf("VirtV2vImage = %q, want %q",
+				migration.VirtV2vImage, standardImage)
+		}
+
+		if migration.VirtV2vImageXFS != xfsImage {
+			t.Errorf("VirtV2vImageXFS = %q, want %q",
+				migration.VirtV2vImageXFS, xfsImage)
+		}
+	})
+}

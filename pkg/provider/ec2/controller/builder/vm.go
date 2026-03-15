@@ -91,7 +91,7 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 	}
 
 	// Map CPU with topology (sockets/cores) and nested virt for metal instances
-	r.mapCPU(vcpus, instanceType, object)
+	r.mapCPU(vmRef, vcpus, instanceType, object)
 
 	// Map firmware (BIOS/EFI) and serial number
 	r.mapFirmware(awsInstance, object)
@@ -117,26 +117,21 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 // mapCPU configures the VM's CPU with proper topology.
 // Uses sockets=1 with all cores, which is a common layout for cloud instances.
 // For .metal instances, enables nested virtualization (vmx/svm features).
-func (r *Builder) mapCPU(vcpus int32, instanceType string, object *cnv.VirtualMachineSpec) {
+func (r *Builder) mapCPU(vmRef ref.Ref, vcpus int32, instanceType string, object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.CPU = &cnv.CPU{
 		Sockets: 1,
 		Cores:   uint32(vcpus),
 	}
 
-	// Enable nested virtualization for bare metal instances
-	// EC2 .metal instances support nested virtualization
-	if r.isMetalInstance(instanceType) {
-		var features []cnv.CPUFeature
-		features = append(features, cnv.CPUFeature{
-			Name:   "vmx",
-			Policy: "optional",
-		})
-		features = append(features, cnv.CPUFeature{
-			Name:   "svm",
-			Policy: "optional",
-		})
-		object.Template.Spec.Domain.CPU.Features = features
-		r.log.Info("Enabled nested virtualization for metal instance", "instanceType", instanceType)
+	if enableNestedVirt := r.NestedVirtualizationSetting(vmRef, r.isMetalInstance(instanceType)); enableNestedVirt != nil {
+		policy := "optional"
+		if !*enableNestedVirt {
+			policy = "disable"
+		}
+		object.Template.Spec.Domain.CPU.Features = append(object.Template.Spec.Domain.CPU.Features,
+			cnv.CPUFeature{Name: "vmx", Policy: policy},
+			cnv.CPUFeature{Name: "svm", Policy: policy},
+		)
 	}
 }
 

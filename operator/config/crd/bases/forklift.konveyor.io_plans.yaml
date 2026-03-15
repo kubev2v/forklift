@@ -1101,6 +1101,14 @@ spec:
               diskBus:
                 description: 'Deprecated: this field will be deprecated in 2.8.'
                 type: string
+              enableNestedVirtualization:
+                description: |-
+                  EnableNestedVirtualization controls whether nested virtualization (vmx/svm CPU features)
+                  is enabled on the target VM.
+                  - nil (default): Auto-detect from source VM settings
+                  - true: Force enable nested virtualization on the target VM regardless of source settings
+                  - false: Force disable nested virtualization on the target VM regardless of source settings
+                type: boolean
               installLegacyDrivers:
                 description: |-
                   InstallLegacyDrivers determines whether to install legacy windows drivers in the VM.
@@ -2449,6 +2457,14 @@ spec:
 
                         Note: If the Plan-level option is set to true, the VM-level option will be ignored.
                       type: boolean
+                    enableNestedVirtualization:
+                      description: |-
+                        EnableNestedVirtualization controls whether nested virtualization (vmx/svm CPU features)
+                        is enabled on the target VM.
+                        When nil (default), the plan-level enableNestedVirtualization value is used.
+                        When explicitly set to true, nested virtualization is enabled for this VM.
+                        When explicitly set to false, nested virtualization is disabled for this VM.
+                      type: boolean
                     hooks:
                       description: Enable hooks.
                       items:
@@ -2695,6 +2711,15 @@ spec:
                 description: |-
                   Whether this is a warm migration.
                   Deprecated: this field will be deprecated in 2.10. Use Type instead.
+                type: boolean
+              xfsCompatibility:
+                default: false
+                description: |-
+                  XfsCompatibility overrides the global virt-v2v container image for this plan.
+                  When set, virt-v2v pods created by this plan will use the XFS compatible image
+                  VIRT_V2V_IMAGE_XFS instead of the cluster-wide VIRT_V2V_IMAGE setting.
+                  Use this to enable XFSv4 compatibility mode for specific plan.
+                  Warning: Enabling XFSv4 support will drop support for BTRFS for the specific plan. Ensure that the plan only selects VMs with supported filesystem.
                 type: boolean
             required:
             - map
@@ -3027,6 +3052,14 @@ spec:
                           description: Boot disk index (0-based) detected by virt-v2v.
                             nil means undetected.
                           type: integer
+                        enableNestedVirtualization:
+                          description: |-
+                            EnableNestedVirtualization controls whether nested virtualization (vmx/svm CPU features)
+                            is enabled on the target VM.
+                            When nil (default), the plan-level enableNestedVirtualization value is used.
+                            When explicitly set to true, nested virtualization is enabled for this VM.
+                            When explicitly set to false, nested virtualization is disabled for this VM.
+                          type: boolean
                         error:
                           description: Errors
                           properties:

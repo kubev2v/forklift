@@ -4,17 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/fcutil"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
-	"github.com/vmware/govmomi/find"
-	"github.com/vmware/govmomi/property"
-	"github.com/vmware/govmomi/vim25/mo"
-	"github.com/vmware/govmomi/vim25/types"
 	"k8s.io/klog/v2"
 )
 
@@ -195,27 +190,29 @@ func fcUIDToWWPN(fcUid string) (string, error) {
 func (f *FlashArrayClonner) VvolCopy(vsphereClient vmware.Client, vmId string, sourceVMDKFile string, persistentVolume populator.PersistentVolume, progress chan<- uint64) error {
 	klog.Infof("Starting VVol copy operation for VM %s", vmId)
 
-	// Parse the VMDK path
-	vmDisk, err := populator.ParseVmdkPath(sourceVMDKFile)
+	backing, err := vsphereClient.GetVMDiskBacking(context.Background(), vmId, sourceVMDKFile)
 	if err != nil {
-		return fmt.Errorf("failed to parse VMDK path: %w", err)
+		return fmt.Errorf("failed to get VVol disk backing info: %w", err)
 	}
 
-	// Resolve target volume details
+	if backing.VVolId == "" {
+		return fmt.Errorf("disk %s is not a VVol disk", sourceVMDKFile)
+	}
+
+	klog.Infof("Found VVol backing with ID %s", backing.VVolId)
+
+	sourceVolume, err := f.restClient.FindVolumeByVVolID(backing.VVolId)
+	if err != nil {
+		return fmt.Errorf("failed to find source volume by VVol ID %s: %w", backing.VVolId, err)
+	}
+
 	targetLUN, err := f.ResolvePVToLUN(persistentVolume)
 	if err != nil {
 		return fmt.Errorf("failed to resolve target volume: %w", err)
 	}
 
-	// Try to get source volume from vSphere API
-	sourceVolume, err := f.getSourceVolume(vsphereClient, vmId, vmDisk)
-	if err != nil {
-		return fmt.Errorf("failed to get source volume from vSphere: %w", err)
-	}
-
 	klog.Infof("Copying from source volume %s to target volume %s", sourceVolume, targetLUN.Name)
 
-	// Perform the copy operation
 	err = f.performVolumeCopy(sourceVolume, targetLUN.Name, progress)
 	if err != nil {
 		return fmt.Errorf("copy operation failed: %w", err)
@@ -223,60 +220,6 @@ func (f *FlashArrayClonner) VvolCopy(vsphereClient vmware.Client, vmId string, s
 
 	klog.Infof("VVol copy operation completed successfully")
 	return nil
-}
-
-// getSourceVolume find the Pure volume name for a VMDK
-func (f *FlashArrayClonner) getSourceVolume(vsphereClient vmware.Client, vmId string, vmDisk populator.VMDisk) (string, error) {
-	ctx := context.Background()
-
-	// Get VM object from vSphere
-	finder := find.NewFinder(vsphereClient.(*vmware.VSphereClient).Client.Client, true)
-	vm, err := finder.VirtualMachine(ctx, vmId)
-	if err != nil {
-		return "", fmt.Errorf("failed to get VM: %w", err)
-	}
-
-	// Get VM hardware configuration
-	var vmObject mo.VirtualMachine
-	pc := property.DefaultCollector(vsphereClient.(*vmware.VSphereClient).Client.Client)
-	err = pc.RetrieveOne(ctx, vm.Reference(), []string{"config.hardware.device"}, &vmObject)
-	if err != nil {
-		return "", fmt.Errorf("failed to get VM hardware config: %w", err)
-	}
-
-	// Look through VM's virtual disks to find VVol backing
-	if vmObject.Config == nil || vmObject.Config.Hardware.Device == nil {
-		return "", fmt.Errorf("VM config or hardware devices not found")
-	}
-
-	for _, device := range vmObject.Config.Hardware.Device {
-		if disk, ok := device.(*types.VirtualDisk); ok {
-			if backing, ok := disk.Backing.(*types.VirtualDiskFlatVer2BackingInfo); ok {
-				// Check if this is a VVol backing and matches our target VMDK
-				if backing.BackingObjectId != "" && f.matchesVMDKPath(backing.FileName, vmDisk) {
-					klog.Infof("Found VVol backing for VMDK %s with ID %s", vmDisk.VmdkFile, backing.BackingObjectId)
-
-					// Use REST client to find the volume by VVol ID
-					volumeName, err := f.restClient.FindVolumeByVVolID(backing.BackingObjectId)
-					if err != nil {
-						klog.Warningf("Failed to find volume by VVol ID %s: %v", backing.BackingObjectId, err)
-						continue
-					}
-
-					return volumeName, nil
-				}
-			}
-		}
-	}
-
-	return "", fmt.Errorf("VVol backing for VMDK %s not found", vmDisk.VmdkFile)
-}
-
-// matchesVMDKPath checks if a vSphere VVol filename matches the target VMDK
-func (f *FlashArrayClonner) matchesVMDKPath(fileName string, vmDisk populator.VMDisk) bool {
-	fileBase := filepath.Base(fileName)
-	targetBase := filepath.Base(vmDisk.VmdkFile)
-	return fileBase == targetBase
 }
 
 // RDMCopy performs a copy operation for RDM-backed disks using Pure FlashArray APIs
