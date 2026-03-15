@@ -8,3 +8,8 @@ spec:
   feature_ui_plugin: "true"
   feature_validation: "true"
   feature_volume_populator: "true"
+  # Enable NetworkPolicies. Set to "true" to install policies.
+  # When enabled, a baseline default‑deny (Ingress+Egress) policy is applied and
+  # Forklift policies explicitly allow required traffic.
+  feature_network_policies: "false"
+
