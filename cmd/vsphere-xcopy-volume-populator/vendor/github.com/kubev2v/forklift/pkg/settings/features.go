@@ -27,6 +27,15 @@ const ocpMinForVmwareSystemSerial = "4.20.0-0"
 //   - https://issues.redhat.com/browse/CNV-66820
 const ocpMinForUdnMacSupport = "4.20.0-0"
 
+// OpenShift version where Forklift can specify static IP addresses in User Defined Network:
+//   - https://issues.redhat.com/browse/CNV-61227
+const ocpMinForUdnPreserveStaticIp = "4.20.0-0"
+
+// OpenShift version where InsecureSkipVerify is supported for ImageIO data sources:
+//   - https://issues.redhat.com/browse/CNV-71978
+//   - https://github.com/kubevirt/containerized-data-importer/pull/3944
+const ocpMinForInsecureSkipVerify = "4.21.0-0"
+
 // Feature gates.
 type Features struct {
 	// Whether migration is supported from oVirt sources.
@@ -76,7 +85,7 @@ func (r *Features) isOpenShiftVersionAboveMinimum(minimumVersion string) bool {
 func (r *Features) Load() (err error) {
 	r.OvirtWarmMigration = getEnvBool(FeatureOvirtWarmMigration, false)
 	r.RetainPrecopyImporterPods = getEnvBool(FeatureRetainPrecopyImporterPods, false)
-	r.StaticUdnIpAddresses = getEnvBool(FeatureStaticUdnIpAddresses, false)
+	r.StaticUdnIpAddresses = getEnvBool(FeatureStaticUdnIpAddresses, false) && r.isOpenShiftVersionAboveMinimum(ocpMinForUdnPreserveStaticIp)
 	r.VsphereIncrementalBackup = getEnvBool(FeatureVsphereIncrementalBackup, false)
 	r.CopyOffload = getEnvBool(FeatureCopyOffload, false)
 	r.OCPLiveMigration = getEnvBool(FeatureOCPLiveMigration, false)
