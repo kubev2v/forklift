@@ -66,6 +66,20 @@ func (c *Client) FindSystem(
 	return nil, fmt.Errorf("err: systemid or systemname not found")
 }
 
+func (c *Client) GetMetrics(resource string, ids []string) (*types.MetricsResponse, error) {
+	defer TimeSpent("GetMetrics", time.Now())
+	req := &types.MetricsRequest{
+		ResourceType: resource,
+		IDs:          ids,
+	}
+	var resp types.MetricsResponse
+	err := c.getJSONWithRetry("POST", "/dtapi/rest/v1/metrics/query", req, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
 // GetStatistics returns system statistics
 func (s *System) GetStatistics() (*types.Statistics, error) {
 	defer TimeSpent("GetStatistics", time.Now())
@@ -84,6 +98,50 @@ func (s *System) GetStatistics() (*types.Statistics, error) {
 	}
 
 	return &stats, nil
+}
+
+func (s *System) CreateSnapshot(
+	snapshotVolumesParam *types.CreateSnapshotParam,
+) (*types.SnapshotVolumesResp, error) {
+	defer TimeSpent("CreateSnapshot", time.Now())
+
+	link, err := GetLink(s.System.Links, "self")
+	if err != nil {
+		return nil, err
+	}
+
+	path := fmt.Sprintf("%v/action/createSnapshot", link.HREF)
+
+	snapResp := types.SnapshotVolumesResp{}
+	err = s.client.getJSONWithRetry(
+		http.MethodPost, path, snapshotVolumesParam, &snapResp)
+	if err != nil {
+		return nil, err
+	}
+
+	return &snapResp, nil
+}
+
+func (s *System) CreateThinClone(
+	snapshotVolumesParam *types.CreateSnapshotParam,
+) (*types.SnapshotVolumesResp, error) {
+	defer TimeSpent("CreateThinClone", time.Now())
+
+	link, err := GetLink(s.System.Links, "self")
+	if err != nil {
+		return nil, err
+	}
+
+	path := fmt.Sprintf("%v/action/createThinClone", link.HREF)
+
+	snapResp := types.SnapshotVolumesResp{}
+	err = s.client.getJSONWithRetry(
+		http.MethodPost, path, snapshotVolumesParam, &snapResp)
+	if err != nil {
+		return nil, err
+	}
+
+	return &snapResp, nil
 }
 
 // CreateSnapshotConsistencyGroup creates a snapshot consistency group

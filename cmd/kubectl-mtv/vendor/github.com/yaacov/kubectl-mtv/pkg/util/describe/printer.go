@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 	"gopkg.in/yaml.v3"
 
 	"github.com/yaacov/kubectl-mtv/pkg/util/output"
@@ -173,7 +175,7 @@ func formatTable(desc *Description) string {
 	var sb strings.Builder
 
 	sb.WriteString("\n")
-	sb.WriteString(output.ColorizedSeparator(80, output.YellowColor))
+	sb.WriteString(output.Separator(80, output.Yellow))
 	sb.WriteString("\n")
 	sb.WriteString(output.Bold(output.Cyan(desc.Title)))
 	sb.WriteString("\n")
@@ -238,72 +240,45 @@ func writeTableTable(sb *strings.Builder, t Table, prefix string) {
 		return
 	}
 
-	// Calculate column widths
-	widths := make([]int, len(t.Headers))
+	headers := make([]string, len(t.Headers))
 	for i, h := range t.Headers {
-		widths[i] = len(h.Display)
+		headers[i] = h.Display
 	}
+
+	rows := make([][]string, 0, len(t.Rows))
 	for _, row := range t.Rows {
-		for i, h := range t.Headers {
-			if l := len(row[h.Key]); l > widths[i] {
-				widths[i] = l
-			}
-		}
-	}
-
-	// Cap column widths
-	for i := range widths {
-		if widths[i] > 50 {
-			widths[i] = 50
-		}
-		if widths[i] < 4 {
-			widths[i] = 4
-		}
-	}
-
-	padding := 2
-
-	// Header row
-	sb.WriteString(prefix)
-	for i, h := range t.Headers {
-		sb.WriteString(output.Bold(h.Display))
-		if i < len(t.Headers)-1 {
-			pad := widths[i] - len(h.Display) + padding
-			if pad > 0 {
-				sb.WriteString(strings.Repeat(" ", pad))
-			}
-		}
-	}
-	sb.WriteString("\n")
-
-	// Separator
-	sb.WriteString(prefix)
-	for i, w := range widths {
-		sb.WriteString(strings.Repeat("─", w))
-		if i < len(widths)-1 {
-			sb.WriteString(strings.Repeat(" ", padding))
-		}
-	}
-	sb.WriteString("\n")
-
-	// Data rows
-	for _, row := range t.Rows {
-		sb.WriteString(prefix)
-		for i, h := range t.Headers {
+		r := make([]string, len(t.Headers))
+		for j, h := range t.Headers {
 			val := row[h.Key]
-			display := val
 			if h.ColorFunc != nil {
-				display = h.ColorFunc(val)
+				val = h.ColorFunc(val)
 			}
-			sb.WriteString(display)
-			if i < len(t.Headers)-1 {
-				visLen := len(val)
-				pad := widths[i] - visLen + padding
-				if pad > 0 {
-					sb.WriteString(strings.Repeat(" ", pad))
-				}
-			}
+			r[j] = val
 		}
+		rows = append(rows, r)
+	}
+
+	tbl := table.New().
+		Headers(headers...).
+		Rows(rows...).
+		BorderTop(false).
+		BorderBottom(false).
+		BorderLeft(false).
+		BorderRight(false).
+		BorderColumn(false).
+		BorderHeader(true).
+		BorderStyle(lipgloss.NewStyle()).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			s := lipgloss.NewStyle().PaddingRight(2)
+			if row == table.HeaderRow && output.IsColorEnabled() {
+				return s.Bold(true)
+			}
+			return s
+		})
+
+	for _, line := range strings.Split(tbl.Render(), "\n") {
+		sb.WriteString(prefix)
+		sb.WriteString(line)
 		sb.WriteString("\n")
 	}
 }

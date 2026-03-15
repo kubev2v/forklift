@@ -68,7 +68,8 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig Glo
 	// PlanSpec fields
 	var planSpec forkliftv1beta1.PlanSpec
 	var transferNetwork string
-	var installLegacyDrivers string // "true", "false", or "" for nil
+	var installLegacyDrivers string       // "true", "false", or "auto" for nil (auto-detect)
+	var enableNestedVirtualization string // "true", "false", or "auto" for nil (auto-detect)
 	migrationTypeFlag := flags.NewMigrationTypeFlag()
 	var targetLabels []string
 	var targetNodeSelector []string
@@ -187,9 +188,16 @@ Affinity Syntax (KARL):
     --vms "where name ~= 'test-.*'" \
     --default-target-network default \
     --default-target-storage-class standard`,
-		Args:         cobra.NoArgs,
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := flags.ResolveNameArg(&name, args); err != nil {
+				return err
+			}
+			if name == "" {
+				return fmt.Errorf("--name is required")
+			}
+
 			// Resolve the appropriate namespace based on context and flags
 			namespace := client.ResolveNamespace(kubeConfigFlags)
 
@@ -328,15 +336,31 @@ Affinity Syntax (KARL):
 			}
 
 			// Handle InstallLegacyDrivers flag
-			if installLegacyDrivers != "" {
-				switch installLegacyDrivers {
-				case "true":
-					val := true
-					planSpec.InstallLegacyDrivers = &val
-				case "false":
-					val := false
-					planSpec.InstallLegacyDrivers = &val
-				}
+			switch installLegacyDrivers {
+			case "true":
+				val := true
+				planSpec.InstallLegacyDrivers = &val
+			case "false":
+				val := false
+				planSpec.InstallLegacyDrivers = &val
+			case "auto":
+				// leave nil (auto-detect)
+			default:
+				return fmt.Errorf("invalid value for --install-legacy-drivers: %q (must be 'true', 'false', or 'auto')", installLegacyDrivers)
+			}
+
+			// Handle EnableNestedVirtualization flag
+			switch enableNestedVirtualization {
+			case "true":
+				val := true
+				planSpec.EnableNestedVirtualization = &val
+			case "false":
+				val := false
+				planSpec.EnableNestedVirtualization = &val
+			case "auto":
+				// leave nil (auto-detect)
+			default:
+				return fmt.Errorf("invalid value for --enable-nested-virtualization: %q (must be 'true', 'false', or 'auto')", enableNestedVirtualization)
 			}
 
 			// Handle migration type flag
@@ -506,7 +530,7 @@ Affinity Syntax (KARL):
 	cmd.Flags().StringVar(&offloadCACert, "offload-cacert", "", "CA certificate for offload secret (use @filename to load from file)")
 	cmd.Flags().BoolVar(&offloadInsecureSkipTLS, "offload-insecure-skip-tls", false, "Skip TLS verification for offload connections")
 
-	_ = cmd.MarkFlagRequired("name")
+	flags.MarkRequiredForMCP(cmd, "name")
 	_ = cmd.MarkFlagRequired("source")
 	cmd.Flags().StringVar(&vmNamesQuaryOrFile, "vms", "", "List of VM names (comma-separated), path to YAML/JSON file (prefix with @), or query string (prefix with 'where ')")
 	_ = cmd.MarkFlagRequired("vms")
@@ -529,7 +553,7 @@ Affinity Syntax (KARL):
 	cmd.Flags().BoolVar(&planSpec.DeleteVmOnFailMigration, "delete-vm-on-fail-migration", false, "Delete target VM when migration fails")
 	cmd.Flags().BoolVar(&planSpec.SkipGuestConversion, "skip-guest-conversion", false, "Skip the guest conversion process (raw disk copy mode)")
 	cmd.Flags().BoolVar(&planSpec.RunPreflightInspection, "run-preflight-inspection", true, "Run preflight inspection on VM base disks before starting disk transfer")
-	cmd.Flags().StringVar(&installLegacyDrivers, "install-legacy-drivers", "", "Install legacy Windows drivers (true/false, leave empty for auto-detection)")
+	cmd.Flags().StringVar(&installLegacyDrivers, "install-legacy-drivers", "auto", "Install legacy Windows drivers (true/false/auto)")
 	cmd.Flags().VarP(migrationTypeFlag, "migration-type", "m", "Migration type: cold, warm, live, or conversion (default: cold)")
 	cmd.Flags().StringVarP(&defaultTargetNetwork, "default-target-network", "N", "", "Default target network for auto-generated mapping. Use 'default' for pod networking, 'namespace/network-name', or 'network-name'")
 	cmd.Flags().StringVar(&defaultTargetStorageClass, "default-target-storage-class", "", "Default target storage class for auto-generated mapping")
@@ -553,8 +577,14 @@ Affinity Syntax (KARL):
 	cmd.Flags().BoolVar(&planSpec.SkipZoneNodeSelector, "skip-zone-node-selector", false, "Skip adding zone-based node selector to migrated VMs (EC2 only)")
 	cmd.Flags().StringVar(&customizationScripts, "customization-scripts", "", "ConfigMap containing customization scripts for guest conversion. Supports 'namespace/name' or 'name'")
 	cmd.Flags().StringVar(&planSpec.VirtV2vImage, "virt-v2v-image", "", "Override global virt-v2v container image for this plan")
+	cmd.Flags().StringVar(&enableNestedVirtualization, "enable-nested-virtualization", "auto", "Enable nested virtualization on target VMs (true/false/auto)")
+	cmd.Flags().BoolVar(&planSpec.XfsCompatibility, "xfs-compatibility", false, "Use XFS-compatible virt-v2v image for this plan")
 
-	// Add completion for storage enhancement flags
+	_ = cmd.RegisterFlagCompletionFunc("source", completion.ProviderNameCompletion(kubeConfigFlags))
+	_ = cmd.RegisterFlagCompletionFunc("target", completion.ProviderNameCompletionByType(kubeConfigFlags, "openshift"))
+	_ = cmd.RegisterFlagCompletionFunc("network-mapping", completion.MappingNameCompletion(kubeConfigFlags, "network"))
+	_ = cmd.RegisterFlagCompletionFunc("storage-mapping", completion.MappingNameCompletion(kubeConfigFlags, "storage"))
+
 	if err := cmd.RegisterFlagCompletionFunc("default-volume-mode", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"Filesystem", "Block"}, cobra.ShellCompDirectiveNoFileComp
 	}); err != nil {
@@ -588,7 +618,13 @@ Affinity Syntax (KARL):
 
 	// Add completion for install legacy drivers flag
 	if err := cmd.RegisterFlagCompletionFunc("install-legacy-drivers", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"true", "false"}, cobra.ShellCompDirectiveNoFileComp
+		return []string{"true", "false", "auto"}, cobra.ShellCompDirectiveNoFileComp
+	}); err != nil {
+		panic(err)
+	}
+
+	if err := cmd.RegisterFlagCompletionFunc("enable-nested-virtualization", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"true", "false", "auto"}, cobra.ShellCompDirectiveNoFileComp
 	}); err != nil {
 		panic(err)
 	}

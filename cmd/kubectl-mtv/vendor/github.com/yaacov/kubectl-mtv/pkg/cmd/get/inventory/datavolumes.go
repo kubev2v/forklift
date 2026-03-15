@@ -37,18 +37,18 @@ func listDataVolumesOnce(ctx context.Context, kubeConfigFlags *genericclioptions
 	}
 
 	// Define default headers based on provider type
-	var defaultHeaders []output.Header
+	var defaultHeaders []output.Column
 	switch providerType {
 	case "openshift":
-		defaultHeaders = []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "NAMESPACE", JSONPath: "namespace"},
-			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "PHASE", JSONPath: "object.status.phase", ColorFunc: output.ColorizeStatus},
-			{DisplayName: "PROGRESS", JSONPath: "object.status.progress", ColorFunc: output.ColorizeProgress},
-			{DisplayName: "STORAGE_CLASS", JSONPath: "object.spec.pvc.storageClassName"},
-			{DisplayName: "SIZE", JSONPath: "sizeFormatted"},
-			{DisplayName: "CREATED", JSONPath: "object.metadata.creationTimestamp"},
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "NAMESPACE", Key: "namespace"},
+			{Title: "ID", Key: "id"},
+			{Title: "PHASE", Key: "object.status.phase", ColorFunc: output.ColorizeStatus},
+			{Title: "PROGRESS", Key: "object.status.progress", ColorFunc: output.ColorizeProgress},
+			{Title: "STORAGE_CLASS", Key: "object.spec.pvc.storageClassName"},
+			{Title: "SIZE", Key: "sizeFormatted"},
+			{Title: "CREATED", Key: "object.metadata.creationTimestamp"},
 		}
 	default:
 		return fmt.Errorf("provider type '%s' does not support data volume inventory", providerType)

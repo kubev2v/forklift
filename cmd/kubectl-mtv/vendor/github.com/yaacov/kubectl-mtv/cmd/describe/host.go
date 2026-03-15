@@ -26,9 +26,12 @@ func NewHostCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig get
 Shows host configuration, IP address, provider reference, and status conditions.`,
 		Example: `  # Describe a host
   kubectl-mtv describe host --name esxi-host-1`,
-		Args:         cobra.NoArgs,
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := flags.ResolveNameArg(&name, args); err != nil {
+				return err
+			}
 			if name == "" {
 				return fmt.Errorf("--name is required")
 			}
@@ -40,7 +43,7 @@ Shows host configuration, IP address, provider reference, and status conditions.
 	}
 
 	cmd.Flags().StringVarP(&name, "name", "M", "", "Host name")
-	_ = cmd.MarkFlagRequired("name")
+	flags.MarkRequiredForMCP(cmd, "name")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", flags.OutputFormatHelp)
 
 	_ = cmd.RegisterFlagCompletionFunc("name", completion.HostResourceNameCompletion(kubeConfigFlags))

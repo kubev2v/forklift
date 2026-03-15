@@ -27,9 +27,12 @@ Shows hook configuration including container image, playbook content,
 service account, deadline, and status conditions.`,
 		Example: `  # Describe a hook
   kubectl-mtv describe hook --name my-post-hook`,
-		Args:         cobra.NoArgs,
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := flags.ResolveNameArg(&name, args); err != nil {
+				return err
+			}
 			if name == "" {
 				return fmt.Errorf("--name is required")
 			}
@@ -40,7 +43,7 @@ service account, deadline, and status conditions.`,
 	}
 
 	cmd.Flags().StringVarP(&name, "name", "M", "", "Hook name")
-	_ = cmd.MarkFlagRequired("name")
+	flags.MarkRequiredForMCP(cmd, "name")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", flags.OutputFormatHelp)
 
 	_ = cmd.RegisterFlagCompletionFunc("name", completion.HookResourceNameCompletion(kubeConfigFlags))
