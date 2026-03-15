@@ -37,16 +37,16 @@ func listFoldersOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Con
 	}
 
 	// Define default headers based on provider type
-	var defaultHeaders []output.Header
+	var defaultHeaders []output.Column
 	switch providerType {
 	case "vsphere":
-		defaultHeaders = []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "PARENT", JSONPath: "parent"},
-			{DisplayName: "PATH", JSONPath: "path"},
-			{DisplayName: "DATACENTER", JSONPath: "datacenter"},
-			{DisplayName: "REVISION", JSONPath: "revision"},
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "ID", Key: "id"},
+			{Title: "PARENT", Key: "parent"},
+			{Title: "PATH", Key: "path"},
+			{Title: "DATACENTER", Key: "datacenter"},
+			{Title: "REVISION", Key: "revision"},
 		}
 	default:
 		return fmt.Errorf("provider type '%s' does not support folder inventory", providerType)

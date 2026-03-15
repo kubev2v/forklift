@@ -152,6 +152,14 @@ type VM struct {
 	//
 	// +optional
 	MigrateSharedDisks *bool `json:"migrateSharedDisks,omitempty"`
+	// EnableNestedVirtualization controls whether nested virtualization (vmx/svm CPU features)
+	// is enabled on the target VM.
+	// When nil (default), the plan-level enableNestedVirtualization value is used.
+	// When explicitly set to true, nested virtualization is enabled for this VM.
+	// When explicitly set to false, nested virtualization is disabled for this VM.
+	//
+	// +optional
+	EnableNestedVirtualization *bool `json:"enableNestedVirtualization,omitempty"`
 }
 
 // Find a Hook for the specified step.

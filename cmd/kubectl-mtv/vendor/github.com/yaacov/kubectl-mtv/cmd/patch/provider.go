@@ -31,10 +31,12 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 		Use:          "provider",
 		Short:        "Patch an existing provider",
 		Long:         `Patch an existing provider by updating URL, credentials, or VDDK settings. Type and SDK endpoint cannot be changed.`,
-		Args:         cobra.NoArgs,
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate required --name flag
+			if err := flags.ResolveNameArg(&opts.Name, args); err != nil {
+				return err
+			}
 			if opts.Name == "" {
 				return fmt.Errorf("--name is required")
 			}
@@ -63,7 +65,7 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 
 	// Provider name (required)
 	cmd.Flags().StringVarP(&opts.Name, "name", "M", "", "Provider name")
-	_ = cmd.MarkFlagRequired("name")
+	flags.MarkRequiredForMCP(cmd, "name")
 
 	// Editable provider flags
 	cmd.Flags().StringVarP(&opts.URL, "url", "U", "", "Provider URL")

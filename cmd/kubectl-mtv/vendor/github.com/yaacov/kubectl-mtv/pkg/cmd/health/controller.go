@@ -23,6 +23,7 @@ var knownFQINFields = []string{
 	"populator_controller_image_fqin",
 	"populator_ovirt_image_fqin",
 	"populator_openstack_image_fqin",
+	"virt_v2v_image_xfs_fqin",
 	"populator_vsphere_xcopy_volume_image_fqin",
 	"ova_provider_server_fqin",
 	"ova_proxy_fqin",

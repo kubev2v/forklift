@@ -10,6 +10,7 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/delete/hook"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/completion"
+	"github.com/yaacov/kubectl-mtv/pkg/util/flags"
 )
 
 // NewHookCmd creates the delete hook command
@@ -20,9 +21,13 @@ func NewHookCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "hook",
 		Short:        "Delete one or more migration hooks",
-		Args:         cobra.NoArgs,
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := flags.ResolveNamesArg(&hookNames, args); err != nil {
+				return err
+			}
+
 			// Validate --all and --name are mutually exclusive
 			if all && len(hookNames) > 0 {
 				return errors.New("cannot use --name with --all")

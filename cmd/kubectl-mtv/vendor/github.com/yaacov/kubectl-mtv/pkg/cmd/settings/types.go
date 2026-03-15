@@ -151,7 +151,7 @@ var SupportedSettings = map[string]SettingDefinition{
 	"feature_ocp_live_migration": {
 		Name:        "feature_ocp_live_migration",
 		Type:        TypeBool,
-		Default:     false,
+		Default:     true,
 		Description: "Enable cross-cluster OpenShift live migration",
 		Category:    CategoryFeature,
 	},
@@ -292,6 +292,27 @@ var SupportedSettings = map[string]SettingDefinition{
 		Type:        TypeString,
 		Default:     "",
 		Description: "ConfigMap with extra virt-v2v configuration files",
+		Category:    CategoryVirtV2V,
+	},
+	"virt_v2v_inspector_extra_args": {
+		Name:        "virt_v2v_inspector_extra_args",
+		Type:        TypeString,
+		Default:     "",
+		Description: "Additional virt-v2v inspector command-line arguments",
+		Category:    CategoryVirtV2V,
+	},
+	"virt_v2v_memsize": {
+		Name:        "virt_v2v_memsize",
+		Type:        TypeString,
+		Default:     "",
+		Description: "Memory size for virt-v2v appliance",
+		Category:    CategoryVirtV2V,
+	},
+	"virt_v2v_smp": {
+		Name:        "virt_v2v_smp",
+		Type:        TypeString,
+		Default:     "",
+		Description: "Number of vCPUs for virt-v2v appliance",
 		Category:    CategoryVirtV2V,
 	},
 	"virt_v2v_container_limits_cpu": {
@@ -673,28 +694,28 @@ var ExtendedSettings = map[string]SettingDefinition{
 	"cli_download_container_limits_cpu": {
 		Name:        "cli_download_container_limits_cpu",
 		Type:        TypeString,
-		Default:     "100m",
+		Default:     "1000m",
 		Description: "CLI download service CPU limit",
 		Category:    CategoryCLIDownload,
 	},
 	"cli_download_container_limits_memory": {
 		Name:        "cli_download_container_limits_memory",
 		Type:        TypeString,
-		Default:     "128Mi",
+		Default:     "1Gi",
 		Description: "CLI download service memory limit",
 		Category:    CategoryCLIDownload,
 	},
 	"cli_download_container_requests_cpu": {
 		Name:        "cli_download_container_requests_cpu",
 		Type:        TypeString,
-		Default:     "50m",
+		Default:     "100m",
 		Description: "CLI download service CPU request",
 		Category:    CategoryCLIDownload,
 	},
 	"cli_download_container_requests_memory": {
 		Name:        "cli_download_container_requests_memory",
 		Type:        TypeString,
-		Default:     "64Mi",
+		Default:     "512Mi",
 		Description: "CLI download service memory request",
 		Category:    CategoryCLIDownload,
 	},
@@ -814,6 +835,13 @@ var ExtendedSettings = map[string]SettingDefinition{
 		Description: "HyperV provider server image",
 		Category:    CategoryImage,
 	},
+	"virt_v2v_image_xfs_fqin": {
+		Name:        "virt_v2v_image_xfs_fqin",
+		Type:        TypeString,
+		Default:     "",
+		Description: "Custom virt-v2v XFS container image",
+		Category:    CategoryImage,
+	},
 	"must_gather_image_fqin": {
 		Name:        "must_gather_image_fqin",
 		Type:        TypeString,
@@ -827,6 +855,22 @@ var ExtendedSettings = map[string]SettingDefinition{
 		Default:     "",
 		Description: "OVA inventory proxy image",
 		Category:    CategoryImage,
+	},
+
+	// HyperV Controller Settings
+	"controller_hyperv_refresh_interval": {
+		Name:        "controller_hyperv_refresh_interval",
+		Type:        TypeString,
+		Default:     "10s",
+		Description: "HyperV provider inventory refresh interval",
+		Category:    CategoryHyperV,
+	},
+	"controller_hyperv_validation_timeout": {
+		Name:        "controller_hyperv_validation_timeout",
+		Type:        TypeString,
+		Default:     "30s",
+		Description: "HyperV provider validation timeout",
+		Category:    CategoryHyperV,
 	},
 
 	// ConfigMap Names
@@ -872,13 +916,6 @@ var ExtendedSettings = map[string]SettingDefinition{
 		Type:        TypeInt,
 		Default:     10,
 		Description: "Maximum retries for parent backing lookup",
-		Category:    CategoryAdvanced,
-	},
-	"controller_cdi_export_token_ttl": {
-		Name:        "controller_cdi_export_token_ttl",
-		Type:        TypeInt,
-		Default:     720,
-		Description: "CDI export token TTL (minutes)",
 		Category:    CategoryAdvanced,
 	},
 	"image_pull_policy": {
