@@ -16,6 +16,7 @@ const (
 	HookRetry                        = "HOOK_RETRY"
 	ImporterRetry                    = "IMPORTER_RETRY"
 	VirtV2vImage                     = "VIRT_V2V_IMAGE"
+	VirtV2vImageXFS                  = "VIRT_V2V_IMAGE_XFS"
 	vddkImage                        = "VDDK_IMAGE"
 	PrecopyInterval                  = "PRECOPY_INTERVAL"
 	VirtV2vDontRequestKVM            = "VIRT_V2V_DONT_REQUEST_KVM"
@@ -31,7 +32,6 @@ const (
 	VirtCustomizeConfigMap           = "VIRT_CUSTOMIZE_MAP"
 	VddkJobActiveDeadline            = "VDDK_JOB_ACTIVE_DEADLINE"
 	VirtV2vExtraArgs                 = "VIRT_V2V_EXTRA_ARGS"
-	VirtV2vInspectorExtraArgs        = "VIRT_V2V_INSPECTOR_EXTRA_ARGS"
 	VirtV2vExtraConfConfigMap        = "VIRT_V2V_EXTRA_CONF_CONFIG_MAP"
 	VirtV2vContainerLimitsCpu        = "VIRT_V2V_CONTAINER_LIMITS_CPU"
 	VirtV2vContainerLimitsMemory     = "VIRT_V2V_CONTAINER_LIMITS_MEMORY"
@@ -84,6 +84,8 @@ type Migration struct {
 	SnapshotStatusCheckRate int
 	// Virt-v2v image for guest conversion
 	VirtV2vImage string
+	// Virt-v2v image for guest conversion with XFSv4 support
+	VirtV2vImageXFS string
 	// Virt-v2v require KVM flags for guest conversion
 	VirtV2vDontRequestKVM bool
 	// OCP Export token TTL minutes
@@ -106,14 +108,8 @@ type Migration struct {
 	VddkJobActiveDeadline int
 	// Additional arguments for virt-v2v
 	VirtV2vExtraArgs string
-	// Additional arguments for virt-v2v-inspector
-	VirtV2vInspectorExtraArgs string
 	// Additional configuration for virt-v2v
-	VirtV2vExtraConfConfigMap string
-	// Memory (in MB) allocated for the virt-v2v conversion appliance
-	VirtV2vMemSize int
-	// Number of virtual CPUs used for the virt-v2v conversion appliance
-	VirtV2vSmp                       int
+	VirtV2vExtraConfConfigMap        string
 	VirtV2vContainerLimitsCpu        string
 	VirtV2vContainerLimitsMemory     string
 	VirtV2vContainerRequestsCpu      string
@@ -180,6 +176,14 @@ func (r *Migration) Load() (err error) {
 	} else if Settings.Role.Has(MainRole) {
 		return liberr.Wrap(fmt.Errorf("failed to find environment variable %s", VirtV2vImage))
 	}
+	if virtV2vImageXFS, ok := os.LookupEnv(VirtV2vImageXFS); ok {
+		r.VirtV2vImageXFS = virtV2vImageXFS
+	} else if Settings.Role.Has(MainRole) {
+		return liberr.Wrap(fmt.Errorf("failed to find environment variable %s", VirtV2vImageXFS))
+	}
+	if r.VirtV2vImageXFS == "" && Settings.Role.Has(MainRole) {
+		return liberr.Wrap(fmt.Errorf("environment variable %s was empty", VirtV2vImageXFS))
+	}
 	r.VirtV2vDontRequestKVM = getEnvBool(VirtV2vDontRequestKVM, false)
 
 	// VDDK image for guest conversion
@@ -222,15 +226,7 @@ func (r *Migration) Load() (err error) {
 		if encoded, jsonErr := json.Marshal(strings.Fields(val)); jsonErr == nil {
 			r.VirtV2vExtraArgs = string(encoded)
 		} else {
-			return liberr.Wrap(jsonErr)
-		}
-	}
-	r.VirtV2vInspectorExtraArgs = "[]"
-	if val, found := os.LookupEnv(VirtV2vInspectorExtraArgs); found && len(val) > 0 {
-		if encoded, jsonErr := json.Marshal(strings.Fields(val)); jsonErr == nil {
-			r.VirtV2vInspectorExtraArgs = string(encoded)
-		} else {
-			return liberr.Wrap(jsonErr)
+			return liberr.Wrap(err)
 		}
 	}
 	if val, found := os.LookupEnv(VirtV2vExtraConfConfigMap); found {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -43,18 +42,16 @@ func countNetworkSubnets(network map[string]interface{}) int {
 	return len(subnetsArray)
 }
 
-// ListNetworks queries the provider's network inventory and displays the results
-func ListNetworks(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
-	if watchMode {
-		return watch.Watch(func() error {
-			return listNetworksOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
-		}, 10*time.Second)
-	}
+// ListNetworksWithInsecure queries the provider's network inventory and displays the results with optional insecure TLS skip verification
+func ListNetworksWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
+	sq := watch.NewSafeQuery(query)
 
-	return listNetworksOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return watch.WrapWithWatchAndQuery(watchMode, outputFormat, func() error {
+		return listNetworksOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, sq.Get(), insecureSkipTLS)
+	}, watch.DefaultInterval, sq.Set, query)
 }
 
-func listNetworksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listNetworksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -62,7 +59,7 @@ func listNetworksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Co
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to determine resource path and headers
 	providerType, err := providerClient.GetProviderType()
@@ -71,32 +68,41 @@ func listNetworksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Co
 	}
 
 	// Define default headers based on provider type
-	var defaultHeaders []output.Header
+	var defaultHeaders []output.Column
 	switch providerType {
 	case "openshift":
-		defaultHeaders = []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "NAMESPACE", JSONPath: "namespace"},
-			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "CREATED", JSONPath: "object.metadata.creationTimestamp"},
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "NAMESPACE", Key: "namespace"},
+			{Title: "ID", Key: "id"},
+			{Title: "CREATED", Key: "object.metadata.creationTimestamp"},
 		}
 	case "openstack":
-		defaultHeaders = []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "STATUS", JSONPath: "status"},
-			{DisplayName: "SHARED", JSONPath: "shared"},
-			{DisplayName: "ADMIN-UP", JSONPath: "adminStateUp"},
-			{DisplayName: "SUBNETS", JSONPath: "subnetsCount"},
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "ID", Key: "id"},
+			{Title: "STATUS", Key: "status", ColorFunc: output.ColorizeStatus},
+			{Title: "SHARED", Key: "shared", ColorFunc: output.ColorizeBooleanString},
+			{Title: "ADMIN-UP", Key: "adminStateUp", ColorFunc: output.ColorizeBooleanString},
+			{Title: "SUBNETS", Key: "subnetsCount"},
+		}
+	case "ec2":
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "ID", Key: "id"},
+			{Title: "TYPE", Key: "networkType"},
+			{Title: "CIDR", Key: "CidrBlock"},
+			{Title: "STATE", Key: "State", ColorFunc: output.ColorizeStatus},
+			{Title: "DEFAULT", Key: "IsDefault", ColorFunc: output.ColorizeBooleanString},
 		}
 	default:
-		defaultHeaders = []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "VARIANT", JSONPath: "variant"},
-			{DisplayName: "HOSTS", JSONPath: "hostCount"},
-			{DisplayName: "VLAN", JSONPath: "vlanId"},
-			{DisplayName: "REVISION", JSONPath: "revision"},
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "ID", Key: "id"},
+			{Title: "VARIANT", Key: "variant"},
+			{Title: "HOSTS", Key: "hostCount"},
+			{Title: "VLAN", Key: "vlanId"},
+			{Title: "REVISION", Key: "revision"},
 		}
 	}
 
@@ -105,13 +111,18 @@ func listNetworksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Co
 	switch providerType {
 	case "openshift":
 		// For OpenShift, get network attachment definitions
-		data, err = providerClient.GetResourceCollection("networkattachmentdefinitions", 4)
+		data, err = providerClient.GetResourceCollection(ctx, "networkattachmentdefinitions", 4)
 	default:
 		// For other providers, get networks
-		data, err = providerClient.GetNetworks(4)
+		data, err = providerClient.GetNetworks(ctx, 4)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to fetch network inventory: %v", err)
+	}
+
+	// Extract objects from EC2 envelope
+	if providerType == "ec2" {
+		data = ExtractEC2Objects(data)
 	}
 
 	// Verify data is an array
@@ -135,6 +146,11 @@ func listNetworksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Co
 				network["subnetsCount"] = countNetworkSubnets(network)
 			}
 
+			// Process EC2 networks (extract name from tags, set ID and type)
+			if providerType == "ec2" {
+				processEC2Network(network)
+			}
+
 			networks = append(networks, network)
 		}
 	}
@@ -153,8 +169,8 @@ func listNetworksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Co
 
 	// Format validation
 	outputFormat = strings.ToLower(outputFormat)
-	if outputFormat != "table" && outputFormat != "json" && outputFormat != "yaml" {
-		return fmt.Errorf("unsupported output format: %s. Supported formats: table, json, yaml", outputFormat)
+	if outputFormat != "table" && outputFormat != "json" && outputFormat != "yaml" && outputFormat != "markdown" {
+		return fmt.Errorf("unsupported output format: %s. Supported formats: table, json, yaml, markdown", outputFormat)
 	}
 
 	// Handle different output formats
@@ -164,6 +180,8 @@ func listNetworksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Co
 		return output.PrintJSONWithEmpty(networks, emptyMessage)
 	case "yaml":
 		return output.PrintYAMLWithEmpty(networks, emptyMessage)
+	case "markdown":
+		return output.PrintMarkdownWithQuery(networks, defaultHeaders, queryOpts, emptyMessage)
 	default:
 		return output.PrintTableWithQuery(networks, defaultHeaders, queryOpts, emptyMessage)
 	}
