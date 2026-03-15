@@ -1,0 +1,126 @@
+name: Backport on Comment
+on:
+  issue_comment:
+    types:
+      - created
+
+concurrency:
+  group: backport-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  parse:
+    name: Parse backport command
+    runs-on: ubuntu-latest
+    if: |
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/backport') &&
+      contains(fromJSON('["OWNER", "MEMBER"]'), github.event.comment.author_association)
+    permissions:
+      issues: write
+    outputs:
+      branch_name: ${{ steps.parse.outputs.branch_name }}
+      pr_number: ${{ steps.parse.outputs.pr_number }}
+      dry_run: ${{ steps.parse.outputs.dry_run }}
+    steps:
+      - name: Parse comment
+        id: parse
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          read -ra words <<< "$COMMENT_BODY"
+
+          if [[ ${#words[@]} -lt 2 ]]; then
+            echo "::error::Usage: /backport release-X.Y [--dry-run]"
+            exit 1
+          fi
+
+          branch="${words[1]}"
+          if [[ ! "$branch" =~ ^release-[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Branch must match release-X.Y (e.g. release-2.7)"
+            exit 1
+          fi
+
+          dry_run="false"
+          for word in "${words[@]:2}"; do
+            [[ "$word" == "--dry-run" ]] && dry_run="true" && break
+          done
+
+          echo "branch_name=$branch" >> "$GITHUB_OUTPUT"
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
+
+      - name: Post status comment
+        uses: actions/github-script@v7
+        env:
+          BRANCH_NAME: ${{ steps.parse.outputs.branch_name }}
+          DRY_RUN: ${{ steps.parse.outputs.dry_run }}
+          PR_NUMBER: ${{ steps.parse.outputs.pr_number }}
+        with:
+          script: |
+            const branch = process.env.BRANCH_NAME;
+            const dryRun = process.env.DRY_RUN === 'true';
+            const prNumber = process.env.PR_NUMBER;
+            github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: context.issue.number,
+              body: [
+                `🔄 Starting backport of PR #${prNumber} to \`${branch}\``,
+                dryRun ? '🧪 **Dry run mode**' : '🚀 **Live mode**',
+                `[View run](${context.serverUrl}/${process.env.GITHUB_REPOSITORY}/actions/runs/${context.runId})`
+              ].join('\n')
+            });
+
+  backport:
+    name: Backport
+    needs: parse
+    uses: ./.github/workflows/backport.yml
+    with:
+      branch_name: ${{ needs.parse.outputs.branch_name }}
+      pr_number: ${{ fromJSON(needs.parse.outputs.pr_number) }}
+      dry_run: ${{ fromJSON(needs.parse.outputs.dry_run) }}
+    secrets: inherit
+
+  report:
+    name: Report result
+    runs-on: ubuntu-latest
+    needs: [parse, backport]
+    if: always() && needs.parse.result == 'success'
+    permissions:
+      issues: write
+    steps:
+      - name: Post result comment
+        uses: actions/github-script@v7
+        env:
+          BRANCH_NAME: ${{ needs.parse.outputs.branch_name }}
+          DRY_RUN: ${{ needs.parse.outputs.dry_run }}
+          PR_NUMBER: ${{ needs.parse.outputs.pr_number }}
+          BACKPORT_RESULT: ${{ needs.backport.result }}
+        with:
+          script: |
+            const branch = process.env.BRANCH_NAME;
+            const dryRun = process.env.DRY_RUN === 'true';
+            const success = process.env.BACKPORT_RESULT === 'success';
+            const prNumber = process.env.PR_NUMBER;
+
+            let body;
+            if (success && dryRun) {
+              body = `✅ Dry run succeeded for \`${branch}\`. Run \`/backport ${branch}\` to apply.`;
+            } else if (success) {
+              body = `✅ PR #${prNumber} backported to \`${branch}\`.`;
+            } else {
+              body = [
+                `❌ Backport to \`${branch}\` failed.`,
+                `Check [logs](${context.serverUrl}/${process.env.GITHUB_REPOSITORY}/actions/runs/${context.runId}).`,
+                '',
+                'You may need to backport manually or resolve merge conflicts.'
+              ].join('\n');
+            }
+
+            github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: context.issue.number,
+              body
+            });

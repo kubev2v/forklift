@@ -1,0 +1,49 @@
+name: Backport on Label
+on:
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  detect:
+    name: Detect backport labels
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.pull_request.merged == true &&
+      contains(toJSON(github.event.pull_request.labels.*.name), 'backport-release-')
+    outputs:
+      branches: ${{ steps.detect.outputs.branches }}
+    steps:
+      - name: Extract target branches from labels
+        id: detect
+        env:
+          LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          set -euo pipefail
+          branches=()
+
+          for label in $(echo "$LABELS_JSON" | jq -r '.[]'); do
+            if [[ "$label" =~ ^backport-(release-[0-9]+\.[0-9]+)$ ]]; then
+              branches+=("\"${BASH_REMATCH[1]}\"")
+            fi
+          done
+
+          if [[ ${#branches[@]} -eq 0 ]]; then
+            echo "branches=[]" >> "$GITHUB_OUTPUT"
+          else
+            echo "branches=[$(IFS=,; echo "${branches[*]}")]" >> "$GITHUB_OUTPUT"
+          fi
+
+  backport:
+    name: Backport to ${{ matrix.target_branch }}
+    needs: detect
+    if: needs.detect.outputs.branches != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        target_branch: ${{ fromJSON(needs.detect.outputs.branches) }}
+    uses: ./.github/workflows/backport.yml
+    with:
+      branch_name: ${{ matrix.target_branch }}
+      pr_number: ${{ github.event.pull_request.number }}
+    secrets: inherit
