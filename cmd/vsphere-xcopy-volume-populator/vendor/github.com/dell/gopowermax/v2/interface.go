@@ -1,5 +1,5 @@
 /*
- Copyright © 2020 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2020-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -100,11 +100,17 @@ type Pmax interface {
 	// GetVolumeByID returns a Volume given the volumeID.
 	GetVolumeByID(ctx context.Context, symID string, volumeID string) (*types.Volume, error)
 
+	// GetVolumesByIdentifier returns a Volume given the volume identifier.
+	GetVolumesByIdentifier(ctx context.Context, symID string, identifier string) (*types.Volumev1, error)
+
 	// GetStorageGroupIDList returns a list of all the StorageGroup ids.
 	GetStorageGroupIDList(ctx context.Context, symID, storageGroupIDMatch string, like bool) (*types.StorageGroupIDList, error)
 
 	// GetStorageGroup returns a storage group given the StorageGroup id.
 	GetStorageGroup(ctx context.Context, symID string, storageGroupID string) (*types.StorageGroup, error)
+
+	// GetStorageGroupVolumeCounts returns a StorageGroupVolumeCounts object, which contains a list of storage groups with their respective volume counts
+	GetStorageGroupVolumeCounts(ctx context.Context, symID string, prefix string) (*types.StorageGroupVolumeCounts, error)
 
 	// GetStorageGroupSnapshotPolicy returns a storage group snapshot policy details.
 	GetStorageGroupSnapshotPolicy(ctx context.Context, symID, snapshotPolicyID, storageGroupID string) (*types.StorageGroupSnapshotPolicy, error)
@@ -253,6 +259,14 @@ type Pmax interface {
 	GetDirectorIDList(ctx context.Context, symID string) (*types.DirectorIDList, error)
 	// GetPortList returns a list of all the ports on a specified director/array.
 	GetPortList(ctx context.Context, symID string, directorID string, query string) (*types.PortList, error)
+
+	// GetPorts returns a list of all the ports on a specified director/array-Enhanced API.
+	GetPorts(ctx context.Context, symID string) (*types.PortV1, error)
+
+	// GetPortGroupListByType returns a list of all the Port Group ids.
+	GetPortGroupListByType(ctx context.Context, symID string, portGroupType string) (*types.PortGroupListResult, error)
+	// GetPortListByProtocol returns a list of ports associated with a given protocol for a specified Symmetrix array.
+	GetPortListByProtocol(ctx context.Context, symID string, protocol string) (*types.PortList, error)
 	// GetPort returns port details.
 	GetPort(ctx context.Context, symID string, directorID string, portID string) (*types.Port, error)
 	// GetListOfTargetAddresses returns an array of all IP addresses which expose iscsi targets.
@@ -387,6 +401,10 @@ type Pmax interface {
 	DeleteMigrationEnvironment(ctx context.Context, localSymID, remoteSymID string) error
 	// GetMigrationEnvironment returns a migration environment
 	GetMigrationEnvironment(ctx context.Context, localSymID, remoteSymID string) (*types.MigrationEnv, error)
+	// MigrateStorageGroup creates a Storage Group given the storageGroupID (name), srpID (storage resource pool), service level, and boolean for thick volumes.
+	// If srpID is "None" then serviceLevel and thickVolumes settings are ignored
+	MigrateStorageGroup(ctx context.Context, symID, storageGroupID, srpID, serviceLevel string, thickVolumes bool) (*types.StorageGroup, error)
+
 	// GetStorageGroupMigration returns migration sessions on the array
 	GetStorageGroupMigration(ctx context.Context, localSymID string) (*types.MigrationStorageGroups, error)
 	// GetStorageGroupMigrationByID returns migration details for a storage group
@@ -434,7 +452,18 @@ type Pmax interface {
 	DeleteNASServer(ctx context.Context, symID, nasID string) error
 	// GetFileInterfaceByID gets a FileInterface
 	GetFileInterfaceByID(ctx context.Context, symID, interfaceID string) (*types.FileInterface, error)
-
 	// RefreshSymmetrix refreshes cache on the symID
 	RefreshSymmetrix(ctx context.Context, symID string) error
+
+	// GetNFSServerList get NFS Server list on a symID
+	GetNFSServerList(ctx context.Context, symID string) (*types.NFSServerIterator, error)
+
+	// GetNFSServerByID fetch specific NFS server on symID
+	GetNFSServerByID(ctx context.Context, symID, nfsID string) (*types.NFSServer, error)
+
+	// GetVersionDetails fetch array API version details
+	GetVersionDetails(ctx context.Context) (*types.VersionDetails, error)
+
+	// CloneVolumeFromVolume is an enhanced for volume clone.
+	CloneVolumeFromVolume(ctx context.Context, symID string, replicaPair types.ReplicationRequest) error
 }
