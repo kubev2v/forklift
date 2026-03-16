@@ -98,6 +98,7 @@ CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-controller:$(REGISTRY_T
 API_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-api:$(REGISTRY_TAG)
 VALIDATION_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-validation:$(REGISTRY_TAG)
 VIRT_V2V_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-virt-v2v:$(REGISTRY_TAG)
+VIRT_V2V_IMAGE_XFS ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-virt-v2v-xfs:$(REGISTRY_TAG)
 OPERATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator:$(REGISTRY_TAG)
 POPULATOR_CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/populator-controller:$(REGISTRY_TAG)
 OVIRT_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/ovirt-populator:$(REGISTRY_TAG)
@@ -121,81 +122,87 @@ UI_PLUGIN_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-console-plugin:$(REGISTR
 GOLANGCI_LINT_VERSION ?= v1.64.2
 GOLANGCI_LINT_BIN ?= $(GOBIN)/golangci-lint
 
+##@ General
+
+.PHONY: help
+help: ## Display this help
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-40s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+
+.DEFAULT_GOAL := help
+
 ##@ Main Targets
 
 .PHONY: ci
+ci: ## Run CI pipeline (test, lint, vendor, generate, validate)
 ci: all tidy vendor generate-verify lint validate-forklift-controller-crd
 
 .PHONY: all
+all: ## Build and test forklift-controller
 all: test forklift-controller
 
 ##@ Testing
 
-# Download setup-envtest locally if necessary.
 .PHONY: envtest
-envtest: $(ENVTEST) 
+envtest: $(ENVTEST) ## Download setup-envtest locally if necessary
 $(ENVTEST): $(LOCALBIN)
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION)
 
-# Run tests
+test: ## Run unit tests
 test: generate fmt vet manifests validation-test
 	go test -coverprofile=cover.out ./pkg/... ./cmd/...
 
-# Experimental e2e target
+e2e-sanity: ## Run e2e sanity tests (oVirt + vSphere)
 e2e-sanity: e2e-sanity-ovirt e2e-sanity-vsphere
 
-e2e-sanity-ovirt:
-	# oVirt suite
+e2e-sanity-ovirt: ## Run e2e oVirt sanity tests
 	KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION=v1 go test ./tests/suit -v -ginkgo.focus ".*oVirt.*|.*Forklift.*"
 
-e2e-sanity-vsphere:
-	# vSphere suite
+e2e-sanity-vsphere: ## Run e2e vSphere sanity tests
 	go test ./tests/suit -v -ginkgo.focus ".*vSphere.*"
 
-e2e-sanity-openstack:
-	# OpenStack suite
+e2e-sanity-openstack: ## Run e2e OpenStack sanity tests
 	go test ./tests/suit -v -ginkgo.focus ".*Migration tests for OpenStack.*"
 
-e2e-sanity-openstack-extended:
-	# OpenStack extended suite
+e2e-sanity-openstack-extended: ## Run e2e OpenStack extended tests
 	sudo bash -c 'grep -qE "^[[:space:]]*127\.0\.0\.1[[:space:]]+packstack\.konveyor-forklift(\s|$$)" /etc/hosts || echo "127.0.0.1 packstack.konveyor-forklift" >> /etc/hosts'
 	go test ./tests/suit -v -ginkgo.focus ".*Migration Extended tests for OpenStack.*" -ginkgo.parallel.total 1
 
-e2e-sanity-ova:
-	# OVA suite
+e2e-sanity-ova: ## Run e2e OVA sanity tests
 	go test ./tests/suit -v -ginkgo.focus ".*OVA.*"
 
 .PHONY: validation-test
+validation-test: ## Run OPA validation policy tests
 validation-test: opa-bin
 	ENVIRONMENT=test ${OPA} test validation/policies --explain fails
 
 .PHONY: validate-forklift-controller-crd
-validate-forklift-controller-crd:
+validate-forklift-controller-crd: ## Validate ForkliftController CRD schema
 	@echo "Validating ForkliftController CRD..."
 	python3 hack/validate_forklift_controller_crd.py
 
 .PHONY: integration-test
+integration-test: ## Run integration tests with envtest
 integration-test: generate fmt vet manifests envtest
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -i --bin-dir $(LOCALBIN) -p path)" go test ./pkg/controller/migration/... -coverprofile cover.out
 
 ##@ Build & Development
 
-# Build forklift-controller binary
+forklift-controller: ## Build forklift-controller binary
 forklift-controller: generate fmt vet
 	go build -o bin/forklift-controller github.com/kubev2v/forklift/cmd/forklift-controller
 
-# Ensure temporary directories for forklift services
 .PHONY: ensure-temp-dirs
-ensure-temp-dirs:
+ensure-temp-dirs: ## Create temporary directories for forklift services
 	install -d -m 700 /tmp/forklift-controller
 	install -d -m 700 /tmp/forklift-inventory
 
-# Run against the configured Kubernetes cluster in ~/.kube/config
 .PHONY: run
+run: ## Run controller against the configured cluster in ~/.kube/config
 run: generate fmt vet ensure-temp-dirs
 	VSPHERE_OS_MAP=$(VSPHERE_OS_MAP) \
 	OVIRT_OS_MAP=$(OVIRT_OS_MAP) \
 	VIRT_V2V_IMAGE=$(VIRT_V2V_IMAGE) \
+	VIRT_V2V_IMAGE_XFS=$(VIRT_V2V_IMAGE_XFS) \
 	VIRT_CUSTOMIZE_MAP=$(VIRT_CUSTOMIZE_MAP) \
 	METRICS_PORT=$(METRICS_PORT) \
 	AUTH_REQUIRED=false \
@@ -203,12 +210,13 @@ run: generate fmt vet ensure-temp-dirs
 	WORKING_DIR=/tmp/forklift-controller \
 		KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION=v1 go run ./cmd/forklift-controller/main.go
 
-# Run inventory service against the configured Kubernetes cluster in ~/.kube/config
 .PHONY: run-inventory
+run-inventory: ## Run inventory service against the configured cluster
 run-inventory: generate fmt vet ensure-temp-dirs
 	VSPHERE_OS_MAP=$(VSPHERE_OS_MAP) \
 	OVIRT_OS_MAP=$(OVIRT_OS_MAP) \
 	VIRT_V2V_IMAGE=$(VIRT_V2V_IMAGE) \
+	VIRT_V2V_IMAGE_XFS=$(VIRT_V2V_IMAGE_XFS) \
 	VIRT_CUSTOMIZE_MAP=$(VIRT_CUSTOMIZE_MAP) \
 	METRICS_PORT=$(METRICS_PORT_INVENTORY) \
 	ROLE=inventory \
@@ -219,41 +227,40 @@ run-inventory: generate fmt vet ensure-temp-dirs
 
 ##@ Code Generation & Quality
 
-# Run go fmt against code
-fmt:
+fmt: ## Run go fmt
 	go fmt ./pkg/... ./cmd/...
 
-# Run go vet against code
-vet:
+vet: ## Run go vet
 	go vet ./pkg/... ./cmd/...
 
-# Run go mod tidy against code
-tidy:
+tidy: ## Run go mod tidy
 	go mod tidy
 
-# Run go mod vendor against code
-vendor:
+vendor: ## Run go mod vendor
 	go mod vendor
 
-# Generate code
+generate: ## Generate Go code from API types
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="./hack/boilerplate.go.txt" paths="./pkg/apis/..."
 
+generate-verify: ## Verify generated code is up-to-date
 generate-verify: generate
 	./hack/verify-generate.sh
 
 ##@ Kubernetes Manifests
 
-# Generate manifests e.g. CRD, Webhooks
 .PHONY: manifests
+manifests: ## Generate CRD and RBAC manifests
 manifests: controller-gen
 	$(CONTROLLER_GEN) crd rbac:roleName=manager-role webhook paths="./pkg/apis/..." output:dir=operator/config/crd/bases
 
 .PHONY: kustomized-manifests
+kustomized-manifests: ## Generate kustomized OLM bundle manifests
 kustomized-manifests: kubectl
 	$(KUBECTL) kustomize operator/config/manifests > operator/.kustomized_manifests
 
 .PHONY: generate-manifests
+generate-manifests: ## Generate upstream and downstream deployment manifests
 generate-manifests: kubectl manifests
 	$(KUBECTL) kustomize operator/streams/upstream > operator/streams/upstream/upstream_manifests
 	$(KUBECTL) kustomize operator/streams/downstream > operator/streams/downstream/downstream_manifests
@@ -261,45 +268,54 @@ generate-manifests: kubectl manifests
 	STREAM=downstream bash operator/streams/prepare-vars.sh
 
 .PHONY: update-manifests
+update-manifests: ## Regenerate all manifests (OLM bundle, upstream, downstream)
 update-manifests: kustomized-manifests generate-manifests
 	@echo "All manifests updated successfully!"
 	@echo "  - OLM bundle: operator/.kustomized_manifests"
 	@echo "  - Upstream deployment: operator/streams/upstream/upstream_manifests"
 	@echo "  - Downstream deployment: operator/streams/downstream/downstream_manifests"
 
-# Install CRDs into a cluster
 .PHONY: install
+install: ## Install CRDs into the cluster
 install: manifests kubectl
 	$(KUBECTL) apply -k operator/config/crd
 
 ##@ Container Images
 
+build-controller-image: ## Build controller container image
 build-controller-image: check_container_runtime
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(CONTROLLER_IMAGE)$(PLATFORM_SUFFIX) -f build/forklift-controller/Containerfile .
 
+push-controller-image: ## Push controller container image
 push-controller-image: build-controller-image
 	$(CONTAINER_CMD) push $(CONTROLLER_IMAGE)$(PLATFORM_SUFFIX)
 
+build-api-image: ## Build API container image
 build-api-image: check_container_runtime
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(API_IMAGE)$(PLATFORM_SUFFIX) -f build/forklift-api/Containerfile .
 
+push-api-image: ## Push API container image
 push-api-image: build-api-image
 	$(CONTAINER_CMD) push $(API_IMAGE)$(PLATFORM_SUFFIX)
 
+build-validation-image: ## Build validation container image
 build-validation-image: check_container_runtime
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) --build-arg TARGETARCH=$(PLATFORM_ARCH) -t $(VALIDATION_IMAGE)$(PLATFORM_SUFFIX) -f build/validation/Containerfile .
 
+push-validation-image: ## Push validation container image
 push-validation-image: build-validation-image
 	$(CONTAINER_CMD) push $(VALIDATION_IMAGE)$(PLATFORM_SUFFIX)
 
+build-operator-image: ## Build operator container image
 build-operator-image: check_container_runtime
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(OPERATOR_IMAGE)$(PLATFORM_SUFFIX) -f build/forklift-operator/Containerfile .
 
+push-operator-image: ## Push operator container image
 push-operator-image: build-operator-image
 	$(CONTAINER_CMD) push $(OPERATOR_IMAGE)$(PLATFORM_SUFFIX)
 
+build-virt-v2v-image: ## Build virt-v2v container image (amd64 only)
 build-virt-v2v-image: check_container_runtime
-	# virt-v2v dependencies (libguestfs, nbdkit, etc.) are AMD64-only
 	@if [ "$(PLATFORM_ARCH)" != "amd64" ]; then \
 		echo "Notice: virt-v2v image build is only supported on amd64 platform."; \
 		echo "Current platform: $(PLATFORM) - skipping virt-v2v image build."; \
@@ -307,6 +323,7 @@ build-virt-v2v-image: check_container_runtime
 		$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(VIRT_V2V_IMAGE)$(PLATFORM_SUFFIX) -f build/virt-v2v/Containerfile-upstream .; \
 	fi
 
+push-virt-v2v-image: ## Push virt-v2v container image (amd64 only)
 push-virt-v2v-image: build-virt-v2v-image
 	@if [ "$(PLATFORM_ARCH)" != "amd64" ]; then \
 		echo "Notice: virt-v2v image push is only supported on amd64 platform."; \
@@ -315,6 +332,25 @@ push-virt-v2v-image: build-virt-v2v-image
 		$(CONTAINER_CMD) push $(VIRT_V2V_IMAGE)$(PLATFORM_SUFFIX); \
 	fi
 
+build-virt-v2v-xfs-image: ## Build virt-v2v XFS container image (amd64 only)
+build-virt-v2v-xfs-image: check_container_runtime
+	@if [ "$(PLATFORM_ARCH)" != "amd64" ]; then \
+		echo "Notice: virt-v2v-xfs image build is only supported on amd64 platform."; \
+		echo "Current platform: $(PLATFORM) - skipping virt-v2v-xfs image build."; \
+	else \
+		$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(VIRT_V2V_IMAGE_XFS)$(PLATFORM_SUFFIX) -f build/virt-v2v-rhel9/Containerfile-upstream .; \
+	fi
+
+push-virt-v2v-xfs-image: ## Push virt-v2v XFS container image (amd64 only)
+push-virt-v2v-xfs-image: build-virt-v2v-xfs-image
+	@if [ "$(PLATFORM_ARCH)" != "amd64" ]; then \
+		echo "Notice: virt-v2v-xfs image push is only supported on amd64 platform."; \
+		echo "Current platform: $(PLATFORM) - skipping virt-v2v-xfs image push."; \
+	else \
+		$(CONTAINER_CMD) push $(VIRT_V2V_IMAGE_XFS)$(PLATFORM_SUFFIX); \
+	fi
+
+build-operator-bundle-image: ## Build OLM operator bundle image
 build-operator-bundle-image: check_container_runtime
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) \
 		-t $(OPERATOR_BUNDLE_IMAGE)$(PLATFORM_SUFFIX) \
@@ -325,6 +361,7 @@ build-operator-bundle-image: check_container_runtime
 		--build-arg API_IMAGE=$(API_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg VALIDATION_IMAGE=$(VALIDATION_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg VIRT_V2V_IMAGE=$(VIRT_V2V_IMAGE)$(PLATFORM_SUFFIX) \
+		--build-arg VIRT_V2V_IMAGE_RHEL9=$(VIRT_V2V_IMAGE_XFS)$(PLATFORM_SUFFIX) \
 		--build-arg OPERATOR_IMAGE=$(OPERATOR_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg POPULATOR_CONTROLLER_IMAGE=$(POPULATOR_CONTROLLER_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg OVIRT_POPULATOR_IMAGE=$(OVIRT_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) \
@@ -336,9 +373,11 @@ build-operator-bundle-image: check_container_runtime
 		--build-arg HYPERV_PROVIDER_SERVER_IMAGE=$(HYPERV_PROVIDER_SERVER_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg OVA_PROXY_IMAGE=$(OVA_PROXY_IMAGE)$(PLATFORM_SUFFIX)
 
+push-operator-bundle-image: ## Push OLM operator bundle image
 push-operator-bundle-image: build-operator-bundle-image
 	$(CONTAINER_CMD) push $(OPERATOR_BUNDLE_IMAGE)$(PLATFORM_SUFFIX)
 
+build-operator-index-image: ## Build OLM operator index image
 build-operator-index-image: check_container_runtime
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(OPERATOR_INDEX_IMAGE)$(PLATFORM_SUFFIX) -f build/forklift-operator-index/Containerfile . \
 		--build-arg VERSION=$(VERSION) \
@@ -347,29 +386,36 @@ build-operator-index-image: check_container_runtime
 		--build-arg DEFAULT_CHANNEL=$(DEFAULT_CHANNEL) \
 		--build-arg OPM_OPTS=$(OPM_OPTS)
 
+push-operator-index-image: ## Push OLM operator index image
 push-operator-index-image: build-operator-index-image
 	$(CONTAINER_CMD) push $(OPERATOR_INDEX_IMAGE)$(PLATFORM_SUFFIX)
 
+build-operator-bundle-image-multiarch: ## Build OLM operator bundle image (multiarch)
 build-operator-bundle-image-multiarch: check_container_runtime
 	$(MAKE) build-operator-bundle-image PLATFORM_SUFFIX=
 
+push-operator-bundle-image-multiarch: ## Push OLM operator bundle image (multiarch)
 push-operator-bundle-image-multiarch: build-operator-bundle-image-multiarch
 	$(CONTAINER_CMD) push $(OPERATOR_BUNDLE_IMAGE)
 
+build-operator-index-image-multiarch: ## Build OLM operator index image (multiarch)
 build-operator-index-image-multiarch: check_container_runtime
 	$(MAKE) build-operator-index-image PLATFORM_SUFFIX=
 
+push-operator-index-image-multiarch: ## Push OLM operator index image (multiarch)
 push-operator-index-image-multiarch: build-operator-index-image-multiarch
 	$(CONTAINER_CMD) push $(OPERATOR_INDEX_IMAGE)
 
+build-populator-controller-image: ## Build populator controller image
 build-populator-controller-image: check_container_runtime
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(POPULATOR_CONTROLLER_IMAGE)$(PLATFORM_SUFFIX) -f build/populator-controller/Containerfile .
 
+push-populator-controller-image: ## Push populator controller image
 push-populator-controller-image: build-populator-controller-image
 	$(CONTAINER_CMD) push $(POPULATOR_CONTROLLER_IMAGE)$(PLATFORM_SUFFIX)
 
+build-ovirt-populator-image: ## Build oVirt populator image (amd64 only)
 build-ovirt-populator-image: check_container_runtime
-	# ovirt-populator dependencies (python3-ovirt-engine-sdk4, ovirt-imageio-client) are AMD64-only
 	@if [ "$(PLATFORM_ARCH)" != "amd64" ]; then \
 		echo "Notice: ovirt-populator image build is only supported on amd64 platform."; \
 		echo "Current platform: $(PLATFORM) - skipping ovirt-populator image build."; \
@@ -377,6 +423,7 @@ build-ovirt-populator-image: check_container_runtime
 		$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(OVIRT_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) -f build/ovirt-populator/Containerfile-upstream .; \
 	fi
 
+push-ovirt-populator-image: ## Push oVirt populator image (amd64 only)
 push-ovirt-populator-image: build-ovirt-populator-image
 	@if [ "$(PLATFORM_ARCH)" != "amd64" ]; then \
 		echo "Notice: ovirt-populator image push is only supported on amd64 platform."; \
@@ -385,47 +432,61 @@ push-ovirt-populator-image: build-ovirt-populator-image
 		$(CONTAINER_CMD) push $(OVIRT_POPULATOR_IMAGE)$(PLATFORM_SUFFIX); \
 	fi
 
+build-openstack-populator-image: ## Build OpenStack populator image
 build-openstack-populator-image: check_container_runtime
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(OPENSTACK_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) -f build/openstack-populator/Containerfile .
 
+push-openstack-populator-image: ## Push OpenStack populator image
 push-openstack-populator-image: build-openstack-populator-image
 	$(CONTAINER_CMD) push $(OPENSTACK_POPULATOR_IMAGE)$(PLATFORM_SUFFIX)
 
+build-vsphere-xcopy-volume-populator-image: ## Build vSphere xcopy volume populator image
 build-vsphere-xcopy-volume-populator-image: check_container_runtime
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) -f build/vsphere-xcopy-volume-populator/Containerfile .
 
+push-vsphere-xcopy-volume-populator-image: ## Push vSphere xcopy volume populator image
 push-vsphere-xcopy-volume-populator-image: build-vsphere-xcopy-volume-populator-image
 	$(CONTAINER_CMD) push $(VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE)$(PLATFORM_SUFFIX)
 
+build-ova-provider-server-image: ## Build OVA provider server image
 build-ova-provider-server-image: check_container_runtime
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(OVA_PROVIDER_SERVER_IMAGE)$(PLATFORM_SUFFIX) -f build/ova-provider-server/Containerfile .
 
+push-ova-provider-server-image: ## Push OVA provider server image
 push-ova-provider-server-image: build-ova-provider-server-image
 	$(CONTAINER_CMD) push $(OVA_PROVIDER_SERVER_IMAGE)$(PLATFORM_SUFFIX)
 
+build-hyperv-provider-server-image: ## Build Hyper-V provider server image
 build-hyperv-provider-server-image: check_container_runtime
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(HYPERV_PROVIDER_SERVER_IMAGE)$(PLATFORM_SUFFIX) -f build/hyperv-provider-server/Containerfile .
 
+push-hyperv-provider-server-image: ## Push Hyper-V provider server image
 push-hyperv-provider-server-image: build-hyperv-provider-server-image
 	$(CONTAINER_CMD) push $(HYPERV_PROVIDER_SERVER_IMAGE)$(PLATFORM_SUFFIX)
 
+build-cli-download-image: ## Build CLI download image
 build-cli-download-image: check_container_runtime
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(CLI_DOWNLOAD_IMAGE)$(PLATFORM_SUFFIX) -f build/forklift-cli-download/Containerfile .
 
+push-cli-download-image: ## Push CLI download image
 push-cli-download-image: build-cli-download-image
 	$(CONTAINER_CMD) push $(CLI_DOWNLOAD_IMAGE)$(PLATFORM_SUFFIX)
 
+build-ova-proxy-image: ## Build OVA proxy image
 build-ova-proxy-image: check_container_runtime
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(OVA_PROXY_IMAGE)$(PLATFORM_SUFFIX) -f build/ova-proxy/Containerfile .
 
+push-ova-proxy-image: ## Push OVA proxy image
 push-ova-proxy-image: build-ova-proxy-image
 	$(CONTAINER_CMD) push $(OVA_PROXY_IMAGE)$(PLATFORM_SUFFIX)
 
+build-all-images: ## Build all container images
 build-all-images: build-api-image \
                   build-controller-image \
                   build-validation-image \
                   build-operator-image \
                   build-virt-v2v-image \
+                  build-virt-v2v-xfs-image \
                   build-populator-controller-image \
                   build-ovirt-populator-image \
                   build-openstack-populator-image\
@@ -437,11 +498,13 @@ build-all-images: build-api-image \
                   build-operator-bundle-image \
                   build-operator-index-image
 
+push-all-images: ## Push all container images
 push-all-images:  push-api-image \
                   push-controller-image \
                   push-validation-image \
                   push-operator-image \
                   push-virt-v2v-image \
+                  push-virt-v2v-xfs-image \
                   push-populator-controller-image \
                   push-ovirt-populator-image \
                   push-openstack-populator-image\
@@ -488,6 +551,12 @@ push-virt-v2v-image-manifest:
 	$(CONTAINER_CMD) manifest create $(VIRT_V2V_IMAGE) \
 		$(VIRT_V2V_IMAGE)-amd64
 	$(CONTAINER_CMD) manifest push $(VIRT_V2V_IMAGE)
+
+push-virt-v2v-xfs-image-manifest:
+	$(CONTAINER_CMD) manifest rm $(VIRT_V2V_IMAGE_XFS) || true
+	$(CONTAINER_CMD) manifest create $(VIRT_V2V_IMAGE_XFS) \
+		$(VIRT_V2V_IMAGE_XFS)-amd64
+	$(CONTAINER_CMD) manifest push $(VIRT_V2V_IMAGE_XFS)
 
 push-populator-controller-image-manifest:
 	$(CONTAINER_CMD) manifest rm $(POPULATOR_CONTROLLER_IMAGE) || true
@@ -558,11 +627,13 @@ push-operator-index-image-manifest:
 		$(OPERATOR_INDEX_IMAGE)-arm64
 	$(CONTAINER_CMD) manifest push $(OPERATOR_INDEX_IMAGE)
 
+push-all-images-manifest: ## Push all multi-architecture image manifests
 push-all-images-manifest: push-controller-image-manifest \
                           push-api-image-manifest \
                           push-validation-image-manifest \
                           push-operator-image-manifest \
                           push-virt-v2v-image-manifest \
+                          push-virt-v2v-xfs-image-manifest \
                           push-populator-controller-image-manifest \
                           push-ovirt-populator-image-manifest \
                           push-openstack-populator-image-manifest \
@@ -585,10 +656,12 @@ check_container_runtime:
 ##@ Deployment
 
 .PHONY: deploy-operator-index
+deploy-operator-index: ## Deploy operator catalog index (platform-specific)
 deploy-operator-index: kubectl
 	export OPERATOR_INDEX_IMAGE=${OPERATOR_INDEX_IMAGE}$(PLATFORM_SUFFIX); envsubst < operator/forklift-operator-catalog.yaml | $(KUBECTL) apply -f -
 
 .PHONY: deploy-operator-index-multiarch
+deploy-operator-index-multiarch: ## Deploy operator catalog index (multiarch)
 deploy-operator-index-multiarch: kubectl
 	export OPERATOR_INDEX_IMAGE=${OPERATOR_INDEX_IMAGE}; envsubst < operator/forklift-operator-catalog.yaml | $(KUBECTL) apply -f -
 
@@ -597,11 +670,11 @@ setup-k8s-prerequisites: ## Install prerequisites for Forklift on k8s (cert-mana
 	./hack/setup-k8s-prerequisites.sh
 
 .PHONY: deploy-k8s
-deploy-k8s: kubectl ## Deploy Forklift on k8s with forklift-k8s-dev.yaml using local images. Usage: make deploy-k8s [REGISTRY=quay.io] [REGISTRY_ORG=kubev2v] [REGISTRY_TAG=devel] [PLATFORM=linux/amd64]
+deploy-k8s: kubectl ## Deploy Forklift on k8s with forklift-k8s-dev.yaml using local images. Usage: make deploy-k8s [PLATFORM=linux/amd64]
 	export OPERATOR_INDEX_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-index:$(REGISTRY_TAG)$(PLATFORM_SUFFIX); envsubst < operator/forklift-k8s-dev.yaml | $(KUBECTL) apply -f -
 
 .PHONY: deploy-k8s-multiarch
-deploy-k8s-multiarch: kubectl ## Deploy Forklift on k8s with forklift-k8s-dev.yaml using local images (multiarch). Usage: make deploy-k8s-multiarch [REGISTRY=quay.io] [REGISTRY_ORG=kubev2v] [REGISTRY_TAG=devel]
+deploy-k8s-multiarch: kubectl ## Deploy Forklift on k8s with forklift-k8s-dev.yaml using local images (multiarch). Usage: make deploy-k8s-multiarch
 	export OPERATOR_INDEX_IMAGE=$(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-index:$(REGISTRY_TAG); envsubst < operator/forklift-k8s-dev.yaml | $(KUBECTL) apply -f -
 
 .PHONY: deploy-k8s-controller
@@ -612,27 +685,34 @@ deploy-k8s-controller: kubectl ## Deploy ForkliftController CR on k8s. Usage: ma
 	fi; \
 	KUBECTL=$(KUBECTL) ./hack/deploy-k8s-controller.sh $$NAMESPACE
 
+.PHONY: cleanup-forklift
+cleanup-forklift: ## Remove all Forklift resources from the cluster. Usage: make cleanup-forklift [DRY_RUN=true] [CLEANUP_NS=<namespace>]
+	@KUBECTL=$(KUBECTL) ./hack/cleanup-forklift.sh $(if $(filter true,$(DRY_RUN)),--dry-run) $(if $(CLEANUP_NS),--namespace $(CLEANUP_NS))
+
 ##@ Tool Installation
 
 .PHONY: controller-gen
+controller-gen: ## Install controller-gen tool
 controller-gen: $(CONTROLLER_GEN)
 $(CONTROLLER_GEN): $(LOCALBIN)
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.17.3
 
 .PHONY: kubectl
+kubectl: ## Install kubectl
 kubectl: $(KUBECTL)
 $(DEFAULT_KUBECTL):
 	curl -L https://dl.k8s.io/release/v1.25.10/bin/linux/amd64/kubectl -o $(GOBIN)/kubectl && chmod +x $(GOBIN)/kubectl
 
 .PHONY: kustomize
+kustomize: ## Install kustomize
 kustomize: $(KUSTOMIZE)
 $(DEFAULT_KUSTOMIZE):
 	go install sigs.k8s.io/kustomize/kustomize/v5@v5.7.0
 
-mockgen-install:
+mockgen-install: ## Install mockgen
 	go install go.uber.org/mock/mockgen@v0.4.0
 
-opa-bin:
+opa-bin: ## Install OPA binary
 ifeq (, $(shell command -v opa))
 	GOBIN=$(GOBIN) go install github.com/open-policy-agent/opa@v1.8.0
 OPA=$(GOBIN)/opa
@@ -658,26 +738,27 @@ export DEPLOYMENT_VARS
 ##@ Code Quality
 
 .PHONY: lint-install
-lint-install:
+lint-install: ## Install golangci-lint
 	@echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."
 	GOBIN=$(GOBIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 	@echo "golangci-lint installed successfully."
 
 .PHONY: lint
+lint: ## Run golangci-lint
 lint: $(GOLANGCI_LINT_BIN)
 	@echo "Running golangci-lint..."
 	$(GOLANGCI_LINT_BIN) run --timeout 10m ./pkg/... ./cmd/...
 
 .PHONY: update-tekton
-update-tekton:
+update-tekton: ## Update Tekton pipeline definitions
 	SKIP_UPDATE=false ./update-tekton.sh .tekton/*.yaml
 
 .PHONY: validate-commits validate-commits-range
-validate-commits:
+validate-commits: ## Validate commit messages
 	@echo "Validating commit messages..."
 	@./scripts/validate-commits.sh --verbose
 
-validate-commits-range:
+validate-commits-range: ## Validate commit messages in a range
 	@echo "Validating commit messages in range: $(RANGE)"
 	@./scripts/validate-commits.sh --range "$(RANGE)" --verbose
 
