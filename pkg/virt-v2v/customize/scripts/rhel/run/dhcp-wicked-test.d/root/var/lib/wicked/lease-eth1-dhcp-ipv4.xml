@@ -1,0 +1,8 @@
+<lease>
+    <family>ipv4</family>
+    <type>dhcp</type>
+    <state>granted</state>
+    <ipv4:dhcp>
+        <address>192.168.122.83</address>
+    </ipv4:dhcp>
+</lease>

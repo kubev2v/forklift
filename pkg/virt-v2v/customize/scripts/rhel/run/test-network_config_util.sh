@@ -22,6 +22,7 @@ test_dir() {
     export NETPLAN_DIR="$TEST_DIR/"
     export NM_LEASES_DIR="$TEST_DIR/var/lib/NetworkManager"
     export DHCLIENT_LEASES_DIR="$TEST_DIR/var/lib/dhclient"
+    export WICKED_DIR="$TEST_DIR/var/lib/wicked"
 
     export IFQUERY_CMD="
       podman run
