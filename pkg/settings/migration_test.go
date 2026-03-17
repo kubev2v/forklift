@@ -239,6 +239,64 @@ func TestMigration_ExtraArgsSeparation(t *testing.T) {
 	})
 }
 
+// TestMigration_ServiceAccount tests loading the MIGRATION_SERVICE_ACCOUNT environment
+// variable. When set, it provides a cluster-wide default ServiceAccount for migration pods.
+// Priority: Plan.Spec.ServiceAccount > Settings.Migration.ServiceAccount > "" (namespace default).
+func TestMigration_ServiceAccount(t *testing.T) {
+	tests := []struct {
+		name     string
+		envValue string
+		unsetEnv bool
+		expected string
+	}{
+		{
+			name:     "unset env defaults to empty",
+			envValue: "",
+			unsetEnv: true,
+			expected: "",
+		},
+		{
+			name:     "empty string remains empty",
+			envValue: "",
+			unsetEnv: false,
+			expected: "",
+		},
+		{
+			name:     "loads SA name when set",
+			envValue: "global-migration-sa",
+			unsetEnv: false,
+			expected: "global-migration-sa",
+		},
+		{
+			name:     "handles hyphenated SA name",
+			envValue: "my-custom-sa",
+			unsetEnv: false,
+			expected: "my-custom-sa",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(Roles, InventoryRole)
+
+			if !tt.unsetEnv {
+				t.Setenv(MigrationServiceAccount, tt.envValue)
+			}
+
+			var migration Migration
+			err := migration.Load()
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+
+			if migration.ServiceAccount != tt.expected {
+				t.Errorf("ServiceAccount = %q, want %q",
+					migration.ServiceAccount, tt.expected)
+			}
+		})
+	}
+}
+
 // TestMigration_VirtV2vImageXFS tests the loading of the VIRT_V2V_IMAGE_RHEL9 environment
 // variable for XFS compatibility mode. This XFS-compatible image supports XFSv4 filesystems
 // and can be selected per-plan via the XfsCompatibility flag.

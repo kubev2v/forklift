@@ -288,6 +288,10 @@ spec:
                 example: "custom-virt-customize"
 
               # Migration Settings & Timeouts
+              controller_migration_service_account:
+                type: string
+                description: "Global default ServiceAccount for migration pods in the target namespace. Overridden by Plan-level serviceAccount."
+                example: "custom-migration-sa"
               controller_max_vm_inflight:
                 x-kubernetes-int-or-string: true
                 description: "Max concurrent VM migrations (default: 20)"

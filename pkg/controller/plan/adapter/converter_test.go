@@ -32,6 +32,77 @@ var _ = Describe("Converter tests", func() {
 		pvcNamespace = "test-namespace"
 	)
 
+	Describe("createConvertJob ServiceAccount", func() {
+		It("should set ServiceAccountName on the job pod template", func() {
+			pvc := &v1.PersistentVolumeClaim{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      pvcName,
+					Namespace: pvcNamespace,
+				},
+			}
+			dv := &cdi.DataVolume{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "scratch-dv",
+					Namespace: pvcNamespace,
+				},
+			}
+			job := createConvertJob(pvc, dv, "qcow2", "raw", map[string]string{}, "quay.io/kubev2v/forklift-virt-v2v:latest", "my-sa")
+			Expect(job.Spec.Template.Spec.ServiceAccountName).To(Equal("my-sa"))
+		})
+
+		It("should leave ServiceAccountName empty when not specified", func() {
+			pvc := &v1.PersistentVolumeClaim{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      pvcName,
+					Namespace: pvcNamespace,
+				},
+			}
+			dv := &cdi.DataVolume{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "scratch-dv",
+					Namespace: pvcNamespace,
+				},
+			}
+			job := createConvertJob(pvc, dv, "qcow2", "raw", map[string]string{}, "quay.io/kubev2v/forklift-virt-v2v:latest", "")
+			Expect(job.Spec.Template.Spec.ServiceAccountName).To(BeEmpty())
+		})
+	})
+
+	Describe("Converter.ServiceAccountName propagation", func() {
+		It("should pass SA to ensureJob when creating a new job", func() {
+			pvc := &v1.PersistentVolumeClaim{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      pvcName,
+					Namespace: pvcNamespace,
+					Annotations: map[string]string{
+						base.AnnSourceFormat: "qcow2",
+					},
+				},
+			}
+			converter = createFakeConverter(pvc)
+			converter.ServiceAccountName = "converter-sa"
+			converter.VirtV2vImage = "quay.io/kubev2v/forklift-virt-v2v:latest"
+
+			dv := &cdi.DataVolume{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-dv",
+					Namespace: pvcNamespace,
+				},
+			}
+			job, err := converter.ensureJob(pvc, dv, "qcow2", "raw")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(job).ToNot(BeNil())
+
+			createdJob := &batchv1.Job{}
+			err = converter.Destination.Client.Get(context.TODO(), types.NamespacedName{
+				Name:      job.Name,
+				Namespace: job.Namespace,
+			}, createdJob)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(createdJob.Spec.Template.Spec.ServiceAccountName).To(Equal("converter-sa"))
+		})
+	})
+
 	var _ = Describe("Job status", func() {
 		qcow2PVC := &v1.PersistentVolumeClaim{
 			ObjectMeta: meta.ObjectMeta{

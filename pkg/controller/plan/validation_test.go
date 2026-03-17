@@ -1063,6 +1063,81 @@ var _ = ginkgo.Describe("Template Validation", func() {
 		})
 	})
 
+	ginkgo.Describe("createVddkCheckJob ServiceAccount", func() {
+		const globalImage = "quay.io/kubev2v/forklift-virt-v2v:latest"
+		const vddkImage = "quay.io/kubev2v/vddk:latest"
+		var savedGlobalSA string
+
+		newPlanWithVddkProvider := func() *api.Plan {
+			return &api.Plan{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-plan",
+					Namespace: testNamespace,
+					UID:       "test-uid",
+				},
+				Spec: api.PlanSpec{
+					TargetNamespace: testNamespace,
+				},
+				Referenced: api.Referenced{
+					Provider: struct {
+						Source      *api.Provider
+						Destination *api.Provider
+					}{
+						Source: &api.Provider{
+							ObjectMeta: meta.ObjectMeta{Name: "vsphere-src"},
+							Spec: api.ProviderSpec{
+								Settings: map[string]string{
+									api.VDDK: vddkImage,
+								},
+							},
+						},
+					},
+				},
+			}
+		}
+
+		ginkgo.BeforeEach(func() {
+			Settings.Migration.VirtV2vImage = globalImage
+			savedGlobalSA = Settings.Migration.ServiceAccount
+		})
+
+		ginkgo.AfterEach(func() {
+			Settings.Migration.ServiceAccount = savedGlobalSA
+		})
+
+		ginkgo.It("should set plan SA on the VDDK validation job", func() {
+			p := newPlanWithVddkProvider()
+			p.Spec.ServiceAccount = "plan-sa"
+			Settings.Migration.ServiceAccount = ""
+			job := createVddkCheckJob(p)
+			gomega.Expect(job.Spec.Template.Spec.ServiceAccountName).To(gomega.Equal("plan-sa"))
+		})
+
+		ginkgo.It("should fall back to global SA when plan SA is empty", func() {
+			p := newPlanWithVddkProvider()
+			p.Spec.ServiceAccount = ""
+			Settings.Migration.ServiceAccount = "global-sa"
+			job := createVddkCheckJob(p)
+			gomega.Expect(job.Spec.Template.Spec.ServiceAccountName).To(gomega.Equal("global-sa"))
+		})
+
+		ginkgo.It("should leave SA empty when both plan and global are empty", func() {
+			p := newPlanWithVddkProvider()
+			p.Spec.ServiceAccount = ""
+			Settings.Migration.ServiceAccount = ""
+			job := createVddkCheckJob(p)
+			gomega.Expect(job.Spec.Template.Spec.ServiceAccountName).To(gomega.BeEmpty())
+		})
+
+		ginkgo.It("should prefer plan SA over global SA", func() {
+			p := newPlanWithVddkProvider()
+			p.Spec.ServiceAccount = "plan-sa"
+			Settings.Migration.ServiceAccount = "global-sa"
+			job := createVddkCheckJob(p)
+			gomega.Expect(job.Spec.Template.Spec.ServiceAccountName).To(gomega.Equal("plan-sa"))
+		})
+	})
+
 	ginkgo.Describe("createVddkCheckJob image selection", func() {
 		const globalImage = "quay.io/kubev2v/forklift-virt-v2v:latest"
 		const vddkImage = "quay.io/kubev2v/vddk:latest"

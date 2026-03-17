@@ -116,6 +116,10 @@ spec:
         - name: MAX_PARENT_BACKING_RETRIES
           value: "{{ controller_max_parent_backing_retries }}"
 {% endif %}
+{% if controller_migration_service_account is string and controller_migration_service_account|length > 0 %}
+        - name: MIGRATION_SERVICE_ACCOUNT
+          value: "{{ controller_migration_service_account }}"
+{% endif %}
 {% if controller_cdi_export_token_ttl is number %}
         - name: CDI_EXPORT_TOKEN_TTL
           value: "{{ controller_cdi_export_token_ttl }}"

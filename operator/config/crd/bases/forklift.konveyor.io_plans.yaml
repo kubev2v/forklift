@@ -1399,6 +1399,15 @@ spec:
                   - true (default): Inspection step runs before transferring any disks and may fail if it detects the migration would fail.
                   - false: No inspection is performed before disk transfer.
                 type: boolean
+              serviceAccount:
+                description: |-
+                  ServiceAccount is the name of the ServiceAccount to use for migration
+                  pods in the target namespace. Overrides the global setting.
+                  If empty, falls back to ForkliftController's controller_migration_service_account,
+                  then to the namespace default.
+                maxLength: 253
+                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                type: string
               skipGuestConversion:
                 default: false
                 description: Determines if the plan should skip the guest conversion.

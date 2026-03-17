@@ -61,6 +61,7 @@ const (
 	MaxParentBackingRetries          = "MAX_PARENT_BACKING_RETRIES"
 	HostLeaseNamespace               = "HOST_LEASE_NAMESPACE"
 	HostLeaseDurationSeconds         = "HOST_LEASE_DURATION_SECONDS"
+	MigrationServiceAccount          = "MIGRATION_SERVICE_ACCOUNT"
 )
 
 // Default values for populator container resources
@@ -147,6 +148,8 @@ type Migration struct {
 	HostLeaseNamespace string
 	// HostLeaseDurationSeconds is the host lease duration in seconds used in copy offload
 	HostLeaseDurationSeconds string
+	// ServiceAccount is the cluster-wide default ServiceAccount for migration pods
+	ServiceAccount string
 }
 
 // Load settings.
@@ -359,5 +362,8 @@ func (r *Migration) Load() (err error) {
 	// Host lease settings for copy offload
 	r.HostLeaseNamespace = Lookup(HostLeaseNamespace, "openshift-mtv")
 	r.HostLeaseDurationSeconds = Lookup(HostLeaseDurationSeconds, "10")
+	if val, found := os.LookupEnv(MigrationServiceAccount); found {
+		r.ServiceAccount = val
+	}
 	return
 }
