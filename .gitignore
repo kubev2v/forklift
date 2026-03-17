@@ -39,8 +39,8 @@ vendor/**/Dockerfile
 vendor/**/Dockerfile.vcsim
 vendor/**/Dockerfile.govc
 
-cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper/vmkfstools-wrapper.vib
-cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper/.passwords/
+cmd/vsphere-copy-offload-populator/vmkfstools-wrapper/vmkfstools-wrapper.vib
+cmd/vsphere-copy-offload-populator/vmkfstools-wrapper/.passwords/
 
 .github/workflows/build-push-images-hal.yml
 __pycache__
@@ -72,8 +72,8 @@ operator/streams/**/downstream_manifests
 .tekton/validation-dev-preview-push.yaml-e
 .tekton/virt-v2v-dev-preview-pull-request.yaml-e
 .tekton/virt-v2v-dev-preview-push.yaml-e
-.tekton/vsphere-xcopy-volume-populator-dev-preview-pull-request.yaml-e
-.tekton/vsphere-xcopy-volume-populator-dev-preview-push.yaml-e
+.tekton/vsphere-copy-offload-populator-dev-preview-pull-request.yaml-e
+.tekton/vsphere-copy-offload-populator-dev-preview-push.yaml-e
 
 # passwords directories
 .passwords/

@@ -86,8 +86,8 @@ spec:
           value: ${VSPHERE_OS_MAP}
         - name: VIRT_CUSTOMIZE_MAP
           value: ${VIRT_CUSTOMIZE_MAP}
-        - name: VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE
-          value: ${VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE}
+        - name: VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE
+          value: ${VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE}
         livenessProbe:
           httpGet:
             path: /healthz

@@ -51,7 +51,7 @@ var populators = map[string]populator{
 		kind:            "VSphereXcopyVolumePopulator",
 		resource:        "vspherexcopyvolumepopulators",
 		controllerFunc:  getVXPopulatorPodArgs,
-		imageVar:        "VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE",
+		imageVar:        "VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE",
 		metricsEndpoint: ":8082",
 	},
 }

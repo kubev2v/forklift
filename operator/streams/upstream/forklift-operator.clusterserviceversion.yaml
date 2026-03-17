@@ -234,7 +234,7 @@ spec:
           - urn:alm:descriptor:com.tectonic.ui:hidden
         - description: vSphere xcopy populator image
           displayName: vSphere Populator Image
-          path: populator_vsphere_xcopy_volume_image_fqin
+          path: populator_vsphere_copy_offload_image_fqin
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:hidden
         - description: OVA provider server image
@@ -735,4 +735,4 @@ spec:
     - name: ova_proxy
       image: "${OVA_PROXY_IMAGE}"
     - name: vsphere_xcopy_volume_populator
-      image: "${VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE}"
+      image: "${VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE}"

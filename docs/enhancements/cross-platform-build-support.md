@@ -221,7 +221,7 @@ Individual targets for each component:
 - `push-populator-controller-image-manifest`
 - `push-ovirt-populator-image-manifest` (AMD64 only)
 - `push-openstack-populator-image-manifest`
-- `push-vsphere-xcopy-volume-populator-image-manifest`
+- `push-vsphere-copy-offload-populator-image-manifest`
 - `push-ova-provider-server-image-manifest`
 - `push-cli-download-image-manifest`
 - `push-ova-proxy-image-manifest`
