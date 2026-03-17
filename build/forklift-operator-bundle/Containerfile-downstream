@@ -19,7 +19,7 @@ ARG MUST_GATHER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-m
 
 ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-openstack-populator-rhel9@sha256:83f921e7a5c28b4081af9f7ce1a2310c03518ab2483b8a2abcdbe4cb79d2b207"
 
-ARG OPERATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-rhel9-operator@sha256:5adfcaff465e0ea0e11a0fac0e9db169928f2753a799dc7223c825d837f03941"
+ARG OPERATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-rhel9-operator@sha256:902ba7969541bf46ddfe52d00abb3088991af0a2b6c60eaf82598e284ce960c1"
 
 ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-ova-provider-server-rhel9@sha256:aa2d2e54d709efe18c7d5a8288cd82542c9f23ed559e2f373f2630d28b946f7d"
 
