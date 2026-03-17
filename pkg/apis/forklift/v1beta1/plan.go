@@ -55,6 +55,14 @@ type PlanSpec struct {
 	Description string `json:"description,omitempty"`
 	// Target namespace.
 	TargetNamespace string `json:"targetNamespace"`
+	// ServiceAccount is the name of the ServiceAccount to use for migration
+	// pods in the target namespace. Overrides the global setting.
+	// If empty, falls back to ForkliftController's controller_migration_service_account,
+	// then to the namespace default.
+	// +optional
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	ServiceAccount string `json:"serviceAccount,omitempty"`
 	// TargetLabels are labels that should be applied to the target virtual machines.
 	// Note: System-managed labels (migration, plan, vmID, app) will override any user-defined
 	// labels with the same keys to ensure proper system functionality.
