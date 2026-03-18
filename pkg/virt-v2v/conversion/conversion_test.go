@@ -583,6 +583,26 @@ var _ = Describe("Conversion", func() {
 			err := conversion.addVirtV2vArgs(mockCommandBuilder)
 			Expect(err).ToNot(HaveOccurred())
 		})
+
+		It("falls back to VmName when NewVmName is empty", func() {
+			appConfig.Source = config.HYPERV
+			appConfig.Workdir = "/var/tmp/v2v"
+			appConfig.VmName = "test-win-vm"
+			appConfig.NewVmName = ""
+			appConfig.DiskPath = "/hyperv/test-win-vm.vhdx"
+
+			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-o", "kubevirt").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-os", "/var/tmp/v2v").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-on", "test-win-vm").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-i", "disk").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddPositional("/hyperv/test-win-vm.vhdx").Return(mockCommandBuilder)
+
+			err := conversion.addVirtV2vArgs(mockCommandBuilder)
+			Expect(err).ToNot(HaveOccurred())
+		})
 	})
 
 	Describe("addCommonArgs with LUKS files", func() {
