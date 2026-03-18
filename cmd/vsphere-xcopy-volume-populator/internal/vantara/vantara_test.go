@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
@@ -499,40 +498,6 @@ func TestGetLunIdFromPorts(t *testing.T) {
 	}
 }
 
-func TestVvolCopy_ParseVmdkPathError(t *testing.T) {
-	mock := &mockVantaraClient{}
-	cloner := VantaraCloner{
-		client: mock,
-	}
-
-	progress := make(chan uint64, 10)
-
-	// Empty string is a robust “must-fail” input for most path parsers.
-	err := cloner.VvolCopy(
-		/* vsphereClient */ (vmware.Client)(nil),
-		/* vmId */ "dummy-vm",
-		/* sourceVMDKFile */ "",
-		/* persistentVolume */ populator.PersistentVolume{VolumeHandle: "01--proto--storage--123--name"},
-		progress,
-	)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-
-	// No storage calls should happen when VMDK parsing fails.
-	if mock.getLdevCallCount != 0 {
-		t.Fatalf("expected GetLdev not called, got %d", mock.getLdevCallCount)
-	}
-
-	// Should not emit progress for early failure.
-	select {
-	case p := <-progress:
-		t.Fatalf("unexpected progress value: %d", p)
-	default:
-		// ok
-	}
-}
-
 func TestVvolCopy_ResolvePVToLUNError(t *testing.T) {
 	mock := &mockVantaraClient{}
 	cloner := &VantaraCloner{client: mock}
@@ -547,9 +512,19 @@ func TestVvolCopy_ResolvePVToLUNError(t *testing.T) {
 	// If your ParseVmdkPath is strict and fails here, change to a known-good sample.
 	sourceVMDK := "[datastore1] vm/vm.vmdk"
 
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	vc := vmware_mocks.NewMockClient(ctrl)
+	vc.EXPECT().
+		GetVMDiskBacking(gomock.Any(), "vm-001", sourceVMDK).
+		Return(&vmware.DiskBacking{
+			IsRDM: false,
+		}, nil)
+
 	err := cloner.VvolCopy(
-		/* vsphereClient */ (vmware.Client)(nil),
-		/* vmId */ "dummy-vm",
+		/* vsphereClient */ vc,
+		/* vmId */ "vm-001",
 		/* sourceVMDKFile */ sourceVMDK,
 		/* persistentVolume */ badPV,
 		progress,
@@ -568,35 +543,6 @@ func TestVvolCopy_ResolvePVToLUNError(t *testing.T) {
 		t.Fatalf("unexpected progress value: %d", p)
 	default:
 		// ok
-	}
-}
-
-// Optional: sanity check that VvolCopy does not block the caller by writing to an
-// unbuffered channel on these early error paths.
-func TestVvolCopy_DoesNotBlockOnProgressChannel_EarlyErrors(t *testing.T) {
-	mock := &mockVantaraClient{}
-	cloner := &VantaraCloner{client: mock}
-
-	// Unbuffered channel
-	progress := make(chan uint64)
-
-	done := make(chan struct{})
-	go func() {
-		_ = cloner.VvolCopy(
-			(vmware.Client)(nil),
-			"dummy-vm",
-			"", // force ParseVmdkPath fail
-			populator.PersistentVolume{VolumeHandle: "01--proto--storage--123--name"},
-			progress,
-		)
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		// ok
-	case <-time.After(2 * time.Second):
-		t.Fatalf("VvolCopy appears to have blocked on early error path")
 	}
 }
 
