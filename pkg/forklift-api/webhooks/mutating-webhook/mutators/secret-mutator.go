@@ -17,6 +17,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/forklift-api/webhooks/util"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
+	libutil "github.com/kubev2v/forklift/pkg/lib/util"
 	admissionv1 "k8s.io/api/admission/v1beta1"
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -79,7 +80,19 @@ func (mutator *SecretMutator) mutateProviderSecret() *admissionv1.AdmissionRespo
 		}
 
 		certPool := x509.NewCertPool()
-		ok := certPool.AppendCertsFromPEM(mutator.secret.Data["cacert"])
+		existingCACert, hasCert := libutil.GetCACert(&mutator.secret)
+		if !hasCert {
+			err = liberr.Wrap(errors.New("CA certificate not found in secret"))
+			log.Error(err, "CA certificate is missing")
+			return &admissionv1.AdmissionResponse{
+				Allowed: false,
+				Result: &metav1.Status{
+					Message: "CA certificate is required for oVirt provider.",
+					Code:    http.StatusBadRequest,
+				},
+			}
+		}
+		ok := certPool.AppendCertsFromPEM(existingCACert)
 		if !ok {
 			err = liberr.Wrap(errors.New("failed to parse certificate"))
 			log.Error(err, "Certificate is not valid")
@@ -106,9 +119,14 @@ func (mutator *SecretMutator) mutateProviderSecret() *admissionv1.AdmissionRespo
 			return util.ToAdmissionResponseError(err)
 		}
 
-		//check if the CA included in the secrete provided by the user and update it if needed
-		if !contains(mutator.secret.Data["cacert"], cert) {
-			mutator.secret.Data["cacert"] = appendCerts(mutator.secret.Data["cacert"], cert)
+		//check if the CA included in the secret provided by the user and update it if needed
+		if !contains(existingCACert, cert) {
+			// Update the CA cert in whichever field it was originally provided
+			if _, hasStandardField := mutator.secret.Data["ca.crt"]; hasStandardField {
+				mutator.secret.Data["ca.crt"] = appendCerts(existingCACert, cert)
+			} else {
+				mutator.secret.Data["cacert"] = appendCerts(existingCACert, cert)
+			}
 			mutator.secret.Labels["ca-cert-updated"] = "true"
 			secretChanged = true
 			log.Info("Engine CA certificate was missing, updating the secret")

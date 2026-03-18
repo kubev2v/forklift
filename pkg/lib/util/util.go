@@ -82,7 +82,7 @@ func tlsConfig(secret *core.Secret) (cfg *tls.Config, err error) {
 	cfg = &tls.Config{}
 	if InsecureProvider(secret) {
 		cfg.InsecureSkipVerify = true
-	} else if cacert, ok := secret.Data["cacert"]; ok {
+	} else if cacert, ok := GetCACert(secret); ok {
 		cfg.RootCAs = x509.NewCertPool()
 		if ok := cfg.RootCAs.AppendCertsFromPEM(cacert); !ok {
 			err = liberr.New("failed to parse the specified certificate")
@@ -119,4 +119,20 @@ func InsecureProvider(secret *core.Secret) bool {
 	}
 
 	return insecureSkipVerify
+}
+
+// GetCACert retrieves the CA certificate from a secret.
+// It first checks for the standard Kubernetes field "ca.crt",
+// then falls back to the legacy "cacert" field for backward compatibility.
+// Returns the certificate bytes and a boolean indicating if found.
+func GetCACert(secret *core.Secret) ([]byte, bool) {
+	// Try standard Kubernetes field first
+	if cacrt, ok := secret.Data["ca.crt"]; ok && len(cacrt) > 0 {
+		return cacrt, true
+	}
+	// Fall back to legacy field
+	if cacert, ok := secret.Data["cacert"]; ok && len(cacert) > 0 {
+		return cacert, true
+	}
+	return nil, false
 }

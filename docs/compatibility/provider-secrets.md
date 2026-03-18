@@ -15,7 +15,10 @@ These fields are available across multiple providers:
 | Field | Type | Description |
 |-------|------|-------------|
 | `insecureSkipVerify` | string | Set to `"true"` to skip TLS certificate verification (not recommended for production) |
-| `cacert` | string | CA certificate in PEM format for TLS verification |
+| `ca.crt` | string | CA certificate in PEM format for TLS verification (Kubernetes standard field) |
+| `cacert` | string | CA certificate in PEM format for TLS verification (legacy field, maintained for backward compatibility) |
+
+**Note:** Either `ca.crt` or `cacert` can be used to provide the CA certificate. The system checks for `ca.crt` first, then falls back to `cacert` if not found.
 
 ---
 
@@ -34,11 +37,29 @@ Authentication to vCenter or ESXi hosts.
 
 | Field | Description |
 |-------|-------------|
-| `cacert` | vCenter CA certificate in PEM format |
+| `ca.crt` or `cacert` | vCenter CA certificate in PEM format |
 | `insecureSkipVerify` | Skip TLS verification (`"true"` or `"false"`) |
-| `thumbprint` | vCenter SSL thumbprint (alternative to cacert) |
+| `thumbprint` | vCenter SSL thumbprint (alternative to CA certificate) |
 
-### Example
+### Example (using standard Kubernetes field)
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vsphere-credentials
+  namespace: openshift-mtv
+type: Opaque
+stringData:
+  user: administrator@vsphere.local
+  password: "your-password"
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    ...
+    -----END CERTIFICATE-----
+```
+
+### Example (using legacy field)
 
 ```yaml
 apiVersion: v1
@@ -177,10 +198,27 @@ Authentication to remote OpenShift clusters for cross-cluster migration.
 
 | Field | Description |
 |-------|-------------|
-| `cacert` | OpenShift API CA certificate |
+| `ca.crt` or `cacert` | OpenShift API CA certificate |
 | `insecureSkipVerify` | Skip TLS verification |
 
-### Example
+### Example (ACM-managed secret format)
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openshift-credentials
+  namespace: openshift-mtv
+type: Opaque
+stringData:
+  token: "sha256~xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    ...
+    -----END CERTIFICATE-----
+```
+
+### Example (basic token-only)
 
 ```yaml
 apiVersion: v1
@@ -193,7 +231,7 @@ stringData:
   token: "sha256~xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ```
 
-**Note:** For the "host" provider (same cluster), no secret is required.
+**Note:** For the "host" provider (same cluster), no secret is required. The `ca.crt` field is the Kubernetes standard and is automatically populated by ACM-managed secrets.
 
 ---
 
@@ -324,7 +362,7 @@ stringData:
 | `user` / `username` | Req | Req | Req* | - | Opt | - | Req |
 | `password` | Req | Req | Req* | - | Opt | - | Req |
 | `token` | - | - | Opt | Req | - | - | - |
-| `cacert` | Opt | Opt | Opt | Opt | - | - | Opt |
+| `ca.crt` / `cacert` | Opt | Opt | Opt | Opt | - | - | Opt |
 | `insecureSkipVerify` | Opt | Opt | Opt | Opt | - | - | Opt |
 | `region` | - | - | Opt | - | - | Req | - |
 | `accessKeyId` | - | - | - | - | - | Req | - |
