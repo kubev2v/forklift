@@ -31,7 +31,7 @@ ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-populator-c
 
 ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:85e9afcf59d0cacfb99af0238559e1c46aa15bd93706824673cffc2f819705b3"
 
-ARG CLI_DOWNLOAD_IMAGE="registry.redhat.io/mtv-candidate/mtv-cli-download-rhel9@sha256:6a76ec2fc92a08472cab612ea38d00cc2c4a4114a498c3a508bc13d764f0f41f"
+ARG CLI_DOWNLOAD_IMAGE="registry.redhat.io/mtv-candidate/mtv-cli-download-rhel9@sha256:8d097b123fda441d803e3de3a42eb76acca3108635b4197e18b96bdf6bc94312"
 
 ARG VALIDATION_IMAGE="registry.redhat.io/mtv-candidate/mtv-validation-rhel9@sha256:3b4b49403155138c82fa3ef6e49bc07c2c42a93121dcb39d967d2f31676aea05"
 
