@@ -22,6 +22,7 @@ type VantaraCloner struct {
 	client          VantaraClient
 	envHostGroupIds []string
 	initiatorGroup  string
+	copySpeed       string
 }
 
 func NewVantaraClonner(hostname, username, password string) (VantaraCloner, error) {
@@ -52,6 +53,7 @@ func NewVantaraClonner(hostname, username, password string) (VantaraCloner, erro
 	return VantaraCloner{
 		client:          client,
 		envHostGroupIds: envStorage["hostGroupIds"].([]string),
+		copySpeed:       envStorage["copySpeed"].(string),
 	}, nil
 }
 
@@ -77,6 +79,11 @@ func getStorageEnvVars() (map[string]interface{}, error) {
 		}
 	}
 
+	copySpeed, found := os.LookupEnv("COPY_SPEED")
+	if !found {
+		copySpeed = "slower" // default value
+	}
+
 	storageEnvVars := map[string]interface{}{
 		"storageId":    os.Getenv("STORAGE_ID"),
 		"restServerIP": os.Getenv("STORAGE_HOSTNAME"),
@@ -84,6 +91,7 @@ func getStorageEnvVars() (map[string]interface{}, error) {
 		"userID":       os.Getenv("STORAGE_USERNAME"),
 		"password":     os.Getenv("STORAGE_PASSWORD"),
 		"hostGroupIds": hgids,
+		"copySpeed":    copySpeed,
 	}
 	klog.Info(
 		"storageId: ", storageEnvVars["storageId"],
@@ -92,6 +100,7 @@ func getStorageEnvVars() (map[string]interface{}, error) {
 		"userID: ", "",
 		"password: ", "",
 		"hostGroupID: ", storageEnvVars["hostGroupIds"],
+		"copySpeed: ", storageEnvVars["copySpeed"],
 	)
 	return storageEnvVars, nil
 }
@@ -294,9 +303,8 @@ func (v *VantaraCloner) performVolumeCopy(sourceLdevId string, ldevResp *LdevRes
 
 	// Perform the copy operation using Vantara API
 	snapshotGroupName := "mtv-ss-copy-" + sourceLdevId + "-to-" + targetLdevId
-	copySpeed := "faster"
 
-	err := v.client.CreateCloneLdev(snapshotGroupName, poolID, sourceLdevId, targetLdevId, copySpeed)
+	err := v.client.CreateCloneLdev(snapshotGroupName, poolID, sourceLdevId, targetLdevId, v.copySpeed)
 	if err != nil {
 		return fmt.Errorf("Vantara CopyVolume failed: %w", err)
 	}
