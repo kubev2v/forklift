@@ -14,6 +14,7 @@ as the `StorageMap` object. The secret contains the following
 |STORAGE_PORT|required|The storage vendor api port|
 |STORAGE_ID|required|storage array serial number|
 |HOSTGROUP_ID_LIST|required|list of IO ports and host group IDs, (e.g. CL1-A,1:CL2-B,2:CL4-A,1:CL6-A,1) |
+|COPY_SPEED|optional|The background copy speed to be used for the volume copy operation to vVol or RDM. Valid values are: `slower`, `medium`, and `faster`. If not specified, the default value is `slower`.|
 
 
 ## Host Mode Options:
