@@ -200,6 +200,16 @@ func (r *Builder) PodSpec(provider *api.Provider, secret *core.Secret, pvc *core
 						core.ResourceMemory: resource.MustParse(Settings.Providers.HyperV.Resources.Memory.Limit),
 					},
 				},
+				ReadinessProbe: &core.Probe{
+					ProbeHandler: core.ProbeHandler{
+						HTTPGet: &core.HTTPGetAction{
+							Path: "/healthz",
+							Port: intstr.FromInt32(8080),
+						},
+					},
+					InitialDelaySeconds: 5,
+					PeriodSeconds:       10,
+				},
 				SecurityContext: r.securityContext(),
 				VolumeMounts: []core.VolumeMount{
 					{

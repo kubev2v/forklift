@@ -1,7 +1,16 @@
-FROM quay.io/konflux-ci/operator-sdk-builder@sha256:2737ff035f3a6d94e189cd31e7653998525c52f4d4db994ba1874a3a74bb4912 as builder
+# Upstream operator bundle: use config/manifests (kustomize) + operator-sdk.
+# For release from Tekton staged builds: use STREAM=upstream and pass staged image
+# refs via build-args (e.g. CONTROLLER_IMAGE=quay.io/.../forklift-controller-2-10:revision).
+# Use build-args-file=build/release.conf for MTV_VERSION, CHANNEL, DEFAULT_CHANNEL, RELEASE.
+FROM quay.io/konflux-ci/operator-sdk-builder@sha256:1e4677720ef0c0563d67bcfe1cbac6ac87970b8cb1cdc58bf25b168deeabfecf as builder
 
 ARG STREAM=downstream
 ARG VERSION="2.7.0"
+# Release versioning (from build/release.conf when building for release)
+ARG MTV_VERSION
+ARG RELEASE
+ARG CHANNEL
+ARG DEFAULT_CHANNEL
 ARG CONTROLLER_IMAGE="quay.io/kubev2v/forklift-controller:latest"
 ARG API_IMAGE="quay.io/kubev2v/forklift-api:latest"
 ARG VIRT_V2V_IMAGE="quay.io/kubev2v/forklift-virt-v2v:latest"
@@ -9,7 +18,7 @@ ARG OPERATOR_IMAGE="quay.io/kubev2v/forklift-operator:latest"
 ARG POPULATOR_CONTROLLER_IMAGE="quay.io/kubev2v/populator-controller:latest"
 ARG OVIRT_POPULATOR_IMAGE="quay.io/kubev2v/ovirt-populator:latest"
 ARG OPENSTACK_POPULATOR_IMAGE="quay.io/kubev2v/openstack-populator:latest"
-ARG VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE="quay.io/kubev2v/vsphere-copy-offload-populator:latest"
+ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="quay.io/kubev2v/vsphere-xcopy-volume-populator:latest"
 ARG MUST_GATHER_IMAGE="quay.io/kubev2v/forklift-must-gather:latest"
 ARG UI_PLUGIN_IMAGE="quay.io/kubev2v/forklift-console-plugin:latest"
 ARG CLI_DOWNLOAD_IMAGE="quay.io/kubev2v/forklift-cli-download:latest"
@@ -23,21 +32,29 @@ WORKDIR /repo
 
 # Set project name to forklift-operator so operator-sdk can successfully generate resources
 RUN cp PROJECT PROJECT.template && PROJECT_NAME=forklift-operator envsubst < PROJECT.template > PROJECT
-RUN source ./export-vars-${STREAM}.sh && \
+# Use release versioning when set (e.g. from build/release.conf), else fall back to VERSION and development channel
+RUN BUNDLE_VERSION="${MTV_VERSION:-$VERSION}" && \
+    BUNDLE_CHANNELS="${CHANNEL:-development}" && \
+    BUNDLE_DEFAULT_CHANNEL="${DEFAULT_CHANNEL:-development}" && \
+    source ./export-vars-${STREAM}.sh && \
     kustomize build config/manifests/ \
     | envsubst \
     | operator-sdk generate bundle \
         -q \
         --overwrite \
         --extra-service-accounts forklift-controller,forklift-api,forklift-populator-controller \
-        --version $VERSION \
-        --channels development \
-        --default-channel development \
+        --version "$BUNDLE_VERSION" \
+        --channels "$BUNDLE_CHANNELS" \
+        --default-channel "$BUNDLE_DEFAULT_CHANNEL" \
         --output-dir build
 
 FROM scratch
 
 ARG VERSION="2.7.0"
+ARG MTV_VERSION=$VERSION
+ARG RELEASE=v2.7
+ARG CHANNEL=release-v2.7
+ARG DEFAULT_CHANNEL=release-v2.7
 
 COPY --from=builder /repo/build/manifests /manifests/
 COPY --from=builder /repo/build/metadata /metadata/
@@ -62,8 +79,8 @@ LABEL operators.operatorframework.io.bundle.mediatype.v1=registry+v1
 LABEL operators.operatorframework.io.bundle.manifests.v1=manifests/
 LABEL operators.operatorframework.io.bundle.metadata.v1=metadata/
 LABEL operators.operatorframework.io.bundle.package.v1=mtv-operator
-LABEL operators.operatorframework.io.bundle.channels.v1=release-v2.7
-LABEL operators.operatorframework.io.bundle.channel.default.v1=release-v2.7
+LABEL operators.operatorframework.io.bundle.channels.v1=$CHANNEL
+LABEL operators.operatorframework.io.bundle.channel.default.v1=$DEFAULT_CHANNEL
 
 # Not sure whate these label expand to
 LABEL operators.operatorframework.io.metrics.builder=operator-sdk-v1.22.0+git
@@ -72,7 +89,7 @@ LABEL operators.operatorframework.io.metrics.project_layout=ansible.sdk.operator
 LABEL operators.operatorframework.io.test.config.v1=tests/scorecard/
 LABEL operators.operatorframework.io.test.mediatype.v1=scorecard+v1
 
-# Main labels
+# Main labels (pass RELEASE and MTV_VERSION when building for release)
 LABEL \
         com.redhat.component="mtv-operator-bundle-container" \
         name="migration-toolkit-virtualization/mtv-operator-bundle" \
@@ -85,6 +102,6 @@ LABEL \
         description="Migration Toolkit for Virtualization - Operator Bundle" \
         vendor="Red Hat, Inc." \
         distribution-scope="public" \
-        release="v2.7" \
+        release="$RELEASE" \
         url="https://github.com/kubev2v/forklift" \
-        version="v$VERSION"
+        version="v$MTV_VERSION"
