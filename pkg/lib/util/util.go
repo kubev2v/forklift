@@ -130,7 +130,7 @@ func GetCACert(secret *core.Secret) ([]byte, bool) {
 	if cacrt, ok := secret.Data["ca.crt"]; ok && len(cacrt) > 0 {
 		return cacrt, true
 	}
-	// Fall back to legacy field
+	// The following field is deprecated and will be removed in Forklift v2.14.
 	if cacert, ok := secret.Data["cacert"]; ok && len(cacert) > 0 {
 		return cacert, true
 	}

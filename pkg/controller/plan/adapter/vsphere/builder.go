@@ -466,7 +466,7 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 			"secretKey":   in.Data["password"],
 		}
 	}
-	if cacert, ok := in.Data["cacert"]; ok {
+	if cacert, ok := util.GetCACert(in); ok {
 		object.Data["cacert"] = cacert
 	}
 	return
