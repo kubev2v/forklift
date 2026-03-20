@@ -72,7 +72,7 @@ func (r *Client) connect() (status int, err error) {
 			err = liberr.New("CA certificate not found in secret")
 			return
 		}
-		ok = roots.AppendCertsFromPEM(cacert) // use `=`, not `:=`
+		ok = roots.AppendCertsFromPEM(cacert)
 		if !ok {
 			err = liberr.New("failed to parse CA certificate")
 			return
