@@ -1,28 +1,36 @@
 package vantara
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"testing"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
+	vmware_mocks "github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware/mocks"
+
+	"go.uber.org/mock/gomock"
 )
 
 // mockVantaraClient is a mock implementation of VantaraClient for testing
 type mockVantaraClient struct {
-	connectErr          error
-	disconnectErr       error
-	getLdevResp         *LdevResponse
-	getLdevErr          error
-	addPathErr          error
-	deletePathErr       error
-	getPortDetailsResp  *PortDetailsResponse
-	getPortDetailsErr   error
-	connectCallCount    int
-	disconnectCallCount int
-	getLdevCallCount    int
-	addPathCalls        []addPathCall
-	deletePathCalls     []deletePathCall
+	connectErr               error
+	disconnectErr            error
+	getLdevResp              *LdevResponse
+	getLdevErr               error
+	addPathErr               error
+	deletePathErr            error
+	getPortDetailsResp       *PortDetailsResponse
+	getPortDetailsErr        error
+	connectCallCount         int
+	disconnectCallCount      int
+	getLdevCallCount         int
+	addPathCalls             []addPathCall
+	deletePathCalls          []deletePathCall
+	createCloneErr           error
+	pairsResp                *ClonePairResponse
+	createCloneLdevCallCount int
 }
 
 type addPathCall struct {
@@ -68,11 +76,18 @@ func (m *mockVantaraClient) GetPortDetails() (*PortDetailsResponse, error) {
 }
 
 func (m *mockVantaraClient) CreateCloneLdev(snapshotGroupName string, snapshotPoolId string, pvolLdevId string, svolLdevId string, copySpeed string) error {
-	return nil
+	m.createCloneLdevCallCount++
+	if m.createCloneErr != nil {
+		return m.createCloneErr
+	}
+	return m.createCloneErr
 }
 
 func (m *mockVantaraClient) GetClonePairs(snapshotGroupName string, pvolLdevId string) (*ClonePairResponse, error) {
-	return &ClonePairResponse{}, nil
+	if m.pairsResp == nil {
+		return &ClonePairResponse{}, nil
+	}
+	return m.pairsResp, nil
 }
 
 // TestResolvePVToLUN tests PV to LUN resolution
@@ -480,5 +495,432 @@ func TestGetLunIdFromPorts(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestVvolCopy_ResolvePVToLUNError(t *testing.T) {
+	mock := &mockVantaraClient{}
+	cloner := &VantaraCloner{client: mock}
+
+	progress := make(chan uint64, 10)
+
+	// Use a PV handle that is guaranteed to fail ResolvePVToLUN():
+	// len(parts) != 5 OR parts[0] != "01"
+	badPV := populator.PersistentVolume{VolumeHandle: "bad-handle"}
+
+	// sourceVMDKFile: pick something plausible-looking.
+	// If your ParseVmdkPath is strict and fails here, change to a known-good sample.
+	sourceVMDK := "[datastore1] vm/vm.vmdk"
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	vc := vmware_mocks.NewMockClient(ctrl)
+	vc.EXPECT().
+		GetVMDiskBacking(gomock.Any(), "vm-001", sourceVMDK).
+		Return(&vmware.DiskBacking{
+			IsRDM: false,
+		}, nil)
+
+	err := cloner.VvolCopy(
+		/* vsphereClient */ vc,
+		/* vmId */ "vm-001",
+		/* sourceVMDKFile */ sourceVMDK,
+		/* persistentVolume */ badPV,
+		progress,
+	)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+
+	// It should fail before any storage copy call occurs.
+	if mock.getLdevCallCount != 0 {
+		t.Fatalf("expected GetLdev not called, got %d", mock.getLdevCallCount)
+	}
+
+	select {
+	case p := <-progress:
+		t.Fatalf("unexpected progress value: %d", p)
+	default:
+		// ok
+	}
+}
+
+func TestPerformVolumeCopy_Success_ImmediatePSUP(t *testing.T) {
+	mock := &mockVantaraClient{
+		pairsResp: &ClonePairResponse{
+			Data: []CloneDataEntry{
+				{Status: "PSUP"},
+			},
+		},
+	}
+
+	v := &VantaraCloner{client: mock}
+
+	progress := make(chan uint64, 1)
+
+	ldevResp := &LdevResponse{
+		LdevId: 1,
+		PoolId: 2,
+	}
+
+	err := v.performVolumeCopy("1234", ldevResp, progress)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	select {
+	case p := <-progress:
+		if p != 100 {
+			t.Fatalf("unexpected progress: got=%d want=100", p)
+		}
+	default:
+		t.Fatalf("expected progress to be written")
+	}
+}
+
+func TestPerformVolumeCopy_CreateCloneError(t *testing.T) {
+	mock := &mockVantaraClient{
+		createCloneErr: errors.New("create clone failed"),
+		// Never return PSUP status to ensure it fails at CreateCloneLdev step, not later
+		pairsResp: &ClonePairResponse{
+			Data: []CloneDataEntry{
+				{Status: "PSUP"},
+			},
+		},
+	}
+
+	v := &VantaraCloner{client: mock}
+
+	progress := make(chan uint64, 1)
+
+	ldevResp := &LdevResponse{
+		LdevId: 1,
+		PoolId: 2,
+	}
+
+	err := v.performVolumeCopy("1234", ldevResp, progress)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+
+	// Should not emit progress when CreateCloneLdev fails, even if pairsToReturn has PSUP, because it should fail before the loop that checks pairsToReturn.
+	select {
+	case p := <-progress:
+		t.Fatalf("unexpected progress on error: %d", p)
+	default:
+		// ok
+	}
+}
+
+func TestFindVolumeByVVolID_Success(t *testing.T) {
+	v := &VantaraCloner{}
+
+	// last4 = ABCD (hex) => 43981 (dec)
+	got, err := v.findVolumeByVVolID("00000000-0000-0000-0000-00000000ABCD")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "43981" {
+		t.Fatalf("unexpected value: got=%s want=43981", got)
+	}
+}
+
+func TestFindVolumeByVVolID_TooShort(t *testing.T) {
+	v := &VantaraCloner{}
+
+	_, err := v.findVolumeByVVolID("ABC") // len < 4
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+}
+
+func TestFindVolumeByVVolID_NonHexLast4(t *testing.T) {
+	v := &VantaraCloner{}
+
+	// last4 = "ZZZZ" is not hex
+	_, err := v.findVolumeByVVolID("0000ZZZZ")
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+}
+
+func TestRDMCopy_Error_WhenGetBackingFails(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	vc := vmware_mocks.NewMockClient(ctrl)
+	vc.EXPECT().
+		GetVMDiskBacking(gomock.Any(), "vm-001", "[ds] vm/disk.vmdk").
+		Return(nil, errors.New("boom"))
+
+	cloner := &VantaraCloner{
+		client: &mockVantaraClient{getLdevResp: &LdevResponse{}},
+	}
+
+	progress := make(chan uint64, 10)
+
+	err := cloner.RDMCopy(
+		vc,
+		"vm-001",
+		"[ds] vm/disk.vmdk",
+		populator.PersistentVolume{VolumeHandle: "01--fc--storage--999--target"},
+		progress,
+	)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+}
+
+func TestRDMCopy_Error_WhenNotRDM(t *testing.T) {
+	v := &VantaraCloner{
+		client: &mockVantaraClient{getLdevResp: &LdevResponse{}},
+	}
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	vc := vmware_mocks.NewMockClient(ctrl)
+	vc.EXPECT().
+		GetVMDiskBacking(gomock.Any(), "vm-001", "[ds] vm/disk.vmdk").
+		Return(&vmware.DiskBacking{
+			IsRDM:      false,
+			DeviceName: "naa.60060e80deadbeefdeadbeefdeadbeef",
+		}, nil)
+
+	progress := make(chan uint64, 10)
+
+	err := v.RDMCopy(
+		(vmware.Client)(vc),
+		"vm-001",
+		"[ds] vm/disk.vmdk",
+		populator.PersistentVolume{VolumeHandle: "01--fc--storage--999--target"},
+		progress,
+	)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+
+	select {
+	case p := <-progress:
+		t.Fatalf("unexpected progress: %d", p)
+	default:
+		// ok
+	}
+}
+
+func TestRDMCopy_Success_ProgressSequence(t *testing.T) {
+
+	naaDevice := "60060e80" + "0000000000000000000000ab" // 8 + 24 = 32
+
+	targetLdevID := "999"
+
+	fc := &mockVantaraClient{
+		// return PSUP immediately to skip waiting loop and test progress sequence more easily
+		pairsResp: &ClonePairResponse{Data: []CloneDataEntry{{Status: "PSUP"}}},
+		getLdevResp: &LdevResponse{
+			LdevId: 171,
+			PoolId: 3,
+			NaaId:  "60060e800000000000000000000000ab",
+		},
+	}
+
+	v := &VantaraCloner{client: fc}
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	vc := vmware_mocks.NewMockClient(ctrl)
+	vc.EXPECT().
+		GetVMDiskBacking(gomock.Any(), "vm-001", "[ds] vm/disk.vmdk").
+		Return(&vmware.DiskBacking{
+			IsRDM:      true,
+			DeviceName: "naa." + naaDevice, // lower-case to match what resolveRDMToLUN returns
+		}, nil)
+
+	progress := make(chan uint64, 10)
+
+	err := v.RDMCopy(
+		(vmware.Client)(vc),
+		"vm-001",
+		"[ds] vm/disk.vmdk",
+		populator.PersistentVolume{VolumeHandle: "01--fc--storage--" + targetLdevID + "--target"},
+		progress,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// RDMCopy: progress <- 10
+	// performVolumeCopy: progress <- 100
+	// RDMCopy: progress <- 100
+	got := []uint64{}
+	for len(progress) > 0 {
+		got = append(got, <-progress)
+	}
+
+	want := []uint64{10, 100, 100}
+	if len(got) != len(want) {
+		t.Fatalf("unexpected progress length: got=%v want=%v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("unexpected progress sequence: got=%v want=%v", got, want)
+		}
+	}
+}
+
+func TestRDMCopy_Error_WhenResolveRDMToLUNMismatchNAA(t *testing.T) {
+	naaDevice := "60060e80" + "0000000000000000000000ab" // last4=00ab => 171
+
+	// Intentionally mismatch the NAA in the LdevResponse to trigger the error path in resolveRDMToLUN
+	fc := &mockVantaraClient{
+		getLdevResp: &LdevResponse{
+			LdevId: 171,
+			NaaId:  "60060e80" + "1111111111111111111111ab", // mismatch
+		},
+	}
+
+	v := &VantaraCloner{client: fc}
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	vc := vmware_mocks.NewMockClient(ctrl)
+	vc.EXPECT().
+		GetVMDiskBacking(gomock.Any(), "vm-001", "[ds] vm/disk.vmdk").
+		Return(&vmware.DiskBacking{
+			IsRDM:      true,
+			DeviceName: "naa." + naaDevice,
+		}, nil)
+
+	progress := make(chan uint64, 10)
+
+	err := v.RDMCopy(
+		(vmware.Client)(vc),
+		"vm-001",
+		"[ds] vm/disk.vmdk",
+		populator.PersistentVolume{VolumeHandle: "01--fc--storage--999--target"},
+		progress,
+	)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+
+	// resolveRDMToLUN fails, so progress is not written
+	select {
+	case p := <-progress:
+		t.Fatalf("unexpected progress: %d", p)
+	default:
+		// ok
+	}
+}
+
+func TestResolveRDMToLUN_Success(t *testing.T) {
+	// 32 chars starting with provider prefix (8 chars)
+	// last4 = "00ab" => 171(dec)
+	naaDevice := VantaraProviderID + "0000000000000000000000ab" // 8 + 24 = 32
+	deviceName := "naa." + naaDevice
+
+	fc := &mockVantaraClient{
+		getLdevResp: &LdevResponse{
+			LdevId: 171,
+			NaaId:  naaDevice, // must match extracted 32 chars (case-insensitive compare via ToLower)
+		},
+	}
+
+	v := &VantaraCloner{client: fc}
+
+	lun, err := v.resolveRDMToLUN(deviceName)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if lun.LDeviceID != "171" {
+		t.Fatalf("unexpected LDeviceID: got=%s want=171", lun.LDeviceID)
+	}
+	// resolveRDMToLUN sets NAA to lower-case ldevResp.NaaId (no "naa." prefix)
+	if lun.NAA != naaDevice {
+		t.Fatalf("unexpected NAA: got=%s want=%s", lun.NAA, naaDevice)
+	}
+}
+
+func TestResolveRDMToLUN_Error_TargetNotFound(t *testing.T) {
+	fc := &mockVantaraClient{}
+	v := &VantaraCloner{client: fc}
+
+	_, err := v.resolveRDMToLUN("naa.1234567890")
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+}
+
+func TestResolveRDMToLUN_Error_StringTooShort(t *testing.T) {
+	fc := &mockVantaraClient{}
+	v := &VantaraCloner{client: fc}
+
+	// provider id is present but total length is insufficient for 32 chars slice
+	deviceName := "naa." + VantaraProviderID + "short"
+
+	_, err := v.resolveRDMToLUN(deviceName)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+}
+
+func TestResolveRDMToLUN_Error_InvalidHexLast4(t *testing.T) {
+	naaDevice := VantaraProviderID + "0000000000000000000000ZZ" // last4="00ZZ" -> invalid hex
+	deviceName := "naa." + naaDevice
+
+	fc := &mockVantaraClient{}
+	v := &VantaraCloner{client: fc}
+
+	_, err := v.resolveRDMToLUN(deviceName)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+}
+
+func TestResolveRDMToLUN_Error_NAAMismatch(t *testing.T) {
+	naaDevice := VantaraProviderID + "0000000000000000000000ab" // => 171
+	deviceName := "naa." + naaDevice
+
+	fc := &mockVantaraClient{
+		getLdevResp: &LdevResponse{
+			LdevId: 171,
+			// mismatch on purpose
+			NaaId: VantaraProviderID + "1111111111111111111111ab",
+		},
+	}
+	v := &VantaraCloner{client: fc}
+
+	_, err := v.resolveRDMToLUN(deviceName)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+}
+
+// Optional: ensure it lower-cases deviceName before searching/comparing
+func TestResolveRDMToLUN_CaseInsensitiveDeviceName(t *testing.T) {
+	naaDeviceLower := VantaraProviderID + "0000000000000000000000ab"
+	deviceNameUpper := "NAA." + naaDeviceLower // prefix uppercase, but provider id is numeric so ok
+
+	fc := &mockVantaraClient{
+		getLdevResp: &LdevResponse{
+			LdevId: 171,
+			// Put uppercase in NaaId to confirm code lower-cases it
+			NaaId: naaDeviceLower,
+		},
+	}
+	v := &VantaraCloner{client: fc}
+
+	lun, err := v.resolveRDMToLUN(deviceNameUpper)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if lun.LDeviceID != "171" {
+		t.Fatalf("unexpected LDeviceID: got=%s want=171", lun.LDeviceID)
+	}
+	if lun.NAA != naaDeviceLower {
+		t.Fatalf("unexpected NAA: got=%s want=%s", lun.NAA, naaDeviceLower)
 	}
 }

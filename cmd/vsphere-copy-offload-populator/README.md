@@ -16,6 +16,7 @@
   - [Dell PowerMax](#dell-powermax)
   - [Dell PowerFlex](#dell-powerflex)
 - [Limitations](#limitations)
+- [Storage Offload Fallback Copy](#storage-offload-fallback-copy)
 - [Matching PVC with DataStores](#matching-pvc-with-datastores-to-deduce-copy-offload-support)
 - [vSphere User Privileges](#vsphere-user-privileges)
 - [Clone Methods: VIB vs SSH](#clone-methods-vib-vs-ssh)
@@ -319,6 +320,58 @@ This volume populator implementation is specific for performing XCOPY from a sou
 descriptor disk file to a target PVC; this also works if the underlying disk is
 vVol or RDM. The way it works is by performing the XCOPY using vmkfstools on the target ESXi.
 
+
+## Storage Offload Fallback Copy
+
+When the source datastore and the target PVC are on the **same** storage array,
+`vmkfstools clone` on the ESXi host triggers a SCSI XCOPY (T10 Extended Copy).
+The storage array handles the copy internally and no data crosses the network.
+
+When the source and destination are on **different** storage arrays, XCOPY is not
+possible. However, `vmkfstools clone` still works — it falls back to copying the
+data through the ESXi host over the **storage network** (SAN/iSCSI/FC). This is
+typically much faster than VDDK, which copies data over the management network.
+
+This fallback is useful in two scenarios:
+
+1. **Unsupported source storage vendor** — the source datastore is on storage
+   that MTV does not have an offload plugin for (e.g., Huawei), but the
+   destination storage is a supported vendor (e.g., Dell PowerStore, NetApp).
+   Configure the StorageMap with the **destination** vendor's offload plugin and
+   credentials. The ESXi host must have connectivity to the destination storage.
+
+2. **Storage migration** — a user wants to migrate VMs from an old storage
+   array to a new one as part of a hardware refresh. Even though both arrays
+   are from supported vendors, XCOPY won't work across different arrays. The
+   fallback copy still uses the fast storage network, making it a practical
+   path for moving workloads to new storage during the migration to OpenShift.
+
+### How to configure
+
+The configuration is identical to a regular copy offload StorageMap. The
+`storageVendorProduct` and `secretRef` refer to the **destination** storage
+system. The source datastore can be on any storage — supported or not.
+
+```yaml
+spec:
+  map:
+  - destination:
+      storageClass: YOUR_STORAGE_CLASS
+    offloadPlugin:
+      vsphereXcopyConfig:
+        secretRef: DESTINATION_STORAGE_SECRET
+        storageVendorProduct: powerstore   # destination vendor
+    source:
+      id: datastore-12345                  # source datastore (any vendor)
+```
+
+### Requirements
+
+- The ESXi host must have network connectivity to the destination storage array
+  (iSCSI or FC).
+- The destination storage must be a [supported vendor](#supported-storage-providers).
+- A secret with the destination storage credentials must exist (see
+  [Secret with Storage Provider Credentials](#secret-with-storage-provider-credentials)).
 
 <a id="matching-pvc"></a>
 ## Matching PVC with DataStores to deduce copy-offload support

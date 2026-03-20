@@ -221,7 +221,7 @@ func (api *BlockStorageAPI) InvokeAsyncCommand(methodType, url string, body, hea
 		state = jobResult["state"].(string)
 		if state == "Failed" {
 			jobError := jobResult["error"].(map[string]interface{})
-			klog.Infof("Async job state: %s with error: %v", state, jobError)
+			return "", fmt.Errorf("Async job state: %s with error: %v", state, jobError)
 		}
 		klog.Infof("Status: %s", status)
 		if waitTime*2 < 120 {
