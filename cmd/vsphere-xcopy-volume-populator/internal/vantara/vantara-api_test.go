@@ -498,3 +498,184 @@ func TestHTTPErrorHandling(t *testing.T) {
 		t.Error("Expected error on authentication failure, got nil")
 	}
 }
+
+func TestCreateCloneLdev(t *testing.T) {
+	jobCompleted := false
+
+	// Expected values for the CreateCloneLdev request
+	wantGroup := "mtv-ss-copy-123-to-999"
+	wantPool := "7"
+	wantPvol := "123"
+	wantSvol := "999"
+	wantSpeed := "faster"
+
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/ConfigurationManager/configuration/version":
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"apiVersion": "1.9.0"})
+
+		case "/ConfigurationManager/v1/objects/sessions":
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"token":     "test-token-123",
+				"sessionId": float64(42),
+			})
+
+		case "/ConfigurationManager/v1/objects/snapshots":
+			// CreateCloneLdev endpoint (InvokeAsyncCommand POST)
+			if r.Method != http.MethodPost {
+				t.Errorf("Expected POST method, got %s", r.Method)
+			}
+
+			// Verify request body (not done in AddPath, but valuable for CreateCloneLdev)
+			var got map[string]string
+			if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+				t.Fatalf("failed to decode request body: %v", err)
+			}
+
+			if got["snapshotGroupName"] != wantGroup {
+				t.Errorf("snapshotGroupName: got=%q want=%q", got["snapshotGroupName"], wantGroup)
+			}
+			if got["snapshotPoolId"] != wantPool {
+				t.Errorf("snapshotPoolId: got=%q want=%q", got["snapshotPoolId"], wantPool)
+			}
+			if got["pvolLdevId"] != wantPvol {
+				t.Errorf("pvolLdevId: got=%q want=%q", got["pvolLdevId"], wantPvol)
+			}
+			if got["svolLdevId"] != wantSvol {
+				t.Errorf("svolLdevId: got=%q want=%q", got["svolLdevId"], wantSvol)
+			}
+			if got["copySpeed"] != wantSpeed {
+				t.Errorf("copySpeed: got=%q want=%q", got["copySpeed"], wantSpeed)
+			}
+
+			// Fixed value fields
+			if got["isClone"] != "true" {
+				t.Errorf("isClone: got=%q want=%q", got["isClone"], "true")
+			}
+			if got["canCascade"] != "true" {
+				t.Errorf("canCascade: got=%q want=%q", got["canCascade"], "true")
+			}
+			if got["clonesAutomation"] != "true" {
+				t.Errorf("clonesAutomation: got=%q want=%q", got["clonesAutomation"], "true")
+			}
+
+			w.WriteHeader(http.StatusAccepted)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"jobId": float64(200),
+				"self":  "/jobs/200",
+			})
+
+		case "/ConfigurationManager/v1/objects/jobs/200":
+			// Job status endpoint
+			w.WriteHeader(http.StatusOK)
+			if jobCompleted {
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"status": "Completed",
+					"state":  "Succeeded",
+					"error":  nil,
+				})
+			} else {
+				jobCompleted = true
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"status": "Initializing",
+					"state":  "Queued",
+					"error":  nil,
+				})
+			}
+
+		default:
+			t.Errorf("Unexpected request to %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	api := NewBlockStorageAPI(server.Listener.Addr().String(), "", "storage123", "admin", "password")
+	api.BaseURL = server.URL + "/ConfigurationManager/v1"
+
+	err := api.CreateCloneLdev(wantGroup, wantPool, wantPvol, wantSvol, wantSpeed)
+	if err != nil {
+		t.Fatalf("CreateCloneLdev() failed: %v", err)
+	}
+}
+
+func TestGetClonePairs(t *testing.T) {
+	wantGroup := "mtv-ss-copy-123-to-999"
+	wantPvol := "123"
+
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/ConfigurationManager/configuration/version":
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"apiVersion": "1.9.0"})
+
+		case "/ConfigurationManager/v1/objects/sessions":
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"token":     "test-token-123",
+				"sessionId": float64(42),
+			})
+
+		case "/ConfigurationManager/v1/objects/snapshots":
+			if r.Method != http.MethodGet {
+				t.Errorf("Expected GET method, got %s", r.Method)
+			}
+
+			q := r.URL.Query()
+			if q.Get("snapshotGroupName") != wantGroup {
+				t.Errorf("snapshotGroupName: got=%q want=%q", q.Get("snapshotGroupName"), wantGroup)
+			}
+			if q.Get("pvolLdevId") != wantPvol {
+				t.Errorf("pvolLdevId: got=%q want=%q", q.Get("pvolLdevId"), wantPvol)
+			}
+
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"data": []interface{}{
+					map[string]interface{}{
+						"snapshotGroupName": wantGroup,
+						"pvolLdevId":        float64(123),
+						"muNumber":          float64(0),
+						"status":            "PSUP",
+					},
+				},
+			})
+
+		default:
+			t.Errorf("Unexpected request to %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	api := NewBlockStorageAPI(server.Listener.Addr().String(), "", "storage123", "admin", "password")
+	api.BaseURL = server.URL + "/ConfigurationManager/v1"
+
+	resp, err := api.GetClonePairs(wantGroup, wantPvol)
+	if err != nil {
+		t.Fatalf("GetClonePairs() failed: %v", err)
+	}
+
+	if resp == nil {
+		t.Fatalf("expected non-nil response")
+	}
+	if len(resp.Data) != 1 {
+		t.Fatalf("expected 1 clone pair, got %d", len(resp.Data))
+	}
+
+	got := resp.Data[0]
+	if got.SnapshotGroupName != wantGroup {
+		t.Fatalf("SnapshotGroupName: got=%q want=%q", got.SnapshotGroupName, wantGroup)
+	}
+	if got.PvolLdevId != 123 {
+		t.Fatalf("PvolLdevId: got=%v want=%v", got.PvolLdevId, float64(123))
+	}
+	if got.MuNumber != 0 {
+		t.Fatalf("MuNumber: got=%v want=%v", got.MuNumber, float64(0))
+	}
+	if got.Status != "PSUP" {
+		t.Fatalf("Status: got=%q want=%q", got.Status, "PSUP")
+	}
+}
