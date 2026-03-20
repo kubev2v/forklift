@@ -67,12 +67,13 @@ func (r *Client) connect() (status int, err error) {
 		TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	} else {
 		cacert, ok := util.GetCACert(r.secret)
+		roots := x509.NewCertPool()
 		if !ok {
 			err = liberr.New("CA certificate not found in secret")
 			return
 		}
-		roots := x509.NewCertPool()
-		if !roots.AppendCertsFromPEM(cacert) {
+		ok = roots.AppendCertsFromPEM(cacert) // use `=`, not `:=`
+		if !ok {
 			err = liberr.New("failed to parse CA certificate")
 			return
 		}

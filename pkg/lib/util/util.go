@@ -136,3 +136,8 @@ func GetCACert(secret *core.Secret) ([]byte, bool) {
 	}
 	return nil, false
 }
+
+func HasCACert(secret *core.Secret) bool {
+	_, ok := GetCACert(secret)
+	return ok
+}

@@ -121,12 +121,12 @@ func (mutator *SecretMutator) mutateProviderSecret() *admissionv1.AdmissionRespo
 
 		//check if the CA included in the secret provided by the user and update it if needed
 		if !contains(existingCACert, cert) {
-			// Update the CA cert in whichever field it was originally provided
-			if _, hasStandardField := mutator.secret.Data["ca.crt"]; hasStandardField {
-				mutator.secret.Data["ca.crt"] = appendCerts(existingCACert, cert)
-			} else {
-				mutator.secret.Data["cacert"] = appendCerts(existingCACert, cert)
-			}
+			// Normalize and migrate the CA cert to the new format.
+			mutator.secret.Data["ca.crt"] = appendCerts(existingCACert, cert)
+
+			// Optional: clean up the legacy field while we're here to accelerate migration.
+			delete(mutator.secret.Data, "cacert")
+
 			mutator.secret.Labels["ca-cert-updated"] = "true"
 			secretChanged = true
 			log.Info("Engine CA certificate was missing, updating the secret")

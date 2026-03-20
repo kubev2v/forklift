@@ -336,11 +336,9 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 		insecureSkipVerify := base.GetInsecureSkipVerifyFlag(secret)
 
 		// Validate required keys based on TLS settings
-		if !insecureSkipVerify {
-			if _, hasCACert := util.GetCACert(secret); !hasCACert {
-				keyList = append(keyList, "cacert or ca.crt")
-				break
-			}
+		if !insecureSkipVerify && !util.HasCACert(secret) {
+			keyList = append(keyList, "cacert or ca.crt")
+			break
 		}
 
 		// Validate connection status
@@ -381,10 +379,8 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 				Category: Warn,
 				Message:  "TLS is susceptible to machine-in-the-middle attacks when certificate verification is skipped.",
 			})
-		} else {
-			if _, hasCACert := util.GetCACert(secret); !hasCACert {
-				keyList = append(keyList, "cacert or ca.crt")
-			}
+		} else if !util.HasCACert(secret) {
+			keyList = append(keyList, "cacert or ca.crt")
 		}
 	case api.Ova:
 		keyList = []string{
@@ -413,11 +409,9 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 		}
 
 		insecureSkipVerify := base.GetInsecureSkipVerifyFlag(secret)
-		if !insecureSkipVerify {
-			if _, hasCACert := util.GetCACert(secret); !hasCACert {
-				keyList = append(keyList, "cacert or ca.crt")
-				break
-			}
+		if !insecureSkipVerify && !util.HasCACert(secret) {
+			keyList = append(keyList, "cacert or ca.crt")
+			break
 		}
 		tlsURL := buildTLSURL(provider.Spec.URL, hvutil.WinRMPort(provider.Spec.Settings))
 		r.validateTLSConnection(provider, secret, tlsURL, insecureSkipVerify)
