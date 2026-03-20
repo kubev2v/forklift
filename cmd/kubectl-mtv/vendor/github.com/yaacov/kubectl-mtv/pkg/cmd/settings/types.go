@@ -793,8 +793,8 @@ var ExtendedSettings = map[string]SettingDefinition{
 		Description: "OpenStack populator image",
 		Category:    CategoryImage,
 	},
-	"populator_vsphere_xcopy_volume_image_fqin": {
-		Name:        "populator_vsphere_xcopy_volume_image_fqin",
+	"populator_vsphere_copy_offload_image_fqin": {
+		Name:        "populator_vsphere_copy_offload_image_fqin",
 		Type:        TypeString,
 		Default:     "",
 		Description: "vSphere xcopy populator image",

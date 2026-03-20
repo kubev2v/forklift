@@ -29,8 +29,8 @@ spec:
           - name: OPENSTACK_POPULATOR_IMAGE
             value: {{ populator_openstack_image_fqin }}
 {% if feature_copy_offload|bool %}
-          - name: VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE
-            value: {{ populator_vsphere_xcopy_volume_image_fqin }}
+          - name: VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE
+            value: {{ populator_vsphere_copy_offload_image_fqin }}
 {% if controller_host_lease_namespace is defined %}
           - name: HOST_LEASE_NAMESPACE
             value: "{{ controller_host_lease_namespace }}"

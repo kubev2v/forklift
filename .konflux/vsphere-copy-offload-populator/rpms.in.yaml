@@ -1,0 +1,8 @@
+packages: []
+contentOrigin:
+  repofiles:
+    - ./ubi.repo
+context:
+  containerfile:
+    file: ../../build/vsphere-copy-offload-populator/Containerfile-downstream
+arches: [x86_64]

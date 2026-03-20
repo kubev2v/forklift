@@ -394,7 +394,7 @@ spec:
                 description: oVirt populator image
                 example: quay.io/kubev2v/ovirt-populator:latest
                 type: string
-              populator_vsphere_xcopy_volume_image_fqin:
+              populator_vsphere_copy_offload_image_fqin:
                 description: vSphere xcopy populator image
                 example: quay.io/kubev2v/vsphere-populator:latest
                 type: string
@@ -7503,8 +7503,8 @@ spec:
           value: ${VSPHERE_OS_MAP}
         - name: VIRT_CUSTOMIZE_MAP
           value: ${VIRT_CUSTOMIZE_MAP}
-        - name: VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE
-          value: ${VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE}
+        - name: VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE
+          value: ${VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE}
         image: ${OPERATOR_IMAGE}
         imagePullPolicy: Always
         livenessProbe:
@@ -7808,7 +7808,7 @@ spec:
         - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: vSphere xcopy populator image
         displayName: vSphere Populator Image
-        path: populator_vsphere_xcopy_volume_image_fqin
+        path: populator_vsphere_copy_offload_image_fqin
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: OVA provider server image
@@ -8365,7 +8365,7 @@ spec:
     name: ova_provider_server
   - image: ${OVA_PROXY_IMAGE}
     name: ova_proxy
-  - image: ${VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE}
+  - image: ${VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE}
     name: vsphere_xcopy_volume_populator
   version: ${MTV_VERSION}
 ---

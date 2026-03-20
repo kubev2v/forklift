@@ -1,8 +1,0 @@
-packages: []
-contentOrigin:
-  repofiles:
-    - ./ubi.repo
-context:
-  containerfile:
-    file: ../../build/vsphere-xcopy-volume-populator/Containerfile-downstream
-arches: [x86_64]
