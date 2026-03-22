@@ -1,3 +1,13 @@
+# Key environment variables (all optional, shown with defaults):
+#   REGISTRY=quay.io            Container image registry
+#   REGISTRY_ORG=kubev2v        Registry organization / namespace
+#   REGISTRY_TAG=devel          Image tag for builds and bundles
+#   NAMESPACE=konveyor-forklift Target Kubernetes namespace for deployment
+#   PLATFORM=linux/amd64        Container build platform (linux/amd64 or linux/arm64)
+#   CONTAINER_RUNTIME=          Force docker or podman (auto-detected if empty)
+
+.DEFAULT_GOAL := help
+
 GOOS ?= $(shell go env GOOS)
 GOPATH ?= $(shell go env GOPATH)
 GOBIN ?= $(GOPATH)/bin
@@ -123,65 +133,63 @@ GOLANGCI_LINT_BIN ?= $(GOBIN)/golangci-lint
 
 ##@ Main Targets
 
+.PHONY: help
+help: ## Show this help message
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} \
+		/^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } \
+		/^[a-zA-Z_0-9-]+:.*?## / { printf "  \033[36m%-40s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+
 .PHONY: ci
-ci: all tidy vendor generate-verify lint validate-forklift-controller-crd
+ci: all tidy vendor generate-verify lint validate-forklift-controller-crd ## Run full CI pipeline
 
 .PHONY: all
-all: test forklift-controller
+all: test forklift-controller ## Run tests and build controller binary
 
 ##@ Testing
 
 # Download setup-envtest locally if necessary.
 .PHONY: envtest
-envtest: $(ENVTEST) 
+envtest: $(ENVTEST) ## Install setup-envtest tool
 $(ENVTEST): $(LOCALBIN)
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION)
 
-# Run tests
-test: generate fmt vet manifests validation-test
+test: generate fmt vet manifests validation-test ## Run unit tests with coverage
 	go test -coverprofile=cover.out ./pkg/... ./cmd/...
 
-# Experimental e2e target
-e2e-sanity: e2e-sanity-ovirt e2e-sanity-vsphere
+e2e-sanity: e2e-sanity-ovirt e2e-sanity-vsphere ## Run all e2e sanity suites
 
-e2e-sanity-ovirt:
-	# oVirt suite
+e2e-sanity-ovirt: ## Run oVirt e2e tests
 	KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION=v1 go test ./tests/suit -v -ginkgo.focus ".*oVirt.*|.*Forklift.*"
 
-e2e-sanity-vsphere:
-	# vSphere suite
+e2e-sanity-vsphere: ## Run vSphere e2e tests
 	go test ./tests/suit -v -ginkgo.focus ".*vSphere.*"
 
-e2e-sanity-openstack:
-	# OpenStack suite
+e2e-sanity-openstack: ## Run OpenStack e2e tests
 	go test ./tests/suit -v -ginkgo.focus ".*Migration tests for OpenStack.*"
 
-e2e-sanity-openstack-extended:
-	# OpenStack extended suite
+e2e-sanity-openstack-extended: ## Run OpenStack extended e2e tests
 	sudo bash -c 'grep -qE "^[[:space:]]*127\.0\.0\.1[[:space:]]+packstack\.konveyor-forklift(\s|$$)" /etc/hosts || echo "127.0.0.1 packstack.konveyor-forklift" >> /etc/hosts'
 	go test ./tests/suit -v -ginkgo.focus ".*Migration Extended tests for OpenStack.*" -ginkgo.parallel.total 1
 
-e2e-sanity-ova:
-	# OVA suite
+e2e-sanity-ova: ## Run OVA e2e tests
 	go test ./tests/suit -v -ginkgo.focus ".*OVA.*"
 
 .PHONY: validation-test
-validation-test: opa-bin
+validation-test: opa-bin ## Run OPA validation policy tests
 	ENVIRONMENT=test ${OPA} test validation/policies --explain fails
 
 .PHONY: validate-forklift-controller-crd
-validate-forklift-controller-crd:
+validate-forklift-controller-crd: ## Validate ForkliftController CRD schema
 	@echo "Validating ForkliftController CRD..."
 	python3 hack/validate_forklift_controller_crd.py
 
 .PHONY: integration-test
-integration-test: generate fmt vet manifests envtest
+integration-test: generate fmt vet manifests envtest ## Run integration tests with envtest
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -i --bin-dir $(LOCALBIN) -p path)" go test ./pkg/controller/migration/... -coverprofile cover.out
 
 ##@ Build & Development
 
-# Build forklift-controller binary
-forklift-controller: generate fmt vet
+forklift-controller: generate fmt vet ## Build the forklift-controller binary
 	go build -o bin/forklift-controller github.com/kubev2v/forklift/cmd/forklift-controller
 
 # Ensure temporary directories for forklift services
@@ -190,9 +198,8 @@ ensure-temp-dirs:
 	install -d -m 700 /tmp/forklift-controller
 	install -d -m 700 /tmp/forklift-inventory
 
-# Run against the configured Kubernetes cluster in ~/.kube/config
 .PHONY: run
-run: generate fmt vet ensure-temp-dirs
+run: generate fmt vet ensure-temp-dirs ## Run controller locally against cluster
 	VSPHERE_OS_MAP=$(VSPHERE_OS_MAP) \
 	OVIRT_OS_MAP=$(OVIRT_OS_MAP) \
 	VIRT_V2V_IMAGE=$(VIRT_V2V_IMAGE) \
@@ -203,9 +210,8 @@ run: generate fmt vet ensure-temp-dirs
 	WORKING_DIR=/tmp/forklift-controller \
 		KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION=v1 go run ./cmd/forklift-controller/main.go
 
-# Run inventory service against the configured Kubernetes cluster in ~/.kube/config
 .PHONY: run-inventory
-run-inventory: generate fmt vet ensure-temp-dirs
+run-inventory: generate fmt vet ensure-temp-dirs ## Run inventory service locally against cluster
 	VSPHERE_OS_MAP=$(VSPHERE_OS_MAP) \
 	OVIRT_OS_MAP=$(OVIRT_OS_MAP) \
 	VIRT_V2V_IMAGE=$(VIRT_V2V_IMAGE) \
@@ -219,57 +225,50 @@ run-inventory: generate fmt vet ensure-temp-dirs
 
 ##@ Code Generation & Quality
 
-# Run go fmt against code
-fmt:
+fmt: ## Run go fmt
 	go fmt ./pkg/... ./cmd/...
 
-# Run go vet against code
-vet:
+vet: ## Run go vet
 	go vet ./pkg/... ./cmd/...
 
-# Run go mod tidy against code
-tidy:
+tidy: ## Run go mod tidy
 	go mod tidy
 
-# Run go mod vendor against code
-vendor:
+vendor: ## Run go mod vendor
 	go mod vendor
 
-# Generate code
-generate: controller-gen
+generate: controller-gen ## Generate deepcopy and CRD code
 	$(CONTROLLER_GEN) object:headerFile="./hack/boilerplate.go.txt" paths="./pkg/apis/..."
 
-generate-verify: generate
+generate-verify: generate ## Verify generated code is up to date
 	./hack/verify-generate.sh
 
 ##@ Kubernetes Manifests
 
-# Generate manifests e.g. CRD, Webhooks
 .PHONY: manifests
-manifests: controller-gen
+manifests: controller-gen ## Generate CRD and webhook manifests
 	$(CONTROLLER_GEN) crd rbac:roleName=manager-role webhook paths="./pkg/apis/..." output:dir=operator/config/crd/bases
 
 .PHONY: kustomized-manifests
-kustomized-manifests: kubectl
+kustomized-manifests: kubectl ## Build kustomized OLM manifests
 	$(KUBECTL) kustomize operator/config/manifests > operator/.kustomized_manifests
 
 .PHONY: generate-manifests
-generate-manifests: kubectl manifests
+generate-manifests: kubectl manifests ## Generate upstream and downstream manifests
 	$(KUBECTL) kustomize operator/streams/upstream > operator/streams/upstream/upstream_manifests
 	$(KUBECTL) kustomize operator/streams/downstream > operator/streams/downstream/downstream_manifests
 	STREAM=upstream bash operator/streams/prepare-vars.sh
 	STREAM=downstream bash operator/streams/prepare-vars.sh
 
 .PHONY: update-manifests
-update-manifests: kustomized-manifests generate-manifests
+update-manifests: kustomized-manifests generate-manifests ## Regenerate all manifests
 	@echo "All manifests updated successfully!"
 	@echo "  - OLM bundle: operator/.kustomized_manifests"
 	@echo "  - Upstream deployment: operator/streams/upstream/upstream_manifests"
 	@echo "  - Downstream deployment: operator/streams/downstream/downstream_manifests"
 
-# Install CRDs into a cluster
 .PHONY: install
-install: manifests kubectl
+install: manifests kubectl ## Install CRDs into cluster
 	$(KUBECTL) apply -k operator/config/crd
 
 ##@ Container Images
@@ -421,6 +420,7 @@ build-ova-proxy-image: check_container_runtime
 push-ova-proxy-image: build-ova-proxy-image
 	$(CONTAINER_CMD) push $(OVA_PROXY_IMAGE)$(PLATFORM_SUFFIX)
 
+build-all-images: ## Build all container images
 build-all-images: build-api-image \
                   build-controller-image \
                   build-validation-image \
@@ -437,6 +437,7 @@ build-all-images: build-api-image \
                   build-operator-bundle-image \
                   build-operator-index-image
 
+push-all-images: ## Push all container images
 push-all-images:  push-api-image \
                   push-controller-image \
                   push-validation-image \
@@ -558,6 +559,7 @@ push-operator-index-image-manifest:
 		$(OPERATOR_INDEX_IMAGE)-arm64
 	$(CONTAINER_CMD) manifest push $(OPERATOR_INDEX_IMAGE)
 
+push-all-images-manifest: ## Push all multi-arch manifests
 push-all-images-manifest: push-controller-image-manifest \
                           push-api-image-manifest \
                           push-validation-image-manifest \
@@ -585,11 +587,11 @@ check_container_runtime:
 ##@ Deployment
 
 .PHONY: deploy-operator-index
-deploy-operator-index: kubectl
+deploy-operator-index: kubectl ## Deploy operator catalog source
 	export OPERATOR_INDEX_IMAGE=${OPERATOR_INDEX_IMAGE}$(PLATFORM_SUFFIX); envsubst < operator/forklift-operator-catalog.yaml | $(KUBECTL) apply -f -
 
 .PHONY: deploy-operator-index-multiarch
-deploy-operator-index-multiarch: kubectl
+deploy-operator-index-multiarch: kubectl ## Deploy operator catalog source (multiarch)
 	export OPERATOR_INDEX_IMAGE=${OPERATOR_INDEX_IMAGE}; envsubst < operator/forklift-operator-catalog.yaml | $(KUBECTL) apply -f -
 
 .PHONY: setup-k8s-prerequisites
@@ -615,17 +617,17 @@ deploy-k8s-controller: kubectl ## Deploy ForkliftController CR on k8s. Usage: ma
 ##@ Tool Installation
 
 .PHONY: controller-gen
-controller-gen: $(CONTROLLER_GEN)
+controller-gen: $(CONTROLLER_GEN) ## Install controller-gen tool
 $(CONTROLLER_GEN): $(LOCALBIN)
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.17.3
 
 .PHONY: kubectl
-kubectl: $(KUBECTL)
+kubectl: $(KUBECTL) ## Install kubectl
 $(DEFAULT_KUBECTL):
 	curl -L https://dl.k8s.io/release/v1.25.10/bin/linux/amd64/kubectl -o $(GOBIN)/kubectl && chmod +x $(GOBIN)/kubectl
 
 .PHONY: kustomize
-kustomize: $(KUSTOMIZE)
+kustomize: $(KUSTOMIZE) ## Install kustomize
 $(DEFAULT_KUSTOMIZE):
 	go install sigs.k8s.io/kustomize/kustomize/v5@v5.7.0
 
@@ -658,13 +660,13 @@ export DEPLOYMENT_VARS
 ##@ Code Quality
 
 .PHONY: lint-install
-lint-install:
+lint-install: ## Install golangci-lint
 	@echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."
 	GOBIN=$(GOBIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 	@echo "golangci-lint installed successfully."
 
 .PHONY: lint
-lint: $(GOLANGCI_LINT_BIN)
+lint: $(GOLANGCI_LINT_BIN) ## Run golangci-lint
 	@echo "Running golangci-lint..."
 	$(GOLANGCI_LINT_BIN) run --timeout 10m ./pkg/... ./cmd/...
 
@@ -673,7 +675,7 @@ update-tekton:
 	SKIP_UPDATE=false ./update-tekton.sh .tekton/*.yaml
 
 .PHONY: validate-commits validate-commits-range
-validate-commits:
+validate-commits: ## Validate commit messages
 	@echo "Validating commit messages..."
 	@./scripts/validate-commits.sh --verbose
 
