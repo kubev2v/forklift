@@ -137,7 +137,7 @@ klog.Infof("Starting Forklift %s (build %s)",
 - ✅ Created centralized version package
 - ✅ Removed SecureScriptVersion (always upload script)
 - ✅ Updated VIB version handling  
-- ✅ Updated vsphere-xcopy-volume-populator
+- ✅ Updated vsphere-copy-offload-populator
 - ✅ Updated validation.go references
 - 🔄 Integration with build scripts (in progress)
 - ⏳ Migration of other components (future)
