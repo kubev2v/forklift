@@ -18,8 +18,10 @@ package plan
 
 import (
 	"context"
+	"fmt"
 	"path"
 	"sort"
+	"strings"
 	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -371,6 +373,9 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	}()
 	conditionRequiresReQ := plan.Status.HasReQCondition()
 	if plan.Status.HasBlockerCondition() || plan.Status.HasCondition(Archived) || conditionRequiresReQ {
+		if plan.Status.HasBlockerCondition() {
+			r.failExecutingMigrationOnBlocker(plan)
+		}
 		if conditionRequiresReQ || plan.Status.HasBlockerCondition() {
 			r.Log.Info(
 				"Found a condition requiring re-reconcile.",
@@ -502,6 +507,77 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	}
 
 	return
+}
+
+// Fail an actively executing migration when blocker conditions appear.
+func (r *Reconciler) failExecutingMigrationOnBlocker(plan *api.Plan) {
+	// Only act on snapshots that are mid-execution and not yet terminal.
+	if len(plan.Status.Migration.History) == 0 {
+		return
+	}
+	snapshot := plan.Status.Migration.ActiveSnapshot()
+	if !snapshot.HasCondition(Executing) {
+		return
+	}
+	if snapshot.HasAnyCondition(Failed, Canceled, Succeeded) {
+		return
+	}
+
+	reason := criticalOrErrorCondition(plan)
+	r.Log.Info(
+		"Failing active migration due to blocker condition during execution.",
+		"name", plan.GetName(),
+		"namespace", plan.GetNamespace(),
+		"reason", reason)
+
+	failedCondition := libcnd.Condition{
+		Type:     Failed,
+		Status:   True,
+		Category: api.CategoryAdvisory,
+		Message:  "The migration has FAILED due to a validation blocker: " + reason,
+		Durable:  true,
+	}
+
+	// Transition snapshot and plan to Failed.
+	plan.Status.Migration.MarkCompleted()
+	snapshot.DeleteCondition(Executing)
+	snapshot.SetCondition(failedCondition)
+	// Set on plan directly, the normal snapshot→plan reflection loop is not reached on early return.
+	plan.Status.DeleteCondition(Executing)
+	plan.Status.SetCondition(failedCondition)
+
+	// Fail all in-flight VMs, skip those already terminal.
+	for _, vm := range plan.Status.Migration.VMs {
+		if vm.HasAnyCondition(Succeeded, Failed, Canceled) {
+			continue
+		}
+		vm.SetCondition(failedCondition)
+		vm.AddError(failedCondition.Message)
+		vm.Phase = api.PhaseCompleted
+		vm.MarkCompleted()
+		markStartedStepsCompleted(vm)
+	}
+}
+
+// Collect human-readable messages from all Critical/Error conditions on the plan.
+func criticalOrErrorCondition(plan *api.Plan) string {
+	var messages []string
+	for _, cnd := range plan.Status.Conditions.List {
+		if cnd.Status != True {
+			continue
+		}
+		if cnd.Category == Critical || cnd.Category == Error {
+			msg := cnd.Message
+			if msg == "" {
+				msg = fmt.Sprintf("%s (category=%s, reason=%s)", cnd.Type, cnd.Category, cnd.Reason)
+			}
+			messages = append(messages, msg)
+		}
+	}
+	if len(messages) == 0 {
+		return "no active critical or error conditions found"
+	}
+	return strings.Join(messages, "; ")
 }
 
 // Create a new snapshot.

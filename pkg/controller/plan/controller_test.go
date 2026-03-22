@@ -3,8 +3,11 @@ package plan
 import (
 	"context"
 
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/controller/base"
 	"github.com/kubev2v/forklift/pkg/controller/plan/util"
+	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -413,4 +416,255 @@ var _ = ginkgo.Describe("hasVMOwner", func() {
 		ginkgo.Entry("returns false for empty owner list",
 			[]meta.OwnerReference{}, false),
 	)
+})
+
+var _ = ginkgo.Describe("failExecutingMigrationOnBlocker", func() {
+	newPlanWithSnapshot := func(snapshotConditions ...libcnd.Condition) *api.Plan {
+		plan := &api.Plan{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "test-plan",
+				Namespace: "test-ns",
+			},
+		}
+		snapshot := planapi.Snapshot{}
+		for _, c := range snapshotConditions {
+			snapshot.SetCondition(c)
+		}
+		plan.Status.Migration.NewSnapshot(snapshot)
+		return plan
+	}
+
+	ginkgo.Context("when the migration is actively executing and a blocker appears", func() {
+		ginkgo.It("should mark the snapshot and plan as Failed", func() {
+			plan := newPlanWithSnapshot(libcnd.Condition{
+				Type:     Executing,
+				Status:   True,
+				Category: api.CategoryAdvisory,
+				Message:  "The plan is EXECUTING.",
+				Durable:  true,
+			})
+			plan.Status.SetCondition(libcnd.Condition{
+				Type:     NetMapNotReady,
+				Status:   True,
+				Category: api.CategoryCritical,
+				Message:  "Map.Network does not have Ready condition.",
+			})
+			plan.Status.Migration.VMs = []*planapi.VMStatus{
+				{Phase: "Running"},
+				{Phase: "Running"},
+			}
+
+			r := newTestReconciler()
+			r.failExecutingMigrationOnBlocker(plan)
+
+			snapshot := plan.Status.Migration.ActiveSnapshot()
+			gomega.Expect(snapshot.HasCondition(Failed)).To(gomega.BeTrue(),
+				"snapshot should have Failed condition")
+			gomega.Expect(snapshot.HasCondition(Executing)).To(gomega.BeFalse(),
+				"snapshot should not have Executing condition")
+
+			gomega.Expect(plan.Status.HasCondition(Failed)).To(gomega.BeTrue(),
+				"plan should have Failed condition")
+			gomega.Expect(plan.Status.HasCondition(Executing)).To(gomega.BeFalse(),
+				"plan should not have Executing condition")
+
+			for _, vm := range plan.Status.Migration.VMs {
+				gomega.Expect(vm.HasCondition(api.ConditionFailed)).To(gomega.BeTrue(),
+					"VM should have Failed condition")
+				gomega.Expect(vm.Phase).To(gomega.Equal(api.PhaseCompleted),
+					"VM phase should be Completed")
+				gomega.Expect(vm.MarkedCompleted()).To(gomega.BeTrue(),
+					"VM should be marked completed")
+			}
+		})
+
+		ginkgo.It("should include the blocker reason in the failure message", func() {
+			plan := newPlanWithSnapshot(libcnd.Condition{
+				Type:     Executing,
+				Status:   True,
+				Category: api.CategoryAdvisory,
+				Durable:  true,
+			})
+			plan.Status.SetCondition(libcnd.Condition{
+				Type:     DsMapNotReady,
+				Status:   True,
+				Category: api.CategoryCritical,
+				Message:  "Map.Storage does not have Ready condition.",
+			})
+
+			r := newTestReconciler()
+			r.failExecutingMigrationOnBlocker(plan)
+
+			snapshot := plan.Status.Migration.ActiveSnapshot()
+			cnd := snapshot.FindCondition(Failed)
+			gomega.Expect(cnd).NotTo(gomega.BeNil())
+			gomega.Expect(cnd.Message).To(gomega.ContainSubstring("Map.Storage does not have Ready condition."))
+		})
+
+		ginkgo.It("should not fail VMs that already Succeeded", func() {
+			plan := newPlanWithSnapshot(libcnd.Condition{
+				Type:     Executing,
+				Status:   True,
+				Category: api.CategoryAdvisory,
+				Durable:  true,
+			})
+			plan.Status.SetCondition(libcnd.Condition{
+				Type:     NetMapNotReady,
+				Status:   True,
+				Category: api.CategoryCritical,
+				Message:  "Map.Network does not have Ready condition.",
+			})
+
+			succeededVM := &planapi.VMStatus{Phase: api.PhaseCompleted}
+			succeededVM.SetCondition(libcnd.Condition{
+				Type:    Succeeded,
+				Status:  True,
+				Durable: true,
+			})
+			runningVM := &planapi.VMStatus{Phase: "Running"}
+			plan.Status.Migration.VMs = []*planapi.VMStatus{succeededVM, runningVM}
+
+			r := newTestReconciler()
+			r.failExecutingMigrationOnBlocker(plan)
+
+			gomega.Expect(succeededVM.HasCondition(api.ConditionFailed)).To(gomega.BeFalse(),
+				"already-Succeeded VM should not be marked Failed")
+			gomega.Expect(runningVM.HasCondition(api.ConditionFailed)).To(gomega.BeTrue(),
+				"running VM should be marked Failed")
+		})
+	})
+
+	ginkgo.Context("when there is no active executing snapshot", func() {
+		ginkgo.It("should not change anything when snapshot has no Executing condition", func() {
+			plan := newPlanWithSnapshot()
+			plan.Status.SetCondition(libcnd.Condition{
+				Type:     NetMapNotReady,
+				Status:   True,
+				Category: api.CategoryCritical,
+				Message:  "Map.Network does not have Ready condition.",
+			})
+
+			r := newTestReconciler()
+			r.failExecutingMigrationOnBlocker(plan)
+
+			snapshot := plan.Status.Migration.ActiveSnapshot()
+			gomega.Expect(snapshot.HasCondition(Failed)).To(gomega.BeFalse(),
+				"non-executing snapshot should not become Failed")
+		})
+
+		ginkgo.It("should not change anything when there is no snapshot history", func() {
+			plan := &api.Plan{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-plan",
+					Namespace: "test-ns",
+				},
+			}
+			plan.Status.SetCondition(libcnd.Condition{
+				Type:     NetMapNotReady,
+				Status:   True,
+				Category: api.CategoryCritical,
+				Message:  "Map.Network does not have Ready condition.",
+			})
+
+			r := newTestReconciler()
+			r.failExecutingMigrationOnBlocker(plan)
+
+			gomega.Expect(plan.Status.HasCondition(Failed)).To(gomega.BeFalse(),
+				"plan with no history should not become Failed")
+		})
+
+		ginkgo.It("should not change anything when snapshot is already Failed", func() {
+			plan := newPlanWithSnapshot(
+				libcnd.Condition{
+					Type:     Executing,
+					Status:   True,
+					Category: api.CategoryAdvisory,
+					Durable:  true,
+				},
+				libcnd.Condition{
+					Type:     Failed,
+					Status:   True,
+					Category: api.CategoryAdvisory,
+					Durable:  true,
+				},
+			)
+			plan.Status.SetCondition(libcnd.Condition{
+				Type:     NetMapNotReady,
+				Status:   True,
+				Category: api.CategoryCritical,
+				Message:  "Map.Network does not have Ready condition.",
+			})
+
+			r := newTestReconciler()
+			r.failExecutingMigrationOnBlocker(plan)
+
+			snapshot := plan.Status.Migration.ActiveSnapshot()
+			cnd := snapshot.FindCondition(Failed)
+			gomega.Expect(cnd).NotTo(gomega.BeNil())
+			gomega.Expect(cnd.Message).NotTo(gomega.ContainSubstring("validation blocker"),
+				"already-Failed snapshot should not be overwritten")
+		})
+	})
+})
+
+var _ = ginkgo.Describe("failExecutingMigrationOnBlocker - transient conditions", func() {
+	ginkgo.It("should not be triggered by ValidatingVDDK (Advisory category)", func() {
+		plan := &api.Plan{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "test-plan",
+				Namespace: "test-ns",
+			},
+		}
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     ValidatingVDDK,
+			Status:   True,
+			Reason:   "Started",
+			Category: api.CategoryAdvisory,
+			Message:  "Validating VDDK init image",
+		})
+
+		// ValidatingVDDK is Advisory, so it must NOT trigger HasBlockerCondition.
+		// In execute(), failExecutingMigrationOnBlocker is only called when
+		// HasBlockerCondition() is true, so VDDK validation can never cause
+		// a migration to be failed.
+		gomega.Expect(plan.Status.HasBlockerCondition()).To(gomega.BeFalse(),
+			"ValidatingVDDK should NOT trigger HasBlockerCondition")
+		gomega.Expect(plan.Status.HasReQCondition()).To(gomega.BeTrue(),
+			"ValidatingVDDK should trigger HasReQCondition for requeue")
+	})
+})
+
+var _ = ginkgo.Describe("criticalOrErrorCondition", func() {
+	ginkgo.It("should collect Critical and Error category messages", func() {
+		plan := &api.Plan{}
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     NetMapNotReady,
+			Status:   True,
+			Category: api.CategoryCritical,
+			Message:  "Map.Network does not have Ready condition.",
+		})
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     "SomeError",
+			Status:   True,
+			Category: libcnd.Error,
+			Message:  "This is an error.",
+		})
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     "SomeWarning",
+			Status:   True,
+			Category: libcnd.Warn,
+			Message:  "This is a warning.",
+		})
+
+		result := criticalOrErrorCondition(plan)
+		gomega.Expect(result).To(gomega.ContainSubstring("Map.Network does not have Ready condition."))
+		gomega.Expect(result).To(gomega.ContainSubstring("This is an error."))
+		gomega.Expect(result).NotTo(gomega.ContainSubstring("This is a warning."))
+	})
+
+	ginkgo.It("should return fallback message when no critical or error conditions exist", func() {
+		plan := &api.Plan{}
+		result := criticalOrErrorCondition(plan)
+		gomega.Expect(result).To(gomega.Equal("no active critical or error conditions found"))
+	})
 })
