@@ -62,6 +62,61 @@ var _ = Describe("NetworkMap Struct", func() {
 			Expect(nm.Status.HasAnyCondition(SourceNetworkNotValid, DestinationNetworkNotValid)).To(BeTrue())
 		})
 	})
+
+	Describe("Permissive source validation", func() {
+		It("should use Warn for NotFound (non-blocking)", func() {
+			nm := &api.NetworkMap{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-network-map",
+					Namespace: "default",
+				},
+			}
+			nm.Status.SetCondition(libcnd.Condition{
+				Type:     SourceNetworkNotValid,
+				Status:   True,
+				Reason:   NotFound,
+				Category: Warn,
+				Message:  "Source network not found.",
+				Items:    []string{"net-1"},
+			})
+			Expect(nm.Status.HasBlockerCondition()).To(BeFalse())
+		})
+
+		It("should keep Critical for NotSet (blocking)", func() {
+			nm := &api.NetworkMap{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-network-map",
+					Namespace: "default",
+				},
+			}
+			nm.Status.SetCondition(libcnd.Condition{
+				Type:     SourceNetworkNotValid,
+				Status:   True,
+				Reason:   NotSet,
+				Category: Critical,
+				Message:  "Source network: either `ID` or `Name` required.",
+			})
+			Expect(nm.Status.HasBlockerCondition()).To(BeTrue())
+		})
+
+		It("should keep Critical for Ambiguous (blocking)", func() {
+			nm := &api.NetworkMap{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-network-map",
+					Namespace: "default",
+				},
+			}
+			nm.Status.SetCondition(libcnd.Condition{
+				Type:     SourceNetworkNotValid,
+				Status:   True,
+				Reason:   Ambiguous,
+				Category: Critical,
+				Message:  "Source network has ambiguous ref.",
+				Items:    []string{"net-1"},
+			})
+			Expect(nm.Status.HasBlockerCondition()).To(BeTrue())
+		})
+	})
 })
 
 var _ = Describe("NetworkPair", func() {
