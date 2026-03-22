@@ -87,7 +87,7 @@ func (mutator *SecretMutator) mutateProviderSecret() *admissionv1.AdmissionRespo
 			return &admissionv1.AdmissionResponse{
 				Allowed: false,
 				Result: &metav1.Status{
-					Message: "CA certificate is required for oVirt provider.",
+					Message: "CA certificate is required for oVirt provider in secure mode (insecureSkipVerify=false).",
 					Code:    http.StatusBadRequest,
 				},
 			}
