@@ -586,8 +586,8 @@ The system requires command restrictions for security. Create the restricted key
 
 ```bash
 # The public key needs to be prefixed with command restrictions
-# The system now uses dynamic datastore routing - a single key works for all datastores
-echo 'command="sh -c '\''DS=$(echo \"$SSH_ORIGINAL_COMMAND\" | sed -n \"s|.*/vmfs/volumes/\\([^/]*\\)/.*|\\1|p\"); exec sh /vmfs/volumes/$DS/secure-vmkfstools-wrapper.sh'\''",no-port-forwarding,no-agent-forwarding,no-X11-forwarding '$(cat esxi_public_key.pub) > restricted_key.pub
+# The system uses structured DS=<datastore>;CMD=<command> routing - a single key works for all datastores
+echo 'command="sh -c '\''DS=$(echo \"$SSH_ORIGINAL_COMMAND\" | sed -n \"s/^DS=\\([^;]*\\);.*/\\1/p\"); CMD=$(echo \"$SSH_ORIGINAL_COMMAND\" | sed -n \"s/^DS=[^;]*;CMD=\\(.*\\)/\\1/p\"); if [ -z \"$DS\" ]; then echo \"SSH_OK\"; else SSH_ORIGINAL_COMMAND=\"$CMD\" exec sh /vmfs/volumes/$DS/secure-vmkfstools-wrapper; fi'\''",no-port-forwarding,no-agent-forwarding,no-X11-forwarding '$(cat esxi_public_key.pub) > restricted_key.pub
 
 # View the final restricted key
 cat restricted_key.pub
@@ -636,7 +636,7 @@ rm -f esxi_public_key.pub restricted_key.pub esxi_private_key
 **Important Notes**
 
 - The public key must include command restrictions for security
-- The system uses dynamic datastore routing - the inline shell command automatically detects the datastore from the SSH command and routes to the correct script location
+- The system uses structured `DS=<datastore>;CMD=<command>` routing - the inline shell command extracts the datastore and command from the SSH request and routes to the correct script location
 - A single SSH key works for all datastores - no need to hardcode datastore paths
 - Each ESXi host in your migration environment needs the key installed
 - SSH service must be enabled on all target ESXi hosts
