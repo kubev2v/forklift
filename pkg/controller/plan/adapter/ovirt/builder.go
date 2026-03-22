@@ -126,7 +126,7 @@ func (r *Builder) ConfigMap(_ ref.Ref, in *core.Secret, object *core.ConfigMap) 
 	// For CNV 4.21+, ConfigMap is only needed in secure mode (when insecureSkipVerify is not used).
 	// For CNV < 4.21, ConfigMap is required even in insecure mode as a fallback,
 	// since the InsecureSkipVerify field is not supported.
-	if cacert, exists := in.Data["cacert"]; exists && len(cacert) > 0 {
+	if cacert, exists := util.GetCACert(in); exists && len(cacert) > 0 {
 		object.BinaryData["ca.pem"] = cacert
 	} else {
 		// If no CA cert provided, try to fetch it from the oVirt engine.

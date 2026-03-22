@@ -14,6 +14,7 @@ import (
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/lib/util"
 	core "k8s.io/api/core/v1"
 )
 
@@ -65,11 +66,15 @@ func (r *Client) connect() (status int, err error) {
 	if base.GetInsecureSkipVerifyFlag(r.secret) {
 		TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	} else {
-		cacert := r.secret.Data["cacert"]
+		cacert, ok := util.GetCACert(r.secret)
 		roots := x509.NewCertPool()
-		ok := roots.AppendCertsFromPEM(cacert)
 		if !ok {
-			err = liberr.New("failed to parse cacert")
+			err = liberr.New("CA certificate not found in secret")
+			return
+		}
+		ok = roots.AppendCertsFromPEM(cacert)
+		if !ok {
+			err = liberr.New("failed to parse CA certificate")
 			return
 		}
 		TLSClientConfig = &tls.Config{RootCAs: roots}

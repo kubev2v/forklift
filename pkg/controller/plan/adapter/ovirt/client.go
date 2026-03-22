@@ -16,6 +16,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/ovirt"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	libutil "github.com/kubev2v/forklift/pkg/lib/util"
 	"github.com/kubev2v/forklift/pkg/settings"
 	ovirtsdk "github.com/ovirt/go-ovirt"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
@@ -411,7 +412,7 @@ func (r *Client) password() string {
 }
 
 func (r *Client) cacert() []byte {
-	if cacert, found := r.Source.Secret.Data["cacert"]; found {
+	if cacert, found := libutil.GetCACert(r.Source.Secret); found {
 		return cacert
 	}
 	return nil
