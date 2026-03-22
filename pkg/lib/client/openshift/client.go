@@ -5,6 +5,7 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	"github.com/kubev2v/forklift/pkg/lib/util"
 	core "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -27,7 +28,7 @@ func RestCfg(p *api.Provider, secret *core.Secret) *rest.Config {
 
 	insecure, _ := strconv.ParseBool(string(secret.Data[api.Insecure]))
 
-	cacert, hasCACert := secret.Data["cacert"]
+	cacert, hasCACert := util.GetCACert(secret)
 	cfg = &rest.Config{
 		Host:        p.Spec.URL,
 		BearerToken: string(secret.Data[api.Token]),

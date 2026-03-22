@@ -17,6 +17,7 @@ import (
 	webhookutils "github.com/kubev2v/forklift/pkg/forklift-api/webhooks/util"
 	libcontainer "github.com/kubev2v/forklift/pkg/lib/inventory/container"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/lib/util"
 	"github.com/kubev2v/forklift/pkg/settings"
 	admissionv1 "k8s.io/api/admission/v1beta1"
 	core "k8s.io/api/core/v1"
@@ -81,7 +82,7 @@ func (admitter *SecretAdmitter) validateProviderSecret() *admissionv1.AdmissionR
 		}
 	}
 
-	if _, ok := admitter.secret.Data["cacert"]; ok && insecure {
+	if _, hasCACert := util.GetCACert(&admitter.secret); hasCACert && insecure {
 		return webhookutils.ToAdmissionResponseError(fmt.Errorf("received a request to add insecure provider with a CA certificate"))
 	}
 
