@@ -38,6 +38,9 @@ jobs:
     name: Backport to ${{ matrix.target_branch }}
     needs: detect
     if: needs.detect.outputs.branches != '[]'
+    permissions:
+      contents: write
+      pull-requests: write
     strategy:
       fail-fast: false
       matrix:
