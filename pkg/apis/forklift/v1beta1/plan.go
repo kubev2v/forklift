@@ -270,11 +270,22 @@ type PlanSpec struct {
 	// When enabled, legacy drivers are exposed to the virt-v2v conversion process via the VIRTIO_WIN environment variable,
 	// which points to the legacy ISO at /usr/local/virtio-win-legacy.iso.
 	InstallLegacyDrivers *bool `json:"installLegacyDrivers,omitempty"`
-	// EnableNestedVirtualization controls whether nested virtualization (vmx/svm CPU features)
-	// is enabled on the target VM.
-	// - nil (default): Auto-detect from source VM settings
-	// - true: Force enable nested virtualization on the target VM regardless of source settings
-	// - false: Force disable nested virtualization on the target VM regardless of source settings
+	// EnableNestedVirtualization controls whether nested virtualization CPU features (vmx for Intel,
+	// svm for AMD) are requested on the target VM.
+	//
+	// - nil (default): Auto-detect from the source VM settings. If the source had nested
+	//   virtualization enabled, the target will request it; otherwise no CPU feature is added.
+	// - true: Request nested virtualization on the target VM (overrides source settings).
+	//   Both vmx and svm CPU features are added with policy "optional", meaning the VM will
+	//   have nested virtualization only if the underlying host hardware supports it.
+	//   This does NOT guarantee nested virtualization; it is a best-effort hint to the hypervisor.
+	// - false: Explicitly disable nested virtualization on the target VM (overrides source settings).
+	//   Both vmx and svm CPU features are added with policy "disable", unconditionally preventing
+	//   nested virtualization regardless of host capability.
+	//
+	// Both vmx and svm are added together so the VM is portable across Intel and AMD hosts.
+	// The "optional" policy activates only the feature the host CPU supports; the other is ignored.
+	//
 	// +optional
 	EnableNestedVirtualization *bool `json:"enableNestedVirtualization,omitempty"`
 	// Determines if the plan should skip the guest conversion.
