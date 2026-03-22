@@ -111,7 +111,7 @@ func (r *Reconciler) validateSource(mp *api.StorageMap) (err error) {
 			Type:     SourceStorageNotValid,
 			Status:   True,
 			Reason:   NotFound,
-			Category: Critical,
+			Category: Warn,
 			Message:  "Source storage not found.",
 			Items:    notValid,
 		})

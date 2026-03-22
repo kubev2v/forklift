@@ -63,6 +63,61 @@ var _ = Describe("StorageMap Struct", func() {
 			Expect(sm.Status.HasAnyCondition(SourceStorageNotValid, DestinationStorageNotValid)).To(BeTrue())
 		})
 	})
+
+	Describe("Permissive source validation", func() {
+		It("should use Warn for NotFound (non-blocking)", func() {
+			sm := &api.StorageMap{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-storage-map",
+					Namespace: "default",
+				},
+			}
+			sm.Status.SetCondition(libcnd.Condition{
+				Type:     SourceStorageNotValid,
+				Status:   True,
+				Reason:   NotFound,
+				Category: Warn,
+				Message:  "Source storage not found.",
+				Items:    []string{"ds-1"},
+			})
+			Expect(sm.Status.HasBlockerCondition()).To(BeFalse())
+		})
+
+		It("should keep Critical for NotSet (blocking)", func() {
+			sm := &api.StorageMap{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-storage-map",
+					Namespace: "default",
+				},
+			}
+			sm.Status.SetCondition(libcnd.Condition{
+				Type:     SourceStorageNotValid,
+				Status:   True,
+				Reason:   NotSet,
+				Category: Critical,
+				Message:  "Source storage: either `ID` or `Name` required.",
+			})
+			Expect(sm.Status.HasBlockerCondition()).To(BeTrue())
+		})
+
+		It("should keep Critical for Ambiguous (blocking)", func() {
+			sm := &api.StorageMap{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-storage-map",
+					Namespace: "default",
+				},
+			}
+			sm.Status.SetCondition(libcnd.Condition{
+				Type:     SourceStorageNotValid,
+				Status:   True,
+				Reason:   Ambiguous,
+				Category: Critical,
+				Message:  "Source storage has ambiguous ref.",
+				Items:    []string{"ds-1"},
+			})
+			Expect(sm.Status.HasBlockerCondition()).To(BeTrue())
+		})
+	})
 })
 
 var _ = Describe("StoragePair", func() {

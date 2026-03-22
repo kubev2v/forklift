@@ -120,7 +120,7 @@ func (r *Reconciler) validateSource(mp *api.NetworkMap) (err error) {
 			Type:     SourceNetworkNotValid,
 			Status:   True,
 			Reason:   NotFound,
-			Category: Critical,
+			Category: Warn,
 			Message:  "Source network not found.",
 			Items:    notValid,
 		})
