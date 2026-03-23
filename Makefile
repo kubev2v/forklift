@@ -135,7 +135,20 @@ GOLANGCI_LINT_BIN ?= $(GOBIN)/golangci-lint
 
 .PHONY: help
 help: ## Show this help message
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} \
+	@printf "\n\033[1mForklift – VM migration toolkit (VMware, oVirt, OpenStack, OVA → KubeVirt)\033[0m\n"
+	@printf "\n\033[1mQuick start:\033[0m\n"
+	@printf "  make all                  Run tests and build the controller binary\n"
+	@printf "  make ci                   Run the full CI pipeline\n"
+	@printf "  make build-all-images     Build every container image\n"
+	@printf "\n\033[1mKey environment variables (all optional, shown with defaults):\033[0m\n"
+	@printf "  \033[36m%-28s\033[0m %s\n" "REGISTRY=quay.io"            "Container image registry"
+	@printf "  \033[36m%-28s\033[0m %s\n" "REGISTRY_ORG=kubev2v"        "Registry organization / namespace"
+	@printf "  \033[36m%-28s\033[0m %s\n" "REGISTRY_TAG=devel"          "Image tag for builds and bundles"
+	@printf "  \033[36m%-28s\033[0m %s\n" "NAMESPACE=konveyor-forklift" "Target Kubernetes namespace for deployment"
+	@printf "  \033[36m%-28s\033[0m %s\n" "PLATFORM=linux/amd64"        "Container build platform (linux/amd64 or linux/arm64)"
+	@printf "  \033[36m%-28s\033[0m %s\n" "CONTAINER_RUNTIME="          "Force docker or podman (auto-detected if empty)"
+	@printf "\n\033[1mExample:\033[0m  REGISTRY_ORG=myuser make build-controller-image push-controller-image\n"
+	@awk 'BEGIN {FS = ":.*##"; printf "\n\033[1mTargets:\033[0m\n"} \
 		/^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } \
 		/^[a-zA-Z_0-9-]+:.*?## / { printf "  \033[36m%-40s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
@@ -249,23 +262,20 @@ generate-verify: generate ## Verify generated code is up to date
 manifests: controller-gen ## Generate CRD and webhook manifests
 	$(CONTROLLER_GEN) crd rbac:roleName=manager-role webhook paths="./pkg/apis/..." output:dir=operator/config/crd/bases
 
-.PHONY: kustomized-manifests
-kustomized-manifests: kubectl ## Build kustomized OLM manifests
-	$(KUBECTL) kustomize operator/config/manifests > operator/.kustomized_manifests
+MANIFEST_VARS = $${CSV_NAME} $${CSV_DISPLAYNAME} $${NAMESPACE} $${CSV_CERTIFIED} $${CSV_SUPPORT} $${MAINTAINER_NAME} $${MAINTAINER_EMAIL} $${PROVIDER} $${DOCS_LINK_NAME} $${DOCS_LINK_URL}
 
 .PHONY: generate-manifests
 generate-manifests: kubectl manifests ## Generate upstream and downstream manifests
-	$(KUBECTL) kustomize operator/streams/upstream > operator/streams/upstream/upstream_manifests
-	$(KUBECTL) kustomize operator/streams/downstream > operator/streams/downstream/downstream_manifests
-	STREAM=upstream bash operator/streams/prepare-vars.sh
-	STREAM=downstream bash operator/streams/prepare-vars.sh
+	. operator/streams/upstream/operator.conf && \
+		$(KUBECTL) kustomize operator/streams/upstream | envsubst '$(MANIFEST_VARS)' > operator/.upstream_manifests
+	. operator/streams/downstream/operator.conf && \
+		$(KUBECTL) kustomize operator/streams/downstream | envsubst '$(MANIFEST_VARS)' > operator/.downstream_manifests
 
 .PHONY: update-manifests
-update-manifests: kustomized-manifests generate-manifests ## Regenerate all manifests
+update-manifests: generate generate-manifests ## Regenerate all code and manifests
 	@echo "All manifests updated successfully!"
-	@echo "  - OLM bundle: operator/.kustomized_manifests"
-	@echo "  - Upstream deployment: operator/streams/upstream/upstream_manifests"
-	@echo "  - Downstream deployment: operator/streams/downstream/downstream_manifests"
+	@echo "  - Upstream deployment: operator/.upstream_manifests"
+	@echo "  - Downstream deployment: operator/.downstream_manifests"
 
 .PHONY: install
 install: manifests kubectl ## Install CRDs into cluster
