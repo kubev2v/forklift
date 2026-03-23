@@ -37,13 +37,13 @@ printf "px_%s" $(oc get storagecluster -A -o=jsonpath='{.items[0].status.cluster
 // Authentication is mutually exclusive:
 // - If apiToken is provided (non-empty), it will be used for authentication (username/password ignored)
 // - If apiToken is empty, username and password will be used for authentication
-func NewFlashArrayClonner(hostname, username, password, apiToken string, skipSSLVerification bool, clusterPrefix string) (FlashArrayClonner, error) {
+func NewFlashArrayClonner(hostname, username, password, apiToken string, skipSSLVerification bool, clusterPrefix string, httpTimeoutSeconds int) (FlashArrayClonner, error) {
 	if clusterPrefix == "" {
 		return FlashArrayClonner{}, errors.New(helpMessage)
 	}
 
 	// Create the REST client for all operations
-	restClient, err := NewRestClient(hostname, username, password, apiToken, skipSSLVerification)
+	restClient, err := NewRestClient(hostname, username, password, apiToken, skipSSLVerification, httpTimeoutSeconds)
 	if err != nil {
 		return FlashArrayClonner{}, fmt.Errorf("failed to create REST client: %w", err)
 	}
