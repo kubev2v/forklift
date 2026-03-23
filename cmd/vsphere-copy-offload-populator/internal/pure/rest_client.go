@@ -119,7 +119,11 @@ type HostConnectionRequest struct {
 // NewRestClient creates a new REST client for Pure FlashArray
 // If apiToken is provided (non-empty), it will be used directly, skipping username/password authentication
 // If apiToken is empty, username and password will be used to obtain an API token
-func NewRestClient(hostname, username, password, apiToken string, skipSSLVerify bool) (*RestClient, error) {
+// httpTimeoutSeconds controls the HTTP client timeout; pass 0 to use the default of 30 seconds
+func NewRestClient(hostname, username, password, apiToken string, skipSSLVerify bool, httpTimeoutSeconds int) (*RestClient, error) {
+	if httpTimeoutSeconds <= 0 {
+		httpTimeoutSeconds = 30
+	}
 	// Create base transport with TLS config
 	baseTransport := &http.Transport{
 		TLSClientConfig: &tls.Config{
@@ -135,7 +139,7 @@ func NewRestClient(hostname, username, password, apiToken string, skipSSLVerify 
 	client := &RestClient{
 		hostname: hostname,
 		httpClient: &http.Client{
-			Timeout:   30 * time.Second,
+			Timeout:   time.Duration(httpTimeoutSeconds) * time.Second,
 			Transport: transport,
 		},
 	}

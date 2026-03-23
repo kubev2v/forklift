@@ -159,6 +159,7 @@ to have a secret with the following fields:
 | STORAGE_PASSWORD | string | y* | |
 | STORAGE_TOKEN | string | n** | |
 | STORAGE_SKIP_SSL_VERIFICATION | true/false | n | false |
+| STORAGE_HTTP_TIMEOUT_SECONDS | integer | n | 30 |
 
 \* For most storage vendors, `STORAGE_USERNAME` and `STORAGE_PASSWORD` are required. Pure FlashArray is an exception - see below.
 
