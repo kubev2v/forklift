@@ -108,7 +108,7 @@ func main() {
 	case forklift.StorageVendorProductPureFlashArray:
 		apiTimeout, err := strconv.Atoi(storageAPITimeoutSeconds)
 		if err != nil && storageAPITimeoutSeconds != "" {
-			klog.Warningf("invalid value %q for storage-api-timeout-seconds, using default (30s): %v", storageAPITimeoutSeconds, err)
+			klog.Warningf("invalid value %q for storage-http-timeout-seconds, using default (30s): %v", storageAPITimeoutSeconds, err)
 		}
 		sm, err := pure.NewFlashArrayClonner(
 			storageHostname, storageUsername, storagePassword, storageToken, storageSkipSSLVerification == "true", os.Getenv(pure.ClusterPrefixEnv), apiTimeout)
