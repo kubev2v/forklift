@@ -27,7 +27,7 @@ relatedImages:
     image: ${HYPERV_PROVIDER_SERVER_IMAGE}
   - name: ova_proxy
     image: ${OVA_PROXY_IMAGE}
-  - name: vsphere_xcopy_volume_populator
+  - name: vsphere_copy_offload_populator
     image: ${VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE}
   - name: cli_download
     image: ${CLI_DOWNLOAD_IMAGE}
