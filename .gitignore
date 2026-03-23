@@ -45,10 +45,6 @@ cmd/vsphere-copy-offload-populator/vmkfstools-wrapper/.passwords/
 .github/workflows/build-push-images-hal.yml
 __pycache__
 
-# ignore intermediate manifests
-operator/streams/**/upstream_manifests
-operator/streams/**/downstream_manifests
-
 # ignore tekton pipelines
 .tekton/forklift-api-dev-preview-pull-request.yaml-e
 .tekton/forklift-api-dev-preview-push.yaml-e
