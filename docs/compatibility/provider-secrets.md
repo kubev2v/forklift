@@ -16,7 +16,6 @@ These fields are available across multiple providers:
 |-------|------|-------------|
 | `insecureSkipVerify` | string | Set to `"true"` to skip TLS certificate verification (not recommended for production) |
 | `ca.crt` | string | CA certificate in PEM format for TLS verification |
-| `cacert` | string | CA certificate in PEM format for TLS verification (legacy field, maintained for backward compatibility) |
 
 > **⚠️ Deprecation Notice:** The `cacert` field is deprecated and will be removed in Forklift **v2.14**.
 > Please migrate to `ca.crt` as the standard Kubernetes secret field for CA certificates.
