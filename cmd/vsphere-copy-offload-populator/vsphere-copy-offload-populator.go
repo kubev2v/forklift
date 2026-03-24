@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -59,6 +60,7 @@ var (
 	vspherePassword            string
 	esxiCloneMethod            string
 	sshTimeoutSeconds          int
+	storageAPITimeoutSeconds   string
 
 	// kube args
 	httpEndpoint string
@@ -104,8 +106,12 @@ func main() {
 		}
 		storageApi = &sm
 	case forklift.StorageVendorProductPureFlashArray:
+		apiTimeout, err := strconv.Atoi(storageAPITimeoutSeconds)
+		if err != nil && storageAPITimeoutSeconds != "" {
+			klog.Warningf("invalid value %q for storage-http-timeout-seconds, using default (30s): %v", storageAPITimeoutSeconds, err)
+		}
 		sm, err := pure.NewFlashArrayClonner(
-			storageHostname, storageUsername, storagePassword, storageToken, storageSkipSSLVerification == "true", os.Getenv(pure.ClusterPrefixEnv))
+			storageHostname, storageUsername, storagePassword, storageToken, storageSkipSSLVerification == "true", os.Getenv(pure.ClusterPrefixEnv), apiTimeout)
 		if err != nil {
 			klog.Fatalf("failed to initialize Pure FlashArray clonner with %s", err)
 		}
@@ -306,6 +312,7 @@ func handleArgs() {
 	flag.StringVar(&vspherePassword, "vsphere-password", os.Getenv("GOVMOMI_PASSWORD"), "vSphere's API password")
 	flag.StringVar(&esxiCloneMethod, "esxi-clone-method", os.Getenv("ESXI_CLONE_METHOD"), "ESXi clone method: 'vib' (default) or 'ssh'")
 	flag.IntVar(&sshTimeoutSeconds, "ssh-timeout-seconds", 30, "SSH timeout in seconds for ESXi operations (default: 30)")
+	flag.StringVar(&storageAPITimeoutSeconds, "storage-http-timeout-seconds", os.Getenv("STORAGE_HTTP_TIMEOUT_SECONDS"), "HTTP client timeout in seconds for storage API requests (default: 30)")
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 	// Metrics args

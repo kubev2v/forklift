@@ -310,7 +310,7 @@ func TestAuthenticationMethods(t *testing.T) {
 			hostname := strings.TrimPrefix(server.URL, "https://")
 
 			// Create REST client with test parameters
-			client, err := NewRestClient(hostname, tc.username, tc.password, tc.token, true)
+			client, err := NewRestClient(hostname, tc.username, tc.password, tc.token, true, 30)
 
 			if tc.expectError {
 				if err == nil {
