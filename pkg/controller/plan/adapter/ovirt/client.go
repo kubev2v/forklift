@@ -539,7 +539,7 @@ func (r *Client) DetachDisks(vmRef ref.Ref) (err error) {
 	}
 	diskAttachments := vm.DiskAttachments
 	for _, da := range diskAttachments {
-		if da.Disk.StorageType == "lun" {
+		if da.Disk.IsLun() {
 			_, err = vmService.DiskAttachmentsService().AttachmentService(da.ID).Remove().Send()
 			if err != nil {
 				err = liberr.Wrap(err, "vm", vmRef.String(), "disk", da)

@@ -499,7 +499,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []*core.Pe
 			bus = Virtio
 		}
 		var disk cnv.Disk
-		if da.Disk.Disk.StorageType == "lun" {
+		if da.Disk.Disk.IsLun() {
 			claimName = volumeName
 			disk = cnv.Disk{
 				Name: volumeName,
@@ -559,7 +559,7 @@ func (r *Builder) Tasks(vmRef ref.Ref) (list []*plan.Task, err error) {
 	for _, da := range vm.DiskAttachments {
 		// We don't add a task for LUNs because we don't copy their content but rather assume we can connect to
 		// the LUNs that are used in the source environment also from the target environment.
-		if da.Disk.StorageType != "lun" {
+		if !da.Disk.IsLun() {
 			mB := da.Disk.ProvisionedSize / 0x100000
 			list = append(
 				list,
@@ -636,6 +636,39 @@ func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVol
 	return pvc.Annotations[planbase.AnnDiskSource]
 }
 
+type lunStorageSettings struct {
+	storageClassName string
+	volumeMode       core.PersistentVolumeMode
+	accessMode       core.PersistentVolumeAccessMode
+}
+
+func (r *Builder) resolveLunStorageSettings(storageDomainID, diskID string) lunStorageSettings {
+	settings := lunStorageSettings{
+		volumeMode: core.PersistentVolumeBlock,
+		accessMode: core.ReadWriteMany,
+	}
+	if r.Context.Map.Storage == nil {
+		return settings
+	}
+	lookupID := storageDomainID
+	if lookupID == "" {
+		lookupID = diskID
+	}
+	if lookupID == "" {
+		return settings
+	}
+	if pair, found := r.Context.Map.Storage.FindStorage(lookupID); found {
+		settings.storageClassName = pair.Destination.StorageClass
+		if pair.Destination.VolumeMode != "" {
+			settings.volumeMode = pair.Destination.VolumeMode
+		}
+		if pair.Destination.AccessMode != "" {
+			settings.accessMode = pair.Destination.AccessMode
+		}
+	}
+	return settings
+}
+
 // Create PVs specs for the VM LUNs.
 func (r *Builder) LunPersistentVolumes(vmRef ref.Ref) (pvs []core.PersistentVolume, err error) {
 	vm := &model.Workload{}
@@ -645,8 +678,9 @@ func (r *Builder) LunPersistentVolumes(vmRef ref.Ref) (pvs []core.PersistentVolu
 		return
 	}
 	for _, da := range vm.DiskAttachments {
-		if da.Disk.StorageType == "lun" {
-			volMode := core.PersistentVolumeBlock
+		if da.Disk.IsLun() {
+			settings := r.resolveLunStorageSettings(da.Disk.StorageDomain, da.Disk.ID)
+
 			logicalUnit := da.Disk.Lun.LogicalUnits.LogicalUnit[0]
 
 			var pvSource core.PersistentVolumeSource
@@ -685,13 +719,14 @@ func (r *Builder) LunPersistentVolumes(vmRef ref.Ref) (pvs []core.PersistentVolu
 				},
 				Spec: core.PersistentVolumeSpec{
 					PersistentVolumeSource: pvSource,
+					StorageClassName:       settings.storageClassName,
 					Capacity: core.ResourceList{
 						core.ResourceStorage: *resource.NewQuantity(logicalUnit.Size, resource.BinarySI),
 					},
 					AccessModes: []core.PersistentVolumeAccessMode{
-						core.ReadWriteMany,
+						settings.accessMode,
 					},
-					VolumeMode: &volMode,
+					VolumeMode: &settings.volumeMode,
 				},
 			}
 			pvs = append(pvs, pvSpec)
@@ -709,9 +744,8 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 		return
 	}
 	for _, da := range vm.DiskAttachments {
-		if da.Disk.StorageType == "lun" {
-			sc := ""
-			volMode := core.PersistentVolumeBlock
+		if da.Disk.IsLun() {
+			settings := r.resolveLunStorageSettings(da.Disk.StorageDomain, da.Disk.ID)
 			pvcSpec := core.PersistentVolumeClaim{
 				ObjectMeta: meta.ObjectMeta{
 					Name:      da.Disk.ID,
@@ -728,15 +762,15 @@ func (r *Builder) LunPersistentVolumeClaims(vmRef ref.Ref) (pvcs []core.Persiste
 				},
 				Spec: core.PersistentVolumeClaimSpec{
 					AccessModes: []core.PersistentVolumeAccessMode{
-						core.ReadWriteMany,
+						settings.accessMode,
 					},
 					Selector: &meta.LabelSelector{
 						MatchLabels: map[string]string{
 							"volume": fmt.Sprintf("%v-%v", vm.Name, da.ID),
 						},
 					},
-					StorageClassName: &sc,
-					VolumeMode:       &volMode,
+					StorageClassName: &settings.storageClassName,
+					VolumeMode:       &settings.volumeMode,
 					Resources: core.VolumeResourceRequirements{
 						Requests: core.ResourceList{
 							core.ResourceStorage: *resource.NewQuantity(da.Disk.Lun.LogicalUnits.LogicalUnit[0].Size, resource.BinarySI),
@@ -764,7 +798,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 
 	var sdToStorageClass map[string]string
 	for _, diskAttachment := range workload.DiskAttachments {
-		if diskAttachment.Disk.StorageType == "lun" {
+		if diskAttachment.Disk.IsLun() {
 			continue
 		}
 		_, err = r.getVolumePopulator(diskAttachment.DiskAttachment.ID)

@@ -163,7 +163,12 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (ok bool, err error) {
 	}
 
 	for _, da := range vm.DiskAttachments {
-		if da.Disk.StorageType != "lun" && !r.Plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: da.Disk.StorageDomain}) {
+		if da.Disk.IsLun() && da.Disk.StorageDomain == "" {
+			// Direct-LUN disks have no StorageDomain. They can optionally
+			// be mapped by their oVirt disk ID, if unmapped they use defaults.
+			continue
+		}
+		if !r.Plan.Referenced.Map.Storage.Status.Refs.Find(ref.Ref{ID: da.Disk.StorageDomain}) {
 			return
 		}
 	}
@@ -181,7 +186,7 @@ func (r *Validator) DirectStorage(vmRef ref.Ref) (ok bool, err error) {
 	}
 
 	for _, da := range vm.DiskAttachments {
-		if da.Disk.StorageType == "lun" {
+		if da.Disk.IsLun() {
 			if len(da.Disk.Lun.LogicalUnits.LogicalUnit) > 0 {
 				if ok, err := r.canImportDirectDisksFromProvider(); !ok {
 					return ok, err
