@@ -1,0 +1,10 @@
+apiVersion: forklift.konveyor.io/v1beta1
+kind: VSphereCopyOffloadVolumePopulator
+metadata:
+  name: example-vcovp
+  namespace: ${NAMESPACE}
+spec:
+  vmId: vm-42
+  vmdkPath: "[my-datastore] my-vm/myvmdisk.vmdk"
+  secretName: secret-with-vsphere-and-storage-credentials
+  storageVendorProduct: powerstore

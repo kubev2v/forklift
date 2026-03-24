@@ -36,7 +36,7 @@ The vsphere-copy-offload-populator provides a mechanism to perform storage-level
 vSphere Virtual Machine Disks (VMDKs) to KubeVirt Persistent Volume Claims (PVCs) using Forklift.
 When a specific feature flag (forklift controller `spec.feature_copy_offload`) is enabled, and the storage
 configuration allows for offloading, the Forklift controller will provision a PVC and associate it with a custom
-`VSphereXcopyVolumePopulator` resource via the `dataSourceRef` field. A dedicated populator controller then
+`VSphereCopyOffloadVolumePopulator` resource via the `dataSourceRef` field. A dedicated populator controller then
 orchestrates a containerised CLI program that uses storage and vSphere APIs to instruct the ESXi host to perform an
 XCOPY operation using vmkfstools, transferring data directly between storage LUNs . This approach is intended to be
 more efficient than traditional host-based copying. The mechanism requires the ESXi host to have VAAI and accelerations
@@ -61,13 +61,13 @@ array, reducing migration downtime and impact on compute resources, thereby faci
 - Implementing copy offload for sources other than vSphere using this specific populator (this populator is vSphere copy offload specific).
 
 ## Proposal
-The proposal outlines the implementation of a `VSphereXcopyVolumePopulator` resource and a corresponding populator
+The proposal outlines the implementation of a `VSphereCopyOffloadVolumePopulator` resource and a corresponding populator
 controller. This populator is activated when the feature_copy_offload flag is enabled and the `StorageMap` configuration
 indicates that a source datastore and destination storage class pair supports offload.
 When a VM disk migration is planned for offload:
-1. The Forklift controller creates the target `PVC` and a `VSphereXcopyVolumePopulator` custom resource.
-2. The PVC's `dataSourceRef` is set to reference the created `VSphereXcopyVolumePopulator` resource.
-3. The volume populator controller for `VSphereXcopyVolumePopulator` instances picks up the new resource.
+1. The Forklift controller creates the target `PVC` and a `VSphereCopyOffloadVolumePopulator` custom resource.
+2. The PVC's `dataSourceRef` is set to reference the created `VSphereCopyOffloadVolumePopulator` resource.
+3. The volume populator controller for `VSphereCopyOffloadVolumePopulator` instances picks up the new resource.
 4. A container running the `vsphere-copy-offload-populator` CLI program is orchestrated by the volume-populator
 5. This program uses a configurable storage API to map the target PVC back to the specific ESXi host it resides on.
 6. It then uses the vSphere API to invoke functions on that ESXi host.
@@ -112,7 +112,7 @@ Security review processes would involve examining the implementation of the popu
 interaction points with vSphere/ESXi and storage APIs.
 
 ## Design Details
-The core design involves custom Kubernetes resources (`VSphereXcopyVolumePopulator`, `StorageMap`), a dedicated controller,
+The core design involves custom Kubernetes resources (`VSphereCopyOffloadVolumePopulator`, `StorageMap`), a dedicated controller,
 a containerised CLI populator, and dependencies on vSphere/ESXi capabilities (`VAAI`, `vmkfstools`, `vmkfstools-wrapper`)
 and storage array configuration.
 

@@ -228,7 +228,7 @@ spec:
           path: populator_openstack_image_fqin
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:hidden
-        - description: vSphere xcopy populator image
+        - description: vSphere copy-offload populator image
           displayName: vSphere Populator Image
           path: populator_vsphere_copy_offload_image_fqin
           x-descriptors:
@@ -700,8 +700,8 @@ spec:
         kind: StorageMap
         name: storagemaps.forklift.konveyor.io
         version: v1beta1
-      - description: VSphere Xcopy Volume Populator
-        displayName: VSphereXcopyVolumePopulator
-        kind: VSphereXcopyVolumePopulator
-        name: vspherexcopyvolumepopulators.forklift.konveyor.io
+      - description: VSphere Copy-Offload Volume Populator
+        displayName: VSphereCopyOffloadVolumePopulator
+        kind: VSphereCopyOffloadVolumePopulator
+        name: vspherecopyoffloadvolumepopulators.forklift.konveyor.io
         version: v1beta1

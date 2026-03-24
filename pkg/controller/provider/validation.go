@@ -1204,7 +1204,7 @@ func (r *Reconciler) validateSSHReadiness(provider *api.Provider, secret *core.S
 				successSuggestion.WriteString(fmt.Sprintf("  - %s\n", item))
 			}
 		}
-		successSuggestion.WriteString("\nTo use the xcopy volume populator, ensure your VMs are located on these ESXi hosts before starting the migration.\n")
+		successSuggestion.WriteString("\nTo use the copy-offload volume populator, ensure your VMs are located on these ESXi hosts before starting the migration.\n")
 
 		provider.Status.SetCondition(libcnd.Condition{
 			Type:       SSHReady,

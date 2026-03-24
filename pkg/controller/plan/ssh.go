@@ -14,7 +14,7 @@ const (
 	SSHNotReady = "SSHNotReady"
 )
 
-// validateSSHReadiness validates SSH readiness for migration plans using xcopy volume populators
+// validateSSHReadiness validates SSH readiness for migration plans using copy-offload volume populators
 func (r *Reconciler) validateSSHReadiness(plan *api.Plan) error {
 	// Check source provider for SSH readiness issues
 	sourceProvider := plan.Referenced.Provider.Source
@@ -27,9 +27,9 @@ func (r *Reconciler) validateSSHReadiness(plan *api.Plan) error {
 		return nil
 	}
 
-	// Only validate SSH readiness for plans using VSphere xcopy volume populators
-	if !r.planUsesVSphereXcopyPopulator(plan) {
-		// Remove any existing SSH readiness conditions since xcopy is not used
+	// Only validate SSH readiness for plans using VSphere copy-offload volume populators
+	if !r.planUsesVSphereCopyOffloadPopulator(plan) {
+		// Remove any existing SSH readiness conditions since copy-offload is not used
 		plan.Status.DeleteCondition(SSHReady)
 		plan.Status.DeleteCondition(SSHNotReady)
 		return nil
@@ -66,7 +66,7 @@ func (r *Reconciler) validateSSHReadiness(plan *api.Plan) error {
 	// Check for provider SSH not ready condition (warning - hosts that failed validation)
 	sshNotReadyCondition := sourceProvider.Status.FindCondition(SSHNotReady)
 	if sshNotReadyCondition != nil && sshNotReadyCondition.Status == libcnd.True && len(sshNotReadyCondition.Items) > 0 {
-		suggestion := fmt.Sprintf("Migration plan uses xcopy volume populator with provider '%s' that has SSH connectivity issues. ", sourceProvider.Name)
+		suggestion := fmt.Sprintf("Migration plan uses copy-offload volume populator with provider '%s' that has SSH connectivity issues. ", sourceProvider.Name)
 		suggestion += sshNotReadyCondition.Suggestion
 
 		plan.Status.SetCondition(libcnd.Condition{
@@ -85,9 +85,9 @@ func (r *Reconciler) validateSSHReadiness(plan *api.Plan) error {
 	return nil
 }
 
-// planUsesVSphereXcopyPopulator checks if a plan uses VSphere xcopy volume populators
-func (r *Reconciler) planUsesVSphereXcopyPopulator(plan *api.Plan) bool {
-	// Check storage mappings for VSphereXcopyPluginConfig
+// planUsesVSphereCopyOffloadPopulator checks if a plan uses VSphere copy-offload volume populators
+func (r *Reconciler) planUsesVSphereCopyOffloadPopulator(plan *api.Plan) bool {
+	// Check storage mappings for VSphereCopyOffloadPluginConfig
 	if plan.Referenced.Map.Storage == nil {
 		return false
 	}
@@ -96,13 +96,13 @@ func (r *Reconciler) planUsesVSphereXcopyPopulator(plan *api.Plan) bool {
 	}
 	dsMapIn := plan.Referenced.Map.Storage.Spec.Map
 	for _, mapping := range dsMapIn {
-		if mapping.OffloadPlugin != nil && mapping.OffloadPlugin.VSphereXcopyPluginConfig != nil {
-			r.Log.V(2).Info("Plan uses VSphere xcopy volume populator", "plan", plan.Name)
+		if mapping.OffloadPlugin != nil && mapping.OffloadPlugin.VSphereCopyOffloadPluginConfig != nil {
+			r.Log.V(2).Info("Plan uses VSphere copy-offload volume populator", "plan", plan.Name)
 			return true
 		}
 	}
 
-	r.Log.V(2).Info("Plan does not use VSphere xcopy volume populator", "plan", plan.Name)
+	r.Log.V(2).Info("Plan does not use VSphere copy-offload volume populator", "plan", plan.Name)
 	return false
 }
 

@@ -16,6 +16,7 @@ const (
 	HookRetry                        = "HOOK_RETRY"
 	ImporterRetry                    = "IMPORTER_RETRY"
 	VirtV2vImage                     = "VIRT_V2V_IMAGE"
+	VirtV2vImageXFS                  = "VIRT_V2V_IMAGE_XFS"
 	vddkImage                        = "VDDK_IMAGE"
 	PrecopyInterval                  = "PRECOPY_INTERVAL"
 	VirtV2vDontRequestKVM            = "VIRT_V2V_DONT_REQUEST_KVM"
@@ -60,6 +61,7 @@ const (
 	MaxParentBackingRetries          = "MAX_PARENT_BACKING_RETRIES"
 	HostLeaseNamespace               = "HOST_LEASE_NAMESPACE"
 	HostLeaseDurationSeconds         = "HOST_LEASE_DURATION_SECONDS"
+	MigrationServiceAccount          = "MIGRATION_SERVICE_ACCOUNT"
 )
 
 // Default values for populator container resources
@@ -86,6 +88,8 @@ type Migration struct {
 	SnapshotStatusCheckRate int
 	// Virt-v2v image for guest conversion
 	VirtV2vImage string
+	// Virt-v2v image for guest conversion with XFSv4 support
+	VirtV2vImageXFS string
 	// Virt-v2v require KVM flags for guest conversion
 	VirtV2vDontRequestKVM bool
 	// OCP Export token TTL minutes
@@ -144,6 +148,8 @@ type Migration struct {
 	HostLeaseNamespace string
 	// HostLeaseDurationSeconds is the host lease duration in seconds used in copy offload
 	HostLeaseDurationSeconds string
+	// ServiceAccount is the cluster-wide default ServiceAccount for migration pods
+	ServiceAccount string
 }
 
 // Load settings.
@@ -181,6 +187,14 @@ func (r *Migration) Load() (err error) {
 		r.VirtV2vImage = virtV2vImage
 	} else if Settings.Role.Has(MainRole) {
 		return liberr.Wrap(fmt.Errorf("failed to find environment variable %s", VirtV2vImage))
+	}
+	if virtV2vImageXFS, ok := os.LookupEnv(VirtV2vImageXFS); ok {
+		r.VirtV2vImageXFS = virtV2vImageXFS
+	} else if Settings.Role.Has(MainRole) {
+		return liberr.Wrap(fmt.Errorf("failed to find environment variable %s", VirtV2vImageXFS))
+	}
+	if r.VirtV2vImageXFS == "" && Settings.Role.Has(MainRole) {
+		return liberr.Wrap(fmt.Errorf("environment variable %s was empty", VirtV2vImageXFS))
 	}
 	r.VirtV2vDontRequestKVM = getEnvBool(VirtV2vDontRequestKVM, false)
 
@@ -348,5 +362,8 @@ func (r *Migration) Load() (err error) {
 	// Host lease settings for copy offload
 	r.HostLeaseNamespace = Lookup(HostLeaseNamespace, "openshift-mtv")
 	r.HostLeaseDurationSeconds = Lookup(HostLeaseDurationSeconds, "10")
+	if val, found := os.LookupEnv(MigrationServiceAccount); found {
+		r.ServiceAccount = val
+	}
 	return
 }

@@ -1272,8 +1272,8 @@ func (r *Builder) SupportsVolumePopulators() bool {
 			return false
 		}
 
-		if m.OffloadPlugin != nil && m.OffloadPlugin.VSphereXcopyPluginConfig != nil {
-			klog.V(2).Infof("found offload plugin: config %+v on ds map  %+v", m.OffloadPlugin.VSphereXcopyPluginConfig, dsMapIn)
+		if m.OffloadPlugin != nil && m.OffloadPlugin.VSphereCopyOffloadPluginConfig != nil {
+			klog.V(2).Infof("found offload plugin: config %+v on ds map  %+v", m.OffloadPlugin.VSphereCopyOffloadPluginConfig, dsMapIn)
 			return true
 
 		}
@@ -1347,8 +1347,8 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				storageClass := mapped.Destination.StorageClass
 				r.Log.Info(fmt.Sprintf("getting storage mapping by storage class %q and datastore %v datastore name %s datastore", storageClass, disk.Datastore, disk.Datastore))
 				vsphereInstance := r.Context.Plan.Provider.Source.GetName()
-				storageVendorProduct := mapped.OffloadPlugin.VSphereXcopyPluginConfig.StorageVendorProduct
-				storageVendorSecretRef := mapped.OffloadPlugin.VSphereXcopyPluginConfig.SecretRef
+				storageVendorProduct := mapped.OffloadPlugin.VSphereCopyOffloadPluginConfig.StorageVendorProduct
+				storageVendorSecretRef := mapped.OffloadPlugin.VSphereCopyOffloadPluginConfig.SecretRef
 
 				r.Log.Info(fmt.Sprintf("vsphere provider %v storage vendor product %v storage secret name %v ", vsphereInstance, storageVendorProduct, storageVendorSecretRef))
 
@@ -1389,7 +1389,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 						},
 						DataSourceRef: &core.TypedObjectReference{
 							APIGroup: &api.SchemeGroupVersion.Group,
-							Kind:     api.VSphereXcopyVolumePopulatorKind,
+							Kind:     api.VSphereCopyOffloadVolumePopulatorKind,
 						},
 					},
 				}
@@ -1440,8 +1440,8 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 						pvc.Annotations[planbase.AnnPreviousCheckpoint] = ""
 
 						copied := fmt.Sprintf("%s.%s", planbase.AnnCheckpointsCopied, snapshot)
-						pvc.Annotations[copied] = "xcopy-initial-offload"                // Any value should work here
-						pvc.Annotations[planbase.AnnImportPod] = "xcopy-initial-offload" // Should match above
+						pvc.Annotations[copied] = "copy-offload-initial"                // Any value should work here
+						pvc.Annotations[planbase.AnnImportPod] = "copy-offload-initial" // Should match above
 					}
 				}
 
@@ -1450,7 +1450,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				diskSecretName := fmt.Sprintf("%s-%d", secretName, diskIndex)
 				pvc.Annotations[planbase.AnnSecret] = diskSecretName
 				pvcs = append(pvcs, &pvc)
-				vp := api.VSphereXcopyVolumePopulator{
+				vp := api.VSphereCopyOffloadVolumePopulator{
 					ObjectMeta: metav1.ObjectMeta{
 						OwnerReferences: []metav1.OwnerReference{
 							{
@@ -1464,7 +1464,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 						Namespace: namespace,
 						Labels:    labels,
 					},
-					Spec: api.VSphereXcopyVolumePopulatorSpec{
+					Spec: api.VSphereCopyOffloadVolumePopulatorSpec{
 						VmId:                 vmRef.ID,
 						VmdkPath:             baseVolume(disk.File, r.Plan.IsWarm()),
 						SecretName:           diskSecretName,
@@ -1504,7 +1504,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				if err != nil {
 					return nil, err
 				}
-				err = r.ensureXCopyVolumePopulator(&vp)
+				err = r.ensureCopyOffloadVolumePopulator(&vp)
 				if err != nil {
 					return nil, err
 				}
@@ -1561,8 +1561,8 @@ func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (tr
 	return
 }
 
-func (r *Builder) getVolumePopulator(vmId, vmdkKey string) (api.VSphereXcopyVolumePopulator, error) {
-	list := api.VSphereXcopyVolumePopulatorList{}
+func (r *Builder) getVolumePopulator(vmId, vmdkKey string) (api.VSphereCopyOffloadVolumePopulator, error) {
+	list := api.VSphereCopyOffloadVolumePopulatorList{}
 	err := r.Destination.Client.List(context.TODO(), &list, &client.ListOptions{
 		Namespace: r.Plan.Spec.TargetNamespace,
 		LabelSelector: labels.SelectorFromSet(map[string]string{
@@ -1572,12 +1572,12 @@ func (r *Builder) getVolumePopulator(vmId, vmdkKey string) (api.VSphereXcopyVolu
 		}),
 	})
 	if err != nil {
-		return api.VSphereXcopyVolumePopulator{}, liberr.Wrap(err)
+		return api.VSphereCopyOffloadVolumePopulator{}, liberr.Wrap(err)
 	}
 	if len(list.Items) == 0 {
-		return api.VSphereXcopyVolumePopulator{},
+		return api.VSphereCopyOffloadVolumePopulator{},
 			liberr.New(
-				"No VSphereXcopyVolumePopulator CR found - populator may not have been created or was deleted",
+				"No VSphereCopyOffloadVolumePopulator CR found - populator may not have been created or was deleted",
 				"namespace", r.Plan.Spec.TargetNamespace,
 				"migration", string(r.Migration.UID),
 				"vmID", vmId,
@@ -1588,9 +1588,9 @@ func (r *Builder) getVolumePopulator(vmId, vmdkKey string) (api.VSphereXcopyVolu
 		for i, item := range list.Items {
 			names[i] = item.Name
 		}
-		return api.VSphereXcopyVolumePopulator{},
+		return api.VSphereCopyOffloadVolumePopulator{},
 			liberr.New(
-				"Multiple VSphereXcopyVolumePopulator CRs found for the same VMDK disk",
+				"Multiple VSphereCopyOffloadVolumePopulator CRs found for the same VMDK disk",
 				"namespace", r.Plan.Spec.TargetNamespace,
 				"migration", string(r.Migration.UID),
 				"vmID", vmId,
@@ -2279,15 +2279,15 @@ func (r *Builder) generatePopulatorSuffix(migrationUID, vmID string, diskKey int
 	return hex.EncodeToString(hash[:])[:8]
 }
 
-func (r *Builder) ensureXCopyVolumePopulator(vp *api.VSphereXcopyVolumePopulator) error {
-	existingPopulator := &api.VSphereXcopyVolumePopulator{}
+func (r *Builder) ensureCopyOffloadVolumePopulator(vp *api.VSphereCopyOffloadVolumePopulator) error {
+	existingPopulator := &api.VSphereCopyOffloadVolumePopulator{}
 	err := r.Destination.Client.Get(context.TODO(), client.ObjectKey{
 		Namespace: vp.Namespace,
 		Name:      vp.Name,
 	}, existingPopulator)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
-			r.Log.Info("Creating the populator resource", "VSphereXcopyVolumePopulator", vp.Name, "namespace", vp.Namespace)
+			r.Log.Info("Creating the populator resource", "VSphereCopyOffloadVolumePopulator", vp.Name, "namespace", vp.Namespace)
 			err = r.Destination.Client.Create(context.TODO(), vp, &client.CreateOptions{})
 			if err != nil {
 				return err

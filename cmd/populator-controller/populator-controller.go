@@ -47,10 +47,10 @@ var populators = map[string]populator{
 		imageVar:        "OPENSTACK_POPULATOR_IMAGE",
 		metricsEndpoint: ":8081",
 	},
-	"vsphere-xcopy": {
-		kind:            "VSphereXcopyVolumePopulator",
-		resource:        "vspherexcopyvolumepopulators",
-		controllerFunc:  getVXPopulatorPodArgs,
+	"vsphere-copy-offload": {
+		kind:            "VSphereCopyOffloadVolumePopulator",
+		resource:        "vspherecopyoffloadvolumepopulators",
+		controllerFunc:  getVSphereCopyOffloadPopulatorPodArgs,
 		imageVar:        "VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE",
 		metricsEndpoint: ":8082",
 	},
@@ -138,21 +138,21 @@ func getOpenstackPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured, _
 	return args, nil
 }
 
-func getVXPopulatorPodArgs(_ bool, u *unstructured.Unstructured, pvc corev1.PersistentVolumeClaim) ([]string, error) {
-	var xcopy v1beta1.VSphereXcopyVolumePopulator
-	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &xcopy)
+func getVSphereCopyOffloadPopulatorPodArgs(_ bool, u *unstructured.Unstructured, pvc corev1.PersistentVolumeClaim) ([]string, error) {
+	var vp v1beta1.VSphereCopyOffloadVolumePopulator
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &vp)
 	if nil != err {
 		return nil, err
 	}
 	args := []string{
-		"--source-vm-id=" + xcopy.Spec.VmId,
-		"--source-vmdk=" + xcopy.Spec.VmdkPath,
-		"--target-namespace=" + xcopy.GetNamespace(),
-		"--cr-name=" + xcopy.Name,
-		"--cr-namespace=" + xcopy.Namespace,
+		"--source-vm-id=" + vp.Spec.VmId,
+		"--source-vmdk=" + vp.Spec.VmdkPath,
+		"--target-namespace=" + vp.GetNamespace(),
+		"--cr-name=" + vp.Name,
+		"--cr-namespace=" + vp.Namespace,
 		"--owner-name=" + pvc.Name,
-		"--secret-name=" + xcopy.Spec.SecretName,
-		"--storage-vendor-product=" + xcopy.Spec.StorageVendorProduct,
+		"--secret-name=" + vp.Spec.SecretName,
+		"--storage-vendor-product=" + vp.Spec.StorageVendorProduct,
 	}
 	return args, nil
 }

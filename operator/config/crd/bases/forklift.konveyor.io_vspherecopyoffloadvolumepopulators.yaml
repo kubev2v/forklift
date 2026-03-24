@@ -4,17 +4,17 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.3
-  name: vspherexcopyvolumepopulators.forklift.konveyor.io
+  name: vspherecopyoffloadvolumepopulators.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
   names:
-    kind: VSphereXcopyVolumePopulator
-    listKind: VSphereXcopyVolumePopulatorList
-    plural: vspherexcopyvolumepopulators
+    kind: VSphereCopyOffloadVolumePopulator
+    listKind: VSphereCopyOffloadVolumePopulatorList
+    plural: vspherecopyoffloadvolumepopulators
     shortNames:
-    - vxvp
-    - vxvps
-    singular: vspherexcopyvolumepopulator
+    - vcovp
+    - vcovps
+    singular: vspherecopyoffloadvolumepopulator
   scope: Namespaced
   versions:
   - name: v1beta1

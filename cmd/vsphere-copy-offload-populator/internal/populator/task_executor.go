@@ -48,7 +48,7 @@ func ParseProgress(lastLine string) (int, error) {
 	return -1, nil
 }
 
-func updateTaskStatus(ctx context.Context, task *vmkfstoolsTask, executor TaskExecutor, host *object.HostSystem, datastore string, progress chan<- uint64, xcopyUsed chan<- int) (*vmkfstoolsTask, error) {
+func updateTaskStatus(ctx context.Context, task *vmkfstoolsTask, executor TaskExecutor, host *object.HostSystem, datastore string, progress chan<- uint64, storageOffloadUsed chan<- int) (*vmkfstoolsTask, error) {
 	taskStatus, err := executor.GetTaskStatus(ctx, host, datastore, task.TaskId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get task status: %w", err)
@@ -61,19 +61,19 @@ func updateTaskStatus(ctx context.Context, task *vmkfstoolsTask, executor TaskEx
 		progress <- uint64(progressValue)
 	}
 
-	// Report xcopyUsed as 0 or 1
+	// Report whether storage offload was used: 0 or 1
 	// nil means unknown/not determined, treat as 0 (not used)
 	if taskStatus.XcopyUsed != nil && *taskStatus.XcopyUsed {
-		xcopyUsed <- 1
+		storageOffloadUsed <- 1
 	} else {
-		xcopyUsed <- 0
+		storageOffloadUsed <- 0
 	}
 
 	return taskStatus, nil
 }
 
 // ExecuteCloneTask handles the unified task execution logic
-func ExecuteCloneTask(ctx context.Context, executor TaskExecutor, host *object.HostSystem, datastore, sourcePath, targetLUN string, progress chan<- uint64, xcopyUsed chan<- int) error {
+func ExecuteCloneTask(ctx context.Context, executor TaskExecutor, host *object.HostSystem, datastore, sourcePath, targetLUN string, progress chan<- uint64, storageOffloadUsed chan<- int) error {
 	log := klog.FromContext(ctx)
 
 	log.Info("starting clone task", "source", sourcePath, "target", targetLUN)
@@ -94,14 +94,14 @@ func ExecuteCloneTask(ctx context.Context, executor TaskExecutor, host *object.H
 	}
 
 	for {
-		taskStatus, err := updateTaskStatus(ctx, task, executor, host, datastore, progress, xcopyUsed)
+		taskStatus, err := updateTaskStatus(ctx, task, executor, host, datastore, progress, storageOffloadUsed)
 		if err != nil {
 			return fmt.Errorf("failed to update task status: %w", err)
 		}
 
 		if taskStatus != nil && taskStatus.ExitCode != "" {
 			time.Sleep(taskPollingInterval)
-			taskStatus, err := updateTaskStatus(ctx, task, executor, host, datastore, progress, xcopyUsed)
+			taskStatus, err := updateTaskStatus(ctx, task, executor, host, datastore, progress, storageOffloadUsed)
 			if err != nil {
 				return fmt.Errorf("failed to update task status: %w", err)
 			}

@@ -64,7 +64,7 @@ var _ = Describe("Populator", func() {
 	DescribeTable("should handle various population scenarios",
 		func(tc testCase) {
 			progressCh := make(chan uint64)
-			xcopyUsedCh := make(chan int)
+			storageOffloadCh := make(chan int)
 			quitCh := make(chan error, 1)
 
 			tc.setup()
@@ -75,14 +75,14 @@ var _ = Describe("Populator", func() {
 				}
 			}()
 			go func() {
-				for range xcopyUsedCh {
+				for range storageOffloadCh {
 
 				}
 			}()
 
 			go func() {
 				defer GinkgoRecover()
-				underTest.Populate(tc.sourceVmId, tc.sourceVMDK, populator.PersistentVolume{Name: tc.targetPVC}, hostLocker, progressCh, xcopyUsedCh, quitCh)
+				underTest.Populate(tc.sourceVmId, tc.sourceVMDK, populator.PersistentVolume{Name: tc.targetPVC}, hostLocker, progressCh, storageOffloadCh, quitCh)
 			}()
 
 			if tc.want != nil {

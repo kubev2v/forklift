@@ -237,7 +237,7 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		return err
 	}
 
-	// Validate SSH readiness for plans using xcopy with SSH-enabled providers
+	// Validate SSH readiness for plans using copy-offload with SSH-enabled providers
 	if err = r.validateSSHReadiness(plan); err != nil {
 		return err
 	}
@@ -2243,7 +2243,7 @@ func (r *Reconciler) vmUsesVddk(storageMap *api.StorageMap, vsphereVM *vsphere.V
 		if !found {
 			continue // Another validation will handle this
 		}
-		if mapping.OffloadPlugin == nil || mapping.OffloadPlugin.VSphereXcopyPluginConfig == nil {
+		if mapping.OffloadPlugin == nil || mapping.OffloadPlugin.VSphereCopyOffloadPluginConfig == nil {
 			return true, nil
 		}
 	}

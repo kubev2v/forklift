@@ -82,7 +82,7 @@ func NewWithRemoteEsxcliSSH(storageApi VMDKCapable, vmwareClient vmware.Client, 
 	}, nil
 }
 
-func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) (errFinal error) {
+func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, storageOffloadUsed chan<- int, quit chan error) (errFinal error) {
 	log := klog.Background().WithName("copy-offload").WithName("xcopy")
 	setupLog := log.WithName("setup")
 	mapLog := log.WithName("map-volume")
@@ -291,7 +291,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 
 	// Use unified task execution (clone context so all clone/SSH logs show under clone)
 	cloneCtx := klog.NewContext(context.Background(), cloneLog)
-	return ExecuteCloneTask(cloneCtx, executor, host, vmDisk.Datastore, vmDisk.Path(), targetLUN, progress, xcopyUsed)
+	return ExecuteCloneTask(cloneCtx, executor, host, vmDisk.Datastore, vmDisk.Path(), targetLUN, progress, storageOffloadUsed)
 }
 
 // waitForDeviceStateOff waits for the device state to become "off" using exponential backoff

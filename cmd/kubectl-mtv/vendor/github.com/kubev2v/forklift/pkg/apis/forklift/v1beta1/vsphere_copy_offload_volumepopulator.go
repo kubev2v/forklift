@@ -4,23 +4,23 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var VSphereXcopyVolumePopulatorKind = "VSphereXcopyVolumePopulator"
-var VSphereXcopyVolumePopulatorResource = "vspherexcopyvolumepopulators"
+var VSphereCopyOffloadVolumePopulatorKind = "VSphereCopyOffloadVolumePopulator"
+var VSphereCopyOffloadVolumePopulatorResource = "vspherecopyoffloadvolumepopulators"
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:openapi-gen=true
-// +kubebuilder:resource:shortName={vxvp,vxvps}
-type VSphereXcopyVolumePopulator struct {
+// +kubebuilder:resource:shortName={vcovp,vcovps}
+type VSphereCopyOffloadVolumePopulator struct {
 	meta.TypeMeta   `json:",inline"`
 	meta.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec VSphereXcopyVolumePopulatorSpec `json:"spec"`
+	Spec VSphereCopyOffloadVolumePopulatorSpec `json:"spec"`
 	// +optional
-	Status VSphereXcopyVolumePopulatorStatus `json:"status"`
+	Status VSphereCopyOffloadVolumePopulatorStatus `json:"status"`
 }
 
-type VSphereXcopyVolumePopulatorSpec struct {
+type VSphereCopyOffloadVolumePopulatorSpec struct {
 	// VmId is the VM object id in vSphere
 	VmId string `json:"vmId"`
 	// VmdkPath is the full path the vmdk disk. A valid path format is
@@ -33,18 +33,18 @@ type VSphereXcopyVolumePopulatorSpec struct {
 	StorageVendorProduct string `json:"storageVendorProduct"`
 }
 
-type VSphereXcopyVolumePopulatorStatus struct {
+type VSphereCopyOffloadVolumePopulatorStatus struct {
 	// +optional
 	Progress string `json:"progress"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type VSphereXcopyVolumePopulatorList struct {
+type VSphereCopyOffloadVolumePopulatorList struct {
 	meta.TypeMeta `json:",inline"`
 	meta.ListMeta `json:"metadata,omitempty"`
-	Items         []VSphereXcopyVolumePopulator `json:"items"`
+	Items         []VSphereCopyOffloadVolumePopulator `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&VSphereXcopyVolumePopulator{}, &VSphereXcopyVolumePopulatorList{})
+	SchemeBuilder.Register(&VSphereCopyOffloadVolumePopulator{}, &VSphereCopyOffloadVolumePopulatorList{})
 }

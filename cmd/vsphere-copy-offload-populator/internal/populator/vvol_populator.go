@@ -19,7 +19,7 @@ func NewVvolPopulator(storageApi VVolCapable, vmwareClient vmware.Client) (Popul
 	}, nil
 }
 
-func (p *VvolPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) (errFinal error) {
+func (p *VvolPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, storageOffloadUsed chan<- int, quit chan error) (errFinal error) {
 	log := klog.Background().WithName("copy-offload").WithName("vvol")
 	defer func() {
 		r := recover()
@@ -33,7 +33,7 @@ func (p *VvolPopulator) Populate(vmId string, sourceVMDKFile string, pv Persiste
 	log.Info("VVol copy started", "vm", vmId, "source", sourceVMDKFile, "target", pv.Name)
 
 	// VVol copy does not use xcopy
-	xcopyUsed <- 0
+	storageOffloadUsed <- 0
 
 	err := p.storageApi.VvolCopy(p.vSphereClient, vmId, sourceVMDKFile, pv, progress)
 	if err != nil {

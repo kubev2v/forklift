@@ -75,10 +75,10 @@ spec:
                     offloadPlugin:
                       description: Offload Plugin
                       properties:
-                        vsphereXcopyConfig:
+                        vsphereCopyOffloadConfig:
                           description: |-
-                            VSphereXcopyPluginConfig works with the Vsphere Xcopy Volume Populator
-                            to offload the copy to Vsphere and the storage array.
+                            VSphereCopyOffloadPluginConfig works with the VSphere copy-offload volume populator
+                            to offload the copy to vSphere and the storage array.
                           properties:
                             secretRef:
                               description: |-
@@ -104,7 +104,7 @@ spec:
                           - storageVendorProduct
                           type: object
                       required:
-                      - vsphereXcopyConfig
+                      - vsphereCopyOffloadConfig
                       type: object
                     source:
                       description: Source storage.

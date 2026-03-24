@@ -22,7 +22,7 @@ func NewRDMPopulator(storageApi RDMCapable, vmwareClient vmware.Client) (Populat
 }
 
 // Populate performs the RDM copy operation
-func (p *RDMPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) (errFinal error) {
+func (p *RDMPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, storageOffloadUsed chan<- int, quit chan error) (errFinal error) {
 	log := klog.Background().WithName("copy-offload").WithName("rdm")
 	defer func() {
 		r := recover()
@@ -36,7 +36,7 @@ func (p *RDMPopulator) Populate(vmId string, sourceVMDKFile string, pv Persisten
 	log.Info("RDM copy started", "vm", vmId, "source", sourceVMDKFile, "target", pv.Name)
 
 	// RDM copy does not use xcopy
-	xcopyUsed <- 0
+	storageOffloadUsed <- 0
 
 	err := p.storageApi.RDMCopy(p.vSphereClient, vmId, sourceVMDKFile, pv, progress)
 	if err != nil {

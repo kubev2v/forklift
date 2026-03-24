@@ -157,7 +157,7 @@ spec:
         path: populator_openstack_image_fqin
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
-      - description: vSphere xcopy populator image
+      - description: vSphere copy-offload populator image
         displayName: vSphere Populator Image
         path: populator_vsphere_copy_offload_image_fqin
         x-descriptors:

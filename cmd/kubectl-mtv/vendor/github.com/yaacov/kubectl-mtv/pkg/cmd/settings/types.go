@@ -797,7 +797,7 @@ var ExtendedSettings = map[string]SettingDefinition{
 		Name:        "populator_vsphere_copy_offload_image_fqin",
 		Type:        TypeString,
 		Default:     "",
-		Description: "vSphere xcopy populator image",
+		Description: "vSphere copy-offload populator image",
 		Category:    CategoryImage,
 	},
 	"ova_provider_server_fqin": {

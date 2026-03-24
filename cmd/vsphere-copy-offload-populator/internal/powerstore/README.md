@@ -72,7 +72,7 @@ oc run powerstore-test --image=curlimages/curl --rm -i --restart=Never -- \
 # 3. Verify StorageMap status, replace <powerstore-storagemap> with your actual StorageMap name
 oc get storagemap <powerstore-storagemap> -n openshift-mtv -o yaml
 
-# 4. Check Forklift operator and VSphereXcopyVolumePopulator status
+# 4. Check Forklift operator and VSphereCopyOffloadVolumePopulator status
 oc get migrations -n openshift-mtv | grep plan-1d50gb-10vm-1snap
 ```
 

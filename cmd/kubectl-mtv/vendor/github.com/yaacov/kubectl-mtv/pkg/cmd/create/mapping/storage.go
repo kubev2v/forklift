@@ -213,7 +213,7 @@ func parseStoragePairsInternal(pairStr, defaultNamespace string, configFlags *ge
 
 				switch offloadPlugin {
 				case "vsphere":
-					offloadPluginConfig.VSphereXcopyPluginConfig = &forkliftv1beta1.VSphereXcopyPluginConfig{
+					offloadPluginConfig.VSphereCopyOffloadPluginConfig = &forkliftv1beta1.VSphereCopyOffloadPluginConfig{
 						SecretRef:            offloadSecret,
 						StorageVendorProduct: forkliftv1beta1.StorageVendorProduct(offloadVendor),
 					}

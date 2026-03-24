@@ -127,7 +127,7 @@ spec:
                 example: "quay.io/kubev2v/openstack-populator:latest"
               populator_vsphere_copy_offload_image_fqin:
                 type: string
-                description: "vSphere xcopy populator image"
+                description: "vSphere copy-offload populator image"
                 example: "quay.io/kubev2v/vsphere-populator:latest"
               ova_provider_server_fqin:
                 type: string

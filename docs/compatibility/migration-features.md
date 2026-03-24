@@ -214,7 +214,7 @@ spec:
       destination:
         storageClass: premium-ssd
       offloadPlugin:
-        vsphereXcopyConfig:
+        vsphereCopyOffloadConfig:
           secretRef: storage-credentials
           storageVendorProduct: flashsystem
 ```

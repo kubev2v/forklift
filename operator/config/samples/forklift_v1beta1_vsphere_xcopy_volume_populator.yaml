@@ -1,9 +1,0 @@
-apiVersion: forklift.konveyor.io/v1beta1
-kind: VSphereXcopyVolumePopulator
-metadata:
-  name: example-vxvp
-  namespace: ${NAMESPACE}
-spec:
-  sourceVMDK: "[my-datastore] my-vm/myvmdisk.vmdk"
-  targetPVC: pvc-name
-  secretRef: secret-with-vsphere-and-storage-credentials

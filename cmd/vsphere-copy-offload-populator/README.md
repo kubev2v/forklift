@@ -1,10 +1,10 @@
-# vSphere XCOPY Volume-Populator
+# vSphere copy-offload volume populator
 
 ## Table of Contents
 
 - [Forklift Controller](#forklift-controller)
 - [Populator Controller](#populator-controller)
-- [VSphereXcopyVolumePopulator Resource](#vspherexcopyvolumepopoulator-resource)
+- [VSphereCopyOffloadVolumePopulator Resource](#vsphere-copy-offload-volume-populator-resource)
 - [vmkfstools-wrapper](#vmkfstools-wrapper)
 - [Setup Copy Offload](#setup-copy-offload)
 - [Supported Storage Providers](#supported-storage-providers)
@@ -33,13 +33,13 @@ When the feature flag `feature_copy_offload` is true (on by default), the contro
 consult the storagemaps offload plugin configuration, to decided if VM disk from
 VMWare could be copied by the storage backend(offloaded) into the newly created PVC.
 When the controller creates the PVC for the v2v pod it will also create
-a volume popoulator resource of type VSphereXcopyVolumePopulator and set
+a volume popoulator resource of type VSphereCopyOffloadVolumePopulator and set
 the filed `dataSourceRef` in the PVC to reference it.
 
 ## Populator Controller
-Added a new populator controller for the resource VSPhereXcopyVolumePopulator
+Added a new populator controller for the resource VSphereCopyOffloadVolumePopulator
 
-## VSphereXcopyVolumePopulator Resource
+## VSphereCopyOffloadVolumePopulator Resource
 A new populator implementation under cmd/vsphere-copy-offload-populator
 is a cli program that runs in a container that is responsible to perform
 XCOPY to efficiently copy data from a VMDK to the target PVC. See the
@@ -63,22 +63,22 @@ spec:
       storage: 100000Mi
   dataSourceRef:
     apiGroup: forklift.konveyor.io
-    kind: VSphereXcopyVolumePopulator
-    name: vm-1-xcopy-1
+    kind: VSphereCopyOffloadVolumePopulator
+    name: vm-1-copy-offload-1
   storageClassName: sc-1  
   volumeMode: Block
   volumeName: pvc-6dff02f2-de63-40ab-a534-3bd5a7b47f82
 ---
 apiVersion: forklift.konveyor.io/v1beta1
-kind: VSphereXcopyVolumePopulator
+kind: VSphereCopyOffloadVolumePopulator
 metadata:
-  name: vm-1-xcopy-1 
+  name: vm-1-copy-offload-1 
   namespace: default
 spec:
-  secretRef: vantara-secret 
-  storageVendorProduct: vantara
-  targetPVC: my-pvc 
+  vmId: vm-123
   vmdkPath: '[my-vsphere-ds] vm-1/vm-1.vmdk'
+  secretName: vantara-secret
+  storageVendorProduct: vantara
 ```
 
 ## vmkfstools-wrapper
@@ -358,7 +358,7 @@ spec:
   - destination:
       storageClass: YOUR_STORAGE_CLASS
     offloadPlugin:
-      vsphereXcopyConfig:
+      vsphereCopyOffloadConfig:
         secretRef: DESTINATION_STORAGE_SECRET
         storageVendorProduct: powerstore   # destination vendor
     source:
@@ -399,7 +399,7 @@ spec:
   - destination:
       storageClass: YOUR_STORAGE_CLASS  #1)
     offloadPlugin:
-      vsphereXcopyConfig:
+      vsphereCopyOffloadConfig:
         secretRef: SECRET_WITH_ONTAP_CREDS #2)
         storageVendorProduct: ontap #3)
     source:

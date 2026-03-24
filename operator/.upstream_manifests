@@ -138,6 +138,11 @@ spec:
               controller_max_vm_inflight:
                 description: 'Max concurrent VM migrations (default: 20)'
                 x-kubernetes-int-or-string: true
+              controller_migration_service_account:
+                description: Global default ServiceAccount for migration pods in the
+                  target namespace. Overridden by Plan-level serviceAccount.
+                example: custom-migration-sa
+                type: string
               controller_ovirt_warm_migration:
                 description: 'Enable oVirt warm migration (default: true)'
                 enum:
@@ -395,7 +400,7 @@ spec:
                 example: quay.io/kubev2v/ovirt-populator:latest
                 type: string
               populator_vsphere_copy_offload_image_fqin:
-                description: vSphere xcopy populator image
+                description: vSphere copy-offload populator image
                 example: quay.io/kubev2v/vsphere-populator:latest
                 type: string
               ui_plugin_container_limits_cpu:
@@ -3865,6 +3870,15 @@ spec:
                   - true (default): Inspection step runs before transferring any disks and may fail if it detects the migration would fail.
                   - false: No inspection is performed before disk transfer.
                 type: boolean
+              serviceAccount:
+                description: |-
+                  ServiceAccount is the name of the ServiceAccount to use for migration
+                  pods in the target namespace. Overrides the global setting.
+                  If empty, falls back to ForkliftController's controller_migration_service_account,
+                  then to the namespace default.
+                maxLength: 253
+                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                type: string
               skipGuestConversion:
                 default: false
                 description: Determines if the plan should skip the guest conversion.
@@ -6300,10 +6314,10 @@ spec:
                     offloadPlugin:
                       description: Offload Plugin
                       properties:
-                        vsphereXcopyConfig:
+                        vsphereCopyOffloadConfig:
                           description: |-
-                            VSphereXcopyPluginConfig works with the Vsphere Xcopy Volume Populator
-                            to offload the copy to Vsphere and the storage array.
+                            VSphereCopyOffloadPluginConfig works with the VSphere copy-offload volume populator
+                            to offload the copy to vSphere and the storage array.
                           properties:
                             secretRef:
                               description: |-
@@ -6329,7 +6343,7 @@ spec:
                           - storageVendorProduct
                           type: object
                       required:
-                      - vsphereXcopyConfig
+                      - vsphereCopyOffloadConfig
                       type: object
                     source:
                       description: Source storage.
@@ -6546,17 +6560,17 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.3
-  name: vspherexcopyvolumepopulators.forklift.konveyor.io
+  name: vspherecopyoffloadvolumepopulators.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
   names:
-    kind: VSphereXcopyVolumePopulator
-    listKind: VSphereXcopyVolumePopulatorList
-    plural: vspherexcopyvolumepopulators
+    kind: VSphereCopyOffloadVolumePopulator
+    listKind: VSphereCopyOffloadVolumePopulatorList
+    plural: vspherecopyoffloadvolumepopulators
     shortNames:
-    - vxvp
-    - vxvps
-    singular: vspherexcopyvolumepopulator
+    - vcovp
+    - vcovps
+    singular: vspherecopyoffloadvolumepopulator
   scope: Namespaced
   versions:
   - name: v1beta1
@@ -7843,7 +7857,7 @@ spec:
         path: populator_openstack_image_fqin
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
-      - description: vSphere xcopy populator image
+      - description: vSphere copy-offload populator image
         displayName: vSphere Populator Image
         path: populator_vsphere_copy_offload_image_fqin
         x-descriptors:
@@ -8299,10 +8313,10 @@ spec:
       kind: StorageMap
       name: storagemaps.forklift.konveyor.io
       version: v1beta1
-    - description: VSphere Xcopy Volume Populator
-      displayName: VSphereXcopyVolumePopulator
-      kind: VSphereXcopyVolumePopulator
-      name: vspherexcopyvolumepopulators.forklift.konveyor.io
+    - description: VSphere Copy-Offload Volume Populator
+      displayName: VSphereCopyOffloadVolumePopulator
+      kind: VSphereCopyOffloadVolumePopulator
+      name: vspherecopyoffloadvolumepopulators.forklift.konveyor.io
       version: v1beta1
   description: |
     The Forklift Operator fully manages the deployment and life cycle of Forklift on [OpenShift](https://www.openshift.com/).
@@ -8403,7 +8417,7 @@ spec:
   - image: ${OVA_PROXY_IMAGE}
     name: ova_proxy
   - image: ${VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE}
-    name: vsphere_xcopy_volume_populator
+    name: vsphere_copy_offload_volume_populator
   version: ${MTV_VERSION}
 ---
 apiVersion: scorecard.operatorframework.io/v1alpha3

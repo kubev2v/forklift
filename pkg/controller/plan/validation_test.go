@@ -691,7 +691,7 @@ var _ = ginkgo.Describe("vmUsesVddk", func() {
 			}
 			if pair.hasOffload {
 				sp.OffloadPlugin = &api.OffloadPlugin{
-					VSphereXcopyPluginConfig: &api.VSphereXcopyPluginConfig{
+					VSphereCopyOffloadPluginConfig: &api.VSphereCopyOffloadPluginConfig{
 						StorageVendorProduct: api.StorageVendorProduct("test-vendor"),
 					},
 				}

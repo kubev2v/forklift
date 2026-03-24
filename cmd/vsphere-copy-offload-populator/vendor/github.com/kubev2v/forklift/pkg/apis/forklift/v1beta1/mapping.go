@@ -53,10 +53,10 @@ type NetworkPair struct {
 // phase of the migration. There can be more than one available but currently only
 // one will be supported
 type OffloadPlugin struct {
-	VSphereXcopyPluginConfig *VSphereXcopyPluginConfig `json:"vsphereXcopyConfig"`
+	VSphereCopyOffloadPluginConfig *VSphereCopyOffloadPluginConfig `json:"vsphereCopyOffloadConfig"`
 }
 
-// StorageVendorProduct is an identifier of the product used for XCOPY.
+// StorageVendorProduct is an identifier of the product used for storage copy offload.
 // NOTE - Update the kubebuilder:validation line for every change to this enum
 type StorageVendorProduct string
 
@@ -86,9 +86,9 @@ func StorageVendorProducts() []StorageVendorProduct {
 	}
 }
 
-// VSphereXcopyPluginConfig works with the Vsphere Xcopy Volume Populator
-// to offload the copy to Vsphere and the storage array.
-type VSphereXcopyPluginConfig struct {
+// VSphereCopyOffloadPluginConfig works with the VSphere copy-offload volume populator
+// to offload the copy to vSphere and the storage array.
+type VSphereCopyOffloadPluginConfig struct {
 	// SecretRef is the name of the secret with the storage credentials for the plugin.
 	// The secret should reside in the same namespace where the source provider is.
 	SecretRef string `json:"secretRef"`

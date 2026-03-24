@@ -187,22 +187,22 @@ func main() {
 	}
 
 	klog.InfoS("populator", "stage", "setupTracing")
-	progressCounter, xcopyUsedGauge, err := setupTracingMetrics()
+	progressCounter, storageOffloadGauge, err := setupTracingMetrics()
 	if err != nil {
 		klog.Fatal(err)
 	}
 
 	progressCh := make(chan uint64)
-	xCopyUsedCh := make(chan int)
+	storageOffloadCh := make(chan int)
 	quitCh := make(chan error)
 
 	log := klog.Background().WithName("copy-offload").WithValues("pvc", ownerName, "source_vmdk", sourceVMDKFile)
-	cloneLog := log.WithName("xcopy").WithName("clone")
+	cloneLog := log.WithName("clone")
 	log.Info("copy-offload started")
 
 	hll := populator.NewHostLeaseLocker(clientSet)
 	klog.InfoS("populator", "stage", "starting")
-	go p.Populate(sourceVmId, sourceVMDKFile, pv, hll, progressCh, xCopyUsedCh, quitCh)
+	go p.Populate(sourceVmId, sourceVMDKFile, pv, hll, progressCh, storageOffloadCh, quitCh)
 
 	for {
 		select {
@@ -214,13 +214,13 @@ func main() {
 			} else if float64(p) > metric.Counter.GetValue() {
 				progressCounter.WithLabelValues(ownerUID).Add(float64(p) - metric.Counter.GetValue())
 			}
-		case c := <-xCopyUsedCh:
-			cloneLog.Info("xcopy", "xcopyUsed", c)
+		case c := <-storageOffloadCh:
+			cloneLog.Info("storage offload primitive", "used", c)
 			metric := dto.Metric{}
-			if err := xcopyUsedGauge.WithLabelValues(ownerUID).Write(&metric); err != nil {
-				log.Error(err, "failed to write xcopy used gauge")
+			if err := storageOffloadGauge.WithLabelValues(ownerUID).Write(&metric); err != nil {
+				log.Error(err, "failed to write storage offload gauge")
 			} else {
-				xcopyUsedGauge.WithLabelValues(ownerUID).Set(float64(c))
+				storageOffloadGauge.WithLabelValues(ownerUID).Set(float64(c))
 			}
 		case q := <-quitCh:
 			if q != nil {
@@ -411,16 +411,16 @@ func setupTracingMetrics() (*prometheus.CounterVec, *prometheus.GaugeVec, error)
 	// Register metrics
 	progressCounter := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "vsphere_xcopy_volume_populator_progress",
-			Help: "Progress of vsphere XCOPY volume population",
+			Name: "vsphere_copy_offload_volume_populator_progress",
+			Help: "Progress of vSphere copy-offload volume population",
 		},
 		[]string{"ownerUID"},
 	)
 
-	xcopyUsedGauge := prometheus.NewGaugeVec(
+	storageOffloadGauge := prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "vsphere_xcopy_volume_populator_xcopy_used",
-			Help: "Indicates whether XCOPY was used for cloning (0=no, 1=yes)",
+			Name: "vsphere_copy_offload_volume_populator_storage_offload_used",
+			Help: "Whether a storage offload primitive (e.g. VAAI XCOPY) was used for the clone (0=no, 1=yes)",
 		},
 		[]string{"ownerUID"},
 	)
@@ -429,13 +429,13 @@ func setupTracingMetrics() (*prometheus.CounterVec, *prometheus.GaugeVec, error)
 	if err := prometheus.Register(progressCounter); err != nil {
 		return nil, nil, fmt.Errorf("Progress counter not registered: %w", err)
 	}
-	if err := prometheus.Register(xcopyUsedGauge); err != nil {
-		return nil, nil, fmt.Errorf("XCOPY used gauge not registered: %w", err)
+	if err := prometheus.Register(storageOffloadGauge); err != nil {
+		return nil, nil, fmt.Errorf("storage offload gauge not registered: %w", err)
 	}
 
 	startMetricsServer(certFile, keyFile)
 
-	return progressCounter, xcopyUsedGauge, nil
+	return progressCounter, storageOffloadGauge, nil
 }
 
 // getSSHKeysFromEnvironment retrieves SSH keys from environment variables set by the provider controller

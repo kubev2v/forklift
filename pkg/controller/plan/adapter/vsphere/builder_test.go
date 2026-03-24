@@ -117,7 +117,7 @@ var _ = Describe("vSphere builder", func() {
 						StorageClass: "test-sc",
 					},
 					OffloadPlugin: &v1beta1.OffloadPlugin{
-						VSphereXcopyPluginConfig: &v1beta1.VSphereXcopyPluginConfig{
+						VSphereCopyOffloadPluginConfig: &v1beta1.VSphereCopyOffloadPluginConfig{
 							StorageVendorProduct: "test-vendor",
 							SecretRef:            "test-secret",
 						},
@@ -185,7 +185,7 @@ var _ = Describe("vSphere builder", func() {
 						StorageClass: "test-sc",
 					},
 					OffloadPlugin: &v1beta1.OffloadPlugin{
-						VSphereXcopyPluginConfig: &v1beta1.VSphereXcopyPluginConfig{
+						VSphereCopyOffloadPluginConfig: &v1beta1.VSphereCopyOffloadPluginConfig{
 							StorageVendorProduct: "test-vendor",
 							SecretRef:            "test-secret",
 						},
@@ -217,7 +217,7 @@ var _ = Describe("vSphere builder", func() {
 			pvc := pvcs[0]
 			// The default template now uses trunc 4 for both plan and VM names
 			Expect(pvc.Name).Should(HavePrefix(fmt.Sprintf("%.4s-%.4s-disk-", builder.Plan.Name, vm.Name)))
-			Expect(pvc.Spec.DataSourceRef.Kind).To(Equal(v1beta1.VSphereXcopyVolumePopulatorKind))
+			Expect(pvc.Spec.DataSourceRef.Kind).To(Equal(v1beta1.VSphereCopyOffloadVolumePopulatorKind))
 			Expect(pvc.Spec.DataSourceRef.APIGroup).To(Equal(&v1beta1.SchemeGroupVersion.Group))
 			Expect(pvc.Spec.DataSourceRef.Name).To(Equal(pvc.Name))
 		})
@@ -247,7 +247,7 @@ var _ = Describe("vSphere builder", func() {
 							VolumeMode:   core.PersistentVolumeFilesystem,
 						},
 						OffloadPlugin: &v1beta1.OffloadPlugin{
-							VSphereXcopyPluginConfig: &v1beta1.VSphereXcopyPluginConfig{
+							VSphereCopyOffloadPluginConfig: &v1beta1.VSphereCopyOffloadPluginConfig{
 								StorageVendorProduct: "test-vendor",
 								SecretRef:            "test-secret",
 							},

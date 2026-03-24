@@ -38,7 +38,7 @@ func (d *DestinationClient) DeletePopulatorDataSource(vm *plan.VMStatus) error {
 			"namespace", populatorCr.Namespace,
 			"vmdkPath", populatorCr.Spec.VmdkPath)
 
-		err = d.DeleteObject(&populatorCr, vm, "Deleted VSphereXcopyPopulator CR.", "VSphereXcopyVolumePopulator")
+		err = d.DeleteObject(&populatorCr, vm, "Deleted VSphereCopyOffloadPopulator CR.", "VSphereCopyOffloadVolumePopulator")
 		if err != nil {
 			d.Log.Error(err, "Failed to delete populator CR", "name", populatorCr.Name)
 			return liberr.Wrap(err)
@@ -58,20 +58,20 @@ func (r *DestinationClient) SetPopulatorCrOwnership() (err error) {
 	return nil
 }
 
-// Get the VSphereXcopyVolumePopulator CustomResource List.
-func (r *DestinationClient) getPopulatorCrList() (populatorCrList v1beta1.VSphereXcopyVolumePopulatorList, err error) {
+// Get the VSphereCopyOffloadVolumePopulator CustomResource List.
+func (r *DestinationClient) getPopulatorCrList() (populatorCrList v1beta1.VSphereCopyOffloadVolumePopulatorList, err error) {
 	snap := r.Plan.Status.Migration.ActiveSnapshot()
 	if snap.Migration.UID == "" {
 		err = liberr.New("no active migration snapshot", "plan", r.Plan.Name)
 		r.Log.Error(err, "Cannot list populator CRs")
-		return v1beta1.VSphereXcopyVolumePopulatorList{}, err
+		return v1beta1.VSphereCopyOffloadVolumePopulatorList{}, err
 	}
 	migUID := string(snap.Migration.UID)
 	r.Log.Info("Getting populator CR list",
 		"namespace", r.Plan.Spec.TargetNamespace,
 		"migrationUID", migUID)
 
-	populatorCrList = v1beta1.VSphereXcopyVolumePopulatorList{}
+	populatorCrList = v1beta1.VSphereCopyOffloadVolumePopulatorList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
 		&populatorCrList,
@@ -119,7 +119,7 @@ func (r *DestinationClient) DeleteObject(object client.Object, vm *plan.VMStatus
 	return err
 }
 
-func (r *DestinationClient) findPVCByCR(cr *v1beta1.VSphereXcopyVolumePopulator) (pvc *core.PersistentVolumeClaim, err error) {
+func (r *DestinationClient) findPVCByCR(cr *v1beta1.VSphereCopyOffloadVolumePopulator) (pvc *core.PersistentVolumeClaim, err error) {
 	snap := r.Plan.Status.Migration.ActiveSnapshot()
 	if snap.Migration.UID == "" {
 		err = liberr.New("no active migration snapshot", "plan", r.Plan.Name)

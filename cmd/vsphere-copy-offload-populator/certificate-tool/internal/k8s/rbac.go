@@ -48,7 +48,7 @@ func NewClusterRole(roleName string) *rbacv1.ClusterRole {
 			},
 			{
 				APIGroups: []string{"forklift.konveyor.io"},
-				Resources: []string{"ovirtvolumepopulators", "vspherexcopyvolumepopulators", "openstackvolumepopulators"},
+				Resources: []string{"ovirtvolumepopulators", "vspherecopyoffloadvolumepopulators", "openstackvolumepopulators"},
 				Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
 			},
 		},

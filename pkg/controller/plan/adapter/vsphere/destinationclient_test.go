@@ -26,7 +26,7 @@ var _ = Describe("DestinationClient", func() {
 	Describe("DeletePopulatorDataSource", func() {
 		It("should delete all populator CRs successfully", func() {
 			// Setup
-			populator1 := &v1beta1.VSphereXcopyVolumePopulator{
+			populator1 := &v1beta1.VSphereCopyOffloadVolumePopulator{
 				ObjectMeta: meta.ObjectMeta{
 					Name:      "populator-1",
 					Namespace: "test",
@@ -34,11 +34,11 @@ var _ = Describe("DestinationClient", func() {
 						"migration": "123",
 					},
 				},
-				Spec: v1beta1.VSphereXcopyVolumePopulatorSpec{
+				Spec: v1beta1.VSphereCopyOffloadVolumePopulatorSpec{
 					VmdkPath: "/vmdk/path1.vmdk",
 				},
 			}
-			populator2 := &v1beta1.VSphereXcopyVolumePopulator{
+			populator2 := &v1beta1.VSphereCopyOffloadVolumePopulator{
 				ObjectMeta: meta.ObjectMeta{
 					Name:      "populator-2",
 					Namespace: "test",
@@ -46,7 +46,7 @@ var _ = Describe("DestinationClient", func() {
 						"migration": "123",
 					},
 				},
-				Spec: v1beta1.VSphereXcopyVolumePopulatorSpec{
+				Spec: v1beta1.VSphereCopyOffloadVolumePopulatorSpec{
 					VmdkPath: "/vmdk/path2.vmdk",
 				},
 			}
@@ -63,7 +63,7 @@ var _ = Describe("DestinationClient", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify all populators are deleted
-			populatorList := &v1beta1.VSphereXcopyVolumePopulatorList{}
+			populatorList := &v1beta1.VSphereCopyOffloadVolumePopulatorList{}
 			err = destClient.Destination.Client.List(context.TODO(), populatorList, client.InNamespace("test"))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(populatorList.Items).To(BeEmpty())
@@ -87,7 +87,7 @@ var _ = Describe("DestinationClient", func() {
 	Describe("getPopulatorCrList", func() {
 		It("should return only CRs matching the migration UID", func() {
 			// Setup
-			populator1 := &v1beta1.VSphereXcopyVolumePopulator{
+			populator1 := &v1beta1.VSphereCopyOffloadVolumePopulator{
 				ObjectMeta: meta.ObjectMeta{
 					Name:      "populator-match-1",
 					Namespace: "test",
@@ -95,11 +95,11 @@ var _ = Describe("DestinationClient", func() {
 						"migration": "123",
 					},
 				},
-				Spec: v1beta1.VSphereXcopyVolumePopulatorSpec{
+				Spec: v1beta1.VSphereCopyOffloadVolumePopulatorSpec{
 					VmdkPath: "/vmdk/path1.vmdk",
 				},
 			}
-			populator2 := &v1beta1.VSphereXcopyVolumePopulator{
+			populator2 := &v1beta1.VSphereCopyOffloadVolumePopulator{
 				ObjectMeta: meta.ObjectMeta{
 					Name:      "populator-match-2",
 					Namespace: "test",
@@ -107,11 +107,11 @@ var _ = Describe("DestinationClient", func() {
 						"migration": "123",
 					},
 				},
-				Spec: v1beta1.VSphereXcopyVolumePopulatorSpec{
+				Spec: v1beta1.VSphereCopyOffloadVolumePopulatorSpec{
 					VmdkPath: "/vmdk/path2.vmdk",
 				},
 			}
-			populatorDifferent := &v1beta1.VSphereXcopyVolumePopulator{
+			populatorDifferent := &v1beta1.VSphereCopyOffloadVolumePopulator{
 				ObjectMeta: meta.ObjectMeta{
 					Name:      "populator-different-migration",
 					Namespace: "test",
@@ -119,7 +119,7 @@ var _ = Describe("DestinationClient", func() {
 						"migration": "different-uid",
 					},
 				},
-				Spec: v1beta1.VSphereXcopyVolumePopulatorSpec{
+				Spec: v1beta1.VSphereCopyOffloadVolumePopulatorSpec{
 					VmdkPath: "/vmdk/path3.vmdk",
 				},
 			}
@@ -153,12 +153,12 @@ var _ = Describe("DestinationClient", func() {
 	Describe("DeleteObject", func() {
 		It("should delete the object successfully", func() {
 			// Setup
-			populator := &v1beta1.VSphereXcopyVolumePopulator{
+			populator := &v1beta1.VSphereCopyOffloadVolumePopulator{
 				ObjectMeta: meta.ObjectMeta{
 					Name:      "test-populator",
 					Namespace: "test",
 				},
-				Spec: v1beta1.VSphereXcopyVolumePopulatorSpec{
+				Spec: v1beta1.VSphereCopyOffloadVolumePopulatorSpec{
 					VmdkPath: "/vmdk/test.vmdk",
 				},
 			}
@@ -169,13 +169,13 @@ var _ = Describe("DestinationClient", func() {
 			}
 
 			// Execute
-			err := destClient.DeleteObject(populator, vmStatus, "Deleted test object", "VSphereXcopyVolumePopulator")
+			err := destClient.DeleteObject(populator, vmStatus, "Deleted test object", "VSphereCopyOffloadVolumePopulator")
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify object is deleted
-			deletedPop := &v1beta1.VSphereXcopyVolumePopulator{}
+			deletedPop := &v1beta1.VSphereCopyOffloadVolumePopulator{}
 			err = destClient.Destination.Client.Get(context.TODO(), client.ObjectKey{
 				Name:      "test-populator",
 				Namespace: "test",
@@ -186,12 +186,12 @@ var _ = Describe("DestinationClient", func() {
 		It("should succeed without error when object does not exist", func() {
 			// Setup
 			destClient := createDestinationClient()
-			populator := &v1beta1.VSphereXcopyVolumePopulator{
+			populator := &v1beta1.VSphereCopyOffloadVolumePopulator{
 				ObjectMeta: meta.ObjectMeta{
 					Name:      "nonexistent-populator",
 					Namespace: "test",
 				},
-				Spec: v1beta1.VSphereXcopyVolumePopulatorSpec{
+				Spec: v1beta1.VSphereCopyOffloadVolumePopulatorSpec{
 					VmdkPath: "/vmdk/test.vmdk",
 				},
 			}
@@ -200,7 +200,7 @@ var _ = Describe("DestinationClient", func() {
 			}
 
 			// Execute
-			err := destClient.DeleteObject(populator, vmStatus, "Deleted test object", "VSphereXcopyVolumePopulator")
+			err := destClient.DeleteObject(populator, vmStatus, "Deleted test object", "VSphereCopyOffloadVolumePopulator")
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
@@ -226,7 +226,7 @@ var _ = Describe("DestinationClient", func() {
 					AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
 				},
 			}
-			populator := &v1beta1.VSphereXcopyVolumePopulator{
+			populator := &v1beta1.VSphereCopyOffloadVolumePopulator{
 				ObjectMeta: meta.ObjectMeta{
 					Name:      "test-populator",
 					Namespace: "test",
@@ -235,7 +235,7 @@ var _ = Describe("DestinationClient", func() {
 						"vmdkKey":   "disk-1",
 					},
 				},
-				Spec: v1beta1.VSphereXcopyVolumePopulatorSpec{
+				Spec: v1beta1.VSphereCopyOffloadVolumePopulatorSpec{
 					VmdkPath: "/vmdk/test.vmdk",
 				},
 			}
@@ -254,7 +254,7 @@ var _ = Describe("DestinationClient", func() {
 
 		It("should return an error when no matching PVC exists", func() {
 			// Setup
-			populator := &v1beta1.VSphereXcopyVolumePopulator{
+			populator := &v1beta1.VSphereCopyOffloadVolumePopulator{
 				ObjectMeta: meta.ObjectMeta{
 					Name:      "test-populator",
 					Namespace: "test",
@@ -263,7 +263,7 @@ var _ = Describe("DestinationClient", func() {
 						"vmdkKey":   "disk-1",
 					},
 				},
-				Spec: v1beta1.VSphereXcopyVolumePopulatorSpec{
+				Spec: v1beta1.VSphereCopyOffloadVolumePopulatorSpec{
 					VmdkPath: "/vmdk/test.vmdk",
 				},
 			}
@@ -313,7 +313,7 @@ var _ = Describe("DestinationClient", func() {
 					AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
 				},
 			}
-			populator := &v1beta1.VSphereXcopyVolumePopulator{
+			populator := &v1beta1.VSphereCopyOffloadVolumePopulator{
 				ObjectMeta: meta.ObjectMeta{
 					Name:      "test-populator",
 					Namespace: "test",
@@ -322,7 +322,7 @@ var _ = Describe("DestinationClient", func() {
 						"vmdkKey":   "disk-1",
 					},
 				},
-				Spec: v1beta1.VSphereXcopyVolumePopulatorSpec{
+				Spec: v1beta1.VSphereCopyOffloadVolumePopulatorSpec{
 					VmdkPath: "/vmdk/test.vmdk",
 				},
 			}
@@ -353,7 +353,7 @@ var _ = Describe("DestinationClient", func() {
 					AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
 				},
 			}
-			populator := &v1beta1.VSphereXcopyVolumePopulator{
+			populator := &v1beta1.VSphereCopyOffloadVolumePopulator{
 				ObjectMeta: meta.ObjectMeta{
 					Name:      "test-populator",
 					Namespace: "test",
@@ -362,7 +362,7 @@ var _ = Describe("DestinationClient", func() {
 						"vmdkKey":   "disk-1",
 					},
 				},
-				Spec: v1beta1.VSphereXcopyVolumePopulatorSpec{
+				Spec: v1beta1.VSphereCopyOffloadVolumePopulatorSpec{
 					VmdkPath: "/vmdk/test.vmdk",
 				},
 			}
@@ -393,7 +393,7 @@ var _ = Describe("DestinationClient", func() {
 					AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
 				},
 			}
-			populator := &v1beta1.VSphereXcopyVolumePopulator{
+			populator := &v1beta1.VSphereCopyOffloadVolumePopulator{
 				ObjectMeta: meta.ObjectMeta{
 					Name:      "test-populator",
 					Namespace: "test",
@@ -402,7 +402,7 @@ var _ = Describe("DestinationClient", func() {
 						"vmdkKey":   "disk-1",
 					},
 				},
-				Spec: v1beta1.VSphereXcopyVolumePopulatorSpec{
+				Spec: v1beta1.VSphereCopyOffloadVolumePopulatorSpec{
 					VmdkPath: "/vmdk/test.vmdk",
 				},
 			}

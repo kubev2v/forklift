@@ -100,10 +100,10 @@ var (
 			resource:           "openstackvolumepopulators",
 			regexKey:           "openstack_volume_populator",
 		},
-		api.VSphereXcopyVolumePopulatorKind: {
+		api.VSphereCopyOffloadVolumePopulatorKind: {
 			storageResourceKey: "source_vmdk",
-			resource:           api.VSphereXcopyVolumePopulatorResource,
-			regexKey:           "vsphere_xcopy_volume_populator",
+			resource:           api.VSphereCopyOffloadVolumePopulatorResource,
+			regexKey:           "vsphere_copy_offload_volume_populator",
 		},
 	}
 
@@ -637,8 +637,8 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 				},
 				Spec: makePopulatePodSpec(pvcPrimeName, secretName),
 			}
-			if c.gk.Kind == api.VSphereXcopyVolumePopulatorKind {
-				pod.Spec.ServiceAccountName = "populator" // Xcopy always uses its dedicated SA
+			if c.gk.Kind == api.VSphereCopyOffloadVolumePopulatorKind {
+				pod.Spec.ServiceAccountName = "populator" // vSphere copy-offload always uses its dedicated SA
 			} else if sa, ok := pvc.Annotations[AnnPopulatorServiceAccount]; ok && sa != "" {
 				pod.Spec.ServiceAccountName = sa // Other populators use the annotation
 			}
@@ -742,9 +742,9 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 
 		if corev1.PodSucceeded != pod.Status.Phase {
 			if corev1.PodFailed == pod.Status.Phase {
-				// Skip retry logic for VSphere xcopy populator - let it fail immediately
-				if c.gk.Kind == api.VSphereXcopyVolumePopulatorKind {
-					c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPodFailed, "VSphere xcopy populator failed (no retry): Please check the logs of the populator pod, %s/%s", populatorNamespace, pod.Name)
+				// Skip retry logic for vSphere copy-offload populator - let it fail immediately
+				if c.gk.Kind == api.VSphereCopyOffloadVolumePopulatorKind {
+					c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPodFailed, "VSphere copy-offload populator failed (no retry): Please check the logs of the populator pod, %s/%s", populatorNamespace, pod.Name)
 					return c.deleteFailedPVC(ctx, pvc)
 				}
 
