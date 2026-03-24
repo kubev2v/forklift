@@ -15,6 +15,28 @@ type HookSpec struct {
 	Playbook string `json:"playbook,omitempty"`
 	// Hook deadline in seconds.
 	Deadline int64 `json:"deadline,omitempty"`
+	// AAP (Ansible Automation Platform) configuration for remote job execution.
+	// When specified, the hook will trigger an AAP job template instead of running a local playbook.
+	// +optional
+	AAP *AAPConfig `json:"aap,omitempty"`
+}
+
+// AAPConfig defines configuration for executing hooks via Ansible Automation Platform.
+type AAPConfig struct {
+	// URL of the AAP instance (e.g., "https://aap.example.com").
+	// +kubebuilder:validation:Required
+	URL string `json:"url"`
+	// ID of the AAP job template to execute.
+	// +kubebuilder:validation:Required
+	JobTemplateID int `json:"jobTemplateId"`
+	// Reference to a Secret containing the AAP API token.
+	// The Secret must contain a key named "token" with the Bearer token value.
+	// +kubebuilder:validation:Required
+	TokenSecret string `json:"tokenSecret"`
+	// Timeout for AAP job execution in seconds.
+	// If not specified, defaults to the Hook deadline.
+	// +optional
+	Timeout int64 `json:"timeout,omitempty"`
 }
 
 // Hook status.

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"path"
 	"strings"
+	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
@@ -64,6 +65,14 @@ func (r *HookRunner) Run(vm *planapi.VMStatus) (err error) {
 		step.MarkedCompleted()
 		return
 	}
+
+	// Check if this is an AAP job template hook
+	if r.hook.Spec.AAP != nil {
+		err = r.runAAPJob(step)
+		return
+	}
+
+	// Standard local playbook execution
 	job, err := r.ensureJob()
 	if err != nil {
 		return
@@ -372,4 +381,95 @@ func (r *HookRunner) labels() map[string]string {
 		kHook:      string(r.hook.UID),
 		kResource:  ResourceHookConfig,
 	}
+}
+
+// Run AAP job template remotely.
+func (r *HookRunner) runAAPJob(step *planapi.Step) (err error) {
+	aapConfig := r.hook.Spec.AAP
+
+	// Get AAP token from Secret
+	token, err := GetAAPToken(
+		context.TODO(),
+		r.Client,
+		r.Plan.Namespace,
+		aapConfig.TokenSecret,
+	)
+	if err != nil {
+		step.AddError(err.Error())
+		step.MarkCompleted()
+		return
+	}
+
+	// Create AAP client
+	aapClient := NewAAPClient(aapConfig.URL, token)
+
+	// Prepare extra variables to pass to AAP
+	extraVars := make(map[string]string)
+
+	// Add VM information
+	extraVars["vm_id"] = r.vm.ID
+	extraVars["vm_name"] = r.vm.Name
+	if r.vm.Ref.ID != "" {
+		extraVars["vm_source_id"] = r.vm.Ref.ID
+	}
+
+	// Add migration plan information
+	extraVars["plan_name"] = r.Plan.Name
+	extraVars["plan_namespace"] = r.Plan.Namespace
+	extraVars["migration_phase"] = r.vm.Phase
+
+	r.Log.Info(
+		"Launching AAP job template",
+		"jobTemplateId", aapConfig.JobTemplateID,
+		"aapUrl", aapConfig.URL,
+		"vm", r.vm.Name,
+	)
+
+	// Launch the job
+	jobID, err := aapClient.LaunchJob(context.TODO(), aapConfig.JobTemplateID, extraVars)
+	if err != nil {
+		step.AddError(err.Error())
+		step.MarkCompleted()
+		return
+	}
+
+	step.MarkStarted()
+	r.Log.Info(
+		"AAP job launched successfully",
+		"jobId", jobID,
+		"jobTemplateId", aapConfig.JobTemplateID,
+	)
+
+	// Determine timeout
+	timeout := r.hook.Spec.Deadline
+	if aapConfig.Timeout > 0 {
+		timeout = aapConfig.Timeout
+	}
+	if timeout == 0 {
+		timeout = 3600 // Default 1 hour if no timeout specified
+	}
+
+	// Wait for job completion
+	err = aapClient.WaitForJobCompletion(
+		context.TODO(),
+		jobID,
+		time.Duration(timeout)*time.Second,
+	)
+
+	if err != nil {
+		r.Log.Error(err, "AAP job failed", "jobId", jobID)
+		step.AddError(err.Error())
+		step.MarkCompleted()
+		return
+	}
+
+	r.Log.Info(
+		"AAP job completed successfully",
+		"jobId", jobID,
+	)
+
+	step.Progress.Completed = 1
+	step.MarkCompleted()
+
+	return
 }
