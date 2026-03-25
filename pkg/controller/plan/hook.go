@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"path"
 	"strings"
+	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
@@ -36,6 +37,9 @@ const (
 	ResourceHookConfig = "hook-config"
 )
 
+// defaultAAPJobPollSeconds is used when neither spec.aap.timeout nor spec.deadline set a positive limit.
+const defaultAAPJobPollSeconds int64 = 3600
+
 // Hook runner.
 type HookRunner struct {
 	*plancontext.Context
@@ -65,6 +69,14 @@ func (r *HookRunner) Run(vm *planapi.VMStatus) (err error) {
 		step.MarkedCompleted()
 		return
 	}
+
+	// Check if this is an AAP job template hook
+	if r.hook.Spec.AAP != nil {
+		err = r.runAAPJob(step)
+		return
+	}
+
+	// Standard local playbook execution
 	job, err := r.ensureJob()
 	if err != nil {
 		return
@@ -224,6 +236,7 @@ func (r *HookRunner) template(mp *core.ConfigMap) (template *core.PodTemplateSpe
 	if deadline > 0 {
 		template.Spec.ActiveDeadlineSeconds = &deadline
 	}
+	// Hook SA > plan SA > global controller SA > namespace default (empty).
 	if sa := cmp.Or(r.hook.Spec.ServiceAccount, r.Context.Plan.Spec.ServiceAccount, Settings.Migration.ServiceAccount); sa != "" {
 		template.Spec.ServiceAccountName = sa
 	}
@@ -372,4 +385,109 @@ func (r *HookRunner) labels() map[string]string {
 		kHook:      string(r.hook.UID),
 		kResource:  ResourceHookConfig,
 	}
+}
+
+// aapJobExtraVars builds extra_vars for the AAP job template (extend here when adding new migration context).
+func (r *HookRunner) aapJobExtraVars() map[string]string {
+	m := map[string]string{
+		"vm_id":           r.vm.ID,
+		"vm_name":         r.vm.Name,
+		"plan_name":       r.Plan.Name,
+		"plan_namespace":  r.Plan.Namespace,
+		"migration_phase": r.vm.Phase,
+	}
+	if id := r.vm.Ref.ID; id != "" {
+		m["vm_source_id"] = id
+	}
+	return m
+}
+
+// Run AAP job template remotely.
+func (r *HookRunner) runAAPJob(step *planapi.Step) (err error) {
+	aapConfig := r.hook.Spec.AAP
+
+	// Get AAP token from Secret
+	token, err := GetAAPTokenFromSecret(
+		context.TODO(),
+		r.Client,
+		r.Plan.Namespace,
+		&aapConfig.TokenSecret,
+	)
+	if err != nil {
+		step.AddError(err.Error())
+		step.MarkCompleted()
+		return
+	}
+
+	// Create AAP client
+	aapClient := NewAAPClient(aapConfig.URL, token)
+
+	extraVars := r.aapJobExtraVars()
+
+	r.Log.Info(
+		"Launching AAP job template",
+		"jobTemplateId", aapConfig.JobTemplateID,
+		"aapUrl", aapConfig.URL,
+		"vm", r.vm.Name,
+	)
+
+	// Launch the job
+	jobID, err := aapClient.LaunchJob(context.TODO(), aapConfig.JobTemplateID, extraVars)
+	if err != nil {
+		step.AddError(err.Error())
+		step.MarkCompleted()
+		return
+	}
+
+	step.MarkStarted()
+	r.Log.Info(
+		"AAP job launched successfully",
+		"jobId", jobID,
+		"jobTemplateId", aapConfig.JobTemplateID,
+	)
+
+	// Poll until the AAP job completes. Timeout semantics (seconds):
+	//   < 0 : no wall-clock limit
+	//   > 0 : use this value
+	//     0 : use Hook deadline, else default 3600
+	var pollTimeout time.Duration
+	unlimited := false
+	switch {
+	case aapConfig.Timeout < 0:
+		unlimited = true
+	case aapConfig.Timeout > 0:
+		pollTimeout = time.Duration(aapConfig.Timeout) * time.Second
+	default:
+		timeout := r.hook.Spec.Deadline
+		if timeout > 0 {
+			pollTimeout = time.Duration(timeout) * time.Second
+		} else {
+			pollTimeout = time.Duration(defaultAAPJobPollSeconds) * time.Second
+		}
+	}
+
+	// Wait for job completion
+	err = aapClient.WaitForJobCompletion(
+		context.TODO(),
+		jobID,
+		pollTimeout,
+		unlimited,
+	)
+
+	if err != nil {
+		r.Log.Error(err, "AAP job failed", "jobId", jobID)
+		step.AddError(err.Error())
+		step.MarkCompleted()
+		return
+	}
+
+	r.Log.Info(
+		"AAP job completed successfully",
+		"jobId", jobID,
+	)
+
+	step.Progress.Completed = 1
+	step.MarkCompleted()
+
+	return
 }
