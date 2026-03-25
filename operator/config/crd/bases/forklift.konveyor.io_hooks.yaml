@@ -47,23 +47,96 @@ spec:
           metadata:
             type: object
           spec:
-            description: Hook specification.
+            description: |-
+              Hook specification.
+              Local hooks require spec.image (playbook is optional if the image runs without an injected playbook).
+              AAP hooks require spec.aap (image/playbook omitted for execution).
+              Whether the spec is valid for execution is enforced by the hook and plan controllers (not by CRD admission rules).
             properties:
+              aap:
+                description: |-
+                  AAP (Ansible Automation Platform) configuration for remote job execution.
+                  When specified, the hook will trigger an AAP job template instead of running a local playbook.
+                properties:
+                  jobTemplateId:
+                    description: ID of the AAP job template to execute.
+                    type: integer
+                  timeout:
+                    description: |-
+                      Timeout in seconds to wait for the AAP job after launch (wall-clock polling limit).
+                      Default when omitted or 0: first use HookSpec.deadline if it is > 0; otherwise 3600 seconds (1 hour).
+                      Any negative value: wait without a wall-clock limit until the job finishes or fails.
+                    format: int64
+                    type: integer
+                  tokenSecret:
+                    description: |-
+                      Reference to the Secret containing the AAP API token.
+                      The Secret must contain a key named "token" with the Bearer token value.
+                      If Namespace is empty, the Secret is read from the migration plan namespace.
+                    properties:
+                      apiVersion:
+                        description: API version of the referent.
+                        type: string
+                      fieldPath:
+                        description: |-
+                          If referring to a piece of an object instead of an entire object, this string
+                          should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                          For example, if the object reference is to a container within a pod, this would take on a value like:
+                          "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                          the event) or if no container name is specified "spec.containers[2]" (container with
+                          index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                          referencing a part of an object.
+                        type: string
+                      kind:
+                        description: |-
+                          Kind of the referent.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                        type: string
+                      name:
+                        description: |-
+                          Name of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                      namespace:
+                        description: |-
+                          Namespace of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                        type: string
+                      resourceVersion:
+                        description: |-
+                          Specific resourceVersion to which this reference is made, if any.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                        type: string
+                      uid:
+                        description: |-
+                          UID of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  url:
+                    description: URL of the AAP instance (e.g., "https://aap.example.com").
+                    type: string
+                required:
+                - jobTemplateId
+                - tokenSecret
+                - url
+                type: object
               deadline:
                 description: Hook deadline in seconds.
                 format: int64
                 type: integer
               image:
-                description: Image to run.
+                description: Image to run the hook workload (required for local hooks;
+                  omit for AAP hooks).
                 type: string
               playbook:
-                description: A base64 encoded Ansible playbook.
+                description: A base64 encoded Ansible playbook (optional for local
+                  hooks; when set, ansible-runner is used).
                 type: string
               serviceAccount:
                 description: Service account.
                 type: string
-            required:
-            - image
             type: object
           status:
             description: Hook status.

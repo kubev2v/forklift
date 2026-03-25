@@ -14,6 +14,7 @@ import (
 
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	apisplan "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	refapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
@@ -1444,6 +1445,26 @@ func planHasHooks(plan *api.Plan) bool {
 	return false
 }
 
+// planHookValidSteps is the set of pipeline steps that may reference a Hook.
+var planHookValidSteps = map[string]struct{}{
+	api.PhasePreHook:  {},
+	api.PhasePostHook: {},
+}
+
+const (
+	planHookStepDescriptionFmt  = "VM: %s step: %s"
+	planHookVMRefDescriptionFmt = "VM: %s hook: %s"
+	planHookVMOnlyFmt           = "VM: %s"
+)
+
+func planHookStepDescription(vm apisplan.VM, step string) string {
+	return fmt.Sprintf(planHookStepDescriptionFmt, vm.String(), step)
+}
+
+func planHookVMRefDescription(vm apisplan.VM, href apisplan.HookRef) string {
+	return fmt.Sprintf(planHookVMRefDescriptionFmt, vm.String(), href.Hook.String())
+}
+
 // Validate referenced hooks.
 func (r *Reconciler) validateHooks(plan *api.Plan) (err error) {
 	notSet := libcnd.Condition{
@@ -1478,27 +1499,23 @@ func (r *Reconciler) validateHooks(plan *api.Plan) (err error) {
 		Message:  "Hook step not valid.",
 		Items:    []string{},
 	}
+	hookNotExecutable := libcnd.Condition{
+		Type:     HookNotValid,
+		Status:   True,
+		Reason:   NotValid,
+		Category: api.CategoryCritical,
+		Message:  "Hook must set spec.aap or spec.image for a local hook (playbook optional).",
+		Items:    []string{},
+	}
 	for _, vm := range plan.Spec.VMs {
 		for _, ref := range vm.Hooks {
-			// Step not valid.
-			if _, found := map[string]int{api.PhasePreHook: 1, api.PhasePostHook: 1}[ref.Step]; !found {
-				description := fmt.Sprintf(
-					"VM: %s step: %s",
-					vm.String(),
-					ref.Step)
-				stepNotValid.Items = append(
-					stepNotValid.Items,
-					description)
+			if _, ok := planHookValidSteps[ref.Step]; !ok {
+				stepNotValid.Items = append(stepNotValid.Items, planHookStepDescription(vm, ref.Step))
 			}
-			// Not Set.
 			if !libref.RefSet(&ref.Hook) {
-				description := fmt.Sprintf("VM: %s", vm.String())
-				notSet.Items = append(
-					notSet.Items,
-					description)
+				notSet.Items = append(notSet.Items, fmt.Sprintf(planHookVMOnlyFmt, vm.String()))
 				continue
 			}
-			// Not Found.
 			hook := &api.Hook{}
 			err = r.Get(
 				context.TODO(),
@@ -1508,36 +1525,23 @@ func (r *Reconciler) validateHooks(plan *api.Plan) (err error) {
 				},
 				hook)
 			if err != nil {
-				if k8serr.IsNotFound(err) {
-					description := fmt.Sprintf(
-						"VM: %s hook: %s",
-						vm.String(),
-						ref.Hook.String())
-					notFound.Items = append(
-						notFound.Items,
-						description)
-					continue
-				} else {
+				if !k8serr.IsNotFound(err) {
 					return
 				}
-			} else {
-				plan.Referenced.Hooks = append(
-					plan.Referenced.Hooks,
-					hook)
+				notFound.Items = append(notFound.Items, planHookVMRefDescription(vm, ref))
+				continue
 			}
-			// Not Ready.
+			plan.Referenced.Hooks = append(plan.Referenced.Hooks, hook)
+			hookRefDesc := planHookVMRefDescription(vm, ref)
+			if !api.HookExecutionConfigValid(hook) {
+				hookNotExecutable.Items = append(hookNotExecutable.Items, hookRefDesc)
+			}
 			if !hook.Status.HasCondition(libcnd.Ready) {
-				description := fmt.Sprintf(
-					"VM: %s hook: %s",
-					vm.String(),
-					ref.Hook.String())
-				notReady.Items = append(
-					notReady.Items,
-					description)
+				notReady.Items = append(notReady.Items, hookRefDesc)
 			}
 		}
 	}
-	for _, cnd := range []libcnd.Condition{notSet, notFound, notReady, stepNotValid} {
+	for _, cnd := range []libcnd.Condition{notSet, notFound, notReady, stepNotValid, hookNotExecutable} {
 		if len(cnd.Items) > 0 {
 			plan.Status.SetCondition(cnd)
 		}
