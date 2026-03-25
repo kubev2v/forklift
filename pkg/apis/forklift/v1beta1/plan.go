@@ -505,6 +505,9 @@ func (r *Plan) ShouldRunPreflightInspection() bool {
 
 // IsUsingOffloadPlugin determines if any of the mappings is using storage offload
 func (r *Plan) IsUsingOffloadPlugin() bool {
+	if r.Map.Storage == nil {
+		return false
+	}
 	dsMapIn := r.Map.Storage.Spec.Map
 	for _, m := range dsMapIn {
 		if m.OffloadPlugin != nil && m.OffloadPlugin.VSphereXcopyPluginConfig != nil {
