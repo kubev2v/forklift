@@ -144,6 +144,9 @@ func (p *PowermaxClonner) EnsureClonnerIgroup(_ string, clonnerIqn []string) (po
 	klog.Infof("filtered initiators for protocol %s: %v", portGroup.PortGroupProtocol, filteredInitiators)
 
 	hosts, err := p.client.GetHostList(ctx, p.symmetrixID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get host list from symmetrix %s: %w", p.symmetrixID, err)
+	}
 h:
 	for _, hostId := range hosts.HostIDs {
 		host, err := p.client.GetHostByID(ctx, p.symmetrixID, hostId)
@@ -160,11 +163,12 @@ h:
 			}
 		}
 	}
-	if p.hostID != "" {
-		klog.Infof("found host ID %s matching protocol %s", p.hostID, portGroup.PortGroupProtocol)
-	} else {
-		klog.Infof("cannot find host matching filtered initiators %v", filteredInitiators)
+	if p.hostID == "" {
+		return nil, fmt.Errorf("can't find a host on symmetrix %s with initiators matching %v. "+
+			"Ensure the ESXi host has a corresponding host object in PowerMax with the correct FC/iSCSI initiators registered",
+			p.symmetrixID, filteredInitiators)
 	}
+	klog.Infof("found host ID %s matching protocol %s", p.hostID, portGroup.PortGroupProtocol)
 
 	klog.Infof("port group ID %s", p.portGroup)
 	mappingContext := map[string]any{}
