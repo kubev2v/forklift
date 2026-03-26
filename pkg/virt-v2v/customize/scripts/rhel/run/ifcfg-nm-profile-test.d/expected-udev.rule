@@ -1,0 +1,1 @@
+SUBSYSTEM=="net",ACTION=="add",ATTR{address}=="00:50:56:b4:b9:77",NAME="eno16780032"

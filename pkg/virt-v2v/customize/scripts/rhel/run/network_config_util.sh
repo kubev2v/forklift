@@ -69,13 +69,59 @@ get_device_from_ifcfg() {
     # If no DEVICE, check for HWADDR and ensure S_HW is part of HWADDR (case-insensitive)
     HWADDR=$(grep '^HWADDR=' "$IFCFG" | cut -d'=' -f2)
     if echo "$HWADDR" | grep -iq "$S_HW"; then
-        # Extract device name from the file name, using last part after splitting by "-"
-        echo "$(basename "$IFCFG" | awk -F'-' '{print $NF}')"
+        device_name_from_ifcfg_filename "$IFCFG"
         return
     fi
 
-    # Return an empty string if no valid device is found
     echo ""
+}
+
+# When the IP-matched ifcfg file has neither DEVICE= nor HWADDR= (e.g. an NM
+# profile like ifcfg-Profile_1), search sibling ifcfg files for one that carries
+# a DEVICE= for the same physical NIC.
+resolve_device_from_siblings() {
+    local SCRIPTS_DIR="$1"
+    local IFCFG="$2"
+    local S_HW="$3"
+
+    for SIBLING in "$SCRIPTS_DIR"/ifcfg-*; do
+        [ "$SIBLING" = "$IFCFG" ] && continue
+        local SIBLING_DEV
+        SIBLING_DEV=$(remove_quotes "$(grep '^DEVICE=' "$SIBLING" 2>/dev/null | cut -d'=' -f2)")
+        { [ -z "$SIBLING_DEV" ] || [ "$SIBLING_DEV" = "lo" ]; } && continue
+        local SIBLING_HW
+        SIBLING_HW=$(grep -i '^HWADDR=' "$SIBLING" 2>/dev/null | cut -d'=' -f2)
+
+        if [ -n "$SIBLING_HW" ]; then
+            if echo "$SIBLING_HW" | grep -iq "$S_HW"; then
+                log "Info: resolved device '$SIBLING_DEV' from sibling $SIBLING (matched by HWADDR)."
+                echo "$SIBLING_DEV"
+                return
+            fi
+        elif ! grep -q '^IPADDR=.' "$SIBLING" 2>/dev/null; then
+            # Sibling has DEVICE= but no HWADDR= and no IPADDR= — likely the
+            # auto-created DHCP ifcfg for the same NIC.
+            # If the VM has multiple NICs without HWADDR, the first glob match
+            # wins, which could be wrong. The duplicate-MAC filter in
+            # check_dupe_hws() will discard the result if two MACs collide.
+            log "Info: resolved device '$SIBLING_DEV' from sibling $SIBLING (DEVICE= without IPADDR=)."
+            echo "$SIBLING_DEV"
+            return
+        fi
+    done
+}
+
+# Extract device name from an ifcfg filename only if it looks like a real
+# interface name (eth0, eno1, ens3, …) rather than an NM profile name.
+device_name_from_ifcfg_filename() {
+    local IFCFG="$1"
+    local CANDIDATE
+    CANDIDATE=$(basename "$IFCFG" | sed 's/^ifcfg-//')
+    if echo "$CANDIDATE" | grep -qE '^(eth|eno|ens|enp|em|bond|team|br|vlan)'; then
+        echo "$CANDIDATE"
+    else
+        log "Info: filename-derived name '$CANDIDATE' does not look like a standard network interface, skipping."
+    fi
 }
 
 # Create udev rules based on the macToip mapping + ifcfg network scripts
@@ -117,10 +163,8 @@ udev_from_ifcfg() {
         # RHEL/CentOS: typically has DEVICE= or HWADDR= inside the file
         # SUSE: device name is encoded in the filename itself (ifcfg-eth0 -> eth0)
         DEVICE=$(get_device_from_ifcfg "$IFCFG" "$S_HW")
-        if [ -z "$DEVICE" ]; then
-            # SUSE style: extract device name from filename (ifcfg-eth0 -> eth0)
-            DEVICE=$(basename "$IFCFG" | sed 's/^ifcfg-//')
-        fi
+        [ -z "$DEVICE" ] && DEVICE=$(resolve_device_from_siblings "$SCRIPTS_DIR" "$IFCFG" "$S_HW")
+        [ -z "$DEVICE" ] && DEVICE=$(device_name_from_ifcfg_filename "$IFCFG")
 
         if [ -z "$DEVICE" ] || [ "$DEVICE" = "lo" ]; then
             log "Info: no valid interface name found in $IFCFG."
