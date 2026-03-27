@@ -59,13 +59,14 @@ Templates can be specified at two levels:
 | Feature | VMware (vSphere) | OpenShift | oVirt | OpenStack | OVA |
 |---------|------------------|-----------|-------|-----------|-----|
 | **PVCNameTemplate** | Full | Full | No | No | No |
-| **PVCNameTemplateUseGenerateName** | Full | Ignored | No | No | No |
+| **PVCNameTemplateUseGenerateName** | Full | Full* | No | No | No |
 | **VolumeNameTemplate** | Full | No | No | No | No |
 | **NetworkNameTemplate** | Full | No | No | No | No |
 
 ### Legend
 
 - **Full** - Feature is fully supported
+- **Full*** - Feature is supported only when a custom `pvcNameTemplate` is set; otherwise the default behavior (exact name) is preserved
 - **No** - Feature is not supported
 - **Ignored** - Field exists but is ignored by the provider
 
@@ -199,7 +200,16 @@ pvcNameTemplate: "{{.TargetVmName}}-disk-{{.DiskIndex}}"
 
 #### PVCNameTemplateUseGenerateName
 
-**Status:** Ignored - OpenShift always uses the template output as the exact PVC name.
+**Type:** bool
+
+**Default:** `true`
+
+This field is only honored when a custom `pvcNameTemplate` is explicitly set (plan-level or VM-level). When no custom template is set, the default `{{.SourcePVCName}}` behavior always uses exact names regardless of this field.
+
+| Value | Behavior (with custom template) |
+|-------|----------|
+| `true` | Template output is used as `generateName` prefix, Kubernetes adds a random suffix (e.g., "my-vm-disk-0-" becomes "my-vm-disk-0-abc12") |
+| `false` | Template output is used as the exact PVC name. Warning: may cause conflicts if names are not unique |
 
 #### VolumeNameTemplate / NetworkNameTemplate
 
