@@ -271,6 +271,7 @@ type VM struct {
 	ConnectionState          string                 `json:"connectionState"`
 	Snapshot                 model.Ref              `json:"snapshot"`
 	ChangeTrackingEnabled    bool                   `json:"changeTrackingEnabled"`
+	ConsolidationNeeded      bool                   `json:"consolidationNeeded"`
 	CpuAffinity              []int32                `json:"cpuAffinity"`
 	CpuHotAddEnabled         bool                   `json:"cpuHotAddEnabled"`
 	CpuHotRemoveEnabled      bool                   `json:"cpuHotRemoveEnabled"`
@@ -351,6 +352,7 @@ func (r *VM) With(m *model.VM) {
 	r.CustomDef = m.CustomDef
 	r.CustomValues = m.CustomValues
 	r.Tags = m.Tags
+	r.ConsolidationNeeded = m.ConsolidationNeeded
 }
 
 // Build self link (URI).
