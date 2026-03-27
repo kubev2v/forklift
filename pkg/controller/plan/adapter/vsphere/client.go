@@ -124,7 +124,23 @@ func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hosts util.Hosts
 		"snapshot", snapshot,
 		"children", false)
 
-	task, err := vm.RemoveSnapshot(context.TODO(), snapshot, false, nil)
+	var consolidate bool
+	switch r.Plan.Spec.AllowSnapshotConsolidation {
+	case "Always":
+		consolidate = true
+	case "Never":
+		consolidate = false
+	case "AfterFinalSnapshot":
+		consolidate = false
+		migrationVM, found := r.Plan.Status.Migration.FindVM(vmRef)
+		if found && migrationVM.Phase == v1beta1.PhaseRemoveFinalSnapshot {
+			consolidate = true
+		}
+	default:
+		consolidate = true
+	}
+
+	task, err := vm.RemoveSnapshot(context.TODO(), snapshot, false, &consolidate)
 	if err != nil {
 		return "", liberr.Wrap(err)
 	}
@@ -316,6 +332,16 @@ func (r *Client) GetSnapshotDeltas(vmRef ref.Ref, snapshotId string, hosts util.
 // Check if a snapshot is removed
 func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (bool, error) {
 	r.Log.Info("Check Snapshot Remove", "vmRef", vmRef, "precopy", precopy)
+
+	// If configured to allow consolidation after the final snapshot,
+	// do not wait for it to complete.
+	if r.Plan.Spec.AllowSnapshotConsolidation == "AfterFinalSnapshot" {
+		migrationVM, found := r.Plan.Status.Migration.FindVM(vmRef)
+		if found && migrationVM.Phase == v1beta1.PhaseRemoveFinalSnapshot {
+			return true, nil
+		}
+	}
+
 	taskInfo, err := r.getTaskById(vmRef, precopy.RemoveTaskId, hosts)
 	if err != nil {
 		return false, liberr.Wrap(err)
