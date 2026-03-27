@@ -141,6 +141,7 @@ const (
 	fRuntimeHost              = "runtime.host"
 	fPowerState               = "runtime.powerState"
 	fConnectionState          = "runtime.connectionState"
+	fConsolidationNeeded      = "runtime.consolidationNeeded"
 	fSnapshot                 = "snapshot"
 	fIsTemplate               = "config.template"
 	fGuestNet                 = "guest.net"
@@ -860,6 +861,7 @@ func (r *Collector) vmPathSet() []string {
 		fRuntimeHost,
 		fPowerState,
 		fConnectionState,
+		fConsolidationNeeded,
 		fIsTemplate,
 		fSnapshot,
 		fChangeTracking,
