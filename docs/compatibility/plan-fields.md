@@ -182,9 +182,11 @@ Templates for customizing resource names. See [Template Support Matrix](../templ
 | Field | vSphere | oVirt | OpenStack | OpenShift | OVA | EC2 | HyperV |
 |-------|:-------:|:-----:|:---------:|:---------:|:---:|:---:|:------:|
 | `pvcNameTemplate` | Yes | No | No | Yes | No | No | No |
-| `pvcNameTemplateUseGenerateName` | Yes | No | No | Ignored | No | No | No |
+| `pvcNameTemplateUseGenerateName` | Yes | No | No | Yes* | No | No | No |
 | `volumeNameTemplate` | Yes | No | No | No | No | No | No |
 | `networkNameTemplate` | Yes | No | No | No | No | No | No |
+
+*Only applies when a custom `pvcNameTemplate` is set; default behavior (exact name) is preserved otherwise.
 
 ### Default Templates
 
@@ -300,7 +302,7 @@ All providers support `deleteVmOnFailMigration`.
 | `conversionTempStorageSize` | Yes | - | - | - | Yes | Yes | Yes |
 | **Templates** | | | | | | | |
 | `pvcNameTemplate` | Yes | - | - | Yes | - | - | - |
-| `pvcNameTemplateUseGenerateName` | Yes | - | - | Ignored | - | - | - |
+| `pvcNameTemplateUseGenerateName` | Yes | - | - | Yes* | - | - | - |
 | `volumeNameTemplate` | Yes | - | - | - | - | - | - |
 | `networkNameTemplate` | Yes | - | - | - | - | - | - |
 | **Conversion** | | | | | | | |

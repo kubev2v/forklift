@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
@@ -114,16 +115,23 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *v1.Secret, configMap *v1.Co
 
 		size := pvc.Spec.Resources.Requests["storage"]
 		dataVolume := dvTemplate.DeepCopy()
-		// The dvTemplate contains GenerateName which will create a PVC with different name than the original PVC
 		dataVolume.GenerateName = ""
 
-		// Generate PVC name using template
 		pvcName, templateErr := r.setPVCNameFromTemplate(vmRef, pvc, diskIndex)
 		if templateErr != nil {
 			r.Log.Info("Failed to generate PVC name using template, using source PVC name", "error", templateErr)
 			pvcName = pvc.Name
 		}
-		dataVolume.Name = pvcName
+
+		if r.hasCustomPVCNameTemplate(vmRef) && r.Plan.Spec.PVCNameTemplateUseGenerateName {
+			if !strings.HasSuffix(pvcName, "-") {
+				pvcName = pvcName + "-"
+			}
+			dataVolume.GenerateName = pvcName
+			dataVolume.Name = ""
+		} else {
+			dataVolume.Name = pvcName
+		}
 
 		dataVolume.Annotations[planbase.AnnDiskSource] = fmt.Sprintf("%s/%s", pvc.Namespace, pvc.Name)
 		dataVolume.Annotations[planbase.AnnDiskIndex] = fmt.Sprintf("%d", diskIndex)
@@ -708,20 +716,17 @@ func (r *Builder) ConversionPodConfig(_ ref.Ref) (*planbase.ConversionPodConfigR
 
 // getPlanVM returns the plan VM for the given vmRef
 func (r *Builder) getPlanVM(vmRef ref.Ref) *planapi.VM {
+	var fallback *planapi.VM
 	for i := range r.Plan.Spec.VMs {
 		planVM := &r.Plan.Spec.VMs[i]
 		if planVM.ID != "" && planVM.ID == vmRef.ID {
 			return planVM
 		}
-	}
-	// Fallback: match by Name when the spec VM has no ID
-	for i := range r.Plan.Spec.VMs {
-		planVM := &r.Plan.Spec.VMs[i]
-		if planVM.ID == "" && planVM.Name != "" && planVM.Name == vmRef.Name {
-			return planVM
+		if fallback == nil && planVM.Name != "" && planVM.Name == vmRef.Name {
+			fallback = planVM
 		}
 	}
-	return nil
+	return fallback
 }
 
 // getPlanVMStatus returns the plan VM status for the given vmRef
@@ -729,18 +734,26 @@ func (r *Builder) getPlanVMStatus(vmRef ref.Ref) *planapi.VMStatus {
 	if r.Plan == nil || r.Plan.Status.Migration.VMs == nil {
 		return nil
 	}
+	var fallback *planapi.VMStatus
 	for _, planVMStatus := range r.Plan.Status.Migration.VMs {
 		if planVMStatus.ID != "" && planVMStatus.ID == vmRef.ID {
 			return planVMStatus
 		}
-	}
-	// Fallback: match by Name when the status VM has no ID
-	for _, planVMStatus := range r.Plan.Status.Migration.VMs {
-		if planVMStatus.ID == "" && planVMStatus.Name != "" && planVMStatus.Name == vmRef.Name {
-			return planVMStatus
+		if fallback == nil && planVMStatus.Name != "" && planVMStatus.Name == vmRef.Name {
+			fallback = planVMStatus
 		}
 	}
-	return nil
+	return fallback
+}
+
+// hasCustomPVCNameTemplate returns true when a pvcNameTemplate has been
+// explicitly set at the VM or Plan level (i.e. it is not the built-in default).
+func (r *Builder) hasCustomPVCNameTemplate(vmRef ref.Ref) bool {
+	planVM := r.getPlanVM(vmRef)
+	if planVM != nil && planVM.PVCNameTemplate != "" {
+		return true
+	}
+	return r.Plan.Spec.PVCNameTemplate != ""
 }
 
 // getPVCNameTemplate returns the PVC name template for the given vmRef
