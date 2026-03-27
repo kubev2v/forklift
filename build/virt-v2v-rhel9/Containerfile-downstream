@@ -1,9 +1,9 @@
-FROM registry.redhat.io/ubi9:9.6-1754586119 AS winlegacyiso
+FROM registry.redhat.io/ubi9:9.7-1774415752 AS winlegacyiso
 
 RUN rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 RUN yum install -y --setopt=install_weak_deps=False virtio-win-1.9.12-4.el7
 
-FROM registry.redhat.io/ubi9:9.6-1754586119 AS appliance
+FROM registry.redhat.io/ubi9:9.7-1774415752 AS appliance
 
 RUN dnf update -y && \
     dnf install -y --setopt=install_weak_deps=False \
@@ -23,7 +23,7 @@ RUN mkdir -p /usr/local/lib/guestfs/appliance && \
     qemu-img convert -c -O qcow2 root root.qcow2 && \
     mv -vf root.qcow2 root
 
-FROM registry.redhat.io/ubi9/go-toolset:1.25.3-1766449309 AS builder
+FROM registry.redhat.io/ubi9/go-toolset:1.25.7-1774499506 AS builder
 USER 0
 RUN dnf install -y libvirt-devel
 WORKDIR /app
@@ -35,7 +35,7 @@ RUN GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o virt-v2
 RUN GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o image-converter github.com/kubev2v/forklift/cmd/image-converter
 RUN GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o virt-v2v-wrapper github.com/kubev2v/forklift/cmd/virt-v2v
 
-FROM registry.redhat.io/ubi9:9.6-1754586119 AS runtime
+FROM registry.redhat.io/ubi9:9.7-1774415752 AS runtime
 
 RUN rm /etc/pki/tls/fips_local.cnf && \
     echo -e '[fips_sect]\ntls1-prf-ems-check = 0\nactivate = 1' > /etc/pki/tls/fips_local.cnf && \

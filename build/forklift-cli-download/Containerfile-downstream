@@ -1,5 +1,5 @@
 # Build stage
-FROM registry.redhat.io/ubi9/go-toolset:1.25.3-1766449309 AS builder
+FROM registry.redhat.io/ubi9/go-toolset:1.25.7-1774499506 AS builder
 
 USER 0
 WORKDIR /app
@@ -13,7 +13,7 @@ WORKDIR /app/cmd/kubectl-mtv
 RUN --mount=type=cache,target=${GOCACHE},uid=1001 make build-all
 
 # Nginx serving stage  
-FROM registry.redhat.io/ubi9/nginx-126:1-1756959223
+FROM registry.redhat.io/ubi9/nginx-126:1-1774456672
 
 # Copy binaries directly from build stage
 COPY --from=builder /app/cmd/kubectl-mtv/bin /opt/app-root/src/
