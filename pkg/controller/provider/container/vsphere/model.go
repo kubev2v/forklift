@@ -1083,6 +1083,10 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 					}
 				}
 				v.model.CustomValues = customValues
+			case fConsolidationNeeded:
+				if b, cast := p.Val.(bool); cast {
+					v.model.ConsolidationNeeded = b
+				}
 			}
 		}
 	}
