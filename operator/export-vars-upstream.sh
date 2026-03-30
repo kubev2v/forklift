@@ -28,6 +28,8 @@ images[VALIDATION_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-
 
 images[VIRT_V2V_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/virt-v2v@sha256:9a8548cf4439121ceaa7a8d626d6c6f1f9280f63b2daf471d24fd62c8185a3f4
 
+images[VIRT_V2V_IMAGE_RHEL9]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/virt-v2v-rhel9@sha256:0000000000000000000000000000000000000000000000000000000000000000
+
 # Chage the repository of the images to match the repository they would be pushed
 # to during a release.
 

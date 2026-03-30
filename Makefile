@@ -108,6 +108,7 @@ CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-controller:$(REGISTRY_T
 API_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-api:$(REGISTRY_TAG)
 VALIDATION_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-validation:$(REGISTRY_TAG)
 VIRT_V2V_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-virt-v2v:$(REGISTRY_TAG)
+VIRT_V2V_IMAGE_RHEL9 ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-virt-v2v-xfs:$(REGISTRY_TAG)
 OPERATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator:$(REGISTRY_TAG)
 POPULATOR_CONTROLLER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/populator-controller:$(REGISTRY_TAG)
 OVIRT_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/ovirt-populator:$(REGISTRY_TAG)
@@ -324,6 +325,22 @@ push-virt-v2v-image: build-virt-v2v-image
 		$(CONTAINER_CMD) push $(VIRT_V2V_IMAGE)$(PLATFORM_SUFFIX); \
 	fi
 
+build-virt-v2v-xfs-image: check_container_runtime
+	@if [ "$(PLATFORM_ARCH)" != "amd64" ]; then \
+		echo "Notice: virt-v2v-xfs image build is only supported on amd64 platform."; \
+		echo "Current platform: $(PLATFORM) - skipping virt-v2v-xfs image build."; \
+	else \
+		$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(VIRT_V2V_IMAGE_RHEL9)$(PLATFORM_SUFFIX) -f build/virt-v2v/Containerfile-upstream-xfs .; \
+	fi
+
+push-virt-v2v-xfs-image: build-virt-v2v-xfs-image
+	@if [ "$(PLATFORM_ARCH)" != "amd64" ]; then \
+		echo "Notice: virt-v2v-xfs image push is only supported on amd64 platform."; \
+		echo "Current platform: $(PLATFORM) - skipping virt-v2v-xfs image push."; \
+	else \
+		$(CONTAINER_CMD) push $(VIRT_V2V_IMAGE_RHEL9)$(PLATFORM_SUFFIX); \
+	fi
+
 build-operator-bundle-image: check_container_runtime
 	$(CONTAINER_CMD) build $(PLATFORM_FLAG) \
 		-t $(OPERATOR_BUNDLE_IMAGE)$(PLATFORM_SUFFIX) \
@@ -343,7 +360,9 @@ build-operator-bundle-image: check_container_runtime
 		--build-arg CLI_DOWNLOAD_IMAGE=$(CLI_DOWNLOAD_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg OVA_PROVIDER_SERVER_IMAGE=$(OVA_PROVIDER_SERVER_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg HYPERV_PROVIDER_SERVER_IMAGE=$(HYPERV_PROVIDER_SERVER_IMAGE)$(PLATFORM_SUFFIX) \
-		--build-arg OVA_PROXY_IMAGE=$(OVA_PROXY_IMAGE)$(PLATFORM_SUFFIX)
+		--build-arg OVA_PROXY_IMAGE=$(OVA_PROXY_IMAGE)$(PLATFORM_SUFFIX) \
+		--build-arg VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE=$(VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) \
+		--build-arg VIRT_V2V_IMAGE_RHEL9=$(VIRT_V2V_IMAGE_RHEL9)$(PLATFORM_SUFFIX)
 
 push-operator-bundle-image: build-operator-bundle-image
 	$(CONTAINER_CMD) push $(OPERATOR_BUNDLE_IMAGE)$(PLATFORM_SUFFIX)
@@ -436,6 +455,7 @@ build-all-images: build-api-image \
                   build-validation-image \
                   build-operator-image \
                   build-virt-v2v-image \
+                  build-virt-v2v-xfs-image \
                   build-populator-controller-image \
                   build-ovirt-populator-image \
                   build-openstack-populator-image\
@@ -453,6 +473,7 @@ push-all-images:  push-api-image \
                   push-validation-image \
                   push-operator-image \
                   push-virt-v2v-image \
+                  push-virt-v2v-xfs-image \
                   push-populator-controller-image \
                   push-ovirt-populator-image \
                   push-openstack-populator-image\
@@ -499,6 +520,12 @@ push-virt-v2v-image-manifest:
 	$(CONTAINER_CMD) manifest create $(VIRT_V2V_IMAGE) \
 		$(VIRT_V2V_IMAGE)-amd64
 	$(CONTAINER_CMD) manifest push $(VIRT_V2V_IMAGE)
+
+push-virt-v2v-xfs-image-manifest:
+	$(CONTAINER_CMD) manifest rm $(VIRT_V2V_IMAGE_RHEL9) || true
+	$(CONTAINER_CMD) manifest create $(VIRT_V2V_IMAGE_RHEL9) \
+		$(VIRT_V2V_IMAGE_RHEL9)-amd64
+	$(CONTAINER_CMD) manifest push $(VIRT_V2V_IMAGE_RHEL9)
 
 push-populator-controller-image-manifest:
 	$(CONTAINER_CMD) manifest rm $(POPULATOR_CONTROLLER_IMAGE) || true
@@ -575,6 +602,7 @@ push-all-images-manifest: push-controller-image-manifest \
                           push-validation-image-manifest \
                           push-operator-image-manifest \
                           push-virt-v2v-image-manifest \
+                          push-virt-v2v-xfs-image-manifest \
                           push-populator-controller-image-manifest \
                           push-ovirt-populator-image-manifest \
                           push-openstack-populator-image-manifest \
@@ -623,6 +651,13 @@ deploy-k8s-controller: kubectl ## Deploy ForkliftController CR on k8s. Usage: ma
 		NAMESPACE=konveyor-forklift; \
 	fi; \
 	KUBECTL=$(KUBECTL) ./hack/deploy-k8s-controller.sh $$NAMESPACE
+
+.PHONY: remove-deployment
+remove-deployment: ## Remove all Forklift resources from the cluster. Usage: make remove-deployment [NAMESPACE=konveyor-forklift] [DRY_RUN=true]
+	@ARGS=""; \
+	if [ "$(DRY_RUN)" = "true" ]; then ARGS="$$ARGS --dry-run"; fi; \
+	if [ -n "$(NAMESPACE)" ]; then ARGS="$$ARGS --namespace $(NAMESPACE)"; fi; \
+	KUBECTL=$(KUBECTL) ./hack/remove-deployment.sh $$ARGS
 
 ##@ Tool Installation
 

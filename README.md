@@ -18,6 +18,11 @@ executing the migration effort.
 ## Deploy
 Deploy the Forklift operator index to the cluster.
 
+Create the target namespace first (it is not created automatically):
+```bash
+kubectl create namespace konveyor-forklift
+```
+
 For single-architecture deployment (development):
 ```bash
 make deploy-operator-index PLATFORM=linux/amd64 REGISTRY_TAG=latest
