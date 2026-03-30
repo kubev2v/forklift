@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
@@ -102,7 +103,8 @@ func (r *Validator) NICNetworkRefs(vmRef ref.Ref) (refs []ref.Ref, err error) {
 }
 
 func (r *Validator) StaticIPs(vmRef ref.Ref) (bool, error) {
-	if !r.Plan.Spec.PreserveStaticIPs {
+	planVM := r.Plan.Spec.GetVM(vmRef)
+	if !planVM.ShouldPreserveStaticIPs(r.Plan.Spec.PreserveStaticIPs) {
 		return true, nil
 	}
 
@@ -112,12 +114,16 @@ func (r *Validator) StaticIPs(vmRef ref.Ref) (bool, error) {
 		return false, liberr.Wrap(err, "vm", vmRef.String())
 	}
 
-	// Warn if no guest network data - static IPs cannot be preserved without it.
 	if len(vm.GuestNetworks) == 0 {
 		return false, nil
 	}
 
+	excludeMACs := planVM.ExcludedMACs()
+
 	for _, guestNetwork := range vm.GuestNetworks {
+		if excludeMACs[plan.NormalizeMAC(guestNetwork.MAC)] {
+			continue
+		}
 		found := false
 		for _, nic := range vm.NICs {
 			if strings.EqualFold(nic.MAC, guestNetwork.MAC) {

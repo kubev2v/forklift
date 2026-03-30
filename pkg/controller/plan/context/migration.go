@@ -116,7 +116,7 @@ func (r *Context) SetMigration(migration *api.Migration) {
 }
 
 func (r *Context) NestedVirtualizationSetting(vmRef ref.Ref, sourceDefault bool) *bool {
-	if vm, found := r.Plan.Spec.FindVM(vmRef); found && vm.EnableNestedVirtualization != nil {
+	if vm := r.Plan.Spec.GetVM(vmRef); vm != nil && vm.EnableNestedVirtualization != nil {
 		return vm.EnableNestedVirtualization
 	}
 	if r.Plan.Spec.EnableNestedVirtualization != nil {

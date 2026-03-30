@@ -353,27 +353,20 @@ type PlanSpec struct {
 	XfsCompatibility bool `json:"xfsCompatibility,omitempty"`
 }
 
-// Find a planned VM.
-func (r *PlanSpec) FindVM(ref ref.Ref) (v *plan.VM, found bool) {
+// GetVM returns the planned VM matching the ref (by ID first, then Name),
+// or nil if not found.
+func (r *PlanSpec) GetVM(ref ref.Ref) *plan.VM {
 	for i := range r.VMs {
-		vm := r.VMs[i]
-		if vm.ID != "" && vm.ID == ref.ID {
-			found = true
-			v = &vm
-			return
+		if r.VMs[i].ID != "" && r.VMs[i].ID == ref.ID {
+			return &r.VMs[i]
 		}
 	}
-	// Fallback: match by Name when the spec VM has no ID
 	for i := range r.VMs {
-		vm := r.VMs[i]
-		if vm.ID == "" && vm.Name != "" && vm.Name == ref.Name {
-			found = true
-			v = &vm
-			return
+		if r.VMs[i].ID == "" && r.VMs[i].Name != "" && r.VMs[i].Name == ref.Name {
+			return &r.VMs[i]
 		}
 	}
-
-	return
+	return nil
 }
 
 // PlanStatus defines the observed state of Plan.
@@ -432,7 +425,7 @@ func (p *Plan) ShouldUseV2vForTransfer(vmRef ref.Ref) (bool, error) {
 		// The virt-v2v transfers all disks attached to the VM. If we want to skip the shared disks so we don't transfer
 		// them multiple times we need to manage the transfer using KubeVirt CDI DataVolumes and v2v-in-place.
 		migrateSharedDisks := p.Spec.MigrateSharedDisks
-		if vm, found := p.Spec.FindVM(vmRef); found && vm.MigrateSharedDisks != nil {
+		if vm := p.Spec.GetVM(vmRef); vm != nil && vm.MigrateSharedDisks != nil {
 			migrateSharedDisks = *vm.MigrateSharedDisks
 		}
 		return !p.IsWarm() &&

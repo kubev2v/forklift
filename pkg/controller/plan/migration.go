@@ -223,7 +223,7 @@ func (r *Migration) begin() (err error) {
 			return
 		}
 
-		if _, found := r.Plan.Spec.FindVM(status.Ref); found {
+		if r.Plan.Spec.GetVM(status.Ref) != nil {
 			kept = append(kept, status)
 		}
 	}

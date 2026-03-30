@@ -374,8 +374,11 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		core.EnvVar{Name: "V2V_diskPath", Value: strings.Join(diskPaths, ",")},
 	)
 
-	if r.Plan.Spec.PreserveStaticIPs {
-		macsToIps := r.mapMacStaticIps(vm)
+	planVM := r.Plan.Spec.GetVM(ref.Ref{ID: vm.ID, Name: vm.Name})
+	preserveStaticIPs := planVM.ShouldPreserveStaticIPs(r.Plan.Spec.PreserveStaticIPs)
+	if preserveStaticIPs {
+		excludeMACs := planVM.ExcludedMACs()
+		macsToIps := r.mapMacStaticIps(vm, excludeMACs)
 		if macsToIps != "" {
 			env = append(env,
 				core.EnvVar{Name: "V2V_staticIPs", Value: macsToIps},
@@ -414,11 +417,14 @@ func hasMultipleStaticIPsPerNIC(vm *model.VM) bool {
 	return false
 }
 
-func (r *Builder) mapMacStaticIps(vm *model.VM) string {
+func (r *Builder) mapMacStaticIps(vm *model.VM, excludeMACs map[string]bool) string {
 	isWin := isWindows(vm)
 
 	var configurations []string
 	for _, gn := range vm.GuestNetworks {
+		if excludeMACs[plan.NormalizeMAC(gn.MAC)] {
+			continue
+		}
 		if !isWin || gn.Origin == hyperv.OriginManual {
 			ip := net.ParseIP(gn.IP)
 			if ip == nil {

@@ -210,8 +210,11 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		vm.RemoveSharedDisks()
 	}
 	macsToIps := ""
-	if r.Plan.Spec.PreserveStaticIPs {
-		macsToIps, err = r.mapMacStaticIps(vm)
+	planVM := r.Plan.Spec.GetVM(ref.Ref{ID: vm.ID, Name: vm.Name})
+	preserveStaticIPs := planVM.ShouldPreserveStaticIPs(r.Plan.Spec.PreserveStaticIPs)
+	if preserveStaticIPs {
+		excludeMACs := planVM.ExcludedMACs()
+		macsToIps, err = r.mapMacStaticIps(vm, excludeMACs)
 		if err != nil {
 			return
 		}
@@ -261,7 +264,6 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 			Value: vm.HostName,
 		})
 	}
-	planVM := r.getPlanVM(vm)
 	if planVM != nil && planVM.NbdeClevis {
 		env = append(env, core.EnvVar{
 			Name:  "V2V_NBDE_CLEVIS",
@@ -312,13 +314,16 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 	return
 }
 
-func (r *Builder) mapMacStaticIps(vm *model.VM) (ipMap string, err error) {
+func (r *Builder) mapMacStaticIps(vm *model.VM, excludeMACs map[string]bool) (ipMap string, err error) {
 	// on windows machines we check if the interface origin is manual
 	// on linux we collect all networks.
 	isWindowsFlag := isWindows(vm)
 
 	var configurations []string
 	for _, guestNetwork := range vm.GuestNetworks {
+		if excludeMACs[plan.NormalizeMAC(guestNetwork.MAC)] {
+			continue
+		}
 		if !isWindowsFlag || guestNetwork.Origin == string(types.NetIpConfigInfoIpAddressOriginManual) {
 			gateway := ""
 			isIpv4 := net.IP.To4(net.ParseIP(guestNetwork.IP)) != nil
@@ -749,6 +754,13 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 	var kInterfaces []cnv.Interface
 	var staticIpInterfaces = make(map[string][]string)
 
+	planVM := r.Plan.Spec.GetVM(ref.Ref{ID: vm.ID, Name: vm.Name})
+	preserveStaticIPs := planVM.ShouldPreserveStaticIPs(r.Plan.Spec.PreserveStaticIPs)
+	var excludeMACs map[string]bool
+	if preserveStaticIPs {
+		excludeMACs = planVM.ExcludedMACs()
+	}
+
 	numNetworks := 0
 	hasUDN := r.Plan.DestinationHasUdnNetwork(r.Destination)
 	netMapIn := r.Context.Map.Network.Spec.Map
@@ -790,7 +802,7 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 				kInterface.Binding = &cnv.PluginBinding{
 					Name: planbase.UdnL2bridge,
 				}
-				if r.Plan.Spec.PreserveStaticIPs {
+				if preserveStaticIPs && !excludeMACs[plan.NormalizeMAC(nic.MAC)] {
 					ips := r.findInterfaceIps(vm, nic)
 					if len(ips) > 0 {
 						staticIpInterfaces[networkName] = ips
@@ -813,7 +825,7 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 	object.Template.Spec.Networks = kNetworks
 	object.Template.Spec.Domain.Devices.Interfaces = kInterfaces
 
-	if settings.Settings.StaticUdnIpAddresses && hasUDN && r.Plan.Spec.PreserveStaticIPs && len(staticIpInterfaces) > 0 {
+	if settings.Settings.StaticUdnIpAddresses && hasUDN && preserveStaticIPs && len(staticIpInterfaces) > 0 {
 		var staticIpInterfacesAnnotation []byte
 		staticIpInterfacesAnnotation, err = json.Marshal(staticIpInterfaces)
 		if err != nil {
@@ -1615,29 +1627,10 @@ func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskNam
 	return
 }
 
-// getPlanVM get the plan VM for the given vsphere VM
-func (r *Builder) getPlanVM(vm *model.VM) *plan.VM {
-	for i := range r.Plan.Spec.VMs {
-		planVM := &r.Plan.Spec.VMs[i]
-		if planVM.ID != "" && planVM.ID == vm.ID {
-			return planVM
-		}
-	}
-	// Fallback: match by Name when the spec VM has no ID
-	for i := range r.Plan.Spec.VMs {
-		planVM := &r.Plan.Spec.VMs[i]
-		if planVM.ID == "" && planVM.Name != "" && planVM.Name == vm.Name {
-			return planVM
-		}
-	}
-
-	return nil
-}
-
 // shouldMigrateSharedDisks returns whether shared disks should be migrated for the given VM.
 // VM-level setting takes precedence; falls back to plan-level setting.
 func (r *Builder) shouldMigrateSharedDisks(vm *model.VM) bool {
-	if planVM := r.getPlanVM(vm); planVM != nil && planVM.MigrateSharedDisks != nil {
+	if planVM := r.Plan.Spec.GetVM(ref.Ref{ID: vm.ID, Name: vm.Name}); planVM != nil && planVM.MigrateSharedDisks != nil {
 		return *planVM.MigrateSharedDisks
 	}
 	return r.Context.Plan.Spec.MigrateSharedDisks
@@ -1646,7 +1639,7 @@ func (r *Builder) shouldMigrateSharedDisks(vm *model.VM) bool {
 // shouldRDMAsLun returns whether RDM disks should be mapped as LUN devices for the given VM.
 // VM-level setting takes precedence; falls back to plan-level setting.
 func (r *Builder) shouldRDMAsLun(vm *model.VM) bool {
-	if planVM := r.getPlanVM(vm); planVM != nil && planVM.RDMAsLun != nil {
+	if planVM := r.Plan.Spec.GetVM(ref.Ref{ID: vm.ID, Name: vm.Name}); planVM != nil && planVM.RDMAsLun != nil {
 		return *planVM.RDMAsLun
 	}
 	return r.Context.Plan.Spec.RDMAsLun
@@ -1740,7 +1733,7 @@ func (r *Builder) setColdMigrationDefaultPVCName(objectMeta *metav1.ObjectMeta, 
 		pvcNameTemplate = "{{trunc 4 .PlanName}}-{{trunc 4 .VmName}}-disk-{{.DiskIndex}}"
 	}
 
-	planVM := r.getPlanVM(vm)
+	planVM := r.Plan.Spec.GetVM(ref.Ref{ID: vm.ID, Name: vm.Name})
 	rootDiskIndex := 0
 	if planVM != nil {
 		rootDiskIndex = utils.GetBootDiskNumber(planVM.RootDisk)
@@ -1774,7 +1767,7 @@ func (r *Builder) setPVCNameFromTemplate(objectMeta *metav1.ObjectMeta, vm *mode
 	}
 
 	// Get the VM root disk index
-	planVM := r.getPlanVM(vm)
+	planVM := r.Plan.Spec.GetVM(ref.Ref{ID: vm.ID, Name: vm.Name})
 	rootDiskIndex := 0
 	if planVM != nil {
 		rootDiskIndex = utils.GetBootDiskNumber(planVM.RootDisk)
@@ -1853,7 +1846,7 @@ func (r *Builder) setNetworkNameFromTemplate(vm *model.VM, mapped *api.NetworkPa
 // GetPVCNameTemplate returns the PVC name template
 func (r *Builder) getPVCNameTemplate(vm *model.VM) string {
 	// Check VM-level template first
-	planVM := r.getPlanVM(vm)
+	planVM := r.Plan.Spec.GetVM(ref.Ref{ID: vm.ID, Name: vm.Name})
 	if planVM != nil && planVM.PVCNameTemplate != "" {
 		return planVM.PVCNameTemplate
 	}
@@ -1903,7 +1896,7 @@ func (r *Builder) getPlanVMSafeName(vm *model.VM) string {
 // getVolumeNameTemplate returns the volume name template
 func (r *Builder) getVolumeNameTemplate(vm *model.VM) string {
 	// Check VM-level template first
-	planVM := r.getPlanVM(vm)
+	planVM := r.Plan.Spec.GetVM(ref.Ref{ID: vm.ID, Name: vm.Name})
 	if planVM != nil && planVM.VolumeNameTemplate != "" {
 		return planVM.VolumeNameTemplate
 	}
@@ -1919,7 +1912,7 @@ func (r *Builder) getVolumeNameTemplate(vm *model.VM) string {
 // getNetworkNameTemplate returns the network name template
 func (r *Builder) getNetworkNameTemplate(vm *model.VM) string {
 	// Check VM-level template first
-	planVM := r.getPlanVM(vm)
+	planVM := r.Plan.Spec.GetVM(ref.Ref{ID: vm.ID, Name: vm.Name})
 	if planVM != nil && planVM.NetworkNameTemplate != "" {
 		return planVM.NetworkNameTemplate
 	}

@@ -501,22 +501,33 @@ func (r *Reconciler) validateNetworkMap(plan *api.Plan) (err error) {
 	}
 	// Check if we are preserving static IPs and give warning if we are mapping to Pod Network.
 	// The Pod network has different subnet than the source provider so the VMs might not be accessible.
-	if plan.Referenced.Provider.Source.SupportsPreserveStaticIps() && plan.Spec.PreserveStaticIPs {
-		var hasMappingToPodNetwork bool
-		for _, networkMap := range mp.Spec.Map {
-			if networkMap.Destination.Type == Pod {
-				hasMappingToPodNetwork = true
-				break
+	if plan.Referenced.Provider.Source.SupportsPreserveStaticIps() {
+		anyPreserve := plan.Spec.PreserveStaticIPs
+		if !anyPreserve {
+			for _, vm := range plan.Spec.VMs {
+				if vm.ShouldPreserveStaticIPs(false) {
+					anyPreserve = true
+					break
+				}
 			}
 		}
-		// The UDNs can be valid network for which there are additional validations to check the subnet ranges per VM
-		if hasMappingToPodNetwork && !plan.DestinationHasUdnNetwork(r.Client) {
-			plan.Status.SetCondition(libcnd.Condition{
-				Type:     NetMapPreservingIPsOnPodNetwork,
-				Status:   True,
-				Category: api.CategoryWarn,
-				Message:  "Your migration plan preserves the static IPs of VMs and uses Pod Networking target network mapping. This combination isn't supported, because VM IPs aren't preserved in Pod Networking migrations.",
-			})
+		if anyPreserve {
+			var hasMappingToPodNetwork bool
+			for _, networkMap := range mp.Spec.Map {
+				if networkMap.Destination.Type == Pod {
+					hasMappingToPodNetwork = true
+					break
+				}
+			}
+			// The UDNs can be valid network for which there are additional validations to check the subnet ranges per VM
+			if hasMappingToPodNetwork && !plan.DestinationHasUdnNetwork(r.Client) {
+				plan.Status.SetCondition(libcnd.Condition{
+					Type:     NetMapPreservingIPsOnPodNetwork,
+					Status:   True,
+					Category: api.CategoryWarn,
+					Message:  "Your migration plan preserves the static IPs of VMs and uses Pod Networking target network mapping. This combination isn't supported, because VM IPs aren't preserved in Pod Networking migrations.",
+				})
+			}
 		}
 	}
 
@@ -1084,7 +1095,7 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 			sharedDisks.Type = fmt.Sprintf("%s-%s", sharedDisks.Type, ref.ID)
 			sharedDisksConditions = append(sharedDisksConditions, sharedDisks)
 		}
-		if settings.Settings.StaticUdnIpAddresses && plan.Spec.PreserveStaticIPs && plan.DestinationHasUdnNetwork(r.Client) {
+		if settings.Settings.StaticUdnIpAddresses && vm.ShouldPreserveStaticIPs(plan.Spec.PreserveStaticIPs) && plan.DestinationHasUdnNetwork(r.Client) {
 			ok, err = validator.UdnStaticIPs(*ref, ctx.Destination.Client)
 			if err != nil {
 				return err

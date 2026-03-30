@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
@@ -284,10 +285,12 @@ var _ = Describe("vSphere builder", func() {
 	})
 
 	builder := createBuilder()
-	DescribeTable("should", func(vm *model.VM, outputMap string) {
-		Expect(builder.mapMacStaticIps(vm)).Should(Equal(outputMap))
+	DescribeTable("mapMacStaticIps", func(vm *model.VM, excludeMACs map[string]bool, outputMap string) {
+		result, err := builder.mapMacStaticIps(vm, excludeMACs)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(result).Should(Equal(outputMap))
 	},
-		Entry("no static ips", &model.VM{GuestID: "windows9Guest"}, ""),
+		Entry("no static ips", &model.VM{GuestID: "windows9Guest"}, nil, ""),
 		Entry("single static ip", &model.VM{
 			GuestID: "windows9Guest",
 			GuestNetworks: []vsphere.GuestNetwork{
@@ -303,7 +306,7 @@ var _ = Describe("vSphere builder", func() {
 					Gateway: "172.29.3.1",
 					Network: "0.0.0.0",
 				}},
-		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,16,8.8.8.8"),
+		}, nil, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,16,8.8.8.8"),
 		Entry("multiple static ips", &model.VM{
 			GuestID: "windows9Guest",
 			GuestNetworks: []vsphere.GuestNetwork{
@@ -332,10 +335,10 @@ var _ = Describe("vSphere builder", func() {
 					Network: "0.0.0.0",
 				},
 			},
-		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,16,8.8.8.8_00:50:56:83:25:47:ip:fe80::5da:b7a5:e0a2:a097,fe80::5da:b7a5:e0a2:a095,64,fec0:0:0:ffff::1,fec0:0:0:ffff::2,fec0:0:0:ffff::3"),
-		Entry("non-static ip", &model.VM{GuestID: "windows9Guest", GuestNetworks: []vsphere.GuestNetwork{{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: string(types.NetIpConfigInfoIpAddressOriginDhcp)}}}, ""),
-		Entry("non windows vm", &model.VM{GuestID: "other", GuestNetworks: []vsphere.GuestNetwork{{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin}}}, "00:50:56:83:25:47:ip:172.29.3.193,,0"),
-		Entry("no OS vm", &model.VM{GuestNetworks: []vsphere.GuestNetwork{{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin}}}, "00:50:56:83:25:47:ip:172.29.3.193,,0"),
+		}, nil, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,16,8.8.8.8_00:50:56:83:25:47:ip:fe80::5da:b7a5:e0a2:a097,fe80::5da:b7a5:e0a2:a095,64,fec0:0:0:ffff::1,fec0:0:0:ffff::2,fec0:0:0:ffff::3"),
+		Entry("non-static ip", &model.VM{GuestID: "windows9Guest", GuestNetworks: []vsphere.GuestNetwork{{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: string(types.NetIpConfigInfoIpAddressOriginDhcp)}}}, nil, ""),
+		Entry("non windows vm", &model.VM{GuestID: "other", GuestNetworks: []vsphere.GuestNetwork{{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin}}}, nil, "00:50:56:83:25:47:ip:172.29.3.193,,0"),
+		Entry("no OS vm", &model.VM{GuestNetworks: []vsphere.GuestNetwork{{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin}}}, nil, "00:50:56:83:25:47:ip:172.29.3.193,,0"),
 		Entry("multiple nics static ips", &model.VM{
 			GuestID: "windows9Guest",
 			GuestNetworks: []vsphere.GuestNetwork{
@@ -386,7 +389,7 @@ var _ = Describe("vSphere builder", func() {
 					Network: "0.0.0.0",
 				},
 			},
-		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,16,8.8.8.8_00:50:56:83:25:47:ip:fe80::5da:b7a5:e0a2:a097,fe80::5da:b7a5:e0a2:a095,64,fec0:0:0:ffff::1,fec0:0:0:ffff::2,fec0:0:0:ffff::3_00:50:56:83:25:48:ip:172.29.3.192,172.29.3.1,24,4.4.4.4_00:50:56:83:25:48:ip:fe80::5da:b7a5:e0a2:a090,fe80::5da:b7a5:e0a2:a095,32,fec0:0:0:ffff::4,fec0:0:0:ffff::5,fec0:0:0:ffff::6"),
+		}, nil, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,16,8.8.8.8_00:50:56:83:25:47:ip:fe80::5da:b7a5:e0a2:a097,fe80::5da:b7a5:e0a2:a095,64,fec0:0:0:ffff::1,fec0:0:0:ffff::2,fec0:0:0:ffff::3_00:50:56:83:25:48:ip:172.29.3.192,172.29.3.1,24,4.4.4.4_00:50:56:83:25:48:ip:fe80::5da:b7a5:e0a2:a090,fe80::5da:b7a5:e0a2:a095,32,fec0:0:0:ffff::4,fec0:0:0:ffff::5,fec0:0:0:ffff::6"),
 		Entry("single static ip without DNS", &model.VM{
 			GuestID: "windows9Guest",
 			GuestNetworks: []vsphere.GuestNetwork{
@@ -401,7 +404,7 @@ var _ = Describe("vSphere builder", func() {
 					Gateway: "172.29.3.1",
 					Network: "0.0.0.0",
 				}},
-		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,16"),
+		}, nil, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,16"),
 		Entry("gateway from different subnet", &model.VM{
 			GuestID: "windows9Guest",
 			GuestNetworks: []vsphere.GuestNetwork{
@@ -417,7 +420,7 @@ var _ = Describe("vSphere builder", func() {
 					Gateway: "172.29.4.1",
 					Network: "0.0.0.0",
 				}},
-		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.4.1,24,8.8.8.8"),
+		}, nil, "00:50:56:83:25:47:ip:172.29.3.193,172.29.4.1,24,8.8.8.8"),
 		Entry("multiple gateways with different networks", &model.VM{
 			GuestID: "windows9Guest",
 			GuestNetworks: []vsphere.GuestNetwork{
@@ -441,7 +444,36 @@ var _ = Describe("vSphere builder", func() {
 					Gateway: "10.10.10.1",
 					Network: "10.10.10.0",
 				}},
-		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,24,8.8.8.8"),
+		}, nil, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,24,8.8.8.8"),
+
+		// MAC exclusion test entries
+		Entry("exclude single NIC by MAC", &model.VM{
+			GuestID: "windows9Guest",
+			GuestNetworks: []vsphere.GuestNetwork{
+				{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+				{MAC: "00:50:56:83:25:48", IP: "172.29.3.194", Origin: ManualOrigin, PrefixLength: 16},
+			},
+		}, map[string]bool{"00:50:56:83:25:47": true}, "00:50:56:83:25:48:ip:172.29.3.194,,16"),
+		Entry("exclude all NICs", &model.VM{
+			GuestID: "windows9Guest",
+			GuestNetworks: []vsphere.GuestNetwork{
+				{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+				{MAC: "00:50:56:83:25:48", IP: "172.29.3.194", Origin: ManualOrigin, PrefixLength: 16},
+			},
+		}, map[string]bool{"00:50:56:83:25:47": true, "00:50:56:83:25:48": true}, ""),
+		Entry("exclude with case-insensitive MAC (uppercase in guest network)", &model.VM{
+			GuestID: "windows9Guest",
+			GuestNetworks: []vsphere.GuestNetwork{
+				{MAC: "00:50:56:83:25:AF", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+				{MAC: "00:50:56:83:25:48", IP: "172.29.3.194", Origin: ManualOrigin, PrefixLength: 16},
+			},
+		}, map[string]bool{"00:50:56:83:25:af": true}, "00:50:56:83:25:48:ip:172.29.3.194,,16"),
+		Entry("empty exclusion list", &model.VM{
+			GuestID: "windows9Guest",
+			GuestNetworks: []vsphere.GuestNetwork{
+				{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+			},
+		}, map[string]bool{}, "00:50:56:83:25:47:ip:172.29.3.193,,16"),
 	)
 
 	DescribeTable("should", func(disks []vsphere.Disk, output []vsphere.Disk) {
@@ -582,6 +614,74 @@ var _ = Describe("vSphere builder", func() {
 			},
 		),
 	)
+
+	Context("PodEnvironment per-VM preserveStaticIPs", func() {
+		buildTestBuilder := func(planPreserve bool, vmOverride *bool, vmGuestNetworks []vsphere.GuestNetwork) *Builder {
+			vmID := "test-vm-id"
+			vmName := "test-vm"
+			planVMs := []planapi.VM{
+				{
+					Ref:               ref.Ref{ID: vmID, Name: vmName},
+					PreserveStaticIPs: vmOverride,
+				},
+			}
+			b := createBuilder()
+			b.Plan.Spec.PreserveStaticIPs = planPreserve
+			b.Plan.Spec.VMs = planVMs
+			b.Source.Inventory = &mockInventory{
+				vm: model.VM{
+					GuestID: "windows9Guest",
+					VM1: model.VM1{
+						VM0: model.VM0{ID: vmID, Name: vmName},
+					},
+					GuestNetworks: vmGuestNetworks,
+				},
+			}
+			return b
+		}
+
+		It("should not produce V2V_staticIPs when VM overrides preserveStaticIPs to false", func() {
+			b := buildTestBuilder(true, ptr.To(false), []vsphere.GuestNetwork{
+				{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+			})
+			env, err := b.PodEnvironment(ref.Ref{ID: "test-vm-id", Name: "test-vm"}, &core.Secret{})
+			Expect(err).NotTo(HaveOccurred())
+			for _, e := range env {
+				Expect(e.Name).NotTo(Equal("V2V_staticIPs"))
+			}
+		})
+
+		It("should produce V2V_staticIPs when VM overrides preserveStaticIPs to true and plan-level is false", func() {
+			b := buildTestBuilder(false, ptr.To(true), []vsphere.GuestNetwork{
+				{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+			})
+			env, err := b.PodEnvironment(ref.Ref{ID: "test-vm-id", Name: "test-vm"}, &core.Secret{})
+			Expect(err).NotTo(HaveOccurred())
+			var foundStaticIPs bool
+			for _, e := range env {
+				if e.Name == "V2V_staticIPs" {
+					foundStaticIPs = true
+					Expect(e.Value).To(ContainSubstring("00:50:56:83:25:47"))
+				}
+			}
+			Expect(foundStaticIPs).To(BeTrue())
+		})
+
+		It("should inherit plan-level preserveStaticIPs when VM override is nil", func() {
+			b := buildTestBuilder(true, nil, []vsphere.GuestNetwork{
+				{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+			})
+			env, err := b.PodEnvironment(ref.Ref{ID: "test-vm-id", Name: "test-vm"}, &core.Secret{})
+			Expect(err).NotTo(HaveOccurred())
+			var foundStaticIPs bool
+			for _, e := range env {
+				if e.Name == "V2V_staticIPs" {
+					foundStaticIPs = true
+				}
+			}
+			Expect(foundStaticIPs).To(BeTrue())
+		})
+	})
 })
 
 //nolint:errcheck

@@ -302,7 +302,7 @@ func (r *Validator) sharedDisksRunningVms(vm *model.VM) (runningVms []string, er
 // shouldMigrateSharedDisks returns whether shared disks should be migrated for the given model VM.
 // VM-level setting takes precedence; falls back to plan-level setting.
 func (r *Validator) shouldMigrateSharedDisks(vm *model.VM) bool {
-	if planVM := r.getPlanVM(vm); planVM != nil && planVM.MigrateSharedDisks != nil {
+	if planVM := r.Plan.Spec.GetVM(ref.Ref{ID: vm.ID, Name: vm.Name}); planVM != nil && planVM.MigrateSharedDisks != nil {
 		return *planVM.MigrateSharedDisks
 	}
 	return r.Plan.Spec.MigrateSharedDisks
@@ -506,7 +506,14 @@ func (r *Validator) UdnStaticIPs(vmRef ref.Ref, client client.Client) (ok bool, 
 	if err != nil {
 		return false, liberr.Wrap(err, "vm", vmRef)
 	}
+
+	pVM := r.Plan.Spec.GetVM(vmRef)
+	excludeMACs := pVM.ExcludedMACs()
+
 	for _, guestNetwork := range vm.GuestNetworks {
+		if excludeMACs[plan.NormalizeMAC(guestNetwork.MAC)] {
+			continue
+		}
 		if guestNetwork.Network == sourceNetwork.Name {
 			// Validate the NAD
 			_, ipNet, err := net.ParseCIDR(udnSubnet)
@@ -528,7 +535,8 @@ func (r *Validator) UdnStaticIPs(vmRef ref.Ref, client client.Client) (ok bool, 
 // Validate that we have information about static IPs for every guest network.
 // Virtual nics are not required to have a static IP.
 func (r *Validator) StaticIPs(vmRef ref.Ref) (ok bool, err error) {
-	if !r.Plan.Spec.PreserveStaticIPs {
+	planVM := r.Plan.Spec.GetVM(vmRef)
+	if !planVM.ShouldPreserveStaticIPs(r.Plan.Spec.PreserveStaticIPs) {
 		return true, nil
 	}
 	vm := &model.Workload{}
@@ -538,10 +546,19 @@ func (r *Validator) StaticIPs(vmRef ref.Ref) (ok bool, err error) {
 		return
 	}
 
+	if len(vm.GuestNetworks) == 0 {
+		return false, nil
+	}
+
+	excludeMACs := planVM.ExcludedMACs()
+
 	for _, guestNetwork := range vm.GuestNetworks {
+		if excludeMACs[plan.NormalizeMAC(guestNetwork.MAC)] {
+			continue
+		}
 		found := false
 		for _, nic := range vm.NICs {
-			if nic.MAC == guestNetwork.MAC {
+			if strings.EqualFold(nic.MAC, guestNetwork.MAC) {
 				found = true
 				break
 			}
@@ -568,21 +585,11 @@ func (r *Validator) ChangeTrackingEnabled(vmRef ref.Ref) (bool, error) {
 	return vm.ChangeTrackingEnabled, nil
 }
 
-// getPlanVM get the plan VM for the given vsphere VM by looping over plan.Spec.VMs
-func (r *Validator) getPlanVM(vm *model.VM) *plan.VM {
-	for i := range r.Plan.Spec.VMs {
-		if r.Plan.Spec.VMs[i].ID == vm.ID {
-			return &r.Plan.Spec.VMs[i]
-		}
-	}
-	return nil
-}
-
 // getPlanVMTargetName returns the target VM name, either by using the TargetName field if present,
 // or by cleaning the VM name to make it DNS1123 compatible
 func (r *Validator) getPlanVMTargetName(vm *model.VM) string {
 	// Get plan VM from spec.vms and use the TargetName field if present
-	planVM := r.getPlanVM(vm)
+	planVM := r.Plan.Spec.GetVM(ref.Ref{ID: vm.ID, Name: vm.Name})
 	if planVM != nil {
 		if name := strings.TrimSpace(planVM.TargetName); name != "" {
 			return name

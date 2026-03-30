@@ -16,6 +16,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 var ErrNotImplemented = errors.New("not implemented")
@@ -388,6 +389,130 @@ var _ = Describe("vsphere validation tests", func() {
 			// Error cases
 			Entry("when VM is missing from inventory", "missing_from_inventory", false, true),
 		)
+	})
+
+	Describe("StaticIPs per-VM override and MAC exclusion", func() {
+		It("should skip validation when per-VM override is false even if plan is true", func() {
+			plan := createPlan()
+			plan.Spec.PreserveStaticIPs = true
+			plan.Spec.VMs = []planapi.VM{
+				{
+					Ref:               ref.Ref{Name: "test", ID: "test-vm-id"},
+					PreserveStaticIPs: ptr.To(false),
+				},
+			}
+			ctx := plancontext.Context{
+				Plan: plan,
+				Source: plancontext.Source{Inventory: &mockInventory{
+					vm: model.VM{
+						VM1: model.VM1{
+							VM0: model.VM0{ID: "test-vm-id", Name: "test"},
+						},
+						GuestNetworks: []vsphere.GuestNetwork{},
+						NICs:          []vsphere.NIC{},
+					},
+				}},
+			}
+			validator := &Validator{Context: &ctx}
+			ok, err := validator.StaticIPs(ref.Ref{Name: "test", ID: "test-vm-id"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ok).To(BeTrue())
+		})
+
+		It("should run validation when per-VM override is true even if plan is false", func() {
+			plan := createPlan()
+			plan.Spec.PreserveStaticIPs = false
+			plan.Spec.VMs = []planapi.VM{
+				{
+					Ref:               ref.Ref{Name: "test", ID: "test-vm-id"},
+					PreserveStaticIPs: ptr.To(true),
+				},
+			}
+			ctx := plancontext.Context{
+				Plan: plan,
+				Source: plancontext.Source{Inventory: &mockInventory{
+					vm: model.VM{
+						VM1: model.VM1{
+							VM0: model.VM0{ID: "test-vm-id", Name: "test"},
+						},
+						GuestNetworks: []vsphere.GuestNetwork{
+							{MAC: "mac1"},
+						},
+						NICs: []vsphere.NIC{
+							{MAC: "mac1"},
+						},
+					},
+				}},
+			}
+			validator := &Validator{Context: &ctx}
+			ok, err := validator.StaticIPs(ref.Ref{Name: "test", ID: "test-vm-id"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ok).To(BeTrue())
+		})
+
+		It("should skip excluded NIC with missing guest data", func() {
+			plan := createPlan()
+			plan.Spec.PreserveStaticIPs = true
+			plan.Spec.VMs = []planapi.VM{
+				{
+					Ref:                      ref.Ref{Name: "test", ID: "test-vm-id"},
+					ExcludeNICsFromStaticIPs: []string{"orphan-mac"},
+				},
+			}
+			ctx := plancontext.Context{
+				Plan: plan,
+				Source: plancontext.Source{Inventory: &mockInventory{
+					vm: model.VM{
+						VM1: model.VM1{
+							VM0: model.VM0{ID: "test-vm-id", Name: "test"},
+						},
+						GuestNetworks: []vsphere.GuestNetwork{
+							{MAC: "orphan-mac"},
+							{MAC: "good-mac"},
+						},
+						NICs: []vsphere.NIC{
+							{MAC: "good-mac"},
+						},
+					},
+				}},
+			}
+			validator := &Validator{Context: &ctx}
+			ok, err := validator.StaticIPs(ref.Ref{Name: "test", ID: "test-vm-id"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ok).To(BeTrue())
+		})
+
+		It("should fail for non-excluded NIC with missing guest data", func() {
+			plan := createPlan()
+			plan.Spec.PreserveStaticIPs = true
+			plan.Spec.VMs = []planapi.VM{
+				{
+					Ref:                      ref.Ref{Name: "test", ID: "test-vm-id"},
+					ExcludeNICsFromStaticIPs: []string{"good-mac"},
+				},
+			}
+			ctx := plancontext.Context{
+				Plan: plan,
+				Source: plancontext.Source{Inventory: &mockInventory{
+					vm: model.VM{
+						VM1: model.VM1{
+							VM0: model.VM0{ID: "test-vm-id", Name: "test"},
+						},
+						GuestNetworks: []vsphere.GuestNetwork{
+							{MAC: "orphan-mac"},
+							{MAC: "good-mac"},
+						},
+						NICs: []vsphere.NIC{
+							{MAC: "good-mac"},
+						},
+					},
+				}},
+			}
+			validator := &Validator{Context: &ctx}
+			ok, err := validator.StaticIPs(ref.Ref{Name: "test", ID: "test-vm-id"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ok).To(BeFalse())
+		})
 	})
 
 	Describe("NICNetworkRefs + ValidateNetworkDuplicates", func() {

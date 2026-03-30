@@ -706,24 +706,6 @@ func (r *Builder) ConversionPodConfig(_ ref.Ref) (*planbase.ConversionPodConfigR
 	return &planbase.ConversionPodConfigResult{}, nil
 }
 
-// getPlanVM returns the plan VM for the given vmRef
-func (r *Builder) getPlanVM(vmRef ref.Ref) *planapi.VM {
-	for i := range r.Plan.Spec.VMs {
-		planVM := &r.Plan.Spec.VMs[i]
-		if planVM.ID != "" && planVM.ID == vmRef.ID {
-			return planVM
-		}
-	}
-	// Fallback: match by Name when the spec VM has no ID
-	for i := range r.Plan.Spec.VMs {
-		planVM := &r.Plan.Spec.VMs[i]
-		if planVM.ID == "" && planVM.Name != "" && planVM.Name == vmRef.Name {
-			return planVM
-		}
-	}
-	return nil
-}
-
 // getPlanVMStatus returns the plan VM status for the given vmRef
 func (r *Builder) getPlanVMStatus(vmRef ref.Ref) *planapi.VMStatus {
 	if r.Plan == nil || r.Plan.Status.Migration.VMs == nil {
@@ -749,7 +731,7 @@ func (r *Builder) getPlanVMStatus(vmRef ref.Ref) *planapi.VMStatus {
 // the original PVC name (backward compatible behavior).
 func (r *Builder) getPVCNameTemplate(vmRef ref.Ref) string {
 	// Check VM-level template first
-	planVM := r.getPlanVM(vmRef)
+	planVM := r.Plan.Spec.GetVM(vmRef)
 	if planVM != nil && planVM.PVCNameTemplate != "" {
 		return planVM.PVCNameTemplate
 	}

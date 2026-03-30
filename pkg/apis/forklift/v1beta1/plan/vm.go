@@ -3,6 +3,7 @@ package plan
 import (
 	"fmt"
 	"path"
+	"strings"
 
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
@@ -177,6 +178,20 @@ type VM struct {
 	//
 	// +optional
 	RDMAsLun *bool `json:"rdmAsLun,omitempty"`
+	// PreserveStaticIPs overrides the plan-level preserveStaticIPs for this VM.
+	// - nil (default): Inherits the plan-level preserveStaticIPs value.
+	// - true: Preserve static IPs for this VM's vNICs (subject to ExcludeNICsFromStaticIPs).
+	// - false: Do not preserve static IPs for any vNIC on this VM.
+	// +optional
+	PreserveStaticIPs *bool `json:"preserveStaticIPs,omitempty"`
+	// ExcludeNICsFromStaticIPs lists MAC addresses of vNICs whose static IPs
+	// should NOT be preserved, even when static IP preservation is enabled.
+	// MAC addresses are case-insensitive and accept both colon (:) and hyphen (-)
+	// separators (e.g. "00:50:56:a1:2b:3c" and "00-50-56-A1-2B-3C" are equivalent).
+	// Only effective when static IP preservation is active for this VM.
+	// +optional
+	// +kubebuilder:validation:items:Pattern=`^([0-9a-fA-F]{2}[:\-]){5}[0-9a-fA-F]{2}$`
+	ExcludeNICsFromStaticIPs []string `json:"excludeNICsFromStaticIPs,omitempty"`
 }
 
 // Find a Hook for the specified step.
@@ -190,6 +205,31 @@ func (r *VM) FindHook(step string) (ref HookRef, found bool) {
 	}
 
 	return
+}
+
+func NormalizeMAC(mac string) string {
+	return strings.ToLower(strings.ReplaceAll(strings.TrimSpace(mac), "-", ":"))
+}
+
+func (r *VM) ShouldPreserveStaticIPs(planDefault bool) bool {
+	if r == nil || r.PreserveStaticIPs == nil {
+		return planDefault
+	}
+	return *r.PreserveStaticIPs
+}
+
+func (r *VM) ExcludedMACs() map[string]bool {
+	if r == nil {
+		return nil
+	}
+	m := make(map[string]bool, len(r.ExcludeNICsFromStaticIPs))
+	for _, mac := range r.ExcludeNICsFromStaticIPs {
+		normalized := NormalizeMAC(mac)
+		if normalized != "" {
+			m[normalized] = true
+		}
+	}
+	return m
 }
 
 // VM Status

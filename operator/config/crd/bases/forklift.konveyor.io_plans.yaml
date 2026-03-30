@@ -2502,6 +2502,17 @@ spec:
                         Both vmx and svm are added together so the VM is portable across Intel and AMD hosts.
                         The "optional" policy activates only the feature the host CPU supports; the other is ignored.
                       type: boolean
+                    excludeNICsFromStaticIPs:
+                      description: |-
+                        ExcludeNICsFromStaticIPs lists MAC addresses of vNICs whose static IPs
+                        should NOT be preserved, even when static IP preservation is enabled.
+                        MAC addresses are case-insensitive and accept both colon (:) and hyphen (-)
+                        separators (e.g. "00:50:56:a1:2b:3c" and "00-50-56-A1-2B-3C" are equivalent).
+                        Only effective when static IP preservation is active for this VM.
+                      items:
+                        pattern: ^([0-9a-fA-F]{2}[:\-]){5}[0-9a-fA-F]{2}$
+                        type: string
+                      type: array
                     hooks:
                       description: Enable hooks.
                       items:
@@ -2658,6 +2669,13 @@ spec:
                           "net-{{.NetworkIndex}}"
                           "{{if eq .NetworkType "Pod"}}pod{{else}}multus-{{.NetworkIndex}}{{end}}"
                       type: string
+                    preserveStaticIPs:
+                      description: |-
+                        PreserveStaticIPs overrides the plan-level preserveStaticIPs for this VM.
+                        - nil (default): Inherits the plan-level preserveStaticIPs value.
+                        - true: Preserve static IPs for this VM's vNICs (subject to ExcludeNICsFromStaticIPs).
+                        - false: Do not preserve static IPs for any vNIC on this VM.
+                      type: boolean
                     pvcNameTemplate:
                       description: "PVCNameTemplate is a template for generating PVC
                         names for VM disks.\nGenerated names must be valid DNS-1123
@@ -3127,6 +3145,17 @@ spec:
                           - phase
                           - reasons
                           type: object
+                        excludeNICsFromStaticIPs:
+                          description: |-
+                            ExcludeNICsFromStaticIPs lists MAC addresses of vNICs whose static IPs
+                            should NOT be preserved, even when static IP preservation is enabled.
+                            MAC addresses are case-insensitive and accept both colon (:) and hyphen (-)
+                            separators (e.g. "00:50:56:a1:2b:3c" and "00-50-56-A1-2B-3C" are equivalent).
+                            Only effective when static IP preservation is active for this VM.
+                          items:
+                            pattern: ^([0-9a-fA-F]{2}[:\-]){5}[0-9a-fA-F]{2}$
+                            type: string
+                          type: array
                         firmware:
                           description: The firmware type detected from the OVF file
                             produced by virt-v2v.
@@ -3423,6 +3452,13 @@ spec:
                             - progress
                             type: object
                           type: array
+                        preserveStaticIPs:
+                          description: |-
+                            PreserveStaticIPs overrides the plan-level preserveStaticIPs for this VM.
+                            - nil (default): Inherits the plan-level preserveStaticIPs value.
+                            - true: Preserve static IPs for this VM's vNICs (subject to ExcludeNICsFromStaticIPs).
+                            - false: Do not preserve static IPs for any vNIC on this VM.
+                          type: boolean
                         pvcNameTemplate:
                           description: "PVCNameTemplate is a template for generating
                             PVC names for VM disks.\nGenerated names must be valid
