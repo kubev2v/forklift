@@ -257,8 +257,12 @@ udev_from_nm_dhcp_lease() {
 }
 
 udev_from_dhclient_lease() {
-    if [ ! -d "$DHCLIENT_LEASES_DIR" ]; then
-        log "Warning: Directory $DHCLIENT_LEASES_DIR does not exist."
+    local LEASE_DIRS=""
+    [ -d "$DHCLIENT_LEASES_DIR" ] && LEASE_DIRS="$DHCLIENT_LEASES_DIR"
+    [ -d "$NM_LEASES_DIR" ] && LEASE_DIRS="$LEASE_DIRS $NM_LEASES_DIR"
+
+    if [ -z "$LEASE_DIRS" ]; then
+        log "Warning: No dhclient lease directories found (checked $DHCLIENT_LEASES_DIR and $NM_LEASES_DIR)."
         return 0
     fi
 
@@ -290,7 +294,9 @@ udev_from_dhclient_lease() {
         local CURRENT_EXPIRE=""
         local LATEST_EPOCH=0
         local DEVICE=""
-        for FILE in "$DHCLIENT_LEASES_DIR"/*; do
+        for DIR in $LEASE_DIRS; do
+        for FILE in "$DIR"/dhclient-*; do
+            [ -f "$FILE" ] || continue
             while IFS= read -r line || [ -n "$line" ]; do
                 # Remove leading spaces
                 line=$(echo "$line" | sed -e 's/^[[:space:]]*//' -e 's/;[[:space:]]*$//')
@@ -333,6 +339,7 @@ udev_from_dhclient_lease() {
                         ;;
                 esac
             done < "$FILE"
+        done
         done
 
         if [ -z "$DEVICE" ]; then
