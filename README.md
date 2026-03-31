@@ -1,6 +1,6 @@
 ![Build](https://github.com/kubev2v/forklift/workflows/Build%20and%20push%20images/badge.svg)&nbsp;![CI](https://github.com/kubev2v/forklift/workflows/CI/badge.svg)&nbsp;[![Code Coverage](https://codecov.io/gh/kubev2v/forklift/branch/main/graph/badge.svg?token=VV6EBWKJGB)](https://codecov.io/gh/kubev2v/forklift)
 
-# Forklift
+# Forklift 
 Migrates virtual machines at scale to Kubernetes KubeVirt.
 Migrations are performed in a few simple steps, first by providing source and destination credentials,
 then mapping the source and destination infrastructure and creating a choreographed plan, and finally,
