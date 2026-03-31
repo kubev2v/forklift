@@ -37,7 +37,7 @@ spec:
     value: build/release.conf
   - name: build-args
     value:
-    - "EVENT_TITLE={{body.head_commit.message}}"
+    - "EVENT_TITLE={{body.head_commit.id}}"
     - "REVISION={{revision}}"
   pipelineSpec:
     description: |
