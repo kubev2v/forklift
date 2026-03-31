@@ -254,6 +254,8 @@ type Validator interface {
 	PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (bool, error)
 	// Validate guest tools installation and status (e.g., VMware Tools, VirtIO drivers).
 	GuestToolsInstalled(vmRef ref.Ref) (ok bool, err error)
+	// Validate that VM does not need to collapse any snapshots into a single base file
+	ConsolidationNeeded(vmRef ref.Ref) (needed bool, err error)
 }
 
 // DestinationClient API.

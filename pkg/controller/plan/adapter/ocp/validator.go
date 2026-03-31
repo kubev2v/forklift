@@ -91,6 +91,11 @@ func (r *Validator) GuestToolsInstalled(vmRef ref.Ref) (ok bool, err error) {
 	return
 }
 
+// NO-OP
+func (r *Validator) ConsolidationNeeded(vmRef ref.Ref) (needed bool, err error) {
+	return
+}
+
 // MaintenanceMode implements base.Validator
 func (r *Validator) MaintenanceMode(vmRef ref.Ref) (bool, error) {
 	return true, nil

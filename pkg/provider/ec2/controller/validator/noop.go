@@ -81,3 +81,8 @@ func (r *Validator) VMMigrationType(vmRef ref.Ref) (bool, error) {
 func (r *Validator) WarmMigration() bool {
 	return false
 }
+
+// ConsolidationNeeded returns false - snapshot consolidation not applicable for EC2.
+func (r *Validator) ConsolidationNeeded(vmRef ref.Ref) (bool, error) {
+	return false, nil
+}

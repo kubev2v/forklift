@@ -653,3 +653,13 @@ func isUnknownToolsStatus(s string) bool {
 		return false
 	}
 }
+
+func (r *Validator) ConsolidationNeeded(vmRef ref.Ref) (needed bool, err error) {
+	vm := &model.VM{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef.String())
+		return
+	}
+	return vm.ConsolidationNeeded, nil
+}
