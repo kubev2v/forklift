@@ -588,6 +588,32 @@ var _ = Describe("vsphere validation tests", func() {
 			Expect(err).To(HaveOccurred())
 		})
 	})
+
+	Describe("ConsolidationNeeded", func() {
+		It("should warn on consolidation needed", func() {
+			plan := createPlan()
+			ctx := plancontext.Context{
+				Plan: plan,
+				Source: plancontext.Source{
+					Inventory: &mockInventory{
+						vm: model.VM{
+							VM1: model.VM1{
+								VM0: model.VM0{
+									ID:   "consolidation-vm-1",
+									Name: "consolidation-vm",
+								},
+							},
+							ConsolidationNeeded: true,
+						},
+					},
+				},
+			}
+			validator := Validator{Context: &ctx}
+			needed, err := validator.ConsolidationNeeded(ref.Ref{Name: "consolidation-vm"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(needed).To(BeTrue())
+		})
+	})
 })
 
 func createPlan() *v1beta1.Plan {
