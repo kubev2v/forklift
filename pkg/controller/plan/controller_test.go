@@ -2,6 +2,7 @@ package plan
 
 import (
 	"context"
+	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
@@ -434,6 +435,16 @@ var _ = ginkgo.Describe("failExecutingMigrationOnBlocker", func() {
 		return plan
 	}
 
+	backdateBlockerConditions := func(plan *api.Plan, age time.Duration) {
+		past := meta.NewTime(time.Now().Add(-age))
+		for i := range plan.Status.Conditions.List {
+			cnd := &plan.Status.Conditions.List[i]
+			if cnd.Category == api.CategoryCritical || cnd.Category == libcnd.Error {
+				cnd.LastTransitionTime = past
+			}
+		}
+	}
+
 	ginkgo.Context("when the migration is actively executing and a blocker appears", func() {
 		ginkgo.It("should mark the snapshot and plan as Failed", func() {
 			plan := newPlanWithSnapshot(libcnd.Condition{
@@ -449,6 +460,7 @@ var _ = ginkgo.Describe("failExecutingMigrationOnBlocker", func() {
 				Category: api.CategoryCritical,
 				Message:  "Map.Network does not have Ready condition.",
 			})
+			backdateBlockerConditions(plan, blockerGracePeriod()+time.Second)
 			plan.Status.Migration.VMs = []*planapi.VMStatus{
 				{Phase: "Running"},
 				{Phase: "Running"},
@@ -491,6 +503,7 @@ var _ = ginkgo.Describe("failExecutingMigrationOnBlocker", func() {
 				Category: api.CategoryCritical,
 				Message:  "Map.Storage does not have Ready condition.",
 			})
+			backdateBlockerConditions(plan, blockerGracePeriod()+time.Second)
 
 			r := newTestReconciler()
 			r.failExecutingMigrationOnBlocker(plan)
@@ -514,6 +527,7 @@ var _ = ginkgo.Describe("failExecutingMigrationOnBlocker", func() {
 				Category: api.CategoryCritical,
 				Message:  "Map.Network does not have Ready condition.",
 			})
+			backdateBlockerConditions(plan, blockerGracePeriod()+time.Second)
 
 			succeededVM := &planapi.VMStatus{Phase: api.PhaseCompleted}
 			succeededVM.SetCondition(libcnd.Condition{
@@ -531,6 +545,57 @@ var _ = ginkgo.Describe("failExecutingMigrationOnBlocker", func() {
 				"already-Succeeded VM should not be marked Failed")
 			gomega.Expect(runningVM.HasCondition(api.ConditionFailed)).To(gomega.BeTrue(),
 				"running VM should be marked Failed")
+		})
+	})
+
+	ginkgo.Context("when the blocker condition is within the grace period", func() {
+		ginkgo.It("should not fail the migration for a recent blocker", func() {
+			plan := newPlanWithSnapshot(libcnd.Condition{
+				Type:     Executing,
+				Status:   True,
+				Category: api.CategoryAdvisory,
+				Durable:  true,
+			})
+			plan.Status.SetCondition(libcnd.Condition{
+				Type:     NetMapNotReady,
+				Status:   True,
+				Category: api.CategoryCritical,
+				Message:  "Map.Network does not have Ready condition.",
+			})
+
+			r := newTestReconciler()
+			r.failExecutingMigrationOnBlocker(plan)
+
+			snapshot := plan.Status.Migration.ActiveSnapshot()
+			gomega.Expect(snapshot.HasCondition(Failed)).To(gomega.BeFalse(),
+				"snapshot should NOT be Failed while condition is within grace period")
+			gomega.Expect(snapshot.HasCondition(Executing)).To(gomega.BeTrue(),
+				"snapshot should still be Executing")
+		})
+
+		ginkgo.It("should fail once the blocker exceeds the grace period", func() {
+			plan := newPlanWithSnapshot(libcnd.Condition{
+				Type:     Executing,
+				Status:   True,
+				Category: api.CategoryAdvisory,
+				Durable:  true,
+			})
+			plan.Status.SetCondition(libcnd.Condition{
+				Type:     NetMapNotReady,
+				Status:   True,
+				Category: api.CategoryCritical,
+				Message:  "Map.Network does not have Ready condition.",
+			})
+			backdateBlockerConditions(plan, blockerGracePeriod()+time.Second)
+
+			r := newTestReconciler()
+			r.failExecutingMigrationOnBlocker(plan)
+
+			snapshot := plan.Status.Migration.ActiveSnapshot()
+			gomega.Expect(snapshot.HasCondition(Failed)).To(gomega.BeTrue(),
+				"snapshot should be Failed after grace period elapsed")
+			gomega.Expect(snapshot.HasCondition(Executing)).To(gomega.BeFalse(),
+				"snapshot should no longer be Executing")
 		})
 	})
 
@@ -635,7 +700,16 @@ var _ = ginkgo.Describe("failExecutingMigrationOnBlocker - transient conditions"
 })
 
 var _ = ginkgo.Describe("criticalOrErrorCondition", func() {
-	ginkgo.It("should collect Critical and Error category messages", func() {
+	backdateCondition := func(plan *api.Plan, condType string, age time.Duration) {
+		past := meta.NewTime(time.Now().Add(-age))
+		for i := range plan.Status.Conditions.List {
+			if plan.Status.Conditions.List[i].Type == condType {
+				plan.Status.Conditions.List[i].LastTransitionTime = past
+			}
+		}
+	}
+
+	ginkgo.It("should collect Critical and Error messages past the grace period", func() {
 		plan := &api.Plan{}
 		plan.Status.SetCondition(libcnd.Condition{
 			Type:     NetMapNotReady,
@@ -655,16 +729,55 @@ var _ = ginkgo.Describe("criticalOrErrorCondition", func() {
 			Category: libcnd.Warn,
 			Message:  "This is a warning.",
 		})
+		backdateCondition(plan, NetMapNotReady, blockerGracePeriod()+time.Second)
+		backdateCondition(plan, "SomeError", blockerGracePeriod()+time.Second)
 
-		result := criticalOrErrorCondition(plan)
+		result := criticalOrErrorCondition(plan, blockerGracePeriod())
 		gomega.Expect(result).To(gomega.ContainSubstring("Map.Network does not have Ready condition."))
 		gomega.Expect(result).To(gomega.ContainSubstring("This is an error."))
 		gomega.Expect(result).NotTo(gomega.ContainSubstring("This is a warning."))
 	})
 
-	ginkgo.It("should return fallback message when no critical or error conditions exist", func() {
+	ginkgo.It("should return empty string when no critical or error conditions exist", func() {
 		plan := &api.Plan{}
-		result := criticalOrErrorCondition(plan)
-		gomega.Expect(result).To(gomega.Equal("no active critical or error conditions found"))
+		result := criticalOrErrorCondition(plan, blockerGracePeriod())
+		gomega.Expect(result).To(gomega.BeEmpty())
+	})
+
+	ginkgo.It("should exclude conditions still within the grace period", func() {
+		plan := &api.Plan{}
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     NetMapNotReady,
+			Status:   True,
+			Category: api.CategoryCritical,
+			Message:  "Map.Network does not have Ready condition.",
+		})
+
+		result := criticalOrErrorCondition(plan, blockerGracePeriod())
+		gomega.Expect(result).To(gomega.BeEmpty(),
+			"recently-set condition should be excluded by grace period")
+	})
+
+	ginkgo.It("should include only the conditions past the grace period when mixed", func() {
+		plan := &api.Plan{}
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     NetMapNotReady,
+			Status:   True,
+			Category: api.CategoryCritical,
+			Message:  "Map.Network does not have Ready condition.",
+		})
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     DsMapNotReady,
+			Status:   True,
+			Category: api.CategoryCritical,
+			Message:  "Map.Storage does not have Ready condition.",
+		})
+		backdateCondition(plan, NetMapNotReady, blockerGracePeriod()+time.Minute)
+
+		result := criticalOrErrorCondition(plan, blockerGracePeriod())
+		gomega.Expect(result).To(gomega.ContainSubstring("Map.Network does not have Ready condition."),
+			"old condition should be included")
+		gomega.Expect(result).NotTo(gomega.ContainSubstring("Map.Storage"),
+			"recent condition should be excluded")
 	})
 })

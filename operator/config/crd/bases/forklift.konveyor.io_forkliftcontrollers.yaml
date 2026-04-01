@@ -298,6 +298,9 @@ spec:
               controller_precopy_interval:
                 x-kubernetes-int-or-string: true
                 description: "Precopy interval in minutes (default: 60)"
+              controller_blocker_grace_period_minutes:
+                x-kubernetes-int-or-string: true
+                description: "How long Critical/Error blocker conditions must persist before failing an active migration, in minutes (default: 5)"
               controller_host_lease_namespace:
                 type: string
                 description: "Namespace for host lease objects (default: openshift-mtv)"
