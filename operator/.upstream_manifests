@@ -83,6 +83,10 @@ spec:
               controller_block_overhead:
                 description: 'Block overhead in bytes (default: 0)'
                 x-kubernetes-int-or-string: true
+              controller_blocker_grace_period_minutes:
+                description: 'How long Critical/Error blocker conditions must persist
+                  before failing an active migration, in minutes (default: 5)'
+                x-kubernetes-int-or-string: true
               controller_cleanup_retries:
                 description: 'Cleanup retry count (default: 10)'
                 x-kubernetes-int-or-string: true
@@ -8147,6 +8151,12 @@ spec:
       - description: Precopy interval in minutes (default 60)
         displayName: Precopy Interval
         path: controller_precopy_interval
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: How long Critical/Error blocker conditions must persist before
+          failing an active migration, in minutes (default 5)
+        displayName: Blocker Grace Period
+        path: controller_blocker_grace_period_minutes
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Max concurrent reconciles (default 10)

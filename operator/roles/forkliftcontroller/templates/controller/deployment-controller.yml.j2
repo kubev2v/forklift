@@ -76,6 +76,10 @@ spec:
         - name: PRECOPY_INTERVAL
           value: "{{ controller_precopy_interval }}"
 {% endif %}
+{% if controller_blocker_grace_period_minutes is number %}
+        - name: BLOCKER_GRACE_PERIOD_MINUTES
+          value: "{{ controller_blocker_grace_period_minutes }}"
+{% endif %}
 {% if controller_vddk_job_active_deadline_sec is number %}
         - name: VDDK_JOB_ACTIVE_DEADLINE
           value: "{{ controller_vddk_job_active_deadline_sec }}"

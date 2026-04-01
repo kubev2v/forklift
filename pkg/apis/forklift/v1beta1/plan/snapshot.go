@@ -48,7 +48,12 @@ func (r *SnapshotRef) With(object meta.Object) {
 	r.UID = object.GetUID()
 }
 
-// Match the object and ref by UID/Generation.
+// Match the object and ref by UID.
+// Generation is intentionally not compared: it increments for any
+// controller-driven update (inventory refresh, status change, etc.)
+// which does not invalidate a running migration.  If an update
+// actually breaks something, the blocker-condition + grace-period
+// path handles it.
 func (r *SnapshotRef) Match(object meta.Object) bool {
-	return r.UID == object.GetUID() && r.Generation == object.GetGeneration()
+	return r.UID == object.GetUID()
 }

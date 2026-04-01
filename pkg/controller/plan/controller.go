@@ -64,6 +64,18 @@ var log = logging.WithName(Name)
 // Application settings.
 var Settings = &settings.Settings
 
+// blockerGracePeriod returns how long Critical/Error blocker conditions must
+// persist before an actively executing migration is failed (ForkliftController
+// controller_blocker_grace_period_minutes / BLOCKER_GRACE_PERIOD_MINUTES).
+// If settings were not loaded (e.g. unit tests), defaults to 5 minutes.
+func blockerGracePeriod() time.Duration {
+	m := Settings.Migration.BlockerGracePeriodMinutes
+	if m <= 0 {
+		return 5 * time.Minute
+	}
+	return time.Duration(m) * time.Minute
+}
+
 // Creates a new Plan Controller and adds it to the Manager.
 func Add(mgr manager.Manager) error {
 	reconciler := &Reconciler{
@@ -510,6 +522,8 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 }
 
 // Fail an actively executing migration when blocker conditions appear.
+// Conditions must have persisted for at least the configured grace period to
+// allow transient issues (e.g. brief provider blips) to self-resolve.
 func (r *Reconciler) failExecutingMigrationOnBlocker(plan *api.Plan) {
 	// Only act on snapshots that are mid-execution and not yet terminal.
 	if len(plan.Status.Migration.History) == 0 {
@@ -523,7 +537,17 @@ func (r *Reconciler) failExecutingMigrationOnBlocker(plan *api.Plan) {
 		return
 	}
 
-	reason := criticalOrErrorCondition(plan)
+	grace := blockerGracePeriod()
+	reason := criticalOrErrorCondition(plan, grace)
+	if reason == "" {
+		r.Log.Info(
+			"Blocker condition detected but still within grace period, will recheck.",
+			"name", plan.GetName(),
+			"namespace", plan.GetNamespace(),
+			"gracePeriod", grace)
+		return
+	}
+
 	r.Log.Info(
 		"Failing active migration due to blocker condition during execution.",
 		"name", plan.GetName(),
@@ -559,23 +583,31 @@ func (r *Reconciler) failExecutingMigrationOnBlocker(plan *api.Plan) {
 	}
 }
 
-// Collect human-readable messages from all Critical/Error conditions on the plan.
-func criticalOrErrorCondition(plan *api.Plan) string {
+// Collect human-readable messages from Critical/Error conditions on the plan
+// that have persisted for at least the given grace period. Returns an empty
+// string when no qualifying conditions exist (either none are present or all
+// are still within the grace window).
+func criticalOrErrorCondition(plan *api.Plan, gracePeriod time.Duration) string {
+	now := time.Now()
 	var messages []string
 	for _, cnd := range plan.Status.Conditions.List {
 		if cnd.Status != True {
 			continue
 		}
-		if cnd.Category == Critical || cnd.Category == Error {
-			msg := cnd.Message
-			if msg == "" {
-				msg = fmt.Sprintf("%s (category=%s, reason=%s)", cnd.Type, cnd.Category, cnd.Reason)
-			}
-			messages = append(messages, msg)
+		if cnd.Category != Critical && cnd.Category != Error {
+			continue
 		}
+		if now.Sub(cnd.LastTransitionTime.Time) < gracePeriod {
+			continue
+		}
+		msg := cnd.Message
+		if msg == "" {
+			msg = fmt.Sprintf("%s (category=%s, reason=%s)", cnd.Type, cnd.Category, cnd.Reason)
+		}
+		messages = append(messages, msg)
 	}
 	if len(messages) == 0 {
-		return "no active critical or error conditions found"
+		return ""
 	}
 	return strings.Join(messages, "; ")
 }

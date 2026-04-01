@@ -113,6 +113,12 @@ func (r *Migration) Run() (reQ time.Duration, err error) {
 		vm, hasNext, err = r.scheduler.Next()
 		if err != nil {
 			if errors.As(err, &web.NotFoundError{}) {
+				if !r.Source.Provider.Status.HasCondition(libcnd.Ready) {
+					r.Log.Info(
+						"VM not found in inventory but source provider is not ready, will retry.",
+						"vm", vm.String())
+					return
+				}
 				vm.SetCondition(libcnd.Condition{
 					Type:     api.ConditionCanceled,
 					Status:   libcnd.True,

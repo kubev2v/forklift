@@ -19,6 +19,7 @@ const (
 	VirtV2vImageXFS                  = "VIRT_V2V_IMAGE_XFS"
 	vddkImage                        = "VDDK_IMAGE"
 	PrecopyInterval                  = "PRECOPY_INTERVAL"
+	BlockerGracePeriodMinutes        = "BLOCKER_GRACE_PERIOD_MINUTES"
 	VirtV2vDontRequestKVM            = "VIRT_V2V_DONT_REQUEST_KVM"
 	SnapshotRemovalTimeout           = "SNAPSHOT_REMOVAL_TIMEOUT"
 	SnapshotStatusCheckRate          = "SNAPSHOT_STATUS_CHECK_RATE"
@@ -82,6 +83,8 @@ type Migration struct {
 	ImporterRetry int
 	// Warm migration precopy interval in minutes
 	PrecopyInterval int
+	// How long Critical/Error blocker conditions must persist before failing an active migration
+	BlockerGracePeriodMinutes int
 	// Snapshot removal timeout in minutes
 	SnapshotRemovalTimeout int
 	// Snapshot status check rate in seconds
@@ -164,6 +167,9 @@ func (r *Migration) Load() (err error) {
 		return liberr.Wrap(err)
 	}
 	if r.PrecopyInterval, err = getPositiveEnvLimit(PrecopyInterval, 60); err != nil {
+		return liberr.Wrap(err)
+	}
+	if r.BlockerGracePeriodMinutes, err = getPositiveEnvLimit(BlockerGracePeriodMinutes, 5); err != nil {
 		return liberr.Wrap(err)
 	}
 	if r.SnapshotRemovalTimeout, err = getPositiveEnvLimit(SnapshotRemovalTimeout, 120); err != nil {
