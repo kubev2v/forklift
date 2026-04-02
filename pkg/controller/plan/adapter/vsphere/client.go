@@ -337,7 +337,7 @@ func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, precopy planapi.Precopy, hos
 	// do not wait for it to complete.
 	if r.Plan.Spec.AllowSnapshotConsolidation == "AfterFinalSnapshot" {
 		migrationVM, found := r.Plan.Status.Migration.FindVM(vmRef)
-		if found && migrationVM.Phase == v1beta1.PhaseRemoveFinalSnapshot {
+		if found && migrationVM.Phase == v1beta1.PhaseWaitForFinalSnapshotRemoval {
 			return true, nil
 		}
 	}
