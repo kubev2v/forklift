@@ -56,6 +56,8 @@ ARG MTV_VERSION=$VERSION
 ARG RELEASE=v2.7
 ARG CHANNEL=release-v2.7
 ARG DEFAULT_CHANNEL=release-v2.7
+ARG GIT_COMMIT=unknown
+ARG BUILD_DATE=unknown
 
 COPY --from=builder /repo/build/manifests /manifests/
 COPY --from=builder /repo/build/metadata /metadata/
@@ -105,4 +107,7 @@ LABEL \
         distribution-scope="public" \
         release="$RELEASE" \
         url="https://github.com/kubev2v/forklift" \
-        version="v$MTV_VERSION"
+        version="v$MTV_VERSION" \
+        org.opencontainers.image.revision="$GIT_COMMIT" \
+        org.opencontainers.image.created="$BUILD_DATE" \
+        org.opencontainers.image.source="https://github.com/kubev2v/forklift"

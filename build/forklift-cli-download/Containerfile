@@ -20,6 +20,9 @@ COPY --from=builder /app/cmd/kubectl-mtv/bin /opt/app-root/src/
 EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]
 
+ARG GIT_COMMIT=unknown
+ARG BUILD_DATE=unknown
+
 LABEL \
         com.redhat.component="mtv-cli-download-container" \
         name="migration-toolkit-virtualization/mtv-cli-download-rhel9" \
@@ -30,4 +33,7 @@ LABEL \
         summary="Migration Toolkit for Virtualization - CLI Download Service" \
         description="Migration Toolkit for Virtualization - CLI Download Service" \
         vendor="Red Hat, Inc." \
-        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"
+        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+        org.opencontainers.image.revision="$GIT_COMMIT" \
+        org.opencontainers.image.created="$BUILD_DATE" \
+        org.opencontainers.image.source="https://github.com/kubev2v/forklift"

@@ -51,6 +51,9 @@ REGISTRY_ORG ?= kubev2v
 REGISTRY_TAG ?= devel
 
 VERSION ?= 99.0.0
+GIT_COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null || echo unknown)
+BUILD_DATE ?= $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
+BUILD_LABEL_ARGS := --build-arg GIT_COMMIT=$(GIT_COMMIT) --build-arg BUILD_DATE=$(BUILD_DATE)
 NAMESPACE ?= konveyor-forklift
 OPERATOR_NAME ?= forklift-operator
 CHANNELS ?= development
@@ -285,25 +288,25 @@ install: manifests kubectl ## Install CRDs into cluster
 ##@ Container Images
 
 build-controller-image: check_container_runtime
-	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(CONTROLLER_IMAGE)$(PLATFORM_SUFFIX) -f build/forklift-controller/Containerfile .
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(CONTROLLER_IMAGE)$(PLATFORM_SUFFIX) -f build/forklift-controller/Containerfile .
 
 push-controller-image: build-controller-image
 	$(CONTAINER_CMD) push $(CONTROLLER_IMAGE)$(PLATFORM_SUFFIX)
 
 build-api-image: check_container_runtime
-	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(API_IMAGE)$(PLATFORM_SUFFIX) -f build/forklift-api/Containerfile .
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(API_IMAGE)$(PLATFORM_SUFFIX) -f build/forklift-api/Containerfile .
 
 push-api-image: build-api-image
 	$(CONTAINER_CMD) push $(API_IMAGE)$(PLATFORM_SUFFIX)
 
 build-validation-image: check_container_runtime
-	$(CONTAINER_CMD) build $(PLATFORM_FLAG) --build-arg TARGETARCH=$(PLATFORM_ARCH) -t $(VALIDATION_IMAGE)$(PLATFORM_SUFFIX) -f build/validation/Containerfile .
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) --build-arg TARGETARCH=$(PLATFORM_ARCH) -t $(VALIDATION_IMAGE)$(PLATFORM_SUFFIX) -f build/validation/Containerfile .
 
 push-validation-image: build-validation-image
 	$(CONTAINER_CMD) push $(VALIDATION_IMAGE)$(PLATFORM_SUFFIX)
 
 build-operator-image: check_container_runtime
-	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(OPERATOR_IMAGE)$(PLATFORM_SUFFIX) -f build/forklift-operator/Containerfile .
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(OPERATOR_IMAGE)$(PLATFORM_SUFFIX) -f build/forklift-operator/Containerfile .
 
 push-operator-image: build-operator-image
 	$(CONTAINER_CMD) push $(OPERATOR_IMAGE)$(PLATFORM_SUFFIX)
@@ -314,7 +317,7 @@ build-virt-v2v-image: check_container_runtime
 		echo "Notice: virt-v2v image build is only supported on amd64 platform."; \
 		echo "Current platform: $(PLATFORM) - skipping virt-v2v image build."; \
 	else \
-		$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(VIRT_V2V_IMAGE)$(PLATFORM_SUFFIX) -f build/virt-v2v/Containerfile-upstream .; \
+		$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(VIRT_V2V_IMAGE)$(PLATFORM_SUFFIX) -f build/virt-v2v/Containerfile-upstream .; \
 	fi
 
 push-virt-v2v-image: build-virt-v2v-image
@@ -330,7 +333,7 @@ build-virt-v2v-xfs-image: check_container_runtime
 		echo "Notice: virt-v2v-xfs image build is only supported on amd64 platform."; \
 		echo "Current platform: $(PLATFORM) - skipping virt-v2v-xfs image build."; \
 	else \
-		$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(VIRT_V2V_IMAGE_RHEL9)$(PLATFORM_SUFFIX) -f build/virt-v2v/Containerfile-upstream-xfs .; \
+		$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(VIRT_V2V_IMAGE_RHEL9)$(PLATFORM_SUFFIX) -f build/virt-v2v/Containerfile-upstream-xfs .; \
 	fi
 
 push-virt-v2v-xfs-image: build-virt-v2v-xfs-image
@@ -342,7 +345,7 @@ push-virt-v2v-xfs-image: build-virt-v2v-xfs-image
 	fi
 
 build-operator-bundle-image: check_container_runtime
-	$(CONTAINER_CMD) build $(PLATFORM_FLAG) \
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) \
 		-t $(OPERATOR_BUNDLE_IMAGE)$(PLATFORM_SUFFIX) \
 		-f build/forklift-operator-bundle/Containerfile . \
 		--build-arg STREAM=dev \
@@ -368,7 +371,7 @@ push-operator-bundle-image: build-operator-bundle-image
 	$(CONTAINER_CMD) push $(OPERATOR_BUNDLE_IMAGE)$(PLATFORM_SUFFIX)
 
 build-operator-index-image: check_container_runtime
-	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(OPERATOR_INDEX_IMAGE)$(PLATFORM_SUFFIX) -f build/forklift-operator-index/Containerfile . \
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(OPERATOR_INDEX_IMAGE)$(PLATFORM_SUFFIX) -f build/forklift-operator-index/Containerfile . \
 		--build-arg VERSION=$(VERSION) \
 		--build-arg OPERATOR_BUNDLE_IMAGE=$(OPERATOR_BUNDLE_IMAGE)$(PLATFORM_SUFFIX) \
 		--build-arg CHANNELS=$(CHANNELS) \
@@ -391,7 +394,7 @@ push-operator-index-image-multiarch: build-operator-index-image-multiarch
 	$(CONTAINER_CMD) push $(OPERATOR_INDEX_IMAGE)
 
 build-populator-controller-image: check_container_runtime
-	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(POPULATOR_CONTROLLER_IMAGE)$(PLATFORM_SUFFIX) -f build/populator-controller/Containerfile .
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(POPULATOR_CONTROLLER_IMAGE)$(PLATFORM_SUFFIX) -f build/populator-controller/Containerfile .
 
 push-populator-controller-image: build-populator-controller-image
 	$(CONTAINER_CMD) push $(POPULATOR_CONTROLLER_IMAGE)$(PLATFORM_SUFFIX)
@@ -402,7 +405,7 @@ build-ovirt-populator-image: check_container_runtime
 		echo "Notice: ovirt-populator image build is only supported on amd64 platform."; \
 		echo "Current platform: $(PLATFORM) - skipping ovirt-populator image build."; \
 	else \
-		$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(OVIRT_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) -f build/ovirt-populator/Containerfile-upstream .; \
+		$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(OVIRT_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) -f build/ovirt-populator/Containerfile-upstream .; \
 	fi
 
 push-ovirt-populator-image: build-ovirt-populator-image
@@ -414,37 +417,37 @@ push-ovirt-populator-image: build-ovirt-populator-image
 	fi
 
 build-openstack-populator-image: check_container_runtime
-	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(OPENSTACK_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) -f build/openstack-populator/Containerfile .
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(OPENSTACK_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) -f build/openstack-populator/Containerfile .
 
 push-openstack-populator-image: build-openstack-populator-image
 	$(CONTAINER_CMD) push $(OPENSTACK_POPULATOR_IMAGE)$(PLATFORM_SUFFIX)
 
 build-vsphere-copy-offload-populator-image: check_container_runtime
-	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) -f build/vsphere-copy-offload-populator/Containerfile .
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE)$(PLATFORM_SUFFIX) -f build/vsphere-copy-offload-populator/Containerfile .
 
 push-vsphere-copy-offload-populator-image: build-vsphere-copy-offload-populator-image
 	$(CONTAINER_CMD) push $(VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE)$(PLATFORM_SUFFIX)
 
 build-ova-provider-server-image: check_container_runtime
-	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(OVA_PROVIDER_SERVER_IMAGE)$(PLATFORM_SUFFIX) -f build/ova-provider-server/Containerfile .
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(OVA_PROVIDER_SERVER_IMAGE)$(PLATFORM_SUFFIX) -f build/ova-provider-server/Containerfile .
 
 push-ova-provider-server-image: build-ova-provider-server-image
 	$(CONTAINER_CMD) push $(OVA_PROVIDER_SERVER_IMAGE)$(PLATFORM_SUFFIX)
 
 build-hyperv-provider-server-image: check_container_runtime
-	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(HYPERV_PROVIDER_SERVER_IMAGE)$(PLATFORM_SUFFIX) -f build/hyperv-provider-server/Containerfile .
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(HYPERV_PROVIDER_SERVER_IMAGE)$(PLATFORM_SUFFIX) -f build/hyperv-provider-server/Containerfile .
 
 push-hyperv-provider-server-image: build-hyperv-provider-server-image
 	$(CONTAINER_CMD) push $(HYPERV_PROVIDER_SERVER_IMAGE)$(PLATFORM_SUFFIX)
 
 build-cli-download-image: check_container_runtime
-	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(CLI_DOWNLOAD_IMAGE)$(PLATFORM_SUFFIX) -f build/forklift-cli-download/Containerfile .
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(CLI_DOWNLOAD_IMAGE)$(PLATFORM_SUFFIX) -f build/forklift-cli-download/Containerfile .
 
 push-cli-download-image: build-cli-download-image
 	$(CONTAINER_CMD) push $(CLI_DOWNLOAD_IMAGE)$(PLATFORM_SUFFIX)
 
 build-ova-proxy-image: check_container_runtime
-	$(CONTAINER_CMD) build $(PLATFORM_FLAG) -t $(OVA_PROXY_IMAGE)$(PLATFORM_SUFFIX) -f build/ova-proxy/Containerfile .
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(OVA_PROXY_IMAGE)$(PLATFORM_SUFFIX) -f build/ova-proxy/Containerfile .
 
 push-ova-proxy-image: build-ova-proxy-image
 	$(CONTAINER_CMD) push $(OVA_PROXY_IMAGE)$(PLATFORM_SUFFIX)

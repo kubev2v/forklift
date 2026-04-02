@@ -18,6 +18,9 @@ RUN microdnf -y install tar && \
 COPY --from=builder /app/controller /usr/local/bin/populator-controller
 ENTRYPOINT ["/usr/local/bin/populator-controller"]
 
+ARG GIT_COMMIT=unknown
+ARG BUILD_DATE=unknown
+
 LABEL \
         com.redhat.component="mtv-populator-controller-container" \
         name="migration-toolkit-virtualization/mtv-populator-controller-rhel9" \
@@ -28,4 +31,7 @@ LABEL \
         summary="Migration Toolkit for Virtualization - Populator Controller" \
         description="Migration Toolkit for Virtualization - Populator Controller" \
         vendor="Red Hat, Inc." \
-        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"
+        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+        org.opencontainers.image.revision="$GIT_COMMIT" \
+        org.opencontainers.image.created="$BUILD_DATE" \
+        org.opencontainers.image.source="https://github.com/kubev2v/forklift"

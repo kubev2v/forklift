@@ -17,6 +17,9 @@ RUN microdnf update -y && \
 COPY --from=builder /app/proxy /usr/local/bin/ova-proxy
 ENTRYPOINT ["/usr/local/bin/ova-proxy"]
 
+ARG GIT_COMMIT=unknown
+ARG BUILD_DATE=unknown
+
 LABEL \
         com.redhat.component="mtv-ova-proxy-container" \
         name="migration-toolkit-virtualization/mtv-ova-proxy-rhel9" \
@@ -27,5 +30,8 @@ LABEL \
         description="Migration Toolkit for Virtualization - OVA Proxy" \
         summary="Migration Toolkit for Virtualization - OVA Proxy" \
         vendor="Red Hat, Inc." \
-        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"
+        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+        org.opencontainers.image.revision="$GIT_COMMIT" \
+        org.opencontainers.image.created="$BUILD_DATE" \
+        org.opencontainers.image.source="https://github.com/kubev2v/forklift"
 

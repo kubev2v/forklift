@@ -19,6 +19,9 @@ COPY --from=builder /app/ova-provider-server /usr/local/bin/ova-provider-server
 ENTRYPOINT ["/usr/local/bin/ova-provider-server"]
 
 
+ARG GIT_COMMIT=unknown
+ARG BUILD_DATE=unknown
+
 LABEL \
         com.redhat.component="mtv-ova-provider-server-container" \
         name="migration-toolkit-virtualization/mtv-ova-provider-server-rhel9" \
@@ -29,5 +32,8 @@ LABEL \
         summary="Migration Toolkit for Virtualization - OVA Provider Server" \
         description="Migration Toolkit for Virtualization - OVA Provider Server" \
         vendor="Red Hat, Inc." \
-        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"
+        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+        org.opencontainers.image.revision="$GIT_COMMIT" \
+        org.opencontainers.image.created="$BUILD_DATE" \
+        org.opencontainers.image.source="https://github.com/kubev2v/forklift"
 

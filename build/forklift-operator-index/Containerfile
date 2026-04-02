@@ -30,6 +30,9 @@ COPY --from=builder /app/operator.yaml /configs/operator.yaml
 CMD ["serve", "/configs"]
 ENTRYPOINT ["/bin/opm"]
 
+ARG GIT_COMMIT=unknown
+ARG BUILD_DATE=unknown
+
 # Main labels
 LABEL \
         com.redhat.component="mtv-operator-index-container" \
@@ -44,3 +47,6 @@ LABEL \
         vendor="Red Hat, Inc." \
         distribution-scope="public" \
         url="https://github.com/kubev2v/forklift" \
+        org.opencontainers.image.revision="$GIT_COMMIT" \
+        org.opencontainers.image.created="$BUILD_DATE" \
+        org.opencontainers.image.source="https://github.com/kubev2v/forklift" \

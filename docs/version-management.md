@@ -64,6 +64,28 @@ go build -ldflags "
 "
 ```
 
+### Container Image Labels
+
+All upstream Containerfiles declare OCI standard labels via `ARG`/`LABEL`. The
+Makefile and GitHub Actions CI pass the real values at build time:
+
+| Label | ARG | Description |
+|---|---|---|
+| `org.opencontainers.image.revision` | `GIT_COMMIT` | Git commit SHA (`HEAD`) |
+| `org.opencontainers.image.created` | `BUILD_DATE` | ISO 8601 UTC build timestamp |
+| `org.opencontainers.image.source` | *(static)* | `https://github.com/kubev2v/forklift` |
+
+```bash
+# Local build (Makefile injects GIT_COMMIT and BUILD_DATE automatically)
+make build-controller-image
+
+# Override manually
+make build-controller-image GIT_COMMIT=abc123 BUILD_DATE=2025-01-15T10:30:00Z
+
+# Inspect labels on a built image
+docker inspect --format='{{json .Config.Labels}}' quay.io/kubev2v/forklift-controller:latest | jq .
+```
+
 ## Migration Guide
 
 ### Before (Multiple scattered versions)
@@ -139,5 +161,5 @@ klog.Infof("Starting Forklift %s (build %s)",
 - ✅ Updated VIB version handling  
 - ✅ Updated vsphere-copy-offload-populator
 - ✅ Updated validation.go references
-- 🔄 Integration with build scripts (in progress)
+- ✅ Integration with build scripts (OCI image labels via ARG/LABEL in Containerfiles)
 - ⏳ Migration of other components (future)

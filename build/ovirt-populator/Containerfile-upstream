@@ -13,6 +13,9 @@ RUN dnf install -y centos-release-ovirt45
 RUN dnf install -y python3-ovirt-engine-sdk4 ovirt-imageio-client && dnf clean all
 
 ENTRYPOINT ["/usr/local/bin/ovirt-populator"]
+ARG GIT_COMMIT=unknown
+ARG BUILD_DATE=unknown
+
 LABEL \
         com.redhat.component="forklift-ovirt-populator-container" \
         name="migration-toolkit-virtualization/forklift-ovirt-populator-rhel8" \
@@ -23,5 +26,8 @@ LABEL \
         summary="Migration Toolkit for Virtualization - oVirt Populator" \
         description="Migration Toolkit for Virtualization - oVirt Populator" \
         vendor="Red Hat, Inc." \
-        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"
+        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+        org.opencontainers.image.revision="$GIT_COMMIT" \
+        org.opencontainers.image.created="$BUILD_DATE" \
+        org.opencontainers.image.source="https://github.com/kubev2v/forklift"
 
