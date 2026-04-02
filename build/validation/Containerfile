@@ -7,6 +7,9 @@ COPY validation/entrypoint.sh /usr/bin/
 
 ENTRYPOINT ["/usr/bin/entrypoint.sh"]
 
+ARG GIT_COMMIT=unknown
+ARG BUILD_DATE=unknown
+
 LABEL \
         com.redhat.component="mtv-validation-container" \
         name="migration-toolkit-virtualization/mtv-validation-rhel9" \
@@ -17,4 +20,7 @@ LABEL \
         summary="Migration Toolkit for Virtualization - Validation Service" \
         description="Migration Toolkit for Virtualization - Validation Service" \
         vendor="Red Hat, Inc." \
-        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"
+        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+        org.opencontainers.image.revision="$GIT_COMMIT" \
+        org.opencontainers.image.created="$BUILD_DATE" \
+        org.opencontainers.image.source="https://github.com/kubev2v/forklift"

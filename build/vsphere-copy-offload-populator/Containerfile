@@ -31,6 +31,9 @@ COPY --from=builder /usr/src/app/cmd/vsphere-copy-offload-populator/vmkfstools-w
 
 ENTRYPOINT ["/bin/vsphere-copy-offload-populator"]
 
+ARG GIT_COMMIT=unknown
+ARG BUILD_DATE=unknown
+
 LABEL \
         com.redhat.component="mtv-vsphere-copy-offload-populator-container" \
         name="migration-toolkit-virtualization/mtv-vsphere-copy-offload-populator-rhel9" \
@@ -41,7 +44,10 @@ LABEL \
         summary="Migration Toolkit for Virtualization - vSphere XCOPY Volume Populator" \
         description="Migration Toolkit for Virtualization - vSphere XCOPY Volume Populator" \
         vendor="Red Hat, Inc." \
-        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"
+        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+        org.opencontainers.image.revision="$GIT_COMMIT" \
+        org.opencontainers.image.created="$BUILD_DATE" \
+        org.opencontainers.image.source="https://github.com/kubev2v/forklift"
 
 
 

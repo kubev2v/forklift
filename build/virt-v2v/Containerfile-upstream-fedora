@@ -69,6 +69,9 @@ COPY --from=builder /app/virt-v2v-wrapper /usr/bin/virt-v2v-wrapper
 
 ENTRYPOINT ["/usr/libexec/catatonit/catatonit", "/usr/bin/virt-v2v-wrapper"]
 
+ARG GIT_COMMIT=unknown
+ARG BUILD_DATE=unknown
+
 LABEL \
         com.redhat.component="forklift-virt-v2v-container" \
         name="forklift/forklift-virt-v2v-rhel9" \
@@ -80,5 +83,8 @@ LABEL \
         description="Forklift - Virt-V2V" \
         io.k8s.description="Forklift - Virt-V2V" \
         vendor="Red Hat, Inc." \
-        maintainer="Forklift by Konveyor Community <forklift-dev@googlegroups.com>"
+        maintainer="Forklift by Konveyor Community <forklift-dev@googlegroups.com>" \
+        org.opencontainers.image.revision="$GIT_COMMIT" \
+        org.opencontainers.image.created="$BUILD_DATE" \
+        org.opencontainers.image.source="https://github.com/kubev2v/forklift"
 

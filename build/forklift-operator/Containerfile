@@ -14,6 +14,9 @@ COPY operator/watches.yaml watches.yaml
 COPY operator/roles roles
 RUN ansible-galaxy collection install -r /app/requirements.yml
 
+ARG GIT_COMMIT=unknown
+ARG BUILD_DATE=unknown
+
 LABEL \
         com.redhat.component="mtv-operator-container" \
         name="migration-toolkit-virtualization/mtv-rhel8-operator" \
@@ -24,5 +27,8 @@ LABEL \
         summary="Migration Toolkit for Virtualization - Operator" \
         description="Migration Toolkit for Virtualization - Operator" \
         vendor="Red Hat, Inc." \
-        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>"
+        maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+        org.opencontainers.image.revision="$GIT_COMMIT" \
+        org.opencontainers.image.created="$BUILD_DATE" \
+        org.opencontainers.image.source="https://github.com/kubev2v/forklift"
 

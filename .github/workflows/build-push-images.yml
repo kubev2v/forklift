@@ -13,6 +13,8 @@ env:
   REGISTRY_TAG: ${{ (github.head_ref||github.ref_name)=='main' && 'latest' || (github.head_ref||github.ref_name) }}
   REGISTRY_ORG: kubev2v
   VERSION: ${{ (github.head_ref||github.ref_name)=='main' && '99.0.0' || (github.head_ref||github.ref_name) }}
+  GIT_COMMIT: ${{ github.sha }}
+  BUILD_DATE: ${{ github.event.head_commit.timestamp || 'unknown' }}
 
 jobs:
   build_push:
@@ -83,6 +85,9 @@ jobs:
           push: true
           file: "${{ matrix.file }}"
           tags: ${{ env.REGISTRY }}/${{ env.REGISTRY_ORG }}/${{ matrix.repo }}:${{ env.REGISTRY_TAG }}
+          build-args: |
+            GIT_COMMIT=${{ env.GIT_COMMIT }}
+            BUILD_DATE=${{ env.BUILD_DATE }}
 
   build_push_bundle:
     runs-on: ubuntu-latest
@@ -107,6 +112,8 @@ jobs:
           build-args: |
             VERSION=${{ env.VERSION }}
             STREAM=dev
+            GIT_COMMIT=${{ env.GIT_COMMIT }}
+            BUILD_DATE=${{ env.BUILD_DATE }}
 
   build_push_index:
     runs-on: ubuntu-latest
@@ -132,3 +139,5 @@ jobs:
             OPERATOR_BUNDLE_IMAGE=${{ env.REGISTRY }}/${{ env.REGISTRY_ORG }}/forklift-operator-bundle:${{ env.REGISTRY_TAG }}
             STREAM=dev
             VERSION=${{ env.VERSION }}
+            GIT_COMMIT=${{ env.GIT_COMMIT }}
+            BUILD_DATE=${{ env.BUILD_DATE }}
