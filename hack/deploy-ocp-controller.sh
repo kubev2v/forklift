@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Deploy ForkliftController CR Script
-# Usage: ./deploy-k8s-controller.sh [namespace]
+# Deploy ForkliftController CR Script for OpenShift
+# Usage: ./deploy-ocp-controller.sh [namespace]
 
 NAMESPACE="${1:-konveyor-forklift}"
 KUBECTL="${KUBECTL:-kubectl}"
@@ -36,24 +36,14 @@ metadata:
   name: forklift-controller
   namespace: $NAMESPACE
 spec:
-  k8s_cluster: "true"
-  feature_ui_plugin: "false"
-  feature_cli_download: "false"
-  feature_ocp_live_migration: "false"
+  feature_ui_plugin: "true"
+  feature_cli_download: "true"
+  feature_ocp_live_migration: "true"
+  feature_validation: "true"
+  feature_volume_populator: "true"
 EOF
 then
     echo "ForkliftController deployed successfully in namespace: $NAMESPACE"
-    echo ""
-    echo "Use kubectl-mtv with port-forwarded inventory:"
-    echo ""
-    echo "   # In one terminal, forward the inventory service:"
-    echo "   kubectl port-forward -n $NAMESPACE service/forklift-inventory 8443:8443"
-    echo ""
-    echo "   # In another terminal, set the inventory URL and use kubectl-mtv:"
-    echo "   export MTV_INVENTORY_URL=https://localhost:8443"
-    echo "   export MTV_INVENTORY_INSECURE_SKIP_TLS=true"
-    echo ""
-    echo "   kubectl-mtv get provider"
 else
     echo "Error: Failed to deploy ForkliftController in namespace: $NAMESPACE" >&2
     exit 1

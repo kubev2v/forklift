@@ -635,6 +635,10 @@ deploy-operator-index: kubectl ## Deploy operator catalog source
 deploy-operator-index-multiarch: kubectl ## Deploy operator catalog source (multiarch)
 	export OPERATOR_INDEX_IMAGE=${OPERATOR_INDEX_IMAGE}; envsubst < operator/forklift-operator-catalog.yaml | $(KUBECTL) apply -f -
 
+.PHONY: deploy-ocp
+deploy-ocp: kubectl ## Deploy Forklift operator on OpenShift (run after deploy-operator-index). Usage: make deploy-ocp
+	$(KUBECTL) apply -f operator/forklift-ocp-dev.yaml
+
 .PHONY: setup-k8s-prerequisites
 setup-k8s-prerequisites: ## Install prerequisites for Forklift on k8s (cert-manager, CDI, CNA, KubeVirt, OLM). Usage: make setup-k8s-prerequisites
 	./hack/setup-k8s-prerequisites.sh
@@ -654,6 +658,14 @@ deploy-k8s-controller: kubectl ## Deploy ForkliftController CR on k8s. Usage: ma
 		NAMESPACE=konveyor-forklift; \
 	fi; \
 	KUBECTL=$(KUBECTL) ./hack/deploy-k8s-controller.sh $$NAMESPACE
+
+.PHONY: deploy-ocp-controller
+deploy-ocp-controller: kubectl ## Deploy ForkliftController CR on OpenShift. Usage: make deploy-ocp-controller [NAMESPACE=konveyor-forklift]
+	@NAMESPACE=${NAMESPACE}; \
+	if [ -z "$$NAMESPACE" ]; then \
+		NAMESPACE=konveyor-forklift; \
+	fi; \
+	KUBECTL=$(KUBECTL) ./hack/deploy-ocp-controller.sh $$NAMESPACE
 
 .PHONY: remove-deployment
 remove-deployment: ## Remove all Forklift resources from the cluster. Usage: make remove-deployment [NAMESPACE=konveyor-forklift] [DRY_RUN=true]
