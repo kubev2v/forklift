@@ -309,6 +309,37 @@ func (c *RestClient) getAuthToken() error {
 	return nil
 }
 
+// doWithReauth executes an HTTP request and retries once with a fresh auth
+// token if the server responds with 401 (session expired).
+func (c *RestClient) doWithReauth(req *http.Request) (*http.Response, []byte, error) {
+	req.Header.Set("x-auth-token", c.authToken)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		resp.Body.Close()
+		klog.Infof("Pure REST Client: Auth token expired, re-authenticating")
+		if err := c.getAuthToken(); err != nil {
+			return nil, nil, fmt.Errorf("re-authentication failed: %w", err)
+		}
+		req.Header.Set("x-auth-token", c.authToken)
+		resp, err = c.httpClient.Do(req)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	return resp, body, nil
+}
+
 // FindVolumeByVVolID finds a volume using its VVol ID via the tags API
 func (c *RestClient) FindVolumeByVVolID(vvolID string) (string, error) {
 	filter := fmt.Sprintf("key='PURE_VVOL_ID' AND value='%s'", vvolID)
@@ -327,17 +358,9 @@ func (c *RestClient) FindVolumeByVVolID(vvolID string) (string, error) {
 		return "", fmt.Errorf("failed to create volume search request: %w", err)
 	}
 
-	req.Header.Set("x-auth-token", c.authToken)
-
-	resp, err := c.httpClient.Do(req)
+	resp, body, err := c.doWithReauth(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to send volume search request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read volume search response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -378,17 +401,10 @@ func (c *RestClient) CopyVolume(sourceVolumeName, targetVolumeName string) error
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-auth-token", c.authToken)
 
-	resp, err := c.httpClient.Do(req)
+	resp, body, err := c.doWithReauth(req)
 	if err != nil {
 		return fmt.Errorf("failed to send copy volume request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read copy volume response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
@@ -401,7 +417,6 @@ func (c *RestClient) CopyVolume(sourceVolumeName, targetVolumeName string) error
 
 // ListHosts lists all local hosts on the Pure FlashArray
 func (c *RestClient) ListHosts() ([]Host, error) {
-	// Filter for local hosts only to avoid selecting remote hosts in active cluster setups
 	url := fmt.Sprintf("https://%s/api/%s/hosts?filter=is_local", c.hostname, c.apiV2)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -409,17 +424,9 @@ func (c *RestClient) ListHosts() ([]Host, error) {
 		return nil, fmt.Errorf("failed to create list hosts request: %w", err)
 	}
 
-	req.Header.Set("x-auth-token", c.authToken)
-
-	resp, err := c.httpClient.Do(req)
+	resp, body, err := c.doWithReauth(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send list hosts request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read list hosts response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -454,17 +461,10 @@ func (c *RestClient) ConnectHost(hostName, volumeName string) error {
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-auth-token", c.authToken)
 
-	resp, err := c.httpClient.Do(req)
+	resp, body, err := c.doWithReauth(req)
 	if err != nil {
 		return fmt.Errorf("failed to send connect host request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read connect host response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
@@ -483,17 +483,9 @@ func (c *RestClient) DisconnectHost(hostName, volumeName string) error {
 		return fmt.Errorf("failed to create disconnect host request: %w", err)
 	}
 
-	req.Header.Set("x-auth-token", c.authToken)
-
-	resp, err := c.httpClient.Do(req)
+	resp, body, err := c.doWithReauth(req)
 	if err != nil {
 		return fmt.Errorf("failed to send disconnect host request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read disconnect host response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
@@ -517,17 +509,9 @@ func (c *RestClient) GetVolume(volumeName string) (*Volume, error) {
 		return nil, fmt.Errorf("failed to create get volume request: %w", err)
 	}
 
-	req.Header.Set("x-auth-token", c.authToken)
-
-	resp, err := c.httpClient.Do(req)
+	resp, body, err := c.doWithReauth(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send get volume request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read get volume response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -560,17 +544,9 @@ func (c *RestClient) GetVolumeById(volumeId string) (*Volume, error) {
 		return nil, fmt.Errorf("failed to create get volume request: %w", err)
 	}
 
-	req.Header.Set("x-auth-token", c.authToken)
-
-	resp, err := c.httpClient.Do(req)
+	resp, body, err := c.doWithReauth(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send get volume request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read get volume response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -598,17 +574,9 @@ func (c *RestClient) ListVolumes() ([]Volume, error) {
 		return nil, fmt.Errorf("failed to create list volumes request: %w", err)
 	}
 
-	req.Header.Set("x-auth-token", c.authToken)
-
-	resp, err := c.httpClient.Do(req)
+	resp, body, err := c.doWithReauth(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send list volumes request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read list volumes response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -625,10 +593,8 @@ func (c *RestClient) ListVolumes() ([]Volume, error) {
 
 // FindVolumeBySerial finds a volume by its serial number
 func (c *RestClient) FindVolumeBySerial(serial string) (*Volume, error) {
-	// Pure FlashArray API allows filtering by serial
 	baseURL := fmt.Sprintf("https://%s/api/%s/volumes", c.hostname, c.apiV2)
 
-	// Normalize serial to uppercase for comparison
 	serial = strings.ToUpper(serial)
 
 	params := url.Values{}
@@ -641,17 +607,9 @@ func (c *RestClient) FindVolumeBySerial(serial string) (*Volume, error) {
 		return nil, fmt.Errorf("failed to create find volume request: %w", err)
 	}
 
-	req.Header.Set("x-auth-token", c.authToken)
-
-	resp, err := c.httpClient.Do(req)
+	resp, body, err := c.doWithReauth(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send find volume request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read find volume response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
