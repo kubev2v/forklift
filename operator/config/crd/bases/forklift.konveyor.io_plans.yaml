@@ -62,10 +62,12 @@ spec:
                   - "Always" (default): always consolidate snapshots after removal
                   - "Never": never consolidate snapshots after removal
                   - "AfterFinalSnapshot": only consolidate after the final snapshot is removed, and do not wait for it to finish
+                  - "BeforePenultimateSnapshot": consolidate after every snapshot removal until the second-to-last snapshot
                 enum:
                 - Always
                 - Never
                 - AfterFinalSnapshot
+                - BeforePenultimateSnapshot
                 type: string
               archived:
                 description: Whether this plan should be archived.

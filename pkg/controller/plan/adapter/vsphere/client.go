@@ -136,6 +136,14 @@ func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hosts util.Hosts
 		if found && migrationVM.Phase == v1beta1.PhaseRemoveFinalSnapshot {
 			consolidate = true
 		}
+	case "BeforePenultimateSnapshot":
+		consolidate = true
+		migrationVM, found := r.Plan.Status.Migration.FindVM(vmRef)
+		if found && migrationVM.Phase == v1beta1.PhaseRemoveFinalSnapshot {
+			consolidate = false
+		} else if found && migrationVM.Phase == v1beta1.PhaseRemovePenultimateSnapshot {
+			consolidate = false
+		}
 	default:
 		consolidate = true
 	}
