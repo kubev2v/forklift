@@ -3633,6 +3633,7 @@ spec:
                     - If migration fails the conversion pod will remain present even if this option is enabled.
                 type: boolean
               deleteVmOnFailMigration:
+                default: true
                 description: |-
                   DeleteVmOnFailMigration controls whether the target VM created by this Plan is deleted when a migration fails.
                   When true and the migration fails after the target VM has been created, the controller

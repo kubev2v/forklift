@@ -268,6 +268,7 @@ type PlanSpec struct {
 	// Note: If the Plan-level option is set to true, the VM-level option will be ignored.
 	//
 	// +optional
+	// +kubebuilder:default:=true
 	DeleteVmOnFailMigration bool `json:"deleteVmOnFailMigration,omitempty"`
 	// InstallLegacyDrivers determines whether to install legacy windows drivers in the VM.
 	//The following Vm's are lack of SHA-2 support and need legacy drivers:
