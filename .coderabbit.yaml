@@ -1,9 +1,9 @@
 reviews:
   auto_review:
-    enabled: false
+    enabled: true
     auto_incremental_review: false
     drafts: false
-  profile: assertive
+  profile: chill
   high_level_summary: false
   review_status: false
   commit_status: true
