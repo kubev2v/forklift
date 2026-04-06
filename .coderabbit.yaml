@@ -1,6 +1,6 @@
 reviews:
   auto_review:
-    enabled: false
+    enabled: true
     auto_incremental_review: false
     drafts: false
   profile: assertive
