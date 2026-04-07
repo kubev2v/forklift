@@ -63,4 +63,18 @@ should be aware of.
 | `run` | Build a controller manager binary and run the controller against the active cluster |
 | `install` | Install generated CRDs onto the active cluster |
 | `manifests` | Generate updated CRDs from types.go files, RBAC from annotations in controller, deploy manifest YAML |
+| `crd-api-changelog` | Print CRD API changelog (Markdown). Optional `FROM_REF` (default: latest `v*` tag by version sort); optional `TO_REF` (default `HEAD`). Optional `SHOW_CHANGE_DIFFS=1` adds code diffs under **Changed** (can be large) |
 
+### CRD schema changelog (optional)
+
+[`hack/crd_changelog_diff.py`](hack/crd_changelog_diff.py) compares generated CRD OpenAPI under `operator/config/crd/bases/` between two git refs and prints changlog summaries as Markdown.
+
+```bash
+# Compare latest release tag → HEAD (defaults)
+make crd-api-changelog
+
+# Explicit range
+make crd-api-changelog FROM_REF=v2.11.1 TO_REF=v2.11.2
+# Optional: include unified diffs under Changed (larger output)
+make crd-api-changelog FROM_REF=v2.11.1 TO_REF=v2.11.2 SHOW_CHANGE_DIFFS=1
+```
