@@ -96,6 +96,7 @@ const (
 	VMMigrationTypeUnsupported      = "VMMigrationTypeUnsupported"
 	GuestToolsIssue                 = "GuestToolsIssue"
 	VDDKAndOffloadMixedUsage        = "VDDKAndOffloadMixedUsage"
+	ServiceAccountNotValid          = "ServiceAccountNotValid"
 	RestrictedPodSecurity           = "RestrictedPodSecurity"
 )
 
@@ -204,6 +205,10 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	}
 
 	if err = r.validateTransferNetwork(plan); err != nil {
+		return err
+	}
+
+	if err = r.validateServiceAccount(plan); err != nil {
 		return err
 	}
 
@@ -1352,6 +1357,68 @@ func (r *Reconciler) validateTransferNetwork(plan *api.Plan) (err error) {
 	return
 }
 
+// Validate that the specified ServiceAccount exists in the target namespace
+// and, when the plan has hooks, also in the plan namespace (where hook pods run).
+func (r *Reconciler) validateServiceAccount(plan *api.Plan) (err error) {
+	sa := resolveServiceAccount(plan)
+	if sa == "" {
+		return
+	}
+	key := client.ObjectKey{
+		Namespace: plan.Spec.TargetNamespace,
+		Name:      sa,
+	}
+	serviceAccount := &core.ServiceAccount{}
+	err = r.Get(context.TODO(), key, serviceAccount)
+	if k8serr.IsNotFound(err) {
+		err = nil
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     ServiceAccountNotValid,
+			Status:   True,
+			Category: api.CategoryCritical,
+			Reason:   NotFound,
+			Message: fmt.Sprintf(
+				"ServiceAccount '%s' not found in target namespace '%s'.",
+				sa, plan.Spec.TargetNamespace),
+		})
+		return
+	}
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	if planHasHooks(plan) && plan.Namespace != plan.Spec.TargetNamespace {
+		key.Namespace = plan.Namespace
+		err = r.Get(context.TODO(), key, serviceAccount)
+		if k8serr.IsNotFound(err) {
+			err = nil
+			plan.Status.SetCondition(libcnd.Condition{
+				Type:     ServiceAccountNotValid,
+				Status:   True,
+				Category: api.CategoryCritical,
+				Reason:   NotFound,
+				Message: fmt.Sprintf(
+					"ServiceAccount '%s' not found in plan namespace '%s' (required for hook pods).",
+					sa, plan.Namespace),
+			})
+		} else if err != nil {
+			err = liberr.Wrap(err)
+		}
+	}
+	return
+}
+
+// planHasHooks returns true if any VM in the plan has a pre- or post-hook configured.
+func planHasHooks(plan *api.Plan) bool {
+	for _, vm := range plan.Spec.VMs {
+		if len(vm.Hooks) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // Validate referenced hooks.
 func (r *Reconciler) validateHooks(plan *api.Plan) (err error) {
 	notSet := libcnd.Condition{
@@ -1753,7 +1820,7 @@ func createVddkCheckJob(plan *api.Plan) *batchv1.Job {
 		psc.RunAsNonRoot = ptr.To(true)
 		psc.RunAsUser = ptr.To(qemuUser)
 	}
-	return &batchv1.Job{
+	job := &batchv1.Job{
 		ObjectMeta: meta.ObjectMeta{
 			GenerateName: fmt.Sprintf("vddk-validator-%s", plan.Name),
 			Namespace:    plan.Spec.TargetNamespace,
@@ -1801,6 +1868,10 @@ func createVddkCheckJob(plan *api.Plan) *batchv1.Job {
 			},
 		},
 	}
+	if sa := resolveServiceAccount(plan); sa != "" {
+		job.Spec.Template.Spec.ServiceAccountName = sa
+	}
+	return job
 }
 
 func (r *Reconciler) setupSecret(plan *api.Plan) (err error) {

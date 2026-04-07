@@ -224,6 +224,89 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 		})
 	})
 
+	ginkgo.Describe("resolveServiceAccount", func() {
+		var savedGlobalSA string
+
+		ginkgo.BeforeEach(func() {
+			savedGlobalSA = Settings.Migration.ServiceAccount
+		})
+
+		ginkgo.AfterEach(func() {
+			Settings.Migration.ServiceAccount = savedGlobalSA
+		})
+
+		ginkgo.It("should return plan SA when both plan and global are set", func() {
+			Settings.Migration.ServiceAccount = "global-sa"
+			p := createPlanKubevirt(nil)
+			p.Spec.ServiceAccount = "plan-sa"
+			Expect(resolveServiceAccount(p)).To(Equal("plan-sa"))
+		})
+
+		ginkgo.It("should return global SA when plan SA is empty", func() {
+			Settings.Migration.ServiceAccount = "global-sa"
+			p := createPlanKubevirt(nil)
+			p.Spec.ServiceAccount = ""
+			Expect(resolveServiceAccount(p)).To(Equal("global-sa"))
+		})
+
+		ginkgo.It("should return empty string when both are empty", func() {
+			Settings.Migration.ServiceAccount = ""
+			p := createPlanKubevirt(nil)
+			p.Spec.ServiceAccount = ""
+			Expect(resolveServiceAccount(p)).To(BeEmpty())
+		})
+
+		ginkgo.It("should return plan SA when global is empty", func() {
+			Settings.Migration.ServiceAccount = ""
+			p := createPlanKubevirt(nil)
+			p.Spec.ServiceAccount = "plan-sa"
+			Expect(resolveServiceAccount(p)).To(Equal("plan-sa"))
+		})
+	})
+
+	ginkgo.Describe("dataVolumes CDI SA annotation", func() {
+		var savedGlobalSA string
+
+		ginkgo.BeforeEach(func() {
+			savedGlobalSA = Settings.Migration.ServiceAccount
+		})
+
+		ginkgo.AfterEach(func() {
+			Settings.Migration.ServiceAccount = savedGlobalSA
+		})
+
+		ginkgo.It("should set CDI SA annotation when plan SA is set", func() {
+			Settings.Migration.ServiceAccount = ""
+			p := createPlanKubevirt(nil)
+			p.Spec.ServiceAccount = "plan-sa"
+			annotations := make(map[string]string)
+			if sa := resolveServiceAccount(p); sa != "" {
+				annotations[AnnCDIPodServiceAccount] = sa
+			}
+			Expect(annotations).To(HaveKeyWithValue(AnnCDIPodServiceAccount, "plan-sa"))
+		})
+
+		ginkgo.It("should set CDI SA annotation when global SA is set", func() {
+			Settings.Migration.ServiceAccount = "global-sa"
+			p := createPlanKubevirt(nil)
+			annotations := make(map[string]string)
+			if sa := resolveServiceAccount(p); sa != "" {
+				annotations[AnnCDIPodServiceAccount] = sa
+			}
+			Expect(annotations).To(HaveKeyWithValue(AnnCDIPodServiceAccount, "global-sa"))
+		})
+
+		ginkgo.It("should not set CDI SA annotation when both SAs are empty", func() {
+			Settings.Migration.ServiceAccount = ""
+			p := createPlanKubevirt(nil)
+			annotations := make(map[string]string)
+			if sa := resolveServiceAccount(p); sa != "" {
+				annotations[AnnCDIPodServiceAccount] = sa
+			}
+			Expect(annotations).ToNot(HaveKey(AnnCDIPodServiceAccount))
+		})
+	})
+
 	ginkgo.Describe("ConversionTempStorage plan spec", func() {
 		ginkgo.It("should read ConversionTempStorageClass and ConversionTempStorageSize from plan spec", func() {
 			plan := createPlanKubevirt(nil)
