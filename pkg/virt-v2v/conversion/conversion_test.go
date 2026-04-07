@@ -138,6 +138,7 @@ var _ = Describe("Conversion", func() {
 				mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("-i", "libvirtxml").Return(mockCommandBuilder)
+				mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddPositional(config.V2vInPlaceLibvirtDomain).Return(mockCommandBuilder)
 
 				mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
@@ -161,6 +162,7 @@ var _ = Describe("Conversion", func() {
 				mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("-i", "libvirtxml").Return(mockCommandBuilder)
+				mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddExtraArgs("--debug", "--verbose").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddPositional(config.V2vInPlaceLibvirtDomain).Return(mockCommandBuilder)
 
@@ -184,6 +186,7 @@ var _ = Describe("Conversion", func() {
 				mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("-i", "libvirtxml").Return(mockCommandBuilder)
+				mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddPositional(config.V2vInPlaceLibvirtDomain).Return(mockCommandBuilder)
 
 				mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
@@ -212,6 +215,7 @@ var _ = Describe("Conversion", func() {
 				mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("-i", "disk").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
+				mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddPositional("/var/tmp/v2v/vm-sda").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddPositional("/var/tmp/v2v/vm-sdb").Return(mockCommandBuilder)
 
@@ -248,6 +252,7 @@ var _ = Describe("Conversion", func() {
 				mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("-i", "disk").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
+				mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddExtraArgs("--custom-flag").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddPositional("/var/tmp/v2v/vm-sda").Return(mockCommandBuilder)
 
@@ -444,6 +449,7 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-i", "disk").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("/var/tmp/v2v/vm-sda").Return(mockCommandBuilder)
 
 			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
@@ -518,6 +524,7 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddArg("-i", "libvirtxml").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--mac", "00:11:22:33:44:55:ip:192.168.1.100").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional(config.V2vInPlaceLibvirtDomain).Return(mockCommandBuilder)
 
 			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
