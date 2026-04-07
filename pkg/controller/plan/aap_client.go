@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -134,43 +135,39 @@ func (c *AAPClient) GetJobStatus(ctx context.Context, jobID int) (*JobStatusResp
 // WaitForJobCompletion polls the AAP job status until it completes, fails, or hits a timeout.
 // If unlimited is true, timeout is ignored and polling runs until a terminal status or ctx is cancelled.
 func (c *AAPClient) WaitForJobCompletion(ctx context.Context, jobID int, timeout time.Duration, unlimited bool) error {
+	if !unlimited {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
-	var timeoutTimer *time.Timer
-	if !unlimited {
-		timeoutTimer = time.NewTimer(timeout)
-		defer timeoutTimer.Stop()
+	done, err := c.jobPollTick(ctx, jobID)
+	if err != nil {
+		return err
+	}
+	if done {
+		return nil
 	}
 
 	for {
-		if err := c.waitForNextPoll(ctx, jobID, ticker, timeoutTimer, timeout); err != nil {
-			return err
-		}
-		done, err := c.jobPollTick(ctx, jobID)
-		if done {
-			return err
-		}
-	}
-}
-
-// waitForNextPoll blocks until ctx is cancelled, a poll tick, or (when timer is non-nil) timeout.
-func (c *AAPClient) waitForNextPoll(ctx context.Context, jobID int, ticker *time.Ticker, timeoutTimer *time.Timer, timeout time.Duration) error {
-	if timeoutTimer == nil {
 		select {
 		case <-ctx.Done():
+			if !unlimited && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				return fmt.Errorf("AAP job %d timed out after %s", jobID, timeout)
+			}
 			return ctx.Err()
 		case <-ticker.C:
+		}
+		done, err := c.jobPollTick(ctx, jobID)
+		if err != nil {
+			return err
+		}
+		if done {
 			return nil
 		}
-	}
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timeoutTimer.C:
-		return fmt.Errorf("AAP job %d timed out after %s", jobID, timeout)
-	case <-ticker.C:
-		return nil
 	}
 }
 
@@ -178,8 +175,7 @@ func (c *AAPClient) waitForNextPoll(ctx context.Context, jobID int, ticker *time
 func (c *AAPClient) jobPollTick(ctx context.Context, jobID int) (done bool, err error) {
 	status, err := c.GetJobStatus(ctx, jobID)
 	if err != nil {
-		log.Error(err, "Failed to check AAP job status", "jobID", jobID)
-		return false, nil
+		return false, liberr.Wrap(err, fmt.Sprintf("checking AAP job %d status", jobID))
 	}
 
 	log.Info("AAP job status", "jobID", jobID, "status", status.Status)
@@ -198,15 +194,18 @@ func (c *AAPClient) jobPollTick(ctx context.Context, jobID int) (done bool, err 
 }
 
 // GetAAPTokenFromSecret reads the AAP API token from a Kubernetes Secret referenced by ref.
-// If ref.Namespace is empty, defaultNamespace is used (typically the migration plan namespace).
+// The Secret is always loaded from defaultNamespace (the migration plan namespace).
+// If ref.Namespace is set, it must equal defaultNamespace.
 func GetAAPTokenFromSecret(ctx context.Context, k8sClient client.Client, defaultNamespace string, ref *core.ObjectReference) (string, error) {
 	if ref == nil || strings.TrimSpace(ref.Name) == "" {
 		return "", fmt.Errorf("tokenSecret must be set with a non-empty name")
 	}
-	ns := ref.Namespace
-	if ns == "" {
-		ns = defaultNamespace
+	if strings.TrimSpace(ref.Namespace) != "" && ref.Namespace != defaultNamespace {
+		return "", fmt.Errorf(
+			"tokenSecret namespace %q must be empty or match the plan namespace %q",
+			ref.Namespace, defaultNamespace)
 	}
+	ns := defaultNamespace
 	secret := &core.Secret{}
 	err := k8sClient.Get(
 		ctx,

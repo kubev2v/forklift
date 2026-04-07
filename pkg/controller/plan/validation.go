@@ -1414,7 +1414,7 @@ func (r *Reconciler) validateServiceAccount(plan *api.Plan) (err error) {
 		return
 	}
 
-	if planHasHooks(plan) && plan.Namespace != plan.Spec.TargetNamespace {
+	if r.planHasLocalHookPods(plan) && plan.Namespace != plan.Spec.TargetNamespace {
 		key.Namespace = plan.Namespace
 		err = r.Get(context.TODO(), key, serviceAccount)
 		if k8serr.IsNotFound(err) {
@@ -1435,11 +1435,28 @@ func (r *Reconciler) validateServiceAccount(plan *api.Plan) (err error) {
 	return
 }
 
-// planHasHooks returns true if any VM in the plan has a pre- or post-hook configured.
-func planHasHooks(plan *api.Plan) bool {
+// planHasLocalHookPods returns true if any referenced hook runs a workload in the cluster
+// (local image hook). AAP-only hooks do not need a ServiceAccount in the plan namespace.
+func (r *Reconciler) planHasLocalHookPods(plan *api.Plan) bool {
 	for _, vm := range plan.Spec.VMs {
-		if len(vm.Hooks) > 0 {
-			return true
+		for _, href := range vm.Hooks {
+			if !libref.RefSet(&href.Hook) {
+				continue
+			}
+			hook := &api.Hook{}
+			err := r.Get(
+				context.TODO(),
+				client.ObjectKey{Namespace: href.Hook.Namespace, Name: href.Hook.Name},
+				hook)
+			if err != nil {
+				continue
+			}
+			if hook.Spec.AAP != nil {
+				continue
+			}
+			if strings.TrimSpace(hook.Spec.Image) != "" {
+				return true
+			}
 		}
 	}
 	return false
