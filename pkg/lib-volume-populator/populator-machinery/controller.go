@@ -70,14 +70,15 @@ const (
 	annSelectedNode         = "volume.kubernetes.io/selected-node"
 	controllerNameSuffix    = "populator"
 
-	reasonPodCreationError   = "PopulatorCreationError"
-	reasonPodCreationSuccess = "PopulatorCreated"
-	reasonPodFailed          = "PopulatorFailed"
-	reasonPodFinished        = "PopulatorFinished"
-	reasonPVCCreationError   = "PopulatorPVCCreationError"
-	reasonPopulatorProgress  = "PopulatorProgress"
-	AnnTransferNetwork       = "k8s.v1.cni.cncf.io/networks"
-	AnnPopulatorReCreations  = "recreations"
+	reasonPodCreationError     = "PopulatorCreationError"
+	reasonPodCreationSuccess   = "PopulatorCreated"
+	reasonPodFailed            = "PopulatorFailed"
+	reasonPodFinished          = "PopulatorFinished"
+	reasonPVCCreationError     = "PopulatorPVCCreationError"
+	reasonPopulatorProgress    = "PopulatorProgress"
+	AnnTransferNetwork         = "k8s.v1.cni.cncf.io/networks"
+	AnnPopulatorReCreations    = "recreations"
+	AnnPopulatorServiceAccount = "forklift.konveyor.io/serviceAccount"
 
 	qemuGroup = 107
 )
@@ -638,7 +639,9 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 				Spec: makePopulatePodSpec(pvcPrimeName, secretName),
 			}
 			if c.gk.Kind == api.VSphereXcopyVolumePopulatorKind {
-				pod.Spec.ServiceAccountName = "populator"
+				pod.Spec.ServiceAccountName = "populator" // Xcopy always uses its dedicated SA
+			} else if sa, ok := pvc.Annotations[AnnPopulatorServiceAccount]; ok && sa != "" {
+				pod.Spec.ServiceAccountName = sa // Other populators use the annotation
 			}
 			pod.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName = pvcPrimeName
 			con := &pod.Spec.Containers[0]

@@ -185,6 +185,7 @@ rules:
   resources:
   - serviceaccounts
   verbs:
+  - get
   - create
 - apiGroups:
   - rbac.authorization.k8s.io

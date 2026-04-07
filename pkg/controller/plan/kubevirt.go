@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -93,6 +94,12 @@ const (
 	DynamicScriptsMountPath = "/mnt/dynamic_scripts"
 	// Annotation to specify current number of retries for getting parent backing
 	ParentBackingRetriesAnnotation = "parentBackingRetries"
+	// AnnPopulatorServiceAccount is set on populator PVCs to propagate the
+	// migration ServiceAccount to the populator pod.
+	AnnPopulatorServiceAccount = "forklift.konveyor.io/serviceAccount"
+	// AnnCDIPodServiceAccount is set on DataVolume annotations so CDI uses
+	// the specified ServiceAccount for its data transfer pods.
+	AnnCDIPodServiceAccount = "cdi.kubevirt.io/storage.pod.serviceAccountName"
 )
 
 // Labels
@@ -173,6 +180,12 @@ type KubeVirt struct {
 	Builder adapter.Builder
 	// Ensurer
 	Ensurer adapter.Ensurer
+}
+
+// resolveServiceAccount resolves the ServiceAccount for migration pods.
+// Priority: Plan.Spec.ServiceAccount > Settings.Migration.ServiceAccount > "" (namespace default).
+func resolveServiceAccount(plan *api.Plan) string {
+	return cmp.Or(plan.Spec.ServiceAccount, Settings.Migration.ServiceAccount)
 }
 
 // CNINetworkConfig represents a CNI network configuration parsed from a NetworkAttachmentDefinition.
@@ -680,7 +693,10 @@ func (r *KubeVirt) PopulatorVolumes(vmRef ref.Ref) (pvcs []*core.PersistentVolum
 		err = liberr.Wrap(err)
 		return
 	}
-	annotations := r.vmLabels(vmRef)
+	annotations := make(map[string]string)
+	if sa := resolveServiceAccount(r.Plan); sa != "" {
+		annotations[AnnPopulatorServiceAccount] = sa
+	}
 	err = r.createLunDisks(vmRef)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -991,6 +1007,9 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) (er
 				},
 			},
 		},
+	}
+	if sa := resolveServiceAccount(r.Plan); sa != "" {
+		pod.Spec.ServiceAccountName = sa
 	}
 	// Align with the conversion pod request, to prevent breakage
 	r.setKvmOnPodSpec(&pod.Spec)
@@ -1550,6 +1569,10 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 		// running a cold migration to the local cluster only when the source is either OpenShift
 		// or vSphere, and in the latter case the conversion pod acts as the first-consumer
 		annotations[planbase.AnnBindImmediate] = "true"
+	}
+
+	if sa := resolveServiceAccount(r.Plan); sa != "" {
+		annotations[AnnCDIPodServiceAccount] = sa
 	}
 
 	// Do not delete the DV when the import completes as we check the DV to get the current
@@ -2393,6 +2416,9 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 			},
 			Volumes: volumes,
 		},
+	}
+	if sa := resolveServiceAccount(r.Plan); sa != "" {
+		pod.Spec.ServiceAccountName = sa
 	}
 	// Request access to /dev/kvm via Kubevirt's Device Manager
 	// That is to ensure the appliance virt-v2v uses would not

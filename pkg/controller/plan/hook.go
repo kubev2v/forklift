@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"cmp"
 	"context"
 	"encoding/base64"
 	"path"
@@ -223,8 +224,7 @@ func (r *HookRunner) template(mp *core.ConfigMap) (template *core.PodTemplateSpe
 	if deadline > 0 {
 		template.Spec.ActiveDeadlineSeconds = &deadline
 	}
-	sa := r.hook.Spec.ServiceAccount
-	if len(sa) > 0 {
+	if sa := cmp.Or(r.hook.Spec.ServiceAccount, r.Context.Plan.Spec.ServiceAccount, Settings.Migration.ServiceAccount); sa != "" {
 		template.Spec.ServiceAccountName = sa
 	}
 	if len(r.hook.Spec.Playbook) > 0 {
