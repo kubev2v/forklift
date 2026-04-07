@@ -142,6 +142,7 @@ func (c *Conversion) RunVirtV2vInPlace() error {
 	if err != nil {
 		return err
 	}
+	v2vCmdBuilder.AddFlag("--no-fstrim")
 	c.addConversionExtraArgs(v2vCmdBuilder)
 	v2vCmdBuilder.AddPositional(c.LibvirtDomainFile)
 	v2vCmd := v2vCmdBuilder.Build()
@@ -167,6 +168,7 @@ func (c *Conversion) RunVirtV2vInPlaceDisk() error {
 	if err != nil {
 		return err
 	}
+	v2vCmdBuilder.AddFlag("--no-fstrim")
 	c.addConversionExtraArgs(v2vCmdBuilder)
 
 	// Add all disks as positional arguments
