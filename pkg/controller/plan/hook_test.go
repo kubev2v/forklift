@@ -39,13 +39,21 @@ func hookTestScheme(t *testing.T) *runtime.Scheme {
 
 func savedHookRunnerSettings(t *testing.T) func() {
 	t.Helper()
-	saved := Settings.Migration.ServiceAccount
+	savedServiceAccount := Settings.Migration.ServiceAccount
+	savedRequestsCPU := Settings.Migration.HooksContainerRequestsCpu
+	savedRequestsMemory := Settings.Migration.HooksContainerRequestsMemory
+	savedLimitsCPU := Settings.Migration.HooksContainerLimitsCpu
+	savedLimitsMemory := Settings.Migration.HooksContainerLimitsMemory
 	Settings.Migration.HooksContainerRequestsCpu = "100m"
 	Settings.Migration.HooksContainerRequestsMemory = "128Mi"
 	Settings.Migration.HooksContainerLimitsCpu = "1"
 	Settings.Migration.HooksContainerLimitsMemory = "512Mi"
 	return func() {
-		Settings.Migration.ServiceAccount = saved
+		Settings.Migration.ServiceAccount = savedServiceAccount
+		Settings.Migration.HooksContainerRequestsCpu = savedRequestsCPU
+		Settings.Migration.HooksContainerRequestsMemory = savedRequestsMemory
+		Settings.Migration.HooksContainerLimitsCpu = savedLimitsCPU
+		Settings.Migration.HooksContainerLimitsMemory = savedLimitsMemory
 	}
 }
 
@@ -122,11 +130,8 @@ func TestHookSpecAAPFields(t *testing.T) {
 			},
 		},
 	}
-	if hook.Spec.AAP == nil || hook.Spec.Playbook != "" {
-		t.Fatal("AAP hook should have aap set and no playbook")
-	}
-	if hook.Spec.AAP.URL != testHookAAPExampleURL || hook.Spec.AAP.JobTemplateID != 7 {
-		t.Fatal("unexpected AAP field values")
+	if !api.HookExecutionConfigValid(hook) {
+		t.Fatal("HookExecutionConfigValid should accept this AAP hook")
 	}
 }
 
@@ -137,8 +142,8 @@ func TestHookSpecPlaybookFields(t *testing.T) {
 			Playbook: "LS0tCi0gbmFtZTogVGVzdCBwbGF5Ym9vawogIGhvc3RzOiBsb2NhbGhvc3Q=",
 		},
 	}
-	if hook.Spec.AAP != nil || hook.Spec.Playbook == "" || hook.Spec.Image == "" {
-		t.Fatal("expected local playbook hook")
+	if !api.HookExecutionConfigValid(hook) {
+		t.Fatal("HookExecutionConfigValid should accept this local hook")
 	}
 }
 
@@ -164,13 +169,19 @@ func TestGetAAPTokenFromSecret(t *testing.T) {
 			want: "tok",
 		},
 		{
-			name: "uses ref namespace when set",
+			name: "allows explicit namespace matching plan namespace",
 			objs: []client.Object{&core.Secret{
-				ObjectMeta: meta.ObjectMeta{Name: "s", Namespace: "other-ns"},
-				Data:       map[string][]byte{"token": []byte("cross")},
+				ObjectMeta: meta.ObjectMeta{Name: "s", Namespace: ns},
+				Data:       map[string][]byte{"token": []byte("explicit-ns")},
 			}},
-			ref:  &core.ObjectReference{Name: "s", Namespace: "other-ns"},
-			want: "cross",
+			ref:  &core.ObjectReference{Name: "s", Namespace: ns},
+			want: "explicit-ns",
+		},
+		{
+			name:    "rejects cross-namespace token secret",
+			objs:    nil,
+			ref:     &core.ObjectReference{Name: "s", Namespace: "other-ns"},
+			wantErr: true,
 		},
 		{name: "missing secret", objs: nil, ref: ref("missing"), wantErr: true},
 		{

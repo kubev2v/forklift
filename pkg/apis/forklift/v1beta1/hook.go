@@ -36,7 +36,8 @@ type AAPConfig struct {
 	JobTemplateID int `json:"jobTemplateId"`
 	// Reference to the Secret containing the AAP API token.
 	// The Secret must contain a key named "token" with the Bearer token value.
-	// If Namespace is empty, the Secret is read from the migration plan namespace.
+	// The controller reads the Secret only from the migration plan namespace.
+	// Namespace must be empty or equal to that plan namespace.
 	// +kubebuilder:validation:Required
 	TokenSecret core.ObjectReference `json:"tokenSecret" ref:"Secret"`
 	// Timeout in seconds to wait for the AAP job after launch (wall-clock polling limit).

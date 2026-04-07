@@ -40,6 +40,16 @@ const (
 // Validate the hook.
 func (r *Reconciler) validate(hook *api.Hook) (err error) {
 	if hook.Spec.AAP != nil {
+		if strings.TrimSpace(hook.Spec.Image) != "" || strings.TrimSpace(hook.Spec.Playbook) != "" {
+			hook.Status.SetCondition(libcnd.Condition{
+				Type:     InvalidHookExecute,
+				Status:   True,
+				Reason:   NotSet,
+				Category: Critical,
+				Message:  "AAP hooks cannot be combined with local `spec.image` or `spec.playbook`; clear those fields or use a local hook instead.",
+			})
+			return nil
+		}
 		r.validateAAP(hook)
 		return nil
 	}
@@ -92,7 +102,7 @@ func (r *Reconciler) validateImage(hook *api.Hook) {
 	}
 }
 
-func (r Reconciler) validatePlaybook(hook *api.Hook) {
+func (r *Reconciler) validatePlaybook(hook *api.Hook) {
 	if hook.Spec.Playbook == "" {
 		return
 	}

@@ -426,9 +426,10 @@ func (r *HookRunner) runAAPJob(step *planapi.Step) (err error) {
 
 	r.Log.Info(
 		"Launching AAP job template",
-		"jobTemplateId", aapConfig.JobTemplateID,
-		"aapUrl", aapConfig.URL,
-		"vm", r.vm.Name,
+		"aap.jobTemplateId", aapConfig.JobTemplateID,
+		"aap.url", aapConfig.URL,
+		"vm.name", r.vm.Name,
+		"vm.id", r.vm.ID,
 	)
 
 	// Launch the job

@@ -72,7 +72,8 @@ spec:
                     description: |-
                       Reference to the Secret containing the AAP API token.
                       The Secret must contain a key named "token" with the Bearer token value.
-                      If Namespace is empty, the Secret is read from the migration plan namespace.
+                      The controller reads the Secret only from the migration plan namespace.
+                      Namespace must be empty or equal to that plan namespace.
                     properties:
                       apiVersion:
                         description: API version of the referent.
