@@ -2609,6 +2609,7 @@ spec:
             description: PlanSpec defines the desired state of Plan.
             properties:
               allowSnapshotConsolidation:
+                default: Always
                 description: |-
                   AllowSnapshotConsolidation enables some level of control over when forklift
                   will allow VMware to consolidate snapshots after removal, and when forklift

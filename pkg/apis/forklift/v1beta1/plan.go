@@ -364,6 +364,7 @@ type PlanSpec struct {
 	// - "BeforePenultimateSnapshot": consolidate after every snapshot removal until the second-to-last snapshot
 	// +optional
 	// +kubebuilder:validation:Enum=Always;Never;AfterFinalSnapshot;BeforePenultimateSnapshot
+	// +kubebuilder:default:=Always
 	AllowSnapshotConsolidation string `json:"allowSnapshotConsolidation,omitempty"`
 }
 
