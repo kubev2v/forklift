@@ -4,13 +4,13 @@ lockfileVendor: redhat
 arches:
 - arch: x86_64
   packages:
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-libs-11.5.0-4.1.el10_1.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/l/libvirt-libs-11.5.0-4.8.el10_1.x86_64.rpm
     repoid: rhel-10-for-x86_64-appstream-rpms
-    size: 5504089
-    checksum: sha256:449f1f6b8a46f756dbb19c12c599133f41c7f969b4064e357c49020e3980208c
+    size: 5491048
+    checksum: sha256:db7752360cda66f3ecb912307643542347224947060560dadec3e96b017e65a6
     name: libvirt-libs
-    evr: 11.5.0-4.1.el10_1
-    sourcerpm: libvirt-11.5.0-4.1.el10_1.src.rpm
+    evr: 11.5.0-4.8.el10_1
+    sourcerpm: libvirt-11.5.0-4.8.el10_1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/c/cyrus-sasl-gssapi-2.1.28-29.el10.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
     size: 28091
@@ -32,20 +32,20 @@ arches:
     name: numactl-libs
     evr: 2.0.19-2.el10
     sourcerpm: numactl-2.0.19-2.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/codeready-builder/os/Packages/l/libvirt-devel-11.5.0-4.1.el10_1.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/codeready-builder/os/Packages/l/libvirt-devel-11.5.0-4.8.el10_1.x86_64.rpm
     repoid: codeready-builder-for-rhel-10-x86_64-rpms
-    size: 215096
-    checksum: sha256:4b37dd5743139e2df129548e758a99eace57b0680cc542357c6533f3c77ace74
+    size: 222677
+    checksum: sha256:f779f7a0d2c190d6c7b5a269e4958e74723490c19331803c6c7a0e4ab0841af8
     name: libvirt-devel
-    evr: 11.5.0-4.1.el10_1
-    sourcerpm: libvirt-11.5.0-4.1.el10_1.src.rpm
+    evr: 11.5.0-4.8.el10_1
+    sourcerpm: libvirt-11.5.0-4.8.el10_1.src.rpm
   source:
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/l/libvirt-11.5.0-4.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/source/SRPMS/Packages/l/libvirt-11.5.0-4.8.el10_1.src.rpm
     repoid: rhel-10-for-x86_64-appstream-source-rpms
-    size: 10181500
-    checksum: sha256:57bc381750268cd7f24596f1acfef15009e46b37c2930b9d25e713d1cdcad91c
+    size: 10225483
+    checksum: sha256:b3fbc7c5643ec6d2252a197e0c6785dc6cbda7360bafb4ffc0aa625b76ea8706
     name: libvirt
-    evr: 11.5.0-4.1.el10_1
+    evr: 11.5.0-4.8.el10_1
   - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/source/SRPMS/Packages/c/cyrus-sasl-2.1.28-29.el10.src.rpm
     repoid: rhel-10-for-x86_64-baseos-source-rpms
     size: 3988047
