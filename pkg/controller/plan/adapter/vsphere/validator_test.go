@@ -593,8 +593,8 @@ var _ = Describe("vsphere validation tests", func() {
 		})
 	})
 
-	Describe("ConsolidationNeeded", func() {
-		It("should warn on consolidation needed", func() {
+	DescribeTable("ConsolidationNeeded",
+		func(consolidationNeeded bool) {
 			plan := createPlan()
 			ctx := plancontext.Context{
 				Plan: plan,
@@ -607,7 +607,7 @@ var _ = Describe("vsphere validation tests", func() {
 									Name: "consolidation-vm",
 								},
 							},
-							ConsolidationNeeded: true,
+							ConsolidationNeeded: consolidationNeeded,
 						},
 					},
 				},
@@ -615,9 +615,11 @@ var _ = Describe("vsphere validation tests", func() {
 			validator := Validator{Context: &ctx}
 			needed, err := validator.ConsolidationNeeded(ref.Ref{Name: "consolidation-vm"})
 			Expect(err).NotTo(HaveOccurred())
-			Expect(needed).To(BeTrue())
-		})
-	})
+			Expect(needed).To(Equal(consolidationNeeded))
+		},
+		Entry("should warn on consolidation needed", true),
+		Entry("should not warn when consolidation is not needed", false),
+	)
 })
 
 func createPlan() *v1beta1.Plan {
