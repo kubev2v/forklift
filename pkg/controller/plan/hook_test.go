@@ -5,15 +5,12 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
-	"github.com/kubev2v/forklift/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
-
-var hookLog = logging.WithName("hook-test")
 
 const (
 	testHookGlobalSA          = "global-sa"
