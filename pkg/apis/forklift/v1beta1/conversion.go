@@ -1,12 +1,36 @@
 package v1beta1
 
 import (
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
+	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// ConversionType defines the type of conversion to perform.
+type ConversionType string
+
+const (
+	Inspection ConversionType = "Inspection"
+	InPlace    ConversionType = "InPlace"
+	Cold       ConversionType = "Cold"
 )
 
 // ConversionSpec defines the desired state of Conversion.
 type ConversionSpec struct {
+	// Type of conversion.
+	// +kubebuilder:validation:Enum=Inspection;InPlace;Cold
+	Type ConversionType `json:"type"`
+	// Reference to the provider.
+	Provider core.ObjectReference `json:"provider" ref:"Provider"`
+	// Reference to the source VM.
+	VM ref.Ref `json:"vm"`
+	// Disk decryption LUKS keys.
+	// +optional
+	LUKS core.ObjectReference `json:"luks,omitempty" ref:"Secret"`
+	// Freeform settings passed to the conversion process.
+	// +optional
+	Settings map[string]string `json:"settings,omitempty"`
 }
 
 // ConversionStatus defines the observed state of Conversion.

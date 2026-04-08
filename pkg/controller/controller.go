@@ -17,13 +17,13 @@ limitations under the License.
 package controller
 
 import (
+	"github.com/kubev2v/forklift/pkg/controller/conversion"
 	"github.com/kubev2v/forklift/pkg/controller/hook"
 	"github.com/kubev2v/forklift/pkg/controller/host"
 	"github.com/kubev2v/forklift/pkg/controller/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/map/network"
 	"github.com/kubev2v/forklift/pkg/controller/map/storage"
 	"github.com/kubev2v/forklift/pkg/controller/migration"
-	"github.com/kubev2v/forklift/pkg/controller/migrationtask"
 	"github.com/kubev2v/forklift/pkg/controller/ova"
 	"github.com/kubev2v/forklift/pkg/controller/plan"
 	"github.com/kubev2v/forklift/pkg/controller/provider"
