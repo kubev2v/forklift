@@ -1239,10 +1239,20 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			step.MarkStarted()
 			step.Phase = api.StepRunning
 			var ready bool
-			if ready, err = r.ensureGuestConversionPod(vm, step); err != nil {
-				step.AddError(err.Error())
-				err = nil
+			if r.Plan.ShouldUseConversionCR() {
+				if err = r.ensureConversionCR(vm); err != nil {
+					step.AddError(err.Error())
+					err = nil
+					break
+				}
+				r.NextPhase(vm)
 				break
+			} else {
+				if ready, err = r.ensureGuestConversionPod(vm, step); err != nil {
+					step.AddError(err.Error())
+					err = nil
+					break
+				}
 			}
 			if !ready {
 				r.Log.Info("virt-v2v pod isn't ready yet")
@@ -1512,6 +1522,44 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus, step *plan.Step)
 		ready = true
 	}
 
+	return
+}
+
+// Ensure the Conversion CR exists for the VM.
+func (r *Migration) ensureConversionCR(vm *plan.VMStatus) (err error) {
+	conversion := &api.Conversion{
+		ObjectMeta: meta.ObjectMeta{
+			Namespace:    r.Plan.Spec.TargetNamespace,
+			GenerateName: r.Plan.Name + "-" + vm.ID + "-",
+			Labels: map[string]string{
+				"plan":      r.Plan.Name,
+				"migration": r.Migration.Name,
+				"vmID":      vm.ID,
+			},
+		},
+		Spec: api.ConversionSpec{
+			Type: api.Cold,
+			Provider: core.ObjectReference{
+				Namespace: r.Source.Provider.Namespace,
+				Name:      r.Source.Provider.Name,
+			},
+			VM: vm.Ref,
+		},
+	}
+	if vm.LUKS.Name != "" {
+		conversion.Spec.LUKS = vm.LUKS
+	}
+	err = r.Destination.Client.Create(context.TODO(), conversion)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	r.Log.Info(
+		"Conversion CR created.",
+		"conversion",
+		path.Join(conversion.Namespace, conversion.Name),
+		"vm",
+		vm.String())
 	return
 }
 

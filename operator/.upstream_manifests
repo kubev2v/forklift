@@ -5021,6 +5021,12 @@ spec:
                   - true (default): Use compatibility devices (SATA bus, E1000E NIC) to ensure bootability
                   - false: Use high-performance VirtIO devices (requires VirtIO drivers already installed in source VM)
                 type: boolean
+              useConversionCR:
+                default: false
+                description: |-
+                  UseConversionCR controls whether the plan creates Conversion custom resources
+                  to drive the VM conversion process instead of managing it directly.
+                type: boolean
               virtV2vImage:
                 description: |-
                   VirtV2vImage overrides the global virt-v2v container image for this plan.
