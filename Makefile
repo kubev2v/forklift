@@ -200,6 +200,15 @@ validate-forklift-controller-crd: ## Validate ForkliftController CRD schema
 	@echo "Validating ForkliftController CRD..."
 	python3 hack/validate_forklift_controller_crd.py
 
+# CRD API changelog (hack/crd_changelog_diff.py)
+TO_REF ?= HEAD
+# Set SHOW_CHANGE_DIFFS=1 to pass --show-change-diffs (large output)
+SHOW_CHANGE_DIFFS ?=
+
+.PHONY: crd-api-changelog
+crd-api-changelog: ## Print CRD API changelog as Markdown (optional FROM_REF, default latest v* tag; TO_REF default HEAD)
+	python3 hack/crd_changelog_diff.py $(if $(FROM_REF),--from-ref "$(FROM_REF)",) --to-ref "$(TO_REF)" $(if $(filter 1 true yes,$(SHOW_CHANGE_DIFFS)),--show-change-diffs,)
+
 .PHONY: integration-test
 integration-test: generate fmt vet manifests envtest ## Run integration tests with envtest
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -i --bin-dir $(LOCALBIN) -p path)" go test ./pkg/controller/migration/... -coverprofile cover.out
