@@ -123,7 +123,6 @@ func (c *Conversion) RunVirtV2vInPlace() error {
 		return err
 	}
 	v2vCmdBuilder.AddFlag("--no-fstrim")
-	c.addConversionExtraArgs(v2vCmdBuilder)
 	v2vCmdBuilder.AddPositional(c.LibvirtDomainFile)
 	v2vCmd := v2vCmdBuilder.Build()
 	v2vCmd.SetStdout(os.Stdout)
@@ -149,7 +148,6 @@ func (c *Conversion) RunVirtV2vInPlaceDisk() error {
 		return err
 	}
 	v2vCmdBuilder.AddFlag("--no-fstrim")
-	c.addConversionExtraArgs(v2vCmdBuilder)
 
 	// Add all disks as positional arguments
 	for _, disk := range c.Disks {
