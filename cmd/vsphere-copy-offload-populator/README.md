@@ -177,6 +177,22 @@ See [README](internal/vantara/README.md)
 | --- | --- | --- |
 | ONTAP_SVM | string | the SVM to use in all the client interactions. Can be taken from trident.netapp.io/v1/TridentBackend.config.ontap_config.svm resource field. |
 
+**Example secret:**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ontap-secret
+  namespace: openshift-mtv
+type: Opaque
+stringData:
+  STORAGE_HOSTNAME: "ontap-mgmt.example.com"
+  STORAGE_USERNAME: "admin"
+  STORAGE_PASSWORD: "your-password"
+  ONTAP_SVM: "svm0"
+```
+
 ### HPE Primera/3PAR
 
 **Important**: For HPE Primera/3PAR, the `STORAGE_HOSTNAME` must include the full URL with protocol and the 3PAR's Web Services API (WSAPI) port. Use the 3PAR command `cli% showwsapi` to determine the correct WSAPI port. 3PAR systems default to port `8080` for both HTTP and HTTPS connections, Primera and Alletra 9000/MP default to port `443` (SSL/HTTPS). Depending on configured certificates you may need to skip SSL verification.
