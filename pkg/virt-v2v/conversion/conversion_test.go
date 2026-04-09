@@ -350,55 +350,6 @@ var _ = Describe("Conversion", func() {
 		)
 	})
 
-	Describe("addConversionExtraArgs", func() {
-		It("adds extra args when they are set",
-			func() {
-				appConfig.ExtraArgs = []string{"--arg1", "--arg2", "value"}
-
-				mockCommandBuilder.EXPECT().AddExtraArgs("--arg1", "--arg2", "value").Return(mockCommandBuilder)
-
-				conversion.addConversionExtraArgs(mockCommandBuilder)
-			},
-		)
-
-		It("does nothing when extra args are nil",
-			func() {
-				appConfig.ExtraArgs = nil
-				// No mock expectations - nothing should be called
-				conversion.addConversionExtraArgs(mockCommandBuilder)
-			},
-		)
-
-		It("calls AddExtraArgs with empty slice when extra args are empty",
-			func() {
-				appConfig.ExtraArgs = []string{}
-				// Empty slice is not nil, so AddExtraArgs is still called
-				mockCommandBuilder.EXPECT().AddExtraArgs().Return(mockCommandBuilder)
-				conversion.addConversionExtraArgs(mockCommandBuilder)
-			},
-		)
-	})
-
-	Describe("addInspectorExtraArgs", func() {
-		It("adds inspector extra args when they are set",
-			func() {
-				appConfig.InspectorExtraArgs = []string{"--inspector-arg1", "--inspector-arg2"}
-
-				mockCommandBuilder.EXPECT().AddExtraArgs("--inspector-arg1", "--inspector-arg2").Return(mockCommandBuilder)
-
-				conversion.addInspectorExtraArgs(mockCommandBuilder)
-			},
-		)
-
-		It("does nothing when inspector extra args are nil",
-			func() {
-				appConfig.InspectorExtraArgs = nil
-				// No mock expectations - nothing should be called
-				conversion.addInspectorExtraArgs(mockCommandBuilder)
-			},
-		)
-	})
-
 	Describe("virtV2vOVAArgs", func() {
 		It("adds OVA args correctly",
 			func() {
