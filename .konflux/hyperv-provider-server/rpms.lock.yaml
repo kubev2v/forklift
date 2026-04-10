@@ -1,0 +1,15 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/t/tar-1.34-9.el9_7.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 906521
+    checksum: sha256:4c0beb933074a5254c297e8968b3f41ec5a02b23056997ddcf526fe7e6166482
+    name: tar
+    evr: 2:1.34-9.el9_7
+    sourcerpm: tar-1.34-9.el9_7.src.rpm
+  source: []
+  module_metadata: []
