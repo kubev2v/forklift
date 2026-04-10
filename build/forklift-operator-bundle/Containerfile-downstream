@@ -17,7 +17,7 @@ ARG CLI_DOWNLOAD_IMAGE="registry.redhat.io/mtv-candidate/mtv-cli-download-rhel9@
 
 ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:bddce2575c5eff3ea1b48fe90a20214cf150a9cae8608d56fb8f854cc4cb324b"
 
-ARG HYPERV_PROVIDER_SERVER_IMAGE="registry.redhat.io/mtv-candidate/mtv-hyperv-provider-server-rhel9@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+ARG HYPERV_PROVIDER_SERVER_IMAGE="registry.redhat.io/mtv-candidate/mtv-hyperv-provider-server-rhel9@sha256:c7b6eadf6421f5f4bcd6dd9513fad35ff4e6c4af0b8658b5b10b20e9a114cc2b"
 
 ARG MUST_GATHER_IMAGE="registry.redhat.io/mtv-candidate/mtv-must-gather-rhel8@sha256:8cd5703df6d6abfe6fc41c94de4b115532041ac0d2d17da950f7053bcaf40625"
 
