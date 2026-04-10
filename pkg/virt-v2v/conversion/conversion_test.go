@@ -684,6 +684,7 @@ var _ = Describe("Conversion", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 				Expect(result).ToNot(ContainSubstring("/original/path/disk.vmdk"))
+				Expect(result).To(ContainSubstring(`<driver name="qemu" type="raw"`))
 			},
 		)
 
@@ -707,6 +708,7 @@ var _ = Describe("Conversion", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 				Expect(result).ToNot(ContainSubstring("/dev/original-block"))
+				Expect(result).To(ContainSubstring(`<driver name="qemu" type="raw"`))
 			},
 		)
 
