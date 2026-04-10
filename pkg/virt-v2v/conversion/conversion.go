@@ -393,6 +393,10 @@ func (c *Conversion) updateDiskPaths(domainXML string) (string, error) {
 		}
 		newPath := c.Disks[diskIdx].Link
 		if updated := updateDiskSource(&disk, newPath); updated {
+			disk.Driver = &libvirtxml.DomainDiskDriver{
+				Name: "qemu",
+				Type: "raw",
+			}
 			updatedDisks = append(updatedDisks, disk)
 		}
 		diskIdx++
