@@ -186,6 +186,8 @@ rules:
   - serviceaccounts
   verbs:
   - get
+  - list
+  - watch
   - create
 - apiGroups:
   - rbac.authorization.k8s.io
