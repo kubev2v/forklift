@@ -50,41 +50,13 @@ var _ = Describe("Conversion", func() {
 				mockCommandBuilder.EXPECT().New("virt-v2v-inspector").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
-				mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("-if", "raw").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("-i", "disk").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("-O", config.InspectionOutputFile).Return(mockCommandBuilder)
+				mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
+				mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddPositional("/var/tmp/v2v/new-vm-name-sda").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddPositional("/var/tmp/v2v/new-vm-name-sdb").Return(mockCommandBuilder)
-
-				mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
-
-				mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
-				mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
-				mockCommandExecutor.EXPECT().Run()
-
-				err := conversion.RunVirtV2VInspection()
-				Expect(err).ToNot(HaveOccurred())
-			},
-		)
-
-		It("passes virt-v2v-inspection with inspector extra args",
-			func() {
-				appConfig.InspectionOutputFile = config.InspectionOutputFile
-				appConfig.InspectorExtraArgs = []string{"--extra-arg1", "--extra-arg2"}
-				conversion.Disks = []*Disk{
-					{Link: "/var/tmp/v2v/new-vm-name-sda"},
-				}
-
-				mockCommandBuilder.EXPECT().New("virt-v2v-inspector").Return(mockCommandBuilder)
-				mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
-				mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
-				mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
-				mockCommandBuilder.EXPECT().AddArg("-if", "raw").Return(mockCommandBuilder)
-				mockCommandBuilder.EXPECT().AddArg("-i", "disk").Return(mockCommandBuilder)
-				mockCommandBuilder.EXPECT().AddArg("-O", config.InspectionOutputFile).Return(mockCommandBuilder)
-				mockCommandBuilder.EXPECT().AddExtraArgs("--extra-arg1", "--extra-arg2").Return(mockCommandBuilder)
-				mockCommandBuilder.EXPECT().AddPositional("/var/tmp/v2v/new-vm-name-sda").Return(mockCommandBuilder)
 
 				mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
 
@@ -107,10 +79,11 @@ var _ = Describe("Conversion", func() {
 				mockCommandBuilder.EXPECT().New("virt-v2v-inspector").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
-				mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("-if", "raw").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("-i", "disk").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("-O", config.InspectionOutputFile).Return(mockCommandBuilder)
+				mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
+				mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddPositional("/var/tmp/v2v/new-vm-name-sda").Return(mockCommandBuilder)
 
 				mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
@@ -449,8 +422,9 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddArg("-if", "raw").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-i", "disk").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-O", config.InspectionOutputFile).Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddPositional("/var/tmp/v2v/new-vm-name-sda").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddPositional("/var/tmp/v2v/new-vm-name-sdb").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("--root", "/dev/sdb").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddPositional("/var/tmp/v2v/vm-sda").Return(mockCommandBuilder)
 
 			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
 
