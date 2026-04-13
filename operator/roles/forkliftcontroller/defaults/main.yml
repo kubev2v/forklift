@@ -9,6 +9,7 @@ feature_volume_populator: true
 feature_copy_offload: true
 feature_ocp_live_migration: true
 feature_vmware_system_serial_number: true
+feature_vsphere_vmware_driver_removal: false
 feature_cli_download: true
 feature_ova_appliance_management: true
 

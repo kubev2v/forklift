@@ -163,6 +163,10 @@ spec:
         - name: FEATURE_VMWARE_SYSTEM_SERIAL_NUMBER
           value: "true"
 {% endif %}
+{% if feature_vsphere_vmware_driver_removal|bool %}
+        - name: FEATURE_VSPHERE_VMWARE_DRIVER_REMOVAL
+          value: "true"
+{% endif %}
 {% if ovirt_osmap_configmap_name is defined %}
         - name: OVIRT_OS_MAP
           value: {{ ovirt_osmap_configmap_name }}
