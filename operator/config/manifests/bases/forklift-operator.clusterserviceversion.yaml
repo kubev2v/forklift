@@ -515,6 +515,42 @@ spec:
         path: ova_container_requests_memory
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
+      # HyperV Settings
+      - description: HyperV CPU limit (default 1000m)
+        displayName: HyperV CPU Limit
+        path: hyperv_container_limits_cpu
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: HyperV memory limit (default 1Gi)
+        displayName: HyperV Memory Limit
+        path: hyperv_container_limits_memory
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: HyperV CPU request (default 100m)
+        displayName: HyperV CPU Request
+        path: hyperv_container_requests_cpu
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: HyperV memory request (default 512Mi)
+        displayName: HyperV Memory Request
+        path: hyperv_container_requests_memory
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: HyperV provider server image
+        displayName: HyperV Provider Server Image
+        path: hyperv_provider_server_fqin
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: HyperV inventory refresh interval (default 10s)
+        displayName: HyperV Refresh Interval
+        path: controller_hyperv_refresh_interval
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Timeout for HyperV SMB disk validation (default 30s)
+        displayName: HyperV Validation Timeout
+        path: controller_hyperv_validation_timeout
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
       # OVA Proxy Settings
       - description: OVA Proxy CPU limit (default 1000m)
         displayName: OVA Proxy CPU Limit
