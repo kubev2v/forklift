@@ -235,6 +235,13 @@ spec:
                 - "true"
                 - "false"
                 type: string
+              feature_vsphere_vmware_driver_removal:
+                description: 'Run VMware driver removal scripts during Windows vSphere
+                  conversion (default: false)'
+                enum:
+                - "true"
+                - "false"
+                type: string
               hooks_container_limits_cpu:
                 description: 'Hooks CPU limit (default: 1000m)'
                 example: 2000m
@@ -7748,6 +7755,13 @@ spec:
       - description: Use VMware system serial numbers (default true)
         displayName: Use VMware System Serial Numbers
         path: feature_vmware_system_serial_number
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:radio:true
+        - urn:alm:descriptor:com.tectonic.ui:radio:false
+      - description: Run VMware driver removal scripts during Windows vSphere conversion
+          (default false)
+        displayName: Enable VMware Driver Removal On Windows vSphere Conversion
+        path: feature_vsphere_vmware_driver_removal
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:radio:true
         - urn:alm:descriptor:com.tectonic.ui:radio:false

@@ -153,6 +153,12 @@ spec:
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:radio:true
           - urn:alm:descriptor:com.tectonic.ui:radio:false
+        - description: Run VMware driver removal scripts during Windows vSphere conversion (default false)
+          displayName: Enable VMware Driver Removal On Windows vSphere Conversion
+          path: feature_vsphere_vmware_driver_removal
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:radio:true
+          - urn:alm:descriptor:com.tectonic.ui:radio:false
         - description: Require authentication (default true)
           displayName: Require Authentication
           path: feature_auth_required
