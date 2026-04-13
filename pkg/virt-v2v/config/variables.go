@@ -14,24 +14,25 @@ type MountPath string
 
 // Enviroment variables
 const (
-	EnvLibvirtUrlName             = "V2V_libvirtURL"
-	EnvFingerprintName            = "V2V_fingerprint"
-	EnvInPlaceName                = "V2V_inPlace"
-	EnvExtraArgsName              = "V2V_extra_args"
-	EnvNewNameName                = "V2V_NewName"
-	EnvVmNameName                 = "V2V_vmName"
-	EnvRootDiskName               = "V2V_RootDisk"
-	EnvStaticIPsName              = "V2V_staticIPs"
-	EnvSourceName                 = "V2V_source"
-	EnvDiskPathName               = "V2V_diskPath"
-	EnvSecretKeyName              = "V2V_secretKey"
-	EnvLocalMigrationName         = "LOCAL_MIGRATION"
-	EnvVirtIoWinLegacyDriversName = "VIRTIO_WIN"
-	EnvHostName                   = "V2V_HOSTNAME"
-	EnvNbdeClevis                 = "V2V_NBDE_CLEVIS"
-	EnvMultipleIpsPerNicName      = "V2V_multipleIPsPerNic"
-	EnvRemoteInspection           = "V2V_remoteInspection"
-	EnvRemoteInspectionDisk       = "V2V_remoteInspectDisk_"
+	EnvLibvirtUrlName                 = "V2V_libvirtURL"
+	EnvFingerprintName                = "V2V_fingerprint"
+	EnvInPlaceName                    = "V2V_inPlace"
+	EnvExtraArgsName                  = "V2V_extra_args"
+	EnvNewNameName                    = "V2V_NewName"
+	EnvVmNameName                     = "V2V_vmName"
+	EnvRootDiskName                   = "V2V_RootDisk"
+	EnvStaticIPsName                  = "V2V_staticIPs"
+	EnvSourceName                     = "V2V_source"
+	EnvDiskPathName                   = "V2V_diskPath"
+	EnvSecretKeyName                  = "V2V_secretKey"
+	EnvLocalMigrationName             = "LOCAL_MIGRATION"
+	EnvVirtIoWinLegacyDriversName     = "VIRTIO_WIN"
+	EnvHostName                       = "V2V_HOSTNAME"
+	EnvNbdeClevis                     = "V2V_NBDE_CLEVIS"
+	EnvMultipleIpsPerNicName          = "V2V_multipleIPsPerNic"
+	EnvRemoteInspection               = "V2V_remoteInspection"
+	EnvRemoteInspectionDisk           = "V2V_remoteInspectDisk_"
+	EnvVsphereVmwareDriverRemovalName = "V2V_vsphereVmwareDriverRemoval"
 )
 
 const (
@@ -97,6 +98,8 @@ type AppConfig struct {
 	IsRemoteInspection bool
 	// RemoteInspectionDisks
 	RemoteInspectionDisks []string
+	// V2V_vsphereVmwareDriverRemoval
+	VsphereVmwareDriverRemoval bool
 
 	// V2V_multipleIPsPerNic
 	MultipleIpsPerNicName string
@@ -137,6 +140,7 @@ func (s *AppConfig) Load() (err error) {
 	flag.StringVar(&s.HostName, "hostname", os.Getenv(EnvHostName), "Hostname of the vm")
 	flag.StringVar(&s.MultipleIpsPerNicName, "multiple-ips-per-nic", os.Getenv(EnvMultipleIpsPerNicName), "Multiple IPs per NIC")
 	flag.BoolVar(&s.IsRemoteInspection, "remote-inspection", s.getEnvBool(EnvRemoteInspection, false), "Run virt-v2v-inspection on remote disks")
+	flag.BoolVar(&s.VsphereVmwareDriverRemoval, "vsphere-vmware-driver-removal", s.getEnvBool(EnvVsphereVmwareDriverRemovalName, false), "Run VMware driver removal scripts during Windows vSphere conversion")
 	s.RemoteInspectionDisks = s.getRemoteInspectionDisks()
 	flag.Parse()
 

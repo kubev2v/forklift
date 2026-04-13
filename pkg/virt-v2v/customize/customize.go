@@ -26,6 +26,15 @@ const (
 	FirstbootCmd            = "--firstboot"
 )
 
+// vsphereVmwareDriverRemovalScriptNames are uploaded in filename order (services, drivers, registry).
+var vsphereVmwareDriverRemovalScriptNames = []string{
+	"9101_disable_vmware_services.bat",
+	"9102_remove_vmware_services.bat",
+	"9103_remove_vmware_driver_packages.bat",
+	"9104_query_vmware_registry.bat",
+	"9105_remove_vmware_registry.bat",
+}
+
 //go:embed scripts
 var scriptFS embed.FS
 
@@ -144,6 +153,11 @@ func (c *Customize) customizeWindows() (err error) {
 		if err != nil {
 			return err
 		}
+	}
+
+	if c.appConfig.VsphereVmwareDriverRemoval && c.appConfig.IsVsphereMigration() {
+		fmt.Println("Adding vSphere VMware driver removal scripts")
+		c.addVsphereVmwareDriverRemoval(cmdBuilder)
 	}
 
 	c.addWinFirstbootScripts(cmdBuilder)
@@ -283,6 +297,15 @@ func (c *Customize) runCmd(builder utils.CommandBuilder) error {
 	return nil
 }
 
+// addVsphereVmwareDriverRemoval uploads VMware cleanup scripts to the guest Firstboot scripts directory.
+func (c *Customize) addVsphereVmwareDriverRemoval(cmdBuilder utils.CommandBuilder) {
+	windowsScriptsPath := filepath.Join(c.appConfig.Workdir, "scripts", "windows")
+	for _, name := range vsphereVmwareDriverRemovalScriptNames {
+		src := filepath.Join(windowsScriptsPath, name)
+		cmdBuilder.AddArg(UploadCmd, c.formatUpload(src, filepath.Join(WinFirstbootScriptsPath, name)))
+	}
+}
+
 // addWinFirstbootScripts appends firstboot script arguments to extraArgs
 func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) {
 	windowsScriptsPath := filepath.Join(c.appConfig.Workdir, "scripts", "windows")
@@ -322,7 +345,7 @@ func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) {
 		}
 	}
 	uploadInitPath := c.formatUpload(initPath, WinFirstbootScriptsPath)
-	cmdBuilder.AddArgs("--upload", uploadPreserveIpPath, uploadInitPath, uploadRemoveDuplicatesPath, uploadPreserveMultipleIpPath)
+	cmdBuilder.AddArgs(UploadCmd, uploadPreserveIpPath, uploadInitPath, uploadRemoveDuplicatesPath, uploadPreserveMultipleIpPath)
 }
 
 func (c *Customize) addWinDynamicScripts(cmdBuilder utils.CommandBuilder, dir string) error {
