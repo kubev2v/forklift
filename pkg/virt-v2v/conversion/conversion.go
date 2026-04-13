@@ -104,6 +104,7 @@ func (c *Conversion) RunVirtV2VInspection() error {
 	if err != nil {
 		return err
 	}
+	v2vCmdBuilder.AddFlag("--no-fstrim")
 	for _, disk := range c.Disks {
 		v2vCmdBuilder.AddPositional(disk.Link)
 	}
