@@ -2255,6 +2255,13 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 				Value: strconv.Itoa(settings.Settings.Migration.VirtV2vSmp),
 			})
 	}
+	if settings.Settings.Features.VsphereVmwareDriverRemoval {
+		environment = append(environment,
+			core.EnvVar{
+				Name:  "V2V_vsphereVmwareDriverRemoval",
+				Value: "true",
+			})
+	}
 
 	environment = append(environment,
 		core.EnvVar{

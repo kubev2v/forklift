@@ -683,6 +683,34 @@ var _ = Describe("Customize", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to read scripts directory"))
 		})
+
+		It("adds vSphere VMware driver removal script uploads", func() {
+			customize.disks = disks
+			appConfig.VsphereVmwareDriverRemoval = true
+			appConfig.Source = config.VSPHERE
+
+			mockFileSystem.EXPECT().Stat(appConfig.DynamicScriptsDir).Return(nil, os.ErrNotExist)
+
+			mockCommandBuilder.EXPECT().New("virt-customize").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("--verbose").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("--format", "raw").Return(mockCommandBuilder)
+
+			mockCommandBuilder.EXPECT().AddArg("--upload", gomock.Any()).Return(mockCommandBuilder).Times(5)
+
+			mockCommandBuilder.EXPECT().AddArgs("--upload", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockCommandBuilder)
+
+			for _, disk := range disks {
+				mockCommandBuilder.EXPECT().AddArg("--add", disk).Return(mockCommandBuilder)
+			}
+
+			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
+			mockCommandExecutor.EXPECT().Run().Return(nil)
+			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
+			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
+
+			err := customize.customizeWindows()
+			Expect(err).ToNot(HaveOccurred())
+		})
 	})
 
 	Describe("addWinDynamicScripts", func() {
