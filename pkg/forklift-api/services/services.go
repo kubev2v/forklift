@@ -17,4 +17,8 @@ func RegisterServices(mux *http.ServeMux, client client.Client) {
 	mux.HandleFunc(TLS_CERTIFICATE_PATH, func(w http.ResponseWriter, r *http.Request) {
 		serveTlsCertificate(w, r, client)
 	})
+	log.Info("register AAP job templates proxy service")
+	mux.HandleFunc(AAPJobTemplatesPath, func(w http.ResponseWriter, r *http.Request) {
+		serveAAPJobTemplates(w, r, client)
+	})
 }
