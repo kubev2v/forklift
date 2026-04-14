@@ -50,3 +50,8 @@ type Concern struct {
 	Category   string `json:"category"`
 	Assessment string `json:"assessment"`
 }
+
+// ConcernHolder is implemented by any inventory VM that carries concerns.
+type ConcernHolder interface {
+	GetConcerns() []Concern
+}

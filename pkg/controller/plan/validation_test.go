@@ -1202,3 +1202,147 @@ var _ = ginkgo.Describe("Template Validation", func() {
 		})
 	})
 })
+
+var _ = ginkgo.Describe("aggregateCriticalConcerns", func() {
+	var vmCriticalConcerns libcnd.Condition
+
+	ginkgo.BeforeEach(func() {
+		vmCriticalConcerns = libcnd.Condition{
+			Type:     VMCriticalConcerns,
+			Status:   libcnd.True,
+			Reason:   NotValid,
+			Category: api.CategoryCritical,
+			Message:  "One or more VMs in the plan have critical concerns that block migration.",
+			Items:    []string{},
+		}
+	})
+
+	ginkgo.It("should flag VMs with Critical concerns", func() {
+		vm := &vsphere.VM{
+			VM1: vsphere.VM1{
+				Concerns: []vspheremodel.Concern{
+					{Id: "vmware.passthrough_device.detected", Label: "Passthrough device detected", Category: "Critical"},
+				},
+			},
+		}
+		vmRef := ref.Ref{Name: "vm-with-passthrough", Namespace: "test"}
+
+		aggregateCriticalConcerns(vm, vmRef.String(), &vmCriticalConcerns)
+
+		gomega.Expect(vmCriticalConcerns.Items).To(gomega.HaveLen(1))
+		gomega.Expect(vmCriticalConcerns.Items[0]).To(gomega.ContainSubstring("Passthrough device detected"))
+	})
+
+	ginkgo.It("should not flag VMs with only Warning concerns", func() {
+		vm := &vsphere.VM{
+			VM1: vsphere.VM1{
+				Concerns: []vspheremodel.Concern{
+					{Id: "vmware.disk.rdm.detected", Label: "Raw Device Mapped disk detected", Category: "Warning"},
+				},
+			},
+		}
+		vmRef := ref.Ref{Name: "vm-with-rdm", Namespace: "test"}
+
+		aggregateCriticalConcerns(vm, vmRef.String(), &vmCriticalConcerns)
+
+		gomega.Expect(vmCriticalConcerns.Items).To(gomega.BeEmpty())
+	})
+
+	ginkgo.It("should list all Critical concerns per VM", func() {
+		vm := &vsphere.VM{
+			VM1: vsphere.VM1{
+				Concerns: []vspheremodel.Concern{
+					{Id: "vmware.disk_mode.independent", Label: "Independent disk detected", Category: "Critical"},
+					{Id: "vmware.disk.rdm.detected", Label: "RDM disk detected", Category: "Warning"},
+					{Id: "vmware.passthrough_device.detected", Label: "Passthrough device detected", Category: "Critical"},
+				},
+			},
+		}
+		vmRef := ref.Ref{Name: "vm-multi", Namespace: "test"}
+
+		aggregateCriticalConcerns(vm, vmRef.String(), &vmCriticalConcerns)
+
+		gomega.Expect(vmCriticalConcerns.Items).To(gomega.HaveLen(2))
+		gomega.Expect(vmCriticalConcerns.Items[0]).To(gomega.ContainSubstring("Independent disk detected"))
+		gomega.Expect(vmCriticalConcerns.Items[1]).To(gomega.ContainSubstring("Passthrough device detected"))
+	})
+
+	ginkgo.It("should flag multiple VMs with Critical concerns", func() {
+		vms := []struct {
+			vm  *vsphere.VM
+			ref ref.Ref
+		}{
+			{
+				vm: &vsphere.VM{VM1: vsphere.VM1{Concerns: []vspheremodel.Concern{
+					{Id: "vmware.disk_mode.independent", Label: "Independent disk detected", Category: "Critical"},
+				}}},
+				ref: ref.Ref{Name: "vm1", Namespace: "test"},
+			},
+			{
+				vm: &vsphere.VM{VM1: vsphere.VM1{Concerns: []vspheremodel.Concern{
+					{Id: "vmware.disk.rdm.detected", Label: "RDM disk detected", Category: "Warning"},
+				}}},
+				ref: ref.Ref{Name: "vm2", Namespace: "test"},
+			},
+			{
+				vm: &vsphere.VM{VM1: vsphere.VM1{Concerns: []vspheremodel.Concern{
+					{Id: "vmware.passthrough_device.detected", Label: "Passthrough device detected", Category: "Critical"},
+				}}},
+				ref: ref.Ref{Name: "vm3", Namespace: "test"},
+			},
+		}
+
+		for _, entry := range vms {
+			aggregateCriticalConcerns(entry.vm, entry.ref.String(), &vmCriticalConcerns)
+		}
+
+		gomega.Expect(vmCriticalConcerns.Items).To(gomega.HaveLen(2))
+		gomega.Expect(vmCriticalConcerns.Items[0]).To(gomega.ContainSubstring("vm1"))
+		gomega.Expect(vmCriticalConcerns.Items[1]).To(gomega.ContainSubstring("vm3"))
+	})
+})
+
+var _ = ginkgo.Describe("aggregateWarningConcerns", func() {
+	var unsupportedOVFExport libcnd.Condition
+
+	ginkgo.BeforeEach(func() {
+		unsupportedOVFExport = libcnd.Condition{
+			Type:     UnsupportedOVFExportSource,
+			Status:   libcnd.True,
+			Category: api.CategoryWarn,
+			Message:  "VM appears to have been exported from an unsupported OVF source.",
+			Items:    []string{},
+		}
+	})
+
+	ginkgo.It("should detect OVA unsupported export source", func() {
+		vm := &vsphere.VM{
+			VM1: vsphere.VM1{
+				Concerns: []vspheremodel.Concern{
+					{Id: "ova.source.unsupported", Label: "Unsupported OVF source", Category: "Warning"},
+				},
+			},
+		}
+		vmRef := ref.Ref{Name: "ova-vm", Namespace: "test"}
+
+		aggregateWarningConcerns(vm, vmRef.String(), &unsupportedOVFExport)
+
+		gomega.Expect(unsupportedOVFExport.Items).To(gomega.HaveLen(1))
+		gomega.Expect(unsupportedOVFExport.Items[0]).To(gomega.ContainSubstring("ova-vm"))
+	})
+
+	ginkgo.It("should not flag VMs without the unsupported OVA concern", func() {
+		vm := &vsphere.VM{
+			VM1: vsphere.VM1{
+				Concerns: []vspheremodel.Concern{
+					{Id: "vmware.disk.rdm.detected", Label: "Raw Device Mapped disk detected", Category: "Warning"},
+				},
+			},
+		}
+		vmRef := ref.Ref{Name: "normal-vm", Namespace: "test"}
+
+		aggregateWarningConcerns(vm, vmRef.String(), &unsupportedOVFExport)
+
+		gomega.Expect(unsupportedOVFExport.Items).To(gomega.BeEmpty())
+	})
+})
