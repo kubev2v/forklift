@@ -239,6 +239,10 @@ type AttachedVolume = model.AttachedVolume
 type Concern = model.Concern
 type Fault = model.Fault
 
+func (r *VM) GetConcerns() []model.Concern {
+	return r.Concerns
+}
+
 // Build the resource using the model.
 func (r *VM) With(m *model.VM) {
 	r.VM1.With(m)

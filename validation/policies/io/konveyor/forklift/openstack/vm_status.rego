@@ -15,7 +15,7 @@ concerns contains flag if {
 	not legal_vm_status
 	flag := {
 		"id": "openstack.vm.status.invalid",
-		"category": "Critical",
+		"category": "Warning",
 		"label": "VM has a status condition that may prevent successful migration",
 		"assessment": "The VM's status is not 'ACTIVE' or 'SHUTOFF'. Attempting to migrate this VM may fail.",
 	}
