@@ -19,9 +19,9 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	modelbase "github.com/kubev2v/forklift/pkg/controller/provider/model/base"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
-	"github.com/kubev2v/forklift/pkg/controller/provider/web/ova"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/validation"
 	ocp "github.com/kubev2v/forklift/pkg/lib/client/openshift"
@@ -101,6 +101,7 @@ const (
 	ServiceAccountNotValid          = "ServiceAccountNotValid"
 	RestrictedPodSecurity           = "RestrictedPodSecurity"
 	NetMapDestinationNADNotValid    = "NetMapDestinationNADNotValid"
+	VMCriticalConcerns              = "VMCriticalConcerns"
 )
 
 // Categories
@@ -596,6 +597,35 @@ func (r *Reconciler) validateStorageMap(plan *api.Plan) (err error) {
 	return
 }
 
+// aggregateCriticalConcerns appends critical-category concerns from an
+// inventory VM to the vmCriticalConcerns condition.
+func aggregateCriticalConcerns(v interface{}, vmRef string, vmCriticalConcerns *libcnd.Condition) {
+	ch, ok := v.(modelbase.ConcernHolder)
+	if !ok {
+		return
+	}
+	for _, concern := range ch.GetConcerns() {
+		if concern.Category == "Critical" {
+			vmCriticalConcerns.Items = append(vmCriticalConcerns.Items,
+				fmt.Sprintf("%s (%s)", vmRef, concern.Label))
+		}
+	}
+}
+
+// aggregateWarningConcerns appends well-known warning concerns from an
+// inventory VM to the matching conditions (e.g. unsupported OVA source).
+func aggregateWarningConcerns(v interface{}, vmRef string, unsupportedOVFExportSource *libcnd.Condition) {
+	ch, ok := v.(modelbase.ConcernHolder)
+	if !ok {
+		return
+	}
+	for _, concern := range ch.GetConcerns() {
+		if concern.Id == "ova.source.unsupported" {
+			unsupportedOVFExportSource.Items = append(unsupportedOVFExportSource.Items, vmRef)
+		}
+	}
+}
+
 // Validate listed VMs.
 func (r *Reconciler) validateVM(plan *api.Plan) error {
 	if plan.Status.HasCondition(Executing) {
@@ -827,6 +857,14 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "Copy offload is enabled. MTV does not support mixed copy methods. Each migration plan can use one migration strategy, either VDDK or copy offload. Check your storage map and VMs to ensure they are using the same migration strategy.",
 		Items:    []string{},
 	}
+	vmCriticalConcerns := libcnd.Condition{
+		Type:     VMCriticalConcerns,
+		Status:   True,
+		Reason:   NotValid,
+		Category: api.CategoryCritical,
+		Message:  "One or more VMs in the plan have critical concerns that block migration.",
+		Items:    []string{},
+	}
 
 	var sharedDisksConditions []libcnd.Condition
 	setOf := map[string]bool{}
@@ -906,15 +944,8 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 				setOfTargetName[vm.TargetName] = true
 			}
 		}
-		// check for supported OVA source
-		if ova, ok := v.(*ova.VM); ok {
-			for _, concern := range ova.Concerns {
-				// match label from ova/export_source.rego
-				if concern.Id == "ova.source.unsupported" {
-					unsupportedOVFExportSource.Items = append(unsupportedOVFExportSource.Items, ref.String())
-				}
-			}
-		}
+		aggregateCriticalConcerns(v, ref.String(), &vmCriticalConcerns)
+		aggregateWarningConcerns(v, ref.String(), &unsupportedOVFExportSource)
 		if plan.Spec.Type == api.MigrationOnlyConversion {
 			if vm, ok := v.(*vsphere.VM); ok {
 				pvcs, err := r.getVmPVCs(plan, vm)
@@ -1268,6 +1299,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	// Set the condition if any VMs with VDDK disks were found when plan uses offload
 	if len(vddkAndOffloadMixedUsage.Items) > 0 {
 		plan.Status.SetCondition(vddkAndOffloadMixedUsage)
+	}
+	if len(vmCriticalConcerns.Items) > 0 {
+		plan.Status.SetCondition(vmCriticalConcerns)
 	}
 
 	return nil

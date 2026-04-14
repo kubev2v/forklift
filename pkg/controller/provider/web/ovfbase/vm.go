@@ -231,6 +231,10 @@ type VM struct {
 	Networks              []model.Network `json:"networks"`
 }
 
+func (r *VM) GetConcerns() []model.Concern {
+	return r.Concerns
+}
+
 // Build the resource using the model.
 func (r *VM) With(m *model.VM) {
 	r.VM1.With(m)
