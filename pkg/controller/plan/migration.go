@@ -465,17 +465,51 @@ func (r *Migration) removeLastWarmSnapshot(vm *plan.VMStatus) {
 	if vm.Warm == nil {
 		return
 	}
+
+	snapshot := ""
 	n := len(vm.Warm.Precopies)
-	if n < 1 {
+	if n >= 1 {
+		snapshot = vm.Warm.Precopies[n-1].Snapshot
+	}
+
+	// If no snapshot ID is recorded (e.g., the migration was canceled before
+	// CheckSnapshotReady ran and persisted the ID), fall back to finding the
+	// snapshot on the source VM by its well-known name.
+	if snapshot == "" {
+		var err error
+		snapshot, err = r.provider.FindForkliftSnapshot(vm.Ref, r.kubevirt.loadHosts)
+		if err != nil {
+			r.Log.Error(err, "Failed to find warm migration snapshot for cleanup.", "vm", vm)
+			return
+		}
+		if snapshot == "" {
+			return
+		}
+	}
+
+	taskId, err := r.provider.RemoveSnapshot(vm.Ref, snapshot, r.kubevirt.loadHosts)
+	if err != nil {
+		r.Log.Error(err, "Failed to initiate warm migration snapshot removal.", "vm", vm)
 		return
 	}
-	snapshot := vm.Warm.Precopies[n-1].Snapshot
-	if _, err := r.provider.RemoveSnapshot(vm.Ref, snapshot, r.kubevirt.loadHosts); err != nil {
-		r.Log.Error(
-			err,
-			"Failed to clean up warm migration snapshots.",
-			"vm", vm)
+
+	// RemoveSnapshot is asynchronous on vSphere. Poll until the task completes so
+	// we don't return with an orphaned snapshot still being removed in the background.
+	precopy := plan.Precopy{RemoveTaskId: taskId}
+	retries := settings.Settings.Migration.SnapshotRemovalCheckRetries
+	checkRate := time.Duration(settings.Settings.Migration.SnapshotStatusCheckRate) * time.Second
+	for i := 0; i < retries; i++ {
+		time.Sleep(checkRate)
+		ready, checkErr := r.provider.CheckSnapshotRemove(vm.Ref, precopy, r.kubevirt.loadHosts)
+		if checkErr != nil {
+			r.Log.Error(checkErr, "Error checking warm migration snapshot removal.", "vm", vm)
+			return
+		}
+		if ready {
+			return
+		}
 	}
+	r.Log.Error(nil, "Timed out waiting for warm migration snapshot removal.", "vm", vm)
 }
 
 func (r *Migration) deleteImporterPods(vm *plan.VMStatus) (err error) {

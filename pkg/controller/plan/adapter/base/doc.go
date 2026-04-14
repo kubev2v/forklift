@@ -213,6 +213,10 @@ type Client interface {
 	PreTransferActions(vmRef ref.Ref) (ready bool, err error)
 	// Get disk deltas for a VM snapshot.
 	GetSnapshotDeltas(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc) (map[string]string, error)
+	// Find the Forklift warm migration snapshot on the source VM by its well-known name.
+	// Returns the snapshot ID (managed object reference value for vSphere), or "" if not found.
+	// Used as a fallback during cleanup when the snapshot ID was not yet recorded in VM status.
+	FindForkliftSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (snapshotId string, err error)
 }
 
 // Validator API.

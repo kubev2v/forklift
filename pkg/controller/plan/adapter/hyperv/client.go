@@ -138,6 +138,10 @@ func (r *Client) RemoveSnapshot(_ ref.Ref, _ string, _ util.HostsFunc) (string, 
 	return "", nil
 }
 
+func (r *Client) FindForkliftSnapshot(_ ref.Ref, _ util.HostsFunc) (string, error) {
+	return "", nil
+}
+
 func (r *Client) CheckSnapshotReady(_ ref.Ref, _ planapi.Precopy, _ util.HostsFunc) (bool, string, error) {
 	return true, "", nil
 }
