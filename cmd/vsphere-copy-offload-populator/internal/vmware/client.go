@@ -280,9 +280,45 @@ func (c *VSphereClient) GetDatastoreActiveAdapters(ctx context.Context, host *ob
 		klog.V(1).Infof("Active adapter %s with initiator ID: %s, driver: %s", adapter.Name, adapter.Id, adapter.Driver)
 	}
 
-	if len(result) == 0 {
-		klog.Warningf("No active paths found for device %s. All paths: %+v", deviceName, logicalUnit.Path)
-		return nil, fmt.Errorf("no active adapters found for datastore %s", datastoreName)
+	// Check if any result has an FC or iSCSI adapter
+	hasSANAdapter := false
+	for _, a := range result {
+		if strings.HasPrefix(a.Id, "iqn.") || strings.HasPrefix(a.Id, "fc.") {
+			hasSANAdapter = true
+			break
+		}
+	}
+
+	// Fallback for local datastores: if no SAN (FC/iSCSI) adapters were found
+	// among active paths, pick the first FC or iSCSI adapter available on the host.
+	if !hasSANAdapter {
+		klog.V(1).Infof("No FC/iSCSI adapters found in active paths for datastore %s, falling back to first available SAN adapter", datastoreName)
+
+		var firstFC, firstISCSI *HostAdapter
+		for _, adapter := range hbaByKey {
+			switch {
+			case strings.HasPrefix(adapter.Id, "fc.") && firstFC == nil:
+				a := adapter
+				firstFC = &a
+			case strings.HasPrefix(adapter.Id, "iqn.") && firstISCSI == nil:
+				a := adapter
+				firstISCSI = &a
+			}
+		}
+
+		if firstFC != nil {
+			klog.V(1).Infof("Falling back to FC adapter %s (ID: %s)", firstFC.Name, firstFC.Id)
+			return []HostAdapter{*firstFC}, nil
+		}
+		if firstISCSI != nil {
+			klog.V(1).Infof("Falling back to iSCSI adapter %s (ID: %s)", firstISCSI.Name, firstISCSI.Id)
+			return []HostAdapter{*firstISCSI}, nil
+		}
+
+		klog.Warningf("No FC or iSCSI adapters found on host for fallback")
+		if len(result) == 0 {
+			return nil, fmt.Errorf("no active adapters found for datastore %s", datastoreName)
+		}
 	}
 
 	return result, nil
