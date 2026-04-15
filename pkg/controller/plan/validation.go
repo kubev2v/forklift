@@ -99,6 +99,7 @@ const (
 	GuestToolsIssue                 = "GuestToolsIssue"
 	VDDKAndOffloadMixedUsage        = "VDDKAndOffloadMixedUsage"
 	ServiceAccountNotValid          = "ServiceAccountNotValid"
+	HookServiceAccountNotValid      = "HookServiceAccountNotValid"
 	RestrictedPodSecurity           = "RestrictedPodSecurity"
 	NetMapDestinationNADNotValid    = "NetMapDestinationNADNotValid"
 	VMCriticalConcerns              = "VMCriticalConcerns"
@@ -1558,6 +1559,14 @@ func (r *Reconciler) validateHooks(plan *api.Plan) (err error) {
 		Message:  "Hook must set spec.aap or spec.image for a local hook (playbook optional).",
 		Items:    []string{},
 	}
+	hookSANotFound := libcnd.Condition{
+		Type:     HookServiceAccountNotValid,
+		Status:   True,
+		Reason:   NotFound,
+		Category: api.CategoryCritical,
+		Message:  "Hook ServiceAccount not found in plan namespace.",
+		Items:    []string{},
+	}
 	for _, vm := range plan.Spec.VMs {
 		for _, ref := range vm.Hooks {
 			if _, ok := planHookValidSteps[ref.Step]; !ok {
@@ -1590,9 +1599,25 @@ func (r *Reconciler) validateHooks(plan *api.Plan) (err error) {
 			if !hook.Status.HasCondition(libcnd.Ready) {
 				notReady.Items = append(notReady.Items, hookRefDesc)
 			}
+			if sa := hook.Spec.ServiceAccount; sa != "" && hook.Spec.AAP == nil {
+				saKey := client.ObjectKey{
+					Namespace: plan.Namespace,
+					Name:      sa,
+				}
+				if saErr := r.Get(context.TODO(), saKey, &core.ServiceAccount{}); saErr != nil {
+					if k8serr.IsNotFound(saErr) {
+						hookSANotFound.Items = append(hookSANotFound.Items,
+							fmt.Sprintf("VM: %s hook: %s ServiceAccount '%s' not found in namespace '%s'",
+								vm.String(), ref.Hook.String(), sa, plan.Namespace))
+					} else {
+						err = liberr.Wrap(saErr)
+						return
+					}
+				}
+			}
 		}
 	}
-	for _, cnd := range []libcnd.Condition{notSet, notFound, notReady, stepNotValid, hookNotExecutable} {
+	for _, cnd := range []libcnd.Condition{notSet, notFound, notReady, stepNotValid, hookNotExecutable, hookSANotFound} {
 		if len(cnd.Items) > 0 {
 			plan.Status.SetCondition(cnd)
 		}
