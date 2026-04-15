@@ -206,6 +206,34 @@ func (c *Conversion) addVirtV2vVsphereArgs(cmd utils.CommandBuilder) (err error)
 	return nil
 }
 
+// addVirtV2vVsphereArgsForInspection adds vSphere-specific args WITHOUT conversion extra args
+// This is used for remote inspection where we want inspector-specific args instead
+func (c *Conversion) addVirtV2vVsphereArgsForInspection(cmd utils.CommandBuilder) (err error) {
+	cmd.AddArg("-i", "libvirt").
+		AddArg("-ic", c.LibvirtUrl).
+		AddArg("-ip", c.SecretKey).
+		AddArg("--hostname", c.HostName)
+
+	err = c.addCommonArgs(cmd)
+	if err != nil {
+		return err
+	}
+	// Note: NO addConversionExtraArgs here - this is for inspection
+	if info, err := os.Stat(c.VddkLibDir); err == nil && info.IsDir() {
+		cmd.AddArg("-it", "vddk")
+		cmd.AddArg("-io", fmt.Sprintf("vddk-libdir=%s", c.VddkLibDir))
+		cmd.AddArg("-io", fmt.Sprintf("vddk-thumbprint=%s", c.Fingerprint))
+		// Always use vddk-config for inspection if it exists (no extra args override)
+		if _, err := os.Stat(c.VddkConfFile); !errors.Is(err, os.ErrNotExist) {
+			cmd.AddArg("-io", fmt.Sprintf("vddk-config=%s", c.VddkConfFile))
+		}
+	}
+	cmd.AddFlag("--no-fstrim")
+	cmd.AddPositional("--")
+	cmd.AddPositional(c.VmName)
+	return nil
+}
+
 func (c *Conversion) virtV2vOVAArgs(cmd utils.CommandBuilder) {
 	cmd.AddArg("-i", "ova")
 	cmd.AddPositional(c.DiskPath)

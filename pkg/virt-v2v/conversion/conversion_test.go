@@ -875,6 +875,7 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
 
@@ -896,6 +897,7 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 			// Note: NO AddExtraArgs expectation - this is the critical test
+			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
 
@@ -915,6 +917,7 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "/dev/sdb").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
 
@@ -935,7 +938,9 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--mac", "00:11:22:33:44:55:ip:192.168.1.100").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--mac", "00:11:22:33:44:56:ip:192.168.1.101").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
 
 			err := conversion.addCommonArgs(mockCommandBuilder)
 			Expect(err).ToNot(HaveOccurred())
@@ -964,7 +969,32 @@ var _ = Describe("Conversion", func() {
 			}
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 
-			err := conversion.addCommonArgs(mockCommandBuilder)
+			mockFileSystem.EXPECT().Stat(luksDir).Return(nil, nil)
+			mockFileSystem.EXPECT().ReadDir(luksDir).Return(nil, errors.New("permission denied"))
+
+			err := conversion.addVirtV2vVsphereArgsForInspection(mockCommandBuilder)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("error adding LUKS keys"))
+		})
+
+		It("adds vSphere args with clevis for NBDE", func() {
+			appConfig.LibvirtUrl = "vpx://user@vcenter.example.com/Datacenter/Cluster/esxi-host?no_verify=1"
+			appConfig.SecretKey = "/etc/secret/secretKey"
+			appConfig.HostName = "vcenter.example.com"
+			appConfig.VmName = "test-vm"
+			appConfig.NbdeClevis = true
+
+			mockCommandBuilder.EXPECT().AddArg("-i", "libvirt").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-ic", appConfig.LibvirtUrl).Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArgs("--key", "all:clevis").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
+
+			err := conversion.addVirtV2vVsphereArgsForInspection(mockCommandBuilder)
 			Expect(err).ToNot(HaveOccurred())
 		},
 	)
