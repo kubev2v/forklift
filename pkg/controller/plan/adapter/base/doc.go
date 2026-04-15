@@ -3,6 +3,7 @@ package base
 import (
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	convctx "github.com/kubev2v/forklift/pkg/controller/conversion/context"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/plan/util"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
@@ -88,7 +89,8 @@ const (
 	AnnImportPod = "cdi.kubevirt.io/storage.import.importPod"
 
 	// In a UDN namespace we can't directly reach the virt-v2v pod unless we specify default opened ports on the pod network.
-	AnnOpenDefaultPorts = "k8s.ovn.org/open-default-ports"
+	// Deprecated: Use convctx.AnnOpenDefaultPorts instead.
+	AnnOpenDefaultPorts = convctx.AnnOpenDefaultPorts
 
 	// UDN L2 bridge binding, needed for KubeVirt VMs with UDN
 	UdnL2bridge = "l2bridge"
