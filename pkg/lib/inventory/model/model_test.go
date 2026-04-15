@@ -997,12 +997,12 @@ func TestWatch(t *testing.T) {
 		time.Sleep(time.Millisecond * 10)
 		if len(handlerA.created) != N ||
 			len(handlerA.updated) != N ||
-			len(handlerA.created) != N ||
+			len(handlerA.deleted) != N ||
 			len(handlerB.created) != N ||
 			len(handlerB.updated) != N ||
-			len(handlerB.created) != N ||
+			len(handlerB.deleted) != N ||
 			len(handlerC.created) != N ||
-			len(handlerC.created) != N {
+			len(handlerC.deleted) != N {
 			continue
 		} else {
 			break
