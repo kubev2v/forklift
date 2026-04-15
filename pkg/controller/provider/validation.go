@@ -1288,8 +1288,8 @@ func (r *Reconciler) validateSMBCSI(provider *api.Provider) error {
 			Status:   True,
 			Category: Critical,
 			Reason:   NotFound,
-			Message: "SMB CSI driver (smb.csi.k8s.io) is not installed. " +
-				"Install the CIFS/SMB CSI Driver Operator.",
+			Message: "SMB CSI driver (smb.csi.k8s.io) is not available. " +
+				"Ensure the CIFS/SMB CSI Driver Operator is installed and that the ClusterCSIDriver CR for smb.csi.k8s.io exists.",
 		})
 		return nil
 	}
