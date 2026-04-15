@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/cli/esx"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
+	"github.com/vmware/govmomi/session"
+	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
@@ -61,6 +64,8 @@ type VSphereClient struct {
 	*govmomi.Client
 }
 
+const sessionKeepAliveIdle = 5 * time.Minute
+
 func NewClient(vcenterUrl, username, password string) (Client, error) {
 	ctx := context.Background()
 	u, err := soap.ParseURL(vcenterUrl)
@@ -69,9 +74,20 @@ func NewClient(vcenterUrl, username, password string) (Client, error) {
 	}
 	u.User = url.UserPassword(username, password)
 
-	c, err := govmomi.NewClient(ctx, u, true)
+	soapClient := soap.NewClient(u, true)
+	vimClient, err := vim25.NewClient(ctx, soapClient)
 	if err != nil {
 		return nil, fmt.Errorf("Failed creating vSphere client: %w", err)
+	}
+
+	vimClient.RoundTripper = session.KeepAlive(vimClient.RoundTripper, sessionKeepAliveIdle)
+
+	c := &govmomi.Client{
+		Client:         vimClient,
+		SessionManager: session.NewManager(vimClient),
+	}
+	if err = c.Login(ctx, u.User); err != nil {
+		return nil, fmt.Errorf("Failed to login to vSphere: %w", err)
 	}
 
 	return &VSphereClient{Client: c}, nil
