@@ -76,3 +76,6 @@ __pycache__
 
 .gemini/
 gha-creds-*.json
+
+# developer-private test scenarios (verification, bug reproduction, etc.)
+tests/scenarios/
