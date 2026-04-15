@@ -7,7 +7,7 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
-	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
+	convctx "github.com/kubev2v/forklift/pkg/controller/conversion/context"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/settings"
 	"gopkg.in/yaml.v2"
@@ -21,31 +21,6 @@ const (
 	qemuUser  = int64(107)
 	qemuGroup = int64(107)
 )
-
-// Pod labels used by the conversion controller.
-const (
-	kConversion = "conversion"
-	kApp        = "forklift.app"
-	// migration label (value=UID)
-	kMigration = "migration"
-	// plan label (value=UID)
-	kPlan = "plan"
-	// plan name label (value=Plan.Name)
-	kPlanName = "plan-name"
-	// plan namespace label (value=Plan.Namespace)
-	kPlanNamespace = "plan-namespace"
-	// VM label (value=vmID)
-	kVM = "vmID"
-)
-
-// VddkVolumeName is the volume name used for the VDDK library scratch space.
-const VddkVolumeName = "vddk-vol-mount"
-
-// OpenPort describes a port that should be opened for UDN networks.
-type OpenPort struct {
-	Protocol string `yaml:"protocol"`
-	Port     int    `yaml:"port"`
-}
 
 // ConversionParams holds the inputs needed to create a Conversion CR.
 type ConversionParams struct {
@@ -64,61 +39,24 @@ type ConversionParams struct {
 	Connection    api.Connection
 	Image         string
 	Settings      map[string]string
+
+	VDDKImage      string
+	RequestKVM     bool
+	LocalMigration bool
+	UDN            bool
+	PodSettings    api.PodSettings
 }
 
-// PodConfig holds plan-level or CR-level configuration for pod creation.
-// Both the plan-driven and standalone-CR paths populate this struct,
-// eliminating the Builder's dependency on api.Plan.
-type PodConfig struct {
-	TargetNamespace            string
-	Image                      string
-	XfsCompatibility           bool
-	ConversionTempStorageClass string
-	ConversionTempStorageSize  string
-	TransferNetwork            *core.ObjectReference
-	ConvertorNodeSelector      map[string]string
-	ConvertorLabels            map[string]string
-	ServiceAccount             string
-}
-
-// PodConfigFromPlan builds a PodConfig from an api.Plan.
-func PodConfigFromPlan(p *api.Plan) PodConfig {
-	return PodConfig{
-		TargetNamespace:            p.Spec.TargetNamespace,
-		Image:                      p.Spec.VirtV2vImage,
-		XfsCompatibility:           p.Spec.XfsCompatibility,
-		ConversionTempStorageClass: p.Spec.ConversionTempStorageClass,
-		ConversionTempStorageSize:  p.Spec.ConversionTempStorageSize,
-		TransferNetwork:            p.Spec.TransferNetwork,
-		ConvertorNodeSelector:      p.Spec.ConvertorNodeSelector,
-		ConvertorLabels:            p.Spec.ConvertorLabels,
-		ServiceAccount:             p.Spec.ServiceAccount,
-	}
-}
-
-// PodConfigFromConversion builds a PodConfig from a Conversion CR.
-func PodConfigFromConversion(c *api.Conversion) PodConfig {
-	ns := c.Spec.TargetNamespace
-	if ns == "" {
-		ns = c.Namespace
-	}
-	return PodConfig{
-		TargetNamespace:  ns,
-		Image:            c.Spec.Image,
-		XfsCompatibility: c.Spec.XfsCompatibility,
-	}
-}
-
-// Builder constructs virt-v2v pod specs.
+// Builder constructs virt-v2v pod specs from a fully-resolved PodConfig.
+// Callers must populate all PodConfig fields before invoking the builder.
 type Builder struct {
-	Ctx    KubevirtCtx
-	Config PodConfig
+	Config convctx.PodConfig
 }
 
 // BuildVirtV2vPod is the main entry point that builds a complete pod
 // for either conversion or inspection, dispatching to the type-specific
-// builder for additional settings.
-func (b *Builder) BuildVirtV2vPod(vm *plan.VMStatus, volumes []core.Volume, volumeMounts []core.VolumeMount, volumeDevices []core.VolumeDevice, v2vSecret *core.Secret, podType int, step *plan.Step, inPlace bool) (pod *core.Pod, err error) {
+// builder for additional settings. All data comes from b.Config.
+func (b *Builder) BuildVirtV2vPod(vm *plan.VMStatus, volumes []core.Volume, volumeMounts []core.VolumeMount, volumeDevices []core.VolumeDevice, v2vSecret *core.Secret, podType int, inPlace bool) (pod *core.Pod, err error) {
 	pod, environment, err := b.GetVirtV2vPodSpec(vm, volumes, volumeMounts, volumeDevices, v2vSecret, inPlace)
 	if err != nil {
 		return nil, err
@@ -130,16 +68,18 @@ func (b *Builder) BuildVirtV2vPod(vm *plan.VMStatus, volumes []core.Volume, volu
 	}
 
 	switch podType {
-	case VirtV2vConversionPod:
+	case convctx.VirtV2vConversionPod:
 		err = b.BuildVirtV2vConversionPod(pod, environment, vm)
-	case VirtV2vInspectionPod:
-		pod, err = b.BuildVirtV2vInspectionPod(pod, environment, vm, step)
+	case convctx.VirtV2vInspectionPod:
+		pod, err = b.BuildVirtV2vInspectionPod(pod, environment, vm)
 	}
 
 	return
 }
 
-// GetVirtV2vPodSpec builds the bare-bones pod spec, volumes, volumeDevices et.c are already resolved by the caller
+// GetVirtV2vPodSpec builds the bare-bones pod spec. All pod-construction
+// parameters are read from b.Config which must be fully resolved by the
+// caller (ensurer) before invoking the builder.
 func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, volumeMounts []core.VolumeMount, volumeDevices []core.VolumeDevice, v2vSecret *core.Secret, inPlace bool) (pod *core.Pod, environment []core.EnvVar, err error) {
 	cfg := &b.Config
 
@@ -194,14 +134,13 @@ func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, vo
 	}
 
 	var initContainers []core.Container
-	vddkImage := settings.GetVDDKImage(b.Ctx.GetSourceProvider().Spec.Settings)
-	if vddkImage != "" {
+	if cfg.VDDKImage != "" {
 		initContainers = append(initContainers, core.Container{
 			Name:            "vddk-side-car",
-			Image:           vddkImage,
+			Image:           cfg.VDDKImage,
 			ImagePullPolicy: core.PullIfNotPresent,
 			VolumeMounts: []core.VolumeMount{
-				{Name: VddkVolumeName, MountPath: "/opt"},
+				{Name: convctx.VddkVolumeName, MountPath: "/opt"},
 			},
 			Resources: core.ResourceRequirements{
 				Requests: core.ResourceList{
@@ -221,14 +160,11 @@ func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, vo
 	}
 
 	annotations := map[string]string{}
-	if cfg.TransferNetwork != nil {
-		err = b.Ctx.SetTransferNetwork(annotations)
-		if err != nil {
-			return
-		}
+	if cfg.TransferNetworkAnnotations != nil {
+		maps.Copy(annotations, cfg.TransferNetworkAnnotations)
 	}
-	if b.Ctx.DestinationHasUdnNetwork() {
-		ports := []OpenPort{
+	if cfg.UDN {
+		ports := []convctx.OpenPort{
 			{Protocol: "tcp", Port: 2112},
 			{Protocol: "tcp", Port: 8080},
 		}
@@ -237,7 +173,7 @@ func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, vo
 		if err != nil {
 			return
 		}
-		annotations[planbase.AnnOpenDefaultPorts] = string(yamlPorts)
+		annotations[convctx.AnnOpenDefaultPorts] = string(yamlPorts)
 	}
 
 	seccompProfile := core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}
@@ -249,29 +185,18 @@ func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, vo
 		}
 	}
 
-	providerConfig, err := b.Ctx.ConversionPodConfig(vm.Ref)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	podLabels := make(map[string]string)
-	if providerConfig.Labels != nil {
-		maps.Copy(podLabels, providerConfig.Labels)
+	if cfg.PodLabels != nil {
+		maps.Copy(podLabels, cfg.PodLabels)
 	}
 
 	var podNodeSelector map[string]string
-	if providerConfig.NodeSelector != nil {
+	if cfg.PodNodeSelector != nil {
 		podNodeSelector = make(map[string]string)
-		maps.Copy(podNodeSelector, providerConfig.NodeSelector)
+		maps.Copy(podNodeSelector, cfg.PodNodeSelector)
 	}
-	if cfg.ConvertorNodeSelector != nil {
-		if podNodeSelector == nil {
-			podNodeSelector = make(map[string]string)
-		}
-		maps.Copy(podNodeSelector, cfg.ConvertorNodeSelector)
-	}
-	if providerConfig.Annotations != nil {
-		maps.Copy(annotations, providerConfig.Annotations)
+	if cfg.PodAnnotations != nil {
+		maps.Copy(annotations, cfg.PodAnnotations)
 	}
 
 	pod = &core.Pod{
@@ -279,7 +204,7 @@ func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, vo
 			Namespace:       cfg.TargetNamespace,
 			Annotations:     annotations,
 			Labels:          podLabels,
-			OwnerReferences: b.Ctx.OwnerReferences(),
+			OwnerReferences: cfg.OwnerReferences,
 		},
 		Spec: core.PodSpec{
 			SecurityContext: &core.PodSecurityContext{
@@ -289,7 +214,7 @@ func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, vo
 				SeccompProfile: &seccompProfile,
 			},
 			NodeSelector:   podNodeSelector,
-			Affinity:       b.Ctx.GetConvertorAffinity(),
+			Affinity:       cfg.Affinity,
 			RestartPolicy:  core.RestartPolicyNever,
 			InitContainers: initContainers,
 			Containers: []core.Container{
@@ -314,7 +239,7 @@ func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, vo
 							},
 						},
 					},
-					Image:         GetVirtV2vImage(cfg),
+					Image:         convctx.GetVirtV2vImage(cfg),
 					VolumeMounts:  volumeMounts,
 					VolumeDevices: volumeDevices,
 					Ports: []core.ContainerPort{
@@ -330,62 +255,59 @@ func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, vo
 		},
 	}
 
-	if sa := ResolveServiceAccount(cfg); sa != "" {
+	if sa := convctx.ResolveServiceAccount(cfg); sa != "" {
 		pod.Spec.ServiceAccountName = sa
 	}
-	b.Ctx.SetKvmOnPodSpec(&pod.Spec)
+	setKvmOnPodSpec(&pod.Spec, cfg.RequestKVM)
 
 	return
 }
 
-// BuildVirtV2vConversionPod applies conversion-specific settings to a pod
+// setKvmOnPodSpec adds KVM device request and schedulable node selector
+// when requestKVM is true.
+func setKvmOnPodSpec(podSpec *core.PodSpec, requestKVM bool) {
+	if !requestKVM {
+		return
+	}
+	if podSpec.NodeSelector == nil {
+		podSpec.NodeSelector = make(map[string]string)
+	}
+	podSpec.NodeSelector["kubevirt.io/schedulable"] = "true"
+	container := &podSpec.Containers[0]
+	if container.Resources.Limits == nil {
+		container.Resources.Limits = make(map[core.ResourceName]resource.Quantity)
+	}
+	container.Resources.Limits["devices.kubevirt.io/kvm"] = resource.MustParse("1")
+	if container.Resources.Requests == nil {
+		container.Resources.Requests = make(map[core.ResourceName]resource.Quantity)
+	}
+	container.Resources.Requests["devices.kubevirt.io/kvm"] = resource.MustParse("1")
+}
+
+// BuildVirtV2vConversionPod applies conversion-specific settings to a pod.
 func (b *Builder) BuildVirtV2vConversionPod(pod *core.Pod, environment []core.EnvVar, vm *plan.VMStatus) error {
-	pod.GenerateName = b.Ctx.GetGeneratedName(vm)
+	pod.GenerateName = b.Config.GenerateName
+	pod.Labels[convctx.LabelApp] = "virt-v2v"
 	pod.Spec.Containers[0].Name = "virt-v2v"
 	pod.Spec.Containers[0].Env = environment
-
-	if b.Config.ConvertorLabels != nil {
-		maps.Copy(pod.Labels, b.Config.ConvertorLabels)
-	}
-	maps.Copy(pod.Labels, b.Ctx.ConversionLabels(vm.Ref, false))
-
 	return nil
 }
 
-// BuildVirtV2vInspectioPod applies inspection-specific settings to a pod
-func (b *Builder) BuildVirtV2vInspectionPod(pod *core.Pod, environment []core.EnvVar, vm *plan.VMStatus, step *plan.Step) (*core.Pod, error) {
-	pod.GenerateName = b.Ctx.GetGeneratedName(vm) + "inspection-"
+// BuildVirtV2vInspectionPod applies inspection-specific settings to a pod.
+// Inspection env vars must be pre-populated in b.Config.Environment by the caller.
+func (b *Builder) BuildVirtV2vInspectionPod(pod *core.Pod, environment []core.EnvVar, vm *plan.VMStatus) (*core.Pod, error) {
+	pod.GenerateName = b.Config.GenerateName + "inspection-"
+	pod.Labels[convctx.LabelApp] = "virt-v2v-inspection"
 	pod.Spec.Containers[0].Name = "virt-v2v-inspection"
-
-	maps.Copy(pod.Labels, b.Ctx.InspectionLabels(vm.Ref))
-
-	var success bool
-	environment, success, err := b.Ctx.BuildInspectionPodEnvironment(environment, vm, step)
-	if err != nil {
-		return nil, err
-	}
-	if !success {
-		return nil, nil //nolint:nilnil
-	}
 	pod.Spec.Containers[0].Env = environment
-
 	return pod, nil
 }
 
-// BuildV2vPodEnvironment builds provider-specific variables from KubevirtCtx.PodEnvironment, then appends common variables
+// BuildV2vPodEnvironment appends pre-resolved env vars from PodConfig,
+// then adds common variables (memSize, smp, LOCAL_MIGRATION).
 func (b *Builder) BuildV2vPodEnvironment(env []core.EnvVar, vm *plan.VMStatus) ([]core.EnvVar, error) {
-	providerEnv, err := b.Ctx.PodEnvironment(vm.Ref, b.Ctx.GetSourceSecret())
-	if err != nil {
-		return nil, err
-	}
-	env = append(env, providerEnv...)
+	env = append(env, b.Config.Environment...)
 
-	if vm.RootDisk != "" {
-		env = append(env, core.EnvVar{Name: "V2V_RootDisk", Value: vm.RootDisk})
-	}
-	if vm.NewName != "" {
-		env = append(env, core.EnvVar{Name: "V2V_NewName", Value: b.Ctx.GetNewVMName(vm)})
-	}
 	if settings.Settings.Migration.VirtV2vMemSize > 0 {
 		env = append(env, core.EnvVar{
 			Name:  "V2V_memSize",
@@ -400,42 +322,15 @@ func (b *Builder) BuildV2vPodEnvironment(env []core.EnvVar, vm *plan.VMStatus) (
 	}
 	env = append(env, core.EnvVar{
 		Name:  "LOCAL_MIGRATION",
-		Value: strconv.FormatBool(b.Ctx.GetDestinationProvider().IsHost()),
+		Value: strconv.FormatBool(b.Config.LocalMigration),
 	})
 	return env, nil
 }
 
-// GetVirtV2vImage resolves the virt-v2v container image from PodConfig.
-func GetVirtV2vImage(cfg *PodConfig) string {
-	if cfg.Image != "" {
-		return cfg.Image
-	}
-	if cfg.XfsCompatibility {
-		if Settings.Migration.VirtV2vImageXFS != "" {
-			return Settings.Migration.VirtV2vImageXFS
-		}
-	}
-	return Settings.Migration.VirtV2vImage
-}
-
-// ResolveServiceAccount resolves the ServiceAccount for migration pods.
-func ResolveServiceAccount(cfg *PodConfig) string {
-	if cfg.ServiceAccount != "" {
-		return cfg.ServiceAccount
-	}
-	return Settings.Migration.ServiceAccount
-}
-
 // ensurePod creates the virt-v2v pod for the Conversion CR if it does
-// not already exist. Delegates to Ensurer.EnsurePod with Kubevirt ctx
+// not already exist and updates the status phase from the pod state.
 func (r *Reconciler) ensurePod(ctx context.Context, conversion *api.Conversion) (err error) {
-	crCtx, err := NewCRPodContext(r.Client, r.Log, conversion)
-	if err != nil {
-		return
-	}
-
-	ensurer := NewEnsurer(crCtx, PodConfigFromConversion(conversion), r.Log)
-	err = ensurer.EnsurePod(conversion)
+	err = EnsureCRPod(r.Client, r.Log, conversion)
 	if err != nil {
 		return
 	}
@@ -444,14 +339,25 @@ func (r *Reconciler) ensurePod(ctx context.Context, conversion *api.Conversion) 
 	if err != nil {
 		return
 	}
-	if pod != nil {
-		conversion.Status.Pod = core.ObjectReference{
-			Namespace: pod.Namespace,
-			Name:      pod.Name,
-		}
-		conversion.Status.Phase = string(pod.Status.Phase)
+	if pod == nil {
+		return
 	}
 
+	conversion.Status.Pod = core.ObjectReference{
+		Namespace: pod.Namespace,
+		Name:      pod.Name,
+	}
+
+	switch pod.Status.Phase {
+	case core.PodSucceeded:
+		conversion.Status.Phase = api.PhaseSucceeded
+	case core.PodFailed:
+		conversion.Status.Phase = api.PhaseFailed
+	case core.PodRunning:
+		conversion.Status.Phase = api.PhaseRunning
+	default:
+		conversion.Status.Phase = api.PhaseCreating
+	}
 	return
 }
 
@@ -460,7 +366,7 @@ func (r *Reconciler) getPod(ctx context.Context, conversion *api.Conversion) (*c
 	list := &core.PodList{}
 	err := r.Client.List(ctx, list,
 		client.InNamespace(conversion.Namespace),
-		client.MatchingLabels{kConversion: conversion.Name},
+		client.MatchingLabels{convctx.LabelConversion: conversion.Name},
 	)
 	if err != nil {
 		return nil, liberr.Wrap(err)
