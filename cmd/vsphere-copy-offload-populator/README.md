@@ -734,6 +734,28 @@ rm -f esxi_public_key.pub restricted_key.pub esxi_private_key
 ## Troubleshooting
 
 ### vSphere/ESXi
+
+### ESXi Memory Limit Issues with Concurrent vmkfstools Operations
+When running many concurrent `vmkfstools` operations (typically a migration of a VM with lots of disks), you may encounter memory limit errors on the ESXi host.
+By default, transient processes invoked via SSH or `esxcli` run within the `hostd-tmp` resource group, which typically has a strict memory limit (e.g., 500MB).
+
+If you see memory-related errors or sudden process terminations during high concurrency, you can temporarily increase this limit using the provided helper script.
+
+**Resolution:**
+Use the helper script `vmkfstools-wrapper/tweak-esxi-mem.sh` to increase the memory limit for the `hostd-tmp` resource group at runtime.
+
+1. Copy the script to the target ESXi host:
+   ```bash
+   scp cmd/vsphere-copy-offload-populator/vmkfstools-wrapper/tweak-esxi-mem.sh root@<esxi-host>:/tmp/
+   ```
+2. SSH into the ESXi host, make it executable, and run it with the desired memory limit in MB (e.g., 2048 MB):
+   ```bash
+   ssh root@<esxi-host>
+   chmod +x /tmp/tweak-esxi-mem.sh
+   /tmp/tweak-esxi-mem.sh 2048
+   ```
+
+*Note: This adjusts the runtime configuration via `vsish` to avoid requiring a reboot, but the change will revert upon the next ESXi reboot.*
 - Sometimes remote ESXi execution can fail with SOAP error with no apparent root cause message
   Since VSphere is invoking some SOAP/Rest endpoints on the ESXi, those can fail because of
   standard error reasons and vanish after the next try. If the popoulator fails the migration
@@ -748,7 +770,7 @@ rm -f esxi_public_key.pub restricted_key.pub esxi_private_key
 
     resolution: ssh into the ESXi and run `/etc/init.d/hostd restart`. Wait for few seconds till the ESX renews the connection with vSphere.
 
-- **Error**: Migration failures with multiple disks 
+- **Error**: Migration failures with multiple disks
 
   **Cause**: ESXi has a configurable limit on the number of SCSI LUN IDs it will discover during storage rescans, controlled by the `Disk.MaxLUN` parameter (default: 1024). During copy-offload migrations, each VM disk creates a new PVC that provisions a new LUN on the storage array. When the total number of LUN IDs (existing LUNs + newly created LUNs for migration) approaches or exceeds the Disk.MaxLUN value, newly created LUNs with higher LUN IDs become invisible to the ESXi host. This causes vmkfstools clone operations to fail because the target LUN cannot be discovered during storage rescans.
 
