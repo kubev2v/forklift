@@ -5,6 +5,7 @@ import (
 
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	apisplan "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/provider"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	"github.com/kubev2v/forklift/pkg/controller/base"
@@ -460,6 +461,88 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 			err := r.validateNetworkMap(plan)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(plan.Status.HasCondition(NetMapDestinationNADNotValid)).To(gomega.BeFalse())
+		})
+	})
+
+	ginkgo.Describe("validateHooks hook ServiceAccount", func() {
+		const planNS = "openshift-mtv"
+		const hookName = "test-hook"
+
+		newHook := func(sa string, aap *api.AAPConfig) *api.Hook {
+			h := &api.Hook{
+				ObjectMeta: meta.ObjectMeta{Name: hookName, Namespace: planNS},
+				Spec: api.HookSpec{
+					ServiceAccount: sa,
+					Image:          "quay.io/kubev2v/hook-runner:latest",
+					AAP:            aap,
+				},
+			}
+			h.Status.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			return h
+		}
+
+		newPlanWithHook := func() *api.Plan {
+			return &api.Plan{
+				ObjectMeta: meta.ObjectMeta{Name: "test-plan", Namespace: planNS},
+				Spec: api.PlanSpec{
+					VMs: []apisplan.VM{{
+						Ref: ref.Ref{ID: "vm-1", Name: "test-vm"},
+						Hooks: []apisplan.HookRef{{
+							Step: api.PhasePreHook,
+							Hook: core.ObjectReference{Name: hookName, Namespace: planNS},
+						}},
+					}},
+				},
+			}
+		}
+
+		ginkgo.It("should not set condition when hook SA exists in plan namespace", func() {
+			sa := &core.ServiceAccount{ObjectMeta: meta.ObjectMeta{Name: "my-sa", Namespace: planNS}}
+			hook := newHook("my-sa", nil)
+			plan := newPlanWithHook()
+			r := createFakeReconciler(hook, sa)
+
+			err := r.validateHooks(plan)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(HookServiceAccountNotValid)).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("should set condition when hook SA does not exist", func() {
+			hook := newHook("nonexistent-sa", nil)
+			plan := newPlanWithHook()
+			r := createFakeReconciler(hook)
+
+			err := r.validateHooks(plan)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(HookServiceAccountNotValid)).To(gomega.BeTrue())
+			cnd := plan.Status.FindCondition(HookServiceAccountNotValid)
+			gomega.Expect(cnd.Items).To(gomega.HaveLen(1))
+			gomega.Expect(cnd.Items[0]).To(gomega.ContainSubstring("nonexistent-sa"))
+		})
+
+		ginkgo.It("should skip SA validation for AAP hooks", func() {
+			aapCfg := &api.AAPConfig{
+				URL:           "https://aap.example.com",
+				JobTemplateID: 42,
+				TokenSecret:   core.ObjectReference{Name: "aap-token", Namespace: planNS},
+			}
+			hook := newHook("nonexistent-sa", aapCfg)
+			plan := newPlanWithHook()
+			r := createFakeReconciler(hook)
+
+			err := r.validateHooks(plan)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(HookServiceAccountNotValid)).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("should not set condition when hook has no SA", func() {
+			hook := newHook("", nil)
+			plan := newPlanWithHook()
+			r := createFakeReconciler(hook)
+
+			err := r.validateHooks(plan)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(HookServiceAccountNotValid)).To(gomega.BeFalse())
 		})
 	})
 
