@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -17,7 +18,11 @@ const (
 	AAPJobTemplatesPath = "/aap/job-templates"
 	headerAAPToken      = "X-AAP-Token"
 	aapProxyTimeout     = 60 * time.Second
+	aapJobTemplatesPath = "/api/controller/v2/job_templates/"
 )
+
+// aapProxyHTTPClient is the client used for upstream AAP requests (overridable in tests).
+var aapProxyHTTPClient = &http.Client{Timeout: aapProxyTimeout}
 
 func serveAAPJobTemplates(resp http.ResponseWriter, req *http.Request, _ client.Client) {
 	if req.Method != http.MethodGet {
@@ -37,8 +42,10 @@ func serveAAPJobTemplates(resp http.ResponseWriter, req *http.Request, _ client.
 		http.Error(resp, "invalid url query parameter", http.StatusBadRequest)
 		return
 	}
-	if aapBase.Scheme != "http" && aapBase.Scheme != "https" {
-		http.Error(resp, "url scheme must be http or https", http.StatusBadRequest)
+
+	if err := validateAAPUpstreamURL(aapBase); err != nil {
+		log.Info("rejected AAP upstream url", "url", rawBase, "reason", err.Error())
+		http.Error(resp, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -52,10 +59,11 @@ func serveAAPJobTemplates(resp http.ResponseWriter, req *http.Request, _ client.
 	q.Del("url")
 	upstreamQuery := q.Encode()
 
-	base := strings.TrimRight(aapBase.String(), "/")
-	target := base + "/api/controller/v2/job_templates/"
-	if upstreamQuery != "" {
-		target += "?" + upstreamQuery
+	target, err := aapJobTemplatesTargetURL(aapBase, upstreamQuery)
+	if err != nil {
+		log.Error(err, "failed to build AAP target URL")
+		http.Error(resp, "invalid url query parameter", http.StatusBadRequest)
+		return
 	}
 
 	ctx, cancel := context.WithTimeout(req.Context(), aapProxyTimeout)
@@ -69,8 +77,7 @@ func serveAAPJobTemplates(resp http.ResponseWriter, req *http.Request, _ client.
 	}
 	httpReq.Header.Set("Authorization", "Bearer "+token)
 
-	hc := &http.Client{Timeout: aapProxyTimeout}
-	out, err := hc.Do(httpReq)
+	out, err := aapProxyHTTPClient.Do(httpReq)
 	if err != nil {
 		log.Error(err, "AAP job_templates request failed", "target", target)
 		http.Error(resp, err.Error(), http.StatusBadGateway)
@@ -85,4 +92,69 @@ func serveAAPJobTemplates(resp http.ResponseWriter, req *http.Request, _ client.
 	if _, err := io.Copy(resp, out.Body); err != nil {
 		log.Error(err, "failed to write AAP response body")
 	}
+}
+
+// validateAAPUpstreamURL rejects schemes and hosts that would turn this service into an open proxy (SSRF).
+func validateAAPUpstreamURL(u *url.URL) error {
+	if !strings.EqualFold(u.Scheme, "https") {
+		return fmt.Errorf("url scheme must be https")
+	}
+	host := u.Hostname()
+	if host == "" {
+		return fmt.Errorf("url host is required")
+	}
+	if isBlockedAAPHostname(host) {
+		return fmt.Errorf("url host is not allowed")
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		if isBlockedAAPIP(ip) {
+			return fmt.Errorf("url host is not allowed")
+		}
+	}
+	return nil
+}
+
+func isBlockedAAPHostname(host string) bool {
+	h := strings.ToLower(strings.TrimSpace(host))
+	switch h {
+	case "localhost":
+		return true
+	}
+	if strings.HasSuffix(h, ".svc.cluster.local") || strings.HasSuffix(h, ".svc") {
+		return true
+	}
+	switch h {
+	case "metadata.google.internal", "kubernetes.default.svc.cluster.local":
+		return true
+	}
+	return false
+}
+
+func isBlockedAAPIP(ip net.IP) bool {
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		return true
+	}
+	// Cloud instance metadata
+	if ip.Equal(net.IPv4(169, 254, 169, 254)) {
+		return true
+	}
+	return false
+}
+
+// aapJobTemplatesTargetURL builds the AAP Controller list URL from a parsed base using url.URL (not string concatenation).
+func aapJobTemplatesTargetURL(base *url.URL, upstreamQuery string) (string, error) {
+	if base == nil {
+		return "", fmt.Errorf("base url is nil")
+	}
+	t := *base
+	t.Scheme = "https"
+	t.Fragment = ""
+	t.RawQuery = upstreamQuery
+	p := strings.TrimSuffix(t.Path, "/")
+	if p == "" {
+		t.Path = aapJobTemplatesPath
+	} else {
+		t.Path = p + aapJobTemplatesPath
+	}
+	return t.String(), nil
 }
