@@ -163,16 +163,21 @@ func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, vo
 	if cfg.TransferNetworkAnnotations != nil {
 		maps.Copy(annotations, cfg.TransferNetworkAnnotations)
 	}
+
 	if cfg.UDN {
-		ports := []convctx.OpenPort{
-			{Protocol: "tcp", Port: 2112},
-			{Protocol: "tcp", Port: 8080},
-		}
+		metricsPort := convctx.OpenPort{Protocol: "tcp", Port: 2112}
+		dataServerPort := convctx.OpenPort{Protocol: "tcp", Port: 8080}
+		ports := []convctx.OpenPort{metricsPort, dataServerPort}
+
 		var yamlPorts []byte
 		yamlPorts, err = yaml.Marshal(ports)
 		if err != nil {
 			return
 		}
+		/*
+		   For the User Defined Networks we need to open some port so we can communicate with our metrics server inside the User Defined Network Namespace.
+		   Docs: https://docs.redhat.com/en/documentation/openshift_container_platform/4.19/html/multiple_networks/primary-networks#opening-default-network-ports-udn_about-user-defined-networks
+		*/
 		annotations[convctx.AnnOpenDefaultPorts] = string(yamlPorts)
 	}
 
@@ -320,6 +325,28 @@ func (b *Builder) BuildV2vPodEnvironment(env []core.EnvVar, vm *plan.VMStatus) (
 			Value: strconv.Itoa(settings.Settings.Migration.VirtV2vSmp),
 		})
 	}
+	if settings.Settings.Features.VsphereVmwareDriverRemoval {
+		env = append(env,
+			core.EnvVar{
+				Name:  "V2V_vsphereVmwareDriverRemoval",
+				Value: "true",
+			})
+	}
+	if b.Config.XfsCompatibility {
+		env = append(env,
+			core.EnvVar{
+				Name:  "V2V_xfsCompatibility",
+				Value: "true",
+			})
+	}
+	if settings.Settings.Features.WindowsRegistryNetworkConfig {
+		env = append(env,
+			core.EnvVar{
+				Name:  "V2V_windowsRegistryNetworkConfig",
+				Value: "true",
+			})
+	}
+
 	env = append(env, core.EnvVar{
 		Name:  "LOCAL_MIGRATION",
 		Value: strconv.FormatBool(b.Config.LocalMigration),
@@ -330,7 +357,7 @@ func (b *Builder) BuildV2vPodEnvironment(env []core.EnvVar, vm *plan.VMStatus) (
 // ensurePod creates the virt-v2v pod for the Conversion CR if it does
 // not already exist and updates the status phase from the pod state.
 func (r *Reconciler) ensurePod(ctx context.Context, conversion *api.Conversion) (err error) {
-	err = EnsureCRPod(r.Client, r.Log, conversion)
+	err = EnsurePod(r.Client, r.Log, conversion)
 	if err != nil {
 		return
 	}

@@ -133,14 +133,14 @@ func GetPodByLabels(k8sClient client.Client, namespace string, labels map[string
 	return nil, nil
 }
 
-// EnsureCRPod dispatches pod creation based on the Conversion CR type.
-// Fully self-contained — all data is read from the Conversion spec.
-func EnsureCRPod(k8sClient client.Client, log logging.LevelLogger, conversion *api.Conversion) (err error) {
+// EnsurePod dispatches pod creation based on the Conversion CR type.
+// all data is read from the Conversion spec.
+func EnsurePod(k8sClient client.Client, log logging.LevelLogger, conversion *api.Conversion) (err error) {
 	cfg := podConfigFromSpec(conversion)
 
 	switch conversion.Spec.Type {
 	case api.Remote, api.InPlace:
-		err = ensureCRVirtV2vPod(k8sClient, log, conversion, cfg, convctx.VirtV2vConversionPod)
+		err = ensureVirtV2vPod(k8sClient, log, conversion, cfg, convctx.VirtV2vConversionPod)
 	case api.Inspection:
 		log.Info(
 			"Deep inspection pod creation not yet implemented.",
@@ -150,10 +150,10 @@ func EnsureCRPod(k8sClient client.Client, log logging.LevelLogger, conversion *a
 	return
 }
 
-// ensureCRVirtV2vPod creates the virt-v2v pod for a Conversion CR if
+// ensureVirtV2vPod creates the virt-v2v pod for a Conversion CR if
 // one does not already exist. All data comes from the spec.
-func ensureCRVirtV2vPod(k8sClient client.Client, log logging.LevelLogger, conversion *api.Conversion, cfg convctx.PodConfig, podType int) error {
-	existing, err := getCRPod(k8sClient, conversion, cfg.PodLabels)
+func ensureVirtV2vPod(k8sClient client.Client, log logging.LevelLogger, conversion *api.Conversion, cfg convctx.PodConfig, podType int) error {
+	existing, err := getPod(k8sClient, conversion, cfg.PodLabels)
 	if err != nil {
 		return err
 	}
@@ -224,8 +224,8 @@ func ensureCRVirtV2vPod(k8sClient client.Client, log logging.LevelLogger, conver
 	return nil
 }
 
-// getCRPod returns the managed pod matching the given labels, or nil.
-func getCRPod(k8sClient client.Client, conversion *api.Conversion, labels map[string]string) (*core.Pod, error) {
+// getPod returns the managed pod matching the given labels, or nil.
+func getPod(k8sClient client.Client, conversion *api.Conversion, labels map[string]string) (*core.Pod, error) {
 	list := &core.PodList{}
 	err := k8sClient.List(context.TODO(), list,
 		client.InNamespace(conversion.Namespace),
@@ -305,7 +305,7 @@ func podConfigFromSpec(conversion *api.Conversion) convctx.PodConfig {
 	return cfg
 }
 
-// DiskRefsFromVolumes converts pre-resolved volumes, mounts, devices and PVCs
+// DiskRefsFromVolumes converts resolved volumes, mounts, devices and PVCs
 // into DiskRef entries for a Conversion CR spec.
 func DiskRefsFromVolumes(volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, pvcs []*core.PersistentVolumeClaim) []api.DiskRef {
 	mountByName := make(map[string]string, len(mounts))
@@ -347,7 +347,7 @@ func DiskRefsFromVolumes(volumes []core.Volume, mounts []core.VolumeMount, devic
 }
 
 // VolumesFromDiskRefs converts a slice of DiskRef into Kubernetes
-// volume, volume-mount, and volume-device entries ready for a pod spec.
+// volume, mount, and device ready for a pod spec.
 func VolumesFromDiskRefs(disks []api.DiskRef) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice) {
 	for _, disk := range disks {
 		if disk.Namespace == "" {
