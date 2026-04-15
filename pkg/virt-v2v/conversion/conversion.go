@@ -259,6 +259,7 @@ func (c *Conversion) addVirtV2vVsphereArgsForInspection(cmd utils.CommandBuilder
 			cmd.AddArg("-io", fmt.Sprintf("vddk-config=%s", c.VddkConfFile))
 		}
 	}
+	cmd.AddFlag("--no-fstrim")
 	cmd.AddPositional("--")
 	cmd.AddPositional(c.VmName)
 	return nil

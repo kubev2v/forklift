@@ -1033,6 +1033,7 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
 
@@ -1054,6 +1055,7 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 			// Note: NO AddExtraArgs expectation - this is the critical test
+			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
 
@@ -1073,6 +1075,7 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "/dev/sdb").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
 
@@ -1093,6 +1096,7 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--mac", "00:11:22:33:44:55:ip:192.168.1.100").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
 
@@ -1135,6 +1139,7 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArgs("--key", "all:clevis").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
 
