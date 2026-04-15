@@ -8,6 +8,7 @@ import (
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	"github.com/kubev2v/forklift/pkg/settings"
+	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/storage/names"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -81,7 +82,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	}()
 
 	conversion := &api.Conversion{}
-	err = r.Get(context.TODO(), request.NamespacedName, conversion)
+	err = r.Get(ctx, request.NamespacedName, conversion)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
 			r.Log.Info("Conversion deleted.")
@@ -95,17 +96,48 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 
 	conversion.Status.BeginStagingConditions()
 
+	// Validate the spec.
 	err = r.validate(conversion)
 	if err != nil {
 		return
 	}
 
-	if !conversion.Status.HasBlockerCondition() {
+	if conversion.Status.HasBlockerCondition() {
+		conversion.Status.EndStagingConditions()
+		r.Record(conversion, conversion.Status.Conditions)
+		conversion.Status.ObservedGeneration = conversion.Generation
+		err = r.Status().Update(ctx, conversion)
+		return
+	}
+
+	// Ensure the virt-v2v pod exists and track its state.
+	err = r.ensurePod(ctx, conversion)
+	if err != nil {
+		return
+	}
+
+	// Set Ready based on pod phase.
+	switch conversion.Status.Phase {
+	case string(core.PodSucceeded):
 		conversion.Status.SetCondition(libcnd.Condition{
 			Type:     libcnd.Ready,
 			Status:   True,
 			Category: Required,
-			Message:  "The conversion is ready.",
+			Message:  "The conversion has completed successfully.",
+		})
+	case string(core.PodFailed):
+		conversion.Status.SetCondition(libcnd.Condition{
+			Type:     "PodFailed",
+			Status:   True,
+			Category: Critical,
+			Message:  "The conversion pod has failed.",
+		})
+	default:
+		conversion.Status.SetCondition(libcnd.Condition{
+			Type:     libcnd.Ready,
+			Status:   False,
+			Category: Required,
+			Message:  "The conversion pod is running.",
 		})
 	}
 
@@ -114,10 +146,10 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	r.Record(conversion, conversion.Status.Conditions)
 
 	conversion.Status.ObservedGeneration = conversion.Generation
-	err = r.Status().Update(context.TODO(), conversion)
+	err = r.Status().Update(ctx, conversion)
 	if err != nil {
 		return
 	}
-
+	result.RequeueAfter = base.SlowReQ
 	return
 }
