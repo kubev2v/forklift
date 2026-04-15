@@ -8,7 +8,6 @@ import (
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	"github.com/kubev2v/forklift/pkg/settings"
-	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/storage/names"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -94,6 +93,14 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		r.Log.V(2).Info("Conditions.", "all", conversion.Status.Conditions)
 	}()
 
+	if conversion.Status.Phase == api.PhaseSucceeded || conversion.Status.Phase == api.PhaseFailed {
+		return
+	}
+
+	if conversion.Status.Phase == "" {
+		conversion.Status.Phase = api.PhasePending
+	}
+
 	conversion.Status.BeginStagingConditions()
 
 	// Validate the spec.
@@ -110,22 +117,24 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		return
 	}
 
+	conversion.Status.Phase = api.PhaseCreating
+
 	// Ensure the virt-v2v pod exists and track its state.
 	err = r.ensurePod(ctx, conversion)
 	if err != nil {
 		return
 	}
 
-	// Set Ready based on pod phase.
+	// Set phase and Ready condition based on pod state.
 	switch conversion.Status.Phase {
-	case string(core.PodSucceeded):
+	case api.PhaseSucceeded:
 		conversion.Status.SetCondition(libcnd.Condition{
 			Type:     libcnd.Ready,
 			Status:   True,
 			Category: Required,
 			Message:  "The conversion has completed successfully.",
 		})
-	case string(core.PodFailed):
+	case api.PhaseFailed:
 		conversion.Status.SetCondition(libcnd.Condition{
 			Type:     "PodFailed",
 			Status:   True,
@@ -150,6 +159,8 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	if err != nil {
 		return
 	}
-	result.RequeueAfter = base.SlowReQ
+	if conversion.Status.Phase != api.PhaseSucceeded && conversion.Status.Phase != api.PhaseFailed {
+		result.RequeueAfter = base.SlowReQ
+	}
 	return
 }
