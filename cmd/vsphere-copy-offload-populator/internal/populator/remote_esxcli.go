@@ -56,19 +56,17 @@ type RemoteEsxcliPopulator struct {
 	SSHPrivateKey []byte
 	SSHPublicKey  []byte
 	UseSSHMethod  bool
-	SSHTimeout    time.Duration
 }
 
 func NewWithRemoteEsxcli(storageApi VMDKCapable, vmwareClient vmware.Client) (Populator, error) {
 	return &RemoteEsxcliPopulator{
 		VSphereClient: vmwareClient,
 		StorageApi:    storageApi,
-		UseSSHMethod:  false,            // VIB method
-		SSHTimeout:    30 * time.Second, // Default timeout (not used for VIB method)
+		UseSSHMethod:  false, // VIB method
 	}, nil
 }
 
-func NewWithRemoteEsxcliSSH(storageApi VMDKCapable, vmwareClient vmware.Client, sshPrivateKey, sshPublicKey []byte, sshTimeoutSeconds int) (Populator, error) {
+func NewWithRemoteEsxcliSSH(storageApi VMDKCapable, vmwareClient vmware.Client, sshPrivateKey, sshPublicKey []byte) (Populator, error) {
 	if len(sshPrivateKey) == 0 || len(sshPublicKey) == 0 {
 		return nil, fmt.Errorf("ssh key material must be non-empty")
 	}
@@ -78,7 +76,6 @@ func NewWithRemoteEsxcliSSH(storageApi VMDKCapable, vmwareClient vmware.Client, 
 		SSHPrivateKey: sshPrivateKey,
 		SSHPublicKey:  sshPublicKey,
 		UseSSHMethod:  true,
-		SSHTimeout:    time.Duration(sshTimeoutSeconds) * time.Second,
 	}, nil
 }
 
@@ -135,7 +132,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	var dsActiveAdapters []vmware.HostAdapter
 	dsActiveAdapters, err = p.VSphereClient.GetDatastoreActiveAdapters(context.Background(), host, vmDisk.Datastore)
 	initiators := []string{}
-	setupLog.Info("Datastore active adapters", "datastore",vmDisk.Datastore, "activeAdapters", dsActiveAdapters)
+	setupLog.Info("Datastore active adapters", "datastore", vmDisk.Datastore, "activeAdapters", dsActiveAdapters)
 	for _, a := range dsActiveAdapters {
 		initiators = append(initiators, a.Id)
 	}
@@ -246,8 +243,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	// Execute the clone using the unified task handling approach
 	var executor TaskExecutor
 	if p.UseSSHMethod {
-		sshSetupCtx, sshCancel := context.WithTimeout(context.Background(), p.SSHTimeout)
-		defer sshCancel()
+		sshSetupCtx := klog.NewContext(context.Background(), setupLog)
 
 		// Setup secure script
 		finalScriptPath, err := ensureSecureScript(sshSetupCtx, p.VSphereClient, host, vmDisk.Datastore)
@@ -375,7 +371,7 @@ func deleteDeadDevices(ctx context.Context, client vmware.Client, host *object.H
 	log := klog.FromContext(ctx)
 	failedDevices := []string{}
 	for _, adapter := range hostAdapters {
-		log.V(2).Info("deleting dead devices for adapter","adapter", adapter.Name)
+		log.V(2).Info("deleting dead devices for adapter", "adapter", adapter.Name)
 		success := false
 		for range rescanRetries {
 			_, errClean := client.RunEsxCommand(

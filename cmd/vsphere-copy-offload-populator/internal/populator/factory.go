@@ -19,7 +19,6 @@ type SSHConfig struct {
 	UseSSH         bool
 	PrivateKey     []byte
 	PublicKey      []byte
-	TimeoutSeconds int
 }
 
 // NewPopulator creates a new PopulatorSelector
@@ -98,15 +97,10 @@ func createVMDKPopulator(storageApi StorageApi, vmwareClient vmware.Client, sshC
 	var err error
 
 	if sshConfig != nil && sshConfig.UseSSH {
-		timeout := sshConfig.TimeoutSeconds
-		if timeout == 0 {
-			timeout = 30
-		}
 		pop, err = NewWithRemoteEsxcliSSH(vmdkApi,
 			vmwareClient,
 			sshConfig.PrivateKey,
-			sshConfig.PublicKey,
-			timeout)
+			sshConfig.PublicKey)
 	} else {
 		pop, err = NewWithRemoteEsxcli(vmdkApi, vmwareClient)
 	}
