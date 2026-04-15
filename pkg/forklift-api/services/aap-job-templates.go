@@ -131,7 +131,13 @@ func isBlockedAAPHostname(host string) bool {
 }
 
 func isBlockedAAPIP(ip net.IP) bool {
-	if ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+	// Block loopback, unspecified, and multicast. Do not block RFC1918: on-prem AAP
+	// commonly uses private IPs reachable only from the cluster.
+	if ip.IsLoopback() || ip.IsUnspecified() || ip.IsLinkLocalMulticast() {
+		return true
+	}
+	// Link-local unicast (e.g. fe80::/10); allow RFC1918 private networks for customer AAP.
+	if ip.IsLinkLocalUnicast() {
 		return true
 	}
 	// Cloud instance metadata
