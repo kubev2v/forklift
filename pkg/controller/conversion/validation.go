@@ -7,9 +7,11 @@ import (
 
 // Types
 const (
-	TypeNotValid    = "TypeNotValid"
-	ProviderNotSet  = "ProviderNotSet"
-	VMNotSet        = "VMNotSet"
+	TypeNotValid     = "TypeNotValid"
+	ProviderNotSet   = "ProviderNotSet"
+	VMNotSet         = "VMNotSet"
+	DisksNotSet      = "DisksNotSet"
+	ConnectionNotSet = "ConnectionNotSet"
 )
 
 // Categories
@@ -23,7 +25,7 @@ const (
 
 // Reasons
 const (
-	NotSet  = "NotSet"
+	NotSet   = "NotSet"
 	NotValid = "NotValid"
 )
 
@@ -46,19 +48,27 @@ func (r *Reconciler) validate(conversion *api.Conversion) (err error) {
 	if err != nil {
 		return
 	}
+	err = r.validateDisks(conversion)
+	if err != nil {
+		return
+	}
+	err = r.validateConnection(conversion)
+	if err != nil {
+		return
+	}
 	return
 }
 
 func (r *Reconciler) validateType(conversion *api.Conversion) (err error) {
 	switch conversion.Spec.Type {
-	case api.Inspection, api.InPlace, api.Cold:
+	case api.Inspection, api.InPlace, api.Remote:
 	default:
 		conversion.Status.SetCondition(libcnd.Condition{
 			Type:     TypeNotValid,
 			Status:   True,
 			Reason:   NotValid,
 			Category: Critical,
-			Message:  "The `Type` must be one of: Inspection, InPlace, Cold.",
+			Message:  "The `Type` must be one of: Inspection, InPlace, Remote.",
 		})
 	}
 	return
@@ -85,6 +95,35 @@ func (r *Reconciler) validateVM(conversion *api.Conversion) (err error) {
 			Reason:   NotSet,
 			Category: Critical,
 			Message:  "The `VM` reference is not set.",
+		})
+	}
+	return
+}
+
+func (r *Reconciler) validateDisks(conversion *api.Conversion) (err error) {
+	switch conversion.Spec.Type {
+	case api.InPlace, api.Remote, api.Inspection:
+		if len(conversion.Spec.Disks) == 0 {
+			conversion.Status.SetCondition(libcnd.Condition{
+				Type:     DisksNotSet,
+				Status:   True,
+				Reason:   NotSet,
+				Category: Critical,
+				Message:  "The `Disks` field is required for this conversion type.",
+			})
+		}
+	}
+	return
+}
+
+func (r *Reconciler) validateConnection(conversion *api.Conversion) (err error) {
+	if conversion.Spec.Connection.Secret.Name == "" {
+		conversion.Status.SetCondition(libcnd.Condition{
+			Type:     ConnectionNotSet,
+			Status:   True,
+			Reason:   NotSet,
+			Category: Critical,
+			Message:  "The `Connection.Secret` is required.",
 		})
 	}
 	return
