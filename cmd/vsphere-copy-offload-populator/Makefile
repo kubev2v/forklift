@@ -63,13 +63,13 @@ install-mockgen:
 test-copy-using-cli: build
 	bin/vsphere-copy-offload-populator \
 		--source-vm-id=vm-92749 \
-		--source-vmdk="[eco-iscsi-ds3] tshefi_40G/tshefi_40G.vmdk" \
+		--source-vmdk="[eco-iscsi-ds3] tshefi_40G_1/tshefi_40G.vmdk" \
 		--owner-name=tshefi40g \
 		--target-namespace=openshift-mtv \
 		--storage-vendor-product=ontap \
 		--secret-name=ontap \
 		--owner-uid=tshefi40g \
-		--esxi-clone-method=vib \
+		--esxi-clone-method=ssh \
 		--kubeconfig=$$KUBECONFIG
 
 test-flashsystem: build

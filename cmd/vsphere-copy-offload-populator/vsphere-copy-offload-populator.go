@@ -59,7 +59,6 @@ var (
 	vsphereUsername            string
 	vspherePassword            string
 	esxiCloneMethod            string
-	sshTimeoutSeconds          int
 	storageAPITimeoutSeconds   string
 
 	// kube args
@@ -169,7 +168,6 @@ func main() {
 			UseSSH:         true,
 			PrivateKey:     sshPrivateKey,
 			PublicKey:      sshPublicKey,
-			TimeoutSeconds: sshTimeoutSeconds,
 		}
 	}
 
@@ -311,7 +309,6 @@ func handleArgs() {
 	flag.StringVar(&vsphereUsername, "vsphere-username", os.Getenv("GOVMOMI_USERNAME"), "vSphere's API username")
 	flag.StringVar(&vspherePassword, "vsphere-password", os.Getenv("GOVMOMI_PASSWORD"), "vSphere's API password")
 	flag.StringVar(&esxiCloneMethod, "esxi-clone-method", os.Getenv("ESXI_CLONE_METHOD"), "ESXi clone method: 'vib' (default) or 'ssh'")
-	flag.IntVar(&sshTimeoutSeconds, "ssh-timeout-seconds", 30, "SSH timeout in seconds for ESXi operations (default: 30)")
 	flag.StringVar(&storageAPITimeoutSeconds, "storage-http-timeout-seconds", os.Getenv("STORAGE_HTTP_TIMEOUT_SECONDS"), "HTTP client timeout in seconds for storage API requests (default: 30)")
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
