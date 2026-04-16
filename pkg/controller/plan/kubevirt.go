@@ -2262,6 +2262,13 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 				Value: "true",
 			})
 	}
+	if r.Plan.Spec.XfsCompatibility {
+		environment = append(environment,
+			core.EnvVar{
+				Name:  "V2V_xfsCompatibility",
+				Value: "true",
+			})
+	}
 
 	environment = append(environment,
 		core.EnvVar{

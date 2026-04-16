@@ -112,6 +112,14 @@ func (c *Conversion) addInspectorExtraArgs(cmd utils.CommandBuilder) {
 	}
 }
 
+// addNoFstrimUnlessXfsCompat passes --no-fstrim unless XFS compatibility mode is enabled
+// the el9 v2v is missing the --no-fstrim flag so the conversion would fail
+func (c *Conversion) addNoFstrimUnlessXfsCompat(cmd utils.CommandBuilder) {
+	if !c.XfsCompatibility {
+		cmd.AddFlag("--no-fstrim")
+	}
+}
+
 func (c *Conversion) RunVirtV2VInspection() error {
 	v2vCmdBuilder := c.CommandBuilder.New("virt-v2v-inspector").
 		AddFlag("-v").
@@ -123,7 +131,7 @@ func (c *Conversion) RunVirtV2VInspection() error {
 	if err != nil {
 		return err
 	}
-	v2vCmdBuilder.AddFlag("--no-fstrim")
+	c.addNoFstrimUnlessXfsCompat(v2vCmdBuilder)
 	c.addInspectorExtraArgs(v2vCmdBuilder)
 	for _, disk := range c.Disks {
 		v2vCmdBuilder.AddPositional(disk.Link)
@@ -143,7 +151,7 @@ func (c *Conversion) RunVirtV2vInPlace() error {
 	if err != nil {
 		return err
 	}
-	v2vCmdBuilder.AddFlag("--no-fstrim")
+	c.addNoFstrimUnlessXfsCompat(v2vCmdBuilder)
 	c.addConversionExtraArgs(v2vCmdBuilder)
 	v2vCmdBuilder.AddPositional(c.LibvirtDomainFile)
 	v2vCmd := v2vCmdBuilder.Build()
@@ -169,7 +177,7 @@ func (c *Conversion) RunVirtV2vInPlaceDisk() error {
 	if err != nil {
 		return err
 	}
-	v2vCmdBuilder.AddFlag("--no-fstrim")
+	c.addNoFstrimUnlessXfsCompat(v2vCmdBuilder)
 	c.addConversionExtraArgs(v2vCmdBuilder)
 
 	// Add all disks as positional arguments
@@ -259,7 +267,7 @@ func (c *Conversion) addVirtV2vVsphereArgsForInspection(cmd utils.CommandBuilder
 			cmd.AddArg("-io", fmt.Sprintf("vddk-config=%s", c.VddkConfFile))
 		}
 	}
-	cmd.AddFlag("--no-fstrim")
+	c.addNoFstrimUnlessXfsCompat(cmd)
 	cmd.AddPositional("--")
 	cmd.AddPositional(c.VmName)
 	return nil
