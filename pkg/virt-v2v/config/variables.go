@@ -36,6 +36,7 @@ const (
 	EnvMemSizeName                    = "V2V_memSize"
 	EnvSmpName                        = "V2V_smp"
 	EnvVsphereVmwareDriverRemovalName = "V2V_vsphereVmwareDriverRemoval"
+	EnvXfsCompatibilityName           = "V2V_xfsCompatibility"
 )
 
 const (
@@ -110,6 +111,9 @@ type AppConfig struct {
 	Smp int
 	// V2V_vsphereVmwareDriverRemoval
 	VsphereVmwareDriverRemoval bool
+	// V2V_xfsCompatibility — use XFS-capable virt-v2v; omit --no-fstrim when true
+	// the el9 v2v is missing the --no-fstrim flag so the conversion would fail
+	XfsCompatibility bool
 
 	// V2V_multipleIPsPerNic
 	MultipleIpsPerNicName string
@@ -154,6 +158,7 @@ func (s *AppConfig) Load() (err error) {
 	flag.IntVar(&s.MemSize, "memsize", s.getEnvInt(EnvMemSizeName, 0), "Amount of memory (in MB) allocated for the conversion appliance")
 	flag.IntVar(&s.Smp, "smp", s.getEnvInt(EnvSmpName, 0), "Number of virtual CPUs used for the conversion appliance")
 	flag.BoolVar(&s.VsphereVmwareDriverRemoval, "vsphere-vmware-driver-removal", s.getEnvBool(EnvVsphereVmwareDriverRemovalName, false), "Run VMware driver removal scripts during Windows vSphere conversion")
+	flag.BoolVar(&s.XfsCompatibility, "xfs-compatibility", s.getEnvBool(EnvXfsCompatibilityName, false), "XFS compatibility mode: do not pass --no-fstrim to virt-v2v")
 	s.RemoteInspectionDisks = s.getRemoteInspectionDisks()
 	flag.Parse()
 
