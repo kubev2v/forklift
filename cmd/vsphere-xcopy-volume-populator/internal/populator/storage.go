@@ -65,3 +65,21 @@ type MappingContext map[string]any
 type SciniAware interface {
 	SciniRequired() bool
 }
+
+// StorageArrayInfo holds metadata about the storage array, retrieved from the API at connection time.
+type StorageArrayInfo struct {
+	// Vendor is the storage array vendor (e.g. "IBM", "Dell", "NetApp").
+	Vendor string
+	// Product is the vendor's product name (e.g. "FlashSystem", "PowerMax", "ONTAP").
+	Product string
+	// Model is the specific model of the storage array, retrieved from the API. May be empty.
+	Model string
+	// Version is the software/firmware version of the storage array, retrieved from the API. May be empty.
+	Version string
+}
+
+// StorageArrayInfoProvider is an optional interface that storage implementations can implement
+// to provide metadata about the storage array for metric labels.
+type StorageArrayInfoProvider interface {
+	GetStorageArrayInfo() StorageArrayInfo
+}
