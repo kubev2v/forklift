@@ -33,6 +33,7 @@ const (
 	EnvRemoteInspection               = "V2V_remoteInspection"
 	EnvRemoteInspectionDisk           = "V2V_remoteInspectDisk_"
 	EnvVsphereVmwareDriverRemovalName = "V2V_vsphereVmwareDriverRemoval"
+	EnvXfsCompatibilityName           = "V2V_xfsCompatibility"
 )
 
 const (
@@ -100,6 +101,9 @@ type AppConfig struct {
 	RemoteInspectionDisks []string
 	// V2V_vsphereVmwareDriverRemoval
 	VsphereVmwareDriverRemoval bool
+	// V2V_xfsCompatibility — use XFS-capable virt-v2v; omit --no-fstrim when true
+	// the el9 v2v is missing the --no-fstrim flag so the conversion would fail
+	XfsCompatibility bool
 
 	// V2V_multipleIPsPerNic
 	MultipleIpsPerNicName string
@@ -141,6 +145,7 @@ func (s *AppConfig) Load() (err error) {
 	flag.StringVar(&s.MultipleIpsPerNicName, "multiple-ips-per-nic", os.Getenv(EnvMultipleIpsPerNicName), "Multiple IPs per NIC")
 	flag.BoolVar(&s.IsRemoteInspection, "remote-inspection", s.getEnvBool(EnvRemoteInspection, false), "Run virt-v2v-inspection on remote disks")
 	flag.BoolVar(&s.VsphereVmwareDriverRemoval, "vsphere-vmware-driver-removal", s.getEnvBool(EnvVsphereVmwareDriverRemovalName, false), "Run VMware driver removal scripts during Windows vSphere conversion")
+	flag.BoolVar(&s.XfsCompatibility, "xfs-compatibility", s.getEnvBool(EnvXfsCompatibilityName, false), "XFS compatibility mode: do not pass --no-fstrim to virt-v2v")
 	s.RemoteInspectionDisks = s.getRemoteInspectionDisks()
 	flag.Parse()
 

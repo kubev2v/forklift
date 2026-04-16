@@ -996,6 +996,87 @@ var _ = Describe("Conversion", func() {
 
 			err := conversion.addVirtV2vVsphereArgsForInspection(mockCommandBuilder)
 			Expect(err).ToNot(HaveOccurred())
-		},
-	)
+		})
+
+		It("omits --no-fstrim when XfsCompatibility is enabled", func() {
+			appConfig.LibvirtUrl = "vpx://user@vcenter.example.com/Datacenter/Cluster/esxi-host?no_verify=1"
+			appConfig.SecretKey = "/etc/secret/secretKey"
+			appConfig.HostName = "vcenter.example.com"
+			appConfig.VmName = "test-vm"
+			appConfig.XfsCompatibility = true
+
+			mockCommandBuilder.EXPECT().AddArg("-i", "libvirt").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-ic", appConfig.LibvirtUrl).Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-ip", appConfig.SecretKey).Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("--hostname", appConfig.HostName).Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddPositional("--").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddPositional("test-vm").Return(mockCommandBuilder)
+
+			err := conversion.addVirtV2vVsphereArgsForInspection(mockCommandBuilder)
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	Describe("XfsCompatibility", func() {
+		It("omits --no-fstrim for RunVirtV2VInspection", func() {
+			appConfig.InspectionOutputFile = config.InspectionOutputFile
+			appConfig.XfsCompatibility = true
+			conversion.Disks = []*Disk{{Link: "/var/tmp/v2v/vm-sda"}}
+
+			mockCommandBuilder.EXPECT().New("virt-v2v-inspector").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-if", "raw").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-i", "disk").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-O", config.InspectionOutputFile).Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddPositional("/var/tmp/v2v/vm-sda").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
+			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
+			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
+			mockCommandExecutor.EXPECT().Run()
+
+			err := conversion.RunVirtV2VInspection()
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("omits --no-fstrim for RunVirtV2vInPlace", func() {
+			appConfig.LibvirtDomainFile = config.V2vInPlaceLibvirtDomain
+			appConfig.XfsCompatibility = true
+
+			mockCommandBuilder.EXPECT().New("virt-v2v-in-place").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-i", "libvirtxml").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddPositional(config.V2vInPlaceLibvirtDomain).Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
+			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
+			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
+			mockCommandExecutor.EXPECT().Run()
+
+			err := conversion.RunVirtV2vInPlace()
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("omits --no-fstrim for RunVirtV2vInPlaceDisk", func() {
+			appConfig.XfsCompatibility = true
+			conversion.Disks = []*Disk{{Link: "/var/tmp/v2v/vm-sda"}}
+
+			mockCommandBuilder.EXPECT().New("virt-v2v-in-place").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-i", "disk").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddPositional("/var/tmp/v2v/vm-sda").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
+			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
+			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
+			mockCommandExecutor.EXPECT().Run()
+
+			err := conversion.RunVirtV2vInPlaceDisk()
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
 })
