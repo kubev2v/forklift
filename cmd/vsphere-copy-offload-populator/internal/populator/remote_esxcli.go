@@ -56,17 +56,23 @@ type RemoteEsxcliPopulator struct {
 	SSHPrivateKey []byte
 	SSHPublicKey  []byte
 	UseSSHMethod  bool
+	copyCtx       CopyContext
 }
 
-func NewWithRemoteEsxcli(storageApi VMDKCapable, vmwareClient vmware.Client) (Populator, error) {
+func (p *RemoteEsxcliPopulator) GetCopyContext() CopyContext {
+	return p.copyCtx
+}
+
+func NewWithRemoteEsxcli(storageApi VMDKCapable, vmwareClient vmware.Client, copyCtx CopyContext) (Populator, error) {
 	return &RemoteEsxcliPopulator{
 		VSphereClient: vmwareClient,
 		StorageApi:    storageApi,
 		UseSSHMethod:  false, // VIB method
+		copyCtx:       copyCtx,
 	}, nil
 }
 
-func NewWithRemoteEsxcliSSH(storageApi VMDKCapable, vmwareClient vmware.Client, sshPrivateKey, sshPublicKey []byte) (Populator, error) {
+func NewWithRemoteEsxcliSSH(storageApi VMDKCapable, vmwareClient vmware.Client, copyCtx CopyContext, sshPrivateKey, sshPublicKey []byte) (Populator, error) {
 	if len(sshPrivateKey) == 0 || len(sshPublicKey) == 0 {
 		return nil, fmt.Errorf("ssh key material must be non-empty")
 	}
@@ -76,6 +82,7 @@ func NewWithRemoteEsxcliSSH(storageApi VMDKCapable, vmwareClient vmware.Client, 
 		SSHPrivateKey: sshPrivateKey,
 		SSHPublicKey:  sshPublicKey,
 		UseSSHMethod:  true,
+		copyCtx:       copyCtx,
 	}, nil
 }
 
@@ -135,6 +142,13 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	setupLog.Info("Datastore active adapters", "datastore", vmDisk.Datastore, "activeAdapters", dsActiveAdapters)
 	for _, a := range dsActiveAdapters {
 		initiators = append(initiators, a.Id)
+		if p.copyCtx.StorageProtocol == "" {
+			if strings.HasPrefix(a.Id, "iqn.") || strings.HasPrefix(a.Id, "eui.") {
+				p.copyCtx.StorageProtocol = "iscsi"
+			} else if strings.HasPrefix(a.Id, "fc.") || strings.HasPrefix(a.Id, "20:") {
+				p.copyCtx.StorageProtocol = "fc"
+			}
+		}
 	}
 	mappingContext, err := p.StorageApi.EnsureClonnerIgroup(xcopyInitiatorGroup, initiators)
 	if err != nil {

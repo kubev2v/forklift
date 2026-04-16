@@ -453,6 +453,32 @@ func (api *BlockStorageAPI) GetPortDetails() (*PortDetailsResponse, error) {
 	return &portDetails, nil
 }
 
+// GetStorageInfo retrieves the storage system model and microcode version
+func (api *BlockStorageAPI) GetStorageInfo() (*StorageInfo, error) {
+	if err := api.ensureConnected(); err != nil {
+		return nil, err
+	}
+
+	url := fmt.Sprintf("%s/objects/storages/%s", api.BaseURL, api.StorageID)
+	headers := api.sessionHeaders()
+
+	r, err := api.makeHTTPRequest("GET", url, nil, headers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get storage info: %w", err)
+	}
+
+	var info StorageInfo
+	jsonBytes, err := json.Marshal(r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal storage info response: %w", err)
+	}
+	if err := json.Unmarshal(jsonBytes, &info); err != nil {
+		return nil, fmt.Errorf("failed to parse storage info response: %w", err)
+	}
+
+	return &info, nil
+}
+
 // ensureConnected checks the connection status and reconnects if needed
 func (api *BlockStorageAPI) ensureConnected() error {
 	if !api.isConnected {
