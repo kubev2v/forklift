@@ -1250,6 +1250,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					Shared:         backing.Sharing != "sharingNone" && backing.Sharing != "",
 					Mode:           backing.DiskMode,
 					RDM:            true,
+					PhysicalMode:   backing.CompatibilityMode == string(types.VirtualDiskCompatibilityModePhysicalMode),
 					Bus:            bus,
 					Serial:         backing.Uuid,
 					WinDriveLetter: winDriveLetter,
@@ -1264,13 +1265,17 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 				disks = append(disks, md)
 			case *types.VirtualDiskRawDiskVer2BackingInfo:
 				md := model.Disk{
-					Key:            disk.Key,
-					UnitNumber:     *disk.UnitNumber,
-					ControllerKey:  disk.ControllerKey,
-					File:           backing.DescriptorFileName,
-					Capacity:       disk.CapacityInBytes,
-					Shared:         backing.Sharing != "sharingNone" && backing.Sharing != "",
-					RDM:            true,
+					Key:           disk.Key,
+					UnitNumber:    *disk.UnitNumber,
+					ControllerKey: disk.ControllerKey,
+					File:          backing.DescriptorFileName,
+					Capacity:      disk.CapacityInBytes,
+					Shared:        backing.Sharing != "sharingNone" && backing.Sharing != "",
+					RDM:           true,
+					// VirtualDiskRawDiskVer2BackingInfo represents direct pass-through
+					// to a physical device without SCSI virtualization, so it is
+					// always treated as physical mode.
+					PhysicalMode:   true,
 					Bus:            bus,
 					WinDriveLetter: winDriveLetter,
 				}

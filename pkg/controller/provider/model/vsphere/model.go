@@ -371,6 +371,7 @@ type Disk struct {
 	Capacity              int64  `json:"capacity"`
 	Shared                bool   `json:"shared"`
 	RDM                   bool   `json:"rdm"`
+	PhysicalMode          bool   `json:"physicalMode,omitempty"`
 	Bus                   string `json:"bus"`
 	Mode                  string `json:"mode,omitempty"`
 	Serial                string `json:"serial,omitempty"`
