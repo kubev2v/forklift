@@ -22,6 +22,8 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	convbuilder "github.com/kubev2v/forklift/pkg/controller/conversion"
+	convctx "github.com/kubev2v/forklift/pkg/controller/conversion/context"
 	hvutil "github.com/kubev2v/forklift/pkg/controller/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
@@ -38,7 +40,6 @@ import (
 	template "github.com/openshift/api/template/v1"
 	"github.com/openshift/library-go/pkg/template/generator"
 	"github.com/openshift/library-go/pkg/template/templateprocessing"
-	"gopkg.in/yaml.v2"
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -163,10 +164,10 @@ const (
 	VddkAioBufCountDefault = "4"
 )
 
-// VirtV2V pod types
+// VirtV2V pod types (aliases for the canonical constants in the conversion/context package).
 const (
-	VirtV2vConversionPod = 0
-	VirtV2vInspectionPod = 1
+	VirtV2vConversionPod = convctx.VirtV2vConversionPod
+	VirtV2vInspectionPod = convctx.VirtV2vInspectionPod
 )
 
 // PV size
@@ -184,6 +185,274 @@ type KubeVirt struct {
 	Builder adapter.Builder
 	// Ensurer
 	Ensurer adapter.Ensurer
+}
+
+// conversionResources holds all resolved resources needed by both the
+// Conversion CR and the direct pod creation
+type conversionResources struct {
+	cfg            convctx.PodConfig
+	pvcs           []*core.PersistentVolumeClaim
+	volumes        []core.Volume
+	mounts         []core.VolumeMount
+	devices        []core.VolumeDevice
+	secret         *core.Secret
+	inPlace        bool
+	vddkImage      string
+	requestKVM     bool
+	localMigration bool
+	udn            bool
+}
+
+// resolveConversionResources resolves VM volumes, PVCs, pod volume mounts,
+// the v2v secret, provider settings and a fully-populated PodConfig.
+func (r *KubeVirt) resolveConversionResources(vm *plan.VMStatus) (res conversionResources, err error) {
+	res.cfg = convctx.PodConfigFromPlan(r.Plan)
+
+	vmVolumes, err := r.getVMVolumes(vm)
+	if err != nil {
+		return
+	}
+
+	res.pvcs, err = r.getPVCs(vm.Ref)
+	if err != nil {
+		return
+	}
+
+	var vddkConfigMap *core.ConfigMap
+	if r.Source.Provider.UseVddkAioOptimization() {
+		vddkConfigMap, err = r.ensureVddkConfigMap()
+		if err != nil {
+			return
+		}
+	}
+
+	res.volumes, res.mounts, res.devices, err = r.podVolumeMounts(vmVolumes, vddkConfigMap, res.pvcs, vm, convctx.VirtV2vConversionPod)
+	if err != nil {
+		return
+	}
+
+	res.secret, err = r.ensureV2vSecret(vm.Ref)
+	if err != nil {
+		return
+	}
+
+	useV2v, err := r.Context.Plan.ShouldUseV2vForTransfer(vm.Ref)
+	if err != nil {
+		return
+	}
+	res.inPlace = !useV2v || r.IsCopyOffload(res.pvcs)
+
+	res.vddkImage = settings.GetVDDKImage(r.Source.Provider.Spec.Settings)
+	res.requestKVM = shouldRequestKVM(r.Source.Provider)
+	res.localMigration = r.Destination.Provider.IsHost()
+	res.udn = r.Plan.DestinationHasUdnNetwork(r.Destination)
+
+	res.cfg.VDDKImage = res.vddkImage
+	res.cfg.RequestKVM = res.requestKVM
+	res.cfg.LocalMigration = res.localMigration
+	res.cfg.UDN = res.udn
+	res.cfg.GenerateName = r.getGeneratedName(vm)
+
+	if res.cfg.TransferNetwork != nil {
+		anns := map[string]string{}
+		if err = r.setTransferNetwork(anns); err != nil {
+			return
+		}
+		res.cfg.TransferNetworkAnnotations = anns
+	}
+
+	res.cfg.PodLabels = r.conversionLabels(vm.Ref, false)
+
+	providerCfg, err := r.Builder.ConversionPodConfig(vm.Ref)
+	if err != nil {
+		return
+	}
+	maps.Copy(res.cfg.PodLabels, providerCfg.Labels)
+	maps.Copy(res.cfg.PodLabels, res.cfg.ConvertorLabels)
+	res.cfg.PodAnnotations = providerCfg.Annotations
+	if providerCfg.NodeSelector != nil || res.cfg.ConvertorNodeSelector != nil {
+		res.cfg.PodNodeSelector = make(map[string]string)
+		maps.Copy(res.cfg.PodNodeSelector, providerCfg.NodeSelector)
+		maps.Copy(res.cfg.PodNodeSelector, res.cfg.ConvertorNodeSelector)
+	}
+
+	providerEnv, err := r.Builder.PodEnvironment(vm.Ref, r.Source.Secret)
+	if err != nil {
+		return
+	}
+	res.cfg.Environment = providerEnv
+	if vm.RootDisk != "" {
+		res.cfg.Environment = append(res.cfg.Environment, core.EnvVar{Name: "V2V_RootDisk", Value: vm.RootDisk})
+	}
+	if vm.NewName != "" {
+		res.cfg.Environment = append(res.cfg.Environment, core.EnvVar{Name: "V2V_NewName", Value: r.getNewVMName(vm)})
+	}
+	if settings.Settings.Migration.VirtV2vMemSize > 0 {
+		res.cfg.Environment = append(res.cfg.Environment,
+			core.EnvVar{
+				Name:  "V2V_memSize",
+				Value: strconv.Itoa(settings.Settings.Migration.VirtV2vMemSize),
+			})
+	}
+	if settings.Settings.Migration.VirtV2vSmp > 0 {
+		res.cfg.Environment = append(res.cfg.Environment,
+			core.EnvVar{
+				Name:  "V2V_smp",
+				Value: strconv.Itoa(settings.Settings.Migration.VirtV2vSmp),
+			})
+	}
+	if settings.Settings.Features.VsphereVmwareDriverRemoval {
+		res.cfg.Environment = append(res.cfg.Environment,
+			core.EnvVar{
+				Name:  "V2V_vsphereVmwareDriverRemoval",
+				Value: "true",
+			})
+	}
+
+	return
+}
+
+// checkProviderReady returns whether the provider storage is ready after pod/CR creation.
+func (r *KubeVirt) checkProviderReady(vmID string) (ready bool, err error) {
+	switch r.Source.Provider.Type() {
+	case api.Ova, api.HyperV:
+		return r.EnsureProviderVirtV2VPVCStatus(vmID)
+	case api.EC2, api.VSphere:
+		return true, nil
+	default:
+		return true, nil
+	}
+}
+
+// EnsureConversion resolves all plan data and creates a Conversion CR.
+func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.ConversionType, planName, planNamespace, planID string, migration *api.Migration) (ready bool, err error) {
+	res, err := r.resolveConversionResources(vm)
+	if err != nil {
+		return
+	}
+
+	diskRefs := convbuilder.DiskRefsFromVolumes(res.volumes, res.mounts, res.devices, res.pvcs)
+
+	envSettings := make(map[string]string, len(res.cfg.Environment))
+	for _, ev := range res.cfg.Environment {
+		envSettings[ev.Name] = ev.Value
+	}
+
+	podSettings := api.PodSettings{
+		ServiceAccount:             convctx.ResolveServiceAccount(&res.cfg),
+		Affinity:                   res.cfg.Affinity,
+		GenerateName:               res.cfg.GenerateName,
+		TransferNetworkAnnotations: res.cfg.TransferNetworkAnnotations,
+		Labels:                     res.cfg.PodLabels,
+		Annotations:                res.cfg.PodAnnotations,
+		NodeSelector:               res.cfg.PodNodeSelector,
+	}
+
+	params := &convbuilder.ConversionParams{
+		Migration:     migration,
+		Namespace:     r.Plan.Namespace,
+		PlanName:      planName,
+		PlanNamespace: planNamespace,
+		PlanID:        planID,
+		VM:            vm,
+		Provider: core.ObjectReference{
+			Namespace: r.Source.Provider.Namespace,
+			Name:      r.Source.Provider.Name,
+		},
+		Type:  conversionType,
+		Disks: diskRefs,
+		Connection: api.Connection{
+			Secret: core.ObjectReference{
+				Namespace: res.cfg.TargetNamespace,
+				Name:      res.secret.Name,
+			},
+		},
+		Image:          convctx.GetVirtV2vImage(&res.cfg),
+		Settings:       envSettings,
+		VDDKImage:      res.vddkImage,
+		RequestKVM:     res.requestKVM,
+		LocalMigration: res.localMigration,
+		UDN:            res.udn,
+		PodSettings:    podSettings,
+	}
+
+	_, err = convbuilder.CreateConversionCR(context.TODO(), r.Destination.Client, r.Log, params)
+	if err != nil {
+		return
+	}
+
+	return r.checkProviderReady(vm.ID)
+}
+
+// EnsureGuestConversionPod resolves all data and creates the conversion pod
+// via conversion.EnsureVirtV2vPod.
+func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, step *plan.Step) (ready bool, err error) {
+	res, err := r.resolveConversionResources(vm)
+	if err != nil {
+		return
+	}
+
+	err = convbuilder.EnsureVirtV2vPod(r.Destination.Client, r.Log, vm, res.volumes, res.mounts, res.devices, res.secret, convctx.VirtV2vConversionPod, res.inPlace, res.cfg)
+	if err != nil {
+		return
+	}
+
+	return r.checkProviderReady(vm.ID)
+}
+
+// EnsureGuestInspectionPod resolves all data and creates the inspection pod
+// via conversion.EnsureVirtV2vPod.
+func (r *KubeVirt) EnsureGuestInspectionPod(vm *plan.VMStatus, step *plan.Step) (ready bool, err error) {
+	r.Log.Info("Deep inspection pod creation not yet implemented.", "vm", vm.String())
+	return true, nil
+}
+
+// GetConversionPod returns the managed pod for the given VM ref and pod type.
+func (r *KubeVirt) GetConversionPod(vmRef ref.Ref, podType int) (*core.Pod, error) {
+	var labels map[string]string
+	switch podType {
+	case convctx.VirtV2vConversionPod:
+		labels = r.conversionLabels(vmRef, true)
+	case convctx.VirtV2vInspectionPod:
+		labels = r.inspectionLabels(vmRef)
+	}
+	list, err := r.GetPodsWithLabels(labels)
+	if err != nil {
+		return nil, err
+	}
+	if len(list.Items) > 0 {
+		return &list.Items[0], nil
+	}
+	return nil, nil
+}
+
+// ensureV2vSecret ensures the v2v secret exists for the given VM.
+func (r *KubeVirt) ensureV2vSecret(vmRef ref.Ref) (*core.Secret, error) {
+	labels := r.vmLabels(vmRef)
+	labels[kV2V] = "true"
+	return r.ensureSecret(vmRef, r.secretDataSetterForCDI(vmRef), labels)
+}
+
+// shouldRequestKVM returns true for provider types that need KVM passthrough.
+func shouldRequestKVM(provider *api.Provider) bool {
+	if settings.Settings.VirtV2vDontRequestKVM {
+		return false
+	}
+	switch provider.Type() {
+	case api.VSphere, api.Ova, api.HyperV:
+		return true
+	default:
+		return false
+	}
+}
+
+// getVMVolumes returns the volumes from the KubeVirt VM spec.
+func (r *KubeVirt) getVMVolumes(vm *plan.VMStatus) ([]cnv.Volume, error) {
+	vmCr, err := r.virtualMachine(vm, true)
+	if err != nil {
+		return nil, err
+	}
+	return vmCr.Spec.Template.Spec.Volumes, nil
 }
 
 // resolveServiceAccount resolves the ServiceAccount for migration pods.
@@ -1015,7 +1284,6 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) (er
 	if sa := resolveServiceAccount(r.Plan); sa != "" {
 		pod.Spec.ServiceAccountName = sa
 	}
-	// Align with the conversion pod request, to prevent breakage
 	r.setKvmOnPodSpec(&pod.Spec)
 
 	err = r.Client.Create(context.TODO(), pod, &client.CreateOptions{})
@@ -1026,7 +1294,12 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) (er
 	return nil
 }
 
-// Sets KVM requirement to the pod and container.
+func (r *KubeVirt) getListOptionsNamespaced() (listOptions *client.ListOptions) {
+	return &client.ListOptions{
+		Namespace: r.Plan.Spec.TargetNamespace,
+	}
+}
+
 func (r *KubeVirt) setKvmOnPodSpec(podSpec *core.PodSpec) {
 	if Settings.VirtV2vDontRequestKVM {
 		return
@@ -1045,79 +1318,8 @@ func (r *KubeVirt) setKvmOnPodSpec(podSpec *core.PodSpec) {
 		if container.Resources.Requests == nil {
 			container.Resources.Requests = make(map[core.ResourceName]resource.Quantity)
 		}
-		// Ensure that the pod is deployed on a node where /dev/kvm is present.
 		container.Resources.Requests["devices.kubevirt.io/kvm"] = resource.MustParse("1")
 	}
-}
-
-func (r *KubeVirt) getListOptionsNamespaced() (listOptions *client.ListOptions) {
-	return &client.ListOptions{
-		Namespace: r.Plan.Spec.TargetNamespace,
-	}
-}
-
-// Ensure the guest conversion/inspection (virt-v2v) pod exists on the destination.
-func (r *KubeVirt) EnsureVirtV2vPod(vm *plan.VMStatus, vmCr *VirtualMachine, pvcs []*core.PersistentVolumeClaim, podType int, step *plan.Step) (err error) {
-	labels := r.vmLabels(vm.Ref)
-	labels[kV2V] = "true"
-	v2vSecret, err := r.ensureSecret(vm.Ref, r.secretDataSetterForCDI(vm.Ref), labels)
-	if err != nil {
-		return
-	}
-
-	var vddkConfigMap *core.ConfigMap
-	if r.Source.Provider.UseVddkAioOptimization() {
-		vddkConfigMap, err = r.ensureVddkConfigMap()
-		if err != nil {
-			return err
-		}
-	}
-
-	// vmVolumes is not used when creating inspection pod so it can be empty
-	vmVolumes := []cnv.Volume{}
-	if podType == VirtV2vConversionPod {
-		vmVolumes = vmCr.Spec.Template.Spec.Volumes
-	}
-	newPod, err := r.getVirtV2vPod(vm, vmVolumes, vddkConfigMap, pvcs, v2vSecret, podType, step)
-	if err != nil {
-		return
-	}
-	if newPod == nil {
-		r.Log.Info("Couldn't prepare virt-v2v pod for vm.", "vm", vm.String())
-		return
-	}
-
-	var podTypeLabels = map[string]string{}
-	switch podType {
-	case VirtV2vConversionPod:
-		podTypeLabels = r.conversionLabels(vm.Ref, true)
-	case VirtV2vInspectionPod:
-		podTypeLabels = r.inspectionLabels(vm.Ref)
-	}
-	list, err := r.GetPodsWithLabels(podTypeLabels)
-	if err != nil {
-		return
-	}
-
-	pod := &core.Pod{}
-	if len(list.Items) == 0 {
-		pod = newPod
-		err = r.Destination.Client.Create(context.TODO(), pod)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return
-		}
-		r.Log.Info(
-			"Created virt-v2v pod.",
-			"pod",
-			path.Join(
-				pod.Namespace,
-				pod.Name),
-			"vm",
-			vm.String())
-	}
-
-	return
 }
 
 // EnsureProviderVirtV2VPVCStatus checks if the provider storage PVC is ready.
@@ -1191,6 +1393,9 @@ func (r *KubeVirt) EnsureProviderVirtV2VPVCStatus(vmID string) (ready bool, err 
 
 // Get the guest conversion pod for the VM.
 func (r *KubeVirt) GetGuestConversionPod(vm *plan.VMStatus) (pod *core.Pod, err error) {
+	if r.Plan.ShouldUseConversionCR() {
+		return r.getConversionCRPod(vm)
+	}
 	list := &core.PodList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
@@ -1205,6 +1410,67 @@ func (r *KubeVirt) GetGuestConversionPod(vm *plan.VMStatus) (pod *core.Pod, err 
 	}
 	if len(list.Items) > 0 {
 		pod = &list.Items[0]
+	}
+	return
+}
+
+// getConversionCRPod finds the Conversion CR for the VM and returns its managed pod.
+func (r *KubeVirt) getConversionCRPod(vm *plan.VMStatus) (pod *core.Pod, err error) {
+	labels := map[string]string{
+		"plan": string(r.Plan.UID),
+		"vmID": vm.Ref.ID,
+	}
+	convList := &api.ConversionList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		convList,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(labels),
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		})
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	if len(convList.Items) == 0 {
+		r.Log.V(1).Info(
+			"No Conversion CR found for VM.",
+			"vm", vm.String(),
+			"labels", labels,
+			"namespace", r.Plan.Spec.TargetNamespace)
+		return
+	}
+	conv := &convList.Items[0]
+	r.Log.V(1).Info(
+		"Found Conversion CR.",
+		"conversion", path.Join(conv.Namespace, conv.Name),
+		"vm", vm.String(),
+		"podRef", conv.Status.Pod.Name)
+	if conv.Status.Pod.Name == "" {
+		r.Log.Info(
+			"Conversion CR has no pod reference yet.",
+			"conversion", path.Join(conv.Namespace, conv.Name))
+		return
+	}
+	pod = &core.Pod{}
+	err = r.Destination.Client.Get(
+		context.TODO(),
+		types.NamespacedName{
+			Namespace: conv.Status.Pod.Namespace,
+			Name:      conv.Status.Pod.Name,
+		},
+		pod)
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			r.Log.Info(
+				"Conversion CR pod not found.",
+				"conversion", path.Join(conv.Namespace, conv.Name),
+				"pod", path.Join(conv.Status.Pod.Namespace, conv.Status.Pod.Name))
+			pod = nil
+			err = nil
+			return
+		}
+		err = liberr.Wrap(err)
 	}
 	return
 }
@@ -2108,335 +2374,6 @@ func (r *KubeVirt) getConvertorAffinity() *core.Affinity {
 	}
 }
 
-func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, v2vSecret *core.Secret, podType int, step *plan.Step) (pod *core.Pod, err error) {
-	volumes, volumeMounts, volumeDevices, err := r.podVolumeMounts(vmVolumes, vddkConfigmap, pvcs, vm, podType)
-	if err != nil {
-		return
-	}
-
-	// pod environment
-	environment, err := r.Builder.PodEnvironment(vm.Ref, r.Source.Secret)
-	if err != nil {
-		return
-	}
-
-	// qemu group
-	fsGroup := qemuGroup
-	user := qemuUser
-	nonRoot := true
-	allowPrivilageEscalation := false
-	// virt-v2v image
-	useV2vForTransfer, vErr := r.Context.Plan.ShouldUseV2vForTransfer(vm.Ref)
-	if vErr != nil {
-		err = vErr
-		return
-	}
-	volumes = append(volumes, core.Volume{
-		Name: "secret-volume",
-		VolumeSource: core.VolumeSource{
-			Secret: &core.SecretVolumeSource{
-				SecretName: v2vSecret.Name,
-			},
-		},
-	})
-	volumeMounts = append(volumeMounts, core.VolumeMount{
-		Name:      "secret-volume",
-		ReadOnly:  true,
-		MountPath: "/etc/secret",
-	})
-
-	// Add temporary conversion storage if configured
-	if r.Plan.Spec.ConversionTempStorageClass != "" && r.Plan.Spec.ConversionTempStorageSize != "" {
-		// Use Generic Ephemeral Volume for temporary conversion storage
-		// This creates a temporary PVC that is automatically deleted with the pod
-		storageClass := r.Plan.Spec.ConversionTempStorageClass
-		// VolumeMode must be Filesystem since we mount it at /var/tmp/virt-v2v for use as a filesystem.
-		// Without this, Kubernetes may default to block mode which cannot be mounted as a filesystem.
-		volumeMode := core.PersistentVolumeFilesystem
-		volumes = append(volumes, core.Volume{
-			Name: "conversion-temp-storage",
-			VolumeSource: core.VolumeSource{
-				Ephemeral: &core.EphemeralVolumeSource{
-					VolumeClaimTemplate: &core.PersistentVolumeClaimTemplate{
-						Spec: core.PersistentVolumeClaimSpec{
-							AccessModes: []core.PersistentVolumeAccessMode{
-								core.ReadWriteOnce,
-							},
-							StorageClassName: &storageClass,
-							VolumeMode:       &volumeMode,
-							Resources: core.VolumeResourceRequirements{
-								Requests: core.ResourceList{
-									core.ResourceStorage: resource.MustParse(r.Plan.Spec.ConversionTempStorageSize),
-								},
-							},
-						},
-					},
-				},
-			},
-		})
-		volumeMounts = append(volumeMounts, core.VolumeMount{
-			Name:      "conversion-temp-storage",
-			MountPath: "/var/tmp/virt-v2v",
-		})
-		// Tell virt-v2v to use the custom scratch directory
-		environment = append(environment,
-			core.EnvVar{
-				Name:  "TMPDIR",
-				Value: "/var/tmp/virt-v2v",
-			})
-	}
-
-	if !useV2vForTransfer || r.IsCopyOffload(pvcs) {
-		environment = append(environment,
-			core.EnvVar{
-				Name:  "V2V_inPlace",
-				Value: "1",
-			})
-	}
-	// VDDK image
-	var initContainers []core.Container
-
-	vddkImage := settings.GetVDDKImage(r.Source.Provider.Spec.Settings)
-	if vddkImage != "" {
-		initContainers = append(initContainers, core.Container{
-			Name:            "vddk-side-car",
-			Image:           vddkImage,
-			ImagePullPolicy: core.PullIfNotPresent,
-			VolumeMounts: []core.VolumeMount{
-				{
-					Name:      VddkVolumeName,
-					MountPath: "/opt",
-				},
-			},
-			Resources: core.ResourceRequirements{
-				Requests: core.ResourceList{
-					core.ResourceCPU:    resource.MustParse("100m"),
-					core.ResourceMemory: resource.MustParse("150Mi"),
-				},
-				Limits: core.ResourceList{
-					core.ResourceCPU:    resource.MustParse("1000m"),
-					core.ResourceMemory: resource.MustParse("500Mi"),
-				},
-			},
-			SecurityContext: &core.SecurityContext{
-				AllowPrivilegeEscalation: &allowPrivilageEscalation,
-				Capabilities: &core.Capabilities{
-					Drop: []core.Capability{"ALL"},
-				},
-			},
-		})
-	}
-	if vm.RootDisk != "" {
-		environment = append(environment,
-			core.EnvVar{
-				Name:  "V2V_RootDisk",
-				Value: vm.RootDisk,
-			})
-	}
-
-	if vm.NewName != "" {
-		environment = append(environment,
-			core.EnvVar{
-				Name:  "V2V_NewName",
-				Value: r.getNewVMName(vm),
-			})
-	}
-	if settings.Settings.Migration.VirtV2vMemSize > 0 {
-		environment = append(environment,
-			core.EnvVar{
-				Name:  "V2V_memSize",
-				Value: strconv.Itoa(settings.Settings.Migration.VirtV2vMemSize),
-			})
-	}
-	if settings.Settings.Migration.VirtV2vSmp > 0 {
-		environment = append(environment,
-			core.EnvVar{
-				Name:  "V2V_smp",
-				Value: strconv.Itoa(settings.Settings.Migration.VirtV2vSmp),
-			})
-	}
-	if settings.Settings.Features.VsphereVmwareDriverRemoval {
-		environment = append(environment,
-			core.EnvVar{
-				Name:  "V2V_vsphereVmwareDriverRemoval",
-				Value: "true",
-			})
-	}
-
-	environment = append(environment,
-		core.EnvVar{
-			Name:  "LOCAL_MIGRATION",
-			Value: strconv.FormatBool(r.Destination.Provider.IsHost()),
-		},
-	)
-	// pod annotations
-	annotations := map[string]string{}
-	if r.Plan.Spec.TransferNetwork != nil {
-		err = r.setTransferNetwork(annotations)
-		if err != nil {
-			return
-		}
-	}
-	if r.Plan.DestinationHasUdnNetwork(r.Destination) {
-		metricsPort := OpenPort{Protocol: "tcp", Port: 2112}
-		dataServerPort := OpenPort{Protocol: "tcp", Port: 8080}
-		ports := []OpenPort{metricsPort, dataServerPort}
-		var yamlPorts []byte
-		yamlPorts, err = yaml.Marshal(ports)
-		if err != nil {
-			return
-		}
-		/*
-		   For the User Defined Networks we need to open some port so we can communicate with our metrics server inside the User Defined Network Namespace.
-		   Docs: https://docs.redhat.com/en/documentation/openshift_container_platform/4.19/html/multiple_networks/primary-networks#opening-default-network-ports-udn_about-user-defined-networks
-		*/
-		annotations[planbase.AnnOpenDefaultPorts] = string(yamlPorts)
-	}
-	var seccompProfile core.SeccompProfile
-	if settings.Settings.OpenShift {
-		unshare := "profiles/unshare.json"
-		seccompProfile = core.SeccompProfile{
-			Type:             core.SeccompProfileTypeLocalhost,
-			LocalhostProfile: &unshare,
-		}
-	} else {
-		seccompProfile = core.SeccompProfile{
-			Type: core.SeccompProfileTypeRuntimeDefault,
-		}
-	}
-
-	// Get provider-specific conversion pod configuration
-	providerConfig, err := r.Builder.ConversionPodConfig(vm.Ref)
-	if err != nil {
-		return nil, err
-	}
-
-	var podName string
-	var containerName string
-	// pod labels - merge order: provider config -> user labels -> system labels (system overrides all)
-	podLabels := make(map[string]string)
-	if providerConfig.Labels != nil {
-		maps.Copy(podLabels, providerConfig.Labels)
-	}
-	switch podType {
-	case VirtV2vConversionPod:
-		if r.Plan.Spec.ConvertorLabels != nil {
-			maps.Copy(podLabels, r.Plan.Spec.ConvertorLabels)
-		}
-		// System conversion labels override user labels
-		maps.Copy(podLabels, r.conversionLabels(vm.Ref, false))
-		podName = r.getGeneratedName(vm)
-		containerName = "virt-v2v"
-	case VirtV2vInspectionPod:
-		maps.Copy(podLabels, r.inspectionLabels(vm.Ref))
-		// Add inspection pod specific settings
-		podName = r.getGeneratedName(vm) + "inspection-"
-		containerName = "virt-v2v-inspection"
-
-		var success bool
-		environment, success, err = r.buildInspectionPodEnvironment(environment, vm, step)
-		if err != nil {
-			return nil, err
-		}
-		if !success {
-			// This is intentional and it means that pod was not created and no error occured (yet), e.g. retry
-			return nil, nil //nolint:nilnil
-		}
-	}
-
-	// pod annotations - merge provider config after system annotations
-	if providerConfig.Annotations != nil {
-		maps.Copy(annotations, providerConfig.Annotations)
-	}
-
-	// pod node selector - merge provider config with user settings (user takes precedence)
-	var podNodeSelector map[string]string
-	if providerConfig.NodeSelector != nil {
-		podNodeSelector = make(map[string]string)
-		maps.Copy(podNodeSelector, providerConfig.NodeSelector)
-	}
-	if r.Plan.Spec.ConvertorNodeSelector != nil {
-		if podNodeSelector == nil {
-			podNodeSelector = make(map[string]string)
-		}
-		maps.Copy(podNodeSelector, r.Plan.Spec.ConvertorNodeSelector)
-	}
-
-	// pod
-	pod = &core.Pod{
-		ObjectMeta: meta.ObjectMeta{
-			Namespace:    r.Plan.Spec.TargetNamespace,
-			Annotations:  annotations,
-			Labels:       podLabels,
-			GenerateName: podName,
-		},
-		Spec: core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				FSGroup:        &fsGroup,
-				RunAsUser:      &user,
-				RunAsNonRoot:   &nonRoot,
-				SeccompProfile: &seccompProfile,
-			},
-			NodeSelector:   podNodeSelector,
-			Affinity:       r.getConvertorAffinity(),
-			RestartPolicy:  core.RestartPolicyNever,
-			InitContainers: initContainers,
-			Containers: []core.Container{
-				{
-					Name:            containerName,
-					Env:             environment,
-					ImagePullPolicy: core.PullAlways,
-					Resources: core.ResourceRequirements{
-						Requests: core.ResourceList{
-							core.ResourceCPU:    resource.MustParse(Settings.Migration.VirtV2vContainerRequestsCpu),
-							core.ResourceMemory: resource.MustParse(Settings.Migration.VirtV2vContainerRequestsMemory),
-						},
-						Limits: core.ResourceList{
-							core.ResourceCPU:    resource.MustParse(Settings.Migration.VirtV2vContainerLimitsCpu),
-							core.ResourceMemory: resource.MustParse(Settings.Migration.VirtV2vContainerLimitsMemory),
-						},
-					},
-					EnvFrom: []core.EnvFromSource{
-						{
-							Prefix: "V2V_",
-							SecretRef: &core.SecretEnvSource{
-								LocalObjectReference: core.LocalObjectReference{
-									Name: v2vSecret.Name,
-								},
-							},
-						},
-					},
-					Image:         getVirtV2vImage(r.Plan),
-					VolumeMounts:  volumeMounts,
-					VolumeDevices: volumeDevices,
-					Ports: []core.ContainerPort{
-						{
-							Name:          "metrics",
-							ContainerPort: 2112,
-							Protocol:      core.ProtocolTCP,
-						},
-					},
-					SecurityContext: &core.SecurityContext{
-						AllowPrivilegeEscalation: &allowPrivilageEscalation,
-						Capabilities: &core.Capabilities{
-							Drop: []core.Capability{"ALL"},
-						},
-					},
-				},
-			},
-			Volumes: volumes,
-		},
-	}
-	if sa := resolveServiceAccount(r.Plan); sa != "" {
-		pod.Spec.ServiceAccountName = sa
-	}
-	// Request access to /dev/kvm via Kubevirt's Device Manager
-	// That is to ensure the appliance virt-v2v uses would not
-	// run in emulation mode, which is significantly slower
-	r.setKvmOnPodSpec(&pod.Spec)
-
-	return
-}
 
 // Build the inspection pod environment
 func (r *KubeVirt) buildInspectionPodEnvironment(env []core.EnvVar, vm *plan.VMStatus, step *plan.Step) (newEnv []core.EnvVar, success bool, err error) {
@@ -2704,6 +2641,16 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 			})
 	}
 	return
+}
+
+// DiskRefsFromPodVolumeMounts calls podVolumeMounts and converts the
+// PVC-backed volumes into DiskRef entries for a Conversion CR.
+func (r *KubeVirt) DiskRefsFromPodVolumeMounts(vmVolumes []cnv.Volume, pvcs []*core.PersistentVolumeClaim, vm *plan.VMStatus, podType int) (refs []api.DiskRef, err error) {
+	volumes, mounts, devices, err := r.podVolumeMounts(vmVolumes, nil, pvcs, vm, podType)
+	if err != nil {
+		return
+	}
+	return convbuilder.DiskRefsFromVolumes(volumes, mounts, devices, pvcs), nil
 }
 
 func (r *KubeVirt) findConfigMapInNamespace(name string, namespace string) (configMap *core.ConfigMap, exists bool, err error) {
@@ -3671,13 +3618,6 @@ func (r *KubeVirt) determineRunStrategy(vm *plan.VMStatus) cnv.VirtualMachineRun
 }
 
 func getVirtV2vImage(plan *api.Plan) string {
-	if plan.Spec.VirtV2vImage != "" {
-		return plan.Spec.VirtV2vImage
-	}
-	if plan.Spec.XfsCompatibility {
-		if Settings.Migration.VirtV2vImageXFS != "" {
-			return Settings.Migration.VirtV2vImageXFS
-		}
-	}
-	return Settings.Migration.VirtV2vImage
+	cfg := convctx.PodConfigFromPlan(plan)
+	return convctx.GetVirtV2vImage(&cfg)
 }

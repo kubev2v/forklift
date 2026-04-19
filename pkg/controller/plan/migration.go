@@ -1239,10 +1239,18 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			step.MarkStarted()
 			step.Phase = api.StepRunning
 			var ready bool
-			if ready, err = r.ensureGuestConversionPod(vm, step); err != nil {
-				step.AddError(err.Error())
-				err = nil
-				break
+			if r.Plan.ShouldUseConversionCR() {
+				if ready, err = r.kubevirt.EnsureConversion(vm, api.Remote, r.Plan.Name, r.Plan.Namespace, string(r.Plan.UID), r.Migration); err != nil {
+					step.AddError(err.Error())
+					err = nil
+					break
+				}
+			} else {
+				if ready, err = r.kubevirt.EnsureGuestConversionPod(vm, step); err != nil {
+					step.AddError(err.Error())
+					err = nil
+					break
+				}
 			}
 			if !ready {
 				r.Log.Info("virt-v2v pod isn't ready yet")
@@ -1291,21 +1299,27 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			step.MarkStarted()
 			step.Phase = api.StepRunning
 
-			// Create inspection pod if missing
 			var ready bool
-			if ready, err = r.ensureGuestInspectionPod(vm, step); err != nil {
-				step.AddError(err.Error())
-				err = nil
-				break
+			if r.Plan.ShouldUseConversionCR() {
+				if ready, err = r.kubevirt.EnsureConversion(vm, api.Inspection, r.Plan.Name, r.Plan.Namespace, string(r.Plan.UID), r.Migration); err != nil {
+					step.AddError(err.Error())
+					err = nil
+					break
+				}
+			} else {
+				if ready, err = r.kubevirt.EnsureGuestInspectionPod(vm, step); err != nil {
+					step.AddError(err.Error())
+					err = nil
+					break
+				}
 			}
 			if !ready {
 				r.Log.Info("virt-v2v inspection pod isn't ready yet")
 				return
 			}
 
-			// Fetch the inspection pod
 			var pod *core.Pod
-			pod, err = r.getInspectionPod(vm)
+			pod, err = r.kubevirt.GetConversionPod(vm.Ref, VirtV2vInspectionPod)
 
 			if err != nil {
 				step.AddError(err.Error())
@@ -1479,73 +1493,6 @@ func (r *Migration) end() (completed bool, err error) {
 }
 
 // Ensure the guest conversion pod is present.
-func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus, step *plan.Step) (ready bool, err error) {
-	if r.vmMap == nil {
-		r.vmMap, err = r.kubevirt.VirtualMachineMap()
-		if err != nil {
-			return
-		}
-	}
-	var vmCr VirtualMachine
-	var pvcs []*core.PersistentVolumeClaim
-	found := false
-	if vmCr, found = r.vmMap[vm.ID]; !found {
-		vmCr.VirtualMachine, err = r.kubevirt.virtualMachine(vm, true)
-		if err != nil {
-			return
-		}
-		pvcs, err = r.kubevirt.getPVCs(vm.Ref)
-		if err != nil {
-			return
-		}
-	}
-
-	err = r.kubevirt.EnsureVirtV2vPod(vm, &vmCr, pvcs, VirtV2vConversionPod, step)
-	if err != nil {
-		return
-	}
-
-	switch r.Source.Provider.Type() {
-	case api.Ova, api.HyperV:
-		ready, err = r.kubevirt.EnsureProviderVirtV2VPVCStatus(vm.ID)
-	case api.EC2, api.VSphere:
-		ready = true
-	}
-
-	return
-}
-
-// Ensure the guest inspection pod is present.
-func (r *Migration) ensureGuestInspectionPod(vm *plan.VMStatus, step *plan.Step) (ready bool, err error) {
-	var vmCr VirtualMachine
-	var pvcs []*core.PersistentVolumeClaim
-	// pass empty vmCr and pvcs because they are not used when getting inspection pod
-	err = r.kubevirt.EnsureVirtV2vPod(vm, &vmCr, pvcs, VirtV2vInspectionPod, step)
-	if err != nil {
-		return
-	}
-	// When inspection pod does not exist, something went wrong while creating, most likely the parent backing was missing
-	if pod, err := r.getInspectionPod(vm); pod == nil {
-		return false, err
-	}
-	return true, err
-}
-
-// Get pod that has inspection label
-func (r *Migration) getInspectionPod(vm *plan.VMStatus) (pod *core.Pod, err error) {
-	list, err := r.kubevirt.GetPodsWithLabels(r.kubevirt.inspectionLabels(vm.Ref))
-	if err != nil {
-		return
-	}
-
-	if len(list.Items) > 0 {
-		pod = &list.Items[0]
-		return
-	}
-
-	return
-}
-
 func (r *Migration) setTaskCompleted(task *plan.Task) {
 	task.Phase = api.StepCompleted
 	task.Reason = TransferCompleted
