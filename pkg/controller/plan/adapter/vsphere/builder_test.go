@@ -74,9 +74,10 @@ var _ = Describe("vSphere builder", func() {
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
 			Expect(errGet).NotTo(HaveOccurred())
-			Expect(underTest.Data).To(HaveLen(4))
+			Expect(underTest.Data).To(HaveLen(5))
 			Expect(underTest.Data).To(HaveKeyWithValue("storagekey", []byte("storageval")))
 			Expect(underTest.Data).To(HaveKeyWithValue("providerkey", []byte("providerval")))
+			Expect(underTest.Data).To(HaveKeyWithValue("GOVMOMI_HOSTNAME", []byte("vcenter.test.example.com")))
 			Expect(underTest.Data).To(HaveKey("SSH_PRIVATE_KEY"))
 			Expect(underTest.Data).To(HaveKey("SSH_PUBLIC_KEY"))
 			Expect(underTest.OwnerReferences).To(HaveLen(1))
@@ -605,7 +606,7 @@ func createBuilder(objs ...runtime.Object) *Builder {
 					ObjectMeta: meta.ObjectMeta{Name: "test-vsphere-provider", Namespace: "test"},
 					Spec: v1beta1.ProviderSpec{
 						Type: (*v1beta1.ProviderType)(ptr.To("vsphere")),
-						URL:  "test-vsphere-provider",
+						URL:  "https://vcenter.test.example.com/sdk",
 					},
 				},
 				Inventory: nil,
