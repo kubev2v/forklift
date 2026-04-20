@@ -248,9 +248,12 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	if err != nil {
 		if r.isDanglingArchivedPlan(plan) {
 			r.Log.Info("Dangling Plan - Aborting reconcile of plan without source provider.")
-			r.archive(plan)
+			archived := r.archive(plan)
 			if err = r.updatePlanStatus(plan); err != nil {
 				r.Log.Error(err, "failed to update plan status")
+			}
+			if !archived {
+				result.RequeueAfter = base.SlowReQ
 			}
 		}
 		return
@@ -264,7 +267,10 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 
 	// Archive the plan.
 	if plan.Spec.Archived {
-		r.archive(plan)
+		archived := r.archive(plan)
+		if !archived {
+			result.RequeueAfter = base.SlowReQ
+		}
 	}
 
 	// Ready condition.
@@ -345,17 +351,20 @@ func (r *Reconciler) setPopulatorDataSourceLabels(plan *api.Plan) {
 }
 
 // Archive the plan.
-// Makes a best-effort attempt to clean up lingering
-// plan resources.
-func (r *Reconciler) archive(plan *api.Plan) {
+// Makes a best-effort attempt to clean up lingering plan resources.
+// Returns true when Migration.Archive finished for every VM (including warm snapshot removal).
+// Returns false when snapshot removal is still in flight; the reconciler should requeue and
+// avoid setting the Archived status condition until cleanup completes.
+func (r *Reconciler) archive(plan *api.Plan) (markedArchived bool) {
 	ctx, err := plancontext.New(r, plan, r.Log)
 	if err != nil {
 		r.Log.Error(err, "Couldn't construct plan context while archiving plan.")
-	} else {
-		runner := Migration{Context: ctx}
-		runner.Archive()
+		return false
 	}
-	// Regardless of whether or not we can clean up, mark the plan archived.
+	runner := Migration{Context: ctx}
+	if !runner.Archive() {
+		return false
+	}
 	plan.Status.SetCondition(
 		libcnd.Condition{
 			Type:     Archived,
@@ -365,6 +374,7 @@ func (r *Reconciler) archive(plan *api.Plan) {
 			Message:  "The migration plan has been archived.",
 		})
 	r.Log.Info("Plan archived.")
+	return true
 }
 
 // Execute the plan.

@@ -274,15 +274,19 @@ func (r *Migration) begin() (err error) {
 
 // Archive the plan.
 // Best effort to remove any retained migration resources.
-func (r *Migration) Archive() {
+// Returns true when every VM has been passed to migrator.
+// Complete after any warm snapshot removal has finished (or there was nothing to remove).
+// Returns false when a vSphere removal task is still in flight
+func (r *Migration) Archive() (complete bool) {
 	defer func() {
 		if r.provider != nil {
 			r.provider.Close()
 		}
 	}()
+	complete = true
 	if err := r.init(); err != nil {
 		r.Log.Error(err, "Archive initialization failed.")
-		return
+		return false
 	}
 
 	switch r.Plan.Provider.Source.Type() {
@@ -310,8 +314,15 @@ func (r *Migration) Archive() {
 			return false
 		}
 		_ = r.cleanup(vm, dontFailOnError)
+		// Same reconcile-driven snapshot removal as Cancel()
+		// May be overkill if archive is best effort but prevents orphaned snapshots if the migration fails before completing.
+		if !r.removeLastWarmSnapshot(vm) {
+			complete = false
+			continue
+		}
 		r.migrator.Complete(vm)
 	}
+	return complete
 }
 
 func (r *Migration) SetPopulatorDataSourceLabels() {
@@ -367,7 +378,15 @@ func (r *Migration) Cancel() error {
 				}
 				return false
 			}
-			_ = r.cleanup(vm, dontFailOnError)
+			_ = r.cleanup(vm, dontFailOnError) // K8s resource deletions — idempotent, safe to repeat
+
+			// Don't mark the VM complete until the vSphere snapshot is gone.
+			// Cancel() is called on every reconcile while !vm.MarkedCompleted(),
+			// so returning here without advancing is the polling mechanism.
+			if !r.removeLastWarmSnapshot(vm) {
+				continue
+			}
+
 			if vm.RestorePowerState == plan.VMPowerStateOn {
 				if err := r.provider.PowerOn(vm.Ref); err != nil {
 					r.Log.Error(err,
@@ -456,60 +475,65 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool) error
 		return err
 	}
 
-	r.removeLastWarmSnapshot(vm)
-
 	return nil
 }
 
-func (r *Migration) removeLastWarmSnapshot(vm *plan.VMStatus) {
+func (r *Migration) removeLastWarmSnapshot(vm *plan.VMStatus) (done bool) {
 	if vm.Warm == nil {
-		return
+		return true
 	}
 
-	snapshot := ""
 	n := len(vm.Warm.Precopies)
+
+	// If a removal task is already in flight, check its status rather than firing again.
+	if n >= 1 && vm.Warm.Precopies[n-1].RemoveTaskId != "" {
+		ready, err := r.provider.CheckSnapshotRemove(vm.Ref, vm.Warm.Precopies[n-1], r.kubevirt.loadHosts)
+		if err != nil {
+			r.Log.Error(err, "Error checking warm migration snapshot removal.", "vm", vm.String())
+		}
+		return ready
+	}
+
+	// Determine which snapshot to remove.
+	snapshot := ""
 	if n >= 1 {
 		snapshot = vm.Warm.Precopies[n-1].Snapshot
 	}
 
-	// If no snapshot ID is recorded (e.g., the migration was canceled before
-	// CheckSnapshotReady ran and persisted the ID), fall back to finding the
-	// snapshot on the source VM by its well-known name.
+	// If no ID was recorded (e.g., canceled before CheckSnapshotReady ran),
+	// fall back to finding the snapshot by its well-known name.
 	if snapshot == "" {
 		var err error
 		snapshot, err = r.provider.FindForkliftSnapshot(vm.Ref, r.kubevirt.loadHosts)
 		if err != nil {
-			r.Log.Error(err, "Failed to find warm migration snapshot for cleanup.", "vm", vm)
-			return
+			r.Log.Error(err, "Failed to find warm migration snapshot for cleanup.", "vm", vm.String())
+			return false
 		}
 		if snapshot == "" {
-			return
+			return true // no snapshot exists, nothing to do
 		}
 	}
 
+	// Fire the removal task once.
 	taskId, err := r.provider.RemoveSnapshot(vm.Ref, snapshot, r.kubevirt.loadHosts)
 	if err != nil {
-		r.Log.Error(err, "Failed to initiate warm migration snapshot removal.", "vm", vm)
-		return
+		r.Log.Error(err, "Failed to initiate warm migration snapshot removal.", "vm", vm.String())
+		return false
 	}
 
-	// RemoveSnapshot is asynchronous on vSphere. Poll until the task completes so
-	// we don't return with an orphaned snapshot still being removed in the background.
-	precopy := plan.Precopy{RemoveTaskId: taskId}
-	retries := settings.Settings.Migration.SnapshotRemovalCheckRetries
-	checkRate := time.Duration(settings.Settings.Migration.SnapshotStatusCheckRate) * time.Second
-	for i := 0; i < retries; i++ {
-		time.Sleep(checkRate)
-		ready, checkErr := r.provider.CheckSnapshotRemove(vm.Ref, precopy, r.kubevirt.loadHosts)
-		if checkErr != nil {
-			r.Log.Error(checkErr, "Error checking warm migration snapshot removal.", "vm", vm)
-			return
-		}
-		if ready {
-			return
-		}
+	// Persist the task ID so the next reconcile can check progress.
+	if n >= 1 {
+		vm.Warm.Precopies[n-1].RemoveTaskId = taskId
+	} else {
+		// No precopy row yet (e.g. very early cancel)
+		// Record removal on a synthetic precopy so status persists the task ID across reconciles.
+		vm.Warm.Precopies = append(vm.Warm.Precopies, plan.Precopy{
+			Snapshot:     snapshot,
+			RemoveTaskId: taskId,
+		})
 	}
-	r.Log.Error(nil, "Timed out waiting for warm migration snapshot removal.", "vm", vm)
+
+	return false // task is in flight; caller should not mark the VM complete yet
 }
 
 func (r *Migration) deleteImporterPods(vm *plan.VMStatus) (err error) {
@@ -1363,6 +1387,10 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				}
 			}
 		case api.PhaseCompleted:
+			// Failed VMs finalize snapshot cleanup and conditions after the switch (see vm.Error block).
+			if vm.Error != nil {
+				break
+			}
 			vm.MarkCompleted()
 			r.Log.Info(
 				"Migration [COMPLETED]",
@@ -1422,20 +1450,26 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 	} else if vm.Error != nil {
 		vm.Phase = api.PhaseCompleted
 
-		// Failed warm migration can't follow its planned itinerary to snapshot removal phase
-		// so we remove the snapshot here to prevent an orphaned snapshot.
+		// Failed warm migration can't follow its planned itinerary to snapshot removal phase so we remove the snapshot here to prevent an orphaned snapshot.
+		// Wait for the async vSphere task (reconcile-driven via RemoveTaskId) before Failed + MarkCompleted.
 		if r.Plan.IsWarm() && !vm.HasCondition(api.ConditionFailed) {
-			r.removeLastWarmSnapshot(vm)
+			if !r.removeLastWarmSnapshot(vm) {
+				return
+			}
 		}
-
-		vm.SetCondition(
-			libcnd.Condition{
-				Type:     api.ConditionFailed,
-				Status:   True,
-				Category: api.CategoryAdvisory,
-				Message:  "The VM migration has FAILED.",
-				Durable:  true,
-			})
+		if !vm.HasCondition(api.ConditionFailed) {
+			vm.SetCondition(
+				libcnd.Condition{
+					Type:     api.ConditionFailed,
+					Status:   True,
+					Category: api.CategoryAdvisory,
+					Message:  "The VM migration has FAILED.",
+					Durable:  true,
+				})
+		}
+		if vm.HasCondition(api.ConditionFailed) && !vm.MarkedCompleted() {
+			vm.MarkCompleted()
+		}
 	}
 
 	return

@@ -109,6 +109,7 @@ func (r *Client) findRunningSnapshotTask(vmRef ref.Ref, vm *object.VirtualMachin
 // FindForkliftSnapshot finds the Forklift warm migration snapshot on the source VM by its
 // well-known name. This is used as a fallback during cleanup when the snapshot ID was not
 // yet recorded in the VM status (e.g., the migration was canceled before CheckSnapshotReady ran).
+// On vSphere the returned snapshotId is the snapshot managed object reference (MOR) value.
 func (r *Client) FindForkliftSnapshot(vmRef ref.Ref, hosts util.HostsFunc) (snapshotId string, err error) {
 	vm, err := r.getVM(vmRef, hosts)
 	if err != nil {
