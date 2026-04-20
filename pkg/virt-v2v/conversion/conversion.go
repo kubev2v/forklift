@@ -113,7 +113,6 @@ func (c *Conversion) RunVirtV2VInspection() error {
 		return err
 	}
 	c.addNoFstrimUnlessXfsCompat(v2vCmdBuilder)
-	c.addInspectorExtraArgs(v2vCmdBuilder)
 	for _, disk := range c.Disks {
 		v2vCmdBuilder.AddPositional(disk.Link)
 	}
@@ -133,7 +132,6 @@ func (c *Conversion) RunVirtV2vInPlace() error {
 		return err
 	}
 	c.addNoFstrimUnlessXfsCompat(v2vCmdBuilder)
-	c.addConversionExtraArgs(v2vCmdBuilder)
 	v2vCmdBuilder.AddPositional(c.LibvirtDomainFile)
 	v2vCmd := v2vCmdBuilder.Build()
 	v2vCmd.SetStdout(os.Stdout)
@@ -159,7 +157,6 @@ func (c *Conversion) RunVirtV2vInPlaceDisk() error {
 		return err
 	}
 	c.addNoFstrimUnlessXfsCompat(v2vCmdBuilder)
-	c.addConversionExtraArgs(v2vCmdBuilder)
 
 	// Add all disks as positional arguments
 	for _, disk := range c.Disks {
