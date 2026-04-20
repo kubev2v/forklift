@@ -102,7 +102,7 @@ func (r *Reconciler) validateVM(conversion *api.Conversion) (err error) {
 
 func (r *Reconciler) validateDisks(conversion *api.Conversion) (err error) {
 	switch conversion.Spec.Type {
-	case api.InPlace, api.Remote, api.Inspection:
+	case api.InPlace, api.Remote:
 		if len(conversion.Spec.Disks) == 0 {
 			conversion.Status.SetCondition(libcnd.Condition{
 				Type:     DisksNotSet,
