@@ -1258,7 +1258,12 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			step.Phase = api.StepRunning
 			var ready bool
 			if r.Plan.ShouldUseConversionCR() {
-				if ready, err = r.kubevirt.EnsureConversion(vm, api.Remote, r.Plan.Name, r.Plan.Namespace, string(r.Plan.UID), r.Migration); err != nil {
+				convType, resolveErr := r.kubevirt.ResolveConversionType(vm)
+				if resolveErr != nil {
+					step.AddError(resolveErr.Error())
+					break
+				}
+				if ready, err = r.kubevirt.EnsureConversion(vm, convType, r.Plan.Name, r.Plan.Namespace, string(r.Plan.UID), r.Migration, step); err != nil {
 					step.AddError(err.Error())
 					err = nil
 					break
@@ -1319,7 +1324,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 
 			var ready bool
 			if r.Plan.ShouldUseConversionCR() {
-				if ready, err = r.kubevirt.EnsureConversion(vm, api.Inspection, r.Plan.Name, r.Plan.Namespace, string(r.Plan.UID), r.Migration); err != nil {
+				if ready, err = r.kubevirt.EnsureConversion(vm, api.Inspection, r.Plan.Name, r.Plan.Namespace, string(r.Plan.UID), r.Migration, step); err != nil {
 					step.AddError(err.Error())
 					err = nil
 					break
