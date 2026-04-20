@@ -1,51 +1,22 @@
 package conversion
 
 import (
-	"context"
 	"maps"
 	"strconv"
 
-	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	convctx "github.com/kubev2v/forklift/pkg/controller/conversion/context"
-	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/settings"
 	"gopkg.in/yaml.v2"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
 	qemuUser  = int64(107)
 	qemuGroup = int64(107)
 )
-
-// ConversionParams holds the inputs needed to create a Conversion CR.
-type ConversionParams struct {
-	Migration *api.Migration
-
-	Namespace     string
-	GenerateName  string
-	Labels        map[string]string
-	PlanName      string
-	PlanNamespace string
-	PlanID        string
-	VM            *plan.VMStatus
-	Provider      core.ObjectReference
-	Type          api.ConversionType
-	Disks         []api.DiskRef
-	Connection    api.Connection
-	Image         string
-	Settings      map[string]string
-
-	VDDKImage      string
-	RequestKVM     bool
-	LocalMigration bool
-	UDN            bool
-	PodSettings    api.PodSettings
-}
 
 // Builder constructs virt-v2v pod specs from a fully-resolved PodConfig.
 // Callers must populate all PodConfig fields before invoking the builder.
@@ -54,9 +25,9 @@ type Builder struct {
 }
 
 // BuildVirtV2vPod is the main entry point that builds a complete pod
-// for either conversion or inspection, dispatching to the type-specific
+// for either conversion or inspection, calling the type-specific
 // builder for additional settings. All data comes from b.Config.
-func (b *Builder) BuildVirtV2vPod(vm *plan.VMStatus, volumes []core.Volume, volumeMounts []core.VolumeMount, volumeDevices []core.VolumeDevice, v2vSecret *core.Secret, podType int, inPlace bool) (pod *core.Pod, err error) {
+func (b *Builder) BuildVirtV2vPod(vm *plan.VMStatus, volumes []core.Volume, volumeMounts []core.VolumeMount, volumeDevices []core.VolumeDevice, v2vSecret *core.Secret, podType convctx.V2vPodType, inPlace bool) (pod *core.Pod, err error) {
 	pod, environment, err := b.GetVirtV2vPodSpec(vm, volumes, volumeMounts, volumeDevices, v2vSecret, inPlace)
 	if err != nil {
 		return nil, err
@@ -77,9 +48,7 @@ func (b *Builder) BuildVirtV2vPod(vm *plan.VMStatus, volumes []core.Volume, volu
 	return
 }
 
-// GetVirtV2vPodSpec builds the bare-bones pod spec. All pod-construction
-// parameters are read from b.Config which must be fully resolved by the
-// caller (ensurer) before invoking the builder.
+// GetVirtV2vPodSpec builds the barebones pod spec.
 func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, volumeMounts []core.VolumeMount, volumeDevices []core.VolumeDevice, v2vSecret *core.Secret, inPlace bool) (pod *core.Pod, environment []core.EnvVar, err error) {
 	cfg := &b.Config
 
@@ -299,7 +268,7 @@ func (b *Builder) BuildVirtV2vConversionPod(pod *core.Pod, environment []core.En
 }
 
 // BuildVirtV2vInspectionPod applies inspection-specific settings to a pod.
-// Inspection env vars must be pre-populated in b.Config.Environment by the caller.
+// Inspection env vars must be populated in b.Config.Environment by the caller.
 func (b *Builder) BuildVirtV2vInspectionPod(pod *core.Pod, environment []core.EnvVar, vm *plan.VMStatus) (*core.Pod, error) {
 	pod.GenerateName = b.Config.GenerateName + "inspection-"
 	pod.Labels[convctx.LabelApp] = "virt-v2v-inspection"
@@ -308,7 +277,7 @@ func (b *Builder) BuildVirtV2vInspectionPod(pod *core.Pod, environment []core.En
 	return pod, nil
 }
 
-// BuildV2vPodEnvironment appends pre-resolved env vars from PodConfig,
+// BuildV2vPodEnvironment appends env vars from PodConfig,
 // then adds common variables (memSize, smp, LOCAL_MIGRATION).
 func (b *Builder) BuildV2vPodEnvironment(env []core.EnvVar, vm *plan.VMStatus) ([]core.EnvVar, error) {
 	env = append(env, b.Config.Environment...)
@@ -330,54 +299,4 @@ func (b *Builder) BuildV2vPodEnvironment(env []core.EnvVar, vm *plan.VMStatus) (
 		Value: strconv.FormatBool(b.Config.LocalMigration),
 	})
 	return env, nil
-}
-
-// ensurePod creates the virt-v2v pod for the Conversion CR if it does
-// not already exist and updates the status phase from the pod state.
-func (r *Reconciler) ensurePod(ctx context.Context, conversion *api.Conversion) (err error) {
-	err = EnsurePod(r.Client, r.Log, conversion)
-	if err != nil {
-		return
-	}
-
-	pod, err := r.getPod(ctx, conversion)
-	if err != nil {
-		return
-	}
-	if pod == nil {
-		return
-	}
-
-	conversion.Status.Pod = core.ObjectReference{
-		Namespace: pod.Namespace,
-		Name:      pod.Name,
-	}
-
-	switch pod.Status.Phase {
-	case core.PodSucceeded:
-		conversion.Status.Phase = api.PhaseSucceeded
-	case core.PodFailed:
-		conversion.Status.Phase = api.PhaseFailed
-	case core.PodRunning:
-		conversion.Status.Phase = api.PhaseRunning
-	default:
-		conversion.Status.Phase = api.PhaseCreating
-	}
-	return
-}
-
-// getPod returns the managed pod for the conversion, if it exists.
-func (r *Reconciler) getPod(ctx context.Context, conversion *api.Conversion) (*core.Pod, error) {
-	list := &core.PodList{}
-	err := r.Client.List(ctx, list,
-		client.InNamespace(conversion.Namespace),
-		client.MatchingLabels{convctx.LabelConversion: conversion.Name},
-	)
-	if err != nil {
-		return nil, liberr.Wrap(err)
-	}
-	if len(list.Items) > 0 {
-		return &list.Items[0], nil
-	}
-	return nil, nil
 }
