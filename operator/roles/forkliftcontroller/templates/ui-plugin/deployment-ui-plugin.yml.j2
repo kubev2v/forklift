@@ -21,6 +21,22 @@ spec:
     spec:
       containers:
         - name: "{{ ui_plugin_container_name }}"
+          command:
+            - /bin/sh
+            - -c
+            - |
+              if echo "$POD_IP" | grep -q ':'; then
+                LISTEN_ADDRESS_PORT_REPLACED_AT_RUNTIME="[::]:9443"
+              else
+                LISTEN_ADDRESS_PORT_REPLACED_AT_RUNTIME="9443"
+              fi
+              sed "s/LISTEN_ADDRESS_PORT_REPLACED_AT_RUNTIME/$LISTEN_ADDRESS_PORT_REPLACED_AT_RUNTIME/g" /etc/nginx/nginx.conf > /tmp/nginx.conf
+              exec nginx -c /tmp/nginx.conf -g 'daemon off;'
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
           image: "{{ ui_plugin_image_fqin }}"
           ports:
             - containerPort: 9443
