@@ -11,9 +11,14 @@ import (
 type ConversionType string
 
 const (
+	// DeepInspection uses vm-migration-detective to inspect the disks
+	DeepInspection ConversionType = "DeepInspection"
+	// Inspection uses virt-v2v-inspector to inspect the disks (kept only for backward compatibility)
 	Inspection ConversionType = "Inspection"
+	// InPlace conversion does not use virt-v2v to copy the disks. It only converts the disks in place
 	InPlace    ConversionType = "InPlace"
-	Remote     ConversionType = "Remote"
+	// Remote conversion uses virt-v2v to copy the disks from remote provider to the destination cluster and converts the disks.
+	Remote     ConversionType = "Remote" 
 )
 
 // ConversionPhase represents the lifecycle phase of a Conversion resource.
@@ -88,8 +93,14 @@ type ConversionSpec struct {
 	// Type of conversion.
 	// +kubebuilder:validation:Enum=Inspection;InPlace;Remote
 	Type ConversionType `json:"type"`
-	// Reference to the provider.
+	// Reference to the source provider.
 	Provider core.ObjectReference `json:"provider" ref:"Provider"`
+	// Reference to the destination provider where pods and PVCs live.
+	// When empty or pointing to the host provider the local client is used;
+	// otherwise a remote k8s client is constructed from the provider URL
+	// and its secret.
+	// +optional
+	DestinationProvider core.ObjectReference `json:"destinationProvider,omitempty" ref:"Provider"`
 	// Reference to the source VM.
 	VM ref.Ref `json:"vm"`
 	// Disks to be converted or inspected.

@@ -122,6 +122,7 @@ func (in *ConversionList) DeepCopyObject() runtime.Object {
 func (in *ConversionSpec) DeepCopyInto(out *ConversionSpec) {
 	*out = *in
 	out.Provider = in.Provider
+	out.DestinationProvider = in.DestinationProvider
 	out.VM = in.VM
 	if in.Disks != nil {
 		in, out := &in.Disks, &out.Disks
