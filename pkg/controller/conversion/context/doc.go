@@ -7,21 +7,23 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Pod type constants.
+// VirtV2vPod type constants.
+type V2vPodType int
 const (
-	VirtV2vConversionPod = 0
-	VirtV2vInspectionPod = 1
+	VirtV2vConversionPod V2vPodType = 0
+	VirtV2vInspectionPod V2vPodType = 1
 )
 
 // Label keys used on Conversion CRs and their managed pods.
 const (
-	LabelConversion    = "conversion"
-	LabelApp           = "forklift.app"
-	LabelPlan          = "plan"
-	LabelPlanName      = "plan-name"
-	LabelPlanNamespace = "plan-namespace"
-	LabelMigration     = "migration"
-	LabelVM            = "vmID"
+	LabelConversion     = "conversion"
+	LabelConversionType = "conversion-type"
+	LabelApp            = "forklift.app"
+	LabelPlan           = "plan"
+	LabelPlanName       = "plan-name"
+	LabelPlanNamespace  = "plan-namespace"
+	LabelMigration      = "migration"
+	LabelVM             = "vmID"
 )
 
 // VddkVolumeName is the volume name used for the VDDK library scratch space.
@@ -71,6 +73,62 @@ type PodConfig struct {
 	GenerateName string
 	Environment  []core.EnvVar
 	Disks        []api.DiskRef
+}
+
+// PodConfigFromSpec builds a PodConfig from a Conversion CR spec.
+func PodConfigFromSpec(conversion *api.Conversion) PodConfig {
+	ns := conversion.Spec.TargetNamespace
+	if ns == "" {
+		ns = conversion.Namespace
+	}
+
+	podConfig := PodConfig{
+		TargetNamespace:  ns,
+		Image:            conversion.Spec.Image,
+		XfsCompatibility: conversion.Spec.XfsCompatibility,
+		VDDKImage:        conversion.Spec.VDDKImage,
+		RequestKVM:       conversion.Spec.RequestKVM,
+		LocalMigration:   conversion.Spec.LocalMigration,
+		UDN:              conversion.Spec.UDN,
+	}
+
+	podSettings := conversion.Spec.PodSettings
+	podConfig.TransferNetworkAnnotations = podSettings.TransferNetworkAnnotations
+	podConfig.PodAnnotations = podSettings.Annotations
+	podConfig.PodNodeSelector = podSettings.NodeSelector
+	podConfig.Affinity = podSettings.Affinity
+	if podSettings.ServiceAccount != "" {
+		podConfig.ServiceAccount = podSettings.ServiceAccount
+	}
+
+	podConfig.GenerateName = podSettings.GenerateName
+	if podConfig.GenerateName == "" {
+		podConfig.GenerateName = conversion.Name + "-"
+	}
+
+	podConfig.Disks = conversion.Spec.Disks
+
+	podLabels := make(map[string]string)
+	if podSettings.Labels != nil {
+		for k, v := range podSettings.Labels {
+			podLabels[k] = v
+		}
+	}
+	podLabels[LabelConversion] = conversion.Name
+	for _, k := range []string{LabelPlan, LabelPlanName, LabelPlanNamespace, LabelMigration, LabelVM, LabelConversionType} {
+		if v, ok := conversion.Labels[k]; ok {
+			podLabels[k] = v
+		}
+	}
+	podConfig.PodLabels = podLabels
+
+	env := make([]core.EnvVar, 0, len(conversion.Spec.Settings))
+	for k, v := range conversion.Spec.Settings {
+		env = append(env, core.EnvVar{Name: k, Value: v})
+	}
+	podConfig.Environment = env
+
+	return podConfig
 }
 
 // PodConfigFromPlan builds a PodConfig from an api.Plan.
