@@ -5,6 +5,7 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/base"
+	convctx "github.com/kubev2v/forklift/pkg/controller/conversion/context"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	"github.com/kubev2v/forklift/pkg/settings"
@@ -15,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	core "k8s.io/api/core/v1"
 )
 
 const (
@@ -93,6 +95,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		r.Log.V(2).Info("Conditions.", "all", conversion.Status.Conditions)
 	}()
 
+	// only reconcile if the conversion pod is not finished
 	if conversion.Status.Phase == api.PhaseSucceeded || conversion.Status.Phase == api.PhaseFailed {
 		return
 	}
@@ -119,8 +122,8 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 
 	conversion.Status.Phase = api.PhaseCreating
 
-	// Ensure the virt-v2v pod exists and track its state.
-	err = r.ensurePod(ctx, conversion)
+	// Ensure the conversion CR pod exists and track its state.
+	err = r.ensurePod(conversion)
 	if err != nil {
 		return
 	}
@@ -132,7 +135,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 			Type:     libcnd.Ready,
 			Status:   True,
 			Category: Required,
-			Message:  "The conversion has completed successfully.",
+			Message:  "The conversion pod has completed successfully.",
 		})
 	case api.PhaseFailed:
 		conversion.Status.SetCondition(libcnd.Condition{
@@ -141,12 +144,19 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 			Category: Critical,
 			Message:  "The conversion pod has failed.",
 		})
+	case api.PhaseRunning:
+		conversion.Status.SetCondition(libcnd.Condition{
+			Type:     libcnd.Ready,
+			Status:   True,
+			Category: Required,
+			Message:  "The conversion pod is running.",
+		})
 	default:
 		conversion.Status.SetCondition(libcnd.Condition{
 			Type:     libcnd.Ready,
 			Status:   False,
 			Category: Required,
-			Message:  "The conversion pod is running.",
+			Message:  "The conversion pod is pending.",
 		})
 	}
 
@@ -162,5 +172,47 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	if conversion.Status.Phase != api.PhaseSucceeded && conversion.Status.Phase != api.PhaseFailed {
 		result.RequeueAfter = base.SlowReQ
 	}
+	return
+}
+
+// ensurePod creates the pod for the Conversion CR if it does
+// not already exist and updates the status phase from the pod state.
+func (r *Reconciler) ensurePod(conversion *api.Conversion) (err error) {
+	ensurer, err := NewEnsurer(r.Client, r.Log, conversion.Spec)
+	if err != nil {
+		return
+	}
+
+	err = ensurer.EnsurePod(conversion)
+	if err != nil {
+		return
+	}
+
+	cfg := convctx.PodConfigFromSpec(conversion)
+	var pod *core.Pod
+	pod, err = ensurer.GetPod(conversion, cfg.PodLabels)
+	if err != nil {
+		return err
+	}
+	if pod == nil {
+		return nil
+	}
+
+	conversion.Status.Pod = core.ObjectReference{
+		Namespace: pod.Namespace,
+		Name:      pod.Name,
+	}
+
+	switch pod.Status.Phase {
+	case core.PodSucceeded:
+		conversion.Status.Phase = api.PhaseSucceeded
+	case core.PodFailed:
+		conversion.Status.Phase = api.PhaseFailed
+	case core.PodRunning:
+		conversion.Status.Phase = api.PhaseRunning
+	case core.PodPending:
+		conversion.Status.Phase = api.PhasePending
+	}
+
 	return
 }
