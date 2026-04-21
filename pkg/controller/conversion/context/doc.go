@@ -191,6 +191,14 @@ func GetVirtV2vImage(cfg *PodConfig) string {
 	return settings.Settings.Migration.VirtV2vImage
 }
 
+// GetDeepInspectionImage resolves the deep inspection workload image from PodConfig.
+func GetDeepInspectionImage(cfg *PodConfig) string {
+	if cfg.Image != "" {
+		return cfg.Image
+	}
+	return settings.Settings.Migration.DeepInspectionImage
+}
+
 // ResolveServiceAccount resolves the ServiceAccount for migration pods.
 func ResolveServiceAccount(cfg *PodConfig) string {
 	if cfg.ServiceAccount != "" {
