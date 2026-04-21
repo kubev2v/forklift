@@ -21,6 +21,15 @@ const (
 type PowerstoreClonner struct {
 	Client         gopowerstore.Client
 	initiatorGroup string
+	arrayInfo      populator.StorageArrayInfo
+}
+
+// Ensure PowerstoreClonner implements StorageArrayInfoProvider
+var _ populator.StorageArrayInfoProvider = &PowerstoreClonner{}
+
+// GetStorageArrayInfo returns metadata about the PowerStore array for metric labels.
+func (p *PowerstoreClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
+	return p.arrayInfo
 }
 
 func (p *PowerstoreClonner) MapTarget(targetLUN populator.LUN, mappingContext populator.MappingContext) (populator.LUN, error) {
@@ -336,5 +345,26 @@ func NewPowerstoreClonner(hostname, username, password string, sslSkipVerify boo
 		return PowerstoreClonner{}, fmt.Errorf("failed to authenticate with PowerStore backend %s: %w", hostname, err)
 	}
 
-	return PowerstoreClonner{Client: client}, nil
+	clonner := PowerstoreClonner{
+		Client: client,
+		arrayInfo: populator.StorageArrayInfo{
+			Vendor:  "Dell",
+			Product: "PowerStore",
+		},
+	}
+
+	// Fetch software version from the API
+	sw, err := client.GetSoftwareInstalled(ctx)
+	if err != nil {
+		klog.Warningf("Failed to get PowerStore software version for metrics: %v", err)
+	} else {
+		for _, s := range sw {
+			if s.IsCluster {
+				clonner.arrayInfo.Version = s.ReleaseVersion
+				break
+			}
+		}
+	}
+
+	return clonner, nil
 }

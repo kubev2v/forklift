@@ -629,6 +629,100 @@ func (c *RestClient) FindVolumeBySerial(serial string) (*Volume, error) {
 	return &volumesResponse.Items[0], nil
 }
 
+// ArrayInfo holds array metadata aggregated from /arrays and /controllers endpoints.
+type ArrayInfo struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	OS      string `json:"os"`      // e.g. "Purity//FA"
+	Model   string `json:"model"`   // from /controllers, e.g. "FA-m50"
+	Version string `json:"version"` // e.g. "6.10.3"
+}
+
+// arrayGetResponse maps the GET /api/2.x/arrays JSON response.
+type arrayGetResponse struct {
+	Items []struct {
+		ID      string `json:"id"`
+		Name    string `json:"name"`
+		OS      string `json:"os"`
+		Version string `json:"version"`
+	} `json:"items"`
+}
+
+// controllerGetResponse maps the GET /api/2.x/controllers JSON response.
+type controllerGetResponse struct {
+	Items []struct {
+		Model string `json:"model"`
+		Mode  string `json:"mode"`
+	} `json:"items"`
+}
+
+// GetArrayInfo retrieves array metadata from the FlashArray API.
+// It calls GET /arrays for os and version, and GET /controllers for model.
+func (c *RestClient) GetArrayInfo() (*ArrayInfo, error) {
+	info := &ArrayInfo{}
+
+	// Fetch os + version from /arrays
+	arrResp, err := c.apiGet(fmt.Sprintf("https://%s/api/%s/arrays", c.hostname, c.apiV2))
+	if err != nil {
+		return nil, fmt.Errorf("get array info: %w", err)
+	}
+	var arrays arrayGetResponse
+	if err := json.Unmarshal(arrResp, &arrays); err != nil {
+		return nil, fmt.Errorf("failed to parse arrays response: %w", err)
+	}
+	if len(arrays.Items) == 0 {
+		return nil, fmt.Errorf("arrays response did not contain any items")
+	}
+	info.ID = arrays.Items[0].ID
+	info.Name = arrays.Items[0].Name
+	info.OS = arrays.Items[0].OS
+	info.Version = arrays.Items[0].Version
+
+	// Fetch model from /controllers (use the primary controller)
+	ctrlResp, err := c.apiGet(fmt.Sprintf("https://%s/api/%s/controllers", c.hostname, c.apiV2))
+	if err != nil {
+		klog.Warningf("Pure REST Client: could not fetch controllers for model: %v", err)
+	} else {
+		var controllers controllerGetResponse
+		if err := json.Unmarshal(ctrlResp, &controllers); err != nil {
+			klog.Warningf("Pure REST Client: could not parse controllers response: %v", err)
+		} else {
+			for _, ctrl := range controllers.Items {
+				if ctrl.Model != "" {
+					info.Model = ctrl.Model
+					break
+				}
+			}
+		}
+	}
+
+	return info, nil
+}
+
+// apiGet is a small helper for authenticated GET requests.
+func (c *RestClient) apiGet(url string) ([]byte, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("x-auth-token", c.authToken)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+	return body, nil
+}
+
 // compareVersions compares two version strings (e.g., "1.19" vs "1.2")
 // Returns > 0 if v1 > v2, 0 if equal, < 0 if v1 < v2
 func compareVersions(v1, v2 string) int {
