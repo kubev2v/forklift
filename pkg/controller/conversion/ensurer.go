@@ -90,11 +90,74 @@ func (e *Ensurer) EnsurePod(conversion *api.Conversion) error {
 	case api.Inspection:
 		return e.ensureVirtV2vPodFromSpec(conversion, cfg, convctx.VirtV2vInspectionPod)
 	case api.DeepInspection:
-		e.Log.Info(
-			"Deep inspection pod creation not yet implemented.",
-			"conversion", path.Join(conversion.Namespace, conversion.Name),
-			"vm", conversion.Spec.VM.String())
+		return e.ensureDeepInspectionPodFromSpec(conversion, cfg)
 	}
+	return nil
+}
+
+// ensureDeepInspectionPodFromSpec creates the deep inspection pod for a Conversion
+// CR if one does not already exist.
+func (e *Ensurer) ensureDeepInspectionPodFromSpec(conversion *api.Conversion, cfg convctx.PodConfig) error {
+	existing, err := e.GetPod(conversion, cfg.PodLabels)
+	if err != nil {
+		return err
+	}
+	if existing != nil {
+		return nil
+	}
+
+	secret := &core.Secret{}
+	if conversion.Spec.Connection.Secret.Name != "" {
+		err = e.Client.Get(context.TODO(), types.NamespacedName{
+			Namespace: conversion.Spec.Connection.Secret.Namespace,
+			Name:      conversion.Spec.Connection.Secret.Name,
+		}, secret)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+	}
+
+	vm := &plan.VMStatus{}
+	vm.Ref = conversion.Spec.VM
+
+	volumes, mounts, devices, err := e.VolumesFromDiskRefs(conversion.Spec.Disks)
+	if err != nil {
+		return err
+	}
+
+	if conversion.Spec.LUKS.Name != "" {
+		volumes = append(volumes, core.Volume{
+			Name: "luks",
+			VolumeSource: core.VolumeSource{
+				Secret: &core.SecretVolumeSource{SecretName: conversion.Spec.LUKS.Name},
+			},
+		})
+		mounts = append(mounts, core.VolumeMount{
+			Name:      "luks",
+			MountPath: "/etc/luks",
+			ReadOnly:  true,
+		})
+	}
+
+	builder := &Builder{Config: cfg}
+	pod, err := builder.BuildDeepInspectionPod(vm, volumes, mounts, devices, secret)
+	if err != nil {
+		return err
+	}
+	if pod == nil {
+		e.Log.Info("Couldn't prepare deep inspection pod for vm.", "vm", vm.String())
+		return nil
+	}
+
+	err = e.DestinationClient.Create(context.TODO(), pod)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	e.Log.Info(
+		"Created deep inspection pod.",
+		"pod", path.Join(pod.Namespace, pod.Name),
+		"vm", vm.String())
 	return nil
 }
 
