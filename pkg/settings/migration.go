@@ -17,6 +17,7 @@ const (
 	ImporterRetry                    = "IMPORTER_RETRY"
 	VirtV2vImage                     = "VIRT_V2V_IMAGE"
 	VirtV2vImageXFS                  = "VIRT_V2V_IMAGE_XFS"
+	DeepInspectionImage              = "DEEP_INSPECTION_IMAGE"
 	vddkImage                        = "VDDK_IMAGE"
 	PrecopyInterval                  = "PRECOPY_INTERVAL"
 	BlockerGracePeriodMinutes        = "BLOCKER_GRACE_PERIOD_MINUTES"
@@ -93,6 +94,8 @@ type Migration struct {
 	VirtV2vImage string
 	// Virt-v2v image for guest conversion with XFSv4 support
 	VirtV2vImageXFS string
+	// Default image for deep inspection pods when Conversion spec.Image is empty
+	DeepInspectionImage string
 	// Virt-v2v require KVM flags for guest conversion
 	VirtV2vDontRequestKVM bool
 	// OCP Export token TTL minutes
@@ -370,6 +373,9 @@ func (r *Migration) Load() (err error) {
 	r.HostLeaseDurationSeconds = Lookup(HostLeaseDurationSeconds, "10")
 	if val, found := os.LookupEnv(MigrationServiceAccount); found {
 		r.ServiceAccount = val
+	}
+	if val, found := os.LookupEnv(DeepInspectionImage); found {
+		r.DeepInspectionImage = val
 	}
 	return
 }
