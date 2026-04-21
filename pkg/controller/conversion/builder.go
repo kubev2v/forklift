@@ -1,6 +1,7 @@
 package conversion
 
 import (
+	"fmt"
 	"maps"
 	"strconv"
 
@@ -274,6 +275,186 @@ func (b *Builder) BuildVirtV2vInspectionPod(pod *core.Pod, environment []core.En
 	pod.Labels[convctx.LabelApp] = "virt-v2v-inspection"
 	pod.Spec.Containers[0].Name = "virt-v2v-inspection"
 	pod.Spec.Containers[0].Env = environment
+	return pod, nil
+}
+
+// GetDeepInspectionPodSpec builds a pod spec for the deep inspection
+func (b *Builder) GetDeepInspectionPodSpec(volumes []core.Volume, volumeMounts []core.VolumeMount, volumeDevices []core.VolumeDevice, secret *core.Secret) (*core.Pod, error) {
+	cfg := &b.Config
+
+	img := convctx.GetDeepInspectionImage(cfg)
+	if img == "" {
+		return nil, fmt.Errorf("deep inspection container image is not set (Conversion spec.image or DEEP_INSPECTION_IMAGE)")
+	}
+
+	runAsUser := int64(1001)
+	fsGroup := int64(1001)
+	nonRoot := true
+	allowPrivilegeEscalation := false
+
+	if !vddkVolumeInList(volumes) {
+		volumes = append(volumes, core.Volume{
+			Name:         convctx.VddkVolumeName,
+			VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
+		})
+		volumeMounts = append(volumeMounts, core.VolumeMount{
+			Name:      convctx.VddkVolumeName,
+			MountPath: "/opt",
+		})
+	}
+
+	var initContainers []core.Container
+	if cfg.VDDKImage != "" {
+		initContainers = append(initContainers, core.Container{
+			Name:            "vddk-side-car",
+			Image:           cfg.VDDKImage,
+			ImagePullPolicy: core.PullIfNotPresent,
+			VolumeMounts: []core.VolumeMount{
+				{Name: convctx.VddkVolumeName, MountPath: "/opt"},
+			},
+			Resources: core.ResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceCPU:    resource.MustParse("100m"),
+					core.ResourceMemory: resource.MustParse("150Mi"),
+				},
+				Limits: core.ResourceList{
+					core.ResourceCPU:    resource.MustParse("1000m"),
+					core.ResourceMemory: resource.MustParse("500Mi"),
+				},
+			},
+			SecurityContext: &core.SecurityContext{
+				AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+				Capabilities:             &core.Capabilities{Drop: []core.Capability{"ALL"}},
+			},
+		})
+	}
+
+	if secret != nil && secret.Name != "" {
+		volumes = append(volumes, core.Volume{
+			Name: "connection-secret",
+			VolumeSource: core.VolumeSource{
+				Secret: &core.SecretVolumeSource{SecretName: secret.Name},
+			},
+		})
+		volumeMounts = append(volumeMounts, core.VolumeMount{
+			Name:      "connection-secret",
+			ReadOnly:  true,
+			MountPath: "/etc/deep-inspection/connection",
+		})
+	}
+
+	annotations := map[string]string{}
+	if cfg.TransferNetworkAnnotations != nil {
+		maps.Copy(annotations, cfg.TransferNetworkAnnotations)
+	}
+	if cfg.PodAnnotations != nil {
+		maps.Copy(annotations, cfg.PodAnnotations)
+	}
+
+	seccompProfile := core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}
+
+	podLabels := make(map[string]string)
+	if cfg.PodLabels != nil {
+		maps.Copy(podLabels, cfg.PodLabels)
+	}
+
+	var podNodeSelector map[string]string
+	if cfg.PodNodeSelector != nil {
+		podNodeSelector = make(map[string]string)
+		maps.Copy(podNodeSelector, cfg.PodNodeSelector)
+	}
+
+	pod := &core.Pod{
+		ObjectMeta: meta.ObjectMeta{
+			Namespace:       cfg.TargetNamespace,
+			Annotations:     annotations,
+			Labels:          podLabels,
+			OwnerReferences: cfg.OwnerReferences,
+		},
+		Spec: core.PodSpec{
+			SecurityContext: &core.PodSecurityContext{
+				FSGroup:        &fsGroup,
+				RunAsUser:      &runAsUser,
+				RunAsNonRoot:   &nonRoot,
+				SeccompProfile: &seccompProfile,
+			},
+			NodeSelector:   podNodeSelector,
+			Affinity:       cfg.Affinity,
+			RestartPolicy:  core.RestartPolicyNever,
+			InitContainers: initContainers,
+			Containers: []core.Container{
+				{
+					Name:            "deep-inspection",
+					Image:           img,
+					ImagePullPolicy: core.PullIfNotPresent,
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceCPU:    resource.MustParse("100m"),
+							core.ResourceMemory: resource.MustParse("512Mi"),
+						},
+						Limits: core.ResourceList{
+							core.ResourceCPU:    resource.MustParse("2000m"),
+							core.ResourceMemory: resource.MustParse("4Gi"),
+						},
+					},
+					VolumeMounts:  volumeMounts,
+					VolumeDevices: volumeDevices,
+					SecurityContext: &core.SecurityContext{
+						AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+						Capabilities:             &core.Capabilities{Drop: []core.Capability{"ALL"}},
+					},
+				},
+			},
+			Volumes: volumes,
+		},
+	}
+
+	if sa := convctx.ResolveServiceAccount(cfg); sa != "" {
+		pod.Spec.ServiceAccountName = sa
+	}
+
+	return pod, nil
+}
+
+func vddkVolumeInList(volumes []core.Volume) bool {
+	for _, v := range volumes {
+		if v.Name == convctx.VddkVolumeName {
+			return true
+		}
+	}
+	return false
+}
+
+// BuildDeepInspectionPodEnvironment builds environment variables for deep inspection pods.
+// It does not use virt-v2v conventions (no V2V_memSize / V2V_smp).
+func (b *Builder) BuildDeepInspectionPodEnvironment(vm *plan.VMStatus) []core.EnvVar {
+	env := make([]core.EnvVar, 0, len(b.Config.Environment)+4)
+	env = append(env, b.Config.Environment...)
+	if vm != nil {
+		if vm.ID != "" {
+			env = append(env, core.EnvVar{Name: "VM_ID", Value: vm.ID})
+		}
+		if vm.Name != "" {
+			env = append(env, core.EnvVar{Name: "VM_NAME", Value: vm.Name})
+		}
+	}
+	env = append(env, core.EnvVar{
+		Name:  "LOCAL_MIGRATION",
+		Value: strconv.FormatBool(b.Config.LocalMigration),
+	})
+	return env
+}
+
+// BuildDeepInspectionPod builds a pod for DeepInspection conversions.
+func (b *Builder) BuildDeepInspectionPod(vm *plan.VMStatus, volumes []core.Volume, volumeMounts []core.VolumeMount, volumeDevices []core.VolumeDevice, secret *core.Secret) (*core.Pod, error) {
+	pod, err := b.GetDeepInspectionPodSpec(volumes, volumeMounts, volumeDevices, secret)
+	if err != nil {
+		return nil, err
+	}
+
+	pod.GenerateName = b.Config.GenerateName + "deep-inspection-"
+	pod.Labels[convctx.LabelApp] = "deep-inspection"
+	pod.Spec.Containers[0].Env = b.BuildDeepInspectionPodEnvironment(vm)
 	return pod, nil
 }
 
