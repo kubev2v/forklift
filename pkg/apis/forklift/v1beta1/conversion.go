@@ -91,7 +91,7 @@ type PodSettings struct {
 // ConversionSpec defines the desired state of Conversion.
 type ConversionSpec struct {
 	// Type of conversion.
-	// +kubebuilder:validation:Enum=Inspection;InPlace;Remote
+	// +kubebuilder:validation:Enum=DeepInspection;Inspection;InPlace;Remote
 	Type ConversionType `json:"type"`
 	// Reference to the source provider.
 	Provider core.ObjectReference `json:"provider" ref:"Provider"`
@@ -128,7 +128,8 @@ type ConversionSpec struct {
 	// Freeform settings passed to the conversion process as environment variables.
 	// +optional
 	Settings map[string]string `json:"settings,omitempty"`
-	// VDDK init container image. Empty means no VDDK sidecar.
+	// VDDK init container image. Required when type is DeepInspection.
+	// For other types, empty means no VDDK sidecar.
 	// +optional
 	VDDKImage string `json:"vddkImage,omitempty"`
 	// Whether the pod needs a KVM device and kubevirt.io/schedulable node selector.
