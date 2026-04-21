@@ -7,11 +7,12 @@ import (
 
 // Types
 const (
-	TypeNotValid     = "TypeNotValid"
-	ProviderNotSet   = "ProviderNotSet"
-	VMNotSet         = "VMNotSet"
-	DisksNotSet      = "DisksNotSet"
-	ConnectionNotSet = "ConnectionNotSet"
+	TypeNotValid      = "TypeNotValid"
+	ProviderNotSet    = "ProviderNotSet"
+	VMNotSet          = "VMNotSet"
+	DisksNotSet       = "DisksNotSet"
+	ConnectionNotSet  = "ConnectionNotSet"
+	VDDKImageNotSet   = "VDDKImageNotSet"
 )
 
 // Categories
@@ -56,19 +57,39 @@ func (r *Reconciler) validate(conversion *api.Conversion) (err error) {
 	if err != nil {
 		return
 	}
+	err = r.validateVDDKImage(conversion)
+	if err != nil {
+		return
+	}
+	return
+}
+
+func (r *Reconciler) validateVDDKImage(conversion *api.Conversion) (err error) {
+	if conversion.Spec.Type != api.DeepInspection {
+		return
+	}
+	if conversion.Spec.VDDKImage == "" {
+		conversion.Status.SetCondition(libcnd.Condition{
+			Type:     VDDKImageNotSet,
+			Status:   True,
+			Reason:   NotSet,
+			Category: Critical,
+			Message:  "The `vddkImage` field is required when `type` is DeepInspection.",
+		})
+	}
 	return
 }
 
 func (r *Reconciler) validateType(conversion *api.Conversion) (err error) {
 	switch conversion.Spec.Type {
-	case api.Inspection, api.InPlace, api.Remote:
+	case api.DeepInspection, api.Inspection, api.InPlace, api.Remote:
 	default:
 		conversion.Status.SetCondition(libcnd.Condition{
 			Type:     TypeNotValid,
 			Status:   True,
 			Reason:   NotValid,
 			Category: Critical,
-			Message:  "The `Type` must be one of: Inspection, InPlace, Remote.",
+			Message:  "The `Type` must be one of: DeepInspection, Inspection, InPlace, Remote.",
 		})
 	}
 	return
