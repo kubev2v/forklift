@@ -9,6 +9,7 @@ import (
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	"github.com/kubev2v/forklift/pkg/settings"
+	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/storage/names"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -16,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	core "k8s.io/api/core/v1"
 )
 
 const (
@@ -40,7 +40,8 @@ func Add(mgr manager.Manager) error {
 		Name,
 		mgr,
 		controller.Options{
-			Reconciler: reconciler,
+			Reconciler:              reconciler,
+			MaxConcurrentReconciles: Settings.MaxConcurrentReconciles,
 		})
 	if err != nil {
 		log.Trace(err)
@@ -216,3 +217,4 @@ func (r *Reconciler) ensurePod(conversion *api.Conversion) (err error) {
 
 	return
 }
+
