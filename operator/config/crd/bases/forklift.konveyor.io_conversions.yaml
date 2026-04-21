@@ -1255,6 +1255,7 @@ spec:
               type:
                 description: Type of conversion.
                 enum:
+                - DeepInspection
                 - Inspection
                 - InPlace
                 - Remote
@@ -1263,7 +1264,9 @@ spec:
                 description: Whether to add UDN open-default-ports annotation.
                 type: boolean
               vddkImage:
-                description: VDDK init container image. Empty means no VDDK sidecar.
+                description: |-
+                  VDDK init container image. Required when type is DeepInspection.
+                  For other types, empty means no VDDK sidecar.
                 type: string
               vm:
                 description: Reference to the source VM.

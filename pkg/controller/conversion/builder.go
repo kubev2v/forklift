@@ -426,7 +426,6 @@ func vddkVolumeInList(volumes []core.Volume) bool {
 }
 
 // BuildDeepInspectionPodEnvironment builds environment variables for deep inspection pods.
-// It does not use virt-v2v conventions (no V2V_memSize / V2V_smp).
 func (b *Builder) BuildDeepInspectionPodEnvironment(vm *plan.VMStatus) []core.EnvVar {
 	env := make([]core.EnvVar, 0, len(b.Config.Environment)+4)
 	env = append(env, b.Config.Environment...)
