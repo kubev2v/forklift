@@ -228,18 +228,24 @@ func (r *VM1) filterDisksWithBus(disks []model.Disk, bus string) []model.Disk {
 	return resp
 }
 
-// The disks are first sorted by the buses going in order SCSI, SATA and IDE and within the controller the
-// disks are sorted by the key. This needs to be done because the virt-v2v outputs the files in an order,
-// which it gets from libvirt. The libvirt orders the devices starting with SCSI, SATA and IDE.
-// When we were sorting by the keys the order was IDE, SATA and SCSI. This cause that some PVs were populated by
-// incorrect disks.
+// The disks are first sorted by the buses going in order SCSI, SATA and IDE and within each bus they are
+// sorted by controller (ControllerKey), then unit (UnitNumber), then device key. VMware can assign device keys
+// that are not monotonic with (controller, unit), so sorting by Key alone can interleave disks from different
+// controllers and misalign with libvirt / virt-v2v ordering.
 // https://github.com/libvirt/libvirt/blob/d7b3be8ca35ffcbbece2c65120ab3ac9ec3dff0c/src/vmx/vmx.c#L1730
 func (r *VM1) sortedDisksByBusses(disks []model.Disk, buses []string) []model.Disk {
 	var resp []model.Disk
 	for _, bus := range buses {
 		disksWithBus := r.filterDisksWithBus(disks, bus)
 		sort.Slice(disksWithBus, func(i, j int) bool {
-			return disksWithBus[i].Key < disksWithBus[j].Key
+			a, b := disksWithBus[i], disksWithBus[j]
+			if a.ControllerKey != b.ControllerKey {
+				return a.ControllerKey < b.ControllerKey
+			}
+			if a.UnitNumber != b.UnitNumber {
+				return a.UnitNumber < b.UnitNumber
+			}
+			return a.Key < b.Key
 		})
 		resp = append(resp, disksWithBus...)
 	}
