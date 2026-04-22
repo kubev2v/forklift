@@ -581,6 +581,18 @@ var _ = Describe("vSphere builder", func() {
 				{Key: 2, Bus: vsphere.NVME},
 			},
 		),
+		Entry("sort SCSI disks by controller key then unit when device keys are not monotonic",
+			[]vsphere.Disk{
+				{Key: 2000, Bus: vsphere.SCSI, ControllerKey: 1001, UnitNumber: 0},
+				{Key: 1800, Bus: vsphere.SCSI, ControllerKey: 1000, UnitNumber: 2},
+				{Key: 1700, Bus: vsphere.SCSI, ControllerKey: 1000, UnitNumber: 0},
+			},
+			[]vsphere.Disk{
+				{Key: 1700, Bus: vsphere.SCSI, ControllerKey: 1000, UnitNumber: 0},
+				{Key: 1800, Bus: vsphere.SCSI, ControllerKey: 1000, UnitNumber: 2},
+				{Key: 2000, Bus: vsphere.SCSI, ControllerKey: 1001, UnitNumber: 0},
+			},
+		),
 	)
 })
 
