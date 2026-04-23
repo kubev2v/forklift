@@ -22,7 +22,6 @@ import (
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
-	"k8s.io/utils/ptr"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -508,20 +507,15 @@ func (r *Client) getVM(vmRef ref.Ref, hosts util.HostsFunc) (vsphereVm *object.V
 		return
 	}
 
-	searchIndex := object.NewSearchIndex(client)
-	vsphereRef, err := searchIndex.FindByUuid(context.TODO(), nil, vm.UUID, true, ptr.To(false))
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	if vsphereRef == nil {
+	// Use the managed object id from inventory (not FindByUuid on BIOS UUID), so we target the
+	// same VM as the plan when multiple VMs share config.uuid.
+	moref := types.ManagedObjectReference{Type: "VirtualMachine", Value: vm.ID}
+	if moref.Value == "" {
 		err = liberr.New(
-			fmt.Sprintf(
-				"VM %s source lookup failed",
-				vmRef.String()))
+			fmt.Sprintf("VM %s has empty managed object id; source lookup failed", vmRef.String()))
 		return
 	}
-	vsphereVm = object.NewVirtualMachine(client, vsphereRef.Reference())
+	vsphereVm = object.NewVirtualMachine(client, moref)
 	return
 }
 
