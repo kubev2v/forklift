@@ -150,6 +150,11 @@ def load_tasks_variables(tasks_file):
         'cli_download_route_name',
         'cli_download_service_name',
         'cli_download_state',
+        'cli_download_tls_secret_name',
+        # MCP server configuration (calculated/derived values)
+        'mcp_server_service_name',
+        'mcp_server_deployment_name',
+        'mcp_server_container_name',
         # Populator configuration
         'populator_controller_deployment_name',
         'populator_controller_container_name',

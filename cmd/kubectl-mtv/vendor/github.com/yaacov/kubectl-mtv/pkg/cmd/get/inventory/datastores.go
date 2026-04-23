@@ -37,17 +37,17 @@ func listDatastoresOnce(ctx context.Context, kubeConfigFlags *genericclioptions.
 	}
 
 	// Define default headers based on provider type
-	var defaultHeaders []output.Header
+	var defaultHeaders []output.Column
 	switch providerType {
 	case "vsphere":
-		defaultHeaders = []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "TYPE", JSONPath: "type"},
-			{DisplayName: "CAPACITY", JSONPath: "capacityFormatted"},
-			{DisplayName: "FREE", JSONPath: "freeSpaceFormatted"},
-			{DisplayName: "ACCESSIBLE", JSONPath: "accessible", ColorFunc: output.ColorizeBooleanString},
-			{DisplayName: "REVISION", JSONPath: "revision"},
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "ID", Key: "id"},
+			{Title: "TYPE", Key: "type"},
+			{Title: "CAPACITY", Key: "capacityFormatted"},
+			{Title: "FREE", Key: "freeSpaceFormatted"},
+			{Title: "ACCESSIBLE", Key: "accessible", ColorFunc: output.ColorizeBooleanString},
+			{Title: "REVISION", Key: "revision"},
 		}
 	default:
 		return fmt.Errorf("provider type '%s' does not support datastore inventory", providerType)

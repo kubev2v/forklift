@@ -1,0 +1,79 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ mcp_server_deployment_name }}
+  namespace: "{{ app_namespace }}"
+  labels:
+    app: {{ app_name }}
+    service: {{ mcp_server_service_name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ app_name }}
+      service: {{ mcp_server_service_name }}
+  template:
+    metadata:
+      labels:
+        app: {{ app_name }}
+        service: {{ mcp_server_service_name }}
+    spec:
+      containers:
+        - name: "{{ mcp_server_container_name }}"
+          image: "{{ cli_download_image_fqin }}"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              exec kubectl-mtv mcp-server --http \
+                --host "" --port 8081 \
+                --output-format "${MCP_OUTPUT_FORMAT:-markdown}" \
+                ${MCP_MAX_RESPONSE_CHARS:+--max-response-chars "$MCP_MAX_RESPONSE_CHARS"} \
+                ${MCP_KUBE_SERVER:+--server "$MCP_KUBE_SERVER"} \
+                ${MCP_KUBE_TOKEN:+--token "$MCP_KUBE_TOKEN"} \
+                $([ "${MCP_KUBE_INSECURE}" = "true" ] && echo --insecure-skip-tls-verify) \
+                $([ "${MCP_READ_ONLY}" = "true" ] && echo --read-only) \
+                ${MCP_VERBOSE:+--verbose "$MCP_VERBOSE"}
+          env:
+            - name: MCP_OUTPUT_FORMAT
+              value: "{{ mcp_server_output_format }}"
+            - name: MCP_MAX_RESPONSE_CHARS
+              value: "{{ mcp_server_max_response_chars }}"
+            - name: MCP_KUBE_SERVER
+              value: "https://kubernetes.default.svc"
+            - name: MCP_KUBE_INSECURE
+              value: "{{ mcp_server_kube_insecure }}"
+            - name: MCP_READ_ONLY
+              value: "{{ mcp_server_read_only }}"
+            - name: MCP_VERBOSE
+              value: "{{ mcp_server_verbose }}"
+          ports:
+            - containerPort: 8081
+              protocol: TCP
+          imagePullPolicy: "{{ image_pull_policy }}"
+          resources:
+            limits:
+              cpu: "{{ mcp_server_container_limits_cpu }}"
+              memory: "{{ mcp_server_container_limits_memory }}"
+            requests:
+              cpu: "{{ mcp_server_container_requests_cpu }}"
+              memory: "{{ mcp_server_container_requests_memory }}"
+          readinessProbe:
+            httpGet:
+              path: /mcp
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /mcp
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 30
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%

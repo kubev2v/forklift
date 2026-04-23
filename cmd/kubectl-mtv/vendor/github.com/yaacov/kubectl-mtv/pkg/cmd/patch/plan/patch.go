@@ -25,15 +25,16 @@ type PatchPlanOptions struct {
 	Namespace   string
 
 	// Core plan fields
-	TransferNetwork      string
-	InstallLegacyDrivers string
-	MigrationType        string
-	TargetLabels         []string
-	TargetNodeSelector   []string
-	UseCompatibilityMode bool
-	TargetAffinity       string
-	TargetNamespace      string
-	TargetPowerState     string
+	TransferNetwork            string
+	InstallLegacyDrivers       string
+	EnableNestedVirtualization string
+	MigrationType              string
+	TargetLabels               []string
+	TargetNodeSelector         []string
+	UseCompatibilityMode       bool
+	TargetAffinity             string
+	TargetNamespace            string
+	TargetPowerState           string
 
 	// Convertor-related fields
 	ConvertorLabels       []string
@@ -46,6 +47,7 @@ type PatchPlanOptions struct {
 	SkipZoneNodeSelector       bool
 	CustomizationScripts       string
 	VirtV2vImage               string
+	XfsCompatibility           bool
 
 	// Additional plan fields
 	Description                    string
@@ -62,6 +64,8 @@ type PatchPlanOptions struct {
 	SkipGuestConversion            bool
 	Warm                           bool
 	RunPreflightInspection         bool
+	RDMAsLun                       bool
+	ServiceAccount                 string
 
 	// Flag change tracking
 	UseCompatibilityModeChanged           bool
@@ -76,6 +80,11 @@ type PatchPlanOptions struct {
 	WarmChanged                           bool
 	RunPreflightInspectionChanged         bool
 	SkipZoneNodeSelectorChanged           bool
+	XfsCompatibilityChanged               bool
+	InstallLegacyDriversChanged           bool
+	EnableNestedVirtualizationChanged     bool
+	RDMAsLunChanged                       bool
+	ServiceAccountChanged                 bool
 }
 
 // PatchPlan patches an existing migration plan
@@ -116,8 +125,8 @@ func PatchPlan(opts PatchPlanOptions) error {
 		planUpdated = true
 	}
 
-	// Update install legacy drivers if provided
-	if opts.InstallLegacyDrivers != "" {
+	// Update install legacy drivers if flag was changed
+	if opts.InstallLegacyDriversChanged {
 		switch strings.ToLower(opts.InstallLegacyDrivers) {
 		case "true":
 			patchSpec["installLegacyDrivers"] = true
@@ -127,8 +136,32 @@ func PatchPlan(opts PatchPlanOptions) error {
 			patchSpec["installLegacyDrivers"] = false
 			klog.V(2).Infof("Updated install legacy drivers to false")
 			planUpdated = true
+		case "auto", "":
+			patchSpec["installLegacyDrivers"] = nil
+			klog.V(2).Infof("Reset install legacy drivers to auto-detect")
+			planUpdated = true
 		default:
-			return fmt.Errorf("invalid value for install-legacy-drivers: %s (must be 'true' or 'false')", opts.InstallLegacyDrivers)
+			return fmt.Errorf("invalid value for install-legacy-drivers: %s (must be 'true', 'false', or 'auto')", opts.InstallLegacyDrivers)
+		}
+	}
+
+	// Update enable nested virtualization if flag was changed
+	if opts.EnableNestedVirtualizationChanged {
+		switch strings.ToLower(opts.EnableNestedVirtualization) {
+		case "true":
+			patchSpec["enableNestedVirtualization"] = true
+			klog.V(2).Infof("Updated enable nested virtualization to true")
+			planUpdated = true
+		case "false":
+			patchSpec["enableNestedVirtualization"] = false
+			klog.V(2).Infof("Updated enable nested virtualization to false")
+			planUpdated = true
+		case "auto", "":
+			patchSpec["enableNestedVirtualization"] = nil
+			klog.V(2).Infof("Reset enable nested virtualization to auto-detect")
+			planUpdated = true
+		default:
+			return fmt.Errorf("invalid value for enable-nested-virtualization: %s (must be 'true', 'false', or 'auto')", opts.EnableNestedVirtualization)
 		}
 	}
 
@@ -351,6 +384,13 @@ func PatchPlan(opts PatchPlanOptions) error {
 		planUpdated = true
 	}
 
+	// Update xfs compatibility if flag was changed
+	if opts.XfsCompatibilityChanged {
+		patchSpec["xfsCompatibility"] = opts.XfsCompatibility
+		klog.V(2).Infof("Updated xfs compatibility to %t", opts.XfsCompatibility)
+		planUpdated = true
+	}
+
 	// Update description if provided
 	if opts.Description != "" {
 		patchSpec["description"] = opts.Description
@@ -449,6 +489,25 @@ func PatchPlan(opts PatchPlanOptions) error {
 		planUpdated = true
 	}
 
+	// Update RDM as LUN if flag was changed
+	if opts.RDMAsLunChanged {
+		patchSpec["rdmAsLun"] = opts.RDMAsLun
+		klog.V(2).Infof("Updated RDM as LUN to %t", opts.RDMAsLun)
+		planUpdated = true
+	}
+
+	// Update service account if flag was changed
+	if opts.ServiceAccountChanged {
+		if opts.ServiceAccount != "" {
+			patchSpec["serviceAccount"] = opts.ServiceAccount
+			klog.V(2).Infof("Updated service account to '%s'", opts.ServiceAccount)
+		} else {
+			patchSpec["serviceAccount"] = nil
+			klog.V(2).Infof("Cleared service account override")
+		}
+		planUpdated = true
+	}
+
 	// Early return if no changes were made
 	if !planUpdated {
 		fmt.Printf("plan/%s unchanged (no updates specified)\n", opts.Name)
@@ -490,7 +549,8 @@ func PatchPlan(opts PatchPlanOptions) error {
 func PatchPlanVM(configFlags *genericclioptions.ConfigFlags, planName, vmName, namespace string,
 	targetName, rootDisk, instanceType, pvcNameTemplate, volumeNameTemplate, networkNameTemplate, luksSecret, targetPowerState string,
 	addPreHook, addPostHook, removeHook string, clearHooks bool, deleteVmOnFailMigration bool, deleteVmOnFailMigrationChanged bool,
-	nbdeClevis bool, nbdeClevisChanged bool) error {
+	nbdeClevis bool, nbdeClevisChanged bool, enableNestedVirtualization string, enableNestedVirtualizationChanged bool,
+	migrateSharedDisks string, migrateSharedDisksChanged bool, rdmAsLun string, rdmAsLunChanged bool) error {
 
 	klog.V(2).Infof("Patching VM '%s' in plan '%s'", vmName, planName)
 
@@ -654,6 +714,84 @@ func PatchPlanVM(configFlags *genericclioptions.ConfigFlags, planName, vmName, n
 		}
 		klog.V(2).Infof("Updated VM NBDE/Clevis to %t", nbdeClevis)
 		vmUpdated = true
+	}
+
+	// Update enable nested virtualization if flag was changed
+	if enableNestedVirtualizationChanged {
+		switch strings.ToLower(enableNestedVirtualization) {
+		case "true":
+			err = unstructured.SetNestedField(vmCopy, true, "enableNestedVirtualization")
+			if err != nil {
+				return fmt.Errorf("failed to set enable nested virtualization: %v", err)
+			}
+			klog.V(2).Infof("Updated VM enable nested virtualization to true")
+			vmUpdated = true
+		case "false":
+			err = unstructured.SetNestedField(vmCopy, false, "enableNestedVirtualization")
+			if err != nil {
+				return fmt.Errorf("failed to set enable nested virtualization: %v", err)
+			}
+			klog.V(2).Infof("Updated VM enable nested virtualization to false")
+			vmUpdated = true
+		case "auto", "":
+			unstructured.RemoveNestedField(vmCopy, "enableNestedVirtualization")
+			klog.V(2).Infof("Cleared VM enable nested virtualization override")
+			vmUpdated = true
+		default:
+			return fmt.Errorf("invalid value for enable-nested-virtualization: %s (must be 'true', 'false', or 'auto')", enableNestedVirtualization)
+		}
+	}
+
+	// Update migrate shared disks if flag was changed (VM-level *bool)
+	if migrateSharedDisksChanged {
+		switch strings.ToLower(migrateSharedDisks) {
+		case "true":
+			err = unstructured.SetNestedField(vmCopy, true, "migrateSharedDisks")
+			if err != nil {
+				return fmt.Errorf("failed to set migrate shared disks: %v", err)
+			}
+			klog.V(2).Infof("Updated VM migrate shared disks to true")
+			vmUpdated = true
+		case "false":
+			err = unstructured.SetNestedField(vmCopy, false, "migrateSharedDisks")
+			if err != nil {
+				return fmt.Errorf("failed to set migrate shared disks: %v", err)
+			}
+			klog.V(2).Infof("Updated VM migrate shared disks to false")
+			vmUpdated = true
+		case "auto", "":
+			unstructured.RemoveNestedField(vmCopy, "migrateSharedDisks")
+			klog.V(2).Infof("Cleared VM migrate shared disks override")
+			vmUpdated = true
+		default:
+			return fmt.Errorf("invalid value for migrate-shared-disks: %s (must be 'true', 'false', or 'auto')", migrateSharedDisks)
+		}
+	}
+
+	// Update RDM as LUN if flag was changed (VM-level *bool)
+	if rdmAsLunChanged {
+		switch strings.ToLower(rdmAsLun) {
+		case "true":
+			err = unstructured.SetNestedField(vmCopy, true, "rdmAsLun")
+			if err != nil {
+				return fmt.Errorf("failed to set RDM as LUN: %v", err)
+			}
+			klog.V(2).Infof("Updated VM RDM as LUN to true")
+			vmUpdated = true
+		case "false":
+			err = unstructured.SetNestedField(vmCopy, false, "rdmAsLun")
+			if err != nil {
+				return fmt.Errorf("failed to set RDM as LUN: %v", err)
+			}
+			klog.V(2).Infof("Updated VM RDM as LUN to false")
+			vmUpdated = true
+		case "auto", "":
+			unstructured.RemoveNestedField(vmCopy, "rdmAsLun")
+			klog.V(2).Infof("Cleared VM RDM as LUN override")
+			vmUpdated = true
+		default:
+			return fmt.Errorf("invalid value for rdm-as-lun: %s (must be 'true', 'false', or 'auto')", rdmAsLun)
+		}
 	}
 
 	// Handle hook operations

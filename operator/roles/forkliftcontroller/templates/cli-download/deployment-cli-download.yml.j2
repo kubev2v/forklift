@@ -23,7 +23,7 @@ spec:
         - name: "{{ cli_download_container_name }}"
           image: "{{ cli_download_image_fqin }}"
           ports:
-            - containerPort: 8080
+            - containerPort: 8443
               protocol: TCP
           imagePullPolicy: "{{ image_pull_policy }}"
           resources:
@@ -33,6 +33,29 @@ spec:
             requests:
               cpu: "{{ cli_download_container_requests_cpu }}"
               memory: "{{ cli_download_container_requests_memory }}"
+          readinessProbe:
+            tcpSocket:
+              port: 8443
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8443
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: cli-serving-cert
+              readOnly: true
+              mountPath: /var/cli-serving-cert
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: cli-serving-cert
+          secret:
+            secretName: {{ cli_download_tls_secret_name }}
+            defaultMode: 420
       restartPolicy: Always
       dnsPolicy: ClusterFirst
   strategy:

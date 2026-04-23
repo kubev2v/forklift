@@ -476,6 +476,54 @@ func HookResourceNameCompletion(configFlags *genericclioptions.ConfigFlags) func
 	}
 }
 
+// PlanVMNameCompletion provides completion for VM names within a specific migration plan.
+// It reads the --plan-name flag value from the command to look up the plan's VM list.
+func PlanVMNameCompletion(configFlags *genericclioptions.ConfigFlags) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		planName, _ := cmd.Flags().GetString("plan-name")
+		if planName == "" {
+			return []string{"Specify --plan-name first"}, cobra.ShellCompDirectiveError
+		}
+
+		namespace := client.ResolveNamespace(configFlags)
+
+		c, err := client.GetDynamicClient(configFlags)
+		if err != nil {
+			return []string{fmt.Sprintf("Error getting client: %v", err)}, cobra.ShellCompDirectiveError
+		}
+
+		plan, err := c.Resource(client.PlansGVR).Namespace(namespace).Get(context.Background(), planName, metav1.GetOptions{})
+		if err != nil {
+			return []string{fmt.Sprintf("Error fetching plan '%s': %v", planName, err)}, cobra.ShellCompDirectiveError
+		}
+
+		vms, found, err := unstructured.NestedSlice(plan.Object, "spec", "vms")
+		if err != nil || !found {
+			return []string{"No VMs found in plan"}, cobra.ShellCompDirectiveError
+		}
+
+		var filtered []string
+		for _, vm := range vms {
+			if vmMap, ok := vm.(map[string]interface{}); ok {
+				if name, ok := vmMap["name"].(string); ok && name != "" {
+					if strings.HasPrefix(name, toComplete) {
+						filtered = append(filtered, name)
+					}
+				}
+			}
+		}
+
+		if len(filtered) == 0 {
+			if toComplete != "" {
+				return []string{fmt.Sprintf("No VMs matching '%s' in plan '%s'", toComplete, planName)}, cobra.ShellCompDirectiveError
+			}
+			return []string{fmt.Sprintf("No VMs found in plan '%s'", planName)}, cobra.ShellCompDirectiveError
+		}
+
+		return filtered, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
 // HostResourceNameCompletion provides completion for host resource names
 func HostResourceNameCompletion(configFlags *genericclioptions.ConfigFlags) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

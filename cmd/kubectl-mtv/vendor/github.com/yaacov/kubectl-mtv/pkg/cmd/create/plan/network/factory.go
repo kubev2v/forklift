@@ -33,6 +33,7 @@ import (
 	vsphereMapper "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/mapper/vsphere"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/get/inventory"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
+	"github.com/yaacov/kubectl-mtv/pkg/util/output"
 )
 
 // NetworkMapperInterface defines the interface for network mapping operations
@@ -61,6 +62,8 @@ type NetworkMapperOptions struct {
 	InventoryInsecureSkipTLS bool
 	PlanVMNames              []string
 	DefaultTargetNetwork     string
+	DryRun                   bool
+	OutputFormat             string
 }
 
 // GetSourceNetworkFetcher returns the appropriate source network fetcher based on provider type
@@ -273,12 +276,23 @@ func CreateNetworkMap(ctx context.Context, opts NetworkMapperOptions) (string, e
 		return "", fmt.Errorf("failed to create network pairs: %v", err)
 	}
 
+	if opts.DryRun {
+		networkMap, networkMapName, err := buildNetworkMapObject(opts, networkPairs)
+		if err != nil {
+			return "", err
+		}
+		if err := output.OutputResource(networkMap, opts.OutputFormat); err != nil {
+			return "", err
+		}
+		return networkMapName, nil
+	}
+
 	// Create the network map using the existing infrastructure
 	return createNetworkMap(opts, networkPairs)
 }
 
-// createNetworkMap helper function to create the actual network map resource
-func createNetworkMap(opts NetworkMapperOptions, networkPairs []forkliftv1beta1.NetworkPair) (string, error) {
+// buildNetworkMapObject builds a typed NetworkMap (no API call).
+func buildNetworkMapObject(opts NetworkMapperOptions, networkPairs []forkliftv1beta1.NetworkPair) (*forkliftv1beta1.NetworkMap, string, error) {
 	// If no network pairs, create a dummy pair
 	if len(networkPairs) == 0 {
 		klog.V(4).Infof("DEBUG: No network pairs found, creating dummy pair")
@@ -294,10 +308,8 @@ func createNetworkMap(opts NetworkMapperOptions, networkPairs []forkliftv1beta1.
 		}
 	}
 
-	// Create the network map name
 	networkMapName := opts.Name + "-network-map"
 
-	// Create NetworkMap object
 	networkMap := &forkliftv1beta1.NetworkMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      networkMapName,
@@ -323,6 +335,15 @@ func createNetworkMap(opts NetworkMapperOptions, networkPairs []forkliftv1beta1.
 	}
 	networkMap.Kind = "NetworkMap"
 	networkMap.APIVersion = forkliftv1beta1.SchemeGroupVersion.String()
+	return networkMap, networkMapName, nil
+}
+
+// createNetworkMap helper function to create the actual network map resource
+func createNetworkMap(opts NetworkMapperOptions, networkPairs []forkliftv1beta1.NetworkPair) (string, error) {
+	networkMap, networkMapName, err := buildNetworkMapObject(opts, networkPairs)
+	if err != nil {
+		return "", err
+	}
 
 	// Convert to Unstructured
 	unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(networkMap)

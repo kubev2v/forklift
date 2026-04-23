@@ -40,5 +40,9 @@ func NewPatchCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig Gl
 	planVMCmd.Aliases = []string{"planvms"}
 	cmd.AddCommand(planVMCmd)
 
+	hookCmd := NewHookCmd(kubeConfigFlags)
+	hookCmd.Aliases = []string{"hooks"}
+	cmd.AddCommand(hookCmd)
+
 	return cmd
 }

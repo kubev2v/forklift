@@ -176,6 +176,12 @@ spec:
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:radio:true
           - urn:alm:descriptor:com.tectonic.ui:radio:false
+        - description: Register MCP server with OpenShift Lightspeed (default false)
+          displayName: Enable Lightspeed Integration
+          path: feature_lightspeed_integration
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:radio:true
+          - urn:alm:descriptor:com.tectonic.ui:radio:false
         - description: Enable OVA appliance management endpoints (default false)
           displayName: Enable OVA Appliance Management
           path: feature_ova_appliance_management

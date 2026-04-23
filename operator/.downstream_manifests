@@ -212,6 +212,13 @@ spec:
                 - "true"
                 - "false"
                 type: string
+              feature_lightspeed_integration:
+                description: 'Register MCP server with OpenShift Lightspeed (default:
+                  false)'
+                enum:
+                - "true"
+                - "false"
+                type: string
               feature_ocp_live_migration:
                 description: 'Enable OCP live migration (default: false)'
                 enum:
@@ -326,6 +333,46 @@ spec:
                 - "true"
                 - "false"
                 type: string
+              mcp_server_container_limits_cpu:
+                description: 'MCP server CPU limit (default: 1000m)'
+                example: 2000m
+                type: string
+              mcp_server_container_limits_memory:
+                description: 'MCP server memory limit (default: 512Mi)'
+                example: 1Gi
+                type: string
+              mcp_server_container_requests_cpu:
+                description: 'MCP server CPU request (default: 100m)'
+                example: 200m
+                type: string
+              mcp_server_container_requests_memory:
+                description: 'MCP server memory request (default: 256Mi)'
+                example: 512Mi
+                type: string
+              mcp_server_kube_insecure:
+                description: 'Skip TLS verification for in-cluster MCP calls (default:
+                  false)'
+                enum:
+                - "true"
+                - "false"
+                type: string
+              mcp_server_max_response_chars:
+                description: 'MCP server max response chars, 0 for unlimited (default:
+                  0)'
+                x-kubernetes-int-or-string: true
+              mcp_server_output_format:
+                description: 'MCP server output format (default: markdown)'
+                example: markdown
+                type: string
+              mcp_server_read_only:
+                description: 'Run MCP server in read-only mode (default: false)'
+                enum:
+                - "true"
+                - "false"
+                type: string
+              mcp_server_verbose:
+                description: 'MCP server verbosity level (default: 2)'
+                x-kubernetes-int-or-string: true
               metric_interval:
                 description: 'Metrics scrape interval (default: 30s)'
                 example: 60s
@@ -7532,6 +7579,16 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - ols.openshift.io
+  resources:
+  - olsconfigs
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -7925,6 +7982,12 @@ spec:
       - description: Enable CLI download service (default true)
         displayName: Enable CLI Download Service
         path: feature_cli_download
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:radio:true
+        - urn:alm:descriptor:com.tectonic.ui:radio:false
+      - description: Register MCP server with OpenShift Lightspeed (default false)
+        displayName: Enable Lightspeed Integration
+        path: feature_lightspeed_integration
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:radio:true
         - urn:alm:descriptor:com.tectonic.ui:radio:false

@@ -7,6 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"github.com/yaacov/kubectl-mtv/pkg/util/flags"
 )
 
 // SchemaVersion is the current version of the help schema format.
@@ -192,9 +194,12 @@ func commandToSchema(cmd *cobra.Command, path []string, opts Options) Command {
 		}
 		schema := flagToSchema(f)
 
-		// Check if flag is required (MarkFlagRequired annotates the flag, not the command)
+		// Check if flag is required (MarkFlagRequired or MarkRequiredForMCP)
 		if ann := f.Annotations; ann != nil {
 			if _, ok := ann[cobra.BashCompOneRequiredFlag]; ok {
+				schema.Required = true
+			}
+			if _, ok := ann[flags.MCPRequiredFlag]; ok {
 				schema.Required = true
 			}
 		}
