@@ -104,6 +104,13 @@ const (
 	RestrictedPodSecurity           = "RestrictedPodSecurity"
 	NetMapDestinationNADNotValid    = "NetMapDestinationNADNotValid"
 	VMCriticalConcerns              = "VMCriticalConcerns"
+	// NetAppShift (Advisory) reports whether the plan's storage map uses a NetApp Shift/Trident class.
+	NetAppShift = "NetAppShift"
+	// NetAppShiftWarmNotSupported (Critical) blocks warm migration when the storage map uses NetApp Shift.
+	NetAppShiftWarmNotSupported = "NetAppShiftWarmNotSupported"
+	// NetAppShiftDatastoreNASMissing (Critical) blocks when a disk maps to NetApp Shift but the source
+	// datastore lacks NAS export details in inventory (required for MTV annotations).
+	NetAppShiftDatastoreNASMissing = "NetAppShiftDatastoreNASMissing"
 )
 
 // Categories
@@ -198,6 +205,11 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		return err
 	}
 
+	err = r.validateNetAppShift(ctx)
+	if err != nil {
+		return err
+	}
+
 	if err = r.validateWarmMigration(ctx); err != nil {
 		return err
 	}
@@ -206,7 +218,7 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		return err
 	}
 
-	if err = r.validateVM(plan); err != nil {
+	if err = r.validateVM(plan, ctx); err != nil {
 		return err
 	}
 
@@ -344,6 +356,67 @@ func (r *Reconciler) ensureSecretForProvider(plan *api.Plan) error {
 	}
 
 	return nil
+}
+
+// validateNetAppShift checks plan-level NetApp Shift constraints (warm migration blocker)
+// and returns whether the plan uses Shift storage so callers can pass the flag forward.
+func (r *Reconciler) validateNetAppShift(ctx *plancontext.Context) (err error) {
+	plan := ctx.Plan
+	src := plan.Referenced.Provider.Source
+	if src == nil || src.Type() != api.VSphere || plan.Map.Storage == nil {
+		return nil
+	}
+	shift, err := plan.Map.Storage.HasNetAppShiftDestination(ctx.Destination.Client)
+	if err != nil {
+		return liberr.Wrap(err, "check NetApp Shift storage")
+	}
+	if !shift {
+		return nil
+	}
+	if plan.IsWarm() {
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     NetAppShiftWarmNotSupported,
+			Status:   True,
+			Category: api.CategoryCritical,
+			Reason:   NotSupported,
+			Message:  "NetApp Shift/Trident destination storage is not supported for warm migration. Use a cold migration plan, or map disks to a non-Shift StorageClass.",
+		})
+	}
+	return nil
+}
+
+// hasShiftDiskMissingNAS checks whether any Shift-mapped disk on the VM lacks NAS export
+// details on its backing datastore. Returns true on the first missing entry found.
+func hasShiftDiskMissingNAS(vm *vsphere.VM, storageMap *api.StorageMap, inventory web.Client, destClient client.Client) (string, error) {
+	for _, disk := range vm.SortedDisksAsVmware() {
+		pair, found := storageMap.FindStorage(disk.Datastore.ID)
+		if !found {
+			continue
+		}
+		diskShift, err := pair.Destination.IsNetAppShiftStorageClass(destClient)
+		if err != nil {
+			return "", err
+		}
+		if !diskShift {
+			continue
+		}
+		ds := &vsphere.Datastore{}
+		if err := inventory.Find(ds, refapi.Ref{ID: disk.Datastore.ID}); err != nil {
+			return "", liberr.Wrap(err, "datastore", disk.Datastore.ID)
+		}
+		nfsServer := ds.NasRemoteHost
+		if hn := len(ds.NasRemoteHostNames); hn > 0 {
+			nfsServer = ds.NasRemoteHostNames[hn-1]
+		}
+		if ds.NasRemotePath == "" || nfsServer == "" {
+			label := ds.Name
+			if label == "" {
+				label = disk.Datastore.ID
+			}
+			return label, nil
+		}
+	}
+	return "", nil
 }
 
 // Validate that warm migration is supported from the source provider.
@@ -629,7 +702,7 @@ func aggregateWarningConcerns(v interface{}, vmRef string, unsupportedOVFExportS
 }
 
 // Validate listed VMs.
-func (r *Reconciler) validateVM(plan *api.Plan) error {
+func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error {
 	if plan.Status.HasCondition(Executing) {
 		return nil
 	}
@@ -868,6 +941,22 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Items:    []string{},
 	}
 
+	shiftSnapshotVMs := libcnd.Condition{
+		Type:     VMHasSnapshots,
+		Status:   True,
+		Reason:   NotValid,
+		Category: api.CategoryCritical,
+		Message:  "NetApp Shift plans require VMs to have no VMware snapshots. Remove snapshots before migration.",
+		Items:    []string{},
+	}
+	shiftNASMissing := libcnd.Condition{
+		Type:     NetAppShiftDatastoreNASMissing,
+		Status:   True,
+		Reason:   NotValid,
+		Category: api.CategoryCritical,
+		Message:  "Datastore is missing NAS export details required for NetApp Shift.",
+		Items:    []string{},
+	}
 	var sharedDisksConditions []libcnd.Condition
 	setOf := map[string]bool{}
 	setOfTargetName := map[string]bool{}
@@ -876,8 +965,18 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	source := plan.Referenced.Provider.Source
 	checkMixedUsage := source != nil && source.Type() == api.VSphere && settings.Settings.Features.CopyOffload
 	planUsesOffload := checkMixedUsage && plan.IsUsingOffloadPlugin()
+	netAppShift := false
+	var err error
+	if source != nil && source.Type() == api.VSphere && plan.Map.Storage != nil {
+		netAppShift, err = plan.Map.Storage.HasNetAppShiftDestination(ctx.Destination.Client)
+		if err != nil {
+			return liberr.Wrap(err, "check NetApp Shift storage")
+		}
+	}
+	if err != nil {
+		return liberr.Wrap(err, "check NetApp Shift storage")
+	}
 
-	//
 	// Referenced VMs.
 	for i := range plan.Spec.VMs {
 		vm := &plan.Spec.VMs[i]
@@ -948,6 +1047,18 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		}
 		aggregateCriticalConcerns(v, ref.String(), &vmCriticalConcerns)
 		aggregateWarningConcerns(v, ref.String(), &unsupportedOVFExportSource)
+		if netAppShift {
+			if vsphereVM, ok := v.(*vsphere.VM); ok {
+				if vsphereVM.Snapshot.ID != "" {
+					shiftSnapshotVMs.Items = append(shiftSnapshotVMs.Items, ref.String())
+				}
+				if label, sErr := hasShiftDiskMissingNAS(vsphereVM, plan.Map.Storage, inventory, ctx.Destination.Client); sErr != nil {
+					return sErr
+				} else if label != "" {
+					shiftNASMissing.Items = append(shiftNASMissing.Items, label)
+				}
+			}
+		}
 		if plan.Spec.Type == api.MigrationOnlyConversion {
 			if vm, ok := v.(*vsphere.VM); ok {
 				pvcs, err := r.getVmPVCs(plan, vm)
@@ -1169,7 +1280,6 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 				missingCbtForWarm.Items = append(missingCbtForWarm.Items, ref.String())
 			}
 
-			// Check for pre-existing snapshots
 			ok, msg, _, err := validator.HasSnapshot(*ref)
 			if err != nil {
 				return err
@@ -1304,6 +1414,12 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(vmCriticalConcerns.Items) > 0 {
 		plan.Status.SetCondition(vmCriticalConcerns)
+	}
+	if len(shiftSnapshotVMs.Items) > 0 {
+		plan.Status.SetCondition(shiftSnapshotVMs)
+	}
+	if len(shiftNASMissing.Items) > 0 {
+		plan.Status.SetCondition(shiftNASMissing)
 	}
 
 	return nil

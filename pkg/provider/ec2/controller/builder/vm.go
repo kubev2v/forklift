@@ -617,3 +617,7 @@ func (r *Builder) ConversionPodConfig(_ ref.Ref) (*planbase.ConversionPodConfigR
 		},
 	}, nil
 }
+
+func (r *Builder) NetAppShiftPVCs(vmRef ref.Ref, labels map[string]string) ([]core.PersistentVolumeClaim, error) {
+	return nil, nil
+}

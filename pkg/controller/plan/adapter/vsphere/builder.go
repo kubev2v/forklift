@@ -96,10 +96,6 @@ const (
 	Shareable = "shareable"
 )
 
-const (
-	ManagementNetwork = "Management Network"
-)
-
 // Map of vmware guest ids to osinfo ids.
 var osMap = map[string]string{
 	"centos64Guest":              "centos5.11",
@@ -570,9 +566,17 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 			continue
 		}
 
+		// Shift disks are handled by NetAppShiftPVCs (PVCs, not DVs).
+		if isShift, sErr := mapped.Destination.IsNetAppShiftStorageClass(r.Destination.Client); sErr != nil {
+			err = sErr
+			return
+		} else if isShift {
+			continue
+		}
+
 		storageClass := mapped.Destination.StorageClass
 		var dvSource cdi.DataVolumeSource
-		useV2vForTransfer, vErr := r.Context.Plan.ShouldUseV2vForTransfer(vmRef)
+		useV2vForTransfer, vErr := r.Context.Plan.ShouldUseV2vForTransfer(vmRef, r.Context.Destination.Client)
 		if vErr != nil {
 			err = vErr
 			return
@@ -628,7 +632,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 			dv.ObjectMeta.Labels[Shareable] = "true"
 		}
 
-		// Preserve the disk index as an annotation on the created DataVolume
+		// Preserve the disk index as an annotation on the created DataVolume.
 		// Note: this annotation will be used to match the PVC to the VM disks by
 		//       matching the disk and PVC index.
 		dv.ObjectMeta.Annotations[planbase.AnnDiskIndex] = fmt.Sprintf("%d", diskIndex)
@@ -2318,4 +2322,105 @@ func (r *Builder) ensureXCopyVolumePopulator(vp *api.VSphereXcopyVolumePopulator
 // vSphere provider does not require any special configuration.
 func (r *Builder) ConversionPodConfig(_ ref.Ref) (*planbase.ConversionPodConfigResult, error) {
 	return &planbase.ConversionPodConfigResult{}, nil
+}
+
+// NetAppShiftPVCs builds PVCs for disks mapped to a NetApp Shift
+// StorageClass. The PVC size is computed using CDIConfig filesystem overhead (same
+// formula CDI applies to DataVolumes). Returns nil when no disks map to Shift classes.
+func (r *Builder) NetAppShiftPVCs(vmRef ref.Ref, labels map[string]string) (pvcs []core.PersistentVolumeClaim, err error) {
+	vm := &model.VM{}
+	if err = r.Source.Inventory.Find(vm, vmRef); err != nil {
+		err = liberr.Wrap(err, "vm", vmRef.String())
+		return
+	}
+	if !r.shouldMigrateSharedDisks(vm) {
+		vm.RemoveSharedDisks()
+	}
+
+	dsMap, err := r.buildDatastoreMap()
+	if err != nil {
+		return
+	}
+
+	disks := vm.SortedDisksAsVmware()
+	for diskIndex, disk := range disks {
+		mapped, found := dsMap[disk.Datastore.ID]
+		if !found {
+			continue
+		}
+
+		isShift, sErr := mapped.Destination.IsNetAppShiftStorageClass(r.Destination.Client)
+		if sErr != nil {
+			err = sErr
+			return
+		}
+		if !isShift {
+			continue
+		}
+
+		storageClass := mapped.Destination.StorageClass
+
+		capacity, cErr := utils.CalculateSpaceWithCDIOverhead(
+			r.Destination.Client, storageClass, disk.Capacity)
+		if cErr != nil {
+			err = liberr.Wrap(cErr, "CDIConfig overhead", storageClass)
+			return
+		}
+
+		fsMode := core.PersistentVolumeFilesystem
+		accessModes := []core.PersistentVolumeAccessMode{core.ReadWriteMany}
+		if mapped.Destination.AccessMode != "" {
+			accessModes = []core.PersistentVolumeAccessMode{mapped.Destination.AccessMode}
+		}
+
+		pvc := &core.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    r.Plan.Spec.TargetNamespace,
+				Labels:       maps.Clone(labels),
+				Annotations:  make(map[string]string),
+				GenerateName: r.Plan.Name + "-" + vmRef.ID + "-",
+			},
+			Spec: core.PersistentVolumeClaimSpec{
+				AccessModes:      accessModes,
+				VolumeMode:       &fsMode,
+				StorageClassName: &storageClass,
+				Resources: core.VolumeResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceStorage: *resource.NewQuantity(capacity, resource.BinarySI),
+					},
+				},
+			},
+		}
+
+		if err = r.setPVCNameFromTemplate(&pvc.ObjectMeta, vm, diskIndex, disk); err != nil {
+			r.Log.Info("Failed to set PVC name from template", "error", err)
+			err = nil
+		}
+
+		ann := pvc.ObjectMeta.Annotations
+		ann[planbase.AnnDiskSource] = baseVolume(disk.File, r.Plan.IsWarm())
+		ann[planbase.AnnDiskIndex] = fmt.Sprintf("%d", diskIndex)
+		ann[planbase.AnnVmId] = vmRef.ID
+		ann[planbase.AnnVmUUID] = vm.UUID
+
+		ds := &model.Datastore{}
+		if fErr := r.Source.Inventory.Find(ds, ref.Ref{ID: disk.Datastore.ID}); fErr != nil {
+			err = liberr.Wrap(fErr, "datastore", disk.Datastore.ID)
+			return
+		}
+		ann[planbase.AnnNfsPath] = ds.NasRemotePath
+		n := len(ds.NasRemoteHostNames)
+		if n > 0 {
+			ann[planbase.AnnNfsServer] = ds.NasRemoteHostNames[n-1]
+		} else {
+			ann[planbase.AnnNfsServer] = ds.NasRemoteHost
+		}
+
+		if disk.Shared {
+			pvc.Labels[Shareable] = "true"
+		}
+
+		pvcs = append(pvcs, *pvc)
+	}
+	return
 }

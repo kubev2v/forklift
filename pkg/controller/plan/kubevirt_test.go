@@ -387,7 +387,6 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 			Expect(getVirtV2vImage(p)).To(Equal(xfsImage))
 		})
 	})
-
 })
 
 func createKubeVirt(objs ...runtime.Object) *KubeVirt {

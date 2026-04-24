@@ -99,6 +99,12 @@ const (
 
 	// Explicitly disable CDI's populator auto-detection to avoid webhook validation errors
 	AnnUsePopulator = "cdi.kubevirt.io/storage.usePopulator"
+
+	// Consumer-side disk metadata used by NetApp Shift/Trident integration.
+	AnnNfsServer = "forklift.konveyor.io/nfs-server"
+	AnnNfsPath   = "forklift.konveyor.io/nfs-path"
+	AnnVmId      = "forklift.konveyor.io/vm-id"
+	AnnVmUUID    = "forklift.konveyor.io/vm-uuid"
 )
 
 var VolumePopulatorNotSupportedError = liberr.New("provider does not support volume populators")
@@ -180,6 +186,9 @@ type Builder interface {
 	// Returns an empty struct if no provider-specific configuration is needed.
 	// The returned config is merged with user settings from Plan.Spec (user settings take precedence).
 	ConversionPodConfig(vmRef ref.Ref) (*ConversionPodConfigResult, error)
+	// NetAppShiftPVCs builds PVCs for disks mapped to NetApp Shift StorageClasses.
+	// Returns nil for non-vSphere providers or when no Shift mappings exist.
+	NetAppShiftPVCs(vmRef ref.Ref, labels map[string]string) ([]core.PersistentVolumeClaim, error)
 }
 
 // Client API.
@@ -272,4 +281,6 @@ type Ensurer interface {
 	SharedConfigMaps(vm *planapi.VMStatus, configMaps []core.ConfigMap) (err error)
 	// SharedSecrets ensures that shared Secret with VM are present
 	SharedSecrets(vm *planapi.VMStatus, secrets []core.Secret) (err error)
+	// PersistentVolumeClaims ensures that PVCs are present on the destination.
+	PersistentVolumeClaims(vm *planapi.VMStatus, pvcs []core.PersistentVolumeClaim) (err error)
 }

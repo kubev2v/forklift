@@ -400,13 +400,6 @@ func markStartedStepsCompleted(vm *plan.VMStatus) {
 	}
 }
 
-func (r *Migration) deletePopulatorPVCs(vm *plan.VMStatus) (err error) {
-	if r.builder.SupportsVolumePopulators() {
-		err = r.kubevirt.DeletePopulatedPVCs(vm)
-	}
-	return
-}
-
 // Delete left over migration resources associated with a VM.
 func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool) error {
 	// If the migration fails and the DeleteVmOnFailMigration is enabled, clean up the VM.
@@ -415,7 +408,7 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool) error
 		if err := r.kubevirt.DeleteVM(vm); failOnErr(err) {
 			return err
 		}
-		if err := r.deletePopulatorPVCs(vm); failOnErr(err) {
+		if err := r.kubevirt.DeletePopulatedPVCs(vm); failOnErr(err) {
 			return err
 		}
 		if err := r.kubevirt.DeleteDataVolumes(vm); failOnErr(err) {
@@ -911,6 +904,31 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 							r.Log.Error(err, "error updating DataVolume, retrying", "dv", dataVolume.Name)
 							return
 						}
+					}
+				}
+			}
+
+			shiftPVCs, shiftErr := r.kubevirt.NetAppShiftPVCs(vm)
+			if shiftErr != nil {
+				if !errors.As(shiftErr, &web.ProviderNotReadyError{}) {
+					r.Log.Error(shiftErr, "error building Shift PVCs", "vm", vm.Name)
+					step.AddError(shiftErr.Error())
+					err = nil
+					break
+				} else {
+					err = shiftErr
+					return
+				}
+			}
+			if len(shiftPVCs) > 0 {
+				if shiftErr = r.ensurer.PersistentVolumeClaims(vm, shiftPVCs); shiftErr != nil {
+					if !errors.As(shiftErr, &web.ProviderNotReadyError{}) {
+						step.AddError(shiftErr.Error())
+						err = nil
+						break
+					} else {
+						err = shiftErr
+						return
 					}
 				}
 			}
@@ -1779,7 +1797,7 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 			break
 		}
 
-		useV2vForTransfer, err := r.Context.Plan.ShouldUseV2vForTransfer(vm.Ref)
+		useV2vForTransfer, err := r.Context.Plan.ShouldUseV2vForTransfer(vm.Ref, r.Destination.Client)
 		switch {
 		case err != nil:
 			return liberr.Wrap(err)

@@ -179,6 +179,9 @@ type Datastore struct {
 	Free                int64    `json:"free"`
 	MaintenanceMode     string   `json:"maintenance"`
 	BackingDevicesNames []string `json:"backingDevicesNames"`
+	NasRemoteHost       string   `json:"nasRemoteHost,omitempty"`
+	NasRemotePath       string   `json:"nasRemotePath,omitempty"`
+	NasRemoteHostNames  []string `json:"nasRemoteHostNames,omitempty"`
 }
 
 // Build the resource using the model.
@@ -189,6 +192,9 @@ func (r *Datastore) With(m *model.Datastore) {
 	r.Free = m.Free
 	r.MaintenanceMode = m.MaintenanceMode
 	r.BackingDevicesNames = m.BackingDevicesNames
+	r.NasRemoteHost = m.NasRemoteHost
+	r.NasRemotePath = m.NasRemotePath
+	r.NasRemoteHostNames = m.NasRemoteHostNames
 }
 
 // Build self link (URI).

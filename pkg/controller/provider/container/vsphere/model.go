@@ -614,16 +614,47 @@ func (v *DatastoreAdapter) Apply(u types.ObjectUpdate) {
 					v.model.MaintenanceMode = s
 				}
 			case fVmfsExtent:
-				if s, cast := p.Val.(types.VmfsDatastoreInfo); cast {
-					backingDevList := []string{}
-					for _, val := range s.Vmfs.Extent {
-						backingDevList = append(backingDevList, val.DiskName)
-					}
-					v.model.BackingDevicesNames = backingDevList
-				}
+				applyDatastoreInfoProperty(p.Val, &v.model)
 			}
 		}
 	}
+}
+
+// applyDatastoreInfoProperty decodes the datastore "info" property, which is either
+// VMFS (LUN extent names) or NAS (NfsDatastoreInfo with HostNasVolume details).
+func applyDatastoreInfoProperty(val types.AnyType, ds *model.Datastore) {
+	if val == nil {
+		return
+	}
+	switch t := val.(type) {
+	case types.VmfsDatastoreInfo:
+		backing := []string{}
+		if t.Vmfs != nil {
+			for _, e := range t.Vmfs.Extent {
+				backing = append(backing, e.DiskName)
+			}
+		}
+		ds.BackingDevicesNames = backing
+	case *types.VmfsDatastoreInfo:
+		if t != nil {
+			applyDatastoreInfoProperty(*t, ds)
+		}
+	case types.NasDatastoreInfo:
+		applyNasDatastoreNfsInfo(t, ds)
+	case *types.NasDatastoreInfo:
+		if t != nil {
+			applyNasDatastoreNfsInfo(*t, ds)
+		}
+	}
+}
+
+func applyNasDatastoreNfsInfo(info types.NasDatastoreInfo, ds *model.Datastore) {
+	if info.Nas == nil {
+		return
+	}
+	ds.NasRemoteHost = info.Nas.RemoteHost
+	ds.NasRemotePath = info.Nas.RemotePath
+	ds.NasRemoteHostNames = append([]string(nil), info.Nas.RemoteHostNames...)
 }
 
 // VM model adapter.

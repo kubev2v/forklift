@@ -421,7 +421,7 @@ func (p *Plan) IsWarm() bool {
 // just use virt-v2v directly to convert the vm while copying data over. In other
 // cases, we use CDI to transfer disks to the destination cluster and then use
 // virt-v2v-in-place to convert these disks after cutover.
-func (p *Plan) ShouldUseV2vForTransfer(vmRef ref.Ref) (bool, error) {
+func (p *Plan) ShouldUseV2vForTransfer(vmRef ref.Ref, destinationClient k8sclient.Client) (bool, error) {
 	source := p.Referenced.Provider.Source
 	if source == nil {
 		return false, liberr.New("Cannot analyze plan, source provider is missing.")
@@ -439,12 +439,20 @@ func (p *Plan) ShouldUseV2vForTransfer(vmRef ref.Ref) (bool, error) {
 		if vm, found := p.Spec.FindVM(vmRef); found && vm.MigrateSharedDisks != nil {
 			migrateSharedDisks = *vm.MigrateSharedDisks
 		}
-		return !p.IsWarm() &&
-				destination.IsHost() &&
-				migrateSharedDisks &&
-				!p.Spec.SkipGuestConversion &&
-				p.Spec.Type != MigrationOnlyConversion,
-			nil
+		if p.IsWarm() || !destination.IsHost() || !migrateSharedDisks ||
+			p.Spec.SkipGuestConversion || p.Spec.Type == MigrationOnlyConversion {
+			return false, nil
+		}
+		if p.Map.Storage != nil {
+			hasNetAppShift, err := p.Map.Storage.HasNetAppShiftDestination(destinationClient)
+			if err != nil {
+				return false, err
+			}
+			if hasNetAppShift {
+				return false, nil
+			}
+		}
+		return true, nil
 	case Ova, HyperV:
 		return true, nil
 	default:

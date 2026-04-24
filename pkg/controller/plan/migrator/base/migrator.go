@@ -252,9 +252,9 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 		step = Initialize
 	case api.PhaseAllocateDisks:
 		step = DiskAllocation
-	case api.PhaseCopyDisks, api.PhaseCopyingPaused, api.PhaseRemovePreviousSnapshot, api.PhaseWaitForPreviousSnapshotRemoval,
-		api.PhaseCreateSnapshot, api.PhaseWaitForSnapshot, api.PhaseStoreSnapshotDeltas, api.PhaseAddCheckpoint,
-		api.PhaseConvertOpenstackSnapshot:
+	case api.PhaseCopyDisks, api.PhaseCopyingPaused, api.PhaseRemovePreviousSnapshot,
+		api.PhaseWaitForPreviousSnapshotRemoval, api.PhaseCreateSnapshot, api.PhaseWaitForSnapshot,
+		api.PhaseStoreSnapshotDeltas, api.PhaseAddCheckpoint, api.PhaseConvertOpenstackSnapshot:
 		step = DiskTransfer
 	case api.PhaseCreateDataVolumes:
 		// This phase should be present in DiskTransfer step only when executing Preflight Inspection to avoid UI pipeline artifacts.
@@ -345,7 +345,7 @@ func (r *BaseMigrator) coldItinerary() *libitr.Itinerary {
 			{Name: api.PhaseAllocateDisks, All: VirtV2vDiskCopy},
 			{Name: api.PhaseCreateGuestConversionPod, All: RequiresConversion},
 			{Name: api.PhaseConvertGuest, All: RequiresConversion},
-			{Name: api.PhaseCopyDisksVirtV2V, All: RequiresConversion},
+			{Name: api.PhaseCopyDisksVirtV2V, All: RequiresConversion | VirtV2vDiskCopy},
 			{Name: api.PhaseConvertOpenstackSnapshot, All: OpenstackImageMigration},
 			{Name: api.PhaseCreateVM},
 			{Name: api.PhasePostHook, All: HasPostHook},
@@ -382,7 +382,7 @@ type BasePredicate struct {
 
 // Evaluate predicate flags.
 func (r *BasePredicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
-	useV2vForTransfer, vErr := r.context.Plan.ShouldUseV2vForTransfer(r.vm.Ref)
+	useV2vForTransfer, vErr := r.context.Plan.ShouldUseV2vForTransfer(r.vm.Ref, r.context.Destination.Client)
 	if vErr != nil {
 		err = vErr
 		return

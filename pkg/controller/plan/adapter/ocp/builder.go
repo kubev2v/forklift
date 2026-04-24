@@ -714,6 +714,10 @@ func (r *Builder) ConversionPodConfig(_ ref.Ref) (*planbase.ConversionPodConfigR
 	return &planbase.ConversionPodConfigResult{}, nil
 }
 
+func (r *Builder) NetAppShiftPVCs(vmRef ref.Ref, labels map[string]string) ([]v1.PersistentVolumeClaim, error) {
+	return nil, nil
+}
+
 // getPlanVM returns the plan VM for the given vmRef
 func (r *Builder) getPlanVM(vmRef ref.Ref) *planapi.VM {
 	var fallback *planapi.VM

@@ -1038,3 +1038,7 @@ func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (taskNam
 func (r *Builder) ConversionPodConfig(_ ref.Ref) (*planbase.ConversionPodConfigResult, error) {
 	return &planbase.ConversionPodConfigResult{}, nil
 }
+
+func (r *Builder) NetAppShiftPVCs(vmRef ref.Ref, labels map[string]string) ([]core.PersistentVolumeClaim, error) {
+	return nil, nil
+}
