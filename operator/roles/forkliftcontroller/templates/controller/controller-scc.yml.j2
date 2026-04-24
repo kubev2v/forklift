@@ -11,6 +11,10 @@ runAsUser:
 seLinuxContext:
   type: RunAsAny
 allowPrivilegedContainer: false
+allowedCapabilities:
+  - CHOWN
+  - DAC_OVERRIDE
+  - FOWNER
 seccompProfiles:
   - runtime/default
   - localhost/profiles/unshare.json

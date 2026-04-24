@@ -13,60 +13,64 @@ import (
 
 // Environment variables.
 const (
-	MaxVmInFlight                    = "MAX_VM_INFLIGHT"
-	HookRetry                        = "HOOK_RETRY"
-	ImporterRetry                    = "IMPORTER_RETRY"
-	VirtV2vImage                     = "VIRT_V2V_IMAGE"
-	VirtV2vImageXFS                  = "VIRT_V2V_IMAGE_XFS"
-	vddkImage                        = "VDDK_IMAGE"
-	PrecopyInterval                  = "PRECOPY_INTERVAL"
-	BlockerGracePeriodMinutes        = "BLOCKER_GRACE_PERIOD_MINUTES"
-	VirtV2vDontRequestKVM            = "VIRT_V2V_DONT_REQUEST_KVM"
-	SnapshotRemovalTimeout           = "SNAPSHOT_REMOVAL_TIMEOUT"
-	SnapshotStatusCheckRate          = "SNAPSHOT_STATUS_CHECK_RATE"
-	CDIExportTokenTTL                = "CDI_EXPORT_TOKEN_TTL"
-	FileSystemOverhead               = "FILESYSTEM_OVERHEAD"
-	BlockOverhead                    = "BLOCK_OVERHEAD"
-	CleanupRetries                   = "CLEANUP_RETRIES"
-	SnapshotRemovalCheckRetries      = "SNAPSHOT_REMOVAL_CHECK_RETRIES"
-	OvirtOsConfigMap                 = "OVIRT_OS_MAP"
-	VsphereOsConfigMap               = "VSPHERE_OS_MAP"
-	VirtCustomizeConfigMap           = "VIRT_CUSTOMIZE_MAP"
-	VddkJobActiveDeadline            = "VDDK_JOB_ACTIVE_DEADLINE"
-	VirtV2vExtraArgs                 = "VIRT_V2V_EXTRA_ARGS"
-	VirtV2vInspectorExtraArgs        = "VIRT_V2V_INSPECTOR_EXTRA_ARGS"
-	VirtV2vExtraConfConfigMap        = "VIRT_V2V_EXTRA_CONF_CONFIG_MAP"
-	VirtV2vMemSize                   = "VIRT_V2V_MEMSIZE"
-	VirtV2vSmp                       = "VIRT_V2V_SMP"
-	VirtV2vContainerLimitsCpu        = "VIRT_V2V_CONTAINER_LIMITS_CPU"
-	VirtV2vContainerLimitsMemory     = "VIRT_V2V_CONTAINER_LIMITS_MEMORY"
-	VirtV2vContainerRequestsCpu      = "VIRT_V2V_CONTAINER_REQUESTS_CPU"
-	VirtV2vContainerRequestsMemory   = "VIRT_V2V_CONTAINER_REQUESTS_MEMORY"
-	HooksContainerLimitsCpu          = "HOOKS_CONTAINER_LIMITS_CPU"
-	HooksContainerLimitsMemory       = "HOOKS_CONTAINER_LIMITS_MEMORY"
-	HooksContainerRequestsCpu        = "HOOKS_CONTAINER_REQUESTS_CPU"
-	HooksContainerRequestsMemory     = "HOOKS_CONTAINER_REQUESTS_MEMORY"
-	OvaContainerLimitsCpu            = "OVA_CONTAINER_LIMITS_CPU"
-	OvaContainerLimitsMemory         = "OVA_CONTAINER_LIMITS_MEMORY"
-	OvaContainerRequestsCpu          = "OVA_CONTAINER_REQUESTS_CPU"
-	OvaContainerRequestsMemory       = "OVA_CONTAINER_REQUESTS_MEMORY"
-	HyperVContainerLimitsCpu         = "HYPERV_CONTAINER_LIMITS_CPU"
-	HyperVContainerLimitsMemory      = "HYPERV_CONTAINER_LIMITS_MEMORY"
-	HyperVContainerRequestsCpu       = "HYPERV_CONTAINER_REQUESTS_CPU"
-	HyperVContainerRequestsMemory    = "HYPERV_CONTAINER_REQUESTS_MEMORY"
-	PopulatorContainerLimitsCpu      = "POPULATOR_CONTAINER_LIMITS_CPU"
-	PopulatorContainerLimitsMemory   = "POPULATOR_CONTAINER_LIMITS_MEMORY"
-	PopulatorContainerRequestsCpu    = "POPULATOR_CONTAINER_REQUESTS_CPU"
-	PopulatorContainerRequestsMemory = "POPULATOR_CONTAINER_REQUESTS_MEMORY"
-	TlsConnectionTimeout             = "TLS_CONNECTION_TIMEOUT"
-	MaxConcurrentReconciles          = "MAX_CONCURRENT_RECONCILES"
-	MaxParentBackingRetries          = "MAX_PARENT_BACKING_RETRIES"
-	HostLeaseNamespace               = "HOST_LEASE_NAMESPACE"
-	HostLeaseDurationSeconds         = "HOST_LEASE_DURATION_SECONDS"
-	MigrationServiceAccount          = "MIGRATION_SERVICE_ACCOUNT"
-	AAPURL                           = "AAP_URL"
-	AAPTokenSecretName               = "AAP_TOKEN_SECRET_NAME"
-	AAPTimeout                       = "AAP_TIMEOUT"
+	MaxVmInFlight                          = "MAX_VM_INFLIGHT"
+	HookRetry                              = "HOOK_RETRY"
+	ImporterRetry                          = "IMPORTER_RETRY"
+	VirtV2vImage                           = "VIRT_V2V_IMAGE"
+	VirtV2vImageXFS                        = "VIRT_V2V_IMAGE_XFS"
+	vddkImage                              = "VDDK_IMAGE"
+	PrecopyInterval                        = "PRECOPY_INTERVAL"
+	BlockerGracePeriodMinutes              = "BLOCKER_GRACE_PERIOD_MINUTES"
+	VirtV2vDontRequestKVM                  = "VIRT_V2V_DONT_REQUEST_KVM"
+	SnapshotRemovalTimeout                 = "SNAPSHOT_REMOVAL_TIMEOUT"
+	SnapshotStatusCheckRate                = "SNAPSHOT_STATUS_CHECK_RATE"
+	CDIExportTokenTTL                      = "CDI_EXPORT_TOKEN_TTL"
+	FileSystemOverhead                     = "FILESYSTEM_OVERHEAD"
+	BlockOverhead                          = "BLOCK_OVERHEAD"
+	CleanupRetries                         = "CLEANUP_RETRIES"
+	SnapshotRemovalCheckRetries            = "SNAPSHOT_REMOVAL_CHECK_RETRIES"
+	OvirtOsConfigMap                       = "OVIRT_OS_MAP"
+	VsphereOsConfigMap                     = "VSPHERE_OS_MAP"
+	VirtCustomizeConfigMap                 = "VIRT_CUSTOMIZE_MAP"
+	VddkJobActiveDeadline                  = "VDDK_JOB_ACTIVE_DEADLINE"
+	VirtV2vExtraArgs                       = "VIRT_V2V_EXTRA_ARGS"
+	VirtV2vInspectorExtraArgs              = "VIRT_V2V_INSPECTOR_EXTRA_ARGS"
+	VirtV2vExtraConfConfigMap              = "VIRT_V2V_EXTRA_CONF_CONFIG_MAP"
+	VirtV2vMemSize                         = "VIRT_V2V_MEMSIZE"
+	VirtV2vSmp                             = "VIRT_V2V_SMP"
+	VirtV2vContainerLimitsCpu              = "VIRT_V2V_CONTAINER_LIMITS_CPU"
+	VirtV2vContainerLimitsMemory           = "VIRT_V2V_CONTAINER_LIMITS_MEMORY"
+	VirtV2vContainerRequestsCpu            = "VIRT_V2V_CONTAINER_REQUESTS_CPU"
+	VirtV2vContainerRequestsMemory         = "VIRT_V2V_CONTAINER_REQUESTS_MEMORY"
+	HooksContainerLimitsCpu                = "HOOKS_CONTAINER_LIMITS_CPU"
+	HooksContainerLimitsMemory             = "HOOKS_CONTAINER_LIMITS_MEMORY"
+	HooksContainerRequestsCpu              = "HOOKS_CONTAINER_REQUESTS_CPU"
+	HooksContainerRequestsMemory           = "HOOKS_CONTAINER_REQUESTS_MEMORY"
+	OvaContainerLimitsCpu                  = "OVA_CONTAINER_LIMITS_CPU"
+	OvaContainerLimitsMemory               = "OVA_CONTAINER_LIMITS_MEMORY"
+	OvaContainerRequestsCpu                = "OVA_CONTAINER_REQUESTS_CPU"
+	OvaContainerRequestsMemory             = "OVA_CONTAINER_REQUESTS_MEMORY"
+	HyperVContainerLimitsCpu               = "HYPERV_CONTAINER_LIMITS_CPU"
+	HyperVContainerLimitsMemory            = "HYPERV_CONTAINER_LIMITS_MEMORY"
+	HyperVContainerRequestsCpu             = "HYPERV_CONTAINER_REQUESTS_CPU"
+	HyperVContainerRequestsMemory          = "HYPERV_CONTAINER_REQUESTS_MEMORY"
+	PopulatorContainerLimitsCpu            = "POPULATOR_CONTAINER_LIMITS_CPU"
+	PopulatorContainerLimitsMemory         = "POPULATOR_CONTAINER_LIMITS_MEMORY"
+	PopulatorContainerRequestsCpu          = "POPULATOR_CONTAINER_REQUESTS_CPU"
+	PopulatorContainerRequestsMemory       = "POPULATOR_CONTAINER_REQUESTS_MEMORY"
+	TlsConnectionTimeout                   = "TLS_CONNECTION_TIMEOUT"
+	MaxConcurrentReconciles                = "MAX_CONCURRENT_RECONCILES"
+	MaxParentBackingRetries                = "MAX_PARENT_BACKING_RETRIES"
+	HostLeaseNamespace                     = "HOST_LEASE_NAMESPACE"
+	HostLeaseDurationSeconds               = "HOST_LEASE_DURATION_SECONDS"
+	MigrationServiceAccount                = "MIGRATION_SERVICE_ACCOUNT"
+	NetAppShiftDiskPermsInitRequestsCpu    = "NETAPP_SHIFT_DISK_PERMS_INIT_REQUESTS_CPU"
+	NetAppShiftDiskPermsInitRequestsMemory = "NETAPP_SHIFT_DISK_PERMS_INIT_REQUESTS_MEMORY"
+	NetAppShiftDiskPermsInitLimitsCpu      = "NETAPP_SHIFT_DISK_PERMS_INIT_LIMITS_CPU"
+	NetAppShiftDiskPermsInitLimitsMemory   = "NETAPP_SHIFT_DISK_PERMS_INIT_LIMITS_MEMORY"
+	AAPURL                                 = "AAP_URL"
+	AAPTokenSecretName                     = "AAP_TOKEN_SECRET_NAME"
+	AAPTimeout                             = "AAP_TIMEOUT"
 )
 
 // Default values for populator container resources
@@ -157,6 +161,11 @@ type Migration struct {
 	HostLeaseDurationSeconds string
 	// ServiceAccount is the cluster-wide default ServiceAccount for migration pods
 	ServiceAccount string
+	// NetAppShiftDiskPermsInit* are CPU/memory for the privileged NetApp Shift disk-perms init on virt-v2v conversion pods
+	NetAppShiftDiskPermsInitRequestsCpu    string
+	NetAppShiftDiskPermsInitRequestsMemory string
+	NetAppShiftDiskPermsInitLimitsCpu      string
+	NetAppShiftDiskPermsInitLimitsMemory   string
 	// AAPURL is the Ansible Automation Platform base URL (ForkliftController aap_url).
 	AAPURL string
 	// AAPTokenSecretName is the name of the Secret in the controller namespace holding the AAP API token (key "token").
@@ -381,6 +390,10 @@ func (r *Migration) Load() (err error) {
 	if val, found := os.LookupEnv(MigrationServiceAccount); found {
 		r.ServiceAccount = val
 	}
+	r.NetAppShiftDiskPermsInitRequestsCpu = Lookup(NetAppShiftDiskPermsInitRequestsCpu, "10m")
+	r.NetAppShiftDiskPermsInitRequestsMemory = Lookup(NetAppShiftDiskPermsInitRequestsMemory, "32Mi")
+	r.NetAppShiftDiskPermsInitLimitsCpu = Lookup(NetAppShiftDiskPermsInitLimitsCpu, "200m")
+	r.NetAppShiftDiskPermsInitLimitsMemory = Lookup(NetAppShiftDiskPermsInitLimitsMemory, "64Mi")
 	if val, found := os.LookupEnv(AAPURL); found {
 		r.AAPURL = strings.TrimSpace(val)
 	}

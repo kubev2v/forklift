@@ -743,6 +743,12 @@ func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVo
 	return
 }
 
+// NetAppShiftPVCs builds PVCs for disks mapped to NetApp Shift StorageClasses.
+func (r *KubeVirt) NetAppShiftPVCs(vm *plan.VMStatus) ([]core.PersistentVolumeClaim, error) {
+	labels := r.vmLabels(vm.Ref)
+	return r.Builder.NetAppShiftPVCs(vm.Ref, labels)
+}
+
 func (r *KubeVirt) vddkConfigMap(labels map[string]string) (*core.ConfigMap, error) {
 	data := make(map[string]string)
 	if r.Source.Provider.UseVddkAioOptimization() {
@@ -2126,7 +2132,7 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 	nonRoot := true
 	allowPrivilageEscalation := false
 	// virt-v2v image
-	useV2vForTransfer, vErr := r.Context.Plan.ShouldUseV2vForTransfer(vm.Ref)
+	useV2vForTransfer, vErr := r.Context.Plan.ShouldUseV2vForTransfer(vm.Ref, r.Context.Destination.Client)
 	if vErr != nil {
 		err = vErr
 		return
@@ -2225,6 +2231,11 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 				},
 			},
 		})
+	}
+	// The Shift tool migrates the disks, but we need to change the migrated files permissions and ownership to QEMU user
+	if podType == VirtV2vConversionPod && util.AnyNetAppShiftPersistentVolumeClaim(pvcs) {
+		initContainers = append(initContainers,
+			netAppShiftDiskPermsInitContainer(volumeMounts, getVirtV2vImage(r.Plan)))
 	}
 	if vm.RootDisk != "" {
 		environment = append(environment,
@@ -2443,6 +2454,47 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 	r.setKvmOnPodSpec(&pod.Spec)
 
 	return
+}
+
+// netAppShiftDiskPermsInitContainer runs as root in a privileged container on filesystem-mode
+// disk PVCs only. It sets the disk image permissions to QEMU user.
+func netAppShiftDiskPermsInitContainer(mounts []core.VolumeMount, image string) core.Container {
+	script := fmt.Sprintf(`
+set -e
+for m in /mnt/disks/disk*; do
+  if [ -f "$m/disk.img" ]; then
+    chown %d:%d "$m/disk.img"
+    chmod 660 "$m/disk.img"
+  fi
+done
+`, qemuUser, qemuGroup)
+	runAsNonRoot := false
+	var runAsUser int64 = 0
+	return core.Container{
+		Name:            "netapp-shift-disk-perms",
+		Image:           image,
+		Command:         []string{"/bin/sh", "-c", script},
+		VolumeMounts:    mounts,
+		ImagePullPolicy: core.PullIfNotPresent,
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse(Settings.Migration.NetAppShiftDiskPermsInitRequestsCpu),
+				core.ResourceMemory: resource.MustParse(Settings.Migration.NetAppShiftDiskPermsInitRequestsMemory),
+			},
+			Limits: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse(Settings.Migration.NetAppShiftDiskPermsInitLimitsCpu),
+				core.ResourceMemory: resource.MustParse(Settings.Migration.NetAppShiftDiskPermsInitLimitsMemory),
+			},
+		},
+		SecurityContext: &core.SecurityContext{
+			RunAsUser:    &runAsUser,
+			RunAsNonRoot: &runAsNonRoot,
+			Capabilities: &core.Capabilities{
+				Add:  []core.Capability{"CHOWN", "DAC_OVERRIDE", "FOWNER"},
+				Drop: []core.Capability{"ALL"},
+			},
+		},
+	}
 }
 
 // Build the inspection pod environment

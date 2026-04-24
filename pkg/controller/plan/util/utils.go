@@ -1,9 +1,12 @@
 package util
 
 import (
+	"context"
+	"fmt"
 	"math"
 	"math/rand"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -12,6 +15,8 @@ import (
 	"github.com/kubev2v/forklift/pkg/settings"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Disk alignment size used to align FS overhead,
@@ -22,6 +27,12 @@ const (
 
 // KubeVirt resource kind used in owner references and type metadata.
 const VirtualMachineKind = "VirtualMachine"
+
+// NetApp Shift PVC annotations.
+const (
+	AnnNfsServer = "forklift.konveyor.io/nfs-server"
+	AnnNfsPath   = "forklift.konveyor.io/nfs-path"
+)
 
 // RootDisk prefix for boot order.
 const (
@@ -45,6 +56,54 @@ func CalculateSpaceWithOverhead(requestedSpace int64, volumeMode *core.Persisten
 		spaceWithOverhead = alignedSize + settings.Settings.BlockOverhead
 	}
 	return spaceWithOverhead
+}
+
+const (
+	cdiConfigName         = "config"
+	defaultGlobalOverhead = 0.055
+)
+
+// CalculateSpaceWithCDIOverhead computes the PVC size the same way CDI does:
+// it reads CDIConfig.Status.FilesystemOverhead from the destination cluster,
+// uses the per-StorageClass overhead when that key exists (invalid values return
+// an error), otherwise uses Global when set (invalid values return an error),
+// otherwise the CDI default of 5.5%, aligns the raw capacity, and inflates it by
+// ceil(aligned / (1 - overhead)).
+func CalculateSpaceWithCDIOverhead(client k8sclient.Client, storageClassName string, rawCapacity int64) (int64, error) {
+	if client == nil {
+		return 0, fmt.Errorf("destination client is nil, cannot read CDIConfig")
+	}
+	overhead := defaultGlobalOverhead
+
+	cfg := &cdi.CDIConfig{}
+	if err := client.Get(context.TODO(), k8sclient.ObjectKey{Name: cdiConfigName}, cfg); err != nil {
+		return 0, err
+	}
+	if fo := cfg.Status.FilesystemOverhead; fo != nil {
+		if scPercent, hasSC := fo.StorageClass[storageClassName]; hasSC {
+			v, err := strconv.ParseFloat(string(scPercent), 64)
+			if err != nil {
+				return 0, fmt.Errorf("invalid filesystem overhead for storage class %q: %w", storageClassName, err)
+			}
+			if v < 0 || v >= 1 {
+				return 0, fmt.Errorf("filesystem overhead for storage class %q must be in [0,1), got %g", storageClassName, v)
+			}
+			overhead = v
+		} else if fo.Global != "" {
+			v, err := strconv.ParseFloat(string(fo.Global), 64)
+			if err != nil {
+				return 0, fmt.Errorf("invalid global filesystem overhead: %w", err)
+			}
+			if v < 0 || v >= 1 {
+				return 0, fmt.Errorf("global filesystem overhead must be in [0,1), got %g", v)
+			}
+			overhead = v
+		}
+	}
+
+	aligned := RoundUp(rawCapacity, DefaultAlignBlockSize)
+	inflated := int64(math.Ceil(float64(aligned) / (1.0 - overhead)))
+	return inflated, nil
 }
 
 func GetBootDiskNumber(deviceString string) int {
@@ -146,4 +205,23 @@ func GenerateRandomSuffix() string {
 		b[i] = charset[seededRand.Intn(len(charset))]
 	}
 	return string(b)
+}
+
+// IsNetAppShiftPersistentVolumeClaim reports whether a PVC is a NetApp Shift volume.
+func IsNetAppShiftPersistentVolumeClaim(ann map[string]string) bool {
+	if ann == nil {
+		return false
+	}
+	_, hasServer := ann[AnnNfsServer]
+	_, hasExport := ann[AnnNfsPath]
+	return hasServer && hasExport
+}
+
+func AnyNetAppShiftPersistentVolumeClaim(pvcs []*core.PersistentVolumeClaim) bool {
+	for _, pvc := range pvcs {
+		if pvc != nil && IsNetAppShiftPersistentVolumeClaim(pvc.Annotations) {
+			return true
+		}
+	}
+	return false
 }

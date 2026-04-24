@@ -35,3 +35,8 @@ func (r *Ensurer) SharedSecrets(vm *planapi.VMStatus, secrets []core.Secret) err
 	// EC2 provider doesn't use shared secrets currently
 	return nil
 }
+
+// PersistentVolumeClaims is a no-op for EC2.
+func (r *Ensurer) PersistentVolumeClaims(vm *planapi.VMStatus, pvcs []core.PersistentVolumeClaim) error {
+	return nil
+}

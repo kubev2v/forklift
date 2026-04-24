@@ -296,6 +296,9 @@ type Datastore struct {
 	Free                int64    `sql:""`
 	MaintenanceMode     string   `sql:""`
 	BackingDevicesNames []string `sql:""`
+	NasRemoteHost       string   `sql:""`
+	NasRemotePath       string   `sql:""`
+	NasRemoteHostNames  []string `sql:""`
 }
 
 type VM struct {
