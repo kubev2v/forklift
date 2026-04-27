@@ -5,6 +5,7 @@ import (
 
 	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	. "github.com/onsi/ginkgo/v2"
@@ -219,7 +220,7 @@ var _ = Describe("DestinationClient", func() {
 						"vmdkKey":   "disk-1",
 					},
 					Annotations: map[string]string{
-						"copy-offload": "/vmdk/test.vmdk",
+						planbase.AnnDiskSource: "/vmdk/test.vmdk",
 					},
 				},
 				Spec: core.PersistentVolumeClaimSpec{
@@ -290,7 +291,7 @@ var _ = Describe("DestinationClient", func() {
 						"vmdkKey":   "disk-1",
 					},
 					Annotations: map[string]string{
-						"copy-offload": "/vmdk/test.vmdk",
+						planbase.AnnDiskSource: "/vmdk/test.vmdk",
 					},
 				},
 				Spec: core.PersistentVolumeClaimSpec{
@@ -306,7 +307,7 @@ var _ = Describe("DestinationClient", func() {
 						"vmdkKey":   "disk-1",
 					},
 					Annotations: map[string]string{
-						"copy-offload": "/vmdk/test.vmdk",
+						planbase.AnnDiskSource: "/vmdk/test.vmdk",
 					},
 				},
 				Spec: core.PersistentVolumeClaimSpec{
@@ -430,10 +431,10 @@ func createDestinationClient(objs ...runtime.Object) *DestinationClient {
 	client := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithRuntimeObjects(objs...).
-		WithIndex(&core.PersistentVolumeClaim{}, "metadata.annotations.copy-offload", func(obj client.Object) []string {
+		WithIndex(&core.PersistentVolumeClaim{}, "metadata.annotations."+planbase.AnnDiskSource, func(obj client.Object) []string {
 			pvc := obj.(*core.PersistentVolumeClaim)
 			if pvc.Annotations != nil {
-				if val, ok := pvc.Annotations["copy-offload"]; ok {
+				if val, ok := pvc.Annotations[planbase.AnnDiskSource]; ok {
 					return []string{val}
 				}
 			}

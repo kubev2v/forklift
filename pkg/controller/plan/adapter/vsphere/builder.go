@@ -554,8 +554,8 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 		}
 
 		for _, pvc := range pvcs.Items {
-			if copyOffload, present := pvc.Annotations["copy-offload"]; present && copyOffload != "" {
-				pvcMap[baseVolume(copyOffload, r.Plan.IsWarm())] = pvc
+			if diskSource, present := pvc.Annotations[planbase.AnnDiskSource]; present && diskSource != "" {
+				pvcMap[baseVolume(diskSource, r.Plan.IsWarm())] = pvc
 			}
 		}
 	}
@@ -1409,7 +1409,6 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					pvc.Annotations = annotations
 				}
 				pvc.Annotations[planbase.AnnDiskSource] = baseVolume(disk.File, r.Plan.IsWarm())
-				pvc.Annotations["copy-offload"] = baseVolume(disk.File, r.Plan.IsWarm())
 
 				// Apply PVC template naming if configured, replacing the commonName
 				if err := r.setColdMigrationDefaultPVCName(&pvc.ObjectMeta, vm, diskIndex, disk); err != nil {
@@ -2318,4 +2317,90 @@ func (r *Builder) ensureXCopyVolumePopulator(vp *api.VSphereXcopyVolumePopulator
 // vSphere provider does not require any special configuration.
 func (r *Builder) ConversionPodConfig(_ ref.Ref) (*planbase.ConversionPodConfigResult, error) {
 	return &planbase.ConversionPodConfigResult{}, nil
+}
+
+// buildVMDiskStorageMap creates disk storage map for a single VM
+func (r *Builder) buildVMDiskStorageMap(vm *model.VM, vmRef ref.Ref) (*VMDiskStorageMap, error) {
+	dsMap, err := r.buildDatastoreMap()
+	if err != nil {
+		return nil, err
+	}
+
+	useV2vForTransfer, err := r.Context.Plan.ShouldUseV2vForTransfer(vmRef)
+	if err != nil {
+		return nil, err
+	}
+
+	vmCopy := *vm
+	if !r.shouldMigrateSharedDisks(vm) {
+		vmCopy.RemoveSharedDisks()
+	}
+
+	disks := vmCopy.SortedDisksAsVmware()
+	vmMap := &VMDiskStorageMap{
+		VMID:         vmRef.ID,
+		VMName:       vm.Name,
+		Disks:        make(map[string]*DiskStorageInfo),
+		DisksByIndex: make([]*DiskStorageInfo, 0, len(disks)),
+	}
+
+	isWarm := r.Plan.IsWarm()
+
+	for diskIndex, disk := range disks {
+		mapped, found := dsMap[disk.Datastore.ID]
+		if !found {
+			continue
+		}
+
+		// Determine copy method based on plan settings and storage mapping
+		var copyMethod DiskCopyMethod
+
+		if useV2vForTransfer {
+			copyMethod = CopyMethodVirtV2v
+		} else if mapped.OffloadPlugin != nil &&
+			mapped.OffloadPlugin.VSphereXcopyPluginConfig != nil {
+			copyMethod = CopyMethodCopyOffload
+		} else {
+			copyMethod = CopyMethodCDI
+		}
+
+		diskFile := baseVolume(disk.File, isWarm)
+		diskInfo := &DiskStorageInfo{
+			DiskFile:           diskFile,
+			DiskKey:            disk.Key,
+			DiskIndex:          diskIndex,
+			SourceDatastore:    disk.Datastore,
+			TargetStorageClass: mapped.Destination.StorageClass,
+			CopyMethod:         copyMethod,
+		}
+
+		vmMap.Disks[diskFile] = diskInfo
+		vmMap.DisksByIndex = append(vmMap.DisksByIndex, diskInfo)
+	}
+
+	return vmMap, nil
+}
+
+// buildPlanDiskStorageMaps creates storage maps for all VMs in the plan
+func (r *Builder) buildPlanDiskStorageMaps() (*PlanDiskStorageMaps, error) {
+	planMaps := &PlanDiskStorageMaps{
+		VMs: make(map[string]*VMDiskStorageMap),
+	}
+
+	for _, vmRef := range r.Plan.Spec.VMs {
+		vm := &model.VM{}
+		err := r.Source.Inventory.Find(vm, vmRef.Ref)
+		if err != nil {
+			return nil, liberr.Wrap(err, "vm", vmRef.String())
+		}
+
+		vmMap, err := r.buildVMDiskStorageMap(vm, vmRef.Ref)
+		if err != nil {
+			return nil, err
+		}
+
+		planMaps.VMs[vmRef.ID] = vmMap
+	}
+
+	return planMaps, nil
 }

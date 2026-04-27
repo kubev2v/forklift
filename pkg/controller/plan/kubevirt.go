@@ -184,6 +184,8 @@ type KubeVirt struct {
 	Builder adapter.Builder
 	// Ensurer
 	Ensurer adapter.Ensurer
+	// StorageMapper
+	StorageMapper adapter.StorageMapper
 }
 
 // resolveServiceAccount resolves the ServiceAccount for migration pods.
@@ -2186,7 +2188,7 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 			})
 	}
 
-	if !useV2vForTransfer || r.IsCopyOffload(pvcs) {
+	if !useV2vForTransfer || (r.StorageMapper != nil && r.StorageMapper.IsAnyPVCCopyOffload(pvcs)) {
 		environment = append(environment,
 			core.EnvVar{
 				Name:  "V2V_inPlace",
@@ -3635,22 +3637,6 @@ func (r *KubeVirt) loadHosts() (hosts map[string]*api.Host, err error) {
 	hosts = hostMap
 
 	return
-}
-
-// IsCopyOffload is determined by PVC having the copy-offload label, which is
-// set by the builder earlier in #PopulatorVolumes
-// TODO rgolan - for now the check will be done if any PVC match in the migration - this is obviously coarse
-// and should be per a disk's storage class, for example a disk from NFS or local doesn't support that
-// (specifically referring to vmkfstools xcopy for RDM)
-func (r *KubeVirt) IsCopyOffload(pvcs []*core.PersistentVolumeClaim) bool {
-	for _, p := range pvcs {
-		for a := range p.Annotations {
-			if a == "copy-offload" {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 // determineRunStrategy determines the appropriate run strategy based on the target power state configuration

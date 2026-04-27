@@ -174,10 +174,15 @@ func (r *Migration) init() (err error) {
 	if err != nil {
 		return
 	}
+	storageMapper, err := adapter.StorageMapper(r.Context)
+	if err != nil {
+		return
+	}
 	r.kubevirt = KubeVirt{
-		Context: r.Context,
-		Builder: r.builder,
-		Ensurer: r.ensurer,
+		Context:       r.Context,
+		Builder:       r.builder,
+		Ensurer:       r.ensurer,
+		StorageMapper: storageMapper,
 	}
 	r.scheduler, err = scheduler.New(r.Context)
 	if err != nil {

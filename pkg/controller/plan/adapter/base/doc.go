@@ -132,6 +132,8 @@ type Adapter interface {
 	DestinationClient(ctx *plancontext.Context) (DestinationClient, error)
 	// Ensurer
 	Ensurer(ctx *plancontext.Context) (ensure Ensurer, err error)
+	// StorageMapper
+	StorageMapper(ctx *plancontext.Context) (StorageMapper, error)
 }
 
 // Builder API.
@@ -272,4 +274,15 @@ type Ensurer interface {
 	SharedConfigMaps(vm *planapi.VMStatus, configMaps []core.ConfigMap) (err error)
 	// SharedSecrets ensures that shared Secret with VM are present
 	SharedSecrets(vm *planapi.VMStatus, secrets []core.Secret) (err error)
+}
+
+// StorageMapper API
+// Provides disk storage copy method information
+type StorageMapper interface {
+	// IsCopyOffload checks if a specific disk uses copy-offload method
+	IsCopyOffload(diskFile string, vmID string) bool
+	// IsPVCCopyOffload checks if a specific PVC uses copy-offload by extracting disk metadata
+	IsPVCCopyOffload(pvc *core.PersistentVolumeClaim) bool
+	// IsAnyPVCCopyOffload checks if any PVC in the list uses copy-offload
+	IsAnyPVCCopyOffload(pvcs []*core.PersistentVolumeClaim) bool
 }

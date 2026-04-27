@@ -7,6 +7,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/provider/ec2/controller/client"
 	ec2ensurer "github.com/kubev2v/forklift/pkg/provider/ec2/controller/ensurer"
 	"github.com/kubev2v/forklift/pkg/provider/ec2/controller/validator"
+	core "k8s.io/api/core/v1"
 )
 
 // Adapter provides EC2-specific migration components that implement the Forklift migration
@@ -52,4 +53,24 @@ func (r *Adapter) Client(ctx *plancontext.Context) (base.Client, error) {
 // Ensures resources have proper owner references for automatic garbage collection.
 func (r *Adapter) DestinationClient(ctx *plancontext.Context) (base.DestinationClient, error) {
 	return &DestinationClient{Context: ctx}, nil
+}
+
+// StorageMapper returns a no-op storage mapper (EC2 doesn't use copy-offload).
+func (r *Adapter) StorageMapper(ctx *plancontext.Context) (base.StorageMapper, error) {
+	return &NoOpStorageMapper{}, nil
+}
+
+// NoOpStorageMapper is a no-op implementation for providers that don't use copy-offload.
+type NoOpStorageMapper struct{}
+
+func (r *NoOpStorageMapper) IsCopyOffload(diskFile string, vmID string) bool {
+	return false
+}
+
+func (r *NoOpStorageMapper) IsPVCCopyOffload(pvc *core.PersistentVolumeClaim) bool {
+	return false
+}
+
+func (r *NoOpStorageMapper) IsAnyPVCCopyOffload(pvcs []*core.PersistentVolumeClaim) bool {
+	return false
 }

@@ -4,6 +4,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/plan/ensurer"
+	core "k8s.io/api/core/v1"
 )
 
 // Adapter for OVF-based providers.
@@ -45,4 +46,24 @@ func (r *Adapter) Client(ctx *plancontext.Context) (client base.Client, err erro
 func (r *Adapter) DestinationClient(ctx *plancontext.Context) (destinationClient base.DestinationClient, err error) {
 	destinationClient = &DestinationClient{Context: ctx}
 	return
+}
+
+// Constructs a storage mapper (no-op).
+func (r *Adapter) StorageMapper(ctx *plancontext.Context) (base.StorageMapper, error) {
+	return &NoOpStorageMapper{}, nil
+}
+
+// NoOpStorageMapper is a no-op implementation for providers that don't use copy-offload.
+type NoOpStorageMapper struct{}
+
+func (r *NoOpStorageMapper) IsCopyOffload(diskFile string, vmID string) bool {
+	return false
+}
+
+func (r *NoOpStorageMapper) IsPVCCopyOffload(pvc *core.PersistentVolumeClaim) bool {
+	return false
+}
+
+func (r *NoOpStorageMapper) IsAnyPVCCopyOffload(pvcs []*core.PersistentVolumeClaim) bool {
+	return false
 }
