@@ -5,3 +5,5 @@ This guide will provide you with hands-on exposure to OpenShift Migration Toolin
 ### Sections
 
 [Section 1 - Migration Hooks](./hooks.md)<br>
+[Section 2 - Metrics](./metrics.md)<br>
+[Section 3 - Metrics Reference](./metrics-reference.md)<br>
