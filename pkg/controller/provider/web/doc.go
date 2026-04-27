@@ -1,6 +1,7 @@
 package web
 
 import (
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/aap"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
@@ -11,10 +12,11 @@ import (
 	"github.com/kubev2v/forklift/pkg/lib/inventory/container"
 	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
 	ec2web "github.com/kubev2v/forklift/pkg/provider/ec2/inventory/web"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // All handlers.
-func All(container *container.Container) (all []libweb.RequestHandler) {
+func All(container *container.Container, k8s client.Client) (all []libweb.RequestHandler) {
 	all = []libweb.RequestHandler{
 		&libweb.SchemaHandler{},
 		&ProviderHandler{
@@ -22,6 +24,7 @@ func All(container *container.Container) (all []libweb.RequestHandler) {
 				Container: container,
 			},
 		},
+		&aap.Handler{Client: k8s},
 	}
 	all = append(
 		all,

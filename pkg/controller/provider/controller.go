@@ -76,7 +76,7 @@ var Settings = &settings.Settings
 func Add(mgr manager.Manager) error {
 	libfb.WorkingDir = Settings.WorkingDir
 	container := libcontainer.New()
-	web := libweb.New(container, web.All(container)...)
+	web := libweb.New(container, web.All(container, mgr.GetClient())...)
 	web.Port = Settings.Inventory.Port
 	if Settings.Inventory.TLS.Key != "" {
 		web.TLS.Enabled = true

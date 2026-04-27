@@ -124,6 +124,21 @@ spec:
         - name: MIGRATION_SERVICE_ACCOUNT
           value: "{{ controller_migration_service_account }}"
 {% endif %}
+{% if aap_url is defined and aap_url is string and aap_url|length > 0 %}
+        - name: AAP_URL
+          value: "{{ aap_url }}"
+{% endif %}
+{% if aap_token_secret_name is defined and aap_token_secret_name is string and aap_token_secret_name|length > 0 %}
+        - name: AAP_TOKEN_SECRET_NAME
+          value: "{{ aap_token_secret_name }}"
+{% endif %}
+{% if aap_timeout is defined and aap_timeout is string and aap_timeout|length > 0 %}
+        - name: AAP_TIMEOUT
+          value: "{{ aap_timeout }}"
+{% elif aap_timeout is defined and aap_timeout is number %}
+        - name: AAP_TIMEOUT
+          value: "{{ aap_timeout }}"
+{% endif %}
 {% if controller_cdi_export_token_ttl is number %}
         - name: CDI_EXPORT_TOKEN_TTL
           value: "{{ controller_cdi_export_token_ttl }}"
@@ -270,6 +285,21 @@ spec:
           value: "v1"
         - name: AUTH_REQUIRED
           value: '{{ feature_auth_required|lower }}'
+{% if aap_url is defined and aap_url is string and aap_url|length > 0 %}
+        - name: AAP_URL
+          value: "{{ aap_url }}"
+{% endif %}
+{% if aap_token_secret_name is defined and aap_token_secret_name is string and aap_token_secret_name|length > 0 %}
+        - name: AAP_TOKEN_SECRET_NAME
+          value: "{{ aap_token_secret_name }}"
+{% endif %}
+{% if aap_timeout is defined and aap_timeout is string and aap_timeout|length > 0 %}
+        - name: AAP_TIMEOUT
+          value: "{{ aap_timeout }}"
+{% elif aap_timeout is defined and aap_timeout is number %}
+        - name: AAP_TIMEOUT
+          value: "{{ aap_timeout }}"
+{% endif %}
         - name: API_PORT
           value: "8443"
         - name: API_TLS_CERTIFICATE

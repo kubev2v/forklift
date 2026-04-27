@@ -18,51 +18,70 @@ func TestHookExecutionConfigValid(t *testing.T) {
 		{"local playbook only", &Hook{Spec: HookSpec{Playbook: "cGxheQ=="}}, false},
 		{"local whitespace image", &Hook{Spec: HookSpec{Image: "  "}}, false},
 		{"local image and playbook", &Hook{Spec: HookSpec{Image: "i", Playbook: "cGxheQ=="}}, true},
-		{"aap complete", &Hook{Spec: HookSpec{AAP: &AAPConfig{
-			URL: "https://aap", JobTemplateID: 1,
-			TokenSecret: core.ObjectReference{Name: "s"},
+		{"aap job template only", &Hook{Spec: HookSpec{AAP: &AAPConfig{
+			JobTemplateID: 1,
 		}}}, true},
 		{"aap with local image rejected", &Hook{Spec: HookSpec{
 			Image: "quay.io/x",
 			AAP: &AAPConfig{
-				URL: "https://aap", JobTemplateID: 1,
-				TokenSecret: core.ObjectReference{Name: "s"},
+				JobTemplateID: 1,
 			},
 		}}, false},
 		{"aap with playbook rejected", &Hook{Spec: HookSpec{
 			Playbook: "eA==",
 			AAP: &AAPConfig{
-				URL: "https://aap", JobTemplateID: 1,
-				TokenSecret: core.ObjectReference{Name: "s"},
+				JobTemplateID: 1,
 			},
 		}}, false},
 		{"aap zero template id", &Hook{Spec: HookSpec{AAP: &AAPConfig{
-			URL: "https://aap", JobTemplateID: 0,
-			TokenSecret: core.ObjectReference{Name: "s"},
+			JobTemplateID: 0,
 		}}}, false},
 		{"aap negative template id", &Hook{Spec: HookSpec{AAP: &AAPConfig{
-			URL: "https://aap", JobTemplateID: -1,
-			TokenSecret: core.ObjectReference{Name: "s"},
-		}}}, false},
-		{"aap whitespace url", &Hook{Spec: HookSpec{AAP: &AAPConfig{
-			URL: "   ", JobTemplateID: 1,
-			TokenSecret: core.ObjectReference{Name: "s"},
-		}}}, false},
-		{"aap missing url", &Hook{Spec: HookSpec{AAP: &AAPConfig{
-			JobTemplateID: 1, TokenSecret: core.ObjectReference{Name: "s"},
-		}}}, false},
-		{"aap whitespace token name", &Hook{Spec: HookSpec{AAP: &AAPConfig{
-			URL: "https://aap", JobTemplateID: 1,
-			TokenSecret: core.ObjectReference{Name: "   "},
-		}}}, false},
-		{"aap missing token name", &Hook{Spec: HookSpec{AAP: &AAPConfig{
-			URL: "https://aap", JobTemplateID: 1, TokenSecret: core.ObjectReference{Name: ""},
+			JobTemplateID: -1,
 		}}}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := HookExecutionConfigValid(tc.hook); got != tc.want {
 				t.Fatalf("HookExecutionConfigValid() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestHookAAPRunnable(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name       string
+		hook       *Hook
+		clusterURL string
+		clusterTok string
+		want       bool
+	}{
+		{"nil hook", nil, "", "", true},
+		{"non-aap hook", &Hook{Spec: HookSpec{Image: "i"}}, "", "", true},
+		{"cluster config", &Hook{Spec: HookSpec{AAP: &AAPConfig{JobTemplateID: 1}}},
+			"https://aap", "sec", true},
+		{"cluster url only", &Hook{Spec: HookSpec{AAP: &AAPConfig{JobTemplateID: 1}}},
+			"https://aap", "", false},
+		{"per-hook only", &Hook{Spec: HookSpec{AAP: &AAPConfig{
+			JobTemplateID: 1,
+			URL:           "https://aap",
+			TokenSecret:   &core.ObjectReference{Name: "s"},
+		}}}, "", "", true},
+		{"neither", &Hook{Spec: HookSpec{AAP: &AAPConfig{
+			JobTemplateID: 1,
+		}}}, "", "", false},
+		{"bad template id", &Hook{Spec: HookSpec{AAP: &AAPConfig{
+			JobTemplateID: 0,
+			URL:           "https://aap",
+			TokenSecret:   &core.ObjectReference{Name: "s"},
+		}}}, "https://aap", "sec", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := HookAAPRunnable(tc.hook, tc.clusterURL, tc.clusterTok); got != tc.want {
+				t.Fatalf("HookAAPRunnable() = %v, want %v", got, tc.want)
 			}
 		})
 	}

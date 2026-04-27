@@ -40,6 +40,21 @@ spec:
             additionalProperties: true
             description: Spec defines the desired state of ForkliftController
             properties:
+              aap_timeout:
+                description: Default timeout in seconds for AAP HTTP calls and job
+                  polling when Hook spec.deadline is 0 (optional).
+                x-kubernetes-int-or-string: true
+              aap_token_secret_name:
+                description: 'Name of the Secret in the operator namespace containing
+                  the AAP API Bearer token (data key: token). Required for centralized
+                  AAP connection together with aap_url; omit when hooks use per-hook
+                  spec.aap.url and tokenSecret.'
+                type: string
+              aap_url:
+                description: Ansible Automation Platform base URL (e.g. https://aap.example.com).
+                  Required for centralized AAP connection together with aap_token_secret_name;
+                  omit when hooks use spec.aap.url and spec.aap.tokenSecret.
+                type: string
               api_container_limits_cpu:
                 description: 'API service CPU limit (default: 1000m)'
                 example: 2000m
@@ -603,18 +618,15 @@ spec:
                     description: ID of the AAP job template to execute.
                     type: integer
                   timeout:
-                    description: |-
-                      Timeout in seconds to wait for the AAP job after launch (wall-clock polling limit).
-                      Default when omitted or 0: first use HookSpec.deadline if it is > 0; otherwise 3600 seconds (1 hour).
-                      Any negative value: wait without a wall-clock limit until the job finishes or fails.
+                    description: Optional timeout in seconds for polling the AAP job
+                      after launch. Overrides defaulting from spec.deadline and ForkliftController
+                      aap_timeout when non-zero behavior applies.
                     format: int64
                     type: integer
                   tokenSecret:
                     description: |-
-                      Reference to the Secret containing the AAP API token.
-                      The Secret must contain a key named "token" with the Bearer token value.
-                      The controller reads the Secret only from the migration plan namespace.
-                      Namespace must be empty or equal to that plan namespace.
+                      Optional Secret reference for the AAP API token (key "token"). When set together with url, overrides
+                      ForkliftController aap_token_secret_name; the Secret is read from the migration plan namespace.
                     properties:
                       apiVersion:
                         description: API version of the referent.
@@ -657,12 +669,11 @@ spec:
                     type: object
                     x-kubernetes-map-type: atomic
                   url:
-                    description: URL of the AAP instance (e.g., "https://aap.example.com").
+                    description: Optional per-hook AAP base URL. When set together
+                      with tokenSecret, overrides ForkliftController aap_url.
                     type: string
                 required:
                 - jobTemplateId
-                - tokenSecret
-                - url
                 type: object
               deadline:
                 description: Hook deadline in seconds.

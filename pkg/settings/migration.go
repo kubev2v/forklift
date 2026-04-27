@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
@@ -63,6 +64,9 @@ const (
 	HostLeaseNamespace               = "HOST_LEASE_NAMESPACE"
 	HostLeaseDurationSeconds         = "HOST_LEASE_DURATION_SECONDS"
 	MigrationServiceAccount          = "MIGRATION_SERVICE_ACCOUNT"
+	AAPURL                           = "AAP_URL"
+	AAPTokenSecretName               = "AAP_TOKEN_SECRET_NAME"
+	AAPTimeout                       = "AAP_TIMEOUT"
 )
 
 // Default values for populator container resources
@@ -153,6 +157,12 @@ type Migration struct {
 	HostLeaseDurationSeconds string
 	// ServiceAccount is the cluster-wide default ServiceAccount for migration pods
 	ServiceAccount string
+	// AAPURL is the Ansible Automation Platform base URL (ForkliftController aap_url).
+	AAPURL string
+	// AAPTokenSecretName is the name of the Secret in the controller namespace holding the AAP API token (key "token").
+	AAPTokenSecretName string
+	// AAPTimeoutSeconds is the default wall-clock timeout in seconds for AAP job polling when not set on the Hook.
+	AAPTimeoutSeconds int
 }
 
 // Load settings.
@@ -370,6 +380,25 @@ func (r *Migration) Load() (err error) {
 	r.HostLeaseDurationSeconds = Lookup(HostLeaseDurationSeconds, "10")
 	if val, found := os.LookupEnv(MigrationServiceAccount); found {
 		r.ServiceAccount = val
+	}
+	if val, found := os.LookupEnv(AAPURL); found {
+		r.AAPURL = strings.TrimSpace(val)
+	}
+	if val, found := os.LookupEnv(AAPTokenSecretName); found {
+		r.AAPTokenSecretName = strings.TrimSpace(val)
+	}
+	if val, found := os.LookupEnv(AAPTimeout); found {
+		val = strings.TrimSpace(val)
+		if val != "" {
+			n, perr := strconv.Atoi(val)
+			if perr != nil {
+				return fmt.Errorf("invalid %s %q: %w", AAPTimeout, val, perr)
+			}
+			if n < 0 {
+				return fmt.Errorf("%s must be non-negative, got %q", AAPTimeout, val)
+			}
+			r.AAPTimeoutSeconds = n
+		}
 	}
 	return
 }

@@ -336,6 +336,15 @@ spec:
               controller_max_parent_backing_retries:
                 x-kubernetes-int-or-string: true
                 description: "Max retries when getting parent disks (default: 10)"
+              aap_url:
+                type: string
+                description: "Ansible Automation Platform base URL (e.g. https://aap.example.com). Required for centralized AAP connection together with aap_token_secret_name; omit when hooks use spec.aap.url and spec.aap.tokenSecret."
+              aap_token_secret_name:
+                type: string
+                description: "Name of the Secret in the operator namespace containing the AAP API Bearer token (data key: token). Required for centralized AAP connection together with aap_url; omit when hooks use per-hook spec.aap.url and tokenSecret."
+              aap_timeout:
+                x-kubernetes-int-or-string: true
+                description: "Default timeout in seconds for AAP HTTP calls and job polling when Hook spec.deadline is 0 (optional)."
 
               # Migration Feature-Specific Settings
               controller_vsphere_incremental_backup:
