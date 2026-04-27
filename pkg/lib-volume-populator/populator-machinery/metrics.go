@@ -40,6 +40,10 @@ type metricsManager struct {
 	registry         k8smetrics.KubeRegistry
 	opLatencyMetrics *k8smetrics.HistogramVec
 	opInFlight       *k8smetrics.Gauge
+	// Completion metrics scraped from populator pod /metrics (xcopy only)
+	copyDuration       *k8smetrics.GaugeVec
+	sourceDiskSize     *k8smetrics.GaugeVec
+	completionRecorded map[types.UID]bool
 }
 
 var metricBuckets = []float64{0.1, 0.25, 0.5, 1, 2.5, 5, 10, 15, 30, 60, 120, 300, 600}
@@ -77,6 +81,65 @@ func initMetrics() *metricsManager {
 	go m.scheduleOpsInFlightMetric()
 
 	return m
+}
+
+// initCompletionMetrics registers xcopy-specific completion metrics on the controller.
+// Call only for the vsphere-xcopy populator controller instance.
+func (m *metricsManager) initCompletionMetrics() {
+	completionLabels := []string{"result", "migration", "owner_uid", "storage_vendor", "clone_method", "xcopy_used", "storage_protocol"}
+
+	m.copyDuration = k8smetrics.NewGaugeVec(
+		&k8smetrics.GaugeOpts{
+			Name: "mtv_vsphere_xcopy_volume_populator_copy_duration_seconds",
+			Help: "Duration of copy-offload operation in seconds per disk, scraped from populator pods.",
+		},
+		completionLabels,
+	)
+	m.sourceDiskSize = k8smetrics.NewGaugeVec(
+		&k8smetrics.GaugeOpts{
+			Name: "mtv_vsphere_xcopy_volume_populator_source_disk_bytes",
+			Help: "Source disk size in bytes per disk, scraped from populator pods. type=provisioned is guest-visible size; type=datastore_allocated is actual data on datastore.",
+		},
+		[]string{"result", "migration", "owner_uid", "storage_vendor", "clone_method", "storage_protocol", "type"},
+	)
+
+	m.completionRecorded = make(map[types.UID]bool)
+
+	m.registry.MustRegister(m.copyDuration)
+	m.registry.MustRegister(m.sourceDiskSize)
+}
+
+// isCompletionRecorded returns whether completion metrics have already been recorded for this PVC.
+func (m *metricsManager) isCompletionRecorded(pvcUID types.UID) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.completionRecorded[pvcUID]
+}
+
+// recordCompletionFromScrape records completion metrics with structured values scraped from the populator pod.
+func (m *metricsManager) recordCompletionFromScrape(pvcUID types.UID, result, migration, ownerUID, vendor, method, xcopy, protocol string, duration, provisionedBytes, allocatedBytes float64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.completionRecorded[pvcUID] {
+		return // already recorded
+	}
+	m.completionRecorded[pvcUID] = true
+
+	if m.copyDuration != nil {
+		m.copyDuration.WithLabelValues(result, migration, ownerUID, vendor, method, xcopy, protocol).Set(duration)
+	}
+	if m.sourceDiskSize != nil {
+		if provisionedBytes > 0 {
+			m.sourceDiskSize.WithLabelValues(result, migration, ownerUID, vendor, method, protocol, "provisioned").Set(provisionedBytes)
+		}
+		if allocatedBytes > 0 {
+			m.sourceDiskSize.WithLabelValues(result, migration, ownerUID, vendor, method, protocol, "datastore_allocated").Set(allocatedBytes)
+		}
+	}
+
+	klog.Infof("Recorded completion metrics: result=%s, migration=%s, owner_uid=%s, duration=%.1fs, vendor=%s, method=%s, xcopy=%s, provisioned=%.0f, allocated=%.0f",
+		result, migration, ownerUID, duration, vendor, method, xcopy, provisionedBytes, allocatedBytes)
 }
 
 func (m *metricsManager) scheduleOpsInFlightMetric() {
