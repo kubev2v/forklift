@@ -44,7 +44,7 @@ type Client struct {
 // Create a VM snapshot and return its ID.
 func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (snapshotId string, creationTaskId string, err error) {
 	r.Log.V(1).Info("Creating snapshot", "vmRef", vmRef)
-	vm, err := r.getVM(vmRef, hostsFunc)
+	vm, err := r.getVM(vmRef)
 	if err != nil {
 		return
 	}
@@ -110,7 +110,7 @@ func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hosts util.Hosts
 	r.Log.V(1).Info("RemoveSnapshot",
 		"vmRef", vmRef,
 		"snapshot", snapshot)
-	vm, err := r.getVM(vmRef, hosts)
+	vm, err := r.getVM(vmRef)
 	if err != nil {
 		return
 	}
@@ -171,7 +171,7 @@ func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, data
 
 // Get the power state of the VM.
 func (r *Client) PowerState(vmRef ref.Ref) (state planapi.VMPowerState, err error) {
-	vm, err := r.getVM(vmRef, nullableHosts)
+	vm, err := r.getVM(vmRef)
 	if err != nil {
 		return
 	}
@@ -193,7 +193,7 @@ func (r *Client) PowerState(vmRef ref.Ref) (state planapi.VMPowerState, err erro
 
 // Power on the VM.
 func (r *Client) PowerOn(vmRef ref.Ref) (err error) {
-	vm, err := r.getVM(vmRef, nullableHosts)
+	vm, err := r.getVM(vmRef)
 	if err != nil {
 		return
 	}
@@ -214,7 +214,7 @@ func (r *Client) PowerOn(vmRef ref.Ref) (err error) {
 
 // Power off the VM. Requires guest tools to be installed.
 func (r *Client) PowerOff(vmRef ref.Ref) (err error) {
-	vm, err := r.getVM(vmRef, nullableHosts)
+	vm, err := r.getVM(vmRef)
 	if err != nil {
 		return
 	}
@@ -236,7 +236,7 @@ func (r *Client) PowerOff(vmRef ref.Ref) (err error) {
 
 // Determine whether the VM has been powered off.
 func (r *Client) PoweredOff(vmRef ref.Ref) (poweredOff bool, err error) {
-	vm, err := r.getVM(vmRef, nullableHosts)
+	vm, err := r.getVM(vmRef)
 	if err != nil {
 		return
 	}
@@ -273,7 +273,7 @@ func (r *Client) PreTransferActions(vmRef ref.Ref) (ready bool, err error) {
 
 // Get a mapping of disks and change IDs for a given snapshot.
 func (r *Client) GetSnapshotDeltas(vmRef ref.Ref, snapshotId string, hosts util.HostsFunc) (changeIdMapping map[string]string, err error) {
-	vm, err := r.getVM(vmRef, hosts)
+	vm, err := r.getVM(vmRef)
 	if err != nil {
 		return
 	}
@@ -494,7 +494,7 @@ func (r *Client) getHostClient(hostDef *v1beta1.Host, host *model.Host) (client 
 }
 
 // Get the VM by ref.
-func (r *Client) getVM(vmRef ref.Ref, hosts util.HostsFunc) (vsphereVm *object.VirtualMachine, err error) {
+func (r *Client) getVM(vmRef ref.Ref) (vsphereVm *object.VirtualMachine, err error) {
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
@@ -502,24 +502,16 @@ func (r *Client) getVM(vmRef ref.Ref, hosts util.HostsFunc) (vsphereVm *object.V
 		return
 	}
 
-	client, err := r.getClient(vm, hosts)
-	if err != nil {
-		return
-	}
-
-	// Use the managed object id from inventory (not FindByUuid on BIOS UUID), so we target the
-	// same VM as the plan when multiple VMs share config.uuid.
+	// vm.ID is the vCenter inventory MoRef, which is only valid on the vCenter
+	// endpoint. Always use the vCenter client here; ESXi host clients are used
+	// separately for task-level operations (getTaskById, findRunningSnapshotTask).
 	moref := types.ManagedObjectReference{Type: "VirtualMachine", Value: vm.ID}
 	if moref.Value == "" {
 		err = liberr.New(
 			fmt.Sprintf("VM %s has empty managed object id; source lookup failed", vmRef.String()))
 		return
 	}
-	vsphereVm = object.NewVirtualMachine(client, moref)
-	return
-}
-
-func nullableHosts() (hosts map[string]*v1beta1.Host, err error) {
+	vsphereVm = object.NewVirtualMachine(r.client.Client, moref)
 	return
 }
 
