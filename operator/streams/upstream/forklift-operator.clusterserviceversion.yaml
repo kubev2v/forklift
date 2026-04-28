@@ -243,6 +243,11 @@ spec:
           path: populator_vsphere_copy_offload_image_fqin
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:hidden
+        - description: HyperV populator image
+          displayName: HyperV Populator Image
+          path: populator_hyperv_image_fqin
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:hidden
         - description: OVA provider server image
           displayName: OVA Provider Server Image
           path: ova_provider_server_fqin
@@ -756,6 +761,11 @@ spec:
         kind: VSphereXcopyVolumePopulator
         name: vspherexcopyvolumepopulators.forklift.konveyor.io
         version: v1beta1
+      - description: HyperV Volume Populator
+        displayName: HyperVVolumePopulator
+        kind: HyperVVolumePopulator
+        name: hypervvolumepopulators.forklift.konveyor.io
+        version: v1beta1
   relatedImages:
     - name: forklift-operator
       image: "${OPERATOR_IMAGE}"
@@ -785,6 +795,8 @@ spec:
       image: "${VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE}"
     - name: hyperv_provider_server
       image: "${HYPERV_PROVIDER_SERVER_IMAGE}"
+    - name: hyperv_populator
+      image: "${HYPERV_POPULATOR_IMAGE}"
     - name: cli_download
       image: "${CLI_DOWNLOAD_IMAGE}"
     - name: virt_v2v_rhel9

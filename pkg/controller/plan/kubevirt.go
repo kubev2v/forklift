@@ -47,6 +47,7 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	cnv "kubevirt.io/api/core/v1"
 	instancetypeapi "kubevirt.io/api/instancetype"
@@ -1403,6 +1404,37 @@ func (r *KubeVirt) GetPodsWithLabels(podLabels map[string]string) (pods *core.Po
 	return
 }
 
+// GetPopulatorPodsWithoutMigrationLabel finds populator pods that haven't been
+// adopted by a migration yet. Populator pods are created by the volume-populator
+// framework (not the migration controller), so they lack a "migration" label at
+// birth. The migration controller calls this to discover them and then patches
+// the label on, enabling later selection for cleanup or cancellation.
+func (r *KubeVirt) GetPopulatorPodsWithoutMigrationLabel() (pods *core.PodList, err error) {
+	req, err := k8slabels.NewRequirement("pvcName", selection.Exists, nil)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	noMigration, err := k8slabels.NewRequirement("migration", selection.DoesNotExist, nil)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	selector := k8slabels.NewSelector().Add(*req, *noMigration)
+	pods = &core.PodList{}
+	err = r.Destination.Client.List(
+		context.TODO(),
+		pods,
+		&client.ListOptions{
+			LabelSelector: selector,
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return nil, err
+	}
+	return
+}
+
 // Deletes an object from destination cluster associated with the VM.
 func (r *KubeVirt) DeleteObject(object client.Object, vm *plan.VMStatus, message, objType string, options ...client.DeleteOption) (err error) {
 	err = r.Destination.Client.Delete(context.TODO(), object, options...)
@@ -2626,41 +2658,19 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 	}
 
 	switch r.Source.Provider.Type() {
-	case api.Ova, api.HyperV:
-		var pvc *core.PersistentVolumeClaim
-		var volumeName, mountPath string
-
-		if r.Source.Provider.Type() == api.Ova {
-			// OVA: Static NFS PV/PVC
-			pv := r.BuildPVForNFS(vm)
-			pv, err = r.EnsurePVForNFS(pv)
-			if err != nil {
-				return
-			}
-			pvc = r.BuildPVCForNFS(pv, vm)
-			volumeName = "store-pv"
-			mountPath = "/ova"
-		} else {
-			// HyperV: Static SMB CSI PV/PVC
-			pv := r.BuildPVForSMB(vm)
-			pv, err = r.EnsurePVForSMB(pv)
-			if err != nil {
-				return
-			}
-			pvc = r.BuildPVCForSMB(pv, vm)
-			volumeName = "hyperv-storage"
-			mountPath = "/hyperv"
+	case api.Ova:
+		pv := r.BuildPVForNFS(vm)
+		pv, err = r.EnsurePVForNFS(pv)
+		if err != nil {
+			return
 		}
-
-		// Ensure PVC exists (common logic)
+		pvc := r.BuildPVCForNFS(pv, vm)
 		pvc, err = r.EnsureProviderStoragePVC(pvc, r.Source.Provider.Type())
 		if err != nil {
 			return
 		}
-
-		// Mount provider storage (common pattern)
 		volumes = append(volumes, core.Volume{
-			Name: volumeName,
+			Name: "store-pv",
 			VolumeSource: core.VolumeSource{
 				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
 					ClaimName: pvc.Name,
@@ -2668,9 +2678,34 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 			},
 		})
 		mounts = append(mounts, core.VolumeMount{
-			Name:      volumeName,
-			MountPath: mountPath,
+			Name:      "store-pv",
+			MountPath: "/ova",
 		})
+	case api.HyperV:
+		if r.Source.Provider.GetHyperVTransferMethod() == api.HyperVTransferMethodSMB {
+			pv := r.BuildPVForSMB(vm)
+			pv, err = r.EnsurePVForSMB(pv)
+			if err != nil {
+				return
+			}
+			pvc := r.BuildPVCForSMB(pv, vm)
+			pvc, err = r.EnsureProviderStoragePVC(pvc, r.Source.Provider.Type())
+			if err != nil {
+				return
+			}
+			volumes = append(volumes, core.Volume{
+				Name: "hyperv-storage",
+				VolumeSource: core.VolumeSource{
+					PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
+						ClaimName: pvc.Name,
+					},
+				},
+			})
+			mounts = append(mounts, core.VolumeMount{
+				Name:      "hyperv-storage",
+				MountPath: "/hyperv",
+			})
+		}
 	case api.VSphere:
 		mounts = append(mounts,
 			core.VolumeMount{
@@ -3386,7 +3421,6 @@ func (r *KubeVirt) BuildPVForNFS(vm *plan.VMStatus) (pv *core.PersistentVolume) 
 
 // EnsureProviderStoragePVC returns existing PVC if found by labels, creates if not found (OVA NFS or HyperV SMB).
 func (r *KubeVirt) EnsureProviderStoragePVC(pvc *core.PersistentVolumeClaim, providerType api.ProviderType) (out *core.PersistentVolumeClaim, err error) {
-	// Query k8s for existing PVC matching labels (plan, migration, vmID)
 	list := &core.PersistentVolumeClaimList{}
 	err = r.Destination.Client.List(
 		context.TODO(),

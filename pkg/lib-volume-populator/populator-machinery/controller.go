@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -79,7 +80,8 @@ const (
 	AnnPopulatorReCreations    = "recreations"
 	AnnPopulatorServiceAccount = "forklift.konveyor.io/serviceAccount"
 
-	qemuGroup = 107
+	qemuGroup            = 107
+	progressPollInterval = 5 * time.Second
 )
 
 type empty struct{}
@@ -105,9 +107,17 @@ var (
 			resource:           api.VSphereXcopyVolumePopulatorResource,
 			regexKey:           "vsphere_xcopy_volume_populator",
 		},
+		api.HyperVVolumePopulatorKind: {
+			storageResourceKey: "disk_path",
+			resource:           api.HyperVVolumePopulatorResource,
+			regexKey:           "hyperv_volume_populator",
+		},
 	}
 
-	monitoredPVCs = map[string]interface{}{}
+	// monitoredPVCs tracks PVCs that already have a progress-monitoring
+	// goroutine running, so re-syncs don't spawn duplicates.
+	monitoredPVCs   = map[string]interface{}{}
+	monitoredPVCsMu sync.Mutex
 )
 
 type populatorResource struct {
@@ -142,6 +152,7 @@ type controller struct {
 	metrics           *metricsManager
 	recorder          record.EventRecorder
 	httpClient        *http.Client
+	httpClientOnce    sync.Once
 	resources         *corev1.ResourceRequirements
 }
 
@@ -645,6 +656,67 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 			} else if sa, ok := pvc.Annotations[AnnPopulatorServiceAccount]; ok && sa != "" {
 				pod.Spec.ServiceAccountName = sa // Other populators use the annotation
 			}
+			if c.gk.Kind == api.HyperVVolumePopulatorKind {
+				privileged := true
+				pod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
+					Privileged: &privileged,
+				}
+				// Clear FSGroup/RunAsUser from the template — they conflict with
+				// privileged hostPath mounts to /dev and /etc/iscsi.
+				pod.Spec.SecurityContext = &corev1.PodSecurityContext{}
+				// NETLINK_ISCSI is scoped to the network namespace, hostNetwork
+				// lets the pod use the host kernel's iSCSI transport and the
+				// host's iscsid daemon.
+				pod.Spec.HostNetwork = true
+				// HostPID allows nsenter -t 1 -m to run iscsiadm in the host's
+				// mount namespace, ensuring version compatibility with iscsid.
+				pod.Spec.HostPID = true
+				hostPathDir := corev1.HostPathDirectory
+				pod.Spec.Volumes = append(pod.Spec.Volumes,
+					// Writable scratch space (base filesystem is read-only).
+					corev1.Volume{
+						Name:         "tmp",
+						VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+					},
+					// Shared iSCSI config dir: the populator creates a per-session
+					// iface (forklift-<PID>) under /etc/iscsi/ifaces/ with its own
+					// initiator IQN — the global initiatorname.iscsi is never modified.
+					// The host's iscsid reads these iface files to complete logins.
+					corev1.Volume{
+						Name: "host-iscsi-etc",
+						VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{
+							Path: "/etc/iscsi",
+							Type: &hostPathDir,
+						}},
+					},
+					// Node records and session state shared with the host's iscsid.
+					corev1.Volume{
+						Name: "host-iscsi-var",
+						VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{
+							Path: "/var/lib/iscsi",
+							Type: &hostPathDir,
+						}},
+					},
+					// Block devices (/dev/sdX) created by the kernel after iSCSI login.
+					// Mounted at /host-dev (not /dev) to avoid shadowing kubelet's
+					// VolumeDevice bind mount at /populatorblock — mounting over /dev
+					// causes writes to /populatorblock to land on overlay instead of
+					// the real block device, silently losing all data.
+					corev1.Volume{
+						Name: "host-dev",
+						VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{
+							Path: "/dev",
+							Type: &hostPathDir,
+						}},
+					},
+				)
+				pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts,
+					corev1.VolumeMount{Name: "tmp", MountPath: "/tmp"},
+					corev1.VolumeMount{Name: "host-iscsi-etc", MountPath: "/etc/iscsi"},
+					corev1.VolumeMount{Name: "host-iscsi-var", MountPath: "/var/lib/iscsi"},
+					corev1.VolumeMount{Name: "host-dev", MountPath: "/host-dev"},
+				)
+			}
 			pod.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ClaimName = pvcPrimeName
 			con := &pod.Spec.Containers[0]
 			con.Image = c.imageName
@@ -653,19 +725,21 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 				con.Resources = *c.resources
 			}
 			if rawBlock {
+				devPath := c.devicePath
+				if c.gk.Kind == api.HyperVVolumePopulatorKind {
+					devPath = api.HyperVPopulatorBlockDevicePath
+				}
 				con.VolumeDevices = []corev1.VolumeDevice{
 					{
 						Name:       populatorPodVolumeName,
-						DevicePath: c.devicePath,
+						DevicePath: devPath,
 					},
 				}
 			} else {
-				con.VolumeMounts = []corev1.VolumeMount{
-					{
-						Name:      populatorPodVolumeName,
-						MountPath: c.mountPath,
-					},
-				}
+				con.VolumeMounts = append(con.VolumeMounts, corev1.VolumeMount{
+					Name:      populatorPodVolumeName,
+					MountPath: c.mountPath,
+				})
 			}
 
 			if waitForFirstConsumer {
@@ -716,29 +790,53 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 			return nil
 		} else {
 			if pod.Status.PodIP != "" {
-				if _, ok := monitoredPVCs[string(pvc.UID)]; !ok {
+				monitoredPVCsMu.Lock()
+				_, alreadyMonitored := monitoredPVCs[string(pvc.UID)]
+				if !alreadyMonitored {
 					monitoredPVCs[string(pvc.UID)] = true
-					go func() {
-						c.recorder.Eventf(pod, corev1.EventTypeWarning, reasonPopulatorProgress, "Starting to monitor progress for PVC %s", pvc.Name)
+				}
+				monitoredPVCsMu.Unlock()
+				if !alreadyMonitored {
+					go func(currentPod *corev1.Pod) {
+						defer func() {
+							monitoredPVCsMu.Lock()
+							delete(monitoredPVCs, string(pvc.UID))
+							monitoredPVCsMu.Unlock()
+						}()
+						c.recorder.Eventf(currentPod, corev1.EventTypeWarning, reasonPopulatorProgress, "Starting to monitor progress for PVC %s", pvc.Name)
+						podName := currentPod.Name
+						consecutiveErrors := 0
+						const maxConsecutiveErrors = 60 // ~5 min at 5s intervals
 						for {
-							err = c.updateProgress(pod, pvc, crInstance)
+							if err := c.updateProgress(currentPod, pvc, crInstance); err != nil {
+								consecutiveErrors++
+								// Log the first few failures, then throttle to once per minute
+								// (every 12th attempt at 5s intervals) to avoid log spam during
+								// transient outages such as the metrics server startup race.
+								if consecutiveErrors <= 3 || consecutiveErrors%12 == 0 {
+									klog.Warningf("Failed to update progress for PVC %s (attempt %d): %v", pvc.Name, consecutiveErrors, err)
+								}
+							} else {
+								consecutiveErrors = 0
+							}
+
+							time.Sleep(progressPollInterval)
+
+							latest, err := c.podLister.Pods(populatorNamespace).Get(podName)
 							if err != nil {
-								klog.V(5).Info("Failed to update progress", err)
+								consecutiveErrors++
+								if consecutiveErrors >= maxConsecutiveErrors {
+									klog.Warningf("Stopping progress monitor for PVC %s: pod %s not found after %d attempts", pvc.Name, podName, consecutiveErrors)
+									break
+								}
 								continue
 							}
-
-							pod, err = c.podLister.Pods(populatorNamespace).Get(pod.Name)
-							if err != nil {
+							currentPod = latest
+							if currentPod.Status.Phase != corev1.PodRunning {
 								break
 							}
-							if pod.Status.Phase != corev1.PodRunning {
-								break
-							}
-
-							// TODO make configurable?
-							time.Sleep(5 * time.Second)
 						}
-					}()
+					}(pod)
 				}
 			}
 		}
@@ -852,7 +950,9 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 	c.cleanupNotifications(key)
 
 	// Stop progress monitoring
+	monitoredPVCsMu.Lock()
 	delete(monitoredPVCs, string(pvc.UID))
+	monitoredPVCsMu.Unlock()
 
 	return nil
 }
@@ -866,6 +966,9 @@ func (c *controller) deleteFailedPVC(ctx context.Context, pvc *corev1.Persistent
 }
 
 func (c *controller) retryFailedPopulator(ctx context.Context, pvc *corev1.PersistentVolumeClaim, namespace, podName string, counter int) error {
+	if pvc.Annotations == nil {
+		pvc.Annotations = make(map[string]string)
+	}
 	pvc.Annotations[AnnPopulatorReCreations] = strconv.Itoa(counter)
 	err := c.updatePvc(ctx, pvc, namespace)
 	if err != nil {
@@ -886,26 +989,8 @@ func (c *controller) updatePvc(ctx context.Context, pvc *corev1.PersistentVolume
 func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolumeClaim, cr *unstructured.Unstructured) error {
 	populatorKind := pvc.Spec.DataSourceRef.Kind
 
-	url, err := getMetricsURL(pod)
+	body, err := c.scrapeMetrics(pod)
 	if err != nil {
-		klog.V(5).Info("Failed to get metrics URL: ", err)
-		return err
-	}
-
-	if c.httpClient == nil {
-		c.httpClient = buildHTTPClient()
-	}
-
-	resp, err := c.httpClient.Get(url)
-	if err != nil {
-		klog.V(5).Info("Failed to get metrics: ", err)
-		return err
-	}
-
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		klog.V(5).Info(err)
 		return err
 	}
 
@@ -916,17 +1001,9 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 		c.parseAndRecordCompletion(bodyStr, pvc, cr)
 	}
 
-	// Pick the right progress regex for the populator type.
-	var importRegExp *regexp.Regexp
-	if populatorKind == api.VSphereXcopyVolumePopulatorKind {
-		importRegExp = regexp.MustCompile(`vsphere_xcopy_volume_populator_progress\{[^}]*owner_uid="` + string(pvc.UID) + `"[^}]*\} (\d+\.?\d*)`)
-	} else {
-		importRegExp = regexp.MustCompile("progress\\{ownerUID=\"" + string(pvc.UID) + "\"\\} (\\d+\\.?\\d*)")
-	}
-
-	match := importRegExp.FindStringSubmatch(bodyStr)
+	match := progressRegex(populatorKind, string(pvc.UID)).FindStringSubmatch(bodyStr)
 	if match == nil {
-		klog.V(5).Info("Failed to find matches, regex: ", importRegExp)
+		klog.V(5).Info("Failed to find progress match for populator kind: ", populatorKind)
 		return nil
 	}
 
@@ -936,10 +1013,15 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 		return err
 	}
 
+	pr, ok := populatorToResource[populatorKind]
+	if !ok || pr == nil {
+		klog.V(3).Infof("No populatorToResource entry for kind %q, skipping progress update", populatorKind)
+		return nil
+	}
 	gvr := schema.GroupVersionResource{
 		Group:    *pvc.Spec.DataSourceRef.APIGroup,
 		Version:  "v1beta1",
-		Resource: populatorToResource[populatorKind].resource,
+		Resource: pr.resource,
 	}
 
 	latestPopulator, err := c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Get(context.TODO(), cr.GetName(), metav1.GetOptions{})
@@ -954,7 +1036,14 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 		return err
 	}
 
-	_, err = c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Update(context.TODO(), latestPopulator, metav1.UpdateOptions{})
+	// CRDs with a status subresource (HyperVVolumePopulator, VSphereXcopyVolumePopulator)
+	// require UpdateStatus; a plain Update silently drops status field changes.
+	// Legacy CRDs without a status subresource need Update instead.
+	if c.gk.Kind == api.HyperVVolumePopulatorKind || c.gk.Kind == api.VSphereXcopyVolumePopulatorKind {
+		_, err = c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).UpdateStatus(context.TODO(), latestPopulator, metav1.UpdateOptions{})
+	} else {
+		_, err = c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Update(context.TODO(), latestPopulator, metav1.UpdateOptions{})
+	}
 	if err != nil {
 		klog.V(5).Info("Failed to update CR ", err)
 		return err
@@ -965,6 +1054,13 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 	}
 
 	return nil
+}
+
+func progressRegex(populatorKind, pvcUID string) *regexp.Regexp {
+	if populatorKind == api.VSphereXcopyVolumePopulatorKind {
+		return regexp.MustCompile(`vsphere_xcopy_volume_populator_progress\{[^}]*owner_uid="` + pvcUID + `"[^}]*\} (\d+\.?\d*)`)
+	}
+	return regexp.MustCompile("progress\\{ownerUID=\"" + pvcUID + "\"\\} (\\d+\\.?\\d*)")
 }
 
 // parseAndRecordCompletion extracts completion metrics from the populator pod's /metrics output.
@@ -1101,16 +1197,31 @@ func buildHTTPClient() *http.Client {
 	return &http.Client{Transport: transport}
 }
 
-func getMetricsURL(pod *corev1.Pod) (string, error) {
-	if pod == nil {
-		return "", nil
-	}
+// scrapeMetrics fetches Prometheus metrics from a populator pod.
+// For hostNetwork pods (Hyper-V iSCSI) PodIP is the node's physical IP
+// and the metrics server binds 0.0.0.0, so PodIP is the correct address.
+// The node IP is routable from any pod in the cluster via the OVN gateway.
+func (c *controller) scrapeMetrics(pod *corev1.Pod) ([]byte, error) {
 	port, err := getPodMetricsPort(pod)
-	if err != nil || pod.Status.PodIP == "" {
-		return "", err
+	if err != nil {
+		return nil, err
 	}
-	url := fmt.Sprintf("https://%s:%d/metrics", pod.Status.PodIP, port)
-	return url, nil
+
+	ip := pod.Status.PodIP
+	if ip == "" {
+		return nil, fmt.Errorf("pod %s/%s has no PodIP yet", pod.Namespace, pod.Name)
+	}
+
+	// Thread-safe: multiple goroutines may call scrapeMetrics concurrently.
+	c.httpClientOnce.Do(func() {
+		c.httpClient = buildHTTPClient()
+	})
+	resp, err := c.httpClient.Get(fmt.Sprintf("https://%s/metrics", net.JoinHostPort(ip, strconv.Itoa(port))))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return io.ReadAll(resp.Body)
 }
 
 func getPodMetricsPort(pod *corev1.Pod) (int, error) {

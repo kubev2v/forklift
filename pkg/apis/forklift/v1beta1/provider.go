@@ -19,6 +19,7 @@ package v1beta1
 import (
 	"os"
 	"strconv"
+	"strings"
 
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	core "k8s.io/api/core/v1"
@@ -84,6 +85,13 @@ const (
 const (
 	ESXiCloneMethodVIB = "vib"
 	ESXiCloneMethodSSH = "ssh"
+)
+
+// Hyper-V transfer method settings.
+const (
+	HyperVTransferMethod      = "hyperVTransferMethod"
+	HyperVTransferMethodSMB   = "smb"
+	HyperVTransferMethodISCSI = "iscsi"
 )
 
 const OvaProviderFinalizer = "forklift/ova-provider"
@@ -199,4 +207,11 @@ func (p *Provider) UseVddkAioOptimization() bool {
 		return false
 	}
 	return parseBool
+}
+
+func (p *Provider) GetHyperVTransferMethod() string {
+	if m, ok := p.Spec.Settings[HyperVTransferMethod]; ok && strings.EqualFold(m, HyperVTransferMethodISCSI) {
+		return HyperVTransferMethodISCSI
+	}
+	return HyperVTransferMethodSMB
 }

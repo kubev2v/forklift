@@ -42,6 +42,9 @@ ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel10@sha256:
 ARG VIRT_V2V_IMAGE_RHEL9="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel9@sha256:f9f62a6716d9ee1ae156d15f54f5a1d8887ff379eac94912a7db5596ba46b1ab"
 
 ARG VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-vsphere-copy-offload-populator-rhel9@sha256:a1f8308e6fa235654a4d35fe9c40e4657777814968879bde3f6c3713d6728150"
+# TODO: Replace with registry.redhat.io/mtv-candidate/mtv-hyperv-populator-rhel9@sha256:...
+# once the downstream image is published.
+ARG HYPERV_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-hyperv-populator-rhel9@sha256:0000000000000000000000000000000000000000000000000000000000000000"
 
 USER root
 

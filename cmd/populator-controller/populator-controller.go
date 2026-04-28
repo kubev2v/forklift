@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -53,6 +55,13 @@ var populators = map[string]populator{
 		controllerFunc:  getVXPopulatorPodArgs,
 		imageVar:        "VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE",
 		metricsEndpoint: ":8082",
+	},
+	"hyperv": {
+		kind:            "HyperVVolumePopulator",
+		resource:        "hypervvolumepopulators",
+		controllerFunc:  getHyperVPopulatorPodArgs,
+		imageVar:        "HYPERV_POPULATOR_IMAGE",
+		metricsEndpoint: ":8083",
 	},
 }
 
@@ -153,6 +162,40 @@ func getVXPopulatorPodArgs(_ bool, u *unstructured.Unstructured, pvc corev1.Pers
 		"--owner-name=" + pvc.Name,
 		"--secret-name=" + xcopy.Spec.SecretName,
 		"--storage-vendor-product=" + xcopy.Spec.StorageVendorProduct,
+	}
+	return args, nil
+}
+
+func getHyperVPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured, _ corev1.PersistentVolumeClaim) ([]string, error) {
+	var hvp v1beta1.HyperVVolumePopulator
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &hvp)
+	if err != nil {
+		return nil, fmt.Errorf("convert HyperVVolumePopulator: %w", err)
+	}
+
+	var volumePath string
+	if rawBlock {
+		volumePath = v1beta1.HyperVPopulatorBlockDevicePath
+	} else {
+		volumePath = getVolumePath(rawBlock)
+	}
+	specs := []struct {
+		LunID      int    `json:"lunId"`
+		VolumePath string `json:"volumePath"`
+	}{{hvp.Spec.LunID, volumePath}}
+	diskSpecsJSON, err := json.Marshal(specs)
+	if err != nil {
+		return nil, fmt.Errorf("marshal disk specs: %w", err)
+	}
+
+	args := []string{
+		"--portal=" + hvp.Spec.TargetPortal,
+		"--target-iqn=" + hvp.Spec.TargetIQN,
+		"--initiator-iqn=" + hvp.Spec.InitiatorIQN,
+		"--disk-specs=" + string(diskSpecsJSON),
+		"--secret-name=" + hvp.Spec.SecretName,
+		"--cr-name=" + hvp.Name,
+		"--cr-namespace=" + hvp.Namespace,
 	}
 	return args, nil
 }

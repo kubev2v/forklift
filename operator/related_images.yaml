@@ -29,5 +29,7 @@ relatedImages:
     image: ${OVA_PROXY_IMAGE}
   - name: vsphere_copy_offload_populator
     image: ${VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE}
+  - name: hyperv_populator
+    image: ${HYPERV_POPULATOR_IMAGE}
   - name: cli_download
     image: ${CLI_DOWNLOAD_IMAGE}
