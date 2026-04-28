@@ -355,6 +355,17 @@ type PlanSpec struct {
 	// Warning: Enabling XFSv4 support will drop support for BTRFS for the specific plan. Ensure that the plan only selects VMs with supported filesystem.
 	// +kubebuilder:default:=false
 	XfsCompatibility bool `json:"xfsCompatibility,omitempty"`
+	// AllowSnapshotConsolidation enables some level of control over when forklift
+	// will allow VMware to consolidate snapshots after removal, and when forklift
+	// will wait for any consolidations to complete.
+	// - "Always" (default): always consolidate snapshots after removal
+	// - "Never": never consolidate snapshots after removal
+	// - "AfterFinalSnapshot": only consolidate after the final snapshot is removed, and do not wait for it to finish
+	// - "BeforePenultimateSnapshot": consolidate after every snapshot removal until the second-to-last snapshot
+	// +optional
+	// +kubebuilder:validation:Enum=Always;Never;AfterFinalSnapshot;BeforePenultimateSnapshot
+	// +kubebuilder:default:=Always
+	AllowSnapshotConsolidation string `json:"allowSnapshotConsolidation,omitempty"`
 }
 
 // Find a planned VM.

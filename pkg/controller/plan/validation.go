@@ -68,6 +68,7 @@ const (
 	VMIpNotMatchingUdnSubnet        = "VMIpNotMatchingUdnSubnet"
 	VMMissingChangedBlockTracking   = "VMMissingChangedBlockTracking"
 	VMHasSnapshots                  = "VMHasSnapshots"
+	VMConsolidationNeeded           = "VMConsolidationNeeded"
 	HostNotReady                    = "HostNotReady"
 	DuplicateVM                     = "DuplicateVM"
 	SharedDisks                     = "SharedDisks"
@@ -136,6 +137,7 @@ const (
 	InMaintenanceMode           = "InMaintenanceMode"
 	MissingGuestInfo            = "MissingGuestInformation"
 	MissingChangedBlockTracking = "MissingChangedBlockTracking"
+	ConsolidationNeeded         = "ConsolidationNeeded"
 )
 
 // Statuses
@@ -867,6 +869,14 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 		Message:  "One or more VMs in the plan have critical concerns that block migration.",
 		Items:    []string{},
 	}
+	consolidationNeeded := libcnd.Condition{
+		Type:     VMConsolidationNeeded,
+		Status:   True,
+		Reason:   ConsolidationNeeded,
+		Category: api.CategoryWarn,
+		Message:  "VM has snapshots that require consolidation. This may cause long delays between precopies.",
+		Items:    []string{},
+	}
 
 	var sharedDisksConditions []libcnd.Condition
 	setOf := map[string]bool{}
@@ -1180,6 +1190,15 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 					vmHasSnapshotsForWarm.Message = msg
 				}
 			}
+
+			// Check for "consolidation needed"
+			consolidation, err := validator.ConsolidationNeeded(*ref)
+			if err != nil {
+				return err
+			}
+			if consolidation {
+				consolidationNeeded.Items = append(consolidationNeeded.Items, ref.String())
+			}
 		}
 		// is valid vm pvc name template
 		if plan.Spec.PVCNameTemplate != "" || vm.PVCNameTemplate != "" {
@@ -1304,6 +1323,9 @@ func (r *Reconciler) validateVM(plan *api.Plan) error {
 	}
 	if len(vmCriticalConcerns.Items) > 0 {
 		plan.Status.SetCondition(vmCriticalConcerns)
+	}
+	if len(consolidationNeeded.Items) > 0 {
+		plan.Status.SetCondition(consolidationNeeded)
 	}
 
 	return nil
