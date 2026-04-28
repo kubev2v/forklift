@@ -28,6 +28,7 @@ const flashCopyMappingNamePrefixLen = 10 // first N characters of source/target 
 const defaultFlashCopyRate = 100
 
 const HostNameKey = "hostName"
+const loggerName = "copy-offload"
 const HostCreatedKey = "hostCreated"
 
 type ExtractedMapping struct {
@@ -39,17 +40,17 @@ type ExtractedMapping struct {
 
 // extractWWPNsFromFCFormat extracts individual WWPNs from fc.WWNN:WWPN format
 // Uses the second part (after colon) as the real WWPN
-func extractWWPNsFromFCFormat(fcStrings []string) []string {
+func extractWWPNsFromFCFormat(fcStrings []string, log klog.Logger) []string {
 	var wwpns []string
 	for _, fcStr := range fcStrings {
 		if strings.HasPrefix(fcStr, "fc.") {
 			wwpn, err := fcutil.ExtractWWPN(fcStr)
 			if err != nil {
-				klog.Warningf("Failed to extract WWPN from %s: %v", fcStr, err)
+				log.Info("failed to extract WWPN", "fc_string", fcStr, "err", err)
 				continue
 			}
 			wwpns = append(wwpns, wwpn)
-			klog.Infof("Extracted WWPN: %s from %s", wwpn, fcStr)
+			log.V(2).Info("extracted WWPN", "wwpn", wwpn, "fc_string", fcStr)
 		}
 	}
 	return wwpns
@@ -140,7 +141,8 @@ func (c *FlashSystemAPIClient) authenticate() error {
 	req.Header.Set("X-Auth-Username", c.username)
 	req.Header.Set("X-Auth-Password", c.password)
 
-	klog.Infof("Attempting to authenticate with FlashSystem at %s for user %s", c.ManagementIP, c.username)
+	log := klog.Background().WithName(loggerName).WithName("setup")
+	log.V(2).Info("authenticating with FlashSystem", "host", c.ManagementIP, "user", c.username)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send auth request to FlashSystem: %w", err)
@@ -167,7 +169,7 @@ func (c *FlashSystemAPIClient) authenticate() error {
 
 	c.authToken = authResp.Token
 
-	klog.Infof("Successfully authenticated with FlashSystem and obtained session token.")
+	log.V(2).Info("authentication successful, session token obtained")
 	return nil
 }
 
@@ -445,8 +447,10 @@ func (c *FlashSystemClonner) UnmapTarget(targetLUN populator.LUN, context popula
 
 // EnsureSingleHost creates or finds a single host with the given identifiers.
 func (c *FlashSystemClonner) EnsureClonnerIgroup(hostName string, clonnerIdentifiers []string) (populator.MappingContext, error) {
+	log := klog.Background().WithName(loggerName).WithName("map").WithName("ensure-igroup")
+	log.Info("ensuring initiator group", "group", hostName, "adapters", clonnerIdentifiers)
+
 	c.initiatorGroup = hostName
-	klog.Infof("Ensuring single host '%s' exists with identifiers: %v", hostName, clonnerIdentifiers)
 	ctx := make(populator.MappingContext)
 
 	if len(clonnerIdentifiers) == 0 {
@@ -460,7 +464,7 @@ func (c *FlashSystemClonner) EnsureClonnerIgroup(hostName string, clonnerIdentif
 	for _, identifier := range clonnerIdentifiers {
 		if strings.HasPrefix(identifier, "fc.") {
 			// It's a FC WWPN - extract and get the first half (non-virtual part)
-			wwpns := extractWWPNsFromFCFormat([]string{identifier})
+			wwpns := extractWWPNsFromFCFormat([]string{identifier}, log)
 			fcWWPNs = append(fcWWPNs, wwpns...)
 		} else {
 			// Assume it's an iSCSI IQN
@@ -468,7 +472,7 @@ func (c *FlashSystemClonner) EnsureClonnerIgroup(hostName string, clonnerIdentif
 		}
 	}
 
-	klog.Infof("Categorized identifiers - FC WWPNs: %v, iSCSI IQNs: %v", fcWWPNs, iscsiIQNs)
+	log.V(2).Info("categorized identifiers", "fc_wwpns", fcWWPNs, "iscsi_iqns", iscsiIQNs)
 
 	// Step 2: Check for existing hosts with any of these identifiers
 	var existingHostName string
@@ -478,10 +482,10 @@ func (c *FlashSystemClonner) EnsureClonnerIgroup(hostName string, clonnerIdentif
 	if len(fcWWPNs) > 0 {
 		existingFCHosts, err := c.findAllHostsByWWPNs(fcWWPNs)
 		if err != nil {
-			klog.Warningf("Error searching for existing FC hosts: %v", err)
+			log.Info("error searching for existing FC hosts", "err", err)
 		} else if len(existingFCHosts) > 0 {
 			existingHostName = existingFCHosts[0]
-			klog.Infof("Found existing host '%s' with FC WWPNs %v", existingHostName, fcWWPNs)
+			log.V(2).Info("found existing host with FC WWPNs", "host", existingHostName, "wwpns", fcWWPNs)
 		}
 	}
 
@@ -489,10 +493,10 @@ func (c *FlashSystemClonner) EnsureClonnerIgroup(hostName string, clonnerIdentif
 	if existingHostName == "" && len(iscsiIQNs) > 0 {
 		existingISCSIHosts, err := c.findAllHostsByIQNs(iscsiIQNs)
 		if err != nil {
-			klog.Warningf("Error searching for existing iSCSI hosts: %v", err)
+			log.Info("error searching for existing iSCSI hosts", "err", err)
 		} else if len(existingISCSIHosts) > 0 {
 			existingHostName = existingISCSIHosts[0]
-			klog.Infof("Found existing host '%s' with iSCSI IQNs %v", existingHostName, iscsiIQNs)
+			log.V(2).Info("found existing host with iSCSI IQNs", "host", existingHostName, "iqns", iscsiIQNs)
 		}
 	}
 
@@ -508,7 +512,8 @@ func (c *FlashSystemClonner) EnsureClonnerIgroup(hostName string, clonnerIdentif
 		// Note: created_host is not set (defaults to false) since we're using an existing host
 		ctx[HostNameKey] = hostDetails.Name
 		ctx[HostIdKey] = hostDetails.ID
-		klog.Infof("Using existing host '%s' with ID '%s'", hostDetails.Name, hostDetails.ID)
+		log.Info("using existing host", "host", hostDetails.Name, "host_id", hostDetails.ID)
+		log.Info("initiator group ready", "group", hostName)
 		return ctx, nil
 	}
 
@@ -517,15 +522,15 @@ func (c *FlashSystemClonner) EnsureClonnerIgroup(hostName string, clonnerIdentif
 	var newHostName string
 	if len(fcWWPNs) > 0 {
 		// Create FC host
-		klog.Infof("Creating new FC host '%s' with WWPNs: %v", hostName, fcWWPNs)
-		newHostName, err = c.createNewHost(hostName, fcWWPNs, true)
+		log.V(2).Info("creating new FC host", "host", hostName, "wwpns", fcWWPNs)
+		newHostName, err = c.createNewHost(hostName, fcWWPNs, true, log)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create FC host: %w", err)
 		}
 	} else if len(iscsiIQNs) > 0 {
 		// Create iSCSI host (only if no FC WWPNs exist)
-		klog.Infof("Creating new iSCSI host '%s' with IQNs: %v", hostName, iscsiIQNs)
-		newHostName, err = c.createNewHost(hostName, iscsiIQNs, false)
+		log.V(2).Info("creating new iSCSI host", "host", hostName, "iqns", iscsiIQNs)
+		newHostName, err = c.createNewHost(hostName, iscsiIQNs, false, log)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create iSCSI host: %w", err)
 		}
@@ -544,12 +549,13 @@ func (c *FlashSystemClonner) EnsureClonnerIgroup(hostName string, clonnerIdentif
 	ctx[HostNameKey] = hostDetails.Name
 	ctx[HostIdKey] = hostDetails.ID
 	ctx[HostCreatedKey] = true
-	klog.Infof("Successfully created new host '%s' with ID '%s'", hostDetails.Name, hostDetails.ID)
+	log.Info("created new host", "host", hostDetails.Name, "host_id", hostDetails.ID)
+	log.Info("initiator group ready", "group", hostName)
 	return ctx, nil
 }
 
 // createNewHost creates a new host without checking for existing ones (used when we've already determined none exist)
-func (c *FlashSystemClonner) createNewHost(hostName string, identifiers []string, isFibreChannel bool) (string, error) {
+func (c *FlashSystemClonner) createNewHost(hostName string, identifiers []string, isFibreChannel bool, log klog.Logger) (string, error) {
 	// Check if our desired host name exists and adjust if needed
 	filterPayload := map[string]string{
 		"filtervalue": fmt.Sprintf("name=%s", hostName),
@@ -565,12 +571,16 @@ func (c *FlashSystemClonner) createNewHost(hostName string, identifiers []string
 		if err := json.Unmarshal(hostBytes, &existingHosts); err == nil && len(existingHosts) > 0 {
 			// Generate a unique name by appending a suffix
 			hostName = fmt.Sprintf("%s-%d", hostName, time.Now().Unix())
-			klog.Infof("Host name conflict, using alternative name: %s", hostName)
+			log.Info("host name conflict, using alternative name", "host", hostName)
 		}
 	}
 
 	// Create new host with unique WWPNs and name
-	klog.Infof("Creating NEW host '%s' with identifiers: %v (FC: %t)", hostName, identifiers, isFibreChannel)
+	protocol := "iSCSI"
+	if isFibreChannel {
+		protocol = "FC"
+	}
+	log.Info("creating new host", "host", hostName, "protocol", protocol, "identifier_count", len(identifiers))
 
 	createPayload := map[string]interface{}{
 		"name": hostName,
@@ -583,19 +593,19 @@ func (c *FlashSystemClonner) createNewHost(hostName string, identifiers []string
 		createPayload["force"] = true
 		createPayload["protocol"] = "fcscsi"
 		createPayload["type"] = "generic"
-		klog.Infof("Creating FC host '%s' with WWPNs: %s", hostName, wwpnString)
+		log.V(2).Info("creating FC host", "host", hostName, "wwpns", wwpnString)
 	} else {
 		// iSCSI host
 		iqnString := strings.Join(identifiers, ",")
 		createPayload["iscsiname"] = iqnString
 		createPayload["protocol"] = "iscsi"
 		createPayload["type"] = "generic"
-		klog.Infof("Creating iSCSI host '%s' with IQNs: %s", hostName, iqnString)
+		log.V(2).Info("creating iSCSI host", "host", hostName, "iqns", iqnString)
 	}
 
 	// Log the exact payload for debugging
 	if payloadJSON, err := json.MarshalIndent(createPayload, "", "  "); err == nil {
-		klog.Infof("FlashSystem mkhost API request payload: %s", string(payloadJSON))
+		log.V(2).Info("FlashSystem mkhost API request payload", "payload", string(payloadJSON))
 	}
 
 	// Make the mkhost API call
@@ -608,23 +618,25 @@ func (c *FlashSystemClonner) createNewHost(hostName string, identifiers []string
 		return "", fmt.Errorf("failed to create host: status %d, body: %s", respStatus, string(respBytes))
 	}
 
-	klog.Infof("Successfully created host '%s'", hostName)
+	log.Info("host created successfully", "host", hostName)
 	return hostName, nil
 }
 
 // Map maps a VDisk to a Host using mkvolumehostmap API.
 func (c *FlashSystemClonner) Map(initiatorGroup string, targetLUN populator.LUN, context populator.MappingContext) (populator.LUN, error) {
+	log := klog.Background().WithName(loggerName).WithName("map")
+
 	mapping := extractFromContext(context)
 
 	if !mapping.IsSet {
-		klog.Infof("No mapping context provided, skipping map operation for LUN '%s' to '%s' (assuming already correctly mapped)", targetLUN.Name, initiatorGroup)
+		log.V(2).Info("no mapping context provided, skipping map operation", "volume", targetLUN.Name, "group", initiatorGroup)
 		return targetLUN, nil
 	}
 
 	hostID := mapping.HostId
 
 	vdiskID := targetLUN.Name // The LUN.Name field should hold the VDisk ID for this provider.
-	klog.Infof("Mapping LUN (VDisk ID '%s') to Host '%s' (Host ID '%s')", vdiskID, mapping.HostName, hostID)
+	log.Info("mapping volume to host", "vdisk_id", vdiskID, "host", mapping.HostName, "host_id", hostID)
 
 	// Create the mapping using mkvdiskhostmap API endpoint
 	mapPayload := map[string]interface{}{
@@ -636,12 +648,12 @@ func (c *FlashSystemClonner) Map(initiatorGroup string, targetLUN populator.LUN,
 
 	// Handle the specific case where mapping already exists to same host
 	if mapErr != nil && mapStatus == http.StatusConflict && strings.Contains(mapErr.Error(), "CMMVC5878E") {
-		klog.Infof("VDisk '%s' is already mapped to Host '%s', continuing...", vdiskID, hostID)
+		log.V(2).Info("volume already mapped to host", "vdisk_id", vdiskID, "host_id", hostID)
 	} else if mapErr != nil && mapStatus == http.StatusConflict && strings.Contains(mapErr.Error(), "CMMVC9375E") {
 		// Volume is already mapped to a different host (CMMVC9375E)
 		// Use lshostvdiskmap to find the next available SCSI ID for the target host
 		// Then map with explicit SCSI ID, which allows multi-host mapping
-		klog.Warningf("VDisk '%s' is already mapped to another host. Finding next available SCSI ID for multi-host mapping.", vdiskID)
+		log.Info("volume already mapped to another host, finding next available SCSI ID for multi-host mapping", "vdisk_id", vdiskID)
 
 		// Query lshostvdiskmap for the target host to get all current SCSI IDs
 		hostMapEndpoint := fmt.Sprintf("/lshostvdiskmap/%s", hostID)
@@ -670,7 +682,7 @@ func (c *FlashSystemClonner) Map(initiatorGroup string, targetLUN populator.LUN,
 
 		// Use the next available SCSI ID
 		nextSCSIID := maxSCSIID + 1
-		klog.Infof("Found max SCSI ID %d on host '%s', using next available: %d", maxSCSIID, initiatorGroup, nextSCSIID)
+		log.V(2).Info("found next available SCSI ID", "max_scsi_id", maxSCSIID, "next_scsi_id", nextSCSIID, "host", initiatorGroup)
 
 		// Retry mapping with explicit SCSI ID for multi-host assignment
 		// Note: REST API may allow multi-host mapping when explicit SCSI ID is provided
@@ -685,14 +697,14 @@ func (c *FlashSystemClonner) Map(initiatorGroup string, targetLUN populator.LUN,
 		} else if mapStatus != http.StatusOK && mapStatus != http.StatusCreated {
 			return populator.LUN{}, fmt.Errorf("failed to map VDisk '%s' to Host '%s' with SCSI ID %d, status: %d, body: %s", vdiskID, hostID, nextSCSIID, mapStatus, string(mapBody))
 		}
-		klog.Infof("Successfully mapped VDisk '%s' to Host '%s' with SCSI ID %d for multi-host access", vdiskID, hostID, nextSCSIID)
+		log.Info("volume mapped successfully with SCSI ID for multi-host access", "vdisk_id", vdiskID, "host_id", hostID, "scsi_id", nextSCSIID)
 	} else if mapErr != nil {
 		return populator.LUN{}, fmt.Errorf("failed to create host mapping: %w", mapErr)
 	} else if mapStatus != http.StatusOK && mapStatus != http.StatusCreated {
 		return populator.LUN{}, fmt.Errorf("failed to map VDisk '%s' to Host '%s', status: %d, body: %s", vdiskID, hostID, mapStatus, string(mapBody))
 	}
 
-	klog.Infof("Successfully created mapping of VDisk '%s' to Host '%s'.", vdiskID, hostID)
+	log.Info("volume mapped successfully", "vdisk_id", vdiskID, "host_id", hostID)
 
 	return targetLUN, nil
 }
@@ -727,16 +739,18 @@ func extractFromContext(context populator.MappingContext) ExtractedMapping {
 
 // UnMap removes a VDisk mapping from a Host.
 func (c *FlashSystemClonner) UnMap(initiatorGroup string, targetLUN populator.LUN, context populator.MappingContext) error {
+	log := klog.Background().WithName(loggerName).WithName("map")
+
 	mapping := extractFromContext(context)
 	if !mapping.IsSet {
-		klog.Infof("mapping context is empty, skipping unmap")
+		log.V(2).Info("mapping context is empty, skipping unmap")
 		return nil
 	}
 
 	hostID := mapping.HostId
 
 	vdiskID := targetLUN.Name // VDisk ID from the LUN object.
-	klog.Infof("Unmapping LUN (VDisk ID '%s') from Host '%s' (Host ID '%s')", vdiskID, mapping.HostName, hostID)
+	log.Info("unmapping volume from host", "vdisk_id", vdiskID, "host", mapping.HostName, "host_id", hostID)
 
 	// Use v1 API endpoint for removing host mapping
 	payload := map[string]string{
@@ -753,30 +767,30 @@ func (c *FlashSystemClonner) UnMap(initiatorGroup string, targetLUN populator.LU
 	if unmapStatus != http.StatusOK && unmapStatus != http.StatusNoContent {
 		// It's possible the API returns 404 if mapping doesn't exist, which is idempotent.
 		if unmapStatus == http.StatusNotFound {
-			klog.Infof("Mapping for VDisk '%s' to Host '%s' did not exist.", vdiskID, hostID)
+			log.V(2).Info("mapping did not exist", "vdisk_id", vdiskID, "host_id", hostID)
 			return nil
 		}
 		return fmt.Errorf("failed to unmap VDisk '%s' from Host '%s', status: %d, body: %s", vdiskID, hostID, unmapStatus, string(unmapBody))
 	}
 
-	klog.Infof("Successfully unmapped LUN (VDisk ID '%s') from Host '%s'", vdiskID, hostID)
+	log.Info("volume unmapped successfully", "vdisk_id", vdiskID, "host_id", hostID)
 
 	// Clean up the host if we created it and if it has no more mappings
 	if mapping.HostCreated {
-		c.cleanupEmptyHost(hostID)
+		c.cleanupEmptyHost(hostID, log)
 	}
 
 	// Clear the context to signal that no remapping is needed
 	for key := range context {
 		delete(context, key)
 	}
-	klog.Infof("Cleared mapping context after successful unmap")
+	log.V(2).Info("cleared mapping context after successful unmap")
 
 	return nil
 }
 
 // cleanupEmptyHost removes a host if it has no mappings (safe cleanup)
-func (c *FlashSystemClonner) cleanupEmptyHost(hostID string) {
+func (c *FlashSystemClonner) cleanupEmptyHost(hostID string, log klog.Logger) {
 	// Check if host has any remaining mappings
 	filterPayload := map[string]string{
 		"filtervalue": fmt.Sprintf("host_id=%s", hostID),
@@ -784,20 +798,20 @@ func (c *FlashSystemClonner) cleanupEmptyHost(hostID string) {
 
 	mappingsBytes, status, err := c.api.makeRequest("POST", "/lshostvdiskmap", filterPayload)
 	if err != nil {
-		klog.Warningf("Failed to check host mappings before cleanup: %v", err)
+		log.Info("failed to check host mappings before cleanup", "host_id", hostID, "err", err)
 		return
 	}
 
 	if status == http.StatusOK {
 		var mappings []FlashSystemVolumeHostMapping
 		if err := json.Unmarshal(mappingsBytes, &mappings); err == nil && len(mappings) > 0 {
-			klog.Infof("Host id '%s' still has %d mappings, not cleaning up", hostID, len(mappings))
+			log.V(2).Info("host still has mappings, not cleaning up", "host_id", hostID, "mapping_count", len(mappings))
 			return
 		}
 	}
 
 	// Host has no mappings, safe to remove it
-	klog.Infof("Cleaning up empty host ID: %s)", hostID)
+	log.V(2).Info("cleaning up empty host", "host_id", hostID)
 
 	rmPayload := map[string]string{
 		"host": hostID,
@@ -805,22 +819,24 @@ func (c *FlashSystemClonner) cleanupEmptyHost(hostID string) {
 
 	rmBody, rmStatus, rmErr := c.api.makeRequest("POST", "/rmhost", rmPayload)
 	if rmErr != nil {
-		klog.Warningf("Failed to cleanup host: %v", rmErr)
+		log.Info("failed to cleanup host", "host_id", hostID, "err", rmErr)
 		return
 	}
 
 	if rmStatus != http.StatusOK && rmStatus != http.StatusNoContent {
-		klog.Warningf("Failed to cleanup host id '%s', status: %d, body: %s", hostID, rmStatus, string(rmBody))
+		log.Info("failed to cleanup host", "host_id", hostID, "status", rmStatus, "body", string(rmBody))
 		return
 	}
 
-	klog.Infof("Successfully cleaned up empty host id '%s'", hostID)
+	log.V(2).Info("host cleaned up successfully", "host_id", hostID)
 }
 
 // CurrentMappedGroups returns the host names a VDisk is mapped to.
 func (c *FlashSystemClonner) CurrentMappedGroups(targetLUN populator.LUN, context populator.MappingContext) ([]string, error) {
+	log := klog.Background().WithName(loggerName).WithName("map")
+
 	vdiskID := targetLUN.Name // VDisk ID is stored in the Name field.
-	klog.Infof("Getting current mapped groups for LUN (VDisk ID '%s')", vdiskID)
+	log.V(2).Info("querying current mapped groups", "vdisk_id", vdiskID)
 
 	groupSet := make(map[string]bool)
 	uniqueGroups := []string{}
@@ -845,16 +861,16 @@ func (c *FlashSystemClonner) CurrentMappedGroups(targetLUN populator.LUN, contex
 		if !groupSet[m.HostName] {
 			groupSet[m.HostName] = true
 			uniqueGroups = append(uniqueGroups, m.HostName)
-			klog.Infof("Found host mapping: %s", m.HostName)
+			log.V(2).Info("found host mapping", "host", m.HostName)
 		}
 	}
 
-	klog.Infof("LUN (VDisk ID '%s') is mapped to host groups: %v", vdiskID, uniqueGroups)
+	log.V(2).Info("found mapped groups", "vdisk_id", vdiskID, "hosts", uniqueGroups)
 	return uniqueGroups, nil
 }
 
 // createLUNFromVDisk creates a LUN object from a FlashSystemVolume
-func (c *FlashSystemClonner) createLUNFromVDisk(vdiskDetails FlashSystemVolume, volumeHandle string) (populator.LUN, error) {
+func (c *FlashSystemClonner) createLUNFromVDisk(vdiskDetails FlashSystemVolume, volumeHandle string, log klog.Logger) (populator.LUN, error) {
 	vdiskUID := strings.ToLower(vdiskDetails.VdiskUID)
 	if vdiskUID == "" {
 		return populator.LUN{}, fmt.Errorf("resolved volume '%s' has an empty UID", vdiskDetails.Name)
@@ -871,14 +887,14 @@ func (c *FlashSystemClonner) createLUNFromVDisk(vdiskDetails FlashSystemVolume, 
 		NAA:          naaDeviceID,
 	}
 
-	klog.Infof("Resolved volume handle '%s' to LUN: Name(ID)=%s, SN(UID)=%s, NAA=%s, VDisk Name=%s",
-		volumeHandle, lun.Name, lun.SerialNumber, lun.NAA, vdiskDetails.Name)
+	log.Info("LUN resolved", "lun", lun.Name, "naa", lun.NAA, "serial", lun.SerialNumber, "vdisk", vdiskDetails.Name)
 	return lun, nil
 }
 
 // ResolvePVToLUN resolves a PersistentVolume to a LUN by finding a volume with matching vdisk_UID.
 func (c *FlashSystemClonner) ResolvePVToLUN(pv populator.PersistentVolume) (populator.LUN, error) {
-	klog.Infof("Resolving PersistentVolume '%s' to LUN details", pv.Name)
+	log := klog.Background().WithName(loggerName).WithName("resolve")
+	log.Info("resolving PV to LUN", "pv", pv.Name, "volume_handle", pv.VolumeHandle)
 
 	// Parse PV VolumeHandle to extract the vdisk_UID
 	// Expected format: 'SVC:5;600507681088804CB800000000001074'
@@ -893,7 +909,7 @@ func (c *FlashSystemClonner) ResolvePVToLUN(pv populator.PersistentVolume) (popu
 		"filtervalue": fmt.Sprintf("vdisk_UID=%s", pvUID),
 	}
 
-	klog.Infof("Querying vdisk with vdisk_UID filter: %s", pvUID)
+	log.V(2).Info("querying vdisk by UID", "uid", pvUID)
 	vdisksBytes, vdisksStatus, vdisksErr := c.api.makeRequest("POST", "/lsvdisk", filterPayload)
 	if vdisksErr != nil {
 		return populator.LUN{}, fmt.Errorf("failed to get vdisk with UID %s: %w", pvUID, vdisksErr)
@@ -916,8 +932,8 @@ func (c *FlashSystemClonner) ResolvePVToLUN(pv populator.PersistentVolume) (popu
 	}
 
 	vdisk := vdisks[0]
-	klog.Infof("Found matching volume: '%s' (ID: %s) for PV '%s'", vdisk.Name, vdisk.ID, pv.Name)
-	return c.createLUNFromVDisk(vdisk, pv.VolumeHandle)
+	log.V(2).Info("found matching volume", "vdisk", vdisk.Name, "vdisk_id", vdisk.ID, "pv", pv.Name)
+	return c.createLUNFromVDisk(vdisk, pv.VolumeHandle, log)
 }
 
 // getVDiskByUID returns a volume by its vdisk_UID (NAA without "naa." prefix).
@@ -947,11 +963,14 @@ func (c *FlashSystemClonner) getVDiskByUID(uid string) (*FlashSystemVolume, erro
 
 // RDMCopy performs a copy from an RDM-backed disk to the target PVC volume using FlashCopy.
 func (c *FlashSystemClonner) RDMCopy(vsphereClient vmware.Client, vmId string, sourceVMDKFile string, persistentVolume populator.PersistentVolume, progress chan<- uint64) error {
-	log := klog.Background().WithName("copy-offload").WithName("rdm")
-	ctx := klog.NewContext(context.Background(), log)
-	log.Info("RDM copy started", "vm", vmId)
+	log := klog.Background().WithName(loggerName).WithName("rdm")
+	resolveSourceLog := log.WithName("resolve-source")
+	resolveTargetLog := log.WithName("resolve-target")
+	copyLog := log.WithName("copy")
 
-	backing, err := vsphereClient.GetVMDiskBacking(ctx, vmId, sourceVMDKFile)
+	resolveSourceLog.Info("RDM copy started", "vm", vmId)
+
+	backing, err := vsphereClient.GetVMDiskBacking(context.Background(), vmId, sourceVMDKFile)
 	if err != nil {
 		return fmt.Errorf("failed to get RDM disk backing: %w", err)
 	}
@@ -962,22 +981,22 @@ func (c *FlashSystemClonner) RDMCopy(vsphereClient vmware.Client, vmId string, s
 	if backing.LunUuid == "" {
 		return fmt.Errorf("RDM backing has no LunUuid; cannot resolve volume (need vSphere LunUuid for lsvdisk vdisk_UID)")
 	}
-	log.Info("resolving source by LunUuid", "lun_uuid", backing.LunUuid)
-	resolveCtx := klog.NewContext(ctx, log.WithName("resolve"))
-	sourceLUN, err := c.resolveRDMToLUN(resolveCtx, backing.LunUuid)
+	resolveSourceLog.Info("found RDM device", "lun_uuid", backing.LunUuid)
+
+	sourceLUN, err := c.resolveRDMToLUN(backing.LunUuid, resolveSourceLog)
 	if err != nil {
 		return fmt.Errorf("failed to resolve RDM LunUuid to source LUN: %w", err)
 	}
 
+	resolveTargetLog.Info("resolving target PV to LUN", "pv", persistentVolume.Name)
 	targetLUN, err := c.ResolvePVToLUN(persistentVolume)
 	if err != nil {
 		return fmt.Errorf("failed to resolve target volume: %w", err)
 	}
 
-	log.Info("copying via FlashCopy", "source", sourceLUN.Name, "target", targetLUN.Name)
+	copyLog.Info("copying volume", "source", sourceLUN.Name, "target", targetLUN.Name)
 	progress <- 10
-	flashcopyCtx := klog.NewContext(ctx, log.WithName("flashcopy"))
-	if err := c.performFlashCopy(flashcopyCtx, sourceLUN, targetLUN, progress); err != nil {
+	if err := c.performFlashCopy(sourceLUN, targetLUN, progress, copyLog); err != nil {
 		return err
 	}
 	log.Info("RDM copy completed successfully")
@@ -998,8 +1017,7 @@ func rdmLunUuidToVdiskUID(lunUuid string) (string, error) {
 }
 
 // resolveRDMToLUN resolves the vSphere RDM LunUuid to an IBM FlashSystem LUN.
-func (c *FlashSystemClonner) resolveRDMToLUN(ctx context.Context, lunUuid string) (populator.LUN, error) {
-	log := klog.FromContext(ctx)
+func (c *FlashSystemClonner) resolveRDMToLUN(lunUuid string, log klog.Logger) (populator.LUN, error) {
 	vdiskUID, err := rdmLunUuidToVdiskUID(lunUuid)
 	if err != nil {
 		return populator.LUN{}, err
@@ -1009,8 +1027,8 @@ func (c *FlashSystemClonner) resolveRDMToLUN(ctx context.Context, lunUuid string
 	if err != nil {
 		return populator.LUN{}, fmt.Errorf("could not find volume for LunUuid (vdisk_UID %s): %w", vdiskUID, err)
 	}
-	log.Info("resolved LunUuid to volume", "vdisk_uid", vdiskUID, "volume", vdisk.Name)
-	return c.createLUNFromVDisk(*vdisk, "naa."+strings.ToLower(vdisk.VdiskUID))
+	log.V(2).Info("resolved LunUuid to volume", "vdisk_uid", vdiskUID, "volume", vdisk.Name)
+	return c.createLUNFromVDisk(*vdisk, "naa."+strings.ToLower(vdisk.VdiskUID), log)
 }
 
 func firstN(s string, n int) string {
@@ -1023,8 +1041,7 @@ func firstN(s string, n int) string {
 // performFlashCopy creates a FlashCopy mapping with autodelete and starts it.
 // The target is immediately usable (redirect-on-read); the array will remove the mapping when copy reaches 100%.
 // Mapping name format: mp_<first10_source>_<first10_target>_<uuid> to avoid collisions and stay within IBM's 63-char limit.
-func (c *FlashSystemClonner) performFlashCopy(ctx context.Context, sourceLUN, targetLUN populator.LUN, progress chan<- uint64) error {
-	log := klog.FromContext(ctx)
+func (c *FlashSystemClonner) performFlashCopy(sourceLUN, targetLUN populator.LUN, progress chan<- uint64, log klog.Logger) error {
 	sourceRef := sourceLUN.VolumeHandle
 	if sourceRef == "" {
 		sourceRef = sourceLUN.Name

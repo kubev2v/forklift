@@ -15,8 +15,11 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const VantaraProviderID = "60060e80" // Vantara's NAA prefix
-const LengthNAAID = 32
+const (
+	VantaraProviderID = "60060e80" // Vantara's NAA prefix
+	LengthNAAID       = 32
+	loggerName        = "copy-offload"
+)
 
 type VantaraCloner struct {
 	client          VantaraClient
@@ -70,12 +73,14 @@ func NewVantaraClonner(hostname, username, password string) (VantaraCloner, erro
 	}
 
 	// Fetch model and version from the API
+	log := klog.Background().WithName(loggerName).WithName("setup")
 	storageInfo, err := client.GetStorageInfo()
 	if err != nil {
-		klog.Warningf("Failed to get Vantara storage info for metrics: %v", err)
+		log.Info("failed to get Vantara storage info for metrics", "err", err)
 	} else {
 		cloner.arrayInfo.Model = storageInfo.Model
 		cloner.arrayInfo.Version = storageInfo.DkcMicroVersion
+		log.V(2).Info("Vantara array info", "vendor", cloner.arrayInfo.Vendor, "product", cloner.arrayInfo.Product, "model", cloner.arrayInfo.Model, "version", cloner.arrayInfo.Version)
 	}
 
 	return cloner, nil
@@ -130,25 +135,32 @@ func getStorageEnvVars() (map[string]interface{}, error) {
 }
 
 func (v *VantaraCloner) CurrentMappedGroups(lun populator.LUN, context populator.MappingContext) ([]string, error) {
+	log := klog.Background().WithName(loggerName).WithName("map")
+	log.V(2).Info("querying current mapped groups", "ldev_id", lun.LDeviceID)
+
 	ldevResp, err := v.client.GetLdev(lun.LDeviceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get LDEV: %w", err)
 	}
 
-	klog.Infof("LDEV: %+v", ldevResp)
+	log.V(2).Info("LDEV response", "ldev", ldevResp)
 
 	hgids := make([]string, 0, len(ldevResp.Ports))
 	for _, port := range ldevResp.Ports {
 		hostGroupNumber := fmt.Sprintf("%d", int(port.HostGroupNumber))
 		hgid := fmt.Sprintf("%s,%s", port.PortId, hostGroupNumber)
 		hgids = append(hgids, hgid)
-		klog.V(2).Infof("Found mapping: portID=%s, hostGroupNumber=%s", port.PortId, hostGroupNumber)
+		log.V(2).Info("found mapping", "port_id", port.PortId, "host_group_number", hostGroupNumber)
 	}
 
+	log.V(2).Info("found mapped groups", "ldev_id", lun.LDeviceID, "host_group_ids", hgids)
 	return hgids, nil
 }
 
 func (v *VantaraCloner) ResolvePVToLUN(pv populator.PersistentVolume) (populator.LUN, error) {
+	log := klog.Background().WithName(loggerName).WithName("resolve")
+	log.Info("resolving PV to LUN", "pv", pv.Name, "volume_handle", pv.VolumeHandle)
+
 	parts := strings.Split(pv.VolumeHandle, "--")
 	lun := populator.LUN{}
 	if len(parts) != 5 || parts[0] != "01" {
@@ -170,31 +182,37 @@ func (v *VantaraCloner) ResolvePVToLUN(pv populator.PersistentVolume) (populator
 	//	lun.SerialNumber = ldevnaaid[6:]
 	lun.VolumeHandle = pv.VolumeHandle
 	lun.Name = ldevNickName
-	klog.Infof("Resolved LUN: %+v", lun)
+	log.Info("LUN resolved", "lun", lun.Name, "ldev_id", lun.LDeviceID, "protocol", lun.Protocol)
 	return lun, nil
 }
 
 func (v *VantaraCloner) GetNaaID(lun populator.LUN) populator.LUN {
+	log := klog.Background().WithName(loggerName).WithName("resolve")
 	ldevResp, err := v.client.GetLdev(lun.LDeviceID)
 	if err != nil {
-		klog.Errorf("Failed to get LDEV NAA ID: %v", err)
+		log.Info("failed to get LDEV NAA ID", "ldev_id", lun.LDeviceID, "err", err)
 		return lun
 	}
 	lun.ProviderID = ldevResp.NaaId[:6]
 	lun.SerialNumber = ldevResp.NaaId[6:]
 	lun.NAA = fmt.Sprintf("naa.%s", ldevResp.NaaId)
+	log.V(2).Info("NAA ID retrieved", "ldev_id", lun.LDeviceID, "naa", lun.NAA)
 	return lun
 }
 
 func (v *VantaraCloner) EnsureClonnerIgroup(xcopyInitiatorGroup string, hbaUIDs []string) (populator.MappingContext, error) {
+	log := klog.Background().WithName(loggerName).WithName("map").WithName("ensure-igroup")
+	log.Info("ensuring initiator group", "group", xcopyInitiatorGroup, "adapters", hbaUIDs)
+
 	v.initiatorGroup = xcopyInitiatorGroup
 	if len(v.envHostGroupIds) > 0 {
-		klog.Infof("Using host group IDs from environment: %v", v.envHostGroupIds)
+		log.Info("using host group IDs from environment", "host_group_ids", v.envHostGroupIds)
+		log.Info("initiator group ready", "group", xcopyInitiatorGroup)
 		return populator.MappingContext{"hostGroupIds": v.envHostGroupIds}, nil
 	}
 
 	// Get port details from storage
-	klog.Info("Fetching host group IDs from storage")
+	log.V(2).Info("fetching host group IDs from storage")
 	portDetails, err := v.client.GetPortDetails()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get port details: %w", err)
@@ -205,18 +223,19 @@ func (v *VantaraCloner) EnsureClonnerIgroup(xcopyInitiatorGroup string, hbaUIDs 
 	logins := FindHostGroupIDs(jsonData, hbaUIDs)
 
 	jsonBytes, _ := json.MarshalIndent(logins, "", "  ")
-	klog.Infof("Found logins: %s", string(jsonBytes))
+	log.V(2).Info("found logins", "logins", string(jsonBytes))
 
 	hostGroupIds := make([]string, len(logins))
 	for i, login := range logins {
 		hostGroupIds[i] = login.HostGroupId
 	}
 
-	klog.Infof("Host group IDs: %v", hostGroupIds)
+	log.Info("initiator group ready", "group", xcopyInitiatorGroup, "host_group_ids", hostGroupIds)
 	return populator.MappingContext{"hostGroupIds": hostGroupIds}, nil
 }
 
 func (v *VantaraCloner) Map(xcopyInitiatorGroup string, lun populator.LUN, context populator.MappingContext) (populator.LUN, error) {
+	log := klog.Background().WithName(loggerName).WithName("map")
 	hostGroupIds := context["hostGroupIds"].([]string)
 
 	for _, hostGroupId := range hostGroupIds {
@@ -227,6 +246,7 @@ func (v *VantaraCloner) Map(xcopyInitiatorGroup string, lun populator.LUN, conte
 		portId := parts[0]
 		hostGroupNumber := parts[1]
 
+		log.Info("mapping volume to host group", "ldev_id", lun.LDeviceID, "port_id", portId, "host_group", hostGroupNumber)
 		if err := v.client.AddPath(lun.LDeviceID, portId, hostGroupNumber); err != nil {
 			return populator.LUN{}, fmt.Errorf("failed to add path %s: %w", hostGroupId, err)
 		}
@@ -234,10 +254,12 @@ func (v *VantaraCloner) Map(xcopyInitiatorGroup string, lun populator.LUN, conte
 
 	// Get NAA ID after mapping
 	lun = v.GetNaaID(lun)
+	log.Info("volume mapped successfully", "ldev_id", lun.LDeviceID, "naa", lun.NAA)
 	return lun, nil
 }
 
 func (v *VantaraCloner) UnMap(xcopyInitiatorGroup string, lun populator.LUN, context populator.MappingContext) error {
+	log := klog.Background().WithName(loggerName).WithName("map")
 	hostGroupIds := context["hostGroupIds"].([]string)
 
 	// First get the LDEV to find LUN IDs
@@ -260,11 +282,13 @@ func (v *VantaraCloner) UnMap(xcopyInitiatorGroup string, lun populator.LUN, con
 			return fmt.Errorf("failed to get LUN ID for %s: %w", hostGroupId, err)
 		}
 
+		log.Info("unmapping volume from host group", "ldev_id", lun.LDeviceID, "port_id", portId, "host_group", hostGroupNumber, "lun_id", lunId)
 		if err := v.client.DeletePath(lun.LDeviceID, portId, hostGroupNumber, lunId); err != nil {
 			return fmt.Errorf("failed to delete path %s: %w", hostGroupId, err)
 		}
 	}
 
+	log.Info("volume unmapped successfully", "ldev_id", lun.LDeviceID)
 	return nil
 }
 
@@ -280,7 +304,12 @@ func getLunIdFromPorts(ports []PortMapping, portId string, hostGroupNumber strin
 
 // VvolCopy performs a direct copy operation using vSphere API to discover source volume
 func (v *VantaraCloner) VvolCopy(vsphereClient vmware.Client, vmId string, sourceVMDKFile string, persistentVolume populator.PersistentVolume, progress chan<- uint64) error {
-	klog.Infof("Starting VVol copy operation for VM %s", vmId)
+	log := klog.Background().WithName(loggerName).WithName("vvol")
+	resolveSourceLog := log.WithName("resolve-source")
+	resolveTargetLog := log.WithName("resolve-target")
+	copyLog := log.WithName("copy")
+
+	resolveSourceLog.Info("VVol copy started", "vm", vmId, "source", sourceVMDKFile)
 
 	backing, err := vsphereClient.GetVMDiskBacking(context.Background(), vmId, sourceVMDKFile)
 	if err != nil {
@@ -291,36 +320,37 @@ func (v *VantaraCloner) VvolCopy(vsphereClient vmware.Client, vmId string, sourc
 		return fmt.Errorf("disk %s is not a VVol disk", sourceVMDKFile)
 	}
 
-	klog.Infof("Found VVol backing with ID %s", backing.VVolId)
+	resolveSourceLog.Info("found VVol backing", "vvol_id", backing.VVolId)
 
-	sourceVolumeID, err := v.findVolumeByVVolID(backing.VVolId)
+	sourceVolumeID, err := v.findVolumeByVVolID(backing.VVolId, resolveSourceLog)
 	if err != nil {
 		return fmt.Errorf("failed to find source volume by VVol ID %s: %w", backing.VVolId, err)
 	}
 
+	resolveTargetLog.Info("resolving target PV to LUN", "pv", persistentVolume.Name)
 	targetLUN, err := v.ResolvePVToLUN(persistentVolume)
 	if err != nil {
 		return fmt.Errorf("failed to resolve target volume: %w", err)
 	}
 
-	klog.Infof("Copying from source volume %s to target volume %s", sourceVolumeID, targetLUN.Name)
+	copyLog.Info("copying volume", "source", sourceVolumeID, "target", targetLUN.Name)
 
 	// Get target volume pool ID
 	ldevResp, err := v.client.GetLdev(targetLUN.LDeviceID)
-	klog.Infof("Target LDEV: %v", ldevResp)
+	copyLog.V(2).Info("target LDEV details", "ldev", ldevResp)
 
 	// Perform the copy operation
-	err = v.performVolumeCopy(sourceVolumeID, ldevResp, progress)
+	err = v.performVolumeCopy(sourceVolumeID, ldevResp, progress, copyLog)
 	if err != nil {
 		return fmt.Errorf("copy operation failed: %w", err)
 	}
 
-	klog.Infof("VVol copy operation completed successfully")
+	log.Info("VVol copy completed successfully")
 	return nil
 }
 
 // performVolumeCopy executes the volume copy operation on Vantara
-func (v *VantaraCloner) performVolumeCopy(sourceLdevId string, ldevResp *LdevResponse, progress chan<- uint64) error {
+func (v *VantaraCloner) performVolumeCopy(sourceLdevId string, ldevResp *LdevResponse, progress chan<- uint64, log klog.Logger) error {
 
 	targetLdevId := fmt.Sprintf("%d", int(ldevResp.LdevId))
 	poolID := fmt.Sprintf("%d", int(ldevResp.PoolId))
@@ -328,6 +358,7 @@ func (v *VantaraCloner) performVolumeCopy(sourceLdevId string, ldevResp *LdevRes
 	// Perform the copy operation using Vantara API
 	snapshotGroupName := "mtv-ss-copy-" + sourceLdevId + "-to-" + targetLdevId
 
+	log.V(2).Info("creating clone LDEV", "snapshot_group", snapshotGroupName, "pool_id", poolID, "source_ldev", sourceLdevId, "target_ldev", targetLdevId)
 	err := v.client.CreateCloneLdev(snapshotGroupName, poolID, sourceLdevId, targetLdevId, v.copySpeed)
 	if err != nil {
 		return fmt.Errorf("Vantara CopyVolume failed: %w", err)
@@ -347,12 +378,12 @@ func (v *VantaraCloner) performVolumeCopy(sourceLdevId string, ldevResp *LdevRes
 		count++
 		respPairs, err := v.client.GetClonePairs(snapshotGroupName, sourceLdevId)
 		if err != nil || len(respPairs.Data) == 0 {
-			klog.Infof("Waiting... (no clone pair yet)")
+			log.V(2).Info("waiting for clone pair", "attempt", count, "max", maxcount)
 			continue
 		}
 		for _, cp := range respPairs.Data {
 			if cp.Status == "PSUP" {
-				klog.Infof("Clone pair created: %+v", cp)
+				log.V(2).Info("clone pair created", "pair", cp)
 				found = true
 				break
 			}
@@ -360,13 +391,13 @@ func (v *VantaraCloner) performVolumeCopy(sourceLdevId string, ldevResp *LdevRes
 		if found {
 			break
 		}
-		klog.Infof("Waiting for clone pair to be created...")
+		log.V(2).Info("waiting for clone pair to be created", "attempt", count, "max", maxcount)
 	}
 	progress <- 100
 	return nil
 }
 
-func (v *VantaraCloner) findVolumeByVVolID(vvolID string) (string, error) {
+func (v *VantaraCloner) findVolumeByVVolID(vvolID string, log klog.Logger) (string, error) {
 	if len(vvolID) < 4 {
 		return "", errors.New("VVol ID is too short")
 	}
@@ -381,12 +412,19 @@ func (v *VantaraCloner) findVolumeByVVolID(vvolID string) (string, error) {
 	}
 
 	// Convert to decimal string and return
-	return strconv.FormatUint(value, 10), nil
+	ldevId := strconv.FormatUint(value, 10)
+	log.Info("found source volume by VVol ID", "vvol_id", vvolID, "ldev_id", ldevId)
+	return ldevId, nil
 }
 
 // RDMCopy performs a copy operation for RDM-backed disks using Vantara APIs
 func (v *VantaraCloner) RDMCopy(vsphereClient vmware.Client, vmId string, sourceVMDKFile string, persistentVolume populator.PersistentVolume, progress chan<- uint64) error {
-	klog.Infof("Vantara RDM Copy: Starting RDM copy operation for VM %s", vmId)
+	log := klog.Background().WithName(loggerName).WithName("rdm")
+	resolveSourceLog := log.WithName("resolve-source")
+	resolveTargetLog := log.WithName("resolve-target")
+	copyLog := log.WithName("copy")
+
+	resolveSourceLog.Info("RDM copy started", "vm", vmId)
 
 	// Get disk backing info to find the RDM device
 	backing, err := vsphereClient.GetVMDiskBacking(context.Background(), vmId, sourceVMDKFile)
@@ -398,21 +436,22 @@ func (v *VantaraCloner) RDMCopy(vsphereClient vmware.Client, vmId string, source
 		return fmt.Errorf("disk %s is not an RDM disk", sourceVMDKFile)
 	}
 
-	klog.Infof("Vantara RDM Copy: Found RDM device: %s", backing.DeviceName)
+	resolveSourceLog.Info("found RDM device", "device", backing.DeviceName)
 
 	// Resolve the source LUN from the RDM device name
-	sourceLUN, err := v.resolveRDMToLUN(backing.DeviceName)
+	sourceLUN, err := v.resolveRDMToLUN(backing.DeviceName, resolveSourceLog)
 	if err != nil {
 		return fmt.Errorf("failed to resolve RDM device to source LUN: %w", err)
 	}
 
 	// Resolve the target PV to LUN
+	resolveTargetLog.Info("resolving target PV to LUN", "pv", persistentVolume.Name)
 	targetLUN, err := v.ResolvePVToLUN(persistentVolume)
 	if err != nil {
 		return fmt.Errorf("failed to resolve target volume: %w", err)
 	}
 
-	klog.Infof("Vantara RDM Copy: Copying from source LUN %s to target LUN %s", sourceLUN.LDeviceID, targetLUN.LDeviceID)
+	copyLog.Info("copying volume", "source", sourceLUN.LDeviceID, "target", targetLUN.LDeviceID)
 
 	// Report progress start
 	progress <- 10
@@ -420,10 +459,10 @@ func (v *VantaraCloner) RDMCopy(vsphereClient vmware.Client, vmId string, source
 	// Perform the copy operation using Vantara API
 	// Get target volume pool ID
 	ldevResp, err := v.client.GetLdev(targetLUN.LDeviceID)
-	klog.Infof("Target LDEV: %v", ldevResp)
+	copyLog.V(2).Info("target LDEV details", "ldev", ldevResp)
 
 	// Perform the copy operation
-	err = v.performVolumeCopy(sourceLUN.LDeviceID, ldevResp, progress)
+	err = v.performVolumeCopy(sourceLUN.LDeviceID, ldevResp, progress, copyLog)
 	if err != nil {
 		return fmt.Errorf("copy operation failed: %w", err)
 	}
@@ -431,22 +470,21 @@ func (v *VantaraCloner) RDMCopy(vsphereClient vmware.Client, vmId string, source
 	// Report progress complete
 	progress <- 100
 
-	klog.Infof("Vantara RDM Copy: Copy operation completed successfully")
+	log.Info("RDM copy completed successfully")
 	return nil
 }
 
 // resolveRDMToLUN resolves an RDM device name to a Vantara LDEV ID
-func (v *VantaraCloner) resolveRDMToLUN(deviceName string) (populator.LUN, error) {
+func (v *VantaraCloner) resolveRDMToLUN(deviceName string, log klog.Logger) (populator.LUN, error) {
+	log.V(2).Info("resolving RDM device to LUN", "device", deviceName)
 
 	deviceName = strings.ToLower(deviceName)
 	start := strings.Index(deviceName, VantaraProviderID)
 	if start == -1 {
-		fmt.Println("target not found")
 		return populator.LUN{}, fmt.Errorf("target not found")
 	}
 
 	if start+LengthNAAID > len(deviceName) {
-		fmt.Println("string too short")
 		return populator.LUN{}, fmt.Errorf("device name too short")
 	}
 
@@ -459,6 +497,8 @@ func (v *VantaraCloner) resolveRDMToLUN(deviceName string) (populator.LUN, error
 	}
 
 	ldevIds := strconv.FormatUint(ldevId, 10)
+	log.V(2).Info("parsing LDEV ID from device", "ldev_id", ldevIds, "hex", ldevIdHex)
+
 	ldevResp, err := v.client.GetLdev(ldevIds)
 	if err != nil {
 		return populator.LUN{}, fmt.Errorf("failed to get LDEV info for device name %s: %w", deviceName, err)
@@ -470,9 +510,11 @@ func (v *VantaraCloner) resolveRDMToLUN(deviceName string) (populator.LUN, error
 		return populator.LUN{}, fmt.Errorf("device name %s does not match LDEV NAA ID %s", naaDevice, naa)
 	}
 
-	return populator.LUN{
+	lun := populator.LUN{
 		LDeviceID: ldevIds,
 		NAA:       naa,
-	}, nil
+	}
+	log.Info("resolved source LUN", "ldev_id", lun.LDeviceID, "naa", lun.NAA)
+	return lun, nil
 
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/klog/v2"
 )
 
 func TestExtractSerialFromNAA(t *testing.T) {
@@ -113,8 +114,9 @@ func TestFindVolumeByVVolID(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			log := klog.Background()
 			clonner := clonnerWithVolumes(volumes)
-			result, err := clonner.findVolumeByVVolID(tc.vvolID)
+			result, err := clonner.findVolumeByVVolID(tc.vvolID, log)
 			if tc.expectError {
 				assert.Error(t, err)
 			} else {
@@ -161,8 +163,9 @@ func TestResolveRDMToLUN(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			log := klog.Background()
 			clonner := clonnerWithVolumes(volumes)
-			lun, err := clonner.resolveRDMToLUN(tc.deviceName)
+			lun, err := clonner.resolveRDMToLUN(tc.deviceName, log)
 			if tc.expectError {
 				assert.Error(t, err)
 			} else {
@@ -209,8 +212,9 @@ func TestFindVolumeByDeviceName(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			log := klog.Background()
 			clonner := clonnerWithVolumes(volumes)
-			lun, err := clonner.findVolumeByDeviceName(tc.deviceName)
+			lun, err := clonner.findVolumeByDeviceName(tc.deviceName, log)
 			if tc.expectError {
 				assert.Error(t, err)
 			} else {
