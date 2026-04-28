@@ -19,6 +19,7 @@ type Ensurer = base.Ensurer
 type Client = base.Client
 type Validator = base.Validator
 type DestinationClient = base.DestinationClient
+type StorageMapper = base.StorageMapper
 
 // Adapter factory.
 func New(provider *api.Provider) (adapter Adapter, err error) {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	core "k8s.io/api/core/v1"
@@ -143,7 +144,7 @@ func (r *DestinationClient) findPVCByCR(cr *v1beta1.VSphereXcopyVolumePopulator)
 				"migration": migUID,
 			}),
 			FieldSelector: fields.SelectorFromSet(map[string]string{
-				"metadata.annotations.copy-offload": cr.Spec.VmdkPath,
+				"metadata.annotations." + planbase.AnnDiskSource: cr.Spec.VmdkPath,
 			}),
 		})
 

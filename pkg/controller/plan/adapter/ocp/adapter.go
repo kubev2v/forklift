@@ -99,3 +99,23 @@ func createClient(sourceProvider *api.Provider) (sourceClient k8sclient.Client, 
 
 	return
 }
+
+// Constructs a storage mapper (no-op).
+func (r *Adapter) StorageMapper(ctx *plancontext.Context) (base.StorageMapper, error) {
+	return &NoOpStorageMapper{}, nil
+}
+
+// NoOpStorageMapper is a no-op implementation for providers that don't use copy-offload.
+type NoOpStorageMapper struct{}
+
+func (r *NoOpStorageMapper) IsCopyOffload(diskFile string, vmID string) bool {
+	return false
+}
+
+func (r *NoOpStorageMapper) IsPVCCopyOffload(pvc *core.PersistentVolumeClaim) bool {
+	return false
+}
+
+func (r *NoOpStorageMapper) IsAnyPVCCopyOffload(pvcs []*core.PersistentVolumeClaim) bool {
+	return false
+}

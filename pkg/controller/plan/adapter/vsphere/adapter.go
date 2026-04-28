@@ -50,3 +50,8 @@ func (r *Adapter) DestinationClient(ctx *plancontext.Context) (destinationClient
 	destinationClient = &DestinationClient{Context: ctx}
 	return
 }
+
+// Constructs a storage mapper.
+func (r *Adapter) StorageMapper(ctx *plancontext.Context) (base.StorageMapper, error) {
+	return &StorageMapper{Context: ctx}, nil
+}
