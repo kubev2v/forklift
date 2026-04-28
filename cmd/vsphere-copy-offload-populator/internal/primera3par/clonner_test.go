@@ -3,6 +3,7 @@ package primera3par
 import (
 	"testing"
 
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logutil"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
 	"github.com/stretchr/testify/assert"
 )
@@ -73,7 +74,7 @@ func clonnerWithVolumes(volumes []Volume) *Primera3ParClonner {
 			SerialNumber: v.WWN,
 		}
 	}
-	return &Primera3ParClonner{client: mock}
+	return &Primera3ParClonner{client: mock, log: logutil.NewLogger("primera3par")}
 }
 
 func TestFindVolumeByVVolID(t *testing.T) {
