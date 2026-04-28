@@ -24,6 +24,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/validation"
+	libaap "github.com/kubev2v/forklift/pkg/lib/aap"
 	ocp "github.com/kubev2v/forklift/pkg/lib/client/openshift"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
@@ -1594,6 +1595,8 @@ func (r *Reconciler) validateHooks(plan *api.Plan) (err error) {
 			plan.Referenced.Hooks = append(plan.Referenced.Hooks, hook)
 			hookRefDesc := planHookVMRefDescription(vm, ref)
 			if !api.HookExecutionConfigValid(hook) {
+				hookNotExecutable.Items = append(hookNotExecutable.Items, hookRefDesc)
+			} else if hook.Spec.AAP != nil && !libaap.HookAAPRunnableFromMigrationSettings(hook) {
 				hookNotExecutable.Items = append(hookNotExecutable.Items, hookRefDesc)
 			}
 			if !hook.Status.HasCondition(libcnd.Ready) {

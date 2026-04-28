@@ -5,6 +5,7 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/lib/aap"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -14,7 +15,6 @@ import (
 
 const (
 	testHookGlobalSA          = "global-sa"
-	testHookAAPExampleURL     = "https://aap.example.com"
 	testHookAAPTokenSecret    = "aap-token-secret"
 	testHookHookSA            = "hook-sa"
 	testHookPlanSA            = "plan-sa"
@@ -124,9 +124,7 @@ func TestHookSpecAAPFields(t *testing.T) {
 		},
 		Spec: api.HookSpec{
 			AAP: &api.AAPConfig{
-				URL: testHookAAPExampleURL, JobTemplateID: 7,
-				TokenSecret: core.ObjectReference{Name: testHookAAPTokenSecret},
-				Timeout:     600,
+				JobTemplateID: 7,
 			},
 		},
 	}
@@ -205,7 +203,79 @@ func TestGetAAPTokenFromSecret(t *testing.T) {
 				b = b.WithObjects(tt.objs...)
 			}
 			cl := b.Build()
-			tok, err := GetAAPTokenFromSecret(t.Context(), cl, ns, tt.ref)
+			tok, err := aap.GetTokenFromSecret(t.Context(), cl, ns, tt.ref)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			if tok != tt.want {
+				t.Fatalf("token = %q, want %q", tok, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetAAPTokenFromSecretName(t *testing.T) {
+	scheme := hookTestScheme(t)
+	ns := testHookNamespace
+
+	tests := []struct {
+		name       string
+		objs       []client.Object
+		secretNS   string
+		secretName string
+		want       string
+		wantErr    bool
+	}{
+		{
+			name: "success",
+			objs: []client.Object{&core.Secret{
+				ObjectMeta: meta.ObjectMeta{Name: testHookAAPTokenSecret, Namespace: ns},
+				Data:       map[string][]byte{"token": []byte("tok")},
+			}},
+			secretNS:   ns,
+			secretName: testHookAAPTokenSecret,
+			want:       "tok",
+		},
+		{name: "blank namespace", objs: nil, secretNS: "  ", secretName: "s", wantErr: true},
+		{name: "blank name", objs: nil, secretNS: ns, secretName: "  ", wantErr: true},
+		{name: "missing secret", objs: nil, secretNS: ns, secretName: "missing", wantErr: true},
+		{
+			name: "missing token key",
+			objs: []client.Object{&core.Secret{
+				ObjectMeta: meta.ObjectMeta{Name: "bad-secret", Namespace: ns},
+				Data:       map[string][]byte{"wrong": []byte("x")},
+			}},
+			secretNS:   ns,
+			secretName: "bad-secret",
+			wantErr:    true,
+		},
+		{
+			name: "empty token value",
+			objs: []client.Object{&core.Secret{
+				ObjectMeta: meta.ObjectMeta{Name: "empty-tok", Namespace: ns},
+				Data:       map[string][]byte{"token": []byte("   \n")},
+			}},
+			secretNS:   ns,
+			secretName: "empty-tok",
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			b := fake.NewClientBuilder().WithScheme(scheme)
+			if len(tt.objs) > 0 {
+				b = b.WithObjects(tt.objs...)
+			}
+			cl := b.Build()
+			tok, err := aap.GetTokenFromSecretName(t.Context(), cl, tt.secretNS, tt.secretName)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected error")

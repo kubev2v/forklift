@@ -6,6 +6,10 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// AnnotationAAPJobTemplateName is an optional Hook metadata annotation for a human-readable
+// AAP job template name (UI/CLI). It does not affect execution; only spec.aap.jobTemplateId is used to launch jobs.
+const AnnotationAAPJobTemplateName = "forklift.konveyor.io/aap-job-template-name"
+
 // Hook specification.
 // Local hooks require spec.image (playbook is optional if the image runs without an injected playbook).
 // AAP hooks require spec.aap (image/playbook omitted for execution).
@@ -27,22 +31,20 @@ type HookSpec struct {
 }
 
 // AAPConfig defines configuration for executing hooks via Ansible Automation Platform.
+// Default connection (AAP URL, token Secret name, default HTTP/poll timeouts) is configured on ForkliftController.
+// Optional per-hook url, tokenSecret, and timeout override the cluster defaults when set (both url and tokenSecret.name are required to use the hook-local path).
 type AAPConfig struct {
-	// URL of the AAP instance (e.g., "https://aap.example.com").
-	// +kubebuilder:validation:Required
-	URL string `json:"url"`
 	// ID of the AAP job template to execute.
 	// +kubebuilder:validation:Required
 	JobTemplateID int `json:"jobTemplateId"`
-	// Reference to the Secret containing the AAP API token.
-	// The Secret must contain a key named "token" with the Bearer token value.
-	// The controller reads the Secret only from the migration plan namespace.
-	// Namespace must be empty or equal to that plan namespace.
-	// +kubebuilder:validation:Required
-	TokenSecret core.ObjectReference `json:"tokenSecret" ref:"Secret"`
-	// Timeout in seconds to wait for the AAP job after launch (wall-clock polling limit).
-	// Default when omitted or 0: first use HookSpec.deadline if it is > 0; otherwise 3600 seconds (1 hour).
-	// Any negative value: wait without a wall-clock limit until the job finishes or fails.
+	// Optional per-hook AAP base URL. When set together with tokenSecret, overrides ForkliftController aap_url.
+	// +optional
+	URL string `json:"url,omitempty"`
+	// Optional Secret reference for the AAP API token (key "token"). When set together with url, overrides
+	// ForkliftController aap_token_secret_name; the Secret is read from the migration plan namespace.
+	// +optional
+	TokenSecret *core.ObjectReference `json:"tokenSecret,omitempty" ref:"Secret"`
+	// Optional timeout in seconds for polling the AAP job after launch. Overrides defaulting from spec.deadline and ForkliftController aap_timeout when non-zero behavior applies.
 	// +optional
 	Timeout int64 `json:"timeout,omitempty"`
 }

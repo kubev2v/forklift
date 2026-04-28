@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	libaap "github.com/kubev2v/forklift/pkg/lib/aap"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 )
 
@@ -78,13 +79,23 @@ func (r *Reconciler) validateAAP(hook *api.Hook) {
 	if a == nil {
 		return
 	}
-	if strings.TrimSpace(a.URL) == "" || a.JobTemplateID <= 0 || strings.TrimSpace(a.TokenSecret.Name) == "" {
+	if a.JobTemplateID <= 0 {
 		hook.Status.SetCondition(libcnd.Condition{
 			Type:     InvalidHookExecute,
 			Status:   True,
 			Reason:   NotSet,
 			Category: Critical,
-			Message:  "AAP hooks require url, jobTemplateId > 0, and tokenSecret.name (Secret reference).",
+			Message:  "AAP hooks require jobTemplateId > 0.",
+		})
+		return
+	}
+	if !libaap.HookAAPRunnableFromMigrationSettings(hook) {
+		hook.Status.SetCondition(libcnd.Condition{
+			Type:     InvalidHookExecute,
+			Status:   True,
+			Reason:   NotSet,
+			Category: Critical,
+			Message:  "AAP hooks require ForkliftController aap_url and aap_token_secret_name, or spec.aap.url and spec.aap.tokenSecret.name for per-hook connection.",
 		})
 	}
 }

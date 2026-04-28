@@ -56,6 +56,10 @@ controller_tls_connection_timeout_sec: 5
 controller_max_concurrent_reconciles: 10
 controller_max_parent_backing_retries: 10
 controller_migration_service_account: ""
+# Ansible Automation Platform (optional; for AAP migration hooks and inventory job-template listing)
+aap_url: ""
+aap_token_secret_name: ""
+aap_timeout: ""
 profiler_volume_path: "/var/cache/profiler"
 
 inventory_volume_path: "/var/cache/inventory"

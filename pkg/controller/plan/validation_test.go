@@ -468,14 +468,16 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 		const planNS = "openshift-mtv"
 		const hookName = "test-hook"
 
-		newHook := func(sa string, aap *api.AAPConfig) *api.Hook {
+		newHook := func(sa string, aapCfg *api.AAPConfig) *api.Hook {
+			spec := api.HookSpec{ServiceAccount: sa}
+			if aapCfg != nil {
+				spec.AAP = aapCfg
+			} else {
+				spec.Image = "quay.io/kubev2v/hook-runner:latest"
+			}
 			h := &api.Hook{
 				ObjectMeta: meta.ObjectMeta{Name: hookName, Namespace: planNS},
-				Spec: api.HookSpec{
-					ServiceAccount: sa,
-					Image:          "quay.io/kubev2v/hook-runner:latest",
-					AAP:            aap,
-				},
+				Spec:       spec,
 			}
 			h.Status.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
 			return h
@@ -521,10 +523,17 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 		})
 
 		ginkgo.It("should skip SA validation for AAP hooks", func() {
+			savedURL := Settings.Migration.AAPURL
+			savedTok := Settings.Migration.AAPTokenSecretName
+			defer func() {
+				Settings.Migration.AAPURL = savedURL
+				Settings.Migration.AAPTokenSecretName = savedTok
+			}()
+			Settings.Migration.AAPURL = "https://aap.example.com"
+			Settings.Migration.AAPTokenSecretName = "aap-token"
+
 			aapCfg := &api.AAPConfig{
-				URL:           "https://aap.example.com",
 				JobTemplateID: 42,
-				TokenSecret:   core.ObjectReference{Name: "aap-token", Namespace: planNS},
 			}
 			hook := newHook("nonexistent-sa", aapCfg)
 			plan := newPlanWithHook()

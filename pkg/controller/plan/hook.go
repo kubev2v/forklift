@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"encoding/base64"
+	"os"
 	"path"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/lib/aap"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"gopkg.in/yaml.v2"
@@ -37,7 +39,7 @@ const (
 	ResourceHookConfig = "hook-config"
 )
 
-// defaultAAPJobPollSeconds is used when neither spec.aap.timeout nor spec.deadline set a positive limit.
+// defaultAAPJobPollSeconds is used when spec.aap.timeout and spec.deadline are 0 and ForkliftController aap_timeout is unset.
 const defaultAAPJobPollSeconds int64 = 3600
 
 // Hook runner.
@@ -405,29 +407,71 @@ func (r *HookRunner) aapJobExtraVars() map[string]string {
 // Run AAP job template remotely.
 func (r *HookRunner) runAAPJob(step *planapi.Step) (err error) {
 	aapConfig := r.hook.Spec.AAP
+	m := Settings.Migration
 
-	// Get AAP token from Secret
-	token, err := GetAAPTokenFromSecret(
-		context.TODO(),
-		r.Client,
-		r.Plan.Namespace,
-		&aapConfig.TokenSecret,
-	)
+	if aapConfig == nil {
+		step.AddError("Hook AAP configuration is missing")
+		step.MarkCompleted()
+		return
+	}
+
+	useHook := strings.TrimSpace(aapConfig.URL) != "" && aapConfig.TokenSecret != nil &&
+		strings.TrimSpace(aapConfig.TokenSecret.Name) != ""
+	useCluster := strings.TrimSpace(m.AAPURL) != "" && strings.TrimSpace(m.AAPTokenSecretName) != ""
+	if !useHook && !useCluster {
+		step.AddError("AAP is not configured: set ForkliftController aap_url and aap_token_secret_name, or spec.aap.url and spec.aap.tokenSecret")
+		step.MarkCompleted()
+		return
+	}
+
+	var aapURL string
+	var token string
+	if useHook {
+		aapURL = strings.TrimSpace(aapConfig.URL)
+		var tokErr error
+		token, tokErr = aap.GetTokenFromSecret(
+			context.TODO(),
+			r.Client,
+			r.Plan.Namespace,
+			aapConfig.TokenSecret,
+		)
+		err = tokErr
+	} else {
+		// Centralized token Secret lives in the forklift-controller deployment namespace (POD_NAMESPACE).
+		aapURL = strings.TrimSpace(m.AAPURL)
+		ns := strings.TrimSpace(os.Getenv("POD_NAMESPACE"))
+		if ns == "" {
+			step.AddError("POD_NAMESPACE is not set; cannot load AAP token Secret")
+			step.MarkCompleted()
+			return
+		}
+		var tokErr error
+		token, tokErr = aap.GetTokenFromSecretName(
+			context.TODO(),
+			r.Client,
+			ns,
+			m.AAPTokenSecretName,
+		)
+		err = tokErr
+	}
 	if err != nil {
 		step.AddError(err.Error())
 		step.MarkCompleted()
 		return
 	}
 
-	// Create AAP client
-	aapClient := NewAAPClient(aapConfig.URL, token)
+	httpTimeout := 30 * time.Second
+	if m.AAPTimeoutSeconds > 0 {
+		httpTimeout = time.Duration(m.AAPTimeoutSeconds) * time.Second
+	}
+	aapClient := aap.NewClient(aapURL, token, httpTimeout)
 
 	extraVars := r.aapJobExtraVars()
 
 	r.Log.Info(
 		"Launching AAP job template",
 		"aap.jobTemplateId", aapConfig.JobTemplateID,
-		"aap.url", aapConfig.URL,
+		"aap.url", aapURL,
 		"vm.name", r.vm.Name,
 		"vm.id", r.vm.ID,
 	)
@@ -447,10 +491,8 @@ func (r *HookRunner) runAAPJob(step *planapi.Step) (err error) {
 		"jobTemplateId", aapConfig.JobTemplateID,
 	)
 
-	// Poll until the AAP job completes. Timeout semantics (seconds):
-	//   < 0 : no wall-clock limit
-	//   > 0 : use this value
-	//     0 : use Hook deadline, else default 3600
+	// Poll until the AAP job completes. spec.aap.timeout (if set) takes precedence for wall-clock behavior,
+	// then spec.deadline, then ForkliftController aap_timeout, then default 3600.
 	var pollTimeout time.Duration
 	unlimited := false
 	switch {
@@ -458,10 +500,13 @@ func (r *HookRunner) runAAPJob(step *planapi.Step) (err error) {
 		unlimited = true
 	case aapConfig.Timeout > 0:
 		pollTimeout = time.Duration(aapConfig.Timeout) * time.Second
+	case r.hook.Spec.Deadline < 0:
+		unlimited = true
+	case r.hook.Spec.Deadline > 0:
+		pollTimeout = time.Duration(r.hook.Spec.Deadline) * time.Second
 	default:
-		timeout := r.hook.Spec.Deadline
-		if timeout > 0 {
-			pollTimeout = time.Duration(timeout) * time.Second
+		if m.AAPTimeoutSeconds > 0 {
+			pollTimeout = time.Duration(m.AAPTimeoutSeconds) * time.Second
 		} else {
 			pollTimeout = time.Duration(defaultAAPJobPollSeconds) * time.Second
 		}
