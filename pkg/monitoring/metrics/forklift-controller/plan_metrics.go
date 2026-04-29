@@ -13,6 +13,7 @@ import (
 
 var activePlanStatuses = make(map[string]struct{})
 var activePlanAlertStatuses = make(map[string]struct{})
+var processedPlannedVMs = make(map[string]struct{})
 
 // Calculate Plans metrics every 10 seconds
 func RecordPlanMetrics(c client.Client) {
@@ -55,9 +56,12 @@ func RecordPlanMetrics(c client.Client) {
 				} else {
 					target = Remote
 				}
-				if m.IsWarm() {
+				switch m.Spec.Type {
+				case api.MigrationWarm:
 					mode = Warm
-				} else {
+				case api.MigrationLive:
+					mode = Live
+				default:
 					mode = Cold
 				}
 
@@ -65,6 +69,16 @@ func RecordPlanMetrics(c client.Client) {
 				planUID := string(m.UID)
 				planName := m.GetName()
 				phase := ""
+
+				for _, vm := range m.Spec.VMs {
+					plannedKey := fmt.Sprintf("%s/%s", planUID, vm.ID)
+					if _, exists := processedPlannedVMs[plannedKey]; !exists {
+						plannedVMsCounter.With(prometheus.Labels{
+							"provider": provider, "mode": mode, "target": target,
+						}).Inc()
+						processedPlannedVMs[plannedKey] = struct{}{}
+					}
+				}
 
 				if m.Status.HasCondition(Succeeded) {
 					key = fmt.Sprintf("%s|%s|%s|%s", Succeeded, provider, mode, target)

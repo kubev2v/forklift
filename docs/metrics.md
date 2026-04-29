@@ -38,14 +38,16 @@ Two background goroutines drive the controller metrics:
 - **`RecordMigrationMetrics`** -- started by the Migration controller
   (`pkg/controller/migration/controller.go`). Polls every 10 seconds, lists all
   `Migration` objects, and increments counters for terminal states (Succeeded,
-  Failed, Canceled). Uses in-memory maps keyed by migration UID to guarantee
-  each migration is counted exactly once.
+  Failed, Canceled). Also counts individual VM terminal states within each
+  migration. Uses in-memory maps keyed by migration UID (and migration
+  UID + VM ID for per-VM counts) to guarantee each entry is counted exactly
+  once.
 
 - **`RecordPlanMetrics`** -- started by the Plan controller
   (`pkg/controller/plan/controller.go`). Polls every 10 seconds, lists all
-  `Plan` objects, and recalculates gauge values from scratch. Stale label
-  combinations (plans that no longer exist or changed state) are reset to zero
-  or deleted.
+  `Plan` objects, and recalculates gauge values from scratch. Also counts
+  Planned VMs from each plan's `spec.vms` list. Stale label combinations
+  (plans that no longer exist or changed state) are reset to zero or deleted.
 
 ---
 
@@ -58,8 +60,8 @@ At a glance:
 
 | Area | Key metrics | Source |
 |---|---|---|
-| Migrations | `mtv_migrations_status_total`, `mtv_workload_migrations_status_total`, `mtv_migration_duration_seconds`, `mtv_migrations_duration_seconds`, `mtv_migration_data_transferred_bytes` | `pkg/monitoring/metrics/forklift-controller/` |
-| Plans | `mtv_plans_status`, `mtv_plan_alert_status` | `pkg/monitoring/metrics/forklift-controller/` |
+| Migrations | `mtv_migrations_status_total`, `mtv_workload_migrations_status_total`, `mtv_migrated_vms_total`, `mtv_migration_duration_seconds`, `mtv_migrations_duration_seconds`, `mtv_migration_data_transferred_bytes` | `pkg/monitoring/metrics/forklift-controller/` |
+| Plans | `mtv_plans_status`, `mtv_plan_alert_status`, `mtv_planned_vms_total` | `pkg/monitoring/metrics/forklift-controller/` |
 
 ---
 
@@ -86,9 +88,9 @@ allowed values:
 
 | Label | Values | Meaning |
 |---|---|---|
-| `status` | `Succeeded`, `Failed`, `Canceled`, `Executing`, `Running`, `Pending`, `Blocked`, `Deleted` | Current lifecycle state of a plan or migration object. Counters only use the terminal states (`Succeeded`, `Failed`, `Canceled`); gauges may use the full set. Not every metric exposes every value -- check the per-metric docs in the [Metrics Reference](./metrics-reference.md). |
+| `status` | `Succeeded`, `Failed`, `Canceled`, `Executing`, `Running`, `Pending`, `Blocked`, `Deleted` | Lifecycle state of a plan, migration, or VM. Counters use the terminal states (`Succeeded`, `Failed`, `Canceled`); gauges may use the full set. Not every metric exposes every value -- check the per-metric docs in the [Metrics Reference](./metrics-reference.md). |
 | `provider` | `openshift`, `vsphere`, `ovirt`, `openstack`, `ova`, `ec2`, `hyperv` | The source virtualization platform the VMs are being migrated from. The value comes from `sourceProvider.Type().String()` and matches the `ProviderType` constants defined in `pkg/apis/forklift/v1beta1/provider.go`. |
-| `mode` | `Cold`, `Warm` | The migration strategy. **Cold** shuts down the source VM and copies disks in a single pass. **Warm** performs incremental snapshot-based replication while the source VM stays running, then does a final cutover. |
+| `mode` | `Cold`, `Warm`, `Live` | The migration strategy. **Cold** shuts down the source VM and copies disks in a single pass. **Warm** performs incremental snapshot-based replication while the source VM stays running, then does a final cutover. **Live** performs a live migration without shutting down the source VM. |
 | `target` | `Local`, `Remote` | Where the VMs are being migrated to. **Local** means the destination is the same OpenShift cluster that runs the forklift-controller (the destination provider has no URL configured). **Remote** means the destination is a different OpenShift cluster reached via an explicit URL. |
 | `plan` | UID string | The Kubernetes UID of the `Plan` resource that owns the migration. Used to correlate migration-level metrics back to a specific plan, especially when multiple plans target the same provider/mode/target combination. |
 | `plan_name` | string | The human-readable `.metadata.name` of the plan. Present only on `mtv_plan_alert_status` to make alerting rules easier to read without requiring a UID-to-name lookup. |
@@ -101,6 +103,15 @@ allowed values:
   (`processedSucceededMigrations`, `processedFailedMigrations`,
   `processedCanceledMigrations`) keyed by migration UID. Each migration is
   counted exactly once per terminal state.
+
+- **Planned VM counter** (`mtv_planned_vms_total`): `processedPlannedVMs`
+  keyed by `planUID/vmID`. Each VM in a plan spec is counted exactly once per
+  plan, regardless of how many times the plan is executed.
+
+- **Migrated VM counter** (`mtv_migrated_vms_total`): `processedVMStatuses`
+  keyed by `migrationUID/vmID/status`. Each VM is counted once per terminal
+  state per migration attempt. Re-running a plan creates a new Migration CR
+  with a new UID, so the same VM will be counted again in the new attempt.
 
 - **Plan gauges** (`mtv_plans_status`, `mtv_plan_alert_status`): recalculated
   from scratch every 10-second cycle. Label combinations that existed in the

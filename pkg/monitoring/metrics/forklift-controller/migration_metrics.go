@@ -14,6 +14,7 @@ var (
 	processedSucceededMigrations = make(map[string]struct{})
 	processedFailedMigrations    = make(map[string]struct{})
 	processedCanceledMigrations  = make(map[string]struct{})
+	processedVMStatuses          = make(map[string]struct{})
 )
 
 // Calculate Migrations metrics every 10 seconds
@@ -59,14 +60,18 @@ func RecordMigrationMetrics(c client.Client) {
 				} else {
 					target = Remote
 				}
-				if plan.IsWarm() {
+				switch plan.Spec.Type {
+				case api.MigrationWarm:
 					mode = Warm
-				} else {
+				case api.MigrationLive:
+					mode = Live
+				default:
 					mode = Cold
 				}
 
 				provider := sourceProvider.Type().String()
 				processMigration(m, provider, mode, target, string(plan.UID))
+				processVMStatuses(m, provider, mode, target)
 			}
 		}
 	}()
@@ -105,6 +110,29 @@ func processMigration(migration api.Migration, provider, mode, target, planUID s
 func updateMetricsCount(status, provider, mode, target, plan string) {
 	migrationStatusCounter.With(prometheus.Labels{"status": status, "provider": provider, "mode": mode, "target": target}).Inc()
 	migrationPlanCorrelationStatusCounter.With(prometheus.Labels{"status": status, "provider": provider, "mode": mode, "target": target, "plan": plan}).Inc()
+}
+
+func processVMStatuses(migration api.Migration, provider, mode, target string) {
+	for _, vm := range migration.Status.VMs {
+		var vmStatus string
+		switch {
+		case vm.HasCondition(Succeeded):
+			vmStatus = Succeeded
+		case vm.HasCondition(Failed):
+			vmStatus = Failed
+		case vm.HasCondition(Canceled):
+			vmStatus = Canceled
+		default:
+			continue
+		}
+		vmKey := fmt.Sprintf("%s/%s/%s", string(migration.UID), vm.ID, vmStatus)
+		if _, exists := processedVMStatuses[vmKey]; !exists {
+			migratedVMsCounter.With(prometheus.Labels{
+				"status": vmStatus, "provider": provider, "mode": mode, "target": target,
+			}).Inc()
+			processedVMStatuses[vmKey] = struct{}{}
+		}
+	}
 }
 
 func recordSuccessfulMigrationMetrics(migration api.Migration, provider, mode, target, planUID string) {
