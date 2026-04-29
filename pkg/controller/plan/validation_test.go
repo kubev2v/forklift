@@ -1438,3 +1438,86 @@ var _ = ginkgo.Describe("aggregateWarningConcerns", func() {
 		gomega.Expect(unsupportedOVFExport.Items).To(gomega.BeEmpty())
 	})
 })
+
+var _ = ginkgo.Describe("validateVirtV2vImage", func() {
+	var reconciler *Reconciler
+
+	ginkgo.BeforeEach(func() {
+		reconciler = &Reconciler{
+			base.Reconciler{},
+			nil,
+		}
+	})
+
+	ginkgo.It("should not set condition when VirtV2vImage is empty", func() {
+		plan := &api.Plan{}
+		plan.Spec.VirtV2vImage = ""
+		err := reconciler.validateVirtV2vImage(plan)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(plan.Status.HasCondition(VirtV2vImageNotValid)).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should not set condition for a valid fully-qualified image", func() {
+		plan := &api.Plan{}
+		plan.Spec.VirtV2vImage = "quay.io/kubev2v/forklift-virt-v2v:latest"
+		err := reconciler.validateVirtV2vImage(plan)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(plan.Status.HasCondition(VirtV2vImageNotValid)).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should not set condition for image with tag and registry port", func() {
+		plan := &api.Plan{}
+		plan.Spec.VirtV2vImage = "registry.example.com:5000/myorg/myimage:v1.2.3"
+		err := reconciler.validateVirtV2vImage(plan)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(plan.Status.HasCondition(VirtV2vImageNotValid)).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should set condition for a bare name like 'test'", func() {
+		plan := &api.Plan{}
+		plan.Spec.VirtV2vImage = "test"
+		err := reconciler.validateVirtV2vImage(plan)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(plan.Status.HasCondition(VirtV2vImageNotValid)).To(gomega.BeTrue())
+	})
+
+	ginkgo.It("should set condition for an invalid reference with spaces", func() {
+		plan := &api.Plan{}
+		plan.Spec.VirtV2vImage = "invalid image name"
+		err := reconciler.validateVirtV2vImage(plan)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(plan.Status.HasCondition(VirtV2vImageNotValid)).To(gomega.BeTrue())
+	})
+
+	ginkgo.It("should set condition for a bare name with tag", func() {
+		plan := &api.Plan{}
+		plan.Spec.VirtV2vImage = "myimage:latest"
+		err := reconciler.validateVirtV2vImage(plan)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(plan.Status.HasCondition(VirtV2vImageNotValid)).To(gomega.BeTrue())
+	})
+
+	ginkgo.It("should not set condition for org/image format", func() {
+		plan := &api.Plan{}
+		plan.Spec.VirtV2vImage = "kubev2v/forklift-virt-v2v:custom"
+		err := reconciler.validateVirtV2vImage(plan)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(plan.Status.HasCondition(VirtV2vImageNotValid)).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should not set condition for image with double underscore separator", func() {
+		plan := &api.Plan{}
+		plan.Spec.VirtV2vImage = "quay.io/my__org/image:tag"
+		err := reconciler.validateVirtV2vImage(plan)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(plan.Status.HasCondition(VirtV2vImageNotValid)).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should not set condition for image with multiple dashes in path", func() {
+		plan := &api.Plan{}
+		plan.Spec.VirtV2vImage = "quay.io/my---image/repo:tag"
+		err := reconciler.validateVirtV2vImage(plan)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(plan.Status.HasCondition(VirtV2vImageNotValid)).To(gomega.BeFalse())
+	})
+})
