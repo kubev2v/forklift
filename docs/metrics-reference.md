@@ -30,7 +30,8 @@ Most metrics carry a subset of these labels:
   One of: `openshift`, `vsphere`, `ovirt`, `openstack`, `ova`, `ec2`, `hyperv`.
 - **`mode`** -- migration strategy. `Cold` shuts the source VM down and copies
   disks in one pass. `Warm` replicates incrementally while the source VM keeps
-  running, then cuts over.
+  running, then cuts over. `Live` performs a live migration without shutting
+  down the source VM.
 - **`target`** -- destination cluster. `Local` means the same OpenShift cluster
   that runs the controller (no URL configured). `Remote` means a different
   cluster reached via an explicit URL.
@@ -81,6 +82,58 @@ same provider/mode/target combination.
 ```bash
 # Succeeded migrations for a specific plan
 oc metrics query --query 'mtv_workload_migrations_status_total{status="Succeeded", plan="<plan-uid>"}'
+```
+
+### `mtv_planned_vms_total`
+
+| | |
+|---|---|
+| **Type** | Counter |
+| **Labels** | `provider`, `mode`, `target` |
+| **Description** | Number of VMs listed in migration plan specs. |
+
+Incremented once per VM in a plan's `spec.vms`, deduplicated by plan UID + VM
+ID. Counts every VM the user intended to migrate, even if the plan was never
+executed. If a VM is added to a plan later, it is counted on the next poll
+cycle.
+
+This metric counts VMs **per plan, not per migration attempt**. Re-running a
+plan does not change this counter.
+
+```bash
+# Total VMs planned for migration
+oc metrics query --query 'mtv_planned_vms_total'
+
+# Planned VMs from vSphere
+oc metrics query --query 'mtv_planned_vms_total{provider="vsphere"}'
+```
+
+### `mtv_migrated_vms_total`
+
+| | |
+|---|---|
+| **Type** | Counter |
+| **Labels** | `status`, `provider`, `mode`, `target` |
+| **Description** | Individual VM migration outcomes. |
+
+Incremented once per VM that reaches a terminal condition within a migration,
+deduplicated by migration UID + VM ID + status. Valid `status` values:
+`Succeeded`, `Failed`, `Canceled`.
+
+This metric counts **per migration attempt**. If a plan with 10 VMs is
+executed twice (first attempt fails, second succeeds), the counter will show
+10 Failed + 10 Succeeded = 20 total events, even though only 10 unique VMs
+were involved. Each Migration CR is an independent attempt with its own UID.
+
+```bash
+# Total VMs successfully migrated
+oc metrics query --query 'mtv_migrated_vms_total{status="Succeeded"}'
+
+# Failed VMs from vSphere cold migrations
+oc metrics query --query 'mtv_migrated_vms_total{status="Failed", provider="vsphere", mode="Cold"}'
+
+# Rate of individual VM migrations over the last hour
+oc metrics query --query 'rate(mtv_migrated_vms_total[1h])'
 ```
 
 ### `mtv_plans_status`
