@@ -339,7 +339,7 @@ func (b *Builder) GetDeepInspectionPodSpec(volumes []core.Volume, volumeMounts [
 		volumeMounts = append(volumeMounts, core.VolumeMount{
 			Name:      "connection-secret",
 			ReadOnly:  true,
-			MountPath: "/etc/deep-inspection/connection",
+			MountPath: "/etc/secret",
 		})
 	}
 
@@ -386,7 +386,7 @@ func (b *Builder) GetDeepInspectionPodSpec(volumes []core.Volume, volumeMounts [
 				{
 					Name:            "deep-inspection",
 					Image:           img,
-					ImagePullPolicy: core.PullIfNotPresent,
+					ImagePullPolicy: core.PullAlways,
 					Resources: core.ResourceRequirements{
 						Requests: core.ResourceList{
 							core.ResourceCPU:    resource.MustParse("100m"),
@@ -431,16 +431,9 @@ func (b *Builder) BuildDeepInspectionPodEnvironment(vm *plan.VMStatus) []core.En
 	env = append(env, b.Config.Environment...)
 	if vm != nil {
 		if vm.ID != "" {
-			env = append(env, core.EnvVar{Name: "VM_ID", Value: vm.ID})
-		}
-		if vm.Name != "" {
-			env = append(env, core.EnvVar{Name: "VM_NAME", Value: vm.Name})
+			env = append(env, core.EnvVar{Name: "VM_MOREF", Value: vm.ID})
 		}
 	}
-	env = append(env, core.EnvVar{
-		Name:  "LOCAL_MIGRATION",
-		Value: strconv.FormatBool(b.Config.LocalMigration),
-	})
 	return env
 }
 
@@ -453,8 +446,30 @@ func (b *Builder) BuildDeepInspectionPod(vm *plan.VMStatus, volumes []core.Volum
 
 	pod.GenerateName = b.Config.GenerateName + "deep-inspection-"
 	pod.Labels[convctx.LabelApp] = "deep-inspection"
-	pod.Spec.Containers[0].Env = b.BuildDeepInspectionPodEnvironment(vm)
+	env := b.BuildDeepInspectionPodEnvironment(vm)
+	env = b.appendDeepInspectionProviderURLEnv(env, secret)
+	pod.Spec.Containers[0].Env = env
 	return pod, nil
+}
+
+func (b *Builder) appendDeepInspectionProviderURLEnv(env []core.EnvVar, secret *core.Secret) []core.EnvVar {
+	if secret == nil || secret.Name == "" {
+		return env
+	}
+	for _, e := range env {
+		if e.Name == "PROVIDER_URL" {
+			return env
+		}
+	}
+	return append(env, core.EnvVar{
+		Name: "PROVIDER_URL",
+		ValueFrom: &core.EnvVarSource{
+			SecretKeyRef: &core.SecretKeySelector{
+				LocalObjectReference: core.LocalObjectReference{Name: secret.Name},
+				Key:                  "url",
+			},
+		},
+	})
 }
 
 // BuildV2vPodEnvironment appends env vars from PodConfig,

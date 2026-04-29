@@ -443,6 +443,16 @@ github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8
 # github.com/klauspost/cpuid/v2 v2.2.10
 ## explicit; go 1.22
 github.com/klauspost/cpuid/v2
+# github.com/kubev2v/vm-migration-detective v0.0.0-20260329082930-1ddc8baf4483
+## explicit; go 1.24.0
+github.com/kubev2v/vm-migration-detective/internal/checks
+github.com/kubev2v/vm-migration-detective/internal/inspection
+github.com/kubev2v/vm-migration-detective/internal/persistent
+github.com/kubev2v/vm-migration-detective/internal/vddk
+github.com/kubev2v/vm-migration-detective/internal/vsphere
+github.com/kubev2v/vm-migration-detective/pkg/checks
+github.com/kubev2v/vm-migration-detective/pkg/types
+github.com/kubev2v/vm-migration-detective/pkg/vmdetect
 # github.com/leodido/go-urn v1.4.0
 ## explicit; go 1.18
 github.com/leodido/go-urn
@@ -632,6 +642,9 @@ github.com/remyoudompheng/bigfft
 # github.com/shopspring/decimal v1.4.0
 ## explicit; go 1.10
 github.com/shopspring/decimal
+# github.com/sirupsen/logrus v1.9.3
+## explicit; go 1.13
+github.com/sirupsen/logrus
 # github.com/spf13/cast v1.7.0
 ## explicit; go 1.19
 github.com/spf13/cast

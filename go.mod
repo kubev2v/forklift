@@ -21,6 +21,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/hashicorp/go-version v1.7.0
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.6
+	github.com/kubev2v/vm-migration-detective v0.0.0-20260329082930-1ddc8baf4483
 	github.com/masterzen/winrm v0.0.0-20250927112105-5f8e6c707321
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/ginkgo/v2 v2.22.0
@@ -34,6 +35,7 @@ require (
 	github.com/prometheus/client_golang v1.19.1
 	github.com/prometheus/client_model v0.6.1
 	github.com/prometheus/common v0.55.0
+	github.com/sirupsen/logrus v1.9.3
 	github.com/vmware/govmomi v0.50.0
 	go.uber.org/mock v0.4.0
 	go.uber.org/zap v1.27.0

@@ -9,6 +9,7 @@ import (
 
 // VirtV2vPod type constants.
 type V2vPodType int
+
 const (
 	VirtV2vConversionPod V2vPodType = 0
 	VirtV2vInspectionPod V2vPodType = 1
@@ -206,4 +207,3 @@ func ResolveServiceAccount(cfg *PodConfig) string {
 	}
 	return settings.Settings.Migration.ServiceAccount
 }
-
