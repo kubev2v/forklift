@@ -16,6 +16,7 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	apisplan "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	refapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	hookutil "github.com/kubev2v/forklift/pkg/controller/hook"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
@@ -90,6 +91,7 @@ const (
 	LuksAndClevisIncompatibility    = "LuksAndClevisIncompatibility"
 	UnsupportedUdn                  = "UnsupportedUserDefinedNetwork"
 	unsupportedVersion              = "UnsupportedVersion"
+	VirtV2vImageNotValid            = "VirtV2vImageNotValid"
 	VDDKInvalid                     = "VDDKInvalid"
 	ValidatingVDDK                  = "ValidatingVDDK"
 	VDDKInitImageNotReady           = "VDDKInitImageNotReady"
@@ -234,8 +236,15 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		return err
 	}
 
-	if err = r.validateVddkImage(plan); err != nil {
+	if err = r.validateVirtV2vImage(plan); err != nil {
 		return err
+	}
+
+	// Skip VDDK validation when VirtV2vImage is invalid to avoid creating unnecessary jobs.
+	if !plan.Status.HasCondition(VirtV2vImageNotValid) {
+		if err = r.validateVddkImage(plan); err != nil {
+			return err
+		}
 	}
 
 	// Validate version only if migration is OCP to OCP
@@ -2432,6 +2441,23 @@ func (r *Reconciler) validatePodSecurity(plan *api.Plan) error {
 			"plan", plan.Name)
 	}
 
+	return nil
+}
+
+func (r *Reconciler) validateVirtV2vImage(plan *api.Plan) error {
+	if plan.Spec.VirtV2vImage == "" {
+		return nil
+	}
+	img := plan.Spec.VirtV2vImage
+	if !hookutil.ReferenceRegexp.MatchString(img) || !strings.Contains(img, "/") {
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     VirtV2vImageNotValid,
+			Status:   True,
+			Reason:   NotValid,
+			Category: Critical,
+			Message:  "VirtV2vImage is not a valid container image reference. A fully-qualified image is required (e.g. quay.io/kubev2v/forklift-virt-v2v:latest).",
+		})
+	}
 	return nil
 }
 
