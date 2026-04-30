@@ -42,7 +42,7 @@ Returns: command flags (with required/optional markers), usage pattern, and exam
 
 // HandleMTVHelp handles the mtv_help tool invocation.
 func HandleMTVHelp(ctx context.Context, req *mcp.CallToolRequest, input MTVHelpInput) (*mcp.CallToolResult, any, error) {
-	// Extract K8s credentials from HTTP headers (populated by wrapper in SSE mode)
+	// Extract K8s credentials from HTTP headers (populated by SDK in HTTP mode)
 	ctx = extractKubeCredsFromRequest(ctx, req)
 
 	command := strings.TrimSpace(input.Command)

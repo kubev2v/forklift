@@ -90,6 +90,8 @@ func buildSpecSection(b *describe.Builder, plan *unstructured.Unstructured) {
 	description, _, _ := unstructured.NestedString(plan.Object, "spec", "description")
 	preserveCPUModel, _, _ := unstructured.NestedBool(plan.Object, "spec", "preserveClusterCPUModel")
 	preserveStaticIPs, _, _ := unstructured.NestedBool(plan.Object, "spec", "preserveStaticIPs")
+	enableNestedVirt, enableNestedVirtExists, _ := unstructured.NestedBool(plan.Object, "spec", "enableNestedVirtualization")
+	xfsCompatibility, _, _ := unstructured.NestedBool(plan.Object, "spec", "xfsCompatibility")
 
 	migrationType := "cold"
 	if v, exists, _ := unstructured.NestedString(plan.Object, "spec", "type"); exists && v != "" {
@@ -115,6 +117,12 @@ func buildSpecSection(b *describe.Builder, plan *unstructured.Unstructured) {
 	b.SubSection("Advanced Settings")
 	b.FieldC("Preserve CPU Model", fmt.Sprintf("%t", preserveCPUModel), output.ColorizeBooleanString)
 	b.FieldC("Preserve Static IPs", fmt.Sprintf("%t", preserveStaticIPs), output.ColorizeBooleanString)
+	if enableNestedVirtExists {
+		b.FieldC("Nested Virtualization", fmt.Sprintf("%t", enableNestedVirt), output.ColorizeBooleanString)
+	} else {
+		b.Field("Nested Virtualization", "auto-detect")
+	}
+	b.FieldC("XFS Compatibility", fmt.Sprintf("%t", xfsCompatibility), output.ColorizeBooleanString)
 	b.EndSubSection()
 
 	if description != "" {
@@ -268,6 +276,7 @@ func buildVMsSection(b *describe.Builder, plan *unstructured.Unstructured, migra
 		pvcNameTemplate, _, _ := unstructured.NestedString(vm, "pvcNameTemplate")
 		volumeNameTemplate, _, _ := unstructured.NestedString(vm, "volumeNameTemplate")
 		networkNameTemplate, _, _ := unstructured.NestedString(vm, "networkNameTemplate")
+		enableNestedVirt, enableNestedVirtExists, _ := unstructured.NestedBool(vm, "enableNestedVirtualization")
 		hooks, _, _ := unstructured.NestedSlice(vm, "hooks")
 		luks, _, _ := unstructured.NestedMap(vm, "luks")
 
@@ -302,6 +311,9 @@ func buildVMsSection(b *describe.Builder, plan *unstructured.Unstructured, migra
 		}
 		if networkNameTemplate != "" {
 			b.Field("Network Template", networkNameTemplate)
+		}
+		if enableNestedVirtExists {
+			b.FieldC("Nested Virtualization", fmt.Sprintf("%t", enableNestedVirt), output.ColorizeBooleanString)
 		}
 
 		if len(hooks) > 0 {

@@ -37,29 +37,29 @@ func listClustersOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Co
 	}
 
 	// Define default headers based on provider type
-	var defaultHeaders []output.Header
+	var defaultHeaders []output.Column
 	switch providerType {
 	case "ovirt":
-		defaultHeaders = []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "DATACENTER", JSONPath: "dataCenter.name"},
-			{DisplayName: "HA-RESERVATION", JSONPath: "haReservation"},
-			{DisplayName: "KSM-ENABLED", JSONPath: "ksmEnabled"},
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "ID", Key: "id"},
+			{Title: "DATACENTER", Key: "dataCenter.name"},
+			{Title: "HA-RESERVATION", Key: "haReservation"},
+			{Title: "KSM-ENABLED", Key: "ksmEnabled"},
 		}
 	case "vsphere":
-		defaultHeaders = []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "DATACENTER", JSONPath: "dataCenter.name"},
-			{DisplayName: "DRS", JSONPath: "drsEnabled"},
-			{DisplayName: "HA", JSONPath: "haEnabled"},
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "ID", Key: "id"},
+			{Title: "DATACENTER", Key: "dataCenter.name"},
+			{Title: "DRS", Key: "drsEnabled"},
+			{Title: "HA", Key: "haEnabled"},
 		}
 	default:
-		defaultHeaders = []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "DATACENTER", JSONPath: "dataCenter.name"},
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "ID", Key: "id"},
+			{Title: "DATACENTER", Key: "dataCenter.name"},
 		}
 	}
 

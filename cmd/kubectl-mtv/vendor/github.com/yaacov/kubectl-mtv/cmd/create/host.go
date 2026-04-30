@@ -24,6 +24,8 @@ func NewHostCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig Glo
 	var networkAdapterName string
 	var hostInsecureSkipTLS bool
 	var cacert string
+	var dryRun bool
+	var outputFormat string
 
 	// HostSpec fields
 	var hostSpec forkliftv1beta1.HostSpec
@@ -105,6 +107,17 @@ Examples:
 				cacert = string(fileContent)
 			}
 
+			if !dryRun && outputFormat != "" {
+				return fmt.Errorf("--output flag can only be used with --dry-run")
+			}
+			if dryRun && outputFormat != "" && outputFormat != "json" && outputFormat != "yaml" {
+				return fmt.Errorf("invalid output format for dry-run: %s. Valid formats are: json, yaml", outputFormat)
+			}
+			resolvedFormat := outputFormat
+			if dryRun && resolvedFormat == "" {
+				resolvedFormat = "yaml"
+			}
+
 			opts := host.CreateHostOptions{
 				HostIDs:                  hostIDs,
 				Namespace:                namespace,
@@ -120,6 +133,8 @@ Examples:
 				HostInsecureSkipTLS:      hostInsecureSkipTLS,
 				CACert:                   cacert,
 				HostSpec:                 hostSpec,
+				DryRun:                   dryRun,
+				OutputFormat:             resolvedFormat,
 			}
 
 			return host.Create(cmd.Context(), opts)
@@ -137,6 +152,8 @@ Examples:
 	cmd.Flags().StringVar(&networkAdapterName, "network-adapter", "", "Network adapter name to get IP address from inventory (required - mutually exclusive with --ip-address)")
 	cmd.Flags().BoolVar(&hostInsecureSkipTLS, "host-insecure-skip-tls", false, "Skip TLS verification when connecting to the host (only used when creating new secret)")
 	cmd.Flags().StringVar(&cacert, "cacert", "", "CA certificate for host authentication - provide certificate content directly or use @filename to load from file (only used when creating new secret)")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Output Host CR(s) to stdout instead of creating them")
+	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format for dry-run (json, yaml). Defaults to yaml when --dry-run is used")
 
 	if err := cmd.MarkFlagRequired("host-id"); err != nil {
 		panic(err)

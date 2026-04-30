@@ -38,30 +38,30 @@ func listStorageOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Con
 	}
 
 	// Define default headers based on provider type
-	var defaultHeaders []output.Header
+	var defaultHeaders []output.Column
 	switch providerType {
 	case "openshift":
-		defaultHeaders = []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "DEFAULT", JSONPath: "object.metadata.annotations[storageclass.kubernetes.io/is-default-class]", ColorFunc: output.ColorizeBooleanString},
-			{DisplayName: "VIRT-DEFAULT", JSONPath: "object.metadata.annotations[storageclass.kubevirt.io/is-default-virt-class]", ColorFunc: output.ColorizeBooleanString},
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "ID", Key: "id"},
+			{Title: "DEFAULT", Key: "object.metadata.annotations[storageclass.kubernetes.io/is-default-class]", ColorFunc: output.ColorizeBooleanString},
+			{Title: "VIRT-DEFAULT", Key: "object.metadata.annotations[storageclass.kubevirt.io/is-default-virt-class]", ColorFunc: output.ColorizeBooleanString},
 		}
 	case "ec2":
-		defaultHeaders = []output.Header{
-			{DisplayName: "TYPE", JSONPath: "type"},
-			{DisplayName: "DESCRIPTION", JSONPath: "description"},
-			{DisplayName: "MAX-IOPS", JSONPath: "maxIOPS"},
-			{DisplayName: "MAX-THROUGHPUT", JSONPath: "maxThroughput"},
+		defaultHeaders = []output.Column{
+			{Title: "TYPE", Key: "type"},
+			{Title: "DESCRIPTION", Key: "description"},
+			{Title: "MAX-IOPS", Key: "maxIOPS"},
+			{Title: "MAX-THROUGHPUT", Key: "maxThroughput"},
 		}
 	default:
-		defaultHeaders = []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "TYPE", JSONPath: "type"},
-			{DisplayName: "CAPACITY", JSONPath: "capacityHuman"},
-			{DisplayName: "FREE", JSONPath: "freeHuman"},
-			{DisplayName: "MAINTENANCE", JSONPath: "maintenance", ColorFunc: output.ColorizeBooleanString},
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "ID", Key: "id"},
+			{Title: "TYPE", Key: "type"},
+			{Title: "CAPACITY", Key: "capacityHuman"},
+			{Title: "FREE", Key: "freeHuman"},
+			{Title: "MAINTENANCE", Key: "maintenance", ColorFunc: output.ColorizeBooleanString},
 		}
 	}
 

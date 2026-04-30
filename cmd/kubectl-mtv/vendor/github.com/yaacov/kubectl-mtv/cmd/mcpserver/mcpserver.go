@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -21,7 +22,7 @@ import (
 )
 
 var (
-	sse              bool
+	httpMode         bool
 	port             string
 	host             string
 	certFile         string
@@ -46,7 +47,7 @@ USE WITH CAUTION: Includes write operations that can modify resources.
 
 Modes:
   Default: Stdio mode for AI assistant integration
-  --sse:   HTTP server mode with optional TLS
+  --http:  HTTP server mode using Streamable HTTP transport
 
 Read-Only Mode:
   --read-only: Disables all write operations (mtv_write tool not registered)
@@ -60,10 +61,10 @@ Kubernetes Authentication:
   --server:  Kubernetes API server URL (passed to kubectl via --server flag)
   --token:   Kubernetes authentication token (passed to kubectl via --token flag)
 
-  These flags set default credentials for all requests. They work in both stdio and SSE modes.
+  These flags set default credentials for all requests. They work in both stdio and HTTP modes.
 
-SSE Mode Authentication (HTTP Headers):
-  In SSE mode, the following HTTP headers are also supported for per-request authentication:
+HTTP Mode Authentication (HTTP Headers):
+  In HTTP mode, the following HTTP headers are supported for per-request authentication:
 
   Authorization: Bearer <token>
     Kubernetes authentication token. Passed to kubectl via --token flag.
@@ -72,6 +73,8 @@ SSE Mode Authentication (HTTP Headers):
     Kubernetes API server URL. Passed to kubectl via --server flag.
 
   Precedence: HTTP headers (per-request) > CLI flags (--server/--token) > kubeconfig (implicit).
+
+  Each HTTP POST carries its own headers, so token rotation works seamlessly.
 
 Quick Setup for AI Assistants:
 
@@ -113,32 +116,36 @@ Manual Claude config: Add to claude_desktop_config.json:
 			sigChan := make(chan os.Signal, 1)
 			signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
-			if sse {
-				// SSE mode - run HTTP server
+			if httpMode {
+				// HTTP mode - run Streamable HTTP server
 				addr := net.JoinHostPort(host, port)
 
-				// Create MCP handler with header capture for SSE mode
-				// The SSE transport doesn't populate RequestExtra.Header automatically.
-				// The createMCPServerWithHeaderCapture callback is invoked once during
-				// session initiation (the initial SSE GET request) and captures HTTP headers
-				// at that time. Those captured headers persist for the lifetime of the SSE
-				// session and are injected into RequestExtra.Header for all subsequent tool
-				// calls within that session. The outer POST-logging wrapper below provides
-				// diagnostic logging per-request but doesn't affect header propagation.
-				innerHandler := mcp.NewSSEHandler(func(req *http.Request) *mcp.Server {
-					server, err := createMCPServerWithHeaderCapture(req, readOnly)
+				// Discover commands once at startup; the schema is static.
+				registry, err := discovery.NewRegistry(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to discover commands: %w", err)
+				}
+
+				innerHandler := mcp.NewStreamableHTTPHandler(func(req *http.Request) *mcp.Server {
+					server, err := createMCPServerWithRegistry(registry, readOnly)
 					if err != nil {
 						klog.Errorf("Failed to create server: %v", err)
 						return nil
 					}
 					return server
-				}, nil)
+				}, &mcp.StreamableHTTPOptions{})
 
-				// Wrap to log header capture (without leaking sensitive data)
 				handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if origin := r.Header.Get("Origin"); origin != "" {
+						parsed, err := url.Parse(origin)
+						if err != nil || parsed.Host != r.Host {
+							http.Error(w, "Forbidden", http.StatusForbidden)
+							return
+						}
+					}
+
 					if r.Method == http.MethodPost {
 						if auth := r.Header.Get("Authorization"); auth != "" {
-							// Extract only the scheme (e.g., "Bearer") without token content
 							scheme := "unknown"
 							if parts := strings.SplitN(auth, " ", 2); len(parts) > 0 {
 								scheme = parts[0]
@@ -152,24 +159,24 @@ Manual Claude config: Add to claude_desktop_config.json:
 				})
 
 				server := &http.Server{
-					Addr:    addr,
-					Handler: handler,
+					Addr:              addr,
+					Handler:           handler,
+					ReadHeaderTimeout: 5 * time.Second,
 				}
 
 				// Start server in a goroutine
 				errChan := make(chan error, 1)
 				go func() {
-					// Check if TLS should be enabled (both cert and key files provided)
 					useTLS := certFile != "" && keyFile != ""
 
 					if useTLS {
-						klog.V(1).Infof("Starting kubectl-mtv MCP server with TLS in SSE mode on %s", addr)
+						klog.V(1).Infof("Starting kubectl-mtv MCP server with TLS in HTTP mode on %s", addr)
 						klog.V(1).Infof("Using cert: %s, key: %s", certFile, keyFile)
-						klog.V(1).Infof("Connect clients to: https://%s/sse", addr)
+						klog.V(1).Infof("Connect clients to: https://%s/mcp", addr)
 						errChan <- server.ListenAndServeTLS(certFile, keyFile)
 					} else {
-						klog.V(1).Infof("Starting kubectl-mtv MCP server in SSE mode on %s", addr)
-						klog.V(1).Infof("Connect clients to: http://%s/sse", addr)
+						klog.V(1).Infof("Starting kubectl-mtv MCP server in HTTP mode on %s", addr)
+						klog.V(1).Infof("Connect clients to: http://%s/mcp", addr)
 						errChan <- server.ListenAndServe()
 					}
 				}()
@@ -182,7 +189,6 @@ Manual Claude config: Add to claude_desktop_config.json:
 					}
 				case <-sigChan:
 					klog.V(1).Info("Shutting down server...")
-					// Give the server 5 seconds to gracefully shutdown
 					shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 					defer shutdownCancel()
 					if err := server.Shutdown(shutdownCtx); err != nil {
@@ -193,7 +199,7 @@ Manual Claude config: Add to claude_desktop_config.json:
 			}
 
 			// Stdio mode - default behavior
-			server, err := createMCPServer()
+			server, err := createMCPServer(readOnly)
 			if err != nil {
 				return fmt.Errorf("failed to create server: %w", err)
 			}
@@ -221,10 +227,9 @@ Manual Claude config: Add to claude_desktop_config.json:
 		},
 	}
 
-	// Add flags matching the MCP CLI flags
-	mcpCmd.Flags().BoolVar(&sse, "sse", false, "Run in SSE (Server-Sent Events) mode over HTTP")
-	mcpCmd.Flags().StringVar(&port, "port", "8080", "Port to listen on for SSE mode")
-	mcpCmd.Flags().StringVar(&host, "host", "127.0.0.1", "Host address to bind to for SSE mode")
+	mcpCmd.Flags().BoolVar(&httpMode, "http", false, "Run in HTTP mode using Streamable HTTP transport")
+	mcpCmd.Flags().StringVar(&port, "port", "8080", "Port to listen on for HTTP mode")
+	mcpCmd.Flags().StringVar(&host, "host", "127.0.0.1", "Host address to bind to for HTTP mode")
 	mcpCmd.Flags().StringVar(&certFile, "cert-file", "", "Path to TLS certificate file (enables TLS when used with --key-file)")
 	mcpCmd.Flags().StringVar(&keyFile, "key-file", "", "Path to TLS private key file (enables TLS when used with --cert-file)")
 	mcpCmd.Flags().StringVar(&outputFormat, "output-format", "markdown", "Default output format for commands: markdown, text (table), or json")
@@ -237,23 +242,25 @@ Manual Claude config: Add to claude_desktop_config.json:
 	return mcpCmd
 }
 
-// createMCPServer creates the MCP server with dynamically discovered tools.
-// Discovery happens at startup using kubectl-mtv help --machine.
-func createMCPServer() (*mcp.Server, error) {
-	return createMCPServerWithHeaderCapture(nil, readOnly)
-}
-
-// createMCPServerWithHeaderCapture creates the MCP server with HTTP header capture
-// The req parameter contains the HTTP request that triggered server creation,
-// which may include authentication headers that we want to pass to tool handlers
-// The readOnlyMode parameter controls whether write operations are enabled
-func createMCPServerWithHeaderCapture(req *http.Request, readOnlyMode bool) (*mcp.Server, error) {
+// createMCPServer discovers commands and creates the MCP server.
+// Used by stdio mode where a single server instance is sufficient.
+func createMCPServer(readOnlyMode bool) (*mcp.Server, error) {
 	ctx := context.Background()
 	registry, err := discovery.NewRegistry(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to discover commands: %w", err)
 	}
+	return createMCPServerWithRegistry(registry, readOnlyMode)
+}
 
+// createMCPServerWithRegistry builds an MCP server from a pre-built registry.
+// HTTP mode calls this per-request so that each POST gets its own server
+// instance while reusing the (static) command schema discovered at startup.
+//
+// In HTTP mode, the SDK populates req.Extra.Header on every POST with that
+// request's HTTP headers, giving each tool call fresh auth credentials.
+// In stdio mode, there are no HTTP headers and we fall back to CLI defaults.
+func createMCPServerWithRegistry(registry *discovery.Registry, readOnlyMode bool) (*mcp.Server, error) {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "kubectl-mtv",
 		Version: version.ClientVersion,
@@ -261,44 +268,14 @@ func createMCPServerWithHeaderCapture(req *http.Request, readOnlyMode bool) (*mc
 		Instructions: registry.GenerateServerInstructions(),
 	})
 
-	// Register tools. The mtv_help tool provides on-demand detailed help for any command or topic.
-	// Use AddToolWithCoercion for tools with boolean parameters to handle string
-	// booleans ("True"/"true") from AI models that don't send proper JSON booleans.
+	tools.AddToolWithCoercion(server, tools.GetMTVReadTool(registry), tools.HandleMTVRead(registry))
+	mcp.AddTool(server, tools.GetMTVHelpTool(), tools.HandleMTVHelp)
 
-	// Since the SSE transport doesn't populate RequestExtra.Header, we wrap each
-	// tool handler to manually inject headers from the HTTP request
-	var capturedHeaders http.Header
-	if req != nil {
-		capturedHeaders = req.Header
-	}
-
-	// Always register read-only tools
-	tools.AddToolWithCoercion(server, tools.GetMTVReadTool(registry), wrapWithHeaders(tools.HandleMTVRead(registry), capturedHeaders))
-	mcp.AddTool(server, tools.GetMTVHelpTool(), wrapWithHeaders(tools.HandleMTVHelp, capturedHeaders))
-
-	// Only register write tool if not in read-only mode
 	if !readOnlyMode {
-		tools.AddToolWithCoercion(server, tools.GetMTVWriteTool(registry), wrapWithHeaders(tools.HandleMTVWrite(registry), capturedHeaders))
+		tools.AddToolWithCoercion(server, tools.GetMTVWriteTool(registry), tools.HandleMTVWrite(registry))
 	} else {
 		klog.V(1).Info("Running in read-only mode - write operations disabled")
 	}
 
 	return server, nil
-}
-
-// wrapWithHeaders wraps a tool handler to inject captured HTTP headers into RequestExtra
-func wrapWithHeaders[In, Out any](
-	handler func(context.Context, *mcp.CallToolRequest, In) (*mcp.CallToolResult, Out, error),
-	headers http.Header,
-) func(context.Context, *mcp.CallToolRequest, In) (*mcp.CallToolResult, Out, error) {
-	return func(ctx context.Context, req *mcp.CallToolRequest, input In) (*mcp.CallToolResult, Out, error) {
-		// Inject headers into RequestExtra if not already present
-		if req.Extra == nil && headers != nil {
-			req.Extra = &mcp.RequestExtra{Header: headers}
-		} else if req.Extra != nil && req.Extra.Header == nil && headers != nil {
-			req.Extra.Header = headers
-		}
-
-		return handler(ctx, req, input)
-	}
 }

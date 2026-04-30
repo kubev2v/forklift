@@ -420,6 +420,14 @@ func (c *HTTPClient) GetWithContext(ctx context.Context, path string) ([]byte, e
 
 	// Check for non-success status codes
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		errBody, _ := io.ReadAll(io.LimitReader(resp.Body, 201))
+		if len(errBody) > 0 {
+			preview := string(errBody)
+			if len(preview) > 200 {
+				preview = preview[:200] + "..."
+			}
+			return nil, fmt.Errorf("HTTP %s: %s", resp.Status, preview)
+		}
 		return nil, fmt.Errorf("HTTP request failed with status: %s", resp.Status)
 	}
 
