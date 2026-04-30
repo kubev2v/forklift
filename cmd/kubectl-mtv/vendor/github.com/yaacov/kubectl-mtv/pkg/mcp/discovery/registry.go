@@ -268,6 +268,8 @@ func (r *Registry) GenerateReadWriteDescription() string {
 // collectOrderedExamples collects MCP-style examples by iterating commands in
 // their help registration order and taking the first example from each command.
 // No heuristics — the help output order is the source of truth.
+// Namespace is injected into examples for namespace-scoped commands so the
+// generated examples match the RULE that MCP callers must always set one.
 func (r *Registry) collectOrderedExamples(commands map[string]*Command, orderedKeys []string, maxExamples int) []string {
 	var examples []string
 	for _, key := range orderedKeys {
@@ -278,7 +280,8 @@ func (r *Registry) collectOrderedExamples(commands map[string]*Command, orderedK
 		if cmd == nil || len(cmd.Examples) == 0 {
 			continue
 		}
-		mcpExamples := convertCLIToMCPExamples(cmd, 1)
+		inject := !noNamespaceCommands[key]
+		mcpExamples := convertCLIToMCPExamples(cmd, 1, inject)
 		examples = append(examples, mcpExamples...)
 	}
 	return examples
@@ -290,12 +293,27 @@ var sensitiveFlags = map[string]bool{
 	"password": true, "token": true, "provider-token": true, "secret": true, "secret-name": true,
 }
 
+// noNamespaceCommands lists commands that don't operate on namespace-scoped
+// resources and should not have namespace injected into MCP examples.
+var noNamespaceCommands = map[string]bool{
+	"create/vddk-image":          true,
+	"settings":                   true,
+	"settings/get":               true,
+	"settings/set":               true,
+	"settings/unset":             true,
+	"get/inventory/job-template": true,
+}
+
 // convertCLIToMCPExamples converts up to n CLI examples of a command into
 // MCP-style call format strings. CLI commands should define their most
 // instructive examples first — this is the source of truth for MCP descriptions.
 // Duplicate MCP call strings (e.g., examples that differ only in description)
 // are deduplicated.
-func convertCLIToMCPExamples(cmd *Command, n int) []string {
+//
+// When injectNamespace is true, examples that lack --namespace or
+// --all-namespaces get --namespace <namespace> appended before conversion
+// so the MCP output matches the rule that callers must always set one.
+func convertCLIToMCPExamples(cmd *Command, n int, injectNamespace bool) []string {
 	if len(cmd.Examples) == 0 || n <= 0 {
 		return nil
 	}
@@ -308,13 +326,49 @@ func convertCLIToMCPExamples(cmd *Command, n int) []string {
 		if len(results) >= n {
 			break
 		}
-		mcpCall := formatCLIAsMCP(ex.Command, pathString)
+		cliCmd := ex.Command
+		if injectNamespace && !cliHasNamespaceFlag(cliCmd) {
+			cliCmd += " --namespace <namespace>"
+		}
+		mcpCall := formatCLIAsMCP(cliCmd, pathString)
 		if mcpCall != "" && !seen[mcpCall] {
 			results = append(results, mcpCall)
 			seen[mcpCall] = true
 		}
 	}
 	return results
+}
+
+// shortFlagAliases maps single-letter CLI short flags to their canonical
+// long-form names so that -n and -A are emitted as namespace / all_namespaces
+// in MCP output.
+var shortFlagAliases = map[string]string{
+	"n": "namespace",
+	"A": "all-namespaces",
+}
+
+// canonicalFlagName returns the long-form flag name for a short alias,
+// or the input unchanged if no alias exists.
+func canonicalFlagName(name string) string {
+	if long, ok := shortFlagAliases[name]; ok {
+		return long
+	}
+	return name
+}
+
+// cliHasNamespaceFlag reports whether a CLI command string already includes
+// a namespace flag (--namespace, -n, --all-namespaces, or -A).
+func cliHasNamespaceFlag(cliCmd string) bool {
+	for _, tok := range strings.Fields(cliCmd) {
+		switch tok {
+		case "--namespace", "-n", "--all-namespaces", "-A":
+			return true
+		}
+		if strings.HasPrefix(tok, "--namespace=") || strings.HasPrefix(tok, "-n=") {
+			return true
+		}
+	}
+	return false
 }
 
 // formatCLIAsMCP parses a single CLI command string and converts it to
@@ -373,6 +427,9 @@ func formatCLIAsMCP(cliCmd string, pathString string) string {
 			// Boolean flag (no value)
 			flagValue = "true"
 		}
+
+		// Canonicalize short flags (e.g. -n → namespace, -A → all-namespaces)
+		flagName = canonicalFlagName(flagName)
 
 		// Skip sensitive flags
 		if sensitiveFlags[flagName] {
@@ -469,7 +526,8 @@ func FormatCommandHelp(cmd *Command) string {
 		}
 	}
 
-	mcpExamples := convertCLIToMCPExamples(cmd, len(cmd.Examples))
+	inject := !noNamespaceCommands[cmd.PathKey()]
+	mcpExamples := convertCLIToMCPExamples(cmd, len(cmd.Examples), inject)
 	if len(mcpExamples) > 0 {
 		if len(mcpExamples) == 1 {
 			sb.WriteString(fmt.Sprintf("Example: %s\n", mcpExamples[0]))

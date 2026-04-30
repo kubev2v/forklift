@@ -147,7 +147,6 @@ or storage classes (OpenShift) available in the source provider.`,
 // NewInventoryVMCmd creates the get inventory vm command
 func NewInventoryVMCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	outputFormatFlag := flags.NewVMInventoryOutputTypeFlag()
-	var extendedOutput bool
 	var query string
 	var watch bool
 	var provider string
@@ -158,8 +157,7 @@ func NewInventoryVMCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalCon
 		Long: `Get virtual machines from a provider's inventory.
 
 Queries the MTV inventory service to list VMs available for migration.
-Use --query to filter results using TSL query syntax. The --extended
-flag shows additional VM details.
+Use --query to filter results using TSL query syntax.
 
 Output format 'planvms' generates YAML suitable for use with 'create plan --vms @file'.
 
@@ -193,9 +191,6 @@ Query Language (TSL):
   # List all VMs from a provider
   kubectl-mtv get inventory vms --provider vsphere-prod
 
-  # Show extended VM details
-  kubectl-mtv get inventory vms --provider vsphere-prod --extended
-
   # Export VMs for plan creation
   kubectl-mtv get inventory vms --provider vsphere-prod --query "where name ~= 'prod-.*'" --output planvms > vms.yaml
   kubectl-mtv create plan --name my-migration --vms @vms.yaml`,
@@ -218,14 +213,13 @@ Query Language (TSL):
 			inventoryURL := globalConfig.GetInventoryURL()
 			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
-			return inventory.ListVMsWithInsecure(ctx, globalConfig.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), extendedOutput, query, watch, inventoryInsecureSkipTLS)
+			return inventory.ListVMsWithInsecure(ctx, globalConfig.GetKubeConfigFlags(), provider, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch, inventoryInsecureSkipTLS)
 		},
 	}
 
 	cmd.Flags().StringVarP(&provider, "provider", "p", "", "Provider name")
 	_ = cmd.MarkFlagRequired("provider")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", "Output format (table, json, yaml, markdown, planvms)")
-	cmd.Flags().BoolVar(&extendedOutput, "extended", false, "Show extended output")
 	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter using TSL syntax (e.g. \"where name ~= 'web-.*' and cpuCount > 4\")")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
 	help.MarkMCPHidden(cmd, "watch")

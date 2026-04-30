@@ -12,16 +12,8 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 )
 
-// Helper function to create an EC2 secret
-func createSecret(configFlags *genericclioptions.ConfigFlags, namespace, providerName, accessKeyID, secretAccessKey, url, cacert, region string, insecureSkipTLS bool, targetAccessKeyID, targetSecretAccessKey string) (*corev1.Secret, error) {
-	// Get the Kubernetes client using configFlags
-	k8sClient, err := client.GetKubernetesClientset(configFlags)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create kubernetes client: %v", err)
-	}
-
-	// Create secret data without base64 encoding (the API handles this automatically)
-	// URL is always included (either custom or default AWS endpoint)
+// buildSecret returns an EC2 provider Secret without submitting it to the API.
+func buildSecret(namespace, providerName, accessKeyID, secretAccessKey, url, cacert, region string, insecureSkipTLS bool, targetAccessKeyID, targetSecretAccessKey string) *corev1.Secret {
 	secretData := map[string][]byte{
 		"accessKeyId":     []byte(accessKeyID),
 		"secretAccessKey": []byte(secretAccessKey),
@@ -29,7 +21,6 @@ func createSecret(configFlags *genericclioptions.ConfigFlags, namespace, provide
 		"region":          []byte(region),
 	}
 
-	// Add optional fields
 	if insecureSkipTLS {
 		secretData["insecureSkipVerify"] = []byte("true")
 	}
@@ -37,7 +28,6 @@ func createSecret(configFlags *genericclioptions.ConfigFlags, namespace, provide
 		secretData["cacert"] = []byte(cacert)
 	}
 
-	// Add cross-account migration credentials (optional)
 	if targetAccessKeyID != "" {
 		secretData["targetAccessKeyId"] = []byte(targetAccessKeyID)
 	}
@@ -45,14 +35,14 @@ func createSecret(configFlags *genericclioptions.ConfigFlags, namespace, provide
 		secretData["targetSecretAccessKey"] = []byte(targetSecretAccessKey)
 	}
 
-	// Generate a name prefix for the secret
-	secretName := fmt.Sprintf("%s-ec2-", providerName)
-
-	// Create the secret object directly as a typed Secret
-	secret := &corev1.Secret{
+	return &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Secret",
+		},
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: secretName,
-			Namespace:    namespace,
+			Name:      fmt.Sprintf("%s-ec2-credentials", providerName),
+			Namespace: namespace,
 			Labels: map[string]string{
 				"createdForProviderType": "ec2",
 				"createdForResourceType": "providers",
@@ -61,6 +51,19 @@ func createSecret(configFlags *genericclioptions.ConfigFlags, namespace, provide
 		Data: secretData,
 		Type: corev1.SecretTypeOpaque,
 	}
+}
+
+// createSecret creates an EC2 secret reusing the same object shape as buildSecret.
+// It swaps the deterministic Name for a GenerateName so the API server assigns a unique suffix.
+func createSecret(configFlags *genericclioptions.ConfigFlags, namespace, providerName, accessKeyID, secretAccessKey, url, cacert, region string, insecureSkipTLS bool, targetAccessKeyID, targetSecretAccessKey string) (*corev1.Secret, error) {
+	k8sClient, err := client.GetKubernetesClientset(configFlags)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kubernetes client: %v", err)
+	}
+
+	secret := buildSecret(namespace, providerName, accessKeyID, secretAccessKey, url, cacert, region, insecureSkipTLS, targetAccessKeyID, targetSecretAccessKey)
+	secret.Name = ""
+	secret.GenerateName = fmt.Sprintf("%s-ec2-", providerName)
 
 	return k8sClient.CoreV1().Secrets(namespace).Create(context.Background(), secret, metav1.CreateOptions{})
 }

@@ -40,10 +40,12 @@ Use --vm to see detailed status of a specific VM in the plan.`,
 
   # Watch VM status with live updates
   kubectl-mtv describe plan --name my-migration --vm web-server --watch`,
-		Args:         cobra.NoArgs,
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate required --name flag
+			if err := flags.ResolveNameArg(&name, args); err != nil {
+				return err
+			}
 			if name == "" {
 				return fmt.Errorf("--name is required")
 			}
@@ -76,7 +78,7 @@ Use --vm to see detailed status of a specific VM in the plan.`,
 	}
 
 	cmd.Flags().StringVarP(&name, "name", "M", "", "Plan name")
-	_ = cmd.MarkFlagRequired("name")
+	flags.MarkRequiredForMCP(cmd, "name")
 	cmd.Flags().BoolVar(&withVMs, "with-vms", false, "Include list of VMs in the plan specification")
 	cmd.Flags().StringVar(&vmName, "vm", "", "VM name to describe (switches to VM description mode)")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch VM status with live updates (only when --vm is used)")

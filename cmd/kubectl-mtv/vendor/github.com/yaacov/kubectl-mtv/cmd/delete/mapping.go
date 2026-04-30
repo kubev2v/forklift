@@ -10,6 +10,7 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/delete/mapping"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/completion"
+	"github.com/yaacov/kubectl-mtv/pkg/util/flags"
 )
 
 // NewMappingCmd creates the mapping deletion command with subcommands
@@ -54,9 +55,13 @@ Ensure no migration plans reference the mapping before deletion.`,
 
   # Delete all network mappings
   kubectl-mtv delete mappings network --all`,
-		Args:         cobra.NoArgs,
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := flags.ResolveNamesArg(&mappingNames, args); err != nil {
+				return err
+			}
+
 			// Validate --all and --name are mutually exclusive
 			if all && len(mappingNames) > 0 {
 				return errors.New("cannot use --name with --all")
@@ -123,9 +128,13 @@ Ensure no migration plans reference the mapping before deletion.`,
 
   # Delete all storage mappings
   kubectl-mtv delete mappings storage --all`,
-		Args:         cobra.NoArgs,
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := flags.ResolveNamesArg(&mappingNames, args); err != nil {
+				return err
+			}
+
 			// Validate --all and --name are mutually exclusive
 			if all && len(mappingNames) > 0 {
 				return errors.New("cannot use --name with --all")

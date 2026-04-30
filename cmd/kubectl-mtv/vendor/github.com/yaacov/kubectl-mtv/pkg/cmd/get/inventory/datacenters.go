@@ -37,11 +37,11 @@ func listDataCentersOnce(ctx context.Context, kubeConfigFlags *genericclioptions
 	}
 
 	// Define default headers
-	defaultHeaders := []output.Header{
-		{DisplayName: "NAME", JSONPath: "name"},
-		{DisplayName: "ID", JSONPath: "id"},
-		{DisplayName: "DESCRIPTION", JSONPath: "description"},
-		{DisplayName: "STATUS", JSONPath: "status", ColorFunc: output.ColorizeStatus},
+	defaultHeaders := []output.Column{
+		{Title: "NAME", Key: "name"},
+		{Title: "ID", Key: "id"},
+		{Title: "DESCRIPTION", Key: "description"},
+		{Title: "STATUS", Key: "status", ColorFunc: output.ColorizeStatus},
 	}
 
 	// Fetch datacenters inventory from the provider based on provider type

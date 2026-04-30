@@ -44,14 +44,14 @@ func listEC2InstancesOnce(ctx context.Context, kubeConfigFlags *genericclioption
 	// Define default headers for EC2 instances
 	// Note: AWS API returns PascalCase field names (object extracted)
 	// NAME column shows Name tag if available, otherwise falls back to InstanceId
-	defaultHeaders := []output.Header{
-		{DisplayName: "NAME", JSONPath: "name"},
-		{DisplayName: "TYPE", JSONPath: "InstanceType"},
-		{DisplayName: "STATE", JSONPath: "State.Name", ColorFunc: output.ColorizeStatus},
-		{DisplayName: "PLATFORM", JSONPath: "PlatformDetails"},
-		{DisplayName: "AZ", JSONPath: "Placement.AvailabilityZone"},
-		{DisplayName: "PUBLIC-IP", JSONPath: "PublicIpAddress"},
-		{DisplayName: "PRIVATE-IP", JSONPath: "PrivateIpAddress"},
+	defaultHeaders := []output.Column{
+		{Title: "NAME", Key: "name"},
+		{Title: "TYPE", Key: "InstanceType"},
+		{Title: "STATE", Key: "State.Name", ColorFunc: output.ColorizeStatus},
+		{Title: "PLATFORM", Key: "PlatformDetails"},
+		{Title: "AZ", Key: "Placement.AvailabilityZone"},
+		{Title: "PUBLIC-IP", Key: "PublicIpAddress"},
+		{Title: "PRIVATE-IP", Key: "PrivateIpAddress"},
 	}
 
 	// Fetch EC2 instances from the provider
@@ -126,15 +126,15 @@ func listEC2VolumesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.
 
 	// Define default headers for EC2 volumes
 	// Note: AWS API returns PascalCase field names (object extracted)
-	defaultHeaders := []output.Header{
-		{DisplayName: "NAME", JSONPath: "name"},
-		{DisplayName: "ID", JSONPath: "id"},
-		{DisplayName: "SIZE", JSONPath: "sizeHuman"},
-		{DisplayName: "TYPE", JSONPath: "VolumeType"},
-		{DisplayName: "STATE", JSONPath: "State", ColorFunc: output.ColorizeStatus},
-		{DisplayName: "IOPS", JSONPath: "Iops"},
-		{DisplayName: "THROUGHPUT", JSONPath: "Throughput"},
-		{DisplayName: "ATTACHED-TO", JSONPath: "attachedTo"},
+	defaultHeaders := []output.Column{
+		{Title: "NAME", Key: "name"},
+		{Title: "ID", Key: "id"},
+		{Title: "SIZE", Key: "sizeHuman"},
+		{Title: "TYPE", Key: "VolumeType"},
+		{Title: "STATE", Key: "State", ColorFunc: output.ColorizeStatus},
+		{Title: "IOPS", Key: "Iops"},
+		{Title: "THROUGHPUT", Key: "Throughput"},
+		{Title: "ATTACHED-TO", Key: "attachedTo"},
 	}
 
 	// Fetch EC2 volumes from the provider
@@ -211,11 +211,11 @@ func listEC2VolumeTypesOnce(ctx context.Context, kubeConfigFlags *genericcliopti
 	}
 
 	// Define default headers for EC2 volume types
-	defaultHeaders := []output.Header{
-		{DisplayName: "TYPE", JSONPath: "type"},
-		{DisplayName: "DESCRIPTION", JSONPath: "description"},
-		{DisplayName: "MAX-IOPS", JSONPath: "maxIOPS"},
-		{DisplayName: "MAX-THROUGHPUT", JSONPath: "maxThroughput"},
+	defaultHeaders := []output.Column{
+		{Title: "TYPE", Key: "type"},
+		{Title: "DESCRIPTION", Key: "description"},
+		{Title: "MAX-IOPS", Key: "maxIOPS"},
+		{Title: "MAX-THROUGHPUT", Key: "maxThroughput"},
 	}
 
 	// Fetch EC2 volume types (storage classes) from the provider
@@ -290,13 +290,13 @@ func listEC2NetworksOnce(ctx context.Context, kubeConfigFlags *genericclioptions
 
 	// Define default headers for EC2 networks
 	// Note: AWS API returns PascalCase field names (object extracted)
-	defaultHeaders := []output.Header{
-		{DisplayName: "NAME", JSONPath: "name"},
-		{DisplayName: "ID", JSONPath: "id"},
-		{DisplayName: "TYPE", JSONPath: "networkType"},
-		{DisplayName: "CIDR", JSONPath: "CidrBlock"},
-		{DisplayName: "STATE", JSONPath: "State", ColorFunc: output.ColorizeStatus},
-		{DisplayName: "DEFAULT", JSONPath: "IsDefault", ColorFunc: output.ColorizeBooleanString},
+	defaultHeaders := []output.Column{
+		{Title: "NAME", Key: "name"},
+		{Title: "ID", Key: "id"},
+		{Title: "TYPE", Key: "networkType"},
+		{Title: "CIDR", Key: "CidrBlock"},
+		{Title: "STATE", Key: "State", ColorFunc: output.ColorizeStatus},
+		{Title: "DEFAULT", Key: "IsDefault", ColorFunc: output.ColorizeBooleanString},
 	}
 
 	// Fetch EC2 networks from the provider

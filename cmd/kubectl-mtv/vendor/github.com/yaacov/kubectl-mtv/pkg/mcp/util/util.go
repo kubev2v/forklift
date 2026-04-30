@@ -24,8 +24,8 @@ const (
 	kubeconfigTokenKey contextKey = "kubeconfig_token"
 	// kubeconfigServerKey is the context key for Kubernetes API server URL
 	kubeconfigServerKey contextKey = "kubeconfig_server"
-	// dryRunKey is the context key for dry run mode
-	dryRunKey contextKey = "dry_run"
+	// showCLIKey is the context key for show-CLI mode (returns CLI command without executing)
+	showCLIKey contextKey = "show_cli"
 )
 
 // WithKubeToken adds a Kubernetes token to the context
@@ -84,18 +84,18 @@ func WithKubeCredsFromHeaders(ctx context.Context, headers http.Header) context.
 	return ctx
 }
 
-// WithDryRun adds a dry run flag to the context
-func WithDryRun(ctx context.Context, dryRun bool) context.Context {
-	return context.WithValue(ctx, dryRunKey, dryRun)
+// WithShowCLI adds a show-CLI flag to the context
+func WithShowCLI(ctx context.Context, showCLI bool) context.Context {
+	return context.WithValue(ctx, showCLIKey, showCLI)
 }
 
-// GetDryRun retrieves the dry run flag from the context
-func GetDryRun(ctx context.Context) bool {
+// GetShowCLI retrieves the show-CLI flag from the context
+func GetShowCLI(ctx context.Context) bool {
 	if ctx == nil {
 		return false
 	}
-	dryRun, ok := ctx.Value(dryRunKey).(bool)
-	return ok && dryRun
+	showCLI, ok := ctx.Value(showCLIKey).(bool)
+	return ok && showCLI
 }
 
 // outputFormat stores the configured output format for MCP responses
@@ -175,6 +175,10 @@ func GetDefaultKubeToken() string {
 // When true, --insecure-skip-tls-verify is prepended to every subprocess invocation.
 var defaultInsecureSkipTLS bool
 
+// defaultKubeCACert stores the path to a custom CA certificate file for Kubernetes API TLS.
+// When set, --certificate-authority is prepended to every subprocess invocation.
+var defaultKubeCACert string
+
 // defaultVerbosity stores the verbosity level set via the global --verbose flag.
 // When > 0, --verbose N is prepended to every subprocess invocation so that
 // tool-spawned commands inherit the same debug/trace level as the MCP server.
@@ -188,6 +192,16 @@ func SetDefaultInsecureSkipTLS(skip bool) {
 // GetDefaultInsecureSkipTLS returns whether TLS verification should be skipped.
 func GetDefaultInsecureSkipTLS() bool {
 	return defaultInsecureSkipTLS
+}
+
+// SetDefaultKubeCACert sets the default CA certificate path from CLI flags.
+func SetDefaultKubeCACert(path string) {
+	defaultKubeCACert = path
+}
+
+// GetDefaultKubeCACert returns the default CA certificate path set via CLI flags.
+func GetDefaultKubeCACert() string {
+	return defaultKubeCACert
 }
 
 // SetDefaultVerbosity sets the verbosity level from the global --verbose flag.
@@ -225,7 +239,7 @@ var selfExePath = func() string {
 // If a server URL is present in the context, it will be passed via the --server flag.
 // If neither is present, it falls back to CLI default values, then to the default kubeconfig behavior.
 // Precedence: context (HTTP headers) > CLI defaults > kubeconfig (implicit).
-// If dry run mode is enabled in the context, it returns a teaching response instead of executing.
+// If show-CLI mode is enabled in the context, it returns a teaching response instead of executing.
 func RunKubectlMTVCommand(ctx context.Context, args []string) (string, error) {
 	// Always disable ANSI color codes -- MCP consumers are LLMs, not terminals
 	args = append([]string{"--no-color"}, args...)
@@ -238,6 +252,12 @@ func RunKubectlMTVCommand(ctx context.Context, args []string) (string, error) {
 	// Prepend --insecure-skip-tls-verify when configured (before server/token)
 	if defaultInsecureSkipTLS {
 		args = append([]string{"--insecure-skip-tls-verify"}, args...)
+	}
+
+	// Prepend --certificate-authority when a custom CA cert path is configured
+	if defaultKubeCACert != "" {
+		klog.V(2).Infof("[auth] using --certificate-authority from CLI flag: %s", defaultKubeCACert)
+		args = append([]string{"--certificate-authority", defaultKubeCACert}, args...)
 	}
 
 	// Check context first (HTTP headers), then fall back to CLI defaults for --server flag
@@ -263,10 +283,9 @@ func RunKubectlMTVCommand(ctx context.Context, args []string) (string, error) {
 		klog.V(2).Info("[auth] no explicit --token; falling back to kubeconfig")
 	}
 
-	// Check if we're in dry run mode
-	if GetDryRun(ctx) {
-		// In dry run mode, just return the command that would be executed
-		// The AI will explain it in context
+	// Check if we're in show-CLI mode
+	if GetShowCLI(ctx) {
+		// In show-CLI mode, just return the command that would be executed
 		cmdStr := formatShellCommand("kubectl-mtv", args)
 		response := CommandResponse{
 			Command:     cmdStr,
@@ -284,7 +303,7 @@ func RunKubectlMTVCommand(ctx context.Context, args []string) (string, error) {
 	}
 
 	// Resolve environment variable references for sensitive flags (e.g., $VCENTER_PASSWORD)
-	// This is done after dry run check so dry run shows $VAR syntax, not resolved values
+	// This is done after show-CLI check so show-CLI shows $VAR syntax, not resolved values
 	resolvedArgs, err := ResolveEnvVars(args)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve environment variables: %w", err)

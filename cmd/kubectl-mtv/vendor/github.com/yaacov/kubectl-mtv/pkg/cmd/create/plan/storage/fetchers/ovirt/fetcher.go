@@ -134,21 +134,7 @@ func (f *OvirtStorageFetcher) FetchSourceStorages(ctx context.Context, configFla
 			return nil, fmt.Errorf("unexpected data format: expected array for disks inventory")
 		}
 
-		// Map disk IDs to storage domains
-		for _, diskItem := range disksArray {
-			if disk, ok := diskItem.(map[string]interface{}); ok {
-				if diskID, ok := disk["id"].(string); ok {
-					// Check if this disk is used by our VMs
-					if diskIDSet[diskID] {
-						// Extract storage domain from disk
-						if storageDomainID, ok := disk["storageDomain"].(string); ok {
-							klog.V(4).Infof("Disk %s uses storage domain: %s", diskID, storageDomainID)
-							storageDomainIDSet[storageDomainID] = true
-						}
-					}
-				}
-			}
-		}
+		collectStorageDomains(disksArray, diskIDSet, storageDomainIDSet)
 	}
 
 	// Create source storage references for the storage domains used by VMs
@@ -161,6 +147,28 @@ func (f *OvirtStorageFetcher) FetchSourceStorages(ctx context.Context, configFla
 
 	klog.V(4).Infof("oVirt storage fetcher - found %d source storages", len(sourceStorages))
 	return sourceStorages, nil
+}
+
+// collectStorageDomains iterates over disk inventory items, skips LUN disks,
+// and adds the storage domain IDs of the remaining disks (that are in diskIDSet)
+// to storageDomainIDSet.
+func collectStorageDomains(disksArray []interface{}, diskIDSet, storageDomainIDSet map[string]bool) {
+	for _, diskItem := range disksArray {
+		if disk, ok := diskItem.(map[string]interface{}); ok {
+			if diskID, ok := disk["id"].(string); ok {
+				if diskIDSet[diskID] {
+					if storageType, ok := disk["storageType"].(string); ok && storageType == "lun" {
+						klog.V(4).Infof("Skipping LUN disk %s - LUN disks are not mapped", diskID)
+						continue
+					}
+					if storageDomainID, ok := disk["storageDomain"].(string); ok {
+						klog.V(4).Infof("Disk %s uses storage domain: %s", diskID, storageDomainID)
+						storageDomainIDSet[storageDomainID] = true
+					}
+				}
+			}
+		}
+	}
 }
 
 // FetchTargetStorages is not supported for oVirt as target - only OpenShift is supported as target

@@ -13,6 +13,7 @@ import (
 
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/output"
+	querypkg "github.com/yaacov/kubectl-mtv/pkg/util/query"
 	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
@@ -93,7 +94,7 @@ func createHookItem(hook unstructured.Unstructured, useUTC bool) map[string]inte
 }
 
 // ListHooks lists hooks without watch functionality
-func ListHooks(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace, outputFormat string, hookName string, useUTC bool) error {
+func ListHooks(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace, outputFormat string, hookName string, useUTC bool, query string) error {
 	dynamicClient, err := client.GetDynamicClient(configFlags)
 	if err != nil {
 		return fmt.Errorf("failed to get client: %v", err)
@@ -118,6 +119,18 @@ func ListHooks(ctx context.Context, configFlags *genericclioptions.ConfigFlags, 
 	// Handle error if no items found
 	if err != nil {
 		return err
+	}
+
+	// Apply query filter
+	if query != "" {
+		queryOpts, err := querypkg.ParseQueryString(query)
+		if err != nil {
+			return fmt.Errorf("failed to parse query: %v", err)
+		}
+		allItems, err = querypkg.ApplyQuery(allItems, queryOpts)
+		if err != nil {
+			return fmt.Errorf("error applying query: %v", err)
+		}
 	}
 
 	// Handle output based on format
@@ -195,7 +208,7 @@ func printHookOutput(items []map[string]interface{}, outputFormat string) error 
 	printer := output.NewTablePrinter()
 
 	// Create headers using Header struct
-	var tableHeaders []output.Header
+	var tableHeaders []output.Column
 	headerMappings := map[string]string{
 		"NAME":            "name",
 		"IMAGE":           "image",
@@ -210,9 +223,9 @@ func printHookOutput(items []map[string]interface{}, outputFormat string) error 
 		"STATUS": output.ColorizeStatus,
 	}
 	for _, header := range headers {
-		h := output.Header{
-			DisplayName: header,
-			JSONPath:    headerMappings[header],
+		h := output.Column{
+			Title: header,
+			Key:   headerMappings[header],
 		}
 		if cf, ok := colorFuncs[header]; ok {
 			h.ColorFunc = cf
@@ -220,7 +233,7 @@ func printHookOutput(items []map[string]interface{}, outputFormat string) error 
 		tableHeaders = append(tableHeaders, h)
 	}
 
-	printer.WithHeaders(tableHeaders...)
+	printer.WithColumns(tableHeaders...)
 
 	// Convert data to map format for the table printer
 	for _, row := range data {
@@ -259,8 +272,8 @@ func GetHookPlaybookContent(hook unstructured.Unstructured) (string, error) {
 }
 
 // List lists hooks with optional watch mode
-func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace string, watchMode bool, outputFormat string, hookName string, useUTC bool) error {
+func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace string, watchMode bool, outputFormat string, hookName string, useUTC bool, query string) error {
 	return watch.WrapWithWatch(watchMode, outputFormat, func() error {
-		return ListHooks(ctx, configFlags, namespace, outputFormat, hookName, useUTC)
+		return ListHooks(ctx, configFlags, namespace, outputFormat, hookName, useUTC, query)
 	}, watch.DefaultInterval)
 }

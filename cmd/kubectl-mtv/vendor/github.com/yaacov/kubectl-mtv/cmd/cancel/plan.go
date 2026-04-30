@@ -13,6 +13,7 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/cancel/plan"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/completion"
+	"github.com/yaacov/kubectl-mtv/pkg/util/flags"
 )
 
 // NewPlanCmd creates the plan cancellation command
@@ -33,9 +34,16 @@ comma-separated list or read from a file.`,
 
   # Cancel VMs from a file
   kubectl-mtv cancel plan --name my-migration --vms @failed-vms.yaml`,
-		Args:         cobra.NoArgs,
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := flags.ResolveNameArg(&name, args); err != nil {
+				return err
+			}
+			if name == "" {
+				return fmt.Errorf("--name is required")
+			}
+
 			// Resolve the appropriate namespace based on context and flags
 			namespace := client.ResolveNamespace(kubeConfigFlags)
 
@@ -76,9 +84,7 @@ comma-separated list or read from a file.`,
 	cmd.Flags().StringVarP(&name, "name", "M", "", "Plan name")
 	cmd.Flags().StringVar(&vmNamesOrFile, "vms", "", "List of VM names to cancel (comma-separated) or path to file containing VM names (prefix with @)")
 
-	if err := cmd.MarkFlagRequired("name"); err != nil {
-		fmt.Printf("Warning: error marking 'name' flag as required: %v\n", err)
-	}
+	flags.MarkRequiredForMCP(cmd, "name")
 	if err := cmd.MarkFlagRequired("vms"); err != nil {
 		fmt.Printf("Warning: error marking 'vms' flag as required: %v\n", err)
 	}

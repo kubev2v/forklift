@@ -18,6 +18,7 @@ import (
 func NewHookCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	outputFormatFlag := flags.NewOutputFormatTypeFlag()
 	var watch bool
+	var query string
 
 	var hookName string
 	cmd := &cobra.Command{
@@ -36,9 +37,13 @@ the migration process, such as installing drivers or configuring the target VM.`
 
   # Watch hook status changes
   kubectl-mtv get hooks --watch`,
-		Args:         cobra.NoArgs,
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := flags.ResolveNameArg(&hookName, args); err != nil {
+				return err
+			}
+
 			ctx := cmd.Context()
 			if !watch {
 				var cancel context.CancelFunc
@@ -59,12 +64,13 @@ the migration process, such as installing drivers or configuring the target VM.`
 			}
 			logOutputFormat(outputFormatFlag.GetValue())
 
-			return hook.List(ctx, kubeConfigFlags, namespace, watch, outputFormatFlag.GetValue(), hookName, globalConfig.GetUseUTC())
+			return hook.List(ctx, kubeConfigFlags, namespace, watch, outputFormatFlag.GetValue(), hookName, globalConfig.GetUseUTC(), query)
 		},
 	}
 
 	cmd.Flags().StringVarP(&hookName, "name", "M", "", "Hook name")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", flags.OutputFormatHelp)
+	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter using TSL syntax (e.g. \"where name ~= 'prod-.*'\")")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
 	help.MarkMCPHidden(cmd, "watch")
 

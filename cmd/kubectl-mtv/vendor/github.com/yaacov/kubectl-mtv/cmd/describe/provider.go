@@ -30,9 +30,12 @@ secret reference, and provider-specific settings (VDDK, SDK endpoint, etc.).`,
 
   # Describe a provider in JSON format
   kubectl-mtv describe provider --name vsphere-prod --output json`,
-		Args:         cobra.NoArgs,
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := flags.ResolveNameArg(&name, args); err != nil {
+				return err
+			}
 			if name == "" {
 				return fmt.Errorf("--name is required")
 			}
@@ -43,7 +46,7 @@ secret reference, and provider-specific settings (VDDK, SDK endpoint, etc.).`,
 	}
 
 	cmd.Flags().StringVarP(&name, "name", "M", "", "Provider name")
-	_ = cmd.MarkFlagRequired("name")
+	flags.MarkRequiredForMCP(cmd, "name")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", flags.OutputFormatHelp)
 
 	_ = cmd.RegisterFlagCompletionFunc("name", completion.ProviderNameCompletion(kubeConfigFlags))

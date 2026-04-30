@@ -1,11 +1,15 @@
 package create
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/mapping"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
+	"github.com/yaacov/kubectl-mtv/pkg/util/completion"
+	"github.com/yaacov/kubectl-mtv/pkg/util/flags"
 )
 
 // NewMappingCmd creates the mapping creation command with subcommands
@@ -32,6 +36,8 @@ create specific mapping types.`,
 func newNetworkMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	var name, sourceProvider, targetProvider string
 	var networkPairs string
+	var dryRun bool
+	var outputFormat string
 
 	cmd := &cobra.Command{
 		Use:   "network",
@@ -57,9 +63,16 @@ Pair formats:
     --source vsphere-prod \
     --target host \
     --network-pairs "VM Network:openshift-cnv/br-external,Management:default"`,
-		Args:         cobra.NoArgs,
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := flags.ResolveNameArg(&name, args); err != nil {
+				return err
+			}
+			if name == "" {
+				return fmt.Errorf("--name is required")
+			}
+
 			// Resolve the appropriate namespace based on context and flags
 			namespace := client.ResolveNamespace(kubeConfigFlags)
 
@@ -67,7 +80,17 @@ Pair formats:
 			inventoryURL := globalConfig.GetInventoryURL()
 			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
-			return mapping.CreateNetworkWithInsecure(kubeConfigFlags, name, namespace, sourceProvider, targetProvider, networkPairs, inventoryURL, inventoryInsecureSkipTLS)
+			if !dryRun && outputFormat != "" {
+				return fmt.Errorf("--output flag can only be used with --dry-run")
+			}
+			if dryRun && outputFormat != "" && outputFormat != "json" && outputFormat != "yaml" {
+				return fmt.Errorf("invalid output format for dry-run: %s. Valid formats are: json, yaml", outputFormat)
+			}
+			if dryRun && outputFormat == "" {
+				outputFormat = "yaml"
+			}
+
+			return mapping.CreateNetworkWithInsecure(kubeConfigFlags, name, namespace, sourceProvider, targetProvider, networkPairs, inventoryURL, inventoryInsecureSkipTLS, dryRun, outputFormat)
 		},
 	}
 
@@ -75,10 +98,13 @@ Pair formats:
 	cmd.Flags().StringVarP(&sourceProvider, "source", "S", "", "Source provider name")
 	cmd.Flags().StringVarP(&targetProvider, "target", "T", "", "Target provider name")
 	cmd.Flags().StringVar(&networkPairs, "network-pairs", "", "Network mapping pairs in format 'source:target-namespace/target-network', 'source:target-network', 'source:default', or 'source:ignored' (comma-separated)")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Output mapping CR to stdout instead of creating it")
+	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format for dry-run (json, yaml). Defaults to yaml when --dry-run is used")
 
-	if err := cmd.MarkFlagRequired("name"); err != nil {
-		panic(err)
-	}
+	_ = cmd.RegisterFlagCompletionFunc("source", completion.ProviderNameCompletion(kubeConfigFlags))
+	_ = cmd.RegisterFlagCompletionFunc("target", completion.ProviderNameCompletion(kubeConfigFlags))
+
+	flags.MarkRequiredForMCP(cmd, "name")
 
 	return cmd
 }
@@ -98,6 +124,8 @@ func newStorageMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, global
 	var offloadStorageUsername, offloadStoragePassword, offloadStorageEndpoint string
 	var offloadCACert string
 	var offloadInsecureSkipTLS bool
+	var dryRun bool
+	var outputFormat string
 
 	cmd := &cobra.Command{
 		Use:   "storage",
@@ -125,15 +153,32 @@ plugin configuration for optimized data transfer.`,
     --source vsphere-prod \
     --target host \
     --storage-pairs "datastore1:ocs-storagecluster-ceph-rbd;offloadPlugin=vsphere;offloadVendor=ontap"`,
-		Args:         cobra.NoArgs,
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := flags.ResolveNameArg(&name, args); err != nil {
+				return err
+			}
+			if name == "" {
+				return fmt.Errorf("--name is required")
+			}
+
 			// Resolve the appropriate namespace based on context and flags
 			namespace := client.ResolveNamespace(kubeConfigFlags)
 
 			// Get inventory URL and insecure skip TLS from global config (auto-discovers if needed)
 			inventoryURL := globalConfig.GetInventoryURL()
 			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
+
+			if !dryRun && outputFormat != "" {
+				return fmt.Errorf("--output flag can only be used with --dry-run")
+			}
+			if dryRun && outputFormat != "" && outputFormat != "json" && outputFormat != "yaml" {
+				return fmt.Errorf("invalid output format for dry-run: %s. Valid formats are: json, yaml", outputFormat)
+			}
+			if dryRun && outputFormat == "" {
+				outputFormat = "yaml"
+			}
 
 			return mapping.CreateStorageWithOptions(mapping.StorageCreateOptions{
 				ConfigFlags:              kubeConfigFlags,
@@ -158,6 +203,8 @@ plugin configuration for optimized data transfer.`,
 				OffloadStorageEndpoint: offloadStorageEndpoint,
 				OffloadCACert:          offloadCACert,
 				OffloadInsecureSkipTLS: offloadInsecureSkipTLS,
+				DryRun:                 dryRun,
+				OutputFormat:           outputFormat,
 			})
 		},
 	}
@@ -181,8 +228,12 @@ plugin configuration for optimized data transfer.`,
 	cmd.Flags().StringVar(&offloadStorageEndpoint, "offload-storage-endpoint", "", "Storage array management endpoint URL for offload secret")
 	cmd.Flags().StringVar(&offloadCACert, "offload-cacert", "", "CA certificate for offload secret (use @filename to load from file)")
 	cmd.Flags().BoolVar(&offloadInsecureSkipTLS, "offload-insecure-skip-tls", false, "Skip TLS verification for offload connections")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Output mapping CR to stdout instead of creating it")
+	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format for dry-run (json, yaml). Defaults to yaml when --dry-run is used")
 
-	// Add completion for volume mode flag
+	_ = cmd.RegisterFlagCompletionFunc("source", completion.ProviderNameCompletion(kubeConfigFlags))
+	_ = cmd.RegisterFlagCompletionFunc("target", completion.ProviderNameCompletion(kubeConfigFlags))
+
 	if err := cmd.RegisterFlagCompletionFunc("default-volume-mode", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"Filesystem", "Block"}, cobra.ShellCompDirectiveNoFileComp
 	}); err != nil {
@@ -210,9 +261,7 @@ plugin configuration for optimized data transfer.`,
 		panic(err)
 	}
 
-	if err := cmd.MarkFlagRequired("name"); err != nil {
-		panic(err)
-	}
+	flags.MarkRequiredForMCP(cmd, "name")
 
 	return cmd
 }

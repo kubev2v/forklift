@@ -118,8 +118,26 @@ func CreateProvider(configFlags *genericclioptions.ConfigFlags, options provider
 	var createdSecret *corev1.Secret
 	var err error
 
+	if options.DryRun {
+		if options.Secret == "" {
+			createdSecret, err = buildSecret(options.Namespace, options.Name, options)
+			if err != nil {
+				return nil, nil, err
+			}
+			provider.Spec.Secret = corev1.ObjectReference{
+				Name:      createdSecret.Name,
+				Namespace: createdSecret.Namespace,
+			}
+		} else {
+			provider.Spec.Secret = corev1.ObjectReference{
+				Name:      options.Secret,
+				Namespace: options.Namespace,
+			}
+		}
+		return provider, createdSecret, nil
+	}
+
 	if options.Secret == "" {
-		// Create a new secret if none is provided
 		createdSecret, err = createSecret(configFlags, options.Namespace, options.Name, options)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create HyperV secret: %v", err)
@@ -130,7 +148,6 @@ func CreateProvider(configFlags *genericclioptions.ConfigFlags, options provider
 			Namespace: createdSecret.Namespace,
 		}
 	} else {
-		// Use the existing secret
 		provider.Spec.Secret = corev1.ObjectReference{
 			Name:      options.Secret,
 			Namespace: options.Namespace,

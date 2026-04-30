@@ -33,8 +33,23 @@ func Describe(configFlags *genericclioptions.ConfigFlags, name, namespace string
 	b.Field("Namespace", hook.GetNamespace())
 	b.Field("Created", output.FormatTimestamp(hook.GetCreationTimestamp().Time, useUTC))
 
-	if image, found, _ := unstructured.NestedString(hook.Object, "spec", "image"); found {
+	aapConfig, hasAAP, _ := unstructured.NestedMap(hook.Object, "spec", "aap")
+	if hasAAP {
+		b.FieldC("Type", "AAP", output.Green)
+	} else {
+		b.Field("Type", "Local")
+	}
+
+	if hasAAP {
+		if jobTemplateID, ok := aapConfig["jobTemplateId"]; ok {
+			b.Field("AAP Job Template ID", fmt.Sprintf("%v", jobTemplateID))
+		}
+	}
+
+	if image, found, _ := unstructured.NestedString(hook.Object, "spec", "image"); found && image != "" {
 		b.Field("Image", image)
+	} else if !hasAAP {
+		b.Field("Image", "(not set)")
 	}
 
 	if sa, found, _ := unstructured.NestedString(hook.Object, "spec", "serviceAccount"); found && sa != "" {
@@ -49,7 +64,6 @@ func Describe(configFlags *genericclioptions.ConfigFlags, name, namespace string
 		b.Field("Deadline", "(unlimited)")
 	}
 
-	// Playbook
 	playbook, playbookFound, _ := unstructured.NestedString(hook.Object, "spec", "playbook")
 	if playbookFound && playbook != "" {
 		b.FieldC("Playbook", "Yes", output.Green)

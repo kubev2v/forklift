@@ -163,15 +163,30 @@ func CreateProvider(configFlags *genericclioptions.ConfigFlags, options provider
 	var createdSecret *corev1.Secret
 	var err error
 
-	// Handle secret creation
+	if options.DryRun {
+		if options.Secret != "" {
+			provider.Spec.Secret = corev1.ObjectReference{
+				Name:      options.Secret,
+				Namespace: options.Namespace,
+			}
+		} else {
+			createdSecret = buildSecret(options.Namespace, options.Name,
+				options.Username, options.Password, options.URL, options.CACert, options.Token,
+				options.InsecureSkipTLS, options.DomainName, options.ProjectName, options.RegionName)
+			provider.Spec.Secret = corev1.ObjectReference{
+				Name:      createdSecret.Name,
+				Namespace: createdSecret.Namespace,
+			}
+		}
+		return provider, createdSecret, nil
+	}
+
 	if options.Secret != "" {
-		// Use existing secret
 		provider.Spec.Secret = corev1.ObjectReference{
 			Name:      options.Secret,
 			Namespace: options.Namespace,
 		}
 	} else {
-		// Create new secret
 		createdSecret, err = createSecret(configFlags, options.Namespace, options.Name,
 			options.Username, options.Password, options.URL, options.CACert, options.Token,
 			options.InsecureSkipTLS, options.DomainName, options.ProjectName, options.RegionName)

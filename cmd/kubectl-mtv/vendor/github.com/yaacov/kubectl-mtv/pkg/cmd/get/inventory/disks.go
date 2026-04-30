@@ -37,32 +37,32 @@ func listDisksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Confi
 	}
 
 	// Define default headers based on provider type
-	var defaultHeaders []output.Header
+	var defaultHeaders []output.Column
 	switch providerType {
 	case "ova":
-		defaultHeaders = []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "PATH", JSONPath: "path"},
-			{DisplayName: "SIZE", JSONPath: "sizeHuman"},
-			{DisplayName: "VM-COUNT", JSONPath: "vmCount"},
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "ID", Key: "id"},
+			{Title: "PATH", Key: "path"},
+			{Title: "SIZE", Key: "sizeHuman"},
+			{Title: "VM-COUNT", Key: "vmCount"},
 		}
 	case "hyperv":
-		defaultHeaders = []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "SIZE", JSONPath: "provisionedSizeHuman"},
-			{DisplayName: "PATH", JSONPath: "filePath"},
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "ID", Key: "id"},
+			{Title: "SIZE", Key: "provisionedSizeHuman"},
+			{Title: "PATH", Key: "filePath"},
 		}
 	default:
-		defaultHeaders = []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "STORAGE-DOMAIN", JSONPath: "storageDomain.name"},
-			{DisplayName: "SIZE", JSONPath: "provisionedSizeHuman"},
-			{DisplayName: "ACTUAL-SIZE", JSONPath: "actualSizeHuman"},
-			{DisplayName: "TYPE", JSONPath: "storageType"},
-			{DisplayName: "STATUS", JSONPath: "status", ColorFunc: output.ColorizeStatus},
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "ID", Key: "id"},
+			{Title: "STORAGE-DOMAIN", Key: "storageDomain.name"},
+			{Title: "SIZE", Key: "provisionedSizeHuman"},
+			{Title: "ACTUAL-SIZE", Key: "actualSizeHuman"},
+			{Title: "TYPE", Key: "storageType"},
+			{Title: "STATUS", Key: "status", ColorFunc: output.ColorizeStatus},
 		}
 	}
 
