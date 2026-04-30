@@ -11,26 +11,28 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/client-go/util/cert"
 
-	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/flashsystem"
-	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/infinibox"
-	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/ontap"
-	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
-	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/powerflex"
-	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/powermax"
-	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/powerstore"
-	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/primera3par"
-	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/pure"
-	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vantara"
-	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/version"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/flashsystem"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/infinibox"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/metrics"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/ontap"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/powerflex"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/powermax"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/powerstore"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/primera3par"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/pure"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vantara"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/version"
 
 	forklift "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
-	"github.com/prometheus/client_golang/prometheus"
-	dto "github.com/prometheus/client_model/go"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -190,8 +192,26 @@ func main() {
 		klog.Fatalf("Failed to fetch the volume handle details from the target pvc %s: %s", ownerName, err)
 	}
 
+	// Get storage array info for metric labels
+	var arrayInfo populator.StorageArrayInfo
+	if infoProvider, ok := storageApi.(populator.StorageArrayInfoProvider); ok {
+		arrayInfo = infoProvider.GetStorageArrayInfo()
+		klog.Infof("Storage array info: vendor=%s, product=%s, model=%s, version=%s",
+			arrayInfo.Vendor, arrayInfo.Product, arrayInfo.Model, arrayInfo.Version)
+	}
+
 	klog.InfoS("populator", "stage", "setupTracing")
-	progressCounter, xcopyUsedGauge, err := setupTracingMetrics()
+	copyCtx := p.GetCopyContext()
+	var volumeSizeBytes int64
+	if q, err := resource.ParseQuantity(pvcSize); err == nil {
+		volumeSizeBytes = q.Value()
+	}
+	_ = volumeSizeBytes // retained for future use
+
+	// Set up metrics server with scrape detection for post-completion exit.
+	var completionReady atomic.Bool
+	scrapedCh := make(chan struct{}, 1)
+	copyMetrics, err := setupTracingMetrics(&completionReady, scrapedCh)
 	if err != nil {
 		klog.Fatal(err)
 	}
@@ -204,34 +224,66 @@ func main() {
 	cloneLog := log.WithName("xcopy").WithName("clone")
 	log.Info("copy-offload started")
 
+	cloneMethod := copyCtx.CloneMethod // always set by factory: "vib", "ssh", "vvol", or "rdm"
+	var copyStartTime time.Time
+	lastXcopyUsed := 0
+
+	// Record storage array info before Populate (no storageProtocol dependency).
+	copyMetrics.RecordStorageArrayInfo(storageVendor, arrayInfo)
+
 	hll := populator.NewHostLeaseLocker(clientSet)
 	klog.InfoS("populator", "stage", "starting")
+	copyStartTime = time.Now()
 	go p.Populate(sourceVmId, sourceVMDKFile, pv, hll, progressCh, xCopyUsedCh, quitCh)
 
 	for {
 		select {
-		case p := <-progressCh:
-			cloneLog.Info("clone progress", "progress", p)
-			metric := dto.Metric{}
-			if err := progressCounter.WithLabelValues(ownerUID).Write(&metric); err != nil {
-				klog.Error(err)
-			} else if float64(p) > metric.Counter.GetValue() {
-				progressCounter.WithLabelValues(ownerUID).Add(float64(p) - metric.Counter.GetValue())
-			}
+		case progress := <-progressCh:
+			cloneLog.Info("clone progress", "progress", progress)
+			copyMetrics.RecordProgress(ownerUID, progress)
 		case c := <-xCopyUsedCh:
 			cloneLog.Info("xcopy", "xcopyUsed", c)
-			metric := dto.Metric{}
-			if err := xcopyUsedGauge.WithLabelValues(ownerUID).Write(&metric); err != nil {
-				log.Error(err, "failed to write xcopy used gauge")
-			} else {
-				xcopyUsedGauge.WithLabelValues(ownerUID).Set(float64(c))
-			}
+			lastXcopyUsed = c
+			copyMetrics.RecordXcopyUsed(ownerUID, storageVendor, cloneMethod, c)
 		case q := <-quitCh:
+			duration := time.Since(copyStartTime)
 			if q != nil {
 				log.Error(q, "copy-offload failed")
+				copyMetrics.RecordCompletion("failure", ownerUID, storageVendor, cloneMethod, "n/a", lastXcopyUsed, duration)
+
+				completionReady.Store(true)
+				log.Info("copy-offload failed, waiting for metrics scrape", "duration", duration)
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				select {
+				case <-scrapedCh:
+					log.Info("metrics scraped after failure, exiting")
+				case <-ctx.Done():
+					log.Info("timeout waiting for post-failure scrape, exiting")
+				}
 				klog.Fatal(q)
 			}
-			log.Info("copy-offload finished")
+			// Read CopyContext after Populate() — StorageProtocol is now available.
+			copyCtx = p.GetCopyContext()
+			storageProtocol := copyCtx.StorageProtocol
+			if storageProtocol == "" {
+				storageProtocol = "n/a" // VVol/RDM paths don't detect protocol from ESXi adapters
+			}
+			copyMetrics.RecordSourceDiskBytes(ownerUID, storageVendor, cloneMethod, storageProtocol, copyCtx.SourceDiskCapacityBytes, copyCtx.SourceDiskDatastoreAllocatedBytes)
+			copyMetrics.RecordCompletion("success", ownerUID, storageVendor, cloneMethod, storageProtocol, lastXcopyUsed, duration)
+
+			// Signal that completion metrics are ready and wait for one final scrape.
+			completionReady.Store(true)
+			log.Info("copy-offload finished, waiting for metrics scrape", "duration", duration)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			select {
+			case <-scrapedCh:
+				log.Info("metrics scraped after completion, exiting")
+			case <-ctx.Done():
+				log.Info("timeout waiting for post-completion scrape, exiting")
+			}
 			return
 		}
 	}
@@ -376,12 +428,24 @@ func validateStorageAuthentication(token, username, password string) error {
 	return nil
 }
 
-func startMetricsServer(certFile, keyFile string) {
+func startMetricsServer(certFile, keyFile string, completionReady *atomic.Bool, scrapedCh chan<- struct{}) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
+		promhttp.Handler().ServeHTTP(w, r)
+		// After serving, if completion is ready, notify that we've been scraped.
+		if completionReady.Load() {
+			select {
+			case scrapedCh <- struct{}{}:
+			default:
+			}
+		}
+	})
+
 	go func() {
-		http.Handle("/metrics", promhttp.Handler())
 		cfg := tls.Config{MinVersion: tls.VersionTLS12}
 		server := http.Server{
 			Addr:      ":8443",
+			Handler:   mux,
 			TLSConfig: &cfg,
 		}
 		klog.Info("Starting metrics server")
@@ -391,55 +455,35 @@ func startMetricsServer(certFile, keyFile string) {
 	}()
 }
 
-func setupTracingMetrics() (*prometheus.CounterVec, *prometheus.GaugeVec, error) {
+func setupTracingMetrics(completionReady *atomic.Bool, scrapedCh chan<- struct{}) (*metrics.CopyMetrics, error) {
 	certsDirectory, err := os.MkdirTemp("", "certsdir")
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	certBytes, keyBytes, err := cert.GenerateSelfSignedCertKey("", nil, nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Error generating cert for prometheus: %w", err)
+		return nil, fmt.Errorf("Error generating cert for prometheus: %w", err)
 	}
 
 	certFile := path.Join(certsDirectory, "tls.crt")
 	if err = os.WriteFile(certFile, certBytes, 0600); err != nil {
-		return nil, nil, fmt.Errorf("Error writing cert file: %w", err)
+		return nil, fmt.Errorf("Error writing cert file: %w", err)
 	}
 
 	keyFile := path.Join(certsDirectory, "tls.key")
 	if err = os.WriteFile(keyFile, keyBytes, 0600); err != nil {
-		return nil, nil, fmt.Errorf("Error writing key file: %w", err)
+		return nil, fmt.Errorf("Error writing key file: %w", err)
 	}
 
-	// Register metrics
-	progressCounter := prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "vsphere_xcopy_volume_populator_progress",
-			Help: "Progress of vsphere XCOPY volume population",
-		},
-		[]string{"ownerUID"},
-	)
-
-	xcopyUsedGauge := prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "vsphere_xcopy_volume_populator_xcopy_used",
-			Help: "Indicates whether XCOPY was used for cloning (0=no, 1=yes)",
-		},
-		[]string{"ownerUID"},
-	)
-
-	// Register both to the default registry
-	if err := prometheus.Register(progressCounter); err != nil {
-		return nil, nil, fmt.Errorf("Progress counter not registered: %w", err)
-	}
-	if err := prometheus.Register(xcopyUsedGauge); err != nil {
-		return nil, nil, fmt.Errorf("XCOPY used gauge not registered: %w", err)
+	m, err := metrics.NewCopyMetrics()
+	if err != nil {
+		return nil, fmt.Errorf("metric not registered: %w", err)
 	}
 
-	startMetricsServer(certFile, keyFile)
+	startMetricsServer(certFile, keyFile, completionReady, scrapedCh)
 
-	return progressCounter, xcopyUsedGauge, nil
+	return m, nil
 }
 
 // getSSHKeysFromEnvironment retrieves SSH keys from environment variables set by the provider controller
