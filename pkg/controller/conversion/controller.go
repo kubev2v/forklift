@@ -5,12 +5,11 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/base"
-	convctx "github.com/kubev2v/forklift/pkg/controller/conversion/context"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	"github.com/kubev2v/forklift/pkg/settings"
-	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/storage/names"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -123,44 +122,15 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		return
 	}
 
-
-	// Ensure the conversion CR pod exists and track its state.
-	err = r.ensurePod(conversion)
+	pipe := NewConversionPipeline(ctx, &r, conversion)
+	succeeded, err := pipe.Run()
 	if err != nil {
-		return
+		conversion.Status.Phase = api.PhaseFailed
+	} else if succeeded {
+		conversion.Status.Phase = api.PhaseSucceeded
 	}
 
-	// Set phase and Ready condition based on pod state.
-	switch conversion.Status.Phase {
-	case api.PhaseSucceeded:
-		conversion.Status.SetCondition(libcnd.Condition{
-			Type:     libcnd.Ready,
-			Status:   True,
-			Category: Required,
-			Message:  "The conversion pod has completed successfully.",
-		})
-	case api.PhaseFailed:
-		conversion.Status.SetCondition(libcnd.Condition{
-			Type:     "PodFailed",
-			Status:   True,
-			Category: Critical,
-			Message:  "The conversion pod has failed.",
-		})
-	case api.PhaseRunning:
-		conversion.Status.SetCondition(libcnd.Condition{
-			Type:     libcnd.Ready,
-			Status:   True,
-			Category: Required,
-			Message:  "The conversion pod is running.",
-		})
-	default:
-		conversion.Status.SetCondition(libcnd.Condition{
-			Type:     libcnd.Ready,
-			Status:   False,
-			Category: Required,
-			Message:  "The conversion pod is pending.",
-		})
-	}
+	resolvePhaseConditions(conversion)
 
 	conversion.Status.EndStagingConditions()
 
@@ -171,51 +141,46 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	if err != nil {
 		return
 	}
-	if conversion.Status.Phase != api.PhaseSucceeded && conversion.Status.Phase != api.PhaseFailed {
-		result.RequeueAfter = base.SlowReQ
-	}
-	return
-}
 
-// ensurePod creates the pod for the Conversion CR if it does
-// not already exist and updates the status phase from the pod state.
-func (r *Reconciler) ensurePod(conversion *api.Conversion) (err error) {
-	ensurer, err := NewEnsurer(r.Client, r.Log, conversion.Spec)
-	if err != nil {
-		return
-	}
-
-	err = ensurer.EnsurePod(conversion)
-	if err != nil {
-		return
-	}
-
-	cfg := convctx.PodConfigFromSpec(conversion)
-	var pod *core.Pod
-	pod, err = ensurer.GetPod(conversion, cfg.PodLabels)
-	if err != nil {
-		return err
-	}
-	if pod == nil {
-		return nil
-	}
-
-	conversion.Status.Pod = core.ObjectReference{
-		Namespace: pod.Namespace,
-		Name:      pod.Name,
-	}
-
-	switch pod.Status.Phase {
-	case core.PodSucceeded:
-		conversion.Status.Phase = api.PhaseSucceeded
-	case core.PodFailed:
-		conversion.Status.Phase = api.PhaseFailed
-	case core.PodRunning:
-		conversion.Status.Phase = api.PhaseRunning
-	case core.PodPending:
-		conversion.Status.Phase = api.PhasePending
-	}
+	result.RequeueAfter = base.SlowReQ
 
 	return
 }
 
+// resolvePhaseConditions sets the Ready condition on conversion based on the current phase.
+func resolvePhaseConditions(conversion *api.Conversion) {
+	switch conversion.Status.Phase {
+	case api.PhaseSucceeded:
+		now := meta.Now()
+		conversion.Status.CompletionTime = &now
+		conversion.Status.SetCondition(libcnd.Condition{
+			Type:     libcnd.Ready,
+			Status:   True,
+			Category: Required,
+			Message:  "The conversion has completed successfully.",
+		})
+	case api.PhaseFailed:
+		now := meta.Now()
+		conversion.Status.CompletionTime = &now
+		conversion.Status.SetCondition(libcnd.Condition{
+			Type:     "ConversionFailed",
+			Status:   True,
+			Category: Critical,
+			Message:  "The conversion has failed.",
+		})
+	case api.PhasePending:
+		conversion.Status.SetCondition(libcnd.Condition{
+			Type:     libcnd.Ready,
+			Status:   False,
+			Category: Required,
+			Message:  "The conversion is pending.",
+		})
+	case api.PhaseRunning:
+		conversion.Status.SetCondition(libcnd.Condition{
+			Type:     libcnd.Advisory,
+			Status:   True,
+			Category: Advisory,
+			Message:  "The conversion is running.",
+		})
+	}
+}
