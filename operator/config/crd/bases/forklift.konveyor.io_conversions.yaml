@@ -21,6 +21,9 @@ spec:
     - jsonPath: .status.phase
       name: PHASE
       type: string
+    - jsonPath: .status.stage
+      name: STAGE
+      type: string
     - jsonPath: .status.conditions[?(@.type=='Ready')].status
       name: READY
       type: string
@@ -1306,6 +1309,11 @@ spec:
           status:
             description: ConversionStatus defines the observed state of Conversion.
             properties:
+              completionTime:
+                description: CompletionTime is when the conversion reached Succeeded
+                  or Failed.
+                format: date-time
+                type: string
               conditions:
                 description: List of conditions.
                 items:
@@ -1349,20 +1357,22 @@ spec:
                   type: object
                 type: array
               observedGeneration:
-                description: The most recent generation observed by the controller.
+                description: |-
+                  The most recent generation observed by the controller.
+                  Used by the update predicate to suppress reconciles triggered by the
+                  controller's own status writes.
                 format: int64
                 type: integer
               phase:
-                description: Phase of the conversion lifecycle.
+                description: Phase is the high-level lifecycle state of the conversion.
                 enum:
                 - Pending
-                - CreatingPod
                 - Running
                 - Succeeded
                 - Failed
                 type: string
               pod:
-                description: Reference to the managed virt-v2v pod.
+                description: Reference to the managed conversion pod.
                 properties:
                   apiVersion:
                     description: API version of the referent.
@@ -1404,6 +1414,48 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              snapshot:
+                description: |-
+                  Snapshot tracks the vSphere snapshot lifecycle for conversions that require
+                  a controller-managed snapshot (DeepInspection without a pre-supplied MoRef).
+                properties:
+                  createTaskId:
+                    description: CreateTaskID is the in-flight vSphere task id for
+                      snapshot creation.
+                    type: string
+                  moref:
+                    description: |-
+                      Moref is the vSphere managed object reference of the snapshot, used as
+                      SNAPSHOT_MOREF in the inspection pod.
+                    type: string
+                  owned:
+                    description: |-
+                      Owned is true when the converison controller created the snapshot and is responsible
+                      for removing it after the pod exits.
+                    type: boolean
+                  removeTaskId:
+                    description: RemoveTaskID is the in-flight vSphere task id for
+                      snapshot removal.
+                    type: string
+                type: object
+              stage:
+                description: |-
+                  Stage is the current fine-grained pipeline position within the Running phase.
+                  Intended for progress observability; the pipeline advances it as work proceeds.
+                enum:
+                - PodCreating
+                - PodRunning
+                - CreatingSnapshot
+                - WaitingForSnapshot
+                - RemovingSnapshot
+                - WaitingForSnapshotRemoval
+                - Finished
+                type: string
+              startTime:
+                description: StartTime is when the conversion entered the Running
+                  phase.
+                format: date-time
+                type: string
             type: object
         type: object
     served: true
