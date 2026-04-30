@@ -79,6 +79,10 @@ spec:
                 type: string
                 enum: ["true", "false"]
                 description: "Enable CLI download service (default: true)"
+              feature_lightspeed_integration:
+                type: string
+                enum: ["true", "false"]
+                description: "Register MCP server with OpenShift Lightspeed (default: false)"
               feature_vsphere_vmware_driver_removal:
                 type: string
                 enum: ["true", "false"]
@@ -229,6 +233,44 @@ spec:
                 type: string
                 description: "CLI download service memory request (default: 64Mi)"
                 example: "128Mi"
+
+              # MCP Server Resource Configuration
+              mcp_server_container_limits_cpu:
+                type: string
+                description: "MCP server CPU limit (default: 1000m)"
+                example: "2000m"
+              mcp_server_container_limits_memory:
+                type: string
+                description: "MCP server memory limit (default: 512Mi)"
+                example: "1Gi"
+              mcp_server_container_requests_cpu:
+                type: string
+                description: "MCP server CPU request (default: 100m)"
+                example: "200m"
+              mcp_server_container_requests_memory:
+                type: string
+                description: "MCP server memory request (default: 256Mi)"
+                example: "512Mi"
+
+              # MCP Server Settings
+              mcp_server_output_format:
+                type: string
+                description: "MCP server output format (default: markdown)"
+                example: "markdown"
+              mcp_server_max_response_chars:
+                x-kubernetes-int-or-string: true
+                description: "MCP server max response chars, 0 for unlimited (default: 0)"
+              mcp_server_kube_insecure:
+                type: string
+                enum: ["true", "false"]
+                description: "Skip TLS verification for in-cluster MCP calls (default: false)"
+              mcp_server_read_only:
+                type: string
+                enum: ["true", "false"]
+                description: "Run MCP server in read-only mode (default: false)"
+              mcp_server_verbose:
+                x-kubernetes-int-or-string: true
+                description: "MCP server verbosity level (default: 2)"
 
               # UI Plugin Resource Configuration
               ui_plugin_container_limits_cpu:

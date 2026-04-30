@@ -34,6 +34,12 @@ func (r *HealthReport) buildOperatorSection(b *describe.Builder) {
 			b.Field("Version", op.Version)
 		}
 		b.Field("Namespace", op.Namespace)
+
+		if r.AllNamespaces {
+			b.Field("Resource Scope", "all namespaces")
+		} else if r.UserNamespace != "" && r.UserNamespace != op.Namespace {
+			b.Field("Resource Scope", r.UserNamespace)
+		}
 	} else if op.Error != "" {
 		b.FieldC("MTV Operator", op.Error, output.Red)
 	} else if op.Status == "Unknown" {

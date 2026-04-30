@@ -29,6 +29,7 @@ github.com/charmbracelet/colorprofile
 # github.com/charmbracelet/lipgloss v1.1.0
 ## explicit; go 1.18
 github.com/charmbracelet/lipgloss
+github.com/charmbracelet/lipgloss/table
 # github.com/charmbracelet/x/ansi v0.11.6
 ## explicit; go 1.24.2
 github.com/charmbracelet/x/ansi
@@ -116,7 +117,7 @@ github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8
 # github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 ## explicit
 github.com/kballard/go-shellquote
-# github.com/kubev2v/forklift v0.0.0-20260310043128-869a5e1c16fa => ../../
+# github.com/kubev2v/forklift v0.0.0-20260327145126-7320affe4d23 => ../../
 ## explicit; go 1.24.0
 github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1
 github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan
@@ -149,8 +150,8 @@ github.com/mattn/go-runewidth
 ## explicit; go 1.18
 github.com/moby/term
 github.com/moby/term/windows
-# github.com/modelcontextprotocol/go-sdk v1.4.0
-## explicit; go 1.24.0
+# github.com/modelcontextprotocol/go-sdk v1.4.1
+## explicit; go 1.25.0
 github.com/modelcontextprotocol/go-sdk/auth
 github.com/modelcontextprotocol/go-sdk/internal/json
 github.com/modelcontextprotocol/go-sdk/internal/jsonrpc2
@@ -202,7 +203,7 @@ github.com/segmentio/asm/cpu/cpuid
 github.com/segmentio/asm/cpu/x86
 github.com/segmentio/asm/internal/unsafebytes
 github.com/segmentio/asm/keyset
-# github.com/segmentio/encoding v0.5.3
+# github.com/segmentio/encoding v0.5.4
 ## explicit; go 1.23
 github.com/segmentio/encoding/ascii
 github.com/segmentio/encoding/iso8601
@@ -225,7 +226,7 @@ github.com/xo/terminfo
 # github.com/yaacov/karl-interpreter v0.0.1
 ## explicit; go 1.21
 github.com/yaacov/karl-interpreter/pkg/karl
-# github.com/yaacov/kubectl-mtv v0.1.97
+# github.com/yaacov/kubectl-mtv v0.2.9
 ## explicit; go 1.25.0
 github.com/yaacov/kubectl-mtv/cmd
 github.com/yaacov/kubectl-mtv/cmd/archive
@@ -315,6 +316,7 @@ github.com/yaacov/kubectl-mtv/pkg/cmd/get/plan/status
 github.com/yaacov/kubectl-mtv/pkg/cmd/get/provider
 github.com/yaacov/kubectl-mtv/pkg/cmd/health
 github.com/yaacov/kubectl-mtv/pkg/cmd/help
+github.com/yaacov/kubectl-mtv/pkg/cmd/patch/hook
 github.com/yaacov/kubectl-mtv/pkg/cmd/patch/mapping
 github.com/yaacov/kubectl-mtv/pkg/cmd/patch/plan
 github.com/yaacov/kubectl-mtv/pkg/cmd/patch/provider
@@ -334,7 +336,7 @@ github.com/yaacov/kubectl-mtv/pkg/util/query
 github.com/yaacov/kubectl-mtv/pkg/util/tui
 github.com/yaacov/kubectl-mtv/pkg/util/watch
 github.com/yaacov/kubectl-mtv/pkg/version
-# github.com/yaacov/tree-search-language/v6 v6.0.9
+# github.com/yaacov/tree-search-language/v6 v6.0.10
 ## explicit; go 1.23
 github.com/yaacov/tree-search-language/v6/pkg/parser
 github.com/yaacov/tree-search-language/v6/pkg/tsl
@@ -426,7 +428,7 @@ gopkg.in/inf.v0
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
-# k8s.io/api v0.35.2
+# k8s.io/api v0.35.3
 ## explicit; go 1.25.0
 k8s.io/api/admissionregistration/v1
 k8s.io/api/admissionregistration/v1alpha1
@@ -489,7 +491,7 @@ k8s.io/api/storagemigration/v1beta1
 ## explicit; go 1.25.0
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1
-# k8s.io/apimachinery v0.35.2
+# k8s.io/apimachinery v0.35.3
 ## explicit; go 1.25.0
 k8s.io/apimachinery/pkg/api/equality
 k8s.io/apimachinery/pkg/api/errors
@@ -549,13 +551,13 @@ k8s.io/apimachinery/pkg/version
 k8s.io/apimachinery/pkg/watch
 k8s.io/apimachinery/third_party/forked/golang/json
 k8s.io/apimachinery/third_party/forked/golang/reflect
-# k8s.io/cli-runtime v0.35.2
+# k8s.io/cli-runtime v0.35.3
 ## explicit; go 1.25.0
 k8s.io/cli-runtime/pkg/genericclioptions
 k8s.io/cli-runtime/pkg/genericiooptions
 k8s.io/cli-runtime/pkg/printers
 k8s.io/cli-runtime/pkg/resource
-# k8s.io/client-go v0.35.2
+# k8s.io/client-go v0.35.3
 ## explicit; go 1.25.0
 k8s.io/client-go/applyconfigurations/admissionregistration/v1
 k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1

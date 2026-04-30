@@ -9,6 +9,7 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/patch/mapping"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/completion"
+	"github.com/yaacov/kubectl-mtv/pkg/util/flags"
 )
 
 // NewMappingCmd creates the mapping patch command with subcommands
@@ -45,10 +46,12 @@ func newPatchNetworkMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, g
 
   # Update network pairs
   kubectl-mtv patch mapping network --name my-net-map --update-pairs "VM Network:migration-net"`,
-		Args:         cobra.NoArgs,
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate required --name flag
+			if err := flags.ResolveNameArg(&name, args); err != nil {
+				return err
+			}
 			if name == "" {
 				return fmt.Errorf("--name is required")
 			}
@@ -64,7 +67,7 @@ func newPatchNetworkMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, g
 	}
 
 	cmd.Flags().StringVarP(&name, "name", "M", "", "Network mapping name")
-	_ = cmd.MarkFlagRequired("name")
+	flags.MarkRequiredForMCP(cmd, "name")
 	cmd.Flags().StringVar(&addPairs, "add-pairs", "", "Network pairs to add in format 'source:target-namespace/target-network', 'source:target-network', 'source:default', or 'source:ignored' (comma-separated)")
 	cmd.Flags().StringVar(&updatePairs, "update-pairs", "", "Network pairs to update in format 'source:target-namespace/target-network', 'source:target-network', 'source:default', or 'source:ignored' (comma-separated)")
 	cmd.Flags().StringVar(&removePairs, "remove-pairs", "", "Source network names to remove from mapping (comma-separated)")
@@ -93,10 +96,12 @@ func newPatchStorageMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, g
 
   # Update storage pairs
   kubectl-mtv patch mapping storage --name my-storage-map --update-pairs "datastore1:premium"`,
-		Args:         cobra.NoArgs,
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate required --name flag
+			if err := flags.ResolveNameArg(&name, args); err != nil {
+				return err
+			}
 			if name == "" {
 				return fmt.Errorf("--name is required")
 			}
@@ -115,7 +120,7 @@ func newPatchStorageMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, g
 	}
 
 	cmd.Flags().StringVarP(&name, "name", "M", "", "Storage mapping name")
-	_ = cmd.MarkFlagRequired("name")
+	flags.MarkRequiredForMCP(cmd, "name")
 	cmd.Flags().StringVar(&addPairs, "add-pairs", "", "Storage pairs to add in format 'source:storage-class[;volumeMode=Block|Filesystem][;accessMode=ReadWriteOnce|ReadWriteMany|ReadOnlyMany][;offloadPlugin=vsphere][;offloadSecret=secret-name][;offloadVendor=vantara|ontap|...]' (comma-separated pairs, semicolon-separated parameters)")
 	cmd.Flags().StringVar(&updatePairs, "update-pairs", "", "Storage pairs to update in format 'source:storage-class[;volumeMode=Block|Filesystem][;accessMode=ReadWriteOnce|ReadWriteMany|ReadOnlyMany][;offloadPlugin=vsphere][;offloadSecret=secret-name][;offloadVendor=vantara|ontap|...]' (comma-separated pairs, semicolon-separated parameters)")
 	cmd.Flags().StringVar(&removePairs, "remove-pairs", "", "Source storage names to remove from mapping (comma-separated)")

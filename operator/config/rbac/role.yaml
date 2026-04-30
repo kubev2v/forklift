@@ -95,3 +95,13 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - ols.openshift.io
+  resources:
+  - olsconfigs
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch

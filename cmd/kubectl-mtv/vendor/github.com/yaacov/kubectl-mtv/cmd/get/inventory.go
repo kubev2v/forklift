@@ -146,5 +146,10 @@ Available resource types vary by provider:
 	ec2NetworkCmd.Aliases = []string{"ec2-networks"}
 	cmd.AddCommand(ec2NetworkCmd)
 
+	// Add AAP resources
+	jobTemplateCmd := NewInventoryJobTemplateCmd(kubeConfigFlags, globalConfig)
+	jobTemplateCmd.Aliases = []string{"job-templates", "jobtemplates"}
+	cmd.AddCommand(jobTemplateCmd)
+
 	return cmd
 }

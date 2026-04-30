@@ -3,6 +3,7 @@ package health
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -15,8 +16,15 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 )
 
+// structuredLogLine is used to extract the level from JSON-structured log lines
+// without unmarshalling the entire object.
+type structuredLogLine struct {
+	Level string `json:"level"`
+}
+
 // Log analysis patterns (pre-compiled for performance)
 var (
+	// Fallback regex patterns for non-structured (plain text) log lines
 	errorPatterns = []*regexp.Regexp{
 		regexp.MustCompile(`(?i)\berror\b`),
 		regexp.MustCompile(`(?i)\bfailed\b`),
@@ -28,7 +36,7 @@ var (
 		regexp.MustCompile(`(?i)\bwarn(ing)?\b`),
 	}
 
-	// Patterns to ignore (false positives)
+	// Patterns to ignore (false positives in plain-text fallback)
 	ignorePatterns = []*regexp.Regexp{
 		regexp.MustCompile(`(?i)error.*nil`),
 		regexp.MustCompile(`(?i)no error`),
@@ -140,34 +148,79 @@ func analyzePodsLogs(ctx context.Context, clientset *kubernetes.Clientset, pod *
 	return analysis
 }
 
-// analyzeLogLine analyzes a single log line for errors and warnings
+// analyzeLogLine analyzes a single log line for errors and warnings.
+// It first tries to classify by the structured "level" field in JSON logs.
+// Only falls back to regex pattern matching when no structured level is found
+// or the level value is not recognized.
 func analyzeLogLine(line string, analysis *LogAnalysis) {
-	// Check if line should be ignored
+	if level := extractStructuredLevel(line); level != "" {
+		if analyzeByLevel(level, line, analysis) {
+			return
+		}
+	}
+
+	analyzeByPatterns(line, analysis)
+}
+
+// extractStructuredLevel pulls the "level" value from a JSON-structured log line.
+// Returns empty string if the line is not valid JSON or has no "level" field.
+func extractStructuredLevel(line string) string {
+	var entry structuredLogLine
+	if err := json.Unmarshal([]byte(line), &entry); err != nil || entry.Level == "" {
+		return ""
+	}
+	return strings.ToLower(entry.Level)
+}
+
+// analyzeByLevel classifies a log line using its structured level field.
+// Returns true if the level was recognized (even if the line was intentionally
+// skipped, e.g. info/debug), false for unknown levels so the caller can fall
+// through to pattern-based analysis.
+func analyzeByLevel(level, line string, analysis *LogAnalysis) bool {
+	switch level {
+	case "error", "fatal", "panic", "dpanic":
+		analysis.Errors++
+		if len(analysis.ErrorLines) < 5 {
+			analysis.ErrorLines = append(analysis.ErrorLines, truncateLine(line, 200))
+		}
+	case "warn", "warning":
+		analysis.Warnings++
+		if len(analysis.WarnLines) < 5 {
+			analysis.WarnLines = append(analysis.WarnLines, truncateLine(line, 200))
+		}
+	case "info", "debug", "trace":
+		// Recognized non-error levels -- intentionally skip
+	default:
+		return false
+	}
+	return true
+}
+
+// analyzeByPatterns classifies a non-structured log line using regex patterns.
+func analyzeByPatterns(line string, analysis *LogAnalysis) {
 	for _, pattern := range ignorePatterns {
 		if pattern.MatchString(line) {
 			return
 		}
 	}
 
-	// Check for errors
 	for _, pattern := range errorPatterns {
 		if pattern.MatchString(line) {
 			analysis.Errors++
-			if len(analysis.ErrorLines) < 5 { // Keep only first 5 error lines
+			if len(analysis.ErrorLines) < 5 {
 				analysis.ErrorLines = append(analysis.ErrorLines, truncateLine(line, 200))
 			}
-			return // Count as error only once
+			return
 		}
 	}
 
-	// Check for warnings
 	for _, pattern := range warningPatterns {
 		if pattern.MatchString(line) {
 			analysis.Warnings++
-			if len(analysis.WarnLines) < 5 { // Keep only first 5 warning lines
+			if len(analysis.WarnLines) < 5 {
 				analysis.WarnLines = append(analysis.WarnLines, truncateLine(line, 200))
 			}
-			return // Count as warning only once
+			return
 		}
 	}
 }

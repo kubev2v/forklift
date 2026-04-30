@@ -15,20 +15,12 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 )
 
-// Helper function to create a HyperV secret
-func createSecret(configFlags *genericclioptions.ConfigFlags, namespace, providerName string, options providerutil.ProviderOptions) (*corev1.Secret, error) {
-	// Get the Kubernetes client using configFlags
-	k8sClient, err := client.GetKubernetesClientset(configFlags)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create kubernetes client: %v", err)
-	}
-
-	// Validate required credentials
+// buildSecret returns a HyperV provider Secret without submitting it to the API.
+func buildSecret(namespace, providerName string, options providerutil.ProviderOptions) (*corev1.Secret, error) {
 	if options.Username == "" || options.Password == "" {
 		return nil, fmt.Errorf("username and password are required for HyperV provider")
 	}
 
-	// Create secret data without base64 encoding (the API handles this automatically)
 	secretData := map[string][]byte{
 		"username": []byte(options.Username),
 		"password": []byte(options.Password),
@@ -49,14 +41,14 @@ func createSecret(configFlags *genericclioptions.ConfigFlags, namespace, provide
 		secretData["cacert"] = []byte(options.CACert)
 	}
 
-	// Generate a name prefix for the secret
-	secretName := fmt.Sprintf("%s-hyperv-", providerName)
-
-	// Create the secret object directly as a typed Secret
-	secret := &corev1.Secret{
+	return &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Secret",
+		},
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: secretName,
-			Namespace:    namespace,
+			Name:      fmt.Sprintf("%s-hyperv-credentials", providerName),
+			Namespace: namespace,
 			Labels: map[string]string{
 				"createdForProviderType": "hyperv",
 				"createdForResourceType": "providers",
@@ -64,7 +56,23 @@ func createSecret(configFlags *genericclioptions.ConfigFlags, namespace, provide
 		},
 		Data: secretData,
 		Type: corev1.SecretTypeOpaque,
+	}, nil
+}
+
+// createSecret creates a HyperV secret reusing the same object shape as buildSecret.
+// It swaps the deterministic Name for a GenerateName so the API server assigns a unique suffix.
+func createSecret(configFlags *genericclioptions.ConfigFlags, namespace, providerName string, options providerutil.ProviderOptions) (*corev1.Secret, error) {
+	k8sClient, err := client.GetKubernetesClientset(configFlags)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kubernetes client: %v", err)
 	}
+
+	secret, err := buildSecret(namespace, providerName, options)
+	if err != nil {
+		return nil, err
+	}
+	secret.Name = ""
+	secret.GenerateName = fmt.Sprintf("%s-hyperv-", providerName)
 
 	return k8sClient.CoreV1().Secrets(namespace).Create(context.Background(), secret, metav1.CreateOptions{})
 }

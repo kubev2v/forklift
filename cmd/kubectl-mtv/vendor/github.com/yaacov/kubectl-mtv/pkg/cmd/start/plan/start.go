@@ -2,7 +2,6 @@ package plan
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"time"
@@ -13,7 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"sigs.k8s.io/yaml"
 
 	forkliftv1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/get/plan/status"
@@ -115,7 +113,7 @@ func Start(configFlags *genericclioptions.ConfigFlags, name, namespace string, c
 
 	// Handle dry-run mode
 	if dryRun {
-		return OutputMigrationCR(migration, outputFormat)
+		return output.OutputResource(migration, outputFormat)
 	}
 
 	// Convert Migration object to Unstructured
@@ -135,37 +133,5 @@ func Start(configFlags *genericclioptions.ConfigFlags, name, namespace string, c
 	if warm && cutoverTime != nil {
 		fmt.Fprintf(os.Stderr, "Cutover scheduled for: %s\n", output.FormatTimestamp(*cutoverTime, useUTC))
 	}
-	return nil
-}
-
-// OutputMigrationCR serializes a Migration CR to the specified format and outputs it to stdout
-func OutputMigrationCR(migration *forkliftv1beta1.Migration, outputFormat string) error {
-	if migration == nil {
-		return fmt.Errorf("migration CR is nil")
-	}
-
-	var output []byte
-	var err error
-
-	switch outputFormat {
-	case "yaml":
-		output, err = yaml.Marshal(migration)
-		if err != nil {
-			return fmt.Errorf("failed to marshal Migration to YAML: %v", err)
-		}
-		// Always prefix YAML with document separator for proper multi-document format
-		fmt.Print("---\n")
-		fmt.Print(string(output))
-		return nil
-	case "json":
-		output, err = json.MarshalIndent(migration, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to marshal Migration to JSON: %v", err)
-		}
-	default:
-		return fmt.Errorf("unsupported output format: %s", outputFormat)
-	}
-
-	fmt.Print(string(output))
 	return nil
 }

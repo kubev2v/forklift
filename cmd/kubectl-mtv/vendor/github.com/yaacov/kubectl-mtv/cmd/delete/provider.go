@@ -10,6 +10,7 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/delete/provider"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/completion"
+	"github.com/yaacov/kubectl-mtv/pkg/util/flags"
 )
 
 // NewProviderCmd creates the provider deletion command
@@ -32,9 +33,13 @@ Ensure no migration plans reference the provider before deletion.`,
 
   # Delete all providers in namespace
   kubectl-mtv delete providers --all`,
-		Args:         cobra.NoArgs,
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := flags.ResolveNamesArg(&providerNames, args); err != nil {
+				return err
+			}
+
 			// Validate --all and --name are mutually exclusive
 			if all && len(providerNames) > 0 {
 				return errors.New("cannot use --name with --all")

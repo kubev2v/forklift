@@ -11,6 +11,7 @@ feature_ocp_live_migration: true
 feature_vmware_system_serial_number: true
 feature_vsphere_vmware_driver_removal: false
 feature_cli_download: true
+feature_lightspeed_integration: false
 feature_ova_appliance_management: true
 
 k8s_cluster: false
@@ -113,6 +114,7 @@ ui_plugin_state: absent
 cli_download_image_fqin: "{{ lookup( 'env', 'CLI_DOWNLOAD_IMAGE') or lookup( 'env', 'RELATED_IMAGE_CLI_DOWNLOAD') }}"
 cli_download_service_name: "{{ app_name }}-cli-download"
 cli_download_route_name: "{{ cli_download_service_name }}"
+cli_download_tls_secret_name: "{{ cli_download_service_name }}-serving-cert"
 cli_download_deployment_name: "{{ cli_download_service_name }}"
 cli_download_container_name: "{{ app_name }}-cli-download"
 cli_download_container_limits_cpu: "1000m"
@@ -120,6 +122,22 @@ cli_download_container_limits_memory: "1Gi"
 cli_download_container_requests_cpu: "100m"
 cli_download_container_requests_memory: "512Mi"
 cli_download_state: absent
+
+mcp_server_service_name: "{{ app_name }}-mcp-server"
+mcp_server_deployment_name: "{{ app_name }}-mcp-server"
+mcp_server_container_name: "{{ app_name }}-mcp-server"
+mcp_server_container_limits_cpu: "1000m"
+mcp_server_container_limits_memory: "512Mi"
+mcp_server_container_requests_cpu: "100m"
+mcp_server_container_requests_memory: "256Mi"
+mcp_server_output_format: "markdown"
+mcp_server_max_response_chars: "0"
+# In-cluster: kubectl-mtv uses --server + --token from HTTP headers, bypassing
+# the default kubeconfig and its CA bundle. TLS verification must be skipped
+# for kubernetes.default.svc unless a custom CA is explicitly mounted.
+mcp_server_kube_insecure: "true"
+mcp_server_read_only: "false"
+mcp_server_verbose: "2"
 
 api_image_fqin: "{{ lookup( 'env', 'API_IMAGE') or lookup( 'env', 'RELATED_IMAGE_API') }}"
 api_service_name: "{{ app_name }}-api"

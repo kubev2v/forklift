@@ -25,9 +25,13 @@ func NewInventoryProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags, glo
 		Use:          "provider",
 		Short:        "Get inventory information from providers",
 		Long:         `Get inventory information from providers including resource counts and provider status`,
-		Args:         cobra.NoArgs,
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := flags.ResolveNameArg(&providerName, args); err != nil {
+				return err
+			}
+
 			ctx := cmd.Context()
 			if !watch {
 				var cancel context.CancelFunc
@@ -48,7 +52,7 @@ func NewInventoryProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags, glo
 			inventoryURL := globalConfig.GetInventoryURL()
 			inventoryInsecureSkipTLS := globalConfig.GetInventoryInsecureSkipTLS()
 
-			return inventory.ListProvidersWithInsecure(ctx, globalConfig.GetKubeConfigFlags(), providerName, namespace, inventoryURL, outputFormatFlag.GetValue(), query, watch, inventoryInsecureSkipTLS)
+			return inventory.List(ctx, globalConfig.GetKubeConfigFlags(), namespace, inventoryURL, watch, outputFormatFlag.GetValue(), providerName, inventoryInsecureSkipTLS, query)
 		},
 	}
 	cmd.Flags().StringVarP(&providerName, "name", "M", "", "Provider name")

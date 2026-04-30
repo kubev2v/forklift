@@ -8,18 +8,33 @@ ENV GOFLAGS="-mod=vendor -tags=strictfipsruntime"
 ENV GOEXPERIMENT=strictfipsruntime
 ENV GOCACHE=/go-build/cache
 
-# Change to kubectl-mtv directory and build all platform binaries
+# Build all platform binaries for download
 WORKDIR /app/cmd/kubectl-mtv
 RUN --mount=type=cache,target=${GOCACHE},uid=1001 make build-all
 
-# Nginx serving stage  
+# Build a native binary for the MCP server running inside the container
+RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -buildvcs=false -ldflags="-w -s" -o mcp-bin/kubectl-mtv
+
+# Nginx + MCP server stage
 FROM registry.redhat.io/ubi9/nginx-126:1-1756959223
 
-# Copy binaries directly from build stage
+# Copy cross-compiled binaries for all platforms (linux, darwin, windows)
 COPY --from=builder /app/cmd/kubectl-mtv/bin /opt/app-root/src/
 
-EXPOSE 8080
-CMD ["nginx", "-g", "daemon off;"]
+# Copy native binary for MCP server runtime
+COPY --from=builder --chmod=755 /app/cmd/kubectl-mtv/mcp-bin/kubectl-mtv /usr/local/bin/kubectl-mtv
+
+# Nginx server block for CLI static file serving
+COPY build/forklift-cli-download/nginx.conf /opt/app-root/etc/nginx.d/nginx.conf
+
+ENV MCP_OUTPUT_FORMAT="markdown" \
+    MCP_MAX_RESPONSE_CHARS="0" \
+    MCP_READ_ONLY="false" \
+    MCP_VERBOSE="2" \
+    MCP_KUBE_SERVER="" \
+    MCP_KUBE_INSECURE=""
+
+EXPOSE 8443 8081
 
 ARG MTV_VERSION
 ARG REGISTRY
@@ -32,10 +47,10 @@ LABEL \
     name="${REGISTRY}/mtv-cli-download-rhel9" \
     license="Apache License 2.0" \
     io.k8s.display-name="Migration Toolkit for Virtualization" \
-    io.k8s.description="Migration Toolkit for Virtualization - CLI Download Service" \
-    io.openshift.tags="migration,mtv,forklift,cli" \
-    description="Migration Toolkit for Virtualization - CLI Download Service" \
-    summary="Migration Toolkit for Virtualization - CLI Download Service" \
+    io.k8s.description="Migration Toolkit for Virtualization - CLI Download and MCP Server" \
+    io.openshift.tags="migration,mtv,forklift,cli,mcp" \
+    description="Migration Toolkit for Virtualization - CLI Download and MCP Server" \
+    summary="Migration Toolkit for Virtualization - CLI Download and MCP Server" \
     vendor="Red Hat, Inc." \
     maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
     version="$MTV_VERSION" \

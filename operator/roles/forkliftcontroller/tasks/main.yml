@@ -385,6 +385,81 @@
         state: "{{ cli_download_state }}"
         definition: "{{ lookup('template', 'cli-download/console-cli-download-kubectl-mtv.yml.j2') }}"
 
+    - name: "Setup MCP server HTTP service"
+      k8s:
+        state: "{{ cli_download_state }}"
+        definition: "{{ lookup('template', 'mcp-server/service-mcp-server.yml.j2') }}"
+
+    - name: "Setup MCP server deployment"
+      k8s:
+        state: "{{ cli_download_state }}"
+        definition: "{{ lookup('template', 'mcp-server/deployment-mcp-server.yml.j2') }}"
+
+    - name: "Register MCP server with Lightspeed"
+      when:
+        - feature_lightspeed_integration|bool
+        - "'ols.openshift.io' in api_groups"
+      ignore_errors: true
+      block:
+        - name: "Read current OLSConfig for registration"
+          k8s_info:
+            api_version: ols.openshift.io/v1alpha1
+            kind: OLSConfig
+            name: cluster
+          register: olsconfig_current
+
+        - name: "Add kubectl-mtv to OLSConfig mcpServers"
+          vars:
+            existing_mcp_servers: "{{ (olsconfig_current.resources[0].spec.mcpServers | default([])) | rejectattr('name', 'equalto', 'kubectl-mtv') | list }}"
+            new_mcp_entry:
+              name: kubectl-mtv
+              url: "http://{{ mcp_server_service_name }}.{{ app_namespace }}.svc:8081/mcp"
+              timeout: 30
+              headers:
+                - name: Authorization
+                  valueFrom:
+                    type: kubernetes
+            existing_feature_gates: "{{ (olsconfig_current.resources[0].spec.featureGates | default([])) | reject('equalto', 'MCPServer') | list }}"
+          k8s:
+            state: present
+            definition:
+              apiVersion: ols.openshift.io/v1alpha1
+              kind: OLSConfig
+              metadata:
+                name: cluster
+              spec:
+                featureGates: "{{ existing_feature_gates + ['MCPServer'] }}"
+                mcpServers: "{{ existing_mcp_servers + [new_mcp_entry] }}"
+          when: olsconfig_current.resources | length > 0
+
+  - name: "Unregister MCP server from Lightspeed"
+    when:
+      - not feature_lightspeed_integration|bool or not feature_cli_download|bool
+      - "'ols.openshift.io' in api_groups"
+    ignore_errors: true
+    block:
+      - name: "Read current OLSConfig"
+        k8s_info:
+          api_version: ols.openshift.io/v1alpha1
+          kind: OLSConfig
+          name: cluster
+        register: olsconfig_current
+
+      - name: "Remove kubectl-mtv from OLSConfig mcpServers"
+        k8s:
+          state: present
+          definition:
+            apiVersion: ols.openshift.io/v1alpha1
+            kind: OLSConfig
+            metadata:
+              name: cluster
+            spec:
+              mcpServers: "{{ olsconfig_current.resources[0].spec.mcpServers | rejectattr('name', 'equalto', 'kubectl-mtv') | list }}"
+        when:
+          - olsconfig_current.resources | length > 0
+          - olsconfig_current.resources[0].spec.mcpServers is defined
+          - olsconfig_current.resources[0].spec.mcpServers | selectattr('name', 'equalto', 'kubectl-mtv') | list | length > 0
+
   - name: "Create controller service-account token Secret for download vddk tar"
     k8s:
       state: present
@@ -420,6 +495,15 @@
     vars:
       feature_label: "{{ cli_download_service_name }}"
 
+  - when: not feature_cli_download|bool
+    name: "Cleanup {{ mcp_server_service_name }} if disabled"
+    include_tasks: cleanup.yml
+    loop: "{{ forklift_resources }}"
+    loop_control:
+      loop_var: resource_kind
+    vars:
+      feature_label: "{{ mcp_server_service_name }}"
+
   - when: not feature_validation|bool
     name: "Cleanup {{ validation_service_name }} if disabled"
     include_tasks: cleanup.yml
@@ -448,5 +532,31 @@
     k8s:
       state: absent
       definition: "{{ lookup('template', 'ui-plugin/console-plugin.yml.j2') }}"
+
+  - name: "Unregister MCP server from Lightspeed on finalize"
+    when: "'ols.openshift.io' in api_groups"
+    ignore_errors: true
+    block:
+      - name: "Read current OLSConfig for finalize"
+        k8s_info:
+          api_version: ols.openshift.io/v1alpha1
+          kind: OLSConfig
+          name: cluster
+        register: olsconfig_finalize
+
+      - name: "Remove kubectl-mtv from OLSConfig mcpServers on finalize"
+        k8s:
+          state: present
+          definition:
+            apiVersion: ols.openshift.io/v1alpha1
+            kind: OLSConfig
+            metadata:
+              name: cluster
+            spec:
+              mcpServers: "{{ olsconfig_finalize.resources[0].spec.mcpServers | rejectattr('name', 'equalto', 'kubectl-mtv') | list }}"
+        when:
+          - olsconfig_finalize.resources | length > 0
+          - olsconfig_finalize.resources[0].spec.mcpServers is defined
+          - olsconfig_finalize.resources[0].spec.mcpServers | selectattr('name', 'equalto', 'kubectl-mtv') | list | length > 0
 
   when: finalize is defined

@@ -204,11 +204,11 @@ func formatOutput(settingValues []settings.SettingValue, format string) error {
 
 // formatTable formats settings as a table.
 func formatTable(settingValues []settings.SettingValue) error {
-	tableHeaders := []output.Header{
-		{DisplayName: "CATEGORY", JSONPath: "category"},
-		{DisplayName: "SETTING", JSONPath: "setting"},
-		{DisplayName: "VALUE", JSONPath: "value"},
-		{DisplayName: "DEFAULT", JSONPath: "default"},
+	tableHeaders := []output.Column{
+		{Title: "CATEGORY", Key: "category"},
+		{Title: "SETTING", Key: "setting"},
+		{Title: "VALUE", Key: "value"},
+		{Title: "DEFAULT", Key: "default"},
 	}
 	items := make([]map[string]interface{}, 0, len(settingValues))
 	for _, sv := range settingValues {
@@ -221,7 +221,7 @@ func formatTable(settingValues []settings.SettingValue) error {
 	}
 
 	return output.NewTablePrinter().
-		WithHeaders(tableHeaders...).
+		WithColumns(tableHeaders...).
 		AddItems(items).
 		Print()
 }
@@ -289,11 +289,11 @@ func formatYAML(settingValues []settings.SettingValue) error {
 }
 
 func formatSettingsMarkdown(settingValues []settings.SettingValue) error {
-	tableHeaders := []output.Header{
-		{DisplayName: "CATEGORY", JSONPath: "category"},
-		{DisplayName: "SETTING", JSONPath: "setting"},
-		{DisplayName: "VALUE", JSONPath: "value"},
-		{DisplayName: "DEFAULT", JSONPath: "default"},
+	tableHeaders := []output.Column{
+		{Title: "CATEGORY", Key: "category"},
+		{Title: "SETTING", Key: "setting"},
+		{Title: "VALUE", Key: "value"},
+		{Title: "DEFAULT", Key: "default"},
 	}
 	items := make([]map[string]interface{}, 0, len(settingValues))
 	for _, sv := range settingValues {
@@ -306,7 +306,7 @@ func formatSettingsMarkdown(settingValues []settings.SettingValue) error {
 	}
 
 	return output.NewTablePrinter().
-		WithHeaders(tableHeaders...).
+		WithColumns(tableHeaders...).
 		AddItems(items).
 		PrintMarkdown()
 }

@@ -37,13 +37,13 @@ func listInstancesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.C
 	}
 
 	// Define default headers
-	defaultHeaders := []output.Header{
-		{DisplayName: "NAME", JSONPath: "name"},
-		{DisplayName: "ID", JSONPath: "id"},
-		{DisplayName: "STATUS", JSONPath: "status", ColorFunc: output.ColorizeStatus},
-		{DisplayName: "FLAVOR", JSONPath: "flavor.name"},
-		{DisplayName: "IMAGE", JSONPath: "image.name"},
-		{DisplayName: "PROJECT", JSONPath: "project.name"},
+	defaultHeaders := []output.Column{
+		{Title: "NAME", Key: "name"},
+		{Title: "ID", Key: "id"},
+		{Title: "STATUS", Key: "status", ColorFunc: output.ColorizeStatus},
+		{Title: "FLAVOR", Key: "flavor.name"},
+		{Title: "IMAGE", Key: "image.name"},
+		{Title: "PROJECT", Key: "project.name"},
 	}
 
 	// Fetch instances inventory from the provider
@@ -116,12 +116,12 @@ func listImagesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Conf
 	}
 
 	// Define default headers
-	defaultHeaders := []output.Header{
-		{DisplayName: "NAME", JSONPath: "name"},
-		{DisplayName: "ID", JSONPath: "id"},
-		{DisplayName: "STATUS", JSONPath: "status", ColorFunc: output.ColorizeStatus},
-		{DisplayName: "SIZE", JSONPath: "sizeHuman"},
-		{DisplayName: "VISIBILITY", JSONPath: "visibility"},
+	defaultHeaders := []output.Column{
+		{Title: "NAME", Key: "name"},
+		{Title: "ID", Key: "id"},
+		{Title: "STATUS", Key: "status", ColorFunc: output.ColorizeStatus},
+		{Title: "SIZE", Key: "sizeHuman"},
+		{Title: "VISIBILITY", Key: "visibility"},
 	}
 
 	// Fetch images inventory from the provider
@@ -197,13 +197,13 @@ func listFlavorsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Con
 	}
 
 	// Define default headers
-	defaultHeaders := []output.Header{
-		{DisplayName: "NAME", JSONPath: "name"},
-		{DisplayName: "ID", JSONPath: "id"},
-		{DisplayName: "VCPUS", JSONPath: "vcpus"},
-		{DisplayName: "RAM", JSONPath: "ramHuman"},
-		{DisplayName: "DISK", JSONPath: "diskHuman"},
-		{DisplayName: "EPHEMERAL", JSONPath: "ephemeralHuman"},
+	defaultHeaders := []output.Column{
+		{Title: "NAME", Key: "name"},
+		{Title: "ID", Key: "id"},
+		{Title: "VCPUS", Key: "vcpus"},
+		{Title: "RAM", Key: "ramHuman"},
+		{Title: "DISK", Key: "diskHuman"},
+		{Title: "EPHEMERAL", Key: "ephemeralHuman"},
 	}
 
 	// Fetch flavors inventory from the provider
@@ -280,11 +280,11 @@ func listProjectsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Co
 	}
 
 	// Define default headers
-	defaultHeaders := []output.Header{
-		{DisplayName: "NAME", JSONPath: "name"},
-		{DisplayName: "ID", JSONPath: "id"},
-		{DisplayName: "DESCRIPTION", JSONPath: "description"},
-		{DisplayName: "ENABLED", JSONPath: "enabled", ColorFunc: output.ColorizeBooleanString},
+	defaultHeaders := []output.Column{
+		{Title: "NAME", Key: "name"},
+		{Title: "ID", Key: "id"},
+		{Title: "DESCRIPTION", Key: "description"},
+		{Title: "ENABLED", Key: "enabled", ColorFunc: output.ColorizeBooleanString},
 	}
 
 	// Fetch projects inventory from the provider
@@ -357,13 +357,13 @@ func listVolumesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Con
 	}
 
 	// Define default headers
-	defaultHeaders := []output.Header{
-		{DisplayName: "NAME", JSONPath: "name"},
-		{DisplayName: "ID", JSONPath: "id"},
-		{DisplayName: "STATUS", JSONPath: "status", ColorFunc: output.ColorizeStatus},
-		{DisplayName: "SIZE", JSONPath: "sizeHuman"},
-		{DisplayName: "TYPE", JSONPath: "volumeType"},
-		{DisplayName: "BOOTABLE", JSONPath: "bootable", ColorFunc: output.ColorizeBooleanString},
+	defaultHeaders := []output.Column{
+		{Title: "NAME", Key: "name"},
+		{Title: "ID", Key: "id"},
+		{Title: "STATUS", Key: "status", ColorFunc: output.ColorizeStatus},
+		{Title: "SIZE", Key: "sizeHuman"},
+		{Title: "TYPE", Key: "volumeType"},
+		{Title: "BOOTABLE", Key: "bootable", ColorFunc: output.ColorizeBooleanString},
 	}
 
 	// Fetch volumes inventory from the provider
@@ -439,11 +439,11 @@ func listVolumeTypesOnce(ctx context.Context, kubeConfigFlags *genericclioptions
 	}
 
 	// Define default headers
-	defaultHeaders := []output.Header{
-		{DisplayName: "NAME", JSONPath: "name"},
-		{DisplayName: "ID", JSONPath: "id"},
-		{DisplayName: "DESCRIPTION", JSONPath: "description"},
-		{DisplayName: "PUBLIC", JSONPath: "isPublic"},
+	defaultHeaders := []output.Column{
+		{Title: "NAME", Key: "name"},
+		{Title: "ID", Key: "id"},
+		{Title: "DESCRIPTION", Key: "description"},
+		{Title: "PUBLIC", Key: "isPublic"},
 	}
 
 	// Fetch volume types inventory from the provider
@@ -516,12 +516,12 @@ func listSnapshotsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.C
 	}
 
 	// Define default headers
-	defaultHeaders := []output.Header{
-		{DisplayName: "NAME", JSONPath: "name"},
-		{DisplayName: "ID", JSONPath: "id"},
-		{DisplayName: "STATUS", JSONPath: "status", ColorFunc: output.ColorizeStatus},
-		{DisplayName: "SIZE", JSONPath: "sizeHuman"},
-		{DisplayName: "VOLUME-ID", JSONPath: "volumeID"},
+	defaultHeaders := []output.Column{
+		{Title: "NAME", Key: "name"},
+		{Title: "ID", Key: "id"},
+		{Title: "STATUS", Key: "status", ColorFunc: output.ColorizeStatus},
+		{Title: "SIZE", Key: "sizeHuman"},
+		{Title: "VOLUME-ID", Key: "volumeID"},
 	}
 
 	// Fetch snapshots inventory from the provider
@@ -597,14 +597,14 @@ func listSubnetsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Con
 	}
 
 	// Define default headers
-	defaultHeaders := []output.Header{
-		{DisplayName: "NAME", JSONPath: "name"},
-		{DisplayName: "ID", JSONPath: "id"},
-		{DisplayName: "NETWORK-ID", JSONPath: "networkID"},
-		{DisplayName: "CIDR", JSONPath: "cidr"},
-		{DisplayName: "IP-VERSION", JSONPath: "ipVersion"},
-		{DisplayName: "GATEWAY", JSONPath: "gatewayIP"},
-		{DisplayName: "DHCP", JSONPath: "enableDHCP", ColorFunc: output.ColorizeBooleanString},
+	defaultHeaders := []output.Column{
+		{Title: "NAME", Key: "name"},
+		{Title: "ID", Key: "id"},
+		{Title: "NETWORK-ID", Key: "networkID"},
+		{Title: "CIDR", Key: "cidr"},
+		{Title: "IP-VERSION", Key: "ipVersion"},
+		{Title: "GATEWAY", Key: "gatewayIP"},
+		{Title: "DHCP", Key: "enableDHCP", ColorFunc: output.ColorizeBooleanString},
 	}
 
 	// Fetch subnets inventory from the provider

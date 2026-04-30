@@ -22,6 +22,8 @@ type StorageCreateOptions struct {
 	DefaultOffloadPlugin     string
 	DefaultOffloadSecret     string
 	DefaultOffloadVendor     string
+	DryRun                   bool
+	OutputFormat             string
 	// Offload secret creation fields
 	OffloadVSphereUsername string
 	OffloadVSpherePassword string
@@ -50,12 +52,12 @@ type StorageParseOptions struct {
 
 // CreateNetwork creates a new network mapping
 func CreateNetwork(configFlags *genericclioptions.ConfigFlags, name, namespace, sourceProvider, targetProvider, networkPairs, inventoryURL string) error {
-	return CreateNetworkWithInsecure(configFlags, name, namespace, sourceProvider, targetProvider, networkPairs, inventoryURL, false)
+	return CreateNetworkWithInsecure(configFlags, name, namespace, sourceProvider, targetProvider, networkPairs, inventoryURL, false, false, "")
 }
 
 // CreateNetworkWithInsecure creates a new network mapping with optional insecure TLS skip verification
-func CreateNetworkWithInsecure(configFlags *genericclioptions.ConfigFlags, name, namespace, sourceProvider, targetProvider, networkPairs, inventoryURL string, insecureSkipTLS bool) error {
-	return createNetworkMappingWithInsecure(configFlags, name, namespace, sourceProvider, targetProvider, networkPairs, inventoryURL, insecureSkipTLS)
+func CreateNetworkWithInsecure(configFlags *genericclioptions.ConfigFlags, name, namespace, sourceProvider, targetProvider, networkPairs, inventoryURL string, insecureSkipTLS bool, dryRun bool, outputFormat string) error {
+	return createNetworkMappingWithInsecure(configFlags, name, namespace, sourceProvider, targetProvider, networkPairs, inventoryURL, insecureSkipTLS, dryRun, outputFormat)
 }
 
 // CreateStorageWithOptions creates a new storage mapping with additional options for VolumeMode, AccessMode, and OffloadPlugin

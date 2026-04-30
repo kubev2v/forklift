@@ -12,7 +12,7 @@ spec:
     kind: Service
     name: {{ cli_download_service_name }}
   port:
-    targetPort: 8080
+    targetPort: 8443
   tls:
-    termination: edge
+    termination: reencrypt
     insecureEdgeTerminationPolicy: Redirect
