@@ -283,6 +283,309 @@ var _ = Describe("vSphere builder", func() {
 		)
 	})
 
+	Context("SourceVMLabelsAndAnnotations", func() {
+		It("should convert all tags to labels when no tagMapping is provided", func() {
+			builder := createBuilder()
+			vm := model.VM{
+				VM1: model.VM1{
+					VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
+				},
+				Tags: []vsphere.Tag{
+					{Name: "owner", Description: "platform-team"},
+					{Name: "environment", Description: "production"},
+					{Name: "cost-center", Description: "cc-123"},
+				},
+			}
+			builder.Source.Inventory = &mockInventory{vm: vm}
+
+			labels, annotations, sanitizationReport, err := builder.SourceVMLabelsAndAnnotations(ref.Ref{ID: "vm-1"}, nil)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(labels).To(HaveLen(3))
+			Expect(labels["vsphere.forklift.konveyor.io/owner"]).To(Equal("platform-team"))
+			Expect(labels["vsphere.forklift.konveyor.io/environment"]).To(Equal("production"))
+			Expect(labels["vsphere.forklift.konveyor.io/cost-center"]).To(Equal("cc-123"))
+			Expect(annotations).To(BeEmpty())
+			Expect(sanitizationReport).To(BeEmpty())
+		})
+
+		It("should convert only specified tags to labels when tagMapping is provided", func() {
+			builder := createBuilder()
+			vm := model.VM{
+				VM1: model.VM1{
+					VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
+				},
+				Tags: []vsphere.Tag{
+					{Name: "owner", Description: "platform-team"},
+					{Name: "environment", Description: "production"},
+					{Name: "cost-center", Description: "cc-123"},
+					{Name: "internal-tag", Description: "should-be-ignored"},
+				},
+			}
+			builder.Source.Inventory = &mockInventory{vm: vm}
+
+			tagMapping := &v1beta1.TagMapping{
+				LabelTags: []string{"owner", "cost-center"},
+			}
+			labels, annotations, _, err := builder.SourceVMLabelsAndAnnotations(ref.Ref{ID: "vm-1"}, tagMapping)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(labels).To(HaveLen(2))
+			Expect(labels["vsphere.forklift.konveyor.io/owner"]).To(Equal("platform-team"))
+			Expect(labels["vsphere.forklift.konveyor.io/cost-center"]).To(Equal("cc-123"))
+			Expect(labels).NotTo(HaveKey("vsphere.forklift.konveyor.io/environment"))
+			Expect(labels).NotTo(HaveKey("vsphere.forklift.konveyor.io/internal-tag"))
+			Expect(annotations).To(BeEmpty())
+		})
+
+		It("should match tag names case-insensitively", func() {
+			builder := createBuilder()
+			vm := model.VM{
+				VM1: model.VM1{
+					VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
+				},
+				Tags: []vsphere.Tag{
+					{Name: "Owner", Description: "platform-team"},
+					{Name: "ENVIRONMENT", Description: "production"},
+				},
+			}
+			builder.Source.Inventory = &mockInventory{vm: vm}
+
+			tagMapping := &v1beta1.TagMapping{
+				LabelTags: []string{"owner", "environment"},
+			}
+			labels, _, _, err := builder.SourceVMLabelsAndAnnotations(ref.Ref{ID: "vm-1"}, tagMapping)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(labels).To(HaveLen(2))
+			Expect(labels["vsphere.forklift.konveyor.io/Owner"]).To(Equal("platform-team"))
+			Expect(labels["vsphere.forklift.konveyor.io/ENVIRONMENT"]).To(Equal("production"))
+		})
+
+		It("should convert custom attributes to annotations", func() {
+			builder := createBuilder()
+			vm := model.VM{
+				VM1: model.VM1{
+					VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
+				},
+				CustomDef: []vsphere.CustomFieldDef{
+					{Key: 100, Name: "app-name"},
+					{Key: 101, Name: "app-version"},
+				},
+				CustomValues: []vsphere.CustomFieldValue{
+					{Key: 100, Value: "my-application"},
+					{Key: 101, Value: "v1.2.3"},
+				},
+			}
+			builder.Source.Inventory = &mockInventory{vm: vm}
+
+			labels, annotations, _, err := builder.SourceVMLabelsAndAnnotations(ref.Ref{ID: "vm-1"}, nil)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(labels).To(BeEmpty())
+			Expect(annotations).To(HaveLen(2))
+			Expect(annotations["vsphere.forklift.konveyor.io/app-name"]).To(Equal("my-application"))
+			Expect(annotations["vsphere.forklift.konveyor.io/app-version"]).To(Equal("v1.2.3"))
+		})
+
+		It("should sanitize invalid tag names and descriptions and report them", func() {
+			builder := createBuilder()
+			vm := model.VM{
+				VM1: model.VM1{
+					VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
+				},
+				Tags: []vsphere.Tag{
+					{Name: "invalid tag name", Description: "invalid description value"},
+					{Name: "valid-tag", Description: "valid-value"},
+				},
+			}
+			builder.Source.Inventory = &mockInventory{vm: vm}
+
+			labels, _, sanitizationReport, err := builder.SourceVMLabelsAndAnnotations(ref.Ref{ID: "vm-1"}, nil)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(labels).To(HaveLen(2))
+			Expect(labels["vsphere.forklift.konveyor.io/invalid_tag_name"]).To(Equal("invalid_description_value"))
+			Expect(labels["vsphere.forklift.konveyor.io/valid-tag"]).To(Equal("valid-value"))
+			Expect(sanitizationReport).To(HaveLen(2))
+			Expect(sanitizationReport["tag.name.invalid tag name"]).To(Equal("invalid_tag_name"))
+			Expect(sanitizationReport["tag.value.invalid tag name"]).To(Equal("invalid_description_value"))
+		})
+
+		It("should skip tags with empty names after sanitization", func() {
+			builder := createBuilder()
+			vm := model.VM{
+				VM1: model.VM1{
+					VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
+				},
+				Tags: []vsphere.Tag{
+					{Name: "", Description: "no-name"},
+					{Name: "valid-tag", Description: "valid-value"},
+				},
+			}
+			builder.Source.Inventory = &mockInventory{vm: vm}
+
+			labels, _, _, err := builder.SourceVMLabelsAndAnnotations(ref.Ref{ID: "vm-1"}, nil)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(labels).To(HaveLen(1))
+			Expect(labels["vsphere.forklift.konveyor.io/valid-tag"]).To(Equal("valid-value"))
+		})
+
+		It("should convert both tags and custom attributes together", func() {
+			builder := createBuilder()
+			vm := model.VM{
+				VM1: model.VM1{
+					VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
+				},
+				Tags: []vsphere.Tag{
+					{Name: "owner", Description: "platform-team"},
+				},
+				CustomDef: []vsphere.CustomFieldDef{
+					{Key: 100, Name: "app-name"},
+				},
+				CustomValues: []vsphere.CustomFieldValue{
+					{Key: 100, Value: "my-application"},
+				},
+			}
+			builder.Source.Inventory = &mockInventory{vm: vm}
+
+			labels, annotations, _, err := builder.SourceVMLabelsAndAnnotations(ref.Ref{ID: "vm-1"}, nil)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(labels).To(HaveLen(1))
+			Expect(labels["vsphere.forklift.konveyor.io/owner"]).To(Equal("platform-team"))
+			Expect(annotations).To(HaveLen(1))
+			Expect(annotations["vsphere.forklift.konveyor.io/app-name"]).To(Equal("my-application"))
+		})
+
+		It("should convert no tags to labels when tagMapping.Disabled is true", func() {
+			builder := createBuilder()
+			vm := model.VM{
+				VM1: model.VM1{
+					VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
+				},
+				Tags: []vsphere.Tag{
+					{Name: "owner", Description: "platform-team"},
+					{Name: "environment", Description: "production"},
+				},
+				CustomDef: []vsphere.CustomFieldDef{
+					{Key: 100, Name: "app-name"},
+				},
+				CustomValues: []vsphere.CustomFieldValue{
+					{Key: 100, Value: "my-application"},
+				},
+			}
+			builder.Source.Inventory = &mockInventory{vm: vm}
+
+			tagMapping := &v1beta1.TagMapping{
+				Disabled: true,
+			}
+			labels, annotations, _, err := builder.SourceVMLabelsAndAnnotations(ref.Ref{ID: "vm-1"}, tagMapping)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(labels).To(BeEmpty())
+			Expect(annotations).To(HaveLen(1))
+			Expect(annotations["vsphere.forklift.konveyor.io/app-name"]).To(Equal("my-application"))
+		})
+
+		It("should ignore LabelTags when tagMapping.Disabled is true", func() {
+			builder := createBuilder()
+			vm := model.VM{
+				VM1: model.VM1{
+					VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
+				},
+				Tags: []vsphere.Tag{
+					{Name: "owner", Description: "platform-team"},
+					{Name: "environment", Description: "production"},
+				},
+			}
+			builder.Source.Inventory = &mockInventory{vm: vm}
+
+			tagMapping := &v1beta1.TagMapping{
+				Disabled:  true,
+				LabelTags: []string{"owner"},
+			}
+			labels, _, _, err := builder.SourceVMLabelsAndAnnotations(ref.Ref{ID: "vm-1"}, tagMapping)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(labels).To(BeEmpty())
+		})
+
+		It("should convert all tags when tagMapping has empty LabelTags", func() {
+			builder := createBuilder()
+			vm := model.VM{
+				VM1: model.VM1{
+					VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
+				},
+				Tags: []vsphere.Tag{
+					{Name: "owner", Description: "platform-team"},
+					{Name: "environment", Description: "production"},
+				},
+			}
+			builder.Source.Inventory = &mockInventory{vm: vm}
+
+			tagMapping := &v1beta1.TagMapping{
+				LabelTags: []string{},
+			}
+			labels, _, _, err := builder.SourceVMLabelsAndAnnotations(ref.Ref{ID: "vm-1"}, tagMapping)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(labels).To(HaveLen(2))
+			Expect(labels["vsphere.forklift.konveyor.io/owner"]).To(Equal("platform-team"))
+			Expect(labels["vsphere.forklift.konveyor.io/environment"]).To(Equal("production"))
+		})
+
+		It("should report sanitized custom attribute names", func() {
+			builder := createBuilder()
+			vm := model.VM{
+				VM1: model.VM1{
+					VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
+				},
+				CustomDef: []vsphere.CustomFieldDef{
+					{Key: 100, Name: "invalid attr name"},
+				},
+				CustomValues: []vsphere.CustomFieldValue{
+					{Key: 100, Value: "some-value"},
+				},
+			}
+			builder.Source.Inventory = &mockInventory{vm: vm}
+
+			_, annotations, sanitizationReport, err := builder.SourceVMLabelsAndAnnotations(ref.Ref{ID: "vm-1"}, nil)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(annotations).To(HaveLen(1))
+			Expect(annotations["vsphere.forklift.konveyor.io/invalid_attr_name"]).To(Equal("some-value"))
+			Expect(sanitizationReport).To(HaveLen(1))
+			Expect(sanitizationReport["customAttribute.name.invalid attr name"]).To(Equal("invalid_attr_name"))
+		})
+
+		It("should skip custom attributes whose name sanitizes to empty", func() {
+			builder := createBuilder()
+			vm := model.VM{
+				VM1: model.VM1{
+					VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
+				},
+				CustomDef: []vsphere.CustomFieldDef{
+					{Key: 100, Name: "!@#$"},
+					{Key: 101, Name: "valid-attr"},
+				},
+				CustomValues: []vsphere.CustomFieldValue{
+					{Key: 100, Value: "should-be-skipped"},
+					{Key: 101, Value: "kept"},
+				},
+			}
+			builder.Source.Inventory = &mockInventory{vm: vm}
+
+			_, annotations, _, err := builder.SourceVMLabelsAndAnnotations(ref.Ref{ID: "vm-1"}, nil)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(annotations).To(HaveLen(1))
+			Expect(annotations["vsphere.forklift.konveyor.io/valid-attr"]).To(Equal("kept"))
+			Expect(annotations).NotTo(HaveKey("vsphere.forklift.konveyor.io/"))
+		})
+	})
+
 	builder := createBuilder()
 	DescribeTable("should", func(vm *model.VM, outputMap string) {
 		Expect(builder.mapMacStaticIps(vm)).Should(Equal(outputMap))
