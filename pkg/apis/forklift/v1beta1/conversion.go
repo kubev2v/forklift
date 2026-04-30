@@ -16,12 +16,12 @@ const (
 	// Inspection uses virt-v2v-inspector to inspect the disks (kept only for backward compatibility)
 	Inspection ConversionType = "Inspection"
 	// InPlace conversion does not use virt-v2v to copy the disks. It only converts the disks in place
-	InPlace    ConversionType = "InPlace"
+	InPlace ConversionType = "InPlace"
 	// Remote conversion uses virt-v2v to copy the disks from remote provider to the destination cluster and converts the disks.
-	Remote     ConversionType = "Remote" 
+	Remote ConversionType = "Remote"
 )
 
-// ConversionPhase represents the lifecycle phase of a Conversion resource.
+// ConversionPhase is the high-level lifecycle state of a Conversion resource
 type ConversionPhase string
 
 const (
@@ -29,6 +29,26 @@ const (
 	PhaseRunning   ConversionPhase = "Running"
 	PhaseSucceeded ConversionPhase = "Succeeded"
 	PhaseFailed    ConversionPhase = "Failed"
+)
+
+// ConversionStage is the fine-grained pipeline position within the Running phase.
+type ConversionStage string
+
+const (
+	// StageCreatePod is set while the conversion pod is being scheduled.
+	StageCreatePod ConversionStage = "CreatingPod"
+	// StagePodRunning is set while the conversion pod is actively running.
+	StagePodRunning ConversionStage = "PodRunning"
+	// StageFinished is always the last stage in every pipeline definition.
+	StageFinished ConversionStage = "Finished"
+	// StageCreateSnapshot is set while the vSphere snapshot creation task is being submitted.
+	StageCreateSnapshot ConversionStage = "CreatingSnapshot"
+	// StageWaitForSnapshot is set while polling for the snapshot creation task to complete.
+	StageWaitForSnapshot ConversionStage = "WaitingForSnapshot"
+	// StageRemoveSnapshot is set while the vSphere snapshot removal task is being submitted.
+	StageRemoveSnapshot ConversionStage = "RemovingSnapshot"
+	// StageWaitForSnapshotRemoval is set while polling for the snapshot removal task to complete.
+	StageWaitForSnapshotRemoval ConversionStage = "WaitingForSnapshotRemoval"
 )
 
 // DiskRef references a PVC to be used as a disk in the conversion process.
@@ -169,15 +189,28 @@ type ConversionStatus struct {
 	// Conditions.
 	libcnd.Conditions `json:",inline"`
 	// The most recent generation observed by the controller.
+	// Used by the update predicate to suppress reconciles triggered by the
+	// controller's own status writes.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-	// Phase of the conversion lifecycle.
+	// Phase is the high-level lifecycle state of the conversion.
 	// +optional
-	// +kubebuilder:validation:Enum=Pending;CreatingPod;Running;Succeeded;Failed
+	// +kubebuilder:validation:Enum=Pending;Running;Succeeded;Failed
 	Phase ConversionPhase `json:"phase,omitempty"`
-	// Reference to the managed virt-v2v pod.
+	// Stage is the current fine-grained pipeline position within the Running phase.
+	// Intended for progress observability; the pipeline advances it as work proceeds.
+	// +optional
+	// +kubebuilder:validation:Enum=PodCreating;PodRunning;CreatingSnapshot;WaitingForSnapshot;RemovingSnapshot;WaitingForSnapshotRemoval;Finished
+	Stage ConversionStage `json:"stage,omitempty"`
+	// Reference to the managed conversion pod.
 	// +optional
 	Pod core.ObjectReference `json:"pod,omitempty"`
+	// StartTime is when the conversion entered the Running phase.
+	// +optional
+	StartTime *meta.Time `json:"startTime,omitempty"`
+	// CompletionTime is when the conversion reached Succeeded or Failed.
+	// +optional
+	CompletionTime *meta.Time `json:"completionTime,omitempty"`
 	// Snapshot tracks the vSphere snapshot lifecycle for conversions that require
 	// a controller-managed snapshot (DeepInspection without a pre-supplied MoRef).
 	// +optional
@@ -192,6 +225,7 @@ type ConversionStatus struct {
 // +k8s:openapi-gen=true
 // +kubebuilder:printcolumn:name="TYPE",type=string,JSONPath=".spec.type"
 // +kubebuilder:printcolumn:name="PHASE",type=string,JSONPath=".status.phase"
+// +kubebuilder:printcolumn:name="STAGE",type=string,JSONPath=".status.stage"
 // +kubebuilder:printcolumn:name="READY",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:subresource:status
