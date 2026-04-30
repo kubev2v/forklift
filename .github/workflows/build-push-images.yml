@@ -67,6 +67,9 @@ jobs:
           - name: vsphere-copy-offload-populator
             file: build/vsphere-copy-offload-populator/Containerfile
             repo: vsphere-copy-offload-populator
+          - name: hyperv-populator
+            file: build/hyperv-populator/Containerfile
+            repo: hyperv-populator
     runs-on: ubuntu-latest
     steps:
       - name: Checkout forklift

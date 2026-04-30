@@ -252,6 +252,18 @@
         state: "{{ volume_populator_state }}"
         definition: "{{ lookup('template', 'populator/deployment-populator-controller.yml.j2') }}"
 
+    - name: "Register HyperV volume populator"
+      k8s:
+        state: "{{ volume_populator_state }}"
+        definition:
+          apiVersion: populator.storage.k8s.io/v1beta1
+          kind: VolumePopulator
+          metadata:
+            name: hypervvolumepopulator
+          sourceKind:
+            group: forklift.konveyor.io
+            kind: HyperVVolumePopulator
+
   - when: k8s_cluster|bool
     block:
     - name: "Create a trusted CA issuer"

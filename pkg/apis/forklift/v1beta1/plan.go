@@ -453,8 +453,10 @@ func (p *Plan) ShouldUseV2vForTransfer(vmRef ref.Ref, destinationClient k8sclien
 			}
 		}
 		return true, nil
-	case Ova, HyperV:
+	case Ova:
 		return true, nil
+	case HyperV:
+		return source.GetHyperVTransferMethod() == HyperVTransferMethodSMB, nil
 	default:
 		return false, nil
 	}

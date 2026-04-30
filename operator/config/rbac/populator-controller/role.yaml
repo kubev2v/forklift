@@ -30,6 +30,14 @@ rules:
       - update
       - patch
       - delete
+  # Required by scrapeMetrics/nodeOVNGatewayIP to resolve a cluster-routable
+  # IP for hostNetwork populator pods (Hyper-V iSCSI).
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - get
   - apiGroups:
       - batch
     resources:

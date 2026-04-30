@@ -88,6 +88,8 @@ spec:
           value: ${VIRT_CUSTOMIZE_MAP}
         - name: VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE
           value: ${VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE}
+        - name: HYPERV_POPULATOR_IMAGE
+          value: ${HYPERV_POPULATOR_IMAGE}
         livenessProbe:
           httpGet:
             path: /healthz

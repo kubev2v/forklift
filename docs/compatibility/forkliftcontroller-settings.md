@@ -171,7 +171,8 @@ These settings define the container images used by Forklift components. Containe
 | `virt_v2v_image_fqin` | `VIRT_V2V_IMAGE`, `RELATED_IMAGE_VIRT_V2V` | Container image for virt-v2v guest conversion pods |
 | `vddk_image` | `VDDK_IMAGE` | Container image for VMware VDDK (can be overridden per-provider via `spec.settings.vddkInitImage`) |
 | `ova_provider_server_fqin` | `OVA_PROVIDER_SERVER_IMAGE` | Container image for OVA provider server deployments (one per OVA provider) |
-| `hyperv_provider_server_fqin` | `HYPERV_PROVIDER_SERVER_IMAGE` | Container image for HyperV provider server deployments (one per HyperV provider) |
+| `hyperv_provider_server_fqin` | `HYPERV_PROVIDER_SERVER_IMAGE` | Container image for HyperV provider server deployments (one per HyperV provider, SMB mode only) |
+| `populator_hyperv_image_fqin` | `HYPERV_POPULATOR_IMAGE` | Container image for HyperV populator pods (used during iSCSI mode migrations) |
 
 ### OVA/HyperV Provider Server Architecture
 

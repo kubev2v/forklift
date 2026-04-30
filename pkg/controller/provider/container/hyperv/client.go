@@ -14,6 +14,7 @@ import (
 	hvutil "github.com/kubev2v/forklift/pkg/controller/hyperv"
 	types "github.com/kubev2v/forklift/pkg/controller/provider/model/hyperv/types"
 	"github.com/kubev2v/forklift/pkg/lib/hyperv/driver"
+	"github.com/kubev2v/forklift/pkg/lib/hyperv/iscsi"
 	ps "github.com/kubev2v/forklift/pkg/lib/hyperv/powershell"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
@@ -32,6 +33,9 @@ const (
 	StorageTypeSMB        = "SMB"
 	StorageNamePrefixSMB  = "SMB: "
 	StorageNameDefaultSMB = "hyperv-storage"
+
+	StorageTypeISCSI = "iSCSI"
+	StorageNameISCSI = "iSCSI: Local Disks"
 )
 
 const (
@@ -75,12 +79,14 @@ func (r *Client) Connect(provider *api.Provider) (err error) {
 
 	r.driver = drv
 	r.provider = provider
-	r.smbUrl = hvutil.SMBUrl(r.Secret)
-	r.smbMountPath = hvutil.SMBMountPath
 
-	if r.smbUrl != "" {
-		if pErr := r.discoverSMBWindowsPrefix(); pErr != nil {
-			r.Log.Error(pErr, "Failed to discover SMB Windows prefix, will retry")
+	if provider.GetHyperVTransferMethod() == api.HyperVTransferMethodSMB {
+		r.smbUrl = hvutil.SMBUrl(r.Secret)
+		r.smbMountPath = hvutil.SMBMountPath
+		if r.smbUrl != "" {
+			if pErr := r.discoverSMBWindowsPrefix(); pErr != nil {
+				r.Log.Error(pErr, "Failed to discover SMB Windows prefix, will retry on next reconnect")
+			}
 		}
 	}
 
@@ -100,8 +106,12 @@ func (r *Client) ListVMs() ([]types.VM, error) {
 	}
 
 	var vms []types.VM
+	smbPrefix := ""
+	if r.provider != nil && r.provider.GetHyperVTransferMethod() == api.HyperVTransferMethodSMB {
+		smbPrefix = r.smbWindowsPrefix
+	}
 	for _, domain := range domains {
-		vm, err := r.getVMFromDomain(domain, networks, r.smbWindowsPrefix)
+		vm, err := r.getVMFromDomain(domain, networks, smbPrefix)
 		if err != nil {
 			r.Log.Error(err, "Failed to process domain")
 			_ = domain.Free()
@@ -111,7 +121,9 @@ func (r *Client) ListVMs() ([]types.VM, error) {
 		_ = domain.Free()
 	}
 
-	r.validateDisksOnSMB(vms)
+	if r.provider != nil && r.provider.GetHyperVTransferMethod() == api.HyperVTransferMethodSMB {
+		r.validateDisksOnSMB(vms)
+	}
 
 	return vms, nil
 }
@@ -235,8 +247,20 @@ func (r *Client) ListNetworks() ([]types.Network, error) {
 	return result, nil
 }
 
-// ListStorages returns the SMB storage record from the HyperV host via WinRM.
+// ListStorages returns the storage record from the HyperV host.
+// For SMB providers it returns the SMB share details, for iSCSI providers it
+// returns a synthetic entry so the UI can build a valid StorageMap.
 func (r *Client) ListStorages() ([]types.Storage, error) {
+	if r.provider != nil && r.provider.GetHyperVTransferMethod() == api.HyperVTransferMethodISCSI {
+		storage := types.Storage{
+			ID:   hvutil.StorageIDDefault,
+			Name: StorageNameISCSI,
+			Type: StorageTypeISCSI,
+		}
+		r.Log.Info("Returning synthetic iSCSI storage entry", "name", storage.Name)
+		return []types.Storage{storage}, nil
+	}
+
 	if r.smbUrl == "" {
 		return nil, nil
 	}
@@ -373,7 +397,10 @@ func (r *Client) extractDisks(domain driver.Domain, smbWindowsPrefix string, vmU
 			continue
 		}
 
-		smbPath := r.mapWindowsPathToSMB(di.Path, smbWindowsPrefix)
+		var smbPath string
+		if smbWindowsPrefix != "" {
+			smbPath = r.mapWindowsPathToSMB(di.Path, smbWindowsPrefix)
+		}
 		capacity := r.getDiskCapacity(di.Path)
 		rctEnabled := r.getDiskRCTEnabled(di.Path)
 
@@ -720,6 +747,15 @@ func (r *Client) discoverSMBWindowsPrefix() error {
 	r.smbWindowsPrefix = windowsPath
 	r.Log.Info("Discovered SMB Windows prefix", "shareName", shareName, "windowsPath", windowsPath)
 	return nil
+}
+
+// CheckIscsiReadiness verifies that the iSCSI Target Server feature is installed
+// and that TCP port 3260 is reachable on the Hyper-V host.
+func (r *Client) CheckIscsiReadiness() (*iscsi.Readiness, error) {
+	if r.driver == nil {
+		return nil, fmt.Errorf("WinRM driver not connected")
+	}
+	return iscsi.NewTargetClient(r.driver).CheckReadiness()
 }
 
 func mapPowerState(state driver.DomainState) string {

@@ -417,6 +417,10 @@ spec:
                 description: Volume populator controller image
                 example: quay.io/kubev2v/populator-controller:latest
                 type: string
+              populator_hyperv_image_fqin:
+                description: HyperV populator image
+                example: quay.io/kubev2v/hyperv-populator:latest
+                type: string
               populator_openstack_image_fqin:
                 description: OpenStack populator image
                 example: quay.io/kubev2v/openstack-populator:latest
@@ -1151,6 +1155,127 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
             type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.3
+  name: hypervvolumepopulators.forklift.konveyor.io
+spec:
+  group: forklift.konveyor.io
+  names:
+    kind: HyperVVolumePopulator
+    listKind: HyperVVolumePopulatorList
+    plural: hypervvolumepopulators
+    shortNames:
+    - hvp
+    - hvps
+    singular: hypervvolumepopulator
+  scope: Namespaced
+  versions:
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              diskIndex:
+                description: DiskIndex is the zero-based index of this disk within
+                  the VM's disk list.
+                minimum: 0
+                type: integer
+              diskPath:
+                description: |-
+                  DiskPath is the full Windows path to the source VHDX file
+                  (e.g. "C:\\VMs\\MyVM\\disk0.vhdx").
+                type: string
+              initiatorIQN:
+                description: |-
+                  InitiatorIQN is the IQN the copy pod must use to authenticate via the
+                  target's initiator ACL (e.g. "iqn.YYYY-MM.io.forklift:copy-<migrationID>").
+                type: string
+              lunId:
+                description: LunID is the LUN number assigned to this disk within
+                  the iSCSI target.
+                minimum: 0
+                type: integer
+              secretName:
+                description: SecretName is the name of the Secret holding Hyper-V
+                  provider credentials.
+                type: string
+              targetIQN:
+                description: |-
+                  TargetIQN is the iSCSI Qualified Name of the target created on the Hyper-V host
+                  (e.g. "iqn.YYYY-MM.io.forklift:vm-abc123").
+                type: string
+              targetPortal:
+                description: |-
+                  TargetPortal is the iSCSI target portal address in "host:port" format
+                  (e.g. "10.0.0.100:3260").
+                type: string
+              vmId:
+                description: VMID is the unique identifier of the source VM on the
+                  Hyper-V host.
+                type: string
+              vmName:
+                description: VMName is the display name of the source VM.
+                type: string
+            required:
+            - diskIndex
+            - diskPath
+            - initiatorIQN
+            - lunId
+            - secretName
+            - targetIQN
+            - targetPortal
+            - vmId
+            - vmName
+            type: object
+          status:
+            properties:
+              bytesTransferred:
+                description: BytesTransferred is the number of bytes written to the
+                  destination so far.
+                format: int64
+                type: integer
+              phase:
+                description: Phase describes the current lifecycle phase of the populator.
+                type: string
+              progress:
+                description: Progress is a human-readable percentage string (e.g.
+                  "45%").
+                type: string
+              totalBytes:
+                description: TotalBytes is the total number of bytes expected for
+                  the transfer.
+                format: int64
+                type: integer
+            type: object
+        required:
+        - spec
         type: object
     served: true
     storage: true
@@ -7342,6 +7467,12 @@ rules:
   - patch
   - delete
 - apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+- apiGroups:
   - batch
   resources:
   - jobs
@@ -7692,6 +7823,8 @@ spec:
           value: ${VIRT_CUSTOMIZE_MAP}
         - name: VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE
           value: ${VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE}
+        - name: HYPERV_POPULATOR_IMAGE
+          value: ${HYPERV_POPULATOR_IMAGE}
         image: ${OPERATOR_IMAGE}
         imagePullPolicy: Always
         livenessProbe:
@@ -8003,6 +8136,11 @@ spec:
       - description: vSphere xcopy populator image
         displayName: vSphere Populator Image
         path: populator_vsphere_copy_offload_image_fqin
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: HyperV populator image
+        displayName: HyperV Populator Image
+        path: populator_hyperv_image_fqin
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: OVA provider server image
@@ -8501,6 +8639,11 @@ spec:
       displayName: VSphereXcopyVolumePopulator
       kind: VSphereXcopyVolumePopulator
       name: vspherexcopyvolumepopulators.forklift.konveyor.io
+      version: v1beta1
+    - description: HyperV Volume Populator
+      displayName: HyperVVolumePopulator
+      kind: HyperVVolumePopulator
+      name: hypervvolumepopulators.forklift.konveyor.io
       version: v1beta1
   description: |
     The Migration Toolkit for Virtualization Operator manages the deployment and life cycle of Migration Toolkit for Virtualization on [OpenShift](https://www.openshift.com/) Container Platform.

@@ -31,6 +31,22 @@ test_disk_missing_smb_path if {
 	result.id == "hyperv.disk.smb_path.missing"
 }
 
+test_disk_missing_smb_path_explicit_smb if {
+	mock_vm := {
+		"name": "test-vm",
+		"transferMethod": "smb",
+		"disks": [{
+			"name": "disk-0",
+			"capacity": 1000,
+			"windowsPath": "C:\\VMs\\test.vhdx",
+			"smbPath": "",
+		}],
+	}
+	results := concerns with input as mock_vm
+	some result in results
+	result.id == "hyperv.disk.smb_path.missing"
+}
+
 test_disk_null_smb_path if {
 	mock_vm := {
 		"name": "test-vm",
@@ -43,6 +59,35 @@ test_disk_null_smb_path if {
 	results := concerns with input as mock_vm
 	some result in results
 	result.id == "hyperv.disk.smb_path.missing"
+}
+
+test_disk_missing_smb_path_iscsi_no_concern if {
+	mock_vm := {
+		"name": "test-vm",
+		"transferMethod": "iscsi",
+		"disks": [{
+			"name": "disk-0",
+			"capacity": 1000,
+			"windowsPath": "C:\\VMs\\test.vhdx",
+			"smbPath": "",
+		}],
+	}
+	results := concerns with input as mock_vm
+	not any_smb_path_concern(results)
+}
+
+test_disk_null_smb_path_iscsi_no_concern if {
+	mock_vm := {
+		"name": "test-vm",
+		"transferMethod": "iscsi",
+		"disks": [{
+			"name": "disk-0",
+			"capacity": 1000,
+			"windowsPath": "C:\\VMs\\test.vhdx",
+		}],
+	}
+	results := concerns with input as mock_vm
+	not any_smb_path_concern(results)
 }
 
 test_multiple_disks_one_missing if {

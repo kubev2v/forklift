@@ -285,19 +285,7 @@ func (r *Migration) Archive() {
 		return
 	}
 
-	switch r.Plan.Provider.Source.Type() {
-	case api.Ova, api.HyperV:
-		if err := r.deleteProviderStorage(); err != nil {
-			r.Log.Error(err, "Failed to clean up the PVC and PV for the provider storage")
-		}
-	case api.VSphere:
-		if err := r.deleteValidateVddkJob(); err != nil {
-			r.Log.Error(err, "Failed to clean up validate-VDDK job(s)")
-		}
-		if err := r.deleteConfigMap(); err != nil {
-			r.Log.Error(err, "Failed to clean up vddk configmap")
-		}
-	}
+	r.cleanupProviderResources()
 
 	for _, vm := range r.Plan.Status.Migration.VMs {
 		dontFailOnError := func(err error) bool {
@@ -311,6 +299,28 @@ func (r *Migration) Archive() {
 		}
 		_ = r.cleanup(vm, dontFailOnError)
 		r.migrator.Complete(vm)
+	}
+}
+
+func (r *Migration) cleanupProviderResources() {
+	switch r.Plan.Provider.Source.Type() {
+	case api.Ova:
+		if err := r.deleteProviderStorage(); err != nil {
+			r.Log.Error(err, "Failed to clean up the PVC and PV for the provider storage")
+		}
+	case api.HyperV:
+		if r.Plan.Provider.Source.GetHyperVTransferMethod() == api.HyperVTransferMethodSMB {
+			if err := r.deleteProviderStorage(); err != nil {
+				r.Log.Error(err, "Failed to clean up the PVC and PV for the provider storage")
+			}
+		}
+	case api.VSphere:
+		if err := r.deleteValidateVddkJob(); err != nil {
+			r.Log.Error(err, "Failed to clean up validate-VDDK job(s)")
+		}
+		if err := r.deleteConfigMap(); err != nil {
+			r.Log.Error(err, "Failed to clean up vddk configmap")
+		}
 	}
 }
 
@@ -1371,8 +1381,9 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
+			} else {
+				step.AddError(err.Error())
 			}
-			step.AddError(err.Error())
 			r.Log.Error(err,
 				"Could not detach LUN disk(s) from the source VM.",
 				"vm",
@@ -1524,8 +1535,14 @@ func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus, step *plan.Step)
 	}
 
 	switch r.Source.Provider.Type() {
-	case api.Ova, api.HyperV:
+	case api.Ova:
 		ready, err = r.kubevirt.EnsureProviderVirtV2VPVCStatus(vm.ID)
+	case api.HyperV:
+		if r.Source.Provider.GetHyperVTransferMethod() == api.HyperVTransferMethodSMB {
+			ready, err = r.kubevirt.EnsureProviderVirtV2VPVCStatus(vm.ID)
+		} else {
+			ready = true
+		}
 	case api.EC2, api.VSphere:
 		ready = true
 	}
@@ -1976,21 +1993,28 @@ func (r *Migration) isPopulatorPodFailed(givenPvcId string) bool {
 }
 
 func (r *Migration) setPopulatorPodsWithLabels(vm *plan.VMStatus, migrationID string) {
-	podList, err := r.kubevirt.GetPodsWithLabels(map[string]string{})
+	podList, err := r.kubevirt.GetPopulatorPodsWithoutMigrationLabel()
 	if err != nil {
+		r.Log.Error(err, "couldn't list populator pods", "vm", vm.String())
 		return
 	}
+	pvcs, err := r.kubevirt.getPVCs(vm.Ref)
+	if err != nil {
+		r.Log.Error(err, "couldn't get VM PVCs for populator pod labeling", "vm", vm.String())
+		return
+	}
+	vmPVCNames := make(map[string]struct{}, len(pvcs))
+	for _, pvc := range pvcs {
+		vmPVCNames[pvc.Name] = struct{}{}
+	}
 	for _, pod := range podList.Items {
-		if strings.HasPrefix(pod.Name, PopulatorPodPrefix) {
-			// it's populator pod
-			if _, ok := pod.Labels["migration"]; !ok {
-				// un-labeled pod, we need to set it
-				err = r.kubevirt.setPopulatorPodLabels(pod, migrationID)
-				if err != nil {
-					r.Log.Error(err, "couldn't update the Populator pod labels.", "vm", vm.String(), "migration", migrationID, "pod", pod.Name)
-					continue
-				}
-			}
+		// Only label pods that belong to this VM, not other concurrent migrations.
+		if _, ok := vmPVCNames[pod.Labels["pvcName"]]; !ok {
+			continue
+		}
+		err = r.kubevirt.setPopulatorPodLabels(pod, migrationID)
+		if err != nil {
+			r.Log.Error(err, "couldn't update the Populator pod labels.", "vm", vm.String(), "migration", migrationID, "pod", pod.Name)
 		}
 	}
 }

@@ -133,6 +133,10 @@ spec:
                 type: string
                 description: "vSphere xcopy populator image"
                 example: "quay.io/kubev2v/vsphere-populator:latest"
+              populator_hyperv_image_fqin:
+                type: string
+                description: "HyperV populator image"
+                example: "quay.io/kubev2v/hyperv-populator:latest"
               ova_provider_server_fqin:
                 type: string
                 description: "OVA provider server image"

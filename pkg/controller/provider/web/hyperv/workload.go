@@ -79,22 +79,23 @@ func (h WorkloadHandler) Get(ctx *gin.Context) {
 type Workload struct {
 	SelfLink string `json:"selfLink"`
 	// Embed VM fields for validation
-	ID            string               `json:"id"`
-	Name          string               `json:"name"`
-	UUID          string               `json:"uuid"`
-	Firmware      string               `json:"firmware"`
-	CpuCount      int32                `json:"cpuCount"`
-	MemoryMB      int32                `json:"memoryMB"`
-	PowerState    string               `json:"powerState"`
-	GuestOS       string               `json:"guestOS,omitempty"`
-	TpmEnabled    bool                 `json:"tpmEnabled"`
-	SecureBoot    bool                 `json:"secureBoot"`
-	HasCheckpoint bool                 `json:"hasCheckpoint"`
-	Disks         []model.Disk         `json:"disks"`
-	NICs          []model.NIC          `json:"nics"`
-	GuestNetworks []model.GuestNetwork `json:"guestNetworks"`
-	Concerns      []model.Concern      `json:"concerns"`
-	config        Config               // unexported, not serialized
+	ID             string               `json:"id"`
+	Name           string               `json:"name"`
+	UUID           string               `json:"uuid"`
+	Firmware       string               `json:"firmware"`
+	CpuCount       int32                `json:"cpuCount"`
+	MemoryMB       int32                `json:"memoryMB"`
+	PowerState     string               `json:"powerState"`
+	GuestOS        string               `json:"guestOS,omitempty"`
+	TpmEnabled     bool                 `json:"tpmEnabled"`
+	SecureBoot     bool                 `json:"secureBoot"`
+	HasCheckpoint  bool                 `json:"hasCheckpoint"`
+	TransferMethod string               `json:"transferMethod,omitempty"`
+	Disks          []model.Disk         `json:"disks"`
+	NICs           []model.NIC          `json:"nics"`
+	GuestNetworks  []model.GuestNetwork `json:"guestNetworks"`
+	Concerns       []model.Concern      `json:"concerns"`
+	config         Config               // unexported, not serialized
 }
 
 // With populates the workload from a VM model.
@@ -129,7 +130,8 @@ func (r *Workload) With(m *model.VM) {
 	}
 }
 
-// Build self link (URI).
+// Link populates provider-derived fields: builds the self link (URI)
+// and sets the transfer method from the provider configuration.
 func (r *Workload) Link(p *api.Provider) {
 	r.SelfLink = base.Link(
 		WorkloadRoot,
@@ -137,6 +139,7 @@ func (r *Workload) Link(p *api.Provider) {
 			base.ProviderParam: string(p.UID),
 			VMParam:            r.ID,
 		})
+	r.TransferMethod = p.GetHyperVTransferMethod()
 }
 
 // Expand the resource.

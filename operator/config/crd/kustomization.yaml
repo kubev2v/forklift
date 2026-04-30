@@ -15,4 +15,5 @@ resources:
 - bases/forklift.konveyor.io_vspherexcopyvolumepopulators.yaml
 - bases/forklift.konveyor.io_ovaproviderservers.yaml
 - bases/forklift.konveyor.io_hypervproviderservers.yaml
+- bases/forklift.konveyor.io_hypervvolumepopulators.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
