@@ -1,6 +1,7 @@
 package create
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -8,13 +9,14 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider"
+	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/providerutil"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/flags"
 )
 
 // NewProviderCmd creates the provider creation command
 func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
-	var secret string
+	var name, secret string
 	providerType := flags.NewProviderTypeFlag()
 
 	// Add Provider credential flags
@@ -26,9 +28,21 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 	// VSphere VDDK specific flags
 	var useVddkAioOptimization bool
 	var vddkBufSizeIn64K, vddkBufCount int
+	esxiCloneMethod := flags.NewEsxiCloneMethodFlag()
 
 	// OpenStack specific flags
 	var domainName, projectName, regionName string
+
+	// EC2 specific flags
+	var ec2Region, ec2TargetRegion, ec2TargetAZ string
+	var ec2TargetAccessKeyID, ec2TargetSecretKey string
+	var autoTargetCredentials bool
+
+	// HyperV specific flags
+	var smbUrl, smbUser, smbPassword string
+
+	var dryRun bool
+	var outputFormat string
 
 	// Check if MTV_VDDK_INIT_IMAGE environment variable is set
 	if envVddkInitImage := os.Getenv("MTV_VDDK_INIT_IMAGE"); envVddkInitImage != "" {
@@ -36,13 +50,69 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 	}
 
 	cmd := &cobra.Command{
-		Use:          "provider NAME",
-		Short:        "Create a new provider",
-		Args:         cobra.ExactArgs(1),
+		Use:   "provider",
+		Short: "Create a new provider",
+		Long: `Create a new MTV provider to connect to a virtualization platform.
+
+Providers represent source or target environments for VM migrations. Supported types:
+  - vsphere: VMware vSphere/vCenter (requires VDDK init image for migration)
+  - ovirt: Red Hat Virtualization (oVirt/RHV)
+  - openstack: OpenStack cloud platform
+  - ova: OVA files from NFS share
+  - openshift: Target OpenShift cluster (usually named 'host')
+  - ec2: Amazon EC2 instances
+  - hyperv: Microsoft Hyper-V
+
+Credentials can be provided directly via flags or through an existing Kubernetes secret.`,
+		Example: `  # Create a vSphere provider
+  kubectl-mtv create provider --name vsphere-prod \
+    --type vsphere \
+    --url https://vcenter.example.com/sdk \
+    --username admin@vsphere.local \
+    --password 'secret' \
+    --vddk-init-image quay.io/kubev2v/vddk:latest
+
+  # Create an oVirt provider
+  kubectl-mtv create provider --name ovirt-prod \
+    --type ovirt \
+    --url https://rhv-manager.example.com/ovirt-engine/api \
+    --username admin@internal \
+    --password 'secret'
+
+  # Create a local OpenShift host provider (auto-detects cluster API)
+  kubectl-mtv create provider --name host --type openshift
+
+  # Create a remote OpenShift target provider
+  kubectl-mtv create provider --name remote-cluster \
+    --type openshift \
+    --url https://api.cluster.example.com:6443 \
+    --provider-token 'eyJhbGciOiJSUzI1NiIsInR5...'
+
+  # Create an OpenStack provider
+  kubectl-mtv create provider --name openstack-prod \
+    --type openstack \
+    --url https://keystone.example.com:5000/v3 \
+    --username admin \
+    --password 'secret' \
+    --provider-domain-name Default \
+    --provider-project-name admin
+
+  # Create a HyperV provider
+  kubectl-mtv create provider --name my-hyperv \
+    --type hyperv \
+    --url https://192.168.1.100 \
+    --username Administrator \
+    --password 'MyPassword' \
+    --smb-url '//192.168.1.100/VMShare'`,
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Get name from positional argument
-			name := args[0]
+			if err := flags.ResolveNameArg(&name, args); err != nil {
+				return err
+			}
+			if name == "" {
+				return fmt.Errorf("--name is required")
+			}
 
 			// Resolve the appropriate namespace based on context and flags
 			namespace := client.ResolveNamespace(kubeConfigFlags)
@@ -57,13 +127,55 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 				cacert = string(fileContent)
 			}
 
-			return provider.Create(kubeConfigFlags, providerType.GetValue(), name, namespace, secret,
-				url, username, password, cacert, insecureSkipTLS, vddkInitImage, sdkEndpointType.GetValue(), token,
-				domainName, projectName, regionName, useVddkAioOptimization, vddkBufSizeIn64K, vddkBufCount)
+			if !dryRun && outputFormat != "" {
+				return fmt.Errorf("--output flag can only be used with --dry-run")
+			}
+			if dryRun && outputFormat != "" && outputFormat != "json" && outputFormat != "yaml" {
+				return fmt.Errorf("invalid output format for dry-run: %s. Valid formats are: json, yaml", outputFormat)
+			}
+			resolvedFormat := outputFormat
+			if dryRun && resolvedFormat == "" {
+				resolvedFormat = "yaml"
+			}
+
+			options := providerutil.ProviderOptions{
+				Name:                   name,
+				Namespace:              namespace,
+				Secret:                 secret,
+				URL:                    url,
+				Username:               username,
+				Password:               password,
+				CACert:                 cacert,
+				InsecureSkipTLS:        insecureSkipTLS,
+				VddkInitImage:          vddkInitImage,
+				SdkEndpoint:            sdkEndpointType.GetValue(),
+				Token:                  token,
+				DomainName:             domainName,
+				ProjectName:            projectName,
+				RegionName:             regionName,
+				UseVddkAioOptimization: useVddkAioOptimization,
+				VddkBufSizeIn64K:       vddkBufSizeIn64K,
+				VddkBufCount:           vddkBufCount,
+				EsxiCloneMethod:        esxiCloneMethod.GetValue(),
+				EC2Region:              ec2Region,
+				EC2TargetRegion:        ec2TargetRegion,
+				EC2TargetAZ:            ec2TargetAZ,
+				EC2TargetAccessKeyID:   ec2TargetAccessKeyID,
+				EC2TargetSecretKey:     ec2TargetSecretKey,
+				AutoTargetCredentials:  autoTargetCredentials,
+				SMBUrl:                 smbUrl,
+				SMBUser:                smbUser,
+				SMBPassword:            smbPassword,
+				DryRun:                 dryRun,
+				OutputFormat:           resolvedFormat,
+			}
+
+			return provider.Create(kubeConfigFlags, providerType.GetValue(), options)
 		},
 	}
 
-	cmd.Flags().VarP(providerType, "type", "t", "Provider type (openshift, vsphere, ovirt, openstack, ova)")
+	cmd.Flags().StringVarP(&name, "name", "M", "", "Provider name")
+	cmd.Flags().VarP(providerType, "type", "t", "Provider type (openshift, vsphere, ovirt, openstack, ova, ec2, hyperv)")
 	cmd.Flags().StringVar(&secret, "secret", "", "Secret containing provider credentials")
 
 	// Provider credential flags
@@ -74,19 +186,37 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 	cmd.Flags().BoolVar(&insecureSkipTLS, "provider-insecure-skip-tls", false, "Skip TLS verification when connecting to the provider")
 
 	// OpenShift specific flags
-	cmd.Flags().StringVarP(&token, "token", "T", "", "Provider authentication token (used for openshift provider)")
+	cmd.Flags().StringVarP(&token, "provider-token", "T", "", "Provider authentication token")
 
-	// VSphere specific flags
+	// vSphere specific flags
 	cmd.Flags().StringVar(&vddkInitImage, "vddk-init-image", vddkInitImage, "Virtual Disk Development Kit (VDDK) container init image path")
-	cmd.Flags().Var(sdkEndpointType, "sdk-endpoint", "SDK endpoint type for vSphere provider (vcenter or esxi)")
-	cmd.Flags().BoolVar(&useVddkAioOptimization, "use-vddk-aio-optimization", false, "Enable VDDK AIO optimization for vSphere provider")
+	cmd.Flags().Var(sdkEndpointType, "sdk-endpoint", "SDK endpoint type (vcenter or esxi)")
+	cmd.Flags().BoolVar(&useVddkAioOptimization, "use-vddk-aio-optimization", false, "Enable VDDK AIO optimization for improved disk transfer performance")
 	cmd.Flags().IntVar(&vddkBufSizeIn64K, "vddk-buf-size-in-64k", 0, "VDDK buffer size in 64K units (VixDiskLib.nfcAio.Session.BufSizeIn64K)")
 	cmd.Flags().IntVar(&vddkBufCount, "vddk-buf-count", 0, "VDDK buffer count (VixDiskLib.nfcAio.Session.BufCount)")
+	cmd.Flags().Var(esxiCloneMethod, "esxi-clone-method", "ESXi clone method for vSphere provider (vib or ssh)")
 
 	// OpenStack specific flags
 	cmd.Flags().StringVar(&domainName, "provider-domain-name", "", "OpenStack domain name")
 	cmd.Flags().StringVar(&projectName, "provider-project-name", "", "OpenStack project name")
 	cmd.Flags().StringVar(&regionName, "provider-region-name", "", "OpenStack region name")
+	cmd.Flags().StringVar(&regionName, "region", "", "Region name (alias for --provider-region-name)")
+
+	// EC2 specific flags
+	cmd.Flags().StringVar(&ec2Region, "ec2-region", "", "AWS region where source EC2 instances are located")
+	cmd.Flags().StringVar(&ec2TargetRegion, "target-region", "", "Target region for migrations (defaults to provider region)")
+	cmd.Flags().StringVar(&ec2TargetAZ, "target-az", "", "Target availability zone for migrations (required - EBS volumes are AZ-specific)")
+	cmd.Flags().StringVar(&ec2TargetAccessKeyID, "target-access-key-id", "", "Target AWS account access key ID (for cross-account migrations)")
+	cmd.Flags().StringVar(&ec2TargetSecretKey, "target-secret-access-key", "", "Target AWS account secret access key (for cross-account migrations)")
+	cmd.Flags().BoolVar(&autoTargetCredentials, "auto-target-credentials", false, "Automatically fetch target AWS credentials from cluster and target-az from worker nodes")
+
+	// HyperV specific flags
+	cmd.Flags().StringVar(&smbUrl, "smb-url", "", "SMB share URL for HyperV (e.g., //server/share)")
+	cmd.Flags().StringVar(&smbUser, "smb-user", "", "SMB username (defaults to HyperV username)")
+	cmd.Flags().StringVar(&smbPassword, "smb-password", "", "SMB password (defaults to HyperV password)")
+
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Output Provider CR(s) to stdout instead of creating them")
+	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format for dry-run (json, yaml). Defaults to yaml when --dry-run is used")
 
 	// Add completion for provider type flag
 	if err := cmd.RegisterFlagCompletionFunc("type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -102,6 +232,14 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 		panic(err)
 	}
 
+	// Add completion for esxi-clone-method flag
+	if err := cmd.RegisterFlagCompletionFunc("esxi-clone-method", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return esxiCloneMethod.GetValidValues(), cobra.ShellCompDirectiveNoFileComp
+	}); err != nil {
+		panic(err)
+	}
+
+	flags.MarkRequiredForMCP(cmd, "name")
 	if err := cmd.MarkFlagRequired("type"); err != nil {
 		panic(err)
 	}
