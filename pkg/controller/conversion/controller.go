@@ -123,7 +123,6 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		return
 	}
 
-	conversion.Status.Phase = api.PhaseCreating
 
 	// Ensure the conversion CR pod exists and track its state.
 	err = r.ensurePod(conversion)

@@ -26,7 +26,6 @@ type ConversionPhase string
 
 const (
 	PhasePending   ConversionPhase = "Pending"
-	PhaseCreating  ConversionPhase = "CreatingPod"
 	PhaseRunning   ConversionPhase = "Running"
 	PhaseSucceeded ConversionPhase = "Succeeded"
 	PhaseFailed    ConversionPhase = "Failed"
