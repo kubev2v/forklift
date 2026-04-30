@@ -1,7 +1,6 @@
 package web
 
 import (
-	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -114,19 +113,4 @@ func (h Handler) ListOptionsWithLabels(ctx *gin.Context) libmodel.ListOptions {
 		Detail:    detail,
 		Page:      &h.Page,
 	}
-}
-
-// Provider handler.
-type ProviderHandler struct {
-	Handler
-}
-
-// Add routes to the `gin` router.
-func (h *ProviderHandler) AddRoutes(e *gin.Engine) {
-	e.GET(ProviderRoot, h.Get)
-}
-
-// Get provider info.
-func (h *ProviderHandler) Get(ctx *gin.Context) {
-	ctx.Status(http.StatusOK)
 }
