@@ -8,6 +8,7 @@ import (
 
 // Environment Variables
 const (
+<<<<<<< HEAD
 	FeatureOvirtWarmMigration           = "FEATURE_OVIRT_WARM_MIGRATION"
 	FeatureRetainPrecopyImporterPods    = "FEATURE_RETAIN_PRECOPY_IMPORTER_PODS"
 	FeatureStaticUdnIpAddresses         = "FEATURE_STATIC_UDN_IP_ADDRESSES"
@@ -18,6 +19,18 @@ const (
 	FeatureOVFApplianceManagement       = "FEATURE_OVF_APPLIANCE_MANAGEMENT"
 	FeatureVsphereVmwareDriverRemoval   = "FEATURE_VSPHERE_VMWARE_DRIVER_REMOVAL"
 	FeatureWindowsRegistryNetworkConfig = "FEATURE_WINDOWS_REGISTRY_NETWORK_CONFIG"
+=======
+	FeatureOvirtWarmMigration         = "FEATURE_OVIRT_WARM_MIGRATION"
+	FeatureRetainPrecopyImporterPods  = "FEATURE_RETAIN_PRECOPY_IMPORTER_PODS"
+	FeatureStaticUdnIpAddresses       = "FEATURE_STATIC_UDN_IP_ADDRESSES"
+	FeatureVsphereIncrementalBackup   = "FEATURE_VSPHERE_INCREMENTAL_BACKUP"
+	FeatureCopyOffload                = "FEATURE_COPY_OFFLOAD"
+	FeatureOCPLiveMigration           = "FEATURE_OCP_LIVE_MIGRATION"
+	FeatureVmwareSystemSerialNumber   = "FEATURE_VMWARE_SYSTEM_SERIAL_NUMBER"
+	FeatureOVFApplianceManagement     = "FEATURE_OVF_APPLIANCE_MANAGEMENT"
+	FeatureVsphereVmwareDriverRemoval = "FEATURE_VSPHERE_VMWARE_DRIVER_REMOVAL"
+	FeatureUseConversionCR            = "FEATURE_USE_CONVERSION_CR"
+>>>>>>> 803ff8a7f (move feature setting to FC)
 )
 
 // OpenShift version where the FeatureVmwareSystemSerialNumber feature is supported:
@@ -65,6 +78,8 @@ type Features struct {
 	VsphereVmwareDriverRemoval bool
 	// Whether to use registry-based network configuration scripts for Windows static IP setup.
 	WindowsRegistryNetworkConfig bool
+	// Whether to delegate VM conversion to Conversion CRs instead of managing it directly.
+	UseConversionCR bool
 }
 
 // isOpenShiftVersionAboveMinimum checks if OpenShift version is above or equal to minimum version using semantic versioning
@@ -103,5 +118,6 @@ func (r *Features) Load() (err error) {
 	r.OVFApplianceManagement = getEnvBool(FeatureOVFApplianceManagement, false)
 	r.VsphereVmwareDriverRemoval = getEnvBool(FeatureVsphereVmwareDriverRemoval, false)
 	r.WindowsRegistryNetworkConfig = getEnvBool(FeatureWindowsRegistryNetworkConfig, false)
+	r.UseConversionCR = getEnvBool(FeatureUseConversionCR, true)
 	return
 }

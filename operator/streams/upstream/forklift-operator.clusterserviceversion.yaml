@@ -164,6 +164,12 @@ spec:
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:radio:true
           - urn:alm:descriptor:com.tectonic.ui:radio:false
+        - description: Delegate VM conversion to Conversion CRs instead of managing it directly (default true)
+          displayName: Enable Conversion CR
+          path: feature_use_conversion_cr
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:radio:true
+          - urn:alm:descriptor:com.tectonic.ui:radio:false
         - description: Require authentication (default true)
           displayName: Require Authentication
           path: feature_auth_required

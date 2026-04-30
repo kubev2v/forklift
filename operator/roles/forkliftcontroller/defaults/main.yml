@@ -11,6 +11,7 @@ feature_ocp_live_migration: true
 feature_vmware_system_serial_number: true
 feature_vsphere_vmware_driver_removal: false
 feature_windows_registry_network_config: false
+feature_use_conversion_cr: true
 feature_cli_download: true
 feature_mcp_server: false
 feature_ova_appliance_management: true

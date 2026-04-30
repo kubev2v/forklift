@@ -184,6 +184,8 @@ spec:
 {% endif %}
 {% if feature_windows_registry_network_config|bool %}
         - name: FEATURE_WINDOWS_REGISTRY_NETWORK_CONFIG
+{% if feature_use_conversion_cr|bool %}
+        - name: FEATURE_USE_CONVERSION_CR
           value: "true"
 {% endif %}
 {% if ovirt_osmap_configmap_name is defined %}

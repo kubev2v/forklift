@@ -355,11 +355,6 @@ type PlanSpec struct {
 	// Warning: Enabling XFSv4 support will drop support for BTRFS for the specific plan. Ensure that the plan only selects VMs with supported filesystem.
 	// +kubebuilder:default:=false
 	XfsCompatibility bool `json:"xfsCompatibility,omitempty"`
-	// UseConversionCR controls whether the plan creates Conversion custom resources
-	// to drive the VM conversion process instead of managing it directly.
-	// +optional
-	// +kubebuilder:default:=false
-	UseConversionCR bool `json:"useConversionCR,omitempty"`
 }
 
 // Find a planned VM.
@@ -422,10 +417,6 @@ func (p *Plan) IsWarm() bool {
 	return p.Spec.Warm || p.Spec.Type == MigrationWarm
 }
 
-// ShouldUseConversionCR returns whether this plan delegates conversion to Conversion CRs.
-func (p *Plan) ShouldUseConversionCR() bool {
-	return p.Spec.UseConversionCR
-}
 
 // If the plan calls for the vm to be cold migrated to the local cluster, we can
 // just use virt-v2v directly to convert the vm while copying data over. In other

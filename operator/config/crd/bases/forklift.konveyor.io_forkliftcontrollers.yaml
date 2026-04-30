@@ -91,6 +91,10 @@ spec:
                 type: string
                 enum: ["true", "false"]
                 description: "Use registry-based network configuration scripts for Windows static IP setup (default: false)"
+              feature_use_conversion_cr:
+                type: string
+                enum: ["true", "false"]
+                description: "Delegate VM conversion to Conversion CRs instead of managing it directly (default: true)"
 
               # Container Images
               controller_image_fqin:
