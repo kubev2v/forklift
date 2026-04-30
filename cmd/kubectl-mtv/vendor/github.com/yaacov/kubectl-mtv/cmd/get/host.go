@@ -18,6 +18,7 @@ import (
 func NewHostCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
 	outputFormatFlag := flags.NewOutputFormatTypeFlag()
 	var watch bool
+	var query string
 
 	var hostName string
 	cmd := &cobra.Command{
@@ -35,9 +36,13 @@ for oVirt migrations. They store host-specific credentials and configuration.`,
 
   # Watch host status changes
   kubectl-mtv get hosts --watch`,
-		Args:         cobra.NoArgs,
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := flags.ResolveNameArg(&hostName, args); err != nil {
+				return err
+			}
+
 			ctx := cmd.Context()
 			if !watch {
 				var cancel context.CancelFunc
@@ -56,12 +61,13 @@ for oVirt migrations. They store host-specific credentials and configuration.`,
 			}
 			logOutputFormat(outputFormatFlag.GetValue())
 
-			return host.List(ctx, globalConfig.GetKubeConfigFlags(), namespace, watch, outputFormatFlag.GetValue(), hostName, globalConfig.GetUseUTC())
+			return host.List(ctx, globalConfig.GetKubeConfigFlags(), namespace, watch, outputFormatFlag.GetValue(), hostName, globalConfig.GetUseUTC(), query)
 		},
 	}
 
 	cmd.Flags().StringVarP(&hostName, "name", "M", "", "Host name")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", flags.OutputFormatHelp)
+	cmd.Flags().StringVarP(&query, "query", "q", "", "Query filter using TSL syntax (e.g. \"where name ~= 'prod-.*'\")")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for changes")
 	help.MarkMCPHidden(cmd, "watch")
 

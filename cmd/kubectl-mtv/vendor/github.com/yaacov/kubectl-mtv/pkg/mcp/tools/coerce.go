@@ -13,8 +13,9 @@ import (
 )
 
 // extractKubeCredsFromRequest extracts Kubernetes credentials from the request's
-// Extra.Header field and adds them to the context. The wrapper in mcpserver.go
-// ensures that Extra.Header is populated for SSE mode.
+// Extra.Header field and adds them to the context. In HTTP mode, the SDK
+// populates Extra.Header per-request. In stdio mode, this is nil and we
+// fall back to CLI defaults.
 func extractKubeCredsFromRequest(ctx context.Context, req *mcp.CallToolRequest) context.Context {
 	if req.Extra != nil && req.Extra.Header != nil {
 		return util.WithKubeCredsFromHeaders(ctx, req.Extra.Header)

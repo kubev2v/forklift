@@ -16,7 +16,8 @@ import (
 func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	// Editable PlanSpec fields
 	var transferNetwork string
-	var installLegacyDrivers string // "true", "false", or "" for nil
+	var installLegacyDrivers string       // "true", "false", or "auto" for nil (auto-detect)
+	var enableNestedVirtualization string // "true", "false", or "auto" for nil (auto-detect)
 	migrationTypeFlag := flags.NewMigrationTypeFlag()
 	var targetLabels []string
 	var targetNodeSelector []string
@@ -36,9 +37,17 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	var skipZoneNodeSelector bool
 	var customizationScripts string
 	var virtV2vImage string
+	var xfsCompatibility bool
+	var rdmAsLun bool
+	var serviceAccount string
 
 	// Change tracking for new bool flags
 	var skipZoneNodeSelectorChanged bool
+	var xfsCompatibilityChanged bool
+	var installLegacyDriversChanged bool
+	var enableNestedVirtualizationChanged bool
+	var rdmAsLunChanged bool
+	var serviceAccountChanged bool
 
 	// Missing flags from create plan
 	var description string
@@ -121,6 +130,11 @@ Affinity Syntax (KARL):
 			warmChanged = cmd.Flags().Changed("warm")
 			runPreflightInspectionChanged = cmd.Flags().Changed("run-preflight-inspection")
 			skipZoneNodeSelectorChanged = cmd.Flags().Changed("skip-zone-node-selector")
+			xfsCompatibilityChanged = cmd.Flags().Changed("xfs-compatibility")
+			installLegacyDriversChanged = cmd.Flags().Changed("install-legacy-drivers")
+			enableNestedVirtualizationChanged = cmd.Flags().Changed("enable-nested-virtualization")
+			rdmAsLunChanged = cmd.Flags().Changed("rdm-as-lun")
+			serviceAccountChanged = cmd.Flags().Changed("service-account")
 
 			return plan.PatchPlan(plan.PatchPlanOptions{
 				ConfigFlags: kubeConfigFlags,
@@ -128,15 +142,16 @@ Affinity Syntax (KARL):
 				Namespace:   namespace,
 
 				// Core plan fields
-				TransferNetwork:      transferNetwork,
-				InstallLegacyDrivers: installLegacyDrivers,
-				MigrationType:        string(migrationTypeFlag.GetValue()),
-				TargetLabels:         targetLabels,
-				TargetNodeSelector:   targetNodeSelector,
-				UseCompatibilityMode: useCompatibilityMode,
-				TargetAffinity:       targetAffinity,
-				TargetNamespace:      targetNamespace,
-				TargetPowerState:     targetPowerState,
+				TransferNetwork:            transferNetwork,
+				InstallLegacyDrivers:       installLegacyDrivers,
+				EnableNestedVirtualization: enableNestedVirtualization,
+				MigrationType:              string(migrationTypeFlag.GetValue()),
+				TargetLabels:               targetLabels,
+				TargetNodeSelector:         targetNodeSelector,
+				UseCompatibilityMode:       useCompatibilityMode,
+				TargetAffinity:             targetAffinity,
+				TargetNamespace:            targetNamespace,
+				TargetPowerState:           targetPowerState,
 
 				// Convertor-related fields
 				ConvertorLabels:       convertorLabels,
@@ -149,6 +164,8 @@ Affinity Syntax (KARL):
 				SkipZoneNodeSelector:       skipZoneNodeSelector,
 				CustomizationScripts:       customizationScripts,
 				VirtV2vImage:               virtV2vImage,
+				XfsCompatibility:           xfsCompatibility,
+				XfsCompatibilityChanged:    xfsCompatibilityChanged,
 
 				// Additional plan fields
 				Description:                    description,
@@ -164,6 +181,8 @@ Affinity Syntax (KARL):
 				SkipGuestConversion:            skipGuestConversion,
 				Warm:                           warm,
 				RunPreflightInspection:         runPreflightInspection,
+				RDMAsLun:                       rdmAsLun,
+				ServiceAccount:                 serviceAccount,
 
 				// Flag change tracking
 				UseCompatibilityModeChanged:           useCompatibilityModeChanged,
@@ -179,6 +198,10 @@ Affinity Syntax (KARL):
 				WarmChanged:                           warmChanged,
 				RunPreflightInspectionChanged:         runPreflightInspectionChanged,
 				SkipZoneNodeSelectorChanged:           skipZoneNodeSelectorChanged,
+				InstallLegacyDriversChanged:           installLegacyDriversChanged,
+				EnableNestedVirtualizationChanged:     enableNestedVirtualizationChanged,
+				RDMAsLunChanged:                       rdmAsLunChanged,
+				ServiceAccountChanged:                 serviceAccountChanged,
 			})
 		},
 	}
@@ -186,7 +209,7 @@ Affinity Syntax (KARL):
 	cmd.Flags().StringVar(&planName, "plan-name", "", "Plan name")
 	_ = cmd.MarkFlagRequired("plan-name")
 	cmd.Flags().StringVar(&transferNetwork, "transfer-network", "", "Network to use for transferring VM data. Supports 'namespace/network-name' or just 'network-name' (uses plan namespace)")
-	cmd.Flags().StringVar(&installLegacyDrivers, "install-legacy-drivers", "", "Install legacy Windows drivers (true/false, leave empty for auto-detection)")
+	cmd.Flags().StringVar(&installLegacyDrivers, "install-legacy-drivers", "", "Install legacy Windows drivers (true/false/auto)")
 	cmd.Flags().Var(migrationTypeFlag, "migration-type", "Migration type: cold, warm, live, or conversion")
 	cmd.Flags().StringSliceVar(&targetLabels, "target-labels", []string{}, "Target VM labels in format key=value (can be specified multiple times)")
 	cmd.Flags().StringSliceVar(&targetNodeSelector, "target-node-selector", []string{}, "Target node selector in format key=value (can be specified multiple times)")
@@ -206,6 +229,8 @@ Affinity Syntax (KARL):
 	cmd.Flags().BoolVar(&skipZoneNodeSelector, "skip-zone-node-selector", false, "Skip adding zone-based node selector to migrated VMs (EC2 only)")
 	cmd.Flags().StringVar(&customizationScripts, "customization-scripts", "", "ConfigMap containing customization scripts for guest conversion. Supports 'namespace/name' or 'name'")
 	cmd.Flags().StringVar(&virtV2vImage, "virt-v2v-image", "", "Override global virt-v2v container image for this plan")
+	cmd.Flags().StringVar(&enableNestedVirtualization, "enable-nested-virtualization", "", "Enable nested virtualization on target VMs (true/false/auto)")
+	cmd.Flags().BoolVar(&xfsCompatibility, "xfs-compatibility", false, "Use XFS-compatible virt-v2v image for this plan")
 
 	// Plan metadata and configuration flags
 	cmd.Flags().StringVar(&description, "description", "", "Plan description")
@@ -222,6 +247,8 @@ Affinity Syntax (KARL):
 	cmd.Flags().BoolVar(&skipGuestConversion, "skip-guest-conversion", false, "Skip the guest conversion process (raw disk copy mode)")
 	cmd.Flags().BoolVar(&warm, "warm", false, "Enable warm migration (use --migration-type=warm instead)")
 	cmd.Flags().BoolVar(&runPreflightInspection, "run-preflight-inspection", true, "Run preflight inspection on VM base disks before starting disk transfer")
+	cmd.Flags().BoolVar(&rdmAsLun, "rdm-as-lun", false, "Map VMware RDM disks as LUN devices (SCSI passthrough) in the target VM (vSphere only)")
+	cmd.Flags().StringVar(&serviceAccount, "service-account", "", "ServiceAccount for migration pods in the target namespace (overrides global setting)")
 
 	// Add completion for migration type flag
 	if err := cmd.RegisterFlagCompletionFunc("migration-type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -232,7 +259,13 @@ Affinity Syntax (KARL):
 
 	// Add completion for install legacy drivers flag
 	if err := cmd.RegisterFlagCompletionFunc("install-legacy-drivers", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"true", "false"}, cobra.ShellCompDirectiveNoFileComp
+		return []string{"true", "false", "auto"}, cobra.ShellCompDirectiveNoFileComp
+	}); err != nil {
+		panic(err)
+	}
+
+	if err := cmd.RegisterFlagCompletionFunc("enable-nested-virtualization", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"true", "false", "auto"}, cobra.ShellCompDirectiveNoFileComp
 	}); err != nil {
 		panic(err)
 	}
@@ -276,6 +309,12 @@ func NewPlanVMCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command
 	var deleteVmOnFailMigrationChanged bool
 	var nbdeClevis bool
 	var nbdeClevisChanged bool
+	var enableNestedVirtualization string
+	var enableNestedVirtualizationChanged bool
+	var migrateSharedDisks string
+	var migrateSharedDisksChanged bool
+	var rdmAsLunVM string
+	var rdmAsLunVMChanged bool
 
 	cmd := &cobra.Command{
 		Use:          "planvm",
@@ -298,11 +337,15 @@ func NewPlanVMCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command
 			// Check if boolean flags have been explicitly set (changed from default)
 			deleteVmOnFailMigrationChanged = cmd.Flags().Changed("delete-vm-on-fail-migration")
 			nbdeClevisChanged = cmd.Flags().Changed("nbde-clevis")
+			enableNestedVirtualizationChanged = cmd.Flags().Changed("enable-nested-virtualization")
+			migrateSharedDisksChanged = cmd.Flags().Changed("migrate-shared-disks")
+			rdmAsLunVMChanged = cmd.Flags().Changed("rdm-as-lun")
 
 			return plan.PatchPlanVM(kubeConfigFlags, planName, vmName, namespace,
 				targetName, rootDisk, instanceType, pvcNameTemplate, volumeNameTemplate, networkNameTemplate, luksSecret, targetPowerState,
 				addPreHook, addPostHook, removeHook, clearHooks, deleteVmOnFailMigration, deleteVmOnFailMigrationChanged,
-				nbdeClevis, nbdeClevisChanged)
+				nbdeClevis, nbdeClevisChanged, enableNestedVirtualization, enableNestedVirtualizationChanged,
+				migrateSharedDisks, migrateSharedDisksChanged, rdmAsLunVM, rdmAsLunVMChanged)
 		},
 	}
 
@@ -330,6 +373,9 @@ func NewPlanVMCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command
 	// Additional VM flags
 	cmd.Flags().BoolVar(&deleteVmOnFailMigration, "delete-vm-on-fail-migration", false, "Delete target VM when migration fails (overrides plan-level setting)")
 	cmd.Flags().BoolVar(&nbdeClevis, "nbde-clevis", false, "Enable passphrase-less NBDE/Clevis disk unlocking via TANG server (takes precedence over --luks-secret)")
+	cmd.Flags().StringVar(&enableNestedVirtualization, "enable-nested-virtualization", "", "Enable nested virtualization for this VM (true/false/auto)")
+	cmd.Flags().StringVar(&migrateSharedDisks, "migrate-shared-disks", "", "Migrate shared disks for this VM, overrides plan-level setting (true/false/auto)")
+	cmd.Flags().StringVar(&rdmAsLunVM, "rdm-as-lun", "", "Map VMware RDM disks as LUN devices for this VM, overrides plan-level setting (vSphere only, true/false/auto)")
 
 	// Add completion for hook flags
 	if err := cmd.RegisterFlagCompletionFunc("add-pre-hook", completion.HookResourceNameCompletion(kubeConfigFlags)); err != nil {
@@ -351,7 +397,26 @@ func NewPlanVMCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command
 		panic(err)
 	}
 
+	if err := cmd.RegisterFlagCompletionFunc("enable-nested-virtualization", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"true", "false", "auto"}, cobra.ShellCompDirectiveNoFileComp
+	}); err != nil {
+		panic(err)
+	}
+
+	if err := cmd.RegisterFlagCompletionFunc("migrate-shared-disks", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"true", "false", "auto"}, cobra.ShellCompDirectiveNoFileComp
+	}); err != nil {
+		panic(err)
+	}
+
+	if err := cmd.RegisterFlagCompletionFunc("rdm-as-lun", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"true", "false", "auto"}, cobra.ShellCompDirectiveNoFileComp
+	}); err != nil {
+		panic(err)
+	}
+
 	_ = cmd.RegisterFlagCompletionFunc("plan-name", completion.PlanNameCompletion(kubeConfigFlags))
+	_ = cmd.RegisterFlagCompletionFunc("vm-name", completion.PlanVMNameCompletion(kubeConfigFlags))
 
 	return cmd
 }

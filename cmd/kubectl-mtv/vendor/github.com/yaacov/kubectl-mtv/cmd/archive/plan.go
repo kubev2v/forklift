@@ -10,6 +10,7 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/archive/plan"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/completion"
+	"github.com/yaacov/kubectl-mtv/pkg/util/flags"
 )
 
 // NewPlanCmd creates the plan archiving command
@@ -33,9 +34,13 @@ Use 'unarchive' to restore a plan if needed.`,
 
   # Archive all plans in the namespace
   kubectl-mtv archive plans --all`,
-		Args:         cobra.NoArgs,
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := flags.ResolveNamesArg(&planNames, args); err != nil {
+				return err
+			}
+
 			// Validate mutual exclusivity of --name and --all
 			if all && len(planNames) > 0 {
 				return errors.New("cannot use --name with --all")

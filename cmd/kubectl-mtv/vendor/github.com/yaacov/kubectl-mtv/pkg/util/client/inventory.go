@@ -184,6 +184,26 @@ func FetchSpecificProviderWithDetailAndInsecure(ctx context.Context, configFlags
 	}, nil
 }
 
+// FetchAAPJobTemplatesWithInsecure fetches AAP job templates from the inventory service.
+// The endpoint /aap/job-templates is not provider-scoped.
+func FetchAAPJobTemplatesWithInsecure(ctx context.Context, configFlags *genericclioptions.ConfigFlags, baseURL string, insecureSkipTLS bool) (interface{}, error) {
+	httpClient, err := GetAuthenticatedHTTPClientWithInsecure(ctx, configFlags, baseURL, insecureSkipTLS)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create authenticated HTTP client: %v", err)
+	}
+
+	path := "/aap/job-templates"
+
+	klog.V(4).Infof("Fetching AAP job templates from: %s%s (insecure=%v)", baseURL, path, insecureSkipTLS)
+
+	responseBytes, err := httpClient.GetWithContext(ctx, path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch AAP job templates: %v", err)
+	}
+
+	return parseJSONResponse(responseBytes)
+}
+
 // DiscoverInventoryURL tries to discover the inventory URL from an OpenShift Route
 func DiscoverInventoryURL(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace string) string {
 	route, err := GetForkliftInventoryRoute(ctx, configFlags, namespace)

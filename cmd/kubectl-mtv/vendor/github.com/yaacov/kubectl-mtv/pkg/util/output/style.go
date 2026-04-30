@@ -2,31 +2,21 @@ package output
 
 import (
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
-	"unicode/utf8"
+
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
-// ANSI color codes
-const (
-	Reset       = "\033[0m"
-	BoldText    = "\033[1m"
-	RedColor    = "\033[31m"
-	GreenColor  = "\033[32m"
-	YellowColor = "\033[33m"
-	BlueColor   = "\033[34m"
-	PurpleColor = "\033[35m"
-	CyanColor   = "\033[36m"
-	White       = "\033[37m"
-	BoldRed     = "\033[1;31m"
-	BoldGreen   = "\033[1;32m"
-	BoldYellow  = "\033[1;33m"
-	BoldBlue    = "\033[1;34m"
+var (
+	boldStyle   = lipgloss.NewStyle().Bold(true)
+	redStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+	greenStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+	yellowStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+	blueStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
+	cyanStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
 )
-
-// ansiRegex is a regular expression that matches ANSI color escape codes
-var ansiRegex = regexp.MustCompile("\033\\[[0-9;]*m")
 
 // colorEnabled controls whether ANSI color codes are emitted.
 // Defaults to true; set to false via SetColorEnabled for terminals that
@@ -39,59 +29,78 @@ func SetColorEnabled(enabled bool) { colorEnabled = enabled }
 // IsColorEnabled reports whether ANSI color output is currently enabled.
 func IsColorEnabled() bool { return colorEnabled }
 
-// Bold returns a bold-formatted string
 func Bold(text string) string {
-	return ColorizedString(text, BoldText)
-}
-
-// ColorizedString returns a string with the specified color applied.
-// When color output is disabled, the text is returned unchanged.
-func ColorizedString(text string, color string) string {
 	if !colorEnabled {
 		return text
 	}
-	return color + text + Reset
+	return boldStyle.Render(text)
 }
 
-// Yellow returns a yellow-colored string
-func Yellow(text string) string {
-	return ColorizedString(text, YellowColor)
-}
-
-// Green returns a green-colored string
-func Green(text string) string {
-	return ColorizedString(text, GreenColor)
-}
-
-// Red returns a red-colored string
 func Red(text string) string {
-	return ColorizedString(text, RedColor)
+	if !colorEnabled {
+		return text
+	}
+	return redStyle.Render(text)
 }
 
-// Blue returns a blue-colored string
+func Green(text string) string {
+	if !colorEnabled {
+		return text
+	}
+	return greenStyle.Render(text)
+}
+
+func Yellow(text string) string {
+	if !colorEnabled {
+		return text
+	}
+	return yellowStyle.Render(text)
+}
+
 func Blue(text string) string {
-	return ColorizedString(text, BlueColor)
+	if !colorEnabled {
+		return text
+	}
+	return blueStyle.Render(text)
 }
 
-// Cyan returns a cyan-colored string
 func Cyan(text string) string {
-	return ColorizedString(text, CyanColor)
+	if !colorEnabled {
+		return text
+	}
+	return cyanStyle.Render(text)
 }
 
-// StripANSI removes ANSI color codes from a string
+// StripANSI removes ANSI escape sequences from a string.
 func StripANSI(text string) string {
-	return ansiRegex.ReplaceAllString(text, "")
+	return ansi.Strip(text)
 }
 
-// VisibleLength returns the visible rune count of a string, excluding ANSI color codes
+// VisibleLength returns the display width of a string, excluding ANSI escape sequences.
 func VisibleLength(text string) int {
-	return utf8.RuneCountInString(StripANSI(text))
+	return ansi.StringWidth(text)
 }
+
+// TruncateANSI truncates text to maxWidth visible characters while preserving
+// ANSI color codes. Appends "..." when truncation occurs.
+func TruncateANSI(text string, maxWidth int) string {
+	return ansi.Truncate(text, maxWidth, "...")
+}
+
+// Separator returns a repeated "=" line, optionally colored.
+func Separator(length int, colorFn func(string) string) string {
+	s := strings.Repeat("=", length)
+	if colorFn != nil {
+		return colorFn(s)
+	}
+	return s
+}
+
+// ---------------------------------------------------------------------------
+// Semantic colorizers
+// ---------------------------------------------------------------------------
 
 // ColorizeStatus returns a colored string based on status value.
-// Handles migration-phase statuses (Running, Completed, Failed, ...),
-// general resource statuses (Ready, Not Ready, Unknown, ...),
-// and cloud provider states (stopped, available, terminated, ...).
 func ColorizeStatus(status string) string {
 	status = strings.TrimSpace(status)
 	switch strings.ToLower(status) {
@@ -126,8 +135,6 @@ func ColorizeCategory(category string) string {
 }
 
 // ColorizePowerState returns a colored string based on VM power state.
-// Handles both descriptive states (Running/Stopped) and short forms (On/Off)
-// as set by augmentVMInfo's powerStateHuman field.
 func ColorizePowerState(state string) string {
 	state = strings.TrimSpace(state)
 	switch strings.ToLower(state) {
@@ -142,12 +149,12 @@ func ColorizePowerState(state string) string {
 	}
 }
 
-// ColorizeNumber returns a blue-colored number for migration progress
+// ColorizeNumber returns a blue-colored number for migration progress.
 func ColorizeNumber(number interface{}) string {
 	return Blue(fmt.Sprintf("%v", number))
 }
 
-// ColorizeBoolean returns a colored string based on boolean value
+// ColorizeBoolean returns a colored string based on boolean value.
 func ColorizeBoolean(b bool) string {
 	if b {
 		return Green(fmt.Sprintf("%t", b))
@@ -155,7 +162,7 @@ func ColorizeBoolean(b bool) string {
 	return fmt.Sprintf("%t", b)
 }
 
-// ColorizeConditionStatus returns a colored string for Kubernetes condition status values
+// ColorizeConditionStatus returns a colored string for Kubernetes condition status values.
 func ColorizeConditionStatus(status string) string {
 	switch strings.TrimSpace(status) {
 	case "True":
@@ -167,7 +174,7 @@ func ColorizeConditionStatus(status string) string {
 	}
 }
 
-// ColorizeBooleanString returns a colored string for string representations of booleans
+// ColorizeBooleanString returns a colored string for string representations of booleans.
 func ColorizeBooleanString(val string) string {
 	switch strings.ToLower(strings.TrimSpace(val)) {
 	case "true", "yes":
@@ -179,8 +186,25 @@ func ColorizeBooleanString(val string) string {
 	}
 }
 
+// ColorizeConcerns colors a "C/W/I" concerns summary string:
+// red when criticals > 0, yellow when warnings > 0, green when all zeros.
+func ColorizeConcerns(val string) string {
+	parts := strings.SplitN(strings.TrimSpace(val), "/", 3)
+	if len(parts) < 2 {
+		return val
+	}
+	critical, _ := strconv.Atoi(strings.TrimSpace(parts[0]))
+	warning, _ := strconv.Atoi(strings.TrimSpace(parts[1]))
+	if critical > 0 {
+		return Red(val)
+	}
+	if warning > 0 {
+		return Yellow(val)
+	}
+	return Green(val)
+}
+
 // ColorizeProgress returns a colored string based on percentage thresholds.
-// Expects strings like "85.0%" or "100.0%".
 func ColorizeProgress(progress string) string {
 	trimmed := strings.TrimSpace(progress)
 	numStr := strings.TrimRight(trimmed, "%")
@@ -196,53 +220,4 @@ func ColorizeProgress(progress string) string {
 		return Yellow(progress)
 	}
 	return Cyan(progress)
-}
-
-// TruncateANSI truncates text to maxWidth visible characters while preserving
-// ANSI color codes. Appends "..." and a Reset code when truncation occurs.
-func TruncateANSI(text string, maxWidth int) string {
-	if maxWidth <= 0 {
-		return ""
-	}
-	if VisibleLength(text) <= maxWidth {
-		return text
-	}
-
-	truncWidth := maxWidth - 3
-	if truncWidth < 0 {
-		truncWidth = 0
-	}
-
-	var result strings.Builder
-	visCount := 0
-	runes := []rune(text)
-	i := 0
-
-	for i < len(runes) && visCount < truncWidth {
-		if runes[i] == '\033' {
-			for i < len(runes) {
-				result.WriteRune(runes[i])
-				if runes[i] == 'm' {
-					i++
-					break
-				}
-				i++
-			}
-			continue
-		}
-		result.WriteRune(runes[i])
-		visCount++
-		i++
-	}
-
-	result.WriteString(Reset)
-	if truncWidth < maxWidth {
-		result.WriteString("...")
-	}
-	return result.String()
-}
-
-// ColorizedSeparator returns a separator line with the specified color
-func ColorizedSeparator(length int, color string) string {
-	return ColorizedString(strings.Repeat("=", length), color)
 }

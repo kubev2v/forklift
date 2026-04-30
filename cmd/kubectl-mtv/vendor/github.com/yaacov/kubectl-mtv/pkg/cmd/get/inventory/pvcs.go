@@ -37,18 +37,18 @@ func listPersistentVolumeClaimsOnce(ctx context.Context, kubeConfigFlags *generi
 	}
 
 	// Define default headers based on provider type
-	var defaultHeaders []output.Header
+	var defaultHeaders []output.Column
 	switch providerType {
 	case "openshift":
-		defaultHeaders = []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "NAMESPACE", JSONPath: "namespace"},
-			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "STATUS", JSONPath: "object.status.phase", ColorFunc: output.ColorizeStatus},
-			{DisplayName: "CAPACITY", JSONPath: "object.status.capacity.storage"},
-			{DisplayName: "STORAGE_CLASS", JSONPath: "object.spec.storageClassName"},
-			{DisplayName: "ACCESS_MODES", JSONPath: "object.spec.accessModes"},
-			{DisplayName: "CREATED", JSONPath: "object.metadata.creationTimestamp"},
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "NAMESPACE", Key: "namespace"},
+			{Title: "ID", Key: "id"},
+			{Title: "STATUS", Key: "object.status.phase", ColorFunc: output.ColorizeStatus},
+			{Title: "CAPACITY", Key: "object.status.capacity.storage"},
+			{Title: "STORAGE_CLASS", Key: "object.spec.storageClassName"},
+			{Title: "ACCESS_MODES", Key: "object.spec.accessModes"},
+			{Title: "CREATED", Key: "object.metadata.creationTimestamp"},
 		}
 	default:
 		return fmt.Errorf("provider type '%s' does not support persistent volume claim inventory", providerType)

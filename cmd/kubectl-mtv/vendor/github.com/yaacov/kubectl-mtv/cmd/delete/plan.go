@@ -10,6 +10,7 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/delete/plan"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/completion"
+	"github.com/yaacov/kubectl-mtv/pkg/util/flags"
 )
 
 // NewPlanCmd creates the plan deletion command
@@ -41,9 +42,13 @@ to also clean up any target VMs created from failed migrations.`,
 
   # Delete all plans in namespace
   kubectl-mtv delete plans --all`,
-		Args:         cobra.NoArgs,
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := flags.ResolveNamesArg(&planNames, args); err != nil {
+				return err
+			}
+
 			// Validate --all and --name are mutually exclusive
 			if all && len(planNames) > 0 {
 				return errors.New("cannot use --name with --all")

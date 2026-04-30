@@ -16,7 +16,13 @@ func NewOpenShiftStorageMapper() mapper.StorageMapper {
 	return &OpenShiftStorageMapper{}
 }
 
-// CreateStoragePairs creates storage mapping pairs with OpenShift-specific logic
+// CreateStoragePairs creates storage mapping pairs with OpenShift-specific logic.
+//
+// Three-step flow:
+//
+//	(a) If the user specified --default-target-storage-class, map every source to that SC.
+//	(b) For OCP-to-OCP, try same-name matching per source against ALL target SCs.
+//	(c) Any source that didn't get a same-name match is mapped to the default SC (targetStorages[0]).
 func (m *OpenShiftStorageMapper) CreateStoragePairs(sourceStorages []ref.Ref, targetStorages []forkliftv1beta1.DestinationStorage, opts mapper.StorageMappingOptions) ([]forkliftv1beta1.StoragePair, error) {
 	var storagePairs []forkliftv1beta1.StoragePair
 
@@ -28,112 +34,96 @@ func (m *OpenShiftStorageMapper) CreateStoragePairs(sourceStorages []ref.Ref, ta
 		return storagePairs, nil
 	}
 
-	// For OCP-to-OCP: Try same-name matching (all-or-nothing)
+	// (a) User specified a default SC — map every source to it.
+	if opts.DefaultTargetStorageClass != "" {
+		return createDefaultStoragePairs(sourceStorages, opts.DefaultTargetStorageClass)
+	}
+
+	// Resolve the default SC for gap-filling (best SC selected by the target fetcher).
+	defaultSC := findDefaultStorageClass(targetStorages)
+
+	// (b) + (c) For OCP-to-OCP: same-name matching with gap-fill.
 	if opts.TargetProviderType == "openshift" {
-		klog.V(4).Infof("DEBUG: OCP-to-OCP migration detected, attempting same-name matching")
-		if canMatchAllStoragesByName(sourceStorages, targetStorages) {
-			klog.V(4).Infof("DEBUG: All storages can be matched by name, using same-name mapping")
-			return createSameNameStoragePairs(sourceStorages, targetStorages)
-		}
-		klog.V(4).Infof("DEBUG: Not all storages can be matched by name, falling back to default behavior")
+		klog.V(4).Infof("DEBUG: OCP-to-OCP migration detected, attempting same-name matching with gap-fill")
+		return createSameNameWithFallback(sourceStorages, targetStorages, defaultSC)
 	}
 
-	// Fall back to default behavior
-	return createDefaultStoragePairs(sourceStorages, targetStorages, opts)
+	// Non-OCP target: map all sources to the default SC.
+	return createAllToDefaultPairs(sourceStorages, defaultSC)
 }
 
-// canMatchAllStoragesByName checks if every source storage has a matching target storage by name
-func canMatchAllStoragesByName(sourceStorages []ref.Ref, targetStorages []forkliftv1beta1.DestinationStorage) bool {
-	// Create a map of target storage class names for quick lookup
-	targetNames := make(map[string]bool)
-	for _, target := range targetStorages {
-		if target.StorageClass != "" {
-			targetNames[target.StorageClass] = true
-		}
+// createDefaultStoragePairs maps every source to the user-specified SC.
+func createDefaultStoragePairs(sourceStorages []ref.Ref, storageClass string) ([]forkliftv1beta1.StoragePair, error) {
+	klog.V(4).Infof("DEBUG: Using user-defined default storage class: %s", storageClass)
+	storagePairs := make([]forkliftv1beta1.StoragePair, 0, len(sourceStorages))
+	dest := forkliftv1beta1.DestinationStorage{StorageClass: storageClass}
+	for _, src := range sourceStorages {
+		storagePairs = append(storagePairs, forkliftv1beta1.StoragePair{
+			Source:      src,
+			Destination: dest,
+		})
+		klog.V(4).Infof("DEBUG: Mapped source storage %s -> %s (user default)", src.Name, storageClass)
 	}
-
-	klog.V(4).Infof("DEBUG: Available target storage classes: %v", getTargetStorageNames(targetStorages))
-
-	// Check if every source has a matching target by name
-	for _, source := range sourceStorages {
-		if !targetNames[source.Name] {
-			klog.V(4).Infof("DEBUG: Source storage '%s' has no matching target by name", source.Name)
-			return false
-		}
-	}
-
-	klog.V(4).Infof("DEBUG: All source storages can be matched by name")
-	return true
+	return storagePairs, nil
 }
 
-// createSameNameStoragePairs creates storage pairs using same-name matching
-func createSameNameStoragePairs(sourceStorages []ref.Ref, targetStorages []forkliftv1beta1.DestinationStorage) ([]forkliftv1beta1.StoragePair, error) {
-	var storagePairs []forkliftv1beta1.StoragePair
+// createSameNameWithFallback matches sources to targets by name, then fills
+// any gaps with the default SC.
+func createSameNameWithFallback(sourceStorages []ref.Ref, targetStorages []forkliftv1beta1.DestinationStorage, defaultSC forkliftv1beta1.DestinationStorage) ([]forkliftv1beta1.StoragePair, error) {
+	storagePairs := make([]forkliftv1beta1.StoragePair, 0, len(sourceStorages))
 
-	// Create a map of target storages by name for quick lookup
-	targetByName := make(map[string]forkliftv1beta1.DestinationStorage)
+	targetByName := make(map[string]forkliftv1beta1.DestinationStorage, len(targetStorages))
 	for _, target := range targetStorages {
 		if target.StorageClass != "" {
 			targetByName[target.StorageClass] = target
 		}
 	}
 
-	// Create pairs using same-name matching
-	for _, sourceStorage := range sourceStorages {
-		if targetStorage, exists := targetByName[sourceStorage.Name]; exists {
+	klog.V(4).Infof("DEBUG: Available target storage classes: %v", getTargetStorageNames(targetStorages))
+
+	for _, src := range sourceStorages {
+		if target, exists := targetByName[src.Name]; exists {
 			storagePairs = append(storagePairs, forkliftv1beta1.StoragePair{
-				Source:      sourceStorage,
-				Destination: targetStorage,
+				Source:      src,
+				Destination: target,
 			})
-			klog.V(4).Infof("DEBUG: Mapped source storage %s -> %s (same name)", sourceStorage.Name, targetStorage.StorageClass)
+			klog.V(4).Infof("DEBUG: Mapped source storage %s -> %s (same name)", src.Name, target.StorageClass)
+		} else {
+			storagePairs = append(storagePairs, forkliftv1beta1.StoragePair{
+				Source:      src,
+				Destination: defaultSC,
+			})
+			klog.V(2).Infof("WARNING: OpenShift storage mapper - No same-name match for '%s', using default SC '%s'", src.Name, defaultSC.StorageClass)
 		}
 	}
 
-	klog.V(4).Infof("DEBUG: Created %d same-name storage pairs", len(storagePairs))
+	klog.V(4).Infof("DEBUG: Created %d storage pairs (same-name with fallback)", len(storagePairs))
 	return storagePairs, nil
 }
 
-// createDefaultStoragePairs creates storage pairs using the default behavior (all sources -> single default target)
-func createDefaultStoragePairs(sourceStorages []ref.Ref, targetStorages []forkliftv1beta1.DestinationStorage, opts mapper.StorageMappingOptions) ([]forkliftv1beta1.StoragePair, error) {
-	var storagePairs []forkliftv1beta1.StoragePair
-
-	// Find default storage class using the same logic as the original mapper
-	defaultStorageClass := findDefaultStorageClass(targetStorages, opts)
-	klog.V(4).Infof("DEBUG: Selected default storage class: %s", defaultStorageClass.StorageClass)
-
-	// Map all source storages to the default storage class
-	for _, sourceStorage := range sourceStorages {
+// createAllToDefaultPairs maps every source to the default SC.
+func createAllToDefaultPairs(sourceStorages []ref.Ref, defaultSC forkliftv1beta1.DestinationStorage) ([]forkliftv1beta1.StoragePair, error) {
+	storagePairs := make([]forkliftv1beta1.StoragePair, 0, len(sourceStorages))
+	for _, src := range sourceStorages {
 		storagePairs = append(storagePairs, forkliftv1beta1.StoragePair{
-			Source:      sourceStorage,
-			Destination: defaultStorageClass,
+			Source:      src,
+			Destination: defaultSC,
 		})
-		klog.V(4).Infof("DEBUG: Mapped source storage %s -> %s (default)", sourceStorage.Name, defaultStorageClass.StorageClass)
+		klog.V(4).Infof("DEBUG: Mapped source storage %s -> %s (default)", src.Name, defaultSC.StorageClass)
 	}
-
 	klog.V(4).Infof("DEBUG: Created %d default storage pairs", len(storagePairs))
 	return storagePairs, nil
 }
 
-// findDefaultStorageClass finds the default storage class using the original priority logic
-func findDefaultStorageClass(targetStorages []forkliftv1beta1.DestinationStorage, opts mapper.StorageMappingOptions) forkliftv1beta1.DestinationStorage {
-	// Priority 1: If user explicitly specified a default storage class, use it
-	if opts.DefaultTargetStorageClass != "" {
-		defaultStorage := forkliftv1beta1.DestinationStorage{
-			StorageClass: opts.DefaultTargetStorageClass,
-		}
-		klog.V(4).Infof("DEBUG: Using user-defined default storage class: %s", opts.DefaultTargetStorageClass)
-		return defaultStorage
-	}
-
-	// Priority 2-5: Use the target storage selected by FetchTargetStorages
-	// (which implements: virt annotation -> k8s annotation -> name with "virtualization" -> first available)
+// findDefaultStorageClass returns the best target SC. The OpenShift fetcher
+// places the highest-priority SC at index 0 (virt annotation > k8s annotation
+// > name with "virtualization" > first available).
+func findDefaultStorageClass(targetStorages []forkliftv1beta1.DestinationStorage) forkliftv1beta1.DestinationStorage {
 	if len(targetStorages) > 0 {
-		defaultStorage := targetStorages[0]
-		klog.V(4).Infof("DEBUG: Using auto-selected storage class: %s", defaultStorage.StorageClass)
-		return defaultStorage
+		klog.V(4).Infof("DEBUG: Using auto-selected storage class: %s", targetStorages[0].StorageClass)
+		return targetStorages[0]
 	}
 
-	// Priority 6: Fall back to empty storage class (system default)
 	klog.V(4).Infof("DEBUG: No storage classes available, using system default")
 	return forkliftv1beta1.DestinationStorage{}
 }

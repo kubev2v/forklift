@@ -45,6 +45,10 @@ func RunHealthCheck(ctx context.Context, configFlags *genericclioptions.ConfigFl
 	// User-specified namespace for providers/plans (empty means use operatorNamespace as default)
 	userNamespace := opts.Namespace
 
+	// Store scope on the report so it can be shown in output
+	report.UserNamespace = userNamespace
+	report.AllNamespaces = opts.AllNamespaces
+
 	// If operator is not installed and no error (genuinely not found), we can't do much more
 	if !report.Operator.Installed && report.Operator.Error == "" {
 		report.AddIssue(

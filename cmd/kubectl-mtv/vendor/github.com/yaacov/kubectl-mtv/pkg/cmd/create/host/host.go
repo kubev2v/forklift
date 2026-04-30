@@ -17,6 +17,7 @@ import (
 	forkliftv1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/get/inventory"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
+	"github.com/yaacov/kubectl-mtv/pkg/util/output"
 )
 
 // CreateHostOptions encapsulates the parameters for creating migration hosts.
@@ -37,6 +38,8 @@ type CreateHostOptions struct {
 	HostInsecureSkipTLS      bool
 	CACert                   string
 	HostSpec                 forkliftv1beta1.HostSpec
+	DryRun                   bool
+	OutputFormat             string
 }
 
 // Create creates new migration hosts for vSphere providers.
@@ -46,7 +49,7 @@ type CreateHostOptions struct {
 func Create(ctx context.Context, opts CreateHostOptions) error {
 	// Get the provider object and validate it's a vSphere provider
 	// Only vSphere providers support host creation
-	_, err := validateAndGetProvider(ctx, opts.ConfigFlags, opts.Provider, opts.Namespace)
+	provider, err := validateAndGetProvider(ctx, opts.ConfigFlags, opts.Provider, opts.Namespace)
 	if err != nil {
 		return err
 	}
@@ -74,6 +77,10 @@ func Create(ctx context.Context, opts CreateHostOptions) error {
 		return fmt.Errorf("failed to check provider endpoint type: %v", err)
 	}
 
+	// In dry-run mode we collect all resources first and only emit output after
+	// every host has been successfully built and validated.
+	var dryRunResources []interface{}
+
 	if providerHasESXIEndpoint && opts.ExistingSecret == "" && opts.Username == "" {
 		// For ESXi endpoints, reuse the provider's existing secret for efficiency
 		secret = providerSecret
@@ -89,13 +96,24 @@ func Create(ctx context.Context, opts CreateHostOptions) error {
 		// Use first host ID for secret naming when creating multiple hosts
 		firstHostID := opts.HostIDs[0]
 		firstHostResourceName := firstHostID + "-" + generateHash(firstHostID)
-		createdSecret, err = createHostSecret(opts.ConfigFlags, opts.Namespace, firstHostResourceName, opts.Username, opts.Password, opts.HostInsecureSkipTLS, opts.CACert)
-		if err != nil {
-			return fmt.Errorf("failed to create host secret: %v", err)
-		}
-		secret = &corev1.ObjectReference{
-			Name:      createdSecret.Name,
-			Namespace: createdSecret.Namespace,
+		if opts.DryRun {
+			sec := buildHostSecretObject(opts.Namespace, firstHostResourceName, opts.Username, opts.Password, opts.HostInsecureSkipTLS, opts.CACert, true)
+			sec.Kind = "Secret"
+			sec.APIVersion = "v1"
+			dryRunResources = append(dryRunResources, sec)
+			secret = &corev1.ObjectReference{
+				Name:      sec.Name,
+				Namespace: sec.Namespace,
+			}
+		} else {
+			createdSecret, err = createHostSecret(ctx, opts.ConfigFlags, opts.Namespace, firstHostResourceName, opts.Username, opts.Password, opts.HostInsecureSkipTLS, opts.CACert)
+			if err != nil {
+				return fmt.Errorf("failed to create host secret: %v", err)
+			}
+			secret = &corev1.ObjectReference{
+				Name:      createdSecret.Name,
+				Namespace: createdSecret.Namespace,
+			}
 		}
 	}
 
@@ -107,8 +125,17 @@ func Create(ctx context.Context, opts CreateHostOptions) error {
 			return fmt.Errorf("failed to resolve IP address for host %s: %v", hostID, err)
 		}
 
+		if opts.DryRun {
+			hostObj, err := buildSingleHost(ctx, opts.ConfigFlags, opts.Namespace, hostID, provider, hostIP, secret, availableHosts)
+			if err != nil {
+				return fmt.Errorf("failed to build host %s: %v", hostID, err)
+			}
+			dryRunResources = append(dryRunResources, hostObj)
+			continue
+		}
+
 		// Create the host resource with provider ownership
-		hostObj, err := createSingleHost(ctx, opts.ConfigFlags, opts.Namespace, hostID, opts.Provider, hostIP, secret, availableHosts)
+		hostObj, err := createSingleHost(ctx, opts.ConfigFlags, opts.Namespace, hostID, provider, hostIP, secret, availableHosts)
 		if err != nil {
 			return fmt.Errorf("failed to create host %s: %v", hostID, err)
 		}
@@ -116,7 +143,7 @@ func Create(ctx context.Context, opts CreateHostOptions) error {
 		// If we created a new secret, add this host as an owner for proper garbage collection
 		// This ensures the secret is deleted only when all hosts using it are deleted
 		if createdSecret != nil {
-			err = addHostAsSecretOwner(opts.ConfigFlags, opts.Namespace, createdSecret.Name, hostObj)
+			err = addHostAsSecretOwner(ctx, opts.ConfigFlags, opts.Namespace, createdSecret.Name, hostObj)
 			if err != nil {
 				return fmt.Errorf("failed to add host %s as owner of secret %s: %v", hostID, createdSecret.Name, err)
 			}
@@ -126,6 +153,16 @@ func Create(ctx context.Context, opts CreateHostOptions) error {
 		fmt.Printf("host/%s created\n", hostObj.Name)
 
 		klog.V(2).Infof("Created host '%s' in namespace '%s'", hostID, opts.Namespace)
+	}
+
+	// Emit all dry-run resources only after all hosts have been built successfully
+	if opts.DryRun {
+		for _, res := range dryRunResources {
+			if err := output.OutputResource(res, opts.OutputFormat); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	if createdSecret != nil {
@@ -241,16 +278,9 @@ func resolveHostIPAddress(directIP, networkAdapterName, hostID string, available
 	return "", fmt.Errorf("network adapter '%s' not found for host '%s' or no IP address available", networkAdapterName, hostID)
 }
 
-// createSingleHost creates a single Host resource with proper ownership by the provider.
-// It extracts the host ID from inventory, sets up owner references, and creates the Kubernetes resource.
-// Returns the created host object for use in establishing secret ownership.
-func createSingleHost(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace, hostID, providerName, ipAddress string, secret *corev1.ObjectReference, availableHosts []map[string]interface{}) (*forkliftv1beta1.Host, error) {
-	provider, err := inventory.GetProviderByName(ctx, configFlags, providerName, namespace)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get provider for ownership: %v", err)
-	}
-
-	// Create Host resource with provider as controlling owner for lifecycle management
+// buildSingleHost constructs a Host resource with provider ownership and secret reference without persisting it.
+// The provider parameter is the already-validated provider object fetched once by the caller.
+func buildSingleHost(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace, hostID string, provider *unstructured.Unstructured, ipAddress string, secret *corev1.ObjectReference, availableHosts []map[string]interface{}) (*forkliftv1beta1.Host, error) {
 	hostResourceName := hostID + "-" + generateHash(hostID)
 	hostObj := &forkliftv1beta1.Host{
 		ObjectMeta: metav1.ObjectMeta{
@@ -270,7 +300,7 @@ func createSingleHost(ctx context.Context, configFlags *genericclioptions.Config
 			Provider: corev1.ObjectReference{
 				Kind:       "Provider",
 				APIVersion: forkliftv1beta1.SchemeGroupVersion.String(),
-				Name:       providerName,
+				Name:       provider.GetName(),
 				Namespace:  namespace,
 			},
 			IpAddress: ipAddress,
@@ -283,6 +313,18 @@ func createSingleHost(ctx context.Context, configFlags *genericclioptions.Config
 	hostObj.Kind = "Host"
 	hostObj.APIVersion = forkliftv1beta1.SchemeGroupVersion.String()
 
+	return hostObj, nil
+}
+
+// createSingleHost creates a single Host resource with proper ownership by the provider.
+// It sets up owner references and creates the Kubernetes resource.
+// Returns the created host object for use in establishing secret ownership.
+func createSingleHost(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace, hostID string, provider *unstructured.Unstructured, ipAddress string, secret *corev1.ObjectReference, availableHosts []map[string]interface{}) (*forkliftv1beta1.Host, error) {
+	hostObj, err := buildSingleHost(ctx, configFlags, namespace, hostID, provider, ipAddress, secret, availableHosts)
+	if err != nil {
+		return nil, err
+	}
+
 	unstructuredHost, err := runtime.DefaultUnstructuredConverter.ToUnstructured(hostObj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert host to unstructured: %v", err)
@@ -294,7 +336,7 @@ func createSingleHost(ctx context.Context, configFlags *genericclioptions.Config
 	}
 
 	createdHostUnstructured, err := dynamicClient.Resource(client.HostsGVR).Namespace(namespace).Create(
-		context.Background(),
+		ctx,
 		&unstructured.Unstructured{Object: unstructuredHost},
 		metav1.CreateOptions{},
 	)
@@ -333,15 +375,9 @@ func generateHash(input string) string {
 	return fmt.Sprintf("%x", hash[:2]) // 2 bytes = 4 hex characters
 }
 
-// createHostSecret creates a Kubernetes Secret containing host authentication credentials.
-// The secret is labeled to associate it with the host resource and includes optional
-// TLS configuration for secure or insecure connections.
-func createHostSecret(configFlags *genericclioptions.ConfigFlags, namespace, hostResourceName, username, password string, hostInsecureSkipTLS bool, cacert string) (*corev1.Secret, error) {
-	k8sClient, err := client.GetKubernetesClientset(configFlags)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create kubernetes client: %v", err)
-	}
-
+// buildHostSecretObject builds a Kubernetes Secret for host credentials without persisting it.
+// When dryRun is true, the secret uses a deterministic Name suitable for dry-run output; otherwise GenerateName is used.
+func buildHostSecretObject(namespace, hostResourceName, username, password string, hostInsecureSkipTLS bool, cacert string, dryRun bool) *corev1.Secret {
 	secretData := map[string][]byte{
 		"user":     []byte(username),
 		"password": []byte(password),
@@ -354,34 +390,49 @@ func createHostSecret(configFlags *genericclioptions.ConfigFlags, namespace, hos
 		secretData["cacert"] = []byte(cacert)
 	}
 
-	secretName := fmt.Sprintf("%s-host-", hostResourceName)
-
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: secretName,
-			Namespace:    namespace,
-			Labels: map[string]string{
-				"createdForResource":     hostResourceName,
-				"createdForResourceType": "hosts",
-			},
+	meta := metav1.ObjectMeta{
+		Namespace: namespace,
+		Labels: map[string]string{
+			"createdForResource":     hostResourceName,
+			"createdForResourceType": "hosts",
 		},
-		Data: secretData,
-		Type: corev1.SecretTypeOpaque,
+	}
+	if dryRun {
+		meta.Name = fmt.Sprintf("%s-host-dryrun", hostResourceName)
+	} else {
+		meta.GenerateName = fmt.Sprintf("%s-host-", hostResourceName)
 	}
 
-	return k8sClient.CoreV1().Secrets(namespace).Create(context.Background(), secret, metav1.CreateOptions{})
+	return &corev1.Secret{
+		ObjectMeta: meta,
+		Data:       secretData,
+		Type:       corev1.SecretTypeOpaque,
+	}
+}
+
+// createHostSecret creates a Kubernetes Secret containing host authentication credentials.
+// The secret is labeled to associate it with the host resource and includes optional
+// TLS configuration for secure or insecure connections.
+func createHostSecret(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace, hostResourceName, username, password string, hostInsecureSkipTLS bool, cacert string) (*corev1.Secret, error) {
+	k8sClient, err := client.GetKubernetesClientset(configFlags)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kubernetes client: %v", err)
+	}
+
+	secret := buildHostSecretObject(namespace, hostResourceName, username, password, hostInsecureSkipTLS, cacert, false)
+	return k8sClient.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
 }
 
 // addHostAsSecretOwner adds a host as an owner reference to a secret, enabling proper
 // garbage collection. When multiple hosts share a secret, each becomes an owner, and
 // the secret is only deleted when all owning hosts are removed.
-func addHostAsSecretOwner(configFlags *genericclioptions.ConfigFlags, namespace, secretName string, host *forkliftv1beta1.Host) error {
+func addHostAsSecretOwner(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace, secretName string, host *forkliftv1beta1.Host) error {
 	k8sClient, err := client.GetKubernetesClientset(configFlags)
 	if err != nil {
 		return fmt.Errorf("failed to create kubernetes client: %v", err)
 	}
 
-	secret, err := k8sClient.CoreV1().Secrets(namespace).Get(context.Background(), secretName, metav1.GetOptions{})
+	secret, err := k8sClient.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get secret %s: %v", secretName, err)
 	}
@@ -404,7 +455,7 @@ func addHostAsSecretOwner(configFlags *genericclioptions.ConfigFlags, namespace,
 
 	secret.OwnerReferences = append(secret.OwnerReferences, hostOwnerRef)
 
-	_, err = k8sClient.CoreV1().Secrets(namespace).Update(context.Background(), secret, metav1.UpdateOptions{})
+	_, err = k8sClient.CoreV1().Secrets(namespace).Update(ctx, secret, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to update secret %s with host owner reference: %v", secretName, err)
 	}

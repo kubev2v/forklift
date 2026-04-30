@@ -109,7 +109,7 @@ func getVMCompletionStatus(vm map[string]interface{}) string {
 
 // printHeader prints the migration plan header
 func printHeader(planName, migrationName, title string) {
-	fmt.Print("\n", output.ColorizedSeparator(105, output.YellowColor))
+	fmt.Print("\n", output.Separator(105, output.Yellow))
 	fmt.Printf("\n%s\n", output.Bold(title))
 	fmt.Printf("%s %s\n", output.Bold("Plan:"), output.Yellow(planName))
 	fmt.Printf("%s %s\n", output.Bold("Migration:"), output.Yellow(migrationName))
@@ -123,9 +123,9 @@ func printNoMigrationMessage(planName string, plan *unstructured.Unstructured) {
 	specVMs, exists, err := unstructured.NestedSlice(plan.Object, "spec", "vms")
 	if err == nil && exists && len(specVMs) > 0 {
 		fmt.Printf("\n%s\n", output.Bold("Plan VM Specifications:"))
-		tableHeaders := []output.Header{
-			{DisplayName: "NAME", JSONPath: "name", ColorFunc: output.Yellow},
-			{DisplayName: "ID", JSONPath: "id", ColorFunc: output.Cyan},
+		cols := []output.Column{
+			{Title: "NAME", Key: "name", ColorFunc: output.Yellow},
+			{Title: "ID", Key: "id", ColorFunc: output.Cyan},
 		}
 		items := make([]map[string]interface{}, 0, len(specVMs))
 
@@ -144,9 +144,7 @@ func printNoMigrationMessage(planName string, plan *unstructured.Unstructured) {
 		}
 
 		output.NewTablePrinter().
-			WithHeaders(tableHeaders...).
-			WithColumnWidths([]int{40, 20}).
-			WithSeparator("-").
+			WithColumns(cols...).
 			AddItems(items).
 			Print()
 	}
@@ -163,7 +161,7 @@ func printVMInfo(vm map[string]interface{}, showOS bool) string {
 
 	vmCompletionStatus := getVMCompletionStatus(vm)
 
-	fmt.Print("\n", output.ColorizedSeparator(105, output.CyanColor))
+	fmt.Print("\n", output.Separator(105, output.Cyan))
 	fmt.Printf("\n%s %s (%s %s)\n", output.Bold("VM:"), output.Yellow(vmName), output.Bold("vmID="), output.Cyan(vmID))
 	fmt.Printf("%s %s  %s %s\n", output.Bold("Phase:"), output.ColorizeStatus(vmPhase), output.Bold("Status:"), output.ColorizeStatus(vmCompletionStatus))
 
@@ -191,12 +189,12 @@ func printPipelineTable(vm map[string]interface{}, vmCompletionStatus string) {
 	}
 
 	fmt.Printf("\n%s\n", output.Bold("Pipeline:"))
-	tableHeaders := []output.Header{
-		{DisplayName: "PHASE", JSONPath: "phase", ColorFunc: output.ColorizeStatus},
-		{DisplayName: "NAME", JSONPath: "name", ColorFunc: output.Bold},
-		{DisplayName: "STARTED", JSONPath: "started"},
-		{DisplayName: "COMPLETED", JSONPath: "completed"},
-		{DisplayName: "PROGRESS", JSONPath: "progress"},
+	cols := []output.Column{
+		{Title: "PHASE", Key: "phase", ColorFunc: output.ColorizeStatus},
+		{Title: "NAME", Key: "name", ColorFunc: output.Bold},
+		{Title: "STARTED", Key: "started"},
+		{Title: "COMPLETED", Key: "completed"},
+		{Title: "PROGRESS", Key: "progress"},
 	}
 	items := make([]map[string]interface{}, 0, len(pipeline))
 
@@ -251,9 +249,7 @@ func printPipelineTable(vm map[string]interface{}, vmCompletionStatus string) {
 	}
 
 	output.NewTablePrinter().
-		WithHeaders(tableHeaders...).
-		WithColumnWidths([]int{15, 25, 25, 25, 15}).
-		WithSeparator("-").
+		WithColumns(cols...).
 		AddItems(items).
 		Print()
 }
@@ -286,16 +282,15 @@ func printDisksTable(vm map[string]interface{}, vmCompletionStatus string) {
 		}
 
 		fmt.Printf("\n%s %s\n", output.Bold("Disk Transfers:"), output.Yellow(phaseName))
-		tableHeaders := []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "PHASE", JSONPath: "phase", ColorFunc: output.ColorizeStatus},
-			{DisplayName: "PROGRESS", JSONPath: "progress"},
-			{DisplayName: "SIZE", JSONPath: "size"},
-			{DisplayName: "DURATION", JSONPath: "duration"},
-			{DisplayName: "STARTED", JSONPath: "started"},
-			{DisplayName: "COMPLETED", JSONPath: "completed"},
+		diskCols := []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "PHASE", Key: "phase", ColorFunc: output.ColorizeStatus},
+			{Title: "PROGRESS", Key: "progress"},
+			{Title: "SIZE", Key: "size"},
+			{Title: "DURATION", Key: "duration"},
+			{Title: "STARTED", Key: "started"},
+			{Title: "COMPLETED", Key: "completed"},
 		}
-		diskColWidths := []int{35, 12, 12, 12, 10, 22, 22}
 		items := make([]map[string]interface{}, 0, len(tasks))
 
 		phaseAnnotations, _, _ := unstructured.NestedStringMap(phase, "annotations")
@@ -316,8 +311,8 @@ func printDisksTable(vm map[string]interface{}, vmCompletionStatus string) {
 				taskPhase = phaseStatus
 			}
 
-			if len(taskName) > diskColWidths[0] {
-				taskName = taskName[:diskColWidths[0]-3] + "..."
+			if len(taskName) > 35 {
+				taskName = taskName[:32] + "..."
 			}
 
 			taskAnnotations, _, _ := unstructured.NestedStringMap(task, "annotations")
@@ -388,9 +383,7 @@ func printDisksTable(vm map[string]interface{}, vmCompletionStatus string) {
 		}
 
 		output.NewTablePrinter().
-			WithHeaders(tableHeaders...).
-			WithColumnWidths(diskColWidths).
-			WithSeparator("-").
+			WithColumns(diskCols...).
 			AddItems(items).
 			Print()
 	}

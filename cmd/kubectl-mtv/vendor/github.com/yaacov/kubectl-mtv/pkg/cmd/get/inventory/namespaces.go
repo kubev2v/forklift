@@ -89,10 +89,10 @@ func listNamespacesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.
 
 	// Handle different output formats
 	emptyMessage := fmt.Sprintf("No namespaces found for provider %s", providerName)
-	defaultHeaders := []output.Header{
-		{DisplayName: "NAME", JSONPath: "name"},
-		{DisplayName: "ID", JSONPath: "id"},
-		{DisplayName: "PROVIDER", JSONPath: "provider"},
+	defaultHeaders := []output.Column{
+		{Title: "NAME", Key: "name"},
+		{Title: "ID", Key: "id"},
+		{Title: "PROVIDER", Key: "provider"},
 	}
 
 	switch outputFormat {

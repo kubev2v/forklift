@@ -13,21 +13,14 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 )
 
-// createSecret creates a secret for generic providers (oVirt, OpenStack)
-func createSecret(configFlags *genericclioptions.ConfigFlags, namespace, providerName, user, password, url, cacert, token string, insecureSkipTLS bool, domainName, projectName, regionName, providerType string) (*corev1.Secret, error) {
-	c, err := client.GetDynamicClient(configFlags)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get client: %v", err)
-	}
-
+// buildSecret returns a secret for generic providers (oVirt) without submitting it to the API.
+func buildSecret(namespace, providerName, user, password, url, cacert, token string, insecureSkipTLS bool, domainName, projectName, regionName, providerType string) *corev1.Secret {
 	secretName := fmt.Sprintf("%s-provider-secret", providerName)
 
-	// Prepare secret data
 	secretData := map[string][]byte{
 		"url": []byte(url),
 	}
 
-	// Add authentication data based on what's provided
 	if token != "" {
 		secretData["token"] = []byte(token)
 	} else {
@@ -35,17 +28,14 @@ func createSecret(configFlags *genericclioptions.ConfigFlags, namespace, provide
 		secretData["password"] = []byte(password)
 	}
 
-	// Add CA certificate if provided
 	if cacert != "" {
 		secretData["cacert"] = []byte(cacert)
 	}
 
-	// Add insecureSkipVerify if true
 	if insecureSkipTLS {
 		secretData["insecureSkipVerify"] = []byte("true")
 	}
 
-	// Add OpenStack specific fields if provided
 	if providerType == "openstack" {
 		if domainName != "" {
 			secretData["domainName"] = []byte(domainName)
@@ -58,7 +48,11 @@ func createSecret(configFlags *genericclioptions.ConfigFlags, namespace, provide
 		}
 	}
 
-	secret := &corev1.Secret{
+	return &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Secret",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
 			Namespace: namespace,
@@ -66,6 +60,16 @@ func createSecret(configFlags *genericclioptions.ConfigFlags, namespace, provide
 		Type: corev1.SecretTypeOpaque,
 		Data: secretData,
 	}
+}
+
+// createSecret creates a secret for generic providers (oVirt, OpenStack)
+func createSecret(configFlags *genericclioptions.ConfigFlags, namespace, providerName, user, password, url, cacert, token string, insecureSkipTLS bool, domainName, projectName, regionName, providerType string) (*corev1.Secret, error) {
+	c, err := client.GetDynamicClient(configFlags)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client: %v", err)
+	}
+
+	secret := buildSecret(namespace, providerName, user, password, url, cacert, token, insecureSkipTLS, domainName, projectName, regionName, providerType)
 
 	// Convert secret to unstructured
 	unstructSecret, err := runtime.DefaultUnstructuredConverter.ToUnstructured(secret)

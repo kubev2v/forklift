@@ -14,6 +14,7 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/providerutil"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/output"
+	querypkg "github.com/yaacov/kubectl-mtv/pkg/util/query"
 	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
@@ -50,13 +51,8 @@ func normalizeProviderInventory(ctx context.Context, configFlags *genericcliopti
 				item[fieldName] = count
 				klog.V(4).Infof("Counted %d %s for %s provider %s", count, resourceType, providerType, providerName)
 			} else {
-				// Counting failed, but this is a relevant field - set to 0
-				item[fieldName] = 0
-				klog.V(4).Infof("Failed to count %s for %s provider %s, defaulting to 0", resourceType, providerType, providerName)
+				klog.V(4).Infof("Failed to count %s for %s provider %s, leaving unavailable", resourceType, providerType, providerName)
 			}
-		} else {
-			// No inventory URL or cannot count this resource type - set to 0
-			item[fieldName] = 0
 		}
 	}
 
@@ -64,13 +60,11 @@ func normalizeProviderInventory(ctx context.Context, configFlags *genericcliopti
 	// The table printer will show empty cells for undefined fields
 }
 
-// getDynamicInventoryColumns returns consistent inventory columns for all provider types
-func getDynamicInventoryColumns(providerTypes map[string]bool) []output.Header {
-	// Always return the same essential columns for all providers
-	// This ensures consistent table headers
-	return []output.Header{
-		{DisplayName: "VMS", JSONPath: "vmCount"},
-		{DisplayName: "NETWORKS", JSONPath: "networkCount"},
+// getDynamicInventoryColumns returns consistent inventory columns for all provider types.
+func getDynamicInventoryColumns() []output.Column {
+	return []output.Column{
+		{Title: "VMS", Key: "vmCount"},
+		{Title: "NETWORKS", Key: "networkCount"},
 	}
 }
 
@@ -140,7 +134,7 @@ func getSpecificProvider(ctx context.Context, dynamicClient dynamic.Interface, n
 }
 
 // ListProviders lists providers without watch functionality
-func ListProviders(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace string, baseURL string, outputFormat string, providerName string, insecureSkipTLS bool) error {
+func ListProviders(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace string, baseURL string, outputFormat string, providerName string, insecureSkipTLS bool, query string) error {
 	c, err := client.GetDynamicClient(configFlags)
 	if err != nil {
 		return fmt.Errorf("failed to get client: %v", err)
@@ -315,60 +309,69 @@ func ListProviders(ctx context.Context, configFlags *genericclioptions.ConfigFla
 		items = append(items, item)
 	}
 
+	// Apply query filter
+	if query != "" {
+		queryOpts, err := querypkg.ParseQueryString(query)
+		if err != nil {
+			return fmt.Errorf("failed to parse query: %v", err)
+		}
+		items, err = querypkg.ApplyQuery(items, queryOpts)
+		if err != nil {
+			return fmt.Errorf("error applying query: %v", err)
+		}
+	}
+
+	// Build empty-result message once so all output formats use the same text.
+	emptyMsg := "No providers found"
+	if namespace != "" {
+		emptyMsg += " in namespace " + namespace
+	}
+	if query != "" {
+		emptyMsg += " matching query"
+	}
+
 	// Handle different output formats
 	switch outputFormat {
 	case "json":
-		// Use JSON printer
 		jsonPrinter := output.NewJSONPrinter().
 			WithPrettyPrint(true).
 			AddItems(items)
 
-		if len(providers.Items) == 0 {
-			return jsonPrinter.PrintEmpty("No providers found in namespace " + namespace)
+		if len(items) == 0 {
+			return jsonPrinter.PrintEmpty(emptyMsg)
 		}
 		return jsonPrinter.Print()
 	case "yaml":
-		// Use YAML printer
 		yamlPrinter := output.NewYAMLPrinter().
 			AddItems(items)
 
-		if len(providers.Items) == 0 {
-			return yamlPrinter.PrintEmpty("No providers found in namespace " + namespace)
+		if len(items) == 0 {
+			return yamlPrinter.PrintEmpty(emptyMsg)
 		}
 		return yamlPrinter.Print()
 	default:
-		var headers []output.Header
+		var headers []output.Column
 
-		headers = append(headers, output.Header{DisplayName: "NAME", JSONPath: "metadata.name"})
+		headers = append(headers, output.Column{Title: "NAME", Key: "metadata.name"})
 
 		if namespace == "" {
-			headers = append(headers, output.Header{DisplayName: "NAMESPACE", JSONPath: "metadata.namespace"})
+			headers = append(headers, output.Column{Title: "NAMESPACE", Key: "metadata.namespace"})
 		}
 
 		headers = append(headers,
-			output.Header{DisplayName: "TYPE", JSONPath: "spec.type"},
-			output.Header{DisplayName: "URL", JSONPath: "spec.url"},
-			output.Header{DisplayName: "STATUS", JSONPath: "status.phase", ColorFunc: output.ColorizeStatus},
-			output.Header{DisplayName: "CONNECTED", JSONPath: "conditionStatuses.ConnectionStatus", ColorFunc: output.ColorizeConditionStatus},
-			output.Header{DisplayName: "INVENTORY", JSONPath: "conditionStatuses.InventoryStatus", ColorFunc: output.ColorizeConditionStatus},
-			output.Header{DisplayName: "READY", JSONPath: "conditionStatuses.ReadyStatus", ColorFunc: output.ColorizeConditionStatus},
+			output.Column{Title: "TYPE", Key: "spec.type"},
+			output.Column{Title: "URL", Key: "spec.url"},
+			output.Column{Title: "STATUS", Key: "status.phase", ColorFunc: output.ColorizeStatus},
+			output.Column{Title: "CONNECTED", Key: "conditionStatuses.ConnectionStatus", ColorFunc: output.ColorizeConditionStatus},
+			output.Column{Title: "INVENTORY", Key: "conditionStatuses.InventoryStatus", ColorFunc: output.ColorizeConditionStatus},
+			output.Column{Title: "READY", Key: "conditionStatuses.ReadyStatus", ColorFunc: output.ColorizeConditionStatus},
 		)
 
-		providerTypes := make(map[string]bool)
-		for _, item := range items {
-			if spec, ok := item["spec"].(map[string]interface{}); ok {
-				if providerType, ok := spec["type"].(string); ok {
-					providerTypes[providerType] = true
-				}
-			}
-		}
+		headers = append(headers, getDynamicInventoryColumns()...)
+		tablePrinter := output.NewTablePrinter().WithColumns(headers...).AddItems(items)
 
-		headers = append(headers, getDynamicInventoryColumns(providerTypes)...)
-
-		tablePrinter := output.NewTablePrinter().WithHeaders(headers...).AddItems(items)
-
-		if len(providers.Items) == 0 {
-			if err := tablePrinter.PrintEmpty("No providers found in namespace " + namespace); err != nil {
+		if len(items) == 0 {
+			if err := tablePrinter.PrintEmpty(emptyMsg); err != nil {
 				return fmt.Errorf("error printing empty table: %v", err)
 			}
 		} else if outputFormat == "markdown" {
@@ -386,8 +389,8 @@ func ListProviders(ctx context.Context, configFlags *genericclioptions.ConfigFla
 }
 
 // List lists providers with optional watch mode
-func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace string, baseURL string, watchMode bool, outputFormat string, providerName string, insecureSkipTLS bool) error {
+func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace string, baseURL string, watchMode bool, outputFormat string, providerName string, insecureSkipTLS bool, query string) error {
 	return watch.WrapWithWatch(watchMode, outputFormat, func() error {
-		return ListProviders(ctx, configFlags, namespace, baseURL, outputFormat, providerName, insecureSkipTLS)
+		return ListProviders(ctx, configFlags, namespace, baseURL, outputFormat, providerName, insecureSkipTLS, query)
 	}, watch.DefaultInterval)
 }

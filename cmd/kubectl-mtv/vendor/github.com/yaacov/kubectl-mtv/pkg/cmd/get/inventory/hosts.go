@@ -87,15 +87,15 @@ func listHostsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Confi
 
 	// Handle different output formats
 	emptyMessage := fmt.Sprintf("No hosts found for provider %s", providerName)
-	defaultHeaders := []output.Header{
-		{DisplayName: "NAME", JSONPath: "name"},
-		{DisplayName: "ID", JSONPath: "id"},
-		{DisplayName: "STATUS", JSONPath: "status", ColorFunc: output.ColorizeStatus},
-		{DisplayName: "VERSION", JSONPath: "productVersion"},
-		{DisplayName: "MGMT IP", JSONPath: "managementServerIp"},
-		{DisplayName: "CORES", JSONPath: "cpuCores"},
-		{DisplayName: "SOCKETS", JSONPath: "cpuSockets"},
-		{DisplayName: "MAINTENANCE", JSONPath: "inMaintenance", ColorFunc: output.ColorizeBooleanString},
+	defaultHeaders := []output.Column{
+		{Title: "NAME", Key: "name"},
+		{Title: "ID", Key: "id"},
+		{Title: "STATUS", Key: "status", ColorFunc: output.ColorizeStatus},
+		{Title: "VERSION", Key: "productVersion"},
+		{Title: "MGMT IP", Key: "managementServerIp"},
+		{Title: "CORES", Key: "cpuCores"},
+		{Title: "SOCKETS", Key: "cpuSockets"},
+		{Title: "MAINTENANCE", Key: "inMaintenance", ColorFunc: output.ColorizeBooleanString},
 	}
 
 	switch outputFormat {

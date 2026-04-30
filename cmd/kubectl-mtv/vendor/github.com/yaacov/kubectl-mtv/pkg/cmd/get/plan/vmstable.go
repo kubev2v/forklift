@@ -19,17 +19,17 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
-// vmTableHeaders defines the default columns for the VMs table.
-var vmTableHeaders = []output.Header{
-	{DisplayName: "VM", JSONPath: "vm"},
-	{DisplayName: "SOURCE STATUS", JSONPath: "sourceStatus", ColorFunc: output.ColorizePowerState},
-	{DisplayName: "SOURCE IP", JSONPath: "sourceIP"},
-	{DisplayName: "TARGET", JSONPath: "target"},
-	{DisplayName: "TARGET IP", JSONPath: "targetIP"},
-	{DisplayName: "TARGET STATUS", JSONPath: "targetStatus", ColorFunc: output.ColorizePowerState},
-	{DisplayName: "PLAN", JSONPath: "plan", ColorFunc: colorizePlanName},
-	{DisplayName: "PLAN STATUS", JSONPath: "planStatus", ColorFunc: output.ColorizeStatus},
-	{DisplayName: "PROGRESS", JSONPath: "progress"},
+// vmTableColumns defines the default columns for the VMs table.
+var vmTableColumns = []output.Column{
+	{Title: "VM", Key: "vm"},
+	{Title: "SOURCE STATUS", Key: "sourceStatus", ColorFunc: output.ColorizePowerState},
+	{Title: "SOURCE IP", Key: "sourceIP"},
+	{Title: "TARGET", Key: "target"},
+	{Title: "TARGET IP", Key: "targetIP"},
+	{Title: "TARGET STATUS", Key: "targetStatus", ColorFunc: output.ColorizePowerState},
+	{Title: "PLAN", Key: "plan", ColorFunc: colorizePlanName},
+	{Title: "PLAN STATUS", Key: "planStatus", ColorFunc: output.ColorizeStatus},
+	{Title: "PROGRESS", Key: "progress"},
 }
 
 // colorizePlanName returns a red-colored string when the plan is not ready.
@@ -134,9 +134,9 @@ func listVMsTableOnce(
 	case "yaml":
 		return output.PrintYAMLWithEmpty(items, emptyMsg)
 	case "markdown":
-		return output.PrintMarkdownWithQuery(items, vmTableHeaders, queryOpts, emptyMsg)
+		return output.PrintMarkdownWithQuery(items, vmTableColumns, queryOpts, emptyMsg)
 	default:
-		return output.PrintTableWithQuery(items, vmTableHeaders, queryOpts, emptyMsg)
+		return output.PrintTableWithQuery(items, vmTableColumns, queryOpts, emptyMsg)
 	}
 }
 

@@ -49,63 +49,6 @@ func countConcernsByCategory(vm map[string]interface{}) map[string]int {
 	return counts
 }
 
-// formatVMConcerns formats all concerns for a VM into a displayable string
-func formatVMConcerns(vm map[string]interface{}) string {
-	concerns, exists := vm["concerns"]
-	if !exists {
-		return "No concerns found"
-	}
-
-	concernsArray, ok := concerns.([]interface{})
-	if !ok || len(concernsArray) == 0 {
-		return "No concerns found"
-	}
-
-	var result strings.Builder
-
-	for i, c := range concernsArray {
-		concern, ok := c.(map[string]interface{})
-		if !ok {
-			continue
-		}
-
-		if i > 0 {
-			result.WriteString("\n")
-		}
-
-		// Get category and use short form using GetValueByPathString
-		categoryShort := "[?]" // Default if category unknown
-		if categoryVal, err := querypkg.GetValueByPathString(concern, "category"); err == nil {
-			if category, ok := categoryVal.(string); ok {
-				switch category {
-				case "Critical":
-					categoryShort = "[C]"
-				case "Warning":
-					categoryShort = "[W]"
-				case "Information":
-					categoryShort = "[I]"
-				default:
-					categoryShort = "[" + string(category[0]) + "]"
-				}
-			}
-		}
-		result.WriteString(categoryShort + " ")
-
-		// Add assessment using GetValueByPathString
-		if assessmentVal, err := querypkg.GetValueByPathString(concern, "assessment"); err == nil {
-			if assessment, ok := assessmentVal.(string); ok {
-				result.WriteString(assessment)
-			} else {
-				result.WriteString("No details available")
-			}
-		} else {
-			result.WriteString("No details available")
-		}
-	}
-
-	return result.String()
-}
-
 // calculateTotalDiskCapacity returns the total disk capacity in GB
 func calculateTotalDiskCapacity(vm map[string]interface{}) float64 {
 	disks, exists := vm["disks"]
@@ -134,46 +77,31 @@ func calculateTotalDiskCapacity(vm map[string]interface{}) float64 {
 	return totalCapacity / (1024 * 1024 * 1024)
 }
 
-// augmentVMInfo adds computed fields to VM data for display purposes
-// Returns the expanded data string if the VM has concerns (for extended output)
-func augmentVMInfo(vm map[string]interface{}, extendedOutput bool) string {
-	var expandedText string
-
-	// Add concern counts by category
+// augmentVMInfo adds computed fields to VM data for display purposes.
+func augmentVMInfo(vm map[string]interface{}) {
 	concernCounts := countConcernsByCategory(vm)
 	vm["criticalConcerns"] = concernCounts["Critical"]
 	vm["warningConcerns"] = concernCounts["Warning"]
 	vm["infoConcerns"] = concernCounts["Information"]
 
-	// Create a combined concerns string (Critical/Warning/Info)
 	vm["concernsHuman"] = fmt.Sprintf("%d/%d/%d",
 		concernCounts["Critical"],
 		concernCounts["Warning"],
 		concernCounts["Information"])
 
-	// Add (*) indicator if critical concerns exist
 	if concernCounts["Critical"] > 0 {
 		vm["concernsHuman"] = vm["concernsHuman"].(string) + " (*)"
 	}
 
-	// If VM has concerns, create expanded data
-	if extendedOutput && (concernCounts["Critical"] > 0 || concernCounts["Warning"] > 0 || concernCounts["Information"] > 0) {
-		// Format concerns for expanded view
-		expandedText = formatVMConcerns(vm)
-	}
-
-	// Format memory in GB for display
 	if memoryMB, exists := vm["memoryMB"]; exists {
 		if memVal, ok := memoryMB.(float64); ok {
 			vm["memoryGB"] = fmt.Sprintf("%.1f GB", memVal/1024)
 		}
 	}
 
-	// Calculate and format disk capacity
 	totalDiskCapacityGB := calculateTotalDiskCapacity(vm)
 	vm["diskCapacity"] = fmt.Sprintf("%.1f GB", totalDiskCapacityGB)
 
-	// Format storage used
 	if storageUsed, exists := vm["storageUsed"]; exists {
 		if storageVal, ok := storageUsed.(float64); ok {
 			storageUsedGB := storageVal / (1024 * 1024 * 1024)
@@ -181,14 +109,9 @@ func augmentVMInfo(vm map[string]interface{}, extendedOutput bool) string {
 		}
 	}
 
-	// Augment from VirtualMachineInstance data when available (OpenShift/KubeVirt)
 	augmentFromInstance(vm)
 
-	// Humanize power state: check top-level powerState first (vSphere, oVirt),
-	// then fall back to object.status.printableStatus / object.status.phase (OpenShift/KubeVirt).
 	vm["powerStateHuman"] = humanizePowerState(vm)
-
-	return expandedText
 }
 
 // humanizePowerState derives a human-readable power state from a VM map.
@@ -376,17 +299,16 @@ func FetchVMsByQueryWithInsecure(ctx context.Context, kubeConfigFlags *genericcl
 	return planVMs, nil
 }
 
-// ListVMs queries the provider's VM inventory and displays the results
-// ListVMsWithInsecure queries the provider's VM inventory and displays the results with optional insecure TLS skip verification
-func ListVMsWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, extendedOutput bool, query string, watchMode bool, insecureSkipTLS bool) error {
+// ListVMsWithInsecure queries the provider's VM inventory and displays the results with optional insecure TLS skip verification.
+func ListVMsWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
 	sq := watch.NewSafeQuery(query)
 
 	return watch.WrapWithWatchAndQuery(watchMode, outputFormat, func() error {
-		return listVMsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, extendedOutput, sq.Get(), insecureSkipTLS)
+		return listVMsOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, sq.Get(), insecureSkipTLS)
 	}, watch.DefaultInterval, sq.Set, query)
 }
 
-func listVMsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, extendedOutput bool, query string, insecureSkipTLS bool) error {
+func listVMsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -429,26 +351,12 @@ func listVMsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigF
 
 	// Convert to expected format
 	vms := make([]map[string]interface{}, 0, len(dataArray))
-	expandedData := make(map[string]string) // Map for expanded VM concerns
-
 	for _, item := range dataArray {
 		if vm, ok := item.(map[string]interface{}); ok {
-			// Add provider name to each VM
 			vm["provider"] = providerName
 
-			// Provider-specific handling
-			if providerType == "ec2" {
-				// For EC2, skip augmentVMInfo as it doesn't have concern/memory/disk/power fields
-				// The inventory server already provides name and id fields
-				vms = append(vms, vm)
-				continue
-			}
-
-			// Augment VM info for non-EC2 providers (adds concern counts, memory, disk, power formatting)
-			if expandedText := augmentVMInfo(vm, extendedOutput); expandedText != "" {
-				if vmName, ok := vm["name"].(string); ok {
-					expandedData[vmName] = expandedText
-				}
+			if providerType != "ec2" {
+				augmentVMInfo(vm)
 			}
 
 			vms = append(vms, vm)
@@ -512,100 +420,35 @@ func listVMsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigF
 		fmt.Println(string(yamlData))
 		return nil
 	default:
-		var tablePrinter *output.TablePrinter
-
-		// Check if we should use custom headers from SELECT clause
-		if queryOpts.HasSelect {
-			headers := make([]output.Header, 0, len(queryOpts.Select))
-			for _, sel := range queryOpts.Select {
-				headers = append(headers, output.Header{
-					DisplayName: sel.Alias,
-					JSONPath:    sel.Alias,
-				})
-			}
-			tablePrinter = output.NewTablePrinter().
-				WithHeaders(headers...).
-				WithSelectOptions(queryOpts.Select).
-				WithJSONPathRow().
-				WithSeparator("─")
-		} else {
-			// Use provider-specific table headers
-			var headers []output.Header
-
-			switch providerType {
-			case "ec2":
-				headers = []output.Header{
-					{DisplayName: "NAME", JSONPath: "name"},
-					{DisplayName: "TYPE", JSONPath: "InstanceType"},
-					{DisplayName: "STATE", JSONPath: "State.Name", ColorFunc: output.ColorizeStatus},
-					{DisplayName: "PLATFORM", JSONPath: "PlatformDetails"},
-					{DisplayName: "AZ", JSONPath: "Placement.AvailabilityZone"},
-					{DisplayName: "PUBLIC-IP", JSONPath: "PublicIpAddress"},
-					{DisplayName: "PRIVATE-IP", JSONPath: "PrivateIpAddress"},
-				}
-			default:
-				headers = []output.Header{
-					{DisplayName: "NAME", JSONPath: "name"},
-					{DisplayName: "ID", JSONPath: "id"},
-					{DisplayName: "POWER", JSONPath: "powerStateHuman", ColorFunc: output.ColorizePowerState},
-					{DisplayName: "CPU", JSONPath: "cpuCount"},
-					{DisplayName: "MEMORY", JSONPath: "memoryGB"},
-					{DisplayName: "DISK USAGE", JSONPath: "storageUsedGB"},
-					{DisplayName: "GUEST OS", JSONPath: "guestId"},
-					{DisplayName: "CONCERNS (C/W/I)", JSONPath: "concernsHuman"},
-				}
-			}
-
-			tablePrinter = output.NewTablePrinter().
-				WithHeaders(headers...).
-				WithJSONPathRow().
-				WithSeparator("─")
-		}
-
-		// Add items with expanded concern data
-		for _, vm := range vms {
-			vmName, _ := vm["name"].(string)
-			expandedText, hasExpanded := expandedData[vmName]
-
-			if hasExpanded {
-				tablePrinter.AddItemWithExpanded(vm, expandedText)
-			} else {
-				tablePrinter.AddItem(vm)
-			}
-		}
-
-		if len(vms) == 0 {
-			return tablePrinter.PrintEmpty(emptyMessage)
-		}
-		return tablePrinter.Print()
+		return output.PrintTableWithQuery(vms, vmColumns(providerType), queryOpts, emptyMessage)
 	}
 }
 
 func printVMsMarkdown(vms []map[string]interface{}, queryOpts *querypkg.QueryOptions, providerType, emptyMessage string) error {
-	var defaultHeaders []output.Header
-	switch providerType {
-	case "ec2":
-		defaultHeaders = []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "TYPE", JSONPath: "InstanceType"},
-			{DisplayName: "STATE", JSONPath: "State.Name"},
-			{DisplayName: "PLATFORM", JSONPath: "PlatformDetails"},
-			{DisplayName: "AZ", JSONPath: "Placement.AvailabilityZone"},
-			{DisplayName: "PUBLIC-IP", JSONPath: "PublicIpAddress"},
-			{DisplayName: "PRIVATE-IP", JSONPath: "PrivateIpAddress"},
-		}
-	default:
-		defaultHeaders = []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "POWER", JSONPath: "powerStateHuman"},
-			{DisplayName: "CPU", JSONPath: "cpuCount"},
-			{DisplayName: "MEMORY", JSONPath: "memoryGB"},
-			{DisplayName: "DISK USAGE", JSONPath: "storageUsedGB"},
-			{DisplayName: "GUEST OS", JSONPath: "guestId"},
-			{DisplayName: "CONCERNS (C/W/I)", JSONPath: "concernsHuman"},
+	return output.PrintMarkdownWithQuery(vms, vmColumns(providerType), queryOpts, emptyMessage)
+}
+
+// vmColumns returns the default table columns for VM listings based on provider type.
+func vmColumns(providerType string) []output.Column {
+	if providerType == "ec2" {
+		return []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "TYPE", Key: "InstanceType"},
+			{Title: "STATE", Key: "State.Name", ColorFunc: output.ColorizeStatus},
+			{Title: "PLATFORM", Key: "PlatformDetails"},
+			{Title: "AZ", Key: "Placement.AvailabilityZone"},
+			{Title: "PUBLIC-IP", Key: "PublicIpAddress"},
+			{Title: "PRIVATE-IP", Key: "PrivateIpAddress"},
 		}
 	}
-
-	return output.PrintMarkdownWithQuery(vms, defaultHeaders, queryOpts, emptyMessage)
+	return []output.Column{
+		{Title: "NAME", Key: "name"},
+		{Title: "ID", Key: "id"},
+		{Title: "POWER", Key: "powerStateHuman", ColorFunc: output.ColorizePowerState},
+		{Title: "CPU", Key: "cpuCount"},
+		{Title: "MEMORY", Key: "memoryGB"},
+		{Title: "DISK USAGE", Key: "storageUsedGB"},
+		{Title: "GUEST OS", Key: "guestId"},
+		{Title: "CONCERNS (C/W/I)", Key: "concernsHuman", ColorFunc: output.ColorizeConcerns},
+	}
 }

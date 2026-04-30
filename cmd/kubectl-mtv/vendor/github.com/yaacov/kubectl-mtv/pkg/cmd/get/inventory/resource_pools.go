@@ -37,17 +37,17 @@ func listResourcePoolsOnce(ctx context.Context, kubeConfigFlags *genericclioptio
 	}
 
 	// Define default headers based on provider type
-	var defaultHeaders []output.Header
+	var defaultHeaders []output.Column
 	switch providerType {
 	case "vsphere":
-		defaultHeaders = []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "CPU_LIMIT", JSONPath: "cpuLimit"},
-			{DisplayName: "CPU_SHARES", JSONPath: "cpuShares"},
-			{DisplayName: "MEM_LIMIT", JSONPath: "memoryLimitFormatted"},
-			{DisplayName: "MEM_SHARES", JSONPath: "memoryShares"},
-			{DisplayName: "REVISION", JSONPath: "revision"},
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "ID", Key: "id"},
+			{Title: "CPU_LIMIT", Key: "cpuLimit"},
+			{Title: "CPU_SHARES", Key: "cpuShares"},
+			{Title: "MEM_LIMIT", Key: "memoryLimitFormatted"},
+			{Title: "MEM_SHARES", Key: "memoryShares"},
+			{Title: "REVISION", Key: "revision"},
 		}
 	default:
 		return fmt.Errorf("provider type '%s' does not support resource pool inventory", providerType)

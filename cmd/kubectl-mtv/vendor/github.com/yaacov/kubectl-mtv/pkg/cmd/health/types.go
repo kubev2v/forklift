@@ -36,6 +36,8 @@ type HealthReport struct {
 	Issues          []HealthIssue    `json:"issues" yaml:"issues"`
 	Recommendations []string         `json:"recommendations" yaml:"recommendations"`
 	Summary         HealthSummary    `json:"summary" yaml:"summary"`
+	UserNamespace   string           `json:"userNamespace,omitempty" yaml:"userNamespace,omitempty"`
+	AllNamespaces   bool             `json:"allNamespaces,omitempty" yaml:"allNamespaces,omitempty"`
 }
 
 // HealthSummary provides a quick overview of the health report

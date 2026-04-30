@@ -37,11 +37,11 @@ func listDiskProfilesOnce(ctx context.Context, kubeConfigFlags *genericclioption
 	}
 
 	// Define default headers
-	defaultHeaders := []output.Header{
-		{DisplayName: "NAME", JSONPath: "name"},
-		{DisplayName: "ID", JSONPath: "id"},
-		{DisplayName: "STORAGE-DOMAIN", JSONPath: "storageDomain.name"},
-		{DisplayName: "QOS", JSONPath: "qos.name"},
+	defaultHeaders := []output.Column{
+		{Title: "NAME", Key: "name"},
+		{Title: "ID", Key: "id"},
+		{Title: "STORAGE-DOMAIN", Key: "storageDomain.name"},
+		{Title: "QOS", Key: "qos.name"},
 	}
 
 	// Fetch disk profiles inventory from the provider based on provider type
@@ -114,13 +114,13 @@ func listNICProfilesOnce(ctx context.Context, kubeConfigFlags *genericclioptions
 	}
 
 	// Define default headers
-	defaultHeaders := []output.Header{
-		{DisplayName: "NAME", JSONPath: "name"},
-		{DisplayName: "ID", JSONPath: "id"},
-		{DisplayName: "NETWORK", JSONPath: "network.name"},
-		{DisplayName: "PORT-MIRRORING", JSONPath: "portMirroring"},
-		{DisplayName: "PASS-THROUGH", JSONPath: "passThrough"},
-		{DisplayName: "QOS", JSONPath: "qos.name"},
+	defaultHeaders := []output.Column{
+		{Title: "NAME", Key: "name"},
+		{Title: "ID", Key: "id"},
+		{Title: "NETWORK", Key: "network.name"},
+		{Title: "PORT-MIRRORING", Key: "portMirroring"},
+		{Title: "PASS-THROUGH", Key: "passThrough"},
+		{Title: "QOS", Key: "qos.name"},
 	}
 
 	// Fetch NIC profiles inventory from the provider based on provider type
