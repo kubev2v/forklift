@@ -97,6 +97,7 @@ const (
 	GuestToolsIssue                 = "GuestToolsIssue"
 	VDDKAndOffloadMixedUsage        = "VDDKAndOffloadMixedUsage"
 	ServiceAccountNotValid          = "ServiceAccountNotValid"
+	HookServiceAccountNotValid      = "HookServiceAccountNotValid"
 	RestrictedPodSecurity           = "RestrictedPodSecurity"
 )
 
@@ -1453,6 +1454,14 @@ func (r *Reconciler) validateHooks(plan *api.Plan) (err error) {
 		Message:  "Hook step not valid.",
 		Items:    []string{},
 	}
+	hookSANotFound := libcnd.Condition{
+		Type:     HookServiceAccountNotValid,
+		Status:   True,
+		Reason:   NotFound,
+		Category: api.CategoryCritical,
+		Message:  "Hook ServiceAccount not found in plan namespace.",
+		Items:    []string{},
+	}
 	for _, vm := range plan.Spec.VMs {
 		for _, ref := range vm.Hooks {
 			// Step not valid.
@@ -1510,9 +1519,25 @@ func (r *Reconciler) validateHooks(plan *api.Plan) (err error) {
 					notReady.Items,
 					description)
 			}
+			if sa := hook.Spec.ServiceAccount; sa != "" {
+				saKey := client.ObjectKey{
+					Namespace: plan.Namespace,
+					Name:      sa,
+				}
+				if saErr := r.Get(context.TODO(), saKey, &core.ServiceAccount{}); saErr != nil {
+					if k8serr.IsNotFound(saErr) {
+						hookSANotFound.Items = append(hookSANotFound.Items,
+							fmt.Sprintf("VM: %s hook: %s ServiceAccount '%s' not found in namespace '%s'",
+								vm.String(), ref.Hook.String(), sa, plan.Namespace))
+					} else {
+						err = liberr.Wrap(saErr)
+						return
+					}
+				}
+			}
 		}
 	}
-	for _, cnd := range []libcnd.Condition{notSet, notFound, notReady, stepNotValid} {
+	for _, cnd := range []libcnd.Condition{notSet, notFound, notReady, stepNotValid, hookSANotFound} {
 		if len(cnd.Items) > 0 {
 			plan.Status.SetCondition(cnd)
 		}
