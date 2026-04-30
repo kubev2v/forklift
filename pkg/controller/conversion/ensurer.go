@@ -78,10 +78,9 @@ func resolveDestinationClient(localClient client.Client, spec api.ConversionSpec
 	return ocp.Client(provider, secret)
 }
 
-// EnsurePod dispatches pod creation based on the Conversion CR type.
-// All data is read from the Conversion spec. The destination client
-// is used for pod and PVC operations.
-func (e *Ensurer) EnsurePod(conversion *api.Conversion) error {
+// EnsurePod creates the pod for the Conversion CR if it does not already exist
+// and returns it. Returns nil when the conversion type is not recognised.
+func (e *Ensurer) EnsurePod(conversion *api.Conversion) (*core.Pod, error) {
 	cfg := convctx.PodConfigFromSpec(conversion)
 
 	switch conversion.Spec.Type {
@@ -92,21 +91,21 @@ func (e *Ensurer) EnsurePod(conversion *api.Conversion) error {
 	case api.DeepInspection:
 		return e.ensureDeepInspectionPodFromSpec(conversion, cfg)
 	}
-	return nil
+	return nil, nil
 }
 
 // ensureDeepInspectionPodFromSpec creates the deep inspection pod for a Conversion
-// CR if one does not already exist.
-func (e *Ensurer) ensureDeepInspectionPodFromSpec(conversion *api.Conversion, cfg convctx.PodConfig) error {
+// CR if one does not already exist and returns it.
+func (e *Ensurer) ensureDeepInspectionPodFromSpec(conversion *api.Conversion, cfg convctx.PodConfig) (pod *core.Pod, err error) {
 	if conversion.Status.Snapshot != nil && conversion.Status.Snapshot.Moref != "" {
 		cfg.DeepInspectionSnapshotMoref = conversion.Status.Snapshot.Moref
 	}
-	existing, err := e.GetPod(conversion, cfg.PodLabels)
+	pod, err = e.GetPod(conversion, cfg.PodLabels)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if existing != nil {
-		return nil
+	if pod != nil {
+		return pod, nil
 	}
 
 	secret := &core.Secret{}
@@ -116,7 +115,7 @@ func (e *Ensurer) ensureDeepInspectionPodFromSpec(conversion *api.Conversion, cf
 			Name:      conversion.Spec.Connection.Secret.Name,
 		}, secret)
 		if err != nil {
-			return liberr.Wrap(err)
+			return nil, liberr.Wrap(err)
 		}
 	}
 
@@ -125,7 +124,7 @@ func (e *Ensurer) ensureDeepInspectionPodFromSpec(conversion *api.Conversion, cf
 
 	volumes, mounts, devices, err := e.VolumesFromDiskRefs(conversion.Spec.Disks)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if conversion.Spec.LUKS.Name != "" {
@@ -143,36 +142,36 @@ func (e *Ensurer) ensureDeepInspectionPodFromSpec(conversion *api.Conversion, cf
 	}
 
 	builder := &Builder{Config: cfg}
-	pod, err := builder.BuildDeepInspectionPod(vm, volumes, mounts, devices, secret)
+	pod, err = builder.BuildDeepInspectionPod(vm, volumes, mounts, devices, secret)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if pod == nil {
 		e.Log.Info("Couldn't prepare deep inspection pod for vm.", "vm", vm.String())
-		return nil
+		return nil, nil
 	}
 
 	err = e.DestinationClient.Create(context.TODO(), pod)
 	if err != nil {
-		return liberr.Wrap(err)
+		return nil, liberr.Wrap(err)
 	}
 
 	e.Log.Info(
 		"Created deep inspection pod.",
 		"pod", path.Join(pod.Namespace, pod.Name),
 		"vm", vm.String())
-	return nil
+	return pod, nil
 }
 
 // ensureVirtV2vPodFromSpec creates the virt-v2v pod for a Conversion
-// CR if one does not already exist. All data comes from the spec.
-func (e *Ensurer) ensureVirtV2vPodFromSpec(conversion *api.Conversion, cfg convctx.PodConfig, podType convctx.V2vPodType) error {
-	existing, err := e.GetPod(conversion, cfg.PodLabels)
+// CR if one does not already exist and returns it.
+func (e *Ensurer) ensureVirtV2vPodFromSpec(conversion *api.Conversion, cfg convctx.PodConfig, podType convctx.V2vPodType) (pod *core.Pod, err error) {
+	pod, err = e.GetPod(conversion, cfg.PodLabels)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if existing != nil {
-		return nil
+	if pod != nil {
+		return pod, nil
 	}
 
 	secret := &core.Secret{}
@@ -182,7 +181,7 @@ func (e *Ensurer) ensureVirtV2vPodFromSpec(conversion *api.Conversion, cfg convc
 			Name:      conversion.Spec.Connection.Secret.Name,
 		}, secret)
 		if err != nil {
-			return liberr.Wrap(err)
+			return nil, liberr.Wrap(err)
 		}
 	}
 
@@ -191,7 +190,7 @@ func (e *Ensurer) ensureVirtV2vPodFromSpec(conversion *api.Conversion, cfg convc
 
 	volumes, mounts, devices, err := e.VolumesFromDiskRefs(conversion.Spec.Disks)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	volumes = append(volumes, core.Volume{
@@ -220,25 +219,25 @@ func (e *Ensurer) ensureVirtV2vPodFromSpec(conversion *api.Conversion, cfg convc
 	inPlace := conversion.Spec.Type == api.InPlace
 
 	builder := &Builder{Config: cfg}
-	pod, err := builder.BuildVirtV2vPod(vm, volumes, mounts, devices, secret, podType, inPlace)
+	pod, err = builder.BuildVirtV2vPod(vm, volumes, mounts, devices, secret, podType, inPlace)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if pod == nil {
 		e.Log.Info("Couldn't prepare virt-v2v pod for vm.", "vm", vm.String())
-		return nil
+		return nil, nil
 	}
 
 	err = e.DestinationClient.Create(context.TODO(), pod)
 	if err != nil {
-		return liberr.Wrap(err)
+		return nil, liberr.Wrap(err)
 	}
 
 	e.Log.Info(
 		"Created virt-v2v pod.",
 		"pod", path.Join(pod.Namespace, pod.Name),
 		"vm", vm.String())
-	return nil
+	return pod, nil
 }
 
 // GetPod returns the managed pod matching the given labels, or nil.
