@@ -119,6 +119,10 @@ type ProviderStatus struct {
 	// Provider service reference
 	// +optional
 	Service *core.ObjectReference `json:"service,omitempty"`
+	// The ResourceVersion of the secret referenced by this provider.
+	// Used to detect when credentials have been rotated.
+	// +optional
+	SecretResourceVersion string `json:"secretResourceVersion,omitempty"`
 }
 
 // +genclient
