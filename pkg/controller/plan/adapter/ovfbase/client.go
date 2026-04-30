@@ -50,6 +50,11 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (snapsh
 	return
 }
 
+// FindForkliftSnapshot is a no-op for this provider.
+func (r *Client) FindForkliftSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (snapshotId string, err error) {
+	return
+}
+
 // Remove a VM snapshot. No-op for this provider.
 func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc) (removeTaskId string, err error) {
 	return

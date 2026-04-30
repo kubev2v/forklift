@@ -105,6 +105,42 @@ func (r *Client) findRunningSnapshotTask(vmRef ref.Ref, vm *object.VirtualMachin
 	return ""
 }
 
+// FindForkliftSnapshot finds the Forklift warm migration snapshot on the source VM by its
+// well-known name. This is used as a fallback during cleanup when the snapshot ID was not
+// yet recorded in the VM status (e.g., the migration was canceled before CheckSnapshotReady ran).
+// On vSphere the returned snapshotId is the snapshot managed object reference (MOR) value.
+func (r *Client) FindForkliftSnapshot(vmRef ref.Ref, hosts util.HostsFunc) (snapshotId string, err error) {
+	vm, err := r.getVM(vmRef, hosts)
+	if err != nil {
+		return
+	}
+	var vmObj mo.VirtualMachine
+	err = vm.Properties(context.TODO(), vm.Reference(), []string{"snapshot"}, &vmObj)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	if vmObj.Snapshot == nil {
+		return
+	}
+	snapshotId = findSnapshotByName(vmObj.Snapshot.RootSnapshotList, snapshotName)
+	return
+}
+
+// findSnapshotByName walks a vSphere snapshot tree and returns the MOR value of the first
+// snapshot whose name matches the given name, or "" if not found.
+func findSnapshotByName(snapshots []types.VirtualMachineSnapshotTree, name string) string {
+	for _, s := range snapshots {
+		if s.Name == name {
+			return s.Snapshot.Value
+		}
+		if id := findSnapshotByName(s.ChildSnapshotList, name); id != "" {
+			return id
+		}
+	}
+	return ""
+}
+
 // Remove a VM snapshot.
 func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hosts util.HostsFunc) (taskId string, err error) {
 	r.Log.V(1).Info("RemoveSnapshot",

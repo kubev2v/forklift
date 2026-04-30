@@ -28,5 +28,10 @@ func (r *Client) GetSnapshotDeltas(vmRef ref.Ref, snapshot string, hostsFunc uti
 	return make(map[string]string), nil
 }
 
+// FindForkliftSnapshot is a no-op for this provider.
+func (r *Client) FindForkliftSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (snapshotId string, err error) {
+	return
+}
+
 // Compile-time interface check. Ensures Client implements required base.Client interface.
 var _ base.Client = &Client{}

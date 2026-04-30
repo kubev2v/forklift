@@ -115,6 +115,11 @@ func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hostsFunc util.H
 	return
 }
 
+// FindForkliftSnapshot is a no-op for this provider.
+func (r *Client) FindForkliftSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (snapshotId string, err error) {
+	return
+}
+
 // Get disk deltas for a VM snapshot. No-op for this provider.
 func (r *Client) GetSnapshotDeltas(vmRef ref.Ref, snapshot string, hostsFunc util.HostsFunc) (s map[string]string, err error) {
 	return
