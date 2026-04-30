@@ -297,9 +297,12 @@ type VM struct {
 	ToolsRunningStatus       string                 `json:"toolsRunningStatus"`
 	// Note: vSphere reports version as "toolsVersionStatus2"; we keep the Go field
 	// name ToolsVersionStatus for continuity while serializing as toolsVersionStatus2.
-	ToolsVersionStatus string `json:"toolsVersionStatus2"`
-	DiskEnableUuid     bool   `json:"diskEnableUuid"`
-	NestedHVEnabled    bool   `json:"nestedHVEnabled"`
+	ToolsVersionStatus string                   `json:"toolsVersionStatus2"`
+	DiskEnableUuid     bool                     `json:"diskEnableUuid"`
+	NestedHVEnabled    bool                     `json:"nestedHVEnabled"`
+	CustomDef          []model.CustomFieldDef   `json:"customDef"`
+	CustomValues       []model.CustomFieldValue `json:"customValues"`
+	Tags               []model.Tag              `json:"tags"`
 }
 
 func (r *VM) GetConcerns() []model.Concern {
@@ -343,6 +346,9 @@ func (r *VM) With(m *model.VM) {
 	r.ToolsVersionStatus = m.ToolsVersionStatus
 	r.DiskEnableUuid = m.DiskEnableUuid
 	r.NestedHVEnabled = m.NestedHVEnabled
+	r.CustomDef = m.CustomDef
+	r.CustomValues = m.CustomValues
+	r.Tags = m.Tags
 }
 
 // Build self link (URI).
