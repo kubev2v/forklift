@@ -98,6 +98,9 @@ func (e *Ensurer) EnsurePod(conversion *api.Conversion) error {
 // ensureDeepInspectionPodFromSpec creates the deep inspection pod for a Conversion
 // CR if one does not already exist.
 func (e *Ensurer) ensureDeepInspectionPodFromSpec(conversion *api.Conversion, cfg convctx.PodConfig) error {
+	if conversion.Status.Snapshot != nil && conversion.Status.Snapshot.Moref != "" {
+		cfg.DeepInspectionSnapshotMoref = conversion.Status.Snapshot.Moref
+	}
 	existing, err := e.GetPod(conversion, cfg.PodLabels)
 	if err != nil {
 		return err

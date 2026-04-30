@@ -146,6 +146,24 @@ type ConversionSpec struct {
 	PodSettings PodSettings `json:"podSettings,omitempty"`
 }
 
+// SnapshotStatus tracks vSphere snapshot tasks and ownership for deep inspection.
+type SnapshotStatus struct {
+	// Moref is the vSphere managed object reference of the snapshot, used as
+	// SNAPSHOT_MOREF in the inspection pod.
+	// +optional
+	Moref string `json:"moref,omitempty"`
+	// Owned is true when the converison controller created the snapshot and is responsible
+	// for removing it after the pod exits.
+	// +optional
+	Owned bool `json:"owned,omitempty"`
+	// CreateTaskID is the in-flight vSphere task id for snapshot creation.
+	// +optional
+	CreateTaskID string `json:"createTaskId,omitempty"`
+	// RemoveTaskID is the in-flight vSphere task id for snapshot removal.
+	// +optional
+	RemoveTaskID string `json:"removeTaskId,omitempty"`
+}
+
 // ConversionStatus defines the observed state of Conversion.
 type ConversionStatus struct {
 	// Conditions.
@@ -160,6 +178,10 @@ type ConversionStatus struct {
 	// Reference to the managed virt-v2v pod.
 	// +optional
 	Pod core.ObjectReference `json:"pod,omitempty"`
+	// Snapshot tracks the vSphere snapshot lifecycle for conversions that require
+	// a controller-managed snapshot (DeepInspection without a pre-supplied MoRef).
+	// +optional
+	Snapshot *SnapshotStatus `json:"snapshot,omitempty"`
 }
 
 // +genclient

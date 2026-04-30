@@ -74,6 +74,8 @@ type PodConfig struct {
 	GenerateName string
 	Environment  []core.EnvVar
 	Disks        []api.DiskRef
+	// DeepInspectionSnapshotMoref is injected as SNAPSHOT_MOREF for DeepInspection pods when set by the controller.
+	DeepInspectionSnapshotMoref string
 }
 
 // PodConfigFromSpec builds a PodConfig from a Conversion CR spec.
