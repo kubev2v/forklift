@@ -55,6 +55,8 @@ const (
 	CategoryConfigMaps SettingCategory = "configmaps"
 	// CategoryAdvanced represents advanced/misc settings.
 	CategoryAdvanced SettingCategory = "advanced"
+	// CategoryAAP represents Ansible Automation Platform settings.
+	CategoryAAP SettingCategory = "aap"
 )
 
 // SettingDefinition defines metadata for a ForkliftController setting.
@@ -105,6 +107,7 @@ var CategoryOrder = []SettingCategory{
 	CategoryOVAProxy,
 	CategoryConfigMaps,
 	CategoryAdvanced,
+	CategoryAAP,
 }
 
 // SupportedSettings contains all supported ForkliftController settings.
@@ -123,6 +126,24 @@ var SupportedSettings = map[string]SettingDefinition{
 		Type:        TypeString,
 		Default:     "",
 		Description: "Custom virt-v2v container image",
+		Category:    CategoryImage,
+	},
+	"populator_vsphere_copy_offload_image_fqin": {
+		Name:        "populator_vsphere_copy_offload_image_fqin",
+		Type:        TypeString,
+		Default:     "",
+		Description: "vSphere copy offload populator image (Forklift >= 2.12)",
+		Category:    CategoryImage,
+	},
+	// TODO: Remove populator_vsphere_xcopy_volume_image_fqin once all Forklift
+	// servers older than 2.12 are out of support. New servers use
+	// populator_vsphere_copy_offload_image_fqin; the old key is kept so the CLI
+	// can still set/read the field on older ForkliftController CRs.
+	"populator_vsphere_xcopy_volume_image_fqin": {
+		Name:        "populator_vsphere_xcopy_volume_image_fqin",
+		Type:        TypeString,
+		Default:     "",
+		Description: "vSphere xcopy populator image (Forklift < 2.12, use populator_vsphere_copy_offload_image_fqin for newer)",
 		Category:    CategoryImage,
 	},
 
@@ -151,7 +172,7 @@ var SupportedSettings = map[string]SettingDefinition{
 	"feature_ocp_live_migration": {
 		Name:        "feature_ocp_live_migration",
 		Type:        TypeBool,
-		Default:     false,
+		Default:     true,
 		Description: "Enable cross-cluster OpenShift live migration",
 		Category:    CategoryFeature,
 	},
@@ -292,6 +313,27 @@ var SupportedSettings = map[string]SettingDefinition{
 		Type:        TypeString,
 		Default:     "",
 		Description: "ConfigMap with extra virt-v2v configuration files",
+		Category:    CategoryVirtV2V,
+	},
+	"virt_v2v_inspector_extra_args": {
+		Name:        "virt_v2v_inspector_extra_args",
+		Type:        TypeString,
+		Default:     "",
+		Description: "Additional virt-v2v inspector command-line arguments",
+		Category:    CategoryVirtV2V,
+	},
+	"virt_v2v_memsize": {
+		Name:        "virt_v2v_memsize",
+		Type:        TypeString,
+		Default:     "",
+		Description: "Memory size for virt-v2v appliance",
+		Category:    CategoryVirtV2V,
+	},
+	"virt_v2v_smp": {
+		Name:        "virt_v2v_smp",
+		Type:        TypeString,
+		Default:     "",
+		Description: "Number of vCPUs for virt-v2v appliance",
 		Category:    CategoryVirtV2V,
 	},
 	"virt_v2v_container_limits_cpu": {
@@ -442,6 +484,29 @@ var SupportedSettings = map[string]SettingDefinition{
 		Description: "HyperV provider server memory request",
 		Category:    CategoryHyperV,
 	},
+
+	// Ansible Automation Platform (AAP)
+	"aap_url": {
+		Name:        "aap_url",
+		Type:        TypeString,
+		Default:     "",
+		Description: "Ansible Automation Platform base URL (e.g. https://aap.example.com)",
+		Category:    CategoryAAP,
+	},
+	"aap_token_secret_name": {
+		Name:        "aap_token_secret_name",
+		Type:        TypeString,
+		Default:     "",
+		Description: "Name of the Secret containing the AAP API Bearer token (data key: token)",
+		Category:    CategoryAAP,
+	},
+	"aap_timeout": {
+		Name:        "aap_timeout",
+		Type:        TypeInt,
+		Default:     0,
+		Description: "Default timeout in seconds for AAP HTTP calls and job polling when Hook spec.deadline is 0",
+		Category:    CategoryAAP,
+	},
 }
 
 // ExtendedSettings contains additional ForkliftController settings not in the curated SupportedSettings.
@@ -518,6 +583,13 @@ var ExtendedSettings = map[string]SettingDefinition{
 		Type:        TypeString,
 		Default:     "",
 		Description: "Optional NAD name for controller pod transfer network (format: namespace/network-name)",
+		Category:    CategoryController,
+	},
+	"controller_migration_service_account": {
+		Name:        "controller_migration_service_account",
+		Type:        TypeString,
+		Default:     "",
+		Description: "Default ServiceAccount for migration pods (overridden by plan-level serviceAccount)",
 		Category:    CategoryController,
 	},
 
@@ -673,28 +745,28 @@ var ExtendedSettings = map[string]SettingDefinition{
 	"cli_download_container_limits_cpu": {
 		Name:        "cli_download_container_limits_cpu",
 		Type:        TypeString,
-		Default:     "100m",
+		Default:     "1000m",
 		Description: "CLI download service CPU limit",
 		Category:    CategoryCLIDownload,
 	},
 	"cli_download_container_limits_memory": {
 		Name:        "cli_download_container_limits_memory",
 		Type:        TypeString,
-		Default:     "128Mi",
+		Default:     "1Gi",
 		Description: "CLI download service memory limit",
 		Category:    CategoryCLIDownload,
 	},
 	"cli_download_container_requests_cpu": {
 		Name:        "cli_download_container_requests_cpu",
 		Type:        TypeString,
-		Default:     "50m",
+		Default:     "100m",
 		Description: "CLI download service CPU request",
 		Category:    CategoryCLIDownload,
 	},
 	"cli_download_container_requests_memory": {
 		Name:        "cli_download_container_requests_memory",
 		Type:        TypeString,
-		Default:     "64Mi",
+		Default:     "512Mi",
 		Description: "CLI download service memory request",
 		Category:    CategoryCLIDownload,
 	},
@@ -793,13 +865,6 @@ var ExtendedSettings = map[string]SettingDefinition{
 		Description: "OpenStack populator image",
 		Category:    CategoryImage,
 	},
-	"populator_vsphere_copy_offload_image_fqin": {
-		Name:        "populator_vsphere_copy_offload_image_fqin",
-		Type:        TypeString,
-		Default:     "",
-		Description: "vSphere xcopy populator image",
-		Category:    CategoryImage,
-	},
 	"ova_provider_server_fqin": {
 		Name:        "ova_provider_server_fqin",
 		Type:        TypeString,
@@ -812,6 +877,13 @@ var ExtendedSettings = map[string]SettingDefinition{
 		Type:        TypeString,
 		Default:     "",
 		Description: "HyperV provider server image",
+		Category:    CategoryImage,
+	},
+	"virt_v2v_image_xfs_fqin": {
+		Name:        "virt_v2v_image_xfs_fqin",
+		Type:        TypeString,
+		Default:     "",
+		Description: "Custom virt-v2v XFS container image",
 		Category:    CategoryImage,
 	},
 	"must_gather_image_fqin": {
@@ -827,6 +899,22 @@ var ExtendedSettings = map[string]SettingDefinition{
 		Default:     "",
 		Description: "OVA inventory proxy image",
 		Category:    CategoryImage,
+	},
+
+	// HyperV Controller Settings
+	"controller_hyperv_refresh_interval": {
+		Name:        "controller_hyperv_refresh_interval",
+		Type:        TypeString,
+		Default:     "10s",
+		Description: "HyperV provider inventory refresh interval",
+		Category:    CategoryHyperV,
+	},
+	"controller_hyperv_validation_timeout": {
+		Name:        "controller_hyperv_validation_timeout",
+		Type:        TypeString,
+		Default:     "30s",
+		Description: "HyperV provider validation timeout",
+		Category:    CategoryHyperV,
 	},
 
 	// ConfigMap Names
@@ -872,13 +960,6 @@ var ExtendedSettings = map[string]SettingDefinition{
 		Type:        TypeInt,
 		Default:     10,
 		Description: "Maximum retries for parent backing lookup",
-		Category:    CategoryAdvanced,
-	},
-	"controller_cdi_export_token_ttl": {
-		Name:        "controller_cdi_export_token_ttl",
-		Type:        TypeInt,
-		Default:     720,
-		Description: "CDI export token TTL (minutes)",
 		Category:    CategoryAdvanced,
 	},
 	"image_pull_policy": {

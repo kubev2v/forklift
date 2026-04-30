@@ -14,6 +14,7 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/get/plan/status"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/output"
+	querypkg "github.com/yaacov/kubectl-mtv/pkg/util/query"
 	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
@@ -64,7 +65,7 @@ func getSpecificPlan(ctx context.Context, dynamicClient dynamic.Interface, names
 }
 
 // ListPlans lists migration plans without watch functionality
-func ListPlans(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace string, outputFormat string, planName string, useUTC bool) error {
+func ListPlans(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace string, outputFormat string, planName string, useUTC bool, query string) error {
 	c, err := client.GetDynamicClient(configFlags)
 	if err != nil {
 		return fmt.Errorf("failed to get client: %v", err)
@@ -182,6 +183,18 @@ func ListPlans(ctx context.Context, configFlags *genericclioptions.ConfigFlags, 
 		items = append(items, item)
 	}
 
+	// Apply query filter
+	if query != "" {
+		queryOpts, err := querypkg.ParseQueryString(query)
+		if err != nil {
+			return fmt.Errorf("failed to parse query: %v", err)
+		}
+		items, err = querypkg.ApplyQuery(items, queryOpts)
+		if err != nil {
+			return fmt.Errorf("error applying query: %v", err)
+		}
+	}
+
 	// Handle different output formats
 	switch outputFormat {
 	case "json":
@@ -190,7 +203,7 @@ func ListPlans(ctx context.Context, configFlags *genericclioptions.ConfigFlags, 
 			WithPrettyPrint(true).
 			AddItems(items)
 
-		if len(plans.Items) == 0 {
+		if len(items) == 0 {
 			return jsonPrinter.PrintEmpty("No plans found in namespace " + namespace)
 		}
 		return jsonPrinter.Print()
@@ -198,37 +211,37 @@ func ListPlans(ctx context.Context, configFlags *genericclioptions.ConfigFlags, 
 		yamlPrinter := output.NewYAMLPrinter().
 			AddItems(items)
 
-		if len(plans.Items) == 0 {
+		if len(items) == 0 {
 			return yamlPrinter.PrintEmpty("No plans found in namespace " + namespace)
 		}
 		return yamlPrinter.Print()
 	}
 
-	var headers []output.Header
+	var headers []output.Column
 
-	headers = append(headers, output.Header{DisplayName: "NAME", JSONPath: "metadata.name"})
+	headers = append(headers, output.Column{Title: "NAME", Key: "metadata.name"})
 
 	if namespace == "" {
-		headers = append(headers, output.Header{DisplayName: "NAMESPACE", JSONPath: "metadata.namespace"})
+		headers = append(headers, output.Column{Title: "NAMESPACE", Key: "metadata.namespace"})
 	}
 
 	headers = append(headers,
-		output.Header{DisplayName: "SOURCE", JSONPath: "source"},
-		output.Header{DisplayName: "TARGET", JSONPath: "target"},
-		output.Header{DisplayName: "VMS", JSONPath: "vms"},
-		output.Header{DisplayName: "READY", JSONPath: "ready", ColorFunc: output.ColorizeConditionStatus},
-		output.Header{DisplayName: "STATUS", JSONPath: "status", ColorFunc: output.ColorizeStatus},
-		output.Header{DisplayName: "PROGRESS", JSONPath: "progress"},
-		output.Header{DisplayName: "CUTOVER", JSONPath: "cutover"},
-		output.Header{DisplayName: "ARCHIVED", JSONPath: "archived"},
-		output.Header{DisplayName: "CREATED", JSONPath: "created"},
+		output.Column{Title: "SOURCE", Key: "source"},
+		output.Column{Title: "TARGET", Key: "target"},
+		output.Column{Title: "VMS", Key: "vms"},
+		output.Column{Title: "READY", Key: "ready", ColorFunc: output.ColorizeConditionStatus},
+		output.Column{Title: "STATUS", Key: "status", ColorFunc: output.ColorizeStatus},
+		output.Column{Title: "PROGRESS", Key: "progress"},
+		output.Column{Title: "CUTOVER", Key: "cutover"},
+		output.Column{Title: "ARCHIVED", Key: "archived"},
+		output.Column{Title: "CREATED", Key: "created"},
 	)
 
-	tablePrinter := output.NewTablePrinter().WithHeaders(headers...).AddItems(items)
+	tablePrinter := output.NewTablePrinter().WithColumns(headers...).AddItems(items)
 
 	emptyMsg := "No plans found in namespace " + namespace
 	if outputFormat == "markdown" {
-		if len(plans.Items) == 0 {
+		if len(items) == 0 {
 			if err := tablePrinter.PrintEmpty(emptyMsg); err != nil {
 				return fmt.Errorf("error printing empty markdown: %v", err)
 			}
@@ -236,7 +249,7 @@ func ListPlans(ctx context.Context, configFlags *genericclioptions.ConfigFlags, 
 			return fmt.Errorf("error printing markdown: %v", err)
 		}
 	} else {
-		if len(plans.Items) == 0 {
+		if len(items) == 0 {
 			if err := tablePrinter.PrintEmpty(emptyMsg); err != nil {
 				return fmt.Errorf("error printing empty table: %v", err)
 			}
@@ -249,8 +262,8 @@ func ListPlans(ctx context.Context, configFlags *genericclioptions.ConfigFlags, 
 }
 
 // List lists migration plans with optional watch mode
-func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace string, watchMode bool, outputFormat string, planName string, useUTC bool) error {
+func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace string, watchMode bool, outputFormat string, planName string, useUTC bool, query string) error {
 	return watch.WrapWithWatch(watchMode, outputFormat, func() error {
-		return ListPlans(ctx, configFlags, namespace, outputFormat, planName, useUTC)
+		return ListPlans(ctx, configFlags, namespace, outputFormat, planName, useUTC, query)
 	}, watch.DefaultInterval)
 }

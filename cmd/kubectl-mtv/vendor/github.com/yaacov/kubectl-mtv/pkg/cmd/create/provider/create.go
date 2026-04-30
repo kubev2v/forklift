@@ -13,6 +13,7 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/ova"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/providerutil"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/vsphere"
+	"github.com/yaacov/kubectl-mtv/pkg/util/output"
 
 	forkliftv1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -53,6 +54,15 @@ func Create(configFlags *genericclioptions.ConfigFlags, providerType string, opt
 	// Handle any errors that occurred during provider creation
 	if err != nil {
 		return fmt.Errorf("failed to prepare provider: %v", err)
+	}
+
+	if options.DryRun {
+		if secretResource != nil {
+			if err := output.OutputResource(secretResource, options.OutputFormat); err != nil {
+				return err
+			}
+		}
+		return output.OutputResource(providerResource, options.OutputFormat)
 	}
 
 	// Display the creation results to the user

@@ -68,41 +68,41 @@ func listNetworksOnce(ctx context.Context, kubeConfigFlags *genericclioptions.Co
 	}
 
 	// Define default headers based on provider type
-	var defaultHeaders []output.Header
+	var defaultHeaders []output.Column
 	switch providerType {
 	case "openshift":
-		defaultHeaders = []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "NAMESPACE", JSONPath: "namespace"},
-			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "CREATED", JSONPath: "object.metadata.creationTimestamp"},
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "NAMESPACE", Key: "namespace"},
+			{Title: "ID", Key: "id"},
+			{Title: "CREATED", Key: "object.metadata.creationTimestamp"},
 		}
 	case "openstack":
-		defaultHeaders = []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "STATUS", JSONPath: "status", ColorFunc: output.ColorizeStatus},
-			{DisplayName: "SHARED", JSONPath: "shared", ColorFunc: output.ColorizeBooleanString},
-			{DisplayName: "ADMIN-UP", JSONPath: "adminStateUp", ColorFunc: output.ColorizeBooleanString},
-			{DisplayName: "SUBNETS", JSONPath: "subnetsCount"},
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "ID", Key: "id"},
+			{Title: "STATUS", Key: "status", ColorFunc: output.ColorizeStatus},
+			{Title: "SHARED", Key: "shared", ColorFunc: output.ColorizeBooleanString},
+			{Title: "ADMIN-UP", Key: "adminStateUp", ColorFunc: output.ColorizeBooleanString},
+			{Title: "SUBNETS", Key: "subnetsCount"},
 		}
 	case "ec2":
-		defaultHeaders = []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "TYPE", JSONPath: "networkType"},
-			{DisplayName: "CIDR", JSONPath: "CidrBlock"},
-			{DisplayName: "STATE", JSONPath: "State", ColorFunc: output.ColorizeStatus},
-			{DisplayName: "DEFAULT", JSONPath: "IsDefault", ColorFunc: output.ColorizeBooleanString},
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "ID", Key: "id"},
+			{Title: "TYPE", Key: "networkType"},
+			{Title: "CIDR", Key: "CidrBlock"},
+			{Title: "STATE", Key: "State", ColorFunc: output.ColorizeStatus},
+			{Title: "DEFAULT", Key: "IsDefault", ColorFunc: output.ColorizeBooleanString},
 		}
 	default:
-		defaultHeaders = []output.Header{
-			{DisplayName: "NAME", JSONPath: "name"},
-			{DisplayName: "ID", JSONPath: "id"},
-			{DisplayName: "VARIANT", JSONPath: "variant"},
-			{DisplayName: "HOSTS", JSONPath: "hostCount"},
-			{DisplayName: "VLAN", JSONPath: "vlanId"},
-			{DisplayName: "REVISION", JSONPath: "revision"},
+		defaultHeaders = []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "ID", Key: "id"},
+			{Title: "VARIANT", Key: "variant"},
+			{Title: "HOSTS", Key: "hostCount"},
+			{Title: "VLAN", Key: "vlanId"},
+			{Title: "REVISION", Key: "revision"},
 		}
 	}
 

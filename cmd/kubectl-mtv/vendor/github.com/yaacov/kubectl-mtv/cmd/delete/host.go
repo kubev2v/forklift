@@ -10,6 +10,7 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/delete/host"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/completion"
+	"github.com/yaacov/kubectl-mtv/pkg/util/flags"
 )
 
 // NewHostCmd creates the delete host command
@@ -20,9 +21,13 @@ func NewHostCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "host",
 		Short:        "Delete one or more migration hosts",
-		Args:         cobra.NoArgs,
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := flags.ResolveNamesArg(&hostNames, args); err != nil {
+				return err
+			}
+
 			// Validate --all and --name are mutually exclusive
 			if all && len(hostNames) > 0 {
 				return errors.New("cannot use --name with --all")

@@ -14,6 +14,7 @@ import (
 	forkliftv1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/provider"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
+	"github.com/yaacov/kubectl-mtv/pkg/util/output"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -176,18 +177,14 @@ func parseNetworkPairsWithInsecure(ctx context.Context, pairStr, defaultNamespac
 }
 
 // createNetworkMappingWithInsecure creates a new network mapping with optional insecure TLS skip verification
-func createNetworkMappingWithInsecure(configFlags *genericclioptions.ConfigFlags, name, namespace, sourceProvider, targetProvider, networkPairs, inventoryURL string, insecureSkipTLS bool) error {
-	dynamicClient, err := client.GetDynamicClient(configFlags)
-	if err != nil {
-		return fmt.Errorf("failed to get client: %v", err)
-	}
-
+func createNetworkMappingWithInsecure(configFlags *genericclioptions.ConfigFlags, name, namespace, sourceProvider, targetProvider, networkPairs, inventoryURL string, insecureSkipTLS bool, dryRun bool, outputFormat string) error {
 	// Parse provider references to extract names and namespaces
 	sourceProviderName, sourceProviderNamespace := parseProviderReference(sourceProvider, namespace)
 	targetProviderName, targetProviderNamespace := parseProviderReference(targetProvider, namespace)
 
 	// Parse network pairs if provided
 	var mappingPairs []forkliftv1beta1.NetworkPair
+	var err error
 	if networkPairs != "" {
 		mappingPairs, err = parseNetworkPairsWithInsecure(context.TODO(), networkPairs, namespace, configFlags, sourceProvider, inventoryURL, insecureSkipTLS)
 		if err != nil {
@@ -214,6 +211,17 @@ func createNetworkMappingWithInsecure(configFlags *genericclioptions.ConfigFlags
 			},
 			Map: mappingPairs,
 		},
+	}
+	networkMap.Kind = "NetworkMap"
+	networkMap.APIVersion = forkliftv1beta1.SchemeGroupVersion.String()
+
+	if dryRun {
+		return output.OutputResource(networkMap, outputFormat)
+	}
+
+	dynamicClient, err := client.GetDynamicClient(configFlags)
+	if err != nil {
+		return fmt.Errorf("failed to get client: %v", err)
 	}
 
 	// Convert to unstructured

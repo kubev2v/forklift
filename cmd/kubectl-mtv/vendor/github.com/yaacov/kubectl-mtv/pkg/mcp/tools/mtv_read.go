@@ -16,7 +16,7 @@ type MTVReadInput struct {
 
 	Flags map[string]any `json:"flags,omitempty" jsonschema:"All parameters including positional args and options (e.g. name: \"my-plan\", provider: \"my-vsphere\", output: \"json\", namespace: \"ns\", query: \"where cpuCount > 4\")"`
 
-	DryRun bool `json:"dry_run,omitempty" jsonschema:"If true, does not execute. Returns the equivalent CLI command in the output field instead"`
+	ShowCLI bool `json:"show_cli,omitempty" jsonschema:"If true, does not execute. Returns the equivalent CLI command in the output field instead"`
 
 	Fields []string `json:"fields,omitempty" jsonschema:"Limit JSON to these top-level keys only (e.g. [name, id, concerns])"`
 }
@@ -93,7 +93,7 @@ func validateCommandInput(command string) error {
 // HandleMTVRead returns a handler function for the mtv_read tool.
 func HandleMTVRead(registry *discovery.Registry) func(context.Context, *mcp.CallToolRequest, MTVReadInput) (*mcp.CallToolResult, any, error) {
 	return func(ctx context.Context, req *mcp.CallToolRequest, input MTVReadInput) (*mcp.CallToolResult, any, error) {
-		// Extract K8s credentials from HTTP headers (populated by wrapper in SSE mode)
+		// Extract K8s credentials from HTTP headers (populated by SDK in HTTP mode)
 		ctx = extractKubeCredsFromRequest(ctx, req)
 
 		// Validate input to catch common small-LLM mistakes early
@@ -117,9 +117,9 @@ func HandleMTVRead(registry *discovery.Registry) func(context.Context, *mcp.Call
 			return nil, nil, fmt.Errorf("unknown command '%s'. Available read commands: %s", input.Command, strings.Join(available, ", "))
 		}
 
-		// Enable dry run mode if requested
-		if input.DryRun {
-			ctx = util.WithDryRun(ctx, true)
+		// Enable show-CLI mode if requested
+		if input.ShowCLI {
+			ctx = util.WithShowCLI(ctx, true)
 		}
 
 		// Apply default output format for commands that support --output.

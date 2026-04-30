@@ -1,60 +1,178 @@
 package output
 
-// PrintTable prints the given data as a table using TablePrinter and headers
 import (
 	"fmt"
 	"io"
 	"os"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
+
 	"github.com/yaacov/kubectl-mtv/pkg/util/query"
 )
 
-// PrintTableWithQuery prints the given data as a table using TablePrinter,
-// supporting dynamic headers from query options and empty message handling.
-func PrintTableWithQuery(data interface{}, defaultHeaders []Header, queryOpts *query.QueryOptions, emptyMessage string) error {
-	items, ok := data.([]map[string]interface{})
-	if !ok {
-		if item, ok := data.(map[string]interface{}); ok {
-			// Handle single item map
-			items = []map[string]interface{}{item}
-		} else if slice, ok := data.([]interface{}); ok {
-			// Handle []interface{} from JSON unmarshaling
-			items = make([]map[string]interface{}, len(slice))
-			for i, item := range slice {
-				if mapItem, ok := item.(map[string]interface{}); ok {
-					items[i] = mapItem
-				} else {
-					return fmt.Errorf("unsupported data type for table output: slice contains non-map elements")
-				}
+// Column describes a single table column: its header text, the map key used
+// to extract cell values, and an optional colorizer applied to cell values.
+type Column struct {
+	Title     string
+	Key       string
+	ColorFunc func(string) string
+}
+
+// TablePrinter builds tabular data from []map[string]interface{} rows and
+// renders them via lipgloss/table.
+type TablePrinter struct {
+	columns       []Column
+	items         []map[string]interface{}
+	writer        io.Writer
+	selectOptions []query.SelectOption
+}
+
+// NewTablePrinter creates a new TablePrinter that writes to stdout.
+func NewTablePrinter() *TablePrinter {
+	return &TablePrinter{
+		columns: []Column{},
+		items:   []map[string]interface{}{},
+		writer:  os.Stdout,
+	}
+}
+
+// WithColumns sets the table columns.
+func (t *TablePrinter) WithColumns(cols ...Column) *TablePrinter {
+	t.columns = cols
+	return t
+}
+
+// WithWriter sets the output writer (default: os.Stdout).
+func (t *TablePrinter) WithWriter(w io.Writer) *TablePrinter {
+	t.writer = w
+	return t
+}
+
+// WithSelectOptions sets select options for advanced value extraction.
+func (t *TablePrinter) WithSelectOptions(opts []query.SelectOption) *TablePrinter {
+	t.selectOptions = opts
+	return t
+}
+
+// AddItem appends a single row to the table.
+func (t *TablePrinter) AddItem(item map[string]interface{}) *TablePrinter {
+	t.items = append(t.items, item)
+	return t
+}
+
+// AddItems appends multiple rows to the table.
+func (t *TablePrinter) AddItems(items []map[string]interface{}) *TablePrinter {
+	t.items = append(t.items, items...)
+	return t
+}
+
+// PrintEmpty prints a message when there are no items to display.
+func (t *TablePrinter) PrintEmpty(message string) error {
+	_, err := fmt.Fprintln(t.writer, message)
+	return err
+}
+
+// Print renders the table to the configured writer.
+func (t *TablePrinter) Print() error {
+	headers, rows := t.buildTable()
+	if len(headers) == 0 {
+		return nil
+	}
+
+	tbl := table.New().
+		Headers(headers...).
+		Rows(rows...).
+		BorderTop(false).
+		BorderBottom(false).
+		BorderLeft(false).
+		BorderRight(false).
+		BorderColumn(false).
+		BorderHeader(true).
+		BorderStyle(lipgloss.NewStyle()).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			s := lipgloss.NewStyle().PaddingRight(2)
+			if row == table.HeaderRow && IsColorEnabled() {
+				return s.Bold(true)
 			}
-		} else {
-			return fmt.Errorf("unsupported data type for table output")
+			return s
+		})
+
+	_, err := fmt.Fprintln(t.writer, tbl.Render())
+	return err
+}
+
+// PrintMarkdown renders the table as a GitHub-flavored markdown table.
+// ANSI color codes are stripped from all cell values.
+func (t *TablePrinter) PrintMarkdown() error {
+	if len(t.columns) == 0 {
+		return nil
+	}
+
+	headers := make([]string, len(t.columns))
+	for i, c := range t.columns {
+		headers[i] = c.Title
+	}
+
+	if _, err := fmt.Fprintln(t.writer, "| "+strings.Join(headers, " | ")+" |"); err != nil {
+		return err
+	}
+
+	sep := make([]string, len(t.columns))
+	for i := range sep {
+		sep[i] = "---"
+	}
+	if _, err := fmt.Fprintln(t.writer, "| "+strings.Join(sep, " | ")+" |"); err != nil {
+		return err
+	}
+
+	for _, item := range t.items {
+		cells := make([]string, len(t.columns))
+		for j, c := range t.columns {
+			val := StripANSI(t.extractValue(item, c.Key))
+			cells[j] = strings.ReplaceAll(val, "|", `\|`)
 		}
+		if _, err := fmt.Fprintln(t.writer, "| "+strings.Join(cells, " | ")+" |"); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// Convenience functions for common output patterns
+// ---------------------------------------------------------------------------
+
+// PrintTableWithQuery prints the given data as a table using TablePrinter,
+// supporting dynamic columns from query options and empty message handling.
+func PrintTableWithQuery(data interface{}, defaultColumns []Column, queryOpts *query.QueryOptions, emptyMessage string) error {
+	items, err := toItemSlice(data)
+	if err != nil {
+		return err
 	}
 
 	var printer *TablePrinter
 
-	// Check if we should use custom headers from SELECT clause
 	if queryOpts != nil && queryOpts.HasSelect {
-		headers := make([]Header, 0, len(queryOpts.Select))
+		cols := make([]Column, 0, len(queryOpts.Select))
 		for _, sel := range queryOpts.Select {
-			headers = append(headers, Header{
-				DisplayName: sel.Alias,
-				JSONPath:    sel.Alias,
+			display := sel.Alias
+			if display == "" {
+				display = strings.TrimPrefix(sel.Field, ".")
+			}
+			cols = append(cols, Column{
+				Title: display,
+				Key:   display,
 			})
 		}
 		printer = NewTablePrinter().
-			WithHeaders(headers...).
-			WithSelectOptions(queryOpts.Select).
-			WithJSONPathRow().
-			WithSeparator("─")
+			WithColumns(cols...).
+			WithSelectOptions(queryOpts.Select)
 	} else {
-		// Use the provided default headers
 		printer = NewTablePrinter().
-			WithHeaders(defaultHeaders...).
-			WithJSONPathRow().
-			WithSeparator("─")
+			WithColumns(defaultColumns...)
 	}
 
 	if len(items) == 0 && emptyMessage != "" {
@@ -65,138 +183,87 @@ func PrintTableWithQuery(data interface{}, defaultHeaders []Header, queryOpts *q
 	return printer.Print()
 }
 
-// Header represents a table column header with display text and a JSON path
-type Header struct {
-	DisplayName string
-	JSONPath    string
-	ColorFunc   func(string) string
-}
-
-// TablePrinter prints tabular data with dynamically sized columns
-type TablePrinter struct {
-	headers         []Header
-	items           []map[string]interface{}
-	padding         int
-	minWidth        int
-	writer          io.Writer
-	maxColWidth     int
-	expandedData    map[int]string       // Stores expanded data for each row by index
-	selectOptions   []query.SelectOption // Optional: select options for advanced extraction
-	separator       string               // if set, printed between header and data rows
-	columnWidths    []int                // if set, overrides auto-calculated widths
-	showJSONPathRow bool                 // if true, prints a row of JSON paths below the header
-}
-
-// NewTablePrinter creates a new TablePrinter
-func NewTablePrinter() *TablePrinter {
-	return &TablePrinter{
-		headers:      []Header{},
-		items:        []map[string]interface{}{},
-		padding:      2,
-		minWidth:     10,
-		writer:       os.Stdout,
-		maxColWidth:  50, // Prevent very wide columns
-		expandedData: make(map[int]string),
+// PrintMarkdownWithQuery prints data as a markdown table, supporting dynamic
+// columns from query options and empty message handling.
+func PrintMarkdownWithQuery(data interface{}, defaultColumns []Column, queryOpts *query.QueryOptions, emptyMessage string) error {
+	items, err := toItemSlice(data)
+	if err != nil {
+		return err
 	}
+
+	var printer *TablePrinter
+
+	if queryOpts != nil && queryOpts.HasSelect {
+		cols := make([]Column, 0, len(queryOpts.Select))
+		for _, sel := range queryOpts.Select {
+			display := sel.Alias
+			if display == "" {
+				display = strings.TrimPrefix(sel.Field, ".")
+			}
+			cols = append(cols, Column{
+				Title: display,
+				Key:   display,
+			})
+		}
+		printer = NewTablePrinter().
+			WithColumns(cols...).
+			WithSelectOptions(queryOpts.Select)
+	} else {
+		printer = NewTablePrinter().
+			WithColumns(defaultColumns...)
+	}
+
+	if len(items) == 0 && emptyMessage != "" {
+		return printer.PrintEmpty(emptyMessage)
+	}
+
+	printer.AddItems(items)
+	return printer.PrintMarkdown()
 }
 
-// WithHeaders sets the table headers with display names and JSON paths
-func (t *TablePrinter) WithHeaders(headers ...Header) *TablePrinter {
-	t.headers = headers
-	return t
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+// buildTable extracts header strings and row string slices from the configured
+// columns and items. ColorFunc is applied to cell values.
+func (t *TablePrinter) buildTable() ([]string, [][]string) {
+	headers := make([]string, len(t.columns))
+	for i, c := range t.columns {
+		headers[i] = c.Title
+	}
+
+	rows := make([][]string, 0, len(t.items))
+	for _, item := range t.items {
+		row := make([]string, len(t.columns))
+		for j, c := range t.columns {
+			val := t.extractValue(item, c.Key)
+			if c.ColorFunc != nil {
+				val = c.ColorFunc(val)
+			}
+			row[j] = val
+		}
+		rows = append(rows, row)
+	}
+
+	return headers, rows
 }
 
-// WithPadding sets the padding between columns
-func (t *TablePrinter) WithPadding(padding int) *TablePrinter {
-	t.padding = padding
-	return t
-}
-
-// WithMinWidth sets the minimum column width
-func (t *TablePrinter) WithMinWidth(minWidth int) *TablePrinter {
-	t.minWidth = minWidth
-	return t
-}
-
-// WithMaxWidth sets the maximum column width
-func (t *TablePrinter) WithMaxWidth(maxWidth int) *TablePrinter {
-	t.maxColWidth = maxWidth
-	return t
-}
-
-// WithWriter sets the output writer
-func (t *TablePrinter) WithWriter(writer io.Writer) *TablePrinter {
-	t.writer = writer
-	return t
-}
-
-// WithExpandedData sets expanded data for a specific row index
-func (t *TablePrinter) WithExpandedData(index int, data string) *TablePrinter {
-	t.expandedData[index] = data
-	return t
-}
-
-// WithSelectOptions sets the select options for the table printer
-func (t *TablePrinter) WithSelectOptions(selectOptions []query.SelectOption) *TablePrinter {
-	t.selectOptions = selectOptions
-	return t
-}
-
-// WithSeparator sets the character used to draw a separator line between the header and data rows
-func (t *TablePrinter) WithSeparator(char string) *TablePrinter {
-	t.separator = char
-	return t
-}
-
-// WithJSONPathRow enables printing a row of JSON paths below the header row
-func (t *TablePrinter) WithJSONPathRow() *TablePrinter {
-	t.showJSONPathRow = true
-	return t
-}
-
-// WithColumnWidths sets explicit column widths, overriding auto-calculation
-func (t *TablePrinter) WithColumnWidths(widths []int) *TablePrinter {
-	t.columnWidths = widths
-	return t
-}
-
-// AddItem adds an item to the table
-func (t *TablePrinter) AddItem(item map[string]interface{}) *TablePrinter {
-	t.items = append(t.items, item)
-	return t
-}
-
-// AddItemWithExpanded adds an item to the table with expanded data
-func (t *TablePrinter) AddItemWithExpanded(item map[string]interface{}, expanded string) *TablePrinter {
-	index := len(t.items)
-	t.items = append(t.items, item)
-	t.expandedData[index] = expanded
-	return t
-}
-
-// AddItems adds multiple items to the table
-func (t *TablePrinter) AddItems(items []map[string]interface{}) *TablePrinter {
-	t.items = append(t.items, items...)
-	return t
-}
-
-// extractValue extracts a value from an item using a JSON path
-func (t *TablePrinter) extractValue(item map[string]interface{}, path string) string {
-	if path == "" {
-		// No path provided, return empty string
+// extractValue extracts a value from an item using a map key.
+func (t *TablePrinter) extractValue(item map[string]interface{}, key string) string {
+	if key == "" {
 		return ""
 	}
 
-	// Use query.GetValue if selectOptions are set, otherwise fallback to GetValueByPathString
 	if len(t.selectOptions) > 0 {
-		val, err := query.GetValue(item, path, t.selectOptions)
+		val, err := query.GetValue(item, key, t.selectOptions)
 		if err != nil {
 			return ""
 		}
 		return valueToString(val)
 	}
 
-	value, err := query.GetValueByPathString(item, path)
+	value, err := query.GetValueByPathString(item, key)
 	if err != nil {
 		return ""
 	}
@@ -204,7 +271,7 @@ func (t *TablePrinter) extractValue(item map[string]interface{}, path string) st
 	return valueToString(value)
 }
 
-// valueToString converts a value of any supported type to a string
+// valueToString converts a value of any supported type to a string.
 func valueToString(value interface{}) string {
 	if value == nil {
 		return ""
@@ -226,300 +293,28 @@ func valueToString(value interface{}) string {
 	case bool:
 		return fmt.Sprintf("%t", v)
 	default:
-		// For other types, use default string conversion
 		return fmt.Sprintf("%v", v)
 	}
 }
 
-// calculateColumnWidths determines the optimal width for each column
-func (t *TablePrinter) calculateColumnWidths() []int {
-	numCols := len(t.headers)
-	if numCols == 0 {
-		return []int{}
+// toItemSlice normalizes various data shapes into []map[string]interface{}.
+func toItemSlice(data interface{}) ([]map[string]interface{}, error) {
+	if items, ok := data.([]map[string]interface{}); ok {
+		return items, nil
 	}
-
-	if len(t.columnWidths) == numCols {
-		return t.columnWidths
+	if item, ok := data.(map[string]interface{}); ok {
+		return []map[string]interface{}{item}, nil
 	}
-
-	// Initialize widths with minimum values
-	widths := make([]int, numCols)
-	for i := range widths {
-		widths[i] = t.minWidth
-	}
-
-	// Check header widths
-	for i, header := range t.headers {
-		headerWidth := VisibleLength(header.DisplayName)
-		if headerWidth > widths[i] {
-			widths[i] = min(headerWidth, t.maxColWidth)
-		}
-		if t.showJSONPathRow {
-			pathWidth := len(header.JSONPath) + 2 // +2 for surrounding brackets
-			if pathWidth > widths[i] {
-				widths[i] = min(pathWidth, t.maxColWidth)
+	if slice, ok := data.([]interface{}); ok {
+		items := make([]map[string]interface{}, len(slice))
+		for i, elem := range slice {
+			if m, ok := elem.(map[string]interface{}); ok {
+				items[i] = m
+			} else {
+				return nil, fmt.Errorf("unsupported data type for table output: slice contains non-map elements")
 			}
 		}
+		return items, nil
 	}
-
-	// Calculate row data for width determination
-	for _, item := range t.items {
-		for i, header := range t.headers {
-			value := t.extractValue(item, header.JSONPath)
-			cellWidth := VisibleLength(value)
-			if cellWidth > widths[i] {
-				widths[i] = min(cellWidth, t.maxColWidth)
-			}
-		}
-	}
-
-	return widths
-}
-
-// Print prints the table with dynamic column widths
-func (t *TablePrinter) Print() error {
-	widths := t.calculateColumnWidths()
-	if len(widths) == 0 {
-		return nil
-	}
-
-	// Print headers
-	headerRow := make([]string, len(t.headers))
-	for i, header := range t.headers {
-		headerRow[i] = header.DisplayName
-	}
-	t.printRow(headerRow, widths)
-
-	if t.showJSONPathRow {
-		pathRow := make([]string, len(t.headers))
-		for i, header := range t.headers {
-			pathRow[i] = "[" + header.JSONPath + "]"
-		}
-		t.printRow(pathRow, widths)
-	}
-
-	if t.separator != "" {
-		t.printSeparator(widths)
-	}
-
-	// Print item rows and expanded data if available
-	for i, item := range t.items {
-		row := make([]string, len(t.headers))
-		for j, header := range t.headers {
-			value := t.extractValue(item, header.JSONPath)
-			if header.ColorFunc != nil {
-				value = header.ColorFunc(value)
-			}
-			row[j] = value
-		}
-		t.printRow(row, widths)
-
-		// Print expanded data if it exists for this row
-		if expanded, exists := t.expandedData[i]; exists && expanded != "" {
-			// Split expanded data into lines and add prefix
-			lines := strings.Split(expanded, "\n")
-			for _, line := range lines {
-				fmt.Fprintf(t.writer, "  │ %s\n", line)
-			}
-		}
-	}
-
-	return nil
-}
-
-// PrintEmpty prints a message when there are no items to display
-func (t *TablePrinter) PrintEmpty(message string) error {
-	fmt.Fprintln(t.writer, message)
-	return nil
-}
-
-// printRow prints a single row with the specified column widths.
-// Handles ANSI color codes by using visible length for padding calculations.
-func (t *TablePrinter) printRow(row []string, widths []int) {
-	var sb strings.Builder
-
-	for i, cell := range row {
-		if i >= len(widths) {
-			break
-		}
-
-		displayCell := cell
-		visLen := VisibleLength(cell)
-
-		if visLen > t.maxColWidth {
-			displayCell = TruncateANSI(cell, t.maxColWidth)
-			visLen = t.maxColWidth
-		}
-
-		targetWidth := widths[i] + t.padding
-		pad := targetWidth - visLen
-		if pad < 0 {
-			pad = 0
-		}
-
-		sb.WriteString(displayCell)
-		sb.WriteString(strings.Repeat(" ", pad))
-	}
-
-	fmt.Fprintln(t.writer, strings.TrimRight(sb.String(), " "))
-}
-
-// printSeparator prints a separator line between the header and data rows.
-func (t *TablePrinter) printSeparator(widths []int) {
-	var sb strings.Builder
-	for i, w := range widths {
-		sb.WriteString(strings.Repeat(t.separator, w))
-		if i < len(widths)-1 {
-			sb.WriteString(strings.Repeat(" ", t.padding))
-		}
-	}
-	fmt.Fprintln(t.writer, sb.String())
-}
-
-// min returns the minimum of two integers
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-// MappingEntryFormatter is a function type for formatting mapping entries
-type MappingEntryFormatter func(entryMap map[string]interface{}, entryType string) string
-
-// PrintMappingTable prints mapping entries in a custom table format
-func PrintMappingTable(mapEntries []interface{}, formatter MappingEntryFormatter) error {
-	if len(mapEntries) == 0 {
-		return nil
-	}
-
-	// Calculate the maximum width for both source and destination columns based on content
-	maxSourceWidth := len("SOURCE")    // minimum width (header width)
-	maxDestWidth := len("DESTINATION") // minimum width (header width)
-
-	for _, entry := range mapEntries {
-		if entryMap, ok := entry.(map[string]interface{}); ok {
-			// Calculate source width
-			sourceText := formatter(entryMap, "source")
-			sourceLines := strings.Split(sourceText, "\n")
-			for _, line := range sourceLines {
-				if len(line) > maxSourceWidth {
-					maxSourceWidth = len(line)
-				}
-			}
-
-			// Calculate destination width
-			destText := formatter(entryMap, "destination")
-			destLines := strings.Split(destText, "\n")
-			for _, line := range destLines {
-				if len(line) > maxDestWidth {
-					maxDestWidth = len(line)
-				}
-			}
-		}
-	}
-
-	// Cap the widths to prevent overly wide tables
-	if maxSourceWidth > 50 {
-		maxSourceWidth = 50
-	}
-	if maxDestWidth > 50 {
-		maxDestWidth = 50
-	}
-
-	// Define column spacing
-	columnSpacing := "  " // 2 spaces
-
-	// Print table header
-	headerFormat := fmt.Sprintf("%%-%ds%s%%s\n", maxSourceWidth+8, columnSpacing)
-	fmt.Printf(headerFormat, Bold("SOURCE"), Bold("DESTINATION"))
-
-	// Print separator line using calculated widths
-	separatorLine := strings.Repeat("─", maxSourceWidth) + columnSpacing + strings.Repeat("─", maxDestWidth)
-	fmt.Println(separatorLine)
-
-	// Process each mapping entry
-	for i, entry := range mapEntries {
-		if entryMap, ok := entry.(map[string]interface{}); ok {
-			sourceText := formatter(entryMap, "source")
-			destText := formatter(entryMap, "destination")
-
-			printMappingTableRow(sourceText, destText, maxSourceWidth, maxDestWidth, columnSpacing)
-
-			// Add separator between entries (except for the last one)
-			if i < len(mapEntries)-1 {
-				entrySeperatorLine := strings.Repeat("─", maxSourceWidth) + columnSpacing + strings.Repeat("─", maxDestWidth)
-				fmt.Println(entrySeperatorLine)
-			}
-		}
-	}
-
-	return nil
-}
-
-// printMappingTableRow prints a single mapping row with proper alignment for multi-line content
-func printMappingTableRow(source, dest string, sourceWidth, destWidth int, columnSpacing string) {
-	sourceLines := strings.Split(source, "\n")
-	destLines := strings.Split(dest, "\n")
-
-	// Determine the maximum number of lines
-	maxLines := len(sourceLines)
-	if len(destLines) > maxLines {
-		maxLines = len(destLines)
-	}
-
-	// Print each line
-	for i := 0; i < maxLines; i++ {
-		var sourceLine, destLine string
-
-		if i < len(sourceLines) {
-			sourceLine = sourceLines[i]
-		}
-		if i < len(destLines) {
-			destLine = destLines[i]
-		}
-
-		// Truncate lines if they're too long
-		if len(sourceLine) > sourceWidth {
-			sourceLine = sourceLine[:sourceWidth-3] + "..."
-		}
-		if len(destLine) > destWidth {
-			destLine = destLine[:destWidth-3] + "..."
-		}
-
-		// Format and print the line with proper column widths
-		rowFormat := fmt.Sprintf("%%-%ds%s%%-%ds\n", sourceWidth, columnSpacing, destWidth)
-		fmt.Printf(rowFormat, sourceLine, destLine)
-	}
-}
-
-// PrintConditions prints conditions information in a consistent format
-func PrintConditions(conditions []interface{}) {
-	if len(conditions) == 0 {
-		return
-	}
-
-	fmt.Printf("%s\n", Bold("Conditions:"))
-	for _, condition := range conditions {
-		if condMap, ok := condition.(map[string]interface{}); ok {
-			condType, _ := condMap["type"].(string)
-			condStatus, _ := condMap["status"].(string)
-			category, _ := condMap["category"].(string)
-			message, _ := condMap["message"].(string)
-			lastTransitionTime, _ := condMap["lastTransitionTime"].(string)
-
-			fmt.Printf("  %s: %s", Bold(condType), ColorizeStatus(condStatus))
-			if category != "" {
-				fmt.Printf(" (%s)", ColorizeCategory(category))
-			}
-			fmt.Println()
-
-			if message != "" {
-				fmt.Printf("    %s\n", message)
-			}
-			if lastTransitionTime != "" {
-				fmt.Printf("    Last Transition: %s\n", lastTransitionTime)
-			}
-		}
-	}
+	return nil, fmt.Errorf("unsupported data type for table output")
 }

@@ -45,9 +45,12 @@ func newDescribeNetworkMappingCmd(globalConfig get.GlobalConfigGetter) *cobra.Co
 Shows the source and target network pairs, provider references, and status.`,
 		Example: `  # Describe a network mapping
   kubectl-mtv describe mapping network --name my-net-map`,
-		Args:         cobra.NoArgs,
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := flags.ResolveNameArg(&name, args); err != nil {
+				return err
+			}
 			if name == "" {
 				return fmt.Errorf("--name is required")
 			}
@@ -57,7 +60,7 @@ Shows the source and target network pairs, provider references, and status.`,
 	}
 
 	cmd.Flags().StringVarP(&name, "name", "M", "", "Network mapping name")
-	_ = cmd.MarkFlagRequired("name")
+	flags.MarkRequiredForMCP(cmd, "name")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", flags.OutputFormatHelp)
 
 	_ = cmd.RegisterFlagCompletionFunc("name", completion.MappingNameCompletion(globalConfig.GetKubeConfigFlags(), "network"))
@@ -80,9 +83,12 @@ func newDescribeStorageMappingCmd(globalConfig get.GlobalConfigGetter) *cobra.Co
 Shows the source and target storage pairs, volume modes, access modes, and status.`,
 		Example: `  # Describe a storage mapping
   kubectl-mtv describe mapping storage --name my-storage-map`,
-		Args:         cobra.NoArgs,
+		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := flags.ResolveNameArg(&name, args); err != nil {
+				return err
+			}
 			if name == "" {
 				return fmt.Errorf("--name is required")
 			}
@@ -92,7 +98,7 @@ Shows the source and target storage pairs, volume modes, access modes, and statu
 	}
 
 	cmd.Flags().StringVarP(&name, "name", "M", "", "Storage mapping name")
-	_ = cmd.MarkFlagRequired("name")
+	flags.MarkRequiredForMCP(cmd, "name")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", flags.OutputFormatHelp)
 
 	_ = cmd.RegisterFlagCompletionFunc("name", completion.MappingNameCompletion(globalConfig.GetKubeConfigFlags(), "storage"))

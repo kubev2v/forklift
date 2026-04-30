@@ -16,7 +16,7 @@ type MTVWriteInput struct {
 
 	Flags map[string]any `json:"flags,omitempty" jsonschema:"All parameters including positional args and options (e.g. name: \"my-provider\", type: \"vsphere\", url: \"https://vcenter/sdk\", namespace: \"ns\")"`
 
-	DryRun bool `json:"dry_run,omitempty" jsonschema:"If true, does not execute. Returns the equivalent CLI command in the output field instead"`
+	ShowCLI bool `json:"show_cli,omitempty" jsonschema:"If true, does not execute. Returns the equivalent CLI command in the output field instead"`
 }
 
 // GetMTVWriteTool returns the tool definition for read-write MTV commands.
@@ -35,7 +35,7 @@ func GetMTVWriteTool(registry *discovery.Registry) *mcp.Tool {
 // HandleMTVWrite returns a handler function for the mtv_write tool.
 func HandleMTVWrite(registry *discovery.Registry) func(context.Context, *mcp.CallToolRequest, MTVWriteInput) (*mcp.CallToolResult, any, error) {
 	return func(ctx context.Context, req *mcp.CallToolRequest, input MTVWriteInput) (*mcp.CallToolResult, any, error) {
-		// Extract K8s credentials from HTTP headers (populated by wrapper in SSE mode)
+		// Extract K8s credentials from HTTP headers (populated by SDK in HTTP mode)
 		ctx = extractKubeCredsFromRequest(ctx, req)
 
 		// Validate input to catch common small-LLM mistakes early
@@ -59,9 +59,9 @@ func HandleMTVWrite(registry *discovery.Registry) func(context.Context, *mcp.Cal
 			return nil, nil, fmt.Errorf("unknown command '%s'. Available write commands: %s", input.Command, strings.Join(available, ", "))
 		}
 
-		// Enable dry run mode if requested
-		if input.DryRun {
-			ctx = util.WithDryRun(ctx, true)
+		// Enable show-CLI mode if requested
+		if input.ShowCLI {
+			ctx = util.WithShowCLI(ctx, true)
 		}
 
 		// Build command arguments (all params passed via flags)

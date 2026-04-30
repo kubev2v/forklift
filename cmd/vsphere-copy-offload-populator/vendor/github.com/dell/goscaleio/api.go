@@ -15,13 +15,16 @@ package goscaleio
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"math"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -32,6 +35,8 @@ import (
 	"github.com/dell/goscaleio/api"
 	"github.com/dell/goscaleio/log"
 	types "github.com/dell/goscaleio/types/v1"
+	"github.com/zitadel/oidc/v3/pkg/client/rp"
+	"golang.org/x/oauth2"
 )
 
 var (
@@ -39,9 +44,9 @@ var (
 	accHeader string
 	conHeader string
 
-	errNilReponse = errors.New("nil response from API")
-	errBodyRead   = errors.New("error reading body")
-	errNoLink     = errors.New("Error: problem finding link")
+	errNilResponse = errors.New("nil response from API")
+	errBodyRead    = errors.New("error reading body")
+	errNoLink      = errors.New("Error: problem finding link")
 
 	debug, _    = strconv.ParseBool(os.Getenv("GOSCALEIO_DEBUG"))
 	showHTTP, _ = strconv.ParseBool(os.Getenv("GOSCALEIO_SHOWHTTP"))
@@ -58,12 +63,21 @@ type Client struct {
 type Cluster struct{}
 
 // ConfigConnect defines struct for ConfigConnect
+
 type ConfigConnect struct {
-	Endpoint string
-	Version  string
-	Username string
-	Password string
-	Insecure bool
+	Endpoint         string
+	Version          string
+	Username         string
+	Password         string
+	Insecure         bool
+	AuthType         string // "Basic" or "OIDC"
+	PfmpIP           string
+	CiamClientID     string
+	CiamClientSecret string
+	OidcClientID     string
+	OidcClientSecret string
+	Issuer           string
+	Scopes           []string
 }
 
 // GetVersion returns version
@@ -84,7 +98,7 @@ func (c *Client) GetVersion() (string, error) {
 	// parse the response
 	switch {
 	case resp == nil:
-		return "", errNilReponse
+		return "", errNilResponse
 	case resp.StatusCode == http.StatusUnauthorized:
 		// Authenticate then try again
 		if _, err = c.Authenticate(c.configConnect); err != nil {
@@ -138,40 +152,25 @@ func (c *Client) Authenticate(configConnect *ConfigConnect) (Cluster, error) {
 	c.configConnect = configConnect
 
 	c.api.SetToken("")
-
-	headers := make(map[string]string, 1)
-	headers["Authorization"] = "Basic " + basicAuth(
-		configConnect.Username, configConnect.Password)
-
 	ctx := c.Context()
 	defer c.ResetContext()
 
-	resp, err := c.api.DoAndGetResponseBody(
-		ctx, http.MethodGet, "api/login", headers, nil, c.configConnect.Version)
-	if err != nil {
-		log.DoLog(log.Log.Error, err.Error())
-		return Cluster{}, err
-	}
+	var token string
+	var err error
 
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.DoLog(log.Log.Error, err.Error())
+	if configConnect.AuthType == "OIDC" {
+		log.DoLog(log.Log.Info, "Authenticating with OIDC")
+		token, err = c.oidcAuthenticate(configConnect)
+		if err != nil {
+			return Cluster{}, err
 		}
-	}()
-
-	// parse the response
-	switch {
-	case resp == nil:
-		return Cluster{}, errNilReponse
-	case !(resp.StatusCode >= 200 && resp.StatusCode <= 299):
-		return Cluster{}, c.api.ParseJSONError(resp)
+	} else {
+		log.DoLog(log.Log.Info, "Basic Authentication")
+		token, err = c.basicAuthenticate(ctx, configConnect)
+		if err != nil {
+			return Cluster{}, err
+		}
 	}
-
-	token, err := extractString(resp)
-	if err != nil {
-		return Cluster{}, nil
-	}
-
 	c.api.SetToken(token)
 
 	if c.configConnect.Version == "" {
@@ -182,6 +181,231 @@ func (c *Client) Authenticate(configConnect *ConfigConnect) (Cluster, error) {
 	}
 
 	return Cluster{}, nil
+}
+
+func (c *Client) basicAuthenticate(ctx context.Context, configConnect *ConfigConnect) (string, error) {
+	// Prepare headers for Basic Auth
+	headers := map[string]string{
+		"Authorization": "Basic " + basicAuth(configConnect.Username, configConnect.Password),
+	}
+
+	// Call the login API
+	resp, err := c.api.DoAndGetResponseBody(ctx, http.MethodGet, "api/login", headers, nil, c.configConnect.Version)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.DoLog(log.Log.Error, err.Error())
+		}
+	}()
+
+	// parse the response
+	switch {
+	case resp == nil:
+		return "", errNilResponse
+	case !(resp.StatusCode >= 200 && resp.StatusCode <= 299):
+		return "", c.api.ParseJSONError(resp)
+	}
+
+	// Extract token from response body
+	token, err := extractString(resp)
+	if err != nil {
+		return "", err
+	}
+
+	return token, nil
+}
+
+func (p *OIDCTokenProvider) GetToken(ctx context.Context) (*oauth2.Token, error) {
+	// rp library expects issuer base URL; discovery uses /.well-known/openid-configuration
+	rpClient, err := rp.NewRelyingPartyOIDC(
+		ctx,
+		p.cfg.Issuer,
+		p.cfg.ClientID,
+		p.cfg.ClientSecret,
+		"",
+		p.cfg.Scopes,
+		rp.WithHTTPClient(p.httpClient),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating OIDC relying party client: %w", err)
+	}
+
+	token, err := rp.ClientCredentials(ctx, rpClient, nil)
+	if err != nil {
+		return nil, fmt.Errorf("client credentials: %w", err)
+	}
+
+	return token, nil
+}
+
+type TokenProvider interface {
+	GetToken(ctx context.Context) (*oauth2.Token, error)
+}
+
+func WithHTTPClient(c *http.Client) OIDCOption {
+	return func(o *oidcOpts) { o.httpClient = c }
+}
+
+func WithTimeout(d time.Duration) OIDCOption {
+	return func(o *oidcOpts) { o.timeout = d }
+}
+
+func WithInsecureSkipVerify(skip bool) OIDCOption {
+	return func(o *oidcOpts) { o.insecureSkipVerify = skip }
+}
+
+func NewTokenProvider(config *ConfigConnect, opts ...OIDCOption) (TokenProvider, error) {
+	// Validate essentials
+	if config == nil {
+		return nil, fmt.Errorf("array connection data is nil")
+	}
+	if strings.TrimSpace(config.Issuer) == "" {
+		return nil, fmt.Errorf("issuer must not be empty")
+	}
+	if strings.TrimSpace(config.OidcClientID) == "" || strings.TrimSpace(config.OidcClientSecret) == "" {
+		return nil, fmt.Errorf("oidc client credentials must not be empty (OidcClientID/OidcClientSecret)")
+	}
+
+	if config.Scopes == nil {
+		config.Scopes = mergedScopes(config)
+	}
+	cfg := OIDCConfig{
+		Issuer:       config.Issuer,
+		ClientID:     config.OidcClientID,
+		ClientSecret: config.OidcClientSecret,
+		Scopes:       config.Scopes,
+	}
+
+	return NewOIDCTokenProvider(cfg, opts...)
+}
+
+func mergedScopes(config *ConfigConnect) []string {
+	iss := strings.ToLower(strings.TrimSpace(config.Issuer))
+	switch {
+	case strings.Contains(iss, "login.microsoftonline.com") || strings.HasSuffix(iss, "/v2.0"):
+		// Azure Scope: {"api://{resource-app-id}/.default"}
+		// If you have a dedicated Resource App ID, use that instead of OidcClientID.
+		return []string{fmt.Sprintf("api://%s/.default", config.OidcClientID)}
+
+	case strings.Contains(iss, "/realms/"):
+		// Keycloak Scope: {"openid"}
+		return []string{"openid"}
+	default:
+		// Unknown provider: keep empty unless caller specifies explicitly via options/fields
+		return nil
+	}
+}
+
+type OIDCOption func(*oidcOpts)
+
+type oidcOpts struct {
+	httpClient         *http.Client
+	timeout            time.Duration
+	insecureSkipVerify bool
+}
+
+type OIDCConfig struct {
+	// Base issuer URL (realm base for Keycloak, tenant base for Azure)
+	Issuer       string
+	ClientID     string
+	ClientSecret string
+	Scopes       []string
+}
+
+type OIDCTokenProvider struct {
+	cfg        OIDCConfig
+	httpClient *http.Client
+}
+
+func NewOIDCTokenProvider(cfg OIDCConfig, opts ...OIDCOption) (*OIDCTokenProvider, error) {
+	opt := &oidcOpts{}
+	for _, f := range opts {
+		f(opt)
+	}
+	httpClient, err := buildHTTPClient(opt)
+	if err != nil {
+		return nil, err
+	}
+	return &OIDCTokenProvider{cfg: cfg, httpClient: httpClient}, nil
+}
+
+func buildHTTPClient(o *oidcOpts) (*http.Client, error) {
+	if o.httpClient != nil {
+		return o.httpClient, nil
+	}
+	tlsCfg := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
+	if o.insecureSkipVerify {
+		tlsCfg.InsecureSkipVerify = true
+	}
+	transport := &http.Transport{TLSClientConfig: tlsCfg}
+	client := &http.Client{Transport: transport}
+	if o.timeout > 0 {
+		client.Timeout = o.timeout
+	}
+	return client, nil
+}
+
+func (c *Client) oidcAuthenticate(configConnect *ConfigConnect) (string, error) {
+	ctx := c.Context()
+
+	form := url.Values{}
+	form.Set("grant_type", "urn:ietf:params:oauth:grant-type:token-exchange")
+	form.Set("subject_token_type", "urn:ietf:params:oauth:token-type:jwt")
+	idpProvider, err := NewTokenProvider(
+		configConnect,
+		WithInsecureSkipVerify(configConnect.Insecure),
+		WithTimeout(20*time.Second),
+	)
+
+	idpToken, err := idpProvider.GetToken(ctx)
+	if err != nil {
+		return "", fmt.Errorf("Failed to get IDP token %s", err.Error())
+	}
+
+	form.Set("subject_token", idpToken.AccessToken)
+
+	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("https://%s/rest/v1/token", configConnect.PfmpIP), strings.NewReader(form.Encode()))
+	if err != nil {
+		return "", fmt.Errorf("creating token request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("ClientId", configConnect.CiamClientID)
+	req.Header.Set("ClientSecret", configConnect.CiamClientSecret)
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			// #nosec G402
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: configConnect.Insecure}, // same as curl -k
+		},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	switch {
+	case resp == nil:
+		return "", errNilResponse
+	case !(resp.StatusCode >= 200 && resp.StatusCode <= 299):
+		return "", c.api.ParseJSONError(resp)
+	}
+	return extractOauth2Token(resp), nil
+}
+
+func extractOauth2Token(response *http.Response) string {
+	token := &oauth2.Token{}
+	err := json.NewDecoder(response.Body).Decode(token)
+	if err != nil {
+		log.DoLog(log.Log.Error, err.Error())
+	}
+	return token.AccessToken
 }
 
 func basicAuth(username, password string) string {
@@ -279,7 +503,7 @@ func (c *Client) getStringWithRetry(
 		// parse the response
 		switch {
 		case resp == nil:
-			return "", false, errNilReponse
+			return "", false, errNilResponse
 		case resp.StatusCode == 401:
 			return "", true, c.api.ParseJSONError(resp)
 		case !(resp.StatusCode >= 200 && resp.StatusCode <= 299):
