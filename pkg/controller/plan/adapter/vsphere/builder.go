@@ -1975,13 +1975,6 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 
 	for key, value := range dst.Data {
 		switch key {
-		case "url":
-			h, err := liburl.Parse(string(value))
-			if err != nil {
-				// ignore and try to use as is
-				dst.Data["GOVMOMI_HOSTNAME"] = value
-			}
-			dst.Data["GOVMOMI_HOSTNAME"] = []byte(h.Hostname())
 		case "user":
 			dst.Data["GOVMOMI_USERNAME"] = value
 			dst.Data["accessKeyId"] = value
@@ -1991,6 +1984,19 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 		case "insecureSkipVerify":
 			dst.Data["GOVMOMI_INSECURE"] = value
 		}
+	}
+
+	// Always derive GOVMOMI_HOSTNAME from the provider spec, which is the
+	// authoritative source for the vCenter URL.
+	providerURL := r.Source.Provider.Spec.URL
+	if providerURL == "" {
+		return fmt.Errorf("provider %s/%s has an empty spec.url", r.Source.Provider.Namespace, r.Source.Provider.Name)
+	}
+	h, err := liburl.Parse(providerURL)
+	if err != nil {
+		dst.Data["GOVMOMI_HOSTNAME"] = []byte(providerURL)
+	} else {
+		dst.Data["GOVMOMI_HOSTNAME"] = []byte(h.Hostname())
 	}
 
 	// Add provider settings to the secret
