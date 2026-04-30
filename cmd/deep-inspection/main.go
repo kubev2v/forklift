@@ -29,10 +29,8 @@ import (
 )
 
 const (
-	// SecretDir is where the connection Secret is mounted in the deep-inspection pod.
+	// secretDir is where the connection Secret is mounted in the deep-inspection pod.
 	secretDir = "/etc/secret"
-	// envProviderURL holds the source provider API URL (e.g. vCenter URL for VMware).
-	envProviderURL = "PROVIDER_URL"
 )
 
 func main() {
@@ -95,11 +93,10 @@ func main() {
 }
 
 func loadProviderCredentials() (vmdetect.Credentials, error) {
-	url := strings.TrimSpace(os.Getenv(envProviderURL))
-	if url == "" {
-		return vmdetect.Credentials{}, fmt.Errorf("environment variable %s must be set to the provider URL", envProviderURL)
+	url, err := readSecretDataFile("url")
+	if err != nil {
+		return vmdetect.Credentials{}, err
 	}
-
 	user, err := readSecretDataFile("user")
 	if err != nil {
 		return vmdetect.Credentials{}, err
