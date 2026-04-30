@@ -11,6 +11,7 @@ import (
 	vmware_mocks "github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware/mocks"
 
 	"go.uber.org/mock/gomock"
+	"k8s.io/klog/v2"
 )
 
 // mockVantaraClient is a mock implementation of VantaraClient for testing
@@ -571,7 +572,7 @@ func TestPerformVolumeCopy_Success_ImmediatePSUP(t *testing.T) {
 		PoolId: 2,
 	}
 
-	err := v.performVolumeCopy("1234", ldevResp, progress)
+	err := v.performVolumeCopy("1234", ldevResp, progress, klog.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -606,7 +607,7 @@ func TestPerformVolumeCopy_CreateCloneError(t *testing.T) {
 		PoolId: 2,
 	}
 
-	err := v.performVolumeCopy("1234", ldevResp, progress)
+	err := v.performVolumeCopy("1234", ldevResp, progress, klog.Background())
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -624,7 +625,7 @@ func TestFindVolumeByVVolID_Success(t *testing.T) {
 	v := &VantaraCloner{}
 
 	// last4 = ABCD (hex) => 43981 (dec)
-	got, err := v.findVolumeByVVolID("00000000-0000-0000-0000-00000000ABCD")
+	got, err := v.findVolumeByVVolID("00000000-0000-0000-0000-00000000ABCD", klog.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -636,7 +637,7 @@ func TestFindVolumeByVVolID_Success(t *testing.T) {
 func TestFindVolumeByVVolID_TooShort(t *testing.T) {
 	v := &VantaraCloner{}
 
-	_, err := v.findVolumeByVVolID("ABC") // len < 4
+	_, err := v.findVolumeByVVolID("ABC", klog.Background()) // len < 4
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -646,7 +647,7 @@ func TestFindVolumeByVVolID_NonHexLast4(t *testing.T) {
 	v := &VantaraCloner{}
 
 	// last4 = "ZZZZ" is not hex
-	_, err := v.findVolumeByVVolID("0000ZZZZ")
+	_, err := v.findVolumeByVVolID("0000ZZZZ", klog.Background())
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -838,7 +839,7 @@ func TestResolveRDMToLUN_Success(t *testing.T) {
 
 	v := &VantaraCloner{client: fc}
 
-	lun, err := v.resolveRDMToLUN(deviceName)
+	lun, err := v.resolveRDMToLUN(deviceName, klog.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -855,7 +856,7 @@ func TestResolveRDMToLUN_Error_TargetNotFound(t *testing.T) {
 	fc := &mockVantaraClient{}
 	v := &VantaraCloner{client: fc}
 
-	_, err := v.resolveRDMToLUN("naa.1234567890")
+	_, err := v.resolveRDMToLUN("naa.1234567890", klog.Background())
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -868,7 +869,7 @@ func TestResolveRDMToLUN_Error_StringTooShort(t *testing.T) {
 	// provider id is present but total length is insufficient for 32 chars slice
 	deviceName := "naa." + VantaraProviderID + "short"
 
-	_, err := v.resolveRDMToLUN(deviceName)
+	_, err := v.resolveRDMToLUN(deviceName, klog.Background())
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -881,7 +882,7 @@ func TestResolveRDMToLUN_Error_InvalidHexLast4(t *testing.T) {
 	fc := &mockVantaraClient{}
 	v := &VantaraCloner{client: fc}
 
-	_, err := v.resolveRDMToLUN(deviceName)
+	_, err := v.resolveRDMToLUN(deviceName, klog.Background())
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -900,7 +901,7 @@ func TestResolveRDMToLUN_Error_NAAMismatch(t *testing.T) {
 	}
 	v := &VantaraCloner{client: fc}
 
-	_, err := v.resolveRDMToLUN(deviceName)
+	_, err := v.resolveRDMToLUN(deviceName, klog.Background())
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -920,7 +921,7 @@ func TestResolveRDMToLUN_CaseInsensitiveDeviceName(t *testing.T) {
 	}
 	v := &VantaraCloner{client: fc}
 
-	lun, err := v.resolveRDMToLUN(deviceNameUpper)
+	lun, err := v.resolveRDMToLUN(deviceNameUpper, klog.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

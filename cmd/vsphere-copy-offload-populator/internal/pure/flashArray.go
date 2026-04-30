@@ -13,7 +13,10 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const FlashProviderID = "624a9370"
+const (
+	FlashProviderID = "624a9370"
+	loggerName      = "copy-offload"
+)
 
 // Ensure FlashArrayClonner implements required interfaces
 var _ populator.RDMCapable = &FlashArrayClonner{}
@@ -60,12 +63,14 @@ func NewFlashArrayClonner(hostname, username, password, apiToken string, skipSSL
 	}
 
 	// Fetch model and version from the API
+	log := klog.Background().WithName(loggerName).WithName("setup")
 	info, err := restClient.GetArrayInfo()
 	if err != nil {
-		klog.Warningf("Failed to get Pure FlashArray info for metrics: %v", err)
+		log.Info("failed to get Pure FlashArray info for metrics", "err", err)
 	} else {
 		clonner.arrayInfo.Model = info.Model
 		clonner.arrayInfo.Version = info.Version
+		log.V(2).Info("Pure FlashArray info", "vendor", clonner.arrayInfo.Vendor, "product", clonner.arrayInfo.Product, "model", clonner.arrayInfo.Model, "version", clonner.arrayInfo.Version)
 	}
 
 	return clonner, nil
@@ -79,6 +84,9 @@ func (f *FlashArrayClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 // EnsureClonnerIgroup creates or updates an initiator group with the ESX adapters
 // Named hgroup in flash terminology
 func (f *FlashArrayClonner) EnsureClonnerIgroup(initiatorGroup string, esxAdapters []string) (populator.MappingContext, error) {
+	log := klog.Background().WithName(loggerName).WithName("map").WithName("ensure-igroup")
+	log.Info("ensuring initiator group", "group", initiatorGroup, "adapters", esxAdapters)
+
 	// pure does not allow a single host to connect to 2 separae groups. Hence
 	// we must connect map the volume to the host, and not to the group
 	hosts, err := f.restClient.ListHosts()
@@ -86,7 +94,7 @@ func (f *FlashArrayClonner) EnsureClonnerIgroup(initiatorGroup string, esxAdapte
 		return nil, err
 	}
 	for _, h := range hosts {
-		klog.Infof("checking host %s, iqns: %v, wwns: %v", h.Name, h.Iqn, h.Wwn)
+		log.V(2).Info("checking host", "host", h.Name, "iqns", h.Iqn, "wwns", h.Wwn)
 		for _, wwn := range h.Wwn {
 			for _, hostAdapter := range esxAdapters {
 				if !strings.HasPrefix(hostAdapter, "fc.") {
@@ -94,21 +102,23 @@ func (f *FlashArrayClonner) EnsureClonnerIgroup(initiatorGroup string, esxAdapte
 				}
 				adapterWWPN, err := fcUIDToWWPN(hostAdapter)
 				if err != nil {
-					klog.Warningf("failed to extract WWPN from adapter %s: %s", hostAdapter, err)
+					log.Info("failed to extract WWPN from adapter", "adapter", hostAdapter, "err", err)
 					continue
 				}
 
 				// Compare WWNs using the utility function that normalizes formatting
-				klog.Infof("comparing ESX adapter WWPN %s with Pure host WWN %s", adapterWWPN, wwn)
+				log.V(2).Info("comparing WWNs", "adapter_wwpn", adapterWWPN, "host_wwn", wwn)
 				if fcutil.CompareWWNs(adapterWWPN, wwn) {
-					klog.Infof("match found. Adding host %s to mapping context.", h.Name)
+					log.Info("found matching host", "host", h.Name)
+					log.Info("initiator group ready", "group", initiatorGroup, "host", h.Name)
 					return populator.MappingContext{"hosts": []string{h.Name}}, nil
 				}
 			}
 		}
 		for _, iqn := range h.Iqn {
 			if slices.Contains(esxAdapters, iqn) {
-				klog.Infof("adding host to group %v", h.Name)
+				log.Info("found matching host by IQN", "host", h.Name, "iqn", iqn)
+				log.Info("initiator group ready", "group", initiatorGroup, "host", h.Name)
 				return populator.MappingContext{"hosts": []string{h.Name}}, nil
 			}
 		}
@@ -122,6 +132,8 @@ func (f *FlashArrayClonner) Map(
 	initatorGroup string,
 	targetLUN populator.LUN,
 	context populator.MappingContext) (populator.LUN, error) {
+	log := klog.Background().WithName(loggerName).WithName("map")
+
 	hosts, ok := context["hosts"]
 	if !ok {
 		return populator.LUN{}, fmt.Errorf("hosts not found in context")
@@ -131,15 +143,17 @@ func (f *FlashArrayClonner) Map(
 		return populator.LUN{}, errors.New("invalid or empty hosts list in mapping context")
 	}
 	for _, host := range hs {
-		klog.Infof("connecting host %s to volume %s", host, targetLUN.Name)
+		log.Info("mapping volume to host", "volume", targetLUN.Name, "host", host)
 		err := f.restClient.ConnectHost(host, targetLUN.Name)
 		if err != nil {
 			if strings.Contains(err.Error(), "Connection already exists.") {
+				log.V(2).Info("volume already mapped to host", "volume", targetLUN.Name, "host", host)
 				continue
 			}
 			return populator.LUN{}, fmt.Errorf("connect host %q to volume %q: %w", host, targetLUN.Name, err)
 		}
 
+		log.Info("volume mapped successfully", "volume", targetLUN.Name, "host", host)
 		return targetLUN, nil
 	}
 	return populator.LUN{}, fmt.Errorf("connection failed for all hosts in context")
@@ -155,18 +169,20 @@ func (f *FlashArrayClonner) UnmapTarget(targetLUN populator.LUN, context populat
 
 // UnMap is responsible to unmapping an initiator group from a populator.LUN
 func (f *FlashArrayClonner) UnMap(initatorGroup string, targetLUN populator.LUN, context populator.MappingContext) error {
+	log := klog.Background().WithName(loggerName).WithName("map")
+
 	hosts, ok := context["hosts"]
 
 	if ok {
 		hs, ok := hosts.([]string)
 		if ok && len(hs) > 0 {
 			for _, host := range hs {
-				klog.Infof("disconnecting host %s from volume %s", host, targetLUN.Name)
+				log.Info("unmapping volume from host", "volume", targetLUN.Name, "host", host)
 				err := f.restClient.DisconnectHost(host, targetLUN.Name)
 				if err != nil {
 					return err
 				}
-
+				log.Info("volume unmapped successfully", "volume", targetLUN.Name, "host", host)
 			}
 		}
 	}
@@ -175,6 +191,8 @@ func (f *FlashArrayClonner) UnMap(initatorGroup string, targetLUN populator.LUN,
 
 // CurrentMappedGroups returns the initiator groups the populator.LUN is mapped to
 func (f *FlashArrayClonner) CurrentMappedGroups(targetLUN populator.LUN, context populator.MappingContext) ([]string, error) {
+	log := klog.Background().WithName(loggerName).WithName("map")
+	log.V(2).Info("querying current mapped groups", "volume", targetLUN.Name)
 	// we don't use the host group feature, as a host in pure flasharray can not belong to two separate groups, and we
 	// definitely don't want to break host from their current groups. insted we'll just map/unmap the volume to individual hosts
 	return nil, nil
@@ -182,11 +200,14 @@ func (f *FlashArrayClonner) CurrentMappedGroups(targetLUN populator.LUN, context
 
 // ResolvePVToLUN resolves a PersistentVolume to Pure FlashArray LUN details
 func (f *FlashArrayClonner) ResolvePVToLUN(pv populator.PersistentVolume) (populator.LUN, error) {
+	log := klog.Background().WithName(loggerName).WithName("resolve")
+	log.Info("resolving PV to LUN", "pv", pv.Name, "volume_handle", pv.VolumeHandle)
+
 	pvVolumeHandle := pv.VolumeHandle
 	v, err := f.restClient.GetVolumeById(pvVolumeHandle)
 	if err != nil {
 		if strings.Contains(err.Error(), "Volume does not exist.") {
-			klog.Errorf("Volume with handle %s does not exist: %v. Trying with Volume Name", pvVolumeHandle, err)
+			log.Info("volume not found by handle, trying by name", "volume_handle", pvVolumeHandle, "err", err)
 			volumeName := fmt.Sprintf("%s-%s", f.clusterPrefix, pv.Name)
 			v, err = f.restClient.GetVolume(volumeName)
 			if err != nil {
@@ -195,8 +216,9 @@ func (f *FlashArrayClonner) ResolvePVToLUN(pv populator.PersistentVolume) (popul
 		}
 	}
 
-	klog.Infof("volume %+v\n", v)
+	log.V(2).Info("volume details", "volume", v)
 	l := populator.LUN{Name: v.Name, SerialNumber: v.Serial, NAA: fmt.Sprintf("naa.%s%s", FlashProviderID, strings.ToLower(v.Serial))}
+	log.Info("LUN resolved", "lun", l.Name, "naa", l.NAA, "serial", l.SerialNumber)
 
 	return l, nil
 }
@@ -210,7 +232,12 @@ func fcUIDToWWPN(fcUid string) (string, error) {
 
 // VvolCopy performs a direct copy operation using vSphere API to discover source volume
 func (f *FlashArrayClonner) VvolCopy(vsphereClient vmware.Client, vmId string, sourceVMDKFile string, persistentVolume populator.PersistentVolume, progress chan<- uint64) error {
-	klog.Infof("Starting VVol copy operation for VM %s", vmId)
+	log := klog.Background().WithName(loggerName).WithName("vvol")
+	resolveSourceLog := log.WithName("resolve-source")
+	resolveTargetLog := log.WithName("resolve-target")
+	copyLog := log.WithName("copy")
+
+	resolveSourceLog.Info("VVol copy started", "vm", vmId, "source", sourceVMDKFile)
 
 	backing, err := vsphereClient.GetVMDiskBacking(context.Background(), vmId, sourceVMDKFile)
 	if err != nil {
@@ -221,32 +248,38 @@ func (f *FlashArrayClonner) VvolCopy(vsphereClient vmware.Client, vmId string, s
 		return fmt.Errorf("disk %s is not a VVol disk", sourceVMDKFile)
 	}
 
-	klog.Infof("Found VVol backing with ID %s", backing.VVolId)
+	resolveSourceLog.Info("found VVol backing", "vvol_id", backing.VVolId)
 
 	sourceVolume, err := f.restClient.FindVolumeByVVolID(backing.VVolId)
 	if err != nil {
 		return fmt.Errorf("failed to find source volume by VVol ID %s: %w", backing.VVolId, err)
 	}
 
+	resolveTargetLog.Info("resolving target PV to LUN", "pv", persistentVolume.Name)
 	targetLUN, err := f.ResolvePVToLUN(persistentVolume)
 	if err != nil {
 		return fmt.Errorf("failed to resolve target volume: %w", err)
 	}
 
-	klog.Infof("Copying from source volume %s to target volume %s", sourceVolume, targetLUN.Name)
+	copyLog.Info("copying volume", "source", sourceVolume, "target", targetLUN.Name)
 
-	err = f.performVolumeCopy(sourceVolume, targetLUN.Name, progress)
+	err = f.performVolumeCopy(sourceVolume, targetLUN.Name, progress, copyLog)
 	if err != nil {
 		return fmt.Errorf("copy operation failed: %w", err)
 	}
 
-	klog.Infof("VVol copy operation completed successfully")
+	log.Info("VVol copy completed successfully")
 	return nil
 }
 
 // RDMCopy performs a copy operation for RDM-backed disks using Pure FlashArray APIs
 func (f *FlashArrayClonner) RDMCopy(vsphereClient vmware.Client, vmId string, sourceVMDKFile string, persistentVolume populator.PersistentVolume, progress chan<- uint64) error {
-	klog.Infof("Pure RDM Copy: Starting RDM copy operation for VM %s", vmId)
+	log := klog.Background().WithName(loggerName).WithName("rdm")
+	resolveSourceLog := log.WithName("resolve-source")
+	resolveTargetLog := log.WithName("resolve-target")
+	copyLog := log.WithName("copy")
+
+	resolveSourceLog.Info("RDM copy started", "vm", vmId)
 
 	// Get disk backing info to find the RDM device
 	backing, err := vsphereClient.GetVMDiskBacking(context.Background(), vmId, sourceVMDKFile)
@@ -258,21 +291,22 @@ func (f *FlashArrayClonner) RDMCopy(vsphereClient vmware.Client, vmId string, so
 		return fmt.Errorf("disk %s is not an RDM disk", sourceVMDKFile)
 	}
 
-	klog.Infof("Pure RDM Copy: Found RDM device: %s", backing.DeviceName)
+	resolveSourceLog.Info("found RDM device", "device", backing.DeviceName)
 
 	// Resolve the source LUN from the RDM device name
-	sourceLUN, err := f.resolveRDMToLUN(backing.DeviceName)
+	sourceLUN, err := f.resolveRDMToLUN(backing.DeviceName, resolveSourceLog)
 	if err != nil {
 		return fmt.Errorf("failed to resolve RDM device to source LUN: %w", err)
 	}
 
 	// Resolve the target PV to LUN
+	resolveTargetLog.Info("resolving target PV to LUN", "pv", persistentVolume.Name)
 	targetLUN, err := f.ResolvePVToLUN(persistentVolume)
 	if err != nil {
 		return fmt.Errorf("failed to resolve target volume: %w", err)
 	}
 
-	klog.Infof("Pure RDM Copy: Copying from source LUN %s to target LUN %s", sourceLUN.Name, targetLUN.Name)
+	copyLog.Info("copying volume", "source", sourceLUN.Name, "target", targetLUN.Name)
 
 	// Report progress start
 	progress <- 10
@@ -286,13 +320,13 @@ func (f *FlashArrayClonner) RDMCopy(vsphereClient vmware.Client, vmId string, so
 	// Report progress complete
 	progress <- 100
 
-	klog.Infof("Pure RDM Copy: Copy operation completed successfully")
+	log.Info("RDM copy completed successfully")
 	return nil
 }
 
 // resolveRDMToLUN resolves an RDM device name to a Pure FlashArray LUN
-func (f *FlashArrayClonner) resolveRDMToLUN(deviceName string) (populator.LUN, error) {
-	klog.Infof("Pure RDM Copy: Resolving RDM device %s to LUN", deviceName)
+func (f *FlashArrayClonner) resolveRDMToLUN(deviceName string, log klog.Logger) (populator.LUN, error) {
+	log.V(2).Info("resolving RDM device to LUN", "device", deviceName)
 
 	// The device name from RDM typically contains the NAA identifier
 	// For Pure FlashArray, format is "naa.624a9370<serial>" where 624a9370 is the FlashProviderID
@@ -302,22 +336,24 @@ func (f *FlashArrayClonner) resolveRDMToLUN(deviceName string) (populator.LUN, e
 	serial, err := extractSerialFromNAA(deviceName)
 	if err != nil {
 		// Try to find by listing all volumes and matching
-		klog.Warningf("Could not extract serial from NAA %s: %v, trying to find by listing volumes", deviceName, err)
-		return f.findVolumeByDeviceName(deviceName)
+		log.Info("could not extract serial from NAA, trying to find by listing volumes", "device", deviceName, "err", err)
+		return f.findVolumeByDeviceName(deviceName, log)
 	}
 
 	// Find volume by serial number
+	log.V(2).Info("finding volume by serial", "serial", serial)
 	volume, err := f.restClient.FindVolumeBySerial(serial)
 	if err != nil {
 		return populator.LUN{}, fmt.Errorf("failed to find volume by serial %s: %w", serial, err)
 	}
 
-	klog.Infof("Pure RDM Copy: Found matching volume %s for device %s", volume.Name, deviceName)
-	return populator.LUN{
+	lun := populator.LUN{
 		Name:         volume.Name,
 		SerialNumber: volume.Serial,
 		NAA:          fmt.Sprintf("naa.%s%s", FlashProviderID, strings.ToLower(volume.Serial)),
-	}, nil
+	}
+	log.Info("resolved source LUN", "lun", lun.Name, "serial", lun.SerialNumber, "naa", lun.NAA)
+	return lun, nil
 }
 
 // extractSerialFromNAA extracts the serial number from a NAA identifier
@@ -344,7 +380,7 @@ func extractSerialFromNAA(naa string) (string, error) {
 }
 
 // findVolumeByDeviceName finds a volume by searching through all volumes
-func (f *FlashArrayClonner) findVolumeByDeviceName(deviceName string) (populator.LUN, error) {
+func (f *FlashArrayClonner) findVolumeByDeviceName(deviceName string, log klog.Logger) (populator.LUN, error) {
 	// List all volumes and find the one matching the device name
 	volumes, err := f.restClient.ListVolumes()
 	if err != nil {
@@ -352,6 +388,7 @@ func (f *FlashArrayClonner) findVolumeByDeviceName(deviceName string) (populator
 	}
 
 	deviceName = strings.ToLower(deviceName)
+	log.V(2).Info("searching for volume by device name", "device", deviceName)
 
 	for _, volume := range volumes {
 		// Build the expected NAA for this volume
@@ -361,7 +398,7 @@ func (f *FlashArrayClonner) findVolumeByDeviceName(deviceName string) (populator
 		if strings.Contains(deviceName, strings.ToLower(volume.Serial)) ||
 			strings.Contains(deviceName, naa) ||
 			deviceName == naa {
-			klog.Infof("Pure RDM Copy: Found matching volume %s for device %s", volume.Name, deviceName)
+			log.Info("found matching volume", "volume", volume.Name, "device", deviceName)
 			return populator.LUN{
 				Name:         volume.Name,
 				SerialNumber: volume.Serial,
@@ -374,7 +411,8 @@ func (f *FlashArrayClonner) findVolumeByDeviceName(deviceName string) (populator
 }
 
 // performVolumeCopy executes the volume copy operation on Pure FlashArray
-func (f *FlashArrayClonner) performVolumeCopy(sourceVolumeName, targetVolumeName string, progress chan<- uint64) error {
+func (f *FlashArrayClonner) performVolumeCopy(sourceVolumeName, targetVolumeName string, progress chan<- uint64, log klog.Logger) error {
+	log.V(2).Info("performing FlashArray copy", "source", sourceVolumeName, "target", targetVolumeName)
 	// Perform the copy operation using Pure FlashArray API
 	err := f.restClient.CopyVolume(sourceVolumeName, targetVolumeName)
 	if err != nil {
