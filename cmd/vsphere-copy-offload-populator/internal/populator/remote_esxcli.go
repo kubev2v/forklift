@@ -21,9 +21,34 @@ import (
 )
 
 const (
-	taskPollingInterval = 5 * time.Second
-	rescanSleepInterval = 5 * time.Second
-	rescanRetries       = 5
+	taskPollingInterval    = 5 * time.Second
+	rescanSleepInterval    = 5 * time.Second
+	rescanRetries          = 5
+	sshInstructionTemplate = `Version mismatch detected!
+  - Just uploaded script version: %s
+  - SSH returned version: %s
+
+This indicates the SSH key is executing a different script file.
+Most likely cause: You are using the old Python-based SSH key format
+which executes a file with .py extension or UUID in the filename.
+
+The new shell-based format executes:
+  /vmfs/volumes/%s/secure-vmkfstools-wrapper (no extension)
+
+To fix this issue:
+1. SSH to the ESXi host
+2. Edit /etc/ssh/keys-root/authorized_keys: vi /etc/ssh/keys-root/authorized_keys
+3. Find the line containing the old Python wrapper
+4. DELETE the line containing .py extension or UUID in filename
+   Examples of old format to remove:
+     - Lines ending with: secure-vmkfstools-wrapper.py
+     - Lines ending with: secure-vmkfstools-wrapper-$UUID.py
+5. Add the following NEW SSH key line:
+
+  %s
+
+6. Save and exit
+7. Retry the operation`
 )
 
 // CloneMethod represents the method used for cloning operations
@@ -260,24 +285,23 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	if p.UseSSHMethod {
 		sshSetupCtx := klog.NewContext(context.Background(), setupLog)
 
-		// Setup secure script
-		finalScriptPath, err := ensureSecureScript(sshSetupCtx, p.VSphereClient, host, vmDisk.Datastore)
-		if err != nil {
-			return fmt.Errorf("failed to ensure secure script: %w", err)
-		}
-		setupLog.V(2).Info("secure script ready", "path", finalScriptPath)
-
-		// Enable SSH access
-		err = vmware.EnableSSHAccess(sshSetupCtx, p.VSphereClient, host, p.SSHPrivateKey, p.SSHPublicKey, finalScriptPath)
-		if err != nil {
-			return fmt.Errorf("failed to enable SSH access: %w", err)
-		}
-
-		// Get host IP
+		// Get host IP (needed for SSH version check and connection)
 		hostIP, err := vmware.GetHostIPAddress(sshSetupCtx, host)
 		if err != nil {
 			return fmt.Errorf("failed to get host IP address: %w", err)
 		}
+
+		err = vmware.EnableSSHAccess(sshSetupCtx, p.VSphereClient, host, p.SSHPrivateKey, p.SSHPublicKey, "")
+		if err != nil {
+			return fmt.Errorf("failed to enable SSH access: %w", err)
+		}
+
+		// Setup secure script (skips upload if remote version already matches)
+		finalScriptPath, err := ensureSecureScript(sshSetupCtx, p.VSphereClient, host, vmDisk.Datastore, hostIP, p.SSHPrivateKey)
+		if err != nil {
+			return fmt.Errorf("failed to ensure secure script: %w", err)
+		}
+		setupLog.V(2).Info("secure script ready", "path", finalScriptPath)
 
 		// Create SSH client; pass setup context so SSH logs show under setup.ssh
 		sshClient := vmware.NewSSHClient()
@@ -410,15 +434,16 @@ func deleteDeadDevices(ctx context.Context, client vmware.Client, host *object.H
 	return nil
 }
 
-func checkScriptVersion(ctx context.Context, sshClient vmware.SSHClient, datastore, embeddedVersion string, publicKey []byte) error {
+// getScriptVersion queries the remote wrapper script version via SSH.
+func getScriptVersion(ctx context.Context, sshClient vmware.SSHClient, datastore string) (string, error) {
 	output, err := sshClient.ExecuteCommand(ctx, datastore, "--version")
 	if err != nil {
-		return fmt.Errorf("old script format detected (likely Python-based). Update script on datastore %s to version %s or newer: %w", datastore, embeddedVersion, err)
+		return "", fmt.Errorf("version command failed: %w", err)
 	}
 
 	var resp XMLResponse
 	if err := xml.Unmarshal([]byte(output), &resp); err != nil {
-		return fmt.Errorf("failed to parse version response: %w", err)
+		return "", fmt.Errorf("failed to parse version response: %w", err)
 	}
 
 	var status, message string
@@ -431,19 +456,28 @@ func checkScriptVersion(ctx context.Context, sshClient vmware.SSHClient, datasto
 		}
 	}
 	if status != "0" || message == "" {
-		return fmt.Errorf("version command failed: status=%s, message=%s", status, message)
+		return "", fmt.Errorf("version command failed: status=%s, message=%s", status, message)
 	}
 
 	var versionInfo struct {
 		Version string `json:"version"`
 	}
 	if err := json.Unmarshal([]byte(message), &versionInfo); err != nil {
-		return fmt.Errorf("failed to parse version JSON: %w", err)
+		return "", fmt.Errorf("failed to parse version JSON: %w", err)
 	}
 
-	scriptVer, err := hversion.NewVersion(versionInfo.Version)
+	return versionInfo.Version, nil
+}
+
+func checkScriptVersion(ctx context.Context, sshClient vmware.SSHClient, datastore, embeddedVersion string, publicKey []byte) error {
+	remoteVersion, err := getScriptVersion(ctx, sshClient, datastore)
 	if err != nil {
-		return fmt.Errorf("invalid script version format %s: %w", versionInfo.Version, err)
+		return fmt.Errorf("old script format detected (likely Python-based). Update script on datastore %s to version %s or newer: %w", datastore, embeddedVersion, err)
+	}
+
+	scriptVer, err := hversion.NewVersion(remoteVersion)
+	if err != nil {
+		return fmt.Errorf("invalid script version format %s: %w", remoteVersion, err)
 	}
 
 	embeddedVer, err := hversion.NewVersion(embeddedVersion)
@@ -456,36 +490,12 @@ func checkScriptVersion(ctx context.Context, sshClient vmware.SSHClient, datasto
 		restrictedPublicKey := fmt.Sprintf(`command="%s",no-port-forwarding,no-agent-forwarding,no-X11-forwarding %s`,
 			util.RestrictedSSHCommandTemplate, publicKeyStr)
 
-		instructions := fmt.Sprintf(`Version mismatch detected!
-  - Just uploaded script version: %s
-  - SSH returned version: %s
-
-This indicates the SSH key is executing a different script file.
-Most likely cause: You are using the old Python-based SSH key format
-which executes a file with .py extension or UUID in the filename.
-
-The new shell-based format executes:
-  /vmfs/volumes/%s/secure-vmkfstools-wrapper (no extension)
-
-To fix this issue:
-1. SSH to the ESXi host
-2. Edit /etc/ssh/keys-root/authorized_keys: vi /etc/ssh/keys-root/authorized_keys
-3. Find the line containing the old Python wrapper
-4. DELETE the line containing .py extension or UUID in filename
-   Examples of old format to remove:
-     - Lines ending with: secure-vmkfstools-wrapper.py
-     - Lines ending with: secure-vmkfstools-wrapper-$UUID.py
-5. Add the following NEW SSH key line:
-
-  %s
-
-6. Save and exit
-7. Retry the operation`, embeddedVersion, versionInfo.Version, datastore, restrictedPublicKey)
 		setupLog := logger.New("xcopy").WithName("setup")
-		setupLog.Error(fmt.Errorf("version mismatch: uploaded %s, SSH returned %s", embeddedVersion, versionInfo.Version), "script version mismatch", "instructions", instructions)
-
-		return fmt.Errorf("version mismatch: uploaded %s but SSH returned %s - old SSH key format detected",
-			embeddedVersion, versionInfo.Version)
+		err := fmt.Errorf("version mismatch: uploaded %s, but SSH returned %s - old SSH key format detected", embeddedVersion, remoteVersion)
+		setupLog.Error(err, "script version mismatch",
+			"instructions",
+			fmt.Sprintf(sshInstructionTemplate, embeddedVersion, remoteVersion, datastore, restrictedPublicKey))
+		return err
 	}
 
 	return nil
