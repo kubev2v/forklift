@@ -152,6 +152,21 @@ type VM struct {
 	//
 	// +optional
 	MigrateSharedDisks *bool `json:"migrateSharedDisks,omitempty"`
+	// EnableNestedVirtualization controls whether nested virtualization (vmx/svm CPU features)
+	// is enabled on the target VM.
+	// - nil (default): Auto-detect from source VM settings
+	// - true: Force enable nested virtualization on the target VM regardless of source settings
+	// - false: Force disable nested virtualization on the target VM regardless of source settings
+	// +optional
+	EnableNestedVirtualization *bool `json:"enableNestedVirtualization,omitempty"`
+	// RDMAsLun controls whether RDM (Raw Device Mapping) disks from VMware should be
+	// mapped as LUN devices in the target KubeVirt VM instead of regular disk devices.
+	// When nil (default), the plan-level rdmAsLun value is used.
+	// When explicitly set to true, RDM disks are attached using lun: {} for this VM.
+	// When explicitly set to false, RDM disks are attached as regular disks for this VM.
+	//
+	// +optional
+	RDMAsLun *bool `json:"rdmAsLun,omitempty"`
 }
 
 // Find a Hook for the specified step.

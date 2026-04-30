@@ -19,13 +19,15 @@
 package gopowerstore
 
 import (
+	"time"
+
 	"github.com/dell/gopowerstore/api"
 )
 
 // ClientOptions defaults
 const (
 	clientOptionsDefaultInsecure     = false
-	clientOptionsDefaultTimeout      = 120
+	clientOptionsDefaultTimeout      = 120 * time.Second
 	clientOptionsDefaultRateLimit    = 60
 	clientOptionsDefaultRequestIDKey = "csi.requestid"
 )
@@ -38,10 +40,19 @@ func NewClientOptions() *ClientOptions {
 // ClientOptions struct provide additional options for api client configuration
 type ClientOptions struct {
 	insecure       *bool // skip https cert check
-	defaultTimeout *int64
+	defaultTimeout *time.Duration
 	rateLimit      *int
 	// define field name in context which will be used for tracing
 	requestIDKey *api.ContextKey
+	caFilePath   *string
+}
+
+// CAFilePath adds the certificate authority to the http client
+func (co *ClientOptions) CAFilePath() string {
+	if co.caFilePath == nil {
+		return ""
+	}
+	return *co.caFilePath
 }
 
 // Insecure returns insecure client option
@@ -53,7 +64,7 @@ func (co *ClientOptions) Insecure() bool {
 }
 
 // DefaultTimeout returns http client default timeout
-func (co *ClientOptions) DefaultTimeout() int64 {
+func (co *ClientOptions) DefaultTimeout() time.Duration {
 	if co.defaultTimeout == nil {
 		return clientOptionsDefaultTimeout
 	}
@@ -82,8 +93,14 @@ func (co *ClientOptions) SetInsecure(value bool) *ClientOptions {
 	return co
 }
 
+// SetCAFilePath sets certificate authority file path value
+func (co *ClientOptions) SetCAFilePath(path string) *ClientOptions {
+	co.caFilePath = &path
+	return co
+}
+
 // SetDefaultTimeout sets default http client timeout value
-func (co *ClientOptions) SetDefaultTimeout(value int64) *ClientOptions {
+func (co *ClientOptions) SetDefaultTimeout(value time.Duration) *ClientOptions {
 	co.defaultTimeout = &value
 	return co
 }

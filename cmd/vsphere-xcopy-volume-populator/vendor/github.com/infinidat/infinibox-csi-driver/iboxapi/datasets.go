@@ -13,10 +13,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
+	"log/slog"
 	"strconv"
 
 	"github.com/infinidat/infinibox-csi-driver/common"
@@ -28,47 +28,28 @@ type GetAllSnapshotsResponse struct {
 	Error    Error    `json:"error"`
 }
 
-func (iboxClient *IboxClient) GetAllSnapshots() (results []Volume, err error) {
-	const functionName = "GetAllSnapshots"
-
-	url := fmt.Sprintf("%s%s", iboxClient.Creds.URL, "api/rest/datasets")
-	iboxClient.Log.V(TRACE_LEVEL).Info(functionName, "URL", url)
+func (client *IboxClient) GetAllSnapshots(ctx context.Context) (results []Volume, err error) {
+	url := fmt.Sprintf("%s%s", client.Creds.URL, "api/rest/datasets")
+	slog.Log(ctx, common.LevelTrace, "info", "URL", url)
 
 	pageSize := common.IBOXDefaultQueryPageSize
 	totalPages := 1 // start with 1, update after first query.
 	for page := 1; page <= totalPages; page++ {
-		iboxClient.Log.V(TRACE_LEVEL).Info(functionName, "page", page, "totalPages", totalPages)
+		slog.Log(ctx, common.LevelTrace, "info", "page", page, "totalPages", totalPages)
 
-		req, err := http.NewRequest(http.MethodGet, url, nil)
+		parameters := make(map[string]string)
+		parameters[PARAMETER_PAGE_SIZE] = strconv.Itoa(pageSize)
+		parameters[PARAMETER_PAGE] = strconv.Itoa(page)
+		parameters["type"] = "SNAPSHOT"
+
+		bodyBytes, err := commonGetLogic(ctx, url, client, parameters)
 		if err != nil {
-			return results, fmt.Errorf("%s - NewRequest - error %w", functionName, err)
-		}
-
-		values := req.URL.Query()
-		values.Add(PARAMETER_PAGE_SIZE, strconv.Itoa(pageSize))
-		values.Add(PARAMETER_PAGE, strconv.Itoa(page))
-		values.Add("type", "SNAPSHOT")
-		req.URL.RawQuery = values.Encode()
-
-		SetAuthHeader(req, iboxClient.Creds)
-
-		resp, err := iboxClient.HTTPClient.Do(req)
-		if err != nil {
-			return results, fmt.Errorf("%s - Do - error %w", functionName, err)
-		}
-		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				iboxClient.Log.V(INFO_LEVEL).Error(err, functionName, "error in Close()", err.Error())
-			}
-		}()
-		bodyBytes, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return results, fmt.Errorf("%s - ReadAll - error %w", functionName, err)
+			return results, common.Errorf("commonGetLogic - error: %w url: %s", err, url)
 		}
 		var responseObject GetAllSnapshotsResponse
 		err = json.Unmarshal(bodyBytes, &responseObject)
 		if err != nil {
-			return results, fmt.Errorf("%s - Unmarshal - error %w", functionName, err)
+			return results, common.Errorf("unmarshal - error: %w url: %s", err, url)
 		}
 		results = append(results, responseObject.Result...)
 

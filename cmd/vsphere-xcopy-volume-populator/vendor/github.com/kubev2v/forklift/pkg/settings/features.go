@@ -8,14 +8,15 @@ import (
 
 // Environment Variables
 const (
-	FeatureOvirtWarmMigration        = "FEATURE_OVIRT_WARM_MIGRATION"
-	FeatureRetainPrecopyImporterPods = "FEATURE_RETAIN_PRECOPY_IMPORTER_PODS"
-	FeatureStaticUdnIpAddresses      = "FEATURE_STATIC_UDN_IP_ADDRESSES"
-	FeatureVsphereIncrementalBackup  = "FEATURE_VSPHERE_INCREMENTAL_BACKUP"
-	FeatureCopyOffload               = "FEATURE_COPY_OFFLOAD"
-	FeatureOCPLiveMigration          = "FEATURE_OCP_LIVE_MIGRATION"
-	FeatureVmwareSystemSerialNumber  = "FEATURE_VMWARE_SYSTEM_SERIAL_NUMBER"
-	FeatureOVFApplianceManagement    = "FEATURE_OVF_APPLIANCE_MANAGEMENT"
+	FeatureOvirtWarmMigration         = "FEATURE_OVIRT_WARM_MIGRATION"
+	FeatureRetainPrecopyImporterPods  = "FEATURE_RETAIN_PRECOPY_IMPORTER_PODS"
+	FeatureStaticUdnIpAddresses       = "FEATURE_STATIC_UDN_IP_ADDRESSES"
+	FeatureVsphereIncrementalBackup   = "FEATURE_VSPHERE_INCREMENTAL_BACKUP"
+	FeatureCopyOffload                = "FEATURE_COPY_OFFLOAD"
+	FeatureOCPLiveMigration           = "FEATURE_OCP_LIVE_MIGRATION"
+	FeatureVmwareSystemSerialNumber   = "FEATURE_VMWARE_SYSTEM_SERIAL_NUMBER"
+	FeatureOVFApplianceManagement     = "FEATURE_OVF_APPLIANCE_MANAGEMENT"
+	FeatureVsphereVmwareDriverRemoval = "FEATURE_VSPHERE_VMWARE_DRIVER_REMOVAL"
 )
 
 // OpenShift version where the FeatureVmwareSystemSerialNumber feature is supported:
@@ -26,6 +27,10 @@ const ocpMinForVmwareSystemSerial = "4.20.0-0"
 // OpenShift version where the defined MAC address is supported in User Defined Network:
 //   - https://issues.redhat.com/browse/CNV-66820
 const ocpMinForUdnMacSupport = "4.20.0-0"
+
+// OpenShift version where Forklift can specify static IP addresses in User Defined Network:
+//   - https://issues.redhat.com/browse/CNV-61227
+const ocpMinForUdnPreserveStaticIp = "4.20.0-0"
 
 // OpenShift version where InsecureSkipVerify is supported for ImageIO data sources:
 //   - https://issues.redhat.com/browse/CNV-71978
@@ -55,6 +60,8 @@ type Features struct {
 	OVFApplianceManagement bool
 	// Whether CDI supports InsecureSkipVerify for ImageIO data sources (CNV 4.21+)
 	InsecureSkipVerifySupported bool
+	// Whether to run VMware driver removal scripts during Windows vSphere conversion (virt-customize).
+	VsphereVmwareDriverRemoval bool
 }
 
 // isOpenShiftVersionAboveMinimum checks if OpenShift version is above or equal to minimum version using semantic versioning
@@ -83,7 +90,7 @@ func (r *Features) isOpenShiftVersionAboveMinimum(minimumVersion string) bool {
 func (r *Features) Load() (err error) {
 	r.OvirtWarmMigration = getEnvBool(FeatureOvirtWarmMigration, false)
 	r.RetainPrecopyImporterPods = getEnvBool(FeatureRetainPrecopyImporterPods, false)
-	r.StaticUdnIpAddresses = getEnvBool(FeatureStaticUdnIpAddresses, false)
+	r.StaticUdnIpAddresses = getEnvBool(FeatureStaticUdnIpAddresses, false) && r.isOpenShiftVersionAboveMinimum(ocpMinForUdnPreserveStaticIp)
 	r.VsphereIncrementalBackup = getEnvBool(FeatureVsphereIncrementalBackup, false)
 	r.CopyOffload = getEnvBool(FeatureCopyOffload, false)
 	r.OCPLiveMigration = getEnvBool(FeatureOCPLiveMigration, false)
@@ -91,5 +98,6 @@ func (r *Features) Load() (err error) {
 	r.UdnSupportsMac = r.isOpenShiftVersionAboveMinimum(ocpMinForUdnMacSupport)
 	r.InsecureSkipVerifySupported = r.isOpenShiftVersionAboveMinimum(ocpMinForInsecureSkipVerify)
 	r.OVFApplianceManagement = getEnvBool(FeatureOVFApplianceManagement, false)
+	r.VsphereVmwareDriverRemoval = getEnvBool(FeatureVsphereVmwareDriverRemoval, false)
 	return
 }
