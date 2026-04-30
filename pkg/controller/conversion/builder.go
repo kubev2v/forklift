@@ -426,13 +426,20 @@ func vddkVolumeInList(volumes []core.Volume) bool {
 }
 
 // BuildDeepInspectionPodEnvironment builds environment variables for deep inspection pods.
+// Any SNAPSHOT_MOREF already present in Config.Environment is dropped so the
+// controller value always takes precedent.
 func (b *Builder) BuildDeepInspectionPodEnvironment(vm *plan.VMStatus) []core.EnvVar {
-	env := make([]core.EnvVar, 0, len(b.Config.Environment)+4)
-	env = append(env, b.Config.Environment...)
-	if vm != nil {
-		if vm.ID != "" {
-			env = append(env, core.EnvVar{Name: "VM_MOREF", Value: vm.ID})
+	var env []core.EnvVar
+	for _, e := range b.Config.Environment {
+		if e.Name != "SNAPSHOT_MOREF" {
+			env = append(env, e)
 		}
+	}
+	if vm != nil && vm.ID != "" {
+		env = append(env, core.EnvVar{Name: "VM_MOREF", Value: vm.ID})
+	}
+	if b.Config.DeepInspectionSnapshotMoref != "" {
+		env = append(env, core.EnvVar{Name: "SNAPSHOT_MOREF", Value: b.Config.DeepInspectionSnapshotMoref})
 	}
 	return env
 }
@@ -446,30 +453,8 @@ func (b *Builder) BuildDeepInspectionPod(vm *plan.VMStatus, volumes []core.Volum
 
 	pod.GenerateName = b.Config.GenerateName + "deep-inspection-"
 	pod.Labels[convctx.LabelApp] = "deep-inspection"
-	env := b.BuildDeepInspectionPodEnvironment(vm)
-	env = b.appendDeepInspectionProviderURLEnv(env, secret)
-	pod.Spec.Containers[0].Env = env
+	pod.Spec.Containers[0].Env = b.BuildDeepInspectionPodEnvironment(vm)
 	return pod, nil
-}
-
-func (b *Builder) appendDeepInspectionProviderURLEnv(env []core.EnvVar, secret *core.Secret) []core.EnvVar {
-	if secret == nil || secret.Name == "" {
-		return env
-	}
-	for _, e := range env {
-		if e.Name == "PROVIDER_URL" {
-			return env
-		}
-	}
-	return append(env, core.EnvVar{
-		Name: "PROVIDER_URL",
-		ValueFrom: &core.EnvVarSource{
-			SecretKeyRef: &core.SecretKeySelector{
-				LocalObjectReference: core.LocalObjectReference{Name: secret.Name},
-				Key:                  "url",
-			},
-		},
-	})
 }
 
 // BuildV2vPodEnvironment appends env vars from PodConfig,
