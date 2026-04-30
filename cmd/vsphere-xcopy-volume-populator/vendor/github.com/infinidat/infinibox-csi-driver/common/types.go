@@ -12,8 +12,11 @@ limitations under the License.
 */
 package common
 
+import "log/slog"
+
 // storage class parameter keys
 const (
+	LevelTrace  = slog.Level(-8)
 	NodeRootDir = "/host"
 
 	FSTypeExt3 = "ext3"
@@ -74,9 +77,10 @@ const LockedState = "LOCKED"
 
 // PVC annotations
 const (
-	PVCAnnotationPoolName     = "infinidat.com/pool_name"
-	PVCAnnotationNetworkSpace = "infinidat.com/network_space"
-	PVCAnnotationIBOXSecret   = "infinidat.com/ibox_secret"
+	PVCAnnotationPoolName       = "infinidat.com/pool_name"
+	PVCAnnotationNetworkSpace   = "infinidat.com/network_space"
+	PVCAnnotationIBOXSecret     = "infinidat.com/ibox_secret"
+	PVCAnnotationVolumeMetadata = "infinidat.com/volume_metadata"
 )
 
 const BytesInOneGibibyte = 1073741824
@@ -143,8 +147,32 @@ const (
 	CredentialPassword = "password"
 )
 
+// IBOX features we check with the IBOX API
+const (
+	IboxFeaturePromoteSnapshot = "promote_snapshot"
+)
+
 const (
 	IboxreplicaReplicaTypeSYNC          = "SYNC"
 	IboxreplicaReplicaTypeASYNC         = "ASYNC"
 	IboxreplicaReplicaTypeACTIVE_ACTIVE = "ACTIVE_ACTIVE"
+
+	// the following can be specified in a StorageClass to enable replica creation
+	IboxReplicaTypeParameter                    = "replication_type"
+	IboxReplicaCGNameParameter                  = "cg_name"
+	IboxReplicaRemotePoolIDParameter            = "remote_pool_id"
+	IboxReplicaRemoteIboxCredNameParameter      = "remote_ibox_credential_name"
+	IboxReplicaRemoteIboxCredNamespaceParameter = "remote_ibox_credential_namespace"
+	IboxReplicaLocalIboxCredNameParameter       = "local_ibox_credential_name"
+	IboxReplicaLocalIboxCredNamespaceParameter  = "local_ibox_credential_namespace"
+	IboxReplicaRemoteIboxLinkNameParameter      = "link_remote_system_name"
+	IboxReplicaIgnoreReplicaErrorsParameter     = "ignore_replica_errors"
+	// these are required for creating PVCs for the replica volumes when configured
+	IboxReplicaCreatePVC                          = "remote_create_pvc"
+	IboxReplicaCreatePVCSuffix                    = "remote_pvc_name_suffix"
+	IboxReplicaCreatePVCNamespace                 = "remote_pvc_namespace"
+	IboxReplicaCreatePVCNetworkSpace              = "remote_network_space"
+	IboxReplicaCreatePVCPoolName                  = "remote_pool_name"
+	IboxReplicaCreatePVCKubeconfigSecretName      = "remote_kubeconfig_secret_name"
+	IboxReplicaCreatePVCKubeconfigSecretNamespace = "remote_kubeconfig_secret_namespace"
 )

@@ -194,8 +194,9 @@ func MappingNameCompletion(configFlags *genericclioptions.ConfigFlags, mappingTy
 	}
 }
 
-// HostNameCompletion provides completion for host names from provider inventory
-func HostNameCompletion(configFlags *genericclioptions.ConfigFlags, providerName, toComplete string) ([]string, cobra.ShellCompDirective) {
+// HostIDCompletion provides completion for host inventory IDs from provider inventory.
+// These are vSphere managed object IDs (e.g. "host-8"), not display names or IP addresses.
+func HostIDCompletion(configFlags *genericclioptions.ConfigFlags, providerName, toComplete string) ([]string, cobra.ShellCompDirective) {
 	if providerName == "" {
 		return []string{"Provider not specified"}, cobra.ShellCompDirectiveError
 	}
@@ -220,8 +221,9 @@ func HostNameCompletion(configFlags *genericclioptions.ConfigFlags, providerName
 	}
 
 	// Get available hosts
-	providerClient := inventory.NewProviderClient(configFlags, provider, inventoryURL)
-	data, err := providerClient.GetHosts(4)
+	// Note: Completion functions use insecure=false as a safe default
+	providerClient := inventory.NewProviderClientWithInsecure(configFlags, provider, inventoryURL, false)
+	data, err := providerClient.GetHosts(context.Background(), 4)
 	if err != nil {
 		return []string{fmt.Sprintf("Error fetching hosts: %v", err)}, cobra.ShellCompDirectiveError
 	}
@@ -274,8 +276,9 @@ func HostIPAddressCompletion(configFlags *genericclioptions.ConfigFlags, provide
 	}
 
 	// Get available hosts
-	providerClient := inventory.NewProviderClient(configFlags, provider, inventoryURL)
-	data, err := providerClient.GetHosts(4)
+	// Note: Completion functions use insecure=false as a safe default
+	providerClient := inventory.NewProviderClientWithInsecure(configFlags, provider, inventoryURL, false)
+	data, err := providerClient.GetHosts(context.Background(), 4)
 	if err != nil {
 		return []string{fmt.Sprintf("Error fetching hosts: %v", err)}, cobra.ShellCompDirectiveError
 	}
@@ -351,8 +354,9 @@ func HostNetworkAdapterCompletion(configFlags *genericclioptions.ConfigFlags, pr
 	}
 
 	// Get available hosts
-	providerClient := inventory.NewProviderClient(configFlags, provider, inventoryURL)
-	data, err := providerClient.GetHosts(4)
+	// Note: Completion functions use insecure=false as a safe default
+	providerClient := inventory.NewProviderClientWithInsecure(configFlags, provider, inventoryURL, false)
+	data, err := providerClient.GetHosts(context.Background(), 4)
 	if err != nil {
 		return []string{fmt.Sprintf("Error fetching hosts: %v", err)}, cobra.ShellCompDirectiveError
 	}
@@ -466,6 +470,54 @@ func HookResourceNameCompletion(configFlags *genericclioptions.ConfigFlags) func
 			if strings.HasPrefix(name, toComplete) {
 				filtered = append(filtered, name)
 			}
+		}
+
+		return filtered, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+// PlanVMNameCompletion provides completion for VM names within a specific migration plan.
+// It reads the --plan-name flag value from the command to look up the plan's VM list.
+func PlanVMNameCompletion(configFlags *genericclioptions.ConfigFlags) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		planName, _ := cmd.Flags().GetString("plan-name")
+		if planName == "" {
+			return []string{"Specify --plan-name first"}, cobra.ShellCompDirectiveError
+		}
+
+		namespace := client.ResolveNamespace(configFlags)
+
+		c, err := client.GetDynamicClient(configFlags)
+		if err != nil {
+			return []string{fmt.Sprintf("Error getting client: %v", err)}, cobra.ShellCompDirectiveError
+		}
+
+		plan, err := c.Resource(client.PlansGVR).Namespace(namespace).Get(context.Background(), planName, metav1.GetOptions{})
+		if err != nil {
+			return []string{fmt.Sprintf("Error fetching plan '%s': %v", planName, err)}, cobra.ShellCompDirectiveError
+		}
+
+		vms, found, err := unstructured.NestedSlice(plan.Object, "spec", "vms")
+		if err != nil || !found {
+			return []string{"No VMs found in plan"}, cobra.ShellCompDirectiveError
+		}
+
+		var filtered []string
+		for _, vm := range vms {
+			if vmMap, ok := vm.(map[string]interface{}); ok {
+				if name, ok := vmMap["name"].(string); ok && name != "" {
+					if strings.HasPrefix(name, toComplete) {
+						filtered = append(filtered, name)
+					}
+				}
+			}
+		}
+
+		if len(filtered) == 0 {
+			if toComplete != "" {
+				return []string{fmt.Sprintf("No VMs matching '%s' in plan '%s'", toComplete, planName)}, cobra.ShellCompDirectiveError
+			}
+			return []string{fmt.Sprintf("No VMs found in plan '%s'", planName)}, cobra.ShellCompDirectiveError
 		}
 
 		return filtered, cobra.ShellCompDirectiveNoFileComp

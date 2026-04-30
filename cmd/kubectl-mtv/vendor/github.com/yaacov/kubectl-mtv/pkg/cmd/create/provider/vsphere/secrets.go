@@ -2,34 +2,24 @@ package vsphere
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	forkliftv1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 )
 
-// Helper function to create a vSphere secret
-func createSecret(configFlags *genericclioptions.ConfigFlags, namespace, providerName, user, password, url, cacert string, insecureSkipTLS bool) (*corev1.Secret, error) {
-	// Get the Kubernetes client using configFlags
-	k8sClient, err := client.GetKubernetesClientset(configFlags)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create kubernetes client: %v", err)
-	}
-
-	// Create secret data without base64 encoding (the API handles this automatically)
+// buildSecret returns a vSphere provider Secret without submitting it to the API.
+func buildSecret(namespace, providerName, user, password, url, cacert string, insecureSkipTLS bool) *corev1.Secret {
 	secretData := map[string][]byte{
 		"user":     []byte(user),
 		"password": []byte(password),
 		"url":      []byte(url),
 	}
 
-	// Add optional fields
 	if insecureSkipTLS {
 		secretData["insecureSkipVerify"] = []byte("true")
 	}
@@ -37,14 +27,14 @@ func createSecret(configFlags *genericclioptions.ConfigFlags, namespace, provide
 		secretData["cacert"] = []byte(cacert)
 	}
 
-	// Generate a name prefix for the secret
-	secretName := fmt.Sprintf("%s-vsphere-", providerName)
-
-	// Create the secret object directly as a typed Secret
 	secret := &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Secret",
+		},
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: secretName,
-			Namespace:    namespace,
+			Name:      fmt.Sprintf("%s-vsphere-credentials", providerName),
+			Namespace: namespace,
 			Labels: map[string]string{
 				"createdForProviderType": "vsphere",
 				"createdForResourceType": "providers",
@@ -53,6 +43,20 @@ func createSecret(configFlags *genericclioptions.ConfigFlags, namespace, provide
 		Data: secretData,
 		Type: corev1.SecretTypeOpaque,
 	}
+	return secret
+}
+
+// createSecret creates a vSphere secret reusing the same object shape as buildSecret.
+// It swaps the deterministic Name for a GenerateName so the API server assigns a unique suffix.
+func createSecret(configFlags *genericclioptions.ConfigFlags, namespace, providerName, user, password, url, cacert string, insecureSkipTLS bool) (*corev1.Secret, error) {
+	k8sClient, err := client.GetKubernetesClientset(configFlags)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kubernetes client: %v", err)
+	}
+
+	secret := buildSecret(namespace, providerName, user, password, url, cacert, insecureSkipTLS)
+	secret.Name = ""
+	secret.GenerateName = fmt.Sprintf("%s-vsphere-", providerName)
 
 	return k8sClient.CoreV1().Secrets(namespace).Create(context.Background(), secret, metav1.CreateOptions{})
 }
@@ -65,6 +69,16 @@ func setSecretOwnership(configFlags *genericclioptions.ConfigFlags, provider *fo
 		return fmt.Errorf("failed to create kubernetes client: %v", err)
 	}
 
+	// Get the current secret to safely append owner reference
+	currentSecret, err := k8sClient.CoreV1().Secrets(secret.Namespace).Get(
+		context.Background(),
+		secret.Name,
+		metav1.GetOptions{},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to get secret for ownership update: %v", err)
+	}
+
 	// Create the owner reference
 	ownerRef := metav1.OwnerReference{
 		APIVersion: provider.APIVersion,
@@ -73,29 +87,24 @@ func setSecretOwnership(configFlags *genericclioptions.ConfigFlags, provider *fo
 		UID:        provider.UID,
 	}
 
-	// Patch secret to add the owner reference
-	patch := map[string]interface{}{
-		"metadata": map[string]interface{}{
-			"ownerReferences": []metav1.OwnerReference{ownerRef},
-		},
+	// Check if this provider is already an owner to avoid duplicates
+	for _, existingOwner := range currentSecret.OwnerReferences {
+		if existingOwner.UID == provider.UID {
+			return nil // Already an owner, nothing to do
+		}
 	}
 
-	// Convert patch to JSON bytes
-	patchBytes, err := json.Marshal(patch)
-	if err != nil {
-		return fmt.Errorf("failed to marshal patch data: %v", err)
-	}
+	// Append the new owner reference to existing ones
+	currentSecret.OwnerReferences = append(currentSecret.OwnerReferences, ownerRef)
 
-	// Apply the patch to the secret
-	_, err = k8sClient.CoreV1().Secrets(secret.Namespace).Patch(
+	// Update the secret with the new owner reference
+	_, err = k8sClient.CoreV1().Secrets(secret.Namespace).Update(
 		context.Background(),
-		secret.Name,
-		types.MergePatchType,
-		patchBytes,
-		metav1.PatchOptions{},
+		currentSecret,
+		metav1.UpdateOptions{},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to patch secret with owner reference: %v", err)
+		return fmt.Errorf("failed to update secret with owner reference: %v", err)
 	}
 
 	return nil
