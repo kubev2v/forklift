@@ -1,9 +1,11 @@
 package vsphere
 
 import (
+	"reflect"
 	"testing"
 
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	"github.com/vmware/govmomi/vim25/types"
 )
 
 // Test getDiskGuestInfo method
@@ -236,6 +238,130 @@ func TestVmAdapter_getDiskGuestInfo(t *testing.T) {
 			} else {
 				if result != nil {
 					t.Errorf("expected nil for key %d, but got %+v", tt.deviceKey, result)
+				}
+			}
+		})
+	}
+}
+
+func TestVmAdapter_Apply_CustomFields(t *testing.T) {
+	tests := []struct {
+		name              string
+		preExistingDef    []model.CustomFieldDef
+		preExistingValues []model.CustomFieldValue
+		availableFieldVal interface{}
+		customValueVal    interface{}
+		expectedDef       []model.CustomFieldDef
+		expectedValues    []model.CustomFieldValue
+	}{
+		{
+			name: "populates CustomDef and CustomValues from scratch",
+			availableFieldVal: types.ArrayOfCustomFieldDef{
+				CustomFieldDef: []types.CustomFieldDef{
+					{Name: "owner", Key: 100, ManagedObjectType: "VirtualMachine"},
+					{Name: "env", Key: 200, ManagedObjectType: ""},
+				},
+			},
+			customValueVal: types.ArrayOfCustomFieldValue{
+				CustomFieldValue: []types.BaseCustomFieldValue{
+					&types.CustomFieldStringValue{
+						CustomFieldValue: types.CustomFieldValue{Key: 100},
+						Value:            "alice",
+					},
+					&types.CustomFieldStringValue{
+						CustomFieldValue: types.CustomFieldValue{Key: 200},
+						Value:            "production",
+					},
+				},
+			},
+			expectedDef: []model.CustomFieldDef{
+				{Name: "owner", Key: 100, ManagedObjectType: "VirtualMachine"},
+				{Name: "env", Key: 200, ManagedObjectType: ""},
+			},
+			expectedValues: []model.CustomFieldValue{
+				{Key: 100, Value: "alice"},
+				{Key: 200, Value: "production"},
+			},
+		},
+		{
+			name: "clears CustomDef when vSphere reports empty availableField",
+			preExistingDef: []model.CustomFieldDef{
+				{Name: "stale", Key: 999},
+			},
+			availableFieldVal: types.ArrayOfCustomFieldDef{
+				CustomFieldDef: []types.CustomFieldDef{},
+			},
+			expectedDef: []model.CustomFieldDef{},
+		},
+		{
+			name: "clears CustomValues when vSphere reports empty customValue (ArrayOf)",
+			preExistingValues: []model.CustomFieldValue{
+				{Key: 999, Value: "stale"},
+			},
+			customValueVal: types.ArrayOfCustomFieldValue{
+				CustomFieldValue: []types.BaseCustomFieldValue{},
+			},
+			expectedValues: []model.CustomFieldValue{},
+		},
+		{
+			name: "clears CustomValues when vSphere reports empty customValue (slice)",
+			preExistingValues: []model.CustomFieldValue{
+				{Key: 999, Value: "stale"},
+			},
+			customValueVal: []types.BaseCustomFieldValue{},
+			expectedValues: []model.CustomFieldValue{},
+		},
+		{
+			name: "handles customValue as []BaseCustomFieldValue",
+			customValueVal: []types.BaseCustomFieldValue{
+				&types.CustomFieldStringValue{
+					CustomFieldValue: types.CustomFieldValue{Key: 10},
+					Value:            "value-from-slice",
+				},
+			},
+			expectedValues: []model.CustomFieldValue{
+				{Key: 10, Value: "value-from-slice"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := &VmAdapter{
+				model: model.VM{
+					CustomDef:    tt.preExistingDef,
+					CustomValues: tt.preExistingValues,
+				},
+			}
+
+			changeSet := []types.PropertyChange{}
+			if tt.availableFieldVal != nil {
+				changeSet = append(changeSet, types.PropertyChange{
+					Op:   Assign,
+					Name: fAvailableField,
+					Val:  tt.availableFieldVal,
+				})
+			}
+			if tt.customValueVal != nil {
+				changeSet = append(changeSet, types.PropertyChange{
+					Op:   Assign,
+					Name: fCustomValue,
+					Val:  tt.customValueVal,
+				})
+			}
+
+			v.Apply(types.ObjectUpdate{
+				ChangeSet: changeSet,
+			})
+
+			if tt.expectedDef != nil {
+				if !reflect.DeepEqual(v.model.CustomDef, tt.expectedDef) {
+					t.Errorf("CustomDef mismatch\ngot:  %+v\nwant: %+v", v.model.CustomDef, tt.expectedDef)
+				}
+			}
+			if tt.expectedValues != nil {
+				if !reflect.DeepEqual(v.model.CustomValues, tt.expectedValues) {
+					t.Errorf("CustomValues mismatch\ngot:  %+v\nwant: %+v", v.model.CustomValues, tt.expectedValues)
 				}
 			}
 		})

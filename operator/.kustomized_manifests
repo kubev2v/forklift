@@ -3901,6 +3901,37 @@ spec:
                   - false (default): Add zone-based node selector using value from provider's spec.settings.target-az
                   - true: Skip adding zone-based node selector
                 type: boolean
+              tagMapping:
+                description: |-
+                  TagMapping configures how vSphere tags are converted to Kubernetes labels on the destination VM.
+                  Only applicable to vSphere sources; ignored for other providers (EC2, Hyper-V, oVirt, OpenStack).
+                  If not specified, all tags become labels (default behavior).
+                  If specified with Disabled: true, no tags become labels.
+                  If specified with LabelTags, only those tags become labels; others are ignored.
+                  Custom attributes always become annotations regardless of this setting.
+                  Examples:
+                    tagMapping:
+                      disabled: true
+
+                    tagMapping:
+                      labelTags:
+                        - owner
+                        - cost-center
+                        - environment
+                properties:
+                  disabled:
+                    description: |-
+                      Disabled completely prevents all tags from being converted to labels.
+                      When true, LabelTags is ignored and no tag labels are applied.
+                    type: boolean
+                  labelTags:
+                    description: |-
+                      LabelTags filters which vSphere tags become labels (case-insensitive).
+                      Empty means all tags become labels. Ignored when Disabled is true.
+                    items:
+                      type: string
+                    type: array
+                type: object
               targetAffinity:
                 description: |-
                   TargetAffinity allows specifying hard- and soft-affinity for VMs.

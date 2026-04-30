@@ -1682,10 +1682,36 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) 
 
 	//Add the original name and ID info to the VM annotations
 	if len(vm.NewName) > 0 {
-		annotations := make(map[string]string)
-		annotations[AnnDisplayName] = vm.Name
-		annotations[AnnOriginalID] = vm.ID
-		object.ObjectMeta.Annotations = annotations
+		if object.ObjectMeta.Annotations == nil {
+			object.ObjectMeta.Annotations = make(map[string]string)
+		}
+		object.ObjectMeta.Annotations[AnnDisplayName] = vm.Name
+		object.ObjectMeta.Annotations[AnnOriginalID] = vm.ID
+	}
+
+	sourceLabels, sourceAnnotations, sanitizationReport, tagErr := r.Builder.SourceVMLabelsAndAnnotations(vm.Ref, r.Plan.Spec.TagMapping)
+	if tagErr != nil {
+		r.Log.Error(tagErr, "Failed to get source VM labels/annotations", "vm", vm.String())
+	} else {
+		if object.ObjectMeta.Labels == nil {
+			object.ObjectMeta.Labels = make(map[string]string)
+		}
+		maps.Copy(object.ObjectMeta.Labels, sourceLabels)
+		if object.ObjectMeta.Annotations == nil {
+			object.ObjectMeta.Annotations = make(map[string]string)
+		}
+		maps.Copy(object.ObjectMeta.Annotations, sourceAnnotations)
+		if len(sanitizationReport) > 0 {
+			reportJSON, jsonErr := json.Marshal(sanitizationReport)
+			if jsonErr != nil {
+				r.Log.Error(jsonErr, "Failed to marshal sanitization report",
+					"vm", object.Name,
+					"namespace", object.Namespace,
+					"annotation", planbase.AnnSanitizedMetadata)
+			} else {
+				object.ObjectMeta.Annotations[planbase.AnnSanitizedMetadata] = string(reportJSON)
+			}
+		}
 	}
 
 	// Assign the determined run strategy to the object
@@ -1775,14 +1801,12 @@ func (r *KubeVirt) setInstanceType(vm *plan.VMStatus, object *cnv.VirtualMachine
 }
 
 func (r *KubeVirt) setVmLabels(object *cnv.VirtualMachine) (err error) {
-	labels := object.ObjectMeta.Labels
-	if labels == nil {
-		object.ObjectMeta.Labels = map[string]string{}
+	if object.ObjectMeta.Labels == nil {
+		object.ObjectMeta.Labels = make(map[string]string)
 	}
 	if r.Plan.Provider.Source.RequiresConversion() {
-		labels["guestConverted"] = strconv.FormatBool(!r.Plan.Spec.SkipGuestConversion)
+		object.ObjectMeta.Labels["guestConverted"] = strconv.FormatBool(!r.Plan.Spec.SkipGuestConversion)
 	}
-	object.ObjectMeta.Labels = labels
 	return
 }
 

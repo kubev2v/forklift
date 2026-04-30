@@ -355,6 +355,23 @@ type PlanSpec struct {
 	// Warning: Enabling XFSv4 support will drop support for BTRFS for the specific plan. Ensure that the plan only selects VMs with supported filesystem.
 	// +kubebuilder:default:=false
 	XfsCompatibility bool `json:"xfsCompatibility,omitempty"`
+	// TagMapping configures how vSphere tags are converted to Kubernetes labels on the destination VM.
+	// Only applicable to vSphere sources; ignored for other providers (EC2, Hyper-V, oVirt, OpenStack).
+	// If not specified, all tags become labels (default behavior).
+	// If specified with Disabled: true, no tags become labels.
+	// If specified with LabelTags, only those tags become labels; others are ignored.
+	// Custom attributes always become annotations regardless of this setting.
+	// Examples:
+	//   tagMapping:
+	//     disabled: true
+	//
+	//   tagMapping:
+	//     labelTags:
+	//       - owner
+	//       - cost-center
+	//       - environment
+	// +optional
+	TagMapping *TagMapping `json:"tagMapping,omitempty"`
 }
 
 // Find a planned VM.
@@ -575,4 +592,15 @@ type NetworkNameTemplateData struct {
 	NetworkType string `json:"networkType,omitempty"`
 	// NetworkIndex is the sequential index of the network interface (0-based)
 	NetworkIndex int `json:"networkIndex,omitempty"`
+}
+
+type TagMapping struct {
+	// Disabled completely prevents all tags from being converted to labels.
+	// When true, LabelTags is ignored and no tag labels are applied.
+	// +optional
+	Disabled bool `json:"disabled,omitempty"`
+	// LabelTags filters which vSphere tags become labels (case-insensitive).
+	// Empty means all tags become labels. Ignored when Disabled is true.
+	// +optional
+	LabelTags []string `json:"labelTags,omitempty"`
 }
