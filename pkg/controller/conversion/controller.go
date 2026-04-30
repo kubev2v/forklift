@@ -98,6 +98,8 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 
 	// only reconcile if the conversion pod is not finished
 	if conversion.Status.Phase == api.PhaseSucceeded || conversion.Status.Phase == api.PhaseFailed {
+		result.RequeueAfter = 0
+		err = nil
 		return
 	}
 
