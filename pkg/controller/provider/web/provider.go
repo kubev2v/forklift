@@ -11,6 +11,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/ovirt"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
+	ec2web "github.com/kubev2v/forklift/pkg/provider/ec2/inventory/web"
 
 	"net/http"
 )
@@ -148,6 +149,27 @@ func (h ProviderHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
+	// EC2
+	ec2Handler := &ec2web.ProviderHandler{
+		Handler: base.Handler{
+			Container: h.Container,
+		},
+	}
+	status, err = ec2Handler.Prepare(ctx)
+	if status != http.StatusOK {
+		ctx.Status(status)
+		base.SetForkliftError(ctx, err)
+		return
+	}
+	ec2List, err := ec2Handler.ListContent(ctx)
+	if err != nil {
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
 	// HyperV
 	hypervHandler := &hyperv.ProviderHandler{
 		Handler: base.Handler{
@@ -176,6 +198,7 @@ func (h ProviderHandler) List(ctx *gin.Context) {
 		string(api.OVirt):     oVirtList,
 		string(api.OpenStack): openStackList,
 		string(api.Ova):       ovaList,
+		string(api.EC2):       ec2List,
 		string(api.HyperV):    hypervList,
 	}
 

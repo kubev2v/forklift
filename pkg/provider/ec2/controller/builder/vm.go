@@ -69,8 +69,6 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 
 	vcpus, memoryMiB := r.mapInstanceType(instanceType)
 
-	runStrategy := cnv.RunStrategyHalted
-	object.RunStrategy = &runStrategy
 	object.Template = &cnv.VirtualMachineInstanceTemplateSpec{
 		Spec: cnv.VirtualMachineInstanceSpec{
 			Domain: cnv.DomainSpec{
