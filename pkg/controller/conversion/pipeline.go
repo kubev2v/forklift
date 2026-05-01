@@ -81,10 +81,27 @@ func NewConversionPipeline(ctx context.Context, cr *Reconciler, conv *api.Conver
 func (p *ConversionPipeline) advanceStage() {
 	for i, s := range p.stages {
 		if s.Stage == p.conv.Status.Stage && i+1 < len(p.stages) {
-			p.conv.Status.Stage = p.stages[i+1].Stage
+			next := p.stages[i+1].Stage
+			p.r.Log.Info("Stage transition.", "from", p.conv.Status.Stage, "to", next)
+			p.conv.Status.Stage = next
 			return
 		}
 	}
+}
+
+// setPhase updates the conversion phase and logs the transition.
+func (p *ConversionPipeline) setPhase(phase api.ConversionPhase) {
+	p.r.Log.Info("Phase transition.", "from", p.conv.Status.Phase, "to", phase)
+	p.conv.Status.Phase = phase
+}
+
+// setStage updates the conversion stage and logs when the value actually changes.
+func (p *ConversionPipeline) setStage(stage api.ConversionStage) {
+	if p.conv.Status.Stage == stage {
+		return
+	}
+	p.r.Log.Info("Stage transition.", "from", p.conv.Status.Stage, "to", stage)
+	p.conv.Status.Stage = stage
 }
 
 // currentStage returns the PipelineStage matching conv.Status.Stage, or nil.
@@ -105,6 +122,7 @@ func (p *ConversionPipeline) checkStagePredicate() {
 		if stage == nil || stage.Predicate == nil || stage.Predicate(p.conv) {
 			break
 		}
+		p.r.Log.V(3).Info("Skipping stage (predicate false).", "stage", stage.Stage)
 		p.advanceStage()
 	}
 }
@@ -118,13 +136,21 @@ func (p *ConversionPipeline) checkStagePredicate() {
 // stages have completed and the pod succeeded.
 // Returns (false, nil) while work is still in progress
 func (p *ConversionPipeline) Run() (succeeded bool, err error) {
+	p.r.Log.V(3).Info("Pipeline run.",
+		"type", p.conv.Spec.Type,
+		"phase", p.conv.Status.Phase,
+		"stage", p.conv.Status.Stage)
+
 	if p.conv.Status.Phase == api.PhasePending {
 		err = p.runPhasePending()
 		if err != nil {
+			p.r.Log.Error(err, "runPhasePending failed.")
 			return false, err
 		}
 		// when not running, there was an error with the provider
 		if p.conv.Status.Phase != api.PhaseRunning {
+			p.r.Log.Info("Conversion did not transition to Running after pending phase.",
+				"phase", p.conv.Status.Phase)
 			return false, nil
 		}
 	}
@@ -142,16 +168,24 @@ func (p *ConversionPipeline) Run() (succeeded bool, err error) {
 func (p *ConversionPipeline) runPhasePending() error {
 	if p.conv.Spec.Type == api.DeepInspection {
 		snapshotMoref := strings.TrimSpace(p.conv.Spec.Settings[SpecSettingsSnapshotMorefKey])
+		p.r.Log.Info("Pending phase: resolving snapshot ownership.",
+			"snapshotMorefProvided", snapshotMoref != "")
 		if snapshotMoref != "" {
+			p.r.Log.Info("Using supplied snapshot MoRef; controller will not own the snapshot.",
+				"snapshotMoref", snapshotMoref)
 			p.conv.Status.Snapshot = &api.SnapshotStatus{Moref: snapshotMoref, Owned: false}
 		} else {
 			provider, _, err := p.r.loadProviderSecret(p.ctx, p.conv)
 			if err != nil {
+				p.r.Log.Error(err, "Failed to load provider secret.")
 				return err
 			}
+			p.r.Log.Info("Provider type for snapshot ownership check.", "providerType", provider.Type())
 			if provider.Type() != api.VSphere {
-				p.conv.Status.Phase = api.PhaseFailed
-				p.conv.Status.SetCondition(libcnd.Condition{
+			p.r.Log.Info("Non-vSphere provider; deep inspection requires SNAPSHOT_MOREF.",
+				"providerType", provider.Type())
+			p.setPhase(api.PhaseFailed)
+			p.conv.Status.SetCondition(libcnd.Condition{
 					Type:     "NonVSphereProvider",
 					Status:   True,
 					Category: Critical,
@@ -164,14 +198,14 @@ func (p *ConversionPipeline) runPhasePending() error {
 	}
 
 	now := meta.Now()
-	p.conv.Status.Phase = api.PhaseRunning
+	p.setPhase(api.PhaseRunning)
 	p.conv.Status.StartTime = &now
 	return nil
 }
 
 func (p *ConversionPipeline) runVirtV2v() (pipelineFinished bool, err error) {
 	if p.conv.Status.Stage == "" {
-		p.conv.Status.Stage = p.stages[0].Stage
+		p.setStage(p.stages[0].Stage)
 	}
 
 	// currently, this does nothing for virt-v2v pipeline because it has no predicates, only here for consistency.
@@ -201,10 +235,12 @@ func (p *ConversionPipeline) runDeepInspection() (pipelineFinished bool, err err
 	}
 
 	if p.conv.Status.Stage == "" {
-		p.conv.Status.Stage = p.stages[0].Stage
+		p.setStage(p.stages[0].Stage)
 	}
 
 	p.checkStagePredicate()
+
+	p.r.Log.V(3).Info("Deep inspection stage.", "stage", p.conv.Status.Stage)
 
 	var stageDone bool
 	switch p.conv.Status.Stage {
@@ -225,6 +261,7 @@ func (p *ConversionPipeline) runDeepInspection() (pipelineFinished bool, err err
 	}
 
 	if err != nil {
+		p.r.Log.Error(err, "Stage failed.", "stage", p.conv.Status.Stage)
 		return false, err
 	}
 	if stageDone {
@@ -238,10 +275,12 @@ func (p *ConversionPipeline) runStageCreatingSnapshot() (stageDone bool, err err
 	snap := p.conv.Status.Snapshot
 	provider, secret, err := p.r.loadProviderSecret(p.ctx, p.conv)
 	if err != nil {
+		p.r.Log.Error(err, "Failed to load provider secret for snapshot creation.")
 		return stageDone, err
 	}
 	if provider.Type() != api.VSphere {
-		p.conv.Status.Phase = api.PhaseFailed
+		p.r.Log.Info("Non-vSphere provider; cannot create snapshot.", "providerType", provider.Type())
+		p.setPhase(api.PhaseFailed)
 		return stageDone, nil
 	}
 
@@ -261,8 +300,10 @@ func (p *ConversionPipeline) runStageCreatingSnapshot() (stageDone bool, err err
 
 	_, taskID, err := snapClient.CreateSnapshot()
 	if err != nil {
+		p.r.Log.Error(err, "CreateSnapshot failed.")
 		return stageDone, err
 	}
+	p.r.Log.Info("Snapshot creation task submitted.", "taskID", taskID)
 	snap.CreateTaskID = taskID
 	return true, nil
 }
@@ -291,7 +332,8 @@ func (p *ConversionPipeline) runStageWaitingForSnapshot() (stageDone bool, err e
 
 	ready, moref, err := snapClient.CheckCreateTaskReady(snap.CreateTaskID)
 	if err != nil {
-		p.conv.Status.Phase = api.PhaseFailed
+		p.r.Log.Error(err, "Snapshot creation task failed.", "taskID", snap.CreateTaskID)
+		p.setPhase(api.PhaseFailed)
 		return stageDone, nil
 	}
 	if !ready {
@@ -320,15 +362,15 @@ func (p *ConversionPipeline) runStageEnsurePod() (stageDone bool, err error) {
 
 	switch pod.Status.Phase {
 	case core.PodPending:
-		p.conv.Status.Stage = api.StageCreatePod
+		p.setStage(api.StageCreatePod)
 		return stageDone, nil
 	case core.PodRunning:
-		p.conv.Status.Stage = api.StagePodRunning
+		p.setStage(api.StagePodRunning)
 		return stageDone, nil
 	}
 
 	// Pod exited
-	p.conv.Status.Stage = api.StagePodRunning
+	p.setStage(api.StagePodRunning)
 	return true, nil
 }
 
@@ -339,26 +381,31 @@ func (p *ConversionPipeline) runStageEnsurePod() (stageDone bool, err error) {
 func (p *ConversionPipeline) runStageDeepInspectionPod() (stageDone bool, err error) {
 	ensurer, err := NewEnsurer(p.r.Client, p.r.Log, p.conv.Spec)
 	if err != nil {
+		p.r.Log.Error(err, "Failed to create ensurer for deep inspection pod.")
 		return
 	}
 	pod, err := ensurer.EnsurePod(p.conv)
 	if err != nil {
+		p.r.Log.Error(err, "EnsurePod failed.")
 		return
 	}
 	if pod == nil {
+		p.r.Log.V(3).Info("EnsurePod returned nil; waiting.")
 		return
 	}
 
 	p.conv.Status.Pod = core.ObjectReference{Namespace: pod.Namespace, Name: pod.Name}
+	p.r.Log.V(3).Info("Deep inspection pod status.", "pod", pod.Name, "phase", pod.Status.Phase, "podIP", pod.Status.PodIP)
 
 	switch pod.Status.Phase {
 	case core.PodPending:
-		p.conv.Status.Stage = api.StageCreatePod
+		p.setStage(api.StageCreatePod)
 		return
 	case core.PodRunning:
-		p.conv.Status.Stage = api.StagePodRunning
+		p.setStage(api.StagePodRunning)
 		// Advance early when the pod signals that detection is complete.
 		if p.isResultReady(pod.Status.PodIP) {
+			p.r.Log.Info("Deep inspection pod is ready; advancing to FetchingResults.")
 			return true, nil
 		}
 		return
@@ -366,7 +413,8 @@ func (p *ConversionPipeline) runStageDeepInspectionPod() (stageDone bool, err er
 
 	// Pod has exited (Succeeded, Failed, Unknown) — advance regardless so
 	// the pipeline can still attempt result fetching or skip gracefully.
-	p.conv.Status.Stage = api.StagePodRunning
+	p.r.Log.Info("Deep inspection pod exited.", "pod", pod.Name, "phase", pod.Status.Phase)
+	p.setStage(api.StagePodRunning)
 	return true, nil
 }
 
@@ -393,6 +441,7 @@ func (p *ConversionPipeline) isResultReady(podIP string) bool {
 func (p *ConversionPipeline) runStageFetchingResults() (stageDone bool, err error) {
 	podRef := p.conv.Status.Pod
 	if podRef.Name == "" {
+		p.r.Log.Info("No pod reference in status; skipping result fetch.")
 		return true, nil
 	}
 
@@ -402,27 +451,35 @@ func (p *ConversionPipeline) runStageFetchingResults() (stageDone bool, err erro
 		Name:      podRef.Name,
 	}, pod)
 	if err != nil {
+		p.r.Log.Error(err, "Failed to get deep inspection pod.", "pod", podRef.Name)
 		return
 	}
 
+	p.r.Log.V(3).Info("Fetching results: pod status.", "pod", pod.Name, "phase", pod.Status.Phase, "podIP", pod.Status.PodIP)
+
 	// Pod exited before we could fetch results, skip
 	if pod.Status.Phase != core.PodRunning {
+		p.r.Log.Info("Pod is no longer running; skipping result fetch.", "pod", pod.Name, "phase", pod.Status.Phase)
 		return true, nil
 	}
 	if pod.Status.PodIP == "" {
+		p.r.Log.V(3).Info("Pod has no IP yet; retrying.")
 		return
 	}
 
 	result, fetchErr := p.fetchInspectionResults(pod.Status.PodIP)
 	if fetchErr != nil {
 		// Transient connection error, retry
+		p.r.Log.V(3).Info("Transient error fetching results; retrying.", "error", fetchErr.Error())
 		return
 	}
 	if result == nil {
 		// Pod returned 503, not ready yet
+		p.r.Log.V(3).Info("Results not ready yet (503); retrying.")
 		return
 	}
 
+	p.r.Log.Info("Inspection results fetched.", "passed", result.Passed, "concerns", len(result.Concerns))
 	p.conv.Status.InspectionResult = result
 	return true, nil
 }
@@ -512,13 +569,20 @@ func (p *ConversionPipeline) fetchInspectionResults(podIP string) (*api.Inspecti
 func (p *ConversionPipeline) podSucceeded() (podSucceeded bool, err error) {
 	ensurer, err := NewEnsurer(p.r.Client, p.r.Log, p.conv.Spec)
 	if err != nil {
+		p.r.Log.Error(err, "Failed to create ensurer in podSucceeded.")
 		return false, err
 	}
 	pod, err := ensurer.EnsurePod(p.conv)
 	if err != nil {
+		p.r.Log.Error(err, "EnsurePod failed in podSucceeded.")
 		return false, err
 	}
-	return pod != nil && pod.Status.Phase == core.PodSucceeded, nil
+	if pod == nil {
+		p.r.Log.Info("podSucceeded: pod not found.")
+		return false, nil
+	}
+	p.r.Log.Info("podSucceeded: pod phase check.", "pod", pod.Name, "phase", pod.Status.Phase)
+	return pod.Status.Phase == core.PodSucceeded, nil
 }
 
 // runStageRemovingSnapshot submits the vSphere snapshot removal task
@@ -576,7 +640,8 @@ func (p *ConversionPipeline) runStageWaitingForSnapshotRemoval() (stageDone bool
 
 	ready, err := snapClient.CheckRemoveTaskReady(snap.RemoveTaskID)
 	if err != nil {
-		p.conv.Status.Phase = api.PhaseFailed
+		p.r.Log.Error(err, "Snapshot removal task failed.", "taskID", snap.RemoveTaskID)
+		p.setPhase(api.PhaseFailed)
 		return stageDone, nil
 	}
 	if !ready {
