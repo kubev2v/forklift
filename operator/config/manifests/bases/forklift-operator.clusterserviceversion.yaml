@@ -147,6 +147,11 @@ spec:
         path: virt_v2v_image_fqin
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Deep inspection image used by deep-inspection pods
+        displayName: Deep Inspection Image
+        path: deep_inspection_image_fqin
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: VDDK image for VMware disk access
         displayName: VDDK Image
         path: vddk_image

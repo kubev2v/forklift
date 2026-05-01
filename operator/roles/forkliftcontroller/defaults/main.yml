@@ -226,4 +226,3 @@ metric_servicemonitor_name: "{{ app_name }}-metrics"
 metric_interval: "30s"
 metric_port_name: "metrics"
 metrics_rule_name: "{{app_name}}-migration-rules"
-

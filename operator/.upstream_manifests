@@ -209,6 +209,10 @@ spec:
                 - "true"
                 - "false"
                 type: string
+              deep_inspection_image_fqin:
+                description: Deep inspection image used by deep-inspection pods
+                example: quay.io/kubev2v/forklift-deep-inspection:latest
+                type: string
               feature_auth_required:
                 description: 'Require authentication (default: true)'
                 enum:
@@ -8070,6 +8074,11 @@ spec:
       - description: Virt-v2v XFS conversion image used by migration pods
         displayName: Virt-v2v XFS Image
         path: virt_v2v_image_xfs_fqin
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Deep inspection image used by deep-inspection pods
+        displayName: Deep Inspection Image
+        path: deep_inspection_image_fqin
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: VDDK image for VMware disk access

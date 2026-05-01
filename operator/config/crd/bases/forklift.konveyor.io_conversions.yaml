@@ -1338,6 +1338,98 @@ spec:
                   - type
                   type: object
                 type: array
+              inspectionResult:
+                description: |-
+                  InspectionResult holds the outcome fetched from the deep-inspection pod
+                  HTTP API once the StageFetchingResults stage completes.
+                properties:
+                  concerns:
+                    description: Concerns lists all issues found during inspection.
+                    items:
+                      description: InspectionConcern is a single issue reported by
+                        the deep-inspection process.
+                      properties:
+                        category:
+                          description: Category classifies the severity (e.g. Warning,
+                            Critical).
+                          type: string
+                        id:
+                          description: ID is the unique concern identifier.
+                          type: string
+                        label:
+                          description: Label is a short human-readable title.
+                          type: string
+                        message:
+                          description: Message contains additional detail.
+                          type: string
+                      required:
+                      - category
+                      - id
+                      - label
+                      - message
+                      type: object
+                    type: array
+                  filesystems:
+                    description: Filesystems lists the filesystems detected on the
+                      VM's disks.
+                    items:
+                      description: InspectionFilesystem describes a single filesystem
+                        found on the inspected VM.
+                      properties:
+                        device:
+                          description: Device is the block device path (e.g. /dev/sda1).
+                          type: string
+                        type:
+                          description: Type is the filesystem type (e.g. ext4, xfs).
+                          type: string
+                        uuid:
+                          description: UUID is the filesystem UUID when available.
+                          type: string
+                      required:
+                      - device
+                      - type
+                      type: object
+                    type: array
+                  mountpoints:
+                    description: Mountpoints lists the mount paths of the VM's filesystems.
+                    items:
+                      description: InspectionMountpoint maps a block device to its
+                        mount path inside the VM.
+                      properties:
+                        device:
+                          description: Device is the block device path.
+                          type: string
+                        mountPoint:
+                          description: MountPoint is the path where the device is
+                            mounted (e.g. /).
+                          type: string
+                      required:
+                      - device
+                      - mountPoint
+                      type: object
+                    type: array
+                  osInfo:
+                    description: OSInfo contains operating-system metadata.
+                    properties:
+                      arch:
+                        description: Arch is the CPU architecture (e.g. x86_64).
+                        type: string
+                      distro:
+                        description: Distro is the distribution identifier.
+                        type: string
+                      name:
+                        description: Name is the OS product name.
+                        type: string
+                      version:
+                        description: Version is the major OS version.
+                        type: string
+                    type: object
+                  passed:
+                    description: Passed is true when all checks passed with no concerns.
+                    type: boolean
+                required:
+                - passed
+                type: object
               observedGeneration:
                 description: |-
                   The most recent generation observed by the controller.
@@ -1352,6 +1444,7 @@ spec:
                 - Running
                 - Succeeded
                 - Failed
+                - Canceled
                 type: string
               pod:
                 description: Reference to the managed conversion pod.
@@ -1425,12 +1518,13 @@ spec:
                   Stage is the current fine-grained pipeline position within the Running phase.
                   Intended for progress observability; the pipeline advances it as work proceeds.
                 enum:
-                - PodCreating
+                - CreatingPod
                 - PodRunning
                 - CreatingSnapshot
                 - WaitingForSnapshot
                 - RemovingSnapshot
                 - WaitingForSnapshotRemoval
+                - FetchingResults
                 - Finished
                 type: string
               startTime:
