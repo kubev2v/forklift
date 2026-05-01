@@ -123,6 +123,8 @@ const (
 	kApp = "forklift.app"
 	// LUKS
 	kLUKS = "isLUKS"
+	// Connection
+	kConnection = "isConnection"
 	// Use
 	kUse = "use"
 	// DV secret
@@ -485,114 +487,201 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 	return
 }
 
-// EnsureDeepInspectionConversion manages a DeepInspection Conversion CR for warm vSphere
-// migrations.  It uses the pre-existing warm snapshot (snapshotMoref) so the Conversion
-// controller skips snapshot creation/removal.
-//
-// State machine:
-//   - PhaseSucceeded → returns (true, cr, nil) — caller reads InspectionResult
-//   - Pending/Running → returns (false, nil, nil) — requeue, still in progress
-//   - PhaseFailed/PhaseCanceled → deletes stale CR, creates fresh one, returns (false, nil, nil)
-//   - Not found → creates new CR, returns (false, nil, nil)
-func (r *KubeVirt) EnsureDeepInspectionConversion(
-	vm *plan.VMStatus, snapshotMoref, planName, planID string,
-) (ready bool, cr *api.Conversion, err error) {
-	// Labels stored on the CR when it is created.
-	crLabels := map[string]string{
-		convctx.LabelPlan:           planID,
-		convctx.LabelVM:             vm.ID,
-		convctx.LabelConversionType: string(api.DeepInspection),
+// getConversionLabels returns the base label set for a Conversion CR or its
+// associated secrets. convType and vmID are always included; planID is added
+// when non-empty. Entries in extra override / extend the base set.
+func (r *KubeVirt) getConversionLabels(convType api.ConversionType, vmID, planID string, extra map[string]string) map[string]string {
+	labels := map[string]string{
+		convctx.LabelVM:             vmID,
+		convctx.LabelConversionType: string(convType),
 	}
-
-	// Lookup only by VM ID + type, scoped to the plan namespace.
-	lookupLabels := map[string]string{
-		convctx.LabelVM:             vm.ID,
-		convctx.LabelConversionType: string(api.DeepInspection),
+	if planID != "" {
+		labels[convctx.LabelPlan] = planID
 	}
+	for k, v := range extra {
+		labels[k] = v
+	}
+	return labels
+}
 
+// getConversion looks up a single Conversion CR in Plan.Namespace that matches
+// all supplied labels. Returns nil (no error) when no match is found.
+func (r *KubeVirt) getConversion(labels map[string]string) (*api.Conversion, error) {
 	list := &api.ConversionList{}
-	err = r.Client.List(context.TODO(), list,
+	if err := r.Client.List(context.TODO(), list,
 		client.InNamespace(r.Plan.Namespace),
-		client.MatchingLabels(lookupLabels),
-	)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
+		client.MatchingLabels(labels),
+	); err != nil {
+		return nil, liberr.Wrap(err)
 	}
-
-	if len(list.Items) > 0 {
-		existing := &list.Items[0]
-		switch existing.Status.Phase {
-		case api.PhaseSucceeded:
-			r.Log.Info("Deep inspection CR succeeded; reusing result.",
-				"conversion", path.Join(existing.Namespace, existing.Name),
-				"vm", vm.String())
-			return true, existing, nil
-		case api.PhaseFailed, api.PhaseCanceled:
-			r.Log.Info("Deep inspection CR is terminal non-succeeded; replacing.",
-				"conversion", path.Join(existing.Namespace, existing.Name),
-				"phase", existing.Status.Phase,
-				"vm", vm.String())
-			if err = r.Client.Delete(context.TODO(), existing); err != nil {
-				err = liberr.Wrap(err)
-				return
-			}
-			// Fall through to creation below.
-		default:
-			// Still running (Pending, Running, or unset), wait.
-			r.Log.Info("Deep inspection CR is still running.",
-				"conversion", path.Join(existing.Namespace, existing.Name),
-				"phase", existing.Status.Phase,
-				"vm", vm.String())
-			return false, nil, nil
-		}
+	if len(list.Items) == 0 {
+		return nil, nil
 	}
+	return &list.Items[0], nil
+}
 
-	// Ensure a provider-format secret (url/user/password) exists for the deep-inspection pod.
-	// The secret must live in the same namespace as the pod.
-	// ensureSecret() always targets Plan.Spec.TargetNamespace via r.Destination.Client, which may differ, so we manage this
-	// secret directly here.
-	secret, secErr := r.ensureDeepInspectionSecret(vm.Ref, planName, planID)
-	if secErr != nil {
-		err = liberr.Wrap(secErr)
-		return
-	}
-
-	cr := &api.Conversion{
+// buildConversion constructs a Conversion CR in memory from a ready-made Spec.
+func (r *KubeVirt) buildConversion(planName, vmID string, labels map[string]string, spec api.ConversionSpec) *api.Conversion {
+	return &api.Conversion{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace:    r.Plan.Namespace,
-			GenerateName: planName + "-" + vm.ID + "-",
-			Labels:       crLabels,
+			GenerateName: planName + "-" + vmID + "-",
+			Labels:       labels,
 		},
-		Spec: api.ConversionSpec{
-			Type:            api.DeepInspection,
-			TargetNamespace: r.Plan.Spec.TargetNamespace,
-			VM:              vm.Ref,
-			Connection: api.Connection{
-				Secret: core.ObjectReference{
-					Namespace: secret.Namespace,
-					Name:      secret.Name,
-				},
-			},
-			Settings: map[string]string{
-				"SNAPSHOT_MOREF": snapshotMoref,
-			},
-			VDDKImage: settings.GetVDDKImage(r.Source.Provider.Spec.Settings),
-			PodSettings: api.PodSettings{
-				ServiceAccount: resolveServiceAccount(r.Plan),
-			},
+		Spec: spec,
+	}
+}
+
+// ensureConversion creates or updates the Conversion CR on the cluster.
+// An existing CR is found by matching all labels except LabelPlan (which
+// changes when a plan is re-created). When found its Spec and Labels are
+// refreshed; otherwise the provided CR is created verbatim.
+func (r *KubeVirt) ensureConversion(cr *api.Conversion) (*api.Conversion, error) {
+	lookupLabels := make(map[string]string, len(cr.Labels))
+	for k, v := range cr.Labels {
+		if k != convctx.LabelPlan {
+			lookupLabels[k] = v
+		}
+	}
+	list := &api.ConversionList{}
+	if err := r.Client.List(context.TODO(), list,
+		client.InNamespace(cr.Namespace),
+		client.MatchingLabels(lookupLabels),
+	); err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	if len(list.Items) > 0 {
+		existing := &list.Items[0]
+		existing.Spec = cr.Spec
+		existing.Labels = cr.Labels
+		if err := r.Client.Update(context.TODO(), existing); err != nil {
+			return nil, liberr.Wrap(err)
+		}
+		r.Log.Info("Conversion CR updated.",
+			"conversion", path.Join(existing.Namespace, existing.Name),
+			"type", string(existing.Spec.Type))
+		return existing, nil
+	}
+	if err := r.Client.Create(context.TODO(), cr); err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	r.Log.Info("Conversion CR created.",
+		"conversion", path.Join(cr.Namespace, cr.Name),
+		"type", string(cr.Spec.Type))
+	return cr, nil
+}
+
+// buildConversionSecret constructs a Secret spec in memory for a Conversion pod.
+func (r *KubeVirt) buildConversionSecret(namespace, generateName string, labels map[string]string, data map[string][]byte) *core.Secret {
+	return &core.Secret{
+		ObjectMeta: meta.ObjectMeta{
+			Namespace:    namespace,
+			GenerateName: generateName,
+			Labels:       labels,
 		},
+		Data: data,
+	}
+}
+
+// ensureConversionSecret creates or updates a Secret on the destination cluster.
+// The existing Secret is found by matching all labels except LabelPlan (due to it's changing nature)
+func (r *KubeVirt) ensureConversionSecret(secret *core.Secret) (*core.Secret, error) {
+	lookupLabels := make(map[string]string, len(secret.Labels))
+	for k, v := range secret.Labels {
+		if k != convctx.LabelPlan {
+			lookupLabels[k] = v
+		}
+	}
+	list := &core.SecretList{}
+	if err := r.Destination.Client.List(context.TODO(), list,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(lookupLabels),
+			Namespace:     secret.Namespace,
+		},
+	); err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	if len(list.Items) > 0 {
+		existing := &list.Items[0]
+		existing.Data = secret.Data
+		if err := r.Destination.Client.Update(context.TODO(), existing); err != nil {
+			return nil, liberr.Wrap(err)
+		}
+		r.Log.V(1).Info("Conversion secret updated.",
+			"secret", path.Join(existing.Namespace, existing.Name))
+		return existing, nil
+	}
+	if err := r.Destination.Client.Create(context.TODO(), secret); err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	r.Log.V(1).Info("Conversion secret created.",
+		"secret", path.Join(secret.Namespace, secret.Name))
+	return secret, nil
+}
+
+// GetDeepInspectionConversion returns the DeepInspection Conversion CR for the
+// given VM, or nil when none exists.
+func (r *KubeVirt) GetDeepInspectionConversion(vm *plan.VMStatus) (*api.Conversion, error) {
+	labels := r.getConversionLabels(api.DeepInspection, vm.ID, "", nil)
+	return r.getConversion(labels)
+}
+
+// CreateDeepInspectionConversion creates a new DeepInspection Conversion CR and
+// returns it. retryAllowed controls the value of the LabelRetryAllowed label
+// stamped on the new CR: "true" permits one future retry on failure; "false"
+// makes the next failure permanent.
+func (r *KubeVirt) CreateDeepInspectionConversion(
+	vm *plan.VMStatus, snapshotMoref, planName, planID string, retryAllowed bool,
+) (*api.Conversion, error) {
+	retryValue := "false"
+	if retryAllowed {
+		retryValue = "true"
 	}
 
-	if vm.NbdeClevis {
-		cr.Spec.DiskEncryption = &api.DiskEncryption{Type: api.DiskEncryptionTypeClevis}
-	} else if vm.LUKS.Name != "" {
-		// The deep-inspection pod runs in TargetNamespace; copy the LUKS secret there.
-		luksSecret, luksErr := r.ensureDeepInspectionLUKSSecret(vm.Ref, vm.LUKS, planName, planID)
+	// Build and ensure the provider connection secret in TargetNamespace.
+	connSecretData := r.buildDeepInspectionConnectionSecretData()
+	connLabels := r.getConversionLabels(api.DeepInspection, vm.Ref.ID, planID,
+		map[string]string{kConnection: "true"})
+	connSecretSpec := r.buildConversionSecret(
+		r.Plan.Spec.TargetNamespace,
+		planName+"-"+vm.Ref.ID+"-di-",
+		connLabels,
+		connSecretData,
+	)
+	connSecret, err := r.ensureConversionSecret(connSecretSpec)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
+	// Build and ensure the disk-encryption secret(s) when needed.
+	var diskEncryption *api.DiskEncryption
+	switch {
+	case vm.NbdeClevis:
+		diskEncryption = &api.DiskEncryption{Type: api.DiskEncryptionTypeClevis}
+	case vm.LUKS.Name != "":
+		sourceNS := vm.LUKS.Namespace
+		if sourceNS == "" {
+			sourceNS = r.Plan.Namespace
+		}
+		source := &core.Secret{}
+		if err = r.Client.Get(context.TODO(),
+			types.NamespacedName{Namespace: sourceNS, Name: vm.LUKS.Name}, source,
+		); err != nil {
+			return nil, liberr.Wrap(err)
+		}
+		luksLabels := r.getConversionLabels(api.DeepInspection, vm.Ref.ID, planID,
+			map[string]string{kLUKS: "true"})
+		luksSecretSpec := r.buildConversionSecret(
+			r.Plan.Spec.TargetNamespace,
+			planName+"-"+vm.Ref.ID+"-di-luks-",
+			luksLabels,
+			source.Data,
+		)
+		luksSecret, luksErr := r.ensureConversionSecret(luksSecretSpec)
 		if luksErr != nil {
 			return nil, liberr.Wrap(luksErr)
 		}
-		cr.Spec.DiskEncryption = &api.DiskEncryption{
+		diskEncryption = &api.DiskEncryption{
 			Type: api.DiskEncryptionTypeLUKS,
 			Secret: core.ObjectReference{
 				Namespace: luksSecret.Namespace,
@@ -601,65 +690,59 @@ func (r *KubeVirt) EnsureDeepInspectionConversion(
 		}
 	}
 
-	if err = r.Client.Create(context.TODO(), cr); err != nil {
-		return nil, liberr.Wrap(err)
+	// Assemble the Conversion spec and create the CR.
+	crLabels := r.getConversionLabels(api.DeepInspection, vm.ID, planID,
+		map[string]string{convctx.LabelRetryAllowed: retryValue})
+	spec := api.ConversionSpec{
+		Type:            api.DeepInspection,
+		TargetNamespace: r.Plan.Spec.TargetNamespace,
+		VM:              vm.Ref,
+		Connection: api.Connection{
+			Secret: core.ObjectReference{
+				Namespace: connSecret.Namespace,
+				Name:      connSecret.Name,
+			},
+		},
+		Settings: map[string]string{
+			api.SpecSettingsSnapshotMorefKey: snapshotMoref,
+		},
+		VDDKImage:      settings.GetVDDKImage(r.Source.Provider.Spec.Settings),
+		DiskEncryption: diskEncryption,
+		PodSettings: api.PodSettings{
+			ServiceAccount: resolveServiceAccount(r.Plan),
+		},
 	}
-	r.Log.Info("Deep inspection CR created.",
-		"conversion", path.Join(cr.Namespace, cr.Name),
-		"vm", vm.String())
-	return
+	cr := r.buildConversion(planName, vm.ID, crLabels, spec)
+	return r.ensureConversion(cr)
 }
 
-// ensureDeepInspectionSecret ensures a provider-format credential secret for the
-// deep-inspection pod exists in Plan.Spec.TargetNamespace
-func (r *KubeVirt) ensureDeepInspectionSecret(vmRef ref.Ref, planName, planID string) (secret *core.Secret, err error) {
-	secretLabels := map[string]string{
-		convctx.LabelPlan:           planID,
-		convctx.LabelVM:             vmRef.ID,
-		convctx.LabelConversionType: string(api.DeepInspection),
+// DeleteConversion deletes the given Conversion CR.
+func (r *KubeVirt) DeleteConversion(cr *api.Conversion) error {
+	if err := r.Client.Delete(context.TODO(), cr); err != nil && !k8serr.IsNotFound(err) {
+		return liberr.Wrap(err)
 	}
+	r.Log.Info("Conversion CR deleted.",
+		"conversion", path.Join(cr.Namespace, cr.Name),
+		"type", string(cr.Spec.Type))
+	return nil
+}
 
-	// Lookup by VM ID + type only, consistent with the CR lookup.
-	lookupLabels := map[string]string{
-		convctx.LabelVM:             vmRef.ID,
-		convctx.LabelConversionType: string(api.DeepInspection),
+// buildDeepInspectionConnectionSecretData assembles the secret payload for the
+// deep-inspection pod's connection secret. It copies the source provider
+// credentials and injects the provider URL and fingerprint so the pod can read
+// them from /etc/secret/ without needing the Provider CR.
+func (r *KubeVirt) buildDeepInspectionConnectionSecretData() map[string][]byte {
+	data := make(map[string][]byte, len(r.Source.Secret.Data)+2)
+	for k, v := range r.Source.Secret.Data {
+		data[k] = v
 	}
-
-	list := &core.SecretList{}
-	err = r.Destination.Client.List(context.TODO(), list,
-		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(lookupLabels),
-			Namespace:     r.Plan.Spec.TargetNamespace,
-		},
-	)
-	if err != nil {
-		return nil, liberr.Wrap(err)
+	if r.Source.Provider.Spec.URL != "" {
+		data["url"] = []byte(r.Source.Provider.Spec.URL)
 	}
-	if len(list.Items) > 0 {
-		secret = &list.Items[0]
-		secret.Data = r.Source.Secret.Data
-		if err = r.Destination.Client.Update(context.TODO(), secret); err != nil {
-			return nil, liberr.Wrap(err)
-		}
-		r.Log.V(1).Info("Deep inspection secret updated.",
-			"secret", path.Join(secret.Namespace, secret.Name))
-		return
+	if r.Source.Provider.Status.Fingerprint != "" {
+		data["fingerprint"] = []byte(r.Source.Provider.Status.Fingerprint)
 	}
-
-	secret = &core.Secret{
-		ObjectMeta: meta.ObjectMeta{
-			Labels:       secretLabels,
-			Namespace:    r.Plan.Spec.TargetNamespace,
-			GenerateName: planName + "-" + vmRef.ID + "-di-",
-		},
-	}
-	secret.Data = r.Source.Secret.Data
-	if err = r.Destination.Client.Create(context.TODO(), secret); err != nil {
-		return nil, liberr.Wrap(err)
-	}
-	r.Log.V(1).Info("Deep inspection secret created.",
-		"secret", path.Join(secret.Namespace, secret.Name))
-	return
+	return data
 }
 
 // CancelConversion finds the Conversion CR for the given VM and marks it as Canceled.

@@ -1377,7 +1377,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 					// Label missing or set to "true", one retry allowed.
 					// Delete the failed CR and recreate it with retryAllowed=false so
 					// the replacement cannot trigger another retry.
-					if err = r.kubevirt.DeleteDeepInspectionConversion(vm, cr); err != nil {
+					if err = r.kubevirt.DeleteConversion(cr); err != nil {
 						step.AddError(err.Error())
 						err = nil
 						break
