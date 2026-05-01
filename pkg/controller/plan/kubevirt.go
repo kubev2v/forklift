@@ -1521,66 +1521,6 @@ func (r *KubeVirt) GetGuestConversionPod(vm *plan.VMStatus) (pod *core.Pod, err 
 	return
 }
 
-// getConversionCRPod finds the Conversion CR for the VM and returns its managed pod.
-func (r *KubeVirt) getConversionCRPod(vm *plan.VMStatus) (pod *core.Pod, err error) {
-	labels := map[string]string{
-		"plan": string(r.Plan.UID),
-		"vmID": vm.Ref.ID,
-	}
-	convList := &api.ConversionList{}
-	err = r.Client.List(
-		context.TODO(),
-		convList,
-		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(labels),
-			Namespace:     r.Plan.Namespace,
-		})
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	if len(convList.Items) == 0 {
-		r.Log.V(1).Info(
-			"No Conversion CR found for VM.",
-			"vm", vm.String(),
-			"labels", labels,
-			"namespace", r.Plan.Namespace)
-		return
-	}
-	conv := &convList.Items[0]
-	r.Log.V(1).Info(
-		"Found Conversion CR.",
-		"conversion", path.Join(conv.Namespace, conv.Name),
-		"vm", vm.String(),
-		"podRef", conv.Status.Pod.Name)
-	if conv.Status.Pod.Name == "" {
-		r.Log.Info(
-			"Conversion CR has no pod reference yet.",
-			"conversion", path.Join(conv.Namespace, conv.Name))
-		return
-	}
-	pod = &core.Pod{}
-	err = r.Destination.Client.Get(
-		context.TODO(),
-		types.NamespacedName{
-			Namespace: conv.Status.Pod.Namespace,
-			Name:      conv.Status.Pod.Name,
-		},
-		pod)
-	if err != nil {
-		if k8serr.IsNotFound(err) {
-			r.Log.Info(
-				"Conversion CR pod not found.",
-				"conversion", path.Join(conv.Namespace, conv.Name),
-				"pod", path.Join(conv.Status.Pod.Namespace, conv.Status.Pod.Name))
-			pod = nil
-			err = nil
-			return
-		}
-		err = liberr.Wrap(err)
-	}
-	return
-}
 
 func (r *KubeVirt) getInspectionXml(pod *core.Pod) (string, error) {
 	if pod == nil {
