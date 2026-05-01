@@ -5,7 +5,6 @@ import (
 	"fmt"
 	liburl "net/url"
 
-	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	"github.com/kubev2v/forklift/pkg/controller/base"
@@ -21,9 +20,7 @@ import (
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
-	core "k8s.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
-	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -37,8 +34,7 @@ const (
 // vSphere VM Client
 type Client struct {
 	*plancontext.Context
-	client      *govmomi.Client
-	hostClients map[string]*govmomi.Client
+	client *govmomi.Client
 }
 
 // Create a VM snapshot and return its ID.
@@ -50,7 +46,7 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (snapsh
 	}
 
 	// Check if there's already a running CreateSnapshot task - prevents duplicates
-	if existingTaskId := r.findRunningSnapshotTask(vmRef, vm, hostsFunc, createSnapshotTaskName); existingTaskId != "" {
+	if existingTaskId := r.findRunningSnapshotTask(vm, createSnapshotTaskName); existingTaskId != "" {
 		return "", existingTaskId, nil
 	}
 
@@ -64,17 +60,10 @@ func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (snapsh
 	return "", creationTaskId, nil
 }
 
-// Check if there's already a running CreateSnapshot task on the VM to prevent duplicates
-func (r *Client) findRunningSnapshotTask(vmRef ref.Ref, vm *object.VirtualMachine, hosts util.HostsFunc, snapshotTaskName string) string {
-	// Get the ESXi client
-	client, err := r.getClientFromVmRef(vmRef, hosts)
-	if err != nil {
-		return ""
-	}
-
-	// Create property collector
-	pc := property.DefaultCollector(client)
-	pc, err = pc.Create(context.TODO())
+// Check if there's already a running snapshot task on the VM to prevent duplicates.
+func (r *Client) findRunningSnapshotTask(vm *object.VirtualMachine, snapshotTaskName string) string {
+	pc := property.DefaultCollector(r.client.Client)
+	pc, err := pc.Create(context.TODO())
 	if err != nil {
 		return ""
 	}
@@ -115,7 +104,7 @@ func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hosts util.Hosts
 		return
 	}
 	// Check if there's already a running remove snapshot task - prevents duplicates
-	if existingTaskId := r.findRunningSnapshotTask(vmRef, vm, hosts, removeSnapshotTaskName); existingTaskId != "" {
+	if existingTaskId := r.findRunningSnapshotTask(vm, removeSnapshotTaskName); existingTaskId != "" {
 		return existingTaskId, nil
 	}
 	r.Log.Info("Removing snapshot",
@@ -256,11 +245,6 @@ func (r *Client) Close() {
 		r.client.CloseIdleConnections()
 		r.client = nil
 	}
-	for _, client := range r.hostClients {
-		_ = client.Logout(context.TODO())
-		client.CloseIdleConnections()
-	}
-	r.hostClients = nil
 }
 
 func (c *Client) Finalize(vms []*planapi.VMStatus, planName string) {
@@ -315,7 +299,7 @@ func (r *Client) GetSnapshotDeltas(vmRef ref.Ref, snapshotId string, hosts util.
 // Check if a snapshot is removed
 func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (bool, error) {
 	r.Log.Info("Check Snapshot Remove", "vmRef", vmRef, "precopy", precopy)
-	taskInfo, err := r.getTaskById(vmRef, precopy.RemoveTaskId, hosts)
+	taskInfo, err := r.getTaskById(precopy.RemoveTaskId)
 	if err != nil {
 		return false, liberr.Wrap(err)
 	}
@@ -325,7 +309,7 @@ func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, precopy planapi.Precopy, hos
 // Check if a snapshot is ready to transfer.
 func (r *Client) CheckSnapshotReady(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (ready bool, snapshotId string, err error) {
 	r.Log.Info("Check Snapshot Ready", "vmRef", vmRef, "precopy", precopy)
-	taskInfo, err := r.getTaskById(vmRef, precopy.CreateTaskId, hosts)
+	taskInfo, err := r.getTaskById(precopy.CreateTaskId)
 	if err != nil {
 		return false, "", liberr.Wrap(err)
 	}
@@ -356,33 +340,17 @@ func (r *Client) checkTaskStatus(taskInfo *types.TaskInfo) (ready bool, err erro
 	}
 }
 
-func (r *Client) getClientFromVmRef(vmRef ref.Ref, hosts util.HostsFunc) (client *vim25.Client, err error) {
-	vm := &model.VM{}
-	err = r.Source.Inventory.Find(vm, vmRef)
-	if err != nil {
-		return nil, liberr.Wrap(err, "vm", vmRef.String())
-	}
-	return r.getClient(vm, hosts)
-}
+func (r *Client) getTaskById(taskId string) (*types.TaskInfo, error) {
+	r.Log.V(1).Info("Get task by id", "taskId", taskId)
 
-func (r *Client) getTaskById(vmRef ref.Ref, taskId string, hosts util.HostsFunc) (*types.TaskInfo, error) {
-	r.Log.V(1).Info("Get task by id", "taskId", taskId, "vmRef", vmRef)
-
-	// Get the ESXi client for the haTasks
-	client, err := r.getClientFromVmRef(vmRef, hosts)
-	if err != nil {
-		return nil, err
-	}
-	// Create a collector to receive the tasks
-	pc := property.DefaultCollector(client)
-	pc, err = pc.Create(context.TODO())
+	pc := property.DefaultCollector(r.client.Client)
+	pc, err := pc.Create(context.TODO())
 	if err != nil {
 		return nil, err
 	}
 	//nolint:errcheck
 	defer pc.Destroy(context.TODO())
 
-	// Retrieve the task from ESXi host
 	taskRef := types.ManagedObjectReference{
 		Type:  taskType,
 		Value: taskId,
@@ -405,94 +373,6 @@ func (r *Client) getTaskById(vmRef ref.Ref, taskId string, hosts util.HostsFunc)
 	return &task, nil
 }
 
-func (r *Client) getClient(vm *model.VM, hosts util.HostsFunc) (client *vim25.Client, err error) {
-	if useV2vForTransfer, vErr := r.Plan.ShouldUseV2vForTransfer(ref.Ref{ID: vm.ID}, r.Destination.Client); vErr == nil && useV2vForTransfer {
-		// when virt-v2v runs the migration, forklift-controller should interact only
-		// with the component that serves the SDK endpoint of the provider
-		client = r.client.Client
-		return
-	}
-
-	if r.Source.Provider.Spec.Settings[v1beta1.SDK] == v1beta1.ESXI {
-		// when migrating from ESXi host, we use the client of the SDK endpoint of the provider,
-		// there's no need in a different client (the ESXi host is the only component involved in the migration)
-		client = r.client.Client
-		return
-	}
-
-	host := &model.Host{}
-	if err = r.Source.Inventory.Get(host, vm.Host); err != nil {
-		err = liberr.Wrap(err, "host", vm.Host)
-		return
-	}
-
-	if cachedClient, found := r.hostClients[host.ID]; found {
-		// return the cached client for the ESXi host
-		client = cachedClient.Client
-		return
-	}
-
-	if hostMap, hostsErr := hosts(); hostsErr == nil {
-		if hostDef, found := hostMap[host.ID]; found {
-			// create a new client for the ESXi host we are going to transfer the disk(s) from, and cache it
-			client, err = r.getHostClient(hostDef, host)
-		} else {
-			// there is no network defined for the ESXi host, so we will transfer the disk(s) from vCenter and
-			// thus there is no need in a client for the ESXi host but we use the client for vCenter instead
-			client = r.client.Client
-		}
-	} else {
-		err = liberr.Wrap(hostsErr)
-	}
-	return
-}
-
-func (r *Client) getHostClient(hostDef *v1beta1.Host, host *model.Host) (client *vim25.Client, err error) {
-	url, err := liburl.Parse("https://" + formatHostAddress(hostDef.Spec.IpAddress) + "/sdk")
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-
-	ref := hostDef.Spec.Secret
-	secret := &core.Secret{}
-	err = r.Get(
-		context.TODO(),
-		k8sclient.ObjectKey{
-			Namespace: ref.Namespace,
-			Name:      ref.Name,
-		},
-		secret)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-
-	url.User = liburl.UserPassword(string(secret.Data["user"]), string(secret.Data["password"]))
-	soapClient := soap.NewClient(url, base.GetInsecureSkipVerifyFlag(r.Source.Secret))
-	soapClient.SetThumbprint(url.Host, host.Thumbprint)
-	vimClient, err := vim25.NewClient(context.TODO(), soapClient)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	hostClient := &govmomi.Client{
-		SessionManager: session.NewManager(vimClient),
-		Client:         vimClient,
-	}
-	if err = hostClient.Login(context.TODO(), url.User); err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-
-	if r.hostClients == nil {
-		r.hostClients = make(map[string]*govmomi.Client)
-	}
-	r.hostClients[host.ID] = hostClient
-	client = hostClient.Client
-	return
-}
-
 // Get the VM by ref.
 func (r *Client) getVM(vmRef ref.Ref) (vsphereVm *object.VirtualMachine, err error) {
 	vm := &model.VM{}
@@ -502,9 +382,7 @@ func (r *Client) getVM(vmRef ref.Ref) (vsphereVm *object.VirtualMachine, err err
 		return
 	}
 
-	// vm.ID is the vCenter inventory MoRef, which is only valid on the vCenter
-	// endpoint. Always use the vCenter client here; ESXi host clients are used
-	// separately for task-level operations (getTaskById, findRunningSnapshotTask).
+	// vm.ID is the vCenter inventory MoRef — always use the vCenter client.
 	moref := types.ManagedObjectReference{Type: "VirtualMachine", Value: vm.ID}
 	if moref.Value == "" {
 		err = liberr.New(
