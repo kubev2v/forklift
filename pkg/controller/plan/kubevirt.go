@@ -494,8 +494,15 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 func (r *KubeVirt) EnsureDeepInspectionConversion(
 	vm *plan.VMStatus, snapshotMoref, planName, planID string,
 ) (ready bool, cr *api.Conversion, err error) {
-	labels := map[string]string{
+	// Labels stored on the CR when it is created.
+	crLabels := map[string]string{
 		convctx.LabelPlan:           planID,
+		convctx.LabelVM:             vm.ID,
+		convctx.LabelConversionType: string(api.DeepInspection),
+	}
+
+	// Lookup only by VM ID + type, scoped to the plan namespace.
+	lookupLabels := map[string]string{
 		convctx.LabelVM:             vm.ID,
 		convctx.LabelConversionType: string(api.DeepInspection),
 	}
@@ -503,7 +510,7 @@ func (r *KubeVirt) EnsureDeepInspectionConversion(
 	list := &api.ConversionList{}
 	err = r.Client.List(context.TODO(), list,
 		client.InNamespace(r.Plan.Namespace),
-		client.MatchingLabels(labels),
+		client.MatchingLabels(lookupLabels),
 	)
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -552,7 +559,7 @@ func (r *KubeVirt) EnsureDeepInspectionConversion(
 		ObjectMeta: meta.ObjectMeta{
 			Namespace:    r.Plan.Namespace,
 			GenerateName: planName + "-" + vm.ID + "-di-",
-			Labels:       labels,
+			Labels:       crLabels,
 		},
 		Spec: api.ConversionSpec{
 			Type:            api.DeepInspection,
@@ -590,12 +597,16 @@ func (r *KubeVirt) EnsureDeepInspectionConversion(
 }
 
 // ensureDeepInspectionSecret ensures a provider-format credential secret for the
-// deep-inspection pod exists in Plan.Spec.TargetNamespace — the same namespace
-// where the pod will run.  It uses r.Destination.Client so it works whether the
-// target namespace is local or on a remote cluster.
+// deep-inspection pod exists in Plan.Spec.TargetNamespace
 func (r *KubeVirt) ensureDeepInspectionSecret(vmRef ref.Ref, planName, planID string) (secret *core.Secret, err error) {
-	labels := map[string]string{
+	secretLabels := map[string]string{
 		convctx.LabelPlan:           planID,
+		convctx.LabelVM:             vmRef.ID,
+		convctx.LabelConversionType: string(api.DeepInspection),
+	}
+
+	// Lookup by VM ID + type only, consistent with the CR lookup.
+	lookupLabels := map[string]string{
 		convctx.LabelVM:             vmRef.ID,
 		convctx.LabelConversionType: string(api.DeepInspection),
 	}
@@ -603,7 +614,7 @@ func (r *KubeVirt) ensureDeepInspectionSecret(vmRef ref.Ref, planName, planID st
 	list := &core.SecretList{}
 	err = r.Destination.Client.List(context.TODO(), list,
 		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(labels),
+			LabelSelector: k8slabels.SelectorFromSet(lookupLabels),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
@@ -623,7 +634,7 @@ func (r *KubeVirt) ensureDeepInspectionSecret(vmRef ref.Ref, planName, planID st
 
 	secret = &core.Secret{
 		ObjectMeta: meta.ObjectMeta{
-			Labels:       labels,
+			Labels:       secretLabels,
 			Namespace:    r.Plan.Spec.TargetNamespace,
 			GenerateName: planName + "-" + vmRef.ID + "-di-",
 		},
