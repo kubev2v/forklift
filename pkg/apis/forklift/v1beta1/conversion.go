@@ -77,6 +77,31 @@ type DiskRef struct {
 	DevicePath string `json:"devicePath,omitempty"`
 }
 
+// DiskEncryptionType identifies the mechanism used to unlock encrypted disks.
+// +kubebuilder:validation:Enum=LUKS;Clevis
+type DiskEncryptionType string
+
+const (
+	// DiskEncryptionTypeLUKS unlocks disks using a passphrase stored in a Secret.
+	DiskEncryptionTypeLUKS DiskEncryptionType = "LUKS"
+	// DiskEncryptionTypeClevis unlocks disks using Clevis (tang/TPM2) —
+	// no passphrase secret is required.
+	DiskEncryptionTypeClevis DiskEncryptionType = "Clevis"
+)
+
+// DiskEncryption specifies how LUKS-encrypted disks are unlocked during conversion.
+// Exactly one of Secret (LUKS passphrase) or Clevis (network-based automated unlock)
+// must be configured.
+type DiskEncryption struct {
+	// Type selects the unlock mechanism.
+	// +kubebuilder:validation:Enum=LUKS;Clevis
+	Type DiskEncryptionType `json:"type"`
+	// Secret references a Kubernetes Secret whose data contains the LUKS passphrase(s).
+	// Required when Type is LUKS.
+	// +optional
+	Secret core.ObjectReference `json:"secret,omitempty" ref:"Secret"`
+}
+
 // Connection holds source connection details for the conversion pod.
 // Provider-specific values such as libvirtURL and fingerprint are
 // expected to be included in the referenced Secret and are injected
@@ -127,9 +152,11 @@ type ConversionSpec struct {
 	Disks []DiskRef `json:"disks,omitempty"`
 	// Source connection details including the virt-v2v credentials secret.
 	Connection Connection `json:"connection"`
-	// Disk decryption LUKS keys.
+	// DiskEncryption configures how LUKS-encrypted disks are unlocked.
+	// Set Type=LUKS and populate Secret for passphrase-based unlocking,
+	// or set Type=Clevis for automated network-based (tang/TPM2) unlocking.
 	// +optional
-	LUKS core.ObjectReference `json:"luks,omitempty" ref:"Secret"`
+	DiskEncryption *DiskEncryption `json:"diskEncryption,omitempty"`
 	// Container image for the virt-v2v pod. When empty the controller
 	// falls back to the global default from settings.
 	// +optional

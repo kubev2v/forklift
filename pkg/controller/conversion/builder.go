@@ -5,6 +5,7 @@ import (
 	"maps"
 	"strconv"
 
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	convctx "github.com/kubev2v/forklift/pkg/controller/conversion/context"
 	"github.com/kubev2v/forklift/pkg/settings"
@@ -218,7 +219,6 @@ func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, vo
 	return
 }
 
-
 // BuildVirtV2vConversionPod applies conversion-specific settings to a pod.
 func (b *Builder) BuildVirtV2vConversionPod(pod *core.Pod, environment []core.EnvVar, vm *plan.VMStatus) error {
 	pod.GenerateName = b.Config.GenerateName
@@ -401,6 +401,7 @@ func (b *Builder) BuildDeepInspectionPodEnvironment(vm *plan.VMStatus) []core.En
 	if b.Config.DeepInspectionSnapshotMoref != "" {
 		env = append(env, core.EnvVar{Name: "SNAPSHOT_MOREF", Value: b.Config.DeepInspectionSnapshotMoref})
 	}
+	env = b.appendDiskEncryptionEnv(env)
 	return env
 }
 
@@ -418,7 +419,7 @@ func (b *Builder) BuildDeepInspectionPod(vm *plan.VMStatus, volumes []core.Volum
 }
 
 // BuildV2vPodEnvironment appends env vars from PodConfig,
-// then adds common variables (memSize, smp, LOCAL_MIGRATION).
+// then adds common variables (memSize, smp, LOCAL_MIGRATION, encryption).
 func (b *Builder) BuildV2vPodEnvironment(env []core.EnvVar, vm *plan.VMStatus) ([]core.EnvVar, error) {
 	env = append(env, b.Config.Environment...)
 
@@ -460,5 +461,17 @@ func (b *Builder) BuildV2vPodEnvironment(env []core.EnvVar, vm *plan.VMStatus) (
 		Name:  "LOCAL_MIGRATION",
 		Value: strconv.FormatBool(b.Config.LocalMigration),
 	})
+	env = b.appendDiskEncryptionEnv(env)
 	return env, nil
+}
+
+// appendDiskEncryptionEnv adds V2V_NBDE_CLEVIS=true when the Conversion
+// specifies Clevis disk unlocking. For LUKS passphrase unlocking
+// the secret is already mounted at /etc/luks by the ensurer so no extra env
+// var is needed.
+func (b *Builder) appendDiskEncryptionEnv(env []core.EnvVar) []core.EnvVar {
+	if b.Config.DiskEncryption != nil && b.Config.DiskEncryption.Type == api.DiskEncryptionTypeClevis {
+		env = append(env, core.EnvVar{Name: "V2V_NBDE_CLEVIS", Value: "true"})
+	}
+	return env
 }

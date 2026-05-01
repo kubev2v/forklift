@@ -461,10 +461,17 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 		},
 	}
 
-	if vm.LUKS.Name != "" {
-		conversion.Spec.LUKS = core.ObjectReference{
-			Namespace: vm.LUKS.Namespace,
-			Name:      vm.LUKS.Name,
+	if vm.NbdeClevis {
+		conversion.Spec.DiskEncryption = &api.DiskEncryption{
+			Type: api.DiskEncryptionTypeClevis,
+		}
+	} else if vm.LUKS.Name != "" {
+		conversion.Spec.DiskEncryption = &api.DiskEncryption{
+			Type: api.DiskEncryptionTypeLUKS,
+			Secret: core.ObjectReference{
+				Namespace: vm.LUKS.Namespace,
+				Name:      vm.LUKS.Name,
+			},
 		}
 	}
 
@@ -585,10 +592,25 @@ func (r *KubeVirt) EnsureDeepInspectionConversion(
 		},
 	}
 
-	err = r.Client.Create(context.TODO(), conversion)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
+	if vm.NbdeClevis {
+		cr.Spec.DiskEncryption = &api.DiskEncryption{Type: api.DiskEncryptionTypeClevis}
+	} else if vm.LUKS.Name != "" {
+		// The deep-inspection pod runs in TargetNamespace; copy the LUKS secret there.
+		luksSecret, luksErr := r.ensureDeepInspectionLUKSSecret(vm.Ref, vm.LUKS, planName, planID)
+		if luksErr != nil {
+			return nil, liberr.Wrap(luksErr)
+		}
+		cr.Spec.DiskEncryption = &api.DiskEncryption{
+			Type: api.DiskEncryptionTypeLUKS,
+			Secret: core.ObjectReference{
+				Namespace: luksSecret.Namespace,
+				Name:      luksSecret.Name,
+			},
+		}
+	}
+
+	if err = r.Client.Create(context.TODO(), cr); err != nil {
+		return nil, liberr.Wrap(err)
 	}
 	r.Log.Info("Deep inspection CR created.",
 		"conversion", path.Join(conversion.Namespace, conversion.Name),

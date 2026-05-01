@@ -67,6 +67,8 @@ type PodConfig struct {
 	Disks        []api.DiskRef
 	// DeepInspectionSnapshotMoref is injected as SNAPSHOT_MOREF for DeepInspection pods when set by the controller.
 	DeepInspectionSnapshotMoref string
+	// DiskEncryption carries the disk encryption config from the Conversion spec into the builder.
+	DiskEncryption *api.DiskEncryption
 }
 
 // PodConfigFromSpec builds a PodConfig from a Conversion CR spec.
@@ -101,6 +103,7 @@ func PodConfigFromSpec(conversion *api.Conversion) PodConfig {
 	}
 
 	podConfig.Disks = conversion.Spec.Disks
+	podConfig.DiskEncryption = conversion.Spec.DiskEncryption
 
 	// Pod labels are stored directly on the Conversion CR so they can be
 	// copied here without indirection through PodSettings.
@@ -134,7 +137,6 @@ func PodConfigFromPlan(p *api.Plan) PodConfig {
 	}
 }
 
-
 // GetVirtV2vImage resolves the virt-v2v container image from PodConfig.
 func GetVirtV2vImage(cfg *PodConfig) string {
 	if cfg.Image != "" {
@@ -163,4 +165,3 @@ func ResolveServiceAccount(cfg *PodConfig) string {
 	}
 	return settings.Settings.Migration.ServiceAccount
 }
-

@@ -128,11 +128,11 @@ func (e *Ensurer) ensureDeepInspectionPodFromSpec(conversion *api.Conversion, cf
 		return nil, err
 	}
 
-	if conversion.Spec.LUKS.Name != "" {
+	if diskEnc := conversion.Spec.DiskEncryption; diskEnc != nil && diskEnc.Type == api.DiskEncryptionTypeLUKS && diskEnc.Secret.Name != "" {
 		volumes = append(volumes, core.Volume{
 			Name: "luks",
 			VolumeSource: core.VolumeSource{
-				Secret: &core.SecretVolumeSource{SecretName: conversion.Spec.LUKS.Name},
+				Secret: &core.SecretVolumeSource{SecretName: diskEnc.Secret.Name},
 			},
 		})
 		mounts = append(mounts, core.VolumeMount{
@@ -203,11 +203,11 @@ func (e *Ensurer) ensureVirtV2vPodFromSpec(conversion *api.Conversion, cfg convc
 		MountPath: "/opt",
 	})
 
-	if conversion.Spec.LUKS.Name != "" {
+	if diskEnc := conversion.Spec.DiskEncryption; diskEnc != nil && diskEnc.Type == api.DiskEncryptionTypeLUKS && diskEnc.Secret.Name != "" {
 		volumes = append(volumes, core.Volume{
 			Name: "luks",
 			VolumeSource: core.VolumeSource{
-				Secret: &core.SecretVolumeSource{SecretName: conversion.Spec.LUKS.Name},
+				Secret: &core.SecretVolumeSource{SecretName: diskEnc.Secret.Name},
 			},
 		})
 		mounts = append(mounts, core.VolumeMount{
