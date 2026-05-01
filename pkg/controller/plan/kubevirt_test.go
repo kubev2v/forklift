@@ -6,6 +6,7 @@ import (
 
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
@@ -14,6 +15,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	cnv "kubevirt.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -385,6 +387,84 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 			p.Spec.VirtV2vImage = ""
 			p.Spec.XfsCompatibility = true
 			Expect(getVirtV2vImage(p)).To(Equal(xfsImage))
+		})
+	})
+
+	ginkgo.Describe("determineRunStrategy", func() {
+		var kubevirt *KubeVirt
+
+		ginkgo.BeforeEach(func() {
+			kubevirt = createKubeVirt()
+		})
+
+		ginkgo.It("should return RunStrategyAlways when plan TargetPowerState is 'on'", func() {
+			kubevirt.Plan.Spec.TargetPowerState = plan.TargetPowerStateOn
+			vm := &plan.VMStatus{}
+
+			result := kubevirt.determineRunStrategy(vm)
+			Expect(result).To(Equal(cnv.RunStrategyAlways))
+		})
+
+		ginkgo.It("should return RunStrategyHalted when plan TargetPowerState is 'off'", func() {
+			kubevirt.Plan.Spec.TargetPowerState = plan.TargetPowerStateOff
+			vm := &plan.VMStatus{}
+
+			result := kubevirt.determineRunStrategy(vm)
+			Expect(result).To(Equal(cnv.RunStrategyHalted))
+		})
+
+		ginkgo.It("should return RunStrategyAlways when VM-level TargetPowerState overrides plan to 'on'", func() {
+			kubevirt.Plan.Spec.TargetPowerState = plan.TargetPowerStateOff
+			vm := &plan.VMStatus{}
+			vm.TargetPowerState = plan.TargetPowerStateOn
+
+			result := kubevirt.determineRunStrategy(vm)
+			Expect(result).To(Equal(cnv.RunStrategyAlways))
+		})
+
+		ginkgo.It("should return RunStrategyHalted when VM-level TargetPowerState overrides plan to 'off'", func() {
+			kubevirt.Plan.Spec.TargetPowerState = plan.TargetPowerStateOn
+			vm := &plan.VMStatus{}
+			vm.TargetPowerState = plan.TargetPowerStateOff
+
+			result := kubevirt.determineRunStrategy(vm)
+			Expect(result).To(Equal(cnv.RunStrategyHalted))
+		})
+
+		ginkgo.It("should match source power state when no TargetPowerState is set (source On)", func() {
+			kubevirt.Plan.Spec.TargetPowerState = ""
+			vm := &plan.VMStatus{}
+			vm.RestorePowerState = plan.VMPowerStateOn
+
+			result := kubevirt.determineRunStrategy(vm)
+			Expect(result).To(Equal(cnv.RunStrategyAlways))
+		})
+
+		ginkgo.It("should match source power state when no TargetPowerState is set (source Off)", func() {
+			kubevirt.Plan.Spec.TargetPowerState = ""
+			vm := &plan.VMStatus{}
+			vm.RestorePowerState = plan.VMPowerStateOff
+
+			result := kubevirt.determineRunStrategy(vm)
+			Expect(result).To(Equal(cnv.RunStrategyHalted))
+		})
+
+		ginkgo.It("should default to RunStrategyHalted when source power state is unknown", func() {
+			kubevirt.Plan.Spec.TargetPowerState = ""
+			vm := &plan.VMStatus{}
+			vm.RestorePowerState = plan.VMPowerStateUnknown
+
+			result := kubevirt.determineRunStrategy(vm)
+			Expect(result).To(Equal(cnv.RunStrategyHalted))
+		})
+
+		ginkgo.It("should default to RunStrategyHalted when source power state is empty", func() {
+			kubevirt.Plan.Spec.TargetPowerState = ""
+			vm := &plan.VMStatus{}
+			vm.RestorePowerState = ""
+
+			result := kubevirt.determineRunStrategy(vm)
+			Expect(result).To(Equal(cnv.RunStrategyHalted))
 		})
 	})
 })
