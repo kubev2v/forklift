@@ -29,6 +29,7 @@ const (
 	PhaseRunning   ConversionPhase = "Running"
 	PhaseSucceeded ConversionPhase = "Succeeded"
 	PhaseFailed    ConversionPhase = "Failed"
+	PhaseCanceled  ConversionPhase = "Canceled"
 )
 
 // ConversionStage is the fine-grained pipeline position within the Running phase.
@@ -182,7 +183,7 @@ type ConversionStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 	// Phase is the high-level lifecycle state of the conversion.
 	// +optional
-	// +kubebuilder:validation:Enum=Pending;Running;Succeeded;Failed
+	// +kubebuilder:validation:Enum=Pending;Running;Succeeded;Failed;Canceled
 	Phase ConversionPhase `json:"phase,omitempty"`
 	// Stage is the current fine-grained pipeline position within the Running phase.
 	// Intended for progress observability; the pipeline advances it as work proceeds.

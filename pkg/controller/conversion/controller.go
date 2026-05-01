@@ -114,6 +114,17 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		return
 	}
 
+	// canceled conversion
+	if conversion.Status.Phase == api.PhaseCanceled {
+		resolvePhaseConditions(conversion)
+		conversion.Status.EndStagingConditions()
+		r.Record(conversion, conversion.Status.Conditions)
+		conversion.Status.ObservedGeneration = conversion.Generation
+		err = r.Status().Update(ctx, conversion)
+		result.RequeueAfter = 0
+		return
+	}
+
 	if conversion.Status.HasBlockerCondition() {
 		conversion.Status.EndStagingConditions()
 		r.Record(conversion, conversion.Status.Conditions)
@@ -167,6 +178,15 @@ func resolvePhaseConditions(conversion *api.Conversion) {
 			Status:   True,
 			Category: Critical,
 			Message:  "The conversion has failed.",
+		})
+	case api.PhaseCanceled:
+		now := meta.Now()
+		conversion.Status.CompletionTime = &now
+		conversion.Status.SetCondition(libcnd.Condition{
+			Type:     "ConversionCanceled",
+			Status:   True,
+			Category: Advisory,
+			Message:  "The conversion has been canceled.",
 		})
 	case api.PhasePending:
 		conversion.Status.SetCondition(libcnd.Condition{

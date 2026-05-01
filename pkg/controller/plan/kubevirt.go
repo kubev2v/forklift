@@ -482,6 +482,35 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 	return
 }
 
+// CancelConversion finds the Conversion CR for the given VM and marks it as Canceled.
+func (r *KubeVirt) CancelConversion(vm *plan.VMStatus) error {
+	labels := map[string]string{
+		convctx.LabelPlan: string(r.Plan.UID),
+		convctx.LabelVM:   vm.Ref.ID,
+	}
+	list := &api.ConversionList{}
+	err := r.Client.List(context.TODO(), list,
+		client.InNamespace(r.Plan.Namespace),
+		client.MatchingLabels(labels),
+	)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for i := range list.Items {
+		conv := &list.Items[i]
+		if conv.Status.Phase == api.PhaseSucceeded || conv.Status.Phase == api.PhaseFailed || conv.Status.Phase == api.PhaseCanceled {
+			continue
+		}
+		conv.Status.Phase = api.PhaseCanceled
+		conv.Status.Stage = api.StageFinished
+		if err = r.Client.Status().Update(context.TODO(), conv); err != nil {
+			return liberr.Wrap(err)
+		}
+		r.Log.Info("Conversion CR canceled.", "conversion", path.Join(conv.Namespace, conv.Name), "vm", vm.String())
+	}
+	return nil
+}
+
 // EnsureGuestConversionPod resolves all data and creates the conversion pod
 // via conversion.EnsureVirtV2vPod.
 func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, step *plan.Step) (ready bool, err error) {
