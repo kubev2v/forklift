@@ -16,6 +16,7 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	convctx "github.com/kubev2v/forklift/pkg/controller/conversion/context"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
@@ -1329,30 +1330,74 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 
 			if settings.Settings.UseConversionCR {
 				snapshotMoref := vm.Warm.Precopies[0].Snapshot
-				var (
-					ready bool
-					cr    *api.Conversion
-				)
-				ready, cr, err = r.kubevirt.EnsureDeepInspectionConversion(
-					vm, snapshotMoref, r.Plan.Name, string(r.Plan.UID))
+
+				var cr *api.Conversion
+				cr, err = r.kubevirt.GetDeepInspectionConversion(vm)
 				if err != nil {
 					step.AddError(err.Error())
 					err = nil
 					break
 				}
-				if !ready {
-					r.Log.Info("Deep inspection CR is not ready yet")
+
+				if cr == nil {
+					// No CR yet, first attempt
+					// retryAllowed=false means if this one fails it will not be retried automatically.
+					_, err = r.kubevirt.CreateDeepInspectionConversion(
+						vm, snapshotMoref, r.Plan.Name, string(r.Plan.UID), false)
+					if err != nil {
+						step.AddError(err.Error())
+						err = nil
+					}
 					return
 				}
-				// CR reached PhaseSucceeded, propagate concerns and fail on blockers.
-				if blockers := r.propagateInspectionConcerns(vm, cr.Status.InspectionResult); len(blockers) > 0 {
-					step.Error = &plan.Error{
-						Reasons: append([]string{"VM deep inspection found critical concerns"}, blockers...),
-						Phase:   step.Phase,
+
+				switch cr.Status.Phase {
+				case api.PhaseSucceeded:
+					// Propagate concerns and advance, failing on blockers.
+					if blockers := r.propagateInspectionConcerns(vm, cr.Status.InspectionResult); len(blockers) > 0 {
+						step.Error = &plan.Error{
+							Reasons: append([]string{"VM deep inspection found critical concerns"}, blockers...),
+							Phase:   step.Phase,
+						}
+						break
 					}
-					break
+					r.NextPhase(vm)
+
+				case api.PhaseFailed, api.PhaseCanceled:
+					r.Log.Info("Deep inspection CR failed.",
+						"conversion", cr.Name,
+						"phase", cr.Status.Phase,
+						"vm", vm.String())
+					retryLabel, hasLabel := cr.Labels[convctx.LabelRetryAllowed]
+					// Label present and explicitly false, no more retries.
+					if hasLabel && retryLabel == "false" {
+						step.AddError("Deep inspection failed after retry.")
+						break
+					}
+					// Label missing or set to "true", one retry allowed.
+					// Delete the failed CR and recreate it with retryAllowed=false so
+					// the replacement cannot trigger another retry.
+					if err = r.kubevirt.DeleteDeepInspectionConversion(vm, cr); err != nil {
+						step.AddError(err.Error())
+						err = nil
+						break
+					}
+					_, err = r.kubevirt.CreateDeepInspectionConversion(
+						vm, snapshotMoref, r.Plan.Name, string(r.Plan.UID), false)
+					if err != nil {
+						step.AddError(err.Error())
+						err = nil
+					}
+					return
+
+				default:
+					// Pending/Running, still in progress.
+					r.Log.Info("Deep inspection CR is still in progress.",
+						"conversion", cr.Name,
+						"phase", cr.Status.Phase,
+						"vm", vm.String())
+					return
 				}
-				r.NextPhase(vm)
 				break
 			}
 

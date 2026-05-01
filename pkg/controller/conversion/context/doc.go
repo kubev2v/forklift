@@ -27,6 +27,11 @@ const (
 	LabelPlanNamespace  = "plan-namespace"
 	LabelMigration      = "migration"
 	LabelVM             = "vmID"
+	// LabelRetryAllowed controls whether a failed/canceled DeepInspection Conversion CR may be retried during preflight inspection.
+	// "true": one retry is allowed, the replacement CR will be stamped "false".
+	// "false": no further retries, the step is immediately failed.
+	// absent: treated the same as "true" (one retry allowed).
+	LabelRetryAllowed = "retryAllowed"
 )
 
 // VddkVolumeName is the volume name used for the VDDK library scratch space.
