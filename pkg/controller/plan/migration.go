@@ -1344,8 +1344,14 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 					r.Log.Info("Deep inspection CR is not ready yet")
 					return
 				}
-				// CR reached PhaseSucceeded, propagate concerns and advance.
-				r.propagateInspectionConcerns(vm, cr.Status.InspectionResult)
+				// CR reached PhaseSucceeded, propagate concerns and fail on blockers.
+				if blockers := r.propagateInspectionConcerns(vm, cr.Status.InspectionResult); len(blockers) > 0 {
+					step.Error = &plan.Error{
+						Reasons: append([]string{"VM deep inspection found critical concerns"}, blockers...),
+						Phase:   step.Phase,
+					}
+					break
+				}
 				r.NextPhase(vm)
 				break
 			}
@@ -1966,9 +1972,9 @@ func (r *Migration) setPopulatorPodsWithLabels(vm *plan.VMStatus, migrationID st
 	}
 }
 
-// propagateInspectionConcerns maps concerns from an InspectionResult onto the VM status
-// as conditions so they are visible to the migration consumer.
-func (r *Migration) propagateInspectionConcerns(vm *plan.VMStatus, result *api.InspectionResult) {
+// propagateInspectionConcerns maps concerns from an InspectionResult onto the VM
+// status as conditions and returns the messages of any blocker concerns (Critical or Error).
+func (r *Migration) propagateInspectionConcerns(vm *plan.VMStatus, result *api.InspectionResult) (blockerMessages []string) {
 	if result == nil {
 		return
 	}
@@ -1980,7 +1986,11 @@ func (r *Migration) propagateInspectionConcerns(vm *plan.VMStatus, result *api.I
 			Reason:   c.ID,
 			Message:  c.Message,
 		})
+		if c.Category == libcnd.Critical || c.Category == libcnd.Error {
+			blockerMessages = append(blockerMessages, c.Message)
+		}
 	}
+	return
 }
 
 // Retrieve the termination message from a pod's first container.
