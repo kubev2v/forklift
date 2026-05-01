@@ -2,6 +2,7 @@ package conversion
 
 import (
 	"context"
+	"fmt"
 	"path"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -253,7 +254,7 @@ func (e *Ensurer) GetPod(conversion *api.Conversion, labels map[string]string) (
 	}
 	if len(list.Items) == 1 {
 		return &list.Items[0], nil
-	} else if len(list.Items) > 1 { 
+	} else if len(list.Items) > 1 {
 		return nil, liberr.New("found multiple pods with the same labels", "labels", labels)
 	} else {
 		return nil, nil
@@ -266,7 +267,7 @@ func (e *Ensurer) GetPod(conversion *api.Conversion, labels map[string]string) (
 // in the DiskRef so that volume mode can be determined when not
 // already set.
 func (e *Ensurer) VolumesFromDiskRefs(disks []api.DiskRef) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, err error) {
-	for _, disk := range disks {
+	for i, disk := range disks {
 		if disk.Namespace == "" {
 			continue
 		}
@@ -296,22 +297,14 @@ func (e *Ensurer) VolumesFromDiskRefs(disks []api.DiskRef) (volumes []core.Volum
 		}
 
 		if volumeMode != nil && *volumeMode == core.PersistentVolumeBlock {
-			devPath := disk.DevicePath
-			if devPath == "" {
-				devPath = "/dev/block" + disk.Name
-			}
 			devices = append(devices, core.VolumeDevice{
 				Name:       disk.Name,
-				DevicePath: devPath,
+				DevicePath: fmt.Sprintf("/dev/block%v", i),
 			})
 		} else {
-			mountPath := disk.MountPath
-			if mountPath == "" {
-				mountPath = "/mnt/disks/" + disk.Name
-			}
 			mounts = append(mounts, core.VolumeMount{
 				Name:      disk.Name,
-				MountPath: mountPath,
+				MountPath: fmt.Sprintf("/mnt/disks/disk%v", i),
 			})
 		}
 	}
@@ -364,7 +357,7 @@ func GetPodByLabels(k8sClient client.Client, namespace string, labels map[string
 	}
 	if len(list.Items) == 1 {
 		return &list.Items[0], nil
-	} else if len(list.Items) > 1 { 
+	} else if len(list.Items) > 1 {
 		return nil, liberr.New("found multiple pods with the same labels", "labels", labels)
 	} else {
 		return nil, nil
