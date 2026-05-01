@@ -2,7 +2,11 @@ package conversion
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
 	"strings"
+	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
@@ -46,10 +50,14 @@ var DeepInspectionPipelineStages = []PipelineStage{
 	{Stage: api.StageWaitForSnapshot, Predicate: snapshotOwnedByController},
 	{Stage: api.StageCreatePod},
 	{Stage: api.StagePodRunning},
+	{Stage: api.StageFetchingResults},
 	{Stage: api.StageRemoveSnapshot, Predicate: snapshotOwnedByController},
 	{Stage: api.StageWaitForSnapshotRemoval, Predicate: snapshotOwnedByController},
 	{Stage: api.StageFinished},
 }
+
+// inspectionResultPort is the port the deep-inspection pod's HTTP server listens on.
+const inspectionResultPort = 8080
 
 // ConversionPipeline drives reconciliation for a single Conversion CR.
 type ConversionPipeline struct {
@@ -205,7 +213,9 @@ func (p *ConversionPipeline) runDeepInspection() (pipelineFinished bool, err err
 	case api.StageWaitForSnapshot:
 		stageDone, err = p.runStageWaitingForSnapshot()
 	case api.StageCreatePod, api.StagePodRunning:
-		stageDone, err = p.runStageEnsurePod()
+		stageDone, err = p.runStageDeepInspectionPod()
+	case api.StageFetchingResults:
+		stageDone, err = p.runStageFetchingResults()
 	case api.StageRemoveSnapshot:
 		stageDone, err = p.runStageRemovingSnapshot()
 	case api.StageWaitForSnapshotRemoval:
@@ -320,6 +330,181 @@ func (p *ConversionPipeline) runStageEnsurePod() (stageDone bool, err error) {
 	// Pod exited
 	p.conv.Status.Stage = api.StagePodRunning
 	return true, nil
+}
+
+// runStageDeepInspectionPod ensures the deep-inspection pod exists and tracks
+// its progress.Unlike the generic runStageEnsurePod it also polls the pod's
+// HTTP /ready endpoint so the pipeline can advance to StageFetchingResults
+// while the pod is still running and serving results.
+func (p *ConversionPipeline) runStageDeepInspectionPod() (stageDone bool, err error) {
+	ensurer, err := NewEnsurer(p.r.Client, p.r.Log, p.conv.Spec)
+	if err != nil {
+		return
+	}
+	pod, err := ensurer.EnsurePod(p.conv)
+	if err != nil {
+		return
+	}
+	if pod == nil {
+		return
+	}
+
+	p.conv.Status.Pod = core.ObjectReference{Namespace: pod.Namespace, Name: pod.Name}
+
+	switch pod.Status.Phase {
+	case core.PodPending:
+		p.conv.Status.Stage = api.StageCreatePod
+		return
+	case core.PodRunning:
+		p.conv.Status.Stage = api.StagePodRunning
+		// Advance early when the pod signals that detection is complete.
+		if p.isResultReady(pod.Status.PodIP) {
+			return true, nil
+		}
+		return
+	}
+
+	// Pod has exited (Succeeded, Failed, Unknown) — advance regardless so
+	// the pipeline can still attempt result fetching or skip gracefully.
+	p.conv.Status.Stage = api.StagePodRunning
+	return true, nil
+}
+
+// isResultReady probes GET /ready on the deep-inspection pod.  Returns true only
+// when the pod responds with 200 OK, indicating that vmdetect.Detect has
+// completed and results are ready to be served.
+func (p *ConversionPipeline) isResultReady(podIP string) bool {
+	if podIP == "" {
+		return false
+	}
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(fmt.Sprintf("http://%s:%d/ready", podIP, inspectionResultPort))
+	if err != nil {
+		return false
+	}
+	_ = resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
+}
+
+// runStageFetchingResults fetches the DetectResult JSON from the deep-inspection
+// pod's HTTP /results endpoint and stores a summary in conv.Status.InspectionResult.
+// If the pod has already exited before results could be fetched, the stage is
+// skipped gracefully so the pipeline can continue.
+func (p *ConversionPipeline) runStageFetchingResults() (stageDone bool, err error) {
+	podRef := p.conv.Status.Pod
+	if podRef.Name == "" {
+		return true, nil
+	}
+
+	pod := &core.Pod{}
+	err = p.r.Get(p.ctx, types.NamespacedName{
+		Namespace: podRef.Namespace,
+		Name:      podRef.Name,
+	}, pod)
+	if err != nil {
+		return
+	}
+
+	// Pod exited before we could fetch results, skip
+	if pod.Status.Phase != core.PodRunning {
+		return true, nil
+	}
+	if pod.Status.PodIP == "" {
+		return
+	}
+
+	result, fetchErr := p.fetchInspectionResults(pod.Status.PodIP)
+	if fetchErr != nil {
+		// Transient connection error, retry
+		return
+	}
+	if result == nil {
+		// Pod returned 503, not ready yet
+		return
+	}
+
+	p.conv.Status.InspectionResult = result
+	return true, nil
+}
+
+// fetchInspectionResults calls GET /results on the deep-inspection pod and
+// maps the response into the API InspectionResult type.
+// Returns (nil, nil) when the pod responds with 503 (not ready).
+func (p *ConversionPipeline) fetchInspectionResults(podIP string) (*api.InspectionResult, error) {
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(fmt.Sprintf("http://%s:%d/results", podIP, inspectionResultPort))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusServiceUnavailable {
+		return nil, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status %d from deep-inspection /results", resp.StatusCode)
+	}
+
+	// Decode only the subset of fields we persist on the CR.
+	var raw struct {
+		Passed      bool `json:"passed"`
+		AllConcerns []struct {
+			ID       string `json:"id"`
+			Category string `json:"category"`
+			Label    string `json:"label"`
+			Message  string `json:"message"`
+		} `json:"all_concerns"`
+		OSInfo *struct {
+			Name         string `json:"name"`
+			Distro       string `json:"distro"`
+			MajorVersion string `json:"major_version"`
+			Architecture string `json:"architecture"`
+		} `json:"os_info"`
+		Filesystems []struct {
+			Device string `json:"device"`
+			Type   string `json:"type"`
+			UUID   string `json:"uuid"`
+		} `json:"filesystems"`
+		Mountpoints []struct {
+			Device     string `json:"device"`
+			MountPoint string `json:"mount_point"`
+		} `json:"mountpoints"`
+	}
+	if err = json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, err
+	}
+
+	result := &api.InspectionResult{Passed: raw.Passed}
+	if raw.OSInfo != nil {
+		result.OSInfo = &api.OSInfo{
+			Name:    raw.OSInfo.Name,
+			Distro:  raw.OSInfo.Distro,
+			Version: raw.OSInfo.MajorVersion,
+			Arch:    raw.OSInfo.Architecture,
+		}
+	}
+	for _, c := range raw.AllConcerns {
+		result.Concerns = append(result.Concerns, api.InspectionConcern{
+			ID:       c.ID,
+			Category: c.Category,
+			Label:    c.Label,
+			Message:  c.Message,
+		})
+	}
+	for _, f := range raw.Filesystems {
+		result.Filesystems = append(result.Filesystems, api.InspectionFilesystem{
+			Device: f.Device,
+			Type:   f.Type,
+			UUID:   f.UUID,
+		})
+	}
+	for _, m := range raw.Mountpoints {
+		result.Mountpoints = append(result.Mountpoints, api.InspectionMountpoint{
+			Device:     m.Device,
+			MountPoint: m.MountPoint,
+		})
+	}
+	return result, nil
 }
 
 // podSucceeded is called by the pipeline runners when StageFinished is reached.

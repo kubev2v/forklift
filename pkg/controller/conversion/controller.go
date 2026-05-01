@@ -196,11 +196,38 @@ func resolvePhaseConditions(conversion *api.Conversion) {
 			Message:  "The conversion is pending.",
 		})
 	case api.PhaseRunning:
-		conversion.Status.SetCondition(libcnd.Condition{
-			Type:     libcnd.Advisory,
-			Status:   True,
-			Category: Advisory,
-			Message:  "The conversion is running.",
-		})
+		resolveStageConditions(conversion)
 	}
+}
+
+// resolveStageConditions sets a detailed Advisory message on the conversion
+// based on the current pipeline stage.  Called only when Phase == Running.
+func resolveStageConditions(conversion *api.Conversion) {
+	var msg string
+	switch conversion.Status.Stage {
+	case api.StageCreatePod:
+		msg = "Creating the conversion pod."
+	case api.StagePodRunning:
+		msg = "Conversion pod is running."
+	case api.StageCreateSnapshot:
+		msg = "Creating vSphere snapshot."
+	case api.StageWaitForSnapshot:
+		msg = "Waiting for snapshot creation to complete."
+	case api.StageFetchingResults:
+		msg = "Fetching inspection results from pod."
+	case api.StageRemoveSnapshot:
+		msg = "Removing vSphere snapshot."
+	case api.StageWaitForSnapshotRemoval:
+		msg = "Waiting for snapshot removal to complete."
+	case api.StageFinished:
+		msg = "Finalizing conversion."
+	default:
+		msg = "The conversion is running."
+	}
+	conversion.Status.SetCondition(libcnd.Condition{
+		Type:     libcnd.Advisory,
+		Status:   True,
+		Category: Advisory,
+		Message:  msg,
+	})
 }

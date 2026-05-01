@@ -50,6 +50,9 @@ const (
 	StageRemoveSnapshot ConversionStage = "RemovingSnapshot"
 	// StageWaitForSnapshotRemoval is set while polling for the snapshot removal task to complete.
 	StageWaitForSnapshotRemoval ConversionStage = "WaitingForSnapshotRemoval"
+	// StageFetchingResults is set while the controller is retrieving inspection
+	// results from the deep-inspection pod's HTTP API.
+	StageFetchingResults ConversionStage = "FetchingResults"
 )
 
 // DiskRef references a PVC to be used as a disk in the conversion process.
@@ -154,6 +157,73 @@ type ConversionSpec struct {
 	PodSettings PodSettings `json:"podSettings,omitempty"`
 }
 
+// InspectionConcern is a single issue reported by the deep-inspection process.
+type InspectionConcern struct {
+	// ID is the unique concern identifier.
+	ID string `json:"id"`
+	// Category classifies the severity (e.g. Warning, Critical).
+	Category string `json:"category"`
+	// Label is a short human-readable title.
+	Label string `json:"label"`
+	// Message contains additional detail.
+	Message string `json:"message"`
+}
+
+// OSInfo holds operating-system metadata collected during deep inspection.
+type OSInfo struct {
+	// Name is the OS product name.
+	// +optional
+	Name string `json:"name,omitempty"`
+	// Distro is the distribution identifier.
+	// +optional
+	Distro string `json:"distro,omitempty"`
+	// Version is the major OS version.
+	// +optional
+	Version string `json:"version,omitempty"`
+	// Arch is the CPU architecture (e.g. x86_64).
+	// +optional
+	Arch string `json:"arch,omitempty"`
+}
+
+// InspectionFilesystem describes a single filesystem found on the inspected VM.
+type InspectionFilesystem struct {
+	// Device is the block device path (e.g. /dev/sda1).
+	Device string `json:"device"`
+	// Type is the filesystem type (e.g. ext4, xfs).
+	Type string `json:"type"`
+	// UUID is the filesystem UUID when available.
+	// +optional
+	UUID string `json:"uuid,omitempty"`
+}
+
+// InspectionMountpoint maps a block device to its mount path inside the VM.
+type InspectionMountpoint struct {
+	// Device is the block device path.
+	Device string `json:"device"`
+	// MountPoint is the path where the device is mounted (e.g. /).
+	MountPoint string `json:"mountPoint"`
+}
+
+// InspectionResult stores a summary of the deep-inspection outcome fetched from
+// the pod HTTP API.  Only fields relevant for migration decisions are kept here;
+// the full JSON is available in the pod logs.
+type InspectionResult struct {
+	// Passed is true when all checks passed with no concerns.
+	Passed bool `json:"passed"`
+	// OSInfo contains operating-system metadata.
+	// +optional
+	OSInfo *OSInfo `json:"osInfo,omitempty"`
+	// Concerns lists all issues found during inspection.
+	// +optional
+	Concerns []InspectionConcern `json:"concerns,omitempty"`
+	// Filesystems lists the filesystems detected on the VM's disks.
+	// +optional
+	Filesystems []InspectionFilesystem `json:"filesystems,omitempty"`
+	// Mountpoints lists the mount paths of the VM's filesystems.
+	// +optional
+	Mountpoints []InspectionMountpoint `json:"mountpoints,omitempty"`
+}
+
 // SnapshotStatus tracks vSphere snapshot tasks and ownership for deep inspection.
 type SnapshotStatus struct {
 	// Moref is the vSphere managed object reference of the snapshot, used as
@@ -188,7 +258,7 @@ type ConversionStatus struct {
 	// Stage is the current fine-grained pipeline position within the Running phase.
 	// Intended for progress observability; the pipeline advances it as work proceeds.
 	// +optional
-	// +kubebuilder:validation:Enum=PodCreating;PodRunning;CreatingSnapshot;WaitingForSnapshot;RemovingSnapshot;WaitingForSnapshotRemoval;Finished
+	// +kubebuilder:validation:Enum=CreatingPod;PodRunning;CreatingSnapshot;WaitingForSnapshot;RemovingSnapshot;WaitingForSnapshotRemoval;FetchingResults;Finished
 	Stage ConversionStage `json:"stage,omitempty"`
 	// Reference to the managed conversion pod.
 	// +optional
@@ -203,6 +273,10 @@ type ConversionStatus struct {
 	// a controller-managed snapshot (DeepInspection without a pre-supplied MoRef).
 	// +optional
 	Snapshot *SnapshotStatus `json:"snapshot,omitempty"`
+	// InspectionResult holds the outcome fetched from the deep-inspection pod
+	// HTTP API once the StageFetchingResults stage completes.
+	// +optional
+	InspectionResult *InspectionResult `json:"inspectionResult,omitempty"`
 }
 
 // +genclient
