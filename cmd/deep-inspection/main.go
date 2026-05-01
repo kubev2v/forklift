@@ -18,7 +18,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,7 +33,6 @@ const (
 )
 
 func main() {
-	// Initialize logger
 	log := logrus.New()
 	log.SetLevel(logrus.DebugLevel)
 	log.SetOutput(os.Stdout)
@@ -45,7 +43,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create detector
 	detector, err := vmdetect.NewDetector(vmdetect.DetectorConfig{
 		Credentials: creds,
 		VDDKLibDir:  "/opt/vmware-vix-disklib-distrib",
@@ -63,33 +60,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Run detection
-	result, err := detector.Detect(vmdetect.DetectParams{
-		Ctx:           context.Background(),
-		VMMoref:       vmMoref,
-		SnapshotMoref: snapshotMoref,
-	})
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
+	srv := newResultServer()
 
-	prettyJSON, err := json.MarshalIndent(result, "", "  ")
-	if err != nil {
-		fmt.Printf("Error marshaling result: %v\n", err)
-		return
-	}
+	go func() {
+		result, detectErr := detector.Detect(vmdetect.DetectParams{
+			Ctx:           context.Background(),
+			VMMoref:       vmMoref,
+			SnapshotMoref: snapshotMoref,
+		})
+		srv.setResult(result, detectErr)
+	}()
 
-	fmt.Print(string(prettyJSON))
-
-	// Check results
-	if !result.Passed {
-		for _, concern := range result.AllConcerns {
-			fmt.Printf("[%s] %s: %s\n", concern.Category, concern.Label, concern.Message)
-		}
-	}
-
-	os.Exit(0)
+	os.Exit(srv.run())
 }
 
 func loadProviderCredentials() (vmdetect.Credentials, error) {
@@ -122,7 +104,6 @@ func readSecretDataFile(basename string) (string, error) {
 }
 
 func vmAndSnapshotFromEnv() (vmMoref, snapshotMoref string, err error) {
-	// VM_ID is set on deep-inspection pods built by the conversion controller.
 	vmMoref = strings.TrimSpace(os.Getenv("VM_MOREF"))
 	snapshotMoref = strings.TrimSpace(os.Getenv("SNAPSHOT_MOREF"))
 	if vmMoref == "" || snapshotMoref == "" {
