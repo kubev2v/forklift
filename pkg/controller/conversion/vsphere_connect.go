@@ -4,7 +4,6 @@ import (
 	"context"
 	liburl "net/url"
 
-	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/base"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/lib/util"
@@ -15,15 +14,18 @@ import (
 	core "k8s.io/api/core/v1"
 )
 
-// GovmomiClientFromProvider builds a logged-in govmomi client using the provider URL and secret,
-func GovmomiClientFromProvider(ctx context.Context, provider *api.Provider, secret *core.Secret) (*govmomi.Client, error) {
-	if provider == nil {
-		return nil, liberr.New("provider is nil")
-	}
+// GovmomiClientFromSecret builds a logged-in govmomi client using credentials
+// and connection parameters stored entirely in secret.Data.
+// Required keys: "url", "user", "password".
+// Optional keys: "fingerprint" (used when insecureSkipVerify is true).
+func GovmomiClientFromSecret(ctx context.Context, secret *core.Secret) (*govmomi.Client, error) {
 	if secret == nil {
 		return nil, liberr.New("secret is nil")
 	}
-	urlStr := provider.Spec.URL
+	urlStr := string(secret.Data["url"])
+	if urlStr == "" {
+		return nil, liberr.New("connection secret is missing required key 'url'")
+	}
 	u, err := liburl.Parse(urlStr)
 	if err != nil {
 		return nil, liberr.Wrap(err)
@@ -32,9 +34,11 @@ func GovmomiClientFromProvider(ctx context.Context, provider *api.Provider, secr
 	password := string(secret.Data["password"])
 	u.User = liburl.UserPassword(user, password)
 
-	thumbprint := provider.Status.Fingerprint
 	skipVerifying := base.GetInsecureSkipVerifyFlag(secret)
-	if !skipVerifying {
+	var thumbprint string
+	if skipVerifying {
+		thumbprint = string(secret.Data["fingerprint"])
+	} else {
 		cert, errtls := base.VerifyTLSConnection(urlStr, secret)
 		if errtls != nil {
 			return nil, liberr.Wrap(errtls)

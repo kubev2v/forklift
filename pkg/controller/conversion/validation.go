@@ -7,12 +7,11 @@ import (
 
 // Types
 const (
-	TypeNotValid      = "TypeNotValid"
-	ProviderNotSet    = "ProviderNotSet"
-	VMNotSet          = "VMNotSet"
-	DisksNotSet       = "DisksNotSet"
-	ConnectionNotSet  = "ConnectionNotSet"
-	VDDKImageNotSet   = "VDDKImageNotSet"
+	TypeNotValid     = "TypeNotValid"
+	VMNotSet         = "VMNotSet"
+	DisksNotSet      = "DisksNotSet"
+	ConnectionNotSet = "ConnectionNotSet"
+	VDDKImageNotSet  = "VDDKImageNotSet"
 )
 
 // Categories
@@ -38,10 +37,6 @@ const (
 
 func (r *Reconciler) validate(conversion *api.Conversion) (err error) {
 	err = r.validateType(conversion)
-	if err != nil {
-		return
-	}
-	err = r.validateProvider(conversion)
 	if err != nil {
 		return
 	}
@@ -90,19 +85,6 @@ func (r *Reconciler) validateType(conversion *api.Conversion) (err error) {
 			Reason:   NotValid,
 			Category: Critical,
 			Message:  "The `Type` must be one of: DeepInspection, Inspection, InPlace, Remote.",
-		})
-	}
-	return
-}
-
-func (r *Reconciler) validateProvider(conversion *api.Conversion) (err error) {
-	if conversion.Spec.Provider.Name == "" {
-		conversion.Status.SetCondition(libcnd.Condition{
-			Type:     ProviderNotSet,
-			Status:   True,
-			Reason:   NotSet,
-			Category: Critical,
-			Message:  "The `Provider` is not set.",
 		})
 	}
 	return

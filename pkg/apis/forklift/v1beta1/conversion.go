@@ -135,8 +135,6 @@ type ConversionSpec struct {
 	// Type of conversion.
 	// +kubebuilder:validation:Enum=DeepInspection;Inspection;InPlace;Remote
 	Type ConversionType `json:"type"`
-	// Reference to the source provider.
-	Provider core.ObjectReference `json:"provider" ref:"Provider"`
 	// Reference to the destination provider where pods and PVCs live.
 	// When empty or pointing to the host provider the local client is used;
 	// otherwise a remote k8s client is constructed from the provider URL

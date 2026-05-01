@@ -16,10 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// SpecSettingsSnapshotMorefKey is the settings key for a user-supplied snapshot MoRef.
-// When set the controller skips snapshot creation/removal and does not own the snapshot.
-const SpecSettingsSnapshotMorefKey = "SNAPSHOT_MOREF"
-
 // PipelineStage is a single entry in a ConversionPipeline stage sequence.
 // When Predicate is non-nil and returns false for the current Conversion the stage
 // is automatically skipped and pipeline advances to the next stage without
@@ -33,7 +29,7 @@ type PipelineStage struct {
 // supplied in spec.settings, meaning the controller is responsible for creating
 // and removing the snapshot itself.
 func snapshotOwnedByController(conv *api.Conversion) bool {
-	return strings.TrimSpace(conv.Spec.Settings[SpecSettingsSnapshotMorefKey]) == ""
+	return strings.TrimSpace(conv.Spec.Settings[api.SpecSettingsSnapshotMorefKey]) == ""
 }
 
 // VirtV2vPipelineStages is the ordered list of stages for Inspection / InPlace / Remote workloads.
@@ -167,7 +163,7 @@ func (p *ConversionPipeline) Run() (succeeded bool, err error) {
 // in spec.settings means the controller does not own the snapshot
 func (p *ConversionPipeline) runPhasePending() error {
 	if p.conv.Spec.Type == api.DeepInspection {
-		snapshotMoref := strings.TrimSpace(p.conv.Spec.Settings[SpecSettingsSnapshotMorefKey])
+		snapshotMoref := strings.TrimSpace(p.conv.Spec.Settings[api.SpecSettingsSnapshotMorefKey])
 		p.r.Log.Info("Pending phase: resolving snapshot ownership.",
 			"snapshotMorefProvided", snapshotMoref != "")
 		if snapshotMoref != "" {
@@ -175,21 +171,14 @@ func (p *ConversionPipeline) runPhasePending() error {
 				"snapshotMoref", snapshotMoref)
 			p.conv.Status.Snapshot = &api.SnapshotStatus{Moref: snapshotMoref, Owned: false}
 		} else {
-			provider, _, err := p.r.loadProviderSecret(p.ctx, p.conv)
-			if err != nil {
-				p.r.Log.Error(err, "Failed to load provider secret.")
-				return err
-			}
-			p.r.Log.Info("Provider type for snapshot ownership check.", "providerType", provider.Type())
-			if provider.Type() != api.VSphere {
-			p.r.Log.Info("Non-vSphere provider; deep inspection requires SNAPSHOT_MOREF.",
-				"providerType", provider.Type())
-			p.setPhase(api.PhaseFailed)
-			p.conv.Status.SetCondition(libcnd.Condition{
-					Type:     "NonVSphereProvider",
+			if p.conv.Spec.Connection.Secret.Name == "" {
+				p.r.Log.Info("Connection secret not set; cannot own snapshot.")
+				p.setPhase(api.PhaseFailed)
+				p.conv.Status.SetCondition(libcnd.Condition{
+					Type:     "ConnectionSecretNotSet",
 					Status:   True,
 					Category: Critical,
-					Message:  "DeepInspection requires SNAPSHOT_MOREF in spec.settings or a vSphere provider to create a snapshot.",
+					Message:  "DeepInspection requires a Connection secret when the controller owns snapshots.",
 				})
 				return nil
 			}
@@ -273,18 +262,13 @@ func (p *ConversionPipeline) runDeepInspection() (pipelineFinished bool, err err
 // runStageCreatingSnapshot submits the vSphere snapshot creation task
 func (p *ConversionPipeline) runStageCreatingSnapshot() (stageDone bool, err error) {
 	snap := p.conv.Status.Snapshot
-	provider, secret, err := p.r.loadProviderSecret(p.ctx, p.conv)
+	secret, err := p.r.loadConnectionSecret(p.ctx, p.conv)
 	if err != nil {
-		p.r.Log.Error(err, "Failed to load provider secret for snapshot creation.")
+		p.r.Log.Error(err, "Failed to load connection secret for snapshot creation.")
 		return stageDone, err
 	}
-	if provider.Type() != api.VSphere {
-		p.r.Log.Info("Non-vSphere provider; cannot create snapshot.", "providerType", provider.Type())
-		p.setPhase(api.PhaseFailed)
-		return stageDone, nil
-	}
 
-	gClient, err := GovmomiClientFromProvider(p.ctx, provider, secret)
+	gClient, err := GovmomiClientFromSecret(p.ctx, secret)
 	if err != nil {
 		return stageDone, err
 	}
@@ -293,7 +277,7 @@ func (p *ConversionPipeline) runStageCreatingSnapshot() (stageDone bool, err err
 		gClient.CloseIdleConnections()
 	}()
 
-	snapClient, err := NewSnapshotClient(p.r.Log, gClient, provider, p.conv.Spec.VM)
+	snapClient, err := NewSnapshotClient(p.r.Log, gClient, p.conv.Spec.VM)
 	if err != nil {
 		return stageDone, err
 	}
@@ -311,12 +295,12 @@ func (p *ConversionPipeline) runStageCreatingSnapshot() (stageDone bool, err err
 // runStageWaitingForSnapshot polls the snapshot creation task until the MoRef is available
 func (p *ConversionPipeline) runStageWaitingForSnapshot() (stageDone bool, err error) {
 	snap := p.conv.Status.Snapshot
-	provider, secret, err := p.r.loadProviderSecret(p.ctx, p.conv)
+	secret, err := p.r.loadConnectionSecret(p.ctx, p.conv)
 	if err != nil {
 		return stageDone, err
 	}
 
-	gClient, err := GovmomiClientFromProvider(p.ctx, provider, secret)
+	gClient, err := GovmomiClientFromSecret(p.ctx, secret)
 	if err != nil {
 		return stageDone, err
 	}
@@ -325,7 +309,7 @@ func (p *ConversionPipeline) runStageWaitingForSnapshot() (stageDone bool, err e
 		gClient.CloseIdleConnections()
 	}()
 
-	snapClient, err := NewSnapshotClient(p.r.Log, gClient, provider, p.conv.Spec.VM)
+	snapClient, err := NewSnapshotClient(p.r.Log, gClient, p.conv.Spec.VM)
 	if err != nil {
 		return stageDone, err
 	}
@@ -565,7 +549,8 @@ func (p *ConversionPipeline) fetchInspectionResults(podIP string) (*api.Inspecti
 }
 
 // podSucceeded is called by the pipeline runners when StageFinished is reached.
-// It fetches the pod and returns true when it succeeded.
+// Returns (true, nil) when the pod succeeded, (false, err) when it failed, and
+// (false, nil) when it is still running or not yet found.
 func (p *ConversionPipeline) podSucceeded() (podSucceeded bool, err error) {
 	ensurer, err := NewEnsurer(p.r.Client, p.r.Log, p.conv.Spec)
 	if err != nil {
@@ -582,18 +567,28 @@ func (p *ConversionPipeline) podSucceeded() (podSucceeded bool, err error) {
 		return false, nil
 	}
 	p.r.Log.Info("podSucceeded: pod phase check.", "pod", pod.Name, "phase", pod.Status.Phase)
-	return pod.Status.Phase == core.PodSucceeded, nil
+	switch pod.Status.Phase {
+	case core.PodSucceeded:
+		return true, nil
+	case core.PodFailed:
+		return false, liberr.New("conversion pod failed", "pod", pod.Name, "phase", pod.Status.Phase)
+	case core.PodUnknown:
+		return false, liberr.New("conversion pod in unknown state", "pod", pod.Name)
+	default:
+		// PodPending/PodRunning, still in progress
+		return false, nil
+	}
 }
 
 // runStageRemovingSnapshot submits the vSphere snapshot removal task
 func (p *ConversionPipeline) runStageRemovingSnapshot() (stageDone bool, err error) {
 	snap := p.conv.Status.Snapshot
-	provider, secret, err := p.r.loadProviderSecret(p.ctx, p.conv)
+	secret, err := p.r.loadConnectionSecret(p.ctx, p.conv)
 	if err != nil {
 		return stageDone, err
 	}
 
-	gClient, err := GovmomiClientFromProvider(p.ctx, provider, secret)
+	gClient, err := GovmomiClientFromSecret(p.ctx, secret)
 	if err != nil {
 		return stageDone, err
 	}
@@ -602,7 +597,7 @@ func (p *ConversionPipeline) runStageRemovingSnapshot() (stageDone bool, err err
 		gClient.CloseIdleConnections()
 	}()
 
-	snapClient, err := NewSnapshotClient(p.r.Log, gClient, provider, p.conv.Spec.VM)
+	snapClient, err := NewSnapshotClient(p.r.Log, gClient, p.conv.Spec.VM)
 	if err != nil {
 		return stageDone, err
 	}
@@ -619,12 +614,12 @@ func (p *ConversionPipeline) runStageRemovingSnapshot() (stageDone bool, err err
 // completes
 func (p *ConversionPipeline) runStageWaitingForSnapshotRemoval() (stageDone bool, err error) {
 	snap := p.conv.Status.Snapshot
-	provider, secret, err := p.r.loadProviderSecret(p.ctx, p.conv)
+	secret, err := p.r.loadConnectionSecret(p.ctx, p.conv)
 	if err != nil {
 		return stageDone, err
 	}
 
-	gClient, err := GovmomiClientFromProvider(p.ctx, provider, secret)
+	gClient, err := GovmomiClientFromSecret(p.ctx, secret)
 	if err != nil {
 		return stageDone, err
 	}
@@ -633,7 +628,7 @@ func (p *ConversionPipeline) runStageWaitingForSnapshotRemoval() (stageDone bool
 		gClient.CloseIdleConnections()
 	}()
 
-	snapClient, err := NewSnapshotClient(p.r.Log, gClient, provider, p.conv.Spec.VM)
+	snapClient, err := NewSnapshotClient(p.r.Log, gClient, p.conv.Spec.VM)
 	if err != nil {
 		return stageDone, err
 	}
@@ -653,23 +648,18 @@ func (p *ConversionPipeline) runStageWaitingForSnapshotRemoval() (stageDone bool
 	return true, nil
 }
 
-// loadProviderSecret returns the source Provider and its credentials Secret.
-func (r *Reconciler) loadProviderSecret(ctx context.Context, conversion *api.Conversion) (*api.Provider, *core.Secret, error) {
-	provider := &api.Provider{}
-	err := r.Get(ctx, types.NamespacedName{
-		Namespace: conversion.Spec.Provider.Namespace,
-		Name:      conversion.Spec.Provider.Name,
-	}, provider)
-	if err != nil {
-		return nil, nil, liberr.Wrap(err)
+// loadConnectionSecret returns the Secret referenced by conv.Spec.Connection.Secret.
+func (r *Reconciler) loadConnectionSecret(ctx context.Context, conversion *api.Conversion) (*core.Secret, error) {
+	if conversion.Spec.Connection.Secret.Name == "" {
+		return nil, liberr.New("Connection.Secret not set on Conversion CR")
 	}
 	secret := &core.Secret{}
-	err = r.Get(ctx, types.NamespacedName{
-		Namespace: provider.Spec.Secret.Namespace,
-		Name:      provider.Spec.Secret.Name,
+	err := r.Get(ctx, types.NamespacedName{
+		Namespace: conversion.Spec.Connection.Secret.Namespace,
+		Name:      conversion.Spec.Connection.Secret.Name,
 	}, secret)
 	if err != nil {
-		return nil, nil, liberr.Wrap(err)
+		return nil, liberr.Wrap(err)
 	}
-	return provider, secret, nil
+	return secret, nil
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
@@ -26,19 +25,15 @@ const (
 
 // Client performs vSphere snapshot operations for a single VM using one vSphere session.
 type Client struct {
-	client   *govmomi.Client
-	Log      logging.LevelLogger
-	Provider *api.Provider
-	VMRef    ref.Ref
+	client *govmomi.Client
+	Log    logging.LevelLogger
+	VMRef  ref.Ref
 }
 
 // NewSnapshotClient creates a snapshot client for the given VM and govmomi session.
-func NewSnapshotClient(log logging.LevelLogger, client *govmomi.Client, provider *api.Provider, vmRef ref.Ref) (*Client, error) {
+func NewSnapshotClient(log logging.LevelLogger, client *govmomi.Client, vmRef ref.Ref) (*Client, error) {
 	if client == nil {
 		return nil, liberr.New("govmomi Client is required")
-	}
-	if provider == nil {
-		return nil, liberr.New("Provider is required")
 	}
 	if vmRef.ID == "" {
 		return nil, liberr.New("vmRef.ID (vSphere VirtualMachine managed object id) is required")
@@ -47,10 +42,9 @@ func NewSnapshotClient(log logging.LevelLogger, client *govmomi.Client, provider
 		log = logging.WithName("deep-inspection-snapshot")
 	}
 	return &Client{
-		client:   client,
-		Log:      log,
-		Provider: provider,
-		VMRef:    vmRef,
+		client: client,
+		Log:    log,
+		VMRef:  vmRef,
 	}, nil
 }
 
