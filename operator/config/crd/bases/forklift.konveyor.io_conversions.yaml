@@ -1169,19 +1169,9 @@ spec:
                             x-kubernetes-list-type: atomic
                         type: object
                     type: object
-                  annotations:
-                    additionalProperties:
-                      type: string
-                    description: Annotations to add to the conversion pod.
-                    type: object
                   generateName:
                     description: GenerateName prefix for the managed pod.
                     type: string
-                  labels:
-                    additionalProperties:
-                      type: string
-                    description: Labels to add to the conversion pod.
-                    type: object
                   nodeSelector:
                     additionalProperties:
                       type: string

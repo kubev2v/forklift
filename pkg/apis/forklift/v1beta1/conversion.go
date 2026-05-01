@@ -87,12 +87,6 @@ type PodSettings struct {
 	// Pre-resolved transfer network annotations.
 	// +optional
 	TransferNetworkAnnotations map[string]string `json:"transferNetworkAnnotations,omitempty"`
-	// Labels to add to the conversion pod.
-	// +optional
-	Labels map[string]string `json:"labels,omitempty"`
-	// Annotations to add to the conversion pod.
-	// +optional
-	Annotations map[string]string `json:"annotations,omitempty"`
 	// Node selector constraints for the conversion pod.
 	// +optional
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`

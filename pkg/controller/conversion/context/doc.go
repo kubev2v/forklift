@@ -1,6 +1,8 @@
 package context
 
 import (
+	"maps"
+
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/settings"
 	core "k8s.io/api/core/v1"
@@ -97,7 +99,9 @@ func PodConfigFromSpec(conversion *api.Conversion) PodConfig {
 
 	podSettings := conversion.Spec.PodSettings
 	podConfig.TransferNetworkAnnotations = podSettings.TransferNetworkAnnotations
-	podConfig.PodAnnotations = podSettings.Annotations
+	// Pod annotations are stored directly on the Conversion CR so they can be
+	// copied here without indirection through PodSettings.
+	podConfig.PodAnnotations = conversion.Annotations
 	podConfig.PodNodeSelector = podSettings.NodeSelector
 	podConfig.Affinity = podSettings.Affinity
 	if podSettings.ServiceAccount != "" {
@@ -111,18 +115,11 @@ func PodConfigFromSpec(conversion *api.Conversion) PodConfig {
 
 	podConfig.Disks = conversion.Spec.Disks
 
+	// Pod labels are stored directly on the Conversion CR so they can be
+	// copied here without indirection through PodSettings.
 	podLabels := make(map[string]string)
-	if podSettings.Labels != nil {
-		for k, v := range podSettings.Labels {
-			podLabels[k] = v
-		}
-	}
+	maps.Copy(podLabels, conversion.Labels)
 	podLabels[LabelConversion] = conversion.Name
-	for _, k := range []string{LabelPlan, LabelPlanName, LabelPlanNamespace, LabelMigration, LabelVM, LabelConversionType} {
-		if v, ok := conversion.Labels[k]; ok {
-			podLabels[k] = v
-		}
-	}
 	podConfig.PodLabels = podLabels
 
 	env := make([]core.EnvVar, 0, len(conversion.Spec.Settings))

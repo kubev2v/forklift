@@ -382,6 +382,9 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 	if migration != nil {
 		labels[convctx.LabelMigration] = string(migration.UID)
 	}
+	// Pod labels are stored on the CR itself so they can be copied
+	// directly to the pod during creation without routing through PodSettings.
+	maps.Copy(labels, resources.podConfig.PodLabels)
 
 	list := &api.ConversionList{}
 	err = r.Client.List(context.TODO(), list,
@@ -413,6 +416,7 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 			Namespace:    r.Plan.Namespace,
 			GenerateName: planName + "-" + vm.ID + "-",
 			Labels:       labels,
+			Annotations:  resources.podConfig.PodAnnotations,
 		},
 		Spec: api.ConversionSpec{
 			Type:            conversionType,
@@ -444,8 +448,6 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 				Affinity:                   resources.podConfig.Affinity,
 				GenerateName:               resources.podConfig.GenerateName,
 				TransferNetworkAnnotations: resources.podConfig.TransferNetworkAnnotations,
-				Labels:                     resources.podConfig.PodLabels,
-				Annotations:                resources.podConfig.PodAnnotations,
 				NodeSelector:               resources.podConfig.PodNodeSelector,
 			},
 		},
