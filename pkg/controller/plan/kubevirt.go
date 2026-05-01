@@ -226,7 +226,7 @@ func (r *KubeVirt) resolveConversionResources(vm *plan.VMStatus, podType convctx
 			return
 		}
 
-		useV2v, v2vErr := r.Context.Plan.ShouldUseV2vForTransfer(vm.Ref)
+		useV2v, v2vErr := r.Context.Plan.ShouldUseV2vForTransfer(vm.Ref, r.Destination.Client)
 		if v2vErr != nil {
 			err = v2vErr
 			return
@@ -345,7 +345,7 @@ func (r *KubeVirt) checkProviderReady(vmID string) (ready bool, err error) {
 // should use InPlace or Remote conversion based on the plan transfer mode
 // and PVC copy-offload annotations.
 func (r *KubeVirt) ResolveConversionType(vm *plan.VMStatus) (api.ConversionType, error) {
-	useV2v, err := r.Context.Plan.ShouldUseV2vForTransfer(vm.Ref)
+	useV2v, err := r.Context.Plan.ShouldUseV2vForTransfer(vm.Ref, r.Destination.Client)
 	if err != nil {
 		return "", err
 	}
@@ -431,10 +431,6 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 		Spec: api.ConversionSpec{
 			Type:            conversionType,
 			TargetNamespace: r.Plan.Spec.TargetNamespace,
-			Provider: core.ObjectReference{
-				Namespace: r.Source.Provider.Namespace,
-				Name:      r.Source.Provider.Name,
-			},
 			DestinationProvider: core.ObjectReference{
 				Namespace: r.Destination.Provider.Namespace,
 				Name:      r.Destination.Provider.Name,
@@ -562,20 +558,16 @@ func (r *KubeVirt) EnsureDeepInspectionConversion(
 		return
 	}
 
-	conversion := &api.Conversion{
+	cr := &api.Conversion{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace:    r.Plan.Namespace,
-			GenerateName: planName + "-" + vm.ID + "-di-",
+			GenerateName: planName + "-" + vm.ID + "-",
 			Labels:       crLabels,
 		},
 		Spec: api.ConversionSpec{
 			Type:            api.DeepInspection,
 			TargetNamespace: r.Plan.Spec.TargetNamespace,
-			Provider: core.ObjectReference{
-				Namespace: r.Source.Provider.Namespace,
-				Name:      r.Source.Provider.Name,
-			},
-			VM: vm.Ref,
+			VM:              vm.Ref,
 			Connection: api.Connection{
 				Secret: core.ObjectReference{
 					Namespace: secret.Namespace,
@@ -613,7 +605,7 @@ func (r *KubeVirt) EnsureDeepInspectionConversion(
 		return nil, liberr.Wrap(err)
 	}
 	r.Log.Info("Deep inspection CR created.",
-		"conversion", path.Join(conversion.Namespace, conversion.Name),
+		"conversion", path.Join(cr.Namespace, cr.Name),
 		"vm", vm.String())
 	return
 }
@@ -765,7 +757,6 @@ func (r *KubeVirt) ensureV2vSecret(vmRef ref.Ref) (*core.Secret, error) {
 	labels[kV2V] = "true"
 	return r.ensureSecret(vmRef, r.secretDataSetterForCDI(vmRef), labels)
 }
-
 
 // getVMVolumes returns the volumes from the KubeVirt VM spec.
 func (r *KubeVirt) getVMVolumes(vm *plan.VMStatus) ([]cnv.Volume, error) {
@@ -1346,9 +1337,8 @@ func (r *KubeVirt) vddkConfigMap(labels map[string]string) (*core.ConfigMap, err
 		if vddkConfig != "" {
 			data["vddk-config-file"] = vddkConfig
 		} else {
-			data["vddk-config-file"] =
-				"VixDiskLib.nfcAio.Session.BufSizeIn64KB=16\n" +
-					"VixDiskLib.nfcAio.Session.BufCount=4"
+			data["vddk-config-file"] = "VixDiskLib.nfcAio.Session.BufSizeIn64KB=16\n" +
+				"VixDiskLib.nfcAio.Session.BufCount=4"
 		}
 	}
 	configMap := core.ConfigMap{
@@ -1446,7 +1436,6 @@ func (r *KubeVirt) getDVs(vm *plan.VMStatus) (edvs []ExtendedDataVolume, err err
 			LabelSelector: k8slabels.SelectorFromSet(r.vmAllButMigrationLabels(vm.Ref)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		})
-
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -1502,7 +1491,6 @@ func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, e
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
-
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -1738,7 +1726,6 @@ func (r *KubeVirt) GetGuestConversionPod(vm *plan.VMStatus) (pod *core.Pod, err 
 	return
 }
 
-
 func (r *KubeVirt) getInspectionXml(pod *core.Pod) (string, error) {
 	if pod == nil {
 		return "", liberr.New("no pod found to get the inspection")
@@ -1758,7 +1745,7 @@ func (r *KubeVirt) getInspectionXml(pod *core.Pod) (string, error) {
 
 func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, step *plan.Step) error {
 	if pod == nil || pod.Status.PodIP == "" {
-		//we need the IP for fetching the configuration of the convered VM.
+		// we need the IP for fetching the configuration of the convered VM.
 		return nil
 	}
 
@@ -1967,7 +1954,6 @@ func (r *KubeVirt) DeleteHookJobs(vm *plan.VMStatus) (err error) {
 			Namespace:     r.Plan.Namespace,
 		},
 	)
-
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -2126,7 +2112,8 @@ func (r *KubeVirt) getGeneratedName(vm *plan.VMStatus) string {
 	return strings.Join(
 		[]string{
 			r.Plan.Name,
-			vm.ID},
+			vm.ID,
+		},
 		"-") + "-"
 }
 
@@ -2204,7 +2191,7 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) 
 		return
 	}
 
-	//Add the original name and ID info to the VM annotations
+	// Add the original name and ID info to the VM annotations
 	if len(vm.NewName) > 0 {
 		annotations := make(map[string]string)
 		annotations[AnnDisplayName] = vm.Name
@@ -2246,7 +2233,6 @@ func (r *KubeVirt) virtualMachine(vm *plan.VMStatus, sortVolumesByLibvirt bool) 
 	secrets, err = r.Builder.Secrets(vm.Ref)
 	if err != nil {
 		return
-
 	}
 	err = r.Ensurer.SharedSecrets(vm, secrets)
 	if err != nil {
@@ -3027,7 +3013,8 @@ func (r *KubeVirt) configMap(vmRef ref.Ref) (object *core.ConfigMap, err error) 
 			GenerateName: strings.Join(
 				[]string{
 					r.Plan.Name,
-					vmRef.ID},
+					vmRef.ID,
+				},
 				"-") + "-",
 		},
 		BinaryData: make(map[string][]byte),
@@ -3132,7 +3119,8 @@ func (r *KubeVirt) secret(vmRef ref.Ref, setSecretData func(*core.Secret) error,
 			GenerateName: strings.Join(
 				[]string{
 					r.Plan.Name,
-					vmRef.ID},
+					vmRef.ID,
+				},
 				"-") + "-",
 		},
 	}
