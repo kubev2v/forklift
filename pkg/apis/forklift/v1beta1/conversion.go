@@ -152,9 +152,6 @@ type ConversionSpec struct {
 	// Sets LOCAL_MIGRATION env var in the conversion pod.
 	// +optional
 	LocalMigration bool `json:"localMigration,omitempty"`
-	// Whether to add UDN open-default-ports annotation.
-	// +optional
-	UDN bool `json:"udn,omitempty"`
 	// Pod-level overrides for the conversion pod.
 	// +optional
 	PodSettings PodSettings `json:"podSettings,omitempty"`

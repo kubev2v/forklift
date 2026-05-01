@@ -8,7 +8,6 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	convctx "github.com/kubev2v/forklift/pkg/controller/conversion/context"
 	"github.com/kubev2v/forklift/pkg/settings"
-	"gopkg.in/yaml.v2"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -132,23 +131,6 @@ func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, vo
 	annotations := map[string]string{}
 	if cfg.TransferNetworkAnnotations != nil {
 		maps.Copy(annotations, cfg.TransferNetworkAnnotations)
-	}
-
-	if cfg.UDN {
-		metricsPort := convctx.OpenPort{Protocol: "tcp", Port: 2112}
-		dataServerPort := convctx.OpenPort{Protocol: "tcp", Port: 8080}
-		ports := []convctx.OpenPort{metricsPort, dataServerPort}
-
-		var yamlPorts []byte
-		yamlPorts, err = yaml.Marshal(ports)
-		if err != nil {
-			return
-		}
-		/*
-		   For the User Defined Networks we need to open some port so we can communicate with our metrics server inside the User Defined Network Namespace.
-		   Docs: https://docs.redhat.com/en/documentation/openshift_container_platform/4.19/html/multiple_networks/primary-networks#opening-default-network-ports-udn_about-user-defined-networks
-		*/
-		annotations[convctx.AnnOpenDefaultPorts] = string(yamlPorts)
 	}
 
 	seccompProfile := core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}

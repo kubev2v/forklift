@@ -1253,9 +1253,6 @@ spec:
                 - InPlace
                 - Remote
                 type: string
-              udn:
-                description: Whether to add UDN open-default-ports annotation.
-                type: boolean
               vddkImage:
                 description: |-
                   VDDK init container image. Required when type is DeepInspection.

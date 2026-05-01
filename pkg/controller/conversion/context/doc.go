@@ -32,15 +32,6 @@ const (
 // VddkVolumeName is the volume name used for the VDDK library scratch space.
 const VddkVolumeName = "vddk-vol-mount"
 
-// AnnOpenDefaultPorts is the annotation key for UDN default opened ports.
-const AnnOpenDefaultPorts = "k8s.ovn.org/open-default-ports"
-
-// OpenPort describes a port that should be opened for UDN networks.
-type OpenPort struct {
-	Protocol string `yaml:"protocol"`
-	Port     int    `yaml:"port"`
-}
-
 // ConversionPodConfigResult contains provider-specific configuration
 // for the virt-v2v conversion pod.
 type ConversionPodConfigResult struct {
@@ -64,7 +55,6 @@ type PodConfig struct {
 	VDDKImage      string
 	RequestKVM     bool
 	LocalMigration bool
-	UDN            bool
 
 	PodLabels                  map[string]string
 	PodAnnotations             map[string]string
@@ -94,7 +84,6 @@ func PodConfigFromSpec(conversion *api.Conversion) PodConfig {
 		VDDKImage:        conversion.Spec.VDDKImage,
 		RequestKVM:       conversion.Spec.RequestKVM,
 		LocalMigration:   conversion.Spec.LocalMigration,
-		UDN:              conversion.Spec.UDN,
 	}
 
 	podSettings := conversion.Spec.PodSettings
@@ -206,3 +195,4 @@ func ResolveServiceAccount(cfg *PodConfig) string {
 	}
 	return settings.Settings.Migration.ServiceAccount
 }
+

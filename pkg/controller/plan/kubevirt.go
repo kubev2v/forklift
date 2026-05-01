@@ -18,6 +18,8 @@ import (
 	"strings"
 	"time"
 
+	"gopkg.in/yaml.v2"
+
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
@@ -258,7 +260,6 @@ func (r *KubeVirt) resolveConversionResources(vm *plan.VMStatus, podType convctx
 	res.podConfig.VDDKImage = res.vddkImage
 	res.podConfig.RequestKVM = res.requestKVM
 	res.podConfig.LocalMigration = res.localMigration
-	res.podConfig.UDN = res.udn
 	res.podConfig.GenerateName = r.getGeneratedName(vm)
 
 	if res.podConfig.TransferNetwork != nil {
@@ -283,6 +284,17 @@ func (r *KubeVirt) resolveConversionResources(vm *plan.VMStatus, podType convctx
 	maps.Copy(res.podConfig.PodLabels, providerCfg.Labels)
 	maps.Copy(res.podConfig.PodLabels, res.podConfig.ConvertorLabels)
 	res.podConfig.PodAnnotations = providerCfg.Annotations
+	if res.udn {
+		udnAnnotation, udnErr := buildUDNAnnotation()
+		if udnErr != nil {
+			err = udnErr
+			return
+		}
+		if res.podConfig.PodAnnotations == nil {
+			res.podConfig.PodAnnotations = make(map[string]string)
+		}
+		res.podConfig.PodAnnotations[planbase.AnnOpenDefaultPorts] = udnAnnotation
+	}
 	if providerCfg.NodeSelector != nil || res.podConfig.ConvertorNodeSelector != nil {
 		res.podConfig.PodNodeSelector = make(map[string]string)
 		maps.Copy(res.podConfig.PodNodeSelector, providerCfg.NodeSelector)
@@ -442,7 +454,6 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 			VDDKImage:      resources.vddkImage,
 			RequestKVM:     resources.requestKVM,
 			LocalMigration: resources.localMigration,
-			UDN:            resources.udn,
 			PodSettings: api.PodSettings{
 				ServiceAccount:             resolveServiceAccount(r.Plan),
 				Affinity:                   resources.podConfig.Affinity,
@@ -3771,4 +3782,18 @@ func (r *KubeVirt) determineRunStrategy(vm *plan.VMStatus) cnv.VirtualMachineRun
 func getVirtV2vImage(plan *api.Plan) string {
 	cfg := convctx.PodConfigFromPlan(plan)
 	return convctx.GetVirtV2vImage(&cfg)
+}
+
+// buildUDNAnnotation returns the YAML-encoded value for the
+// k8s.ovn.org/open-default-ports annotation required for User Defined Networks.
+func buildUDNAnnotation() (string, error) {
+	ports := []OpenPort{
+		{Protocol: "tcp", Port: 2112},
+		{Protocol: "tcp", Port: 8080},
+	}
+	out, err := yaml.Marshal(ports)
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
 }
