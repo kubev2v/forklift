@@ -215,31 +215,9 @@ func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, vo
 	if sa := convctx.ResolveServiceAccount(cfg); sa != "" {
 		pod.Spec.ServiceAccountName = sa
 	}
-	setKvmOnPodSpec(&pod.Spec, cfg.RequestKVM)
-
 	return
 }
 
-// setKvmOnPodSpec adds KVM device request and schedulable node selector
-// when requestKVM is true.
-func setKvmOnPodSpec(podSpec *core.PodSpec, requestKVM bool) {
-	if !requestKVM {
-		return
-	}
-	if podSpec.NodeSelector == nil {
-		podSpec.NodeSelector = make(map[string]string)
-	}
-	podSpec.NodeSelector["kubevirt.io/schedulable"] = "true"
-	container := &podSpec.Containers[0]
-	if container.Resources.Limits == nil {
-		container.Resources.Limits = make(map[core.ResourceName]resource.Quantity)
-	}
-	container.Resources.Limits["devices.kubevirt.io/kvm"] = resource.MustParse("1")
-	if container.Resources.Requests == nil {
-		container.Resources.Requests = make(map[core.ResourceName]resource.Quantity)
-	}
-	container.Resources.Requests["devices.kubevirt.io/kvm"] = resource.MustParse("1")
-}
 
 // BuildVirtV2vConversionPod applies conversion-specific settings to a pod.
 func (b *Builder) BuildVirtV2vConversionPod(pod *core.Pod, environment []core.EnvVar, vm *plan.VMStatus) error {

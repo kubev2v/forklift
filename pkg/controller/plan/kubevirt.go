@@ -200,7 +200,6 @@ type conversionResources struct {
 	secret         *core.Secret
 	inPlace        bool
 	vddkImage      string
-	requestKVM     bool
 	localMigration bool
 	udn            bool
 	// ready is false when inspection environment data is not yet available (e.g. waiting for a snapshot)
@@ -253,12 +252,10 @@ func (r *KubeVirt) resolveConversionResources(vm *plan.VMStatus, podType convctx
 	}
 
 	res.vddkImage = settings.GetVDDKImage(r.Source.Provider.Spec.Settings)
-	res.requestKVM = shouldRequestKVM(r.Source.Provider)
 	res.localMigration = r.Destination.Provider.IsHost()
 	res.udn = r.Plan.DestinationHasUdnNetwork(r.Destination)
 
 	res.podConfig.VDDKImage = res.vddkImage
-	res.podConfig.RequestKVM = res.requestKVM
 	res.podConfig.LocalMigration = res.localMigration
 	res.podConfig.GenerateName = r.getGeneratedName(vm)
 
@@ -452,7 +449,6 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 			Image:          convctx.GetVirtV2vImage(&resources.podConfig),
 			Settings:       envSettings,
 			VDDKImage:      resources.vddkImage,
-			RequestKVM:     resources.requestKVM,
 			LocalMigration: resources.localMigration,
 			PodSettings: api.PodSettings{
 				ServiceAccount:             resolveServiceAccount(r.Plan),
@@ -552,18 +548,6 @@ func (r *KubeVirt) ensureV2vSecret(vmRef ref.Ref) (*core.Secret, error) {
 	return r.ensureSecret(vmRef, r.secretDataSetterForCDI(vmRef), labels)
 }
 
-// shouldRequestKVM returns true for provider types that need KVM passthrough.
-func shouldRequestKVM(provider *api.Provider) bool {
-	if settings.Settings.VirtV2vDontRequestKVM {
-		return false
-	}
-	switch provider.Type() {
-	case api.VSphere, api.Ova, api.HyperV:
-		return true
-	default:
-		return false
-	}
-}
 
 // getVMVolumes returns the volumes from the KubeVirt VM spec.
 func (r *KubeVirt) getVMVolumes(vm *plan.VMStatus) ([]cnv.Volume, error) {

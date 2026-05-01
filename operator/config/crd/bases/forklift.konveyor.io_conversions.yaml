@@ -1229,11 +1229,6 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
-              requestKVM:
-                default: true
-                description: Whether the pod needs a KVM device and kubevirt.io/schedulable
-                  node selector.
-                type: boolean
               settings:
                 additionalProperties:
                   type: string

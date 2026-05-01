@@ -145,10 +145,6 @@ type ConversionSpec struct {
 	// For other types, empty means no VDDK sidecar.
 	// +optional
 	VDDKImage string `json:"vddkImage,omitempty"`
-	// Whether the pod needs a KVM device and kubevirt.io/schedulable node selector.
-	// +optional
-	// +kubebuilder:default:=true
-	RequestKVM bool `json:"requestKVM,omitempty"`
 	// Sets LOCAL_MIGRATION env var in the conversion pod.
 	// +optional
 	LocalMigration bool `json:"localMigration,omitempty"`

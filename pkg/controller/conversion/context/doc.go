@@ -53,7 +53,6 @@ type PodConfig struct {
 	ServiceAccount             string
 
 	VDDKImage      string
-	RequestKVM     bool
 	LocalMigration bool
 
 	PodLabels                  map[string]string
@@ -82,7 +81,6 @@ func PodConfigFromSpec(conversion *api.Conversion) PodConfig {
 		Image:            conversion.Spec.Image,
 		XfsCompatibility: conversion.Spec.XfsCompatibility,
 		VDDKImage:        conversion.Spec.VDDKImage,
-		RequestKVM:       conversion.Spec.RequestKVM,
 		LocalMigration:   conversion.Spec.LocalMigration,
 	}
 
