@@ -251,10 +251,13 @@ func (e *Ensurer) GetPod(conversion *api.Conversion, labels map[string]string) (
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
-	if len(list.Items) > 0 {
+	if len(list.Items) == 1 {
 		return &list.Items[0], nil
+	} else if len(list.Items) > 1 { 
+		return nil, liberr.New("found multiple pods with the same labels", "labels", labels)
+	} else {
+		return nil, nil
 	}
-	return nil, nil
 }
 
 // VolumesFromDiskRefs converts a slice of DiskRef into Kubernetes
@@ -359,10 +362,13 @@ func GetPodByLabels(k8sClient client.Client, namespace string, labels map[string
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
-	if len(list.Items) > 0 {
+	if len(list.Items) == 1 {
 		return &list.Items[0], nil
+	} else if len(list.Items) > 1 { 
+		return nil, liberr.New("found multiple pods with the same labels", "labels", labels)
+	} else {
+		return nil, nil
 	}
-	return nil, nil
 }
 
 // DiskRefsFromVolumes converts resolved volumes, mounts, devices and PVCs
