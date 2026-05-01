@@ -529,7 +529,7 @@ func (r *KubeVirt) EnsureDeepInspectionConversion(
 			}
 			// Fall through to creation below.
 		default:
-			// Still running (Pending, Running, or unset) — wait.
+			// Still running (Pending, Running, or unset), wait.
 			r.Log.Info("Deep inspection CR is still running.",
 				"conversion", path.Join(existing.Namespace, existing.Name),
 				"phase", existing.Status.Phase,
@@ -539,9 +539,8 @@ func (r *KubeVirt) EnsureDeepInspectionConversion(
 	}
 
 	// Ensure a provider-format secret (url/user/password) exists for the deep-inspection pod.
-	// The secret must live in r.Plan.Namespace — the same namespace as the Conversion CR and
-	// the pod — so that the pod's volume mount can resolve it.  ensureSecret() always targets
-	// Plan.Spec.TargetNamespace via r.Destination.Client, which may differ, so we manage this
+	// The secret must live in the same namespace as the pod.
+	// ensureSecret() always targets Plan.Spec.TargetNamespace via r.Destination.Client, which may differ, so we manage this
 	// secret directly here.
 	secret, secErr := r.ensureDeepInspectionSecret(vm.Ref, planName, planID)
 	if secErr != nil {

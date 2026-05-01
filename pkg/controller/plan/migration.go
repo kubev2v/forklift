@@ -1329,17 +1329,33 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 
 			var ready bool
 			if settings.Settings.UseConversionCR {
-				if ready, err = r.kubevirt.EnsureConversion(vm, api.Inspection, r.Plan.Name, r.Plan.Namespace, string(r.Plan.UID), r.Migration, step); err != nil {
+				snapshotMoref := vm.Warm.Precopies[0].Snapshot
+				var (
+					ready bool
+					cr    *api.Conversion
+				)
+				ready, cr, err = r.kubevirt.EnsureDeepInspectionConversion(
+					vm, snapshotMoref, r.Plan.Name, string(r.Plan.UID))
+				if err != nil {
 					step.AddError(err.Error())
 					err = nil
 					break
 				}
-			} else {
-				if ready, err = r.kubevirt.EnsureGuestInspectionPod(vm, step); err != nil {
-					step.AddError(err.Error())
-					err = nil
-					break
+				if !ready {
+					r.Log.Info("Deep inspection CR is not ready yet")
+					return
 				}
+				// CR reached PhaseSucceeded, propagate concerns and advance.
+				r.propagateInspectionConcerns(vm, cr.Status.InspectionResult)
+				r.NextPhase(vm)
+				break
+			}
+
+			var ready bool
+			if ready, err = r.kubevirt.EnsureGuestInspectionPod(vm, step); err != nil {
+				step.AddError(err.Error())
+				err = nil
+				break
 			}
 			if !ready {
 				r.Log.Info("virt-v2v inspection pod isn't ready yet")
@@ -1348,7 +1364,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 
 			var pod *core.Pod
 			pod, err = r.kubevirt.GetConversionPod(vm.Ref, VirtV2vInspectionPod)
-
 			if err != nil {
 				step.AddError(err.Error())
 				err = nil
@@ -1949,6 +1964,23 @@ func (r *Migration) setPopulatorPodsWithLabels(vm *plan.VMStatus, migrationID st
 				}
 			}
 		}
+	}
+}
+
+// propagateInspectionConcerns maps concerns from an InspectionResult onto the VM status
+// as conditions so they are visible to the migration consumer.
+func (r *Migration) propagateInspectionConcerns(vm *plan.VMStatus, result *api.InspectionResult) {
+	if result == nil {
+		return
+	}
+	for _, c := range result.Concerns {
+		vm.SetCondition(libcnd.Condition{
+			Type:     InspectionHasConcerns,
+			Status:   libcnd.True,
+			Category: c.Category,
+			Reason:   c.ID,
+			Message:  c.Message,
+		})
 	}
 }
 
