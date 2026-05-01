@@ -67,6 +67,9 @@ func (m *mockInventory) Find(resource interface{}, ref ref.Ref) error {
 		if ref.Name == "not_windows_guest" {
 			res.VM.GuestID = "rhel8_64Guest"
 		}
+		if ref.Name == "nics_no_guest_networks" {
+			res.VM.GuestNetworks = nil
+		}
 		if ref.Name == "missing_from_inventory" {
 			return base.NotFoundError{}
 		}
@@ -200,6 +203,7 @@ var _ = Describe("vsphere validation tests", func() {
 			Entry("when the vm have static ips, and the plan set without static ip", "test", false, false),
 			Entry("when the vm doesn't have static ips, and the plan set without static ip, vm is non-windows", "not_windows_guest", false, false),
 			Entry("when the vm doesn't have static ips, and the plan set with static ip, vm is non-windows", "not_windows_guest", true, false),
+			Entry("when the vm has NICs but no guest networks, and the plan set with static ip", "nics_no_guest_networks", true, true),
 			Entry("when the vm doesn't exist", "missing_from_inventory", true, true),
 		)
 	})
