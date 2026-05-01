@@ -46,18 +46,18 @@ func NewEnsurer(localClient client.Client, log logging.LevelLogger, spec api.Con
 
 // resolveDestinationClient returns a k8s client for the cluster where
 // pods and PVCs should be managed. When the Conversion spec has a
-// DestinationProvider pointing to a remote cluster, a new client is
-// built from the provider URL and its secret. Otherwise the supplied
-// local client is returned unchanged.
+// Destination pointing to a remote cluster, a new client is built from
+// the provider URL and its secret. Otherwise the supplied local client
+// is returned unchanged.
 func resolveDestinationClient(localClient client.Client, spec api.ConversionSpec) (client.Client, error) {
-	if spec.DestinationProvider.Name == "" {
+	if spec.Destination.Name == "" {
 		return localClient, nil
 	}
 
 	provider := &api.Provider{}
 	err := localClient.Get(context.TODO(), types.NamespacedName{
-		Namespace: spec.DestinationProvider.Namespace,
-		Name:      spec.DestinationProvider.Name,
+		Namespace: spec.Destination.Namespace,
+		Name:      spec.Destination.Name,
 	}, provider)
 	if err != nil {
 		return nil, liberr.Wrap(err)

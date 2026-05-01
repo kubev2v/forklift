@@ -145,7 +145,7 @@ type ConversionSpec struct {
 	// otherwise a remote k8s client is constructed from the provider URL
 	// and its secret.
 	// +optional
-	DestinationProvider core.ObjectReference `json:"destinationProvider,omitempty" ref:"Provider"`
+	Destination core.ObjectReference `json:"destination,omitempty" ref:"Provider"`
 	// Reference to the source VM.
 	VM ref.Ref `json:"vm"`
 	// Disks to be converted or inspected.
@@ -238,8 +238,8 @@ type InspectionMountpoint struct {
 // the pod HTTP API.  Only fields relevant for migration decisions are kept here;
 // the full JSON is available in the pod logs.
 type InspectionResult struct {
-	// Passed is true when all checks passed with no concerns.
-	Passed bool `json:"passed"`
+	// AllChecksPassed is true when all checks passed with no concerns.
+	AllChecksPassed bool `json:"allChecksPassed"`
 	// OSInfo contains operating-system metadata.
 	// +optional
 	OSInfo *OSInfo `json:"osInfo,omitempty"`

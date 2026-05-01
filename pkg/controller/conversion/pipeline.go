@@ -463,7 +463,7 @@ func (p *ConversionPipeline) runStageFetchingResults() (stageDone bool, err erro
 		return
 	}
 
-	p.r.Log.Info("Inspection results fetched.", "passed", result.Passed, "concerns", len(result.Concerns))
+	p.r.Log.Info("Inspection results fetched.", "allChecksPassed", result.AllChecksPassed, "concerns", len(result.Concerns))
 	p.conv.Status.InspectionResult = result
 	return true, nil
 }
@@ -488,8 +488,8 @@ func (p *ConversionPipeline) fetchInspectionResults(podIP string) (*api.Inspecti
 
 	// Decode only the subset of fields we persist on the CR.
 	var raw struct {
-		Passed      bool `json:"passed"`
-		AllConcerns []struct {
+		AllChecksPassed bool `json:"all_checks_passed"`
+		AllConcerns     []struct {
 			ID       string `json:"id"`
 			Category string `json:"category"`
 			Label    string `json:"label"`
@@ -515,7 +515,7 @@ func (p *ConversionPipeline) fetchInspectionResults(podIP string) (*api.Inspecti
 		return nil, err
 	}
 
-	result := &api.InspectionResult{Passed: raw.Passed}
+	result := &api.InspectionResult{AllChecksPassed: raw.AllChecksPassed}
 	if raw.OSInfo != nil {
 		result.OSInfo = &api.OSInfo{
 			Name:    raw.OSInfo.Name,

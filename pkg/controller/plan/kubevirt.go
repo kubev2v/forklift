@@ -431,7 +431,7 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 		Spec: api.ConversionSpec{
 			Type:            conversionType,
 			TargetNamespace: r.Plan.Spec.TargetNamespace,
-			DestinationProvider: core.ObjectReference{
+			Destination: core.ObjectReference{
 				Namespace: r.Destination.Provider.Namespace,
 				Name:      r.Destination.Provider.Name,
 			},
