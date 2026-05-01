@@ -136,9 +136,20 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	pipe := NewConversionPipeline(ctx, &r, conversion)
 	succeeded, err := pipe.Run()
 	if err != nil {
+		r.Log.Error(err, "Conversion pipeline failed.",
+			"type", conversion.Spec.Type,
+			"phase", conversion.Status.Phase,
+			"stage", conversion.Status.Stage)
 		conversion.Status.Phase = api.PhaseFailed
 	} else if succeeded {
+		r.Log.Info("Conversion pipeline succeeded.",
+			"type", conversion.Spec.Type)
 		conversion.Status.Phase = api.PhaseSucceeded
+	} else {
+		r.Log.V(3).Info("Conversion pipeline still in progress.",
+			"type", conversion.Spec.Type,
+			"phase", conversion.Status.Phase,
+			"stage", conversion.Status.Stage)
 	}
 
 	resolvePhaseConditions(conversion)
