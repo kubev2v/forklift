@@ -13,12 +13,12 @@ import (
 
 // Environment variables.
 const (
-<<<<<<< HEAD
 	MaxVmInFlight                          = "MAX_VM_INFLIGHT"
 	HookRetry                              = "HOOK_RETRY"
 	ImporterRetry                          = "IMPORTER_RETRY"
 	VirtV2vImage                           = "VIRT_V2V_IMAGE"
 	VirtV2vImageXFS                        = "VIRT_V2V_IMAGE_XFS"
+	DeepInspectionImage                    = "DEEP_INSPECTION_IMAGE"
 	vddkImage                              = "VDDK_IMAGE"
 	PrecopyInterval                        = "PRECOPY_INTERVAL"
 	BlockerGracePeriodMinutes              = "BLOCKER_GRACE_PERIOD_MINUTES"
@@ -72,60 +72,6 @@ const (
 	AAPURL                                 = "AAP_URL"
 	AAPTokenSecretName                     = "AAP_TOKEN_SECRET_NAME"
 	AAPTimeout                             = "AAP_TIMEOUT"
-=======
-	MaxVmInFlight                    = "MAX_VM_INFLIGHT"
-	HookRetry                        = "HOOK_RETRY"
-	ImporterRetry                    = "IMPORTER_RETRY"
-	VirtV2vImage                     = "VIRT_V2V_IMAGE"
-	VirtV2vImageXFS                  = "VIRT_V2V_IMAGE_XFS"
-	DeepInspectionImage              = "DEEP_INSPECTION_IMAGE"
-	vddkImage                        = "VDDK_IMAGE"
-	PrecopyInterval                  = "PRECOPY_INTERVAL"
-	BlockerGracePeriodMinutes        = "BLOCKER_GRACE_PERIOD_MINUTES"
-	VirtV2vDontRequestKVM            = "VIRT_V2V_DONT_REQUEST_KVM"
-	SnapshotRemovalTimeout           = "SNAPSHOT_REMOVAL_TIMEOUT"
-	SnapshotStatusCheckRate          = "SNAPSHOT_STATUS_CHECK_RATE"
-	CDIExportTokenTTL                = "CDI_EXPORT_TOKEN_TTL"
-	FileSystemOverhead               = "FILESYSTEM_OVERHEAD"
-	BlockOverhead                    = "BLOCK_OVERHEAD"
-	CleanupRetries                   = "CLEANUP_RETRIES"
-	SnapshotRemovalCheckRetries      = "SNAPSHOT_REMOVAL_CHECK_RETRIES"
-	OvirtOsConfigMap                 = "OVIRT_OS_MAP"
-	VsphereOsConfigMap               = "VSPHERE_OS_MAP"
-	VirtCustomizeConfigMap           = "VIRT_CUSTOMIZE_MAP"
-	VddkJobActiveDeadline            = "VDDK_JOB_ACTIVE_DEADLINE"
-	VirtV2vExtraArgs                 = "VIRT_V2V_EXTRA_ARGS"
-	VirtV2vInspectorExtraArgs        = "VIRT_V2V_INSPECTOR_EXTRA_ARGS"
-	VirtV2vExtraConfConfigMap        = "VIRT_V2V_EXTRA_CONF_CONFIG_MAP"
-	VirtV2vMemSize                   = "VIRT_V2V_MEMSIZE"
-	VirtV2vSmp                       = "VIRT_V2V_SMP"
-	VirtV2vContainerLimitsCpu        = "VIRT_V2V_CONTAINER_LIMITS_CPU"
-	VirtV2vContainerLimitsMemory     = "VIRT_V2V_CONTAINER_LIMITS_MEMORY"
-	VirtV2vContainerRequestsCpu      = "VIRT_V2V_CONTAINER_REQUESTS_CPU"
-	VirtV2vContainerRequestsMemory   = "VIRT_V2V_CONTAINER_REQUESTS_MEMORY"
-	HooksContainerLimitsCpu          = "HOOKS_CONTAINER_LIMITS_CPU"
-	HooksContainerLimitsMemory       = "HOOKS_CONTAINER_LIMITS_MEMORY"
-	HooksContainerRequestsCpu        = "HOOKS_CONTAINER_REQUESTS_CPU"
-	HooksContainerRequestsMemory     = "HOOKS_CONTAINER_REQUESTS_MEMORY"
-	OvaContainerLimitsCpu            = "OVA_CONTAINER_LIMITS_CPU"
-	OvaContainerLimitsMemory         = "OVA_CONTAINER_LIMITS_MEMORY"
-	OvaContainerRequestsCpu          = "OVA_CONTAINER_REQUESTS_CPU"
-	OvaContainerRequestsMemory       = "OVA_CONTAINER_REQUESTS_MEMORY"
-	HyperVContainerLimitsCpu         = "HYPERV_CONTAINER_LIMITS_CPU"
-	HyperVContainerLimitsMemory      = "HYPERV_CONTAINER_LIMITS_MEMORY"
-	HyperVContainerRequestsCpu       = "HYPERV_CONTAINER_REQUESTS_CPU"
-	HyperVContainerRequestsMemory    = "HYPERV_CONTAINER_REQUESTS_MEMORY"
-	PopulatorContainerLimitsCpu      = "POPULATOR_CONTAINER_LIMITS_CPU"
-	PopulatorContainerLimitsMemory   = "POPULATOR_CONTAINER_LIMITS_MEMORY"
-	PopulatorContainerRequestsCpu    = "POPULATOR_CONTAINER_REQUESTS_CPU"
-	PopulatorContainerRequestsMemory = "POPULATOR_CONTAINER_REQUESTS_MEMORY"
-	TlsConnectionTimeout             = "TLS_CONNECTION_TIMEOUT"
-	MaxConcurrentReconciles          = "MAX_CONCURRENT_RECONCILES"
-	MaxParentBackingRetries          = "MAX_PARENT_BACKING_RETRIES"
-	HostLeaseNamespace               = "HOST_LEASE_NAMESPACE"
-	HostLeaseDurationSeconds         = "HOST_LEASE_DURATION_SECONDS"
-	MigrationServiceAccount          = "MIGRATION_SERVICE_ACCOUNT"
->>>>>>> 0f55b6cb0 (Add deepinspection image setting)
 )
 
 // Default values for populator container resources
@@ -469,8 +415,9 @@ func (r *Migration) Load() (err error) {
 			}
 			r.AAPTimeoutSeconds = n
 		}
+	}
 	if val, found := os.LookupEnv(DeepInspectionImage); found {
-		r.DeepInspectionImage = val
+		r.DeepInspectionImage = strings.TrimSpace(val)
 	}
 	return
 }
