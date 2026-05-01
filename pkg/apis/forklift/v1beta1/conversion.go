@@ -7,6 +7,11 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// SpecSettingsSnapshotMorefKey is the key in ConversionSpec.Settings that holds
+// a pre-existing vSphere snapshot MoRef.  When set the controller skips
+// snapshot creation/removal and does not take ownership of the snapshot.
+const SpecSettingsSnapshotMorefKey = "SNAPSHOT_MOREF"
+
 // ConversionType defines the type of conversion to perform.
 type ConversionType string
 
