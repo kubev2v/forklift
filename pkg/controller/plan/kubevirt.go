@@ -482,6 +482,162 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 	return
 }
 
+// EnsureDeepInspectionConversion manages a DeepInspection Conversion CR for warm vSphere
+// migrations.  It uses the pre-existing warm snapshot (snapshotMoref) so the Conversion
+// controller skips snapshot creation/removal.
+//
+// State machine:
+//   - PhaseSucceeded → returns (true, cr, nil) — caller reads InspectionResult
+//   - Pending/Running → returns (false, nil, nil) — requeue, still in progress
+//   - PhaseFailed/PhaseCanceled → deletes stale CR, creates fresh one, returns (false, nil, nil)
+//   - Not found → creates new CR, returns (false, nil, nil)
+func (r *KubeVirt) EnsureDeepInspectionConversion(
+	vm *plan.VMStatus, snapshotMoref, planName, planID string,
+) (ready bool, cr *api.Conversion, err error) {
+	labels := map[string]string{
+		convctx.LabelPlan:           planID,
+		convctx.LabelVM:             vm.ID,
+		convctx.LabelConversionType: string(api.DeepInspection),
+	}
+
+	list := &api.ConversionList{}
+	err = r.Client.List(context.TODO(), list,
+		client.InNamespace(r.Plan.Namespace),
+		client.MatchingLabels(labels),
+	)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	if len(list.Items) > 0 {
+		existing := &list.Items[0]
+		switch existing.Status.Phase {
+		case api.PhaseSucceeded:
+			r.Log.Info("Deep inspection CR succeeded; reusing result.",
+				"conversion", path.Join(existing.Namespace, existing.Name),
+				"vm", vm.String())
+			return true, existing, nil
+		case api.PhaseFailed, api.PhaseCanceled:
+			r.Log.Info("Deep inspection CR is terminal non-succeeded; replacing.",
+				"conversion", path.Join(existing.Namespace, existing.Name),
+				"phase", existing.Status.Phase,
+				"vm", vm.String())
+			if err = r.Client.Delete(context.TODO(), existing); err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
+			// Fall through to creation below.
+		default:
+			// Still running (Pending, Running, or unset) — wait.
+			r.Log.Info("Deep inspection CR is still running.",
+				"conversion", path.Join(existing.Namespace, existing.Name),
+				"phase", existing.Status.Phase,
+				"vm", vm.String())
+			return false, nil, nil
+		}
+	}
+
+	// Ensure a provider-format secret (url/user/password) exists for the deep-inspection pod.
+	// The secret must live in r.Plan.Namespace — the same namespace as the Conversion CR and
+	// the pod — so that the pod's volume mount can resolve it.  ensureSecret() always targets
+	// Plan.Spec.TargetNamespace via r.Destination.Client, which may differ, so we manage this
+	// secret directly here.
+	secret, secErr := r.ensureDeepInspectionSecret(vm.Ref, planName, planID)
+	if secErr != nil {
+		err = liberr.Wrap(secErr)
+		return
+	}
+
+	conversion := &api.Conversion{
+		ObjectMeta: meta.ObjectMeta{
+			Namespace:    r.Plan.Namespace,
+			GenerateName: planName + "-" + vm.ID + "-di-",
+			Labels:       labels,
+		},
+		Spec: api.ConversionSpec{
+			Type:            api.DeepInspection,
+			TargetNamespace: r.Plan.Spec.TargetNamespace,
+			Provider: core.ObjectReference{
+				Namespace: r.Source.Provider.Namespace,
+				Name:      r.Source.Provider.Name,
+			},
+			VM: vm.Ref,
+			Connection: api.Connection{
+				Secret: core.ObjectReference{
+					Namespace: secret.Namespace,
+					Name:      secret.Name,
+				},
+			},
+			Settings: map[string]string{
+				"SNAPSHOT_MOREF": snapshotMoref,
+			},
+			VDDKImage: settings.GetVDDKImage(r.Source.Provider.Spec.Settings),
+			PodSettings: api.PodSettings{
+				ServiceAccount: resolveServiceAccount(r.Plan),
+			},
+		},
+	}
+
+	err = r.Client.Create(context.TODO(), conversion)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	r.Log.Info("Deep inspection CR created.",
+		"conversion", path.Join(conversion.Namespace, conversion.Name),
+		"vm", vm.String())
+	return
+}
+
+// ensureDeepInspectionSecret ensures a provider-format credential secret for the
+// deep-inspection pod exists in Plan.Spec.TargetNamespace — the same namespace
+// where the pod will run.  It uses r.Destination.Client so it works whether the
+// target namespace is local or on a remote cluster.
+func (r *KubeVirt) ensureDeepInspectionSecret(vmRef ref.Ref, planName, planID string) (secret *core.Secret, err error) {
+	labels := map[string]string{
+		convctx.LabelPlan:           planID,
+		convctx.LabelVM:             vmRef.ID,
+		convctx.LabelConversionType: string(api.DeepInspection),
+	}
+
+	list := &core.SecretList{}
+	err = r.Destination.Client.List(context.TODO(), list,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(labels),
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	if len(list.Items) > 0 {
+		secret = &list.Items[0]
+		secret.Data = r.Source.Secret.Data
+		if err = r.Destination.Client.Update(context.TODO(), secret); err != nil {
+			return nil, liberr.Wrap(err)
+		}
+		r.Log.V(1).Info("Deep inspection secret updated.",
+			"secret", path.Join(secret.Namespace, secret.Name))
+		return
+	}
+
+	secret = &core.Secret{
+		ObjectMeta: meta.ObjectMeta{
+			Labels:       labels,
+			Namespace:    r.Plan.Spec.TargetNamespace,
+			GenerateName: planName + "-" + vmRef.ID + "-di-",
+		},
+	}
+	secret.Data = r.Source.Secret.Data
+	if err = r.Destination.Client.Create(context.TODO(), secret); err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	r.Log.V(1).Info("Deep inspection secret created.",
+		"secret", path.Join(secret.Namespace, secret.Name))
+	return
+}
+
 // CancelConversion finds the Conversion CR for the given VM and marks it as Canceled.
 func (r *KubeVirt) CancelConversion(vm *plan.VMStatus) error {
 	labels := map[string]string{
