@@ -212,6 +212,7 @@ type conversionResources struct {
 // not yet available res.ready will be false.
 func (r *KubeVirt) resolveConversionResources(vm *plan.VMStatus, podType convctx.V2vPodType, step *plan.Step) (res conversionResources, err error) {
 	res.podConfig = convctx.PodConfigFromPlan(r.Plan)
+	res.podConfig.Affinity = r.getConvertorAffinity()
 
 	var vmVolumes []cnv.Volume
 	if podType == convctx.VirtV2vConversionPod {

@@ -130,40 +130,10 @@ func PodConfigFromPlan(p *api.Plan) PodConfig {
 		ConvertorNodeSelector:      p.Spec.ConvertorNodeSelector,
 		ConvertorLabels:            p.Spec.ConvertorLabels,
 		ServiceAccount:             p.Spec.ServiceAccount,
-		Affinity:                   ResolveConvertorAffinity(p.Spec.ConvertorAffinity),
+		Affinity:                   p.Spec.ConvertorAffinity,
 	}
 }
 
-// ResolveConvertorAffinity returns the user-specified affinity if set,
-// otherwise a default pod anti-affinity that spreads virt-v2v pods
-// across nodes.
-func ResolveConvertorAffinity(custom *core.Affinity) *core.Affinity {
-	if custom != nil {
-		return custom.DeepCopy()
-	}
-	return &core.Affinity{
-		PodAntiAffinity: &core.PodAntiAffinity{
-			PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
-				{
-					Weight: 100,
-					PodAffinityTerm: core.PodAffinityTerm{
-						NamespaceSelector: &meta.LabelSelector{},
-						TopologyKey:       "kubernetes.io/hostname",
-						LabelSelector: &meta.LabelSelector{
-							MatchExpressions: []meta.LabelSelectorRequirement{
-								{
-									Key:      LabelApp,
-									Values:   []string{"virt-v2v"},
-									Operator: meta.LabelSelectorOpIn,
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-}
 
 // GetVirtV2vImage resolves the virt-v2v container image from PodConfig.
 func GetVirtV2vImage(cfg *PodConfig) string {
