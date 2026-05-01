@@ -106,7 +106,7 @@ spec:
                 required:
                 - secret
                 type: object
-              destinationProvider:
+              destination:
                 description: |-
                   Reference to the destination provider where pods and PVCs live.
                   When empty or pointing to the host provider the local client is used;
@@ -153,6 +153,70 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              diskEncryption:
+                description: |-
+                  DiskEncryption configures how LUKS-encrypted disks are unlocked.
+                  Set Type=LUKS and populate Secret for passphrase-based unlocking,
+                  or set Type=Clevis for automated network-based (tang/TPM2) unlocking.
+                properties:
+                  secret:
+                    description: |-
+                      Secret references a Kubernetes Secret whose data contains the LUKS passphrase(s).
+                      Required when Type is LUKS.
+                    properties:
+                      apiVersion:
+                        description: API version of the referent.
+                        type: string
+                      fieldPath:
+                        description: |-
+                          If referring to a piece of an object instead of an entire object, this string
+                          should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                          For example, if the object reference is to a container within a pod, this would take on a value like:
+                          "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                          the event) or if no container name is specified "spec.containers[2]" (container with
+                          index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                          referencing a part of an object.
+                        type: string
+                      kind:
+                        description: |-
+                          Kind of the referent.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                        type: string
+                      name:
+                        description: |-
+                          Name of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                      namespace:
+                        description: |-
+                          Namespace of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                        type: string
+                      resourceVersion:
+                        description: |-
+                          Specific resourceVersion to which this reference is made, if any.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                        type: string
+                      uid:
+                        description: |-
+                          UID of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  type:
+                    allOf:
+                    - enum:
+                      - LUKS
+                      - Clevis
+                    - enum:
+                      - LUKS
+                      - Clevis
+                    description: Type selects the unlock mechanism.
+                    type: string
+                required:
+                - type
+                type: object
               disks:
                 description: |-
                   Disks to be converted or inspected.
@@ -196,49 +260,6 @@ spec:
               localMigration:
                 description: Sets LOCAL_MIGRATION env var in the conversion pod.
                 type: boolean
-              luks:
-                description: Disk decryption LUKS keys.
-                properties:
-                  apiVersion:
-                    description: API version of the referent.
-                    type: string
-                  fieldPath:
-                    description: |-
-                      If referring to a piece of an object instead of an entire object, this string
-                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
-                      For example, if the object reference is to a container within a pod, this would take on a value like:
-                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
-                      the event) or if no container name is specified "spec.containers[2]" (container with
-                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
-                      referencing a part of an object.
-                    type: string
-                  kind:
-                    description: |-
-                      Kind of the referent.
-                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-                    type: string
-                  name:
-                    description: |-
-                      Name of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                    type: string
-                  namespace:
-                    description: |-
-                      Namespace of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
-                    type: string
-                  resourceVersion:
-                    description: |-
-                      Specific resourceVersion to which this reference is made, if any.
-                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
-                    type: string
-                  uid:
-                    description: |-
-                      UID of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
-                    type: string
-                type: object
-                x-kubernetes-map-type: atomic
               podSettings:
                 description: Pod-level overrides for the conversion pod.
                 properties:
@@ -1186,49 +1207,6 @@ spec:
                     description: Pre-resolved transfer network annotations.
                     type: object
                 type: object
-              provider:
-                description: Reference to the source provider.
-                properties:
-                  apiVersion:
-                    description: API version of the referent.
-                    type: string
-                  fieldPath:
-                    description: |-
-                      If referring to a piece of an object instead of an entire object, this string
-                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
-                      For example, if the object reference is to a container within a pod, this would take on a value like:
-                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
-                      the event) or if no container name is specified "spec.containers[2]" (container with
-                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
-                      referencing a part of an object.
-                    type: string
-                  kind:
-                    description: |-
-                      Kind of the referent.
-                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-                    type: string
-                  name:
-                    description: |-
-                      Name of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                    type: string
-                  namespace:
-                    description: |-
-                      Namespace of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
-                    type: string
-                  resourceVersion:
-                    description: |-
-                      Specific resourceVersion to which this reference is made, if any.
-                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
-                    type: string
-                  uid:
-                    description: |-
-                      UID of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
-                    type: string
-                type: object
-                x-kubernetes-map-type: atomic
               settings:
                 additionalProperties:
                   type: string
@@ -1284,7 +1262,6 @@ spec:
                 type: boolean
             required:
             - connection
-            - provider
             - type
             - vm
             type: object
@@ -1343,6 +1320,10 @@ spec:
                   InspectionResult holds the outcome fetched from the deep-inspection pod
                   HTTP API once the StageFetchingResults stage completes.
                 properties:
+                  allChecksPassed:
+                    description: AllChecksPassed is true when all checks passed with
+                      no concerns.
+                    type: boolean
                   concerns:
                     description: Concerns lists all issues found during inspection.
                     items:
@@ -1424,11 +1405,8 @@ spec:
                         description: Version is the major OS version.
                         type: string
                     type: object
-                  passed:
-                    description: Passed is true when all checks passed with no concerns.
-                    type: boolean
                 required:
-                - passed
+                - allChecksPassed
                 type: object
               observedGeneration:
                 description: |-
