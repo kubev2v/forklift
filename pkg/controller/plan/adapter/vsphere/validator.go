@@ -538,6 +538,10 @@ func (r *Validator) StaticIPs(vmRef ref.Ref) (ok bool, err error) {
 		return
 	}
 
+	if len(vm.NICs) > 0 && len(vm.GuestNetworks) == 0 {
+		return false, nil
+	}
+
 	for _, guestNetwork := range vm.GuestNetworks {
 		found := false
 		for _, nic := range vm.NICs {
