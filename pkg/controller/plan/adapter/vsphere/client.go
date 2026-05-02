@@ -509,7 +509,12 @@ func (r *Client) getVM(vmRef ref.Ref, hosts util.HostsFunc) (vsphereVm *object.V
 	}
 
 	searchIndex := object.NewSearchIndex(client)
-	vsphereRef, err := searchIndex.FindByUuid(context.TODO(), nil, vm.UUID, true, ptr.To(false))
+	uuid := vm.InstanceUUID
+	useInstanceUUID := uuid != ""
+	if !useInstanceUUID {
+		uuid = vm.UUID
+	}
+	vsphereRef, err := searchIndex.FindByUuid(context.TODO(), nil, uuid, true, ptr.To(useInstanceUUID))
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
