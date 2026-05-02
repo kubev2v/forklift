@@ -22,6 +22,7 @@ import (
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -44,7 +45,7 @@ type Client struct {
 // Create a VM snapshot and return its ID.
 func (r *Client) CreateSnapshot(vmRef ref.Ref, hostsFunc util.HostsFunc) (snapshotId string, creationTaskId string, err error) {
 	r.Log.V(1).Info("Creating snapshot", "vmRef", vmRef)
-	vm, err := r.getVM(vmRef)
+	vm, err := r.getVM(vmRef, hostsFunc)
 	if err != nil {
 		return
 	}
@@ -110,7 +111,7 @@ func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hosts util.Hosts
 	r.Log.V(1).Info("RemoveSnapshot",
 		"vmRef", vmRef,
 		"snapshot", snapshot)
-	vm, err := r.getVM(vmRef)
+	vm, err := r.getVM(vmRef, hosts)
 	if err != nil {
 		return
 	}
@@ -171,7 +172,7 @@ func (r *Client) SetCheckpoints(vmRef ref.Ref, precopies []planapi.Precopy, data
 
 // Get the power state of the VM.
 func (r *Client) PowerState(vmRef ref.Ref) (state planapi.VMPowerState, err error) {
-	vm, err := r.getVM(vmRef)
+	vm, err := r.getVM(vmRef, nullableHosts)
 	if err != nil {
 		return
 	}
@@ -193,7 +194,7 @@ func (r *Client) PowerState(vmRef ref.Ref) (state planapi.VMPowerState, err erro
 
 // Power on the VM.
 func (r *Client) PowerOn(vmRef ref.Ref) (err error) {
-	vm, err := r.getVM(vmRef)
+	vm, err := r.getVM(vmRef, nullableHosts)
 	if err != nil {
 		return
 	}
@@ -214,7 +215,7 @@ func (r *Client) PowerOn(vmRef ref.Ref) (err error) {
 
 // Power off the VM. Requires guest tools to be installed.
 func (r *Client) PowerOff(vmRef ref.Ref) (err error) {
-	vm, err := r.getVM(vmRef)
+	vm, err := r.getVM(vmRef, nullableHosts)
 	if err != nil {
 		return
 	}
@@ -236,7 +237,7 @@ func (r *Client) PowerOff(vmRef ref.Ref) (err error) {
 
 // Determine whether the VM has been powered off.
 func (r *Client) PoweredOff(vmRef ref.Ref) (poweredOff bool, err error) {
-	vm, err := r.getVM(vmRef)
+	vm, err := r.getVM(vmRef, nullableHosts)
 	if err != nil {
 		return
 	}
@@ -273,7 +274,7 @@ func (r *Client) PreTransferActions(vmRef ref.Ref) (ready bool, err error) {
 
 // Get a mapping of disks and change IDs for a given snapshot.
 func (r *Client) GetSnapshotDeltas(vmRef ref.Ref, snapshotId string, hosts util.HostsFunc) (changeIdMapping map[string]string, err error) {
-	vm, err := r.getVM(vmRef)
+	vm, err := r.getVM(vmRef, hosts)
 	if err != nil {
 		return
 	}
@@ -494,7 +495,7 @@ func (r *Client) getHostClient(hostDef *v1beta1.Host, host *model.Host) (client 
 }
 
 // Get the VM by ref.
-func (r *Client) getVM(vmRef ref.Ref) (vsphereVm *object.VirtualMachine, err error) {
+func (r *Client) getVM(vmRef ref.Ref, hosts util.HostsFunc) (vsphereVm *object.VirtualMachine, err error) {
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
@@ -502,16 +503,29 @@ func (r *Client) getVM(vmRef ref.Ref) (vsphereVm *object.VirtualMachine, err err
 		return
 	}
 
-	// vm.ID is the vCenter inventory MoRef, which is only valid on the vCenter
-	// endpoint. Always use the vCenter client here; ESXi host clients are used
-	// separately for task-level operations (getTaskById, findRunningSnapshotTask).
-	moref := types.ManagedObjectReference{Type: "VirtualMachine", Value: vm.ID}
-	if moref.Value == "" {
-		err = liberr.New(
-			fmt.Sprintf("VM %s has empty managed object id; source lookup failed", vmRef.String()))
+	client, err := r.getClient(vm, hosts)
+	if err != nil {
 		return
 	}
-	vsphereVm = object.NewVirtualMachine(r.client.Client, moref)
+
+	searchIndex := object.NewSearchIndex(client)
+	vsphereRef, err := searchIndex.FindByUuid(context.TODO(), nil, vm.UUID, true, ptr.To(false))
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	if vsphereRef == nil {
+		err = liberr.New(
+			fmt.Sprintf(
+				"VM %s source lookup failed",
+				vmRef.String()))
+		return
+	}
+	vsphereVm = object.NewVirtualMachine(client, vsphereRef.Reference())
+	return
+}
+
+func nullableHosts() (hosts map[string]*v1beta1.Host, err error) {
 	return
 }
 
