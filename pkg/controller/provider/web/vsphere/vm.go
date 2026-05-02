@@ -266,6 +266,7 @@ type VM struct {
 	VM1
 	PolicyVersion            int                    `json:"policyVersion"`
 	UUID                     string                 `json:"uuid"`
+	InstanceUUID             string                 `json:"instanceUuid"`
 	Firmware                 string                 `json:"firmware"`
 	ConnectionState          string                 `json:"connectionState"`
 	Snapshot                 model.Ref              `json:"snapshot"`
@@ -307,6 +308,7 @@ func (r *VM) With(m *model.VM) {
 	r.VM1.With(m)
 	r.PolicyVersion = m.PolicyVersion
 	r.UUID = m.UUID
+	r.InstanceUUID = m.InstanceUUID
 	r.Firmware = m.Firmware
 	r.ConnectionState = m.ConnectionState
 	r.Snapshot = m.Snapshot
