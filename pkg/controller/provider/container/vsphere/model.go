@@ -714,6 +714,10 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				if s, cast := p.Val.(string); cast {
 					v.model.UUID = s
 				}
+			case fInstanceUUID:
+				if s, cast := p.Val.(string); cast {
+					v.model.InstanceUUID = s
+				}
 			case fFirmware:
 				if s, cast := p.Val.(string); cast {
 					v.model.Firmware = s

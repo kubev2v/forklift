@@ -308,6 +308,7 @@ type VM struct {
 	RevisionValidated        int64            `sql:"d0,index(revisionValidated)"`
 	PolicyVersion            int              `sql:"d0,index(policyVersion)"`
 	UUID                     string           `sql:""`
+	InstanceUUID             string           `sql:""`
 	Firmware                 string           `sql:""`
 	PowerState               string           `sql:""`
 	ConnectionState          string           `sql:""`
