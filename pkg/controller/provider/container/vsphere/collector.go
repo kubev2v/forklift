@@ -117,6 +117,7 @@ const (
 	fVmfsExtent  = "info"
 	// VM
 	fUUID                     = "config.uuid"
+	fInstanceUUID             = "config.instanceUuid"
 	fFirmware                 = "config.firmware"
 	fFtInfo                   = "config.ftInfo"
 	fBootOptions              = "config.bootOptions"
@@ -834,6 +835,7 @@ func (r *Collector) vmPathSet() []string {
 		fName,
 		fParent,
 		fUUID,
+		fInstanceUUID,
 		fFirmware,
 		fFtInfo,
 		fCpuAffinity,
