@@ -21,7 +21,7 @@ ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualizati
 
 ARG OPERATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-rhel9-operator@sha256:a62516ddadae4bb4327a8805c049ea3770aa36e16ac4c7037cef8e5c16ef3c65"
 
-ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-ova-provider-server-rhel9@sha256:978267c83c344ec96e5458923fe7439403c2a73c7d556bdf5ab082ed3e8560e9"
+ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-ova-provider-server-rhel9@sha256:9be0416fe727f8d74b6e7e1cb49d620837963541f76613796066a7cbb3907ebd"
 
 ARG OVA_PROXY_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-ova-proxy-rhel9@sha256:e4544611a55cd4a11996d3038261340f6ef6e5810f7b824d262ec2293f766b46"
 
