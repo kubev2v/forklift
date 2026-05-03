@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logutil"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
 	"k8s.io/klog/v2"
@@ -63,7 +63,7 @@ func NewVantaraClonner(hostname, username, password string) (VantaraCloner, erro
 		return VantaraCloner{}, fmt.Errorf("failed to connect to Vantara storage: %w", err)
 	}
 
-	log := logutil.NewLogger("vantara")
+	log := logger.New("vantara")
 	cloner := VantaraCloner{
 		client:          client,
 		envHostGroupIds: envStorage["hostGroupIds"].([]string),
@@ -124,7 +124,7 @@ func getStorageEnvVars() (map[string]interface{}, error) {
 		"hostGroupIds": hgids,
 		"copySpeed":    copySpeed,
 	}
-	log := logutil.NewLogger("vantara")
+	log := logger.New("vantara")
 	log.V(2).Info("storage configuration loaded",
 		"storage_id", storageEnvVars["storageId"],
 		"rest_server_ip", storageEnvVars["restServerIP"],

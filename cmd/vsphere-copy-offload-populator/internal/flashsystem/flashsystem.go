@@ -13,7 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/fcutil"
-	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logutil"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
 	"k8s.io/klog/v2"
@@ -117,7 +117,7 @@ func NewFlashSystemAPIClient(managementIP, username, password string, sslSkipVer
 		httpClient:   httpClient,
 		username:     username,
 		password:     password,
-		log:          logutil.NewLogger("flashsystem"),
+		log:          logger.New("flashsystem"),
 	}
 
 	// Initial authentication
@@ -406,7 +406,7 @@ func (c *FlashSystemClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 // It checks that vdisk protection is disabled on the FlashSystem; if protection is enabled,
 // it returns an error because it must be off for Virtual Machines (see README, section IBM FlashSystem).
 func NewFlashSystemClonner(managementIP, username, password string, sslSkipVerify bool) (FlashSystemClonner, error) {
-	log := logutil.NewLogger("flashsystem")
+	log := logger.New("flashsystem")
 	client, err := NewFlashSystemAPIClient(managementIP, username, password, sslSkipVerify)
 	if err != nil {
 		return FlashSystemClonner{}, fmt.Errorf("failed to create FlashSystem API client: %w", err)
@@ -483,7 +483,7 @@ func (c *FlashSystemClonner) EnsureClonnerIgroup(hostName string, clonnerIdentif
 	if len(fcWWPNs) > 0 {
 		existingFCHosts, err := c.findAllHostsByWWPNs(fcWWPNs)
 		if err != nil {
-			c.log.Error(nil, "error searching for existing FC hosts", "err", err)
+			c.log.Error(err, "error searching for existing FC hosts")
 		} else if len(existingFCHosts) > 0 {
 			existingHostName = existingFCHosts[0]
 			c.log.V(2).Info("found existing host with FC WWPNs", "host", existingHostName, "wwpns", fcWWPNs)
@@ -494,7 +494,7 @@ func (c *FlashSystemClonner) EnsureClonnerIgroup(hostName string, clonnerIdentif
 	if existingHostName == "" && len(iscsiIQNs) > 0 {
 		existingISCSIHosts, err := c.findAllHostsByIQNs(iscsiIQNs)
 		if err != nil {
-			c.log.Error(nil, "error searching for existing iSCSI hosts", "err", err)
+			c.log.Error(err, "error searching for existing iSCSI hosts")
 		} else if len(existingISCSIHosts) > 0 {
 			existingHostName = existingISCSIHosts[0]
 			c.log.V(2).Info("found existing host with iSCSI IQNs", "host", existingHostName, "iqns", iscsiIQNs)
@@ -577,31 +577,23 @@ func (c *FlashSystemClonner) createNewHost(hostName string, identifiers []string
 	}
 
 	// Create new host with unique WWPNs and name
-	protocol := "iSCSI"
-	if isFibreChannel {
-		protocol = "FC"
-	}
-	c.log.Info("creating new host", "host", hostName, "protocol", protocol, "identifier_count", len(identifiers))
+	c.log.Info("creating new host", "host", hostName, "identifiers", identifiers)
 
 	createPayload := map[string]interface{}{
 		"name": hostName,
 	}
 
 	if isFibreChannel {
-		// Fibre Channel host
 		wwpnString := strings.Join(identifiers, ":")
 		createPayload["fcwwpn"] = wwpnString
 		createPayload["force"] = true
 		createPayload["protocol"] = "fcscsi"
 		createPayload["type"] = "generic"
-		c.log.V(2).Info("creating FC host", "host", hostName, "wwpns", wwpnString)
 	} else {
-		// iSCSI host
 		iqnString := strings.Join(identifiers, ",")
 		createPayload["iscsiname"] = iqnString
 		createPayload["protocol"] = "iscsi"
 		createPayload["type"] = "generic"
-		c.log.V(2).Info("creating iSCSI host", "host", hostName, "iqns", iqnString)
 	}
 
 	// Log the exact payload for debugging
@@ -795,7 +787,7 @@ func (c *FlashSystemClonner) cleanupEmptyHost(hostID string) {
 
 	mappingsBytes, status, err := c.api.makeRequest("POST", "/lshostvdiskmap", filterPayload)
 	if err != nil {
-		c.log.Error(nil, "failed to check host mappings before cleanup", "host_id", hostID, "err", err)
+		c.log.Error(err, "failed to check host mappings before cleanup", "host_id", hostID)
 		return
 	}
 
@@ -816,7 +808,7 @@ func (c *FlashSystemClonner) cleanupEmptyHost(hostID string) {
 
 	rmBody, rmStatus, rmErr := c.api.makeRequest("POST", "/rmhost", rmPayload)
 	if rmErr != nil {
-		c.log.Error(nil, "failed to cleanup host", "host_id", hostID, "err", rmErr)
+		c.log.Error(rmErr, "failed to cleanup host", "host_id", hostID)
 		return
 	}
 

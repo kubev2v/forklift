@@ -8,7 +8,7 @@ import (
 
 	"github.com/dell/gopowerstore"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/fcutil"
-	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logutil"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
 	"k8s.io/klog/v2"
 )
@@ -333,7 +333,7 @@ func (p *PowerstoreClonner) UnMap(initiatorGroup string, targetLUN populator.LUN
 }
 
 func NewPowerstoreClonner(hostname, username, password string, sslSkipVerify bool) (PowerstoreClonner, error) {
-	log := logutil.NewLogger("powerstore")
+	log := logger.New("powerstore")
 
 	if hostname == "" {
 		return PowerstoreClonner{}, fmt.Errorf("hostname is required")

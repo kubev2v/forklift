@@ -13,7 +13,7 @@ import (
 
 	gopowermax "github.com/dell/gopowermax/v2"
 	pmxtypes "github.com/dell/gopowermax/v2/types/v100"
-	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logutil"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
 	"k8s.io/klog/v2"
 )
@@ -295,7 +295,7 @@ func (p *PowermaxClonner) UnMap(_ string, targetLUN populator.LUN, mappingContex
 var newClientWithArgs = gopowermax.NewClientWithArgs
 
 func NewPowermaxClonner(hostname, username, password string, sslSkipVerify bool) (PowermaxClonner, error) {
-	log := logutil.NewLogger("powermax")
+	log := logger.New("powermax")
 
 	symID := os.Getenv("POWERMAX_SYMMETRIX_ID")
 	if symID == "" {

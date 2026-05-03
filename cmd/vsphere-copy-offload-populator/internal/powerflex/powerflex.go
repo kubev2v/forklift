@@ -8,7 +8,7 @@ import (
 
 	"github.com/dell/goscaleio"
 	siotypes "github.com/dell/goscaleio/types/v1"
-	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logutil"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
 	"k8s.io/klog/v2"
 )
@@ -229,7 +229,7 @@ func (p *PowerflexClonner) UnMap(initatorGroup string, targetLUN populator.LUN, 
 }
 
 func NewPowerflexClonner(hostname, username, password string, sslSkipVerify bool, systemId string) (PowerflexClonner, error) {
-	log := logutil.NewLogger("powerflex")
+	log := logger.New("powerflex")
 
 	if systemId == "" {
 		return PowerflexClonner{}, fmt.Errorf("systemId is empty. Make sure to pass systemId using the env variable %q. The value can be taken from the vxflexos-config secret under the powerflex CSI deployment", SYSTEM_ID_ENV_KEY)

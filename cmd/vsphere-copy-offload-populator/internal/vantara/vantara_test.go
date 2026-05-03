@@ -11,7 +11,7 @@ import (
 	vmware_mocks "github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware/mocks"
 
 	"go.uber.org/mock/gomock"
-	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logutil"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 )
 
 // mockVantaraClient is a mock implementation of VantaraClient for testing
@@ -102,7 +102,7 @@ func (m *mockVantaraClient) GetStorageInfo() (*StorageInfo, error) {
 func TestResolvePVToLUN(t *testing.T) {
 	cloner := VantaraCloner{
 		client: &mockVantaraClient{},
-		log:    logutil.NewLogger("vantara"),
+		log:    logger.New("vantara"),
 	}
 
 	tests := []struct {
@@ -181,7 +181,7 @@ func TestCurrentMappedGroups(t *testing.T) {
 
 	cloner := VantaraCloner{
 		client: mock,
-		log:    logutil.NewLogger("vantara"),
+		log:    logger.New("vantara"),
 	}
 
 	lun := populator.LUN{
@@ -220,7 +220,7 @@ func TestGetNaaID(t *testing.T) {
 
 	cloner := VantaraCloner{
 		client: mock,
-		log:    logutil.NewLogger("vantara"),
+		log:    logger.New("vantara"),
 	}
 
 	lun := populator.LUN{
@@ -251,7 +251,7 @@ func TestMap(t *testing.T) {
 
 	cloner := VantaraCloner{
 		client: mock,
-		log:    logutil.NewLogger("vantara"),
+		log:    logger.New("vantara"),
 	}
 
 	lun := populator.LUN{
@@ -296,7 +296,7 @@ func TestMapInvalidHostGroupId(t *testing.T) {
 
 	cloner := VantaraCloner{
 		client: mock,
-		log:    logutil.NewLogger("vantara"),
+		log:    logger.New("vantara"),
 	}
 
 	lun := populator.LUN{
@@ -328,7 +328,7 @@ func TestUnMap(t *testing.T) {
 
 	cloner := VantaraCloner{
 		client: mock,
-		log:    logutil.NewLogger("vantara"),
+		log:    logger.New("vantara"),
 	}
 
 	lun := populator.LUN{
@@ -369,7 +369,7 @@ func TestEnsureClonnerIgroupWithEnvVar(t *testing.T) {
 	cloner := VantaraCloner{
 		client:          mock,
 		envHostGroupIds: []string{"CL1-A,1", "CL2-B,2"},
-		log:             logutil.NewLogger("vantara"),
+		log:             logger.New("vantara"),
 	}
 
 	context, err := cloner.EnsureClonnerIgroup("xcopy-ig", []string{"fc.0:21000024FF123456"})
@@ -411,7 +411,7 @@ func TestEnsureClonnerIgroupFromStorage(t *testing.T) {
 	cloner := VantaraCloner{
 		client:          mock,
 		envHostGroupIds: []string{}, // Empty - force fetching from storage
-		log:             logutil.NewLogger("vantara"),
+		log:             logger.New("vantara"),
 	}
 
 	context, err := cloner.EnsureClonnerIgroup("xcopy-ig", []string{"fc.0:21000024FF123456"})
@@ -516,7 +516,7 @@ func TestGetLunIdFromPorts(t *testing.T) {
 
 func TestVvolCopy_ResolvePVToLUNError(t *testing.T) {
 	mock := &mockVantaraClient{}
-	cloner := &VantaraCloner{client: mock, log: logutil.NewLogger("vantara")}
+	cloner := &VantaraCloner{client: mock, log: logger.New("vantara")}
 
 	progress := make(chan uint64, 10)
 
@@ -571,7 +571,7 @@ func TestPerformVolumeCopy_Success_ImmediatePSUP(t *testing.T) {
 		},
 	}
 
-	v := &VantaraCloner{client: mock, log: logutil.NewLogger("vantara")}
+	v := &VantaraCloner{client: mock, log: logger.New("vantara")}
 
 	progress := make(chan uint64, 1)
 
@@ -606,7 +606,7 @@ func TestPerformVolumeCopy_CreateCloneError(t *testing.T) {
 		},
 	}
 
-	v := &VantaraCloner{client: mock, log: logutil.NewLogger("vantara")}
+	v := &VantaraCloner{client: mock, log: logger.New("vantara")}
 
 	progress := make(chan uint64, 1)
 
@@ -630,7 +630,7 @@ func TestPerformVolumeCopy_CreateCloneError(t *testing.T) {
 }
 
 func TestFindVolumeByVVolID_Success(t *testing.T) {
-	v := &VantaraCloner{log: logutil.NewLogger("vantara")}
+	v := &VantaraCloner{log: logger.New("vantara")}
 
 	// last4 = ABCD (hex) => 43981 (dec)
 	got, err := v.findVolumeByVVolID("00000000-0000-0000-0000-00000000ABCD")
@@ -643,7 +643,7 @@ func TestFindVolumeByVVolID_Success(t *testing.T) {
 }
 
 func TestFindVolumeByVVolID_TooShort(t *testing.T) {
-	v := &VantaraCloner{log: logutil.NewLogger("vantara")}
+	v := &VantaraCloner{log: logger.New("vantara")}
 
 	_, err := v.findVolumeByVVolID("ABC") // len < 4
 	if err == nil {
@@ -652,7 +652,7 @@ func TestFindVolumeByVVolID_TooShort(t *testing.T) {
 }
 
 func TestFindVolumeByVVolID_NonHexLast4(t *testing.T) {
-	v := &VantaraCloner{log: logutil.NewLogger("vantara")}
+	v := &VantaraCloner{log: logger.New("vantara")}
 
 	// last4 = "ZZZZ" is not hex
 	_, err := v.findVolumeByVVolID("0000ZZZZ")
@@ -672,7 +672,7 @@ func TestRDMCopy_Error_WhenGetBackingFails(t *testing.T) {
 
 	cloner := &VantaraCloner{
 		client: &mockVantaraClient{getLdevResp: &LdevResponse{}},
-		log:    logutil.NewLogger("vantara"),
+		log:    logger.New("vantara"),
 	}
 
 	progress := make(chan uint64, 10)
@@ -692,7 +692,7 @@ func TestRDMCopy_Error_WhenGetBackingFails(t *testing.T) {
 func TestRDMCopy_Error_WhenNotRDM(t *testing.T) {
 	v := &VantaraCloner{
 		client: &mockVantaraClient{getLdevResp: &LdevResponse{}},
-		log:    logutil.NewLogger("vantara"),
+		log:    logger.New("vantara"),
 	}
 
 	ctrl := gomock.NewController(t)
@@ -743,7 +743,7 @@ func TestRDMCopy_Success_ProgressSequence(t *testing.T) {
 		},
 	}
 
-	v := &VantaraCloner{client: fc, log: logutil.NewLogger("vantara")}
+	v := &VantaraCloner{client: fc, log: logger.New("vantara")}
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -799,7 +799,7 @@ func TestRDMCopy_Error_WhenResolveRDMToLUNMismatchNAA(t *testing.T) {
 		},
 	}
 
-	v := &VantaraCloner{client: fc, log: logutil.NewLogger("vantara")}
+	v := &VantaraCloner{client: fc, log: logger.New("vantara")}
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -847,7 +847,7 @@ func TestResolveRDMToLUN_Success(t *testing.T) {
 		},
 	}
 
-	v := &VantaraCloner{client: fc, log: logutil.NewLogger("vantara")}
+	v := &VantaraCloner{client: fc, log: logger.New("vantara")}
 
 	lun, err := v.resolveRDMToLUN(deviceName)
 	if err != nil {
@@ -864,7 +864,7 @@ func TestResolveRDMToLUN_Success(t *testing.T) {
 
 func TestResolveRDMToLUN_Error_TargetNotFound(t *testing.T) {
 	fc := &mockVantaraClient{}
-	v := &VantaraCloner{client: fc, log: logutil.NewLogger("vantara")}
+	v := &VantaraCloner{client: fc, log: logger.New("vantara")}
 
 	_, err := v.resolveRDMToLUN("naa.1234567890")
 	if err == nil {
@@ -874,7 +874,7 @@ func TestResolveRDMToLUN_Error_TargetNotFound(t *testing.T) {
 
 func TestResolveRDMToLUN_Error_StringTooShort(t *testing.T) {
 	fc := &mockVantaraClient{}
-	v := &VantaraCloner{client: fc, log: logutil.NewLogger("vantara")}
+	v := &VantaraCloner{client: fc, log: logger.New("vantara")}
 
 	// provider id is present but total length is insufficient for 32 chars slice
 	deviceName := "naa." + VantaraProviderID + "short"
@@ -890,7 +890,7 @@ func TestResolveRDMToLUN_Error_InvalidHexLast4(t *testing.T) {
 	deviceName := "naa." + naaDevice
 
 	fc := &mockVantaraClient{}
-	v := &VantaraCloner{client: fc, log: logutil.NewLogger("vantara")}
+	v := &VantaraCloner{client: fc, log: logger.New("vantara")}
 
 	_, err := v.resolveRDMToLUN(deviceName)
 	if err == nil {
@@ -909,7 +909,7 @@ func TestResolveRDMToLUN_Error_NAAMismatch(t *testing.T) {
 			NaaId: VantaraProviderID + "1111111111111111111111ab",
 		},
 	}
-	v := &VantaraCloner{client: fc, log: logutil.NewLogger("vantara")}
+	v := &VantaraCloner{client: fc, log: logger.New("vantara")}
 
 	_, err := v.resolveRDMToLUN(deviceName)
 	if err == nil {
@@ -929,7 +929,7 @@ func TestResolveRDMToLUN_CaseInsensitiveDeviceName(t *testing.T) {
 			NaaId: naaDeviceLower,
 		},
 	}
-	v := &VantaraCloner{client: fc, log: logutil.NewLogger("vantara")}
+	v := &VantaraCloner{client: fc, log: logger.New("vantara")}
 
 	lun, err := v.resolveRDMToLUN(deviceNameUpper)
 	if err != nil {

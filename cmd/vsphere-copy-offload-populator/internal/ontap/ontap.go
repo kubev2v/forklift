@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/fcutil"
-	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logutil"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
 	drivers "github.com/netapp/trident/storage_drivers"
 	"github.com/netapp/trident/storage_drivers/ontap/api"
@@ -127,7 +127,7 @@ func (c *NetappClonner) EnsureClonnerIgroup(initiatorGroup string, adapterIds []
 }
 
 func NewNetappClonner(hostname, username, password string) (NetappClonner, error) {
-	log := logutil.NewLogger("ontap")
+	log := logger.New("ontap")
 
 	// additional ontap values should be passed as env variables using prefix ONTAP_
 	svm := os.Getenv("ONTAP_SVM")

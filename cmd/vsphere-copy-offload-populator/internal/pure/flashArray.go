@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/fcutil"
-	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logutil"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
 	"k8s.io/klog/v2"
@@ -52,7 +52,7 @@ func NewFlashArrayClonner(hostname, username, password, apiToken string, skipSSL
 		return FlashArrayClonner{}, fmt.Errorf("failed to create REST client: %w", err)
 	}
 
-	log := logutil.NewLogger("pure")
+	log := logger.New("pure")
 	clonner := FlashArrayClonner{
 		restClient:    restClient,
 		clusterPrefix: clusterPrefix,

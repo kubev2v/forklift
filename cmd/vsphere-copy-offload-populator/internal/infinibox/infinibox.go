@@ -8,7 +8,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/infinidat/infinibox-csi-driver/iboxapi"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/fcutil"
-	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logutil"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
 	"k8s.io/klog/v2"
 )
@@ -165,7 +165,7 @@ func createMappingContext(host *iboxapi.Host, initiatorGroup string) populator.M
 }
 
 func NewInfiniboxClonner(hostname, username, password string, insecure bool) (InfiniboxClonner, error) {
-	log := logutil.NewLogger("infinibox")
+	log := logger.New("infinibox")
 	log.V(2).Info("creating InfiniBox client", "hostname", hostname)
 
 	// Create credentials
