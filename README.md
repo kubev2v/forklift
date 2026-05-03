@@ -114,7 +114,7 @@ make validate-commits-range RANGE="HEAD~5..HEAD"
 
 ### Detailed Commit Message Guide
 
-For comprehensive information about commit message formatting, supported issue tracking systems, and troubleshooting, see [COMMIT_MESSAGE_GUIDE.md](./COMMIT_MESSAGE_GUIDE.md).
+For comprehensive information about commit message formatting, supported issue tracking systems, and troubleshooting, see [commit-message-guide.md](.cursor/skills/git-commit/commit-message-guide.md).
 
 ### Configuration
 

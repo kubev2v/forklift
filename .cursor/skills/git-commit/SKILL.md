@@ -5,6 +5,10 @@ description: Compose CI-valid commit messages with Jira linking and sign-off. Us
 
 # Git Commit Skill
 
+**Never run `git add` or `git commit` yourself.** The user will review, adjust if needed, and execute the commit manually.
+
+For full commit message validation rules, formats, and troubleshooting, see [commit-message-guide.md](commit-message-guide.md) in this skill directory.
+
 ## Step 1: Check Branch
 
 Run `git branch --show-current`. If on `main`, **warn the user** and ask if they want to continue or switch to a new branch first.
@@ -28,7 +32,7 @@ MTV-XXXX | <imperative description, ~72 chars total>
 
 <body: what changed and why, lines wrapped at 72 chars>
 
-Ref: https://issues.redhat.com/browse/MTV-XXXX
+Ref: https://redhat.atlassian.net/browse/MTV-XXXX
 Resolves: MTV-XXXX
 ```
 
@@ -37,7 +41,7 @@ Title (~72 chars max, imperative mood):
 - **Without Jira:** `chore(type): description` (skips CI — no `Ref:`/`Resolves:` needed)
 
 Trailers (with Jira only):
-- `Ref: https://issues.redhat.com/browse/MTV-XXXX`
+- `Ref: https://redhat.atlassian.net/browse/MTV-XXXX`
 - `Resolves: MTV-XXXX` (required by CI)
 
 If co-author requested, append: `Co-authored-by: AI Assistant <noreply@cursor.com>`
@@ -53,5 +57,3 @@ git commit -s -m "$(cat <<'EOF'
 EOF
 )"
 ```
-
-**Never run `git add` or `git commit` yourself.** The user will review, adjust if needed, and execute the commit manually.
