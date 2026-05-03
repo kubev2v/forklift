@@ -10,6 +10,7 @@ import (
 	"time"
 
 	hversion "github.com/hashicorp/go-version"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/version"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
 	vmkfstoolswrapper "github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/vmkfstools-wrapper"
@@ -87,7 +88,7 @@ func NewWithRemoteEsxcliSSH(storageApi VMDKCapable, vmwareClient vmware.Client, 
 }
 
 func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) (errFinal error) {
-	log := klog.Background().WithName("copy-offload").WithName("xcopy")
+	log := logger.New("xcopy")
 	setupLog := log.WithName("setup")
 	mapLog := log.WithName("map-volume")
 	rescanLog := log.WithName("rescan")
@@ -336,7 +337,7 @@ func waitForDeviceStateOff(ctx context.Context, client vmware.Client, host *obje
 
 // After mapping a volume the ESX needs a rescan to see the device. ESXs can opt-in to do it automatically
 func rescan(ctx context.Context, client vmware.Client, host *object.HostSystem, targetLUN string) error {
-	log := klog.Background().WithName("copy-offload").WithName("xcopy").WithName("rescan")
+	log := logger.New("xcopy").WithName("rescan")
 	ctx = klog.NewContext(ctx, log)
 	for i := 1; i <= rescanRetries; i++ {
 		if ctx.Err() != nil {
@@ -480,7 +481,7 @@ To fix this issue:
 
 6. Save and exit
 7. Retry the operation`, embeddedVersion, versionInfo.Version, datastore, restrictedPublicKey)
-		setupLog := klog.Background().WithName("copy-offload").WithName("xcopy").WithName("setup")
+		setupLog := logger.New("xcopy").WithName("setup")
 		setupLog.Error(fmt.Errorf("version mismatch: uploaded %s, SSH returned %s", embeddedVersion, versionInfo.Version), "script version mismatch", "instructions", instructions)
 
 		return fmt.Errorf("version mismatch: uploaded %s but SSH returned %s - old SSH key format detected",

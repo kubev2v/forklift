@@ -7,6 +7,7 @@ import (
 
 	"k8s.io/klog/v2"
 
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
 )
@@ -22,6 +23,7 @@ type Primera3ParClonner struct {
 	client         Primera3ParClient
 	initiatorGroup string
 	arrayInfo      populator.StorageArrayInfo
+	log            klog.Logger
 }
 
 // GetStorageArrayInfo returns metadata about the Primera/3PAR array for metric labels.
@@ -30,6 +32,7 @@ func (c *Primera3ParClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 }
 
 func NewPrimera3ParClonner(storageHostname, storageUsername, storagePassword string, sslSkipVerify bool) (Primera3ParClonner, error) {
+	log := logger.New("primera3par")
 	clon := NewPrimera3ParClientWsImpl(storageHostname, storageUsername, storagePassword, sslSkipVerify)
 	clonner := Primera3ParClonner{
 		client: &clon,
@@ -37,15 +40,17 @@ func NewPrimera3ParClonner(storageHostname, storageUsername, storagePassword str
 			Vendor:  "HPE",
 			Product: "Primera/3PAR",
 		},
+		log: log,
 	}
 
 	// Fetch model and version from the API
 	sysInfo, err := clon.GetSystemInfo()
 	if err != nil {
-		klog.Warningf("Failed to get Primera/3PAR system info for metrics: %v", err)
+		log.Info("failed to get Primera/3PAR system info for metrics", "err", err)
 	} else {
 		clonner.arrayInfo.Model = sysInfo.Model
 		clonner.arrayInfo.Version = sysInfo.SystemVersion
+		log.V(2).Info("Primera/3PAR array info", "vendor", clonner.arrayInfo.Vendor, "product", clonner.arrayInfo.Product, "model", clonner.arrayInfo.Model, "version", clonner.arrayInfo.Version)
 	}
 
 	return clonner, nil
@@ -53,6 +58,8 @@ func NewPrimera3ParClonner(storageHostname, storageUsername, storagePassword str
 
 // EnsureClonnerIgroup creates or update an initiator group with the clonnerIqn
 func (c *Primera3ParClonner) EnsureClonnerIgroup(initiatorGroup string, adapterIds []string) (populator.MappingContext, error) {
+	c.log.Info("ensuring initiator group", "group", initiatorGroup, "adapters", adapterIds)
+
 	c.initiatorGroup = initiatorGroup
 	hostNames, err := c.client.EnsureHostsWithIds(adapterIds)
 	if err != nil {
@@ -65,12 +72,13 @@ func (c *Primera3ParClonner) EnsureClonnerIgroup(initiatorGroup string, adapterI
 	}
 
 	for _, hostName := range hostNames {
-		klog.Infof("adding host %s, to initiatorGroup: %s", hostName, initiatorGroup)
+		c.log.V(2).Info("adding host to host set", "host", hostName, "group", initiatorGroup)
 		err = c.client.AddHostToHostSet(initiatorGroup, hostName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to add host to host set: %w", err)
 		}
 	}
+	c.log.Info("initiator group ready", "group", initiatorGroup)
 	return nil, nil
 }
 
@@ -88,35 +96,51 @@ func (c *Primera3ParClonner) UnmapTarget(targetLUN populator.LUN, mappingContext
 
 // Map is responsible to mapping an initiator group to a LUN
 func (c *Primera3ParClonner) Map(initiatorGroup string, targetLUN populator.LUN, mappingContext populator.MappingContext) (populator.LUN, error) {
-	return c.client.EnsureLunMapped(initiatorGroup, targetLUN)
+	c.log.Info("mapping volume to group", "volume", targetLUN.Name, "group", initiatorGroup)
+	lun, err := c.client.EnsureLunMapped(initiatorGroup, targetLUN)
+	if err != nil {
+		return populator.LUN{}, err
+	}
+	c.log.Info("volume mapped successfully", "volume", lun.Name, "group", initiatorGroup)
+	return lun, nil
 }
 
 // UnMap is responsible to unmapping an initiator group from a LUN
 func (c *Primera3ParClonner) UnMap(initiatorGroup string, targetLUN populator.LUN, mappingContext populator.MappingContext) error {
-	return c.client.LunUnmap(context.TODO(), initiatorGroup, targetLUN.Name)
+	c.log.Info("unmapping volume from group", "volume", targetLUN.Name, "group", initiatorGroup)
+	err := c.client.LunUnmap(context.TODO(), initiatorGroup, targetLUN.Name)
+	if err != nil {
+		return err
+	}
+	c.log.Info("volume unmapped successfully", "volume", targetLUN.Name, "group", initiatorGroup)
+	return nil
 }
 
 // Return initiatorGroups the LUN is mapped to
 func (p *Primera3ParClonner) CurrentMappedGroups(targetLUN populator.LUN, mappingContext populator.MappingContext) ([]string, error) {
+	p.log.V(2).Info("querying current mapped groups", "volume", targetLUN.Name)
 	res, err := p.client.CurrentMappedGroups(targetLUN.Name, nil)
 	if err != nil {
 		return []string{}, fmt.Errorf("failed to get current mapped groups: %w", err)
 	}
+	p.log.V(2).Info("found mapped groups", "volume", targetLUN.Name, "groups", res)
 	return res, nil
 }
 
 func (c *Primera3ParClonner) ResolvePVToLUN(pv populator.PersistentVolume) (populator.LUN, error) {
+	c.log.Info("resolving PV to LUN", "pv", pv.Name, "volume_handle", pv.VolumeHandle)
 	lun := populator.LUN{VolumeHandle: pv.VolumeHandle}
 	lun, err := c.client.GetLunDetailsByVolumeName(pv.VolumeHandle, lun)
 	if err != nil {
 		return populator.LUN{}, err
 	}
+	c.log.Info("LUN resolved", "lun", lun.Name, "naa", lun.NAA)
 	return lun, nil
 }
 
 // VvolCopy performs a direct copy operation using vSphere API to discover source volume
 func (c *Primera3ParClonner) VvolCopy(vsphereClient vmware.Client, vmId string, sourceVMDKFile string, persistentVolume populator.PersistentVolume, progress chan<- uint64) error {
-	klog.Infof("Starting VVol copy operation for VM %s", vmId)
+	c.log.Info("VVol copy started", "vm", vmId, "source", sourceVMDKFile)
 
 	backing, err := vsphereClient.GetVMDiskBacking(context.Background(), vmId, sourceVMDKFile)
 	if err != nil {
@@ -127,19 +151,20 @@ func (c *Primera3ParClonner) VvolCopy(vsphereClient vmware.Client, vmId string, 
 		return fmt.Errorf("disk %s is not a VVol disk", sourceVMDKFile)
 	}
 
-	klog.Infof("Found VVol backing with ID %s", backing.VVolId)
+	c.log.Info("found VVol backing", "vvol_id", backing.VVolId)
 
 	sourceVolumeName, err := c.findVolumeByVVolID(backing.VVolId)
 	if err != nil {
 		return fmt.Errorf("failed to find source volume by VVol ID %s: %w", backing.VVolId, err)
 	}
 
+	c.log.Info("resolving target PV to LUN", "pv", persistentVolume.Name)
 	targetLUN, err := c.ResolvePVToLUN(persistentVolume)
 	if err != nil {
 		return fmt.Errorf("failed to resolve target volume: %w", err)
 	}
 
-	klog.Infof("Copying from source volume %s to target volume %s", sourceVolumeName, targetLUN.Name)
+	c.log.Info("copying volume", "source", sourceVolumeName, "target", targetLUN.Name)
 
 	progress <- 10
 
@@ -149,7 +174,7 @@ func (c *Primera3ParClonner) VvolCopy(vsphereClient vmware.Client, vmId string, 
 	}
 
 	progress <- 100
-	klog.Infof("VVol copy operation completed successfully")
+	c.log.Info("VVol copy completed successfully")
 	return nil
 }
 
@@ -160,12 +185,15 @@ func (c *Primera3ParClonner) findVolumeByVVolID(vvolID string) (string, error) {
 	}
 
 	searchID := strings.ReplaceAll(strings.ToLower(strings.TrimPrefix(vvolID, "rfc4122.")), "-", "")
+	c.log.V(2).Info("searching for volume by VVol ID", "vvol_id", vvolID, "search_id", searchID)
 
 	for _, v := range volumes {
 		if strings.Contains(strings.ToLower(v.Name), searchID) {
+			c.log.Info("found volume by name match", "volume", v.Name, "vvol_id", vvolID)
 			return v.Name, nil
 		}
 		if strings.ToLower(v.WWN) == searchID {
+			c.log.Info("found volume by WWN match", "volume", v.Name, "wwn", v.WWN, "vvol_id", vvolID)
 			return v.Name, nil
 		}
 	}
@@ -174,7 +202,7 @@ func (c *Primera3ParClonner) findVolumeByVVolID(vvolID string) (string, error) {
 }
 
 func (c *Primera3ParClonner) RDMCopy(vsphereClient vmware.Client, vmId string, sourceVMDKFile string, persistentVolume populator.PersistentVolume, progress chan<- uint64) error {
-	klog.Infof("3PAR RDM Copy: Starting RDM copy operation for VM %s", vmId)
+	c.log.Info("RDM copy started", "vm", vmId)
 
 	backing, err := vsphereClient.GetVMDiskBacking(context.Background(), vmId, sourceVMDKFile)
 	if err != nil {
@@ -185,19 +213,20 @@ func (c *Primera3ParClonner) RDMCopy(vsphereClient vmware.Client, vmId string, s
 		return fmt.Errorf("disk %s is not an RDM disk", sourceVMDKFile)
 	}
 
-	klog.Infof("3PAR RDM Copy: Found RDM device: %s", backing.DeviceName)
+	c.log.Info("found RDM device", "device", backing.DeviceName)
 
 	sourceLUN, err := c.resolveRDMToLUN(backing.DeviceName)
 	if err != nil {
 		return fmt.Errorf("failed to resolve RDM device to source LUN: %w", err)
 	}
 
+	c.log.Info("resolving target PV to LUN", "pv", persistentVolume.Name)
 	targetLUN, err := c.ResolvePVToLUN(persistentVolume)
 	if err != nil {
 		return fmt.Errorf("failed to resolve target volume: %w", err)
 	}
 
-	klog.Infof("3PAR RDM Copy: Copying from source LUN %s to target LUN %s", sourceLUN.Name, targetLUN.Name)
+	c.log.Info("copying volume", "source", sourceLUN.Name, "target", targetLUN.Name)
 
 	progress <- 10
 
@@ -208,16 +237,16 @@ func (c *Primera3ParClonner) RDMCopy(vsphereClient vmware.Client, vmId string, s
 
 	progress <- 100
 
-	klog.Infof("3PAR RDM Copy: Copy operation completed successfully")
+	c.log.Info("RDM copy completed successfully")
 	return nil
 }
 
 func (c *Primera3ParClonner) resolveRDMToLUN(deviceName string) (populator.LUN, error) {
-	klog.Infof("3PAR RDM Copy: Resolving RDM device %s to LUN", deviceName)
+	c.log.V(2).Info("resolving RDM device to LUN", "device", deviceName)
 
 	serial, err := extractSerialFromNAA(deviceName)
 	if err != nil {
-		klog.Warningf("Could not extract serial from NAA %s: %v, trying to find by listing volumes", deviceName, err)
+		c.log.Info("could not extract serial from NAA, trying to find by listing volumes", "device", deviceName, "err", err)
 		return c.findVolumeByDeviceName(deviceName)
 	}
 
@@ -226,13 +255,16 @@ func (c *Primera3ParClonner) resolveRDMToLUN(deviceName string) (populator.LUN, 
 		return populator.LUN{}, fmt.Errorf("failed to get volumes: %w", err)
 	}
 
+	c.log.V(2).Info("searching for volume by serial", "serial", serial)
 	for _, v := range volumes {
 		if strings.ToLower(v.WWN) == strings.ToLower(serial) {
-			return populator.LUN{
+			lun := populator.LUN{
 				Name:         v.Name,
 				SerialNumber: v.WWN,
 				NAA:          fmt.Sprintf("naa.%s%s", PROVIDER_ID, strings.ToLower(v.WWN)),
-			}, nil
+			}
+			c.log.Info("resolved source LUN", "lun", lun.Name, "serial", lun.SerialNumber, "naa", lun.NAA)
+			return lun, nil
 		}
 	}
 
@@ -263,6 +295,7 @@ func (c *Primera3ParClonner) findVolumeByDeviceName(deviceName string) (populato
 	}
 
 	deviceName = strings.ToLower(deviceName)
+	c.log.V(2).Info("searching for volume by device name", "device", deviceName)
 
 	for _, volume := range volumes {
 		naa := fmt.Sprintf("naa.%s%s", PROVIDER_ID, strings.ToLower(volume.WWN))
@@ -270,7 +303,7 @@ func (c *Primera3ParClonner) findVolumeByDeviceName(deviceName string) (populato
 		if strings.Contains(deviceName, strings.ToLower(volume.WWN)) ||
 			strings.Contains(deviceName, naa) ||
 			deviceName == naa {
-			klog.Infof("3PAR RDM Copy: Found matching volume %s for device %s", volume.Name, deviceName)
+			c.log.Info("found matching volume", "volume", volume.Name, "device", deviceName)
 			return populator.LUN{
 				Name:         volume.Name,
 				SerialNumber: volume.WWN,
