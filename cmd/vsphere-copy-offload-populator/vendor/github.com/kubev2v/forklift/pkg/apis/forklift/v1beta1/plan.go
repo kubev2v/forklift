@@ -55,6 +55,14 @@ type PlanSpec struct {
 	Description string `json:"description,omitempty"`
 	// Target namespace.
 	TargetNamespace string `json:"targetNamespace"`
+	// ServiceAccount is the name of the ServiceAccount to use for migration
+	// pods in the target namespace. Overrides the global setting.
+	// If empty, falls back to ForkliftController's controller_migration_service_account,
+	// then to the namespace default.
+	// +optional
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	ServiceAccount string `json:"serviceAccount,omitempty"`
 	// TargetLabels are labels that should be applied to the target virtual machines.
 	// Note: System-managed labels (migration, plan, vmID, app) will override any user-defined
 	// labels with the same keys to ensure proper system functionality.
@@ -193,7 +201,7 @@ type PlanSpec struct {
 	// OpenShift:
 	//   - Supported when a custom pvcNameTemplate is set (plan-level or VM-level).
 	//   - When no custom template is set, the default "{{.SourcePVCName}}" always uses exact names
-	//     regardless of this field (backward compatible).
+	//     regardless of this field.
 	//   - true: Template output is used as generateName prefix, Kubernetes adds a random suffix
 	//   - false: Template output is used as the exact PVC name
 	//
@@ -240,6 +248,14 @@ type PlanSpec struct {
 	// Determines if the plan should migrate shared disks.
 	// +kubebuilder:default:=true
 	MigrateSharedDisks bool `json:"migrateSharedDisks,omitempty"`
+	// RDMAsLun controls whether RDM (Raw Device Mapping) disks from VMware should be
+	// mapped as LUN devices in the target KubeVirt VM instead of regular disk devices.
+	// When true, RDM disks are attached using lun: {} which allows the guest to execute
+	// arbitrary SCSI command passthrough (SGIO).
+	// This is useful when the source VM uses RDM disks for applications that require
+	// direct SCSI access, such as shared storage clusters or database applications.
+	// +optional
+	RDMAsLun bool `json:"rdmAsLun,omitempty"`
 	// DeleteGuestConversionPod determines if the guest conversion pod should be deleted after successful migration.
 	// Note:
 	//   - If this option is enabled and migration succeeds then the pod will get deleted. However the VM could still not boot and the virt-v2v logs, with additional information, will be deleted alongside guest conversion pod.
@@ -255,6 +271,7 @@ type PlanSpec struct {
 	// Note: If the Plan-level option is set to true, the VM-level option will be ignored.
 	//
 	// +optional
+	// +kubebuilder:default:=true
 	DeleteVmOnFailMigration bool `json:"deleteVmOnFailMigration,omitempty"`
 	// InstallLegacyDrivers determines whether to install legacy windows drivers in the VM.
 	//The following Vm's are lack of SHA-2 support and need legacy drivers:
@@ -273,6 +290,24 @@ type PlanSpec struct {
 	// When enabled, legacy drivers are exposed to the virt-v2v conversion process via the VIRTIO_WIN environment variable,
 	// which points to the legacy ISO at /usr/local/virtio-win-legacy.iso.
 	InstallLegacyDrivers *bool `json:"installLegacyDrivers,omitempty"`
+	// EnableNestedVirtualization controls whether nested virtualization CPU features (vmx for Intel,
+	// svm for AMD) are requested on the target VM.
+	//
+	// - nil (default): Auto-detect from the source VM settings. If the source had nested
+	//   virtualization enabled, the target will request it; otherwise no CPU feature is added.
+	// - true: Request nested virtualization on the target VM (overrides source settings).
+	//   Both vmx and svm CPU features are added with policy "optional", meaning the VM will
+	//   have nested virtualization only if the underlying host hardware supports it.
+	//   This does NOT guarantee nested virtualization; it is a best-effort hint to the hypervisor.
+	// - false: Explicitly disable nested virtualization on the target VM (overrides source settings).
+	//   Both vmx and svm CPU features are added with policy "disable", unconditionally preventing
+	//   nested virtualization regardless of host capability.
+	//
+	// Both vmx and svm are added together so the VM is portable across Intel and AMD hosts.
+	// The "optional" policy activates only the feature the host CPU supports; the other is ignored.
+	//
+	// +optional
+	EnableNestedVirtualization *bool `json:"enableNestedVirtualization,omitempty"`
 	// Determines if the plan should skip the guest conversion.
 	// +kubebuilder:default:=false
 	SkipGuestConversion bool `json:"skipGuestConversion,omitempty"`
@@ -313,6 +348,13 @@ type PlanSpec struct {
 	// of the cluster-wide VIRT_V2V_IMAGE setting.
 	// Use this to run different virt-v2v builds for specific migration scenarios
 	VirtV2vImage string `json:"virtV2vImage,omitempty"`
+	// XfsCompatibility overrides the global virt-v2v container image for this plan.
+	// When set, virt-v2v pods created by this plan will use the XFS compatible image
+	// VIRT_V2V_IMAGE_XFS instead of the cluster-wide VIRT_V2V_IMAGE setting.
+	// Use this to enable XFSv4 compatibility mode for specific plan.
+	// Warning: Enabling XFSv4 support will drop support for BTRFS for the specific plan. Ensure that the plan only selects VMs with supported filesystem.
+	// +kubebuilder:default:=false
+	XfsCompatibility bool `json:"xfsCompatibility,omitempty"`
 }
 
 // Find a planned VM.
@@ -475,6 +517,9 @@ func (r *Plan) ShouldRunPreflightInspection() bool {
 
 // IsUsingOffloadPlugin determines if any of the mappings is using storage offload
 func (r *Plan) IsUsingOffloadPlugin() bool {
+	if r.Map.Storage == nil {
+		return false
+	}
 	dsMapIn := r.Map.Storage.Spec.Map
 	for _, m := range dsMapIn {
 		if m.OffloadPlugin != nil && m.OffloadPlugin.VSphereXcopyPluginConfig != nil {

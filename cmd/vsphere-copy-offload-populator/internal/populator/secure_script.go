@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
+	"github.com/kubev2v/forklift/pkg/lib/client/vsphere/vmware"
 	vmkfstoolswrapper "github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/vmkfstools-wrapper"
 	"github.com/vmware/govmomi/object"
 	"k8s.io/klog/v2"

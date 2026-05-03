@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
@@ -16,8 +17,10 @@ const (
 	HookRetry                        = "HOOK_RETRY"
 	ImporterRetry                    = "IMPORTER_RETRY"
 	VirtV2vImage                     = "VIRT_V2V_IMAGE"
+	VirtV2vImageXFS                  = "VIRT_V2V_IMAGE_XFS"
 	vddkImage                        = "VDDK_IMAGE"
 	PrecopyInterval                  = "PRECOPY_INTERVAL"
+	BlockerGracePeriodMinutes        = "BLOCKER_GRACE_PERIOD_MINUTES"
 	VirtV2vDontRequestKVM            = "VIRT_V2V_DONT_REQUEST_KVM"
 	SnapshotRemovalTimeout           = "SNAPSHOT_REMOVAL_TIMEOUT"
 	SnapshotStatusCheckRate          = "SNAPSHOT_STATUS_CHECK_RATE"
@@ -60,6 +63,10 @@ const (
 	MaxParentBackingRetries          = "MAX_PARENT_BACKING_RETRIES"
 	HostLeaseNamespace               = "HOST_LEASE_NAMESPACE"
 	HostLeaseDurationSeconds         = "HOST_LEASE_DURATION_SECONDS"
+	MigrationServiceAccount          = "MIGRATION_SERVICE_ACCOUNT"
+	AAPURL                           = "AAP_URL"
+	AAPTokenSecretName               = "AAP_TOKEN_SECRET_NAME"
+	AAPTimeout                       = "AAP_TIMEOUT"
 )
 
 // Default values for populator container resources
@@ -80,12 +87,16 @@ type Migration struct {
 	ImporterRetry int
 	// Warm migration precopy interval in minutes
 	PrecopyInterval int
+	// How long Critical/Error blocker conditions must persist before failing an active migration
+	BlockerGracePeriodMinutes int
 	// Snapshot removal timeout in minutes
 	SnapshotRemovalTimeout int
 	// Snapshot status check rate in seconds
 	SnapshotStatusCheckRate int
 	// Virt-v2v image for guest conversion
 	VirtV2vImage string
+	// Virt-v2v image for guest conversion with XFSv4 support
+	VirtV2vImageXFS string
 	// Virt-v2v require KVM flags for guest conversion
 	VirtV2vDontRequestKVM bool
 	// OCP Export token TTL minutes
@@ -144,6 +155,14 @@ type Migration struct {
 	HostLeaseNamespace string
 	// HostLeaseDurationSeconds is the host lease duration in seconds used in copy offload
 	HostLeaseDurationSeconds string
+	// ServiceAccount is the cluster-wide default ServiceAccount for migration pods
+	ServiceAccount string
+	// AAPURL is the Ansible Automation Platform base URL (ForkliftController aap_url).
+	AAPURL string
+	// AAPTokenSecretName is the name of the Secret in the controller namespace holding the AAP API token (key "token").
+	AAPTokenSecretName string
+	// AAPTimeoutSeconds is the default wall-clock timeout in seconds for AAP job polling when not set on the Hook.
+	AAPTimeoutSeconds int
 }
 
 // Load settings.
@@ -158,6 +177,9 @@ func (r *Migration) Load() (err error) {
 		return liberr.Wrap(err)
 	}
 	if r.PrecopyInterval, err = getPositiveEnvLimit(PrecopyInterval, 60); err != nil {
+		return liberr.Wrap(err)
+	}
+	if r.BlockerGracePeriodMinutes, err = getPositiveEnvLimit(BlockerGracePeriodMinutes, 5); err != nil {
 		return liberr.Wrap(err)
 	}
 	if r.SnapshotRemovalTimeout, err = getPositiveEnvLimit(SnapshotRemovalTimeout, 120); err != nil {
@@ -181,6 +203,14 @@ func (r *Migration) Load() (err error) {
 		r.VirtV2vImage = virtV2vImage
 	} else if Settings.Role.Has(MainRole) {
 		return liberr.Wrap(fmt.Errorf("failed to find environment variable %s", VirtV2vImage))
+	}
+	if virtV2vImageXFS, ok := os.LookupEnv(VirtV2vImageXFS); ok {
+		r.VirtV2vImageXFS = virtV2vImageXFS
+	} else if Settings.Role.Has(MainRole) {
+		return liberr.Wrap(fmt.Errorf("failed to find environment variable %s", VirtV2vImageXFS))
+	}
+	if r.VirtV2vImageXFS == "" && Settings.Role.Has(MainRole) {
+		return liberr.Wrap(fmt.Errorf("environment variable %s was empty", VirtV2vImageXFS))
 	}
 	r.VirtV2vDontRequestKVM = getEnvBool(VirtV2vDontRequestKVM, false)
 
@@ -348,5 +378,27 @@ func (r *Migration) Load() (err error) {
 	// Host lease settings for copy offload
 	r.HostLeaseNamespace = Lookup(HostLeaseNamespace, "openshift-mtv")
 	r.HostLeaseDurationSeconds = Lookup(HostLeaseDurationSeconds, "10")
+	if val, found := os.LookupEnv(MigrationServiceAccount); found {
+		r.ServiceAccount = val
+	}
+	if val, found := os.LookupEnv(AAPURL); found {
+		r.AAPURL = strings.TrimSpace(val)
+	}
+	if val, found := os.LookupEnv(AAPTokenSecretName); found {
+		r.AAPTokenSecretName = strings.TrimSpace(val)
+	}
+	if val, found := os.LookupEnv(AAPTimeout); found {
+		val = strings.TrimSpace(val)
+		if val != "" {
+			n, perr := strconv.Atoi(val)
+			if perr != nil {
+				return fmt.Errorf("invalid %s %q: %w", AAPTimeout, val, perr)
+			}
+			if n < 0 {
+				return fmt.Errorf("%s must be non-negative, got %q", AAPTimeout, val)
+			}
+			r.AAPTimeoutSeconds = n
+		}
+	}
 	return
 }

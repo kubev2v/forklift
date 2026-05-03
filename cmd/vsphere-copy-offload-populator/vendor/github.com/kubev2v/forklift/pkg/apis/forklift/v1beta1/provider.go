@@ -163,7 +163,7 @@ func (p *Provider) Type() ProviderType {
 }
 
 func (p *Provider) SupportsPreserveStaticIps() bool {
-	return p.Type() == VSphere
+	return p.Type() == VSphere || p.Type() == HyperV
 }
 
 // This provider is the `host` cluster.
