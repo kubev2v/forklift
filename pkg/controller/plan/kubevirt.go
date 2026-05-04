@@ -2280,6 +2280,13 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 				Value: "true",
 			})
 	}
+	if settings.Settings.Features.WindowsRegistryNetworkConfig {
+		environment = append(environment,
+			core.EnvVar{
+				Name:  "V2V_windowsRegistryNetworkConfig",
+				Value: "true",
+			})
+	}
 
 	environment = append(environment,
 		core.EnvVar{

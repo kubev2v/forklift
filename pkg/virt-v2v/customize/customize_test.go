@@ -940,4 +940,52 @@ var _ = Describe("Customize", func() {
 		})
 	})
 
+	Describe("addWinFirstbootScripts path selection", func() {
+		It("no static IPs - only init script uploaded", func() {
+			appConfig.StaticIPs = ""
+			mockCommandBuilder.EXPECT().AddArgs("--upload", "", gomock.Any(), "", "").Return(mockCommandBuilder)
+			err := customize.addWinFirstbootScripts(mockCommandBuilder)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("static IPs but neither legacy nor registry - no static IP uploads", func() {
+			appConfig.StaticIPs = "00:11:22:33:44:55:ip:10.0.0.1,10.0.0.254,24,8.8.8.8,"
+			appConfig.VirtIoWinLegacyDrivers = ""
+			appConfig.WindowsRegistryNetworkConfig = false
+			mockCommandBuilder.EXPECT().AddArgs("--upload", "", gomock.Any(), "", "").Return(mockCommandBuilder)
+			err := customize.addWinFirstbootScripts(mockCommandBuilder)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("legacy init path is selected when VirtIoWinLegacyDrivers is set", func() {
+			appConfig.VirtIoWinLegacyDrivers = "/mnt/virtio.iso"
+			appConfig.StaticIPs = ""
+			var capturedInit string
+			mockCommandBuilder.EXPECT().AddArgs("--upload", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				Do(func(flag string, values ...string) {
+					capturedInit = values[1]
+				}).Return(mockCommandBuilder)
+			err := customize.addWinFirstbootScripts(mockCommandBuilder)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(capturedInit).To(ContainSubstring("9999-run-mtv-ps-scripts-legacy.bat"))
+		})
+
+		It("static IP with legacy returns error on missing template", func() {
+			appConfig.VirtIoWinLegacyDrivers = "/mnt/virtio.iso"
+			appConfig.StaticIPs = "00:11:22:33:44:55:ip:10.0.0.1,10.0.0.254,24,8.8.8.8,"
+			err := customize.addWinFirstbootScripts(mockCommandBuilder)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("inject static IP template"))
+			Expect(err.Error()).To(ContainSubstring("9999-network-config.ps1.tmpl"))
+		})
+
+		It("static IP with registry returns error referencing registry template", func() {
+			appConfig.WindowsRegistryNetworkConfig = true
+			appConfig.StaticIPs = "00:11:22:33:44:55:ip:10.0.0.1,10.0.0.254,24,8.8.8.8,"
+			err := customize.addWinFirstbootScripts(mockCommandBuilder)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("9999-network-config-registry.ps1.tmpl"))
+		})
+	})
+
 })

@@ -83,6 +83,10 @@ spec:
                 type: string
                 enum: ["true", "false"]
                 description: "Run VMware driver removal scripts during Windows vSphere conversion (default: false)"
+              feature_windows_registry_network_config:
+                type: string
+                enum: ["true", "false"]
+                description: "Use registry-based network configuration scripts for Windows static IP setup (default: false)"
 
               # Container Images
               controller_image_fqin:

@@ -182,6 +182,10 @@ spec:
         - name: FEATURE_VSPHERE_VMWARE_DRIVER_REMOVAL
           value: "true"
 {% endif %}
+{% if feature_windows_registry_network_config|bool %}
+        - name: FEATURE_WINDOWS_REGISTRY_NETWORK_CONFIG
+          value: "true"
+{% endif %}
 {% if ovirt_osmap_configmap_name is defined %}
         - name: OVIRT_OS_MAP
           value: {{ ovirt_osmap_configmap_name }}
