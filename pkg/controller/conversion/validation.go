@@ -7,11 +7,12 @@ import (
 
 // Types
 const (
-	TypeNotValid     = "TypeNotValid"
-	VMNotSet         = "VMNotSet"
-	DisksNotSet      = "DisksNotSet"
-	ConnectionNotSet = "ConnectionNotSet"
-	VDDKImageNotSet  = "VDDKImageNotSet"
+	TypeNotValid        = "TypeNotValid"
+	VMNotSet            = "VMNotSet"
+	DisksNotSet         = "DisksNotSet"
+	ConnectionNotSet    = "ConnectionNotSet"
+	VDDKImageNotSet     = "VDDKImageNotSet"
+	LUKSSecretNotSet    = "LUKSSecretNotSet"
 )
 
 // Categories
@@ -53,6 +54,10 @@ func (r *Reconciler) validate(conversion *api.Conversion) (err error) {
 		return
 	}
 	err = r.validateVDDKImage(conversion)
+	if err != nil {
+		return
+	}
+	err = r.validateDiskEncryption(conversion)
 	if err != nil {
 		return
 	}
@@ -115,6 +120,23 @@ func (r *Reconciler) validateDisks(conversion *api.Conversion) (err error) {
 				Message:  "The `Disks` field is required for this conversion type.",
 			})
 		}
+	}
+	return
+}
+
+func (r *Reconciler) validateDiskEncryption(conversion *api.Conversion) (err error) {
+	de := conversion.Spec.DiskEncryption
+	if de == nil {
+		return
+	}
+	if de.Type == api.DiskEncryptionTypeLUKS && de.Secret.Name == "" {
+		conversion.Status.SetCondition(libcnd.Condition{
+			Type:     LUKSSecretNotSet,
+			Status:   True,
+			Reason:   NotSet,
+			Category: Critical,
+			Message:  "The `diskEncryption.secret` is required when `diskEncryption.type` is LUKS.",
+		})
 	}
 	return
 }
