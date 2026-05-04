@@ -652,6 +652,9 @@ func (r *Reconciler) loadConnectionSecret(ctx context.Context, conversion *api.C
 	if conversion.Spec.Connection.Secret.Name == "" {
 		return nil, liberr.New("Connection.Secret not set on Conversion CR")
 	}
+	if conversion.Spec.Connection.Secret.Namespace == "" {
+		return nil, liberr.New("Connection.Secret.Namespace not set on Conversion CR")
+	}
 	secret := &core.Secret{}
 	err := r.Get(ctx, types.NamespacedName{
 		Namespace: conversion.Spec.Connection.Secret.Namespace,
