@@ -112,7 +112,7 @@ func (e *Ensurer) ensureDeepInspectionPodFromSpec(conversion *api.Conversion, cf
 
 	secret := &core.Secret{}
 	if conversion.Spec.Connection.Secret.Name != "" {
-		err = e.Client.Get(context.TODO(), types.NamespacedName{
+		err = e.DestinationClient.Get(context.TODO(), types.NamespacedName{
 			Namespace: conversion.Spec.Connection.Secret.Namespace,
 			Name:      conversion.Spec.Connection.Secret.Name,
 		}, secret)
@@ -178,7 +178,7 @@ func (e *Ensurer) ensureVirtV2vPodFromSpec(conversion *api.Conversion, cfg convc
 
 	secret := &core.Secret{}
 	if conversion.Spec.Connection.Secret.Name != "" {
-		err = e.Client.Get(context.TODO(), types.NamespacedName{
+		err = e.DestinationClient.Get(context.TODO(), types.NamespacedName{
 			Namespace: conversion.Spec.Connection.Secret.Namespace,
 			Name:      conversion.Spec.Connection.Secret.Name,
 		}, secret)
