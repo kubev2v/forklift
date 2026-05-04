@@ -58,6 +58,10 @@ func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, vo
 	nonRoot := true
 	allowPrivilegeEscalation := false
 
+	if v2vSecret == nil || v2vSecret.Name == "" {
+		err = fmt.Errorf("v2vSecret must be a non-nil secret with a non-empty name")
+		return
+	}
 	volumes = append(volumes, core.Volume{
 		Name: "secret-volume",
 		VolumeSource: core.VolumeSource{
