@@ -435,51 +435,51 @@ var _ = Describe("Conversion", func() {
 			err := conversion.RunVirtV2VInspection()
 			Expect(err).ToNot(HaveOccurred())
 		},
-	)
-	It("passes virt-v2v-inspection",
-		func() {
-			appConfig.LibvirtDomainFile = config.V2vInPlaceLibvirtDomain
+		)
+		It("passes virt-v2v-inspection",
+			func() {
+				appConfig.LibvirtDomainFile = config.V2vInPlaceLibvirtDomain
 
-			mockCommandBuilder.EXPECT().New("virt-v2v-in-place").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--mac", "00:11:22:33:44:55:ip:192.168.1.100").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddPositional(config.V2vInPlaceLibvirtDomain).Return(mockCommandBuilder)
+				mockCommandBuilder.EXPECT().New("virt-v2v-in-place").Return(mockCommandBuilder)
+				mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
+				mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
+				mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
+				mockCommandBuilder.EXPECT().AddArg("--mac", "00:11:22:33:44:55:ip:192.168.1.100").Return(mockCommandBuilder)
+				mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
+				mockCommandBuilder.EXPECT().AddPositional(config.V2vInPlaceLibvirtDomain).Return(mockCommandBuilder)
 
-			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
+				mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
 
-			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
-			mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
-			mockCommandExecutor.EXPECT().Run()
+				mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
+				mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
+				mockCommandExecutor.EXPECT().Run()
 
-			err := conversion.RunVirtV2vInPlace()
-			Expect(err).ToNot(HaveOccurred())
-		},
-	)
-	It("adds common args with root disk and static IPs",
-		func() {
-			appConfig := config.AppConfig{
-				RootDisk:  "/dev/sda",
-				StaticIPs: "00:11:22:33:44:55:ip:192.168.1.100_00:11:22:33:44:56:ip:192.168.1.101",
-			}
-			conversion.AppConfig = &appConfig
+				err := conversion.RunVirtV2vInPlace()
+				Expect(err).ToNot(HaveOccurred())
+			},
+		)
+		It("adds common args with root disk and static IPs",
+			func() {
+				appConfig := config.AppConfig{
+					RootDisk:  "/dev/sda",
+					StaticIPs: "00:11:22:33:44:55:ip:192.168.1.100_00:11:22:33:44:56:ip:192.168.1.101",
+				}
+				conversion.AppConfig = &appConfig
 
-			luksFiles := utils.ConvertMockDirEntryToOs([]utils.MockDirEntry{
-				{FileName: "key1", FileIsDir: false},
-				{FileName: "key2", FileIsDir: false},
+				luksFiles := utils.ConvertMockDirEntryToOs([]utils.MockDirEntry{
+					{FileName: "key1", FileIsDir: false},
+					{FileName: "key2", FileIsDir: false},
+				})
+
+				mockFileSystem.EXPECT().Stat(luksDir).Return(nil, nil)
+				mockFileSystem.EXPECT().ReadDir(luksDir).Return(luksFiles, nil)
+
+				mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
+				mockCommandBuilder.EXPECT().AddArgs("--key", "all:file:/etc/luks/key1", "all:file:/etc/luks/key2").Return(mockCommandBuilder)
+
+				err := conversion.addCommonArgs(mockCommandBuilder)
+				Expect(err).ToNot(HaveOccurred())
 			})
-
-			mockFileSystem.EXPECT().Stat(luksDir).Return(nil, nil)
-			mockFileSystem.EXPECT().ReadDir(luksDir).Return(luksFiles, nil)
-
-			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArgs("--key", "all:file:/etc/luks/key1", "all:file:/etc/luks/key2").Return(mockCommandBuilder)
-
-			err := conversion.addCommonArgs(mockCommandBuilder)
-			Expect(err).ToNot(HaveOccurred())
-		})
 
 		It("returns error when LUKS directory read fails", func() {
 			luksDir := "/etc/luks"
@@ -945,37 +945,37 @@ var _ = Describe("Conversion", func() {
 			err := conversion.addCommonArgs(mockCommandBuilder)
 			Expect(err).ToNot(HaveOccurred())
 		},
-	)
-	It("adds common args with root disk and static IPs",
-		func() {
-			appConfig := config.AppConfig{
-				RootDisk:  "/dev/sda",
-				StaticIPs: "00:11:22:33:44:55:ip:192.168.1.100",
-			}
-			conversion.AppConfig = &appConfig
-			mockCommandBuilder.EXPECT().AddArg("--root", "/dev/sda").Return(mockCommandBuilder)
-			mockCommandBuilder.EXPECT().AddArg("--mac", "00:11:22:33:44:55:ip:192.168.1.100").Return(mockCommandBuilder)
+		)
+		It("adds common args with root disk and static IPs",
+			func() {
+				appConfig := config.AppConfig{
+					RootDisk:  "/dev/sda",
+					StaticIPs: "00:11:22:33:44:55:ip:192.168.1.100",
+				}
+				conversion.AppConfig = &appConfig
+				mockCommandBuilder.EXPECT().AddArg("--root", "/dev/sda").Return(mockCommandBuilder)
+				mockCommandBuilder.EXPECT().AddArg("--mac", "00:11:22:33:44:55:ip:192.168.1.100").Return(mockCommandBuilder)
 
-			err := conversion.addCommonArgs(mockCommandBuilder)
-			Expect(err).ToNot(HaveOccurred())
-		},
-	)
-	It("adds common args with root disk as default",
-		func() {
-			appConfig := config.AppConfig{}
-			conversion = &Conversion{
-				AppConfig:      &appConfig,
-				CommandBuilder: mockCommandBuilder,
-			}
-			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
+				err := conversion.addCommonArgs(mockCommandBuilder)
+				Expect(err).ToNot(HaveOccurred())
+			},
+		)
+		It("adds common args with root disk as default",
+			func() {
+				appConfig := config.AppConfig{}
+				conversion = &Conversion{
+					AppConfig:      &appConfig,
+					CommandBuilder: mockCommandBuilder,
+				}
+				mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 
-			mockFileSystem.EXPECT().Stat(luksDir).Return(nil, nil)
-			mockFileSystem.EXPECT().ReadDir(luksDir).Return(nil, errors.New("permission denied"))
+				mockFileSystem.EXPECT().Stat(luksDir).Return(nil, nil)
+				mockFileSystem.EXPECT().ReadDir(luksDir).Return(nil, errors.New("permission denied"))
 
-			err := conversion.addVirtV2vVsphereArgsForInspection(mockCommandBuilder)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("error adding LUKS keys"))
-		})
+				err := conversion.addVirtV2vVsphereArgsForInspection(mockCommandBuilder)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("error adding LUKS keys"))
+			})
 
 		It("adds vSphere args with clevis for NBDE", func() {
 			appConfig.LibvirtUrl = "vpx://user@vcenter.example.com/Datacenter/Cluster/esxi-host?no_verify=1"

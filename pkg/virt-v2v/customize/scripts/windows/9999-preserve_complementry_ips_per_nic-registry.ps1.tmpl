@@ -1,0 +1,120 @@
+# Adds complementary (additional) IPs to NICs via registry.
+# Registry writes don't depend on RPC or DHCP Client service.
+
+$adapterWaitMinutes = 5
+
+function Convert-PrefixToMask($prefix) {
+    $bin = ("1" * [int]$prefix).PadRight(32, "0")
+    $mask = ""
+    for ($i = 0; $i -lt 32; $i += 8) {
+        $chunk = $bin.Substring($i, 8)
+        $num = [Convert]::ToInt32($chunk, 2)
+        if ($mask -ne "") { $mask = $mask + "." }
+        $mask = $mask + $num
+    }
+    return $mask
+}
+
+# Wait for the netkvm (virtio-net) driver to become active.
+$startdate = Get-Date
+$adapters = @()
+While (-Not $adapters -and $startdate.AddMinutes($adapterWaitMinutes) -gt (Get-Date)) {
+    Start-Sleep -Seconds 5
+    $adapters = Get-NetAdapter -Physical | Where DriverFileName -eq "netkvm.sys"
+    Write-Host "[INFO] Waiting for netkvm.sys adapters..."
+}
+
+# Define MACs and IPs for each adapter
+$networkConfigs = @(
+{{- range $i, $cfg := . }}
+    @{
+        MAC = '{{ lower $cfg.MAC }}'
+        IPs = @{{ formatIPs $cfg.IPs }}
+        PrefixLength = {{ (index $cfg.IPs 0).PrefixLength }}
+        DNS = @{{ formatDNS $cfg }}
+    }{{ if ne (add $i 1) (len $) }},{{ end }}
+{{- end }}
+)
+
+Write-Host "=============================================="
+Write-Host "[INFO] MTV Complementary IPs Configuration (Registry)"
+Write-Host "=============================================="
+
+foreach ($config in $networkConfigs) {
+    $mac = $config.MAC
+    Write-Host ""
+    Write-Host "[INFO] Processing adapter with MAC: $mac"
+
+    $adapter = Get-NetAdapter -Physical | Where-Object {
+        $_.MacAddress -and ($_.MacAddress.ToLower().Replace(":", "-") -eq $mac.Replace(":", "-"))
+    }
+
+    if (-not $adapter) {
+        Write-Warning "[FAIL] Adapter with MAC $mac not found"
+        continue
+    }
+
+    $guid = $adapter.InterfaceGuid
+    $name = $adapter.Name
+    Write-Host "[INFO] Configuring adapter '$name' (GUID=$guid)"
+
+    $regPath = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces\$guid"
+    if (-not (Test-Path $regPath)) {
+        Write-Warning "[FAIL] Registry path not found: $regPath"
+        continue
+    }
+
+    # Read existing IPs from registry
+    $existingIPs = @()
+    $existingMasks = @()
+    $regIPAddress = (Get-ItemProperty -Path $regPath -Name "IPAddress" -ErrorAction SilentlyContinue).IPAddress
+    $regSubnetMask = (Get-ItemProperty -Path $regPath -Name "SubnetMask" -ErrorAction SilentlyContinue).SubnetMask
+
+    if ($regIPAddress) {
+        $existingIPs = @($regIPAddress | Where-Object { $_ -ne "" })
+    }
+    if ($regSubnetMask) {
+        $existingMasks = @($regSubnetMask | Where-Object { $_ -ne "" })
+    }
+
+    Write-Host "[INFO] Existing IPs: $($existingIPs -join ', ')"
+
+    $mask = Convert-PrefixToMask $config.PrefixLength
+    $allIPs = [System.Collections.ArrayList]@($existingIPs)
+    $allMasks = [System.Collections.ArrayList]@($existingMasks)
+
+    foreach ($ip in $config.IPs) {
+        if ($allIPs -contains $ip) {
+            Write-Host "[INFO] IP $ip already present, skipping"
+            continue
+        }
+        Write-Host "[INFO] Adding complementary IP: $ip"
+        $allIPs.Add($ip) | Out-Null
+        $allMasks.Add($mask) | Out-Null
+    }
+
+    if ($allIPs.Count -eq $existingIPs.Count) {
+        Write-Host "[INFO] No new IPs to add for adapter '$name'"
+        continue
+    }
+
+    # Write updated IPs to registry
+    Write-Host "[INFO] Writing to registry: IPs=($($allIPs -join ', ')) Masks=($($allMasks -join ', '))"
+    Set-ItemProperty -Path $regPath -Name "IPAddress" -Value ([string[]]$allIPs) -Type MultiString
+    Set-ItemProperty -Path $regPath -Name "SubnetMask" -Value ([string[]]$allMasks) -Type MultiString
+    Set-ItemProperty -Path $regPath -Name "EnableDHCP" -Value 0 -Type DWord
+
+    # Set DNS
+    if ($config.DNS.Count -gt 0) {
+        $dnsString = $config.DNS -join ","
+        Write-Host "[INFO] Setting DNS: $dnsString"
+        Set-ItemProperty -Path $regPath -Name "NameServer" -Value $dnsString -Type String
+    }
+
+    Write-Host "[OK] Complementary IPs written to registry for '$name'"
+}
+
+Write-Host ""
+Write-Host "=============================================="
+Write-Host "[INFO] Complementary IPs configuration complete"
+Write-Host "=============================================="
