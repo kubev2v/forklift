@@ -35,7 +35,7 @@ type Primera3ParClient interface {
 	GetLunDetailsByVolumeName(lunName string, lun populator.LUN) (populator.LUN, error)
 	CurrentMappedGroups(volumeName string, mappingContext populator.MappingContext) ([]string, error)
 	CopyVolume(sourceVolName string, destVolName string) error
-	GetVolumes() ([]Volume, error)
+	GetVolumes(query string) ([]Volume, error)
 	GetSystemInfo() (SystemInfo, error)
 }
 
@@ -802,35 +802,17 @@ func (p *Primera3ParClientWsImpl) deleteVolume(volumeName string) error {
 func (p *Primera3ParClientWsImpl) CopyVolume(sourceVolName string, destVolName string) error {
 	destName := prefixOfString(destVolName, 31)
 
-	// Get the dest volume's CPG before we move it aside
-	destVol, err := p.GetVolume(destName)
-	if err != nil {
-		return fmt.Errorf("failed to get dest volume details: %w", err)
-	}
-
-	if destVol.UserCPG == "" {
-		return fmt.Errorf("destination volume %s has no userCPG set", destVolName)
-	}
-
-	// createPhysicalCopy requires the dest volume to not exist. Since the dest volume
-	// is CSI-provisioned, we rename it aside (preserving its internal ID/WWN), then
-	// create the physical copy with the original dest name. Finally, delete the old
-	// empty volume. The CSI driver locates volumes by name, so the new volume (with
-	// the source's data) seamlessly takes its place.
-	tempName := prefixOfString("mtv-old-"+destName, 31)
-	klog.Infof("Renaming dest volume %s -> %s (CPG: %s) before physical copy", destName, tempName, destVol.UserCPG)
-	if err := p.renameVolume(destName, tempName); err != nil {
-		return fmt.Errorf("failed to rename dest volume aside: %w", err)
-	}
-
 	reqURL := fmt.Sprintf("%s/api/v1/volumes/%s", p.BaseURL, url.PathEscape(prefixOfString(sourceVolName, 31)))
 
 	requestBody := map[string]interface{}{
 		"action": "createPhysicalCopy",
 		"parameters": map[string]interface{}{
 			"destVolume": destName,
-			"destCPG":    destVol.UserCPG,
-			"online":     true,
+			"saveSnapshot": false,
+			"priority": 1,
+			//"destCPG":    destVol.UserCPG,
+			"online": false,
+			//"tpvv": true,
 		},
 	}
 
@@ -847,19 +829,19 @@ func (p *Primera3ParClientWsImpl) CopyVolume(sourceVolName string, destVolName s
 
 	resp, err := p.doRequest(req, "CopyVolume")
 	if err != nil {
-		p.rollbackRename(tempName, destName)
+		//p.rollbackRename(tempName, destName)
 		return fmt.Errorf("CopyVolume failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		p.rollbackRename(tempName, destName)
+		//p.rollbackRename(tempName, destName)
 		return fmt.Errorf("failed to read CopyVolume response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		p.rollbackRename(tempName, destName)
+		//p.rollbackRename(tempName, destName)
 		return fmt.Errorf("CopyVolume failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -878,9 +860,9 @@ func (p *Primera3ParClientWsImpl) CopyVolume(sourceVolName string, destVolName s
 	}
 
 	// Physical copy succeeded — clean up the old empty volume
-	if err := p.deleteVolume(tempName); err != nil {
-		klog.Warningf("Failed to delete old volume %s (non-fatal): %v", tempName, err)
-	}
+	//if err := p.deleteVolume(tempName); err != nil {
+	//	klog.Warningf("Failed to delete old volume %s (non-fatal): %v", tempName, err)
+	//}
 
 	return nil
 }
@@ -964,18 +946,25 @@ func (p *Primera3ParClientWsImpl) GetSystemInfo() (SystemInfo, error) {
 	return sysInfo, nil
 }
 
-func (p *Primera3ParClientWsImpl) GetVolumes() ([]Volume, error) {
-	url := fmt.Sprintf("%s/api/v1/volumes", p.BaseURL)
+func (p *Primera3ParClientWsImpl) GetVolumes(query string) ([]Volume, error) {
+	u := fmt.Sprintf("%s/api/v1/volumes", p.BaseURL)
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	if query != "" {
+		klog.Infof("query value %s", query)
+		encoded := url.PathEscape(fmt.Sprintf("%q", query))
+		req.URL.RawQuery = fmt.Sprintf("query=%s", encoded) 
 	}
 
 	type GetVolumesResponse struct {
 		Members []Volume `json:"members"`
 	}
 
+	klog.Infof("get volumes request %+v\n", req)
 	var response GetVolumesResponse
 
 	err = p.doRequestUnmarshalResponse(req, "getVolumes", &response)

@@ -96,6 +96,44 @@ test-flashsystem-rdm: build
 		--owner-uid=test-cli \
 		--kubeconfig=$$KUBECONFIG
 
+test-copy-using-cli-primera-vvol: build
+	bin/vsphere-copy-offload-populator \
+		--source-vm-id=vm-1034 \
+		--source-vmdk="[vvol-ds-1] naa.60002AC00000000000000053000261F2/vvol-vm-1.vmdk" \
+		--owner-name=100g-primera-rgo-test \
+		--owner-uid=100g-primera-rgo-test \
+		--target-namespace=default \
+		--storage-vendor-product=primera3par \
+		--secret-name=populator-secret \
+		--storage-skip-ssl-verification=true \
+		--kubeconfig=$$KUBECONFIG
+
+
+test-copy-using-cli-alletra: build
+	bin/vsphere-copy-offload-populator \
+		--source-vm-id=vm-1031 \
+		--source-vmdk="[mp_iscsi_ds01] alletravm/alletravm.vmdk" \
+		--owner-name=100g-alletra-mp-rgo-test \
+		--owner-uid=100g-alletra-mp-rgo-test \
+		--target-namespace=alletranamespace \
+		--storage-vendor-product=primera3par \
+		--secret-name=populator-secret \
+		--storage-skip-ssl-verification=true \
+		--kubeconfig=$$KUBECONFIG
+
+
+test-copy-using-cli-alletra-rdm: build
+	bin/vsphere-copy-offload-populator \
+		--source-vm-id=vm-1031 \
+		--source-vmdk="[mp_iscsi_ds01] alletravm/alletravm_1.vmdk" \
+		--owner-name=100g-alletra-mp-rgo-test \
+		--owner-uid=100g-alletra-mp-rgo-test \
+		--target-namespace=alletranamespace \
+		--storage-vendor-product=primera3par \
+		--secret-name=populator-secret \
+		--storage-skip-ssl-verification=true \
+		--kubeconfig=$$KUBECONFIG
+
 test-copy-using-cli-3par: build
 	bin/vsphere-copy-offload-populator \
 		--source-vmdk="[eco-iscsi-ds1] vm-8/vm-8.vmdk" \
