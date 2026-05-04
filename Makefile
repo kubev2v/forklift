@@ -494,6 +494,7 @@ build-all-images: build-api-image \
                   build-hyperv-provider-server-image \
                   build-cli-download-image \
                   build-ova-proxy-image \
+                  build-deep-inspection-image \
                   build-operator-bundle-image \
                   build-operator-index-image
 
@@ -512,8 +513,9 @@ push-all-images:  push-api-image \
                   push-hyperv-provider-server-image \
                   push-cli-download-image \
                   push-ova-proxy-image \
+                  push-deep-inspection-image \
                   push-operator-bundle-image \
-				  push-operator-index-image            
+                  push-operator-index-image
 
 ##@ Multi-Architecture Manifests
 
