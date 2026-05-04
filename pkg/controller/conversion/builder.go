@@ -250,6 +250,9 @@ func (b *Builder) GetDeepInspectionPodSpec(volumes []core.Volume, volumeMounts [
 	if img == "" {
 		return nil, fmt.Errorf("deep inspection container image is not set (Conversion spec.image or DEEP_INSPECTION_IMAGE)")
 	}
+	if cfg.VDDKImage == "" {
+		return nil, fmt.Errorf("VDDK image is required for deep inspection but is not set (Conversion spec.vddkImage or VDDK_IMAGE)")
+	}
 
 	runAsUser := int64(1001)
 	fsGroup := int64(1001)
