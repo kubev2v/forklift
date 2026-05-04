@@ -133,6 +133,9 @@ func (s *resultServer) run() (exitCode int) {
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			fmt.Printf("deep-inspection: HTTP server error: %v\n", err)
+			s.mu.Lock()
+			s.detectErr = err
+			s.mu.Unlock()
 			s.triggerShutdown()
 		}
 	}()
