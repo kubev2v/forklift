@@ -1,0 +1,133 @@
+# Configures static IP on Windows network interfaces via registry.
+# Registry writes don't depend on RPC or DHCP Client service.
+# Changes take effect after reboot.
+# Input format: MAC:ip:IP,Gateway,Prefix,DNS1,DNS2 (entries separated by '_')
+
+$inputString = "{{.InputString}}"
+$adapterWaitMinutes = 5
+
+function Convert-PrefixToMask($prefix) {
+    $bin = ("1" * $prefix).PadRight(32, "0")
+    $mask = ""
+    for ($i = 0; $i -lt 32; $i += 8) {
+        $chunk = $bin.Substring($i, 8)
+        $num = [Convert]::ToInt32($chunk, 2)
+        if ($mask -ne "") { $mask = $mask + "." }
+        $mask = $mask + $num
+    }
+    return $mask
+}
+
+function Find-AdapterByMAC($mac) {
+    $startTime = Get-Date
+    $deadline = $startTime.AddMinutes($adapterWaitMinutes)
+    Write-Host "[INFO] Waiting for adapter with MAC $mac..."
+
+    while ((Get-Date) -lt $deadline) {
+        $adapters = Get-NetAdapter -Physical -ErrorAction SilentlyContinue
+        foreach ($a in $adapters) {
+            if ($a.MacAddress -and ($a.MacAddress.ToUpper().Replace(":", "-") -eq $mac)) {
+                $elapsed = ((Get-Date) - $startTime).TotalSeconds
+                Write-Host "[INFO] Found adapter '$($a.Name)' (GUID=$($a.InterfaceGuid)) after $([math]::Round($elapsed))s"
+                return $a
+            }
+        }
+        Start-Sleep -Seconds 2
+    }
+    return $null
+}
+
+Write-Host "=============================================="
+Write-Host "[INFO] MTV Network Configuration Script (Registry)"
+Write-Host "[INFO] Input: $inputString"
+Write-Host "=============================================="
+
+# Group entries by MAC so multiple IPs for the same adapter are written together
+$entries = $inputString.Split("_")
+$totalEntries = $entries.Count
+$adapterConfigs = @{}
+
+Write-Host "[INFO] Parsing $totalEntries entries..."
+
+foreach ($entry in $entries) {
+    if ($entry -match "^([0-9A-Fa-f:\-]+):ip:([^,]+),([^,]+),([^,]+),([^,]+),([^,]*)$") {
+        $mac = $matches[1].ToUpper().Replace(":", "-")
+        $ip = $matches[2]
+        $gw = $matches[3]
+        $prefix = [int]$matches[4]
+        $dns1 = $matches[5]
+        $dns2 = $matches[6]
+        $mask = Convert-PrefixToMask $prefix
+
+        if (-not $adapterConfigs.ContainsKey($mac)) {
+            $adapterConfigs[$mac] = @{
+                IPs = @()
+                Masks = @()
+                Gateway = $gw
+                DNS1 = $dns1
+                DNS2 = $dns2
+            }
+        }
+
+        $adapterConfigs[$mac].IPs += $ip
+        $adapterConfigs[$mac].Masks += $mask
+    } else {
+        Write-Warning "[ERROR] Invalid input format: '$entry'"
+        Write-Warning "[ERROR] Expected: MAC:ip:IP,Gateway,Prefix,DNS1,DNS2"
+    }
+}
+
+$successCount = 0
+$failCount = 0
+
+foreach ($mac in $adapterConfigs.Keys) {
+    $config = $adapterConfigs[$mac]
+    Write-Host ""
+    Write-Host "--- Adapter MAC=$mac ---"
+    Write-Host "[INFO] IPs: $($config.IPs -join ', ')"
+    Write-Host "[INFO] Masks: $($config.Masks -join ', ')"
+    Write-Host "[INFO] GW=$($config.Gateway) DNS=$($config.DNS1),$($config.DNS2)"
+
+    $adapter = Find-AdapterByMAC $mac
+    if ($adapter -eq $null) {
+        Write-Warning "[FAIL] Adapter with MAC $mac not found after waiting ${adapterWaitMinutes}m"
+        $failCount++
+        continue
+    }
+
+    $guid = $adapter.InterfaceGuid
+    $regPath = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces\$guid"
+
+    if (-not (Test-Path $regPath)) {
+        Write-Warning "[FAIL] Registry path not found: $regPath"
+        $failCount++
+        continue
+    }
+
+    Write-Host "[INFO] Writing to registry: $regPath"
+    try {
+        Set-ItemProperty -Path $regPath -Name "EnableDHCP" -Value 0 -Type DWord
+        Set-ItemProperty -Path $regPath -Name "IPAddress" -Value ([string[]]$config.IPs) -Type MultiString
+        Set-ItemProperty -Path $regPath -Name "SubnetMask" -Value ([string[]]$config.Masks) -Type MultiString
+        Set-ItemProperty -Path $regPath -Name "DefaultGateway" -Value @($config.Gateway) -Type MultiString
+
+        $dnsServers = $config.DNS1
+        if ($config.DNS2 -ne "") { $dnsServers = "$($config.DNS1),$($config.DNS2)" }
+        Set-ItemProperty -Path $regPath -Name "NameServer" -Value $dnsServers -Type String
+
+        Write-Host "[OK] Registry updated: IPs=($($config.IPs -join ', ')) GW=$($config.Gateway) DNS=$dnsServers"
+        $successCount++
+    } catch {
+        Write-Error "[FAIL] Registry write failed for MAC=$mac at ${regPath}: $_"
+        $failCount++
+    }
+}
+
+Write-Host ""
+Write-Host "=============================================="
+Write-Host "[INFO] Network configuration complete"
+Write-Host "[INFO] Adapters configured: $successCount"
+if ($failCount -gt 0) {
+    Write-Warning "[WARN] Failed: $failCount"
+}
+Write-Host "=============================================="

@@ -160,7 +160,9 @@ func (c *Customize) customizeWindows() (err error) {
 		c.addVsphereVmwareDriverRemoval(cmdBuilder)
 	}
 
-	c.addWinFirstbootScripts(cmdBuilder)
+	if err = c.addWinFirstbootScripts(cmdBuilder); err != nil {
+		return err
+	}
 
 	c.addDisksToCustomize(cmdBuilder)
 
@@ -307,7 +309,7 @@ func (c *Customize) addVsphereVmwareDriverRemoval(cmdBuilder utils.CommandBuilde
 }
 
 // addWinFirstbootScripts appends firstboot script arguments to extraArgs
-func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) {
+func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) error {
 	windowsScriptsPath := filepath.Join(c.appConfig.Workdir, "scripts", "windows")
 	initPath := filepath.Join(windowsScriptsPath, "9999-run-mtv-ps-scripts.bat")
 
@@ -317,35 +319,42 @@ func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) {
 	uploadPreserveMultipleIpPath := ""
 	if c.appConfig.VirtIoWinLegacyDrivers != "" {
 		initPath = filepath.Join(windowsScriptsPath, "9999-run-mtv-ps-scripts-legacy.bat")
-
-		if c.appConfig.StaticIPs != "" {
-			networkConfigtemplate := filepath.Join(windowsScriptsPath, "9999-network-config.ps1.tmpl")
-			networkConfigScript := filepath.Join(windowsScriptsPath, "9999-network-config.ps1")
-
-			err := c.injectStaticIPTemplate(networkConfigtemplate, networkConfigScript)
-			if err != nil {
-				fmt.Printf("Error injecting static IP template: %v", err)
-			}
-			uploadPreserveIpPath = c.formatUpload(networkConfigScript, WinFirstbootScriptsPath)
-		}
 	}
 
-	if c.appConfig.StaticIPs != "" {
-		removeDuplicatesPersistentRoutesPath := filepath.Join(windowsScriptsPath, "9999-remove_duplicate_persistent_routes.ps1")
+	staticIPFirstbootScripts := c.appConfig.VirtIoWinLegacyDrivers != "" || c.appConfig.WindowsRegistryNetworkConfig
+	if c.appConfig.StaticIPs != "" && staticIPFirstbootScripts {
+		var networkConfigTemplate string
+		var removeDuplicatesPersistentRoutesPath string
+		var preserveIpsTemplate string
+		if c.appConfig.WindowsRegistryNetworkConfig {
+			networkConfigTemplate = filepath.Join(windowsScriptsPath, "9999-network-config-registry.ps1.tmpl")
+			removeDuplicatesPersistentRoutesPath = filepath.Join(windowsScriptsPath, "9999-remove_duplicate_persistent_routes-registry.ps1")
+			preserveIpsTemplate = filepath.Join(windowsScriptsPath, "9999-preserve_complementry_ips_per_nic-registry.ps1.tmpl")
+		} else {
+			networkConfigTemplate = filepath.Join(windowsScriptsPath, "9999-network-config.ps1.tmpl")
+			removeDuplicatesPersistentRoutesPath = filepath.Join(windowsScriptsPath, "9999-remove_duplicate_persistent_routes.ps1")
+			preserveIpsTemplate = filepath.Join(windowsScriptsPath, "9999-preserve_complementry_ips_per_nic.ps1.tmpl")
+		}
+
+		networkConfigScript := filepath.Join(windowsScriptsPath, "9999-network-config.ps1")
+		if err := c.injectStaticIPTemplate(networkConfigTemplate, networkConfigScript); err != nil {
+			return fmt.Errorf("inject static IP template from %q to %q: %w", networkConfigTemplate, networkConfigScript, err)
+		}
+		uploadPreserveIpPath = c.formatUpload(networkConfigScript, WinFirstbootScriptsPath)
+
 		uploadRemoveDuplicatesPath = c.formatUpload(removeDuplicatesPersistentRoutesPath, WinFirstbootScriptsPath)
 
 		if c.appConfig.MultipleIpsPerNicName != "" {
-			preserveIpsTemplate := filepath.Join(windowsScriptsPath, "9999-preserve_complementry_ips_per_nic.ps1.tmpl")
 			preserveMultipleNicsPath := filepath.Join(windowsScriptsPath, "9999-preserve_complementry_ips_per_nic.ps1")
-			err := c.injectComplementryStaticIPTemplate(preserveIpsTemplate, preserveMultipleNicsPath)
-			if err != nil {
-				fmt.Printf("Error injecting Complementry StaticIP's template: %v", err)
+			if err := c.injectComplementryStaticIPTemplate(preserveIpsTemplate, preserveMultipleNicsPath); err != nil {
+				return fmt.Errorf("inject complementary static IP template from %q to %q: %w", preserveIpsTemplate, preserveMultipleNicsPath, err)
 			}
 			uploadPreserveMultipleIpPath = c.formatUpload(preserveMultipleNicsPath, WinFirstbootScriptsPath)
 		}
 	}
 	uploadInitPath := c.formatUpload(initPath, WinFirstbootScriptsPath)
 	cmdBuilder.AddArgs(UploadCmd, uploadPreserveIpPath, uploadInitPath, uploadRemoveDuplicatesPath, uploadPreserveMultipleIpPath)
+	return nil
 }
 
 func (c *Customize) addWinDynamicScripts(cmdBuilder utils.CommandBuilder, dir string) error {
