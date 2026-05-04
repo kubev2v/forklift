@@ -441,10 +441,9 @@ func (p *ConversionPipeline) runStageFetchingResults() (stageDone bool, err erro
 
 	p.r.Log.V(3).Info("Fetching results: pod status.", "pod", pod.Name, "phase", pod.Status.Phase, "podIP", pod.Status.PodIP)
 
-	// Pod exited before we could fetch results, skip
+	// Pod exited before we could fetch results, return error
 	if pod.Status.Phase != core.PodRunning {
-		p.r.Log.Info("Pod is no longer running; skipping result fetch.", "pod", pod.Name, "phase", pod.Status.Phase)
-		return true, nil
+		return false, fmt.Errorf("pod %s exited before /results could be fetched: phase=%s", pod.Name, pod.Status.Phase)
 	}
 	if pod.Status.PodIP == "" {
 		p.r.Log.V(3).Info("Pod has no IP yet; retrying.")
