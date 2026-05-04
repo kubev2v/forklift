@@ -188,8 +188,7 @@ spec:
         - name: FEATURE_WINDOWS_REGISTRY_NETWORK_CONFIG
 {% if feature_use_conversion_cr|bool %}
         - name: FEATURE_USE_CONVERSION_CR
-          value: "true"
-{% endif %}
+          value: "{{ feature_use_conversion_cr|bool|lower }}"
 {% if ovirt_osmap_configmap_name is defined %}
         - name: OVIRT_OS_MAP
           value: {{ ovirt_osmap_configmap_name }}
