@@ -1,0 +1,230 @@
+# Requires Administrator privileges to run
+
+Write-Host "Starting persistent route cleanup script..." -ForegroundColor Green
+
+# Function to convert CIDR prefix length to subnet mask
+function Convert-PrefixToMask($prefix) {
+    $bin = ("1" * $prefix).PadRight(32, "0")
+    $octets = @(
+        $bin.Substring(0, 8)
+        $bin.Substring(8, 8)
+        $bin.Substring(16, 8)
+        $bin.Substring(24, 8)
+    ) | ForEach-Object { [Convert]::ToInt32($_, 2) }
+
+    return ($octets -join ".")
+}
+
+# Get persistent routes
+try {
+    $routes = Get-NetRoute -PolicyStore PersistentStore -ErrorAction Stop
+} catch {
+    Write-Host "Error retrieving persistent routes: $_" -ForegroundColor Red
+    Exit 1
+}
+
+$routes = $routes | Where-Object { $_.AddressFamily -eq "IPv4" }
+
+# Step 1: Preserve ALL default gateways (0.0.0.0/0) with their interface indexes
+$defaultGateways = $routes | Where-Object { $_.DestinationPrefix -eq "0.0.0.0/0" }
+Write-Host "Found $($defaultGateways.Count) default gateway(s) to preserve:" -ForegroundColor Cyan
+foreach ($gw in $defaultGateways) {
+    Write-Host "  Gateway: $($gw.NextHop) on Interface $($gw.InterfaceIndex) with metric $($gw.RouteMetric)" -ForegroundColor Cyan
+}
+
+# Step 2: Clean up duplicate routes (including default gateways)
+Write-Host "Analyzing routes for duplicates..." -ForegroundColor Yellow
+
+# Group ALL routes for duplicate detection  
+$groupedRoutes = $routes | Group-Object {
+    "$($_.DestinationPrefix)-$($_.NextHop)-$($_.RouteMetric)-$($_.InterfaceIndex)"
+} | Where-Object { $_.Count -gt 1 }
+
+# Separate default gateway duplicates from other duplicates
+$gatewayDuplicates = $groupedRoutes | Where-Object { $_.Name.Trim().StartsWith("0.0.0.0/0-") }
+$nonGatewayDuplicates = $groupedRoutes | Where-Object { -not $_.Name.Trim().StartsWith("0.0.0.0/0-") }
+
+Write-Host "Found $($gatewayDuplicates.Count) duplicate default gateway groups" -ForegroundColor Cyan
+Write-Host "Found $($nonGatewayDuplicates.Count) duplicate non-gateway route groups" -ForegroundColor Cyan
+
+if (-not $groupedRoutes) {
+    Write-Host "No duplicate persistent routes found." -ForegroundColor Green
+} else {
+    Write-Host "Cleaning up duplicate persistent routes..." -ForegroundColor Yellow
+    
+    # First, handle duplicate default gateways
+    foreach ($group in $gatewayDuplicates) {
+        $routes = $group.Group
+        
+        # Choose the route with an interface that actually exists
+        $toKeep = $null
+        foreach ($route in $routes) {
+            $interface = Get-NetAdapter | Where-Object { $_.InterfaceIndex -eq $route.InterfaceIndex } -ErrorAction SilentlyContinue
+            if ($interface) {
+                $toKeep = $route
+                break
+            }
+        }
+        
+        # If no existing interface found, just use the first one
+        if (-not $toKeep) {
+            $toKeep = $routes[0]
+        }
+        
+        $dest = $toKeep.DestinationPrefix
+        $gateway = $toKeep.NextHop
+        $metric = $toKeep.RouteMetric
+        
+        Write-Host "  Cleaning duplicate default gateway: $gateway (metric $metric) - keeping IF $($toKeep.InterfaceIndex)" -ForegroundColor Yellow
+        
+        # Remove ALL instances
+        foreach ($route in $routes) {
+            try {
+                Remove-NetRoute -DestinationPrefix $route.DestinationPrefix -NextHop $route.NextHop -InterfaceIndex $route.InterfaceIndex -PolicyStore PersistentStore -Confirm:$false -ErrorAction Stop
+                Write-Host "    Deleted: $($route.DestinationPrefix) via $($route.NextHop) on IF $($route.InterfaceIndex)" -ForegroundColor Red
+            } catch {
+                Write-Host "      Failed to delete: $($_.Exception.Message)" -ForegroundColor Red
+            }
+        }
+        
+        # Re-add only ONE instance (preserve the first interface)
+        $reAddSucceeded = $false
+        try {
+            New-NetRoute -DestinationPrefix $dest -InterfaceIndex $toKeep.InterfaceIndex -NextHop $gateway -RouteMetric $metric -PolicyStore PersistentStore -ErrorAction Stop
+            Write-Host "    Re-added: $dest via $gateway on IF $($toKeep.InterfaceIndex)" -ForegroundColor Green
+            $reAddSucceeded = $true
+        } catch {
+            Write-Host "      PolicyStore method failed: $($_.Exception.Message)" -ForegroundColor Yellow
+        }
+        
+        # Fallback to route.exe if PolicyStore failed
+        if (-not $reAddSucceeded) {
+            try {
+                $parts = $dest.Split("/")
+                $network = $parts[0]
+                $prefix = [int]$parts[1]
+                $netmask = Convert-PrefixToMask $prefix
+                $metricStr = if ($metric -is [int]) { "METRIC $metric" } else { "" }
+                $command = "route -p ADD $network MASK $netmask $gateway IF $($toKeep.InterfaceIndex) $metricStr"
+                Write-Host "      Trying route.exe: $command" -ForegroundColor Gray
+                cmd /c $command
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Error "route.exe failed with exit code $LASTEXITCODE, command: $command"
+                } else {
+                    Write-Host "    Re-added with route.exe: $dest via $gateway on IF $($toKeep.InterfaceIndex)" -ForegroundColor Green
+                }
+            } catch {
+                Write-Host "      route.exe also failed: $($_.Exception.Message)" -ForegroundColor Red
+            }
+        }
+    }
+    
+    # Then handle non-gateway duplicates
+    foreach ($group in $nonGatewayDuplicates) {
+        $toKeep = $group.Group[0]
+        $dest = $toKeep.DestinationPrefix
+        $gateway = $toKeep.NextHop
+        $metric = $toKeep.RouteMetric
+        $interfaceIndex = $toKeep.InterfaceIndex
+
+        $parts = $dest.Split("/")
+        if ($parts.Count -ne 2) {
+            Write-Host "  Invalid destination prefix format: $dest" -ForegroundColor Red
+            continue
+        }
+
+        $network = $parts[0]
+        $prefix = [int]$parts[1]
+        $netmask = Convert-PrefixToMask $prefix
+        $metricStr = if ($metric -is [int]) { "METRIC $metric" } else { "" }
+
+        # Delete all matching routes
+        foreach ($route in $group.Group) {
+            try {
+                Remove-NetRoute -DestinationPrefix $route.DestinationPrefix -NextHop $route.NextHop `
+                    -InterfaceIndex $route.InterfaceIndex -PolicyStore PersistentStore -Confirm:$false -ErrorAction Stop
+                Write-Host "  Deleted: $($route.DestinationPrefix) via $($route.NextHop)" -ForegroundColor Red
+            } catch {
+                Write-Host "    Failed to delete route: $($_.Exception.Message)" -ForegroundColor Red
+            }
+        }
+
+        # Try re-adding route using New-NetRoute with PolicyStore
+        $reAddSucceeded = $false
+        try {
+            New-NetRoute -DestinationPrefix $dest -InterfaceIndex $interfaceIndex `
+                -NextHop $gateway -RouteMetric $metric -PolicyStore PersistentStore -ErrorAction Stop
+            Write-Host "  Re-added with New-NetRoute: $dest via $gateway metric $metric" -ForegroundColor Green
+            $reAddSucceeded = $true
+        } catch {
+            Write-Host "  New-NetRoute failed: $($_.Exception.Message), falling back to route.exe " -ForegroundColor Yellow
+        }
+
+        # Fallback to route.exe if New-NetRoute failed
+        if (-not $reAddSucceeded) {
+            $command = "route -p ADD $network MASK $netmask $gateway IF $interfaceIndex"
+            if ($metricStr -ne "") {
+                $command += " $metricStr"
+            }
+
+            try {
+                cmd /c $command
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Error "route.exe failed with exit code $LASTEXITCODE, command: $command"
+                } else {
+                    Write-Host "  Re-added with route.exe: $dest via $gateway metric $metric on IF $interfaceIndex" -ForegroundColor Green
+                }
+            } catch {
+                Write-Host "    Failed to re-add route: $($_.Exception.Message)" -ForegroundColor Red
+            }
+        }
+    }
+}
+
+# Step 3: Configure default gateways at NIC/IP configuration level via registry
+Write-Host "Configuring default gateways at interface level (Registry)..." -ForegroundColor Cyan
+
+# Get current default gateways after cleanup
+$currentDefaultGateways = Get-NetRoute -PolicyStore PersistentStore -AddressFamily IPv4 | Where-Object { $_.DestinationPrefix -eq "0.0.0.0/0" }
+Write-Host "Configuring $($currentDefaultGateways.Count) remaining default gateway(s)..." -ForegroundColor Cyan
+
+foreach ($gateway in $currentDefaultGateways) {
+    $nextHop = $gateway.NextHop
+    $interfaceIndex = $gateway.InterfaceIndex
+    $metric = $gateway.RouteMetric
+
+    # Check if interface still exists
+    $interface = Get-NetAdapter | Where-Object { $_.InterfaceIndex -eq $interfaceIndex } -ErrorAction SilentlyContinue
+    if (-not $interface) {
+        Write-Host "  Skipping Interface $interfaceIndex - Interface no longer exists" -ForegroundColor Gray
+        continue
+    }
+
+    $interfaceAlias = $interface.Name
+    $guid = $interface.InterfaceGuid
+    Write-Host "  Processing Interface $interfaceIndex ($interfaceAlias) - Gateway $nextHop" -ForegroundColor Yellow
+
+    $regPath = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces\$guid"
+    if (-not (Test-Path $regPath)) {
+        Write-Host "    Registry path not found: $regPath" -ForegroundColor Red
+        continue
+    }
+
+    $regGateways = (Get-ItemProperty -Path $regPath -Name "DefaultGateway" -ErrorAction SilentlyContinue).DefaultGateway
+    $gwList = @()
+    if ($null -ne $regGateways) {
+        $gwList = @($regGateways)
+    }
+    if ($gwList -contains $nextHop) {
+        Write-Host "    Interface already has gateway $nextHop in registry" -ForegroundColor Green
+        continue
+    }
+
+    $merged = ($gwList + @($nextHop)) | Select-Object -Unique
+    Write-Host "    Setting DefaultGateway=$($merged -join ',') in registry" -ForegroundColor Yellow
+    Set-ItemProperty -Path $regPath -Name "DefaultGateway" -Value $merged -Type MultiString
+    Write-Host "    [OK] Gateway written to registry for $interfaceAlias" -ForegroundColor Green
+
+}
+
+Write-Host "Persistent route cleanup completed!" -ForegroundColor Green
