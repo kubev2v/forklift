@@ -80,7 +80,7 @@ func resolveDestinationClient(localClient client.Client, spec api.ConversionSpec
 }
 
 // EnsurePod creates the pod for the Conversion CR if it does not already exist
-// and returns it. Returns nil when the conversion type is not recognised.
+// and returns it. Returns error when the conversion type is not recognised.
 func (e *Ensurer) EnsurePod(conversion *api.Conversion) (*core.Pod, error) {
 	cfg := convctx.PodConfigFromSpec(conversion)
 
@@ -91,8 +91,9 @@ func (e *Ensurer) EnsurePod(conversion *api.Conversion) (*core.Pod, error) {
 		return e.ensureVirtV2vPodFromSpec(conversion, cfg, convctx.VirtV2vInspectionPod)
 	case api.DeepInspection:
 		return e.ensureDeepInspectionPodFromSpec(conversion, cfg)
+	default:
+		return nil, fmt.Errorf("unsupported conversion type: %q", conversion.Spec.Type)
 	}
-	return nil, nil
 }
 
 // ensureDeepInspectionPodFromSpec creates the deep inspection pod for a Conversion
