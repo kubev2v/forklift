@@ -31,7 +31,13 @@ func GovmomiClientFromSecret(ctx context.Context, secret *core.Secret) (*govmomi
 		return nil, liberr.Wrap(err)
 	}
 	user := string(secret.Data["user"])
+	if user == "" {
+		return nil, liberr.New("connection secret is missing required key 'user'")
+	}
 	password := string(secret.Data["password"])
+	if password == "" {
+		return nil, liberr.New("connection secret is missing required key 'password'")
+	}
 	u.User = liburl.UserPassword(user, password)
 
 	skipVerifying := base.GetInsecureSkipVerifyFlag(secret)
