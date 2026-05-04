@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -102,11 +103,16 @@ func (s *resultServer) handleResults(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
+	// try json encoding first, if that fails, don't return 200 ok but 500 internal server error
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(result); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.triggerShutdown()
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(result); err != nil {
-		fmt.Fprintf(w, `{"error":%q}`, err.Error())
-	}
+	_, _ = buf.WriteTo(w)
 	s.triggerShutdown()
 }
 
