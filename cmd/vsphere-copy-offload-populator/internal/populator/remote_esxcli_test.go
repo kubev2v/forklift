@@ -193,7 +193,7 @@ var _ = Describe("checkScriptVersion", func() {
 			err := checkScriptVersion(context.Background(), client, datastore, "0.3.0", publicKey)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("version mismatch"))
-			Expect(err.Error()).To(ContainSubstring("uploaded 0.3.0 but SSH returned 0.2.0"))
+			Expect(err.Error()).To(ContainSubstring("uploaded 0.3.0, but SSH returned 0.2.0"))
 			Expect(err.Error()).To(ContainSubstring("old SSH key format detected"))
 		})
 	})
