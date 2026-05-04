@@ -270,7 +270,8 @@ func (e *Ensurer) GetPod(conversion *api.Conversion, labels map[string]string) (
 func (e *Ensurer) VolumesFromDiskRefs(disks []api.DiskRef) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, err error) {
 	for i, disk := range disks {
 		if disk.Namespace == "" {
-			continue
+			err = fmt.Errorf("spec.disks[%d] (%q): namespace is required", i, disk.Name)
+			return
 		}
 
 		pvc := &core.PersistentVolumeClaim{}
