@@ -17,13 +17,17 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/provider"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	core "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Mapped network destination.
@@ -117,6 +121,26 @@ type DestinationStorage struct {
 	// Access mode.
 	// +kubebuilder:validation:Enum=ReadWriteOnce;ReadWriteMany;ReadOnlyMany
 	AccessMode core.PersistentVolumeAccessMode `json:"accessMode,omitempty"`
+}
+
+const (
+	AnnotationNetAppShiftStorageClassType = "shift.netapp.io/storage-class-type"
+	ValueNetAppShiftStorageClassType      = "shift"
+)
+
+func (d *DestinationStorage) IsNetAppShiftStorageClass(client k8sclient.Client) (bool, error) {
+	if client == nil || d == nil || d.StorageClass == "" {
+		return false, nil
+	}
+	sc := &storagev1.StorageClass{}
+	err := client.Get(context.TODO(), k8sclient.ObjectKey{Name: d.StorageClass}, sc)
+	if k8serr.IsNotFound(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return sc.Annotations[AnnotationNetAppShiftStorageClassType] == ValueNetAppShiftStorageClassType, nil
 }
 
 // Network map spec.
@@ -248,6 +272,29 @@ func (r *StorageMap) FindStorageByName(storageName string) (pair StoragePair, fo
 	}
 
 	return
+}
+
+// HasNetAppShiftDestination is true if any map entry's destination StorageClass, resolved
+// against the destination cluster, is a NetApp Shift/Trident class. Unique class names are
+// queried at most once. When c is nil or the map is nil, returns (false, nil).
+func (r *StorageMap) HasNetAppShiftDestination(c k8sclient.Client) (bool, error) {
+	if c == nil || r == nil {
+		return false, nil
+	}
+	for _, pair := range r.Spec.Map {
+		name := pair.Destination.StorageClass
+		if name == "" {
+			continue
+		}
+		shift, err := pair.Destination.IsNetAppShiftStorageClass(c)
+		if err != nil {
+			return false, err
+		}
+		if shift {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

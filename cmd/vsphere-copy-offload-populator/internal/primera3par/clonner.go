@@ -166,9 +166,7 @@ func (c *Primera3ParClonner) VvolCopy(vsphereClient vmware.Client, vmId string, 
 
 	c.log.Info("copying volume", "source", sourceVolumeName, "target", targetLUN.Name)
 
-	progress <- 10
-
-	err = c.client.CopyVolume(sourceVolumeName, targetLUN.Name)
+	err = c.client.CopyVolume(sourceVolumeName, targetLUN.Name, progress)
 	if err != nil {
 		return fmt.Errorf("copy operation failed: %w", err)
 	}
@@ -179,20 +177,16 @@ func (c *Primera3ParClonner) VvolCopy(vsphereClient vmware.Client, vmId string, 
 }
 
 func (c *Primera3ParClonner) findVolumeByVVolID(vvolID string) (string, error) {
-	volumes, err := c.client.GetVolumes()
+	searchID := strings.ReplaceAll(strings.ToLower(strings.TrimPrefix(vvolID, "rfc4122.")), "-", "")
+	searchID = strings.TrimPrefix(searchID, "naa.")
+
+	volumes, err := c.client.GetVolumes(fmt.Sprintf("wwn EQ '%s'", searchID))
 	if err != nil {
 		return "", fmt.Errorf("failed to get volumes: %w", err)
 	}
 
-	searchID := strings.ReplaceAll(strings.ToLower(strings.TrimPrefix(vvolID, "rfc4122.")), "-", "")
-	c.log.V(2).Info("searching for volume by VVol ID", "vvol_id", vvolID, "search_id", searchID)
-
 	for _, v := range volumes {
-		if strings.Contains(strings.ToLower(v.Name), searchID) {
-			c.log.Info("found volume by name match", "volume", v.Name, "vvol_id", vvolID)
-			return v.Name, nil
-		}
-		if strings.ToLower(v.WWN) == searchID {
+		if strings.EqualFold(v.WWN, searchID) {
 			c.log.Info("found volume by WWN match", "volume", v.Name, "wwn", v.WWN, "vvol_id", vvolID)
 			return v.Name, nil
 		}
@@ -228,9 +222,7 @@ func (c *Primera3ParClonner) RDMCopy(vsphereClient vmware.Client, vmId string, s
 
 	c.log.Info("copying volume", "source", sourceLUN.Name, "target", targetLUN.Name)
 
-	progress <- 10
-
-	err = c.client.CopyVolume(sourceLUN.Name, targetLUN.Name)
+	err = c.client.CopyVolume(sourceLUN.Name, targetLUN.Name, progress)
 	if err != nil {
 		return fmt.Errorf("3PAR CopyVolume failed: %w", err)
 	}
@@ -250,7 +242,7 @@ func (c *Primera3ParClonner) resolveRDMToLUN(deviceName string) (populator.LUN, 
 		return c.findVolumeByDeviceName(deviceName)
 	}
 
-	volumes, err := c.client.GetVolumes()
+	volumes, err := c.client.GetVolumes("")
 	if err != nil {
 		return populator.LUN{}, fmt.Errorf("failed to get volumes: %w", err)
 	}
@@ -289,7 +281,7 @@ func extractSerialFromNAA(naa string) (string, error) {
 }
 
 func (c *Primera3ParClonner) findVolumeByDeviceName(deviceName string) (populator.LUN, error) {
-	volumes, err := c.client.GetVolumes()
+	volumes, err := c.client.GetVolumes("")
 	if err != nil {
 		return populator.LUN{}, fmt.Errorf("failed to list volumes: %w", err)
 	}
