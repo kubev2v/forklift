@@ -16,6 +16,22 @@ const (
 	scriptName = "secure-vmkfstools-wrapper"
 )
 
+// getRemoteScriptVersion connects via SSH and queries the wrapper script's version.
+// Returns the version string or an error if the check cannot be performed
+// (e.g. SSH keys not yet configured, script not present).
+func getRemoteScriptVersion(ctx context.Context, hostIP string, privateKey []byte, datastore string) (string, error) {
+	checkCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	sshClient := vmware.NewSSHClient()
+	if err := sshClient.Connect(checkCtx, hostIP, "root", privateKey); err != nil {
+		return "", fmt.Errorf("SSH connect failed: %w", err)
+	}
+	defer sshClient.Close()
+
+	return getScriptVersion(checkCtx, sshClient, datastore)
+}
+
 // writeSecureScriptToTemp writes the embedded script to a temporary file
 func writeSecureScriptToTemp() (string, error) {
 	tempFile, err := os.CreateTemp("", "secure-vmkfstools-wrapper-*")
@@ -33,12 +49,27 @@ func writeSecureScriptToTemp() (string, error) {
 	return tempFile.Name(), nil
 }
 
-// ensureSecureScript ensures the secure script is uploaded and available on the target ESX
-// Returns the script path
-func ensureSecureScript(ctx context.Context, client vmware.Client, esx *object.HostSystem, datastore string) (string, error) {
+// ensureSecureScript ensures the secure script is uploaded and available on the target ESX.
+// It first checks the version of any existing script via SSH; if it matches the
+// embedded version, the upload is skipped to avoid racing with other populator pods.
+func ensureSecureScript(ctx context.Context, client vmware.Client, esx *object.HostSystem, datastore, hostIP string, privateKey []byte) (string, error) {
 	log := klog.Background().WithName("copy-offload").WithName("secure-script")
 	log.Info("ensuring secure script on ESXi", "host", esx.Name())
-	log.Info("force uploading secure script to ensure latest version")
+
+	datastorePath := fmt.Sprintf("/vmfs/volumes/%s/%s", datastore, scriptName)
+
+	if vmkfstoolswrapper.Version != "dev" {
+		remoteVersion, err := getRemoteScriptVersion(ctx, hostIP, privateKey, datastore)
+		if err == nil && remoteVersion == vmkfstoolswrapper.Version {
+			log.Info("script version matches, skipping upload", "version", remoteVersion)
+			return datastorePath, nil
+		}
+		if err != nil {
+			log.V(2).Info("could not check remote script version, will upload", "err", err)
+		} else {
+			log.Info("script version mismatch, will upload", "remote", remoteVersion, "embedded", vmkfstoolswrapper.Version)
+		}
+	}
 
 	dc, err := getHostDC(esx)
 	if err != nil {

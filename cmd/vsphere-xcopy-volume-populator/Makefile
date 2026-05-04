@@ -61,9 +61,9 @@ install-mockgen:
 
 # pre-requisits: ensure a PVC exists.
 test-copy-using-cli: build
-	bin/vsphere-xcopy-volume-populator \
-		--source-vm-id=vm-92749 \
-		--source-vmdk="[eco-iscsi-ds3] tshefi_40G_1/tshefi_40G.vmdk" \
+	bin/vsphere-copy-offload-populator \
+		--source-vm-id=vm-155695 \
+		--source-vmdk="[eco-iscsi-ds3] vm-21/vm-21.vmdk" \
 		--owner-name=tshefi40g \
 		--target-namespace=openshift-mtv \
 		--storage-vendor-product=ontap \
