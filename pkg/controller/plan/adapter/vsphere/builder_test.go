@@ -74,13 +74,61 @@ var _ = Describe("vSphere builder", func() {
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
 			Expect(errGet).NotTo(HaveOccurred())
-			Expect(underTest.Data).To(HaveLen(4))
+			Expect(underTest.Data).To(HaveLen(5))
 			Expect(underTest.Data).To(HaveKeyWithValue("storagekey", []byte("storageval")))
 			Expect(underTest.Data).To(HaveKeyWithValue("providerkey", []byte("providerval")))
+			Expect(underTest.Data).To(HaveKeyWithValue("GOVMOMI_HOSTNAME", []byte("vcenter.example.com")))
 			Expect(underTest.Data).To(HaveKey("SSH_PRIVATE_KEY"))
 			Expect(underTest.Data).To(HaveKey("SSH_PUBLIC_KEY"))
 			Expect(underTest.OwnerReferences).To(HaveLen(1))
 			Expect(underTest.OwnerReferences[0].Name).To(Equal("test-pvc"))
+		})
+		It("should set GOVMOMI_HOSTNAME from provider URL even when secret has no url key", func() {
+			builder := createBuilder(
+				&core.Secret{
+					ObjectMeta: meta.ObjectMeta{Name: "storage-test-secret", Namespace: "test"},
+					Data: map[string][]byte{
+						"storagekey": []byte("storageval"),
+					},
+				},
+				&core.Secret{
+					ObjectMeta: meta.ObjectMeta{Name: "migration-test-secret", Namespace: "test"},
+					Data: map[string][]byte{
+						"user":     []byte("admin"),
+						"password": []byte("secret"),
+					},
+				},
+				&core.Secret{
+					ObjectMeta: meta.ObjectMeta{Name: "offload-ssh-keys-test-vsphere-provider-private", Namespace: "test"},
+					Data: map[string][]byte{
+						"private-key": []byte("fake-private-key"),
+					},
+				},
+				&core.Secret{
+					ObjectMeta: meta.ObjectMeta{Name: "offload-ssh-keys-test-vsphere-provider-public", Namespace: "test"},
+					Data: map[string][]byte{
+						"public-key": []byte("fake-public-key"),
+					},
+				},
+				&core.PersistentVolumeClaim{
+					ObjectMeta: meta.ObjectMeta{Name: "test-pvc", Namespace: "test"},
+				},
+			)
+
+			pvc := &core.PersistentVolumeClaim{
+				ObjectMeta: meta.ObjectMeta{Name: "test-pvc", Namespace: "test"},
+			}
+			err := builder.mergeSecrets("migration-test-secret", "test", "storage-test-secret", "test", "merged-test-secret", pvc)
+			underTest := core.Secret{}
+			errGet := builder.Destination.Get(context.Background(), client.ObjectKey{
+				Name:      "merged-test-secret",
+				Namespace: "test"}, &underTest)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(errGet).NotTo(HaveOccurred())
+			Expect(underTest.Data).To(HaveKeyWithValue("GOVMOMI_HOSTNAME", []byte("vcenter.example.com")))
+			Expect(underTest.Data).To(HaveKeyWithValue("GOVMOMI_USERNAME", []byte("admin")))
+			Expect(underTest.Data).To(HaveKeyWithValue("GOVMOMI_PASSWORD", []byte("secret")))
 		})
 		It("should set default access mode to ReadWriteMany for block volumes", func() {
 			// Setup
@@ -617,7 +665,7 @@ func createBuilder(objs ...runtime.Object) *Builder {
 					ObjectMeta: meta.ObjectMeta{Name: "test-vsphere-provider", Namespace: "test"},
 					Spec: v1beta1.ProviderSpec{
 						Type: (*v1beta1.ProviderType)(ptr.To("vsphere")),
-						URL:  "test-vsphere-provider",
+						URL:  "https://vcenter.example.com/sdk",
 					},
 				},
 				Inventory: nil,

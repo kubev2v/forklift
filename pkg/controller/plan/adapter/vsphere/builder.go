@@ -1975,13 +1975,6 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 
 	for key, value := range dst.Data {
 		switch key {
-		case "url":
-			h, err := liburl.Parse(string(value))
-			if err != nil {
-				// ignore and try to use as is
-				dst.Data["GOVMOMI_HOSTNAME"] = value
-			}
-			dst.Data["GOVMOMI_HOSTNAME"] = []byte(h.Hostname())
 		case "user":
 			dst.Data["GOVMOMI_USERNAME"] = value
 			dst.Data["accessKeyId"] = value
@@ -1992,6 +1985,12 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 			dst.Data["GOVMOMI_INSECURE"] = value
 		}
 	}
+
+	providerURL, pErr := liburl.Parse(r.Source.Provider.Spec.URL)
+	if pErr != nil {
+		return fmt.Errorf("failed to parse provider URL: %w", pErr)
+	}
+	dst.Data["GOVMOMI_HOSTNAME"] = []byte(providerURL.Hostname())
 
 	// Add provider settings to the secret
 	if esxiCloneMethod, ok := r.Source.Provider.Spec.Settings[api.ESXiCloneMethod]; ok {
