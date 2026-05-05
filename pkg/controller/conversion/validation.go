@@ -7,12 +7,13 @@ import (
 
 // Types
 const (
-	TypeNotValid        = "TypeNotValid"
-	VMNotSet            = "VMNotSet"
-	DisksNotSet         = "DisksNotSet"
-	ConnectionNotSet    = "ConnectionNotSet"
-	VDDKImageNotSet     = "VDDKImageNotSet"
-	LUKSSecretNotSet    = "LUKSSecretNotSet"
+	TypeNotValid           = "TypeNotValid"
+	VMNotSet               = "VMNotSet"
+	DisksNotSet            = "DisksNotSet"
+	ConnectionNotSet       = "ConnectionNotSet"
+	VDDKImageNotSet        = "VDDKImageNotSet"
+	LUKSSecretNotSet       = "LUKSSecretNotSet"
+	TargetNamespaceNotSet  = "TargetNamespaceNotSet"
 )
 
 // Categories
@@ -41,6 +42,10 @@ func (r *Reconciler) validate(conversion *api.Conversion) (err error) {
 	if err != nil {
 		return
 	}
+	err = r.validateTargetNamespace(conversion)
+	if err != nil {
+		return
+	}
 	err = r.validateVM(conversion)
 	if err != nil {
 		return
@@ -60,6 +65,19 @@ func (r *Reconciler) validate(conversion *api.Conversion) (err error) {
 	err = r.validateDiskEncryption(conversion)
 	if err != nil {
 		return
+	}
+	return
+}
+
+func (r *Reconciler) validateTargetNamespace(conversion *api.Conversion) (err error) {
+	if conversion.Spec.TargetNamespace == "" {
+		conversion.Status.SetCondition(libcnd.Condition{
+			Type:     TargetNamespaceNotSet,
+			Status:   True,
+			Reason:   NotSet,
+			Category: Critical,
+			Message:  "The `targetNamespace` field is required.",
+		})
 	}
 	return
 }

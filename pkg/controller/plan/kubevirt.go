@@ -718,12 +718,51 @@ func (r *KubeVirt) CreateDeepInspectionConversion(
 
 // DeleteConversion deletes the given Conversion CR.
 func (r *KubeVirt) DeleteConversion(cr *api.Conversion) error {
+	// TODO: Should we raise error when targetNS is not set?
+	if cr.Spec.TargetNamespace != "" {
+		if err := r.deleteConversionSecrets(cr); err != nil {
+			return err
+		}
+	}
 	if err := r.Client.Delete(context.TODO(), cr); err != nil && !k8serr.IsNotFound(err) {
 		return liberr.Wrap(err)
 	}
 	r.Log.Info("Conversion CR deleted.",
 		"conversion", path.Join(cr.Namespace, cr.Name),
 		"type", string(cr.Spec.Type))
+	return nil
+}
+
+// deleteConversionSecrets removes the connection and LUKS secrets that were
+// created on the destination cluster for a Conversion CR.
+// Secrets are located by the LabelVM + LabelConversionType labels stamped on
+// them at creation time, both kConnection and kLUKS secrets share these labels.
+func (r *KubeVirt) deleteConversionSecrets(cr *api.Conversion) error {
+	vmID, ok := cr.Labels[convctx.LabelVM]
+	if !ok || vmID == "" {
+		return nil
+	}
+	matchLabels := map[string]string{
+		convctx.LabelVM:             vmID,
+		convctx.LabelConversionType: string(cr.Spec.Type),
+	}
+	list := &core.SecretList{}
+	if err := r.Destination.Client.List(context.TODO(), list,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(matchLabels),
+			Namespace:     cr.Spec.TargetNamespace,
+		},
+	); err != nil {
+		return liberr.Wrap(err)
+	}
+	for i := range list.Items {
+		s := &list.Items[i]
+		if err := r.Destination.Client.Delete(context.TODO(), s); err != nil && !k8serr.IsNotFound(err) {
+			return liberr.Wrap(err)
+		}
+		r.Log.V(1).Info("Conversion secret deleted.",
+			"secret", path.Join(s.Namespace, s.Name))
+	}
 	return nil
 }
 
