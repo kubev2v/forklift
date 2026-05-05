@@ -464,11 +464,39 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 			Type: api.DiskEncryptionTypeClevis,
 		}
 	} else if vm.LUKS.Name != "" {
+		// The pod runs in TargetNamespace on the destination cluster, so the
+		// LUKS secret must exist there. Copy it from the management cluster
+		// (where vm.LUKS lives) to target cluster.
+		sourceNS := vm.LUKS.Namespace
+		if sourceNS == "" {
+			sourceNS = r.Plan.Namespace
+		}
+		source := &core.Secret{}
+		if err = r.Client.Get(context.TODO(),
+			types.NamespacedName{Namespace: sourceNS, Name: vm.LUKS.Name}, source,
+		); err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
+		luksLabels := r.getConversionLabels(conversionType, vm.ID, planID,
+			map[string]string{kLUKS: "true"})
+		luksSecretSpec := r.buildConversionSecret(
+			r.Plan.Spec.TargetNamespace,
+			planName+"-"+vm.ID+"-luks-",
+			luksLabels,
+			source.Data,
+		)
+		var luksSecret *core.Secret
+		luksSecret, err = r.ensureConversionSecret(luksSecretSpec)
+		if err != nil {
+			err = liberr.Wrap(err)
+			return
+		}
 		conversion.Spec.DiskEncryption = &api.DiskEncryption{
 			Type: api.DiskEncryptionTypeLUKS,
 			Secret: core.ObjectReference{
-				Namespace: vm.LUKS.Namespace,
-				Name:      vm.LUKS.Name,
+				Namespace: luksSecret.Namespace,
+				Name:      luksSecret.Name,
 			},
 		}
 	}
