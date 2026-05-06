@@ -3,13 +3,13 @@ package hyperv
 import (
 	"path"
 
+	"context"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/watch/handler"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
-	"golang.org/x/net/context"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 

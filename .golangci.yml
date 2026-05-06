@@ -1,15 +1,24 @@
-issues:
-  exclude-dirs:
-    - vendor
-    - pkg/lib/gob
+version: "2"
+
 linters:
   enable:
-  - ginkgolinter
-  - nilerr
-  - nilnil
-  - bodyclose
-  - gofmt
-  - goimports
-linters-settings:
-  ginkgolinter:
-    forbid-focus-container: true
+    - ginkgolinter
+    - nilerr
+    - nilnil
+    - bodyclose
+  settings:
+    ginkgolinter:
+      forbid-focus-container: true
+  exclusions:
+    paths:
+      - vendor
+      - pkg/lib/gob
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    paths:
+      - vendor
+      - pkg/lib/gob

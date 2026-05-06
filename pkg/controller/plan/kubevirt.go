@@ -147,8 +147,6 @@ const (
 const (
 	// Qemu user
 	qemuUser = int64(107)
-	// Qemu group
-	qemuGroup = int64(107)
 )
 
 // Labels
@@ -412,7 +410,6 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 			"Conversion CR already exists.",
 			"conversion", path.Join(list.Items[0].Namespace, list.Items[0].Name),
 			"vm", vm.String())
-		ready = true
 		return r.checkProviderReady(vm.ID)
 	}
 
