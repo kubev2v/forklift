@@ -55,7 +55,7 @@ func ValidateMigrateableFstab(inspectionData *types.VirtInspectorXML) CheckResul
 			if strings.HasPrefix(mountpoint.Device, "/dev/disk/by-path/") {
 				concerns = append(concerns, Concern{
 					ID:       "fstab-by-path-device",
-					Category: ConcernCategoryWarning,
+					Category: ConcernCategoryCritical,
 					Label:    "Fstab contains /dev/disk/by-path/ entry",
 					Message: "Fstab contains /dev/disk/by-path/ entries which are not migrateable. " +
 						"Found device: " + mountpoint.Device + " mounted at: " + mountpoint.MountPoint,

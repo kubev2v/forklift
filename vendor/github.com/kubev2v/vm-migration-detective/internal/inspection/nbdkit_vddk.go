@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kubev2v/vm-migration-detective/internal/cmdbuilder"
 	"github.com/kubev2v/vm-migration-detective/internal/vddk"
 	"github.com/sirupsen/logrus"
 )
@@ -86,41 +87,25 @@ func OpenWithNBDKitVDDK(
 		return nil, fmt.Errorf("VDDK library directory not found - ensure VDDK is installed or configured")
 	}
 
-	// Build nbdkit command with VDDK plugin
-	// Use password=+file to read password securely from file (not exposed in process list)
-	nbdkitArgs := []string{
-		"-U", socketPath, // Unix socket path
-		"--foreground",       // Run in foreground
-		"--exit-with-parent", // Exit when parent process exits
-		"-r",                 // Read-only mode for snapshots
-		"vddk",               // VDDK plugin
-		fmt.Sprintf("server=%s", vcenterHost),
-		fmt.Sprintf("user=%s", username),
-		fmt.Sprintf("password=+%s", passwordFile), // Read password from file (secure)
-		fmt.Sprintf("vm=moref=%s", vmMoref),       // VM moref (required)
-		fmt.Sprintf("snapshot=%s", snapshotMoref), // Snapshot moref to read from
-		fmt.Sprintf("file=%s", baseDiskPath),      // Base VMDK file path
-		fmt.Sprintf("libdir=%s", vddkLibDir),      // VDDK library location
-	}
+	// password=+file keeps the password out of the process list.
+	nbdkitCmd := cmdbuilder.New().
+		WithLogger(logger).
+		Flag("-U", socketPath).
+		Add("--foreground").
+		Add("--exit-with-parent").
+		Add("-r").
+		Add("vddk").
+		Add(fmt.Sprintf("server=%s", vcenterHost)).
+		Add(fmt.Sprintf("user=%s", username)).
+		SensitiveArg(fmt.Sprintf("password=+%s", passwordFile), "password=+***").
+		Add(fmt.Sprintf("vm=moref=%s", vmMoref)).
+		Add(fmt.Sprintf("snapshot=%s", snapshotMoref)).
+		Add(fmt.Sprintf("file=%s", baseDiskPath)).
+		Add(fmt.Sprintf("libdir=%s", vddkLibDir)).
+		AddIf(thumbprint != "", fmt.Sprintf("thumbprint=%s", thumbprint)) // Add thumbprint if available (for SSL verification)
 
-	// Add thumbprint if available (for SSL verification)
-	if thumbprint != "" {
-		nbdkitArgs = append(nbdkitArgs, fmt.Sprintf("thumbprint=%s", thumbprint))
-	}
-
-	// Log the command (mask password file path)
 	if logger != nil {
-		logArgs := make([]string, len(nbdkitArgs))
-		copy(logArgs, nbdkitArgs)
-		// Mask password file path in log
-		for i, arg := range logArgs {
-			if len(arg) > 10 && arg[:10] == "password=+" {
-				logArgs[i] = "password=+***"
-			}
-		}
 		logger.WithFields(logrus.Fields{
-			"command":        "nbdkit",
-			"args":           logArgs,
 			"socket_path":    socketPath,
 			"vm_moref":       vmMoref,
 			"snapshot_moref": snapshotMoref,
@@ -128,12 +113,8 @@ func OpenWithNBDKitVDDK(
 		}).Info("Starting nbdkit with VDDK plugin")
 	}
 
-	// Start nbdkit with VDDK plugin
-	cmd := exec.CommandContext(ctx, "nbdkit", nbdkitArgs...)
-
-	// Preserve environment - the nbdkit wrapper (created in Dockerfile) will set LD_LIBRARY_PATH
-	// for VDDK libraries, so we don't need to set it here
-	cmd.Env = os.Environ()
+	// nbdkit is a long-lived server process; Start() not Run().
+	cmd := nbdkitCmd.Command(ctx, "nbdkit")
 
 	// Capture both stdout and stderr to check for errors
 	stdoutBuf := &bytes.Buffer{}
@@ -142,6 +123,7 @@ func OpenWithNBDKitVDDK(
 	cmd.Stdout = stdoutBuf
 
 	// Start nbdkit
+	// nbdkit is a long-lived server process so Start() not Run()
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start nbdkit: %w", err)
 	}
@@ -351,7 +333,7 @@ func getVCenterThumbprint(vcenterHost string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to connect to vCenter: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	// Get the certificate chain
 	certs := conn.ConnectionState().PeerCertificates
@@ -388,20 +370,20 @@ func createNBDKitPasswordFile(password string) (string, error) {
 
 	// Write password to file
 	if _, err := tmpFile.WriteString(password); err != nil {
-		tmpFile.Close()
-		os.Remove(tmpFile.Name())
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpFile.Name())
 		return "", fmt.Errorf("failed to write password to file: %w", err)
 	}
 
 	// Close the file
 	if err := tmpFile.Close(); err != nil {
-		os.Remove(tmpFile.Name())
+		_ = os.Remove(tmpFile.Name())
 		return "", fmt.Errorf("failed to close password file: %w", err)
 	}
 
 	// Set restrictive permissions (read-only for owner)
 	if err := os.Chmod(tmpFile.Name(), 0600); err != nil {
-		os.Remove(tmpFile.Name())
+		_ = os.Remove(tmpFile.Name())
 		return "", fmt.Errorf("failed to set password file permissions: %w", err)
 	}
 

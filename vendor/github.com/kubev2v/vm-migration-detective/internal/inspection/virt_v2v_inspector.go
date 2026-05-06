@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
+	"github.com/kubev2v/vm-migration-detective/internal/cmdbuilder"
 	"github.com/kubev2v/vm-migration-detective/internal/vddk"
 	"github.com/kubev2v/vm-migration-detective/pkg/types"
 	"github.com/sirupsen/logrus"
@@ -92,148 +92,52 @@ func (i *VirtV2vInspector) Inspect(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create password file: %w", err)
 	}
-	defer os.Remove(passwordFile) // Clean up the temporary file
+	defer func() { _ = os.Remove(passwordFile) }()
 
-	var output []byte
-
-	// Build virt-v2v-inspector command
-	// Libvirt authentication is handled via LIBVIRT_AUTH_FILE environment variable
-	// The -ip password file provides credentials for both libvirt and VDDK (used internally)
-	args := []string{
-		"-v",            // Verbose
-		"-x",            // Debug
-		"-i", "libvirt", // Input type: libvirt
-		"-ic", libvirtURL, // libvirt connection URI (vpx://... without credentials)
-		"-ip", passwordFile, // Password file (used by virt-v2v-inspector for VDDK authentication)
-		"-it", "vddk", // Input transport: VDDK
-	}
-
-	// Add VDDK options
-	// Get vCenter thumbprint
+	// Strip VDDK paths from LD_LIBRARY_PATH so libguestfs/supermin doesn't pick them up.
 	thumbprint, err := getVCenterThumbprint(vcenterHost)
 	if err != nil {
 		i.logger.WithError(err).Warn("Failed to get thumbprint, proceeding without SSL verification")
-	} else if thumbprint != "" {
-		args = append(args, "-io", fmt.Sprintf("vddk-thumbprint=%s", thumbprint))
 	}
-
-	// Add VDDK library directory
 	vddkLibDir := vddk.GetLibDir()
-	if vddkLibDir != "" {
-		args = append(args, "-io", fmt.Sprintf("vddk-libdir=%s", vddkLibDir))
-	}
+	vddkLibPath := vddk.GetLibPath()
 
-	// Add disk file specifications for all disks
-	// virt-v2v-inspector needs the disk file paths in VDDK format
-	// Format: vddk-file=[datastore] path/to/disk.vmdk
-	// Add one -io vddk-file= option for each disk
+	diskUnlock := resolveDiskUnlock(i.logger)
+
+	cmdArgs := cmdbuilder.New().
+		WithLogger(i.logger).
+		FilterEnv("LD_LIBRARY_PATH", func(val string) string {
+			var kept []string
+			for _, p := range strings.Split(val, ":") {
+				if p != vddkLibPath && !strings.Contains(p, "vmware-vix-disklib") {
+					kept = append(kept, p)
+				}
+			}
+			return strings.Join(kept, ":")
+		}).
+		SetEnv("LIBGUESTFS_DEBUG", "1").
+		Add("-v", "-x").
+		Flag("-i", "libvirt").
+		Flag("-ic", libvirtURL).
+		Flag("-ip", passwordFile).
+		Flag("-it", "vddk").
+		FlagIf(thumbprint != "", "-io", fmt.Sprintf("vddk-thumbprint=%s", thumbprint)).
+		FlagIf(vddkLibDir != "", "-io", fmt.Sprintf("vddk-libdir=%s", vddkLibDir))
+
 	for _, baseDiskPath := range diskInfo.BaseDiskPaths {
 		if baseDiskPath != "" {
-			args = append(args, "-io", fmt.Sprintf("vddk-file=%s", baseDiskPath))
+			cmdArgs.Flag("-io", fmt.Sprintf("vddk-file=%s", baseDiskPath))
 		}
 	}
 
-	// VM identifier - using moref since we no longer have VM name
-	args = append(args, "--", vmMoref)
-
-	// Log the command (mask password file path for security)
-	if i.logger != nil {
-		logArgs := make([]string, len(args))
-		copy(logArgs, args)
-		// Mask password file path in -ip option
-		for idx, arg := range logArgs {
-			if arg == "-ip" && idx+1 < len(logArgs) {
-				logArgs[idx+1] = "***"
-			}
-		}
-		i.logger.WithFields(logrus.Fields{
-			"command": "virt-v2v-inspector",
-			"args":    logArgs,
-		}).Info("Running virt-v2v-inspector command")
+	if args := diskUnlock.Args(); len(args) > 0 {
+		cmdArgs.Add(args...)
 	}
 
-	// Execute virt-v2v-inspector
-	cmd := exec.CommandContext(inspectCtx, i.virtV2vInspectorPath, args...)
+	cmdArgs.Add("--", vmMoref)
 
-	// Filter out VDDK library paths from LD_LIBRARY_PATH to prevent supermin
-	// (called by libguestfs) from picking up VDDK's OpenSSL library
-	// virt-v2v-inspector will spawn nbdkit internally, and nbdkit's wrapper
-	// will set LD_LIBRARY_PATH only for nbdkit itself
-	env := os.Environ()
-	filteredEnv := make([]string, 0, len(env))
-	vddkLibPath := vddk.GetLibPath()
-	for _, e := range env {
-		// Remove VDDK library path from LD_LIBRARY_PATH if present
-		if strings.HasPrefix(e, "LD_LIBRARY_PATH=") {
-			ldPath := strings.TrimPrefix(e, "LD_LIBRARY_PATH=")
-			// Filter out VDDK library path
-			paths := strings.Split(ldPath, ":")
-			filteredPaths := make([]string, 0, len(paths))
-			for _, p := range paths {
-				if p != vddkLibPath && !strings.Contains(p, "vmware-vix-disklib") {
-					filteredPaths = append(filteredPaths, p)
-				}
-			}
-			if len(filteredPaths) > 0 {
-				filteredEnv = append(filteredEnv, fmt.Sprintf("LD_LIBRARY_PATH=%s", strings.Join(filteredPaths, ":")))
-			}
-			// If LD_LIBRARY_PATH becomes empty, don't set it at all
-		} else {
-			filteredEnv = append(filteredEnv, e)
-		}
-	}
-
-	// Add libguestfs debug environment variable for detailed error messages
-	filteredEnv = append(filteredEnv, "LIBGUESTFS_DEBUG=1")
-
-	cmd.Env = filteredEnv
-
-	// Log environment filtering for debugging
-	if i.logger != nil {
-		hasVddkPath := false
-		for _, e := range filteredEnv {
-			if strings.HasPrefix(e, "LD_LIBRARY_PATH=") && strings.Contains(e, "vmware-vix-disklib") {
-				hasVddkPath = true
-				break
-			}
-		}
-		if hasVddkPath {
-			i.logger.Warn("LD_LIBRARY_PATH still contains VDDK paths after filtering")
-		} else {
-			i.logger.Debug("LD_LIBRARY_PATH filtered successfully (VDDK paths removed)")
-		}
-	}
-
-	// Capture output with timeout handling
-	// Use a goroutine to capture output so we can monitor for context cancellation
-	type result struct {
-		output []byte
-		err    error
-	}
-	resultChan := make(chan result, 1)
-
-	go func() {
-		output, err := cmd.CombinedOutput()
-		resultChan <- result{output: output, err: err}
-	}()
-
-	// Wait for either completion or context cancellation
-	select {
-	case res := <-resultChan:
-		output = res.output
-		err = res.err
-	case <-inspectCtx.Done():
-		// Context was cancelled (timeout or parent cancellation)
-		// Kill the process if it's still running
-		if cmd.Process != nil {
-			if killErr := cmd.Process.Kill(); killErr != nil {
-				if i.logger != nil {
-					i.logger.WithError(killErr).Warn("Failed to kill virt-v2v-inspector process after timeout")
-				}
-			} else if i.logger != nil {
-				i.logger.Warn("Killed virt-v2v-inspector process due to timeout")
-			}
-		}
+	output, err := cmdArgs.RunCombined(inspectCtx, i.virtV2vInspectorPath)
+	if inspectCtx.Err() != nil {
 		if inspectCtx.Err() == context.DeadlineExceeded {
 			return nil, fmt.Errorf("virt-v2v-inspector command timed out after %v", i.timeout)
 		}
@@ -242,29 +146,33 @@ func (i *VirtV2vInspector) Inspect(
 
 	outputStr := string(output)
 	if err != nil {
-		// Get exit code if available
-		exitCode := -1
-		if exitError, ok := err.(*exec.ExitError); ok {
-			exitCode = exitError.ExitCode()
-		}
+		exitCode := cmdbuilder.ExitCode(err)
 
 		// Check if this is likely an encrypted disk error
-		if isEncryptedDiskError(outputStr) {
+		if encrypted, reason := isEncryptedDiskError(outputStr); encrypted {
 			i.logger.WithFields(logrus.Fields{
-				"output":    outputStr,
-				"exit_code": exitCode,
-				"command":   i.virtV2vInspectorPath,
-				"args":      args,
+				"output":          outputStr,
+				"exit_code":       exitCode,
+				"executable":      i.virtV2vInspectorPath,
+				"args":            cmdArgs.MaskedArgs(),
+				"matched_pattern": reason,
 			}).Error("virt-v2v-inspector failed - disk appears to be encrypted")
 
-			return nil, fmt.Errorf("disk encryption detected: virt-v2v-inspector cannot access encrypted disks. The VM disk appears to be encrypted and cannot be inspected without decryption. Exit code: %d", exitCode)
+			switch diskUnlock.method {
+			case unlockClevis:
+				return nil, fmt.Errorf("disk encryption detected: virt-v2v-inspector could not unlock disk using clevis/NBDE. Exit code: %d", exitCode)
+			case unlockKeyFiles:
+				return nil, fmt.Errorf("disk encryption detected: virt-v2v-inspector could not unlock disk using %d LUKS key file(s) from %s. Exit code: %d", len(diskUnlock.keys), defaultLUKSKeyDir, exitCode)
+			default:
+				return nil, fmt.Errorf("disk encryption detected: virt-v2v-inspector cannot access encrypted disks. The VM disk appears to be encrypted and cannot be inspected without decryption. Exit code: %d", exitCode)
+			}
 		}
 
 		i.logger.WithFields(logrus.Fields{
-			"output":    outputStr,
-			"exit_code": exitCode,
-			"command":   i.virtV2vInspectorPath,
-			"args":      args,
+			"output":     outputStr,
+			"exit_code":  exitCode,
+			"executable": i.virtV2vInspectorPath,
+			"args":       cmdArgs.MaskedArgs(),
 		}).Error("virt-v2v-inspector failed")
 
 		// Include output in error message for better debugging
@@ -360,20 +268,20 @@ func (i *VirtV2vInspector) createPasswordFile(password string) (string, error) {
 
 	// Write password to file
 	if _, err := tmpFile.WriteString(password); err != nil {
-		tmpFile.Close()
-		os.Remove(tmpFile.Name())
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpFile.Name())
 		return "", fmt.Errorf("failed to write password to file: %w", err)
 	}
 
 	// Close the file
 	if err := tmpFile.Close(); err != nil {
-		os.Remove(tmpFile.Name())
+		_ = os.Remove(tmpFile.Name())
 		return "", fmt.Errorf("failed to close password file: %w", err)
 	}
 
 	// Set restrictive permissions (read-only for owner)
 	if err := os.Chmod(tmpFile.Name(), 0600); err != nil {
-		os.Remove(tmpFile.Name())
+		_ = os.Remove(tmpFile.Name())
 		return "", fmt.Errorf("failed to set password file permissions: %w", err)
 	}
 

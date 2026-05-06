@@ -23,7 +23,6 @@ func (c *DiskAccessCheck) Run(params InspectionParams) CheckResult {
 		params.SnapshotMoref,
 		params.DiskInfo,
 	)
-
 	if err != nil {
 		// Check if the error message indicates an encrypted disk
 		// The inspection function already detects encrypted disks and returns a specific error message
@@ -37,7 +36,7 @@ func (c *DiskAccessCheck) Run(params InspectionParams) CheckResult {
 				Concerns: []Concern{
 					{
 						ID:       "disk-encrypted",
-						Category: ConcernCategoryWarning,
+						Category: ConcernCategoryCritical,
 						Label:    "Disk encryption detected",
 						Message:  err.Error(),
 					},

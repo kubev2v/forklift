@@ -1,14 +1,13 @@
 package inspection
 
 import (
-	"bytes"
 	"context"
 	"encoding/xml"
 	"fmt"
-	"os/exec"
 	"strings"
 	"time"
 
+	"github.com/kubev2v/vm-migration-detective/internal/cmdbuilder"
 	"github.com/kubev2v/vm-migration-detective/internal/vsphere"
 	"github.com/kubev2v/vm-migration-detective/pkg/types"
 	"github.com/sirupsen/logrus"
@@ -196,20 +195,21 @@ func (i *VirtInspector) attemptInspect(
 		"disk_count": len(nbdURLs),
 	}).Info("Running virt-inspector on NBD")
 
-	// Build command with multiple -a options for all disks
-	// Format must be specified before each -a parameter
-	var aOptions string
+	diskUnlock := resolveDiskUnlock(i.logger)
+
+	diskArgs := cmdbuilder.New().
+		WithLogger(i.logger).
+		UnsetEnv("LD_LIBRARY_PATH").
+		SetEnv("LIBGUESTFS_DEBUG", "1")
 	for _, url := range nbdURLs {
-		aOptions += fmt.Sprintf(" --format=raw -a '%s'", url)
+		diskArgs.Add("--format=raw").Flag("-a", url)
 	}
-	cmdString := fmt.Sprintf("unset LD_LIBRARY_PATH && LIBGUESTFS_DEBUG=1 %s%s",
-		i.virtInspectorPath, aOptions)
+	if args := diskUnlock.Args(); len(args) > 0 {
+		diskArgs.Add(args...)
+	}
 
-	virtInspectorCmd := exec.CommandContext(inspectCtx, "sh", "-c", cmdString)
-
-	// Capture stdout and stderr separately
-	// XML output goes to stdout, debug logs go to stderr
-	stdout, stderr, err := captureSeparateOutput(virtInspectorCmd)
+	// XML goes to stdout, debug logs to stderr.
+	stdout, stderr, err := diskArgs.RunSeparate(inspectCtx, i.virtInspectorPath)
 
 	// Log stderr (debug output) separately
 	if len(stderr) > 0 && i.logger != nil {
@@ -220,25 +220,30 @@ func (i *VirtInspector) attemptInspect(
 	outputStr := string(stdout)
 	stderrStr := string(stderr)
 	if err != nil {
-		// Get exit code if available
-		exitCode := -1
-		if exitError, ok := err.(*exec.ExitError); ok {
-			exitCode = exitError.ExitCode()
-		}
+		exitCode := cmdbuilder.ExitCode(err)
 
 		// Check if this is likely an encrypted disk error (check both stdout and stderr)
 		combinedOutput := outputStr + stderrStr
-		if isEncryptedDiskError(combinedOutput) {
+		if encrypted, reason := isEncryptedDiskError(combinedOutput); encrypted {
 			i.logger.WithFields(logrus.Fields{
-				"stdout":     outputStr,
-				"stderr":     stderrStr,
-				"exit_code":  exitCode,
-				"nbd_urls":   nbdURLs,
-				"disk_count": len(nbdURLs),
-				"command":    cmdString,
+				"stdout":          outputStr,
+				"stderr":          stderrStr,
+				"exit_code":       exitCode,
+				"nbd_urls":        nbdURLs,
+				"disk_count":      len(nbdURLs),
+				"executable":      i.virtInspectorPath,
+				"args":            diskArgs.MaskedArgs(),
+				"matched_pattern": reason,
 			}).Error("virt-inspector failed - disk appears to be encrypted")
 
-			return nil, fmt.Errorf("disk encryption detected: virt-inspector cannot access encrypted disks. The VM disk appears to be encrypted and cannot be inspected without decryption. Exit code: %d", exitCode)
+			switch diskUnlock.method {
+			case unlockClevis:
+				return nil, fmt.Errorf("disk encryption detected: virt-inspector could not unlock disk using clevis/NBDE. Exit code: %d", exitCode)
+			case unlockKeyFiles:
+				return nil, fmt.Errorf("disk encryption detected: virt-inspector could not unlock disk using %d LUKS key file(s) from %s. Exit code: %d", len(diskUnlock.keys), defaultLUKSKeyDir, exitCode)
+			default:
+				return nil, fmt.Errorf("disk encryption detected: virt-inspector cannot access encrypted disks. The VM disk appears to be encrypted and cannot be inspected without decryption. Exit code: %d", exitCode)
+			}
 		}
 
 		i.logger.WithFields(logrus.Fields{
@@ -247,7 +252,8 @@ func (i *VirtInspector) attemptInspect(
 			"exit_code":  exitCode,
 			"nbd_urls":   nbdURLs,
 			"disk_count": len(nbdURLs),
-			"command":    cmdString,
+			"executable": i.virtInspectorPath,
+			"args":       diskArgs.MaskedArgs(),
 		}).Error("virt-inspector failed")
 
 		// Include output in error message for better debugging
@@ -375,14 +381,4 @@ func (i *VirtInspector) getBaseDiskPathsFromVSphere(ctx context.Context, vcenter
 	}
 
 	return baseDiskPaths, nil
-}
-
-// captureSeparateOutput runs the command and captures stdout and stderr separately
-func captureSeparateOutput(cmd *exec.Cmd) (stdout []byte, stderr []byte, err error) {
-	var stdoutBuf, stderrBuf bytes.Buffer
-	cmd.Stdout = &stdoutBuf
-	cmd.Stderr = &stderrBuf
-
-	err = cmd.Run()
-	return stdoutBuf.Bytes(), stderrBuf.Bytes(), err
 }

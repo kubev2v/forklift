@@ -2,90 +2,78 @@ package inspection
 
 import "strings"
 
-// isEncryptedDiskError checks if the error output indicates an encrypted disk
-// Common patterns:
-// - Direct encryption/LUKS mentions
-// - QEMU errors about encrypted formats
-// - Cipher-related errors
-// - Passphrase requirements
-func isEncryptedDiskError(output string) bool {
-	// Convert to lowercase for case-insensitive matching
+// isEncryptedDiskError returns (true, reason) when the output looks like an
+// encrypted-disk failure, or (false, "") otherwise. The reason string names
+// the specific pattern that matched, which is useful for distinguishing real
+// decryption failures from false-positives in libguestfs debug output.
+func isEncryptedDiskError(output string) (bool, string) {
 	lowerOutput := strings.ToLower(output)
 
-	// Must contain "error" or "failed" to be considered an error condition
+	// Require at least one generic error signal before doing anything else.
 	hasError := strings.Contains(lowerOutput, "error") ||
 		strings.Contains(lowerOutput, "failed") ||
 		strings.Contains(lowerOutput, "could not open")
-
 	if !hasError {
-		return false
+		return false, ""
 	}
 
-	// Strong encryption indicators (specific to encryption) - check these FIRST
-	// This ensures both virt-inspector and virt-v2v-inspector can detect encryption
+	// Strong encryption indicators checked before access-rights exclusions.
 	strongIndicators := []string{
-		"encryption",            // Direct encryption mention
-		"encrypted",             // Direct encrypted mention
-		"luks",                  // LUKS encryption
-		"unknown cipher",        // Cipher-related errors
-		"requires a passphrase", // Passphrase requirement
-		"dm-crypt",              // Device-mapper crypto
-		"cryptsetup",            // Cryptsetup tool
-		"crypto_",               // Crypto-related functions
-		"cipher",                // Cipher operations
-		"aes-",                  // AES encryption
-		"encryption format",     // QEMU encryption format errors
-		"encrypted disk",        // Direct mention
-		"encrypted volume",      // Direct mention
+		"encryption",
+		"encrypted",
+		"luks",
+		"unknown cipher",
+		"requires a passphrase",
+		"dm-crypt",
+		"cryptsetup",
+		"crypto_",
+		"cipher",
+		"aes-",
+		"encryption format",
+		"encrypted disk",
+		"encrypted volume",
 	}
-
-	// Check for strong indicators FIRST (before excluding access rights)
 	for _, indicator := range strongIndicators {
 		if strings.Contains(lowerOutput, indicator) {
-			return true
+			return true, indicator
 		}
 	}
 
-	// Pattern: "Could not open backing image" + "VixDiskLib_Open" + "you do not have access rights"
-	// This combination typically indicates encrypted disk, not just permissions
+	// "Could not open backing image" + VixDiskLib + access rights → likely encrypted.
 	if strings.Contains(lowerOutput, "could not open backing image") &&
 		strings.Contains(lowerOutput, "vixdisklib_open") &&
 		strings.Contains(lowerOutput, "you do not have access rights") {
-		return true
+		return true, "could not open backing image + vixdisklib_open + access rights"
 	}
 
-	// Pattern: "Requested export not available" + "VixDiskLib_Open" + "you do not have access rights"
-	// This also indicates encrypted disk
+	// "Requested export not available" + VixDiskLib + access rights → likely encrypted.
 	if strings.Contains(lowerOutput, "requested export not available") &&
 		strings.Contains(lowerOutput, "vixdisklib_open") &&
 		strings.Contains(lowerOutput, "you do not have access rights") {
-		return true
+		return true, "requested export not available + vixdisklib_open + access rights"
 	}
 
-	// Exclude false positives - these are NOT encryption errors
-	// Access rights/permissions errors from VDDK (but only if not combined with the patterns above)
+	// Exclude plain access-rights errors that are not encryption-related.
 	if strings.Contains(lowerOutput, "you do not have access rights") ||
 		strings.Contains(lowerOutput, "access denied") ||
 		strings.Contains(lowerOutput, "permission denied") {
-		return false
+		return false, ""
 	}
 
-	// Pattern: QEMU reports "could not open backing image" with encryption context
+	// "Could not open backing image" with any encryption context.
 	if strings.Contains(lowerOutput, "could not open backing image") {
-		// Only if there's encryption context, not access rights issues
 		if strings.Contains(lowerOutput, "encrypt") ||
 			strings.Contains(lowerOutput, "luks") ||
 			strings.Contains(lowerOutput, "cipher") {
-			return true
+			return true, "could not open backing image + encryption context"
 		}
 	}
 
-	// Pattern: "invalid or incomplete multibyte" often appears with encrypted disks
-	// when trying to read filesystem metadata that's actually encrypted data
+	// Garbled multibyte data often means the tool is reading encrypted raw bytes.
 	if strings.Contains(lowerOutput, "invalid or incomplete multibyte") ||
 		strings.Contains(lowerOutput, "invalid multibyte") {
-		return true
+		return true, "invalid multibyte sequence"
 	}
 
-	return false
+	return false, ""
 }
