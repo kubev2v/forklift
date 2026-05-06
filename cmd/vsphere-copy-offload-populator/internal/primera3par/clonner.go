@@ -9,7 +9,7 @@ import (
 
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
-	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
+	"github.com/kubev2v/forklift/pkg/lib/client/vsphere/vmware"
 )
 
 const PROVIDER_ID = "60002ac"

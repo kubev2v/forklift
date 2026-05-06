@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
-	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
-	vmware_mocks "github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware/mocks"
+	"github.com/kubev2v/forklift/pkg/lib/client/vsphere/vmware"
+	vmware_mocks "github.com/kubev2v/forklift/pkg/lib/client/vsphere/vmware/mocks"
 
 	"go.uber.org/mock/gomock"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"

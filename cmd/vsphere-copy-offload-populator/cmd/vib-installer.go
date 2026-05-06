@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
+	"github.com/kubev2v/forklift/pkg/lib/client/vsphere/vmware"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/vim25/soap"

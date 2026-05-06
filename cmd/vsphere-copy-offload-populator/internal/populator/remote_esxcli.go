@@ -12,7 +12,7 @@ import (
 	hversion "github.com/hashicorp/go-version"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/version"
-	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
+	"github.com/kubev2v/forklift/pkg/lib/client/vsphere/vmware"
 	vmkfstoolswrapper "github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/vmkfstools-wrapper"
 	"github.com/kubev2v/forklift/pkg/lib/util"
 	"github.com/vmware/govmomi/object"
