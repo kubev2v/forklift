@@ -878,13 +878,14 @@ var _ = Describe("Customize", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("static IPs but neither legacy nor registry - no static IP uploads", func() {
+		It("static IPs but neither legacy nor registry - still injects static IP scripts", func() {
 			appConfig.StaticIPs = "00:11:22:33:44:55:ip:10.0.0.1,10.0.0.254,24,8.8.8.8,"
 			appConfig.VirtIoWinLegacyDrivers = ""
 			appConfig.WindowsRegistryNetworkConfig = false
-			mockCommandBuilder.EXPECT().AddArgs("--upload", "", gomock.Any(), "", "").Return(mockCommandBuilder)
 			err := customize.addWinFirstbootScripts(mockCommandBuilder)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("inject static IP template"))
+			Expect(err.Error()).To(ContainSubstring("9999-network-config.ps1.tmpl"))
 		})
 
 		It("legacy init path is selected when VirtIoWinLegacyDrivers is set", func() {
