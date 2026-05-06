@@ -7,13 +7,13 @@ import (
 
 // Types
 const (
-	TypeNotValid           = "TypeNotValid"
-	VMNotSet               = "VMNotSet"
-	DisksNotSet            = "DisksNotSet"
-	ConnectionNotSet       = "ConnectionNotSet"
-	VDDKImageNotSet        = "VDDKImageNotSet"
-	LUKSSecretNotSet       = "LUKSSecretNotSet"
-	TargetNamespaceNotSet  = "TargetNamespaceNotSet"
+	TypeNotValid          = "TypeNotValid"
+	VMNotSet              = "VMNotSet"
+	DisksNotSet           = "DisksNotSet"
+	ConnectionNotSet      = "ConnectionNotSet"
+	VDDKImageNotSet       = "VDDKImageNotSet"
+	LUKSSecretNotSet      = "LUKSSecretNotSet"
+	TargetNamespaceNotSet = "TargetNamespaceNotSet"
 )
 
 // Categories
