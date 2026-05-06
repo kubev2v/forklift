@@ -956,6 +956,11 @@ func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, step *plan.Step) 
 		return false, nil
 	}
 
+	if util.AnyNetAppShiftPersistentVolumeClaim(res.pvcs) {
+		res.podConfig.ExtraInitContainers = append(res.podConfig.ExtraInitContainers,
+			netAppShiftDiskPermsInitContainer(res.mounts, getVirtV2vImage(r.Plan)))
+	}
+
 	err = convbuilder.EnsureVirtV2vPod(r.Destination.Client, r.Log, vm, res.volumes, res.mounts, res.devices, res.secret, convctx.VirtV2vConversionPod, res.inPlace, res.podConfig)
 	if err != nil {
 		return
@@ -2878,45 +2883,9 @@ func (r *KubeVirt) getConvertorAffinity() *core.Affinity {
 	}
 }
 
-// netAppShiftDiskPermsInitContainer runs as root in a privileged container on filesystem-mode
-// disk PVCs only. It sets the disk image permissions to QEMU user.
+// netAppShiftDiskPermsInitContainer delegates to the shared builder function.
 func netAppShiftDiskPermsInitContainer(mounts []core.VolumeMount, image string) core.Container {
-	script := fmt.Sprintf(`
-set -e
-for m in /mnt/disks/disk*; do
-  if [ -f "$m/disk.img" ]; then
-    chown %d:%d "$m/disk.img"
-    chmod 660 "$m/disk.img"
-  fi
-done
-`, qemuUser, qemuGroup)
-	runAsNonRoot := false
-	var runAsUser int64 = 0
-	return core.Container{
-		Name:            "netapp-shift-disk-perms",
-		Image:           image,
-		Command:         []string{"/bin/sh", "-c", script},
-		VolumeMounts:    mounts,
-		ImagePullPolicy: core.PullIfNotPresent,
-		Resources: core.ResourceRequirements{
-			Requests: core.ResourceList{
-				core.ResourceCPU:    resource.MustParse(Settings.Migration.NetAppShiftDiskPermsInitRequestsCpu),
-				core.ResourceMemory: resource.MustParse(Settings.Migration.NetAppShiftDiskPermsInitRequestsMemory),
-			},
-			Limits: core.ResourceList{
-				core.ResourceCPU:    resource.MustParse(Settings.Migration.NetAppShiftDiskPermsInitLimitsCpu),
-				core.ResourceMemory: resource.MustParse(Settings.Migration.NetAppShiftDiskPermsInitLimitsMemory),
-			},
-		},
-		SecurityContext: &core.SecurityContext{
-			RunAsUser:    &runAsUser,
-			RunAsNonRoot: &runAsNonRoot,
-			Capabilities: &core.Capabilities{
-				Add:  []core.Capability{"CHOWN", "DAC_OVERRIDE", "FOWNER"},
-				Drop: []core.Capability{"ALL"},
-			},
-		},
-	}
+	return convbuilder.NetAppShiftDiskPermsInitContainer(mounts, image)
 }
 
 // Build the inspection pod environment

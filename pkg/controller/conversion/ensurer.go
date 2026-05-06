@@ -8,6 +8,7 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	convctx "github.com/kubev2v/forklift/pkg/controller/conversion/context"
+	planutil "github.com/kubev2v/forklift/pkg/controller/plan/util"
 	ocp "github.com/kubev2v/forklift/pkg/lib/client/openshift"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
@@ -194,6 +195,13 @@ func (e *Ensurer) ensureVirtV2vPodFromSpec(conversion *api.Conversion, cfg convc
 	volumes, mounts, devices, err := e.VolumesFromDiskRefs(conversion.Spec.Disks)
 	if err != nil {
 		return nil, err
+	}
+
+	if shift, sErr := e.anyNetAppShiftDisk(conversion.Spec.Disks); sErr != nil {
+		e.Log.Error(sErr, "Could not check for NetApp Shift PVCs; skipping init container.")
+	} else if shift {
+		cfg.ExtraInitContainers = append(cfg.ExtraInitContainers,
+			NetAppShiftDiskPermsInitContainer(mounts, cfg.Image))
 	}
 
 	volumes = append(volumes, core.Volume{
@@ -389,6 +397,28 @@ func (e *Ensurer) VolumesFromDiskRefs(disks []api.DiskRef) (volumes []core.Volum
 		}
 	}
 	return
+}
+
+// anyNetAppShiftDisk returns true if any disk in the list is backed by a
+// NetApp Shift (NFS-offloaded) PVC, by checking PVC annotations on the
+// destination cluster.
+func (e *Ensurer) anyNetAppShiftDisk(disks []api.DiskRef) (bool, error) {
+	for _, disk := range disks {
+		if disk.Namespace == "" {
+			continue
+		}
+		pvc := &core.PersistentVolumeClaim{}
+		if err := e.DestinationClient.Get(context.TODO(), types.NamespacedName{
+			Namespace: disk.Namespace,
+			Name:      disk.Name,
+		}, pvc); err != nil {
+			return false, liberr.Wrap(err)
+		}
+		if planutil.IsNetAppShiftPersistentVolumeClaim(pvc.Annotations) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // EnsureVirtV2vPod creates the conversion or inspection pod if it does

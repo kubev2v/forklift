@@ -8,7 +8,6 @@ import (
 
 // Environment Variables
 const (
-<<<<<<< HEAD
 	FeatureOvirtWarmMigration           = "FEATURE_OVIRT_WARM_MIGRATION"
 	FeatureRetainPrecopyImporterPods    = "FEATURE_RETAIN_PRECOPY_IMPORTER_PODS"
 	FeatureStaticUdnIpAddresses         = "FEATURE_STATIC_UDN_IP_ADDRESSES"
@@ -19,18 +18,7 @@ const (
 	FeatureOVFApplianceManagement       = "FEATURE_OVF_APPLIANCE_MANAGEMENT"
 	FeatureVsphereVmwareDriverRemoval   = "FEATURE_VSPHERE_VMWARE_DRIVER_REMOVAL"
 	FeatureWindowsRegistryNetworkConfig = "FEATURE_WINDOWS_REGISTRY_NETWORK_CONFIG"
-=======
-	FeatureOvirtWarmMigration         = "FEATURE_OVIRT_WARM_MIGRATION"
-	FeatureRetainPrecopyImporterPods  = "FEATURE_RETAIN_PRECOPY_IMPORTER_PODS"
-	FeatureStaticUdnIpAddresses       = "FEATURE_STATIC_UDN_IP_ADDRESSES"
-	FeatureVsphereIncrementalBackup   = "FEATURE_VSPHERE_INCREMENTAL_BACKUP"
-	FeatureCopyOffload                = "FEATURE_COPY_OFFLOAD"
-	FeatureOCPLiveMigration           = "FEATURE_OCP_LIVE_MIGRATION"
-	FeatureVmwareSystemSerialNumber   = "FEATURE_VMWARE_SYSTEM_SERIAL_NUMBER"
-	FeatureOVFApplianceManagement     = "FEATURE_OVF_APPLIANCE_MANAGEMENT"
-	FeatureVsphereVmwareDriverRemoval = "FEATURE_VSPHERE_VMWARE_DRIVER_REMOVAL"
-	FeatureUseConversionCR            = "FEATURE_USE_CONVERSION_CR"
->>>>>>> 803ff8a7f (move feature setting to FC)
+	FeatureUseConversionCR              = "FEATURE_USE_CONVERSION_CR"
 )
 
 // OpenShift version where the FeatureVmwareSystemSerialNumber feature is supported:

@@ -107,7 +107,7 @@ func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, vo
 		environment = append(environment, core.EnvVar{Name: "V2V_inPlace", Value: "1"})
 	}
 
-	var initContainers []core.Container
+	initContainers := append([]core.Container(nil), cfg.ExtraInitContainers...)
 	if cfg.VDDKImage != "" {
 		initContainers = append(initContainers, core.Container{
 			Name:            "vddk-side-car",
@@ -481,4 +481,46 @@ func (b *Builder) appendDiskEncryptionEnv(env []core.EnvVar) []core.EnvVar {
 		env = append(env, core.EnvVar{Name: "V2V_NBDE_CLEVIS", Value: "true"})
 	}
 	return env
+}
+
+// NetAppShiftDiskPermsInitContainer returns an init container that runs as root
+// and sets ownership/permissions on NetApp Shift-migrated disk images so that
+// virt-v2v can access them as the QEMU user.
+func NetAppShiftDiskPermsInitContainer(mounts []core.VolumeMount, image string) core.Container {
+	script := fmt.Sprintf(`
+set -e
+for m in /mnt/disks/disk*; do
+  if [ -f "$m/disk.img" ]; then
+    chown %d:%d "$m/disk.img"
+    chmod 660 "$m/disk.img"
+  fi
+done
+`, qemuUser, qemuGroup)
+	runAsNonRoot := false
+	var runAsUser int64 = 0
+	return core.Container{
+		Name:            "netapp-shift-disk-perms",
+		Image:           image,
+		Command:         []string{"/bin/sh", "-c", script},
+		VolumeMounts:    mounts,
+		ImagePullPolicy: core.PullIfNotPresent,
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse(settings.Settings.Migration.NetAppShiftDiskPermsInitRequestsCpu),
+				core.ResourceMemory: resource.MustParse(settings.Settings.Migration.NetAppShiftDiskPermsInitRequestsMemory),
+			},
+			Limits: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse(settings.Settings.Migration.NetAppShiftDiskPermsInitLimitsCpu),
+				core.ResourceMemory: resource.MustParse(settings.Settings.Migration.NetAppShiftDiskPermsInitLimitsMemory),
+			},
+		},
+		SecurityContext: &core.SecurityContext{
+			RunAsUser:    &runAsUser,
+			RunAsNonRoot: &runAsNonRoot,
+			Capabilities: &core.Capabilities{
+				Add:  []core.Capability{"CHOWN", "DAC_OVERRIDE", "FOWNER"},
+				Drop: []core.Capability{"ALL"},
+			},
+		},
+	}
 }

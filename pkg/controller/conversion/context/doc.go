@@ -74,6 +74,9 @@ type PodConfig struct {
 	DeepInspectionSnapshotMoref string
 	// DiskEncryption carries the disk encryption config from the Conversion spec into the builder.
 	DiskEncryption *api.DiskEncryption
+	// ExtraInitContainers are prepended to the pod's init container list before the VDDK sidecar.
+	// Used by callers that need provider-specific init work (e.g. NetApp Shift disk-perms fixer).
+	ExtraInitContainers []core.Container
 }
 
 // PodConfigFromSpec builds a PodConfig from a Conversion CR spec.
