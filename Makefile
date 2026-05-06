@@ -121,6 +121,7 @@ HYPERV_PROVIDER_SERVER_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-hyperv-prov
 OVA_PROXY_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-ova-proxy:$(REGISTRY_TAG)
 CLI_DOWNLOAD_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-cli-download:$(REGISTRY_TAG)
 VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/vsphere-copy-offload-populator:$(REGISTRY_TAG)
+DEEP_INSPECTION_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-deep-inspection:$(REGISTRY_TAG)
 
 ### OLM
 OPERATOR_BUNDLE_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/forklift-operator-bundle:$(REGISTRY_TAG)
@@ -461,6 +462,23 @@ build-ova-proxy-image: check_container_runtime
 push-ova-proxy-image: build-ova-proxy-image
 	$(CONTAINER_CMD) push $(OVA_PROXY_IMAGE)$(PLATFORM_SUFFIX)
 
+build-deep-inspection-image: check_container_runtime ## Build forklift-deep-inspection (virt-inspector + VDDK) container image
+	# libguestfs/virt tools stack is AMD64-only
+	@if [ "$(PLATFORM_ARCH)" != "amd64" ]; then \
+		echo "Notice: deep-inspection image build is only supported on amd64 platform."; \
+		echo "Current platform: $(PLATFORM) - skipping deep-inspection image build."; \
+	else \
+		$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(DEEP_INSPECTION_IMAGE)$(PLATFORM_SUFFIX) -f build/deep-inspection/Containerfile-upstream .; \
+	fi
+
+push-deep-inspection-image: build-deep-inspection-image ## Push forklift-deep-inspection image
+	@if [ "$(PLATFORM_ARCH)" != "amd64" ]; then \
+		echo "Notice: deep-inspection image push is only supported on amd64 platform."; \
+		echo "Current platform: $(PLATFORM) - skipping deep-inspection image push."; \
+	else \
+		$(CONTAINER_CMD) push $(DEEP_INSPECTION_IMAGE)$(PLATFORM_SUFFIX); \
+	fi
+
 build-all-images: ## Build all container images
 build-all-images: build-api-image \
                   build-controller-image \
@@ -476,6 +494,7 @@ build-all-images: build-api-image \
                   build-hyperv-provider-server-image \
                   build-cli-download-image \
                   build-ova-proxy-image \
+                  build-deep-inspection-image \
                   build-operator-bundle-image \
                   build-operator-index-image
 
@@ -494,8 +513,9 @@ push-all-images:  push-api-image \
                   push-hyperv-provider-server-image \
                   push-cli-download-image \
                   push-ova-proxy-image \
+                  push-deep-inspection-image \
                   push-operator-bundle-image \
-				  push-operator-index-image            
+                  push-operator-index-image
 
 ##@ Multi-Architecture Manifests
 

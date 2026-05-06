@@ -91,6 +91,10 @@ spec:
                 type: string
                 enum: ["true", "false"]
                 description: "Use registry-based network configuration scripts for Windows static IP setup (default: false)"
+              feature_use_conversion_cr:
+                type: string
+                enum: ["true", "false"]
+                description: "Delegate VM conversion to Conversion CRs instead of managing it directly (default: true)"
 
               # Container Images
               controller_image_fqin:
@@ -105,6 +109,10 @@ spec:
                 type: string
                 description: "Virt-v2v XFS conversion image used by migration pods"
                 example: "quay.io/kubev2v/forklift-virt-v2v-xfs:latest"
+              deep_inspection_image_fqin:
+                type: string
+                description: "Deep inspection image used by deep-inspection pods"
+                example: "quay.io/kubev2v/forklift-deep-inspection:latest"
               vddk_image:
                 type: string
                 description: "VDDK image for VMware disk access"

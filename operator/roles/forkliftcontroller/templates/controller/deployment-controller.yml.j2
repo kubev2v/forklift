@@ -50,6 +50,8 @@ spec:
           value: {{ virt_v2v_image_fqin }}
         - name: VIRT_V2V_IMAGE_XFS
           value: {{ virt_v2v_image_xfs_fqin }}
+        - name: DEEP_INSPECTION_IMAGE
+          value: {{ deep_inspection_image_fqin }}
         - name: API_PORT
           value: "8443"
         - name: METRICS_PORT
@@ -184,8 +186,9 @@ spec:
 {% endif %}
 {% if feature_windows_registry_network_config|bool %}
         - name: FEATURE_WINDOWS_REGISTRY_NETWORK_CONFIG
-          value: "true"
-{% endif %}
+{% if feature_use_conversion_cr|bool %}
+        - name: FEATURE_USE_CONVERSION_CR
+          value: "{{ feature_use_conversion_cr|bool|lower }}"
 {% if ovirt_osmap_configmap_name is defined %}
         - name: OVIRT_OS_MAP
           value: {{ ovirt_osmap_configmap_name }}

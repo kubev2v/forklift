@@ -11,6 +11,7 @@ feature_ocp_live_migration: true
 feature_vmware_system_serial_number: true
 feature_vsphere_vmware_driver_removal: false
 feature_windows_registry_network_config: false
+feature_use_conversion_cr: true
 feature_cli_download: true
 feature_mcp_server: false
 feature_ova_appliance_management: true
@@ -166,6 +167,7 @@ must_gather_image_fqin: "{{ lookup( 'env', 'MUST_GATHER_IMAGE') or lookup( 'env'
 
 virt_v2v_image_fqin: "{{ lookup( 'env', 'VIRT_V2V_IMAGE') or lookup( 'env', 'RELATED_IMAGE_VIRT_V2V') }}"
 virt_v2v_image_xfs_fqin: "{{ lookup( 'env', 'VIRT_V2V_IMAGE_XFS') or lookup( 'env', 'RELATED_IMAGE_VIRT_V2V_XFS') }}"
+deep_inspection_image_fqin: "{{ lookup( 'env', 'DEEP_INSPECTION_IMAGE') or lookup( 'env', 'RELATED_IMAGE_DEEP_INSPECTION') }}"
 virt_v2v_dont_request_kvm: "{{ lookup( 'env', 'VIRT_V2V_DONT_REQUEST_KVM') }}"
 virt_v2v_extra_args: "{{ lookup( 'env', 'VIRT_V2V_EXTRA_ARGS') }}"
 virt_v2v_inspector_extra_args: "{{ lookup( 'env', 'VIRT_V2V_INSPECTOR_EXTRA_ARGS') }}"
@@ -224,4 +226,3 @@ metric_servicemonitor_name: "{{ app_name }}-metrics"
 metric_interval: "30s"
 metric_port_name: "metrics"
 metrics_rule_name: "{{app_name}}-migration-rules"
-

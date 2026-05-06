@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"github.com/kubev2v/forklift/pkg/controller/conversion"
 	"github.com/kubev2v/forklift/pkg/controller/hook"
 	"github.com/kubev2v/forklift/pkg/controller/host"
 	"github.com/kubev2v/forklift/pkg/controller/hyperv"
@@ -45,6 +46,7 @@ var MainControllers = []AddFunction{
 	storage.Add,
 	host.Add,
 	hook.Add,
+	conversion.Add,
 }
 
 // List of Inventory controllers

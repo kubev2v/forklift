@@ -16,6 +16,7 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	convctx "github.com/kubev2v/forklift/pkg/controller/conversion/context"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
@@ -367,7 +368,7 @@ func (r *Migration) Cancel() error {
 				}
 				return false
 			}
-			_ = r.cleanup(vm, dontFailOnError)
+			_ = r.cleanup(vm, dontFailOnError, true)
 			if vm.RestorePowerState == plan.VMPowerStateOn {
 				if err := r.provider.PowerOn(vm.Ref); err != nil {
 					r.Log.Error(err,
@@ -400,8 +401,12 @@ func markStartedStepsCompleted(vm *plan.VMStatus) {
 	}
 }
 
-// Delete left over migration resources associated with a VM.
-func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool) error {
+// cleanup deletes left-over migration resources associated with a VM.
+// Pass cancelConversions=true to only cancel Conversion CRs (plan canceled);
+// omit or pass false to fully delete them (archive, retry).
+func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool, cancelConversions ...bool) error {
+	isCancelOnly := len(cancelConversions) > 0 && cancelConversions[0]
+
 	// If the migration fails and the DeleteVmOnFailMigration is enabled, clean up the VM.
 	// When DeleteVmOnFailMigration is disabled, VM resources are preserved on failure.
 	if !vm.HasCondition(api.ConditionSucceeded) && (r.Plan.Spec.DeleteVmOnFailMigration || vm.DeleteVmOnFailMigration) {
@@ -425,10 +430,22 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool) error
 	if err := r.kubevirt.DeleteGuestConversionPod(vm); failOnErr(err) {
 		return err
 	}
-	if err := r.kubevirt.DeletePreflightInspectionPod(vm); failOnErr(err) {
-		return err
+	if settings.Settings.UseConversionCR {
+		if isCancelOnly {
+			if err := r.kubevirt.CancelConversion(vm); failOnErr(err) {
+				return err
+			}
+		} else {
+			if err := r.kubevirt.DeleteAllConversions(vm); failOnErr(err) {
+				return err
+			}
+		}
+	} else {
+		if err := r.kubevirt.DeleteSecret(vm); failOnErr(err) {
+			return err
+		}
 	}
-	if err := r.kubevirt.DeleteSecret(vm); failOnErr(err) {
+	if err := r.kubevirt.DeletePreflightInspectionPod(vm); failOnErr(err) {
 		return err
 	}
 	if err := r.kubevirt.DeleteConfigMap(vm); failOnErr(err) {
@@ -1257,10 +1274,23 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			step.MarkStarted()
 			step.Phase = api.StepRunning
 			var ready bool
-			if ready, err = r.ensureGuestConversionPod(vm, step); err != nil {
-				step.AddError(err.Error())
-				err = nil
-				break
+			if settings.Settings.UseConversionCR {
+				convType, resolveErr := r.kubevirt.ResolveConversionType(vm)
+				if resolveErr != nil {
+					step.AddError(resolveErr.Error())
+					break
+				}
+				if ready, err = r.kubevirt.EnsureConversion(vm, convType, r.Plan.Name, r.Plan.Namespace, string(r.Plan.UID), r.Migration, step); err != nil {
+					step.AddError(err.Error())
+					err = nil
+					break
+				}
+			} else {
+				if ready, err = r.kubevirt.EnsureGuestConversionPod(vm, step); err != nil {
+					step.AddError(err.Error())
+					err = nil
+					break
+				}
 			}
 			if !ready {
 				r.Log.Info("virt-v2v pod isn't ready yet")
@@ -1309,9 +1339,81 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			step.MarkStarted()
 			step.Phase = api.StepRunning
 
-			// Create inspection pod if missing
+			if settings.Settings.UseConversionCR {
+				snapshotMoref := vm.Warm.Precopies[0].Snapshot
+
+				var cr *api.Conversion
+				cr, err = r.kubevirt.GetDeepInspectionConversion(vm)
+				if err != nil {
+					step.AddError(err.Error())
+					err = nil
+					break
+				}
+
+				if cr == nil {
+					// No CR yet, first attempt
+					// retryAllowed=false means if this one fails it will not be retried automatically.
+					_, err = r.kubevirt.CreateDeepInspectionConversion(
+						vm, snapshotMoref, r.Plan.Name, string(r.Plan.UID), false)
+					if err != nil {
+						step.AddError(err.Error())
+						err = nil
+					}
+					return
+				}
+
+				switch cr.Status.Phase {
+				case api.PhaseSucceeded:
+					// Propagate concerns and advance, failing on blockers.
+					if blockers := r.propagateInspectionConcerns(vm, cr.Status.InspectionResult); len(blockers) > 0 {
+						step.Error = &plan.Error{
+							Reasons: append([]string{"VM deep inspection found critical concerns"}, blockers...),
+							Phase:   step.Phase,
+						}
+						break
+					}
+					r.NextPhase(vm)
+
+				case api.PhaseFailed, api.PhaseCanceled:
+					r.Log.Info("Deep inspection CR failed.",
+						"conversion", cr.Name,
+						"phase", cr.Status.Phase,
+						"vm", vm.String())
+					retryLabel, hasLabel := cr.Labels[convctx.LabelRetryAllowed]
+					// Label present and explicitly false, no more retries.
+					if hasLabel && retryLabel == "false" {
+						step.AddError("Deep inspection failed after retry.")
+						break
+					}
+					// Label missing or set to "true", one retry allowed.
+					// Delete the failed CR and recreate it with retryAllowed=false so
+					// the replacement cannot trigger another retry.
+					if err = r.kubevirt.DeleteConversion(cr); err != nil {
+						step.AddError(err.Error())
+						err = nil
+						break
+					}
+					_, err = r.kubevirt.CreateDeepInspectionConversion(
+						vm, snapshotMoref, r.Plan.Name, string(r.Plan.UID), false)
+					if err != nil {
+						step.AddError(err.Error())
+						err = nil
+					}
+					return
+
+				default:
+					// Pending/Running, still in progress.
+					r.Log.Info("Deep inspection CR is still in progress.",
+						"conversion", cr.Name,
+						"phase", cr.Status.Phase,
+						"vm", vm.String())
+					return
+				}
+				break
+			}
+
 			var ready bool
-			if ready, err = r.ensureGuestInspectionPod(vm, step); err != nil {
+			if ready, err = r.kubevirt.EnsureGuestInspectionPod(vm, step); err != nil {
 				step.AddError(err.Error())
 				err = nil
 				break
@@ -1321,10 +1423,8 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				return
 			}
 
-			// Fetch the inspection pod
 			var pod *core.Pod
-			pod, err = r.getInspectionPod(vm)
-
+			pod, err = r.kubevirt.GetConversionPod(vm.Ref, VirtV2vInspectionPod)
 			if err != nil {
 				step.AddError(err.Error())
 				err = nil
@@ -1497,73 +1597,6 @@ func (r *Migration) end() (completed bool, err error) {
 }
 
 // Ensure the guest conversion pod is present.
-func (r *Migration) ensureGuestConversionPod(vm *plan.VMStatus, step *plan.Step) (ready bool, err error) {
-	if r.vmMap == nil {
-		r.vmMap, err = r.kubevirt.VirtualMachineMap()
-		if err != nil {
-			return
-		}
-	}
-	var vmCr VirtualMachine
-	var pvcs []*core.PersistentVolumeClaim
-	found := false
-	if vmCr, found = r.vmMap[vm.ID]; !found {
-		vmCr.VirtualMachine, err = r.kubevirt.virtualMachine(vm, true)
-		if err != nil {
-			return
-		}
-		pvcs, err = r.kubevirt.getPVCs(vm.Ref)
-		if err != nil {
-			return
-		}
-	}
-
-	err = r.kubevirt.EnsureVirtV2vPod(vm, &vmCr, pvcs, VirtV2vConversionPod, step)
-	if err != nil {
-		return
-	}
-
-	switch r.Source.Provider.Type() {
-	case api.Ova, api.HyperV:
-		ready, err = r.kubevirt.EnsureProviderVirtV2VPVCStatus(vm.ID)
-	case api.EC2, api.VSphere:
-		ready = true
-	}
-
-	return
-}
-
-// Ensure the guest inspection pod is present.
-func (r *Migration) ensureGuestInspectionPod(vm *plan.VMStatus, step *plan.Step) (ready bool, err error) {
-	var vmCr VirtualMachine
-	var pvcs []*core.PersistentVolumeClaim
-	// pass empty vmCr and pvcs because they are not used when getting inspection pod
-	err = r.kubevirt.EnsureVirtV2vPod(vm, &vmCr, pvcs, VirtV2vInspectionPod, step)
-	if err != nil {
-		return
-	}
-	// When inspection pod does not exist, something went wrong while creating, most likely the parent backing was missing
-	if pod, err := r.getInspectionPod(vm); pod == nil {
-		return false, err
-	}
-	return true, err
-}
-
-// Get pod that has inspection label
-func (r *Migration) getInspectionPod(vm *plan.VMStatus) (pod *core.Pod, err error) {
-	list, err := r.kubevirt.GetPodsWithLabels(r.kubevirt.inspectionLabels(vm.Ref))
-	if err != nil {
-		return
-	}
-
-	if len(list.Items) > 0 {
-		pod = &list.Items[0]
-		return
-	}
-
-	return
-}
-
 func (r *Migration) setTaskCompleted(task *plan.Task) {
 	task.Phase = api.StepCompleted
 	task.Reason = TransferCompleted
@@ -1813,7 +1846,7 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 }
 
 func (r *Migration) updateConversionProgressV2vMonitor(pod *core.Pod, step *plan.Step) (err error) {
-	var diskRegex = regexp.MustCompile(`v2v_disk_transfers\{disk_id="(\d+)"\} (\d{1,3}\.?\d*)`)
+	diskRegex := regexp.MustCompile(`v2v_disk_transfers\{disk_id="(\d+)"\} (\d{1,3}\.?\d*)`)
 	url := fmt.Sprintf("http://%s:2112/metrics", pod.Status.PodIP)
 	resp, err := http.Get(url)
 	switch {
@@ -1993,6 +2026,27 @@ func (r *Migration) setPopulatorPodsWithLabels(vm *plan.VMStatus, migrationID st
 			}
 		}
 	}
+}
+
+// propagateInspectionConcerns maps concerns from an InspectionResult onto the VM
+// status as conditions and returns the messages of any blocker concerns (Critical or Error).
+func (r *Migration) propagateInspectionConcerns(vm *plan.VMStatus, result *api.InspectionResult) (blockerMessages []string) {
+	if result == nil {
+		return
+	}
+	for _, c := range result.Concerns {
+		vm.SetCondition(libcnd.Condition{
+			Type:     InspectionHasConcerns,
+			Status:   libcnd.True,
+			Category: c.Category,
+			Reason:   c.ID,
+			Message:  c.Message,
+		})
+		if c.Category == libcnd.Critical || c.Category == libcnd.Error {
+			blockerMessages = append(blockerMessages, c.Message)
+		}
+	}
+	return
 }
 
 // Retrieve the termination message from a pod's first container.
