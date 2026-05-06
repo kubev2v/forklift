@@ -114,8 +114,19 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		return
 	}
 
-	// canceled conversion
+	// Canceled: delete pod, trigger snapshot removal (fire-and-forget), keep secrets.
 	if conversion.Status.Phase == api.PhaseCanceled {
+		ensurer, ensureErr := NewEnsurer(r.Client, r.Log, conversion.Spec)
+		if ensureErr == nil {
+			if podErr := ensurer.DeletePod(conversion); podErr != nil {
+				r.Log.Error(podErr, "Failed to delete pod for canceled Conversion.")
+			}
+			if _, snapErr := ensurer.RemoveOwnedSnapshot(ctx, conversion); snapErr != nil {
+				r.Log.Error(snapErr, "Failed to trigger snapshot removal for canceled Conversion.")
+			}
+		} else {
+			r.Log.Error(ensureErr, "Failed to build Ensurer for canceled Conversion.")
+		}
 		resolvePhaseConditions(conversion)
 		conversion.Status.EndStagingConditions()
 		r.Record(conversion, conversion.Status.Conditions)
@@ -242,3 +253,4 @@ func resolveStageConditions(conversion *api.Conversion) {
 		Message:  msg,
 	})
 }
+

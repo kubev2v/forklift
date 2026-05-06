@@ -12,6 +12,7 @@ import (
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -260,6 +261,83 @@ func (e *Ensurer) GetPod(conversion *api.Conversion, labels map[string]string) (
 	} else {
 		return nil, nil
 	}
+}
+
+// DeletePod finds the pod that was created for the Conversion CR and deletes
+// it. Returns nil when no pod is found (already gone or never created).
+func (e *Ensurer) DeletePod(conversion *api.Conversion) error {
+	cfg := convctx.PodConfigFromSpec(conversion)
+	pod, err := e.GetPod(conversion, cfg.PodLabels)
+	if err != nil || pod == nil {
+		return err
+	}
+	if err := e.DestinationClient.Delete(context.TODO(), pod); err != nil && !k8serr.IsNotFound(err) {
+		return liberr.Wrap(err)
+	}
+	return nil
+}
+
+// RemoveOwnedSnapshot drives async vSphere snapshot removal for a
+// controller-owned DeepInspection snapshot. Returns (true, nil) when done or
+// when there is nothing to remove. Returns (false, nil) while the vSphere
+// task is still in flight; the caller must persist status and requeue.
+func (e *Ensurer) RemoveOwnedSnapshot(ctx context.Context, conversion *api.Conversion) (bool, error) {
+	if conversion.Spec.Type != api.DeepInspection {
+		return true, nil
+	}
+	if !snapshotOwnedByController(conversion) {
+		return true, nil
+	}
+	if conversion.Status.Snapshot == nil || conversion.Status.Snapshot.Moref == "" {
+		return true, nil
+	}
+
+	if conversion.Spec.Connection.Secret.Name == "" || conversion.Spec.Connection.Secret.Namespace == "" {
+		return false, liberr.New("cannot remove snapshot: connection secret not set",
+			"conversion", path.Join(conversion.Namespace, conversion.Name))
+	}
+	secret := &core.Secret{}
+	if err := e.Client.Get(ctx, types.NamespacedName{
+		Namespace: conversion.Spec.Connection.Secret.Namespace,
+		Name:      conversion.Spec.Connection.Secret.Name,
+	}, secret); err != nil {
+		return false, liberr.Wrap(err)
+	}
+
+	snap := conversion.Status.Snapshot
+
+	snapClient, err := newSnapshotClientFromSecret(ctx, e.Log, secret, conversion.Spec.VM)
+	if err != nil {
+		return false, err
+	}
+	defer snapClient.Close()
+
+	if snap.RemoveTaskID == "" {
+		// Stage 1: submit removal task.
+		taskID, err := snapClient.RemoveSnapshot(snap.Moref)
+		if err != nil {
+			return false, err
+		}
+		snap.RemoveTaskID = taskID
+		e.Log.Info("Snapshot removal task submitted.",
+			"moref", snap.Moref, "taskID", snap.RemoveTaskID,
+			"conversion", path.Join(conversion.Namespace, conversion.Name))
+		return false, nil
+	}
+
+	// Stage 2: poll for completion.
+	ready, err := snapClient.CheckRemoveTaskReady(snap.RemoveTaskID)
+	if err != nil {
+		return false, err
+	}
+	if !ready {
+		return false, nil
+	}
+	e.Log.Info("Owned snapshot removed.",
+		"moref", snap.Moref,
+		"conversion", path.Join(conversion.Namespace, conversion.Name))
+	conversion.Status.Snapshot = nil
+	return true, nil
 }
 
 // VolumesFromDiskRefs converts a slice of DiskRef into Kubernetes

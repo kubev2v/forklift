@@ -586,24 +586,14 @@ func (p *ConversionPipeline) runStageRemovingSnapshot() (stageDone bool, err err
 	if err != nil {
 		return stageDone, err
 	}
-
-	gClient, err := GovmomiClientFromSecret(p.ctx, secret)
+	snapClient, err := newSnapshotClientFromSecret(p.ctx, p.r.Log, secret, p.conv.Spec.VM)
 	if err != nil {
-		return stageDone, err
+		return false, err
 	}
-	defer func() {
-		_ = gClient.Logout(p.ctx)
-		gClient.CloseIdleConnections()
-	}()
-
-	snapClient, err := NewSnapshotClient(p.r.Log, gClient, p.conv.Spec.VM)
-	if err != nil {
-		return stageDone, err
-	}
-
+	defer snapClient.Close()
 	taskID, err := snapClient.RemoveSnapshot(snap.Moref)
 	if err != nil {
-		return stageDone, err
+		return false, err
 	}
 	snap.RemoveTaskID = taskID
 	return true, nil
@@ -617,32 +607,20 @@ func (p *ConversionPipeline) runStageWaitingForSnapshotRemoval() (stageDone bool
 	if err != nil {
 		return stageDone, err
 	}
-
-	gClient, err := GovmomiClientFromSecret(p.ctx, secret)
+	snapClient, err := newSnapshotClientFromSecret(p.ctx, p.r.Log, secret, p.conv.Spec.VM)
 	if err != nil {
-		return stageDone, err
+		return false, err
 	}
-	defer func() {
-		_ = gClient.Logout(p.ctx)
-		gClient.CloseIdleConnections()
-	}()
-
-	snapClient, err := NewSnapshotClient(p.r.Log, gClient, p.conv.Spec.VM)
-	if err != nil {
-		return stageDone, err
-	}
-
+	defer snapClient.Close()
 	ready, err := snapClient.CheckRemoveTaskReady(snap.RemoveTaskID)
 	if err != nil {
 		p.r.Log.Error(err, "Snapshot removal task failed.", "taskID", snap.RemoveTaskID)
 		p.setPhase(api.PhaseFailed)
-		return stageDone, nil
+		return false, nil
 	}
 	if !ready {
-		return stageDone, nil
+		return false, nil
 	}
-
-	// Snapshot removed
 	p.conv.Status.Snapshot = nil
 	return true, nil
 }

@@ -368,7 +368,7 @@ func (r *Migration) Cancel() error {
 				}
 				return false
 			}
-			_ = r.cleanup(vm, dontFailOnError)
+			_ = r.cleanup(vm, dontFailOnError, true)
 			if vm.RestorePowerState == plan.VMPowerStateOn {
 				if err := r.provider.PowerOn(vm.Ref); err != nil {
 					r.Log.Error(err,
@@ -401,8 +401,12 @@ func markStartedStepsCompleted(vm *plan.VMStatus) {
 	}
 }
 
-// Delete left over migration resources associated with a VM.
-func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool) error {
+// cleanup deletes left-over migration resources associated with a VM.
+// Pass cancelConversions=true to only cancel Conversion CRs (plan canceled);
+// omit or pass false to fully delete them (archive, retry).
+func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool, cancelConversions ...bool) error {
+	isCancelOnly := len(cancelConversions) > 0 && cancelConversions[0]
+
 	// If the migration fails and the DeleteVmOnFailMigration is enabled, clean up the VM.
 	// When DeleteVmOnFailMigration is disabled, VM resources are preserved on failure.
 	if !vm.HasCondition(api.ConditionSucceeded) && (r.Plan.Spec.DeleteVmOnFailMigration || vm.DeleteVmOnFailMigration) {
@@ -427,14 +431,21 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool) error
 		return err
 	}
 	if settings.Settings.UseConversionCR {
-		if err := r.kubevirt.CancelConversion(vm); failOnErr(err) {
+		if isCancelOnly {
+			if err := r.kubevirt.CancelConversion(vm); failOnErr(err) {
+				return err
+			}
+		} else {
+			if err := r.kubevirt.DeleteAllConversions(vm); failOnErr(err) {
+				return err
+			}
+		}
+	} else {
+		if err := r.kubevirt.DeleteSecret(vm); failOnErr(err) {
 			return err
 		}
 	}
 	if err := r.kubevirt.DeletePreflightInspectionPod(vm); failOnErr(err) {
-		return err
-	}
-	if err := r.kubevirt.DeleteSecret(vm); failOnErr(err) {
 		return err
 	}
 	if err := r.kubevirt.DeleteConfigMap(vm); failOnErr(err) {

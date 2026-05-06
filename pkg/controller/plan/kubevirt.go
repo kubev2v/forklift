@@ -487,7 +487,7 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 			source.Data,
 		)
 		var luksSecret *core.Secret
-		luksSecret, err = r.ensureConversionSecret(luksSecretSpec)
+		luksSecret, err = r.ensureConversionSecret(r.Destination.Client, luksSecretSpec)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -611,9 +611,9 @@ func (r *KubeVirt) buildConversionSecret(namespace, generateName string, labels 
 	}
 }
 
-// ensureConversionSecret creates or updates a Secret on the destination cluster.
-// The existing Secret is found by matching all labels except LabelPlan (due to it's changing nature)
-func (r *KubeVirt) ensureConversionSecret(secret *core.Secret) (*core.Secret, error) {
+// ensureConversionSecret creates or updates a Secret using the supplied client.
+// Existing secrets are found by label-match, excluding LabelPlan (it changes).
+func (r *KubeVirt) ensureConversionSecret(cl client.Client, secret *core.Secret) (*core.Secret, error) {
 	lookupLabels := make(map[string]string, len(secret.Labels))
 	for k, v := range secret.Labels {
 		if k != convctx.LabelPlan {
@@ -621,7 +621,7 @@ func (r *KubeVirt) ensureConversionSecret(secret *core.Secret) (*core.Secret, er
 		}
 	}
 	list := &core.SecretList{}
-	if err := r.Destination.Client.List(context.TODO(), list,
+	if err := cl.List(context.TODO(), list,
 		&client.ListOptions{
 			LabelSelector: k8slabels.SelectorFromSet(lookupLabels),
 			Namespace:     secret.Namespace,
@@ -632,14 +632,14 @@ func (r *KubeVirt) ensureConversionSecret(secret *core.Secret) (*core.Secret, er
 	if len(list.Items) > 0 {
 		existing := &list.Items[0]
 		existing.Data = secret.Data
-		if err := r.Destination.Client.Update(context.TODO(), existing); err != nil {
+		if err := cl.Update(context.TODO(), existing); err != nil {
 			return nil, liberr.Wrap(err)
 		}
 		r.Log.V(1).Info("Conversion secret updated.",
 			"secret", path.Join(existing.Namespace, existing.Name))
 		return existing, nil
 	}
-	if err := r.Destination.Client.Create(context.TODO(), secret); err != nil {
+	if err := cl.Create(context.TODO(), secret); err != nil {
 		return nil, liberr.Wrap(err)
 	}
 	r.Log.V(1).Info("Conversion secret created.",
@@ -666,17 +666,18 @@ func (r *KubeVirt) CreateDeepInspectionConversion(
 		retryValue = "true"
 	}
 
-	// Build and ensure the provider connection secret in TargetNamespace.
+	// Connection secret goes to Plan.Namespace on the management cluster
+	// (DeepInspection pods run there, not on the destination cluster).
 	connSecretData := r.buildDeepInspectionConnectionSecretData()
 	connLabels := r.getConversionLabels(api.DeepInspection, vm.Ref.ID, planID,
 		map[string]string{kConnection: "true"})
 	connSecretSpec := r.buildConversionSecret(
-		r.Plan.Spec.TargetNamespace,
+		r.Plan.Namespace,
 		planName+"-"+vm.Ref.ID+"-di-",
 		connLabels,
 		connSecretData,
 	)
-	connSecret, err := r.ensureConversionSecret(connSecretSpec)
+	connSecret, err := r.ensureConversionSecret(r.Client, connSecretSpec)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -700,12 +701,12 @@ func (r *KubeVirt) CreateDeepInspectionConversion(
 		luksLabels := r.getConversionLabels(api.DeepInspection, vm.Ref.ID, planID,
 			map[string]string{kLUKS: "true"})
 		luksSecretSpec := r.buildConversionSecret(
-			r.Plan.Spec.TargetNamespace,
+			r.Plan.Namespace,
 			planName+"-"+vm.Ref.ID+"-di-luks-",
 			luksLabels,
 			source.Data,
 		)
-		luksSecret, luksErr := r.ensureConversionSecret(luksSecretSpec)
+		luksSecret, luksErr := r.ensureConversionSecret(r.Client, luksSecretSpec)
 		if luksErr != nil {
 			return nil, liberr.Wrap(luksErr)
 		}
@@ -718,12 +719,13 @@ func (r *KubeVirt) CreateDeepInspectionConversion(
 		}
 	}
 
-	// Assemble the Conversion spec and create the CR.
+	// Empty Destination → resolveDestinationClient returns localClient →
+	// pod is created on the management cluster in Plan.Namespace.
 	crLabels := r.getConversionLabels(api.DeepInspection, vm.ID, planID,
 		map[string]string{convctx.LabelRetryAllowed: retryValue})
 	spec := api.ConversionSpec{
 		Type:            api.DeepInspection,
-		TargetNamespace: r.Plan.Spec.TargetNamespace,
+		TargetNamespace: r.Plan.Namespace,
 		VM:              vm.Ref,
 		Connection: api.Connection{
 			Secret: core.ObjectReference{
@@ -744,9 +746,15 @@ func (r *KubeVirt) CreateDeepInspectionConversion(
 	return r.ensureConversion(cr)
 }
 
-// DeleteConversion deletes the given Conversion CR.
+// DeleteConversion tears down a Conversion CR: pod → snapshot → secrets → CR.
 func (r *KubeVirt) DeleteConversion(cr *api.Conversion) error {
-	// TODO: Should we raise error when targetNS is not set?
+	if err := r.deleteConversionPod(cr); err != nil {
+		return err
+	}
+	if err := r.removeOwnedSnapshotForCR(cr); err != nil {
+		r.Log.Error(err, "Failed to remove owned snapshot during Conversion deletion; continuing.",
+			"conversion", path.Join(cr.Namespace, cr.Name))
+	}
 	if cr.Spec.TargetNamespace != "" {
 		if err := r.deleteConversionSecrets(cr); err != nil {
 			return err
@@ -761,21 +769,92 @@ func (r *KubeVirt) DeleteConversion(cr *api.Conversion) error {
 	return nil
 }
 
-// deleteConversionSecrets removes the connection and LUKS secrets that were
-// created on the destination cluster for a Conversion CR.
-// Secrets are located by the LabelVM + LabelConversionType labels stamped on
-// them at creation time, both kConnection and kLUKS secrets share these labels.
+// DeleteAllConversions deletes every Conversion CR that was created for the
+// given VM on this plan, together with their pods and secrets.
+func (r *KubeVirt) DeleteAllConversions(vm *plan.VMStatus) error {
+	labels := map[string]string{
+		convctx.LabelPlan: string(r.Plan.UID),
+		convctx.LabelVM:   vm.Ref.ID,
+	}
+	list := &api.ConversionList{}
+	if err := r.Client.List(context.TODO(), list,
+		client.InNamespace(r.Plan.Namespace),
+		client.MatchingLabels(labels),
+	); err != nil {
+		return liberr.Wrap(err)
+	}
+	for i := range list.Items {
+		if err := r.DeleteConversion(&list.Items[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// deleteConversionPod finds the pod that was created for the given Conversion
+// CR and deletes it. For DeepInspection the pod lives on the management cluster
+// for all other types it lives on the destination cluster.
+func (r *KubeVirt) deleteConversionPod(cr *api.Conversion) error {
+	cl := r.Destination.Client
+	if cr.Spec.Type == api.DeepInspection {
+		cl = r.Client
+	}
+	matchLabels := map[string]string{
+		convctx.LabelVM:             cr.Labels[convctx.LabelVM],
+		convctx.LabelConversionType: string(cr.Spec.Type),
+	}
+	if matchLabels[convctx.LabelVM] == "" {
+		return nil
+	}
+	list := &core.PodList{}
+	if err := cl.List(context.TODO(), list,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(matchLabels),
+			Namespace:     cr.Spec.TargetNamespace,
+		},
+	); err != nil {
+		return liberr.Wrap(err)
+	}
+	for i := range list.Items {
+		pod := &list.Items[i]
+		if err := cl.Delete(context.TODO(), pod); err != nil && !k8serr.IsNotFound(err) {
+			return liberr.Wrap(err)
+		}
+		r.Log.V(1).Info("Conversion pod deleted.",
+			"pod", path.Join(pod.Namespace, pod.Name))
+	}
+	return nil
+}
+
+// removeOwnedSnapshotForCR triggers vSphere snapshot removal (fire-and-forget).
+// only done for ddep inspection type.
+func (r *KubeVirt) removeOwnedSnapshotForCR(cr *api.Conversion) error {
+	ensurer, err := convbuilder.NewEnsurer(r.Client, r.Log, cr.Spec)
+	if err != nil {
+		return err
+	}
+	_, err = ensurer.RemoveOwnedSnapshot(context.TODO(), cr)
+	return err
+}
+
+// deleteConversionSecrets deletes all secrets owned by a Conversion CR.
 func (r *KubeVirt) deleteConversionSecrets(cr *api.Conversion) error {
 	vmID, ok := cr.Labels[convctx.LabelVM]
 	if !ok || vmID == "" {
 		return nil
+	}
+
+	// DeepInspection secrets live on the management cluster.
+	cl := r.Destination.Client
+	if cr.Spec.Type == api.DeepInspection {
+		cl = r.Client
 	}
 	matchLabels := map[string]string{
 		convctx.LabelVM:             vmID,
 		convctx.LabelConversionType: string(cr.Spec.Type),
 	}
 	list := &core.SecretList{}
-	if err := r.Destination.Client.List(context.TODO(), list,
+	if err := cl.List(context.TODO(), list,
 		&client.ListOptions{
 			LabelSelector: k8slabels.SelectorFromSet(matchLabels),
 			Namespace:     cr.Spec.TargetNamespace,
@@ -785,10 +864,35 @@ func (r *KubeVirt) deleteConversionSecrets(cr *api.Conversion) error {
 	}
 	for i := range list.Items {
 		s := &list.Items[i]
-		if err := r.Destination.Client.Delete(context.TODO(), s); err != nil && !k8serr.IsNotFound(err) {
+		if err := cl.Delete(context.TODO(), s); err != nil && !k8serr.IsNotFound(err) {
 			return liberr.Wrap(err)
 		}
 		r.Log.V(1).Info("Conversion secret deleted.",
+			"secret", path.Join(s.Namespace, s.Name))
+	}
+
+	// v2v credentials secret (not labelled with conversion-type).
+	if cr.Spec.Type == api.DeepInspection {
+		return nil
+	}
+	v2vList := &core.SecretList{}
+	if err := r.Destination.Client.List(context.TODO(), v2vList,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(map[string]string{
+				convctx.LabelVM: vmID,
+				kV2V:            "true",
+			}),
+			Namespace: cr.Spec.TargetNamespace,
+		},
+	); err != nil {
+		return liberr.Wrap(err)
+	}
+	for i := range v2vList.Items {
+		s := &v2vList.Items[i]
+		if err := r.Destination.Client.Delete(context.TODO(), s); err != nil && !k8serr.IsNotFound(err) {
+			return liberr.Wrap(err)
+		}
+		r.Log.V(1).Info("Conversion v2v secret deleted.",
 			"secret", path.Join(s.Namespace, s.Name))
 	}
 	return nil

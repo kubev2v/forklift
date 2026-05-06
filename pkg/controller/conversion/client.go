@@ -13,6 +13,7 @@ import (
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
+	core "k8s.io/api/core/v1"
 )
 
 const (
@@ -217,4 +218,20 @@ func (r *Client) Close() {
 		_ = r.client.Logout(context.TODO())
 		r.client.CloseIdleConnections()
 	}
+}
+
+// newSnapshotClientFromSecret creates a govmomi session from the secret and
+// returns a SnapshotClient. The caller must defer snapClient.Close().
+func newSnapshotClientFromSecret(ctx context.Context, log logging.LevelLogger, secret *core.Secret, vmRef ref.Ref) (*Client, error) {
+	gClient, err := GovmomiClientFromSecret(ctx, secret)
+	if err != nil {
+		return nil, err
+	}
+	snapClient, err := NewSnapshotClient(log, gClient, vmRef)
+	if err != nil {
+		_ = gClient.Logout(ctx)
+		gClient.CloseIdleConnections()
+		return nil, err
+	}
+	return snapClient, nil
 }
