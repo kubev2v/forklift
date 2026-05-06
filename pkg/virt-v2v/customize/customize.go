@@ -335,12 +335,14 @@ func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) erro
 			preserveIpsTemplate = filepath.Join(windowsScriptsPath, "9999-preserve_complementry_ips_per_nic.ps1.tmpl")
 		}
 
-		networkConfigScript := filepath.Join(windowsScriptsPath, "9999-network-config.ps1")
-		if err := c.injectStaticIPTemplate(networkConfigTemplate, networkConfigScript); err != nil {
-			return fmt.Errorf("inject static IP template from %q to %q: %w", networkConfigTemplate, networkConfigScript, err)
+		injectNetworkConfig := c.appConfig.VirtIoWinLegacyDrivers != "" || c.appConfig.WindowsRegistryNetworkConfig
+		if injectNetworkConfig {
+			networkConfigScript := filepath.Join(windowsScriptsPath, "9999-network-config.ps1")
+			if err := c.injectStaticIPTemplate(networkConfigTemplate, networkConfigScript); err != nil {
+				return fmt.Errorf("inject static IP template from %q to %q: %w", networkConfigTemplate, networkConfigScript, err)
+			}
+			uploadPreserveIpPath = c.formatUpload(networkConfigScript, WinFirstbootScriptsPath)
 		}
-		uploadPreserveIpPath = c.formatUpload(networkConfigScript, WinFirstbootScriptsPath)
-
 		uploadRemoveDuplicatesPath = c.formatUpload(removeDuplicatesPersistentRoutesPath, WinFirstbootScriptsPath)
 
 		if c.appConfig.MultipleIpsPerNicName != "" {
