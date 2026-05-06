@@ -164,8 +164,7 @@ spec:
           displayName: Enable Conversion CR
           path: feature_use_conversion_cr
           x-descriptors:
-          - urn:alm:descriptor:com.tectonic.ui:radio:true
-          - urn:alm:descriptor:com.tectonic.ui:radio:false
+          - urn:alm:descriptor:com.tectonic.ui:hidden
         - description: Require authentication (default true)
           displayName: Require Authentication
           path: feature_auth_required
