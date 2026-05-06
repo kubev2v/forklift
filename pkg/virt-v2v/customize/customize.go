@@ -321,8 +321,7 @@ func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) erro
 		initPath = filepath.Join(windowsScriptsPath, "9999-run-mtv-ps-scripts-legacy.bat")
 	}
 
-	staticIPFirstbootScripts := c.appConfig.VirtIoWinLegacyDrivers != "" || c.appConfig.WindowsRegistryNetworkConfig
-	if c.appConfig.StaticIPs != "" && staticIPFirstbootScripts {
+	if c.appConfig.StaticIPs != "" {
 		var networkConfigTemplate string
 		var removeDuplicatesPersistentRoutesPath string
 		var preserveIpsTemplate string
