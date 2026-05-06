@@ -33,11 +33,11 @@ const listenAddr = ":8080"
 // result once detection is complete.  The server shuts itself down after
 // /results has been served once or on error.
 type resultServer struct {
-	mu       sync.Mutex
-	result   *vmdetect.DetectResult
+	mu        sync.Mutex
+	result    *vmdetect.DetectResult
 	detectErr error
-	once     sync.Once
-	shutdown chan struct{}
+	once      sync.Once
+	shutdown  chan struct{}
 }
 
 func newResultServer() *resultServer {
