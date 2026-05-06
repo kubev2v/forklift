@@ -419,9 +419,9 @@ func (p *ConversionPipeline) isResultReady(podIP string) bool {
 }
 
 // runStageFetchingResults fetches the DetectResult JSON from the deep-inspection
-// pod's HTTP /results endpoint and stores a summary in conv.Status.InspectionResult.
-// If the pod has already exited before results could be fetched, the stage is
-// skipped gracefully so the pipeline can continue.
+// pod's /results endpoint and stores it in conv.Status.InspectionResult.
+// The pod stays running until /shutdown is called, so the stage retries until
+// results are available.
 func (p *ConversionPipeline) runStageFetchingResults() (stageDone bool, err error) {
 	podRef := p.conv.Status.Pod
 	if podRef.Name == "" {
@@ -441,30 +441,46 @@ func (p *ConversionPipeline) runStageFetchingResults() (stageDone bool, err erro
 
 	p.r.Log.V(3).Info("Fetching results: pod status.", "pod", pod.Name, "phase", pod.Status.Phase, "podIP", pod.Status.PodIP)
 
-	// Pod exited before we could fetch results, return error
-	if pod.Status.Phase != core.PodRunning {
-		return false, fmt.Errorf("pod %s exited before /results could be fetched: phase=%s", pod.Name, pod.Status.Phase)
-	}
-	if pod.Status.PodIP == "" {
-		p.r.Log.V(3).Info("Pod has no IP yet; retrying.")
+	switch pod.Status.Phase {
+	case core.PodFailed:
+		return false, fmt.Errorf("pod %s failed before /results could be fetched", pod.Name)
+	case core.PodRunning:
+		if pod.Status.PodIP == "" {
+			p.r.Log.V(3).Info("Pod has no IP yet; retrying.")
+			return
+		}
+	default:
+		p.r.Log.V(3).Info("Pod not yet running; retrying.", "phase", pod.Status.Phase)
 		return
 	}
 
 	result, fetchErr := p.fetchInspectionResults(pod.Status.PodIP)
 	if fetchErr != nil {
-		// Transient connection error, retry
 		p.r.Log.V(3).Info("Transient error fetching results; retrying.", "error", fetchErr.Error())
 		return
 	}
 	if result == nil {
-		// Pod returned 503, not ready yet
 		p.r.Log.V(3).Info("Results not ready yet (503); retrying.")
 		return
 	}
 
 	p.r.Log.Info("Inspection results fetched.", "allChecksPassed", result.AllChecksPassed, "concerns", len(result.Concerns))
 	p.conv.Status.InspectionResult = result
+	p.signalPodShutdown(pod.Status.PodIP)
 	return true, nil
+}
+
+// signalPodShutdown calls POST /shutdown on the deep-inspection pod so it can
+// exit cleanly after results have been stored. Errors are logged and ignored —
+// the pod will eventually be deleted by the controller.
+func (p *ConversionPipeline) signalPodShutdown(podIP string) {
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Post(fmt.Sprintf("http://%s:%d/shutdown", podIP, inspectionResultPort), "", nil)
+	if err != nil {
+		p.r.Log.V(3).Info("Could not signal pod shutdown; it will be deleted by the controller.", "error", err.Error())
+		return
+	}
+	resp.Body.Close()
 }
 
 // fetchInspectionResults calls GET /results on the deep-inspection pod and
@@ -487,7 +503,7 @@ func (p *ConversionPipeline) fetchInspectionResults(podIP string) (*api.Inspecti
 
 	// Decode only the subset of fields we persist on the CR.
 	var raw struct {
-		AllChecksPassed bool `json:"all_checks_passed"`
+		AllChecksPassed bool `json:"passed"`
 		AllConcerns     []struct {
 			ID       string `json:"id"`
 			Category string `json:"category"`

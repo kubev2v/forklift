@@ -253,4 +253,3 @@ func resolveStageConditions(conversion *api.Conversion) {
 		Message:  msg,
 	})
 }
-

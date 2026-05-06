@@ -30,8 +30,9 @@ import (
 const listenAddr = ":8080"
 
 // resultServer is a short-lived HTTP server that exposes the deep-inspection
-// result once detection is complete.  The server shuts itself down after
-// /results has been served once or on error.
+// result once detection is complete. The server shuts itself down on error;
+// on success it stays alive so the controller can retry /results until it
+// confirms the data. The controller deletes the pod when it is done.
 type resultServer struct {
 	mu        sync.Mutex
 	result    *vmdetect.DetectResult
@@ -82,9 +83,17 @@ func (s *resultServer) handleReady(w http.ResponseWriter, _ *http.Request) {
 	_, _ = fmt.Fprintln(w, "ok")
 }
 
-// handleResults serves the DetectResult as JSON.  Returns 503 while detection
+// handleShutdown lets the controller signal that results have been received and
+// the pod may exit cleanly.
+func (s *resultServer) handleShutdown(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	_, _ = fmt.Fprintln(w, "ok")
+	s.triggerShutdown()
+}
+
+// handleResults serves the DetectResult as JSON. Returns 503 while detection
 // is still running, 500 when detection failed, or 200 with the full result.
-// The server shuts down after the first successful 200 response.
+// On success the server stays alive; on error it triggers shutdown.
 func (s *resultServer) handleResults(w http.ResponseWriter, _ *http.Request) {
 	if !s.isReady() {
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -113,7 +122,8 @@ func (s *resultServer) handleResults(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = buf.WriteTo(w)
-	s.triggerShutdown()
+	// No shutdown here, the controller fetches /results and then deletes
+	// the pod. Staying alive allows retries across reconcile cycles.
 }
 
 // run starts the HTTP server on listenAddr and blocks until results have been
@@ -124,6 +134,7 @@ func (s *resultServer) run() (exitCode int) {
 	mux.HandleFunc("/healthz", s.handleHealthz)
 	mux.HandleFunc("/ready", s.handleReady)
 	mux.HandleFunc("/results", s.handleResults)
+	mux.HandleFunc("/shutdown", s.handleShutdown)
 
 	srv := &http.Server{
 		Addr:    listenAddr,

@@ -141,7 +141,7 @@ type ConversionSpec struct {
 	// +kubebuilder:validation:Enum=DeepInspection;Inspection;InPlace;Remote
 	Type ConversionType `json:"type"`
 	// Reference to the destination provider where pods and PVCs live.
-	// When empty or pointing to the host provider the local client is used;
+	// When nil or pointing to the host provider the local client is used;
 	// otherwise a remote k8s client is constructed from the provider URL
 	// and its secret.
 	// +optional
@@ -239,7 +239,8 @@ type InspectionMountpoint struct {
 // the full JSON is available in the pod logs.
 type InspectionResult struct {
 	// AllChecksPassed is true when all checks passed with no concerns.
-	AllChecksPassed bool `json:"allChecksPassed"`
+	// +optional
+	AllChecksPassed bool `json:"allChecksPassed,omitempty"`
 	// OSInfo contains operating-system metadata.
 	// +optional
 	OSInfo *OSInfo `json:"osInfo,omitempty"`
