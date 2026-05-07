@@ -1,0 +1,79 @@
+FROM registry.access.redhat.com/ubi9/go-toolset:1.25.7-1772728670 AS builder
+USER 0
+WORKDIR /app
+COPY --chown=1001:0 ./ ./
+ENV GOFLAGS="-mod=vendor -tags=strictfipsruntime"
+ENV GOEXPERIMENT=strictfipsruntime
+ENV GOCACHE=/go-build/cache
+RUN --mount=type=cache,target=${GOCACHE},uid=1001 GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o deep-inspection github.com/kubev2v/forklift/cmd/deep-inspection
+
+FROM quay.io/centos/centos:stream10
+
+# Update packages to address security vulnerabilities (CVE fixes)
+RUN dnf install -y --allowerasing \
+  libguestfs \
+  libguestfs-tools \
+  libguestfs-tools-c \
+  virt-v2v \
+  qemu-kvm \
+  nbdkit \
+  nbdkit-vddk-plugin \
+  curl \
+  ca-certificates \
+  sqlite-libs \
+  && dnf clean all \
+  && echo "Verifying nbdkit installation..." \
+  && (nbdkit --version || echo "WARNING: nbdkit command not found in PATH") \
+  && (rpm -ql nbdkit | head -5 || echo "WARNING: nbdkit package files not found") \
+  && echo "nbdkit installation verified"
+
+# nbdkit wrapper (for VDDK plugin)
+# Find nbdkit binary location from installed package
+RUN NBDKIT_PATH=$(rpm -ql nbdkit 2>/dev/null | grep -E '^/usr/bin/nbdkit$|^/usr/sbin/nbdkit$' | head -1) && \
+  if [ -z "$NBDKIT_PATH" ]; then \
+  NBDKIT_PATH=$(command -v nbdkit 2>/dev/null || echo ""); \
+  fi && \
+  if [ -z "$NBDKIT_PATH" ]; then \
+  for path in /usr/bin/nbdkit /usr/sbin/nbdkit /usr/local/bin/nbdkit; do \
+  if [ -f "$path" ] 2>/dev/null; then \
+  NBDKIT_PATH="$path"; \
+  break; \
+  fi; \
+  done; \
+  fi && \
+  if [ -n "$NBDKIT_PATH" ] && [ -f "$NBDKIT_PATH" ]; then \
+  mv "$NBDKIT_PATH" "${NBDKIT_PATH}.real" && \
+  printf '#!/bin/bash\n\
+  if [ -z "$LD_LIBRARY_PATH" ]; then\n\
+  export LD_LIBRARY_PATH=/opt/vmware-vix-disklib/lib64\n\
+  else\n\
+  export LD_LIBRARY_PATH=/opt/vmware-vix-disklib/lib64:$LD_LIBRARY_PATH\n\
+  fi\n\
+  exec "%s.real" "$@"\n' "$NBDKIT_PATH" > "$NBDKIT_PATH" && \
+  chmod +x "$NBDKIT_PATH" && \
+  echo "Created nbdkit wrapper at $NBDKIT_PATH"; \
+  else \
+  echo "ERROR: nbdkit binary not found after installation!"; \
+  echo "Attempting to locate nbdkit:"; \
+  rpm -ql nbdkit 2>/dev/null | grep -E 'bin/nbdkit|sbin/nbdkit' || echo "No nbdkit binary found in package"; \
+  which nbdkit 2>/dev/null || echo "nbdkit not in PATH"; \
+  echo "Wrapper not created - nbdkit will use LD_LIBRARY_PATH from environment"; \
+  fi
+# ---------- FIX END ----------
+
+COPY --from=builder --chown=1001:0 /app/deep-inspection /usr/local/bin/deep-inspection
+ENV LIBGUESTFS_BACKEND=direct
+ENTRYPOINT ["/usr/local/bin/deep-inspection"]
+
+LABEL \
+  com.redhat.component="mtv-deep-inspection-container" \
+  name="migration-toolkit-virtualization/mtv-deep-inspection-rhel10" \
+  license="Apache License 2.0" \
+  io.k8s.display-name="Migration Toolkit for Virtualization" \
+  io.k8s.description="Migration Toolkit for Virtualization - Deep Inspection" \
+  io.openshift.tags="migration,mtv,forklift" \
+  description="Migration Toolkit for Virtualization - Deep Inspection" \
+  summary="Migration Toolkit for Virtualization - Deep Inspection" \
+  vendor="Red Hat, Inc." \
+  maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+  org.opencontainers.image.source="https://github.com/kubev2v/forklift"
