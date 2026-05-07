@@ -129,7 +129,10 @@ func (m *MockPrimera3ParClient) CurrentMappedGroups(volumeName string, mappingCo
 	return groups, nil
 }
 
-func (m *MockPrimera3ParClient) CopyVolume(sourceVolName string, destVolName string) error {
+func (m *MockPrimera3ParClient) CopyVolume(sourceVolName string, destVolName string, progress chan<- uint64) error {
+	if progress != nil {
+		progress <- 100
+	}
 	return nil
 }
 
@@ -140,7 +143,7 @@ func (m *MockPrimera3ParClient) GetSystemInfo() (SystemInfo, error) {
 	}, nil
 }
 
-func (m *MockPrimera3ParClient) GetVolumes() ([]Volume, error) {
+func (m *MockPrimera3ParClient) GetVolumes(query string) ([]Volume, error) {
 	var result []Volume
 	id := 0
 	for _, lun := range m.Volumes {

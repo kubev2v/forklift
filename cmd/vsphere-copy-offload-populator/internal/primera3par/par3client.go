@@ -34,8 +34,8 @@ type Primera3ParClient interface {
 	AddHostToHostSet(hostSetName string, hostName string) error
 	GetLunDetailsByVolumeName(lunName string, lun populator.LUN) (populator.LUN, error)
 	CurrentMappedGroups(volumeName string, mappingContext populator.MappingContext) ([]string, error)
-	CopyVolume(sourceVolName string, destVolName string) error
-	GetVolumes() ([]Volume, error)
+	CopyVolume(sourceVolName string, destVolName string, progress chan<- uint64) error
+	GetVolumes(query string) ([]Volume, error)
 	GetSystemInfo() (SystemInfo, error)
 }
 
@@ -44,6 +44,7 @@ type Volume struct {
 	Name    string `json:"name"`
 	WWN     string `json:"wwn"`
 	UserCPG string `json:"userCPG"`
+	SnapCPG string `json:"snapCPG"`
 }
 
 type HostsResponse struct {
@@ -87,6 +88,7 @@ type Primera3ParClientWsImpl struct {
 	Username         string
 	HTTPClient       *http.Client
 	SessionStartTime time.Time
+	wsApiBuild       int
 }
 
 func NewPrimera3ParClientWsImpl(storageHostname, storageUsername, storagePassword string, skipSSLVerification bool) Primera3ParClientWsImpl {
@@ -776,6 +778,35 @@ func (p *Primera3ParClientWsImpl) renameVolume(oldName, newName string) error {
 	return nil
 }
 
+func (p *Primera3ParClientWsImpl) setVolumeSnapCPG(volumeName, snapCPG string) error {
+	reqURL := fmt.Sprintf("%s/api/v1/volumes/%s", p.BaseURL, url.PathEscape(volumeName))
+
+	body, err := json.Marshal(map[string]string{"snapCPG": snapCPG})
+	if err != nil {
+		return fmt.Errorf("failed to encode setVolumeSnapCPG request: %w", err)
+	}
+
+	req, err := http.NewRequest("PUT", reqURL, bytes.NewBuffer(body))
+	if err != nil {
+		return fmt.Errorf("failed to create setVolumeSnapCPG request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := p.doRequest(req, "setVolumeSnapCPG")
+	if err != nil {
+		return fmt.Errorf("setVolumeSnapCPG failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("setVolumeSnapCPG failed with status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	klog.Infof("Set snapCPG=%s on volume %s", snapCPG, volumeName)
+	return nil
+}
+
 func (p *Primera3ParClientWsImpl) deleteVolume(volumeName string) error {
 	reqURL := fmt.Sprintf("%s/api/v1/volumes/%s", p.BaseURL, url.PathEscape(volumeName))
 
@@ -799,85 +830,62 @@ func (p *Primera3ParClientWsImpl) deleteVolume(volumeName string) error {
 	return nil
 }
 
-func (p *Primera3ParClientWsImpl) CopyVolume(sourceVolName string, destVolName string) error {
+func (p *Primera3ParClientWsImpl) CopyVolume(sourceVolName string, destVolName string, progress chan<- uint64) error {
+	sourceName := prefixOfString(sourceVolName, 31)
 	destName := prefixOfString(destVolName, 31)
 
-	// Get the dest volume's CPG before we move it aside
-	destVol, err := p.GetVolume(destName)
+	sourceVol, err := p.GetVolume(sourceName)
 	if err != nil {
-		return fmt.Errorf("failed to get dest volume details: %w", err)
+		return fmt.Errorf("failed to get source volume details: %w", err)
+	}
+	klog.Infof("Source volume: name=%s id=%d wwn=%s cpg=%s snapCPG=%s", sourceVol.Name, sourceVol.Id, sourceVol.WWN, sourceVol.UserCPG, sourceVol.SnapCPG)
+
+	apiBuild, err := p.getWsApiBuild()
+	if err != nil {
+		return fmt.Errorf("failed to query WSAPI version: %w", err)
 	}
 
-	if destVol.UserCPG == "" {
-		return fmt.Errorf("destination volume %s has no userCPG set", destVolName)
+	if sourceVol.SnapCPG == "" && apiBuild < wsApiBuild2023 {
+		snapCPG := sourceVol.UserCPG
+		klog.Infof("Source volume %s has no snapCPG, setting it to %s", sourceName, snapCPG)
+		if err := p.setVolumeSnapCPG(sourceName, snapCPG); err != nil {
+			return fmt.Errorf("failed to set snapCPG on source volume %s: %w", sourceName, err)
+		}
+	} else if sourceVol.SnapCPG == "" {
+		klog.Infof("Source volume %s has no snapCPG but WSAPI build %d >= %d — array manages snap space at pool level", sourceName, apiBuild, wsApiBuild2023)
 	}
 
-	// createPhysicalCopy requires the dest volume to not exist. Since the dest volume
-	// is CSI-provisioned, we rename it aside (preserving its internal ID/WWN), then
-	// create the physical copy with the original dest name. Finally, delete the old
-	// empty volume. The CSI driver locates volumes by name, so the new volume (with
-	// the source's data) seamlessly takes its place.
-	tempName := prefixOfString("mtv-old-"+destName, 31)
-	klog.Infof("Renaming dest volume %s -> %s (CPG: %s) before physical copy", destName, tempName, destVol.UserCPG)
+	// Rename the CSI-provisioned dest volume aside so we can create a snapshot
+	// with the same name. The CSI driver locates volumes by name, so the
+	// snapshot seamlessly takes its place after promotion.
+	tempName := prefixOfString(uuid.New().String(), 31)
+	klog.Infof("Renaming dest volume %s -> %s before snapshot copy", destName, tempName)
 	if err := p.renameVolume(destName, tempName); err != nil {
 		return fmt.Errorf("failed to rename dest volume aside: %w", err)
 	}
 
-	reqURL := fmt.Sprintf("%s/api/v1/volumes/%s", p.BaseURL, url.PathEscape(prefixOfString(sourceVolName, 31)))
-
-	requestBody := map[string]interface{}{
-		"action": "createPhysicalCopy",
-		"parameters": map[string]interface{}{
-			"destVolume": destName,
-			"destCPG":    destVol.UserCPG,
-			"online":     true,
-		},
-	}
-
-	jsonBody, err := json.Marshal(requestBody)
-	if err != nil {
-		return fmt.Errorf("failed to encode JSON for CopyVolume: %w", err)
-	}
-
-	req, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(jsonBody))
-	if err != nil {
-		return fmt.Errorf("failed to create CopyVolume request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := p.doRequest(req, "CopyVolume")
-	if err != nil {
+	// Step 1: Create a read-only snapshot of the source with the dest name.
+	// This is instant (CoW) — no data is copied.
+	klog.Infof("Creating snapshot of %s as %s", sourceName, destName)
+	if err := p.createSnapshot(sourceName, destName); err != nil {
 		p.rollbackRename(tempName, destName)
-		return fmt.Errorf("CopyVolume failed: %w", err)
+		return fmt.Errorf("failed to create snapshot: %w", err)
 	}
-	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
+	if progress != nil {
+		progress <- 50
+	}
+
+	// Step 2: Promote the snapshot to an independent writable volume.
+	// With online=true the volume is writable immediately; background
+	// data separation happens asynchronously.
+	klog.Infof("Promoting snapshot %s to independent volume", destName)
+	if err := p.promoteVirtualCopy(destName); err != nil {
+		p.deleteVolume(destName)
 		p.rollbackRename(tempName, destName)
-		return fmt.Errorf("failed to read CopyVolume response: %w", err)
+		return fmt.Errorf("failed to promote snapshot: %w", err)
 	}
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		p.rollbackRename(tempName, destName)
-		return fmt.Errorf("CopyVolume failed with status %d: %s", resp.StatusCode, string(body))
-	}
-
-	var taskResp struct {
-		TaskID int `json:"taskid"`
-	}
-	if err := json.Unmarshal(body, &taskResp); err != nil {
-		return fmt.Errorf("failed to parse CopyVolume response: %w", err)
-	}
-
-	if taskResp.TaskID != 0 {
-		klog.Infof("CopyVolume started async task %d, polling for completion", taskResp.TaskID)
-		if err := p.waitForTask(taskResp.TaskID); err != nil {
-			return err
-		}
-	}
-
-	// Physical copy succeeded — clean up the old empty volume
 	if err := p.deleteVolume(tempName); err != nil {
 		klog.Warningf("Failed to delete old volume %s (non-fatal): %v", tempName, err)
 	}
@@ -892,60 +900,118 @@ func (p *Primera3ParClientWsImpl) rollbackRename(tempName, origName string) {
 	}
 }
 
-// waitForTask polls the 3PAR task API until the task completes or fails.
-// 3PAR task status: 1 = done, 2 = active, 3 = cancelled, 4 = failed.
-func (p *Primera3ParClientWsImpl) waitForTask(taskID int) error {
+func (p *Primera3ParClientWsImpl) createSnapshot(sourceVolName, snapshotName string) error {
+	reqURL := fmt.Sprintf("%s/api/v1/volumes/%s", p.BaseURL, url.PathEscape(sourceVolName))
+
+	requestBody := map[string]any{
+		"action": "createSnapshot",
+		"parameters": map[string]any{
+			"name": snapshotName,
+		},
+	}
+
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		return fmt.Errorf("failed to encode createSnapshot request: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return fmt.Errorf("failed to create createSnapshot request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := p.doRequest(req, "createSnapshot")
+	if err != nil {
+		return fmt.Errorf("createSnapshot failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("createSnapshot failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	klog.Infof("Created snapshot %s of volume %s", snapshotName, sourceVolName)
+	return nil
+}
+
+const promoteVirtualCopyAction = 4
+
+func (p *Primera3ParClientWsImpl) promoteVirtualCopy(snapshotName string) error {
+	reqURL := fmt.Sprintf("%s/api/v1/volumes/%s", p.BaseURL, url.PathEscape(snapshotName))
+
+	requestBody := map[string]any{
+		"action": promoteVirtualCopyAction,
+		"online": true,
+	}
+
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		return fmt.Errorf("failed to encode promoteVirtualCopy request: %w", err)
+	}
+
+	req, err := http.NewRequest("PUT", reqURL, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return fmt.Errorf("failed to create promoteVirtualCopy request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := p.doRequest(req, "promoteVirtualCopy")
+	if err != nil {
+		return fmt.Errorf("promoteVirtualCopy failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read promoteVirtualCopy response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("promoteVirtualCopy failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var taskResp struct {
+		TaskID int `json:"taskid"`
+	}
+	if err := json.Unmarshal(body, &taskResp); err == nil && taskResp.TaskID != 0 {
+		klog.Infof("promoteVirtualCopy started async task %d, verifying it is running", taskResp.TaskID)
+		if err := p.verifyTaskRunning(taskResp.TaskID); err != nil {
+			return fmt.Errorf("promote task %d failed verification: %w", taskResp.TaskID, err)
+		}
+	}
+
+	klog.Infof("Promoted snapshot %s to independent volume", snapshotName)
+	return nil
+}
+
+func (p *Primera3ParClientWsImpl) verifyTaskRunning(taskID int) error {
 	const (
-		taskStatusDone      = 1
-		taskStatusActive    = 2
-		taskStatusCancelled = 3
-		taskStatusFailed    = 4
-		pollInterval        = 5 * time.Second
-		maxWait             = 30 * time.Minute
+		taskStatusDone   = 1
+		taskStatusActive = 2
 	)
 
-	type task3PAR struct {
-		ID         int    `json:"id"`
-		Status     int    `json:"status"`
-		Name       string `json:"name"`
-		FinishTime string `json:"finishTime"`
+	taskURL := fmt.Sprintf("%s/api/v1/tasks/%d", p.BaseURL, taskID)
+	req, err := http.NewRequest("GET", taskURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create task status request: %w", err)
 	}
 
-	deadline := time.Now().Add(maxWait)
-
-	for {
-		if time.Now().After(deadline) {
-			return fmt.Errorf("timed out waiting for task %d after %v", taskID, maxWait)
-		}
-
-		time.Sleep(pollInterval)
-
-		taskURL := fmt.Sprintf("%s/api/v1/tasks/%d", p.BaseURL, taskID)
-		req, err := http.NewRequest("GET", taskURL, nil)
-		if err != nil {
-			return fmt.Errorf("failed to create task status request: %w", err)
-		}
-
-		var t task3PAR
-		if err := p.doRequestUnmarshalResponse(req, "getTask", &t); err != nil {
-			return fmt.Errorf("failed to get task %d status: %w", taskID, err)
-		}
-
-		switch t.Status {
-		case taskStatusDone:
-			klog.Infof("Task %d completed successfully", taskID)
-			return nil
-		case taskStatusActive:
-			klog.V(2).Infof("Task %d still active, polling again...", taskID)
-			continue
-		case taskStatusCancelled:
-			return fmt.Errorf("task %d was cancelled", taskID)
-		case taskStatusFailed:
-			return fmt.Errorf("task %d failed (name: %s)", taskID, t.Name)
-		default:
-			klog.Warningf("Task %d has unknown status %d, continuing to poll", taskID, t.Status)
-		}
+	var t struct {
+		ID     int    `json:"id"`
+		Status int    `json:"status"`
+		Name   string `json:"name"`
 	}
+	if err := p.doRequestUnmarshalResponse(req, "verifyTaskRunning", &t); err != nil {
+		return fmt.Errorf("failed to get task %d status: %w", taskID, err)
+	}
+
+	klog.Infof("Task %d (%s) status: %d", taskID, t.Name, t.Status)
+	if t.Status != taskStatusDone && t.Status != taskStatusActive {
+		return fmt.Errorf("task %d has unexpected status %d (name: %s)", taskID, t.Status, t.Name)
+	}
+	return nil
 }
 
 func (p *Primera3ParClientWsImpl) GetSystemInfo() (SystemInfo, error) {
@@ -964,12 +1030,44 @@ func (p *Primera3ParClientWsImpl) GetSystemInfo() (SystemInfo, error) {
 	return sysInfo, nil
 }
 
-func (p *Primera3ParClientWsImpl) GetVolumes() ([]Volume, error) {
-	url := fmt.Sprintf("%s/api/v1/volumes", p.BaseURL)
+// wsApiBuild2023 is the WSAPI build number starting from which snapCPG is
+// managed at the pool level and must not be set on individual volumes.
+const wsApiBuild2023 = 100000000
 
-	req, err := http.NewRequest("GET", url, nil)
+func (p *Primera3ParClientWsImpl) getWsApiBuild() (int, error) {
+	if p.wsApiBuild > 0 {
+		return p.wsApiBuild, nil
+	}
+
+	reqURL := fmt.Sprintf("%s/api", p.BaseURL)
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create WSAPI version request: %w", err)
+	}
+
+	var resp struct {
+		Build int `json:"build"`
+	}
+	if err := p.doRequestUnmarshalResponse(req, "getWsApiBuild", &resp); err != nil {
+		return 0, fmt.Errorf("failed to get WSAPI version: %w", err)
+	}
+
+	p.wsApiBuild = resp.Build
+	klog.Infof("WSAPI build version: %d", p.wsApiBuild)
+	return p.wsApiBuild, nil
+}
+
+func (p *Primera3ParClientWsImpl) GetVolumes(query string) ([]Volume, error) {
+	u := fmt.Sprintf("%s/api/v1/volumes", p.BaseURL)
+
+	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	if query != "" {
+		encoded := url.PathEscape(fmt.Sprintf("%q", query))
+		req.URL.RawQuery = fmt.Sprintf("query=%s", encoded)
 	}
 
 	type GetVolumesResponse struct {

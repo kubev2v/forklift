@@ -96,9 +96,9 @@ func TestFindVolumeByVVolID(t *testing.T) {
 			expected: "vv-abcdef01234567890abcdef012345678",
 		},
 		{
-			name:     "match by name containing ID",
-			vvolID:   "rfc4122.abcdef01-2345-6789-0abc-def012345678",
-			expected: "vv-abcdef01234567890abcdef012345678",
+			name:        "no match when WWN differs despite name containing ID",
+			vvolID:      "rfc4122.abcdef01-2345-6789-0abc-def012345678",
+			expectError: true,
 		},
 		{
 			name:        "no match",

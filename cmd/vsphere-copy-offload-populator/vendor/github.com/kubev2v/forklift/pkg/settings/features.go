@@ -8,14 +8,17 @@ import (
 
 // Environment Variables
 const (
-	FeatureOvirtWarmMigration        = "FEATURE_OVIRT_WARM_MIGRATION"
-	FeatureRetainPrecopyImporterPods = "FEATURE_RETAIN_PRECOPY_IMPORTER_PODS"
-	FeatureStaticUdnIpAddresses      = "FEATURE_STATIC_UDN_IP_ADDRESSES"
-	FeatureVsphereIncrementalBackup  = "FEATURE_VSPHERE_INCREMENTAL_BACKUP"
-	FeatureCopyOffload               = "FEATURE_COPY_OFFLOAD"
-	FeatureOCPLiveMigration          = "FEATURE_OCP_LIVE_MIGRATION"
-	FeatureVmwareSystemSerialNumber  = "FEATURE_VMWARE_SYSTEM_SERIAL_NUMBER"
-	FeatureOVFApplianceManagement    = "FEATURE_OVF_APPLIANCE_MANAGEMENT"
+	FeatureOvirtWarmMigration           = "FEATURE_OVIRT_WARM_MIGRATION"
+	FeatureRetainPrecopyImporterPods    = "FEATURE_RETAIN_PRECOPY_IMPORTER_PODS"
+	FeatureStaticUdnIpAddresses         = "FEATURE_STATIC_UDN_IP_ADDRESSES"
+	FeatureVsphereIncrementalBackup     = "FEATURE_VSPHERE_INCREMENTAL_BACKUP"
+	FeatureCopyOffload                  = "FEATURE_COPY_OFFLOAD"
+	FeatureOCPLiveMigration             = "FEATURE_OCP_LIVE_MIGRATION"
+	FeatureVmwareSystemSerialNumber     = "FEATURE_VMWARE_SYSTEM_SERIAL_NUMBER"
+	FeatureOVFApplianceManagement       = "FEATURE_OVF_APPLIANCE_MANAGEMENT"
+	FeatureVsphereVmwareDriverRemoval   = "FEATURE_VSPHERE_VMWARE_DRIVER_REMOVAL"
+	FeatureWindowsRegistryNetworkConfig = "FEATURE_WINDOWS_REGISTRY_NETWORK_CONFIG"
+	FeatureUseConversionCR              = "FEATURE_USE_CONVERSION_CR"
 )
 
 // OpenShift version where the FeatureVmwareSystemSerialNumber feature is supported:
@@ -59,6 +62,12 @@ type Features struct {
 	OVFApplianceManagement bool
 	// Whether CDI supports InsecureSkipVerify for ImageIO data sources (CNV 4.21+)
 	InsecureSkipVerifySupported bool
+	// Whether to run VMware driver removal scripts during Windows vSphere conversion (virt-customize).
+	VsphereVmwareDriverRemoval bool
+	// Whether to use registry-based network configuration scripts for Windows static IP setup.
+	WindowsRegistryNetworkConfig bool
+	// Whether to delegate VM conversion to Conversion CRs instead of managing it directly.
+	UseConversionCR bool
 }
 
 // isOpenShiftVersionAboveMinimum checks if OpenShift version is above or equal to minimum version using semantic versioning
@@ -95,5 +104,8 @@ func (r *Features) Load() (err error) {
 	r.UdnSupportsMac = r.isOpenShiftVersionAboveMinimum(ocpMinForUdnMacSupport)
 	r.InsecureSkipVerifySupported = r.isOpenShiftVersionAboveMinimum(ocpMinForInsecureSkipVerify)
 	r.OVFApplianceManagement = getEnvBool(FeatureOVFApplianceManagement, false)
+	r.VsphereVmwareDriverRemoval = getEnvBool(FeatureVsphereVmwareDriverRemoval, false)
+	r.WindowsRegistryNetworkConfig = getEnvBool(FeatureWindowsRegistryNetworkConfig, false)
+	r.UseConversionCR = getEnvBool(FeatureUseConversionCR, true)
 	return
 }
