@@ -1,10 +1,10 @@
 package vsphere
 
 import (
+	"context"
 	"path"
 	"strings"
 
-	"context"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/watch/handler"

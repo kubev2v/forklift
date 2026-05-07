@@ -1,6 +1,7 @@
 package openstack
 
 import (
+	"context"
 	"path"
 	"strings"
 
@@ -10,7 +11,6 @@ import (
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
-	"golang.org/x/net/context"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
