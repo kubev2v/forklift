@@ -10,8 +10,8 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
 	vmware_mocks "github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware/mocks"
 
-	"go.uber.org/mock/gomock"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
+	"go.uber.org/mock/gomock"
 )
 
 // mockVantaraClient is a mock implementation of VantaraClient for testing

@@ -110,7 +110,7 @@ var _ = Describe("Populator", func() {
 			targetPVC:  "pvc-12345",
 			setup: func() {
 				vmwareClient.EXPECT().GetEsxByVm(gomock.Any(), gomock.Any()).Return(dummyHost, nil)
-				vmwareClient.EXPECT().GetDatastoreActiveAdapters(context.Background(), gomock.Any(), "my-ds").Return([]vmware.HostAdapter{{Name:"vmhb64", Id: "iqn.foobar"}}, nil)
+				vmwareClient.EXPECT().GetDatastoreActiveAdapters(context.Background(), gomock.Any(), "my-ds").Return([]vmware.HostAdapter{{Name: "vmhb64", Id: "iqn.foobar"}}, nil)
 				vmwareClient.EXPECT().RunEsxCommand(gomock.Any(), gomock.Any(), []string{"software", "vib", "get", "-n", "vmkfstools-wrapper"}).Return([]esx.Values{{"Version": {version.VibVersion}}}, nil)
 				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any()).Return(nil, nil)
 				storageClient.EXPECT().ResolvePVToLUN(populator.PersistentVolume{Name: "pvc-12345"}).Return(populator.LUN{}, fmt.Errorf("some error")).Times(1)
