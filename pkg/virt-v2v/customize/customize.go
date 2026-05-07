@@ -220,7 +220,7 @@ func (c *Customize) injectComplementryStaticIPTemplate(templatePath, outputPath 
 	var configs []IPConfig
 	for mac, ips := range macMap {
 		if len(ips) > 1 {
-			configs = append(configs, IPConfig{MAC: mac, IPs: ips[1:]}) // Skip the first (primary) IP
+			configs = append(configs, IPConfig{MAC: mac, IPs: ips[1:]})
 		}
 	}
 
@@ -330,19 +330,20 @@ func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) erro
 			removeDuplicatesPersistentRoutesPath = filepath.Join(windowsScriptsPath, "9999-remove_duplicate_persistent_routes-registry.ps1")
 			preserveIpsTemplate = filepath.Join(windowsScriptsPath, "9999-preserve_complementry_ips_per_nic-registry.ps1.tmpl")
 		} else {
-			networkConfigTemplate = filepath.Join(windowsScriptsPath, "9999-network-config.ps1.tmpl")
+			networkConfigTemplate = filepath.Join(windowsScriptsPath, "9999-network-config-legacy.ps1.tmpl")
 			removeDuplicatesPersistentRoutesPath = filepath.Join(windowsScriptsPath, "9999-remove_duplicate_persistent_routes.ps1")
 			preserveIpsTemplate = filepath.Join(windowsScriptsPath, "9999-preserve_complementry_ips_per_nic.ps1.tmpl")
 		}
 
 		injectNetworkConfig := c.appConfig.VirtIoWinLegacyDrivers != "" || c.appConfig.WindowsRegistryNetworkConfig
 		if injectNetworkConfig {
-			networkConfigScript := filepath.Join(windowsScriptsPath, "9999-network-config.ps1")
+			networkConfigScript := filepath.Join(windowsScriptsPath, "9999-network-config-legacy.ps1")
 			if err := c.injectStaticIPTemplate(networkConfigTemplate, networkConfigScript); err != nil {
 				return fmt.Errorf("inject static IP template from %q to %q: %w", networkConfigTemplate, networkConfigScript, err)
 			}
 			uploadPreserveIpPath = c.formatUpload(networkConfigScript, WinFirstbootScriptsPath)
 		}
+
 		uploadRemoveDuplicatesPath = c.formatUpload(removeDuplicatesPersistentRoutesPath, WinFirstbootScriptsPath)
 
 		if c.appConfig.MultipleIpsPerNicName != "" {

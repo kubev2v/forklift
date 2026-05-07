@@ -976,11 +976,21 @@ var _ = Describe("Customize", func() {
 			err := customize.addWinFirstbootScripts(mockCommandBuilder)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("inject static IP template"))
-			Expect(err.Error()).To(ContainSubstring("9999-network-config.ps1.tmpl"))
+			Expect(err.Error()).To(ContainSubstring("9999-network-config-legacy.ps1.tmpl"))
 		})
 
-		It("static IP with registry returns error referencing registry template", func() {
+		It("static IP with registry but non-legacy - injects registry template", func() {
 			appConfig.WindowsRegistryNetworkConfig = true
+			appConfig.VirtIoWinLegacyDrivers = ""
+			appConfig.StaticIPs = "00:11:22:33:44:55:ip:10.0.0.1,10.0.0.254,24,8.8.8.8,"
+			err := customize.addWinFirstbootScripts(mockCommandBuilder)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("9999-network-config-registry.ps1.tmpl"))
+		})
+
+		It("static IP with registry and legacy returns error referencing registry template", func() {
+			appConfig.WindowsRegistryNetworkConfig = true
+			appConfig.VirtIoWinLegacyDrivers = "/mnt/virtio.iso"
 			appConfig.StaticIPs = "00:11:22:33:44:55:ip:10.0.0.1,10.0.0.254,24,8.8.8.8,"
 			err := customize.addWinFirstbootScripts(mockCommandBuilder)
 			Expect(err).To(HaveOccurred())

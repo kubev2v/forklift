@@ -32,10 +32,15 @@ foreach ($config in $networkConfigs) {
         Write-Host "Configuring adapter '$name' ($($config.MAC))"
 
         foreach ($ip in $config.IPs) {
-            Write-Host "Setting IP $ip on '$name'"
-            New-NetIPAddress -InterfaceIndex $ifindex -IPAddress $ip -PrefixLength $config.PrefixLength
-            Set-DnsClientServerAddress -InterfaceIndex $ifindex -ServerAddresses $config.DNS
+            $existing = Get-NetIPAddress -InterfaceIndex $ifindex -IPAddress $ip -ErrorAction SilentlyContinue
+            if ($existing) {
+                Write-Host "IP $ip already exists on '$name', skipping"
+                continue
+            }
+            Write-Host "Adding IP $ip on '$name'"
+            New-NetIPAddress -InterfaceIndex $ifindex -IPAddress $ip -PrefixLength $config.PrefixLength -SkipAsSource $true -ErrorAction Stop
         }
+        Set-DnsClientServerAddress -InterfaceIndex $ifindex -ServerAddresses $config.DNS
     } else {
         Write-Warning "Adapter with MAC $($config.MAC) not found"
     }

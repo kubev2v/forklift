@@ -24,6 +24,10 @@ function Convert-PrefixToMask($prefix) {
 # Split entries by '_'
 $entries = $inputString.Split("_")
 
+# Track which MACs have been configured so we use "set address" (replace) for
+# the first IP on each interface and "add address" for subsequent IPs.
+$configuredMACs = @{}
+
 # Extract parts
 foreach ($entry in $entries) {
     if ($entry -match "^([0-9A-Fa-f:\-]+):ip:([^,]+),([^,]+),([^,]+),([^,]+),([^,]+)$") {
@@ -58,23 +62,30 @@ foreach ($entry in $entries) {
         }
 
         $iface = $adapter.NetConnectionID
-        Write-Host "Using interface: $iface`n"
+        $wshell = New-Object -ComObject WScript.Shell
 
-       $cmd = "netsh interface ip set address name=`"$iface`" static $ip $mask $gw"
-       # Use WScript.Shell COM object to run netsh commands:
-       # - The '0' parameter hides the command window (runs silently)
-       # - The '$true' parameter ensures the script waits for the command to finish before continuing
-       $wshell = New-Object -ComObject WScript.Shell
-       $wshell.Run($cmd, 0, $true)
-
-       $cmd = "netsh interface ip set dns name=`"$iface`" static $dns1"
-       $wshell.Run($cmd, 0, $true)
-        
-        if ($dns2 -ne "") {
-            $cmd = "netsh interface ip add dns name=`"$iface`" $dns2 index=2"
+        if ($configuredMACs.ContainsKey($mac)) {
+            # Secondary IP: use "add address" without gateway
+            Write-Host "Adding secondary IP $ip to interface: $iface`n"
+            $cmd = "netsh interface ip add address name=`"$iface`" $ip $mask"
             $wshell.Run($cmd, 0, $true)
-        } 
-        
+        } else {
+            # Primary IP: use "set address" with gateway
+            Write-Host "Using interface: $iface`n"
+            $cmd = "netsh interface ip set address name=`"$iface`" static $ip $mask $gw"
+            $wshell.Run($cmd, 0, $true)
+
+            $cmd = "netsh interface ip set dns name=`"$iface`" static $dns1"
+            $wshell.Run($cmd, 0, $true)
+
+            if ($dns2 -ne "") {
+                $cmd = "netsh interface ip add dns name=`"$iface`" $dns2 index=2"
+                $wshell.Run($cmd, 0, $true)
+            }
+
+            $configuredMACs[$mac] = $true
+        }
+
         Write-Host "IP configuration applied`n"
     }
     else {
