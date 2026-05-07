@@ -9280,6 +9280,8 @@ spec:
           value: explicit
         - name: CONTROLLER_IMAGE
           value: ${CONTROLLER_IMAGE}
+        - name: DEEP_INSPECTION_IMAGE
+          value: ${DEEP_INSPECTION_IMAGE}
         - name: API_IMAGE
           value: ${API_IMAGE}
         - name: MUST_GATHER_IMAGE

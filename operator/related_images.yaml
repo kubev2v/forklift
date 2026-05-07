@@ -3,6 +3,8 @@ relatedImages:
     image: ${OPERATOR_IMAGE}
   - name: controller
     image: ${CONTROLLER_IMAGE}
+  - name: deep-inspection
+    image: ${DEEP_INSPECTION_IMAGE}
   - name: must_gather
     image: ${MUST_GATHER_IMAGE}
   - name: validation
