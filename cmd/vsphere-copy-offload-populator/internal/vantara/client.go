@@ -2,8 +2,8 @@ package vantara
 
 // StorageInfo represents storage system details from the Vantara API
 type StorageInfo struct {
-	Model            string `json:"model"`
-	DkcMicroVersion  string `json:"dkcMicroVersion"`
+	Model           string `json:"model"`
+	DkcMicroVersion string `json:"dkcMicroVersion"`
 }
 
 // VantaraClient defines the interface for interacting with Vantara storage REST API

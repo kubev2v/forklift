@@ -167,9 +167,9 @@ func main() {
 		}
 		klog.Infof("SSH keys retrieved, private key length: %d, public key length: %d", len(sshPrivateKey), len(sshPublicKey))
 		sshConfig = &populator.SSHConfig{
-			UseSSH:         true,
-			PrivateKey:     sshPrivateKey,
-			PublicKey:      sshPublicKey,
+			UseSSH:     true,
+			PrivateKey: sshPrivateKey,
+			PublicKey:  sshPublicKey,
 		}
 	}
 

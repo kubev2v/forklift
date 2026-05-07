@@ -16,9 +16,9 @@ var settings = populatorSettings{
 
 // SSHConfig holds SSH configuration for VMDK/Xcopy populator
 type SSHConfig struct {
-	UseSSH         bool
-	PrivateKey     []byte
-	PublicKey      []byte
+	UseSSH     bool
+	PrivateKey []byte
+	PublicKey  []byte
 }
 
 // NewPopulator creates a Populator with an embedded CopyContext describing how the
