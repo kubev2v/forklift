@@ -115,6 +115,11 @@ spec:
         displayName: ForkliftController
         kind: ForkliftController
         name: forkliftcontrollers.forklift.konveyor.io
+      - description: VM conversion and inspection lifecycle manager
+        displayName: Conversion
+        kind: Conversion
+        name: conversions.forklift.konveyor.io
+        version: v1beta1
         version: v1beta1
         specDescriptors:
         # Feature Gates

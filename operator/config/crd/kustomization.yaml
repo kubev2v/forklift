@@ -5,6 +5,7 @@ resources:
 - bases/forklift.konveyor.io_forkliftcontrollers.yaml
 - bases/forklift.konveyor.io_hooks.yaml
 - bases/forklift.konveyor.io_hosts.yaml
+- bases/forklift.konveyor.io_conversions.yaml
 - bases/forklift.konveyor.io_migrations.yaml
 - bases/forklift.konveyor.io_networkmaps.yaml
 - bases/forklift.konveyor.io_plans.yaml
