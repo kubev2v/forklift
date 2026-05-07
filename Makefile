@@ -480,6 +480,7 @@ push-deep-inspection-image: build-deep-inspection-image ## Push forklift-deep-in
 	fi
 
 build-all-images: ## Build all container images
+# NOTE: build-deep-inspection-image is excluded until build/deep-inspection/Containerfile-upstream exists
 build-all-images: build-api-image \
                   build-controller-image \
                   build-validation-image \
@@ -494,11 +495,11 @@ build-all-images: build-api-image \
                   build-hyperv-provider-server-image \
                   build-cli-download-image \
                   build-ova-proxy-image \
-                  build-deep-inspection-image \
                   build-operator-bundle-image \
                   build-operator-index-image
 
 push-all-images: ## Push all container images
+# NOTE: push-deep-inspection-image is excluded until build/deep-inspection/Containerfile-upstream exists
 push-all-images:  push-api-image \
                   push-controller-image \
                   push-validation-image \
@@ -513,7 +514,6 @@ push-all-images:  push-api-image \
                   push-hyperv-provider-server-image \
                   push-cli-download-image \
                   push-ova-proxy-image \
-                  push-deep-inspection-image \
                   push-operator-bundle-image \
                   push-operator-index-image
 
