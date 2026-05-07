@@ -1,9 +1,9 @@
 package hyperv
 
 import (
+	"context"
 	"path"
 
-	"context"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/watch/handler"

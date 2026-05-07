@@ -540,7 +540,7 @@ func (r *KubeVirt) getConversion(labels map[string]string) (*api.Conversion, err
 		return nil, liberr.Wrap(err)
 	}
 	if len(list.Items) == 0 {
-		return nil, nil
+		return nil, nil //nolint:nilnil
 	}
 	return &list.Items[0], nil
 }
@@ -1004,7 +1004,7 @@ func (r *KubeVirt) GetConversionPod(vmRef ref.Ref, podType convctx.V2vPodType) (
 	if len(list.Items) > 0 {
 		return &list.Items[0], nil
 	}
-	return nil, nil
+	return nil, nil //nolint:nilnil
 }
 
 // ensureV2vSecret ensures the v2v secret exists for the given VM.

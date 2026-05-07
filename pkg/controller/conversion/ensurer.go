@@ -2,6 +2,7 @@ package conversion
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path"
 
@@ -30,6 +31,11 @@ type Ensurer struct {
 	DestinationClient client.Client
 	Log               logging.LevelLogger
 }
+
+// ErrNoPodFound is returned by GetPod / GetPodByLabels when no
+// matching pod exists. Callers that treat "not found" as a non-error
+// condition should check with errors.Is.
+var ErrNoPodFound = errors.New("no matching pod found")
 
 // NewEnsurer builds an Ensurer for the given Conversion CR. When the
 // spec references a remote destination provider a remote client is
@@ -105,7 +111,7 @@ func (e *Ensurer) ensureDeepInspectionPodFromSpec(conversion *api.Conversion, cf
 		cfg.DeepInspectionSnapshotMoref = conversion.Status.Snapshot.Moref
 	}
 	pod, err = e.GetPod(conversion, cfg.PodLabels)
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrNoPodFound) {
 		return nil, err
 	}
 	if pod != nil {
@@ -151,8 +157,7 @@ func (e *Ensurer) ensureDeepInspectionPodFromSpec(conversion *api.Conversion, cf
 		return nil, err
 	}
 	if pod == nil {
-		e.Log.Info("Couldn't prepare deep inspection pod for vm.", "vm", vm.String())
-		return nil, nil
+		return nil, fmt.Errorf("couldn't prepare deep inspection pod for vm %s", vm.String())
 	}
 
 	err = e.DestinationClient.Create(context.TODO(), pod)
@@ -171,7 +176,7 @@ func (e *Ensurer) ensureDeepInspectionPodFromSpec(conversion *api.Conversion, cf
 // CR if one does not already exist and returns it.
 func (e *Ensurer) ensureVirtV2vPodFromSpec(conversion *api.Conversion, cfg convctx.PodConfig, podType convctx.V2vPodType) (pod *core.Pod, err error) {
 	pod, err = e.GetPod(conversion, cfg.PodLabels)
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrNoPodFound) {
 		return nil, err
 	}
 	if pod != nil {
@@ -235,8 +240,7 @@ func (e *Ensurer) ensureVirtV2vPodFromSpec(conversion *api.Conversion, cfg convc
 		return nil, err
 	}
 	if pod == nil {
-		e.Log.Info("Couldn't prepare virt-v2v pod for vm.", "vm", vm.String())
-		return nil, nil
+		return nil, fmt.Errorf("couldn't prepare virt-v2v pod for vm %s", vm.String())
 	}
 
 	err = e.DestinationClient.Create(context.TODO(), pod)
@@ -266,9 +270,8 @@ func (e *Ensurer) GetPod(conversion *api.Conversion, labels map[string]string) (
 		return &list.Items[0], nil
 	} else if len(list.Items) > 1 {
 		return nil, liberr.New("found multiple pods with the same labels", "labels", labels)
-	} else {
-		return nil, nil
 	}
+	return nil, ErrNoPodFound
 }
 
 // DeletePod finds the pod that was created for the Conversion CR and deletes
@@ -276,7 +279,10 @@ func (e *Ensurer) GetPod(conversion *api.Conversion, labels map[string]string) (
 func (e *Ensurer) DeletePod(conversion *api.Conversion) error {
 	cfg := convctx.PodConfigFromSpec(conversion)
 	pod, err := e.GetPod(conversion, cfg.PodLabels)
-	if err != nil || pod == nil {
+	if errors.Is(err, ErrNoPodFound) {
+		return nil
+	}
+	if err != nil {
 		return err
 	}
 	if err := e.DestinationClient.Delete(context.TODO(), pod); err != nil && !k8serr.IsNotFound(err) {
@@ -425,7 +431,7 @@ func (e *Ensurer) anyNetAppShiftDisk(disks []api.DiskRef) (bool, error) {
 // not already exist. Helper funvtion for the plan pod creation.
 func EnsureVirtV2vPod(k8sClient client.Client, log logging.LevelLogger, vm *plan.VMStatus, volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, secret *core.Secret, podType convctx.V2vPodType, inPlace bool, cfg convctx.PodConfig) error {
 	existing, err := GetPodByLabels(k8sClient, cfg.TargetNamespace, cfg.PodLabels)
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrNoPodFound) {
 		return err
 	}
 	if existing != nil {
@@ -469,9 +475,8 @@ func GetPodByLabels(k8sClient client.Client, namespace string, labels map[string
 		return &list.Items[0], nil
 	} else if len(list.Items) > 1 {
 		return nil, liberr.New("found multiple pods with the same labels", "labels", labels)
-	} else {
-		return nil, nil
 	}
+	return nil, ErrNoPodFound
 }
 
 // DiskRefsFromVolumes converts resolved volumes, mounts, devices and PVCs
