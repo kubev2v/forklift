@@ -784,6 +784,11 @@ spec:
         kind: VSphereXcopyVolumePopulator
         name: vspherexcopyvolumepopulators.forklift.konveyor.io
         version: v1beta1
+      - description: VM conversion and inspection lifecycle manager
+        displayName: Conversion
+        kind: Conversion
+        name: conversions.forklift.konveyor.io
+        version: v1beta1
   relatedImages:
     - name: forklift-operator
       image: "${OPERATOR_IMAGE}"
