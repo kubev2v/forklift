@@ -355,6 +355,10 @@ func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) erro
 	}
 	uploadInitPath := c.formatUpload(initPath, WinFirstbootScriptsPath)
 	cmdBuilder.AddArgs(UploadCmd, uploadPreserveIpPath, uploadInitPath, uploadRemoveDuplicatesPath, uploadPreserveMultipleIpPath)
+	if c.appConfig.WaitForGuestReboot {
+		signalScript := filepath.Join(windowsScriptsPath, "99999-signal-conversion-done.ps1")
+		cmdBuilder.AddArg(UploadCmd, c.formatUpload(signalScript, filepath.Join(WinFirstbootScriptsPath, "99999-signal-conversion-done.ps1")))
+	}
 	return nil
 }
 

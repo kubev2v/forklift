@@ -21,6 +21,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/plan/migrator"
+	planmigrbase "github.com/kubev2v/forklift/pkg/controller/plan/migrator/base"
 	"github.com/kubev2v/forklift/pkg/controller/plan/scheduler"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 
@@ -452,6 +453,9 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool, cance
 		return err
 	}
 	if err := r.kubevirt.DeleteHookJobs(vm); failOnErr(err) {
+		return err
+	}
+	if err := r.kubevirt.DeleteWaitForRebootPod(vm); failOnErr(err) {
 		return err
 	}
 	if r.Plan.Provider.Destination.IsHost() {
@@ -995,6 +999,73 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				return
 			}
 			r.NextPhase(vm)
+		case api.PhaseWaitForGuestReboots:
+			step, found := vm.FindStep(r.migrator.Step(vm))
+			if !found {
+				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
+				break
+			}
+			step.MarkStarted()
+			step.Phase = api.StepRunning
+
+			targetPS := vm.TargetPowerState
+			if targetPS == "" {
+				targetPS = r.Plan.Spec.TargetPowerState
+			}
+			if !settings.Settings.WindowsWaitForReboot ||
+				targetPS == plan.TargetPowerStateOff {
+				r.NextPhase(vm)
+				break
+			}
+			win, wErr := planmigrbase.IsWindowsFromInventory(r.Source.Inventory, vm.Ref)
+			if wErr != nil {
+				r.Log.Info("Windows inventory lookup failed; skipping wait-for-reboot.", "vm", vm.String(), "error", wErr)
+				r.NextPhase(vm)
+				break
+			}
+			if !win {
+				r.NextPhase(vm)
+				break
+			}
+
+			if ierr := r.kubevirt.EnsureWaitForRebootPod(vm); ierr != nil {
+				step.AddError(ierr.Error())
+				err = nil
+				break
+			}
+
+			pod, ierr := r.kubevirt.GetWaitForRebootPod(vm)
+			if ierr != nil {
+				step.AddError(ierr.Error())
+				err = nil
+				break
+			}
+			if pod == nil {
+				return
+			}
+
+			switch pod.Status.Phase {
+			case core.PodSucceeded:
+				_ = r.kubevirt.DeleteWaitForRebootPod(vm)
+				r.NextPhase(vm)
+			case core.PodFailed:
+				r.Log.Info(
+					"Windows wait-for-reboot watcher ended without success; continuing migration.",
+					"vm", vm.String(),
+					"podNamespace", pod.Namespace,
+					"podName", pod.Name)
+				vm.SetCondition(libcnd.Condition{
+					Type:     "WaitForGuestReboots",
+					Status:   libcnd.True,
+					Category: api.CategoryWarn,
+					Message:  "Windows guest reboot wait did not complete successfully; migration continues.",
+					Durable:  true,
+				})
+				_ = r.kubevirt.DeleteWaitForRebootPod(vm)
+				r.NextPhase(vm)
+			default:
+				// Pending or Running — wait for next reconcile.
+			}
 		case api.PhaseAllocateDisks, api.PhaseCopyDisks:
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
@@ -1493,6 +1564,9 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				)
 				err = nil
 			}
+		}
+		if ierr := r.kubevirt.DeleteWaitForRebootPod(vm); ierr != nil {
+			r.Log.Error(ierr, "Could not remove Windows wait-for-reboot pod for finished VM.", "vm", vm.String())
 		}
 		vm.SetCondition(
 			libcnd.Condition{

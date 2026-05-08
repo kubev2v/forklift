@@ -272,6 +272,11 @@ func (r *VM) GetConcerns() []model.Concern {
 	return r.Concerns
 }
 
+func (r *VM) IsWindows() bool {
+	os := strings.ToLower(r.OSType + " " + r.GuestName)
+	return strings.Contains(os, "win")
+}
+
 // Build the resource using the model.
 func (r *VM) With(m *model.VM) {
 	r.VM1.With(m)

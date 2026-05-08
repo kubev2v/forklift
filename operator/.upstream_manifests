@@ -3600,6 +3600,11 @@ spec:
                 - "true"
                 - "false"
                 type: string
+              controller_windows_reboot_timeout:
+                description: 'Timeout in seconds for the wait-for-reboot step (default:
+                  1800)'
+                minimum: 1
+                type: integer
               deep_inspection_image_fqin:
                 description: Deep inspection image used by deep-inspection pods
                 example: quay.io/kubev2v/deep-inspection:latest
@@ -3688,6 +3693,13 @@ spec:
               feature_windows_registry_network_config:
                 description: 'Use registry-based network configuration scripts for
                   Windows static IP setup (default: false)'
+                enum:
+                - "true"
+                - "false"
+                type: string
+              feature_windows_wait_for_reboot:
+                description: 'Enable automatic wait-for-reboot step for Windows VM
+                  migrations (default: false)'
                 enum:
                 - "true"
                 - "false"

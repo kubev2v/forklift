@@ -3,6 +3,7 @@ package hyperv
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -95,6 +96,10 @@ type Workload struct {
 	GuestNetworks []model.GuestNetwork `json:"guestNetworks"`
 	Concerns      []model.Concern      `json:"concerns"`
 	config        Config               // unexported, not serialized
+}
+
+func (r *Workload) IsWindows() bool {
+	return strings.Contains(strings.ToLower(r.GuestOS), "win")
 }
 
 // With populates the workload from a VM model.
