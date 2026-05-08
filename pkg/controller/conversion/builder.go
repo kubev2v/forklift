@@ -464,6 +464,13 @@ func (b *Builder) BuildV2vPodEnvironment(env []core.EnvVar, vm *plan.VMStatus) (
 				Value: "true",
 			})
 	}
+	if settings.Settings.WindowsWaitForReboot {
+		env = append(env,
+			core.EnvVar{
+				Name:  "V2V_waitForGuestReboot",
+				Value: "true",
+			})
+	}
 
 	env = append(env, core.EnvVar{
 		Name:  "LOCAL_MIGRATION",
