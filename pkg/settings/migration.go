@@ -61,6 +61,7 @@ const (
 	PopulatorContainerRequestsCpu          = "POPULATOR_CONTAINER_REQUESTS_CPU"
 	PopulatorContainerRequestsMemory       = "POPULATOR_CONTAINER_REQUESTS_MEMORY"
 	TlsConnectionTimeout                   = "TLS_CONNECTION_TIMEOUT"
+	ControllerWindowsRebootTimeout         = "CONTROLLER_WINDOWS_REBOOT_TIMEOUT"
 	MaxConcurrentReconciles                = "MAX_CONCURRENT_RECONCILES"
 	MaxParentBackingRetries                = "MAX_PARENT_BACKING_RETRIES"
 	HostLeaseNamespace                     = "HOST_LEASE_NAMESPACE"
@@ -159,6 +160,8 @@ type Migration struct {
 	VddkImage string
 	// TlsConnectionTimeout is the timeout for TLS connections in seconds
 	TlsConnectionTimeout int
+	// WindowsRebootTimeout is the timeout in seconds for the Windows wait-for-reboot migration step.
+	WindowsRebootTimeout int
 	// MaxConcurrentReconciles is the limit of how many reconciles can run at once
 	MaxConcurrentReconciles int
 	// MaxParentBackingRetries is the limit of how many retries can happen while getting parent backing of a disk
@@ -268,6 +271,9 @@ func (r *Migration) Load() (err error) {
 		return liberr.Wrap(err)
 	}
 	if r.TlsConnectionTimeout, err = getPositiveEnvLimit(TlsConnectionTimeout, 5); err != nil {
+		return liberr.Wrap(err)
+	}
+	if r.WindowsRebootTimeout, err = getPositiveEnvLimit(ControllerWindowsRebootTimeout, 1800); err != nil {
 		return liberr.Wrap(err)
 	}
 	r.VirtV2vExtraArgs = "[]"
