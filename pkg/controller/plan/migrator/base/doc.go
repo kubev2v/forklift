@@ -5,20 +5,40 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 )
 
+// WindowsDetectable is implemented by provider VM/Workload models that can report whether the guest is Windows.
+type WindowsDetectable interface {
+	IsWindows() bool
+}
+
+// IsWindowsFromInventory determines whether the source VM appears to be Windows using inventory.
+func IsWindowsFromInventory(inv web.Client, vmRef ref.Ref) (bool, error) {
+	wl, err := inv.Workload(&vmRef)
+	if err != nil {
+		return false, err
+	}
+	if wd, ok := wl.(WindowsDetectable); ok {
+		return wd.IsWindows(), nil
+	}
+	return false, nil
+}
+
 // Predicates.
 var (
-	HasPreHook              libitr.Flag = 0x01
-	HasPostHook             libitr.Flag = 0x02
-	RequiresConversion      libitr.Flag = 0x04
-	CDIDiskCopy             libitr.Flag = 0x08
-	VirtV2vDiskCopy         libitr.Flag = 0x10
-	OpenstackImageMigration libitr.Flag = 0x20
-	VSphere                 libitr.Flag = 0x40
-	RunInspection           libitr.Flag = 0x80
+	HasPreHook                libitr.Flag = 0x01
+	HasPostHook               libitr.Flag = 0x02
+	RequiresConversion        libitr.Flag = 0x04
+	CDIDiskCopy               libitr.Flag = 0x08
+	VirtV2vDiskCopy           libitr.Flag = 0x10
+	OpenstackImageMigration   libitr.Flag = 0x20
+	VSphere                   libitr.Flag = 0x40
+	RunInspection             libitr.Flag = 0x80
+	WindowsWaitForGuestReboot libitr.Flag = 0x100
 )
 
 // Steps.

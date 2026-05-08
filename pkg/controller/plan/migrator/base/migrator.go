@@ -10,6 +10,7 @@ import (
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/settings"
 )
 
 type BaseMigrator struct {
@@ -194,6 +195,17 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 						Progress:    libitr.Progress{Total: 1},
 					},
 				})
+		case api.PhaseWaitForGuestReboots:
+			pipeline = append(
+				pipeline,
+				&plan.Step{
+					Task: plan.Task{
+						Name:        api.PhaseWaitForGuestReboots,
+						Description: "Wait for Windows guest reboot after conversion.",
+						Phase:       api.StepPending,
+						Progress:    libitr.Progress{Total: 1},
+					},
+				})
 		case api.PhasePreflightInspection:
 			pipeline = append(
 				pipeline,
@@ -274,6 +286,8 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 		step = DiskTransferV2v
 	case api.PhaseCreateVM:
 		step = VMCreation
+	case api.PhaseWaitForGuestReboots:
+		step = api.PhaseWaitForGuestReboots
 	case api.PhasePreHook, api.PhasePostHook:
 		step = status.Phase
 	case api.PhaseStorePowerState, api.PhasePowerOffSource, api.PhaseWaitForPowerOff:
@@ -325,6 +339,7 @@ func (r *BaseMigrator) warmItinerary() *libitr.Itinerary {
 			{Name: api.PhaseCreateGuestConversionPod, All: RequiresConversion},
 			{Name: api.PhaseConvertGuest, All: RequiresConversion},
 			{Name: api.PhaseCreateVM},
+			{Name: api.PhaseWaitForGuestReboots, All: WindowsWaitForGuestReboot},
 			{Name: api.PhasePostHook, All: HasPostHook},
 			{Name: api.PhaseCompleted},
 		},
@@ -348,6 +363,7 @@ func (r *BaseMigrator) coldItinerary() *libitr.Itinerary {
 			{Name: api.PhaseCopyDisksVirtV2V, All: RequiresConversion | VirtV2vDiskCopy},
 			{Name: api.PhaseConvertOpenstackSnapshot, All: OpenstackImageMigration},
 			{Name: api.PhaseCreateVM},
+			{Name: api.PhaseWaitForGuestReboots, All: WindowsWaitForGuestReboot},
 			{Name: api.PhasePostHook, All: HasPostHook},
 			{Name: api.PhaseCompleted},
 		},
@@ -366,6 +382,7 @@ func (r *BaseMigrator) onlyConversionItinerary() *libitr.Itinerary {
 			{Name: api.PhaseCreateGuestConversionPod, All: RequiresConversion},
 			{Name: api.PhaseConvertGuest, All: RequiresConversion},
 			{Name: api.PhaseCreateVM},
+			{Name: api.PhaseWaitForGuestReboots, All: WindowsWaitForGuestReboot},
 			{Name: api.PhasePostHook, All: HasPostHook},
 			{Name: api.PhaseCompleted},
 		},
@@ -405,11 +422,27 @@ func (r *BasePredicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 		allowed = r.context.Plan.IsSourceProviderVSphere()
 	case RunInspection:
 		allowed = r.context.Plan.ShouldRunPreflightInspection()
+	case WindowsWaitForGuestReboot:
+		if !settings.Settings.WindowsWaitForReboot {
+			break
+		}
+		target := r.vm.TargetPowerState
+		if target == "" {
+			target = r.context.Plan.Spec.TargetPowerState
+		}
+		if target == plan.TargetPowerStateOff {
+			break
+		}
+		win, _ := IsWindowsFromInventory(r.context.Source.Inventory, r.vm.Ref)
+		if !win {
+			break
+		}
+		allowed = r.context.Source.Provider.RequiresConversion() && !r.context.Plan.Spec.SkipGuestConversion
 	}
 
 	return
 }
 
 func (r *BasePredicate) Count() int {
-	return 0x80
+	return 0x100
 }

@@ -2,7 +2,9 @@ package openstack
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -79,6 +81,14 @@ func (h WorkloadHandler) Get(ctx *gin.Context) {
 type Workload struct {
 	SelfLink string `json:"selfLink"`
 	XVM
+}
+
+func (r *Workload) IsWindows() bool {
+	if d, ok := r.Image.Properties["os_distro"]; ok {
+		distro := strings.ToLower(fmt.Sprint(d))
+		return distro == "windows" || strings.Contains(distro, "win")
+	}
+	return false
 }
 
 // Build self link (URI).

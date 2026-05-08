@@ -91,6 +91,10 @@ spec:
                 type: string
                 enum: ["true", "false"]
                 description: "Use registry-based network configuration scripts for Windows static IP setup (default: false)"
+              feature_windows_wait_for_reboot:
+                type: string
+                enum: ["true", "false"]
+                description: "Enable automatic wait-for-reboot step for Windows VM migrations (default: false)"
               feature_use_conversion_cr:
                 type: string
                 enum: ["true", "false"]
@@ -403,6 +407,10 @@ spec:
               controller_tls_connection_timeout_sec:
                 x-kubernetes-int-or-string: true
                 description: "TLS connection timeout seconds (default: 5)"
+              controller_windows_reboot_timeout:
+                type: integer
+                minimum: 1
+                description: "Timeout in seconds for the wait-for-reboot step (default: 1800)"
               controller_max_parent_backing_retries:
                 x-kubernetes-int-or-string: true
                 description: "Max retries when getting parent disks (default: 10)"

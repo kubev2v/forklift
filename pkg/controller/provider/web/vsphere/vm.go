@@ -310,6 +310,12 @@ func (r *VM) GetConcerns() []model.Concern {
 	return r.Concerns
 }
 
+func (r *VM) IsWindows() bool {
+	gid := strings.ToLower(r.GuestID)
+	gname := strings.ToLower(r.GuestName)
+	return strings.Contains(gid, "win") || strings.Contains(gname, "win")
+}
+
 // Build the resource using the model.
 func (r *VM) With(m *model.VM) {
 	r.VM1.With(m)
