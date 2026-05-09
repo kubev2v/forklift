@@ -451,7 +451,7 @@ func (r *BasePredicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 		}
 		allowed = r.context.Source.Provider.RequiresConversion() && !r.context.Plan.Spec.SkipGuestConversion
 	case WaitForFinalSnapshotConsolidation:
-		allowed = settings.Settings.Migration.WaitForFinalSnapshotConsolidation
+		allowed = settings.Settings.WaitForFinalSnapshotConsolidation
 	}
 
 	return
