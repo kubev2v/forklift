@@ -37,7 +37,7 @@ ARG VALIDATION_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-va
 
 ARG VIRT_V2V_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel10@sha256:9845edfb378801f0345d2bba04651787aa30f908ed47f569c047b7c9ccee9cc7"
 
-ARG VIRT_V2V_IMAGE_RHEL9="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel9@sha256:900dd1328ecd7ed40b59fbe79d09ecd82e3e670d5cd26b9079f599711dfbce21"
+ARG VIRT_V2V_IMAGE_RHEL9="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel9@sha256:5d8b68940085ab7673dd712ba1188a69147c0473679c59f05e61e05be2e57a61"
 
 ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:6748a5f008e200d4a884c81327a9b3f04629f1a45c8c8eece1c77a3c42f1007c"
 
