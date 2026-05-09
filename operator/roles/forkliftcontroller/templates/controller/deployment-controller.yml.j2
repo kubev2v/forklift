@@ -270,6 +270,8 @@ spec:
           value: "{{ populator_container_requests_cpu }}"
         - name: POPULATOR_CONTAINER_REQUESTS_MEMORY
           value: "{{ populator_container_requests_memory }}"
+        - name: WAIT_FOR_FINAL_SNAPSHOT_CONSOLIDATION
+          value: "{{ wait_for_final_snapshot_consolidation }}"
         envFrom:
         - configMapRef:
             name: {{ controller_configmap_name }}
