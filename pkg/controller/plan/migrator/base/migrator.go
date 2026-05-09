@@ -419,7 +419,7 @@ func (r *BasePredicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 	case RunInspection:
 		allowed = r.context.Plan.ShouldRunPreflightInspection()
 	case WaitForFinalSnapshotConsolidation:
-		allowed = settings.Settings.Migration.WaitForFinalSnapshotConsolidation
+		allowed = settings.Settings.WaitForFinalSnapshotConsolidation
 	}
 
 	return
