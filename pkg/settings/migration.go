@@ -77,6 +77,7 @@ const (
 	AAPTimeout                             = "AAP_TIMEOUT"
 	AAPInsecureSkipVerify                  = "AAP_INSECURE_SKIP_VERIFY"
 	AAPCASecretName                        = "AAP_CA_SECRET_NAME"
+	WaitForFinalSnapshotConsolidation      = "WAIT_FOR_FINAL_SNAPSHOT_CONSOLIDATION"
 )
 
 // Default values for populator container resources
@@ -188,6 +189,8 @@ type Migration struct {
 	AAPInsecureSkipVerify bool
 	// AAPCASecretName is the name of the Secret in the controller namespace holding a custom CA cert (key "ca.crt").
 	AAPCASecretName string
+	// Whether or not to wait for final snapshot removal and consolidation before finishing Plan.
+	WaitForFinalSnapshotConsolidation bool
 }
 
 // Load settings.
@@ -442,5 +445,6 @@ func (r *Migration) Load() (err error) {
 	if val, found := os.LookupEnv(DeepInspectionImageXFS); found {
 		r.DeepInspectionImageXFS = strings.TrimSpace(val)
 	}
+	r.WaitForFinalSnapshotConsolidation = getEnvBool(WaitForFinalSnapshotConsolidation, true)
 	return
 }

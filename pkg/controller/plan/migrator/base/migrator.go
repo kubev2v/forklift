@@ -217,6 +217,17 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 						Progress:    libitr.Progress{Total: 1},
 					},
 				})
+		case api.PhaseWaitForFinalSnapshotRemoval:
+			pipeline = append(
+				pipeline,
+				&plan.Step{
+					Task: plan.Task{
+						Name:        WaitForSnapshotConsolidation,
+						Description: "Waiting for final snapshot removal and consolidation",
+						Phase:       api.StepPending,
+						Progress:    libitr.Progress{Total: 1},
+					},
+				})
 		}
 		next, done, _ := itinerary.Next(step.Name)
 		if !done {
@@ -277,8 +288,7 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 			step = Initialize
 		}
 	case api.PhaseRemovePenultimateSnapshot, api.PhaseWaitForPenultimateSnapshotRemoval, api.PhaseCreateFinalSnapshot,
-		api.PhaseWaitForFinalSnapshot, api.PhaseAddFinalCheckpoint, api.PhaseFinalize, api.PhaseRemoveFinalSnapshot,
-		api.PhaseWaitForFinalSnapshotRemoval:
+		api.PhaseWaitForFinalSnapshot, api.PhaseAddFinalCheckpoint, api.PhaseFinalize, api.PhaseRemoveFinalSnapshot:
 		step = Cutover
 	case api.PhaseCreateGuestConversionPod, api.PhaseConvertGuest:
 		step = ImageConversion
@@ -298,6 +308,8 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 		}
 	case api.PhasePreflightInspection:
 		step = PreflightInspection
+	case api.PhaseWaitForFinalSnapshotRemoval:
+		step = WaitForSnapshotConsolidation
 	default:
 		step = Unknown
 	}
@@ -335,12 +347,12 @@ func (r *BaseMigrator) warmItinerary() *libitr.Itinerary {
 			{Name: api.PhaseAddFinalCheckpoint},
 			{Name: api.PhaseFinalize},
 			{Name: api.PhaseRemoveFinalSnapshot, All: VSphere},
-			{Name: api.PhaseWaitForFinalSnapshotRemoval, All: VSphere},
 			{Name: api.PhaseCreateGuestConversionPod, All: RequiresConversion},
 			{Name: api.PhaseConvertGuest, All: RequiresConversion},
 			{Name: api.PhaseCreateVM},
 			{Name: api.PhaseWaitForGuestReboots, All: WindowsWaitForGuestReboot},
 			{Name: api.PhasePostHook, All: HasPostHook},
+			{Name: api.PhaseWaitForFinalSnapshotRemoval, All: VSphere | WaitForFinalSnapshotConsolidation},
 			{Name: api.PhaseCompleted},
 		},
 	}
@@ -438,6 +450,8 @@ func (r *BasePredicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 			break
 		}
 		allowed = r.context.Source.Provider.RequiresConversion() && !r.context.Plan.Spec.SkipGuestConversion
+	case WaitForFinalSnapshotConsolidation:
+		allowed = settings.Settings.Migration.WaitForFinalSnapshotConsolidation
 	}
 
 	return
