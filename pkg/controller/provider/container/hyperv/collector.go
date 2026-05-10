@@ -12,6 +12,7 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	hvutil "github.com/kubev2v/forklift/pkg/controller/hyperv"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/hyperv"
+	"github.com/kubev2v/forklift/pkg/lib/hyperv/iscsi"
 	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
@@ -417,6 +418,10 @@ func (r *Collector) endWatch() {
 		w.End()
 	}
 	r.watches = nil
+}
+
+func (r *Collector) CheckIscsiReadiness() (*iscsi.Readiness, error) {
+	return r.client.CheckIscsiReadiness()
 }
 
 // HyperVCredentials returns the HyperV/WinRM credentials from the secret.

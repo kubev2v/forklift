@@ -1,9 +1,11 @@
 package hyperv
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"path"
+	"strconv"
 	"strings"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -11,15 +13,21 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/plan/util"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/hyperv"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/hyperv"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
 	core "k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Firmware types
@@ -35,11 +43,34 @@ const (
 	Ignored = "ignored"
 )
 
+// AnnDefaultStorageClass is the standard annotation marking a StorageClass as the cluster default.
+const AnnDefaultStorageClass = "storageclass.kubernetes.io/is-default-class"
+
+type populatorCRParams struct {
+	vm           *model.VM
+	disk         hyperv.Disk
+	diskIndex    int
+	secretName   string
+	vmID         string
+	migrationUID string
+	targetIQN    string
+	portal       string
+	initiatorIQN string
+}
+
+type pvcParams struct {
+	disk          hyperv.Disk
+	storageClass  string
+	populatorName string
+	annotations   map[string]string
+	vmID          string
+	migrationUID  string
+}
+
 type Builder struct {
 	*plancontext.Context
 }
 
-// SMB credentials handled by CSI driver at pod mount time, not per-VM
 func (r *Builder) Secret(_ ref.Ref, _, _ *core.Secret) error {
 	return nil
 }
@@ -273,7 +304,10 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 }
 
 func (r *Builder) mapDataVolume(disk hyperv.Disk, dvTemplate *cdi.DataVolume) (*cdi.DataVolume, error) {
-	storageClass := r.getStorageClass()
+	storageClass, err := r.getStorageClass()
+	if err != nil {
+		return nil, err
+	}
 	dvSource := cdi.DataVolumeSource{
 		Blank: &cdi.DataVolumeBlankImage{},
 	}
@@ -298,13 +332,22 @@ func (r *Builder) mapDataVolume(disk hyperv.Disk, dvTemplate *cdi.DataVolume) (*
 	return dv, nil
 }
 
-func (r *Builder) getStorageClass() string {
+func (r *Builder) getStorageClass() (string, error) {
 	if r.Context.Map.Storage != nil {
 		for _, pair := range r.Context.Map.Storage.Spec.Map {
-			return pair.Destination.StorageClass
+			return pair.Destination.StorageClass, nil
 		}
 	}
-	return ""
+	scList := &storage.StorageClassList{}
+	if err := r.Client.List(context.TODO(), scList); err != nil {
+		return "", fmt.Errorf("list StorageClasses: %w", err)
+	}
+	for _, sc := range scList.Items {
+		if sc.Annotations[AnnDefaultStorageClass] == "true" {
+			return sc.Name, nil
+		}
+	}
+	return "", fmt.Errorf("no storage class found: storage map is empty and no default StorageClass exists in the cluster")
 }
 
 func (r *Builder) Tasks(vmRef ref.Ref) (tasks []*plan.Task, err error) {
@@ -361,17 +404,21 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		return
 	}
 
-	var diskPaths []string
-	for _, disk := range vm.Disks {
-		if disk.SMBPath != "" {
-			diskPaths = append(diskPaths, disk.SMBPath)
+	if r.Source.Provider.GetHyperVTransferMethod() == api.HyperVTransferMethodSMB {
+		var diskPaths []string
+		for _, disk := range vm.Disks {
+			if disk.SMBPath != "" {
+				diskPaths = append(diskPaths, disk.SMBPath)
+			}
 		}
+		env = append(env,
+			core.EnvVar{Name: "V2V_diskPath", Value: strings.Join(diskPaths, ",")},
+		)
 	}
 
 	env = append(env,
 		core.EnvVar{Name: "V2V_vmName", Value: vm.Name},
 		core.EnvVar{Name: "V2V_source", Value: "hyperv"},
-		core.EnvVar{Name: "V2V_diskPath", Value: strings.Join(diskPaths, ",")},
 	)
 
 	if r.Plan.Spec.PreserveStaticIPs {
@@ -466,23 +513,313 @@ func (r *Builder) LunPersistentVolumeClaims(_ ref.Ref) (pvcs []core.PersistentVo
 }
 
 func (r *Builder) SupportsVolumePopulators() bool {
-	return false
+	return r.Source.Provider.GetHyperVTransferMethod() == api.HyperVTransferMethodISCSI
 }
 
-func (r *Builder) PopulatorVolumes(_ ref.Ref, _ map[string]string, _ string) ([]*core.PersistentVolumeClaim, error) {
-	return nil, planbase.VolumePopulatorNotSupportedError
+func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) (pvcs []*core.PersistentVolumeClaim, err error) {
+	vm := &model.VM{}
+	if err = r.Source.Inventory.Find(vm, vmRef); err != nil {
+		err = liberr.Wrap(err, "vm", vmRef.String())
+		return
+	}
+
+	params := populatorCRParams{
+		vm:           vm,
+		secretName:   secretName,
+		vmID:         vmRef.ID,
+		migrationUID: string(r.Migration.UID),
+		portal:       iscsiTargetPortal(r.Context),
+		initiatorIQN: iscsiInitiatorIQN(r.Context),
+	}
+
+	params.targetIQN, err = r.getTargetIQN(vmRef.ID)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef.String())
+		return
+	}
+
+	sc, scErr := r.getStorageClass()
+	if scErr != nil {
+		err = liberr.Wrap(scErr)
+		return
+	}
+	pvcP := pvcParams{
+		storageClass: sc,
+		annotations:  annotations,
+		vmID:         params.vmID,
+		migrationUID: params.migrationUID,
+	}
+
+	for i, disk := range vm.Disks {
+		pvc, skip, diskErr := r.ensureDiskPopulator(disk, i, &params, &pvcP)
+		if diskErr != nil {
+			err = diskErr
+			return
+		}
+		if skip {
+			continue
+		}
+		pvcs = append(pvcs, pvc)
+	}
+	return
 }
 
-func (r *Builder) PopulatorTransferredBytes(_ *core.PersistentVolumeClaim) (int64, error) {
-	return 0, planbase.VolumePopulatorNotSupportedError
+func (r *Builder) ensureDiskPopulator(disk hyperv.Disk, diskIndex int, params *populatorCRParams, pvcP *pvcParams) (*core.PersistentVolumeClaim, bool, error) {
+	diskID := disk.ID
+
+	if r.pvcExistsForDisk(diskID, params.migrationUID) {
+		return nil, true, nil
+	}
+
+	populatorName, err := r.ensurePopulatorCR(disk, diskIndex, params)
+	if err != nil {
+		return nil, false, liberr.Wrap(err, "disk", diskID)
+	}
+
+	pvcP.disk = disk
+	pvcP.populatorName = populatorName
+	pvc, pErr := r.persistentVolumeClaimWithSourceRef(*pvcP)
+	if pErr != nil {
+		if k8serr.IsAlreadyExists(pErr) {
+			return nil, true, nil
+		}
+		return nil, false, liberr.Wrap(pErr, "disk", diskID, "storageClass", pvcP.storageClass)
+	}
+	return pvc, false, nil
 }
 
-func (r *Builder) SetPopulatorDataSourceLabels(_ ref.Ref, _ []*core.PersistentVolumeClaim) error {
+// ensurePopulatorCR reuses an existing CR if a previous reconcile created it
+// but the PVC creation failed before completing; otherwise creates a new one.
+func (r *Builder) ensurePopulatorCR(disk hyperv.Disk, diskIndex int, params *populatorCRParams) (string, error) {
+	existing, getErr := r.getVolumePopulator(disk.ID, params.migrationUID)
+	if getErr == nil {
+		return existing.Name, nil
+	}
+	if !k8serr.IsNotFound(getErr) {
+		return "", getErr
+	}
+	params.disk = disk
+	params.diskIndex = diskIndex
+	return r.createVolumePopulatorCR(*params)
+}
+
+func (r *Builder) getTargetIQN(vmID string) (string, error) {
+	// Read the real IQN persisted by PreTransferActions on the Migration object.
+	annKey := iscsiTargetIQNAnnKey(vmID)
+	if r.Migration.Annotations != nil {
+		if iqn, ok := r.Migration.Annotations[annKey]; ok && iqn != "" {
+			return iqn, nil
+		}
+	}
+	return "", fmt.Errorf("real iSCSI target IQN not found on migration annotation %q; PreTransferActions may not have run yet", annKey)
+}
+
+// pvcExistsForDisk returns true if a PVC for the given disk already exists.
+func (r *Builder) pvcExistsForDisk(diskID, migrationUID string) bool {
+	list := core.PersistentVolumeClaimList{}
+	err := r.Destination.Client.List(context.TODO(), &list, &client.ListOptions{
+		Namespace: r.Plan.Spec.TargetNamespace,
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			"migration": migrationUID,
+			"diskID":    diskID,
+		}),
+	})
+	return err == nil && len(list.Items) > 0
+}
+
+func (r *Builder) getVolumePopulator(diskID, migrationUID string) (api.HyperVVolumePopulator, error) {
+	list := api.HyperVVolumePopulatorList{}
+	err := r.Destination.Client.List(context.TODO(), &list, &client.ListOptions{
+		Namespace: r.Plan.Spec.TargetNamespace,
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			"migration": migrationUID,
+			"diskID":    diskID,
+		}),
+	})
+	if err != nil {
+		return api.HyperVVolumePopulator{}, liberr.Wrap(err)
+	}
+	if len(list.Items) == 0 {
+		return api.HyperVVolumePopulator{},
+			k8serr.NewNotFound(
+				api.SchemeGroupVersion.WithResource("HyperVVolumePopulator").GroupResource(),
+				diskID,
+			)
+	}
+	if len(list.Items) > 1 {
+		r.Log.Info("Multiple HyperVVolumePopulator CRs found for disk; using first",
+			"diskID", diskID, "migration", migrationUID, "count", len(list.Items))
+	}
+	return list.Items[0], nil
+}
+
+func (r *Builder) createVolumePopulatorCR(p populatorCRParams) (string, error) {
+	cr := &api.HyperVVolumePopulator{
+		ObjectMeta: meta.ObjectMeta{
+			GenerateName: fmt.Sprintf("hyperv-%s-%d-", p.vmID[:min(8, len(p.vmID))], p.diskIndex),
+			Namespace:    r.Plan.Spec.TargetNamespace,
+			Labels: map[string]string{
+				"vmID":      p.vmID,
+				"migration": p.migrationUID,
+				"diskID":    p.disk.ID,
+			},
+		},
+		Spec: api.HyperVVolumePopulatorSpec{
+			SecretName:   p.secretName,
+			VMID:         p.vmID,
+			VMName:       p.vm.Name,
+			DiskIndex:    p.diskIndex,
+			DiskPath:     p.disk.WindowsPath,
+			TargetIQN:    p.targetIQN,
+			TargetPortal: p.portal,
+			LunID:        p.diskIndex,
+			InitiatorIQN: p.initiatorIQN,
+		},
+	}
+
+	if err := r.Destination.Client.Create(context.TODO(), cr, &client.CreateOptions{}); err != nil {
+		if k8serr.IsAlreadyExists(err) {
+			existing, getErr := r.getVolumePopulator(p.disk.ID, p.migrationUID)
+			if getErr != nil {
+				return "", liberr.Wrap(getErr)
+			}
+			return existing.Name, nil
+		}
+		return "", liberr.Wrap(err)
+	}
+	return cr.Name, nil
+}
+
+func (r *Builder) persistentVolumeClaimWithSourceRef(p pvcParams) (*core.PersistentVolumeClaim, error) {
+	diskSize := p.disk.Capacity
+	accessModes, volumeMode, err := r.getDefaultVolumeAndAccessMode(p.storageClass)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
+	diskSize = util.CalculateSpaceWithOverhead(diskSize, volumeMode)
+
+	pvcAnnotations := make(map[string]string, len(p.annotations)+2)
+	for k, v := range p.annotations {
+		pvcAnnotations[k] = v
+	}
+	pvcAnnotations[planbase.AnnDiskSource] = p.disk.ID
+	pvcAnnotations["copy-offload"] = p.disk.ID
+	pvcAnnotations[planbase.AnnUsePopulator] = "false"
+
+	pvc := &core.PersistentVolumeClaim{
+		ObjectMeta: meta.ObjectMeta{
+			GenerateName: fmt.Sprintf("hyperv-%s-", p.disk.ID[:min(8, len(p.disk.ID))]),
+			Namespace:    r.Plan.Spec.TargetNamespace,
+			Annotations:  pvcAnnotations,
+			Labels: map[string]string{
+				"migration": p.migrationUID,
+				"vmID":      p.vmID,
+				"diskID":    p.disk.ID,
+			},
+		},
+		Spec: core.PersistentVolumeClaimSpec{
+			AccessModes: accessModes,
+			Resources: core.VolumeResourceRequirements{
+				Requests: map[core.ResourceName]resource.Quantity{
+					core.ResourceStorage: *resource.NewQuantity(diskSize, resource.BinarySI),
+				},
+			},
+			StorageClassName: &p.storageClass,
+			VolumeMode:       volumeMode,
+			DataSourceRef: &core.TypedObjectReference{
+				APIGroup: &api.SchemeGroupVersion.Group,
+				Kind:     api.HyperVVolumePopulatorKind,
+				Name:     p.populatorName,
+			},
+		},
+	}
+
+	err = r.Destination.Client.Create(context.TODO(), pvc, &client.CreateOptions{})
+	return pvc, err
+}
+
+func (r *Builder) getDefaultVolumeAndAccessMode(storageClassName string) ([]core.PersistentVolumeAccessMode, *core.PersistentVolumeMode, error) {
+	filesystemMode := core.PersistentVolumeFilesystem
+	storageProfile := &cdi.StorageProfile{}
+	err := r.Client.Get(context.TODO(), client.ObjectKey{Name: storageClassName}, storageProfile)
+	if err != nil {
+		return nil, nil, liberr.Wrap(err)
+	}
+	if len(storageProfile.Status.ClaimPropertySets) > 0 &&
+		len(storageProfile.Status.ClaimPropertySets[0].AccessModes) > 0 {
+		accessModes := storageProfile.Status.ClaimPropertySets[0].AccessModes
+		volumeMode := storageProfile.Status.ClaimPropertySets[0].VolumeMode
+		if volumeMode == nil {
+			volumeMode = &filesystemMode
+		}
+		return accessModes, volumeMode, nil
+	}
+	return nil, nil, liberr.New("no accessMode defined on StorageProfile for StorageClass", "storageName", storageClassName)
+}
+
+func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (int64, error) {
+	if pvc.Annotations == nil {
+		return 0, nil
+	}
+	diskID := pvc.Annotations[planbase.AnnDiskSource]
+	if diskID == "" {
+		return 0, nil
+	}
+	migrationUID := string(r.Migration.UID)
+
+	cr, err := r.getVolumePopulator(diskID, migrationUID)
+	if err != nil {
+		if k8serr.IsNotFound(err) {
+			return 0, nil
+		}
+		return 0, liberr.Wrap(err, "diskID", diskID)
+	}
+
+	if cr.Status.Progress == "" {
+		return 0, nil
+	}
+	progressStr := strings.TrimSuffix(cr.Status.Progress, "%")
+	pct, pErr := strconv.ParseInt(progressStr, 10, 64)
+	if pErr != nil {
+		r.Log.V(1).Info("Failed to parse populator progress",
+			"progress", cr.Status.Progress, "error", pErr)
+		return 0, nil
+	}
+
+	pvcSize := pvc.Spec.Resources.Requests[core.ResourceStorage]
+	return (pct * pvcSize.Value()) / 100, nil
+}
+
+func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) error {
+	migrationUID := string(r.Migration.UID)
+	for _, pvc := range pvcs {
+		diskID := pvc.Annotations[planbase.AnnDiskSource]
+		if diskID == "" {
+			continue
+		}
+		cr, err := r.getVolumePopulator(diskID, migrationUID)
+		if err != nil {
+			if !k8serr.IsNotFound(err) {
+				r.Log.Error(err, "Failed to get volume populator for label update", "diskID", diskID)
+			}
+			continue
+		}
+		patch := client.MergeFrom(cr.DeepCopy())
+		if cr.Labels == nil {
+			cr.Labels = make(map[string]string)
+		}
+		cr.Labels["vmID"] = vmRef.ID
+		cr.Labels["migration"] = migrationUID
+		if pErr := r.Destination.Client.Patch(context.TODO(), &cr, patch); pErr != nil {
+			return liberr.Wrap(pErr)
+		}
+	}
 	return nil
 }
 
-func (r *Builder) GetPopulatorTaskName(_ *core.PersistentVolumeClaim) (string, error) {
-	return "", nil
+func (r *Builder) GetPopulatorTaskName(pvc *core.PersistentVolumeClaim) (string, error) {
+	return pvc.Annotations[planbase.AnnDiskSource], nil
 }
 
 func (r *Builder) PreferenceName(_ ref.Ref, _ *core.ConfigMap) (string, error) {

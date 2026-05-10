@@ -8,13 +8,34 @@ users:
   - system:serviceaccount:{{ app_namespace }}:forklift-populator-controller
 runAsUser:
   type: RunAsAny
+fsGroup:
+  type: RunAsAny
 seLinuxContext:
   type: RunAsAny
-allowPrivilegedContainer: false
+supplementalGroups:
+  type: RunAsAny
+allowPrivilegedContainer: true
+allowPrivilegeEscalation: true
+allowHostNetwork: true
+allowHostPID: true
+allowHostPorts: true
+allowHostDirVolumePlugin: true
 allowedCapabilities:
   - CHOWN
   - DAC_OVERRIDE
   - FOWNER
+  - NET_RAW
+  - SYS_ADMIN
+volumes:
+  - configMap
+  - downwardAPI
+  - emptyDir
+  - ephemeral
+  - hostPath
+  - nfs
+  - persistentVolumeClaim
+  - projected
+  - secret
 seccompProfiles:
   - runtime/default
   - localhost/profiles/unshare.json

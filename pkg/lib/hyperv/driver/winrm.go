@@ -107,15 +107,12 @@ func (d *WinRMDriver) ExecuteCommandWithTimeout(command string, timeout time.Dur
 		return "", fmt.Errorf("WinRM client not connected")
 	}
 
-	// Wrap in powershell if not already
+	// Wrap in powershell if not already.
+	// Always use -EncodedCommand to avoid cmd.exe misinterpreting pipes,
+	// semicolons, or other special characters in the PowerShell script.
 	if !strings.HasPrefix(strings.ToLower(command), "powershell") {
-		// For complex scripts (multiline or containing quotes), use encoded command
-		if strings.Contains(command, "\n") || strings.Contains(command, "'") || strings.Contains(command, "\"") {
-			encoded := base64.StdEncoding.EncodeToString(utf16LEEncode(command))
-			command = fmt.Sprintf(`powershell -EncodedCommand %s`, encoded)
-		} else {
-			command = fmt.Sprintf(`powershell -Command "%s"`, command)
-		}
+		encoded := base64.StdEncoding.EncodeToString(utf16LEEncode(command))
+		command = fmt.Sprintf(`powershell -EncodedCommand %s`, encoded)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)

@@ -18,6 +18,8 @@ images[OVA_PROVIDER_SERVER_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/
 
 images[OVIRT_POPULATOR_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/ovirt-populator@sha256:c2e933d4ec5c94e7721d2835d71a91d0bd7451af2cffd2860c4dd86e40a0bdfc
 
+images[HYPERV_POPULATOR_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/hyperv-populator@sha256:0000000000000000000000000000000000000000000000000000000000000000
+
 images[POPULATOR_CONTROLLER_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/populator-controller@sha256:c127768d14d9c56d487e2356a315f634278a412a9a50ab9c3eda447d5e3d0f2d
 
 images[UI_PLUGIN_IMAGE]=quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator/forklift-console-plugin@sha256:86d33a87e4e96858af57c9a574dfc7357b5e97aa78e269de39aa3d7b7c3423d9
@@ -41,6 +43,7 @@ replacements[OPENSTACK_POPULATOR_IMAGE]=mtv-openstack-populator-rhel9
 replacements[OPERATOR_IMAGE]=mtv-rhel8-operator
 replacements[OVA_PROVIDER_SERVER_IMAGE]=mtv-ova-provider-server-rhel9
 replacements[OVIRT_POPULATOR_IMAGE]=mtv-rhv-populator-rhel8
+replacements[HYPERV_POPULATOR_IMAGE]=mtv-hyperv-populator-rhel9
 replacements[POPULATOR_CONTROLLER_IMAGE]=mtv-populator-controller-rhel9
 replacements[UI_PLUGIN_IMAGE]=mtv-console-plugin-rhel9
 replacements[CLI_DOWNLOAD_IMAGE]=mtv-cli-download-rhel9
