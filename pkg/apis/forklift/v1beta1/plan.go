@@ -473,6 +473,7 @@ func (p *Plan) ShouldUseV2vForTransfer(vmRef ref.Ref, destinationClient k8sclien
 	case Ova:
 		return true, nil
 	case HyperV:
+		// iSCSI copies disks via populator then runs virt-v2v-in-place, only SMB uses virt-v2v for transfer.
 		return source.GetHyperVTransferMethod() == HyperVTransferMethodSMB, nil
 	default:
 		return false, nil

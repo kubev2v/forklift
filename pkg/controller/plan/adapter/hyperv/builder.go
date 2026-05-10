@@ -339,7 +339,7 @@ func (r *Builder) getStorageClass() (string, error) {
 		}
 	}
 	scList := &storage.StorageClassList{}
-	if err := r.Client.List(context.TODO(), scList); err != nil {
+	if err := r.List(context.TODO(), scList); err != nil {
 		return "", fmt.Errorf("list StorageClasses: %w", err)
 	}
 	for _, sc := range scList.Items {
@@ -551,6 +551,9 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 	}
 
 	for i, disk := range vm.Disks {
+		if disk.WindowsPath == "" {
+			continue
+		}
 		pvc, skip, diskErr := r.ensureDiskPopulator(disk, i, &params, &pvcP)
 		if diskErr != nil {
 			err = diskErr
@@ -617,7 +620,7 @@ func (r *Builder) getTargetIQN(vmID string) (string, error) {
 // pvcExistsForDisk returns true if a PVC for the given disk already exists.
 func (r *Builder) pvcExistsForDisk(diskID, migrationUID string) bool {
 	list := core.PersistentVolumeClaimList{}
-	err := r.Destination.Client.List(context.TODO(), &list, &client.ListOptions{
+	err := r.Destination.List(context.TODO(), &list, &client.ListOptions{
 		Namespace: r.Plan.Spec.TargetNamespace,
 		LabelSelector: labels.SelectorFromSet(map[string]string{
 			"migration": migrationUID,
@@ -629,7 +632,7 @@ func (r *Builder) pvcExistsForDisk(diskID, migrationUID string) bool {
 
 func (r *Builder) getVolumePopulator(diskID, migrationUID string) (api.HyperVVolumePopulator, error) {
 	list := api.HyperVVolumePopulatorList{}
-	err := r.Destination.Client.List(context.TODO(), &list, &client.ListOptions{
+	err := r.Destination.List(context.TODO(), &list, &client.ListOptions{
 		Namespace: r.Plan.Spec.TargetNamespace,
 		LabelSelector: labels.SelectorFromSet(map[string]string{
 			"migration": migrationUID,
@@ -677,7 +680,7 @@ func (r *Builder) createVolumePopulatorCR(p populatorCRParams) (string, error) {
 		},
 	}
 
-	if err := r.Destination.Client.Create(context.TODO(), cr, &client.CreateOptions{}); err != nil {
+	if err := r.Destination.Create(context.TODO(), cr, &client.CreateOptions{}); err != nil {
 		if k8serr.IsAlreadyExists(err) {
 			existing, getErr := r.getVolumePopulator(p.disk.ID, p.migrationUID)
 			if getErr != nil {
@@ -735,14 +738,14 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(p pvcParams) (*core.Persist
 		},
 	}
 
-	err = r.Destination.Client.Create(context.TODO(), pvc, &client.CreateOptions{})
+	err = r.Destination.Create(context.TODO(), pvc, &client.CreateOptions{})
 	return pvc, err
 }
 
 func (r *Builder) getDefaultVolumeAndAccessMode(storageClassName string) ([]core.PersistentVolumeAccessMode, *core.PersistentVolumeMode, error) {
 	filesystemMode := core.PersistentVolumeFilesystem
 	storageProfile := &cdi.StorageProfile{}
-	err := r.Client.Get(context.TODO(), client.ObjectKey{Name: storageClassName}, storageProfile)
+	err := r.Get(context.TODO(), client.ObjectKey{Name: storageClassName}, storageProfile)
 	if err != nil {
 		return nil, nil, liberr.Wrap(err)
 	}
@@ -811,7 +814,7 @@ func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.Persi
 		}
 		cr.Labels["vmID"] = vmRef.ID
 		cr.Labels["migration"] = migrationUID
-		if pErr := r.Destination.Client.Patch(context.TODO(), &cr, patch); pErr != nil {
+		if pErr := r.Destination.Patch(context.TODO(), &cr, patch); pErr != nil {
 			return liberr.Wrap(pErr)
 		}
 	}

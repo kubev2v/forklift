@@ -83,45 +83,35 @@ const (
 )
 
 const (
-	// GetGuestNetworkConfig retrieves IP configuration from a running VM via KVP Exchange.
-	// Requires: VM running, Integration Services installed, Data Exchange enabled.
-	// Returns JSON with MAC, IPs, Subnets, DHCP status, Gateways, DNS servers.
+	// GetVMSettingData returns the InstanceID of the "Realized" VirtualSystemSettingData for a VM.
 	// Parameters: vmName
-	GetGuestNetworkConfig = `$vm=Get-CimInstance -Namespace root\virtualization\v2 -ClassName Msvm_ComputerSystem -Filter "ElementName='%s'"
-if(-not $vm){'no_vm';return}
-$vs=Get-CimAssociatedInstance -InputObject $vm -ResultClassName Msvm_VirtualSystemSettingData|Where-Object{$_.VirtualSystemType -eq 'Microsoft:Hyper-V:System:Realized'}
-$ports=Get-CimAssociatedInstance -InputObject $vs -ResultClassName Msvm_SyntheticEthernetPortSettingData
-$r=@()
-foreach($p in $ports){$gc=Get-CimAssociatedInstance -InputObject $p -ResultClassName Msvm_GuestNetworkAdapterConfiguration;if($gc){$r+=[PSCustomObject]@{MAC=$p.Address;IPs=$gc.IPAddresses;Subnets=$gc.Subnets;DHCP=$gc.DHCPEnabled;GW=$gc.DefaultGateways;DNS=$gc.DNSServers}}}
-if($r.Count -gt 0){$r|ConvertTo-Json -Compress}else{'no_gc'}`
+	GetVMSettingData = `Get-CimAssociatedInstance -InputObject (Get-CimInstance -Namespace root\virtualization\v2 -ClassName Msvm_ComputerSystem -Filter "ElementName='%s'" -ErrorAction SilentlyContinue) -ResultClassName Msvm_VirtualSystemSettingData -ErrorAction SilentlyContinue | Where-Object{$_.VirtualSystemType -eq 'Microsoft:Hyper-V:System:Realized'} | Select-Object -ExpandProperty InstanceID`
+
+	// GetNICPortsForSettingData lists synthetic NIC ports for a VirtualSystemSettingData.
+	// Returns JSON array of {InstanceID, Address(MAC)}.
+	// Parameters: settingDataInstanceID
+	GetNICPortsForSettingData = `Get-CimAssociatedInstance -InputObject (Get-CimInstance -Namespace root\virtualization\v2 -ClassName Msvm_VirtualSystemSettingData -Filter "InstanceID='%s'" -ErrorAction SilentlyContinue) -ResultClassName Msvm_SyntheticEthernetPortSettingData -ErrorAction SilentlyContinue | Select-Object InstanceID, Address | ConvertTo-Json -Compress`
+
+	// GetGuestNICConfig retrieves IP config for a single NIC port.
+	// Returns JSON: {IPs, Subnets, DHCP, GW, DNS} or empty if unavailable.
+	// Parameters: portInstanceID
+	GetGuestNICConfig = `$gc=Get-CimAssociatedInstance -InputObject (Get-CimInstance -Namespace root\virtualization\v2 -ClassName Msvm_SyntheticEthernetPortSettingData -Filter "InstanceID='%s'" -ErrorAction SilentlyContinue) -ResultClassName Msvm_GuestNetworkAdapterConfiguration -ErrorAction SilentlyContinue; if($gc){[PSCustomObject]@{IPs=$gc.IPAddresses;Subnets=$gc.Subnets;DHCP=$gc.DHCPEnabled;GW=$gc.DefaultGateways;DNS=$gc.DNSServers} | ConvertTo-Json -Compress}`
 )
 
-const (
-	// GetGuestOS retrieves guest operating system name via KVP Exchange.
-	// Requires: VM running, Integration Services installed, Data Exchange enabled.
-	// Returns the OS name string (e.g., "Microsoft Windows Server 2019 Standard"),
-	// or empty string if VM not found or Integration Services unavailable.
-	// Parameters: vmName
-	GetGuestOS = `$vm=Get-CimInstance -Namespace root\virtualization\v2 -ClassName Msvm_ComputerSystem -Filter "ElementName='%s'" -ErrorAction SilentlyContinue
-if(-not $vm){return}
-$kvp=Get-CimAssociatedInstance -InputObject $vm -ResultClassName Msvm_KvpExchangeComponent -ErrorAction SilentlyContinue
-if(-not $kvp -or -not $kvp.GuestIntrinsicExchangeItems){return}
-foreach($item in $kvp.GuestIntrinsicExchangeItems){$xml=[xml]$item;$name=$xml.INSTANCE.PROPERTY|Where-Object{$_.NAME -eq 'Name'}|Select-Object -ExpandProperty VALUE;$value=$xml.INSTANCE.PROPERTY|Where-Object{$_.NAME -eq 'Data'}|Select-Object -ExpandProperty VALUE;if($name -eq 'OSName'){$value;return}}`
-)
+// GetGuestKVPItems retrieves raw KVP Exchange XML items for a VM.
+// Returns a JSON array of XML strings, or empty if VM not found or no KVP data.
+// The XML parsing (e.g. extracting OSName) is done in Go.
+// Parameters: vmName
+const GetGuestKVPItems = `(Get-CimAssociatedInstance -InputObject (Get-CimInstance -Namespace root\virtualization\v2 -ClassName Msvm_ComputerSystem -Filter "ElementName='%s'") -ResultClassName Msvm_KvpExchangeComponent -ErrorAction SilentlyContinue).GuestIntrinsicExchangeItems | ConvertTo-Json -Compress`
 
 const (
-	// GetVMSecurityInfo retrieves TPM and security settings for a VM.
-	// Only Gen2 VMs support TPM. Returns JSON with TpmEnabled and SecureBoot.
-	// Parameters: vmName (used for Get-VM, Get-VMSecurity, Get-VMFirmware)
-	GetVMSecurityInfo = `$vm=Get-VM -Name '%s' -ErrorAction SilentlyContinue
-if(-not $vm){return '{}'}
-if($vm.Generation -ne 2){return '{"TpmEnabled":false,"SecureBoot":false}'}
-$sec=Get-VMSecurity -VMName '%s' -ErrorAction SilentlyContinue
-$fw=Get-VMFirmware -VMName '%s' -ErrorAction SilentlyContinue
-$tpm=$false;$sb=$false
-if($sec){$tpm=$sec.TpmEnabled}
-if($fw -and $fw.SecureBoot -eq 'On'){$sb=$true}
-[PSCustomObject]@{TpmEnabled=$tpm;SecureBoot=$sb}|ConvertTo-Json -Compress`
+	// GetVMSecurity returns TPM status for a VM. JSON: {"TpmEnabled": true/false}
+	// Parameters: vmName
+	GetVMSecurity = `Get-VMSecurity -VMName '%s' -ErrorAction SilentlyContinue | Select-Object TpmEnabled | ConvertTo-Json -Compress`
+
+	// GetVMFirmware returns firmware/SecureBoot status. JSON: {"SecureBoot": "On"/"Off"}
+	// Parameters: vmName
+	GetVMFirmware = `Get-VMFirmware -VMName '%s' -ErrorAction SilentlyContinue | Select-Object SecureBoot | ConvertTo-Json -Compress`
 )
 
 const (
@@ -166,19 +156,11 @@ if($existing){$ids=@($existing.InitiatorIds);if($ids -notcontains "IQN:$iqn"){$i
 $t=New-IscsiServerTarget -TargetName $name -InitiatorIds @("IQN:$iqn") -ErrorAction Stop
 [PSCustomObject]@{TargetIqn=[string]$t.TargetIqn;Created=$true;InitiatorIds=($t.InitiatorIds -join ',')}|ConvertTo-Json -Compress`
 
-	// RemoveIscsiTarget removes an iSCSI Server Target and all its virtual disk mappings.
-	// Idempotent: succeeds even if the target does not exist.
+	// RemoveIscsiServerTarget deletes an iSCSI Server Target by name.
+	// Callers should unmap disks first via the existing unmap/remove primitives.
+	// Idempotent: succeeds if the target does not exist.
 	// Parameters: targetName
-	RemoveIscsiTarget = `$name='%s'
-$t=Get-IscsiServerTarget -TargetName $name -ErrorAction SilentlyContinue
-if(-not $t){return}
-$mappings=@($t.LunMappings)
-$unmapErrors=@()
-foreach($m in $mappings){try{Remove-IscsiVirtualDiskTargetMapping -TargetName $name -Path $m.Path -ErrorAction Stop}catch{$unmapErrors+=$_.Exception.Message}}
-foreach($m in $mappings){try{Remove-IscsiVirtualDisk -Path $m.Path -ErrorAction Stop}catch{}}
-$retries=3;$removed=$false
-for($i=0;$i -lt $retries;$i++){Remove-IscsiServerTarget -TargetName $name -ErrorAction SilentlyContinue;$check=Get-IscsiServerTarget -TargetName $name -ErrorAction SilentlyContinue;if(-not $check){$removed=$true;break};Start-Sleep -Seconds 2}
-if(-not $removed){throw "Failed to remove iSCSI target '$name' after $retries attempts. Unmap errors: $($unmapErrors -join '; ')"}`
+	RemoveIscsiServerTarget = `Remove-IscsiServerTarget -TargetName '%s' -ErrorAction SilentlyContinue`
 
 	// GetIscsiTarget retrieves information about an existing iSCSI Server Target.
 	// Returns JSON with TargetIqn and Status, or empty string if not found.
@@ -201,26 +183,26 @@ const (
 	// Idempotent — no error if the directory already exists.
 	EnsureIscsiTargetDir = `$d='%s';if(-not (Test-Path $d)){New-Item -Path $d -ItemType Directory -Force | Out-Null}`
 
-	// CreateIscsiVirtualDisk creates a differencing disk referencing an existing VHDX.
-	// The differencing disk is a thin metadata file (<1 MB) that references the original
-	// VHDX. The iSCSI Target Server serves the logical content (raw guest disk), not the
-	// VHDX container format.
-	// Returns JSON: {"DevicePath": "C:\\iscsi-targets\\forklift-<vmId>-disk0.vhdx"}
+	// GetIscsiVirtualDisk checks whether an iSCSI virtual disk exists at the given path.
+	// Returns JSON: {"Path": "..."} or empty if not found.
+	// Parameters: diffDiskPath
+	GetIscsiVirtualDisk = `Get-IscsiVirtualDisk -Path '%s' -ErrorAction SilentlyContinue | Select-Object Path | ConvertTo-Json -Compress`
+
+	// GetVHDParentPath returns the ParentPath of a VHD/VHDX file.
+	// Used to verify a differencing disk still references the expected parent.
+	// Parameters: vhdPath
+	GetVHDParentPath = `(Get-VHD -Path '%s' -ErrorAction SilentlyContinue).ParentPath`
+
+	// NewIscsiVirtualDisk creates a differencing disk referencing an existing VHDX
+	// and registers it as an iSCSI virtual disk.
+	// Returns JSON: {"Path": "C:\\iscsi-targets\\forklift-<vmId>-disk0.vhdx"}
 	// Parameters: diffDiskPath, parentVhdxPath
-	CreateIscsiVirtualDisk = `$diffPath='%s'
-$parentPath='%s'
-$existing=Get-IscsiVirtualDisk -Path $diffPath -ErrorAction SilentlyContinue
-if($existing){
-  $vhd=Get-VHD -Path $diffPath -ErrorAction SilentlyContinue
-  if($vhd -and $vhd.ParentPath -ne $parentPath){
-    Remove-IscsiVirtualDisk -Path $diffPath -ErrorAction SilentlyContinue
-    if(Test-Path $diffPath){Remove-Item -Path $diffPath -Force}
-  }else{
-    [PSCustomObject]@{DevicePath=$existing.Path}|ConvertTo-Json -Compress;return
-  }
-}
-$vd=New-IscsiVirtualDisk -Path $diffPath -ParentPath $parentPath -ErrorAction Stop
-[PSCustomObject]@{DevicePath=$vd.Path}|ConvertTo-Json -Compress`
+	NewIscsiVirtualDisk = `New-IscsiVirtualDisk -Path '%s' -ParentPath '%s' -ErrorAction Stop | Select-Object Path | ConvertTo-Json -Compress`
+
+	// RemoveFileByPath deletes a single file from the filesystem.
+	// Idempotent: no error if the file does not exist.
+	// Parameters: filePath
+	RemoveFileByPath = `if (Test-Path '%s') { Remove-Item -Path '%s' -Force -ErrorAction SilentlyContinue }`
 
 	// AddIscsiVirtualDiskTargetMapping maps a virtual disk to an iSCSI target at a specific LUN.
 	// The LUN number determines which /dev/disk/by-path/ip-*-lun-N device the initiator sees.
@@ -244,15 +226,10 @@ Add-IscsiVirtualDiskTargetMapping -TargetName $target -Path $diskPath -Lun $lun 
 Remove-IscsiVirtualDisk -Path $p -ErrorAction SilentlyContinue
 if(Test-Path $p){Remove-Item -Path $p -Force -ErrorAction SilentlyContinue}`
 
-	// CleanupIscsiDiffDisks removes all differencing disk mappings, virtual disks, and files
-	// for a specific VM from an iSCSI target. Called after copy completes (or on failure).
-	// The target itself is NOT removed — it may be reused on retry.
-	// Parameters: targetName, vmFilePattern (e.g. "C:\iscsi-targets\forklift-<vmId>-*")
-	CleanupIscsiDiffDisks = `$target='%s'
-$pattern='%s'
-$t=Get-IscsiServerTarget -TargetName $target -ErrorAction SilentlyContinue
-if($t){$mappings=@($t.LunMappings);foreach($m in $mappings){if($m.Path -like $pattern){Remove-IscsiVirtualDiskTargetMapping -TargetName $target -Path $m.Path -ErrorAction SilentlyContinue;Remove-IscsiVirtualDisk -Path $m.Path -ErrorAction SilentlyContinue}}}
-Get-ChildItem -Path $pattern -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue`
+	// RemoveFilesByPattern deletes files matching a wildcard pattern from the filesystem.
+	// Idempotent: no error if no files match.
+	// Parameters: windowsPattern (e.g. "C:\iscsi-targets\forklift-<vmId>-*")
+	RemoveFilesByPattern = `Get-ChildItem -Path '%s' -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue`
 
 	// GetIscsiVirtualDiskTargetMappings lists all LUN mappings for a target.
 	// Returns JSON array with Path and Lun for each mapping.

@@ -65,7 +65,7 @@ func (r *Client) Finalize(vms []*planapi.VMStatus, _ string) {
 	}
 
 	for _, vm := range vms {
-		targetName := iscsiTargetName(vm.Ref.ID)
+		targetName := iscsiTargetName(vm.ID)
 		drv, err := r.connect()
 		if err != nil {
 			log.Error(err, "WinRM connect failed during finalize, skipping VM",
@@ -244,7 +244,7 @@ func (r *Client) PreTransferActions(vmRef ref.Ref) (bool, error) {
 	}
 	if migration.Annotations[annKey] != targetResult.TargetIQN {
 		migration.Annotations[annKey] = targetResult.TargetIQN
-		if err := r.Client.Update(context.TODO(), migration, &client.UpdateOptions{}); err != nil {
+		if err := r.Update(context.TODO(), migration, &client.UpdateOptions{}); err != nil {
 			return false, fmt.Errorf("store iSCSI target IQN on migration: %w", err)
 		}
 		r.Migration.Annotations = migration.Annotations

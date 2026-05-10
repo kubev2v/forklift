@@ -87,13 +87,13 @@ func TestDiffDiskPattern(t *testing.T) {
 	}
 }
 
-func TestCreateIscsiVirtualDisk_Template(t *testing.T) {
-	cmd := BuildCommand(CreateIscsiVirtualDisk,
+func TestNewIscsiVirtualDisk_Template(t *testing.T) {
+	cmd := BuildCommand(NewIscsiVirtualDisk,
 		`C:\iscsi-targets\forklift-abc123-disk0.vhdx`,
 		`C:\VMs\win2019\disk0.vhdx`)
 
 	if !strings.Contains(cmd, "-ParentPath") {
-		t.Error("CreateIscsiVirtualDisk must use -ParentPath, not -Path")
+		t.Error("NewIscsiVirtualDisk must use -ParentPath")
 	}
 	if !strings.Contains(cmd, "New-IscsiVirtualDisk") {
 		t.Error("expected New-IscsiVirtualDisk cmdlet")
@@ -132,19 +132,15 @@ func TestRemoveIscsiVirtualDisk_Template(t *testing.T) {
 	}
 }
 
-func TestCleanupIscsiDiffDisks_Template(t *testing.T) {
-	cmd := BuildCommand(CleanupIscsiDiffDisks,
-		"forklift-abc123",
+func TestRemoveFilesByPattern_Template(t *testing.T) {
+	cmd := BuildCommand(RemoveFilesByPattern,
 		`C:\iscsi-targets\forklift-abc123-*`)
 
-	if !strings.Contains(cmd, "Get-IscsiServerTarget") {
-		t.Error("expected target query for LUN mappings")
-	}
-	if !strings.Contains(cmd, "Remove-IscsiVirtualDiskTargetMapping") {
-		t.Error("expected mapping removal")
-	}
 	if !strings.Contains(cmd, "Get-ChildItem") {
-		t.Error("expected filesystem cleanup via Get-ChildItem")
+		t.Error("expected Get-ChildItem for file discovery")
+	}
+	if !strings.Contains(cmd, "Remove-Item") {
+		t.Error("expected Remove-Item for file deletion")
 	}
 }
 
@@ -172,7 +168,7 @@ func TestTestPaths_Template(t *testing.T) {
 }
 
 func TestEnsureIscsiTargetDir_Template(t *testing.T) {
-	cmd := BuildCommand(EnsureIscsiTargetDir, IscsiTargetDir, IscsiTargetDir)
+	cmd := BuildCommand(EnsureIscsiTargetDir, IscsiTargetDir)
 	if !strings.Contains(cmd, "New-Item") {
 		t.Error("expected New-Item for directory creation")
 	}

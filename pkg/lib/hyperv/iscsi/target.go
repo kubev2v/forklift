@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/kubev2v/forklift/pkg/lib/hyperv/driver"
 	ps "github.com/kubev2v/forklift/pkg/lib/hyperv/powershell"
@@ -165,17 +166,47 @@ func (c *TargetClient) GetTarget(targetName string) (*TargetInfo, error) {
 }
 
 // RemoveTarget removes an iSCSI target, its disk mappings, and virtual disks.
-// The underlying PowerShell script is a no-op if the target does not exist.
 func (c *TargetClient) RemoveTarget(targetName string) error {
 	if err := validateTargetName(targetName); err != nil {
 		return fmt.Errorf("remove iSCSI target: %w", err)
 	}
-	cmd := ps.BuildCommand(ps.RemoveIscsiTarget, targetName)
-	_, err := c.drv.ExecuteCommand(cmd)
-	if err != nil {
-		return fmt.Errorf("remove iSCSI target %q: %w", targetName, err)
+
+	// If the target doesn't exist, nothing to do.
+	info, err := c.GetTarget(targetName)
+	if errors.Is(err, ErrTargetNotFound) {
+		return nil
 	}
-	return nil
+	if err != nil {
+		return fmt.Errorf("remove iSCSI target %q: check existence: %w", targetName, err)
+	}
+
+	// Unmap and remove all virtual disks associated with the target.
+	if info.LunCount > 0 {
+		mappings, err := c.ListLunMappings(targetName)
+		if err != nil {
+			log.Error(err, "failed to list LUN mappings during target removal", "target", targetName)
+		}
+		for _, m := range mappings {
+			if unmapErr := c.UnmapDiskFromTarget(targetName, m.Path); unmapErr != nil {
+				log.Error(unmapErr, "failed to unmap disk during target removal", "target", targetName, "path", m.Path)
+			}
+			if rmErr := c.RemoveVirtualDisk(m.Path); rmErr != nil {
+				log.Error(rmErr, "failed to remove virtual disk during target removal", "path", m.Path)
+			}
+		}
+	}
+
+	// Remove the target itself with retry.
+	const maxRetries = 3
+	removeCmd := ps.BuildCommand(ps.RemoveIscsiServerTarget, targetName)
+	for i := 0; i < maxRetries; i++ {
+		_, _ = c.drv.ExecuteCommand(removeCmd)
+		if _, checkErr := c.GetTarget(targetName); errors.Is(checkErr, ErrTargetNotFound) {
+			return nil
+		}
+		time.Sleep(2 * time.Second)
+	}
+	return fmt.Errorf("failed to remove iSCSI target %q after %d attempts", targetName, maxRetries)
 }
 
 // EnsureTargetDir creates the staging directory for differencing disks.
@@ -189,11 +220,41 @@ func (c *TargetClient) EnsureTargetDir() error {
 }
 
 // CreateVirtualDisk creates a differencing disk referencing parentVhdxPath and
-// registers it as an iSCSI virtual disk. The diffDiskPath is typically obtained
-// from powershell.DiffDiskPath().
+// registers it as an iSCSI virtual disk. If a stale disk exists with a different
+// parent, it is removed first. The diffDiskPath is typically obtained from
+// powershell.DiffDiskPath().
 func (c *TargetClient) CreateVirtualDisk(diffDiskPath, parentVhdxPath string) (*VirtualDiskResult, error) {
-	cmd := ps.BuildCommand(ps.CreateIscsiVirtualDisk, diffDiskPath, parentVhdxPath)
-	stdout, err := c.drv.ExecuteCommand(cmd)
+	// Check if a virtual disk already exists at this path.
+	checkCmd := ps.BuildCommand(ps.GetIscsiVirtualDisk, diffDiskPath)
+	checkOut, err := c.drv.ExecuteCommand(checkCmd)
+	if err != nil {
+		return nil, fmt.Errorf("create iSCSI virtual disk %q: check existing: %w", diffDiskPath, err)
+	}
+	checkOut = strings.TrimSpace(checkOut)
+
+	if checkOut != "" {
+		var existing struct {
+			Path string `json:"Path"`
+		}
+		if err := json.Unmarshal([]byte(checkOut), &existing); err == nil && existing.Path != "" {
+			// Verify the parent path matches; if not, remove the stale disk.
+			parentCmd := ps.BuildCommand(ps.GetVHDParentPath, diffDiskPath)
+			parentOut, _ := c.drv.ExecuteCommand(parentCmd)
+			if strings.TrimSpace(parentOut) == parentVhdxPath {
+				return &VirtualDiskResult{DevicePath: existing.Path}, nil
+			}
+			// Stale disk — remove and recreate.
+			if rmErr := c.RemoveVirtualDisk(diffDiskPath); rmErr != nil {
+				log.Error(rmErr, "failed to remove stale virtual disk", "path", diffDiskPath)
+			}
+			rmFileCmd := ps.BuildCommand(ps.RemoveFileByPath, diffDiskPath, diffDiskPath)
+			_, _ = c.drv.ExecuteCommand(rmFileCmd)
+		}
+	}
+
+	// Create the new differencing disk.
+	createCmd := ps.BuildCommand(ps.NewIscsiVirtualDisk, diffDiskPath, parentVhdxPath)
+	stdout, err := c.drv.ExecuteCommand(createCmd)
 	if err != nil {
 		return nil, fmt.Errorf("create iSCSI virtual disk %q (parent %q): %w", diffDiskPath, parentVhdxPath, err)
 	}
@@ -201,11 +262,13 @@ func (c *TargetClient) CreateVirtualDisk(diffDiskPath, parentVhdxPath string) (*
 	if stdout == "" {
 		return nil, fmt.Errorf("create iSCSI virtual disk %q: empty response", diffDiskPath)
 	}
-	var result VirtualDiskResult
-	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
+	var raw struct {
+		Path string `json:"Path"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &raw); err != nil {
 		return nil, fmt.Errorf("create iSCSI virtual disk %q: parse response: %w (output: %s)", diffDiskPath, err, stdout)
 	}
-	return &result, nil
+	return &VirtualDiskResult{DevicePath: raw.Path}, nil
 }
 
 // MapDiskToTarget maps a virtual disk to an iSCSI target at the given LUN ID.
@@ -240,15 +303,43 @@ func (c *TargetClient) RemoveVirtualDisk(diffDiskPath string) error {
 
 // CleanupDiffDisks removes all differencing disk mappings, virtual disks, and
 // files for a VM from a target. The target itself is preserved for potential
-// retry. targetName is the iSCSI target; vmFilePattern is the wildcard from
-// powershell.DiffDiskPattern().
+// retry. Orchestrates existing primitives: list mappings → filter by pattern →
+// unmap → remove virtual disk → delete leftover files.
 func (c *TargetClient) CleanupDiffDisks(targetName, vmFilePattern string) error {
-	cmd := ps.BuildCommand(ps.CleanupIscsiDiffDisks, targetName, vmFilePattern)
-	_, err := c.drv.ExecuteCommand(cmd)
+	mappings, err := c.ListLunMappings(targetName)
 	if err != nil {
-		return fmt.Errorf("cleanup diff disks for target %q (pattern %q): %w", targetName, vmFilePattern, err)
+		log.Error(err, "failed to list LUN mappings during cleanup", "target", targetName)
+	}
+
+	for _, m := range mappings {
+		if !pathMatchesPattern(m.Path, vmFilePattern) {
+			continue
+		}
+		if unmapErr := c.UnmapDiskFromTarget(targetName, m.Path); unmapErr != nil {
+			log.Error(unmapErr, "failed to unmap disk during cleanup", "target", targetName, "path", m.Path)
+		}
+		if rmErr := c.RemoveVirtualDisk(m.Path); rmErr != nil {
+			log.Error(rmErr, "failed to remove virtual disk during cleanup", "path", m.Path)
+		}
+	}
+
+	// Delete any leftover differencing disk files from the filesystem.
+	rmCmd := ps.BuildCommand(ps.RemoveFilesByPattern, vmFilePattern)
+	if _, err := c.drv.ExecuteCommand(rmCmd); err != nil {
+		return fmt.Errorf("cleanup diff disk files for target %q (pattern %q): %w", targetName, vmFilePattern, err)
 	}
 	return nil
+}
+
+// pathMatchesPattern does a simple suffix-based match for patterns like
+// "C:\iscsi-targets\forklift-abc123-*" against paths like
+// "C:\iscsi-targets\forklift-abc123-disk0.vhdx".
+func pathMatchesPattern(path, pattern string) bool {
+	if !strings.HasSuffix(pattern, "*") {
+		return strings.EqualFold(path, pattern)
+	}
+	prefix := pattern[:len(pattern)-1]
+	return len(path) >= len(prefix) && strings.EqualFold(path[:len(prefix)], prefix)
 }
 
 // ListLunMappings returns all LUN mappings for a target.

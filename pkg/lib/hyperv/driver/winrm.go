@@ -124,10 +124,64 @@ func (d *WinRMDriver) ExecuteCommandWithTimeout(command string, timeout time.Dur
 	}
 
 	if exitCode != 0 {
+		if isOnlyCLIXMLProgress(stderr) {
+			return strings.TrimSpace(stdout), nil
+		}
 		return "", fmt.Errorf("command exited with code %d: %s", exitCode, stderr)
 	}
 
 	return strings.TrimSpace(stdout), nil
+}
+
+// isOnlyCLIXMLProgress returns true when stderr contains only CLIXML progress
+// records (e.g. "Preparing modules for first use") and no real error text.
+// WinRM encodes PowerShell progress output as CLIXML in stderr, which can
+// cause a non-zero exit code even when the command actually succeeds.
+func isOnlyCLIXMLProgress(stderr string) bool {
+	s := strings.TrimSpace(stderr)
+	if s == "" {
+		return false
+	}
+	if !strings.Contains(s, "#< CLIXML") {
+		return false
+	}
+	// Strip the CLIXML envelope and progress records, if nothing meaningful
+	// remains, it was purely progress output.
+	cleaned := s
+	cleaned = strings.ReplaceAll(cleaned, "#< CLIXML", "")
+	// Remove all XML tags
+	for strings.Contains(cleaned, "<") {
+		start := strings.Index(cleaned, "<")
+		end := strings.Index(cleaned[start:], ">")
+		if end == -1 {
+			break
+		}
+		cleaned = cleaned[:start] + cleaned[start+end+1:]
+	}
+	cleaned = strings.TrimSpace(cleaned)
+	if cleaned == "" {
+		return true
+	}
+	// After stripping XML tags, inner text from progress records remains
+	// (type names, "Preparing modules…", "Completed", digits, etc.).
+	// Remove all known benign fragments; if anything is left it's a real error.
+	lower := strings.ToLower(cleaned)
+	benign := []string{
+		"preparing modules for first use.",
+		"completed",
+		"system.management.automation.pscustomobject",
+		"system.object",
+	}
+	for _, phrase := range benign {
+		lower = strings.ReplaceAll(lower, phrase, "")
+	}
+	stripped := strings.Map(func(r rune) rune {
+		if r >= '0' && r <= '9' || r == '-' || r == '.' || r == ' ' || r == '\t' || r == '\n' || r == '\r' {
+			return -1
+		}
+		return r
+	}, lower)
+	return strings.TrimSpace(stripped) == ""
 }
 
 func utf16LEEncode(s string) []byte {

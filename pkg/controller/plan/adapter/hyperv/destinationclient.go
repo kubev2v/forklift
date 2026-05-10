@@ -21,7 +21,7 @@ func (r *DestinationClient) DeletePopulatorDataSource(vm *plan.VMStatus) error {
 	}
 	migrationUID := string(r.Migration.UID)
 	list := api.HyperVVolumePopulatorList{}
-	err := r.Destination.Client.List(context.TODO(), &list, &client.ListOptions{
+	err := r.Destination.List(context.TODO(), &list, &client.ListOptions{
 		Namespace: r.Plan.Spec.TargetNamespace,
 		LabelSelector: labels.SelectorFromSet(map[string]string{
 			"migration": migrationUID,
@@ -32,7 +32,7 @@ func (r *DestinationClient) DeletePopulatorDataSource(vm *plan.VMStatus) error {
 		return liberr.Wrap(err)
 	}
 	for i := range list.Items {
-		if err := client.IgnoreNotFound(r.Destination.Client.Delete(context.TODO(), &list.Items[i])); err != nil {
+		if err := client.IgnoreNotFound(r.Destination.Delete(context.TODO(), &list.Items[i])); err != nil {
 			return liberr.Wrap(err)
 		}
 	}

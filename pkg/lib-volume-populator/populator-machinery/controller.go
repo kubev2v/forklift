@@ -1236,7 +1236,7 @@ func (c *controller) scrapeMetrics(pod *corev1.Pod) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	return io.ReadAll(resp.Body)
 }
 

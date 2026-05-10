@@ -1607,22 +1607,6 @@ func (r *Migration) end() (completed bool, err error) {
 	return
 }
 
-
-// Get pod that has inspection label
-func (r *Migration) getInspectionPod(vm *plan.VMStatus) (pod *core.Pod, err error) {
-	list, err := r.kubevirt.GetPodsWithLabels(r.kubevirt.inspectionLabels(vm.Ref))
-	if err != nil {
-		return
-	}
-
-	if len(list.Items) > 0 {
-		pod = &list.Items[0]
-		return
-	}
-
-	return
-}
-
 func (r *Migration) setTaskCompleted(task *plan.Task) {
 	task.Phase = api.StepCompleted
 	task.Reason = TransferCompleted

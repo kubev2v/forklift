@@ -2200,7 +2200,7 @@ func (r *KubeVirt) GetPopulatorPodsWithoutMigrationLabel() (pods *core.PodList, 
 	}
 	selector := k8slabels.NewSelector().Add(*req, *noMigration)
 	pods = &core.PodList{}
-	err = r.Destination.Client.List(
+	err = r.Destination.List(
 		context.TODO(),
 		pods,
 		&client.ListOptions{

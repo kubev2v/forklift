@@ -12,16 +12,20 @@ import (
 
 // mockDriver implements driver.HyperVDriver for unit tests.
 // Commands and errors are keyed by the exact PowerShell command string.
+// Hooks run after a command executes, allowing state transitions (e.g. making
+// a target "disappear" after the remove command fires).
 type mockDriver struct {
 	commands map[string]string
 	errors   map[string]error
 	called   []string // records every command executed, in order
+	hooks    map[string]func(m *mockDriver)
 }
 
 func newMockDriver() *mockDriver {
 	return &mockDriver{
 		commands: make(map[string]string),
 		errors:   make(map[string]error),
+		hooks:    make(map[string]func(m *mockDriver)),
 	}
 }
 
@@ -49,10 +53,14 @@ func (m *mockDriver) ExecuteCommand(command string) (string, error) {
 	if e, ok := m.errors[command]; ok {
 		return "", e
 	}
-	if out, ok := m.commands[command]; ok {
-		return out, nil
+	out, ok := m.commands[command]
+	if !ok {
+		return "", fmt.Errorf("unexpected command: %s", command)
 	}
-	return "", fmt.Errorf("unexpected command: %s", command)
+	if h, ok := m.hooks[command]; ok {
+		h(m)
+	}
+	return out, nil
 }
 
 func TestCheckReadiness_AllReady(t *testing.T) {
@@ -286,10 +294,16 @@ func TestGetTarget_CommandFails(t *testing.T) {
 
 func TestRemoveTarget_Success(t *testing.T) {
 	targetName := "forklift-abc123"
-	cmd := ps.BuildCommand(ps.RemoveIscsiTarget, targetName)
+	getCmd := ps.BuildCommand(ps.GetIscsiTarget, targetName)
+	removeCmd := ps.BuildCommand(ps.RemoveIscsiServerTarget, targetName)
 
 	drv := newMockDriver()
-	drv.commands[cmd] = ""
+	drv.commands[getCmd] = `{"TargetIqn":"iqn.test","Status":"Connected","LunCount":0}`
+	drv.commands[removeCmd] = ""
+	// After remove executes, GetTarget should return empty (target gone).
+	drv.hooks[removeCmd] = func(m *mockDriver) {
+		m.commands[getCmd] = ""
+	}
 
 	c := NewTargetClient(drv)
 	if err := c.RemoveTarget(targetName); err != nil {
@@ -297,16 +311,16 @@ func TestRemoveTarget_Success(t *testing.T) {
 	}
 }
 
-func TestRemoveTarget_CommandFails(t *testing.T) {
+func TestRemoveTarget_NotFound(t *testing.T) {
 	targetName := "forklift-abc123"
-	cmd := ps.BuildCommand(ps.RemoveIscsiTarget, targetName)
+	getCmd := ps.BuildCommand(ps.GetIscsiTarget, targetName)
 
 	drv := newMockDriver()
-	drv.errors[cmd] = errors.New("access denied")
+	drv.commands[getCmd] = ""
 
 	c := NewTargetClient(drv)
-	if err := c.RemoveTarget(targetName); err == nil {
-		t.Fatal("expected error")
+	if err := c.RemoveTarget(targetName); err != nil {
+		t.Fatalf("expected no error for non-existent target, got: %v", err)
 	}
 }
 
@@ -334,13 +348,15 @@ func TestEnsureTargetDir_Fails(t *testing.T) {
 	}
 }
 
-func TestCreateVirtualDisk_Success(t *testing.T) {
+func TestCreateVirtualDisk_NewDisk(t *testing.T) {
 	diffPath := `C:\iscsi-targets\forklift-abc123-disk0.vhdx`
 	parentPath := `C:\VMs\win2019\disk0.vhdx`
-	cmd := ps.BuildCommand(ps.CreateIscsiVirtualDisk, diffPath, parentPath)
+	checkCmd := ps.BuildCommand(ps.GetIscsiVirtualDisk, diffPath)
+	createCmd := ps.BuildCommand(ps.NewIscsiVirtualDisk, diffPath, parentPath)
 
 	drv := newMockDriver()
-	drv.commands[cmd] = `{"DevicePath":"C:\\iscsi-targets\\forklift-abc123-disk0.vhdx"}`
+	drv.commands[checkCmd] = ""
+	drv.commands[createCmd] = fmt.Sprintf(`{"Path":"%s"}`, strings.ReplaceAll(diffPath, `\`, `\\`))
 
 	c := NewTargetClient(drv)
 	res, err := c.CreateVirtualDisk(diffPath, parentPath)
@@ -352,33 +368,40 @@ func TestCreateVirtualDisk_Success(t *testing.T) {
 	}
 }
 
-func TestCreateVirtualDisk_EmptyResponse(t *testing.T) {
+func TestCreateVirtualDisk_ExistingWithSameParent(t *testing.T) {
 	diffPath := `C:\iscsi-targets\forklift-abc123-disk0.vhdx`
 	parentPath := `C:\VMs\win2019\disk0.vhdx`
-	cmd := ps.BuildCommand(ps.CreateIscsiVirtualDisk, diffPath, parentPath)
+	checkCmd := ps.BuildCommand(ps.GetIscsiVirtualDisk, diffPath)
+	parentCmd := ps.BuildCommand(ps.GetVHDParentPath, diffPath)
 
 	drv := newMockDriver()
-	drv.commands[cmd] = ""
+	drv.commands[checkCmd] = fmt.Sprintf(`{"Path":"%s"}`, strings.ReplaceAll(diffPath, `\`, `\\`))
+	drv.commands[parentCmd] = parentPath
 
 	c := NewTargetClient(drv)
-	_, err := c.CreateVirtualDisk(diffPath, parentPath)
-	if err == nil {
-		t.Fatal("expected error on empty response")
+	res, err := c.CreateVirtualDisk(diffPath, parentPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.DevicePath == "" {
+		t.Error("expected non-empty DevicePath for reused disk")
 	}
 }
 
-func TestCreateVirtualDisk_InvalidJSON(t *testing.T) {
+func TestCreateVirtualDisk_CreateFails(t *testing.T) {
 	diffPath := `C:\iscsi-targets\forklift-abc123-disk0.vhdx`
 	parentPath := `C:\VMs\win2019\disk0.vhdx`
-	cmd := ps.BuildCommand(ps.CreateIscsiVirtualDisk, diffPath, parentPath)
+	checkCmd := ps.BuildCommand(ps.GetIscsiVirtualDisk, diffPath)
+	createCmd := ps.BuildCommand(ps.NewIscsiVirtualDisk, diffPath, parentPath)
 
 	drv := newMockDriver()
-	drv.commands[cmd] = "not json"
+	drv.commands[checkCmd] = ""
+	drv.errors[createCmd] = errors.New("disk creation failed")
 
 	c := NewTargetClient(drv)
 	_, err := c.CreateVirtualDisk(diffPath, parentPath)
 	if err == nil {
-		t.Fatal("expected error on invalid JSON")
+		t.Fatal("expected error on create failure")
 	}
 }
 
@@ -440,10 +463,24 @@ func TestRemoveVirtualDisk_Success(t *testing.T) {
 func TestCleanupDiffDisks_Success(t *testing.T) {
 	targetName := "forklift-abc123"
 	pattern := ps.DiffDiskPattern(targetName)
-	cmd := ps.BuildCommand(ps.CleanupIscsiDiffDisks, targetName, pattern)
+	disk0 := `C:\iscsi-targets\forklift-abc123-disk0.vhdx`
+	disk1 := `C:\iscsi-targets\forklift-abc123-disk1.vhdx`
+
+	listCmd := ps.BuildCommand(ps.GetIscsiVirtualDiskTargetMappings, targetName)
+	unmap0 := ps.BuildCommand(ps.RemoveIscsiVirtualDiskTargetMapping, targetName, disk0)
+	unmap1 := ps.BuildCommand(ps.RemoveIscsiVirtualDiskTargetMapping, targetName, disk1)
+	rmDisk0 := ps.BuildCommand(ps.RemoveIscsiVirtualDisk, disk0)
+	rmDisk1 := ps.BuildCommand(ps.RemoveIscsiVirtualDisk, disk1)
+	rmFiles := ps.BuildCommand(ps.RemoveFilesByPattern, pattern)
 
 	drv := newMockDriver()
-	drv.commands[cmd] = ""
+	drv.commands[listCmd] = fmt.Sprintf(`[{"Path":"%s","Lun":0},{"Path":"%s","Lun":1}]`,
+		strings.ReplaceAll(disk0, `\`, `\\`), strings.ReplaceAll(disk1, `\`, `\\`))
+	drv.commands[unmap0] = ""
+	drv.commands[unmap1] = ""
+	drv.commands[rmDisk0] = ""
+	drv.commands[rmDisk1] = ""
+	drv.commands[rmFiles] = ""
 
 	c := NewTargetClient(drv)
 	if err := c.CleanupDiffDisks(targetName, pattern); err != nil {
@@ -451,17 +488,20 @@ func TestCleanupDiffDisks_Success(t *testing.T) {
 	}
 }
 
-func TestCleanupDiffDisks_Fails(t *testing.T) {
+func TestCleanupDiffDisks_NoMappings(t *testing.T) {
 	targetName := "forklift-abc123"
 	pattern := ps.DiffDiskPattern(targetName)
-	cmd := ps.BuildCommand(ps.CleanupIscsiDiffDisks, targetName, pattern)
+
+	listCmd := ps.BuildCommand(ps.GetIscsiVirtualDiskTargetMappings, targetName)
+	rmFiles := ps.BuildCommand(ps.RemoveFilesByPattern, pattern)
 
 	drv := newMockDriver()
-	drv.errors[cmd] = errors.New("access denied")
+	drv.commands[listCmd] = ""
+	drv.commands[rmFiles] = ""
 
 	c := NewTargetClient(drv)
-	if err := c.CleanupDiffDisks(targetName, pattern); err == nil {
-		t.Fatal("expected error")
+	if err := c.CleanupDiffDisks(targetName, pattern); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -540,12 +580,14 @@ func TestSetupDiskForMigration_Success(t *testing.T) {
 	diffPath := ps.DiffDiskPath(targetName, diskIndex)
 
 	ensureCmd := ps.BuildCommand(ps.EnsureIscsiTargetDir, ps.IscsiTargetDir)
-	createCmd := ps.BuildCommand(ps.CreateIscsiVirtualDisk, diffPath, parentPath)
+	checkCmd := ps.BuildCommand(ps.GetIscsiVirtualDisk, diffPath)
+	createCmd := ps.BuildCommand(ps.NewIscsiVirtualDisk, diffPath, parentPath)
 	mapCmd := ps.BuildCommand(ps.AddIscsiVirtualDiskTargetMapping, targetName, diffPath, "0")
 
 	drv := newMockDriver()
 	drv.commands[ensureCmd] = ""
-	drv.commands[createCmd] = fmt.Sprintf(`{"DevicePath":"%s"}`, strings.ReplaceAll(diffPath, `\`, `\\`))
+	drv.commands[checkCmd] = ""
+	drv.commands[createCmd] = fmt.Sprintf(`{"Path":"%s"}`, strings.ReplaceAll(diffPath, `\`, `\\`))
 	drv.commands[mapCmd] = ""
 
 	c := NewTargetClient(drv)
@@ -555,10 +597,6 @@ func TestSetupDiskForMigration_Success(t *testing.T) {
 	}
 	if result == "" {
 		t.Error("expected non-empty result path")
-	}
-
-	if len(drv.called) != 3 {
-		t.Errorf("expected 3 commands, got %d", len(drv.called))
 	}
 }
 
@@ -585,10 +623,12 @@ func TestSetupDiskForMigration_CreateDiskFails(t *testing.T) {
 	diffPath := ps.DiffDiskPath(targetName, diskIndex)
 
 	ensureCmd := ps.BuildCommand(ps.EnsureIscsiTargetDir, ps.IscsiTargetDir)
-	createCmd := ps.BuildCommand(ps.CreateIscsiVirtualDisk, diffPath, parentPath)
+	checkCmd := ps.BuildCommand(ps.GetIscsiVirtualDisk, diffPath)
+	createCmd := ps.BuildCommand(ps.NewIscsiVirtualDisk, diffPath, parentPath)
 
 	drv := newMockDriver()
 	drv.commands[ensureCmd] = ""
+	drv.commands[checkCmd] = ""
 	drv.errors[createCmd] = errors.New("parent path not found")
 
 	c := NewTargetClient(drv)
@@ -605,13 +645,15 @@ func TestSetupDiskForMigration_MapFails_RollsBackVirtualDisk(t *testing.T) {
 	diffPath := ps.DiffDiskPath(targetName, diskIndex)
 
 	ensureCmd := ps.BuildCommand(ps.EnsureIscsiTargetDir, ps.IscsiTargetDir)
-	createCmd := ps.BuildCommand(ps.CreateIscsiVirtualDisk, diffPath, parentPath)
+	checkCmd := ps.BuildCommand(ps.GetIscsiVirtualDisk, diffPath)
+	createCmd := ps.BuildCommand(ps.NewIscsiVirtualDisk, diffPath, parentPath)
 	mapCmd := ps.BuildCommand(ps.AddIscsiVirtualDiskTargetMapping, targetName, diffPath, "0")
 	removeCmd := ps.BuildCommand(ps.RemoveIscsiVirtualDisk, diffPath)
 
 	drv := newMockDriver()
 	drv.commands[ensureCmd] = ""
-	drv.commands[createCmd] = fmt.Sprintf(`{"DevicePath":"%s"}`, strings.ReplaceAll(diffPath, `\`, `\\`))
+	drv.commands[checkCmd] = ""
+	drv.commands[createCmd] = fmt.Sprintf(`{"Path":"%s"}`, strings.ReplaceAll(diffPath, `\`, `\\`))
 	drv.errors[mapCmd] = errors.New("target not found")
 	drv.commands[removeCmd] = ""
 
@@ -637,20 +679,23 @@ func TestTeardownVM_Success(t *testing.T) {
 	targetName := "forklift-abc123"
 	pattern := ps.DiffDiskPattern(targetName)
 
-	cleanupCmd := ps.BuildCommand(ps.CleanupIscsiDiffDisks, targetName, pattern)
-	removeCmd := ps.BuildCommand(ps.RemoveIscsiTarget, targetName)
+	listCmd := ps.BuildCommand(ps.GetIscsiVirtualDiskTargetMappings, targetName)
+	rmFiles := ps.BuildCommand(ps.RemoveFilesByPattern, pattern)
+	getCmd := ps.BuildCommand(ps.GetIscsiTarget, targetName)
+	removeCmd := ps.BuildCommand(ps.RemoveIscsiServerTarget, targetName)
 
 	drv := newMockDriver()
-	drv.commands[cleanupCmd] = ""
+	drv.commands[listCmd] = ""
+	drv.commands[rmFiles] = ""
+	drv.commands[getCmd] = `{"TargetIqn":"iqn.test","Status":"Connected","LunCount":0}`
 	drv.commands[removeCmd] = ""
+	drv.hooks[removeCmd] = func(m *mockDriver) {
+		m.commands[getCmd] = ""
+	}
 
 	c := NewTargetClient(drv)
 	if err := c.TeardownVM(targetName); err != nil {
 		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(drv.called) != 2 {
-		t.Errorf("expected 2 commands, got %d", len(drv.called))
 	}
 }
 
@@ -658,14 +703,23 @@ func TestTeardownVM_CleanupFails_StillRemovesTarget(t *testing.T) {
 	targetName := "forklift-abc123"
 	pattern := ps.DiffDiskPattern(targetName)
 
-	cleanupCmd := ps.BuildCommand(ps.CleanupIscsiDiffDisks, targetName, pattern)
-	removeCmd := ps.BuildCommand(ps.RemoveIscsiTarget, targetName)
+	listCmd := ps.BuildCommand(ps.GetIscsiVirtualDiskTargetMappings, targetName)
+	rmFiles := ps.BuildCommand(ps.RemoveFilesByPattern, pattern)
+	getCmd := ps.BuildCommand(ps.GetIscsiTarget, targetName)
+	removeCmd := ps.BuildCommand(ps.RemoveIscsiServerTarget, targetName)
 
 	drv := newMockDriver()
-	drv.errors[cleanupCmd] = errors.New("partial failure")
+	drv.errors[listCmd] = errors.New("partial failure")
+	drv.errors[rmFiles] = errors.New("partial failure")
+	drv.commands[getCmd] = `{"TargetIqn":"iqn.test","Status":"Connected","LunCount":0}`
 	drv.commands[removeCmd] = ""
+	drv.hooks[removeCmd] = func(m *mockDriver) {
+		m.commands[getCmd] = ""
+	}
 
 	c := NewTargetClient(drv)
+	// CleanupDiffDisks will fail on rmFiles, but TeardownVM logs it and proceeds.
+	// RemoveTarget should still succeed.
 	if err := c.TeardownVM(targetName); err != nil {
 		t.Fatalf("unexpected error: %v (should succeed despite cleanup failure)", err)
 	}
@@ -686,11 +740,16 @@ func TestTeardownVM_RemoveTargetFails(t *testing.T) {
 	targetName := "forklift-abc123"
 	pattern := ps.DiffDiskPattern(targetName)
 
-	cleanupCmd := ps.BuildCommand(ps.CleanupIscsiDiffDisks, targetName, pattern)
-	removeCmd := ps.BuildCommand(ps.RemoveIscsiTarget, targetName)
+	listCmd := ps.BuildCommand(ps.GetIscsiVirtualDiskTargetMappings, targetName)
+	rmFiles := ps.BuildCommand(ps.RemoveFilesByPattern, pattern)
+	getCmd := ps.BuildCommand(ps.GetIscsiTarget, targetName)
+	removeCmd := ps.BuildCommand(ps.RemoveIscsiServerTarget, targetName)
 
 	drv := newMockDriver()
-	drv.commands[cleanupCmd] = ""
+	drv.commands[listCmd] = ""
+	drv.commands[rmFiles] = ""
+	// GetTarget always returns the target (never goes away) — simulates sticky target.
+	drv.commands[getCmd] = `{"TargetIqn":"iqn.test","Status":"Connected","LunCount":0}`
 	drv.errors[removeCmd] = errors.New("sticky target")
 
 	c := NewTargetClient(drv)

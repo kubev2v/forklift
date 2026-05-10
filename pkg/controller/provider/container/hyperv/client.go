@@ -3,6 +3,7 @@ package hyperv
 import (
 	"bytes"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"net"
 	"net/http"
@@ -455,32 +456,86 @@ func formatMAC(mac string) string {
 	return mac
 }
 
+// kvpInstance maps the Hyper-V KVP XML schema:
+// <INSTANCE><PROPERTY NAME="Name"><VALUE>key</VALUE></PROPERTY><PROPERTY NAME="Data"><VALUE>val</VALUE></PROPERTY></INSTANCE>
+type kvpInstance struct {
+	XMLName    xml.Name      `xml:"INSTANCE"`
+	Properties []kvpProperty `xml:"PROPERTY"`
+}
+
+type kvpProperty struct {
+	Name  string `xml:"NAME,attr"`
+	Value string `xml:"VALUE"`
+}
+
+func (k *kvpInstance) get(name string) string {
+	for _, p := range k.Properties {
+		if p.Name == name {
+			return p.Value
+		}
+	}
+	return ""
+}
+
 func (r *Client) collectGuestOS(vmName string) (string, error) {
-	script := ps.BuildCommand(ps.GetGuestOS, vmName)
+	script := ps.BuildCommand(ps.GetGuestKVPItems, vmName)
 	stdout, err := r.driver.ExecuteCommand(script)
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(stdout), nil
+	stdout = strings.TrimSpace(stdout)
+	if stdout == "" {
+		return "", nil
+	}
+
+	var xmlItems []string
+	if err := json.Unmarshal([]byte(stdout), &xmlItems); err != nil {
+		// Single item comes back as a bare string, not an array.
+		var single string
+		if singleErr := json.Unmarshal([]byte(stdout), &single); singleErr != nil {
+			return "", fmt.Errorf("parse KVP items: %w (output: %.200s)", singleErr, stdout)
+		}
+		xmlItems = []string{single}
+	}
+
+	for _, item := range xmlItems {
+		var inst kvpInstance
+		if err := xml.Unmarshal([]byte(item), &inst); err != nil {
+			continue
+		}
+		if inst.get("Name") == "OSName" {
+			return inst.get("Data"), nil
+		}
+	}
+	return "", nil
 }
 
 func (r *Client) collectSecurityInfo(vmName string) (*securityInfo, error) {
-	script := ps.BuildCommand(ps.GetVMSecurityInfo, vmName, vmName, vmName)
-	stdout, err := r.driver.ExecuteCommand(script)
-	if err != nil {
-		return nil, err
+	info := &securityInfo{}
+
+	secCmd := ps.BuildCommand(ps.GetVMSecurity, vmName)
+	secOut, err := r.driver.ExecuteCommand(secCmd)
+	if err == nil && strings.TrimSpace(secOut) != "" {
+		var sec struct {
+			TpmEnabled bool `json:"TpmEnabled"`
+		}
+		if err := json.Unmarshal([]byte(secOut), &sec); err == nil {
+			info.TpmEnabled = sec.TpmEnabled
+		}
 	}
 
-	stdout = strings.TrimSpace(stdout)
-	if stdout == "" || stdout == "{}" {
-		return &securityInfo{}, nil
+	fwCmd := ps.BuildCommand(ps.GetVMFirmware, vmName)
+	fwOut, err := r.driver.ExecuteCommand(fwCmd)
+	if err == nil && strings.TrimSpace(fwOut) != "" {
+		var fw struct {
+			SecureBoot string `json:"SecureBoot"`
+		}
+		if err := json.Unmarshal([]byte(fwOut), &fw); err == nil {
+			info.SecureBoot = fw.SecureBoot == "On"
+		}
 	}
 
-	var info securityInfo
-	if err := json.Unmarshal([]byte(stdout), &info); err != nil {
-		return nil, fmt.Errorf("failed to parse security info JSON: %w", err)
-	}
-	return &info, nil
+	return info, nil
 }
 
 func (r *Client) collectHasCheckpoint(vmName string) (bool, error) {
@@ -494,18 +549,42 @@ func (r *Client) collectHasCheckpoint(vmName string) (bool, error) {
 }
 
 func (r *Client) collectGuestNetworkConfig(vmName string, nics []types.NIC) ([]types.GuestNetwork, error) {
-	script := ps.BuildCommand(ps.GetGuestNetworkConfig, vmName)
-	stdout, err := r.driver.ExecuteCommand(script)
+	// Step 1: Get the Realized VirtualSystemSettingData InstanceID for this VM.
+	sdCmd := ps.BuildCommand(ps.GetVMSettingData, vmName)
+	sdOut, err := r.driver.ExecuteCommand(sdCmd)
 	if err != nil {
 		return nil, err
 	}
-
-	if stdout == "" || strings.Contains(stdout, "no_vm") || strings.Contains(stdout, "no_gc") {
+	settingDataID := strings.TrimSpace(sdOut)
+	if settingDataID == "" {
 		return []types.GuestNetwork{}, nil
 	}
 
-	type guestNetConfig struct {
-		MAC     string   `json:"MAC"`
+	// Step 2: Get all NIC ports for this SettingData.
+	escapedSD := strings.ReplaceAll(settingDataID, `\`, `\\`)
+	portsCmd := ps.BuildCommand(ps.GetNICPortsForSettingData, escapedSD)
+	portsOut, err := r.driver.ExecuteCommand(portsCmd)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(portsOut) == "" {
+		return []types.GuestNetwork{}, nil
+	}
+
+	type nicPort struct {
+		InstanceID string `json:"InstanceID"`
+		Address    string `json:"Address"`
+	}
+	var ports []nicPort
+	if err := json.Unmarshal([]byte(portsOut), &ports); err != nil {
+		var single nicPort
+		if err := json.Unmarshal([]byte(portsOut), &single); err != nil {
+			return nil, fmt.Errorf("parse NIC ports: %w", err)
+		}
+		ports = append(ports, single)
+	}
+
+	type nicConfig struct {
 		IPs     []string `json:"IPs"`
 		Subnets []string `json:"Subnets"`
 		DHCP    bool     `json:"DHCP"`
@@ -513,18 +592,28 @@ func (r *Client) collectGuestNetworkConfig(vmName string, nics []types.NIC) ([]t
 		DNS     []string `json:"DNS"`
 	}
 
-	var configs []guestNetConfig
-	if err := json.Unmarshal([]byte(stdout), &configs); err != nil {
-		var single guestNetConfig
-		if err := json.Unmarshal([]byte(stdout), &single); err != nil {
-			return nil, fmt.Errorf("failed to parse KVP JSON: %w", err)
-		}
-		configs = append(configs, single)
-	}
-
+	// Step 3: For each port, fetch its guest network config (one WinRM call per NIC).
 	var guestNetworks []types.GuestNetwork
-	for _, cfg := range configs {
-		mac := cfg.MAC
+	for _, port := range ports {
+		// Escape backslashes in InstanceID for the WMI filter.
+		escapedID := strings.ReplaceAll(port.InstanceID, `\`, `\\`)
+		cfgCmd := ps.BuildCommand(ps.GetGuestNICConfig, escapedID)
+		cfgOut, err := r.driver.ExecuteCommand(cfgCmd)
+		if err != nil {
+			r.Log.V(1).Info("failed to get NIC config, skipping", "port", port.InstanceID, "error", err)
+			continue
+		}
+		if strings.TrimSpace(cfgOut) == "" {
+			continue
+		}
+
+		var cfg nicConfig
+		if err := json.Unmarshal([]byte(cfgOut), &cfg); err != nil {
+			r.Log.V(1).Info("failed to parse NIC config, skipping", "port", port.InstanceID, "error", err)
+			continue
+		}
+
+		mac := port.Address
 		if len(mac) == 12 && !strings.Contains(mac, ":") {
 			mac = fmt.Sprintf("%s:%s:%s:%s:%s:%s", mac[0:2], mac[2:4], mac[4:6], mac[6:8], mac[8:10], mac[10:12])
 		}

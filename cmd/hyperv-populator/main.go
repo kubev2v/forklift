@@ -323,7 +323,7 @@ func verifyDiskNotEmpty(path string, lunID int) error {
 	if err != nil {
 		return fmt.Errorf("post-copy verify: open %s: %w", path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	buf := make([]byte, 1024)
 	n, err := f.Read(buf)
@@ -529,7 +529,7 @@ func tryResolveDevice(pattern string, lunID int, enxioLogged *bool) (string, boo
 		}
 		return "", false, nil
 	}
-	f.Close()
+	_ = f.Close()
 	return resolved, true, nil
 }
 
@@ -724,7 +724,7 @@ func startMetricsServer() {
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, "ok")
+		_, _ = fmt.Fprintln(w, "ok")
 	})
 
 	go func() {
