@@ -163,13 +163,15 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	var kInterfaces []cnv.Interface
 
 	numNetworks := 0
-	var netMapIn []api.NetworkPair
-	if r.Context.Map.Network != nil {
-		netMapIn = r.Context.Map.Network.Spec.Map
-	}
+	pool := planbase.NewNADPool()
+	nicKeys, pairsBySource := r.buildNICResolver(vm.NICs)
 
-	for _, nic := range vm.NICs {
-		mapped := r.findNetworkMapping(nic, netMapIn)
+	for i, nic := range vm.NICs {
+		pair, allocated := planbase.AllocateNetwork(pool, pairsBySource[nicKeys[i]])
+		var mapped *api.NetworkPair
+		if allocated {
+			mapped = &pair
+		}
 
 		// Skip if no valid mapping found or the destination type is Ignored
 		if mapped == nil || mapped.Destination.Type == Ignored {
@@ -206,20 +208,22 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	object.Template.Spec.Domain.Devices.Interfaces = kInterfaces
 }
 
-func (r *Builder) findNetworkMapping(nic hyperv.NIC, netMap []api.NetworkPair) *api.NetworkPair {
-	for i := range netMap {
-		candidate := &netMap[i]
-		network := &model.Network{}
-		if err := r.Source.Inventory.Find(network, candidate.Source); err != nil {
-			continue
-		}
-
-		// Match by network ID
-		if nic.Network.ID == network.ID {
-			return candidate
+func (r *Builder) buildNICResolver(nics []hyperv.NIC) ([]string, map[string][]api.NetworkPair) {
+	pairsBySource := map[string][]api.NetworkPair{}
+	if r.Map.Network != nil {
+		for _, pair := range r.Map.Network.Spec.Map {
+			network := &model.Network{}
+			if err := r.Source.Inventory.Find(network, pair.Source); err != nil {
+				continue
+			}
+			pairsBySource[network.ID] = append(pairsBySource[network.ID], pair)
 		}
 	}
-	return nil
+	nicKeys := make([]string, len(nics))
+	for i, nic := range nics {
+		nicKeys[i] = nic.Network.ID
+	}
+	return nicKeys, pairsBySource
 }
 
 func (r *Builder) mapCPU(vmRef ref.Ref, vm *model.VM, object *cnv.VirtualMachineSpec, usesInstanceType bool) {
