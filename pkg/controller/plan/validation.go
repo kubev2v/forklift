@@ -801,7 +801,7 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 		Status:   True,
 		Reason:   NotValid,
 		Category: api.CategoryCritical,
-		Message:  "Multiple VM NICs use the same Multus NAD name (OVN-Kubernetes uses NAD names as map keys).",
+		Message:  "Multiple VM NICs mapped to the same Multus NAD. Add additional NetworkMap entries with different destination NADs for the same source network.",
 		Items:    []string{},
 	}
 	missingStaticIPs := libcnd.Condition{
