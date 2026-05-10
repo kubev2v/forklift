@@ -757,10 +757,18 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 
 	numNetworks := 0
 	hasUDN := r.Plan.DestinationHasUdnNetwork(r.Destination)
-	netMapIn := r.Context.Map.Network.Spec.Map
+	pool := planbase.NewNADPool()
+	nicKeys, pairsBySource, err := r.buildNICResolver(vm.NICs)
+	if err != nil {
+		return
+	}
 
-	for _, nic := range vm.NICs {
-		mapped := r.findNetworkMapping(nic, netMapIn)
+	for i, nic := range vm.NICs {
+		pair, allocated := planbase.AllocateNetwork(pool, pairsBySource[nicKeys[i]])
+		var mapped *api.NetworkPair
+		if allocated {
+			mapped = &pair
+		}
 
 		// Skip if no valid mapping found or the destination type is Ignored
 		if mapped == nil || mapped.Destination.Type == Ignored {
@@ -833,20 +841,23 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 	return
 }
 
-func (r *Builder) findNetworkMapping(nic vsphere.NIC, netMap []api.NetworkPair) *api.NetworkPair {
-	for i := range netMap {
-		candidate := &netMap[i]
+func (r *Builder) buildNICResolver(nics []vsphere.NIC) ([]string, map[string][]api.NetworkPair, error) {
+	pairsBySource := map[string][]api.NetworkPair{}
+	for _, pair := range r.Map.Network.Spec.Map {
 		network := &model.Network{}
-		if err := r.Source.Inventory.Find(network, candidate.Source); err != nil {
-			continue
+		if err := r.Source.Inventory.Find(network, pair.Source); err != nil {
+			return nil, nil, liberr.Wrap(err, "buildNICResolver, source", pair.Source.String())
 		}
-
-		if (network.Variant == vsphere.NetDvPortGroup || network.Variant == vsphere.OpaqueNetwork) &&
-			nic.Network.ID == network.Key || nic.Network.ID == network.ID {
-			return candidate
+		if network.Variant == vsphere.NetDvPortGroup || network.Variant == vsphere.OpaqueNetwork {
+			pairsBySource[network.Key] = append(pairsBySource[network.Key], pair)
 		}
+		pairsBySource[network.ID] = append(pairsBySource[network.ID], pair)
 	}
-	return nil
+	nicKeys := make([]string, len(nics))
+	for i, nic := range nics {
+		nicKeys[i] = nic.Network.ID
+	}
+	return nicKeys, pairsBySource, nil
 }
 
 func (r *Builder) mapInput(object *cnv.VirtualMachineSpec) {
