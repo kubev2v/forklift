@@ -6,7 +6,26 @@ import (
 	"strings"
 )
 
+// CopyContext describes how the copy is performed (for metric labels).
+// Populated by the factory at construction time; StorageProtocol may be
+// updated by the populator during Populate() when adapter info is available.
+type CopyContext struct {
+	// CloneMethod is the method used for the copy: "vib", "ssh", "vvol", or "rdm".
+	CloneMethod string
+	// StorageProtocol is the storage protocol when known (e.g. "iscsi", "fc"). May be empty.
+	StorageProtocol string
+	// SourceDiskCapacityBytes is provisioned (guest-visible) size of the source disk.
+	SourceDiskCapacityBytes int64
+	// SourceDiskDatastoreAllocatedBytes is datastore footprint (layoutEx diskExtent sizes) when known.
+	// Thin VMFS: approximates allocated blocks; not guest OS used space. 0 if unavailable (VVol/RDM/NFS limits).
+	SourceDiskDatastoreAllocatedBytes int64
+}
+
 type Populator interface {
+	// GetCopyContext returns metadata describing how the copy is performed (clone method,
+	// protocol, source disk sizes). Call after Populate completes for the most up-to-date
+	// values (e.g. StorageProtocol is detected during Populate).
+	GetCopyContext() CopyContext
 	// Populate will populate the volume identified by volumeHanle with the content of
 	// the sourceVMDKFile.
 	// persistentVolume is a slim version of k8s PersistentVolume created by the CSI driver,

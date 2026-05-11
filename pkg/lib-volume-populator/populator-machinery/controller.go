@@ -216,6 +216,9 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 		resources:         resources,
 	}
 
+	if gk.Kind == api.VSphereXcopyVolumePopulatorKind {
+		c.metrics.initCompletionMetrics()
+	}
 	c.metrics.startListener(httpEndpoint, metricsPath)
 	defer c.metrics.stopListener()
 
@@ -737,6 +740,10 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 			if corev1.PodFailed == pod.Status.Phase {
 				// Skip retry logic for VSphere xcopy populator - let it fail immediately
 				if c.gk.Kind == api.VSphereXcopyVolumePopulatorKind {
+					// Record failure metrics with available labels from the CR.
+					migration, _, _ := unstructured.NestedString(crInstance.Object, "metadata", "labels", "migration")
+					vendor, _, _ := unstructured.NestedString(crInstance.Object, "spec", "storageVendorProduct")
+					c.metrics.recordCompletionFromScrape(pvc.UID, "failure", migration, string(pvc.UID), vendor, "", "", "", 0, 0, 0)
 					c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPodFailed, "VSphere xcopy populator failed (no retry): Please check the logs of the populator pod, %s/%s", populatorNamespace, pod.Name)
 				} else {
 					restarts, ok := pvc.Annotations[AnnPopulatorReCreations]
@@ -821,6 +828,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 	c.metrics.recordMetrics(pvc.UID, "success")
 
 	// *** At this point the volume population is done and we're just cleaning up ***
+	// Completion metrics were already recorded by updateProgress during the final pod scrape.
 	c.recorder.Eventf(pvc, corev1.EventTypeNormal, reasonPodFinished, "Populator finished")
 
 	// If PVC' still exists, delete it
@@ -866,7 +874,6 @@ func (c *controller) updatePvc(ctx context.Context, pvc *corev1.PersistentVolume
 
 func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolumeClaim, cr *unstructured.Unstructured) error {
 	populatorKind := pvc.Spec.DataSourceRef.Kind
-	importRegExp := regexp.MustCompile("progress\\{ownerUID=\"" + string(pvc.UID) + "\"\\} (\\d+\\.?\\d*)")
 
 	url, err := getMetricsURL(pod)
 	if err != nil {
@@ -891,7 +898,22 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 		return err
 	}
 
-	match := importRegExp.FindStringSubmatch(string(body))
+	bodyStr := string(body)
+
+	// For xcopy populator: detect completion metrics from the scraped body.
+	if populatorKind == api.VSphereXcopyVolumePopulatorKind && !c.metrics.isCompletionRecorded(pvc.UID) {
+		c.parseAndRecordCompletion(bodyStr, pvc, cr)
+	}
+
+	// Pick the right progress regex for the populator type.
+	var importRegExp *regexp.Regexp
+	if populatorKind == api.VSphereXcopyVolumePopulatorKind {
+		importRegExp = regexp.MustCompile(`vsphere_xcopy_volume_populator_progress\{[^}]*owner_uid="` + string(pvc.UID) + `"[^}]*\} (\d+\.?\d*)`)
+	} else {
+		importRegExp = regexp.MustCompile("progress\\{ownerUID=\"" + string(pvc.UID) + "\"\\} (\\d+\\.?\\d*)")
+	}
+
+	match := importRegExp.FindStringSubmatch(bodyStr)
 	if match == nil {
 		klog.V(5).Info("Failed to find matches, regex: ", importRegExp)
 		return nil
@@ -932,6 +954,53 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 	}
 
 	return nil
+}
+
+// parseAndRecordCompletion extracts completion metrics from the populator pod's /metrics output.
+// The presence of copy_duration_seconds signals that the copy finished (success or failure).
+func (c *controller) parseAndRecordCompletion(body string, pvc *corev1.PersistentVolumeClaim, cr *unstructured.Unstructured) {
+	ownerUID := string(pvc.UID)
+
+	// Use copy_duration_seconds as the completion signal — emitted on both success and failure.
+	durationRegex := regexp.MustCompile(`vsphere_xcopy_volume_populator_copy_duration_seconds\{[^}]*owner_uid="` + ownerUID + `"[^}]*\} ([0-9.]+)`)
+	durationMatch := durationRegex.FindStringSubmatch(body)
+	if durationMatch == nil {
+		return
+	}
+
+	duration, _ := strconv.ParseFloat(durationMatch[1], 64)
+
+	migration, _, _ := unstructured.NestedString(cr.Object, "metadata", "labels", "migration")
+
+	// Parse source disk bytes by type
+	var provisionedBytes, allocatedBytes float64
+	provisionedRegex := regexp.MustCompile(`vsphere_xcopy_volume_populator_source_disk_bytes\{[^}]*owner_uid="` + ownerUID + `"[^}]*type="provisioned"[^}]*\} ([0-9.e+]+)`)
+	if m := provisionedRegex.FindStringSubmatch(body); m != nil {
+		provisionedBytes, _ = strconv.ParseFloat(m[1], 64)
+	}
+	allocatedRegex := regexp.MustCompile(`vsphere_xcopy_volume_populator_source_disk_bytes\{[^}]*owner_uid="` + ownerUID + `"[^}]*type="datastore_allocated"[^}]*\} ([0-9.e+]+)`)
+	if m := allocatedRegex.FindStringSubmatch(body); m != nil {
+		allocatedBytes, _ = strconv.ParseFloat(m[1], 64)
+	}
+
+	// Parse labels from the duration metric line
+	durationLine := durationRegex.FindString(body)
+	result := extractLabel(durationLine, "result")
+	vendor := extractLabel(durationLine, "storage_vendor")
+	method := extractLabel(durationLine, "clone_method")
+	xcopy := extractLabel(durationLine, "xcopy_used")
+	protocol := extractLabel(durationLine, "storage_protocol")
+
+	c.metrics.recordCompletionFromScrape(pvc.UID, result, migration, ownerUID, vendor, method, xcopy, protocol, duration, provisionedBytes, allocatedBytes)
+}
+
+// extractLabel extracts a label value from a Prometheus metric line.
+func extractLabel(line, labelName string) string {
+	re := regexp.MustCompile(labelName + `="([^"]*)"`)
+	if m := re.FindStringSubmatch(line); m != nil {
+		return m[1]
+	}
+	return ""
 }
 
 func updatePopulatorProgress(progress int64, cr *unstructured.Unstructured) error {
