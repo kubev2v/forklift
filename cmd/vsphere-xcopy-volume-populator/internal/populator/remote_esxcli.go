@@ -10,7 +10,6 @@ import (
 	"time"
 
 	hversion "github.com/hashicorp/go-version"
-	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/version"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/vmware"
 	vmkfstoolswrapper "github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/vmkfstools-wrapper"
 	"github.com/kubev2v/forklift/pkg/lib/util"
@@ -144,14 +143,6 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	hostID := strings.ReplaceAll(strings.ToLower(host.String()), ":", "-")
 	xcopyInitiatorGroup := fmt.Sprintf("xcopy-%s", hostID)
 	setupLog.Info("initiator group", "group", xcopyInitiatorGroup)
-
-	// Only ensure VIB if using VIB method
-	if !p.UseSSHMethod {
-		err = ensureVib(setupCtx, p.VSphereClient, host, vmDisk.Datastore, version.VibVersion)
-		if err != nil {
-			return fmt.Errorf("failed to ensure VIB is installed: %w", err)
-		}
-	}
 
 	// Filter HBA UIDs based on datastore active adapters
 	var dsActiveAdapters []vmware.HostAdapter
