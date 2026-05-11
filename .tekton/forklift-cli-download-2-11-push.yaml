@@ -7,7 +7,7 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "release-2.11" && ("build/forklift-cli-download/Containerfile-downstream".pathChanged() || "cmd/kubectl-mtv/***".pathChanged())
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "release-2.11" && (".tekton/forklift-cli-download-2-11-*.yaml".pathChanged() || "build/forklift-cli-download/Containerfile-downstream".pathChanged() || "cmd/kubectl-mtv/***".pathChanged())
   creationTimestamp:
   labels:
     appstudio.openshift.io/application: forklift-operator-2-11
