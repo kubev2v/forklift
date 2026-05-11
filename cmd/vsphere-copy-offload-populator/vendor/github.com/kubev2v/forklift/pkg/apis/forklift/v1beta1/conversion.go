@@ -133,6 +133,10 @@ type PodSettings struct {
 	// GenerateName prefix for the managed pod.
 	// +optional
 	GenerateName string `json:"generateName,omitempty"`
+	// RequestKVM adds devices.kubevirt.io/kvm to the conversion pod
+	// so that virt-v2v uses hardware virtualisation instead of emulation.
+	// +optional
+	RequestKVM bool `json:"requestKVM,omitempty"`
 }
 
 // ConversionSpec defines the desired state of Conversion.

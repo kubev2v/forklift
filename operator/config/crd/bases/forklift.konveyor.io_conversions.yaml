@@ -3047,6 +3047,11 @@ spec:
                       type: string
                     description: Node selector constraints for the conversion pod.
                     type: object
+                  requestKVM:
+                    default: true
+                    description: Whether the pod needs a KVM device and kubevirt.io/schedulable
+                      node selector.
+                    type: boolean
                   serviceAccount:
                     description: ServiceAccount for the conversion pod.
                     type: string

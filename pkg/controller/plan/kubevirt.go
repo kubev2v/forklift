@@ -216,6 +216,8 @@ func (r *KubeVirt) resolveConversionResources(vm *plan.VMStatus, podType convctx
 	res.podConfig = convctx.PodConfigFromPlan(r.Plan)
 	res.podConfig.Affinity = r.getConvertorAffinity()
 
+	res.podConfig.RequestKVM = shouldRequestKVM(r.Plan.Provider.Source)
+
 	var vmVolumes []cnv.Volume
 	if podType == convctx.VirtV2vConversionPod {
 		vmVolumes, err = r.getVMVolumes(vm)
@@ -464,6 +466,7 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 				GenerateName:               resources.podConfig.GenerateName,
 				TransferNetworkAnnotations: resources.podConfig.TransferNetworkAnnotations,
 				NodeSelector:               resources.podConfig.PodNodeSelector,
+				RequestKVM:                 resources.podConfig.RequestKVM,
 			},
 			ExtraVolumes: resources.extraVolumes,
 			ExtraMounts:  resources.extraMounts,
@@ -1869,7 +1872,7 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) (er
 	if sa := resolveServiceAccount(r.Plan); sa != "" {
 		pod.Spec.ServiceAccountName = sa
 	}
-	r.setKvmOnPodSpec(&pod.Spec)
+	convbuilder.SetKvmOnPodSpec(&pod.Spec, shouldRequestKVM(r.Plan.Provider.Source))
 
 	err = r.Client.Create(context.TODO(), pod, &client.CreateOptions{})
 	if err != nil {
@@ -1885,25 +1888,16 @@ func (r *KubeVirt) getListOptionsNamespaced() (listOptions *client.ListOptions) 
 	}
 }
 
-func (r *KubeVirt) setKvmOnPodSpec(podSpec *core.PodSpec) {
+// shouldRequestKVM returns true for provider types that need KVM passthrough.
+func shouldRequestKVM(provider *api.Provider) bool {
 	if Settings.VirtV2vDontRequestKVM {
-		return
+		return false
 	}
-	switch *r.Plan.Provider.Source.Spec.Type {
+	switch provider.Type() {
 	case api.VSphere, api.Ova, api.HyperV:
-		if podSpec.NodeSelector == nil {
-			podSpec.NodeSelector = make(map[string]string)
-		}
-		podSpec.NodeSelector["kubevirt.io/schedulable"] = "true"
-		container := &podSpec.Containers[0]
-		if container.Resources.Limits == nil {
-			container.Resources.Limits = make(map[core.ResourceName]resource.Quantity)
-		}
-		container.Resources.Limits["devices.kubevirt.io/kvm"] = resource.MustParse("1")
-		if container.Resources.Requests == nil {
-			container.Resources.Requests = make(map[core.ResourceName]resource.Quantity)
-		}
-		container.Resources.Requests["devices.kubevirt.io/kvm"] = resource.MustParse("1")
+		return true
+	default:
+		return false
 	}
 }
 

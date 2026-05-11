@@ -220,6 +220,7 @@ func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, vo
 	if sa := convctx.ResolveServiceAccount(cfg); sa != "" {
 		pod.Spec.ServiceAccountName = sa
 	}
+	SetKvmOnPodSpec(&pod.Spec, cfg.RequestKVM)
 	return
 }
 
@@ -523,4 +524,27 @@ done
 			},
 		},
 	}
+}
+
+// SetKvmOnPodSpec adds the devices.kubevirt.io/kvm resource request/limit
+// and the kubevirt.io/schedulable node selector when requestKVM is true.
+// This ensures the pod lands on a node with /dev/kvm so the virt-v2v
+// appliance uses hardware virtualisation instead of emulation.
+func SetKvmOnPodSpec(podSpec *core.PodSpec, requestKVM bool) {
+	if !requestKVM {
+		return
+	}
+	if podSpec.NodeSelector == nil {
+		podSpec.NodeSelector = make(map[string]string)
+	}
+	podSpec.NodeSelector["kubevirt.io/schedulable"] = "true"
+	container := &podSpec.Containers[0]
+	if container.Resources.Limits == nil {
+		container.Resources.Limits = make(map[core.ResourceName]resource.Quantity)
+	}
+	container.Resources.Limits["devices.kubevirt.io/kvm"] = resource.MustParse("1")
+	if container.Resources.Requests == nil {
+		container.Resources.Requests = make(map[core.ResourceName]resource.Quantity)
+	}
+	container.Resources.Requests["devices.kubevirt.io/kvm"] = resource.MustParse("1")
 }
