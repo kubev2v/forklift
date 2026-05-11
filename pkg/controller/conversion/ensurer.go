@@ -151,6 +151,8 @@ func (e *Ensurer) ensureDeepInspectionPodFromSpec(conversion *api.Conversion, cf
 		})
 	}
 
+	volumes, mounts = appendExtraVolumes(conversion.Spec, volumes, mounts)
+
 	builder := &Builder{Config: cfg}
 	pod, err = builder.BuildDeepInspectionPod(vm, volumes, mounts, devices, secret)
 	if err != nil {
@@ -231,6 +233,8 @@ func (e *Ensurer) ensureVirtV2vPodFromSpec(conversion *api.Conversion, cfg convc
 			ReadOnly:  true,
 		})
 	}
+
+	volumes, mounts = appendExtraVolumes(conversion.Spec, volumes, mounts)
 
 	inPlace := conversion.Spec.Type == api.InPlace
 
@@ -391,18 +395,33 @@ func (e *Ensurer) VolumesFromDiskRefs(disks []api.DiskRef) (volumes []core.Volum
 		}
 
 		if volumeMode != nil && *volumeMode == core.PersistentVolumeBlock {
+			devPath := disk.DevicePath
+			if devPath == "" {
+				devPath = fmt.Sprintf("/dev/block%v", i)
+			}
 			devices = append(devices, core.VolumeDevice{
 				Name:       disk.Name,
-				DevicePath: fmt.Sprintf("/dev/block%v", i),
+				DevicePath: devPath,
 			})
 		} else {
+			mountPath := disk.MountPath
+			if mountPath == "" {
+				mountPath = fmt.Sprintf("/mnt/disks/disk%v", i)
+			}
 			mounts = append(mounts, core.VolumeMount{
 				Name:      disk.Name,
-				MountPath: fmt.Sprintf("/mnt/disks/disk%v", i),
+				MountPath: mountPath,
 			})
 		}
 	}
 	return
+}
+
+// appendExtraVolumes appends provider-specific storage (e.g. HyperV SMB share,
+// OVA NFS share) to the pod volumes and mounts. Names are controller-generated
+// and won't collide with disk PVC names.
+func appendExtraVolumes(spec api.ConversionSpec, volumes []core.Volume, mounts []core.VolumeMount) ([]core.Volume, []core.VolumeMount) {
+	return append(volumes, spec.ExtraVolumes...), append(mounts, spec.ExtraMounts...)
 }
 
 // anyNetAppShiftDisk returns true if any disk in the list is backed by a

@@ -185,6 +185,12 @@ type ConversionSpec struct {
 	// Pod-level overrides for the conversion pod.
 	// +optional
 	PodSettings PodSettings `json:"podSettings,omitempty"`
+	// Extra volumes to add to the conversion pod (e.g. provider storage PVCs).
+	// +optional
+	ExtraVolumes []core.Volume `json:"extraVolumes,omitempty"`
+	// Extra volume mounts to add to the conversion pod container.
+	// +optional
+	ExtraMounts []core.VolumeMount `json:"extraMounts,omitempty"`
 }
 
 // InspectionConcern is a single issue reported by the deep-inspection process.
