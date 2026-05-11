@@ -133,6 +133,10 @@ type PodSettings struct {
 	// GenerateName prefix for the managed pod.
 	// +optional
 	GenerateName string `json:"generateName,omitempty"`
+	// Whether the pod needs a KVM device and kubevirt.io/schedulable node selector.
+	// +optional
+	// +kubebuilder:default:=true
+	RequestKVM bool `json:"requestKVM,omitempty"`
 }
 
 // ConversionSpec defines the desired state of Conversion.
