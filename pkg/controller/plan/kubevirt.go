@@ -456,10 +456,11 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 					Name:      resources.secret.Name,
 				},
 			},
-			Image:          convctx.GetVirtV2vImage(&resources.podConfig),
-			Settings:       envSettings,
-			VDDKImage:      resources.vddkImage,
-			LocalMigration: resources.localMigration,
+			Image:            convctx.GetVirtV2vImage(&resources.podConfig),
+			XfsCompatibility: resources.podConfig.XfsCompatibility,
+			Settings:         envSettings,
+			VDDKImage:        resources.vddkImage,
+			LocalMigration:   resources.localMigration,
 			PodSettings: api.PodSettings{
 				ServiceAccount:             resolveServiceAccount(r.Plan),
 				Affinity:                   resources.podConfig.Affinity,
@@ -750,8 +751,9 @@ func (r *KubeVirt) CreateDeepInspectionConversion(
 		Settings: map[string]string{
 			api.SpecSettingsSnapshotMorefKey: snapshotMoref,
 		},
-		VDDKImage:      settings.GetVDDKImage(r.Source.Provider.Spec.Settings),
-		DiskEncryption: diskEncryption,
+		XfsCompatibility: r.Plan.Spec.XfsCompatibility,
+		VDDKImage:        settings.GetVDDKImage(r.Source.Provider.Spec.Settings),
+		DiskEncryption:   diskEncryption,
 		PodSettings: api.PodSettings{
 			ServiceAccount: resolveServiceAccount(r.Plan),
 		},
