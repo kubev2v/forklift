@@ -1,6 +1,8 @@
 package ocp
 
 import (
+	"encoding/json"
+	"fmt"
 	"path"
 	"strconv"
 
@@ -205,9 +207,10 @@ const (
 	RolePrimary    RoleType     = "primary"
 	RoleSecondary  RoleType     = "secondary"
 	OvnOverlayType NadType      = "ovn-k8s-cni-overlay"
+	CalicoCNIType  NadType      = "calico"
 )
 
-// NetworkConfig represents the structure of the OVN-Kubernetes CNI configuration JSON.
+// NetworkConfig represents the structure of the OVN-Kubernetes, or Calico CNI configuration JSON.
 // The `json:"..."` tags are used by the encoding/json package to map the JSON keys
 // to the struct fields during marshalling and unmarshalling.
 type NetworkConfig struct {
@@ -220,9 +223,33 @@ type NetworkConfig struct {
 	Subnets            string       `json:"subnets"`
 	Topology           TopologyType `json:"topology"`
 	Type               NadType      `json:"type"`
+
+	// Name of a projectcalico.org/v3 Network resource the NAD attaches to.
+	Network string `json:"network,omitempty"`
+	// 802.1Q VLAN ID (1-4094) for Calico CNI. Zero means unspecified.
+	VLAN uint16 `json:"vlan,omitempty"`
 }
 
 func (m *NetworkConfig) IsUnsupportedUdn() bool {
 	return m.Type == OvnOverlayType &&
 		(m.Role == RolePrimary || m.Topology == TopologyLayer3)
+}
+
+// ReferencesCalicoNetwork reports whether the NAD invokes the Calico CNI and
+// names a projectcalico.org/v3 Network resource.
+func (m *NetworkConfig) ReferencesCalicoNetwork() bool {
+	return m.Type == CalicoCNIType && m.Network != ""
+}
+
+// ParseNAD unmarshals nad.Spec.Config into a NetworkConfig.
+// An empty Spec.Config yields a zero-valued NetworkConfig and no error.
+func ParseNAD(nad *net.NetworkAttachmentDefinition) (*NetworkConfig, error) {
+	cfg := &NetworkConfig{}
+	if nad.Spec.Config == "" {
+		return cfg, nil
+	}
+	if err := json.Unmarshal([]byte(nad.Spec.Config), cfg); err != nil {
+		return nil, fmt.Errorf("nad %s/%s: parse Spec.Config: %w", nad.Namespace, nad.Name, err)
+	}
+	return cfg, nil
 }
