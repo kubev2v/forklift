@@ -81,3 +81,13 @@ func (r *Validator) WarmMigration() bool {
 func (r *Validator) ConsolidationNeeded(vmRef ref.Ref) (bool, error) {
 	return false, nil
 }
+
+// ValidateCalicoNADs returns empty results (not applicable for EC2).
+func (r *Validator) ValidateCalicoNADs(_ client.Client) (planbase.CalicoValidationResult, error) {
+	return planbase.CalicoValidationResult{}, nil
+}
+
+// CalicoVMIssues returns no issues (not applicable for EC2).
+func (r *Validator) CalicoVMIssues(_ ref.Ref, _ *planbase.CalicoValidationCache) ([]planbase.CalicoIssue, error) {
+	return nil, nil
+}
