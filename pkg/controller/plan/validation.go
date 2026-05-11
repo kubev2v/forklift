@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -67,6 +66,9 @@ const (
 	VMDuplicateNADMappings          = "VMDuplicateNADMappings"
 	VMMissingGuestIPs               = "VMMissingGuestIPs"
 	VMIpNotMatchingUdnSubnet        = "VMIpNotMatchingUdnSubnet"
+	CalicoNetworkInvalid            = "CalicoNetworkInvalid"
+	VMIpNotInCalicoSubnet           = "VMIpNotInCalicoSubnet"
+	VMIpNotInCalicoIPPool           = "VMIpNotInCalicoIPPool"
 	VMMissingChangedBlockTracking   = "VMMissingChangedBlockTracking"
 	VMHasSnapshots                  = "VMHasSnapshots"
 	VMConsolidationNeeded           = "VMConsolidationNeeded"
@@ -212,6 +214,11 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		return err
 	}
 
+	calicoCache, err := r.validateCalicoNetwork(ctx)
+	if err != nil {
+		return err
+	}
+
 	err = r.validateNetAppShift(ctx)
 	if err != nil {
 		return err
@@ -225,7 +232,7 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		return err
 	}
 
-	if err = r.validateVM(plan, ctx); err != nil {
+	if err = r.validateVM(plan, ctx, calicoCache); err != nil {
 		return err
 	}
 
@@ -515,8 +522,7 @@ func (r *Reconciler) validateUserDefinedNetwork(ctx *plancontext.Context) (err e
 	}
 
 	for _, nad := range nads.Items {
-		var networkConfig model.NetworkConfig
-		err = json.Unmarshal([]byte(nad.Spec.Config), &networkConfig)
+		networkConfig, err := model.ParseNAD(&nad)
 		if err != nil {
 			r.Log.Info("Skipping NAD: failed to parse network config", "namespace", nad.Namespace, "name", nad.Name, "error", err.Error())
 			continue
@@ -536,6 +542,55 @@ func (r *Reconciler) validateUserDefinedNetwork(ctx *plancontext.Context) (err e
 		}
 	}
 	return
+}
+
+// validateCalicoNetwork validates every Calico-referencing NAD referenced by
+// the plan's network map. Resource-level issues (Network CR missing, no
+// l2Bridge, no eligible IPPool, etc.) are surfaced as a plan-level
+// CalicoNetworkInvalid condition whose items are the offending NAD
+// references. Healthy NADs are returned in a cache for per-VM checks.
+func (r *Reconciler) validateCalicoNetwork(ctx *plancontext.Context) (*planbase.CalicoValidationCache, error) {
+	provider := ctx.Plan.Referenced.Provider.Source
+	if provider == nil {
+		return nil, nil
+	}
+	pAdapter, err := adapter.New(provider)
+	if err != nil {
+		return nil, err
+	}
+	validator, err := pAdapter.Validator(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result, err := validator.ValidateCalicoNADs(ctx.Destination.Client)
+	if err != nil {
+		return nil, err
+	}
+	if len(result.Issues) == 0 {
+		return result.Cache, nil
+	}
+
+	cond := libcnd.Condition{
+		Type:     CalicoNetworkInvalid,
+		Status:   True,
+		Reason:   NotValid,
+		Category: api.CategoryCritical,
+		Message:  "One or more Calico Network destinations are invalid",
+		Items:    []string{},
+	}
+	details := make([]string, 0, len(result.Issues))
+	seenNAD := map[string]bool{}
+	for _, issue := range result.Issues {
+		ref := issue.NAD.String()
+		if !seenNAD[ref] {
+			seenNAD[ref] = true
+			cond.Items = append(cond.Items, ref)
+		}
+		details = append(details, calicoNADIssueDetail(issue))
+	}
+	cond.Message = fmt.Sprintf("%s: %s.", cond.Message, strings.Join(details, "; "))
+	ctx.Plan.Status.SetCondition(cond)
+	return result.Cache, nil
 }
 
 func (r *Reconciler) getDestinationNamespaceNads(ctx *plancontext.Context) (*k8snet.NetworkAttachmentDefinitionList, error) {
@@ -716,7 +771,7 @@ func aggregateWarningConcerns(v interface{}, vmRef string, unsupportedOVFExportS
 }
 
 // Validate listed VMs.
-func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error {
+func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context, calicoCache *planbase.CalicoValidationCache) error {
 	if plan.Status.HasCondition(Executing) {
 		return nil
 	}
@@ -822,6 +877,22 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 		Reason:   NotValid,
 		Category: api.CategoryWarn,
 		Message:  "VM IP does not match with the primary UDN subnet",
+		Items:    []string{},
+	}
+	vmIpNotInCalicoSubnet := libcnd.Condition{
+		Type:     VMIpNotInCalicoSubnet,
+		Status:   True,
+		Reason:   NotValid,
+		Category: api.CategoryCritical,
+		Message:  "VM static IP does not fall within any subnet of the mapped Calico Network VLAN.",
+		Items:    []string{},
+	}
+	vmIpNotInCalicoIPPool := libcnd.Condition{
+		Type:     VMIpNotInCalicoIPPool,
+		Status:   True,
+		Reason:   NotValid,
+		Category: api.CategoryCritical,
+		Message:  "VM static IP is within the Calico Network VLAN subnet but no IPPool covers it.",
 		Items:    []string{},
 	}
 	missingCbtForWarm := libcnd.Condition{
@@ -1297,6 +1368,25 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 				vmIpDoesNotMatchUdnSubnet.Items = append(vmIpDoesNotMatchUdnSubnet.Items, ref.String())
 			}
 		}
+		calicoIssues, err := validator.CalicoVMIssues(*ref, calicoCache)
+		if err != nil {
+			return err
+		}
+		addedSubnet, addedPool := false, false
+		for _, issue := range calicoIssues {
+			switch issue.Kind {
+			case planbase.CalicoIssueIPNotInSubnet:
+				if !addedSubnet {
+					vmIpNotInCalicoSubnet.Items = append(vmIpNotInCalicoSubnet.Items, ref.String())
+					addedSubnet = true
+				}
+			case planbase.CalicoIssueIPNotInIPPool:
+				if !addedPool {
+					vmIpNotInCalicoIPPool.Items = append(vmIpNotInCalicoIPPool.Items, ref.String())
+					addedPool = true
+				}
+			}
+		}
 		// Destination.
 		provider = plan.Referenced.Provider.Destination
 		if provider == nil {
@@ -1432,6 +1522,12 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 	}
 	if len(vmIpDoesNotMatchUdnSubnet.Items) > 0 {
 		plan.Status.SetCondition(vmIpDoesNotMatchUdnSubnet)
+	}
+	if len(vmIpNotInCalicoSubnet.Items) > 0 {
+		plan.Status.SetCondition(vmIpNotInCalicoSubnet)
+	}
+	if len(vmIpNotInCalicoIPPool.Items) > 0 {
+		plan.Status.SetCondition(vmIpNotInCalicoIPPool)
 	}
 	if len(vmHasSnapshotsForWarm.Items) > 0 {
 		plan.Status.SetCondition(vmHasSnapshotsForWarm)
@@ -1865,6 +1961,29 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 	}
 
 	return
+}
+
+// calicoNADIssueDetail formats a per-NAD detail phrase for the plan-level
+// CalicoNetworkInvalid condition's Message: e.g.
+// "default/foo (NetworkNotFound network=\"calico-vlan\")".
+func calicoNADIssueDetail(i planbase.CalicoNADIssue) string {
+	switch i.Kind {
+	case planbase.CalicoIssueNADUnreadable:
+		return fmt.Sprintf("%s (NADUnreadable)", i.NAD.String())
+	case planbase.CalicoIssueNetworkNotFound:
+		return fmt.Sprintf("%s (NetworkNotFound network=%q)", i.NAD.String(), i.Network)
+	case planbase.CalicoIssueNetworkHasNoL2Bridge:
+		return fmt.Sprintf("%s (NetworkHasNoL2Bridge network=%q)", i.NAD.String(), i.Network)
+	case planbase.CalicoIssueNetworkHasNoVLANs:
+		return fmt.Sprintf("%s (NetworkHasNoVLANs network=%q)", i.NAD.String(), i.Network)
+	case planbase.CalicoIssueVLANNotInNetwork:
+		return fmt.Sprintf("%s (VLANNotInNetwork network=%q vlan=%d)", i.NAD.String(), i.Network, i.VLAN)
+	case planbase.CalicoIssueVLANAmbiguous:
+		return fmt.Sprintf("%s (VLANAmbiguous network=%q)", i.NAD.String(), i.Network)
+	case planbase.CalicoIssueVLANHasNoIPPool:
+		return fmt.Sprintf("%s (VLANHasNoIPPool network=%q vlan=%d)", i.NAD.String(), i.Network, i.VLAN)
+	}
+	return fmt.Sprintf("%s (%s)", i.NAD.String(), i.Kind)
 }
 
 func missingStaticIPsMessage(plan *api.Plan) string {

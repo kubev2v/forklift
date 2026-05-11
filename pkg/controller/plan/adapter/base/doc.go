@@ -286,6 +286,55 @@ type Validator interface {
 	GuestToolsInstalled(vmRef ref.Ref) (ok bool, err error)
 	// Validate that VM does not need to collapse any snapshots into a single base file
 	ConsolidationNeeded(vmRef ref.Ref) (needed bool, err error)
+	// ValidateCalicoNADs validates every Calico-referencing NAD in the
+	// plan's network map. Issues are NAD-scoped (network/IPPool config);
+	// the returned cache is consumed by CalicoVMIssues.
+	ValidateCalicoNADs(client client.Client) (CalicoValidationResult, error)
+	// CalicoVMIssues returns per-VM Calico issues (IP membership in subnet
+	// / IPPool). Reads only from the cache produced by ValidateCalicoNADs;
+	// VMs whose mapped NAD failed plan-level validation are skipped here
+	// — their failure is already reported via CalicoNetworkInvalid.
+	CalicoVMIssues(vmRef ref.Ref, cache *CalicoValidationCache) ([]CalicoIssue, error)
+}
+
+// CalicoIssueKind enumerates the Calico Network failure modes.
+type CalicoIssueKind string
+
+const (
+	// CalicoIssueNADUnreadable indicates the destination NAD could not be
+	// fetched or parsed (NotFound, malformed JSON, transient API error). The
+	// NAD's Calico configuration is unknowable until this is resolved.
+	CalicoIssueNADUnreadable CalicoIssueKind = "NADUnreadable"
+	// CalicoIssueNetworkNotFound no Network CR existed.
+	CalicoIssueNetworkNotFound CalicoIssueKind = "NetworkNotFound"
+	// CalicoIssueNetworkHasNoL2Bridge Network CR existed but had no L2Bridge field spec'd.
+	CalicoIssueNetworkHasNoL2Bridge CalicoIssueKind = "NetworkHasNoL2Bridge"
+	// CalicoIssueNetworkHasNoVLANs Network CR's L2Bridge had an empty vlans list (no VLAN to select).
+	CalicoIssueNetworkHasNoVLANs CalicoIssueKind = "NetworkHasNoVLANs"
+	// CalicoIssueVLANNotInNetwork NIC's NAD entry's VLAN was not present in the referenced Network CR.
+	CalicoIssueVLANNotInNetwork CalicoIssueKind = "VLANNotInNetwork"
+	// CalicoIssueVLANAmbiguous NIC's NAD entry had no VLAN, and Network CR had more than one VLAN to choose from.
+	CalicoIssueVLANAmbiguous CalicoIssueKind = "VLANAmbiguous"
+	// CalicoIssueVLANHasNoIPPool no IPPool existed satisfying the VLAN subnet's requirements.
+	CalicoIssueVLANHasNoIPPool CalicoIssueKind = "VLANHasNoIPPool"
+	// CalicoIssueIPNotInSubnet NIC's IP was not in any Network.spec.l2Bridge.vlans[].subnets[].cidr.
+	CalicoIssueIPNotInSubnet CalicoIssueKind = "IPNotInSubnet"
+	// CalicoIssueIPNotInIPPool NIC's IP was not in any Calico IPPool.
+	CalicoIssueIPNotInIPPool CalicoIssueKind = "IPNotInIPPool"
+)
+
+// CalicoIssue represents a per-VM Calico Network validation failure: the
+// VM's NIC IP does not fit the destination's Calico Network VLAN subnet or
+// IPPool. NAD-level issues (NetworkNotFound, NetworkHasNoL2Bridge, etc.)
+// are surfaced via CalicoNADIssue, not this type.
+type CalicoIssue struct {
+	Kind CalicoIssueKind
+	// Network is the Calico Network CR name reference.
+	Network string
+	// VLAN is the resolved l2Bridge.vlans[].vlan.id (always non-zero).
+	VLAN uint16
+	// IP is the source VM IP.
+	IP string
 }
 
 // DestinationClient API.

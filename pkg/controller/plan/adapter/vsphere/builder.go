@@ -27,6 +27,7 @@ import (
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	utils "github.com/kubev2v/forklift/pkg/controller/plan/util"
+	ocpmodel "github.com/kubev2v/forklift/pkg/controller/provider/model/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
@@ -46,6 +47,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
@@ -746,7 +748,7 @@ func isIPv4(address string) bool {
 	return ip != nil && ip.To4() != nil
 }
 
-func (r *Builder) findInterfaceIps(vm *model.VM, nic vsphere.NIC) []string {
+func findInterfaceIps(vm *model.VM, nic vsphere.NIC) []string {
 	var interfaceIps []string
 	for _, net := range vm.GuestNetworks {
 		if net.DeviceConfigId == nic.DeviceKey {
@@ -762,6 +764,11 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 	var kNetworks []cnv.Network
 	var kInterfaces []cnv.Interface
 	staticIpInterfaces := make(map[string][]string)
+	calicoMacInterfaces := map[string]string{}
+	calicoIpInterfaces := map[string][]string{}
+
+	// cache for network configs to avoid duplicate GETs.
+	nadCache := map[k8stypes.NamespacedName]*ocpmodel.NetworkConfig{}
 
 	numNetworks := 0
 	hasUDN := r.Plan.DestinationHasUdnNetwork(r.Destination)
@@ -818,7 +825,7 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 					Name: planbase.UdnL2bridge,
 				}
 				if r.Plan.Spec.PreserveStaticIPs {
-					ips := r.findInterfaceIps(vm, nic)
+					ips := findInterfaceIps(vm, nic)
 					if len(ips) > 0 {
 						staticIpInterfaces[networkName] = ips
 					}
@@ -831,6 +838,28 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 				NetworkName: path.Join(mapped.Destination.Namespace, mapped.Destination.Name),
 			}
 			kInterface.Bridge = &cnv.InterfaceBridge{}
+
+			nadKey := k8stypes.NamespacedName{
+				Namespace: mapped.Destination.Namespace,
+				Name:      mapped.Destination.Name,
+			}
+			cfg, cached := nadCache[nadKey]
+			if !cached {
+				cfg, err = planbase.FetchAndParseNAD(context.TODO(), r.Destination.Client,
+					nadKey.Namespace, nadKey.Name)
+				if err != nil {
+					return err
+				}
+				nadCache[nadKey] = cfg
+			}
+			if cfg != nil && cfg.ReferencesCalicoNetwork() {
+				calicoMacInterfaces[networkName] = nic.MAC
+				if r.Plan.Spec.PreserveStaticIPs {
+					if ips := findInterfaceIps(vm, nic); len(ips) > 0 {
+						calicoIpInterfaces[networkName] = ips
+					}
+				}
+			}
 		}
 
 		kNetworks = append(kNetworks, kNetwork)
@@ -850,6 +879,15 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 			object.Template.ObjectMeta.Annotations = make(map[string]string)
 		}
 		object.Template.ObjectMeta.Annotations[planbase.AnnStaticUdnIp] = string(staticIpInterfacesAnnotation)
+	}
+
+	for ifname, mac := range calicoMacInterfaces {
+		planbase.SetCalicoMAC(&object.Template.ObjectMeta, ifname, mac)
+	}
+	for ifname, ips := range calicoIpInterfaces {
+		if err = planbase.SetCalicoStaticIPs(&object.Template.ObjectMeta, ifname, ips); err != nil {
+			return
+		}
 	}
 	return
 }
