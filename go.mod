@@ -33,13 +33,13 @@ require (
 	golang.org/x/crypto v0.51.0
 	golang.org/x/net v0.54.0
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.35.1
+	k8s.io/api v0.35.4
 	k8s.io/apiextensions-apiserver v0.35.1
-	k8s.io/apimachinery v0.35.1
+	k8s.io/apimachinery v0.35.4
 	k8s.io/apiserver v0.35.1
-	k8s.io/client-go v0.35.1
+	k8s.io/client-go v0.35.4
 	k8s.io/component-base v0.35.1
-	k8s.io/component-helpers v0.26.0
+	k8s.io/component-helpers v0.35.4
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/utils v0.0.0-20260507154919-ff6756f316d2
 	kubevirt.io/api v1.8.2
