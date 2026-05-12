@@ -296,6 +296,7 @@ func installVIBOnHost(ctx context.Context, config *Config, host string, privateK
 	if err := testVmkfstoolsNamespace(client); err == nil {
 		logSuccess("[%s] ✓ Installation successful! vmkfstools namespace is available.", host)
 	} else {
+		logError("[%s] The vmkfstools namespace test failed with: %v", host, err)
 		logWarn("[%s] ⚠ VIB installed but vmkfstools namespace not yet available", host)
 		logWarn("[%s] You may need to restart hostd manually: /etc/init.d/hostd restart", host)
 	}
