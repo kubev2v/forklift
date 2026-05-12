@@ -143,41 +143,58 @@ type MapVolumeToHostResponse struct {
 	Error    Error    `json:"error"`
 }
 
-func (iboxClient *IboxClient) GetAllHosts() (host []Host, err error) {
+func (iboxClient *IboxClient) GetAllHosts() (hosts []Host, err error) {
 	const functionName = "GetAllHosts"
 	url := fmt.Sprintf("%s%s", iboxClient.Creds.URL, "api/rest/hosts")
 	iboxClient.Log.V(TRACE_LEVEL).Info(functionName, "URL", url)
 
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return host, fmt.Errorf("%s - NewRequest - error %w", functionName, err)
-	}
-	SetAuthHeader(req, iboxClient.Creds)
+	pageSize := common.IBOXDefaultQueryPageSize
+	totalPages := 1 // start with 1, update after first query.
 
-	resp, err := iboxClient.HTTPClient.Do(req)
-	if err != nil {
-		return host, fmt.Errorf("%s - Do - error %w", functionName, err)
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			iboxClient.Log.V(INFO_LEVEL).Error(err, functionName, "error in Close()", err.Error())
+	for page := 1; page <= totalPages; page++ {
+		iboxClient.Log.V(TRACE_LEVEL).Info(functionName, "page", page, "totalPages", totalPages)
+		req, err := http.NewRequest(http.MethodGet, url, nil)
+		if err != nil {
+			return hosts, fmt.Errorf("%s - NewRequest - error %w", functionName, err)
 		}
-	}()
+		values := req.URL.Query()
+		values.Add(PARAMETER_PAGE_SIZE, strconv.Itoa(pageSize))
+		values.Add(PARAMETER_PAGE, strconv.Itoa(page))
+		req.URL.RawQuery = values.Encode()
+		iboxClient.Log.V(TRACE_LEVEL).Info(functionName, "page", page, "totalPages", totalPages, "URL", req.URL.RawQuery)
 
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return host, fmt.Errorf("%s - ReadAll - error %w", functionName, err)
-	}
-	var responseObject HostResponse
-	err = json.Unmarshal(bodyBytes, &responseObject)
-	if err != nil {
-		return host, fmt.Errorf("%s - Unmarshal - error %w", functionName, err)
-	}
-	if responseObject.Error.Code != "" {
-		return host, fmt.Errorf("%s - ibox API - error code: %s message: %s", functionName, responseObject.Error.Code, responseObject.Error.Message)
+		SetAuthHeader(req, iboxClient.Creds)
+
+		resp, err := iboxClient.HTTPClient.Do(req)
+		if err != nil {
+			return hosts, fmt.Errorf("%s - Do - error %w", functionName, err)
+		}
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				iboxClient.Log.V(INFO_LEVEL).Error(err, functionName, "error in Close()", err.Error())
+			}
+		}()
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return hosts, fmt.Errorf("%s - ReadAll - error %w", functionName, err)
+		}
+		var responseObject HostResponse
+		err = json.Unmarshal(bodyBytes, &responseObject)
+		if err != nil {
+			return hosts, fmt.Errorf("%s - Unmarshal - error %w", functionName, err)
+		}
+		if responseObject.Error.Code != "" {
+			return hosts, fmt.Errorf("%s - ibox API - error code: %s message: %s", functionName, responseObject.Error.Code, responseObject.Error.Message)
+		}
+
+		hosts = append(hosts, responseObject.Result...)
+
+		if page == 1 {
+			totalPages = responseObject.Metadata.PagesTotal
+		}
 	}
 
-	return responseObject.Result, nil
+	return hosts, nil
 }
 
 func (iboxClient *IboxClient) GetHostByName(hostName string) (host *Host, err error) {

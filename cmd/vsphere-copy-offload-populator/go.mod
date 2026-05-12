@@ -146,3 +146,5 @@ require (
 )
 
 replace github.com/kubev2v/forklift => ../../
+
+replace github.com/infinidat/infinibox-csi-driver => github.com/amitosw15/infinibox-csi-driver v0.0.0-20260512123444-0b4db0405326
