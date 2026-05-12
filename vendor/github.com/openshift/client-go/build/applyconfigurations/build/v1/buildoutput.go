@@ -3,18 +3,31 @@
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
-// BuildOutputApplyConfiguration represents an declarative configuration of the BuildOutput type for use
+// BuildOutputApplyConfiguration represents a declarative configuration of the BuildOutput type for use
 // with apply.
+//
+// BuildOutput is input to a build strategy and describes the container image that the strategy
+// should produce.
 type BuildOutputApplyConfiguration struct {
-	To          *v1.ObjectReference            `json:"to,omitempty"`
-	PushSecret  *v1.LocalObjectReference       `json:"pushSecret,omitempty"`
+	// to defines an optional location to push the output of this build to.
+	// Kind must be one of 'ImageStreamTag' or 'DockerImage'.
+	// This value will be used to look up a container image repository to push to.
+	// In the case of an ImageStreamTag, the ImageStreamTag will be looked for in the namespace of
+	// the build unless Namespace is specified.
+	To *corev1.ObjectReference `json:"to,omitempty"`
+	// pushSecret is the name of a Secret that would be used for setting
+	// up the authentication for executing the Docker push to authentication
+	// enabled Docker Registry (or Docker Hub).
+	PushSecret *corev1.LocalObjectReference `json:"pushSecret,omitempty"`
+	// imageLabels define a list of labels that are applied to the resulting image. If there
+	// are multiple labels with the same name then the last one in the list is used.
 	ImageLabels []ImageLabelApplyConfiguration `json:"imageLabels,omitempty"`
 }
 
-// BuildOutputApplyConfiguration constructs an declarative configuration of the BuildOutput type for use with
+// BuildOutputApplyConfiguration constructs a declarative configuration of the BuildOutput type for use with
 // apply.
 func BuildOutput() *BuildOutputApplyConfiguration {
 	return &BuildOutputApplyConfiguration{}
@@ -23,7 +36,7 @@ func BuildOutput() *BuildOutputApplyConfiguration {
 // WithTo sets the To field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the To field is set to the value of the last call.
-func (b *BuildOutputApplyConfiguration) WithTo(value v1.ObjectReference) *BuildOutputApplyConfiguration {
+func (b *BuildOutputApplyConfiguration) WithTo(value corev1.ObjectReference) *BuildOutputApplyConfiguration {
 	b.To = &value
 	return b
 }
@@ -31,7 +44,7 @@ func (b *BuildOutputApplyConfiguration) WithTo(value v1.ObjectReference) *BuildO
 // WithPushSecret sets the PushSecret field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PushSecret field is set to the value of the last call.
-func (b *BuildOutputApplyConfiguration) WithPushSecret(value v1.LocalObjectReference) *BuildOutputApplyConfiguration {
+func (b *BuildOutputApplyConfiguration) WithPushSecret(value corev1.LocalObjectReference) *BuildOutputApplyConfiguration {
 	b.PushSecret = &value
 	return b
 }

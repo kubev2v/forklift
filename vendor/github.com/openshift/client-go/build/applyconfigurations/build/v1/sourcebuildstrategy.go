@@ -3,22 +3,36 @@
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
-// SourceBuildStrategyApplyConfiguration represents an declarative configuration of the SourceBuildStrategy type for use
+// SourceBuildStrategyApplyConfiguration represents a declarative configuration of the SourceBuildStrategy type for use
 // with apply.
+//
+// SourceBuildStrategy defines input parameters specific to an Source build.
 type SourceBuildStrategyApplyConfiguration struct {
-	From        *v1.ObjectReference             `json:"from,omitempty"`
-	PullSecret  *v1.LocalObjectReference        `json:"pullSecret,omitempty"`
-	Env         []v1.EnvVar                     `json:"env,omitempty"`
-	Scripts     *string                         `json:"scripts,omitempty"`
-	Incremental *bool                           `json:"incremental,omitempty"`
-	ForcePull   *bool                           `json:"forcePull,omitempty"`
-	Volumes     []BuildVolumeApplyConfiguration `json:"volumes,omitempty"`
+	// from is reference to an DockerImage, ImageStreamTag, or ImageStreamImage from which
+	// the container image should be pulled
+	From *corev1.ObjectReference `json:"from,omitempty"`
+	// pullSecret is the name of a Secret that would be used for setting up
+	// the authentication for pulling the container images from the private Docker
+	// registries
+	PullSecret *corev1.LocalObjectReference `json:"pullSecret,omitempty"`
+	// env contains additional environment variables you want to pass into a builder container.
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// scripts is the location of Source scripts
+	Scripts *string `json:"scripts,omitempty"`
+	// incremental flag forces the Source build to do incremental builds if true.
+	Incremental *bool `json:"incremental,omitempty"`
+	// forcePull describes if the builder should pull the images from registry prior to building.
+	ForcePull *bool `json:"forcePull,omitempty"`
+	// volumes is a list of input volumes that can be mounted into the builds runtime environment.
+	// Only a subset of Kubernetes Volume sources are supported by builds.
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes
+	Volumes []BuildVolumeApplyConfiguration `json:"volumes,omitempty"`
 }
 
-// SourceBuildStrategyApplyConfiguration constructs an declarative configuration of the SourceBuildStrategy type for use with
+// SourceBuildStrategyApplyConfiguration constructs a declarative configuration of the SourceBuildStrategy type for use with
 // apply.
 func SourceBuildStrategy() *SourceBuildStrategyApplyConfiguration {
 	return &SourceBuildStrategyApplyConfiguration{}
@@ -27,7 +41,7 @@ func SourceBuildStrategy() *SourceBuildStrategyApplyConfiguration {
 // WithFrom sets the From field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the From field is set to the value of the last call.
-func (b *SourceBuildStrategyApplyConfiguration) WithFrom(value v1.ObjectReference) *SourceBuildStrategyApplyConfiguration {
+func (b *SourceBuildStrategyApplyConfiguration) WithFrom(value corev1.ObjectReference) *SourceBuildStrategyApplyConfiguration {
 	b.From = &value
 	return b
 }
@@ -35,7 +49,7 @@ func (b *SourceBuildStrategyApplyConfiguration) WithFrom(value v1.ObjectReferenc
 // WithPullSecret sets the PullSecret field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PullSecret field is set to the value of the last call.
-func (b *SourceBuildStrategyApplyConfiguration) WithPullSecret(value v1.LocalObjectReference) *SourceBuildStrategyApplyConfiguration {
+func (b *SourceBuildStrategyApplyConfiguration) WithPullSecret(value corev1.LocalObjectReference) *SourceBuildStrategyApplyConfiguration {
 	b.PullSecret = &value
 	return b
 }
@@ -43,7 +57,7 @@ func (b *SourceBuildStrategyApplyConfiguration) WithPullSecret(value v1.LocalObj
 // WithEnv adds the given value to the Env field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Env field.
-func (b *SourceBuildStrategyApplyConfiguration) WithEnv(values ...v1.EnvVar) *SourceBuildStrategyApplyConfiguration {
+func (b *SourceBuildStrategyApplyConfiguration) WithEnv(values ...corev1.EnvVar) *SourceBuildStrategyApplyConfiguration {
 	for i := range values {
 		b.Env = append(b.Env, values[i])
 	}
