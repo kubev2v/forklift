@@ -116,6 +116,8 @@ func (r *Migrator) ExecutePhase(vm *planapi.VMStatus) (ok bool, err error) {
 		if ready {
 			r.NextPhase(vm)
 		}
+	case api.PhaseStorePowerState:
+		ok = false
 	case api.PhaseCreateGuestConversionPod, api.PhaseConvertGuest:
 		ok = false
 	case api.PhaseFinalize:
@@ -175,7 +177,7 @@ func (r *Migrator) Step(status *planapi.VMStatus) (step string) {
 		step = Initialize
 	case api.PhasePreHook:
 		step = api.PhasePreHook
-	case api.PhasePowerOffSource, api.PhaseWaitForPowerOff:
+	case api.PhaseStorePowerState, api.PhasePowerOffSource, api.PhaseWaitForPowerOff:
 		step = PrepareSource
 	case PhaseCreateSnapshots, PhaseWaitForSnapshots:
 		step = CreateSnapshots
