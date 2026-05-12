@@ -411,6 +411,13 @@ spec:
               aap_timeout:
                 x-kubernetes-int-or-string: true
                 description: "Default timeout in seconds for AAP HTTP calls and job polling when Hook spec.deadline is 0 (optional)."
+              aap_insecure_skip_verify:
+                type: string
+                enum: ["true", "false"]
+                description: "Skip TLS certificate verification when connecting to AAP (default: false). Use only for testing or when the AAP server uses a self-signed certificate and no CA is provided."
+              aap_ca_secret_name:
+                type: string
+                description: "Name of the Secret in the operator namespace containing a custom CA certificate (data key: ca.crt) for verifying the AAP server TLS certificate. Optional; when unset, the system CA bundle is used."
 
               # Migration Feature-Specific Settings
               controller_vsphere_incremental_backup:

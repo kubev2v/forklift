@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"context"
 	"encoding/base64"
-	"os"
 	"path"
 	"strings"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/lib/aap"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	"github.com/kubev2v/forklift/pkg/settings"
 	"gopkg.in/yaml.v2"
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
@@ -437,19 +437,12 @@ func (r *HookRunner) runAAPJob(step *planapi.Step) (err error) {
 		)
 		err = tokErr
 	} else {
-		// Centralized token Secret lives in the forklift-controller deployment namespace (POD_NAMESPACE).
 		aapURL = strings.TrimSpace(m.AAPURL)
-		ns := strings.TrimSpace(os.Getenv("POD_NAMESPACE"))
-		if ns == "" {
-			step.AddError("POD_NAMESPACE is not set; cannot load AAP token Secret")
-			step.MarkCompleted()
-			return
-		}
 		var tokErr error
 		token, tokErr = aap.GetTokenFromSecretName(
 			context.TODO(),
 			r.Client,
-			ns,
+			settings.ControllerNamespace(),
 			m.AAPTokenSecretName,
 		)
 		err = tokErr
@@ -464,7 +457,15 @@ func (r *HookRunner) runAAPJob(step *planapi.Step) (err error) {
 	if m.AAPTimeoutSeconds > 0 {
 		httpTimeout = time.Duration(m.AAPTimeoutSeconds) * time.Second
 	}
-	aapClient := aap.NewClient(aapURL, token, httpTimeout)
+
+	transport, tlsErr := aap.TLSTransportFromSettings(context.TODO(), r.Client, m.AAPInsecureSkipVerify, m.AAPCASecretName)
+	if tlsErr != nil {
+		step.AddError(tlsErr.Error())
+		step.MarkCompleted()
+		return
+	}
+
+	aapClient := aap.NewClient(aapURL, token, httpTimeout, transport)
 
 	extraVars := r.aapJobExtraVars()
 
