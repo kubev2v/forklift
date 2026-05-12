@@ -3,22 +3,40 @@
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
-// TagReferenceApplyConfiguration represents an declarative configuration of the TagReference type for use
+// TagReferenceApplyConfiguration represents a declarative configuration of the TagReference type for use
 // with apply.
+//
+// TagReference specifies optional annotations for images using this tag and an optional reference to an ImageStreamTag, ImageStreamImage, or DockerImage this tag should track.
 type TagReferenceApplyConfiguration struct {
-	Name            *string                               `json:"name,omitempty"`
-	Annotations     map[string]string                     `json:"annotations,omitempty"`
-	From            *v1.ObjectReference                   `json:"from,omitempty"`
-	Reference       *bool                                 `json:"reference,omitempty"`
-	Generation      *int64                                `json:"generation,omitempty"`
-	ImportPolicy    *TagImportPolicyApplyConfiguration    `json:"importPolicy,omitempty"`
+	// name of the tag
+	Name *string `json:"name,omitempty"`
+	// Optional; if specified, annotations that are applied to images retrieved via ImageStreamTags.
+	Annotations map[string]string `json:"annotations,omitempty"`
+	// Optional; if specified, a reference to another image that this tag should point to. Valid values
+	// are ImageStreamTag, ImageStreamImage, and DockerImage.  ImageStreamTag references
+	// can only reference a tag within this same ImageStream.
+	From *corev1.ObjectReference `json:"from,omitempty"`
+	// reference states if the tag will be imported. Default value is false, which means the tag will
+	// be imported.
+	Reference *bool `json:"reference,omitempty"`
+	// generation is a counter that tracks mutations to the spec tag (user intent). When a tag reference
+	// is changed the generation is set to match the current stream generation (which is incremented every
+	// time spec is changed). Other processes in the system like the image importer observe that the
+	// generation of spec tag is newer than the generation recorded in the status and use that as a trigger
+	// to import the newest remote tag. To trigger a new import, clients may set this value to zero which
+	// will reset the generation to the latest stream generation. Legacy clients will send this value as
+	// nil which will be merged with the current tag generation.
+	Generation *int64 `json:"generation,omitempty"`
+	// importPolicy is information that controls how images may be imported by the server.
+	ImportPolicy *TagImportPolicyApplyConfiguration `json:"importPolicy,omitempty"`
+	// referencePolicy defines how other components should consume the image.
 	ReferencePolicy *TagReferencePolicyApplyConfiguration `json:"referencePolicy,omitempty"`
 }
 
-// TagReferenceApplyConfiguration constructs an declarative configuration of the TagReference type for use with
+// TagReferenceApplyConfiguration constructs a declarative configuration of the TagReference type for use with
 // apply.
 func TagReference() *TagReferenceApplyConfiguration {
 	return &TagReferenceApplyConfiguration{}
@@ -49,7 +67,7 @@ func (b *TagReferenceApplyConfiguration) WithAnnotations(entries map[string]stri
 // WithFrom sets the From field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the From field is set to the value of the last call.
-func (b *TagReferenceApplyConfiguration) WithFrom(value v1.ObjectReference) *TagReferenceApplyConfiguration {
+func (b *TagReferenceApplyConfiguration) WithFrom(value corev1.ObjectReference) *TagReferenceApplyConfiguration {
 	b.From = &value
 	return b
 }

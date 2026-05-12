@@ -2,14 +2,18 @@
 
 package v1
 
-// ImageStreamTagReferenceApplyConfiguration represents an declarative configuration of the ImageStreamTagReference type for use
+// ImageStreamTagReferenceApplyConfiguration represents a declarative configuration of the ImageStreamTagReference type for use
 // with apply.
+//
+// ImageStreamTagReference references the ImageStreamTag in an image change trigger by namespace and name.
 type ImageStreamTagReferenceApplyConfiguration struct {
+	// namespace is the namespace where the ImageStreamTag for an ImageChangeTrigger is located
 	Namespace *string `json:"namespace,omitempty"`
-	Name      *string `json:"name,omitempty"`
+	// name is the name of the ImageStreamTag for an ImageChangeTrigger
+	Name *string `json:"name,omitempty"`
 }
 
-// ImageStreamTagReferenceApplyConfiguration constructs an declarative configuration of the ImageStreamTagReference type for use with
+// ImageStreamTagReferenceApplyConfiguration constructs a declarative configuration of the ImageStreamTagReference type for use with
 // apply.
 func ImageStreamTagReference() *ImageStreamTagReferenceApplyConfiguration {
 	return &ImageStreamTagReferenceApplyConfiguration{}

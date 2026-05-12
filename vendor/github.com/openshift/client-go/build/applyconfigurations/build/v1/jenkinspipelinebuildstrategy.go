@@ -3,18 +3,26 @@
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
-// JenkinsPipelineBuildStrategyApplyConfiguration represents an declarative configuration of the JenkinsPipelineBuildStrategy type for use
+// JenkinsPipelineBuildStrategyApplyConfiguration represents a declarative configuration of the JenkinsPipelineBuildStrategy type for use
 // with apply.
+//
+// JenkinsPipelineBuildStrategy holds parameters specific to a Jenkins Pipeline build.
+// Deprecated: use OpenShift Pipelines
 type JenkinsPipelineBuildStrategyApplyConfiguration struct {
-	JenkinsfilePath *string     `json:"jenkinsfilePath,omitempty"`
-	Jenkinsfile     *string     `json:"jenkinsfile,omitempty"`
-	Env             []v1.EnvVar `json:"env,omitempty"`
+	// jenkinsfilePath is the optional path of the Jenkinsfile that will be used to configure the pipeline
+	// relative to the root of the context (contextDir). If both JenkinsfilePath & Jenkinsfile are
+	// both not specified, this defaults to Jenkinsfile in the root of the specified contextDir.
+	JenkinsfilePath *string `json:"jenkinsfilePath,omitempty"`
+	// jenkinsfile defines the optional raw contents of a Jenkinsfile which defines a Jenkins pipeline build.
+	Jenkinsfile *string `json:"jenkinsfile,omitempty"`
+	// env contains additional environment variables you want to pass into a build pipeline.
+	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
-// JenkinsPipelineBuildStrategyApplyConfiguration constructs an declarative configuration of the JenkinsPipelineBuildStrategy type for use with
+// JenkinsPipelineBuildStrategyApplyConfiguration constructs a declarative configuration of the JenkinsPipelineBuildStrategy type for use with
 // apply.
 func JenkinsPipelineBuildStrategy() *JenkinsPipelineBuildStrategyApplyConfiguration {
 	return &JenkinsPipelineBuildStrategyApplyConfiguration{}
@@ -39,7 +47,7 @@ func (b *JenkinsPipelineBuildStrategyApplyConfiguration) WithJenkinsfile(value s
 // WithEnv adds the given value to the Env field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Env field.
-func (b *JenkinsPipelineBuildStrategyApplyConfiguration) WithEnv(values ...v1.EnvVar) *JenkinsPipelineBuildStrategyApplyConfiguration {
+func (b *JenkinsPipelineBuildStrategyApplyConfiguration) WithEnv(values ...corev1.EnvVar) *JenkinsPipelineBuildStrategyApplyConfiguration {
 	for i := range values {
 		b.Env = append(b.Env, values[i])
 	}
