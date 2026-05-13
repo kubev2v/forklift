@@ -33,7 +33,7 @@ spec:
   - name: build-source-image
     value: "true"
   - name: prefetch-input
-    value: '[{"type": "rpm", "path": ".konflux/deep-inspection"}]'
+    value: '[{"type": "rpm", "path": ".konflux/deep-inspection-rhel9"}]'
   - name: build-args-file
     value: build/release.conf
   - name: build-args
