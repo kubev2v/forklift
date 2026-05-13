@@ -5,6 +5,8 @@ relatedImages:
     image: ${CONTROLLER_IMAGE}
   - name: deep-inspection
     image: ${DEEP_INSPECTION_IMAGE}
+  - name: deep-inspection-rhel9
+    image: ${DEEP_INSPECTION_IMAGE_RHEL9}
   - name: must_gather
     image: ${MUST_GATHER_IMAGE}
   - name: validation
