@@ -172,10 +172,10 @@ func GetDeepInspectionImage(cfg *PodConfig) string {
 	}
 	if cfg.XfsCompatibility {
 		if settings.Settings.Migration.DeepInspectionImageXFS != "" {
-			return settings.Settings.Migration.DeepInspectionImageXFS
+			return settings.Settings.DeepInspectionImageXFS
 		}
 	}
-	return settings.Settings.Migration.DeepInspectionImage
+	return settings.Settings.DeepInspectionImage
 }
 
 // ResolveServiceAccount resolves the ServiceAccount for migration pods.
