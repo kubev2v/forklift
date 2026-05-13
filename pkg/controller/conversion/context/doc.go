@@ -156,11 +156,11 @@ func GetVirtV2vImage(cfg *PodConfig) string {
 		return cfg.Image
 	}
 	if cfg.XfsCompatibility {
-		if settings.Settings.Migration.VirtV2vImageXFS != "" {
-			return settings.Settings.Migration.VirtV2vImageXFS
+		if settings.VirtV2vImageXFS != "" {
+			return settings.VirtV2vImageXFS
 		}
 	}
-	return settings.Settings.Migration.VirtV2vImage
+	return settings.VirtV2vImage
 }
 
 // GetDeepInspectionImage resolves the deep inspection workload image from PodConfig.
@@ -171,11 +171,11 @@ func GetDeepInspectionImage(cfg *PodConfig) string {
 		return cfg.Image
 	}
 	if cfg.XfsCompatibility {
-		if settings.Settings.Migration.DeepInspectionImageXFS != "" {
-			return settings.Settings.Migration.DeepInspectionImageXFS
+		if settings.DeepInspectionImageXFS != "" {
+			return settings.DeepInspectionImageXFS
 		}
 	}
-	return settings.Settings.Migration.DeepInspectionImage
+	return settings.DeepInspectionImage
 }
 
 // ResolveServiceAccount resolves the ServiceAccount for migration pods.
@@ -183,5 +183,5 @@ func ResolveServiceAccount(cfg *PodConfig) string {
 	if cfg.ServiceAccount != "" {
 		return cfg.ServiceAccount
 	}
-	return settings.Settings.Migration.ServiceAccount
+	return settings.Settings.ServiceAccount
 }
