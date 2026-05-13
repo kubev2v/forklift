@@ -205,7 +205,7 @@ Credentials can be provided directly via flags or through an existing Kubernetes
 	// EC2 specific flags
 	cmd.Flags().StringVar(&ec2Region, "ec2-region", "", "AWS region where source EC2 instances are located")
 	cmd.Flags().StringVar(&ec2TargetRegion, "target-region", "", "Target region for migrations (defaults to provider region)")
-	cmd.Flags().StringVar(&ec2TargetAZ, "target-az", "", "Target availability zone for migrations (required - EBS volumes are AZ-specific)")
+	cmd.Flags().StringVar(&ec2TargetAZ, "target-az", "", "Target availability zone for migrations (auto-detected from worker nodes if omitted)")
 	cmd.Flags().StringVar(&ec2TargetAccessKeyID, "target-access-key-id", "", "Target AWS account access key ID (for cross-account migrations)")
 	cmd.Flags().StringVar(&ec2TargetSecretKey, "target-secret-access-key", "", "Target AWS account secret access key (for cross-account migrations)")
 	cmd.Flags().BoolVar(&autoTargetCredentials, "auto-target-credentials", false, "Automatically fetch target AWS credentials from cluster and target-az from worker nodes")

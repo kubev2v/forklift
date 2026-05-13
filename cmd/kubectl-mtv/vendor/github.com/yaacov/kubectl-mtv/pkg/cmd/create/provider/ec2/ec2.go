@@ -114,6 +114,19 @@ func CreateProvider(configFlags *genericclioptions.ConfigFlags, options provider
 		}
 	}
 
+	// Auto-detect target-az from worker nodes if not provided
+	if options.EC2TargetAZ == "" {
+		detectedAZ, err := FetchTargetAZFromCluster(configFlags)
+		if err == nil {
+			options.EC2TargetAZ = detectedAZ
+			fmt.Printf("Auto-detected target availability zone: %s\n", detectedAZ)
+			if options.EC2TargetRegion == "" && len(detectedAZ) > 1 {
+				options.EC2TargetRegion = detectedAZ[:len(detectedAZ)-1]
+				fmt.Printf("Auto-detected target region: %s\n", options.EC2TargetRegion)
+			}
+		}
+	}
+
 	// Validate required fields
 	if err := validateProviderOptions(options); err != nil {
 		return nil, nil, err

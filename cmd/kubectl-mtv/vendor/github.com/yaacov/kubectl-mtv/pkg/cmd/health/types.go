@@ -104,6 +104,7 @@ type ImageOverride struct {
 type PodHealth struct {
 	Name             string   `json:"name" yaml:"name"`
 	Namespace        string   `json:"namespace" yaml:"namespace"`
+	Image            string   `json:"image" yaml:"image"`
 	Status           string   `json:"status" yaml:"status"`
 	Ready            bool     `json:"ready" yaml:"ready"`
 	Restarts         int      `json:"restarts" yaml:"restarts"`

@@ -21,6 +21,8 @@ type MTVReadInput struct {
 	Fields []string `json:"fields,omitempty" jsonschema:"Limit JSON to these top-level keys only (e.g. [name, id, concerns])"`
 }
 
+func ptrBool(b bool) *bool { return &b }
+
 // mtvOutputSchema is the shared output schema for mtv_read and mtv_write tools.
 // The "command" field is intentionally omitted to prevent small LLMs from
 // mimicking CLI command syntax (e.g., generating "kubectl-mtv get plan ...")
@@ -51,6 +53,12 @@ func GetMTVReadTool(registry *discovery.Registry) *mcp.Tool {
 		Name:         "mtv_read",
 		Description:  description,
 		OutputSchema: mtvOutputSchema,
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "MTV Read",
+			ReadOnlyHint:    true,
+			DestructiveHint: ptrBool(false),
+			OpenWorldHint:   ptrBool(false),
+		},
 	}
 }
 
