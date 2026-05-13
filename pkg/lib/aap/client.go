@@ -60,9 +60,6 @@ type Client struct {
 	apiPathPrefix string
 }
 
-// ClientOption configures [NewClient].
-type ClientOption func(*Client)
-
 // LaunchJobResponse represents the response from AAP job launch.
 type LaunchJobResponse struct {
 	ID     int    `json:"id"`
@@ -89,14 +86,6 @@ type JobTemplateListResponse struct {
 	Next     string               `json:"next"`
 	Previous string               `json:"previous"`
 	Results  []JobTemplateSummary `json:"results"`
-}
-
-// WithPathPrefix sets a fixed API path prefix and skips GET /api discovery. For tests; production
-// should omit this option so the first HTTP call can discover the prefix from GET {baseURL}/api.
-func WithPathPrefix(prefix string) ClientOption {
-	return func(c *Client) {
-		c.staticPathPrefix = prefix
-	}
 }
 
 // resolvePathPrefix sets apiPathPrefix once: optional static ([WithPathPrefix]), else GET {baseURL}/api
@@ -187,7 +176,7 @@ func (c *Client) resourceURL(ctx context.Context, path string) (string, error) {
 }
 
 // NewClient creates an AAP API client with the given HTTP timeout.
-func NewClient(aapURL, token string, httpTimeout time.Duration, opts ...ClientOption) *Client {
+func NewClient(aapURL, token string, httpTimeout time.Duration, transport *http.Transport) *Client {
 	if httpTimeout <= 0 {
 		httpTimeout = 30 * time.Second
 	}
@@ -198,8 +187,8 @@ func NewClient(aapURL, token string, httpTimeout time.Duration, opts ...ClientOp
 			Timeout: httpTimeout,
 		},
 	}
-	for _, o := range opts {
-		o(c)
+	if transport != nil {
+		c.client.Transport = transport
 	}
 	return c
 }

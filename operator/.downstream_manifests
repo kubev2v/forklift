@@ -3410,6 +3410,20 @@ spec:
             additionalProperties: true
             description: Spec defines the desired state of ForkliftController
             properties:
+              aap_ca_secret_name:
+                description: 'Name of the Secret in the operator namespace containing
+                  a custom CA certificate (data key: ca.crt) for verifying the AAP
+                  server TLS certificate. Optional; when unset, the system CA bundle
+                  is used.'
+                type: string
+              aap_insecure_skip_verify:
+                description: 'Skip TLS certificate verification when connecting to
+                  AAP (default: false). Use only for testing or when the AAP server
+                  uses a self-signed certificate and no CA is provided.'
+                enum:
+                - "true"
+                - "false"
+                type: string
               aap_timeout:
                 description: Default timeout in seconds for AAP HTTP calls and job
                   polling when Hook spec.deadline is 0 (optional).

@@ -141,6 +141,14 @@ spec:
         - name: AAP_TIMEOUT
           value: "{{ aap_timeout }}"
 {% endif %}
+{% if aap_insecure_skip_verify is defined and aap_insecure_skip_verify|bool %}
+        - name: AAP_INSECURE_SKIP_VERIFY
+          value: "true"
+{% endif %}
+{% if aap_ca_secret_name is defined and aap_ca_secret_name is string and aap_ca_secret_name|length > 0 %}
+        - name: AAP_CA_SECRET_NAME
+          value: "{{ aap_ca_secret_name }}"
+{% endif %}
 {% if controller_cdi_export_token_ttl is number %}
         - name: CDI_EXPORT_TOKEN_TTL
           value: "{{ controller_cdi_export_token_ttl }}"
@@ -309,6 +317,14 @@ spec:
 {% elif aap_timeout is defined and aap_timeout is number %}
         - name: AAP_TIMEOUT
           value: "{{ aap_timeout }}"
+{% endif %}
+{% if aap_insecure_skip_verify is defined and aap_insecure_skip_verify|bool %}
+        - name: AAP_INSECURE_SKIP_VERIFY
+          value: "true"
+{% endif %}
+{% if aap_ca_secret_name is defined and aap_ca_secret_name is string and aap_ca_secret_name|length > 0 %}
+        - name: AAP_CA_SECRET_NAME
+          value: "{{ aap_ca_secret_name }}"
 {% endif %}
         - name: API_PORT
           value: "8443"
