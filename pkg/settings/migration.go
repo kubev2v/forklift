@@ -19,6 +19,7 @@ const (
 	VirtV2vImage                           = "VIRT_V2V_IMAGE"
 	VirtV2vImageXFS                        = "VIRT_V2V_IMAGE_XFS"
 	DeepInspectionImage                    = "DEEP_INSPECTION_IMAGE"
+	DeepInspectionImageXFS                 = "DEEP_INSPECTION_IMAGE_XFS"
 	vddkImage                              = "VDDK_IMAGE"
 	PrecopyInterval                        = "PRECOPY_INTERVAL"
 	BlockerGracePeriodMinutes              = "BLOCKER_GRACE_PERIOD_MINUTES"
@@ -106,6 +107,8 @@ type Migration struct {
 	VirtV2vImageXFS string
 	// Default image for deep inspection pods when Conversion spec.Image is empty
 	DeepInspectionImage string
+	// Deep inspection image built on RHEL9, used when XfsCompatibility is requested
+	DeepInspectionImageXFS string
 	// Virt-v2v require KVM flags for guest conversion
 	VirtV2vDontRequestKVM bool
 	// OCP Export token TTL minutes
@@ -428,6 +431,9 @@ func (r *Migration) Load() (err error) {
 	}
 	if val, found := os.LookupEnv(DeepInspectionImage); found {
 		r.DeepInspectionImage = strings.TrimSpace(val)
+	}
+	if val, found := os.LookupEnv(DeepInspectionImageXFS); found {
+		r.DeepInspectionImageXFS = strings.TrimSpace(val)
 	}
 	return
 }

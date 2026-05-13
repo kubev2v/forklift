@@ -164,9 +164,16 @@ func GetVirtV2vImage(cfg *PodConfig) string {
 }
 
 // GetDeepInspectionImage resolves the deep inspection workload image from PodConfig.
+// When XfsCompatibility is requested it prefers DEEP_INSPECTION_IMAGE_XFS over
+// DEEP_INSPECTION_IMAGE, mirroring the virt-v2v XFS image selection.
 func GetDeepInspectionImage(cfg *PodConfig) string {
 	if cfg.Image != "" {
 		return cfg.Image
+	}
+	if cfg.XfsCompatibility {
+		if settings.Settings.Migration.DeepInspectionImageXFS != "" {
+			return settings.Settings.Migration.DeepInspectionImageXFS
+		}
 	}
 	return settings.Settings.Migration.DeepInspectionImage
 }

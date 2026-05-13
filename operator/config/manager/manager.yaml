@@ -42,6 +42,8 @@ spec:
           value: ${CONTROLLER_IMAGE}
         - name: DEEP_INSPECTION_IMAGE
           value: ${DEEP_INSPECTION_IMAGE}
+        - name: DEEP_INSPECTION_IMAGE_XFS
+          value: ${DEEP_INSPECTION_IMAGE_RHEL9}
         - name: API_IMAGE
           value: ${API_IMAGE}
         - name: MUST_GATHER_IMAGE
