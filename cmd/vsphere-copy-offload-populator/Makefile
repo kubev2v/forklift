@@ -51,7 +51,7 @@ build:
 	    vsphere-copy-offload-populator.go
 	PATH="$(PATH)" \
 	    go build \
-	    -ldflags="-w -s" \
+	    -ldflags="-w -s -X 'github.com/kubev2v/forklift/pkg/lib/client/vsphere.VibVersion=$(VIB_VERSION)'" \
 	    -o bin/vib-installer \
 	    cmd/vib-installer.go
 

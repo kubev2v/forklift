@@ -10,6 +10,7 @@ import (
 
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
 	populator_mocks "github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator/mocks"
+	vspherelib "github.com/kubev2v/forklift/pkg/lib/client/vsphere"
 	"github.com/kubev2v/forklift/pkg/lib/client/vsphere/vmware"
 	vmware_mocks "github.com/kubev2v/forklift/pkg/lib/client/vsphere/vmware/mocks"
 	"github.com/vmware/govmomi/cli/esx"
@@ -144,6 +145,9 @@ var _ = Describe("Populator", func() {
 			setup: func() {
 				vmwareClient.EXPECT().GetEsxByVm(gomock.Any(), gomock.Any()).Return(dummyHost, nil)
 				vmwareClient.EXPECT().GetDatastoreActiveAdapters(context.Background(), gomock.Any(), "my-ds").Return([]vmware.HostAdapter{{Name: "vmhbatest", Id: "iqn.foobar"}}, nil)
+				// VIB pre-flight check: checkVIBVersion → GetLoadedVIBVersion
+				vmwareClient.EXPECT().RunEsxCommand(gomock.Any(), gomock.Any(), []string{"vmkfstools", "version"}).
+					Return([]esx.Values{{"message": {fmt.Sprintf(`{"version": "%s"}`, vspherelib.VibVersion)}}}, nil)
 				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any()).Return(nil, nil)
 				storageClient.EXPECT().ResolvePVToLUN(gomock.Any()).Return(populator.LUN{NAA: "naa.616263"}, nil)
 				storageClient.EXPECT().CurrentMappedGroups(gomock.Any(), gomock.Any()).Return([]string{}, nil)
