@@ -8,6 +8,8 @@
 
 .DEFAULT_GOAL := help
 
+include cmd/vsphere-copy-offload-populator/vmkfstools-wrapper/version.mk
+
 GOOS ?= $(shell go env GOOS)
 GOPATH ?= $(shell go env GOPATH)
 GOBIN ?= $(GOPATH)/bin
@@ -298,7 +300,7 @@ install: manifests kubectl ## Install CRDs into cluster
 ##@ Container Images
 
 build-controller-image: check_container_runtime
-	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) -t $(CONTROLLER_IMAGE)$(PLATFORM_SUFFIX) -f build/forklift-controller/Containerfile .
+	$(CONTAINER_CMD) build $(PLATFORM_FLAG) $(BUILD_LABEL_ARGS) --build-arg VIB_VERSION=$(VIB_VERSION) -t $(CONTROLLER_IMAGE)$(PLATFORM_SUFFIX) -f build/forklift-controller/Containerfile .
 
 push-controller-image: build-controller-image
 	$(CONTAINER_CMD) push $(CONTROLLER_IMAGE)$(PLATFORM_SUFFIX)

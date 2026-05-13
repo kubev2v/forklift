@@ -89,7 +89,7 @@ func (c *ESXiSSHClient) ExecuteCommand(ctx context.Context, datastore, sshComman
 	if err != nil {
 		return "", fmt.Errorf("failed to create SSH session: %w", err)
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	// Build the command part
 	cmdPart := sshCommand
@@ -130,8 +130,7 @@ func (c *ESXiSSHClient) ExecuteCommand(ctx context.Context, datastore, sshComman
 		output = result.output
 		cmdErr = result.err
 	case <-runCtx.Done():
-		// Command timed out, try to close the session
-		session.Close()
+		// Command timed out - session will be closed by defer
 		return "", fmt.Errorf("SSH command timed out after 60 seconds: %s", fullCommand)
 	}
 
@@ -150,7 +149,6 @@ func (c *ESXiSSHClient) Close() error {
 	if c.sshClient != nil {
 		err := c.sshClient.Close()
 		c.sshClient = nil
-		// No ctx available at Close; use base logger so we still show "ssh"
 		klog.Background().WithName("copy-offload").WithName("ssh").Info("SSH connection closed", "host", c.hostname)
 		return err
 	}

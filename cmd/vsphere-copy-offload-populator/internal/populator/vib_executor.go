@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
+	"github.com/kubev2v/forklift/pkg/lib/client/vsphere/vmware"
 	"github.com/vmware/govmomi/object"
 	"k8s.io/klog/v2"
 )

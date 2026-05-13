@@ -14,6 +14,7 @@ import (
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/session"
+	"github.com/vmware/govmomi/view"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
@@ -33,6 +34,7 @@ const (
 //go:generate go run go.uber.org/mock/mockgen -destination=mocks/vmware_mock_client.go -package=vmware_mocks . Client
 type Client interface {
 	GetEsxByVm(ctx context.Context, vmName string) (*object.HostSystem, error)
+	GetAllHosts(ctx context.Context) ([]*object.HostSystem, error)
 	RunEsxCommand(ctx context.Context, host *object.HostSystem, command []string) ([]esx.Values, error)
 	GetDatastore(ctx context.Context, dc *object.Datacenter, datastore string) (*object.Datastore, error)
 	// GetVMDiskBacking returns disk backing information for detecting disk type (VVol, RDM, VMDK)
@@ -44,6 +46,8 @@ type Client interface {
 	// Returns (0, 0, nil, nil) if the disk cannot be matched.
 	GetVirtualDiskSizes(ctx context.Context, vmId, vmdkPath string) (provisionedBytes, datastoreAllocatedBytes int64, backing *DiskBacking, err error)
 	GetDatastoreActiveAdapters(ctx context.Context, host *object.HostSystem, datastoreName string) ([]HostAdapter, error)
+	GetHostByRef(ctx context.Context, morefValue string) *object.HostSystem
+	Logout(ctx context.Context) error
 }
 
 type HostAdapter struct {
@@ -76,14 +80,14 @@ func NewClient(vcenterUrl, username, password string) (Client, error) {
 	ctx := context.Background()
 	u, err := soap.ParseURL(vcenterUrl)
 	if err != nil {
-		return nil, fmt.Errorf("Failed parsing vCenter URL: %w", err)
+		return nil, fmt.Errorf("failed parsing vCenter URL: %w", err)
 	}
 	u.User = url.UserPassword(username, password)
 
 	soapClient := soap.NewClient(u, true)
 	vimClient, err := vim25.NewClient(ctx, soapClient)
 	if err != nil {
-		return nil, fmt.Errorf("Failed creating vSphere client: %w", err)
+		return nil, fmt.Errorf("failed creating vSphere client: %w", err)
 	}
 
 	vimClient.RoundTripper = session.KeepAlive(vimClient.RoundTripper, sessionKeepAliveIdle)
@@ -93,10 +97,14 @@ func NewClient(vcenterUrl, username, password string) (Client, error) {
 		SessionManager: session.NewManager(vimClient),
 	}
 	if err = c.Login(ctx, u.User); err != nil {
-		return nil, fmt.Errorf("Failed to login to vSphere: %w", err)
+		return nil, fmt.Errorf("failed to login to vSphere: %w", err)
 	}
 
 	return &VSphereClient{Client: c}, nil
+}
+
+func (c *VSphereClient) Logout(ctx context.Context) error {
+	return c.Client.Logout(ctx)
 }
 
 // getSciniGuid queries the kernel module system to extract the ioctlIniGuidStr
@@ -181,7 +189,6 @@ func (c *VSphereClient) GetDatastoreActiveAdapters(ctx context.Context, host *ob
 
 	// 2. Fetch Host Storage Topology (MultipathInfo and ScsiLun)
 	var hostConfig mo.HostSystem
-	// We need storageDevice which contains both ScsiLun list and MultipathInfo
 	err = host.Properties(ctx, host.Reference(), []string{"config.storageDevice"}, &hostConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch host storage device info: %w", err)
@@ -204,12 +211,7 @@ func (c *VSphereClient) GetDatastoreActiveAdapters(ctx context.Context, host *ob
 	}
 
 	if scsiLunKey == "" {
-		// Fallback: Try identifying by ID if CanonicalName didn't match (unlikely for VMFS)
-		// Or maybe deviceName isn't the canonical name?
-		// For now, let's log and error out, or try a direct ID match in multipath as backup?
 		klog.Warningf("Could not find ScsiLun with CanonicalName %s", deviceName)
-		// Let's try the direct Multipath match as a fallback, reusing previous logic is risky if it was wrong.
-		// Better to fail active detection than return wrong one, but user reported "goes with all adapters", so we want to be precise.
 		return nil, fmt.Errorf("scsi lun with canonical name %s not found", deviceName)
 	}
 
@@ -218,7 +220,7 @@ func (c *VSphereClient) GetDatastoreActiveAdapters(ctx context.Context, host *ob
 	}
 
 	// 4. Build HBA map with full adapter information
-	hbaByKey := make(map[string]HostAdapter) // Maps HBA Key to HostAdapter
+	hbaByKey := make(map[string]HostAdapter)
 
 	for _, hba := range storageDevice.HostBusAdapter {
 		h := hba.GetHostHostBusAdapter()
@@ -231,14 +233,11 @@ func (c *VSphereClient) GetDatastoreActiveAdapters(ctx context.Context, host *ob
 			Driver: h.Driver,
 		}
 
-		// Extract initiator ID based on HBA type
 		switch typedHba := hba.(type) {
 		case *types.HostInternetScsiHba:
 			adapter.Id = typedHba.IScsiName
 			klog.V(1).Infof("iSCSI HBA %s has IQN: %s", h.Device, adapter.Id)
 		case *types.HostFibreChannelHba:
-			// For FC, use ESX format: fc.WWNN:WWPN
-			// Convert int64 to uint64 to handle negative values correctly
 			wwnn := uint64(typedHba.NodeWorldWideName)
 			wwpn := uint64(typedHba.PortWorldWideName)
 			adapter.Id = fmt.Sprintf("fc.%016x:%016x", wwnn, wwpn)
@@ -292,7 +291,6 @@ func (c *VSphereClient) GetDatastoreActiveAdapters(ctx context.Context, host *ob
 
 	var result []HostAdapter
 	for _, adapter := range activeAdapters {
-		// For scini driver, override the initiator ID with the GUID from kernel module
 		if adapter.Driver == "scini" && sciniGuid != "" {
 			adapter.Id = sciniGuid
 			klog.V(1).Infof("Using scini GUID for adapter %s: %s", adapter.Name, adapter.Id)
@@ -302,7 +300,6 @@ func (c *VSphereClient) GetDatastoreActiveAdapters(ctx context.Context, host *ob
 		klog.V(1).Infof("Active adapter %s with initiator ID: %s, driver: %s", adapter.Name, adapter.Id, adapter.Driver)
 	}
 
-	// Check if any result has an FC or iSCSI adapter
 	hasSANAdapter := false
 	for _, a := range result {
 		if strings.HasPrefix(a.Id, "iqn.") || strings.HasPrefix(a.Id, "fc.") {
@@ -311,8 +308,6 @@ func (c *VSphereClient) GetDatastoreActiveAdapters(ctx context.Context, host *ob
 		}
 	}
 
-	// Fallback for local datastores: if no SAN (FC/iSCSI) adapters were found
-	// among active paths, pick the first FC or iSCSI adapter available on the host.
 	if !hasSANAdapter {
 		klog.V(1).Infof("No FC/iSCSI adapters found in active paths for datastore %s, falling back to first available SAN adapter", datastoreName)
 
@@ -366,11 +361,11 @@ func (c *VSphereClient) RunEsxCommand(ctx context.Context, host *object.HostSyst
 		return nil, err
 	}
 	for _, valueMap := range res.Values {
-		message, _ := valueMap["message"]
+		message := valueMap["message"]
 		status, statusExists := valueMap["status"]
 		log.V(2).Info("esxcli result", "message", message, "status", status)
 		if statusExists && strings.Join(status, "") != "0" {
-			return nil, fmt.Errorf("Failed to invoke vmkfstools: %v", message)
+			return nil, fmt.Errorf("failed to invoke vmkfstools: %v", message)
 		}
 	}
 	return res.Values, nil
@@ -419,13 +414,39 @@ func (c *VSphereClient) GetEsxByVm(ctx context.Context, vmId string) (*object.Ho
 	return host, nil
 }
 
+func (c *VSphereClient) GetHostByRef(ctx context.Context, morefValue string) *object.HostSystem {
+	moref := types.ManagedObjectReference{Type: "HostSystem", Value: morefValue}
+	return object.NewHostSystem(c.Client.Client, moref)
+}
+
+func (c *VSphereClient) GetAllHosts(ctx context.Context) ([]*object.HostSystem, error) {
+	m := view.NewManager(c.Client.Client)
+	v, err := m.CreateContainerView(ctx, c.ServiceContent.RootFolder, []string{"HostSystem"}, true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create container view: %w", err)
+	}
+	defer func() { _ = v.Destroy(ctx) }()
+
+	var hosts []mo.HostSystem
+	err = v.Retrieve(ctx, []string{"HostSystem"}, []string{"name"}, &hosts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve hosts: %w", err)
+	}
+
+	result := make([]*object.HostSystem, len(hosts))
+	for i, h := range hosts {
+		result[i] = object.NewHostSystem(c.Client.Client, h.Reference())
+	}
+	return result, nil
+}
+
 func (c *VSphereClient) GetDatastore(ctx context.Context, dc *object.Datacenter, datastore string) (*object.Datastore, error) {
 	finder := find.NewFinder(c.Client.Client, false)
 	finder.SetDatacenter(dc)
 
 	ds, err := finder.Datastore(ctx, datastore)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to find datastore %s: %w", datastore, err)
+		return nil, fmt.Errorf("failed to find datastore %s: %w", datastore, err)
 	}
 
 	return ds, nil
@@ -439,29 +460,23 @@ func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkP
 		return nil, err
 	}
 
-	// Normalize vmdkPath for comparison (remove brackets and spaces)
 	normalizedPath := strings.ToLower(vmdkPath)
 
-	// Find the disk matching the vmdkPath
 	for _, device := range vmProps.Config.Hardware.Device {
 		disk, ok := device.(*types.VirtualDisk)
 		if !ok {
 			continue
 		}
 
-		// Check different backing types
 		switch backing := disk.Backing.(type) {
 		case *types.VirtualDiskFlatVer2BackingInfo:
-			// Check if this disk matches the requested path
 			if !strings.Contains(strings.ToLower(backing.FileName), normalizedPath) &&
 				!strings.Contains(normalizedPath, strings.ToLower(backing.FileName)) {
-				// Try to match by extracting datastore and path
 				if !diskPathMatches(backing.FileName, vmdkPath) {
 					continue
 				}
 			}
 
-			// Check for VVol backing
 			if backing.BackingObjectId != "" {
 				log.V(2).Info("disk is VVol-backed", "vmdk", vmdkPath, "backing_object_id", backing.BackingObjectId)
 				return &DiskBacking{
@@ -471,7 +486,6 @@ func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkP
 				}, nil
 			}
 
-			// Regular VMDK
 			log.V(2).Info("disk is VMDK-backed", "vmdk", vmdkPath)
 			return &DiskBacking{
 				VVolId:     "",
@@ -480,7 +494,6 @@ func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkP
 			}, nil
 
 		case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
-			// Check if this disk matches
 			if !strings.Contains(strings.ToLower(backing.FileName), normalizedPath) &&
 				!strings.Contains(normalizedPath, strings.ToLower(backing.FileName)) {
 				if !diskPathMatches(backing.FileName, vmdkPath) {
@@ -498,7 +511,6 @@ func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkP
 		}
 	}
 
-	// If we couldn't find the disk, return default VMDK type
 	log.V(2).Info("disk not found, assuming VMDK type", "vmdk", vmdkPath)
 	return &DiskBacking{
 		VVolId:     "",
@@ -508,7 +520,6 @@ func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkP
 }
 
 // getVMWithConfig looks up a VM across all datacenters and fetches its hardware device config.
-// Falls back to a direct moref lookup if the VM is not found by name/path.
 func (c *VSphereClient) getVMWithConfig(ctx context.Context, vmId string) (*object.VirtualMachine, *mo.VirtualMachine, error) {
 	finder := find.NewFinder(c.Client.Client, true)
 	datacenters, err := finder.DatacenterList(ctx, "*")
@@ -550,8 +561,8 @@ func virtualDiskProvisionedBytes(d *types.VirtualDisk) int64 {
 	return d.CapacityInKB * 1024
 }
 
-// GetVirtualDiskSizes implements Client. It returns provisioned bytes, datastore-allocated
-// bytes, and disk backing info for the disk matching vmdkPath in a single VM lookup.
+// GetVirtualDiskSizes returns provisioned bytes, datastore-allocated bytes,
+// and disk backing info for the disk matching vmdkPath in a single VM lookup.
 func (c *VSphereClient) GetVirtualDiskSizes(ctx context.Context, vmId, vmdkPath string) (int64, int64, *DiskBacking, error) {
 	log := klog.FromContext(ctx).WithName("esxcli")
 	vm, vmProps, err := c.getVMWithConfig(ctx, vmId)
@@ -656,12 +667,9 @@ func (c *VSphereClient) GetVirtualDiskSizes(ctx context.Context, vmId, vmdkPath 
 
 // diskPathMatches compares two VMDK paths accounting for different formats
 func diskPathMatches(path1, path2 string) bool {
-	// Extract datastore and filename from both paths
-	// Format: "[datastore] folder/file.vmdk"
 	normalize := func(p string) string {
 		p = strings.TrimSpace(p)
 		p = strings.ToLower(p)
-		// Remove brackets from datastore
 		p = strings.ReplaceAll(p, "[", "")
 		p = strings.ReplaceAll(p, "]", "")
 		return p
