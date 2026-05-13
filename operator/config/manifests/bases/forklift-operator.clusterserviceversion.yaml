@@ -152,6 +152,11 @@ spec:
         path: deep_inspection_image_fqin
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Deep inspection image built on RHEL9, used when xfsCompatibility is enabled
+        displayName: Deep Inspection Image (RHEL9)
+        path: deep_inspection_image_xfs_fqin
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: VDDK image for VMware disk access
         displayName: VDDK Image
         path: vddk_image

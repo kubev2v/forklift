@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi10/go-toolset:1.25.9-1778589469 AS builder
+FROM registry.access.redhat.com/ubi9/go-toolset:1.25.9-1778604137 AS builder
 USER 0
 WORKDIR /app
 COPY --chown=1001:0 ./ ./
@@ -7,20 +7,25 @@ ENV GOEXPERIMENT=strictfipsruntime
 ENV GOCACHE=/go-build/cache
 RUN --mount=type=cache,target=${GOCACHE},uid=1001 GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o deep-inspection github.com/kubev2v/forklift/cmd/deep-inspection
 
-FROM registry.redhat.io/ubi10/ubi-minimal:10.1-1778576723
-RUN microdnf install -y \
-  virt-v2v \
-  virtio-win \
-  qemu-img \
-  libvirt-libs \
+FROM quay.io/centos/centos:stream9
+
+# Update packages to address security vulnerabilities (CVE fixes)
+RUN dnf install -y --allowerasing \
   libguestfs \
   libguestfs-tools \
   libguestfs-tools-c \
+  virt-v2v \
   qemu-kvm \
   nbdkit \
   nbdkit-vddk-plugin \
+  curl \
   ca-certificates \
-  sqlite-libs && microdnf clean all
+  sqlite-libs \
+  && dnf clean all \
+  && echo "Verifying nbdkit installation..." \
+  && (nbdkit --version || echo "WARNING: nbdkit command not found in PATH") \
+  && (rpm -ql nbdkit | head -5 || echo "WARNING: nbdkit package files not found") \
+  && echo "nbdkit installation verified"
 
 # nbdkit wrapper (for VDDK plugin)
 # Find nbdkit binary location from installed package
@@ -60,22 +65,15 @@ COPY --from=builder --chown=1001:0 /app/deep-inspection /usr/local/bin/deep-insp
 ENV LIBGUESTFS_BACKEND=direct
 ENTRYPOINT ["/usr/local/bin/deep-inspection"]
 
-ARG MTV_VERSION
-ARG REGISTRY
-ARG REVISION
-ARG CPE
-
 LABEL \
-    com.redhat.component="mtv-deep-inspection-container" \
-    cpe="cpe:/a:redhat:migration_toolkit_virtualization:${CPE}::el10" \
-    name="${REGISTRY}/mtv-deep-inspection-rhel10" \
-    license="Apache License 2.0" \
-    io.k8s.display-name="Migration Toolkit for Virtualization" \
-    io.k8s.description="Migration Toolkit for Virtualization - Deep Inspection" \
-    io.openshift.tags="migration,mtv,forklift" \
-    description="Migration Toolkit for Virtualization - Deep Inspection" \
-    summary="Migration Toolkit for Virtualization - Deep Inspection" \
-    vendor="Red Hat, Inc." \
-    maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
-    version="$MTV_VERSION" \
-    revision="$REVISION"
+  com.redhat.component="mtv-deep-inspection-rhel9-container" \
+  name="migration-toolkit-virtualization/mtv-deep-inspection-rhel9" \
+  license="Apache License 2.0" \
+  io.k8s.display-name="Migration Toolkit for Virtualization" \
+  io.k8s.description="Migration Toolkit for Virtualization - Deep Inspection" \
+  io.openshift.tags="migration,mtv,forklift" \
+  description="Migration Toolkit for Virtualization - Deep Inspection" \
+  summary="Migration Toolkit for Virtualization - Deep Inspection" \
+  vendor="Red Hat, Inc." \
+  maintainer="Migration Toolkit for Virtualization Team <migtoolkit-virt@redhat.com>" \
+  org.opencontainers.image.source="https://github.com/kubev2v/forklift"

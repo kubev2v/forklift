@@ -3595,7 +3595,12 @@ spec:
                 type: string
               deep_inspection_image_fqin:
                 description: Deep inspection image used by deep-inspection pods
-                example: quay.io/kubev2v/forklift-deep-inspection:latest
+                example: quay.io/kubev2v/deep-inspection:latest
+                type: string
+              deep_inspection_image_xfs_fqin:
+                description: Deep inspection image built on RHEL9, used when xfsCompatibility
+                  is enabled
+                example: quay.io/kubev2v/deep-inspection-rhel9:latest
                 type: string
               feature_auth_required:
                 description: 'Require authentication (default: true)'
@@ -11150,6 +11155,8 @@ spec:
           value: ${CONTROLLER_IMAGE}
         - name: DEEP_INSPECTION_IMAGE
           value: ${DEEP_INSPECTION_IMAGE}
+        - name: DEEP_INSPECTION_IMAGE_XFS
+          value: ${DEEP_INSPECTION_IMAGE_RHEL9}
         - name: API_IMAGE
           value: ${API_IMAGE}
         - name: MUST_GATHER_IMAGE
@@ -11495,6 +11502,11 @@ spec:
       - description: Deep inspection image used by deep-inspection pods
         displayName: Deep Inspection Image
         path: deep_inspection_image_fqin
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Deep inspection XFS image used by deep-inspection pods
+        displayName: Deep Inspection XFS Image
+        path: deep_inspection_image_xfs_fqin
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: VDDK image for VMware disk access

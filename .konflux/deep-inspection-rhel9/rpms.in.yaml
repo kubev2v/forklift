@@ -1,0 +1,20 @@
+packages:
+  - virt-v2v
+  - virtio-win
+  - qemu-img
+  - libvirt-libs
+  - libguestfs
+  - libguestfs-tools
+  - libguestfs-tools-c
+  - qemu-kvm
+  - nbdkit
+  - nbdkit-vddk-plugin
+  - ca-certificates
+  - sqlite-libs
+contentOrigin:
+  repofiles:
+    - ./redhat.repo
+context:
+  containerfile:
+    file: ../../build/deep-inspection-rhel9/Containerfile-downstream
+arches: [x86_64]
