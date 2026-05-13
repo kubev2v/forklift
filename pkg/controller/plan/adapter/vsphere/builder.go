@@ -590,12 +590,16 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 			}
 		} else {
 			vddkImage := settings.GetVDDKImage(r.Source.Provider.Spec.Settings)
+			uuid := vm.InstanceUUID
+			if uuid == "" {
+				uuid = vm.UUID
+			}
 
 			// Let CDI do the copying
 			dvSource = cdi.DataVolumeSource{
 				VDDK: &cdi.DataVolumeSourceVDDK{
 					BackingFile:  baseVolume(disk.File, r.Plan.IsWarm()),
-					UUID:         vm.UUID,
+					UUID:         uuid,
 					URL:          url,
 					SecretRef:    secret.Name,
 					Thumbprint:   thumbprint,
@@ -1300,6 +1304,10 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
+	uuid := vm.InstanceUUID
+	if uuid == "" {
+		uuid = vm.UUID
+	}
 
 	// Get a list of existing PVCs to avoid creating duplicates
 	pvcLabels := map[string]string{
@@ -1436,7 +1444,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				if v != nil && v.Warm != nil {
 					pvc.Annotations[planbase.AnnEndpoint] = r.Source.Provider.Spec.URL
 					pvc.Annotations[planbase.AnnImportBackingFile] = baseVolume(disk.File, r.Plan.IsWarm())
-					pvc.Annotations[planbase.AnnUUID] = vm.UUID
+					pvc.Annotations[planbase.AnnUUID] = uuid
 					pvc.Annotations[planbase.AnnThumbprint] = r.Source.Provider.Status.Fingerprint
 					pvc.Annotations[planbase.AnnVddkInitImageURL] = settings.GetVDDKImage(r.Source.Provider.Spec.Settings)
 					pvc.Annotations[planbase.AnnPodPhase] = "Succeeded"
