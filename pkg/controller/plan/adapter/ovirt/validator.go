@@ -264,3 +264,8 @@ func (r *Validator) GuestToolsInstalled(vmRef ref.Ref) (ok bool, err error) {
 	ok = true
 	return
 }
+
+// NO-OP
+func (r *Validator) ConsolidationNeeded(vmRef ref.Ref) (needed bool, err error) {
+	return
+}

@@ -11,27 +11,29 @@ import (
 
 // Predicates.
 var (
-	HasPreHook              libitr.Flag = 0x01
-	HasPostHook             libitr.Flag = 0x02
-	RequiresConversion      libitr.Flag = 0x04
-	CDIDiskCopy             libitr.Flag = 0x08
-	VirtV2vDiskCopy         libitr.Flag = 0x10
-	OpenstackImageMigration libitr.Flag = 0x20
-	VSphere                 libitr.Flag = 0x40
-	RunInspection           libitr.Flag = 0x80
+	HasPreHook                        libitr.Flag = 0x01
+	HasPostHook                       libitr.Flag = 0x02
+	RequiresConversion                libitr.Flag = 0x04
+	CDIDiskCopy                       libitr.Flag = 0x08
+	VirtV2vDiskCopy                   libitr.Flag = 0x10
+	OpenstackImageMigration           libitr.Flag = 0x20
+	VSphere                           libitr.Flag = 0x40
+	RunInspection                     libitr.Flag = 0x80
+	WaitForFinalSnapshotConsolidation libitr.Flag = 0x100
 )
 
 // Steps.
 const (
-	Initialize          = "Initialize"
-	Cutover             = "Cutover"
-	DiskAllocation      = "DiskAllocation"
-	DiskTransfer        = "DiskTransfer"
-	ImageConversion     = "ImageConversion"
-	DiskTransferV2v     = "DiskTransferV2v"
-	VMCreation          = "VirtualMachineCreation"
-	PreflightInspection = "PreflightInspection"
-	Unknown             = "Unknown"
+	Initialize                   = "Initialize"
+	Cutover                      = "Cutover"
+	DiskAllocation               = "DiskAllocation"
+	DiskTransfer                 = "DiskTransfer"
+	ImageConversion              = "ImageConversion"
+	DiskTransferV2v              = "DiskTransferV2v"
+	VMCreation                   = "VirtualMachineCreation"
+	PreflightInspection          = "PreflightInspection"
+	WaitForSnapshotConsolidation = "WaitForFinalSnapshotConsolidation"
+	Unknown                      = "Unknown"
 )
 
 type Migrator interface {

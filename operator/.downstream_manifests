@@ -4007,6 +4007,13 @@ spec:
                 description: 'ConfigMap name for vSphere OS mappings (default: forklift-vsphere-osmap)'
                 example: custom-vsphere-osmap
                 type: string
+              wait_for_final_snapshot_consolidation:
+                description: 'Wait for final snapshot removal and consolidation in
+                  a VMware warm migration (default: true)'
+                enum:
+                - "true"
+                - "false"
+                type: string
             type: object
           status:
             description: Status defines the observed state of ForkliftController

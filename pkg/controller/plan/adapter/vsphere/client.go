@@ -124,7 +124,7 @@ func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hosts util.Hosts
 		"snapshot", snapshot,
 		"children", false)
 
-	task, err := vm.RemoveSnapshot(context.TODO(), snapshot, false, nil)
+	task, err := vm.RemoveSnapshot(context.TODO(), snapshot, false, ptr.To(true))
 	if err != nil {
 		return "", liberr.Wrap(err)
 	}
@@ -316,6 +316,7 @@ func (r *Client) GetSnapshotDeltas(vmRef ref.Ref, snapshotId string, hosts util.
 // Check if a snapshot is removed
 func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (bool, error) {
 	r.Log.Info("Check Snapshot Remove", "vmRef", vmRef, "precopy", precopy)
+
 	taskInfo, err := r.getTaskById(vmRef, precopy.RemoveTaskId, hosts)
 	if err != nil {
 		return false, liberr.Wrap(err)

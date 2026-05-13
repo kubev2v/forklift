@@ -350,6 +350,7 @@ type VM struct {
 	CustomDef                []CustomFieldDef   `sql:""`
 	CustomValues             []CustomFieldValue `sql:""`
 	Tags                     []Tag              `sql:""`
+	ConsolidationNeeded      bool               `sql:""`
 }
 
 // Determine if current revision has been validated.
