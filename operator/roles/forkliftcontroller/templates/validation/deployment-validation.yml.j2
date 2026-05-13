@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
         - name: {{ validation_container_name }}
-          image: {{ validation_image_fqin }}
+          image: "{{ validation_image_fqin or lookup('env', 'VALIDATION_IMAGE') or lookup('env', 'RELATED_IMAGE_VALIDATION') }}"
           imagePullPolicy: {{ image_pull_policy }}
           ports:
             - name: opa
