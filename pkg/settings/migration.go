@@ -72,6 +72,8 @@ const (
 	AAPURL                                 = "AAP_URL"
 	AAPTokenSecretName                     = "AAP_TOKEN_SECRET_NAME"
 	AAPTimeout                             = "AAP_TIMEOUT"
+	AAPInsecureSkipVerify                  = "AAP_INSECURE_SKIP_VERIFY"
+	AAPCASecretName                        = "AAP_CA_SECRET_NAME"
 )
 
 // Default values for populator container resources
@@ -175,6 +177,10 @@ type Migration struct {
 	AAPTokenSecretName string
 	// AAPTimeoutSeconds is the default wall-clock timeout in seconds for AAP job polling when not set on the Hook.
 	AAPTimeoutSeconds int
+	// AAPInsecureSkipVerify skips TLS certificate verification when connecting to AAP.
+	AAPInsecureSkipVerify bool
+	// AAPCASecretName is the name of the Secret in the controller namespace holding a custom CA cert (key "ca.crt").
+	AAPCASecretName string
 }
 
 // Load settings.
@@ -415,6 +421,10 @@ func (r *Migration) Load() (err error) {
 			}
 			r.AAPTimeoutSeconds = n
 		}
+	}
+	r.AAPInsecureSkipVerify = getEnvBool(AAPInsecureSkipVerify, false)
+	if val, found := os.LookupEnv(AAPCASecretName); found {
+		r.AAPCASecretName = strings.TrimSpace(val)
 	}
 	if val, found := os.LookupEnv(DeepInspectionImage); found {
 		r.DeepInspectionImage = strings.TrimSpace(val)

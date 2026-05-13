@@ -27,6 +27,7 @@ func (r *Migrator) Itinerary(vm planapi.VM) *libitr.Itinerary {
 		Pipeline: libitr.Pipeline{
 			{Name: api.PhaseStarted},
 			{Name: api.PhasePreHook, All: PreHookFlag},
+			{Name: api.PhaseStorePowerState},
 			{Name: api.PhasePowerOffSource},
 			{Name: api.PhaseWaitForPowerOff},
 			{Name: PhaseCreateSnapshots},

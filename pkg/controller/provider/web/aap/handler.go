@@ -36,17 +36,12 @@ func (h *Handler) AddRoutes(e *gin.Engine) {
 
 // ListJobTemplates returns all configured AAP job templates (flat list). Pagination is handled inside pkg/lib/aap.
 func (h *Handler) ListJobTemplates(ctx *gin.Context) {
-	invNS := settings.Settings.Inventory.Namespace
-	if invNS == "" {
-		log.Error(nil, "inventory namespace not set for AAP handler")
-		ctx.Status(http.StatusInternalServerError)
-		return
-	}
+	ns := settings.ControllerNamespace()
 
 	if base.Settings.AuthRequired {
 		nsForAuth := ctx.Request.URL.Query().Get(base.NsParam)
 		if nsForAuth == "" {
-			nsForAuth = invNS
+			nsForAuth = ns
 		}
 		orig := ctx.Request.URL.RawQuery
 		q := ctx.Request.URL.Query()
@@ -69,7 +64,6 @@ func (h *Handler) ListJobTemplates(ctx *gin.Context) {
 		})
 		return
 	}
-	ns := invNS
 	token, err := aap.GetTokenFromSecretName(ctx.Request.Context(), h.Client, ns, m.AAPTokenSecretName)
 	if err != nil {
 		log.Error(err, "failed to read AAP token Secret")
@@ -93,7 +87,15 @@ func (h *Handler) ListJobTemplates(ctx *gin.Context) {
 	if m.AAPTimeoutSeconds > 0 {
 		httpTimeout = time.Duration(m.AAPTimeoutSeconds) * time.Second
 	}
-	cl := aap.NewClient(m.AAPURL, token, httpTimeout)
+
+	transport, tlsErr := aap.TLSTransportFromSettings(ctx.Request.Context(), h.Client, m.AAPInsecureSkipVerify, m.AAPCASecretName)
+	if tlsErr != nil {
+		log.Error(tlsErr, "failed to read AAP CA Secret")
+		ctx.JSON(http.StatusBadGateway, gin.H{"message": "failed to read AAP CA Secret"})
+		return
+	}
+
+	cl := aap.NewClient(m.AAPURL, token, httpTimeout, transport)
 	results, err := cl.ListAllJobTemplates(ctx.Request.Context(), maxJobs)
 	if err != nil {
 		log.Error(err, "AAP list job templates failed")

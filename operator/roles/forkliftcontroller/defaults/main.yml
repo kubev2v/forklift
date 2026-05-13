@@ -63,6 +63,8 @@ controller_migration_service_account: ""
 aap_url: ""
 aap_token_secret_name: ""
 aap_timeout: ""
+aap_insecure_skip_verify: false
+aap_ca_secret_name: ""
 profiler_volume_path: "/var/cache/profiler"
 
 inventory_volume_path: "/var/cache/inventory"

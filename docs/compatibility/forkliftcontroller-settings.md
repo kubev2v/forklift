@@ -225,6 +225,22 @@ For storage copy offload (XCOPY) feature:
 
 ---
 
+## Ansible Automation Platform (AAP) Settings
+
+Settings for the centralized AAP connection used by migration hooks and the job-template inventory endpoint.
+
+| Setting | Default | Environment Variable | Description |
+|---------|---------|---------------------|-------------|
+| `aap_url` | `""` | `AAP_URL` | AAP base URL (e.g. `https://aap.example.com`) |
+| `aap_token_secret_name` | `""` | `AAP_TOKEN_SECRET_NAME` | Secret name holding the AAP Bearer token (key `token`) |
+| `aap_timeout` | `""` | `AAP_TIMEOUT` | Default timeout (seconds) for AAP HTTP calls and job polling |
+| `aap_insecure_skip_verify` | `false` | `AAP_INSECURE_SKIP_VERIFY` | Skip TLS certificate verification for AAP connections |
+| `aap_ca_secret_name` | `""` | `AAP_CA_SECRET_NAME` | Secret name holding a custom CA certificate (key `ca.crt`) for AAP TLS |
+
+When `aap_insecure_skip_verify` is `true`, the controller will not verify the AAP server's TLS certificate. When `aap_ca_secret_name` is set (and insecure is `false`), the specified Secret's `ca.crt` key is used as the trusted CA for TLS verification instead of the system CA bundle.
+
+---
+
 ## Logging and Debugging
 
 | Setting | Default | Environment Variable | Description |

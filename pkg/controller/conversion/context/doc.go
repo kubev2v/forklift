@@ -77,6 +77,10 @@ type PodConfig struct {
 	// ExtraInitContainers are prepended to the pod's init container list before the VDDK sidecar.
 	// Used by callers that need provider-specific init work (e.g. NetApp Shift disk-perms fixer).
 	ExtraInitContainers []core.Container
+	// RequestKVM, when true, adds devices.kubevirt.io/kvm resource
+	// request/limit and the kubevirt.io/schedulable node selector so that
+	// virt-v2v runs with hardware virtualisation instead of emulation.
+	RequestKVM bool
 }
 
 // PodConfigFromSpec builds a PodConfig from a Conversion CR spec.
@@ -101,6 +105,7 @@ func PodConfigFromSpec(conversion *api.Conversion) PodConfig {
 	podConfig.PodAnnotations = conversion.Annotations
 	podConfig.PodNodeSelector = podSettings.NodeSelector
 	podConfig.Affinity = podSettings.Affinity
+	podConfig.RequestKVM = podSettings.RequestKVM
 	if podSettings.ServiceAccount != "" {
 		podConfig.ServiceAccount = podSettings.ServiceAccount
 	}

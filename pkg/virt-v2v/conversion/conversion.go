@@ -112,10 +112,11 @@ func (c *Conversion) addInspectorExtraArgs(cmd utils.CommandBuilder) {
 	}
 }
 
-// addNoFstrimUnlessXfsCompat passes --no-fstrim unless XFS compatibility mode is enabled
-// the el9 v2v is missing the --no-fstrim flag so the conversion would fail
+// addNoFstrimUnlessXfsCompat passes --no-fstrim when the binary supports it
+// and XFS compatibility mode is not enabled. The --no-fstrim flag is a
+// RHEL-only downstream patch. upstream virt-v2v (CentOS/Fedora) lacks it.
 func (c *Conversion) addNoFstrimUnlessXfsCompat(cmd utils.CommandBuilder) {
-	if !c.XfsCompatibility {
+	if !c.XfsCompatibility && c.SupportsNoFstrim {
 		cmd.AddFlag("--no-fstrim")
 	}
 }

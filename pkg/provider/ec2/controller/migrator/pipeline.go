@@ -36,7 +36,7 @@ func (r *Migrator) Pipeline(vm planapi.VM) (pipeline []*planapi.Step, err error)
 				},
 			})
 
-		case api.PhasePowerOffSource, api.PhaseWaitForPowerOff:
+		case api.PhaseStorePowerState, api.PhasePowerOffSource, api.PhaseWaitForPowerOff:
 			if step.Name == api.PhasePowerOffSource {
 				pipeline = append(pipeline, &planapi.Step{
 					Task: planapi.Task{

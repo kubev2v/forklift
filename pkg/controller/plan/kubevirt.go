@@ -197,6 +197,8 @@ type conversionResources struct {
 	volumes        []core.Volume
 	mounts         []core.VolumeMount
 	devices        []core.VolumeDevice
+	extraVolumes   []core.Volume
+	extraMounts    []core.VolumeMount
 	secret         *core.Secret
 	inPlace        bool
 	vddkImage      string
@@ -213,6 +215,8 @@ type conversionResources struct {
 func (r *KubeVirt) resolveConversionResources(vm *plan.VMStatus, podType convctx.V2vPodType, step *plan.Step) (res conversionResources, err error) {
 	res.podConfig = convctx.PodConfigFromPlan(r.Plan)
 	res.podConfig.Affinity = r.getConvertorAffinity()
+
+	res.podConfig.RequestKVM = shouldRequestKVM(r.Plan.Provider.Source)
 
 	var vmVolumes []cnv.Volume
 	if podType == convctx.VirtV2vConversionPod {
@@ -242,7 +246,7 @@ func (r *KubeVirt) resolveConversionResources(vm *plan.VMStatus, podType convctx
 		}
 	}
 
-	res.volumes, res.mounts, res.devices, err = r.podVolumeMounts(vmVolumes, vddkConfigMap, res.pvcs, vm)
+	res.volumes, res.mounts, res.devices, res.extraVolumes, res.extraMounts, err = r.podVolumeMounts(vmVolumes, vddkConfigMap, res.pvcs, vm)
 	if err != nil {
 		return
 	}
@@ -413,7 +417,17 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 		return r.checkProviderReady(vm.ID)
 	}
 
-	diskRefs := convbuilder.DiskRefsFromVolumes(resources.volumes, resources.mounts, resources.devices, resources.pvcs)
+	extraVolNames := make(map[string]bool, len(resources.extraVolumes))
+	for _, v := range resources.extraVolumes {
+		extraVolNames[v.Name] = true
+	}
+	var diskVolumes []core.Volume
+	for _, v := range resources.volumes {
+		if !extraVolNames[v.Name] {
+			diskVolumes = append(diskVolumes, v)
+		}
+	}
+	diskRefs := convbuilder.DiskRefsFromVolumes(diskVolumes, resources.mounts, resources.devices, resources.pvcs)
 
 	envSettings := make(map[string]string, len(resources.podConfig.Environment))
 	for _, ev := range resources.podConfig.Environment {
@@ -442,17 +456,21 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 					Name:      resources.secret.Name,
 				},
 			},
-			Image:          convctx.GetVirtV2vImage(&resources.podConfig),
-			Settings:       envSettings,
-			VDDKImage:      resources.vddkImage,
-			LocalMigration: resources.localMigration,
+			Image:            convctx.GetVirtV2vImage(&resources.podConfig),
+			XfsCompatibility: resources.podConfig.XfsCompatibility,
+			Settings:         envSettings,
+			VDDKImage:        resources.vddkImage,
+			LocalMigration:   resources.localMigration,
 			PodSettings: api.PodSettings{
 				ServiceAccount:             resolveServiceAccount(r.Plan),
 				Affinity:                   resources.podConfig.Affinity,
 				GenerateName:               resources.podConfig.GenerateName,
 				TransferNetworkAnnotations: resources.podConfig.TransferNetworkAnnotations,
 				NodeSelector:               resources.podConfig.PodNodeSelector,
+				RequestKVM:                 resources.podConfig.RequestKVM,
 			},
+			ExtraVolumes: resources.extraVolumes,
+			ExtraMounts:  resources.extraMounts,
 		},
 	}
 
@@ -733,8 +751,9 @@ func (r *KubeVirt) CreateDeepInspectionConversion(
 		Settings: map[string]string{
 			api.SpecSettingsSnapshotMorefKey: snapshotMoref,
 		},
-		VDDKImage:      settings.GetVDDKImage(r.Source.Provider.Spec.Settings),
-		DiskEncryption: diskEncryption,
+		XfsCompatibility: r.Plan.Spec.XfsCompatibility,
+		VDDKImage:        settings.GetVDDKImage(r.Source.Provider.Spec.Settings),
+		DiskEncryption:   diskEncryption,
 		PodSettings: api.PodSettings{
 			ServiceAccount: resolveServiceAccount(r.Plan),
 		},
@@ -1855,7 +1874,7 @@ func (r *KubeVirt) createPodToBindPVCs(vm *plan.VMStatus, pvcNames []string) (er
 	if sa := resolveServiceAccount(r.Plan); sa != "" {
 		pod.Spec.ServiceAccountName = sa
 	}
-	r.setKvmOnPodSpec(&pod.Spec)
+	convbuilder.SetKvmOnPodSpec(&pod.Spec, shouldRequestKVM(r.Plan.Provider.Source))
 
 	err = r.Client.Create(context.TODO(), pod, &client.CreateOptions{})
 	if err != nil {
@@ -1871,25 +1890,16 @@ func (r *KubeVirt) getListOptionsNamespaced() (listOptions *client.ListOptions) 
 	}
 }
 
-func (r *KubeVirt) setKvmOnPodSpec(podSpec *core.PodSpec) {
+// shouldRequestKVM returns true for provider types that need KVM passthrough.
+func shouldRequestKVM(provider *api.Provider) bool {
 	if Settings.VirtV2vDontRequestKVM {
-		return
+		return false
 	}
-	switch *r.Plan.Provider.Source.Spec.Type {
+	switch provider.Type() {
 	case api.VSphere, api.Ova, api.HyperV:
-		if podSpec.NodeSelector == nil {
-			podSpec.NodeSelector = make(map[string]string)
-		}
-		podSpec.NodeSelector["kubevirt.io/schedulable"] = "true"
-		container := &podSpec.Containers[0]
-		if container.Resources.Limits == nil {
-			container.Resources.Limits = make(map[core.ResourceName]resource.Quantity)
-		}
-		container.Resources.Limits["devices.kubevirt.io/kvm"] = resource.MustParse("1")
-		if container.Resources.Requests == nil {
-			container.Resources.Requests = make(map[core.ResourceName]resource.Quantity)
-		}
-		container.Resources.Requests["devices.kubevirt.io/kvm"] = resource.MustParse("1")
+		return true
+	default:
+		return false
 	}
 }
 
@@ -2971,7 +2981,7 @@ func (r *KubeVirt) buildInspectionPodEnvironment(env []core.EnvVar, vm *plan.VMS
 	return newEnv, true, nil
 }
 
-func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, vm *plan.VMStatus) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, err error) {
+func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.ConfigMap, pvcs []*core.PersistentVolumeClaim, vm *plan.VMStatus) (volumes []core.Volume, mounts []core.VolumeMount, devices []core.VolumeDevice, extraVolumes []core.Volume, extraMounts []core.VolumeMount, err error) {
 	pvcsByName := make(map[string]*core.PersistentVolumeClaim)
 	for _, pvc := range pvcs {
 		pvcsByName[pvc.Name] = pvc
@@ -3071,18 +3081,22 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 		}
 
 		// Mount provider storage (common pattern)
-		volumes = append(volumes, core.Volume{
+		providerVol := core.Volume{
 			Name: volumeName,
 			VolumeSource: core.VolumeSource{
 				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
 					ClaimName: pvc.Name,
 				},
 			},
-		})
-		mounts = append(mounts, core.VolumeMount{
+		}
+		providerMount := core.VolumeMount{
 			Name:      volumeName,
 			MountPath: mountPath,
-		})
+		}
+		volumes = append(volumes, providerVol)
+		mounts = append(mounts, providerMount)
+		extraVolumes = append(extraVolumes, providerVol)
+		extraMounts = append(extraMounts, providerMount)
 	case api.VSphere:
 		mounts = append(mounts,
 			core.VolumeMount{
@@ -3180,11 +3194,21 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 // DiskRefsFromPodVolumeMounts calls podVolumeMounts and converts the
 // PVC-backed volumes into DiskRef entries for a Conversion CR.
 func (r *KubeVirt) DiskRefsFromPodVolumeMounts(vmVolumes []cnv.Volume, pvcs []*core.PersistentVolumeClaim, vm *plan.VMStatus, podType int) (refs []api.DiskRef, err error) {
-	volumes, mounts, devices, err := r.podVolumeMounts(vmVolumes, nil, pvcs, vm)
+	volumes, mounts, devices, extraVols, _, err := r.podVolumeMounts(vmVolumes, nil, pvcs, vm)
 	if err != nil {
 		return
 	}
-	return convbuilder.DiskRefsFromVolumes(volumes, mounts, devices, pvcs), nil
+	extraNames := make(map[string]bool, len(extraVols))
+	for _, v := range extraVols {
+		extraNames[v.Name] = true
+	}
+	var diskVolumes []core.Volume
+	for _, v := range volumes {
+		if !extraNames[v.Name] {
+			diskVolumes = append(diskVolumes, v)
+		}
+	}
+	return convbuilder.DiskRefsFromVolumes(diskVolumes, mounts, devices, pvcs), nil
 }
 
 func (r *KubeVirt) findConfigMapInNamespace(name string, namespace string) (configMap *core.ConfigMap, exists bool, err error) {
