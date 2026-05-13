@@ -19,6 +19,7 @@ const (
 	VirtV2vImage                           = "VIRT_V2V_IMAGE"
 	VirtV2vImageXFS                        = "VIRT_V2V_IMAGE_XFS"
 	DeepInspectionImage                    = "DEEP_INSPECTION_IMAGE"
+	DeepInspectionImageXFS                 = "DEEP_INSPECTION_IMAGE_XFS"
 	vddkImage                              = "VDDK_IMAGE"
 	PrecopyInterval                        = "PRECOPY_INTERVAL"
 	BlockerGracePeriodMinutes              = "BLOCKER_GRACE_PERIOD_MINUTES"
@@ -72,6 +73,8 @@ const (
 	AAPURL                                 = "AAP_URL"
 	AAPTokenSecretName                     = "AAP_TOKEN_SECRET_NAME"
 	AAPTimeout                             = "AAP_TIMEOUT"
+	AAPInsecureSkipVerify                  = "AAP_INSECURE_SKIP_VERIFY"
+	AAPCASecretName                        = "AAP_CA_SECRET_NAME"
 )
 
 // Default values for populator container resources
@@ -104,6 +107,8 @@ type Migration struct {
 	VirtV2vImageXFS string
 	// Default image for deep inspection pods when Conversion spec.Image is empty
 	DeepInspectionImage string
+	// Deep inspection image built on RHEL9, used when XfsCompatibility is requested
+	DeepInspectionImageXFS string
 	// Virt-v2v require KVM flags for guest conversion
 	VirtV2vDontRequestKVM bool
 	// OCP Export token TTL minutes
@@ -175,6 +180,10 @@ type Migration struct {
 	AAPTokenSecretName string
 	// AAPTimeoutSeconds is the default wall-clock timeout in seconds for AAP job polling when not set on the Hook.
 	AAPTimeoutSeconds int
+	// AAPInsecureSkipVerify skips TLS certificate verification when connecting to AAP.
+	AAPInsecureSkipVerify bool
+	// AAPCASecretName is the name of the Secret in the controller namespace holding a custom CA cert (key "ca.crt").
+	AAPCASecretName string
 }
 
 // Load settings.
@@ -416,8 +425,15 @@ func (r *Migration) Load() (err error) {
 			r.AAPTimeoutSeconds = n
 		}
 	}
+	r.AAPInsecureSkipVerify = getEnvBool(AAPInsecureSkipVerify, false)
+	if val, found := os.LookupEnv(AAPCASecretName); found {
+		r.AAPCASecretName = strings.TrimSpace(val)
+	}
 	if val, found := os.LookupEnv(DeepInspectionImage); found {
 		r.DeepInspectionImage = strings.TrimSpace(val)
+	}
+	if val, found := os.LookupEnv(DeepInspectionImageXFS); found {
+		r.DeepInspectionImageXFS = strings.TrimSpace(val)
 	}
 	return
 }
