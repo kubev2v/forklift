@@ -3,6 +3,7 @@ package health
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -100,6 +101,7 @@ func analyzePod(pod *corev1.Pod) PodHealth {
 	health := PodHealth{
 		Name:      pod.Name,
 		Namespace: pod.Namespace,
+		Image:     getContainerImages(pod),
 		Status:    string(pod.Status.Phase),
 		Ready:     isPodReady(pod),
 		Restarts:  getTotalRestarts(pod),
@@ -154,6 +156,15 @@ func isPodReady(pod *corev1.Pod) bool {
 		}
 	}
 	return false
+}
+
+// getContainerImages returns a comma-separated list of container images for a pod
+func getContainerImages(pod *corev1.Pod) string {
+	images := make([]string, 0, len(pod.Spec.Containers))
+	for _, c := range pod.Spec.Containers {
+		images = append(images, c.Image)
+	}
+	return strings.Join(images, ", ")
 }
 
 // getTotalRestarts returns the total restart count across all containers

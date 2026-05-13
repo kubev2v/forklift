@@ -121,6 +121,7 @@ func (r *HealthReport) buildPodsSection(b *describe.Builder) {
 
 	headers := []describe.TableColumn{
 		{Display: "NAME", Key: "name"},
+		{Display: "IMAGE", Key: "image"},
 		{Display: "STATUS", Key: "status", ColorFunc: output.ColorizeStatus},
 		{Display: "RESTARTS", Key: "restarts"},
 		{Display: "ISSUES", Key: "issues"},
@@ -134,6 +135,7 @@ func (r *HealthReport) buildPodsSection(b *describe.Builder) {
 		}
 		rows = append(rows, map[string]string{
 			"name":     pod.Name,
+			"image":    pod.Image,
 			"status":   pod.Status,
 			"restarts": fmt.Sprintf("%d", pod.Restarts),
 			"issues":   issues,

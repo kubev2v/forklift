@@ -66,6 +66,8 @@ type PatchPlanOptions struct {
 	RunPreflightInspection         bool
 	RDMAsLun                       bool
 	ServiceAccount                 string
+	TagMappingDisabled             bool
+	TagMappingLabelTags            []string
 
 	// Flag change tracking
 	UseCompatibilityModeChanged           bool
@@ -85,6 +87,8 @@ type PatchPlanOptions struct {
 	EnableNestedVirtualizationChanged     bool
 	RDMAsLunChanged                       bool
 	ServiceAccountChanged                 bool
+	TagMappingDisabledChanged             bool
+	TagMappingLabelTagsChanged            bool
 }
 
 // PatchPlan patches an existing migration plan
@@ -400,7 +404,7 @@ func PatchPlan(opts PatchPlanOptions) error {
 
 	// Update preserve cluster CPU model if flag was changed
 	if opts.PreserveClusterCPUModelChanged {
-		patchSpec["preserveClusterCPUModel"] = opts.PreserveClusterCPUModel
+		patchSpec["preserveClusterCpuModel"] = opts.PreserveClusterCPUModel
 		klog.V(2).Infof("Updated preserve cluster CPU model to %t", opts.PreserveClusterCPUModel)
 		planUpdated = true
 	}
@@ -505,6 +509,24 @@ func PatchPlan(opts PatchPlanOptions) error {
 			patchSpec["serviceAccount"] = nil
 			klog.V(2).Infof("Cleared service account override")
 		}
+		planUpdated = true
+	}
+
+	// Update tag mapping if either flag was changed
+	if opts.TagMappingDisabledChanged || opts.TagMappingLabelTagsChanged {
+		tagMapping := map[string]interface{}{}
+		if opts.TagMappingDisabledChanged {
+			tagMapping["disabled"] = opts.TagMappingDisabled
+		}
+		if opts.TagMappingLabelTagsChanged {
+			labelTags := make([]interface{}, len(opts.TagMappingLabelTags))
+			for i, tag := range opts.TagMappingLabelTags {
+				labelTags[i] = tag
+			}
+			tagMapping["labelTags"] = labelTags
+		}
+		patchSpec["tagMapping"] = tagMapping
+		klog.V(2).Infof("Updated tag mapping: %v", tagMapping)
 		planUpdated = true
 	}
 

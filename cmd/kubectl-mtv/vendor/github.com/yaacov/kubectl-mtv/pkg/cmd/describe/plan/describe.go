@@ -88,7 +88,7 @@ func buildSpecSection(b *describe.Builder, plan *unstructured.Unstructured) {
 	targetNamespace, _, _ := unstructured.NestedString(plan.Object, "spec", "targetNamespace")
 	transferNetwork, _, _ := unstructured.NestedString(plan.Object, "spec", "transferNetwork", "name")
 	description, _, _ := unstructured.NestedString(plan.Object, "spec", "description")
-	preserveCPUModel, _, _ := unstructured.NestedBool(plan.Object, "spec", "preserveClusterCPUModel")
+	preserveCPUModel, _, _ := unstructured.NestedBool(plan.Object, "spec", "preserveClusterCpuModel")
 	preserveStaticIPs, _, _ := unstructured.NestedBool(plan.Object, "spec", "preserveStaticIPs")
 	enableNestedVirt, enableNestedVirtExists, _ := unstructured.NestedBool(plan.Object, "spec", "enableNestedVirtualization")
 	xfsCompatibility, _, _ := unstructured.NestedBool(plan.Object, "spec", "xfsCompatibility")
