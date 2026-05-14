@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -115,8 +116,10 @@ type AppConfig struct {
 	// V2V_windowsRegistryNetworkConfig
 	WindowsRegistryNetworkConfig bool
 	// V2V_xfsCompatibility — use XFS-capable virt-v2v; omit --no-fstrim when true
-	// the el9 v2v is missing the --no-fstrim flag so the conversion would fail
 	XfsCompatibility bool
+	// SupportsNoFstrim is true when the virt-v2v binary supports --no-fstrim
+	// (RHEL-only downstream patch. upstream CentOS/Fedora builds lack this flag)
+	SupportsNoFstrim bool
 
 	// V2V_multipleIPsPerNic
 	MultipleIpsPerNicName string
@@ -165,6 +168,8 @@ func (s *AppConfig) Load() (err error) {
 	flag.BoolVar(&s.XfsCompatibility, "xfs-compatibility", s.getEnvBool(EnvXfsCompatibilityName, false), "XFS compatibility mode: do not pass --no-fstrim to virt-v2v")
 	s.RemoteInspectionDisks = s.getRemoteInspectionDisks()
 	flag.Parse()
+
+	s.SupportsNoFstrim = detectNoFstrimSupport("/etc/os-release")
 
 	return s.validate()
 }
@@ -241,6 +246,29 @@ func (s *AppConfig) getEnvBool(name string, def bool) bool {
 
 func (s *AppConfig) envMissingError(env string) error {
 	return fmt.Errorf("the env variable '%s' is needed for the migration", env)
+}
+
+// detectNoFstrimSupport reads an os-release file and returns true if the
+// OS is RHEL, which ships a downstream virt-v2v with --no-fstrim support.
+// Upstream builds (CentOS Stream, Fedora) lack this flag.
+func detectNoFstrimSupport(osReleasePath string) bool {
+	f, err := os.Open(osReleasePath)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = f.Close() }()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if key, val, ok := strings.Cut(line, "="); ok {
+			if strings.TrimSpace(key) == "ID" {
+				id := strings.Trim(strings.TrimSpace(val), "\"'")
+				return id == "rhel"
+			}
+		}
+	}
+	return false
 }
 
 func (s *AppConfig) validate() error {

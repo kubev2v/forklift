@@ -37,6 +37,13 @@ Topics:
 
 Returns: command flags (with required/optional markers), usage pattern, and examples as structured data.`,
 		OutputSchema: mtvOutputSchema,
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "MTV Help",
+			ReadOnlyHint:    true,
+			IdempotentHint:  true,
+			DestructiveHint: ptrBool(false),
+			OpenWorldHint:   ptrBool(false),
+		},
 	}
 }
 

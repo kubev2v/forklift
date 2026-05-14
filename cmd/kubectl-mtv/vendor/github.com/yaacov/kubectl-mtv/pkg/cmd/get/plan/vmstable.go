@@ -402,6 +402,11 @@ func fetchInventoryVMs(
 		return nil
 	}
 
+	providerType, _ := providerClient.GetProviderType()
+	if providerType == "ec2" {
+		data = inventory.ExtractEC2Objects(data)
+	}
+
 	vmMap := map[string]map[string]interface{}{}
 	if dataArray, ok := data.([]interface{}); ok {
 		for _, item := range dataArray {

@@ -85,6 +85,10 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig Glo
 	var convertorNodeSelector []string
 	var convertorAffinity string
 
+	// Tag mapping flags (vSphere only)
+	var tagMappingDisabled bool
+	var tagMappingLabelTags []string
+
 	var dryRun bool
 	var outputFormat string
 
@@ -451,6 +455,14 @@ Affinity Syntax (KARL):
 				planSpec.ConvertorAffinity = affinity
 			}
 
+			// Handle tag mapping (vSphere only)
+			if tagMappingDisabled || len(tagMappingLabelTags) > 0 {
+				planSpec.TagMapping = &forkliftv1beta1.TagMapping{
+					Disabled:  tagMappingDisabled,
+					LabelTags: tagMappingLabelTags,
+				}
+			}
+
 			// Handle customization scripts reference (ConfigMap)
 			if customizationScripts != "" {
 				scriptsNamespace, scriptsName, err := flags.ParseResourceRef(customizationScripts, namespace)
@@ -566,7 +578,7 @@ Affinity Syntax (KARL):
 	cmd.Flags().BoolVar(&planSpec.Archived, "archived", false, "Whether this plan should be archived")
 	cmd.Flags().BoolVar(&planSpec.PVCNameTemplateUseGenerateName, "pvc-name-template-use-generate-name", true, "Use generateName instead of name for PVC name template")
 	cmd.Flags().BoolVar(&planSpec.DeleteGuestConversionPod, "delete-guest-conversion-pod", false, "Delete guest conversion pod after successful migration")
-	cmd.Flags().BoolVar(&planSpec.DeleteVmOnFailMigration, "delete-vm-on-fail-migration", false, "Delete target VM when migration fails")
+	cmd.Flags().BoolVar(&planSpec.DeleteVmOnFailMigration, "delete-vm-on-fail-migration", true, "Delete target VM when migration fails")
 	cmd.Flags().BoolVar(&planSpec.SkipGuestConversion, "skip-guest-conversion", false, "Skip the guest conversion process (raw disk copy mode)")
 	cmd.Flags().BoolVar(&planSpec.RunPreflightInspection, "run-preflight-inspection", true, "Run preflight inspection on VM base disks before starting disk transfer")
 	cmd.Flags().StringVar(&installLegacyDrivers, "install-legacy-drivers", "auto", "Install legacy Windows drivers (true/false/auto)")
@@ -599,6 +611,8 @@ Affinity Syntax (KARL):
 	cmd.Flags().BoolVar(&planSpec.XfsCompatibility, "xfs-compatibility", false, "Use XFS-compatible virt-v2v image for this plan")
 	cmd.Flags().BoolVar(&planSpec.RDMAsLun, "rdm-as-lun", false, "Map VMware RDM disks as LUN devices (SCSI passthrough) in the target VM (vSphere only)")
 	cmd.Flags().StringVar(&planSpec.ServiceAccount, "service-account", "", "ServiceAccount for migration pods in the target namespace (overrides global setting)")
+	cmd.Flags().BoolVar(&tagMappingDisabled, "tag-mapping-disabled", false, "Disable vSphere tag-to-label conversion entirely (vSphere only)")
+	cmd.Flags().StringSliceVar(&tagMappingLabelTags, "tag-mapping-label-tags", nil, "Only convert these vSphere tag categories to labels (comma-separated, vSphere only)")
 
 	_ = cmd.RegisterFlagCompletionFunc("source", completion.ProviderNameCompletion(kubeConfigFlags))
 	_ = cmd.RegisterFlagCompletionFunc("target", completion.ProviderNameCompletionByType(kubeConfigFlags, "openshift"))

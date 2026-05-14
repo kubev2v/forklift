@@ -41,6 +41,10 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	var rdmAsLun bool
 	var serviceAccount string
 
+	// Tag mapping flags (vSphere only)
+	var tagMappingDisabled bool
+	var tagMappingLabelTags []string
+
 	// Change tracking for new bool flags
 	var skipZoneNodeSelectorChanged bool
 	var xfsCompatibilityChanged bool
@@ -48,6 +52,8 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	var enableNestedVirtualizationChanged bool
 	var rdmAsLunChanged bool
 	var serviceAccountChanged bool
+	var tagMappingDisabledChanged bool
+	var tagMappingLabelTagsChanged bool
 
 	// Missing flags from create plan
 	var description string
@@ -135,6 +141,8 @@ Affinity Syntax (KARL):
 			enableNestedVirtualizationChanged = cmd.Flags().Changed("enable-nested-virtualization")
 			rdmAsLunChanged = cmd.Flags().Changed("rdm-as-lun")
 			serviceAccountChanged = cmd.Flags().Changed("service-account")
+			tagMappingDisabledChanged = cmd.Flags().Changed("tag-mapping-disabled")
+			tagMappingLabelTagsChanged = cmd.Flags().Changed("tag-mapping-label-tags")
 
 			return plan.PatchPlan(plan.PatchPlanOptions{
 				ConfigFlags: kubeConfigFlags,
@@ -183,6 +191,8 @@ Affinity Syntax (KARL):
 				RunPreflightInspection:         runPreflightInspection,
 				RDMAsLun:                       rdmAsLun,
 				ServiceAccount:                 serviceAccount,
+				TagMappingDisabled:             tagMappingDisabled,
+				TagMappingLabelTags:            tagMappingLabelTags,
 
 				// Flag change tracking
 				UseCompatibilityModeChanged:           useCompatibilityModeChanged,
@@ -202,6 +212,8 @@ Affinity Syntax (KARL):
 				EnableNestedVirtualizationChanged:     enableNestedVirtualizationChanged,
 				RDMAsLunChanged:                       rdmAsLunChanged,
 				ServiceAccountChanged:                 serviceAccountChanged,
+				TagMappingDisabledChanged:             tagMappingDisabledChanged,
+				TagMappingLabelTagsChanged:            tagMappingLabelTagsChanged,
 			})
 		},
 	}
@@ -249,6 +261,8 @@ Affinity Syntax (KARL):
 	cmd.Flags().BoolVar(&runPreflightInspection, "run-preflight-inspection", true, "Run preflight inspection on VM base disks before starting disk transfer")
 	cmd.Flags().BoolVar(&rdmAsLun, "rdm-as-lun", false, "Map VMware RDM disks as LUN devices (SCSI passthrough) in the target VM (vSphere only)")
 	cmd.Flags().StringVar(&serviceAccount, "service-account", "", "ServiceAccount for migration pods in the target namespace (overrides global setting)")
+	cmd.Flags().BoolVar(&tagMappingDisabled, "tag-mapping-disabled", false, "Disable vSphere tag-to-label conversion entirely (vSphere only)")
+	cmd.Flags().StringSliceVar(&tagMappingLabelTags, "tag-mapping-label-tags", nil, "Only convert these vSphere tag categories to labels (comma-separated, vSphere only)")
 
 	// Add completion for migration type flag
 	if err := cmd.RegisterFlagCompletionFunc("migration-type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

@@ -63,6 +63,8 @@ controller_migration_service_account: ""
 aap_url: ""
 aap_token_secret_name: ""
 aap_timeout: ""
+aap_insecure_skip_verify: false
+aap_ca_secret_name: ""
 profiler_volume_path: "/var/cache/profiler"
 
 inventory_volume_path: "/var/cache/inventory"
@@ -168,6 +170,7 @@ must_gather_image_fqin: "{{ lookup( 'env', 'MUST_GATHER_IMAGE') or lookup( 'env'
 virt_v2v_image_fqin: "{{ lookup( 'env', 'VIRT_V2V_IMAGE') or lookup( 'env', 'RELATED_IMAGE_VIRT_V2V') }}"
 virt_v2v_image_xfs_fqin: "{{ lookup( 'env', 'VIRT_V2V_IMAGE_XFS') or lookup( 'env', 'RELATED_IMAGE_VIRT_V2V_XFS') }}"
 deep_inspection_image_fqin: "{{ lookup( 'env', 'DEEP_INSPECTION_IMAGE') or lookup( 'env', 'RELATED_IMAGE_DEEP_INSPECTION') }}"
+deep_inspection_image_xfs_fqin: "{{ lookup( 'env', 'DEEP_INSPECTION_IMAGE_XFS') or lookup( 'env', 'RELATED_IMAGE_DEEP_INSPECTION_XFS') }}"
 virt_v2v_dont_request_kvm: "{{ lookup( 'env', 'VIRT_V2V_DONT_REQUEST_KVM') }}"
 virt_v2v_extra_args: "{{ lookup( 'env', 'VIRT_V2V_EXTRA_ARGS') }}"
 virt_v2v_inspector_extra_args: "{{ lookup( 'env', 'VIRT_V2V_INSPECTOR_EXTRA_ARGS') }}"

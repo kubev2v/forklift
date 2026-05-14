@@ -29,6 +29,11 @@ func GetMTVWriteTool(registry *discovery.Registry) *mcp.Tool {
 		Name:         "mtv_write",
 		Description:  description,
 		OutputSchema: mtvOutputSchema,
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "MTV Write",
+			DestructiveHint: ptrBool(true),
+			OpenWorldHint:   ptrBool(false),
+		},
 	}
 }
 

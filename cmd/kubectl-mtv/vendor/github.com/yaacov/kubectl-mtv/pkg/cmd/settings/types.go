@@ -49,6 +49,8 @@ const (
 	CategoryValidation SettingCategory = "validation"
 	// CategoryCLIDownload represents CLI download service resource settings.
 	CategoryCLIDownload SettingCategory = "cli-download"
+	// CategoryMCP represents MCP server settings.
+	CategoryMCP SettingCategory = "mcp-server"
 	// CategoryOVAProxy represents OVA proxy resource settings.
 	CategoryOVAProxy SettingCategory = "ova-proxy"
 	// CategoryConfigMaps represents ConfigMap name settings.
@@ -104,6 +106,7 @@ var CategoryOrder = []SettingCategory{
 	CategoryUIPlugin,
 	CategoryValidation,
 	CategoryCLIDownload,
+	CategoryMCP,
 	CategoryOVAProxy,
 	CategoryConfigMaps,
 	CategoryAdvanced,
@@ -132,18 +135,7 @@ var SupportedSettings = map[string]SettingDefinition{
 		Name:        "populator_vsphere_copy_offload_image_fqin",
 		Type:        TypeString,
 		Default:     "",
-		Description: "vSphere copy offload populator image (Forklift >= 2.12)",
-		Category:    CategoryImage,
-	},
-	// TODO: Remove populator_vsphere_xcopy_volume_image_fqin once all Forklift
-	// servers older than 2.12 are out of support. New servers use
-	// populator_vsphere_copy_offload_image_fqin; the old key is kept so the CLI
-	// can still set/read the field on older ForkliftController CRs.
-	"populator_vsphere_xcopy_volume_image_fqin": {
-		Name:        "populator_vsphere_xcopy_volume_image_fqin",
-		Type:        TypeString,
-		Default:     "",
-		Description: "vSphere xcopy populator image (Forklift < 2.12, use populator_vsphere_copy_offload_image_fqin for newer)",
+		Description: "vSphere copy offload populator image",
 		Category:    CategoryImage,
 	},
 
@@ -200,8 +192,29 @@ var SupportedSettings = map[string]SettingDefinition{
 	"feature_ova_appliance_management": {
 		Name:        "feature_ova_appliance_management",
 		Type:        TypeBool,
-		Default:     false,
+		Default:     true,
 		Description: "Enable appliance management for OVF-based providers",
+		Category:    CategoryFeature,
+	},
+	"feature_vsphere_vmware_driver_removal": {
+		Name:        "feature_vsphere_vmware_driver_removal",
+		Type:        TypeBool,
+		Default:     false,
+		Description: "Enable VMware driver removal during vSphere migrations",
+		Category:    CategoryFeature,
+	},
+	"feature_windows_registry_network_config": {
+		Name:        "feature_windows_registry_network_config",
+		Type:        TypeBool,
+		Default:     false,
+		Description: "Enable Windows registry-based network configuration",
+		Category:    CategoryFeature,
+	},
+	"feature_mcp_server": {
+		Name:        "feature_mcp_server",
+		Type:        TypeBool,
+		Default:     false,
+		Description: "Enable MCP server deployment for AI assistant integration",
 		Category:    CategoryFeature,
 	},
 
@@ -260,6 +273,13 @@ var SupportedSettings = map[string]SettingDefinition{
 		Type:        TypeInt,
 		Default:     10,
 		Description: "Maximum cleanup retry attempts",
+		Category:    CategoryPerformance,
+	},
+	"controller_blocker_grace_period_minutes": {
+		Name:        "controller_blocker_grace_period_minutes",
+		Type:        TypeInt,
+		Default:     5,
+		Description: "Grace period in minutes before blocking conditions stop a migration",
 		Category:    CategoryPerformance,
 	},
 	"controller_snapshot_removal_check_retries": {
@@ -502,10 +522,40 @@ var SupportedSettings = map[string]SettingDefinition{
 	},
 	"aap_timeout": {
 		Name:        "aap_timeout",
-		Type:        TypeInt,
-		Default:     0,
+		Type:        TypeString,
+		Default:     "",
 		Description: "Default timeout in seconds for AAP HTTP calls and job polling when Hook spec.deadline is 0",
 		Category:    CategoryAAP,
+	},
+	"aap_insecure_skip_verify": {
+		Name:        "aap_insecure_skip_verify",
+		Type:        TypeBool,
+		Default:     false,
+		Description: "Skip TLS certificate verification when connecting to AAP",
+		Category:    CategoryAAP,
+	},
+	"aap_ca_secret_name": {
+		Name:        "aap_ca_secret_name",
+		Type:        TypeString,
+		Default:     "",
+		Description: "Name of the Secret containing a custom CA certificate for AAP TLS (data key: ca.crt)",
+		Category:    CategoryAAP,
+	},
+
+	// MCP Server (Lightspeed)
+	"mcp_server_lightspeed_integration": {
+		Name:        "mcp_server_lightspeed_integration",
+		Type:        TypeBool,
+		Default:     true,
+		Description: "Register MCP server with OpenShift Lightspeed",
+		Category:    CategoryMCP,
+	},
+	"mcp_server_lightspeed_set_mcp_gate": {
+		Name:        "mcp_server_lightspeed_set_mcp_gate",
+		Type:        TypeBool,
+		Default:     false,
+		Description: "Add MCPServer to OLSConfig featureGates when registering with Lightspeed",
+		Category:    CategoryMCP,
 	},
 }
 
@@ -548,6 +598,13 @@ var ExtendedSettings = map[string]SettingDefinition{
 		Description: "Enable kubectl-mtv CLI download service",
 		Category:    CategoryFeature,
 	},
+	"feature_use_conversion_cr": {
+		Name:        "feature_use_conversion_cr",
+		Type:        TypeBool,
+		Default:     true,
+		Description: "Enable Conversion CR-based guest conversion workflow",
+		Category:    CategoryFeature,
+	},
 
 	// Controller Deployment Resources
 	"controller_container_limits_cpu": {
@@ -576,13 +633,6 @@ var ExtendedSettings = map[string]SettingDefinition{
 		Type:        TypeString,
 		Default:     "350Mi",
 		Description: "Controller container memory request",
-		Category:    CategoryController,
-	},
-	"controller_transfer_network": {
-		Name:        "controller_transfer_network",
-		Type:        TypeString,
-		Default:     "",
-		Description: "Optional NAD name for controller pod transfer network (format: namespace/network-name)",
 		Category:    CategoryController,
 	},
 	"controller_migration_service_account": {
@@ -816,6 +866,13 @@ var ExtendedSettings = map[string]SettingDefinition{
 		Description: "Controller pod image",
 		Category:    CategoryImage,
 	},
+	"deep_inspection_image_fqin": {
+		Name:        "deep_inspection_image_fqin",
+		Type:        TypeString,
+		Default:     "",
+		Description: "Deep inspection container image for warm migration preflight checks",
+		Category:    CategoryImage,
+	},
 	"api_image_fqin": {
 		Name:        "api_image_fqin",
 		Type:        TypeString,
@@ -982,6 +1039,80 @@ var ExtendedSettings = map[string]SettingDefinition{
 		Default:     "30s",
 		Description: "Metrics scrape interval",
 		Category:    CategoryAdvanced,
+	},
+	"profiler_volume_path": {
+		Name:        "profiler_volume_path",
+		Type:        TypeString,
+		Default:     "/var/cache/profiler",
+		Description: "Volume path for profiler data",
+		Category:    CategoryAdvanced,
+	},
+
+	// MCP Server Container Resources
+	"mcp_server_container_limits_cpu": {
+		Name:        "mcp_server_container_limits_cpu",
+		Type:        TypeString,
+		Default:     "1000m",
+		Description: "MCP server container CPU limit",
+		Category:    CategoryMCP,
+	},
+	"mcp_server_container_limits_memory": {
+		Name:        "mcp_server_container_limits_memory",
+		Type:        TypeString,
+		Default:     "512Mi",
+		Description: "MCP server container memory limit",
+		Category:    CategoryMCP,
+	},
+	"mcp_server_container_requests_cpu": {
+		Name:        "mcp_server_container_requests_cpu",
+		Type:        TypeString,
+		Default:     "100m",
+		Description: "MCP server container CPU request",
+		Category:    CategoryMCP,
+	},
+	"mcp_server_container_requests_memory": {
+		Name:        "mcp_server_container_requests_memory",
+		Type:        TypeString,
+		Default:     "256Mi",
+		Description: "MCP server container memory request",
+		Category:    CategoryMCP,
+	},
+
+	// MCP Server
+	"mcp_server_output_format": {
+		Name:        "mcp_server_output_format",
+		Type:        TypeString,
+		Default:     "markdown",
+		Description: "MCP server output format",
+		Category:    CategoryMCP,
+	},
+	"mcp_server_max_response_chars": {
+		Name:        "mcp_server_max_response_chars",
+		Type:        TypeString,
+		Default:     "0",
+		Description: "Maximum response characters for MCP server (0 = unlimited)",
+		Category:    CategoryMCP,
+	},
+	"mcp_server_kube_insecure": {
+		Name:        "mcp_server_kube_insecure",
+		Type:        TypeString,
+		Default:     "true",
+		Description: "Skip TLS verification for in-cluster Kubernetes API",
+		Category:    CategoryMCP,
+	},
+	"mcp_server_read_only": {
+		Name:        "mcp_server_read_only",
+		Type:        TypeString,
+		Default:     "false",
+		Description: "Run MCP server in read-only mode",
+		Category:    CategoryMCP,
+	},
+	"mcp_server_verbose": {
+		Name:        "mcp_server_verbose",
+		Type:        TypeString,
+		Default:     "2",
+		Description: "MCP server verbosity level",
+		Category:    CategoryMCP,
 	},
 }
 

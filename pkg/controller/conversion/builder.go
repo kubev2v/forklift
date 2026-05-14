@@ -249,7 +249,7 @@ func (b *Builder) GetDeepInspectionPodSpec(volumes []core.Volume, volumeMounts [
 
 	img := convctx.GetDeepInspectionImage(cfg)
 	if img == "" {
-		return nil, fmt.Errorf("deep inspection container image is not set (Conversion spec.image or DEEP_INSPECTION_IMAGE)")
+		return nil, fmt.Errorf("deep inspection container image is not set (Conversion spec.image, DEEP_INSPECTION_IMAGE, or DEEP_INSPECTION_IMAGE_XFS when xfsCompatibility is enabled)")
 	}
 	if cfg.VDDKImage == "" {
 		return nil, fmt.Errorf("VDDK image is required for deep inspection but is not set (Conversion spec.vddkImage or VDDK_IMAGE)")
