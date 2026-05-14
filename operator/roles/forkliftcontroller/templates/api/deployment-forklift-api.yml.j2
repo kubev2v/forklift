@@ -28,7 +28,7 @@ spec:
       serviceAccountName: forklift-api
       containers:
         - name: {{ api_container_name }}
-          image: {{ api_image_fqin }}
+          image: "{{ api_image_fqin or lookup('env', 'API_IMAGE') or lookup('env', 'RELATED_IMAGE_API') }}"
           imagePullPolicy: {{ image_pull_policy }}
           ports:
           - name: api

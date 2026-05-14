@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
         - name: "{{ ui_plugin_container_name }}"
-          image: "{{ ui_plugin_image_fqin }}"
+          image: "{{ ui_plugin_image_fqin or lookup('env', 'UI_PLUGIN_IMAGE') or lookup('env', 'RELATED_IMAGE_UI_PLUGIN') }}"
           ports:
             - containerPort: 9443
               protocol: TCP
