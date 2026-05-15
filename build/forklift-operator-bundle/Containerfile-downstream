@@ -27,7 +27,7 @@ ARG MUST_GATHER_IMAGE="registry.redhat.io/mtv-candidate/mtv-must-gather-rhel8@sh
 
 ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-openstack-populator-rhel9@sha256:e0f629e6751cb065c55c6e391aace810883ea66a126e313d8b2c68cdf5c819ec"
 
-ARG OPERATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhel9-operator@sha256:d867cbd855e9b15a8436dc6464c4871c6755f896fa612a8df8a9135d5a9bc07b"
+ARG OPERATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhel9-operator@sha256:0526d9600293e3265b5a1ef894ee63f538de87564c272f5b7b5ae3e221291d09"
 
 ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/mtv-candidate/mtv-ova-provider-server-rhel9@sha256:7c2a13a71f633245c70d8e76e1208d574563c3a302ea6b23092013214e520281"
 
@@ -37,7 +37,7 @@ ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhv-populator-rh
 
 ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-populator-controller-rhel9@sha256:1e379de1a399355582c70f4a8090611e77b680fc4c36dc50c3be641cd458c44d"
 
-ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:ad3d07d95f7a29ce8899ecc9f32bbfb72898a6111f417f1c704759852b1a0856"
+ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:199af29f3f40c0033c28826c4ac1299c72806543035c1789898afbb8d4010a21"
 
 ARG VALIDATION_IMAGE="registry.redhat.io/mtv-candidate/mtv-validation-rhel9@sha256:c4b8fe82c1763da70791eb47dbb480953012a5ea6272c1105d4e4a45b031d91e"
 

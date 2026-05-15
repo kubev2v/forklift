@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
         - name: "{{ mcp_server_container_name }}"
-          image: "{{ cli_download_image_fqin }}"
+          image: "{{ cli_download_image_fqin or lookup('env', 'CLI_DOWNLOAD_IMAGE') or lookup('env', 'RELATED_IMAGE_CLI_DOWNLOAD') }}"
           command: ["/bin/sh", "-c"]
           args:
             - |
