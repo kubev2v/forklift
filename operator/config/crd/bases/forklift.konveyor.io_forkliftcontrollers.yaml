@@ -112,7 +112,11 @@ spec:
               deep_inspection_image_fqin:
                 type: string
                 description: "Deep inspection image used by deep-inspection pods"
-                example: "quay.io/kubev2v/forklift-deep-inspection:latest"
+                example: "quay.io/kubev2v/deep-inspection:latest"
+              deep_inspection_image_xfs_fqin:
+                type: string
+                description: "Deep inspection image built on RHEL9, used when xfsCompatibility is enabled"
+                example: "quay.io/kubev2v/deep-inspection-rhel9:latest"
               vddk_image:
                 type: string
                 description: "VDDK image for VMware disk access"

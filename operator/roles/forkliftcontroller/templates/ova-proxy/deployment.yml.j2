@@ -34,7 +34,7 @@ spec:
           value: "/var/run/secrets/{{ ova_proxy_tls_secret_name }}/tls.crt"
         - name: TLS_KEY
           value: /var/run/secrets/{{ ova_proxy_tls_secret_name }}/tls.key
-        image: {{ ova_proxy_fqin }}
+        image: "{{ ova_proxy_fqin or lookup('env', 'OVA_PROXY_IMAGE') or lookup('env', 'RELATED_IMAGE_OVA_PROXY') }}"
         imagePullPolicy: {{ image_pull_policy }}
         resources:
           limits:

@@ -1045,6 +1045,22 @@ func makePopulatePodSpec(pvcPrimeName, secretName string) corev1.PodSpec {
 						},
 					},
 				},
+				// Explicit mapping required because Kubernetes drops dotted keys (ca.crt)
+				// when injecting via EnvFrom. Populator binaries expect "cacert" env var.
+				Env: []corev1.EnvVar{
+					{
+						Name: "cacert",
+						ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: secretName,
+								},
+								Key:      "ca.crt",
+								Optional: ptr.To(true),
+							},
+						},
+					},
+				},
 			},
 		},
 		SecurityContext: &corev1.PodSecurityContext{

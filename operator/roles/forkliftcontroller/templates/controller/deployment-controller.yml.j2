@@ -47,11 +47,13 @@ spec:
         - name: KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION
           value: "v1"
         - name: VIRT_V2V_IMAGE
-          value: {{ virt_v2v_image_fqin }}
+          value: "{{ virt_v2v_image_fqin or lookup('env', 'VIRT_V2V_IMAGE') or lookup('env', 'RELATED_IMAGE_VIRT_V2V') }}"
         - name: VIRT_V2V_IMAGE_XFS
-          value: {{ virt_v2v_image_xfs_fqin }}
+          value: "{{ virt_v2v_image_xfs_fqin or lookup('env', 'VIRT_V2V_IMAGE_XFS') or lookup('env', 'RELATED_IMAGE_VIRT_V2V_XFS') }}"
         - name: DEEP_INSPECTION_IMAGE
-          value: {{ deep_inspection_image_fqin }}
+          value: "{{ deep_inspection_image_fqin or lookup('env', 'DEEP_INSPECTION_IMAGE') or lookup('env', 'RELATED_IMAGE_DEEP_INSPECTION') }}"
+        - name: DEEP_INSPECTION_IMAGE_XFS
+          value: "{{ deep_inspection_image_xfs_fqin or lookup('env', 'DEEP_INSPECTION_IMAGE_XFS') or lookup('env', 'RELATED_IMAGE_DEEP_INSPECTION_XFS') }}"
         - name: API_PORT
           value: "8443"
         - name: METRICS_PORT
@@ -273,7 +275,7 @@ spec:
         envFrom:
         - configMapRef:
             name: {{ controller_configmap_name }}
-        image: {{ controller_image_fqin }}
+        image: "{{ controller_image_fqin or lookup('env', 'CONTROLLER_IMAGE') or lookup('env', 'RELATED_IMAGE_CONTROLLER') }}"
         imagePullPolicy: {{ image_pull_policy }}
         resources:
           limits:
@@ -335,9 +337,9 @@ spec:
         - name: METRICS_PORT
           value: '8082'
         - name: OVA_PROVIDER_SERVER_IMAGE
-          value: {{ ova_provider_server_fqin }}
+          value: "{{ ova_provider_server_fqin or lookup('env', 'OVA_PROVIDER_SERVER_IMAGE') or lookup('env', 'RELATED_IMAGE_OVA_PROVIDER_SERVER') }}"
         - name: HYPERV_PROVIDER_SERVER_IMAGE
-          value: {{ hyperv_provider_server_fqin }}
+          value: "{{ hyperv_provider_server_fqin or lookup('env', 'HYPERV_PROVIDER_SERVER_IMAGE') or lookup('env', 'RELATED_IMAGE_HYPERV_PROVIDER_SERVER') }}"
 {% if feature_ova_appliance_management|bool %}
         - name: FEATURE_OVF_APPLIANCE_MANAGEMENT
           value: "true"
@@ -376,7 +378,7 @@ spec:
         envFrom:
         - configMapRef:
             name: {{ controller_configmap_name }}
-        image: {{ controller_image_fqin }}
+        image: "{{ controller_image_fqin or lookup('env', 'CONTROLLER_IMAGE') or lookup('env', 'RELATED_IMAGE_CONTROLLER') }}"
         imagePullPolicy: {{ image_pull_policy }}
         ports:
         - name: api

@@ -94,9 +94,6 @@ func parseNetworkPairsWithInsecure(ctx context.Context, pairStr, defaultNamespac
 	var pairs []forkliftv1beta1.NetworkPair
 	pairList := strings.Split(pairStr, ",")
 
-	// Track source network IDs to detect duplicates
-	sourceIDsSeen := make(map[string]string) // ID -> source name (for error messages)
-
 	for _, pairStr := range pairList {
 		pairStr = strings.TrimSpace(pairStr)
 		if pairStr == "" {
@@ -115,14 +112,6 @@ func parseNetworkPairsWithInsecure(ctx context.Context, pairStr, defaultNamespac
 		sourceNetworkRefs, err := resolveNetworkNameToIDWithInsecure(ctx, configFlags, sourceProvider, defaultNamespace, inventoryURL, sourceName, insecureSkipTLS)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve source network '%s': %v", sourceName, err)
-		}
-
-		// Check for duplicate source network IDs
-		for _, sourceRef := range sourceNetworkRefs {
-			if existingName, exists := sourceIDsSeen[sourceRef.ID]; exists {
-				return nil, fmt.Errorf("invalid network mapping: Source network ID '%s' is mapped multiple times (via '%s' and '%s'). Each source network can only be mapped once", sourceRef.ID, existingName, sourceName)
-			}
-			sourceIDsSeen[sourceRef.ID] = sourceName
 		}
 
 		// Parse target part which can be just a name or namespace/name

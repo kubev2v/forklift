@@ -117,8 +117,8 @@ github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8
 # github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 ## explicit
 github.com/kballard/go-shellquote
-# github.com/kubev2v/forklift v0.0.0-20260327145126-7320affe4d23 => ../../
-## explicit; go 1.24.0
+# github.com/kubev2v/forklift v0.0.0-20260513104241-eaea136684e0 => ../../
+## explicit; go 1.25.0
 github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1
 github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan
 github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/provider
@@ -226,7 +226,7 @@ github.com/xo/terminfo
 # github.com/yaacov/karl-interpreter v0.0.1
 ## explicit; go 1.21
 github.com/yaacov/karl-interpreter/pkg/karl
-# github.com/yaacov/kubectl-mtv v0.3.0
+# github.com/yaacov/kubectl-mtv v0.3.7
 ## explicit; go 1.25.0
 github.com/yaacov/kubectl-mtv/cmd
 github.com/yaacov/kubectl-mtv/cmd/archive
@@ -350,31 +350,32 @@ go.yaml.in/yaml/v2
 # go.yaml.in/yaml/v3 v3.0.4
 ## explicit; go 1.16
 go.yaml.in/yaml/v3
-# golang.org/x/net v0.47.0
-## explicit; go 1.24.0
+# golang.org/x/net v0.53.0
+## explicit; go 1.25.0
 golang.org/x/net/http/httpguts
 golang.org/x/net/http2
 golang.org/x/net/http2/hpack
 golang.org/x/net/idna
 golang.org/x/net/internal/httpcommon
+golang.org/x/net/internal/httpsfv
 # golang.org/x/oauth2 v0.34.0
 ## explicit; go 1.24.0
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
-# golang.org/x/sync v0.18.0
-## explicit; go 1.24.0
+# golang.org/x/sync v0.20.0
+## explicit; go 1.25.0
 golang.org/x/sync/errgroup
-# golang.org/x/sys v0.40.0
-## explicit; go 1.24.0
+# golang.org/x/sys v0.43.0
+## explicit; go 1.25.0
 golang.org/x/sys/cpu
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/term v0.37.0
-## explicit; go 1.24.0
+# golang.org/x/term v0.42.0
+## explicit; go 1.25.0
 golang.org/x/term
-# golang.org/x/text v0.31.0
-## explicit; go 1.24.0
+# golang.org/x/text v0.36.0
+## explicit; go 1.25.0
 golang.org/x/text/encoding
 golang.org/x/text/encoding/internal
 golang.org/x/text/encoding/internal/identifier

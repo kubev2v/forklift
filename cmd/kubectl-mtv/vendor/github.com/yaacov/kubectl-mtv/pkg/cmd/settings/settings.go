@@ -336,9 +336,9 @@ func validateAndConvertValue(value string, def SettingDefinition) (interface{}, 
 	case TypeBool:
 		switch value {
 		case "true", "True", "TRUE", "1", "yes", "Yes", "YES":
-			return true, nil
+			return "true", nil
 		case "false", "False", "FALSE", "0", "no", "No", "NO":
-			return false, nil
+			return "false", nil
 		default:
 			return nil, fmt.Errorf("expected boolean value (true/false), got: %s", value)
 		}
@@ -347,7 +347,7 @@ func validateAndConvertValue(value string, def SettingDefinition) (interface{}, 
 		if err != nil {
 			return nil, fmt.Errorf("expected integer value, got: %s", value)
 		}
-		return i, nil
+		return strconv.Itoa(i), nil
 	case TypeString:
 		return value, nil
 	default:

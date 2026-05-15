@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
 
 	forkliftv1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
@@ -366,139 +367,26 @@ func Create(ctx context.Context, opts CreatePlanOptions) error {
 		return fmt.Errorf("failed to create plan: %v", err)
 	}
 
-	// MTV automatically sets the PVCNameTemplateUseGenerateName field to true, if opts.PlanSpec.PVCNameTemplateUseGenerateName is false
-	// we need to patch the plan to re-set the PVCNameTemplateUseGenerateName field to false.
+	// For fields with +kubebuilder:default:=true, the API server auto-sets them
+	// to true on creation. When the user explicitly sets them to false, we need
+	// a post-create patch to override the kubebuilder default.
 	if !opts.PlanSpec.PVCNameTemplateUseGenerateName {
-		patch := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"pvcNameTemplateUseGenerateName": false,
-			},
-		}
-		patchBytes, err := json.Marshal(patch)
-		if err != nil {
-			// Ignore error here, we will still create the plan
-			fmt.Printf("Warning: failed to marshal patch for PVCNameTemplateUseGenerateName: %v\n", err)
-		} else {
-			_, err = c.Resource(client.PlansGVR).Namespace(opts.Namespace).Patch(
-				context.TODO(),
-				createdPlan.GetName(),
-				types.MergePatchType,
-				patchBytes,
-				metav1.PatchOptions{},
-			)
-			if err != nil {
-				// Ignore error here, we will still create the plan
-				fmt.Printf("Warning: failed to patch plan for PVCNameTemplateUseGenerateName: %v\n", err)
-			}
-		}
+		patchBoolFieldToFalse(c, opts.Namespace, createdPlan.GetName(), "pvcNameTemplateUseGenerateName")
 	}
-
-	// MTV automatically sets the MigrateSharedDisks field to true, if opts.PlanSpec.MigrateSharedDisks is false
-	// we need to patch the plan to re-set the MigrateSharedDisks field to false.
 	if !opts.PlanSpec.MigrateSharedDisks {
-		patch := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"migrateSharedDisks": false,
-			},
-		}
-		patchBytes, err := json.Marshal(patch)
-		if err != nil {
-			// Ignore error here, we will still create the plan
-			fmt.Printf("Warning: failed to marshal patch for MigrateSharedDisks: %v\n", err)
-		} else {
-			_, err = c.Resource(client.PlansGVR).Namespace(opts.Namespace).Patch(
-				context.TODO(),
-				createdPlan.GetName(),
-				types.MergePatchType,
-				patchBytes,
-				metav1.PatchOptions{},
-			)
-			if err != nil {
-				// Ignore error here, we will still create the plan
-				fmt.Printf("Warning: failed to patch plan for MigrateSharedDisks: %v\n", err)
-			}
-		}
+		patchBoolFieldToFalse(c, opts.Namespace, createdPlan.GetName(), "migrateSharedDisks")
 	}
-
-	// MTV UseCompatibilityMode sets the UseCompatibilityMode field to true, if opts.PlanSpec.UseCompatibilityMode is false
-	// we need to patch the plan to re-set the UseCompatibilityMode field to false.
 	if !opts.PlanSpec.UseCompatibilityMode {
-		patch := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"useCompatibilityMode": false,
-			},
-		}
-		patchBytes, err := json.Marshal(patch)
-		if err != nil {
-			// Ignore error here, we will still create the plan
-			fmt.Printf("Warning: failed to marshal patch for UseCompatibilityMode: %v\n", err)
-		} else {
-			_, err = c.Resource(client.PlansGVR).Namespace(opts.Namespace).Patch(
-				context.TODO(),
-				createdPlan.GetName(),
-				types.MergePatchType,
-				patchBytes,
-				metav1.PatchOptions{},
-			)
-			if err != nil {
-				// Ignore error here, we will still create the plan
-				fmt.Printf("Warning: failed to patch plan for UseCompatibilityMode: %v\n", err)
-			}
-		}
+		patchBoolFieldToFalse(c, opts.Namespace, createdPlan.GetName(), "useCompatibilityMode")
 	}
-
-	// MTV automatically sets the PreserveStaticIPs field to true, if opts.PlanSpec.PreserveStaticIPs is false
-	// we need to patch the plan to re-set the PreserveStaticIPs field to false.
 	if !opts.PlanSpec.PreserveStaticIPs {
-		patch := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"preserveStaticIPs": false,
-			},
-		}
-		patchBytes, err := json.Marshal(patch)
-		if err != nil {
-			// Ignore error here, we will still create the plan
-			fmt.Printf("Warning: failed to marshal patch for PreserveStaticIPs: %v\n", err)
-		} else {
-			_, err = c.Resource(client.PlansGVR).Namespace(opts.Namespace).Patch(
-				context.TODO(),
-				createdPlan.GetName(),
-				types.MergePatchType,
-				patchBytes,
-				metav1.PatchOptions{},
-			)
-			if err != nil {
-				// Ignore error here, we will still create the plan
-				fmt.Printf("Warning: failed to patch plan for PreserveStaticIPs: %v\n", err)
-			}
-		}
+		patchBoolFieldToFalse(c, opts.Namespace, createdPlan.GetName(), "preserveStaticIPs")
 	}
-
-	// MTV automatically sets the RunPreflightInspection field to true, if opts.PlanSpec.RunPreflightInspection is false
-	// we need to patch the plan to re-set the RunPreflightInspection field to false.
 	if !opts.PlanSpec.RunPreflightInspection {
-		patch := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"runPreflightInspection": false,
-			},
-		}
-		patchBytes, err := json.Marshal(patch)
-		if err != nil {
-			// Ignore error here, we will still create the plan
-			fmt.Printf("Warning: failed to marshal patch for RunPreflightInspection: %v\n", err)
-		} else {
-			_, err = c.Resource(client.PlansGVR).Namespace(opts.Namespace).Patch(
-				context.TODO(),
-				createdPlan.GetName(),
-				types.MergePatchType,
-				patchBytes,
-				metav1.PatchOptions{},
-			)
-			if err != nil {
-				// Ignore error here, we will still create the plan
-				fmt.Printf("Warning: failed to patch plan for RunPreflightInspection: %v\n", err)
-			}
-		}
+		patchBoolFieldToFalse(c, opts.Namespace, createdPlan.GetName(), "runPreflightInspection")
+	}
+	if !opts.PlanSpec.DeleteVmOnFailMigration {
+		patchBoolFieldToFalse(c, opts.Namespace, createdPlan.GetName(), "deleteVmOnFailMigration")
 	}
 
 	// Set ownership of maps if we created them
@@ -699,6 +587,33 @@ func deleteMap(configFlags *genericclioptions.ConfigFlags, mapGVR schema.GroupVe
 	}
 
 	return nil
+}
+
+// patchBoolFieldToFalse patches a kubebuilder-defaulted-to-true boolean field
+// back to false after plan creation. The API server auto-sets these fields to
+// true via kubebuilder defaults, so an explicit post-create patch is needed
+// when the user wants false.
+func patchBoolFieldToFalse(c dynamic.Interface, namespace, planName, jsonFieldName string) {
+	patch := map[string]interface{}{
+		"spec": map[string]interface{}{
+			jsonFieldName: false,
+		},
+	}
+	patchBytes, err := json.Marshal(patch)
+	if err != nil {
+		fmt.Printf("Warning: failed to marshal patch for %s: %v\n", jsonFieldName, err)
+		return
+	}
+	_, err = c.Resource(client.PlansGVR).Namespace(namespace).Patch(
+		context.TODO(),
+		planName,
+		types.MergePatchType,
+		patchBytes,
+		metav1.PatchOptions{},
+	)
+	if err != nil {
+		fmt.Printf("Warning: failed to patch plan for %s: %v\n", jsonFieldName, err)
+	}
 }
 
 // boolPtr returns a pointer to a bool
