@@ -45,7 +45,7 @@ ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel10@sha256:
 
 ARG VIRT_V2V_IMAGE_RHEL9="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel9@sha256:09ec405052f38a4ca45909545172e62315dbd42e7664aba9dfaa25975d5516a8"
 
-ARG VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-vsphere-copy-offload-populator-rhel9@sha256:5da38770b2f1b64100c40fc6d952944f47b76268b972df4400821c8ee2152bd1"
+ARG VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-vsphere-copy-offload-populator-rhel9@sha256:aca6ef2d87c38bc3fdc38a7c5d20193cb6fccaa804486961c277656e10c4fc31"
 
 USER root
 
