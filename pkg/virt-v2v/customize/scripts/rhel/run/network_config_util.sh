@@ -526,20 +526,21 @@ udev_from_ifquery() {
 # Write to udev config
 # ----------------------------------------
 
-# Checks for duplicate hardware addresses 
+# Dedup identical rules (multi-IP NICs) and reject same-MAC-different-NAME conflicts.
 check_dupe_hws() {
     input=$(cat)
 
-    # Extract MAC addresses, convert to uppercase, sort them, and find duplicates
-    dupes=$(echo "$input" | grep -ioE "[0-9A-F:]{17}" | tr 'a-f' 'A-F' | sort | uniq -d)
+    deduped=$(echo "$input" | awk '!seen[$0]++')
 
-    # If duplicates are found, print an error and exit
-    if [ -n "$dupes" ]; then
-        log "Warning: Duplicate hw: $dupes"
+    # If the same MAC still appears in more than one rule, the NAMEs differ — conflict.
+    conflicts=$(echo "$deduped" | grep -ioE "[0-9A-F:]{17}" | tr 'a-f' 'A-F' | sort | uniq -d)
+
+    if [ -n "$conflicts" ]; then
+        log "Warning: Conflicting rules for same MAC with different names: $conflicts"
         return 0
     fi
 
-    echo "$input"
+    echo "$deduped"
 }
 
 # Create udev rules check for duplicates and write them to udev file
