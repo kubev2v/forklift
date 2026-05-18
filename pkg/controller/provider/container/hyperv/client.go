@@ -3,6 +3,7 @@ package hyperv
 import (
 	"bytes"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"net"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	hvutil "github.com/kubev2v/forklift/pkg/controller/hyperv"
 	types "github.com/kubev2v/forklift/pkg/controller/provider/model/hyperv/types"
 	"github.com/kubev2v/forklift/pkg/lib/hyperv/driver"
+	"github.com/kubev2v/forklift/pkg/lib/hyperv/iscsi"
 	ps "github.com/kubev2v/forklift/pkg/lib/hyperv/powershell"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
@@ -32,6 +34,9 @@ const (
 	StorageTypeSMB        = "SMB"
 	StorageNamePrefixSMB  = "SMB: "
 	StorageNameDefaultSMB = "hyperv-storage"
+
+	StorageTypeISCSI = "iSCSI"
+	StorageNameISCSI = "iSCSI: Local Disks"
 )
 
 const (
@@ -75,12 +80,14 @@ func (r *Client) Connect(provider *api.Provider) (err error) {
 
 	r.driver = drv
 	r.provider = provider
-	r.smbUrl = hvutil.SMBUrl(r.Secret)
-	r.smbMountPath = hvutil.SMBMountPath
 
-	if r.smbUrl != "" {
-		if pErr := r.discoverSMBWindowsPrefix(); pErr != nil {
-			r.Log.Error(pErr, "Failed to discover SMB Windows prefix, will retry")
+	if provider.GetHyperVTransferMethod() == api.HyperVTransferMethodSMB {
+		r.smbUrl = hvutil.SMBUrl(r.Secret)
+		r.smbMountPath = hvutil.SMBMountPath
+		if r.smbUrl != "" {
+			if pErr := r.discoverSMBWindowsPrefix(); pErr != nil {
+				r.Log.Error(pErr, "Failed to discover SMB Windows prefix, will retry on next reconnect")
+			}
 		}
 	}
 
@@ -100,8 +107,12 @@ func (r *Client) ListVMs() ([]types.VM, error) {
 	}
 
 	var vms []types.VM
+	smbPrefix := ""
+	if r.provider != nil && r.provider.GetHyperVTransferMethod() == api.HyperVTransferMethodSMB {
+		smbPrefix = r.smbWindowsPrefix
+	}
 	for _, domain := range domains {
-		vm, err := r.getVMFromDomain(domain, networks, r.smbWindowsPrefix)
+		vm, err := r.getVMFromDomain(domain, networks, smbPrefix)
 		if err != nil {
 			r.Log.Error(err, "Failed to process domain")
 			_ = domain.Free()
@@ -111,7 +122,9 @@ func (r *Client) ListVMs() ([]types.VM, error) {
 		_ = domain.Free()
 	}
 
-	r.validateDisksOnSMB(vms)
+	if r.provider != nil && r.provider.GetHyperVTransferMethod() == api.HyperVTransferMethodSMB {
+		r.validateDisksOnSMB(vms)
+	}
 
 	return vms, nil
 }
@@ -235,8 +248,20 @@ func (r *Client) ListNetworks() ([]types.Network, error) {
 	return result, nil
 }
 
-// ListStorages returns the SMB storage record from the HyperV host via WinRM.
+// ListStorages returns the storage record from the HyperV host.
+// For SMB providers it returns the SMB share details, for iSCSI providers it
+// returns a synthetic entry so the UI can build a valid StorageMap.
 func (r *Client) ListStorages() ([]types.Storage, error) {
+	if r.provider != nil && r.provider.GetHyperVTransferMethod() == api.HyperVTransferMethodISCSI {
+		storage := types.Storage{
+			ID:   hvutil.StorageIDDefault,
+			Name: StorageNameISCSI,
+			Type: StorageTypeISCSI,
+		}
+		r.Log.Info("Returning synthetic iSCSI storage entry", "name", storage.Name)
+		return []types.Storage{storage}, nil
+	}
+
 	if r.smbUrl == "" {
 		return nil, nil
 	}
@@ -373,7 +398,10 @@ func (r *Client) extractDisks(domain driver.Domain, smbWindowsPrefix string, vmU
 			continue
 		}
 
-		smbPath := r.mapWindowsPathToSMB(di.Path, smbWindowsPrefix)
+		var smbPath string
+		if smbWindowsPrefix != "" {
+			smbPath = r.mapWindowsPathToSMB(di.Path, smbWindowsPrefix)
+		}
 		capacity := r.getDiskCapacity(di.Path)
 		rctEnabled := r.getDiskRCTEnabled(di.Path)
 
@@ -428,32 +456,86 @@ func formatMAC(mac string) string {
 	return mac
 }
 
+// kvpInstance maps the Hyper-V KVP XML schema:
+// <INSTANCE><PROPERTY NAME="Name"><VALUE>key</VALUE></PROPERTY><PROPERTY NAME="Data"><VALUE>val</VALUE></PROPERTY></INSTANCE>
+type kvpInstance struct {
+	XMLName    xml.Name      `xml:"INSTANCE"`
+	Properties []kvpProperty `xml:"PROPERTY"`
+}
+
+type kvpProperty struct {
+	Name  string `xml:"NAME,attr"`
+	Value string `xml:"VALUE"`
+}
+
+func (k *kvpInstance) get(name string) string {
+	for _, p := range k.Properties {
+		if p.Name == name {
+			return p.Value
+		}
+	}
+	return ""
+}
+
 func (r *Client) collectGuestOS(vmName string) (string, error) {
-	script := ps.BuildCommand(ps.GetGuestOS, vmName)
+	script := ps.BuildCommand(ps.GetGuestKVPItems, vmName)
 	stdout, err := r.driver.ExecuteCommand(script)
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(stdout), nil
+	stdout = strings.TrimSpace(stdout)
+	if stdout == "" {
+		return "", nil
+	}
+
+	var xmlItems []string
+	if err := json.Unmarshal([]byte(stdout), &xmlItems); err != nil {
+		// Single item comes back as a bare string, not an array.
+		var single string
+		if singleErr := json.Unmarshal([]byte(stdout), &single); singleErr != nil {
+			return "", fmt.Errorf("parse KVP items: %w (output: %.200s)", singleErr, stdout)
+		}
+		xmlItems = []string{single}
+	}
+
+	for _, item := range xmlItems {
+		var inst kvpInstance
+		if err := xml.Unmarshal([]byte(item), &inst); err != nil {
+			continue
+		}
+		if inst.get("Name") == "OSName" {
+			return inst.get("Data"), nil
+		}
+	}
+	return "", nil
 }
 
 func (r *Client) collectSecurityInfo(vmName string) (*securityInfo, error) {
-	script := ps.BuildCommand(ps.GetVMSecurityInfo, vmName, vmName, vmName)
-	stdout, err := r.driver.ExecuteCommand(script)
-	if err != nil {
-		return nil, err
+	info := &securityInfo{}
+
+	secCmd := ps.BuildCommand(ps.GetVMSecurity, vmName)
+	secOut, err := r.driver.ExecuteCommand(secCmd)
+	if err == nil && strings.TrimSpace(secOut) != "" {
+		var sec struct {
+			TpmEnabled bool `json:"TpmEnabled"`
+		}
+		if err := json.Unmarshal([]byte(secOut), &sec); err == nil {
+			info.TpmEnabled = sec.TpmEnabled
+		}
 	}
 
-	stdout = strings.TrimSpace(stdout)
-	if stdout == "" || stdout == "{}" {
-		return &securityInfo{}, nil
+	fwCmd := ps.BuildCommand(ps.GetVMFirmware, vmName)
+	fwOut, err := r.driver.ExecuteCommand(fwCmd)
+	if err == nil && strings.TrimSpace(fwOut) != "" {
+		var fw struct {
+			SecureBoot string `json:"SecureBoot"`
+		}
+		if err := json.Unmarshal([]byte(fwOut), &fw); err == nil {
+			info.SecureBoot = fw.SecureBoot == "On"
+		}
 	}
 
-	var info securityInfo
-	if err := json.Unmarshal([]byte(stdout), &info); err != nil {
-		return nil, fmt.Errorf("failed to parse security info JSON: %w", err)
-	}
-	return &info, nil
+	return info, nil
 }
 
 func (r *Client) collectHasCheckpoint(vmName string) (bool, error) {
@@ -467,18 +549,42 @@ func (r *Client) collectHasCheckpoint(vmName string) (bool, error) {
 }
 
 func (r *Client) collectGuestNetworkConfig(vmName string, nics []types.NIC) ([]types.GuestNetwork, error) {
-	script := ps.BuildCommand(ps.GetGuestNetworkConfig, vmName)
-	stdout, err := r.driver.ExecuteCommand(script)
+	// Step 1: Get the Realized VirtualSystemSettingData InstanceID for this VM.
+	sdCmd := ps.BuildCommand(ps.GetVMSettingData, vmName)
+	sdOut, err := r.driver.ExecuteCommand(sdCmd)
 	if err != nil {
 		return nil, err
 	}
-
-	if stdout == "" || strings.Contains(stdout, "no_vm") || strings.Contains(stdout, "no_gc") {
+	settingDataID := strings.TrimSpace(sdOut)
+	if settingDataID == "" {
 		return []types.GuestNetwork{}, nil
 	}
 
-	type guestNetConfig struct {
-		MAC     string   `json:"MAC"`
+	// Step 2: Get all NIC ports for this SettingData.
+	escapedSD := strings.ReplaceAll(settingDataID, `\`, `\\`)
+	portsCmd := ps.BuildCommand(ps.GetNICPortsForSettingData, escapedSD)
+	portsOut, err := r.driver.ExecuteCommand(portsCmd)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(portsOut) == "" {
+		return []types.GuestNetwork{}, nil
+	}
+
+	type nicPort struct {
+		InstanceID string `json:"InstanceID"`
+		Address    string `json:"Address"`
+	}
+	var ports []nicPort
+	if err := json.Unmarshal([]byte(portsOut), &ports); err != nil {
+		var single nicPort
+		if err := json.Unmarshal([]byte(portsOut), &single); err != nil {
+			return nil, fmt.Errorf("parse NIC ports: %w", err)
+		}
+		ports = append(ports, single)
+	}
+
+	type nicConfig struct {
 		IPs     []string `json:"IPs"`
 		Subnets []string `json:"Subnets"`
 		DHCP    bool     `json:"DHCP"`
@@ -486,18 +592,28 @@ func (r *Client) collectGuestNetworkConfig(vmName string, nics []types.NIC) ([]t
 		DNS     []string `json:"DNS"`
 	}
 
-	var configs []guestNetConfig
-	if err := json.Unmarshal([]byte(stdout), &configs); err != nil {
-		var single guestNetConfig
-		if err := json.Unmarshal([]byte(stdout), &single); err != nil {
-			return nil, fmt.Errorf("failed to parse KVP JSON: %w", err)
-		}
-		configs = append(configs, single)
-	}
-
+	// Step 3: For each port, fetch its guest network config (one WinRM call per NIC).
 	var guestNetworks []types.GuestNetwork
-	for _, cfg := range configs {
-		mac := cfg.MAC
+	for _, port := range ports {
+		// Escape backslashes in InstanceID for the WMI filter.
+		escapedID := strings.ReplaceAll(port.InstanceID, `\`, `\\`)
+		cfgCmd := ps.BuildCommand(ps.GetGuestNICConfig, escapedID)
+		cfgOut, err := r.driver.ExecuteCommand(cfgCmd)
+		if err != nil {
+			r.Log.V(1).Info("failed to get NIC config, skipping", "port", port.InstanceID, "error", err)
+			continue
+		}
+		if strings.TrimSpace(cfgOut) == "" {
+			continue
+		}
+
+		var cfg nicConfig
+		if err := json.Unmarshal([]byte(cfgOut), &cfg); err != nil {
+			r.Log.V(1).Info("failed to parse NIC config, skipping", "port", port.InstanceID, "error", err)
+			continue
+		}
+
+		mac := port.Address
 		if len(mac) == 12 && !strings.Contains(mac, ":") {
 			mac = fmt.Sprintf("%s:%s:%s:%s:%s:%s", mac[0:2], mac[2:4], mac[4:6], mac[6:8], mac[8:10], mac[10:12])
 		}
@@ -720,6 +836,15 @@ func (r *Client) discoverSMBWindowsPrefix() error {
 	r.smbWindowsPrefix = windowsPath
 	r.Log.Info("Discovered SMB Windows prefix", "shareName", shareName, "windowsPath", windowsPath)
 	return nil
+}
+
+// CheckIscsiReadiness verifies that the iSCSI Target Server feature is installed
+// and that TCP port 3260 is reachable on the Hyper-V host.
+func (r *Client) CheckIscsiReadiness() (*iscsi.Readiness, error) {
+	if r.driver == nil {
+		return nil, fmt.Errorf("WinRM driver not connected")
+	}
+	return iscsi.NewTargetClient(r.driver).CheckReadiness()
 }
 
 func mapPowerState(state driver.DomainState) string {

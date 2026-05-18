@@ -605,7 +605,9 @@ func (r *Reconciler) ensureProviderServer(ctx context.Context, provider *api.Pro
 	case api.Ova:
 		return r.EnsureOVAProviderServer(ctx, provider)
 	case api.HyperV:
-		return r.EnsureHyperVProviderServer(ctx, provider)
+		if provider.GetHyperVTransferMethod() == api.HyperVTransferMethodSMB {
+			return r.EnsureHyperVProviderServer(ctx, provider)
+		}
 	}
 	return nil
 }
@@ -616,7 +618,9 @@ func (r *Reconciler) deleteProviderServer(ctx context.Context, provider *api.Pro
 	case api.Ova:
 		return r.DeleteOVAProviderServer(ctx, provider)
 	case api.HyperV:
-		return r.DeleteHyperVProviderServer(ctx, provider)
+		if provider.GetHyperVTransferMethod() == api.HyperVTransferMethodSMB {
+			return r.DeleteHyperVProviderServer(ctx, provider)
+		}
 	}
 	return nil
 }
@@ -629,12 +633,13 @@ func (r *Reconciler) cleanupProviderServer(ctx context.Context, provider *api.Pr
 	switch provider.Type() {
 	case api.Ova:
 		finalizer = api.OvaProviderFinalizer
-		// Legacy OVA PV cleanup (for PVs created before OVAProviderServer CR pattern)
-		// Searches for PVs with old labels (provider name instead of UID)
 		legacyCleanup = r.removeVolumeOfOVAServer
 	case api.HyperV:
+		if provider.GetHyperVTransferMethod() != api.HyperVTransferMethodSMB {
+			return r.cleanupNonSMBHyperVFinalizer(ctx, provider)
+		}
 		finalizer = api.HyperVProviderFinalizer
-		legacyCleanup = nil // HyperV uses SMB CSI, no legacy cleanup needed
+		legacyCleanup = nil
 	default:
 		return nil
 	}
@@ -664,5 +669,22 @@ func (r *Reconciler) cleanupProviderServer(ctx context.Context, provider *api.Pr
 		return err
 	}
 
+	return nil
+}
+
+// cleanupNonSMBHyperVFinalizer removes a stale HyperV finalizer when the
+// provider was switched away from SMB transfer mode.
+func (r *Reconciler) cleanupNonSMBHyperVFinalizer(ctx context.Context, provider *api.Provider) error {
+	if !k8sutil.ContainsFinalizer(provider, api.HyperVProviderFinalizer) {
+		return nil
+	}
+	if err := r.DeleteHyperVProviderServer(ctx, provider); err != nil {
+		return err
+	}
+	clonedProvider := provider.DeepCopy()
+	k8sutil.RemoveFinalizer(provider, api.HyperVProviderFinalizer)
+	if err := r.Patch(ctx, provider, client.MergeFrom(clonedProvider)); err != nil {
+		return err
+	}
 	return nil
 }

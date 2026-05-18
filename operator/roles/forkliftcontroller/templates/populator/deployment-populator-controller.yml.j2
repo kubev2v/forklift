@@ -40,6 +40,8 @@ spec:
             value: "{{ controller_host_lease_duration_seconds }}"
 {% endif %}
 {% endif %}
+          - name: HYPERV_POPULATOR_IMAGE
+            value: {{ populator_hyperv_image_fqin }}
           - name: POPULATOR_CONTAINER_LIMITS_CPU
             value: "{{ populator_container_limits_cpu }}"
           - name: POPULATOR_CONTAINER_LIMITS_MEMORY

@@ -31,7 +31,9 @@ func (r *Validator) MigrationType() bool {
 	}
 }
 
-// HyperV uses single SMB share, validation based on VM concerns
+// StorageMapped validates disk paths based on transfer method.
+// SMB: checks SMBPath (set by provider-server after SMB mount).
+// iSCSI: checks WindowsPath (from inventory, used for diff-disk creation).
 func (r *Validator) StorageMapped(vmRef ref.Ref) (bool, error) {
 	vm := &hyperv.VM{}
 	err := r.Source.Inventory.Find(vm, vmRef)
@@ -39,9 +41,16 @@ func (r *Validator) StorageMapped(vmRef ref.Ref) (bool, error) {
 		return false, liberr.Wrap(err, "vm", vmRef.String())
 	}
 
+	useISCSI := r.Source.Provider.GetHyperVTransferMethod() == api.HyperVTransferMethodISCSI
 	for _, disk := range vm.Disks {
-		if disk.SMBPath == "" {
-			return false, nil
+		if useISCSI {
+			if disk.WindowsPath == "" {
+				return false, nil
+			}
+		} else {
+			if disk.SMBPath == "" {
+				return false, nil
+			}
 		}
 	}
 	return true, nil

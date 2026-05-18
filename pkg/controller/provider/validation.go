@@ -16,6 +16,7 @@ import (
 	hvutil "github.com/kubev2v/forklift/pkg/controller/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/ova"
 	"github.com/kubev2v/forklift/pkg/controller/provider/container"
+	hvcontainer "github.com/kubev2v/forklift/pkg/controller/provider/container/hyperv"
 	vsphere "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
@@ -50,6 +51,9 @@ const (
 	SMBCSIDriverNotReady    = "SMBCSIDriverNotReady"
 	SMBMountFailed          = "SMBMountFailed"
 	WaitingForService       = "WaitingForService"
+	IscsiTargetNotReady     = "IscsiTargetNotReady"
+	IscsiFirewallNotReady   = "IscsiFirewallNotReady"
+	IscsiReadinessValidated = "IscsiReadinessValidated"
 )
 
 // CSI driver names
@@ -132,10 +136,16 @@ func (r *Reconciler) validate(provider *api.Provider) error {
 		return liberr.Wrap(err)
 	}
 
-	// Validate SMB CSI driver for HyperV providers
-	err = r.validateSMBCSI(provider)
-	if err != nil {
-		return liberr.Wrap(err)
+	if provider.Type() == api.HyperV {
+		switch provider.GetHyperVTransferMethod() {
+		case api.HyperVTransferMethodISCSI:
+			err = r.validateIscsiReadiness(provider)
+		default:
+			err = r.validateSMBCSI(provider)
+		}
+		if err != nil {
+			return liberr.Wrap(err)
+		}
 	}
 
 	if !provider.Status.HasBlockerCondition() {
@@ -390,21 +400,22 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 		keyList = []string{
 			hvutil.SecretFieldUsername,
 			hvutil.SecretFieldPassword,
-			hvutil.SecretFieldSMBUrl,
 		}
-
-		if smbUrl, found := secret.Data[hvutil.SecretFieldSMBUrl]; found {
-			if !isValidSMBPath(string(smbUrl)) {
-				provider.Status.Phase = ValidationFailed
-				provider.Status.SetCondition(
-					libcnd.Condition{
-						Type:     SecretNotValid,
-						Status:   True,
-						Reason:   DataErr,
-						Category: Critical,
-						Message:  "The smbUrl in secret is malformed. Expected format: //server/share, \\\\server\\share, or smb://server/share",
-					})
-				break
+		if provider.GetHyperVTransferMethod() == api.HyperVTransferMethodSMB {
+			keyList = append(keyList, hvutil.SecretFieldSMBUrl)
+			if smbUrl, found := secret.Data[hvutil.SecretFieldSMBUrl]; found {
+				if !isValidSMBPath(string(smbUrl)) {
+					provider.Status.Phase = ValidationFailed
+					provider.Status.SetCondition(
+						libcnd.Condition{
+							Type:     SecretNotValid,
+							Status:   True,
+							Reason:   DataErr,
+							Category: Critical,
+							Message:  "The smbUrl in secret is malformed. Expected format: //server/share, \\\\server\\share, or smb://server/share",
+						})
+					break
+				}
 			}
 		}
 
@@ -443,8 +454,8 @@ func (r *Reconciler) testConnection(provider *api.Provider, secret *core.Secret)
 		}
 	}
 
-	// For HyperV providers, check if the provider-server pod (SMB mount) is ready
-	if provider.Type() == api.HyperV {
+	// For HyperV providers using SMB, check if the provider-server pod is ready
+	if provider.Type() == api.HyperV && provider.GetHyperVTransferMethod() == api.HyperVTransferMethodSMB {
 		if !r.checkHyperVServiceReady(provider) {
 			return nil
 		}
@@ -720,9 +731,6 @@ func anyPodReady(pods []core.Pod) bool {
 func smbMountBlocked(pod *core.Pod) (string, bool) {
 	pendingTimeout := providerServicePendingTimeout()
 
-	// Only flag pods that have been scheduled to a node (NodeName set) — if a
-	// pod is unscheduled, the delay is a scheduling/resource issue, not a mount
-	// failure.
 	if pod.Status.Phase == core.PodPending && pod.Spec.NodeName != "" &&
 		time.Since(pod.CreationTimestamp.Time) > pendingTimeout {
 		return fmt.Sprintf("pod %s has been pending for over %s on node %s, check pod events for mount errors", pod.Name, pendingTimeout, pod.Spec.NodeName), true
@@ -1259,26 +1267,117 @@ func (r *Reconciler) testSSHConnectivity(hostIP string, privateKey []byte) bool 
 	return util.TestSSHConnectivity(context.Background(), hostIP, privateKey, r.Log)
 }
 
-func isValidSMBPath(smbPath string) bool {
-	// Normalize Windows UNC paths to //server/share format
-	normalized := smbPath
-	normalized = regexp.MustCompile(`\\`).ReplaceAllString(normalized, "/")
+// validateIscsiReadiness checks that the Hyper-V host has the iSCSI Target Server
+// feature installed and firewall port TCP 3260 open.
+func (r *Reconciler) validateIscsiReadiness(provider *api.Provider) error {
+	if provider.Type() != api.HyperV {
+		return nil
+	}
 
-	// Accept smb://server/share, //server/share, or \\server\share formats
-	// Must have at least server and share name
+	// Only check after WinRM connection is known to work.
+	if !provider.Status.HasCondition(ConnectionTestSucceeded) {
+		return nil
+	}
+
+	secret, err := r.getSecret(provider)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	collector, ok := container.Build(nil, provider, secret).(*hvcontainer.Collector)
+	if !ok {
+		r.Log.Info("iSCSI readiness: unexpected collector type, skipping",
+			"provider", provider.Name)
+		return nil
+	}
+
+	// Connect to the Hyper-V host — the collector is freshly built and has no
+	// active WinRM session yet (ConnectionTestSucceeded is from a prior reconcile).
+	if _, err = collector.Test(); err != nil {
+		r.Log.Info("iSCSI readiness: WinRM connect failed",
+			"provider", provider.Name, "error", err)
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     ConnectionTestFailed,
+			Status:   True,
+			Reason:   Tested,
+			Category: Warn,
+			Message:  fmt.Sprintf("Cannot verify iSCSI readiness: WinRM connection failed: %v", err),
+		})
+		return nil
+	}
+
+	readiness, err := collector.CheckIscsiReadiness()
+	if err != nil {
+		r.Log.Info("iSCSI readiness check failed",
+			"provider", provider.Name, "error", err)
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     IscsiTargetNotReady,
+			Status:   True,
+			Reason:   NotFound,
+			Category: Warn,
+			Message:  fmt.Sprintf("iSCSI readiness check failed: %v", err),
+		})
+		return nil
+	}
+
+	if !readiness.FeatureInstalled {
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     IscsiTargetNotReady,
+			Status:   True,
+			Reason:   NotFound,
+			Category: Warn,
+			Message:  "iSCSI Target Server feature (FS-iSCSITarget-Server) is not installed on the Hyper-V host.",
+			Suggestion: "Run on the Hyper-V host as Administrator:\n\n" +
+				"  Install-WindowsFeature FS-iSCSITarget-Server -IncludeManagementTools\n\n" +
+				"No reboot is required. Re-validate the provider after installing.",
+		})
+		provider.Status.DeleteCondition(IscsiFirewallNotReady)
+		provider.Status.DeleteCondition(IscsiReadinessValidated)
+		return nil
+	}
+	provider.Status.DeleteCondition(IscsiTargetNotReady)
+
+	if !readiness.FirewallOpen {
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     IscsiFirewallNotReady,
+			Status:   True,
+			Reason:   NotFound,
+			Category: Warn,
+			Message:  "iSCSI Target Server feature is installed but TCP port 3260 is not reachable. The Windows firewall may be blocking iSCSI traffic.",
+			Suggestion: "Run on the Hyper-V host as Administrator:\n\n" +
+				"  New-NetFirewallRule -Name \"iSCSI-Target-3260\" -DisplayName \"iSCSI Target\" " +
+				"-Protocol TCP -LocalPort 3260 -Action Allow\n\n" +
+				"Re-validate the provider after opening the port.",
+		})
+		provider.Status.DeleteCondition(IscsiReadinessValidated)
+		return nil
+	}
+	provider.Status.DeleteCondition(IscsiFirewallNotReady)
+
+	provider.Status.SetCondition(libcnd.Condition{
+		Type:     IscsiReadinessValidated,
+		Status:   True,
+		Reason:   Completed,
+		Category: Advisory,
+		Message:  "iSCSI Target Server is installed and TCP port 3260 is reachable on the Hyper-V host.",
+	})
+
+	return nil
+}
+
+func isValidSMBPath(smbPath string) bool {
+	normalized := regexp.MustCompile(`\\`).ReplaceAllString(smbPath, "/")
 	smbRegex := `^(smb:)?\/\/[^\/\s]+\/[^\/\s].*$`
 	re := regexp.MustCompile(smbRegex)
 	return re.MatchString(normalized)
 }
 
-// validateSMBCSI validates that the SMB CSI driver is installed for HyperV providers.
-// HyperV migrations require the SMB CSI driver (smb.csi.k8s.io) to mount SMB shares.
+// validateSMBCSI validates that the SMB CSI driver is installed for HyperV providers using SMB.
 func (r *Reconciler) validateSMBCSI(provider *api.Provider) error {
 	if provider.Type() != api.HyperV {
 		return nil
 	}
 
-	// Check if SMB CSI driver exists
 	csiDriver := &storagev1.CSIDriver{}
 	err := r.Get(context.TODO(), types.NamespacedName{Name: SMBCSIDriverName}, csiDriver)
 	if k8serrors.IsNotFound(err) {
@@ -1297,7 +1396,6 @@ func (r *Reconciler) validateSMBCSI(provider *api.Provider) error {
 		return liberr.Wrap(err)
 	}
 
-	// SMB CSI driver is installed - remove any previous condition
 	provider.Status.DeleteCondition(SMBCSIDriverNotReady)
 	return nil
 }
