@@ -381,6 +381,8 @@ func (b *Builder) GetDeepInspectionPodSpec(volumes []core.Volume, volumeMounts [
 		pod.Spec.ServiceAccountName = sa
 	}
 
+	SetKvmOnPodSpec(&pod.Spec, cfg.RequestKVM)
+
 	return pod, nil
 }
 
