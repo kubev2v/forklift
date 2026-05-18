@@ -4,17 +4,18 @@ metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/kubev2v/forklift?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: "{{revision}}"
+    build.appstudio.redhat.com/pull_request_number: "{{pull_request_number}}"
     build.appstudio.redhat.com/target_branch: "{{target_branch}}"
-    pipelinesascode.tekton.dev/cancel-in-progress: "false"
+    pipelinesascode.tekton.dev/cancel-in-progress: "true"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "release-2.12" && ( ".tekton/forklift-operator-virt-v2v-btrfs-comp-*.yaml".pathChanged() || ".konflux/virt-v2v/rpms.lock.yaml".pathChanged() || "build/virt-v2v/Containerfile-downstream-fssupport".pathChanged() || "pkg/virt-v2v/***".pathChanged() || "cmd/virt-v2v/***".pathChanged() || "cmd/virt-v2v-monitor/***".pathChanged() )
+    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch == "release-2.12" && ( "operator/config/manifests/***".pathChanged() || ".tekton/forklift-operator-bundle-*.yaml".pathChanged() || "build/forklift-operator-bundle/Containerfile-downstream".pathChanged() || "build/forklift-operator-bundle/images.conf".pathChanged() || "operator/export-vars.sh".pathChanged() )
   creationTimestamp:
   labels:
-    appstudio.openshift.io/application: forklift-operator-virt-v2v-btrfs
-    appstudio.openshift.io/component: forklift-operator-virt-v2v-btrfs-comp
+    appstudio.openshift.io/application: forklift-operator-2-12
+    appstudio.openshift.io/component: forklift-operator-bundle-2-12
     pipelines.appstudio.openshift.io/type: build
-  name: forklift-operator-virt-v2v-btrfs-comp-on-pull-request
-  namespace: rh-mtv-btrfs-tenant
+  name: forklift-operator-bundle-2-12-on-pull-request
+  namespace: rh-mtv-1-tenant
 spec:
   params:
     - name: git-url
@@ -22,25 +23,28 @@ spec:
     - name: revision
       value: "{{revision}}"
     - name: output-image
-      value: quay.io/redhat-user-workloads/rh-mtv-btrfs-tenant/forklift-operator-virt-v2v-btrfs-comp:on-pr-{{revision}}
+      value: quay.io/redhat-user-workloads/rh-mtv-1-tenant/forklift-operator-2-12/forklift-operator-bundle-2-12:on-pr-{{revision}}
     - name: image-expires-after
-      value: 14d
+      value: 5d
     - name: dockerfile
-      value: build/virt-v2v/Containerfile-downstream-fssupport
+      value: build/forklift-operator-bundle/Containerfile-downstream
     - name: path-context
       value: .
     - name: build-source-image
       value: "true"
+    - name: prefetch-input
+      value: '[{"type": "gomod", "path": ".konflux/forklift-operator-bundle"}]'
     - name: build-args-file
       value: build/release.conf
     - name: build-args
       value:
+        - "EVENT_TITLE={{body.pull_request.title}}"
         - "REVISION={{revision}}"
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
 
-      _Uses `buildah` to create a container image leveraging [trusted artifacts](https://konflux-ci.dev/architecture/ADR/0036-trusted-artifacts.html). It also optionally creates a source image and runs some build-time tests. Information is shared between tasks using OCI artifacts instead of PVCs. EC will pass the [`trusted_task.trusted`](https://enterprisecontract.dev/docs/ec-policies/release_policy.html#trusted_task__trusted) policy as long as all data used to build the artifact is generated from trusted tasks.
+      _Uses `buildah` to create a container image leveraging [trusted artifacts](https://konflux-ci.dev/architecture/ADR/0036-trusted-artifacts.html). It also optionally creates a source image and runs some build-time tests. Information is shared between tasks using OCI artifacts instead of PVCs. EC will pass the [`trusted_task.trusted`](https://conforma.dev/docs/policy/packages/release_trusted_task.html#trusted_task__trusted) policy as long as all data used to build the artifact is generated from trusted tasks.
       This pipeline is pushed as a Tekton bundle to [quay.io](https://quay.io/repository/konflux-ci/tekton-catalog/pipeline-docker-build-oci-ta?tab=tags)_
     finally:
       - name: show-sbom
@@ -79,7 +83,7 @@ spec:
         description: Skip checks against built image
         name: skip-checks
         type: string
-      - default: "false"
+      - default: "true"
         description: Execute the build with network isolation
         name: hermetic
         type: string
@@ -590,7 +594,7 @@ spec:
       - name: netrc
         optional: true
   taskRunTemplate:
-    serviceAccountName: build-pipeline-virt-v2v-2-12
+    serviceAccountName: build-pipeline-forklift-operator-bundle-2-12
   workspaces:
     - name: git-auth
       secret:
