@@ -32,7 +32,7 @@ declare -A replacements
 
 replacements[API_IMAGE]=mtv-api-rhel9
 replacements[CONTROLLER_IMAGE]=mtv-controller-rhel8
-replacements[MUST_GATHER_IMAGE]=mtv-must-gather-rhel8
+replacements[MUST_GATHER_IMAGE]=mtv-must-gather-rhel9
 replacements[OPENSTACK_POPULATOR_IMAGE]=mtv-openstack-populator-rhel9
 replacements[OPERATOR_IMAGE]=mtv-rhel8-operator
 replacements[OVA_PROVIDER_SERVER_IMAGE]=mtv-ova-provider-server-rhel9
