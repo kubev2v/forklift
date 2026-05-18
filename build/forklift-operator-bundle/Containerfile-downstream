@@ -17,7 +17,7 @@ ARG CLI_DOWNLOAD_IMAGE="registry.redhat.io/mtv-candidate/mtv-cli-download-rhel9@
 
 ARG CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-controller-rhel9@sha256:e574fc24c0aed526a8ca7ee14d71336601943c030a0064d69838758b6518576c"
 
-ARG DEEP_INSPECTION_IMAGE="registry.redhat.io/mtv-candidate/mtv-deep-inspection-rhel10@sha256:b8293453279018967438dbf790579c624201de305ca02813ea061436da3b1bb6"
+ARG DEEP_INSPECTION_IMAGE="registry.redhat.io/mtv-candidate/mtv-deep-inspection-rhel10@sha256:7d875ae66f95614f7566c322258c22f1514bb5867dcbfe1724f952f3442ffa09"
 
 ARG DEEP_INSPECTION_IMAGE_RHEL9="registry.redhat.io/mtv-candidate/mtv-deep-inspection-rhel9@sha256:1f0838638ec6025a07cd66e96ec81e05eceddd6aa7487b7f796d7cd81e1862b1"
 
@@ -41,7 +41,7 @@ ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@s
 
 ARG VALIDATION_IMAGE="registry.redhat.io/mtv-candidate/mtv-validation-rhel9@sha256:2eab85f713bf33f360dc77266d47f446fce9d959e0a83563a4be5cfbb9212f58"
 
-ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel10@sha256:1a026a0d8b78e0384e608ec48341a93ccaecc22a00946965c8c3ca976b5e6a61"
+ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel10@sha256:1efbe16c2c2d3f77651467cbeb4f9561ce9e8cfe7d0b9b7b99d8c1291a3eb4d6"
 
 ARG VIRT_V2V_IMAGE_RHEL9="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel9@sha256:cd6eaf3654533e5247e55fea8b84cb13482d2ce7c896035d071484bd81b9ce80"
 
