@@ -19,6 +19,7 @@ const (
 	FeatureVsphereVmwareDriverRemoval   = "FEATURE_VSPHERE_VMWARE_DRIVER_REMOVAL"
 	FeatureWindowsRegistryNetworkConfig = "FEATURE_WINDOWS_REGISTRY_NETWORK_CONFIG"
 	FeatureUseConversionCR              = "FEATURE_USE_CONVERSION_CR"
+	FeatureRetainPopulatorPods          = "FEATURE_RETAIN_POPULATOR_PODS"
 )
 
 // OpenShift version where the FeatureVmwareSystemSerialNumber feature is supported:
@@ -68,6 +69,8 @@ type Features struct {
 	WindowsRegistryNetworkConfig bool
 	// Whether to delegate VM conversion to Conversion CRs instead of managing it directly.
 	UseConversionCR bool
+	// Whether populator pods should be retained after migration for debugging.
+	RetainPopulatorPods bool
 }
 
 // isOpenShiftVersionAboveMinimum checks if OpenShift version is above or equal to minimum version using semantic versioning
@@ -107,5 +110,6 @@ func (r *Features) Load() (err error) {
 	r.VsphereVmwareDriverRemoval = getEnvBool(FeatureVsphereVmwareDriverRemoval, false)
 	r.WindowsRegistryNetworkConfig = getEnvBool(FeatureWindowsRegistryNetworkConfig, false)
 	r.UseConversionCR = getEnvBool(FeatureUseConversionCR, true)
+	r.RetainPopulatorPods = getEnvBool(FeatureRetainPopulatorPods, false)
 	return
 }

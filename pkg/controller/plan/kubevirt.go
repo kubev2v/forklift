@@ -2284,6 +2284,16 @@ func (r *KubeVirt) deletePopulatedPVC(pvc *core.PersistentVolumeClaim, vm *plan.
 
 // Delete any populator pods that belong to a VM's migration.
 func (r *KubeVirt) DeletePopulatorPods(vm *plan.VMStatus) (err error) {
+	if Settings.RetainPopulatorPods {
+		if r.Plan.Spec.DeleteVmOnFailMigration || vm.DeleteVmOnFailMigration {
+			r.Log.Info(
+				"WARNING: FEATURE_RETAIN_POPULATOR_PODS is enabled but DeleteVmOnFailMigration is also set;"+
+					" on failure the PVCs will be deleted and Kubernetes GC will remove the populator pods via OwnerReference.",
+				"vm", vm.String())
+		}
+		r.Log.Info("Retaining populator pods (feature flag enabled).", "vm", vm.String())
+		return
+	}
 	list, err := r.getPopulatorPods()
 	for _, object := range list {
 		err = r.DeleteObject(&object, vm, "Deleted populator pod.", "pod")
