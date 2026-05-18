@@ -3,10 +3,12 @@ package main
 import (
 	_ "embed"
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/kubev2v/forklift/pkg/virt-v2v/config"
 	"github.com/kubev2v/forklift/pkg/virt-v2v/conversion"
+	"github.com/kubev2v/forklift/pkg/virt-v2v/customize/advancednet"
 	"github.com/kubev2v/forklift/pkg/virt-v2v/server"
 	utils "github.com/kubev2v/forklift/pkg/virt-v2v/utils"
 )
@@ -84,6 +86,26 @@ func main() {
 		if err != nil {
 			fmt.Println("Failed to get inspection file", err)
 			os.Exit(1)
+		}
+
+		// Collect advanced network settings from the Windows boot disk.
+		// The SYSTEM hive is always on Disks[0] (the boot disk).
+		if inspection.OS.IsWindows() && len(convert.Disks) > 0 {
+			settings, advErr := advancednet.ReadAdvancedNetworkSettings(
+				convert.Disks[0].Link, env.Workdir,
+			)
+			if advErr != nil {
+				slog.Error("failed to read advanced network settings",
+					"disk", convert.Disks[0].Link,
+					"workdir", env.Workdir,
+					"error", advErr)
+			} else if settings != nil && settings.HasNonDefaultSettings() {
+				if writeErr := advancednet.WriteSettingsFile(settings, env.Workdir); writeErr != nil {
+					slog.Error("failed to write advanced network settings",
+						"workdir", env.Workdir,
+						"error", writeErr)
+				}
+			}
 		}
 
 		// virt-customize
