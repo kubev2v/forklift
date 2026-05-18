@@ -62,6 +62,7 @@ Feature gates enable or disable specific Forklift capabilities.
 | `feature_vmware_system_serial_number` | `true` | `FEATURE_VMWARE_SYSTEM_SERIAL_NUMBER` | Use VMware system serial number for migrated VMs |
 | `controller_static_udn_ip_addresses` | `false` | `FEATURE_STATIC_UDN_IP_ADDRESSES` | Enable static IP addresses with User Defined Networks |
 | `controller_retain_precopy_importer_pods` | `false` | `FEATURE_RETAIN_PRECOPY_IMPORTER_PODS` | Retain importer pods during warm migration (debugging) |
+| `controller_retain_populator_pods` | `false` | `FEATURE_RETAIN_POPULATOR_PODS` | Retain populator pods after migration for debugging |
 | `feature_ova_appliance_management` | `false` | `FEATURE_OVF_APPLIANCE_MANAGEMENT` | Enable appliance management for OVF-based providers |
 
 ### Feature Requirements

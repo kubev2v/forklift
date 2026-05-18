@@ -436,6 +436,10 @@ spec:
                 type: string
                 enum: ["true", "false"]
                 description: "Retain precopy pods (default: false)"
+              controller_retain_populator_pods:
+                type: string
+                enum: ["true", "false"]
+                description: "Retain populator pods after migration for debugging (default: false)"
               controller_static_udn_ip_addresses:
                 type: string
                 enum: ["true", "false"]
