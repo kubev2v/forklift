@@ -6,6 +6,7 @@ import (
 
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
@@ -385,6 +386,67 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 			p.Spec.VirtV2vImage = ""
 			p.Spec.XfsCompatibility = true
 			Expect(getVirtV2vImage(p)).To(Equal(xfsImage))
+		})
+	})
+
+	ginkgo.Describe("DeletePopulatorPods", func() {
+		const migrationUID = "test-migration-uid"
+		const targetNS = "test-ns"
+
+		var savedRetain bool
+
+		ginkgo.BeforeEach(func() {
+			savedRetain = Settings.RetainPopulatorPods
+		})
+		ginkgo.AfterEach(func() {
+			Settings.RetainPopulatorPods = savedRetain
+		})
+
+		createKubeVirtWithPopulatorPod := func() (*KubeVirt, *v1.Pod) {
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "populate-test-pvc",
+					Namespace: targetNS,
+					Labels: map[string]string{
+						"migration": migrationUID,
+					},
+				},
+			}
+
+			kubevirt := createKubeVirt(pod)
+			kubevirt.Plan.Spec.TargetNamespace = targetNS
+			kubevirt.Plan.Status.Migration.History = []plan.Snapshot{
+				{
+					Migration: plan.SnapshotRef{UID: migrationUID},
+				},
+			}
+			return kubevirt, pod
+		}
+
+		ginkgo.It("should skip deletion when RetainPopulatorPods is true", func() {
+			Settings.RetainPopulatorPods = true
+			kubevirt, _ := createKubeVirtWithPopulatorPod()
+			vm := &plan.VMStatus{}
+
+			err := kubevirt.DeletePopulatorPods(vm)
+			Expect(err).ToNot(HaveOccurred())
+
+			pods, err := kubevirt.getPopulatorPods()
+			Expect(err).ToNot(HaveOccurred())
+			Expect(pods).To(HaveLen(1), "populator pod should still exist")
+		})
+
+		ginkgo.It("should delete populator pods when RetainPopulatorPods is false", func() {
+			Settings.RetainPopulatorPods = false
+			kubevirt, _ := createKubeVirtWithPopulatorPod()
+			vm := &plan.VMStatus{}
+
+			err := kubevirt.DeletePopulatorPods(vm)
+			Expect(err).ToNot(HaveOccurred())
+
+			pods, err := kubevirt.getPopulatorPods()
+			Expect(err).ToNot(HaveOccurred())
+			Expect(pods).To(BeEmpty(), "populator pod should have been deleted")
 		})
 	})
 

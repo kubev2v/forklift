@@ -142,6 +142,13 @@ spec:
               controller_precopy_interval:
                 description: 'Precopy interval in minutes (default: 60)'
                 x-kubernetes-int-or-string: true
+              controller_retain_populator_pods:
+                description: 'Retain populator pods after migration for debugging
+                  (default: false)'
+                enum:
+                - "true"
+                - "false"
+                type: string
               controller_retain_precopy_importer_pods:
                 description: 'Retain precopy pods (default: false)'
                 enum:
@@ -8074,6 +8081,12 @@ spec:
       - description: Retain precopy pods (default false)
         displayName: Retain Precopy Importer Pods
         path: controller_retain_precopy_importer_pods
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Retain populator pods after migration for debugging (default
+          false)
+        displayName: Retain Populator Pods
+        path: controller_retain_populator_pods
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Enable static udn IP addresses feature (default false)
