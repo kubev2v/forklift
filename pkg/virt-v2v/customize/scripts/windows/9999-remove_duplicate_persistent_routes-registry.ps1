@@ -35,9 +35,12 @@ foreach ($gw in $defaultGateways) {
 # Step 2: Clean up duplicate routes (including default gateways)
 Write-Host "Analyzing routes for duplicates..." -ForegroundColor Yellow
 
-# Group ALL routes for duplicate detection  
+# Group routes by destination/gateway/metric, intentionally excluding InterfaceIndex.
+# After migration, stale persistent routes from the source VM's old adapters (e.g. VMware)
+# remain alongside new routes on the target adapter (e.g. VirtIO). These must be grouped
+# together to detect and remove the stale entries.
 $groupedRoutes = $routes | Group-Object {
-    "$($_.DestinationPrefix)-$($_.NextHop)-$($_.RouteMetric)-$($_.InterfaceIndex)"
+    "$($_.DestinationPrefix)-$($_.NextHop)-$($_.RouteMetric)"
 } | Where-Object { $_.Count -gt 1 }
 
 # Separate default gateway duplicates from other duplicates
@@ -56,6 +59,19 @@ if (-not $groupedRoutes) {
     foreach ($group in $gatewayDuplicates) {
         $routes = $group.Group
         
+        # If all interfaces in this group are active, this is a legitimate multi-homed
+        # configuration (same gateway reachable via multiple NICs) — leave it alone.
+        $activeCount = 0
+        foreach ($r in $routes) {
+            if (Get-NetAdapter | Where-Object { $_.InterfaceIndex -eq $r.InterfaceIndex } -ErrorAction SilentlyContinue) {
+                $activeCount++
+            }
+        }
+        if ($activeCount -eq $routes.Count) {
+            Write-Host "  Skipping group '$($group.Name)': all $activeCount interfaces are active (multi-homed)" -ForegroundColor Gray
+            continue
+        }
+
         # Choose the route with an interface that actually exists
         $toKeep = $null
         foreach ($route in $routes) {
@@ -216,7 +232,22 @@ foreach ($gateway in $currentDefaultGateways) {
         $gwList = @($regGateways)
     }
     if ($gwList -contains $nextHop) {
-        Write-Host "    Interface already has gateway $nextHop in registry" -ForegroundColor Green
+        Write-Host "    Interface already has gateway $nextHop in registry DefaultGateway, removing from PersistentRoutes only" -ForegroundColor Green
+        $persistKey = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\PersistentRoutes"
+        if (Test-Path $persistKey) {
+            $routeKeyPrefix = "0.0.0.0,0.0.0.0,$nextHop,"
+            $props = Get-Item -Path $persistKey | Select-Object -ExpandProperty Property
+            foreach ($p in $props) {
+                if ($p.StartsWith($routeKeyPrefix)) {
+                    try {
+                        Remove-ItemProperty -Path $persistKey -Name $p -ErrorAction Stop
+                        Write-Host "    Removed PersistentRoutes entry: $p" -ForegroundColor Green
+                    } catch {
+                        Write-Host "    Failed to remove PersistentRoutes entry '$p': $($_.Exception.Message)" -ForegroundColor Red
+                    }
+                }
+            }
+        }
         continue
     }
 
