@@ -995,7 +995,7 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 		}
 		if disk.RDM && r.shouldRDMAsLun(vm) {
 			diskDevice = cnv.DiskDevice{
-				LUN: &cnv.LunTarget{Bus: bus},
+				LUN: &cnv.LunTarget{Bus: cnv.DiskBusSCSI},
 			}
 		}
 		kubevirtDisk := cnv.Disk{
