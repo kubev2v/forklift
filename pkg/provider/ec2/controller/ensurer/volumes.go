@@ -20,7 +20,7 @@ func (r *Ensurer) EnsurePersistentVolumes(ctx context.Context, vm *planapi.VMSta
 
 	// List existing PVs by label
 	existingPVList := &core.PersistentVolumeList{}
-	vmLabels := r.Labeler.VMLabels(vm.Ref)
+	vmLabels := r.Labeler.MigrationVMLabels(vm.Ref)
 	err := r.Client.List(ctx, existingPVList, &client.ListOptions{
 		LabelSelector: k8slabels.SelectorFromSet(vmLabels),
 	})
@@ -98,7 +98,7 @@ func (r *Ensurer) EnsureDirectPVCs(ctx context.Context, vm *planapi.VMStatus, pv
 
 	// List existing PVCs by label
 	existingPVCList := &core.PersistentVolumeClaimList{}
-	vmLabels := r.Labeler.VMLabels(vm.Ref)
+	vmLabels := r.Labeler.MigrationVMLabels(vm.Ref)
 	err := r.Client.List(ctx, existingPVCList, &client.ListOptions{
 		Namespace:     r.Plan.Spec.TargetNamespace,
 		LabelSelector: k8slabels.SelectorFromSet(vmLabels),
@@ -168,7 +168,7 @@ func (r *Ensurer) EnsureDirectPVCs(ctx context.Context, vm *planapi.VMStatus, pv
 func (r *Ensurer) CheckDirectPVCsBound(ctx context.Context, vm *planapi.VMStatus) (allBound bool, err error) {
 	// List existing PVCs by label
 	existingPVCList := &core.PersistentVolumeClaimList{}
-	vmLabels := r.Labeler.VMLabels(vm.Ref)
+	vmLabels := r.Labeler.MigrationVMLabels(vm.Ref)
 	err = r.Client.List(ctx, existingPVCList, &client.ListOptions{
 		Namespace:     r.Plan.Spec.TargetNamespace,
 		LabelSelector: k8slabels.SelectorFromSet(vmLabels),

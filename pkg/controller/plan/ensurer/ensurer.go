@@ -30,7 +30,7 @@ func (r *Ensurer) VirtualMachine(vm *planapi.VMStatus, target *cnv.VirtualMachin
 		context.TODO(),
 		vms,
 		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.MigrationVMLabels(vm.Ref)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
@@ -40,7 +40,7 @@ func (r *Ensurer) VirtualMachine(vm *planapi.VMStatus, target *cnv.VirtualMachin
 	}
 
 	if len(vms.Items) == 0 {
-		r.Labeler.SetLabels(target, r.Labeler.VMLabels(vm.Ref))
+		r.Labeler.SetLabels(target, r.Labeler.MigrationVMLabels(vm.Ref))
 		err = r.Destination.Client.Create(context.TODO(), target)
 		if err != nil {
 			err = liberr.Wrap(err)
@@ -66,7 +66,7 @@ func (r *Ensurer) DataVolumes(vm *planapi.VMStatus, dvs []cdi.DataVolume) (err e
 		context.Background(),
 		list,
 		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.MigrationVMLabels(vm.Ref)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		})
 	if err != nil {
@@ -81,7 +81,7 @@ func (r *Ensurer) DataVolumes(vm *planapi.VMStatus, dvs []cdi.DataVolume) (err e
 
 	for _, dv := range dvs {
 		if !exists[dv.Annotations[api.AnnDiskSource]] {
-			r.Labeler.SetLabels(&dv, r.Labeler.VMLabels(vm.Ref))
+			r.Labeler.SetLabels(&dv, r.Labeler.MigrationVMLabels(vm.Ref))
 			err = r.Destination.Client.Create(context.Background(), &dv)
 			if err != nil {
 				err = liberr.Wrap(err)
@@ -107,7 +107,7 @@ func (r *Ensurer) PersistentVolumeClaims(vm *planapi.VMStatus, pvcs []core.Persi
 		context.Background(),
 		list,
 		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.MigrationVMLabels(vm.Ref)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		})
 	if err != nil {
@@ -122,7 +122,7 @@ func (r *Ensurer) PersistentVolumeClaims(vm *planapi.VMStatus, pvcs []core.Persi
 
 	for _, pvc := range pvcs {
 		if !exists[pvc.Annotations[api.AnnDiskSource]] {
-			r.Labeler.SetLabels(&pvc, r.Labeler.VMLabels(vm.Ref))
+			r.Labeler.SetLabels(&pvc, r.Labeler.MigrationVMLabels(vm.Ref))
 			err = r.Destination.Client.Create(context.Background(), &pvc)
 			if err != nil {
 				err = liberr.Wrap(err)
