@@ -1,0 +1,86 @@
+name: Release CLI Binaries
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    name: Build and Upload CLI Archives
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check if assets already exist
+        id: check_assets
+        run: |
+          MTV_VERSION="${{ github.event.release.tag_name }}"
+          url="https://github.com/${{ github.repository }}/releases/download/${MTV_VERSION}/kubectl-mtv-${MTV_VERSION}-linux-amd64.tar.gz"
+          if curl -sSL --fail -I "$url" > /dev/null 2>&1; then
+            echo "Assets already exist, skipping build and upload"
+            echo "assets_exist=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Assets do not exist, will build and upload"
+            echo "assets_exist=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.check_assets.outputs.assets_exist != 'true'
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        if: steps.check_assets.outputs.assets_exist != 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: cmd/kubectl-mtv/go.mod
+          check-latest: true
+
+      - name: Build release archives
+        if: steps.check_assets.outputs.assets_exist != 'true'
+        run: make -C cmd/kubectl-mtv dist-all MTV_VERSION=${{ github.event.release.tag_name }}
+        env:
+          GOFLAGS: -mod=vendor
+
+      - name: Upload release assets
+        if: steps.check_assets.outputs.assets_exist != 'true'
+        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631
+        with:
+          files: cmd/kubectl-mtv/dist/*
+
+      - name: Wait for assets to be available
+        if: steps.check_assets.outputs.assets_exist != 'true'
+        run: |
+          echo "Waiting 30 seconds for GitHub to propagate release assets..."
+          sleep 30
+
+      - name: Verify all assets are available
+        run: |
+          MTV_VERSION="${{ github.event.release.tag_name }}"
+          PLATFORMS="linux-amd64 linux-arm64 darwin-amd64 darwin-arm64"
+
+          echo "Verifying release assets are downloadable..."
+          for platform in $PLATFORMS; do
+            asset="kubectl-mtv-${MTV_VERSION}-${platform}.tar.gz"
+            url="https://github.com/${{ github.repository }}/releases/download/${MTV_VERSION}/${asset}"
+            echo "Checking: $url"
+            if curl -sSL --fail -I "$url" > /dev/null; then
+              echo "  $asset is available"
+            else
+              echo "  $asset is not available"
+              exit 1
+            fi
+          done
+
+          asset="kubectl-mtv-${MTV_VERSION}-windows-amd64.zip"
+          url="https://github.com/${{ github.repository }}/releases/download/${MTV_VERSION}/${asset}"
+          echo "Checking: $url"
+          if curl -sSL --fail -I "$url" > /dev/null; then
+            echo "  $asset is available"
+          else
+            echo "  $asset is not available"
+            exit 1
+          fi
+
+          echo "All assets verified successfully!"
