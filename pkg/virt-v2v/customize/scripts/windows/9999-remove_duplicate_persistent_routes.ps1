@@ -2,17 +2,21 @@
 
 Write-Host "Starting persistent route cleanup script..." -ForegroundColor Green
 
-# Function to convert CIDR prefix length to subnet mask
-function Convert-PrefixToMask($prefix) {
-    $bin = ("1" * $prefix).PadRight(32, "0")
-    $octets = @(
-        $bin.Substring(0, 8)
-        $bin.Substring(8, 8)
-        $bin.Substring(16, 8)
-        $bin.Substring(24, 8)
-    ) | ForEach-Object { [Convert]::ToInt32($_, 2) }
+# Lookup table avoids [Convert]::ToInt32() which is blocked in Constrained Language Mode
+$PrefixToMaskTable = @(
+    "0.0.0.0",         "128.0.0.0",       "192.0.0.0",       "224.0.0.0",
+    "240.0.0.0",       "248.0.0.0",       "252.0.0.0",       "254.0.0.0",
+    "255.0.0.0",       "255.128.0.0",     "255.192.0.0",     "255.224.0.0",
+    "255.240.0.0",     "255.248.0.0",     "255.252.0.0",     "255.254.0.0",
+    "255.255.0.0",     "255.255.128.0",   "255.255.192.0",   "255.255.224.0",
+    "255.255.240.0",   "255.255.248.0",   "255.255.252.0",   "255.255.254.0",
+    "255.255.255.0",   "255.255.255.128", "255.255.255.192", "255.255.255.224",
+    "255.255.255.240", "255.255.255.248", "255.255.255.252", "255.255.255.254",
+    "255.255.255.255"
+)
 
-    return ($octets -join ".")
+function Convert-PrefixToMask($prefix) {
+    return $PrefixToMaskTable[[int]$prefix]
 }
 
 # Get persistent routes
