@@ -207,7 +207,7 @@ metadata:
   namespace: openshift-mtv
 type: Opaque
 stringData:
-  STORAGE_HOSTNAME: "https://192.168.1.1:8080"
+  STORAGE_HOSTNAME: "192.168.1.1:8080"
   STORAGE_USERNAME: "admin"
   STORAGE_PASSWORD: "your-password"
 ```
