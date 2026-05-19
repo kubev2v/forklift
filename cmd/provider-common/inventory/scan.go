@@ -77,7 +77,13 @@ func findApplianceFiles(directory string) (ovaFiles []string, ovfFiles []string,
 
 	err = filepath.WalkDir(directory, func(path string, info os.DirEntry, err error) error {
 		if err != nil {
-			return err
+			// only fail if the root is unreadable,
+			// otherwise log and move on.
+			if path == directory {
+				return err
+			}
+			log.Printf("Skipping unreadable path %s: %v", path, err)
+			return nil
 		}
 
 		if info.IsDir() {
