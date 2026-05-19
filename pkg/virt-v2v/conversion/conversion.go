@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/kubev2v/forklift/pkg/virt-v2v/config"
-	"github.com/kubev2v/forklift/pkg/virt-v2v/customize"
+	"github.com/kubev2v/forklift/pkg/virt-v2v/customization"
 	"github.com/kubev2v/forklift/pkg/virt-v2v/utils"
 	"libvirt.org/go/libvirt"
 	libvirtxml "libvirt.org/go/libvirtxml"
@@ -338,13 +338,15 @@ func (c *Conversion) RunVirtV2v() error {
 	return nil
 }
 
-func (c *Conversion) RunCustomize(osinfo utils.InspectionOS) error {
+func (c *Conversion) RunCustomize() error {
 	var disks []string
 	for _, disk := range c.Disks {
 		disks = append(disks, disk.Link)
 	}
-	custom := customize.NewCustomize(c.AppConfig, disks, osinfo)
-	return custom.Run()
+	return customization.Run(customization.Options{
+		Config: c.AppConfig,
+		Disks:  disks,
+	})
 }
 
 func (c *Conversion) RunRemoteV2vInspection() (err error) {
