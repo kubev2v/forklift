@@ -779,7 +779,7 @@ func (r *LiveMigrator) GetTargetVM(vm *planapi.VMStatus) (target *cnv.VirtualMac
 		context.TODO(),
 		vms,
 		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.MigrationVMLabels(vm.Ref)),
 			Namespace:     r.Context.Plan.Spec.TargetNamespace,
 		},
 	)
@@ -819,7 +819,7 @@ func (r *LiveMigrator) GetTargetVMIM(vm *planapi.VMStatus) (vmim *cnv.VirtualMac
 		context.TODO(),
 		vmims,
 		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.MigrationVMLabels(vm.Ref)),
 			Namespace:     r.Context.Plan.Spec.TargetNamespace,
 		})
 	if err != nil {
@@ -848,7 +848,7 @@ func (r *LiveMigrator) GetSourceVMIM(vm *planapi.VMStatus) (vmim *cnv.VirtualMac
 		context.TODO(),
 		vmims,
 		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.MigrationVMLabels(vm.Ref)),
 			Namespace:     virtualMachine.Namespace,
 		})
 	if err != nil {
@@ -909,7 +909,7 @@ func (r *LiveMigrator) findKubeVirt(inventory web.Client) (kv *cnv.KubeVirt, err
 	}
 }
 
-// DeleteServiceExports deletes the ServiceExports that were created to expose the sync endpooints on
+// DeleteServiceExports deletes the ServiceExports that were created to expose the sync endpoints on
 // the destination cluster.
 func (r *LiveMigrator) DeleteServiceExports(vm *planapi.VMStatus) (err error) {
 	kv, err := r.GetTargetKubeVirt()
@@ -922,7 +922,7 @@ func (r *LiveMigrator) DeleteServiceExports(vm *planapi.VMStatus) (err error) {
 		&multicluster.ServiceExport{},
 		&client.DeleteAllOfOptions{
 			ListOptions: client.ListOptions{
-				LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+				LabelSelector: k8slabels.SelectorFromSet(r.Labeler.PlanVMLabels(vm.Ref)),
 				Namespace:     kv.Namespace,
 			},
 		})
@@ -939,7 +939,7 @@ func (r *LiveMigrator) DeleteDataVolumes(vm *planapi.VMStatus) (err error) {
 		&cdi.DataVolume{},
 		&client.DeleteAllOfOptions{
 			ListOptions: client.ListOptions{
-				LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+				LabelSelector: k8slabels.SelectorFromSet(r.Labeler.PlanVMLabels(vm.Ref)),
 				Namespace:     r.Plan.Spec.TargetNamespace,
 			},
 		})
@@ -956,7 +956,7 @@ func (r *LiveMigrator) DeletePersistentVolumeClaims(vm *planapi.VMStatus) (err e
 		&core.PersistentVolumeClaim{},
 		&client.DeleteAllOfOptions{
 			ListOptions: client.ListOptions{
-				LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+				LabelSelector: k8slabels.SelectorFromSet(r.Labeler.PlanVMLabels(vm.Ref)),
 				Namespace:     r.Plan.Spec.TargetNamespace,
 			},
 		})
@@ -973,7 +973,7 @@ func (r *LiveMigrator) DeleteVirtualMachine(vm *planapi.VMStatus) (err error) {
 		&cnv.VirtualMachine{},
 		&client.DeleteAllOfOptions{
 			ListOptions: client.ListOptions{
-				LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+				LabelSelector: k8slabels.SelectorFromSet(r.Labeler.PlanVMLabels(vm.Ref)),
 				Namespace:     r.Plan.Spec.TargetNamespace,
 			},
 		})
@@ -996,7 +996,7 @@ func (r *LiveMigrator) DeleteSourceVMIM(vm *planapi.VMStatus) (err error) {
 		&cnv.VirtualMachineInstanceMigration{},
 		&client.DeleteAllOfOptions{
 			ListOptions: client.ListOptions{
-				LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+				LabelSelector: k8slabels.SelectorFromSet(r.Labeler.PlanVMLabels(vm.Ref)),
 				Namespace:     inventoryVm.Namespace,
 			},
 		})
@@ -1013,7 +1013,7 @@ func (r *LiveMigrator) DeleteTargetVMIM(vm *planapi.VMStatus) (err error) {
 		&cnv.VirtualMachineInstanceMigration{},
 		&client.DeleteAllOfOptions{
 			ListOptions: client.ListOptions{
-				LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+				LabelSelector: k8slabels.SelectorFromSet(r.Labeler.PlanVMLabels(vm.Ref)),
 				Namespace:     r.Plan.Spec.TargetNamespace,
 			},
 		})
@@ -1030,7 +1030,7 @@ func (r *LiveMigrator) DeleteJobs(vm *planapi.VMStatus) (err error) {
 		&batch.Job{},
 		&client.DeleteAllOfOptions{
 			ListOptions: client.ListOptions{
-				LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+				LabelSelector: k8slabels.SelectorFromSet(r.Labeler.PlanVMLabels(vm.Ref)),
 				Namespace:     r.Plan.Spec.TargetNamespace,
 			},
 		})
@@ -1054,7 +1054,7 @@ func (r *Ensurer) EnsureOwnerReferences(vm *planapi.VMStatus) (err error) {
 		context.TODO(),
 		vms,
 		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.MigrationVMLabels(vm.Ref)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
@@ -1072,7 +1072,7 @@ func (r *Ensurer) EnsureOwnerReferences(vm *planapi.VMStatus) (err error) {
 		context.Background(),
 		dvs,
 		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.MigrationVMLabels(vm.Ref)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		})
 	if err != nil {
@@ -1097,7 +1097,7 @@ func (r *Ensurer) EnsureOwnerReferences(vm *planapi.VMStatus) (err error) {
 		context.Background(),
 		pvcs,
 		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.MigrationVMLabels(vm.Ref)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		})
 	if err != nil {
@@ -1127,7 +1127,7 @@ func (r *Ensurer) EnsureTargetVMIM(vm *planapi.VMStatus, target *cnv.VirtualMach
 		context.TODO(),
 		list,
 		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.MigrationVMLabels(vm.Ref)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
@@ -1164,7 +1164,7 @@ func (r *Ensurer) EnsureSourceVMIM(vm *planapi.VMStatus, source *cnv.VirtualMach
 		context.TODO(),
 		list,
 		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.VMLabels(vm.Ref)),
+			LabelSelector: k8slabels.SelectorFromSet(r.Labeler.MigrationVMLabels(vm.Ref)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
 		},
 	)
@@ -1322,9 +1322,9 @@ func (r *Builder) VirtualMachine(vm *planapi.VMStatus) (object *cnv.VirtualMachi
 	object.Name = source.Name
 	object.Namespace = r.Plan.Spec.TargetNamespace
 	r.Labeler.SetLabels(object, source.Object.Labels)
-	r.Labeler.SetLabels(object, r.Labeler.VMLabels(vm.Ref))
+	r.Labeler.SetLabels(object, r.Labeler.MigrationVMLabels(vm.Ref))
 	r.Labeler.SetAnnotations(object, source.Object.Annotations)
-	r.Labeler.SetAnnotations(object, r.Labeler.VMLabels(vm.Ref))
+	r.Labeler.SetAnnotations(object, r.Labeler.MigrationVMLabels(vm.Ref))
 	r.Labeler.SetAnnotation(object, AnnSource, key.String())
 
 	// preserve the original runstrategy so that it can be applied
@@ -1409,8 +1409,8 @@ func (r *Builder) DataVolumes(vm *planapi.VMStatus) (dvs []cdi.DataVolume, err e
 			return
 		}
 		target := r.targetDataVolume(source, pvc, storage)
-		r.Labeler.SetLabels(&target, r.Labeler.VMLabels(vm.Ref))
-		r.Labeler.SetAnnotations(&target, r.Labeler.VMLabels(vm.Ref))
+		r.Labeler.SetLabels(&target, r.Labeler.MigrationVMLabels(vm.Ref))
+		r.Labeler.SetAnnotations(&target, r.Labeler.MigrationVMLabels(vm.Ref))
 		r.Labeler.SetAnnotation(&target, AnnDiskSource, path.Join(pvc.Namespace, pvc.Name))
 		r.Labeler.SetAnnotation(&target, AnnVolumeName, vol.Name)
 		dvs = append(dvs, target)
@@ -1465,8 +1465,8 @@ func (r *Builder) PersistentVolumeClaims(vm *planapi.VMStatus) (pvcs []core.Pers
 			return
 		}
 		target := r.targetPvc(source, storage)
-		r.Labeler.SetLabels(&target, r.Labeler.VMLabels(vm.Ref))
-		r.Labeler.SetAnnotations(&target, r.Labeler.VMLabels(vm.Ref))
+		r.Labeler.SetLabels(&target, r.Labeler.MigrationVMLabels(vm.Ref))
+		r.Labeler.SetAnnotations(&target, r.Labeler.MigrationVMLabels(vm.Ref))
 		r.Labeler.SetAnnotation(&target, AnnDiskSource, path.Join(source.Namespace, source.Name))
 		r.Labeler.SetAnnotation(&target, AnnVolumeName, vol.Name)
 		pvcs = append(pvcs, target)
@@ -1744,7 +1744,7 @@ func (r *Builder) TargetVMIM(vm *planapi.VMStatus) (vmim *cnv.VirtualMachineInst
 	vmim = &cnv.VirtualMachineInstanceMigration{}
 	vmim.GenerateName = "forklift-"
 	vmim.Namespace = r.Context.Plan.Spec.TargetNamespace
-	vmim.Labels = r.Labeler.VMLabels(vm.Ref)
+	vmim.Labels = r.Labeler.MigrationVMLabels(vm.Ref)
 	vmim.Spec.VMIName = inventoryVm.Name
 	vmim.Spec.Receive = &cnv.VirtualMachineInstanceMigrationTarget{
 		MigrationID: r.kubevirtMigrationID(vm),
@@ -1763,7 +1763,7 @@ func (r *Builder) SourceVMIM(vm *planapi.VMStatus, syncAddress string) (vmim *cn
 	vmim = &cnv.VirtualMachineInstanceMigration{}
 	vmim.GenerateName = "forklift-"
 	vmim.Namespace = inventoryVm.Namespace
-	vmim.Labels = r.Labeler.VMLabels(vm.Ref)
+	vmim.Labels = r.Labeler.MigrationVMLabels(vm.Ref)
 	vmim.Spec.VMIName = inventoryVm.Name
 	vmim.Spec.SendTo = &cnv.VirtualMachineInstanceMigrationSource{
 		MigrationID: r.kubevirtMigrationID(vm),
