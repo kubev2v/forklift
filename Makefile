@@ -250,6 +250,10 @@ run-inventory: generate fmt vet ensure-temp-dirs ## Run inventory service locall
 	WORKING_DIR=/tmp/forklift-inventory \
 		KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION=v1 go run ./cmd/forklift-controller/main.go
 
+.PHONY: dist-cli
+dist-cli: ## Build kubectl-mtv release archives for all platforms
+	$(MAKE) -C cmd/kubectl-mtv dist-all
+
 ##@ Code Generation & Quality
 
 fmt: ## Run go fmt
