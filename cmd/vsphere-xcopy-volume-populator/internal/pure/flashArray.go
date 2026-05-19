@@ -243,23 +243,41 @@ func (f *FlashArrayClonner) getSourceVolume(vsphereClient vmware.Client, vmId st
 		if disk, ok := device.(*types.VirtualDisk); ok {
 			if backing, ok := disk.Backing.(*types.VirtualDiskFlatVer2BackingInfo); ok {
 				// Check if this is a VVol backing and matches our target VMDK
-				if backing.BackingObjectId != "" && f.matchesVMDKPath(backing.FileName, vmDisk) {
-					klog.Infof("Found VVol backing for VMDK %s with ID %s", vmDisk.VmdkFile, backing.BackingObjectId)
-
-					// Use REST client to find the volume by VVol ID
-					volumeName, err := f.restClient.FindVolumeByVVolID(backing.BackingObjectId)
-					if err != nil {
-						klog.Warningf("Failed to find volume by VVol ID %s: %v", backing.BackingObjectId, err)
-						continue
-					}
-
-					return volumeName, nil
+				matched := f.findMatchingFlatBacking(backing, vmDisk)
+				if matched == nil || matched.BackingObjectId == "" {
+					continue
 				}
+				klog.Infof("Found VVol backing for VMDK %s with ID %s (matched at FileName %s)",
+					vmDisk.VmdkFile, matched.BackingObjectId, matched.FileName)
+
+				// Use REST client to find the volume by VVol ID
+				volumeName, err := f.restClient.FindVolumeByVVolID(matched.BackingObjectId)
+				if err != nil {
+					klog.Warningf("Failed to find volume by VVol ID %s: %v", matched.BackingObjectId, err)
+					continue
+				}
+				return volumeName, nil
 			}
 		}
 	}
 
 	return "", fmt.Errorf("VVol backing for VMDK %s not found", vmDisk.VmdkFile)
+}
+
+// findMatchingFlatBacking returns the first node in b's Parent chain whose
+// filename matches vmDisk, or nil if none does.
+//
+// While a snapshot is active the chain is "child disk (foo-000001.vmdk) ->
+// parent (foo.vmdk)", and VASA reports a different BackingObjectId per level:
+// child -> base vVol (current writes), parent -> snap-vVol (frozen). The
+// caller's vmdkPath picks which level matches.
+func (f *FlashArrayClonner) findMatchingFlatBacking(b *types.VirtualDiskFlatVer2BackingInfo, vmDisk populator.VMDisk) *types.VirtualDiskFlatVer2BackingInfo {
+	for cur := b; cur != nil; cur = cur.Parent {
+		if f.matchesVMDKPath(cur.FileName, vmDisk) {
+			return cur
+		}
+	}
+	return nil
 }
 
 // matchesVMDKPath checks if a vSphere VVol filename matches the target VMDK
