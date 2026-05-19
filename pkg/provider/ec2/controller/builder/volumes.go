@@ -206,7 +206,7 @@ func (r *Builder) BuildPersistentVolume(vmRef ref.Ref, volumeInfo *VolumeInfo, p
 	storageClass := r.findStorageMapping(volumeInfo.VolumeType)
 	blockMode := core.PersistentVolumeBlock
 
-	pvLabels := r.Labeler.VMLabels(vmRef)
+	pvLabels := r.Labeler.MigrationVMLabels(vmRef)
 	pvLabels["forklift.konveyor.io/ebs-volume-id"] = volumeInfo.EBSVolumeID
 
 	pv := &core.PersistentVolume{
@@ -274,7 +274,7 @@ func (r *Builder) BuildDirectPVC(vmRef ref.Ref, volumeInfo *VolumeInfo, index in
 	volumeSizeBytes := volumeInfo.SizeGiB * 1024 * 1024 * 1024
 	pvcSize := r.calculatePVCSize(volumeSizeBytes, &blockMode)
 
-	pvcLabels := r.Labeler.VMLabels(vmRef)
+	pvcLabels := r.Labeler.MigrationVMLabels(vmRef)
 	// volume-id label stores the source EC2 volume ID - used by mapDisks in vm.go
 	// to match PVCs to the source instance's BlockDeviceMappings
 	pvcLabels["forklift.konveyor.io/volume-id"] = volumeInfo.OriginalVolumeID
