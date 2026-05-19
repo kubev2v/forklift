@@ -30,8 +30,14 @@ func (r *Labeler) MigrationLabels() map[string]string {
 	}
 }
 
-func (r *Labeler) VMLabels(vmRef ref.Ref) map[string]string {
+func (r *Labeler) MigrationVMLabels(vmRef ref.Ref) map[string]string {
 	labels := r.MigrationLabels()
+	labels[LabelVM] = vmRef.ID
+	return labels
+}
+
+func (r *Labeler) PlanVMLabels(vmRef ref.Ref) map[string]string {
+	labels := r.PlanLabels()
 	labels[LabelVM] = vmRef.ID
 	return labels
 }
