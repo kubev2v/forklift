@@ -1,12 +1,12 @@
 FROM registry.redhat.io/ubi10-minimal:10.2-1777462752 AS winlegacyiso
 
 RUN rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
-RUN microdnf install -y --setopt=install_weak_deps=False virtio-win-1.9.12-4.el7
+RUN microdnf install -y --setopt=install_weak_deps=false virtio-win-1.9.12-4.el7
 
 FROM registry.redhat.io/ubi10-minimal:10.2-1777462752 AS appliance
 
 RUN microdnf update -y && \
-    microdnf install -y --setopt=install_weak_deps=False \
+    microdnf install -y --setopt=install_weak_deps=false \
     qemu-img \
     libguestfs-devel \
     libguestfs-winsupport \
@@ -55,7 +55,7 @@ RUN rm /etc/pki/tls/fips_local.cnf && \
 RUN mkdir /disks && \
     source /etc/os-release && \
     microdnf update -y --exclude=kernel,kernel-core,kernel-modules,kernel-modules-core && \
-    microdnf install -y --setopt=install_weak_deps=False \
+    microdnf install -y --setopt=install_weak_deps=false \
     virt-v2v \
     virtio-win \
     libvirt-libs
@@ -70,7 +70,7 @@ ENV HOME=/home/qemu
 # absence of an init process to clean up zombie processes. 'catatonit' acts
 # as PID 1 to resolve this.
 # Refer to: https://issues.redhat.com/browse/RHEL-105529
-RUN dnf install -y catatonit
+RUN microdnf install -y catatonit
 
 # This ensures that the 'libvirt:qemu:///session' connection method, which is
 # the officially tested and supported flow, is utilized instead of direct connections.
