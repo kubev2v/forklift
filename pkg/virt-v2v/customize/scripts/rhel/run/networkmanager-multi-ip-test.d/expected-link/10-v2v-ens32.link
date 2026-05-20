@@ -1,0 +1,5 @@
+[Match]
+MACAddress=00:50:56:a1:b2:c3
+
+[Link]
+Name=ens32
