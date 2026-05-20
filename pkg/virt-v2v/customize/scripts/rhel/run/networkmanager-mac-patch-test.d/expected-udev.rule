@@ -1,0 +1,2 @@
+SUBSYSTEM=="net",ACTION=="add",ATTR{address}=="00:15:5D:A0:A3:0B",NAME="eth0"
+SUBSYSTEM=="net",ACTION=="add",ATTR{address}=="00:15:5D:A0:A3:0C",NAME="eth1"

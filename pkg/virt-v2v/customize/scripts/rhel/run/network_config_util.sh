@@ -12,6 +12,7 @@ IFQUERY_CMD="${IFQUERY_CMD:-ifquery}"
 SYSTEMD_NETWORK_DIR="${SYSTEMD_NETWORK_DIR:-/run/systemd/network}"
 WICKED_DIR="${WICKED_DIR:-/var/lib/wicked}"
 UDEV_RULES_FILE="${UDEV_RULES_FILE:-/etc/udev/rules.d/70-persistent-net.rules}"
+SYSTEMD_LINK_DIR="${SYSTEMD_LINK_DIR:-/etc/systemd/network}"
 NETPLAN_DIR="${NETPLAN_DIR:-/}"
 
 # Dump debug strings into a new file descriptor and redirect it to stdout.
@@ -523,6 +524,67 @@ udev_from_ifquery() {
     done
 }
 
+# Generate systemd .link files to ensure interface renaming works on all distros.
+# On RHEL 9/10+ predictable naming overrides raw udev NAME= rules, but a .link
+# file with a lower priority number takes precedence over the default policy.
+# On older distros the .link file is redundant with the udev rule but harmless.
+#
+# .link files are only created when a NetworkManager connection profile exists
+# for the IP but does not already contain the correct mac-address= binding.
+generate_link_files() {
+    # Only run on NM-based distros,skip Ubuntu/Debian/SUSE where this dir is absent.
+    if [ ! -d "$NETWORK_CONNECTIONS_DIR" ]; then
+        log "Info: $NETWORK_CONNECTIONS_DIR not found, skipping .link file creation."
+        return 0
+    fi
+
+    local CREATED=false
+
+    cat "$V2V_MAP_FILE" | while read -r line; do
+        extract_mac_ip "$line"
+
+        if [ -z "$S_HW" ] || [ -z "$S_IP" ]; then
+            continue
+        fi
+
+        # Find the NM connection profile that owns this IP.
+        local NM_FILE
+        NM_FILE=$(grep -El "address[0-9]*=.*$S_IP\b" "$NETWORK_CONNECTIONS_DIR"/* 2>/dev/null | head -1)
+        if [ -z "$NM_FILE" ]; then
+            continue
+        fi
+
+        # Read the interface name the connection is bound to.
+        local DEVICE
+        DEVICE=$(grep '^interface-name=' "$NM_FILE" | cut -d'=' -f2)
+        if [ -z "$DEVICE" ]; then
+            continue
+        fi
+
+        local MAC_LOWER
+        MAC_LOWER=$(echo "$S_HW" | tr 'A-F' 'a-f')
+
+        # If the profile already carries the correct MAC, a .link file is redundant.
+        local EXISTING_MAC
+        EXISTING_MAC=$(grep '^mac-address=' "$NM_FILE" | cut -d'=' -f2 | tr 'A-F' 'a-f')
+        if [ "$EXISTING_MAC" = "$MAC_LOWER" ]; then
+            log "Info: $NM_FILE already contains mac-address=$MAC_LOWER, skipping .link for $DEVICE."
+            continue
+        fi
+
+        # Create the target directory only when the first .link file is needed.
+        if [ "$CREATED" = false ]; then
+            mkdir -p "$SYSTEMD_LINK_DIR"
+            CREATED=true
+        fi
+
+        # Write the .link file: match by MAC, rename to the original interface name.
+        local LINK_FILE="$SYSTEMD_LINK_DIR/10-v2v-${DEVICE}.link"
+        printf '[Match]\nMACAddress=%s\n\n[Link]\nName=%s\n' "$MAC_LOWER" "$DEVICE" > "$LINK_FILE"
+        log "Created $LINK_FILE: $MAC_LOWER -> $DEVICE"
+    done
+}
+
 # Write to udev config
 # ----------------------------------------
 
@@ -556,6 +618,8 @@ main() {
     } | check_dupe_hws > "$UDEV_RULES_FILE" 2>/dev/null
     echo "New udev rule:"
     cat $UDEV_RULES_FILE
+
+    generate_link_files
 }
 
 main
