@@ -1,6 +1,7 @@
 package conversion
 
 import (
+	"context"
 	"testing"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -41,6 +42,154 @@ func pvcFilesystem(name, ns string) *core.PersistentVolumeClaim {
 
 func pvcBlock(name, ns string) *core.PersistentVolumeClaim {
 	return pvcWithMode(name, ns, core.PersistentVolumeBlock)
+}
+
+// conversionWithSnapshot builds a minimal DeepInspection Conversion whose
+// controller-owned snapshot has the given MoRef. Pass moref="" to simulate a
+// state where snapshot creation has not yet completed.
+func conversionWithSnapshot(moref string) *api.Conversion {
+	conv := &api.Conversion{
+		ObjectMeta: meta.ObjectMeta{Name: "test-conv", Namespace: "default"},
+		Spec: api.ConversionSpec{
+			Type: api.DeepInspection,
+			// No SNAPSHOT_MOREF in Settings → controller owns the snapshot.
+			Connection: api.Connection{
+				Secret: core.ObjectReference{
+					Name:      "vsphere-secret",
+					Namespace: "default",
+				},
+			},
+		},
+		Status: api.ConversionStatus{
+			Snapshot: &api.SnapshotStatus{
+				Owned: true,
+				Moref: moref,
+			},
+		},
+	}
+	return conv
+}
+
+// TestRemoveOwnedSnapshot_Guards verifies that RemoveOwnedSnapshot returns
+// (true, nil) immediately — without contacting vSphere — for all cases where
+// there is nothing to clean up. This is the guard logic that protects the
+// happy-path (SNAPSHOT_MOREF supplied by caller, non-DeepInspection types, or
+// snapshot not yet created) from triggering an unnecessary removal.
+func TestRemoveOwnedSnapshot_Guards(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name     string
+		conv     *api.Conversion
+		wantDone bool
+		wantErr  bool
+	}{
+		{
+			name: "non-DeepInspection type is a no-op",
+			conv: &api.Conversion{
+				Spec:   api.ConversionSpec{Type: api.Remote},
+				Status: api.ConversionStatus{Snapshot: &api.SnapshotStatus{Moref: "snapshot-1", Owned: true}},
+			},
+			wantDone: true,
+		},
+		{
+			// SNAPSHOT_MOREF in settings means the caller owns the snapshot;
+			// Status.Snapshot.Owned is false as runPhasePending would set it.
+			name: "snapshot not owned by controller (SNAPSHOT_MOREF was supplied)",
+			conv: &api.Conversion{
+				ObjectMeta: meta.ObjectMeta{Name: "test-conv", Namespace: "default"},
+				Spec: api.ConversionSpec{
+					Type:     api.DeepInspection,
+					Settings: map[string]string{api.SpecSettingsSnapshotMorefKey: "snapshot-2"},
+				},
+				Status: api.ConversionStatus{
+					Snapshot: &api.SnapshotStatus{Owned: false, Moref: "snapshot-2"},
+				},
+			},
+			wantDone: true,
+		},
+		{
+			name:     "snapshot status is nil",
+			conv:     &api.Conversion{Spec: api.ConversionSpec{Type: api.DeepInspection}},
+			wantDone: true,
+		},
+		{
+			name: "snapshot moref is empty (creation not yet completed)",
+			conv: conversionWithSnapshot(""),
+			// moref="" → nothing to remove yet
+			wantDone: true,
+		},
+		{
+			name: "moref set but connection secret name is empty",
+			conv: func() *api.Conversion {
+				c := conversionWithSnapshot("snapshot-3")
+				c.Spec.Connection.Secret.Name = ""
+				return c
+			}(),
+			// must not attempt vSphere; returns error to surface misconfiguration
+			wantDone: false,
+			wantErr:  true,
+		},
+		{
+			name: "moref set but connection secret namespace is empty",
+			conv: func() *api.Conversion {
+				c := conversionWithSnapshot("snapshot-4")
+				c.Spec.Connection.Secret.Namespace = ""
+				return c
+			}(),
+			wantDone: false,
+			wantErr:  true,
+		},
+		{
+			// Secret ref is fully set but the secret does not exist in the cluster.
+			// testEnsurer uses an empty fake client so e.Client.Get returns not-found.
+			name:     "moref set, valid secret ref, but secret not found in cluster",
+			conv:     conversionWithSnapshot("snapshot-5"),
+			wantDone: false,
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := testEnsurer(t) // no pre-existing k8s objects needed for guard cases
+			done, err := e.RemoveOwnedSnapshot(ctx, tt.conv)
+
+			if tt.wantErr && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if done != tt.wantDone {
+				t.Errorf("done = %v, want %v", done, tt.wantDone)
+			}
+		})
+	}
+}
+
+// TestSnapshotOwnedByController checks the predicate that decides whether the
+// controller created (and is responsible for removing) the snapshot.
+func TestSnapshotOwnedByController(t *testing.T) {
+	tests := []struct {
+		name     string
+		settings map[string]string
+		want     bool
+	}{
+		{"no settings map", nil, true},
+		{"empty SNAPSHOT_MOREF", map[string]string{api.SpecSettingsSnapshotMorefKey: ""}, true},
+		{"whitespace-only SNAPSHOT_MOREF", map[string]string{api.SpecSettingsSnapshotMorefKey: "   "}, true},
+		{"SNAPSHOT_MOREF provided", map[string]string{api.SpecSettingsSnapshotMorefKey: "snapshot-42"}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			conv := &api.Conversion{Spec: api.ConversionSpec{Settings: tt.settings}}
+			if got := snapshotOwnedByController(conv); got != tt.want {
+				t.Errorf("snapshotOwnedByController = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
 
 func TestVolumesFromDiskRefs(t *testing.T) {
