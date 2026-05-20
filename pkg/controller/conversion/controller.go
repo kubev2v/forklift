@@ -163,6 +163,23 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 			"stage", conversion.Status.Stage)
 	}
 
+	// Safety net: if the pipeline terminates with Phase=Failed and an owned
+	// snapshot is still present (e.g. the failure happened before the divert
+	// logic could redirect to StageRemoveSnapshot, or the snapshotRemoval stage
+	// itself errored and set Phase=Failed internally), submit a best effort
+	// removal task here. If in the primary failure path, the divert in
+	// runDeepInspection clears Status.Snapshot before StageFinished (successful snapshot removal) then this block is a no-op.
+	if conversion.Status.Phase == api.PhaseFailed {
+		ensurer, ensureErr := NewEnsurer(r.Client, r.Log, conversion.Spec)
+		if ensureErr == nil {
+			if _, snapErr := ensurer.RemoveOwnedSnapshot(ctx, conversion); snapErr != nil {
+				r.Log.Error(snapErr, "Failed to trigger snapshot removal for failed Conversion.")
+			}
+		} else {
+			r.Log.Error(ensureErr, "Failed to build Ensurer for snapshot cleanup on failure.")
+		}
+	}
+
 	resolvePhaseConditions(conversion)
 
 	conversion.Status.EndStagingConditions()
