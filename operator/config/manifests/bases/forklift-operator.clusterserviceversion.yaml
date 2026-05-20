@@ -446,6 +446,11 @@ spec:
         path: controller_retain_precopy_importer_pods
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Retain populator pods after migration for debugging (default false)
+        displayName: Retain Populator Pods
+        path: controller_retain_populator_pods
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Enable static udn IP addresses feature (default false)
         displayName: Static UDN IP Addresses
         path: controller_static_udn_ip_addresses
