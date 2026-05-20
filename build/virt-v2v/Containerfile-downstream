@@ -39,15 +39,15 @@ RUN GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o forklif
 FROM registry.redhat.io/ubi10:10.2-1777462922 AS runtime
 
 COPY --chown=1001:0 ./libguestfs-fssupport-10.2-4.el10_2.* ./
-COPY --chown=1001:0 ./kernel-modules-internal-6.12.0-211.3.1.el10_2.* ./
+COPY --chown=1001:0 ./kernel-modules-internal-6.12.0-211.16.1.el10_2.* ./
 
 # RHEL 10.1 custom kernel for libguestfs-fssupport
 RUN dnf install -y --setopt=sslverify=false \
-    kernel-6.12.0-211.3.1.el10_2 \
-    kernel-modules-core-6.12.0-211.3.1.el10_2 \
-    kernel-core-6.12.0-211.3.1.el10_2 \
-    kernel-modules-6.12.0-211.3.1.el10_2 \
-    kernel-modules-internal-6.12.0-211.3.1.el10_2.x86_64.rpm \
+    kernel-6.12.0-211.16.1.el10_2 \
+    kernel-modules-core-6.12.0-211.16.1.el10_2 \
+    kernel-core-6.12.0-211.16.1.el10_2 \
+    kernel-modules-6.12.0-211.16.1.el10_2 \
+    kernel-modules-internal-6.12.0-211.16.1.el10_2.x86_64.rpm \
     libguestfs-fssupport-10.2-4.el10_2.x86_64.rpm
 
 RUN rm /etc/pki/tls/fips_local.cnf && \

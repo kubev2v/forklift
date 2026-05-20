@@ -935,34 +935,34 @@ arches:
     name: kbd-misc
     evr: 2.6.4-7.el10
     sourcerpm: kbd-2.6.4-7.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10.2/x86_64/baseos/os/Packages/k/kernel-6.12.0-124.8.1.el10_1.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10.2/x86_64/baseos/os/Packages/k/kernel-6.12.0-211.16.1.el10_2.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 1419749
-    checksum: sha256:0a55c16f69fd44ffcd86d439437608262c28bc4510880afb072ddb9ad9cf5623
+    size: 1650301
+    checksum: sha256:254a7b45cb83d2d16a39f37bbb7ad3a80f7963766312af70a22a1057ebd12a0a
     name: kernel
-    evr: 6.12.0-124.8.1.el10_1
-    sourcerpm: kernel-6.12.0-124.8.1.el10_1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10.2/x86_64/baseos/os/Packages/k/kernel-core-6.12.0-124.8.1.el10_1.x86_64.rpm
+    evr: 6.12.0-211.16.1.el10_2
+    sourcerpm: kernel-6.12.0-211.16.1.el10_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10.2/x86_64/baseos/os/Packages/k/kernel-core-6.12.0-211.16.1.el10_2.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 19259781
-    checksum: sha256:83265595aa3b85aad7132856264f497b36af09e414749b0b742f57424960b17f
+    size: 19853261
+    checksum: sha256:3fcb9f83d44c59c96e5bea7deb9cf33c3d6d8aef566476e5b0425ec242f4ab08
     name: kernel-core
-    evr: 6.12.0-124.8.1.el10_1
-    sourcerpm: kernel-6.12.0-124.8.1.el10_1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10.2/x86_64/baseos/os/Packages/k/kernel-modules-6.12.0-124.8.1.el10_1.x86_64.rpm
+    evr: 6.12.0-211.16.1.el10_2
+    sourcerpm: kernel-6.12.0-211.16.1.el10_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10.2/x86_64/baseos/os/Packages/k/kernel-modules-6.12.0-211.16.1.el10_2.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 42511385
-    checksum: sha256:0b0ffbf435f8316cc87cfb0eb8d19458f755997dfbafd8b49d086db5026c3564
+    size: 43736593
+    checksum: sha256:5b97b7043744d8eff4da22fba36af9458202de66363fbec1d131a279f0ec20e0
     name: kernel-modules
-    evr: 6.12.0-124.8.1.el10_1
-    sourcerpm: kernel-6.12.0-124.8.1.el10_1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10.2/x86_64/baseos/os/Packages/k/kernel-modules-core-6.12.0-124.8.1.el10_1.x86_64.rpm
+    evr: 6.12.0-211.16.1.el10_2
+    sourcerpm: kernel-6.12.0-211.16.1.el10_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10.2/x86_64/baseos/os/Packages/k/kernel-modules-core-6.12.0-211.16.1.el10_2.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 31019077
-    checksum: sha256:3071f1e80f4e0adcf4c0ead00136e4d55534d732b37d4b19d26dbc1d2d2863d6
+    size: 31916281
+    checksum: sha256:6b4db27a280ce40f8d9c2ecefc0c5eb4222a75c61d964ca55e35bf4700d4eed9
     name: kernel-modules-core
-    evr: 6.12.0-124.8.1.el10_1
-    sourcerpm: kernel-6.12.0-124.8.1.el10_1.src.rpm
+    evr: 6.12.0-211.16.1.el10_2
+    sourcerpm: kernel-6.12.0-211.16.1.el10_2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel10/10.2/x86_64/baseos/os/Packages/k/kmod-31-13.el10.x86_64.rpm
     repoid: rhel-10-for-x86_64-baseos-rpms
     size: 146454
@@ -2070,12 +2070,12 @@ arches:
     checksum: sha256:5904753dfb0f575825d54e6001419c6a39bac8b4b43e5360bf37feb9a020946c
     name: kbd
     evr: 2.6.4-7.el10
-  - url: https://cdn.redhat.com/content/dist/rhel10/10.2/x86_64/baseos/source/SRPMS/Packages/k/kernel-6.12.0-124.8.1.el10_1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel10/10.2/x86_64/baseos/source/SRPMS/Packages/k/kernel-6.12.0-211.16.1.el10_2.src.rpm
     repoid: rhel-10-for-x86_64-baseos-source-rpms
-    size: 158631452
-    checksum: sha256:f1624f513910e718baa1a41a71e03103a600f4f09b8d88abd9f489aa12147960
+    size: 159420916
+    checksum: sha256:ee6ae44bc0e4288b6b60ad5bd89716c68568e7e762779ce954a75c8d00e08c02
     name: kernel
-    evr: 6.12.0-124.8.1.el10_1
+    evr: 6.12.0-211.16.1.el10_2
   - url: https://cdn.redhat.com/content/dist/rhel10/10.2/x86_64/baseos/source/SRPMS/Packages/k/kmod-31-13.el10.src.rpm
     repoid: rhel-10-for-x86_64-baseos-source-rpms
     size: 631418
