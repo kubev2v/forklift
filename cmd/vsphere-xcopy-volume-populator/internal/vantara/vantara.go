@@ -23,6 +23,15 @@ type VantaraCloner struct {
 	envHostGroupIds []string
 	initiatorGroup  string
 	copySpeed       string
+	arrayInfo       populator.StorageArrayInfo
+}
+
+// Ensure VantaraCloner implements StorageArrayInfoProvider
+var _ populator.StorageArrayInfoProvider = &VantaraCloner{}
+
+// GetStorageArrayInfo returns metadata about the Vantara array for metric labels.
+func (v *VantaraCloner) GetStorageArrayInfo() populator.StorageArrayInfo {
+	return v.arrayInfo
 }
 
 func NewVantaraClonner(hostname, username, password string) (VantaraCloner, error) {
@@ -50,11 +59,26 @@ func NewVantaraClonner(hostname, username, password string) (VantaraCloner, erro
 		return VantaraCloner{}, fmt.Errorf("failed to connect to Vantara storage: %w", err)
 	}
 
-	return VantaraCloner{
+	cloner := VantaraCloner{
 		client:          client,
 		envHostGroupIds: envStorage["hostGroupIds"].([]string),
 		copySpeed:       envStorage["copySpeed"].(string),
-	}, nil
+		arrayInfo: populator.StorageArrayInfo{
+			Vendor:  "Hitachi",
+			Product: "Vantara",
+		},
+	}
+
+	// Fetch model and version from the API
+	storageInfo, err := client.GetStorageInfo()
+	if err != nil {
+		klog.Warningf("Failed to get Vantara storage info for metrics: %v", err)
+	} else {
+		cloner.arrayInfo.Model = storageInfo.Model
+		cloner.arrayInfo.Version = storageInfo.DkcMicroVersion
+	}
+
+	return cloner, nil
 }
 
 func (v *VantaraCloner) MapTarget(targetLUN populator.LUN, context populator.MappingContext) (populator.LUN, error) {

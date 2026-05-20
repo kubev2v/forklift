@@ -25,6 +25,15 @@ type PowermaxClonner struct {
 	storageGroupID string
 	hostID         string
 	maskingViewID  string
+	arrayInfo      populator.StorageArrayInfo
+}
+
+// Ensure PowermaxClonner implements StorageArrayInfoProvider
+var _ populator.StorageArrayInfoProvider = &PowermaxClonner{}
+
+// GetStorageArrayInfo returns metadata about the PowerMax array for metric labels.
+func (p *PowermaxClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
+	return p.arrayInfo
 }
 
 func (p *PowermaxClonner) MapTarget(targetLUN populator.LUN, mappingContext populator.MappingContext) (populator.LUN, error) {
@@ -301,7 +310,27 @@ func NewPowermaxClonner(hostname, username, password string, sslSkipVerify bool)
 		return PowermaxClonner{}, err
 	}
 	klog.Info("successfuly logged in to PowerMax")
-	return PowermaxClonner{client: client, symmetrixID: symID, portGroup: portGroup}, nil
+
+	clonner := PowermaxClonner{
+		client:      client,
+		symmetrixID: symID,
+		portGroup:   portGroup,
+		arrayInfo: populator.StorageArrayInfo{
+			Vendor:  "Dell",
+			Product: "PowerMax",
+		},
+	}
+
+	// Fetch model and version from the API
+	sym, err := client.GetSymmetrixByID(context.TODO(), symID)
+	if err != nil {
+		klog.Warningf("Failed to get PowerMax symmetrix info for metrics: %v", err)
+	} else {
+		clonner.arrayInfo.Model = sym.Model
+		clonner.arrayInfo.Version = sym.Ucode
+	}
+
+	return clonner, nil
 }
 
 func generateRandomString(length int) (string, error) {

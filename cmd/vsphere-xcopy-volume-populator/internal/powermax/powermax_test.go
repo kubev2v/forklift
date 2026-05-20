@@ -36,6 +36,11 @@ func TestNewPowermaxClonner(t *testing.T) {
 		os.Setenv("POWERMAX_PORT_GROUP_NAME", "456")
 
 		mockClient.EXPECT().Authenticate(gomock.Any(), gomock.Any()).Return(nil)
+		mockClient.EXPECT().GetSymmetrixByID(gomock.Any(), "123").Return(&v100.Symmetrix{
+			SymmetrixID: "123",
+			Model:       "PowerMax_2500",
+			Ucode:       "6079.170.170",
+		}, nil)
 		// not testing the gopowermax constructor
 		origNewClientWithArgs := newClientWithArgs
 		newClientWithArgs = func(string, string, bool, bool, string) (gopowermax.Pmax, error) {
@@ -48,6 +53,10 @@ func TestNewPowermaxClonner(t *testing.T) {
 		g.Expect(clonner).ToNot(gomega.BeNil())
 		g.Expect(clonner.symmetrixID).To(gomega.Equal("123"))
 		g.Expect(clonner.portGroup).To(gomega.Equal("456"))
+		g.Expect(clonner.arrayInfo.Vendor).To(gomega.Equal("Dell"))
+		g.Expect(clonner.arrayInfo.Product).To(gomega.Equal("PowerMax"))
+		g.Expect(clonner.arrayInfo.Model).To(gomega.Equal("PowerMax_2500"))
+		g.Expect(clonner.arrayInfo.Version).To(gomega.Equal("6079.170.170"))
 	})
 }
 
