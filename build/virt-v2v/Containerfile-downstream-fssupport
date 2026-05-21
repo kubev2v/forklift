@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi10/go-toolset:1.24-1752559364 AS builder
+FROM registry.redhat.io/ubi10/go-toolset:1.25.9-1778589469 AS builder
 WORKDIR /app
 COPY --chown=1001:0 ./ ./
 ENV GOFLAGS="-mod=vendor -tags=strictfipsruntime"
@@ -7,8 +7,9 @@ ENV GOEXPERIMENT=strictfipsruntime
 RUN GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o virt-v2v-monitor github.com/kubev2v/forklift/cmd/virt-v2v-monitor
 RUN GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o image-converter github.com/kubev2v/forklift/cmd/image-converter
 RUN GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o virt-v2v-wrapper github.com/kubev2v/forklift/cmd/virt-v2v
+RUN GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o forklift-wait-for-reboot github.com/kubev2v/forklift/cmd/forklift-wait-for-reboot
 
-FROM registry.redhat.io/ubi10:10.1-1772441712
+FROM registry.redhat.io/ubi10:10.2-1777462922
 
 RUN rm /etc/pki/tls/fips_local.cnf && \
     echo -e '[fips_sect]\ntls1-prf-ems-check = 0\nactivate = 1' > /etc/pki/tls/fips_local.cnf && \
@@ -84,6 +85,8 @@ COPY --from=builder /app/virt-v2v-monitor /usr/local/bin/virt-v2v-monitor
 COPY --from=builder /app/image-converter /usr/local/bin/image-converter
 
 COPY --from=builder /app/virt-v2v-wrapper /usr/bin/virt-v2v-wrapper
+
+COPY --from=builder /app/forklift-wait-for-reboot /usr/local/bin/forklift-wait-for-reboot
 
 ENTRYPOINT ["/usr/libexec/catatonit/catatonit", "/usr/bin/virt-v2v-wrapper"]
 
