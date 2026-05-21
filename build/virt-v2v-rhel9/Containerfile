@@ -75,6 +75,10 @@ COPY --from=builder /app/virt-v2v-wrapper /usr/bin/virt-v2v-wrapper
 
 COPY --from=builder /app/forklift-wait-for-reboot /usr/local/bin/forklift-wait-for-reboot
 
+COPY build/virt-v2v/xfs_repair_wrapper.sh /usr/sbin/xfs_repair_wrapper.sh
+RUN mv /usr/sbin/xfs_repair /usr/sbin/xfs_repair.real && \
+    mv /usr/sbin/xfs_repair_wrapper.sh /usr/sbin/xfs_repair
+
 ENTRYPOINT ["/usr/libexec/catatonit/catatonit", "/usr/bin/virt-v2v-wrapper"]
 
 LABEL \
