@@ -220,64 +220,47 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 
 	numNetworks := 0
 	hasUDN := r.Plan.DestinationHasUdnNetwork(r.Destination)
-	netMapIn := r.Context.Map.Network.Spec.Map
-	for i := range netMapIn {
-		mapped := &netMapIn[i]
 
-		// Skip network mappings with destination type 'Ignored'
-		if mapped.Destination.Type == Ignored {
-			continue
-		}
+	resolved, rErr := resolveNICMappings(vm.NICs, r.Map.Network.Spec.Map, r.Source.Inventory)
+	if rErr != nil {
+		err = rErr
+		return
+	}
 
-		ref := mapped.Source
-		network := &model.Network{}
-		fErr := r.Source.Inventory.Find(network, ref)
-		if fErr != nil {
-			err = fErr
-			return
-		}
+	for _, entry := range resolved {
+		nic := entry.NIC
+		mapped := entry.Mapping
 
-		needed := []ovfmodel.NIC{}
-		for _, nic := range vm.NICs {
-			if nic.Network == network.Name {
-				needed = append(needed, nic)
-			}
+		networkName := fmt.Sprintf("net-%v", numNetworks)
+		numNetworks++
+		kNetwork := cnv.Network{
+			Name: networkName,
 		}
-		if len(needed) == 0 {
-			continue
+		kInterface := cnv.Interface{
+			Name:  networkName,
+			Model: Virtio,
 		}
-		for _, nic := range needed {
-			networkName := fmt.Sprintf("net-%v", numNetworks)
-			numNetworks++
-			kNetwork := cnv.Network{
-				Name: networkName,
-			}
-			kInterface := cnv.Interface{
-				Name:  networkName,
-				Model: Virtio,
-			}
-			if !hasUDN || settings.Settings.UdnSupportsMac {
-				kInterface.MacAddress = nic.MAC
-			}
-			switch mapped.Destination.Type {
-			case Pod:
-				kNetwork.Pod = &cnv.PodNetwork{}
-				if hasUDN {
-					kInterface.Binding = &cnv.PluginBinding{
-						Name: planbase.UdnL2bridge,
-					}
-				} else {
-					kInterface.Masquerade = &cnv.InterfaceMasquerade{}
+		if !hasUDN || settings.Settings.UdnSupportsMac {
+			kInterface.MacAddress = nic.MAC
+		}
+		switch mapped.Destination.Type {
+		case Pod:
+			kNetwork.Pod = &cnv.PodNetwork{}
+			if hasUDN {
+				kInterface.Binding = &cnv.PluginBinding{
+					Name: planbase.UdnL2bridge,
 				}
-			case Multus:
-				kNetwork.Multus = &cnv.MultusNetwork{
-					NetworkName: path.Join(mapped.Destination.Namespace, mapped.Destination.Name),
-				}
-				kInterface.Bridge = &cnv.InterfaceBridge{}
+			} else {
+				kInterface.Masquerade = &cnv.InterfaceMasquerade{}
 			}
-			kNetworks = append(kNetworks, kNetwork)
-			kInterfaces = append(kInterfaces, kInterface)
+		case Multus:
+			kNetwork.Multus = &cnv.MultusNetwork{
+				NetworkName: path.Join(mapped.Destination.Namespace, mapped.Destination.Name),
+			}
+			kInterface.Bridge = &cnv.InterfaceBridge{}
 		}
+		kNetworks = append(kNetworks, kNetwork)
+		kInterfaces = append(kInterfaces, kInterface)
 	}
 	object.Template.Spec.Networks = kNetworks
 	object.Template.Spec.Domain.Devices.Interfaces = kInterfaces
