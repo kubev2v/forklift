@@ -1,0 +1,22 @@
+# Network policy for MTV Hook Jobs (both PreHook and PostHook)
+# Provides permissive access for custom Ansible playbooks and container images
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: forklift-hooks-policy
+  namespace: {{ app_namespace }}
+  labels:
+    app: {{ app_name }}
+spec:
+  podSelector:
+    matchExpressions:
+    - key: step
+      operator: In
+      values: ["PreHook", "PostHook"]
+  policyTypes:
+  - Ingress
+  - Egress
+  # No ingress rules
+  egress:
+  # Allow all egress
+  - {}
