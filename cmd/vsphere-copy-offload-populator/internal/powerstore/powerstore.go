@@ -235,36 +235,57 @@ func (p *PowerstoreClonner) Map(initiatorGroup string, targetLUN populator.LUN, 
 		hostName = mappingContext[esxRealHostNameKey].(string)
 	}
 
-	// Get the host by the real PowerStore host name
 	host, err := p.Client.GetHostByName(ctx, hostName)
 	if err != nil {
 		return targetLUN, fmt.Errorf("failed to find host for host name %s: %w", hostName, err)
-	}
-
-	hostID := host.ID
-
-	// idempotency: skip attach if already mapped
-	existing, err := p.Client.GetHostVolumeMappingByVolumeID(ctx, targetLUN.IQN)
-	if err == nil {
-		for _, m := range existing {
-			if m.HostID == hostID {
-				p.log.V(2).Info("volume already mapped to group", "volume", targetLUN.Name, "host", hostName)
-				return targetLUN, nil
-			}
-		}
 	}
 
 	attachParams := &gopowerstore.HostVolumeAttach{
 		VolumeID: &targetLUN.IQN,
 	}
 
-	p.log.V(2).Info("attaching volume to host", "volume_id", targetLUN.IQN, "host_id", hostID)
-	_, err = p.Client.AttachVolumeToHost(ctx, hostID, attachParams)
-	if err != nil {
-		return targetLUN, fmt.Errorf("failed to attach volume %s to initiatior group %s: %w", targetLUN.Name, hostID, err)
+	// PowerStore rejects individual host attach/detach when the host belongs to a
+	// host group — the volume must be mapped to the group instead.
+	if host.HostGroupID != "" {
+		p.log.Info("host belongs to host group, attaching volume to host group", "host", hostName, "host_group", host.HostGroupID)
+
+		existing, err := p.Client.GetHostVolumeMappingByVolumeID(ctx, targetLUN.IQN)
+		if err != nil {
+			p.log.Info("unable to check existing mappings, proceeding with attach", "volume", targetLUN.Name, "err", err)
+		} else {
+			for _, m := range existing {
+				if m.HostGroupID == host.HostGroupID {
+					p.log.Info("volume already mapped to host group, skipping attach", "volume", targetLUN.Name, "host_group", host.HostGroupID)
+					return targetLUN, nil
+				}
+			}
+		}
+
+		_, err = p.Client.AttachVolumeToHostGroup(ctx, host.HostGroupID, attachParams)
+		if err != nil {
+			return targetLUN, fmt.Errorf("failed to attach volume %s to host group %s: %w", targetLUN.Name, host.HostGroupID, err)
+		}
+		p.log.Info("volume mapped to host group", "volume", targetLUN.Name, "host_group", host.HostGroupID)
+	} else {
+		existing, err := p.Client.GetHostVolumeMappingByVolumeID(ctx, targetLUN.IQN)
+		if err != nil {
+			p.log.Info("unable to check existing mappings, proceeding with attach", "volume", targetLUN.Name, "err", err)
+		} else {
+			for _, m := range existing {
+				if m.HostID == host.ID {
+					p.log.Info("volume already mapped to host, skipping attach", "volume", targetLUN.Name, "host", hostName)
+					return targetLUN, nil
+				}
+			}
+		}
+
+		_, err = p.Client.AttachVolumeToHost(ctx, host.ID, attachParams)
+		if err != nil {
+			return targetLUN, fmt.Errorf("failed to attach volume %s to host %s: %w", targetLUN.Name, host.ID, err)
+		}
+		p.log.Info("volume mapped to host", "volume", targetLUN.Name, "host", hostName)
 	}
 
-	p.log.Info("volume mapped successfully", "volume", targetLUN.Name, "host", hostName)
 	return targetLUN, nil
 }
 
@@ -316,19 +337,33 @@ func (p *PowerstoreClonner) UnMap(initiatorGroup string, targetLUN populator.LUN
 		hostName = mappingContext[esxRealHostNameKey].(string)
 	}
 	ctx := context.Background()
-	hostID := mappingContext[hostIDContextKey].(string)
 
-	// Detach volume from host
 	detachParams := &gopowerstore.HostVolumeDetach{
 		VolumeID: &targetLUN.IQN,
 	}
-	p.log.V(2).Info("detaching volume from host", "volume_id", targetLUN.IQN, "host_id", hostID)
-	_, err := p.Client.DetachVolumeFromHost(ctx, hostID, detachParams)
+	host, err := p.Client.GetHostByName(ctx, hostName)
 	if err != nil {
-		return fmt.Errorf("failed to detach volume %s from initiator group %s: %w", targetLUN.Name, hostID, err)
+		return fmt.Errorf("failed to find host for host name %s: %w", hostName, err)
 	}
 
-	p.log.Info("volume unmapped successfully", "volume", targetLUN.Name, "host", hostName)
+	// PowerStore rejects individual host attach/detach when the host belongs to a
+	// host group — the volume must be detached from the group instead.
+	if host.HostGroupID != "" {
+		p.log.Info("host belongs to host group, detaching volume from host group", "host", hostName, "host_group", host.HostGroupID)
+		_, err = p.Client.DetachVolumeFromHostGroup(ctx, host.HostGroupID, detachParams)
+		if err != nil {
+			return fmt.Errorf("failed to detach volume %s from host group %s: %w", targetLUN.Name, host.HostGroupID, err)
+		}
+		p.log.Info("volume unmapped from host group", "volume", targetLUN.Name, "host_group", host.HostGroupID)
+	} else {
+		p.log.V(2).Info("detaching volume from host", "volume_id", targetLUN.IQN, "host_id", host.ID)
+		_, err = p.Client.DetachVolumeFromHost(ctx, host.ID, detachParams)
+		if err != nil {
+			return fmt.Errorf("failed to detach volume %s from host %s: %w", targetLUN.Name, host.ID, err)
+		}
+		p.log.Info("volume unmapped from host", "volume", targetLUN.Name, "host", hostName)
+	}
+
 	return nil
 }
 
