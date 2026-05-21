@@ -13,6 +13,6 @@ concerns contains flag if {
 		"id": "vmware.disk.rdm.detected",
 		"category": "Warning",
 		"label": "Raw Device Mapped disk detected",
-		"assessment": "RDM disk detected. RDM is supported via the RDMAsLun option at the plan or per-VM level. If RDMAsLun is not enabled, the VM cannot be migrated unless the RDM disks are removed.",
+		"assessment": "RDM disks are not supported when using VDDK transfer. If copy-offload (XCOPY) is enabled in the migration plan, RDM disks can be migrated. Otherwise, the RDM disks must be removed before migration and reattached after.",
 	}
 }

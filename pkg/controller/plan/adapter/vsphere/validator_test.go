@@ -112,8 +112,6 @@ func (m *mockInventory) Find(resource interface{}, ref ref.Ref) error {
 			res.ToolsStatus = ToolsNotInstalled // Should be ignored when powered off
 		case "tools_unmanaged":
 			res.ToolsVersionStatus = GuestToolsUnmanaged
-		case "missing_from_inventory":
-			return base.NotFoundError{}
 		}
 	}
 	return nil
@@ -592,6 +590,7 @@ var _ = Describe("vsphere validation tests", func() {
 			Expect(err).To(HaveOccurred())
 		})
 	})
+
 })
 
 func createPlan() *v1beta1.Plan {
