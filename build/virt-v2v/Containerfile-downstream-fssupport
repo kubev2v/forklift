@@ -9,7 +9,7 @@ RUN GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o image-c
 RUN GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o virt-v2v-wrapper github.com/kubev2v/forklift/cmd/virt-v2v
 RUN GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-w -s" -o forklift-wait-for-reboot github.com/kubev2v/forklift/cmd/forklift-wait-for-reboot
 
-FROM registry.redhat.io/ubi10-minimal:10.2-1777462752
+FROM registry.redhat.io/ubi10:10.2-1777462922
 
 RUN rm /etc/pki/tls/fips_local.cnf && \
     echo -e '[fips_sect]\ntls1-prf-ems-check = 0\nactivate = 1' > /etc/pki/tls/fips_local.cnf && \
@@ -43,7 +43,7 @@ RUN \
       libguestfs-fssupport:libguestfs-fssupport-10.1-3.el10 \
     ' ; \
     set -x ; \
-    microdnf install  -y --setopt=sslverify=false \
+    dnf install  -y --setopt=sslverify=false \
         $( for p in $packages; do \
            [[ "$p" =~ ([^:]+):(.+)-([^-]+)-([^-]+) ]] && \
            echo $brewroot/${BASH_REMATCH[1]}/${BASH_REMATCH[3]}/${BASH_REMATCH[4]}/$arch/${BASH_REMATCH[2]}-${BASH_REMATCH[3]}-${BASH_REMATCH[4]}.$arch.rpm; \
