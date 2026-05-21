@@ -6,16 +6,21 @@
 $inputString = "{{.InputString}}"
 $adapterWaitMinutes = 5
 
+# Lookup table avoids [Convert]::ToInt32() which is blocked in Constrained Language Mode
+$PrefixToMaskTable = @(
+    "0.0.0.0",         "128.0.0.0",       "192.0.0.0",       "224.0.0.0",
+    "240.0.0.0",       "248.0.0.0",       "252.0.0.0",       "254.0.0.0",
+    "255.0.0.0",       "255.128.0.0",     "255.192.0.0",     "255.224.0.0",
+    "255.240.0.0",     "255.248.0.0",     "255.252.0.0",     "255.254.0.0",
+    "255.255.0.0",     "255.255.128.0",   "255.255.192.0",   "255.255.224.0",
+    "255.255.240.0",   "255.255.248.0",   "255.255.252.0",   "255.255.254.0",
+    "255.255.255.0",   "255.255.255.128", "255.255.255.192", "255.255.255.224",
+    "255.255.255.240", "255.255.255.248", "255.255.255.252", "255.255.255.254",
+    "255.255.255.255"
+)
+
 function Convert-PrefixToMask($prefix) {
-    $bin = ("1" * $prefix).PadRight(32, "0")
-    $mask = ""
-    for ($i = 0; $i -lt 32; $i += 8) {
-        $chunk = $bin.Substring($i, 8)
-        $num = [Convert]::ToInt32($chunk, 2)
-        if ($mask -ne "") { $mask = $mask + "." }
-        $mask = $mask + $num
-    }
-    return $mask
+    return $PrefixToMaskTable[[int]$prefix]
 }
 
 function Find-AdapterByMAC($mac) {
@@ -28,7 +33,7 @@ function Find-AdapterByMAC($mac) {
         foreach ($a in $adapters) {
             if ($a.MacAddress -and ($a.MacAddress.ToUpper().Replace(":", "-") -eq $mac)) {
                 $elapsed = ((Get-Date) - $startTime).TotalSeconds
-                Write-Host "[INFO] Found adapter '$($a.Name)' (GUID=$($a.InterfaceGuid)) after $([math]::Round($elapsed))s"
+                Write-Host "[INFO] Found adapter '$($a.Name)' (GUID=$($a.InterfaceGuid)) after $([int]$elapsed)s"
                 return $a
             }
         }

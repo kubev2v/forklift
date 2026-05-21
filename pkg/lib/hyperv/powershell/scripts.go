@@ -87,14 +87,19 @@ if($r.Count -gt 0){$r|ConvertTo-Json -Compress}else{'no_gc'}`
 const (
 	// GetGuestOS retrieves guest operating system name via KVP Exchange.
 	// Requires: VM running, Integration Services installed, Data Exchange enabled.
-	// Returns the OS name string (e.g., "Microsoft Windows Server 2019 Standard"),
-	// or empty string if VM not found or Integration Services unavailable.
+	// Returns the OS name string (e.g., "Microsoft Windows Server 2019 Standard").
+	// If OSName lacks a version number, appends OSMajorVersion from KVP
+	// (e.g., "Red Hat Enterprise Linux" + "9" -> "Red Hat Enterprise Linux 9").
+	// Returns empty string if VM not found or Integration Services unavailable.
 	// Parameters: vmName
 	GetGuestOS = `$vm=Get-CimInstance -Namespace root\virtualization\v2 -ClassName Msvm_ComputerSystem -Filter "ElementName='%s'" -ErrorAction SilentlyContinue
 if(-not $vm){return}
 $kvp=Get-CimAssociatedInstance -InputObject $vm -ResultClassName Msvm_KvpExchangeComponent -ErrorAction SilentlyContinue
 if(-not $kvp -or -not $kvp.GuestIntrinsicExchangeItems){return}
-foreach($item in $kvp.GuestIntrinsicExchangeItems){$xml=[xml]$item;$name=$xml.INSTANCE.PROPERTY|Where-Object{$_.NAME -eq 'Name'}|Select-Object -ExpandProperty VALUE;$value=$xml.INSTANCE.PROPERTY|Where-Object{$_.NAME -eq 'Data'}|Select-Object -ExpandProperty VALUE;if($name -eq 'OSName'){$value;return}}`
+$osName='';$osMajor=''
+foreach($item in $kvp.GuestIntrinsicExchangeItems){$xml=[xml]$item;$n=$xml.INSTANCE.PROPERTY|Where-Object{$_.NAME -eq 'Name'}|Select-Object -ExpandProperty VALUE;$v=$xml.INSTANCE.PROPERTY|Where-Object{$_.NAME -eq 'Data'}|Select-Object -ExpandProperty VALUE;if($n -eq 'OSName'){$osName=$v}elseif($n -eq 'OSMajorVersion'){$osMajor=$v}}
+if($osName -and $osMajor -and $osName -notmatch '\d'){$osName="$osName $osMajor"}
+$osName`
 )
 
 const (

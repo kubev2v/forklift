@@ -31,6 +31,7 @@ import (
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	inspectionparser "github.com/kubev2v/forklift/pkg/controller/plan/adapter/vsphere"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	migbase "github.com/kubev2v/forklift/pkg/controller/plan/migrator/base"
 	"github.com/kubev2v/forklift/pkg/controller/plan/util"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
@@ -139,8 +140,9 @@ const (
 
 // Resource labels
 const (
-	ResourceVMConfig   = "vm-config"
-	ResourceVDDKConfig = "vddk-config"
+	ResourceVMConfig      = "vm-config"
+	ResourceVDDKConfig    = "vddk-config"
+	ResourceWaitForReboot = "wait-for-reboot"
 )
 
 // User
@@ -983,6 +985,83 @@ func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, step *plan.Step) 
 	}
 
 	return r.checkProviderReady(vm.ID)
+}
+
+// EnsureWaitForRebootPod creates a pod that runs the forklift-wait-for-reboot binary to monitor the target VMI serial console (idempotent).
+func (r *KubeVirt) EnsureWaitForRebootPod(vm *plan.VMStatus) (err error) {
+	img := getVirtV2vImage(r.Plan)
+	if img == "" {
+		err = liberr.New("virt-v2v image is not set; cannot create Windows wait-for-reboot pod")
+		return
+	}
+
+	existing, gErr := r.GetWaitForRebootPod(vm)
+	if gErr != nil {
+		err = liberr.Wrap(gErr)
+		return
+	}
+	if existing != nil {
+		return nil
+	}
+
+	activeDeadline := int64(settings.Settings.WindowsRebootTimeout + 600)
+	pod := &core.Pod{
+		ObjectMeta: meta.ObjectMeta{
+			GenerateName: "forklift-wait-reboot-",
+			Namespace:    r.Plan.Spec.TargetNamespace,
+			Labels:       r.waitForRebootLabels(vm.Ref),
+		},
+		Spec: core.PodSpec{
+			RestartPolicy:         core.RestartPolicyNever,
+			ServiceAccountName:    resolveServiceAccount(r.Plan),
+			ActiveDeadlineSeconds: &activeDeadline,
+			Containers: []core.Container{
+				{
+					Name:    "forklift-wait-for-reboot",
+					Image:   img,
+					Command: []string{"/usr/local/bin/forklift-wait-for-reboot"},
+					Env: []core.EnvVar{
+						{Name: "VMI_NAME", Value: r.getNewVMName(vm)},
+						{Name: "VMI_NAMESPACE", Value: r.Plan.Spec.TargetNamespace},
+						{Name: "SIGNAL", Value: "CONVERSION_DONE"},
+						{Name: "TIMEOUT", Value: strconv.Itoa(settings.Settings.WindowsRebootTimeout)},
+					},
+				},
+			},
+		},
+	}
+	err = r.Destination.Create(context.TODO(), pod)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	r.Log.Info("Created Windows wait-for-reboot pod.", "podNamespace", pod.Namespace, "podName", pod.Name, "vm", vm.String())
+	return nil
+}
+
+// GetWaitForRebootPod finds the GetWaitForRebootPod-wait-for-reboot pod for the VM migration, if present.
+func (r *KubeVirt) GetWaitForRebootPod(vm *plan.VMStatus) (*core.Pod, error) {
+	list, err := r.GetPodsWithLabels(r.waitForRebootLabels(vm.Ref))
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	if len(list.Items) == 0 {
+		return nil, nil //nolint:nilnil
+	}
+	return &list.Items[0], nil
+}
+
+// DeleteWaitForRebootPod removes the forklift-wait-for-reboot pod for the VM migration.
+func (r *KubeVirt) DeleteWaitForRebootPod(vm *plan.VMStatus) error {
+	pod, err := r.GetWaitForRebootPod(vm)
+	if err != nil || pod == nil {
+		return err
+	}
+	err = r.Destination.Delete(context.TODO(), pod)
+	if err != nil && !k8serr.IsNotFound(err) {
+		return liberr.Wrap(err)
+	}
+	return nil
 }
 
 // EnsureGuestInspectionPod resolves all data and creates the inspection pod
@@ -3445,6 +3524,13 @@ func (r *KubeVirt) inspectionLabels(vmRef ref.Ref) (labels map[string]string) {
 	return
 }
 
+func (r *KubeVirt) waitForRebootLabels(vmRef ref.Ref) map[string]string {
+	labels := r.vmLabels(vmRef)
+	labels[kApp] = "forklift-wait-for-reboot"
+	labels[kResource] = ResourceWaitForReboot
+	return labels
+}
+
 // Labels for a VM on a plan.
 func (r *KubeVirt) vmLabels(vmRef ref.Ref) (labels map[string]string) {
 	labels = r.planLabels()
@@ -4169,6 +4255,16 @@ func (r *KubeVirt) determineRunStrategy(vm *plan.VMStatus) cnv.VirtualMachineRun
 	targetPowerState := vm.TargetPowerState
 	if targetPowerState == "" {
 		targetPowerState = r.Plan.Spec.TargetPowerState
+	}
+
+	if settings.Settings.WindowsWaitForReboot &&
+		targetPowerState != plan.TargetPowerStateOff {
+		win, wErr := migbase.IsWindowsFromInventory(r.Source.Inventory, vm.Ref)
+		if wErr != nil {
+			r.Log.Error(wErr, "Windows inventory lookup failed; falling back to default run strategy.", "vm", vm.String())
+		} else if win {
+			return cnv.RunStrategyAlways
+		}
 	}
 
 	switch targetPowerState {

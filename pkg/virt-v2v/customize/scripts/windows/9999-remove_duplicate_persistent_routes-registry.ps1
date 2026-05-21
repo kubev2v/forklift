@@ -2,17 +2,21 @@
 
 Write-Host "Starting persistent route cleanup script..." -ForegroundColor Green
 
-# Function to convert CIDR prefix length to subnet mask
-function Convert-PrefixToMask($prefix) {
-    $bin = ("1" * $prefix).PadRight(32, "0")
-    $octets = @(
-        $bin.Substring(0, 8)
-        $bin.Substring(8, 8)
-        $bin.Substring(16, 8)
-        $bin.Substring(24, 8)
-    ) | ForEach-Object { [Convert]::ToInt32($_, 2) }
+# Lookup table avoids [Convert]::ToInt32() which is blocked in Constrained Language Mode
+$PrefixToMaskTable = @(
+    "0.0.0.0",         "128.0.0.0",       "192.0.0.0",       "224.0.0.0",
+    "240.0.0.0",       "248.0.0.0",       "252.0.0.0",       "254.0.0.0",
+    "255.0.0.0",       "255.128.0.0",     "255.192.0.0",     "255.224.0.0",
+    "255.240.0.0",     "255.248.0.0",     "255.252.0.0",     "255.254.0.0",
+    "255.255.0.0",     "255.255.128.0",   "255.255.192.0",   "255.255.224.0",
+    "255.255.240.0",   "255.255.248.0",   "255.255.252.0",   "255.255.254.0",
+    "255.255.255.0",   "255.255.255.128", "255.255.255.192", "255.255.255.224",
+    "255.255.255.240", "255.255.255.248", "255.255.255.252", "255.255.255.254",
+    "255.255.255.255"
+)
 
-    return ($octets -join ".")
+function Convert-PrefixToMask($prefix) {
+    return $PrefixToMaskTable[[int]$prefix]
 }
 
 # Get persistent routes
@@ -35,9 +39,12 @@ foreach ($gw in $defaultGateways) {
 # Step 2: Clean up duplicate routes (including default gateways)
 Write-Host "Analyzing routes for duplicates..." -ForegroundColor Yellow
 
-# Group ALL routes for duplicate detection  
+# Group routes by destination/gateway/metric, intentionally excluding InterfaceIndex.
+# After migration, stale persistent routes from the source VM's old adapters (e.g. VMware)
+# remain alongside new routes on the target adapter (e.g. VirtIO). These must be grouped
+# together to detect and remove the stale entries.
 $groupedRoutes = $routes | Group-Object {
-    "$($_.DestinationPrefix)-$($_.NextHop)-$($_.RouteMetric)-$($_.InterfaceIndex)"
+    "$($_.DestinationPrefix)-$($_.NextHop)-$($_.RouteMetric)"
 } | Where-Object { $_.Count -gt 1 }
 
 # Separate default gateway duplicates from other duplicates
@@ -56,6 +63,19 @@ if (-not $groupedRoutes) {
     foreach ($group in $gatewayDuplicates) {
         $routes = $group.Group
         
+        # If all interfaces in this group are active, this is a legitimate multi-homed
+        # configuration (same gateway reachable via multiple NICs) — leave it alone.
+        $activeCount = 0
+        foreach ($r in $routes) {
+            if (Get-NetAdapter | Where-Object { $_.InterfaceIndex -eq $r.InterfaceIndex } -ErrorAction SilentlyContinue) {
+                $activeCount++
+            }
+        }
+        if ($activeCount -eq $routes.Count) {
+            Write-Host "  Skipping group '$($group.Name)': all $activeCount interfaces are active (multi-homed)" -ForegroundColor Gray
+            continue
+        }
+
         # Choose the route with an interface that actually exists
         $toKeep = $null
         foreach ($route in $routes) {
@@ -216,7 +236,22 @@ foreach ($gateway in $currentDefaultGateways) {
         $gwList = @($regGateways)
     }
     if ($gwList -contains $nextHop) {
-        Write-Host "    Interface already has gateway $nextHop in registry" -ForegroundColor Green
+        Write-Host "    Interface already has gateway $nextHop in registry DefaultGateway, removing from PersistentRoutes only" -ForegroundColor Green
+        $persistKey = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\PersistentRoutes"
+        if (Test-Path $persistKey) {
+            $routeKeyPrefix = "0.0.0.0,0.0.0.0,$nextHop,"
+            $props = Get-Item -Path $persistKey | Select-Object -ExpandProperty Property
+            foreach ($p in $props) {
+                if ($p.StartsWith($routeKeyPrefix)) {
+                    try {
+                        Remove-ItemProperty -Path $persistKey -Name $p -ErrorAction Stop
+                        Write-Host "    Removed PersistentRoutes entry: $p" -ForegroundColor Green
+                    } catch {
+                        Write-Host "    Failed to remove PersistentRoutes entry '$p': $($_.Exception.Message)" -ForegroundColor Red
+                    }
+                }
+            }
+        }
         continue
     }
 

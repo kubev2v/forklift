@@ -381,6 +381,8 @@ func (b *Builder) GetDeepInspectionPodSpec(volumes []core.Volume, volumeMounts [
 		pod.Spec.ServiceAccountName = sa
 	}
 
+	SetKvmOnPodSpec(&pod.Spec, cfg.RequestKVM)
+
 	return pod, nil
 }
 
@@ -461,6 +463,13 @@ func (b *Builder) BuildV2vPodEnvironment(env []core.EnvVar, vm *plan.VMStatus) (
 		env = append(env,
 			core.EnvVar{
 				Name:  "V2V_windowsRegistryNetworkConfig",
+				Value: "true",
+			})
+	}
+	if settings.Settings.WindowsWaitForReboot {
+		env = append(env,
+			core.EnvVar{
+				Name:  "V2V_waitForGuestReboot",
 				Value: "true",
 			})
 	}

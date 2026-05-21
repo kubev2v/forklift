@@ -149,7 +149,7 @@ udev_from_ifcfg() {
         fi
 
         # Find the matching network script file
-        IFCFG=$(grep -l "IPADDR=.*$S_IP" "$SCRIPTS_DIR"/ifcfg-* 2>/dev/null)
+        IFCFG=$(grep -l "IPADDR[0-9]*=.*$S_IP\b" "$SCRIPTS_DIR"/ifcfg-* 2>/dev/null)
         if [ -z "$IFCFG" ]; then
             log "Info: no ifcfg config file found for $S_IP in $SCRIPTS_DIR."
             continue
@@ -194,7 +194,7 @@ udev_from_nm() {
         fi
 
         # Find the matching NetworkManager connection file
-        NM_FILE=$(grep -El "address[0-9]*=.*$S_IP.*$" "$NETWORK_CONNECTIONS_DIR"/*)
+        NM_FILE=$(grep -El "address[0-9]*=.*$S_IP\b" "$NETWORK_CONNECTIONS_DIR"/*)
         if [ -z "$NM_FILE" ]; then
             log "Info: no nm config file name found for $S_IP."
             continue
@@ -421,7 +421,7 @@ udev_from_netplan() {
         if netplan_supports_get; then
           # Loop through all interfaces and check for the given IP address
           netplan_get ethernets | grep -Eo "^[^[:space:]]+[^:]" | while read -r IFNAME; do
-              if netplan_get ethernets."$IFNAME".addresses | grep -q "$target_ip"; then
+              if netplan_get ethernets."$IFNAME".addresses | grep -q "$target_ip\b"; then
                   echo "$IFNAME"
                   return
               fi
@@ -432,7 +432,7 @@ udev_from_netplan() {
                 return
             fi
             netplan generate --root-dir "$NETPLAN_DIR" 2>&3
-            NM_FILE=$(grep -El "Address[0-9]*=.*$S_IP.*$" "$SYSTEMD_NETWORK_DIR"/*)
+            NM_FILE=$(grep -El "Address[0-9]*=.*$S_IP\b" "$SYSTEMD_NETWORK_DIR"/*)
             if [ -z "$NM_FILE" ]; then
                 log "Info: no systemd nm config file name found for $S_IP."
                 return
@@ -490,7 +490,7 @@ udev_from_ifquery() {
         target_ip="$1"
         # Loop through all interfaces and check for the given IP address
         ifquery_get -l | while read -r IFNAME; do
-            if ifquery_get $IFNAME | grep -q "$target_ip"; then
+            if ifquery_get "$IFNAME" | grep -q "$target_ip\b"; then
                 echo "$IFNAME"
                 return
             fi

@@ -116,6 +116,10 @@ spec:
         - name: TLS_CONNECTION_TIMEOUT
           value: "{{ controller_tls_connection_timeout_sec }}"
 {% endif %}
+{% if controller_windows_reboot_timeout is number %}
+        - name: CONTROLLER_WINDOWS_REBOOT_TIMEOUT
+          value: "{{ controller_windows_reboot_timeout }}"
+{% endif %}
 {% if controller_max_concurrent_reconciles is number %}
         - name: MAX_CONCURRENT_RECONCILES
           value: "{{ controller_max_concurrent_reconciles }}"
@@ -202,10 +206,12 @@ spec:
         - name: FEATURE_WINDOWS_REGISTRY_NETWORK_CONFIG
           value: "true"
 {% endif %}
-{% if feature_use_conversion_cr|bool %}
+{% if feature_windows_wait_for_reboot|bool %}
+        - name: FEATURE_WINDOWS_WAIT_FOR_REBOOT
+          value: "true"
+{% endif %}
         - name: FEATURE_USE_CONVERSION_CR
           value: "{{ feature_use_conversion_cr|bool|lower }}"
-{% endif %}
 {% if ovirt_osmap_configmap_name is defined %}
         - name: OVIRT_OS_MAP
           value: {{ ovirt_osmap_configmap_name }}
