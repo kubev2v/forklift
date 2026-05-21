@@ -2410,6 +2410,7 @@ func (r *Builder) NetAppShiftPVCs(vmRef ref.Ref, labels map[string]string) (pvcs
 		ann[planbase.AnnDiskIndex] = fmt.Sprintf("%d", diskIndex)
 		ann[planbase.AnnVmId] = vmRef.ID
 		ann[planbase.AnnVmUUID] = vm.UUID
+		ann[planbase.AnnNetAppShift] = "true"
 
 		ds := &model.Datastore{}
 		if fErr := r.Source.Inventory.Find(ds, ref.Ref{ID: disk.Datastore.ID}); fErr != nil {
