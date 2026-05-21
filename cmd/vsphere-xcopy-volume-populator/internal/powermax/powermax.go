@@ -6,14 +6,17 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"slices"
 	"strings"
+	"time"
 
 	gopowermax "github.com/dell/gopowermax/v2"
 	pmxtypes "github.com/dell/gopowermax/v2/types/v100"
 	"github.com/kubev2v/forklift/cmd/vsphere-xcopy-volume-populator/internal/populator"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
 
@@ -114,23 +117,37 @@ func (p *PowermaxClonner) EnsureClonnerIgroup(_ string, clonnerIqn []string) (po
 	// 5. add port group with protocol type that match the cloner IQN type, only if they all online
 	p.storageGroupID = fmt.Sprintf("%s-SG", p.initiatorID)
 	klog.Infof("ensuring storage group %s exists with hosts %v", p.storageGroupID, clonnerIqn)
-	_, err = p.client.GetStorageGroup(ctx, p.symmetrixID, p.storageGroupID)
+	err = retryOnTransient(ctx, "GetStorageGroup", func() error {
+		_, e := p.client.GetStorageGroup(ctx, p.symmetrixID, p.storageGroupID)
+		return e
+	})
 	if err == nil {
 		klog.Infof("group %s exists", p.storageGroupID)
-	}
-	if e, ok := err.(*pmxtypes.Error); ok && e.HTTPStatusCode == 404 {
-		klog.Infof("group %s doesn't exist - create it", p.storageGroupID)
-		_, err := p.client.CreateStorageGroup(ctx, p.symmetrixID, p.storageGroupID, "none", "", true, nil)
-		if err != nil {
-			klog.Errorf("failed to create group %v ", err)
-			return nil, err
+	} else {
+		var pmxErr *pmxtypes.Error
+		if errors.As(err, &pmxErr) && pmxErr.HTTPStatusCode == 404 {
+			klog.Infof("group %s doesn't exist - create it", p.storageGroupID)
+			err = retryOnTransient(ctx, "CreateStorageGroup", func() error {
+				_, e := p.client.CreateStorageGroup(ctx, p.symmetrixID, p.storageGroupID, "none", "", true, nil)
+				return e
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to create group: %w", err)
+			}
+		} else {
+			return nil, fmt.Errorf("failed to check storage group %s: %w", p.storageGroupID, err)
 		}
 	}
 
 	klog.Infof("storage group %s", p.storageGroupID)
 
 	// Fetch port group to determine protocol type
-	portGroup, err := p.client.GetPortGroupByID(ctx, p.symmetrixID, p.portGroup)
+	var portGroup *pmxtypes.PortGroup
+	err = retryOnTransient(ctx, "GetPortGroupByID", func() error {
+		var e error
+		portGroup, e = p.client.GetPortGroupByID(ctx, p.symmetrixID, p.portGroup)
+		return e
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get port group %s: %w", p.portGroup, err)
 	}
@@ -143,24 +160,26 @@ func (p *PowermaxClonner) EnsureClonnerIgroup(_ string, clonnerIqn []string) (po
 	}
 	klog.Infof("filtered initiators for protocol %s: %v", portGroup.PortGroupProtocol, filteredInitiators)
 
-	hosts, err := p.client.GetHostList(ctx, p.symmetrixID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get host list from symmetrix %s: %w", p.symmetrixID, err)
-	}
-h:
-	for _, hostId := range hosts.HostIDs {
-		host, err := p.client.GetHostByID(ctx, p.symmetrixID, hostId)
+	// Direct initiator lookup (1 API call per initiator instead of N+1)
+	for _, filteredInit := range filteredInitiators {
+		lookupID := initiatorToLookupID(filteredInit)
+		var initiator *pmxtypes.Initiator
+		err = retryOnTransient(ctx, "GetInitiatorByID", func() error {
+			var e error
+			initiator, e = p.client.GetInitiatorByID(ctx, p.symmetrixID, lookupID)
+			return e
+		})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to look up initiator %s: %w", lookupID, err)
 		}
-		klog.Infof("host ID %s and initiators %v", host.HostID, host.Initiators)
-		for _, initiator := range host.Initiators {
-			for _, filteredInit := range filteredInitiators {
-				if strings.HasSuffix(filteredInit, initiator) {
-					p.hostID = hostId
-					break h
-				}
-			}
+		hostID := initiator.HostID
+		if hostID == "" {
+			hostID = initiator.Host
+		}
+		if hostID != "" {
+			p.hostID = hostID
+			klog.Infof("found matching host %s for initiator %s", p.hostID, lookupID)
+			break
 		}
 	}
 	if p.hostID == "" {
@@ -310,6 +329,40 @@ func generateRandomString(length int) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(bytes), nil
+}
+
+// retryOnTransient retries the given function with exponential backoff when the
+// error is a transient Unisphere 503 Service Unavailable response.
+func retryOnTransient(ctx context.Context, operation string, fn func() error) error {
+	backoff := wait.Backoff{
+		Duration: 1 * time.Second,
+		Factor:   2.0,
+		Jitter:   0.1,
+		Steps:    5,
+	}
+	var lastErr error
+	err := wait.ExponentialBackoffWithContext(ctx, backoff, func(_ context.Context) (bool, error) {
+		lastErr = fn()
+		if lastErr == nil {
+			return true, nil
+		}
+		var pmxErr *pmxtypes.Error
+		if errors.As(lastErr, &pmxErr) && pmxErr.HTTPStatusCode == 503 {
+			klog.Infof("transient 503 error during %s, retrying: %v", operation, lastErr)
+			return false, nil
+		}
+		return false, lastErr
+	})
+	if err != nil && lastErr != nil && !errors.Is(err, lastErr) {
+		return fmt.Errorf("%w: %w", err, lastErr)
+	}
+	return err
+}
+
+// initiatorToLookupID strips the "fc." prefix from FC-style initiator identifiers
+// so the raw WWN can be used for PowerMax API lookups (e.g., GetInitiatorByID).
+func initiatorToLookupID(initiator string) string {
+	return strings.TrimPrefix(initiator, "fc.")
 }
 
 // filterInitiatorsByProtocol filters the initiator list based on the port group protocol
