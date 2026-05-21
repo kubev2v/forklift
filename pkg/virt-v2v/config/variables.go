@@ -40,6 +40,8 @@ const (
 	EnvWindowsRegistryNetworkConfigName = "V2V_windowsRegistryNetworkConfig"
 	EnvWaitForGuestRebootName           = "V2V_waitForGuestReboot"
 	EnvXfsCompatibilityName             = "V2V_xfsCompatibility"
+	EnvSkipConversionName               = "V2V_skipConversion"
+	EnvSkipCustomizeName                = "V2V_skipCustomize"
 )
 
 const (
@@ -123,6 +125,10 @@ type AppConfig struct {
 	// SupportsNoFstrim is true when the virt-v2v binary supports --no-fstrim
 	// (RHEL-only downstream patch. upstream CentOS/Fedora builds lack this flag)
 	SupportsNoFstrim bool
+	// V2V_skipConversion — skip virt-v2v and inspector, run only customize on existing disks
+	SkipConversion bool
+	// V2V_skipCustomize — skip guest customization after conversion
+	SkipCustomize bool
 
 	// V2V_multipleIPsPerNic
 	MultipleIpsPerNicName string
@@ -170,6 +176,8 @@ func (s *AppConfig) Load() (err error) {
 	flag.BoolVar(&s.WindowsRegistryNetworkConfig, "windows-registry-network-config", s.getEnvBool(EnvWindowsRegistryNetworkConfigName, false), "Use registry-based network configuration scripts for Windows static IP setup")
 	flag.BoolVar(&s.WaitForGuestReboot, "wait-for-guest-reboot", s.getEnvBool(EnvWaitForGuestRebootName, false), "Inject first-boot script to signal conversion completion on guest serial (COM1)")
 	flag.BoolVar(&s.XfsCompatibility, "xfs-compatibility", s.getEnvBool(EnvXfsCompatibilityName, false), "XFS compatibility mode: do not pass --no-fstrim to virt-v2v")
+	flag.BoolVar(&s.SkipConversion, "skip-conversion", s.getEnvBool(EnvSkipConversionName, false), "Skip virt-v2v conversion and inspector")
+	flag.BoolVar(&s.SkipCustomize, "skip-customize", s.getEnvBool(EnvSkipCustomizeName, false), "Skip guest customization after conversion")
 	s.RemoteInspectionDisks = s.getRemoteInspectionDisks()
 	flag.Parse()
 
@@ -276,6 +284,9 @@ func detectNoFstrimSupport(osReleasePath string) bool {
 }
 
 func (s *AppConfig) validate() error {
+	if s.SkipConversion {
+		return nil
+	}
 	if !s.IsInPlace {
 		switch s.Source {
 		case OVA, HYPERV:
