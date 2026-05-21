@@ -1,0 +1,4 @@
+[connection]
+interface-name=ens32
+address1=10.74.238.217/21
+address2=10.74.238.215/21

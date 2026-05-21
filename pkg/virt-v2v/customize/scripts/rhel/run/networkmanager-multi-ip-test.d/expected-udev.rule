@@ -1,0 +1,1 @@
+SUBSYSTEM=="net",ACTION=="add",ATTR{address}=="00:50:56:a1:b2:c3",NAME="ens32"
