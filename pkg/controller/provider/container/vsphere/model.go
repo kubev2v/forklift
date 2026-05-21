@@ -1,6 +1,7 @@
 package vsphere
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"sort"
@@ -858,6 +859,10 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 								}
 								v.model.DiskEnableUuid = boolVal
 							}
+						} else if opt.Key == "guestinfo.appInfo" {
+							if s, cast := opt.Value.(string); cast {
+								v.model.GuestApps = parseGuestApps(s)
+							}
 						} else if hasDiskPrefix(opt.Key) && strings.HasSuffix(strings.ToLower(opt.Key), "."+strings.ToLower(CtkEnabledKey)) {
 							if s, cast := opt.Value.(string); cast {
 								boolVal, err := strconv.ParseBool(s)
@@ -1125,6 +1130,28 @@ func extractWindowsDriveLetter(diskPath string) string {
 		return strings.ToLower(string(diskPath[0]))
 	}
 	return ""
+}
+
+// parseGuestApps parses the guestinfo.appInfo JSON string
+// and returns a list of GuestApp.
+func parseGuestApps(s string) []model.GuestApp {
+	var appInfo struct {
+		Applications []struct {
+			A string `json:"a"`
+			V string `json:"v"`
+		} `json:"applications"`
+	}
+	if err := json.Unmarshal([]byte(s), &appInfo); err != nil {
+		return nil
+	}
+	apps := make([]model.GuestApp, 0, len(appInfo.Applications))
+	for _, a := range appInfo.Applications {
+		apps = append(apps, model.GuestApp{
+			Name:    a.A,
+			Version: a.V,
+		})
+	}
+	return apps
 }
 
 // Update virtual disk devices.
