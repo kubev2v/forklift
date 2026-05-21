@@ -17,11 +17,14 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/ova"
 	"github.com/kubev2v/forklift/pkg/controller/provider/container"
 	vsphere "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	vspherelib "github.com/kubev2v/forklift/pkg/lib/client/vsphere"
+	"github.com/kubev2v/forklift/pkg/lib/client/vsphere/vmware"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/lib/inventory/model"
 	libref "github.com/kubev2v/forklift/pkg/lib/ref"
 	"github.com/kubev2v/forklift/pkg/lib/util"
+	"github.com/kubev2v/forklift/pkg/settings"
 	appsv1 "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -47,6 +50,8 @@ const (
 	ConnectionInsecure      = "ConnectionInsecure"
 	SSHReady                = "SSHReady"
 	SSHNotReady             = "SSHNotReady"
+	VIBReady                = "VIBReady"
+	VIBNotReady             = "VIBNotReady"
 	SMBCSIDriverNotReady    = "SMBCSIDriverNotReady"
 	SMBMountFailed          = "SMBMountFailed"
 	WaitingForService       = "WaitingForService"
@@ -128,6 +133,12 @@ func (r *Reconciler) validate(provider *api.Provider) error {
 
 	// Validate SSH readiness for vSphere providers when SSH method is enabled
 	err = r.validateSSHReadiness(provider, secret)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// Validate VIB readiness for vSphere providers when VIB method is enabled
+	err = r.validateVIBReadiness(provider, secret)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -526,7 +537,6 @@ func (r *Reconciler) checkOVAServiceReady(provider *api.Provider) bool {
 			LabelSelector: labels.SelectorFromSet(labeler.ProviderLabels(provider)),
 			Namespace:     Settings.Namespace,
 		})
-
 	if err != nil {
 		// If we can't list deployments, log but don't fail - allow connection test to proceed
 		log.Error(err, "Failed to list deployments for OVA provider")
@@ -1257,6 +1267,136 @@ func (r *Reconciler) validateSSHReadiness(provider *api.Provider, secret *core.S
 // This matches the exact implementation from the populator's testSSHConnectivity
 func (r *Reconciler) testSSHConnectivity(hostIP string, privateKey []byte) bool {
 	return util.TestSSHConnectivity(context.Background(), hostIP, privateKey, r.Log)
+}
+
+func (r *Reconciler) validateVIBReadiness(provider *api.Provider, secret *core.Secret) error {
+	if provider.Type() != api.VSphere {
+		return nil
+	}
+
+	if !provider.UseVIBMethod() {
+		provider.Status.DeleteCondition(VIBReady)
+		provider.Status.DeleteCondition(VIBNotReady)
+		return nil
+	}
+
+	inventoryCondition := provider.Status.FindCondition(InventoryCreated)
+	if inventoryCondition == nil || inventoryCondition.Status != True {
+		return nil
+	}
+
+	providerSettings := &settings.Providers{}
+	if err := providerSettings.Load(); err != nil {
+		return err
+	}
+
+	vibReadyCond := provider.Status.FindCondition(VIBReady)
+	vibNotReadyCond := provider.Status.FindCondition(VIBNotReady)
+	// Skip if VIBReady or VIBNotReady (excluding connection failures) is set and cache hasn't expired.
+	switch {
+	case vibNotReadyCond != nil:
+		if vibNotReadyCond.Reason != "VCenterConnectionFailed" &&
+			vspherelib.ShouldSkipVIBCheck(vibNotReadyCond.LastTransitionTime.Time, providerSettings.VIBCacheDuration) {
+			return nil
+		}
+	case vibReadyCond != nil:
+		if vspherelib.ShouldSkipVIBCheck(vibReadyCond.LastTransitionTime.Time, providerSettings.VIBCacheDuration) {
+			return nil
+		}
+	}
+
+	collector, found := r.container.Get(provider)
+	if !found {
+		return nil
+	}
+
+	db := collector.DB()
+	var inventoryHosts []vsphere.Host
+	listOptions := model.ListOptions{Detail: model.MaxDetail}
+	err := db.List(&inventoryHosts, listOptions)
+	if err != nil {
+		r.Log.Error(err, "VIB validation: failed to list hosts from inventory", "provider", provider.Name)
+		return nil
+	}
+
+	if len(inventoryHosts) == 0 {
+		return nil
+	}
+
+	vcenterURL := provider.Spec.URL
+	username := string(secret.Data["user"])
+	password := string(secret.Data["password"])
+
+	vClient, err := vmware.NewClient(vcenterURL, username, password)
+	if err != nil {
+		r.Log.Error(err, "VIB validation: failed to create vCenter client", "provider", provider.Name)
+		provider.Status.DeleteCondition(VIBReady)
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     VIBNotReady,
+			Status:   True,
+			Reason:   "VCenterConnectionFailed",
+			Category: Warn,
+			Message:  fmt.Sprintf("Cannot validate VIB readiness: vCenter connection failed: %v", err),
+		})
+		return nil
+	}
+	defer func() {
+		if logoutErr := vClient.Logout(context.Background()); logoutErr != nil {
+			r.Log.V(2).Info("vCenter logout failed during VIB validation", "provider", provider.Name, "error", logoutErr)
+		}
+	}()
+
+	ctx := context.TODO()
+	var readyItems, notReadyItems []string
+
+	for i := range inventoryHosts {
+		invHost := &inventoryHosts[i]
+		itemStr := fmt.Sprintf("%s|%s", invHost.ID, invHost.Name)
+
+		esx := vClient.GetHostByRef(ctx, invHost.ID)
+		version, verr := vspherelib.GetLoadedVIBVersion(ctx, vClient, esx)
+		if verr != nil {
+			r.Log.V(2).Info("VIB version check failed", "host", invHost.Name, "id", invHost.ID, "err", verr)
+			notReadyItems = append(notReadyItems, itemStr)
+			continue
+		}
+
+		if version == vspherelib.VibVersion {
+			readyItems = append(readyItems, itemStr)
+		} else {
+			notReadyItems = append(notReadyItems, itemStr)
+		}
+	}
+
+	if len(readyItems) > 0 {
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     VIBReady,
+			Status:   True,
+			Reason:   "HostVIBInstalled",
+			Category: Required,
+			Message:  fmt.Sprintf("VIB installed on %d host(s).", len(readyItems)),
+			Items:    readyItems,
+			Durable:  true,
+		})
+	} else {
+		provider.Status.DeleteCondition(VIBReady)
+	}
+
+	if len(notReadyItems) > 0 {
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     VIBNotReady,
+			Status:   True,
+			Reason:   "HostVIBNotInstalled",
+			Category: Warn,
+			Message:  fmt.Sprintf("VIB not ready on %d host(s).", len(notReadyItems)),
+			Items:    notReadyItems,
+			Durable:  true,
+		})
+	} else {
+		provider.Status.DeleteCondition(VIBNotReady)
+	}
+
+	return nil
 }
 
 func isValidSMBPath(smbPath string) bool {

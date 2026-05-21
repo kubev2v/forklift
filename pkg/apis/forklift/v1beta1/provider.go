@@ -188,7 +188,13 @@ func (p *Provider) RequiresConversion() bool {
 	return p.Type() == VSphere || p.Type() == Ova || p.Type() == HyperV || p.Type() == EC2
 }
 
-// This provider support the vddk aio parameters.
+// VIB-based xcopy is the default clone method when esxiCloneMethod is
+// unset or explicitly set to "vib".
+func (p *Provider) UseVIBMethod() bool {
+	esxiCloneMethod, methodSet := p.Spec.Settings[ESXiCloneMethod]
+	return !methodSet || esxiCloneMethod == ESXiCloneMethodVIB
+}
+
 func (p *Provider) UseVddkAioOptimization() bool {
 	useVddkAioOptimization := p.Spec.Settings[UseVddkAioOptimization]
 	if useVddkAioOptimization == "" {

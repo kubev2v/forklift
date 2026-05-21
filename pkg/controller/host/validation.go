@@ -30,6 +30,8 @@ const (
 	ConnectionTestFailed    = "ConnectionTestFailed"
 	InMaintenance           = "InMaintenance"
 	NotHealthy              = "NotHealthy"
+	VIBInstalled            = "VIBInstalled"
+	VIBInstallFailed        = "VIBInstallFailed"
 )
 
 // Categories

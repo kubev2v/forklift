@@ -11,8 +11,9 @@ import (
 
 	hversion "github.com/hashicorp/go-version"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
-	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
 	vmkfstoolswrapper "github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/vmkfstools-wrapper"
+	vspherelib "github.com/kubev2v/forklift/pkg/lib/client/vsphere"
+	"github.com/kubev2v/forklift/pkg/lib/client/vsphere/vmware"
 	"github.com/kubev2v/forklift/pkg/lib/util"
 	"github.com/vmware/govmomi/object"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -312,6 +313,10 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 
 		executor = NewSSHTaskExecutor(sshClient)
 	} else {
+		vibSetupCtx := klog.NewContext(context.Background(), setupLog)
+		if err := checkVIBVersion(vibSetupCtx, p.VSphereClient, host); err != nil {
+			return fmt.Errorf("VIB pre-flight check failed: %w", err)
+		}
 		executor = NewVIBTaskExecutor(p.VSphereClient)
 	}
 
@@ -489,5 +494,20 @@ func checkScriptVersion(ctx context.Context, sshClient vmware.SSHClient, datasto
 		return err
 	}
 
+	return nil
+}
+
+func checkVIBVersion(ctx context.Context, client vmware.Client, host *object.HostSystem) error {
+	log := klog.FromContext(ctx)
+	loadedVersion, err := vspherelib.GetLoadedVIBVersion(ctx, client, host)
+	if err != nil {
+		return fmt.Errorf("vmkfstools-wrapper VIB is not installed or not loaded on host %s. "+
+			"Create a Host CR with 'installVIB: true' or install the VIB manually: %w", host.Name(), err)
+	}
+	if loadedVersion != vspherelib.VibVersion {
+		return fmt.Errorf("VIB version mismatch on host %s: loaded=%s, required=%s. "+
+			"Update the VIB via a Host CR with 'installVIB: true' or install manually", host.Name(), loadedVersion, vspherelib.VibVersion)
+	}
+	log.Info("VIB pre-flight check passed", "host", host.Name(), "version", loadedVersion)
 	return nil
 }

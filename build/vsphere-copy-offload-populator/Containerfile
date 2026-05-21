@@ -23,12 +23,6 @@ RUN microdnf update -y && \
 COPY --from=builder /usr/src/app/cmd/vsphere-copy-offload-populator/bin/vsphere-copy-offload-populator \
     /bin/vsphere-copy-offload-populator
 
-COPY --from=builder /usr/src/app/cmd/vsphere-copy-offload-populator/bin/vib-installer \
-    /bin/vib-installer
-
-COPY --from=builder /usr/src/app/cmd/vsphere-copy-offload-populator/vmkfstools-wrapper/vmkfstools-wrapper.vib \
-    /bin/vmkfstools-wrapper.vib
-
 ENTRYPOINT ["/bin/vsphere-copy-offload-populator"]
 
 ARG GIT_COMMIT=unknown
