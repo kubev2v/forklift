@@ -604,11 +604,18 @@ func (c *Client) vmAPI(object interface{}, opts interface{}) (err error) {
 		switch opts := opts.(type) {
 		case *GetOpts:
 			ID := opts.ID
-			server, err = servers.Get(c.computeService, ID).Extract()
+			result := servers.Get(c.computeService, ID)
+			server, err = result.Extract()
 			if err != nil {
 				return
 			}
 			*object = VM{Server: *server}
+			var ext struct {
+				TaskState *string `json:"OS-EXT-STS:task_state"`
+			}
+			if extErr := result.ExtractInto(&ext); extErr == nil && ext.TaskState != nil {
+				object.TaskState = *ext.TaskState
+			}
 		case *VMCreateOpts:
 			server, err = servers.Create(c.computeService, opts).Extract()
 			if err != nil {
@@ -648,7 +655,7 @@ func (c *Client) vmList(object *[]VM, opts *VMListOpts) (err error) {
 	}
 	var instanceList []VM
 	for _, server := range serverList {
-		instanceList = append(instanceList, VM{server})
+		instanceList = append(instanceList, VM{Server: server})
 	}
 	*object = instanceList
 	return

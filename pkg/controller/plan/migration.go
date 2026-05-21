@@ -821,6 +821,11 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				}
 			}
 
+			if !ready {
+				r.Log.Info("PreTransferActions hook isn't ready yet")
+				return
+			}
+
 			if r.builder.SupportsVolumePopulators() {
 				var pvcs []*core.PersistentVolumeClaim
 				if pvcs, err = r.kubevirt.PopulatorVolumes(vm.Ref); err != nil {
@@ -843,11 +848,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 						return
 					}
 				}
-			}
-
-			if !ready {
-				r.Log.Info("PreTransferActions hook isn't ready yet")
-				return
 			}
 			// Create DataVolumes unless this is a cold migration using storage offload
 			if r.Plan.IsWarm() || !r.builder.SupportsVolumePopulators() {
