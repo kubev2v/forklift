@@ -341,6 +341,7 @@ type VM struct {
 	GuestNetworks            []GuestNetwork     `sql:""`
 	GuestDisks               []DiskMountPoint   `sql:""`
 	GuestIpStacks            []GuestIpStack     `sql:""`
+	GuestApps                []GuestApp         `sql:""`
 	SecureBoot               bool               `sql:""`
 	ToolsStatus              string             `sql:""`
 	ToolsRunningStatus       string             `sql:""`
@@ -355,6 +356,12 @@ type VM struct {
 // Determine if current revision has been validated.
 func (m *VM) Validated() bool {
 	return m.RevisionValidated == m.Revision
+}
+
+// Guest application.
+type GuestApp struct {
+	Name    string `json:"name"`
+	Version string `json:"version,omitempty"`
 }
 
 // Virtual Controller.
