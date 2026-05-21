@@ -6,8 +6,11 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	cnv "kubevirt.io/api/core/v1"
 )
 
@@ -102,6 +105,100 @@ var _ = Describe("Builder", func() {
 			builder.mapNetworks("source", target)
 			Expect(target.Spec.Template.Spec.Networks[0].Multus.NetworkName).To(Equal("target/net-attach-target"))
 		})
+	})
+})
+
+var _ = Describe("requestSize", func() {
+	var builder *Builder
+
+	BeforeEach(func() {
+		builder = &Builder{}
+	})
+
+	It("returns the requested size for filesystem volumes", func() {
+		filesystemMode := core.PersistentVolumeFilesystem
+		pvc := &model.PersistentVolumeClaim{
+			Object: core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					VolumeMode: &filesystemMode,
+					Resources: core.VolumeResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("10Gi"),
+						},
+					},
+				},
+				Status: core.PersistentVolumeClaimStatus{
+					Capacity: core.ResourceList{
+						core.ResourceStorage: resource.MustParse("20Gi"),
+					},
+				},
+			},
+		}
+		size := builder.requestSize(pvc)
+		Expect(size.Equal(resource.MustParse("10Gi"))).To(BeTrue())
+	})
+
+	It("returns the requested size when volume mode is nil", func() {
+		pvc := &model.PersistentVolumeClaim{
+			Object: core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					Resources: core.VolumeResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("10Gi"),
+						},
+					},
+				},
+				Status: core.PersistentVolumeClaimStatus{
+					Capacity: core.ResourceList{
+						core.ResourceStorage: resource.MustParse("20Gi"),
+					},
+				},
+			},
+		}
+		size := builder.requestSize(pvc)
+		Expect(size.Equal(resource.MustParse("10Gi"))).To(BeTrue())
+	})
+
+	It("returns the allocated capacity for block volumes", func() {
+		blockMode := core.PersistentVolumeBlock
+		pvc := &model.PersistentVolumeClaim{
+			Object: core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					VolumeMode: &blockMode,
+					Resources: core.VolumeResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("10Gi"),
+						},
+					},
+				},
+				Status: core.PersistentVolumeClaimStatus{
+					Capacity: core.ResourceList{
+						core.ResourceStorage: resource.MustParse("16Gi"),
+					},
+				},
+			},
+		}
+		size := builder.requestSize(pvc)
+		Expect(size.Equal(resource.MustParse("16Gi"))).To(BeTrue())
+	})
+
+	It("tolerates nil resources", func() {
+		blockMode := core.PersistentVolumeBlock
+		pvc := &model.PersistentVolumeClaim{
+			Object: core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					VolumeMode: &blockMode,
+					Resources: core.VolumeResourceRequirements{
+						Requests: core.ResourceList{},
+					},
+				},
+				Status: core.PersistentVolumeClaimStatus{
+					Capacity: core.ResourceList{},
+				},
+			},
+		}
+		size := builder.requestSize(pvc)
+		Expect(size.Equal(resource.MustParse("0"))).To(BeTrue())
 	})
 })
 
