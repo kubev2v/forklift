@@ -105,10 +105,11 @@ const (
 	AnnUsePopulator = "cdi.kubevirt.io/storage.usePopulator"
 
 	// Consumer-side disk metadata used by NetApp Shift/Trident integration.
-	AnnNfsServer = "forklift.konveyor.io/nfs-server"
-	AnnNfsPath   = "forklift.konveyor.io/nfs-path"
-	AnnVmId      = "forklift.konveyor.io/vm-id"
-	AnnVmUUID    = "forklift.konveyor.io/vm-uuid"
+	AnnNfsServer   = "forklift.konveyor.io/nfs-server"
+	AnnNfsPath     = "forklift.konveyor.io/nfs-path"
+	AnnVmId        = "forklift.konveyor.io/vm-id"
+	AnnVmUUID      = "forklift.konveyor.io/vm-uuid"
+	AnnNetAppShift = "forklift.konveyor.io/netapp-shift"
 )
 
 var VolumePopulatorNotSupportedError = liberr.New("provider does not support volume populators")
