@@ -19,3 +19,5 @@
 gosec.log
 
 GOSCALEIO_TEST.env
+
+vendor/

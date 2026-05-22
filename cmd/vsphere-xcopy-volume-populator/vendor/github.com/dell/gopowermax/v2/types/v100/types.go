@@ -1,5 +1,5 @@
 /*
- Copyright © 2020 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2020-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -41,27 +41,31 @@ type SymmetrixIDList struct {
 
 // Symmetrix : information about a Symmetrix system
 type Symmetrix struct {
-	SymmetrixID          string                `json:"symmetrixId"`
-	DellServiceTag       string                `json:"dell_service_tag"`
-	DeviceCount          int                   `json:"device_count"`
-	Ucode                string                `json:"ucode"`
-	UcodeDate            string                `json:"ucode_date"`
-	Model                string                `json:"model"`
-	Local                bool                  `json:"local"`
-	AllFlash             bool                  `json:"all_flash"`
-	DisplayName          string                `json:"display_name"`
-	DiskCount            int                   `json:"disk_count"`
-	CacheSizeMB          int                   `json:"cache_size_mb"`
-	DataEncryption       string                `json:"data_encryption"`
-	FEDirCount           int                   `json:"fe_dir_count"`
-	BEDirCount           int                   `json:"be_dir_count"`
-	RDFDirCount          int                   `json:"rdf_dir_count"`
-	MaxHyperPerDisk      int                   `json:"max_hyper_per_disk"`
-	VCMState             string                `json:"vcm_state"`
-	VCMDBState           string                `json:"vcmdb_state"`
-	ReliabilityState     string                `json:"reliability_state"`
-	UcodeRegisteredBuild int                   `json:"ucode_registered_build"`
-	SystemSizedProperty  []SystemSizedProperty `json:"system_sized_property"`
+	SymmetrixID              string                `json:"symmetrixId"`
+	DellServiceTag           string                `json:"dell_service_tag"`
+	DeviceCount              int                   `json:"device_count"`
+	Ucode                    string                `json:"ucode"`
+	UcodeDate                string                `json:"ucode_date"`
+	Model                    string                `json:"model"`
+	Local                    bool                  `json:"local"`
+	AllFlash                 bool                  `json:"all_flash"`
+	DisplayName              string                `json:"display_name"`
+	DiskCount                int                   `json:"disk_count"`
+	CacheSizeMB              int                   `json:"cache_size_mb"`
+	DataEncryption           string                `json:"data_encryption"`
+	FEDirCount               int                   `json:"fe_dir_count"`
+	BEDirCount               int                   `json:"be_dir_count"`
+	RDFDirCount              int                   `json:"rdf_dir_count"`
+	MaxHyperPerDisk          int                   `json:"max_hyper_per_disk"`
+	VCMState                 string                `json:"vcm_state"`
+	VCMDBState               string                `json:"vcmdb_state"`
+	ReliabilityState         string                `json:"reliability_state"`
+	UcodeRegisteredBuild     int                   `json:"ucode_registered_build"`
+	Microcode                string                `json:"microcode"`
+	MicrocodeDate            string                `json:"microcode_date"`
+	MicrocodeRegisteredBuild int                   `json:"microcode_registered_build"`
+	MicrocodePackageVersion  string                `json:"microcode_package_version"`
+	SystemSizedProperty      []SystemSizedProperty `json:"system_sized_property"`
 }
 
 // SystemSizedProperty contains information about size data
@@ -103,15 +107,15 @@ type StoragePool struct {
 
 // FbaCap FBA storage pool capacity
 type FbaCap struct {
-	Provisioned *provisioned `json:"provisioned"`
+	Provisioned *Provisioned `json:"provisioned"`
 }
 
 // CkdCap CKD storage pool capacity
 type CkdCap struct {
-	Provisioned *provisioned `json:"provisioned"`
+	Provisioned *Provisioned `json:"provisioned"`
 }
 
-type provisioned struct {
+type Provisioned struct {
 	UsableUsedInTB float64 `json:"used_tb"`
 	UsableTotInTB  float64 `json:"effective_capacity_tb"`
 	//	EffectiveUsedCapacityPercent float64 `json:"provisioned_percent"`
@@ -377,4 +381,45 @@ type SymmetrixPortType struct {
 type Port struct {
 	ExecutionOption string            `json:"executionOption,omitempty"`
 	SymmetrixPort   SymmetrixPortType `json:"symmetrixPort"`
+}
+
+type VersionDetails struct {
+	Version    string `json:"version"`
+	APIVersion string `json:"api_version"`
+}
+
+type PortGroupListResult struct {
+	Results []PortGroupListv1 `json:"results,omitempty"`
+}
+
+// PortGroupListByID : list of port groups by ID
+type PortGroupListv1 struct {
+	ID       string       `json:"id,omitempty"`
+	Protocol string       `json:"protocol,omitempty"`
+	Ports    []PortValues `json:"ports,omitempty"`
+}
+
+// PortValues : list of port values
+type PortValues struct {
+	PortID   string     `json:"id,omitempty"`
+	Type     string     `json:"type,omitempty"`
+	Director DirectorID `json:"director,omitempty"`
+}
+
+// DirectorID : list of director IDs
+type DirectorID struct {
+	ID string `json:"id,omitempty"`
+}
+
+type PortV1 struct {
+	ID             string         `json:"id,omitempty"`
+	ResourceType   string         `json:"resource_type,omitempty"`
+	PortNumber     string         `json:"port_number,omitempty"`
+	PortIdentifier string         `json:"port_identifier,omitempty"`
+	PortStatus     string         `json:"port_status"`
+	DirectorStatus string         `json:"director_status"`
+	Director       []PortDirector `json:"director,omitempty"`
+}
+type PortDirector struct {
+	ID string `json:"id,omitempty"`
 }
