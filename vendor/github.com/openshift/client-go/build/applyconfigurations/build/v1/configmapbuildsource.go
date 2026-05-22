@@ -3,17 +3,30 @@
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
-// ConfigMapBuildSourceApplyConfiguration represents an declarative configuration of the ConfigMapBuildSource type for use
+// ConfigMapBuildSourceApplyConfiguration represents a declarative configuration of the ConfigMapBuildSource type for use
 // with apply.
+//
+// ConfigMapBuildSource describes a configmap and its destination directory that will be
+// used only at the build time. The content of the configmap referenced here will
+// be copied into the destination directory instead of mounting.
 type ConfigMapBuildSourceApplyConfiguration struct {
-	ConfigMap      *v1.LocalObjectReference `json:"configMap,omitempty"`
-	DestinationDir *string                  `json:"destinationDir,omitempty"`
+	// configMap is a reference to an existing configmap that you want to use in your
+	// build.
+	ConfigMap *corev1.LocalObjectReference `json:"configMap,omitempty"`
+	// destinationDir is the directory where the files from the configmap should be
+	// available for the build time.
+	// For the Source build strategy, these will be injected into a container
+	// where the assemble script runs.
+	// For the container image build strategy, these will be copied into the build
+	// directory, where the Dockerfile is located, so users can ADD or COPY them
+	// during container image build.
+	DestinationDir *string `json:"destinationDir,omitempty"`
 }
 
-// ConfigMapBuildSourceApplyConfiguration constructs an declarative configuration of the ConfigMapBuildSource type for use with
+// ConfigMapBuildSourceApplyConfiguration constructs a declarative configuration of the ConfigMapBuildSource type for use with
 // apply.
 func ConfigMapBuildSource() *ConfigMapBuildSourceApplyConfiguration {
 	return &ConfigMapBuildSourceApplyConfiguration{}
@@ -22,7 +35,7 @@ func ConfigMapBuildSource() *ConfigMapBuildSourceApplyConfiguration {
 // WithConfigMap sets the ConfigMap field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ConfigMap field is set to the value of the last call.
-func (b *ConfigMapBuildSourceApplyConfiguration) WithConfigMap(value v1.LocalObjectReference) *ConfigMapBuildSourceApplyConfiguration {
+func (b *ConfigMapBuildSourceApplyConfiguration) WithConfigMap(value corev1.LocalObjectReference) *ConfigMapBuildSourceApplyConfiguration {
 	b.ConfigMap = &value
 	return b
 }

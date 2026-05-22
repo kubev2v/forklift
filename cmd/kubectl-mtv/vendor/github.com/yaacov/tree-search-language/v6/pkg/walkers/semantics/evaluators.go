@@ -160,6 +160,10 @@ func isValueInRange(value, min, max interface{}) (bool, error) {
 // evaluateLikePattern performs pattern matching with SQL LIKE semantics
 // Supports % for any sequence of characters and _ for single character
 func evaluateLikePattern(value interface{}, pattern interface{}) (bool, error) {
+	if value == nil || pattern == nil {
+		return false, nil
+	}
+
 	valueStr, okValue := value.(string)
 	patternStr, okPattern := pattern.(string)
 
@@ -185,6 +189,10 @@ func evaluateLikePattern(value interface{}, pattern interface{}) (bool, error) {
 
 // evaluateIlikePattern performs case-insensitive pattern matching with SQL LIKE semantics
 func evaluateIlikePattern(value interface{}, pattern interface{}) (bool, error) {
+	if value == nil || pattern == nil {
+		return false, nil
+	}
+
 	valueStr, okValue := value.(string)
 	patternStr, okPattern := pattern.(string)
 
@@ -206,6 +214,10 @@ func evaluateIlikePattern(value interface{}, pattern interface{}) (bool, error) 
 
 // evaluateRegexMatch evaluates if a string matches a regular expression pattern
 func evaluateRegexMatch(value interface{}, pattern interface{}) (bool, error) {
+	if value == nil || pattern == nil {
+		return false, nil
+	}
+
 	valueStr, okValue := value.(string)
 	patternStr, okPattern := pattern.(string)
 
