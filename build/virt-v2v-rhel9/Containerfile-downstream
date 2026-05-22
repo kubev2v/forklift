@@ -81,6 +81,14 @@ COPY --from=builder /app/forklift-wait-for-reboot /usr/local/bin/forklift-wait-f
 
 COPY --from=winlegacyiso /usr/share/virtio-win/virtio-win.iso /usr/local/virtio-win-legacy.iso
 
+# Replace xfs_repair with a wrapper that can ignore failures; register the
+# original binary in supermin hostfiles so both get copied into the appliance.
+COPY build/virt-v2v/xfs_repair_wrapper.sh /tmp/xfs_repair_wrapper.sh
+RUN cp /usr/sbin/xfs_repair /usr/sbin/xfs_repair.original && \
+    cp /tmp/xfs_repair_wrapper.sh /usr/sbin/xfs_repair && \
+    chmod 755 /usr/sbin/xfs_repair && \
+    echo '/usr/sbin/xfs_repair.original' >> /usr/lib64/guestfs/supermin.d/hostfiles
+
 ENTRYPOINT ["/usr/libexec/catatonit/catatonit", "/usr/bin/virt-v2v-wrapper"]
 
 ARG MTV_VERSION
