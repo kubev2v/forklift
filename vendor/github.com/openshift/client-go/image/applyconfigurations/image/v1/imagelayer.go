@@ -2,15 +2,20 @@
 
 package v1
 
-// ImageLayerApplyConfiguration represents an declarative configuration of the ImageLayer type for use
+// ImageLayerApplyConfiguration represents a declarative configuration of the ImageLayer type for use
 // with apply.
+//
+// ImageLayer represents a single layer of the image. Some images may have multiple layers. Some may have none.
 type ImageLayerApplyConfiguration struct {
-	Name      *string `json:"name,omitempty"`
-	LayerSize *int64  `json:"size,omitempty"`
+	// name of the layer as defined by the underlying store.
+	Name *string `json:"name,omitempty"`
+	// size of the layer in bytes as defined by the underlying store.
+	LayerSize *int64 `json:"size,omitempty"`
+	// mediaType of the referenced object.
 	MediaType *string `json:"mediaType,omitempty"`
 }
 
-// ImageLayerApplyConfiguration constructs an declarative configuration of the ImageLayer type for use with
+// ImageLayerApplyConfiguration constructs a declarative configuration of the ImageLayer type for use with
 // apply.
 func ImageLayer() *ImageLayerApplyConfiguration {
 	return &ImageLayerApplyConfiguration{}

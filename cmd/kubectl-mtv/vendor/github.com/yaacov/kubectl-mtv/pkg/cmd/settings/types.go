@@ -189,13 +189,6 @@ var SupportedSettings = map[string]SettingDefinition{
 		Description: "Retain importer pods during warm migration (debugging)",
 		Category:    CategoryFeature,
 	},
-	"controller_retain_populator_pods": {
-		Name:        "controller_retain_populator_pods",
-		Type:        TypeBool,
-		Default:     false,
-		Description: "Retain populator pods after migration for debugging",
-		Category:    CategoryFeature,
-	},
 	"feature_ova_appliance_management": {
 		Name:        "feature_ova_appliance_management",
 		Type:        TypeBool,
