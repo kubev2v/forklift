@@ -53,6 +53,10 @@ func EventRegisterDefaultImpl() error {
 	if C.virInitializeWrapper(&err) < 0 {
 		return makeError(&err)
 	}
+	e := adminInitialize()
+	if e != nil {
+		return e
+	}
 	if i := int(C.virEventRegisterDefaultImplWrapper(&err)); i != 0 {
 		return makeError(&err)
 	}
@@ -70,8 +74,8 @@ func EventRunDefaultImpl() error {
 
 type EventHandleCallback func(watch int, file int, events EventHandleType)
 
-//export eventHandleCallback
-func eventHandleCallback(watch int, fd int, events int, callbackID int) {
+//export virGoEventHandleCallback
+func virGoEventHandleCallback(watch int, fd int, events int, callbackID int) {
 	callbackFunc := getCallbackId(callbackID)
 
 	callback, ok := callbackFunc.(EventHandleCallback)
@@ -113,8 +117,8 @@ func EventRemoveHandle(watch int) error {
 
 type EventTimeoutCallback func(timer int)
 
-//export eventTimeoutCallback
-func eventTimeoutCallback(timer int, callbackID int) {
+//export virGoEventTimeoutCallback
+func virGoEventTimeoutCallback(timer int, callbackID int) {
 	callbackFunc := getCallbackId(callbackID)
 
 	callback, ok := callbackFunc.(EventTimeoutCallback)
@@ -167,19 +171,19 @@ type EventTimeoutCallbackInfo struct {
 }
 
 func (i *EventHandleCallbackInfo) Invoke(watch int, fd int, event EventHandleType) {
-	C.eventHandleCallbackInvoke(C.int(watch), C.int(fd), C.int(event), C.uintptr_t(i.callback), C.uintptr_t(i.opaque))
+	C.virGoEventHandleCallbackInvoke(C.int(watch), C.int(fd), C.int(event), C.uintptr_t(i.callback), C.uintptr_t(i.opaque))
 }
 
 func (i *EventTimeoutCallbackInfo) Invoke(timer int) {
-	C.eventTimeoutCallbackInvoke(C.int(timer), C.uintptr_t(i.callback), C.uintptr_t(i.opaque))
+	C.virGoEventTimeoutCallbackInvoke(C.int(timer), C.uintptr_t(i.callback), C.uintptr_t(i.opaque))
 }
 
 func (i *EventHandleCallbackInfo) Free() {
-	C.eventHandleCallbackFree(C.uintptr_t(i.free), C.uintptr_t(i.opaque))
+	C.virGoEventHandleCallbackFree(C.uintptr_t(i.free), C.uintptr_t(i.opaque))
 }
 
 func (i *EventTimeoutCallbackInfo) Free() {
-	C.eventTimeoutCallbackFree(C.uintptr_t(i.free), C.uintptr_t(i.opaque))
+	C.virGoEventTimeoutCallbackFree(C.uintptr_t(i.free), C.uintptr_t(i.opaque))
 }
 
 type EventLoop interface {
@@ -207,8 +211,8 @@ func EventRegisterImpl(impl EventLoop) error {
 	return nil
 }
 
-//export eventAddHandleFunc
-func eventAddHandleFunc(fd C.int, event C.int, callback uintptr, opaque uintptr, free uintptr) C.int {
+//export virGoEventAddHandleFunc
+func virGoEventAddHandleFunc(fd C.int, event C.int, callback uintptr, opaque uintptr, free uintptr) C.int {
 	if eventLoopImpl == nil {
 		panic("Event loop impl is missing")
 	}
@@ -222,8 +226,8 @@ func eventAddHandleFunc(fd C.int, event C.int, callback uintptr, opaque uintptr,
 	return C.int(eventLoopImpl.AddHandleFunc(int(fd), EventHandleType(event), cbinfo))
 }
 
-//export eventUpdateHandleFunc
-func eventUpdateHandleFunc(watch C.int, event C.int) {
+//export virGoEventUpdateHandleFunc
+func virGoEventUpdateHandleFunc(watch C.int, event C.int) {
 	if eventLoopImpl == nil {
 		panic("Event loop impl is missing")
 	}
@@ -231,8 +235,8 @@ func eventUpdateHandleFunc(watch C.int, event C.int) {
 	eventLoopImpl.UpdateHandleFunc(int(watch), EventHandleType(event))
 }
 
-//export eventRemoveHandleFunc
-func eventRemoveHandleFunc(watch C.int) {
+//export virGoEventRemoveHandleFunc
+func virGoEventRemoveHandleFunc(watch C.int) {
 	if eventLoopImpl == nil {
 		panic("Event loop impl is missing")
 	}
@@ -240,8 +244,8 @@ func eventRemoveHandleFunc(watch C.int) {
 	eventLoopImpl.RemoveHandleFunc(int(watch))
 }
 
-//export eventAddTimeoutFunc
-func eventAddTimeoutFunc(freq C.int, callback uintptr, opaque uintptr, free uintptr) C.int {
+//export virGoEventAddTimeoutFunc
+func virGoEventAddTimeoutFunc(freq C.int, callback uintptr, opaque uintptr, free uintptr) C.int {
 	if eventLoopImpl == nil {
 		panic("Event loop impl is missing")
 	}
@@ -255,8 +259,8 @@ func eventAddTimeoutFunc(freq C.int, callback uintptr, opaque uintptr, free uint
 	return C.int(eventLoopImpl.AddTimeoutFunc(int(freq), cbinfo))
 }
 
-//export eventUpdateTimeoutFunc
-func eventUpdateTimeoutFunc(timer C.int, freq C.int) {
+//export virGoEventUpdateTimeoutFunc
+func virGoEventUpdateTimeoutFunc(timer C.int, freq C.int) {
 	if eventLoopImpl == nil {
 		panic("Event loop impl is missing")
 	}
@@ -264,8 +268,8 @@ func eventUpdateTimeoutFunc(timer C.int, freq C.int) {
 	eventLoopImpl.UpdateTimeoutFunc(int(timer), int(freq))
 }
 
-//export eventRemoveTimeoutFunc
-func eventRemoveTimeoutFunc(timer C.int) {
+//export virGoEventRemoveTimeoutFunc
+func virGoEventRemoveTimeoutFunc(timer C.int) {
 	if eventLoopImpl == nil {
 		panic("Event loop impl is missing")
 	}

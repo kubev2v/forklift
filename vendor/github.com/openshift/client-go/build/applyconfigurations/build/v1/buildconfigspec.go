@@ -7,17 +7,32 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// BuildConfigSpecApplyConfiguration represents an declarative configuration of the BuildConfigSpec type for use
+// BuildConfigSpecApplyConfiguration represents a declarative configuration of the BuildConfigSpec type for use
 // with apply.
+//
+// BuildConfigSpec describes when and how builds are created
 type BuildConfigSpecApplyConfiguration struct {
-	Triggers                     []BuildTriggerPolicyApplyConfiguration `json:"triggers,omitempty"`
-	RunPolicy                    *buildv1.BuildRunPolicy                `json:"runPolicy,omitempty"`
+	// triggers determine how new Builds can be launched from a BuildConfig. If
+	// no triggers are defined, a new build can only occur as a result of an
+	// explicit client build creation.
+	Triggers []BuildTriggerPolicyApplyConfiguration `json:"triggers,omitempty"`
+	// runPolicy describes how the new build created from this build
+	// configuration will be scheduled for execution.
+	// This is optional, if not specified we default to "Serial".
+	RunPolicy *buildv1.BuildRunPolicy `json:"runPolicy,omitempty"`
+	// CommonSpec is the desired build specification
 	CommonSpecApplyConfiguration `json:",inline"`
+	// successfulBuildsHistoryLimit is the number of old successful builds to retain.
+	// When a BuildConfig is created, the 5 most recent successful builds are retained unless this value is set.
+	// If removed after the BuildConfig has been created, all successful builds are retained.
 	SuccessfulBuildsHistoryLimit *int32 `json:"successfulBuildsHistoryLimit,omitempty"`
-	FailedBuildsHistoryLimit     *int32 `json:"failedBuildsHistoryLimit,omitempty"`
+	// failedBuildsHistoryLimit is the number of old failed builds to retain.
+	// When a BuildConfig is created, the 5 most recent failed builds are retained unless this value is set.
+	// If removed after the BuildConfig has been created, all failed builds are retained.
+	FailedBuildsHistoryLimit *int32 `json:"failedBuildsHistoryLimit,omitempty"`
 }
 
-// BuildConfigSpecApplyConfiguration constructs an declarative configuration of the BuildConfigSpec type for use with
+// BuildConfigSpecApplyConfiguration constructs a declarative configuration of the BuildConfigSpec type for use with
 // apply.
 func BuildConfigSpec() *BuildConfigSpecApplyConfiguration {
 	return &BuildConfigSpecApplyConfiguration{}
@@ -48,7 +63,7 @@ func (b *BuildConfigSpecApplyConfiguration) WithRunPolicy(value buildv1.BuildRun
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ServiceAccount field is set to the value of the last call.
 func (b *BuildConfigSpecApplyConfiguration) WithServiceAccount(value string) *BuildConfigSpecApplyConfiguration {
-	b.ServiceAccount = &value
+	b.CommonSpecApplyConfiguration.ServiceAccount = &value
 	return b
 }
 
@@ -56,7 +71,7 @@ func (b *BuildConfigSpecApplyConfiguration) WithServiceAccount(value string) *Bu
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Source field is set to the value of the last call.
 func (b *BuildConfigSpecApplyConfiguration) WithSource(value *BuildSourceApplyConfiguration) *BuildConfigSpecApplyConfiguration {
-	b.Source = value
+	b.CommonSpecApplyConfiguration.Source = value
 	return b
 }
 
@@ -64,7 +79,7 @@ func (b *BuildConfigSpecApplyConfiguration) WithSource(value *BuildSourceApplyCo
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Revision field is set to the value of the last call.
 func (b *BuildConfigSpecApplyConfiguration) WithRevision(value *SourceRevisionApplyConfiguration) *BuildConfigSpecApplyConfiguration {
-	b.Revision = value
+	b.CommonSpecApplyConfiguration.Revision = value
 	return b
 }
 
@@ -72,7 +87,7 @@ func (b *BuildConfigSpecApplyConfiguration) WithRevision(value *SourceRevisionAp
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Strategy field is set to the value of the last call.
 func (b *BuildConfigSpecApplyConfiguration) WithStrategy(value *BuildStrategyApplyConfiguration) *BuildConfigSpecApplyConfiguration {
-	b.Strategy = value
+	b.CommonSpecApplyConfiguration.Strategy = value
 	return b
 }
 
@@ -80,7 +95,7 @@ func (b *BuildConfigSpecApplyConfiguration) WithStrategy(value *BuildStrategyApp
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Output field is set to the value of the last call.
 func (b *BuildConfigSpecApplyConfiguration) WithOutput(value *BuildOutputApplyConfiguration) *BuildConfigSpecApplyConfiguration {
-	b.Output = value
+	b.CommonSpecApplyConfiguration.Output = value
 	return b
 }
 
@@ -88,7 +103,7 @@ func (b *BuildConfigSpecApplyConfiguration) WithOutput(value *BuildOutputApplyCo
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Resources field is set to the value of the last call.
 func (b *BuildConfigSpecApplyConfiguration) WithResources(value corev1.ResourceRequirements) *BuildConfigSpecApplyConfiguration {
-	b.Resources = &value
+	b.CommonSpecApplyConfiguration.Resources = &value
 	return b
 }
 
@@ -96,7 +111,7 @@ func (b *BuildConfigSpecApplyConfiguration) WithResources(value corev1.ResourceR
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PostCommit field is set to the value of the last call.
 func (b *BuildConfigSpecApplyConfiguration) WithPostCommit(value *BuildPostCommitSpecApplyConfiguration) *BuildConfigSpecApplyConfiguration {
-	b.PostCommit = value
+	b.CommonSpecApplyConfiguration.PostCommit = value
 	return b
 }
 
@@ -104,7 +119,7 @@ func (b *BuildConfigSpecApplyConfiguration) WithPostCommit(value *BuildPostCommi
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CompletionDeadlineSeconds field is set to the value of the last call.
 func (b *BuildConfigSpecApplyConfiguration) WithCompletionDeadlineSeconds(value int64) *BuildConfigSpecApplyConfiguration {
-	b.CompletionDeadlineSeconds = &value
+	b.CommonSpecApplyConfiguration.CompletionDeadlineSeconds = &value
 	return b
 }
 
@@ -112,7 +127,7 @@ func (b *BuildConfigSpecApplyConfiguration) WithCompletionDeadlineSeconds(value 
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the NodeSelector field is set to the value of the last call.
 func (b *BuildConfigSpecApplyConfiguration) WithNodeSelector(value buildv1.OptionalNodeSelector) *BuildConfigSpecApplyConfiguration {
-	b.NodeSelector = &value
+	b.CommonSpecApplyConfiguration.NodeSelector = &value
 	return b
 }
 
@@ -120,7 +135,7 @@ func (b *BuildConfigSpecApplyConfiguration) WithNodeSelector(value buildv1.Optio
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the MountTrustedCA field is set to the value of the last call.
 func (b *BuildConfigSpecApplyConfiguration) WithMountTrustedCA(value bool) *BuildConfigSpecApplyConfiguration {
-	b.MountTrustedCA = &value
+	b.CommonSpecApplyConfiguration.MountTrustedCA = &value
 	return b
 }
 

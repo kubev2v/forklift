@@ -3,19 +3,39 @@
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
-// ImageSourceApplyConfiguration represents an declarative configuration of the ImageSource type for use
+// ImageSourceApplyConfiguration represents a declarative configuration of the ImageSource type for use
 // with apply.
+//
+// ImageSource is used to describe build source that will be extracted from an image or used during a
+// multi stage build. A reference of type ImageStreamTag, ImageStreamImage or DockerImage may be used.
+// A pull secret can be specified to pull the image from an external registry or override the default
+// service account secret if pulling from the internal registry. Image sources can either be used to
+// extract content from an image and place it into the build context along with the repository source,
+// or used directly during a multi-stage container image build to allow content to be copied without overwriting
+// the contents of the repository source (see the 'paths' and 'as' fields).
 type ImageSourceApplyConfiguration struct {
-	From       *v1.ObjectReference                 `json:"from,omitempty"`
-	As         []string                            `json:"as,omitempty"`
-	Paths      []ImageSourcePathApplyConfiguration `json:"paths,omitempty"`
-	PullSecret *v1.LocalObjectReference            `json:"pullSecret,omitempty"`
+	// from is a reference to an ImageStreamTag, ImageStreamImage, or DockerImage to
+	// copy source from.
+	From *corev1.ObjectReference `json:"from,omitempty"`
+	// A list of image names that this source will be used in place of during a multi-stage container image
+	// build. For instance, a Dockerfile that uses "COPY --from=nginx:latest" will first check for an image
+	// source that has "nginx:latest" in this field before attempting to pull directly. If the Dockerfile
+	// does not reference an image source it is ignored. This field and paths may both be set, in which case
+	// the contents will be used twice.
+	As []string `json:"as,omitempty"`
+	// paths is a list of source and destination paths to copy from the image. This content will be copied
+	// into the build context prior to starting the build. If no paths are set, the build context will
+	// not be altered.
+	Paths []ImageSourcePathApplyConfiguration `json:"paths,omitempty"`
+	// pullSecret is a reference to a secret to be used to pull the image from a registry
+	// If the image is pulled from the OpenShift registry, this field does not need to be set.
+	PullSecret *corev1.LocalObjectReference `json:"pullSecret,omitempty"`
 }
 
-// ImageSourceApplyConfiguration constructs an declarative configuration of the ImageSource type for use with
+// ImageSourceApplyConfiguration constructs a declarative configuration of the ImageSource type for use with
 // apply.
 func ImageSource() *ImageSourceApplyConfiguration {
 	return &ImageSourceApplyConfiguration{}
@@ -24,7 +44,7 @@ func ImageSource() *ImageSourceApplyConfiguration {
 // WithFrom sets the From field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the From field is set to the value of the last call.
-func (b *ImageSourceApplyConfiguration) WithFrom(value v1.ObjectReference) *ImageSourceApplyConfiguration {
+func (b *ImageSourceApplyConfiguration) WithFrom(value corev1.ObjectReference) *ImageSourceApplyConfiguration {
 	b.From = &value
 	return b
 }
@@ -55,7 +75,7 @@ func (b *ImageSourceApplyConfiguration) WithPaths(values ...*ImageSourcePathAppl
 // WithPullSecret sets the PullSecret field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PullSecret field is set to the value of the last call.
-func (b *ImageSourceApplyConfiguration) WithPullSecret(value v1.LocalObjectReference) *ImageSourceApplyConfiguration {
+func (b *ImageSourceApplyConfiguration) WithPullSecret(value corev1.LocalObjectReference) *ImageSourceApplyConfiguration {
 	b.PullSecret = &value
 	return b
 }

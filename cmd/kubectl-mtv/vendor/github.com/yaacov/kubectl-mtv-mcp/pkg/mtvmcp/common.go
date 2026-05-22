@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
-	"strings"
 	"time"
 
 	shellquote "github.com/kballard/go-shellquote"
@@ -58,108 +57,6 @@ type CommandResponse struct {
 	Stderr      string `json:"stderr"`
 }
 
-// ValidationError represents a structured validation error
-type ValidationError struct {
-	Error   string   `json:"error"`
-	Type    string   `json:"type"`
-	Message string   `json:"message"`
-	Missing []string `json:"missing_params,omitempty"`
-}
-
-// ValidateRequiredParams validates that required parameters are not empty
-func ValidateRequiredParams(params map[string]string) error {
-	var missing []string
-	for name, value := range params {
-		if value == "" {
-			missing = append(missing, name)
-		}
-	}
-
-	if len(missing) > 0 {
-		validationErr := ValidationError{
-			Error:   "validation_error",
-			Type:    "missing_required_parameters",
-			Message: fmt.Sprintf("Missing required parameter(s): %s", strings.Join(missing, ", ")),
-			Missing: missing,
-		}
-		jsonData, _ := json.MarshalIndent(validationErr, "", "  ")
-		return fmt.Errorf("%s", string(jsonData))
-	}
-	return nil
-}
-
-// NetworkPairValidationError represents a network pair validation error
-type NetworkPairValidationError struct {
-	Error       string   `json:"error"`
-	Type        string   `json:"type"`
-	Message     string   `json:"message"`
-	Target      string   `json:"target"`
-	Sources     []string `json:"sources"`
-	Explanation string   `json:"explanation"`
-}
-
-// ValidateNetworkPairs validates that network pairs follow the constraint rules:
-// - Pod networking ('default') can only be mapped ONCE across all sources
-// - Each specific NAD can only be mapped ONCE across all sources
-// - 'ignored' can be used multiple times
-func ValidateNetworkPairs(pairsStr string) error {
-	if pairsStr == "" {
-		return nil
-	}
-
-	// Parse the pairs
-	pairs := strings.Split(pairsStr, ",")
-	targetMap := make(map[string][]string) // target -> list of sources using it
-
-	for _, pair := range pairs {
-		pair = strings.TrimSpace(pair)
-		if pair == "" {
-			continue
-		}
-
-		parts := strings.SplitN(pair, ":", 2)
-		if len(parts) != 2 {
-			continue // Skip malformed pairs, let kubectl-mtv handle the error
-		}
-
-		source := strings.TrimSpace(parts[0])
-		target := strings.TrimSpace(parts[1])
-
-		// Skip 'ignored' targets - they can be used multiple times
-		if target == "ignored" {
-			continue
-		}
-
-		// Track which sources map to this target
-		targetMap[target] = append(targetMap[target], source)
-	}
-
-	// Check for duplicate target usage
-	for target, sources := range targetMap {
-		if len(sources) > 1 {
-			var explanation string
-			if target == "default" {
-				explanation = "Pod networking can only be used once. Consider using 'ignored' for sources that don't need network access, or map to different network attachment definitions."
-			} else {
-				explanation = "Each network attachment definition can only be mapped once. Consider using different target networks or 'ignored' for sources that don't need this network."
-			}
-
-			validationErr := NetworkPairValidationError{
-				Error:       "validation_error",
-				Type:        "duplicate_network_target",
-				Message:     fmt.Sprintf("Target network '%s' is mapped multiple times", target),
-				Target:      target,
-				Sources:     sources,
-				Explanation: explanation,
-			}
-			jsonData, _ := json.MarshalIndent(validationErr, "", "  ")
-			return fmt.Errorf("%s", string(jsonData))
-		}
-	}
-
-	return nil
-}
-
 // RunKubectlMTVCommand executes a kubectl-mtv command and returns structured JSON
 // It accepts a context which may contain a Kubernetes token for authentication.
 // If a token is present in the context, it will be passed via the --token flag.
@@ -177,10 +74,11 @@ func RunKubectlMTVCommand(ctx context.Context, args []string) (string, error) {
 	if GetDryRun(ctx) {
 		// In dry run mode, just return the command that would be executed
 		// The AI will explain it in context
+		cmdStr := formatShellCommand("kubectl-mtv", args)
 		response := CommandResponse{
-			Command:     formatShellCommand("kubectl-mtv", args),
+			Command:     cmdStr,
 			ReturnValue: 0,
-			Stdout:      formatShellCommand("kubectl-mtv", args),
+			Stdout:      cmdStr,
 			Stderr:      "",
 		}
 
@@ -250,10 +148,11 @@ func RunKubectlCommand(ctx context.Context, args []string) (string, error) {
 	if GetDryRun(ctx) {
 		// In dry run mode, just return the command that would be executed
 		// The AI will explain it in context
+		cmdStr := formatShellCommand("kubectl", args)
 		response := CommandResponse{
-			Command:     formatShellCommand("kubectl", args),
+			Command:     cmdStr,
 			ReturnValue: 0,
-			Stdout:      formatShellCommand("kubectl", args),
+			Stdout:      cmdStr,
 			Stderr:      "",
 		}
 
@@ -339,47 +238,6 @@ func formatShellCommand(cmd string, args []string) string {
 	// Use shellquote.Join to properly quote all arguments
 	quotedArgs := shellquote.Join(sanitizedArgs...)
 	return cmd + " " + quotedArgs
-}
-
-// ExtractStdoutFromResponse extracts stdout from a structured JSON response
-func ExtractStdoutFromResponse(responseJSON string) string {
-	var response CommandResponse
-	if err := json.Unmarshal([]byte(responseJSON), &response); err != nil {
-		return responseJSON // Fallback to original response
-	}
-	return response.Stdout
-}
-
-// AddBooleanFlag adds a boolean flag to args if value is not nil
-func AddBooleanFlag(args *[]string, flagName string, value *bool) {
-	if value != nil {
-		if *value {
-			*args = append(*args, "--"+flagName)
-		} else {
-			*args = append(*args, "--"+flagName+"=false")
-		}
-	}
-}
-
-// BoolPtr returns a pointer to a bool value
-func BoolPtr(b bool) *bool {
-	return &b
-}
-
-// BuildBaseArgs builds base arguments for kubectl-mtv commands
-func BuildBaseArgs(namespace string, allNamespaces bool) []string {
-	args := []string{}
-
-	if allNamespaces {
-		args = append(args, "-A")
-	} else if namespace != "" {
-		args = append(args, "-n", namespace)
-	}
-
-	// Always use JSON output format for MCP
-	args = append(args, "-o", "json")
-
-	return args
 }
 
 // UnmarshalJSONResponse unmarshals a JSON string response into a native object
