@@ -13,10 +13,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
+	"log/slog"
 	"strconv"
 
 	"github.com/infinidat/infinibox-csi-driver/common"
@@ -205,82 +205,48 @@ type GetNtpStatusResponse struct {
 	Error    Error       `json:"error"`
 }
 
-func (iboxClient *IboxClient) GetSystem() (system *SystemDetails, err error) {
-	const functionName = "GetSystem"
-	url := fmt.Sprintf("%s%s", iboxClient.Creds.URL, "api/rest/system")
-	iboxClient.Log.V(TRACE_LEVEL).Info(functionName, "URL", url)
+func (client *IboxClient) GetSystem(ctx context.Context) (system *SystemDetails, err error) {
+	url := fmt.Sprintf("%s%s", client.Creds.URL, "api/rest/system")
+	slog.Log(ctx, common.LevelTrace, "info", "URL", url)
 
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("%s - NewRequest - error %w", functionName, err)
-	}
-	SetAuthHeader(req, iboxClient.Creds)
+	parameters := make(map[string]string)
 
-	resp, err := iboxClient.HTTPClient.Do(req)
+	bodyBytes, err := commonGetLogic(ctx, url, client, parameters)
 	if err != nil {
-		return nil, fmt.Errorf("%s - Do - error %w", functionName, err)
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			iboxClient.Log.V(INFO_LEVEL).Error(err, functionName, "error in Close()", err.Error())
-		}
-	}()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("%s - ReadAll - error %w", functionName, err)
+		return nil, common.Errorf("commonGetLogic - error: %w url: %s", err, url)
 	}
 	var responseObject GetSystemResponse
 	err = json.Unmarshal(bodyBytes, &responseObject)
 	if err != nil {
-		return nil, fmt.Errorf("%s - Unmarshal - error %w", functionName, err)
+		return nil, common.Errorf("unmarshal - error: %w url: %s", err, url)
 	}
 	if responseObject.Error.Code != "" {
-		// TODO check for NOT FOUND ?  return ErrNotFound for callers?
-		return nil, fmt.Errorf("%s - ibox API - error:  code: %s message: %s", functionName, responseObject.Error.Code, responseObject.Error.Message)
+		return nil, common.Errorf("ibox API - errorCode: %s message: %s url: %s", responseObject.Error.Code, responseObject.Error.Message, url)
 	}
 	return &responseObject.Result, nil
 }
 
-func (iboxClient *IboxClient) GetNtpStatus() (results []NtpStatus, err error) {
-	const functionName = "GetNtpStatus"
-	url := fmt.Sprintf("%s%s", iboxClient.Creds.URL, "api/rest/system/ntp_status")
-	iboxClient.Log.V(TRACE_LEVEL).Info(functionName, "URL", url)
+func (client *IboxClient) GetNtpStatus(ctx context.Context) (results []NtpStatus, err error) {
+	url := fmt.Sprintf("%s%s", client.Creds.URL, "api/rest/system/ntp_status")
+	slog.Log(ctx, common.LevelTrace, "info", "URL", url)
 
 	pageSize := common.IBOXDefaultQueryPageSize
 	totalPages := 1 // start with 1, update after first query.
 	for page := 1; page <= totalPages; page++ {
-		iboxClient.Log.V(TRACE_LEVEL).Info(functionName, "page", page, "totalPages", totalPages)
+		slog.Log(ctx, common.LevelTrace, "info", "page", page, "totalPages", totalPages)
 
-		req, err := http.NewRequest(http.MethodGet, url, nil)
+		parameters := make(map[string]string)
+		parameters[PARAMETER_PAGE_SIZE] = strconv.Itoa(pageSize)
+		parameters[PARAMETER_PAGE] = strconv.Itoa(page)
+
+		bodyBytes, err := commonGetLogic(ctx, url, client, parameters)
 		if err != nil {
-			return results, fmt.Errorf("%s - NewRequest - error %w", functionName, err)
-		}
-
-		values := req.URL.Query()
-		values.Add(PARAMETER_PAGE_SIZE, strconv.Itoa(pageSize))
-		values.Add(PARAMETER_PAGE, strconv.Itoa(page))
-		req.URL.RawQuery = values.Encode()
-
-		SetAuthHeader(req, iboxClient.Creds)
-
-		resp, err := iboxClient.HTTPClient.Do(req)
-		if err != nil {
-			return results, fmt.Errorf("%s - Do - error %w", functionName, err)
-		}
-		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				iboxClient.Log.V(INFO_LEVEL).Error(err, functionName, "error in Close()", err.Error())
-			}
-		}()
-		bodyBytes, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return results, fmt.Errorf("%s - ReadAll - error %w", functionName, err)
+			return results, common.Errorf("commonGetLogic - error: %w url: %s", err, url)
 		}
 		var responseObject GetNtpStatusResponse
 		err = json.Unmarshal(bodyBytes, &responseObject)
 		if err != nil {
-			return results, fmt.Errorf("%s - Unmarshal - error %w", functionName, err)
+			return results, common.Errorf("unmarshal - error: %w url: %s", err, url)
 		}
 		results = append(results, responseObject.Result...)
 

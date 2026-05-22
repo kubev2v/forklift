@@ -13,14 +13,9 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 )
 
-// createOffloadSecret creates a secret for offload plugin authentication
-func createOffloadSecret(configFlags *genericclioptions.ConfigFlags, namespace, baseName string, opts StorageCreateOptions) (*corev1.Secret, error) {
-	// Get the Kubernetes client using configFlags
-	k8sClient, err := client.GetKubernetesClientset(configFlags)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create kubernetes client: %v", err)
-	}
-
+// buildOffloadSecret constructs the offload Secret object without persisting it.
+// For dry-run a deterministic Name is used; for live create GenerateName is used.
+func buildOffloadSecret(namespace, baseName string, opts StorageCreateOptions, dryRun bool) (*corev1.Secret, error) {
 	// Process CA certificate file if specified with @filename
 	cacert := opts.OffloadCACert
 	if strings.HasPrefix(cacert, "@") {
@@ -32,10 +27,8 @@ func createOffloadSecret(configFlags *genericclioptions.ConfigFlags, namespace, 
 		cacert = string(fileContent)
 	}
 
-	// Create secret data without base64 encoding (the API handles this automatically)
 	secretData := map[string][]byte{}
 
-	// Add vSphere credentials (required)
 	if opts.OffloadVSphereUsername != "" {
 		secretData["user"] = []byte(opts.OffloadVSphereUsername)
 	}
@@ -45,8 +38,6 @@ func createOffloadSecret(configFlags *genericclioptions.ConfigFlags, namespace, 
 	if opts.OffloadVSphereURL != "" {
 		secretData["url"] = []byte(opts.OffloadVSphereURL)
 	}
-
-	// Add storage array credentials (required)
 	if opts.OffloadStorageUsername != "" {
 		secretData["storageUser"] = []byte(opts.OffloadStorageUsername)
 	}
@@ -56,8 +47,6 @@ func createOffloadSecret(configFlags *genericclioptions.ConfigFlags, namespace, 
 	if opts.OffloadStorageEndpoint != "" {
 		secretData["storageEndpoint"] = []byte(opts.OffloadStorageEndpoint)
 	}
-
-	// Add optional TLS fields
 	if opts.OffloadInsecureSkipTLS {
 		secretData["insecureSkipVerify"] = []byte("true")
 	}
@@ -65,26 +54,41 @@ func createOffloadSecret(configFlags *genericclioptions.ConfigFlags, namespace, 
 		secretData["cacert"] = []byte(cacert)
 	}
 
-	// Validate that we have the minimum required fields
 	if len(secretData) == 0 {
 		return nil, fmt.Errorf("no offload secret fields provided")
 	}
 
-	// Generate a name prefix for the secret
-	secretName := fmt.Sprintf("%s-offload-", baseName)
-
-	// Create the secret object directly as a typed Secret
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: secretName,
-			Namespace:    namespace,
-			Labels: map[string]string{
-				"createdForResourceType": "offload",
-				"createdForMapping":      baseName,
-			},
+	meta := metav1.ObjectMeta{
+		Namespace: namespace,
+		Labels: map[string]string{
+			"createdForResourceType": "offload",
+			"createdForMapping":      baseName,
 		},
-		Data: secretData,
-		Type: corev1.SecretTypeOpaque,
+	}
+	if dryRun {
+		meta.Name = fmt.Sprintf("%s-offload", baseName)
+	} else {
+		meta.GenerateName = fmt.Sprintf("%s-offload-", baseName)
+	}
+
+	return &corev1.Secret{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"},
+		ObjectMeta: meta,
+		Data:       secretData,
+		Type:       corev1.SecretTypeOpaque,
+	}, nil
+}
+
+// createOffloadSecret creates a secret for offload plugin authentication
+func createOffloadSecret(configFlags *genericclioptions.ConfigFlags, namespace, baseName string, opts StorageCreateOptions) (*corev1.Secret, error) {
+	k8sClient, err := client.GetKubernetesClientset(configFlags)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kubernetes client: %v", err)
+	}
+
+	secret, err := buildOffloadSecret(namespace, baseName, opts, false)
+	if err != nil {
+		return nil, err
 	}
 
 	return k8sClient.CoreV1().Secrets(namespace).Create(context.Background(), secret, metav1.CreateOptions{})

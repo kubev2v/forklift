@@ -187,6 +187,21 @@ func (c *ClientIMPL) GetHostVolumeMapping(ctx context.Context, id string) (resp 
 	return resp, WrapErr(err)
 }
 
+func (c *ClientIMPL) GetHostVolumeMappingByHostID(ctx context.Context, hostID string) (resp []HostVolumeMapping, err error) {
+	qp := getHostVolumeMappingQueryParams(c)
+	qp.RawArg("host_id", fmt.Sprintf("eq.%s", hostID))
+
+	_, err = c.APIClient().Query(
+		ctx,
+		RequestConfig{
+			Method:      "GET",
+			Endpoint:    hostMappingURL,
+			QueryParams: qp,
+		},
+		&resp)
+	return resp, WrapErr(err)
+}
+
 // GetHostVolumeMappingByVolumeID returns volume mapping by volumeID
 func (c *ClientIMPL) GetHostVolumeMappingByVolumeID(
 	ctx context.Context, volumeID string,
