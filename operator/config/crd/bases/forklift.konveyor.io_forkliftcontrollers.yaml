@@ -448,6 +448,10 @@ spec:
                 type: string
                 enum: ["true", "false"]
                 description: "Retain populator pods after migration for debugging (default: false)"
+              feature_xfs_repair_ignore:
+                type: string
+                enum: ["true", "false"]
+                description: "Ignore xfs_repair exit status during conversion (default: false)"
               controller_static_udn_ip_addresses:
                 type: string
                 enum: ["true", "false"]

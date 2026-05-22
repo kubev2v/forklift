@@ -3704,6 +3704,13 @@ spec:
                 - "true"
                 - "false"
                 type: string
+              feature_xfs_repair_ignore:
+                description: 'Ignore xfs_repair exit status during conversion (default:
+                  false)'
+                enum:
+                - "true"
+                - "false"
+                type: string
               hooks_container_limits_cpu:
                 description: 'Hooks CPU limit (default: 1000m)'
                 example: 2000m
@@ -11813,6 +11820,11 @@ spec:
           false)
         displayName: Retain Populator Pods
         path: controller_retain_populator_pods
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Ignore xfs_repair exit status during conversion (default false)
+        displayName: XFS Repair Ignore
+        path: feature_xfs_repair_ignore
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Enable static udn IP addresses feature (default false)

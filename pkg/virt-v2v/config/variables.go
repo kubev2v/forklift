@@ -40,6 +40,7 @@ const (
 	EnvWindowsRegistryNetworkConfigName = "V2V_windowsRegistryNetworkConfig"
 	EnvWaitForGuestRebootName           = "V2V_waitForGuestReboot"
 	EnvXfsCompatibilityName             = "V2V_xfsCompatibility"
+	EnvXfsRepairIgnoreName              = "V2V_xfsRepairIgnore"
 )
 
 const (
@@ -174,6 +175,16 @@ func (s *AppConfig) Load() (err error) {
 	flag.Parse()
 
 	s.SupportsNoFstrim = detectNoFstrimSupport("/etc/os-release")
+
+	if s.getEnvBool(EnvXfsRepairIgnoreName, false) {
+		const token = "xfs_repair_ignore=1"
+		if existing := os.Getenv("LIBGUESTFS_APPEND"); existing != "" {
+			_ = os.Setenv("LIBGUESTFS_APPEND", existing+" "+token)
+		} else {
+			_ = os.Setenv("LIBGUESTFS_APPEND", token)
+		}
+		fmt.Fprintf(os.Stderr, "xfs_repair ignore enabled (LIBGUESTFS_APPEND += %s)\n", token)
+	}
 
 	return s.validate()
 }
