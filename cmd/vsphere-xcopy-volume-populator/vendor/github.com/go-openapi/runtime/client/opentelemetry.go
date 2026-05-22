@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright 2015-2025 go-swagger maintainers
+// SPDX-License-Identifier: Apache-2.0
+
 package client
 
 import (
@@ -5,21 +8,62 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/go-openapi/runtime"
-	"github.com/go-openapi/strfmt"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
-	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
-	"go.opentelemetry.io/otel/semconv/v1.17.0/httpconv"
+	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/go-openapi/runtime"
+	"github.com/go-openapi/strfmt"
 )
 
 const (
 	instrumentationVersion = "1.0.0"
 	tracerName             = "go-openapi"
 )
+
+// WithOpenTelemetry adds opentelemetry support to the provided runtime.
+// A new client span is created for each request.
+// If the context of the client operation does not contain an active span, no span is created.
+// The provided opts are applied to each spans - for example to add global tags.
+func (r *Runtime) WithOpenTelemetry(opts ...OpenTelemetryOpt) runtime.ClientTransport {
+	return newOpenTelemetryTransport(r, r.Host, opts)
+}
+
+// WithOpenTracing adds opentracing support to the provided runtime.
+// A new client span is created for each request.
+// If the context of the client operation does not contain an active span, no span is created.
+// The provided opts are applied to each spans - for example to add global tags.
+//
+// Deprecated: use [WithOpenTelemetry] instead, as opentracing is now archived and superseded by opentelemetry.
+//
+// # Deprecation notice
+//
+// The [Runtime.WithOpenTracing] method has been deprecated in favor of [Runtime.WithOpenTelemetry].
+//
+// The method is still around so programs calling it will still build. However, it will return
+// an opentelemetry transport.
+//
+// If you have a strict requirement on using opentracing, you may still do so by importing
+// module [github.com/go-openapi/runtime/client-[middleware]/opentracing] and using
+// [github.com/go-openapi/runtime/client-[middleware]/opentracing.WithOpenTracing] with your
+// usual opentracing options and opentracing-enabled transport.
+//
+// Passed options are ignored unless they are of type [OpenTelemetryOpt].
+func (r *Runtime) WithOpenTracing(opts ...any) runtime.ClientTransport {
+	otelOpts := make([]OpenTelemetryOpt, 0, len(opts))
+	for _, o := range opts {
+		otelOpt, ok := o.(OpenTelemetryOpt)
+		if !ok {
+			continue
+		}
+		otelOpts = append(otelOpts, otelOpt)
+	}
+
+	return r.WithOpenTelemetry(otelOpts...)
+}
 
 type config struct {
 	Tracer            trace.Tracer
@@ -96,12 +140,14 @@ func newOpenTelemetryTransport(transport runtime.ClientTransport, host string, o
 		host:      host,
 	}
 
-	defaultOpts := []OpenTelemetryOpt{
+	const baseOptions = 4
+	defaultOpts := make([]OpenTelemetryOpt, 0, len(opts)+baseOptions)
+	defaultOpts = append(defaultOpts,
 		WithSpanOptions(trace.WithSpanKind(trace.SpanKindClient)),
 		WithSpanNameFormatter(defaultTransportFormatter),
 		WithPropagators(otel.GetTextMapPropagator()),
 		WithTracerProvider(otel.GetTracerProvider()),
-	}
+	)
 
 	c := newConfig(append(defaultOpts, opts...)...)
 	tr.config = c
@@ -109,7 +155,7 @@ func newOpenTelemetryTransport(transport runtime.ClientTransport, host string, o
 	return tr
 }
 
-func (t *openTelemetryTransport) Submit(op *runtime.ClientOperation) (interface{}, error) {
+func (t *openTelemetryTransport) Submit(op *runtime.ClientOperation) (any, error) {
 	if op.Context == nil {
 		return t.transport.Submit(op)
 	}
@@ -129,14 +175,17 @@ func (t *openTelemetryTransport) Submit(op *runtime.ClientOperation) (interface{
 		return params.WriteToRequest(req, reg)
 	})
 
-	op.Reader = runtime.ClientResponseReaderFunc(func(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
+	op.Reader = runtime.ClientResponseReaderFunc(func(response runtime.ClientResponse, consumer runtime.Consumer) (any, error) {
 		if span != nil {
 			statusCode := response.Code()
 			// NOTE: this is replaced by semconv.HTTPResponseStatusCode in semconv v1.21
-			span.SetAttributes(semconv.HTTPStatusCode(statusCode))
+			span.SetAttributes(semconv.HTTPResponseStatusCode(statusCode))
 			// NOTE: the conversion from HTTP status code to trace code is no longer available with
 			// semconv v1.21
-			span.SetStatus(httpconv.ServerStatus(statusCode))
+			const minHTTPStatusIsError = 400
+			if statusCode >= minHTTPStatusIsError {
+				span.SetStatus(codes.Error, http.StatusText(statusCode))
+			}
 		}
 
 		return reader.ReadResponse(response, consumer)
@@ -173,7 +222,7 @@ func (t *openTelemetryTransport) newOpenTelemetrySpan(op *runtime.ClientOperatio
 	span.SetAttributes(
 		attribute.String("net.peer.name", t.host),
 		attribute.String(string(semconv.HTTPRouteKey), op.PathPattern),
-		attribute.String(string(semconv.HTTPMethodKey), op.Method),
+		attribute.String(string(semconv.HTTPRequestMethodKey), op.Method),
 		attribute.String("span.kind", trace.SpanKindClient.String()),
 		attribute.String("http.scheme", scheme),
 	)
