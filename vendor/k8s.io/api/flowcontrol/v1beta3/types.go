@@ -103,10 +103,25 @@ const (
 	AutoUpdateAnnotationKey = "apf.kubernetes.io/autoupdate-spec"
 )
 
+const (
+	// This annotation is only for use in v1beta3.
+	//
+	// The presence of this annotation in a v1beta3 object means that
+	// a zero value in the 'NominalConcurrencyShares' field means zero
+	// rather than the old default of 30.
+	//
+	// To set a zero value for the 'NominalConcurrencyShares' field in v1beta3,
+	// set the annotation to an empty string:
+	//   "flowcontrol.k8s.io/v1beta3-preserve-zero-concurrency-shares": ""
+	//
+	PriorityLevelPreserveZeroConcurrencySharesKey = "flowcontrol.k8s.io/v1beta3-preserve-zero-concurrency-shares"
+)
+
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.26
+// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1,FlowSchema
 
 // FlowSchema defines the schema of a group of flows. Note that a flow is made up of a set of inbound API requests with
 // similar attributes and is identified by a pair of strings: the name of the FlowSchema and a "flow distinguisher".
@@ -128,6 +143,7 @@ type FlowSchema struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.26
+// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1,FlowSchemaList
 
 // FlowSchemaList is a list of FlowSchema objects.
 type FlowSchemaList struct {
@@ -384,6 +400,7 @@ type FlowSchemaConditionType string
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.26
+// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1,PriorityLevelConfiguration
 
 // PriorityLevelConfiguration represents the configuration of a priority level.
 type PriorityLevelConfiguration struct {
@@ -404,6 +421,7 @@ type PriorityLevelConfiguration struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.26
+// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1,PriorityLevelConfigurationList
 
 // PriorityLevelConfigurationList is a list of PriorityLevelConfiguration objects.
 type PriorityLevelConfigurationList struct {
@@ -429,11 +447,16 @@ type PriorityLevelConfigurationSpec struct {
 	// capacity is made available exclusively to this priority level.
 	// Required.
 	// +unionDiscriminator
+	// +k8s:alpha(since: "1.36")=+k8s:required
+	// +k8s:alpha(since: "1.36")=+k8s:discriminator
 	Type PriorityLevelEnablement `json:"type" protobuf:"bytes,1,opt,name=type"`
 
 	// `limited` specifies how requests are handled for a Limited priority level.
 	// This field must be non-empty if and only if `type` is `"Limited"`.
 	// +optional
+	// +k8s:alpha(since: "1.36")=+k8s:optional
+	// +k8s:alpha(since: "1.36")=+k8s:member("Limited")=+k8s:required
+	// +k8s:alpha(since: "1.36")=+k8s:member("Exempt")=+k8s:forbidden
 	Limited *LimitedPriorityLevelConfiguration `json:"limited,omitempty" protobuf:"bytes,2,opt,name=limited"`
 
 	// `exempt` specifies how requests are handled for an exempt priority level.
@@ -442,6 +465,9 @@ type PriorityLevelConfigurationSpec struct {
 	// If empty and `type` is `"Exempt"` then the default values
 	// for `ExemptPriorityLevelConfiguration` apply.
 	// +optional
+	// +k8s:alpha(since: "1.36")=+k8s:optional
+	// +k8s:alpha(since: "1.36")=+k8s:member("Exempt")=+k8s:optional
+	// +k8s:alpha(since: "1.36")=+k8s:member("Limited")=+k8s:forbidden
 	Exempt *ExemptPriorityLevelConfiguration `json:"exempt,omitempty" protobuf:"bytes,3,opt,name=exempt"`
 }
 
@@ -561,11 +587,16 @@ type LimitResponse struct {
 	// are rejected.
 	// Required.
 	// +unionDiscriminator
+	// +k8s:alpha(since: "1.36")=+k8s:required
+	// +k8s:alpha(since: "1.36")=+k8s:discriminator
 	Type LimitResponseType `json:"type" protobuf:"bytes,1,opt,name=type"`
 
 	// `queuing` holds the configuration parameters for queuing.
 	// This field may be non-empty only if `type` is `"Queue"`.
 	// +optional
+	// +k8s:alpha(since: "1.36")=+k8s:optional
+	// +k8s:alpha(since: "1.36")=+k8s:member("Queue")=+k8s:required
+	// +k8s:alpha(since: "1.36")=+k8s:member("Reject")=+k8s:forbidden
 	Queuing *QueuingConfiguration `json:"queuing,omitempty" protobuf:"bytes,2,opt,name=queuing"`
 }
 

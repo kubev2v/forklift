@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-logr/logr/slogr"
+	"github.com/go-logr/logr"
 
 	"k8s.io/klog/v2/internal/buffer"
 	"k8s.io/klog/v2/internal/serialize"
@@ -35,7 +35,7 @@ import (
 
 func (l *klogger) Handle(ctx context.Context, record slog.Record) error {
 	if logging.logger != nil {
-		if slogSink, ok := logging.logger.GetSink().(slogr.SlogSink); ok {
+		if slogSink, ok := logging.logger.GetSink().(logr.SlogSink); ok {
 			// Let that logger do the work.
 			return slogSink.Handle(ctx, record)
 		}
@@ -63,12 +63,17 @@ func slogOutput(file string, line int, now time.Time, err error, s severity.Seve
 	}
 
 	// See printS.
+	qMsg := make([]byte, 0, 1024)
+	qMsg = strconv.AppendQuote(qMsg, msg)
+
 	b := buffer.GetBuffer()
-	b.WriteString(strconv.Quote(msg))
+	b.Write(qMsg)
+
+	var errKV []interface{}
 	if err != nil {
-		serialize.KVListFormat(&b.Buffer, "err", err)
+		errKV = []interface{}{"err", err}
 	}
-	serialize.KVListFormat(&b.Buffer, kvList...)
+	serialize.FormatKVs(&b.Buffer, errKV, kvList)
 
 	// See print + header.
 	buf := logging.formatHeader(s, file, line, now)
@@ -77,13 +82,13 @@ func slogOutput(file string, line int, now time.Time, err error, s severity.Seve
 	buffer.PutBuffer(b)
 }
 
-func (l *klogger) WithAttrs(attrs []slog.Attr) slogr.SlogSink {
+func (l *klogger) WithAttrs(attrs []slog.Attr) logr.SlogSink {
 	clone := *l
 	clone.values = serialize.WithValues(l.values, sloghandler.Attrs2KVList(l.groups, attrs))
 	return &clone
 }
 
-func (l *klogger) WithGroup(name string) slogr.SlogSink {
+func (l *klogger) WithGroup(name string) logr.SlogSink {
 	clone := *l
 	if clone.groups != "" {
 		clone.groups += "." + name
@@ -93,4 +98,4 @@ func (l *klogger) WithGroup(name string) slogr.SlogSink {
 	return &clone
 }
 
-var _ slogr.SlogSink = &klogger{}
+var _ logr.SlogSink = &klogger{}

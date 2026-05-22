@@ -1,3 +1,2289 @@
+<a name="v0.51.0"></a>
+## [Release v0.51.0](https://github.com/vmware/govmomi/compare/v0.51.0-alpha.0...v0.51.0)
+
+> Release Date: 2025-05-23
+
+### 🐞 Fix
+
+- [e61afb1d]	vcsim: Avoid possible race in SessionManager.Logout
+
+### 💫 API Changes
+
+- [2250eba3]	Add option to use a filter function as value of property.Match (#3785)
+- [a534f395]	Add object.VirtualMachine.CreateSnapshotEx method
+- [761efe91]	Add object.VirtualMachine.PromoteDisks method
+- [a09e0ec5]	Extend vmdk.Info to include Descriptor
+
+### 💫 `govc` (CLI)
+
+- [59cb29b9]	Add vm.disk.promote command
+- [eaaeb841]	Add import.vmdk '-i' flag to output vmdk info only
+
+### 💫 `vcsim` (Simulator)
+
+- [30750a65]	Add CreateSnapshotEx for simulator
+- [6af11fcf]	Use OptionManager to configure session timeout duration
+- [40a596c8]	Add VirtualMachine.PromoteDisks_Task method
+- [22c7be30]	Use vmdk.Descriptor for vmdk file metadata
+- [54f2b702]	Avoid use of sha1 for stable UUIDs (OIDs) (#3766)
+
+### 🧹 Chore
+
+- [50196949]	Update version.go for v0.51.0
+- [a5f933dc]	update container images
+- [9002dc9e]	update `.goreleaser.yml` to v2
+
+### ⚠️ BREAKING
+
+Use OptionManager to configure session timeout duration [6af11fcf]:
+var simulator.SessionIdleTimeout has been removed.
+Use sim25.SetSessionTimeout instead.
+
+### 📖 Commits
+
+- [50196949]	chore: Update version.go for v0.51.0
+- [2250eba3]	api: Add option to use a filter function as value of property.Match (#3785)
+- [30750a65]	vcsim: Add CreateSnapshotEx for simulator
+- [a534f395]	api: Add object.VirtualMachine.CreateSnapshotEx method
+- [6af11fcf]	vcsim: Use OptionManager to configure session timeout duration
+- [2bcb4c36]	build(deps): bump actions/setup-go from 5.4.0 to 5.5.0
+- [bf0dfcbe]	chore(deps): go mod tidy
+- [d41f29dc]	build(deps): bump golang.org/x/text from 0.24.0 to 0.25.0
+- [40a596c8]	vcsim: Add VirtualMachine.PromoteDisks_Task method
+- [59cb29b9]	govc: Add vm.disk.promote command
+- [761efe91]	api: Add object.VirtualMachine.PromoteDisks method
+- [22c7be30]	vcsim: Use vmdk.Descriptor for vmdk file metadata
+- [98ad4c12]	build(deps): bump mxschmitt/action-tmate from 3.21 to 3.22
+- [eaaeb841]	govc: Add import.vmdk '-i' flag to output vmdk info only
+- [a09e0ec5]	api: Extend vmdk.Info to include Descriptor
+- [e61afb1d]	fix: vcsim: Avoid possible race in SessionManager.Logout
+- [0cbdbf0d]	emacs: Add datastore.ls '-a' flag when prefix arg is given
+- [a5f933dc]	chore: update container images
+- [54f2b702]	vcsim: Avoid use of sha1 for stable UUIDs (OIDs) (#3766)
+- [49ec77a5]	build(deps): bump test-unit from 3.6.7 to 3.6.8 in /gen
+- [ecbccf52]	build(deps): bump mxschmitt/action-tmate from 3.20 to 3.21
+- [b1a3a202]	build(deps): bump nokogiri in /gen in the bundler group
+- [9002dc9e]	chore: update `.goreleaser.yml` to v2
+
+<a name="v0.50.0"></a>
+## [Release v0.50.0](https://github.com/vmware/govmomi/compare/v0.50.0-alpha.0...v0.50.0)
+
+> Release Date: 2025-04-21
+
+### 🐞 Fix
+
+- [28b39ed2]	vcsim -load Datastore summary.url property (#3705)
+- [5833c6c4]	vcsim: fix PropertyFilter/Collector memory leak
+
+### 💫 API Changes
+
+- [7a02bd92]	Rewrite lookup service URLs on DNS error
+- [eb53c23b]	add PodVMOverheadInfo type and HostCapability field
+- [af92671c]	use `crypto/rand` for nonce generation
+- [036a4d13]	use `ParseInt` and add `int32` bounds check
+- [c99e28ca]	Add optional CategoryID,TagID fields for category and tag creation (#3706)
+
+### 💫 `govc` (CLI)
+
+- [ab3050b1]	Support Datastore Cluster in import.ova command (#1265)
+- [75f2762f]	Add import.ova -net flag (#3679)
+- [96ad8abd]	Add -lease option to import/export commands
+- [aa5a378a]	Support -p and -s in with single task.set
+- [088003eb]	Add vm.policy.ls command (#3727)
+- [278ebc9b]	Support snapshot.export
+- [a8997d55]	fix integer type conversion
+- [b40a2ace]	fix integer type conversion for `guest.chown`
+- [d2b4cc7b]	Add '-id' option for tags.category and tags create commands
+
+### 💫 `vcsim` (Simulator)
+
+- [af3bc8b7]	Populate guest.ipStack property for container backed VMs
+- [282553ee]	Add minimal json-rpc support
+- [89942b79]	Use the simulator's URL.Host in NFC lease URLs
+- [3040a0a9]	support multiple VirtualSystemType in OvfManager.CreateImportSpec
+- [ad31c4f5]	fix integer type conversion
+- [87e9b3e8]	Add vapi support for CategoryID and TagID fields
+
+### 📃 Documentation
+
+- [4e6a5f87]	remove legacy docs links
+- [8a592e2e]	update kb urls
+- [795b5648]	Update various API reference links
+
+### 🧹 Chore
+
+- [6ed9b22e]	Update version.go for v0.50.0
+- [d1eb5e21]	vim25/xml: sync with Go 1.24 encoding/xml
+- [e74e67ed]	gofmt -w -r 'interface{} -> any' .
+- [25e74a37]	update copyright
+- [e966b838]	update `vmware/govc` and `vmware/vcsim` dockerfiles
+- [a628d181]	update codeql workflow
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [6ed9b22e]	chore: Update version.go for v0.50.0
+- [554b6d0c]	chore(gh): update release
+- [1891935f]	build(deps): bump mxschmitt/action-tmate from 3.19 to 3.20
+- [af3bc8b7]	vcsim: Populate guest.ipStack property for container backed VMs
+- [f02f5681]	Handle the duration field as string
+- [7a02bd92]	api: Rewrite lookup service URLs on DNS error
+- [282553ee]	vcsim: Add minimal json-rpc support
+- [89942b79]	vcsim: Use the simulator's URL.Host in NFC lease URLs
+- [ab3050b1]	govc: Support Datastore Cluster in import.ova command (#1265)
+- [75f2762f]	govc: Add import.ova -net flag (#3679)
+- [28b39ed2]	fix: vcsim -load Datastore summary.url property (#3705)
+- [96ad8abd]	govc: Add -lease option to import/export commands
+- [aa5a378a]	govc: Support -p and -s in with single task.set
+- [4e6a5f87]	docs: remove legacy docs links
+- [8a592e2e]	docs: update kb urls
+- [d52c1f80]	chore(deps): go mod tidy
+- [89c260b8]	build(deps): bump golang.org/x/text from 0.23.0 to 0.24.0
+- [088003eb]	govc: Add vm.policy.ls command (#3727)
+- [795b5648]	docs: Update various API reference links
+- [3040a0a9]	vcsim: support multiple VirtualSystemType in OvfManager.CreateImportSpec
+- [278ebc9b]	govc: Support snapshot.export
+- [d1eb5e21]	chore: vim25/xml: sync with Go 1.24 encoding/xml
+- [5833c6c4]	fix: vcsim: fix PropertyFilter/Collector memory leak
+- [b15bf06f]	build(deps): bump goreleaser/goreleaser-action from 6.2.1 to 6.3.0
+- [eb53c23b]	api: add PodVMOverheadInfo type and HostCapability field
+- [a790f8a9]	refactor: header check
+- [e74e67ed]	chore: gofmt -w -r 'interface{} -> any' .
+- [25e74a37]	chore: update copyright
+- [ad31c4f5]	vcsim: fix integer type conversion
+- [d1cb2a32]	chore(deps): update bundler to v2 for dependabot
+- [8e40bd3f]	build(deps): bump actions/cache from 4.2.2 to 4.2.3
+- [0a2a3b13]	build(deps): bump actions/upload-artifact from 4.6.1 to 4.6.2
+- [f8d2b7f0]	build(deps): bump actions/setup-go from 5.3.0 to 5.4.0
+- [e966b838]	chore: update `vmware/govc` and `vmware/vcsim` dockerfiles
+- [af92671c]	api: use `crypto/rand` for nonce generation
+- [036a4d13]	api: use `ParseInt` and add `int32` bounds check
+- [a628d181]	chore: update codeql workflow
+- [a8997d55]	govc: fix integer type conversion
+- [b40a2ace]	govc: fix integer type conversion for `guest.chown`
+- [50264167]	build(deps): bump actions/stale from 9.0.0 to 9.1.0
+- [13746e82]	build(deps): bump actions/setup-go from 5.0.0 to 5.3.0
+- [1d474f48]	chore(gh): update dependabot
+- [69643bd7]	toolbox: fix codeql go/zipslip
+- [1996bca2]	chore(gh): update release workflow
+- [9e95e5a7]	chore(gh): update unit tests workflow
+- [f7ecbc9b]	chore(gh): update build workflow
+- [701a9511]	chore(gh): update linting workflow
+- [6260daaa]	chore(gh): update govc tests workflow
+- [cb5e9108]	chore(gh): update wip workflow
+- [67d10d52]	chore(gh): add lock workflow
+- [61147b65]	chore(gh): update stale workflow
+- [9edf6aad]	chore(gh): update docker workflow
+- [4cd16c72]	chore(gh): update greeting workflow
+- [14d73d64]	chore(gh): update codeql workflow
+- [649b4900]	chore(gh): update to `ubuntu-latest` runner
+- [87e9b3e8]	vcsim: Add vapi support for CategoryID and TagID fields
+- [d2b4cc7b]	govc: Add '-id' option for tags.category and tags create commands
+- [c99e28ca]	api: Add optional CategoryID,TagID fields for category and tag creation (#3706)
+
+<a name="v0.49.0"></a>
+## [Release v0.49.0](https://github.com/vmware/govmomi/compare/v0.49.0-alpha.0...v0.49.0)
+
+> Release Date: 2025-03-11
+
+### 🐞 Fix
+
+- [f13754e9]	vcsim: extend PropertyCollector lock to avoid potential races (#3697)
+- [67566aa6]	Drop operationID soap header for unsupported endpoints
+
+### 💫 `govc` (CLI)
+
+- [29fe42fa]	add volume.rm -keep flag to retain backing disk
+- [55b76378]	add volume.extend command
+- [1b06c598]	add GPU commands
+- [8f7fbc3a]	add session.login -jwt option (#3041)
+- [35b5564b]	Rewrite kms.export URL to use the host we connected to vCenter with
+- [5899d799]	Add storage.policy.create '-e' option to enable encryption
+
+### 💫 `vcsim` (Simulator)
+
+- [f16c46bc]	add vsan Datastore support
+- [cdeb3e48]	remove simulator.Map package variable
+- [4a0b9464]	add query and metadata support for CNS Volume API
+
+### 🧹 Chore
+
+- [bd808e86]	Update version.go for v0.49.0
+- [3bf0935b]	Use cns Task helpers in govc volume commands
+
+### ⚠️ BREAKING
+
+remove simulator.Map package variable [cdeb3e48]:
+simulator.Map package variable has been removed
+simulator.SpoofContext function has been renamed to NewContext
+
+### 📖 Commits
+
+- [bd808e86]	chore: Update version.go for v0.49.0
+- [3b718697]	build(deps): bump golang.org/x/text from 0.22.0 to 0.23.0
+- [3bf0935b]	chore: Use cns Task helpers in govc volume commands
+- [29fe42fa]	govc: add volume.rm -keep flag to retain backing disk
+- [55b76378]	govc: add volume.extend command
+- [f16c46bc]	vcsim: add vsan Datastore support
+- [cdeb3e48]	vcsim: remove simulator.Map package variable
+- [f13754e9]	fix: vcsim: extend PropertyCollector lock to avoid potential races (#3697)
+- [1b06c598]	govc: add GPU commands
+- [8f7fbc3a]	govc: add session.login -jwt option (#3041)
+- [4a0b9464]	vcsim: add query and metadata support for CNS Volume API
+- [afc4788c]	build(deps): bump github.com/google/go-cmp from 0.6.0 to 0.7.0
+- [e8a9a192]	build(deps): bump golang.org/x/text from 0.21.0 to 0.22.0
+- [67566aa6]	fix: Drop operationID soap header for unsupported endpoints
+- [35b5564b]	govc: Rewrite kms.export URL to use the host we connected to vCenter with
+- [5899d799]	govc: Add storage.policy.create '-e' option to enable encryption
+
+<a name="v0.48.1"></a>
+## [Release v0.48.1](https://github.com/vmware/govmomi/compare/v0.48.0...v0.48.1)
+
+> Release Date: 2025-02-11
+
+### 🐞 Fix
+
+- [92adc453]	Drop operationID soap header for unsupported endpoints
+
+### 💫 `govc` (CLI)
+
+- [8df82543]	Rewrite kms.export URL to use the host we connected to vCenter with
+- [93efaa51]	Add storage.policy.create '-e' option to enable encryption
+
+### 🧹 Chore
+
+- [cc1a61ba]	Update version.go for v0.48.1
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [cc1a61ba]	chore: Update version.go for v0.48.1
+- [f642f66f]	build(deps): bump golang.org/x/text from 0.21.0 to 0.22.0
+- [92adc453]	fix: Drop operationID soap header for unsupported endpoints
+- [8df82543]	govc: Rewrite kms.export URL to use the host we connected to vCenter with
+- [93efaa51]	govc: Add storage.policy.create '-e' option to enable encryption
+
+<a name="v0.48.0"></a>
+## [Release v0.48.0](https://github.com/vmware/govmomi/compare/v0.48.0-alpha.0...v0.48.0)
+
+> Release Date: 2025-01-27
+
+### 🐞 Fix
+
+- [8aefcdd8]	add DirectPathProfileManager to mo registry
+- [90bd9759]	support multiple property.Collector.Retrieve base type fields
+- [64dd41d1]	Add session lookup fallback for soap header auth (#3636)
+- [ac1c7713]	govc: import.ovf remote support regression (#3596)
+
+### 💫 API Changes
+
+- [116ba7e8]	add vlsm.GlobalObjectManager.List method
+
+### 💫 `govc` (CLI)
+
+- [0d671fc9]	sha256 for session cache
+- [d6caa719]	add disk.metadata ls and update commands
+- [81828ede]	enhance VAPI for vSphere Supervisor Services (#3624)
+
+### 💫 `vcsim` (Simulator)
+
+- [dfc23116]	add env var for use with ssoadmin GetTrustedCertificates
+- [c87a209c]	add disk query and metadata support
+- [b3b0a6e0]	fix save+load of Alarm objects
+- [f9e80d2a]	add ssoadmin GetTrustedCertificates method
+- [228a1024]	fix lookup service deferred registration
+- [6ac91ac2]	add vslm VStorageObjectManager (aka FCD Global Catalog) support (#2542)
+- [f02e7e95]	add DatastoreNamespaceManager Create/Delete directory methods
+
+### 🧹 Chore
+
+- [648bbc7f]	Update version.go for v0.48.0
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [648bbc7f]	chore: Update version.go for v0.48.0
+- [ca8c6427]	Add ResourcePool.resourceConfigSpecDetailed to missingSet filter
+- [d75327c4]	add delete flag for CnsContainerCluster type
+- [dfc23116]	vcsim: add env var for use with ssoadmin GetTrustedCertificates
+- [0d671fc9]	govc: sha256 for session cache
+- [116ba7e8]	api: add vlsm.GlobalObjectManager.List method
+- [c87a209c]	vcsim: add disk query and metadata support
+- [d6caa719]	govc: add disk.metadata ls and update commands
+- [8aefcdd8]	fix: add DirectPathProfileManager to mo registry
+- [b3b0a6e0]	vcsim: fix save+load of Alarm objects
+- [81828ede]	govc: enhance VAPI for vSphere Supervisor Services (#3624)
+- [f9e80d2a]	vcsim: add ssoadmin GetTrustedCertificates method
+- [228a1024]	vcsim: fix lookup service deferred registration
+- [6ac91ac2]	vcsim: add vslm VStorageObjectManager (aka FCD Global Catalog) support (#2542)
+- [90bd9759]	fix: support multiple property.Collector.Retrieve base type fields
+- [64dd41d1]	fix: Add session lookup fallback for soap header auth (#3636)
+- [f02e7e95]	vcsim: add DatastoreNamespaceManager Create/Delete directory methods
+- [ac1c7713]	fix: govc: import.ovf remote support regression (#3596)
+- [7932d023]	goreleaser: remove brew tap setup
+
+<a name="v0.47.1"></a>
+## [Release v0.47.1](https://github.com/vmware/govmomi/compare/v0.47.0...v0.47.1)
+
+> Release Date: 2025-01-07
+
+### 🐞 Fix
+
+- [27d06f39]	Add session lookup fallback for soap header auth (#3636)
+- [1de5fbfd]	govc: import.ovf remote support regression (#3596)
+
+### 🧹 Chore
+
+- [f8416022]	Update version.go for v0.47.1
+- [5d76bdab]	Update version.go for v0.47.1
+
+### ⏮ Reverts
+
+- [42a6a31e]	chore: Update version.go for v0.47.1
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [f8416022]	chore: Update version.go for v0.47.1
+- [27d06f39]	fix: Add session lookup fallback for soap header auth (#3636)
+- [42a6a31e]	Revert "chore: Update version.go for v0.47.1"
+- [5d76bdab]	chore: Update version.go for v0.47.1
+- [1de5fbfd]	fix: govc: import.ovf remote support regression (#3596)
+
+<a name="v0.47.0"></a>
+## [Release v0.47.0](https://github.com/vmware/govmomi/compare/v0.47.0-alpha.0...v0.47.0)
+
+> Release Date: 2025-01-02
+
+### 🐞 Fix
+
+- [3793a5b2]	govc fix field.info name (-n flag) validation
+- [8adeb8b5]	SOAP vcSessionCookie value must be from vim25.Client
+- [2271a788]	toolbox: add freebsd stub for fileExtendedInfoFormat (#3620)
+- [f08496ed]	vcsim: swap order of xsi type attribute (#2114)
+- [973a2240]	assert Entity interface in mo.Value()
+- [ad24cb43]	Property Collector updates should be triggered on the empty FilterSet (#3631)
+- [29de346f]	vcsim: output signed byte in ByteSlice.MarshalXML (#3615)
+- [71b9c764]	govc: wire up flags for namespace service create
+- [5e9a140d]	vcsim: avoid possible panic when applying PropertyFilter
+
+### 💫 API Changes
+
+- [a447f4d0]	Fix OVF param to use interface
+- [17b5c08b]	Generate bindings for 9.0.0.0.rc1
+- [77de0b54]	Generate API with Broadcom header
+- [4b7d0c56]	Specify ruby bundler for api gen
+- [f2382015]	Update gen/gen.sh for 9.0.0.0.rc1
+- [05a6d571]	Support podman for building api
+- [3d8b0261]	Build api with Go 1.23.2
+- [aa8279b5]	Support returning DS info when resolving lib stor
+- [64ca62fe]	Support DC for ResolveLibItemStor
+- [0af06a3c]	Support encode/decode OVF to JSON
+- [7598ae9f]	Fix object.VirtualDiskManager::Copy
+- [b2bde000]	Update OVF ToConfigSpec to handled unknown types
+- [5bb9901a]	A generic copy function for vim25/types
+- [19189841]	add override mechanism for SOAP Header.Cookie
+- [495a8203]	OVF to ConfigSpec
+- [e9f9eb04]	Support OVF ResourceType enum
+- [42bf8130]	Update OVF parser to conform to spec
+- [05482c0b]	move cli/host/esxcli.Command to cli/esx package
+
+### 💫 `govc` (CLI)
+
+- [ad5c90a4]	Update govc usage doc
+- [ca2e6ffd]	add datastore.download -json support
+- [18a3019f]	add -b flag to volume.ls
+- [e02de720]	add disk.ls '-a' flag (#3639)
+- [c60f498e]	add datastore.ls -H option
+- [228b445f]	remove minimum API version check (#3643)
+- [7e178857]	Move govc commands into cli pkg
+
+### 💫 `vcsim` (Simulator)
+
+- [10e9bc7b]	create cls vmdk descriptor and backing files
+- [dd6bf66f]	Improve sim for pub/sub content libs
+- [b7d4f00d]	make QueryVirtualDiskUuid() result stable
+- [f398e78e]	add VirtualDiskManager.QueryVirtualDiskInfo (#3000)  (#2555)
+- [a9488e06]	fix object.save when run directly against ESX
+- [c0b59448]	LicenseManager enhancements
+- [5db2637e]	add UpdateAssignedLicense method
+- [9322377e]	add esxcli support
+- [53d31e94]	Lock alpine image tag to non-latest tag
+
+### 🧹 Chore
+
+- [95396cdf]	Update version.go for v0.47.0
+- [e1f1db4a]	update copyright header
+- [538dbef1]	Minimum version selection
+
+### ⚠️ BREAKING
+
+Support returning DS info when resolving lib stor [aa8279b5]:
+This change updates the signature for the
+ResolveLibraryItemStorage function.
+
+Signed-off-by: akutz <akutz[@vmware](https://github.com/vmware).com>
+
+Support DC for ResolveLibItemStor [64ca62fe]:
+This change requires updating the use of the
+ResolveLibraryItemStorage function to account for
+its signature change.
+
+Support OVF ResourceType enum [e9f9eb04]:
+Users of the `ovf` package may need to cast ResourceType
+to a uint16 depending on how they have used the value.
+
+Signed-off-by: akutz <akutz[@vmware](https://github.com/vmware).com>
+
+Update OVF parser to conform to spec [42bf8130]:
+Users of the `ovf` package will need to update their
+sources to conform to the changes from this patch. It
+should be a fairly simple change.
+
+move cli/host/esxcli.Command to cli/esx package [05482c0b]:
+Package "github.com/vmware/govmomi/govc/host/esxcli" is now "github.com/vmware/govmomi/cli/esx"
+A 'context.Context' param has also been added to the package's methods.
+See cli/esx/example_test.go for usage.
+
+Move govc commands into cli pkg [7e178857]:
+All packages `./govc/*` (except `./govc/test`) have been
+relocated under the `./cli` package.
+
+Minimum version selection [538dbef1]:
+The `go install` command may no longer be used to install
+govc and vcsim directly from GitHub.
+
+This is because both packages are now distinct sub-modules that still
+depend on the other packages in this project. Therefore these sub-mods
+use the following replace directive:
+
+    replace github.com/vmware/govmomi -> ../
+
+This teaches govc and vcsim where to look for the imported GoVmomi
+packages. This ensures that building these binaries will pick up any
+local changes to the rest of the project.
+
+However, the `go install` command does not support installing modules
+from a remote location if the module contains a `replace` directive.
+This means users will need to either clone all of
+github.com/vmware/govmomi before running `go -C govc install` or
+`go -C vcsim install`, or they can download the released binaries
+directly.
+
+### 📖 Commits
+
+- [95396cdf]	chore: Update version.go for v0.47.0
+- [ad5c90a4]	govc: Update govc usage doc
+- [a447f4d0]	api: Fix OVF param to use interface
+- [17b5c08b]	api: Generate bindings for 9.0.0.0.rc1
+- [77de0b54]	api: Generate API with Broadcom header
+- [4b7d0c56]	api: Specify ruby bundler for api gen
+- [f2382015]	api: Update gen/gen.sh for 9.0.0.0.rc1
+- [05a6d571]	api: Support podman for building api
+- [3d8b0261]	api: Build api with Go 1.23.2
+- [ca2e6ffd]	govc: add datastore.download -json support
+- [e1f1db4a]	chore: update copyright header
+- [10e9bc7b]	vcsim: create cls vmdk descriptor and backing files
+- [dd6bf66f]	vcsim: Improve sim for pub/sub content libs
+- [18a3019f]	govc: add -b flag to volume.ls
+- [cd78f760]	cns: add json tags (#3007)  (#3247)
+- [aa8279b5]	api: Support returning DS info when resolving lib stor
+- [64ca62fe]	api: Support DC for ResolveLibItemStor
+- [e02de720]	govc: add disk.ls '-a' flag (#3639)
+- [0af06a3c]	api: Support encode/decode OVF to JSON
+- [c60f498e]	govc: add datastore.ls -H option
+- [3793a5b2]	fix: govc fix field.info name (-n flag) validation
+- [8adeb8b5]	fix: SOAP vcSessionCookie value must be from vim25.Client
+- [7598ae9f]	api: Fix object.VirtualDiskManager::Copy
+- [b7d4f00d]	vcsim: make QueryVirtualDiskUuid() result stable
+- [f398e78e]	vcsim: add VirtualDiskManager.QueryVirtualDiskInfo (#3000)  (#2555)
+- [a9488e06]	vcsim: fix object.save when run directly against ESX
+- [c0b59448]	vcsim: LicenseManager enhancements
+- [b2bde000]	api: Update OVF ToConfigSpec to handled unknown types
+- [5bb9901a]	api: A generic copy function for vim25/types
+- [228b445f]	govc: remove minimum API version check (#3643)
+- [19189841]	api: add override mechanism for SOAP Header.Cookie
+- [495a8203]	api: OVF to ConfigSpec
+- [83aab93c]	Deprecate haproxy with vSphere 9.0
+- [2271a788]	fix: toolbox: add freebsd stub for fileExtendedInfoFormat (#3620)
+- [3a151398]	build(deps): bump golang.org/x/text from 0.18.0 to 0.21.0
+- [f08496ed]	fix: vcsim: swap order of xsi type attribute (#2114)
+- [e9f9eb04]	api: Support OVF ResourceType enum
+- [42bf8130]	api: Update OVF parser to conform to spec
+- [5db2637e]	vcsim: add UpdateAssignedLicense method
+- [973a2240]	fix: assert Entity interface in mo.Value()
+- [05482c0b]	api: move cli/host/esxcli.Command to cli/esx package
+- [87e4e6a5]	build(deps): bump github.com/stretchr/testify from 1.9.0 to 1.10.0
+- [9322377e]	vcsim: add esxcli support
+- [ad24cb43]	fix: Property Collector updates should be triggered on the empty FilterSet (#3631)
+- [29de346f]	fix: vcsim: output signed byte in ByteSlice.MarshalXML (#3615)
+- [7e178857]	govc: Move govc commands into cli pkg
+- [71b9c764]	fix: govc: wire up flags for namespace service create
+- [53d31e94]	vcsim: Lock alpine image tag to non-latest tag
+- [5e9a140d]	fix: vcsim: avoid possible panic when applying PropertyFilter
+- [538dbef1]	chore: Minimum version selection
+- [3e8e2e5c]	cns: Support encryption/re-encryption of volumes
+
+<a name="v0.46.3"></a>
+## [Release v0.46.3](https://github.com/vmware/govmomi/compare/v0.46.2...v0.46.3)
+
+> Release Date: 2024-12-12
+
+### 🐞 Fix
+
+- [0ef1c709]	toolbox: add freebsd stub for fileExtendedInfoFormat (#3620)
+- [675534ae]	vcsim: swap order of xsi type attribute (#2114)
+- [1481d917]	assert Entity interface in mo.Value()
+- [3f5f8873]	Property Collector updates should be triggered on the empty FilterSet (#3631)
+
+### 💫 `govc` (CLI)
+
+- [211be901]	remove minimum API version check (#3643)
+
+### 💫 `vcsim` (Simulator)
+
+- [7bde166d]	fix object.save when run directly against ESX
+- [4aae3caf]	LicenseManager enhancements
+- [9ec310ac]	add UpdateAssignedLicense method
+
+### 🧹 Chore
+
+- [e5dcb5f7]	Update version.go for v0.46.3
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [e5dcb5f7]	chore: Update version.go for v0.46.3
+- [0ef1c709]	fix: toolbox: add freebsd stub for fileExtendedInfoFormat (#3620)
+- [7bde166d]	vcsim: fix object.save when run directly against ESX
+- [4aae3caf]	vcsim: LicenseManager enhancements
+- [675534ae]	fix: vcsim: swap order of xsi type attribute (#2114)
+- [211be901]	govc: remove minimum API version check (#3643)
+- [9ec310ac]	vcsim: add UpdateAssignedLicense method
+- [1481d917]	fix: assert Entity interface in mo.Value()
+- [3f5f8873]	fix: Property Collector updates should be triggered on the empty FilterSet (#3631)
+
+<a name="v0.46.2"></a>
+## [Release v0.46.2](https://github.com/vmware/govmomi/compare/v0.46.1...v0.46.2)
+
+> Release Date: 2024-11-20
+
+### 🐞 Fix
+
+- [2f0120b3]	vcsim: output signed byte in ByteSlice.MarshalXML (#3615)
+
+### 🧹 Chore
+
+- [c3916ff7]	Update version.go for v0.46.2
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [c3916ff7]	chore: Update version.go for v0.46.2
+- [2f0120b3]	fix: vcsim: output signed byte in ByteSlice.MarshalXML (#3615)
+
+<a name="v0.46.1"></a>
+## [Release v0.46.1](https://github.com/vmware/govmomi/compare/v0.46.0...v0.46.1)
+
+> Release Date: 2024-11-15
+
+### 🐞 Fix
+
+- [6f7bceb1]	vcsim: avoid possible panic when applying PropertyFilter
+
+### 🧹 Chore
+
+- [0ded546e]	Update version.go for v0.46.1
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [0ded546e]	chore: Update version.go for v0.46.1
+- [6f7bceb1]	fix: vcsim: avoid possible panic when applying PropertyFilter
+- [d51c0a32]	cns: Support encryption/re-encryption of volumes
+
+<a name="v0.46.0"></a>
+## [Release v0.46.0](https://github.com/vmware/govmomi/compare/v0.45.1...v0.46.0)
+
+> Release Date: 2024-11-06
+
+### 🐞 Fix
+
+- [f9d093b9]	Set DuplicateName Object to duplicate object (#3610)
+- [60d4b049]	CreateSATAController to return error when no bus numbers
+- [fe934500]	vcsim: avoid race in DestroyPropertyFilter
+
+### 💫 API Changes
+
+- [ae558231]	Support CnsBlockCreateSpec
+- [a9d5985f]	support MOID conversion in Finder methods
+- [5c54c3fa]	change ManagerKmip.IsValidKey to use QueryCryptoKeyStatus
+- [6ecb2087]	add crypto.ManagerKmip.QueryCryptoKeyStatus
+- [6e84b72c]	Fetch crypto key in GetVirtualDiskInfoByUUID
+
+### 💫 `govc` (CLI)
+
+- [fdb091c2]	add vm.change -migrate-encryption and -ft-encryption-mode options (#3493)
+- [8f3b0a38]	add '-I' flag to ls and find commands
+- [66fc63a4]	add kms.key commands
+
+### 💫 `vcsim` (Simulator)
+
+- [ca05e10d]	add QueryCryptoKeyStatus
+
+### 🧹 Chore
+
+- [35c45692]	Update version.go for v0.46.0
+- [34ca8c85]	skip tests unless running docker on linux (#3604)
+
+### ⚠️ BREAKING
+
+change ManagerKmip.IsValidKey to use QueryCryptoKeyStatus [5c54c3fa]:
+IsValidKey now requires a key providerID param.
+
+### 📖 Commits
+
+- [35c45692]	chore: Update version.go for v0.46.0
+- [fdb091c2]	govc: add vm.change -migrate-encryption and -ft-encryption-mode options (#3493)
+- [ae558231]	api: Support CnsBlockCreateSpec
+- [a9d5985f]	api: support MOID conversion in Finder methods
+- [8f3b0a38]	govc: add '-I' flag to ls and find commands
+- [f9d093b9]	fix: Set DuplicateName Object to duplicate object (#3610)
+- [34ca8c85]	chore: skip tests unless running docker on linux (#3604)
+- [60d4b049]	fix: CreateSATAController to return error when no bus numbers
+- [5c54c3fa]	api: change ManagerKmip.IsValidKey to use QueryCryptoKeyStatus
+- [ca05e10d]	vcsim: add QueryCryptoKeyStatus
+- [66fc63a4]	govc: add kms.key commands
+- [6ecb2087]	api: add crypto.ManagerKmip.QueryCryptoKeyStatus
+- [fe934500]	fix: vcsim: avoid race in DestroyPropertyFilter
+- [6e84b72c]	api: Fetch crypto key in GetVirtualDiskInfoByUUID
+- [0206f073]	Fix error assertion in IsCertificateUntrusted
+
+<a name="v0.45.1"></a>
+## [Release v0.45.1](https://github.com/vmware/govmomi/compare/v0.45.0...v0.45.1)
+
+> Release Date: 2024-10-23
+
+### 🧹 Chore
+
+- [af51f76a]	Update version.go for v0.45.1
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [af51f76a]	chore: Update version.go for v0.45.1
+- [0ed140ee]	Fix error assertion in IsCertificateUntrusted
+
+<a name="v0.45.0"></a>
+## [Release v0.45.0](https://github.com/vmware/govmomi/compare/v0.44.1...v0.45.0)
+
+> Release Date: 2024-10-21
+
+### 🐞 Fix
+
+- [84464784]	Add missing privileges in simulator role
+- [36ee9a1e]	Cross-platform path handling (#3555)
+- [71378bcb]	check controller type in simulator configureDevice
+- [c44199a8]	update controller's device list in AssignController
+- [17f6966d]	ensure proper vSAN URI format in ResolveLibraryItemStorage
+- [60f2a6ea]	Use absolute path for reading manifest (#3550)
+- [36cac699]	Abort lease on upload failure (#3554)
+
+### 💫 API Changes
+
+- [d14cbf39]	tags error handling (#3112)
+
+### 💫 `govc` (CLI)
+
+- [407da6c3]	rename 'object.collect' -> 'collect'
+- [aec11224]	display default provider in kms.ls output
+- [831b722f]	Add an unreleased folder.place command for PlaceVMsXCluster
+- [2bbc6d83]	support use of service version via GOVC_VIM_VERSION env var
+
+### 🧹 Chore
+
+- [888548b9]	Update version.go for v0.45.0
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [888548b9]	chore: Update version.go for v0.45.0
+- [407da6c3]	govc: rename 'object.collect' -> 'collect'
+- [aec11224]	govc: display default provider in kms.ls output
+- [84464784]	fix: Add missing privileges in simulator role
+- [36ee9a1e]	fix: Cross-platform path handling (#3555)
+- [0083eae5]	bug: Do not panic on fault.In for valid errs
+- [831b722f]	govc: Add an unreleased folder.place command for PlaceVMsXCluster
+- [71378bcb]	fix: check controller type in simulator configureDevice
+- [c44199a8]	fix: update controller's device list in AssignController
+- [2bbc6d83]	govc: support use of service version via GOVC_VIM_VERSION env var
+- [17f6966d]	fix: ensure proper vSAN URI format in ResolveLibraryItemStorage
+- [d14cbf39]	api: tags error handling (#3112)
+- [60f2a6ea]	fix: Use absolute path for reading manifest (#3550)
+- [36cac699]	fix: Abort lease on upload failure (#3554)
+
+<a name="v0.44.1"></a>
+## [Release v0.44.1](https://github.com/vmware/govmomi/compare/v0.44.0...v0.44.1)
+
+> Release Date: 2024-10-09
+
+### 🐞 Fix
+
+- [05544f74]	ensure proper vSAN URI format in ResolveLibraryItemStorage
+
+### 🧹 Chore
+
+- [8234db49]	Update version.go for v0.44.1
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [8234db49]	chore: Update version.go for v0.44.1
+- [05544f74]	fix: ensure proper vSAN URI format in ResolveLibraryItemStorage
+
+<a name="v0.44.0"></a>
+## [Release v0.44.0](https://github.com/vmware/govmomi/compare/v0.43.0...v0.44.0)
+
+> Release Date: 2024-10-07
+
+### 🐞 Fix
+
+- [bf6e1626]	synchronize access to session.Manager.userSession (#3571)
+
+### 💡 Examples
+
+- [da37212c]	add ExampleListView_ofContainerView
+
+### 💫 API Changes
+
+- [733f1c0c]	Update folder.PlaceVMsXCluster to support several placement types
+- [4665dff2]	disable http.Transport.ForceAttemptHTTP2 by default (#3564)
+- [d95d3508]	add vapi/crypto package with support for native KMS
+- [d2ccadf4]	add rest.Client.DownloadAttachment method
+- [cb0453c9]	extract NewDatastoreURL from Datastore.NewURL method
+- [9a02a4a9]	Support querying PBM profile for IOFILTERS
+- [92797d40]	Helpers for key management servers
+
+### 💫 `govc` (CLI)
+
+- [844fa1cc]	update help url
+- [7daac379]	add vm.change -managed-by flag
+- [2613278c]	add storage.policy.info flag to query IO filters
+- [108e4fd8]	add native kms provider support
+- [ccf449e4]	add kms commands
+
+### 💫 `vcsim` (Simulator)
+
+- [5a9567f6]	lock ViewManager in RegisterObject callbacks
+- [6267644d]	add *Context param to UpdateObject interface method
+- [3ba044c9]	support clearing ManagedBy field (#3572)
+- [2c493262]	handle traversal spec object updates
+- [fc91180a]	ModifyListView 'remove' does not return unresolved objects
+- [1f0838ed]	override response namespace from struct tag
+- [6cea86e8]	fix RelocateVM_Task related races (#3565)
+- [f81e83d8]	support cluster registration in RegisterKmipServer
+- [cddbe1f9]	Gen enc key w default provider on createvm
+
+### 📃 Documentation
+
+- [707acb83]	sync CHANGELOG (#3286)
+- [582eefa8]	various updates
+
+### 🧹 Chore
+
+- [ff95505d]	Update version.go for v0.44.0
+- [f807c483]	fixup internal version
+- [70edf99b]	bump default ClientVersion
+- [e6bfadbd]	bump Go versions
+- [4d0e69db]	fix GH Action tag output param
+- [796892a4]	rename crypto.Manager RegisterKmipCluster > RegisterKmsCluster
+- [2b659905]	simplify error handling by using the new fault package
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [ff95505d]	chore: Update version.go for v0.44.0
+- [f807c483]	chore: fixup internal version
+- [5a9567f6]	vcsim: lock ViewManager in RegisterObject callbacks
+- [844fa1cc]	govc: update help url
+- [d0278e29]	build(deps): bump golang.org/x/text from 0.18.0 to 0.19.0
+- [6267644d]	vcsim: add *Context param to UpdateObject interface method
+- [7daac379]	govc: add vm.change -managed-by flag
+- [3ba044c9]	vcsim: support clearing ManagedBy field (#3572)
+- [bf6e1626]	fix: synchronize access to session.Manager.userSession (#3571)
+- [da37212c]	examples: add ExampleListView_ofContainerView
+- [2c493262]	vcsim: handle traversal spec object updates
+- [fc91180a]	vcsim: ModifyListView 'remove' does not return unresolved objects
+- [70edf99b]	chore: bump default ClientVersion
+- [707acb83]	docs: sync CHANGELOG (#3286)
+- [e6bfadbd]	chore: bump Go versions
+- [4d0e69db]	chore: fix GH Action tag output param
+- [582eefa8]	docs: various updates
+- [2613278c]	govc: add storage.policy.info flag to query IO filters
+- [da340f59]	Use internalpbm namespace for PbmQueryIOFiltersFromProfileId
+- [1f0838ed]	vcsim: override response namespace from struct tag
+- [733f1c0c]	api: Update folder.PlaceVMsXCluster to support several placement types
+- [4665dff2]	api: disable http.Transport.ForceAttemptHTTP2 by default (#3564)
+- [6cea86e8]	vcsim: fix RelocateVM_Task related races (#3565)
+- [108e4fd8]	govc: add native kms provider support
+- [d95d3508]	api: add vapi/crypto package with support for native KMS
+- [d2ccadf4]	api: add rest.Client.DownloadAttachment method
+- [cb0453c9]	api: extract NewDatastoreURL from Datastore.NewURL method
+- [9a02a4a9]	api: Support querying PBM profile for IOFILTERS
+- [ccf449e4]	govc: add kms commands
+- [796892a4]	chore: rename crypto.Manager RegisterKmipCluster > RegisterKmsCluster
+- [f81e83d8]	vcsim: support cluster registration in RegisterKmipServer
+- [cddbe1f9]	vcsim: Gen enc key w default provider on createvm
+- [92797d40]	api: Helpers for key management servers
+- [2b659905]	chore: simplify error handling by using the new fault package
+
+<a name="v0.43.0"></a>
+## [Release v0.43.0](https://github.com/vmware/govmomi/compare/v0.42.0...v0.43.0)
+
+> Release Date: 2024-09-10
+
+### 🐞 Fix
+
+- [97aa7214]	vcsim: avoid possible race when encoding PropertyCollector response
+- [ad2d3573]	use complete InventoryPath in Datacenter.Folders
+
+### 💫 API Changes
+
+- [476704a3]	Fault helpers
+- [caad54aa]	add VirtualMachine.AddDeviceWithProfile method
+- [a316da5c]	VirtualMachine.AttachDisk unitNumber param is optional
+- [8491321a]	ToString for vim types
+- [64610213]	add namespace.RegisterVM binding
+- [e602029e]	Fix panic when encoding nil iface ptrs to JSON
+
+### 💫 `govc` (CLI)
+
+- [8fd86912]	add disk.create '-profile' flag
+- [ea3cf257]	add vm.disk.create '-profile' flag
+- [e73c34fa]	add vm.disk.attach '-profile' flag
+- [06dcf31a]	Add '-size' flag to datastore.create
+- [23390c23]	add namespace.registervm command
+- [1892eecd]	Support thick/eager disk opts on vm.create
+
+### 💫 `vcsim` (Simulator)
+
+- [8421b678]	Support PlaceVm with relocate placement type
+- [9234233e]	Support PlaceVm with reconfigure placement type
+- [f06d0834]	add VirtualMachine AttachDisk and DetachDisk methods
+- [35dc193f]	Support VM crypto spec in vC Sim
+- [0517b87e]	add namespace/registervm implementation
+
+### 🧹 Chore
+
+- [b17abb20]	Update version.go for v0.43.0
+- [93da4a20]	sync generated govc/USAGE.md
+- [51105db8]	govc: add common StorageProfileFlag
+
+### ⚠️ BREAKING
+
+VirtualMachine.AttachDisk unitNumber param is optional [a316da5c]:
+switching from int32 to *int32, otherwise the client must choose a valid unitNumber.
+vCenter will choose a unitNumber when not provided.
+
+### 📖 Commits
+
+- [b17abb20]	chore: Update version.go for v0.43.0
+- [476704a3]	api: Fault helpers
+- [8421b678]	vcsim: Support PlaceVm with relocate placement type
+- [93b97e18]	Update library state info to content library API
+- [9234233e]	vcsim: Support PlaceVm with reconfigure placement type
+- [a2cbe108]	build(deps): bump golang.org/x/text from 0.17.0 to 0.18.0
+- [93da4a20]	chore: sync generated govc/USAGE.md
+- [8fd86912]	govc: add disk.create '-profile' flag
+- [ea3cf257]	govc: add vm.disk.create '-profile' flag
+- [e73c34fa]	govc: add vm.disk.attach '-profile' flag
+- [51105db8]	chore: govc: add common StorageProfileFlag
+- [caad54aa]	api: add VirtualMachine.AddDeviceWithProfile method
+- [f06d0834]	vcsim: add VirtualMachine AttachDisk and DetachDisk methods
+- [97aa7214]	fix: vcsim: avoid possible race when encoding PropertyCollector response
+- [014a150b]	build(deps): bump peter-evans/create-pull-request from 6 to 7
+- [35dc193f]	vcsim: Support VM crypto spec in vC Sim
+- [a56e33d3]	Add BackingDiskPath to BackingObjectDetails
+- [06dcf31a]	govc: Add '-size' flag to datastore.create
+- [f881d9b6]	govc add disk.attach and disk.detach commands
+- [a316da5c]	api: VirtualMachine.AttachDisk unitNumber param is optional
+- [8491321a]	api: ToString for vim types
+- [0517b87e]	vcsim: add namespace/registervm implementation
+- [23390c23]	govc: add namespace.registervm command
+- [64610213]	api: add namespace.RegisterVM binding
+- [e602029e]	api: Fix panic when encoding nil iface ptrs to JSON
+- [1892eecd]	govc: Support thick/eager disk opts on vm.create
+- [ad2d3573]	fix: use complete InventoryPath in Datacenter.Folders
+
+<a name="v0.42.0"></a>
+## [Release v0.42.0](https://github.com/vmware/govmomi/compare/v0.41.0...v0.42.0)
+
+> Release Date: 2024-08-16
+
+### 💫 API Changes
+
+- [3fd16f78]	update eam bindings to include authentication schema with eam-vcenter build 24075398 Closes: 3521
+
+### 🧹 Chore
+
+- [7a7c0646]	Update version.go for v0.42.0
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [7a7c0646]	chore: Update version.go for v0.42.0
+- [3fd16f78]	api: update eam bindings to include authentication schema with eam-vcenter build 24075398 Closes: 3521
+
+<a name="v0.41.0"></a>
+## [Release v0.41.0](https://github.com/vmware/govmomi/compare/v0.40.0...v0.41.0)
+
+> Release Date: 2024-08-16
+
+### 💫 API Changes
+
+- [5a036494]	OptionValues IsTrue|IsFalse
+
+### 🧹 Chore
+
+- [a6cdbd4c]	Update version.go for v0.41.0
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [a6cdbd4c]	chore: Update version.go for v0.41.0
+- [5a036494]	api: OptionValues IsTrue|IsFalse
+
+<a name="v0.40.0"></a>
+## [Release v0.40.0](https://github.com/vmware/govmomi/compare/v0.39.0...v0.40.0)
+
+> Release Date: 2024-08-12
+
+### 🐞 Fix
+
+- [15d5ffdb]	govc object.collect truncation
+- [18e43541]	govc: output Message field for 'EventEx' types
+- [11dc5a39]	restore govc import.spec DiskProvisioning default value
+
+### 💡 Examples
+
+- [eea1d299]	add ExampleCollector_WaitForUpdatesEx_pagination
+
+### 💫 API Changes
+
+- [d035dc72]	add session.Manager.ImpersonateUser method
+- [ea3e806f]	add alarm package with helpers for AlarmManager and Alarms
+- [208d532c]	convert vSAN directory name to uuid in ResolveLibraryItemStorage
+
+### 💫 `govc` (CLI)
+
+- [0917e718]	add session.login '-as' flag to impersonate user
+- [d6a3b614]	add alarm commands
+- [2975ade1]	add event.post command
+- [db6e9623]	add library.sync '-f' flag to force sync file content
+- [cc02310c]	add library.info -S flag
+
+### 💫 `vcsim` (Simulator)
+
+- [ee966a69]	add SessionManager.ImpersonateUser method
+- [5a501b50]	implement WaitForUpdatesEx pagination support
+- [9c282108]	add AlarmManager
+- [db40be6b]	fix panic in CancelTask
+- [e63f1272]	add ovf DiskProvisioning validation
+- [0633de5c]	add DatastoreNamespaceManager
+
+### 🧹 Chore
+
+- [6e27ff34]	Update version.go for v0.40.0
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [6e27ff34]	chore: Update version.go for v0.40.0
+- [eea1d299]	examples: add ExampleCollector_WaitForUpdatesEx_pagination
+- [ee966a69]	vcsim: add SessionManager.ImpersonateUser method
+- [0917e718]	govc: add session.login '-as' flag to impersonate user
+- [d035dc72]	api: add session.Manager.ImpersonateUser method
+- [15d5ffdb]	fix: govc object.collect truncation
+- [5a501b50]	vcsim: implement WaitForUpdatesEx pagination support
+- [9c282108]	vcsim: add AlarmManager
+- [d6a3b614]	govc: add alarm commands
+- [ea3e806f]	api: add alarm package with helpers for AlarmManager and Alarms
+- [2975ade1]	govc: add event.post command
+- [18e43541]	fix: govc: output Message field for 'EventEx' types
+- [6f998780]	build(deps): bump golang.org/x/text from 0.16.0 to 0.17.0
+- [db40be6b]	vcsim: fix panic in CancelTask
+- [db6e9623]	govc: add library.sync '-f' flag to force sync file content
+- [11dc5a39]	fix: restore govc import.spec DiskProvisioning default value
+- [e63f1272]	vcsim: add ovf DiskProvisioning validation
+- [208d532c]	api: convert vSAN directory name to uuid in ResolveLibraryItemStorage
+- [0633de5c]	vcsim: add DatastoreNamespaceManager
+- [cc02310c]	govc: add library.info -S flag
+- [0d6a605c]	review feedback
+- [2957bedf]	review feedback
+- [8e509dfb]	implement capacityAllocationUnits parser
+
+<a name="v0.39.0"></a>
+## [Release v0.39.0](https://github.com/vmware/govmomi/compare/v0.38.0...v0.39.0)
+
+> Release Date: 2024-07-22
+
+### 🐞 Fix
+
+- [1bc3a4a4]	handle base types by default in mo.LoadObjectContent
+
+### 💫 API Changes
+
+- [5c0af375]	use CheckTestType in compat and provisioning checkers
+- [2e77836c]	add sata controller
+- [bdb034ee]	Exporting Unit field in MetricSeries struct for external use
+- [78f07c63]	Add simulator test for GetVirtualDiskInfoByUUID
+- [2d16e19f]	GetVirtualDiskInfoByUUID for getting capacity/size info
+- [29b1bce9]	change CoresPerNumaNode to a pointer type
+- [3139de32]	Add a method for extending VMDK
+- [6096c0d4]	add ResolveLibraryItemStorage
+
+### 💫 `govc` (CLI)
+
+- [04fe4c26]	add vm.check commands
+- [976bca3b]	add '-spec' flag to vm clone, migrate and create commands
+- [d92015c4]	add vm.migrate -net flag
+
+### 💫 `vcsim` (Simulator)
+
+- [eb2e1ea1]	add VmCompatibilityChecker and VmProvisioningChecker
+- [a463e543]	Add support for DRS automation levels
+- [f7a85a81]	Re-enable TenantManager
+
+### 🧹 Chore
+
+- [590c92b1]	Update version.go for v0.39.0
+- [4434e26b]	bump go version
+- [d7e27099]	fix codeql ([#3492](https://github.com/vmware/govmomi/issues/3492))
+- [fb6e5977]	fix codeql
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [590c92b1]	chore: Update version.go for v0.39.0
+- [5c0af375]	api: use CheckTestType in compat and provisioning checkers
+- [2e77836c]	api: add sata controller
+- [bdb034ee]	api: Exporting Unit field in MetricSeries struct for external use
+- [4434e26b]	chore: bump go version
+- [04fe4c26]	govc: add vm.check commands
+- [976bca3b]	govc: add '-spec' flag to vm clone, migrate and create commands
+- [d92015c4]	govc: add vm.migrate -net flag
+- [eb2e1ea1]	vcsim: add VmCompatibilityChecker and VmProvisioningChecker
+- [12467b00]	refactor: make importing templates available as a lib
+- [d7e27099]	chore: fix codeql ([#3492](https://github.com/vmware/govmomi/issues/3492))
+- [fb6e5977]	chore: fix codeql
+- [a463e543]	vcsim: Add support for DRS automation levels
+- [78f07c63]	api: Add simulator test for GetVirtualDiskInfoByUUID
+- [2d16e19f]	api: GetVirtualDiskInfoByUUID for getting capacity/size info
+- [29b1bce9]	api: change CoresPerNumaNode to a pointer type
+- [3139de32]	api: Add a method for extending VMDK
+- [6096c0d4]	api: add ResolveLibraryItemStorage
+- [1bc3a4a4]	fix: handle base types by default in mo.LoadObjectContent
+- [f7a85a81]	vcsim: Re-enable TenantManager
+
+<a name="v0.38.0"></a>
+## [Release v0.38.0](https://github.com/vmware/govmomi/compare/v0.37.3...v0.38.0)
+
+> Release Date: 2024-06-24
+
+### 🐞 Fix
+
+- [22607cd8]	xml marshal byte array fields as vCenter does
+- [298cfbf3]	govc vm.disk.change should only modify CapacityInBytes
+
+### 💫 API Changes
+
+- [0de9553a]	EnsureDisksHaveControllers helper
+- [3d70ab5c]	OptionValueList helper
+- [d80136a5]	add storage_specs field to Namespace related structures
+- [748043cd]	add pbm.DatastoreMap for finding compatible Datastores
+- [fc2a6b12]	HardwareVersion.IsSupported vs IsValid
+- [a68c21f2]	Add library item storage APIs
+- [7d1be3e7]	Update ConfigInfoToConfigSpec
+- [12ab4099]	Update generated types
+- [45aa2e92]	add checksum validation in Content Library update session file API
+- [7a00a0b4]	Generate enum consts with Values funcs
+- [f2852e39]	add SSLCertificate to TransferEndpoint in content library API
+
+### 💫 `govc` (CLI)
+
+- [c3c5ffba]	add vsan.info -file-service-enabled flag
+- [a916df4e]	add host.tpm.info and host.tpm.report commands
+- [7f0c9f0c]	add host.cert.info -show flag
+- [ae316d65]	add storage.policy.create zonal option
+- [3e648db2]	add '-storage' flag to namespace.create and namespace.update commands
+- [e7d54f90]	add vm.create '-profile' and '-place' flags
+- [5677b0e5]	Add feature to pass fullname and org for windows vm customization
+
+### 💫 `vcsim` (Simulator)
+
+- [e9f4cb73]	add vSAN FileServiceConfig support
+- [072011c6]	add HostCertificateManager
+- [a0bbbf3f]	add library item storage API support
+- [3b7ff25f]	add PropertyCollector index support
+- [651f7d27]	fix: ignore unknown refs in Datacenter.PowerOnMultiVM
+- [7251db75]	Add PbmCheckCompatibility method in pbm simulator
+- [542398a2]	add HostVirtualNicManager
+- [0be5fec8]	fix ReconfigVM validation when changing disk size
+
+### 🧹 Chore
+
+- [51648874]	Update version.go for v0.38.0
+- [43510fbc]	make doc
+- [36631314]	govc: use generated enum lists
+
+### ⚠️ BREAKING
+
+HardwareVersion.IsSupported vs IsValid [fc2a6b12]:
+HardwareVersion.IsValid is more relaxed, consider IsSupported
+* HardwareVersion.IsValid returns true if the specified value
+  matches a VMX version format.
+* HardwareVersion.IsSupported behaves how IsValid used to behave.
+
+### 📖 Commits
+
+- [51648874]	chore: Update version.go for v0.38.0
+- [c3c5ffba]	govc: add vsan.info -file-service-enabled flag
+- [e9f4cb73]	vcsim: add vSAN FileServiceConfig support
+- [43510fbc]	chore: make doc
+- [a916df4e]	govc: add host.tpm.info and host.tpm.report commands
+- [072011c6]	vcsim: add HostCertificateManager
+- [7f0c9f0c]	govc: add host.cert.info -show flag
+- [22607cd8]	fix: xml marshal byte array fields as vCenter does
+- [ae316d65]	govc: add storage.policy.create zonal option
+- [0de9553a]	api: EnsureDisksHaveControllers helper
+- [3d70ab5c]	api: OptionValueList helper
+- [3e648db2]	govc: add '-storage' flag to namespace.create and namespace.update commands
+- [d80136a5]	api: add storage_specs field to Namespace related structures
+- [e7d54f90]	govc: add vm.create '-profile' and '-place' flags
+- [748043cd]	api: add pbm.DatastoreMap for finding compatible Datastores
+- [5677b0e5]	govc: Add feature to pass fullname and org for windows vm customization
+- [298cfbf3]	fix: govc vm.disk.change should only modify CapacityInBytes
+- [ee49793c]	build(deps): bump goreleaser/goreleaser-action from 5 to 6
+- [a0bbbf3f]	vcsim: add library item storage API support
+- [1ec975ca]	nfc: Record the SSL thumbprint for the host the (device) URL refers to
+- [3b7ff25f]	vcsim: add PropertyCollector index support
+- [651f7d27]	vcsim: fix: ignore unknown refs in Datacenter.PowerOnMultiVM
+- [fc2a6b12]	api: HardwareVersion.IsSupported vs IsValid
+- [1edfbe3b]	feat: vSphere Zones API bindings
+- [a68c21f2]	api: Add library item storage APIs
+- [b20c733e]	build(deps): bump nokogiri from 1.16.2 to 1.16.5 in /gen
+- [7d1be3e7]	api: Update ConfigInfoToConfigSpec
+- [12ab4099]	api: Update generated types
+- [7251db75]	vcsim: Add PbmCheckCompatibility method in pbm simulator
+- [45aa2e92]	api: add checksum validation in Content Library update session file API
+- [542398a2]	vcsim: add HostVirtualNicManager
+- [36631314]	chore: govc: use generated enum lists
+- [7a00a0b4]	api: Generate enum consts with Values funcs
+- [0be5fec8]	vcsim: fix ReconfigVM validation when changing disk size
+- [f2852e39]	api: add SSLCertificate to TransferEndpoint in content library API
+- [12f8babe]	build(deps): bump chuhlomin/render-template from 1.9 to 1.10
+- [0893552e]	bugfix: Exclude ServerGUID from MOR comparison in WaitEx
+
+<a name="v0.37.3"></a>
+## [Release v0.37.3](https://github.com/vmware/govmomi/compare/v0.37.2...v0.37.3)
+
+> Release Date: 2024-06-05
+
+### 🧹 Chore
+
+- [6b391d35]	Update version.go for v0.37.3
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [6b391d35]	chore: Update version.go for v0.37.3
+- [a554e040]	nfc: Record the SSL thumbprint for the host the (device) URL refers to
+
+<a name="v0.37.2"></a>
+## [Release v0.37.2](https://github.com/vmware/govmomi/compare/v0.37.1...v0.37.2)
+
+> Release Date: 2024-05-09
+
+### 💫 API Changes
+
+- [37269b6a]	add checksum validation in Content Library update session file API
+- [ce7ef70a]	add SSLCertificate to TransferEndpoint in content library API
+
+### 💫 `vcsim` (Simulator)
+
+- [6a0d7e7d]	Add PbmCheckCompatibility method in pbm simulator
+- [e6fe159b]	fix ReconfigVM validation when changing disk size
+
+### 🧹 Chore
+
+- [9a1b3c8f]	Update version.go for v0.37.2
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [9a1b3c8f]	chore: Update version.go for v0.37.2
+- [6a0d7e7d]	vcsim: Add PbmCheckCompatibility method in pbm simulator
+- [37269b6a]	api: add checksum validation in Content Library update session file API
+- [e6fe159b]	vcsim: fix ReconfigVM validation when changing disk size
+- [ce7ef70a]	api: add SSLCertificate to TransferEndpoint in content library API
+
+<a name="v0.37.1"></a>
+## [Release v0.37.1](https://github.com/vmware/govmomi/compare/v0.37.0...v0.37.1)
+
+> Release Date: 2024-04-18
+
+### 🧹 Chore
+
+- [bf28314d]	Update version.go for v0.37.1
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [bf28314d]	chore: Update version.go for v0.37.1
+- [8c99cb85]	bugfix: Exclude ServerGUID from MOR comparison in WaitEx
+
+<a name="v0.37.0"></a>
+## [Release v0.37.0](https://github.com/vmware/govmomi/compare/v0.36.3...v0.37.0)
+
+> Release Date: 2024-04-12
+
+### 🐞 Fix
+
+- [095f926b]	make cns.Client independent of vim25.Client
+- [dcf063cd]	vcsim: re-parent children in ResourcePool.Destroy
+- [7455935a]	endpoint url to bypass lookup service if envoy sidecar enabled
+- [83754772]	lookup client to use envoy sidecar url if enabled
+
+### 💫 API Changes
+
+- [f5080d3e]	use RetrievePropertiesEx in mo package functions
+- [a0a8257a]	change RetrieveProperties to collect results in batches
+- [367c55fe]	move vim25.Client.UseServiceVersion to soap.Client
+- [f6710489]	Expose vSphere API to evict subscribed content library
+- [3784b2f2]	Add Downloadendpoint field in the library item file struct
+
+### 💫 `govc` (CLI)
+
+- [9285e441]	Add library.evict command
+- [fc20e24d]	add default output formatting for namespace commands
+- [27824cf5]	snapshot.tree json output to stdout
+
+### 💫 `vcsim` (Simulator)
+
+- [70a7617d]	toggle Content Library cached fields in sync and evict calls
+- [cf719441]	add ExtensionManager.FindExtension method
+- [4348bd9f]	RetrievePropertiesEx & ContinueRetrievePropertiesEx
+- [4cec0597]	add TaskHistoryCollector support
+- [9c59e9c5]	add TaskManager.CreateTask support
+- [d9af2a26]	add ExtensionManager support
+
+### 📃 Documentation
+
+- [368d194a]	update CHANGELOG
+- [2bbe81af]	update CONTRIBUTORS
+
+### 🧹 Chore
+
+- [134152d4]	Update version.go for v0.37.0
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [134152d4]	chore: Update version.go for v0.37.0
+- [70a7617d]	vcsim: toggle Content Library cached fields in sync and evict calls
+- [9285e441]	govc: Add library.evict command
+- [cf719441]	vcsim: add ExtensionManager.FindExtension method
+- [92a29ebf]	build(deps): add vcsim to rpm
+- [fc20e24d]	govc: add default output formatting for namespace commands
+- [095f926b]	fix: make cns.Client independent of vim25.Client
+- [f5080d3e]	api: use RetrievePropertiesEx in mo package functions
+- [4348bd9f]	vcsim: RetrievePropertiesEx & ContinueRetrievePropertiesEx
+- [a0a8257a]	api: change RetrieveProperties to collect results in batches
+- [8a618f77]	feat: Add VAPI bindings for guest namespaces and virtual machine classes
+- [e66065ab]	build(deps): enable rpm builds and add archs
+- [367c55fe]	api: move vim25.Client.UseServiceVersion to soap.Client
+- [f6710489]	api: Expose vSphere API to evict subscribed content library
+- [dcf063cd]	fix: vcsim: re-parent children in ResourcePool.Destroy
+- [4cec0597]	vcsim: add TaskHistoryCollector support
+- [041fd59a]	Remove deprecation for task.Wait and task.WaitForResult
+- [27824cf5]	govc: snapshot.tree json output to stdout
+- [7455935a]	fix: endpoint url to bypass lookup service if envoy sidecar enabled
+- [3784b2f2]	api: Add Downloadendpoint field in the library item file struct
+- [9c59e9c5]	vcsim: add TaskManager.CreateTask support
+- [d9af2a26]	vcsim: add ExtensionManager support
+- [e0ab2da2]	build(deps): bump google.golang.org/protobuf in /hack/tools
+- [8bfb252c]	Add support for SHA256 thumbprint based vCenter authentication
+- [83754772]	fix: lookup client to use envoy sidecar url if enabled
+- [368d194a]	docs: update CHANGELOG
+- [2bbe81af]	docs: update CONTRIBUTORS
+
+<a name="v0.36.3"></a>
+## [Release v0.36.3](https://github.com/vmware/govmomi/compare/v0.36.2...v0.36.3)
+
+> Release Date: 2024-04-02
+
+### 🧹 Chore
+
+- [35df9f35]	Update version.go for v0.36.3
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [35df9f35]	chore: Update version.go for v0.36.3
+- [47c5ff94]	Remove deprecation for task.Wait and task.WaitForResult
+
+<a name="v0.36.2"></a>
+## [Release v0.36.2](https://github.com/vmware/govmomi/compare/v0.36.1...v0.36.2)
+
+> Release Date: 2024-03-27
+
+### 🐞 Fix
+
+- [9c5fca64]	endpoint url to bypass lookup service if envoy sidecar enabled
+
+### 💫 API Changes
+
+- [f9e1a48e]	Add Downloadendpoint field in the library item file struct
+
+### 💫 `govc` (CLI)
+
+- [cd9ce0ae]	snapshot.tree json output to stdout
+
+### 🧹 Chore
+
+- [f2a87d75]	Update version.go for v0.36.2
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [f2a87d75]	chore: Update version.go for v0.36.2
+- [cd9ce0ae]	govc: snapshot.tree json output to stdout
+- [9c5fca64]	fix: endpoint url to bypass lookup service if envoy sidecar enabled
+- [f9e1a48e]	api: Add Downloadendpoint field in the library item file struct
+
+<a name="v0.36.1"></a>
+## [Release v0.36.1](https://github.com/vmware/govmomi/compare/v0.36.0...v0.36.1)
+
+> Release Date: 2024-03-12
+
+### 🐞 Fix
+
+- [edf70dc3]	lookup client to use envoy sidecar url if enabled
+
+### 🧹 Chore
+
+- [cc533e4b]	Update version.go for v0.36.1
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [cc533e4b]	chore: Update version.go for v0.36.1
+- [27996347]	Add support for SHA256 thumbprint based vCenter authentication
+- [edf70dc3]	fix: lookup client to use envoy sidecar url if enabled
+
+<a name="v0.36.0"></a>
+## [Release v0.36.0](https://github.com/vmware/govmomi/compare/v0.35.0...v0.36.0)
+
+> Release Date: 2024-03-07
+
+### 🐞 Fix
+
+- [fd3840e3]	vcsim Fetch method causes runtime panic when property is not set
+- [4254c59c]	Update summary.config.hwVersion in simulator
+- [44610f43]	govc: use session KeepAlive in library.export command
+
+### 💫 `vcsim` (Simulator)
+
+- [c46ad1af]	Enhanced sim support for upgrade VM
+
+### 🧹 Chore
+
+- [ef3a3d62]	Update version.go for v0.36.0
+- [01a069da]	bump Go versions
+- [08d2fd0b]	Better support for ESXi & HW versions
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [ef3a3d62]	chore: Update version.go for v0.36.0
+- [89693ada]	Updating CONTRIBUTORS
+- [fd3840e3]	fix: vcsim Fetch method causes runtime panic when property is not set
+- [75505549]	Add APIs for vLCM enablement on a cluster and base ESXi image selection
+- [01a069da]	chore: bump Go versions
+- [7998478a]	build(deps): bump github.com/stretchr/testify from 1.8.4 to 1.9.0
+- [4ad8f689]	Add API for vLCM - offline depots and cluster baseline images
+- [08d2fd0b]	chore: Better support for ESXi & HW versions
+- [c46ad1af]	vcsim: Enhanced sim support for upgrade VM
+- [4254c59c]	fix: Update summary.config.hwVersion in simulator
+- [de2ce182]	test fixes
+- [44610f43]	fix: govc: use session KeepAlive in library.export command
+- [41907150]	Add service locator to CNS RelocateVolume spec
+- [ef555e78]	Add  "AggregatedSnapshotCapacityInMb" to CnsSnapshotCreateResult and CnsSnapshotDeleteResult.
+
+<a name="v0.35.0"></a>
+## [Release v0.35.0](https://github.com/vmware/govmomi/compare/v0.34.2...v0.35.0)
+
+> Release Date: 2024-02-12
+
+### 💫 API Changes
+
+- [8e17e4c1]	Sim vm config.changeVersion & config.modified
+- [95aa2571]	WaitForUpdatesEx & DestroyPropertyFilter
+
+### 💫 `govc` (CLI)
+
+- [9ddfc534]	json tag camelCase fixes
+
+### 💫 `vcsim` (Simulator)
+
+- [557d2654]	Fix -method-delay option to update task states
+
+### 📃 Documentation
+
+- [2d1b52ff]	update release doc
+
+### 🧹 Chore
+
+- [d7c0094a]	Update version.go for v0.35.0
+- [69785ff0]	update CONTRIBUTORS
+
+### ⚠️ BREAKING
+
+json tag camelCase fixes [9ddfc534]:
+follow up to json tags missed in PR [#3007](https://github.com/vmware/govmomi/issues/3007) and PR [#3247](https://github.com/vmware/govmomi/issues/3247)
+
+WaitForUpdatesEx & DestroyPropertyFilter [95aa2571]:
+The semantics around the helper functions in the
+          property package have changed. Please review any
+          code that calls this package to ensure it is
+          compatible with the new behaviors.
+
+### 📖 Commits
+
+- [d7c0094a]	chore: Update version.go for v0.35.0
+- [2d1b52ff]	docs: update release doc
+- [69785ff0]	chore: update CONTRIBUTORS
+- [9ddfc534]	govc: json tag camelCase fixes
+- [b137a5d2]	Add "AggregatedSnapshotCapacityInMb" to cnstype.
+- [b948e3cb]	add -json to snapshot.tree
+- [dabec6cd]	build(deps): bump nokogiri from 1.14.3 to 1.16.2 in /gen
+- [8e17e4c1]	api: Sim vm config.changeVersion & config.modified
+- [d55cf6e4]	build(deps): bump peter-evans/create-pull-request from 5 to 6
+- [25cab091]	Re-enable PC updates for indexed properties
+- [8150eedd]	build(deps): bump andstor/file-existence-action from 2 to 3
+- [bfc5d64c]	build(deps): bump peter-evans/create-or-update-comment from 3 to 4
+- [42d7d711]	Add new "UsedCapacityInMb" in struct "CnsBlockBackingDetails"
+- [61f901eb]	build(deps): bump github.com/google/uuid from 1.5.0 to 1.6.0
+- [3b5917a2]	build(deps): bump actions/cache from 3 to 4
+- [78898bd2]	Self identify the executable making calls to vCenter
+- [95aa2571]	api: WaitForUpdatesEx & DestroyPropertyFilter
+- [cd8a7883]	Changes to fix xml tag used for SnapshotId
+- [557d2654]	vcsim: Fix -method-delay option to update task states
+- [98b0b77f]	Fixes Missing Tags in AttachedTags
+- [5410a069]	Changes to add CNS fault CnsSnapshotCreatedFault
+- [8c1d8f18]	build(deps): bump actions/upload-artifact from 3 to 4
+- [14d35380]	build(deps): bump github/codeql-action from 2 to 3
+- [f6c537d7]	build(deps): bump github.com/google/uuid from 1.4.0 to 1.5.0
+- [e9a9f2c0]	build(deps): bump chuhlomin/render-template from 1.8 to 1.9
+
+<a name="v0.34.2"></a>
+## [Release v0.34.2](https://github.com/vmware/govmomi/compare/v0.34.1...v0.34.2)
+
+> Release Date: 2024-01-08
+
+### 💫 `vcsim` (Simulator)
+
+- [4c8ffb26]	Fix -method-delay option to update task states
+
+### 🧹 Chore
+
+- [96b6eb77]	Update version.go for v0.34.2
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [96b6eb77]	chore: Update version.go for v0.34.2
+- [4c8ffb26]	vcsim: Fix -method-delay option to update task states
+- [1c2c1c75]	Fixes Missing Tags in AttachedTags
+- [55924679]	Changes to fix xml tag used for SnapshotId
+
+<a name="v0.34.1"></a>
+## [Release v0.34.1](https://github.com/vmware/govmomi/compare/v0.34.0...v0.34.1)
+
+> Release Date: 2023-12-19
+
+### 🧹 Chore
+
+- [754cb3aa]	Update version.go for v0.34.1
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [754cb3aa]	chore: Update version.go for v0.34.1
+- [dd8bbb4d]	Changes to add CNS fault CnsSnapshotCreatedFault
+
+<a name="v0.34.0"></a>
+## [Release v0.34.0](https://github.com/vmware/govmomi/compare/v0.33.1...v0.34.0)
+
+> Release Date: 2023-12-12
+
+### 🐞 Fix
+
+- [980d22d6]	expose util for rest status return
+
+### 💫 API Changes
+
+- [31423b78]	add object.Datastore.FindInventoryPath
+- [d52f8ee3]	add Content Library update session file APIs
+
+### 💫 `vcsim` (Simulator)
+
+- [4a09f19d]	add PbmQueryAssociatedProfiles method
+- [4cbd6424]	Fix [BUG] vcsim raises TypeError for RemoveSnapshotTask
+- [04ccf69e]	handle HostNotConnected when saving inventory
+- [2f1fefae]	fix MAC Addresses to be unique
+- [e19137f5]	propagate VMwareDVSConfigSpec in CreateDVS_Task
+- [a0923119]	emit DVS and Portgroup create events
+- [c8a2fc2e]	Fix PropertyCollector to handle empty property
+
+### 🧹 Chore
+
+- [a5899afa]	Update version.go for v0.34.0
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [a5899afa]	chore: Update version.go for v0.34.0
+- [980d22d6]	fix: expose util for rest status return
+- [4a09f19d]	vcsim: add PbmQueryAssociatedProfiles method
+- [e39527d4]	build(deps): bump actions/stale from 8 to 9
+- [4cbd6424]	vcsim: Fix [BUG] vcsim raises TypeError for RemoveSnapshotTask
+- [e9a782a9]	build(deps): bump actions/setup-go from 4 to 5
+- [45188e1d]	Add default Historical Intervals to the simulator
+- [04ccf69e]	vcsim: handle HostNotConnected when saving inventory
+- [2f1fefae]	vcsim: fix MAC Addresses to be unique
+- [d32be098]	simulator: fix dropped error
+- [e19137f5]	vcsim: propagate VMwareDVSConfigSpec in CreateDVS_Task
+- [a0923119]	vcsim: emit DVS and Portgroup create events
+- [31423b78]	api: add object.Datastore.FindInventoryPath
+- [c8a2fc2e]	vcsim: Fix PropertyCollector to handle empty property
+- [d52f8ee3]	api: add Content Library update session file APIs
+- [3942d8f6]	build(deps): bump github.com/google/uuid from 1.3.1 to 1.4.0
+- [09c72919]	Add additional PBM methods
+
+<a name="v0.33.1"></a>
+## [Release v0.33.1](https://github.com/vmware/govmomi/compare/v0.33.0...v0.33.1)
+
+> Release Date: 2023-10-30
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [6de69ad0]	Add additional PBM methods
+
+<a name="v0.33.0"></a>
+## [Release v0.33.0](https://github.com/vmware/govmomi/compare/v0.32.0...v0.33.0)
+
+> Release Date: 2023-10-25
+
+### 💫 `govc` (CLI)
+
+- [5264e839]	add cluster.change '-ha-admission-control-enabled' flag
+- [3bcaf429]	add option to enable hidden properties in import.{spec,ova}
+
+### 💫 `vcsim` (Simulator)
+
+- [db0ba920]	Handle prepare guest operations when svm is nil
+- [0754d758]	fix ModifyListView to return unresolved references
+- [7f3a0708]	Remove extra devices in OVF Deploy w/ ConfigSpec
+
+### 🧹 Chore
+
+- [f3c1fca9]	Update version.go for v0.33.0
+- [675eebd2]	remove refs to deprecated io/ioutil
+
+### ⚠️ BREAKING
+
+fix ModifyListView to return unresolved references [0754d758]:
+api: view.ListView.{Add,Remove,Reset} methods now return unresolved references
+
+### 📖 Commits
+
+- [f3c1fca9]	chore: Update version.go for v0.33.0
+- [19726dc6]	Add functionality for checking whether the provided thumbprint is known to the soap client
+- [5264e839]	govc: add cluster.change '-ha-admission-control-enabled' flag
+- [db0ba920]	vcsim: Handle prepare guest operations when svm is nil
+- [0434fd26]	vapi: add support for OperationID header
+- [0754d758]	vcsim: fix ModifyListView to return unresolved references
+- [5569c012]	build(deps): bump github.com/google/go-cmp from 0.5.9 to 0.6.0
+- [babee198]	build(deps): bump chuhlomin/render-template from 1.7 to 1.8
+- [7f3a0708]	vcsim: Remove extra devices in OVF Deploy w/ ConfigSpec
+- [3bcaf429]	govc: add option to enable hidden properties in import.{spec,ova}
+- [675eebd2]	chore: remove refs to deprecated io/ioutil
+
+<a name="v0.32.0"></a>
+## [Release v0.32.0](https://github.com/vmware/govmomi/compare/v0.31.0...v0.32.0)
+
+> Release Date: 2023-09-28
+
+### 🐞 Fix
+
+- [bed95133]	case insensitive govc import.ova PropertyMapping
+
+### 💡 Examples
+
+- [f2aaee58]	add ListView example for waiting on updates to tasks
+
+### 💫 API Changes
+
+- [a91eb5e5]	disable HTTP Keep-Alive for direct ESX connections
+
+### 💫 `govc` (CLI)
+
+- [db5b3d8e]	camelCase json output
+
+### 💫 `vcsim` (Simulator)
+
+- [524ca258]	EnvironmentBrowser improvements
+- [d49e401e]	set HostSystem.Config.Host
+
+### 📃 Documentation
+
+- [258ee244]	update govc jq examples with correct case
+
+### 🧹 Chore
+
+- [a8d705a0]	Update version.go for v0.32.0
+
+### ⚠️ BREAKING
+
+camelCase json output [db5b3d8e]:
+This change adds camelCase (lower-case 1st character) json tags for govc types
+
+EnvironmentBrowser improvements [524ca258]:
+removed object.VirtualMachine.QueryConfigTarget method
+- Use object.VirtualMachine.EnvironmentBrowser().QueryConfigTarget instead
+
+### 📖 Commits
+
+- [a8d705a0]	chore: Update version.go for v0.32.0
+- [f2aaee58]	examples: add ListView example for waiting on updates to tasks
+- [a91eb5e5]	api: disable HTTP Keep-Alive for direct ESX connections
+- [db5b3d8e]	govc: camelCase json output
+- [524ca258]	vcsim: EnvironmentBrowser improvements
+- [bed95133]	fix: case insensitive govc import.ova PropertyMapping
+- [6c19b99a]	emacs: update for v0.31.0 release
+- [258ee244]	docs: update govc jq examples with correct case
+- [d49e401e]	vcsim: set HostSystem.Config.Host
+
+<a name="v0.31.0"></a>
+## [Release v0.31.0](https://github.com/vmware/govmomi/compare/v0.30.7...v0.31.0)
+
+> Release Date: 2023-09-25
+
+### 🐞 Fix
+
+- [8f9e5495]	govc vm.clone failure when using 'cluster' option
+- [b22f730e]	govc datacenter.info VM count with multiple DCs
+- [65814f0c]	Update some goreleaser deprecated fields
+- [b4eac193]	check the error chain when validating if it's x509 error
+- [86cadf21]	Fix the gorelease
+- [1711a843]	avoid modifying client transport outside of NewClient
+- [313aa85b]	share http.Transport with service clients
+- [f81f3b36]	grep warnings during generating usage documentation
+- [2d11115b]	support `binary` and `dateTime` in JSON
+- [c4ffe464]	add esxcli.Fault and revert Error() string
+- [93cb079b]	byte, float and int (de) serialization
+- [8bc2caa1]	avoid govc -verbose flag panic if an UpdateSet is nil
+- [9ba1b852]	include StoragePod Datastore children in ContainerView
+- [8b00a93f]	only limit the number of samples generated to maxSample when maxSample is greater than 0 and the number of samples to generate is greater than maxSample Closes: [#3097](https://github.com/vmware/govmomi/issues/3097)
+- [4ed07633]	support govc ls -xml flag
+- [8554329c]	Pin the result limit of ssoadmin client to its MAX
+
+### 💡 Examples
+
+- [71493efa]	add rest.Client.LoginByToken
+- [3bf46949]	add session.Manager.LoginByToken
+
+### 💫 API Changes
+
+- [a03f4735]	Fix errors w 8.0U2 GA update
+- [515df5df]	Update generated types to vSphere 8.0U2 GA
+- [b7ceedea]	Prep to update types to vSphere 8.0U2 GA
+- [ccd07a01]	Update generated types to vSphere 8.0U1c GA
+- [4c00586f]	Prep to update types to vSphere 8.0U1c GA
+- [5431c33a]	Type/field comments for data structures; API versions
+- [4b2de289]	Add SDK support for VM data sets
+- [25865e57]	set inventory path in SearchIndex.FindByInventoryPath
+- [38d0ac0d]	Add JSON transport for vim25
+- [0938fba2]	Add ServerGuid to gen'd MoRef
+- [e09a4128]	support find.NetworkList by ID
+- [e8fa981e]	support find.Network by cluster path
+- [4e6d6424]	JSON Discriminators for vim25/types
+- [99200868]	Generate JSON tags
+
+### 💫 `govc` (CLI)
+
+- [c4d851b2]	Add CLI support for VM data sets
+- [02f353dd]	Command to print device/backings model as tree
+- [af7833bb]	Fix memory aliasing in for loop (gosec G601)
+- [e17d8842]	add -file flag for cluster.module.rm
+- [e34c7218]	Add CLI  device protocol support for vm.network.add
+- [48bdfada]	Add --help
+- [28014f9b]	Add general usage message
+- [e5f3cd0b]	add detail error message for host.esxcli commands
+- [81733d0e]	add cluster.mv command
+- [daaaca0f]	Add support for CNS volume snapshots
+- [477bf69b]	Support JSON protocol using environment variable
+- [b8007c4b]	dont check poweredOn for vm.console vmrc requests
+- [6b34770c]	add sso.idp.ldap.update command
+- [e5b2aa37]	Add feature VM IOMMU enablement support
+- [f4c678ad]	Add checksum validation to govc import.ova
+- [e935b5a8]	Add feature to get and set default idp
+
+### 💫 `vcsim` (Simulator)
+
+- [35ec7c3f]	Add simulator support for VM data sets
+- [c77de71c]	Introduce separation btw new service instance & infra creation
+- [2b5c457e]	add interactive debug github action stage
+- [9b2ef986]	use docker event for efficient monitoring
+- [6f34f131]	container backing respects changes via reconfigure
+- [6248cbfe]	create underlay network for pNICs in container-backed hosts
+- [6b7b0dfc]	per-host OptionManager instances and differentiated roles
+- [387dc6e5]	support container backing for hosts
+- [fdb4d847]	untangle container/VM to allow reuse of container logic for hosts
+- [9d8380ce]	Fix RefreshDatastore to return a valid response
+- [47dd6e02]	add PerformanceManager counter values
+- [65b6c51f]	add lookup.EndpointURL tests
+- [cd9446c7]	apply PCI UnitNumber offset of 7 for ethernet
+- [11356057]	set StandbyMode default to "none"
+- [0a351a84]	Add RUN.env flag to inject environment variables to container-backed VM
+- [112777b8]	Fix VM ExtraConfig
+- [e6217900]	make task lock handoff optional
+- [6c0ed53b]	async guest shutdown and standby
+- [297c79bf]	add VirtualMachine.StandbyGuest support
+- [7a04bd00]	Fix FindByInventoryPath to handle root folder
+- [78a979c9]	Add CSV format support to QueryPerf API
+- [c62983fd]	add ssoadmin user and group management
+- [eb9c11c6]	add guest.net.ipConfig
+
+### 📃 Documentation
+
+- [e4a36881]	Add README to vendored JSON pkg
+
+### 🧹 Chore
+
+- [2fab8d53]	Update version.go for v0.31.0
+- [c460f706]	Dockerfile & steps for generating types
+- [7e490563]	add missing guest OS IDs
+- [0ed91a21]	bump embano1/wip
+- [c6005086]	Err on json.Decode for invalid type/vals
+- [2f5d7c62]	fix WaitForUpdates bats test race
+- [03718c0f]	remove sso bats test hacks
+- [4aad418a]	upgrade to bats-core v1.9.0 release
+- [d1af63ff]	fix jq query case
+- [91f51cfb]	sync httptest/server race fix
+- [80e6b73f]	add timeout to bats tests
+- [3158766f]	adjust cert trust checks to support newer Go versions
+- [4153cba9]	Update CI to Go 1.20
+- [5b3da2e4]	upgrade golangci-lint
+- [825c73c2]	bats related fixes
+- [1991de51]	Remove JSON tag for "This" / ArrayOf "_value"
+- [b594bf1f]	Move to main
+- [e639aba1]	Exclude vim25/json from CodeStyle workflow
+- [908aa065]	Include LICENSE in vendored JSON pkg
+- [5caa20a4]	JSON Encoding w Discriminator Support
+- [a581fd01]	Vendor Go 1.17.13 encoding/json
+
+### ⚠️ BREAKING
+
+ [4f9f126a]:
+change string to *string for Item.Description and Library.Description in package library
+
+Testing done:
+- Test against a VC testbed
+Sending a UpdateLibraryItem request with this change, and set the new description to "".
+The original item description was "virtualmachinepublishrequest.vmware.com: 6b0d06ad-8e18-4881-a806-2a7c8a7e1b4b",
+after this UpdateLibraryItem request succeeded, the item description was set to "".
+While before this change, it would be a no-op for the description.
+- Test using govc
+  - Update Library
+```
+Create a library:
+➜  govmomi git:(issue-3048) ✗ govc library.create -d "description-1" cl-1
+495f611a-cf74-40d6-a54a-8b239cf15406
+➜  govmomi git:(issue-3048) ✗ ~/go/bin/govc library.info 495f611a-cf74-40d6-a54a-8b239cf15406
+Name:                 cl-1
+  ID:                 495f611a-cf74-40d6-a54a-8b239cf15406
+  Path:               /cl-1
+  Description:        description-1
+  Version:            2
+  Created:            Fri Feb 17 19:18:22 2023
+  Security Policy ID
+  StorageBackings:
+    DatastoreID:      sharedVmfs-0
+    Type:             DATASTORE
+
+Update the library description with new string:
+➜  govmomi git:(issue-3048) ✗ ~/go/bin/govc library.update -d "new description" 495f611a-cf74-40d6-a54a-8b239cf15406
+➜  govmomi git:(issue-3048) ✗ ~/go/bin/govc library.info 495f611a-cf74-40d6-a54a-8b239cf15406
+Name:                 cl-1
+  ID:                 495f611a-cf74-40d6-a54a-8b239cf15406
+  Path:               /cl-1
+  Description:        new description
+  Version:            3
+  Created:            Fri Feb 17 19:18:22 2023
+  Security Policy ID
+  StorageBackings:
+    DatastoreID:      sharedVmfs-0
+    Type:             DATASTORE
+
+Update the item name, description is not erased.
+➜  govmomi git:(issue-3048) ✗ ~/go/bin/govc library.update -n "cl-1-new" 495f611a-cf74-40d6-a54a-8b239cf15406
+➜  govmomi git:(issue-3048) ✗ ~/go/bin/govc library.info 495f611a-cf74-40d6-a54a-8b239cf15406
+Name:                 cl-1-new
+  ID:                 495f611a-cf74-40d6-a54a-8b239cf15406
+  Path:               /cl-1-new
+  Description:        new description
+  Version:            4
+  Created:            Fri Feb 17 19:18:22 2023
+  Security Policy ID
+  StorageBackings:
+    DatastoreID:      sharedVmfs-0
+    Type:             DATASTORE
+
+Update the library description with empty string:
+➜  govmomi git:(issue-3048) ✗ ~/go/bin/govc library.update -d ""
+495f611a-cf74-40d6-a54a-8b239cf15406
+➜  govmomi git:(issue-3048) ✗ ~/go/bin/govc library.info 495f611a-cf74-40d6-a54a-8b239cf15406
+Name:                 cl-1-new
+  ID:                 495f611a-cf74-40d6-a54a-8b239cf15406
+  Path:               /cl-1-new
+  Description:
+  Version:            5
+  Created:            Fri Feb 17 19:18:22 2023
+  Security Policy ID
+  StorageBackings:
+    DatastoreID:      sharedVmfs-0
+    Type:             DATASTORE
+```
+  - Update Library Item
+```
+➜  govmomi git:(issue-3048) ✗ ~/go/bin/govc library.update -d "item-2" /cl-1/image-2
+➜  govmomi git:(issue-3048) ✗ ~/go/bin/govc library.info /cl-1/image-2
+Name:                   image-2
+  ID:                   0dc7df56-31e0-47dc-8b0a-6a33279ddccc
+  Path:                 /cl-1/image-2
+  Description:          item-2
+  Type:                 ovf
+  Size:                 2.0GB
+  Created:              Wed Feb 15 23:05:15 2023
+  Modified:             Fri Feb 17 19:29:54 2023
+  Version:              3
+  Security Compliance:  true
+  Certificate Status:   INTERNAL
+
+Update item name:
+govmomi git:(issue-3048) ✗ ~/go/bin/govc library.update -n "image-2-new" /cl-1/image-2
+➜  govmomi git:(issue-3048) ✗ ~/go/bin/govc library.info /cl-1/image-2-new
+Name:                   image-2-new
+  ID:                   0dc7df56-31e0-47dc-8b0a-6a33279ddccc
+  Path:                 /cl-1/image-2-new
+  Description:          item-2
+  Type:                 ovf
+  Size:                 2.0GB
+  Created:              Wed Feb 15 23:05:15 2023
+  Modified:             Fri Feb 17 19:31:44 2023
+  Version:              4
+  Security Compliance:  true
+  Certificate Status:   INTERNAL
+
+Update item description to empty string
+➜  govmomi git:(issue-3048) ✗ ~/go/bin/govc library.update -d "" /cl-1/image-2-new
+➜  govmomi git:(issue-3048) ✗ ~/go/bin/govc library.info /cl-1/image-2-new
+Name:                   image-2-new
+  ID:                   0dc7df56-31e0-47dc-8b0a-6a33279ddccc
+  Path:                 /cl-1/image-2-new
+  Description:
+  Type:                 ovf
+  Size:                 2.0GB
+  Created:              Wed Feb 15 23:05:15 2023
+  Modified:             Fri Feb 17 19:32:56 2023
+  Version:              5
+  Security Compliance:  true
+  Certificate Status:   INTERNAL
+```
+
+Move to main [b594bf1f]:
+Changing GoVmomi's default branch from `master` to `main` will likely result
+in dependents needing to repoint their clients and other integrations to
+the new, default branch.
+
+Generate JSON tags [99200868]:
+Updating the `vim25/types` with camelCased, JSON tags affects
+the output of the `govc` command when using the `-json` flag
+to emit results as JSON. Field names that used to be PascalCased
+will now be camelCased. Queries for tools that parse JSON, such
+as `jq`, will need to be updated to use the new camelCased fields.
+
+### 📖 Commits
+
+- [2fab8d53]	chore: Update version.go for v0.31.0
+- [a03f4735]	api: Fix errors w 8.0U2 GA update
+- [515df5df]	api: Update generated types to vSphere 8.0U2 GA
+- [b7ceedea]	api: Prep to update types to vSphere 8.0U2 GA
+- [3fb5b821]	Use Envoy sidecar for guest and datastore file transfer.
+- [ccd07a01]	api: Update generated types to vSphere 8.0U1c GA
+- [4c00586f]	api: Prep to update types to vSphere 8.0U1c GA
+- [5431c33a]	api: Type/field comments for data structures; API versions
+- [c4d851b2]	govc: Add CLI support for VM data sets
+- [35ec7c3f]	vcsim: Add simulator support for VM data sets
+- [4b2de289]	api: Add SDK support for VM data sets
+- [02f353dd]	govc: Command to print device/backings model as tree
+- [8f9e5495]	fix: govc vm.clone failure when using 'cluster' option
+- [db076152]	build(deps): bump goreleaser/goreleaser-action from 4 to 5
+- [00407ce9]	build(deps): bump actions/checkout from 3 to 4
+- [c77de71c]	vcsim: Introduce separation btw new service instance & infra creation
+- [b22f730e]	fix: govc datacenter.info VM count with multiple DCs
+- [af7833bb]	govc: Fix memory aliasing in for loop (gosec G601)
+- [73b4535e]	build(deps): bump github.com/google/uuid from 1.3.0 to 1.3.1
+- [e6bb6ce2]	govc/library: fix dropped error
+- [e17d8842]	govc: add -file flag for cluster.module.rm
+- [f636e960]	Address review comments
+- [2b5c457e]	vcsim: add interactive debug github action stage
+- [9b2ef986]	vcsim: use docker event for efficient monitoring
+- [6f34f131]	vcsim: container backing respects changes via reconfigure
+- [6248cbfe]	vcsim: create underlay network for pNICs in container-backed hosts
+- [6b7b0dfc]	vcsim: per-host OptionManager instances and differentiated roles
+- [387dc6e5]	vcsim: support container backing for hosts
+- [fdb4d847]	vcsim: untangle container/VM to allow reuse of container logic for hosts
+- [40264da9]	Trim leading slash on soap path
+- [9d8380ce]	vcsim: Fix RefreshDatastore to return a valid response
+- [47dd6e02]	vcsim: add PerformanceManager counter values
+- [c6a9ac8f]	Bypass lookup svc for STS and SSOadmin clients
+- [ddfd7eb0]	remove bad spacing in new pull request template
+- [65b6c51f]	vcsim: add lookup.EndpointURL tests
+- [c460f706]	chore: Dockerfile & steps for generating types
+- [4cf0b760]	Allow picking datastore upload URL scheme by env
+- [319e4723]	build: quote golang version in release file to workaround issue in github action Close [#3179](https://github.com/vmware/govmomi/issues/3179)
+- [65814f0c]	fix: Update some goreleaser deprecated fields
+- [b4eac193]	fix: check the error chain when validating if it's x509 error
+- [cd9446c7]	vcsim: apply PCI UnitNumber offset of 7 for ethernet
+- [3322f61b]	Merge branch 'main' of github.com:vmware/govmomi into notable-user-otel-contrib
+- [e34c7218]	govc: Add CLI  device protocol support for vm.network.add
+- [eebdbefc]	add opentelemetry collector contrib as notable user
+- [86cadf21]	fix: Fix the gorelease
+- [1711a843]	fix: avoid modifying client transport outside of NewClient
+- [313aa85b]	fix: share http.Transport with service clients
+- [d648a215]	add cnssyncdatastore API
+- [5c7bf5f8]	Remove client request log from debug tracing
+- [11356057]	vcsim: set StandbyMode default to "none"
+- [48bdfada]	govc: Add --help
+- [f81f3b36]	fix: grep warnings during generating usage documentation
+- [28014f9b]	govc: Add general usage message
+- [0a351a84]	vcsim: Add RUN.env flag to inject environment variables to container-backed VM
+- [112777b8]	vcsim: Fix VM ExtraConfig
+- [e6217900]	vcsim: make task lock handoff optional
+- [6c0ed53b]	vcsim: async guest shutdown and standby
+- [7e490563]	chore: add missing guest OS IDs
+- [297c79bf]	vcsim: add VirtualMachine.StandbyGuest support
+- [833cf28e]	build(deps): bump github.com/stretchr/testify from 1.8.3 to 1.8.4
+- [2d11115b]	fix: support `binary` and `dateTime` in JSON
+- [2731f2d5]	Rm SetIndent in json.NewEncoder / JSON file name
+- [0ed91a21]	chore: bump embano1/wip
+- [c4ffe464]	fix: add esxcli.Fault and revert Error() string
+- [174fb998]	build(deps): bump github.com/stretchr/testify from 1.8.2 to 1.8.3
+- [e5f3cd0b]	govc: add detail error message for host.esxcli commands
+- [c65a8461]	build(deps): bump chuhlomin/render-template from 1.6 to 1.7
+- [93cb079b]	fix: byte, float and int (de) serialization
+- [7a04bd00]	vcsim: Fix FindByInventoryPath to handle root folder
+- [81733d0e]	govc: add cluster.mv command
+- [685bd768]	Add RUN.port.xx flag to publish ports on container backed VM
+- [8bc2caa1]	fix: avoid govc -verbose flag panic if an UpdateSet is nil
+- [78a979c9]	vcsim: Add CSV format support to QueryPerf API
+- [9ba1b852]	fix: include StoragePod Datastore children in ContainerView
+- [8b00a93f]	fix: only limit the number of samples generated to maxSample when maxSample is greater than 0 and the number of samples to generate is greater than maxSample Closes: [#3097](https://github.com/vmware/govmomi/issues/3097)
+- [25865e57]	api: set inventory path in SearchIndex.FindByInventoryPath
+- [c6005086]	chore: Err on json.Decode for invalid type/vals
+- [5a2fa4fd]	build(deps): bump nokogiri from 1.13.10 to 1.14.3 in /gen
+- [4ed5b077]	Make mounting DMI information optional with docker-backed vcsim
+- [a1c8c4c8]	build(deps): bump peter-evans/create-pull-request from 4 to 5
+- [8bcff40b]	build(deps): bump peter-evans/create-or-update-comment from 2 to 3
+- [daaaca0f]	govc: Add support for CNS volume snapshots
+- [bf0510b1]	build(deps): bump github.com/google/go-cmp from 0.5.7 to 0.5.9
+- [477bf69b]	govc: Support JSON protocol using environment variable
+- [38d0ac0d]	api: Add JSON transport for vim25
+- [4ed07633]	fix: support govc ls -xml flag
+- [2f5d7c62]	chore: fix WaitForUpdates bats test race
+- [03718c0f]	chore: remove sso bats test hacks
+- [4aad418a]	chore: upgrade to bats-core v1.9.0 release
+- [d1af63ff]	chore: fix jq query case
+- [91f51cfb]	chore: sync httptest/server race fix
+- [80e6b73f]	chore: add timeout to bats tests
+- [49f82b8e]	build(deps): bump actions/stale from 7 to 8
+- [b8007c4b]	govc: dont check poweredOn for vm.console vmrc requests
+- [0938fba2]	api: Add ServerGuid to gen'd MoRef
+- [71493efa]	examples: add rest.Client.LoginByToken
+- [3bf46949]	examples: add session.Manager.LoginByToken
+- [c62983fd]	vcsim: add ssoadmin user and group management
+- [3158766f]	chore: adjust cert trust checks to support newer Go versions
+- [4153cba9]	chore: Update CI to Go 1.20
+- [5b3da2e4]	chore: upgrade golangci-lint
+- [b3a9e0c6]	build(deps): bump actions/setup-go from 3 to 4
+- [6b34770c]	govc: add sso.idp.ldap.update command
+- [e5b2aa37]	govc: Add feature VM IOMMU enablement support
+- [1ea4b002]	build(deps): bump golang.org/x/text from 0.3.7 to 0.3.8 in /hack/tools
+- [4f9f126a]	Use string pointer for library/item description field.
+- [e09a4128]	api: support find.NetworkList by ID
+- [e8fa981e]	api: support find.Network by cluster path
+- [ea058454]	lookup.EndpointURL should only save thumbprints for endpoints outside of vCenter
+- [eb9c11c6]	vcsim: add guest.net.ipConfig
+- [825c73c2]	chore: bats related fixes
+- [f4c678ad]	govc: Add checksum validation to govc import.ova
+- [1991de51]	chore: Remove JSON tag for "This" / ArrayOf "_value"
+- [e935b5a8]	govc: Add feature to get and set default idp
+- [1970ec36]	build(deps): bump actions/stale from 6 to 7
+- [8554329c]	fix: Pin the result limit of ssoadmin client to its MAX
+- [b594bf1f]	chore: Move to main
+- [4e6d6424]	api: JSON Discriminators for vim25/types
+- [99200868]	api: Generate JSON tags
+- [e639aba1]	chore: Exclude vim25/json from CodeStyle workflow
+- [e4a36881]	docs: Add README to vendored JSON pkg
+- [908aa065]	chore: Include LICENSE in vendored JSON pkg
+- [5caa20a4]	chore: JSON Encoding w Discriminator Support
+- [dc1a57ec]	build(deps): bump goreleaser/goreleaser-action from 3 to 4
+- [a581fd01]	chore: Vendor Go 1.17.13 encoding/json
+- [9bd958aa]	build(deps): bump nokogiri from 1.13.9 to 1.13.10 in /gen
+
+<a name="v0.30.7"></a>
+## [Release v0.30.7](https://github.com/vmware/govmomi/compare/v0.30.6...v0.30.7)
+
+> Release Date: 2023-08-04
+
+### 🐞 Fix
+
+- [cd0c259a]	Update some goreleaser deprecated fields
+
+### 💫 `vcsim` (Simulator)
+
+- [3dac2e7d]	Fix RefreshDatastore to return a valid response
+- [fe7a0ac2]	add PerformanceManager counter values
+
+### 🧹 Chore
+
+- [46fd9d2d]	Update version.go for v0.30.7
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [46fd9d2d]	chore: Update version.go for v0.30.7
+- [3dac2e7d]	vcsim: Fix RefreshDatastore to return a valid response
+- [fe7a0ac2]	vcsim: add PerformanceManager counter values
+- [552dfab2]	build: quote golang version in release file to workaround issue in github action Close [#3179](https://github.com/vmware/govmomi/issues/3179)
+- [cd0c259a]	fix: Update some goreleaser deprecated fields
+
+<a name="v0.30.6"></a>
+## [Release v0.30.6](https://github.com/vmware/govmomi/compare/v0.30.5...v0.30.6)
+
+> Release Date: 2023-07-17
+
+### 🐞 Fix
+
+- [ad995d4e]	check the error chain when validating if it's x509 error
+- [0a77c755]	Fix the gorelease
+
+### 💫 `govc` (CLI)
+
+- [4df1b85b]	Add CLI  device protocol support for vm.network.add
+
+### 🧹 Chore
+
+- [55614148]	Update version.go for v0.30.6
+- [1079be90]	adjust cert trust checks to support newer Go versions
+- [64aafeb9]	Update CI to Go 1.20
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [55614148]	chore: Update version.go for v0.30.6
+- [ad995d4e]	fix: check the error chain when validating if it's x509 error
+- [1079be90]	chore: adjust cert trust checks to support newer Go versions
+- [0a77c755]	fix: Fix the gorelease
+- [4df1b85b]	govc: Add CLI  device protocol support for vm.network.add
+- [64aafeb9]	chore: Update CI to Go 1.20
+
+<a name="v0.30.5"></a>
+## [Release v0.30.5](https://github.com/vmware/govmomi/compare/v0.30.4...v0.30.5)
+
+> Release Date: 2023-06-27
+
+### 🐞 Fix
+
+- [03aa9dca]	avoid govc -verbose flag panic if an UpdateSet is nil
+- [b366e940]	include StoragePod Datastore children in ContainerView
+- [ae6efc9f]	only limit the number of samples generated to maxSample when maxSample is greater than 0 and the number of samples to generate is greater than maxSample Closes: [#3097](https://github.com/vmware/govmomi/issues/3097)
+- [b1290083]	support govc ls -xml flag
+
+### 💡 Examples
+
+- [46bf2408]	add rest.Client.LoginByToken
+- [d4e31429]	add session.Manager.LoginByToken
+
+### 💫 API Changes
+
+- [afd45d68]	set inventory path in SearchIndex.FindByInventoryPath
+
+### 💫 `govc` (CLI)
+
+- [ecca4141]	dont check poweredOn for vm.console vmrc requests
+
+### 💫 `vcsim` (Simulator)
+
+- [844274fd]	set StandbyMode default to "none"
+- [a405207d]	Add RUN.env flag to inject environment variables to container-backed VM
+- [3466b11d]	Fix FindByInventoryPath to handle root folder
+- [04737364]	Add CSV format support to QueryPerf API
+- [d46fe80a]	add ssoadmin user and group management
+
+### 🧹 Chore
+
+- [5373c143]	Update version.go for v0.30.5
+- [e2f14cd9]	add missing guest OS IDs
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [5373c143]	chore: Update version.go for v0.30.5
+- [844274fd]	vcsim: set StandbyMode default to "none"
+- [a405207d]	vcsim: Add RUN.env flag to inject environment variables to container-backed VM
+- [e2f14cd9]	chore: add missing guest OS IDs
+- [3466b11d]	vcsim: Fix FindByInventoryPath to handle root folder
+- [3afdbf25]	Add RUN.port.xx flag to publish ports on container backed VM
+- [03aa9dca]	fix: avoid govc -verbose flag panic if an UpdateSet is nil
+- [04737364]	vcsim: Add CSV format support to QueryPerf API
+- [b366e940]	fix: include StoragePod Datastore children in ContainerView
+- [ae6efc9f]	fix: only limit the number of samples generated to maxSample when maxSample is greater than 0 and the number of samples to generate is greater than maxSample Closes: [#3097](https://github.com/vmware/govmomi/issues/3097)
+- [afd45d68]	api: set inventory path in SearchIndex.FindByInventoryPath
+- [16a58c2f]	Make mounting DMI information optional with docker-backed vcsim
+- [b1290083]	fix: support govc ls -xml flag
+- [ecca4141]	govc: dont check poweredOn for vm.console vmrc requests
+- [46bf2408]	examples: add rest.Client.LoginByToken
+- [d4e31429]	examples: add session.Manager.LoginByToken
+- [d46fe80a]	vcsim: add ssoadmin user and group management
+
+<a name="v0.30.4"></a>
+## [Release v0.30.4](https://github.com/vmware/govmomi/compare/v0.30.3...v0.30.4)
+
+> Release Date: 2023-03-16
+
+### 💫 API Changes
+
+- [23a6824e]	support find.Network by cluster path
+- [f4f6a5a7]	support find.NetworkList by ID
+
+### 💫 `govc` (CLI)
+
+- [52328902]	Add feature VM IOMMU enablement support
+
+### 🧹 Chore
+
+- [4561966a]	Update version.go for v0.30.4
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [4561966a]	chore: Update version.go for v0.30.4
+- [52328902]	govc: Add feature VM IOMMU enablement support
+- [23a6824e]	api: support find.Network by cluster path
+- [f4f6a5a7]	api: support find.NetworkList by ID
+
+<a name="v0.30.3"></a>
+## [Release v0.30.3](https://github.com/vmware/govmomi/compare/v0.30.2...v0.30.3)
+
+> Release Date: 2023-03-16
+
+### 🧹 Chore
+
+- [0d36cdc9]	Update version.go for v0.30.3
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [0d36cdc9]	chore: Update version.go for v0.30.3
+
+<a name="v0.30.2"></a>
+## [Release v0.30.2](https://github.com/vmware/govmomi/compare/v0.30.1...v0.30.2)
+
+> Release Date: 2023-02-01
+
+### 🐞 Fix
+
+- [4136fd8e]	Pin the result limit of ssoadmin client to its MAX
+
+### 💫 `vcsim` (Simulator)
+
+- [997d9ddc]	add guest.net.ipConfig
+
+### 🧹 Chore
+
+- [9078b0b4]	Update version.go for v0.30.2
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [9078b0b4]	chore: Update version.go for v0.30.2
+- [997d9ddc]	vcsim: add guest.net.ipConfig
+- [4136fd8e]	fix: Pin the result limit of ssoadmin client to its MAX
+
+<a name="v0.30.1"></a>
+## [Release v0.30.1](https://github.com/vmware/govmomi/compare/v0.30.0...v0.30.1)
+
+> Release Date: 2023-01-28
+
+### 🧹 Chore
+
+- [76a194ea]	Update version.go for v0.30.1
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [76a194ea]	chore: Update version.go for v0.30.1
+- [5818061a]	build(deps): bump goreleaser/goreleaser-action from 3 to 4
+- [fee275a6]	lookup.EndpointURL should only save thumbprints for endpoints outside of vCenter
 
 <a name="v0.30.0"></a>
 ## [Release v0.30.0](https://github.com/vmware/govmomi/compare/v0.29.0...v0.30.0)
@@ -108,7 +2394,7 @@
 - [b44828a4]	vcsim: Fix datastore freespace changed by ReconfigVM_Task
 
 <a name="v0.29.0"></a>
-## [Release v0.29.0](https://github.com/vmware/govmomi/compare/v0.28.0...v0.29.0)
+## [Release v0.29.0](https://github.com/vmware/govmomi/compare/v0.28.5...v0.29.0)
 
 > Release Date: 2022-07-06
 
@@ -116,33 +2402,16 @@
 
 - [d6dd8fb3]	Typos in vim25/soap/client CA tests
 - [e086dfe4]	generate negative device key in AssignController
-- [371a24a4]	Interface conversion panic in pkg simulator
-- [a982c033]	use correct controlflag for vslm SetControlFlags API test
 - [37b3b24c]	avoid possible panic in govc metric commands
-- [310516e2]	govc: disambiguate vm/host search flags in vm.migrate
-- [6af2cdc3]	govc-tests in Go v1.18
-- [142cdca4]	Security update golangci-lint
-- [971079ba]	use correct vcenter.DeploymentSpec.VmConfigSpec json tag
 
 ### 💫 API Changes
 
 - [e6b5974a]	Add versioned user-agent header
-- [ca7ee510]	add VmConfigSpec field to content library DeploymentSpec
-
-### 💫 `govc` (CLI)
-
-- [515ca29f]	Use unique searchFlagKey when calling NewSearchFlag
-- [9d4ca658]	add library.deploy '-config' flag
-- [fc17df08]	add 'device.clock.add' command
-- [11f2d453]	Edit disk storage IO
 
 ### 💫 `vcsim` (Simulator)
 
 - [a1a36c9a]	Fix disk capacity fields in ReconfigVM_Task
 - [361c90ca]	Remove VM Guest.Net entry when removing Ethernet card
-- [578b95e5]	Fix createVM to encode VM name
-- [3325da0c]	add content library VmConfigSpec support
-- [8928a489]	Update Dockerfile
 
 ### 📃 Documentation
 
@@ -152,8 +2421,6 @@
 
 - [69ac8494]	Update version.go for v0.29.0
 - [80489cb5]	Update release automation
-- [e1f76e37]	Add missing copyright header
-- [6ed812fe]	Add Go boilerplate check
 
 ### ⚠️ BREAKING
 
@@ -168,10 +2435,76 @@
 - [361c90ca]	vcsim: Remove VM Guest.Net entry when removing Ethernet card
 - [80489cb5]	chore: Update release automation
 - [e6b5974a]	api: Add versioned user-agent header
+- [37b3b24c]	fix: avoid possible panic in govc metric commands
+
+<a name="v0.28.5"></a>
+## [Release v0.28.5](https://github.com/vmware/govmomi/compare/v0.28.4...v0.28.5)
+
+> Release Date: 2022-09-30
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+
+<a name="v0.28.4"></a>
+## [Release v0.28.4](https://github.com/vmware/govmomi/compare/v0.28.3...v0.28.4)
+
+> Release Date: 2022-10-01
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+
+<a name="v0.28.3"></a>
+## [Release v0.28.3](https://github.com/vmware/govmomi/compare/v0.28.1...v0.28.3)
+
+> Release Date: 2022-09-30
+
+### 🐞 Fix
+
+- [371a24a4]	Interface conversion panic in pkg simulator
+- [a982c033]	use correct controlflag for vslm SetControlFlags API test
+- [310516e2]	govc: disambiguate vm/host search flags in vm.migrate
+- [6af2cdc3]	govc-tests in Go v1.18
+- [142cdca4]	Security update golangci-lint
+- [971079ba]	use correct vcenter.DeploymentSpec.VmConfigSpec json tag
+
+### 💫 API Changes
+
+- [ca7ee510]	add VmConfigSpec field to content library DeploymentSpec
+
+### 💫 `govc` (CLI)
+
+- [515ca29f]	Use unique searchFlagKey when calling NewSearchFlag
+- [9d4ca658]	add library.deploy '-config' flag
+- [fc17df08]	add 'device.clock.add' command
+- [11f2d453]	Edit disk storage IO
+
+### 💫 `vcsim` (Simulator)
+
+- [578b95e5]	Fix createVM to encode VM name
+- [3325da0c]	add content library VmConfigSpec support
+- [8928a489]	Update Dockerfile
+
+### 🧹 Chore
+
+- [e1f76e37]	Add missing copyright header
+- [6ed812fe]	Add Go boilerplate check
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [11e89157]	new to go hence fixing coding errors
+- [e5ffb4a6]	fixed syntax errors
+- [b62ddfaa]	fixing header check failure
+- [9e97647e]	Fixing UT failures
+- [2fd7d28f]	adding support for LLDP and CDP details for GOVC and VCSIM
 - [578b95e5]	vcsim: Fix createVM to encode VM name
 - [371a24a4]	fix: Interface conversion panic in pkg simulator
 - [a982c033]	fix: use correct controlflag for vslm SetControlFlags API test
-- [37b3b24c]	fix: avoid possible panic in govc metric commands
 - [310516e2]	fix: govc: disambiguate vm/host search flags in vm.migrate
 - [5929abfb]	correct SetControlFlags and ClearControlFlags APIs
 - [6af2cdc3]	fix: govc-tests in Go v1.18
@@ -194,6 +2527,23 @@
 - [2f9fab55]	emacs: fix json mode
 - [fc17df08]	govc: add 'device.clock.add' command
 - [11f2d453]	govc: Edit disk storage IO
+
+<a name="v0.28.1"></a>
+## [Release v0.28.1](https://github.com/vmware/govmomi/compare/v0.28.0...v0.28.1)
+
+> Release Date: 2023-01-27
+
+### 🐞 Fix
+
+- [c27ab6b9]	use correct controlflag for vslm SetControlFlags API test
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [205cbcdc]	lookup.EndpointURL should only save thumbprints for endpoints outside of vCenter
+- [c27ab6b9]	fix: use correct controlflag for vslm SetControlFlags API test
+- [8d43c82c]	correct SetControlFlags and ClearControlFlags APIs
 
 <a name="v0.28.0"></a>
 ## [Release v0.28.0](https://github.com/vmware/govmomi/compare/v0.27.5...v0.28.0)
@@ -1843,7 +4193,7 @@ the task manager implementation.
 - [bd9cfd18]	Set the InventoryPath of the folder object in DefaultFolder ([#1515](https://github.com/vmware/govmomi/issues/1515))
 
 <a name="v0.20.1"></a>
-## [Release v0.20.1](https://github.com/vmware/govmomi/compare/v0.20.0...v0.20.1)
+## [Release v0.20.1](https://github.com/vmware/govmomi/compare/v0.20.1-vsan-65a0d6ab...v0.20.1)
 
 > Release Date: 2019-05-20
 
@@ -1852,6 +4202,219 @@ the task manager implementation.
 ### 📖 Commits
 
 - [4514987f]	Fix port signature in REST endpoint token auth
+
+<a name="v0.20.1-vsan-65a0d6ab"></a>
+## [Release v0.20.1-vsan-65a0d6ab](https://github.com/vmware/govmomi/compare/v0.20.1-vsan-199e737b...v0.20.1-vsan-65a0d6ab)
+
+> Release Date: 2021-02-19
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [536a78e2]	Add function to get vsan host config
+- [58e6303b]	Add test for vsan host config
+- [74f25ae7]	Adding VsanQueryObjectIdentities and QueryVsanObjects
+- [e43fff34]	skip tests when env is not set
+- [43532740]	Adding new API to get cluster configuration
+- [9a53dde4]	Add CnsQuerySelectionNameType and CnsKubernetesEntityType back
+- [bac56c3b]	Add bindings for vSANFS and extend CNS bindings to support file volume
+
+<a name="v0.20.1-vsan-199e737b"></a>
+## [Release v0.20.1-vsan-199e737b](https://github.com/vmware/govmomi/compare/v0.20.0...v0.20.1-vsan-199e737b)
+
+> Release Date: 2019-05-13
+
+### 💫 `govc` (CLI)
+
+- [fe372923]	rename vcenter.deploy to library.deploy
+- [436d7a04]	move library.item.update commands to library.session
+- [e6514757]	consolidate library commands
+- [f8249ded]	export Archive Path field
+- [d2ab2782]	add vm.change vpmc-enabled flag
+- [e7b801c6]	fix vm.change against templates
+- [8a856429]	fix option.set for int32 type values
+- [81391309]	add datastore.maintenance.{enter,exit} commands
+- [18cb9142]	FCD workarounds
+- [665affe5]	add datastore.cluster.info Description
+- [7b7f2013]	add permission.remove -f flag
+
+### 💫 `vcsim` (Simulator)
+
+- [83e068c5]	fix ListView.Modify
+- [3a6a02c0]	add ListView to race test
+- [89678493]	avoid ViewManager.ModifyListView race
+- [3661c9b4]	add PlaceVm support ([#1589](https://github.com/vmware/govmomi/issues/1589))
+- [5b5eaa70]	remove httptest.serve flag
+- [20c1873e]	add library.deploy support
+- [0b1ad552]	add ovf manager
+- [6684016f]	fork httptest server package
+- [48c1e0a5]	add content library support
+- [8543ea4f]	set guest.toolsRunningStatus property
+
+### ⚠️ BREAKING
+
+### 📖 Commits
+
+- [b3c1d778]	Add generated vslm types and methods
+- [67f65ce0]	Remove duplicate cns bindings from vsan directory
+- [42ba0d6e]	Add test for vsan host config
+- [45e77063]	Add function to get vsan host config
+- [668f7bcb]	Add wrappers for retrieving vsan properties
+- [001df6f8]	Use gofmt
+- [f51a8ca4]	Add vSAN 7.0 API bindings
+- [f08fb2a3]	Add vSAN 7.0 API bindings
+- [6eec064a]	Adding VsanQueryObjectIdentities and QueryVsanObjects
+- [d17598e4]	Vsan Performance Data Collection API ([#2021](https://github.com/vmware/govmomi/issues/2021))
+- [7406f2dc]	skip tests when env is not set
+- [c32d3619]	removing usage of spew package
+- [e247d675]	Adding new API to get cluster configuration
+- [65160c8e]	Add CnsQuerySelectionNameType and CnsKubernetesEntityType back
+- [2b954493]	Add bindings for vSANFS and extend CNS bindings to support file volume
+- [6e27e035]	Merge branch 'topic/georgek/cherrypick' into 'vmware-internal'
+- [83e068c5]	vcsim: fix ListView.Modify
+- [3a6a02c0]	vcsim: add ListView to race test
+- [89678493]	vcsim: avoid ViewManager.ModifyListView race
+- [86ad2937]	Merge branch 'topic/desaiy/vmware-internal' into 'vmware-internal'
+- [79a6eb29]	Add ExtendDisk and InflateDisk wrappers to vlsm/object_manager
+- [6e531650]	Add AttachDisk and DetachDisk wrappers for the virtualMachine object.
+- [599c291f]	Merge branch 'faiyaza/vmware-internal' into 'vmware-internal'
+- [5ff5d327]	Update to vSphere 7 APIs
+- [c41c4577]	Update generated code to vSphere 6.7u3
+- [4b803b94]	Update to vSphere 6.7u2 API
+- [51cd0cee]	adds error check before returning value
+- [3088c640]	adds code to query for license description
+- [77932350]	adds client code to add license description spec
+- [da94d023]	Merge branch 'topic/rvembuli/fix_client_method' into 'vmware-internal'
+- [1a4b19ad]	adds error check before returning value
+- [95605ad3]	Merge branch 'topic/rvembuli/add_product_search' into 'vmware-internal'
+- [29b5b751]	adds code to query for license description
+- [38855369]	Merge branch 'topic/rvembuli/2590835/add_client_dlf' into 'vmware-internal'
+- [1c8979ee]	adds client code to add license description spec
+- [aeafc880]	Merge branch 'topic/rvembuli/update_bindings_license_service' into 'vmware-internal'
+- [56e5babf]	adds client bindings generated from wsdl file in http://build-squid.eng.vmware.com/build/mts/release/sb-37722446/publish/wsdl/license-cis-vmodl-bindings.wsdl
+- [6a920510]	Merge branch 'topic/nmadanapalli/ls-persistent-client-PR2594868' into 'vmware-internal'
+- [5eb03816]	Keepalive handling for ls.Client
+- [9901834a]	Merge branch 'topic/nmadanapalli/ls-cookie-PR2591635' into 'vmware-internal'
+- [57a072fb]	Instantiating a new cookie jar for every LS client instance
+- [01cf5cca]	Merge branch 'topic/faiyaza/guestopscherrypick' into 'vmware-internal'
+- [97012c79]	Avoid possible nil pointer dereference in guest TransferURL
+- [a8ed5502]	Merge branch 'topic/nmadanapalli/license-asset-bindings' into 'vmware-internal'
+- [876137ae]	Adding AssetService bindings
+- [2407e148]	Merge branch 'topic/nmadanapalli/backport-322d962' into 'vmware-internal'
+- [9c89ff53]	Fix pbm field type lookup
+- [7e26d088]	Merge branch 'cherry-pick-a355f576' into 'vmware-internal'
+- [80c6a727]	Switch VAPI cluster modules to using NewResource to fix URLs to start with /rest/vcenter/
+- [e4872724]	Local cherry-pick of Cluster Module API support without simulator testing.
+- [94f7310e]	Merge branch 'topic/pradyumnaa/nsxt-status' into 'vmware-internal'
+- [b1c7b0f3]	Add the NsxtStatus field to HostProxySwitch
+- [fd246c9e]	Merge branch 'topic/mansia/license' into 'vmware-internal'
+- [8d40f673]	Enhance govmomi license bindings to accept null NotificationSearchSpec
+- [c07aa445]	Merge branch 'topic/ljoyce/lifecycle-managed' into 'vmware-internal'
+- [f9c0e4fb]	Add lifecycleManaged property to ComputeResource object
+- [6f8ae93b]	Cherry-pick 62c20113 and b916904
+- [dcd17fc6]	Merge branch 'topic/mansia/license' into 'vmware-internal'
+- [1f5c0b19]	Add cis.license client
+- [fa03c5db]	Merge branch 'cherry-pick-97c24006' into 'vmware-internal'
+- [a2c9e16e]	Merge branch 'cherry-pick-674286cb' into 'vmware-internal'
+- [318eaf6d]	Add support for appliance/logging/forwarding VAPI [1/3]
+- [ffcb0eca]	Merge branch 'cherry-pick-d296a5f8' into 'vmware-internal'
+- [00e53090]	Support HoK tokens with Interactive Users
+- [f71af4d0]	Merge branch 'cherry-pick-c183577b' into 'vmware-internal'
+- [3661c9b4]	vcsim: add PlaceVm support ([#1589](https://github.com/vmware/govmomi/issues/1589))
+- [c81eab04]	Merge branch 'cherry-pick-384b1b95' into 'vmware-internal'
+- [2751a42a]	Fix port signature in REST endpoint token auth
+- [25117583]	Merge branch 'topic/anubhabm/wcp-license' into 'vmware-internal'
+- [44d91635]	Adding API bindings for isFeatureAvailable internal API
+- [5f837dc8]	Added support for HostSystem InternalConfigManager property
+- [d7abbdbb]	Add bindings for NetworkSystem.PerformHostOpaqueNetworkDataOperation to vim25
+- [4f441128]	Merge branch 'topic/echu/cis-session-get' into 'vmware-internal'
+- [a3ba80dc]	cherry-pick cis-session-get change from master
+- [aba0bbae]	Add vAPI create binding for compute policy
+- [fe292fa4]	Add vAPI create binding for compute policy
+- [c64008ad]	Always use the service version when possible.
+- [9ff64cfe]	Add method that sets vim version to the endpoint service version
+- [218f7ef5]	Add TenantManager helper
+- [ce5f283c]	Fix deadlock for keep alive handlers that attempt log in
+- [3c702b66]	Add TenantManager bindings to vim25
+- [a6b86c92]	Adding API bindings for scalable shares
+- [16823c9b]	Adding API bindings for createNamespaceFolder and createNamespaceResourcePool internal APIs
+- [fe42604f]	Pulling changes from master and resolving conflicts
+- [dc631a2d]	Format import statement
+- [f133c9e9]	Fix paths in vsan/methods
+- [d8e7cc75]	Update copy rights
+- [62412641]	Add vsan bindings
+- [605b62fa]	Adding bindings for placeMultiVms API
+- [fc3f0e9d]	Support resignature of vmfs snapshots ([#1442](https://github.com/vmware/govmomi/issues/1442))
+- [fe372923]	govc: rename vcenter.deploy to library.deploy
+- [436d7a04]	govc: move library.item.update commands to library.session
+- [e6514757]	govc: consolidate library commands
+- [1445cab3]	Merge branch 'cherry-pick-0b097847' into 'vmware-internal'
+- [ee087144]	Added SphereletManager bindings
+- [f8249ded]	govc: export Archive Path field
+- [8a823c52]	vcsa: bump to 6.7u2
+- [5b5eaa70]	vcsim: remove httptest.serve flag
+- [e9f80882]	Add error check to VirtualMachine.WaitForNetIP
+- [5611aaa2]	Add ovftool support
+- [20c1873e]	vcsim: add library.deploy support
+- [0b1ad552]	vcsim: add ovf manager
+- [d2ab2782]	govc: add vm.change vpmc-enabled flag
+- [e7b801c6]	govc: fix vm.change against templates
+- [8a856429]	govc: fix option.set for int32 type values
+- [9155093e]	Typo and->an
+- [81391309]	govc: add datastore.maintenance.{enter,exit} commands
+- [1a857b94]	Add support to reconcile FCD datastore inventory
+- [18cb9142]	govc: FCD workarounds
+- [499a8828]	Fix staticcheck issues value of `XXX` is never used
+- [665affe5]	govc: add datastore.cluster.info Description
+- [546e8897]	Add error check for deferred functions
+- [367c8743]	Fix bug with multiple tags in category
+- [7b7f2013]	govc: add permission.remove -f flag
+- [87bc0c85]	Makefile: Fix govet target using go1.12
+- [791e5434]	travis.yml: Update from golang 1.11 to 1.12
+- [a86a42a2]	travis.yml: Update from Ubuntu Trusty to Xenial
+- [d92ee75e]	Report local Datastore back as type OTHER
+- [6684016f]	vcsim: fork httptest server package
+- [48c1e0a5]	vcsim: add content library support
+- [69faa2de]	Make PostEvent TaskInfo param optional
+- [608ad29f]	Omit namespace tag in generated method body response types
+- [a7c03228]	Fix codespell issues
+- [728e77db]	Fix a race in NewServer().
+- [8543ea4f]	vcsim: set guest.toolsRunningStatus property
+- [e3143407]	Fix elseif gocritic issues
+- [89b53312]	Fix gocritic emptyStringTest issues
+- [63ba9232]	Fix some trivial gocritic issues
+- [0b8d0ee7]	simulator/host_datastore_browser.go: remove commented out code
+- [6c17d66c]	Fix some staticcheck issues
+- [d45b5f34]	Fix some gosimple issues
+- [90e501a6]	Correct the year in the govc changelog
+- [8082a261]	Update XDR to use fork
+- [e94ec246]	govc/USAGE.md: Update documentation
+- [3fde3319]	snapshot.tree: Show snapshots description
+- [1d6f743b]	Fix year in changelog
+- [39b2c871]	support customize vm folder in ovf deploy
+- [3ad203d3]	Use rest.Client for library uploads
+- [5d24c38c]	lib/finder: Support filenames with "/"
+- [087f09f9]	govc library: use govc/flags for Datastore and ResourcePool
+- [d1a7f491]	Remove nested progress.Tee usage
+- [7312711e]	govc/vm/*: Fix some gosec Errors unhandled issues
+- [88601bb7]	vcsim/*: Fix Errors unhandled issues
+- [61d04b46]	session/*: Fix Errors unhandled issues
+- [f9a22349]	vmdk/*: Fix gosec Errors unhandled issues
+- [ca9b71a9]	Fix gosec Expect directory permissions to be 0750 or less issues
+- [6083e891]	Fix gosec potential file inclusion via variable issues
+- [38091bf8]	Build changes needed for content library
+- [885d4b44]	Content library additions/finder
+- [3fb72d1a]	Add support for content library
+- [64f2a5ea]	Fix API Version check.
+- [718331e3]	govc/*: Fix some staticcheck issues
+- [ba7923ae]	Fix all staticcheck "error strings should not be capitalized" issues
+- [ed32a917]	simulator/*: Fix some staticcheck issues
+- [f71d4efb]	govc/vm/*: Fix staticcheck issues
+- [3d77e2b1]	vim25/*: Fix staticcheck issues
+- [d711005a]	.gitignore: add editor files *~
+- [43ff04f1]	Fix [#1173](https://github.com/vmware/govmomi/issues/1173)
+- [562aa0db]	Go Mod Support
 
 <a name="v0.20.0"></a>
 ## [Release v0.20.0](https://github.com/vmware/govmomi/compare/v0.19.0...v0.20.0)
