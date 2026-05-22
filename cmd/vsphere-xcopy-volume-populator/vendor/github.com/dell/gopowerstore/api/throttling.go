@@ -14,6 +14,7 @@
  *
  */
 
+//nolint:revive
 package api
 
 import (
@@ -42,7 +43,7 @@ type TimeoutSemaphore struct {
 	Logger    Logger
 }
 
-func NewTimeoutSemaphore(timeout int64, rateLimit int, logger Logger) *TimeoutSemaphore {
+func NewTimeoutSemaphore(timeout time.Duration, rateLimit int, logger Logger) *TimeoutSemaphore {
 	log := logger
 
 	if log == nil {
@@ -50,7 +51,7 @@ func NewTimeoutSemaphore(timeout int64, rateLimit int, logger Logger) *TimeoutSe
 	}
 
 	return &TimeoutSemaphore{
-		Timeout:   time.Duration(timeout) * time.Second,
+		Timeout:   timeout,
 		Semaphore: make(chan struct{}, rateLimit),
 		Logger:    log,
 	}
@@ -60,10 +61,11 @@ func (ts *TimeoutSemaphore) Acquire(ctx context.Context) error {
 	// find the min timeout between default timeout and context timeout
 	timeout := ts.Timeout
 	ctxTimeout, _ := ctx.Deadline()
-	timeUntil := time.Until(ctxTimeout)
-	if timeUntil > 0 && timeUntil < timeout {
-		timeout = timeUntil
+	timeRemaining := time.Until(ctxTimeout)
+	if timeRemaining > 0 && timeRemaining < timeout {
+		timeout = timeRemaining
 	}
+	ts.Logger.Debug(ctx, "default timeout: %s", ts.Timeout)
 
 	var cancelFunc func()
 	acquireCtx, cancelFunc := context.WithTimeout(ctx, timeout)

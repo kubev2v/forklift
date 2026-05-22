@@ -119,7 +119,7 @@ func CreateProvider(configFlags *genericclioptions.ConfigFlags, options provider
 
 	// Initialize settings map if any settings are provided
 	if options.VddkInitImage != "" || options.SdkEndpoint != "" || options.UseVddkAioOptimization ||
-		options.VddkBufSizeIn64K > 0 || options.VddkBufCount > 0 {
+		options.VddkBufSizeIn64K > 0 || options.VddkBufCount > 0 || options.EsxiCloneMethod != "" {
 		provider.Spec.Settings = map[string]string{}
 	}
 
@@ -158,9 +158,31 @@ func CreateProvider(configFlags *genericclioptions.ConfigFlags, options provider
 		provider.Spec.Settings["vddkConfig"] = vddkConfig.String()
 	}
 
+	// Set ESXi clone method if provided
+	if options.EsxiCloneMethod != "" {
+		provider.Spec.Settings["esxiCloneMethod"] = options.EsxiCloneMethod
+	}
+
 	// Create and set the Secret
 	var createdSecret *corev1.Secret
 	var err error
+
+	if options.DryRun {
+		if options.Secret == "" {
+			createdSecret = buildSecret(options.Namespace, options.Name,
+				options.Username, options.Password, options.URL, options.CACert, options.InsecureSkipTLS)
+			provider.Spec.Secret = corev1.ObjectReference{
+				Name:      createdSecret.Name,
+				Namespace: createdSecret.Namespace,
+			}
+		} else {
+			provider.Spec.Secret = corev1.ObjectReference{
+				Name:      options.Secret,
+				Namespace: options.Namespace,
+			}
+		}
+		return provider, createdSecret, nil
+	}
 
 	if options.Secret == "" {
 		createdSecret, err = createSecret(configFlags, options.Namespace, options.Name,

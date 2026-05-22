@@ -181,10 +181,13 @@ type ReplicationSession struct {
 	Type string `json:"type,omitempty"`
 
 	StorageElementPairs []StorageElementPair `json:"storage_element_pairs,omitempty"`
+
+	// Should be one of "System_Defined", "Promoted", "Demoted", "System_Promoted", or "System_Demoted".
+	LocalResourceState string `json:"local_resource_state,omitempty"`
 }
 
 func (r *ReplicationSession) Fields() []string {
-	return []string{"id", "state", "role", "resource_type", "local_resource_id", "remote_resource_id", "remote_system_id", "type", "storage_element_pairs"}
+	return []string{"id", "state", "role", "resource_type", "local_resource_id", "remote_resource_id", "remote_system_id", "type", "storage_element_pairs", "local_resource_state"}
 }
 
 // ReplicationRoleEnum - List of replication role types associated with a replication session
@@ -195,6 +198,17 @@ const (
 	ReplicationRoleDestination       ReplicationRoleEnum = "Destination"
 	ReplicationRoleMetroPreferred    ReplicationRoleEnum = "Metro_Preferred"
 	ReplicationRoleMetroNonPreferred ReplicationRoleEnum = "Metro_Non_Preferred"
+)
+
+// ReplicationResourceStateEnum - List of replication resource state types associated with a replication session
+type ReplicationResourceStateEnum string
+
+const (
+	ReplicationResourceStateSystemDefined  ReplicationResourceStateEnum = "System_Defined"
+	ReplicationResourceStatePromoted       ReplicationResourceStateEnum = "Promoted"
+	ReplicationResourceStateDemoted        ReplicationResourceStateEnum = "Demoted"
+	ReplicationResourceStateSystemPromoted ReplicationResourceStateEnum = "System_Promoted"
+	ReplicationResourceStateSystemDemoted  ReplicationResourceStateEnum = "System_Demoted"
 )
 
 // ReplicationRuleModify modifies replication rule
