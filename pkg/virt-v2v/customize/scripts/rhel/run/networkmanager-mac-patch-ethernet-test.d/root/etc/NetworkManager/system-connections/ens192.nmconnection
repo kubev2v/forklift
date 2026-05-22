@@ -1,0 +1,14 @@
+[connection]
+id=ens192
+type=ethernet
+interface-name=ens192
+
+[ipv4]
+method=manual
+address1=10.10.10.100/24,10.10.10.1
+
+[ipv6]
+method=disabled
+
+[ethernet]
+auto-negotiate=true
