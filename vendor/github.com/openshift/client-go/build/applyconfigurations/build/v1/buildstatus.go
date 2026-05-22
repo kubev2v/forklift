@@ -5,30 +5,56 @@ package v1
 import (
 	time "time"
 
-	v1 "github.com/openshift/api/build/v1"
+	buildv1 "github.com/openshift/api/build/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// BuildStatusApplyConfiguration represents an declarative configuration of the BuildStatus type for use
+// BuildStatusApplyConfiguration represents a declarative configuration of the BuildStatus type for use
 // with apply.
+//
+// BuildStatus contains the status of a build
 type BuildStatusApplyConfiguration struct {
-	Phase                      *v1.BuildPhase                       `json:"phase,omitempty"`
-	Cancelled                  *bool                                `json:"cancelled,omitempty"`
-	Reason                     *v1.StatusReason                     `json:"reason,omitempty"`
-	Message                    *string                              `json:"message,omitempty"`
-	StartTimestamp             *metav1.Time                         `json:"startTimestamp,omitempty"`
-	CompletionTimestamp        *metav1.Time                         `json:"completionTimestamp,omitempty"`
-	Duration                   *time.Duration                       `json:"duration,omitempty"`
-	OutputDockerImageReference *string                              `json:"outputDockerImageReference,omitempty"`
-	Config                     *corev1.ObjectReference              `json:"config,omitempty"`
-	Output                     *BuildStatusOutputApplyConfiguration `json:"output,omitempty"`
-	Stages                     []StageInfoApplyConfiguration        `json:"stages,omitempty"`
-	LogSnippet                 *string                              `json:"logSnippet,omitempty"`
-	Conditions                 []BuildConditionApplyConfiguration   `json:"conditions,omitempty"`
+	// phase is the point in the build lifecycle. Possible values are
+	// "New", "Pending", "Running", "Complete", "Failed", "Error", and "Cancelled".
+	Phase *buildv1.BuildPhase `json:"phase,omitempty"`
+	// cancelled describes if a cancel event was triggered for the build.
+	Cancelled *bool `json:"cancelled,omitempty"`
+	// reason is a brief CamelCase string that describes any failure and is meant for machine parsing and tidy display in the CLI.
+	Reason *buildv1.StatusReason `json:"reason,omitempty"`
+	// message is a human-readable message indicating details about why the build has this status.
+	Message *string `json:"message,omitempty"`
+	// startTimestamp is a timestamp representing the server time when this Build started
+	// running in a Pod.
+	// It is represented in RFC3339 form and is in UTC.
+	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
+	// completionTimestamp is a timestamp representing the server time when this Build was
+	// finished, whether that build failed or succeeded.  It reflects the time at which
+	// the Pod running the Build terminated.
+	// It is represented in RFC3339 form and is in UTC.
+	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
+	// duration contains time.Duration object describing build time.
+	Duration *time.Duration `json:"duration,omitempty"`
+	// outputDockerImageReference contains a reference to the container image that
+	// will be built by this build. Its value is computed from
+	// Build.Spec.Output.To, and should include the registry address, so that
+	// it can be used to push and pull the image.
+	OutputDockerImageReference *string `json:"outputDockerImageReference,omitempty"`
+	// config is an ObjectReference to the BuildConfig this Build is based on.
+	Config *corev1.ObjectReference `json:"config,omitempty"`
+	// output describes the container image the build has produced.
+	Output *BuildStatusOutputApplyConfiguration `json:"output,omitempty"`
+	// stages contains details about each stage that occurs during the build
+	// including start time, duration (in milliseconds), and the steps that
+	// occured within each stage.
+	Stages []StageInfoApplyConfiguration `json:"stages,omitempty"`
+	// logSnippet is the last few lines of the build log.  This value is only set for builds that failed.
+	LogSnippet *string `json:"logSnippet,omitempty"`
+	// conditions represents the latest available observations of a build's current state.
+	Conditions []BuildConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
-// BuildStatusApplyConfiguration constructs an declarative configuration of the BuildStatus type for use with
+// BuildStatusApplyConfiguration constructs a declarative configuration of the BuildStatus type for use with
 // apply.
 func BuildStatus() *BuildStatusApplyConfiguration {
 	return &BuildStatusApplyConfiguration{}
@@ -37,7 +63,7 @@ func BuildStatus() *BuildStatusApplyConfiguration {
 // WithPhase sets the Phase field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Phase field is set to the value of the last call.
-func (b *BuildStatusApplyConfiguration) WithPhase(value v1.BuildPhase) *BuildStatusApplyConfiguration {
+func (b *BuildStatusApplyConfiguration) WithPhase(value buildv1.BuildPhase) *BuildStatusApplyConfiguration {
 	b.Phase = &value
 	return b
 }
@@ -53,7 +79,7 @@ func (b *BuildStatusApplyConfiguration) WithCancelled(value bool) *BuildStatusAp
 // WithReason sets the Reason field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Reason field is set to the value of the last call.
-func (b *BuildStatusApplyConfiguration) WithReason(value v1.StatusReason) *BuildStatusApplyConfiguration {
+func (b *BuildStatusApplyConfiguration) WithReason(value buildv1.StatusReason) *BuildStatusApplyConfiguration {
 	b.Reason = &value
 	return b
 }

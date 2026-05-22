@@ -2,18 +2,15 @@ package iboxapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
-)
 
-/**
-log levels
-logr.V(0) - Info level logging in zerolog
-logr.V(1) - Debug level logging in zerolog
-logr.V(2) - Trace level logging in zerolog
-*/
+	"github.com/infinidat/infinibox-csi-driver/common"
+)
 
 type EventRequest struct {
 	Data []EventRequestData `json:"data"`
@@ -49,46 +46,44 @@ type CreateEventResult struct {
 	ID                  int    `json:"id"`
 }
 
-func (iboxClient *IboxClient) CreateEvent(eventRequest EventRequest) (err error) {
-	const functionName = "CreateEvent"
-
-	url := fmt.Sprintf("%s%s", iboxClient.Creds.URL, "api/rest/events")
-	iboxClient.Log.V(TRACE_LEVEL).Info(functionName, "URL", url, "event", eventRequest)
+func (client *IboxClient) CreateEvent(ctx context.Context, eventRequest EventRequest) (err error) {
+	url := fmt.Sprintf("%s%s", client.Creds.URL, "api/rest/events")
+	slog.Log(ctx, common.LevelTrace, "info", "URL", url, "event", eventRequest)
 
 	jsonBytes, err := json.Marshal(eventRequest)
 	if err != nil {
-		return fmt.Errorf("%s - Marshal - error %w", functionName, err)
+		return common.Errorf("marshal - error: %w url: %s", err, url)
 	}
-	request, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(jsonBytes))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonBytes))
 	if err != nil {
-		return fmt.Errorf("%s - NewRequest - error %w", functionName, err)
+		return common.Errorf("newRequest - error: %w url: %s", err, url)
 	}
-	SetAuthHeader(request, iboxClient.Creds)
+	SetAuthHeader(request, client.Creds)
 	request.Header.Set(CONTENT_TYPE, JSON_CONTENT_TYPE)
 
-	response, err := iboxClient.HTTPClient.Do(request)
+	response, err := client.HTTPClient.Do(request)
 	if err != nil {
-		return fmt.Errorf("%s - Do - error %w", functionName, err)
+		return common.Errorf("do - error: %w url: %s", err, url)
 	}
 	defer func() {
 		if err := response.Body.Close(); err != nil {
-			iboxClient.Log.V(INFO_LEVEL).Error(err, functionName, "error in Close()", err.Error())
+			slog.Error("error in Close()", "error", err.Error())
 		}
 	}()
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		return fmt.Errorf("%s - ReadAll - error %w", functionName, err)
+		return common.Errorf("readAll - error: %w url: %s", err, url)
 	}
 
 	var responseObject CreateEventResponse
 	err = json.Unmarshal(body, &responseObject)
 	if err != nil {
-		return fmt.Errorf("%s - Unmarshal - error %w", functionName, err)
+		return common.Errorf("unmarshal - error: %w url: %s", err, url)
 	}
-	iboxClient.Log.V(DEBUG_LEVEL).Info("CreateEvent", "Event ID", responseObject.Result.ID)
+	slog.Debug("CreateEvent", "Event ID", responseObject.Result.ID)
 	if responseObject.Error.Code != "" {
-		return fmt.Errorf("%s - ibox API - error:  code: %s message: %s", functionName, responseObject.Error.Code, responseObject.Error.Message)
+		return common.Errorf("ibox API - error: %v url: %s", responseObject.Error, url)
 	}
 	return nil
 }

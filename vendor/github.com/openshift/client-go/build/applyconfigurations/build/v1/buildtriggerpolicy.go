@@ -3,21 +3,54 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/build/v1"
+	buildv1 "github.com/openshift/api/build/v1"
 )
 
-// BuildTriggerPolicyApplyConfiguration represents an declarative configuration of the BuildTriggerPolicy type for use
+// BuildTriggerPolicyApplyConfiguration represents a declarative configuration of the BuildTriggerPolicy type for use
 // with apply.
+//
+// BuildTriggerPolicy describes a policy for a single trigger that results in a new Build.
 type BuildTriggerPolicyApplyConfiguration struct {
-	Type             *v1.BuildTriggerType                  `json:"type,omitempty"`
-	GitHubWebHook    *WebHookTriggerApplyConfiguration     `json:"github,omitempty"`
-	GenericWebHook   *WebHookTriggerApplyConfiguration     `json:"generic,omitempty"`
-	ImageChange      *ImageChangeTriggerApplyConfiguration `json:"imageChange,omitempty"`
-	GitLabWebHook    *WebHookTriggerApplyConfiguration     `json:"gitlab,omitempty"`
-	BitbucketWebHook *WebHookTriggerApplyConfiguration     `json:"bitbucket,omitempty"`
+	// type is the type of build trigger. Valid values:
+	//
+	// - GitHub
+	// GitHubWebHookBuildTriggerType represents a trigger that launches builds on
+	// GitHub webhook invocations
+	//
+	// - Generic
+	// GenericWebHookBuildTriggerType represents a trigger that launches builds on
+	// generic webhook invocations
+	//
+	// - GitLab
+	// GitLabWebHookBuildTriggerType represents a trigger that launches builds on
+	// GitLab webhook invocations
+	//
+	// - Bitbucket
+	// BitbucketWebHookBuildTriggerType represents a trigger that launches builds on
+	// Bitbucket webhook invocations
+	//
+	// - ImageChange
+	// ImageChangeBuildTriggerType represents a trigger that launches builds on
+	// availability of a new version of an image
+	//
+	// - ConfigChange
+	// ConfigChangeBuildTriggerType will trigger a build on an initial build config creation
+	// WARNING: In the future the behavior will change to trigger a build on any config change
+	Type *buildv1.BuildTriggerType `json:"type,omitempty"`
+	// github contains the parameters for a GitHub webhook type of trigger
+	GitHubWebHook *WebHookTriggerApplyConfiguration `json:"github,omitempty"`
+	// generic contains the parameters for a Generic webhook type of trigger
+	GenericWebHook *WebHookTriggerApplyConfiguration `json:"generic,omitempty"`
+	// imageChange contains parameters for an ImageChange type of trigger
+	ImageChange *ImageChangeTriggerApplyConfiguration `json:"imageChange,omitempty"`
+	// GitLabWebHook contains the parameters for a GitLab webhook type of trigger
+	GitLabWebHook *WebHookTriggerApplyConfiguration `json:"gitlab,omitempty"`
+	// BitbucketWebHook contains the parameters for a Bitbucket webhook type of
+	// trigger
+	BitbucketWebHook *WebHookTriggerApplyConfiguration `json:"bitbucket,omitempty"`
 }
 
-// BuildTriggerPolicyApplyConfiguration constructs an declarative configuration of the BuildTriggerPolicy type for use with
+// BuildTriggerPolicyApplyConfiguration constructs a declarative configuration of the BuildTriggerPolicy type for use with
 // apply.
 func BuildTriggerPolicy() *BuildTriggerPolicyApplyConfiguration {
 	return &BuildTriggerPolicyApplyConfiguration{}
@@ -26,7 +59,7 @@ func BuildTriggerPolicy() *BuildTriggerPolicyApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *BuildTriggerPolicyApplyConfiguration) WithType(value v1.BuildTriggerType) *BuildTriggerPolicyApplyConfiguration {
+func (b *BuildTriggerPolicyApplyConfiguration) WithType(value buildv1.BuildTriggerType) *BuildTriggerPolicyApplyConfiguration {
 	b.Type = &value
 	return b
 }
