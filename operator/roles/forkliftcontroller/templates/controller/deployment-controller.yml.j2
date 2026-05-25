@@ -155,6 +155,10 @@ spec:
         - name: FEATURE_RETAIN_POPULATOR_PODS
           value: "true"
 {% endif %}
+{% if feature_xfs_repair_ignore|bool %}
+        - name: FEATURE_XFS_REPAIR_IGNORE
+          value: "true"
+{% endif %}
 {% if feature_ocp_live_migration|bool %}
         - name: FEATURE_OCP_LIVE_MIGRATION
           value: "true"

@@ -38,6 +38,7 @@ const (
 	EnvVsphereVmwareDriverRemovalName   = "V2V_vsphereVmwareDriverRemoval"
 	EnvWindowsRegistryNetworkConfigName = "V2V_windowsRegistryNetworkConfig"
 	EnvXfsCompatibilityName             = "V2V_xfsCompatibility"
+	EnvXfsRepairIgnoreName              = "V2V_xfsRepairIgnore"
 )
 
 const (
@@ -155,6 +156,16 @@ func (s *AppConfig) Load() (err error) {
 	flag.BoolVar(&s.XfsCompatibility, "xfs-compatibility", s.getEnvBool(EnvXfsCompatibilityName, false), "XFS compatibility mode: do not pass --no-fstrim to virt-v2v")
 	s.RemoteInspectionDisks = s.getRemoteInspectionDisks()
 	flag.Parse()
+
+	if s.getEnvBool(EnvXfsRepairIgnoreName, false) {
+		const token = "xfs_repair_ignore=1"
+		if existing := os.Getenv("LIBGUESTFS_APPEND"); existing != "" {
+			_ = os.Setenv("LIBGUESTFS_APPEND", existing+" "+token)
+		} else {
+			_ = os.Setenv("LIBGUESTFS_APPEND", token)
+		}
+		fmt.Fprintf(os.Stderr, "xfs_repair ignore enabled (LIBGUESTFS_APPEND += %s)\n", token)
+	}
 
 	return s.validate()
 }

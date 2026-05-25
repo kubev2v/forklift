@@ -44,6 +44,14 @@ RUN mkdir -p /usr/lib64/guestfs/appliance && \
         mv -vf root.qcow2 root && \
         tar -cvf /libguestfs-appliance.tar /usr/lib64/guestfs/appliance
 
+# Replace xfs_repair with a wrapper that can ignore failures; register the
+# original binary in supermin hostfiles so both get copied into the appliance.
+COPY build/virt-v2v/xfs_repair_wrapper.sh /tmp/xfs_repair_wrapper.sh
+RUN cp /usr/sbin/xfs_repair /usr/sbin/xfs_repair.original && \
+    cp /tmp/xfs_repair_wrapper.sh /usr/sbin/xfs_repair && \
+    chmod 755 /usr/sbin/xfs_repair && \
+    echo '/usr/sbin/xfs_repair.original' >> /usr/lib64/guestfs/supermin.d/hostfiles
+
 # This prevents libvirt from attempting to create files in the root directory,
 # which would lead to permission errors.
 # Refer to: https://issues.redhat.com/browse/RHEL-105490
