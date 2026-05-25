@@ -22,7 +22,7 @@ type DestinationClient struct {
 func (d *DestinationClient) DeletePopulatorDataSource(vm *plan.VMStatus) error {
 	d.Log.Info("Starting DeletePopulatorDataSource", "vm", vm.String())
 
-	populatorCrList, err := d.getPopulatorCrList()
+	populatorCrList, err := d.getPopulatorCrList(vm.ID)
 	if err != nil {
 		d.Log.Error(err, "Failed to get populator CR list")
 		return liberr.Wrap(err)
@@ -58,8 +58,8 @@ func (r *DestinationClient) SetPopulatorCrOwnership() (err error) {
 	return nil
 }
 
-// Get the VSphereXcopyVolumePopulator CustomResource List.
-func (r *DestinationClient) getPopulatorCrList() (populatorCrList v1beta1.VSphereXcopyVolumePopulatorList, err error) {
+// Get the VSphereXcopyVolumePopulator CustomResource List filtered by migration and VM.
+func (r *DestinationClient) getPopulatorCrList(vmID string) (populatorCrList v1beta1.VSphereXcopyVolumePopulatorList, err error) {
 	snap := r.Plan.Status.Migration.ActiveSnapshot()
 	if snap.Migration.UID == "" {
 		err = liberr.New("no active migration snapshot", "plan", r.Plan.Name)
@@ -69,7 +69,8 @@ func (r *DestinationClient) getPopulatorCrList() (populatorCrList v1beta1.VSpher
 	migUID := string(snap.Migration.UID)
 	r.Log.Info("Getting populator CR list",
 		"namespace", r.Plan.Spec.TargetNamespace,
-		"migrationUID", migUID)
+		"migrationUID", migUID,
+		"vmID", vmID)
 
 	populatorCrList = v1beta1.VSphereXcopyVolumePopulatorList{}
 	err = r.Destination.Client.List(
@@ -77,7 +78,7 @@ func (r *DestinationClient) getPopulatorCrList() (populatorCrList v1beta1.VSpher
 		&populatorCrList,
 		&client.ListOptions{
 			Namespace:     r.Plan.Spec.TargetNamespace,
-			LabelSelector: labels.SelectorFromSet(map[string]string{"migration": migUID}),
+			LabelSelector: labels.SelectorFromSet(map[string]string{"migration": migUID, "vmID": vmID}),
 		})
 
 	if err != nil {
