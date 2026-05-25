@@ -5,6 +5,7 @@ import (
 
 	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	ref "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	. "github.com/onsi/ginkgo/v2"
@@ -24,7 +25,7 @@ var destClientLog = logging.WithName("destination-client-test")
 
 var _ = Describe("DestinationClient", func() {
 	Describe("DeletePopulatorDataSource", func() {
-		It("should delete all populator CRs successfully", func() {
+		It("should delete only populator CRs matching the VM", func() {
 			// Setup
 			populator1 := &v1beta1.VSphereXcopyVolumePopulator{
 				ObjectMeta: meta.ObjectMeta{
@@ -32,6 +33,7 @@ var _ = Describe("DestinationClient", func() {
 					Namespace: "test",
 					Labels: map[string]string{
 						"migration": "123",
+						"vmID":      "vm-1",
 					},
 				},
 				Spec: v1beta1.VSphereXcopyVolumePopulatorSpec{
@@ -44,16 +46,31 @@ var _ = Describe("DestinationClient", func() {
 					Namespace: "test",
 					Labels: map[string]string{
 						"migration": "123",
+						"vmID":      "vm-1",
 					},
 				},
 				Spec: v1beta1.VSphereXcopyVolumePopulatorSpec{
 					VmdkPath: "/vmdk/path2.vmdk",
 				},
 			}
+			// Another VM's populator — must survive the cleanup
+			populatorOtherVM := &v1beta1.VSphereXcopyVolumePopulator{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "populator-other-vm",
+					Namespace: "test",
+					Labels: map[string]string{
+						"migration": "123",
+						"vmID":      "vm-2",
+					},
+				},
+				Spec: v1beta1.VSphereXcopyVolumePopulatorSpec{
+					VmdkPath: "/vmdk/path3.vmdk",
+				},
+			}
 
-			destClient := createDestinationClient(populator1, populator2)
+			destClient := createDestinationClient(populator1, populator2, populatorOtherVM)
 			vmStatus := &planapi.VMStatus{
-				NewName: "test-vm",
+				VM: planapi.VM{Ref: ref.Ref{ID: "vm-1"}},
 			}
 
 			// Execute
@@ -62,11 +79,12 @@ var _ = Describe("DestinationClient", func() {
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
 
-			// Verify all populators are deleted
+			// Verify only vm-1 populators are deleted; vm-2 populator survives
 			populatorList := &v1beta1.VSphereXcopyVolumePopulatorList{}
 			err = destClient.Destination.Client.List(context.TODO(), populatorList, client.InNamespace("test"))
 			Expect(err).NotTo(HaveOccurred())
-			Expect(populatorList.Items).To(BeEmpty())
+			Expect(populatorList.Items).To(HaveLen(1))
+			Expect(populatorList.Items[0].Name).To(Equal("populator-other-vm"))
 		})
 
 		It("should succeed when no populator CRs exist", func() {
@@ -85,7 +103,7 @@ var _ = Describe("DestinationClient", func() {
 	})
 
 	Describe("getPopulatorCrList", func() {
-		It("should return only CRs matching the migration UID", func() {
+		It("should return only CRs matching the migration UID and VM ID", func() {
 			// Setup
 			populator1 := &v1beta1.VSphereXcopyVolumePopulator{
 				ObjectMeta: meta.ObjectMeta{
@@ -93,6 +111,7 @@ var _ = Describe("DestinationClient", func() {
 					Namespace: "test",
 					Labels: map[string]string{
 						"migration": "123",
+						"vmID":      "vm-1",
 					},
 				},
 				Spec: v1beta1.VSphereXcopyVolumePopulatorSpec{
@@ -105,35 +124,52 @@ var _ = Describe("DestinationClient", func() {
 					Namespace: "test",
 					Labels: map[string]string{
 						"migration": "123",
+						"vmID":      "vm-1",
 					},
 				},
 				Spec: v1beta1.VSphereXcopyVolumePopulatorSpec{
 					VmdkPath: "/vmdk/path2.vmdk",
 				},
 			}
-			populatorDifferent := &v1beta1.VSphereXcopyVolumePopulator{
+			// Same migration, different VM — must NOT be returned
+			populatorDifferentVM := &v1beta1.VSphereXcopyVolumePopulator{
 				ObjectMeta: meta.ObjectMeta{
-					Name:      "populator-different-migration",
+					Name:      "populator-different-vm",
 					Namespace: "test",
 					Labels: map[string]string{
-						"migration": "different-uid",
+						"migration": "123",
+						"vmID":      "vm-2",
 					},
 				},
 				Spec: v1beta1.VSphereXcopyVolumePopulatorSpec{
 					VmdkPath: "/vmdk/path3.vmdk",
 				},
 			}
+			populatorDifferentMig := &v1beta1.VSphereXcopyVolumePopulator{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "populator-different-migration",
+					Namespace: "test",
+					Labels: map[string]string{
+						"migration": "different-uid",
+						"vmID":      "vm-1",
+					},
+				},
+				Spec: v1beta1.VSphereXcopyVolumePopulatorSpec{
+					VmdkPath: "/vmdk/path4.vmdk",
+				},
+			}
 
-			destClient := createDestinationClient(populator1, populator2, populatorDifferent)
+			destClient := createDestinationClient(populator1, populator2, populatorDifferentVM, populatorDifferentMig)
 
 			// Execute
-			populatorList, err := destClient.getPopulatorCrList()
+			populatorList, err := destClient.getPopulatorCrList("vm-1")
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
 			Expect(populatorList.Items).To(HaveLen(2))
 			for _, pop := range populatorList.Items {
 				Expect(pop.Labels["migration"]).To(Equal("123"))
+				Expect(pop.Labels["vmID"]).To(Equal("vm-1"))
 			}
 		})
 
@@ -142,7 +178,7 @@ var _ = Describe("DestinationClient", func() {
 			destClient := createDestinationClient()
 
 			// Execute
-			populatorList, err := destClient.getPopulatorCrList()
+			populatorList, err := destClient.getPopulatorCrList("any-vm")
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
