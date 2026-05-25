@@ -41,9 +41,9 @@ ARG UI_PLUGIN_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-con
 
 ARG VALIDATION_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-validation-rhel9@sha256:8bf2eabb1064177225200e042cfef34860b4c66d5eaab1a99c8726f51b953585"
 
-ARG VIRT_V2V_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel10@sha256:bed21e5349b71c8ae91d2955e88a8e31ad480fc86a8bc3c86ac4f21627c1e1c4"
+ARG VIRT_V2V_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel10@sha256:11d8d97d0fbdfad430a91acbe74473fd35b576cd326a879530bd71421452ca64"
 
-ARG VIRT_V2V_IMAGE_RHEL9="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel9@sha256:4a729795ad1965631f33cdc45bb0b83f09199e925c171519ac08085d72c01514"
+ARG VIRT_V2V_IMAGE_RHEL9="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel9@sha256:3a86ff29be6217822a140948d1972acf5f05495cdd466d6eac3713adc0eb5ebc"
 
 ARG VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-vsphere-copy-offload-populator-rhel9@sha256:8d98e736cc2e6db00bf3da833373c9792e4153851865f748fa66f990ddcd3acf"
 
