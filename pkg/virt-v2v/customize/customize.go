@@ -3,6 +3,8 @@ package customize
 import (
 	"bytes"
 	"embed"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,8 +14,13 @@ import (
 	"text/template"
 
 	"github.com/kubev2v/forklift/pkg/virt-v2v/config"
+	"github.com/kubev2v/forklift/pkg/virt-v2v/customize/advancednet"
 	"github.com/kubev2v/forklift/pkg/virt-v2v/utils"
 )
+
+// ErrNoAdvancedNetSettings is returned when no advanced network settings file
+// exists or all values are defaults, meaning no firstboot script is needed.
+var ErrNoAdvancedNetSettings = errors.New("advanced net settings not found or all defaults")
 
 const (
 	WinFirstbootPath        = "/Program Files/Guestfs/Firstboot"
@@ -183,12 +190,6 @@ func (c *Customize) addDisksToCustomize(cmdBuilder utils.CommandBuilder) {
 // In case of multiple IP's per NIC on windows there is an existing setup script that assign only primary IP's
 // With this function and its corresponding template we will inject all the complementry IP's to the NICs
 func (c *Customize) injectComplementryStaticIPTemplate(templatePath, outputPath string) error {
-
-	tmplContent, err := os.ReadFile(templatePath)
-	if err != nil {
-		return fmt.Errorf("failed to read template: %w", err)
-	}
-
 	segments := strings.Split(c.appConfig.StaticIPs, "_")
 	macMap := map[string][]IPEntry{}
 
@@ -203,16 +204,11 @@ func (c *Customize) injectComplementryStaticIPTemplate(templatePath, outputPath 
 			continue
 		}
 
-		ip := ipParts[0]
-		gw := ipParts[1]
-		prefix := ipParts[2]
-		dns := ipParts[3:]
-
 		ipEntry := IPEntry{
-			IP:           ip,
-			Gateway:      gw,
-			PrefixLength: prefix,
-			DNS:          dns,
+			IP:           ipParts[0],
+			Gateway:      ipParts[1],
+			PrefixLength: ipParts[2],
+			DNS:          ipParts[3:],
 		}
 		macMap[mac] = append(macMap[mac], ipEntry)
 	}
@@ -241,50 +237,70 @@ func (c *Customize) injectComplementryStaticIPTemplate(templatePath, outputPath 
 		},
 	}
 
-	tmpl, err := template.New("preserveComplementryStaticIpScript").Funcs(funcMap).Parse(string(tmplContent))
+	return renderTemplate(templatePath, outputPath, configs, funcMap)
+}
+
+func renderTemplate(templatePath, outputPath string, data any, funcMaps ...template.FuncMap) error {
+	tmplContent, err := os.ReadFile(templatePath)
 	if err != nil {
-		return fmt.Errorf("failed to parse template: %w", err)
+		return fmt.Errorf("read template %s: %w", templatePath, err)
+	}
+
+	tmpl := template.New(filepath.Base(templatePath))
+	for _, fm := range funcMaps {
+		tmpl = tmpl.Funcs(fm)
+	}
+	if tmpl, err = tmpl.Parse(string(tmplContent)); err != nil {
+		return fmt.Errorf("parse template %s: %w", templatePath, err)
 	}
 
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, configs); err != nil {
-		return fmt.Errorf("failed to render template: %w", err)
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return fmt.Errorf("render template %s: %w", templatePath, err)
 	}
 
 	if err := os.WriteFile(outputPath, buf.Bytes(), 0644); err != nil {
-		return fmt.Errorf("failed to write output script: %w", err)
+		return fmt.Errorf("write rendered script %s: %w", outputPath, err)
 	}
 
 	return nil
 }
 
+func (c *Customize) injectAdvancedNetworkSettingsTemplate(windowsScriptsPath string) error {
+	settings, err := advancednet.ReadSettingsFile(c.appConfig.Workdir)
+	if err != nil {
+		return fmt.Errorf("read advanced net settings: %w", err)
+	}
+	if settings == nil || !settings.HasNonDefaultSettings() {
+		return ErrNoAdvancedNetSettings
+	}
+
+	settingsJSON, err := json.Marshal(settings)
+	if err != nil {
+		return fmt.Errorf("marshal advanced net settings: %w", err)
+	}
+
+	templatePath := filepath.Join(windowsScriptsPath, "9998-advanced-network-settings.ps1.tmpl")
+	outputPath := filepath.Join(windowsScriptsPath, "9998-advanced-network-settings.ps1")
+
+	if err := renderTemplate(templatePath, outputPath, struct {
+		SettingsJSON string
+	}{
+		SettingsJSON: string(settingsJSON),
+	}); err != nil {
+		return err
+	}
+
+	fmt.Printf("Advanced network settings script written to %s\n", outputPath)
+	return nil
+}
+
 func (c *Customize) injectStaticIPTemplate(templatePath, outputPath string) error {
-	tmplContent, err := os.ReadFile(templatePath)
-	if err != nil {
-		return fmt.Errorf("failed to read template: %w", err)
-	}
-
-	tmpl, err := template.New("netConfigScript").Parse(string(tmplContent))
-	if err != nil {
-		return fmt.Errorf("failed to parse template: %w", err)
-	}
-
-	data := struct {
+	return renderTemplate(templatePath, outputPath, struct {
 		InputString string
 	}{
 		InputString: c.appConfig.StaticIPs,
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return fmt.Errorf("failed to render template: %w", err)
-	}
-
-	if err := os.WriteFile(outputPath, buf.Bytes(), 0644); err != nil {
-		return fmt.Errorf("failed to write output script: %w", err)
-	}
-
-	return nil
+	})
 }
 
 func (c *Customize) runCmd(builder utils.CommandBuilder) error {
@@ -353,8 +369,18 @@ func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) erro
 			uploadPreserveMultipleIpPath = c.formatUpload(preserveMultipleNicsPath, WinFirstbootScriptsPath)
 		}
 	}
+	uploadAdvancedNetPath := ""
+	if err := c.injectAdvancedNetworkSettingsTemplate(windowsScriptsPath); err != nil {
+		if !errors.Is(err, ErrNoAdvancedNetSettings) {
+			return fmt.Errorf("inject advanced network settings: %w", err)
+		}
+	} else {
+		advNetScript := filepath.Join(windowsScriptsPath, "9998-advanced-network-settings.ps1")
+		uploadAdvancedNetPath = c.formatUpload(advNetScript, WinFirstbootScriptsPath)
+	}
+
 	uploadInitPath := c.formatUpload(initPath, WinFirstbootScriptsPath)
-	cmdBuilder.AddArgs(UploadCmd, uploadPreserveIpPath, uploadInitPath, uploadRemoveDuplicatesPath, uploadPreserveMultipleIpPath)
+	cmdBuilder.AddArgs(UploadCmd, uploadAdvancedNetPath, uploadPreserveIpPath, uploadInitPath, uploadRemoveDuplicatesPath, uploadPreserveMultipleIpPath)
 	if c.appConfig.WaitForGuestReboot {
 		signalScript := filepath.Join(windowsScriptsPath, "99999-signal-conversion-done.ps1")
 		cmdBuilder.AddArg(UploadCmd, c.formatUpload(signalScript, filepath.Join(WinFirstbootScriptsPath, "99999-signal-conversion-done.ps1")))
