@@ -451,6 +451,11 @@ spec:
         path: controller_retain_populator_pods
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Ignore xfs_repair exit status during conversion (default false)
+        displayName: XFS Repair Ignore
+        path: feature_xfs_repair_ignore
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Enable static udn IP addresses feature (default false)
         displayName: Static UDN IP Addresses
         path: controller_static_udn_ip_addresses
