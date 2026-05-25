@@ -21,6 +21,7 @@ const (
 	FeatureWindowsWaitForReboot         = "FEATURE_WINDOWS_WAIT_FOR_REBOOT"
 	FeatureUseConversionCR              = "FEATURE_USE_CONVERSION_CR"
 	FeatureRetainPopulatorPods          = "FEATURE_RETAIN_POPULATOR_PODS"
+	FeatureXfsRepairIgnore              = "FEATURE_XFS_REPAIR_IGNORE"
 )
 
 // OpenShift version where the FeatureVmwareSystemSerialNumber feature is supported:
@@ -74,6 +75,8 @@ type Features struct {
 	UseConversionCR bool
 	// Whether populator pods should be retained after migration for debugging.
 	RetainPopulatorPods bool
+	// Whether to ignore xfs_repair exit status during conversion.
+	XfsRepairIgnore bool
 }
 
 // isOpenShiftVersionAboveMinimum checks if OpenShift version is above or equal to minimum version using semantic versioning
@@ -115,5 +118,6 @@ func (r *Features) Load() (err error) {
 	r.WindowsWaitForReboot = getEnvBool(FeatureWindowsWaitForReboot, false)
 	r.UseConversionCR = getEnvBool(FeatureUseConversionCR, true)
 	r.RetainPopulatorPods = getEnvBool(FeatureRetainPopulatorPods, false)
+	r.XfsRepairIgnore = getEnvBool(FeatureXfsRepairIgnore, false)
 	return
 }
