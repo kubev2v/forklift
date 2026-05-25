@@ -115,6 +115,7 @@ foreach ($mac in $adapterConfigs.Keys) {
         Set-ItemProperty -Path $regPath -Name "IPAddress" -Value ([string[]]$config.IPs) -Type MultiString
         Set-ItemProperty -Path $regPath -Name "SubnetMask" -Value ([string[]]$config.Masks) -Type MultiString
         Set-ItemProperty -Path $regPath -Name "DefaultGateway" -Value @($config.Gateway) -Type MultiString
+        Set-ItemProperty -Path $regPath -Name "DefaultGatewayMetric" -Value @("0") -Type MultiString
 
         $dnsServers = $config.DNS1
         if ($config.DNS2 -ne "") { $dnsServers = "$($config.DNS1),$($config.DNS2)" }
