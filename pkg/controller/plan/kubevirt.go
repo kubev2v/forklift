@@ -2251,6 +2251,13 @@ func (r *KubeVirt) getVirtV2vPod(vm *plan.VMStatus, vmVolumes []cnv.Volume, vddk
 				Value: "true",
 			})
 	}
+	if settings.Settings.XfsRepairIgnore {
+		environment = append(environment,
+			core.EnvVar{
+				Name:  "V2V_xfsRepairIgnore",
+				Value: "true",
+			})
+	}
 
 	environment = append(environment,
 		core.EnvVar{

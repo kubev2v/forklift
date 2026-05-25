@@ -19,6 +19,7 @@ const (
 	FeatureVsphereVmwareDriverRemoval   = "FEATURE_VSPHERE_VMWARE_DRIVER_REMOVAL"
 	FeatureWindowsRegistryNetworkConfig = "FEATURE_WINDOWS_REGISTRY_NETWORK_CONFIG"
 	FeatureRetainPopulatorPods          = "FEATURE_RETAIN_POPULATOR_PODS"
+	FeatureXfsRepairIgnore              = "FEATURE_XFS_REPAIR_IGNORE"
 )
 
 // OpenShift version where the FeatureVmwareSystemSerialNumber feature is supported:
@@ -68,6 +69,8 @@ type Features struct {
 	WindowsRegistryNetworkConfig bool
 	// Whether populator pods should be retained after migration for debugging.
 	RetainPopulatorPods bool
+	// Whether to ignore xfs_repair exit status during conversion.
+	XfsRepairIgnore bool
 }
 
 // isOpenShiftVersionAboveMinimum checks if OpenShift version is above or equal to minimum version using semantic versioning
@@ -107,5 +110,6 @@ func (r *Features) Load() (err error) {
 	r.VsphereVmwareDriverRemoval = getEnvBool(FeatureVsphereVmwareDriverRemoval, false)
 	r.WindowsRegistryNetworkConfig = getEnvBool(FeatureWindowsRegistryNetworkConfig, false)
 	r.RetainPopulatorPods = getEnvBool(FeatureRetainPopulatorPods, false)
+	r.XfsRepairIgnore = getEnvBool(FeatureXfsRepairIgnore, false)
 	return
 }

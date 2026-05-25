@@ -220,6 +220,36 @@ func TestFeatures_Load_VsphereVmwareDriverRemoval(t *testing.T) {
 	}
 }
 
+func TestFeatures_Load_XfsRepairIgnore(t *testing.T) {
+	tests := []struct {
+		name           string
+		envVal         string
+		unset          bool
+		expectedResult bool
+	}{
+		{name: "default off when unset", unset: true, expectedResult: false},
+		{name: "false when false", envVal: "false", expectedResult: false},
+		{name: "true when true", envVal: "true", expectedResult: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.unset {
+				t.Setenv(FeatureXfsRepairIgnore, "")
+			} else {
+				t.Setenv(FeatureXfsRepairIgnore, tt.envVal)
+			}
+			t.Setenv(OpenShiftVersion, "4.20.0")
+			var features Features
+			if err := features.Load(); err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			if features.XfsRepairIgnore != tt.expectedResult {
+				t.Errorf("XfsRepairIgnore = %v, want %v", features.XfsRepairIgnore, tt.expectedResult)
+			}
+		})
+	}
+}
+
 func TestFeatures_isOpenShiftVersionAboveMinimum(t *testing.T) {
 	tests := []struct {
 		name       string
