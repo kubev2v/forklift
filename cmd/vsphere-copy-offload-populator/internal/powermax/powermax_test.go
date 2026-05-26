@@ -163,9 +163,12 @@ func TestEnsureClonnerIgroup(t *testing.T) {
 
 		mockClient.EXPECT().GetStorageGroup(context.TODO(), "123", gomock.Not(gomock.Nil())).Return(&v100.StorageGroup{}, nil)
 		mockClient.EXPECT().GetPortGroupByID(context.TODO(), "123", "fc-port-group").Return(&v100.PortGroup{PortGroupProtocol: "SCSI_FC"}, nil)
-		// Direct initiator lookup succeeds
-		mockClient.EXPECT().GetInitiatorByID(context.TODO(), "123", "10000000c9a12345:10000000c9a12346").Return(&v100.Initiator{
-			InitiatorID: "10000000c9a12345:10000000c9a12346",
+		// FC lookup: first list by WWPN, then get by PowerMax initiator ID
+		mockClient.EXPECT().GetInitiatorList(context.TODO(), "123", "10000000c9a12346", false, true).Return(&v100.InitiatorList{
+			InitiatorIDs: []string{"OR-2C:0:10000000c9a12346"},
+		}, nil)
+		mockClient.EXPECT().GetInitiatorByID(context.TODO(), "123", "OR-2C:0:10000000c9a12346").Return(&v100.Initiator{
+			InitiatorID: "OR-2C:0:10000000c9a12346",
 			Host:        "host1",
 		}, nil)
 
@@ -193,9 +196,12 @@ func TestEnsureClonnerIgroup(t *testing.T) {
 
 		mockClient.EXPECT().GetStorageGroup(context.TODO(), "123", gomock.Not(gomock.Nil())).Return(&v100.StorageGroup{}, nil)
 		mockClient.EXPECT().GetPortGroupByID(context.TODO(), "123", "fc-port-group").Return(&v100.PortGroup{PortGroupProtocol: "SCSI_FC"}, nil)
-		// Should look up with stripped prefix
-		mockClient.EXPECT().GetInitiatorByID(context.TODO(), "123", "200000109b985703:100000109b985703").Return(&v100.Initiator{
-			InitiatorID: "200000109b985703:100000109b985703",
+		// FC lookup: strip fc. prefix, extract WWPN, list by WWPN, then get by PowerMax ID
+		mockClient.EXPECT().GetInitiatorList(context.TODO(), "123", "100000109b985703", false, true).Return(&v100.InitiatorList{
+			InitiatorIDs: []string{"FA-2D:1:100000109b985703"},
+		}, nil)
+		mockClient.EXPECT().GetInitiatorByID(context.TODO(), "123", "FA-2D:1:100000109b985703").Return(&v100.Initiator{
+			InitiatorID: "FA-2D:1:100000109b985703",
 			Host:        "esx-host-42",
 		}, nil)
 
@@ -305,4 +311,12 @@ func TestInitiatorToLookupID(t *testing.T) {
 	g.Expect(initiatorToLookupID("fc.200000109b985703:100000109b985703")).To(gomega.Equal("200000109b985703:100000109b985703"))
 	g.Expect(initiatorToLookupID("iqn.1994-05.com.redhat:rhv-host")).To(gomega.Equal("iqn.1994-05.com.redhat:rhv-host"))
 	g.Expect(initiatorToLookupID("10000000c9a12345:10000000c9a12346")).To(gomega.Equal("10000000c9a12345:10000000c9a12346"))
+}
+
+func TestExtractWWPN(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	g.Expect(extractWWPN("200000109b985703:100000109b985703")).To(gomega.Equal("100000109b985703"))
+	g.Expect(extractWWPN("10000000c9a12345:10000000c9a12346")).To(gomega.Equal("10000000c9a12346"))
+	g.Expect(extractWWPN("100000109b985703")).To(gomega.Equal("100000109b985703"))
 }
