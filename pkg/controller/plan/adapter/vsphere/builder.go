@@ -2024,6 +2024,7 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 	if settings.Settings.Migration.HostLeaseDurationSeconds != "" {
 		dst.Data["HOST_LEASE_DURATION_SECONDS"] = []byte(settings.Settings.Migration.HostLeaseDurationSeconds)
 	}
+	dst.Data["MAX_VM_INFLIGHT"] = []byte(strconv.Itoa(settings.Settings.MaxInFlight))
 
 	// Add SSH keys for vSphere providers
 	if r.Source.Provider.Type() == api.VSphere {

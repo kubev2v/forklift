@@ -11,6 +11,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	"github.com/kubev2v/forklift/pkg/settings"
 )
 
 // Phases.
@@ -206,26 +207,21 @@ func (r *Scheduler) buildPending() (err error) {
 
 func (r *Scheduler) cost(vm *model.VM, vmStatus *plan.VMStatus) int {
 	useV2vForTransfer, _ := r.Plan.ShouldUseV2vForTransfer(vmStatus.Ref, r.Destination.Client)
-	if useV2vForTransfer {
-		switch vmStatus.Phase {
-		case CreateVM, PostHook, Completed:
-			// In these phases we already have the disk transferred and are left only to create the VM
-			// By setting the cost to 0 other VMs can start migrating
-			return 0
-		default:
-			return 1
-		}
-	} else {
+	// Copy-offload and CDI: xcopy/block transfers are per-disk (separate pods), so count by disk not by VM.
+	if !useV2vForTransfer || settings.Settings.CopyOffload {
 		switch vmStatus.Phase {
 		case CreateVM, PostHook, Completed, CopyingPaused, ConvertGuest, CreateGuestConversionPod:
-			// The warm/remote migrations this is done on already transferred disks,
-			// and we can start other VM migrations at these point.
-			// By setting the cost to 0 other VMs can start migrating
 			return 0
 		default:
-			// CDI transfers the disks in parallel by different pods
 			return len(vm.Disks) - r.finishedDisks(vmStatus)
 		}
+	}
+	// Pure v2v transfer: all disks move as one unit, so cost is 1 per VM.
+	switch vmStatus.Phase {
+	case CreateVM, PostHook, Completed:
+		return 0
+	default:
+		return 1
 	}
 }
 

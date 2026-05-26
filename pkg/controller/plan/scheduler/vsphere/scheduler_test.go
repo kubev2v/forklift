@@ -4,6 +4,13 @@ import (
 	"testing"
 
 	"github.com/onsi/gomega"
+
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	vspheremodel "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	webvsphere "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
+	"github.com/kubev2v/forklift/pkg/settings"
 )
 
 func TestScheduler(t *testing.T) {
@@ -101,4 +108,83 @@ func TestScheduler(t *testing.T) {
 		},
 	}
 	g.Expect(scheduler.schedulable()).To(gomega.Equal(expectedSchedule))
+}
+
+// v2vPlan returns a Plan that makes ShouldUseV2vForTransfer() return true:
+// cold VSphere→host migration with MigrateSharedDisks=true.
+func v2vPlan() *api.Plan {
+	vsphereType := api.VSphere
+	ocpType := api.OpenShift
+
+	sourceProvider := &api.Provider{}
+	sourceProvider.Spec.Type = &vsphereType
+
+	destProvider := &api.Provider{}
+	destProvider.Spec.Type = &ocpType
+	destProvider.Spec.URL = "" // empty URL → IsHost()
+
+	p := &api.Plan{}
+	p.Provider.Source = sourceProvider
+	p.Provider.Destination = destProvider
+	p.Spec.MigrateSharedDisks = true
+	// Referenced.Map.Storage left nil → skips HasNetAppShiftDestination check
+	return p
+}
+
+func vmWithDisks(n int) *webvsphere.VM {
+	vm := &webvsphere.VM{}
+	for range n {
+		vm.Disks = append(vm.Disks, vspheremodel.Disk{})
+	}
+	return vm
+}
+
+func schedulerWithPlan(p *api.Plan) *Scheduler {
+	return &Scheduler{
+		Context: &plancontext.Context{
+			Plan: p,
+		},
+	}
+}
+
+func TestCost_V2vPlan_CopyOffloadDisabled(t *testing.T) {
+	settings.Settings.CopyOffload = false
+	defer func() { settings.Settings.CopyOffload = false }()
+
+	s := schedulerWithPlan(v2vPlan())
+	vm := vmWithDisks(5)
+	vmStatus := &plan.VMStatus{Phase: DiskTransfer}
+	cost := s.cost(vm, vmStatus)
+	if cost != 1 {
+		t.Errorf("expected cost=1 for v2v plan without CopyOffload, got %d", cost)
+	}
+}
+
+func TestCost_V2vPlan_CopyOffloadEnabled(t *testing.T) {
+	settings.Settings.CopyOffload = true
+	defer func() { settings.Settings.CopyOffload = false }()
+
+	s := schedulerWithPlan(v2vPlan())
+	vm := vmWithDisks(5)
+	vmStatus := &plan.VMStatus{Phase: DiskTransfer}
+	cost := s.cost(vm, vmStatus)
+	// With CopyOffload on, a v2v plan must count by disk, not return 1.
+	if cost != 5 {
+		t.Errorf("expected cost=5 (disk count) for v2v+CopyOffload plan, got %d", cost)
+	}
+}
+
+func TestCost_CopyOffload_ZeroCostPhases(t *testing.T) {
+	settings.Settings.CopyOffload = true
+	defer func() { settings.Settings.CopyOffload = false }()
+
+	s := schedulerWithPlan(v2vPlan())
+	vm := vmWithDisks(5)
+	zeroCostPhases := []string{CreateVM, PostHook, Completed, CopyingPaused, ConvertGuest, CreateGuestConversionPod}
+	for _, phase := range zeroCostPhases {
+		vmStatus := &plan.VMStatus{Phase: phase}
+		if cost := s.cost(vm, vmStatus); cost != 0 {
+			t.Errorf("phase %q: expected cost=0, got %d", phase, cost)
+		}
+	}
 }
