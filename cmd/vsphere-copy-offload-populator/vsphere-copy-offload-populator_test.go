@@ -29,7 +29,8 @@ var _ = Describe("Populator", func() {
 		vmwareClient  *vmware_mocks.MockClient
 		storageClient *populator_mocks.MockStorageApi
 		underTest     populator.RemoteEsxcliPopulator
-		hostLocker    *populator_mocks.MockHostlocker
+		rescanLocker  *populator_mocks.MockHostlocker
+		offloadLocker *populator_mocks.MockHostlocker
 		dummyHost     *object.HostSystem
 	)
 
@@ -37,10 +38,13 @@ var _ = Describe("Populator", func() {
 		mockCtrl = gomock.NewController(GinkgoT())
 		vmwareClient = vmware_mocks.NewMockClient(mockCtrl)
 		storageClient = populator_mocks.NewMockStorageApi(mockCtrl)
-		hostLocker = populator_mocks.NewMockHostlocker(mockCtrl)
+		rescanLocker = populator_mocks.NewMockHostlocker(mockCtrl)
+		offloadLocker = populator_mocks.NewMockHostlocker(mockCtrl)
 		underTest = populator.RemoteEsxcliPopulator{
 			VSphereClient: vmwareClient,
 			StorageApi:    storageClient,
+			RescanLocker:  rescanLocker,
+			OffloadLocker: offloadLocker,
 		}
 		dummyHost = &object.HostSystem{
 			Common: object.NewCommon(nil, types.ManagedObjectReference{ServerGUID: "HostSystem:host-1000"}),
@@ -81,7 +85,7 @@ var _ = Describe("Populator", func() {
 
 			go func() {
 				defer GinkgoRecover()
-				underTest.Populate(tc.sourceVmId, tc.sourceVMDK, populator.PersistentVolume{Name: tc.targetPVC}, hostLocker, progressCh, xcopyUsedCh, quitCh)
+				underTest.Populate(tc.sourceVmId, tc.sourceVMDK, populator.PersistentVolume{Name: tc.targetPVC}, progressCh, xcopyUsedCh, quitCh)
 			}()
 
 			if tc.want != nil {
@@ -109,6 +113,10 @@ var _ = Describe("Populator", func() {
 			targetPVC:  "pvc-12345",
 			setup: func() {
 				vmwareClient.EXPECT().GetEsxByVm(gomock.Any(), gomock.Any()).Return(dummyHost, nil)
+				offloadLocker.EXPECT().WithLock(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+					func(ctx context.Context, hostID string, work func(context.Context) error) error {
+						return work(ctx)
+					})
 				vmwareClient.EXPECT().GetDatastoreActiveAdapters(context.Background(), gomock.Any(), "my-ds").Return([]vmware.HostAdapter{{Name: "vmhb64", Id: "iqn.foobar"}}, nil)
 
 				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any()).Return(nil, nil)
@@ -122,6 +130,10 @@ var _ = Describe("Populator", func() {
 			targetPVC:  "pvc-12345",
 			setup: func() {
 				vmwareClient.EXPECT().GetEsxByVm(gomock.Any(), gomock.Any()).Return(dummyHost, nil)
+				offloadLocker.EXPECT().WithLock(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+					func(ctx context.Context, hostID string, work func(context.Context) error) error {
+						return work(ctx)
+					})
 				vmwareClient.EXPECT().GetDatastoreActiveAdapters(context.Background(), gomock.Any(), "my-ds").Return([]vmware.HostAdapter{{Name: "vmhb64", Id: "iqn.foobar"}}, nil)
 
 				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any()).Return(nil, nil)
@@ -145,14 +157,24 @@ var _ = Describe("Populator", func() {
 			targetPVC:  "pvc-12345",
 			setup: func() {
 				vmwareClient.EXPECT().GetEsxByVm(gomock.Any(), gomock.Any()).Return(dummyHost, nil)
+				// Outer xcopy lease wraps the entire populate body
+				offloadLocker.EXPECT().WithLock(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+					func(ctx context.Context, hostID string, work func(context.Context) error) error {
+						return work(ctx)
+					})
 				vmwareClient.EXPECT().GetDatastoreActiveAdapters(context.Background(), gomock.Any(), "my-ds").Return([]vmware.HostAdapter{{Name: "vmhbatest", Id: "iqn.foobar"}}, nil)
 
 				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any()).Return(nil, nil)
 				storageClient.EXPECT().ResolvePVToLUN(gomock.Any()).Return(populator.LUN{NAA: "naa.616263"}, nil)
 				storageClient.EXPECT().CurrentMappedGroups(gomock.Any(), gomock.Any()).Return([]string{}, nil)
 				storageClient.EXPECT().MapTarget(gomock.Any(), nil).Return(populator.LUN{NAA: "naa.616263"}, nil)
-				// Mock rescan device list call (happens inside hostLocker.WithLock) - returns "on" status
+				// Mock rescan device list call (happens inside rescanLocker.WithLock) - returns "on" status
 				vmwareClient.EXPECT().RunEsxCommand(gomock.Any(), gomock.Any(), []string{"storage", "core", "device", "list", "-d", "naa.616263"}).Return([]esx.Values{{"Status": {"on"}}}, nil).Times(1)
+				// Inner rescan lease executes the rescan callback
+				rescanLocker.EXPECT().WithLock(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+					func(ctx context.Context, hostID string, work func(context.Context) error) error {
+						return work(ctx)
+					})
 				vmwareClient.EXPECT().RunEsxCommand(gomock.Any(), gomock.Any(),
 					[]string{"vmkfstools", "clone", "-s", "/vmfs/volumes/my-ds/my-vm/vmdisk.vmdk", "-t", "/vmfs/devices/disks/naa.616263"}).
 					Return([]esx.Values{{"message": {`{"taskId": "1"}`}}}, nil)
@@ -165,11 +187,6 @@ var _ = Describe("Populator", func() {
 				vmwareClient.EXPECT().RunEsxCommand(gomock.Any(), gomock.Any(), []string{"storage", "core", "device", "detached", "remove", "-d", "naa.616263"}).Return(nil, nil)
 				vmwareClient.EXPECT().RunEsxCommand(gomock.Any(), gomock.Any(), []string{"storage", "core", "adapter", "rescan", "-t", "delete", "-A", "vmhbatest"}).Return(nil, nil)
 				storageClient.EXPECT().UnmapTarget(gomock.Any(), gomock.Any()).Return(nil)
-				// Mock hostLocker to actually execute the callback function
-				hostLocker.EXPECT().WithLock(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-					func(ctx context.Context, hostID string, work func(context.Context) error) error {
-						return work(ctx)
-					})
 			},
 			want: nil,
 		}),

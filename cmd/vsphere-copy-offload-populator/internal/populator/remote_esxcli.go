@@ -82,22 +82,28 @@ type RemoteEsxcliPopulator struct {
 	SSHPublicKey  []byte
 	UseSSHMethod  bool
 	copyCtx       CopyContext
+	// RescanLocker gates concurrent host storage rescans (max 2 per host)
+	RescanLocker Hostlocker
+	// OffloadLocker gates the entire xcopy populate body per ESXi host
+	OffloadLocker Hostlocker
 }
 
 func (p *RemoteEsxcliPopulator) GetCopyContext() CopyContext {
 	return p.copyCtx
 }
 
-func NewWithRemoteEsxcli(storageApi VMDKCapable, vmwareClient vmware.Client, copyCtx CopyContext) (Populator, error) {
+func NewWithRemoteEsxcli(storageApi VMDKCapable, vmwareClient vmware.Client, copyCtx CopyContext, rescanLocker, offloadLocker Hostlocker) (Populator, error) {
 	return &RemoteEsxcliPopulator{
 		VSphereClient: vmwareClient,
 		StorageApi:    storageApi,
 		UseSSHMethod:  false, // VIB method
 		copyCtx:       copyCtx,
+		RescanLocker:  rescanLocker,
+		OffloadLocker: offloadLocker,
 	}, nil
 }
 
-func NewWithRemoteEsxcliSSH(storageApi VMDKCapable, vmwareClient vmware.Client, copyCtx CopyContext, sshPrivateKey, sshPublicKey []byte) (Populator, error) {
+func NewWithRemoteEsxcliSSH(storageApi VMDKCapable, vmwareClient vmware.Client, copyCtx CopyContext, sshPrivateKey, sshPublicKey []byte, rescanLocker, offloadLocker Hostlocker) (Populator, error) {
 	if len(sshPrivateKey) == 0 || len(sshPublicKey) == 0 {
 		return nil, fmt.Errorf("ssh key material must be non-empty")
 	}
@@ -108,10 +114,12 @@ func NewWithRemoteEsxcliSSH(storageApi VMDKCapable, vmwareClient vmware.Client, 
 		SSHPublicKey:  sshPublicKey,
 		UseSSHMethod:  true,
 		copyCtx:       copyCtx,
+		RescanLocker:  rescanLocker,
+		OffloadLocker: offloadLocker,
 	}, nil
 }
 
-func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) (errFinal error) {
+func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) (errFinal error) {
 	log := logger.New("xcopy")
 	setupLog := log.WithName("setup")
 	mapLog := log.WithName("map-volume")
@@ -128,6 +136,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		}
 		quit <- errFinal
 	}()
+
 	vmDisk, err := ParseVmdkPath(sourceVMDKFile)
 	if err != nil {
 		return err
@@ -141,6 +150,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	}
 	setupLog.Info("VMDK/Xcopy populate started", "method", cloneMethod, "source", sourceVMDKFile, "target", pv.Name)
 
+	// Resolve host before acquiring the lease so we know its identity for the lease name.
 	setupCtx := klog.NewContext(context.Background(), setupLog)
 	host, err := p.VSphereClient.GetEsxByVm(setupCtx, vmId)
 	if err != nil {
@@ -148,176 +158,182 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	}
 	setupLog.Info("ESXi host", "host", host.String())
 
-	hostID := strings.ReplaceAll(strings.ToLower(host.String()), ":", "-")
-	xcopyInitiatorGroup := fmt.Sprintf("xcopy-%s", hostID)
-	setupLog.Info("initiator group", "group", xcopyInitiatorGroup)
+	leaseHostID := host.Reference().Value
 
-	// Filter HBA UIDs based on datastore active adapters
-	var dsActiveAdapters []vmware.HostAdapter
-	dsActiveAdapters, err = p.VSphereClient.GetDatastoreActiveAdapters(context.Background(), host, vmDisk.Datastore)
-	initiators := []string{}
-	setupLog.Info("Datastore active adapters", "datastore", vmDisk.Datastore, "activeAdapters", dsActiveAdapters)
-	for _, a := range dsActiveAdapters {
-		initiators = append(initiators, a.Id)
-		if p.copyCtx.StorageProtocol == "" {
-			if strings.HasPrefix(a.Id, "iqn.") || strings.HasPrefix(a.Id, "eui.") {
-				p.copyCtx.StorageProtocol = "iscsi"
-			} else if strings.HasPrefix(a.Id, "fc.") || strings.HasPrefix(a.Id, "20:") {
-				p.copyCtx.StorageProtocol = "fc"
-			}
-		}
-	}
-	mappingContext, err := p.StorageApi.EnsureClonnerIgroup(xcopyInitiatorGroup, initiators)
-	if err != nil {
-		return fmt.Errorf("failed to add the ESX HBA UID %s to the initiator group %w", initiators, err)
-	}
+	// Gate the entire populate body (setup → rescan → xcopy → cleanup) so that no
+	// more than MaxInFlight concurrent disk copies run on the same ESXi host.
+	return p.OffloadLocker.WithLock(context.Background(), leaseHostID, func(ctx context.Context) error {
+		xcopyInitiatorGroup := fmt.Sprintf("xcopy-%s", leaseHostID)
+		setupLog.Info("initiator group", "group", xcopyInitiatorGroup)
 
-	setupLog.Info("resolving PV to LUN", "pv", pv.Name)
-	lun, err := p.StorageApi.ResolvePVToLUN(pv)
-	if err != nil {
-		return err
-	}
-
-	setupLog.Info("checking current mapped groups of LUN", "lun", lun.Name)
-	originalInitiatorGroups, err := p.StorageApi.CurrentMappedGroups(lun, mappingContext)
-	if err != nil {
-		return fmt.Errorf("failed to fetch the current initiator groups of the lun %s: %w", lun.Name, err)
-	}
-	setupLog.V(2).Info("current initiator groups for LUN", "lun", lun.IQN, "groups", originalInitiatorGroups)
-
-	fullCleanUpAttempted := false
-
-	defer func() {
-		if fullCleanUpAttempted {
-			return
-		}
-		if !slices.Contains(originalInitiatorGroups, xcopyInitiatorGroup) {
-			// Only attempt cleanup if lun was successfully resolved
-			if lun.Name != "" {
-				if mappingContext != nil {
-					mappingContext["UnmapAllSdc"] = false
-				}
-				errUnmap := p.StorageApi.UnmapTarget(lun, mappingContext)
-				if errUnmap != nil {
-					setupLog.Info("partial cleanup: failed to unmap", "err", errUnmap)
-				}
-			} else {
-				setupLog.V(2).Info("skipping partial cleanup unmap (LUN not resolved)")
-			}
-		}
-	}()
-
-	mapLog.Info("mapping volume to initiator group", "initiator_group", xcopyInitiatorGroup, "lun", lun.Name)
-	lun, err = p.StorageApi.MapTarget(lun, mappingContext)
-	if err != nil {
-		return fmt.Errorf("failed to map lun %s to initiator group %s: %w", lun, xcopyInitiatorGroup, err)
-	}
-
-	targetLUN := fmt.Sprintf("/vmfs/devices/disks/%s", lun.NAA)
-	mapLog.Info("volume mapped to initiator group", "initiator_group", xcopyInitiatorGroup, "device", targetLUN)
-
-	leaseHostID := strings.ReplaceAll(strings.ToLower(host.String()), ":", "-")
-	rescanLog.Info("rescanning host for device", "device", lun.NAA)
-	err = hostLocker.WithLock(context.Background(), leaseHostID,
-		func(ctx context.Context) error {
-			return rescan(ctx, p.VSphereClient, host, lun.NAA)
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("failed to find the device %s after scanning: %w", targetLUN, err)
-	}
-	rescanLog.Info("device visible on ESXi", "device", targetLUN)
-
-	defer func() {
-		cleanupLog.Info("cleanup started: unmap and remove device")
-		fullCleanUpAttempted = true
-		cleanupCtx := klog.NewContext(context.Background(), cleanupLog)
-		if mappingContext != nil {
-			mappingContext["UnmapAllSdc"] = true
-			mappingContext[CleanupXcopyInitiatorGroup] = true
-		}
-
-		// set device state to off and prevents any i/o to it
-		_, err = p.VSphereClient.RunEsxCommand(cleanupCtx, host, []string{"storage", "core", "device", "set", "--state", "off", "-d", lun.NAA})
+		// Filter HBA UIDs based on datastore active adapters
+		dsActiveAdapters, err := p.VSphereClient.GetDatastoreActiveAdapters(context.Background(), host, vmDisk.Datastore)
 		if err != nil {
-			cleanupLog.Info("failed to set device state off", "device", lun.Name, "err", err)
-		} else {
-			err = waitForDeviceStateOff(cleanupCtx, p.VSphereClient, host, lun.NAA)
+			return fmt.Errorf("failed to get datastore active adapters: %w", err)
+		}
+		initiators := []string{}
+		setupLog.Info("Datastore active adapters", "datastore", vmDisk.Datastore, "activeAdapters", dsActiveAdapters)
+		for _, a := range dsActiveAdapters {
+			initiators = append(initiators, a.Id)
+			if p.copyCtx.StorageProtocol == "" {
+				if strings.HasPrefix(a.Id, "iqn.") || strings.HasPrefix(a.Id, "eui.") {
+					p.copyCtx.StorageProtocol = "iscsi"
+				} else if strings.HasPrefix(a.Id, "fc.") || strings.HasPrefix(a.Id, "20:") {
+					p.copyCtx.StorageProtocol = "fc"
+				}
+			}
+		}
+
+		mappingContext, err := p.StorageApi.EnsureClonnerIgroup(xcopyInitiatorGroup, initiators)
+		if err != nil {
+			return fmt.Errorf("failed to add the ESX HBA UID %s to the initiator group %w", initiators, err)
+		}
+
+		setupLog.Info("resolving PV to LUN", "pv", pv.Name)
+		lun, err := p.StorageApi.ResolvePVToLUN(pv)
+		if err != nil {
+			return err
+		}
+
+		setupLog.Info("checking current mapped groups of LUN", "lun", lun.Name)
+		originalInitiatorGroups, err := p.StorageApi.CurrentMappedGroups(lun, mappingContext)
+		if err != nil {
+			return fmt.Errorf("failed to fetch the current initiator groups of the lun %s: %w", lun.Name, err)
+		}
+		setupLog.V(2).Info("current initiator groups for LUN", "lun", lun.IQN, "groups", originalInitiatorGroups)
+
+		fullCleanUpAttempted := false
+
+		defer func() {
+			if fullCleanUpAttempted {
+				return
+			}
+			if !slices.Contains(originalInitiatorGroups, xcopyInitiatorGroup) {
+				// Only attempt cleanup if lun was successfully resolved
+				if lun.Name != "" {
+					if mappingContext != nil {
+						mappingContext["UnmapAllSdc"] = false
+					}
+					errUnmap := p.StorageApi.UnmapTarget(lun, mappingContext)
+					if errUnmap != nil {
+						setupLog.Info("partial cleanup: failed to unmap", "err", errUnmap)
+					}
+				} else {
+					setupLog.V(2).Info("skipping partial cleanup unmap (LUN not resolved)")
+				}
+			}
+		}()
+
+		mapLog.Info("mapping volume to initiator group", "initiator_group", xcopyInitiatorGroup, "lun", lun.Name)
+		lun, err = p.StorageApi.MapTarget(lun, mappingContext)
+		if err != nil {
+			return fmt.Errorf("failed to map lun %s to initiator group %s: %w", lun, xcopyInitiatorGroup, err)
+		}
+
+		targetLUN := fmt.Sprintf("/vmfs/devices/disks/%s", lun.NAA)
+		mapLog.Info("volume mapped to initiator group", "initiator_group", xcopyInitiatorGroup, "device", targetLUN)
+
+		rescanLog.Info("rescanning host for device", "device", lun.NAA)
+		if err = p.RescanLocker.WithLock(context.Background(), leaseHostID,
+			func(ctx context.Context) error {
+				return rescan(ctx, p.VSphereClient, host, lun.NAA)
+			},
+		); err != nil {
+			return fmt.Errorf("failed to find the device %s after scanning: %w", targetLUN, err)
+		}
+		rescanLog.Info("device visible on ESXi", "device", targetLUN)
+
+		defer func() {
+			cleanupLog.Info("cleanup started: unmap and remove device")
+			fullCleanUpAttempted = true
+			cleanupCtx := klog.NewContext(context.Background(), cleanupLog)
+			if mappingContext != nil {
+				mappingContext["UnmapAllSdc"] = true
+				mappingContext[CleanupXcopyInitiatorGroup] = true
+			}
+
+			// set device state to off and prevents any i/o to it
+			_, err = p.VSphereClient.RunEsxCommand(cleanupCtx, host, []string{"storage", "core", "device", "set", "--state", "off", "-d", lun.NAA})
 			if err != nil {
-				cleanupLog.Info("timeout waiting for device off", "device", lun.Name, "err", err)
+				cleanupLog.Info("failed to set device state off", "device", lun.Name, "err", err)
+			} else {
+				err = waitForDeviceStateOff(cleanupCtx, p.VSphereClient, host, lun.NAA)
+				if err != nil {
+					cleanupLog.Info("timeout waiting for device off", "device", lun.Name, "err", err)
+				}
 			}
-		}
-		_, err = p.VSphereClient.RunEsxCommand(cleanupCtx, host, []string{"storage", "core", "device", "detached", "remove", "-d", lun.NAA})
-		if err != nil {
-			cleanupLog.Info("failed to remove device from detached list", "device", lun.Name, "err", err)
-		}
-		// finaly after the kernel have it detached and not having any i/o we can unmap
-		mapLog.Info("volume unmapped from initiatorgroup", "initiator_group", xcopyInitiatorGroup, "device", targetLUN)
-		errUnmap := p.StorageApi.UnmapTarget(lun, mappingContext)
-		if errUnmap != nil {
-			cleanupLog.Info("failed to unmap during cleanup", "lun", lun.Name, "err", errUnmap)
-		}
-
-		cleanupLog.V(2).Info("mapping volume back to original initiator groups", "groups", originalInitiatorGroups)
-		for _, group := range originalInitiatorGroups {
-			_, errMap := p.StorageApi.Map(group, lun, mappingContext)
-			if errMap != nil {
-				cleanupLog.Info("failed to map volume back to original holder", "group", group, "err", errMap)
+			_, err = p.VSphereClient.RunEsxCommand(cleanupCtx, host, []string{"storage", "core", "device", "detached", "remove", "-d", lun.NAA})
+			if err != nil {
+				cleanupLog.Info("failed to remove device from detached list", "device", lun.Name, "err", err)
 			}
+			// finaly after the kernel have it detached and not having any i/o we can unmap
+			mapLog.Info("volume unmapped from initiatorgroup", "initiator_group", xcopyInitiatorGroup, "device", targetLUN)
+			errUnmap := p.StorageApi.UnmapTarget(lun, mappingContext)
+			if errUnmap != nil {
+				cleanupLog.Info("failed to unmap during cleanup", "lun", lun.Name, "err", errUnmap)
+			}
+
+			cleanupLog.V(2).Info("mapping volume back to original initiator groups", "groups", originalInitiatorGroups)
+			for _, group := range originalInitiatorGroups {
+				_, errMap := p.StorageApi.Map(group, lun, mappingContext)
+				if errMap != nil {
+					cleanupLog.Info("failed to map volume back to original holder", "group", group, "err", errMap)
+				}
+			}
+			cleanupLog.V(2).Info("deleting dead devices after short delay")
+			time.Sleep(5 * time.Second)
+			deleteDeadDevices(cleanupCtx, p.VSphereClient, host, dsActiveAdapters)
+			cleanupLog.Info("cleanup finished")
+		}()
+
+		// Execute the clone using the unified task handling approach
+		var executor TaskExecutor
+		if p.UseSSHMethod {
+			sshSetupCtx := klog.NewContext(context.Background(), setupLog)
+
+			// Get host IP (needed for SSH version check and connection)
+			hostIP, err := vmware.GetHostIPAddress(sshSetupCtx, host)
+			if err != nil {
+				return fmt.Errorf("failed to get host IP address: %w", err)
+			}
+
+			err = vmware.EnableSSHAccess(sshSetupCtx, p.VSphereClient, host, p.SSHPrivateKey, p.SSHPublicKey, "")
+			if err != nil {
+				return fmt.Errorf("failed to enable SSH access: %w", err)
+			}
+
+			// Setup secure script (skips upload if remote version already matches)
+			finalScriptPath, err := ensureSecureScript(sshSetupCtx, p.VSphereClient, host, vmDisk.Datastore, hostIP, p.SSHPrivateKey)
+			if err != nil {
+				return fmt.Errorf("failed to ensure secure script: %w", err)
+			}
+			setupLog.V(2).Info("secure script ready", "path", finalScriptPath)
+
+			// Create SSH client; pass setup context so SSH logs show under setup.ssh
+			sshClient := vmware.NewSSHClient()
+			err = sshClient.Connect(sshSetupCtx, hostIP, "root", p.SSHPrivateKey)
+			if err != nil {
+				return fmt.Errorf("failed to connect via SSH: %w", err)
+			}
+			defer sshClient.Close()
+
+			setupLog.V(2).Info("SSH connection established with restricted commands")
+			// Validate the uploaded script version matches the embedded script version
+			scriptVersionCtx := klog.NewContext(sshSetupCtx, setupLog)
+			err = checkScriptVersion(scriptVersionCtx, sshClient, vmDisk.Datastore, vmkfstoolswrapper.Version, p.SSHPublicKey)
+			if err != nil {
+				return fmt.Errorf("script version check failed: %w", err)
+			}
+
+			executor = NewSSHTaskExecutor(sshClient)
+		} else {
+			executor = NewVIBTaskExecutor(p.VSphereClient)
 		}
-		cleanupLog.V(2).Info("deleting dead devices after short delay")
-		time.Sleep(5 * time.Second)
-		deleteDeadDevices(cleanupCtx, p.VSphereClient, host, dsActiveAdapters)
-		cleanupLog.Info("cleanup finished")
-	}()
 
-	// Execute the clone using the unified task handling approach
-	var executor TaskExecutor
-	if p.UseSSHMethod {
-		sshSetupCtx := klog.NewContext(context.Background(), setupLog)
-
-		// Get host IP (needed for SSH version check and connection)
-		hostIP, err := vmware.GetHostIPAddress(sshSetupCtx, host)
-		if err != nil {
-			return fmt.Errorf("failed to get host IP address: %w", err)
-		}
-
-		err = vmware.EnableSSHAccess(sshSetupCtx, p.VSphereClient, host, p.SSHPrivateKey, p.SSHPublicKey, "")
-		if err != nil {
-			return fmt.Errorf("failed to enable SSH access: %w", err)
-		}
-
-		// Setup secure script (skips upload if remote version already matches)
-		finalScriptPath, err := ensureSecureScript(sshSetupCtx, p.VSphereClient, host, vmDisk.Datastore, hostIP, p.SSHPrivateKey)
-		if err != nil {
-			return fmt.Errorf("failed to ensure secure script: %w", err)
-		}
-		setupLog.V(2).Info("secure script ready", "path", finalScriptPath)
-
-		// Create SSH client; pass setup context so SSH logs show under setup.ssh
-		sshClient := vmware.NewSSHClient()
-		err = sshClient.Connect(sshSetupCtx, hostIP, "root", p.SSHPrivateKey)
-		if err != nil {
-			return fmt.Errorf("failed to connect via SSH: %w", err)
-		}
-		defer sshClient.Close()
-
-		setupLog.V(2).Info("SSH connection established with restricted commands")
-		// Validate the uploaded script version matches the embedded script version
-		scriptVersionCtx := klog.NewContext(sshSetupCtx, setupLog)
-		err = checkScriptVersion(scriptVersionCtx, sshClient, vmDisk.Datastore, vmkfstoolswrapper.Version, p.SSHPublicKey)
-		if err != nil {
-			return fmt.Errorf("script version check failed: %w", err)
-		}
-
-		executor = NewSSHTaskExecutor(sshClient)
-	} else {
-		executor = NewVIBTaskExecutor(p.VSphereClient)
-	}
-
-	// Use unified task execution (clone context so all clone/SSH logs show under clone)
-	cloneCtx := klog.NewContext(context.Background(), cloneLog)
-	return ExecuteCloneTask(cloneCtx, executor, host, vmDisk.Datastore, vmDisk.Path(), targetLUN, progress, xcopyUsed)
+		// Use unified task execution (clone context so all clone/SSH logs show under clone)
+		cloneCtx := klog.NewContext(context.Background(), cloneLog)
+		return ExecuteCloneTask(cloneCtx, executor, host, vmDisk.Datastore, vmDisk.Path(), targetLUN, progress, xcopyUsed)
+	})
 }
 
 // waitForDeviceStateOff waits for the device state to become "off" using exponential backoff

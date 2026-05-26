@@ -24,6 +24,7 @@ type SSHConfig struct {
 // NewPopulator creates a Populator with an embedded CopyContext describing how the
 // copy will be performed (clone method, source disk sizes). StorageProtocol is
 // detected by the populator during Populate() and available via GetCopyContext().
+// rescanLocker and offloadLocker are used only by the VMDK/Xcopy path; VVol and RDM ignore them.
 func NewPopulator(
 	storageApi StorageApi,
 	vsphereHostname string,
@@ -32,6 +33,8 @@ func NewPopulator(
 	vmId string,
 	vmdkPath string,
 	sshConfig *SSHConfig,
+	rescanLocker Hostlocker,
+	offloadLocker Hostlocker,
 ) (Populator, error) {
 	// Create vSphere client for type detection
 	vsphereClient, err := vmware.NewClient(vsphereHostname, vsphereUsername, vspherePassword)
@@ -63,7 +66,7 @@ func NewPopulator(
 	}
 
 	log.Info("using VMDK/Xcopy populator")
-	return createVMDKPopulator(storageApi, vsphereClient, sshConfig, sourceDiskCap, sourceDatastoreAlloc)
+	return createVMDKPopulator(storageApi, vsphereClient, sshConfig, sourceDiskCap, sourceDatastoreAlloc, rescanLocker, offloadLocker)
 }
 
 // fetchDiskInfo retrieves provisioned capacity, datastore-allocated bytes, and disk
@@ -113,7 +116,7 @@ func createRDMPopulator(storageApi StorageApi, vmwareClient vmware.Client, sourc
 }
 
 // createVMDKPopulator creates VMDK/Xcopy populator (default/fallback)
-func createVMDKPopulator(storageApi StorageApi, vmwareClient vmware.Client, sshConfig *SSHConfig, sourceDiskCap, sourceDatastoreAlloc int64) (Populator, error) {
+func createVMDKPopulator(storageApi StorageApi, vmwareClient vmware.Client, sshConfig *SSHConfig, sourceDiskCap, sourceDatastoreAlloc int64, rescanLocker, offloadLocker Hostlocker) (Populator, error) {
 	vmdkApi, ok := storageApi.(VMDKCapable)
 	if !ok {
 		return nil, fmt.Errorf("storage API does not implement VMDKCapable (required)")
@@ -132,9 +135,11 @@ func createVMDKPopulator(storageApi StorageApi, vmwareClient vmware.Client, sshC
 			vmwareClient,
 			copyCtx,
 			sshConfig.PrivateKey,
-			sshConfig.PublicKey)
+			sshConfig.PublicKey,
+			rescanLocker,
+			offloadLocker)
 	} else {
-		pop, err = NewWithRemoteEsxcli(vmdkApi, vmwareClient, copyCtx)
+		pop, err = NewWithRemoteEsxcli(vmdkApi, vmwareClient, copyCtx, rescanLocker, offloadLocker)
 	}
 
 	if err != nil {

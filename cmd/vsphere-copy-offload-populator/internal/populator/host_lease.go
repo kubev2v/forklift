@@ -26,6 +26,8 @@ type HostLeaseLocker struct {
 	// a new secret value or a flag
 	namespace string
 	clientset kubernetes.Interface
+	// leasePrefix is the prefix for the lease name, e.g. "esxi-rescan" or "esxi-xcopy"
+	leasePrefix string
 	// leaseDuration is how long the lease is held (in seconds). Default: 10 seconds
 	// Can be configured via HOST_LEASE_DURATION_SECONDS env var
 	leaseDuration time.Duration
@@ -37,14 +39,17 @@ type HostLeaseLocker struct {
 	maxConcurrentHolders int
 }
 
-// NewHostLeaseLocker creates a new HostLeaseLocker with the given clientset
-func NewHostLeaseLocker(clientset kubernetes.Interface) *HostLeaseLocker {
+// NewHostLeaseLocker creates a HostLeaseLocker whose lease slots are named
+// "{leasePrefix}-{hostID}-slot-{n}" in the openshift-mtv namespace
+// (HOST_LEASE_NAMESPACE env var overrides the namespace).
+func NewHostLeaseLocker(clientset kubernetes.Interface, leasePrefix string, maxConcurrentHolders int) *HostLeaseLocker {
 	h := HostLeaseLocker{
 		clientset:            clientset,
+		leasePrefix:          leasePrefix,
 		leaseDuration:        10 * time.Second,
 		retryInterval:        10 * time.Second,
 		renewInterval:        3 * time.Second,
-		maxConcurrentHolders: 2,
+		maxConcurrentHolders: maxConcurrentHolders,
 		namespace:            "openshift-mtv",
 	}
 
@@ -87,7 +92,7 @@ func (h *HostLeaseLocker) WithLock(ctx context.Context, hostID string, work func
 
 	// 3. Pre-check: Verify we can access the Lease API before entering retry loop.
 	// Try to get slot-0 as a test (it may or may not exist)
-	testLeaseName := fmt.Sprintf("esxi-lock-%s-slot-0", hostID)
+	testLeaseName := fmt.Sprintf("%s-%s-slot-0", h.leasePrefix, hostID)
 	_, err = leaseClient.Get(ctx, testLeaseName, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		// API access error (not just "lease doesn't exist") - fail fast
@@ -105,7 +110,7 @@ func (h *HostLeaseLocker) WithLock(ctx context.Context, hostID string, work func
 
 		// Try each slot in order
 		for slot := 0; slot < h.maxConcurrentHolders; slot++ {
-			leaseName := fmt.Sprintf("esxi-lock-%s-slot-%d", hostID, slot)
+			leaseName := fmt.Sprintf("%s-%s-slot-%d", h.leasePrefix, hostID, slot)
 
 			// Try to create the lease for this slot
 			now := metav1.NewMicroTime(time.Now())

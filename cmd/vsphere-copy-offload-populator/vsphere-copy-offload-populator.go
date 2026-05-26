@@ -31,6 +31,7 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/version"
 
 	forklift "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/settings"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -77,6 +78,9 @@ var (
 func main() {
 	handleArgs()
 	klog.Info(version.Get())
+	if err := settings.Settings.Migration.Load(); err != nil {
+		klog.Fatalf("Failed to load settings: %s", err)
+	}
 
 	var storageApi populator.StorageApi
 	product := forklift.StorageVendorProduct(storageVendor)
@@ -173,6 +177,10 @@ func main() {
 		}
 	}
 
+	maxInFlight := settings.Settings.MaxInFlight
+	rescanLocker := populator.NewHostLeaseLocker(clientSet, "esxi-rescan", 2)
+	offloadLocker := populator.NewHostLeaseLocker(clientSet, "esxi-xcopy", maxInFlight)
+
 	// Select the appropriate populator based on disk type
 	p, err := populator.NewPopulator(
 		storageApi,
@@ -182,6 +190,8 @@ func main() {
 		sourceVmId,
 		sourceVMDKFile,
 		sshConfig,
+		rescanLocker,
+		offloadLocker,
 	)
 	if err != nil {
 		klog.Fatalf("Failed to initialize populator: %s", err)
@@ -231,10 +241,9 @@ func main() {
 	// Record storage array info before Populate (no storageProtocol dependency).
 	copyMetrics.RecordStorageArrayInfo(storageVendor, arrayInfo)
 
-	hll := populator.NewHostLeaseLocker(clientSet)
 	klog.InfoS("populator", "stage", "starting")
 	copyStartTime = time.Now()
-	go p.Populate(sourceVmId, sourceVMDKFile, pv, hll, progressCh, xCopyUsedCh, quitCh)
+	go p.Populate(sourceVmId, sourceVMDKFile, pv, progressCh, xCopyUsedCh, quitCh)
 
 	for {
 		select {
