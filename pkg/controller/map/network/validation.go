@@ -112,7 +112,9 @@ func (r *Reconciler) validateSource(mp *api.NetworkMap) (err error) {
 			err = pErr
 			return
 		}
-		references.List = append(references.List, *ref)
+		if !references.Find(*ref) {
+			references.List = append(references.List, *ref)
+		}
 	}
 	mp.Status.Refs = references
 	if len(notValid) > 0 {

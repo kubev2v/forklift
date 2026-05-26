@@ -314,15 +314,14 @@ func (r *Builder) mapNetworks(awsInstance *model.InstanceDetails, object *cnv.Vi
 		kNetworks = append(kNetworks, kNetwork)
 		kInterfaces = append(kInterfaces, kInterface)
 	} else {
-		// Map each network interface using the network mapping
-		netMapIn := r.Context.Map.Network.Spec.Map
+		pool := planbase.NewNADPool()
+		nicKeys, pairsBySource := r.buildNICResolver(networkInterfaces)
 		networkIndex := 0
 
-		for _, eni := range networkInterfaces {
-			// Find mapping for this subnet
+		for i, eni := range networkInterfaces {
 			var mapped *api.NetworkPair
-			if eni.SubnetId != nil {
-				mapped = r.findNetworkMapping(*eni.SubnetId, netMapIn)
+			if pair, allocated := planbase.AllocateNetwork(pool, pairsBySource[nicKeys[i]]); allocated {
+				mapped = &pair
 			}
 
 			// Skip if destination type is Ignored
