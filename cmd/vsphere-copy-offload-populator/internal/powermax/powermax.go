@@ -54,7 +54,12 @@ func (p *PowermaxClonner) CurrentMappedGroups(targetLUN populator.LUN, mappingCo
 	p.log.V(2).Info("querying current mapped groups", "volume", targetLUN.ProviderID)
 
 	ctx := context.TODO()
-	volume, err := p.client.GetVolumeByID(ctx, p.symmetrixID, targetLUN.ProviderID)
+	var volume *pmxtypes.Volume
+	err := retryOnTransient(ctx, p.log, "GetVolumeByID", func() error {
+		var e error
+		volume, e = p.client.GetVolumeByID(ctx, p.symmetrixID, targetLUN.ProviderID)
+		return e
+	})
 	if err != nil {
 		return nil, fmt.Errorf("Error getting volume %s: %v", targetLUN.ProviderID, err)
 	}
@@ -69,7 +74,12 @@ func (p *PowermaxClonner) CurrentMappedGroups(targetLUN populator.LUN, mappingCo
 
 	for _, sgID := range volume.StorageGroups {
 		foundHostGroups = append(foundHostGroups, sgID.StorageGroupName)
-		maskingViewList, err := p.client.GetMaskingViewList(ctx, p.symmetrixID)
+		var maskingViewList *pmxtypes.MaskingViewList
+		err := retryOnTransient(ctx, p.log, "GetMaskingViewList", func() error {
+			var e error
+			maskingViewList, e = p.client.GetMaskingViewList(ctx, p.symmetrixID)
+			return e
+		})
 		if err != nil {
 			p.log.Info("failed to get masking views for storage group", "storage_group", sgID, "err", err)
 			continue
@@ -82,7 +92,12 @@ func (p *PowermaxClonner) CurrentMappedGroups(targetLUN populator.LUN, mappingCo
 
 		// Step 3: Get details of each Masking View to find the Host Group
 		for _, mvID := range maskingViewList.MaskingViewIDs {
-			maskingView, err := p.client.GetMaskingViewByID(ctx, p.symmetrixID, mvID)
+			var maskingView *pmxtypes.MaskingView
+			err := retryOnTransient(ctx, p.log, "GetMaskingViewByID", func() error {
+				var e error
+				maskingView, e = p.client.GetMaskingViewByID(ctx, p.symmetrixID, mvID)
+				return e
+			})
 			if err != nil {
 				p.log.Info("failed to get masking view", "masking_view", mvID, "err", err)
 				continue
@@ -176,14 +191,47 @@ func (p *PowermaxClonner) EnsureClonnerIgroup(_ string, clonnerIqn []string) (po
 	for _, filteredInit := range filteredInitiators {
 		lookupID := initiatorToLookupID(filteredInit)
 		var initiator *pmxtypes.Initiator
-		err = retryOnTransient(ctx, p.log, "GetInitiatorByID", func() error {
-			var e error
-			initiator, e = p.client.GetInitiatorByID(ctx, p.symmetrixID, lookupID)
-			return e
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to look up initiator %s: %w", lookupID, err)
+
+		if portGroup.PortGroupProtocol == "SCSI_FC" {
+			// FC initiators from ESXi are in WWNN:WWPN format, but the PowerMax API
+			// expects initiator IDs in <director>:<port>:<wwn> format (e.g., OR-2C:0:10000000c99debc3).
+			// Use GetInitiatorList with the WWPN to find the correct PowerMax initiator ID.
+			wwpn := extractWWPN(lookupID)
+			var initList *pmxtypes.InitiatorList
+			err = retryOnTransient(ctx, p.log, "GetInitiatorList", func() error {
+				var e error
+				initList, e = p.client.GetInitiatorList(ctx, p.symmetrixID, wwpn, false, true)
+				return e
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to list initiators for WWPN %s: %w", wwpn, err)
+			}
+			if len(initList.InitiatorIDs) == 0 {
+				p.log.V(2).Info("no initiators found for WWPN", "wwpn", wwpn)
+				continue
+			}
+			pmxInitID := initList.InitiatorIDs[0]
+			p.log.V(2).Info("resolved FC initiator", "wwpn", wwpn, "powermax_id", pmxInitID)
+			err = retryOnTransient(ctx, p.log, "GetInitiatorByID", func() error {
+				var e error
+				initiator, e = p.client.GetInitiatorByID(ctx, p.symmetrixID, pmxInitID)
+				return e
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to get initiator %s: %w", pmxInitID, err)
+			}
+		} else {
+			// For iSCSI, the IQN is the initiator ID — direct lookup works
+			err = retryOnTransient(ctx, p.log, "GetInitiatorByID", func() error {
+				var e error
+				initiator, e = p.client.GetInitiatorByID(ctx, p.symmetrixID, lookupID)
+				return e
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to look up initiator %s: %w", lookupID, err)
+			}
 		}
+
 		hostID := initiator.HostID
 		if hostID == "" {
 			hostID = initiator.Host
@@ -208,11 +256,26 @@ func (p *PowermaxClonner) EnsureClonnerIgroup(_ string, clonnerIqn []string) (po
 }
 
 // Map implements populator.StorageApi.
+// On PowerMax, the volume is never removed from its original storage groups during xcopy,
+// so re-mapping after cleanup is a no-op. Only the initial xcopy mapping (via MapTarget)
+// needs to add the volume to the temporary xcopy storage group.
 func (p *PowermaxClonner) Map(_ string, targetLUN populator.LUN, mappingContext populator.MappingContext) (populator.LUN, error) {
+	// After full cleanup the xcopy SG has been deleted; skip re-mapping since
+	// the volume is still in its original storage groups.
+	if v, ok := mappingContext[populator.CleanupXcopyInitiatorGroup]; ok && v.(bool) {
+		p.log.V(2).Info("skipping Map after cleanup, volume remains in original storage groups", "volume", targetLUN.ProviderID)
+		return targetLUN, nil
+	}
+
 	p.log.Info("mapping volume to storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID)
 
 	ctx := context.TODO()
-	volumesMapped, err := p.client.GetVolumeIDListInStorageGroup(ctx, p.symmetrixID, p.storageGroupID)
+	var volumesMapped []string
+	err := retryOnTransient(ctx, p.log, "GetVolumeIDListInStorageGroup", func() error {
+		var e error
+		volumesMapped, e = p.client.GetVolumeIDListInStorageGroup(ctx, p.symmetrixID, p.storageGroupID)
+		return e
+	})
 	if err != nil {
 		return targetLUN, err
 	}
@@ -222,16 +285,24 @@ func (p *PowermaxClonner) Map(_ string, targetLUN populator.LUN, mappingContext 
 	}
 
 	p.log.V(2).Info("adding volume to storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID)
-	err = p.client.AddVolumesToStorageGroupS(ctx, p.symmetrixID, p.storageGroupID, false, targetLUN.ProviderID)
+	err = retryOnTransient(ctx, p.log, "AddVolumesToStorageGroupS", func() error {
+		return p.client.AddVolumesToStorageGroupS(ctx, p.symmetrixID, p.storageGroupID, false, targetLUN.ProviderID)
+	})
 	if err != nil {
 		p.log.Info("failed to add volume to storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID, "err", err)
 		return targetLUN, err
 	}
 
-	mv, err := p.client.GetMaskingViewByID(ctx, p.symmetrixID, p.initiatorID)
+	var mv *pmxtypes.MaskingView
+	err = retryOnTransient(ctx, p.log, "GetMaskingViewByID", func() error {
+		var e error
+		mv, e = p.client.GetMaskingViewByID(ctx, p.symmetrixID, p.initiatorID)
+		return e
+	})
 	if err != nil {
 		// probably not found, will be created later
-		if e, ok := err.(*pmxtypes.Error); ok && e.HTTPStatusCode == 404 {
+		var pmxErr *pmxtypes.Error
+		if errors.As(err, &pmxErr) && pmxErr.HTTPStatusCode == 404 {
 			p.log.V(2).Info("masking view not found, will be created", "initiator_id", p.initiatorID)
 		} else {
 			return populator.LUN{}, err
@@ -240,7 +311,11 @@ func (p *PowermaxClonner) Map(_ string, targetLUN populator.LUN, mappingContext 
 
 	if mv == nil {
 		p.log.V(2).Info("creating masking view", "initiator_id", p.initiatorID, "storage_group", p.storageGroupID, "host_id", p.hostID, "port_group", p.portGroup)
-		mv, err = p.client.CreateMaskingView(ctx, p.symmetrixID, p.initiatorID, p.storageGroupID, p.hostID, false, p.portGroup)
+		err = retryOnTransient(ctx, p.log, "CreateMaskingView", func() error {
+			var e error
+			mv, e = p.client.CreateMaskingView(ctx, p.symmetrixID, p.initiatorID, p.storageGroupID, p.hostID, false, p.portGroup)
+			return e
+		})
 		if err != nil {
 			return populator.LUN{}, err
 		}
@@ -259,7 +334,12 @@ func (p *PowermaxClonner) ResolvePVToLUN(pv populator.PersistentVolume) (populat
 	volID := pv.VolumeHandle[strings.LastIndex(pv.VolumeHandle, "-")+1:]
 	p.log.V(2).Info("extracting volume ID from handle", "volume_id", volID)
 
-	volume, err := p.client.GetVolumeByID(ctx, p.symmetrixID, volID)
+	var volume *pmxtypes.Volume
+	err := retryOnTransient(ctx, p.log, "GetVolumeByID", func() error {
+		var e error
+		volume, e = p.client.GetVolumeByID(ctx, p.symmetrixID, volID)
+		return e
+	})
 	if err != nil || volume.VolumeID == "" {
 		return populator.LUN{}, fmt.Errorf("failed getting details for volume %v: %v", volume, err)
 	}
@@ -279,19 +359,26 @@ func (p *PowermaxClonner) UnMap(_ string, targetLUN populator.LUN, mappingContex
 	cleanup, ok := mappingContext[populator.CleanupXcopyInitiatorGroup]
 	if ok && cleanup.(bool) {
 		p.log.V(2).Info("full cleanup requested, deleting masking view", "masking_view", p.maskingViewID)
-		err := p.client.DeleteMaskingView(ctx, p.symmetrixID, p.maskingViewID)
+		err := retryOnTransient(ctx, p.log, "DeleteMaskingView", func() error {
+			return p.client.DeleteMaskingView(ctx, p.symmetrixID, p.maskingViewID)
+		})
 		if err != nil {
 			return fmt.Errorf("failed to delete masking view: %w", err)
 		}
 
 		p.log.V(2).Info("removing volume from storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID)
-		_, err = p.client.RemoveVolumesFromStorageGroup(ctx, p.symmetrixID, p.storageGroupID, false, targetLUN.ProviderID)
+		err = retryOnTransient(ctx, p.log, "RemoveVolumesFromStorageGroup", func() error {
+			_, e := p.client.RemoveVolumesFromStorageGroup(ctx, p.symmetrixID, p.storageGroupID, false, targetLUN.ProviderID)
+			return e
+		})
 		if err != nil {
 			return fmt.Errorf("failed removing volume from storage group:  %w", err)
 		}
 
 		p.log.V(2).Info("deleting storage group", "storage_group", p.storageGroupID)
-		err = p.client.DeleteStorageGroup(ctx, p.symmetrixID, p.storageGroupID)
+		err = retryOnTransient(ctx, p.log, "DeleteStorageGroup", func() error {
+			return p.client.DeleteStorageGroup(ctx, p.symmetrixID, p.storageGroupID)
+		})
 		if err != nil {
 			return fmt.Errorf("failed to delete storage group: %w", err)
 		}
@@ -302,7 +389,10 @@ func (p *PowermaxClonner) UnMap(_ string, targetLUN populator.LUN, mappingContex
 
 	p.log.V(2).Info("removing volume from storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID)
 
-	_, err := p.client.RemoveVolumesFromStorageGroup(ctx, p.symmetrixID, p.storageGroupID, false, targetLUN.ProviderID)
+	err := retryOnTransient(ctx, p.log, "RemoveVolumesFromStorageGroup", func() error {
+		_, e := p.client.RemoveVolumesFromStorageGroup(ctx, p.symmetrixID, p.storageGroupID, false, targetLUN.ProviderID)
+		return e
+	})
 	if err != nil {
 		return fmt.Errorf("failed removing volume from storage group:  %w", err)
 	}
@@ -393,7 +483,7 @@ func retryOnTransient(ctx context.Context, log klog.Logger, operation string, fn
 	backoff := wait.Backoff{
 		Duration: 1 * time.Second,
 		Factor:   2.0,
-		Jitter:   0.1,
+		Jitter:   1.0,
 		Steps:    5,
 	}
 	var lastErr error
@@ -419,6 +509,15 @@ func retryOnTransient(ctx context.Context, log klog.Logger, operation string, fn
 // so the raw WWN can be used for PowerMax API lookups (e.g., GetInitiatorByID).
 func initiatorToLookupID(initiator string) string {
 	return strings.TrimPrefix(initiator, "fc.")
+}
+
+// extractWWPN extracts the WWPN (World Wide Port Name) from a WWNN:WWPN format string.
+// If no colon is present, the input is returned as-is.
+func extractWWPN(wwnnWwpn string) string {
+	if idx := strings.LastIndex(wwnnWwpn, ":"); idx >= 0 {
+		return wwnnWwpn[idx+1:]
+	}
+	return wwnnWwpn
 }
 
 // filterInitiatorsByProtocol filters the initiator list based on the port group protocol
