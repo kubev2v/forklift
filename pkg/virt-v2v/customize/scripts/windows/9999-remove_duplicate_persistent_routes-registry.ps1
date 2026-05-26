@@ -124,7 +124,7 @@ if (-not $groupedRoutes) {
                 $network = $parts[0]
                 $prefix = [int]$parts[1]
                 $netmask = Convert-PrefixToMask $prefix
-                $metricStr = if ($metric -is [int]) { "METRIC $metric" } else { "" }
+                $metricStr = if ($null -ne $metric) { "METRIC $([int]$metric)" } else { "" }
                 $command = "route -p ADD $network MASK $netmask $gateway IF $($toKeep.InterfaceIndex) $metricStr"
                 Write-Host "      Trying route.exe: $command" -ForegroundColor Gray
                 cmd /c $command
@@ -156,7 +156,7 @@ if (-not $groupedRoutes) {
         $network = $parts[0]
         $prefix = [int]$parts[1]
         $netmask = Convert-PrefixToMask $prefix
-        $metricStr = if ($metric -is [int]) { "METRIC $metric" } else { "" }
+        $metricStr = if ($null -ne $metric) { "METRIC $([int]$metric)" } else { "" }
 
         # Delete all matching routes
         foreach ($route in $group.Group) {
