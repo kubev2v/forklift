@@ -203,6 +203,43 @@ func (r *NetworkMap) FindNetworkByNameAndNamespace(namespace, name string) (pair
 	return
 }
 
+// FindAllNetworks returns all network map entries matching the given source ID.
+func (r *NetworkMap) FindAllNetworks(networkID string) []NetworkPair {
+	var pairs []NetworkPair
+	for _, pair := range r.Spec.Map {
+		if pair.Source.ID == networkID {
+			pairs = append(pairs, pair)
+		}
+	}
+	return pairs
+}
+
+// FindAllNetworksByType returns all network map entries matching the given source type.
+func (r *NetworkMap) FindAllNetworksByType(networkType string) []NetworkPair {
+	var pairs []NetworkPair
+	for _, pair := range r.Spec.Map {
+		if pair.Source.Type == networkType {
+			pairs = append(pairs, pair)
+		}
+	}
+	return pairs
+}
+
+// FindAllNetworksByNameAndNamespace returns all network map entries matching the given source namespace and name.
+func (r *NetworkMap) FindAllNetworksByNameAndNamespace(namespace, name string) []NetworkPair {
+	var pairs []NetworkPair
+	for _, pair := range r.Spec.Map {
+		if pair.Source.Namespace != "" {
+			if pair.Source.Namespace == namespace && pair.Source.Name == name {
+				pairs = append(pairs, pair)
+			}
+		} else if pair.Source.Name == fmt.Sprintf("%s/%s", namespace, name) {
+			pairs = append(pairs, pair)
+		}
+	}
+	return pairs
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type NetworkMapList struct {
 	meta.TypeMeta `json:",inline"`
