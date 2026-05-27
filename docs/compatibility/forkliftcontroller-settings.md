@@ -27,6 +27,7 @@ spec:
 
   # Controller settings
   controller_max_vm_inflight: 20
+  controller_max_populator_inflight: 20
   controller_precopy_interval: 60
   controller_log_level: 3
 
@@ -82,6 +83,7 @@ Feature gates enable or disable specific Forklift capabilities.
 | Setting | Default | Environment Variable | Description |
 |---------|---------|---------------------|-------------|
 | `controller_max_vm_inflight` | `20` | `MAX_VM_INFLIGHT` | Maximum concurrent VM migrations |
+| `controller_max_populator_inflight` | `20` | `MAX_POPULATOR_INFLIGHT` | Maximum concurrent populator pods per ESXi host |
 | `controller_max_concurrent_reconciles` | `10` | `MAX_CONCURRENT_RECONCILES` | Maximum concurrent controller reconciles |
 
 ### Timing Settings
@@ -292,6 +294,7 @@ spec:
 
   # Concurrency
   controller_max_vm_inflight: 30
+  controller_max_populator_inflight: 10
   controller_max_concurrent_reconciles: 15
 
   # Timing
