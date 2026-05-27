@@ -40,6 +40,10 @@ spec:
             value: "{{ controller_host_lease_duration_seconds }}"
 {% endif %}
 {% endif %}
+{% if controller_max_populator_inflight is number %}
+          - name: MAX_POPULATOR_INFLIGHT
+            value: "{{ controller_max_populator_inflight }}"
+{% endif %}
           - name: POPULATOR_CONTAINER_LIMITS_CPU
             value: "{{ populator_container_limits_cpu }}"
           - name: POPULATOR_CONTAINER_LIMITS_MEMORY

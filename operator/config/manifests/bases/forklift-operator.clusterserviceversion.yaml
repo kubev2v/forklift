@@ -350,6 +350,11 @@ spec:
         path: controller_max_vm_inflight
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Max concurrent populator pods per ESXi host (default 20)
+        displayName: Max Populator Inflight
+        path: controller_max_populator_inflight
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Precopy interval in minutes (default 60)
         displayName: Precopy Interval
         path: controller_precopy_interval
