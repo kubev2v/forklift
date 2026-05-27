@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -80,6 +81,8 @@ const (
 	AnnPopulatorServiceAccount = "forklift.konveyor.io/serviceAccount"
 
 	qemuGroup = 107
+
+	labelSourceHost = "sourceHost"
 )
 
 type empty struct{}
@@ -143,12 +146,14 @@ type controller struct {
 	recorder          record.EventRecorder
 	httpClient        *http.Client
 	resources         *corev1.ResourceRequirements
+	maxInFlight       int
 }
 
 func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, prefix string,
 	gk schema.GroupKind, gvr schema.GroupVersionResource, mountPath, devicePath string,
 	populatorArgs func(bool, *unstructured.Unstructured, corev1.PersistentVolumeClaim) ([]string, error),
 	resources *corev1.ResourceRequirements,
+	maxInFlight int,
 ) {
 	klog.Infof("Starting populator controller for %s", gk)
 
@@ -211,6 +216,7 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 		metrics:           initMetrics(),
 		recorder:          getRecorder(kubeClient, prefix+"-"+controllerNameSuffix),
 		resources:         resources,
+		maxInFlight:       maxInFlight,
 	}
 
 	c.metrics.startListener(httpEndpoint, metricsPath)
@@ -601,6 +607,18 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 
 		// If the pod doesn't exist yet, create it
 		if pod == nil {
+			sourceHost, _, _ := unstructured.NestedString(crInstance.Object, "metadata", "labels", labelSourceHost)
+			if c.maxInFlight > 0 && sourceHost != "" {
+				if active := c.countActivePopulatorPodsForHost(sourceHost); active >= c.maxInFlight {
+					klog.V(2).Infof("Max populator pods in-flight reached for host %s (%d/%d), deferring PVC %s/%s",
+						sourceHost, active, c.maxInFlight, pvcNamespace, pvcName)
+					c.recorder.Eventf(pvc, corev1.EventTypeNormal, "PopulatorThrottled",
+						"Waiting for available populator slot on host %s (%d/%d in-flight)", sourceHost, active, c.maxInFlight)
+					c.workqueue.AddAfter(key, 10*time.Second)
+					return nil
+				}
+			}
+
 			transferNetwork, found, err := unstructured.NestedStringMap(crInstance.Object, "spec", "transferNetwork")
 			if err != nil {
 				return err
@@ -617,6 +635,9 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 			labels := map[string]string{"pvcName": pvc.Name}
 			if found {
 				labels["migration"] = migration
+			}
+			if sourceHost != "" {
+				labels[labelSourceHost] = sourceHost
 			}
 
 			// Make the pod
@@ -1013,6 +1034,22 @@ func (c *controller) checkIntreeStorageClass(pvc *corev1.PersistentVolumeClaim, 
 
 	// The SC is in-tree & PVC is not migrated
 	return fmt.Errorf("in-tree volume volume plugin %q cannot use volume populator", sc.Provisioner)
+}
+
+func (c *controller) countActivePopulatorPodsForHost(host string) int {
+	selector := labels.SelectorFromSet(labels.Set{labelSourceHost: host})
+	pods, err := c.podLister.List(selector)
+	if err != nil {
+		klog.V(2).Infof("Failed to list populator pods for host %s: %v", host, err)
+		return 0
+	}
+	count := 0
+	for _, pod := range pods {
+		if pod.Status.Phase == corev1.PodRunning || pod.Status.Phase == corev1.PodPending {
+			count++
+		}
+	}
+	return count
 }
 
 func buildHTTPClient() *http.Client {

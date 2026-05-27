@@ -303,6 +303,10 @@ spec:
               controller_max_vm_inflight:
                 x-kubernetes-int-or-string: true
                 description: "Max concurrent VM migrations (default: 20)"
+              controller_max_populator_inflight:
+                x-kubernetes-int-or-string: true
+                description: "Max concurrent populator pods per ESXi host (default: 20)"
+                example: 10
               controller_precopy_interval:
                 x-kubernetes-int-or-string: true
                 description: "Precopy interval in minutes (default: 60)"

@@ -49,6 +49,7 @@ controller_retain_populator_pods: false
 feature_xfs_repair_ignore: false
 controller_static_udn_ip_addresses: true
 controller_max_vm_inflight: 20
+controller_max_populator_inflight: 20
 controller_host_lease_namespace: "openshift-mtv"
 controller_host_lease_duration_seconds: 10
 controller_filesystem_overhead: 10
