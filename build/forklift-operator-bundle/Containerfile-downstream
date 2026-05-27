@@ -37,7 +37,7 @@ ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-rhv-populator-rh
 
 ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/mtv-candidate/mtv-populator-controller-rhel9@sha256:9d9fcef2b828a9ce1665dd4a751c6add85ef2360f3de7e4324761b82e641b557"
 
-ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:630c9a7a45093664f821e6962885b2c7e828446b9e6499942fcc7434c3bf6283"
+ARG UI_PLUGIN_IMAGE="registry.redhat.io/mtv-candidate/mtv-console-plugin-rhel9@sha256:20e05a70104c762870b7b3f72af15550ff0ca75b2883039f793b2c8564570c2c"
 
 ARG VALIDATION_IMAGE="registry.redhat.io/mtv-candidate/mtv-validation-rhel9@sha256:2eab85f713bf33f360dc77266d47f446fce9d959e0a83563a4be5cfbb9212f58"
 
@@ -45,7 +45,7 @@ ARG VIRT_V2V_IMAGE="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel10@sha256:
 
 ARG VIRT_V2V_IMAGE_RHEL9="registry.redhat.io/mtv-candidate/mtv-virt-v2v-rhel9@sha256:b39baf6e0b4dbfbd87342d156c327a56e36b05e459a43fde62661584e1ff35fa"
 
-ARG VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-vsphere-copy-offload-populator-rhel9@sha256:37b2b30960d56efb0d59bd7491c7a54875ecd3daca7a1853729877b9ab7af279"
+ARG VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE="registry.redhat.io/mtv-candidate/mtv-vsphere-copy-offload-populator-rhel9@sha256:3f4c3709a98290ef51e38b7685509876957070dab9f24f101395ba6eebba3182"
 
 USER root
 
