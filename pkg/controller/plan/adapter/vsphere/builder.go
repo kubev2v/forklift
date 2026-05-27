@@ -1389,6 +1389,9 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				if errs := k8svalidation.IsValidLabelValue(naa); len(errs) == 0 {
 					labels[TemplateNAALabel] = naa
 				}
+				if errs := k8svalidation.IsValidLabelValue(vm.Host); vm.Host != "" && len(errs) == 0 {
+					labels["sourceHost"] = vm.Host
+				}
 
 				if disk.Shared {
 					labels[Shareable] = "true"
