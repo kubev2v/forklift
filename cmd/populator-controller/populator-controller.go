@@ -4,6 +4,7 @@ import (
 	"flag"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -17,11 +18,12 @@ import (
 )
 
 const (
-	prefix     = "forklift.konveyor.io"
-	mountPath  = "/mnt/"
-	devicePath = "/dev/block"
-	groupName  = "forklift.konveyor.io"
-	apiVersion = "v1beta1"
+	prefix                  = "forklift.konveyor.io"
+	mountPath               = "/mnt/"
+	devicePath              = "/dev/block"
+	groupName               = "forklift.konveyor.io"
+	apiVersion              = "v1beta1"
+	maxPopulatorInFlightEnv = "MAX_POPULATOR_INFLIGHT"
 )
 
 type populator struct {
@@ -90,17 +92,28 @@ func main() {
 			klog.Warning("Couldn't find", "imageVar", populator.imageVar)
 			continue
 		}
+		maxInFlight := getEnvInt(maxPopulatorInFlightEnv, 20)
 		gk := schema.GroupKind{Group: groupName, Kind: populator.kind}
 		gvr := schema.GroupVersionResource{Group: groupName, Version: apiVersion, Resource: populator.resource}
 		controllerFunc := populator.controllerFunc
 		metricsEndpoint := populator.metricsEndpoint
 		go func() {
 			populator_machinery.RunController(masterURL, kubeconfig, imageName, metricsEndpoint, metricsPath,
-				prefix, gk, gvr, mountPath, devicePath, controllerFunc, resources)
+				prefix, gk, gvr, mountPath, devicePath, controllerFunc, resources, maxInFlight)
 			<-stop
 		}()
 	}
 	<-stop
+}
+
+func getEnvInt(name string, def int) int {
+	if s, found := os.LookupEnv(name); found {
+		parsed, err := strconv.Atoi(s)
+		if err == nil {
+			return parsed
+		}
+	}
+	return def
 }
 
 func getOvirtPopulatorPodArgs(rawBlock bool, u *unstructured.Unstructured, _ corev1.PersistentVolumeClaim) ([]string, error) {

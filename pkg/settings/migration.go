@@ -14,6 +14,7 @@ import (
 // Environment variables.
 const (
 	MaxVmInFlight                          = "MAX_VM_INFLIGHT"
+	MaxPopulatorInFlight                   = "MAX_POPULATOR_INFLIGHT"
 	HookRetry                              = "HOOK_RETRY"
 	ImporterRetry                          = "IMPORTER_RETRY"
 	VirtV2vImage                           = "VIRT_V2V_IMAGE"
