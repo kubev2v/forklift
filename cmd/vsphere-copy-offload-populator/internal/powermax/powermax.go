@@ -319,6 +319,18 @@ func (p *PowermaxClonner) Map(_ string, targetLUN populator.LUN, mappingContext 
 		if err != nil {
 			return populator.LUN{}, err
 		}
+		// If mv is still nil after a 409 (treated as success), the masking view
+		// was created by a prior attempt — fetch it.
+		if mv == nil {
+			err = retryOnTransient(ctx, "GetMaskingViewByID", func() error {
+				var e error
+				mv, e = p.client.GetMaskingViewByID(ctx, p.symmetrixID, p.initiatorID)
+				return e
+			})
+			if err != nil {
+				return populator.LUN{}, fmt.Errorf("masking view %s exists (409) but failed to fetch it: %w", p.initiatorID, err)
+			}
+		}
 	}
 
 	p.log.Info("volume mapped successfully", "volume", targetLUN.ProviderID, "masking_view", mv.MaskingViewID)
@@ -487,18 +499,44 @@ func retryOnTransient(ctx context.Context, log klog.Logger, operation string, fn
 		Steps:    5,
 	}
 	var lastErr error
+	attempt := 0
 	err := wait.ExponentialBackoffWithContext(ctx, backoff, func(_ context.Context) (bool, error) {
+		attempt++
 		lastErr = fn()
 		if lastErr == nil {
+			if attempt > 1 {
+				klog.Infof("%s succeeded after %d attempts", operation, attempt)
+			}
 			return true, nil
 		}
 		var pmxErr *pmxtypes.Error
-		if errors.As(lastErr, &pmxErr) && pmxErr.HTTPStatusCode == 503 {
-			log.Info("transient 503 error, retrying", "operation", operation, "err", lastErr)
+		if errors.As(lastErr, &pmxErr) {
+			if pmxErr.HTTPStatusCode == 503 {
+				klog.Infof("transient 503 error during %s (attempt %d/%d), retrying: %v", operation, attempt, backoff.Steps, lastErr)
+				return false, nil
+			}
+			if pmxErr.HTTPStatusCode == 409 {
+				klog.Infof("409 conflict during %s, treating as success (operation likely completed on a prior attempt): %v", operation, lastErr)
+				return true, nil
+			}
+			klog.Warningf("non-retryable PowerMax API error during %s: HTTP %d, message=%q, errorCode=%d, type=%T",
+				operation, pmxErr.HTTPStatusCode, pmxErr.Message, pmxErr.ErrorCode, lastErr)
+		} else if strings.Contains(lastErr.Error(), "Service Unavailable") {
+			// Some SDK methods (e.g. AddVolumesToStorageGroupS) wrap the original
+			// *pmxtypes.Error with fmt.Errorf("%s", ...) which destroys the type.
+			// Fall back to string matching for these cases.
+			klog.Infof("transient Service Unavailable error during %s (attempt %d/%d), retrying: %v (error type: %T)",
+				operation, attempt, backoff.Steps, lastErr, lastErr)
 			return false, nil
+		} else {
+			klog.Warningf("non-retryable error during %s (not a PowerMax API error): type=%T, error=%v",
+				operation, lastErr, lastErr)
 		}
 		return false, lastErr
 	})
+	if wait.Interrupted(err) {
+		klog.Errorf("%s failed after %d attempts, last error: %v", operation, attempt, lastErr)
+	}
 	if err != nil && lastErr != nil && !errors.Is(err, lastErr) {
 		return fmt.Errorf("%w: %w", err, lastErr)
 	}
