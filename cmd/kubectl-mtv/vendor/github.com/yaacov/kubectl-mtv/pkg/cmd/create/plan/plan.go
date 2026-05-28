@@ -20,6 +20,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/provider"
 	mapping "github.com/yaacov/kubectl-mtv/pkg/cmd/create/mapping"
+	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/mapping/offload"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/defaultprovider"
@@ -128,6 +129,7 @@ func Create(ctx context.Context, opts CreatePlanOptions) error {
 	// Track which maps we create for cleanup if needed
 	createdNetworkMap := false
 	createdStorageMap := false
+	var createdOffloadSecretName string
 
 	// Extract VM names from the plan
 	var planVMNames []string
@@ -250,7 +252,8 @@ func Create(ctx context.Context, opts CreatePlanOptions) error {
 			}
 		} else {
 			// Create default storage mapping using existing logic
-			storageMapName, err := storage.CreateStorageMap(ctx, storage.StorageMapperOptions{
+			var storageMapName string
+			storageMapName, createdOffloadSecretName, err = storage.CreateStorageMap(ctx, storage.StorageMapperOptions{
 				Name:                      opts.Name,
 				Namespace:                 opts.Namespace,
 				SourceProvider:            opts.SourceProvider,
@@ -264,6 +267,19 @@ func Create(ctx context.Context, opts CreatePlanOptions) error {
 				DefaultTargetStorageClass: opts.DefaultTargetStorageClass,
 				DryRun:                    opts.DryRun,
 				OutputFormat:              opts.OutputFormat,
+				DefaultVolumeMode:         opts.DefaultVolumeMode,
+				DefaultAccessMode:         opts.DefaultAccessMode,
+				DefaultOffloadPlugin:      opts.DefaultOffloadPlugin,
+				DefaultOffloadSecret:      opts.DefaultOffloadSecret,
+				DefaultOffloadVendor:      opts.DefaultOffloadVendor,
+				OffloadVSphereUsername:    opts.OffloadVSphereUsername,
+				OffloadVSpherePassword:    opts.OffloadVSpherePassword,
+				OffloadVSphereURL:         opts.OffloadVSphereURL,
+				OffloadStorageUsername:    opts.OffloadStorageUsername,
+				OffloadStoragePassword:    opts.OffloadStoragePassword,
+				OffloadStorageEndpoint:    opts.OffloadStorageEndpoint,
+				OffloadCACert:             opts.OffloadCACert,
+				OffloadInsecureSkipTLS:    opts.OffloadInsecureSkipTLS,
 			})
 			if err != nil {
 				// Clean up the network map if we created it
@@ -346,6 +362,11 @@ func Create(ctx context.Context, opts CreatePlanOptions) error {
 				fmt.Printf("Warning: failed to delete storage map: %v\n", delErr)
 			}
 		}
+		if createdOffloadSecretName != "" {
+			if delErr := offload.CleanupSecret(opts.ConfigFlags, opts.Namespace, createdOffloadSecretName); delErr != nil {
+				fmt.Printf("Warning: failed to clean up offload secret '%s': %v\n", createdOffloadSecretName, delErr)
+			}
+		}
 		return fmt.Errorf("failed to convert Plan to Unstructured: %v", err)
 	}
 	planUnstructured := &unstructured.Unstructured{Object: unstructuredPlan}
@@ -362,6 +383,11 @@ func Create(ctx context.Context, opts CreatePlanOptions) error {
 		if createdStorageMap {
 			if delErr := deleteMap(opts.ConfigFlags, client.StorageMapGVR, opts.StorageMapping, opts.Namespace); delErr != nil {
 				fmt.Printf("Warning: failed to delete storage map: %v\n", delErr)
+			}
+		}
+		if createdOffloadSecretName != "" {
+			if delErr := offload.CleanupSecret(opts.ConfigFlags, opts.Namespace, createdOffloadSecretName); delErr != nil {
+				fmt.Printf("Warning: failed to clean up offload secret '%s': %v\n", createdOffloadSecretName, delErr)
 			}
 		}
 		return fmt.Errorf("failed to create plan: %v", err)

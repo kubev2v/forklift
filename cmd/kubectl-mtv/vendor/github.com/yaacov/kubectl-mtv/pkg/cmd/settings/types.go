@@ -193,7 +193,7 @@ var SupportedSettings = map[string]SettingDefinition{
 		Name:        "controller_retain_populator_pods",
 		Type:        TypeBool,
 		Default:     false,
-		Description: "Retain populator pods after migration for debugging",
+		Description: "Retain populator pods after migration (debugging)",
 		Category:    CategoryFeature,
 	},
 	"feature_ova_appliance_management": {

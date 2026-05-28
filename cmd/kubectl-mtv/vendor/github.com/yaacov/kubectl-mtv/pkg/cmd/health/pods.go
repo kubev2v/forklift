@@ -158,13 +158,26 @@ func isPodReady(pod *corev1.Pod) bool {
 	return false
 }
 
-// getContainerImages returns a comma-separated list of container images for a pod
+// formatImage truncates a container image string to a max length,
+// placing an ellipsis near the end if needed.
+func formatImage(image string) string {
+	const maxLen = 64
+	if len(image) <= maxLen {
+		return image
+	}
+	usable := maxLen - 3
+	front := usable*3/4 + 4
+	back := usable - front
+	return image[:front] + "..." + image[len(image)-back:]
+}
+
+// getContainerImages returns a newline-separated list of container images for a pod
 func getContainerImages(pod *corev1.Pod) string {
 	images := make([]string, 0, len(pod.Spec.Containers))
 	for _, c := range pod.Spec.Containers {
-		images = append(images, c.Image)
+		images = append(images, formatImage(c.Image))
 	}
-	return strings.Join(images, ", ")
+	return strings.Join(images, "\n")
 }
 
 // getTotalRestarts returns the total restart count across all containers

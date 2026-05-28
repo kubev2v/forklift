@@ -204,6 +204,18 @@ func ColorizeConcerns(val string) string {
 	return Green(val)
 }
 
+// ColorizeImage returns a colored image string based on its container registry.
+func ColorizeImage(image string) string {
+	switch {
+	case strings.HasPrefix(image, "quay.io/"):
+		return Cyan(image)
+	case strings.HasPrefix(image, "registry.redhat.io/"):
+		return Green(image)
+	default:
+		return Yellow(image)
+	}
+}
+
 // ColorizeProgress returns a colored string based on percentage thresholds.
 func ColorizeProgress(progress string) string {
 	trimmed := strings.TrimSpace(progress)

@@ -32,6 +32,14 @@ type SetSettingOptions struct {
 	Verbosity   int
 }
 
+// SetSettingsOptions contains options for setting multiple values in a single patch.
+type SetSettingsOptions struct {
+	ConfigFlags *genericclioptions.ConfigFlags
+	Names       []string
+	Values      []string
+	Verbosity   int
+}
+
 // UnsetSettingOptions contains options for unsetting a value.
 type UnsetSettingOptions struct {
 	ConfigFlags *genericclioptions.ConfigFlags
@@ -201,18 +209,45 @@ func extractSettingValue(spec map[string]interface{}, def SettingDefinition) Set
 }
 
 // SetSetting updates a ForkliftController setting.
+// It delegates to SetSettings to avoid duplicating patch logic.
 func SetSetting(ctx context.Context, opts SetSettingOptions) error {
-	// Validate setting name against all known settings
-	allSettings := GetAllSettings()
-	def, ok := allSettings[opts.Name]
-	if !ok {
-		return fmt.Errorf("unknown setting: %s\nUse 'kubectl mtv settings --all' to see available settings", opts.Name)
+	return SetSettings(ctx, SetSettingsOptions{
+		ConfigFlags: opts.ConfigFlags,
+		Names:       []string{opts.Name},
+		Values:      []string{opts.Value},
+		Verbosity:   opts.Verbosity,
+	})
+}
+
+// SetSettings updates multiple ForkliftController settings in a single patch operation.
+// This avoids multiple reconciliation cycles by merging all settings into one API call.
+func SetSettings(ctx context.Context, opts SetSettingsOptions) error {
+	if len(opts.Names) != len(opts.Values) {
+		return fmt.Errorf("number of --setting flags (%d) must match number of --value flags (%d)", len(opts.Names), len(opts.Values))
 	}
 
-	// Validate and convert the value
-	patchValue, err := validateAndConvertValue(opts.Value, def)
-	if err != nil {
-		return fmt.Errorf("invalid value for %s: %w", opts.Name, err)
+	seen := make(map[string]bool, len(opts.Names))
+	for _, name := range opts.Names {
+		if seen[name] {
+			return fmt.Errorf("duplicate setting: %s (each setting can only be specified once)", name)
+		}
+		seen[name] = true
+	}
+
+	// Validate all setting names and values upfront before making any changes
+	allSettings := GetAllSettings()
+	patchValues := make([]interface{}, len(opts.Names))
+	for i, name := range opts.Names {
+		def, ok := allSettings[name]
+		if !ok {
+			return fmt.Errorf("unknown setting: %s\nUse 'kubectl mtv settings --all' to see available settings", name)
+		}
+
+		patchValue, err := validateAndConvertValue(opts.Values[i], def)
+		if err != nil {
+			return fmt.Errorf("invalid value for setting '%s': %w", name, err)
+		}
+		patchValues[i] = patchValue
 	}
 
 	// Get the MTV operator namespace
@@ -241,12 +276,12 @@ func SetSetting(ctx context.Context, opts SetSettingOptions) error {
 	controller := controllerList.Items[0]
 	controllerName := controller.GetName()
 
-	// Create the patch data
-	patchMap := map[string]interface{}{
-		"spec": map[string]interface{}{
-			opts.Name: patchValue,
-		},
+	// Build one merged patch with all settings
+	specMap := map[string]interface{}{}
+	for i, name := range opts.Names {
+		specMap[name] = patchValues[i]
 	}
+	patchMap := map[string]interface{}{"spec": specMap}
 
 	patchData, err := json.Marshal(patchMap)
 	if err != nil {
@@ -257,7 +292,7 @@ func SetSetting(ctx context.Context, opts SetSettingOptions) error {
 		fmt.Printf("Patching ForkliftController '%s': %s\n", controllerName, string(patchData))
 	}
 
-	// Apply the patch
+	// Apply the single patch
 	_, err = dynamicClient.Resource(client.ForkliftControllersGVR).Namespace(operatorNamespace).Patch(
 		ctx,
 		controllerName,
@@ -266,7 +301,7 @@ func SetSetting(ctx context.Context, opts SetSettingOptions) error {
 		metav1.PatchOptions{},
 	)
 	if err != nil {
-		return wrapClusterError(err, "failed to update setting")
+		return wrapClusterError(err, "failed to update settings")
 	}
 
 	return nil
