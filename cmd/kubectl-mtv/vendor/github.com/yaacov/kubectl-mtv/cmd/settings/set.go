@@ -15,16 +15,19 @@ import (
 
 // NewSetCmd creates the 'settings set' subcommand.
 func NewSetCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig GlobalConfigGetter) *cobra.Command {
-	var settingName string
-	var settingValue string
+	var settingNames []string
+	var settingValues []string
 
 	cmd := &cobra.Command{
 		Use:   "set",
-		Short: "Set a ForkliftController setting value",
-		Long: `Set a ForkliftController setting value.
+		Short: "Set one or more ForkliftController setting values",
+		Long: `Set one or more ForkliftController setting values.
 
 The setting name must be one of the supported settings. Use 'kubectl mtv settings'
 to see all available settings and their current values.
+
+Multiple --setting/--value pairs can be specified to update several settings in a
+single Kubernetes patch operation, avoiding multiple reconciliation cycles.
 
 Value types are automatically validated:
   - Boolean settings accept: true, false, yes, no, 1, 0
@@ -44,38 +47,45 @@ Examples:
   # Increase virt-v2v memory limit for large VMs
   kubectl mtv settings set --setting virt_v2v_container_limits_memory --value 16Gi
 
+  # Set multiple settings at once (single reconciliation cycle)
+  kubectl mtv settings set --setting feature_mcp_server --value true \
+                           --setting mcp_server_lightspeed_set_mcp_gate --value true
+
   # Set a value starting with -- (use -- to stop flag parsing)
   kubectl mtv settings set --setting virt_v2v_extra_args --value --machine-readable`,
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(settingNames) != len(settingValues) {
+				return fmt.Errorf("number of --setting flags (%d) must match number of --value flags (%d)", len(settingNames), len(settingValues))
+			}
+
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
-			opts := settings.SetSettingOptions{
+			opts := settings.SetSettingsOptions{
 				ConfigFlags: kubeConfigFlags,
-				Name:        settingName,
-				Value:       settingValue,
+				Names:       settingNames,
+				Values:      settingValues,
 				Verbosity:   globalConfig.GetVerbosity(),
 			}
 
-			if err := settings.SetSetting(ctx, opts); err != nil {
+			if err := settings.SetSettings(ctx, opts); err != nil {
 				return err
 			}
 
-			fmt.Printf("Setting '%s' updated to '%s'\n", settingName, settingValue)
+			for i, name := range settingNames {
+				fmt.Printf("Setting '%s' updated to '%s'\n", name, settingValues[i])
+			}
 			return nil
 		},
 	}
 
-	cmd.Flags().StringVar(&settingName, "setting", "", "Setting name")
-	cmd.Flags().StringVar(&settingValue, "value", "", "Setting value")
-	if err := cmd.MarkFlagRequired("setting"); err != nil {
-		_ = err
-	}
-	if err := cmd.MarkFlagRequired("value"); err != nil {
-		_ = err
-	}
+	cmd.Flags().StringArrayVar(&settingNames, "setting", nil, "Setting name (can be specified multiple times)")
+	cmd.Flags().StringArrayVar(&settingValues, "value", nil, "Setting value (can be specified multiple times)")
+
+	_ = cmd.MarkFlagRequired("setting")
+	_ = cmd.MarkFlagRequired("value")
 
 	_ = cmd.RegisterFlagCompletionFunc("setting", setSettingCompletion)
 	_ = cmd.RegisterFlagCompletionFunc("value", setValueCompletion)
@@ -97,8 +107,13 @@ func setSettingCompletion(cmd *cobra.Command, args []string, toComplete string) 
 
 // setValueCompletion provides completion for the --value flag based on the --setting flag.
 func setValueCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	settingName, _ := cmd.Flags().GetString("setting")
-	def := settings.GetSettingDefinition(settingName)
+	settingNameList, _ := cmd.Flags().GetStringArray("setting")
+	if len(settingNameList) == 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	// Use the last --setting value for context-sensitive completion
+	lastSettingName := settingNameList[len(settingNameList)-1]
+	def := settings.GetSettingDefinition(lastSettingName)
 	if def == nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}

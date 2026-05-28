@@ -15,6 +15,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/provider"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 
+	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/mapping/offload"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers"
 	ec2Fetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers/ec2"
 	hypervFetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers/hyperv"
@@ -63,10 +64,30 @@ type StorageMapperOptions struct {
 	DefaultTargetStorageClass string
 	DryRun                    bool
 	OutputFormat              string
+
+	// Storage enhancement options
+	DefaultVolumeMode    string
+	DefaultAccessMode    string
+	DefaultOffloadPlugin string
+	DefaultOffloadSecret string
+	DefaultOffloadVendor string
+
+	// Offload secret creation fields
+	OffloadVSphereUsername string
+	OffloadVSpherePassword string
+	OffloadVSphereURL      string
+	OffloadStorageUsername  string
+	OffloadStoragePassword string
+	OffloadStorageEndpoint string
+	OffloadCACert          string
+	OffloadInsecureSkipTLS bool
 }
 
-// CreateStorageMap creates a storage map using the new fetcher-based architecture
-func CreateStorageMap(ctx context.Context, opts StorageMapperOptions) (string, error) {
+// CreateStorageMap creates a storage map using the new fetcher-based architecture.
+// It returns the storage map name, the name of any offload secret that was created
+// (empty if none), and an error. The caller is responsible for cleaning up the
+// returned secret if later operations fail.
+func CreateStorageMap(ctx context.Context, opts StorageMapperOptions) (storageMapName string, createdSecretName string, err error) {
 	klog.V(4).Infof("DEBUG: Creating storage map - Source: %s, Target: %s, DefaultTargetStorageClass: '%s'",
 		opts.SourceProvider, opts.TargetProvider, opts.DefaultTargetStorageClass)
 
@@ -74,7 +95,7 @@ func CreateStorageMap(ctx context.Context, opts StorageMapperOptions) (string, e
 	sourceProviderNamespace := client.GetProviderNamespace(opts.SourceProviderNamespace, opts.Namespace)
 	sourceFetcher, err := GetSourceStorageFetcher(ctx, opts.ConfigFlags, opts.SourceProvider, sourceProviderNamespace, opts.InventoryInsecureSkipTLS)
 	if err != nil {
-		return "", fmt.Errorf("failed to get source storage fetcher: %v", err)
+		return "", "", fmt.Errorf("failed to get source storage fetcher: %v", err)
 	}
 	klog.V(4).Infof("DEBUG: Source storage fetcher created for provider: %s", opts.SourceProvider)
 
@@ -82,14 +103,14 @@ func CreateStorageMap(ctx context.Context, opts StorageMapperOptions) (string, e
 	targetProviderNamespace := client.GetProviderNamespace(opts.TargetProviderNamespace, opts.Namespace)
 	targetFetcher, err := GetTargetStorageFetcher(ctx, opts.ConfigFlags, opts.TargetProvider, targetProviderNamespace, opts.InventoryInsecureSkipTLS)
 	if err != nil {
-		return "", fmt.Errorf("failed to get target storage fetcher: %v", err)
+		return "", "", fmt.Errorf("failed to get target storage fetcher: %v", err)
 	}
 	klog.V(4).Infof("DEBUG: Target storage fetcher created for provider: %s", opts.TargetProvider)
 
 	// Fetch source storages
 	sourceStorages, err := sourceFetcher.FetchSourceStorages(ctx, opts.ConfigFlags, opts.SourceProvider, sourceProviderNamespace, opts.InventoryURL, opts.PlanVMNames, opts.InventoryInsecureSkipTLS)
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch source storages: %v", err)
+		return "", "", fmt.Errorf("failed to fetch source storages: %v", err)
 	}
 	klog.V(4).Infof("DEBUG: Fetched %d source storages", len(sourceStorages))
 
@@ -99,7 +120,7 @@ func CreateStorageMap(ctx context.Context, opts StorageMapperOptions) (string, e
 		klog.V(4).Infof("DEBUG: Fetching target storages from target provider: %s", opts.TargetProvider)
 		targetStorages, err = targetFetcher.FetchTargetStorages(ctx, opts.ConfigFlags, opts.TargetProvider, targetProviderNamespace, opts.InventoryURL, opts.InventoryInsecureSkipTLS)
 		if err != nil {
-			return "", fmt.Errorf("failed to fetch target storages: %v", err)
+			return "", "", fmt.Errorf("failed to fetch target storages: %v", err)
 		}
 		klog.V(4).Infof("DEBUG: Fetched %d target storages", len(targetStorages))
 	} else {
@@ -109,7 +130,46 @@ func CreateStorageMap(ctx context.Context, opts StorageMapperOptions) (string, e
 	// Get provider-specific storage mapper
 	storageMapper, sourceProviderType, targetProviderType, err := GetStorageMapper(ctx, opts.ConfigFlags, opts.SourceProvider, sourceProviderNamespace, opts.TargetProvider, targetProviderNamespace, opts.InventoryInsecureSkipTLS)
 	if err != nil {
-		return "", fmt.Errorf("failed to get storage mapper: %v", err)
+		return "", "", fmt.Errorf("failed to get storage mapper: %v", err)
+	}
+
+	// Handle offload secret creation
+	secretOpts := offload.SecretOptions{
+		DefaultOffloadSecret: opts.DefaultOffloadSecret,
+		VSphereUsername:      opts.OffloadVSphereUsername,
+		VSpherePassword:     opts.OffloadVSpherePassword,
+		VSphereURL:          opts.OffloadVSphereURL,
+		StorageUsername:      opts.OffloadStorageUsername,
+		StoragePassword:     opts.OffloadStoragePassword,
+		StorageEndpoint:     opts.OffloadStorageEndpoint,
+		CACert:              opts.OffloadCACert,
+		InsecureSkipTLS:     opts.OffloadInsecureSkipTLS,
+	}
+
+	if err := offload.ValidateSecretFields(secretOpts); err != nil {
+		return "", "", err
+	}
+
+	storageMapName = opts.Name + "-storage-map"
+	if opts.DryRun && offload.NeedsSecret(secretOpts) {
+		sec, err := offload.BuildSecret(opts.Namespace, storageMapName, secretOpts, true)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to build offload secret for dry-run: %v", err)
+		}
+		if err := output.OutputResource(sec, opts.OutputFormat); err != nil {
+			return "", "", err
+		}
+		opts.DefaultOffloadSecret = sec.Name
+	} else if !opts.DryRun && offload.NeedsSecret(secretOpts) {
+		fmt.Printf("Creating offload secret for storage mapping '%s'\n", storageMapName)
+
+		createdSecret, err := offload.CreateSecret(opts.ConfigFlags, opts.Namespace, storageMapName, secretOpts)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to create offload secret: %v", err)
+		}
+		opts.DefaultOffloadSecret = createdSecret.Name
+		createdSecretName = createdSecret.Name
+		fmt.Printf("Created offload secret '%s' for storage mapping authentication\n", createdSecret.Name)
 	}
 
 	// Create storage pairs using provider-specific mapping logic
@@ -117,25 +177,44 @@ func CreateStorageMap(ctx context.Context, opts StorageMapperOptions) (string, e
 		DefaultTargetStorageClass: opts.DefaultTargetStorageClass,
 		SourceProviderType:        sourceProviderType,
 		TargetProviderType:        targetProviderType,
+		DefaultVolumeMode:         opts.DefaultVolumeMode,
+		DefaultAccessMode:         opts.DefaultAccessMode,
+		DefaultOffloadPlugin:      opts.DefaultOffloadPlugin,
+		DefaultOffloadSecret:      opts.DefaultOffloadSecret,
+		DefaultOffloadVendor:      opts.DefaultOffloadVendor,
 	}
 	storagePairs, err := storageMapper.CreateStoragePairs(sourceStorages, targetStorages, mappingOpts)
 	if err != nil {
-		return "", fmt.Errorf("failed to create storage pairs: %v", err)
+		if createdSecretName != "" {
+			if delErr := offload.CleanupSecret(opts.ConfigFlags, opts.Namespace, createdSecretName); delErr != nil {
+				fmt.Printf("Warning: failed to clean up offload secret '%s': %v\n", createdSecretName, delErr)
+			}
+		}
+		return "", "", fmt.Errorf("failed to create storage pairs: %v", err)
 	}
 
 	if opts.DryRun {
-		storageMap, storageMapName, err := buildStorageMapObject(opts, storagePairs)
+		storageMap, dryRunMapName, err := buildStorageMapObject(opts, storagePairs)
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 		if err := output.OutputResource(storageMap, opts.OutputFormat); err != nil {
-			return "", err
+			return "", "", err
 		}
-		return storageMapName, nil
+		return dryRunMapName, "", nil
 	}
 
 	// Create the storage map using the existing infrastructure
-	return createStorageMap(opts, storagePairs)
+	storageMapResult, err := createStorageMap(opts, storagePairs)
+	if err != nil {
+		if createdSecretName != "" {
+			if delErr := offload.CleanupSecret(opts.ConfigFlags, opts.Namespace, createdSecretName); delErr != nil {
+				fmt.Printf("Warning: failed to clean up offload secret '%s': %v\n", createdSecretName, delErr)
+			}
+		}
+		return "", "", err
+	}
+	return storageMapResult, createdSecretName, nil
 }
 
 // buildStorageMapObject builds a typed StorageMap (no API call).

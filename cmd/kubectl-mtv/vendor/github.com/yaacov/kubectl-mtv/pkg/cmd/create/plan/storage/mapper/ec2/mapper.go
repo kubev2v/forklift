@@ -140,6 +140,9 @@ func (m *EC2StorageMapper) CreateStoragePairs(sourceStorages []ref.Ref, targetSt
 			})
 		}
 		klog.V(4).Infof("DEBUG: EC2 storage mapper - Created %d storage pairs (user default)", len(storagePairs))
+
+		storagePairs = mapper.ApplyOffloadToPairs(storagePairs, opts)
+
 		return storagePairs, nil
 	}
 
@@ -179,5 +182,8 @@ func (m *EC2StorageMapper) CreateStoragePairs(sourceStorages []ref.Ref, targetSt
 	}
 
 	klog.V(4).Infof("DEBUG: EC2 storage mapper - Created %d storage pairs", len(storagePairs))
+
+	storagePairs = mapper.ApplyOffloadToPairs(storagePairs, opts)
+
 	return storagePairs, nil
 }
