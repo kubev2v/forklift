@@ -407,16 +407,32 @@ type BasePredicate struct {
 	vm *plan.VM
 	// Plan context
 	context *plancontext.Context
+	// Cached ShouldUseV2vForTransfer result (one destination API path per VM per pipeline build).
+	useV2vForTransfer *bool
+	useV2vResolved    bool
+	useV2vErr         error
+}
+
+// ensureUseV2vForTransfer loads and caches ShouldUseV2vForTransfer at most once per BasePredicate.
+func (r *BasePredicate) ensureUseV2vForTransfer() (bool, error) {
+	if r.useV2vResolved {
+		if r.useV2vErr != nil {
+			return false, r.useV2vErr
+		}
+		return *r.useV2vForTransfer, nil
+	}
+	result, vErr := r.context.Plan.ShouldUseV2vForTransfer(r.vm.Ref, r.context.Destination.Client)
+	r.useV2vResolved = true
+	if vErr != nil {
+		r.useV2vErr = vErr
+		return false, vErr
+	}
+	r.useV2vForTransfer = &result
+	return result, nil
 }
 
 // Evaluate predicate flags.
 func (r *BasePredicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
-	useV2vForTransfer, vErr := r.context.Plan.ShouldUseV2vForTransfer(r.vm.Ref, r.context.Destination.Client)
-	if vErr != nil {
-		err = vErr
-		return
-	}
-
 	switch flag {
 	case HasPreHook:
 		_, allowed = r.vm.FindHook(api.PhasePreHook)
@@ -425,8 +441,18 @@ func (r *BasePredicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 	case RequiresConversion:
 		allowed = r.context.Source.Provider.RequiresConversion() && !r.context.Plan.Spec.SkipGuestConversion
 	case CDIDiskCopy:
+		var useV2vForTransfer bool
+		useV2vForTransfer, err = r.ensureUseV2vForTransfer()
+		if err != nil {
+			return
+		}
 		allowed = !useV2vForTransfer
 	case VirtV2vDiskCopy:
+		var useV2vForTransfer bool
+		useV2vForTransfer, err = r.ensureUseV2vForTransfer()
+		if err != nil {
+			return
+		}
 		allowed = useV2vForTransfer
 	case OpenstackImageMigration:
 		allowed = r.context.Plan.IsSourceProviderOpenstack()
