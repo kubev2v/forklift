@@ -117,7 +117,7 @@ github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8
 # github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 ## explicit
 github.com/kballard/go-shellquote
-# github.com/kubev2v/forklift v0.0.0-20260513104241-eaea136684e0 => ../../
+# github.com/kubev2v/forklift v0.0.0-20260519094428-e2d6d4e314b5 => ../../
 ## explicit; go 1.25.0
 github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1
 github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan
@@ -226,7 +226,7 @@ github.com/xo/terminfo
 # github.com/yaacov/karl-interpreter v0.0.1
 ## explicit; go 1.21
 github.com/yaacov/karl-interpreter/pkg/karl
-# github.com/yaacov/kubectl-mtv v0.3.7
+# github.com/yaacov/kubectl-mtv v0.3.11
 ## explicit; go 1.25.0
 github.com/yaacov/kubectl-mtv/cmd
 github.com/yaacov/kubectl-mtv/cmd/archive
@@ -249,6 +249,7 @@ github.com/yaacov/kubectl-mtv/pkg/cmd/cancel/plan
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/hook
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/host
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/mapping
+github.com/yaacov/kubectl-mtv/pkg/cmd/create/mapping/offload
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/fetchers
