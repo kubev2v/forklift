@@ -36,7 +36,12 @@ func (m *OpenShiftStorageMapper) CreateStoragePairs(sourceStorages []ref.Ref, ta
 
 	// (a) User specified a default SC — map every source to it.
 	if opts.DefaultTargetStorageClass != "" {
-		return createDefaultStoragePairs(sourceStorages, opts.DefaultTargetStorageClass)
+		pairs, err := createDefaultStoragePairs(sourceStorages, opts.DefaultTargetStorageClass)
+		if err != nil {
+			return nil, err
+		}
+		pairs = mapper.ApplyOffloadToPairs(pairs, opts)
+		return pairs, nil
 	}
 
 	// Resolve the default SC for gap-filling (best SC selected by the target fetcher).
@@ -45,11 +50,21 @@ func (m *OpenShiftStorageMapper) CreateStoragePairs(sourceStorages []ref.Ref, ta
 	// (b) + (c) For OCP-to-OCP: same-name matching with gap-fill.
 	if opts.TargetProviderType == "openshift" {
 		klog.V(4).Infof("DEBUG: OCP-to-OCP migration detected, attempting same-name matching with gap-fill")
-		return createSameNameWithFallback(sourceStorages, targetStorages, defaultSC)
+		pairs, err := createSameNameWithFallback(sourceStorages, targetStorages, defaultSC)
+		if err != nil {
+			return nil, err
+		}
+		pairs = mapper.ApplyOffloadToPairs(pairs, opts)
+		return pairs, nil
 	}
 
 	// Non-OCP target: map all sources to the default SC.
-	return createAllToDefaultPairs(sourceStorages, defaultSC)
+	pairs, err := createAllToDefaultPairs(sourceStorages, defaultSC)
+	if err != nil {
+		return nil, err
+	}
+	pairs = mapper.ApplyOffloadToPairs(pairs, opts)
+	return pairs, nil
 }
 
 // createDefaultStoragePairs maps every source to the user-specified SC.

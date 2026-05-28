@@ -14,6 +14,7 @@ import (
 
 	forkliftv1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/provider"
+	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/mapping/offload"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/output"
 )
@@ -354,10 +355,5 @@ func createStorageMappingWithOptionsAndSecret(ctx context.Context, opts StorageC
 
 // cleanupOffloadSecret removes a created offload secret on failure
 func cleanupOffloadSecret(configFlags *genericclioptions.ConfigFlags, namespace, secretName string) error {
-	k8sClient, err := client.GetKubernetesClientset(configFlags)
-	if err != nil {
-		return fmt.Errorf("failed to get kubernetes client: %v", err)
-	}
-
-	return k8sClient.CoreV1().Secrets(namespace).Delete(context.Background(), secretName, metav1.DeleteOptions{})
+	return offload.CleanupSecret(configFlags, namespace, secretName)
 }
