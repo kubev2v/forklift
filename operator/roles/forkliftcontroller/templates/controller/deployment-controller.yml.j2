@@ -198,10 +198,8 @@ spec:
         - name: FEATURE_OCP_LIVE_MIGRATION
           value: "true"
 {% endif %}
-{% if feature_vmware_system_serial_number|bool %}
         - name: FEATURE_VMWARE_SYSTEM_SERIAL_NUMBER
-          value: "true"
-{% endif %}
+          value: "{{ feature_vmware_system_serial_number|bool|lower }}"
 {% if feature_vsphere_vmware_driver_removal|bool %}
         - name: FEATURE_VSPHERE_VMWARE_DRIVER_REMOVAL
           value: "true"
