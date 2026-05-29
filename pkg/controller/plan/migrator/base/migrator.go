@@ -458,5 +458,5 @@ func (r *BasePredicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 }
 
 func (r *BasePredicate) Count() int {
-	return 0x100
+	return 0x200
 }
