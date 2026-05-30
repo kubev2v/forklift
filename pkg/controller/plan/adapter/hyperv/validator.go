@@ -240,3 +240,8 @@ func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (bool
 func (r *Validator) GuestToolsInstalled(_ ref.Ref) (bool, error) {
 	return true, nil
 }
+
+// NO-OP
+func (r *Validator) ConsolidationNeeded(_ ref.Ref) (bool, error) {
+	return false, nil
+}
