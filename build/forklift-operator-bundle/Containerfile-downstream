@@ -33,7 +33,7 @@ ARG VALIDATION_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-va
 
 ARG VIRT_V2V_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel9@sha256:3c52237050cc2aa7c0b1369f4242ab95f804fd9a43fc494d69472da29fa8c3aa"
 
-ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:36d147562c33e38b3aa06b10a4538074d1bdb34163a407514c82e6ed2582d4b4"
+ARG VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-vsphere-xcopy-volume-populator-rhel9@sha256:7298bf881c1bef5855aa95c8c34dc0e3eaa408a7e8341b473cc1acc8bc79520c"
 
 USER root
 
