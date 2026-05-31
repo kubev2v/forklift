@@ -46,25 +46,23 @@ func main() {
 			// - If LibvirtUrl is set: fetch domain XML from libvirt and use -i libvirtxml mode
 			// - Otherwise: use -i disk mode directly on the mounted disks (e.g., EC2)
 			if convert.LibvirtUrl != "" {
-				// fetch xml description of the guest from libvirt to help virt-v2v make the conversion
 				err = func() error {
 					domainXML, err := convert.GetDomainXML()
 					if err != nil {
 						return fmt.Errorf("failed to get domain XML: %v", err)
 					}
-
-					err = os.WriteFile(convert.LibvirtDomainFile, []byte(domainXML), 0644)
-					if err != nil {
+					if err := os.WriteFile(convert.LibvirtDomainFile, []byte(domainXML), 0644); err != nil {
 						return fmt.Errorf("failed to write domain XML file: %v", err)
 					}
 					return nil
 				}()
 				if err == nil {
-					err = convert.RunVirtV2vInPlace()
+					// Run in-place conversion using libvirtxml input mode
+					err = convert.RunInPlaceWithOverlay(convert.RunVirtV2vInPlace)
 				}
 			} else {
-				// No libvirt URL - use disk mode directly on mounted disks
-				err = convert.RunVirtV2vInPlaceDisk()
+				// No libvirt URL - Run in-place conversion directly on mounted disks
+				err = convert.RunInPlaceWithOverlay(convert.RunVirtV2vInPlaceDisk)
 			}
 		} else {
 			err = convert.RunVirtV2v()
