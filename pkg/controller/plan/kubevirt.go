@@ -668,42 +668,6 @@ func (r *KubeVirt) ensureConversionSecret(cl client.Client, secret *core.Secret)
 	return secret, nil
 }
 
-// GetGuestConversion returns the guest-conversion (Remote or InPlace) Conversion CR
-// for the given VM on this plan, or nil when none exists.
-func (r *KubeVirt) GetGuestConversion(vm *plan.VMStatus) (*api.Conversion, error) {
-	typeReq, err := k8slabels.NewRequirement(
-		convctx.LabelConversionType,
-		selection.In,
-		[]string{string(api.Remote), string(api.InPlace)},
-	)
-	if err != nil {
-		return nil, liberr.Wrap(err)
-	}
-	selector := k8slabels.SelectorFromSet(map[string]string{
-		convctx.LabelPlan: string(r.Plan.UID),
-		convctx.LabelVM:   vm.ID,
-	}).Add(*typeReq)
-
-	list := &api.ConversionList{}
-	if err := r.List(context.TODO(), list,
-		client.InNamespace(r.Plan.Namespace),
-		client.MatchingLabelsSelector{Selector: selector},
-	); err != nil {
-		return nil, liberr.Wrap(err)
-	}
-	if len(list.Items) > 0 {
-		return &list.Items[0], nil
-	}
-	return nil, nil //nolint:nilnil
-}
-
-// GetDeepInspectionConversion returns the DeepInspection Conversion CR for the
-// given VM, or nil when none exists.
-func (r *KubeVirt) GetDeepInspectionConversion(vm *plan.VMStatus) (*api.Conversion, error) {
-	labels := r.getConversionLabels(api.DeepInspection, vm.ID, "", nil)
-	return r.getConversion(labels)
-}
-
 // GetStandaloneDeepInspectionConversion returns the most relevant DeepInspection
 // Conversion CR for the given VM that has no plan label (created outside any plan)
 // and whose settings are compatible with what this plan would create
@@ -763,7 +727,7 @@ func vmDiskEncType(vm *plan.VMStatus) api.DiskEncryptionType {
 
 // deepInspectionMatchesPlan reports whether the Conversion CR is compatible with
 // what the plan would create for the given VM. Two fields affect this:
-//   - DiskEncryption.Type: a CR without dsik encryption can't be used for CR with disk encryption set and vice versa,
+//   - DiskEncryption.Type: a CR without disk encryption can't be used for CR with disk encryption set and vice versa,
 //     e.g. the pod would fail to access the disk.
 //   - XfsCompatibility: selects the XFS compatible deep-inspection image variant,
 //     e.g. CR built without XFS compat cannot substitute for one that needs it.
@@ -814,13 +778,8 @@ func bestConversionByPhase(items []api.Conversion) *api.Conversion {
 // stamped on the new CR: "true" permits one future retry on failure; "false"
 // makes the next failure permanent.
 func (r *KubeVirt) CreateDeepInspectionConversion(
-	vm *plan.VMStatus, snapshotMoref, planName, planID string, retryAllowed bool,
+	vm *plan.VMStatus, snapshotMoref, planName, planID string,
 ) (*api.Conversion, error) {
-	retryValue := "false"
-	if retryAllowed {
-		retryValue = "true"
-	}
-
 	// Connection secret goes to Plan.Namespace on the management cluster
 	// (DeepInspection pods run there, not on the destination cluster).
 	connSecretData := r.buildDeepInspectionConnectionSecretData()
@@ -876,8 +835,7 @@ func (r *KubeVirt) CreateDeepInspectionConversion(
 
 	// Empty Destination → resolveDestinationClient returns localClient →
 	// pod is created on the management cluster in Plan.Namespace.
-	crLabels := r.getConversionLabels(api.DeepInspection, vm.ID, planID,
-		map[string]string{convctx.LabelRetryAllowed: retryValue})
+	crLabels := r.getConversionLabels(api.DeepInspection, vm.ID, planID, nil)
 	spec := api.ConversionSpec{
 		Type:            api.DeepInspection,
 		TargetNamespace: r.Plan.Namespace,

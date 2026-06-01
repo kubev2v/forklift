@@ -1590,7 +1590,7 @@ func (r *Migration) runPreflightDeepInspection(vm *plan.VMStatus, step *plan.Ste
 		return
 	}
 	if planCR != nil {
-		// Plan owned CR already exists, skip Phase 2 and evaluate it di CR
+		// Plan owned CR already exists, skip Phase 2 and evaluate it
 		return r.handlePlanDeepInspectionCR(vm, step, planCR)
 	}
 
@@ -1636,7 +1636,7 @@ func (r *Migration) runPreflightDeepInspection(vm *plan.VMStatus, step *plan.Ste
 	// Create a plan owned CR (no standalone CR found, or CR was just
 	// deleted). Phase 1 will find it and route to Phase 3 on next reconcile.
 	if _, err = r.kubevirt.CreateDeepInspectionConversion(
-		vm, snapshotMoref, r.Plan.Name, string(r.Plan.UID), false,
+		vm, snapshotMoref, r.Plan.Name, string(r.Plan.UID),
 	); err != nil {
 		step.AddError(err.Error())
 		return
