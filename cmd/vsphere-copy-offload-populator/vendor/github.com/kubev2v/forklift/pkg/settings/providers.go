@@ -3,6 +3,7 @@ package settings
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -12,6 +13,7 @@ const (
 	OVAProviderServerImage    = "OVA_PROVIDER_SERVER_IMAGE"
 	HyperVProviderServerImage = "HYPERV_PROVIDER_SERVER_IMAGE"
 	ProviderPendingTimeout    = "PROVIDER_PENDING_TIMEOUT_SECONDS"
+	VIBCacheDurationEnv       = "VIB_CACHE_DURATION_MINUTES"
 )
 
 // Defaults
@@ -27,6 +29,7 @@ const (
 	DefaultHyperVMemoryRequest = "512Mi"
 
 	DefaultProviderPendingTimeoutSeconds = 120
+	DefaultVIBCacheDurationMinutes       = 15
 )
 
 // ProviderPodConfig defines common configuration for provider server pods
@@ -48,6 +51,7 @@ type Providers struct {
 	OVA                           ProviderPodConfig
 	HyperV                        ProviderPodConfig
 	ProviderPendingTimeoutSeconds int
+	VIBCacheDuration              time.Duration
 }
 
 func (r *Providers) Load() error {
@@ -93,6 +97,12 @@ func (r *Providers) Load() error {
 		return fmt.Errorf("invalid provider pending timeout: %w", err)
 	}
 	r.ProviderPendingTimeoutSeconds = timeout
+
+	vibMinutes, err := getPositiveEnvLimit(VIBCacheDurationEnv, DefaultVIBCacheDurationMinutes)
+	if err != nil {
+		return fmt.Errorf("invalid VIB cache duration: %w", err)
+	}
+	r.VIBCacheDuration = time.Duration(vibMinutes) * time.Minute
 
 	return nil
 }

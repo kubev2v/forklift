@@ -38,8 +38,10 @@ import (
 )
 
 const (
-	// Name.
 	Name = "host"
+
+	connectionRetryInterval = 15 * time.Minute
+	vibRetryInterval        = 5 * time.Minute
 )
 
 // Package logger.
@@ -155,6 +157,15 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		return
 	}
 
+	var vibRequeue time.Duration
+	vibRequeue, err = r.ensureVIB(ctx, host)
+	if err != nil {
+		return
+	}
+	if vibRequeue > 0 {
+		result.RequeueAfter = vibRequeue
+	}
+
 	// Ready condition.
 	if !host.Status.HasBlockerCondition() && host.Status.HasCondition(ConnectionTestSucceeded) {
 		host.Status.SetCondition(libcnd.Condition{
@@ -182,7 +193,12 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	// Determined that ESX host retry of 15 minutes
 	// will not trigger DOS response.
 	if host.Status.HasCondition(ConnectionTestFailed) {
-		result.RequeueAfter = time.Minute * 15
+		result.RequeueAfter = connectionRetryInterval
+	}
+
+	// VIB install failed — retry.
+	if host.Status.HasCondition(VIBInstallFailed) && result.RequeueAfter == 0 {
+		result.RequeueAfter = vibRetryInterval
 	}
 
 	// Done

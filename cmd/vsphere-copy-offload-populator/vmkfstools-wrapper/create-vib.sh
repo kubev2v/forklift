@@ -38,6 +38,7 @@ mkdir -p ${ESXCLI_PLUGINS_DIR}
 # Should be removed if we find it useless.
 cp -v esxcli-vmkfstools.xml ${ESXCLI_PLUGINS_DIR}
 cp -v vmkfstools_wrapper.sh ${CUSTOM_VIB_BIN_DIR}/vmkfstools-wrapper
+sed -i "s/^SCRIPT_VERSION=.*/SCRIPT_VERSION=\"${CUSTOM_VIB_VERSION}\"/" ${CUSTOM_VIB_BIN_DIR}/vmkfstools-wrapper
 chmod +x ${CUSTOM_VIB_BIN_DIR}/vmkfstools-wrapper
 
 # Create tgz with payload

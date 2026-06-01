@@ -51,7 +51,7 @@ func (r *Handler) Created(e libweb.Event) {
 	}
 }
 
-// Resource created.
+// Resource updated.
 func (r *Handler) Updated(e libweb.Event) {
 	if host, cast := e.Resource.(*vsphere.Host); cast {
 		updated := e.Updated.(*vsphere.Host)

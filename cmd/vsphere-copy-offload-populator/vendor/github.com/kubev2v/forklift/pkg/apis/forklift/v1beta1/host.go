@@ -32,6 +32,11 @@ type HostSpec struct {
 	IpAddress string `json:"ipAddress"`
 	// Credentials.
 	Secret core.ObjectReference `json:"secret" ref:"Secret"`
+	// Install the VIB (VMware Installation Bundle) on this ESXi host.
+	// When true, the controller will SSH to the host and install the
+	// xcopy offload VIB using the credentials from the referenced secret.
+	// +optional
+	InstallVIB bool `json:"installVIB,omitempty"`
 }
 
 // HostStatus defines the observed state of Host

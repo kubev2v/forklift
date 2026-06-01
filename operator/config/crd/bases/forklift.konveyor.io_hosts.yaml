@@ -54,6 +54,12 @@ spec:
                   vsphere:
                     The managed object ID.
                 type: string
+              installVIB:
+                description: |-
+                  Install the VIB (VMware Installation Bundle) on this ESXi host.
+                  When true, the controller will SSH to the host and install the
+                  xcopy offload VIB using the credentials from the referenced secret.
+                type: boolean
               ipAddress:
                 description: IP address used for disk transfer.
                 type: string
