@@ -16,7 +16,6 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
-	convctx "github.com/kubev2v/forklift/pkg/controller/conversion/context"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
@@ -1445,73 +1444,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			step.Phase = api.StepRunning
 
 			if settings.Settings.UseConversionCR {
-				snapshotMoref := vm.Warm.Precopies[0].Snapshot
-
-				var cr *api.Conversion
-				cr, err = r.kubevirt.GetDeepInspectionConversion(vm)
-				if err != nil {
-					step.AddError(err.Error())
-					err = nil
-					break
-				}
-
-				if cr == nil {
-					// No CR yet, first attempt
-					// retryAllowed=false means if this one fails it will not be retried automatically.
-					_, err = r.kubevirt.CreateDeepInspectionConversion(
-						vm, snapshotMoref, r.Plan.Name, string(r.Plan.UID), false)
-					if err != nil {
-						step.AddError(err.Error())
-						err = nil
-					}
-					return
-				}
-
-				switch cr.Status.Phase {
-				case api.PhaseSucceeded:
-					// Propagate concerns and advance, failing on blockers.
-					if blockers := r.propagateInspectionConcerns(vm, cr.Status.InspectionResult); len(blockers) > 0 {
-						step.Error = &plan.Error{
-							Reasons: append([]string{"VM deep inspection found critical concerns"}, blockers...),
-							Phase:   step.Phase,
-						}
-						break
-					}
-					r.NextPhase(vm)
-
-				case api.PhaseFailed, api.PhaseCanceled:
-					r.Log.Info("Deep inspection CR failed.",
-						"conversion", cr.Name,
-						"phase", cr.Status.Phase,
-						"vm", vm.String())
-					retryLabel, hasLabel := cr.Labels[convctx.LabelRetryAllowed]
-					// Label present and explicitly false, no more retries.
-					if hasLabel && retryLabel == "false" {
-						step.AddError("Deep inspection failed after retry.")
-						break
-					}
-					// Label missing or set to "true", one retry allowed.
-					// Delete the failed CR and recreate it with retryAllowed=false so
-					// the replacement cannot trigger another retry.
-					if err = r.kubevirt.DeleteConversion(cr); err != nil {
-						step.AddError(err.Error())
-						err = nil
-						break
-					}
-					_, err = r.kubevirt.CreateDeepInspectionConversion(
-						vm, snapshotMoref, r.Plan.Name, string(r.Plan.UID), false)
-					if err != nil {
-						step.AddError(err.Error())
-						err = nil
-					}
-					return
-
-				default:
-					// Pending/Running, still in progress.
-					r.Log.Info("Deep inspection CR is still in progress.",
-						"conversion", cr.Name,
-						"phase", cr.Status.Phase,
-						"vm", vm.String())
+				if r.runPreflightDeepInspection(vm, step) {
 					return
 				}
 				break
@@ -1622,6 +1555,121 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			})
 	}
 
+	return
+}
+
+// runPreflightDeepInspection drives the UseConversionCR path of
+// PhasePreflightInspection through three phases:
+//
+//	Phase 1 - look up an existing plan owned CR.
+//	          Found - jump straight to Phase 3.
+//	          Not found - fall through to Phase 2.
+//	Phase 2 - look for a compatible standalone CR (no plan label).
+//	          Succeeded - propagate concerns and advance the step.
+//	          Failed/Canceled - delete the CR, then create a plan owned one and requeue.
+//	          Running/Pending - wait (requeue).
+//	          Not found - create a plan owned CR and requeue.
+//	Phase 3 - evaluate the plan owned CR.
+//	          Succeeded - propagate concerns and advance the step.
+//	          Failed/Canceled - fail the migration step (no retry).
+//	          Running/Pending - wait (requeue).
+//
+// Returns true when the reconcile should requeue (CR still in progress or just
+// created). Returns false when the step has been settled - either advanced to
+// the next phase via NextPhase or failed via step.AddError.
+// All errors are consumed internally and recorded on the step, the caller never
+// receives a non-nil error from this method.
+func (r *Migration) runPreflightDeepInspection(vm *plan.VMStatus, step *plan.Step) (requeue bool) {
+	snapshotMoref := vm.Warm.Precopies[0].Snapshot
+
+	// phase 1: look up an existing plan owned CR (created by a previous
+	// reconcile or promoted from a failed standalone)
+	planCR, err := r.kubevirt.GetPlanDeepInspectionConversion(vm)
+	if err != nil {
+		step.AddError(err.Error())
+		return
+	}
+	if planCR != nil {
+		// Plan owned CR already exists, skip Phase 2 and evaluate it di CR
+		return r.handlePlanDeepInspectionCR(vm, step, planCR)
+	}
+
+	// Phase 2: no plan owned CR so look for a compatible standalone CR (no plan label, matching disk encryption type and XFS compatibility).
+	// Mismatched CRs are silently skipped.
+	standaloneCR, err := r.kubevirt.GetStandaloneDeepInspectionConversion(vm)
+	if err != nil {
+		step.AddError(err.Error())
+		return
+	}
+	if standaloneCR != nil {
+		switch standaloneCR.Status.Phase {
+		case api.PhaseSucceeded:
+			r.Log.Info("Reusing succeeded standalone deep inspection CR.",
+				"conversion", standaloneCR.Name, "vm", vm.String())
+			if blockers := r.propagateInspectionConcerns(vm, standaloneCR.Status.InspectionResult); len(blockers) > 0 {
+				step.Error = &plan.Error{
+					Reasons: append([]string{"VM deep inspection found critical concerns"}, blockers...),
+					Phase:   step.Phase,
+				}
+				return
+			}
+			r.NextPhase(vm)
+			return
+		case api.PhaseFailed, api.PhaseCanceled:
+			// Delete the standalone CR so the plan owned CR created below
+			// starts fresh rather than updating the failed resource.
+			// After it's deleted, continue to create a plan owned CR.
+			r.Log.Info("Found failed standalone deep inspection CR, retrying with plan owned inspection CR.",
+				"conversion", standaloneCR.Name, "phase", standaloneCR.Status.Phase, "vm", vm.String())
+			if err = r.kubevirt.DeleteConversion(standaloneCR); err != nil {
+				step.AddError(err.Error())
+				return
+			}
+		default:
+			r.Log.Info("Standalone deep inspection CR still in progress.",
+				"conversion", standaloneCR.Name, "phase", standaloneCR.Status.Phase, "vm", vm.String())
+			requeue = true
+			return
+		}
+	}
+
+	// Create a plan owned CR (no standalone CR found, or CR was just
+	// deleted). Phase 1 will find it and route to Phase 3 on next reconcile.
+	if _, err = r.kubevirt.CreateDeepInspectionConversion(
+		vm, snapshotMoref, r.Plan.Name, string(r.Plan.UID), false,
+	); err != nil {
+		step.AddError(err.Error())
+		return
+	}
+	requeue = true
+	return
+}
+
+// handlePlanDeepInspectionCR evaluates an existing plan owned deep inspection
+// CR and settles the migration step accordingly (Phase 3).
+func (r *Migration) handlePlanDeepInspectionCR(vm *plan.VMStatus, step *plan.Step, planCR *api.Conversion) (requeue bool) {
+	switch planCR.Status.Phase {
+	case api.PhaseSucceeded:
+		r.Log.Info("Plan owned deep inspection CR succeeded.",
+			"conversion", planCR.Name, "vm", vm.String())
+		if blockers := r.propagateInspectionConcerns(vm, planCR.Status.InspectionResult); len(blockers) > 0 {
+			step.Error = &plan.Error{
+				Reasons: append([]string{"VM deep inspection found critical concerns"}, blockers...),
+				Phase:   step.Phase,
+			}
+			return
+		}
+		r.NextPhase(vm)
+	case api.PhaseFailed, api.PhaseCanceled:
+		r.Log.Info("Plan owned deep inspection CR failed.",
+			"conversion", planCR.Name, "phase", planCR.Status.Phase, "vm", vm.String())
+		step.AddError(fmt.Sprintf("deep inspection failed: conversion %s/%s phase %s",
+			planCR.Namespace, planCR.Name, planCR.Status.Phase))
+	default:
+		r.Log.Info("Plan owned deep inspection CR still in progress.",
+			"conversion", planCR.Name, "phase", planCR.Status.Phase, "vm", vm.String())
+		requeue = true
+	}
 	return
 }
 

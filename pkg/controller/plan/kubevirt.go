@@ -704,6 +704,111 @@ func (r *KubeVirt) GetDeepInspectionConversion(vm *plan.VMStatus) (*api.Conversi
 	return r.getConversion(labels)
 }
 
+// GetStandaloneDeepInspectionConversion returns the most relevant DeepInspection
+// Conversion CR for the given VM that has no plan label (created outside any plan)
+// and whose settings are compatible with what this plan would create
+// (e.g. same disk encryption type). Phase priority: Succeeded > Running/Pending > Failed.
+// Returns nil when no matching CR exists.
+func (r *KubeVirt) GetStandaloneDeepInspectionConversion(vm *plan.VMStatus) (*api.Conversion, error) {
+	vmReq, err := k8slabels.NewRequirement(convctx.LabelVM, selection.Equals, []string{vm.ID})
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	typeReq, err := k8slabels.NewRequirement(convctx.LabelConversionType, selection.Equals, []string{string(api.DeepInspection)})
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	noPlanReq, err := k8slabels.NewRequirement(convctx.LabelPlan, selection.DoesNotExist, nil)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	sel := k8slabels.NewSelector().Add(*vmReq, *typeReq, *noPlanReq)
+
+	list := &api.ConversionList{}
+	if err = r.Client.List(context.TODO(), list,
+		client.InNamespace(r.Plan.Namespace),
+		client.MatchingLabelsSelector{Selector: sel},
+	); err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
+	// Filter to CRs whose settings are compatible with what the plan would create,
+	// then return the most actionable one by phase.
+	var matching []api.Conversion
+	for i := range list.Items {
+		if deepInspectionMatchesPlan(&list.Items[i], vm, r.Plan.Spec.XfsCompatibility) {
+			matching = append(matching, list.Items[i])
+		}
+	}
+	return bestConversionByPhase(matching), nil
+}
+
+// GetPlanDeepInspectionConversion returns the DeepInspection Conversion CR owned
+// by this specific plan for a specific VM. Returns nil when none exists.
+func (r *KubeVirt) GetPlanDeepInspectionConversion(vm *plan.VMStatus) (*api.Conversion, error) {
+	labels := r.getConversionLabels(api.DeepInspection, vm.ID, string(r.Plan.UID), nil)
+	return r.getConversion(labels)
+}
+
+// helper for conversionCR matching rules
+func vmDiskEncType(vm *plan.VMStatus) api.DiskEncryptionType {
+	if vm.NbdeClevis {
+		return api.DiskEncryptionTypeClevis
+	}
+	if vm.LUKS.Name != "" {
+		return api.DiskEncryptionTypeLUKS
+	}
+	return ""
+}
+
+// deepInspectionMatchesPlan reports whether the Conversion CR is compatible with
+// what the plan would create for the given VM. Two fields affect this:
+//   - DiskEncryption.Type: a CR without dsik encryption can't be used for CR with disk encryption set and vice versa,
+//     e.g. the pod would fail to access the disk.
+//   - XfsCompatibility: selects the XFS compatible deep-inspection image variant,
+//     e.g. CR built without XFS compat cannot substitute for one that needs it.
+func deepInspectionMatchesPlan(cr *api.Conversion, vm *plan.VMStatus, xfsCompatibility bool) bool {
+	expected := vmDiskEncType(vm)
+	actual := api.DiskEncryptionType("")
+	if cr.Spec.DiskEncryption != nil {
+		actual = cr.Spec.DiskEncryption.Type
+	}
+	if actual != expected {
+		return false
+	}
+	return cr.Spec.XfsCompatibility == xfsCompatibility
+}
+
+// bestConversionByPhase returns the Conversion from items with prio:
+// Succeeded > Running/Pending > Failed/Canceled/other. Returns nil for empty input.
+func bestConversionByPhase(items []api.Conversion) *api.Conversion {
+	var succeeded, running, other *api.Conversion
+	for i := range items {
+		switch items[i].Status.Phase {
+		case api.PhaseSucceeded:
+			if succeeded == nil {
+				succeeded = &items[i]
+			}
+		case api.PhaseRunning, api.PhasePending:
+			if running == nil {
+				running = &items[i]
+			}
+		default:
+			if other == nil {
+				other = &items[i]
+			}
+		}
+	}
+	switch {
+	case succeeded != nil:
+		return succeeded
+	case running != nil:
+		return running
+	default:
+		return other
+	}
+}
+
 // CreateDeepInspectionConversion creates a new DeepInspection Conversion CR and
 // returns it. retryAllowed controls the value of the LabelRetryAllowed label
 // stamped on the new CR: "true" permits one future retry on failure; "false"

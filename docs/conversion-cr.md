@@ -48,12 +48,10 @@ The conversion controller communicates with the deep-inspection pod over a plain
 
 ### Endpoints
 
-
 | Endpoint   | Method | Description                                                                                                                       |
 | ---------- | ------ | --------------------------------------------------------------------------------------------------------------------------------- |
 | `/ready`   | GET    | Returns `200 OK` when detection is complete and results are ready to serve. Returns non-200 otherwise.                            |
 | `/results` | GET    | Returns `200 OK` + JSON body with the full inspection result. Returns `503 Service Unavailable` while detection is still running. |
-
 
 ### Communication flow
 
@@ -169,25 +167,73 @@ The Plan controller creates `Inspection`, `InPlace`, and `Remote` Conversion CRs
 
 ### 2. Plan + DeepInspection path (warm migration preflight)
 
-When `UseConversionCR` is enabled and the plan is a warm vSphere migration, the Plan controller creates a `DeepInspection` Conversion CR during the `PreflightInspection` step. The controller:
+When `UseConversionCR` is enabled and the plan is a warm vSphere migration, the Plan controller drives the `PreflightInspection` step through a **two phase lookup** that can reuse a compatible standalone CR before falling back to a plan owned one.
 
-1. Copies the source provider credentials + URL into a connection secret in `TargetNamespace`.
-2. Optionally copies the LUKS passphrase secret into `TargetNamespace`.
-3. Creates the Conversion CR pointing at the warm snapshot MoRef via `spec.settings.SNAPSHOT_MOREF`.
-4. Waits for `PhaseSucceeded`, propagates `InspectionResult.Concerns` to the migration step.
+#### Compatibility check
 
-On failure one automatic retry is attempted. The `retryAllowed` label on the CR controls this:
+Before a standalone CR can be reused, it must have been built with settings that produce equivalent inspection results. Two fields are checked:
 
+| Field                   | Why it matters                                                                                        |
+| ----------------------- | ----------------------------------------------------------------------------------------------------- |
+| `spec.diskEncryption.type` | Must match what the plan would configure (`LUKS`, `Clevis`, or none). A mismatch means the pod cannot read the disk and the results are from an incompatible access path. |
+| `spec.xfsCompatibility` | Selects a different container image (`DeepInspectionImageXFS` vs. the standard image). Results from a non-XFS image cannot substitute for an XFS-compat run, or vice versa. |
 
-| Label value        | Behaviour on failure                               |
-| ------------------ | -------------------------------------------------- |
-| absent or `"true"` | CR deleted and recreated with `retryAllowed=false` |
-| `"false"`          | Step is immediately failed                         |
+CRs that fail either check are silently skipped, they will not be deleted or modified.
 
+#### Phase 1 - plan-owned CR (plan UID label set)
+
+The controller first checks for a CR that already has `plan=<planUID>`. This CR is present when the plan previously started a DI run for this VM (either directly created in Phase 3, or promoted from a failed standalone in Phase 2).
+
+| CR state            | Action                                                                                        |
+| ------------------- | --------------------------------------------------------------------------------------------- |
+| `Succeeded`         | Propagate `InspectionResult.Concerns` to the migration step. Advance on no critical concerns. |
+| `Running`/`Pending` | Wait, requeue.                                                                                |
+| `Failed`/`Canceled` | Fail the migration step immediately. No further retries.                                      |
+| None found          | Fall through to Phase 2.                                                                      |
+
+#### Phase 2 - standalone CR (no plan label, compatible settings)
+
+If no plan owned CR exists, the controller searches for `DeepInspection` CRs that have **no** `plan` label and whose `diskEncryption.type` and `xfsCompatibility` match the plan. If more than one exists, the most actionable is chosen: Succeeded > Running/Pending > Failed.
+
+| CR state            | Action                                                                                        |
+| ------------------- | --------------------------------------------------------------------------------------------- |
+| `Succeeded`         | Propagate `InspectionResult.Concerns` to the migration step. Advance on no critical concerns. |
+| `Running`/`Pending` | Wait; requeue.                                                                                |
+| `Failed`/`Canceled` | Delete the standalone CR, then fall through to Phase 3 to create the plan owned CR.          |
+| None found          | Fall through to Phase 3.                                                                      |
+
+The standalone CR is deleted before Phase 3 creates the replacement because `ensureConversion` performs a plan label-agnostic lookup: without deletion it would update the `Failed` CR in place, leaving the conversion controller with no reason to re-run its pipeline.
+
+#### Phase 3 - create plan-owned CR
+
+No existing CR of either kind was found. The controller creates the first plan owned CR (copies credentials, optionally the LUKS passphrase secret, sets `SNAPSHOT_MOREF`) and requeues. Phase 1 handles the CR from the next reconcile onward.
+
+#### Full decision flow
+
+```
+PhasePreflightInspection
+│
+├─ Phase 1: find plan owned CR (plan=<UID>, compatible settings)
+│   ├─ Succeeded  ──► propagate concerns - advance (or fail on critical)
+│   ├─ Running    ──► wait
+│   ├─ Failed     ──► fail migration step (no retry)
+│   └─ none found ──► Phase 2
+│
+├─ Phase 2: find standalone CR (no plan label, compatible settings)
+│   ├─ Succeeded  ──► propagate concerns - advance (or fail on critical)
+│   ├─ Running    ──► wait
+│   ├─ Failed     ──► delete standalone CR ──► Phase 3
+│   └─ none found ──► Phase 3
+│
+└─ Phase 3: create plan owned CR
+    └─ wait (Phase 1 handles Succeeded / Running / Failed next reconcile)
+```
 
 ### 3. Standalone path
 
 Any `Conversion` CR created directly (without a Plan) is reconciled identically. The user is responsible for providing all required fields.
+
+A standalone `DeepInspection` CR created before a plan runs can be **reused by the plan** provided it has no `plan` label and its `spec.diskEncryption.type` and `spec.xfsCompatibility` match what the plan would create. See Phase 2 above.
 
 ---
 
@@ -195,16 +241,13 @@ Any `Conversion` CR created directly (without a Plan) is reconciled identically.
 
 ### Required fields (all types)
 
-
 | Field                    | Description                                              |
 | ------------------------ | -------------------------------------------------------- |
 | `spec.type`              | `DeepInspection`, `Inspection`, `InPlace`, or `Remote`   |
 | `spec.vm.id`             | vSphere managed object ID of the source VM               |
 | `spec.connection.secret` | Reference to the credentials secret (see per-type notes) |
 
-
 ### Optional fields
-
 
 | Field                                         | Description                                                                                                                                                                                                                 |
 | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -222,7 +265,6 @@ Any `Conversion` CR created directly (without a Plan) is reconciled identically.
 | `spec.podSettings.affinity`                   | Pod affinity/anti-affinity rules.                                                                                                                                                                                           |
 | `spec.podSettings.transferNetworkAnnotations` | Network annotations copied to the pod.                                                                                                                                                                                      |
 
-
 ---
 
 ## Resource placement
@@ -231,31 +273,25 @@ Every resource associated with a Conversion CR has a specific namespace and clus
 
 ### Conversion CR
 
-
 | Resource      | Namespace                                                | Cluster            |
 | ------------- | -------------------------------------------------------- | ------------------ |
 | Conversion CR | `Plan.Namespace` (plan path) or user-chosen (standalone) | management cluster |
-
 
 The Conversion CR lives on the **management cluster** alongside the Plan. The controller that reconciles it also runs there.
 
 ### Conversion pod
 
-
 | Resource       | Namespace                                         | Cluster                                                                    |
 | -------------- | ------------------------------------------------- | -------------------------------------------------------------------------- |
 | Conversion pod | `spec.targetNamespace` (defaults to CR namespace) | destination cluster (`spec.destination`, or management cluster if omitted) |
-
 
 The pod is scheduled on the **destination cluster** in `spec.targetNamespace`. When `spec.destination` is empty the management cluster is used as destination.
 
 ### Connection secret
 
-
 | Resource          | Namespace                                       | Cluster             |
 | ----------------- | ----------------------------------------------- | ------------------- |
 | Connection secret | same as conversion pod (`spec.targetNamespace`) | destination cluster |
-
 
 The connection secret is mounted at `/etc/secret` inside the pod. Because a pod can only mount secrets from its **own namespace on its own cluster**, the secret must live in `spec.targetNamespace` on the destination cluster.
 
@@ -263,22 +299,18 @@ In the plan path the controller copies the source-provider credentials (includin
 
 ### LUKS passphrase secret
 
-
 | Resource             | Namespace                               | Cluster             |
 | -------------------- | --------------------------------------- | ------------------- |
 | LUKS secret (source) | `vm.LUKS.Namespace` or `Plan.Namespace` | management cluster  |
 | LUKS secret (copy)   | `spec.targetNamespace`                  | destination cluster |
 
-
 The original LUKS secret lives on the management cluster in the plan namespace. Because the conversion pod cannot reach across clusters or namespaces to mount a secret, the plan controller **copies** the secret into `spec.targetNamespace` on the destination cluster. `spec.diskEncryption.secret` always references this copy; the copy is mounted at `/etc/luks` inside the pod.
 
 ### PVCs (InPlace / Remote)
 
-
 | Resource | Namespace              | Cluster             |
 | -------- | ---------------------- | ------------------- |
 | PVCs     | `spec.targetNamespace` | destination cluster |
-
 
 Disks are represented as PVCs on the destination cluster. `spec.disks` entries reference them by name and namespace; the controller mounts them as block devices or filesystem volumes into the conversion pod.
 
@@ -299,7 +331,6 @@ Source LUKS secret ──copy──►          LUKS secret copy  (spec.targetNa
 
 The secret referenced by `spec.connection.secret` is mounted at `/etc/secret` inside the pod and also injected as `V2V_`-prefixed environment variables.
 
-
 | Key                  | Required by                             | Description                         |
 | -------------------- | --------------------------------------- | ----------------------------------- |
 | `user`               | all                                     | Source username                     |
@@ -307,7 +338,6 @@ The secret referenced by `spec.connection.secret` is mounted at `/etc/secret` in
 | `url`                | `DeepInspection`                        | vSphere SDK endpoint URL            |
 | `fingerprint`        | `DeepInspection` (insecure skip-verify) | TLS fingerprint of the vSphere host |
 | `insecureSkipVerify` | optional                                | Skip TLS certificate verification   |
-
 
 For virt-v2v types the Plan controller supplies the secret; for standalone `DeepInspection` the user must populate all keys.
 
@@ -507,7 +537,6 @@ spec:
 
 ## Status fields
 
-
 | Field                     | Description                                                                    |
 | ------------------------- | ------------------------------------------------------------------------------ |
 | `status.phase`            | `Pending`, `Running`, `Succeeded`, `Failed`, `Canceled`                        |
@@ -518,7 +547,6 @@ spec:
 | `status.snapshot`         | vSphere snapshot tracking (MoRef, task IDs, ownership flag)                    |
 | `status.inspectionResult` | Deep-inspection outcome: `passed`, OS info, concerns, filesystems, mountpoints |
 | `status.conditions`       | Standard Kubernetes conditions set by validation and the pipeline              |
-
 
 ### Inspection concerns
 
@@ -542,4 +570,3 @@ status:
         label: Non-migrateable fstab entries
         message: "Fstab contains /dev/disk/by-path/ entries which are not migrateable. Found device: /dev/disk/by-path/pci-0000:03:00.0-scsi-0:0:1:0-part1 mounted at: /home/..."
 ```
-
