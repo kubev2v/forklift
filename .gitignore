@@ -23,6 +23,7 @@ bin
 *.swo
 *~
 .vscode
+.DS_Store
 
 # ignored dirs for sample resources
 migstuff
