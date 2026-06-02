@@ -10554,6 +10554,7 @@ rules:
   resources:
   - storageclasses
   - csidrivers
+  - csistoragecapacities
   verbs:
   - get
   - list
