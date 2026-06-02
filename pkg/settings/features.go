@@ -115,7 +115,7 @@ func (r *Features) Load() (err error) {
 	r.OVFApplianceManagement = getEnvBool(FeatureOVFApplianceManagement, false)
 	r.VsphereVmwareDriverRemoval = getEnvBool(FeatureVsphereVmwareDriverRemoval, false)
 	r.WindowsRegistryNetworkConfig = getEnvBool(FeatureWindowsRegistryNetworkConfig, false)
-	r.WindowsWaitForReboot = getEnvBool(FeatureWindowsWaitForReboot, false)
+	r.WindowsWaitForReboot = getEnvBool(FeatureWindowsWaitForReboot, true)
 	r.UseConversionCR = getEnvBool(FeatureUseConversionCR, true)
 	r.RetainPopulatorPods = getEnvBool(FeatureRetainPopulatorPods, false)
 	r.XfsRepairIgnore = getEnvBool(FeatureXfsRepairIgnore, false)

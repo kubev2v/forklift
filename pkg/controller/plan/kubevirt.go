@@ -45,6 +45,7 @@ import (
 	"github.com/openshift/library-go/pkg/template/templateprocessing"
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1004,6 +1005,10 @@ func (r *KubeVirt) EnsureWaitForRebootPod(vm *plan.VMStatus) (err error) {
 		return nil
 	}
 
+	if err = r.ensureWaitForRebootRBAC(r.Plan.Spec.TargetNamespace); err != nil {
+		return
+	}
+
 	activeDeadline := int64(settings.Settings.WindowsRebootTimeout + 600)
 	pod := &core.Pod{
 		ObjectMeta: meta.ObjectMeta{
@@ -1013,7 +1018,7 @@ func (r *KubeVirt) EnsureWaitForRebootPod(vm *plan.VMStatus) (err error) {
 		},
 		Spec: core.PodSpec{
 			RestartPolicy:         core.RestartPolicyNever,
-			ServiceAccountName:    resolveServiceAccount(r.Plan),
+			ServiceAccountName:    waitForRebootSAName,
 			ActiveDeadlineSeconds: &activeDeadline,
 			Containers: []core.Container{
 				{
@@ -1036,6 +1041,62 @@ func (r *KubeVirt) EnsureWaitForRebootPod(vm *plan.VMStatus) (err error) {
 		return
 	}
 	r.Log.Info("Created Windows wait-for-reboot pod.", "podNamespace", pod.Namespace, "podName", pod.Name, "vm", vm.String())
+	return nil
+}
+
+const waitForRebootSAName = "forklift-wait-reboot"
+
+// ensureWaitForRebootRBAC creates a dedicated ServiceAccount, Role, and RoleBinding
+// in the target namespace granting only VMI serial console access.
+func (r *KubeVirt) ensureWaitForRebootRBAC(namespace string) error {
+	sa := &core.ServiceAccount{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      waitForRebootSAName,
+			Namespace: namespace,
+		},
+	}
+	if err := r.Destination.Create(context.TODO(), sa); err != nil && !k8serr.IsAlreadyExists(err) {
+		return liberr.Wrap(err)
+	}
+
+	role := &rbacv1.Role{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      waitForRebootSAName,
+			Namespace: namespace,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"subresources.kubevirt.io"},
+				Resources: []string{"virtualmachineinstances/console"},
+				Verbs:     []string{"get"},
+			},
+		},
+	}
+	if err := r.Destination.Create(context.TODO(), role); err != nil && !k8serr.IsAlreadyExists(err) {
+		return liberr.Wrap(err)
+	}
+
+	binding := &rbacv1.RoleBinding{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      waitForRebootSAName + "-binding",
+			Namespace: namespace,
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      waitForRebootSAName,
+				Namespace: namespace,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			Kind:     "Role",
+			Name:     waitForRebootSAName,
+			APIGroup: "rbac.authorization.k8s.io",
+		},
+	}
+	if err := r.Destination.Create(context.TODO(), binding); err != nil && !k8serr.IsAlreadyExists(err) {
+		return liberr.Wrap(err)
+	}
 	return nil
 }
 
