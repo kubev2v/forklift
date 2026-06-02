@@ -322,7 +322,7 @@ func (p *PowermaxClonner) Map(_ string, targetLUN populator.LUN, mappingContext 
 		// If mv is still nil after a 409 (treated as success), the masking view
 		// was created by a prior attempt — fetch it.
 		if mv == nil {
-			err = retryOnTransient(ctx, "GetMaskingViewByID", func() error {
+			err = retryOnTransient(ctx, p.log, "GetMaskingViewByID", func() error {
 				var e error
 				mv, e = p.client.GetMaskingViewByID(ctx, p.symmetrixID, p.initiatorID)
 				return e
