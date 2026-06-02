@@ -294,13 +294,16 @@ func (r *Migration) Archive() {
 
 	switch r.Plan.Provider.Source.Type() {
 	case api.Ova, api.HyperV:
+		r.Log.Info("Deleting provider storage PVCs and PVs.", "provider", r.Plan.Provider.Source.Type())
 		if err := r.deleteProviderStorage(); err != nil {
 			r.Log.Error(err, "Failed to clean up the PVC and PV for the provider storage")
 		}
 	case api.VSphere:
+		r.Log.Info("Deleting validate-VDDK job(s).")
 		if err := r.deleteValidateVddkJob(); err != nil {
 			r.Log.Error(err, "Failed to clean up validate-VDDK job(s)")
 		}
+		r.Log.Info("Deleting VDDK config map.")
 		if err := r.deleteConfigMap(); err != nil {
 			r.Log.Error(err, "Failed to clean up vddk configmap")
 		}
@@ -316,7 +319,7 @@ func (r *Migration) Archive() {
 			}
 			return false
 		}
-		_ = r.cleanup(vm, dontFailOnError)
+		_ = r.cleanup(vm, dontFailOnError, true)
 		r.migrator.Complete(vm)
 	}
 }
@@ -407,56 +410,58 @@ func markStartedStepsCompleted(vm *plan.VMStatus) {
 	}
 }
 
-// cleanup deletes left-over migration resources associated with a VM.
-// Pass cancelConversions=true to only cancel Conversion CRs (plan canceled);
-// omit or pass false to fully delete them (archive, retry).
-func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool, cancelConversions ...bool) error {
-	isCancelOnly := len(cancelConversions) > 0 && cancelConversions[0]
+// Delete left over migration resources associated with a VM.
+func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool, forceDeleteGuestConversionPod bool) error {
+	r.Log.Info("Starting cleanup of migration resources.", "vm", vm.String())
 
 	// If the migration fails and the DeleteVmOnFailMigration is enabled, clean up the VM.
 	// When DeleteVmOnFailMigration is disabled, VM resources are preserved on failure.
 	if !vm.HasCondition(api.ConditionSucceeded) && (r.Plan.Spec.DeleteVmOnFailMigration || vm.DeleteVmOnFailMigration) {
+		r.Log.Info("Deleting VM (failed migration with deleteVmOnFailMigration enabled).", "vm", vm.String())
 		if err := r.kubevirt.DeleteVM(vm); failOnErr(err) {
 			return err
 		}
+		r.Log.Info("Deleting populated PVCs.", "vm", vm.String())
 		if err := r.kubevirt.DeletePopulatedPVCs(vm); failOnErr(err) {
 			return err
 		}
+		r.Log.Info("Deleting DataVolumes.", "vm", vm.String())
 		if err := r.kubevirt.DeleteDataVolumes(vm); failOnErr(err) {
 			return err
 		}
 	}
 
+	r.Log.Info("Deleting importer pods.", "vm", vm.String())
 	if err := r.deleteImporterPods(vm); failOnErr(err) {
 		return err
 	}
+	r.Log.Info("Deleting PVC consumer pod.", "vm", vm.String())
 	if err := r.kubevirt.DeletePVCConsumerPod(vm); failOnErr(err) {
 		return err
 	}
-	if err := r.kubevirt.DeleteGuestConversionPod(vm); failOnErr(err) {
-		return err
-	}
-	if settings.Settings.UseConversionCR {
-		if isCancelOnly {
-			if err := r.kubevirt.CancelConversion(vm); failOnErr(err) {
-				return err
-			}
-		} else {
-			if err := r.kubevirt.DeleteAllConversions(vm); failOnErr(err) {
-				return err
-			}
-		}
-	} else {
-		if err := r.kubevirt.DeleteSecret(vm); failOnErr(err) {
+	if r.Plan.Spec.DeleteGuestConversionPod || forceDeleteGuestConversionPod {
+		r.Log.Info("Deleting guest conversion pod.", "vm", vm.String())
+		if err := r.kubevirt.DeleteGuestConversionPod(vm); failOnErr(err) {
 			return err
 		}
 	}
+	r.Log.Info("Deleting preflight inspection pod.", "vm", vm.String())
 	if err := r.kubevirt.DeletePreflightInspectionPod(vm); failOnErr(err) {
 		return err
 	}
+	r.Log.Info("Deleting secrets.", "vm", vm.String())
+	if err := r.kubevirt.DeleteSecret(vm); failOnErr(err) {
+		return err
+	}
+	r.Log.Info("Deleting preflight inspection pod.", "vm", vm.String())
+	if err := r.kubevirt.DeletePreflightInspectionPod(vm); failOnErr(err) {
+		return err
+	}
+	r.Log.Info("Deleting config maps.", "vm", vm.String())
 	if err := r.kubevirt.DeleteConfigMap(vm); failOnErr(err) {
 		return err
 	}
+	r.Log.Info("Deleting hook jobs.", "vm", vm.String())
 	if err := r.kubevirt.DeleteHookJobs(vm); failOnErr(err) {
 		return err
 	}
@@ -464,19 +469,23 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool, cance
 		return err
 	}
 	if r.Plan.Provider.Destination.IsHost() {
+		r.Log.Info("Deleting populator data source.", "vm", vm.String())
 		if err := r.destinationClient.DeletePopulatorDataSource(vm); failOnErr(err) {
 			return err
 		}
 	}
+	r.Log.Info("Deleting populator pods.", "vm", vm.String())
 	if err := r.kubevirt.DeletePopulatorPods(vm); failOnErr(err) {
 		return err
 	}
+	r.Log.Info("Deleting migration jobs.", "vm", vm.String())
 	if err := r.kubevirt.DeleteJobs(vm); failOnErr(err) {
 		return err
 	}
 
 	r.removeLastWarmSnapshot(vm)
 
+	r.Log.Info("Cleanup of migration resources completed.", "vm", vm.String())
 	return nil
 }
 
@@ -489,6 +498,7 @@ func (r *Migration) removeLastWarmSnapshot(vm *plan.VMStatus) {
 		return
 	}
 	snapshot := vm.Warm.Precopies[n-1].Snapshot
+	r.Log.Info("Removing warm migration snapshot.", "vm", vm.String(), "snapshot", snapshot)
 	if _, err := r.provider.RemoveSnapshot(vm.Ref, snapshot, r.kubevirt.loadHosts); err != nil {
 		r.Log.Error(
 			err,
@@ -719,7 +729,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			vm.MarkStarted()
 			step.MarkStarted()
 			step.Phase = api.StepRunning
-			err = r.cleanup(vm, func(err error) bool { return err != nil })
+			err = r.cleanup(vm, func(err error) bool { return err != nil }, true)
 			if err != nil {
 				step.AddError(err.Error())
 				err = nil
@@ -1575,19 +1585,8 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			err = nil
 			return
 		}
-		// Delete pod if user specified that they want to remove it after successful migration.
-		if r.Plan.Spec.DeleteGuestConversionPod {
-			r.Log.Info("Removing guest conversion pod for finished VM.", "vm", vm.String())
-			err = r.kubevirt.DeleteGuestConversionPod(vm)
-			if err != nil {
-				r.Log.Error(
-					err,
-					"Could not remove guest conversion pod for finished VM.",
-					"vm",
-					vm.String(),
-				)
-				err = nil
-			}
+		if ierr := r.kubevirt.DeleteWaitForRebootPod(vm); ierr != nil {
+			r.Log.Error(ierr, "Could not remove Windows wait-for-reboot pod for finished VM.", "vm", vm.String())
 		}
 		vm.SetCondition(
 			libcnd.Condition{
@@ -1597,6 +1596,12 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				Message:  "The VM migration has SUCCEEDED.",
 				Durable:  true,
 			})
+		_ = r.cleanup(vm, func(err error) bool {
+			if err != nil {
+				r.Log.Error(err, "Cleanup after successful VM migration.", "vm", vm.String())
+			}
+			return false
+		}, false)
 
 	} else if vm.Error != nil {
 		vm.Phase = api.PhaseCompleted
@@ -2098,7 +2103,7 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 		newProgress := int64(percent * float64(task.Progress.Total))
 		if newProgress == task.Progress.Completed {
 			pvcId := string(pvc.UID)
-			populatorFailed := r.isPopulatorPodFailed(pvcId)
+			populatorFailed := r.isPopulatorPodFailed(pvcId, vm.ID)
 			if populatorFailed {
 				return fmt.Errorf("populator pod failed for PVC %s. Please check the pod logs", pvcId)
 			}
@@ -2120,8 +2125,8 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 }
 
 // Checks if the populator pod failed when the progress didn't change
-func (r *Migration) isPopulatorPodFailed(givenPvcId string) bool {
-	populatorPods, err := r.kubevirt.getPopulatorPods()
+func (r *Migration) isPopulatorPodFailed(givenPvcId string, vmID string) bool {
+	populatorPods, err := r.kubevirt.getPopulatorPods(vmID)
 	if err != nil {
 		r.Log.Error(err, "couldn't get the populator pods")
 		return false
