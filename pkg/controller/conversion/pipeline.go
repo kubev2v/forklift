@@ -253,11 +253,15 @@ func (p *ConversionPipeline) runDeepInspection() (pipelineFinished bool, err err
 		p.r.Log.Error(err, "Stage failed.", "stage", p.conv.Status.Stage)
 		// When the controller owns the snapshot and it already exists, divert to the snapshot removal stages instead of propagating the error immediately.
 		// This ensures the snapshot is cleaned up via the normal polling path before the pipeline terminates. The pod failure is then detected again at StageFinished by podHandler and pipeline is set as failed.
+		// When already in a snapshot removal or waiting for snapshot removal stage, propagate errors out instead of looping forever.
+		currentStage := p.conv.Status.Stage
 		if snapshotOwnedByController(p.conv) &&
 			p.conv.Status.Snapshot != nil &&
-			p.conv.Status.Snapshot.Moref != "" {
+			p.conv.Status.Snapshot.Moref != "" &&
+			currentStage != api.StageRemoveSnapshot &&
+			currentStage != api.StageWaitForSnapshotRemoval {
 			p.r.Log.Info("Diverting to snapshot removal stage after stage failure.",
-				"stage", p.conv.Status.Stage, "error", err.Error())
+				"stage", currentStage, "error", err.Error())
 			p.setStage(api.StageRemoveSnapshot)
 			return false, nil
 		}
@@ -573,7 +577,7 @@ func (p *ConversionPipeline) fetchInspectionResults(podIP string) (*api.Inspecti
 	return result, nil
 }
 
-// podhandler is called by the pipeline runners when StageFinished is reached.
+// podHandler is called by the pipeline runners when StageFinished is reached.
 // Returns (true, nil) when the pod succeeded, (false, err) when it failed, and
 // (false, nil) when it is still running or not yet found.
 //   - Succeeded         - (true, nil)  = pipeline complete
