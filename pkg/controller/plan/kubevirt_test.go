@@ -528,7 +528,149 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 			Expect(result).To(Equal(cnv.RunStrategyHalted))
 		})
 	})
+
+	ginkgo.Describe("podVolumeMounts", func() {
+		var kubevirt *KubeVirt
+
+		ginkgo.BeforeEach(func() {
+			kubevirt = createKubeVirt()
+			providerType := v1beta1.VSphere
+			kubevirt.Source = plancontext.Source{
+				Provider: &v1beta1.Provider{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-vsphere", Namespace: "test"},
+					Spec: v1beta1.ProviderSpec{
+						Type: &providerType,
+					},
+				},
+			}
+			kubevirt.Plan.Spec.TargetNamespace = "target-ns"
+		})
+
+		ginkgo.It("should include scripts volume in extraVolumes when CustomizationScripts is set", func() {
+			cm := &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: "my-scripts", Namespace: "target-ns"},
+				Data:       map[string]string{"01_linux_run_test.sh": "#!/bin/sh\necho test"},
+			}
+			kubevirt = createKubeVirtWithProvider(v1beta1.VSphere, cm)
+			kubevirt.Plan.Spec.CustomizationScripts = &v1.ObjectReference{
+				Name: "my-scripts",
+			}
+
+			vmVolumes := []cnv.Volume{}
+			vm := &plan.VMStatus{}
+
+			volumes, mounts, _, extraVolumes, extraMounts, err := kubevirt.podVolumeMounts(vmVolumes, nil, nil, vm)
+			Expect(err).ToNot(HaveOccurred())
+
+			// scripts-volume-mount should be in volumes
+			var foundVol bool
+			for _, vol := range volumes {
+				if vol.Name == DynamicScriptsVolumeName {
+					Expect(vol.ConfigMap).ToNot(BeNil())
+					Expect(vol.ConfigMap.Name).To(Equal("my-scripts"))
+					foundVol = true
+				}
+			}
+			Expect(foundVol).To(BeTrue(), "scripts volume not found in volumes")
+
+			// scripts-volume-mount should be in mounts
+			var foundMount bool
+			for _, m := range mounts {
+				if m.Name == DynamicScriptsVolumeName {
+					Expect(m.MountPath).To(Equal(DynamicScriptsMountPath))
+					foundMount = true
+				}
+			}
+			Expect(foundMount).To(BeTrue(), "scripts mount not found in mounts")
+
+			// scripts-volume-mount must also be in extraVolumes (for Conversion CR propagation)
+			var foundExtraVol bool
+			for _, vol := range extraVolumes {
+				if vol.Name == DynamicScriptsVolumeName {
+					Expect(vol.ConfigMap).ToNot(BeNil())
+					Expect(vol.ConfigMap.Name).To(Equal("my-scripts"))
+					foundExtraVol = true
+				}
+			}
+			Expect(foundExtraVol).To(BeTrue(), "scripts volume not found in extraVolumes")
+
+			// scripts mount must also be in extraMounts
+			var foundExtraMount bool
+			for _, m := range extraMounts {
+				if m.Name == DynamicScriptsVolumeName {
+					Expect(m.MountPath).To(Equal(DynamicScriptsMountPath))
+					foundExtraMount = true
+				}
+			}
+			Expect(foundExtraMount).To(BeTrue(), "scripts mount not found in extraMounts")
+		})
+
+		ginkgo.It("should use explicit namespace from CustomizationScripts when set", func() {
+			cm := &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: "my-scripts", Namespace: "other-ns"},
+				Data:       map[string]string{"01_linux_run_test.sh": "#!/bin/sh\necho test"},
+			}
+			kubevirt = createKubeVirtWithProvider(v1beta1.VSphere, cm)
+			kubevirt.Plan.Spec.CustomizationScripts = &v1.ObjectReference{
+				Name:      "my-scripts",
+				Namespace: "other-ns",
+			}
+
+			vm := &plan.VMStatus{}
+			_, _, _, extraVolumes, _, err := kubevirt.podVolumeMounts(nil, nil, nil, vm)
+			Expect(err).ToNot(HaveOccurred())
+
+			var found bool
+			for _, vol := range extraVolumes {
+				if vol.Name == DynamicScriptsVolumeName {
+					found = true
+				}
+			}
+			Expect(found).To(BeTrue(), "scripts volume should be found when using explicit namespace")
+		})
+
+		ginkgo.It("should return error when CustomizationScripts ConfigMap does not exist", func() {
+			kubevirt.Plan.Spec.CustomizationScripts = &v1.ObjectReference{
+				Name: "nonexistent-scripts",
+			}
+
+			vm := &plan.VMStatus{}
+			_, _, _, _, _, err := kubevirt.podVolumeMounts(nil, nil, nil, vm)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("CustomizationScripts ConfigMap nonexistent-scripts not found"))
+		})
+
+		ginkgo.It("should not add scripts volume when CustomizationScripts is nil", func() {
+			kubevirt.Plan.Spec.CustomizationScripts = nil
+
+			vm := &plan.VMStatus{}
+			volumes, _, _, extraVolumes, _, err := kubevirt.podVolumeMounts(nil, nil, nil, vm)
+			Expect(err).ToNot(HaveOccurred())
+
+			for _, vol := range volumes {
+				Expect(vol.Name).ToNot(Equal(DynamicScriptsVolumeName))
+			}
+			for _, vol := range extraVolumes {
+				Expect(vol.Name).ToNot(Equal(DynamicScriptsVolumeName))
+			}
+		})
+	})
 })
+
+func createKubeVirtWithProvider(providerType v1beta1.ProviderType, objs ...runtime.Object) *KubeVirt {
+	kv := createKubeVirt(objs...)
+	kv.Source = plancontext.Source{
+		Provider: &v1beta1.Provider{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-provider", Namespace: "test"},
+			Spec: v1beta1.ProviderSpec{
+				Type: &providerType,
+			},
+		},
+	}
+	kv.Plan.ObjectMeta = metav1.ObjectMeta{Name: "test-plan", Namespace: "test", UID: "plan-uid"}
+	kv.Plan.Spec.TargetNamespace = "target-ns"
+	return kv
+}
 
 func createKubeVirt(objs ...runtime.Object) *KubeVirt {
 	scheme := runtime.NewScheme()
