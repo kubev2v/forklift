@@ -211,7 +211,7 @@ func (p *ConversionPipeline) runVirtV2v() (pipelineFinished bool, err error) {
 			p.advanceStage()
 		}
 	case api.StageFinished:
-		return p.podSucceeded()
+		return p.podHandler()
 	default:
 		return false, liberr.New("unknown stage", "stage", p.conv.Status.Stage)
 	}
@@ -246,11 +246,25 @@ func (p *ConversionPipeline) runDeepInspection() (pipelineFinished bool, err err
 	case api.StageWaitForSnapshotRemoval:
 		stageDone, err = p.runStageWaitingForSnapshotRemoval()
 	case api.StageFinished:
-		return p.podSucceeded()
+		return p.podHandler()
 	}
 
 	if err != nil {
 		p.r.Log.Error(err, "Stage failed.", "stage", p.conv.Status.Stage)
+		// When the controller owns the snapshot and it already exists, divert to the snapshot removal stages instead of propagating the error immediately.
+		// This ensures the snapshot is cleaned up via the normal polling path before the pipeline terminates. The pod failure is then detected again at StageFinished by podHandler and pipeline is set as failed.
+		// When already in a snapshot removal or waiting for snapshot removal stage, propagate errors out instead of looping forever.
+		currentStage := p.conv.Status.Stage
+		if snapshotOwnedByController(p.conv) &&
+			p.conv.Status.Snapshot != nil &&
+			p.conv.Status.Snapshot.Moref != "" &&
+			currentStage != api.StageRemoveSnapshot &&
+			currentStage != api.StageWaitForSnapshotRemoval {
+			p.r.Log.Info("Diverting to snapshot removal stage after stage failure.",
+				"stage", currentStage, "error", err.Error())
+			p.setStage(api.StageRemoveSnapshot)
+			return false, nil
+		}
 		return false, err
 	}
 	if stageDone {
@@ -563,25 +577,28 @@ func (p *ConversionPipeline) fetchInspectionResults(podIP string) (*api.Inspecti
 	return result, nil
 }
 
-// podSucceeded is called by the pipeline runners when StageFinished is reached.
+// podHandler is called by the pipeline runners when StageFinished is reached.
 // Returns (true, nil) when the pod succeeded, (false, err) when it failed, and
 // (false, nil) when it is still running or not yet found.
-func (p *ConversionPipeline) podSucceeded() (podSucceeded bool, err error) {
+//   - Succeeded         - (true, nil)  = pipeline complete
+//   - Failed / Unknown  - (false, err) = propagate failure to the reconciler
+//   - Pending / Running - (false, nil) = keep waiting
+func (p *ConversionPipeline) podHandler() (podSucceeded bool, err error) {
 	ensurer, err := NewEnsurer(p.r.Client, p.r.Log, p.conv.Spec)
 	if err != nil {
-		p.r.Log.Error(err, "Failed to create ensurer in podSucceeded.")
+		p.r.Log.Error(err, "Failed to create ensurer in podHandler.")
 		return false, err
 	}
 	pod, err := ensurer.EnsurePod(p.conv)
 	if err != nil {
-		p.r.Log.Error(err, "EnsurePod failed in podSucceeded.")
+		p.r.Log.Error(err, "EnsurePod failed in podHandler.")
 		return false, err
 	}
 	if pod == nil {
-		p.r.Log.Info("podSucceeded: pod not found.")
+		p.r.Log.Info("podHandler: pod not found.")
 		return false, nil
 	}
-	p.r.Log.Info("podSucceeded: pod phase check.", "pod", pod.Name, "phase", pod.Status.Phase)
+	p.r.Log.Info("podHandler: pod phase check.", "pod", pod.Name, "phase", pod.Status.Phase)
 	switch pod.Status.Phase {
 	case core.PodSucceeded:
 		return true, nil
