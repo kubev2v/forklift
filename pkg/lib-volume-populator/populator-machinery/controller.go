@@ -32,6 +32,7 @@ import (
 	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/settings"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -120,33 +121,34 @@ type populatorResource struct {
 }
 
 type controller struct {
-	populatedFromAnno string
-	kubeClient        kubernetes.Interface
-	dynamicClient     dynamic.Interface
-	imageName         string
-	devicePath        string
-	mountPath         string
-	pvcLister         corelisters.PersistentVolumeClaimLister
-	pvcSynced         cache.InformerSynced
-	pvLister          corelisters.PersistentVolumeLister
-	pvSynced          cache.InformerSynced
-	podLister         corelisters.PodLister
-	podSynced         cache.InformerSynced
-	scLister          storagelisters.StorageClassLister
-	scSynced          cache.InformerSynced
-	unstLister        dynamiclister.Lister
-	unstSynced        cache.InformerSynced
-	mu                sync.Mutex
-	notifyMap         map[string]*stringSet
-	cleanupMap        map[string]*stringSet
-	workqueue         workqueue.TypedRateLimitingInterface[string]
-	populatorArgs     func(bool, *unstructured.Unstructured, corev1.PersistentVolumeClaim) ([]string, error)
-	gk                schema.GroupKind
-	metrics           *metricsManager
-	recorder          record.EventRecorder
-	httpClient        *http.Client
-	resources         *corev1.ResourceRequirements
-	maxInFlight       int
+	populatedFromAnno   string
+	kubeClient          kubernetes.Interface
+	dynamicClient       dynamic.Interface
+	imageName           string
+	devicePath          string
+	mountPath           string
+	pvcLister           corelisters.PersistentVolumeClaimLister
+	pvcSynced           cache.InformerSynced
+	pvLister            corelisters.PersistentVolumeLister
+	pvSynced            cache.InformerSynced
+	podLister           corelisters.PodLister
+	podSynced           cache.InformerSynced
+	scLister            storagelisters.StorageClassLister
+	scSynced            cache.InformerSynced
+	unstLister          dynamiclister.Lister
+	unstSynced          cache.InformerSynced
+	mu                  sync.Mutex
+	notifyMap           map[string]*stringSet
+	cleanupMap          map[string]*stringSet
+	workqueue           workqueue.TypedRateLimitingInterface[string]
+	populatorArgs       func(bool, *unstructured.Unstructured, corev1.PersistentVolumeClaim) ([]string, error)
+	gk                  schema.GroupKind
+	metrics             *metricsManager
+	recorder            record.EventRecorder
+	httpClient          *http.Client
+	resources           *corev1.ResourceRequirements
+	maxInFlight         int
+	retainPopulatorPods bool
 }
 
 func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, prefix string,
@@ -192,31 +194,36 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 	unstInformer := dynInformerFactory.ForResource(gvr).Informer()
 
 	c := &controller{
-		kubeClient:        kubeClient,
-		dynamicClient:     dynClient,
-		imageName:         imageName,
-		devicePath:        devicePath,
-		mountPath:         mountPath,
-		populatedFromAnno: prefix + "/" + populatedFromAnnoSuffix,
-		pvcLister:         pvcInformer.Lister(),
-		pvcSynced:         pvcInformer.Informer().HasSynced,
-		pvLister:          pvInformer.Lister(),
-		pvSynced:          pvInformer.Informer().HasSynced,
-		podLister:         podInformer.Lister(),
-		podSynced:         podInformer.Informer().HasSynced,
-		scLister:          scInformer.Lister(),
-		scSynced:          scInformer.Informer().HasSynced,
-		unstLister:        dynamiclister.New(unstInformer.GetIndexer(), gvr),
-		unstSynced:        unstInformer.HasSynced,
-		notifyMap:         make(map[string]*stringSet),
-		cleanupMap:        make(map[string]*stringSet),
-		workqueue:         workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
-		populatorArgs:     populatorArgs,
-		gk:                gk,
-		metrics:           initMetrics(),
-		recorder:          getRecorder(kubeClient, prefix+"-"+controllerNameSuffix),
-		resources:         resources,
-		maxInFlight:       maxInFlight,
+		kubeClient:          kubeClient,
+		dynamicClient:       dynClient,
+		imageName:           imageName,
+		devicePath:          devicePath,
+		mountPath:           mountPath,
+		populatedFromAnno:   prefix + "/" + populatedFromAnnoSuffix,
+		pvcLister:           pvcInformer.Lister(),
+		pvcSynced:           pvcInformer.Informer().HasSynced,
+		pvLister:            pvInformer.Lister(),
+		pvSynced:            pvInformer.Informer().HasSynced,
+		podLister:           podInformer.Lister(),
+		podSynced:           podInformer.Informer().HasSynced,
+		scLister:            scInformer.Lister(),
+		scSynced:            scInformer.Informer().HasSynced,
+		unstLister:          dynamiclister.New(unstInformer.GetIndexer(), gvr),
+		unstSynced:          unstInformer.HasSynced,
+		notifyMap:           make(map[string]*stringSet),
+		cleanupMap:          make(map[string]*stringSet),
+		workqueue:           workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
+		populatorArgs:       populatorArgs,
+		gk:                  gk,
+		metrics:             initMetrics(),
+		recorder:            getRecorder(kubeClient, prefix+"-"+controllerNameSuffix),
+		resources:           resources,
+		maxInFlight:         maxInFlight,
+		retainPopulatorPods: settings.Settings.RetainPopulatorPods,
+	}
+
+	if c.retainPopulatorPods {
+		klog.Infof("FEATURE_RETAIN_POPULATOR_PODS is enabled for %s; failed PVCs will NOT be deleted on populator failure", gk)
 	}
 
 	if gk.Kind == api.VSphereXcopyVolumePopulatorKind {
@@ -773,6 +780,11 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 					vendor, _, _ := unstructured.NestedString(crInstance.Object, "spec", "storageVendorProduct")
 					c.metrics.recordCompletionFromScrape(pvc.UID, "failure", migration, string(pvc.UID), vendor, "", "", "", 0, 0, 0)
 					c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPodFailed, "VSphere xcopy populator failed (no retry): Please check the logs of the populator pod, %s/%s", populatorNamespace, pod.Name)
+					if c.retainPopulatorPods {
+						klog.Infof("Retaining failed populator pod %s/%s and PVC %s/%s (FEATURE_RETAIN_POPULATOR_PODS enabled)",
+							populatorNamespace, pod.Name, pvc.Namespace, pvc.Name)
+						return nil
+					}
 					return c.deleteFailedPVC(ctx, pvc)
 				}
 
@@ -788,6 +800,11 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 					return c.retryFailedPopulator(ctx, pvc, populatorNamespace, pod.Name, restartsInteger+1)
 				}
 				c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPodFailed, "Populator failed after few (3) attempts: Please check the logs of the populator pod, %s/%s", populatorNamespace, pod.Name)
+				if c.retainPopulatorPods {
+					klog.Infof("Retaining failed populator pod %s/%s and PVC %s/%s (FEATURE_RETAIN_POPULATOR_PODS enabled)",
+						populatorNamespace, pod.Name, pvc.Namespace, pvc.Name)
+					return nil
+				}
 				return c.deleteFailedPVC(ctx, pvc)
 			}
 			// We'll get called again later when the pod succeeds

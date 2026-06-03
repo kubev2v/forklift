@@ -73,6 +73,10 @@ func main() {
 	klog.InitFlags(nil)
 	flag.Parse()
 
+	if err := settings.Settings.Features.Load(); err != nil {
+		klog.Fatalf("Failed to load feature settings: %v", err)
+	}
+
 	resources, err := getResources()
 	if err != nil {
 		klog.Fatalf("Failed to parse resources: %v", err)

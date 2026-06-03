@@ -44,6 +44,10 @@ spec:
           - name: MAX_POPULATOR_INFLIGHT
             value: "{{ controller_max_populator_inflight }}"
 {% endif %}
+{% if controller_retain_populator_pods|bool %}
+          - name: FEATURE_RETAIN_POPULATOR_PODS
+            value: "true"
+{% endif %}
           - name: POPULATOR_CONTAINER_LIMITS_CPU
             value: "{{ populator_container_limits_cpu }}"
           - name: POPULATOR_CONTAINER_LIMITS_MEMORY
