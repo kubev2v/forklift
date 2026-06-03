@@ -16,6 +16,7 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
+	convctx "github.com/kubev2v/forklift/pkg/controller/conversion/context"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
@@ -1561,80 +1562,60 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 // runPreflightDeepInspection drives the UseConversionCR path of
 // PhasePreflightInspection through three phases:
 //
-//	Phase 1 - look up an existing plan owned CR.
-//	          Found - jump straight to Phase 3.
-//	          Not found - fall through to Phase 2.
-//	Phase 2 - look for a compatible standalone CR (no plan label).
-//	          Succeeded - propagate concerns and advance the step.
-//	          Failed/Canceled - delete the CR, then create a plan owned one and requeue.
-//	          Running/Pending - wait (requeue).
-//	          Not found - create a plan owned CR and requeue.
-//	Phase 3 - evaluate the plan owned CR.
-//	          Succeeded - propagate concerns and advance the step.
-//	          Failed/Canceled - fail the migration step (no retry).
-//	          Running/Pending - wait (requeue).
+//	Phase 1 - look up an existing plan owned DI CR (labels: DeepInspection, vmID, planID)
+//	    Found - go to Phase 3
+//	    Not found - go to Phase 2
+//	Phase 2 - look for a compatible standalone DI CR (labels: DeepInspection, vmID, no planID),
+//	          compatible means the CR settings (disk encryption type, XFS compatibility, ...) match
+//	          what the plan would create, mismatched CRs are considered as "not found" e.g. are skipped
+//	    Found - go to Phase 3
+//	    Not found - create a plan owned DI CR and requeue
+//	Phase 3 - evaluate the found CR:
+//	    Succeeded - propagate inspection concerns, advance or fail the step
+//	    Failed - if standalone: create a plan owned CR and requeue
+//	             if plan owned: fail the migration step (no retry)
+//	    Canceled - if standalone: skip (don't delete), create a plan owned CR and requeue
+//	               if plan owned: delete the CR and requeue for a fresh attempt
+//	    Running/Pending - wait (requeue)
 //
 // Returns true when the reconcile should requeue (CR still in progress or just
-// created). Returns false when the step has been settled - either advanced to
+// created). Returns false when the step has finished, either advanced to
 // the next phase via NextPhase or failed via step.AddError.
 // All errors are consumed internally and recorded on the step, the caller never
-// receives a non-nil error from this method.
+// receives a non-nil error from this method, e.g. no err return.
 func (r *Migration) runPreflightDeepInspection(vm *plan.VMStatus, step *plan.Step) (requeue bool) {
+	// fail when initial snapshot doesn't exist, when this happened something went terribly wrong before preflight step
+	if vm.Warm.Precopies == nil {
+		step.AddError("Preflight inspection failed: no snapshot found for warm migration")
+		return
+	}
 	snapshotMoref := vm.Warm.Precopies[0].Snapshot
 
-	// phase 1: look up an existing plan owned CR (created by a previous
-	// reconcile or promoted from a failed standalone)
+	// Phase 1: look up an existing plan owned CR (created by a previous reconcile)
 	planCR, err := r.kubevirt.GetPlanDeepInspectionConversion(vm)
 	if err != nil {
 		step.AddError(err.Error())
 		return
 	}
 	if planCR != nil {
-		// Plan owned CR already exists, skip Phase 2 and evaluate it
-		return r.handlePlanDeepInspectionCR(vm, step, planCR)
+		// phase 3
+		return r.handleDeepInspectionCR(vm, step, planCR)
 	}
 
-	// Phase 2: no plan owned CR so look for a compatible standalone CR (no plan label, matching disk encryption type and XFS compatibility).
-	// Mismatched CRs are silently skipped.
+	// Phase 2: no plan owned CR, look for a compatible standalone CR
+	// (no plan label, matching disk encryption type and XFS compatibility).
 	standaloneCR, err := r.kubevirt.GetStandaloneDeepInspectionConversion(vm)
 	if err != nil {
 		step.AddError(err.Error())
 		return
 	}
 	if standaloneCR != nil {
-		switch standaloneCR.Status.Phase {
-		case api.PhaseSucceeded:
-			r.Log.Info("Reusing succeeded standalone deep inspection CR.",
-				"conversion", standaloneCR.Name, "vm", vm.String())
-			if blockers := r.propagateInspectionConcerns(vm, standaloneCR.Status.InspectionResult); len(blockers) > 0 {
-				step.Error = &plan.Error{
-					Reasons: append([]string{"VM deep inspection found critical concerns"}, blockers...),
-					Phase:   step.Phase,
-				}
-				return
-			}
-			r.NextPhase(vm)
-			return
-		case api.PhaseFailed, api.PhaseCanceled:
-			// Delete the standalone CR so the plan owned CR created below
-			// starts fresh rather than updating the failed resource.
-			// After it's deleted, continue to create a plan owned CR.
-			r.Log.Info("Found failed standalone deep inspection CR, retrying with plan owned inspection CR.",
-				"conversion", standaloneCR.Name, "phase", standaloneCR.Status.Phase, "vm", vm.String())
-			if err = r.kubevirt.DeleteConversion(standaloneCR); err != nil {
-				step.AddError(err.Error())
-				return
-			}
-		default:
-			r.Log.Info("Standalone deep inspection CR still in progress.",
-				"conversion", standaloneCR.Name, "phase", standaloneCR.Status.Phase, "vm", vm.String())
-			requeue = true
-			return
-		}
+		// phase 3
+		return r.handleDeepInspectionCR(vm, step, standaloneCR)
 	}
 
-	// Create a plan owned CR (no standalone CR found, or CR was just
-	// deleted). Phase 1 will find it and route to Phase 3 on next reconcile.
+	// Plan owned and standalone CR not found so create a new plan owned CR
+	// Phase 1 will find it and go to Phase 3 on the next reconcile.
 	if _, err = r.kubevirt.CreateDeepInspectionConversion(
 		vm, snapshotMoref, r.Plan.Name, string(r.Plan.UID),
 	); err != nil {
@@ -1645,14 +1626,21 @@ func (r *Migration) runPreflightDeepInspection(vm *plan.VMStatus, step *plan.Ste
 	return
 }
 
-// handlePlanDeepInspectionCR evaluates an existing plan owned deep inspection
-// CR and settles the migration step accordingly (Phase 3).
-func (r *Migration) handlePlanDeepInspectionCR(vm *plan.VMStatus, step *plan.Step, planCR *api.Conversion) (requeue bool) {
-	switch planCR.Status.Phase {
+// handleDeepInspectionCR evaluates a deep inspection CR (plan owned or standalone)
+// and processes the migration step (Phase 3):
+//   - Succeeded: propagate concerns and advance or fail the step if critical/error concerns found
+//   - Failed: if standalone (no planID label): create plan owned CR and requeue,
+//     if plan owned: fail the migration step
+//   - Canceled: if standalone: we do not own it so skip it and create a plan owned CR
+//     and requeue so Phase 1 finds the new CR next reconcile,
+//     if plan owned: delete the canceled CR and requeue
+//   - Running/Pending: wait e.g. requeue
+func (r *Migration) handleDeepInspectionCR(vm *plan.VMStatus, step *plan.Step, cr *api.Conversion) (requeue bool) {
+	switch cr.Status.Phase {
 	case api.PhaseSucceeded:
-		r.Log.Info("Plan owned deep inspection CR succeeded.",
-			"conversion", planCR.Name, "vm", vm.String())
-		if blockers := r.propagateInspectionConcerns(vm, planCR.Status.InspectionResult); len(blockers) > 0 {
+		r.Log.Info("Deep inspection CR succeeded.",
+			"conversion", cr.Name, "vm", vm.String())
+		if blockers := r.propagateInspectionConcerns(vm, cr.Status.InspectionResult); len(blockers) > 0 {
 			step.Error = &plan.Error{
 				Reasons: append([]string{"VM deep inspection found critical concerns"}, blockers...),
 				Phase:   step.Phase,
@@ -1660,14 +1648,56 @@ func (r *Migration) handlePlanDeepInspectionCR(vm *plan.VMStatus, step *plan.Ste
 			return
 		}
 		r.NextPhase(vm)
-	case api.PhaseFailed, api.PhaseCanceled:
-		r.Log.Info("Plan owned deep inspection CR failed.",
-			"conversion", planCR.Name, "phase", planCR.Status.Phase, "vm", vm.String())
-		step.AddError(fmt.Sprintf("deep inspection failed: conversion %s/%s phase %s",
-			planCR.Namespace, planCR.Name, planCR.Status.Phase))
+	case api.PhaseFailed:
+		if _, hasPlanLabel := cr.Labels[convctx.LabelPlan]; !hasPlanLabel {
+			// Standalone CR failed, create a plan owned CR so the retry is
+			// isolated to this plan. Phase 1 will pick it up on the next reconcile.
+			r.Log.Info("Standalone deep inspection CR failed, creating plan owned CR to retry.",
+				"conversion", cr.Name, "vm", vm.String())
+			// no need to check for nil here as it was done in runPreflightDeepInspection
+			snapshotMoref := vm.Warm.Precopies[0].Snapshot
+			if _, err := r.kubevirt.CreateDeepInspectionConversion(
+				vm, snapshotMoref, r.Plan.Name, string(r.Plan.UID),
+			); err != nil {
+				step.AddError(err.Error())
+				return
+			}
+			requeue = true
+		} else {
+			r.Log.Info("Plan owned deep inspection CR failed.",
+				"conversion", cr.Name, "vm", vm.String())
+			step.AddError(fmt.Sprintf("deep inspection failed: conversion %s/%s phase %s",
+				cr.Namespace, cr.Name, cr.Status.Phase))
+		}
+	case api.PhaseCanceled:
+		if _, hasPlanLabel := cr.Labels[convctx.LabelPlan]; !hasPlanLabel {
+			// Standalone canceled CR - we don't own it so we don't delete it
+			// Create a plan owned CR instead and Phase 1 will find it next reconcile and
+			// go to Phase 3, bypassing the standalone entirely.
+			r.Log.Info("Standalone deep inspection CR was canceled, creating plan owned CR.",
+				"conversion", cr.Name, "vm", vm.String())
+			snapshotMoref := vm.Warm.Precopies[0].Snapshot
+			if _, err := r.kubevirt.CreateDeepInspectionConversion(
+				vm, snapshotMoref, r.Plan.Name, string(r.Plan.UID),
+			); err != nil {
+				step.AddError(err.Error())
+				return
+			}
+		} else {
+			// Plan owned CR was canceled, delete it so the next reconcile can
+			// create a fresh plan owned CR, this won't loop as the lookup is done only in preflight
+			// inspection step while plan is running, if a plan is canceled, the step is exited
+			r.Log.Info("Plan owned deep inspection CR was canceled, deleting",
+				"conversion", cr.Name, "vm", vm.String())
+			if err := r.kubevirt.DeleteConversion(cr); err != nil {
+				step.AddError(err.Error())
+				return
+			}
+		}
+		requeue = true
 	default:
-		r.Log.Info("Plan owned deep inspection CR still in progress.",
-			"conversion", planCR.Name, "phase", planCR.Status.Phase, "vm", vm.String())
+		r.Log.Info("Deep inspection CR still in progress.",
+			"conversion", cr.Name, "phase", cr.Status.Phase, "vm", vm.String())
 		requeue = true
 	}
 	return

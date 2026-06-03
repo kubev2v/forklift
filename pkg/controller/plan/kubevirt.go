@@ -582,20 +582,11 @@ func (r *KubeVirt) buildConversion(planName, vmID string, labels map[string]stri
 }
 
 // ensureConversion creates or updates the Conversion CR on the cluster.
-// An existing CR is found by matching all labels except LabelPlan (which
-// changes when a plan is re-created). When found its Spec and Labels are
-// refreshed; otherwise the provided CR is created verbatim.
 func (r *KubeVirt) ensureConversion(cr *api.Conversion) (*api.Conversion, error) {
-	lookupLabels := make(map[string]string, len(cr.Labels))
-	for k, v := range cr.Labels {
-		if k != convctx.LabelPlan {
-			lookupLabels[k] = v
-		}
-	}
 	list := &api.ConversionList{}
 	if err := r.Client.List(context.TODO(), list,
 		client.InNamespace(cr.Namespace),
-		client.MatchingLabels(lookupLabels),
+		client.MatchingLabels(cr.Labels),
 	); err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -697,7 +688,7 @@ func (r *KubeVirt) GetStandaloneDeepInspectionConversion(vm *plan.VMStatus) (*ap
 	}
 
 	// Filter to CRs whose settings are compatible with what the plan would create,
-	// then return the most actionable one by phase.
+	// then return the most actionable one by phase priority (e.g. Success>Running>Failed...).
 	var matching []api.Conversion
 	for i := range list.Items {
 		if deepInspectionMatchesPlan(&list.Items[i], vm, r.Plan.Spec.XfsCompatibility) {
@@ -773,13 +764,9 @@ func bestConversionByPhase(items []api.Conversion) *api.Conversion {
 	}
 }
 
-// CreateDeepInspectionConversion creates a new DeepInspection Conversion CR and
-// returns it. retryAllowed controls the value of the LabelRetryAllowed label
-// stamped on the new CR: "true" permits one future retry on failure; "false"
-// makes the next failure permanent.
-func (r *KubeVirt) CreateDeepInspectionConversion(
-	vm *plan.VMStatus, snapshotMoref, planName, planID string,
-) (*api.Conversion, error) {
+// CreateDeepInspectionConversion creates a new DeepInspection Conversion CR
+// owned by the given plan and returns it.
+func (r *KubeVirt) CreateDeepInspectionConversion(vm *plan.VMStatus, snapshotMoref, planName, planID string) (*api.Conversion, error) {
 	// Connection secret goes to Plan.Namespace on the management cluster
 	// (DeepInspection pods run there, not on the destination cluster).
 	connSecretData := r.buildDeepInspectionConnectionSecretData()
@@ -833,7 +820,6 @@ func (r *KubeVirt) CreateDeepInspectionConversion(
 		}
 	}
 
-	// Empty Destination → resolveDestinationClient returns localClient →
 	// pod is created on the management cluster in Plan.Namespace.
 	crLabels := r.getConversionLabels(api.DeepInspection, vm.ID, planID, nil)
 	spec := api.ConversionSpec{
