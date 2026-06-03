@@ -3231,7 +3231,7 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 					configMapName, configMapNamespace))
 			return
 		}
-		volumes = append(volumes, core.Volume{
+		scriptsVol := core.Volume{
 			Name: DynamicScriptsVolumeName,
 			VolumeSource: core.VolumeSource{
 				ConfigMap: &core.ConfigMapVolumeSource{
@@ -3240,11 +3240,15 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 					},
 				},
 			},
-		})
-		mounts = append(mounts, core.VolumeMount{
+		}
+		scriptsMount := core.VolumeMount{
 			Name:      DynamicScriptsVolumeName,
 			MountPath: DynamicScriptsMountPath,
-		})
+		}
+		volumes = append(volumes, scriptsVol)
+		mounts = append(mounts, scriptsMount)
+		extraVolumes = append(extraVolumes, scriptsVol)
+		extraMounts = append(extraMounts, scriptsMount)
 	}
 
 	// Temporary space for VDDK library
