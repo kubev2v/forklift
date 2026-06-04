@@ -51,6 +51,7 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	cnv "kubevirt.io/api/core/v1"
 	instancetypeapi "kubevirt.io/api/instancetype"
@@ -662,6 +663,35 @@ func (r *KubeVirt) ensureConversionSecret(cl client.Client, secret *core.Secret)
 	r.Log.V(1).Info("Conversion secret created.",
 		"secret", path.Join(secret.Namespace, secret.Name))
 	return secret, nil
+}
+
+// GetGuestConversion returns the guest-conversion (Remote or InPlace) Conversion CR
+// for the given VM on this plan, or nil when none exists.
+func (r *KubeVirt) GetGuestConversion(vm *plan.VMStatus) (*api.Conversion, error) {
+	typeReq, err := k8slabels.NewRequirement(
+		convctx.LabelConversionType,
+		selection.In,
+		[]string{string(api.Remote), string(api.InPlace)},
+	)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	selector := k8slabels.SelectorFromSet(map[string]string{
+		convctx.LabelPlan: string(r.Plan.UID),
+		convctx.LabelVM:   vm.ID,
+	}).Add(*typeReq)
+
+	list := &api.ConversionList{}
+	if err := r.List(context.TODO(), list,
+		client.InNamespace(r.Plan.Namespace),
+		client.MatchingLabelsSelector{Selector: selector},
+	); err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	if len(list.Items) > 0 {
+		return &list.Items[0], nil
+	}
+	return nil, nil //nolint:nilnil
 }
 
 // GetDeepInspectionConversion returns the DeepInspection Conversion CR for the
