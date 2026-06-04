@@ -3260,6 +3260,11 @@ spec:
                         type: string
                     type: object
                 type: object
+              message:
+                description: |-
+                  Message is a human-readable explanation of the current phase, populated
+                  by the conversion controller on every reconcile.
+                type: string
               observedGeneration:
                 description: |-
                   The most recent generation observed by the controller.
