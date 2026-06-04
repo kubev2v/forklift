@@ -1510,6 +1510,12 @@ func (r *KubeVirt) DeleteDataVolumes(vm *plan.VMStatus) (err error) {
 		return
 	}
 	for _, dv := range dvs {
+		r.Log.Info(
+			"Deleting DataVolume.",
+			"dv",
+			path.Join(dv.Namespace, dv.Name),
+			"vm",
+			vm.String())
 		err = r.Destination.Client.Delete(context.TODO(), dv.DataVolume)
 		if err != nil {
 			return
@@ -1566,6 +1572,7 @@ func (r *KubeVirt) DeleteJobs(vm *plan.VMStatus) (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
+	r.Log.Info("Found jobs to delete.", "count", len(list.Items), "vm", vm.String())
 
 	jobNames := []string{}
 	for _, job := range list.Items {
@@ -1703,6 +1710,7 @@ func (r *KubeVirt) DeleteSecret(vm *plan.VMStatus) (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
+	r.Log.Info("Found secrets to delete.", "count", len(list.Items), "vm", vm.String())
 	for _, object := range list.Items {
 		err = r.DeleteObject(&object, vm, "Deleted secret.", "secret")
 		if err != nil {
@@ -1728,6 +1736,7 @@ func (r *KubeVirt) DeleteConfigMap(vm *plan.VMStatus) (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
+	r.Log.Info("Found config maps to delete.", "count", len(list.Items), "vm", vm.String())
 	for _, object := range list.Items {
 		err = r.DeleteObject(&object, vm, "Deleted configMap.", "configMap")
 		if err != nil {
@@ -1753,6 +1762,7 @@ func (r *KubeVirt) DeleteVM(vm *plan.VMStatus) (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
+	r.Log.Info("Found VMs to delete.", "count", len(list.Items), "vm", vm.String())
 	for _, object := range list.Items {
 		foreground := meta.DeletePropagationForeground
 		opts := &client.DeleteOptions{PropagationPolicy: &foreground}
@@ -2432,6 +2442,7 @@ func (r *KubeVirt) DeletePVCConsumerPod(vm *plan.VMStatus) (err error) {
 	if err != nil {
 		return err
 	}
+	r.Log.Info("Found PVC consumer pods to delete.", "count", len(list.Items), "vm", vm.String())
 	for _, object := range list.Items {
 		err = r.DeleteObject(&object, vm, "Deleted PVC consumer pod.", "pod")
 		if err != nil {
@@ -2447,6 +2458,7 @@ func (r *KubeVirt) DeletePreflightInspectionPod(vm *plan.VMStatus) (err error) {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	r.Log.Info("Found preflight inspection pods to delete.", "count", len(list.Items), "vm", vm.String())
 	for _, object := range list.Items {
 		err := r.DeleteObject(&object, vm, "Deleted preflight inspection pod.", "pod")
 		if err != nil {
@@ -2462,6 +2474,7 @@ func (r *KubeVirt) DeleteGuestConversionPod(vm *plan.VMStatus) (err error) {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	r.Log.Info("Found guest conversion pods to delete.", "count", len(list.Items), "vm", vm.String())
 	for _, object := range list.Items {
 		err := r.DeleteObject(&object, vm, "Deleted guest conversion pod.", "pod")
 		if err != nil {
@@ -2538,6 +2551,7 @@ func (r *KubeVirt) DeleteHookJobs(vm *plan.VMStatus) (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
+	r.Log.Info("Found hook jobs to delete.", "count", len(list.Items), "vm", vm.String())
 	for _, object := range list.Items {
 		err = r.DeleteObject(&object, vm, "Deleted hook job.", "job",
 			client.PropagationPolicy(meta.DeletePropagationForeground))
@@ -2554,6 +2568,7 @@ func (r *KubeVirt) DeletePopulatedPVCs(vm *plan.VMStatus) error {
 	if err != nil {
 		return err
 	}
+	r.Log.Info("Found populated PVCs to delete.", "count", len(pvcs), "vm", vm.String())
 	for _, pvc := range pvcs {
 		if err = r.deleteCorrespondingPrimePVC(pvc, vm); err != nil {
 			return err
@@ -2608,16 +2623,24 @@ func (r *KubeVirt) DeletePopulatorPods(vm *plan.VMStatus) (err error) {
 		r.Log.Info("Retaining populator pods (feature flag enabled).", "vm", vm.String())
 		return
 	}
-	list, err := r.getPopulatorPods()
+	list, err := r.getPopulatorPods(vm.ID)
+	if err != nil {
+		return
+	}
+	r.Log.Info("Found populator pods to delete.", "count", len(list), "vm", vm.String())
 	for _, object := range list {
 		err = r.DeleteObject(&object, vm, "Deleted populator pod.", "pod")
 	}
 	return
 }
 
-// Get populator pods that belong to a VM's migration.
-func (r *KubeVirt) getPopulatorPods() (pods []core.Pod, err error) {
-	migrationPods, err := r.GetPodsWithLabels(map[string]string{kMigration: string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID)})
+// Get populator pods that belong to a specific VM in a migration.
+func (r *KubeVirt) getPopulatorPods(vmID string) (pods []core.Pod, err error) {
+	labelSelector := map[string]string{kMigration: string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID)}
+	if vmID != "" {
+		labelSelector[kVM] = vmID
+	}
+	migrationPods, err := r.GetPodsWithLabels(labelSelector)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
