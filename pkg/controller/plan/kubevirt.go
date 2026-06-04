@@ -680,7 +680,7 @@ func (r *KubeVirt) GetStandaloneDeepInspectionConversion(vm *plan.VMStatus) (*ap
 	sel := k8slabels.NewSelector().Add(*vmReq, *typeReq, *noPlanReq)
 
 	list := &api.ConversionList{}
-	if err = r.Client.List(context.TODO(), list,
+	if err = r.List(context.TODO(), list,
 		client.InNamespace(r.Plan.Namespace),
 		client.MatchingLabelsSelector{Selector: sel},
 	); err != nil {
