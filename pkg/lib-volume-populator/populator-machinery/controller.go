@@ -636,6 +636,9 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 			if found {
 				labels["migration"] = migration
 			}
+			if vmID, ok, _ := unstructured.NestedString(crInstance.Object, "metadata", "labels", "vmID"); ok && vmID != "" {
+				labels["vmID"] = vmID
+			}
 			if sourceHost != "" {
 				labels[labelSourceHost] = sourceHost
 			}
@@ -766,7 +769,7 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 				// Skip retry logic for VSphere xcopy populator - let it fail immediately
 				if c.gk.Kind == api.VSphereXcopyVolumePopulatorKind {
 					c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPodFailed, "VSphere xcopy populator failed (no retry): Please check the logs of the populator pod, %s/%s", populatorNamespace, pod.Name)
-					return c.deleteFailedPVC(ctx, pvc)
+					return nil
 				}
 
 				restarts, ok := pvc.Annotations[AnnPopulatorReCreations]
@@ -781,7 +784,6 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 					return c.retryFailedPopulator(ctx, pvc, populatorNamespace, pod.Name, restartsInteger+1)
 				}
 				c.recorder.Eventf(pvc, corev1.EventTypeWarning, reasonPodFailed, "Populator failed after few (3) attempts: Please check the logs of the populator pod, %s/%s", populatorNamespace, pod.Name)
-				return c.deleteFailedPVC(ctx, pvc)
 			}
 			// We'll get called again later when the pod succeeds
 			return nil
@@ -867,14 +869,6 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 	// Stop progress monitoring
 	delete(monitoredPVCs, string(pvc.UID))
 
-	return nil
-}
-
-func (c *controller) deleteFailedPVC(ctx context.Context, pvc *corev1.PersistentVolumeClaim) error {
-	klog.V(2).Infof("Deleting PVC %s/%s after permanent populator failure", pvc.Namespace, pvc.Name)
-	if err := c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(ctx, pvc.Name, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
-		return err
-	}
 	return nil
 }
 
