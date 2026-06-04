@@ -1585,7 +1585,13 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 // receives a non-nil error from this method, e.g. no err return.
 func (r *Migration) runPreflightDeepInspection(vm *plan.VMStatus, step *plan.Step) (requeue bool) {
 	// fail when initial snapshot doesn't exist, when this happened something went terribly wrong before preflight step
-	if vm.Warm.Precopies == nil {
+	if vm.Warm == nil {
+		r.Log.Error(nil, "runPreflightDeepInspection: vm.Warm is nil", "vm", vm.ID)
+		step.AddError("Preflight inspection failed: warm migration state is nil")
+		return
+	}
+	if len(vm.Warm.Precopies) == 0 {
+		r.Log.Error(nil, "runPreflightDeepInspection: no precopies found for warm migration", "vm", vm.ID)
 		step.AddError("Preflight inspection failed: no snapshot found for warm migration")
 		return
 	}
