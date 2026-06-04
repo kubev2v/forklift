@@ -1665,6 +1665,7 @@ func (r *Migration) handleDeepInspectionCR(vm *plan.VMStatus, step *plan.Step, c
 			if _, err := r.kubevirt.CreateDeepInspectionConversion(
 				vm, snapshotMoref, r.Plan.Name, string(r.Plan.UID),
 			); err != nil {
+				r.Log.Error(err, "Failed to create a new deep inspection conversion CR")
 				step.AddError(err.Error())
 				return
 			}
@@ -1686,6 +1687,7 @@ func (r *Migration) handleDeepInspectionCR(vm *plan.VMStatus, step *plan.Step, c
 			if _, err := r.kubevirt.CreateDeepInspectionConversion(
 				vm, snapshotMoref, r.Plan.Name, string(r.Plan.UID),
 			); err != nil {
+				r.Log.Error(err, "Failed to create a new deep inspection conversion CR")
 				step.AddError(err.Error())
 				return
 			}
@@ -1696,6 +1698,7 @@ func (r *Migration) handleDeepInspectionCR(vm *plan.VMStatus, step *plan.Step, c
 			r.Log.Info("Plan owned deep inspection CR was canceled, deleting",
 				"conversion", cr.Name, "vm", vm.String())
 			if err := r.kubevirt.DeleteConversion(cr); err != nil {
+				r.Log.Error(err, "Failed to create a new deep inspection conversion CR")
 				step.AddError(err.Error())
 				return
 			}
