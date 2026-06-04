@@ -319,7 +319,7 @@ func (r *Migration) Archive() {
 			}
 			return false
 		}
-		_ = r.cleanup(vm, dontFailOnError)
+		_ = r.cleanup(vm, dontFailOnError, true)
 		r.migrator.Complete(vm)
 	}
 }
@@ -417,7 +417,7 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool, cance
 	isCancelOnly := len(cancelConversions) > 0 && cancelConversions[0]
 
 // Delete left over migration resources associated with a VM.
-func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool) error {
+func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool, forceDeleteGuestConversionPod bool) error {
 	r.Log.Info("Starting cleanup of migration resources.", "vm", vm.String())
 
 	// If the migration fails and the DeleteVmOnFailMigration is enabled, clean up the VM.
@@ -445,7 +445,7 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool) error
 	if err := r.kubevirt.DeletePVCConsumerPod(vm); failOnErr(err) {
 		return err
 	}
-	if r.Plan.Spec.DeleteGuestConversionPod {
+	if r.Plan.Spec.DeleteGuestConversionPod || forceDeleteGuestConversionPod {
 		r.Log.Info("Deleting guest conversion pod.", "vm", vm.String())
 		if err := r.kubevirt.DeleteGuestConversionPod(vm); failOnErr(err) {
 			return err
@@ -731,7 +731,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			vm.MarkStarted()
 			step.MarkStarted()
 			step.Phase = api.StepRunning
-			err = r.cleanup(vm, func(err error) bool { return err != nil })
+			err = r.cleanup(vm, func(err error) bool { return err != nil }, true)
 			if err != nil {
 				step.AddError(err.Error())
 				err = nil
@@ -1600,7 +1600,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				r.Log.Error(err, "Cleanup after successful VM migration.", "vm", vm.String())
 			}
 			return false
-		})
+		}, false)
 
 	} else if vm.Error != nil {
 		vm.Phase = api.PhaseCompleted
