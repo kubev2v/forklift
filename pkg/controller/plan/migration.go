@@ -1883,6 +1883,42 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 	case err != nil:
 		return liberr.Wrap(err)
 	case pod == nil:
+		if settings.Settings.UseConversionCR {
+			conv, convErr := r.kubevirt.GetGuestConversion(vm)
+			if convErr != nil {
+				r.Log.Error(convErr, "Failed to get guest Conversion CR", "vm", vm.String())
+				return nil
+			}
+			if conv == nil {
+				return nil
+			}
+			switch conv.Status.Phase {
+			case api.PhaseSucceeded:
+				step.MarkCompleted()
+				step.Progress.Completed = step.Progress.Total
+				return nil
+			case api.PhaseFailed:
+				step.MarkCompleted()
+				if conv.Status.Message != "" {
+					step.AddError(conv.Status.Message)
+				} else {
+					step.AddError("Guest conversion failed.")
+				}
+				return nil
+			case api.PhaseCanceled:
+				step.MarkCompleted()
+				if conv.Status.Message != "" {
+					step.AddError(conv.Status.Message)
+				} else {
+					step.AddError("Guest conversion was canceled.")
+				}
+				return nil
+			case api.PhaseRunning, api.PhasePending:
+				return nil
+			default:
+				return nil
+			}
+		}
 		step.MarkCompleted()
 		step.AddError("Guest conversion pod not found")
 		return nil
