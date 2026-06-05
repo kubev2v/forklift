@@ -1,4 +1,4 @@
-// Copyright © 2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+// Copyright © 2024 - 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"time"
 
+	logger "github.com/dell/goscaleio/log"
 	types "github.com/dell/goscaleio/types/v1"
 	"github.com/google/uuid"
 )
@@ -53,7 +54,7 @@ func (gc *GatewayClient) DeployService(deploymentName, deploymentDesc, serviceTe
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return nil, httpRespError
 	}
@@ -86,7 +87,7 @@ func (gc *GatewayClient) DeployService(deploymentName, deploymentDesc, serviceTe
 	req.Header.Set("Content-Type", "application/json")
 
 	client = gc.http
-	httpResp, httpRespError = client.Do(req)
+	httpResp, httpRespError = client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return nil, httpRespError
 	}
@@ -141,7 +142,7 @@ func (gc *GatewayClient) DeployService(deploymentName, deploymentDesc, serviceTe
 	req.Header.Set("Content-Type", "application/json")
 
 	client = gc.http
-	httpResp, httpRespError = client.Do(req)
+	httpResp, httpRespError = client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return nil, httpRespError
 	}
@@ -198,7 +199,7 @@ func (gc *GatewayClient) UpdateService(deploymentID, deploymentName, deploymentD
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return nil, httpRespError
 	}
@@ -376,7 +377,7 @@ func (gc *GatewayClient) UpdateService(deploymentID, deploymentName, deploymentD
 		return nil, fmt.Errorf("Removing node(s) is not supported")
 	}
 
-	req, httpError = http.NewRequest("PUT", gc.host+"/Api/V1/Deployment/"+deploymentID, bytes.NewBuffer(deploymentPayloadJSON))
+	req, httpError = http.NewRequest("PUT", gc.host+"/Api/V1/Deployment/"+deploymentID, bytes.NewBuffer(deploymentPayloadJSON)) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpError != nil {
 		return nil, httpError
 	}
@@ -394,7 +395,7 @@ func (gc *GatewayClient) UpdateService(deploymentID, deploymentName, deploymentD
 	req.Header.Set("Content-Type", "application/json")
 
 	client = gc.http
-	httpResp, httpRespError = client.Do(req)
+	httpResp, httpRespError = client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return nil, httpRespError
 	}
@@ -442,21 +443,21 @@ func (gc *GatewayClient) GetServiceDetailsByID(deploymentID string, newToken boo
 
 		req.Header.Add("Content-Type", "application/json")
 
-		resp, err := gc.http.Do(req)
+		resp, err := gc.http.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 		if err != nil {
 			return nil, err
 		}
 
 		defer func() {
 			if err := resp.Body.Close(); err != nil {
-				doLog(logger.Error, err.Error())
+				logger.DoLog(logger.Log.Error, err.Error())
 			}
 		}()
 
 		// parse the response
 		switch {
 		case resp == nil:
-			return nil, errNilReponse
+			return nil, errNilResponse
 		case !(resp.StatusCode >= 200 && resp.StatusCode <= 299):
 			return nil, ParseJSONError(resp)
 		}
@@ -499,7 +500,7 @@ func (gc *GatewayClient) GetServiceDetailsByID(deploymentID string, newToken boo
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return nil, httpRespError
 	}
@@ -543,7 +544,7 @@ func (gc *GatewayClient) GetServiceDetailsByFilter(filter, value string) ([]type
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return nil, httpRespError
 	}
@@ -587,7 +588,7 @@ func (gc *GatewayClient) GetAllServiceDetails() ([]types.ServiceResponse, error)
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return nil, httpRespError
 	}
@@ -631,7 +632,7 @@ func (gc *GatewayClient) DeleteService(serviceID, serversInInventory, serversMan
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return nil, httpRespError
 	}
@@ -669,7 +670,7 @@ func (gc *GatewayClient) GetServiceComplianceDetails(deploymentID string) ([]typ
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return nil, httpRespError
 	}

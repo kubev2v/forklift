@@ -1,4 +1,4 @@
-// Copyright © 2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+// Copyright © 2024 - 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -49,7 +49,7 @@ func (gc *GatewayClient) GetTemplateByID(id string) (*types.TemplateDetails, err
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return nil, httpRespError
 	}
@@ -92,7 +92,7 @@ func (gc *GatewayClient) GetAllTemplates() ([]types.TemplateDetails, error) {
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return nil, httpRespError
 	}
@@ -138,7 +138,7 @@ func (gc *GatewayClient) GetTemplateByFilters(key string, value string) ([]types
 	req.Header.Set("Content-Type", "application/json")
 
 	client := gc.http
-	httpResp, httpRespError := client.Do(req)
+	httpResp, httpRespError := client.Do(req) // #nosec G704 - Internal API call to configured gateway endpoint. Only referenced in UTs.
 	if httpRespError != nil {
 		return nil, httpRespError
 	}
@@ -158,4 +158,27 @@ func (gc *GatewayClient) GetTemplateByFilters(key string, value string) ([]types
 	}
 
 	return templates.TemplateDetails, nil
+}
+
+// CloneTemplate Creates a new Template based on a preexisting Template using the original template id
+func (gc *GatewayClient) CloneTemplate(s *System, originTemplateID string, templateName string) error {
+	defer TimeSpent("CloneTemplate", time.Now())
+	path := `/Api/V1/ServiceTemplate/cloneTemplate`
+
+	template, err := gc.GetTemplateByFilters("originalTemplateId", originTemplateID)
+	if err != nil {
+		return fmt.Errorf("Error While Cloning Template: %s", err.Error())
+	}
+
+	template[0].TemplateLocked = false
+	template[0].Draft = true
+	template[0].TemplateName = templateName
+	template[0].InConfiguration = false
+
+	errCT := s.client.getJSONWithRetry(http.MethodPost, path, template[0], nil)
+	if errCT != nil {
+		return fmt.Errorf("Error While Cloning Template: Template already exists please use a different name")
+	}
+
+	return nil
 }
