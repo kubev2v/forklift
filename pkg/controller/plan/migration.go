@@ -2098,9 +2098,8 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 		newProgress := int64(percent * float64(task.Progress.Total))
 		if newProgress == task.Progress.Completed {
 			pvcId := string(pvc.UID)
-			populatorFailed := r.isPopulatorPodFailed(pvcId)
-			if populatorFailed {
-				return fmt.Errorf("populator pod failed for PVC %s. Please check the pod logs", pvcId)
+			if podName, failed := r.getFailedPopulatorPod(pvcId, vm.ID); failed {
+				return fmt.Errorf("populator pod %s/%s failed for PVC %s/%s. Please check the pod logs", pvc.Namespace, podName, pvc.Namespace, pvc.Name)
 			}
 		}
 		task.Progress.Completed = newProgress
@@ -2120,11 +2119,11 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 }
 
 // Checks if the populator pod failed when the progress didn't change
-func (r *Migration) isPopulatorPodFailed(givenPvcId string) bool {
-	populatorPods, err := r.kubevirt.getPopulatorPods()
+func (r *Migration) getFailedPopulatorPod(givenPvcId string, vmID string) (podName string, failed bool) {
+	populatorPods, err := r.kubevirt.getPopulatorPods(vmID)
 	if err != nil {
 		r.Log.Error(err, "couldn't get the populator pods")
-		return false
+		return
 	}
 	for _, pod := range populatorPods {
 		pvcId := pod.Name[len(PopulatorPodPrefix):]
@@ -2132,11 +2131,12 @@ func (r *Migration) isPopulatorPodFailed(givenPvcId string) bool {
 			continue
 		}
 		if pod.Status.Phase == core.PodFailed {
-			return true
+			podName = pod.Name
+			failed = true
 		}
-		break
+		return
 	}
-	return false
+	return
 }
 
 func (r *Migration) setPopulatorPodsWithLabels(vm *plan.VMStatus, migrationID string) {
