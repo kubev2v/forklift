@@ -480,7 +480,6 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	if migration == nil {
 		r.Log.Info("No pending migrations found.")
 		plan.Status.DeleteCondition(Executing)
-		reQ = base.SlowReQ
 		return
 	}
 
