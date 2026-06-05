@@ -140,6 +140,12 @@ func GetVDDKImage(providerSpecSettings map[string]string) string {
 	return vddkImage
 }
 
+// ControllerNamespace returns the namespace where the forklift-controller
+// pod is deployed (set via fieldRef in the deployment template).
+func ControllerNamespace() string {
+	return os.Getenv("POD_NAMESPACE")
+}
+
 // Lookup the value of an environment variable and
 // return a fallback value if it isn't found.
 func Lookup(env string, fallback string) string {

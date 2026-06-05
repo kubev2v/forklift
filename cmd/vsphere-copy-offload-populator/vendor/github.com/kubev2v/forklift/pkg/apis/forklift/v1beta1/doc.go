@@ -74,6 +74,7 @@ const (
 	PhaseCreateInitialSnapshot             = "CreateInitialSnapshot"
 	PhaseCreateSnapshot                    = "CreateSnapshot"
 	PhaseCreateVM                          = "CreateVM"
+	PhaseWaitForGuestReboots               = "WaitForGuestReboots"
 	PhaseFinalize                          = "Finalize"
 	PhasePreflightInspection               = "PreflightInspection"
 	PhasePowerOffSource                    = "PowerOffSource"

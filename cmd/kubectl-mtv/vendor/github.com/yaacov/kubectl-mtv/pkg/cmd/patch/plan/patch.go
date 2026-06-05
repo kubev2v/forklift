@@ -60,7 +60,7 @@ type PatchPlanOptions struct {
 	Archived                       bool
 	PVCNameTemplateUseGenerateName bool
 	DeleteGuestConversionPod       bool
-	DeleteVmOnFailMigration        bool
+	DeleteVmOnFailMigration        string
 	SkipGuestConversion            bool
 	Warm                           bool
 	RunPreflightInspection         bool
@@ -467,9 +467,18 @@ func PatchPlan(opts PatchPlanOptions) error {
 
 	// Update delete VM on fail migration if flag was changed
 	if opts.DeleteVmOnFailMigrationChanged {
-		patchSpec["deleteVmOnFailMigration"] = opts.DeleteVmOnFailMigration
-		klog.V(2).Infof("Updated delete VM on fail migration to %t", opts.DeleteVmOnFailMigration)
-		planUpdated = true
+		switch strings.ToLower(opts.DeleteVmOnFailMigration) {
+		case "true":
+			patchSpec["deleteVmOnFailMigration"] = true
+			klog.V(2).Infof("Updated delete VM on fail migration to true")
+			planUpdated = true
+		case "false":
+			patchSpec["deleteVmOnFailMigration"] = false
+			klog.V(2).Infof("Updated delete VM on fail migration to false")
+			planUpdated = true
+		default:
+			return fmt.Errorf("invalid value for delete-vm-on-fail-migration: %s (must be 'true' or 'false')", opts.DeleteVmOnFailMigration)
+		}
 	}
 
 	// Update skip guest conversion if flag was changed
@@ -570,7 +579,7 @@ func PatchPlan(opts PatchPlanOptions) error {
 // PatchPlanVM patches a specific VM within a plan's VM list
 func PatchPlanVM(configFlags *genericclioptions.ConfigFlags, planName, vmName, namespace string,
 	targetName, rootDisk, instanceType, pvcNameTemplate, volumeNameTemplate, networkNameTemplate, luksSecret, targetPowerState string,
-	addPreHook, addPostHook, removeHook string, clearHooks bool, deleteVmOnFailMigration bool, deleteVmOnFailMigrationChanged bool,
+	addPreHook, addPostHook, removeHook string, clearHooks bool, deleteVmOnFailMigration string, deleteVmOnFailMigrationChanged bool,
 	nbdeClevis bool, nbdeClevisChanged bool, enableNestedVirtualization string, enableNestedVirtualizationChanged bool,
 	migrateSharedDisks string, migrateSharedDisksChanged bool, rdmAsLun string, rdmAsLunChanged bool) error {
 
@@ -720,12 +729,24 @@ func PatchPlanVM(configFlags *genericclioptions.ConfigFlags, planName, vmName, n
 
 	// Update delete VM on fail migration if flag was changed
 	if deleteVmOnFailMigrationChanged {
-		err = unstructured.SetNestedField(vmCopy, deleteVmOnFailMigration, "deleteVmOnFailMigration")
-		if err != nil {
-			return fmt.Errorf("failed to set delete VM on fail migration: %v", err)
+		switch strings.ToLower(deleteVmOnFailMigration) {
+		case "true":
+			err = unstructured.SetNestedField(vmCopy, true, "deleteVmOnFailMigration")
+			if err != nil {
+				return fmt.Errorf("failed to set delete VM on fail migration: %v", err)
+			}
+			klog.V(2).Infof("Updated VM delete on fail migration to true")
+			vmUpdated = true
+		case "false":
+			err = unstructured.SetNestedField(vmCopy, false, "deleteVmOnFailMigration")
+			if err != nil {
+				return fmt.Errorf("failed to set delete VM on fail migration: %v", err)
+			}
+			klog.V(2).Infof("Updated VM delete on fail migration to false")
+			vmUpdated = true
+		default:
+			return fmt.Errorf("invalid value for delete-vm-on-fail-migration: %s (must be 'true' or 'false')", deleteVmOnFailMigration)
 		}
-		klog.V(2).Infof("Updated VM delete on fail migration to %t", deleteVmOnFailMigration)
-		vmUpdated = true
 	}
 
 	// Update NBDE/Clevis if flag was changed
