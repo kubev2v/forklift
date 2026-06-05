@@ -10583,6 +10583,12 @@ rules:
   - list
   - watch
 - apiGroups:
+  - subresources.kubevirt.io
+  resources:
+  - virtualmachineinstances/console
+  verbs:
+  - get
+- apiGroups:
   - cdi.kubevirt.io
   resources:
   - datavolumes
@@ -10789,6 +10795,12 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - subresources.kubevirt.io
+  resources:
+  - virtualmachineinstances/console
+  verbs:
+  - get
 - apiGroups:
   - cdi.kubevirt.io
   resources:
