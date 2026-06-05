@@ -1065,6 +1065,7 @@ func (r *Builder) createVolumePopulatorCR(image model.Image, secretName, vmId st
 			Labels: map[string]string{
 				"vmID":      vmId,
 				"migration": getMigrationID(r.Context),
+				"plan":      string(r.Plan.GetUID()),
 				"imageID":   image.ID,
 			},
 		},
@@ -1237,6 +1238,7 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image,
 			Annotations:  annotations,
 			Labels: map[string]string{
 				"migration": getMigrationID(r.Context),
+				"plan":      string(r.Plan.GetUID()),
 				"imageID":   image.ID,
 				"vmID":      vmID,
 			},
@@ -1360,6 +1362,7 @@ func (r *Builder) setPopulatorLabels(populatorCr api.OpenstackVolumePopulator, v
 	}
 	populatorCr.Labels["vmID"] = vmId
 	populatorCr.Labels["migration"] = migrationId
+	populatorCr.Labels["plan"] = string(r.Plan.GetUID())
 	patch := client.MergeFrom(populatorCrCopy)
 	err = r.Destination.Client.Patch(context.TODO(), &populatorCr, patch)
 	return
