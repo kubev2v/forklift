@@ -639,6 +639,12 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 			if found {
 				labels["migration"] = migration
 			}
+			if vmID, ok, _ := unstructured.NestedString(crInstance.Object, "metadata", "labels", "vmID"); ok && vmID != "" {
+				labels["vmID"] = vmID
+			}
+			if plan, ok, _ := unstructured.NestedString(crInstance.Object, "metadata", "labels", "plan"); ok && plan != "" {
+				labels["plan"] = plan
+			}
 			if sourceHost != "" {
 				labels[labelSourceHost] = sourceHost
 			}
@@ -701,10 +707,17 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 
 			// If PVC' doesn't exist yet, create it
 			if pvcPrime == nil {
+				pvcPrimeLabels := make(map[string]string)
+				for _, key := range []string{"migration", "plan", "vmID"} {
+					if val, ok := pvc.Labels[key]; ok {
+						pvcPrimeLabels[key] = val
+					}
+				}
 				pvcPrime = &corev1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      pvcPrimeName,
 						Namespace: populatorNamespace,
+						Labels:    pvcPrimeLabels,
 						OwnerReferences: []metav1.OwnerReference{
 							{
 								APIVersion: "v1",

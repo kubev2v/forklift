@@ -844,6 +844,7 @@ func (r *Builder) createVolumePopulatorCR(diskAttachment model.XDiskAttachment, 
 			Labels: map[string]string{
 				"vmID":      vmId,
 				"migration": migrationId,
+				"plan":      string(r.Plan.GetUID()),
 				"diskID":    diskAttachment.Disk.ID,
 			},
 		},
@@ -915,6 +916,7 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskA
 			Annotations:  annotations,
 			Labels: map[string]string{
 				"migration": string(r.Migration.UID),
+				"plan":      string(r.Plan.GetUID()),
 				"vmID":      vmID,
 				"diskID":    diskAttachment.Disk.ID,
 			},
@@ -1007,6 +1009,7 @@ func (r *Builder) setOvirtPopulatorLabels(populatorCr api.OvirtVolumePopulator, 
 	}
 	populatorCr.Labels["vmID"] = vmId
 	populatorCr.Labels["migration"] = migrationId
+	populatorCr.Labels["plan"] = string(r.Plan.GetUID())
 	patch := client.MergeFrom(populatorCrCopy)
 	err = r.Destination.Client.Patch(context.TODO(), &populatorCr, patch)
 	return
