@@ -3,7 +3,6 @@ package inventory
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -12,18 +11,16 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
-// ListDiskProfiles queries the provider's disk profile inventory and displays the results
-func ListDiskProfiles(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
-	if watchMode {
-		return watch.Watch(func() error {
-			return listDiskProfilesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
-		}, 10*time.Second)
-	}
+// ListDiskProfilesWithInsecure queries the provider's disk profile inventory with optional insecure TLS skip verification
+func ListDiskProfilesWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
+	sq := watch.NewSafeQuery(query)
 
-	return listDiskProfilesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return watch.WrapWithWatchAndQuery(watchMode, outputFormat, func() error {
+		return listDiskProfilesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, sq.Get(), insecureSkipTLS)
+	}, watch.DefaultInterval, sq.Set, query)
 }
 
-func listDiskProfilesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listDiskProfilesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -31,7 +28,7 @@ func listDiskProfilesOnce(ctx context.Context, kubeConfigFlags *genericclioption
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to verify disk profile support
 	providerType, err := providerClient.GetProviderType()
@@ -40,18 +37,18 @@ func listDiskProfilesOnce(ctx context.Context, kubeConfigFlags *genericclioption
 	}
 
 	// Define default headers
-	defaultHeaders := []output.Header{
-		{DisplayName: "NAME", JSONPath: "name"},
-		{DisplayName: "ID", JSONPath: "id"},
-		{DisplayName: "STORAGE-DOMAIN", JSONPath: "storageDomain.name"},
-		{DisplayName: "QOS", JSONPath: "qos.name"},
+	defaultHeaders := []output.Column{
+		{Title: "NAME", Key: "name"},
+		{Title: "ID", Key: "id"},
+		{Title: "STORAGE-DOMAIN", Key: "storageDomain.name"},
+		{Title: "QOS", Key: "qos.name"},
 	}
 
 	// Fetch disk profiles inventory from the provider based on provider type
 	var data interface{}
 	switch providerType {
 	case "ovirt":
-		data, err = providerClient.GetDiskProfiles(4)
+		data, err = providerClient.GetDiskProfiles(ctx, 4)
 	default:
 		return fmt.Errorf("provider type '%s' does not support disk profile inventory", providerType)
 	}
@@ -82,6 +79,8 @@ func listDiskProfilesOnce(ctx context.Context, kubeConfigFlags *genericclioption
 		return output.PrintJSONWithEmpty(data, emptyMessage)
 	case "yaml":
 		return output.PrintYAMLWithEmpty(data, emptyMessage)
+	case "markdown":
+		return output.PrintMarkdownWithQuery(data, defaultHeaders, queryOpts, emptyMessage)
 	case "table":
 		return output.PrintTableWithQuery(data, defaultHeaders, queryOpts, emptyMessage)
 	default:
@@ -89,18 +88,16 @@ func listDiskProfilesOnce(ctx context.Context, kubeConfigFlags *genericclioption
 	}
 }
 
-// ListNICProfiles queries the provider's NIC profile inventory and displays the results
-func ListNICProfiles(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool) error {
-	if watchMode {
-		return watch.Watch(func() error {
-			return listNICProfilesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
-		}, 10*time.Second)
-	}
+// ListNICProfilesWithInsecure queries the provider's NIC profile inventory with optional insecure TLS skip verification
+func ListNICProfilesWithInsecure(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, watchMode bool, insecureSkipTLS bool) error {
+	sq := watch.NewSafeQuery(query)
 
-	return listNICProfilesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, query)
+	return watch.WrapWithWatchAndQuery(watchMode, outputFormat, func() error {
+		return listNICProfilesOnce(ctx, kubeConfigFlags, providerName, namespace, inventoryURL, outputFormat, sq.Get(), insecureSkipTLS)
+	}, watch.DefaultInterval, sq.Set, query)
 }
 
-func listNICProfilesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string) error {
+func listNICProfilesOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigFlags, providerName, namespace string, inventoryURL string, outputFormat string, query string, insecureSkipTLS bool) error {
 	// Get the provider object
 	provider, err := GetProviderByName(ctx, kubeConfigFlags, providerName, namespace)
 	if err != nil {
@@ -108,7 +105,7 @@ func listNICProfilesOnce(ctx context.Context, kubeConfigFlags *genericclioptions
 	}
 
 	// Create a new provider client
-	providerClient := NewProviderClient(kubeConfigFlags, provider, inventoryURL)
+	providerClient := NewProviderClientWithInsecure(kubeConfigFlags, provider, inventoryURL, insecureSkipTLS)
 
 	// Get provider type to verify NIC profile support
 	providerType, err := providerClient.GetProviderType()
@@ -117,20 +114,20 @@ func listNICProfilesOnce(ctx context.Context, kubeConfigFlags *genericclioptions
 	}
 
 	// Define default headers
-	defaultHeaders := []output.Header{
-		{DisplayName: "NAME", JSONPath: "name"},
-		{DisplayName: "ID", JSONPath: "id"},
-		{DisplayName: "NETWORK", JSONPath: "network.name"},
-		{DisplayName: "PORT-MIRRORING", JSONPath: "portMirroring"},
-		{DisplayName: "PASS-THROUGH", JSONPath: "passThrough"},
-		{DisplayName: "QOS", JSONPath: "qos.name"},
+	defaultHeaders := []output.Column{
+		{Title: "NAME", Key: "name"},
+		{Title: "ID", Key: "id"},
+		{Title: "NETWORK", Key: "network.name"},
+		{Title: "PORT-MIRRORING", Key: "portMirroring"},
+		{Title: "PASS-THROUGH", Key: "passThrough"},
+		{Title: "QOS", Key: "qos.name"},
 	}
 
 	// Fetch NIC profiles inventory from the provider based on provider type
 	var data interface{}
 	switch providerType {
 	case "ovirt":
-		data, err = providerClient.GetNICProfiles(4)
+		data, err = providerClient.GetNICProfiles(ctx, 4)
 	default:
 		return fmt.Errorf("provider type '%s' does not support NIC profile inventory", providerType)
 	}
@@ -161,6 +158,8 @@ func listNICProfilesOnce(ctx context.Context, kubeConfigFlags *genericclioptions
 		return output.PrintJSONWithEmpty(data, emptyMessage)
 	case "yaml":
 		return output.PrintYAMLWithEmpty(data, emptyMessage)
+	case "markdown":
+		return output.PrintMarkdownWithQuery(data, defaultHeaders, queryOpts, emptyMessage)
 	case "table":
 		return output.PrintTableWithQuery(data, defaultHeaders, queryOpts, emptyMessage)
 	default:

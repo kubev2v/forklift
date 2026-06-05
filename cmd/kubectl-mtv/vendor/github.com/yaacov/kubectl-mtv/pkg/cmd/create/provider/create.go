@@ -5,40 +5,26 @@ import (
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
+	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/ec2"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/generic"
+	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/hyperv"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/openshift"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/openstack"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/ova"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/providerutil"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/vsphere"
+	"github.com/yaacov/kubectl-mtv/pkg/util/output"
 
 	forkliftv1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 )
 
 // Create creates a new provider
-func Create(configFlags *genericclioptions.ConfigFlags, providerType, name, namespace, secret string,
-	url, username, password, cacert string, insecureSkipTLS bool, vddkInitImage, sdkEndpoint string, token string,
-	domainName, projectName, regionName string, useVddkAioOptimization bool, vddkBufSizeIn64K, vddkBufCount int) error {
-	// Create provider options
-	options := providerutil.ProviderOptions{
-		Name:                   name,
-		Namespace:              namespace,
-		Secret:                 secret,
-		URL:                    url,
-		Username:               username,
-		Password:               password,
-		CACert:                 cacert,
-		InsecureSkipTLS:        insecureSkipTLS,
-		VddkInitImage:          vddkInitImage,
-		SdkEndpoint:            sdkEndpoint,
-		Token:                  token,
-		DomainName:             domainName,
-		ProjectName:            projectName,
-		RegionName:             regionName,
-		UseVddkAioOptimization: useVddkAioOptimization,
-		VddkBufSizeIn64K:       vddkBufSizeIn64K,
-		VddkBufCount:           vddkBufCount,
+func Create(configFlags *genericclioptions.ConfigFlags, providerType string, options providerutil.ProviderOptions) error {
+	// For EC2 provider, use regionName (from --provider-region-name) if ec2Region is empty
+	// This allows using --provider-region-name for EC2 regions as shown in documentation
+	if providerType == "ec2" && options.EC2Region == "" && options.RegionName != "" {
+		options.EC2Region = options.RegionName
 	}
 
 	var providerResource *forkliftv1beta1.Provider
@@ -51,20 +37,32 @@ func Create(configFlags *genericclioptions.ConfigFlags, providerType, name, name
 		providerResource, secretResource, err = vsphere.CreateProvider(configFlags, options)
 	case "ova":
 		providerResource, secretResource, err = ova.CreateProvider(configFlags, options)
+	case "hyperv":
+		providerResource, secretResource, err = hyperv.CreateProvider(configFlags, options)
 	case "openshift":
 		providerResource, secretResource, err = openshift.CreateProvider(configFlags, options)
 	case "ovirt":
 		providerResource, secretResource, err = generic.CreateProvider(configFlags, options, "ovirt")
 	case "openstack":
 		providerResource, secretResource, err = openstack.CreateProvider(configFlags, options)
+	case "ec2":
+		providerResource, secretResource, err = ec2.CreateProvider(configFlags, options)
 	default:
-		// If the provider type is not recognized, return an error
 		return fmt.Errorf("unsupported provider type: %s", providerType)
 	}
 
 	// Handle any errors that occurred during provider creation
 	if err != nil {
 		return fmt.Errorf("failed to prepare provider: %v", err)
+	}
+
+	if options.DryRun {
+		if secretResource != nil {
+			if err := output.OutputResource(secretResource, options.OutputFormat); err != nil {
+				return err
+			}
+		}
+		return output.OutputResource(providerResource, options.OutputFormat)
 	}
 
 	// Display the creation results to the user

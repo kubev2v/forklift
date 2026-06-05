@@ -2,7 +2,11 @@ package flags
 
 import (
 	"fmt"
+	"strings"
 )
+
+// vmInventoryOutputFormats is the single source of truth for valid VM inventory output formats.
+var vmInventoryOutputFormats = []string{"table", "json", "yaml", "markdown", "planvms"}
 
 // VMInventoryOutputTypeFlag implements pflag.Value interface for VM inventory output format validation
 type VMInventoryOutputTypeFlag struct {
@@ -14,22 +18,13 @@ func (v *VMInventoryOutputTypeFlag) String() string {
 }
 
 func (v *VMInventoryOutputTypeFlag) Set(value string) error {
-	validTypes := []string{"table", "json", "yaml", "planvms"}
-
-	isValid := false
-	for _, validType := range validTypes {
-		if value == validType {
-			isValid = true
-			break
+	for _, valid := range vmInventoryOutputFormats {
+		if value == valid {
+			v.value = value
+			return nil
 		}
 	}
-
-	if !isValid {
-		return fmt.Errorf("invalid VM inventory output format: %s. Valid formats are: table, json, yaml, planvms", value)
-	}
-
-	v.value = value
-	return nil
+	return fmt.Errorf("invalid VM inventory output format: %s. Valid formats are: %s", value, strings.Join(vmInventoryOutputFormats, ", "))
 }
 
 func (v *VMInventoryOutputTypeFlag) Type() string {
@@ -43,7 +38,7 @@ func (v *VMInventoryOutputTypeFlag) GetValue() string {
 
 // GetValidValues returns all valid VM inventory output format values for auto-completion
 func (v *VMInventoryOutputTypeFlag) GetValidValues() []string {
-	return []string{"table", "json", "yaml", "planvms"}
+	return vmInventoryOutputFormats
 }
 
 // SetDefault sets the default value for the VM inventory output format
