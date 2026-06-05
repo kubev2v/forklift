@@ -1,4 +1,4 @@
-// Copyright © 2019 - 2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+// Copyright © 2019 - 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 	"net/http/httputil"
 	"strings"
 
-	"github.com/dell/goscaleio/log"
+	logger "github.com/dell/goscaleio/log"
 )
 
 func isBinOctetBody(h http.Header) bool {
@@ -50,7 +50,7 @@ func logRequest(
 		fmt.Printf("WriteIndented returned error: %s", err.Error())
 	}
 	if lf != nil {
-		lf(log.Log.Debug, w.String())
+		lf(logger.Log.Debug, w.String())
 	}
 }
 
@@ -85,7 +85,7 @@ func logResponse(
 		fmt.Fprintln(w, scanner.Text())
 	}
 	if lf != nil {
-		lf(log.Log.Debug, w.String())
+		lf(logger.Log.Debug, w.String())
 	}
 }
 
