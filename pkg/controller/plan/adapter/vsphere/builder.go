@@ -1381,6 +1381,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				namespace := r.Plan.Spec.TargetNamespace
 				labels := map[string]string{
 					"migration": string(r.Migration.UID),
+					"plan":      string(r.Plan.GetUID()),
 					// we need uniqness and a value which is less than 64 chars, hence using vmRef.id + disk.key
 					"vmdkKey": fmt.Sprint(disk.Key),
 					"vmID":    vmRef.ID,
@@ -1970,6 +1971,11 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      diskSecretName,
 			Namespace: migrationSecretNS,
+			Labels: map[string]string{
+				"migration": string(r.Migration.UID),
+				"plan":      string(r.Plan.GetUID()),
+				"vmID":      pvc.Labels["vmID"],
+			},
 		},
 		Data: make(map[string][]byte),
 	}
