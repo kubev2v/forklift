@@ -2101,6 +2101,53 @@ func (r *KubeVirt) GetGuestConversionPod(vm *plan.VMStatus) (pod *core.Pod, err 
 	return
 }
 
+// detectBootDiskFromPod fetches the boot disk index from the conversion pod's
+// /bootdisk endpoint, used for in-place conversions where virt-v2v does not
+// produce a KubeVirt YAML with boot order information.
+func (r *KubeVirt) detectBootDiskFromPod(vm *plan.VMStatus, pod *core.Pod) {
+	vm.DetectedBootDisk = nil
+
+	bootNotDetected := libcnd.Condition{
+		Type:     BootDiskNotDetected,
+		Status:   True,
+		Category: "Warning",
+		Reason:   BootDiskNotDetected,
+		Message:  "Boot disk could not be detected from in-place conversion; boot order was not set.",
+	}
+
+	bootDiskURL := fmt.Sprintf("http://%s:8080/bootdisk", pod.Status.PodIP)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, bootDiskURL, nil)
+	if err != nil {
+		r.Log.Error(err, "Failed to create boot disk request", "vmId", vm.ID)
+		vm.SetCondition(bootNotDetected)
+		return
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		r.Log.Error(err, "Failed to fetch boot disk index from conversion pod", "vmId", vm.ID)
+		vm.SetCondition(bootNotDetected)
+		return
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		r.Log.Info("Boot disk endpoint returned non-OK status", "status", resp.StatusCode, "vmId", vm.ID)
+		vm.SetCondition(bootNotDetected)
+		return
+	}
+	var result struct {
+		BootDiskIndex int `json:"bootDiskIndex"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		r.Log.Error(err, "Failed to decode boot disk response", "vmId", vm.ID)
+		vm.SetCondition(bootNotDetected)
+		return
+	}
+	vm.DetectedBootDisk = &result.BootDiskIndex
+	r.Log.Info("Detected boot disk from in-place conversion", "bootDiskIndex", result.BootDiskIndex, "vmId", vm.ID)
+}
+
 func (r *KubeVirt) getInspectionXml(pod *core.Pod) (string, error) {
 	if pod == nil {
 		return "", liberr.New("no pod found to get the inspection")
@@ -2120,11 +2167,10 @@ func (r *KubeVirt) getInspectionXml(pod *core.Pod) (string, error) {
 
 func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, step *plan.Step) error {
 	if pod == nil || pod.Status.PodIP == "" {
-		// we need the IP for fetching the configuration of the convered VM.
 		return nil
 	}
 
-	url := fmt.Sprintf("http://%s:8080/vm", pod.Status.PodIP)
+	vmURL := fmt.Sprintf("http://%s:8080/vm", pod.Status.PodIP)
 
 	/* Due to the virt-v2v operation, the ovf file is only available after the command's execution,
 	meaning it appears following the copydisks phase.
@@ -2133,7 +2179,7 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 	Once the VM server is running, we can make a single call to obtain the OVF configuration,
 	followed by a shutdown request. This will complete the pod process, allowing us to move to the next phase.
 	*/
-	resp, err := http.Get(url)
+	resp, err := http.Get(vmURL)
 	if err != nil {
 		if strings.Contains(err.Error(), "connection refused") {
 			return nil
@@ -2142,15 +2188,21 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 	}
 	defer resp.Body.Close()
 
-	vmConf, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return liberr.Wrap(err)
+	inPlaceConversion := resp.StatusCode == http.StatusNoContent
+	var vmConf []byte
+	if !inPlaceConversion {
+		vmConf, err = io.ReadAll(resp.Body)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
 	}
 
 	switch r.Source.Provider.Type() {
 	case api.Ova, api.HyperV:
-		if vm.Firmware, err = util.GetFirmwareFromYaml(vmConf); err != nil {
-			return liberr.Wrap(err)
+		if !inPlaceConversion {
+			if vm.Firmware, err = util.GetFirmwareFromYaml(vmConf); err != nil {
+				return liberr.Wrap(err)
+			}
 		}
 	case api.VSphere:
 		inspectionXML, err := r.getInspectionXml(pod)
@@ -2163,11 +2215,15 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 		r.Log.Info("Setting the vm OS ", vm.OperatingSystem, "vmId", vm.ID)
 	}
 
-	if bootDiskIndex, bootOrderErr := util.GetDiskBootOrderFromYaml(vmConf); bootOrderErr != nil {
-		r.Log.Error(bootOrderErr, "Failed to extract boot order from virt-v2v output", "vmId", vm.ID)
-	} else if bootDiskIndex >= 0 {
-		vm.DetectedBootDisk = &bootDiskIndex
-		r.Log.Info("Detected boot disk from virt-v2v output", "bootDiskIndex", bootDiskIndex, "vmId", vm.ID)
+	if inPlaceConversion {
+		r.detectBootDiskFromPod(vm, pod)
+	} else {
+		if bootDiskIndex, bootOrderErr := util.GetDiskBootOrderFromYaml(vmConf); bootOrderErr != nil {
+			r.Log.Error(bootOrderErr, "Failed to extract boot order from virt-v2v output", "vmId", vm.ID)
+		} else if bootDiskIndex >= 0 {
+			vm.DetectedBootDisk = &bootDiskIndex
+			r.Log.Info("Detected boot disk from virt-v2v output", "bootDiskIndex", bootDiskIndex, "vmId", vm.ID)
+		}
 	}
 
 	// Fetch warnings before shutting down
