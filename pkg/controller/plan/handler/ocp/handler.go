@@ -65,6 +65,12 @@ func (r *Handler) generateEvents() {
 	}
 	for i := range list.Items {
 		plan := &list.Items[i]
+		if plan.Spec.Archived {
+			continue
+		}
+		if plan.Status.HasAnyCondition("Succeeded", "Failed", "Canceled") {
+			continue
+		}
 		if r.MatchProvider(plan.Spec.Provider.Source) || r.MatchProvider(plan.Spec.Provider.Destination) {
 			r.Enqueue(event.GenericEvent{
 				Object: plan,
