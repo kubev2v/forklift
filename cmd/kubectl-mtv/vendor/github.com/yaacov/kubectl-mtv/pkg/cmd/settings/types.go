@@ -168,13 +168,6 @@ var SupportedSettings = map[string]SettingDefinition{
 		Description: "Enable cross-cluster OpenShift live migration",
 		Category:    CategoryFeature,
 	},
-	"feature_vmware_system_serial_number": {
-		Name:        "feature_vmware_system_serial_number",
-		Type:        TypeBool,
-		Default:     true,
-		Description: "Use VMware system serial number for migrated VMs",
-		Category:    CategoryFeature,
-	},
 	"controller_static_udn_ip_addresses": {
 		Name:        "controller_static_udn_ip_addresses",
 		Type:        TypeBool,
@@ -215,6 +208,13 @@ var SupportedSettings = map[string]SettingDefinition{
 		Type:        TypeBool,
 		Default:     false,
 		Description: "Enable Windows registry-based network configuration",
+		Category:    CategoryFeature,
+	},
+	"feature_windows_wait_for_reboot": {
+		Name:        "feature_windows_wait_for_reboot",
+		Type:        TypeBool,
+		Default:     false,
+		Description: "Enable Windows reboot wait during guest conversion",
 		Category:    CategoryFeature,
 	},
 	"feature_mcp_server": {
@@ -259,6 +259,20 @@ var SupportedSettings = map[string]SettingDefinition{
 		Type:        TypeInt,
 		Default:     300,
 		Description: "VDDK validation job deadline (seconds)",
+		Category:    CategoryPerformance,
+	},
+	"controller_windows_reboot_timeout": {
+		Name:        "controller_windows_reboot_timeout",
+		Type:        TypeInt,
+		Default:     1800,
+		Description: "Windows reboot timeout in seconds",
+		Category:    CategoryPerformance,
+	},
+	"controller_max_populator_inflight": {
+		Name:        "controller_max_populator_inflight",
+		Type:        TypeInt,
+		Default:     20,
+		Description: "Maximum concurrent populator pods",
 		Category:    CategoryPerformance,
 	},
 	"controller_filesystem_overhead": {
@@ -570,6 +584,20 @@ var SupportedSettings = map[string]SettingDefinition{
 // These are less commonly used settings that are available via the --all flag.
 var ExtendedSettings = map[string]SettingDefinition{
 	// Additional Feature Gates
+	"feature_vmware_system_serial_number": {
+		Name:        "feature_vmware_system_serial_number",
+		Type:        TypeBool,
+		Default:     true,
+		Description: "Use VMware system serial number for migrated VMs",
+		Category:    CategoryFeature,
+	},
+	"feature_xfs_repair_ignore": {
+		Name:        "feature_xfs_repair_ignore",
+		Type:        TypeBool,
+		Default:     false,
+		Description: "Ignore XFS repair errors during disk conversion",
+		Category:    CategoryFeature,
+	},
 	"feature_ui_plugin": {
 		Name:        "feature_ui_plugin",
 		Type:        TypeBool,
@@ -880,6 +908,13 @@ var ExtendedSettings = map[string]SettingDefinition{
 		Description: "Deep inspection container image for warm migration preflight checks",
 		Category:    CategoryImage,
 	},
+	"deep_inspection_image_xfs_fqin": {
+		Name:        "deep_inspection_image_xfs_fqin",
+		Type:        TypeString,
+		Default:     "",
+		Description: "Deep inspection XFS container image",
+		Category:    CategoryImage,
+	},
 	"api_image_fqin": {
 		Name:        "api_image_fqin",
 		Type:        TypeString,
@@ -1052,6 +1087,13 @@ var ExtendedSettings = map[string]SettingDefinition{
 		Type:        TypeString,
 		Default:     "/var/cache/profiler",
 		Description: "Volume path for profiler data",
+		Category:    CategoryAdvanced,
+	},
+	"wait_for_final_snapshot_consolidation": {
+		Name:        "wait_for_final_snapshot_consolidation",
+		Type:        TypeBool,
+		Default:     true,
+		Description: "Wait for final snapshot consolidation before cutover",
 		Category:    CategoryAdvanced,
 	},
 
