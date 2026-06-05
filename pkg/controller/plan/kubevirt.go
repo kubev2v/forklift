@@ -3838,6 +3838,7 @@ func (r *KubeVirt) setPopulatorPodLabels(pod core.Pod, migrationId string) (err 
 		pod.Labels = make(map[string]string)
 	}
 	pod.Labels[kMigration] = migrationId
+	pod.Labels[kPlan] = string(r.Plan.GetUID())
 	patch := client.MergeFrom(podCopy)
 	err = r.Destination.Client.Patch(context.TODO(), &pod, patch)
 	return

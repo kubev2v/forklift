@@ -288,6 +288,12 @@ func makeScratchDV(pvc *v1.PersistentVolumeClaim) *cdi.DataVolume {
 		"migration":                     migration,
 		planbase.AnnConversionSourcePVC: pvc.Name,
 	}
+	if plan, ok := pvc.Labels["plan"]; ok {
+		labels["plan"] = plan
+	}
+	if vmID, ok := pvc.Labels["vmID"]; ok {
+		labels["vmID"] = vmID
+	}
 
 	return &cdi.DataVolume{
 		ObjectMeta: meta.ObjectMeta{
