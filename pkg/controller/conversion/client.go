@@ -14,6 +14,7 @@ import (
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -127,7 +128,7 @@ func (r *Client) RemoveSnapshot(snapshot string) (taskID string, err error) {
 		"snapshot", snapshot,
 		"children", false)
 
-	task, err := vm.RemoveSnapshot(context.TODO(), snapshot, false, nil)
+	task, err := vm.RemoveSnapshot(context.TODO(), snapshot, false, ptr.To(true))
 	if err != nil {
 		return "", liberr.Wrap(err)
 	}
