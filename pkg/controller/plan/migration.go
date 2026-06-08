@@ -1584,11 +1584,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				err = nil
 			}
 		}
-		if vm.HasCondition("WaitForGuestReboots") {
-			r.Log.Info("Retaining failed Windows wait-for-reboot pod for debugging.", "vm", vm.String())
-		} else if ierr := r.kubevirt.DeleteWaitForRebootPod(vm); ierr != nil {
-			r.Log.Error(ierr, "Could not remove Windows wait-for-reboot pod for finished VM.", "vm", vm.String())
-		}
 		vm.SetCondition(
 			libcnd.Condition{
 				Type:     api.ConditionSucceeded,

@@ -1011,6 +1011,7 @@ func (r *KubeVirt) EnsureWaitForRebootPod(vm *plan.VMStatus) (err error) {
 	}
 
 	activeDeadline := int64(settings.Settings.WindowsRebootTimeout + 600)
+	automount := true
 	pod := &core.Pod{
 		ObjectMeta: meta.ObjectMeta{
 			GenerateName: "forklift-wait-reboot-",
@@ -1018,9 +1019,10 @@ func (r *KubeVirt) EnsureWaitForRebootPod(vm *plan.VMStatus) (err error) {
 			Labels:       r.waitForRebootLabels(vm.Ref),
 		},
 		Spec: core.PodSpec{
-			RestartPolicy:         core.RestartPolicyNever,
-			ServiceAccountName:    waitForRebootSAName,
-			ActiveDeadlineSeconds: &activeDeadline,
+			RestartPolicy:                core.RestartPolicyNever,
+			ServiceAccountName:           waitForRebootSAName,
+			AutomountServiceAccountToken: &automount,
+			ActiveDeadlineSeconds:        &activeDeadline,
 			Containers: []core.Container{
 				{
 					Name:    "forklift-wait-for-reboot",
