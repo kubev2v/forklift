@@ -553,7 +553,8 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 			}
 			kubevirt = createKubeVirtWithProvider(v1beta1.VSphere, cm)
 			kubevirt.Plan.Spec.CustomizationScripts = &v1.ObjectReference{
-				Name: "my-scripts",
+				Name:      "my-scripts",
+				Namespace: "target-ns",
 			}
 
 			vmVolumes := []cnv.Volume{}
@@ -605,12 +606,14 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 			Expect(foundExtraMount).To(BeTrue(), "scripts mount not found in extraMounts")
 		})
 
-		ginkgo.It("should use explicit namespace from CustomizationScripts when set", func() {
-			cm := &v1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{Name: "my-scripts", Namespace: "other-ns"},
+		ginkgo.It("should use generated name when CustomizationScripts namespace differs from target", func() {
+			// Simulate the CM already copied to target-ns with the generated name
+			// (EnsureCustomizationScriptsConfigMap would have done this before podVolumeMounts)
+			copiedCM := &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-plan-customization-scripts", Namespace: "target-ns"},
 				Data:       map[string]string{"01_linux_run_test.sh": "#!/bin/sh\necho test"},
 			}
-			kubevirt = createKubeVirtWithProvider(v1beta1.VSphere, cm)
+			kubevirt = createKubeVirtWithProvider(v1beta1.VSphere, copiedCM)
 			kubevirt.Plan.Spec.CustomizationScripts = &v1.ObjectReference{
 				Name:      "my-scripts",
 				Namespace: "other-ns",
@@ -623,15 +626,19 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 			var found bool
 			for _, vol := range extraVolumes {
 				if vol.Name == DynamicScriptsVolumeName {
+					Expect(vol.ConfigMap).ToNot(BeNil())
+					Expect(vol.ConfigMap.Name).To(Equal("test-plan-customization-scripts"))
 					found = true
 				}
 			}
-			Expect(found).To(BeTrue(), "scripts volume should be found when using explicit namespace")
+			Expect(found).To(BeTrue(), "scripts volume should be found with generated name")
 		})
 
 		ginkgo.It("should return error when CustomizationScripts ConfigMap does not exist", func() {
+			kubevirt = createKubeVirtWithProvider(v1beta1.VSphere)
 			kubevirt.Plan.Spec.CustomizationScripts = &v1.ObjectReference{
-				Name: "nonexistent-scripts",
+				Name:      "nonexistent-scripts",
+				Namespace: "target-ns",
 			}
 
 			vm := &plan.VMStatus{}
