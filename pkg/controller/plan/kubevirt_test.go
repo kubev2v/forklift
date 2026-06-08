@@ -8,6 +8,7 @@ import (
 	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	convctx "github.com/kubev2v/forklift/pkg/controller/conversion/context"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	ginkgo "github.com/onsi/ginkgo/v2"
@@ -665,6 +666,44 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 			for _, vol := range extraVolumes {
 				Expect(vol.Name).ToNot(Equal(DynamicScriptsVolumeName))
 			}
+		})
+	})
+
+	ginkgo.Describe("GetDeepInspectionConversion", func() {
+		ginkgo.It("returns nil when a Conversion CR for the same VM exists under a different plan UID", func() {
+			const (
+				vmID           = "vm-abc-123"
+				planNamespace  = "test-ns"
+				otherPlanUID   = "other-plan-uid"
+				currentPlanUID = "current-plan-uid"
+			)
+
+			// A DeepInspection CR that belongs to a *different* plan but the same VM.
+			existingCR := &v1beta1.Conversion{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "di-conversion-other-plan",
+					Namespace: planNamespace,
+					Labels: map[string]string{
+						convctx.LabelVM:             vmID,
+						convctx.LabelConversionType: string(v1beta1.DeepInspection),
+						convctx.LabelPlan:           otherPlanUID,
+					},
+				},
+			}
+
+			kubevirt := createKubeVirt(existingCR)
+			kubevirt.Plan.ObjectMeta = metav1.ObjectMeta{
+				Name:      "current-plan",
+				Namespace: planNamespace,
+				UID:       currentPlanUID,
+			}
+
+			vm := &plan.VMStatus{}
+			vm.ID = vmID
+
+			cr, err := kubevirt.GetDeepInspectionConversion(vm)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cr).To(BeNil())
 		})
 	})
 })
