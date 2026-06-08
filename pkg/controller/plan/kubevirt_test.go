@@ -403,6 +403,8 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 			Settings.RetainPopulatorPods = savedRetain
 		})
 
+		const testVmID = "vm-123"
+
 		createKubeVirtWithPopulatorPod := func() (*KubeVirt, *v1.Pod) {
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -410,6 +412,7 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 					Namespace: targetNS,
 					Labels: map[string]string{
 						"migration": migrationUID,
+						"vmID":      testVmID,
 					},
 				},
 			}
@@ -428,11 +431,12 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 			Settings.RetainPopulatorPods = true
 			kubevirt, _ := createKubeVirtWithPopulatorPod()
 			vm := &plan.VMStatus{}
+			vm.ID = testVmID
 
 			err := kubevirt.DeletePopulatorPods(vm)
 			Expect(err).ToNot(HaveOccurred())
 
-			pods, err := kubevirt.getPopulatorPods()
+			pods, err := kubevirt.getPopulatorPods(testVmID)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(pods).To(HaveLen(1), "populator pod should still exist")
 		})
@@ -441,11 +445,12 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 			Settings.RetainPopulatorPods = false
 			kubevirt, _ := createKubeVirtWithPopulatorPod()
 			vm := &plan.VMStatus{}
+			vm.ID = testVmID
 
 			err := kubevirt.DeletePopulatorPods(vm)
 			Expect(err).ToNot(HaveOccurred())
 
-			pods, err := kubevirt.getPopulatorPods()
+			pods, err := kubevirt.getPopulatorPods(testVmID)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(pods).To(BeEmpty(), "populator pod should have been deleted")
 		})
