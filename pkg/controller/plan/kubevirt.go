@@ -1101,6 +1101,11 @@ func (r *KubeVirt) ensureWaitForRebootRBAC(namespace string) error {
 				Resources: []string{"virtualmachineinstances/console"},
 				Verbs:     []string{"get"},
 			},
+			{
+				APIGroups: []string{"kubevirt.io"},
+				Resources: []string{"virtualmachineinstances"},
+				Verbs:     []string{"get"},
+			},
 		},
 	}
 	if err := r.Destination.Create(context.TODO(), role); err != nil && !k8serr.IsAlreadyExists(err) {
