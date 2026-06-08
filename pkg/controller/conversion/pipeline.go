@@ -55,6 +55,16 @@ var DeepInspectionPipelineStages = []PipelineStage{
 // inspectionResultPort is the port the deep-inspection pod's HTTP server listens on.
 const inspectionResultPort = 8080
 
+// pendingPodTimeout returns the configured timeout for conversion pods stuck in
+// Pending. Returns 0 (no timeout) when the setting is 0.
+func pendingPodTimeout() time.Duration {
+	minutes := Settings.ConversionPodPendingTimeout
+	if minutes <= 0 {
+		return 0
+	}
+	return time.Duration(minutes) * time.Minute
+}
+
 // ConversionPipeline drives reconciliation for a single Conversion CR.
 type ConversionPipeline struct {
 	ctx    context.Context
@@ -360,6 +370,9 @@ func (p *ConversionPipeline) runStageEnsurePod() (stageDone bool, err error) {
 
 	switch pod.Status.Phase {
 	case core.PodPending:
+		if err = p.checkPendingPodTimeout(pod); err != nil {
+			return stageDone, err
+		}
 		p.setStage(api.StageCreatePod)
 		return stageDone, nil
 	case core.PodRunning:
@@ -397,6 +410,9 @@ func (p *ConversionPipeline) runStageDeepInspectionPod() (stageDone bool, err er
 
 	switch pod.Status.Phase {
 	case core.PodPending:
+		if err = p.checkPendingPodTimeout(pod); err != nil {
+			return
+		}
 		p.setStage(api.StageCreatePod)
 		return
 	case core.PodRunning:
@@ -606,8 +622,12 @@ func (p *ConversionPipeline) podHandler() (podSucceeded bool, err error) {
 		return false, liberr.New("conversion pod failed", "pod", pod.Name, "phase", pod.Status.Phase)
 	case core.PodUnknown:
 		return false, liberr.New("conversion pod in unknown state", "pod", pod.Name)
+	case core.PodPending:
+		if err = p.checkPendingPodTimeout(pod); err != nil {
+			return false, err
+		}
+		return false, nil
 	default:
-		// PodPending/PodRunning, still in progress
 		return false, nil
 	}
 }
@@ -656,6 +676,38 @@ func (p *ConversionPipeline) runStageWaitingForSnapshotRemoval() (stageDone bool
 	}
 	p.conv.Status.Snapshot = nil
 	return true, nil
+}
+
+func (p *ConversionPipeline) checkPendingPodTimeout(pod *core.Pod) error {
+	timeout := pendingPodTimeout()
+	if timeout == 0 {
+		return nil
+	}
+	if pod.CreationTimestamp.IsZero() {
+		return nil
+	}
+	elapsed := time.Since(pod.CreationTimestamp.Time)
+	if elapsed < timeout {
+		return nil
+	}
+	reason := pendingPodReason(pod)
+	return liberr.New(
+		fmt.Sprintf("conversion pod %s stuck in Pending for %s (reason: %s)",
+			pod.Name, elapsed.Truncate(time.Second), reason))
+}
+
+func pendingPodReason(pod *core.Pod) string {
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == core.PodScheduled && cond.Status == core.ConditionFalse {
+			return fmt.Sprintf("Unschedulable: %s", cond.Message)
+		}
+	}
+	for _, cs := range pod.Status.ContainerStatuses {
+		if cs.State.Waiting != nil && cs.State.Waiting.Reason != "" {
+			return fmt.Sprintf("%s: %s", cs.State.Waiting.Reason, cs.State.Waiting.Message)
+		}
+	}
+	return "check pod events for mount/scheduling failures"
 }
 
 // loadConnectionSecret returns the Secret referenced by conv.Spec.Connection.Secret.

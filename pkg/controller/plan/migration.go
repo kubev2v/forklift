@@ -219,6 +219,11 @@ func (r *Migration) begin() (err error) {
 		err = liberr.Wrap(err)
 		return
 	}
+	err = r.kubevirt.EnsureCustomizationScriptsConfigMap()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
 	//
 	// Delete
 	kept := []*plan.VMStatus{}
@@ -760,11 +765,11 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				configMapName := r.Plan.Spec.CustomizationScripts.Name
 				configMapNamespace := r.Plan.Spec.CustomizationScripts.Namespace
 				if configMapNamespace == "" {
-					configMapNamespace = r.Plan.Spec.TargetNamespace
+					configMapNamespace = r.Plan.Namespace
 				}
 
 				configMap := &core.ConfigMap{}
-				err = r.Destination.Client.Get(
+				err = r.Get(
 					context.TODO(),
 					client.ObjectKey{
 						Namespace: configMapNamespace,
