@@ -1054,19 +1054,38 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				_ = r.kubevirt.DeleteWaitForRebootPod(vm)
 				r.NextPhase(vm)
 			case core.PodFailed:
-				r.Log.Info(
-					"Windows wait-for-reboot watcher ended without success; continuing migration.",
+				logFields := []interface{}{
 					"vm", vm.String(),
 					"podNamespace", pod.Namespace,
-					"podName", pod.Name)
+					"podName", pod.Name,
+					"podMessage", pod.Status.Message,
+					"podReason", pod.Status.Reason,
+				}
+				if len(pod.Status.ContainerStatuses) > 0 {
+					cs := pod.Status.ContainerStatuses[0]
+					if cs.State.Terminated != nil {
+						logFields = append(logFields,
+							"exitCode", cs.State.Terminated.ExitCode,
+							"terminationReason", cs.State.Terminated.Reason,
+							"terminationMessage", cs.State.Terminated.Message,
+						)
+					}
+				}
+				r.Log.Info("Windows wait-for-reboot pod failed; retaining pod for debugging.", logFields...)
+				condMsg := "Windows guest reboot wait did not complete successfully; migration continues. Pod retained for debugging."
+				if len(pod.Status.ContainerStatuses) > 0 && pod.Status.ContainerStatuses[0].State.Terminated != nil {
+					t := pod.Status.ContainerStatuses[0].State.Terminated
+					if t.Message != "" {
+						condMsg = fmt.Sprintf("%s Reason: %s", condMsg, t.Message)
+					}
+				}
 				vm.SetCondition(libcnd.Condition{
 					Type:     "WaitForGuestReboots",
 					Status:   libcnd.True,
 					Category: api.CategoryWarn,
-					Message:  "Windows guest reboot wait did not complete successfully; migration continues.",
+					Message:  condMsg,
 					Durable:  true,
 				})
-				_ = r.kubevirt.DeleteWaitForRebootPod(vm)
 				r.NextPhase(vm)
 			default:
 				// Pending or Running — wait for next reconcile.
@@ -1569,9 +1588,6 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				)
 				err = nil
 			}
-		}
-		if ierr := r.kubevirt.DeleteWaitForRebootPod(vm); ierr != nil {
-			r.Log.Error(ierr, "Could not remove Windows wait-for-reboot pod for finished VM.", "vm", vm.String())
 		}
 		vm.SetCondition(
 			libcnd.Condition{
