@@ -10676,6 +10676,8 @@ rules:
   - list
   - watch
   - create
+  - delete
+  - update
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
@@ -10687,6 +10689,8 @@ rules:
   - get
   - patch
   - create
+  - delete
+  - update
 - apiGroups:
   - build.openshift.io
   resources:
