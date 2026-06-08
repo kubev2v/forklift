@@ -445,6 +445,34 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool, force
 			return err
 		}
 	}
+	if settings.Settings.UseConversionCR {
+		r.Log.Info("Deleting deep inspection conversion CR.", "vm", vm.String())
+		if diConv, diErr := r.kubevirt.GetDeepInspectionConversion(vm); diErr != nil {
+			if failOnErr(diErr) {
+				return diErr
+			}
+		} else if diConv != nil {
+			if err := r.kubevirt.DeleteConversion(diConv); failOnErr(err) {
+				return err
+			}
+		}
+		r.Log.Info("Deleting deep inspection pods.", "vm", vm.String())
+		if err := r.kubevirt.DeleteDeepInspectionPods(vm); failOnErr(err) {
+			return err
+		}
+		if r.Plan.Spec.DeleteGuestConversionPod || forceDeleteGuestConversionPod {
+			r.Log.Info("Deleting guest conversion CR.", "vm", vm.String())
+			if gConv, gErr := r.kubevirt.GetGuestConversion(vm); gErr != nil {
+				if failOnErr(gErr) {
+					return gErr
+				}
+			} else if gConv != nil {
+				if err := r.kubevirt.DeleteConversion(gConv); failOnErr(err) {
+					return err
+				}
+			}
+		}
+	}
 	r.Log.Info("Deleting preflight inspection pod.", "vm", vm.String())
 	if err := r.kubevirt.DeletePreflightInspectionPod(vm); failOnErr(err) {
 		return err

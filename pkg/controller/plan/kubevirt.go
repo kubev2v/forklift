@@ -2468,6 +2468,32 @@ func (r *KubeVirt) DeletePreflightInspectionPod(vm *plan.VMStatus) (err error) {
 	return
 }
 
+// DeleteDeepInspectionPods deletes any deep inspection pods for the given VM
+// that live on the management cluster.
+func (r *KubeVirt) DeleteDeepInspectionPods(vm *plan.VMStatus) error {
+	matchLabels := map[string]string{
+		convctx.LabelPlan:           string(r.Plan.UID),
+		convctx.LabelVM:             vm.ID,
+		convctx.LabelConversionType: string(api.DeepInspection),
+	}
+	list := &core.PodList{}
+	if err := r.List(context.TODO(), list,
+		client.InNamespace(r.Plan.Namespace),
+		client.MatchingLabels(matchLabels),
+	); err != nil {
+		return liberr.Wrap(err)
+	}
+	r.Log.Info("Found deep inspection pods to delete.", "count", len(list.Items), "vm", vm.String())
+	for i := range list.Items {
+		pod := &list.Items[i]
+		if err := r.Delete(context.TODO(), pod); err != nil && !k8serr.IsNotFound(err) {
+			return liberr.Wrap(err)
+		}
+		r.Log.Info("Deleted deep inspection pod.", "pod", pod.Name, "vm", vm.String())
+	}
+	return nil
+}
+
 // Delete the guest conversion pod on the destination cluster.
 func (r *KubeVirt) DeleteGuestConversionPod(vm *plan.VMStatus) (err error) {
 	list, err := r.GetPodsWithLabels(r.conversionLabels(vm.Ref, true))
