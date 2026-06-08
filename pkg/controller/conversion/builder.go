@@ -182,7 +182,7 @@ func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, vo
 			Containers: []core.Container{
 				{
 					Env:             nil, // set by type-specific builder
-					ImagePullPolicy: core.PullAlways,
+					ImagePullPolicy: core.PullIfNotPresent,
 					Resources: core.ResourceRequirements{
 						Requests: core.ResourceList{
 							core.ResourceCPU:    resource.MustParse(Settings.Migration.VirtV2vContainerRequestsCpu),
@@ -354,7 +354,7 @@ func (b *Builder) GetDeepInspectionPodSpec(volumes []core.Volume, volumeMounts [
 				{
 					Name:            "deep-inspection",
 					Image:           img,
-					ImagePullPolicy: core.PullAlways,
+					ImagePullPolicy: core.PullIfNotPresent,
 					Resources: core.ResourceRequirements{
 						Requests: core.ResourceList{
 							core.ResourceCPU:    resource.MustParse("100m"),

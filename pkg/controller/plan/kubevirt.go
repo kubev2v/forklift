@@ -582,20 +582,11 @@ func (r *KubeVirt) buildConversion(planName, vmID string, labels map[string]stri
 }
 
 // ensureConversion creates or updates the Conversion CR on the cluster.
-// An existing CR is found by matching all labels except LabelPlan (which
-// changes when a plan is re-created). When found its Spec and Labels are
-// refreshed; otherwise the provided CR is created verbatim.
 func (r *KubeVirt) ensureConversion(cr *api.Conversion) (*api.Conversion, error) {
-	lookupLabels := make(map[string]string, len(cr.Labels))
-	for k, v := range cr.Labels {
-		if k != convctx.LabelPlan {
-			lookupLabels[k] = v
-		}
-	}
 	list := &api.ConversionList{}
 	if err := r.Client.List(context.TODO(), list,
 		client.InNamespace(cr.Namespace),
-		client.MatchingLabels(lookupLabels),
+		client.MatchingLabels(cr.Labels),
 	); err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -679,13 +670,14 @@ func (r *KubeVirt) GetGuestConversion(vm *plan.VMStatus) (*api.Conversion, error
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
+
 	selector := k8slabels.SelectorFromSet(map[string]string{
 		convctx.LabelPlan: string(r.Plan.UID),
 		convctx.LabelVM:   vm.ID,
 	}).Add(*typeReq)
 
 	list := &api.ConversionList{}
-	if err := r.List(context.TODO(), list,
+	if err = r.List(context.TODO(), list,
 		client.InNamespace(r.Plan.Namespace),
 		client.MatchingLabelsSelector{Selector: selector},
 	); err != nil {
@@ -694,28 +686,118 @@ func (r *KubeVirt) GetGuestConversion(vm *plan.VMStatus) (*api.Conversion, error
 	if len(list.Items) > 0 {
 		return &list.Items[0], nil
 	}
+
 	return nil, nil //nolint:nilnil
 }
 
-// GetDeepInspectionConversion returns the DeepInspection Conversion CR for the
-// given VM, or nil when none exists.
-func (r *KubeVirt) GetDeepInspectionConversion(vm *plan.VMStatus) (*api.Conversion, error) {
-	labels := r.getConversionLabels(api.DeepInspection, vm.ID, "", nil)
+// GetStandaloneDeepInspectionConversion returns the most relevant DeepInspection
+// Conversion CR for the given VM that has no plan label (created outside any plan)
+// and whose settings are compatible with what this plan would create
+// (e.g. same disk encryption type). Phase priority: Succeeded > Running/Pending > Failed.
+// Returns nil when no matching CR exists.
+func (r *KubeVirt) GetStandaloneDeepInspectionConversion(vm *plan.VMStatus) (*api.Conversion, error) {
+	vmReq, err := k8slabels.NewRequirement(convctx.LabelVM, selection.Equals, []string{vm.ID})
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	typeReq, err := k8slabels.NewRequirement(convctx.LabelConversionType, selection.Equals, []string{string(api.DeepInspection)})
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	noPlanReq, err := k8slabels.NewRequirement(convctx.LabelPlan, selection.DoesNotExist, nil)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	sel := k8slabels.NewSelector().Add(*vmReq, *typeReq, *noPlanReq)
+
+	list := &api.ConversionList{}
+	if err = r.List(context.TODO(), list,
+		client.InNamespace(r.Plan.Namespace),
+		client.MatchingLabelsSelector{Selector: sel},
+	); err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
+	// Filter to CRs whose settings are compatible with what the plan would create,
+	// then return the most actionable one by phase priority (e.g. Success>Running>Failed...).
+	var matching []api.Conversion
+	for i := range list.Items {
+		if deepInspectionMatchesPlan(&list.Items[i], vm, r.Plan.Spec.XfsCompatibility) {
+			matching = append(matching, list.Items[i])
+		}
+	}
+	return bestConversionByPhase(matching), nil
+}
+
+// GetPlanDeepInspectionConversion returns the DeepInspection Conversion CR owned
+// by this specific plan for a specific VM. Returns nil when none exists.
+func (r *KubeVirt) GetPlanDeepInspectionConversion(vm *plan.VMStatus) (*api.Conversion, error) {
+	labels := r.getConversionLabels(api.DeepInspection, vm.ID, string(r.Plan.UID), nil)
 	return r.getConversion(labels)
 }
 
-// CreateDeepInspectionConversion creates a new DeepInspection Conversion CR and
-// returns it. retryAllowed controls the value of the LabelRetryAllowed label
-// stamped on the new CR: "true" permits one future retry on failure; "false"
-// makes the next failure permanent.
-func (r *KubeVirt) CreateDeepInspectionConversion(
-	vm *plan.VMStatus, snapshotMoref, planName, planID string, retryAllowed bool,
-) (*api.Conversion, error) {
-	retryValue := "false"
-	if retryAllowed {
-		retryValue = "true"
+// helper for conversionCR matching rules
+func vmDiskEncType(vm *plan.VMStatus) api.DiskEncryptionType {
+	if vm.NbdeClevis {
+		return api.DiskEncryptionTypeClevis
 	}
+	if vm.LUKS.Name != "" {
+		return api.DiskEncryptionTypeLUKS
+	}
+	return ""
+}
 
+// deepInspectionMatchesPlan reports whether the Conversion CR is compatible with
+// what the plan would create for the given VM. Two fields affect this:
+//   - DiskEncryption.Type: a CR without disk encryption can't be used for CR with disk encryption set and vice versa,
+//     e.g. the pod would fail to access the disk.
+//   - XfsCompatibility: selects the XFS compatible deep-inspection image variant,
+//     e.g. CR built without XFS compat cannot substitute for one that needs it.
+func deepInspectionMatchesPlan(cr *api.Conversion, vm *plan.VMStatus, xfsCompatibility bool) bool {
+	expected := vmDiskEncType(vm)
+	actual := api.DiskEncryptionType("")
+	if cr.Spec.DiskEncryption != nil {
+		actual = cr.Spec.DiskEncryption.Type
+	}
+	if actual != expected {
+		return false
+	}
+	return cr.Spec.XfsCompatibility == xfsCompatibility
+}
+
+// bestConversionByPhase returns the Conversion from items with prio:
+// Succeeded > Running/Pending > Failed/Canceled/other. Returns nil for empty input.
+func bestConversionByPhase(items []api.Conversion) *api.Conversion {
+	var succeeded, running, other *api.Conversion
+	for i := range items {
+		switch items[i].Status.Phase {
+		case api.PhaseSucceeded:
+			if succeeded == nil {
+				succeeded = &items[i]
+			}
+		case api.PhaseRunning, api.PhasePending:
+			if running == nil {
+				running = &items[i]
+			}
+		default:
+			if other == nil {
+				other = &items[i]
+			}
+		}
+	}
+	switch {
+	case succeeded != nil:
+		return succeeded
+	case running != nil:
+		return running
+	default:
+		return other
+	}
+}
+
+// CreateDeepInspectionConversion creates a new DeepInspection Conversion CR
+// owned by the given plan and returns it.
+func (r *KubeVirt) CreateDeepInspectionConversion(vm *plan.VMStatus, snapshotMoref, planName, planID string) (*api.Conversion, error) {
 	// Connection secret goes to Plan.Namespace on the management cluster
 	// (DeepInspection pods run there, not on the destination cluster).
 	connSecretData := r.buildDeepInspectionConnectionSecretData()
@@ -769,10 +851,8 @@ func (r *KubeVirt) CreateDeepInspectionConversion(
 		}
 	}
 
-	// Empty Destination → resolveDestinationClient returns localClient →
 	// pod is created on the management cluster in Plan.Namespace.
-	crLabels := r.getConversionLabels(api.DeepInspection, vm.ID, planID,
-		map[string]string{convctx.LabelRetryAllowed: retryValue})
+	crLabels := r.getConversionLabels(api.DeepInspection, vm.ID, planID, nil)
 	spec := api.ConversionSpec{
 		Type:            api.DeepInspection,
 		TargetNamespace: r.Plan.Namespace,
