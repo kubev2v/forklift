@@ -1446,6 +1446,51 @@ func (r *KubeVirt) EnsureCustomizationScriptsConfigMap() error {
 	return err
 }
 
+// CleanupCopiedConfigMaps deletes the extra-v2v-conf, customization-scripts,
+// and vddk-conf ConfigMaps that were copied to the plan's TargetNamespace at
+// migration start. Safe to call regardless of migration outcome.
+func (r *KubeVirt) CleanupCopiedConfigMaps() {
+	ns := r.Plan.Spec.TargetNamespace
+	cl := r.Destination.Client
+
+	// extra-v2v-conf and customization-scripts use deterministic names (delete by name).
+	for _, name := range []string{
+		genExtraV2vConfConfigMapName(r.Plan),
+		genCustomizationScriptsConfigMapName(r.Plan),
+	} {
+		cm := &core.ConfigMap{}
+		cm.Name = name
+		cm.Namespace = ns
+		if err := cl.Delete(context.TODO(), cm); err != nil && !k8serr.IsNotFound(err) {
+			r.Log.Error(err, "Failed to delete copied ConfigMap.", "name", name, "namespace", ns)
+		} else if err == nil {
+			r.Log.Info("Deleted copied ConfigMap.", "name", name, "namespace", ns)
+		}
+	}
+
+	// vddk-conf uses GenerateName so must be found by label selector.
+	list := &core.ConfigMapList{}
+	err := cl.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(r.vddkLabels()),
+			Namespace:     ns,
+		},
+	)
+	if err != nil {
+		r.Log.Error(err, "Failed to list vddk-conf ConfigMaps for cleanup.", "namespace", ns)
+		return
+	}
+	for i := range list.Items {
+		if err := cl.Delete(context.TODO(), &list.Items[i]); err != nil && !k8serr.IsNotFound(err) {
+			r.Log.Error(err, "Failed to delete vddk-conf ConfigMap.", "name", list.Items[i].Name, "namespace", ns)
+		} else if err == nil {
+			r.Log.Info("Deleted vddk-conf ConfigMap.", "name", list.Items[i].Name, "namespace", ns)
+		}
+	}
+}
+
 // Get the importer pod for a PersistentVolumeClaim.
 func (r *KubeVirt) GetImporterPod(pvc core.PersistentVolumeClaim) (pod *core.Pod, found bool, err error) {
 	pod = &core.Pod{}
