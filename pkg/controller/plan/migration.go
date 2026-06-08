@@ -410,12 +410,6 @@ func markStartedStepsCompleted(vm *plan.VMStatus) {
 	}
 }
 
-// cleanup deletes left-over migration resources associated with a VM.
-// Pass cancelConversions=true to only cancel Conversion CRs (plan canceled);
-// omit or pass false to fully delete them (archive, retry).
-func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool, cancelConversions ...bool) error {
-	isCancelOnly := len(cancelConversions) > 0 && cancelConversions[0]
-
 // Delete left over migration resources associated with a VM.
 func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool, forceDeleteGuestConversionPod bool) error {
 	r.Log.Info("Starting cleanup of migration resources.", "vm", vm.String())
@@ -428,7 +422,7 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool, force
 			return err
 		}
 		r.Log.Info("Deleting populated PVCs.", "vm", vm.String())
-		if err := r.deletePopulatorPVCs(vm); failOnErr(err) {
+		if err := r.kubevirt.DeletePopulatedPVCs(vm); failOnErr(err) {
 			return err
 		}
 		r.Log.Info("Deleting DataVolumes.", "vm", vm.String())
