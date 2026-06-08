@@ -2,10 +2,13 @@ package conversion
 
 import (
 	"fmt"
+	"strings"
 	"testing"
+	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
+	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -91,5 +94,121 @@ func TestResolvePhaseConditions_Canceled(t *testing.T) {
 	}
 	if conv.Status.CompletionTime == nil {
 		t.Error("expected CompletionTime to be set")
+	}
+}
+
+func TestCheckPendingPodTimeout_NoTimeout(t *testing.T) {
+	Settings.ConversionPodPendingTimeout = 5
+	p := &ConversionPipeline{}
+	pod := &core.Pod{
+		ObjectMeta: meta.ObjectMeta{
+			Name:              "test-pod",
+			CreationTimestamp: meta.NewTime(time.Now().Add(-1 * time.Minute)),
+		},
+		Status: core.PodStatus{Phase: core.PodPending},
+	}
+	err := p.checkPendingPodTimeout(pod)
+	if err != nil {
+		t.Errorf("expected no error for pod pending < timeout, got: %v", err)
+	}
+}
+
+func TestCheckPendingPodTimeout_Exceeded(t *testing.T) {
+	Settings.ConversionPodPendingTimeout = 5
+	p := &ConversionPipeline{}
+	pod := &core.Pod{
+		ObjectMeta: meta.ObjectMeta{
+			Name:              "test-pod",
+			CreationTimestamp: meta.NewTime(time.Now().Add(-6 * time.Minute)),
+		},
+		Status: core.PodStatus{Phase: core.PodPending},
+	}
+	err := p.checkPendingPodTimeout(pod)
+	if err == nil {
+		t.Fatal("expected error for pod pending > timeout")
+	}
+	if !strings.Contains(err.Error(), "stuck in Pending") {
+		t.Errorf("unexpected error message: %s", err.Error())
+	}
+}
+
+func TestCheckPendingPodTimeout_ZeroTimestamp(t *testing.T) {
+	Settings.ConversionPodPendingTimeout = 5
+	p := &ConversionPipeline{}
+	pod := &core.Pod{
+		ObjectMeta: meta.ObjectMeta{Name: "test-pod"},
+		Status:     core.PodStatus{Phase: core.PodPending},
+	}
+	err := p.checkPendingPodTimeout(pod)
+	if err != nil {
+		t.Errorf("expected no error for zero timestamp, got: %v", err)
+	}
+}
+
+func TestCheckPendingPodTimeout_Disabled(t *testing.T) {
+	Settings.ConversionPodPendingTimeout = 0
+	p := &ConversionPipeline{}
+	pod := &core.Pod{
+		ObjectMeta: meta.ObjectMeta{
+			Name:              "test-pod",
+			CreationTimestamp: meta.NewTime(time.Now().Add(-60 * time.Minute)),
+		},
+		Status: core.PodStatus{Phase: core.PodPending},
+	}
+	err := p.checkPendingPodTimeout(pod)
+	if err != nil {
+		t.Errorf("expected no error when timeout is disabled (0), got: %v", err)
+	}
+}
+
+func TestPendingPodReason_Unschedulable(t *testing.T) {
+	pod := &core.Pod{
+		Status: core.PodStatus{
+			Conditions: []core.PodCondition{
+				{
+					Type:    core.PodScheduled,
+					Status:  core.ConditionFalse,
+					Message: "0/3 nodes are available",
+				},
+			},
+		},
+	}
+	reason := pendingPodReason(pod)
+	if !strings.Contains(reason, "Unschedulable") {
+		t.Errorf("expected Unschedulable reason, got: %s", reason)
+	}
+}
+
+func TestPendingPodReason_ContainerWaiting(t *testing.T) {
+	pod := &core.Pod{
+		Status: core.PodStatus{
+			ContainerStatuses: []core.ContainerStatus{
+				{
+					State: core.ContainerState{
+						Waiting: &core.ContainerStateWaiting{
+							Reason:  "ContainerCreating",
+							Message: "configmap \"my-scripts\" not found",
+						},
+					},
+				},
+			},
+		},
+	}
+	reason := pendingPodReason(pod)
+	if !strings.Contains(reason, "ContainerCreating") {
+		t.Errorf("expected ContainerCreating reason, got: %s", reason)
+	}
+	if !strings.Contains(reason, "my-scripts") {
+		t.Errorf("expected configmap name in reason, got: %s", reason)
+	}
+}
+
+func TestPendingPodReason_Fallback(t *testing.T) {
+	pod := &core.Pod{
+		Status: core.PodStatus{},
+	}
+	reason := pendingPodReason(pod)
+	if reason != "check pod events for mount/scheduling failures" {
+		t.Errorf("expected fallback reason, got: %s", reason)
 	}
 }

@@ -162,8 +162,9 @@ const (
 
 // Vddk v2v conf
 const (
-	ExtraV2vConf = "extra-v2v-conf"
-	VddkConf     = "vddk-conf"
+	ExtraV2vConf         = "extra-v2v-conf"
+	VddkConf             = "vddk-conf"
+	CustomizationScripts = "customization-scripts"
 
 	VddkAioBufSizeDefault  = "16"
 	VddkAioBufCountDefault = "4"
@@ -1295,6 +1296,48 @@ func genExtraV2vConfConfigMapName(plan *api.Plan) string {
 
 func genVddkConfConfigMapName(plan *api.Plan) string {
 	return fmt.Sprintf("%s-%s-", plan.Name, VddkConf)
+}
+
+func genCustomizationScriptsConfigMapName(plan *api.Plan) string {
+	return fmt.Sprintf("%s-%s", plan.Name, CustomizationScripts)
+}
+
+// Ensure the ConfigMap referenced by CustomizationScripts exists in TargetNamespace.
+// If the ConfigMap lives in a different namespace, it is copied to the target.
+func (r *KubeVirt) EnsureCustomizationScriptsConfigMap() error {
+	if r.Plan.Spec.CustomizationScripts == nil {
+		return nil
+	}
+
+	configMapNamespace := r.Plan.Spec.CustomizationScripts.Namespace
+	if configMapNamespace == "" {
+		configMapNamespace = r.Plan.Namespace
+	}
+	if configMapNamespace == r.Plan.Spec.TargetNamespace {
+		return nil
+	}
+
+	configMap := &core.ConfigMap{}
+	err := r.Get(
+		context.TODO(),
+		client.ObjectKey{
+			Name:      r.Plan.Spec.CustomizationScripts.Name,
+			Namespace: configMapNamespace,
+		},
+		configMap,
+	)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	err = ensureConfigMap(configMap, genCustomizationScriptsConfigMapName, r.Plan, r.Destination.Client)
+	if err == nil {
+		r.Log.V(4).Info(
+			"Ensured ConfigMap for customization scripts in target namespace.",
+			"configMap namespace", configMapNamespace,
+			"target namespace", r.Plan.Spec.TargetNamespace)
+	}
+	return err
 }
 
 // Get the importer pod for a PersistentVolumeClaim.
@@ -3246,11 +3289,17 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 		configMapName := r.Plan.Spec.CustomizationScripts.Name
 		configMapNamespace := r.Plan.Spec.CustomizationScripts.Namespace
 		if configMapNamespace == "" {
-			configMapNamespace = r.Plan.Spec.TargetNamespace
+			configMapNamespace = r.Plan.Namespace
+		}
+
+		// When the CM was copied to TargetNamespace, use the generated name
+		volumeConfigMapName := configMapName
+		if configMapNamespace != r.Plan.Spec.TargetNamespace {
+			volumeConfigMapName = genCustomizationScriptsConfigMapName(r.Plan)
 		}
 
 		var exists bool
-		_, exists, err = r.findConfigMapInNamespace(configMapName, configMapNamespace)
+		_, exists, err = r.findConfigMapInNamespace(volumeConfigMapName, r.Plan.Spec.TargetNamespace)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
@@ -3258,7 +3307,7 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 		if !exists {
 			err = liberr.New(
 				fmt.Sprintf("CustomizationScripts ConfigMap %s not found in namespace %s",
-					configMapName, configMapNamespace))
+					volumeConfigMapName, r.Plan.Spec.TargetNamespace))
 			return
 		}
 		scriptsVol := core.Volume{
@@ -3266,7 +3315,7 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 			VolumeSource: core.VolumeSource{
 				ConfigMap: &core.ConfigMapVolumeSource{
 					LocalObjectReference: core.LocalObjectReference{
-						Name: configMapName,
+						Name: volumeConfigMapName,
 					},
 				},
 			},

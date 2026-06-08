@@ -78,6 +78,7 @@ const (
 	AAPInsecureSkipVerify                  = "AAP_INSECURE_SKIP_VERIFY"
 	AAPCASecretName                        = "AAP_CA_SECRET_NAME"
 	WaitForFinalSnapshotConsolidation      = "WAIT_FOR_FINAL_SNAPSHOT_CONSOLIDATION"
+	ConversionPodPendingTimeout            = "CONVERSION_POD_PENDING_TIMEOUT"
 )
 
 // Default values for populator container resources
@@ -87,6 +88,10 @@ var (
 	DefaultPopulatorContainerRequestsCpu    = resource.NewQuantity(100, resource.DecimalSI)
 	DefaultPopulatorContainerRequestsMemory = resource.NewQuantity(512, resource.BinarySI)
 )
+
+// DefaultPendingPodTimeoutMinutes is the default number of minutes a
+// conversion pod may stay in Pending before the controller fails it.
+const DefaultPendingPodTimeoutMinutes = 5
 
 // Migration settings
 type Migration struct {
@@ -191,6 +196,9 @@ type Migration struct {
 	AAPCASecretName string
 	// Whether or not to wait for final snapshot removal and consolidation before finishing Plan.
 	WaitForFinalSnapshotConsolidation bool
+	// ConversionPodPendingTimeout is how long (in minutes) a conversion pod may stay
+	// in Pending phase before the controller fails it. 0 means no timeout.
+	ConversionPodPendingTimeout int
 }
 
 // Load settings.
@@ -446,5 +454,8 @@ func (r *Migration) Load() (err error) {
 		r.DeepInspectionImageXFS = strings.TrimSpace(val)
 	}
 	r.WaitForFinalSnapshotConsolidation = getEnvBool(WaitForFinalSnapshotConsolidation, true)
+	if r.ConversionPodPendingTimeout, err = getEnvLimit(ConversionPodPendingTimeout, DefaultPendingPodTimeoutMinutes, 0); err != nil {
+		return liberr.Wrap(err)
+	}
 	return
 }
