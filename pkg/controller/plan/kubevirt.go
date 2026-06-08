@@ -582,27 +582,19 @@ func (r *KubeVirt) buildConversion(planName, vmID string, labels map[string]stri
 }
 
 // ensureConversion creates or updates the Conversion CR on the cluster.
-// An existing CR is found by matching all labels except LabelPlan (which
-// changes when a plan is re-created). When found its Spec and Labels are
-// refreshed; otherwise the provided CR is created verbatim.
+// An existing CR is found by matching all labels (including LabelPlan). When
+// found its Spec is refreshed; otherwise the provided CR is created verbatim.
 func (r *KubeVirt) ensureConversion(cr *api.Conversion) (*api.Conversion, error) {
-	lookupLabels := make(map[string]string, len(cr.Labels))
-	for k, v := range cr.Labels {
-		if k != convctx.LabelPlan {
-			lookupLabels[k] = v
-		}
-	}
 	list := &api.ConversionList{}
 	if err := r.Client.List(context.TODO(), list,
 		client.InNamespace(cr.Namespace),
-		client.MatchingLabels(lookupLabels),
+		client.MatchingLabels(cr.Labels),
 	); err != nil {
 		return nil, liberr.Wrap(err)
 	}
 	if len(list.Items) > 0 {
 		existing := &list.Items[0]
 		existing.Spec = cr.Spec
-		existing.Labels = cr.Labels
 		if err := r.Client.Update(context.TODO(), existing); err != nil {
 			return nil, liberr.Wrap(err)
 		}
@@ -698,24 +690,17 @@ func (r *KubeVirt) GetGuestConversion(vm *plan.VMStatus) (*api.Conversion, error
 }
 
 // GetDeepInspectionConversion returns the DeepInspection Conversion CR for the
-// given VM, or nil when none exists.
+// given VM on this plan, or nil when none exists.
 func (r *KubeVirt) GetDeepInspectionConversion(vm *plan.VMStatus) (*api.Conversion, error) {
-	labels := r.getConversionLabels(api.DeepInspection, vm.ID, "", nil)
+	labels := r.getConversionLabels(api.DeepInspection, vm.ID, string(r.Plan.UID), nil)
 	return r.getConversion(labels)
 }
 
 // CreateDeepInspectionConversion creates a new DeepInspection Conversion CR and
-// returns it. retryAllowed controls the value of the LabelRetryAllowed label
-// stamped on the new CR: "true" permits one future retry on failure; "false"
-// makes the next failure permanent.
+// returns it.
 func (r *KubeVirt) CreateDeepInspectionConversion(
-	vm *plan.VMStatus, snapshotMoref, planName, planID string, retryAllowed bool,
+	vm *plan.VMStatus, snapshotMoref, planName, planID string,
 ) (*api.Conversion, error) {
-	retryValue := "false"
-	if retryAllowed {
-		retryValue = "true"
-	}
-
 	// Connection secret goes to Plan.Namespace on the management cluster
 	// (DeepInspection pods run there, not on the destination cluster).
 	connSecretData := r.buildDeepInspectionConnectionSecretData()
@@ -771,8 +756,7 @@ func (r *KubeVirt) CreateDeepInspectionConversion(
 
 	// Empty Destination → resolveDestinationClient returns localClient →
 	// pod is created on the management cluster in Plan.Namespace.
-	crLabels := r.getConversionLabels(api.DeepInspection, vm.ID, planID,
-		map[string]string{convctx.LabelRetryAllowed: retryValue})
+	crLabels := r.getConversionLabels(api.DeepInspection, vm.ID, planID, nil)
 	spec := api.ConversionSpec{
 		Type:            api.DeepInspection,
 		TargetNamespace: r.Plan.Namespace,

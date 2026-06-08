@@ -16,7 +16,6 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
-	convctx "github.com/kubev2v/forklift/pkg/controller/conversion/context"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
@@ -1456,10 +1455,8 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				}
 
 				if cr == nil {
-					// No CR yet, first attempt
-					// retryAllowed=false means if this one fails it will not be retried automatically.
 					_, err = r.kubevirt.CreateDeepInspectionConversion(
-						vm, snapshotMoref, r.Plan.Name, string(r.Plan.UID), false)
+						vm, snapshotMoref, r.Plan.Name, string(r.Plan.UID))
 					if err != nil {
 						step.AddError(err.Error())
 						err = nil
@@ -1479,31 +1476,22 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 					}
 					r.NextPhase(vm)
 
-				case api.PhaseFailed, api.PhaseCanceled:
+				case api.PhaseFailed:
 					r.Log.Info("Deep inspection CR failed.",
 						"conversion", cr.Name,
-						"phase", cr.Status.Phase,
 						"vm", vm.String())
-					retryLabel, hasLabel := cr.Labels[convctx.LabelRetryAllowed]
-					// Label present and explicitly false, no more retries.
-					if hasLabel && retryLabel == "false" {
-						step.AddError("Deep inspection failed after retry.")
-						break
-					}
-					// Label missing or set to "true", one retry allowed.
-					// Delete the failed CR and recreate it with retryAllowed=false so
-					// the replacement cannot trigger another retry.
+					step.AddError("Deep inspection failed.")
+
+				case api.PhaseCanceled:
+					r.Log.Info("Deep inspection CR was canceled, deleting.",
+						"conversion", cr.Name,
+						"vm", vm.String())
 					if err = r.kubevirt.DeleteConversion(cr); err != nil {
 						step.AddError(err.Error())
 						err = nil
 						break
 					}
-					_, err = r.kubevirt.CreateDeepInspectionConversion(
-						vm, snapshotMoref, r.Plan.Name, string(r.Plan.UID), false)
-					if err != nil {
-						step.AddError(err.Error())
-						err = nil
-					}
+
 					return
 
 				default:
