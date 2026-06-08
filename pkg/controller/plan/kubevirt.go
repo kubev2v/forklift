@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -1059,48 +1060,85 @@ func (r *KubeVirt) ensureWaitForRebootRBAC(namespace string) error {
 		return liberr.Wrap(err)
 	}
 
+	// rules for the wait-for-reboot pod
+	desiredRules := []rbacv1.PolicyRule{
+		{
+			APIGroups: []string{"subresources.kubevirt.io"},
+			Resources: []string{"virtualmachineinstances/console"},
+			Verbs:     []string{"get"},
+		},
+		{
+			APIGroups: []string{"kubevirt.io"},
+			Resources: []string{"virtualmachineinstances"},
+			Verbs:     []string{"get"},
+		},
+	}
+
 	role := &rbacv1.Role{
 		ObjectMeta: meta.ObjectMeta{
 			Name:      waitForRebootSAName,
 			Namespace: namespace,
 		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				APIGroups: []string{"subresources.kubevirt.io"},
-				Resources: []string{"virtualmachineinstances/console"},
-				Verbs:     []string{"get"},
-			},
-			{
-				APIGroups: []string{"kubevirt.io"},
-				Resources: []string{"virtualmachineinstances"},
-				Verbs:     []string{"get"},
-			},
-		},
+		Rules: desiredRules,
 	}
-	if err := r.Destination.Create(context.TODO(), role); err != nil && !k8serr.IsAlreadyExists(err) {
-		return liberr.Wrap(err)
+	if err := r.Destination.Create(context.TODO(), role); err != nil {
+		if !k8serr.IsAlreadyExists(err) {
+			return liberr.Wrap(err)
+		}
+		existing := &rbacv1.Role{}
+		if err = r.Destination.Client.Get(context.TODO(), client.ObjectKey{Namespace: namespace, Name: waitForRebootSAName}, existing); err != nil {
+			return liberr.Wrap(err)
+		}
+		if !reflect.DeepEqual(existing.Rules, desiredRules) {
+			existing.Rules = desiredRules
+			if err = r.Destination.Client.Update(context.TODO(), existing); err != nil {
+				return liberr.Wrap(err)
+			}
+		}
 	}
 
+	desiredSubjects := []rbacv1.Subject{
+		{
+			Kind:      "ServiceAccount",
+			Name:      waitForRebootSAName,
+			Namespace: namespace,
+		},
+	}
 	binding := &rbacv1.RoleBinding{
 		ObjectMeta: meta.ObjectMeta{
 			Name:      waitForRebootSAName + "-binding",
 			Namespace: namespace,
 		},
-		Subjects: []rbacv1.Subject{
-			{
-				Kind:      "ServiceAccount",
-				Name:      waitForRebootSAName,
-				Namespace: namespace,
-			},
-		},
+		Subjects: desiredSubjects,
 		RoleRef: rbacv1.RoleRef{
 			Kind:     "Role",
 			Name:     waitForRebootSAName,
 			APIGroup: "rbac.authorization.k8s.io",
 		},
 	}
-	if err := r.Destination.Create(context.TODO(), binding); err != nil && !k8serr.IsAlreadyExists(err) {
-		return liberr.Wrap(err)
+	if err := r.Destination.Create(context.TODO(), binding); err != nil {
+		if !k8serr.IsAlreadyExists(err) {
+			return liberr.Wrap(err)
+		}
+		existing := &rbacv1.RoleBinding{}
+		if err = r.Destination.Client.Get(context.TODO(), client.ObjectKey{Namespace: namespace, Name: waitForRebootSAName + "-binding"}, existing); err != nil {
+			return liberr.Wrap(err)
+		}
+		// roleRef is immutable, the binding must be replaced entirely if it's different
+		// subjects diff can be fixed with a plain update
+		if !reflect.DeepEqual(existing.RoleRef, binding.RoleRef) {
+			if err = r.Destination.Client.Delete(context.TODO(), existing); err != nil {
+				return liberr.Wrap(err)
+			}
+			if err = r.Destination.Client.Create(context.TODO(), binding); err != nil {
+				return liberr.Wrap(err)
+			}
+		} else if !reflect.DeepEqual(existing.Subjects, desiredSubjects) {
+			existing.Subjects = desiredSubjects
+			if err = r.Destination.Client.Update(context.TODO(), existing); err != nil {
+				return liberr.Wrap(err)
+			}
+		}
 	}
 	return nil
 }
