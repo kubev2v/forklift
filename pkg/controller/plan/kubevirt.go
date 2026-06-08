@@ -659,6 +659,37 @@ func (r *KubeVirt) ensureConversionSecret(cl client.Client, secret *core.Secret)
 	return secret, nil
 }
 
+// GetGuestConversion returns the guest-conversion (Remote or InPlace) Conversion CR
+// for the given VM on this plan, or nil when none exists.
+func (r *KubeVirt) GetGuestConversion(vm *plan.VMStatus) (*api.Conversion, error) {
+	typeReq, err := k8slabels.NewRequirement(
+		convctx.LabelConversionType,
+		selection.In,
+		[]string{string(api.Remote), string(api.InPlace)},
+	)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
+	selector := k8slabels.SelectorFromSet(map[string]string{
+		convctx.LabelPlan: string(r.Plan.UID),
+		convctx.LabelVM:   vm.ID,
+	}).Add(*typeReq)
+
+	list := &api.ConversionList{}
+	if err = r.List(context.TODO(), list,
+		client.InNamespace(r.Plan.Namespace),
+		client.MatchingLabelsSelector{Selector: selector},
+	); err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	if len(list.Items) > 0 {
+		return &list.Items[0], nil
+	}
+
+	return nil, nil //nolint:nilnil
+}
+
 // GetStandaloneDeepInspectionConversion returns the most relevant DeepInspection
 // Conversion CR for the given VM that has no plan label (created outside any plan)
 // and whose settings are compatible with what this plan would create
