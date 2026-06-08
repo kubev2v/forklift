@@ -1571,6 +1571,11 @@ func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (tr
 		return
 	}
 
+	if populatorCr.Status.Progress == "" {
+		transferredBytes = 0
+		return
+	}
+
 	progressPercentage, err := strconv.ParseInt(populatorCr.Status.Progress, 10, 64)
 	if err != nil {
 		r.Log.Error(err, "Couldn't parse the progress percentage.", "pvcName", pvc.Name, "progressPercentage", progressPercentage)
