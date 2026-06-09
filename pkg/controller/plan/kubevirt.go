@@ -2023,11 +2023,12 @@ func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, e
 		return
 	}
 
-	pvcs = make([]*core.PersistentVolumeClaim, len(pvcsList.Items))
-	for i, pvc := range pvcsList.Items {
-		// loopvar
-		pvc := pvc
-		pvcs[i] = &pvc
+	for i := range pvcsList.Items {
+		pvc := &pvcsList.Items[i]
+		if strings.HasPrefix(pvc.Name, "prime-") || !hasDiskIdentity(pvc) {
+			continue
+		}
+		pvcs = append(pvcs, pvc)
 	}
 
 	// Sort the pvcs slice by disk index
@@ -2038,6 +2039,16 @@ func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, e
 	})
 
 	return
+}
+
+// hasDiskIdentity reports whether the PVC carries the AnnDiskSource annotation
+// that every adapter sets on real disk PVCs.
+func hasDiskIdentity(pvc *core.PersistentVolumeClaim) bool {
+	if pvc.Annotations == nil {
+		return false
+	}
+	source, ok := pvc.Annotations[planbase.AnnDiskSource]
+	return ok && strings.TrimSpace(source) != ""
 }
 
 // Creates the PVs and PVCs for LUN disks.
