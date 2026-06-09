@@ -1006,6 +1006,9 @@ func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, step *plan.Step) 
 
 // EnsureWaitForRebootPod creates a pod that runs the forklift-wait-for-reboot binary to monitor the target VMI serial console (idempotent).
 func (r *KubeVirt) EnsureWaitForRebootPod(vm *plan.VMStatus) (err error) {
+	nonRoot := true
+	allowPrivilegeEscalation := false
+
 	img := getVirtV2vImage(r.Plan)
 	if img == "" {
 		err = liberr.New("virt-v2v image is not set; cannot create Windows wait-for-reboot pod")
@@ -1027,6 +1030,16 @@ func (r *KubeVirt) EnsureWaitForRebootPod(vm *plan.VMStatus) (err error) {
 
 	activeDeadline := int64(settings.Settings.WindowsRebootTimeout + 600)
 	automount := true
+
+	seccompProfile := core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}
+	if settings.Settings.OpenShift {
+		unshare := "profiles/unshare.json"
+		seccompProfile = core.SeccompProfile{
+			Type:             core.SeccompProfileTypeLocalhost,
+			LocalhostProfile: &unshare,
+		}
+	}
+
 	pod := &core.Pod{
 		ObjectMeta: meta.ObjectMeta{
 			GenerateName: "forklift-wait-reboot-",
@@ -1034,6 +1047,10 @@ func (r *KubeVirt) EnsureWaitForRebootPod(vm *plan.VMStatus) (err error) {
 			Labels:       r.waitForRebootLabels(vm.Ref),
 		},
 		Spec: core.PodSpec{
+			SecurityContext: &core.PodSecurityContext{
+				RunAsNonRoot:   &nonRoot,
+				SeccompProfile: &seccompProfile,
+			},
 			RestartPolicy:                core.RestartPolicyNever,
 			ServiceAccountName:           waitForRebootSAName,
 			AutomountServiceAccountToken: &automount,
@@ -1048,6 +1065,10 @@ func (r *KubeVirt) EnsureWaitForRebootPod(vm *plan.VMStatus) (err error) {
 						{Name: "VMI_NAMESPACE", Value: r.Plan.Spec.TargetNamespace},
 						{Name: "SIGNAL", Value: "CONVERSION_DONE"},
 						{Name: "TIMEOUT", Value: strconv.Itoa(settings.Settings.WindowsRebootTimeout)},
+					},
+					SecurityContext: &core.SecurityContext{
+						AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+						Capabilities:             &core.Capabilities{Drop: []core.Capability{"ALL"}},
 					},
 				},
 			},
