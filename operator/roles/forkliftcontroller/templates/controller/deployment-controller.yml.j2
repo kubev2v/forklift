@@ -208,10 +208,8 @@ spec:
         - name: FEATURE_WINDOWS_REGISTRY_NETWORK_CONFIG
           value: "true"
 {% endif %}
-{% if feature_windows_wait_for_reboot|bool %}
         - name: FEATURE_WINDOWS_WAIT_FOR_REBOOT
-          value: "true"
-{% endif %}
+          value: "{{ feature_windows_wait_for_reboot|bool|lower }}"
         - name: FEATURE_USE_CONVERSION_CR
           value: "{{ feature_use_conversion_cr|bool|lower }}"
 {% if ovirt_osmap_configmap_name is defined %}
