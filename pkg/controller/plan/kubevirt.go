@@ -1031,15 +1031,6 @@ func (r *KubeVirt) EnsureWaitForRebootPod(vm *plan.VMStatus) (err error) {
 	activeDeadline := int64(settings.Settings.WindowsRebootTimeout + 600)
 	automount := true
 
-	seccompProfile := core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}
-	if settings.Settings.OpenShift {
-		unshare := "profiles/unshare.json"
-		seccompProfile = core.SeccompProfile{
-			Type:             core.SeccompProfileTypeLocalhost,
-			LocalhostProfile: &unshare,
-		}
-	}
-
 	pod := &core.Pod{
 		ObjectMeta: meta.ObjectMeta{
 			GenerateName: "forklift-wait-reboot-",
@@ -1049,7 +1040,7 @@ func (r *KubeVirt) EnsureWaitForRebootPod(vm *plan.VMStatus) (err error) {
 		Spec: core.PodSpec{
 			SecurityContext: &core.PodSecurityContext{
 				RunAsNonRoot:   &nonRoot,
-				SeccompProfile: &seccompProfile,
+				SeccompProfile: &core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault},
 			},
 			RestartPolicy:                core.RestartPolicyNever,
 			ServiceAccountName:           waitForRebootSAName,
