@@ -1,1 +1,1 @@
-VIB_VERSION := 0.3.0
+VIB_VERSION := 0.3.1

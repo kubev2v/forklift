@@ -3,7 +3,7 @@
 set -e
 
 TMP_PREFIX="/tmp/vmkfstools-wrapper-"
-SCRIPT_VERSION="0.3.0"
+SCRIPT_VERSION="0.3.1"
 LOGIN_TAG="vmkfstools-wrapper"
 
 xml_output() {
@@ -157,9 +157,34 @@ generate_task_id() {
     echo ${hex:0:8}-${hex:8:4}-${hex:12:4}-${hex:16:4}-${hex:20:12}
 }
 
+cleanup_stale_dirs() {
+    log_info "Checking for stale task directories older than 5 days"
+    local stale_dirs
+    stale_dirs=$(find /tmp -maxdepth 1 -type d -name "vmkfstools-wrapper-*" -mtime +5 2>/dev/null) || true
+
+    if [ -z "${stale_dirs}" ]; then
+        log_info "No stale task directories found"
+        return 0
+    fi
+
+    echo "${stale_dirs}" | while IFS= read -r dir; do
+        if [ -n "${dir}" ] && [ -d "${dir}" ]; then
+            case "${dir}" in
+                /tmp/vmkfstools-wrapper-*)
+                    log_info "Removing stale task directory: ${dir}"
+                    rm -rf "${dir}" 2>/dev/null || log_warning "Failed to remove stale directory: ${dir}"
+                    ;;
+            esac
+        fi
+    done
+    return 0
+}
+
 clone() {
     local source_vmdk="$1"
     local target_lun="$2"
+
+    cleanup_stale_dirs || true
 
     log_info "Validating source VMDK path..."
     local source
