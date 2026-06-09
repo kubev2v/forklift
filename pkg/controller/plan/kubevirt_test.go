@@ -32,6 +32,9 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 					"migration": "test",
 					"vmID":      "test",
 				},
+				Annotations: map[string]string{
+					"forklift.konveyor.io/disk-source": "test-disk",
+				},
 			},
 		}
 
@@ -40,6 +43,69 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 			pvcs, err := kubevirt.getPVCs(ref.Ref{ID: "test"})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(pvcs).To(HaveLen(1))
+		})
+
+		ginkgo.It("should exclude prime PVCs created by the volume populator", func() {
+			realPVC := &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "9ba19d87-0d7f-43be-9ffe-d7dd3a552188-ggcw8",
+					Namespace: "test",
+					Labels: map[string]string{
+						"migration": "test",
+						"vmID":      "test",
+						"imageID":   "9ba19d87",
+					},
+					Annotations: map[string]string{
+						"forklift.konveyor.io/disk-source": "9ba19d87",
+					},
+				},
+			}
+			primePVC := &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "prime-222bcc84-8e35-4afb-a607-39605ff0397a",
+					Namespace: "test",
+					Labels: map[string]string{
+						"migration": "test",
+						"vmID":      "test",
+					},
+				},
+			}
+			kubevirt := createKubeVirt(realPVC, primePVC)
+			pvcs, err := kubevirt.getPVCs(ref.Ref{ID: "test"})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(pvcs).To(HaveLen(1))
+			Expect(pvcs[0].Name).To(Equal(realPVC.Name))
+		})
+
+		ginkgo.It("should exclude PVCs without disk-source annotation", func() {
+			realPVC := &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "real-disk-pvc",
+					Namespace: "test",
+					Labels: map[string]string{
+						"migration": "test",
+						"vmID":      "test",
+					},
+					Annotations: map[string]string{
+						"forklift.konveyor.io/disk-source": "disk-001",
+					},
+				},
+			}
+			noIdentityPVC := &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "stray-pvc-no-annotations",
+					Namespace: "test",
+					Labels: map[string]string{
+						"migration": "test",
+						"vmID":      "test",
+					},
+				},
+			}
+			kubevirt := createKubeVirt(realPVC, noIdentityPVC)
+			pvcs, err := kubevirt.getPVCs(ref.Ref{ID: "test"})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(pvcs).To(HaveLen(1))
+			Expect(pvcs[0].Name).To(Equal(realPVC.Name))
 		})
 	})
 
