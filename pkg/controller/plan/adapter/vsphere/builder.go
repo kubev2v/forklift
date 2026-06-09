@@ -961,7 +961,7 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 		}
 	}
 
-	bootDisk := -1
+	var bootDisk int
 	for _, vmConf := range r.Plan.Spec.VMs {
 		if vmConf.ID == vmRef.ID {
 			if vmConf.RootDisk != "" {
@@ -1052,12 +1052,12 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 			r.Log.Info("Available PVC mapping", "diskKey", key, "pvcName", pvc.Name)
 		}
 		return fmt.Errorf("no disks were successfully mapped for VM %s", vm.Name)
-	} else if bootDisk >= 0 && bootDisk < len(kDisks) {
+	} else if bootDisk < len(kDisks) {
+		// For multiboot VMs, if the selected boot device is the current disk,
+		// set it as the first in the boot order.
 		kDisks[bootDisk].BootOrder = ptr.To(uint(1))
-	} else if bootDisk >= len(kDisks) {
-		r.Log.Info("Boot disk index out of range", "bootDisk", bootDisk, "diskCount", len(kDisks), "vm", vm.Name)
 	} else {
-		r.Log.Info("Boot disk not detected, skipping bootOrder assignment", "vm", vm.Name)
+		r.Log.Info("Boot disk index out of range", "bootDisk", bootDisk, "diskCount", len(kDisks), "vm", vm.Name)
 	}
 
 	object.Template.Spec.Volumes = kVolumes
