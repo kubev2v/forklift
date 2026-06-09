@@ -119,7 +119,7 @@ test_version_command() {
     local exit_code=$?
 
     assert_exit_code 0 ${exit_code} "Version command exits with 0"
-    assert_contains "0.3.0" "${output}" "Version output contains version number"
+    assert_contains "0.3.1" "${output}" "Version output contains version number"
     assert_contains "<?xml version" "${output}" "Version output is XML format"
     assert_contains '"version"' "${output}" "Version output contains version field"
 }
@@ -134,7 +134,7 @@ test_version_output_simple() {
     local exit_code=$?
 
     assert_exit_code 0 ${exit_code} "Version command with --output simple exits with 0"
-    assert_equals "0.3.0" "${output}" "Simple output returns only version number"
+    assert_equals "0.3.1" "${output}" "Simple output returns only version number"
     assert_not_contains "<?xml" "${output}" "Simple output has no XML"
     assert_not_contains "version" "${output}" "Simple output has no JSON field name"
 }
@@ -149,7 +149,7 @@ test_version_output_xml() {
     local exit_code=$?
 
     assert_exit_code 0 ${exit_code} "Version command with --output xml exits with 0"
-    assert_contains "0.3.0" "${output}" "XML output contains version number"
+    assert_contains "0.3.1" "${output}" "XML output contains version number"
     assert_contains "<?xml version" "${output}" "XML output has XML declaration"
     assert_contains '"version"' "${output}" "XML output contains version field"
 }
@@ -166,7 +166,7 @@ test_path_validation() {
     cat > "${TEST_TMP_DIR}/validate.sh" << 'EOF'
 #!/bin/sh
 LOG_FILE="/dev/null"
-SCRIPT_VERSION="0.3.0"
+SCRIPT_VERSION="0.3.1"
 log_info() { :; }
 log_error() { echo "ERROR: $1" >&2; }
 validate_path() {
@@ -806,11 +806,11 @@ test_argument_parsing() {
     # Test long form arguments
     local output
     output=$(sh "${WRAPPER_SCRIPT}" --version 2>&1)
-    assert_contains "0.3.0" "${output}" "Long form --version works"
+    assert_contains "0.3.1" "${output}" "Long form --version works"
 
     # Test short form arguments
     output=$(sh "${WRAPPER_SCRIPT}" -v 2>&1)
-    assert_contains "0.3.0" "${output}" "Short form -v works"
+    assert_contains "0.3.1" "${output}" "Short form -v works"
 
     # Test task-get with -i
     output=$(sh "${WRAPPER_SCRIPT}" --task-get -i "test-id" 2>&1)
