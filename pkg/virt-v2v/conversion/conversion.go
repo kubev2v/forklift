@@ -1,18 +1,12 @@
 package conversion
 
 import (
-	"bytes"
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"regexp"
-	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/kubev2v/forklift/pkg/virt-v2v/config"
@@ -59,7 +53,6 @@ func (c *Conversion) getDisk() ([]*Disk, error) {
 		return nil, err
 	}
 	diskPaths = append(diskPaths, disksBlock...)
-	sortDiskMountPaths(diskPaths)
 	for _, path := range diskPaths {
 		disk, err := NewDisk(c.AppConfig, path)
 		if err != nil {
@@ -469,142 +462,6 @@ func updateDiskSource(disk *libvirtxml.DomainDisk, path string) bool {
 		return false
 	}
 	return true
-}
-
-func (c *Conversion) DetectBootDiskIndex() (int, error) {
-	if len(c.Disks) == 0 {
-		return -1, fmt.Errorf("no disks available for boot disk detection")
-	}
-	if len(c.Disks) == 1 {
-		return 0, nil
-	}
-	return detectBootDiskIndexFromPaths(diskLinks(c.Disks))
-}
-
-func diskLinks(disks []*Disk) []string {
-	links := make([]string, len(disks))
-	for i, d := range disks {
-		links[i] = d.Link
-	}
-	return links
-}
-
-var diskMountIndexRe = regexp.MustCompile(`\d+`)
-
-// sortDiskMountPaths orders mount paths by their numeric disk index.
-func sortDiskMountPaths(paths []string) {
-	sort.SliceStable(paths, func(i, j int) bool {
-		return diskMountIndex(paths[i]) < diskMountIndex(paths[j])
-	})
-}
-
-func diskMountIndex(path string) int {
-	s := diskMountIndexRe.FindString(filepath.Base(path))
-	if s == "" {
-		return 0
-	}
-	n, _ := strconv.Atoi(s)
-	return n
-}
-
-// detectBootDiskIndexFromPaths runs virt-inspector to inspect the disks and
-// determine which one contains the boot partition. virt-inspector produces
-// structured XML in a single call, eliminating the need for multiple
-// guestfish sessions and fragile output parsing.
-func detectBootDiskIndexFromPaths(diskPaths []string) (int, error) {
-	var args []string
-	for _, p := range diskPaths {
-		args = append(args, "--format=raw", "-a", p)
-	}
-
-	out, err := execVirtInspector(args)
-	if err != nil {
-		return -1, fmt.Errorf("virt-inspector failed: %v", err)
-	}
-
-	return parseBootDiskFromInspectorXML(out, len(diskPaths))
-}
-
-// inspectorXML mirrors the virt-inspector XML schema (only the fields we need).
-type inspectorXML struct {
-	OS []inspectorOS `xml:"operatingsystem"`
-}
-
-type inspectorOS struct {
-	Root        string               `xml:"root"`
-	Mountpoints inspectorMountpoints `xml:"mountpoints"`
-}
-
-type inspectorMountpoints struct {
-	Mountpoint []inspectorMountpoint `xml:"mountpoint"`
-}
-
-type inspectorMountpoint struct {
-	Device     string `xml:"dev,attr"`
-	MountPoint string `xml:",chardata"`
-}
-
-// parseBootDiskFromInspectorXML extracts the boot disk index from
-// virt-inspector XML output.
-func parseBootDiskFromInspectorXML(xmlData string, numDisks int) (int, error) {
-	var doc inspectorXML
-	if err := xml.Unmarshal([]byte(xmlData), &doc); err != nil {
-		return -1, fmt.Errorf("failed to parse virt-inspector XML: %v", err)
-	}
-	if len(doc.OS) == 0 {
-		return -1, fmt.Errorf("virt-inspector found no operating systems")
-	}
-
-	os := doc.OS[0]
-	mountpoints := make(map[string]string)
-	for _, mp := range os.Mountpoints.Mountpoint {
-		mountpoints[mp.MountPoint] = mp.Device
-	}
-
-	// Prefer /boot/efi (EFI), then /boot (BIOS), then root device
-	for _, mp := range []string{"/boot/efi", "/boot"} {
-		if dev, ok := mountpoints[mp]; ok {
-			if idx := deviceToDiskIndex(dev); idx >= 0 {
-				return idx, nil
-			}
-		}
-	}
-	if idx := deviceToDiskIndex(os.Root); idx >= 0 {
-		return idx, nil
-	}
-	return -1, fmt.Errorf("could not determine boot disk from virt-inspector output")
-}
-
-// execVirtInspector runs virt-inspector with the given arguments and returns
-// the XML output from stdout.
-var execVirtInspector = func(args []string) (string, error) {
-	cmd := execCommand("virt-inspector", args...)
-	var stdout strings.Builder
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "virt-inspector stderr: %s\n", stderr.String())
-	}
-	return stdout.String(), err
-}
-
-var execCommand = exec.Command
-
-// deviceToDiskIndex extracts the 0-based disk index from a device path
-// like /dev/sdc1 or /dev/sdc. Libguestfs names disks /dev/sda…/dev/sdz
-// for up to 26 disks; multi-letter names (/dev/sdaa, etc.) are not handled.
-func deviceToDiskIndex(dev string) int {
-	const prefix = "/dev/sd"
-	if !strings.HasPrefix(dev, prefix) || len(dev) <= len(prefix) {
-		return -1
-	}
-	letter := dev[len(prefix)]
-	if letter >= 'a' && letter <= 'z' {
-		return int(letter - 'a')
-	}
-	return -1
 }
 
 // modify the domain XML to use the local disk paths for in-place conversions

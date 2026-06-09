@@ -24,8 +24,7 @@ type Warning struct {
 }
 
 type Server struct {
-	AppConfig     *config.AppConfig
-	BootDiskIndex *int
+	AppConfig *config.AppConfig
 }
 
 // AddWarning adds a warning that will be exposed via the /warnings endpoint
@@ -40,7 +39,6 @@ func AddWarning(warning Warning) {
 func (s Server) Start() error {
 	http.HandleFunc("/vm", s.vmHandler)
 	http.HandleFunc("/inspection", s.inspectorHandler)
-	http.HandleFunc("/bootdisk", s.bootDiskHandler)
 	http.HandleFunc("/warnings", s.warningsHandler)
 	http.HandleFunc("/shutdown", s.shutdownHandler)
 	server = &http.Server{Addr: ":8080"}
@@ -102,18 +100,6 @@ func (s Server) inspectorHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		fmt.Printf("Error writing response: %v\n", err)
 		http.Error(w, "Error writing response", http.StatusInternalServerError)
-	}
-}
-
-func (s Server) bootDiskHandler(w http.ResponseWriter, r *http.Request) {
-	if s.BootDiskIndex == nil {
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(map[string]int{"bootDiskIndex": *s.BootDiskIndex}); err != nil {
-		fmt.Printf("Error encoding boot disk response: %v\n", err)
 	}
 }
 

@@ -229,37 +229,6 @@ metadata:
 		})
 	})
 
-	Describe("bootDiskHandler", func() {
-		It("returns 204 when BootDiskIndex is nil", func() {
-			s.BootDiskIndex = nil
-			req := httptest.NewRequest("GET", "/bootdisk", nil)
-			w := httptest.NewRecorder()
-			s.bootDiskHandler(w, req)
-			Expect(w.Code).To(Equal(http.StatusNoContent))
-		})
-
-		It("returns 200 with JSON when BootDiskIndex is set", func() {
-			idx := 2
-			s.BootDiskIndex = &idx
-			req := httptest.NewRequest("GET", "/bootdisk", nil)
-			w := httptest.NewRecorder()
-			s.bootDiskHandler(w, req)
-			Expect(w.Code).To(Equal(http.StatusOK))
-			Expect(w.Header().Get("Content-Type")).To(Equal("application/json"))
-			Expect(w.Body.String()).To(ContainSubstring(`"bootDiskIndex":2`))
-		})
-
-		It("returns 200 with index 0", func() {
-			idx := 0
-			s.BootDiskIndex = &idx
-			req := httptest.NewRequest("GET", "/bootdisk", nil)
-			w := httptest.NewRecorder()
-			s.bootDiskHandler(w, req)
-			Expect(w.Code).To(Equal(http.StatusOK))
-			Expect(w.Body.String()).To(ContainSubstring(`"bootDiskIndex":0`))
-		})
-	})
-
 	Describe("AddWarning", func() {
 		It("adds warning to global warnings slice", func() {
 			warnings = nil // Reset
