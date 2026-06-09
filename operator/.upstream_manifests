@@ -3709,7 +3709,7 @@ spec:
                 type: string
               feature_windows_wait_for_reboot:
                 description: 'Enable automatic wait-for-reboot step for Windows VM
-                  migrations (default: false)'
+                  migrations (default: true)'
                 enum:
                 - "true"
                 - "false"
