@@ -2,7 +2,6 @@ package ocp
 
 import (
 	"context"
-	"encoding/json"
 	pathlib "path"
 
 	"github.com/gin-gonic/gin"
@@ -343,8 +342,7 @@ func (h Handler) NetworkAttachmentDefinitions(ctx *gin.Context, provider *api.Pr
 		for _, nad := range list.Items {
 			m := model.NetworkAttachmentDefinition{}
 			m.With(&nad)
-			networkConfig := model.NetworkConfig{}
-			if err := json.Unmarshal([]byte(nad.Spec.Config), &networkConfig); err == nil {
+			if networkConfig, err := model.ParseNAD(&nad); err == nil {
 				if networkConfig.IsUnsupportedUdn() {
 					log.Info("NAD is not supported UDN configuration, skipping", "nad", nad, "networkConfig", networkConfig)
 					continue

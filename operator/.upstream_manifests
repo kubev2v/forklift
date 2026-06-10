@@ -10721,6 +10721,15 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - projectcalico.org
+  resources:
+  - networks
+  - ippools
+  verbs:
+  - get
+  - list
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
