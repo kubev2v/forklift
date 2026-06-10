@@ -194,7 +194,14 @@ Affinity Syntax (KARL):
     --source vsphere-prod \
     --vms "where name ~= 'test-.*'" \
     --default-target-network default \
-    --default-target-storage-class standard`,
+    --default-target-storage-class standard
+
+  # Disable default-true boolean flags with explicit false
+  kubectl-mtv create plan --name no-preflight \
+    --source vsphere-prod \
+    --vms "quick-vm" \
+    --run-preflight-inspection false \
+    --preserve-static-ips false`,
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -570,22 +577,22 @@ Affinity Syntax (KARL):
 	cmd.Flags().StringVar(&planSpec.TargetNamespace, "target-namespace", "", "Target namespace (defaults to plan namespace)")
 	cmd.Flags().StringVar(&transferNetwork, "transfer-network", "", "Network attachment definition for disk transfer. Supports 'namespace/network-name' or 'network-name'")
 	cmd.Flags().BoolVar(&planSpec.PreserveClusterCPUModel, "preserve-cluster-cpu-model", false, "Preserve the CPU model and flags the VM runs with in its cluster")
-	cmd.Flags().BoolVar(&planSpec.PreserveStaticIPs, "preserve-static-ips", true, "Preserve static IP configurations during migration")
+	flags.ExplicitBoolVar(cmd.Flags(), &planSpec.PreserveStaticIPs, "preserve-static-ips", true, "Preserve static IP configurations during migration (true/false)")
 	cmd.Flags().StringVar(&planSpec.PVCNameTemplate, "pvc-name-template", "", "Template for generating PVC names. Variables: {{.VmName}}, {{.PlanName}}, {{.DiskIndex}}, {{.WinDriveLetter}}, {{.RootDiskIndex}}, {{.Shared}}, {{.FileName}}")
 	cmd.Flags().StringVar(&planSpec.VolumeNameTemplate, "volume-name-template", "", "Template for generating volume interface names in the target VM. Variables: {{.PVCName}}, {{.VolumeIndex}}")
 	cmd.Flags().StringVar(&planSpec.NetworkNameTemplate, "network-name-template", "", "Template for generating network interface names in the target VM. Variables: {{.NetworkName}}, {{.NetworkNamespace}}, {{.NetworkType}}, {{.NetworkIndex}}")
-	cmd.Flags().BoolVar(&planSpec.MigrateSharedDisks, "migrate-shared-disks", true, "Migrate disks shared between multiple VMs")
+	flags.ExplicitBoolVar(cmd.Flags(), &planSpec.MigrateSharedDisks, "migrate-shared-disks", true, "Migrate disks shared between multiple VMs (true/false)")
 	cmd.Flags().BoolVar(&planSpec.Archived, "archived", false, "Whether this plan should be archived")
-	cmd.Flags().BoolVar(&planSpec.PVCNameTemplateUseGenerateName, "pvc-name-template-use-generate-name", true, "Use generateName instead of name for PVC name template")
+	flags.ExplicitBoolVar(cmd.Flags(), &planSpec.PVCNameTemplateUseGenerateName, "pvc-name-template-use-generate-name", true, "Use generateName instead of name for PVC name template (true/false)")
 	cmd.Flags().BoolVar(&planSpec.DeleteGuestConversionPod, "delete-guest-conversion-pod", false, "Delete guest conversion pod after successful migration")
-	cmd.Flags().BoolVar(&planSpec.DeleteVmOnFailMigration, "delete-vm-on-fail-migration", true, "Delete target VM when migration fails")
+	flags.ExplicitBoolVar(cmd.Flags(), &planSpec.DeleteVmOnFailMigration, "delete-vm-on-fail-migration", true, "Delete target VM when migration fails (true/false)")
 	cmd.Flags().BoolVar(&planSpec.SkipGuestConversion, "skip-guest-conversion", false, "Skip the guest conversion process (raw disk copy mode)")
-	cmd.Flags().BoolVar(&planSpec.RunPreflightInspection, "run-preflight-inspection", true, "Run preflight inspection on VM base disks before starting disk transfer")
+	flags.ExplicitBoolVar(cmd.Flags(), &planSpec.RunPreflightInspection, "run-preflight-inspection", true, "Run preflight inspection on VM base disks before starting disk transfer (true/false)")
 	cmd.Flags().StringVar(&installLegacyDrivers, "install-legacy-drivers", "auto", "Install legacy Windows drivers (true/false/auto)")
 	cmd.Flags().VarP(migrationTypeFlag, "migration-type", "m", "Migration type: cold, warm, live, or conversion (default: cold)")
 	cmd.Flags().StringVarP(&defaultTargetNetwork, "default-target-network", "N", "", "Default target network for auto-generated mapping. Use 'default' for pod networking, 'namespace/network-name', or 'network-name'")
 	cmd.Flags().StringVar(&defaultTargetStorageClass, "default-target-storage-class", "", "Default target storage class for auto-generated mapping")
-	cmd.Flags().BoolVar(&useCompatibilityMode, "use-compatibility-mode", true, "Use compatibility devices (SATA bus, E1000E NIC) when skipGuestConversion is true")
+	flags.ExplicitBoolVar(cmd.Flags(), &useCompatibilityMode, "use-compatibility-mode", true, "Use compatibility devices (SATA bus, E1000E NIC) when skipGuestConversion is true (true/false)")
 	cmd.Flags().StringSliceVarP(&targetLabels, "target-labels", "L", nil, "Target labels to be added to the VM (e.g., key1=value1,key2=value2)")
 	cmd.Flags().StringSliceVar(&targetNodeSelector, "target-node-selector", nil, "Target node selector to constrain VM scheduling (e.g., key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&planSpec.Warm, "warm", false, "Enable warm migration (use --migration-type=warm instead)")

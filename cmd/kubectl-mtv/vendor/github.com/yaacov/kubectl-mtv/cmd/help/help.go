@@ -9,6 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/help"
+	"github.com/yaacov/kubectl-mtv/pkg/util/flags"
 )
 
 // NewHelpCmd creates the help command with machine-readable output support.
@@ -123,7 +124,7 @@ Help topics are also available for domain-specific languages:
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "json", "Output format for --machine: json, yaml")
 	cmd.Flags().BoolVar(&readOnly, "read-only", false, "Include only read-only commands (with --machine)")
 	cmd.Flags().BoolVar(&write, "write", false, "Include only write commands (with --machine)")
-	cmd.Flags().BoolVar(&includeGlobalFlags, "include-global-flags", true, "Include global flags in output (with --machine)")
+	flags.ExplicitBoolVar(cmd.Flags(), &includeGlobalFlags, "include-global-flags", true, "Include global flags in output (with --machine) (true/false)")
 
 	// Add completion for output format flag
 	if err := cmd.RegisterFlagCompletionFunc("output", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

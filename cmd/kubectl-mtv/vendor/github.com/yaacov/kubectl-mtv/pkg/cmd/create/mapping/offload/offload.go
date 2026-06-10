@@ -20,10 +20,10 @@ import (
 // SecretOptions holds the fields needed to build an offload Secret.
 type SecretOptions struct {
 	DefaultOffloadSecret string
-	VSphereUsername       string
+	VSphereUsername      string
 	VSpherePassword      string
 	VSphereURL           string
-	StorageUsername       string
+	StorageUsername      string
 	StoragePassword      string
 	StorageEndpoint      string
 	CACert               string
