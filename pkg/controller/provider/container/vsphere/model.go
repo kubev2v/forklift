@@ -1320,6 +1320,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					Bus:            bus,
 					Serial:         backing.Uuid,
 					WinDriveLetter: winDriveLetter,
+					DeviceName:     backing.DeviceName,
 				}
 				if backing.Datastore != nil {
 					datastoreId, _ := sanitize(backing.Datastore.Value)
@@ -1340,6 +1341,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					RDM:            true,
 					Bus:            bus,
 					WinDriveLetter: winDriveLetter,
+					DeviceName:     backing.DeviceName,
 				}
 				disks = append(disks, md)
 			}
