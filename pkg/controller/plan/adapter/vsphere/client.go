@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	liburl "net/url"
+	"strings"
 
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
@@ -318,10 +319,27 @@ func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, precopy planapi.Precopy, hos
 	r.Log.Info("Check Snapshot Remove", "vmRef", vmRef, "precopy", precopy)
 
 	taskInfo, err := r.getTaskById(vmRef, precopy.RemoveTaskId, hosts)
-	if err != nil {
+	if err == nil {
+		return r.checkTaskStatus(taskInfo)
+	}
+
+	notFound := strings.Contains(err.Error(), fmt.Sprintf("task %s not found", precopy.RemoveTaskId))
+	alreadyDeleted := strings.Contains(err.Error(), "has already been deleted")
+	if !notFound && !alreadyDeleted {
 		return false, liberr.Wrap(err)
 	}
-	return r.checkTaskStatus(taskInfo)
+
+	// If the task is done and gone, make sure the snapshot itself is gone
+	r.Log.Info("Snapshot removal task not found, checking for existing snapshot", "vmRef", vmRef, "precopy", precopy)
+	vm := &model.VM{}
+	if err := r.Source.Inventory.Find(vm, vmRef); err != nil {
+		return false, liberr.Wrap(err)
+	}
+	if vm.Snapshot.ID == "" {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 // Check if a snapshot is ready to transfer.
