@@ -364,6 +364,10 @@ spec:
                 type: string
                 description: "ConfigMap name for virt-customize configuration (default: forklift-virt-customize)"
                 example: "custom-virt-customize"
+              naa_oui_map_configmap_name:
+                type: string
+                description: "ConfigMap name for custom NAA OUI to storage vendor mappings (default: forklift-naa-oui-map)"
+                example: "custom-naa-oui-map"
 
               # Migration Settings & Timeouts
               controller_migration_service_account:
