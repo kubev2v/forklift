@@ -2,9 +2,9 @@ package vsphere
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	liburl "net/url"
-	"strings"
 
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
@@ -15,6 +15,7 @@ import (
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/vmware/govmomi"
+	"github.com/vmware/govmomi/fault"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/session"
@@ -35,6 +36,10 @@ const (
 	createSnapshotTaskName = "vim.VirtualMachine.createSnapshot"
 	removeSnapshotTaskName = "vim.vm.Snapshot.remove"
 )
+
+var ErrTaskNotFound = errors.New("not found")
+var ErrTaskNotFoundPropSet = errors.New("not found property set")
+var ErrTaskValueNotFound = errors.New("no task value found for task")
 
 // vSphere VM Client
 type Client struct {
@@ -323,8 +328,8 @@ func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, precopy planapi.Precopy, hos
 		return r.checkTaskStatus(taskInfo)
 	}
 
-	notFound := strings.Contains(err.Error(), fmt.Sprintf("task %s not found", precopy.RemoveTaskId))
-	alreadyDeleted := strings.Contains(err.Error(), "has already been deleted")
+	notFound := errors.Is(err, ErrTaskNotFound)
+	alreadyDeleted := fault.Is(err, &types.ManagedObjectNotFound{})
 	if !notFound && !alreadyDeleted {
 		return false, liberr.Wrap(err)
 	}
@@ -413,13 +418,13 @@ func (r *Client) getTaskById(vmRef ref.Ref, taskId string, hosts util.HostsFunc)
 		return nil, err
 	}
 	if len(content) == 0 {
-		return nil, fmt.Errorf("task %s not found", taskId)
+		return nil, fmt.Errorf("task %s %w", taskId, ErrTaskNotFound)
 	}
 	if len(content[0].PropSet) == 0 {
-		return nil, fmt.Errorf("task %s not found property set", taskId)
+		return nil, fmt.Errorf("task %s %w", taskId, ErrTaskNotFoundPropSet)
 	}
 	if content[0].PropSet[0].Val == nil {
-		return nil, fmt.Errorf("no task value found for task %s", taskId)
+		return nil, fmt.Errorf("%w %s", ErrTaskValueNotFound, taskId)
 	}
 	task := content[0].PropSet[0].Val.(types.TaskInfo)
 	return &task, nil
