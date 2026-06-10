@@ -76,7 +76,7 @@ type StorageMapperOptions struct {
 	OffloadVSphereUsername string
 	OffloadVSpherePassword string
 	OffloadVSphereURL      string
-	OffloadStorageUsername  string
+	OffloadStorageUsername string
 	OffloadStoragePassword string
 	OffloadStorageEndpoint string
 	OffloadCACert          string
@@ -137,13 +137,13 @@ func CreateStorageMap(ctx context.Context, opts StorageMapperOptions) (storageMa
 	secretOpts := offload.SecretOptions{
 		DefaultOffloadSecret: opts.DefaultOffloadSecret,
 		VSphereUsername:      opts.OffloadVSphereUsername,
-		VSpherePassword:     opts.OffloadVSpherePassword,
-		VSphereURL:          opts.OffloadVSphereURL,
+		VSpherePassword:      opts.OffloadVSpherePassword,
+		VSphereURL:           opts.OffloadVSphereURL,
 		StorageUsername:      opts.OffloadStorageUsername,
-		StoragePassword:     opts.OffloadStoragePassword,
-		StorageEndpoint:     opts.OffloadStorageEndpoint,
-		CACert:              opts.OffloadCACert,
-		InsecureSkipTLS:     opts.OffloadInsecureSkipTLS,
+		StoragePassword:      opts.OffloadStoragePassword,
+		StorageEndpoint:      opts.OffloadStorageEndpoint,
+		CACert:               opts.OffloadCACert,
+		InsecureSkipTLS:      opts.OffloadInsecureSkipTLS,
 	}
 
 	if err := offload.ValidateSecretFields(secretOpts); err != nil {

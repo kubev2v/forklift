@@ -117,7 +117,7 @@ github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8
 # github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 ## explicit
 github.com/kballard/go-shellquote
-# github.com/kubev2v/forklift v0.0.0-20260519094428-e2d6d4e314b5 => ../../
+# github.com/kubev2v/forklift v0.0.0-20260602052810-43c34bcf9079 => ../../
 ## explicit; go 1.25.0
 github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1
 github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan
@@ -226,7 +226,7 @@ github.com/xo/terminfo
 # github.com/yaacov/karl-interpreter v0.0.1
 ## explicit; go 1.21
 github.com/yaacov/karl-interpreter/pkg/karl
-# github.com/yaacov/kubectl-mtv v0.3.11
+# github.com/yaacov/kubectl-mtv v0.3.15
 ## explicit; go 1.25.0
 github.com/yaacov/kubectl-mtv/cmd
 github.com/yaacov/kubectl-mtv/cmd/archive
