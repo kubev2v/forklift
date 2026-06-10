@@ -94,7 +94,7 @@ spec:
               feature_windows_wait_for_reboot:
                 type: string
                 enum: ["true", "false"]
-                description: "Enable automatic wait-for-reboot step for Windows VM migrations (default: false)"
+                description: "Enable automatic wait-for-reboot step for Windows VM migrations (default: true)"
               feature_use_conversion_cr:
                 type: string
                 enum: ["true", "false"]
