@@ -2091,6 +2091,15 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 		}
 	}
 
+	if r.Plan.IsWarm() {
+		hostsSecret := &core.Secret{}
+		if err := r.Secret(ref.Ref{ID: pvc.Labels["vmID"]}, dst, hostsSecret); err != nil {
+			return fmt.Errorf("failed to get hosts configuration for secret: %w", err)
+		}
+		dst.Data["accessKeyId"] = hostsSecret.Data["accessKeyId"]
+		dst.Data["secretKey"] = hostsSecret.Data["secretKey"]
+	}
+
 	// Always derive GOVMOMI_HOSTNAME from the provider spec, which is the
 	// authoritative source for the vCenter URL.
 	providerURL := r.Source.Provider.Spec.URL
