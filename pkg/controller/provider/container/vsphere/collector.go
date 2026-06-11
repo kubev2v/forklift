@@ -8,11 +8,9 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/kubev2v/forklift/pkg/lib/util"
-	"github.com/kubev2v/forklift/pkg/settings"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/base"
@@ -540,127 +538,48 @@ func (r *Collector) getVMsWithTags(ctx context.Context) (map[string][]model.Tag,
 		return make(map[string][]model.Tag), nil
 	}
 	tagManager := tags.NewManager(r.restClient)
-
-	// Step 1: List all tag IDs (single API call).
-	tagIDs, err := tagManager.ListTags(ctx)
+	allTags, err := tagManager.GetTags(ctx)
 	if err != nil {
-		r.log.Error(err, "Failed to list tags")
+		r.log.Error(err, "Failed to retrieve tags")
 		return nil, err
 	}
 
-	if len(tagIDs) == 0 {
+	if len(allTags) == 0 {
 		return make(map[string][]model.Tag), nil
 	}
 
-	// Step 2: Get attached objects in a single batch API call and filter to
-	// only tags that are attached to at least one VirtualMachine.
-	attachedObjectsList, err := tagManager.ListAttachedObjectsOnTags(ctx, tagIDs)
+	tagIDs := make([]string, len(allTags))
+	for i, tag := range allTags {
+		tagIDs[i] = tag.ID
+	}
+
+	attachedObjectsList, err := tagManager.GetAttachedObjectsOnTags(ctx, tagIDs)
 	if err != nil {
 		r.log.Error(err, "Failed to retrieve attached objects for tags", "tagCount", len(tagIDs))
 		return nil, err
 	}
 
-	type vmAttachment struct {
-		tagID string
-		vmIDs []string
-	}
-	var vmAttachments []vmAttachment
-	vmRelevantTagIDs := make(map[string]struct{})
+	vmTagsMap := make(map[string][]model.Tag)
 
 	for _, attached := range attachedObjectsList {
-		var vmIDs []string
+		if attached.Tag == nil {
+			r.log.Info("Skipping tag with nil details", "tagID", attached.TagID)
+			continue
+		}
+
+		tagDetails := model.Tag{
+			ID:          attached.Tag.ID,
+			Description: attached.Tag.Description,
+			Name:        attached.Tag.Name,
+			CategoryID:  attached.Tag.CategoryID,
+			UsedBy:      attached.Tag.UsedBy,
+		}
+
 		for _, resource := range attached.ObjectIDs {
 			if resource.Reference().Type == VirtualMachine {
-				vmIDs = append(vmIDs, resource.Reference().Value)
+				vmID := resource.Reference().Value
+				vmTagsMap[vmID] = append(vmTagsMap[vmID], tagDetails)
 			}
-		}
-		if len(vmIDs) > 0 {
-			vmAttachments = append(vmAttachments, vmAttachment{tagID: attached.TagID, vmIDs: vmIDs})
-			vmRelevantTagIDs[attached.TagID] = struct{}{}
-		}
-	}
-
-	if len(vmRelevantTagIDs) == 0 {
-		return make(map[string][]model.Tag), nil
-	}
-
-	// Step 3: Fetch tag details only for VM-relevant tags, concurrently.
-	type tagResult struct {
-		tag tags.Tag
-		err error
-	}
-	relevantIDs := make([]string, 0, len(vmRelevantTagIDs))
-	for id := range vmRelevantTagIDs {
-		relevantIDs = append(relevantIDs, id)
-	}
-
-	results := make([]tagResult, len(relevantIDs))
-	concurrency := settings.Settings.VsphereTagFetchConcurrency
-	if concurrency <= 0 {
-		concurrency = settings.DefaultVsphereTagFetchConcurrency
-	}
-	sem := make(chan struct{}, concurrency)
-	var wg sync.WaitGroup
-
-	fetchCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	var firstErr error
-	var firstErrOnce sync.Once
-
-	for i, id := range relevantIDs {
-		wg.Add(1)
-		go func(idx int, tagID string) {
-			defer wg.Done()
-			select {
-			case sem <- struct{}{}:
-			case <-fetchCtx.Done():
-				return
-			}
-			defer func() { <-sem }()
-
-			tag, err := tagManager.GetTag(fetchCtx, tagID)
-			if err != nil {
-				firstErrOnce.Do(func() {
-					firstErr = err
-					cancel()
-				})
-				results[idx] = tagResult{err: err}
-				return
-			}
-			results[idx] = tagResult{tag: *tag}
-		}(i, id)
-	}
-	wg.Wait()
-
-	if firstErr != nil {
-		r.log.Error(firstErr, "Failed to retrieve tag details")
-		return nil, firstErr
-	}
-
-	tagDetailsMap := make(map[string]tags.Tag, len(relevantIDs))
-	for _, res := range results {
-		if res.tag.ID == "" {
-			continue
-		}
-		tagDetailsMap[res.tag.ID] = res.tag
-	}
-
-	// Step 4: Combine tag details + attachments locally.
-	vmTagsMap := make(map[string][]model.Tag)
-	for _, att := range vmAttachments {
-		tag, ok := tagDetailsMap[att.tagID]
-		if !ok {
-			continue
-		}
-		tagDetails := model.Tag{
-			ID:          tag.ID,
-			Description: tag.Description,
-			Name:        tag.Name,
-			CategoryID:  tag.CategoryID,
-			UsedBy:      tag.UsedBy,
-		}
-		for _, vmID := range att.vmIDs {
-			vmTagsMap[vmID] = append(vmTagsMap[vmID], tagDetails)
 		}
 	}
 

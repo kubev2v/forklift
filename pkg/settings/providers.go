@@ -9,10 +9,9 @@ import (
 
 // Env
 const (
-	OVAProviderServerImage       = "OVA_PROVIDER_SERVER_IMAGE"
-	HyperVProviderServerImage    = "HYPERV_PROVIDER_SERVER_IMAGE"
-	ProviderPendingTimeout       = "PROVIDER_PENDING_TIMEOUT_SECONDS"
-	VsphereTagFetchConcurrencyEv = "VSPHERE_TAG_FETCH_CONCURRENCY"
+	OVAProviderServerImage    = "OVA_PROVIDER_SERVER_IMAGE"
+	HyperVProviderServerImage = "HYPERV_PROVIDER_SERVER_IMAGE"
+	ProviderPendingTimeout    = "PROVIDER_PENDING_TIMEOUT_SECONDS"
 )
 
 // Defaults
@@ -28,7 +27,6 @@ const (
 	DefaultHyperVMemoryRequest = "512Mi"
 
 	DefaultProviderPendingTimeoutSeconds = 120
-	DefaultVsphereTagFetchConcurrency    = 10
 )
 
 // ProviderPodConfig defines common configuration for provider server pods
@@ -50,7 +48,6 @@ type Providers struct {
 	OVA                           ProviderPodConfig
 	HyperV                        ProviderPodConfig
 	ProviderPendingTimeoutSeconds int
-	VsphereTagFetchConcurrency    int
 }
 
 func (r *Providers) Load() error {
@@ -96,12 +93,6 @@ func (r *Providers) Load() error {
 		return fmt.Errorf("invalid provider pending timeout: %w", err)
 	}
 	r.ProviderPendingTimeoutSeconds = timeout
-
-	tagConcurrency, err := getPositiveEnvLimit(VsphereTagFetchConcurrencyEv, DefaultVsphereTagFetchConcurrency)
-	if err != nil {
-		return fmt.Errorf("invalid vsphere tag fetch concurrency: %w", err)
-	}
-	r.VsphereTagFetchConcurrency = tagConcurrency
 
 	return nil
 }
