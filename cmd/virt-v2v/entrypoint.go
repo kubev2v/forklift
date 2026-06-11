@@ -74,12 +74,16 @@ func main() {
 			os.Exit(1)
 		}
 
-		// virt-v2v-inspector
-		err = convert.RunVirtV2VInspection()
-		if err != nil {
-			fmt.Println("Failed to inspect the disk", err)
-			os.Exit(1)
+		// For non-in-place conversions, run virt-v2v-inspector separately.
+		// For in-place, the -O flag on virt-v2v-in-place already produced the inspection XML.
+		if !convert.IsInPlace {
+			err = convert.RunVirtV2VInspection()
+			if err != nil {
+				fmt.Println("Failed to inspect the disk", err)
+				os.Exit(1)
+			}
 		}
+
 		inspection, err := utils.GetInspectionV2vFromFile(convert.InspectionOutputFile)
 		if err != nil {
 			fmt.Println("Failed to get inspection file", err)

@@ -147,7 +147,8 @@ func (c *Conversion) RunVirtV2vInPlace() error {
 	v2vCmdBuilder := c.CommandBuilder.New("virt-v2v-in-place").
 		AddFlag("-v").
 		AddFlag("-x").
-		AddArg("-i", "libvirtxml")
+		AddArg("-i", "libvirtxml").
+		AddArg("-O", c.InspectionOutputFile)
 	err := c.addCommonArgs(v2vCmdBuilder)
 	if err != nil {
 		return err
@@ -172,7 +173,8 @@ func (c *Conversion) RunVirtV2vInPlaceDisk() error {
 	v2vCmdBuilder := c.CommandBuilder.New("virt-v2v-in-place").
 		AddFlag("-v").
 		AddFlag("-x").
-		AddArg("-i", "disk")
+		AddArg("-i", "disk").
+		AddArg("-O", c.InspectionOutputFile)
 
 	err := c.addCommonArgs(v2vCmdBuilder)
 	if err != nil {
@@ -181,7 +183,6 @@ func (c *Conversion) RunVirtV2vInPlaceDisk() error {
 	c.addNoFstrimUnlessXfsCompat(v2vCmdBuilder)
 	c.addConversionExtraArgs(v2vCmdBuilder)
 
-	// Add all disks as positional arguments
 	for _, disk := range c.Disks {
 		v2vCmdBuilder.AddPositional(disk.Link)
 	}
