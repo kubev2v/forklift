@@ -500,25 +500,12 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 	if !r.shouldMigrateSharedDisks(vm) {
 		vm.RemoveSharedDisks()
 	}
+
 	url := r.Source.Provider.Spec.URL
 	thumbprint := r.Source.Provider.Status.Fingerprint
-	hostID, err := r.hostID(vmRef)
+	url, thumbprint, err = r.applyHostsConfig(vmRef, url, thumbprint)
 	if err != nil {
 		return
-	}
-	if hostDef, found := r.hosts[hostID]; found {
-		hostURL := liburl.URL{
-			Scheme: "https",
-			Host:   formatHostAddress(hostDef.Spec.IpAddress),
-			Path:   vim25.Path,
-		}
-		url = hostURL.String()
-		h, nErr := r.host(hostID)
-		if nErr != nil {
-			err = nErr
-			return
-		}
-		thumbprint = h.Thumbprint
 	}
 
 	// Build datastore map for more efficient lookups
@@ -659,6 +646,29 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 	}
 
 	return
+}
+
+func (r *Builder) applyHostsConfig(vmRef ref.Ref, url, thumbprint string) (string, string, error) {
+	hostID, err := r.hostID(vmRef)
+	if err != nil {
+		return "", "", liberr.Wrap(err)
+	}
+	if hostDef, found := r.hosts[hostID]; found {
+		hostURL := liburl.URL{
+			Scheme: "https",
+			Host:   formatHostAddress(hostDef.Spec.IpAddress),
+			Path:   vim25.Path,
+		}
+		url = hostURL.String()
+		h, nErr := r.host(hostID)
+		if nErr != nil {
+			err = nErr
+			return "", "", liberr.Wrap(err)
+		}
+		thumbprint = h.Thumbprint
+	}
+
+	return url, thumbprint, nil
 }
 
 // Create the destination Kubevirt VM.
@@ -1489,10 +1499,17 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				// For warm migration, add annotations to jump-start the DataVolume
 				v := r.getPlanVMStatus(vm)
 				if v != nil && v.Warm != nil {
-					pvc.Annotations[planbase.AnnEndpoint] = r.Source.Provider.Spec.URL
+					url := r.Source.Provider.Spec.URL
+					thumbprint := r.Source.Provider.Status.Fingerprint
+					url, thumbprint, err = r.applyHostsConfig(vmRef, url, thumbprint)
+					if err != nil {
+						return nil, err
+					}
+
+					pvc.Annotations[planbase.AnnEndpoint] = url
 					pvc.Annotations[planbase.AnnImportBackingFile] = baseVolume(disk.File, r.Plan.IsWarm())
 					pvc.Annotations[planbase.AnnUUID] = vm.UUID
-					pvc.Annotations[planbase.AnnThumbprint] = r.Source.Provider.Status.Fingerprint
+					pvc.Annotations[planbase.AnnThumbprint] = thumbprint
 					pvc.Annotations[planbase.AnnVddkInitImageURL] = settings.GetVDDKImage(r.Source.Provider.Spec.Settings)
 					pvc.Annotations[planbase.AnnPodPhase] = "Succeeded"
 					pvc.Annotations[planbase.AnnSource] = "vddk"
