@@ -328,7 +328,7 @@ func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, precopy planapi.Precopy, hos
 		return r.checkTaskStatus(taskInfo)
 	}
 
-	notFound := errors.Is(err, ErrTaskNotFound)
+	notFound := errors.Is(err, ErrTaskNotFound) || errors.Is(err, ErrTaskNotFoundPropSet) || errors.Is(err, ErrTaskValueNotFound)
 	alreadyDeleted := fault.Is(err, &types.ManagedObjectNotFound{})
 	if !notFound && !alreadyDeleted {
 		return false, liberr.Wrap(err)
