@@ -80,6 +80,10 @@ func (h VMHandler) List(ctx *gin.Context) {
 				"isTemplate", m.IsTemplate)
 			continue
 		}
+		if m.UUID == "" && m.InstanceUUID == "" && m.Host == "" {
+			log.Info("Skipping ghost VM", "vmID", m.ID)
+			continue
+		}
 		r := &VM{}
 		r.With(&m)
 		r.Link(h.Provider)
