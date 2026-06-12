@@ -1008,6 +1008,7 @@ func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, step *plan.Step) 
 func (r *KubeVirt) EnsureWaitForRebootPod(vm *plan.VMStatus) (err error) {
 	nonRoot := true
 	allowPrivilegeEscalation := false
+	user := qemuUser
 
 	img := getVirtV2vImage(r.Plan)
 	if img == "" {
@@ -1059,6 +1060,7 @@ func (r *KubeVirt) EnsureWaitForRebootPod(vm *plan.VMStatus) (err error) {
 					},
 					SecurityContext: &core.SecurityContext{
 						AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+						RunAsUser:                &user,
 						Capabilities:             &core.Capabilities{Drop: []core.Capability{"ALL"}},
 					},
 				},
