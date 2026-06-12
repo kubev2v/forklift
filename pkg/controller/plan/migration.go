@@ -1240,7 +1240,11 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			precopy := vm.Warm.Precopies[len(vm.Warm.Precopies)-1]
 			ready, err := r.provider.CheckSnapshotRemove(vm.Ref, precopy, r.kubevirt.loadHosts)
 			if err != nil {
-				step.AddError(err.Error())
+				if vm.Phase == api.PhaseWaitForFinalSnapshotRemoval {
+					step.AddWarning(err.Error())
+				} else {
+					step.AddError(err.Error())
+				}
 				err = nil
 				break
 			}

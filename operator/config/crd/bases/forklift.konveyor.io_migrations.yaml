@@ -573,11 +573,37 @@ spec:
                                   description: Started timestamp.
                                   format: date-time
                                   type: string
+                                warning:
+                                  description: Warning.
+                                  properties:
+                                    phase:
+                                      type: string
+                                    reasons:
+                                      items:
+                                        type: string
+                                      type: array
+                                  required:
+                                  - phase
+                                  - reasons
+                                  type: object
                               required:
                               - name
                               - progress
                               type: object
                             type: array
+                          warning:
+                            description: Warning.
+                            properties:
+                              phase:
+                                type: string
+                              reasons:
+                                items:
+                                  type: string
+                                type: array
+                            required:
+                            - phase
+                            - reasons
+                            type: object
                         required:
                         - name
                         - progress
