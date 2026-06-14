@@ -368,48 +368,36 @@ func (p *PowermaxClonner) UnMap(_ string, targetLUN populator.LUN, mappingContex
 
 	ctx := context.TODO()
 
-	cleanup, ok := mappingContext[populator.CleanupXcopyInitiatorGroup]
-	if ok && cleanup.(bool) {
-		p.log.V(2).Info("full cleanup requested, deleting masking view", "masking_view", p.maskingViewID)
+	if p.maskingViewID != "" {
+		p.log.V(2).Info("deleting masking view", "masking_view", p.maskingViewID)
 		err := retryOnTransient(ctx, p.log, "DeleteMaskingView", func() error {
 			return p.client.DeleteMaskingView(ctx, p.symmetrixID, p.maskingViewID)
 		})
 		if err != nil {
-			return fmt.Errorf("failed to delete masking view: %w", err)
+			p.log.Info("failed to delete masking view", "masking_view", p.maskingViewID, "err", err)
 		}
-
-		p.log.V(2).Info("removing volume from storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID)
-		err = retryOnTransient(ctx, p.log, "RemoveVolumesFromStorageGroup", func() error {
-			_, e := p.client.RemoveVolumesFromStorageGroup(ctx, p.symmetrixID, p.storageGroupID, false, targetLUN.ProviderID)
-			return e
-		})
-		if err != nil {
-			return fmt.Errorf("failed removing volume from storage group:  %w", err)
-		}
-
-		p.log.V(2).Info("deleting storage group", "storage_group", p.storageGroupID)
-		err = retryOnTransient(ctx, p.log, "DeleteStorageGroup", func() error {
-			return p.client.DeleteStorageGroup(ctx, p.symmetrixID, p.storageGroupID)
-		})
-		if err != nil {
-			return fmt.Errorf("failed to delete storage group: %w", err)
-		}
-
-		p.log.Info("volume unmapped successfully with full cleanup", "volume", targetLUN.ProviderID)
-		return nil
 	}
 
 	p.log.V(2).Info("removing volume from storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID)
-
 	err := retryOnTransient(ctx, p.log, "RemoveVolumesFromStorageGroup", func() error {
 		_, e := p.client.RemoveVolumesFromStorageGroup(ctx, p.symmetrixID, p.storageGroupID, false, targetLUN.ProviderID)
 		return e
 	})
 	if err != nil {
-		return fmt.Errorf("failed removing volume from storage group:  %w", err)
+		p.log.Info("failed removing volume from storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID, "err", err)
 	}
 
-	p.log.Info("volume unmapped successfully", "volume", targetLUN.ProviderID)
+	if p.storageGroupID != "" {
+		p.log.V(2).Info("deleting storage group", "storage_group", p.storageGroupID)
+		err = retryOnTransient(ctx, p.log, "DeleteStorageGroup", func() error {
+			return p.client.DeleteStorageGroup(ctx, p.symmetrixID, p.storageGroupID)
+		})
+		if err != nil {
+			p.log.Info("failed to delete storage group", "storage_group", p.storageGroupID, "err", err)
+		}
+	}
+
+	p.log.Info("volume unmapped and cleaned up", "volume", targetLUN.ProviderID)
 	return nil
 }
 
