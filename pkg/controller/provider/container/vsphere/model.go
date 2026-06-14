@@ -24,6 +24,59 @@ const (
 // CtkEnabledKey is the VMware ExtraConfig key for Changed Block Tracking (canonical form).
 const CtkEnabledKey = "ctkEnabled"
 
+// VMware persistent PCI slot number encoding (Broadcom KB 311606).
+// The slot is a packed integer with bitmap FFF.BBBBB.DDDDD:
+//
+//	DDDDD  (bits 0-4)   device number on the secondary bus
+//	BBBBB  (bits 5-9)   bridge index: 0 = primary bus, N = pciBridge[N-1]
+//	FFF    (bits 10-12)  root-port function number within the bridge device
+const (
+	pciSlotMaskDevice  = 0x1F
+	pciSlotShiftBridge = 5
+	pciSlotMaskBridge  = 0x1F
+	pciSlotShiftFunc   = 10
+	pciSlotMaskFunc    = 0x7
+
+	// pciBusBaseOffset is the first bus number available for pciBridge devices
+	// in the VMware I440BX virtual chipset. Bus 0 is the root complex and bus 1
+	// is always the AGP bridge at 00:01.0. All VMware hardware versions (vmx-04
+	// through vmx-21, ESXi 2.x–8.x) use I440BX for both BIOS and EFI firmware.
+	pciBusBaseOffset = 2
+
+	// pciLegacyBridgeFunctions is the number of secondary buses consumed by a
+	// legacy PCI-to-PCI bridge (pciBridge0). Unlike PCIe root ports that reserve
+	// one bus per function, the legacy bridge provides a single shared secondary bus.
+	pciLegacyBridgeFunctions = 1
+)
+
+// computePciAddress converts a VMware persistent PCI slot number to the
+// guest-visible PCI address using the VM's pciBridge topology. Returns an
+// empty string when the bridge topology is unavailable or the slot is zero.
+func computePciAddress(slot int32, bridges []model.PciBridge) string {
+	if slot <= 0 {
+		return ""
+	}
+	dev := slot & pciSlotMaskDevice
+	bridgeIdx := (slot >> pciSlotShiftBridge) & pciSlotMaskBridge
+	bridgeFunc := (slot >> pciSlotShiftFunc) & pciSlotMaskFunc
+	// Primary bus devices don't need bridge topology.
+	if bridgeIdx == 0 {
+		return fmt.Sprintf("0000:00:%02x.0", dev)
+	}
+	if len(bridges) == 0 {
+		return ""
+	}
+	bridgeNum := int(bridgeIdx) - 1
+	bus := int32(pciBusBaseOffset)
+	for _, b := range bridges {
+		if b.Number == bridgeNum {
+			return fmt.Sprintf("0000:%02x:%02x.0", bus+bridgeFunc, dev)
+		}
+		bus += int32(b.Functions)
+	}
+	return ""
+}
+
 // Model adapter.
 // Each adapter provides provider-specific management of a model.
 type Adapter interface {
@@ -835,8 +888,15 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				v.model.Networks = v.RefList(p.Val)
 			case fExtraConfig:
 				if options, cast := p.Val.(types.ArrayOfOptionValue); cast {
+					pciBridgeSlots := map[int]int32{}
+					pciBridgeFuncs := map[int]int{}
 					for _, val := range options.OptionValue {
 						opt := val.GetOptionValue()
+
+						if strings.HasPrefix(opt.Key, "pciBridge") {
+							parsePciBridgeOption(opt.Key, opt.Value, pciBridgeSlots, pciBridgeFuncs)
+							continue
+						}
 
 						if opt.Key == "numa.nodeAffinity" {
 							if s, cast := opt.Value.(string); cast {
@@ -872,6 +932,9 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 							}
 						}
 					}
+
+					v.model.PciBridges = buildPciBridges(pciBridgeSlots, pciBridgeFuncs)
+					refreshNICPciAddresses(&v.model)
 
 					//In case of ExtraConfig update, on initial state model.Disks is not ready yet
 					if len(v.model.Disks) > 0 {
@@ -973,70 +1036,8 @@ func (v *VmAdapter) Apply(u types.ObjectUpdate) {
 				}
 			case fDevices:
 				if devArray, cast := p.Val.(types.ArrayOfVirtualDevice); cast {
-					devList := []model.Device{}
-					nicList := []model.NIC{}
-					nicsIndex := 0
-					for _, dev := range devArray.VirtualDevice {
-						var nic *types.VirtualEthernetCard
-						switch device := dev.(type) {
-						case *types.VirtualSriovEthernetCard,
-							*types.VirtualPCIPassthrough,
-							*types.VirtualSCSIPassthrough,
-							*types.VirtualUSBController:
-							devList = append(
-								devList,
-								model.Device{
-									Kind: libref.ToKind(dev),
-								})
-						case *types.VirtualE1000:
-							nic = &device.VirtualEthernetCard
-						case *types.VirtualE1000e:
-							nic = &device.VirtualEthernetCard
-						case *types.VirtualVmxnet:
-							nic = &device.VirtualEthernetCard
-						case *types.VirtualVmxnet2:
-							nic = &device.VirtualEthernetCard
-						case *types.VirtualVmxnet3:
-							nic = &device.VirtualEthernetCard
-						case *types.VirtualPCNet32:
-							nic = &device.VirtualEthernetCard
-						}
-
-						if nic != nil && nic.Backing != nil {
-							var network string
-							switch backing := dev.GetVirtualDevice().Backing.(type) {
-							case *types.VirtualEthernetCardNetworkBackingInfo:
-								if backing.Network != nil {
-									network = backing.Network.Value
-								}
-							case *types.VirtualEthernetCardDistributedVirtualPortBackingInfo:
-								network = backing.Port.PortgroupKey
-							case *types.VirtualEthernetCardOpaqueNetworkBackingInfo:
-								network = backing.OpaqueNetworkId
-							}
-
-							devList = append(
-								devList,
-								model.Device{
-									Kind: libref.ToKind(dev),
-								})
-
-							nicList = append(
-								nicList,
-								model.NIC{
-									MAC:       strings.ToLower(nic.MacAddress),
-									Index:     nicsIndex,
-									DeviceKey: nic.Key,
-									Network: model.Ref{
-										Kind: model.NetKind,
-										ID:   network,
-									},
-								})
-							nicsIndex++
-						}
-					}
-					v.model.Devices = devList
-					v.model.NICs = nicList
+					v.model.Devices = v.collectDevices(devArray)
+					v.model.NICs = v.collectNICs(devArray)
 					v.updateControllers(&devArray)
 					v.updateDisks(&devArray)
 
@@ -1129,6 +1130,189 @@ func extractWindowsDriveLetter(diskPath string) string {
 		return strings.ToLower(string(diskPath[0]))
 	}
 	return ""
+}
+
+// parseGuestApps parses the guestinfo.appInfo JSON string
+// and returns a list of GuestApp.
+func parseGuestApps(s string) []model.GuestApp {
+	var appInfo struct {
+		Applications []struct {
+			A string `json:"a"`
+			V string `json:"v"`
+		} `json:"applications"`
+	}
+	if err := json.Unmarshal([]byte(s), &appInfo); err != nil {
+		return nil
+	}
+	apps := make([]model.GuestApp, 0, len(appInfo.Applications))
+	for _, a := range appInfo.Applications {
+		apps = append(apps, model.GuestApp{
+			Name:    a.A,
+			Version: a.V,
+		})
+	}
+	return apps
+}
+
+// parsePciBridgeOption extracts pciBridge slot numbers and function counts
+// from config.extraConfig entries like "pciBridge4.pciSlotNumber" and
+// "pciBridge4.functions".
+func parsePciBridgeOption(key string, value interface{}, slots map[int]int32, funcs map[int]int) {
+	rest := strings.TrimPrefix(key, "pciBridge")
+	dot := strings.IndexByte(rest, '.')
+	if dot < 1 {
+		return
+	}
+	bridgeNum, err := strconv.Atoi(rest[:dot])
+	if err != nil {
+		return
+	}
+	prop := rest[dot+1:]
+	s, ok := value.(string)
+	if !ok {
+		return
+	}
+	switch prop {
+	case "pciSlotNumber":
+		if n, err := strconv.ParseInt(s, 10, 32); err == nil {
+			slots[bridgeNum] = int32(n)
+		}
+	case "functions":
+		if n, err := strconv.Atoi(s); err == nil {
+			funcs[bridgeNum] = n
+		}
+	}
+}
+
+// buildPciBridges assembles PciBridge structs from the parsed extraConfig maps.
+func buildPciBridges(slots map[int]int32, funcs map[int]int) []model.PciBridge {
+	if len(slots) == 0 {
+		return nil
+	}
+	bridges := make([]model.PciBridge, 0, len(slots))
+	for num, slot := range slots {
+		f := funcs[num]
+		if f == 0 {
+			f = pciLegacyBridgeFunctions
+		}
+		bridges = append(bridges, model.PciBridge{
+			Number:     num,
+			SlotNumber: slot,
+			Functions:  f,
+		})
+	}
+	sort.Slice(bridges, func(i, j int) bool {
+		devI := bridges[i].SlotNumber & pciSlotMaskDevice
+		devJ := bridges[j].SlotNumber & pciSlotMaskDevice
+		return devI < devJ
+	})
+	return bridges
+}
+
+// refreshNICPciAddresses recomputes PciAddress on every NIC using the current
+// Devices and PciBridges. Call after PciBridges changes to keep NICs in sync.
+func refreshNICPciAddresses(m *model.VM) {
+	slotByKey := make(map[int32]int32, len(m.Devices))
+	for _, d := range m.Devices {
+		slotByKey[d.Key] = d.PciSlotNumber
+	}
+	for i := range m.NICs {
+		m.NICs[i].PciAddress = computePciAddress(slotByKey[m.NICs[i].DeviceKey], m.PciBridges)
+	}
+}
+
+// pciSlotNumber extracts the PCI slot number from a virtual device's SlotInfo.
+// Returns 0 if the device has no PCI slot assigned.
+func pciSlotNumber(vd *types.VirtualDevice) int32 {
+	if vd.SlotInfo == nil {
+		return 0
+	}
+	if pciInfo, ok := vd.SlotInfo.(*types.VirtualDevicePciBusSlotInfo); ok {
+		return pciInfo.PciSlotNumber
+	}
+	return 0
+}
+
+// isPassthroughOrController reports whether the device is a passthrough or
+// controller type that is always tracked in the device inventory.
+func isPassthroughOrController(dev types.BaseVirtualDevice) bool {
+	switch dev.(type) {
+	case *types.VirtualSriovEthernetCard,
+		*types.VirtualPCIPassthrough,
+		*types.VirtualSCSIPassthrough,
+		*types.VirtualUSBController:
+		return true
+	}
+	return false
+}
+
+// isConnectedNIC reports whether the device is a regular virtual ethernet card
+// with a backing (i.e. connected to a network). SR-IOV NICs are excluded
+// because they are passthrough devices that require matching physical hardware.
+func isConnectedNIC(dev types.BaseVirtualDevice) bool {
+	if _, sriov := dev.(*types.VirtualSriovEthernetCard); sriov {
+		return false
+	}
+	ethCard, ok := dev.(types.BaseVirtualEthernetCard)
+	return ok && ethCard.GetVirtualEthernetCard().Backing != nil
+}
+
+// collectDevices builds the list of tracked virtual devices (passthrough,
+// controllers, and NICs with backing) from the VirtualDevice array.
+func (v *VmAdapter) collectDevices(devArray types.ArrayOfVirtualDevice) []model.Device {
+	var devList []model.Device
+	for _, dev := range devArray.VirtualDevice {
+		// Skip device types we don't track (e.g. disks, SCSI controllers).
+		if !isPassthroughOrController(dev) && !isConnectedNIC(dev) {
+			continue
+		}
+
+		vd := dev.GetVirtualDevice()
+		devList = append(devList, model.Device{
+			Kind:          libref.ToKind(dev),
+			Key:           vd.Key,
+			PciSlotNumber: pciSlotNumber(vd),
+		})
+	}
+	return devList
+}
+
+// collectNICs builds the list of NICs with their network and PCI address info
+// from the VirtualDevice array.
+func (v *VmAdapter) collectNICs(devArray types.ArrayOfVirtualDevice) []model.NIC {
+	var nicList []model.NIC
+	for _, dev := range devArray.VirtualDevice {
+		if !isConnectedNIC(dev) {
+			continue
+		}
+
+		vd := dev.GetVirtualDevice()
+		nic := dev.(types.BaseVirtualEthernetCard).GetVirtualEthernetCard()
+
+		var network string
+		switch backing := vd.Backing.(type) {
+		case *types.VirtualEthernetCardNetworkBackingInfo:
+			if backing.Network != nil {
+				network = backing.Network.Value
+			}
+		case *types.VirtualEthernetCardDistributedVirtualPortBackingInfo:
+			network = backing.Port.PortgroupKey
+		case *types.VirtualEthernetCardOpaqueNetworkBackingInfo:
+			network = backing.OpaqueNetworkId
+		}
+
+		nicList = append(nicList, model.NIC{
+			MAC:        strings.ToLower(nic.MacAddress),
+			Index:      len(nicList),
+			DeviceKey:  nic.Key,
+			PciAddress: computePciAddress(pciSlotNumber(vd), v.model.PciBridges),
+			Network: model.Ref{
+				Kind: model.NetKind,
+				ID:   network,
+			},
+		})
+	}
+	return nicList
 }
 
 // Update virtual disk devices.
