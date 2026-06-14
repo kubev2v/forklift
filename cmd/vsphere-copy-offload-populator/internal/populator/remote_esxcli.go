@@ -111,7 +111,7 @@ func NewWithRemoteEsxcliSSH(storageApi VMDKCapable, vmwareClient vmware.Client, 
 	}, nil
 }
 
-func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) (errFinal error) {
+func (p *RemoteEsxcliPopulator) Populate(vmId string, migrationHostId, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) (errFinal error) {
 	log := logger.New("xcopy")
 	setupLog := log.WithName("setup")
 	mapLog := log.WithName("map-volume")
@@ -142,9 +142,17 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 	setupLog.Info("VMDK/Xcopy populate started", "method", cloneMethod, "source", sourceVMDKFile, "target", pv.Name)
 
 	setupCtx := klog.NewContext(context.Background(), setupLog)
-	host, err := p.VSphereClient.GetEsxByVm(setupCtx, vmId)
-	if err != nil {
-		return err
+	var host *object.HostSystem
+	if migrationHostId == "" {
+		host, err = p.VSphereClient.GetEsxByVm(setupCtx, vmId)
+		if err != nil {
+			return err
+		}
+	} else {
+		host, err = p.VSphereClient.GetEsxById(setupCtx, migrationHostId)
+		if err != nil {
+			return err
+		}
 	}
 	setupLog.Info("ESXi host", "host", host.String())
 

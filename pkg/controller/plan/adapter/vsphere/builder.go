@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math/rand"
 	"net"
 	liburl "net/url"
 	"path"
@@ -1418,6 +1419,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				storageClass := effectiveMapped.Destination.StorageClass
 				r.Log.Info(fmt.Sprintf("getting storage mapping by storage class %q and datastore %v datastore name %s datastore", storageClass, disk.Datastore, disk.Datastore))
 				vsphereInstance := r.Context.Plan.Provider.Source.GetName()
+				migrationHosts := effectiveMapped.OffloadPlugin.VSphereXcopyPluginConfig.DedicatedMigrationHosts
 				storageVendorProduct := effectiveMapped.OffloadPlugin.VSphereXcopyPluginConfig.StorageVendorProduct
 				storageVendorSecretRef := effectiveMapped.OffloadPlugin.VSphereXcopyPluginConfig.SecretRef
 
@@ -1532,6 +1534,12 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				diskSecretName := fmt.Sprintf("%s-%d", secretName, diskIndex)
 				pvc.Annotations[planbase.AnnSecret] = diskSecretName
 				pvcs = append(pvcs, &pvc)
+
+				migrationHost := ""
+				if len(migrationHosts) > 0 {
+					i := rand.Intn(len(migrationHosts))
+					migrationHost = migrationHosts[i]
+				}
 				vp := api.VSphereXcopyVolumePopulator{
 					ObjectMeta: metav1.ObjectMeta{
 						OwnerReferences: []metav1.OwnerReference{
@@ -1551,6 +1559,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 						VmdkPath:             baseVolume(disk.File, r.Plan.IsWarm()),
 						SecretName:           diskSecretName,
 						StorageVendorProduct: string(storageVendorProduct),
+						MigrationHost:        migrationHost,
 					},
 				}
 				createdPVC := &core.PersistentVolumeClaim{}

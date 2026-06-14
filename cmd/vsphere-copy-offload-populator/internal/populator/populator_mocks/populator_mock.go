@@ -55,15 +55,15 @@ func (mr *MockPopulatorMockRecorder) GetCopyContext() *gomock.Call {
 }
 
 // Populate mocks base method.
-func (m *MockPopulator) Populate(vmId, sourceVMDKFile string, persistentVolume populator.PersistentVolume, hostLocker populator.Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) error {
+func (m *MockPopulator) Populate(vmId, migrationHostId, sourceVMDKFile string, persistentVolume populator.PersistentVolume, hostLocker populator.Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Populate", vmId, sourceVMDKFile, persistentVolume, hostLocker, progress, xcopyUsed, quit)
+	ret := m.ctrl.Call(m, "Populate", vmId, migrationHostId, sourceVMDKFile, persistentVolume, hostLocker, progress, xcopyUsed, quit)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Populate indicates an expected call of Populate.
-func (mr *MockPopulatorMockRecorder) Populate(vmId, sourceVMDKFile, persistentVolume, hostLocker, progress, xcopyUsed, quit any) *gomock.Call {
+func (mr *MockPopulatorMockRecorder) Populate(vmId, migrationHostId, sourceVMDKFile, persistentVolume, hostLocker, progress, xcopyUsed, quit any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Populate", reflect.TypeOf((*MockPopulator)(nil).Populate), vmId, sourceVMDKFile, persistentVolume, hostLocker, progress, xcopyUsed, quit)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Populate", reflect.TypeOf((*MockPopulator)(nil).Populate), vmId, migrationHostId, sourceVMDKFile, persistentVolume, hostLocker, progress, xcopyUsed, quit)
 }

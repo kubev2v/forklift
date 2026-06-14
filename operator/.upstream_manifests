@@ -10051,6 +10051,13 @@ spec:
                             VSphereXcopyPluginConfig works with the Vsphere Xcopy Volume Populator
                             to offload the copy to Vsphere and the storage array.
                           properties:
+                            dedicatedMigrationHosts:
+                              description: |-
+                                DedicatedMigrationHosts is a list of ESXi host IDs to use for
+                                XCOPY migrations instead of the VM's registered host.
+                              items:
+                                type: string
+                              type: array
                             secretRef:
                               description: |-
                                 SecretRef is the name of the secret with the storage credentials for the plugin.
@@ -10328,6 +10335,11 @@ spec:
             type: object
           spec:
             properties:
+              migrationHost:
+                description: |-
+                  MigrationHost is the ESXi host ID to use for the XCOPY operation.
+                  If empty, the host where the source VM is registered will be used.
+                type: string
               secretName:
                 description: The secret name with vsphere and storage credentials
                 type: string

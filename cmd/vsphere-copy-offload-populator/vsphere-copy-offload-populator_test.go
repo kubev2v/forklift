@@ -52,12 +52,12 @@ var _ = Describe("Populator", func() {
 	})
 
 	type testCase struct {
-		name       string
-		setup      func()
-		sourceVmId string
-		sourceVMDK string
-		targetPVC  string
-		want       error
+		setup         func()
+		sourceVmId    string
+		sourceVMDK    string
+		targetPVC     string
+		migrationHost string
+		want          error
 	}
 
 	DescribeTable("should handle various population scenarios",
@@ -81,7 +81,7 @@ var _ = Describe("Populator", func() {
 
 			go func() {
 				defer GinkgoRecover()
-				underTest.Populate(tc.sourceVmId, tc.sourceVMDK, populator.PersistentVolume{Name: tc.targetPVC}, hostLocker, progressCh, xcopyUsedCh, quitCh)
+				underTest.Populate(tc.sourceVmId, tc.migrationHost, tc.sourceVMDK, populator.PersistentVolume{Name: tc.targetPVC}, hostLocker, progressCh, xcopyUsedCh, quitCh)
 			}()
 
 			if tc.want != nil {
@@ -136,6 +136,18 @@ var _ = Describe("Populator", func() {
 			targetPVC:  "pvc-12345",
 			setup: func() {
 				vmwareClient.EXPECT().GetEsxByVm(gomock.Any(), "my-vm").Return(nil, fmt.Errorf("no host found")).Times(1)
+				vmwareClient.EXPECT().GetEsxById(gomock.Any(), gomock.Any()).Times(0)
+			},
+			want: fmt.Errorf("no host found"),
+		}),
+		Entry("migrationHost - fail to locate an ESX by id", testCase{
+			sourceVmId:    "my-vm",
+			migrationHost: "host-123",
+			sourceVMDK:    "[my-ds] my-vm/vmdisk.vmdk",
+			targetPVC:     "pvc-12345",
+			setup: func() {
+				vmwareClient.EXPECT().GetEsxById(gomock.Any(), "host-123").Return(nil, fmt.Errorf("no host found")).Times(1)
+				vmwareClient.EXPECT().GetEsxByVm(gomock.Any(), gomock.Any()).Times(0)
 			},
 			want: fmt.Errorf("no host found"),
 		}),
