@@ -108,6 +108,10 @@ type VSphereXcopyPluginConfig struct {
 	// StorageVendorProduct the string identifier of the storage vendor product
 	// +kubebuilder:validation:Enum=flashsystem;vantara;ontap;primera3par;pureFlashArray;powerflex;powermax;powerstore;infinibox
 	StorageVendorProduct StorageVendorProduct `json:"storageVendorProduct"`
+	// DedicatedMigrationHosts is a list of ESXi host IDs to use for
+	// XCOPY migrations instead of the VM's registered host.
+	// +optional
+	DedicatedMigrationHosts []string `json:"dedicatedMigrationHosts,omitempty"`
 }
 
 // Mapped storage.

@@ -13,12 +13,12 @@ import (
 type mockClient struct {
 	gopowerstore.Client
 
-	hosts            []gopowerstore.Host
-	hostGroups       []gopowerstore.HostGroup
-	volumeMappings   []gopowerstore.HostVolumeMapping
-	attachedToHost   []string
-	attachedToGroup  []string
-	detachedFromHost []string
+	hosts             []gopowerstore.Host
+	hostGroups        []gopowerstore.HostGroup
+	volumeMappings    []gopowerstore.HostVolumeMapping
+	attachedToHost    []string
+	attachedToGroup   []string
+	detachedFromHost  []string
 	detachedFromGroup []string
 }
 

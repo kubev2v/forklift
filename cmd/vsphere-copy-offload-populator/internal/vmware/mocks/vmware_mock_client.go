@@ -73,6 +73,21 @@ func (mr *MockClientMockRecorder) GetDatastoreActiveAdapters(ctx, host, datastor
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDatastoreActiveAdapters", reflect.TypeOf((*MockClient)(nil).GetDatastoreActiveAdapters), ctx, host, datastoreName)
 }
 
+// GetEsxById mocks base method.
+func (m *MockClient) GetEsxById(ctx context.Context, hostId string) (*object.HostSystem, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetEsxById", ctx, hostId)
+	ret0, _ := ret[0].(*object.HostSystem)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetEsxById indicates an expected call of GetEsxById.
+func (mr *MockClientMockRecorder) GetEsxById(ctx, hostId any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEsxById", reflect.TypeOf((*MockClient)(nil).GetEsxById), ctx, hostId)
+}
+
 // GetEsxByVm mocks base method.
 func (m *MockClient) GetEsxByVm(ctx context.Context, vmName string) (*object.HostSystem, error) {
 	m.ctrl.T.Helper()

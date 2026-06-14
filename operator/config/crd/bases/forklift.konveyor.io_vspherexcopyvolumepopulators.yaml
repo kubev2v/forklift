@@ -40,6 +40,11 @@ spec:
             type: object
           spec:
             properties:
+              migrationHost:
+                description: |-
+                  MigrationHost is the ESXi host ID to use for the XCOPY operation.
+                  If empty, the host where the source VM is registered will be used.
+                type: string
               secretName:
                 description: The secret name with vsphere and storage credentials
                 type: string
