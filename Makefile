@@ -41,6 +41,13 @@ else
 PLATFORM_FLAG :=
 endif
 
+# Docker buildx adds attestation manifests by default, turning single-platform
+# images into manifest lists. This breaks `docker manifest create` which expects
+# plain images. Disable provenance to keep images as single-platform manifests.
+ifeq ($(CONTAINER_RUNTIME),docker)
+PLATFORM_FLAG += --provenance=false
+endif
+
 # Extract architecture from PLATFORM for image tag suffix
 # e.g., linux/amd64 -> amd64, linux/arm64 -> arm64
 PLATFORM_ARCH ?= $(shell echo $(PLATFORM) | cut -d'/' -f2)
