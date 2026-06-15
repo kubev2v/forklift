@@ -297,6 +297,9 @@ type Collector struct {
 	cancel func()
 	// has parity.
 	parity bool
+	// Cached missing privileges from the last check.
+	missingPrivs   *privilegeCheckResult
+	missingPrivsMu *sync.RWMutex
 }
 
 // New collector.
@@ -307,11 +310,12 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) *Collector
 			provider.GetNamespace(),
 			provider.GetName()))
 	return &Collector{
-		url:      provider.Spec.URL,
-		provider: provider,
-		secret:   secret,
-		db:       db,
-		log:      nlog,
+		url:            provider.Spec.URL,
+		provider:       provider,
+		secret:         secret,
+		db:             db,
+		log:            nlog,
+		missingPrivsMu: &sync.RWMutex{},
 	}
 }
 
@@ -343,6 +347,17 @@ func (r *Collector) Reset() {
 // Reset.
 func (r *Collector) HasParity() bool {
 	return r.parity
+}
+
+// MissingPrivileges returns the cached privilege check results.
+// The bool indicates whether the check has completed.
+func (r *Collector) MissingPrivileges() ([]MissingPrivileges, bool) {
+	r.missingPrivsMu.RLock()
+	defer r.missingPrivsMu.RUnlock()
+	if r.missingPrivs == nil {
+		return nil, false
+	}
+	return r.missingPrivs.missing, true
 }
 
 // Follow
@@ -431,6 +446,24 @@ func (r *Collector) getUpdates(ctx context.Context) error {
 		return err
 	}
 	defer r.close()
+	r.checkAndCachePermissions(ctx)
+
+	permCtx, cancelPerm := context.WithCancel(ctx)
+	defer cancelPerm()
+
+	go func() {
+		ticker := time.NewTicker(PrivilegeCheckInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-permCtx.Done():
+				return
+			case <-ticker.C:
+				r.checkAndCachePermissions(permCtx)
+			}
+		}
+	}()
+
 	about := r.client.ServiceContent.About
 	err = r.db.Insert(
 		&model.About{
