@@ -819,6 +819,24 @@ test_argument_parsing() {
     # Test task-get with --task-id
     output=$(sh "${WRAPPER_SCRIPT}" --task-get --task-id "test-id-2" 2>&1)
     assert_contains 'test-id-2' "${output}" "Task-get with --task-id parses task ID"
+
+    # MTV-5363: paths with spaces must not be split into standalone dashes
+    local source_path="/vmfs/volumes/eco-iscsi-ds3/vm10disks - cloned/vm10disks - cloned_1.vmdk"
+    local target_path="/vmfs/devices/disks/naa.600a0980383139544924583130374851"
+    output=$(sh "${WRAPPER_SCRIPT}" --clone -s "${source_path}" -t "${target_path}" 2>&1)
+    assert_not_contains "Unknown option: -" "${output}" "Clone with spaces in path does not treat dash as option"
+}
+
+test_esxcli_xml_path_quoting() {
+    echo ""
+    echo "=== Testing esxcli XML Path Quoting (MTV-5363) ==="
+
+    local xml_file="${SCRIPT_DIR}/esxcli-vmkfstools.xml"
+    local xml_content
+    xml_content=$(cat "${xml_file}")
+
+    assert_contains "'\$val{source-vmdk}'" "${xml_content}" "Clone source path is quoted in esxcli XML"
+    assert_contains "'\$val{target-lun}'" "${xml_content}" "Clone target path is quoted in esxcli XML"
 }
 
 # ============================================================================
@@ -1298,8 +1316,8 @@ main() {
     test_version_output_simple
     test_version_output_xml
     test_argument_parsing
-    
-    
+    test_esxcli_xml_path_quoting
+
     # GROUP 2: Path Validation and Security
     test_path_validation
     
