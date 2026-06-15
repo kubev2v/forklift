@@ -11,6 +11,8 @@ import (
 	"github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
 	"k8s.io/klog/v2"
+
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
 )
 
 func TestNewPowermaxClonner(t *testing.T) {
@@ -302,6 +304,498 @@ func TestRetryOnTransient(t *testing.T) {
 		g.Expect(err).To(gomega.HaveOccurred())
 		g.Expect(err.Error()).To(gomega.ContainSubstring("Service Unavailable"))
 		g.Expect(callCount).To(gomega.Equal(5)) // 5 steps in backoff
+	})
+}
+
+func TestUnMap(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	lun := populator.LUN{Name: "test-vol", ProviderID: "vol-001", NAA: "naa.abc123"}
+	ctx := populator.MappingContext{}
+
+	t.Run("deletes masking view, removes volume, deletes SG, then zeros fields", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockClient := NewMockPmax(ctrl)
+
+		clonner := PowermaxClonner{
+			client:         mockClient,
+			symmetrixID:    "sym123",
+			log:            klog.Background(),
+			maskingViewID:  "mv-xcopy",
+			storageGroupID: "sg-xcopy",
+		}
+
+		gomock.InOrder(
+			mockClient.EXPECT().DeleteMaskingView(context.TODO(), "sym123", "mv-xcopy").Return(nil),
+			mockClient.EXPECT().RemoveVolumesFromStorageGroup(context.TODO(), "sym123", "sg-xcopy", false, "vol-001").Return(nil, nil),
+			mockClient.EXPECT().DeleteStorageGroup(context.TODO(), "sym123", "sg-xcopy").Return(nil),
+		)
+
+		err := clonner.UnMap("", lun, ctx)
+		g.Expect(err).ToNot(gomega.HaveOccurred())
+		g.Expect(clonner.maskingViewID).To(gomega.BeEmpty())
+		g.Expect(clonner.storageGroupID).To(gomega.BeEmpty())
+	})
+
+	t.Run("skips DeleteMaskingView when maskingViewID is empty", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockClient := NewMockPmax(ctrl)
+
+		clonner := PowermaxClonner{
+			client:         mockClient,
+			symmetrixID:    "sym123",
+			log:            klog.Background(),
+			maskingViewID:  "",
+			storageGroupID: "sg-xcopy",
+		}
+
+		gomock.InOrder(
+			mockClient.EXPECT().RemoveVolumesFromStorageGroup(context.TODO(), "sym123", "sg-xcopy", false, "vol-001").Return(nil, nil),
+			mockClient.EXPECT().DeleteStorageGroup(context.TODO(), "sym123", "sg-xcopy").Return(nil),
+		)
+
+		err := clonner.UnMap("", lun, ctx)
+		g.Expect(err).ToNot(gomega.HaveOccurred())
+		g.Expect(clonner.storageGroupID).To(gomega.BeEmpty())
+	})
+
+	t.Run("DeleteMaskingView failure is blocking: returns error immediately, skips SG cleanup", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockClient := NewMockPmax(ctrl)
+
+		clonner := PowermaxClonner{
+			client:         mockClient,
+			symmetrixID:    "sym123",
+			log:            klog.Background(),
+			maskingViewID:  "mv-xcopy",
+			storageGroupID: "sg-xcopy",
+		}
+
+		mvErr := fmt.Errorf("masking view delete failed")
+		// gomock strict mode: any unexpected SG call fails the test
+		mockClient.EXPECT().DeleteMaskingView(context.TODO(), "sym123", "mv-xcopy").Return(mvErr)
+
+		err := clonner.UnMap("", lun, ctx)
+		g.Expect(err).To(gomega.HaveOccurred())
+		g.Expect(err.Error()).To(gomega.ContainSubstring("masking view delete failed"))
+		g.Expect(clonner.maskingViewID).To(gomega.BeEmpty())
+		g.Expect(clonner.storageGroupID).To(gomega.BeEmpty())
+	})
+
+	t.Run("makes no API calls when both fields are empty (idempotent second call)", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockClient := NewMockPmax(ctrl)
+
+		clonner := PowermaxClonner{
+			client:         mockClient,
+			symmetrixID:    "sym123",
+			log:            klog.Background(),
+			maskingViewID:  "",
+			storageGroupID: "",
+		}
+
+		// gomock will fail the test if any unexpected call is made
+		err := clonner.UnMap("", lun, ctx)
+		g.Expect(err).ToNot(gomega.HaveOccurred())
+	})
+
+	t.Run("returns error when RemoveVolumesFromStorageGroup fails, still calls DeleteStorageGroup", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockClient := NewMockPmax(ctrl)
+
+		clonner := PowermaxClonner{
+			client:         mockClient,
+			symmetrixID:    "sym123",
+			log:            klog.Background(),
+			maskingViewID:  "mv-xcopy",
+			storageGroupID: "sg-xcopy",
+		}
+
+		removeErr := fmt.Errorf("remove volume failed")
+		gomock.InOrder(
+			mockClient.EXPECT().DeleteMaskingView(context.TODO(), "sym123", "mv-xcopy").Return(nil),
+			mockClient.EXPECT().RemoveVolumesFromStorageGroup(context.TODO(), "sym123", "sg-xcopy", false, "vol-001").Return(nil, removeErr),
+			mockClient.EXPECT().DeleteStorageGroup(context.TODO(), "sym123", "sg-xcopy").Return(nil),
+		)
+
+		err := clonner.UnMap("", lun, ctx)
+		g.Expect(err).To(gomega.HaveOccurred())
+		g.Expect(err.Error()).To(gomega.ContainSubstring("remove volume failed"))
+		g.Expect(clonner.maskingViewID).To(gomega.BeEmpty())
+		g.Expect(clonner.storageGroupID).To(gomega.BeEmpty())
+	})
+
+	t.Run("returns error when DeleteStorageGroup fails", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockClient := NewMockPmax(ctrl)
+
+		clonner := PowermaxClonner{
+			client:         mockClient,
+			symmetrixID:    "sym123",
+			log:            klog.Background(),
+			maskingViewID:  "",
+			storageGroupID: "sg-xcopy",
+		}
+
+		sgErr := fmt.Errorf("delete storage group failed")
+		gomock.InOrder(
+			mockClient.EXPECT().RemoveVolumesFromStorageGroup(context.TODO(), "sym123", "sg-xcopy", false, "vol-001").Return(nil, nil),
+			mockClient.EXPECT().DeleteStorageGroup(context.TODO(), "sym123", "sg-xcopy").Return(sgErr),
+		)
+
+		err := clonner.UnMap("", lun, ctx)
+		g.Expect(err).To(gomega.HaveOccurred())
+		g.Expect(err.Error()).To(gomega.ContainSubstring("delete storage group failed"))
+		g.Expect(clonner.storageGroupID).To(gomega.BeEmpty())
+	})
+
+	t.Run("DeleteMaskingView 404 treated as already deleted, SG cleanup proceeds", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockClient := NewMockPmax(ctrl)
+
+		clonner := PowermaxClonner{
+			client:         mockClient,
+			symmetrixID:    "sym123",
+			log:            klog.Background(),
+			maskingViewID:  "mv-xcopy",
+			storageGroupID: "sg-xcopy",
+		}
+
+		notFound := &v100.Error{HTTPStatusCode: 404, Message: "not found"}
+		gomock.InOrder(
+			mockClient.EXPECT().DeleteMaskingView(context.TODO(), "sym123", "mv-xcopy").Return(notFound),
+			mockClient.EXPECT().RemoveVolumesFromStorageGroup(context.TODO(), "sym123", "sg-xcopy", false, "vol-001").Return(nil, nil),
+			mockClient.EXPECT().DeleteStorageGroup(context.TODO(), "sym123", "sg-xcopy").Return(nil),
+		)
+
+		err := clonner.UnMap("", lun, ctx)
+		g.Expect(err).ToNot(gomega.HaveOccurred())
+		g.Expect(clonner.maskingViewID).To(gomega.BeEmpty())
+		g.Expect(clonner.storageGroupID).To(gomega.BeEmpty())
+	})
+
+	t.Run("returns both SG errors joined when RemoveVolumes and DeleteSG both fail", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockClient := NewMockPmax(ctrl)
+
+		clonner := PowermaxClonner{
+			client:         mockClient,
+			symmetrixID:    "sym123",
+			log:            klog.Background(),
+			maskingViewID:  "mv-xcopy",
+			storageGroupID: "sg-xcopy",
+		}
+
+		removeErr := fmt.Errorf("remove volume failed")
+		sgErr := fmt.Errorf("storage group delete failed")
+		gomock.InOrder(
+			mockClient.EXPECT().DeleteMaskingView(context.TODO(), "sym123", "mv-xcopy").Return(nil),
+			mockClient.EXPECT().RemoveVolumesFromStorageGroup(context.TODO(), "sym123", "sg-xcopy", false, "vol-001").Return(nil, removeErr),
+			mockClient.EXPECT().DeleteStorageGroup(context.TODO(), "sym123", "sg-xcopy").Return(sgErr),
+		)
+
+		err := clonner.UnMap("", lun, ctx)
+		g.Expect(err).To(gomega.HaveOccurred())
+		g.Expect(err.Error()).To(gomega.ContainSubstring("remove volume failed"))
+		g.Expect(err.Error()).To(gomega.ContainSubstring("storage group delete failed"))
+		g.Expect(clonner.maskingViewID).To(gomega.BeEmpty())
+		g.Expect(clonner.storageGroupID).To(gomega.BeEmpty())
+	})
+
+	t.Run("only calls DeleteMaskingView when maskingViewID is set but storageGroupID is empty", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockClient := NewMockPmax(ctrl)
+
+		clonner := PowermaxClonner{
+			client:         mockClient,
+			symmetrixID:    "sym123",
+			log:            klog.Background(),
+			maskingViewID:  "mv-xcopy",
+			storageGroupID: "",
+		}
+
+		mockClient.EXPECT().DeleteMaskingView(context.TODO(), "sym123", "mv-xcopy").Return(nil)
+
+		err := clonner.UnMap("", lun, ctx)
+		g.Expect(err).ToNot(gomega.HaveOccurred())
+		g.Expect(clonner.maskingViewID).To(gomega.BeEmpty())
+	})
+}
+
+func TestMap(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	lun := populator.LUN{Name: "test-vol", ProviderID: "vol-001", NAA: "naa.abc123"}
+	ctx := populator.MappingContext{}
+
+	t.Run("is a no-op when storageGroupID is empty (remap guard after cleanup)", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockClient := NewMockPmax(ctrl)
+
+		clonner := PowermaxClonner{
+			client:         mockClient,
+			symmetrixID:    "sym123",
+			log:            klog.Background(),
+			storageGroupID: "",
+		}
+
+		// gomock will fail the test if any API call is made
+		result, err := clonner.Map("ignored-group", lun, ctx)
+		g.Expect(err).ToNot(gomega.HaveOccurred())
+		g.Expect(result).To(gomega.Equal(lun))
+	})
+
+	t.Run("returns error when GetVolumeIDListInStorageGroup fails", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockClient := NewMockPmax(ctrl)
+
+		clonner := PowermaxClonner{
+			client:         mockClient,
+			symmetrixID:    "sym123",
+			log:            klog.Background(),
+			storageGroupID: "sg-xcopy",
+			initiatorID:    "mv-xcopy",
+		}
+
+		listErr := fmt.Errorf("list volumes failed")
+		mockClient.EXPECT().GetVolumeIDListInStorageGroup(context.TODO(), "sym123", "sg-xcopy").Return(nil, listErr)
+
+		result, err := clonner.Map("ignored-group", lun, ctx)
+		g.Expect(err).To(gomega.HaveOccurred())
+		g.Expect(err.Error()).To(gomega.ContainSubstring("list volumes failed"))
+		g.Expect(result).To(gomega.Equal(lun))
+	})
+
+	t.Run("returns lun unchanged when volume already in storage group", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockClient := NewMockPmax(ctrl)
+
+		clonner := PowermaxClonner{
+			client:         mockClient,
+			symmetrixID:    "sym123",
+			log:            klog.Background(),
+			storageGroupID: "sg-xcopy",
+			initiatorID:    "mv-xcopy",
+		}
+
+		mockClient.EXPECT().GetVolumeIDListInStorageGroup(context.TODO(), "sym123", "sg-xcopy").Return([]string{"vol-001", "vol-002"}, nil)
+
+		result, err := clonner.Map("ignored-group", lun, ctx)
+		g.Expect(err).ToNot(gomega.HaveOccurred())
+		g.Expect(result).To(gomega.Equal(lun))
+	})
+
+	t.Run("returns error when AddVolumesToStorageGroupS fails", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockClient := NewMockPmax(ctrl)
+
+		clonner := PowermaxClonner{
+			client:         mockClient,
+			symmetrixID:    "sym123",
+			log:            klog.Background(),
+			storageGroupID: "sg-xcopy",
+			initiatorID:    "mv-xcopy",
+		}
+
+		addErr := fmt.Errorf("add volumes failed")
+		gomock.InOrder(
+			mockClient.EXPECT().GetVolumeIDListInStorageGroup(context.TODO(), "sym123", "sg-xcopy").Return([]string{}, nil),
+			mockClient.EXPECT().AddVolumesToStorageGroupS(context.TODO(), "sym123", "sg-xcopy", false, "vol-001").Return(addErr),
+		)
+
+		result, err := clonner.Map("ignored-group", lun, ctx)
+		g.Expect(err).To(gomega.HaveOccurred())
+		g.Expect(err.Error()).To(gomega.ContainSubstring("add volumes failed"))
+		g.Expect(result).To(gomega.Equal(lun))
+	})
+
+	t.Run("returns error when GetMaskingViewByID returns non-404 error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockClient := NewMockPmax(ctrl)
+
+		clonner := PowermaxClonner{
+			client:         mockClient,
+			symmetrixID:    "sym123",
+			log:            klog.Background(),
+			storageGroupID: "sg-xcopy",
+			initiatorID:    "mv-xcopy",
+		}
+
+		mvErr := &v100.Error{HTTPStatusCode: 500, Message: "internal server error"}
+		gomock.InOrder(
+			mockClient.EXPECT().GetVolumeIDListInStorageGroup(context.TODO(), "sym123", "sg-xcopy").Return([]string{}, nil),
+			mockClient.EXPECT().AddVolumesToStorageGroupS(context.TODO(), "sym123", "sg-xcopy", false, "vol-001").Return(nil),
+			mockClient.EXPECT().GetMaskingViewByID(context.TODO(), "sym123", "mv-xcopy").Return(nil, mvErr),
+		)
+
+		result, err := clonner.Map("ignored-group", lun, ctx)
+		g.Expect(err).To(gomega.HaveOccurred())
+		g.Expect(result).To(gomega.Equal(populator.LUN{}))
+	})
+
+	t.Run("happy path: masking view already exists, sets maskingViewID", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockClient := NewMockPmax(ctrl)
+
+		clonner := PowermaxClonner{
+			client:         mockClient,
+			symmetrixID:    "sym123",
+			log:            klog.Background(),
+			storageGroupID: "sg-xcopy",
+			initiatorID:    "mv-xcopy",
+		}
+
+		existingMV := &v100.MaskingView{MaskingViewID: "mv-xcopy"}
+		gomock.InOrder(
+			mockClient.EXPECT().GetVolumeIDListInStorageGroup(context.TODO(), "sym123", "sg-xcopy").Return([]string{}, nil),
+			mockClient.EXPECT().AddVolumesToStorageGroupS(context.TODO(), "sym123", "sg-xcopy", false, "vol-001").Return(nil),
+			mockClient.EXPECT().GetMaskingViewByID(context.TODO(), "sym123", "mv-xcopy").Return(existingMV, nil),
+		)
+
+		result, err := clonner.Map("ignored-group", lun, ctx)
+		g.Expect(err).ToNot(gomega.HaveOccurred())
+		g.Expect(result).To(gomega.Equal(lun))
+		g.Expect(clonner.maskingViewID).To(gomega.Equal("mv-xcopy"))
+	})
+
+	t.Run("happy path: masking view not found (404), creates new one", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockClient := NewMockPmax(ctrl)
+
+		clonner := PowermaxClonner{
+			client:         mockClient,
+			symmetrixID:    "sym123",
+			log:            klog.Background(),
+			storageGroupID: "sg-xcopy",
+			initiatorID:    "mv-xcopy",
+			hostID:         "host1",
+			portGroup:      "pg1",
+		}
+
+		notFoundErr := &v100.Error{HTTPStatusCode: 404, Message: "not found"}
+		createdMV := &v100.MaskingView{MaskingViewID: "mv-xcopy"}
+		gomock.InOrder(
+			mockClient.EXPECT().GetVolumeIDListInStorageGroup(context.TODO(), "sym123", "sg-xcopy").Return([]string{}, nil),
+			mockClient.EXPECT().AddVolumesToStorageGroupS(context.TODO(), "sym123", "sg-xcopy", false, "vol-001").Return(nil),
+			mockClient.EXPECT().GetMaskingViewByID(context.TODO(), "sym123", "mv-xcopy").Return(nil, notFoundErr),
+			mockClient.EXPECT().CreateMaskingView(context.TODO(), "sym123", "mv-xcopy", "sg-xcopy", "host1", false, "pg1").Return(createdMV, nil),
+		)
+
+		result, err := clonner.Map("ignored-group", lun, ctx)
+		g.Expect(err).ToNot(gomega.HaveOccurred())
+		g.Expect(result).To(gomega.Equal(lun))
+		g.Expect(clonner.maskingViewID).To(gomega.Equal("mv-xcopy"))
+	})
+
+	t.Run("returns error when CreateMaskingView fails", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockClient := NewMockPmax(ctrl)
+
+		clonner := PowermaxClonner{
+			client:         mockClient,
+			symmetrixID:    "sym123",
+			log:            klog.Background(),
+			storageGroupID: "sg-xcopy",
+			initiatorID:    "mv-xcopy",
+			hostID:         "host1",
+			portGroup:      "pg1",
+		}
+
+		notFoundErr := &v100.Error{HTTPStatusCode: 404, Message: "not found"}
+		createErr := fmt.Errorf("create masking view failed")
+		gomock.InOrder(
+			mockClient.EXPECT().GetVolumeIDListInStorageGroup(context.TODO(), "sym123", "sg-xcopy").Return([]string{}, nil),
+			mockClient.EXPECT().AddVolumesToStorageGroupS(context.TODO(), "sym123", "sg-xcopy", false, "vol-001").Return(nil),
+			mockClient.EXPECT().GetMaskingViewByID(context.TODO(), "sym123", "mv-xcopy").Return(nil, notFoundErr),
+			mockClient.EXPECT().CreateMaskingView(context.TODO(), "sym123", "mv-xcopy", "sg-xcopy", "host1", false, "pg1").Return(nil, createErr),
+		)
+
+		result, err := clonner.Map("ignored-group", lun, ctx)
+		g.Expect(err).To(gomega.HaveOccurred())
+		g.Expect(err.Error()).To(gomega.ContainSubstring("create masking view failed"))
+		g.Expect(result).To(gomega.Equal(populator.LUN{}))
+	})
+
+	t.Run("409 idempotent path: CreateMaskingView returns nil mv, fetches it on retry", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockClient := NewMockPmax(ctrl)
+
+		clonner := PowermaxClonner{
+			client:         mockClient,
+			symmetrixID:    "sym123",
+			log:            klog.Background(),
+			storageGroupID: "sg-xcopy",
+			initiatorID:    "mv-xcopy",
+			hostID:         "host1",
+			portGroup:      "pg1",
+		}
+
+		notFoundErr := &v100.Error{HTTPStatusCode: 404, Message: "not found"}
+		fetchedMV := &v100.MaskingView{MaskingViewID: "mv-xcopy"}
+		gomock.InOrder(
+			mockClient.EXPECT().GetVolumeIDListInStorageGroup(context.TODO(), "sym123", "sg-xcopy").Return([]string{}, nil),
+			mockClient.EXPECT().AddVolumesToStorageGroupS(context.TODO(), "sym123", "sg-xcopy", false, "vol-001").Return(nil),
+			// First GetMaskingViewByID: 404, triggers create path
+			mockClient.EXPECT().GetMaskingViewByID(context.TODO(), "sym123", "mv-xcopy").Return(nil, notFoundErr),
+			// CreateMaskingView returns nil mv (409 idempotent)
+			mockClient.EXPECT().CreateMaskingView(context.TODO(), "sym123", "mv-xcopy", "sg-xcopy", "host1", false, "pg1").Return(nil, nil),
+			// Second GetMaskingViewByID: fetches the existing one
+			mockClient.EXPECT().GetMaskingViewByID(context.TODO(), "sym123", "mv-xcopy").Return(fetchedMV, nil),
+		)
+
+		result, err := clonner.Map("ignored-group", lun, ctx)
+		g.Expect(err).ToNot(gomega.HaveOccurred())
+		g.Expect(result).To(gomega.Equal(lun))
+		g.Expect(clonner.maskingViewID).To(gomega.Equal("mv-xcopy"))
+	})
+
+	t.Run("409 idempotent path: second GetMaskingViewByID fails after nil CreateMaskingView", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockClient := NewMockPmax(ctrl)
+
+		clonner := PowermaxClonner{
+			client:         mockClient,
+			symmetrixID:    "sym123",
+			log:            klog.Background(),
+			storageGroupID: "sg-xcopy",
+			initiatorID:    "mv-xcopy",
+			hostID:         "host1",
+			portGroup:      "pg1",
+		}
+
+		notFoundErr := &v100.Error{HTTPStatusCode: 404, Message: "not found"}
+		fetchErr := fmt.Errorf("fetch after 409 failed")
+		gomock.InOrder(
+			mockClient.EXPECT().GetVolumeIDListInStorageGroup(context.TODO(), "sym123", "sg-xcopy").Return([]string{}, nil),
+			mockClient.EXPECT().AddVolumesToStorageGroupS(context.TODO(), "sym123", "sg-xcopy", false, "vol-001").Return(nil),
+			mockClient.EXPECT().GetMaskingViewByID(context.TODO(), "sym123", "mv-xcopy").Return(nil, notFoundErr),
+			mockClient.EXPECT().CreateMaskingView(context.TODO(), "sym123", "mv-xcopy", "sg-xcopy", "host1", false, "pg1").Return(nil, nil),
+			mockClient.EXPECT().GetMaskingViewByID(context.TODO(), "sym123", "mv-xcopy").Return(nil, fetchErr),
+		)
+
+		result, err := clonner.Map("ignored-group", lun, ctx)
+		g.Expect(err).To(gomega.HaveOccurred())
+		g.Expect(err.Error()).To(gomega.ContainSubstring("fetch after 409 failed"))
+		g.Expect(result).To(gomega.Equal(populator.LUN{}))
 	})
 }
 
