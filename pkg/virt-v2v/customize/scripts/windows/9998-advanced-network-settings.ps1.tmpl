@@ -1,0 +1,154 @@
+# Advanced Network Settings — firstboot script (runs before static IP assignment).
+#
+# Script flow:
+#   1. Parse embedded JSON settings (populated at template render time).
+#   2. For each interface entry, find the adapter by MAC (poll up to 30s).
+#   3. Apply per-adapter settings: InterfaceMetric, DNS registration, NetBIOS.
+#   4. Set LanmanServer service startup type globally (if non-default).
+#   5. Unbind "File & Printer Sharing" on adapters that had it disabled on source.
+
+$settingsJson = '{{.SettingsJSON}}'
+$adapterWaitSeconds = 30
+
+Write-Host "=============================================="
+Write-Host "[INFO] MTV Advanced Network Settings Script"
+Write-Host "=============================================="
+
+try {
+    $settings = $settingsJson | ConvertFrom-Json
+} catch {
+    Write-Error "[FAIL] Failed to parse settings JSON: $_"
+    exit 1
+}
+
+function Find-AdapterByMAC($mac) {
+    $startTime = Get-Date
+    $deadline = $startTime.AddSeconds($adapterWaitSeconds)
+
+    while ((Get-Date) -lt $deadline) {
+        $adapters = Get-NetAdapter -Physical -ErrorAction SilentlyContinue
+        foreach ($a in $adapters) {
+            if ($a.MacAddress -and ($a.MacAddress.ToUpper().Replace(":", "-") -eq $mac.ToUpper().Replace(":", "-"))) {
+                $elapsed = ((Get-Date) - $startTime).TotalSeconds
+                Write-Host "[INFO] Found adapter '$($a.Name)' (MAC=$mac) after $([math]::Round($elapsed))s"
+                return $a
+            }
+        }
+        Start-Sleep -Seconds 2
+    }
+    return $null
+}
+
+$adaptersProcessed = 0
+$failCount = 0
+
+# Per-interface settings (only physical adapters with resolved MACs)
+foreach ($iface in $settings.interfaces) {
+    $mac = $iface.mac
+    Write-Host ""
+    Write-Host "--- Interface: $mac ---"
+
+    $adapter = Find-AdapterByMAC $mac
+    if ($adapter -eq $null) {
+        Write-Warning "[FAIL] Adapter $mac not found after waiting ${adapterWaitSeconds}s"
+        $failCount++
+        continue
+    }
+
+    $idx = $adapter.ifIndex
+    $name = $adapter.Name
+
+    # InterfaceMetric
+    if (-not $iface.interfaceMetricAuto -and $iface.interfaceMetric -gt 0) {
+        Write-Host "[INFO] Setting InterfaceMetric=$($iface.interfaceMetric) on '$name'"
+        try {
+            Set-NetIPInterface -InterfaceIndex $idx -InterfaceMetric $iface.interfaceMetric -ErrorAction Stop
+            Write-Host "[OK] InterfaceMetric set"
+        } catch {
+            Write-Warning "[FAIL] InterfaceMetric: $_"
+            $failCount++
+        }
+    }
+
+    # DNS Registration (RegistrationEnabled=0 means disabled)
+    if ($iface.registrationEnabled -eq 0) {
+        Write-Host "[INFO] Disabling DNS registration on '$name'"
+        try {
+            Set-DnsClient -InterfaceIndex $idx -RegisterThisConnectionsAddress $false -ErrorAction Stop
+            Write-Host "[OK] DNS registration disabled"
+        } catch {
+            Write-Warning "[FAIL] DNS registration: $_"
+            $failCount++
+        }
+    }
+
+    # NetBIOS over TCP/IP (registry write — no clean cmdlet)
+    if ($iface.netbiosOptions -eq 1 -or $iface.netbiosOptions -eq 2) {
+        $guid = $adapter.InterfaceGuid
+        $regPath = "HKLM:\SYSTEM\CurrentControlSet\Services\NetBT\Parameters\Interfaces\Tcpip_$guid"
+        if (Test-Path $regPath) {
+            Write-Host "[INFO] Setting NetbiosOptions=$($iface.netbiosOptions) on '$name'"
+            try {
+                Set-ItemProperty -Path $regPath -Name "NetbiosOptions" -Value $iface.netbiosOptions -Type DWord -ErrorAction Stop
+                Write-Host "[OK] NetbiosOptions set"
+            } catch {
+                Write-Warning "[FAIL] NetbiosOptions: $_"
+                $failCount++
+            }
+        } else {
+            Write-Warning "[WARN] NetBT registry path not found: $regPath"
+        }
+    }
+
+    $adaptersProcessed++
+}
+
+# Global: LanmanServer start type
+if ($settings.lanmanServerStart -ne 0 -and $settings.lanmanServerStart -ne 2) {
+    $typeMap = @{ 3 = 'Manual'; 4 = 'Disabled' }
+    $startType = $typeMap[[int]$settings.lanmanServerStart]
+    if ($startType) {
+        Write-Host ""
+        Write-Host "[INFO] Setting LanmanServer startup to '$startType'"
+        try {
+            Set-Service -Name LanmanServer -StartupType $startType -ErrorAction Stop
+            Write-Host "[OK] LanmanServer startup set"
+        } catch {
+            Write-Warning "[FAIL] LanmanServer startup: $_"
+            $failCount++
+        }
+    } else {
+        Write-Warning "[WARN] Unexpected lanmanServerStart value: $($settings.lanmanServerStart)"
+    }
+}
+
+# Per-adapter File & Printer Sharing (only adapters with resolved MACs)
+if ($settings.filePrinterSharingDisabledAdapters -and $settings.filePrinterSharingDisabledAdapters.Count -gt 0) {
+    foreach ($entry in $settings.filePrinterSharingDisabledAdapters) {
+        $mac = $entry.mac
+        Write-Host ""
+        Write-Host "[INFO] Disabling File & Printer Sharing on MAC=$mac"
+        $adapter = Find-AdapterByMAC $mac
+        if ($adapter) {
+            try {
+                Disable-NetAdapterBinding -InterfaceAlias $adapter.Name -ComponentID ms_server -ErrorAction Stop
+                Write-Host "[OK] ms_server unbound on '$($adapter.Name)'"
+            } catch {
+                Write-Warning "[FAIL] Disable ms_server binding: $_"
+                $failCount++
+            }
+        } else {
+            Write-Warning "[WARN] Adapter MAC=$mac not found for F&PS disable"
+            $failCount++
+        }
+    }
+}
+
+Write-Host ""
+Write-Host "=============================================="
+Write-Host "[INFO] Advanced network settings complete"
+Write-Host "[INFO] Adapters processed: $adaptersProcessed"
+if ($failCount -gt 0) {
+    Write-Warning "[WARN] Failures: $failCount"
+}
+Write-Host "=============================================="
