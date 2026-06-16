@@ -63,6 +63,8 @@ spec:
 
     Migration Toolkit for Virtualization 2.11 is supported on OpenShift 4.19, 4.20 and 4.21
 
+    Migration Toolkit for Virtualization 2.12 is supported on OpenShift 4.20, 4.21 and 4.22
+
     More information on compatibility in the [MTV Lifecycle document](https://access.redhat.com/support/policy/updates/migration-toolkit-for-virtualization).
 
     ### Documentation
