@@ -1293,6 +1293,9 @@ func (r *Builder) SupportsVolumePopulators() bool {
 	if !settings.Settings.Features.CopyOffload {
 		return false
 	}
+	if r.Context.Map.Storage == nil {
+		return false
+	}
 	dsMapIn := r.Context.Map.Storage.Spec.Map
 	for _, m := range dsMapIn {
 		ref := m.Source
