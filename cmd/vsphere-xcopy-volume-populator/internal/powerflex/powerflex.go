@@ -18,9 +18,18 @@ const (
 )
 
 type PowerflexClonner struct {
-	Client   *goscaleio.Client
-	systemId string
-	sdcId    string
+	Client    *goscaleio.Client
+	systemId  string
+	sdcId     string
+	arrayInfo populator.StorageArrayInfo
+}
+
+// Ensure PowerflexClonner implements StorageArrayInfoProvider
+var _ populator.StorageArrayInfoProvider = &PowerflexClonner{}
+
+// GetStorageArrayInfo returns metadata about the PowerFlex array for metric labels.
+func (p *PowerflexClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
+	return p.arrayInfo
 }
 
 // CurrentMappedGroups implements populator.StorageApi.
@@ -221,7 +230,14 @@ func NewPowerflexClonner(hostname, username, password string, sslSkipVerify bool
 		return PowerflexClonner{}, fmt.Errorf("error authenticating: %w", err)
 	}
 
-	klog.Infof("successfuly logged in to ScaleIO Gateway at %s version %s", client.GetConfigConnect().Endpoint, client.GetConfigConnect().Version)
+	klog.Infof("successfuly logged in to ScaleIO Gateway at %s", client.GetConfigConnect().Endpoint)
 
-	return PowerflexClonner{Client: client, systemId: systemId}, nil
+	return PowerflexClonner{
+		Client:   client,
+		systemId: systemId,
+		arrayInfo: populator.StorageArrayInfo{
+			Vendor:  "Dell",
+			Product: "PowerFlex",
+		},
+	}, nil
 }

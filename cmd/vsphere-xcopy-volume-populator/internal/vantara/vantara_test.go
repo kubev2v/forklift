@@ -90,6 +90,13 @@ func (m *mockVantaraClient) GetClonePairs(snapshotGroupName string, pvolLdevId s
 	return m.pairsResp, nil
 }
 
+func (m *mockVantaraClient) GetStorageInfo() (*StorageInfo, error) {
+	return &StorageInfo{
+		Model:           "VSP 5600",
+		DkcMicroVersion: "90-08-01",
+	}, nil
+}
+
 // TestResolvePVToLUN tests PV to LUN resolution
 func TestResolvePVToLUN(t *testing.T) {
 	cloner := VantaraCloner{

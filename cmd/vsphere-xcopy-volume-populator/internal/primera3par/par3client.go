@@ -19,6 +19,12 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// SystemInfo represents the response from GET /api/v1/system
+type SystemInfo struct {
+	SystemVersion string `json:"systemVersion"`
+	Model         string `json:"model"`
+}
+
 type Primera3ParClient interface {
 	GetSessionKey() (string, error)
 	EnsureLunMapped(initiatorGroup string, targetLUN populator.LUN) (populator.LUN, error)
@@ -30,6 +36,7 @@ type Primera3ParClient interface {
 	CurrentMappedGroups(volumeName string, mappingContext populator.MappingContext) ([]string, error)
 	CopyVolume(sourceVolName string, destVolName string) error
 	GetVolumes() ([]Volume, error)
+	GetSystemInfo() (SystemInfo, error)
 }
 
 type Volume struct {
@@ -939,6 +946,22 @@ func (p *Primera3ParClientWsImpl) waitForTask(taskID int) error {
 			klog.Warningf("Task %d has unknown status %d, continuing to poll", taskID, t.Status)
 		}
 	}
+}
+
+func (p *Primera3ParClientWsImpl) GetSystemInfo() (SystemInfo, error) {
+	reqURL := fmt.Sprintf("%s/api/v1/system", p.BaseURL)
+
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return SystemInfo{}, fmt.Errorf("failed to create GetSystemInfo request: %w", err)
+	}
+
+	var sysInfo SystemInfo
+	if err := p.doRequestUnmarshalResponse(req, "GetSystemInfo", &sysInfo); err != nil {
+		return SystemInfo{}, fmt.Errorf("failed to get system info: %w", err)
+	}
+
+	return sysInfo, nil
 }
 
 func (p *Primera3ParClientWsImpl) GetVolumes() ([]Volume, error) {
