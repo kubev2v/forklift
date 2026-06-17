@@ -388,6 +388,7 @@ func (r *VMEventHandler) validated(batch []*policy.Task) {
 		_ = tx.End()
 	}()
 	validatedIDs := map[string]bool{}
+	diskFiles := map[string]bool{}
 	for _, task := range batch {
 		if task.Error != nil {
 			r.log.Error(
@@ -420,6 +421,9 @@ func (r *VMEventHandler) validated(batch []*policy.Task) {
 			continue
 		}
 		validatedIDs[latest.ID] = true
+		for _, disk := range latest.Disks {
+			diskFiles[disk.File] = true
+		}
 		if task.Error == nil {
 			r.log.V(3).Info(
 				"VM validated.",
@@ -431,7 +435,7 @@ func (r *VMEventHandler) validated(batch []*policy.Task) {
 				task.Duration())
 		}
 	}
-	r.triggerSharedDiskRevalidation(tx, validatedIDs)
+	r.triggerSharedDiskRevalidation(tx, validatedIDs, diskFiles)
 	err = tx.Commit()
 	if err != nil {
 		r.log.Error(err, "Tx commit failed.")
@@ -442,23 +446,14 @@ func (r *VMEventHandler) validated(batch []*policy.Task) {
 // triggerSharedDiskRevalidation triggers revalidation of VMs that share
 // disks with the just-validated VMs, so they also pick up or drop the
 // shared disk concern.
-func (r *VMEventHandler) triggerSharedDiskRevalidation(tx *libmodel.Tx, validatedIDs map[string]bool) {
+func (r *VMEventHandler) triggerSharedDiskRevalidation(tx *libmodel.Tx, validatedIDs, diskFiles map[string]bool) {
+	if len(diskFiles) == 0 {
+		return
+	}
 	var allVMs []model.VM
 	err := tx.List(&allVMs, model.ListOptions{Detail: model.MaxDetail})
 	if err != nil {
 		r.log.Error(err, "List VMs for shared disk revalidation failed.")
-		return
-	}
-	diskFiles := map[string]bool{}
-	for i := range allVMs {
-		if !validatedIDs[allVMs[i].ID] {
-			continue
-		}
-		for _, disk := range allVMs[i].Disks {
-			diskFiles[disk.File] = true
-		}
-	}
-	if len(diskFiles) == 0 {
 		return
 	}
 	for i := range allVMs {
