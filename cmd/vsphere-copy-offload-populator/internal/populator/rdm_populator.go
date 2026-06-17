@@ -34,6 +34,8 @@ func (p *RDMPopulator) Populate(vmId string, sourceVMDKFile string, pv Persisten
 		r := recover()
 		if r != nil {
 			log.Info("recovered from panic", "panic", r)
+			quit <- fmt.Errorf("recovered failure: %v", r)
+			return
 		}
 		log.Info("RDM copy exiting", "err", errFinal)
 		quit <- errFinal
