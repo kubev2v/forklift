@@ -251,7 +251,7 @@ func TestRetryOnTransient(t *testing.T) {
 	log := klog.Background()
 	ctx := context.Background()
 
-	t.Run("should not retry on non-503 errors", func(t *testing.T) {
+	t.Run("should not retry on non-transient errors", func(t *testing.T) {
 		callCount := 0
 		err := retryOnTransient(ctx, log, "test", func() error {
 			callCount++
@@ -259,6 +259,19 @@ func TestRetryOnTransient(t *testing.T) {
 		})
 		g.Expect(err).To(gomega.HaveOccurred())
 		g.Expect(callCount).To(gomega.Equal(1))
+	})
+
+	t.Run("should retry on 500 and succeed", func(t *testing.T) {
+		callCount := 0
+		err := retryOnTransient(ctx, log, "test", func() error {
+			callCount++
+			if callCount < 2 {
+				return &v100.Error{HTTPStatusCode: 500, Message: "auto provisioning operation is already in progress"}
+			}
+			return nil
+		})
+		g.Expect(err).ToNot(gomega.HaveOccurred())
+		g.Expect(callCount).To(gomega.Equal(2))
 	})
 
 	t.Run("should retry on 503 and succeed", func(t *testing.T) {
