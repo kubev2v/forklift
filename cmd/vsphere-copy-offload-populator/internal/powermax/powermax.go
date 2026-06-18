@@ -511,8 +511,8 @@ func retryOnTransient(ctx context.Context, log klog.Logger, operation string, fn
 		}
 		var pmxErr *pmxtypes.Error
 		if errors.As(lastErr, &pmxErr) {
-			if pmxErr.HTTPStatusCode == 503 {
-				log.Info("transient 503 error, retrying", "operation", operation, "attempt", attempt, "maxAttempts", backoff.Steps, "err", lastErr)
+			if pmxErr.HTTPStatusCode == 503 || pmxErr.HTTPStatusCode == 500 {
+				log.Info("transient error, retrying", "operation", operation, "httpStatus", pmxErr.HTTPStatusCode, "attempt", attempt, "maxAttempts", backoff.Steps, "err", lastErr)
 				return false, nil
 			}
 			if pmxErr.HTTPStatusCode == 409 {
