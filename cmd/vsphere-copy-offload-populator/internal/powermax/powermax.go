@@ -496,7 +496,7 @@ func retryOnTransient(ctx context.Context, log klog.Logger, operation string, fn
 		Duration: 1 * time.Second,
 		Factor:   2.0,
 		Jitter:   1.0,
-		Steps:    5,
+		Steps:    10,
 	}
 	var lastErr error
 	attempt := 0
