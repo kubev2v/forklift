@@ -510,7 +510,7 @@ if "!VAL_NAME!"=="" (
     ) else (
         reg delete "!REG_PATH!" /f >nul 2>&1
         if !errorlevel! equ 0 (
-            echo [DEL KEY] !REG_PATH! (fallback)
+            echo [DEL KEY] !REG_PATH! ^(fallback^)
             set "RESULT=DELETED"
         ) else (
             set "RESULT=ERROR"
@@ -522,7 +522,8 @@ for %%R in ("!RESULT!") do (
     endlocal
     if "%%~R"=="DELETED" (
         set /a REG_DELETED+=1
-    ) else if "%%~R"=="ERROR" (
+    )
+    if "%%~R"=="ERROR" (
         set /a REG_ERRORS+=1
     )
 )
