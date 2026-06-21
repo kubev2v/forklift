@@ -316,7 +316,7 @@ func TestRetryOnTransient(t *testing.T) {
 		})
 		g.Expect(err).To(gomega.HaveOccurred())
 		g.Expect(err.Error()).To(gomega.ContainSubstring("Service Unavailable"))
-		g.Expect(callCount).To(gomega.Equal(5)) // 5 steps in backoff
+		g.Expect(callCount).To(gomega.Equal(7)) // 7 steps in backoff
 	})
 }
 
@@ -648,7 +648,7 @@ func TestMap(t *testing.T) {
 			initiatorID:    "mv-xcopy",
 		}
 
-		mvErr := &v100.Error{HTTPStatusCode: 500, Message: "internal server error"}
+		mvErr := &v100.Error{HTTPStatusCode: 400, Message: "bad request"}
 		gomock.InOrder(
 			mockClient.EXPECT().GetVolumeIDListInStorageGroup(context.TODO(), "sym123", "sg-xcopy").Return([]string{}, nil),
 			mockClient.EXPECT().AddVolumesToStorageGroupS(context.TODO(), "sym123", "sg-xcopy", false, "vol-001").Return(nil),
