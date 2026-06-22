@@ -45,10 +45,19 @@ type DestinationNetwork struct {
 	Name string `json:"name,omitempty"`
 }
 
+// NetworkSourceRef extends Ref with an optional VLAN qualifier for network disambiguation.
+type NetworkSourceRef struct {
+	ref.Ref `json:",inline"`
+	// VLAN identifier (numeric string, valid range 1-4094) for network disambiguation.
+	// +optional
+	// +kubebuilder:validation:Pattern=`^([1-9]|[1-9][0-9]{1,2}|[1-3][0-9]{3}|40[0-8][0-9]|409[0-4])$`
+	Vlan string `json:"vlan,omitempty"`
+}
+
 // Mapped network.
 type NetworkPair struct {
 	// Source network.
-	Source ref.Ref `json:"source"`
+	Source NetworkSourceRef `json:"source"`
 	// Destination network.
 	Destination DestinationNetwork `json:"destination"`
 }

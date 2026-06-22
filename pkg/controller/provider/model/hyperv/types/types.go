@@ -35,6 +35,7 @@ type NIC struct {
 	DeviceIndex int    `json:"deviceIndex"`
 	NetworkUUID string `json:"networkUUID"`
 	NetworkName string `json:"networkName"`
+	VlanId      int    `json:"vlanId,omitempty"`
 }
 
 // GuestNetwork represents guest OS network configuration collected via KVP Exchange.

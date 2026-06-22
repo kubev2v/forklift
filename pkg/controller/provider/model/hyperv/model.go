@@ -134,6 +134,7 @@ type NIC struct {
 	DeviceIndex int    `json:"deviceIndex"`
 	Network     Ref    `json:"network"`
 	NetworkName string `json:"networkName,omitempty"`
+	VlanId      int    `json:"vlanId,omitempty"`
 }
 
 type GuestNetwork struct {

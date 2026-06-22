@@ -54,9 +54,10 @@ const (
 )
 
 const (
-	// GetVMNICs returns all network adapters attached to a VM
+	// GetVMNICs returns all network adapters attached to a VM including VLAN configuration.
+	// Only Access-mode VLANs are captured, Trunk-mode adapters (NativeVlanId) report 0.
 	// Parameters: vmName
-	GetVMNICs = `Get-VMNetworkAdapter -VMName '%s' | Select-Object Name, MacAddress, SwitchName | ConvertTo-Json`
+	GetVMNICs = `Get-VMNetworkAdapter -VMName '%s' | ForEach-Object { $v = ($_ | Get-VMNetworkAdapterVlan); $_ | Select-Object Name, MacAddress, SwitchName, @{N='VlanId';E={if($v.AccessVlanId){$v.AccessVlanId}else{0}}} } | ConvertTo-Json`
 )
 
 const (

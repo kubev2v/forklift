@@ -460,7 +460,7 @@ func (r *Validator) getSourceNetworkForPodNetworkTarget(vmRef ref.Ref) (net *mod
 		mapped := &mapping[i]
 		ref := mapped.Source
 		network := &model.Network{}
-		fErr := r.Source.Inventory.Find(network, ref)
+		fErr := r.Source.Inventory.Find(network, ref.Ref)
 		if fErr != nil {
 			err = fErr
 			return
