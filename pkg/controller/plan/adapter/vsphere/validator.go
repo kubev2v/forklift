@@ -717,6 +717,17 @@ func (r *Validator) ValidateCalicoNADs(c k8sclient.Client) (planbase.CalicoValid
 			})
 			continue
 		}
+		// type:calico without a "network" field is Calico's legacy L3 IPAM
+		// mode. Forklift's identity preservation only applies to the L2
+		// path; warn the user that MAC/IP annotations will not be emitted
+		// for NICs mapped here.
+		if cfg.Type == ocpmodel.CalicoCNIType && cfg.Network == "" {
+			result.Warnings = append(result.Warnings, planbase.CalicoNADIssue{
+				NAD:  key,
+				Kind: planbase.CalicoIssueNADMissingNetwork,
+			})
+			continue
+		}
 		if !cfg.ReferencesCalicoNetwork() {
 			continue
 		}
