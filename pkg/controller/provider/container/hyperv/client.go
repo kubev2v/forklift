@@ -412,6 +412,7 @@ func (r *Client) extractNICs(domain driver.Domain, networks []types.Network) []t
 			DeviceIndex: i,
 			NetworkUUID: networkUUID,
 			NetworkName: ni.SwitchName,
+			VlanId:      ni.VlanId,
 		})
 	}
 	return nics

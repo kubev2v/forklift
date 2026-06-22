@@ -99,7 +99,7 @@ func (r *Reconciler) validateSource(mp *api.NetworkMap) (err error) {
 			})
 			continue
 		}
-		_, pErr := inventory.Network(ref)
+		_, pErr := inventory.Network(&ref.Ref)
 		if pErr != nil {
 			if errors.As(pErr, &web.NotFoundError{}) {
 				notValid = append(notValid, ref.String())
@@ -112,8 +112,8 @@ func (r *Reconciler) validateSource(mp *api.NetworkMap) (err error) {
 			err = pErr
 			return
 		}
-		if !references.Find(*ref) {
-			references.List = append(references.List, *ref)
+		if !references.Find(ref.Ref) {
+			references.List = append(references.List, ref.Ref)
 		}
 	}
 	mp.Status.Refs = references
