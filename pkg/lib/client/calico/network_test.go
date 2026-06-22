@@ -139,7 +139,10 @@ func TestGetNetwork_MultipleVLANs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got.L2Bridge == nil || len(got.L2Bridge.VLANs) != 3 {
+	if got.L2Bridge == nil {
+		t.Fatal("L2Bridge = nil, want non-nil")
+	}
+	if len(got.L2Bridge.VLANs) != 3 {
 		t.Fatalf("VLANs len = %d, want 3", len(got.L2Bridge.VLANs))
 	}
 	wantVIDs := []uint16{100, 200, 300}
