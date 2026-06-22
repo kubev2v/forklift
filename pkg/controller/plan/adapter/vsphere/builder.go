@@ -855,7 +855,7 @@ func (r *Builder) buildNICResolver(nics []vsphere.NIC) ([]string, map[string][]a
 	pairsBySource := map[string][]api.NetworkPair{}
 	for _, pair := range r.Map.Network.Spec.Map {
 		network := &model.Network{}
-		if err := r.Source.Inventory.Find(network, pair.Source); err != nil {
+		if err := r.Source.Inventory.Find(network, pair.Source.Ref); err != nil {
 			return nil, nil, liberr.Wrap(err, "buildNICResolver, source", pair.Source.String())
 		}
 		if network.Variant == vsphere.NetDvPortGroup || network.Variant == vsphere.OpaqueNetwork {

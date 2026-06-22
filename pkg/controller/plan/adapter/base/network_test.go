@@ -24,7 +24,7 @@ func TestValidateNetworkDuplicates_NoNICs(t *testing.T) {
 
 func TestValidateNetworkDuplicates_SinglePod(t *testing.T) {
 	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
-		{Source: ref.Ref{Type: "pod"}, Destination: api.DestinationNetwork{Type: Pod}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{Type: "pod"}}, Destination: api.DestinationNetwork{Type: Pod}},
 	}}}
 	nicRefs := []ref.Ref{{Type: "pod"}}
 	foundNadDup, foundPodDup := ValidateNetworkDuplicates(nicRefs, nm)
@@ -35,8 +35,8 @@ func TestValidateNetworkDuplicates_SinglePod(t *testing.T) {
 
 func TestValidateNetworkDuplicates_DuplicatePod(t *testing.T) {
 	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
-		{Source: ref.Ref{Type: "pod"}, Destination: api.DestinationNetwork{Type: Pod}},
-		{Source: ref.Ref{ID: "net-1"}, Destination: api.DestinationNetwork{Type: Pod}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{Type: "pod"}}, Destination: api.DestinationNetwork{Type: Pod}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Pod}},
 	}}}
 	nicRefs := []ref.Ref{{Type: "pod"}, {ID: "net-1"}}
 	foundNadDup, foundPodDup := ValidateNetworkDuplicates(nicRefs, nm)
@@ -50,7 +50,7 @@ func TestValidateNetworkDuplicates_DuplicatePod(t *testing.T) {
 
 func TestValidateNetworkDuplicates_DuplicateNAD_ByID(t *testing.T) {
 	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
-		{Source: ref.Ref{ID: "net-1"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
 	}}}
 	nicRefs := []ref.Ref{{ID: "net-1"}, {ID: "net-1"}}
 	foundNadDup, foundPodDup := ValidateNetworkDuplicates(nicRefs, nm)
@@ -64,8 +64,8 @@ func TestValidateNetworkDuplicates_DuplicateNAD_ByID(t *testing.T) {
 
 func TestValidateNetworkDuplicates_DuplicateNAD_ByNameNamespace(t *testing.T) {
 	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
-		{Source: ref.Ref{Namespace: "ns", Name: "net-1"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
-		{Source: ref.Ref{Namespace: "ns", Name: "net-2"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{Namespace: "ns", Name: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{Namespace: "ns", Name: "net-2"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
 	}}}
 	nicRefs := []ref.Ref{{Namespace: "ns", Name: "net-1"}, {Namespace: "ns", Name: "net-2"}}
 	foundNadDup, _ := ValidateNetworkDuplicates(nicRefs, nm)
@@ -76,8 +76,8 @@ func TestValidateNetworkDuplicates_DuplicateNAD_ByNameNamespace(t *testing.T) {
 
 func TestValidateNetworkDuplicates_DistinctNADs(t *testing.T) {
 	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
-		{Source: ref.Ref{ID: "net-1"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
-		{Source: ref.Ref{ID: "net-2"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-b"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-2"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-b"}},
 	}}}
 	nicRefs := []ref.Ref{{ID: "net-1"}, {ID: "net-2"}}
 	foundNadDup, foundPodDup := ValidateNetworkDuplicates(nicRefs, nm)
@@ -88,7 +88,7 @@ func TestValidateNetworkDuplicates_DistinctNADs(t *testing.T) {
 
 func TestValidateNetworkDuplicates_UnmappedNICIgnored(t *testing.T) {
 	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
-		{Source: ref.Ref{ID: "net-1"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
 	}}}
 	nicRefs := []ref.Ref{{ID: "net-1"}, {ID: "net-999"}}
 	foundNadDup, foundPodDup := ValidateNetworkDuplicates(nicRefs, nm)
@@ -101,9 +101,9 @@ func TestValidateNetworkDuplicates_UnmappedNICIgnored(t *testing.T) {
 
 func TestFindAllMappingsForNICRef_MultipleByID(t *testing.T) {
 	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
-		{Source: ref.Ref{ID: "net-1"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
-		{Source: ref.Ref{ID: "net-1"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-b"}},
-		{Source: ref.Ref{ID: "net-2"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-c"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-b"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-2"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-c"}},
 	}}}
 	pairs := FindAllMappingsForNICRef(ref.Ref{ID: "net-1"}, nm)
 	if len(pairs) != 2 {
@@ -116,7 +116,7 @@ func TestFindAllMappingsForNICRef_MultipleByID(t *testing.T) {
 
 func TestFindAllMappingsForNICRef_SingleMatch(t *testing.T) {
 	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
-		{Source: ref.Ref{ID: "net-1"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
 	}}}
 	pairs := FindAllMappingsForNICRef(ref.Ref{ID: "net-1"}, nm)
 	if len(pairs) != 1 {
@@ -133,7 +133,7 @@ func TestFindAllMappingsForNICRef_NilMap(t *testing.T) {
 
 func TestFindAllMappingsForNICRef_NoMatch(t *testing.T) {
 	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
-		{Source: ref.Ref{ID: "net-1"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
 	}}}
 	pairs := FindAllMappingsForNICRef(ref.Ref{ID: "net-999"}, nm)
 	if len(pairs) != 0 {
@@ -145,8 +145,8 @@ func TestFindAllMappingsForNICRef_NoMatch(t *testing.T) {
 
 func TestNADPool_Allocate_DistinctNADs(t *testing.T) {
 	pairsForSource := []api.NetworkPair{
-		{Source: ref.Ref{ID: "net-1"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
-		{Source: ref.Ref{ID: "net-1"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-b"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-b"}},
 	}
 	pool := NewNADPool()
 
@@ -163,7 +163,7 @@ func TestNADPool_Allocate_DistinctNADs(t *testing.T) {
 
 func TestNADPool_Allocate_PoolExhausted(t *testing.T) {
 	pairsForSource := []api.NetworkPair{
-		{Source: ref.Ref{ID: "net-1"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
 	}
 	pool := NewNADPool()
 
@@ -180,7 +180,7 @@ func TestNADPool_Allocate_PoolExhausted(t *testing.T) {
 
 func TestAllocateNetwork_PodPassthrough(t *testing.T) {
 	pairsForSource := []api.NetworkPair{
-		{Source: ref.Ref{Type: "pod"}, Destination: api.DestinationNetwork{Type: Pod}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{Type: "pod"}}, Destination: api.DestinationNetwork{Type: Pod}},
 	}
 	pool := NewNADPool()
 
@@ -195,8 +195,8 @@ func TestAllocateNetwork_PodPassthrough(t *testing.T) {
 
 func TestAllocateNetwork_MultusGoesToPool(t *testing.T) {
 	pairsForSource := []api.NetworkPair{
-		{Source: ref.Ref{ID: "net-1"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
-		{Source: ref.Ref{ID: "net-1"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-b"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-b"}},
 	}
 	pool := NewNADPool()
 
@@ -220,10 +220,10 @@ func TestNADPool_Allocate_Empty(t *testing.T) {
 
 func TestNADPool_Allocate_IndependentNetworks(t *testing.T) {
 	pairsForSourceA := []api.NetworkPair{
-		{Source: ref.Ref{ID: "net-1"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
 	}
 	pairsForSourceB := []api.NetworkPair{
-		{Source: ref.Ref{ID: "net-2"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-b"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-2"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-b"}},
 	}
 	pool := NewNADPool()
 
@@ -242,8 +242,8 @@ func TestNADPool_Allocate_IndependentNetworks(t *testing.T) {
 
 func TestValidateNetworkDuplicates_1toN_NoDuplicate(t *testing.T) {
 	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
-		{Source: ref.Ref{ID: "net-1"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
-		{Source: ref.Ref{ID: "net-1"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-b"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-b"}},
 	}}}
 	nicRefs := []ref.Ref{{ID: "net-1"}, {ID: "net-1"}}
 	foundNadDup, foundPodDup := ValidateNetworkDuplicates(nicRefs, nm)
@@ -257,8 +257,8 @@ func TestValidateNetworkDuplicates_1toN_NoDuplicate(t *testing.T) {
 
 func TestValidateNetworkDuplicates_1toN_PoolExhausted(t *testing.T) {
 	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
-		{Source: ref.Ref{ID: "net-1"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
-		{Source: ref.Ref{ID: "net-1"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-b"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-b"}},
 	}}}
 	nicRefs := []ref.Ref{{ID: "net-1"}, {ID: "net-1"}, {ID: "net-1"}}
 	foundNadDup, _ := ValidateNetworkDuplicates(nicRefs, nm)
@@ -269,9 +269,9 @@ func TestValidateNetworkDuplicates_1toN_PoolExhausted(t *testing.T) {
 
 func TestValidateNetworkDuplicates_1toN_MixedNetworks(t *testing.T) {
 	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
-		{Source: ref.Ref{ID: "net-1"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
-		{Source: ref.Ref{ID: "net-1"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-b"}},
-		{Source: ref.Ref{ID: "net-2"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-c"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-b"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-2"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-c"}},
 	}}}
 	nicRefs := []ref.Ref{{ID: "net-1"}, {ID: "net-1"}, {ID: "net-2"}}
 	foundNadDup, foundPodDup := ValidateNetworkDuplicates(nicRefs, nm)
@@ -282,7 +282,7 @@ func TestValidateNetworkDuplicates_1toN_MixedNetworks(t *testing.T) {
 
 func TestValidateNetworkDuplicates_BackwardCompat_SingleRow(t *testing.T) {
 	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
-		{Source: ref.Ref{ID: "net-1"}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},
 	}}}
 	nicRefs := []ref.Ref{{ID: "net-1"}, {ID: "net-1"}}
 	foundNadDup, _ := ValidateNetworkDuplicates(nicRefs, nm)

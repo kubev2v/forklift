@@ -121,7 +121,7 @@ var _ = Describe("EC2 Controller Mapping", func() {
 				Spec: api.NetworkMapSpec{
 					Map: []api.NetworkPair{
 						{
-							Source: ref.Ref{ID: "subnet-123", Name: ""},
+							Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "subnet-123", Name: ""}},
 							Destination: api.DestinationNetwork{
 								Type: "pod",
 							},
@@ -141,7 +141,7 @@ var _ = Describe("EC2 Controller Mapping", func() {
 				Spec: api.NetworkMapSpec{
 					Map: []api.NetworkPair{
 						{
-							Source: ref.Ref{ID: "", Name: "subnet-456"},
+							Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "", Name: "subnet-456"}},
 							Destination: api.DestinationNetwork{
 								Type: "pod",
 							},
@@ -161,7 +161,7 @@ var _ = Describe("EC2 Controller Mapping", func() {
 				Spec: api.NetworkMapSpec{
 					Map: []api.NetworkPair{
 						{
-							Source: ref.Ref{ID: "subnet-123"},
+							Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "subnet-123"}},
 							Destination: api.DestinationNetwork{
 								Type: "pod",
 							},
@@ -215,13 +215,13 @@ var _ = Describe("EC2 Controller Mapping", func() {
 					Map: []api.NetworkPair{
 						{
 							// Both ID and Name set to prevent empty string matching
-							Source: ref.Ref{ID: "subnet-111", Name: "subnet-111-name"},
+							Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "subnet-111", Name: "subnet-111-name"}},
 							Destination: api.DestinationNetwork{
 								Type: "pod",
 							},
 						},
 						{
-							Source: ref.Ref{ID: "subnet-222-id", Name: "subnet-222"},
+							Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "subnet-222-id", Name: "subnet-222"}},
 							Destination: api.DestinationNetwork{
 								Type: "multus",
 							},
@@ -252,13 +252,13 @@ var _ = Describe("EC2 Controller Mapping", func() {
 				Spec: api.NetworkMapSpec{
 					Map: []api.NetworkPair{
 						{
-							Source: ref.Ref{ID: "subnet-123"},
+							Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "subnet-123"}},
 							Destination: api.DestinationNetwork{
 								Type: "pod",
 							},
 						},
 						{
-							Source: ref.Ref{ID: "subnet-123"}, // Duplicate
+							Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "subnet-123"}}, // Duplicate
 							Destination: api.DestinationNetwork{
 								Type: "multus",
 							},

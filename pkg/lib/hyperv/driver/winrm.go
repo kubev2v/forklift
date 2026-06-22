@@ -361,6 +361,7 @@ func (d *WinRMDomain) GetNICs() ([]NICInfo, error) {
 		Name       string `json:"Name"`
 		MacAddress string `json:"MacAddress"`
 		SwitchName string `json:"SwitchName"`
+		VlanId     int    `json:"VlanId"`
 	}
 
 	var nicsData []nicData
@@ -378,6 +379,7 @@ func (d *WinRMDomain) GetNICs() ([]NICInfo, error) {
 			Name:       nd.Name,
 			MACAddress: nd.MacAddress,
 			SwitchName: nd.SwitchName,
+			VlanId:     nd.VlanId,
 		})
 	}
 	return nics, nil

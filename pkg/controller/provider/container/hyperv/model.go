@@ -446,6 +446,7 @@ func addVMNICs(r *types.VM, m *model.VM) {
 				ID:   n.NetworkUUID,
 			},
 			NetworkName: n.NetworkName,
+			VlanId:      n.VlanId,
 		})
 		if n.NetworkUUID != "" {
 			networkSet[n.NetworkUUID] = true

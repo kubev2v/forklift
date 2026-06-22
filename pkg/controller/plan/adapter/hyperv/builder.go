@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"path"
+	"strconv"
 	"strings"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -209,21 +210,59 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) {
 }
 
 func (r *Builder) buildNICResolver(nics []hyperv.NIC) ([]string, map[string][]api.NetworkPair) {
+	networkCount := nicNetworkCount(nics)
+
 	pairsBySource := map[string][]api.NetworkPair{}
+	vlanQualifiedNetworks := map[string]bool{}
 	if r.Map.Network != nil {
 		for _, pair := range r.Map.Network.Spec.Map {
 			network := &model.Network{}
-			if err := r.Source.Inventory.Find(network, pair.Source); err != nil {
+			if err := r.Source.Inventory.Find(network, pair.Source.Ref); err != nil {
 				continue
 			}
-			pairsBySource[network.ID] = append(pairsBySource[network.ID], pair)
+			key := buildPairKey(network.ID, pair.Source.Vlan, networkCount)
+			pairsBySource[key] = append(pairsBySource[key], pair)
+			if pair.Source.Vlan != "" {
+				vlanQualifiedNetworks[network.ID] = true
+			}
 		}
 	}
-	nicKeys := make([]string, len(nics))
-	for i, nic := range nics {
-		nicKeys[i] = nic.Network.ID
+
+	return buildNICKeys(nics, networkCount, vlanQualifiedNetworks), pairsBySource
+}
+
+// nicNetworkCount returns a map of network ID → number of NICs attached to it.
+func nicNetworkCount(nics []hyperv.NIC) map[string]int {
+	count := map[string]int{}
+	for _, nic := range nics {
+		count[nic.Network.ID]++
 	}
-	return nicKeys, pairsBySource
+	return count
+}
+
+// buildNICKeys produces a lookup key per NIC. VLAN suffixes are only appended
+// when the NetworkMap has VLAN-qualified entries for that network. This ensures
+// backward compatibility: if the map uses plain network IDs (no Vlan field),
+// NIC keys remain plain too, preserving the old 1:1 fallback behavior.
+func buildNICKeys(nics []hyperv.NIC, networkCount map[string]int, vlanQualifiedNetworks map[string]bool) []string {
+	keys := make([]string, len(nics))
+	for i, nic := range nics {
+		if networkCount[nic.Network.ID] > 1 && nic.VlanId > 0 && vlanQualifiedNetworks[nic.Network.ID] {
+			keys[i] = nic.Network.ID + "/" + strconv.Itoa(nic.VlanId)
+		} else {
+			keys[i] = nic.Network.ID
+		}
+	}
+	return keys
+}
+
+// buildPairKey constructs the lookup key for a network map pair entry.
+// The VLAN suffix is only added when the network has multiple NICs attached.
+func buildPairKey(networkID, vlan string, networkCount map[string]int) string {
+	if vlan != "" && networkCount[networkID] > 1 {
+		return networkID + "/" + vlan
+	}
+	return networkID
 }
 
 func (r *Builder) mapCPU(vmRef ref.Ref, vm *model.VM, object *cnv.VirtualMachineSpec, usesInstanceType bool) {

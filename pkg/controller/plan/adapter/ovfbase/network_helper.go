@@ -25,7 +25,7 @@ func buildOvfNICResolver(
 			continue
 		}
 		network := &model.Network{}
-		if err := inventory.Find(network, entry.Source); err != nil {
+		if err := inventory.Find(network, entry.Source.Ref); err != nil {
 			return nil, nil, err
 		}
 		pairsBySource[network.Name] = append(pairsBySource[network.Name], *entry)
