@@ -78,7 +78,7 @@ func (d *WinRMDriver) Connect() error {
 		return fmt.Errorf("failed to create WinRM client: %w", err)
 	}
 	d.client = client
-	log.Info("Connected to Hyper-V host via WinRM/HTTPS", "host", d.host, "port", d.port, "insecureSkipVerify", d.insecureSkipVerify)
+	log.Info("WinRM client initialized.", "host", d.host, "port", d.port, "insecureSkipVerify", d.insecureSkipVerify)
 	return nil
 }
 
@@ -123,7 +123,7 @@ func (d *WinRMDriver) ExecuteCommandWithTimeout(command string, timeout time.Dur
 
 	stdout, stderr, exitCode, err := d.client.RunWithContextWithString(ctx, command, "")
 	if err != nil {
-		return "", fmt.Errorf("WinRM command failed: %w", err)
+		return "", WrapCommandError(fmt.Errorf("WinRM command failed: %w", err))
 	}
 
 	if exitCode != 0 {
