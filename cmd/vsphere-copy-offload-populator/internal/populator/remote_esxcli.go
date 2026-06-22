@@ -162,7 +162,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, migrationHostId, sourceVMD
 
 	// Filter HBA UIDs based on datastore active adapters
 	var dsActiveAdapters []vmware.HostAdapter
-	dsActiveAdapters, err = p.VSphereClient.GetDatastoreActiveAdapters(context.Background(), host, vmDisk.Datastore)
+	dsActiveAdapters, err = p.VSphereClient.GetDatastoreActiveAdapters(context.Background(), host, vmDisk.Datastore, p.StorageApi)
 	initiators := []string{}
 	setupLog.Info("Datastore active adapters", "datastore", vmDisk.Datastore, "activeAdapters", dsActiveAdapters)
 	for _, a := range dsActiveAdapters {

@@ -10,6 +10,7 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/fcutil"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/storage"
 	"k8s.io/klog/v2"
 )
 
@@ -18,6 +19,8 @@ const (
 	esxLogicalHostNameKey string = "esxLogicalHostName"
 	esxRealHostNameKey    string = "esxRealHostName"
 	ocpRealHostNameKey    string = "ocpRealHostName"
+
+	InfiniboxProviderID = "6742b0f" // Infinidat InfiniBox NAA OUI prefix
 )
 
 type InfiniboxClonner struct {
@@ -29,10 +32,20 @@ type InfiniboxClonner struct {
 
 // Ensure InfiniboxClonner implements StorageArrayInfoProvider
 var _ populator.StorageArrayInfoProvider = &InfiniboxClonner{}
+var _ storage.ArrayIdentifier = &InfiniboxClonner{}
 
 // GetStorageArrayInfo returns metadata about the InfiniBox array for metric labels.
 func (c *InfiniboxClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 	return c.arrayInfo
+}
+
+// MatchesDevice returns true if the given device name belongs to this InfiniBox array.
+// It checks whether the device name carries the Infinidat vendor OUI prefix (naa.6742b0f).
+func (c *InfiniboxClonner) MatchesDevice(deviceName string) (bool, error) {
+	prefix := "naa." + InfiniboxProviderID
+	matches := strings.HasPrefix(strings.ToLower(deviceName), prefix)
+	c.log.V(2).Info("checking device ownership", "device", deviceName, "prefix", prefix, "matches", matches)
+	return matches, nil
 }
 
 func (c *InfiniboxClonner) MapTarget(targetLUN populator.LUN, context populator.MappingContext) (populator.LUN, error) {

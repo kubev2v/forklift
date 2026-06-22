@@ -10,6 +10,7 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/fcutil"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/storage"
 	"k8s.io/klog/v2"
 )
 
@@ -17,6 +18,8 @@ const (
 	hostIDContextKey      string = "hostID"
 	esxLogicalHostNameKey string = "esxLogicalHostName"
 	esxRealHostNameKey    string = "esxRealHostName"
+
+	PowerStoreProviderID = "68ccf098" // Dell PowerStore NAA OUI prefix
 )
 
 type PowerstoreClonner struct {
@@ -28,10 +31,20 @@ type PowerstoreClonner struct {
 
 // Ensure PowerstoreClonner implements StorageArrayInfoProvider
 var _ populator.StorageArrayInfoProvider = &PowerstoreClonner{}
+var _ storage.ArrayIdentifier = &PowerstoreClonner{}
 
 // GetStorageArrayInfo returns metadata about the PowerStore array for metric labels.
 func (p *PowerstoreClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 	return p.arrayInfo
+}
+
+// MatchesDevice returns true if the given device name belongs to this PowerStore array.
+// It checks whether the device name carries the Dell PowerStore vendor OUI prefix (naa.68ccf098).
+func (p *PowerstoreClonner) MatchesDevice(deviceName string) (bool, error) {
+	prefix := "naa." + PowerStoreProviderID
+	matches := strings.HasPrefix(strings.ToLower(deviceName), prefix)
+	p.log.V(2).Info("checking device ownership", "device", deviceName, "prefix", prefix, "matches", matches)
+	return matches, nil
 }
 
 func (p *PowerstoreClonner) MapTarget(targetLUN populator.LUN, mappingContext populator.MappingContext) (populator.LUN, error) {

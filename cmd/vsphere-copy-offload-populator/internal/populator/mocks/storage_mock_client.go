@@ -100,6 +100,21 @@ func (mr *MockStorageApiMockRecorder) MapTarget(targetLUN, context any) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MapTarget", reflect.TypeOf((*MockStorageApi)(nil).MapTarget), targetLUN, context)
 }
 
+// MatchesDevice mocks base method.
+func (m *MockStorageApi) MatchesDevice(deviceName string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MatchesDevice", deviceName)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// MatchesDevice indicates an expected call of MatchesDevice.
+func (mr *MockStorageApiMockRecorder) MatchesDevice(deviceName any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MatchesDevice", reflect.TypeOf((*MockStorageApi)(nil).MatchesDevice), deviceName)
+}
+
 // ResolvePVToLUN mocks base method.
 func (m *MockStorageApi) ResolvePVToLUN(persistentVolume populator.PersistentVolume) (populator.LUN, error) {
 	m.ctrl.T.Helper()
