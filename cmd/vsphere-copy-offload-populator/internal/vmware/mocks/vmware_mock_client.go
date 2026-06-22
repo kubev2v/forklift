@@ -13,6 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	storage "github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/storage"
 	vmware "github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
 	resolver "github.com/kubev2v/forklift/pkg/storage/resolver"
 	esx "github.com/vmware/govmomi/cli/esx"
@@ -60,18 +61,18 @@ func (mr *MockClientMockRecorder) GetDatastore(ctx, dc, datastore any) *gomock.C
 }
 
 // GetDatastoreActiveAdapters mocks base method.
-func (m *MockClient) GetDatastoreActiveAdapters(ctx context.Context, host *object.HostSystem, datastoreName string) ([]vmware.HostAdapter, error) {
+func (m *MockClient) GetDatastoreActiveAdapters(ctx context.Context, host *object.HostSystem, datastoreName string, arrayIdentifier storage.ArrayIdentifier) ([]vmware.HostAdapter, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetDatastoreActiveAdapters", ctx, host, datastoreName)
+	ret := m.ctrl.Call(m, "GetDatastoreActiveAdapters", ctx, host, datastoreName, arrayIdentifier)
 	ret0, _ := ret[0].([]vmware.HostAdapter)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetDatastoreActiveAdapters indicates an expected call of GetDatastoreActiveAdapters.
-func (mr *MockClientMockRecorder) GetDatastoreActiveAdapters(ctx, host, datastoreName any) *gomock.Call {
+func (mr *MockClientMockRecorder) GetDatastoreActiveAdapters(ctx, host, datastoreName, arrayIdentifier any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDatastoreActiveAdapters", reflect.TypeOf((*MockClient)(nil).GetDatastoreActiveAdapters), ctx, host, datastoreName)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDatastoreActiveAdapters", reflect.TypeOf((*MockClient)(nil).GetDatastoreActiveAdapters), ctx, host, datastoreName, arrayIdentifier)
 }
 
 // GetEsxById mocks base method.

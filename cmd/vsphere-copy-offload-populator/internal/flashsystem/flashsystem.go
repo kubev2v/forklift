@@ -15,6 +15,7 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/fcutil"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/storage"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
 	"k8s.io/klog/v2"
 )
@@ -396,10 +397,20 @@ type FlashSystemClonner struct {
 
 // Ensure FlashSystemClonner implements StorageArrayInfoProvider
 var _ populator.StorageArrayInfoProvider = &FlashSystemClonner{}
+var _ storage.ArrayIdentifier = &FlashSystemClonner{}
 
 // GetStorageArrayInfo returns metadata about the FlashSystem array for metric labels.
 func (c *FlashSystemClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 	return c.arrayInfo
+}
+
+// MatchesDevice returns true if the given device name belongs to this FlashSystem array.
+// It checks whether the device name carries the IBM vendor OUI prefix (naa.6005076).
+// TODO(MTV-5780): validate prefix against a real array (no lab access at time of writing)
+func (c *FlashSystemClonner) MatchesDevice(deviceName string) (bool, error) {
+	matches := strings.HasPrefix(strings.ToLower(deviceName), FlashSystemProviderIDPrefix)
+	c.log.V(2).Info("checking device ownership", "device", deviceName, "prefix", FlashSystemProviderIDPrefix, "matches", matches)
+	return matches, nil
 }
 
 // NewFlashSystemClonner creates a new FlashSystemClonner.

@@ -12,6 +12,7 @@ import (
 
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/storage"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
 	"k8s.io/klog/v2"
 )
@@ -32,10 +33,21 @@ type VantaraCloner struct {
 
 // Ensure VantaraCloner implements StorageArrayInfoProvider
 var _ populator.StorageArrayInfoProvider = &VantaraCloner{}
+var _ storage.ArrayIdentifier = &VantaraCloner{}
 
 // GetStorageArrayInfo returns metadata about the Vantara array for metric labels.
 func (v *VantaraCloner) GetStorageArrayInfo() populator.StorageArrayInfo {
 	return v.arrayInfo
+}
+
+// MatchesDevice returns true if the given device name belongs to this Vantara array.
+// It checks whether the device name carries the Hitachi Vantara vendor OUI prefix (naa.60060e80).
+// TODO(MTV-5780): validate prefix against a real array (no lab access at time of writing)
+func (v *VantaraCloner) MatchesDevice(deviceName string) (bool, error) {
+	prefix := "naa." + VantaraProviderID
+	matches := strings.HasPrefix(strings.ToLower(deviceName), prefix)
+	v.log.V(2).Info("checking device ownership", "device", deviceName, "prefix", prefix, "matches", matches)
+	return matches, nil
 }
 
 func NewVantaraClonner(hostname, username, password string) (VantaraCloner, error) {

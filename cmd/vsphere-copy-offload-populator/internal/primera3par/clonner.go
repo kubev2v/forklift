@@ -10,6 +10,7 @@ import (
 
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/storage"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
 )
 
@@ -21,6 +22,7 @@ const PROVIDER_ID = "60002ac"
 var _ populator.RDMCapable = &Primera3ParClonner{}
 var _ populator.VVolCapable = &Primera3ParClonner{}
 var _ populator.StorageArrayInfoProvider = &Primera3ParClonner{}
+var _ storage.ArrayIdentifier = &Primera3ParClonner{}
 
 type Primera3ParClonner struct {
 	client         Primera3ParClient
@@ -32,6 +34,15 @@ type Primera3ParClonner struct {
 // GetStorageArrayInfo returns metadata about the Primera/3PAR array for metric labels.
 func (c *Primera3ParClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 	return c.arrayInfo
+}
+
+// MatchesDevice returns true if the given device name belongs to this Primera/3PAR array.
+// It checks whether the device name carries the HPE 3PAR vendor OUI prefix (naa.60002ac).
+func (c *Primera3ParClonner) MatchesDevice(deviceName string) (bool, error) {
+	prefix := "naa." + PROVIDER_ID
+	matches := strings.HasPrefix(strings.ToLower(deviceName), prefix)
+	c.log.V(2).Info("checking device ownership", "device", deviceName, "prefix", prefix, "matches", matches)
+	return matches, nil
 }
 
 func NewPrimera3ParClonner(storageHostname, storageUsername, storagePassword string, sslSkipVerify bool) (Primera3ParClonner, error) {

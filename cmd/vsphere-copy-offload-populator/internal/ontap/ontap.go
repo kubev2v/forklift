@@ -9,6 +9,7 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/fcutil"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/storage"
 	drivers "github.com/netapp/trident/storage_drivers"
 	"github.com/netapp/trident/storage_drivers/ontap/api"
 	"k8s.io/klog/v2"
@@ -19,6 +20,7 @@ const OntapProviderID = "600a0980"
 // Ensure NetappClonner implements required interfaces
 var _ populator.VMDKCapable = &NetappClonner{}
 var _ populator.StorageArrayInfoProvider = &NetappClonner{}
+var _ storage.ArrayIdentifier = &NetappClonner{}
 
 type NetappClonner struct {
 	api                  api.OntapAPI
@@ -30,6 +32,15 @@ type NetappClonner struct {
 // GetStorageArrayInfo returns metadata about the ONTAP array for metric labels.
 func (c *NetappClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 	return c.arrayInfo
+}
+
+// MatchesDevice returns true if the given device name belongs to this ONTAP array.
+// It checks whether the device name carries the ONTAP vendor OUI prefix (naa.600a0980).
+func (c *NetappClonner) MatchesDevice(deviceName string) (bool, error) {
+	prefix := "naa." + OntapProviderID
+	matches := strings.HasPrefix(strings.ToLower(deviceName), prefix)
+	c.log.V(2).Info("checking device ownership", "device", deviceName, "prefix", prefix, "matches", matches)
+	return matches, nil
 }
 
 // Map the targetLUN to the initiator group.
