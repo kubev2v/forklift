@@ -67,6 +67,7 @@ const (
 	VMMissingGuestIPs               = "VMMissingGuestIPs"
 	VMIpNotMatchingUdnSubnet        = "VMIpNotMatchingUdnSubnet"
 	CalicoNetworkInvalid            = "CalicoNetworkInvalid"
+	CalicoNetworkWarning            = "CalicoNetworkWarning"
 	VMIpNotInCalicoSubnet           = "VMIpNotInCalicoSubnet"
 	VMIpNotInCalicoIPPool           = "VMIpNotInCalicoIPPool"
 	VMMissingChangedBlockTracking   = "VMMissingChangedBlockTracking"
@@ -566,31 +567,51 @@ func (r *Reconciler) validateCalicoNetwork(ctx *plancontext.Context) (*planbase.
 	if err != nil {
 		return nil, err
 	}
-	if len(result.Issues) == 0 {
-		return result.Cache, nil
+	if cond, ok := buildCalicoNADCondition(
+		CalicoNetworkInvalid, api.CategoryCritical,
+		"One or more Calico Network destinations are invalid",
+		result.Issues,
+	); ok {
+		ctx.Plan.Status.SetCondition(cond)
 	}
+	if cond, ok := buildCalicoNADCondition(
+		CalicoNetworkWarning, api.CategoryWarn,
+		"One or more Calico NADs will not receive identity preservation",
+		result.Warnings,
+	); ok {
+		ctx.Plan.Status.SetCondition(cond)
+	}
+	return result.Cache, nil
+}
 
+// buildCalicoNADCondition assembles a plan-level Calico NAD condition from a
+// slice of per-NAD issues. Items are deduplicated by NAD reference; Message
+// concatenates a per-issue detail phrase for each (including duplicates, so
+// distinct kinds against the same NAD are both visible). Returns ok=false
+// when issues is empty so callers can skip SetCondition.
+func buildCalicoNADCondition(condType, category, baseMsg string, issues []planbase.CalicoNADIssue) (libcnd.Condition, bool) {
+	if len(issues) == 0 {
+		return libcnd.Condition{}, false
+	}
 	cond := libcnd.Condition{
-		Type:     CalicoNetworkInvalid,
+		Type:     condType,
 		Status:   True,
 		Reason:   NotValid,
-		Category: api.CategoryCritical,
-		Message:  "One or more Calico Network destinations are invalid",
+		Category: category,
 		Items:    []string{},
 	}
-	details := make([]string, 0, len(result.Issues))
-	seenNAD := map[string]bool{}
-	for _, issue := range result.Issues {
+	details := make([]string, 0, len(issues))
+	seen := map[string]bool{}
+	for _, issue := range issues {
 		ref := issue.NAD.String()
-		if !seenNAD[ref] {
-			seenNAD[ref] = true
+		if !seen[ref] {
+			seen[ref] = true
 			cond.Items = append(cond.Items, ref)
 		}
 		details = append(details, calicoNADIssueDetail(issue))
 	}
-	cond.Message = fmt.Sprintf("%s: %s.", cond.Message, strings.Join(details, "; "))
-	ctx.Plan.Status.SetCondition(cond)
-	return result.Cache, nil
+	cond.Message = fmt.Sprintf("%s: %s.", baseMsg, strings.Join(details, "; "))
+	return cond, true
 }
 
 func (r *Reconciler) getDestinationNamespaceNads(ctx *plancontext.Context) (*k8snet.NetworkAttachmentDefinitionList, error) {
@@ -1982,6 +2003,8 @@ func calicoNADIssueDetail(i planbase.CalicoNADIssue) string {
 		return fmt.Sprintf("%s (VLANAmbiguous network=%q)", i.NAD.String(), i.Network)
 	case planbase.CalicoIssueVLANHasNoIPPool:
 		return fmt.Sprintf("%s (VLANHasNoIPPool network=%q vlan=%d)", i.NAD.String(), i.Network, i.VLAN)
+	case planbase.CalicoIssueNADMissingNetwork:
+		return fmt.Sprintf("%s (NADMissingNetwork: type=calico without 'network' field; MAC/IP preservation not applied)", i.NAD.String())
 	}
 	return fmt.Sprintf("%s (%s)", i.NAD.String(), i.Kind)
 }

@@ -321,6 +321,11 @@ const (
 	CalicoIssueIPNotInSubnet CalicoIssueKind = "IPNotInSubnet"
 	// CalicoIssueIPNotInIPPool NIC's IP was not in any Calico IPPool.
 	CalicoIssueIPNotInIPPool CalicoIssueKind = "IPNotInIPPool"
+	// CalicoIssueNADMissingNetwork the NAD requests the Calico CNI but does
+	// not name a projectcalico.org Network resource (no "network" field).
+	// This is Calico's legacy L3 IPAM mode; identity preservation (MAC + IP)
+	// will not be applied for NICs mapped to this NAD. Warn-level.
+	CalicoIssueNADMissingNetwork CalicoIssueKind = "NADMissingNetwork"
 )
 
 // CalicoIssue represents a per-VM Calico Network validation failure: the

@@ -926,6 +926,69 @@ var _ = Describe("vsphere validation tests", func() {
 				Expect(result.Issues).To(BeEmpty())
 				Expect(result.Cache.NADs).To(BeEmpty())
 			})
+
+			It("warns when a Calico-typed NAD has no 'network' field (L3 mode, no identity preservation)", func() {
+				// type:calico without a network reference is Calico's legacy L3
+				// IPAM mode. Forklift's MAC/IP annotation stamping is gated on
+				// the presence of a Calico Network reference, so this NAD would
+				// silently miss preservation. Warn-class issue surfaces the gap
+				// without blocking the migration.
+				l3NAD := &k8snet.NetworkAttachmentDefinition{
+					ObjectMeta: metav1.ObjectMeta{Name: nadName, Namespace: nadNS},
+					Spec:       k8snet.NetworkAttachmentDefinitionSpec{Config: `{"type":"calico"}`},
+				}
+				v, c, _ := setup("10.100.0.5", true, l3NAD)
+				result, err := v.ValidateCalicoNADs(c)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result.Issues).To(BeEmpty())
+				Expect(result.Warnings).To(ConsistOf(planbase.CalicoNADIssue{
+					NAD:  k8stypes.NamespacedName{Namespace: nadNS, Name: nadName},
+					Kind: planbase.CalicoIssueNADMissingNetwork,
+				}))
+				Expect(result.Cache.NADs).To(BeEmpty())
+			})
+
+			It("populates Issues and Warnings independently when both classes coexist", func() {
+				// Two NADs in the same NetworkMap: the original (L2 Calico, but
+				// the referenced Network CR is absent — Critical NetworkNotFound)
+				// and a second L3-mode NAD (Warn NADMissingNetwork). Asserts the
+				// dispatcher's independence claim: both slices populated, items
+				// disjoint, no cross-contamination between Critical and Warn.
+				const (
+					l3NADName = "calico-nad-l3"
+					l3SrcID   = "src-l3"
+				)
+				l3NAD := &k8snet.NetworkAttachmentDefinition{
+					ObjectMeta: metav1.ObjectMeta{Name: l3NADName, Namespace: nadNS},
+					Spec:       k8snet.NetworkAttachmentDefinitionSpec{Config: `{"type":"calico"}`},
+				}
+				v, c, _ := setup("10.100.0.5", true,
+					makeCalicoNAD(100), // existing nadName, references missing Network "vlan100"
+					l3NAD,
+				)
+				v.Plan.Referenced.Map.Network.Spec.Map = append(
+					v.Plan.Referenced.Map.Network.Spec.Map,
+					v1beta1.NetworkPair{
+						Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{ID: l3SrcID}},
+						Destination: v1beta1.DestinationNetwork{
+							Type: planbase.Multus, Namespace: nadNS, Name: l3NADName,
+						},
+					},
+				)
+				result, err := v.ValidateCalicoNADs(c)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result.Issues).To(ConsistOf(planbase.CalicoNADIssue{
+					NAD:     k8stypes.NamespacedName{Namespace: nadNS, Name: nadName},
+					Kind:    planbase.CalicoIssueNetworkNotFound,
+					Network: netName,
+					VLAN:    100,
+				}))
+				Expect(result.Warnings).To(ConsistOf(planbase.CalicoNADIssue{
+					NAD:  k8stypes.NamespacedName{Namespace: nadNS, Name: l3NADName},
+					Kind: planbase.CalicoIssueNADMissingNetwork,
+				}))
+				Expect(result.Cache.NADs).To(BeEmpty())
+			})
 		})
 
 		Describe("plan-level / per-VM cross-cut", func() {
