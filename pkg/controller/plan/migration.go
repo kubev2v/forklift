@@ -417,7 +417,7 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool, force
 
 	// If the migration fails and the DeleteVmOnFailMigration is enabled, clean up the VM.
 	// When DeleteVmOnFailMigration is disabled, VM resources are preserved on failure.
-	if !vm.HasCondition(api.ConditionSucceeded) && (r.Plan.Spec.DeleteVmOnFailMigration || vm.DeleteVmOnFailMigration) {
+	if !vm.HasCondition(api.ConditionSucceeded) && (r.Plan.Spec.DeleteVmOnFailMigration || vm.DeleteVmOnFailMigration) && r.Plan.Spec.Type != api.MigrationOnlyConversion {
 		r.Log.Info("Deleting VM (failed migration with deleteVmOnFailMigration enabled).", "vm", vm.String())
 		if err := r.kubevirt.DeleteVM(vm); failOnErr(err) {
 			return err
