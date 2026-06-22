@@ -129,7 +129,7 @@ var _ = Describe("EC2 Controller Validator", func() {
 			Spec: api.NetworkMapSpec{
 				Map: []api.NetworkPair{
 					{
-						Source: ref.Ref{ID: "subnet-123"},
+						Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "subnet-123"}},
 						Destination: api.DestinationNetwork{
 							Type: "pod",
 						},

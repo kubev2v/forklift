@@ -120,11 +120,11 @@ func TestNICNetworkRefs_NoDuplicates(t *testing.T) {
 		Spec: api.NetworkMapSpec{
 			Map: []api.NetworkPair{
 				{
-					Source:      ref.Ref{Namespace: "test-ns", Name: "net-1"},
+					Source:      api.NetworkSourceRef{Ref: ref.Ref{Namespace: "test-ns", Name: "net-1"}},
 					Destination: api.DestinationNetwork{Type: "multus", Namespace: "ns1", Name: "nad-a"},
 				},
 				{
-					Source:      ref.Ref{Namespace: "test-ns", Name: "net-2"},
+					Source:      api.NetworkSourceRef{Ref: ref.Ref{Namespace: "test-ns", Name: "net-2"}},
 					Destination: api.DestinationNetwork{Type: "multus", Namespace: "ns1", Name: "nad-b"},
 				},
 			},
@@ -174,11 +174,11 @@ func TestNICNetworkRefs_TwoNICsSameNAD(t *testing.T) {
 		Spec: api.NetworkMapSpec{
 			Map: []api.NetworkPair{
 				{
-					Source:      ref.Ref{Namespace: "test-ns", Name: "net-1"},
+					Source:      api.NetworkSourceRef{Ref: ref.Ref{Namespace: "test-ns", Name: "net-1"}},
 					Destination: api.DestinationNetwork{Type: "multus", Namespace: "ns1", Name: "nad-a"},
 				},
 				{
-					Source:      ref.Ref{Namespace: "test-ns", Name: "net-2"},
+					Source:      api.NetworkSourceRef{Ref: ref.Ref{Namespace: "test-ns", Name: "net-2"}},
 					Destination: api.DestinationNetwork{Type: "multus", Namespace: "ns1", Name: "nad-a"},
 				},
 			},
@@ -222,7 +222,7 @@ func TestNICNetworkRefs_TwoNICsSameSourceNetwork(t *testing.T) {
 		Spec: api.NetworkMapSpec{
 			Map: []api.NetworkPair{
 				{
-					Source:      ref.Ref{Namespace: "test-ns", Name: "net-1"},
+					Source:      api.NetworkSourceRef{Ref: ref.Ref{Namespace: "test-ns", Name: "net-1"}},
 					Destination: api.DestinationNetwork{Type: "multus", Namespace: "ns1", Name: "nad-a"},
 				},
 			},
@@ -265,11 +265,11 @@ func TestNICNetworkRefs_VMOnlyUsesOneOfDuplicateMappings(t *testing.T) {
 		Spec: api.NetworkMapSpec{
 			Map: []api.NetworkPair{
 				{
-					Source:      ref.Ref{Namespace: "test-ns", Name: "net-1"},
+					Source:      api.NetworkSourceRef{Ref: ref.Ref{Namespace: "test-ns", Name: "net-1"}},
 					Destination: api.DestinationNetwork{Type: "multus", Namespace: "ns1", Name: "nad-a"},
 				},
 				{
-					Source:      ref.Ref{Namespace: "test-ns", Name: "net-2"},
+					Source:      api.NetworkSourceRef{Ref: ref.Ref{Namespace: "test-ns", Name: "net-2"}},
 					Destination: api.DestinationNetwork{Type: "multus", Namespace: "ns1", Name: "nad-a"},
 				},
 			},
@@ -313,11 +313,11 @@ func TestNICNetworkRefs_PodAndMultus(t *testing.T) {
 		Spec: api.NetworkMapSpec{
 			Map: []api.NetworkPair{
 				{
-					Source:      ref.Ref{Type: "pod"},
+					Source:      api.NetworkSourceRef{Ref: ref.Ref{Type: "pod"}},
 					Destination: api.DestinationNetwork{Type: "pod"},
 				},
 				{
-					Source:      ref.Ref{Namespace: "test-ns", Name: "net-1"},
+					Source:      api.NetworkSourceRef{Ref: ref.Ref{Namespace: "test-ns", Name: "net-1"}},
 					Destination: api.DestinationNetwork{Type: "multus", Namespace: "ns1", Name: "nad-a"},
 				},
 			},
