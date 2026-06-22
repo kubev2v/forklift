@@ -72,14 +72,14 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 	cmd.Flags().StringVarP(&opts.Username, "username", "u", "", "Provider credentials username")
 	cmd.Flags().StringVarP(&opts.Password, "password", "p", "", "Provider credentials password")
 	cmd.Flags().StringVar(&opts.CACert, "cacert", "", "Provider CA certificate (use @filename to load from file)")
-	cmd.Flags().BoolVar(&opts.InsecureSkipTLS, "provider-insecure-skip-tls", false, "Skip TLS verification when connecting to the provider")
+	flags.ExplicitBoolVar(cmd.Flags(), &opts.InsecureSkipTLS, "provider-insecure-skip-tls", false, "Skip TLS verification when connecting to the provider (true/false)")
 
 	// OpenShift specific flags
 	cmd.Flags().StringVarP(&opts.Token, "provider-token", "T", "", "Provider authentication token")
 
 	// vSphere specific flags (editable VDDK settings)
 	cmd.Flags().StringVar(&opts.VddkInitImage, "vddk-init-image", "", "Virtual Disk Development Kit (VDDK) container init image path")
-	cmd.Flags().BoolVar(&opts.UseVddkAioOptimization, "use-vddk-aio-optimization", false, "Enable VDDK AIO optimization for improved disk transfer performance")
+	flags.ExplicitBoolVar(cmd.Flags(), &opts.UseVddkAioOptimization, "use-vddk-aio-optimization", false, "Enable VDDK AIO optimization for improved disk transfer performance (true/false)")
 	cmd.Flags().IntVar(&opts.VddkBufSizeIn64K, "vddk-buf-size-in-64k", 0, "VDDK buffer size in 64K units (VixDiskLib.nfcAio.Session.BufSizeIn64K)")
 	cmd.Flags().IntVar(&opts.VddkBufCount, "vddk-buf-count", 0, "VDDK buffer count (VixDiskLib.nfcAio.Session.BufCount)")
 	cmd.Flags().Var(esxiCloneMethod, "esxi-clone-method", "ESXi clone method for vSphere provider (vib or ssh)")
@@ -101,7 +101,7 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 	cmd.Flags().StringVar(&opts.EC2TargetAZ, "target-az", "", "Target availability zone for migrations (auto-detected from worker nodes if omitted)")
 	cmd.Flags().StringVar(&opts.EC2TargetAccessKeyID, "target-access-key-id", "", "Target AWS account access key ID (for cross-account migrations)")
 	cmd.Flags().StringVar(&opts.EC2TargetSecretKey, "target-secret-access-key", "", "Target AWS account secret access key (for cross-account migrations)")
-	cmd.Flags().BoolVar(&opts.AutoTargetCredentials, "auto-target-credentials", false, "Automatically fetch target AWS credentials from cluster and target-az from worker nodes")
+	flags.ExplicitBoolVar(cmd.Flags(), &opts.AutoTargetCredentials, "auto-target-credentials", false, "Automatically fetch target AWS credentials from cluster and target-az from worker nodes (true/false)")
 
 	_ = cmd.RegisterFlagCompletionFunc("name", completion.ProviderNameCompletion(kubeConfigFlags))
 	_ = cmd.RegisterFlagCompletionFunc("esxi-clone-method", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {

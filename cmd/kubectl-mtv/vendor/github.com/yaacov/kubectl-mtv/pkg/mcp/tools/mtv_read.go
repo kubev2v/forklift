@@ -331,8 +331,7 @@ func buildArgs(cmdPath string, flags map[string]any) []string {
 
 // appendNormalizedFlags appends flags from a map[string]any to the args slice.
 // It handles different value types:
-//   - bool true: includes the flag with no value (presence flag)
-//   - bool false: explicitly passes --flag=false (needed for flags that default to true)
+//   - bool true/false: passes --flag=true or --flag=false (equals form, safe for both BoolVar and ExplicitBool)
 //   - string "true"/"false": treated as boolean
 //   - string/number: converted to string form
 //
@@ -358,19 +357,14 @@ func appendNormalizedFlags(args []string, flags map[string]any, skipFlags map[st
 		switch v := value.(type) {
 		case bool:
 			if v {
-				// Boolean true: include flag with no value
-				args = append(args, prefix+name)
+				args = append(args, prefix+name+"=true")
 			} else {
-				// Boolean false: explicitly pass --flag=false
-				// This is needed for flags that default to true (e.g., --migrate-shared-disks)
 				args = append(args, prefix+name+"=false")
 			}
 		case string:
-			// Handle string "true"/"false" as boolean for backwards compatibility
 			if v == "true" {
-				args = append(args, prefix+name)
+				args = append(args, prefix+name+"=true")
 			} else if v == "false" {
-				// Explicitly pass --flag=false for flags that default to true
 				args = append(args, prefix+name+"=false")
 			} else if v != "" {
 				args = append(args, prefix+name, v)

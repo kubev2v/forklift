@@ -382,12 +382,14 @@ type Disk struct {
 	Capacity              int64  `json:"capacity"`
 	Shared                bool   `json:"shared"`
 	RDM                   bool   `json:"rdm"`
+	PhysicalMode          bool   `json:"physicalMode,omitempty"`
 	Bus                   string `json:"bus"`
 	Mode                  string `json:"mode,omitempty"`
 	Serial                string `json:"serial,omitempty"`
 	WinDriveLetter        string `json:"winDriveLetter,omitempty"`
 	ChangeTrackingEnabled bool   `json:"changeTrackingEnabled"`
 	ParentFile            string `json:"parent"`
+	DeviceName            string `json:"deviceName,omitempty"`
 }
 
 // Virtual Device.

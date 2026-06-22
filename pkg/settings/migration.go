@@ -35,6 +35,7 @@ const (
 	OvirtOsConfigMap                       = "OVIRT_OS_MAP"
 	VsphereOsConfigMap                     = "VSPHERE_OS_MAP"
 	VirtCustomizeConfigMap                 = "VIRT_CUSTOMIZE_MAP"
+	NAAOUIMapConfigMap                     = "NAA_OUI_MAP"
 	VddkJobActiveDeadline                  = "VDDK_JOB_ACTIVE_DEADLINE"
 	VirtV2vExtraArgs                       = "VIRT_V2V_EXTRA_ARGS"
 	VirtV2vInspectorExtraArgs              = "VIRT_V2V_INSPECTOR_EXTRA_ARGS"
@@ -135,6 +136,8 @@ type Migration struct {
 	VsphereOsConfigMap string
 	// vSphere OS config map name
 	VirtCustomizeConfigMap string
+	// NAA OUI map config map name (optional, for custom vendor→NAA mappings)
+	NAAOUIMapConfigMap string
 	// Active deadline for VDDK validation job
 	VddkJobActiveDeadline int
 	// Additional arguments for virt-v2v
@@ -228,6 +231,9 @@ func (r *Migration) Load() (err error) {
 		r.VirtCustomizeConfigMap = virtCustomizeConfigMap
 	} else if Settings.Role.Has(MainRole) {
 		return liberr.Wrap(fmt.Errorf("failed to find environment variable %s", VirtCustomizeConfigMap))
+	}
+	if val, found := os.LookupEnv(NAAOUIMapConfigMap); found {
+		r.NAAOUIMapConfigMap = val
 	}
 	if r.CleanupRetries, err = getPositiveEnvLimit(CleanupRetries, 10); err != nil {
 		return liberr.Wrap(err)

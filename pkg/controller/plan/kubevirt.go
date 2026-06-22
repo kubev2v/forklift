@@ -1006,6 +1006,10 @@ func (r *KubeVirt) EnsureGuestConversionPod(vm *plan.VMStatus, step *plan.Step) 
 
 // EnsureWaitForRebootPod creates a pod that runs the forklift-wait-for-reboot binary to monitor the target VMI serial console (idempotent).
 func (r *KubeVirt) EnsureWaitForRebootPod(vm *plan.VMStatus) (err error) {
+	nonRoot := true
+	allowPrivilegeEscalation := false
+	user := qemuUser
+
 	img := getVirtV2vImage(r.Plan)
 	if img == "" {
 		err = liberr.New("virt-v2v image is not set; cannot create Windows wait-for-reboot pod")
@@ -1027,6 +1031,7 @@ func (r *KubeVirt) EnsureWaitForRebootPod(vm *plan.VMStatus) (err error) {
 
 	activeDeadline := int64(settings.Settings.WindowsRebootTimeout + 600)
 	automount := true
+
 	pod := &core.Pod{
 		ObjectMeta: meta.ObjectMeta{
 			GenerateName: "forklift-wait-reboot-",
@@ -1034,6 +1039,10 @@ func (r *KubeVirt) EnsureWaitForRebootPod(vm *plan.VMStatus) (err error) {
 			Labels:       r.waitForRebootLabels(vm.Ref),
 		},
 		Spec: core.PodSpec{
+			SecurityContext: &core.PodSecurityContext{
+				RunAsNonRoot:   &nonRoot,
+				SeccompProfile: &core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault},
+			},
 			RestartPolicy:                core.RestartPolicyNever,
 			ServiceAccountName:           waitForRebootSAName,
 			AutomountServiceAccountToken: &automount,
@@ -1048,6 +1057,11 @@ func (r *KubeVirt) EnsureWaitForRebootPod(vm *plan.VMStatus) (err error) {
 						{Name: "VMI_NAMESPACE", Value: r.Plan.Spec.TargetNamespace},
 						{Name: "SIGNAL", Value: "CONVERSION_DONE"},
 						{Name: "TIMEOUT", Value: strconv.Itoa(settings.Settings.WindowsRebootTimeout)},
+					},
+					SecurityContext: &core.SecurityContext{
+						AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+						RunAsUser:                &user,
+						Capabilities:             &core.Capabilities{Drop: []core.Capability{"ALL"}},
 					},
 				},
 			},
@@ -1428,6 +1442,51 @@ func (r *KubeVirt) EnsureCustomizationScriptsConfigMap() error {
 			"target namespace", r.Plan.Spec.TargetNamespace)
 	}
 	return err
+}
+
+// CleanupCopiedConfigMaps deletes the extra-v2v-conf, customization-scripts,
+// and vddk-conf ConfigMaps that were copied to the plan's TargetNamespace at
+// migration start. Safe to call regardless of migration outcome.
+func (r *KubeVirt) CleanupCopiedConfigMaps() {
+	ns := r.Plan.Spec.TargetNamespace
+	cl := r.Destination.Client
+
+	// extra-v2v-conf and customization-scripts use deterministic names (delete by name).
+	for _, name := range []string{
+		genExtraV2vConfConfigMapName(r.Plan),
+		genCustomizationScriptsConfigMapName(r.Plan),
+	} {
+		cm := &core.ConfigMap{}
+		cm.Name = name
+		cm.Namespace = ns
+		if err := cl.Delete(context.TODO(), cm); err != nil && !k8serr.IsNotFound(err) {
+			r.Log.Error(err, "Failed to delete copied ConfigMap.", "name", name, "namespace", ns)
+		} else if err == nil {
+			r.Log.Info("Deleted copied ConfigMap.", "name", name, "namespace", ns)
+		}
+	}
+
+	// vddk-conf uses GenerateName so must be found by label selector.
+	list := &core.ConfigMapList{}
+	err := cl.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(r.vddkLabels()),
+			Namespace:     ns,
+		},
+	)
+	if err != nil {
+		r.Log.Error(err, "Failed to list vddk-conf ConfigMaps for cleanup.", "namespace", ns)
+		return
+	}
+	for i := range list.Items {
+		if err := cl.Delete(context.TODO(), &list.Items[i]); err != nil && !k8serr.IsNotFound(err) {
+			r.Log.Error(err, "Failed to delete vddk-conf ConfigMap.", "name", list.Items[i].Name, "namespace", ns)
+		} else if err == nil {
+			r.Log.Info("Deleted vddk-conf ConfigMap.", "name", list.Items[i].Name, "namespace", ns)
+		}
+	}
 }
 
 // Get the importer pod for a PersistentVolumeClaim.
@@ -2023,11 +2082,12 @@ func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, e
 		return
 	}
 
-	pvcs = make([]*core.PersistentVolumeClaim, len(pvcsList.Items))
-	for i, pvc := range pvcsList.Items {
-		// loopvar
-		pvc := pvc
-		pvcs[i] = &pvc
+	for i := range pvcsList.Items {
+		pvc := &pvcsList.Items[i]
+		if strings.HasPrefix(pvc.Name, "prime-") || !hasDiskIdentity(pvc) {
+			continue
+		}
+		pvcs = append(pvcs, pvc)
 	}
 
 	// Sort the pvcs slice by disk index
@@ -2038,6 +2098,16 @@ func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, e
 	})
 
 	return
+}
+
+// hasDiskIdentity reports whether the PVC carries the AnnDiskSource annotation
+// that every adapter sets on real disk PVCs.
+func hasDiskIdentity(pvc *core.PersistentVolumeClaim) bool {
+	if pvc.Annotations == nil {
+		return false
+	}
+	source, ok := pvc.Annotations[planbase.AnnDiskSource]
+	return ok && strings.TrimSpace(source) != ""
 }
 
 // Creates the PVs and PVCs for LUN disks.
@@ -2244,53 +2314,6 @@ func (r *KubeVirt) GetGuestConversionPod(vm *plan.VMStatus) (pod *core.Pod, err 
 	return
 }
 
-// detectBootDiskFromPod fetches the boot disk index from the conversion pod's
-// /bootdisk endpoint, used for in-place conversions where virt-v2v does not
-// produce a KubeVirt YAML with boot order information.
-func (r *KubeVirt) detectBootDiskFromPod(vm *plan.VMStatus, pod *core.Pod) {
-	vm.DetectedBootDisk = nil
-
-	bootNotDetected := libcnd.Condition{
-		Type:     BootDiskNotDetected,
-		Status:   True,
-		Category: "Warning",
-		Reason:   BootDiskNotDetected,
-		Message:  "Boot disk could not be detected from in-place conversion; boot order was not set.",
-	}
-
-	bootDiskURL := fmt.Sprintf("http://%s:8080/bootdisk", pod.Status.PodIP)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, bootDiskURL, nil)
-	if err != nil {
-		r.Log.Error(err, "Failed to create boot disk request", "vmId", vm.ID)
-		vm.SetCondition(bootNotDetected)
-		return
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		r.Log.Error(err, "Failed to fetch boot disk index from conversion pod", "vmId", vm.ID)
-		vm.SetCondition(bootNotDetected)
-		return
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		r.Log.Info("Boot disk endpoint returned non-OK status", "status", resp.StatusCode, "vmId", vm.ID)
-		vm.SetCondition(bootNotDetected)
-		return
-	}
-	var result struct {
-		BootDiskIndex int `json:"bootDiskIndex"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		r.Log.Error(err, "Failed to decode boot disk response", "vmId", vm.ID)
-		vm.SetCondition(bootNotDetected)
-		return
-	}
-	vm.DetectedBootDisk = &result.BootDiskIndex
-	r.Log.Info("Detected boot disk from in-place conversion", "bootDiskIndex", result.BootDiskIndex, "vmId", vm.ID)
-}
-
 func (r *KubeVirt) getInspectionXml(pod *core.Pod) (string, error) {
 	if pod == nil {
 		return "", liberr.New("no pod found to get the inspection")
@@ -2310,10 +2333,11 @@ func (r *KubeVirt) getInspectionXml(pod *core.Pod) (string, error) {
 
 func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, step *plan.Step) error {
 	if pod == nil || pod.Status.PodIP == "" {
+		// we need the IP for fetching the configuration of the convered VM.
 		return nil
 	}
 
-	vmURL := fmt.Sprintf("http://%s:8080/vm", pod.Status.PodIP)
+	url := fmt.Sprintf("http://%s:8080/vm", pod.Status.PodIP)
 
 	/* Due to the virt-v2v operation, the ovf file is only available after the command's execution,
 	meaning it appears following the copydisks phase.
@@ -2322,7 +2346,7 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 	Once the VM server is running, we can make a single call to obtain the OVF configuration,
 	followed by a shutdown request. This will complete the pod process, allowing us to move to the next phase.
 	*/
-	resp, err := http.Get(vmURL)
+	resp, err := http.Get(url)
 	if err != nil {
 		if strings.Contains(err.Error(), "connection refused") {
 			return nil
@@ -2331,21 +2355,15 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 	}
 	defer resp.Body.Close()
 
-	inPlaceConversion := resp.StatusCode == http.StatusNoContent
-	var vmConf []byte
-	if !inPlaceConversion {
-		vmConf, err = io.ReadAll(resp.Body)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
+	vmConf, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return liberr.Wrap(err)
 	}
 
 	switch r.Source.Provider.Type() {
 	case api.Ova, api.HyperV:
-		if !inPlaceConversion {
-			if vm.Firmware, err = util.GetFirmwareFromYaml(vmConf); err != nil {
-				return liberr.Wrap(err)
-			}
+		if vm.Firmware, err = util.GetFirmwareFromYaml(vmConf); err != nil {
+			return liberr.Wrap(err)
 		}
 	case api.VSphere:
 		inspectionXML, err := r.getInspectionXml(pod)
@@ -2358,15 +2376,11 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 		r.Log.Info("Setting the vm OS ", vm.OperatingSystem, "vmId", vm.ID)
 	}
 
-	if inPlaceConversion {
-		r.detectBootDiskFromPod(vm, pod)
-	} else {
-		if bootDiskIndex, bootOrderErr := util.GetDiskBootOrderFromYaml(vmConf); bootOrderErr != nil {
-			r.Log.Error(bootOrderErr, "Failed to extract boot order from virt-v2v output", "vmId", vm.ID)
-		} else if bootDiskIndex >= 0 {
-			vm.DetectedBootDisk = &bootDiskIndex
-			r.Log.Info("Detected boot disk from virt-v2v output", "bootDiskIndex", bootDiskIndex, "vmId", vm.ID)
-		}
+	if bootDiskIndex, bootOrderErr := util.GetDiskBootOrderFromYaml(vmConf); bootOrderErr != nil {
+		r.Log.Error(bootOrderErr, "Failed to extract boot order from virt-v2v output", "vmId", vm.ID)
+	} else if bootDiskIndex >= 0 {
+		vm.DetectedBootDisk = &bootDiskIndex
+		r.Log.Info("Detected boot disk from virt-v2v output", "bootDiskIndex", bootDiskIndex, "vmId", vm.ID)
 	}
 
 	// Fetch warnings before shutting down

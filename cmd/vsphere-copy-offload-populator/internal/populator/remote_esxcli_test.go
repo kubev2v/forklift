@@ -156,11 +156,11 @@ var _ = Describe("checkScriptVersion", func() {
 <output xmlns="http://www.vmware.com/Products/ESX/5.0/esxcli/">
     <structure typeName="result">
         <field name="status"><string>0</string></field>
-        <field name="message"><string>{"version": "0.3.0"}</string></field>
+        <field name="message"><string>{"version": "0.3.1"}</string></field>
     </structure>
 </output>`
 
-			err := checkScriptVersion(context.Background(), client, datastore, "0.3.0", publicKey)
+			err := checkScriptVersion(context.Background(), client, datastore, "0.3.1", publicKey)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
@@ -175,7 +175,7 @@ var _ = Describe("checkScriptVersion", func() {
     </structure>
 </output>`
 
-			err := checkScriptVersion(context.Background(), client, datastore, "0.3.0", publicKey)
+			err := checkScriptVersion(context.Background(), client, datastore, "0.3.1", publicKey)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
@@ -190,10 +190,10 @@ var _ = Describe("checkScriptVersion", func() {
     </structure>
 </output>`
 
-			err := checkScriptVersion(context.Background(), client, datastore, "0.3.0", publicKey)
+			err := checkScriptVersion(context.Background(), client, datastore, "0.3.1", publicKey)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("version mismatch"))
-			Expect(err.Error()).To(ContainSubstring("uploaded 0.3.0, but SSH returned 0.2.0"))
+			Expect(err.Error()).To(ContainSubstring("uploaded 0.3.1, but SSH returned 0.2.0"))
 			Expect(err.Error()).To(ContainSubstring("old SSH key format detected"))
 		})
 	})
@@ -202,7 +202,7 @@ var _ = Describe("checkScriptVersion", func() {
 		It("should return error indicating old script format", func() {
 			client.executeError = fmt.Errorf("command failed: file not found")
 
-			err := checkScriptVersion(context.Background(), client, datastore, "0.3.0", publicKey)
+			err := checkScriptVersion(context.Background(), client, datastore, "0.3.1", publicKey)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("old script format detected"))
 			Expect(err.Error()).To(ContainSubstring("Python-based"))
@@ -213,7 +213,7 @@ var _ = Describe("checkScriptVersion", func() {
 		It("should return parsing error", func() {
 			client.executeResponse = "not valid XML"
 
-			err := checkScriptVersion(context.Background(), client, datastore, "0.3.0", publicKey)
+			err := checkScriptVersion(context.Background(), client, datastore, "0.3.1", publicKey)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to parse version response"))
 		})
@@ -229,7 +229,7 @@ var _ = Describe("checkScriptVersion", func() {
     </structure>
 </output>`
 
-			err := checkScriptVersion(context.Background(), client, datastore, "0.3.0", publicKey)
+			err := checkScriptVersion(context.Background(), client, datastore, "0.3.1", publicKey)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("version command failed"))
 		})
@@ -245,7 +245,7 @@ var _ = Describe("checkScriptVersion", func() {
     </structure>
 </output>`
 
-			err := checkScriptVersion(context.Background(), client, datastore, "0.3.0", publicKey)
+			err := checkScriptVersion(context.Background(), client, datastore, "0.3.1", publicKey)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to parse version JSON"))
 		})
@@ -273,7 +273,7 @@ var _ = Describe("checkScriptVersion", func() {
 			Entry("2.0.0 vs 1.9.9 - script is newer", "2.0.0", "1.9.9", true),
 			Entry("1.9.9 vs 2.0.0 - script is older", "1.9.9", "2.0.0", false),
 			Entry("0.10.0 vs 0.9.0 - script is newer", "0.10.0", "0.9.0", true),
-			Entry("0.3.0 vs 0.3.0 - exact match", "0.3.0", "0.3.0", true),
+			Entry("0.3.1 vs 0.3.1 - exact match", "0.3.1", "0.3.1", true),
 		)
 	})
 
@@ -287,7 +287,7 @@ var _ = Describe("checkScriptVersion", func() {
     </structure>
 </output>`
 
-			err := checkScriptVersion(context.Background(), client, datastore, "0.3.0", publicKey)
+			err := checkScriptVersion(context.Background(), client, datastore, "0.3.1", publicKey)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("invalid script version format"))
 		})
@@ -297,7 +297,7 @@ var _ = Describe("checkScriptVersion", func() {
 <output xmlns="http://www.vmware.com/Products/ESX/5.0/esxcli/">
     <structure typeName="result">
         <field name="status"><string>0</string></field>
-        <field name="message"><string>{"version": "0.3.0"}</string></field>
+        <field name="message"><string>{"version": "0.3.1"}</string></field>
     </structure>
 </output>`
 

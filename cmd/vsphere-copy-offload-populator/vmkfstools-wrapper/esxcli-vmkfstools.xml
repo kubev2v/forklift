@@ -28,7 +28,7 @@
          <format-parameters>
             <formatter>simple</formatter>
          </format-parameters>
-         <execute>/opt/redhat/vmkfstools-wrapper --clone -s $val{source-vmdk} -t $val{target-lun} </execute>
+         <execute>/opt/redhat/vmkfstools-wrapper --clone -s '$val{source-vmdk}' -t '$val{target-lun}' </execute>
       </command>
       <command path="vmkfstools.taskGet">
          <description>Get a clone task status</description>

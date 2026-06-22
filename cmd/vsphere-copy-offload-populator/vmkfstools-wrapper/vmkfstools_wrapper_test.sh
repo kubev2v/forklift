@@ -119,7 +119,7 @@ test_version_command() {
     local exit_code=$?
 
     assert_exit_code 0 ${exit_code} "Version command exits with 0"
-    assert_contains "0.3.0" "${output}" "Version output contains version number"
+    assert_contains "0.3.1" "${output}" "Version output contains version number"
     assert_contains "<?xml version" "${output}" "Version output is XML format"
     assert_contains '"version"' "${output}" "Version output contains version field"
 }
@@ -134,7 +134,7 @@ test_version_output_simple() {
     local exit_code=$?
 
     assert_exit_code 0 ${exit_code} "Version command with --output simple exits with 0"
-    assert_equals "0.3.0" "${output}" "Simple output returns only version number"
+    assert_equals "0.3.1" "${output}" "Simple output returns only version number"
     assert_not_contains "<?xml" "${output}" "Simple output has no XML"
     assert_not_contains "version" "${output}" "Simple output has no JSON field name"
 }
@@ -149,7 +149,7 @@ test_version_output_xml() {
     local exit_code=$?
 
     assert_exit_code 0 ${exit_code} "Version command with --output xml exits with 0"
-    assert_contains "0.3.0" "${output}" "XML output contains version number"
+    assert_contains "0.3.1" "${output}" "XML output contains version number"
     assert_contains "<?xml version" "${output}" "XML output has XML declaration"
     assert_contains '"version"' "${output}" "XML output contains version field"
 }
@@ -166,7 +166,7 @@ test_path_validation() {
     cat > "${TEST_TMP_DIR}/validate.sh" << 'EOF'
 #!/bin/sh
 LOG_FILE="/dev/null"
-SCRIPT_VERSION="0.3.0"
+SCRIPT_VERSION="0.3.1"
 log_info() { :; }
 log_error() { echo "ERROR: $1" >&2; }
 validate_path() {
@@ -806,11 +806,11 @@ test_argument_parsing() {
     # Test long form arguments
     local output
     output=$(sh "${WRAPPER_SCRIPT}" --version 2>&1)
-    assert_contains "0.3.0" "${output}" "Long form --version works"
+    assert_contains "0.3.1" "${output}" "Long form --version works"
 
     # Test short form arguments
     output=$(sh "${WRAPPER_SCRIPT}" -v 2>&1)
-    assert_contains "0.3.0" "${output}" "Short form -v works"
+    assert_contains "0.3.1" "${output}" "Short form -v works"
 
     # Test task-get with -i
     output=$(sh "${WRAPPER_SCRIPT}" --task-get -i "test-id" 2>&1)
@@ -819,6 +819,24 @@ test_argument_parsing() {
     # Test task-get with --task-id
     output=$(sh "${WRAPPER_SCRIPT}" --task-get --task-id "test-id-2" 2>&1)
     assert_contains 'test-id-2' "${output}" "Task-get with --task-id parses task ID"
+
+    # MTV-5363: paths with spaces must not be split into standalone dashes
+    local source_path="/vmfs/volumes/eco-iscsi-ds3/vm10disks - cloned/vm10disks - cloned_1.vmdk"
+    local target_path="/vmfs/devices/disks/naa.600a0980383139544924583130374851"
+    output=$(sh "${WRAPPER_SCRIPT}" --clone -s "${source_path}" -t "${target_path}" 2>&1)
+    assert_not_contains "Unknown option: -" "${output}" "Clone with spaces in path does not treat dash as option"
+}
+
+test_esxcli_xml_path_quoting() {
+    echo ""
+    echo "=== Testing esxcli XML Path Quoting (MTV-5363) ==="
+
+    local xml_file="${SCRIPT_DIR}/esxcli-vmkfstools.xml"
+    local xml_content
+    xml_content=$(cat "${xml_file}")
+
+    assert_contains "'\$val{source-vmdk}'" "${xml_content}" "Clone source path is quoted in esxcli XML"
+    assert_contains "'\$val{target-lun}'" "${xml_content}" "Clone target path is quoted in esxcli XML"
 }
 
 # ============================================================================
@@ -1298,8 +1316,8 @@ main() {
     test_version_output_simple
     test_version_output_xml
     test_argument_parsing
-    
-    
+    test_esxcli_xml_path_quoting
+
     # GROUP 2: Path Validation and Security
     test_path_validation
     

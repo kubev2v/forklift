@@ -2,6 +2,7 @@
 package plan
 
 import (
+	"context"
 	"encoding/json"
 
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
@@ -14,9 +15,11 @@ import (
 	ginkgo "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	cnv "kubevirt.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -32,6 +35,9 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 					"migration": "test",
 					"vmID":      "test",
 				},
+				Annotations: map[string]string{
+					"forklift.konveyor.io/disk-source": "test-disk",
+				},
 			},
 		}
 
@@ -40,6 +46,69 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 			pvcs, err := kubevirt.getPVCs(ref.Ref{ID: "test"})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(pvcs).To(HaveLen(1))
+		})
+
+		ginkgo.It("should exclude prime PVCs created by the volume populator", func() {
+			realPVC := &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "9ba19d87-0d7f-43be-9ffe-d7dd3a552188-ggcw8",
+					Namespace: "test",
+					Labels: map[string]string{
+						"migration": "test",
+						"vmID":      "test",
+						"imageID":   "9ba19d87",
+					},
+					Annotations: map[string]string{
+						"forklift.konveyor.io/disk-source": "9ba19d87",
+					},
+				},
+			}
+			primePVC := &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "prime-222bcc84-8e35-4afb-a607-39605ff0397a",
+					Namespace: "test",
+					Labels: map[string]string{
+						"migration": "test",
+						"vmID":      "test",
+					},
+				},
+			}
+			kubevirt := createKubeVirt(realPVC, primePVC)
+			pvcs, err := kubevirt.getPVCs(ref.Ref{ID: "test"})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(pvcs).To(HaveLen(1))
+			Expect(pvcs[0].Name).To(Equal(realPVC.Name))
+		})
+
+		ginkgo.It("should exclude PVCs without disk-source annotation", func() {
+			realPVC := &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "real-disk-pvc",
+					Namespace: "test",
+					Labels: map[string]string{
+						"migration": "test",
+						"vmID":      "test",
+					},
+					Annotations: map[string]string{
+						"forklift.konveyor.io/disk-source": "disk-001",
+					},
+				},
+			}
+			noIdentityPVC := &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "stray-pvc-no-annotations",
+					Namespace: "test",
+					Labels: map[string]string{
+						"migration": "test",
+						"vmID":      "test",
+					},
+				},
+			}
+			kubevirt := createKubeVirt(realPVC, noIdentityPVC)
+			pvcs, err := kubevirt.getPVCs(ref.Ref{ID: "test"})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(pvcs).To(HaveLen(1))
+			Expect(pvcs[0].Name).To(Equal(realPVC.Name))
 		})
 	})
 
@@ -532,6 +601,104 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 
 			result := kubevirt.determineRunStrategy(vm)
 			Expect(result).To(Equal(cnv.RunStrategyHalted))
+		})
+	})
+
+	ginkgo.Describe("CleanupCopiedConfigMaps", func() {
+		ginkgo.It("should delete extra-v2v-conf and customization-scripts ConfigMaps by name", func() {
+			extraCM := &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-plan-extra-v2v-conf",
+					Namespace: "target-ns",
+				},
+				Data: map[string]string{"key": "val"},
+			}
+			custCM := &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-plan-customization-scripts",
+					Namespace: "target-ns",
+				},
+				Data: map[string]string{"key": "val"},
+			}
+			kubevirt := createKubeVirtWithProvider(v1beta1.VSphere, extraCM, custCM)
+
+			kubevirt.CleanupCopiedConfigMaps()
+
+			// Both should be gone
+			result := &v1.ConfigMap{}
+			err := kubevirt.Destination.Get(context.TODO(),
+				client.ObjectKey{Name: extraCM.Name, Namespace: "target-ns"}, result)
+			Expect(k8serr.IsNotFound(err)).To(BeTrue(), "extra-v2v-conf should be deleted")
+
+			err = kubevirt.Destination.Get(context.TODO(),
+				client.ObjectKey{Name: custCM.Name, Namespace: "target-ns"}, result)
+			Expect(k8serr.IsNotFound(err)).To(BeTrue(), "customization-scripts should be deleted")
+		})
+
+		ginkgo.It("should delete vddk-conf ConfigMaps by label selector", func() {
+			vddkCM := &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-plan-vddk-conf-abc12",
+					Namespace: "target-ns",
+					Labels: map[string]string{
+						kMigration:     "test",
+						kPlan:          "plan-uid",
+						kPlanName:      "test-plan",
+						kPlanNamespace: "test",
+						kUse:           VddkConf,
+						kResource:      ResourceVDDKConfig,
+					},
+				},
+				Data: map[string]string{"key": "val"},
+			}
+			kubevirt := createKubeVirtWithProvider(v1beta1.VSphere, vddkCM)
+
+			kubevirt.CleanupCopiedConfigMaps()
+
+			result := &v1.ConfigMap{}
+			err := kubevirt.Destination.Get(context.TODO(),
+				client.ObjectKey{Name: vddkCM.Name, Namespace: "target-ns"}, result)
+			Expect(k8serr.IsNotFound(err)).To(BeTrue(), "vddk-conf should be deleted")
+		})
+
+		ginkgo.It("should delete multiple vddk-conf ConfigMaps from retries", func() {
+			labels := map[string]string{
+				kMigration:     "test",
+				kPlan:          "plan-uid",
+				kPlanName:      "test-plan",
+				kPlanNamespace: "test",
+				kUse:           VddkConf,
+				kResource:      ResourceVDDKConfig,
+			}
+			vddkCM1 := &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-plan-vddk-conf-aaa11", Namespace: "target-ns", Labels: labels,
+				},
+				Data: map[string]string{"key": "val1"},
+			}
+			vddkCM2 := &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-plan-vddk-conf-bbb22", Namespace: "target-ns", Labels: labels,
+				},
+				Data: map[string]string{"key": "val2"},
+			}
+			kubevirt := createKubeVirtWithProvider(v1beta1.VSphere, vddkCM1, vddkCM2)
+
+			kubevirt.CleanupCopiedConfigMaps()
+
+			result := &v1.ConfigMap{}
+			err := kubevirt.Destination.Get(context.TODO(),
+				client.ObjectKey{Name: vddkCM1.Name, Namespace: "target-ns"}, result)
+			Expect(k8serr.IsNotFound(err)).To(BeTrue(), "first vddk-conf should be deleted")
+
+			err = kubevirt.Destination.Get(context.TODO(),
+				client.ObjectKey{Name: vddkCM2.Name, Namespace: "target-ns"}, result)
+			Expect(k8serr.IsNotFound(err)).To(BeTrue(), "second vddk-conf should be deleted")
+		})
+
+		ginkgo.It("should not error when no copied ConfigMaps exist", func() {
+			kubevirt := createKubeVirtWithProvider(v1beta1.VSphere)
+			Expect(func() { kubevirt.CleanupCopiedConfigMaps() }).ToNot(Panic())
 		})
 	})
 

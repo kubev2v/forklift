@@ -128,6 +128,8 @@ func (p *PowermaxClonner) EnsureClonnerIgroup(_ string, clonnerIqn []string) (po
 	p.log.Info("ensuring initiator group", "adapters", clonnerIqn)
 
 	ctx := context.TODO()
+	p.maskingViewID = ""
+	p.storageGroupID = ""
 
 	randomString, err := generateRandomString(4)
 	if err != nil {
@@ -260,9 +262,8 @@ func (p *PowermaxClonner) EnsureClonnerIgroup(_ string, clonnerIqn []string) (po
 // so re-mapping after cleanup is a no-op. Only the initial xcopy mapping (via MapTarget)
 // needs to add the volume to the temporary xcopy storage group.
 func (p *PowermaxClonner) Map(_ string, targetLUN populator.LUN, mappingContext populator.MappingContext) (populator.LUN, error) {
-	// After full cleanup the xcopy SG has been deleted; skip re-mapping since
-	// the volume is still in its original storage groups.
-	if v, ok := mappingContext[populator.CleanupXcopyInitiatorGroup]; ok && v.(bool) {
+	// storageGroupID is a guard to decide if we need to map.
+	if p.storageGroupID == "" {
 		p.log.V(2).Info("skipping Map after cleanup, volume remains in original storage groups", "volume", targetLUN.ProviderID)
 		return targetLUN, nil
 	}
@@ -363,28 +364,44 @@ func (p *PowermaxClonner) ResolvePVToLUN(pv populator.PersistentVolume) (populat
 }
 
 // UnMap implements populator.StorageApi.
+// Masking view deletion is a blocking step: PowerMax rejects storage group
+// deletion while the SG is still attached to a masking view, so any non-404
+// DeleteMaskingView failure aborts the cleanup and returns immediately.
+// A 404 on DeleteMaskingView is treated as success (idempotent retry).
 func (p *PowermaxClonner) UnMap(_ string, targetLUN populator.LUN, mappingContext populator.MappingContext) error {
 	p.log.Info("unmapping volume from storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID)
 
 	ctx := context.TODO()
+	var errs []error
 
-	cleanup, ok := mappingContext[populator.CleanupXcopyInitiatorGroup]
-	if ok && cleanup.(bool) {
-		p.log.V(2).Info("full cleanup requested, deleting masking view", "masking_view", p.maskingViewID)
+	if p.maskingViewID != "" {
+		p.log.V(2).Info("deleting masking view", "masking_view", p.maskingViewID)
 		err := retryOnTransient(ctx, p.log, "DeleteMaskingView", func() error {
 			return p.client.DeleteMaskingView(ctx, p.symmetrixID, p.maskingViewID)
 		})
 		if err != nil {
-			return fmt.Errorf("failed to delete masking view: %w", err)
+			var pmxErr *pmxtypes.Error
+			if errors.As(err, &pmxErr) && pmxErr.HTTPStatusCode == 404 {
+				p.log.V(2).Info("masking view already deleted", "masking_view", p.maskingViewID)
+			} else {
+				// SG cannot be deleted while the MV is still attached; treat as blocking.
+				p.log.Info("failed to delete masking view, skipping SG cleanup", "masking_view", p.maskingViewID, "err", err)
+				p.maskingViewID = ""
+				p.storageGroupID = ""
+				return fmt.Errorf("failed to delete masking view: %w", err)
+			}
 		}
+	}
 
+	if p.storageGroupID != "" {
 		p.log.V(2).Info("removing volume from storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID)
-		err = retryOnTransient(ctx, p.log, "RemoveVolumesFromStorageGroup", func() error {
+		err := retryOnTransient(ctx, p.log, "RemoveVolumesFromStorageGroup", func() error {
 			_, e := p.client.RemoveVolumesFromStorageGroup(ctx, p.symmetrixID, p.storageGroupID, false, targetLUN.ProviderID)
 			return e
 		})
 		if err != nil {
-			return fmt.Errorf("failed removing volume from storage group:  %w", err)
+			p.log.Info("failed removing volume from storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID, "err", err)
+			errs = append(errs, err)
 		}
 
 		p.log.V(2).Info("deleting storage group", "storage_group", p.storageGroupID)
@@ -392,25 +409,15 @@ func (p *PowermaxClonner) UnMap(_ string, targetLUN populator.LUN, mappingContex
 			return p.client.DeleteStorageGroup(ctx, p.symmetrixID, p.storageGroupID)
 		})
 		if err != nil {
-			return fmt.Errorf("failed to delete storage group: %w", err)
+			p.log.Info("failed to delete storage group", "storage_group", p.storageGroupID, "err", err)
+			errs = append(errs, err)
 		}
-
-		p.log.Info("volume unmapped successfully with full cleanup", "volume", targetLUN.ProviderID)
-		return nil
 	}
 
-	p.log.V(2).Info("removing volume from storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID)
-
-	err := retryOnTransient(ctx, p.log, "RemoveVolumesFromStorageGroup", func() error {
-		_, e := p.client.RemoveVolumesFromStorageGroup(ctx, p.symmetrixID, p.storageGroupID, false, targetLUN.ProviderID)
-		return e
-	})
-	if err != nil {
-		return fmt.Errorf("failed removing volume from storage group:  %w", err)
-	}
-
-	p.log.Info("volume unmapped successfully", "volume", targetLUN.ProviderID)
-	return nil
+	p.maskingViewID = ""
+	p.storageGroupID = ""
+	p.log.Info("volume unmapped and cleaned up", "volume", targetLUN.ProviderID)
+	return errors.Join(errs...)
 }
 
 var newClientWithArgs = gopowermax.NewClientWithArgs
@@ -496,7 +503,7 @@ func retryOnTransient(ctx context.Context, log klog.Logger, operation string, fn
 		Duration: 1 * time.Second,
 		Factor:   2.0,
 		Jitter:   1.0,
-		Steps:    5,
+		Steps:    7,
 	}
 	var lastErr error
 	attempt := 0
@@ -511,8 +518,8 @@ func retryOnTransient(ctx context.Context, log klog.Logger, operation string, fn
 		}
 		var pmxErr *pmxtypes.Error
 		if errors.As(lastErr, &pmxErr) {
-			if pmxErr.HTTPStatusCode == 503 {
-				log.Info("transient 503 error, retrying", "operation", operation, "attempt", attempt, "maxAttempts", backoff.Steps, "err", lastErr)
+			if pmxErr.HTTPStatusCode == 503 || pmxErr.HTTPStatusCode == 500 {
+				log.Info("transient error, retrying", "operation", operation, "httpStatus", pmxErr.HTTPStatusCode, "attempt", attempt, "maxAttempts", backoff.Steps, "err", lastErr)
 				return false, nil
 			}
 			if pmxErr.HTTPStatusCode == 409 {

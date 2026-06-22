@@ -208,10 +208,8 @@ spec:
         - name: FEATURE_WINDOWS_REGISTRY_NETWORK_CONFIG
           value: "true"
 {% endif %}
-{% if feature_windows_wait_for_reboot|bool %}
         - name: FEATURE_WINDOWS_WAIT_FOR_REBOOT
-          value: "true"
-{% endif %}
+          value: "{{ feature_windows_wait_for_reboot|bool|lower }}"
         - name: FEATURE_USE_CONVERSION_CR
           value: "{{ feature_use_conversion_cr|bool|lower }}"
 {% if ovirt_osmap_configmap_name is defined %}
@@ -225,6 +223,10 @@ spec:
 {% if virt_customize_configmap_name is defined %}
         - name: VIRT_CUSTOMIZE_MAP
           value: {{ virt_customize_configmap_name }}
+{% endif %}
+{% if naa_oui_map_configmap_name is defined %}
+        - name: NAA_OUI_MAP
+          value: {{ naa_oui_map_configmap_name }}
 {% endif %}
 {% if controller_profile_kind is defined and controller_profile_path is defined and controller_profile_duration is defined %}
         - name: PROFILE_KIND

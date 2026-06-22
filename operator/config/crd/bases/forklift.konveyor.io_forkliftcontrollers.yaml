@@ -94,7 +94,7 @@ spec:
               feature_windows_wait_for_reboot:
                 type: string
                 enum: ["true", "false"]
-                description: "Enable automatic wait-for-reboot step for Windows VM migrations (default: false)"
+                description: "Enable automatic wait-for-reboot step for Windows VM migrations (default: true)"
               feature_use_conversion_cr:
                 type: string
                 enum: ["true", "false"]
@@ -364,6 +364,10 @@ spec:
                 type: string
                 description: "ConfigMap name for virt-customize configuration (default: forklift-virt-customize)"
                 example: "custom-virt-customize"
+              naa_oui_map_configmap_name:
+                type: string
+                description: "ConfigMap name for custom NAA OUI to storage vendor mappings (default: forklift-naa-oui-map)"
+                example: "custom-naa-oui-map"
 
               # Migration Settings & Timeouts
               controller_migration_service_account:

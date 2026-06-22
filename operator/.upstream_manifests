@@ -3709,7 +3709,7 @@ spec:
                 type: string
               feature_windows_wait_for_reboot:
                 description: 'Enable automatic wait-for-reboot step for Windows VM
-                  migrations (default: false)'
+                  migrations (default: true)'
                 enum:
                 - "true"
                 - "false"
@@ -3852,6 +3852,11 @@ spec:
               must_gather_image_fqin:
                 description: Must-gather debugging image
                 example: quay.io/kubev2v/forklift-must-gather:latest
+                type: string
+              naa_oui_map_configmap_name:
+                description: 'ConfigMap name for custom NAA OUI to storage vendor
+                  mappings (default: forklift-naa-oui-map)'
+                example: custom-naa-oui-map
                 type: string
               ova_container_limits_cpu:
                 description: 'OVA CPU limit (default: 1000m)'
@@ -5242,11 +5247,37 @@ spec:
                                   description: Started timestamp.
                                   format: date-time
                                   type: string
+                                warning:
+                                  description: Warning.
+                                  properties:
+                                    phase:
+                                      type: string
+                                    reasons:
+                                      items:
+                                        type: string
+                                      type: array
+                                  required:
+                                  - phase
+                                  - reasons
+                                  type: object
                               required:
                               - name
                               - progress
                               type: object
                             type: array
+                          warning:
+                            description: Warning.
+                            properties:
+                              phase:
+                                type: string
+                              reasons:
+                                items:
+                                  type: string
+                                type: array
+                            required:
+                            - phase
+                            - reasons
+                            type: object
                         required:
                         - name
                         - progress
@@ -9524,11 +9555,37 @@ spec:
                                       description: Started timestamp.
                                       format: date-time
                                       type: string
+                                    warning:
+                                      description: Warning.
+                                      properties:
+                                        phase:
+                                          type: string
+                                        reasons:
+                                          items:
+                                            type: string
+                                          type: array
+                                      required:
+                                      - phase
+                                      - reasons
+                                      type: object
                                   required:
                                   - name
                                   - progress
                                   type: object
                                 type: array
+                              warning:
+                                description: Warning.
+                                properties:
+                                  phase:
+                                    type: string
+                                  reasons:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - phase
+                                - reasons
+                                type: object
                             required:
                             - name
                             - progress

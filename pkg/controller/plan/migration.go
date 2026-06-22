@@ -308,6 +308,8 @@ func (r *Migration) Archive() {
 		}
 	}
 
+	r.kubevirt.CleanupCopiedConfigMaps()
+
 	for _, vm := range r.Plan.Status.Migration.VMs {
 		dontFailOnError := func(err error) bool {
 			if err != nil {
@@ -1238,7 +1240,11 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			precopy := vm.Warm.Precopies[len(vm.Warm.Precopies)-1]
 			ready, err := r.provider.CheckSnapshotRemove(vm.Ref, precopy, r.kubevirt.loadHosts)
 			if err != nil {
-				step.AddError(err.Error())
+				if vm.Phase == api.PhaseWaitForFinalSnapshotRemoval {
+					step.AddWarning(err.Error())
+				} else {
+					step.AddError(err.Error())
+				}
 				err = nil
 				break
 			}
@@ -1680,6 +1686,7 @@ func (r *Migration) end() (completed bool, err error) {
 	} else if succeeded > 0 {
 		// if the migration didn't fail and at least one VM succeeded,
 		// then the migration succeeded.
+		r.kubevirt.CleanupCopiedConfigMaps()
 		r.Log.Info("Migration [SUCCEEDED]")
 		snapshot.SetCondition(
 			libcnd.Condition{

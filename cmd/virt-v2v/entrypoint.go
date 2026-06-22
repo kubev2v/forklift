@@ -96,28 +96,13 @@ func main() {
 				Message: warningMsg,
 			})
 		}
-		// For in-place conversions, detect the boot disk from the converted
-		// disk images so the controller can set the correct boot order on the
-		// target VM. Regular (non-in-place) conversions get this from the
-		// KubeVirt YAML that virt-v2v produces.
-		var bootDiskIndex *int
-		if env.IsInPlace {
-			if idx, detectErr := convert.DetectBootDiskIndex(); detectErr != nil {
-				fmt.Printf("WARNING: Failed to detect boot disk index: %v\n", detectErr)
-			} else {
-				bootDiskIndex = &idx
-				fmt.Printf("Detected boot disk index: %d\n", idx)
-			}
-		}
-
 		// In the remote migrations we can not connect to the conversion pod from the controller.
 		// This connection is needed for to get the additional configuration which is gathered either form virt-v2v or
 		// virt-v2v-inspector. We expose those parameters via server in this pod and once the controller gets the config
 		// the controller sends the request to terminate the pod.
 		if convert.IsLocalMigration {
 			s := server.Server{
-				AppConfig:     env,
-				BootDiskIndex: bootDiskIndex,
+				AppConfig: env,
 			}
 			err = s.Start()
 			if err != nil {
