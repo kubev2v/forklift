@@ -2,6 +2,7 @@ package base
 
 import (
 	"context"
+	"fmt"
 
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/ocp"
@@ -16,7 +17,7 @@ func FetchAndParseNAD(ctx context.Context, c client.Client, namespace, name stri
 	nad := &k8snet.NetworkAttachmentDefinition{}
 	key := client.ObjectKey{Namespace: namespace, Name: name}
 	if err := c.Get(ctx, key, nad); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get NetworkAttachmentDefinition %s/%s: %w", namespace, name, err)
 	}
 	return model.ParseNAD(nad)
 }
