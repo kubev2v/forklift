@@ -37,9 +37,11 @@ type CalicoNADIssue struct {
 }
 
 // CalicoValidationResult is the output of ValidateCalicoNADs:
-// resource-level issues to report at plan level, and a cache of healthy
-// NADs for downstream per-VM checks.
+// resource-level issues to report at plan level, warnings that describe
+// degraded-but-not-blocked configurations, and a cache of healthy NADs
+// for downstream per-VM checks.
 type CalicoValidationResult struct {
-	Issues []CalicoNADIssue
-	Cache  *CalicoValidationCache
+	Issues   []CalicoNADIssue
+	Warnings []CalicoNADIssue
+	Cache    *CalicoValidationCache
 }
