@@ -19,6 +19,28 @@ function Convert-PrefixToMask($prefix) {
     return $PrefixToMaskTable[[int]$prefix]
 }
 
+# Remove a persistent route using both Remove-NetRoute and route.exe as fallback.
+# Remove-NetRoute -PolicyStore PersistentStore can silently fail on some Windows versions,
+# so we always also invoke route.exe to guarantee the persistent store entry is gone.
+function Remove-PersistentRoute($route) {
+    try {
+        Remove-NetRoute -DestinationPrefix $route.DestinationPrefix -NextHop $route.NextHop `
+            -InterfaceIndex $route.InterfaceIndex -PolicyStore PersistentStore -Confirm:$false -ErrorAction Stop
+    } catch {
+        Write-Host "      Remove-NetRoute failed: $($_.Exception.Message)" -ForegroundColor Red
+    }
+    $parts = $route.DestinationPrefix.Split("/")
+    $prefixLen = [int]$parts[1]
+    if ($prefixLen -le 32) {
+        $network = $parts[0]
+        $netmask = Convert-PrefixToMask $prefixLen
+        $result = cmd /c "route delete $network mask $netmask $($route.NextHop) IF $($route.InterfaceIndex)" 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "      route.exe delete failed (exit $LASTEXITCODE): $result" -ForegroundColor Yellow
+        }
+    }
+}
+
 # Get persistent routes
 try {
     $routes = Get-NetRoute -PolicyStore PersistentStore -ErrorAction Stop
@@ -83,12 +105,8 @@ if (-not $groupedRoutes) {
         
         # Remove ALL instances
         foreach ($route in $routes) {
-            try {
-                Remove-NetRoute -DestinationPrefix $route.DestinationPrefix -NextHop $route.NextHop -InterfaceIndex $route.InterfaceIndex -PolicyStore PersistentStore -Confirm:$false -ErrorAction Stop
-                Write-Host "    Deleted: $($route.DestinationPrefix) via $($route.NextHop) on IF $($route.InterfaceIndex)" -ForegroundColor Red
-            } catch {
-                Write-Host "      Failed to delete: $($_.Exception.Message)" -ForegroundColor Red
-            }
+            Remove-PersistentRoute $route
+            Write-Host "    Deleted: $($route.DestinationPrefix) via $($route.NextHop) on IF $($route.InterfaceIndex)" -ForegroundColor Red
         }
         
         # Re-add only ONE instance (preserve the first interface)
@@ -141,13 +159,8 @@ if (-not $groupedRoutes) {
 
         # Delete all matching routes
         foreach ($route in $group.Group) {
-            try {
-                Remove-NetRoute -DestinationPrefix $route.DestinationPrefix -NextHop $route.NextHop `
-                    -InterfaceIndex $route.InterfaceIndex -PolicyStore PersistentStore -Confirm:$false -ErrorAction Stop
-                Write-Host "  Deleted: $($route.DestinationPrefix) via $($route.NextHop)" -ForegroundColor Red
-            } catch {
-                Write-Host "    Failed to delete route: $($_.Exception.Message)" -ForegroundColor Red
-            }
+            Remove-PersistentRoute $route
+            Write-Host "  Deleted: $($route.DestinationPrefix) via $($route.NextHop)" -ForegroundColor Red
         }
 
         # Try re-adding route using New-NetRoute with PolicyStore
@@ -178,7 +191,32 @@ if (-not $groupedRoutes) {
     }
 }
 
-# Step 3: Configure default gateways at NIC/IP configuration level
+# Step 3: Remove persistent routes bound to interfaces that no longer exist (stale after migration)
+Write-Host "Removing stale persistent routes on dead interfaces..." -ForegroundColor Yellow
+# Re-read persistent routes after Step 2 cleanup
+$allPersistent = Get-NetRoute -PolicyStore PersistentStore -AddressFamily IPv4 -ErrorAction SilentlyContinue
+# Collect interface indexes that are actually present on this machine (including hidden adapters like loopback)
+$activeIndexes = @(Get-NetAdapter -IncludeHidden -ErrorAction SilentlyContinue | ForEach-Object { $_.InterfaceIndex })
+if ($activeIndexes.Count -eq 0) {
+    Write-Host "  WARNING: Could not enumerate active adapters; skipping stale route sweep." -ForegroundColor Yellow
+} else {
+    $staleCount = 0
+    foreach ($route in $allPersistent) {
+        # If the route's interface doesn't exist, it's leftover from the source VM's old adapters
+        if ($activeIndexes -notcontains $route.InterfaceIndex) {
+            Remove-PersistentRoute $route
+            Write-Host "  Removed stale: $($route.DestinationPrefix) via $($route.NextHop) on dead IF $($route.InterfaceIndex)" -ForegroundColor Red
+            $staleCount++
+        }
+    }
+    if ($staleCount -eq 0) {
+        Write-Host "  No stale routes found." -ForegroundColor Green
+    } else {
+        Write-Host "  Removed $staleCount stale route(s)." -ForegroundColor Green
+    }
+}
+
+# Step 4: Configure default gateways at NIC/IP configuration level
 Write-Host "Configuring default gateways at interface level..." -ForegroundColor Cyan
 
 # Get current default gateways after cleanup
