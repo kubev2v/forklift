@@ -2,7 +2,9 @@ package hyperv
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	liburl "net/url"
 	"os"
 	libpath "path"
@@ -12,6 +14,7 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	hvutil "github.com/kubev2v/forklift/pkg/controller/hyperv"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/hyperv"
+	"github.com/kubev2v/forklift/pkg/lib/hyperv/driver"
 	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
@@ -161,9 +164,21 @@ func (r *Collector) HasParity() bool {
 	return r.parity
 }
 
-// Test connect/logout.
-func (r *Collector) Test() (_ int, err error) {
-	err = r.client.Connect(r.provider)
+// Test validates connectivity and credentials against the Hyper-V host.
+func (r *Collector) Test() (status int, err error) {
+	if err = r.client.Connect(r.provider); err != nil {
+		if errors.Is(err, driver.ErrUnauthorized) {
+			status = http.StatusUnauthorized
+		}
+		return
+	}
+	if _, err = r.client.driver.IsAlive(); err != nil {
+		if errors.Is(err, driver.ErrUnauthorized) {
+			status = http.StatusUnauthorized
+		}
+		return
+	}
+	r.log.Info("Connected to Hyper-V host via WinRM/HTTPS.")
 	return
 }
 
@@ -191,10 +206,16 @@ func (r *Collector) Start() error {
 			r.log.Info("Stopped.")
 		}()
 		for {
-			if !ctx.canceled() {
-				_ = r.run(&ctx)
-			} else {
+			if ctx.canceled() {
 				return
+			}
+			if err := r.run(&ctx); err != nil {
+				r.log.Error(err, "Run failed.", "retry", RetryInterval)
+				select {
+				case <-ctx.ctx.Done():
+					return
+				case <-time.After(RetryInterval):
+				}
 			}
 		}
 	}
@@ -217,12 +238,6 @@ func (r *Collector) run(ctx *Context) (err error) {
 	r.log.V(1).Info("Run started.")
 	r.startTime = time.Now()
 	r.phase = Started
-
-	defer func() {
-		if err != nil {
-			r.log.Error(err, "Run failed.")
-		}
-	}()
 
 	// Connect directly to HyperV host via WinRM using Secret credentials
 	err = r.client.Connect(r.provider)

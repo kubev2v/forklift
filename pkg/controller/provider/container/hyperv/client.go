@@ -3,6 +3,7 @@ package hyperv
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -80,7 +81,10 @@ func (r *Client) Connect(provider *api.Provider) (err error) {
 
 	if r.smbUrl != "" {
 		if pErr := r.discoverSMBWindowsPrefix(); pErr != nil {
-			r.Log.Error(pErr, "Failed to discover SMB Windows prefix, will retry")
+			if errors.Is(pErr, driver.ErrUnauthorized) {
+				return fmt.Errorf("SMB discovery auth failed: %w", pErr)
+			}
+			r.Log.Info("SMB Windows prefix not yet discovered, will attempt on next reconnect")
 		}
 	}
 
