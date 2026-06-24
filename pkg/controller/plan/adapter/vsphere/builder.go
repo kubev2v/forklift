@@ -209,8 +209,9 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		vm.RemoveSharedDisks()
 	}
 	macsToIps := ""
-	if r.Plan.Spec.PreserveStaticIPs {
-		macsToIps, err = r.mapMacStaticIps(vm)
+	modeByMAC := planbase.ResolveNICModes(nicRefsFromVM(vm), r.Map.Network, r.Plan.Spec.PreserveStaticIPs)
+	if planbase.HasPreserveMode(modeByMAC) {
+		macsToIps, err = r.mapMacStaticIps(vm, modeByMAC)
 		if err != nil {
 			return
 		}
@@ -234,9 +235,14 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 			Value: "/usr/local/virtio-win-legacy.iso",
 		})
 	} else if isWindows(vm) { // We check for multiple IPs per NIC only on Windows VMs
+		// Only count multi-IP NICs that are actually in "preserve" mode,
+		// since non-preserve NICs are excluded from V2V_staticIPs.
 		macIPCount := make(map[string]int)
 
 		for _, gn := range vm.GuestNetworks {
+			if mode, ok := modeByMAC[gn.MAC]; ok && mode != string(api.NetworkIPModePreserve) {
+				continue
+			}
 			// IS ipv4
 			if gn.Origin == string(types.NetIpConfigInfoIpAddressOriginManual) && net.IP.To4(net.ParseIP(gn.IP)) != nil {
 				macIPCount[gn.MAC]++
@@ -311,13 +317,26 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 	return
 }
 
-func (r *Builder) mapMacStaticIps(vm *model.VM) (ipMap string, err error) {
+func nicRefsFromVM(vm *model.VM) []planbase.NICRef {
+	return planbase.NICRefsFrom(vm.NICs, func(n vsphere.NIC) planbase.NICRef {
+		return planbase.NICRef{MAC: n.MAC, NetworkID: n.Network.ID}
+	})
+}
+
+func (r *Builder) mapMacStaticIps(vm *model.VM, modeByMAC map[string]string) (ipMap string, err error) {
 	// on windows machines we check if the interface origin is manual
 	// on linux we collect all networks.
 	isWindowsFlag := isWindows(vm)
 
 	var configurations []string
 	for _, guestNetwork := range vm.GuestNetworks {
+		// Skip this NIC if its resolved mode is not "preserve".
+		// Even though we're inside the "preserve" path, individual NICs marked
+		// as "dhcp" or "none" on their NetworkPair are excluded here.
+		if mode, ok := modeByMAC[guestNetwork.MAC]; ok && mode != string(api.NetworkIPModePreserve) {
+			continue
+		}
+
 		if !isWindowsFlag || guestNetwork.Origin == string(types.NetIpConfigInfoIpAddressOriginManual) {
 			gateway := ""
 			isIpv4 := net.IP.To4(net.ParseIP(guestNetwork.IP)) != nil

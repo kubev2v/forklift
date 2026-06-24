@@ -280,6 +280,210 @@ func TestValidateNetworkDuplicates_1toN_MixedNetworks(t *testing.T) {
 	}
 }
 
+// --- ResolveNICModes ---
+
+func TestResolveNICModes_NilNetworkMap_PreserveTrue(t *testing.T) {
+	nics := []NICRef{{MAC: "aa:bb:cc:dd:ee:01", NetworkID: "net-1"}}
+	modes := ResolveNICModes(nics, nil, true)
+	if modes["aa:bb:cc:dd:ee:01"] != "preserve" {
+		t.Errorf("nil network map with preserveStaticIPs=true should fallback to preserve, got %q", modes["aa:bb:cc:dd:ee:01"])
+	}
+}
+
+func TestResolveNICModes_NilNetworkMap_PreserveFalse(t *testing.T) {
+	nics := []NICRef{{MAC: "aa:bb:cc:dd:ee:01", NetworkID: "net-1"}}
+	modes := ResolveNICModes(nics, nil, false)
+	if len(modes) != 0 {
+		t.Errorf("nil network map with preserveStaticIPs=false should return empty, got %v", modes)
+	}
+}
+
+func TestResolveNICModes_EmptyNetworkIPMode_PreserveTrue(t *testing.T) {
+	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Pod}},
+	}}}
+	nics := []NICRef{{MAC: "aa:bb:cc:dd:ee:01", NetworkID: "net-1"}}
+	modes := ResolveNICModes(nics, nm, true)
+	if modes["aa:bb:cc:dd:ee:01"] != "preserve" {
+		t.Errorf("expected 'preserve', got %q", modes["aa:bb:cc:dd:ee:01"])
+	}
+}
+
+func TestResolveNICModes_EmptyNetworkIPMode_PreserveFalse(t *testing.T) {
+	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Pod}},
+	}}}
+	nics := []NICRef{{MAC: "aa:bb:cc:dd:ee:01", NetworkID: "net-1"}}
+	modes := ResolveNICModes(nics, nm, false)
+	if modes["aa:bb:cc:dd:ee:01"] != "none" {
+		t.Errorf("expected 'none', got %q", modes["aa:bb:cc:dd:ee:01"])
+	}
+}
+
+func TestResolveNICModes_NetworkIPModeOverridesPlanLevel(t *testing.T) {
+	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Pod}, NetworkIPMode: api.NetworkIPModeDHCP},
+	}}}
+	nics := []NICRef{{MAC: "aa:bb:cc:dd:ee:01", NetworkID: "net-1"}}
+	modes := ResolveNICModes(nics, nm, true)
+	if modes["aa:bb:cc:dd:ee:01"] != "dhcp" {
+		t.Errorf("networkIPMode should override plan-level, expected 'dhcp', got %q", modes["aa:bb:cc:dd:ee:01"])
+	}
+}
+
+func TestResolveNICModes_PreserveOverridesPreserveFalse(t *testing.T) {
+	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Pod}, NetworkIPMode: api.NetworkIPModePreserve},
+	}}}
+	nics := []NICRef{{MAC: "aa:bb:cc:dd:ee:01", NetworkID: "net-1"}}
+	modes := ResolveNICModes(nics, nm, false)
+	if modes["aa:bb:cc:dd:ee:01"] != "preserve" {
+		t.Errorf("networkIPMode=preserve should override preserveStaticIPs=false, got %q", modes["aa:bb:cc:dd:ee:01"])
+	}
+}
+
+func TestResolveNICModes_UnmappedNICSkipped(t *testing.T) {
+	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Pod}},
+	}}}
+	nics := []NICRef{
+		{MAC: "aa:bb:cc:dd:ee:01", NetworkID: "net-1"},
+		{MAC: "aa:bb:cc:dd:ee:02", NetworkID: "net-unmapped"},
+	}
+	modes := ResolveNICModes(nics, nm, true)
+	if len(modes) != 1 {
+		t.Errorf("expected 1 entry, got %d", len(modes))
+	}
+	if _, ok := modes["aa:bb:cc:dd:ee:02"]; ok {
+		t.Error("unmapped NIC should not appear in modes map")
+	}
+}
+
+func TestResolveNICModes_MixedModes(t *testing.T) {
+	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Pod}, NetworkIPMode: api.NetworkIPModePreserve},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-2"}}, Destination: api.DestinationNetwork{Type: Multus, Name: "br0", Namespace: "ns"}, NetworkIPMode: api.NetworkIPModeDHCP},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-3"}}, Destination: api.DestinationNetwork{Type: Multus, Name: "br1", Namespace: "ns"}, NetworkIPMode: api.NetworkIPModeNone},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-4"}}, Destination: api.DestinationNetwork{Type: Pod}},
+	}}}
+	nics := []NICRef{
+		{MAC: "mac-1", NetworkID: "net-1"},
+		{MAC: "mac-2", NetworkID: "net-2"},
+		{MAC: "mac-3", NetworkID: "net-3"},
+		{MAC: "mac-4", NetworkID: "net-4"},
+	}
+	modes := ResolveNICModes(nics, nm, true)
+	if modes["mac-1"] != "preserve" {
+		t.Errorf("mac-1: expected 'preserve', got %q", modes["mac-1"])
+	}
+	if modes["mac-2"] != "dhcp" {
+		t.Errorf("mac-2: expected 'dhcp', got %q", modes["mac-2"])
+	}
+	if modes["mac-3"] != "none" {
+		t.Errorf("mac-3: expected 'none', got %q", modes["mac-3"])
+	}
+	if modes["mac-4"] != "preserve" {
+		t.Errorf("mac-4: expected 'preserve' (plan-level fallback), got %q", modes["mac-4"])
+	}
+}
+
+// --- ResolveNICModes 1:N allocation ---
+
+func TestResolveNICModes_1toN_DifferentNetworkIPMode(t *testing.T) {
+	// Two NICs on the same source network, mapped to two different NADs
+	// with different networkIPMode values. Each NIC should get its own pair's mode.
+	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}, NetworkIPMode: api.NetworkIPModePreserve},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-b"}, NetworkIPMode: api.NetworkIPModeNone},
+	}}}
+	nics := []NICRef{
+		{MAC: "mac-1", NetworkID: "net-1"},
+		{MAC: "mac-2", NetworkID: "net-1"},
+	}
+	modes := ResolveNICModes(nics, nm, true)
+	if modes["mac-1"] != "preserve" {
+		t.Errorf("mac-1: expected 'preserve' (from row 0), got %q", modes["mac-1"])
+	}
+	if modes["mac-2"] != "none" {
+		t.Errorf("mac-2: expected 'none' (from row 1), got %q", modes["mac-2"])
+	}
+}
+
+func TestResolveNICModes_1toN_PoolExhausted(t *testing.T) {
+	// 3 NICs on the same source network but only 2 NAD rows — third NIC should be skipped.
+	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}, NetworkIPMode: api.NetworkIPModePreserve},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-b"}, NetworkIPMode: api.NetworkIPModeDHCP},
+	}}}
+	nics := []NICRef{
+		{MAC: "mac-1", NetworkID: "net-1"},
+		{MAC: "mac-2", NetworkID: "net-1"},
+		{MAC: "mac-3", NetworkID: "net-1"},
+	}
+	modes := ResolveNICModes(nics, nm, true)
+	if modes["mac-1"] != "preserve" {
+		t.Errorf("mac-1: expected 'preserve', got %q", modes["mac-1"])
+	}
+	if modes["mac-2"] != "dhcp" {
+		t.Errorf("mac-2: expected 'dhcp', got %q", modes["mac-2"])
+	}
+	if _, exists := modes["mac-3"]; exists {
+		t.Errorf("mac-3: expected not allocated (pool exhausted), got %q", modes["mac-3"])
+	}
+}
+
+func TestResolveNICModes_1toN_MixedNetworks(t *testing.T) {
+	// Two NICs on net-1 (1:N) and one NIC on net-2 (1:1).
+	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}, NetworkIPMode: api.NetworkIPModePreserve},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-b"}, NetworkIPMode: api.NetworkIPModeNone},
+		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-2"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-c"}, NetworkIPMode: api.NetworkIPModeDHCP},
+	}}}
+	nics := []NICRef{
+		{MAC: "mac-1", NetworkID: "net-1"},
+		{MAC: "mac-2", NetworkID: "net-1"},
+		{MAC: "mac-3", NetworkID: "net-2"},
+	}
+	modes := ResolveNICModes(nics, nm, false)
+	if modes["mac-1"] != "preserve" {
+		t.Errorf("mac-1: expected 'preserve', got %q", modes["mac-1"])
+	}
+	if modes["mac-2"] != "none" {
+		t.Errorf("mac-2: expected 'none', got %q", modes["mac-2"])
+	}
+	if modes["mac-3"] != "dhcp" {
+		t.Errorf("mac-3: expected 'dhcp', got %q", modes["mac-3"])
+	}
+}
+
+// --- HasPreserveMode ---
+
+func TestHasPreserveMode_True(t *testing.T) {
+	modes := map[string]string{"mac-1": "none", "mac-2": "preserve"}
+	if !HasPreserveMode(modes) {
+		t.Error("expected true when at least one NIC is preserve")
+	}
+}
+
+func TestHasPreserveMode_False(t *testing.T) {
+	modes := map[string]string{"mac-1": "none", "mac-2": "dhcp"}
+	if HasPreserveMode(modes) {
+		t.Error("expected false when no NIC is preserve")
+	}
+}
+
+func TestHasPreserveMode_Empty(t *testing.T) {
+	if HasPreserveMode(map[string]string{}) {
+		t.Error("expected false for empty map")
+	}
+}
+
+func TestHasPreserveMode_Nil(t *testing.T) {
+	if HasPreserveMode(nil) {
+		t.Error("expected false for nil map")
+	}
+}
+
 func TestValidateNetworkDuplicates_BackwardCompat_SingleRow(t *testing.T) {
 	nm := &api.NetworkMap{Spec: api.NetworkMapSpec{Map: []api.NetworkPair{
 		{Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}}, Destination: api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-a"}},

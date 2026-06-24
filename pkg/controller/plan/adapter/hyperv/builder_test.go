@@ -3,7 +3,14 @@ package hyperv
 import (
 	"testing"
 
-	hyperv "github.com/kubev2v/forklift/pkg/controller/provider/model/hyperv"
+	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	"github.com/kubev2v/forklift/pkg/controller/provider/model/hyperv"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/web/hyperv"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestBuildNICKeys(t *testing.T) {
@@ -125,5 +132,107 @@ func TestBuildPairKey(t *testing.T) {
 					tc.networkID, tc.vlan, key, tc.expected)
 			}
 		})
+	}
+}
+
+var builderLog = logging.WithName("hyperv-builder-test")
+
+var _ = Describe("HyperV builder", func() {
+	Context("mapMacStaticIps with networkIPMode filtering", func() {
+		It("should skip NICs with mode 'none'", func() {
+			b := createBuilder()
+			vm := &model.VM{
+				GuestOS: "Windows Server 2019",
+				GuestNetworks: []hyperv.GuestNetwork{
+					{MAC: "00:15:5D:01:02:03", IP: "172.29.3.193", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+					{MAC: "00:15:5D:01:02:04", IP: "172.29.3.194", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+				},
+			}
+			modeByMAC := map[string]string{
+				"00:15:5D:01:02:03": "preserve",
+				"00:15:5D:01:02:04": "none",
+			}
+			result := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(result).To(ContainSubstring("00:15:5D:01:02:03"))
+			Expect(result).NotTo(ContainSubstring("00:15:5D:01:02:04"))
+		})
+
+		It("should skip NICs with mode 'dhcp'", func() {
+			b := createBuilder()
+			vm := &model.VM{
+				GuestOS: "Windows Server 2019",
+				GuestNetworks: []hyperv.GuestNetwork{
+					{MAC: "00:15:5D:01:02:03", IP: "172.29.3.193", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+				},
+			}
+			modeByMAC := map[string]string{
+				"00:15:5D:01:02:03": "dhcp",
+			}
+			result := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(result).To(BeEmpty())
+		})
+
+		It("should include NICs not in modeByMAC (backward compat)", func() {
+			b := createBuilder()
+			vm := &model.VM{
+				GuestOS: "Windows Server 2019",
+				GuestNetworks: []hyperv.GuestNetwork{
+					{MAC: "00:15:5D:01:02:03", IP: "172.29.3.193", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+				},
+			}
+			modeByMAC := map[string]string{}
+			result := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(result).To(ContainSubstring("00:15:5D:01:02:03"))
+		})
+
+		It("should include all NICs when modeByMAC is nil", func() {
+			b := createBuilder()
+			vm := &model.VM{
+				GuestOS: "Windows Server 2019",
+				GuestNetworks: []hyperv.GuestNetwork{
+					{MAC: "00:15:5D:01:02:03", IP: "172.29.3.193", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+					{MAC: "00:15:5D:01:02:04", IP: "172.29.3.194", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+				},
+			}
+			result := b.mapMacStaticIps(vm, nil)
+			Expect(result).To(ContainSubstring("00:15:5D:01:02:03"))
+			Expect(result).To(ContainSubstring("00:15:5D:01:02:04"))
+		})
+
+		It("should preserve only marked NICs in a mixed-mode map", func() {
+			b := createBuilder()
+			vm := &model.VM{
+				GuestOS: "Windows Server 2019",
+				GuestNetworks: []hyperv.GuestNetwork{
+					{MAC: "00:15:5D:01:02:03", IP: "172.29.3.193", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+					{MAC: "00:15:5D:01:02:04", IP: "172.29.3.194", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+					{MAC: "00:15:5D:01:02:05", IP: "172.29.3.195", Origin: hyperv.OriginManual, PrefixLength: 16, Gateway: "172.29.3.1"},
+				},
+			}
+			modeByMAC := map[string]string{
+				"00:15:5D:01:02:03": "preserve",
+				"00:15:5D:01:02:04": "dhcp",
+				"00:15:5D:01:02:05": "none",
+			}
+			result := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(result).To(ContainSubstring("00:15:5D:01:02:03"))
+			Expect(result).NotTo(ContainSubstring("00:15:5D:01:02:04"))
+			Expect(result).NotTo(ContainSubstring("00:15:5D:01:02:05"))
+		})
+	})
+
+})
+
+func createBuilder() *Builder {
+	return &Builder{
+		Context: &plancontext.Context{
+			Plan: &v1beta1.Plan{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-plan",
+					Namespace: "test",
+				},
+			},
+			Log: builderLog,
+		},
 	}
 }
