@@ -5,6 +5,70 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 )
 
+type NICRef struct {
+	MAC       string
+	NetworkID string
+}
+
+// NICRefsFrom converts a slice of any NIC type to []NICRef using the provided accessor.
+func NICRefsFrom[N any](nics []N, toRef func(N) NICRef) []NICRef {
+	refs := make([]NICRef, len(nics))
+	for i := range nics {
+		refs[i] = toRef(nics[i])
+	}
+	return refs
+}
+
+// ResolveNICModes returns a MAC->mode map based on NetworkMap pairs and NADPool allocation.
+func ResolveNICModes(nics []NICRef, networkMap *api.NetworkMap, preserveStaticIPs bool) map[string]string {
+	modes := map[string]string{}
+	if networkMap == nil {
+		// No NetworkMap available — fall back to plan-level preserveStaticIPs for all NICs.
+		if preserveStaticIPs {
+			for _, nic := range nics {
+				modes[nic.MAC] = string(api.NetworkIPModePreserve)
+			}
+		}
+		return modes
+	}
+	pool := NewNADPool()
+	for _, nic := range nics {
+		pairs := networkMap.FindAllNetworks(nic.NetworkID)
+		if len(pairs) == 0 {
+			continue
+		}
+		pair, allocated := AllocateNetwork(pool, pairs)
+		if !allocated {
+			// Example: net-1 is mapped to [nad-a, nad-b] but the VM has 3 NICs on net-1.
+			// The first two NICs claim nad-a and nad-b, the third NIC has no NAD left.
+			// It won't appear in the mode map, so mapMacStaticIps includes it in static
+			// IPs by default (backward compat). ValidateNetworkDuplicates warns about this.
+			continue
+		}
+		mode := string(pair.NetworkIPMode)
+		if pair.Destination.Type == Ignored {
+			mode = string(api.NetworkIPModeNone)
+		} else if mode == "" {
+			if preserveStaticIPs {
+				mode = string(api.NetworkIPModePreserve)
+			} else {
+				mode = string(api.NetworkIPModeNone)
+			}
+		}
+		modes[nic.MAC] = mode
+	}
+	return modes
+}
+
+func HasPreserveMode(modes map[string]string) bool {
+	for _, mode := range modes {
+		if mode == string(api.NetworkIPModePreserve) {
+			return true
+		}
+	}
+	return false
+}
+
 // Network destination types.
 const (
 	Pod     = "pod"
@@ -67,6 +131,7 @@ func (p *NADPool) Allocate(pairsForSource []api.NetworkPair) (api.NetworkPair, b
 func AllocateNetwork(pool *NADPool, pairsForSource []api.NetworkPair) (api.NetworkPair, bool) {
 	var nadPairs []api.NetworkPair
 	for _, pair := range pairsForSource {
+		// Only Multus NADs need deduplication via the pool.
 		if pair.Destination.Type != Multus {
 			return pair, true
 		}

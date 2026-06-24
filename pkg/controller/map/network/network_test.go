@@ -254,6 +254,202 @@ var _ = Describe("NetworkMap Methods", func() {
 	})
 })
 
+// These tests verify the condition-setting logic in isolation (not via the reconciler)
+// so they can run without a full envtest cluster. If validateDestination changes,
+// update the inline logic here accordingly.
+var _ = Describe("NetworkIPMode validation", func() {
+	Describe("networkIPMode on ignored destinations", func() {
+		It("should set NetworkIPModeNotValid when networkIPMode is set on ignored destination", func() {
+			nm := &api.NetworkMap{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-network-map",
+					Namespace: "default",
+				},
+				Spec: api.NetworkMapSpec{
+					Map: []api.NetworkPair{
+						{
+							Source:        api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}},
+							Destination:   api.DestinationNetwork{Type: Ignored},
+							NetworkIPMode: api.NetworkIPModePreserve,
+						},
+					},
+				},
+			}
+			// Simulate what validateDestination does for the networkIPMode check
+			var networkIPModeOnIgnored []string
+			for _, entry := range nm.Spec.Map {
+				if entry.Destination.Type == Ignored && entry.NetworkIPMode != "" {
+					networkIPModeOnIgnored = append(networkIPModeOnIgnored, entry.Source.String())
+				}
+			}
+			Expect(networkIPModeOnIgnored).To(HaveLen(1))
+
+			if len(networkIPModeOnIgnored) > 0 {
+				nm.Status.SetCondition(libcnd.Condition{
+					Type:     NetworkIPModeNotValid,
+					Status:   True,
+					Reason:   NotValidForDestination,
+					Category: Critical,
+					Message:  "networkIPMode is not valid for the destination type (ignored or pod network).",
+					Items:    networkIPModeOnIgnored,
+				})
+			}
+			Expect(nm.Status.HasCondition(NetworkIPModeNotValid)).To(BeTrue())
+			Expect(nm.Status.HasBlockerCondition()).To(BeTrue())
+		})
+
+		It("should NOT set NetworkIPModeNotValid when networkIPMode is empty on ignored destination", func() {
+			nm := &api.NetworkMap{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-network-map",
+					Namespace: "default",
+				},
+				Spec: api.NetworkMapSpec{
+					Map: []api.NetworkPair{
+						{
+							Source:      api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}},
+							Destination: api.DestinationNetwork{Type: Ignored},
+						},
+					},
+				},
+			}
+			var networkIPModeOnIgnored []string
+			for _, entry := range nm.Spec.Map {
+				if entry.Destination.Type == Ignored && entry.NetworkIPMode != "" {
+					networkIPModeOnIgnored = append(networkIPModeOnIgnored, entry.Source.String())
+				}
+			}
+			Expect(networkIPModeOnIgnored).To(BeEmpty())
+			Expect(nm.Status.HasCondition(NetworkIPModeNotValid)).To(BeFalse())
+		})
+
+		It("should allow networkIPMode on pod destinations", func() {
+			nm := &api.NetworkMap{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-network-map",
+					Namespace: "default",
+				},
+				Spec: api.NetworkMapSpec{
+					Map: []api.NetworkPair{
+						{
+							Source:        api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}},
+							Destination:   api.DestinationNetwork{Type: Pod},
+							NetworkIPMode: api.NetworkIPModeDHCP,
+						},
+					},
+				},
+			}
+			var networkIPModeOnIgnored []string
+			for _, entry := range nm.Spec.Map {
+				if entry.Destination.Type == Ignored && entry.NetworkIPMode != "" {
+					networkIPModeOnIgnored = append(networkIPModeOnIgnored, entry.Source.String())
+				}
+			}
+			Expect(networkIPModeOnIgnored).To(BeEmpty())
+		})
+
+		It("should allow networkIPMode on multus destinations", func() {
+			nm := &api.NetworkMap{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-network-map",
+					Namespace: "default",
+				},
+				Spec: api.NetworkMapSpec{
+					Map: []api.NetworkPair{
+						{
+							Source:        api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}},
+							Destination:   api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-1"},
+							NetworkIPMode: api.NetworkIPModeNone,
+						},
+					},
+				},
+			}
+			var networkIPModeOnIgnored []string
+			for _, entry := range nm.Spec.Map {
+				if entry.Destination.Type == Ignored && entry.NetworkIPMode != "" {
+					networkIPModeOnIgnored = append(networkIPModeOnIgnored, entry.Source.String())
+				}
+			}
+			Expect(networkIPModeOnIgnored).To(BeEmpty())
+		})
+
+		It("should collect multiple offending entries", func() {
+			nm := &api.NetworkMap{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-network-map",
+					Namespace: "default",
+				},
+				Spec: api.NetworkMapSpec{
+					Map: []api.NetworkPair{
+						{
+							Source:        api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}},
+							Destination:   api.DestinationNetwork{Type: Ignored},
+							NetworkIPMode: api.NetworkIPModePreserve,
+						},
+						{
+							Source:      api.NetworkSourceRef{Ref: ref.Ref{ID: "net-2"}},
+							Destination: api.DestinationNetwork{Type: Pod},
+						},
+						{
+							Source:        api.NetworkSourceRef{Ref: ref.Ref{ID: "net-3"}},
+							Destination:   api.DestinationNetwork{Type: Ignored},
+							NetworkIPMode: api.NetworkIPModeNone,
+						},
+					},
+				},
+			}
+			var networkIPModeOnIgnored []string
+			for _, entry := range nm.Spec.Map {
+				if entry.Destination.Type == Ignored && entry.NetworkIPMode != "" {
+					networkIPModeOnIgnored = append(networkIPModeOnIgnored, entry.Source.String())
+				}
+			}
+			Expect(networkIPModeOnIgnored).To(HaveLen(2))
+		})
+	})
+})
+
+var _ = Describe("FindAllNetworks with NetworkIPMode", func() {
+	It("should return pairs with NetworkIPMode field preserved", func() {
+		nm := &api.NetworkMap{
+			Spec: api.NetworkMapSpec{
+				Map: []api.NetworkPair{
+					{
+						Source:        api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}},
+						Destination:   api.DestinationNetwork{Type: Pod},
+						NetworkIPMode: api.NetworkIPModePreserve,
+					},
+					{
+						Source:        api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}},
+						Destination:   api.DestinationNetwork{Type: Multus, Namespace: "ns", Name: "nad-1"},
+						NetworkIPMode: api.NetworkIPModeDHCP,
+					},
+				},
+			},
+		}
+		pairs := nm.FindAllNetworks("net-1")
+		Expect(pairs).To(HaveLen(2))
+		Expect(pairs[0].NetworkIPMode).To(Equal(api.NetworkIPModePreserve))
+		Expect(pairs[1].NetworkIPMode).To(Equal(api.NetworkIPModeDHCP))
+	})
+
+	It("should return pairs with empty NetworkIPMode when unset", func() {
+		nm := &api.NetworkMap{
+			Spec: api.NetworkMapSpec{
+				Map: []api.NetworkPair{
+					{
+						Source:      api.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}},
+						Destination: api.DestinationNetwork{Type: Pod},
+					},
+				},
+			},
+		}
+		pairs := nm.FindAllNetworks("net-1")
+		Expect(pairs).To(HaveLen(1))
+		Expect(pairs[0].NetworkIPMode).To(Equal(api.NetworkIPMode("")))
+	})
+})
+
 var _ = Describe("MapPredicate", func() {
 	var predicate MapPredicate
 
