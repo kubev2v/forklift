@@ -1,8 +1,6 @@
 package conversion
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -19,56 +17,28 @@ type Overlay struct {
 	OriginalLink string
 }
 
-func (c *Conversion) detectDiskFormat(path string) (string, error) {
-	var stdout bytes.Buffer
-	cmd := c.CommandBuilder.New("qemu-img").
-		AddPositional("info").
-		AddArg("--output", "json").
-		AddPositional(path).
-		Build()
-	cmd.SetStdout(&stdout)
-	cmd.SetStderr(os.Stderr)
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("qemu-img info failed for %s: %w", path, err)
-	}
-	var info struct {
-		Format string `json:"format"`
-	}
-	if err := json.Unmarshal(stdout.Bytes(), &info); err != nil {
-		return "", fmt.Errorf("failed to parse qemu-img info output for %s: %w", path, err)
-	}
-	if info.Format == "" {
-		fmt.Fprintf(os.Stderr, "WARNING: qemu-img info returned empty format for %s, assuming raw\n", path)
-		return "raw", nil
-	}
-	return info.Format, nil
-}
-
+// CreateOverlays creates a qcow2 overlay for each disk, rewires the
+// disk.Link symlink to point at the overlay, and updates disk.Path to
+// the overlay path. The original device path is preserved in Overlay.BackingPath
+// so restoreLinks can revert both the symlink and the struct on cleanup.
 func (c *Conversion) CreateOverlays() ([]*Overlay, error) {
 	var overlays []*Overlay
 	for _, disk := range c.Disks {
 		overlayPath := disk.Link + ".qcow2"
 
-		// Detect the backing disk format instead of assuming raw
-		backingFmt, err := c.detectDiskFormat(disk.Path)
-		if err != nil {
-			c.rollbackOverlays(overlays)
-			return nil, fmt.Errorf("failed to detect format for %s: %w", disk.Path, err)
-		}
-
-		// Step 1: Create qcow2 overlay file backed by the original disk
+		// Step 1: Create qcow2 overlay file backed by the original disk (always raw)
 		cmd := c.CommandBuilder.New("qemu-img").
 			AddPositional("create").
 			AddArg("-f", "qcow2").
 			AddArg("-b", disk.Path).
-			AddArg("-F", backingFmt).
+			AddArg("-F", "raw").
 			AddPositional(overlayPath).
 			Build()
 		cmd.SetStdout(os.Stdout)
 		cmd.SetStderr(os.Stderr)
 		if err := cmd.Run(); err != nil {
 			_ = os.Remove(overlayPath)
-			c.rollbackOverlays(overlays)
+			c.DiscardOverlays(overlays)
 			return nil, fmt.Errorf("failed to create overlay for %s: %w", disk.Path, err)
 		}
 
@@ -76,12 +46,12 @@ func (c *Conversion) CreateOverlays() ([]*Overlay, error) {
 		originalLink, err := os.Readlink(disk.Link)
 		if err != nil {
 			_ = os.Remove(overlayPath)
-			c.rollbackOverlays(overlays)
+			c.DiscardOverlays(overlays)
 			return nil, fmt.Errorf("failed to read symlink %s: %w", disk.Link, err)
 		}
 		if err := os.Remove(disk.Link); err != nil && !os.IsNotExist(err) {
 			_ = os.Remove(overlayPath)
-			c.rollbackOverlays(overlays)
+			c.DiscardOverlays(overlays)
 			return nil, fmt.Errorf("failed to remove old symlink %s: %w", disk.Link, err)
 		}
 
@@ -89,7 +59,7 @@ func (c *Conversion) CreateOverlays() ([]*Overlay, error) {
 		if err := os.Symlink(overlayPath, disk.Link); err != nil {
 			_ = os.Remove(overlayPath)
 			_ = os.Symlink(originalLink, disk.Link)
-			c.rollbackOverlays(overlays)
+			c.DiscardOverlays(overlays)
 			return nil, fmt.Errorf("failed to create overlay symlink %s -> %s: %w", disk.Link, overlayPath, err)
 		}
 
@@ -100,17 +70,9 @@ func (c *Conversion) CreateOverlays() ([]*Overlay, error) {
 			OriginalLink: originalLink,
 		})
 		fmt.Printf("Created overlay %s backed by %s\n", filepath.Base(overlayPath), disk.Path)
+		disk.Path = overlayPath
 	}
 	return overlays, nil
-}
-
-// rollbackOverlays removes overlay files and restores symlinks for
-// partially-created overlays during a failed CreateOverlays call.
-func (c *Conversion) rollbackOverlays(overlays []*Overlay) {
-	for _, o := range overlays {
-		_ = os.Remove(o.Path)
-	}
-	c.restoreLinks(overlays)
 }
 
 // CommitOverlays merges each overlay back into its backing disk, then removes the overlay file.
@@ -128,7 +90,7 @@ func (c *Conversion) CommitOverlays(overlays []*Overlay) error {
 		cmd.SetStdout(os.Stdout)
 		cmd.SetStderr(os.Stderr)
 		if err := cmd.Run(); err != nil {
-			c.rollbackOverlays(overlays)
+			c.DiscardOverlays(overlays)
 			if len(committed) > 0 {
 				return fmt.Errorf("partial commit: disks %v already committed, failed on %s — VM may be in inconsistent state: %w",
 					committed, filepath.Base(o.Path), err)
@@ -162,6 +124,7 @@ func (c *Conversion) DiscardOverlays(overlays []*Overlay) {
 
 func (c *Conversion) restoreLinks(overlays []*Overlay) {
 	for _, o := range overlays {
+		o.Disk.Path = o.BackingPath
 		if err := os.Remove(o.Disk.Link); err != nil && !os.IsNotExist(err) {
 			fmt.Fprintf(os.Stderr, "WARNING: failed to remove symlink %s during restore: %v\n", o.Disk.Link, err)
 			continue

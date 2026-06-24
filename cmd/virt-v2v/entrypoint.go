@@ -57,12 +57,18 @@ func main() {
 					return nil
 				}()
 				if err == nil {
-					// Run in-place conversion using libvirtxml input mode
-					err = convert.RunInPlaceWithOverlay(convert.RunVirtV2vInPlace)
+					if convert.OverlayEnabled {
+						err = convert.RunInPlaceWithOverlay(convert.RunVirtV2vInPlace)
+					} else {
+						err = convert.RunVirtV2vInPlace()
+					}
 				}
 			} else {
-				// No libvirt URL - Run in-place conversion directly on mounted disks
-				err = convert.RunInPlaceWithOverlay(convert.RunVirtV2vInPlaceDisk)
+				if convert.OverlayEnabled {
+					err = convert.RunInPlaceWithOverlay(convert.RunVirtV2vInPlaceDisk)
+				} else {
+					err = convert.RunVirtV2vInPlaceDisk()
+				}
 			}
 		} else {
 			err = convert.RunVirtV2v()
