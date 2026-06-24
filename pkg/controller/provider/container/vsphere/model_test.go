@@ -8,6 +8,385 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 )
 
+// --- helpers for building packed PCI slot numbers ---
+func makeSlot(dev, bridge, fn int32) int32 {
+	return (dev & pciSlotMaskDevice) |
+		((bridge & pciSlotMaskBridge) << pciSlotShiftBridge) |
+		((fn & pciSlotMaskFunc) << pciSlotShiftFunc)
+}
+
+// --- helpers for building govmomi virtual devices ---
+func makeVmxnet3(key int32, slot int32, backing types.BaseVirtualDeviceBackingInfo, mac string) *types.VirtualVmxnet3 {
+	return &types.VirtualVmxnet3{
+		VirtualVmxnet: types.VirtualVmxnet{
+			VirtualEthernetCard: types.VirtualEthernetCard{
+				VirtualDevice: types.VirtualDevice{
+					Key:      key,
+					SlotInfo: &types.VirtualDevicePciBusSlotInfo{PciSlotNumber: slot},
+					Backing:  backing,
+				},
+				MacAddress: mac,
+			},
+		},
+	}
+}
+
+func makeE1000(key int32, backing types.BaseVirtualDeviceBackingInfo) *types.VirtualE1000 {
+	return &types.VirtualE1000{
+		VirtualEthernetCard: types.VirtualEthernetCard{
+			VirtualDevice: types.VirtualDevice{Key: key, Backing: backing},
+		},
+	}
+}
+
+func makeSriov(key int32, backing types.BaseVirtualDeviceBackingInfo) *types.VirtualSriovEthernetCard {
+	return &types.VirtualSriovEthernetCard{
+		VirtualEthernetCard: types.VirtualEthernetCard{
+			VirtualDevice: types.VirtualDevice{Key: key, Backing: backing},
+		},
+	}
+}
+
+func makePCIPassthrough(key int32) *types.VirtualPCIPassthrough {
+	return &types.VirtualPCIPassthrough{
+		VirtualDevice: types.VirtualDevice{Key: key},
+	}
+}
+
+func makeUSBController(key int32) *types.VirtualUSBController {
+	return &types.VirtualUSBController{
+		VirtualController: types.VirtualController{
+			VirtualDevice: types.VirtualDevice{Key: key},
+		},
+	}
+}
+
+func makeDisk(key int32) *types.VirtualDisk {
+	return &types.VirtualDisk{
+		VirtualDevice: types.VirtualDevice{Key: key},
+	}
+}
+
+func netBacking(networkID string) *types.VirtualEthernetCardNetworkBackingInfo {
+	return &types.VirtualEthernetCardNetworkBackingInfo{
+		Network: &types.ManagedObjectReference{Value: networkID},
+	}
+}
+
+// --- computePciAddress tests ---
+
+func TestComputePciAddress(t *testing.T) {
+	bridges := []model.PciBridge{
+		{Number: 0, SlotNumber: 17, Functions: 1},
+		{Number: 4, SlotNumber: 21, Functions: 8},
+		{Number: 5, SlotNumber: 22, Functions: 8},
+	}
+
+	tests := []struct {
+		name     string
+		slot     int32
+		bridges  []model.PciBridge
+		expected string
+	}{
+		{
+			name:     "zero slot returns empty",
+			slot:     0,
+			bridges:  bridges,
+			expected: "",
+		},
+		{
+			name:     "negative slot returns empty",
+			slot:     -1,
+			bridges:  bridges,
+			expected: "",
+		},
+		{
+			name:     "primary bus device (bridgeIdx=0)",
+			slot:     makeSlot(0x11, 0, 0),
+			bridges:  bridges,
+			expected: "0000:00:11.0",
+		},
+		{
+			name:     "primary bus device with empty bridges",
+			slot:     makeSlot(0x11, 0, 0),
+			bridges:  nil,
+			expected: "0000:00:11.0",
+		},
+		{
+			name:     "device on pciBridge0 (bridgeIdx=1, bridgeNum=0)",
+			slot:     makeSlot(0x00, 1, 0),
+			bridges:  bridges,
+			expected: "0000:02:00.0",
+		},
+		{
+			name:     "device on pciBridge4 func 0 (bridgeIdx=5, bridgeNum=4)",
+			slot:     makeSlot(0x00, 5, 0),
+			bridges:  bridges,
+			expected: "0000:03:00.0",
+		},
+		{
+			name:     "device on pciBridge4 func 2",
+			slot:     makeSlot(0x00, 5, 2),
+			bridges:  bridges,
+			expected: "0000:05:00.0",
+		},
+		{
+			name:     "device on pciBridge5 func 0",
+			slot:     makeSlot(0x00, 6, 0),
+			bridges:  bridges,
+			expected: "0000:0b:00.0",
+		},
+		{
+			name:     "non-primary bus with empty bridges returns empty",
+			slot:     makeSlot(0x00, 5, 0),
+			bridges:  nil,
+			expected: "",
+		},
+		{
+			name:     "bridge not found returns empty",
+			slot:     makeSlot(0x00, 10, 0),
+			bridges:  bridges,
+			expected: "",
+		},
+		{
+			name:     "real slot 192 matches test VM NIC",
+			slot:     192,
+			bridges:  bridges,
+			expected: "0000:0b:00.0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := computePciAddress(tt.slot, tt.bridges)
+			if got != tt.expected {
+				t.Errorf("computePciAddress(%d, bridges) = %q, want %q", tt.slot, got, tt.expected)
+			}
+		})
+	}
+}
+
+// --- isPassthroughOrController tests ---
+
+func TestIsPassthroughOrController(t *testing.T) {
+	tests := []struct {
+		name     string
+		dev      types.BaseVirtualDevice
+		expected bool
+	}{
+		{"VirtualSriovEthernetCard", makeSriov(1, nil), true},
+		{"VirtualPCIPassthrough", makePCIPassthrough(2), true},
+		{"VirtualUSBController", makeUSBController(3), true},
+		{"VirtualVmxnet3", makeVmxnet3(4, 0, netBacking("net-1"), ""), false},
+		{"VirtualE1000", makeE1000(5, netBacking("net-1")), false},
+		{"VirtualDisk", makeDisk(6), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isPassthroughOrController(tt.dev)
+			if got != tt.expected {
+				t.Errorf("isPassthroughOrController(%s) = %v, want %v", tt.name, got, tt.expected)
+			}
+		})
+	}
+}
+
+// --- isConnectedNIC tests ---
+
+func TestIsConnectedNIC(t *testing.T) {
+	tests := []struct {
+		name     string
+		dev      types.BaseVirtualDevice
+		expected bool
+	}{
+		{"vmxnet3 with backing", makeVmxnet3(1, 0, netBacking("net-1"), ""), true},
+		{"e1000 with backing", makeE1000(2, netBacking("net-1")), true},
+		{"vmxnet3 nil backing", makeVmxnet3(3, 0, nil, ""), false},
+		{"SR-IOV with backing", makeSriov(4, netBacking("net-1")), false},
+		{"SR-IOV nil backing", makeSriov(5, nil), false},
+		{"PCI passthrough", makePCIPassthrough(6), false},
+		{"USB controller", makeUSBController(7), false},
+		{"virtual disk", makeDisk(8), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isConnectedNIC(tt.dev)
+			if got != tt.expected {
+				t.Errorf("isConnectedNIC(%s) = %v, want %v", tt.name, got, tt.expected)
+			}
+		})
+	}
+}
+
+// --- refreshNICPciAddresses tests ---
+
+func TestRefreshNICPciAddresses(t *testing.T) {
+	bridges := []model.PciBridge{
+		{Number: 0, SlotNumber: 17, Functions: 1},
+		{Number: 4, SlotNumber: 21, Functions: 8},
+	}
+
+	vm := &model.VM{
+		PciBridges: bridges,
+		Devices: []model.Device{
+			{Key: 4000, PciSlotNumber: 192},
+			{Key: 4001, PciSlotNumber: 224},
+		},
+		NICs: []model.NIC{
+			{DeviceKey: 4000, PciAddress: "stale"},
+			{DeviceKey: 4001, PciAddress: "stale"},
+		},
+	}
+
+	refreshNICPciAddresses(vm)
+
+	expected0 := computePciAddress(192, bridges)
+	expected1 := computePciAddress(224, bridges)
+
+	if vm.NICs[0].PciAddress != expected0 {
+		t.Errorf("NIC[0].PciAddress = %q, want %q", vm.NICs[0].PciAddress, expected0)
+	}
+	if vm.NICs[1].PciAddress != expected1 {
+		t.Errorf("NIC[1].PciAddress = %q, want %q", vm.NICs[1].PciAddress, expected1)
+	}
+}
+
+func TestRefreshNICPciAddresses_MissingDevice(t *testing.T) {
+	vm := &model.VM{
+		PciBridges: []model.PciBridge{{Number: 4, SlotNumber: 21, Functions: 8}},
+		Devices:    []model.Device{},
+		NICs: []model.NIC{
+			{DeviceKey: 9999, PciAddress: "old"},
+		},
+	}
+
+	refreshNICPciAddresses(vm)
+
+	if vm.NICs[0].PciAddress != "" {
+		t.Errorf("NIC with missing device should get empty PciAddress, got %q", vm.NICs[0].PciAddress)
+	}
+}
+
+// --- collectDevices tests ---
+
+func TestCollectDevices(t *testing.T) {
+	v := &VmAdapter{}
+
+	devArray := types.ArrayOfVirtualDevice{
+		VirtualDevice: []types.BaseVirtualDevice{
+			makeVmxnet3(4000, 192, netBacking("net-1"), "aa:bb:cc:dd:ee:01"),
+			makePCIPassthrough(100),
+			makeUSBController(200),
+			makeDisk(2000),
+			makeVmxnet3(4001, 224, nil, "aa:bb:cc:dd:ee:02"),
+			makeSriov(300, netBacking("net-2")),
+		},
+	}
+
+	devList := v.collectDevices(devArray)
+
+	expectedKeys := []int32{4000, 100, 200, 300}
+	if len(devList) != len(expectedKeys) {
+		t.Fatalf("collectDevices returned %d devices, want %d", len(devList), len(expectedKeys))
+	}
+	for i, key := range expectedKeys {
+		if devList[i].Key != key {
+			t.Errorf("devList[%d].Key = %d, want %d", i, devList[i].Key, key)
+		}
+	}
+
+	if devList[0].PciSlotNumber != 192 {
+		t.Errorf("devList[0].PciSlotNumber = %d, want 192", devList[0].PciSlotNumber)
+	}
+}
+
+func TestCollectDevices_SkipsUnconnectedNIC(t *testing.T) {
+	v := &VmAdapter{}
+
+	devArray := types.ArrayOfVirtualDevice{
+		VirtualDevice: []types.BaseVirtualDevice{
+			makeVmxnet3(4000, 0, nil, ""),
+		},
+	}
+
+	devList := v.collectDevices(devArray)
+	if len(devList) != 0 {
+		t.Errorf("collectDevices should skip NIC without backing, got %d devices", len(devList))
+	}
+}
+
+// --- collectNICs tests ---
+
+func TestCollectNICs(t *testing.T) {
+	bridges := []model.PciBridge{
+		{Number: 0, SlotNumber: 17, Functions: 1},
+		{Number: 4, SlotNumber: 21, Functions: 8},
+		{Number: 5, SlotNumber: 22, Functions: 8},
+	}
+
+	slot0 := makeSlot(0x00, 5, 0) // on pciBridge4
+	slot1 := makeSlot(0x00, 6, 0) // on pciBridge5
+
+	v := &VmAdapter{model: model.VM{PciBridges: bridges}}
+
+	devArray := types.ArrayOfVirtualDevice{
+		VirtualDevice: []types.BaseVirtualDevice{
+			makeVmxnet3(4000, slot0, netBacking("net-10"), "AA:BB:CC:DD:EE:01"),
+			makeVmxnet3(4001, slot1, netBacking("net-20"), "AA:BB:CC:DD:EE:02"),
+			makePCIPassthrough(100),
+			makeDisk(2000),
+			makeSriov(300, netBacking("net-30")),
+			makeVmxnet3(4002, 0, nil, "AA:BB:CC:DD:EE:03"),
+		},
+	}
+
+	nicList := v.collectNICs(devArray)
+
+	if len(nicList) != 2 {
+		t.Fatalf("collectNICs returned %d NICs, want 2", len(nicList))
+	}
+
+	if nicList[0].MAC != "aa:bb:cc:dd:ee:01" {
+		t.Errorf("NIC[0].MAC = %q, want lowercase", nicList[0].MAC)
+	}
+	if nicList[0].DeviceKey != 4000 {
+		t.Errorf("NIC[0].DeviceKey = %d, want 4000", nicList[0].DeviceKey)
+	}
+	if nicList[0].Index != 0 {
+		t.Errorf("NIC[0].Index = %d, want 0", nicList[0].Index)
+	}
+	if nicList[0].Network.ID != "net-10" {
+		t.Errorf("NIC[0].Network.ID = %q, want net-10", nicList[0].Network.ID)
+	}
+	if nicList[0].PciAddress == "" {
+		t.Error("NIC[0].PciAddress should not be empty")
+	}
+
+	if nicList[1].Index != 1 {
+		t.Errorf("NIC[1].Index = %d, want 1", nicList[1].Index)
+	}
+	if nicList[1].DeviceKey != 4001 {
+		t.Errorf("NIC[1].DeviceKey = %d, want 4001", nicList[1].DeviceKey)
+	}
+}
+
+func TestCollectNICs_ExcludesSRIOV(t *testing.T) {
+	v := &VmAdapter{}
+
+	devArray := types.ArrayOfVirtualDevice{
+		VirtualDevice: []types.BaseVirtualDevice{
+			makeSriov(300, netBacking("net-1")),
+		},
+	}
+
+	nicList := v.collectNICs(devArray)
+	if len(nicList) != 0 {
+		t.Errorf("collectNICs should exclude SR-IOV NICs, got %d", len(nicList))
+	}
+}
+
 // Test getDiskGuestInfo method
 func TestVmAdapter_getDiskGuestInfo(t *testing.T) {
 	tests := []struct {
