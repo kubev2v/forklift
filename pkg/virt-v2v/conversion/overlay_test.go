@@ -2,7 +2,6 @@ package conversion
 
 import (
 	"errors"
-	"io"
 	"os"
 	"path/filepath"
 
@@ -57,21 +56,7 @@ var _ = Describe("Overlay", func() {
 		return linkA, linkB
 	}
 
-	expectQemuImgInfo := func(diskPath, format string) {
-		mockCommandBuilder.EXPECT().New("qemu-img").Return(mockCommandBuilder)
-		mockCommandBuilder.EXPECT().AddPositional("info").Return(mockCommandBuilder)
-		mockCommandBuilder.EXPECT().AddArg("--output", "json").Return(mockCommandBuilder)
-		mockCommandBuilder.EXPECT().AddPositional(diskPath).Return(mockCommandBuilder)
-		mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
-		mockCommandExecutor.EXPECT().SetStdout(gomock.Any()).Do(func(w io.Writer) {
-			_, _ = w.Write([]byte(`{"format":"` + format + `"}`))
-		})
-		mockCommandExecutor.EXPECT().SetStderr(os.Stderr)
-		mockCommandExecutor.EXPECT().Run().Return(nil)
-	}
-
 	expectQemuImgCreate := func(diskPath, overlayPath string) {
-		expectQemuImgInfo(diskPath, "raw")
 		mockCommandBuilder.EXPECT().New("qemu-img").Return(mockCommandBuilder)
 		mockCommandBuilder.EXPECT().AddPositional("create").Return(mockCommandBuilder)
 		mockCommandBuilder.EXPECT().AddArg("-f", "qcow2").Return(mockCommandBuilder)
@@ -129,8 +114,7 @@ var _ = Describe("Overlay", func() {
 
 			expectQemuImgCreate("/dev/block0", linkA+".qcow2")
 
-			// Second disk: info succeeds but create fails
-			expectQemuImgInfo("/dev/block1", "raw")
+			// Second disk: create fails
 			mockCommandBuilder.EXPECT().New("qemu-img").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("create").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-f", "qcow2").Return(mockCommandBuilder)
@@ -287,8 +271,7 @@ var _ = Describe("Overlay", func() {
 			linkPath := setupSingleDisk()
 			overlayPath := linkPath + ".qcow2"
 
-			// info succeeds but qemu-img create fails
-			expectQemuImgInfo("/dev/block0", "raw")
+			// qemu-img create fails
 			mockCommandBuilder.EXPECT().New("qemu-img").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("create").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-f", "qcow2").Return(mockCommandBuilder)
