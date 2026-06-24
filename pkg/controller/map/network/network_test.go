@@ -123,7 +123,7 @@ var _ = Describe("NetworkPair", func() {
 	Describe("Source Ref NotSet", func() {
 		It("should return true when source ref is empty", func() {
 			pair := api.NetworkPair{
-				Source: ref.Ref{},
+				Source: api.NetworkSourceRef{Ref: ref.Ref{}},
 				Destination: api.DestinationNetwork{
 					Type: Pod,
 				},
@@ -133,7 +133,7 @@ var _ = Describe("NetworkPair", func() {
 
 		It("should return false when source has ID", func() {
 			pair := api.NetworkPair{
-				Source: ref.Ref{ID: "network-id"},
+				Source: api.NetworkSourceRef{Ref: ref.Ref{ID: "network-id"}},
 				Destination: api.DestinationNetwork{
 					Type: Pod,
 				},
@@ -143,7 +143,7 @@ var _ = Describe("NetworkPair", func() {
 
 		It("should return false when source has Name", func() {
 			pair := api.NetworkPair{
-				Source: ref.Ref{Name: "network-name"},
+				Source: api.NetworkSourceRef{Ref: ref.Ref{Name: "network-name"}},
 				Destination: api.DestinationNetwork{
 					Type: Pod,
 				},
@@ -165,21 +165,21 @@ var _ = Describe("NetworkMap Methods", func() {
 			Spec: api.NetworkMapSpec{
 				Map: []api.NetworkPair{
 					{
-						Source: ref.Ref{
+						Source: api.NetworkSourceRef{Ref: ref.Ref{
 							ID:   "network-1",
 							Name: "network-one",
 							Type: "bridge",
-						},
+						}},
 						Destination: api.DestinationNetwork{
 							Type: Pod,
 						},
 					},
 					{
-						Source: ref.Ref{
+						Source: api.NetworkSourceRef{Ref: ref.Ref{
 							ID:        "network-2",
 							Name:      "network-two",
 							Namespace: "source-ns",
-						},
+						}},
 						Destination: api.DestinationNetwork{
 							Type:      Multus,
 							Name:      "dest-nad",
@@ -187,10 +187,10 @@ var _ = Describe("NetworkMap Methods", func() {
 						},
 					},
 					{
-						Source: ref.Ref{
+						Source: api.NetworkSourceRef{Ref: ref.Ref{
 							ID:   "network-3",
 							Name: "ns1/network-three",
-						},
+						}},
 						Destination: api.DestinationNetwork{
 							Type: Ignored,
 						},

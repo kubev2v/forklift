@@ -3266,6 +3266,11 @@ spec:
                         type: string
                     type: object
                 type: object
+              message:
+                description: |-
+                  Message is a human-readable explanation of the current phase, populated
+                  by the conversion controller on every reconcile.
+                type: string
               observedGeneration:
                 description: |-
                   The most recent generation observed by the controller.
@@ -3704,7 +3709,7 @@ spec:
                 type: string
               feature_windows_wait_for_reboot:
                 description: 'Enable automatic wait-for-reboot step for Windows VM
-                  migrations (default: false)'
+                  migrations (default: true)'
                 enum:
                 - "true"
                 - "false"
@@ -3847,6 +3852,11 @@ spec:
               must_gather_image_fqin:
                 description: Must-gather debugging image
                 example: quay.io/kubev2v/forklift-must-gather:latest
+                type: string
+              naa_oui_map_configmap_name:
+                description: 'ConfigMap name for custom NAA OUI to storage vendor
+                  mappings (default: forklift-naa-oui-map)'
+                example: custom-naa-oui-map
                 type: string
               ova_container_limits_cpu:
                 description: 'OVA CPU limit (default: 1000m)'
@@ -4042,6 +4052,13 @@ spec:
               vsphere_osmap_configmap_name:
                 description: 'ConfigMap name for vSphere OS mappings (default: forklift-vsphere-osmap)'
                 example: custom-vsphere-osmap
+                type: string
+              wait_for_final_snapshot_consolidation:
+                description: 'Wait for final snapshot removal and consolidation in
+                  a VMware warm migration (default: true)'
+                enum:
+                - "true"
+                - "false"
                 type: string
             type: object
           status:
@@ -5230,11 +5247,37 @@ spec:
                                   description: Started timestamp.
                                   format: date-time
                                   type: string
+                                warning:
+                                  description: Warning.
+                                  properties:
+                                    phase:
+                                      type: string
+                                    reasons:
+                                      items:
+                                        type: string
+                                      type: array
+                                  required:
+                                  - phase
+                                  - reasons
+                                  type: object
                               required:
                               - name
                               - progress
                               type: object
                             type: array
+                          warning:
+                            description: Warning.
+                            properties:
+                              phase:
+                                type: string
+                              reasons:
+                                items:
+                                  type: string
+                                type: array
+                            required:
+                            - phase
+                            - reasons
+                            type: object
                         required:
                         - name
                         - progress
@@ -5477,6 +5520,11 @@ spec:
                           type: string
                         type:
                           description: Type used to qualify the name.
+                          type: string
+                        vlan:
+                          description: VLAN identifier (numeric string, valid range
+                            1-4094) for network disambiguation.
+                          pattern: ^([1-9]|[1-9][0-9]{1,2}|[1-3][0-9]{3}|40[0-8][0-9]|409[0-4])$
                           type: string
                       type: object
                   required:
@@ -9512,11 +9560,37 @@ spec:
                                       description: Started timestamp.
                                       format: date-time
                                       type: string
+                                    warning:
+                                      description: Warning.
+                                      properties:
+                                        phase:
+                                          type: string
+                                        reasons:
+                                          items:
+                                            type: string
+                                          type: array
+                                      required:
+                                      - phase
+                                      - reasons
+                                      type: object
                                   required:
                                   - name
                                   - progress
                                   type: object
                                 type: array
+                              warning:
+                                description: Warning.
+                                properties:
+                                  phase:
+                                    type: string
+                                  reasons:
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - phase
+                                - reasons
+                                type: object
                             required:
                             - name
                             - progress
@@ -10547,6 +10621,7 @@ rules:
   resources:
   - storageclasses
   - csidrivers
+  - csistoragecapacities
   verbs:
   - get
   - list
@@ -10574,6 +10649,12 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - subresources.kubevirt.io
+  resources:
+  - virtualmachineinstances/console
+  verbs:
+  - get
 - apiGroups:
   - cdi.kubevirt.io
   resources:
@@ -10657,6 +10738,8 @@ rules:
   - list
   - watch
   - create
+  - delete
+  - update
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
@@ -10668,6 +10751,8 @@ rules:
   - get
   - patch
   - create
+  - delete
+  - update
 - apiGroups:
   - build.openshift.io
   resources:
@@ -10781,6 +10866,12 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - subresources.kubevirt.io
+  resources:
+  - virtualmachineinstances/console
+  verbs:
+  - get
 - apiGroups:
   - cdi.kubevirt.io
   resources:

@@ -8,9 +8,11 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/kubev2v/forklift/pkg/lib/util"
+	"github.com/kubev2v/forklift/pkg/settings"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/base"
@@ -144,6 +146,7 @@ const (
 	fRuntimeHost              = "runtime.host"
 	fPowerState               = "runtime.powerState"
 	fConnectionState          = "runtime.connectionState"
+	fConsolidationNeeded      = "runtime.consolidationNeeded"
 	fSnapshot                 = "snapshot"
 	fIsTemplate               = "config.template"
 	fGuestNet                 = "guest.net"
@@ -294,6 +297,9 @@ type Collector struct {
 	cancel func()
 	// has parity.
 	parity bool
+	// Cached missing privileges from the last check.
+	missingPrivs   *privilegeCheckResult
+	missingPrivsMu *sync.RWMutex
 }
 
 // New collector.
@@ -304,11 +310,12 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) *Collector
 			provider.GetNamespace(),
 			provider.GetName()))
 	return &Collector{
-		url:      provider.Spec.URL,
-		provider: provider,
-		secret:   secret,
-		db:       db,
-		log:      nlog,
+		url:            provider.Spec.URL,
+		provider:       provider,
+		secret:         secret,
+		db:             db,
+		log:            nlog,
+		missingPrivsMu: &sync.RWMutex{},
 	}
 }
 
@@ -340,6 +347,17 @@ func (r *Collector) Reset() {
 // Reset.
 func (r *Collector) HasParity() bool {
 	return r.parity
+}
+
+// MissingPrivileges returns the cached privilege check results.
+// The bool indicates whether the check has completed.
+func (r *Collector) MissingPrivileges() ([]MissingPrivileges, bool) {
+	r.missingPrivsMu.RLock()
+	defer r.missingPrivsMu.RUnlock()
+	if r.missingPrivs == nil {
+		return nil, false
+	}
+	return r.missingPrivs.missing, true
 }
 
 // Follow
@@ -428,6 +446,24 @@ func (r *Collector) getUpdates(ctx context.Context) error {
 		return err
 	}
 	defer r.close()
+	r.checkAndCachePermissions(ctx)
+
+	permCtx, cancelPerm := context.WithCancel(ctx)
+	defer cancelPerm()
+
+	go func() {
+		ticker := time.NewTicker(PrivilegeCheckInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-permCtx.Done():
+				return
+			case <-ticker.C:
+				r.checkAndCachePermissions(permCtx)
+			}
+		}
+	}()
+
 	about := r.client.ServiceContent.About
 	err = r.db.Insert(
 		&model.About{
@@ -537,48 +573,127 @@ func (r *Collector) getVMsWithTags(ctx context.Context) (map[string][]model.Tag,
 		return make(map[string][]model.Tag), nil
 	}
 	tagManager := tags.NewManager(r.restClient)
-	allTags, err := tagManager.GetTags(ctx)
+
+	// Step 1: List all tag IDs (single API call).
+	tagIDs, err := tagManager.ListTags(ctx)
 	if err != nil {
-		r.log.Error(err, "Failed to retrieve tags")
+		r.log.Error(err, "Failed to list tags")
 		return nil, err
 	}
 
-	if len(allTags) == 0 {
+	if len(tagIDs) == 0 {
 		return make(map[string][]model.Tag), nil
 	}
 
-	tagIDs := make([]string, len(allTags))
-	for i, tag := range allTags {
-		tagIDs[i] = tag.ID
-	}
-
-	attachedObjectsList, err := tagManager.GetAttachedObjectsOnTags(ctx, tagIDs)
+	// Step 2: Get attached objects in a single batch API call and filter to
+	// only tags that are attached to at least one VirtualMachine.
+	attachedObjectsList, err := tagManager.ListAttachedObjectsOnTags(ctx, tagIDs)
 	if err != nil {
 		r.log.Error(err, "Failed to retrieve attached objects for tags", "tagCount", len(tagIDs))
 		return nil, err
 	}
 
-	vmTagsMap := make(map[string][]model.Tag)
+	type vmAttachment struct {
+		tagID string
+		vmIDs []string
+	}
+	var vmAttachments []vmAttachment
+	vmRelevantTagIDs := make(map[string]struct{})
 
 	for _, attached := range attachedObjectsList {
-		if attached.Tag == nil {
-			r.log.Info("Skipping tag with nil details", "tagID", attached.TagID)
-			continue
-		}
-
-		tagDetails := model.Tag{
-			ID:          attached.Tag.ID,
-			Description: attached.Tag.Description,
-			Name:        attached.Tag.Name,
-			CategoryID:  attached.Tag.CategoryID,
-			UsedBy:      attached.Tag.UsedBy,
-		}
-
+		var vmIDs []string
 		for _, resource := range attached.ObjectIDs {
 			if resource.Reference().Type == VirtualMachine {
-				vmID := resource.Reference().Value
-				vmTagsMap[vmID] = append(vmTagsMap[vmID], tagDetails)
+				vmIDs = append(vmIDs, resource.Reference().Value)
 			}
+		}
+		if len(vmIDs) > 0 {
+			vmAttachments = append(vmAttachments, vmAttachment{tagID: attached.TagID, vmIDs: vmIDs})
+			vmRelevantTagIDs[attached.TagID] = struct{}{}
+		}
+	}
+
+	if len(vmRelevantTagIDs) == 0 {
+		return make(map[string][]model.Tag), nil
+	}
+
+	// Step 3: Fetch tag details only for VM-relevant tags, concurrently.
+	type tagResult struct {
+		tag tags.Tag
+		err error
+	}
+	relevantIDs := make([]string, 0, len(vmRelevantTagIDs))
+	for id := range vmRelevantTagIDs {
+		relevantIDs = append(relevantIDs, id)
+	}
+
+	results := make([]tagResult, len(relevantIDs))
+	concurrency := settings.Settings.VsphereTagFetchConcurrency
+	if concurrency <= 0 {
+		concurrency = settings.DefaultVsphereTagFetchConcurrency
+	}
+	sem := make(chan struct{}, concurrency)
+	var wg sync.WaitGroup
+
+	fetchCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var firstErr error
+	var firstErrOnce sync.Once
+
+	for i, id := range relevantIDs {
+		wg.Add(1)
+		go func(idx int, tagID string) {
+			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+			case <-fetchCtx.Done():
+				return
+			}
+			defer func() { <-sem }()
+
+			tag, err := tagManager.GetTag(fetchCtx, tagID)
+			if err != nil {
+				firstErrOnce.Do(func() {
+					firstErr = err
+					cancel()
+				})
+				results[idx] = tagResult{err: err}
+				return
+			}
+			results[idx] = tagResult{tag: *tag}
+		}(i, id)
+	}
+	wg.Wait()
+
+	if firstErr != nil {
+		r.log.Error(firstErr, "Failed to retrieve tag details")
+		return nil, firstErr
+	}
+
+	tagDetailsMap := make(map[string]tags.Tag, len(relevantIDs))
+	for _, res := range results {
+		if res.tag.ID == "" {
+			continue
+		}
+		tagDetailsMap[res.tag.ID] = res.tag
+	}
+
+	// Step 4: Combine tag details + attachments locally.
+	vmTagsMap := make(map[string][]model.Tag)
+	for _, att := range vmAttachments {
+		tag, ok := tagDetailsMap[att.tagID]
+		if !ok {
+			continue
+		}
+		tagDetails := model.Tag{
+			ID:          tag.ID,
+			Description: tag.Description,
+			Name:        tag.Name,
+			CategoryID:  tag.CategoryID,
+			UsedBy:      tag.UsedBy,
+		}
+		for _, vmID := range att.vmIDs {
+			vmTagsMap[vmID] = append(vmTagsMap[vmID], tagDetails)
 		}
 	}
 
@@ -969,6 +1084,7 @@ func (r *Collector) vmPathSet() []string {
 		fRuntimeHost,
 		fPowerState,
 		fConnectionState,
+		fConsolidationNeeded,
 		fIsTemplate,
 		fSnapshot,
 		fChangeTracking,

@@ -11,8 +11,8 @@ concerns contains flag if {
 	independent_disk
 	flag := {
 		"id": "vmware.disk_mode.independent",
-		"category": "Critical",
+		"category": "Warning",
 		"label": "Independent disk detected",
-		"assessment": "Independent disks cannot be transferred using recent versions of VDDK. The VM cannot be migrated unless disks are changed to 'Dependent' mode in VMware.",
+		"assessment": "Independent disks cannot be transferred using VDDK. If copy-offload (XCOPY) is enabled in the migration plan, independent disks can be migrated. Otherwise, the disks must be changed to 'Dependent' mode in VMware before migration.",
 	}
 }

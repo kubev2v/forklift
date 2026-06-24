@@ -35,6 +35,7 @@ const (
 	OvirtOsConfigMap                       = "OVIRT_OS_MAP"
 	VsphereOsConfigMap                     = "VSPHERE_OS_MAP"
 	VirtCustomizeConfigMap                 = "VIRT_CUSTOMIZE_MAP"
+	NAAOUIMapConfigMap                     = "NAA_OUI_MAP"
 	VddkJobActiveDeadline                  = "VDDK_JOB_ACTIVE_DEADLINE"
 	VirtV2vExtraArgs                       = "VIRT_V2V_EXTRA_ARGS"
 	VirtV2vInspectorExtraArgs              = "VIRT_V2V_INSPECTOR_EXTRA_ARGS"
@@ -77,6 +78,8 @@ const (
 	AAPTimeout                             = "AAP_TIMEOUT"
 	AAPInsecureSkipVerify                  = "AAP_INSECURE_SKIP_VERIFY"
 	AAPCASecretName                        = "AAP_CA_SECRET_NAME"
+	WaitForFinalSnapshotConsolidation      = "WAIT_FOR_FINAL_SNAPSHOT_CONSOLIDATION"
+	ConversionPodPendingTimeout            = "CONVERSION_POD_PENDING_TIMEOUT"
 )
 
 // Default values for populator container resources
@@ -86,6 +89,10 @@ var (
 	DefaultPopulatorContainerRequestsCpu    = resource.NewQuantity(100, resource.DecimalSI)
 	DefaultPopulatorContainerRequestsMemory = resource.NewQuantity(512, resource.BinarySI)
 )
+
+// DefaultPendingPodTimeoutMinutes is the default number of minutes a
+// conversion pod may stay in Pending before the controller fails it.
+const DefaultPendingPodTimeoutMinutes = 5
 
 // Migration settings
 type Migration struct {
@@ -129,6 +136,8 @@ type Migration struct {
 	VsphereOsConfigMap string
 	// vSphere OS config map name
 	VirtCustomizeConfigMap string
+	// NAA OUI map config map name (optional, for custom vendor→NAA mappings)
+	NAAOUIMapConfigMap string
 	// Active deadline for VDDK validation job
 	VddkJobActiveDeadline int
 	// Additional arguments for virt-v2v
@@ -188,6 +197,11 @@ type Migration struct {
 	AAPInsecureSkipVerify bool
 	// AAPCASecretName is the name of the Secret in the controller namespace holding a custom CA cert (key "ca.crt").
 	AAPCASecretName string
+	// Whether or not to wait for final snapshot removal and consolidation before finishing Plan.
+	WaitForFinalSnapshotConsolidation bool
+	// ConversionPodPendingTimeout is how long (in minutes) a conversion pod may stay
+	// in Pending phase before the controller fails it. 0 means no timeout.
+	ConversionPodPendingTimeout int
 }
 
 // Load settings.
@@ -217,6 +231,9 @@ func (r *Migration) Load() (err error) {
 		r.VirtCustomizeConfigMap = virtCustomizeConfigMap
 	} else if Settings.Role.Has(MainRole) {
 		return liberr.Wrap(fmt.Errorf("failed to find environment variable %s", VirtCustomizeConfigMap))
+	}
+	if val, found := os.LookupEnv(NAAOUIMapConfigMap); found {
+		r.NAAOUIMapConfigMap = val
 	}
 	if r.CleanupRetries, err = getPositiveEnvLimit(CleanupRetries, 10); err != nil {
 		return liberr.Wrap(err)
@@ -441,6 +458,10 @@ func (r *Migration) Load() (err error) {
 	}
 	if val, found := os.LookupEnv(DeepInspectionImageXFS); found {
 		r.DeepInspectionImageXFS = strings.TrimSpace(val)
+	}
+	r.WaitForFinalSnapshotConsolidation = getEnvBool(WaitForFinalSnapshotConsolidation, true)
+	if r.ConversionPodPendingTimeout, err = getEnvLimit(ConversionPodPendingTimeout, DefaultPendingPodTimeoutMinutes, 0); err != nil {
+		return liberr.Wrap(err)
 	}
 	return
 }

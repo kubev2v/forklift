@@ -28,10 +28,10 @@ var _ = Describe("Builder", func() {
 	Context("mapNetworks for a source network with a separately specified namespace", func() {
 		BeforeEach(func() {
 			source := api.NetworkPair{
-				Source: ref.Ref{
+				Source: api.NetworkSourceRef{Ref: ref.Ref{
 					Namespace: "source",
 					Name:      "net-attach-def",
-				},
+				}},
 				Destination: api.DestinationNetwork{
 					Namespace: "target",
 					Name:      "net-attach-target",
@@ -41,10 +41,10 @@ var _ = Describe("Builder", func() {
 			// an unrelated namespace that happens to
 			// have the same name.
 			unrelated := api.NetworkPair{
-				Source: ref.Ref{
+				Source: api.NetworkSourceRef{Ref: ref.Ref{
 					Namespace: "unrelated",
 					Name:      "net-attach-def",
-				},
+				}},
 				Destination: api.DestinationNetwork{
 					Namespace: "target",
 					Name:      "unrelated",
@@ -69,10 +69,10 @@ var _ = Describe("Builder", func() {
 	Context("mapNetworks for a source network with a namespaced name", func() {
 		BeforeEach(func() {
 			source := api.NetworkPair{
-				Source: ref.Ref{
+				Source: api.NetworkSourceRef{Ref: ref.Ref{
 					Namespace: "",
 					Name:      "source/net-attach-def",
-				},
+				}},
 				Destination: api.DestinationNetwork{
 					Namespace: "target",
 					Name:      "net-attach-target",
@@ -82,10 +82,10 @@ var _ = Describe("Builder", func() {
 			// an unrelated namespace that happens to
 			// have the same name.
 			unrelated := api.NetworkPair{
-				Source: ref.Ref{
+				Source: api.NetworkSourceRef{Ref: ref.Ref{
 					Namespace: "unrelated",
 					Name:      "net-attach-def",
-				},
+				}},
 				Destination: api.DestinationNetwork{
 					Namespace: "target",
 					Name:      "unrelated",

@@ -352,6 +352,14 @@ func (r *Reconciler) archive(plan *api.Plan) {
 	if err != nil {
 		r.Log.Error(err, "Couldn't construct plan context while archiving plan.")
 	} else {
+		snapshot := plan.Status.Migration.ActiveSnapshot()
+		if snapshot.Migration.UID != "" {
+			migration := &api.Migration{}
+			migration.UID = snapshot.Migration.UID
+			migration.Name = snapshot.Migration.Name
+			migration.Namespace = snapshot.Migration.Namespace
+			ctx.SetMigration(migration)
+		}
 		runner := Migration{Context: ctx}
 		runner.Archive()
 	}
@@ -480,7 +488,6 @@ func (r *Reconciler) execute(plan *api.Plan) (reQ time.Duration, err error) {
 	if migration == nil {
 		r.Log.Info("No pending migrations found.")
 		plan.Status.DeleteCondition(Executing)
-		reQ = base.SlowReQ
 		return
 	}
 

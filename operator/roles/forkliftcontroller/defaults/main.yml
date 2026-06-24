@@ -11,7 +11,7 @@ feature_ocp_live_migration: true
 feature_vmware_system_serial_number: true
 feature_vsphere_vmware_driver_removal: false
 feature_windows_registry_network_config: false
-feature_windows_wait_for_reboot: false
+feature_windows_wait_for_reboot: true
 feature_use_conversion_cr: true
 feature_cli_download: true
 feature_mcp_server: false
@@ -33,6 +33,7 @@ controller_service_name: "{{ app_name }}-controller"
 ovirt_osmap_configmap_name: "forklift-ovirt-osmap"
 vsphere_osmap_configmap_name: "forklift-vsphere-osmap"
 virt_customize_configmap_name: "forklift-virt-customize"
+naa_oui_map_configmap_name: "forklift-naa-oui-map"
 controller_deployment_name: "{{ controller_service_name }}"
 controller_container_name: "{{ app_name }}-controller"
 controller_container_limits_cpu: "2"
@@ -234,3 +235,5 @@ metric_servicemonitor_name: "{{ app_name }}-metrics"
 metric_interval: "30s"
 metric_port_name: "metrics"
 metrics_rule_name: "{{app_name}}-migration-rules"
+
+wait_for_final_snapshot_consolidation: true

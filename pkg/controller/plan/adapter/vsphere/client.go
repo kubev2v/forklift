@@ -2,6 +2,7 @@ package vsphere
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	liburl "net/url"
 
@@ -14,6 +15,7 @@ import (
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/vmware/govmomi"
+	"github.com/vmware/govmomi/fault"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/session"
@@ -34,6 +36,10 @@ const (
 	createSnapshotTaskName = "vim.VirtualMachine.createSnapshot"
 	removeSnapshotTaskName = "vim.vm.Snapshot.remove"
 )
+
+var ErrTaskNotFound = errors.New("not found")
+var ErrTaskNotFoundPropSet = errors.New("not found property set")
+var ErrTaskValueNotFound = errors.New("no task value found for task")
 
 // vSphere VM Client
 type Client struct {
@@ -124,7 +130,7 @@ func (r *Client) RemoveSnapshot(vmRef ref.Ref, snapshot string, hosts util.Hosts
 		"snapshot", snapshot,
 		"children", false)
 
-	task, err := vm.RemoveSnapshot(context.TODO(), snapshot, false, nil)
+	task, err := vm.RemoveSnapshot(context.TODO(), snapshot, false, ptr.To(true))
 	if err != nil {
 		return "", liberr.Wrap(err)
 	}
@@ -316,11 +322,29 @@ func (r *Client) GetSnapshotDeltas(vmRef ref.Ref, snapshotId string, hosts util.
 // Check if a snapshot is removed
 func (r *Client) CheckSnapshotRemove(vmRef ref.Ref, precopy planapi.Precopy, hosts util.HostsFunc) (bool, error) {
 	r.Log.Info("Check Snapshot Remove", "vmRef", vmRef, "precopy", precopy)
+
 	taskInfo, err := r.getTaskById(vmRef, precopy.RemoveTaskId, hosts)
-	if err != nil {
+	if err == nil {
+		return r.checkTaskStatus(taskInfo)
+	}
+
+	notFound := errors.Is(err, ErrTaskNotFound) || errors.Is(err, ErrTaskNotFoundPropSet) || errors.Is(err, ErrTaskValueNotFound)
+	alreadyDeleted := fault.Is(err, &types.ManagedObjectNotFound{})
+	if !notFound && !alreadyDeleted {
 		return false, liberr.Wrap(err)
 	}
-	return r.checkTaskStatus(taskInfo)
+
+	// If the task is done and gone, make sure the snapshot itself is gone
+	r.Log.Info("Snapshot removal task not found, checking for existing snapshot", "vmRef", vmRef, "precopy", precopy)
+	vm := &model.VM{}
+	if err := r.Source.Inventory.Find(vm, vmRef); err != nil {
+		return false, liberr.Wrap(err)
+	}
+	if vm.Snapshot.ID == "" {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 // Check if a snapshot is ready to transfer.
@@ -394,13 +418,13 @@ func (r *Client) getTaskById(vmRef ref.Ref, taskId string, hosts util.HostsFunc)
 		return nil, err
 	}
 	if len(content) == 0 {
-		return nil, fmt.Errorf("task %s not found", taskId)
+		return nil, fmt.Errorf("task %s %w", taskId, ErrTaskNotFound)
 	}
 	if len(content[0].PropSet) == 0 {
-		return nil, fmt.Errorf("task %s not found property set", taskId)
+		return nil, fmt.Errorf("task %s %w", taskId, ErrTaskNotFoundPropSet)
 	}
 	if content[0].PropSet[0].Val == nil {
-		return nil, fmt.Errorf("no task value found for task %s", taskId)
+		return nil, fmt.Errorf("%w %s", ErrTaskValueNotFound, taskId)
 	}
 	task := content[0].PropSet[0].Val.(types.TaskInfo)
 	return &task, nil

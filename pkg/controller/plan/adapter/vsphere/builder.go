@@ -500,25 +500,12 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 	if !r.shouldMigrateSharedDisks(vm) {
 		vm.RemoveSharedDisks()
 	}
+
 	url := r.Source.Provider.Spec.URL
 	thumbprint := r.Source.Provider.Status.Fingerprint
-	hostID, err := r.hostID(vmRef)
+	url, thumbprint, err = r.applyHostsConfig(vmRef, url, thumbprint)
 	if err != nil {
 		return
-	}
-	if hostDef, found := r.hosts[hostID]; found {
-		hostURL := liburl.URL{
-			Scheme: "https",
-			Host:   formatHostAddress(hostDef.Spec.IpAddress),
-			Path:   vim25.Path,
-		}
-		url = hostURL.String()
-		h, nErr := r.host(hostID)
-		if nErr != nil {
-			err = nErr
-			return
-		}
-		thumbprint = h.Thumbprint
 	}
 
 	// Build datastore map for more efficient lookups
@@ -659,6 +646,29 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 	}
 
 	return
+}
+
+func (r *Builder) applyHostsConfig(vmRef ref.Ref, url, thumbprint string) (string, string, error) {
+	hostID, err := r.hostID(vmRef)
+	if err != nil {
+		return "", "", liberr.Wrap(err)
+	}
+	if hostDef, found := r.hosts[hostID]; found {
+		hostURL := liburl.URL{
+			Scheme: "https",
+			Host:   formatHostAddress(hostDef.Spec.IpAddress),
+			Path:   vim25.Path,
+		}
+		url = hostURL.String()
+		h, nErr := r.host(hostID)
+		if nErr != nil {
+			err = nErr
+			return "", "", liberr.Wrap(err)
+		}
+		thumbprint = h.Thumbprint
+	}
+
+	return url, thumbprint, nil
 }
 
 // Create the destination Kubevirt VM.
@@ -845,7 +855,7 @@ func (r *Builder) buildNICResolver(nics []vsphere.NIC) ([]string, map[string][]a
 	pairsBySource := map[string][]api.NetworkPair{}
 	for _, pair := range r.Map.Network.Spec.Map {
 		network := &model.Network{}
-		if err := r.Source.Inventory.Find(network, pair.Source); err != nil {
+		if err := r.Source.Inventory.Find(network, pair.Source.Ref); err != nil {
 			return nil, nil, liberr.Wrap(err, "buildNICResolver, source", pair.Source.String())
 		}
 		if network.Variant == vsphere.NetDvPortGroup || network.Variant == vsphere.OpaqueNetwork {
@@ -1283,6 +1293,9 @@ func (r *Builder) SupportsVolumePopulators() bool {
 	if !settings.Settings.Features.CopyOffload {
 		return false
 	}
+	if r.Context.Map.Storage == nil {
+		return false
+	}
 	dsMapIn := r.Context.Map.Storage.Spec.Map
 	for _, m := range dsMapIn {
 		ref := m.Source
@@ -1337,6 +1350,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 	sortedDisks := vm.SortedDisksAsVmware()
 
 	dsMapIn := r.Context.Map.Storage.Spec.Map
+	naaPrefixes := loadNAAPrefixes(r.Client)
 	dsNaaMap := make(map[string]string)
 	for i := range dsMapIn {
 		mapped := &dsMapIn[i]
@@ -1350,26 +1364,65 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 
 		pvblock := core.PersistentVolumeBlock
 		for diskIndex, disk := range sortedDisks {
-			if disk.Datastore.ID == ds.ID {
-				naa, ok := dsNaaMap[ds.ID]
-				if !ok {
-					vsphereClient := &Client{Context: r.Context}
-					err = vsphereClient.connect()
-					if err != nil {
-						r.Log.Error(err, "failed to connect to vSphere client, continue without storage affinity label")
-					}
-					naa, err = vsphereClient.getNAAFromDatastore(context.TODO(), ref.Ref{ID: ds.ID, Name: ds.Name})
-					defer vsphereClient.Close()
-					if err != nil {
-						r.Log.Error(err, "failed to get NAA from datastore %s, continue without storage affinity label", ds.Name)
-					}
-					dsNaaMap[ds.ID] = naa
+			// Resolve the effective storage map entry for this disk.
+			// RDM disks are matched by NAA vendor prefix (not datastore)
+			// because the RDM's backing LUN may reside on a different
+			// storage array than the VM's datastore.
+			var effectiveMapped *api.StoragePair
+			if disk.RDM && disk.DeviceName != "" {
+				if i > 0 {
+					continue // RDM disks are processed once, in the first outer iteration
 				}
-				storageClass := mapped.Destination.StorageClass
+				rdmVendor, matched := vendorFromNAA(disk.DeviceName, naaPrefixes)
+				if !matched {
+					return nil, fmt.Errorf(
+						"RDM disk (key=%d) has device name %q that does not match any known storage vendor NAA prefix",
+						disk.Key, disk.DeviceName)
+				}
+				candidates := findStorageMapEntriesForVendor(dsMapIn, rdmVendor)
+				switch len(candidates) {
+				case 0:
+					return nil, fmt.Errorf(
+						"no storage map entry with offload plugin found for vendor %q; "+
+							"add a storage map entry with an offload plugin for this vendor", rdmVendor)
+				case 1:
+					effectiveMapped = candidates[0]
+				default:
+					effectiveMapped, err = disambiguateRDMByNAA(r.Source.Inventory, candidates, disk.DeviceName, naaPrefixes)
+					if err != nil {
+						return nil, err
+					}
+				}
+				r.Log.Info("RDM disk resolved to storage vendor by NAA",
+					"diskKey", disk.Key, "deviceName", disk.DeviceName,
+					"vendor", rdmVendor, "storageClass", effectiveMapped.Destination.StorageClass)
+			} else if disk.Datastore.ID == ds.ID {
+				effectiveMapped = mapped
+			} else {
+				continue
+			}
+
+			if effectiveMapped.OffloadPlugin == nil || effectiveMapped.OffloadPlugin.VSphereXcopyPluginConfig == nil {
+				continue
+			}
+
+			{
+				// For RDM disks, look up the NAA from the resolved storage map entry's
+				// source datastore (not the outer-loop ds) since the RDM may be on a
+				// different array. Use the storage map ref directly as a synthetic
+				// Datastore to ensure the correct cache key and vSphere query.
+				naaDS := ds
+				if disk.RDM && disk.DeviceName != "" {
+					naaDS = &model.Datastore{}
+					naaDS.ID = effectiveMapped.Source.ID
+					naaDS.Name = effectiveMapped.Source.Name
+				}
+				naa := r.lookupDatastoreNAA(naaDS, dsNaaMap)
+				storageClass := effectiveMapped.Destination.StorageClass
 				r.Log.Info(fmt.Sprintf("getting storage mapping by storage class %q and datastore %v datastore name %s datastore", storageClass, disk.Datastore, disk.Datastore))
 				vsphereInstance := r.Context.Plan.Provider.Source.GetName()
-				storageVendorProduct := mapped.OffloadPlugin.VSphereXcopyPluginConfig.StorageVendorProduct
-				storageVendorSecretRef := mapped.OffloadPlugin.VSphereXcopyPluginConfig.SecretRef
+				storageVendorProduct := effectiveMapped.OffloadPlugin.VSphereXcopyPluginConfig.StorageVendorProduct
+				storageVendorSecretRef := effectiveMapped.OffloadPlugin.VSphereXcopyPluginConfig.SecretRef
 
 				r.Log.Info(fmt.Sprintf("vsphere provider %v storage vendor product %v storage secret name %v ", vsphereInstance, storageVendorProduct, storageVendorSecretRef))
 
@@ -1381,6 +1434,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				namespace := r.Plan.Spec.TargetNamespace
 				labels := map[string]string{
 					"migration": string(r.Migration.UID),
+					"plan":      string(r.Plan.GetUID()),
 					// we need uniqness and a value which is less than 64 chars, hence using vmRef.id + disk.key
 					"vmdkKey": fmt.Sprint(disk.Key),
 					"vmID":    vmRef.ID,
@@ -1417,8 +1471,8 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 						},
 					},
 				}
-				if mapped.Destination.AccessMode != "" {
-					pvc.Spec.AccessModes = []core.PersistentVolumeAccessMode{mapped.Destination.AccessMode}
+				if effectiveMapped.Destination.AccessMode != "" {
+					pvc.Spec.AccessModes = []core.PersistentVolumeAccessMode{effectiveMapped.Destination.AccessMode}
 				} else {
 					pvc.Spec.AccessModes = []core.PersistentVolumeAccessMode{core.ReadWriteMany}
 				}
@@ -1448,10 +1502,17 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				// For warm migration, add annotations to jump-start the DataVolume
 				v := r.getPlanVMStatus(vm)
 				if v != nil && v.Warm != nil {
-					pvc.Annotations[planbase.AnnEndpoint] = r.Source.Provider.Spec.URL
+					url := r.Source.Provider.Spec.URL
+					thumbprint := r.Source.Provider.Status.Fingerprint
+					url, thumbprint, err = r.applyHostsConfig(vmRef, url, thumbprint)
+					if err != nil {
+						return nil, err
+					}
+
+					pvc.Annotations[planbase.AnnEndpoint] = url
 					pvc.Annotations[planbase.AnnImportBackingFile] = baseVolume(disk.File, r.Plan.IsWarm())
 					pvc.Annotations[planbase.AnnUUID] = vm.UUID
-					pvc.Annotations[planbase.AnnThumbprint] = r.Source.Provider.Status.Fingerprint
+					pvc.Annotations[planbase.AnnThumbprint] = thumbprint
 					pvc.Annotations[planbase.AnnVddkInitImageURL] = settings.GetVDDKImage(r.Source.Provider.Spec.Settings)
 					pvc.Annotations[planbase.AnnPodPhase] = "Succeeded"
 					pvc.Annotations[planbase.AnnSource] = "vddk"
@@ -1558,6 +1619,27 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 	return pvcs, nil
 }
 
+// lookupDatastoreNAA returns the NAA identifier for a datastore, using the
+// cache or querying vSphere if not cached yet.
+func (r *Builder) lookupDatastoreNAA(ds *model.Datastore, cache map[string]string) string {
+	if naa, ok := cache[ds.ID]; ok {
+		return naa
+	}
+	vsphereClient := &Client{Context: r.Context}
+	if err := vsphereClient.connect(); err != nil {
+		r.Log.Error(err, "failed to connect to vSphere client, continue without storage affinity label")
+		cache[ds.ID] = ""
+		return ""
+	}
+	defer vsphereClient.Close()
+	naa, err := vsphereClient.getNAAFromDatastore(context.TODO(), ref.Ref{ID: ds.ID, Name: ds.Name})
+	if err != nil {
+		r.Log.Error(err, "failed to get NAA from datastore, continue without storage affinity label", "datastore", ds.Name)
+	}
+	cache[ds.ID] = naa
+	return naa
+}
+
 func (r *Builder) PrePopulateActions(c planbase.Client, vmRef ref.Ref) (ready bool, err error) {
 	err = planbase.VolumePopulatorNotSupportedError
 	return
@@ -1568,6 +1650,11 @@ func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (tr
 	vmId := pvc.Labels["vmID"]
 	populatorCr, err := r.getVolumePopulator(vmId, vmdkKey)
 	if err != nil {
+		return
+	}
+
+	if populatorCr.Status.Progress == "" {
+		transferredBytes = 0
 		return
 	}
 
@@ -1965,6 +2052,11 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      diskSecretName,
 			Namespace: migrationSecretNS,
+			Labels: map[string]string{
+				"migration": string(r.Migration.UID),
+				"plan":      string(r.Plan.GetUID()),
+				"vmID":      pvc.Labels["vmID"],
+			},
 		},
 		Data: make(map[string][]byte),
 	}
@@ -2000,6 +2092,15 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 		case "insecureSkipVerify":
 			dst.Data["GOVMOMI_INSECURE"] = value
 		}
+	}
+
+	if r.Plan.IsWarm() {
+		hostsSecret := &core.Secret{}
+		if err := r.Secret(ref.Ref{ID: pvc.Labels["vmID"]}, dst, hostsSecret); err != nil {
+			return fmt.Errorf("failed to get hosts configuration for secret: %w", err)
+		}
+		dst.Data["accessKeyId"] = hostsSecret.Data["accessKeyId"]
+		dst.Data["secretKey"] = hostsSecret.Data["secretKey"]
 	}
 
 	// Always derive GOVMOMI_HOSTNAME from the provider spec, which is the

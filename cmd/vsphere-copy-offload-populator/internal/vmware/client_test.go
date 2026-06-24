@@ -2,11 +2,102 @@ package vmware
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/simulator"
+	"github.com/vmware/govmomi/vim25/types"
 )
+
+func flatBacking(fileName, backingObjectId string, parent *types.VirtualDiskFlatVer2BackingInfo) *types.VirtualDiskFlatVer2BackingInfo {
+	return &types.VirtualDiskFlatVer2BackingInfo{
+		VirtualDeviceFileBackingInfo: types.VirtualDeviceFileBackingInfo{
+			FileName:        fileName,
+			BackingObjectId: backingObjectId,
+		},
+		Parent: parent,
+	}
+}
+
+func TestFindMatchingFlatBacking(t *testing.T) {
+	tests := []struct {
+		name           string
+		backing        *types.VirtualDiskFlatVer2BackingInfo
+		vmdkPath       string
+		wantMatch      bool
+		wantFileName   string
+		wantBackingObj string
+	}{
+		{
+			name:           "direct match at top (cold migration, no active snapshot)",
+			backing:        flatBacking("[ds1] vm1/disk.vmdk", "rfc4122.top", nil),
+			vmdkPath:       "[ds1] vm1/disk.vmdk",
+			wantMatch:      true,
+			wantFileName:   "[ds1] vm1/disk.vmdk",
+			wantBackingObj: "rfc4122.top",
+		},
+		{
+			name: "parent-chain match (warm precopy: top is child disk, base is parent)",
+			backing: flatBacking("[ds1] vm1/disk-000001.vmdk", "rfc4122.base",
+				flatBacking("[ds1] vm1/disk.vmdk", "rfc4122.snap", nil)),
+			vmdkPath:       "[ds1] vm1/disk.vmdk",
+			wantMatch:      true,
+			wantFileName:   "[ds1] vm1/disk.vmdk",
+			wantBackingObj: "rfc4122.snap",
+		},
+		{
+			name: "deep chain match (two snapshots active)",
+			backing: flatBacking("[ds1] vm1/disk-000002.vmdk", "rfc4122.top",
+				flatBacking("[ds1] vm1/disk-000001.vmdk", "rfc4122.mid",
+					flatBacking("[ds1] vm1/disk.vmdk", "rfc4122.base", nil))),
+			vmdkPath:       "[ds1] vm1/disk.vmdk",
+			wantMatch:      true,
+			wantFileName:   "[ds1] vm1/disk.vmdk",
+			wantBackingObj: "rfc4122.base",
+		},
+		{
+			name:      "no match in chain",
+			backing:   flatBacking("[ds1] vm1/other.vmdk", "rfc4122.x", nil),
+			vmdkPath:  "[ds1] vm1/disk.vmdk",
+			wantMatch: false,
+		},
+		{
+			name:      "nil backing",
+			backing:   nil,
+			vmdkPath:  "[ds1] vm1/disk.vmdk",
+			wantMatch: false,
+		},
+		{
+			name:           "bracket/case differences are tolerated",
+			backing:        flatBacking("[DS1] VM1/Disk.vmdk", "rfc4122.top", nil),
+			vmdkPath:       "[ds1] vm1/disk.vmdk",
+			wantMatch:      true,
+			wantFileName:   "[DS1] VM1/Disk.vmdk",
+			wantBackingObj: "rfc4122.top",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := findMatchingFlatBacking(tt.backing, strings.ToLower(tt.vmdkPath), tt.vmdkPath)
+			if !tt.wantMatch {
+				if got != nil {
+					t.Errorf("expected nil, got FileName=%q BackingObjectId=%q", got.FileName, got.BackingObjectId)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatalf("expected match with FileName=%q, got nil", tt.wantFileName)
+			}
+			if got.FileName != tt.wantFileName {
+				t.Errorf("FileName: got %q, want %q", got.FileName, tt.wantFileName)
+			}
+			if got.BackingObjectId != tt.wantBackingObj {
+				t.Errorf("BackingObjectId: got %q, want %q", got.BackingObjectId, tt.wantBackingObj)
+			}
+		})
+	}
+}
 
 func TestNewClientWithSimulator(t *testing.T) {
 	model := simulator.VPX()

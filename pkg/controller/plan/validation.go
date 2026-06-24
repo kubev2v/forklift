@@ -69,6 +69,7 @@ const (
 	VMIpNotMatchingUdnSubnet        = "VMIpNotMatchingUdnSubnet"
 	VMMissingChangedBlockTracking   = "VMMissingChangedBlockTracking"
 	VMHasSnapshots                  = "VMHasSnapshots"
+	VMConsolidationNeeded           = "VMConsolidationNeeded"
 	HostNotReady                    = "HostNotReady"
 	DuplicateVM                     = "DuplicateVM"
 	SharedDisks                     = "SharedDisks"
@@ -107,6 +108,8 @@ const (
 	RestrictedPodSecurity           = "RestrictedPodSecurity"
 	NetMapDestinationNADNotValid    = "NetMapDestinationNADNotValid"
 	VMCriticalConcerns              = "VMCriticalConcerns"
+	RDMDiskWarning                  = "RDMDiskWarning"
+	IndependentDiskWarning          = "IndependentDiskWarning"
 	// NetAppShift (Advisory) reports whether the plan's storage map uses a NetApp Shift/Trident class.
 	NetAppShift = "NetAppShift"
 	// NetAppShiftWarmNotSupported (Critical) blocks warm migration when the storage map uses NetApp Shift.
@@ -146,6 +149,7 @@ const (
 	InMaintenanceMode           = "InMaintenanceMode"
 	MissingGuestInfo            = "MissingGuestInformation"
 	MissingChangedBlockTracking = "MissingChangedBlockTracking"
+	ConsolidationNeeded         = "ConsolidationNeeded"
 )
 
 // Statuses
@@ -950,6 +954,30 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 		Message:  "One or more VMs in the plan have critical concerns that block migration.",
 		Items:    []string{},
 	}
+	consolidationNeeded := libcnd.Condition{
+		Type:     VMConsolidationNeeded,
+		Status:   True,
+		Reason:   ConsolidationNeeded,
+		Category: api.CategoryWarn,
+		Message:  "VM has snapshots that require consolidation. This may cause long delays between precopies.",
+		Items:    []string{},
+	}
+	rdmDiskWarning := libcnd.Condition{
+		Type:     RDMDiskWarning,
+		Status:   True,
+		Reason:   NotSupported,
+		Category: api.CategoryWarn,
+		Message:  "VM has RDM disks which are not supported with VDDK transfer. Enable copy-offload (XCOPY) in the storage mapping to migrate RDM disks.",
+		Items:    []string{},
+	}
+	independentDiskWarning := libcnd.Condition{
+		Type:     IndependentDiskWarning,
+		Status:   True,
+		Reason:   NotSupported,
+		Category: api.CategoryWarn,
+		Message:  "VM has independent disks which are not supported with VDDK transfer. Enable copy-offload (XCOPY) in the storage mapping to migrate independent disks, or change them to 'Dependent' mode in VMware.",
+		Items:    []string{},
+	}
 
 	shiftSnapshotVMs := libcnd.Condition{
 		Type:     VMHasSnapshots,
@@ -1216,6 +1244,25 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 			macConflicts.Message += fmt.Sprintf("VM %s has MAC address conflicts: %s", ref.String(), strings.Join(conflictDetails, "; "))
 		}
 
+		// RDM and independent disk checks (vSphere only)
+		if !planUsesOffload {
+			if vsphereVM, ok := v.(*vsphere.VM); ok {
+				isWarm := plan.IsWarm()
+				for _, disk := range vsphereVM.Disks {
+					if disk.RDM && (!isWarm || disk.PhysicalMode) {
+						rdmDiskWarning.Items = append(rdmDiskWarning.Items, ref.String())
+						break
+					}
+				}
+				for _, disk := range vsphereVM.Disks {
+					if disk.Mode == "independent_persistent" || disk.Mode == "independent_nonpersistent" {
+						independentDiskWarning.Items = append(independentDiskWarning.Items, ref.String())
+						break
+					}
+				}
+			}
+		}
+
 		ok, msg, category, err := validator.SharedDisks(*ref, ctx.Destination.Client)
 		if err != nil {
 			return err
@@ -1299,6 +1346,15 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 				if msg != "" {
 					vmHasSnapshotsForWarm.Message = msg
 				}
+			}
+
+			// Check for "consolidation needed"
+			consolidation, err := validator.ConsolidationNeeded(*ref)
+			if err != nil {
+				return err
+			}
+			if consolidation {
+				consolidationNeeded.Items = append(consolidationNeeded.Items, ref.String())
 			}
 		}
 		// is valid vm pvc name template
@@ -1425,11 +1481,20 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 	if len(vmCriticalConcerns.Items) > 0 {
 		plan.Status.SetCondition(vmCriticalConcerns)
 	}
+	if len(consolidationNeeded.Items) > 0 {
+		plan.Status.SetCondition(consolidationNeeded)
+	}
 	if len(shiftSnapshotVMs.Items) > 0 {
 		plan.Status.SetCondition(shiftSnapshotVMs)
 	}
 	if len(shiftNASMissing.Items) > 0 {
 		plan.Status.SetCondition(shiftNASMissing)
+	}
+	if len(rdmDiskWarning.Items) > 0 {
+		plan.Status.SetCondition(rdmDiskWarning)
+	}
+	if len(independentDiskWarning.Items) > 0 {
+		plan.Status.SetCondition(independentDiskWarning)
 	}
 
 	return nil

@@ -31,6 +31,8 @@ func (p *VvolPopulator) Populate(vmId string, sourceVMDKFile string, pv Persiste
 		r := recover()
 		if r != nil {
 			log.Info("recovered from panic", "panic", r)
+			quit <- fmt.Errorf("recovered failure: %v", r)
+			return
 		}
 		log.Info("VVol copy exiting", "err", errFinal)
 		quit <- errFinal

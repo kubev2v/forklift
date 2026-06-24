@@ -452,22 +452,25 @@ func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkP
 		// Check different backing types
 		switch backing := disk.Backing.(type) {
 		case *types.VirtualDiskFlatVer2BackingInfo:
-			// Check if this disk matches the requested path
-			if !strings.Contains(strings.ToLower(backing.FileName), normalizedPath) &&
-				!strings.Contains(normalizedPath, strings.ToLower(backing.FileName)) {
-				// Try to match by extracting datastore and path
-				if !diskPathMatches(backing.FileName, vmdkPath) {
-					continue
-				}
+			// Walk the chain to handle warm precopy. While a precopy snapshot is active,
+			// vSphere adds a child disk (foo-000001.vmdk) on top of the original
+			// (foo.vmdk). vmdkPath is the base path, so the match lives at the parent
+			// level, not the top.
+			matched := findMatchingFlatBacking(backing, normalizedPath, vmdkPath)
+			if matched == nil {
+				continue
 			}
 
-			// Check for VVol backing
-			if backing.BackingObjectId != "" {
-				log.V(2).Info("disk is VVol-backed", "vmdk", vmdkPath, "backing_object_id", backing.BackingObjectId)
+			if matched.BackingObjectId != "" {
+				if matched.BackingObjectId != backing.BackingObjectId {
+					log.V(2).Info("disk matched at parent in chain — VVol-backed, warm precopy", "vmdk", vmdkPath, "backing_object_id", matched.BackingObjectId)
+				} else {
+					log.V(2).Info("disk matched at top of chain — VVol-backed", "vmdk", vmdkPath, "backing_object_id", matched.BackingObjectId)
+				}
 				return &DiskBacking{
-					VVolId:     backing.BackingObjectId,
+					VVolId:     matched.BackingObjectId,
 					IsRDM:      false,
-					DeviceName: backing.FileName,
+					DeviceName: matched.FileName,
 				}, nil
 			}
 
@@ -476,7 +479,7 @@ func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkP
 			return &DiskBacking{
 				VVolId:     "",
 				IsRDM:      false,
-				DeviceName: backing.FileName,
+				DeviceName: matched.FileName,
 			}, nil
 
 		case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
@@ -572,19 +575,25 @@ func (c *VSphereClient) GetVirtualDiskSizes(ctx context.Context, vmId, vmdkPath 
 		}
 		switch backing := disk.Backing.(type) {
 		case *types.VirtualDiskFlatVer2BackingInfo:
-			if !strings.Contains(strings.ToLower(backing.FileName), normalizedPath) &&
-				!strings.Contains(normalizedPath, strings.ToLower(backing.FileName)) {
-				if !diskPathMatches(backing.FileName, vmdkPath) {
-					continue
-				}
+			// Walk the chain to handle warm precopy. While a precopy snapshot is active,
+			// vSphere adds a child disk (foo-000001.vmdk) on top of the original
+			// (foo.vmdk). vmdkPath is the base path, so the match lives at the parent
+			// level, not the top.
+			matchedBacking := findMatchingFlatBacking(backing, normalizedPath, vmdkPath)
+			if matchedBacking == nil {
+				continue
 			}
 			matchedDisk = disk
-			if backing.BackingObjectId != "" {
-				log.V(2).Info("disk is VVol-backed", "vmdk", vmdkPath, "backing_object_id", backing.BackingObjectId)
-				diskBacking = &DiskBacking{VVolId: backing.BackingObjectId, DeviceName: backing.FileName}
+			if matchedBacking.BackingObjectId != "" {
+				if matchedBacking.BackingObjectId != backing.BackingObjectId {
+					log.V(2).Info("disk matched at parent in chain — VVol-backed, warm precopy", "vmdk", vmdkPath, "backing_object_id", matchedBacking.BackingObjectId)
+				} else {
+					log.V(2).Info("disk matched at top of chain — VVol-backed", "vmdk", vmdkPath, "backing_object_id", matchedBacking.BackingObjectId)
+				}
+				diskBacking = &DiskBacking{VVolId: matchedBacking.BackingObjectId, DeviceName: matchedBacking.FileName}
 			} else {
 				log.V(2).Info("disk is VMDK-backed", "vmdk", vmdkPath)
-				diskBacking = &DiskBacking{DeviceName: backing.FileName}
+				diskBacking = &DiskBacking{DeviceName: matchedBacking.FileName}
 			}
 		case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
 			if !strings.Contains(strings.ToLower(backing.FileName), normalizedPath) &&
@@ -652,6 +661,25 @@ func (c *VSphereClient) GetVirtualDiskSizes(ctx context.Context, vmId, vmdkPath 
 		return provisionedBytes, 0, diskBacking, nil
 	}
 	return provisionedBytes, total, diskBacking, nil
+}
+
+// findMatchingFlatBacking returns the first node in b's Parent chain whose
+// filename matches vmdkPath, or nil if none does.
+//
+// While a snapshot is active the chain is "child disk (foo-000001.vmdk) ->
+// parent (foo.vmdk)", and VASA reports a different BackingObjectId per level:
+// child -> base vVol (current writes), parent -> snap-vVol (frozen). The
+// caller's vmdkPath picks which level matches.
+func findMatchingFlatBacking(b *types.VirtualDiskFlatVer2BackingInfo, normalizedPath, vmdkPath string) *types.VirtualDiskFlatVer2BackingInfo {
+	for cur := b; cur != nil; cur = cur.Parent {
+		fn := strings.ToLower(cur.FileName)
+		if strings.Contains(fn, normalizedPath) ||
+			strings.Contains(normalizedPath, fn) ||
+			diskPathMatches(cur.FileName, vmdkPath) {
+			return cur
+		}
+	}
+	return nil
 }
 
 // diskPathMatches compares two VMDK paths accounting for different formats

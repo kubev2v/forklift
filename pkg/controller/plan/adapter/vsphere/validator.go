@@ -460,7 +460,7 @@ func (r *Validator) getSourceNetworkForPodNetworkTarget(vmRef ref.Ref) (net *mod
 		mapped := &mapping[i]
 		ref := mapped.Source
 		network := &model.Network{}
-		fErr := r.Source.Inventory.Find(network, ref)
+		fErr := r.Source.Inventory.Find(network, ref.Ref)
 		if fErr != nil {
 			err = fErr
 			return
@@ -656,4 +656,14 @@ func isUnknownToolsStatus(s string) bool {
 	default:
 		return false
 	}
+}
+
+func (r *Validator) ConsolidationNeeded(vmRef ref.Ref) (needed bool, err error) {
+	vm := &model.VM{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef.String())
+		return
+	}
+	return vm.ConsolidationNeeded, nil
 }

@@ -55,6 +55,16 @@ var DeepInspectionPipelineStages = []PipelineStage{
 // inspectionResultPort is the port the deep-inspection pod's HTTP server listens on.
 const inspectionResultPort = 8080
 
+// pendingPodTimeout returns the configured timeout for conversion pods stuck in
+// Pending. Returns 0 (no timeout) when the setting is 0.
+func pendingPodTimeout() time.Duration {
+	minutes := Settings.ConversionPodPendingTimeout
+	if minutes <= 0 {
+		return 0
+	}
+	return time.Duration(minutes) * time.Minute
+}
+
 // ConversionPipeline drives reconciliation for a single Conversion CR.
 type ConversionPipeline struct {
 	ctx    context.Context
@@ -211,7 +221,7 @@ func (p *ConversionPipeline) runVirtV2v() (pipelineFinished bool, err error) {
 			p.advanceStage()
 		}
 	case api.StageFinished:
-		return p.podSucceeded()
+		return p.podHandler()
 	default:
 		return false, liberr.New("unknown stage", "stage", p.conv.Status.Stage)
 	}
@@ -246,11 +256,25 @@ func (p *ConversionPipeline) runDeepInspection() (pipelineFinished bool, err err
 	case api.StageWaitForSnapshotRemoval:
 		stageDone, err = p.runStageWaitingForSnapshotRemoval()
 	case api.StageFinished:
-		return p.podSucceeded()
+		return p.podHandler()
 	}
 
 	if err != nil {
 		p.r.Log.Error(err, "Stage failed.", "stage", p.conv.Status.Stage)
+		// When the controller owns the snapshot and it already exists, divert to the snapshot removal stages instead of propagating the error immediately.
+		// This ensures the snapshot is cleaned up via the normal polling path before the pipeline terminates. The pod failure is then detected again at StageFinished by podHandler and pipeline is set as failed.
+		// When already in a snapshot removal or waiting for snapshot removal stage, propagate errors out instead of looping forever.
+		currentStage := p.conv.Status.Stage
+		if snapshotOwnedByController(p.conv) &&
+			p.conv.Status.Snapshot != nil &&
+			p.conv.Status.Snapshot.Moref != "" &&
+			currentStage != api.StageRemoveSnapshot &&
+			currentStage != api.StageWaitForSnapshotRemoval {
+			p.r.Log.Info("Diverting to snapshot removal stage after stage failure.",
+				"stage", currentStage, "error", err.Error())
+			p.setStage(api.StageRemoveSnapshot)
+			return false, nil
+		}
 		return false, err
 	}
 	if stageDone {
@@ -346,6 +370,9 @@ func (p *ConversionPipeline) runStageEnsurePod() (stageDone bool, err error) {
 
 	switch pod.Status.Phase {
 	case core.PodPending:
+		if err = p.checkPendingPodTimeout(pod); err != nil {
+			return stageDone, err
+		}
 		p.setStage(api.StageCreatePod)
 		return stageDone, nil
 	case core.PodRunning:
@@ -383,6 +410,9 @@ func (p *ConversionPipeline) runStageDeepInspectionPod() (stageDone bool, err er
 
 	switch pod.Status.Phase {
 	case core.PodPending:
+		if err = p.checkPendingPodTimeout(pod); err != nil {
+			return
+		}
 		p.setStage(api.StageCreatePod)
 		return
 	case core.PodRunning:
@@ -563,25 +593,28 @@ func (p *ConversionPipeline) fetchInspectionResults(podIP string) (*api.Inspecti
 	return result, nil
 }
 
-// podSucceeded is called by the pipeline runners when StageFinished is reached.
+// podHandler is called by the pipeline runners when StageFinished is reached.
 // Returns (true, nil) when the pod succeeded, (false, err) when it failed, and
 // (false, nil) when it is still running or not yet found.
-func (p *ConversionPipeline) podSucceeded() (podSucceeded bool, err error) {
+//   - Succeeded         - (true, nil)  = pipeline complete
+//   - Failed / Unknown  - (false, err) = propagate failure to the reconciler
+//   - Pending / Running - (false, nil) = keep waiting
+func (p *ConversionPipeline) podHandler() (podSucceeded bool, err error) {
 	ensurer, err := NewEnsurer(p.r.Client, p.r.Log, p.conv.Spec)
 	if err != nil {
-		p.r.Log.Error(err, "Failed to create ensurer in podSucceeded.")
+		p.r.Log.Error(err, "Failed to create ensurer in podHandler.")
 		return false, err
 	}
 	pod, err := ensurer.EnsurePod(p.conv)
 	if err != nil {
-		p.r.Log.Error(err, "EnsurePod failed in podSucceeded.")
+		p.r.Log.Error(err, "EnsurePod failed in podHandler.")
 		return false, err
 	}
 	if pod == nil {
-		p.r.Log.Info("podSucceeded: pod not found.")
+		p.r.Log.Info("podHandler: pod not found.")
 		return false, nil
 	}
-	p.r.Log.Info("podSucceeded: pod phase check.", "pod", pod.Name, "phase", pod.Status.Phase)
+	p.r.Log.Info("podHandler: pod phase check.", "pod", pod.Name, "phase", pod.Status.Phase)
 	switch pod.Status.Phase {
 	case core.PodSucceeded:
 		return true, nil
@@ -589,8 +622,12 @@ func (p *ConversionPipeline) podSucceeded() (podSucceeded bool, err error) {
 		return false, liberr.New("conversion pod failed", "pod", pod.Name, "phase", pod.Status.Phase)
 	case core.PodUnknown:
 		return false, liberr.New("conversion pod in unknown state", "pod", pod.Name)
+	case core.PodPending:
+		if err = p.checkPendingPodTimeout(pod); err != nil {
+			return false, err
+		}
+		return false, nil
 	default:
-		// PodPending/PodRunning, still in progress
 		return false, nil
 	}
 }
@@ -639,6 +676,38 @@ func (p *ConversionPipeline) runStageWaitingForSnapshotRemoval() (stageDone bool
 	}
 	p.conv.Status.Snapshot = nil
 	return true, nil
+}
+
+func (p *ConversionPipeline) checkPendingPodTimeout(pod *core.Pod) error {
+	timeout := pendingPodTimeout()
+	if timeout == 0 {
+		return nil
+	}
+	if pod.CreationTimestamp.IsZero() {
+		return nil
+	}
+	elapsed := time.Since(pod.CreationTimestamp.Time)
+	if elapsed < timeout {
+		return nil
+	}
+	reason := pendingPodReason(pod)
+	return liberr.New(
+		fmt.Sprintf("conversion pod %s stuck in Pending for %s (reason: %s)",
+			pod.Name, elapsed.Truncate(time.Second), reason))
+}
+
+func pendingPodReason(pod *core.Pod) string {
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == core.PodScheduled && cond.Status == core.ConditionFalse {
+			return fmt.Sprintf("Unschedulable: %s", cond.Message)
+		}
+	}
+	for _, cs := range pod.Status.ContainerStatuses {
+		if cs.State.Waiting != nil && cs.State.Waiting.Reason != "" {
+			return fmt.Sprintf("%s: %s", cs.State.Waiting.Reason, cs.State.Waiting.Message)
+		}
+	}
+	return "check pod events for mount/scheduling failures"
 }
 
 // loadConnectionSecret returns the Secret referenced by conv.Spec.Connection.Secret.

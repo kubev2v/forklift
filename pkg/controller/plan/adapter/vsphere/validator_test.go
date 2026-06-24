@@ -112,8 +112,6 @@ func (m *mockInventory) Find(resource interface{}, ref ref.Ref) error {
 			res.ToolsStatus = ToolsNotInstalled // Should be ignored when powered off
 		case "tools_unmanaged":
 			res.ToolsVersionStatus = GuestToolsUnmanaged
-		case "missing_from_inventory":
-			return base.NotFoundError{}
 		}
 	}
 	return nil
@@ -413,11 +411,11 @@ var _ = Describe("vsphere validation tests", func() {
 
 		It("should return ok when no duplicate NADs exist", func() {
 			plan := createPlan()
-			plan.Referenced.Map.Network = &v1beta1.NetworkMap{
+			plan.Map.Network = &v1beta1.NetworkMap{
 				Spec: v1beta1.NetworkMapSpec{
 					Map: []v1beta1.NetworkPair{
 						{
-							Source: ref.Ref{ID: "net-1"},
+							Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}},
 							Destination: v1beta1.DestinationNetwork{
 								Type:      "multus",
 								Namespace: "ns1",
@@ -425,7 +423,7 @@ var _ = Describe("vsphere validation tests", func() {
 							},
 						},
 						{
-							Source: ref.Ref{ID: "net-2"},
+							Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{ID: "net-2"}},
 							Destination: v1beta1.DestinationNetwork{
 								Type:      "multus",
 								Namespace: "ns1",
@@ -452,18 +450,18 @@ var _ = Describe("vsphere validation tests", func() {
 			validator := &Validator{Context: &ctx}
 			nicRefs, err := validator.NICNetworkRefs(ref.Ref{Name: "test"})
 			Expect(err).NotTo(HaveOccurred())
-			foundNadDup, foundPodDup := planbase.ValidateNetworkDuplicates(nicRefs, plan.Referenced.Map.Network)
+			foundNadDup, foundPodDup := planbase.ValidateNetworkDuplicates(nicRefs, plan.Map.Network)
 			Expect(foundNadDup).To(BeFalse())
 			Expect(foundPodDup).To(BeFalse())
 		})
 
 		It("should detect duplicate when two NICs on same source network map to same NAD", func() {
 			plan := createPlan()
-			plan.Referenced.Map.Network = &v1beta1.NetworkMap{
+			plan.Map.Network = &v1beta1.NetworkMap{
 				Spec: v1beta1.NetworkMapSpec{
 					Map: []v1beta1.NetworkPair{
 						{
-							Source: ref.Ref{ID: "net-1"},
+							Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}},
 							Destination: v1beta1.DestinationNetwork{
 								Type:      "multus",
 								Namespace: "ns1",
@@ -490,17 +488,17 @@ var _ = Describe("vsphere validation tests", func() {
 			validator := &Validator{Context: &ctx}
 			nicRefs, err := validator.NICNetworkRefs(ref.Ref{Name: "test"})
 			Expect(err).NotTo(HaveOccurred())
-			foundNadDup, _ := planbase.ValidateNetworkDuplicates(nicRefs, plan.Referenced.Map.Network)
+			foundNadDup, _ := planbase.ValidateNetworkDuplicates(nicRefs, plan.Map.Network)
 			Expect(foundNadDup).To(BeTrue())
 		})
 
 		It("should detect duplicate when two different source networks map to same NAD", func() {
 			plan := createPlan()
-			plan.Referenced.Map.Network = &v1beta1.NetworkMap{
+			plan.Map.Network = &v1beta1.NetworkMap{
 				Spec: v1beta1.NetworkMapSpec{
 					Map: []v1beta1.NetworkPair{
 						{
-							Source: ref.Ref{ID: "net-1"},
+							Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}},
 							Destination: v1beta1.DestinationNetwork{
 								Type:      "multus",
 								Namespace: "ns1",
@@ -508,7 +506,7 @@ var _ = Describe("vsphere validation tests", func() {
 							},
 						},
 						{
-							Source: ref.Ref{ID: "net-2"},
+							Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{ID: "net-2"}},
 							Destination: v1beta1.DestinationNetwork{
 								Type:      "multus",
 								Namespace: "ns1",
@@ -535,25 +533,25 @@ var _ = Describe("vsphere validation tests", func() {
 			validator := &Validator{Context: &ctx}
 			nicRefs, err := validator.NICNetworkRefs(ref.Ref{Name: "test"})
 			Expect(err).NotTo(HaveOccurred())
-			foundNadDup, _ := planbase.ValidateNetworkDuplicates(nicRefs, plan.Referenced.Map.Network)
+			foundNadDup, _ := planbase.ValidateNetworkDuplicates(nicRefs, plan.Map.Network)
 			Expect(foundNadDup).To(BeTrue())
 		})
 
 		It("should detect multiple pod networks via foundPodDup", func() {
 			plan := createPlan()
-			plan.Referenced.Map.Network = &v1beta1.NetworkMap{
+			plan.Map.Network = &v1beta1.NetworkMap{
 				Spec: v1beta1.NetworkMapSpec{
 					Map: []v1beta1.NetworkPair{
 						{
-							Source:      ref.Ref{ID: "net-1"},
+							Source:      v1beta1.NetworkSourceRef{Ref: ref.Ref{ID: "net-1"}},
 							Destination: v1beta1.DestinationNetwork{Type: "pod"},
 						},
 						{
-							Source:      ref.Ref{ID: "net-2"},
+							Source:      v1beta1.NetworkSourceRef{Ref: ref.Ref{ID: "net-2"}},
 							Destination: v1beta1.DestinationNetwork{Type: "pod"},
 						},
 						{
-							Source:      ref.Ref{ID: "net-3"},
+							Source:      v1beta1.NetworkSourceRef{Ref: ref.Ref{ID: "net-3"}},
 							Destination: v1beta1.DestinationNetwork{Type: "ignored"},
 						},
 					},
@@ -577,7 +575,7 @@ var _ = Describe("vsphere validation tests", func() {
 			validator := &Validator{Context: &ctx}
 			nicRefs, err := validator.NICNetworkRefs(ref.Ref{Name: "test"})
 			Expect(err).NotTo(HaveOccurred())
-			foundNadDup, foundPodDup := planbase.ValidateNetworkDuplicates(nicRefs, plan.Referenced.Map.Network)
+			foundNadDup, foundPodDup := planbase.ValidateNetworkDuplicates(nicRefs, plan.Map.Network)
 			Expect(foundNadDup).To(BeFalse())
 			Expect(foundPodDup).To(BeTrue()) // two NICs mapped to pod
 		})
@@ -592,6 +590,35 @@ var _ = Describe("vsphere validation tests", func() {
 			Expect(err).To(HaveOccurred())
 		})
 	})
+
+	DescribeTable("ConsolidationNeeded",
+		func(consolidationNeeded bool) {
+			plan := createPlan()
+			ctx := plancontext.Context{
+				Plan: plan,
+				Source: plancontext.Source{
+					Inventory: &mockInventory{
+						vm: model.VM{
+							VM1: model.VM1{
+								VM0: model.VM0{
+									ID:   "consolidation-vm-1",
+									Name: "consolidation-vm",
+								},
+							},
+							ConsolidationNeeded: consolidationNeeded,
+						},
+					},
+				},
+			}
+			validator := Validator{Context: &ctx}
+			needed, err := validator.ConsolidationNeeded(ref.Ref{Name: "consolidation-vm"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(needed).To(Equal(consolidationNeeded))
+		},
+		Entry("should warn on consolidation needed", true),
+		Entry("should not warn when consolidation is not needed", false),
+	)
+
 })
 
 func createPlan() *v1beta1.Plan {

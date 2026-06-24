@@ -66,6 +66,7 @@ func (h VMHandler) List(ctx *gin.Context) {
 	if err != nil {
 		return
 	}
+	markSharedDisks(list, buildDiskFileCount(list))
 	content := []interface{}{}
 	err = h.filter(ctx, &list)
 	if err != nil {
@@ -78,6 +79,10 @@ func (h VMHandler) List(ctx *gin.Context) {
 				"Skipping template VM",
 				"vmID", m.ID,
 				"isTemplate", m.IsTemplate)
+			continue
+		}
+		if m.UUID == "" && m.InstanceUUID == "" && m.Host == "" {
+			log.Info("Skipping ghost VM", "vmID", m.ID)
 			continue
 		}
 		r := &VM{}
@@ -117,6 +122,20 @@ func (h VMHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
+	var allVMs []model.VM
+	err = db.List(&allVMs, model.ListOptions{Detail: model.MaxDetail})
+	if err != nil {
+		log.Trace(
+			err,
+			"url",
+			ctx.Request.URL)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
+	fileCount := buildDiskFileCount(allVMs)
+	vms := []model.VM{*m}
+	markSharedDisks(vms, fileCount)
+	*m = vms[0]
 	pb := PathBuilder{DB: db}
 	r := &VM{}
 	r.With(m)
@@ -271,6 +290,7 @@ type VM struct {
 	ConnectionState          string                 `json:"connectionState"`
 	Snapshot                 model.Ref              `json:"snapshot"`
 	ChangeTrackingEnabled    bool                   `json:"changeTrackingEnabled"`
+	ConsolidationNeeded      bool                   `json:"consolidationNeeded"`
 	CpuAffinity              []int32                `json:"cpuAffinity"`
 	CpuHotAddEnabled         bool                   `json:"cpuHotAddEnabled"`
 	CpuHotRemoveEnabled      bool                   `json:"cpuHotRemoveEnabled"`
@@ -357,6 +377,7 @@ func (r *VM) With(m *model.VM) {
 	r.CustomDef = m.CustomDef
 	r.CustomValues = m.CustomValues
 	r.Tags = m.Tags
+	r.ConsolidationNeeded = m.ConsolidationNeeded
 }
 
 // Build self link (URI).
@@ -414,4 +435,29 @@ func (r *VM) RemoveDisk(removeDisk model.Disk) {
 		}
 	}
 	r.Disks = disks
+}
+
+// buildDiskFileCount builds a map from disk file path to the number of
+// VMs that reference that file. Used to detect disks shared by multiple
+// VMs even when vSphere does not report multi-writer sharing.
+func buildDiskFileCount(vms []model.VM) map[string]int {
+	m := map[string]int{}
+	for i := range vms {
+		for _, disk := range vms[i].Disks {
+			m[disk.File]++
+		}
+	}
+	return m
+}
+
+// markSharedDisks sets Shared=true on disks whose backing file is used
+// by more than one VM according to the provided file count map.
+func markSharedDisks(vms []model.VM, fileCount map[string]int) {
+	for i := range vms {
+		for j := range vms[i].Disks {
+			if fileCount[vms[i].Disks[j].File] > 1 {
+				vms[i].Disks[j].Shared = true
+			}
+		}
+	}
 }

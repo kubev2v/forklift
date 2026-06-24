@@ -2,6 +2,7 @@ package conversion
 
 import (
 	"context"
+	"fmt"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/base"
@@ -127,7 +128,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		} else {
 			r.Log.Error(ensureErr, "Failed to build Ensurer for canceled Conversion.")
 		}
-		resolvePhaseConditions(conversion)
+		resolvePhaseConditions(conversion, nil)
 		conversion.Status.EndStagingConditions()
 		r.Record(conversion, conversion.Status.Conditions)
 		conversion.Status.ObservedGeneration = conversion.Generation
@@ -145,9 +146,9 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	}
 
 	pipe := NewConversionPipeline(ctx, &r, conversion)
-	succeeded, err := pipe.Run()
-	if err != nil {
-		r.Log.Error(err, "Conversion pipeline failed.",
+	succeeded, pipelineErr := pipe.Run()
+	if pipelineErr != nil {
+		r.Log.Error(pipelineErr, "Conversion pipeline failed.",
 			"type", conversion.Spec.Type,
 			"phase", conversion.Status.Phase,
 			"stage", conversion.Status.Stage)
@@ -163,7 +164,24 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 			"stage", conversion.Status.Stage)
 	}
 
-	resolvePhaseConditions(conversion)
+	// Safety net: if the pipeline terminates with Phase=Failed and an owned
+	// snapshot is still present (e.g. the failure happened before the divert
+	// logic could redirect to StageRemoveSnapshot, or the snapshotRemoval stage
+	// itself errored and set Phase=Failed internally), submit a best effort
+	// removal task here. If in the primary failure path, the divert in
+	// runDeepInspection clears Status.Snapshot before StageFinished (successful snapshot removal) then this block is a no-op.
+	if conversion.Status.Phase == api.PhaseFailed {
+		ensurer, ensureErr := NewEnsurer(r.Client, r.Log, conversion.Spec)
+		if ensureErr == nil {
+			if _, snapErr := ensurer.RemoveOwnedSnapshot(ctx, conversion); snapErr != nil {
+				r.Log.Error(snapErr, "Failed to trigger snapshot removal for failed Conversion.")
+			}
+		} else {
+			r.Log.Error(ensureErr, "Failed to build Ensurer for snapshot cleanup on failure.")
+		}
+	}
+
+	resolvePhaseConditions(conversion, pipelineErr)
 
 	conversion.Status.EndStagingConditions()
 
@@ -181,41 +199,54 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 }
 
 // resolvePhaseConditions sets the Ready condition on conversion based on the current phase.
-func resolvePhaseConditions(conversion *api.Conversion) {
+// When pipelineErr is non-nil and Phase is Failed, the error detail is included
+// in the ConversionFailed condition so the plan controller can surface it.
+func resolvePhaseConditions(conversion *api.Conversion, pipelineErr error) {
 	switch conversion.Status.Phase {
 	case api.PhaseSucceeded:
 		now := meta.Now()
 		conversion.Status.CompletionTime = &now
+		msg := "The conversion has completed successfully."
+		conversion.Status.Message = msg
 		conversion.Status.SetCondition(libcnd.Condition{
 			Type:     libcnd.Ready,
 			Status:   True,
 			Category: Required,
-			Message:  "The conversion has completed successfully.",
+			Message:  msg,
 		})
 	case api.PhaseFailed:
 		now := meta.Now()
 		conversion.Status.CompletionTime = &now
+		msg := "The conversion has failed."
+		if pipelineErr != nil {
+			msg = fmt.Sprintf("The conversion has failed: %s", pipelineErr.Error())
+		}
+		conversion.Status.Message = msg
 		conversion.Status.SetCondition(libcnd.Condition{
-			Type:     "ConversionFailed",
+			Type:     api.ConversionFailed,
 			Status:   True,
 			Category: Critical,
-			Message:  "The conversion has failed.",
+			Message:  msg,
 		})
 	case api.PhaseCanceled:
 		now := meta.Now()
 		conversion.Status.CompletionTime = &now
+		msg := "The conversion has been canceled."
+		conversion.Status.Message = msg
 		conversion.Status.SetCondition(libcnd.Condition{
-			Type:     "ConversionCanceled",
+			Type:     api.ConversionCanceled,
 			Status:   True,
 			Category: Advisory,
-			Message:  "The conversion has been canceled.",
+			Message:  msg,
 		})
 	case api.PhasePending:
+		msg := "The conversion is pending."
+		conversion.Status.Message = msg
 		conversion.Status.SetCondition(libcnd.Condition{
 			Type:     libcnd.Ready,
 			Status:   False,
 			Category: Required,
-			Message:  "The conversion is pending.",
+			Message:  msg,
 		})
 	case api.PhaseRunning:
 		resolveStageConditions(conversion)
@@ -246,6 +277,7 @@ func resolveStageConditions(conversion *api.Conversion) {
 	default:
 		msg = "The conversion is running."
 	}
+	conversion.Status.Message = msg
 	conversion.Status.SetCondition(libcnd.Condition{
 		Type:     libcnd.Advisory,
 		Status:   True,

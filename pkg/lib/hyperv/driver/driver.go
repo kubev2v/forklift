@@ -74,4 +74,5 @@ type NICInfo struct {
 	Name       string
 	MACAddress string
 	SwitchName string
+	VlanId     int
 }

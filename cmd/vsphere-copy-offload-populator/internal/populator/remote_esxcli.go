@@ -234,7 +234,6 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, sourceVMDKFile string, pv 
 		cleanupCtx := klog.NewContext(context.Background(), cleanupLog)
 		if mappingContext != nil {
 			mappingContext["UnmapAllSdc"] = true
-			mappingContext[CleanupXcopyInitiatorGroup] = true
 		}
 
 		// set device state to off and prevents any i/o to it

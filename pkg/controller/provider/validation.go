@@ -16,6 +16,7 @@ import (
 	hvutil "github.com/kubev2v/forklift/pkg/controller/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/ova"
 	"github.com/kubev2v/forklift/pkg/controller/provider/container"
+	vsphereCollector "github.com/kubev2v/forklift/pkg/controller/provider/container/vsphere"
 	vsphere "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
@@ -47,6 +48,7 @@ const (
 	ConnectionInsecure      = "ConnectionInsecure"
 	SSHReady                = "SSHReady"
 	SSHNotReady             = "SSHNotReady"
+	InsufficientPrivileges  = "InsufficientPrivileges"
 	SMBCSIDriverNotReady    = "SMBCSIDriverNotReady"
 	SMBMountFailed          = "SMBMountFailed"
 	WaitingForService       = "WaitingForService"
@@ -118,6 +120,10 @@ func (r *Reconciler) validate(provider *api.Provider) error {
 		return liberr.Wrap(err)
 	}
 	err = r.testConnection(provider, secret)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	err = r.validateVSpherePrivileges(provider)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -496,6 +502,64 @@ func (r *Reconciler) testConnection(provider *api.Provider, secret *core.Secret)
 					err.Error()),
 			})
 	}
+
+	return nil
+}
+
+// Validate vSphere service account privileges.
+func (r *Reconciler) validateVSpherePrivileges(provider *api.Provider) error {
+	if provider.Type() != api.VSphere {
+		return nil
+	}
+	if provider.Status.HasBlockerCondition() {
+		return nil
+	}
+
+	log.Info(
+		"Validating vSphere privileges.",
+		"name", provider.Name,
+		"namespace", provider.Namespace,
+	)
+
+	collector, found := r.container.Get(provider)
+	if !found {
+		return nil
+	}
+	vsphColl, ok := collector.(*vsphereCollector.Collector)
+	if !ok {
+		return nil
+	}
+
+	missing, checked := vsphColl.MissingPrivileges()
+	if !checked {
+		return nil
+	}
+
+	if len(missing) == 0 {
+		provider.Status.DeleteCondition(InsufficientPrivileges)
+		return nil
+	}
+
+	totalMissing := 0
+	var items []string
+	for _, m := range missing {
+		totalMissing += len(m.Privileges)
+		items = append(items, m.Privileges...)
+	}
+
+	provider.Status.SetCondition(
+		libcnd.Condition{
+			Type:     InsufficientPrivileges,
+			Status:   True,
+			Reason:   "PrivilegesNotGranted",
+			Category: Warn,
+			Message: fmt.Sprintf(
+				"The vSphere service account is missing %d privilege(s) required for migration. "+
+					"See the suggestion field in the Provider's YAML for details.",
+				totalMissing),
+			Suggestion: vsphereCollector.FormatMissing(missing),
+			Items:      items,
+		})
 
 	return nil
 }
