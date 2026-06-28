@@ -34,6 +34,15 @@ const (
 	// Set the source PVC of the conversion, used on the DV for filtering
 	AnnConversionSourcePVC = "forklift.konveyor.io/conversionSourcePVC"
 
+	// Copy method annotation indicates which method was used for volume migration
+	AnnCopyMethod = "forklift.konveyor.io/copy-method"
+
+	// Copy offload annotation contains the source disk identifier for offloaded copies
+	AnnCopyOffload = "copy-offload"
+
+	// Copy method values
+	CopyMethodCsiImport = "csi-import"
+
 	// CDI
 
 	// Causes the importer pod to be retained after import.
@@ -196,6 +205,8 @@ type Builder interface {
 	// NetAppShiftPVCs builds PVCs for disks mapped to NetApp Shift StorageClasses.
 	// Returns nil for non-vSphere providers or when no Shift mappings exist.
 	NetAppShiftPVCs(vmRef ref.Ref, labels map[string]string) ([]core.PersistentVolumeClaim, error)
+	// CsiImportPVCs builds PVCs for disks that have CsiVolumeImport configured.
+	CsiImportPVCs(vmRef ref.Ref, pvcLabels map[string]string) ([]core.PersistentVolumeClaim, error)
 	// SourceVMLabelsAndAnnotations returns provider-specific labels and annotations
 	// derived from source VM metadata (e.g. vSphere tags and custom attributes).
 	SourceVMLabelsAndAnnotations(vmRef ref.Ref, tagMapping *api.TagMapping) (labels map[string]string, annotations map[string]string, sanitizationReport map[string]string, err error)
