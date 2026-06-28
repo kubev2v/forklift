@@ -1,87 +1,37 @@
 ---
+# Runtime variables resolved from the operator pod environment.
+# These cannot be CRD-defaulted because they differ per release/installation.
 app_name: "{{ lookup('env', 'APP_NAME') or 'forklift' }}"
 app_namespace: "{{ lookup( 'env', 'WATCH_NAMESPACE') or 'konveyor-forklift' }}"
 
-# Feature defaults
-feature_ui_plugin: true
-feature_validation: true
-feature_volume_populator: true
-feature_copy_offload: true
-feature_ocp_live_migration: true
-feature_vmware_system_serial_number: true
-feature_vsphere_vmware_driver_removal: false
-feature_windows_registry_network_config: false
-feature_windows_wait_for_reboot: true
-feature_use_conversion_cr: true
-feature_cli_download: true
-feature_mcp_server: false
-feature_ova_appliance_management: true
-
-k8s_cluster: false
-feature_auth_required: true
-image_pull_policy: Always
-forklift_operator_version: "latest"
-forklift_resources:
-  - Deployment
-  - ConfigMap
-  - Service
-  - Route
-
+# Container images -- resolved from RELATED_IMAGE_* env vars injected by OLM/CSV.
 controller_image_fqin: "{{ lookup( 'env', 'CONTROLLER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_CONTROLLER') }}"
+validation_image_fqin: "{{ lookup( 'env', 'VALIDATION_IMAGE') or lookup( 'env', 'RELATED_IMAGE_VALIDATION') }}"
+ui_plugin_image_fqin: "{{ lookup( 'env', 'UI_PLUGIN_IMAGE') or lookup( 'env', 'RELATED_IMAGE_UI_PLUGIN') }}"
+cli_download_image_fqin: "{{ lookup( 'env', 'CLI_DOWNLOAD_IMAGE') or lookup( 'env', 'RELATED_IMAGE_CLI_DOWNLOAD') }}"
+api_image_fqin: "{{ lookup( 'env', 'API_IMAGE') or lookup( 'env', 'RELATED_IMAGE_API') }}"
+populator_controller_image_fqin: "{{ lookup( 'env', 'POPULATOR_CONTROLLER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_POPULATOR_CONTROLLER') }}"
+populator_ovirt_image_fqin: "{{ lookup( 'env', 'OVIRT_POPULATOR_IMAGE') or lookup( 'env', 'RELATED_IMAGE_RHV_POPULATOR') }}"
+populator_openstack_image_fqin: "{{ lookup( 'env', 'OPENSTACK_POPULATOR_IMAGE') or lookup( 'env', 'RELATED_IMAGE_OPENSTACK_POPULATOR') }}"
+populator_vsphere_copy_offload_image_fqin: "{{ lookup( 'env', 'VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE') or lookup( 'env', 'RELATED_IMAGE_VSPHERE_COPY_OFFLOAD_POPULATOR') }}"
+must_gather_image_fqin: "{{ lookup( 'env', 'MUST_GATHER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_MUST_GATHER') }}"
+virt_v2v_image_fqin: "{{ lookup( 'env', 'VIRT_V2V_IMAGE') or lookup( 'env', 'RELATED_IMAGE_VIRT_V2V') }}"
+virt_v2v_image_xfs_fqin: "{{ lookup( 'env', 'VIRT_V2V_IMAGE_XFS') or lookup( 'env', 'RELATED_IMAGE_VIRT_V2V_XFS') }}"
+deep_inspection_image_fqin: "{{ lookup( 'env', 'DEEP_INSPECTION_IMAGE') or lookup( 'env', 'RELATED_IMAGE_DEEP_INSPECTION') }}"
+deep_inspection_image_xfs_fqin: "{{ lookup( 'env', 'DEEP_INSPECTION_IMAGE_XFS') or lookup( 'env', 'RELATED_IMAGE_DEEP_INSPECTION_XFS') }}"
+ova_provider_server_fqin: "{{ lookup( 'env', 'OVA_PROVIDER_SERVER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_OVA_PROVIDER_SERVER') }}"
+hyperv_provider_server_fqin: "{{ lookup( 'env', 'HYPERV_PROVIDER_SERVER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_HYPERV_PROVIDER_SERVER') }}"
+ova_proxy_fqin: "{{ lookup( 'env', 'OVA_PROXY_IMAGE') or lookup( 'env', 'RELATED_IMAGE_OVA_PROXY') }}"
+
+# Computed names derived from app_name (internal to Ansible, not CRD fields).
 controller_configmap_name: "{{ controller_service_name }}-config"
 controller_service_name: "{{ app_name }}-controller"
-ovirt_osmap_configmap_name: "forklift-ovirt-osmap"
-vsphere_osmap_configmap_name: "forklift-vsphere-osmap"
-virt_customize_configmap_name: "forklift-virt-customize"
-naa_oui_map_configmap_name: "forklift-naa-oui-map"
 controller_deployment_name: "{{ controller_service_name }}"
 controller_container_name: "{{ app_name }}-controller"
-controller_container_limits_cpu: "2"
-controller_container_limits_memory: "800Mi"
-controller_container_requests_cpu: "100m"
-controller_container_requests_memory: "350Mi"
-controller_log_level: 3
-controller_precopy_interval: 60
-controller_blocker_grace_period_minutes: 5
-controller_snapshot_removal_timeout_minuts: 120
-controller_snapshot_status_check_rate_seconds: 10
-controller_cleanup_retries: 10
-controller_snapshot_removal_check_retries: 20
-controller_vsphere_incremental_backup: true
-controller_ovirt_warm_migration: true
-controller_retain_precopy_importer_pods: false
-controller_retain_populator_pods: false
-feature_xfs_repair_ignore: false
-controller_static_udn_ip_addresses: true
-controller_max_vm_inflight: 20
-controller_max_populator_inflight: 20
-controller_host_lease_namespace: "openshift-mtv"
-controller_host_lease_duration_seconds: 10
-controller_filesystem_overhead: 10
-controller_block_overhead: 0
-controller_vddk_job_active_deadline_sec: 300
-controller_tls_connection_timeout_sec: 5
-controller_windows_reboot_timeout: 1800
-controller_max_concurrent_reconciles: 10
-controller_max_parent_backing_retries: 10
-controller_migration_service_account: ""
-# Ansible Automation Platform (optional; for AAP migration hooks and inventory job-template listing)
-aap_url: ""
-aap_token_secret_name: ""
-aap_timeout: ""
-aap_insecure_skip_verify: false
-aap_ca_secret_name: ""
-profiler_volume_path: "/var/cache/profiler"
 
-inventory_volume_path: "/var/cache/inventory"
 inventory_container_name: "{{ app_name }}-inventory"
 inventory_service_name: "{{ app_name }}-inventory"
 inventory_route_name: "{{ inventory_service_name }}"
-inventory_route_timeout: "360s"
-inventory_container_limits_cpu: "2"
-inventory_container_limits_memory: "1Gi"
-inventory_container_requests_cpu: "500m"
-inventory_container_requests_memory: "500Mi"
 inventory_tls_secret_name: "{{ inventory_service_name }}-serving-cert"
 inventory_issuer_name: "{{ inventory_service_name }}-issuer"
 inventory_certificate_name: "{{ inventory_service_name }}-certificate"
@@ -92,148 +42,70 @@ services_tls_secret_name: "{{ services_service_name }}-serving-cert"
 services_issuer_name: "{{ services_service_name }}-issuer"
 services_certificate_name: "{{ services_service_name }}-certificate"
 
-validation_image_fqin: "{{ lookup( 'env', 'VALIDATION_IMAGE') or lookup( 'env', 'RELATED_IMAGE_VALIDATION') }}"
 validation_configmap_name: "{{ validation_service_name }}-config"
 validation_service_name: "{{ app_name }}-validation"
 validation_deployment_name: "{{ validation_service_name }}"
 validation_container_name: "{{ app_name }}-validation"
-validation_extra_volume_name: "validation-extra-rules"
-validation_extra_volume_mountpath: "/usr/share/opa/policies/extra"
-validation_policy_agent_search_interval: "120"
-validation_container_limits_cpu: "1000m"
-validation_container_limits_memory: "300Mi"
-validation_container_requests_cpu: "400m"
-validation_container_requests_memory: "50Mi"
 validation_tls_secret_name: "{{ validation_service_name }}-serving-cert"
 validation_issuer_name: "{{ validation_service_name }}-issuer"
 validation_certificate_name: "{{ validation_service_name }}-certificate"
-validation_state: absent
 
-ui_plugin_image_fqin: "{{ lookup( 'env', 'UI_PLUGIN_IMAGE') or lookup( 'env', 'RELATED_IMAGE_UI_PLUGIN') }}"
 ui_plugin_console_name: "{{ app_name }}-console-plugin"
 ui_plugin_display_name: "Console plugin for {{ app_name }}"
 ui_plugin_service_name: "{{ app_name }}-ui-plugin"
 ui_plugin_deployment_name: "{{ ui_plugin_service_name }}"
 ui_plugin_container_name: "{{ app_name }}-ui-plugin"
-ui_plugin_container_limits_cpu: "100m"
-ui_plugin_container_limits_memory: "800Mi"
-ui_plugin_container_requests_cpu: "100m"
-ui_plugin_container_requests_memory: "150Mi"
-ui_plugin_state: absent
 
-cli_download_image_fqin: "{{ lookup( 'env', 'CLI_DOWNLOAD_IMAGE') or lookup( 'env', 'RELATED_IMAGE_CLI_DOWNLOAD') }}"
 cli_download_service_name: "{{ app_name }}-cli-download"
 cli_download_route_name: "{{ cli_download_service_name }}"
 cli_download_tls_secret_name: "{{ cli_download_service_name }}-serving-cert"
 cli_download_deployment_name: "{{ cli_download_service_name }}"
 cli_download_container_name: "{{ app_name }}-cli-download"
-cli_download_container_limits_cpu: "1000m"
-cli_download_container_limits_memory: "1Gi"
-cli_download_container_requests_cpu: "100m"
-cli_download_container_requests_memory: "512Mi"
-cli_download_state: absent
-mcp_server_state: absent
 
 mcp_server_service_name: "{{ app_name }}-mcp-server"
 mcp_server_deployment_name: "{{ app_name }}-mcp-server"
 mcp_server_container_name: "{{ app_name }}-mcp-server"
-mcp_server_container_limits_cpu: "1000m"
-mcp_server_container_limits_memory: "512Mi"
-mcp_server_container_requests_cpu: "100m"
-mcp_server_container_requests_memory: "256Mi"
-mcp_server_output_format: "markdown"
-mcp_server_max_response_chars: "0"
-# In-cluster: kubectl-mtv uses --server + --token from HTTP headers, bypassing
-# the default kubeconfig and its CA bundle. TLS verification must be skipped
-# for kubernetes.default.svc unless a custom CA is explicitly mounted.
-mcp_server_kube_insecure: "true"
-mcp_server_read_only: "false"
-mcp_server_verbose: "2"
-mcp_server_lightspeed_integration: true
-mcp_server_lightspeed_set_mcp_gate: false
 
-api_image_fqin: "{{ lookup( 'env', 'API_IMAGE') or lookup( 'env', 'RELATED_IMAGE_API') }}"
 api_service_name: "{{ app_name }}-api"
 api_deployment_name: "{{ api_service_name }}"
 api_container_name: "{{ app_name }}-api"
-api_container_limits_cpu: "1000m"
-api_container_limits_memory: "1Gi"
-api_container_requests_cpu: "100m"
-api_container_requests_memory: "150Mi"
 api_tls_secret_name: "{{ api_service_name }}-serving-cert"
 api_issuer_name: "{{ api_service_name }}-issuer"
 api_certificate_name: "{{ api_service_name }}-certificate"
 
-populator_controller_image_fqin: "{{ lookup( 'env', 'POPULATOR_CONTROLLER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_POPULATOR_CONTROLLER') }}"
-populator_ovirt_image_fqin: "{{ lookup( 'env', 'OVIRT_POPULATOR_IMAGE') or lookup( 'env', 'RELATED_IMAGE_RHV_POPULATOR') }}"
 populator_controller_deployment_name: "{{ app_name }}-volume-populator-controller"
 populator_controller_container_name: "{{ app_name }}-populator-controller"
-populator_openstack_image_fqin: "{{ lookup( 'env', 'OPENSTACK_POPULATOR_IMAGE') or lookup( 'env', 'RELATED_IMAGE_OPENSTACK_POPULATOR') }}"
-populator_vsphere_copy_offload_image_fqin: "{{ lookup( 'env', 'VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE') or lookup( 'env', 'RELATED_IMAGE_VSPHERE_COPY_OFFLOAD_POPULATOR') }}"
 
-must_gather_image_fqin: "{{ lookup( 'env', 'MUST_GATHER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_MUST_GATHER') }}"
-
-virt_v2v_image_fqin: "{{ lookup( 'env', 'VIRT_V2V_IMAGE') or lookup( 'env', 'RELATED_IMAGE_VIRT_V2V') }}"
-virt_v2v_image_xfs_fqin: "{{ lookup( 'env', 'VIRT_V2V_IMAGE_XFS') or lookup( 'env', 'RELATED_IMAGE_VIRT_V2V_XFS') }}"
-deep_inspection_image_fqin: "{{ lookup( 'env', 'DEEP_INSPECTION_IMAGE') or lookup( 'env', 'RELATED_IMAGE_DEEP_INSPECTION') }}"
-deep_inspection_image_xfs_fqin: "{{ lookup( 'env', 'DEEP_INSPECTION_IMAGE_XFS') or lookup( 'env', 'RELATED_IMAGE_DEEP_INSPECTION_XFS') }}"
-virt_v2v_dont_request_kvm: "{{ lookup( 'env', 'VIRT_V2V_DONT_REQUEST_KVM') }}"
-virt_v2v_extra_args: "{{ lookup( 'env', 'VIRT_V2V_EXTRA_ARGS') }}"
-virt_v2v_inspector_extra_args: "{{ lookup( 'env', 'VIRT_V2V_INSPECTOR_EXTRA_ARGS') }}"
-virt_v2v_extra_conf_config_map: "{{ lookup( 'env', 'VIRT_V2V_EXTRA_CONF_CONFIG_MAP') }}"
-virt_v2v_memsize: ""
-virt_v2v_smp: ""
-virt_v2v_container_limits_cpu: "4000m"
-virt_v2v_container_limits_memory: "8Gi"
-virt_v2v_container_requests_cpu: "1000m"
-virt_v2v_container_requests_memory: "1Gi"
-
-vddk_image: "{{ lookup( 'env', 'VDDK_IMAGE') }}"
-vddk_build_config_name: "vddk"
-vddk_image_stream_name: "vddk"
-
-hooks_container_limits_cpu: "1000m"
-hooks_container_limits_memory: "1Gi"
-hooks_container_requests_cpu: "100m"
-hooks_container_requests_memory: "150Mi"
-
-ova_provider_server_fqin: "{{ lookup( 'env', 'OVA_PROVIDER_SERVER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_OVA_PROVIDER_SERVER') }}"
-ova_container_limits_cpu: "1000m"
-ova_container_limits_memory: "1Gi"
-ova_container_requests_cpu: "100m"
-ova_container_requests_memory: "512Mi"
-
-hyperv_provider_server_fqin: "{{ lookup( 'env', 'HYPERV_PROVIDER_SERVER_IMAGE') or lookup( 'env', 'RELATED_IMAGE_HYPERV_PROVIDER_SERVER') }}"
-hyperv_container_limits_cpu: "1000m"
-hyperv_container_limits_memory: "1Gi"
-hyperv_container_requests_cpu: "100m"
-hyperv_container_requests_memory: "512Mi"
-controller_hyperv_refresh_interval: "10s"
-controller_hyperv_validation_timeout: "30s"
-
-populator_container_limits_cpu: "1000m"
-populator_container_limits_memory: "1Gi"
-populator_container_requests_cpu: "100m"
-populator_container_requests_memory: "512Mi"
-
-ova_proxy_fqin: "{{ lookup( 'env', 'OVA_PROXY_IMAGE') or lookup( 'env', 'RELATED_IMAGE_OVA_PROXY') }}"
 ova_proxy_container_name: "{{ app_name }}-ova-proxy"
 ova_proxy_service_name: "{{ app_name }}-ova-proxy"
 ova_proxy_route_name: "{{ ova_proxy_service_name }}"
-ova_proxy_route_timeout: "360s"
 ova_proxy_subapp_name: "ova-proxy"
-ova_proxy_container_limits_cpu: "1000m"
-ova_proxy_container_limits_memory: "1Gi"
-ova_proxy_container_requests_cpu: "250m"
-ova_proxy_container_requests_memory: "512Mi"
 ova_proxy_tls_secret_name: "{{ ova_proxy_service_name }}-serving-cert"
 ova_proxy_issuer_name: "{{ ova_proxy_service_name }}-issuer"
 ova_proxy_certificate_name: "{{ ova_proxy_service_name }}-certificate"
 
 metric_service_name: "{{ app_name }}-metrics"
 metric_servicemonitor_name: "{{ app_name }}-metrics"
-metric_interval: "30s"
 metric_port_name: "metrics"
 metrics_rule_name: "{{app_name}}-migration-rules"
 
-wait_for_final_snapshot_consolidation: true
+# Internal state management variables (not CRD fields).
+validation_state: absent
+ui_plugin_state: absent
+cli_download_state: absent
+mcp_server_state: absent
+
+# Internal infrastructure paths and settings (not CRD fields).
+profiler_volume_path: "/var/cache/profiler"
+inventory_volume_path: "/var/cache/inventory"
+forklift_operator_version: "latest"
+forklift_resources:
+  - Deployment
+  - ConfigMap
+  - Service
+  - Route
+
+
+# VDDK build config names (internal).
+vddk_build_config_name: "vddk"
+vddk_image_stream_name: "vddk"

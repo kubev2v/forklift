@@ -108,7 +108,7 @@ spec:
         - name: MAX_VM_INFLIGHT
           value: "{{ controller_max_vm_inflight }}"
 {% endif %}
-{% if vddk_image is string and vddk_image|length > 0 %}
+{% if vddk_image is defined and vddk_image|length > 0 %}
         - name: VDDK_IMAGE
           value: "{{ vddk_image }}"
 {% endif %}
@@ -128,7 +128,7 @@ spec:
         - name: MAX_PARENT_BACKING_RETRIES
           value: "{{ controller_max_parent_backing_retries }}"
 {% endif %}
-{% if controller_migration_service_account is string and controller_migration_service_account|length > 0 %}
+{% if controller_migration_service_account is defined and controller_migration_service_account|length > 0 %}
         - name: MIGRATION_SERVICE_ACCOUNT
           value: "{{ controller_migration_service_account }}"
 {% endif %}
@@ -236,16 +236,16 @@ spec:
         - name: PROFILE_DURATION
           value: "{{ controller_profile_duration }}"
 {% endif %}
-{% if virt_v2v_dont_request_kvm|bool %}
+{% if (virt_v2v_dont_request_kvm | default(lookup('env', 'VIRT_V2V_DONT_REQUEST_KVM'))) | bool %}
         - name: VIRT_V2V_DONT_REQUEST_KVM
           value: "true"
 {% endif %}
         - name: VIRT_V2V_EXTRA_ARGS
-          value: "{{ virt_v2v_extra_args }}"
+          value: "{{ virt_v2v_extra_args | default(lookup('env', 'VIRT_V2V_EXTRA_ARGS')) }}"
         - name: VIRT_V2V_INSPECTOR_EXTRA_ARGS
-          value: "{{ virt_v2v_inspector_extra_args }}"
+          value: "{{ virt_v2v_inspector_extra_args | default(lookup('env', 'VIRT_V2V_INSPECTOR_EXTRA_ARGS')) }}"
         - name: VIRT_V2V_EXTRA_CONF_CONFIG_MAP
-          value: "{{ virt_v2v_extra_conf_config_map }}"
+          value: "{{ virt_v2v_extra_conf_config_map | default(lookup('env', 'VIRT_V2V_EXTRA_CONF_CONFIG_MAP')) }}"
 {% if virt_v2v_memsize is defined and virt_v2v_memsize != "" %}
         - name: VIRT_V2V_MEMSIZE
           value: "{{ virt_v2v_memsize }}"

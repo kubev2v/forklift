@@ -86,6 +86,11 @@ OPM_OPTS ?=
 # 'controller-gen' target
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 
+# By default use the operator-sdk installed by the
+# 'operator-sdk' target
+OPERATOR_SDK ?= $(LOCALBIN)/operator-sdk
+OPERATOR_SDK_VERSION ?= v1.42.3
+
 # By default use the kubectl installed by the
 # 'kubectl' target
 DEFAULT_KUBECTL = $(GOBIN)/kubectl
@@ -165,7 +170,7 @@ help: ## Show this help message
 		/^[a-zA-Z_0-9-]+:.*?## / { printf "  \033[36m%-40s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
 .PHONY: ci
-ci: all tidy vendor generate-verify lint validate-forklift-controller-crd ## Run full CI pipeline
+ci: all tidy vendor generate-verify lint ## Run full CI pipeline
 
 .PHONY: all
 all: test forklift-controller ## Run tests and build controller binary
@@ -202,11 +207,6 @@ e2e-sanity-ova: ## Run OVA e2e tests
 .PHONY: validation-test
 validation-test: opa-bin ## Run OPA validation policy tests
 	ENVIRONMENT=test ${OPA} test validation/policies --explain fails
-
-.PHONY: validate-forklift-controller-crd
-validate-forklift-controller-crd: ## Validate ForkliftController CRD schema
-	@echo "Validating ForkliftController CRD..."
-	python3 hack/validate_forklift_controller_crd.py
 
 # CRD API changelog (hack/crd_changelog_diff.py)
 TO_REF ?= HEAD
@@ -287,6 +287,12 @@ generate-verify: generate ## Verify generated code is up to date
 manifests: controller-gen ## Generate CRD and webhook manifests
 	$(CONTROLLER_GEN) crd rbac:roleName=manager-role webhook paths="./pkg/apis/..." output:dir=operator/config/crd/bases
 
+.PHONY: generate-csv
+generate-csv: operator-sdk ## Generate CSV specDescriptors from Go markers
+	cd operator && $(OPERATOR_SDK) generate kustomize manifests \
+		--plugins go.kubebuilder.io/v4 --package $(OPERATOR_NAME) \
+		--apis-dir ../pkg/apis --interactive=false -q
+
 MANIFEST_VARS = $${CSV_NAME} $${CSV_DISPLAYNAME} $${NAMESPACE} $${CSV_CERTIFIED} $${CSV_SUPPORT} $${MAINTAINER_NAME} $${MAINTAINER_EMAIL} $${PROVIDER} $${DOCS_LINK_NAME} $${DOCS_LINK_URL}
 
 .PHONY: generate-manifests
@@ -297,7 +303,7 @@ generate-manifests: kubectl manifests ## Generate upstream and downstream manife
 		$(KUBECTL) kustomize operator/streams/downstream | envsubst '$(MANIFEST_VARS)' > operator/.downstream_manifests
 
 .PHONY: update-manifests
-update-manifests: generate generate-manifests ## Regenerate all code and manifests
+update-manifests: generate generate-csv generate-manifests ## Regenerate all code and manifests
 	@echo "All manifests updated successfully!"
 	@echo "  - Upstream deployment: operator/.upstream_manifests"
 	@echo "  - Downstream deployment: operator/.downstream_manifests"
@@ -730,6 +736,13 @@ $(DEFAULT_KUBECTL):
 kustomize: $(KUSTOMIZE) ## Install kustomize
 $(DEFAULT_KUSTOMIZE):
 	go install sigs.k8s.io/kustomize/kustomize/v5@v5.7.0
+
+.PHONY: operator-sdk
+operator-sdk: $(OPERATOR_SDK) ## Install operator-sdk tool
+$(OPERATOR_SDK): $(LOCALBIN)
+	curl -sSLo $(OPERATOR_SDK) https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$(GOOS)_$(shell go env GOARCH)
+	chmod +x $(OPERATOR_SDK)
+	codesign --force --sign - $(OPERATOR_SDK) 2>/dev/null || true
 
 mockgen-install:
 	go install go.uber.org/mock/mockgen@v0.4.0

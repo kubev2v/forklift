@@ -3383,6 +3383,8 @@ spec:
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.3
   name: forkliftcontrollers.forklift.konveyor.io
 spec:
   group: forklift.konveyor.io
@@ -3397,672 +3399,814 @@ spec:
     schema:
       openAPIV3Schema:
         description: ForkliftController is the Schema for the forkliftcontrollers
-          API
+          API.
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
           spec:
-            additionalProperties: true
-            description: Spec defines the desired state of ForkliftController
+            description: ForkliftControllerSpec defines the desired state of ForkliftController.
             properties:
               aap_ca_secret_name:
-                description: 'Name of the Secret in the operator namespace containing
-                  a custom CA certificate (data key: ca.crt) for verifying the AAP
-                  server TLS certificate. Optional; when unset, the system CA bundle
-                  is used.'
+                description: 'Name of the Secret containing a custom CA certificate
+                  (data key: ca.crt) for AAP TLS verification.'
                 type: string
               aap_insecure_skip_verify:
-                description: 'Skip TLS certificate verification when connecting to
-                  AAP (default: false). Use only for testing or when the AAP server
-                  uses a self-signed certificate and no CA is provided.'
+                default: "false"
+                description: Skip TLS certificate verification when connecting to
+                  AAP.
                 enum:
                 - "true"
                 - "false"
                 type: string
               aap_timeout:
                 description: Default timeout in seconds for AAP HTTP calls and job
-                  polling when Hook spec.deadline is 0 (optional).
-                x-kubernetes-int-or-string: true
+                  polling.
+                format: int32
+                minimum: 1
+                type: integer
               aap_token_secret_name:
-                description: 'Name of the Secret in the operator namespace containing
-                  the AAP API Bearer token (data key: token). Required for centralized
-                  AAP connection together with aap_url; omit when hooks use per-hook
-                  spec.aap.url and tokenSecret.'
+                description: 'Name of the Secret containing the AAP API Bearer token
+                  (data key: token).'
                 type: string
               aap_url:
-                description: Ansible Automation Platform base URL (e.g. https://aap.example.com).
-                  Required for centralized AAP connection together with aap_token_secret_name;
-                  omit when hooks use spec.aap.url and spec.aap.tokenSecret.
+                description: |-
+                  Ansible Automation Platform base URL.
+                  Required for centralized AAP connection together with aap_token_secret_name.
                 type: string
               api_container_limits_cpu:
-                description: 'API service CPU limit (default: 1000m)'
-                example: 2000m
+                default: 1000m
+                description: API service CPU limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               api_container_limits_memory:
-                description: 'API service memory limit (default: 1Gi)'
-                example: 2Gi
+                default: 1Gi
+                description: API service memory limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               api_container_requests_cpu:
-                description: 'API service CPU request (default: 100m)'
-                example: 200m
+                default: 100m
+                description: API service CPU request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               api_container_requests_memory:
-                description: 'API service memory request (default: 150Mi)'
-                example: 300Mi
+                default: 150Mi
+                description: API service memory request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               api_image_fqin:
-                description: API service image
-                example: quay.io/kubev2v/forklift-api:latest
+                description: API service image. Optional. If left empty, the operator
+                  automatically sets this from the release payload.
                 type: string
               cli_download_container_limits_cpu:
-                description: 'CLI download service CPU limit (default: 100m)'
-                example: 200m
+                default: 1000m
+                description: CLI download service CPU limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               cli_download_container_limits_memory:
-                description: 'CLI download service memory limit (default: 128Mi)'
-                example: 256Mi
+                default: 1Gi
+                description: CLI download service memory limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               cli_download_container_requests_cpu:
-                description: 'CLI download service CPU request (default: 50m)'
-                example: 100m
+                default: 100m
+                description: CLI download service CPU request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               cli_download_container_requests_memory:
-                description: 'CLI download service memory request (default: 64Mi)'
-                example: 128Mi
+                default: 512Mi
+                description: CLI download service memory request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               cli_download_image_fqin:
-                description: CLI download service image
-                example: quay.io/kubev2v/forklift-cli-download:latest
+                description: CLI download service image. Optional. If left empty,
+                  the operator automatically sets this from the release payload.
                 type: string
               controller_block_overhead:
-                description: 'Block overhead in bytes (default: 0)'
-                x-kubernetes-int-or-string: true
+                default: 0
+                description: Block overhead in bytes.
+                format: int32
+                minimum: 0
+                type: integer
               controller_blocker_grace_period_minutes:
-                description: 'How long Critical/Error blocker conditions must persist
-                  before failing an active migration, in minutes (default: 5)'
-                x-kubernetes-int-or-string: true
+                default: 5
+                description: How long Critical/Error blocker conditions must persist
+                  before failing an active migration, in minutes.
+                format: int32
+                minimum: 1
+                type: integer
               controller_cleanup_retries:
-                description: 'Cleanup retry count (default: 10)'
-                x-kubernetes-int-or-string: true
+                default: 10
+                description: Cleanup retry count.
+                format: int32
+                minimum: 1
+                type: integer
               controller_container_limits_cpu:
-                description: 'Controller CPU limit (default: 500m)'
-                example: 1000m
+                default: "2"
+                description: Controller CPU limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               controller_container_limits_memory:
-                description: 'Controller memory limit (default: 800Mi)'
-                example: 1Gi
+                default: 800Mi
+                description: Controller memory limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               controller_container_requests_cpu:
-                description: 'Controller CPU request (default: 100m)'
-                example: 200m
+                default: 100m
+                description: Controller CPU request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               controller_container_requests_memory:
-                description: 'Controller memory request (default: 350Mi)'
-                example: 500Mi
+                default: 350Mi
+                description: Controller memory request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               controller_filesystem_overhead:
-                description: 'Filesystem overhead percentage (default: 10)'
-                x-kubernetes-int-or-string: true
+                default: 10
+                description: Filesystem overhead percentage.
+                format: int32
+                minimum: 0
+                type: integer
               controller_host_lease_duration_seconds:
-                description: 'Host lease duration in seconds (default: 10)'
-                x-kubernetes-int-or-string: true
+                default: 10
+                description: Host lease duration in seconds.
+                format: int32
+                minimum: 1
+                type: integer
               controller_host_lease_namespace:
-                description: 'Namespace for host lease objects (default: openshift-mtv)'
-                example: openshift-mtv
+                default: openshift-mtv
+                description: Namespace for host lease objects.
                 type: string
               controller_hyperv_refresh_interval:
-                description: 'HyperV inventory refresh interval as a Go duration (default:
-                  10s)'
-                example: 30s
+                default: 10s
+                description: HyperV inventory refresh interval as a Go duration.
+                pattern: ^[0-9]+(s|m|h)$
                 type: string
               controller_hyperv_validation_timeout:
-                description: 'Timeout for HyperV SMB disk validation HTTP calls as
-                  a Go duration (default: 30s)'
-                example: 60s
+                default: 30s
+                description: Timeout for HyperV SMB disk validation HTTP calls as
+                  a Go duration.
+                pattern: ^[0-9]+(s|m|h)$
                 type: string
               controller_image_fqin:
-                description: Controller pod image
-                example: quay.io/kubev2v/forklift-controller:latest
+                description: Controller pod image. Optional. If left empty, the operator
+                  automatically sets this from the release payload.
                 type: string
               controller_log_level:
-                description: 'Log verbosity level (default: 3)'
-                x-kubernetes-int-or-string: true
+                default: 3
+                description: Log verbosity level.
+                format: int32
+                minimum: 0
+                type: integer
               controller_max_concurrent_reconciles:
-                description: 'Max concurrent reconciles (default: 10)'
-                x-kubernetes-int-or-string: true
+                default: 10
+                description: Max concurrent reconciles.
+                format: int32
+                minimum: 1
+                type: integer
               controller_max_parent_backing_retries:
-                description: 'Max retries when getting parent disks (default: 10)'
-                x-kubernetes-int-or-string: true
+                default: 10
+                description: Max retries when getting parent disks.
+                format: int32
+                minimum: 1
+                type: integer
               controller_max_populator_inflight:
-                description: 'Max concurrent populator pods per ESXi host (default:
-                  20)'
-                example: 10
-                x-kubernetes-int-or-string: true
+                default: 20
+                description: Max concurrent populator pods per ESXi host.
+                format: int32
+                minimum: 1
+                type: integer
               controller_max_vm_inflight:
-                description: 'Max concurrent VM migrations (default: 20)'
-                x-kubernetes-int-or-string: true
+                default: 20
+                description: Max concurrent VM migrations.
+                format: int32
+                minimum: 1
+                type: integer
               controller_migration_service_account:
-                description: Global default ServiceAccount for migration pods in the
-                  target namespace. Overridden by Plan-level serviceAccount.
-                example: custom-migration-sa
+                description: |-
+                  Global default ServiceAccount for migration pods in the target namespace.
+                  Overridden by Plan-level serviceAccount.
                 type: string
               controller_ovirt_warm_migration:
-                description: 'Enable oVirt warm migration (default: true)'
+                default: "true"
+                description: Enable oVirt warm migration.
                 enum:
                 - "true"
                 - "false"
                 type: string
               controller_precopy_interval:
-                description: 'Precopy interval in minutes (default: 60)'
-                x-kubernetes-int-or-string: true
+                default: 60
+                description: Precopy interval in minutes.
+                format: int32
+                minimum: 1
+                type: integer
               controller_retain_populator_pods:
-                description: 'Retain populator pods after migration for debugging
-                  (default: false)'
+                default: "false"
+                description: Retain populator pods after migration for debugging.
                 enum:
                 - "true"
                 - "false"
                 type: string
               controller_retain_precopy_importer_pods:
-                description: 'Retain precopy pods (default: false)'
+                default: "false"
+                description: Retain precopy pods.
                 enum:
                 - "true"
                 - "false"
                 type: string
               controller_snapshot_removal_check_retries:
-                description: 'Snapshot removal retries (default: 20)'
-                x-kubernetes-int-or-string: true
+                default: 20
+                description: Snapshot removal retries.
+                format: int32
+                minimum: 1
+                type: integer
               controller_snapshot_removal_timeout_minuts:
-                description: 'Snapshot removal timeout in minutes (default: 120)'
-                x-kubernetes-int-or-string: true
+                default: 120
+                description: Snapshot removal timeout in minutes.
+                format: int32
+                minimum: 1
+                type: integer
               controller_snapshot_status_check_rate_seconds:
-                description: 'Snapshot status check rate in seconds (default: 10)'
-                x-kubernetes-int-or-string: true
+                default: 10
+                description: Snapshot status check rate in seconds.
+                format: int32
+                minimum: 1
+                type: integer
               controller_static_udn_ip_addresses:
-                description: 'Enable static udn IP addresses feature (default: false)'
+                default: "true"
+                description: Enable static UDN IP addresses feature.
                 enum:
                 - "true"
                 - "false"
                 type: string
               controller_tls_connection_timeout_sec:
-                description: 'TLS connection timeout seconds (default: 5)'
-                x-kubernetes-int-or-string: true
+                default: 5
+                description: TLS connection timeout seconds.
+                format: int32
+                minimum: 1
+                type: integer
               controller_transfer_network:
                 description: 'Optional NAD name for controller pod transfer network
-                  (format: ''namespace/network-name'')'
-                example: openshift-mtv/transfer-network
+                  (format: ''namespace/network-name'').'
                 type: string
               controller_vddk_job_active_deadline_sec:
-                description: 'VDDK job timeout in seconds (default: 300)'
-                x-kubernetes-int-or-string: true
+                default: 300
+                description: VDDK job timeout in seconds.
+                format: int32
+                minimum: 1
+                type: integer
               controller_vsphere_incremental_backup:
-                description: 'Use vSphere incremental backup (default: true)'
+                default: "true"
+                description: Use vSphere incremental backup.
                 enum:
                 - "true"
                 - "false"
                 type: string
               controller_windows_reboot_timeout:
-                description: 'Timeout in seconds for the wait-for-reboot step (default:
-                  1800)'
+                default: 1800
+                description: Timeout in seconds for the wait-for-reboot step.
+                format: int32
                 minimum: 1
                 type: integer
               deep_inspection_image_fqin:
-                description: Deep inspection image used by deep-inspection pods
-                example: quay.io/kubev2v/deep-inspection:latest
+                description: Deep inspection image. Optional. If left empty, the operator
+                  automatically sets this from the release payload.
                 type: string
               deep_inspection_image_xfs_fqin:
-                description: Deep inspection image built on RHEL9, used when xfsCompatibility
-                  is enabled
-                example: quay.io/kubev2v/deep-inspection-rhel9:latest
+                description: Deep inspection XFS image. Optional. If left empty, the
+                  operator automatically sets this from the release payload.
                 type: string
               feature_auth_required:
-                description: 'Require authentication (default: true)'
+                default: "true"
+                description: Require authentication.
                 enum:
                 - "true"
                 - "false"
                 type: string
               feature_cli_download:
-                description: 'Enable CLI download service (default: true)'
+                default: "true"
+                description: Enable CLI download service.
                 enum:
                 - "true"
                 - "false"
                 type: string
               feature_copy_offload:
-                description: 'Enable copy offload plugins (default: true)'
+                default: "true"
+                description: Enable copy offload plugins.
                 enum:
                 - "true"
                 - "false"
                 type: string
               feature_mcp_server:
-                description: 'Enable MCP server deployment (requires OpenShift with
-                  Lightspeed) (default: false)'
+                default: "false"
+                description: Enable MCP server deployment (requires OpenShift with
+                  Lightspeed).
                 enum:
                 - "true"
                 - "false"
                 type: string
               feature_ocp_live_migration:
-                description: 'Enable OCP live migration (default: false)'
+                default: "true"
+                description: Enable OCP live migration.
                 enum:
                 - "true"
                 - "false"
                 type: string
               feature_ova_appliance_management:
-                description: 'Enable OVF-based appliance management endpoints (OVA,
-                  HyperV)  (default: false)'
+                default: "true"
+                description: Enable OVF-based appliance management endpoints (OVA,
+                  HyperV).
                 enum:
                 - "true"
                 - "false"
                 type: string
               feature_ui_plugin:
-                description: 'Enable UI plugin (default: true)'
+                default: "true"
+                description: Enable UI plugin.
                 enum:
                 - "true"
                 - "false"
                 type: string
               feature_use_conversion_cr:
-                description: 'Delegate VM conversion to Conversion CRs instead of
-                  managing it directly (default: true)'
+                default: "true"
+                description: Delegate VM conversion to Conversion CRs instead of managing
+                  it directly.
                 enum:
                 - "true"
                 - "false"
                 type: string
               feature_validation:
-                description: 'Enable validation service (default: true)'
+                default: "true"
+                description: Enable validation service.
                 enum:
                 - "true"
                 - "false"
                 type: string
               feature_vmware_system_serial_number:
-                description: 'Use VMware system serial numbers (default: true)'
+                default: "true"
+                description: Use VMware system serial numbers.
                 enum:
                 - "true"
                 - "false"
                 type: string
               feature_volume_populator:
-                description: 'Enable volume populators (default: true)'
+                default: "true"
+                description: Enable volume populators.
                 enum:
                 - "true"
                 - "false"
                 type: string
               feature_vsphere_vmware_driver_removal:
-                description: 'Run VMware driver removal scripts during Windows vSphere
-                  conversion (default: false)'
+                default: "false"
+                description: Run VMware driver removal scripts during Windows vSphere
+                  conversion.
                 enum:
                 - "true"
                 - "false"
                 type: string
               feature_windows_registry_network_config:
-                description: 'Use registry-based network configuration scripts for
-                  Windows static IP setup (default: false)'
+                default: "false"
+                description: Use registry-based network configuration scripts for
+                  Windows static IP setup.
                 enum:
                 - "true"
                 - "false"
                 type: string
               feature_windows_wait_for_reboot:
-                description: 'Enable automatic wait-for-reboot step for Windows VM
-                  migrations (default: true)'
+                default: "true"
+                description: Enable automatic wait-for-reboot step for Windows VM
+                  migrations.
                 enum:
                 - "true"
                 - "false"
                 type: string
               feature_xfs_repair_ignore:
-                description: 'Ignore xfs_repair exit status during conversion (default:
-                  false)'
+                default: "false"
+                description: Ignore xfs_repair exit status during conversion.
                 enum:
                 - "true"
                 - "false"
                 type: string
               hooks_container_limits_cpu:
-                description: 'Hooks CPU limit (default: 1000m)'
-                example: 2000m
+                default: 1000m
+                description: Hooks CPU limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               hooks_container_limits_memory:
-                description: 'Hooks memory limit (default: 1Gi)'
-                example: 2Gi
+                default: 1Gi
+                description: Hooks memory limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               hooks_container_requests_cpu:
-                description: 'Hooks CPU request (default: 100m)'
-                example: 200m
+                default: 100m
+                description: Hooks CPU request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               hooks_container_requests_memory:
-                description: 'Hooks memory request (default: 150Mi)'
-                example: 300Mi
+                default: 150Mi
+                description: Hooks memory request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               hyperv_container_limits_cpu:
-                description: 'HyperV CPU limit (default: 1000m)'
-                example: 2000m
+                default: 1000m
+                description: HyperV CPU limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               hyperv_container_limits_memory:
-                description: 'HyperV memory limit (default: 1Gi)'
-                example: 2Gi
+                default: 1Gi
+                description: HyperV memory limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               hyperv_container_requests_cpu:
-                description: 'HyperV CPU request (default: 100m)'
-                example: 200m
+                default: 100m
+                description: HyperV CPU request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               hyperv_container_requests_memory:
-                description: 'HyperV memory request (default: 512Mi)'
-                example: 300Mi
+                default: 512Mi
+                description: HyperV memory request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               hyperv_provider_server_fqin:
-                description: HyperV provider server image
-                example: quay.io/kubev2v/forklift-hyperv-provider-server:latest
+                description: HyperV provider server image. Optional. If left empty,
+                  the operator automatically sets this from the release payload.
                 type: string
               image_pull_policy:
-                description: 'Image pull policy (default: Always)'
+                default: Always
+                description: Image pull policy.
                 enum:
                 - Always
                 - IfNotPresent
                 - Never
                 type: string
               inventory_container_limits_cpu:
-                description: 'Inventory CPU limit (default: 1000m)'
-                example: 2000m
+                default: "2"
+                description: Inventory CPU limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               inventory_container_limits_memory:
-                description: 'Inventory memory limit (default: 1Gi)'
-                example: 2Gi
+                default: 1Gi
+                description: Inventory memory limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               inventory_container_requests_cpu:
-                description: 'Inventory CPU request (default: 500m)'
-                example: 1000m
+                default: 500m
+                description: Inventory CPU request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               inventory_container_requests_memory:
-                description: 'Inventory memory request (default: 500Mi)'
-                example: 1Gi
+                default: 500Mi
+                description: Inventory memory request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               inventory_route_timeout:
-                description: 'Inventory route timeout (default: 360s)'
-                example: 600s
+                default: 360s
+                description: Inventory route timeout.
+                pattern: ^[0-9]+(s|m|h)$
                 type: string
               k8s_cluster:
-                description: 'Whether running on Kubernetes (vs OpenShift) (default:
-                  false)'
+                default: "false"
+                description: Whether running on Kubernetes (vs OpenShift).
                 enum:
                 - "true"
                 - "false"
                 type: string
               mcp_server_container_limits_cpu:
-                description: 'MCP server CPU limit (default: 1000m)'
-                example: 2000m
+                default: 1000m
+                description: MCP server CPU limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               mcp_server_container_limits_memory:
-                description: 'MCP server memory limit (default: 512Mi)'
-                example: 1Gi
+                default: 512Mi
+                description: MCP server memory limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               mcp_server_container_requests_cpu:
-                description: 'MCP server CPU request (default: 100m)'
-                example: 200m
+                default: 100m
+                description: MCP server CPU request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               mcp_server_container_requests_memory:
-                description: 'MCP server memory request (default: 256Mi)'
-                example: 512Mi
+                default: 256Mi
+                description: MCP server memory request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               mcp_server_kube_insecure:
-                description: 'Skip TLS verification for in-cluster MCP calls (default:
-                  true)'
+                default: "true"
+                description: Skip TLS verification for in-cluster MCP calls.
                 enum:
                 - "true"
                 - "false"
                 type: string
               mcp_server_lightspeed_integration:
-                description: 'Register MCP server with OpenShift Lightspeed (default:
-                  true)'
+                default: "true"
+                description: Register MCP server with OpenShift Lightspeed.
                 enum:
                 - "true"
                 - "false"
                 type: string
               mcp_server_lightspeed_set_mcp_gate:
-                description: 'Add MCPServer to OLSConfig featureGates when registering
-                  with Lightspeed (default: false)'
+                default: "false"
+                description: Add MCPServer to OLSConfig featureGates when registering
+                  with Lightspeed.
                 enum:
                 - "true"
                 - "false"
                 type: string
               mcp_server_max_response_chars:
-                description: 'MCP server max response chars, 0 for unlimited (default:
-                  0)'
-                x-kubernetes-int-or-string: true
+                default: 0
+                description: MCP server max response chars, 0 for unlimited.
+                format: int32
+                minimum: 0
+                type: integer
               mcp_server_output_format:
-                description: 'MCP server output format (default: markdown)'
-                example: markdown
+                default: markdown
+                description: MCP server output format.
+                enum:
+                - markdown
+                - text
+                - json
                 type: string
               mcp_server_read_only:
-                description: 'Run MCP server in read-only mode (default: false)'
+                default: "false"
+                description: Run MCP server in read-only mode.
                 enum:
                 - "true"
                 - "false"
                 type: string
               mcp_server_verbose:
-                description: 'MCP server verbosity level (default: 2)'
-                x-kubernetes-int-or-string: true
+                default: 2
+                description: MCP server verbosity level.
+                format: int32
+                minimum: 0
+                type: integer
               metric_interval:
-                description: 'Metrics scrape interval (default: 30s)'
-                example: 60s
+                default: 30s
+                description: Metrics scrape interval.
+                pattern: ^[0-9]+(s|m|h)$
                 type: string
               must_gather_image_fqin:
-                description: Must-gather debugging image
-                example: quay.io/kubev2v/forklift-must-gather:latest
+                description: Must-gather debugging image. Optional. If left empty,
+                  the operator automatically sets this from the release payload.
                 type: string
               naa_oui_map_configmap_name:
-                description: 'ConfigMap name for custom NAA OUI to storage vendor
-                  mappings (default: forklift-naa-oui-map)'
-                example: custom-naa-oui-map
+                default: forklift-naa-oui-map
+                description: ConfigMap name for custom NAA OUI to storage vendor mappings.
                 type: string
               ova_container_limits_cpu:
-                description: 'OVA CPU limit (default: 1000m)'
-                example: 2000m
+                default: 1000m
+                description: OVA CPU limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               ova_container_limits_memory:
-                description: 'OVA memory limit (default: 1Gi)'
-                example: 2Gi
+                default: 1Gi
+                description: OVA memory limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               ova_container_requests_cpu:
-                description: 'OVA CPU request (default: 100m)'
-                example: 200m
+                default: 100m
+                description: OVA CPU request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               ova_container_requests_memory:
-                description: 'OVA memory request (default: 150Mi)'
-                example: 300Mi
+                default: 512Mi
+                description: OVA memory request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               ova_provider_server_fqin:
-                description: OVA provider server image
-                example: quay.io/kubev2v/ova-provider-server:latest
+                description: OVA provider server image. Optional. If left empty, the
+                  operator automatically sets this from the release payload.
                 type: string
               ova_proxy_container_limits_cpu:
-                description: 'OVA Proxy CPU limit (default: 1000m)'
-                example: 2000m
+                default: 1000m
+                description: OVA Proxy CPU limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               ova_proxy_container_limits_memory:
-                description: 'OVA Proxy memory limit (default: 1Gi)'
-                example: 2Gi
+                default: 1Gi
+                description: OVA Proxy memory limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               ova_proxy_container_requests_cpu:
-                description: 'OVA Proxy CPU request (default: 250m)'
-                example: 200m
+                default: 250m
+                description: OVA Proxy CPU request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               ova_proxy_container_requests_memory:
-                description: 'OVA Proxy memory request (default: 512Mi)'
-                example: 300Mi
+                default: 512Mi
+                description: OVA Proxy memory request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               ova_proxy_fqin:
-                description: OVA inventory proxy image
-                example: quay.io/kubev2v/forklift-ova-proxy:latest
+                description: OVA inventory proxy image. Optional. If left empty, the
+                  operator automatically sets this from the release payload.
                 type: string
               ova_proxy_route_timeout:
-                description: 'OVA Proxy route timeout (default: 360s)'
-                example: 600s
+                default: 360s
+                description: OVA Proxy route timeout.
+                pattern: ^[0-9]+(s|m|h)$
                 type: string
               ovirt_osmap_configmap_name:
-                description: 'ConfigMap name for oVirt OS mappings (default: forklift-ovirt-osmap)'
-                example: custom-ovirt-osmap
+                default: forklift-ovirt-osmap
+                description: ConfigMap name for oVirt OS mappings.
                 type: string
               populator_container_limits_cpu:
-                description: 'Volume Populator CPU limit (default: 1000m)'
-                example: 2000m
+                default: 1000m
+                description: Volume Populator CPU limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               populator_container_limits_memory:
-                description: 'Volume Populator memory limit (default: 1Gi)'
-                example: 2Gi
+                default: 1Gi
+                description: Volume Populator memory limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               populator_container_requests_cpu:
-                description: 'Volume Populator CPU request (default: 100m)'
-                example: 200m
+                default: 100m
+                description: Volume Populator CPU request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               populator_container_requests_memory:
-                description: 'Volume Populator memory request (default: 512Mi)'
-                example: 300Mi
+                default: 512Mi
+                description: Volume Populator memory request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               populator_controller_image_fqin:
-                description: Volume populator controller image
-                example: quay.io/kubev2v/populator-controller:latest
+                description: Volume populator controller image. Optional. If left
+                  empty, the operator automatically sets this from the release payload.
                 type: string
               populator_openstack_image_fqin:
-                description: OpenStack populator image
-                example: quay.io/kubev2v/openstack-populator:latest
+                description: OpenStack populator image. Optional. If left empty, the
+                  operator automatically sets this from the release payload.
                 type: string
               populator_ovirt_image_fqin:
-                description: oVirt populator image
-                example: quay.io/kubev2v/ovirt-populator:latest
+                description: oVirt populator image. Optional. If left empty, the operator
+                  automatically sets this from the release payload.
                 type: string
               populator_vsphere_copy_offload_image_fqin:
-                description: vSphere xcopy populator image
-                example: quay.io/kubev2v/vsphere-populator:latest
+                description: vSphere xcopy populator image. Optional. If left empty,
+                  the operator automatically sets this from the release payload.
                 type: string
               ui_plugin_container_limits_cpu:
-                description: 'UI plugin CPU limit (default: 100m)'
-                example: 200m
+                default: 100m
+                description: UI plugin CPU limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               ui_plugin_container_limits_memory:
-                description: 'UI plugin memory limit (default: 800Mi)'
-                example: 1Gi
+                default: 800Mi
+                description: UI plugin memory limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               ui_plugin_container_requests_cpu:
-                description: 'UI plugin CPU request (default: 100m)'
-                example: 200m
+                default: 100m
+                description: UI plugin CPU request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               ui_plugin_container_requests_memory:
-                description: 'UI plugin memory request (default: 150Mi)'
-                example: 300Mi
+                default: 150Mi
+                description: UI plugin memory request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               ui_plugin_image_fqin:
-                description: UI plugin image
-                example: quay.io/kubev2v/forklift-ui-plugin:latest
+                description: UI plugin image. Optional. If left empty, the operator
+                  automatically sets this from the release payload.
                 type: string
               validation_container_limits_cpu:
-                description: 'Validation CPU limit (default: 1000m)'
-                example: 2000m
+                default: 1000m
+                description: Validation CPU limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               validation_container_limits_memory:
-                description: 'Validation memory limit (default: 300Mi)'
-                example: 500Mi
+                default: 300Mi
+                description: Validation memory limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               validation_container_requests_cpu:
-                description: 'Validation CPU request (default: 400m)'
-                example: 500m
+                default: 400m
+                description: Validation CPU request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               validation_container_requests_memory:
-                description: 'Validation memory request (default: 50Mi)'
-                example: 100Mi
+                default: 50Mi
+                description: Validation memory request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               validation_extra_volume_mountpath:
-                description: 'Mount path for extra validation rules (default: /usr/share/opa/policies/extra)'
-                example: /custom/validation/path
+                default: /usr/share/opa/policies/extra
+                description: Mount path for extra validation rules.
                 type: string
               validation_extra_volume_name:
-                description: 'Volume name for extra validation rules (default: validation-extra-rules)'
-                example: custom-validation-rules
+                default: validation-extra-rules
+                description: Volume name for extra validation rules.
                 type: string
               validation_image_fqin:
-                description: Validation service image
-                example: quay.io/kubev2v/forklift-validation:latest
+                description: Validation service image. Optional. If left empty, the
+                  operator automatically sets this from the release payload.
                 type: string
               validation_policy_agent_search_interval:
-                description: 'Policy agent search interval in seconds (default: 120)'
-                x-kubernetes-int-or-string: true
+                default: 120
+                description: Policy agent search interval in seconds.
+                format: int32
+                minimum: 1
+                type: integer
               vddk_image:
-                description: VDDK image for VMware disk access
-                example: quay.io/kubev2v/vddk:7.0.3
+                description: VDDK image for VMware disk access. Optional. If left
+                  empty, no VDDK image is configured.
                 type: string
               virt_customize_configmap_name:
-                description: 'ConfigMap name for virt-customize configuration (default:
-                  forklift-virt-customize)'
-                example: custom-virt-customize
+                default: forklift-virt-customize
+                description: ConfigMap name for virt-customize configuration.
                 type: string
               virt_v2v_container_limits_cpu:
-                description: 'virt-v2v CPU limit (default: 4000m)'
-                example: 8000m
+                default: 4000m
+                description: Virt-v2v CPU limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               virt_v2v_container_limits_memory:
-                description: 'virt-v2v memory limit (default: 8Gi)'
-                example: 16Gi
+                default: 8Gi
+                description: Virt-v2v memory limit.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               virt_v2v_container_requests_cpu:
-                description: 'virt-v2v CPU request (default: 1000m)'
-                example: 2000m
+                default: 1000m
+                description: Virt-v2v CPU request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               virt_v2v_container_requests_memory:
-                description: 'virt-v2v memory request (default: 1Gi)'
-                example: 2Gi
+                default: 1Gi
+                description: Virt-v2v memory request.
+                pattern: ^[0-9]+(\.[0-9]+)?(m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei)?$
                 type: string
               virt_v2v_dont_request_kvm:
-                description: Don't request KVM for virt-v2v
+                description: Don't request KVM for virt-v2v. Optional. If left empty,
+                  the operator automatically sets this from the environment.
                 enum:
                 - "true"
                 - "false"
                 type: string
               virt_v2v_extra_args:
-                description: Additional arguments for virt-v2v conversion
-                example: --parallel 4
+                description: Additional arguments for virt-v2v conversion. Optional.
+                  If left empty, the operator automatically sets this from the environment.
                 type: string
               virt_v2v_extra_conf_config_map:
-                description: ConfigMap name containing extra virt-v2v configuration
+                description: ConfigMap name containing extra virt-v2v configuration.
+                  Optional. If left empty, the operator automatically sets this from
+                  the environment.
                 type: string
               virt_v2v_image_fqin:
-                description: Virt-v2v conversion image used by migration pods
-                example: quay.io/kubev2v/forklift-virt-v2v:latest
+                description: Virt-v2v conversion image. Optional. If left empty, the
+                  operator automatically sets this from the release payload.
                 type: string
               virt_v2v_image_xfs_fqin:
-                description: Virt-v2v XFS conversion image used by migration pods
-                example: quay.io/kubev2v/forklift-virt-v2v-xfs:latest
+                description: Virt-v2v XFS conversion image. Optional. If left empty,
+                  the operator automatically sets this from the release payload.
                 type: string
               virt_v2v_inspector_extra_args:
-                description: Additional arguments for virt-v2v-inspector
-                example: --root first
+                description: Additional arguments for virt-v2v-inspector. Optional.
+                  If left empty, the operator automatically sets this from the environment.
                 type: string
               virt_v2v_memsize:
-                description: 'Memory (in MB) allocated for the virt-v2v conversion
-                  appliance (default: virt-v2v chooses)'
-                example: 4096
+                description: Memory (in MB) allocated for the virt-v2v conversion
+                  appliance.
+                format: int32
+                minimum: 1
                 type: integer
               virt_v2v_smp:
-                description: 'Number of virtual CPUs for the virt-v2v conversion appliance
-                  (default: virt-v2v chooses)'
-                example: 8
+                description: Number of virtual CPUs for the virt-v2v conversion appliance.
+                format: int32
+                minimum: 1
                 type: integer
               vsphere_osmap_configmap_name:
-                description: 'ConfigMap name for vSphere OS mappings (default: forklift-vsphere-osmap)'
-                example: custom-vsphere-osmap
+                default: forklift-vsphere-osmap
+                description: ConfigMap name for vSphere OS mappings.
                 type: string
               wait_for_final_snapshot_consolidation:
-                description: 'Wait for final snapshot removal and consolidation in
-                  a VMware warm migration (default: true)'
+                default: "true"
+                description: Wait for final snapshot removal and consolidation in
+                  a VMware warm migration.
                 enum:
                 - "true"
                 - "false"
                 type: string
             type: object
           status:
-            description: Status defines the observed state of ForkliftController
+            description: |-
+              ForkliftControllerStatus defines the observed state of ForkliftController.
+              Status is managed by the Ansible operator and may contain arbitrary fields
+              including conditions with Ansible-specific metadata.
             type: object
             x-kubernetes-preserve-unknown-fields: true
         type: object

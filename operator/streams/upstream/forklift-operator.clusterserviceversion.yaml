@@ -146,7 +146,7 @@ spec:
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:radio:true
           - urn:alm:descriptor:com.tectonic.ui:radio:false
-        - description: Enable OCP live migration (default false)
+        - description: Enable OCP live migration
           displayName: Enable OCP Live Migration
           path: feature_ocp_live_migration
           x-descriptors:
@@ -199,7 +199,7 @@ spec:
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:radio:true
           - urn:alm:descriptor:com.tectonic.ui:radio:false
-        - description: Enable OVA appliance management endpoints (default false)
+        - description: Enable OVA appliance management endpoints
           displayName: Enable OVA Appliance Management
           path: feature_ova_appliance_management
           x-descriptors:
@@ -292,7 +292,7 @@ spec:
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:hidden
         # Controller Resource Configuration
-        - description: Controller CPU limit (default 500m)
+        - description: Controller CPU limit
           displayName: Controller CPU Limit
           path: controller_container_limits_cpu
           x-descriptors:
@@ -313,7 +313,7 @@ spec:
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:hidden
         # Inventory Resource Configuration
-        - description: Inventory CPU limit (default 1000m)
+        - description: Inventory CPU limit
           displayName: Inventory CPU Limit
           path: inventory_container_limits_cpu
           x-descriptors:
@@ -360,22 +360,22 @@ spec:
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:hidden
         # CLI Download Resource Configuration
-        - description: CLI download service CPU limit (default 100m)
+        - description: CLI download service CPU limit
           displayName: CLI Download CPU Limit
           path: cli_download_container_limits_cpu
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:hidden
-        - description: CLI download service memory limit (default 128Mi)
+        - description: CLI download service memory limit
           displayName: CLI Download Memory Limit
           path: cli_download_container_limits_memory
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:hidden
-        - description: CLI download service CPU request (default 50m)
+        - description: CLI download service CPU request
           displayName: CLI Download CPU Request
           path: cli_download_container_requests_cpu
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:hidden
-        - description: CLI download service memory request (default 64Mi)
+        - description: CLI download service memory request
           displayName: CLI Download Memory Request
           path: cli_download_container_requests_memory
           x-descriptors:
