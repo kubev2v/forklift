@@ -37,6 +37,12 @@ const (
 	PhaseCanceled  ConversionPhase = "Canceled"
 )
 
+// Condition types set on Conversion status.
+const (
+	ConversionFailed   = "ConversionFailed"
+	ConversionCanceled = "ConversionCanceled"
+)
+
 // ConversionStage is the fine-grained pipeline position within the Running phase.
 type ConversionStage string
 
@@ -301,6 +307,10 @@ type ConversionStatus struct {
 	// +optional
 	// +kubebuilder:validation:Enum=CreatingPod;PodRunning;CreatingSnapshot;WaitingForSnapshot;RemovingSnapshot;WaitingForSnapshotRemoval;FetchingResults;Finished
 	Stage ConversionStage `json:"stage,omitempty"`
+	// Message is a human-readable explanation of the current phase, populated
+	// by the conversion controller on every reconcile.
+	// +optional
+	Message string `json:"message,omitempty"`
 	// Reference to the managed conversion pod.
 	// +optional
 	Pod core.ObjectReference `json:"pod,omitempty"`

@@ -15,6 +15,12 @@
   - [Pure FlashArray](#pure-flasharray)
   - [Dell PowerMax](#dell-powermax)
   - [Dell PowerFlex](#dell-powerflex)
+- [CSI Volume Import (Tech Preview)](#csi-volume-import-tech-preview)
+  - [How It Works](#how-it-works)
+  - [Supported CSI Import Vendors](#supported-csi-import-vendors)
+  - [Setup CSI Volume Import](#setup-csi-volume-import)
+  - [CSI Volume Import Limitations](#csi-volume-import-limitations)
+  - [Adding New Vendors](#adding-new-vendors)
 - [Limitations](#limitations)
 - [Storage Offload Fallback Copy](#storage-offload-fallback-copy)
 - [Matching PVC with DataStores](#matching-pvc-with-datastores-to-deduce-copy-offload-support)
@@ -325,6 +331,160 @@ For the full requirement and VM configuration details, see the IBM documentation
 
 To prevent overloading ESXi hosts during concurrent migrations, the vsphere-copy-offload-populator uses a distributed lease mechanism based on Kubernetes Lease objects.
 This ensures that heavy operations like storage rescans are serialized per ESXi host. For more details on its configuration, behavior, and monitoring, refer to the [Host Lease Management documentation](docs/copy-offload-lease-management.md).
+
+## CSI Volume Import (Tech Preview)
+
+CSI Volume Import is an alternative copy method for migrating **VVol** and **RDM** disks.
+Instead of using the XCOPY volume populator (which runs a populator pod per disk), CSI Volume
+Import annotates the target PVC with vendor-specific metadata so the **CSI driver** clones the
+array volume directly during provisioning. No populator pod, no ESXi vmkfstools invocation —
+the storage array handles the copy internally.
+
+CSI Volume Import can coexist with XCOPY on the same StorageMap: different datastore mappings
+can independently use XCOPY or CSI import. For example, VMDK datastores can use XCOPY while
+VVol datastores use CSI import in the same migration plan.
+
+### How It Works
+
+1. The forklift controller detects disk type (VVol, RDM, or VMDK) by inspecting the VM's
+   disk backing via the vSphere API.
+2. For VVol/RDM disks on a datastore with CSI import configured, the controller queries the
+   storage array's management API (e.g., HPE WSAPI) to resolve the source volume name.
+3. The controller creates a PVC with vendor-specific annotations (e.g.,
+   `csi.hpe.com/importVolAsClone: <volume-name>`). The CSI driver reads these annotations
+   during provisioning and clones the source volume on the array.
+4. No populator pod or `VSphereXcopyVolumePopulator` CR is created — the CSI driver handles
+   everything.
+
+### Supported CSI Import Vendors
+
+| Vendor | `storageVendorProduct` value | Annotation |
+| ------ | ---------------------------- | ---------- |
+| HPE Primera/3PAR/Alletra | `primera3par` | `csi.hpe.com/importVolAsClone` |
+
+### Setup CSI Volume Import
+
+#### 1. Apply the updated StorageMap CRD
+
+CSI Volume Import requires the `csiVolumeImport` field in the StorageMap CRD. If your
+cluster was deployed before this feature, apply the updated CRD:
+
+```bash
+oc apply -f https://raw.githubusercontent.com/kubev2v/forklift/main/operator/config/crd/bases/forklift.konveyor.io_storagemaps.yaml
+```
+
+#### 2. Create a storage credentials secret
+
+The secret uses the same format as XCOPY. For HPE Primera/3PAR, see
+[HPE Primera/3PAR secret](#hpe-primera3par).
+
+#### 3. Create a StorageMap with CSI Volume Import
+
+```yaml
+apiVersion: forklift.konveyor.io/v1beta1
+kind: StorageMap
+metadata:
+  name: csi-import-map
+  namespace: openshift-mtv
+spec:
+  map:
+  - destination:
+      storageClass: YOUR_STORAGE_CLASS       # (1)
+    offloadPlugin:
+      csiVolumeImport:
+        secretRef: hpe-3par-secret           # (2)
+        storageVendorProduct: primera3par    # (3)
+    source:
+      id: DATASTORE_ID                       # (4) e.g. datastore-18601
+  provider:
+    destination:
+      apiVersion: forklift.konveyor.io/v1beta1
+      kind: Provider
+      name: host
+      namespace: openshift-mtv
+      uid: YOUR_HOST_PROVIDER_ID             # (5)
+    source:
+      apiVersion: forklift.konveyor.io/v1beta1
+      kind: Provider
+      name: YOUR_VSPHERE_PROVIDER_NAME       # (6)
+      namespace: openshift-mtv
+      uid: YOUR_VSPHERE_PROVIDER_ID          # (7)
+```
+
+1. The StorageClass for the target PVC — must be backed by the same storage array
+2. Secret with storage provider credentials (same namespace as the source provider)
+3. Vendor product identifier (see [Supported CSI Import Vendors](#supported-csi-import-vendors))
+4. vSphere datastore ID containing the VVol/RDM disks
+5. Host provider UID
+6. vSphere provider name
+7. vSphere provider UID
+
+#### 4. Create a Plan
+
+Create a migration Plan referencing the StorageMap, same as for XCOPY:
+
+```yaml
+apiVersion: forklift.konveyor.io/v1beta1
+kind: Plan
+metadata:
+  name: my-csi-import-plan
+spec:
+  map:
+    storage:
+      apiVersion: forklift.konveyor.io/v1beta1
+      kind: StorageMap
+      name: csi-import-map
+      namespace: openshift-mtv
+```
+
+#### Mixing with XCOPY
+
+To use both CSI import and XCOPY in the same StorageMap, configure each datastore mapping
+independently:
+
+```yaml
+spec:
+  map:
+  # VVol datastore → CSI import
+  - destination:
+      storageClass: hpe-sc
+    offloadPlugin:
+      csiVolumeImport:
+        secretRef: hpe-secret
+        storageVendorProduct: primera3par
+    source:
+      id: datastore-101    # VVol datastore
+  # VMFS datastore → XCOPY
+  - destination:
+      storageClass: hpe-sc
+    offloadPlugin:
+      vsphereXcopyConfig:
+        secretRef: hpe-secret
+        storageVendorProduct: primera3par
+    source:
+      id: datastore-102    # VMFS datastore
+```
+
+### CSI Volume Import Limitations
+
+- **VVol and RDM disks only** — VMDK disks are not supported. VMs with VMDK disks on a
+  datastore configured for CSI import only (no XCOPY) will be blocked by plan validation.
+- **No warm migration** — CSI import only supports cold migration. The source VM must be
+  powered off before the copy begins.
+- **Binary progress** — unlike XCOPY (which reports copy percentage), CSI import progress
+  is either 0% (PVC not yet bound) or 100% (PVC bound). There is no intermediate progress.
+- **Tech Preview** — the API surface (`csiVolumeImport` in StorageMap) may change in future
+  releases.
+
+### Adding New Vendors
+
+To add CSI import support for a new storage vendor:
+
+1. Implement the `CsiImportPlugin` interface in a new package under
+   `pkg/storage/resolver/<vendor>/`.
+2. Add the new vendor to the factory switch in
+   `pkg/controller/plan/adapter/vsphere/csi_import.go`.
+3. See the HPE package (`pkg/storage/resolver/hpe/`) as a reference implementation.
 
 ## Limitations
 - A migration plan cannot mix VDDK mappings with copy-offload mappings.
