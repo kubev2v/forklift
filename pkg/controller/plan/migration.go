@@ -861,6 +861,31 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				}
 			}
 
+			csiPVCs, csiErr := r.kubevirt.CsiImportPVCs(vm)
+			if csiErr != nil {
+				if !errors.As(csiErr, &web.ProviderNotReadyError{}) {
+					r.Log.Error(csiErr, "error creating CSI import PVCs", "vm", vm.Name)
+					step.AddError(csiErr.Error())
+					err = nil
+					break
+				} else {
+					err = csiErr
+					return
+				}
+			}
+			if len(csiPVCs) > 0 {
+				if csiErr = r.ensurer.PersistentVolumeClaims(vm, csiPVCs); csiErr != nil {
+					if !errors.As(csiErr, &web.ProviderNotReadyError{}) {
+						step.AddError(csiErr.Error())
+						err = nil
+						break
+					} else {
+						err = csiErr
+						return
+					}
+				}
+			}
+
 			if r.builder.SupportsVolumePopulators() {
 				var pvcs []*core.PersistentVolumeClaim
 				if pvcs, err = r.kubevirt.PopulatorVolumes(vm.Ref); err != nil {
