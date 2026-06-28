@@ -405,12 +405,28 @@ func (c *FlashSystemClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 }
 
 // MatchesDevice returns true if the given device name belongs to this FlashSystem array.
-// It checks whether the device name carries the IBM vendor OUI prefix (naa.6005076).
-// TODO(MTV-5780): validate prefix against a real array (no lab access at time of writing)
+// It first checks the IBM vendor OUI prefix (naa.6005076) for a fast reject, then
+// queries the array API to confirm a vdisk with the matching UID exists on this specific array.
 func (c *FlashSystemClonner) MatchesDevice(deviceName string) (bool, error) {
-	matches := strings.HasPrefix(strings.ToLower(deviceName), FlashSystemProviderIDPrefix)
-	c.log.V(2).Info("checking device ownership", "device", deviceName, "prefix", FlashSystemProviderIDPrefix, "matches", matches)
-	return matches, nil
+	if !strings.HasPrefix(strings.ToLower(deviceName), FlashSystemProviderIDPrefix) {
+		c.log.V(1).Info("device does not match vendor prefix", "device", deviceName, "prefix", FlashSystemProviderIDPrefix)
+		return false, nil
+	}
+
+	uid := strings.TrimPrefix(strings.ToLower(deviceName), "naa.")
+	c.log.V(1).Info("querying array for volume ownership", "device", deviceName, "uid", uid)
+
+	_, err := c.getVDiskByUID(uid)
+	if err != nil {
+		if strings.Contains(err.Error(), "no volume found") {
+			c.log.V(1).Info("volume not found on this array", "device", deviceName, "uid", uid)
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to query vdisk by UID %s: %w", uid, err)
+	}
+
+	c.log.V(1).Info("device confirmed on this array", "device", deviceName, "uid", uid)
+	return true, nil
 }
 
 // NewFlashSystemClonner creates a new FlashSystemClonner.
