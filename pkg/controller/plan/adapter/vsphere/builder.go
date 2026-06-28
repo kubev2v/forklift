@@ -36,6 +36,7 @@ import (
 	libref "github.com/kubev2v/forklift/pkg/lib/ref"
 	"github.com/kubev2v/forklift/pkg/lib/util"
 	"github.com/kubev2v/forklift/pkg/settings"
+	"github.com/kubev2v/forklift/pkg/storage/resolver"
 	"github.com/kubev2v/forklift/pkg/templateutil"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/types"
@@ -186,7 +187,6 @@ func (r *Builder) ConfigMap(_ ref.Ref, _ *core.Secret, _ *core.ConfigMap) (err e
 }
 
 func IsLegacyWindows(vm *model.VM) bool {
-
 	guestID := strings.ToLower(vm.GuestID)
 	guestName := strings.ToLower(vm.GuestName)
 
@@ -237,7 +237,7 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		macIPCount := make(map[string]int)
 
 		for _, gn := range vm.GuestNetworks {
-			//IS ipv4
+			// IS ipv4
 			if gn.Origin == string(types.NetIpConfigInfoIpAddressOriginManual) && net.IP.To4(net.ParseIP(gn.IP)) != nil {
 				macIPCount[gn.MAC]++
 			}
@@ -514,24 +514,20 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 	if err != nil {
 		return
 	}
-
 	// For storage offload warm migrations, match this DataVolume to the
 	// existing PVC via the backing file name.
 	var pvcMap map[string]core.PersistentVolumeClaim
 	if r.Plan.IsWarm() && r.SupportsVolumePopulators() {
-		pvcMap = make(map[string]core.PersistentVolumeClaim)
 		pvcs := &core.PersistentVolumeClaimList{}
-		pvcLabels := map[string]string{
-			"vmID":      vmRef.ID,
-			"migration": string(r.Migration.UID),
-		}
-
 		err = r.Context.Destination.Client.List(
 			context.TODO(),
 			pvcs,
 			&client.ListOptions{
-				Namespace:     r.Plan.Spec.TargetNamespace,
-				LabelSelector: labels.SelectorFromSet(pvcLabels),
+				Namespace: r.Plan.Spec.TargetNamespace,
+				LabelSelector: labels.SelectorFromSet(map[string]string{
+					"vmID":      vmRef.ID,
+					"migration": string(r.Migration.UID),
+				}),
 			},
 		)
 		if err != nil {
@@ -539,6 +535,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 			return
 		}
 
+		pvcMap = make(map[string]core.PersistentVolumeClaim)
 		for _, pvc := range pvcs.Items {
 			if copyOffload, present := pvc.Annotations["copy-offload"]; present && copyOffload != "" {
 				pvcMap[baseVolume(copyOffload, r.Plan.IsWarm())] = pvc
@@ -764,7 +761,7 @@ func (r *Builder) findInterfaceIps(vm *model.VM, nic vsphere.NIC) []string {
 func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err error) {
 	var kNetworks []cnv.Network
 	var kInterfaces []cnv.Interface
-	var staticIpInterfaces = make(map[string][]string)
+	staticIpInterfaces := make(map[string][]string)
 
 	numNetworks := 0
 	hasUDN := r.Plan.DestinationHasUdnNetwork(r.Destination)
@@ -942,7 +939,8 @@ func (r *Builder) mapFirmware(vm *model.VM, object *cnv.VirtualMachineSpec) {
 		firmware.Bootloader = &cnv.Bootloader{
 			EFI: &cnv.EFI{
 				SecureBoot: &vm.SecureBoot,
-			}}
+			},
+		}
 		if vm.SecureBoot {
 			object.Template.Spec.Domain.Features = &cnv.Features{
 				SMM: &cnv.FeatureState{
@@ -1312,10 +1310,9 @@ func (r *Builder) SupportsVolumePopulators() bool {
 			return false
 		}
 
-		if m.OffloadPlugin != nil && m.OffloadPlugin.VSphereXcopyPluginConfig != nil {
-			klog.V(2).Infof("found offload plugin: config %+v on ds map  %+v", m.OffloadPlugin.VSphereXcopyPluginConfig, dsMapIn)
+		if m.OffloadPlugin != nil && (m.OffloadPlugin.VSphereXcopyPluginConfig != nil || m.OffloadPlugin.CsiVolumeImport != nil) {
+			klog.V(2).Infof("found offload plugin on ds map %+v", dsMapIn)
 			return true
-
 		}
 	}
 	return false
@@ -1405,6 +1402,12 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 			} else if disk.Datastore.ID == ds.ID {
 				effectiveMapped = mapped
 			} else {
+				continue
+			}
+
+			diskSource := baseVolume(disk.File, r.Plan.IsWarm())
+			if r.diskHandledByCsiImport(pvcList, diskSource) {
+				r.Log.Info("Skipping disk in PopulatorVolumes (already handled by CSI import)", "disk", disk.File, "key", disk.Key)
 				continue
 			}
 
@@ -1654,6 +1657,146 @@ func (r *Builder) lookupDatastoreNAA(ds *model.Datastore, cache map[string]strin
 	return naa
 }
 
+// buildCsiImportPVC creates a PVC with CSI import annotations for VVol/RDM disks.
+// The CSI driver reads the annotation and clones the named source array volume; no
+// populator pod, CR, or service account is created.
+func (r *Builder) buildCsiImportPVC(
+	ctx context.Context,
+	vmRef ref.Ref,
+	vm *model.VM,
+	disk vsphere.Disk,
+	diskIndex int,
+	mapped *api.StoragePair,
+	annotations map[string]string,
+) (*core.PersistentVolumeClaim, error) {
+	if mapped.OffloadPlugin == nil || mapped.OffloadPlugin.CsiVolumeImport == nil {
+		return nil, liberr.New("CSI import plugin not configured for storage pair")
+	}
+
+	csiCfg := mapped.OffloadPlugin.CsiVolumeImport
+	r.Log.V(2).Info("CSI import: processing disk", "disk", disk.File, "vendor", csiCfg.StorageVendorProduct, "secretRef", csiCfg.SecretRef)
+
+	if mapped.Destination.StorageClass == "" {
+		return nil, liberr.New("CSI import requires a destination StorageClass to be specified in the storage mapping")
+	}
+
+	if r.Plan.IsWarm() {
+		r.Log.Info("CSI import: warm migration not supported, falling through", "disk", disk.File)
+		return nil, nil //nolint:nilnil
+	}
+
+	vsphereClient := &Client{Context: r.Context}
+	if err := vsphereClient.connect(); err != nil {
+		return nil, liberr.Wrap(err, "failed to connect to vSphere for disk backing detection")
+	}
+	defer vsphereClient.Close()
+
+	backing, err := vsphereClient.getDiskBacking(ctx, vmRef.ID, disk.File)
+	if err != nil {
+		return nil, liberr.Wrap(err, "disk", disk.File)
+	}
+	diskType := resolver.DetectDiskType(backing)
+	r.Log.V(2).Info("CSI import: detected disk backing", "disk", disk.File, "type", diskType, "vvolId", backing.VVolID, "isRDM", backing.IsRDM, "deviceName", backing.DeviceName)
+
+	if diskType == resolver.DiskTypeVMDK {
+		r.Log.Info("CSI import: VMDK disk, falling through", "disk", disk.File)
+		return nil, nil //nolint:nilnil
+	}
+
+	// Read storage credentials from the secret in the source provider's namespace
+	storageSecret := &core.Secret{}
+	if err = r.Destination.Get(ctx, client.ObjectKey{
+		Name:      csiCfg.SecretRef,
+		Namespace: r.Source.Provider.Namespace,
+	}, storageSecret); err != nil {
+		return nil, liberr.Wrap(err, "secretRef", csiCfg.SecretRef)
+	}
+	host := string(storageSecret.Data["STORAGE_HOSTNAME"])
+	user := string(storageSecret.Data["STORAGE_USERNAME"])
+	pass := string(storageSecret.Data["STORAGE_PASSWORD"])
+	skipSSL := basecontroller.GetInsecureSkipVerifyFlag(r.Source.Secret)
+
+	var missing []string
+	if host == "" {
+		missing = append(missing, "hostname")
+	}
+	if user == "" {
+		missing = append(missing, "username")
+	}
+	if pass == "" {
+		missing = append(missing, "password")
+	}
+	if len(missing) > 0 {
+		return nil, liberr.New(
+			fmt.Sprintf("storage secret %q is missing required keys: %s", csiCfg.SecretRef, strings.Join(missing, ", ")),
+		)
+	}
+
+	// Instantiate vendor plugin (xcopy pattern: switch in newCsiImportPlugin creates concrete type)
+	plugin, err := newCsiImportPlugin(csiCfg.StorageVendorProduct, host, user, pass, skipSSL)
+	if err != nil {
+		return nil, liberr.Wrap(err, "vendor", string(csiCfg.StorageVendorProduct))
+	}
+
+	r.Log.V(2).Info("CSI import: resolving vendor annotations", "disk", disk.File, "type", diskType, "deviceName", backing.DeviceName)
+	vendorAnnotations, err := plugin.Resolve(backing)
+	if err != nil {
+		return nil, liberr.Wrap(err, "disk", disk.File)
+	}
+	r.Log.V(2).Info("CSI import: vendor resolution succeeded", "annotations", vendorAnnotations)
+
+	// Merge annotations: forklift tracking first, then vendor (vendor wins on collision)
+	// AnnDiskSource must match the task name (vSphere disk file) for GetPopulatorTaskName
+	pvcAnnotations := map[string]string{
+		planbase.AnnDiskSource:  baseVolume(disk.File, r.Plan.IsWarm()),
+		planbase.AnnCopyMethod:  planbase.CopyMethodCsiImport,
+		planbase.AnnCopyOffload: baseVolume(disk.File, r.Plan.IsWarm()),
+	}
+	for k, v := range annotations {
+		pvcAnnotations[k] = v
+	}
+	for k, v := range vendorAnnotations {
+		pvcAnnotations[k] = v
+	}
+
+	namespace := r.Plan.Spec.TargetNamespace
+	storageClass := mapped.Destination.StorageClass
+	pvblock := core.PersistentVolumeBlock
+	pvcLabels := map[string]string{
+		"migration": string(r.Migration.UID),
+		"vmdkKey":   fmt.Sprint(disk.Key),
+		"vmID":      vmRef.ID,
+	}
+
+	pvc := &core.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:   namespace,
+			Labels:      pvcLabels,
+			Annotations: pvcAnnotations,
+		},
+		Spec: core.PersistentVolumeClaimSpec{
+			StorageClassName: &storageClass,
+			VolumeMode:       &pvblock,
+			AccessModes:      []core.PersistentVolumeAccessMode{core.ReadWriteMany},
+			Resources: core.VolumeResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceStorage: *resource.NewQuantity(disk.Capacity, resource.BinarySI),
+				},
+			},
+			// No DataSourceRef — CSI driver handles provisioning via import annotation
+		},
+	}
+	if mapped.Destination.AccessMode != "" {
+		pvc.Spec.AccessModes = []core.PersistentVolumeAccessMode{mapped.Destination.AccessMode}
+	}
+
+	if err = r.setColdMigrationDefaultPVCName(&pvc.ObjectMeta, vm, diskIndex, disk); err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
+	return pvc, nil
+}
+
 func (r *Builder) PrePopulateActions(c planbase.Client, vmRef ref.Ref) (ready bool, err error) {
 	err = planbase.VolumePopulatorNotSupportedError
 	return
@@ -1666,6 +1809,16 @@ func (r *Builder) getPopulatorForPVC(pvc *core.PersistentVolumeClaim) (api.VSphe
 }
 
 func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (transferredBytes int64, err error) {
+	if pvc.Annotations[planbase.AnnCopyMethod] == planbase.CopyMethodCsiImport {
+		pvcSize := pvc.Spec.Resources.Requests[core.ResourceStorage]
+		if pvc.Status.Phase == core.ClaimBound {
+			transferredBytes = pvcSize.Value()
+		} else {
+			transferredBytes = 0
+		}
+		return transferredBytes, nil
+	}
+
 	populatorCr, err := r.getPopulatorForPVC(pvc)
 	if err != nil {
 		return 0, err
@@ -1895,7 +2048,6 @@ func (r *Builder) setColdMigrationDefaultPVCName(objectMeta *metav1.ObjectMeta, 
 	}
 
 	return r.setObjectNameFromTemplate(objectMeta, templateConfig, &templateData)
-
 }
 
 // setPVCNameFromTemplate sets PVC name/generateName using the PVC template
@@ -2069,7 +2221,8 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 	baseMigrationSecret := &core.Secret{}
 	if err := r.Destination.Get(context.Background(), client.ObjectKey{
 		Name:      migrationSecret,
-		Namespace: migrationSecretNS}, baseMigrationSecret); err != nil {
+		Namespace: migrationSecretNS,
+	}, baseMigrationSecret); err != nil {
 		return fmt.Errorf("failed to get base migration secret: %w", err)
 	}
 
@@ -2091,7 +2244,8 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 	src := &core.Secret{}
 	if err := r.Destination.Get(context.Background(), client.ObjectKey{
 		Name:      storageVendorSecret,
-		Namespace: storageVendorSecretNS},
+		Namespace: storageVendorSecretNS,
+	},
 		src); err != nil {
 		return fmt.Errorf("failed to get storage secret: %w", err)
 	}
@@ -2305,7 +2459,6 @@ func (r *Builder) ensurePopulatorServiceAccount(namespace string) error {
 			}
 			return nil
 		})
-
 	if err != nil {
 		return err
 	}
@@ -2438,6 +2591,17 @@ func (r *Builder) findExistingPVCInList(pvc *core.PersistentVolumeClaim, pvcList
 	return nil
 }
 
+func (r *Builder) diskHandledByCsiImport(pvcList *core.PersistentVolumeClaimList, diskSource string) bool {
+	for i := range pvcList.Items {
+		pvc := &pvcList.Items[i]
+		if pvc.Annotations[planbase.AnnDiskSource] == diskSource &&
+			pvc.Annotations[planbase.AnnCopyMethod] == planbase.CopyMethodCsiImport {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *Builder) generatePopulatorSuffix(migrationUID, vmID string, diskKey int32, diskFile string, diskIndex int) string {
 	input := fmt.Sprintf("%s-%s-%d-%s-%d", migrationUID, vmID, diskKey, diskFile, diskIndex)
 	hash := sha256.Sum256([]byte(input))
@@ -2464,6 +2628,45 @@ func (r *Builder) ensureXCopyVolumePopulator(vp *api.VSphereXcopyVolumePopulator
 		r.Log.Info("Populator already exists", "populator", vp.Name, "namespace", vp.Namespace)
 	}
 	return nil
+}
+
+// CsiImportPVCs creates PVCs for disks that have CsiVolumeImport configured.
+// VMDK disks are skipped (handled by DataVolumes via VDDK or PopulatorVolumes via xcopy).
+func (r *Builder) CsiImportPVCs(vmRef ref.Ref, pvcLabels map[string]string) (pvcs []core.PersistentVolumeClaim, err error) {
+	vm := &model.VM{}
+	if err = r.Source.Inventory.Find(vm, vmRef); err != nil {
+		err = liberr.Wrap(err, "vm", vmRef.String())
+		return
+	}
+	if !r.shouldMigrateSharedDisks(vm) {
+		vm.RemoveSharedDisks()
+	}
+
+	dsMap, err := r.buildDatastoreMap()
+	if err != nil {
+		return
+	}
+
+	disks := vm.SortedDisksAsVmware()
+	for diskIndex, disk := range disks {
+		mapped, found := dsMap[disk.Datastore.ID]
+		if !found {
+			continue
+		}
+		if mapped.OffloadPlugin == nil || mapped.OffloadPlugin.CsiVolumeImport == nil {
+			continue
+		}
+
+		pvc, pErr := r.buildCsiImportPVC(context.TODO(), vmRef, vm, disk, diskIndex, mapped, nil)
+		if pErr != nil {
+			err = pErr
+			return
+		}
+		if pvc != nil {
+			pvcs = append(pvcs, *pvc)
+		}
+	}
+	return
 }
 
 // ConversionPodConfig returns provider-specific configuration for the virt-v2v conversion pod.

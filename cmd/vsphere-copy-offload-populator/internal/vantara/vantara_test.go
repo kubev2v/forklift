@@ -9,6 +9,7 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
 	vmware_mocks "github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware/mocks"
+	"github.com/kubev2v/forklift/pkg/storage/resolver"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"go.uber.org/mock/gomock"
@@ -534,7 +535,7 @@ func TestVvolCopy_ResolvePVToLUNError(t *testing.T) {
 	vc := vmware_mocks.NewMockClient(ctrl)
 	vc.EXPECT().
 		GetVMDiskBacking(gomock.Any(), "vm-001", sourceVMDK).
-		Return(&vmware.DiskBacking{
+		Return(&resolver.DiskBacking{
 			IsRDM: false,
 		}, nil)
 
@@ -701,7 +702,7 @@ func TestRDMCopy_Error_WhenNotRDM(t *testing.T) {
 	vc := vmware_mocks.NewMockClient(ctrl)
 	vc.EXPECT().
 		GetVMDiskBacking(gomock.Any(), "vm-001", "[ds] vm/disk.vmdk").
-		Return(&vmware.DiskBacking{
+		Return(&resolver.DiskBacking{
 			IsRDM:      false,
 			DeviceName: "naa.60060e80deadbeefdeadbeefdeadbeef",
 		}, nil)
@@ -751,7 +752,7 @@ func TestRDMCopy_Success_ProgressSequence(t *testing.T) {
 	vc := vmware_mocks.NewMockClient(ctrl)
 	vc.EXPECT().
 		GetVMDiskBacking(gomock.Any(), "vm-001", "[ds] vm/disk.vmdk").
-		Return(&vmware.DiskBacking{
+		Return(&resolver.DiskBacking{
 			IsRDM:      true,
 			DeviceName: "naa." + naaDevice, // lower-case to match what resolveRDMToLUN returns
 		}, nil)
@@ -807,7 +808,7 @@ func TestRDMCopy_Error_WhenResolveRDMToLUNMismatchNAA(t *testing.T) {
 	vc := vmware_mocks.NewMockClient(ctrl)
 	vc.EXPECT().
 		GetVMDiskBacking(gomock.Any(), "vm-001", "[ds] vm/disk.vmdk").
-		Return(&vmware.DiskBacking{
+		Return(&resolver.DiskBacking{
 			IsRDM:      true,
 			DeviceName: "naa." + naaDevice,
 		}, nil)

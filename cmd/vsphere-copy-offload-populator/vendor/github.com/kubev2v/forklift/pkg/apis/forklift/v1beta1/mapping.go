@@ -45,10 +45,19 @@ type DestinationNetwork struct {
 	Name string `json:"name,omitempty"`
 }
 
+// NetworkSourceRef extends Ref with an optional VLAN qualifier for network disambiguation.
+type NetworkSourceRef struct {
+	ref.Ref `json:",inline"`
+	// VLAN identifier (numeric string, valid range 1-4094) for network disambiguation.
+	// +optional
+	// +kubebuilder:validation:Pattern=`^([1-9]|[1-9][0-9]{1,2}|[1-3][0-9]{3}|40[0-8][0-9]|409[0-4])$`
+	Vlan string `json:"vlan,omitempty"`
+}
+
 // Mapped network.
 type NetworkPair struct {
 	// Source network.
-	Source ref.Ref `json:"source"`
+	Source NetworkSourceRef `json:"source"`
 	// Destination network.
 	Destination DestinationNetwork `json:"destination"`
 }
@@ -57,7 +66,19 @@ type NetworkPair struct {
 // phase of the migration. There can be more than one available but currently only
 // one will be supported
 type OffloadPlugin struct {
-	VSphereXcopyPluginConfig *VSphereXcopyPluginConfig `json:"vsphereXcopyConfig"`
+	VSphereXcopyPluginConfig *VSphereXcopyPluginConfig `json:"vsphereXcopyConfig,omitempty"`
+	CsiVolumeImport          *CsiVolumeImport          `json:"csiVolumeImport,omitempty"`
+}
+
+// CsiVolumeImport uses the CSI driver's native import capability to migrate VVol/RDM disks.
+// The controller creates a PVC with import annotations; the CSI driver clones the source array
+// volume directly — no populator pod, no CR, no service account is launched.
+type CsiVolumeImport struct {
+	// SecretRef is the name of the secret with storage credentials, in the source provider's namespace.
+	SecretRef string `json:"secretRef"`
+	// StorageVendorProduct identifies the storage array vendor.
+	// +kubebuilder:validation:Enum=primera3par
+	StorageVendorProduct StorageVendorProduct `json:"storageVendorProduct"`
 }
 
 // StorageVendorProduct is an identifier of the product used for XCOPY.
@@ -99,6 +120,10 @@ type VSphereXcopyPluginConfig struct {
 	// StorageVendorProduct the string identifier of the storage vendor product
 	// +kubebuilder:validation:Enum=flashsystem;vantara;ontap;primera3par;pureFlashArray;powerflex;powermax;powerstore;infinibox
 	StorageVendorProduct StorageVendorProduct `json:"storageVendorProduct"`
+	// DedicatedMigrationHosts is a list of ESXi host IDs to use for
+	// XCOPY migrations instead of the VM's registered host.
+	// +optional
+	DedicatedMigrationHosts []string `json:"dedicatedMigrationHosts,omitempty"`
 }
 
 // Mapped storage.
@@ -225,6 +250,43 @@ func (r *NetworkMap) FindNetworkByNameAndNamespace(namespace, name string) (pair
 	}
 
 	return
+}
+
+// FindAllNetworks returns all network map entries matching the given source ID.
+func (r *NetworkMap) FindAllNetworks(networkID string) []NetworkPair {
+	var pairs []NetworkPair
+	for _, pair := range r.Spec.Map {
+		if pair.Source.ID == networkID {
+			pairs = append(pairs, pair)
+		}
+	}
+	return pairs
+}
+
+// FindAllNetworksByType returns all network map entries matching the given source type.
+func (r *NetworkMap) FindAllNetworksByType(networkType string) []NetworkPair {
+	var pairs []NetworkPair
+	for _, pair := range r.Spec.Map {
+		if pair.Source.Type == networkType {
+			pairs = append(pairs, pair)
+		}
+	}
+	return pairs
+}
+
+// FindAllNetworksByNameAndNamespace returns all network map entries matching the given source namespace and name.
+func (r *NetworkMap) FindAllNetworksByNameAndNamespace(namespace, name string) []NetworkPair {
+	var pairs []NetworkPair
+	for _, pair := range r.Spec.Map {
+		if pair.Source.Namespace != "" {
+			if pair.Source.Namespace == namespace && pair.Source.Name == name {
+				pairs = append(pairs, pair)
+			}
+		} else if pair.Source.Name == fmt.Sprintf("%s/%s", namespace, name) {
+			pairs = append(pairs, pair)
+		}
+	}
+	return pairs
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
