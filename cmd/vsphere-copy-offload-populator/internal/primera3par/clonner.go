@@ -159,15 +159,15 @@ func (c *Primera3ParClonner) VvolCopy(vsphereClient vmware.Client, vmId string, 
 		return fmt.Errorf("failed to get VVol disk backing info: %w", err)
 	}
 
-	if backing.VVolId == "" {
+	if backing.VVolID == "" {
 		return fmt.Errorf("disk %s is not a VVol disk", sourceVMDKFile)
 	}
 
-	c.log.Info("found VVol backing", "vvol_id", backing.VVolId)
+	c.log.Info("found VVol backing", "vvol_id", backing.VVolID)
 
-	sourceVolumeName, err := c.findVolumeByVVolID(backing.VVolId)
+	sourceVolumeName, err := c.findVolumeByVVolID(backing.VVolID)
 	if err != nil {
-		return fmt.Errorf("failed to find source volume by VVol ID %s: %w", backing.VVolId, err)
+		return fmt.Errorf("failed to find source volume by VVol ID %s: %w", backing.VVolID, err)
 	}
 
 	c.log.Info("resolving target PV to LUN", "pv", persistentVolume.Name)

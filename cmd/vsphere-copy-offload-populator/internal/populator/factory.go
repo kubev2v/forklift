@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
+	"github.com/kubev2v/forklift/pkg/storage/resolver"
 	"k8s.io/klog/v2"
 )
 
@@ -45,18 +46,18 @@ func NewPopulator(
 	// Single vSphere roundtrip: fetch source disk sizes and backing info.
 	sourceDiskCap, sourceDatastoreAlloc, backing := fetchDiskInfo(ctx, log, vsphereClient, vmId, vmdkPath)
 
-	diskType := detectDiskType(backing)
+	diskType := resolver.DetectDiskType(backing)
 	log.Info("disk type detected", "type", diskType)
 
 	switch diskType {
-	case DiskTypeVVol:
-		if canUse(storageApi, DiskTypeVVol) {
+	case resolver.DiskTypeVVol:
+		if canUse(storageApi, resolver.DiskTypeVVol) {
 			log.Info("using VVol populator")
 			return createVVolPopulator(storageApi, vsphereClient, sourceDiskCap, sourceDatastoreAlloc)
 		}
 
-	case DiskTypeRDM:
-		if canUse(storageApi, DiskTypeRDM) {
+	case resolver.DiskTypeRDM:
+		if canUse(storageApi, resolver.DiskTypeRDM) {
 			log.Info("using RDM populator")
 			return createRDMPopulator(storageApi, vsphereClient, sourceDiskCap, sourceDatastoreAlloc)
 		}
@@ -69,11 +70,11 @@ func NewPopulator(
 // fetchDiskInfo retrieves provisioned capacity, datastore-allocated bytes, and disk
 // backing info from vSphere in a single VM lookup. Best-effort: returns zeros and
 // an empty DiskBacking on failure.
-func fetchDiskInfo(ctx context.Context, log klog.Logger, vsphereClient vmware.Client, vmId, vmdkPath string) (int64, int64, *vmware.DiskBacking) {
+func fetchDiskInfo(ctx context.Context, log klog.Logger, vsphereClient vmware.Client, vmId, vmdkPath string) (int64, int64, *resolver.DiskBacking) {
 	sourceDiskCap, sourceDatastoreAlloc, backing, err := vsphereClient.GetVirtualDiskSizes(ctx, vmId, vmdkPath)
 	if err != nil {
 		log.V(1).Info("could not read source disk info for metrics", "err", err)
-		return 0, 0, &vmware.DiskBacking{}
+		return 0, 0, &resolver.DiskBacking{}
 	}
 	if sourceDiskCap > 0 {
 		log.V(1).Info("source virtual disk provisioned size for metrics", "bytes", sourceDiskCap)
@@ -85,7 +86,7 @@ func fetchDiskInfo(ctx context.Context, log klog.Logger, vsphereClient vmware.Cl
 		log.V(1).Info("source VMDK datastore allocated bytes for metrics", "bytes", sourceDatastoreAlloc)
 	}
 	if backing == nil {
-		backing = &vmware.DiskBacking{}
+		backing = &resolver.DiskBacking{}
 	}
 	return sourceDiskCap, sourceDatastoreAlloc, backing
 }
@@ -145,16 +146,16 @@ func createVMDKPopulator(storageApi StorageApi, vmwareClient vmware.Client, sshC
 }
 
 // canUse checks if a disk type method is enabled and supported
-func canUse(storageApi StorageApi, diskType DiskType) bool {
+func canUse(storageApi StorageApi, diskType resolver.DiskType) bool {
 	switch diskType {
-	case DiskTypeVVol:
+	case resolver.DiskTypeVVol:
 		if settings.VVolDisabled {
 			return false
 		}
 		_, ok := storageApi.(VVolCapable)
 		return ok
 
-	case DiskTypeRDM:
+	case resolver.DiskTypeRDM:
 		if settings.RDMDisabled {
 			return false
 		}

@@ -66,7 +66,19 @@ type NetworkPair struct {
 // phase of the migration. There can be more than one available but currently only
 // one will be supported
 type OffloadPlugin struct {
-	VSphereXcopyPluginConfig *VSphereXcopyPluginConfig `json:"vsphereXcopyConfig"`
+	VSphereXcopyPluginConfig *VSphereXcopyPluginConfig `json:"vsphereXcopyConfig,omitempty"`
+	CsiVolumeImport          *CsiVolumeImport          `json:"csiVolumeImport,omitempty"`
+}
+
+// CsiVolumeImport uses the CSI driver's native import capability to migrate VVol/RDM disks.
+// The controller creates a PVC with import annotations; the CSI driver clones the source array
+// volume directly — no populator pod, no CR, no service account is launched.
+type CsiVolumeImport struct {
+	// SecretRef is the name of the secret with storage credentials, in the source provider's namespace.
+	SecretRef string `json:"secretRef"`
+	// StorageVendorProduct identifies the storage array vendor.
+	// +kubebuilder:validation:Enum=primera3par
+	StorageVendorProduct StorageVendorProduct `json:"storageVendorProduct"`
 }
 
 // StorageVendorProduct is an identifier of the product used for XCOPY.
