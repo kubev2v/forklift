@@ -170,12 +170,11 @@ func (c *VSphereClient) GetDatastoreActiveAdapters(ctx context.Context, host *ob
 
 	klog.V(2).Infof("Datastore %s maps to device %s", datastoreName, deviceName)
 
-	// Check if the destination array owns the source device (same-array detection)
 	sameArray, err := arrayIdentifier.MatchesDevice(deviceName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check if source device %s belongs to destination array: %w", deviceName, err)
 	}
-	klog.V(1).Infof("Same-array check for %s: sameArray=%v", deviceName, sameArray)
+	klog.V(1).Infof("Same-array check for device %s: sameArray=%v", deviceName, sameArray)
 
 	// 2. Fetch Host Storage Topology (MultipathInfo and ScsiLun)
 	var hostConfig mo.HostSystem
@@ -258,17 +257,13 @@ func (c *VSphereClient) GetDatastoreActiveAdapters(ctx context.Context, host *ob
 		hbaByKey[h.Key] = adapter
 	}
 
-	// 5. Find the Multipath LogicalUnit using the ScsiLun Key
-	var logicalUnit *types.HostMultipathInfoLogicalUnit
-	for _, lun := range storageDevice.MultipathInfo.Lun {
-		if lun.Lun == scsiLunKey {
-			l := lun // pin
-			logicalUnit = &l
-			break
-		}
+	mpLunByKey := make(map[string]*types.HostMultipathInfoLogicalUnit, len(storageDevice.MultipathInfo.Lun))
+	for i := range storageDevice.MultipathInfo.Lun {
+		mpLunByKey[storageDevice.MultipathInfo.Lun[i].Lun] = &storageDevice.MultipathInfo.Lun[i]
 	}
 
-	if logicalUnit == nil {
+	logicalUnit, ok := mpLunByKey[scsiLunKey]
+	if !ok {
 		return nil, fmt.Errorf("multipath logical unit for device %s (key %s) not found", deviceName, scsiLunKey)
 	}
 
@@ -289,12 +284,73 @@ func (c *VSphereClient) GetDatastoreActiveAdapters(ctx context.Context, host *ob
 	}
 
 	if sameArray {
-		klog.V(1).Infof("Same array detected — returning source active-path adapters only (XCOPY possible)")
+		klog.V(1).Infof("Same array detected for datastore %s (device %s) — returning source active-path adapters only (XCOPY possible)", datastoreName, deviceName)
 		return prepareAdapters(activeAdapters, sciniGuid, datastoreName)
 	}
 
-	klog.V(1).Infof("Different array detected — returning all host adapters for cross-array migration")
-	return prepareAdapters(hbaByKey, sciniGuid, datastoreName)
+	klog.V(1).Infof("Cross-array detected for datastore %s (device %s) — investigating destination multipath", datastoreName, deviceName)
+	dstAdapters, dstDeviceCount := findDestinationAdapters(storageDevice, arrayIdentifier, mpLunByKey, hbaByKey)
+
+	if len(dstAdapters) == 0 {
+		klog.V(1).Infof("No destination array devices found on host (%d devices checked) — falling back to SAN adapters", dstDeviceCount)
+		return prepareAdapters(filterSANAdapters(hbaByKey), sciniGuid, datastoreName)
+	}
+	klog.V(1).Infof("Cross-array: found %d destination devices, using %d destination adapters", dstDeviceCount, len(dstAdapters))
+	return prepareAdapters(dstAdapters, sciniGuid, datastoreName)
+}
+
+// findDestinationAdapters walks the host's SCSI LUN table to find devices owned
+// by the destination array, then collects adapters with active/standby multipath
+// paths to those devices. Returns the adapter map and the count of matched devices.
+func findDestinationAdapters(
+	storageDevice *types.HostStorageDeviceInfo,
+	arrayIdentifier storage.ArrayIdentifier,
+	mpLunByKey map[string]*types.HostMultipathInfoLogicalUnit,
+	hbaByKey map[string]HostAdapter,
+) (map[string]HostAdapter, int) {
+	dstAdapters := make(map[string]HostAdapter)
+	dstDeviceCount := 0
+	for _, lun := range storageDevice.ScsiLun {
+		dstDeviceName := lun.GetScsiLun().CanonicalName
+		matches, err := arrayIdentifier.MatchesDevice(dstDeviceName)
+		if err != nil {
+			klog.Warningf("MatchesDevice failed for %s: %v", dstDeviceName, err)
+			continue
+		}
+		if !matches {
+			continue
+		}
+		dstDeviceCount++
+		klog.V(2).Infof("Destination device found on host: %s", dstDeviceName)
+		mpLun, found := mpLunByKey[lun.GetScsiLun().Key]
+		if !found {
+			klog.V(2).Infof("Destination device %s has no multipath info, skipping", dstDeviceName)
+			continue
+		}
+		for _, path := range mpLun.Path {
+			state := strings.ToLower(path.State)
+			if state == "dead" || state == "disabled" {
+				continue
+			}
+			if adapter, found := hbaByKey[path.Adapter]; found {
+				dstAdapters[adapter.Name] = adapter
+			} else {
+				klog.Warningf("HBA Key %s not found in host bus adapter list", path.Adapter)
+			}
+		}
+	}
+	return dstAdapters, dstDeviceCount
+}
+
+func filterSANAdapters(hbas map[string]HostAdapter) map[string]HostAdapter {
+	san := make(map[string]HostAdapter)
+	for k, a := range hbas {
+		if strings.HasPrefix(a.Id, "fc.") || strings.HasPrefix(a.Id, "iqn.") ||
+			strings.HasPrefix(a.Id, "nqn.") || a.Driver == "scini" {
+			san[k] = a
+		}
+	}
+	return san
 }
 
 // prepareAdapters processes a set of adapters: applies scini GUID override,

@@ -1,9 +1,15 @@
 package infinibox
 
 import (
+	"context"
+	"crypto/tls"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/infinidat/infinibox-csi-driver/iboxapi"
@@ -28,6 +34,10 @@ type InfiniboxClonner struct {
 	initiatorGroup string
 	arrayInfo      populator.StorageArrayInfo
 	log            klog.Logger
+	hostname       string
+	username       string
+	password       string
+	insecure       bool
 }
 
 // Ensure InfiniboxClonner implements StorageArrayInfoProvider
@@ -39,13 +49,76 @@ func (c *InfiniboxClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 	return c.arrayInfo
 }
 
-// MatchesDevice returns true if the given device name belongs to this InfiniBox array.
-// It checks whether the device name carries the Infinidat vendor OUI prefix (naa.6742b0f).
 func (c *InfiniboxClonner) MatchesDevice(deviceName string) (bool, error) {
 	prefix := "naa." + InfiniboxProviderID
-	matches := strings.HasPrefix(strings.ToLower(deviceName), prefix)
-	c.log.V(2).Info("checking device ownership", "device", deviceName, "prefix", prefix, "matches", matches)
-	return matches, nil
+	if !strings.HasPrefix(strings.ToLower(deviceName), prefix) {
+		c.log.V(1).Info("device does not match vendor prefix", "device", deviceName, "prefix", prefix)
+		return false, nil
+	}
+
+	// NAA format: naa.6{serial} — strip "naa.6" to get serial
+	serial := strings.TrimPrefix(strings.ToLower(deviceName), "naa.6")
+	c.log.V(1).Info("querying array for volume ownership", "device", deviceName, "serial", serial)
+
+	found, err := c.volumeExistsBySerial(serial)
+	if err != nil {
+		return false, fmt.Errorf("failed to query volume by serial %s: %w", serial, err)
+	}
+
+	if found {
+		c.log.V(1).Info("device confirmed on this array", "device", deviceName, "serial", serial)
+	} else {
+		c.log.V(1).Info("volume not found on this array", "device", deviceName, "serial", serial)
+	}
+	return found, nil
+}
+
+type infiniboxVolumeResponse struct {
+	Result []struct {
+		Serial string `json:"serial"`
+	} `json:"result"`
+}
+
+// volumeExistsBySerial queries the InfiniBox REST API directly because the
+// iboxapi.Client only supports GetVolumeByName, not serial-based lookup.
+func (c *InfiniboxClonner) volumeExistsBySerial(serial string) (bool, error) {
+	u := &url.URL{
+		Scheme: "https",
+		Host:   c.hostname,
+		Path:   "/api/rest/volumes",
+	}
+	q := u.Query()
+	q.Set("serial", serial)
+	q.Set("page_size", "1")
+	q.Set("fields", "serial")
+	u.RawQuery = q.Encode()
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
+	if err != nil {
+		return false, err
+	}
+	req.SetBasicAuth(c.username, c.password)
+
+	client := &http.Client{Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: c.insecure},
+	}}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("InfiniBox API returned %d", resp.StatusCode)
+	}
+
+	var result infiniboxVolumeResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return false, err
+	}
+	return len(result.Result) > 0, nil
 }
 
 func (c *InfiniboxClonner) MapTarget(targetLUN populator.LUN, context populator.MappingContext) (populator.LUN, error) {
@@ -200,7 +273,11 @@ func NewInfiniboxClonner(hostname, username, password string, insecure bool) (In
 			Vendor:  "Infinidat",
 			Product: "InfiniBox",
 		},
-		log: log,
+		log:      log,
+		hostname: hostname,
+		username: username,
+		password: password,
+		insecure: insecure,
 	}
 
 	// Fetch model and version from the API

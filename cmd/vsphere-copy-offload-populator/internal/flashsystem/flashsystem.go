@@ -99,6 +99,7 @@ type FlashSystemInfo struct {
 // FlashSystemAPIClient handles communication with the FlashSystem REST API.
 type FlashSystemAPIClient struct {
 	ManagementIP string
+	Port         string
 	httpClient   *http.Client
 	authToken    string // Session token from /auth
 	username     string // Store for re-authentication
@@ -115,6 +116,7 @@ func NewFlashSystemAPIClient(managementIP, username, password string, sslSkipVer
 
 	client := &FlashSystemAPIClient{
 		ManagementIP: managementIP,
+		Port:         "7443",
 		httpClient:   httpClient,
 		username:     username,
 		password:     password,
@@ -131,7 +133,7 @@ func NewFlashSystemAPIClient(managementIP, username, password string, sslSkipVer
 
 // authenticate handles the authentication process using v1 API best practices
 func (c *FlashSystemAPIClient) authenticate() error {
-	authURL := fmt.Sprintf("https://%s:7443/rest/v1/auth", c.ManagementIP)
+	authURL := fmt.Sprintf("https://%s:%s/rest/v1/auth", c.ManagementIP, c.Port)
 
 	// FlashSystem expects username and password via HTTP headers, not JSON body
 	req, err := http.NewRequest("POST", authURL, bytes.NewBuffer([]byte{}))
@@ -195,7 +197,7 @@ func (c *FlashSystemAPIClient) makeRequest(method, path string, payload interfac
 
 // doRequest performs the actual HTTP request
 func (c *FlashSystemAPIClient) doRequest(method, path string, payload interface{}) ([]byte, int, error) {
-	fullURL := fmt.Sprintf("https://%s:7443/rest/v1%s", c.ManagementIP, path)
+	fullURL := fmt.Sprintf("https://%s:%s/rest/v1%s", c.ManagementIP, c.Port, path)
 	c.log.V(2).Info("API request", "method", method, "url", fullURL)
 
 	var reqBody *bytes.Buffer
@@ -405,12 +407,28 @@ func (c *FlashSystemClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 }
 
 // MatchesDevice returns true if the given device name belongs to this FlashSystem array.
-// It checks whether the device name carries the IBM vendor OUI prefix (naa.6005076).
-// TODO(MTV-5780): validate prefix against a real array (no lab access at time of writing)
+// It first checks the IBM vendor OUI prefix (naa.6005076) for a fast reject, then
+// queries the array API to confirm a vdisk with the matching UID exists on this specific array.
 func (c *FlashSystemClonner) MatchesDevice(deviceName string) (bool, error) {
-	matches := strings.HasPrefix(strings.ToLower(deviceName), FlashSystemProviderIDPrefix)
-	c.log.V(2).Info("checking device ownership", "device", deviceName, "prefix", FlashSystemProviderIDPrefix, "matches", matches)
-	return matches, nil
+	if !strings.HasPrefix(strings.ToLower(deviceName), FlashSystemProviderIDPrefix) {
+		c.log.V(1).Info("device does not match vendor prefix", "device", deviceName, "prefix", FlashSystemProviderIDPrefix)
+		return false, nil
+	}
+
+	uid := strings.TrimPrefix(strings.ToLower(deviceName), "naa.")
+	c.log.V(1).Info("querying array for volume ownership", "device", deviceName, "uid", uid)
+
+	_, err := c.getVDiskByUID(uid)
+	if err != nil {
+		if strings.Contains(err.Error(), "no volume found") {
+			c.log.V(1).Info("volume not found on this array", "device", deviceName, "uid", uid)
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to query vdisk by UID %s: %w", uid, err)
+	}
+
+	c.log.V(1).Info("device confirmed on this array", "device", deviceName, "uid", uid)
+	return true, nil
 }
 
 // NewFlashSystemClonner creates a new FlashSystemClonner.

@@ -46,13 +46,12 @@ func (p *PowermaxClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 }
 
 // MatchesDevice returns true if the given device name belongs to this PowerMax array.
-// It checks whether the device name carries the EMC Symmetrix/PowerMax vendor OUI
-// prefix (naa.60000970).
-// TODO(MTV-5780): validate prefix against a real array (no lab access at time of writing)
+// PowerMax WWN format: 60000970{symmetrixID}{volumeId}. The symmetrixID uniquely
+// identifies the array instance, so checking naa.60000970{symmetrixID} is instance-level.
 func (p *PowermaxClonner) MatchesDevice(deviceName string) (bool, error) {
-	prefix := "naa." + PowerMaxProviderID
-	matches := strings.HasPrefix(strings.ToLower(deviceName), prefix)
-	p.log.V(2).Info("checking device ownership", "device", deviceName, "prefix", prefix, "matches", matches)
+	prefix := "naa." + PowerMaxProviderID + p.symmetrixID
+	matches := strings.HasPrefix(strings.ToLower(deviceName), strings.ToLower(prefix))
+	p.log.V(1).Info("checking device ownership", "device", deviceName, "prefix", prefix, "matches", matches)
 	return matches, nil
 }
 

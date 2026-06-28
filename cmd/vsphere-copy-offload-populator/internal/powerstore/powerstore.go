@@ -2,9 +2,13 @@ package powerstore
 
 import (
 	"context"
+	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
+	"time"
 
 	"github.com/dell/gopowerstore"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/fcutil"
@@ -27,6 +31,10 @@ type PowerstoreClonner struct {
 	initiatorGroup string
 	arrayInfo      populator.StorageArrayInfo
 	log            klog.Logger
+	hostname       string
+	username       string
+	password       string
+	sslSkipVerify  bool
 }
 
 // Ensure PowerstoreClonner implements StorageArrayInfoProvider
@@ -42,9 +50,70 @@ func (p *PowerstoreClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 // It checks whether the device name carries the Dell PowerStore vendor OUI prefix (naa.68ccf098).
 func (p *PowerstoreClonner) MatchesDevice(deviceName string) (bool, error) {
 	prefix := "naa." + PowerStoreProviderID
-	matches := strings.HasPrefix(strings.ToLower(deviceName), prefix)
-	p.log.V(2).Info("checking device ownership", "device", deviceName, "prefix", prefix, "matches", matches)
-	return matches, nil
+	if !strings.HasPrefix(strings.ToLower(deviceName), prefix) {
+		p.log.V(1).Info("device does not match vendor prefix", "device", deviceName, "prefix", prefix)
+		return false, nil
+	}
+
+	lower := strings.ToLower(deviceName)
+	p.log.V(1).Info("querying array for volume ownership", "device", lower)
+	found, err := p.volumeExistsByWWN(lower)
+	if err != nil {
+		return false, fmt.Errorf("failed to query volume by WWN %s: %w", deviceName, err)
+	}
+
+	if found {
+		p.log.V(1).Info("device confirmed on this array", "device", deviceName)
+	} else {
+		p.log.V(1).Info("volume not found on this array", "device", deviceName)
+	}
+	return found, nil
+}
+
+type powerstoreVolumeResponse []struct {
+	Name string `json:"name"`
+	WWN  string `json:"wwn"`
+}
+
+// volumeExistsByWWN queries the PowerStore REST API directly because the
+// gopowerstore SDK only supports GetVolumeByName, not WWN-based lookup.
+func (p *PowerstoreClonner) volumeExistsByWWN(wwn string) (bool, error) {
+	u := &url.URL{
+		Scheme: "https",
+		Host:   p.hostname,
+		Path:   "/api/rest/volume",
+	}
+	q := u.Query()
+	q.Set("select", "name,wwn")
+	q.Set("wwn", "eq."+wwn)
+	u.RawQuery = q.Encode()
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
+	if err != nil {
+		return false, err
+	}
+	req.SetBasicAuth(p.username, p.password)
+
+	client := &http.Client{Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: p.sslSkipVerify},
+	}}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("PowerStore API returned %d", resp.StatusCode)
+	}
+
+	var result powerstoreVolumeResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return false, err
+	}
+	return len(result) > 0, nil
 }
 
 func (p *PowerstoreClonner) MapTarget(targetLUN populator.LUN, mappingContext populator.MappingContext) (populator.LUN, error) {
@@ -420,7 +489,11 @@ func NewPowerstoreClonner(hostname, username, password string, sslSkipVerify boo
 			Vendor:  "Dell",
 			Product: "PowerStore",
 		},
-		log: log,
+		log:           log,
+		hostname:      hostname,
+		username:      username,
+		password:      password,
+		sslSkipVerify: sslSkipVerify,
 	}
 
 	// Fetch software version from the API

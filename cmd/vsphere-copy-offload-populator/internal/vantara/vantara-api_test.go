@@ -198,9 +198,12 @@ func TestGetLdev(t *testing.T) {
 	api := NewBlockStorageAPI(server.Listener.Addr().String(), "", "storage123", "admin", "password")
 	api.BaseURL = server.URL + "/ConfigurationManager/v1"
 
-	ldev, err := api.GetLdev("100")
+	ldev, statusCode, err := api.GetLdev("100")
 	if err != nil {
 		t.Fatalf("GetLdev() failed: %v", err)
+	}
+	if statusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", statusCode)
 	}
 
 	if ldev.LdevId != 100 {

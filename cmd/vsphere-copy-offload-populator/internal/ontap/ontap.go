@@ -2,9 +2,15 @@ package ontap
 
 import (
 	"context"
+	"crypto/tls"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/fcutil"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
@@ -27,6 +33,11 @@ type NetappClonner struct {
 	initiatorHostOrGroup string
 	arrayInfo            populator.StorageArrayInfo
 	log                  klog.Logger
+	managementLIF        string
+	username             string
+	password             string
+	svm                  string
+	sslSkipVerify        bool
 }
 
 // GetStorageArrayInfo returns metadata about the ONTAP array for metric labels.
@@ -38,9 +49,79 @@ func (c *NetappClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 // It checks whether the device name carries the ONTAP vendor OUI prefix (naa.600a0980).
 func (c *NetappClonner) MatchesDevice(deviceName string) (bool, error) {
 	prefix := "naa." + OntapProviderID
-	matches := strings.HasPrefix(strings.ToLower(deviceName), prefix)
-	c.log.V(2).Info("checking device ownership", "device", deviceName, "prefix", prefix, "matches", matches)
-	return matches, nil
+	lower := strings.ToLower(deviceName)
+	if !strings.HasPrefix(lower, prefix) {
+		c.log.V(1).Info("device does not match vendor prefix", "device", deviceName, "prefix", prefix)
+		return false, nil
+	}
+
+	// Extract serial from NAA: strip "naa.600a0980" prefix, hex-decode the remainder
+	hexSerial := lower[len(prefix):]
+	serialBytes, err := hex.DecodeString(hexSerial)
+	if err != nil {
+		return false, fmt.Errorf("failed to decode serial from NAA %s: %w", deviceName, err)
+	}
+	serial := string(serialBytes)
+	c.log.V(1).Info("querying array for LUN by serial", "device", deviceName, "serial", serial)
+
+	found, err := c.lunExistsBySerial(serial)
+	if err != nil {
+		return false, fmt.Errorf("failed to query LUN by serial %s: %w", serial, err)
+	}
+
+	if found {
+		c.log.V(1).Info("device confirmed on this array", "device", deviceName, "serial", serial)
+	} else {
+		c.log.V(1).Info("volume not found on this array", "device", deviceName, "serial", serial)
+	}
+	return found, nil
+}
+
+type ontapLunResponse struct {
+	NumRecords int `json:"num_records"`
+}
+
+// lunExistsBySerial queries the ONTAP REST API directly (bypassing Trident SDK)
+// because the Trident OntapAPI interface only exposes LunList which fetches all
+// LUNs (~95s on large arrays). The REST serial_number filter returns in <1s.
+func (c *NetappClonner) lunExistsBySerial(serial string) (bool, error) {
+	u := &url.URL{
+		Scheme: "https",
+		Host:   c.managementLIF,
+		Path:   "/api/storage/luns",
+	}
+	q := u.Query()
+	q.Set("serial_number", serial)
+	q.Set("svm.name", c.svm)
+	q.Set("max_records", "1")
+	u.RawQuery = q.Encode()
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
+	if err != nil {
+		return false, err
+	}
+	req.SetBasicAuth(c.username, c.password)
+
+	client := &http.Client{Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: c.sslSkipVerify},
+	}}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("ONTAP API returned %d", resp.StatusCode)
+	}
+
+	var result ontapLunResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return false, err
+	}
+	return result.NumRecords > 0, nil
 }
 
 // Map the targetLUN to the initiator group.
@@ -137,7 +218,7 @@ func (c *NetappClonner) EnsureClonnerIgroup(initiatorGroup string, adapterIds []
 	return nil, nil
 }
 
-func NewNetappClonner(hostname, username, password string) (NetappClonner, error) {
+func NewNetappClonner(hostname, username, password string, sslSkipVerify bool) (NetappClonner, error) {
 	log := logger.New("ontap")
 
 	// additional ontap values should be passed as env variables using prefix ONTAP_
@@ -163,7 +244,12 @@ func NewNetappClonner(hostname, username, password string) (NetappClonner, error
 			Vendor:  "NetApp",
 			Product: "ONTAP",
 		},
-		log: log,
+		log:           log,
+		managementLIF: hostname,
+		username:      username,
+		password:      password,
+		svm:           svm,
+		sslSkipVerify: sslSkipVerify,
 	}
 
 	// Fetch ONTAP API version

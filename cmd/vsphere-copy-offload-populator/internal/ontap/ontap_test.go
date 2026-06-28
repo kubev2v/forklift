@@ -224,7 +224,7 @@ func TestNetappClonner_CurrentMappedGroups(t *testing.T) {
 
 func TestNewNetappClonner(t *testing.T) {
 	// NOSONAR - fake test credentials for unit testing, not real values
-	_, err := NewNetappClonner("fake-hostname.invalid", "fake-user", "fake-pass")
+	_, err := NewNetappClonner("fake-hostname.invalid", "fake-user", "fake-pass", false)
 	if err == nil {
 		t.Errorf("NewNetappClonner() error = %v, wantErr %v", err, true)
 	}
