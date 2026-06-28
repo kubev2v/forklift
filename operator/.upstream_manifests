@@ -10359,6 +10359,8 @@ spec:
             properties:
               progress:
                 type: string
+              xcopyUsed:
+                type: string
             type: object
         required:
         - spec

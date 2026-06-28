@@ -1301,6 +1301,10 @@ func (r *Builder) getImageFromPVC(pvc *core.PersistentVolumeClaim) (image *model
 	return
 }
 
+func (r *Builder) PopulatorXcopyUsed(_ *core.PersistentVolumeClaim) (string, bool, error) {
+	return "", false, nil
+}
+
 func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (err error) {
 	workload := &model.Workload{}
 	err = r.Source.Inventory.Find(workload, vmRef)
