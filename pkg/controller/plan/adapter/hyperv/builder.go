@@ -520,6 +520,10 @@ func (r *Builder) PopulatorTransferredBytes(_ *core.PersistentVolumeClaim) (int6
 	return 0, planbase.VolumePopulatorNotSupportedError
 }
 
+func (r *Builder) PopulatorXcopyUsed(_ *core.PersistentVolumeClaim) (string, bool, error) {
+	return "", false, nil
+}
+
 func (r *Builder) SetPopulatorDataSourceLabels(_ ref.Ref, _ []*core.PersistentVolumeClaim) error {
 	return nil
 }

@@ -979,6 +979,17 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 		return err
 	}
 
+	if populatorKind == api.VSphereXcopyVolumePopulatorKind {
+		xcopyRegExp := regexp.MustCompile(`xcopy_used\{ownerUID="` + string(pvc.UID) + `"\} (\d+)`)
+		xcopyMatch := xcopyRegExp.FindStringSubmatch(string(body))
+		if xcopyMatch != nil {
+			if err := unstructured.SetNestedField(latestPopulator.Object, xcopyMatch[1], "status", "xcopyUsed"); err != nil {
+				klog.V(5).Info("Failed to update xcopyUsed: ", err)
+				return err
+			}
+		}
+	}
+
 	_, err = c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Update(context.TODO(), latestPopulator, metav1.UpdateOptions{})
 	if err != nil {
 		klog.V(5).Info("Failed to update CR ", err)

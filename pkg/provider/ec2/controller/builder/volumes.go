@@ -116,6 +116,10 @@ func (r *Builder) SupportsVolumePopulators() bool {
 	return false
 }
 
+func (r *Builder) PopulatorXcopyUsed(_ *core.PersistentVolumeClaim) (string, bool, error) {
+	return "", false, nil
+}
+
 // PopulatorTransferredBytes is a no-op for EC2 - direct volume creation doesn't use populators.
 // This method is required by the base.Builder interface but not used by EC2 provider.
 func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (transferredBytes int64, err error) {
