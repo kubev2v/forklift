@@ -40,6 +40,8 @@ type VSphereXcopyVolumePopulatorSpec struct {
 type VSphereXcopyVolumePopulatorStatus struct {
 	// +optional
 	Progress string `json:"progress"`
+	// +optional
+	XcopyUsed string `json:"xcopyUsed,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

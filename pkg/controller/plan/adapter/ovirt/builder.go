@@ -968,6 +968,10 @@ func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (tr
 	return
 }
 
+func (r *Builder) PopulatorXcopyUsed(_ *core.PersistentVolumeClaim) (string, bool, error) {
+	return "", false, nil
+}
+
 // Sets the OvirtVolumePopulator CRs with VM ID and migration ID into the labels.
 func (r *Builder) SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (err error) {
 	ovirtVm := &model.Workload{}

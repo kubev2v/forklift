@@ -1019,6 +1019,135 @@ var _ = Describe("vSphere builder", func() {
 	)
 })
 
+var _ = Describe("PopulatorXcopyUsed", func() {
+	It("should return xcopyUsed when populator CR has the field set", func() {
+		populatorCr := &v1beta1.VSphereXcopyVolumePopulator{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "test-pop",
+				Namespace: "test",
+				Labels: map[string]string{
+					"migration": "123",
+					"vmdkKey":   "2000",
+					"vmID":      "vm-1",
+				},
+			},
+			Spec: v1beta1.VSphereXcopyVolumePopulatorSpec{
+				VmId: "vm-1",
+			},
+			Status: v1beta1.VSphereXcopyVolumePopulatorStatus{
+				Progress:  "100",
+				XcopyUsed: "1",
+			},
+		}
+		builder := createBuilder(populatorCr)
+		pvc := &core.PersistentVolumeClaim{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "test-pvc",
+				Namespace: "test",
+				Labels: map[string]string{
+					"vmdkKey": "2000",
+					"vmID":    "vm-1",
+				},
+			},
+		}
+
+		xcopyUsed, found, err := builder.PopulatorXcopyUsed(pvc)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(found).To(BeTrue())
+		Expect(xcopyUsed).To(Equal("1"))
+	})
+
+	It("should return found=false when xcopyUsed is empty", func() {
+		populatorCr := &v1beta1.VSphereXcopyVolumePopulator{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "test-pop",
+				Namespace: "test",
+				Labels: map[string]string{
+					"migration": "123",
+					"vmdkKey":   "2000",
+					"vmID":      "vm-1",
+				},
+			},
+			Spec: v1beta1.VSphereXcopyVolumePopulatorSpec{
+				VmId: "vm-1",
+			},
+			Status: v1beta1.VSphereXcopyVolumePopulatorStatus{
+				Progress: "50",
+			},
+		}
+		builder := createBuilder(populatorCr)
+		pvc := &core.PersistentVolumeClaim{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "test-pvc",
+				Namespace: "test",
+				Labels: map[string]string{
+					"vmdkKey": "2000",
+					"vmID":    "vm-1",
+				},
+			},
+		}
+
+		xcopyUsed, found, err := builder.PopulatorXcopyUsed(pvc)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(found).To(BeFalse())
+		Expect(xcopyUsed).To(BeEmpty())
+	})
+
+	It("should return error when populator CR is not found", func() {
+		builder := createBuilder()
+		pvc := &core.PersistentVolumeClaim{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "test-pvc",
+				Namespace: "test",
+				Labels: map[string]string{
+					"vmdkKey": "2000",
+					"vmID":    "vm-1",
+				},
+			},
+		}
+
+		_, _, err := builder.PopulatorXcopyUsed(pvc)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("should return xcopyUsed=0 when xcopy was not used", func() {
+		populatorCr := &v1beta1.VSphereXcopyVolumePopulator{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "test-pop",
+				Namespace: "test",
+				Labels: map[string]string{
+					"migration": "123",
+					"vmdkKey":   "2000",
+					"vmID":      "vm-1",
+				},
+			},
+			Spec: v1beta1.VSphereXcopyVolumePopulatorSpec{
+				VmId: "vm-1",
+			},
+			Status: v1beta1.VSphereXcopyVolumePopulatorStatus{
+				Progress:  "100",
+				XcopyUsed: "0",
+			},
+		}
+		builder := createBuilder(populatorCr)
+		pvc := &core.PersistentVolumeClaim{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "test-pvc",
+				Namespace: "test",
+				Labels: map[string]string{
+					"vmdkKey": "2000",
+					"vmID":    "vm-1",
+				},
+			},
+		}
+
+		xcopyUsed, found, err := builder.PopulatorXcopyUsed(pvc)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(found).To(BeTrue())
+		Expect(xcopyUsed).To(Equal("0"))
+	})
+})
+
 //nolint:errcheck
 func createBuilder(objs ...runtime.Object) *Builder {
 	scheme := runtime.NewScheme()
