@@ -1645,12 +1645,16 @@ func (r *Builder) PrePopulateActions(c planbase.Client, vmRef ref.Ref) (ready bo
 	return
 }
 
-func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (transferredBytes int64, err error) {
+func (r *Builder) getPopulatorForPVC(pvc *core.PersistentVolumeClaim) (api.VSphereXcopyVolumePopulator, error) {
 	vmdkKey := pvc.Labels["vmdkKey"]
 	vmId := pvc.Labels["vmID"]
-	populatorCr, err := r.getVolumePopulator(vmId, vmdkKey)
+	return r.getVolumePopulator(vmId, vmdkKey)
+}
+
+func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (transferredBytes int64, err error) {
+	populatorCr, err := r.getPopulatorForPVC(pvc)
 	if err != nil {
-		return
+		return 0, err
 	}
 
 	if populatorCr.Status.Progress == "" {
@@ -1661,15 +1665,22 @@ func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (tr
 	progressPercentage, err := strconv.ParseInt(populatorCr.Status.Progress, 10, 64)
 	if err != nil {
 		r.Log.Error(err, "Couldn't parse the progress percentage.", "pvcName", pvc.Name, "progressPercentage", progressPercentage)
-		transferredBytes = 0
-		err = nil
-		return
+		return 0, nil
 	}
 
 	pvcSize := pvc.Spec.Resources.Requests["storage"]
-	transferredBytes = (progressPercentage * pvcSize.Value()) / 100
+	return (progressPercentage * pvcSize.Value()) / 100, nil
+}
 
-	return
+func (r *Builder) PopulatorXcopyUsed(pvc *core.PersistentVolumeClaim) (string, bool, error) {
+	populatorCr, err := r.getPopulatorForPVC(pvc)
+	if err != nil {
+		return "", false, err
+	}
+	if populatorCr.Status.XcopyUsed == "" {
+		return "", false, nil
+	}
+	return populatorCr.Status.XcopyUsed, true, nil
 }
 
 func (r *Builder) getVolumePopulator(vmId, vmdkKey string) (api.VSphereXcopyVolumePopulator, error) {
