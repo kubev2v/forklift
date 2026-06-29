@@ -337,6 +337,13 @@ func (r *Reconciler) updateContainer(provider *api.Provider) (err error) {
 	}
 	secretChanged := secret.ResourceVersion != provider.Status.SecretResourceVersion
 
+	if provider.Status.HasBlockerCondition() ||
+		!provider.Status.HasCondition(ConnectionTestSucceeded) {
+		r.Log.V(1).Info(
+			"Provider not ready, postponing.")
+		return
+	}
+
 	if !secretChanged {
 		if _, found := r.container.Get(provider); found {
 			// Don't update if provider hasn't changed
@@ -346,15 +353,6 @@ func (r *Reconciler) updateContainer(provider *api.Provider) (err error) {
 				return
 			}
 		}
-
-		// Only build a new collector if connection test succeeded
-		if provider.Status.HasBlockerCondition() ||
-			!provider.Status.HasCondition(ConnectionTestSucceeded) {
-			r.Log.V(1).Info(
-				"Provider not ready, postponing.")
-			return
-		}
-
 	} else {
 		r.Log.V(1).Info(
 			"Detected Secret change.",
