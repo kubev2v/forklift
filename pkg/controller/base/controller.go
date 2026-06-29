@@ -133,7 +133,6 @@ func VerifyTLSConnection(rawURL string, secret *core.Secret) (*x509.Certificate,
 		return nil, fmt.Errorf("invalid URL: %w", err)
 	}
 
-	// Attempt to get certificate
 	cert, err := util.GetTlsCertificate(parsedURL, secret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get TLS certificate: %w", err)
@@ -142,19 +141,26 @@ func VerifyTLSConnection(rawURL string, secret *core.Secret) (*x509.Certificate,
 		return nil, fmt.Errorf("received nil certificate from GetTlsCertificate")
 	}
 
-	// Create cert pool
 	tlsConfig := &tls.Config{
 		RootCAs: x509.NewCertPool(),
 	}
-	tlsConfig.RootCAs.AddCert(cert)
+	if cacert, ok := util.GetCACert(secret); ok {
+		if !tlsConfig.RootCAs.AppendCertsFromPEM(cacert) {
+			return nil, fmt.Errorf("failed to parse the CA certificate from secret")
+		}
+	} else {
+		systemPool, poolErr := x509.SystemCertPool()
+		if poolErr != nil {
+			return nil, fmt.Errorf("failed to load system cert pool: %w", poolErr)
+		}
+		tlsConfig.RootCAs = systemPool
+	}
 
-	// Ensure host:port
 	host := parsedURL.Host
 	if _, _, err := net.SplitHostPort(parsedURL.Host); err != nil {
 		host = parsedURL.Host + ":443"
 	}
 
-	// Dial TLS
 	conn, err := tls.Dial("tcp", host, tlsConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a secure TLS connection: %w", err)
