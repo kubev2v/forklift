@@ -92,8 +92,7 @@ spec:
         displayName: Enable VMware Driver Removal On Windows vSphere Conversion
         path: feature_vsphere_vmware_driver_removal
         x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:radio:true
-        - urn:alm:descriptor:com.tectonic.ui:radio:false
+        - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Delegate VM conversion to Conversion CRs instead of managing it directly (default true)
         displayName: Enable Conversion CR
         path: feature_use_conversion_cr
@@ -104,8 +103,7 @@ spec:
         displayName: Require Authentication
         path: feature_auth_required
         x-descriptors:
-        - urn:alm:descriptor:com.tectonic.ui:radio:true
-        - urn:alm:descriptor:com.tectonic.ui:radio:false
+        - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Enable CLI download service (default true)
         displayName: Enable CLI Download Service
         path: feature_cli_download
@@ -673,6 +671,97 @@ spec:
       - description: Metrics scrape interval (default 30s)
         displayName: Metric Interval
         path: metric_interval
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      # MCP Server Resource Configuration
+      - description: MCP server CPU limit (default 1000m)
+        displayName: MCP Server CPU Limit
+        path: mcp_server_container_limits_cpu
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: MCP server memory limit (default 512Mi)
+        displayName: MCP Server Memory Limit
+        path: mcp_server_container_limits_memory
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: MCP server CPU request (default 100m)
+        displayName: MCP Server CPU Request
+        path: mcp_server_container_requests_cpu
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: MCP server memory request (default 256Mi)
+        displayName: MCP Server Memory Request
+        path: mcp_server_container_requests_memory
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      # MCP Server Settings
+      - description: Run MCP server in read-only mode (default false)
+        displayName: MCP Server Read Only
+        path: mcp_server_read_only
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: MCP server output format (default markdown)
+        displayName: MCP Server Output Format
+        path: mcp_server_output_format
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Skip TLS verification for in-cluster MCP calls (default true)
+        displayName: MCP Server Kube Insecure
+        path: mcp_server_kube_insecure
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      # Migration & Controller Settings
+      - description: Wait for final snapshot removal and consolidation in a VMware warm migration (default true)
+        displayName: Wait For Final Snapshot Consolidation
+        path: wait_for_final_snapshot_consolidation
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Global default ServiceAccount for migration pods in the target namespace
+        displayName: Controller Migration Service Account
+        path: controller_migration_service_account
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Timeout in seconds for the wait-for-reboot step (default 1800)
+        displayName: Controller Windows Reboot Timeout
+        path: controller_windows_reboot_timeout
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Namespace for host lease objects (default openshift-mtv)
+        displayName: Controller Host Lease Namespace
+        path: controller_host_lease_namespace
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      # Windows Settings
+      - description: Use registry-based network configuration scripts for Windows static IP setup (default false)
+        displayName: Windows Registry Network Config
+        path: feature_windows_registry_network_config
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      # AAP Settings
+      - description: Ansible Automation Platform base URL
+        displayName: AAP URL
+        path: aap_url
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Name of the Secret containing the AAP API Bearer token
+        displayName: AAP Token Secret Name
+        path: aap_token_secret_name
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Name of the Secret containing a custom CA certificate for the AAP server
+        displayName: AAP CA Secret Name
+        path: aap_ca_secret_name
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Skip TLS certificate verification when connecting to AAP (default false)
+        displayName: AAP Insecure Skip Verify
+        path: aap_insecure_skip_verify
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      # NAA ConfigMap
+      - description: ConfigMap name for custom NAA OUI to storage vendor mappings (default forklift-naa-oui-map)
+        displayName: NAA OUI Map ConfigMap Name
+        path: naa_oui_map_configmap_name
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
     - description: VM migration
