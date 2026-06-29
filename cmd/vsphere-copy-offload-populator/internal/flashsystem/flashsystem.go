@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -102,11 +103,15 @@ type FlashSystemAPIClient struct {
 	authToken    string // Session token from /auth
 	username     string // Store for re-authentication
 	password     string // Store for re-authentication
+	tokenCache   TokenCache
 	log          klog.Logger
 }
 
 // NewFlashSystemAPIClient creates and authenticates a new API client.
-func NewFlashSystemAPIClient(managementIP, username, password string, sslSkipVerify bool) (*FlashSystemAPIClient, error) {
+// If tokenCache is provided, the client will try to use a cached token before authenticating,
+// and will save new tokens to the cache after authentication. This prevents token invalidation
+// storms when multiple populator pods start concurrently (IBM allows only one valid token per user).
+func NewFlashSystemAPIClient(managementIP, username, password string, sslSkipVerify bool, tokenCache TokenCache) (*FlashSystemAPIClient, error) {
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: sslSkipVerify},
 	}
@@ -117,25 +122,57 @@ func NewFlashSystemAPIClient(managementIP, username, password string, sslSkipVer
 		httpClient:   httpClient,
 		username:     username,
 		password:     password,
+		tokenCache:   tokenCache,
 		log:          logger.New("flashsystem"),
 	}
 
-	// Initial authentication
-	if err := client.authenticate(); err != nil {
+	// Try cached token first to avoid auth call (prevents 429 when many pods start at once)
+	if tokenCache != nil {
+		if cached, err := tokenCache.ReadToken(); err == nil && cached != "" {
+			client.log.Info("using cached FlashSystem auth token from secret")
+			client.authToken = cached
+			return client, nil
+		}
+	}
+
+	if err := client.authenticateAndCache(); err != nil {
 		return nil, fmt.Errorf("initial authentication failed: %w", err)
 	}
 
 	return client, nil
 }
 
-// authenticate handles the authentication process using v1 API best practices
+// authenticate handles the authentication process using v1 API best practices.
+// Retries on 429 (Too Many Requests) with exponential backoff + jitter, since
+// concurrent populator pods can overwhelm the FlashSystem auth endpoint.
 func (c *FlashSystemAPIClient) authenticate() error {
+	var lastStatus int
+	var lastErr error
+	for attempt := 0; attempt <= 3; attempt++ {
+		if attempt > 0 {
+			backoff := time.Duration(1<<uint(attempt-1))*time.Second + time.Duration(rand.Intn(500))*time.Millisecond
+			c.log.Info("auth rate limited (429), retrying", "attempt", attempt, "backoff", backoff)
+			time.Sleep(backoff)
+		}
+
+		lastStatus, lastErr = c.doAuthenticate()
+		if lastErr == nil {
+			return nil
+		}
+		if lastStatus != http.StatusTooManyRequests {
+			return lastErr
+		}
+	}
+	return lastErr
+}
+
+// doAuthenticate performs a single authentication attempt, returning the HTTP status code and any error.
+func (c *FlashSystemAPIClient) doAuthenticate() (int, error) {
 	authURL := fmt.Sprintf("https://%s:7443/rest/v1/auth", c.ManagementIP)
 
-	// FlashSystem expects username and password via HTTP headers, not JSON body
 	req, err := http.NewRequest("POST", authURL, bytes.NewBuffer([]byte{}))
 	if err != nil {
-		return fmt.Errorf("failed to create auth request: %w", err)
+		return 0, fmt.Errorf("failed to create auth request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -146,46 +183,89 @@ func (c *FlashSystemAPIClient) authenticate() error {
 	c.log.V(2).Info("authenticating with FlashSystem", "host", c.ManagementIP)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to send auth request to FlashSystem: %w", err)
+		return 0, fmt.Errorf("failed to send auth request to FlashSystem: %w", err)
 	}
 	defer resp.Body.Close()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read auth response body: %w", err)
+		return resp.StatusCode, fmt.Errorf("failed to read auth response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("FlashSystem authentication failed. Status: %s, Body: %s", resp.Status, string(bodyBytes))
+		return resp.StatusCode, fmt.Errorf("FlashSystem authentication failed. Status: %s, Body: %s", resp.Status, string(bodyBytes))
 	}
 
 	var authResp AuthResponse
 	if err := json.Unmarshal(bodyBytes, &authResp); err != nil {
-		return fmt.Errorf("failed to unmarshal auth token response: %w. Body: %s", err, string(bodyBytes))
+		return resp.StatusCode, fmt.Errorf("failed to unmarshal auth token response: %w. Body: %s", err, string(bodyBytes))
 	}
 
 	if authResp.Token == "" {
-		return fmt.Errorf("FlashSystem authentication successful but no token found in response")
+		return resp.StatusCode, fmt.Errorf("FlashSystem authentication successful but no token found in response")
 	}
 
 	c.authToken = authResp.Token
 
 	c.log.V(2).Info("Successfully authenticated with FlashSystem and obtained session token.")
+	return resp.StatusCode, nil
+}
+
+// authenticateAndCache authenticates and writes the new token to the cache.
+func (c *FlashSystemAPIClient) authenticateAndCache() error {
+	if err := c.authenticate(); err != nil {
+		return err
+	}
+	if c.tokenCache != nil {
+		if err := c.tokenCache.WriteToken(c.authToken); err != nil {
+			c.log.Info("failed to cache auth token in secret (non-fatal)", "error", err)
+		}
+	}
 	return nil
+}
+
+// refreshToken tries to get a fresh token without hitting the auth endpoint.
+// First checks the cache (another pod may have already refreshed). If the cached
+// token is different from ours, uses it. Otherwise authenticates with jitter to
+// avoid multiple pods re-authenticating simultaneously.
+func (c *FlashSystemAPIClient) refreshToken() error {
+	if c.tokenCache == nil {
+		return c.authenticateAndCache()
+	}
+
+	if cached, err := c.tokenCache.ReadToken(); err == nil && cached != "" && cached != c.authToken {
+		c.log.Info("using refreshed token from secret (another pod already re-authenticated)")
+		c.authToken = cached
+		return nil
+	}
+
+	// Jitter before authenticating to spread concurrent re-auth attempts.
+	// If another pod authenticates during our jitter window, we'll pick up
+	// its token from the cache instead of making a redundant auth call.
+	jitter := time.Duration(100+rand.Intn(900)) * time.Millisecond
+	c.log.Info("waiting before re-authentication", "jitter", jitter)
+	time.Sleep(jitter)
+
+	// Re-read cache after jitter — another pod may have authenticated in the meantime
+	if cached, err := c.tokenCache.ReadToken(); err == nil && cached != "" && cached != c.authToken {
+		c.log.Info("using refreshed token from secret after jitter")
+		c.authToken = cached
+		return nil
+	}
+
+	return c.authenticateAndCache()
 }
 
 // makeRequest is a helper to make authenticated HTTP requests with automatic token refresh.
 func (c *FlashSystemAPIClient) makeRequest(method, path string, payload interface{}) ([]byte, int, error) {
-	// Try the request first, and handle 403 (token expiry) by re-authenticating
 	respBodyBytes, statusCode, err := c.doRequest(method, path, payload)
 
-	// Handle 403 Forbidden - token expired, re-authenticate and retry once
+	// Handle 403 Forbidden - token expired or invalidated by another pod
 	if statusCode == http.StatusForbidden {
-		c.log.Info("received 403 forbidden, token likely expired, re-authenticating")
-		if authErr := c.authenticate(); authErr != nil {
-			return nil, statusCode, fmt.Errorf("re-authentication failed: %w", authErr)
+		c.log.Info("received 403 forbidden, refreshing token")
+		if refreshErr := c.refreshToken(); refreshErr != nil {
+			return nil, statusCode, fmt.Errorf("token refresh failed: %w", refreshErr)
 		}
-		// Retry the request with new token
 		return c.doRequest(method, path, payload)
 	}
 
@@ -405,9 +485,9 @@ func (c *FlashSystemClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 // NewFlashSystemClonner creates a new FlashSystemClonner.
 // It checks that vdisk protection is disabled on the FlashSystem; if protection is enabled,
 // it returns an error because it must be off for Virtual Machines (see README, section IBM FlashSystem).
-func NewFlashSystemClonner(managementIP, username, password string, sslSkipVerify bool) (FlashSystemClonner, error) {
+func NewFlashSystemClonner(managementIP, username, password string, sslSkipVerify bool, tokenCache TokenCache) (FlashSystemClonner, error) {
 	log := logger.New("flashsystem")
-	client, err := NewFlashSystemAPIClient(managementIP, username, password, sslSkipVerify)
+	client, err := NewFlashSystemAPIClient(managementIP, username, password, sslSkipVerify, tokenCache)
 	if err != nil {
 		return FlashSystemClonner{}, fmt.Errorf("failed to create FlashSystem API client: %w", err)
 	}
