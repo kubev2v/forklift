@@ -9,6 +9,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/ovf"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/ovirt"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	azuremodel "github.com/kubev2v/forklift/pkg/provider/azure/inventory/model"
 	ec2model "github.com/kubev2v/forklift/pkg/provider/ec2/inventory/model"
 )
 
@@ -47,6 +48,10 @@ func Models(provider *api.Provider) (all []interface{}) {
 		all = append(
 			all,
 			nutanix.All()...)
+	case api.Azure:
+		all = append(
+			all,
+			azuremodel.All()...)
 	}
 
 	return
