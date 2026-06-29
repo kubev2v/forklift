@@ -247,6 +247,7 @@ func (r *Reconciler) validateTLSConnection(provider *api.Provider, secret *core.
 
 	_, err := base.VerifyTLSConnection(tlsURL, secret)
 	if err != nil {
+		provider.Status.Phase = ConnectionFailed
 		provider.Status.SetCondition(libcnd.Condition{
 			Type:     ConnectionTestFailed,
 			Status:   True,
