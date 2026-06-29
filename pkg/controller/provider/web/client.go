@@ -15,6 +15,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/ovirt"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	azureweb "github.com/kubev2v/forklift/pkg/provider/azure/inventory/web"
 	ec2web "github.com/kubev2v/forklift/pkg/provider/ec2/inventory/web"
 )
 
@@ -123,6 +124,14 @@ func NewClient(provider *api.Provider) (client Client, err error) {
 			finder:   &nutanix.Finder{},
 			restClient: base.RestClient{
 				Resolver: &nutanix.Resolver{Provider: provider},
+			},
+		}
+	case api.Azure:
+		client = &ProviderClient{
+			provider: provider,
+			finder:   &azureweb.Finder{},
+			restClient: base.RestClient{
+				Resolver: &azureweb.Resolver{Provider: provider},
 			},
 		}
 	default:
