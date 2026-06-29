@@ -10836,6 +10836,19 @@ rules:
   - list
   - watch
 - apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshots
+  - volumesnapshotcontents
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
   - kubevirt.io
   resources:
   - virtualmachines
@@ -11052,6 +11065,19 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshots
+  - volumesnapshotcontents
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
 - apiGroups:
   - kubevirt.io
   resources:

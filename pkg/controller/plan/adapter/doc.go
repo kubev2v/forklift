@@ -10,6 +10,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/ovirt"
 	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/vsphere"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	azureadapter "github.com/kubev2v/forklift/pkg/provider/azure/controller/adapter"
 	ec2adapter "github.com/kubev2v/forklift/pkg/provider/ec2/controller/adapter"
 )
 
@@ -38,6 +39,8 @@ func New(provider *api.Provider) (adapter Adapter, err error) {
 		adapter = ec2adapter.New()
 	case api.HyperV:
 		adapter = &hyperv.Adapter{}
+	case api.Azure:
+		adapter = azureadapter.New()
 	default:
 		err = liberr.New("provider not supported.")
 	}
