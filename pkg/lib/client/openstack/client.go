@@ -175,7 +175,9 @@ func (c *Client) Authenticate() (err error) {
 func (c *Client) getTLSConfig() (tlsConfig *tls.Config, err error) {
 	identityUrl, err := url.Parse(c.URL)
 	if err != nil {
-		c.Log.Error(err, "error parsing the URL", "url", c.URL)
+		if c.Log != nil {
+			c.Log.Error(err, "error parsing the URL", "url", c.URL)
+		}
 		return
 	}
 	if identityUrl.Scheme == "https" {
@@ -188,7 +190,9 @@ func (c *Client) getTLSConfig() (tlsConfig *tls.Config, err error) {
 				cacert, hasCACert = util.GetCACert(c.secret)
 			}
 			if !hasCACert {
-				c.Log.Info("CA certificate was not provided,system CA cert pool is used")
+				if c.Log != nil {
+					c.Log.Info("CA certificate was not provided,system CA cert pool is used")
+				}
 			} else {
 				roots := x509.NewCertPool()
 				ok := roots.AppendCertsFromPEM(cacert)
@@ -205,6 +209,9 @@ func (c *Client) getTLSConfig() (tlsConfig *tls.Config, err error) {
 
 // Connect
 func (c *Client) Connect() (err error) {
+	if c.Log == nil {
+		c.Log = logging.WithName("openstack")
+	}
 	err = c.Authenticate()
 	if err != nil {
 		return
