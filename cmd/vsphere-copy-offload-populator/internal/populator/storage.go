@@ -1,6 +1,7 @@
 package populator
 
 import (
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/storage"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
 )
 
@@ -51,6 +52,7 @@ type StorageMapper interface {
 type VMDKCapable interface {
 	StorageMapper
 	StorageResolver
+	storage.ArrayIdentifier
 }
 
 // MappingContext holds context information for mapping operations

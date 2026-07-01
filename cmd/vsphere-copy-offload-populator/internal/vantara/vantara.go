@@ -12,6 +12,7 @@ import (
 
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/storage"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
 	"k8s.io/klog/v2"
 )
@@ -32,10 +33,57 @@ type VantaraCloner struct {
 
 // Ensure VantaraCloner implements StorageArrayInfoProvider
 var _ populator.StorageArrayInfoProvider = &VantaraCloner{}
+var _ storage.ArrayIdentifier = &VantaraCloner{}
 
 // GetStorageArrayInfo returns metadata about the Vantara array for metric labels.
 func (v *VantaraCloner) GetStorageArrayInfo() populator.StorageArrayInfo {
 	return v.arrayInfo
+}
+
+// MatchesDevice returns true if the given device name belongs to this Vantara array.
+// It first checks the Hitachi Vantara vendor OUI prefix (naa.60060e80) for a fast reject,
+// then extracts the LDEV ID from the NAA and queries the array API to confirm the device
+// belongs to this specific array by comparing the full NAA ID.
+func (v *VantaraCloner) MatchesDevice(deviceName string) (bool, error) {
+	prefix := "naa." + VantaraProviderID
+	lower := strings.ToLower(deviceName)
+	if !strings.HasPrefix(lower, prefix) {
+		v.log.V(1).Info("device does not match vendor prefix", "device", deviceName, "prefix", prefix)
+		return false, nil
+	}
+
+	start := strings.Index(lower, VantaraProviderID)
+	if start+LengthNAAID > len(lower) {
+		return false, fmt.Errorf("device name too short to extract NAA: %s", deviceName)
+	}
+
+	naaDevice := lower[start : start+LengthNAAID]
+	ldevIdHex := naaDevice[len(naaDevice)-4:]
+	ldevId, err := strconv.ParseUint(ldevIdHex, 16, 64)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse LDEV ID from device name %s: %w", deviceName, err)
+	}
+
+	ldevIds := strconv.FormatUint(ldevId, 10)
+	v.log.V(1).Info("querying array for volume ownership", "device", deviceName, "ldev_id", ldevIds)
+
+	ldevResp, err := v.client.GetLdev(ldevIds)
+	if err != nil {
+		if strings.Contains(err.Error(), "status 404") {
+			v.log.V(1).Info("LDEV not found on this array", "device", deviceName, "ldev_id", ldevIds)
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to query LDEV %s: %w", ldevIds, err)
+	}
+
+	if strings.ToLower(ldevResp.NaaId) != naaDevice {
+		v.log.V(1).Info("LDEV exists but NAA does not match, device belongs to a different array",
+			"device", deviceName, "expected_naa", naaDevice, "actual_naa", strings.ToLower(ldevResp.NaaId))
+		return false, nil
+	}
+
+	v.log.V(1).Info("device confirmed on this array", "device", deviceName, "ldev_id", ldevIds)
+	return true, nil
 }
 
 func NewVantaraClonner(hostname, username, password string) (VantaraCloner, error) {

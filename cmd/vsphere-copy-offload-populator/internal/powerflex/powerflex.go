@@ -10,6 +10,7 @@ import (
 	siotypes "github.com/dell/goscaleio/types/v1"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/storage"
 	"k8s.io/klog/v2"
 )
 
@@ -28,10 +29,21 @@ type PowerflexClonner struct {
 
 // Ensure PowerflexClonner implements StorageArrayInfoProvider
 var _ populator.StorageArrayInfoProvider = &PowerflexClonner{}
+var _ storage.ArrayIdentifier = &PowerflexClonner{}
 
 // GetStorageArrayInfo returns metadata about the PowerFlex array for metric labels.
 func (p *PowerflexClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 	return p.arrayInfo
+}
+
+// MatchesDevice returns true if the given device name belongs to this PowerFlex cluster.
+// PowerFlex uses EUI format (eui.{systemID}{volumeID}), so the systemId prefix
+// identifies this specific cluster instance.
+func (p *PowerflexClonner) MatchesDevice(deviceName string) (bool, error) {
+	prefix := "eui." + p.systemId
+	matches := strings.HasPrefix(strings.ToLower(deviceName), strings.ToLower(prefix))
+	p.log.V(2).Info("checking device ownership", "device", deviceName, "prefix", prefix, "matches", matches)
+	return matches, nil
 }
 
 // CurrentMappedGroups implements populator.StorageApi.

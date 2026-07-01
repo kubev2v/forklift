@@ -10,6 +10,7 @@ import (
 
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/storage"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
 )
 
@@ -21,6 +22,7 @@ const PROVIDER_ID = "60002ac"
 var _ populator.RDMCapable = &Primera3ParClonner{}
 var _ populator.VVolCapable = &Primera3ParClonner{}
 var _ populator.StorageArrayInfoProvider = &Primera3ParClonner{}
+var _ storage.ArrayIdentifier = &Primera3ParClonner{}
 
 type Primera3ParClonner struct {
 	client         Primera3ParClient
@@ -32,6 +34,33 @@ type Primera3ParClonner struct {
 // GetStorageArrayInfo returns metadata about the Primera/3PAR array for metric labels.
 func (c *Primera3ParClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 	return c.arrayInfo
+}
+
+// MatchesDevice returns true if the given device name belongs to this Primera/3PAR array.
+// It first checks the HPE 3PAR vendor OUI prefix (naa.60002ac) for a fast reject, then
+// queries the array API to confirm a volume with the matching WWN exists on this specific array.
+func (c *Primera3ParClonner) MatchesDevice(deviceName string) (bool, error) {
+	prefix := "naa." + PROVIDER_ID
+	if !strings.HasPrefix(strings.ToLower(deviceName), prefix) {
+		c.log.V(1).Info("device does not match vendor prefix", "device", deviceName, "prefix", prefix)
+		return false, nil
+	}
+
+	wwn := strings.TrimPrefix(strings.ToLower(deviceName), "naa.")
+	c.log.V(1).Info("querying array for volume ownership", "device", deviceName, "wwn", wwn)
+
+	volumes, err := c.client.GetVolumes(fmt.Sprintf("wwn EQ '%s'", wwn))
+	if err != nil {
+		return false, fmt.Errorf("failed to query volumes by WWN %s: %w", wwn, err)
+	}
+
+	if len(volumes) == 0 {
+		c.log.V(1).Info("volume not found on this array", "device", deviceName, "wwn", wwn)
+		return false, nil
+	}
+
+	c.log.V(1).Info("device confirmed on this array", "device", deviceName, "wwn", wwn, "volume", volumes[0].Name)
+	return true, nil
 }
 
 func NewPrimera3ParClonner(storageHostname, storageUsername, storagePassword string, sslSkipVerify bool) (Primera3ParClonner, error) {

@@ -17,9 +17,12 @@ import (
 	pmxtypes "github.com/dell/gopowermax/v2/types/v100"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/storage"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
+
+const PowerMaxProviderID = "60000970"
 
 type PowermaxClonner struct {
 	client         gopowermax.Pmax
@@ -35,10 +38,21 @@ type PowermaxClonner struct {
 
 // Ensure PowermaxClonner implements StorageArrayInfoProvider
 var _ populator.StorageArrayInfoProvider = &PowermaxClonner{}
+var _ storage.ArrayIdentifier = &PowermaxClonner{}
 
 // GetStorageArrayInfo returns metadata about the PowerMax array for metric labels.
 func (p *PowermaxClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 	return p.arrayInfo
+}
+
+// MatchesDevice returns true if the given device name belongs to this PowerMax array.
+// PowerMax WWN format: 60000970{symmetrixID}{volumeId}. The symmetrixID uniquely
+// identifies the array instance, so checking naa.60000970{symmetrixID} is instance-level.
+func (p *PowermaxClonner) MatchesDevice(deviceName string) (bool, error) {
+	prefix := "naa." + PowerMaxProviderID + p.symmetrixID
+	matches := strings.HasPrefix(strings.ToLower(deviceName), strings.ToLower(prefix))
+	p.log.V(1).Info("checking device ownership", "device", deviceName, "prefix", prefix, "matches", matches)
+	return matches, nil
 }
 
 func (p *PowermaxClonner) MapTarget(targetLUN populator.LUN, mappingContext populator.MappingContext) (populator.LUN, error) {

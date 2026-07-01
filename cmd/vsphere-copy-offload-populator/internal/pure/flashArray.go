@@ -10,6 +10,7 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/fcutil"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/storage"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
 	"k8s.io/klog/v2"
 )
@@ -21,6 +22,7 @@ var _ populator.RDMCapable = &FlashArrayClonner{}
 var _ populator.VVolCapable = &FlashArrayClonner{}
 var _ populator.VMDKCapable = &FlashArrayClonner{}
 var _ populator.StorageArrayInfoProvider = &FlashArrayClonner{}
+var _ storage.ArrayIdentifier = &FlashArrayClonner{}
 
 type FlashArrayClonner struct {
 	restClient    *RestClient
@@ -79,6 +81,35 @@ func NewFlashArrayClonner(hostname, username, password, apiToken string, skipSSL
 // GetStorageArrayInfo returns metadata about the Pure FlashArray for metric labels.
 func (f *FlashArrayClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 	return f.arrayInfo
+}
+
+// MatchesDevice returns true if the given device name belongs to this Pure FlashArray.
+// It first checks the Pure vendor OUI prefix (naa.624a9370) for a fast reject, then
+// queries the array API to confirm the volume serial exists on this specific array.
+func (f *FlashArrayClonner) MatchesDevice(deviceName string) (bool, error) {
+	prefix := "naa." + FlashProviderID
+	if !strings.HasPrefix(strings.ToLower(deviceName), prefix) {
+		f.log.V(1).Info("device does not match vendor prefix", "device", deviceName, "prefix", prefix)
+		return false, nil
+	}
+
+	serial, err := extractSerialFromNAA(deviceName)
+	if err != nil {
+		return false, fmt.Errorf("failed to extract serial from device name %s: %w", deviceName, err)
+	}
+
+	f.log.V(1).Info("querying array for volume ownership", "device", deviceName, "serial", serial)
+	_, err = f.restClient.FindVolumeBySerial(serial)
+	if err != nil {
+		if strings.Contains(err.Error(), "volume not found") || strings.Contains(err.Error(), "Volume not found") {
+			f.log.V(1).Info("volume not found on this array", "device", deviceName, "serial", serial)
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to query volume by serial %s: %w", serial, err)
+	}
+
+	f.log.V(1).Info("device confirmed on this array", "device", deviceName, "serial", serial)
+	return true, nil
 }
 
 // EnsureClonnerIgroup creates or updates an initiator group with the ESX adapters

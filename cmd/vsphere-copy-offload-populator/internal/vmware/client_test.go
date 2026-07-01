@@ -194,16 +194,12 @@ func TestVSphereClient_GetEsxById_ReturnsBareMoRef(t *testing.T) {
 	}
 	finder.SetDatacenter(dc)
 
-	// Get any host via the finder to learn a valid host ID
 	hosts, err := finder.HostSystemList(context.TODO(), "*")
 	if err != nil || len(hosts) == 0 {
 		t.Fatal("no hosts in simulator")
 	}
 	hostId := hosts[0].Reference().Value
 
-	// GetEsxById must return a bare HostSystem without InventoryPath,
-	// so its String() doesn't include "@ /path" which would break
-	// ONTAP igroup names.
 	host, err := client.GetEsxById(context.TODO(), hostId)
 	if err != nil {
 		t.Fatal(err)
@@ -218,6 +214,133 @@ func TestVSphereClient_GetEsxById_ReturnsBareMoRef(t *testing.T) {
 	}
 	if host.Reference().Value != hostId {
 		t.Errorf("GetEsxById() returned wrong host: got %s, want %s", host.Reference().Value, hostId)
+	}
+}
+
+func TestPrepareAdapters(t *testing.T) {
+	const (
+		sciniGUID  = "1a2b3c4d-5e6f-7890-abcd-ef1234567890"
+		fcId       = "fc.2000f4e9d45532da:2100f4e9d45532da"
+		iscsiId    = "iqn.1998-01.com.vmware:esxi01:12345"
+		sciniRawId = "fc.0000000000000000:0000000000000001"
+		blockId    = "vmhba0"
+	)
+
+	tests := []struct {
+		name      string
+		adapters  map[string]HostAdapter
+		sciniGUID string
+		wantErr   bool
+		wantCount int
+		check     func(t *testing.T, result []HostAdapter)
+	}{
+		{
+			name: "scini adapter gets GUID override",
+			adapters: map[string]HostAdapter{
+				"vmhba67": {Name: "vmhba67", Id: sciniRawId, Driver: "scini"},
+			},
+			sciniGUID: sciniGUID,
+			wantCount: 1,
+			check: func(t *testing.T, result []HostAdapter) {
+				if result[0].Id != sciniGUID {
+					t.Errorf("expected GUID %q, got %q", sciniGUID, result[0].Id)
+				}
+			},
+		},
+		{
+			name: "scini without GUID keeps raw ID",
+			adapters: map[string]HostAdapter{
+				"vmhba67": {Name: "vmhba67", Id: sciniRawId, Driver: "scini"},
+			},
+			sciniGUID: "",
+			wantCount: 1,
+			check: func(t *testing.T, result []HostAdapter) {
+				if result[0].Id != sciniRawId {
+					t.Errorf("expected raw ID %q, got %q", sciniRawId, result[0].Id)
+				}
+			},
+		},
+		{
+			name: "FC adapter passes through unchanged",
+			adapters: map[string]HostAdapter{
+				"vmhba2": {Name: "vmhba2", Id: fcId, Driver: "qlnativefc"},
+			},
+			sciniGUID: "",
+			wantCount: 1,
+			check: func(t *testing.T, result []HostAdapter) {
+				if result[0].Id != fcId {
+					t.Errorf("expected %q, got %q", fcId, result[0].Id)
+				}
+			},
+		},
+		{
+			name: "mixed adapters: scini gets GUID, others pass through",
+			adapters: map[string]HostAdapter{
+				"vmhba67": {Name: "vmhba67", Id: sciniRawId, Driver: "scini"},
+				"vmhba2":  {Name: "vmhba2", Id: fcId, Driver: "qlnativefc"},
+				"vmhba64": {Name: "vmhba64", Id: iscsiId, Driver: "iscsi_vmk"},
+			},
+			sciniGUID: sciniGUID,
+			wantCount: 3,
+			check: func(t *testing.T, result []HostAdapter) {
+				for _, a := range result {
+					if a.Driver == "scini" && a.Id != sciniGUID {
+						t.Errorf("scini should have GUID %q, got %q", sciniGUID, a.Id)
+					}
+					if a.Driver == "qlnativefc" && a.Id != fcId {
+						t.Errorf("FC should be unchanged %q, got %q", fcId, a.Id)
+					}
+					if a.Driver == "iscsi_vmk" && a.Id != iscsiId {
+						t.Errorf("iSCSI should be unchanged %q, got %q", iscsiId, a.Id)
+					}
+				}
+			},
+		},
+		{
+			name:      "empty adapters returns error",
+			adapters:  map[string]HostAdapter{},
+			sciniGUID: "",
+			wantErr:   true,
+		},
+		{
+			name: "all host adapters (different-array case)",
+			adapters: map[string]HostAdapter{
+				"key-vmhba0":  {Name: "vmhba0", Id: blockId, Driver: "smartpqi"},
+				"key-vmhba67": {Name: "vmhba67", Id: sciniRawId, Driver: "scini"},
+				"key-vmhba2":  {Name: "vmhba2", Id: fcId, Driver: "qlnativefc"},
+				"key-vmhba64": {Name: "vmhba64", Id: iscsiId, Driver: "iscsi_vmk"},
+			},
+			sciniGUID: sciniGUID,
+			wantCount: 4,
+			check: func(t *testing.T, result []HostAdapter) {
+				for _, a := range result {
+					if a.Driver == "scini" && a.Id != sciniGUID {
+						t.Errorf("scini should have GUID, got %q", a.Id)
+					}
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := prepareAdapters(tt.adapters, tt.sciniGUID, "test-datastore")
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(result) != tt.wantCount {
+				t.Errorf("expected %d adapters, got %d: %+v", tt.wantCount, len(result), result)
+			}
+			if tt.check != nil {
+				tt.check(t, result)
+			}
+		})
 	}
 }
 
