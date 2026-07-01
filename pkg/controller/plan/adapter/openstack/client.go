@@ -28,6 +28,7 @@ const (
 	SnapshotStatusCreating  = libclient.SnapshotStatusCreating
 	SnapshotStatusDeleting  = libclient.SnapshotStatusDeleting
 	SnapshotStatusDeleted   = libclient.SnapshotStatusDeleted
+	SnapshotStatusError     = libclient.SnapshotStatusError
 
 	VolumeStatusAvailable = libclient.VolumeStatusAvailable
 	VolumeStatusInUse     = libclient.VolumeStatusInUse
@@ -209,12 +210,13 @@ func (r *Client) PreTransferActions(vmRef ref.Ref) (ready bool, err error) {
 		return
 	}
 
-	err = r.ensureSnapshotsFromVolumes(vm)
-	if err != nil {
+	ready, err = r.ensureSnapshotsFromVolumes(vm)
+	if err != nil || !ready {
 		return
 	}
 
 	err = r.ensureVolumesFromSnapshots(vm)
+	ready = false
 	return
 }
 
@@ -512,37 +514,13 @@ func (r *Client) createVmSnapshotImage(vm *libclient.VM) (vmImage *libclient.Ima
 		err = liberr.Wrap(err)
 		return
 	}
-	// The vm is image based and we need to create the snapshots of the
-	// volumes attached to it.
 	if imageID, ok := vm.Image["id"]; ok {
-		// Update property for image based
 		imageUpdateOpts := &libclient.ImageUpdateOpts{}
 		imageUpdateOpts.AddImageProperty(forkliftPropertyOriginalImageID, imageID.(string))
 		err = r.Update(vmImage, imageUpdateOpts)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return
-		}
-		for _, attachedVolume := range vm.AttachedVolumes {
-			var volume *libclient.Volume
-			volume, err = r.getVolume(ref.Ref{ID: attachedVolume.ID})
-			if err != nil {
-				err = liberr.Wrap(err)
-				return
-			}
-			switch volume.Status {
-			case VolumeStatusInUse:
-				_, err = r.createSnapshotFromVolume(vm, attachedVolume.ID)
-				if err != nil {
-					err = liberr.Wrap(err)
-					return
-				}
-			default:
-				err = UnexpectedVolumeStatusError
-				r.Log.Error(err, "creating snapshots from volumes",
-					"vm", vm.Name, "volume", volume.Name)
-				return
-			}
 		}
 	}
 
@@ -573,6 +551,10 @@ func (r *Client) getVolumeFromSnapshot(vm *libclient.VM, snapshotID string) (vol
 	snapshot := &libclient.Snapshot{}
 	err = r.Get(snapshot, snapshotID)
 	if err != nil {
+		if r.IsNotFound(err) {
+			err = ResourceNotFoundError
+			return
+		}
 		err = liberr.Wrap(err)
 		return
 	}
@@ -659,7 +641,7 @@ func (r *Client) removeSnapshotFromVolume(vm *libclient.VM, volumeID string) (er
 		return
 	}
 	switch snapshot.Status {
-	case SnapshotStatusAvailable:
+	case SnapshotStatusAvailable, SnapshotStatusError:
 		err = r.Delete(snapshot)
 		if err != nil {
 			err = liberr.Wrap(err)
@@ -998,22 +980,51 @@ func (r *Client) ensureImageUpToDate(vm *libclient.VM, image *libclient.Image, v
 	return
 }
 
-func (r *Client) ensureSnapshotsFromVolumes(vm *libclient.VM) (err error) {
-	var snapshotsFromVolumes []libclient.Snapshot
-	if snapshotsFromVolumes, err = r.getSnapshotsFromVolumes(vm); err != nil {
-		err = liberr.Wrap(err)
+func (r *Client) ensureSnapshotsFromVolumes(vm *libclient.VM) (ready bool, err error) {
+	if vm.TaskState != "" {
+		r.Log.Info("VM has an active task, waiting before creating volume snapshots...",
+			"vm", vm.Name, "taskState", vm.TaskState)
 		return
 	}
-	for _, snapshot := range snapshotsFromVolumes {
+
+	ready = true
+	for _, attachedVolume := range vm.AttachedVolumes {
+		var snapshot *libclient.Snapshot
+		snapshot, err = r.getSnapshotFromVolume(vm, attachedVolume.ID)
+		if err != nil {
+			if !errors.Is(err, ResourceNotFoundError) {
+				err = liberr.Wrap(err)
+				return
+			}
+			r.Log.Info("creating snapshot from volume",
+				"vm", vm.Name, "volumeID", attachedVolume.ID)
+			_, err = r.createSnapshotFromVolume(vm, attachedVolume.ID)
+			if err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
+			ready = false
+			continue
+		}
 		switch snapshot.Status {
 		case SnapshotStatusCreating:
 			r.Log.Info("the snapshot is still being created, skipping...",
 				"vm", vm.Name, "snapshot", snapshot.Name)
+			ready = false
 		case SnapshotStatusAvailable:
-			err = r.ensureVolumeFromSnapshot(vm, &snapshot)
+			err = r.ensureVolumeFromSnapshot(vm, snapshot)
+		case SnapshotStatusError:
+			r.Log.Info("the snapshot is in error state, deleting for retry...",
+				"vm", vm.Name, "snapshot", snapshot.Name, "volumeID", snapshot.VolumeID)
+			if err = r.Delete(snapshot); err != nil {
+				err = liberr.Wrap(err)
+				return
+			}
+			ready = false
 		case SnapshotStatusDeleted, SnapshotStatusDeleting:
 			r.Log.Info("the snapshot is being deleted, skipping...",
 				"vm", vm.Name, "snapshot", snapshot.Name)
+			ready = false
 		default:
 			err = liberr.New("unexpected snapshot status")
 			r.Log.Error(err, "checking the snapshot",

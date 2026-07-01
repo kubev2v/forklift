@@ -247,6 +247,7 @@ const (
 
 type VM struct {
 	servers.Server
+	TaskState string
 }
 
 type VMCreateOpts struct {
