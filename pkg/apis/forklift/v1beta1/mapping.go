@@ -39,10 +39,31 @@ type DestinationNetwork struct {
 	// - ignored: Network is excluded from mapping
 	// +kubebuilder:validation:Enum=pod;multus;ignored
 	Type string `json:"type"`
-	// The namespace (multus only).
+	// The namespace. Applies only when Type == "multus".
 	Namespace string `json:"namespace,omitempty"`
-	// The name.
+	// The name. Applies only when Type == "multus" (the NetworkAttachmentDefinition name).
 	Name string `json:"name,omitempty"`
+	// Calico marks the destination's default pod network as Calico-provided
+	// and opts the VM's primary NIC into Calico identity preservation: the
+	// source MAC is carried over, and the source IPs too when the Plan sets
+	// preserveStaticIPs. Applies only when Type == "pod".
+	Calico *CalicoDestination `json:"calico,omitempty"`
+}
+
+// CalicoDestination qualifies a type: pod destination whose default pod
+// network is provided by Calico. Its presence (even empty) is the opt-in
+// for primary-NIC identity preservation.
+type CalicoDestination struct {
+	// Name of a cluster-scoped projectcalico.org/v3 Network CR for L2
+	// primary attach. Empty value means no L2 attach: Calico's default L3
+	// IPAM is used.
+	Network string `json:"network,omitempty"`
+	// 802.1Q VLAN ID within the named Calico Network. Applies only when
+	// Network != "". Value 0 (or omitted) means "implicit" and requires the
+	// named Network to have exactly one VLAN entry. Otherwise must match a
+	// VLAN entry's vlan.id in the named Network.
+	// +kubebuilder:validation:Maximum=4094
+	Vlan uint16 `json:"vlan,omitempty"`
 }
 
 // NetworkSourceRef extends Ref with an optional VLAN qualifier for network disambiguation.
