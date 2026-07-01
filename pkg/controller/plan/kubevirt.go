@@ -1916,6 +1916,12 @@ func (r *KubeVirt) NetAppShiftPVCs(vm *plan.VMStatus) ([]core.PersistentVolumeCl
 	return r.Builder.NetAppShiftPVCs(vm.Ref, labels)
 }
 
+// CsiImportPVCs builds PVCs for disks that have CsiVolumeImport configured.
+func (r *KubeVirt) CsiImportPVCs(vm *plan.VMStatus) ([]core.PersistentVolumeClaim, error) {
+	labels := r.vmLabels(vm.Ref)
+	return r.Builder.CsiImportPVCs(vm.Ref, labels)
+}
+
 func (r *KubeVirt) vddkConfigMap(labels map[string]string) (*core.ConfigMap, error) {
 	data := make(map[string]string)
 	if r.Source.Provider.UseVddkAioOptimization() {
@@ -1996,6 +2002,21 @@ func (r *KubeVirt) EnsurePopulatorVolumes(vm *plan.VMStatus, pvcs []*core.Persis
 			pendingPvcNames = append(pendingPvcNames, pvc.Name)
 		}
 	}
+	allPVCs, err := r.getPVCs(vm.Ref)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	seen := make(map[string]bool)
+	for _, name := range pendingPvcNames {
+		seen[name] = true
+	}
+	for _, pvc := range allPVCs {
+		if pvc.Status.Phase == core.ClaimPending && !seen[pvc.Name] {
+			r.Log.V(2).Info("EnsurePopulatorVolumes: adding pending PVC from VM", "pvc", pvc.Name)
+			pendingPvcNames = append(pendingPvcNames, pvc.Name)
+		}
+	}
+	r.Log.V(2).Info("EnsurePopulatorVolumes: creating bind pod", "pendingPVCs", pendingPvcNames)
 	err = r.createPodToBindPVCs(vm, pendingPvcNames)
 	if err != nil {
 		err = liberr.Wrap(err)

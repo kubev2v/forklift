@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubev2v/forklift/pkg/storage/resolver"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/cli/esx"
 	"github.com/vmware/govmomi/find"
@@ -37,13 +38,13 @@ type Client interface {
 	RunEsxCommand(ctx context.Context, host *object.HostSystem, command []string) ([]esx.Values, error)
 	GetDatastore(ctx context.Context, dc *object.Datacenter, datastore string) (*object.Datastore, error)
 	// GetVMDiskBacking returns disk backing information for detecting disk type (VVol, RDM, VMDK)
-	GetVMDiskBacking(ctx context.Context, vmId string, vmdkPath string) (*DiskBacking, error)
+	GetVMDiskBacking(ctx context.Context, vmId string, vmdkPath string) (*resolver.DiskBacking, error)
 	// GetVirtualDiskSizes returns provisioned capacity, datastore-allocated bytes, and disk
 	// backing info for the virtual disk matching vmdkPath in a single VM lookup. Provisioned
 	// is the guest-visible disk size; allocated is the sum of diskExtent file sizes from
 	// layoutEx (thin-used blocks on VMFS). VVol/RDM returns (provisioned, 0, backing, nil).
 	// Returns (0, 0, nil, nil) if the disk cannot be matched.
-	GetVirtualDiskSizes(ctx context.Context, vmId, vmdkPath string) (provisionedBytes, datastoreAllocatedBytes int64, backing *DiskBacking, err error)
+	GetVirtualDiskSizes(ctx context.Context, vmId, vmdkPath string) (provisionedBytes, datastoreAllocatedBytes int64, backing *resolver.DiskBacking, err error)
 	GetDatastoreActiveAdapters(ctx context.Context, host *object.HostSystem, datastoreName string) ([]HostAdapter, error)
 }
 
@@ -53,18 +54,6 @@ type HostAdapter struct {
 	Id string
 	// Driver is the driver name (e.g., "scini" for PowerFlex, "bnx2i" for iSCSI, etc.)
 	Driver string
-}
-
-// DiskBacking contains information about the disk backing type
-type DiskBacking struct {
-	// VVolId is set if the disk is VVol-backed
-	VVolId string
-	// IsRDM is true if the disk is a Raw Device Mapping
-	IsRDM bool
-	// DeviceName is the underlying device name
-	DeviceName string
-	// LunUuid is the unique LUN identifier (SCSI 83h / NAA). Use this for storage resolution; required for RDM.
-	LunUuid string
 }
 
 type VSphereClient struct {
@@ -455,8 +444,8 @@ func (c *VSphereClient) GetDatastore(ctx context.Context, dc *object.Datacenter,
 }
 
 // GetVMDiskBacking retrieves disk backing information to determine disk type
-func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkPath string) (*DiskBacking, error) {
-	log := klog.FromContext(ctx).WithName("esxcli")
+func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkPath string) (*resolver.DiskBacking, error) {
+	log := klog.FromContext(ctx)
 	_, vmProps, err := c.getVMWithConfig(ctx, vmId)
 	if err != nil {
 		return nil, err
@@ -490,8 +479,8 @@ func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkP
 				} else {
 					log.V(2).Info("disk matched at top of chain — VVol-backed", "vmdk", vmdkPath, "backing_object_id", matched.BackingObjectId)
 				}
-				return &DiskBacking{
-					VVolId:     matched.BackingObjectId,
+				return &resolver.DiskBacking{
+					VVolID:     matched.BackingObjectId,
 					IsRDM:      false,
 					DeviceName: matched.FileName,
 				}, nil
@@ -499,8 +488,8 @@ func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkP
 
 			// Regular VMDK
 			log.V(2).Info("disk is VMDK-backed", "vmdk", vmdkPath)
-			return &DiskBacking{
-				VVolId:     "",
+			return &resolver.DiskBacking{
+				VVolID:     "",
 				IsRDM:      false,
 				DeviceName: matched.FileName,
 			}, nil
@@ -515,8 +504,8 @@ func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkP
 			}
 
 			log.V(2).Info("disk is RDM-backed", "vmdk", vmdkPath, "device", backing.DeviceName, "lunUuid", backing.LunUuid)
-			return &DiskBacking{
-				VVolId:     "",
+			return &resolver.DiskBacking{
+				VVolID:     "",
 				IsRDM:      true,
 				DeviceName: backing.DeviceName,
 				LunUuid:    backing.LunUuid,
@@ -526,8 +515,8 @@ func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkP
 
 	// If we couldn't find the disk, return default VMDK type
 	log.V(2).Info("disk not found, assuming VMDK type", "vmdk", vmdkPath)
-	return &DiskBacking{
-		VVolId:     "",
+	return &resolver.DiskBacking{
+		VVolID:     "",
 		IsRDM:      false,
 		DeviceName: "",
 	}, nil
@@ -578,8 +567,8 @@ func virtualDiskProvisionedBytes(d *types.VirtualDisk) int64 {
 
 // GetVirtualDiskSizes implements Client. It returns provisioned bytes, datastore-allocated
 // bytes, and disk backing info for the disk matching vmdkPath in a single VM lookup.
-func (c *VSphereClient) GetVirtualDiskSizes(ctx context.Context, vmId, vmdkPath string) (int64, int64, *DiskBacking, error) {
-	log := klog.FromContext(ctx).WithName("esxcli")
+func (c *VSphereClient) GetVirtualDiskSizes(ctx context.Context, vmId, vmdkPath string) (int64, int64, *resolver.DiskBacking, error) {
+	log := klog.FromContext(ctx)
 	vm, vmProps, err := c.getVMWithConfig(ctx, vmId)
 	if err != nil {
 		return 0, 0, nil, err
@@ -590,7 +579,7 @@ func (c *VSphereClient) GetVirtualDiskSizes(ctx context.Context, vmId, vmdkPath 
 
 	normalizedPath := strings.ToLower(vmdkPath)
 	var matchedDisk *types.VirtualDisk
-	var diskBacking *DiskBacking
+	var diskBacking *resolver.DiskBacking
 	for _, device := range vmProps.Config.Hardware.Device {
 		disk, ok := device.(*types.VirtualDisk)
 		if !ok {
@@ -613,10 +602,10 @@ func (c *VSphereClient) GetVirtualDiskSizes(ctx context.Context, vmId, vmdkPath 
 				} else {
 					log.V(2).Info("disk matched at top of chain — VVol-backed", "vmdk", vmdkPath, "backing_object_id", matchedBacking.BackingObjectId)
 				}
-				diskBacking = &DiskBacking{VVolId: matchedBacking.BackingObjectId, DeviceName: matchedBacking.FileName}
+				diskBacking = &resolver.DiskBacking{VVolID: matchedBacking.BackingObjectId, DeviceName: matchedBacking.FileName}
 			} else {
 				log.V(2).Info("disk is VMDK-backed", "vmdk", vmdkPath)
-				diskBacking = &DiskBacking{DeviceName: matchedBacking.FileName}
+				diskBacking = &resolver.DiskBacking{DeviceName: matchedBacking.FileName}
 			}
 		case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
 			if !strings.Contains(strings.ToLower(backing.FileName), normalizedPath) &&
@@ -627,21 +616,21 @@ func (c *VSphereClient) GetVirtualDiskSizes(ctx context.Context, vmId, vmdkPath 
 			}
 			matchedDisk = disk
 			log.V(2).Info("disk is RDM-backed", "vmdk", vmdkPath, "device", backing.DeviceName, "lunUuid", backing.LunUuid)
-			diskBacking = &DiskBacking{IsRDM: true, DeviceName: backing.DeviceName, LunUuid: backing.LunUuid}
+			diskBacking = &resolver.DiskBacking{IsRDM: true, DeviceName: backing.DeviceName, LunUuid: backing.LunUuid}
 		}
 		if matchedDisk != nil {
 			break
 		}
 	}
+
 	if matchedDisk == nil {
-		log.V(2).Info("disk not found, assuming VMDK type", "vmdk", vmdkPath)
-		return 0, 0, &DiskBacking{}, nil
+		return 0, 0, diskBacking, nil
 	}
 
 	provisionedBytes := virtualDiskProvisionedBytes(matchedDisk)
 
 	// VVol/RDM: layoutEx extent semantics differ; return provisioned only.
-	if diskBacking.VVolId != "" || diskBacking.IsRDM {
+	if diskBacking.VVolID != "" || diskBacking.IsRDM {
 		return provisionedBytes, 0, diskBacking, nil
 	}
 
@@ -707,12 +696,9 @@ func findMatchingFlatBacking(b *types.VirtualDiskFlatVer2BackingInfo, normalized
 
 // diskPathMatches compares two VMDK paths accounting for different formats
 func diskPathMatches(path1, path2 string) bool {
-	// Extract datastore and filename from both paths
-	// Format: "[datastore] folder/file.vmdk"
 	normalize := func(p string) string {
 		p = strings.TrimSpace(p)
 		p = strings.ToLower(p)
-		// Remove brackets from datastore
 		p = strings.ReplaceAll(p, "[", "")
 		p = strings.ReplaceAll(p, "]", "")
 		return p
@@ -720,6 +706,7 @@ func diskPathMatches(path1, path2 string) bool {
 
 	return normalize(path1) == normalize(path2)
 }
+
 
 type Obj struct {
 	XMLName          xml.Name `xml:"urn:vim25 obj"`

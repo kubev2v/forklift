@@ -10195,6 +10195,26 @@ spec:
                     offloadPlugin:
                       description: Offload Plugin
                       properties:
+                        csiVolumeImport:
+                          description: |-
+                            CsiVolumeImport uses the CSI driver's native import capability to migrate VVol/RDM disks.
+                            The controller creates a PVC with import annotations; the CSI driver clones the source array
+                            volume directly — no populator pod, no CR, no service account is launched.
+                          properties:
+                            secretRef:
+                              description: SecretRef is the name of the secret with
+                                storage credentials, in the source provider's namespace.
+                              type: string
+                            storageVendorProduct:
+                              description: StorageVendorProduct identifies the storage
+                                array vendor.
+                              enum:
+                              - primera3par
+                              type: string
+                          required:
+                          - secretRef
+                          - storageVendorProduct
+                          type: object
                         vsphereXcopyConfig:
                           description: |-
                             VSphereXcopyPluginConfig works with the Vsphere Xcopy Volume Populator
@@ -10230,8 +10250,6 @@ spec:
                           - secretRef
                           - storageVendorProduct
                           type: object
-                      required:
-                      - vsphereXcopyConfig
                       type: object
                     source:
                       description: Source storage.

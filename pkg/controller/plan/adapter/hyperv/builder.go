@@ -550,6 +550,10 @@ func (r *Builder) NetAppShiftPVCs(vmRef ref.Ref, labels map[string]string) ([]co
 	return nil, nil
 }
 
+func (r *Builder) CsiImportPVCs(_ ref.Ref, _ map[string]string) ([]core.PersistentVolumeClaim, error) {
+	return nil, nil
+}
+
 func (r *Builder) SourceVMLabelsAndAnnotations(vmRef ref.Ref, tagMapping *api.TagMapping) (labels map[string]string, annotations map[string]string, sanitizationReport map[string]string, err error) {
 	return
 }

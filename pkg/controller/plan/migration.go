@@ -861,6 +861,31 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				}
 			}
 
+			csiPVCs, csiErr := r.kubevirt.CsiImportPVCs(vm)
+			if csiErr != nil {
+				if !errors.As(csiErr, &web.ProviderNotReadyError{}) {
+					r.Log.Error(csiErr, "error creating CSI import PVCs", "vm", vm.Name)
+					step.AddError(csiErr.Error())
+					err = nil
+					break
+				} else {
+					err = csiErr
+					return
+				}
+			}
+			if len(csiPVCs) > 0 {
+				if csiErr = r.ensurer.PersistentVolumeClaims(vm, csiPVCs); csiErr != nil {
+					if !errors.As(csiErr, &web.ProviderNotReadyError{}) {
+						step.AddError(csiErr.Error())
+						err = nil
+						break
+					} else {
+						err = csiErr
+						return
+					}
+				}
+			}
+
 			if r.builder.SupportsVolumePopulators() {
 				var pvcs []*core.PersistentVolumeClaim
 				if pvcs, err = r.kubevirt.PopulatorVolumes(vm.Ref); err != nil {
@@ -2105,6 +2130,11 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 		taskSeen[taskName] = true
 
 		if pvc.Status.Phase == core.ClaimBound {
+			if pvc.Annotations[base.AnnCopyMethod] == base.CopyMethodCsiImport {
+				if pvErr := r.ensureRetainPolicy(*pvc); pvErr != nil {
+					r.Log.Error(pvErr, "failed to patch PV reclaim policy to Retain", "pvc", pvc.Name)
+				}
+			}
 			task.Phase = api.StepCompleted
 			task.Reason = TransferCompleted
 			task.Progress.Completed = task.Progress.Total
@@ -2213,6 +2243,30 @@ func terminationMessage(pod *core.Pod) (msg string, ok bool) {
 		ok = true
 	}
 	return
+}
+
+// ensureRetainPolicy patches the PV backing a bound CSI-import PVC to reclaimPolicy=Retain.
+// This prevents the CSI driver from deleting the source array volume if the PVC is deleted
+// during migration rollback.
+func (r *Migration) ensureRetainPolicy(pvc core.PersistentVolumeClaim) error {
+	pvName := pvc.Spec.VolumeName
+	if pvName == "" {
+		return nil
+	}
+	pv := &core.PersistentVolume{}
+	if err := r.Destination.Client.Get(context.TODO(), client.ObjectKey{Name: pvName}, pv); err != nil {
+		return liberr.Wrap(err)
+	}
+	if pv.Spec.PersistentVolumeReclaimPolicy == core.PersistentVolumeReclaimRetain {
+		return nil
+	}
+	patch := client.MergeFrom(pv.DeepCopy())
+	pv.Spec.PersistentVolumeReclaimPolicy = core.PersistentVolumeReclaimRetain
+	if err := r.Destination.Client.Patch(context.TODO(), pv, patch); err != nil {
+		return liberr.Wrap(err)
+	}
+	r.Log.Info("patched PV reclaim policy to Retain for CSI import", "pv", pvName, "pvc", pvc.Name)
+	return nil
 }
 
 // Return whether the pod has failed and restarted too many times.

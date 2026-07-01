@@ -1111,6 +1111,8 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 
 		// Check for mixed VDDK/Offload usage (vSphere only)
 		// If plan uses offload, add VMs with VDDK disks to the condition
+		// TODO: Also validate VMDK disks on CSI-import-only datastores (no xcopy).
+		// CSI import only supports VVol and RDM — VMDK disks require xcopy.
 		if planUsesOffload {
 			if vsphereVM, ok := v.(*vsphere.VM); ok {
 				storageMap := plan.Referenced.Map.Storage
@@ -2527,16 +2529,24 @@ func (r *Reconciler) validateVirtV2vImage(plan *api.Plan) error {
 	return nil
 }
 
-// vmUsesVddk checks if the VM requires VDDK for migration (i.e., if any disk doesn't use storage offload)
+// vmUsesVddk checks if the VM requires VDDK for migration (i.e., if any disk doesn't use storage offload).
+// Both xcopy and CSI import are considered valid offload methods.
 func (r *Reconciler) vmUsesVddk(storageMap *api.StorageMap, vsphereVM *vsphere.VM, vmName string) (bool, error) {
 	for _, disk := range vsphereVM.Disks {
 		mapping, found := storageMap.FindStorage(disk.Datastore.ID)
 		if !found {
 			continue // Another validation will handle this
 		}
-		if mapping.OffloadPlugin == nil || mapping.OffloadPlugin.VSphereXcopyPluginConfig == nil {
+		if mapping.OffloadPlugin == nil {
 			return true, nil
 		}
+		if mapping.OffloadPlugin.VSphereXcopyPluginConfig != nil {
+			continue
+		}
+		if mapping.OffloadPlugin.CsiVolumeImport != nil {
+			continue
+		}
+		return true, nil
 	}
 
 	return false, nil
