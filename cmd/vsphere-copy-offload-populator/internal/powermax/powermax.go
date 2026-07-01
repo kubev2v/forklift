@@ -51,76 +51,8 @@ func (p *PowermaxClonner) UnmapTarget(targetLUN populator.LUN, mappingContext po
 
 // CurrentMappedGroups implements populator.StorageApi.
 func (p *PowermaxClonner) CurrentMappedGroups(targetLUN populator.LUN, mappingContext populator.MappingContext) ([]string, error) {
-	p.log.V(2).Info("querying current mapped groups", "volume", targetLUN.ProviderID)
-
-	ctx := context.TODO()
-	var volume *pmxtypes.Volume
-	err := retryOnTransient(ctx, p.log, "GetVolumeByID", func() error {
-		var e error
-		volume, e = p.client.GetVolumeByID(ctx, p.symmetrixID, targetLUN.ProviderID)
-		return e
-	})
-	if err != nil {
-		return nil, fmt.Errorf("Error getting volume %s: %v", targetLUN.ProviderID, err)
-	}
-
-	if len(volume.StorageGroups) == 0 {
-		return nil, fmt.Errorf("Volume %s is not associated with any Storage Group.\n", targetLUN.ProviderID)
-	}
-
-	p.log.V(2).Info("volume storage groups", "volume", targetLUN.ProviderID, "storage_groups", volume.StorageGroups)
-
-	foundHostGroups := []string{}
-
-	for _, sgID := range volume.StorageGroups {
-		foundHostGroups = append(foundHostGroups, sgID.StorageGroupName)
-		var maskingViewList *pmxtypes.MaskingViewList
-		err := retryOnTransient(ctx, p.log, "GetMaskingViewList", func() error {
-			var e error
-			maskingViewList, e = p.client.GetMaskingViewList(ctx, p.symmetrixID)
-			return e
-		})
-		if err != nil {
-			p.log.Info("failed to get masking views for storage group", "storage_group", sgID, "err", err)
-			continue
-		}
-
-		if len(maskingViewList.MaskingViewIDs) == 0 {
-			p.log.V(2).Info("no masking views found for storage group", "storage_group", sgID)
-			continue
-		}
-
-		// Step 3: Get details of each Masking View to find the Host Group
-		for _, mvID := range maskingViewList.MaskingViewIDs {
-			var maskingView *pmxtypes.MaskingView
-			err := retryOnTransient(ctx, p.log, "GetMaskingViewByID", func() error {
-				var e error
-				maskingView, e = p.client.GetMaskingViewByID(ctx, p.symmetrixID, mvID)
-				return e
-			})
-			if err != nil {
-				p.log.Info("failed to get masking view", "masking_view", mvID, "err", err)
-				continue
-			}
-
-			if maskingView.HostID != "" {
-				// This masking view is directly mapped to a Host, not a Host Group
-				p.log.V(2).Info("volume mapped via masking view to host", "volume", targetLUN.ProviderID, "masking_view", mvID, "host", maskingView.HostID)
-				foundHostGroups = append(foundHostGroups, maskingView.HostID)
-			} else if maskingView.HostGroupID != "" {
-				// This masking view is mapped to a Host Group
-				p.log.V(2).Info("volume mapped via masking view to host group", "volume", targetLUN.ProviderID, "masking_view", mvID, "host_group", maskingView.HostGroupID)
-				foundHostGroups = append(foundHostGroups, maskingView.HostGroupID)
-			}
-		}
-	}
-
-	if len(foundHostGroups) > 0 {
-		p.log.V(2).Info("found mapped groups", "volume", targetLUN.ProviderID, "groups", foundHostGroups)
-	} else {
-		p.log.V(2).Info("no host groups found for volume", "volume", targetLUN.ProviderID)
-	}
-	return foundHostGroups, nil
+	p.log.Info("skipping CurrentMappedGroups for PowerMax as dynamic masking view created per disk copy")
+	return nil, nil
 }
 
 // EnsureClonnerIgroup implements populator.StorageApi.
