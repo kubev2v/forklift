@@ -4,19 +4,22 @@
 
 - [Forklift Controller](#forklift-controller)
 - [Populator Controller](#populator-controller)
-- [VSphereXcopyVolumePopulator Resource](#vspherexcopyvolumepopoulator-resource)
+- [VSphereXcopyVolumePopulator Resource](#vspherexcopyvolumepopulator-resource)
 - [vmkfstools-wrapper](#vmkfstools-wrapper)
 - [Setup Copy Offload](#setup-copy-offload)
 - [Supported Storage Providers](#supported-storage-providers)
-- [Secret with Storage Provider Credentials](#secret-with-storage-provider-credentials)
-  - [Hitachi Vantara](#hitachi-vantara)
-  - [NetApp ONTAP](#netapp-ontap)
-  - [HPE Primera/3PAR](#hpe-primera3par)
-  - [Pure FlashArray](#pure-flasharray)
-  - [Dell PowerMax](#dell-powermax)
   - [Dell PowerFlex](#dell-powerflex)
-- [Limitations](#limitations)
+  - [Dell PowerMax](#dell-powermax)
+  - [Dell PowerStore](#dell-powerstore)
+  - [HPE Primera / 3PAR](#hpe-primera--3par)
+  - [Hitachi Vantara](#hitachi-vantara)
+  - [IBM FlashSystem](#ibm-flashsystem)
+  - [Infinidat InfiniBox](#infinidat-infinibox)
+  - [NetApp ONTAP](#netapp-ontap)
+  - [Pure Storage FlashArray](#pure-storage-flasharray)
 - [Storage Offload Fallback Copy](#storage-offload-fallback-copy)
+- [Host Lease Management](#host-lease-management)
+- [Limitations](#limitations)
 - [Matching PVC with DataStores](#matching-pvc-with-datastores-to-deduce-copy-offload-support)
 - [vSphere User Privileges](#vsphere-user-privileges)
 - [Clone Methods: VIB vs SSH](#clone-methods-vib-vs-ssh)
@@ -26,10 +29,9 @@
 - [Troubleshooting](#troubleshooting)
   - [vSphere/ESXi](#vsphereesxi)
   - [SSH Method](#ssh-method)
-  - [NetApp](#netapp)
 
 ## Forklift Controller
-When the feature flag `feature_copy_offload` is true (on by default), the controller
+When the feature flag `feature_copy_offload` is true (off by default), the controller
 consult the storagemaps offload plugin configuration, to decided if VM disk from
 VMWare could be copied by the storage backend(offloaded) into the newly created PVC.
 When the controller creates the PVC for the v2v pod it will also create
@@ -83,7 +85,7 @@ spec:
 
 ## vmkfstools-wrapper
 An ESXi CLI extension that exposes the vmkfstools clone operation to API interaction.
-The folder vmkfstools-wrapper has a script to create a VIB to wrap the vmkfstools_wrapper.sh
+The folder vmkfstools-wrapper has a script to create a VIB to wrap the vmkfstools_wrapper.py
 to be a proxy to perform vmkfstools commands and more.
 The VIB should be installed on every ESXi that is connected to the datastores which
 are holds migratable VMs.
@@ -129,55 +131,620 @@ Alternative, that wrapper can be invoked using SSH. See [SSH Method](#ssh-method
 
 The `storageVendorProduct` field in the `StorageMap` identifies which storage product to use for copy offload. Below is a list of supported providers and the corresponding values to use.
 
-| Vendor          | `storageVendorProduct` value | More Info |
+| Vendor          | `storageVendorProduct` value | Details |
 | --------------- | ---------------------------- |:---:|
-| Hitachi Vantara | `vantara`                    | [Link](#hitachi-vantara) |
-| NetApp          | `ontap`                      | [Link](#netapp-ontap) |
-| HPE             | `primera3par`                | |
-| Pure Storage    | `pureFlashArray`             | [Link](#pure-flasharray) |
-| Dell            | `powerflex`                  | [Link](#dell-powerflex) |
-| Dell            | `powermax`                   | [Link](#dell-powermax) |
-| Dell            | `powerstore`                 | |
-| Infinidat       | `infinibox`                  | |
-| IBM             | `flashsystem`                | [Link](#ibm-flashsystem) |
+| Dell            | `powerflex`                  | [Dell PowerFlex](#dell-powerflex) |
+| Dell            | `powermax`                   | [Dell PowerMax](#dell-powermax) |
+| Dell            | `powerstore`                 | [Dell PowerStore](#dell-powerstore) |
+| HPE             | `primera3par`                | [HPE Primera / 3PAR](#hpe-primera--3par) |
+| Hitachi Vantara | `vantara`                    | [Hitachi Vantara](#hitachi-vantara) |
+| IBM             | `flashsystem`                | [IBM FlashSystem](#ibm-flashsystem) |
+| Infinidat       | `infinibox`                  | [Infinidat InfiniBox](#infinidat-infinibox) |
+| NetApp          | `ontap`                      | [NetApp ONTAP](#netapp-ontap) |
+| Pure Storage    | `pureFlashArray`             | [Pure Storage FlashArray](#pure-storage-flasharray) |
 
 If a storage provider wants their storage to be supported, they need
-to implement a go package named after their product, and mutate main
+to implement a Go package named after their product, and mutate the main
 package so their specific code path is initialized.
 See [internal/populator/storage.go](internal/populator/storage.go)
 
-## Secret with Storage Provider Credentials
+### Common Secret Fields
 
-Create a secret where the migration provider is setup, usually openshift-mtv
-and put the credentials of the storage system. All of the providers are required
-to have a secret with the following fields:
+Create a secret in the namespace where the migration provider is set up (usually `openshift-mtv`)
+containing the credentials for both the **storage system** and the **vSphere environment**. All providers require a secret with the following common fields:
 
-| Key | Value | Mandatory | Default |
+| Key | Value | Required | Default |
 | --- | --- | --- | --- |
-| STORAGE_HOSTNAME | ip/hostname | y | |
-| STORAGE_USERNAME | string | y* | |
-| STORAGE_PASSWORD | string | y* | |
-| STORAGE_TOKEN | string | n** | |
-| STORAGE_SKIP_SSL_VERIFICATION | true/false | n | false |
-| STORAGE_HTTP_TIMEOUT_SECONDS | integer | n | 30 |
+| GOVMOMI_HOSTNAME | vSphere API hostname/URL | Yes | |
+| GOVMOMI_USERNAME | vSphere API username | Yes | |
+| GOVMOMI_PASSWORD | vSphere API password | Yes | |
+| STORAGE_HOSTNAME | Storage vendor API hostname/ip | Yes | |
+| STORAGE_USERNAME | Storage vendor API username | Yes\* | |
+| STORAGE_PASSWORD | Storage vendor API password | Yes\* | |
+| STORAGE_TOKEN | string | No\*\* | |
+| STORAGE_SKIP_SSL_VERIFICATION | true/false | No | false |
+| STORAGE_HTTP_TIMEOUT_SECONDS | integer | No | 30 |
 
-\* For most storage vendors, `STORAGE_USERNAME` and `STORAGE_PASSWORD` are required. Pure FlashArray is an exception - see below.
+> **Note:** During migration, the controller merges the vSphere Provider secret with the storage vendor secret into a single secret for the populator pod. `GOVMOMI_HOSTNAME` is always derived from the Provider's `spec.url` — any value in the storage secret is overwritten. `GOVMOMI_USERNAME` and `GOVMOMI_PASSWORD` are populated from the Provider secret's `user`/`password` fields, but can be overridden by including them in the storage vendor secret. Including the `GOVMOMI_*` fields explicitly in the storage secret is useful for standalone testing outside of a migration.
 
-\*\* `STORAGE_TOKEN` is only supported by Pure FlashArray. When provided, it replaces the need for username/password authentication.
+\* For most storage vendors, `STORAGE_USERNAME` and `STORAGE_PASSWORD` are required. Pure Storage FlashArray is an exception — see [Pure Storage FlashArray](#pure-storage-flasharray).
 
-Provider-specific entries in the secret are documented below:
+\*\* `STORAGE_TOKEN` is only supported by Pure Storage FlashArray. When provided, it replaces the need for username/password authentication.
+
+Provider-specific secret fields, full YAML examples, and configuration details are documented in each provider section below.
+
+---
+
+### Dell PowerFlex
+
+`storageVendorProduct: "powerflex"`
+
+#### Overview
+
+Dell PowerFlex (formerly VxFlex OS) integration uses the Dell `goscaleio` SDK to interact with the PowerFlex gateway API. Copy offload is performed via VAAI XCOPY through VMFS datastores backed by PowerFlex volumes. PowerFlex uses SDC (Storage Data Client) mappings rather than traditional iSCSI/FC initiator groups.
+
+#### Prerequisites
+
+- Dell PowerFlex CSI driver deployed on the OpenShift cluster
+- PowerFlex gateway accessible from the migration namespace
+- **scini kernel module** must be loaded on ESXi hosts (PowerFlex is the only provider requiring this)
+- VAAI must be enabled on ESXi hosts
+
+#### Secret Configuration
+
+In addition to the [common fields](#common-secret-fields), PowerFlex requires:
+
+| Key | Value | Description | Required |
+| --- | --- | --- | --- |
+| POWERFLEX_SYSTEM_ID | string | System ID of the storage array. Can be taken from `vxflexos-config` from the `vxflexos` namespace or the `openshift-operators` namespace. | Yes |
+
+**Example StorageMap:**
+
+```yaml
+apiVersion: forklift.konveyor.io/v1beta1
+kind: StorageMap
+metadata:
+  name: copy-offload
+  namespace: openshift-mtv
+spec:
+  map:
+  - destination:
+      storageClass: vxflexos
+    offloadPlugin:
+      vsphereXcopyConfig:
+        secretRef: powerflex-secret
+        storageVendorProduct: powerflex
+    source:
+      id: datastore-123
+```
+
+**Example Secret:**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: powerflex-secret
+  namespace: openshift-mtv
+type: Opaque
+stringData:
+  GOVMOMI_HOSTNAME: "vcenter.example.com"
+  GOVMOMI_USERNAME: "administrator@vsphere.local"
+  GOVMOMI_PASSWORD: "your-vsphere-password"
+  STORAGE_HOSTNAME: "powerflex-gateway.example.com"
+  STORAGE_USERNAME: "admin"
+  STORAGE_PASSWORD: "your-password-here"
+  POWERFLEX_SYSTEM_ID: "your-system-id"
+```
+
+#### Architecture Notes
+
+- **SDK**: Dell `goscaleio`.
+- **Supported disk types**: VMDK via XCOPY. VVol and RDM disks fall back to VMDK/XCOPY.
+- **Requires scini kernel module**: PowerFlex is the only provider that requires the scini kernel module to be loaded on ESXi hosts. The populator verifies this before proceeding.
+- **How it works**: PowerFlex uses a fundamentally different host model than other providers — instead of iSCSI/FC initiator groups, it uses **SDC (Storage Data Client)** mappings. The populator discovers the underlying volume from the target PVC's volume attributes (by name). It then finds the existing SDC that corresponds to the ESXi host by matching GUID among ESX-type SDCs — it does **not** create new SDCs. The volume is mapped to the SDC with multiple-mapping support enabled, and unmapped after the XCOPY completes. There is a 20-second delay when querying current mappings to give the CSI driver time to complete its own operations.
+
+#### Troubleshooting
+
+No provider-specific troubleshooting entries have been documented yet. For general troubleshooting, see the [Troubleshooting](#troubleshooting) section.
+
+---
+
+### Dell PowerMax
+
+`storageVendorProduct: "powermax"`
+
+#### Overview
+
+Dell PowerMax integration uses the Dell `gopowermax/v2` SDK to interact with the Unisphere for PowerMax management API. Copy offload is performed via VAAI XCOPY. PowerMax uses masking views (storage group + host + port group) for LUN presentation.
+
+#### Prerequisites
+
+- Dell PowerMax CSI driver deployed on the OpenShift cluster
+- Unisphere for PowerMax management API accessible from the migration namespace
+- A port group configured on the array for masking view creation
+- VAAI must be enabled on ESXi hosts
+
+#### Secret Configuration
+
+In addition to the [common fields](#common-secret-fields), PowerMax requires:
+
+| Key | Value | Description | Required |
+| --- | --- | --- | --- |
+| POWERMAX_SYMMETRIX_ID | string | Symmetrix ID of the storage array. Can be taken from the ConfigMap under the `powermax` namespace, which the CSI driver uses. | Yes |
+| POWERMAX_PORT_GROUP_NAME | string | Port group to use for masking view creation. | Yes |
+
+**Example StorageMap:**
+
+```yaml
+apiVersion: forklift.konveyor.io/v1beta1
+kind: StorageMap
+metadata:
+  name: copy-offload
+  namespace: openshift-mtv
+spec:
+  map:
+  - destination:
+      storageClass: powermax
+    offloadPlugin:
+      vsphereXcopyConfig:
+        secretRef: powermax-secret
+        storageVendorProduct: powermax
+    source:
+      id: datastore-123
+```
+
+**Example Secret:**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: powermax-secret
+  namespace: openshift-mtv
+type: Opaque
+stringData:
+  GOVMOMI_HOSTNAME: "vcenter.example.com"
+  GOVMOMI_USERNAME: "administrator@vsphere.local"
+  GOVMOMI_PASSWORD: "your-vsphere-password"
+  STORAGE_HOSTNAME: "unisphere.example.com"
+  STORAGE_USERNAME: "admin"
+  STORAGE_PASSWORD: "your-password-here"
+  POWERMAX_SYMMETRIX_ID: "000123456789"
+  POWERMAX_PORT_GROUP_NAME: "your-port-group"
+```
+
+#### Architecture Notes
+
+- **SDK**: Dell `gopowermax/v2`.
+- **Supported disk types**: VMDK via XCOPY. VVol and RDM disks fall back to VMDK/XCOPY.
+- **How it works**: PowerMax uses a **masking view** model — a three-way association of a storage group, a host, and a port group — to present volumes to hosts. The populator discovers the underlying volume from the target PVC's volume handle (extracting the volume ID from the last segment). During host setup, it **creates a new storage group** and finds the existing host whose initiators match the ESXi adapters (filtering by the port group's protocol — iSCSI or FC). When mapping the volume, the populator adds it to the storage group and creates a **masking view** linking the storage group, host, and port group together, making the volume visible for the XCOPY operation. On cleanup, the volume is removed from the storage group, and optionally the masking view and storage group are deleted entirely. PowerMax includes built-in retry logic with exponential backoff for transient API errors (HTTP 503/500), and treats HTTP 409 (conflict) as idempotent success.
+
+#### Troubleshooting
+
+No provider-specific troubleshooting entries have been documented yet. For general troubleshooting, see the [Troubleshooting](#troubleshooting) section.
+
+---
+
+### Dell PowerStore
+
+`storageVendorProduct: "powerstore"`
+
+#### Overview
+
+Dell PowerStore integration uses the Dell `gopowerstore` SDK to interact with the PowerStore REST API. Copy offload is performed via VAAI XCOPY through VMFS datastores backed by PowerStore volumes. PowerStore supports iSCSI, Fibre Channel, and NVMe-oF protocols.
+
+#### Prerequisites
+
+- Dell PowerStore CSI driver deployed on the OpenShift cluster
+- PowerStore management API accessible from the migration namespace
+- VAAI must be enabled on ESXi hosts
+
+#### Secret Configuration
+
+PowerStore uses only the [common secret fields](#common-secret-fields) — no provider-specific fields are required.
+
+**Example StorageMap:**
+
+```yaml
+apiVersion: forklift.konveyor.io/v1beta1
+kind: StorageMap
+metadata:
+  name: copy-offload
+  namespace: openshift-mtv
+spec:
+  map:
+  - destination:
+      storageClass: powerstore-sc
+    offloadPlugin:
+      vsphereXcopyConfig:
+        secretRef: powerstore-secret
+        storageVendorProduct: powerstore
+    source:
+      id: datastore-123
+```
+
+**Example Secret:**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: powerstore-secret
+  namespace: openshift-mtv
+type: Opaque
+stringData:
+  GOVMOMI_HOSTNAME: "vcenter.example.com"
+  GOVMOMI_USERNAME: "administrator@vsphere.local"
+  GOVMOMI_PASSWORD: "your-vsphere-password"
+  STORAGE_HOSTNAME: "powerstore.example.com"
+  STORAGE_USERNAME: "admin"
+  STORAGE_PASSWORD: "your-password-here"
+```
+
+#### Architecture Notes
+
+- **SDK**: Dell `gopowerstore`.
+- **Supported disk types**: VMDK via XCOPY. VVol and RDM disks fall back to VMDK/XCOPY.
+- **Supported protocols**: iSCSI, Fibre Channel, and NVMe-oF.
+- **How it works**: The populator discovers the underlying volume on the PowerStore array from the target PVC's volume attributes (by name). It then searches for an existing host on the array whose initiators match the ESXi host's adapters — first among standalone hosts, then within host groups. If a matching host is found, it is used directly. If no match is found, it checks for an existing host by name, and only if that also fails does the populator **create a new host** on the array with the ESXi adapters and OS type set to ESXi. The discovered volume is then attached to the host (or to the host's **host group** if it belongs to one) for the XCOPY operation, and detached afterwards.
+
+#### Troubleshooting
+
+No provider-specific troubleshooting entries have been documented yet. For general troubleshooting, see the [Troubleshooting](#troubleshooting) section.
+
+---
+
+### HPE Primera / 3PAR
+
+`storageVendorProduct: "primera3par"`
+
+#### Overview
+
+HPE Primera / 3PAR integration uses a custom WSAPI REST client to interact with the Primera/3PAR management API. Copy offload is performed via VAAI XCOPY through VMFS datastores backed by Primera/3PAR volumes. The provider supports both iSCSI and Fibre Channel protocols and uses host sets for initiator group management.
+
+#### Prerequisites
+
+- HPE Primera / 3PAR CSI driver deployed on the OpenShift cluster
+- Primera/3PAR WSAPI endpoint accessible from the migration namespace (the `STORAGE_HOSTNAME` should be the full base URL for the WSAPI endpoint)
+- VAAI must be enabled on ESXi hosts
+
+#### Secret Configuration
+
+Primera / 3PAR uses only the [common secret fields](#common-secret-fields) — no provider-specific fields are required.
+
+**Example StorageMap:**
+
+```yaml
+apiVersion: forklift.konveyor.io/v1beta1
+kind: StorageMap
+metadata:
+  name: copy-offload
+  namespace: openshift-mtv
+spec:
+  map:
+  - destination:
+      storageClass: primera3par-sc
+    offloadPlugin:
+      vsphereXcopyConfig:
+        secretRef: primera3par-secret
+        storageVendorProduct: primera3par
+    source:
+      id: datastore-123
+```
+
+**Example Secret:**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: primera3par-secret
+  namespace: openshift-mtv
+type: Opaque
+stringData:
+  GOVMOMI_HOSTNAME: "vcenter.example.com"
+  GOVMOMI_USERNAME: "administrator@vsphere.local"
+  GOVMOMI_PASSWORD: "your-vsphere-password"
+  STORAGE_HOSTNAME: "https://primera.example.com:8080"
+  STORAGE_USERNAME: "admin"
+  STORAGE_PASSWORD: "your-password-here"
+```
+
+#### Architecture Notes
+
+- **API**: Custom WSAPI REST client (no third-party SDK).
+- **Supported disk types**: **VMDK** (via XCOPY), **VVol** (via vendor-native volume copy), and **RDM** (via vendor-native volume copy).
+- **Supported protocols**: iSCSI and Fibre Channel.
+- **How it works (VMDK/XCOPY)**: The populator discovers the underlying volume by looking it up on the array by name (truncated to 31 characters). Host set names are limited to 27 characters. For each ESXi adapter, the populator first searches for an existing host on the array by matching FC WWN or iSCSI IQN. Only if no matching host is found does it **create a new host** with persona set to 11 (VMware). It then **creates a host set** to group the hosts together. The volume is presented to the host set by creating a VLUN (Virtual LUN) mapping with an explicit LUN ID. On cleanup, the VLUN is deleted. Authentication uses session keys obtained via the WSAPI `/api/v1/credentials` endpoint, with automatic re-authentication when session keys expire.
+- **How it works (VVol/RDM)**: For VVol-backed disks, the populator discovers the source volume via the vSphere API (VVol backing object ID), resolves it to a 3PAR volume, and performs a **snapshot-based copy** (creates a read-only snapshot, then promotes it to an independent writable volume). For RDM-backed disks, the RDM device NAA is used to find the source volume, then the same snapshot-based copy is performed. Both bypass XCOPY entirely — data never leaves the array.
+
+---
 
 ### Hitachi Vantara
 
-See [README](internal/vantara/README.md)
+`storageVendorProduct: "vantara"`
+
+#### Overview
+
+Hitachi Vantara integration uses a custom REST client to interact with the Hitachi Storage REST API. Copy offload is performed via VAAI XCOPY through VMFS datastores backed by Vantara volumes. The provider uses host group IDs for LUN path management and requires specific host mode options to be enabled on the storage array.
+
+#### Prerequisites
+
+- Hitachi Vantara CSI driver deployed on the OpenShift cluster
+- Hitachi Storage REST API accessible from the migration namespace
+- **Host Mode Options** must be enabled via Storage Navigator:
+  - **Mode No. 54** — *(VAAI)* Support Option for the **EXTENDED COPY** command — **Enabled**
+  - **Mode No. 63** — *(VAAI)* Support Option for **vStorage APIs** based on T10 standards — **Enabled**
+- Identify the port and Host Group Name/ID used in the datastore where original VMs are present
+
+![storage navigator](internal/vantara/docs/storage_navigator.png)
+
+#### Secret Configuration
+
+In addition to the [common fields](#common-secret-fields), Vantara requires:
+
+| Key | Value | Description | Required |
+| --- | --- | --- | --- |
+| STORAGE_PORT | string | REST API port for the storage system. Can be found in the Storage Navigator under the REST API configuration. | Yes |
+| STORAGE_ID | string | Storage array serial number. Can be found in the Storage Navigator under the system summary. | Yes |
+| HOSTGROUP_ID_LIST | string | Colon-separated list of port,hostgroup-ID pairs. Identify the port used in the datastore where original VMs are present, then find the Host Group Name and ID in Storage Navigator. Format: `CL1-A,1:CL2-B,2:CL4-A,1:CL6-A,1`. If omitted, host group IDs are discovered dynamically by matching FC WWNs against the array's port details. | No |
+| COPY_SPEED | string | Background copy speed for VVol/RDM volume copy operations. Valid values: `slower`, `medium`, `faster`. Default: `slower`. | No |
+
+**Example StorageMap:**
+
+```yaml
+apiVersion: forklift.konveyor.io/v1beta1
+kind: StorageMap
+metadata:
+  name: copy-offload
+  namespace: openshift-mtv
+spec:
+  map:
+  - destination:
+      storageClass: vantara-sc
+    offloadPlugin:
+      vsphereXcopyConfig:
+        secretRef: vantara-secret
+        storageVendorProduct: vantara
+    source:
+      id: datastore-123
+```
+
+**Example Secret:**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vantara-secret
+  namespace: openshift-mtv
+type: Opaque
+stringData:
+  GOVMOMI_HOSTNAME: "vcenter.example.com"
+  GOVMOMI_USERNAME: "administrator@vsphere.local"
+  GOVMOMI_PASSWORD: "your-vsphere-password"
+  STORAGE_HOSTNAME: "10.0.0.100"
+  STORAGE_USERNAME: "admin"
+  STORAGE_PASSWORD: "your-password-here"
+  STORAGE_PORT: "443"
+  STORAGE_ID: "123456"
+  HOSTGROUP_ID_LIST: "CL1-A,1:CL2-B,2"
+  COPY_SPEED: "slower"
+```
+
+#### Architecture Notes
+
+- **API**: Custom REST client (no third-party SDK).
+- **Supported disk types**: **VMDK** (via XCOPY), **VVol** (via vendor-native volume copy), and **RDM** (via vendor-native volume copy).
+- **How it works (VMDK/XCOPY)**: The populator discovers the underlying LDEV (Logical Device) by parsing the target PVC's volume handle, which encodes the IO protocol, storage device ID, LDEV ID, and LDEV nickname in the format `01--<ioProtocol>--<storageDeviceID>--<ldevID>--<ldevNickName>`. For host discovery, if the `HOSTGROUP_ID_LIST` environment variable is provided, those host group IDs are used directly. Otherwise, the populator queries port details from the storage array and matches by FC WWN to discover host group IDs dynamically. The populator does **not** create hosts or host groups — they must be pre-configured on the array. The LDEV is then made visible by adding paths (`ADDPATH`) to the host groups, and cleaned up by removing paths (`DELETEPATH`) afterwards. After mapping, the NAA ID is retrieved from the LDEV metadata.
+- **How it works (VVol/RDM)**: For VVol-backed disks, the populator discovers the source volume via the vSphere API and performs a vendor-native clone (snapshot-based copy) on the Vantara array. For RDM-backed disks, the RDM device NAA is resolved to an LDEV and a vendor-native clone is performed. The `COPY_SPEED` setting controls the background copy rate (`slower`, `medium`, or `faster`).
+- **Unique behavior**: requires host mode options 54 (XCOPY) and 63 (VAAI) to be enabled via Storage Navigator. Note: `STORAGE_SKIP_SSL_VERIFICATION` has no effect for Vantara — SSL verification is always disabled.
+
+#### Troubleshooting
+
+No provider-specific troubleshooting entries have been documented yet. For general troubleshooting, see the [Troubleshooting](#troubleshooting) section.
+
+---
+
+### IBM FlashSystem
+
+`storageVendorProduct: "flashsystem"`
+
+#### Overview
+
+IBM FlashSystem (Storage Virtualize) integration uses a custom REST client to interact with the IBM Storage Virtualize v1 REST API on port 7443. Copy offload is performed via VAAI XCOPY through VMFS datastores backed by FlashSystem VDisks. The provider supports both iSCSI and Fibre Channel protocols.
+
+#### Prerequisites
+
+- IBM FlashSystem CSI driver (IBM block-csi-driver) deployed on the OpenShift cluster
+- FlashSystem management API accessible on port 7443 from the migration namespace
+- VAAI must be enabled on ESXi hosts
+- **vdisk protection must be disabled** — either globally or for the specific child pools in use. If enabled, the populator will exit with an error.
+
+  **Option 1 — Disable globally:**
+  ```bash
+  chsystem -vdiskprotectionenabled no
+  ```
+
+  **Option 2 — Disable for a specific pool:**
+  ```bash
+  chmdiskgrp -vdiskprotectionenabled no <pool_name_or_id>
+  ```
+
+  See [Volume protection](https://www.ibm.com/docs/en/flashsystem-c200/9.1.1?topic=volumes-volume-protection) and [Configuring a Virtual Machine on Red Hat OpenShift](https://www.ibm.com/docs/en/stg-block-csi-driver/1.13.0?topic=configuration-configuring-virtual-machine-openshift) in IBM documentation.
+
+#### Secret Configuration
+
+FlashSystem uses only the [common secret fields](#common-secret-fields) — no provider-specific fields are required.
+
+**Example StorageMap:**
+
+```yaml
+apiVersion: forklift.konveyor.io/v1beta1
+kind: StorageMap
+metadata:
+  name: copy-offload
+  namespace: openshift-mtv
+spec:
+  map:
+  - destination:
+      storageClass: flashsystem-sc
+    offloadPlugin:
+      vsphereXcopyConfig:
+        secretRef: flashsystem-secret
+        storageVendorProduct: flashsystem
+    source:
+      id: datastore-123
+```
+
+**Example Secret:**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: flashsystem-secret
+  namespace: openshift-mtv
+type: Opaque
+stringData:
+  GOVMOMI_HOSTNAME: "vcenter.example.com"
+  GOVMOMI_USERNAME: "administrator@vsphere.local"
+  GOVMOMI_PASSWORD: "your-vsphere-password"
+  STORAGE_HOSTNAME: "flashsystem.example.com"
+  STORAGE_USERNAME: "admin"
+  STORAGE_PASSWORD: "your-password-here"
+```
+
+#### Architecture Notes
+
+- **API**: Custom REST client against the IBM Storage Virtualize v1 REST API (port 7443). No third-party SDK.
+- **Supported disk types**: **VMDK** (via XCOPY) and **RDM** (via vendor-native FlashCopy). VVol disks fall back to VMDK/XCOPY.
+- **Supported protocols**: iSCSI and Fibre Channel.
+- **How it works (VMDK/XCOPY)**: The populator discovers the underlying VDisk by parsing the target PVC's volume handle (format `SVC:5;<vdisk_UID>`) and looking it up on the array by its UID. It then searches for an existing host on the array by querying host ports and matching FC WWPNs or iSCSI IQNs. If no matching host is found, the populator **creates a new host** on the array. It tracks whether it created the host for cleanup purposes. The VDisk is then mapped to the host for the XCOPY operation. FlashSystem supports multi-host mapping — if a volume is already mapped to a different host, it finds the next available SCSI ID and creates an additional mapping. On cleanup, the mapping is removed, and if the populator created the host and it has no remaining mappings, the host is deleted as well. Authentication uses header-based credentials (`X-Auth-Username`/`X-Auth-Password`) with automatic token refresh on expiry.
+- **How it works (RDM)**: For RDM-backed disks, the populator resolves the RDM device NAA to a VDisk on the FlashSystem array, then performs a vendor-native FlashCopy from the source VDisk to the target VDisk. The data is copied entirely within the array.
+
+#### Troubleshooting
+
+No provider-specific troubleshooting entries have been documented yet. For general troubleshooting, see the [Troubleshooting](#troubleshooting) section.
+
+---
+
+### Infinidat InfiniBox
+
+`storageVendorProduct: "infinibox"`
+
+#### Overview
+
+Infinidat InfiniBox integration uses the Infinidat `infinibox-csi-driver/iboxapi` SDK to interact with the InfiniBox management API. Copy offload is performed via VAAI XCOPY through VMFS datastores backed by InfiniBox volumes. InfiniBox supports both iSCSI and Fibre Channel protocols.
+
+#### Prerequisites
+
+- Infinidat InfiniBox CSI driver deployed on the OpenShift cluster
+- InfiniBox management API accessible from the migration namespace
+- VAAI must be enabled on ESXi hosts
+
+#### Secret Configuration
+
+InfiniBox uses only the [common secret fields](#common-secret-fields) — no provider-specific fields are required.
+
+**Example StorageMap:**
+
+```yaml
+apiVersion: forklift.konveyor.io/v1beta1
+kind: StorageMap
+metadata:
+  name: copy-offload
+  namespace: openshift-mtv
+spec:
+  map:
+  - destination:
+      storageClass: infinibox-sc
+    offloadPlugin:
+      vsphereXcopyConfig:
+        secretRef: infinibox-secret
+        storageVendorProduct: infinibox
+    source:
+      id: datastore-123
+```
+
+**Example Secret:**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: infinibox-secret
+  namespace: openshift-mtv
+type: Opaque
+stringData:
+  GOVMOMI_HOSTNAME: "vcenter.example.com"
+  GOVMOMI_USERNAME: "administrator@vsphere.local"
+  GOVMOMI_PASSWORD: "your-vsphere-password"
+  STORAGE_HOSTNAME: "infinibox.example.com"
+  STORAGE_USERNAME: "admin"
+  STORAGE_PASSWORD: "your-password-here"
+```
+
+#### Architecture Notes
+
+- **SDK**: Infinidat `infinibox-csi-driver/iboxapi`.
+- **Supported disk types**: VMDK via XCOPY. VVol and RDM disks fall back to VMDK/XCOPY.
+- **Supported protocols**: iSCSI and Fibre Channel (determined from the PV's `storage_protocol` attribute).
+- **How it works**: The populator discovers the underlying volume on the InfiniBox array from the target PVC's volume attributes (by name). It then searches all existing hosts on the array for one whose port addresses match the ESXi host's adapters. InfiniBox does **not** create new hosts — the host must already exist on the array, meaning the ESXi host must be pre-configured as a host object on the InfiniBox. The discovered volume is then mapped directly to that host for the XCOPY operation, and unmapped afterwards. Mapping is idempotent — if the volume is already mapped to the target host, it is skipped. Cluster mappings are partially supported with a warning.
+
+#### Troubleshooting
+
+No provider-specific troubleshooting entries have been documented yet. For general troubleshooting, see the [Troubleshooting](#troubleshooting) section.
+
+---
 
 ### NetApp ONTAP
 
-| Key | Value | Description |
-| --- | --- | --- |
-| ONTAP_SVM | string | the SVM to use in all the client interactions. Can be taken from trident.netapp.io/v1/TridentBackend.config.ontap_config.svm resource field. |
+`storageVendorProduct: "ontap"`
 
-**Example secret:**
+#### Overview
+
+NetApp ONTAP was the first storage provider implemented, and its patterns influenced the terminology used throughout the codebase (e.g., "igroup" for initiator groups). The integration uses the NetApp Trident ONTAP Go SDK (`trident/storage_drivers/ontap/api`) to interact with the ONTAP management API. Copy offload is performed via VAAI XCOPY through VMFS datastores backed by ONTAP LUNs.
+
+#### Prerequisites
+
+- NetApp Trident CSI driver deployed on the OpenShift cluster
+- ONTAP management LIF accessible from the migration namespace
+- An SVM (Storage Virtual Machine) configured for the target volumes
+- VAAI must be enabled on ESXi hosts
+
+#### Secret Configuration
+
+In addition to the [common fields](#common-secret-fields), ONTAP requires:
+
+| Key | Value | Description | Required |
+| --- | --- | --- | --- |
+| ONTAP_SVM | string | The SVM to use in all client interactions. Can be taken from `trident.netapp.io/v1/TridentBackend.config.ontap_config.svm` resource field. | Yes |
+
+Note: `STORAGE_HOSTNAME` should be set to the ONTAP management LIF address.
+
+**Example StorageMap:**
+
+```yaml
+apiVersion: forklift.konveyor.io/v1beta1
+kind: StorageMap
+metadata:
+  name: copy-offload
+  namespace: openshift-mtv
+spec:
+  map:
+  - destination:
+      storageClass: trident-ontap
+    offloadPlugin:
+      vsphereXcopyConfig:
+        secretRef: ontap-secret
+        storageVendorProduct: ontap
+    source:
+      id: datastore-123
+```
+
+**Example Secret:**
 
 ```yaml
 apiVersion: v1
@@ -187,43 +754,64 @@ metadata:
   namespace: openshift-mtv
 type: Opaque
 stringData:
-  STORAGE_HOSTNAME: "ontap-mgmt.example.com"
+  GOVMOMI_HOSTNAME: "vcenter.example.com"
+  GOVMOMI_USERNAME: "administrator@vsphere.local"
+  GOVMOMI_PASSWORD: "your-vsphere-password"
+  STORAGE_HOSTNAME: "ontap-mgmt-lif.example.com"
   STORAGE_USERNAME: "admin"
-  STORAGE_PASSWORD: "your-password"
+  STORAGE_PASSWORD: "your-password-here"
   ONTAP_SVM: "svm0"
 ```
 
-### HPE Primera/3PAR
+#### Architecture Notes
 
-**Important**: For HPE Primera/3PAR, the `STORAGE_HOSTNAME` must include the full URL with protocol and the 3PAR's Web Services API (WSAPI) port. Use the 3PAR command `cli% showwsapi` to determine the correct WSAPI port. 3PAR systems default to port `8080` for both HTTP and HTTPS connections, Primera and Alletra 9000/MP default to port `443` (SSL/HTTPS). Depending on configured certificates you may need to skip SSL verification.
+- **SDK**: NetApp Trident ONTAP API (`trident/storage_drivers/ontap/api`).
+- **Supported disk types**: VMDK via XCOPY. VVol and RDM disks fall back to VMDK/XCOPY.
+- **How it works**: ONTAP was the first provider implemented, and its patterns influenced the terminology used throughout the codebase. The populator discovers the underlying LUN in one of two ways: if the PV has an `internalID` attribute (ontap-san-economy storage class), it parses the internal path format; otherwise it falls back to using the `internalName` attribute to construct the LUN path (`/vol/<internalName>/lun0`). Unlike most other providers, ONTAP **always creates a new igroup** (initiator group). The protocol is auto-detected from the adapter IDs — FC adapters result in an `fcp` igroup, iSCSI adapters in an `iscsi` igroup, and a protocol suffix is appended to the igroup name. The ESXi host's adapters are then added to the igroup. It tolerates partial failures — succeeding if at least one adapter is added. The LUN is then mapped to the igroup, making it visible to the ESXi host for the XCOPY operation, and unmapped afterwards.
 
-**Example secret:**
+#### Troubleshooting
 
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: hpe-3par-secret
-  namespace: openshift-mtv
-type: Opaque
-stringData:
-  STORAGE_HOSTNAME: "https://192.168.1.1:8080"
-  STORAGE_USERNAME: "admin"
-  STORAGE_PASSWORD: "your-password"
+**Error**: `cannot derive SVM to use; please specify SVM in config file`
+
+This is a configuration issue with ONTAP and could be fixed by specifying a default SVM using vserver commands on the ONTAP server:
+
+```bash
+# show current config for an SVM
+vserver show -vserver ${NAME_OF_SVM}
+...
 ```
 
-### Pure FlashArray
+Try to set a mgmt interface for the SVM and put that hostname in the `STORAGE_HOSTNAME`.
+
+---
+
+### Pure Storage FlashArray
+
+`storageVendorProduct: "pureFlashArray"`
+
+#### Overview
+
+Pure Storage FlashArray integration uses a custom REST client to interact with the FlashArray management API. It is the **only provider that supports all three disk types**: VMDK (via XCOPY), VVol (via vendor-native volume copy), and RDM (via vendor-native volume copy). FlashArray supports both iSCSI and Fibre Channel protocols, and offers two authentication methods: token-based (recommended) or username/password.
+
+#### Prerequisites
+
+- Pure Storage CSI driver deployed on the OpenShift cluster
+- FlashArray management API accessible from the migration namespace
+- The cluster prefix (from the StorageCluster resource) is required
+- VAAI must be enabled on ESXi hosts (for VMDK/XCOPY operations)
+
+#### Secret Configuration
 
 Pure FlashArray supports two mutually exclusive authentication methods:
 
-#### Token-Based Authentication (Recommended)
+##### Token-Based Authentication (Recommended)
 
 Token-based authentication allows you to reuse the same credentials as your Pure CSI driver deployment.
 
 | Key | Value | Description | Required |
 | --- | --- | --- | --- |
 | STORAGE_TOKEN | string | API token for Pure FlashArray authentication. Can be extracted from the Pure CSI driver secret. | Yes (if using token auth) |
-| PURE_CLUSTER_PREFIX | string | Cluster prefix is set in the StorageCluster resource. Get it with  `printf "px_%s" $(oc get storagecluster -A -o=jsonpath='{.items[0].status.clusterUid}'| head -c 8)` | Yes |
+| PURE_CLUSTER_PREFIX | string | Cluster prefix from the StorageCluster resource. Get it with `printf "px_%s" $(oc get storagecluster -A -o=jsonpath='{.items[0].status.clusterUid}'| head -c 8)` | Yes |
 
 **How to obtain the token from Pure CSI driver:**
 
@@ -237,106 +825,90 @@ oc get secrets -n <pure-csi-namespace> | grep pure
 oc get secret pure-provisioner-secret -n <pure-csi-namespace> -o jsonpath='{.data.PureAPIToken}' | base64 -d
 ```
 
-**Example secret with token authentication:**
-
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: pure-flasharray-secret
-  namespace: openshift-mtv
-type: Opaque
-stringData:
-  STORAGE_HOSTNAME: "flasharray.example.com"
-  STORAGE_TOKEN: "your-api-token-here"
-  PURE_CLUSTER_PREFIX: "px_12345678"
-```
-
-#### Username/Password Authentication (Legacy)
-
-If you prefer username/password authentication or don't have access to the API token:
+##### Username/Password Authentication (Legacy)
 
 | Key | Value | Description | Required |
 | --- | --- | --- | --- |
 | STORAGE_USERNAME | string | Username for Pure FlashArray management API | Yes (if using username/password auth) |
 | STORAGE_PASSWORD | string | Password for Pure FlashArray management API | Yes (if using username/password auth) |
-| PURE_CLUSTER_PREFIX | string | Cluster prefix is set in the StorageCluster resource. Get it with  `printf "px_%s" $(oc get storagecluster -A -o=jsonpath='{.items[0].status.clusterUid}'| head -c 8)` | Yes |
-
-**Example secret with username/password authentication:**
-
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: pure-flasharray-secret
-  namespace: openshift-mtv
-type: Opaque
-stringData:
-  STORAGE_HOSTNAME: "flasharray.example.com"
-  STORAGE_USERNAME: "pureuser"
-  STORAGE_PASSWORD: "your-password-here"
-  PURE_CLUSTER_PREFIX: "px_12345678"
-```
+| PURE_CLUSTER_PREFIX | string | Cluster prefix from the StorageCluster resource. Get it with `printf "px_%s" $(oc get storagecluster -A -o=jsonpath='{.items[0].status.clusterUid}'| head -c 8)` | Yes |
 
 **Important Notes:**
 - Authentication methods are mutually exclusive: if `STORAGE_TOKEN` is provided, it will be used and `STORAGE_USERNAME`/`STORAGE_PASSWORD` are ignored
 - If `STORAGE_TOKEN` is not provided, both `STORAGE_USERNAME` and `STORAGE_PASSWORD` must be set
 - Token-based authentication is recommended as it allows credential reuse with the Pure CSI driver
 
-### Dell PowerFlex
+**Example StorageMap:**
 
-| Key | Value | Description |
-| --- | --- | --- |
-| POWERFLEX_SYSTEM_ID | string | the system id of the storage array. Can be taken from `vxflexos-config` from the `vxflexos` namespace or the openshift-operators namespace. |
-
-### Dell PowerMax
-
-| Key | Value | Description |
-| --- | --- | --- |
-| POWERMAX_SYMMETRIX_ID | string | the symmetrix id of the storage array. Can be taken from the ConfigMap under the 'powermax' namespace, which the CSI driver uses. |
-| POWERMAX_PORT_GROUP_NAME | string | the port group to use for masking view creation. |
-
-### IBM FlashSystem
-
-Prior to using IBM FlashSystem with the volume populator (and with Virtual Machines on Red Hat OpenShift in general), **vdisk protection must be disabled** on the connected IBM FlashSystem—either globally or for the specific child pools in use.
-
-If vdisk protection is enabled, the populator will exit with an error and log that protection must be off.
-
-You may use one of the following options with careful consideration:
-
-**Option 1 — Disable globally (entire system)**
-
-```bash
-chsystem -vdiskprotectionenabled no
+```yaml
+apiVersion: forklift.konveyor.io/v1beta1
+kind: StorageMap
+metadata:
+  name: copy-offload
+  namespace: openshift-mtv
+spec:
+  map:
+  - destination:
+      storageClass: pure-sc
+    offloadPlugin:
+      vsphereXcopyConfig:
+        secretRef: pure-flasharray-secret
+        storageVendorProduct: pureFlashArray
+    source:
+      id: datastore-123
 ```
 
-**Option 2 — Disable for a specific pool**  
-Replace `<pool_name_or_id>` with the name or ID of the child pool:
+**Example Secret (token auth):**
 
-```bash
-chmdiskgrp -vdiskprotectionenabled no <pool_name_or_id>
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pure-flasharray-secret
+  namespace: openshift-mtv
+type: Opaque
+stringData:
+  GOVMOMI_HOSTNAME: "vcenter.example.com"
+  GOVMOMI_USERNAME: "administrator@vsphere.local"
+  GOVMOMI_PASSWORD: "your-vsphere-password"
+  STORAGE_HOSTNAME: "flasharray.example.com"
+  STORAGE_TOKEN: "your-api-token-here"
+  PURE_CLUSTER_PREFIX: "px_12345678"
 ```
 
-See [Volume protection](https://www.ibm.com/docs/en/flashsystem-c200/9.1.1?topic=volumes-volume-protection) in IBM FlashSystem documentation to read about both methods.
+**Example Secret (username/password auth):**
 
-For the full requirement and VM configuration details, see the IBM documentation: [Configuring a Virtual Machine on Red Hat OpenShift](https://www.ibm.com/docs/en/stg-block-csi-driver/1.13.0?topic=configuration-configuring-virtual-machine-openshift).
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pure-flasharray-secret
+  namespace: openshift-mtv
+type: Opaque
+stringData:
+  GOVMOMI_HOSTNAME: "vcenter.example.com"
+  GOVMOMI_USERNAME: "administrator@vsphere.local"
+  GOVMOMI_PASSWORD: "your-vsphere-password"
+  STORAGE_HOSTNAME: "flasharray.example.com"
+  STORAGE_USERNAME: "pureuser"
+  STORAGE_PASSWORD: "your-password-here"
+  PURE_CLUSTER_PREFIX: "px_12345678"
+```
 
-## Host Lease Management
+#### Architecture Notes
 
-To prevent overloading ESXi hosts during concurrent migrations, the vsphere-copy-offload-populator uses a distributed lease mechanism based on Kubernetes Lease objects.
-This ensures that heavy operations like storage rescans are serialized per ESXi host. For more details on its configuration, behavior, and monitoring, refer to the [Host Lease Management documentation](docs/copy-offload-lease-management.md).
+- **API**: Custom REST client (no third-party SDK).
+- **Supported disk types**: **VMDK** (via XCOPY), **VVol** (via vendor-native volume copy), and **RDM** (via vendor-native volume copy).
+- **Supported protocols**: iSCSI and Fibre Channel.
+- **How it works (VMDK/XCOPY)**: The populator discovers the underlying volume by first attempting a lookup by the PV's volume handle (ID); if that fails, it falls back to constructing the name as `<clusterPrefix>-<pvName>` and looking it up on the FlashArray. It then searches existing hosts on the array for one whose FC WWNs or iSCSI IQNs match the ESXi adapters. Pure does **not** create new hosts, and does **not** use host groups (Pure restriction: a host can only belong to one group at a time). The volume is connected directly to the matched host for the XCOPY operation, and disconnected afterwards. Mapping is idempotent — "Connection already exists" errors are silently skipped.
+- **How it works (VVol)**: For VVol-backed disks, the populator uses the vSphere API to discover the source volume by finding the VVol backing object ID on the VM's virtual disk, resolves it to a Pure volume name, and performs a **vendor-native volume copy** (array-side copy, not XCOPY). This is significantly faster than XCOPY as the data never leaves the array.
+- **How it works (RDM)**: For RDM-backed disks, the populator resolves the RDM device name to a source LUN by extracting the serial number from the NAA identifier, then performs a **vendor-native volume copy** from source to target volume on the array.
 
-## Limitations
-- A migration plan cannot mix VDDK mappings with copy-offload mappings.
-  Because the migration controller copies disks **either** through CDI volumes
-  (VDDK) **or** through Volume Populators (copy-offload), all storage pairs
-  in the plan must **either** include copy-offload details (secret + product)
-  **or** none of them must; otherwise the plan will fail.
+#### Troubleshooting
 
-This volume populator implementation is specific for performing XCOPY from a source vmdk
-descriptor disk file to a target PVC; this also works if the underlying disk is
-vVol or RDM. The way it works is by performing the XCOPY using vmkfstools on the target ESXi.
+No provider-specific troubleshooting entries have been documented yet. For general troubleshooting, see the [Troubleshooting](#troubleshooting) section.
 
+---
 
 ## Storage Offload Fallback Copy
 
@@ -388,7 +960,24 @@ spec:
   (iSCSI or FC).
 - The destination storage must be a [supported vendor](#supported-storage-providers).
 - A secret with the destination storage credentials must exist (see
-  [Secret with Storage Provider Credentials](#secret-with-storage-provider-credentials)).
+  [Common Secret Fields](#common-secret-fields)).
+
+## Host Lease Management
+
+To prevent overloading ESXi hosts during concurrent migrations, the vsphere-copy-offload-populator uses a distributed lease mechanism based on Kubernetes Lease objects.
+This ensures that heavy operations like storage rescans are serialized per ESXi host. For more details on its configuration, behavior, and monitoring, refer to the [Host Lease Management documentation](docs/copy-offload-lease-management.md).
+
+## Limitations
+- A migration plan cannot mix VDDK mappings with copy-offload mappings.
+  Because the migration controller copies disks **either** through CDI volumes
+  (VDDK) **or** through Volume Populators (copy-offload), all storage pairs
+  in the plan must **either** include copy-offload details (secret + product)
+  **or** none of them must; otherwise the plan will fail.
+
+This volume populator implementation is specific for performing XCOPY from a source vmdk
+descriptor disk file to a target PVC; this also works if the underlying disk is
+vVol or RDM. The way it works is by performing the XCOPY using vmkfstools on the target ESXi.
+
 
 <a id="matching-pvc"></a>
 ## Matching PVC with DataStores to deduce copy-offload support
@@ -512,7 +1101,7 @@ podman run -it --rm \
   -e GOVMOMI_PASSWORD='your-password' \
   -e GOVMOMI_HOSTNAME='vcenter.example.com' \
   -e GOVMOMI_INSECURE='true' \
-  $( oc get deploy -n openshift-mtv forklift-volume-populator-controller -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE")].value}') \
+  $( oc get deploy -n openshift-mtv forklift-volume-populator-controller -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE")].value}') \
   --ssh-key-file /tmp/esxi_key \
   --datacenter MyDatacenter
 ```
@@ -523,7 +1112,7 @@ podman run -it --rm \
 podman run -it --rm \
   --entrypoint /bin/vib-installer \
   -v $HOME/.ssh/id_rsa:/tmp/esxi_key:Z \
-  $( oc get deploy -n openshift-mtv forklift-volume-populator-controller -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE")].value}') \
+  $( oc get deploy -n openshift-mtv forklift-volume-populator-controller -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE")].value}') \
   --ssh-key-file /tmp/esxi_key \
   --esxi-hosts 'esxi1.example.com,esxi2.example.com,esxi3.example.com'
 ```
@@ -656,8 +1245,8 @@ The system requires command restrictions for security. Create the restricted key
 
 ```bash
 # The public key needs to be prefixed with command restrictions
-# The system uses structured DS=<datastore>;CMD=<command> routing - a single key works for all datastores
-echo 'command="sh -c '\''DS=$(echo \"$SSH_ORIGINAL_COMMAND\" | sed -n \"s/^DS=\\([^;]*\\);.*/\\1/p\"); CMD=$(echo \"$SSH_ORIGINAL_COMMAND\" | sed -n \"s/^DS=[^;]*;CMD=\\(.*\\)/\\1/p\"); if [ -z \"$DS\" ]; then echo \"SSH_OK\"; else SSH_ORIGINAL_COMMAND=\"$CMD\" exec sh /vmfs/volumes/$DS/secure-vmkfstools-wrapper; fi'\''",no-port-forwarding,no-agent-forwarding,no-X11-forwarding '$(cat esxi_public_key.pub) > restricted_key.pub
+# The system now uses dynamic datastore routing - a single key works for all datastores
+echo 'command="sh -c '\''DS=$(echo \"$SSH_ORIGINAL_COMMAND\" | sed -n \"s|.*/vmfs/volumes/\\([^/]*\\)/.*|\\1|p\"); exec python /vmfs/volumes/$DS/secure-vmkfstools-wrapper.py'\''",no-port-forwarding,no-agent-forwarding,no-X11-forwarding '$(cat esxi_public_key.pub) > restricted_key.pub
 
 # View the final restricted key
 cat restricted_key.pub
@@ -706,7 +1295,7 @@ rm -f esxi_public_key.pub restricted_key.pub esxi_private_key
 **Important Notes**
 
 - The public key must include command restrictions for security
-- The system uses structured `DS=<datastore>;CMD=<command>` routing - the inline shell command extracts the datastore and command from the SSH request and routes to the correct script location
+- The system uses dynamic datastore routing - the inline shell command automatically detects the datastore from the SSH command and routes to the correct script location
 - A single SSH key works for all datastores - no need to hardcode datastore paths
 - Each ESXi host in your migration environment needs the key installed
 - SSH service must be enabled on all target ESXi hosts
@@ -756,8 +1345,9 @@ Use the helper script `vmkfstools-wrapper/tweak-esxi-mem.sh` to increase the mem
    ```
 
 *Note: This adjusts the runtime configuration via `vsish` to avoid requiring a reboot, but the change will revert upon the next ESXi reboot.*
+
 - Sometimes remote ESXi execution can fail with SOAP error with no apparent root cause message
-  Since VSphere is invoking some SOAP/Rest endpoints on the ESXi, those can fail because of
+  Since VSphere is invoking some SOAP/Rest endpoints on the ESXi, those can fail because of 
   standard error reasons and vanish after the next try. If the popoulator fails the migration
   can be restarted. We may want to restart/retry that populator or restart the migration.
 
@@ -767,29 +1357,19 @@ Use the helper script `vmkfstools-wrapper/tweak-esxi-mem.sh` to increase the mem
   ```
   CLI Fault: The object or item referred to could not be found. <obj xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="urn:vim25" versionId="5.0" xsi:type="LocalizedMethodFault"><fault xsi:type="NotFound"></fault><localizedMessage>The object or item referred to could not be found.</localizedMessage></obj>
   ```
-
+  
     resolution: ssh into the ESXi and run `/etc/init.d/hostd restart`. Wait for few seconds till the ESX renews the connection with vSphere.
 
 - **Error**: Migration failures with multiple disks
 
-  **Cause**: ESXi has a configurable limit on the number of SCSI LUN IDs it will discover during storage rescans, controlled by the `Disk.MaxLUN` parameter (default: 1024). During copy-offload migrations, each VM disk creates a new PVC that provisions a new LUN on the storage array. When the total number of LUN IDs (existing LUNs + newly created LUNs for migration) approaches or exceeds the Disk.MaxLUN value, newly created LUNs with higher LUN IDs become invisible to the ESXi host. This causes vmkfstools clone operations to fail because the target LUN cannot be discovered during storage rescans.
+  **Cause**: ESXi has a configurable limit on the number of SCSI LUN IDs it will discover during storage rescans, controlled by the `Disk.MaxLUN` parameter (default: 1024). During copy-offload migrations, each VM disk creates a new PVC that provisions a new LUN on the storage array. When the total number of LUN IDs approaches or exceeds the Disk.MaxLUN value, newly created LUNs with higher LUN IDs become invisible to the ESXi host, causing vmkfstools clone operations to fail.
 
   **Symptoms**:
   - Migration failures increase as the number of disks per VM increases
-  - Inconsistent behavior - migrations sometimes succeed, sometimes fail for the same VMs
-  - Failures are more common when:
-    - Migrating VMs with 10+ disks
-    - Running multiple concurrent migrations (e.g., 4 VMs with 5+ disks each)
-    - Storage array already has many existing LUNs consuming lower LUN IDs
+  - Inconsistent behavior — migrations sometimes succeed, sometimes fail for the same VMs
+  - Failures are more common when migrating VMs with 10+ disks or running multiple concurrent migrations
 
-  **Why This Happens**:
-  2. ESXi must perform storage rescans to discover newly created LUNs for XCOPY operations
-  3. Disk.MaxLUN determines which LUN IDs the scan attempts to discover (default: LUN IDs 0-1023)
-  4. If a new LUN gets assigned ID ≥ 1024, it's invisible to ESXi
-
-  **Resolution**: Increase the `Disk.MaxLUN` value on each ESXi host to allow discovery of higher LUN IDs.
-
-  **How to Configure**:
+  **Resolution**: Increase the `Disk.MaxLUN` value on each ESXi host:
 
   1. Navigate to: **vSphere Web Client → Host → Configure → System → Advanced System Settings**
   2. Search for: `Disk.MaxLUN`
@@ -801,11 +1381,9 @@ Use the helper script `vmkfstools-wrapper/tweak-esxi-mem.sh` to increase the mem
   5. Reboot the host (recommended for the change to take full effect)
 
   **Important Notes**:
-  - Storage arrays vary in LUN ID allocation: NetApp ONTAP uses sequential from 0 (higher risk), Pure FlashArray starts at 254 descending (lower initial risk, jumps to 255+ after 254 LUNs), Dell PowerStore uses sequential with wraparound (moderate risk). Mature arrays with many existing LUNs are at higher risk.
-  - This change should be applied to **all ESXi hosts** that will participate in copy-offload migrations
-  - Higher values extend storage rescan times slightly
-  - The value specifies the LUN ID *after* the last one you want to discover (e.g., to discover LUN IDs 0-2047, set Disk.MaxLUN to 2048)
-  - **Caution**: If reducing Disk.MaxLUN from a previously higher value, ensure no LUNs with IDs above the new value are in use
+  - Storage arrays vary in LUN ID allocation: NetApp ONTAP uses sequential from 0 (higher risk), Pure FlashArray starts at 254 descending (lower initial risk), Dell PowerStore uses sequential with wraparound (moderate risk).
+  - This change should be applied to **all ESXi hosts** that will participate in copy-offload migrations.
+  - The value specifies the LUN ID *after* the last one you want to discover (e.g., to discover LUN IDs 0-2047, set Disk.MaxLUN to 2048).
 
   **References**:
   - [Broadcom KB 342823: Changing the Disk.MaxLUN parameter on ESXi Hosts](https://knowledge.broadcom.com/external/article/342823/changing-the-diskmaxlun-parameter-on-esx.html)
@@ -860,17 +1438,4 @@ Use the helper script `vmkfstools-wrapper/tweak-esxi-mem.sh` to increase the mem
   3. Once keys are installed, use secure key-based authentication with command restrictions
   4. Restrict commands to vmkfstools operations only
 
-### NetApp
-
-**Error**: `cannot derive SVM to use; please specify SVM in config file`
-
-This is a configuration issue with Ontap and could be fixed by specifying a default SVM using vserver commands on the ontap server:
-
-```bash
-# show current config for an SVM
-vserver show -vserver ${NAME_OF_SVM}
-...
-```
-
-Try to set a mgmt interface for the SVM and put that hostname in the STORAGE_HOSTNAME
 
