@@ -469,6 +469,9 @@ func (p *Plan) ShouldUseV2vForTransfer(vmRef ref.Ref, destinationClient k8sclien
 				return false, nil
 			}
 		}
+		if p.IsUsingOffloadPlugin() {
+			return false, nil
+		}
 		return true, nil
 	case Ova, HyperV:
 		return true, nil
