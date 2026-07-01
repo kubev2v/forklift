@@ -765,7 +765,6 @@ golang.org/x/exp/constraints
 golang.org/x/mod/semver
 # golang.org/x/net v0.53.0
 ## explicit; go 1.25.0
-golang.org/x/net/context
 golang.org/x/net/html
 golang.org/x/net/html/atom
 golang.org/x/net/html/charset

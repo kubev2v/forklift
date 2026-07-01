@@ -279,6 +279,7 @@ github.com/kubev2v/forklift/pkg/lib/itinerary
 github.com/kubev2v/forklift/pkg/lib/logging
 github.com/kubev2v/forklift/pkg/lib/util
 github.com/kubev2v/forklift/pkg/settings
+github.com/kubev2v/forklift/pkg/storage/resolver
 # github.com/leodido/go-urn v1.4.0
 ## explicit; go 1.18
 github.com/leodido/go-urn

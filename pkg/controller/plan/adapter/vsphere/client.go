@@ -14,6 +14,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/plan/util"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	"github.com/kubev2v/forklift/pkg/storage/resolver"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/fault"
 	"github.com/vmware/govmomi/object"
@@ -605,6 +606,30 @@ func (r *Client) thumbprint() string {
 func (r *Client) DetachDisks(vmRef ref.Ref) (err error) {
 	// no-op
 	return
+}
+
+// getDiskBacking returns vSphere disk backing info (VVol/RDM/VMDK) for a named disk file.
+// Uses RetrieveOne on the VM moref directly — no datacenter search needed since the controller
+// always has managed object reference IDs from inventory.
+func (r *Client) getDiskBacking(ctx context.Context, vmId, diskFile string) (*resolver.DiskBacking, error) {
+	if r.client == nil {
+		if err := r.connect(); err != nil {
+			return nil, liberr.Wrap(err)
+		}
+	}
+
+	var vmMo mo.VirtualMachine
+	err := property.DefaultCollector(r.client.Client).RetrieveOne(
+		ctx,
+		types.ManagedObjectReference{Type: "VirtualMachine", Value: vmId},
+		[]string{"config.hardware.device"},
+		&vmMo,
+	)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
+	return resolver.DiskBackingFromDevices(vmMo.Config.Hardware.Device, diskFile)
 }
 
 func (r *Client) getNAAFromDatastore(ctx context.Context, datastoreRef ref.Ref) (string, error) {

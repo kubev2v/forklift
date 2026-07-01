@@ -1916,6 +1916,12 @@ func (r *KubeVirt) NetAppShiftPVCs(vm *plan.VMStatus) ([]core.PersistentVolumeCl
 	return r.Builder.NetAppShiftPVCs(vm.Ref, labels)
 }
 
+// CsiImportPVCs builds PVCs for disks that have CsiVolumeImport configured.
+func (r *KubeVirt) CsiImportPVCs(vm *plan.VMStatus) ([]core.PersistentVolumeClaim, error) {
+	labels := r.vmLabels(vm.Ref)
+	return r.Builder.CsiImportPVCs(vm.Ref, labels)
+}
+
 func (r *KubeVirt) vddkConfigMap(labels map[string]string) (*core.ConfigMap, error) {
 	data := make(map[string]string)
 	if r.Source.Provider.UseVddkAioOptimization() {

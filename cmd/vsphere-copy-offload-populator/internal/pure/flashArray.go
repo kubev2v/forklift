@@ -233,15 +233,15 @@ func (f *FlashArrayClonner) VvolCopy(vsphereClient vmware.Client, vmId string, s
 		return fmt.Errorf("failed to get VVol disk backing info: %w", err)
 	}
 
-	if backing.VVolId == "" {
+	if backing.VVolID == "" {
 		return fmt.Errorf("disk %s is not a VVol disk", sourceVMDKFile)
 	}
 
-	f.log.Info("found VVol backing", "vvol_id", backing.VVolId)
+	f.log.Info("found VVol backing", "vvol_id", backing.VVolID)
 
-	sourceVolume, err := f.restClient.FindVolumeByVVolID(backing.VVolId)
+	sourceVolume, err := f.restClient.FindVolumeByVVolID(backing.VVolID)
 	if err != nil {
-		return fmt.Errorf("failed to find source volume by VVol ID %s: %w", backing.VVolId, err)
+		return fmt.Errorf("failed to find source volume by VVol ID %s: %w", backing.VVolID, err)
 	}
 
 	f.log.Info("resolving target PV to LUN", "pv", persistentVolume.Name)
