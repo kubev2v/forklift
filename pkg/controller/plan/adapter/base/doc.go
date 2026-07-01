@@ -295,6 +295,29 @@ type Validator interface {
 	// VMs whose mapped NAD failed plan-level validation are skipped here
 	// — their failure is already reported via CalicoNetworkInvalid.
 	CalicoVMIssues(vmRef ref.Ref, cache *CalicoValidationCache) ([]CalicoIssue, error)
+	// ValidateCalicoPrimary validates the (at most one) calico-flagged
+	// NetworkMap entry — a type: pod destination carrying the calico
+	// field. Returns plan-level issues (CRD presence, UDN conflict,
+	// Network/VLAN/IPPool resolution) plus a cache consumed by
+	// CalicoPrimaryIssues. On non-vSphere providers, returns a single
+	// CalicoIssuePrimaryProviderUnsupported issue when any calico-flagged
+	// entry is present.
+	//
+	// Precondition: Plan.Referenced.Map.Network is populated by the
+	// dispatcher before this is called. With a nil NetworkMap, returns an
+	// empty result and a non-nil cache with Primary == nil.
+	ValidateCalicoPrimary(client client.Client) (CalicoPrimaryValidationResult, error)
+	// CalicoPrimaryIssues returns per-VM issues for the calico-flagged
+	// primary NIC (IP membership in IPPool / VLAN subnet, gated on
+	// PreserveStaticIPs). Reads only from the cache produced by
+	// ValidateCalicoPrimary; when the cache is nil or Primary is nil (plan
+	// failed, or no calico-flagged entry exists), returns nil.
+	//
+	// When PreserveStaticIPs is true but the VM has no findable IPv4 IPs
+	// (IPv6-only or no GuestNetworks reported), no per-VM issue is emitted
+	// — the builder will likewise emit no ipAddrs annotation. Both
+	// behaviours are correct: preservation is best-effort.
+	CalicoPrimaryIssues(vmRef ref.Ref, cache *CalicoPrimaryValidationCache) ([]CalicoPrimaryIssue, error)
 }
 
 // CalicoIssueKind enumerates the Calico Network failure modes.
@@ -307,25 +330,104 @@ const (
 	CalicoIssueNADUnreadable CalicoIssueKind = "NADUnreadable"
 	// CalicoIssueNetworkNotFound no Network CR existed.
 	CalicoIssueNetworkNotFound CalicoIssueKind = "NetworkNotFound"
+	// CalicoIssueNetworkCRDAbsent the destination cluster does not have the
+	// projectcalico.org/v3 Network CRD installed (the Calico install is too
+	// old or doesn't ship the L2 feature). The NAD references a Calico
+	// Network but the CRD cannot be queried — distinct from a missing CR,
+	// which is CalicoIssueNetworkNotFound.
+	CalicoIssueNetworkCRDAbsent CalicoIssueKind = "NetworkCRDAbsent"
 	// CalicoIssueNetworkHasNoL2Bridge Network CR existed but had no L2Bridge field spec'd.
 	CalicoIssueNetworkHasNoL2Bridge CalicoIssueKind = "NetworkHasNoL2Bridge"
 	// CalicoIssueNetworkHasNoVLANs Network CR's L2Bridge had an empty vlans list (no VLAN to select).
 	CalicoIssueNetworkHasNoVLANs CalicoIssueKind = "NetworkHasNoVLANs"
 	// CalicoIssueVLANNotInNetwork NIC's NAD entry's VLAN was not present in the referenced Network CR.
 	CalicoIssueVLANNotInNetwork CalicoIssueKind = "VLANNotInNetwork"
-	// CalicoIssueVLANAmbiguous NIC's NAD entry had no VLAN, and Network CR had more than one VLAN to choose from.
-	CalicoIssueVLANAmbiguous CalicoIssueKind = "VLANAmbiguous"
+	// CalicoIssueVLANRequired the NAD references a Calico Network but names
+	// no VLAN. A VLAN must be stated explicitly whenever a Network is
+	// selected; Forklift does not auto-select, not even for a single-VLAN
+	// Network.
+	CalicoIssueVLANRequired CalicoIssueKind = "VLANRequired"
 	// CalicoIssueVLANHasNoIPPool no IPPool existed satisfying the VLAN subnet's requirements.
 	CalicoIssueVLANHasNoIPPool CalicoIssueKind = "VLANHasNoIPPool"
 	// CalicoIssueIPNotInSubnet NIC's IP was not in any Network.spec.l2Bridge.vlans[].subnets[].cidr.
 	CalicoIssueIPNotInSubnet CalicoIssueKind = "IPNotInSubnet"
 	// CalicoIssueIPNotInIPPool NIC's IP was not in any Calico IPPool.
 	CalicoIssueIPNotInIPPool CalicoIssueKind = "IPNotInIPPool"
+	// CalicoIssueTooManyIPs the NIC carries more than one IPv4 address.
+	// Calico's ipAddrs annotation accepts at most one IPv4 per interface,
+	// so preservation cannot represent this NIC — CNI ADD would fail and
+	// the pod would never start.
+	CalicoIssueTooManyIPs CalicoIssueKind = "TooManyIPs"
 	// CalicoIssueNADMissingNetwork the NAD requests the Calico CNI but does
 	// not name a projectcalico.org Network resource (no "network" field).
 	// This is Calico's legacy L3 IPAM mode; identity preservation (MAC + IP)
 	// will not be applied for NICs mapped to this NAD. Warn-level.
 	CalicoIssueNADMissingNetwork CalicoIssueKind = "NADMissingNetwork"
+
+	// Calico-primary IssueKinds. Used by Validator.ValidateCalicoPrimary
+	// and Validator.CalicoPrimaryIssues for the calico-flagged NetworkMap
+	// path (type: pod destinations carrying the calico field). The Primary
+	// prefix disambiguates from the NAD-path kinds above.
+
+	// CalicoIssuePrimaryProviderUnsupported indicates a NetworkMap with a
+	// calico-flagged entry is being consumed by a provider that does not
+	// support the feature in this release (any non-vSphere provider).
+	CalicoIssuePrimaryProviderUnsupported CalicoIssueKind = "PrimaryProviderUnsupported"
+	// CalicoIssuePrimaryUnsupported indicates the destination cluster does
+	// not have Calico installed (projectcalico.org/v3 IPPool CRD absent).
+	// Network CRD absence with IPPool present is reported as the more
+	// specific CalicoIssuePrimaryNetworkCRDAbsent.
+	CalicoIssuePrimaryUnsupported CalicoIssueKind = "PrimaryUnsupported"
+	// CalicoIssuePrimaryNetworkCRDAbsent the destination cluster has Calico
+	// (IPPool CRD present) but the projectcalico.org/v3 Network CRD is not
+	// installed. The user requested L2 attach via calico.network, but the
+	// install does not ship the L2 feature. Case A (calico.network == "")
+	// continues to work in this state and is not blocked.
+	CalicoIssuePrimaryNetworkCRDAbsent CalicoIssueKind = "PrimaryNetworkCRDAbsent"
+	// CalicoIssuePrimaryConflictsWithUDN indicates the destination namespace
+	// is labelled for a UDN primary network — incompatible with the calico
+	// field.
+	CalicoIssuePrimaryConflictsWithUDN CalicoIssueKind = "PrimaryConflictsWithUDN"
+	// CalicoIssuePrimaryNetworkNotFound the named projectcalico.org/v3
+	// Network CR does not exist on the destination cluster.
+	CalicoIssuePrimaryNetworkNotFound CalicoIssueKind = "PrimaryNetworkNotFound"
+	// CalicoIssuePrimaryNetworkHasNoL2Bridge the named Network CR has no
+	// l2Bridge spec — incompatible with L2 attach.
+	CalicoIssuePrimaryNetworkHasNoL2Bridge CalicoIssueKind = "PrimaryNetworkHasNoL2Bridge"
+	// CalicoIssuePrimaryNetworkHasNoVLANs the named Network CR's
+	// l2Bridge.vlans is empty.
+	CalicoIssuePrimaryNetworkHasNoVLANs CalicoIssueKind = "PrimaryNetworkHasNoVLANs"
+	// CalicoIssuePrimaryVLANRequired calico.network is set but calico.vlan
+	// is not. A VLAN must be stated explicitly whenever a Network is
+	// selected; Forklift does not auto-select, not even for a single-VLAN
+	// Network.
+	CalicoIssuePrimaryVLANRequired CalicoIssueKind = "PrimaryVLANRequired"
+	// CalicoIssuePrimaryVLANNotInNetwork the user-specified calico.vlan does
+	// not match any vlan.id in the named Network CR.
+	CalicoIssuePrimaryVLANNotInNetwork CalicoIssueKind = "PrimaryVLANNotInNetwork"
+	// CalicoIssuePrimaryNoEligibleIPPool no IPPool covers either the L3
+	// allocation (Case A) or the matched VLAN's subnet (Cases B/C).
+	CalicoIssuePrimaryNoEligibleIPPool CalicoIssueKind = "PrimaryNoEligibleIPPool"
+	// CalicoIssuePrimaryIPNotInSubnet (Cases B/C only) the source NIC IP
+	// falls outside the matched VLAN's subnets.
+	CalicoIssuePrimaryIPNotInSubnet CalicoIssueKind = "PrimaryIPNotInSubnet"
+	// CalicoIssuePrimaryTooManyIPs the calico-mapped NIC carries more than
+	// one IPv4 address. Calico's ipAddrs annotation accepts at most one
+	// IPv4 per interface, so preservation cannot represent this NIC — CNI
+	// ADD would fail and the pod would never start.
+	CalicoIssuePrimaryTooManyIPs CalicoIssueKind = "PrimaryTooManyIPs"
+	// CalicoIssuePrimaryFieldsMisplaced the calico block is set on a
+	// non-pod entry, or calico.vlan is set without calico.network, or more
+	// than one calico-flagged entry exists in the map. The Network field
+	// on the issue carries the offending value for message disambiguation.
+	CalicoIssuePrimaryFieldsMisplaced CalicoIssueKind = "PrimaryFieldsMisplaced"
+	// CalicoIssuePrimaryStaticIPsNotPreserved indicates a calico-flagged
+	// NetworkMap entry exists while Plan.Spec.PreserveStaticIPs is false.
+	// Bridge binding is still enabled (Calico requires it for L2 attach),
+	// so DHCP-configured guests will pick up the Calico-assigned IP via
+	// the veth. Static-IP-configured guests can have a divergent in-guest
+	// IP, with associated Calico drops. Warn-class — informational only.
+	CalicoIssuePrimaryStaticIPsNotPreserved CalicoIssueKind = "PrimaryStaticIPsNotPreserved"
 )
 
 // CalicoIssue represents a per-VM Calico Network validation failure: the

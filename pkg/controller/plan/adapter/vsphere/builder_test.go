@@ -1249,6 +1249,138 @@ var _ = Describe("vSphere builder", func() {
 			Expect(ann).NotTo(HaveKey("cni.projectcalico.org/net-2.hwAddr"))
 		})
 	})
+
+	Context("mapNetworks Calico primary annotations", func() {
+		const (
+			netID  = "src-primary"
+			nicMAC = "aa:bb:cc:dd:ee:01"
+			nicIP  = "10.244.0.5"
+		)
+		// runPrimary builds a Plan with a single type: calico NetworkMap
+		// entry and runs mapNetworks against a one-NIC VM. extraPair is
+		// appended to the NetworkMap (for mixed primary+secondary tests).
+		runPrimary := func(dest v1beta1.DestinationNetwork, preserveIPs bool, extraPairs []v1beta1.NetworkPair, extraNICs []vsphere.NIC, extraGuestNets []vsphere.GuestNetwork, k8sObjs ...runtime.Object) (*cnv.VirtualMachineSpec, error) {
+			builder := createBuilder(k8sObjs...)
+			networks := map[string]model.Network{
+				netID: {Resource: model.Resource{ID: netID}, Variant: vsphere.NetDvPortGroup, Key: netID},
+			}
+			for _, p := range extraPairs {
+				networks[p.Source.ID] = model.Network{
+					Resource: model.Resource{ID: p.Source.ID},
+					Variant:  vsphere.NetDvPortGroup,
+					Key:      p.Source.ID,
+				}
+			}
+			builder.Source.Inventory = &mockInventory{networks: networks}
+			builder.Plan.Spec.PreserveStaticIPs = preserveIPs
+			pairs := []v1beta1.NetworkPair{
+				{Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{ID: netID}}, Destination: dest},
+			}
+			pairs = append(pairs, extraPairs...)
+			builder.Context.Map.Network = &v1beta1.NetworkMap{Spec: v1beta1.NetworkMapSpec{Map: pairs}}
+			nics := []vsphere.NIC{{Network: vsphere.Ref{ID: netID}, MAC: nicMAC, DeviceKey: 4001}}
+			nics = append(nics, extraNICs...)
+			gnets := []vsphere.GuestNetwork{{MAC: nicMAC, IP: nicIP, DeviceConfigId: 4001, Origin: ManualOrigin, PrefixLength: 24}}
+			gnets = append(gnets, extraGuestNets...)
+			vm := &model.VM{NICs: nics, GuestNetworks: gnets}
+			spec := &cnv.VirtualMachineSpec{Template: &cnv.VirtualMachineInstanceTemplateSpec{}}
+			err := builder.mapNetworks(vm, spec)
+			return spec, err
+		}
+
+		It("Case A no preserveStaticIPs: MAC only, Bridge binding, no IP/Network", func() {
+			spec, err := runPrimary(v1beta1.DestinationNetwork{Type: "pod", Calico: &v1beta1.CalicoDestination{}}, false, nil, nil, nil)
+			Expect(err).NotTo(HaveOccurred())
+			ann := spec.Template.ObjectMeta.Annotations
+			Expect(ann).To(HaveKeyWithValue("cni.projectcalico.org/hwAddr", nicMAC))
+			Expect(ann).NotTo(HaveKey("cni.projectcalico.org/ipAddrs"))
+			Expect(ann).NotTo(HaveKey("cni.projectcalico.org/networks"))
+			// Bridge on the pod network blocks live migration unless the VM
+			// opts in; calico-primary VMs are opted in automatically.
+			Expect(ann).To(HaveKeyWithValue("kubevirt.io/allow-pod-bridge-network-live-migration", "true"))
+			// Bridge binding always for calico-flagged mappings.
+			Expect(spec.Template.Spec.Domain.Devices.Interfaces).To(HaveLen(1))
+			Expect(spec.Template.Spec.Domain.Devices.Interfaces[0].Bridge).NotTo(BeNil())
+			// Pod network for the cluster-default CNI attach.
+			Expect(spec.Template.Spec.Networks).To(HaveLen(1))
+			Expect(spec.Template.Spec.Networks[0].Pod).NotTo(BeNil())
+		})
+
+		It("plain type: pod (no calico) gets no calico or live-migration annotations", func() {
+			spec, err := runPrimary(v1beta1.DestinationNetwork{Type: "pod"}, true, nil, nil, nil)
+			Expect(err).NotTo(HaveOccurred())
+			ann := spec.Template.ObjectMeta.Annotations
+			Expect(ann).NotTo(HaveKey("cni.projectcalico.org/hwAddr"))
+			Expect(ann).NotTo(HaveKey("kubevirt.io/allow-pod-bridge-network-live-migration"))
+		})
+
+		It("Case A with preserveStaticIPs: MAC + IPs", func() {
+			spec, err := runPrimary(v1beta1.DestinationNetwork{Type: "pod", Calico: &v1beta1.CalicoDestination{}}, true, nil, nil, nil)
+			Expect(err).NotTo(HaveOccurred())
+			ann := spec.Template.ObjectMeta.Annotations
+			Expect(ann).To(HaveKeyWithValue("cni.projectcalico.org/hwAddr", nicMAC))
+			Expect(ann).To(HaveKeyWithValue("cni.projectcalico.org/ipAddrs", fmt.Sprintf(`["%s"]`, nicIP)))
+			Expect(ann).NotTo(HaveKey("cni.projectcalico.org/networks"))
+		})
+
+		It("L2 attach (network + vlan), no preserveStaticIPs: MAC + Network + vlan, no IPs", func() {
+			spec, err := runPrimary(
+				v1beta1.DestinationNetwork{Type: "pod", Calico: &v1beta1.CalicoDestination{Network: "datacenter-vlans", Vlan: 100}},
+				false, nil, nil, nil)
+			Expect(err).NotTo(HaveOccurred())
+			ann := spec.Template.ObjectMeta.Annotations
+			Expect(ann).To(HaveKeyWithValue("cni.projectcalico.org/hwAddr", nicMAC))
+			Expect(ann).To(HaveKeyWithValue("cni.projectcalico.org/networks", "datacenter-vlans"))
+			Expect(ann).To(HaveKeyWithValue("cni.projectcalico.org/vlan", "100"))
+			Expect(ann).NotTo(HaveKey("cni.projectcalico.org/ipAddrs"))
+		})
+
+		It("L2 attach (network + vlan) with preserveStaticIPs: MAC + IPs + Network + vlan", func() {
+			spec, err := runPrimary(
+				v1beta1.DestinationNetwork{Type: "pod", Calico: &v1beta1.CalicoDestination{Network: "datacenter-vlans", Vlan: 200}},
+				true, nil, nil, nil)
+			Expect(err).NotTo(HaveOccurred())
+			ann := spec.Template.ObjectMeta.Annotations
+			Expect(ann).To(HaveKeyWithValue("cni.projectcalico.org/hwAddr", nicMAC))
+			Expect(ann).To(HaveKeyWithValue("cni.projectcalico.org/ipAddrs", fmt.Sprintf(`["%s"]`, nicIP)))
+			Expect(ann).To(HaveKeyWithValue("cni.projectcalico.org/networks", "datacenter-vlans"))
+			// Calico's VLAN selection is annotation-driven; the user's
+			// validated choice must reach the pod.
+			Expect(ann).To(HaveKeyWithValue("cni.projectcalico.org/vlan", "200"))
+		})
+
+		It("Mixed: calico-flagged primary + type:multus secondary coexist with correct scoping", func() {
+			// Primary NIC on src-primary, secondary NIC on src-secondary
+			// (mapped to a Calico L2 NAD). Annotations: unscoped for primary,
+			// VMI-network-name-scoped for secondary (Calico reverse-maps the
+			// pod interface name back to the VMI network name).
+			secondaryNAD := &k8snet.NetworkAttachmentDefinition{
+				ObjectMeta: meta.ObjectMeta{Namespace: "test", Name: "secondary-calico-nad"},
+				Spec:       k8snet.NetworkAttachmentDefinitionSpec{Config: `{"type":"calico","network":"sec-vlan","vlan":100}`},
+			}
+			extraPair := v1beta1.NetworkPair{
+				Source:      v1beta1.NetworkSourceRef{Ref: ref.Ref{ID: "src-secondary"}},
+				Destination: v1beta1.DestinationNetwork{Type: "multus", Namespace: "test", Name: "secondary-calico-nad"},
+			}
+			extraNIC := vsphere.NIC{Network: vsphere.Ref{ID: "src-secondary"}, MAC: "aa:bb:cc:00:00:99", DeviceKey: 4002}
+			extraGN := vsphere.GuestNetwork{MAC: "aa:bb:cc:00:00:99", IP: "10.100.0.5", DeviceConfigId: 4002, Origin: ManualOrigin, PrefixLength: 24}
+			spec, err := runPrimary(
+				v1beta1.DestinationNetwork{Type: "pod", Calico: &v1beta1.CalicoDestination{Network: "primary-net", Vlan: 100}},
+				true,
+				[]v1beta1.NetworkPair{extraPair},
+				[]vsphere.NIC{extraNIC},
+				[]vsphere.GuestNetwork{extraGN},
+				secondaryNAD)
+			Expect(err).NotTo(HaveOccurred())
+			ann := spec.Template.ObjectMeta.Annotations
+			// Primary (unscoped) annotations.
+			Expect(ann).To(HaveKeyWithValue("cni.projectcalico.org/hwAddr", nicMAC))
+			Expect(ann).To(HaveKeyWithValue("cni.projectcalico.org/networks", "primary-net"))
+			// Secondary (per-iface) annotations on net-1 (primary NIC is net-0).
+			Expect(ann).To(HaveKeyWithValue("cni.projectcalico.org/net-1.hwAddr", "aa:bb:cc:00:00:99"))
+			Expect(ann).To(HaveKeyWithValue("cni.projectcalico.org/net-1.ipAddrs", `["10.100.0.5"]`))
+		})
+	})
 })
 
 var _ = Describe("PopulatorXcopyUsed", func() {

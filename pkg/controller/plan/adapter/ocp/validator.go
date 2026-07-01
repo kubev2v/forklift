@@ -466,3 +466,26 @@ func (r *Validator) ValidateCalicoNADs(_ k8sclient.Client) (planbase.CalicoValid
 func (r *Validator) CalicoVMIssues(_ ref.Ref, _ *planbase.CalicoValidationCache) ([]planbase.CalicoIssue, error) {
 	return nil, nil
 }
+
+// ValidateCalicoPrimary scans the NetworkMap. If any calico-flagged entry
+// exists, returns a single CalicoIssuePrimaryProviderUnsupported issue —
+// the feature is not supported on this provider in this release.
+func (r *Validator) ValidateCalicoPrimary(_ k8sclient.Client) (planbase.CalicoPrimaryValidationResult, error) {
+	if r.Plan.Referenced.Map.Network == nil {
+		return planbase.CalicoPrimaryValidationResult{}, nil
+	}
+	for _, pair := range r.Plan.Referenced.Map.Network.Spec.Map {
+		if pair.Destination.Calico != nil {
+			return planbase.CalicoPrimaryValidationResult{
+				Issues: []planbase.CalicoPrimaryIssue{{Kind: planbase.CalicoIssuePrimaryProviderUnsupported}},
+			}, nil
+		}
+	}
+	return planbase.CalicoPrimaryValidationResult{}, nil
+}
+
+// CalicoPrimaryIssues returns nil. The plan-level rejection in
+// ValidateCalicoPrimary short-circuits before per-VM dispatch.
+func (r *Validator) CalicoPrimaryIssues(_ ref.Ref, _ *planbase.CalicoPrimaryValidationCache) ([]planbase.CalicoPrimaryIssue, error) {
+	return nil, nil
+}
