@@ -2002,6 +2002,21 @@ func (r *KubeVirt) EnsurePopulatorVolumes(vm *plan.VMStatus, pvcs []*core.Persis
 			pendingPvcNames = append(pendingPvcNames, pvc.Name)
 		}
 	}
+	allPVCs, err := r.getPVCs(vm.Ref)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	seen := make(map[string]bool)
+	for _, name := range pendingPvcNames {
+		seen[name] = true
+	}
+	for _, pvc := range allPVCs {
+		if pvc.Status.Phase == core.ClaimPending && !seen[pvc.Name] {
+			r.Log.V(2).Info("EnsurePopulatorVolumes: adding pending PVC from VM", "pvc", pvc.Name)
+			pendingPvcNames = append(pendingPvcNames, pvc.Name)
+		}
+	}
+	r.Log.V(2).Info("EnsurePopulatorVolumes: creating bind pod", "pendingPVCs", pendingPvcNames)
 	err = r.createPodToBindPVCs(vm, pendingPvcNames)
 	if err != nil {
 		err = liberr.Wrap(err)

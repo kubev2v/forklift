@@ -1310,11 +1310,15 @@ func (r *Builder) SupportsVolumePopulators() bool {
 			return false
 		}
 
+		klog.V(2).Infof("SupportsVolumePopulators: ds=%s offloadPlugin=%v csiVolumeImport=%v xcopy=%v",
+			ds.ID, m.OffloadPlugin != nil,
+			m.OffloadPlugin != nil && m.OffloadPlugin.CsiVolumeImport != nil,
+			m.OffloadPlugin != nil && m.OffloadPlugin.VSphereXcopyPluginConfig != nil)
 		if m.OffloadPlugin != nil && (m.OffloadPlugin.VSphereXcopyPluginConfig != nil || m.OffloadPlugin.CsiVolumeImport != nil) {
-			klog.V(2).Infof("found offload plugin on ds map %+v", dsMapIn)
 			return true
 		}
 	}
+	klog.V(2).Infof("SupportsVolumePopulators: no offload plugin found in storage map")
 	return false
 }
 
@@ -1733,7 +1737,7 @@ func (r *Builder) buildCsiImportPVC(
 	}
 
 	// Instantiate vendor plugin (xcopy pattern: switch in newCsiImportPlugin creates concrete type)
-	plugin, err := newCsiImportPlugin(csiCfg.StorageVendorProduct, host, user, pass, skipSSL)
+	plugin, err := newCsiImportPlugin(csiCfg.StorageVendorProduct, host, user, pass, skipSSL, storageSecret.Data)
 	if err != nil {
 		return nil, liberr.Wrap(err, "vendor", string(csiCfg.StorageVendorProduct))
 	}
@@ -2641,15 +2645,24 @@ func (r *Builder) CsiImportPVCs(vmRef ref.Ref, pvcLabels map[string]string) (pvc
 	}
 
 	disks := vm.SortedDisksAsVmware()
+	r.Log.V(2).Info("CSI import: iterating disks", "count", len(disks), "dsMapKeys", func() []string {
+		keys := make([]string, 0, len(dsMap))
+		for k := range dsMap {
+			keys = append(keys, k)
+		}
+		return keys
+	}())
 	for diskIndex, disk := range disks {
 		mapped, found := dsMap[disk.Datastore.ID]
 		if !found {
+			r.Log.V(2).Info("CSI import: disk datastore not in map, skipping", "disk", disk.File, "datastoreID", disk.Datastore.ID)
 			continue
 		}
 		if mapped.OffloadPlugin == nil || mapped.OffloadPlugin.CsiVolumeImport == nil {
 			continue
 		}
 
+		r.Log.V(2).Info("CSI import: resolving disk", "disk", disk.File, "vendor", mapped.OffloadPlugin.CsiVolumeImport.StorageVendorProduct)
 		pvc, pErr := r.buildCsiImportPVC(context.TODO(), vmRef, vm, disk, diskIndex, mapped, nil)
 		if pErr != nil {
 			err = pErr
