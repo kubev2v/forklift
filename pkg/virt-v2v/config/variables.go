@@ -41,6 +41,7 @@ const (
 	EnvWaitForGuestRebootName           = "V2V_waitForGuestReboot"
 	EnvXfsCompatibilityName             = "V2V_xfsCompatibility"
 	EnvXfsRepairIgnoreName              = "V2V_xfsRepairIgnore"
+	EnvOverlayEnabledName               = "V2V_overlayEnabled"
 )
 
 const (
@@ -124,6 +125,8 @@ type AppConfig struct {
 	// SupportsNoFstrim is true when the virt-v2v binary supports --no-fstrim
 	// (RHEL-only downstream patch. upstream CentOS/Fedora builds lack this flag)
 	SupportsNoFstrim bool
+	// V2V_overlayEnabled — use qcow2 overlay for in-place conversions (default true)
+	OverlayEnabled bool
 
 	// V2V_multipleIPsPerNic
 	MultipleIpsPerNicName string
@@ -143,6 +146,7 @@ func (s *AppConfig) Load() (err error) {
 	s.InspectorExtraArgs = s.getInspectorExtraArgs()
 	flag.BoolVar(&s.IsLocalMigration, "local-migration", s.getEnvBool(EnvLocalMigrationName, true), "Migration is in local or remote cluster")
 	flag.BoolVar(&s.IsInPlace, "in-place", s.getEnvBool(EnvInPlaceName, false), "Run virt-v2v-in-place on already populated disks")
+	flag.BoolVar(&s.OverlayEnabled, "overlay-enabled", s.getEnvBool(EnvOverlayEnabledName, true), "Use qcow2 overlay for in-place conversions")
 	flag.BoolVar(&s.NbdeClevis, "nbde-clevis", s.getEnvBool(EnvNbdeClevis, false), "virt-v2v should unencrypt the disks via clevis client")
 	flag.StringVar(&s.Source, "source", os.Getenv(EnvSourceName), "Source of VM ['ova','vSphere']")
 	flag.StringVar(&s.LibvirtUrl, "libvirt-url", os.Getenv(EnvLibvirtUrlName), "Libvirt domain to the vSphere")

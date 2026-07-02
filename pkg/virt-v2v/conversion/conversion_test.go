@@ -697,7 +697,7 @@ var _ = Describe("Conversion", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 				Expect(result).ToNot(ContainSubstring("/original/path/disk.vmdk"))
-				Expect(result).To(ContainSubstring(`<driver name="qemu" type="raw"`))
+				Expect(result).To(ContainSubstring(`<driver name="qemu" type="qcow2"`))
 			},
 		)
 
@@ -721,7 +721,7 @@ var _ = Describe("Conversion", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
 				Expect(result).ToNot(ContainSubstring("/dev/original-block"))
-				Expect(result).To(ContainSubstring(`<driver name="qemu" type="raw"`))
+				Expect(result).To(ContainSubstring(`<driver name="qemu" type="qcow2"`))
 			},
 		)
 
@@ -984,6 +984,56 @@ var _ = Describe("Conversion", func() {
 				Expect(result).ToNot(ContainSubstring(".iso"))
 			},
 		)
+
+		It("uses qcow2 driver type for disk", func() {
+			conversion.Disks = []*Disk{
+				{Link: "/var/tmp/v2v/vm-sda"},
+			}
+
+			domainXML := `<domain type='kvm'>
+  <name>test-vm</name>
+  <devices>
+    <disk type='file' device='disk'>
+      <source file='/original/path/disk.vmdk'/>
+      <target dev='sda' bus='scsi'/>
+    </disk>
+  </devices>
+</domain>`
+
+			result, err := conversion.updateDiskPaths(domainXML)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
+			Expect(result).To(ContainSubstring(`type="qcow2"`))
+			Expect(result).ToNot(ContainSubstring(`type="raw"`))
+		})
+
+		It("uses qcow2 driver type for multiple disks", func() {
+			conversion.Disks = []*Disk{
+				{Link: "/var/tmp/v2v/vm-sda"},
+				{Link: "/var/tmp/v2v/vm-sdb"},
+			}
+
+			domainXML := `<domain type='kvm'>
+  <name>test-vm</name>
+  <devices>
+    <disk type='file' device='disk'>
+      <source file='/original/path/disk1.vmdk'/>
+      <target dev='sda' bus='scsi'/>
+    </disk>
+    <disk type='file' device='disk'>
+      <source file='/original/path/disk2.vmdk'/>
+      <target dev='sdb' bus='scsi'/>
+    </disk>
+  </devices>
+</domain>`
+
+			result, err := conversion.updateDiskPaths(domainXML)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sda"))
+			Expect(result).To(ContainSubstring("/var/tmp/v2v/vm-sdb"))
+			Expect(result).To(ContainSubstring(`type="qcow2"`))
+			Expect(result).ToNot(ContainSubstring(`type="raw"`))
+		})
 
 		It("handles more XML disks than available when cdroms are present",
 			func() {
