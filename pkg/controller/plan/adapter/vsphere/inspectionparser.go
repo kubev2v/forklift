@@ -66,11 +66,18 @@ var osV2VMap = map[string]string{
 	"win2k25": "windows2022srvNext_64Guest",
 }
 
+type Mountpoint struct {
+	Dev  string `xml:"dev,attr"`
+	Path string `xml:",chardata"`
+}
+
 type InspectionOS struct {
-	Name   string `xml:"name"`
-	Distro string `xml:"distro"`
-	Osinfo string `xml:"osinfo"`
-	Arch   string `xml:"arch"`
+	Name        string       `xml:"name"`
+	Distro      string       `xml:"distro"`
+	Osinfo      string       `xml:"osinfo"`
+	Arch        string       `xml:"arch"`
+	Root        string       `xml:"root"`
+	Mountpoints []Mountpoint `xml:"mountpoints>mountpoint"`
 }
 
 type InspectionV2V struct {
@@ -84,6 +91,63 @@ func ParseInspectionFromString(xmlData string) (InspectionV2V, error) {
 		return InspectionV2V{}, fmt.Errorf("Error unmarshalling XML: %v\n", err)
 	}
 	return xmlConf, nil
+}
+
+func GetBootDiskFromInspectionXML(vmConfigXML string) int {
+	inspection, err := ParseInspectionFromString(vmConfigXML)
+	if err != nil {
+		return -1
+	}
+
+	// Priority: /boot/efi > /boot > root device
+	var bootDev, efiDev, rootDev string
+	for _, mp := range inspection.OS.Mountpoints {
+		switch mp.Path {
+		case "/boot/efi":
+			efiDev = mp.Dev
+		case "/boot":
+			bootDev = mp.Dev
+		}
+	}
+
+	if inspection.OS.Root != "" {
+		rootDev = inspection.OS.Root
+	}
+
+	dev := efiDev
+	if dev == "" {
+		dev = bootDev
+	}
+	if dev == "" {
+		dev = rootDev
+	}
+	if dev == "" {
+		return -1
+	}
+
+	return deviceToDiskIndex(dev)
+}
+
+// deviceToDiskIndex extracts the 0-based disk index from a device path.
+func deviceToDiskIndex(dev string) int {
+	if strings.HasPrefix(dev, "btrfsvol:") {
+		dev = strings.TrimPrefix(dev, "btrfsvol:")
+		parts := strings.SplitN(dev, "/", 4)
+		if len(parts) >= 3 {
+			dev = "/" + parts[1] + "/" + parts[2]
+		}
+	}
+
+	for _, prefix := range []string{"/dev/sd", "/dev/vd", "/dev/hd"} {
+		if strings.HasPrefix(dev, prefix) {
+			remainder := dev[len(prefix):]
+			if len(remainder) > 0 && remainder[0] >= 'a' && remainder[0] <= 'z' {
+				return int(remainder[0] - 'a')
+			}
+		}
+	}
+
+	return -1
 }
 
 func GetOperationSystemFromConfig(vmConfigXML string) (string, error) {

@@ -2366,13 +2366,14 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 		return liberr.Wrap(err)
 	}
 
+	var inspectionXML string
 	switch r.Source.Provider.Type() {
 	case api.Ova, api.HyperV:
 		if vm.Firmware, err = util.GetFirmwareFromYaml(vmConf); err != nil {
 			return liberr.Wrap(err)
 		}
 	case api.VSphere:
-		inspectionXML, err := r.getInspectionXml(pod)
+		inspectionXML, err = r.getInspectionXml(pod)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -2382,11 +2383,29 @@ func (r *KubeVirt) UpdateVmByConvertedConfig(vm *plan.VMStatus, pod *core.Pod, s
 		r.Log.Info("Setting the vm OS ", vm.OperatingSystem, "vmId", vm.ID)
 	}
 
-	if bootDiskIndex, bootOrderErr := util.GetDiskBootOrderFromYaml(vmConf); bootOrderErr != nil {
+	bootDiskIndex, bootOrderErr := util.GetDiskBootOrderFromYaml(vmConf)
+	if bootOrderErr != nil {
 		r.Log.Error(bootOrderErr, "Failed to extract boot order from virt-v2v output", "vmId", vm.ID)
-	} else if bootDiskIndex >= 0 {
+	}
+	if bootOrderErr == nil && bootDiskIndex >= 0 {
 		vm.DetectedBootDisk = &bootDiskIndex
 		r.Log.Info("Detected boot disk from virt-v2v output", "bootDiskIndex", bootDiskIndex, "vmId", vm.ID)
+	} else if inspectionXML != "" {
+		if idx := inspectionparser.GetBootDiskFromInspectionXML(inspectionXML); idx >= 0 {
+			vm.DetectedBootDisk = &idx
+			r.Log.Info("Detected boot disk from inspection XML", "bootDiskIndex", idx, "vmId", vm.ID)
+		}
+	}
+
+	if vm.DetectedBootDisk == nil && r.Source.Provider.Type() == api.VSphere {
+		vm.SetCondition(libcnd.Condition{
+			Type:     BootDiskNotDetected,
+			Status:   True,
+			Category: "Warning",
+			Reason:   BootDiskNotDetected,
+			Message:  "Boot disk could not be determined from conversion output; no bootOrder will be set.",
+		})
+		r.Log.Info("Boot disk not detected, no bootOrder will be set", "vmId", vm.ID)
 	}
 
 	// Fetch warnings before shutting down
