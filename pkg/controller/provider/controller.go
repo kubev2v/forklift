@@ -60,10 +60,8 @@ import (
 )
 
 const (
-	// Name.
-	Name               = "provider"
-	OvaTimeout         = 10 * time.Minute
-	OvaReconcilerRetry = 5 * time.Second
+	Name         = "provider"
+	AuthRetryReQ = 3 * time.Minute
 )
 
 // Package logger.
@@ -194,9 +192,11 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	}()
 
 	defer func() {
-		// Stop reconciliation when auth fails
+		// Slow down reconciliation when auth fails to avoid account lockout,
+		// but keep re-queuing so the provider can recover once the host-side
+		// issue is resolved (e.g., WinRM Basic auth re-enabled).
 		if provider.Status.HasCondition(ConnectionAuthFailed) {
-			result.RequeueAfter = 0
+			result.RequeueAfter = AuthRetryReQ
 			err = nil
 			return
 		}
