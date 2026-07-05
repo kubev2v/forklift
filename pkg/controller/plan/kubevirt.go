@@ -2096,6 +2096,11 @@ func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, e
 		pvcs = append(pvcs, pvc)
 	}
 
+	pvcs, err = r.swapIntermediateForFinalPVCs(pvcs)
+	if err != nil {
+		return
+	}
+
 	// Sort the pvcs slice by disk index
 	sort.Slice(pvcs, func(i, j int) bool {
 		iIdx := getDiskIndex(pvcs[i])
@@ -2104,6 +2109,71 @@ func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, e
 	})
 
 	return
+}
+
+// swapIntermediateForFinalPVCs replaces intermediate FADA PVCs with their
+// final storage-layer counterparts when the target PVC is Bound.
+// If a PVC carries AnnTargetPvcName and the target is Bound, the target PVC
+// is returned in its place; otherwise the intermediate PVC is kept.
+func (r *KubeVirt) swapIntermediateForFinalPVCs(pvcs []*core.PersistentVolumeClaim) ([]*core.PersistentVolumeClaim, error) {
+	result := make([]*core.PersistentVolumeClaim, 0, len(pvcs))
+	for _, pvc := range pvcs {
+		targetName := ""
+		if pvc.Annotations != nil {
+			targetName = pvc.Annotations[planbase.AnnTargetPvcName]
+		}
+		if targetName == "" {
+			result = append(result, pvc)
+			continue
+		}
+		targetPVC := &core.PersistentVolumeClaim{}
+		gErr := r.Destination.Client.Get(context.TODO(), client.ObjectKey{
+			Namespace: pvc.Namespace,
+			Name:      targetName,
+		}, targetPVC)
+		if gErr != nil {
+			if k8serr.IsNotFound(gErr) {
+				result = append(result, pvc)
+				continue
+			}
+			return nil, liberr.Wrap(gErr)
+		}
+		if targetPVC.Status.Phase == core.ClaimBound {
+			result = append(result, targetPVC)
+		} else {
+			result = append(result, pvc)
+		}
+	}
+	return result, nil
+}
+
+// DeleteIntermediatePVCs removes the intermediate FADA PVCs created during
+// phase 1 of a two-phase migration. Identified by AnnTargetPvcName annotation.
+func (r *KubeVirt) DeleteIntermediatePVCs(vmRef ref.Ref) error {
+	pvcList := &core.PersistentVolumeClaimList{}
+	err := r.Destination.Client.List(
+		context.TODO(),
+		pvcList,
+		client.InNamespace(r.Plan.Spec.TargetNamespace),
+		client.MatchingLabels{
+			kVM:        vmRef.ID,
+			kMigration: string(r.Migration.UID),
+		},
+	)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for i := range pvcList.Items {
+		pvc := &pvcList.Items[i]
+		if pvc.Annotations == nil || pvc.Annotations[planbase.AnnTargetPvcName] == "" {
+			continue
+		}
+		r.Log.Info("Deleting intermediate PVC", "pvc", pvc.Name)
+		if dErr := r.Destination.Client.Delete(context.TODO(), pvc); dErr != nil && !k8serr.IsNotFound(dErr) {
+			return liberr.Wrap(dErr)
+		}
+	}
+	return nil
 }
 
 // hasDiskIdentity reports whether the PVC carries the AnnDiskSource annotation
