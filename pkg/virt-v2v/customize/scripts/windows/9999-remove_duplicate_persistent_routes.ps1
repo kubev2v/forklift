@@ -61,9 +61,9 @@ foreach ($gw in $defaultGateways) {
 # Step 2: Clean up duplicate routes (including default gateways)
 Write-Host "Analyzing routes for duplicates..." -ForegroundColor Yellow
 
-# Group ALL routes for duplicate detection  
+# Group ALL routes for duplicate detection
 $groupedRoutes = $routes | Group-Object {
-    "$($_.DestinationPrefix)-$($_.NextHop)-$($_.RouteMetric)"
+    "$($_.DestinationPrefix)-$($_.NextHop)"
 } | Where-Object { $_.Count -gt 1 }
 
 # Separate default gateway duplicates from other duplicates
@@ -77,24 +77,26 @@ if (-not $groupedRoutes) {
     Write-Host "No duplicate persistent routes found." -ForegroundColor Green
 } else {
     Write-Host "Cleaning up duplicate persistent routes..." -ForegroundColor Yellow
+    $liveAdapters = Get-NetAdapter
     
     # First, handle duplicate default gateways
     foreach ($group in $gatewayDuplicates) {
         $routes = $group.Group
         
-        # Choose the route with an interface that actually exists
+        # Choose the route on a live interface with the lowest metric
+        $sortedRoutes = $routes | Sort-Object RouteMetric
         $toKeep = $null
-        foreach ($route in $routes) {
-            $interface = Get-NetAdapter | Where-Object { $_.InterfaceIndex -eq $route.InterfaceIndex } -ErrorAction SilentlyContinue
+        foreach ($route in $sortedRoutes) {
+            $interface = $liveAdapters | Where-Object { $_.InterfaceIndex -eq $route.InterfaceIndex }
             if ($interface) {
                 $toKeep = $route
                 break
             }
         }
         
-        # If no existing interface found, just use the first one
+        # If no existing interface found, just use the lowest-metric one
         if (-not $toKeep) {
-            $toKeep = $routes[0]
+            $toKeep = $sortedRoutes[0]
         }
         
         $dest = $toKeep.DestinationPrefix
@@ -140,7 +142,19 @@ if (-not $groupedRoutes) {
     
     # Then handle non-gateway duplicates
     foreach ($group in $nonGatewayDuplicates) {
-        $toKeep = $group.Group[0]
+        # Prefer route on a live interface with the lowest metric
+        $sorted = $group.Group | Sort-Object RouteMetric
+        $toKeep = $null
+        foreach ($candidate in $sorted) {
+            $iface = $liveAdapters | Where-Object { $_.InterfaceIndex -eq $candidate.InterfaceIndex }
+            if ($iface) {
+                $toKeep = $candidate
+                break
+            }
+        }
+        if (-not $toKeep) {
+            $toKeep = $sorted[0]
+        }
         $dest = $toKeep.DestinationPrefix
         $gateway = $toKeep.NextHop
         $metric = $toKeep.RouteMetric
