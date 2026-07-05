@@ -2163,6 +2163,10 @@ func (r *Migration) executeStorageLayerMigration(vm *plan.VMStatus, step *plan.S
 			// Already set up in a previous reconcile.
 			continue
 		}
+		if pvc.Annotations != nil && pvc.Annotations[base.AnnIntermediatePvc] != "" {
+			// This is a final PVC created by a previous reconcile, not an intermediate.
+			continue
+		}
 
 		finalPVCName := "pxd-" + pvc.Name
 		crName := finalPVCName + "-populator"

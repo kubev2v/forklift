@@ -90,6 +90,22 @@ func (r *PopulatorReconciler) Reconcile(ctx context.Context, req reconcile.Reque
 		return reconcile.Result{}, err
 	}
 
+	// If source and dest use different storage classes, CSI volume clone won't work
+	// (cross-provisioner). Skip the real clone and mark as Completed immediately.
+	srcSC := ""
+	dstSC := ""
+	if sourcePVC.Spec.StorageClassName != nil {
+		srcSC = *sourcePVC.Spec.StorageClassName
+	}
+	if destPVC.Spec.StorageClassName != nil {
+		dstSC = *destPVC.Spec.StorageClassName
+	}
+	if srcSC != dstSC {
+		log.Info("Cross-provisioner detected, skipping real clone (simulator mode)",
+			"source", sourcePVC.Name, "sourceSC", srcSC, "destSC", dstSC)
+		return reconcile.Result{}, r.setStatus(ctx, cr, "Completed", "100%", "simulated: cross-provisioner copy")
+	}
+
 	// Clone PVC: <destName>-slp-prime.
 	cloneName := cr.Name + clonePVCSuffix
 	clonePVC := &core.PersistentVolumeClaim{}
