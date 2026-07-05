@@ -61,12 +61,12 @@ foreach ($gw in $defaultGateways) {
 # Step 2: Clean up duplicate routes (including default gateways)
 Write-Host "Analyzing routes for duplicates..." -ForegroundColor Yellow
 
-# Group routes by destination/gateway/metric, intentionally excluding InterfaceIndex.
-# After migration, stale persistent routes from the source VM's old adapters (e.g. VMware)
-# remain alongside new routes on the target adapter (e.g. VirtIO). These must be grouped
-# together to detect and remove the stale entries.
+# Group routes by destination/gateway only, intentionally excluding InterfaceIndex and
+# RouteMetric. After migration, stale persistent routes from the source VM's old adapters
+# remain alongside new routes on the target adapter. Routes with the same destination+gateway
+# but different metrics on distinct interfaces are still duplicates.
 $groupedRoutes = $routes | Group-Object {
-    "$($_.DestinationPrefix)-$($_.NextHop)-$($_.RouteMetric)"
+    "$($_.DestinationPrefix)-$($_.NextHop)"
 } | Where-Object { $_.Count -gt 1 }
 
 # Separate default gateway duplicates from other duplicates
@@ -80,37 +80,26 @@ if (-not $groupedRoutes) {
     Write-Host "No duplicate persistent routes found." -ForegroundColor Green
 } else {
     Write-Host "Cleaning up duplicate persistent routes..." -ForegroundColor Yellow
+    $liveAdapters = Get-NetAdapter
     
     # First, handle duplicate default gateways
     foreach ($group in $gatewayDuplicates) {
         $routes = $group.Group
-        
-        # If all interfaces in this group are active, this is a legitimate multi-homed
-        # configuration (same gateway reachable via multiple NICs) — leave it alone.
-        $activeCount = 0
-        foreach ($r in $routes) {
-            if (Get-NetAdapter | Where-Object { $_.InterfaceIndex -eq $r.InterfaceIndex } -ErrorAction SilentlyContinue) {
-                $activeCount++
-            }
-        }
-        if ($activeCount -eq $routes.Count) {
-            Write-Host "  Skipping group '$($group.Name)': all $activeCount interfaces are active (multi-homed)" -ForegroundColor Gray
-            continue
-        }
 
-        # Choose the route with an interface that actually exists
+        # Choose the route on a live interface with the lowest metric
+        $sortedRoutes = $routes | Sort-Object RouteMetric
         $toKeep = $null
-        foreach ($route in $routes) {
-            $interface = Get-NetAdapter | Where-Object { $_.InterfaceIndex -eq $route.InterfaceIndex } -ErrorAction SilentlyContinue
+        foreach ($route in $sortedRoutes) {
+            $interface = $liveAdapters | Where-Object { $_.InterfaceIndex -eq $route.InterfaceIndex }
             if ($interface) {
                 $toKeep = $route
                 break
             }
         }
         
-        # If no existing interface found, just use the first one
+        # If no existing interface found, just use the lowest-metric one
         if (-not $toKeep) {
-            $toKeep = $routes[0]
+            $toKeep = $sortedRoutes[0]
         }
         
         $dest = $toKeep.DestinationPrefix
@@ -159,7 +148,19 @@ if (-not $groupedRoutes) {
     
     # Then handle non-gateway duplicates
     foreach ($group in $nonGatewayDuplicates) {
-        $toKeep = $group.Group[0]
+        # Prefer route on a live interface with the lowest metric
+        $sorted = $group.Group | Sort-Object RouteMetric
+        $toKeep = $null
+        foreach ($candidate in $sorted) {
+            $iface = $liveAdapters | Where-Object { $_.InterfaceIndex -eq $candidate.InterfaceIndex }
+            if ($iface) {
+                $toKeep = $candidate
+                break
+            }
+        }
+        if (-not $toKeep) {
+            $toKeep = $sorted[0]
+        }
         $dest = $toKeep.DestinationPrefix
         $gateway = $toKeep.NextHop
         $metric = $toKeep.RouteMetric
