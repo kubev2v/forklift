@@ -3,6 +3,7 @@ package mapping
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -105,8 +106,14 @@ func parseNetworkPairsWithInsecure(ctx context.Context, pairStr, defaultNamespac
 			return nil, fmt.Errorf("invalid network pair format '%s': expected 'source:target-namespace/target-network', 'source:target-network', 'source:default', or 'source:ignored'", pairStr)
 		}
 
-		sourceName := strings.TrimSpace(parts[0])
+		sourcePart := strings.TrimSpace(parts[0])
 		targetPart := strings.TrimSpace(parts[1])
+
+		// Parse optional VLAN qualifier from source (syntax: sourceName@vlan)
+		sourceName, vlan, err := parseSourceVLAN(sourcePart)
+		if err != nil {
+			return nil, fmt.Errorf("invalid source in network pair '%s': %v", pairStr, err)
+		}
 
 		// Resolve source network name to ID
 		sourceNetworkRefs, err := resolveNetworkNameToIDWithInsecure(ctx, configFlags, sourceProvider, defaultNamespace, inventoryURL, sourceName, insecureSkipTLS)
@@ -154,7 +161,7 @@ func parseNetworkPairsWithInsecure(ctx context.Context, pairStr, defaultNamespac
 		// Create a pair for each matching source network resource
 		for _, sourceNetworkRef := range sourceNetworkRefs {
 			pair := forkliftv1beta1.NetworkPair{
-				Source:      sourceNetworkRef,
+				Source:      forkliftv1beta1.NetworkSourceRef{Ref: sourceNetworkRef, Vlan: vlan},
 				Destination: destinationNetwork,
 			}
 
@@ -233,4 +240,29 @@ func createNetworkMappingWithInsecure(configFlags *genericclioptions.ConfigFlags
 
 	fmt.Printf("networkmap/%s created\n", name)
 	return nil
+}
+
+// parseSourceVLAN parses optional VLAN qualifier from a source network specifier.
+// Format: "sourceName" or "sourceName@vlan" where vlan is 1-4094.
+// Returns the source name, VLAN string (empty if not specified), and any error.
+func parseSourceVLAN(sourcePart string) (name, vlan string, err error) {
+	if idx := strings.LastIndex(sourcePart, "@"); idx >= 0 {
+		name = sourcePart[:idx]
+		vlan = sourcePart[idx+1:]
+		if name == "" {
+			return "", "", fmt.Errorf("source network name cannot be empty before @vlan")
+		}
+		if vlan == "" {
+			return "", "", fmt.Errorf("VLAN value cannot be empty after @")
+		}
+		vlanNum, err := strconv.Atoi(vlan)
+		if err != nil {
+			return "", "", fmt.Errorf("VLAN must be a number (1-4094), got '%s'", vlan)
+		}
+		if vlanNum < 1 || vlanNum > 4094 {
+			return "", "", fmt.Errorf("VLAN must be in range 1-4094, got %d", vlanNum)
+		}
+		return name, vlan, nil
+	}
+	return sourcePart, "", nil
 }

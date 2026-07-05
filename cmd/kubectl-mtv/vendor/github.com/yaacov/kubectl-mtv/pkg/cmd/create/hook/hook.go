@@ -27,6 +27,9 @@ type CreateHookOptions struct {
 	DryRun           bool
 	OutputFormat     string
 	AAPJobTemplateID int
+	AAPURL           string
+	AAPTokenSecret   string
+	AAPTimeout       int64
 }
 
 // Create creates a new migration hook resource.
@@ -60,7 +63,7 @@ func Create(opts CreateHookOptions) error {
 	}
 
 	// Create the hook resource
-	createdHook, err := createSingleHook(opts.ConfigFlags, opts.Namespace, hookObj, opts.AAPJobTemplateID)
+	createdHook, err := createSingleHook(opts.ConfigFlags, opts.Namespace, hookObj, opts)
 	if err != nil {
 		return fmt.Errorf("failed to create hook %s: %v", opts.Name, err)
 	}
@@ -86,10 +89,16 @@ func validateHookOptions(opts CreateHookOptions) error {
 		if opts.HookSpec.Image == "" {
 			return fmt.Errorf("image cannot be empty for local hooks")
 		}
+		if opts.AAPURL != "" || opts.AAPTokenSecret != "" || opts.AAPTimeout != 0 {
+			return fmt.Errorf("AAP override flags require AAPJobTemplateID to be set")
+		}
 	}
 
 	if opts.HookSpec.Deadline < 0 {
 		return fmt.Errorf("deadline must be non-negative, got: %d", opts.HookSpec.Deadline)
+	}
+	if opts.AAPTimeout < 0 {
+		return fmt.Errorf("AAP timeout must be non-negative, got: %d", opts.AAPTimeout)
 	}
 
 	return nil
@@ -110,17 +119,30 @@ func isBase64Encoded(s string) bool {
 }
 
 // createSingleHook creates a single Hook resource in Kubernetes using the dynamic client.
-func createSingleHook(configFlags *genericclioptions.ConfigFlags, namespace string, hookObj *forkliftv1beta1.Hook, aapJobTemplateID int) (*unstructured.Unstructured, error) {
+func createSingleHook(configFlags *genericclioptions.ConfigFlags, namespace string, hookObj *forkliftv1beta1.Hook, opts CreateHookOptions) (*unstructured.Unstructured, error) {
 	// Convert to unstructured for dynamic client
 	unstructuredHook, err := runtime.DefaultUnstructuredConverter.ToUnstructured(hookObj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert hook to unstructured: %v", err)
 	}
 
-	if aapJobTemplateID > 0 {
-		if err := unstructured.SetNestedField(unstructuredHook, map[string]interface{}{
-			"jobTemplateId": int64(aapJobTemplateID),
-		}, "spec", "aap"); err != nil {
+	if opts.AAPJobTemplateID > 0 {
+		aapConfig := map[string]interface{}{
+			"jobTemplateId": int64(opts.AAPJobTemplateID),
+		}
+		if opts.AAPURL != "" {
+			aapConfig["url"] = opts.AAPURL
+		}
+		if opts.AAPTokenSecret != "" {
+			aapConfig["tokenSecret"] = map[string]interface{}{
+				"name":      opts.AAPTokenSecret,
+				"namespace": namespace,
+			}
+		}
+		if opts.AAPTimeout > 0 {
+			aapConfig["timeout"] = opts.AAPTimeout
+		}
+		if err := unstructured.SetNestedField(unstructuredHook, aapConfig, "spec", "aap"); err != nil {
 			return nil, fmt.Errorf("failed to set AAP config: %v", err)
 		}
 	}

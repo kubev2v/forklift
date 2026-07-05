@@ -34,6 +34,13 @@ type PatchHookOptions struct {
 	AAPJobTemplateID        int
 	AAPJobTemplateIDChanged bool
 	ClearAAP                bool
+
+	AAPURL            string
+	AAPURLChanged     bool
+	AAPTokenSecret    string
+	AAPTokenChanged   bool
+	AAPTimeout        int64
+	AAPTimeoutChanged bool
 }
 
 // PatchHook patches an existing hook resource.
@@ -80,9 +87,45 @@ func PatchHook(opts PatchHookOptions) error {
 		if opts.AAPJobTemplateID <= 0 {
 			return fmt.Errorf("--aap-job-template-id must be a positive integer")
 		}
-		specPatch["aap"] = map[string]interface{}{
+		aapConfig := map[string]interface{}{
 			"jobTemplateId": opts.AAPJobTemplateID,
 		}
+		if opts.AAPURLChanged {
+			aapConfig["url"] = opts.AAPURL
+		}
+		if opts.AAPTokenChanged {
+			if opts.AAPTokenSecret != "" {
+				aapConfig["tokenSecret"] = map[string]interface{}{
+					"name":      opts.AAPTokenSecret,
+					"namespace": opts.Namespace,
+				}
+			} else {
+				aapConfig["tokenSecret"] = nil
+			}
+		}
+		if opts.AAPTimeoutChanged {
+			aapConfig["timeout"] = opts.AAPTimeout
+		}
+		specPatch["aap"] = aapConfig
+	} else if opts.AAPURLChanged || opts.AAPTokenChanged || opts.AAPTimeoutChanged {
+		aapPatch := map[string]interface{}{}
+		if opts.AAPURLChanged {
+			aapPatch["url"] = opts.AAPURL
+		}
+		if opts.AAPTokenChanged {
+			if opts.AAPTokenSecret != "" {
+				aapPatch["tokenSecret"] = map[string]interface{}{
+					"name":      opts.AAPTokenSecret,
+					"namespace": opts.Namespace,
+				}
+			} else {
+				aapPatch["tokenSecret"] = nil
+			}
+		}
+		if opts.AAPTimeoutChanged {
+			aapPatch["timeout"] = opts.AAPTimeout
+		}
+		specPatch["aap"] = aapPatch
 	}
 	if opts.ClearAAP {
 		specPatch["aap"] = nil
@@ -123,12 +166,20 @@ func validatePatchOptions(existing *unstructured.Unstructured, opts PatchHookOpt
 	settingAAP := opts.AAPJobTemplateIDChanged
 	settingLocal := opts.ImageChanged || opts.PlaybookChanged
 	clearing := opts.ClearAAP
+	hasAAPOverrides := opts.AAPURLChanged || opts.AAPTokenChanged || opts.AAPTimeoutChanged
 
 	if settingAAP && settingLocal {
 		return fmt.Errorf("--aap-job-template-id is mutually exclusive with --image and --playbook")
 	}
 	if settingAAP && clearing {
 		return fmt.Errorf("--aap-job-template-id and --clear-aap are mutually exclusive")
+	}
+	if clearing && hasAAPOverrides {
+		return fmt.Errorf("--clear-aap cannot be combined with AAP override flags (--aap-url, --aap-token-secret, --aap-timeout)")
+	}
+
+	if !settingAAP && !hasAAP && hasAAPOverrides {
+		return fmt.Errorf("AAP override flags require --aap-job-template-id when the hook has no existing AAP configuration")
 	}
 
 	if settingLocal && hasAAP && !clearing {
@@ -147,6 +198,10 @@ func validatePatchOptions(existing *unstructured.Unstructured, opts PatchHookOpt
 		if resultImage == "" && resultPlaybook == "" {
 			return fmt.Errorf("clearing AAP requires at least --image or --playbook for the resulting local hook")
 		}
+	}
+
+	if opts.AAPTimeoutChanged && opts.AAPTimeout < 0 {
+		return fmt.Errorf("AAP timeout must be non-negative, got: %d", opts.AAPTimeout)
 	}
 
 	if settingAAP && !hasAAP {

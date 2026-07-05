@@ -16,6 +16,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/fetchers"
+	azureFetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/fetchers/azure"
 	ec2Fetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/fetchers/ec2"
 	hypervFetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/fetchers/hyperv"
 	openshiftFetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/fetchers/openshift"
@@ -24,6 +25,7 @@ import (
 	ovirtFetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/fetchers/ovirt"
 	vsphereFetcher "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/fetchers/vsphere"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/mapper"
+	azureMapper "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/mapper/azure"
 	ec2Mapper "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/mapper/ec2"
 	hypervMapper "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/mapper/hyperv"
 	openshiftMapper "github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/mapper/openshift"
@@ -107,6 +109,9 @@ func GetSourceNetworkFetcher(ctx context.Context, configFlags *genericclioptions
 	case "hyperv":
 		klog.V(4).Infof("DEBUG: Using HyperV source network fetcher for %s", providerName)
 		return hypervFetcher.NewHyperVNetworkFetcher(), nil
+	case "azure":
+		klog.V(4).Infof("DEBUG: Using Azure source network fetcher for %s", providerName)
+		return azureFetcher.NewAzureNetworkFetcher(), nil
 	default:
 		return nil, fmt.Errorf("unsupported source provider type: %s", providerType)
 	}
@@ -150,6 +155,9 @@ func GetTargetNetworkFetcher(ctx context.Context, configFlags *genericclioptions
 	case "hyperv":
 		klog.V(4).Infof("DEBUG: Using HyperV target network fetcher for %s", providerName)
 		return hypervFetcher.NewHyperVNetworkFetcher(), nil
+	case "azure":
+		klog.V(4).Infof("DEBUG: Using Azure target network fetcher for %s", providerName)
+		return azureFetcher.NewAzureNetworkFetcher(), nil
 	default:
 		return nil, fmt.Errorf("unsupported target provider type: %s", providerType)
 	}
@@ -208,6 +216,9 @@ func GetNetworkMapper(ctx context.Context, configFlags *genericclioptions.Config
 	case "hyperv":
 		klog.V(4).Infof("DEBUG: Using HyperV network mapper for source %s", sourceProviderName)
 		return hypervMapper.NewHyperVNetworkMapper(), sourceProviderType, targetProviderType, nil
+	case "azure":
+		klog.V(4).Infof("DEBUG: Using Azure network mapper for source %s", sourceProviderName)
+		return azureMapper.NewAzureNetworkMapper(), sourceProviderType, targetProviderType, nil
 	default:
 		return nil, "", "", fmt.Errorf("unsupported source provider type: %s", sourceProviderType)
 	}
@@ -298,11 +309,13 @@ func buildNetworkMapObject(opts NetworkMapperOptions, networkPairs []forkliftv1b
 		klog.V(4).Infof("DEBUG: No network pairs found, creating dummy pair")
 		networkPairs = []forkliftv1beta1.NetworkPair{
 			{
-				Source: ref.Ref{
-					Type: "pod", // Use "pod" type for dummy entry
+				Source: forkliftv1beta1.NetworkSourceRef{
+					Ref: ref.Ref{
+						Type: "pod",
+					},
 				},
 				Destination: forkliftv1beta1.DestinationNetwork{
-					Type: "pod", // Use pod networking as default
+					Type: "pod",
 				},
 			},
 		}

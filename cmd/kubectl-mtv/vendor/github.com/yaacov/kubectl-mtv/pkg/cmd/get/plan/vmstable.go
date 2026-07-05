@@ -24,12 +24,20 @@ var vmTableColumns = []output.Column{
 	{Title: "VM", Key: "vm"},
 	{Title: "SOURCE STATUS", Key: "sourceStatus", ColorFunc: output.ColorizePowerState},
 	{Title: "SOURCE IP", Key: "sourceIP"},
-	{Title: "TARGET", Key: "target"},
+	{Title: "TARGET", Key: "target", ColorFunc: colorizeTarget},
 	{Title: "TARGET IP", Key: "targetIP"},
 	{Title: "TARGET STATUS", Key: "targetStatus", ColorFunc: output.ColorizePowerState},
 	{Title: "PLAN", Key: "plan", ColorFunc: colorizePlanName},
 	{Title: "PLAN STATUS", Key: "planStatus", ColorFunc: output.ColorizeStatus},
 	{Title: "PROGRESS", Key: "progress"},
+}
+
+// colorizeTarget dims the target name when it has a * suffix (VM not found in inventory).
+func colorizeTarget(s string) string {
+	if strings.HasSuffix(s, "*") {
+		return output.DarkGray(s)
+	}
+	return s
 }
 
 // colorizePlanName returns a red-colored string when the plan is not ready.
@@ -170,14 +178,23 @@ func buildPlanVMRows(
 
 	// Provider info
 	sourceName, _, _ := unstructured.NestedString(plan.Object, "spec", "provider", "source", "name")
+	sourceNS, _, _ := unstructured.NestedString(plan.Object, "spec", "provider", "source", "namespace")
 	destName, _, _ := unstructured.NestedString(plan.Object, "spec", "provider", "destination", "name")
+	destNS, _, _ := unstructured.NestedString(plan.Object, "spec", "provider", "destination", "namespace")
 	targetNamespace, _, _ := unstructured.NestedString(plan.Object, "spec", "targetNamespace")
 
+	if sourceNS == "" {
+		sourceNS = planNS
+	}
+	if destNS == "" {
+		destNS = planNS
+	}
+
 	// Fetch source inventory (cached)
-	sourceVMs := fetchInventoryVMs(ctx, configFlags, sourceName, planNS, inventoryURL, insecureSkipTLS, sourceCache)
+	sourceVMs := fetchInventoryVMs(ctx, configFlags, sourceName, sourceNS, inventoryURL, insecureSkipTLS, sourceCache)
 
 	// Fetch target VMs (cached)
-	targetWorkloads := fetchInventoryTargetVMs(ctx, configFlags, destName, planNS, inventoryURL, insecureSkipTLS, targetCache)
+	targetWorkloads := fetchInventoryTargetVMs(ctx, configFlags, destName, destNS, inventoryURL, insecureSkipTLS, targetCache)
 
 	// Build rows
 	rows := make([]map[string]interface{}, 0, len(specVMs))
@@ -207,6 +224,10 @@ func buildPlanVMRows(
 
 		// Target inventory lookup
 		tgtStatus, tgtIP := lookupTargetWorkload(targetWorkloads, tgtDisplayName)
+
+		if tgtStatus == "Not Found" {
+			tgtDisplay = tgtDisplay + "*"
+		}
 
 		planDisplay := planNameStr
 		if !planDetails.IsReady {

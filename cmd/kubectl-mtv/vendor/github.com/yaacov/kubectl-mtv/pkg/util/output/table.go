@@ -18,6 +18,7 @@ type Column struct {
 	Title     string
 	Key       string
 	ColorFunc func(string) string
+	MaxWidth  int
 }
 
 // TablePrinter builds tabular data from []map[string]interface{} rows and
@@ -131,6 +132,9 @@ func (t *TablePrinter) PrintMarkdown() error {
 		cells := make([]string, len(t.columns))
 		for j, c := range t.columns {
 			val := StripANSI(t.extractValue(item, c.Key))
+			if c.MaxWidth > 0 {
+				val = truncateMiddle(val, c.MaxWidth)
+			}
 			cells[j] = strings.ReplaceAll(val, "|", `\|`)
 		}
 		if _, err := fmt.Fprintln(t.writer, "| "+strings.Join(cells, " | ")+" |"); err != nil {
@@ -238,6 +242,9 @@ func (t *TablePrinter) buildTable() ([]string, [][]string) {
 		row := make([]string, len(t.columns))
 		for j, c := range t.columns {
 			val := t.extractValue(item, c.Key)
+			if c.MaxWidth > 0 {
+				val = truncateMiddle(val, c.MaxWidth)
+			}
 			if c.ColorFunc != nil {
 				val = c.ColorFunc(val)
 			}
@@ -317,4 +324,17 @@ func toItemSlice(data interface{}) ([]map[string]interface{}, error) {
 		return items, nil
 	}
 	return nil, fmt.Errorf("unsupported data type for table output")
+}
+
+// truncateMiddle shortens s to maxWidth by keeping the start and end with
+// "..." in the middle. If s is already within maxWidth, it is returned as-is.
+func truncateMiddle(s string, maxWidth int) string {
+	if len(s) <= maxWidth || maxWidth < 4 {
+		return s
+	}
+	ellipsis := "..."
+	remaining := maxWidth - len(ellipsis)
+	front := remaining / 2
+	back := remaining - front
+	return s[:front] + ellipsis + s[len(s)-back:]
 }

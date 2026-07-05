@@ -49,11 +49,12 @@ type CreatePlanOptions struct {
 	StoragePairs              string
 
 	// Storage enhancement options
-	DefaultVolumeMode    string
-	DefaultAccessMode    string
-	DefaultOffloadPlugin string
-	DefaultOffloadSecret string
-	DefaultOffloadVendor string
+	DefaultVolumeMode            string
+	DefaultAccessMode            string
+	DefaultOffloadPlugin         string
+	DefaultOffloadSecret         string
+	DefaultOffloadVendor         string
+	DefaultOffloadMigrationHosts string
 
 	// Offload secret creation fields
 	OffloadVSphereUsername string
@@ -211,21 +212,22 @@ func Create(ctx context.Context, opts CreatePlanOptions) error {
 				targetProviderRef = fmt.Sprintf("%s/%s", opts.TargetProviderNamespace, opts.TargetProvider)
 			}
 			err := mapping.CreateStorageWithOptions(mapping.StorageCreateOptions{
-				ConfigFlags:              opts.ConfigFlags,
-				Name:                     storageMapName,
-				Namespace:                opts.Namespace,
-				SourceProvider:           sourceProviderRef,
-				TargetProvider:           targetProviderRef,
-				StoragePairs:             opts.StoragePairs,
-				InventoryURL:             opts.InventoryURL,
-				InventoryInsecureSkipTLS: opts.InventoryInsecureSkipTLS,
-				DefaultVolumeMode:        opts.DefaultVolumeMode,
-				DefaultAccessMode:        opts.DefaultAccessMode,
-				DefaultOffloadPlugin:     opts.DefaultOffloadPlugin,
-				DefaultOffloadSecret:     opts.DefaultOffloadSecret,
-				DefaultOffloadVendor:     opts.DefaultOffloadVendor,
-				DryRun:                   opts.DryRun,
-				OutputFormat:             opts.OutputFormat,
+				ConfigFlags:                  opts.ConfigFlags,
+				Name:                         storageMapName,
+				Namespace:                    opts.Namespace,
+				SourceProvider:               sourceProviderRef,
+				TargetProvider:               targetProviderRef,
+				StoragePairs:                 opts.StoragePairs,
+				InventoryURL:                 opts.InventoryURL,
+				InventoryInsecureSkipTLS:     opts.InventoryInsecureSkipTLS,
+				DefaultVolumeMode:            opts.DefaultVolumeMode,
+				DefaultAccessMode:            opts.DefaultAccessMode,
+				DefaultOffloadPlugin:         opts.DefaultOffloadPlugin,
+				DefaultOffloadSecret:         opts.DefaultOffloadSecret,
+				DefaultOffloadVendor:         opts.DefaultOffloadVendor,
+				DefaultOffloadMigrationHosts: opts.DefaultOffloadMigrationHosts,
+				DryRun:                       opts.DryRun,
+				OutputFormat:                 opts.OutputFormat,
 				// Offload secret creation options
 				OffloadVSphereUsername: opts.OffloadVSphereUsername,
 				OffloadVSpherePassword: opts.OffloadVSpherePassword,
@@ -254,32 +256,33 @@ func Create(ctx context.Context, opts CreatePlanOptions) error {
 			// Create default storage mapping using existing logic
 			var storageMapName string
 			storageMapName, createdOffloadSecretName, err = storage.CreateStorageMap(ctx, storage.StorageMapperOptions{
-				Name:                      opts.Name,
-				Namespace:                 opts.Namespace,
-				SourceProvider:            opts.SourceProvider,
-				SourceProviderNamespace:   opts.SourceProviderNamespace,
-				TargetProvider:            opts.TargetProvider,
-				TargetProviderNamespace:   opts.TargetProviderNamespace,
-				ConfigFlags:               opts.ConfigFlags,
-				InventoryURL:              opts.InventoryURL,
-				InventoryInsecureSkipTLS:  opts.InventoryInsecureSkipTLS,
-				PlanVMNames:               planVMNames,
-				DefaultTargetStorageClass: opts.DefaultTargetStorageClass,
-				DryRun:                    opts.DryRun,
-				OutputFormat:              opts.OutputFormat,
-				DefaultVolumeMode:         opts.DefaultVolumeMode,
-				DefaultAccessMode:         opts.DefaultAccessMode,
-				DefaultOffloadPlugin:      opts.DefaultOffloadPlugin,
-				DefaultOffloadSecret:      opts.DefaultOffloadSecret,
-				DefaultOffloadVendor:      opts.DefaultOffloadVendor,
-				OffloadVSphereUsername:    opts.OffloadVSphereUsername,
-				OffloadVSpherePassword:    opts.OffloadVSpherePassword,
-				OffloadVSphereURL:         opts.OffloadVSphereURL,
-				OffloadStorageUsername:    opts.OffloadStorageUsername,
-				OffloadStoragePassword:    opts.OffloadStoragePassword,
-				OffloadStorageEndpoint:    opts.OffloadStorageEndpoint,
-				OffloadCACert:             opts.OffloadCACert,
-				OffloadInsecureSkipTLS:    opts.OffloadInsecureSkipTLS,
+				Name:                         opts.Name,
+				Namespace:                    opts.Namespace,
+				SourceProvider:               opts.SourceProvider,
+				SourceProviderNamespace:      opts.SourceProviderNamespace,
+				TargetProvider:               opts.TargetProvider,
+				TargetProviderNamespace:      opts.TargetProviderNamespace,
+				ConfigFlags:                  opts.ConfigFlags,
+				InventoryURL:                 opts.InventoryURL,
+				InventoryInsecureSkipTLS:     opts.InventoryInsecureSkipTLS,
+				PlanVMNames:                  planVMNames,
+				DefaultTargetStorageClass:    opts.DefaultTargetStorageClass,
+				DryRun:                       opts.DryRun,
+				OutputFormat:                 opts.OutputFormat,
+				DefaultVolumeMode:            opts.DefaultVolumeMode,
+				DefaultAccessMode:            opts.DefaultAccessMode,
+				DefaultOffloadPlugin:         opts.DefaultOffloadPlugin,
+				DefaultOffloadSecret:         opts.DefaultOffloadSecret,
+				DefaultOffloadVendor:         opts.DefaultOffloadVendor,
+				DefaultOffloadMigrationHosts: opts.DefaultOffloadMigrationHosts,
+				OffloadVSphereUsername:       opts.OffloadVSphereUsername,
+				OffloadVSpherePassword:       opts.OffloadVSpherePassword,
+				OffloadVSphereURL:            opts.OffloadVSphereURL,
+				OffloadStorageUsername:       opts.OffloadStorageUsername,
+				OffloadStoragePassword:       opts.OffloadStoragePassword,
+				OffloadStorageEndpoint:       opts.OffloadStorageEndpoint,
+				OffloadCACert:                opts.OffloadCACert,
+				OffloadInsecureSkipTLS:       opts.OffloadInsecureSkipTLS,
 			})
 			if err != nil {
 				// Clean up the network map if we created it

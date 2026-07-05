@@ -1,6 +1,7 @@
 package ec2
 
 import (
+	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -10,6 +11,8 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/mapper"
 )
+
+const EBSCSIDriver = "ebs.csi.aws.com"
 
 // EC2StorageMapper implements storage mapping for EC2 providers
 type EC2StorageMapper struct{}
@@ -27,22 +30,18 @@ type EC2VolumeTypeConfig struct {
 
 // getVolumeTypeConfig returns the volume mode and access mode for an EC2 volume type
 func getVolumeTypeConfig(ec2Type string) EC2VolumeTypeConfig {
-	// SSD types use Block mode, HDD types use Filesystem mode
 	switch ec2Type {
 	case "gp3", "gp2", "io1", "io2":
-		// General Purpose and Provisioned IOPS SSDs - use Block mode for best performance
 		return EC2VolumeTypeConfig{
 			VolumeMode: corev1.PersistentVolumeBlock,
 			AccessMode: corev1.ReadWriteOnce,
 		}
 	case "st1", "sc1", "standard":
-		// Throughput Optimized HDD, Cold HDD, Magnetic - use Filesystem mode
 		return EC2VolumeTypeConfig{
 			VolumeMode: corev1.PersistentVolumeFilesystem,
 			AccessMode: corev1.ReadWriteOnce,
 		}
 	default:
-		// Default to Block mode for unknown types
 		return EC2VolumeTypeConfig{
 			VolumeMode: corev1.PersistentVolumeBlock,
 			AccessMode: corev1.ReadWriteOnce,
@@ -50,45 +49,75 @@ func getVolumeTypeConfig(ec2Type string) EC2VolumeTypeConfig {
 	}
 }
 
+// findEBSCSIStorageClass finds the first target SC backed by ebs.csi.aws.com.
+func findEBSCSIStorageClass(targetStorages []forkliftv1beta1.DestinationStorage, provisioners map[string]string) string {
+	if len(provisioners) == 0 {
+		return ""
+	}
+	for _, storage := range targetStorages {
+		if provisioners[storage.StorageClass] == EBSCSIDriver {
+			return storage.StorageClass
+		}
+	}
+	return ""
+}
+
 // findMatchingEBSStorageClass tries to find a target SC that matches the given
-// EC2 EBS volume type by name. Returns "" when no match is found so the caller
-// can fall back to the default SC.
+// EC2 EBS volume type by name, preferring EBS CSI-backed SCs.
 //
 // Match strategy:
-//  1. Exact name match (gp3 → gp3)
-//  2. Prefix match with suffix (gp3 → gp3-csi)
-//  3. SC name contains the EBS type as a component (type-gp3, ebs-gp3, etc.)
-func findMatchingEBSStorageClass(ec2Type string, targetStorages []forkliftv1beta1.DestinationStorage) string {
+//  1. Exact name match with EBS CSI provisioner
+//  2. Prefix/component match with EBS CSI provisioner
+//  3. Any exact name match
+//  4. Any prefix/component match
+func findMatchingEBSStorageClass(ec2Type string, targetStorages []forkliftv1beta1.DestinationStorage, provisioners map[string]string) string {
 	if len(targetStorages) == 0 || ec2Type == "" {
 		return ""
 	}
 
 	ec2TypeLower := strings.ToLower(ec2Type)
 
+	// First pass: name matches that are also EBS CSI-backed
 	for _, storage := range targetStorages {
 		scName := strings.ToLower(storage.StorageClass)
 		if scName == "" {
 			continue
 		}
-
-		if scName == ec2TypeLower {
-			klog.V(4).Infof("DEBUG: EC2 storage mapper - Found exact match: %s → %s", ec2Type, storage.StorageClass)
-			return storage.StorageClass
+		if !ebsNameMatches(scName, ec2TypeLower) {
+			continue
 		}
-
-		if strings.HasPrefix(scName, ec2TypeLower+"-") {
-			klog.V(4).Infof("DEBUG: EC2 storage mapper - Found prefix match: %s → %s", ec2Type, storage.StorageClass)
-			return storage.StorageClass
-		}
-
-		if hasDashToken(scName, ec2TypeLower) {
-			klog.V(4).Infof("DEBUG: EC2 storage mapper - Found component match: %s → %s", ec2Type, storage.StorageClass)
+		if provisioners[storage.StorageClass] == EBSCSIDriver {
+			klog.V(4).Infof("EC2 storage mapper - Found CSI name match: %s -> %s", ec2Type, storage.StorageClass)
 			return storage.StorageClass
 		}
 	}
 
-	klog.V(4).Infof("DEBUG: EC2 storage mapper - No name match for %s", ec2Type)
+	// Second pass: any name match, but only if it's also EBS CSI-backed
+	for _, storage := range targetStorages {
+		scName := strings.ToLower(storage.StorageClass)
+		if scName == "" {
+			continue
+		}
+		if ebsNameMatches(scName, ec2TypeLower) {
+			klog.V(4).Infof("EC2 storage mapper - Found name match (non-CSI): %s -> %s, skipping", ec2Type, storage.StorageClass)
+		}
+	}
+
+	klog.V(4).Infof("EC2 storage mapper - No name match for %s", ec2Type)
 	return ""
+}
+
+func ebsNameMatches(scName, ec2TypeLower string) bool {
+	if scName == ec2TypeLower {
+		return true
+	}
+	if strings.HasPrefix(scName, ec2TypeLower+"-") {
+		return true
+	}
+	if hasDashToken(scName, ec2TypeLower) {
+		return true
+	}
+	return false
 }
 
 // hasDashToken checks whether token appears as an exact dash-delimited
@@ -103,31 +132,32 @@ func hasDashToken(s, token string) bool {
 	return false
 }
 
-// CreateStoragePairs creates storage mapping pairs for EC2 → OpenShift migrations.
-//
-// Three-step flow:
-//
-//	(a) If the user specified --default-target-storage-class, map every source to that SC.
-//	(b) Otherwise, try EBS name-matching against ALL target SCs (gp3→gp3-csi, etc.).
-//	(c) After matching, any source still unmapped gets the default SC (targetStorages[0]).
+// CreateStoragePairs creates storage mapping pairs for EC2 -> OpenShift migrations.
 func (m *EC2StorageMapper) CreateStoragePairs(sourceStorages []ref.Ref, targetStorages []forkliftv1beta1.DestinationStorage, opts mapper.StorageMappingOptions) ([]forkliftv1beta1.StoragePair, error) {
 	var storagePairs []forkliftv1beta1.StoragePair
 
 	if opts.TargetProviderType != "" && opts.TargetProviderType != "openshift" {
-		klog.V(2).Infof("WARNING: EC2 storage mapper - Target provider type is '%s', not 'openshift'. EC2→%s migrations may not work as expected.",
+		klog.V(2).Infof("WARNING: EC2 storage mapper - Target provider type is '%s', not 'openshift'. EC2->%s migrations may not work as expected.",
 			opts.TargetProviderType, opts.TargetProviderType)
 	}
 
-	klog.V(4).Infof("DEBUG: EC2 storage mapper - Creating storage pairs for %d source EBS types", len(sourceStorages))
+	klog.V(4).Infof("EC2 storage mapper - Creating storage pairs for %d source EBS types", len(sourceStorages))
 
 	if len(sourceStorages) == 0 {
-		klog.V(4).Infof("DEBUG: No source storages to map")
+		klog.V(4).Infof("No source storages to map")
 		return storagePairs, nil
 	}
 
-	// (a) User specified a default SC — map every source to it.
+	provisioners := opts.TargetStorageProvisioners
+
+	// User specified a default SC -- validate and map every source to it
 	if opts.DefaultTargetStorageClass != "" {
-		klog.V(4).Infof("DEBUG: EC2 storage mapper - Using user-defined storage class '%s' for all types", opts.DefaultTargetStorageClass)
+		klog.V(4).Infof("EC2 storage mapper - Using user-defined storage class '%s' for all types", opts.DefaultTargetStorageClass)
+
+		if err := validateEBSCSIProvisioner(opts.DefaultTargetStorageClass, provisioners); err != nil {
+			return nil, err
+		}
+
 		for _, sourceStorage := range sourceStorages {
 			config := getVolumeTypeConfig(sourceStorage.Name)
 			storagePairs = append(storagePairs, forkliftv1beta1.StoragePair{
@@ -139,34 +169,33 @@ func (m *EC2StorageMapper) CreateStoragePairs(sourceStorages []ref.Ref, targetSt
 				},
 			})
 		}
-		klog.V(4).Infof("DEBUG: EC2 storage mapper - Created %d storage pairs (user default)", len(storagePairs))
+		klog.V(4).Infof("EC2 storage mapper - Created %d storage pairs (user default)", len(storagePairs))
 
 		storagePairs = mapper.ApplyOffloadToPairs(storagePairs, opts)
-
 		return storagePairs, nil
 	}
 
-	// Resolve the default SC for gap-filling (best SC selected by the target fetcher).
-	defaultSC := ""
-	if len(targetStorages) > 0 {
-		defaultSC = targetStorages[0].StorageClass
+	// Auto-mapping: find the best default SC (must be EBS CSI-backed)
+	defaultSC := findEBSCSIStorageClass(targetStorages, provisioners)
+	if defaultSC == "" {
+		return nil, fmt.Errorf(
+			"no StorageClass with provisioner '%s' found on the target cluster; "+
+				"EC2 migrations require an EBS CSI-backed StorageClass. "+
+				"Use --default-target-storage-class to specify one explicitly, or install the AWS EBS CSI driver",
+			EBSCSIDriver)
 	}
+	klog.V(4).Infof("EC2 storage mapper - Selected EBS CSI default SC: %s", defaultSC)
 
-	// (b) Auto-match each EBS type against the full target SC list.
-	// (c) If no match, fall back to the default SC.
 	for _, sourceStorage := range sourceStorages {
 		ec2VolumeType := sourceStorage.Name
 		config := getVolumeTypeConfig(ec2VolumeType)
 
-		ocpStorageClass := findMatchingEBSStorageClass(ec2VolumeType, targetStorages)
+		ocpStorageClass := findMatchingEBSStorageClass(ec2VolumeType, targetStorages, provisioners)
 		if ocpStorageClass != "" {
-			klog.V(4).Infof("DEBUG: EC2 storage mapper - Matched %s → %s", ec2VolumeType, ocpStorageClass)
-		} else if defaultSC != "" {
-			ocpStorageClass = defaultSC
-			klog.V(2).Infof("WARNING: EC2 storage mapper - No EBS match for %s, using default SC '%s'", ec2VolumeType, defaultSC)
+			klog.V(4).Infof("EC2 storage mapper - Matched %s -> %s", ec2VolumeType, ocpStorageClass)
 		} else {
-			klog.V(2).Infof("WARNING: EC2 storage mapper - No target storage class available for %s, skipping", ec2VolumeType)
-			continue
+			ocpStorageClass = defaultSC
+			klog.V(2).Infof("EC2 storage mapper - No match for %s, using EBS CSI default SC '%s'", ec2VolumeType, defaultSC)
 		}
 
 		storagePairs = append(storagePairs, forkliftv1beta1.StoragePair{
@@ -177,13 +206,41 @@ func (m *EC2StorageMapper) CreateStoragePairs(sourceStorages []ref.Ref, targetSt
 				AccessMode:   config.AccessMode,
 			},
 		})
-		klog.V(4).Infof("DEBUG: EC2 storage mapper - Mapped %s → %s (mode: %s, access: %s)",
+		klog.V(4).Infof("EC2 storage mapper - Mapped %s -> %s (mode: %s, access: %s)",
 			ec2VolumeType, ocpStorageClass, config.VolumeMode, config.AccessMode)
 	}
 
-	klog.V(4).Infof("DEBUG: EC2 storage mapper - Created %d storage pairs", len(storagePairs))
+	// Validate all pairs use EBS CSI-backed SCs
+	for _, pair := range storagePairs {
+		if err := validateEBSCSIProvisioner(pair.Destination.StorageClass, provisioners); err != nil {
+			return nil, err
+		}
+	}
+
+	klog.V(4).Infof("EC2 storage mapper - Created %d storage pairs", len(storagePairs))
 
 	storagePairs = mapper.ApplyOffloadToPairs(storagePairs, opts)
-
 	return storagePairs, nil
+}
+
+// validateEBSCSIProvisioner checks that a StorageClass has the EBS CSI provisioner.
+func validateEBSCSIProvisioner(scName string, provisioners map[string]string) error {
+	if len(provisioners) == 0 {
+		klog.V(2).Infof("WARNING: EC2 storage mapper - No provisioner info available, cannot validate SC '%s'", scName)
+		return nil
+	}
+	prov, exists := provisioners[scName]
+	if !exists {
+		return fmt.Errorf(
+			"StorageClass '%s' not found in target cluster inventory; "+
+				"EC2 migrations require a StorageClass with provisioner '%s'",
+			scName, EBSCSIDriver)
+	}
+	if prov != EBSCSIDriver {
+		return fmt.Errorf(
+			"StorageClass '%s' has provisioner '%s', but EC2 migrations require provisioner '%s'; "+
+				"the migration plan will fail at runtime without the correct CSI driver",
+			scName, prov, EBSCSIDriver)
+	}
+	return nil
 }

@@ -469,6 +469,9 @@ func (p *Plan) ShouldUseV2vForTransfer(vmRef ref.Ref, destinationClient k8sclien
 				return false, nil
 			}
 		}
+		if p.IsUsingOffloadPlugin() {
+			return false, nil
+		}
 		return true, nil
 	case Ova, HyperV:
 		return true, nil
@@ -547,7 +550,7 @@ func (r *Plan) IsUsingOffloadPlugin() bool {
 	}
 	dsMapIn := r.Map.Storage.Spec.Map
 	for _, m := range dsMapIn {
-		if m.OffloadPlugin != nil && m.OffloadPlugin.VSphereXcopyPluginConfig != nil {
+		if m.OffloadPlugin != nil && (m.OffloadPlugin.VSphereXcopyPluginConfig != nil || m.OffloadPlugin.CsiVolumeImport != nil) {
 			return true
 		}
 	}

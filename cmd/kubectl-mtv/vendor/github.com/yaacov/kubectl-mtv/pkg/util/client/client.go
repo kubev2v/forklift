@@ -76,6 +76,12 @@ var (
 		Resource: "forkliftcontrollers",
 	}
 
+	ConversionsGVR = schema.GroupVersionResource{
+		Group:    Group,
+		Version:  Version,
+		Resource: "conversions",
+	}
+
 	// SecretGVR is used to access secrets in the cluster
 	SecretsGVR = schema.GroupVersionResource{
 		Group:    "",

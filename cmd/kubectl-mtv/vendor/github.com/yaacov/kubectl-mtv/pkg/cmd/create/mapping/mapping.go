@@ -9,21 +9,22 @@ import (
 
 // StorageCreateOptions holds options for creating storage mappings
 type StorageCreateOptions struct {
-	ConfigFlags              *genericclioptions.ConfigFlags
-	Name                     string
-	Namespace                string
-	SourceProvider           string
-	TargetProvider           string
-	StoragePairs             string
-	InventoryURL             string
-	InventoryInsecureSkipTLS bool
-	DefaultVolumeMode        string
-	DefaultAccessMode        string
-	DefaultOffloadPlugin     string
-	DefaultOffloadSecret     string
-	DefaultOffloadVendor     string
-	DryRun                   bool
-	OutputFormat             string
+	ConfigFlags                  *genericclioptions.ConfigFlags
+	Name                         string
+	Namespace                    string
+	SourceProvider               string
+	TargetProvider               string
+	StoragePairs                 string
+	InventoryURL                 string
+	InventoryInsecureSkipTLS     bool
+	DefaultVolumeMode            string
+	DefaultAccessMode            string
+	DefaultOffloadPlugin         string
+	DefaultOffloadSecret         string
+	DefaultOffloadVendor         string
+	DefaultOffloadMigrationHosts string
+	DryRun                       bool
+	OutputFormat                 string
 	// Offload secret creation fields
 	OffloadVSphereUsername string
 	OffloadVSpherePassword string
@@ -37,17 +38,18 @@ type StorageCreateOptions struct {
 
 // StorageParseOptions holds options for parsing storage pairs
 type StorageParseOptions struct {
-	PairStr                  string
-	DefaultNamespace         string
-	ConfigFlags              *genericclioptions.ConfigFlags
-	SourceProvider           string
-	InventoryURL             string
-	InventoryInsecureSkipTLS bool
-	DefaultVolumeMode        string
-	DefaultAccessMode        string
-	DefaultOffloadPlugin     string
-	DefaultOffloadSecret     string
-	DefaultOffloadVendor     string
+	PairStr                      string
+	DefaultNamespace             string
+	ConfigFlags                  *genericclioptions.ConfigFlags
+	SourceProvider               string
+	InventoryURL                 string
+	InventoryInsecureSkipTLS     bool
+	DefaultVolumeMode            string
+	DefaultAccessMode            string
+	DefaultOffloadPlugin         string
+	DefaultOffloadSecret         string
+	DefaultOffloadVendor         string
+	DefaultOffloadMigrationHosts string
 }
 
 // CreateNetwork creates a new network mapping
@@ -72,5 +74,5 @@ func ParseNetworkPairs(pairStr, defaultNamespace string, configFlags *genericcli
 
 // ParseStoragePairsWithOptions parses storage pairs with additional options for VolumeMode, AccessMode, and OffloadPlugin (exported for patch functionality)
 func ParseStoragePairsWithOptions(opts StorageParseOptions) ([]forkliftv1beta1.StoragePair, error) {
-	return parseStoragePairsWithOptions(context.TODO(), opts.PairStr, opts.DefaultNamespace, opts.ConfigFlags, opts.SourceProvider, opts.InventoryURL, opts.DefaultVolumeMode, opts.DefaultAccessMode, opts.DefaultOffloadPlugin, opts.DefaultOffloadSecret, opts.DefaultOffloadVendor, opts.InventoryInsecureSkipTLS)
+	return parseStoragePairsWithOptions(context.TODO(), opts.PairStr, opts.DefaultNamespace, opts.ConfigFlags, opts.SourceProvider, opts.InventoryURL, opts.DefaultVolumeMode, opts.DefaultAccessMode, opts.DefaultOffloadPlugin, opts.DefaultOffloadSecret, opts.DefaultOffloadVendor, opts.DefaultOffloadMigrationHosts, opts.InventoryInsecureSkipTLS)
 }

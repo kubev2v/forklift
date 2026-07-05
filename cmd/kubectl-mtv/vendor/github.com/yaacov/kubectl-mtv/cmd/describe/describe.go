@@ -32,6 +32,10 @@ func NewDescribeCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig
 	hookCmd.Aliases = []string{"hooks"}
 	cmd.AddCommand(hookCmd)
 
+	conversionCmd := NewConversionCmd(kubeConfigFlags, globalConfig)
+	conversionCmd.Aliases = []string{"conversions"}
+	cmd.AddCommand(conversionCmd)
+
 	mappingCmd := NewMappingCmd(globalConfig)
 	mappingCmd.Aliases = []string{"mappings"}
 	cmd.AddCommand(mappingCmd)
