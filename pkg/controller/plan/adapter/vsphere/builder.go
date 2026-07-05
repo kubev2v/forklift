@@ -1745,33 +1745,8 @@ func (r *Builder) buildCsiImportPVC(
 	}, storageSecret); err != nil {
 		return nil, liberr.Wrap(err, "secretRef", csiCfg.SecretRef)
 	}
-	host := string(storageSecret.Data["STORAGE_HOSTNAME"])
-	user := string(storageSecret.Data["STORAGE_USERNAME"])
-	pass := string(storageSecret.Data["STORAGE_PASSWORD"])
-	skipSSL, err := strconv.ParseBool(string(storageSecret.Data["STORAGE_SKIP_SSL_VERIFICATION"]))
-	if err != nil {
-		r.Log.Error(err, "CSI import: invalid STORAGE_SKIP_SSL_VERIFICATION value, defaulting to false", "secretRef", csiCfg.SecretRef)
-		skipSSL = false
-	}
-
-	var missing []string
-	if host == "" {
-		missing = append(missing, "hostname")
-	}
-	if user == "" {
-		missing = append(missing, "username")
-	}
-	if pass == "" {
-		missing = append(missing, "password")
-	}
-	if len(missing) > 0 {
-		return nil, liberr.New(
-			fmt.Sprintf("storage secret %q is missing required keys: %s", csiCfg.SecretRef, strings.Join(missing, ", ")),
-		)
-	}
-
 	// Instantiate vendor plugin (xcopy pattern: switch in newCsiImportPlugin creates concrete type)
-	plugin, err := newCsiImportPlugin(csiCfg.StorageVendorProduct, host, user, pass, skipSSL)
+	plugin, err := newCsiImportPlugin(csiCfg.StorageVendorProduct, storageSecret.Data, r.Destination.Client, mapped.Destination.StorageClass)
 	if err != nil {
 		return nil, liberr.Wrap(err, "vendor", string(csiCfg.StorageVendorProduct))
 	}
@@ -1780,6 +1755,10 @@ func (r *Builder) buildCsiImportPVC(
 	vendorAnnotations, err := plugin.Resolve(backing)
 	if err != nil {
 		return nil, liberr.Wrap(err, "disk", disk.File)
+	}
+	if vendorAnnotations == nil {
+		r.Log.Info("CSI import: vendor cannot handle this disk, deferring to other migration paths", "disk", disk.File)
+		return nil, nil //nolint:nilnil
 	}
 	r.Log.V(2).Info("CSI import: vendor resolution succeeded", "annotations", vendorAnnotations)
 
@@ -2706,7 +2685,7 @@ func (r *Builder) CsiImportPVCs(vmRef ref.Ref, pvcLabels map[string]string) (pvc
 			continue
 		}
 
-		pvc, pErr := r.buildCsiImportPVC(context.TODO(), vmRef, vm, disk, diskIndex, mapped, nil)
+		pvc, pErr := r.buildCsiImportPVC(context.TODO(), vmRef, vm, disk, diskIndex, mapped, pvcLabels)
 		if pErr != nil {
 			err = pErr
 			return
