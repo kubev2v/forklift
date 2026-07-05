@@ -60,6 +60,16 @@ type PatchProviderOptions struct {
 	SMBUrl      string
 	SMBUser     string
 	SMBPassword string
+
+	// Azure settings
+	AzureTenantID              string
+	AzureSubscriptionID        string
+	AzureClientID              string
+	AzureClientSecret          string
+	AzureResourceGroup         string
+	AzureTargetRegion          string
+	AzureSnapshotSku           string
+	AzureSnapshotResourceGroup string
 }
 
 // PatchProvider patches an existing provider
@@ -106,7 +116,8 @@ func PatchProvider(opts PatchProviderOptions) error {
 	needsCredentialUpdate := opts.Username != "" || opts.Password != "" || opts.Token != "" || opts.CACert != "" ||
 		opts.DomainName != "" || opts.ProjectName != "" || opts.RegionName != "" || opts.EC2Region != "" ||
 		opts.EC2TargetAccessKeyID != "" || opts.EC2TargetSecretKey != "" || opts.InsecureSkipTLSChanged ||
-		opts.SMBUrl != "" || opts.SMBUser != "" || opts.SMBPassword != ""
+		opts.SMBUrl != "" || opts.SMBUser != "" || opts.SMBPassword != "" ||
+		opts.AzureTenantID != "" || opts.AzureSubscriptionID != "" || opts.AzureClientID != "" || opts.AzureClientSecret != ""
 
 	// Get and validate secret ownership if credentials need updating
 	var secret *corev1.Secret
@@ -193,6 +204,25 @@ func PatchProvider(opts PatchProviderOptions) error {
 		if opts.EC2TargetAZ != "" {
 			klog.V(2).Infof("Updating EC2 target-az to '%s'", opts.EC2TargetAZ)
 			currentSettings["target-az"] = opts.EC2TargetAZ
+			providerUpdated = true
+		}
+	}
+
+	// Update Azure settings for Azure providers
+	if providerType == "azure" {
+		if opts.AzureTargetRegion != "" {
+			klog.V(2).Infof("Updating Azure targetRegion to '%s'", opts.AzureTargetRegion)
+			currentSettings["targetRegion"] = opts.AzureTargetRegion
+			providerUpdated = true
+		}
+		if opts.AzureSnapshotSku != "" {
+			klog.V(2).Infof("Updating Azure snapshotSku to '%s'", opts.AzureSnapshotSku)
+			currentSettings["snapshotSku"] = opts.AzureSnapshotSku
+			providerUpdated = true
+		}
+		if opts.AzureSnapshotResourceGroup != "" {
+			klog.V(2).Infof("Updating Azure snapshotResourceGroup to '%s'", opts.AzureSnapshotResourceGroup)
+			currentSettings["snapshotResourceGroup"] = opts.AzureSnapshotResourceGroup
 			providerUpdated = true
 		}
 	}
@@ -409,6 +439,32 @@ func updateSecretCredentials(configFlags *genericclioptions.ConfigFlags, secret 
 		if opts.SMBPassword != "" {
 			secret.Data["smbPassword"] = []byte(opts.SMBPassword)
 			klog.V(2).Infof("Updated HyperV SMB password")
+			updated = true
+		}
+	case "azure":
+		if opts.AzureTenantID != "" {
+			secret.Data["tenantId"] = []byte(opts.AzureTenantID)
+			klog.V(2).Infof("Updated Azure tenant ID")
+			updated = true
+		}
+		if opts.AzureSubscriptionID != "" {
+			secret.Data["subscriptionId"] = []byte(opts.AzureSubscriptionID)
+			klog.V(2).Infof("Updated Azure subscription ID")
+			updated = true
+		}
+		if opts.AzureClientID != "" {
+			secret.Data["clientId"] = []byte(opts.AzureClientID)
+			klog.V(2).Infof("Updated Azure client ID")
+			updated = true
+		}
+		if opts.AzureClientSecret != "" {
+			secret.Data["clientSecret"] = []byte(opts.AzureClientSecret)
+			klog.V(2).Infof("Updated Azure client secret")
+			updated = true
+		}
+		if opts.AzureResourceGroup != "" {
+			secret.Data["resourceGroup"] = []byte(opts.AzureResourceGroup)
+			klog.V(2).Infof("Updated Azure resource group")
 			updated = true
 		}
 	}

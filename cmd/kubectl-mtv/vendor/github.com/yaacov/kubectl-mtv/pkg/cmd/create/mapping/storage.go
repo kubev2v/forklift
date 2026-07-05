@@ -61,21 +61,23 @@ func validateOffloadVendor(vendor string) error {
 
 // StoragePairOptions holds options for parsing storage pairs
 type StoragePairOptions struct {
-	DefaultVolumeMode    string
-	DefaultAccessMode    string
-	DefaultOffloadPlugin string
-	DefaultOffloadSecret string
-	DefaultOffloadVendor string
+	DefaultVolumeMode            string
+	DefaultAccessMode            string
+	DefaultOffloadPlugin         string
+	DefaultOffloadSecret         string
+	DefaultOffloadVendor         string
+	DefaultOffloadMigrationHosts string
 }
 
 // parseStoragePairsWithOptions parses storage pairs with additional options for VolumeMode, AccessMode, and OffloadPlugin
-func parseStoragePairsWithOptions(ctx context.Context, pairStr, defaultNamespace string, configFlags *genericclioptions.ConfigFlags, sourceProvider, inventoryURL string, defaultVolumeMode, defaultAccessMode, defaultOffloadPlugin, defaultOffloadSecret, defaultOffloadVendor string, insecureSkipTLS bool) ([]forkliftv1beta1.StoragePair, error) {
+func parseStoragePairsWithOptions(ctx context.Context, pairStr, defaultNamespace string, configFlags *genericclioptions.ConfigFlags, sourceProvider, inventoryURL string, defaultVolumeMode, defaultAccessMode, defaultOffloadPlugin, defaultOffloadSecret, defaultOffloadVendor, defaultOffloadMigrationHosts string, insecureSkipTLS bool) ([]forkliftv1beta1.StoragePair, error) {
 	options := StoragePairOptions{
-		DefaultVolumeMode:    defaultVolumeMode,
-		DefaultAccessMode:    defaultAccessMode,
-		DefaultOffloadPlugin: defaultOffloadPlugin,
-		DefaultOffloadSecret: defaultOffloadSecret,
-		DefaultOffloadVendor: defaultOffloadVendor,
+		DefaultVolumeMode:            defaultVolumeMode,
+		DefaultAccessMode:            defaultAccessMode,
+		DefaultOffloadPlugin:         defaultOffloadPlugin,
+		DefaultOffloadSecret:         defaultOffloadSecret,
+		DefaultOffloadVendor:         defaultOffloadVendor,
+		DefaultOffloadMigrationHosts: defaultOffloadMigrationHosts,
 	}
 
 	return parseStoragePairsInternal(pairStr, defaultNamespace, configFlags, sourceProvider, inventoryURL, &options, insecureSkipTLS)
@@ -134,6 +136,7 @@ func parseStoragePairsInternal(pairStr, defaultNamespace string, configFlags *ge
 		offloadPlugin := options.DefaultOffloadPlugin
 		offloadSecret := options.DefaultOffloadSecret
 		offloadVendor := options.DefaultOffloadVendor
+		offloadMigrationHosts := options.DefaultOffloadMigrationHosts
 
 		for i := 1; i < len(pairParts); i++ {
 			optionPart := strings.TrimSpace(pairParts[i])
@@ -172,6 +175,8 @@ func parseStoragePairsInternal(pairStr, defaultNamespace string, configFlags *ge
 					return nil, fmt.Errorf("invalid offloadVendor '%s': %v", value, err)
 				}
 				offloadVendor = value
+			case "offloadMigrationHosts":
+				offloadMigrationHosts = value
 			default:
 				return nil, fmt.Errorf("unknown option '%s' in storage pair", key)
 			}
@@ -215,10 +220,19 @@ func parseStoragePairsInternal(pairStr, defaultNamespace string, configFlags *ge
 
 				switch offloadPlugin {
 				case "vsphere":
-					offloadPluginConfig.VSphereXcopyPluginConfig = &forkliftv1beta1.VSphereXcopyPluginConfig{
+					xcopyConfig := &forkliftv1beta1.VSphereXcopyPluginConfig{
 						SecretRef:            offloadSecret,
 						StorageVendorProduct: forkliftv1beta1.StorageVendorProduct(offloadVendor),
 					}
+					if offloadMigrationHosts != "" {
+						for _, h := range strings.Split(offloadMigrationHosts, "+") {
+							h = strings.TrimSpace(h)
+							if h != "" {
+								xcopyConfig.DedicatedMigrationHosts = append(xcopyConfig.DedicatedMigrationHosts, h)
+							}
+						}
+					}
+					offloadPluginConfig.VSphereXcopyPluginConfig = xcopyConfig
 				default:
 					return nil, fmt.Errorf("unknown offload plugin '%s' for storage pair '%s': supported plugins are: vsphere", offloadPlugin, sourceName)
 				}
@@ -243,7 +257,7 @@ func createStorageMappingWithOptions(ctx context.Context, opts StorageCreateOpti
 	var mappingPairs []forkliftv1beta1.StoragePair
 	var err error
 	if opts.StoragePairs != "" {
-		mappingPairs, err = parseStoragePairsWithOptions(ctx, opts.StoragePairs, opts.Namespace, opts.ConfigFlags, opts.SourceProvider, opts.InventoryURL, opts.DefaultVolumeMode, opts.DefaultAccessMode, opts.DefaultOffloadPlugin, opts.DefaultOffloadSecret, opts.DefaultOffloadVendor, opts.InventoryInsecureSkipTLS)
+		mappingPairs, err = parseStoragePairsWithOptions(ctx, opts.StoragePairs, opts.Namespace, opts.ConfigFlags, opts.SourceProvider, opts.InventoryURL, opts.DefaultVolumeMode, opts.DefaultAccessMode, opts.DefaultOffloadPlugin, opts.DefaultOffloadSecret, opts.DefaultOffloadVendor, opts.DefaultOffloadMigrationHosts, opts.InventoryInsecureSkipTLS)
 		if err != nil {
 			return fmt.Errorf("failed to parse storage pairs: %v", err)
 		}

@@ -22,6 +22,8 @@ func NewHookCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	var dryRun bool
 	var outputFormat string
 	var aapJobTemplateID int
+	var aapURL, aapTokenSecret string
+	var aapTimeout int64
 
 	// HookSpec fields
 	var hookSpec forkliftv1beta1.HookSpec
@@ -72,6 +74,11 @@ Examples:
 				return fmt.Errorf("--aap-job-template-id is mutually exclusive with --image and --playbook")
 			}
 
+			hasAAPOverrides := cmd.Flag("aap-url").Changed || cmd.Flag("aap-token-secret").Changed || cmd.Flag("aap-timeout").Changed
+			if !isAAP && hasAAPOverrides {
+				return fmt.Errorf("--aap-url, --aap-token-secret, and --aap-timeout require --aap-job-template-id")
+			}
+
 			namespace := client.ResolveNamespace(kubeConfigFlags)
 
 			if strings.HasPrefix(playbook, "@") {
@@ -118,6 +125,9 @@ Examples:
 				DryRun:           dryRun,
 				OutputFormat:     resolvedFormat,
 				AAPJobTemplateID: aapJobTemplateID,
+				AAPURL:           aapURL,
+				AAPTokenSecret:   aapTokenSecret,
+				AAPTimeout:       aapTimeout,
 			}
 
 			return hook.Create(opts)
@@ -132,6 +142,9 @@ Examples:
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Output Hook CR to stdout instead of creating it")
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format for dry-run (json, yaml). Defaults to yaml when --dry-run is used")
 	cmd.Flags().IntVar(&aapJobTemplateID, "aap-job-template-id", 0, "AAP job template ID (mutually exclusive with --image and --playbook)")
+	cmd.Flags().StringVar(&aapURL, "aap-url", "", "Per-hook AAP base URL (overrides controller default)")
+	cmd.Flags().StringVar(&aapTokenSecret, "aap-token-secret", "", "Per-hook AAP token Secret name (overrides controller default)")
+	cmd.Flags().Int64Var(&aapTimeout, "aap-timeout", 0, "Per-hook AAP job poll timeout in seconds (overrides controller default)")
 
 	if err := cmd.MarkFlagRequired("name"); err != nil {
 		panic(err)

@@ -413,6 +413,9 @@ func FormatValue(sv SettingValue) string {
 
 // FormatDefault formats a default value for display.
 func FormatDefault(def SettingDefinition) string {
+	if def.Default == nil {
+		return "-"
+	}
 	switch v := def.Default.(type) {
 	case bool:
 		return strconv.FormatBool(v)

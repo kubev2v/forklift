@@ -51,7 +51,7 @@ func (m *HyperVNetworkMapper) CreateNetworkPairs(sourceNetworks []ref.Ref, targe
 		}
 
 		networkPairs = append(networkPairs, forkliftv1beta1.NetworkPair{
-			Source:      sourceNetwork,
+			Source:      forkliftv1beta1.NetworkSourceRef{Ref: sourceNetwork},
 			Destination: destination,
 		})
 	}

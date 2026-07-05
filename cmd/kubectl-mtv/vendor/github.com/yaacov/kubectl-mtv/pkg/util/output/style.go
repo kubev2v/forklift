@@ -10,12 +10,13 @@ import (
 )
 
 var (
-	boldStyle   = lipgloss.NewStyle().Bold(true)
-	redStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
-	greenStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-	yellowStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-	blueStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
-	cyanStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+	boldStyle     = lipgloss.NewStyle().Bold(true)
+	redStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+	greenStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+	yellowStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+	blueStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
+	cyanStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+	darkGrayStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 )
 
 // colorEnabled controls whether ANSI color codes are emitted.
@@ -69,6 +70,13 @@ func Cyan(text string) string {
 		return text
 	}
 	return cyanStyle.Render(text)
+}
+
+func DarkGray(text string) string {
+	if !colorEnabled {
+		return text
+	}
+	return darkGrayStyle.Render(text)
 }
 
 // StripANSI removes ANSI escape sequences from a string.
