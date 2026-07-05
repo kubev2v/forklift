@@ -117,7 +117,7 @@ github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8
 # github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 ## explicit
 github.com/kballard/go-shellquote
-# github.com/kubev2v/forklift v0.0.0-20260602052810-43c34bcf9079 => ../../
+# github.com/kubev2v/forklift v0.0.0-20260630205043-0e6f6933ffde => ../../
 ## explicit; go 1.25.0
 github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1
 github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan
@@ -226,7 +226,7 @@ github.com/xo/terminfo
 # github.com/yaacov/karl-interpreter v0.0.1
 ## explicit; go 1.21
 github.com/yaacov/karl-interpreter/pkg/karl
-# github.com/yaacov/kubectl-mtv v0.3.15
+# github.com/yaacov/kubectl-mtv v0.3.19
 ## explicit; go 1.25.0
 github.com/yaacov/kubectl-mtv/cmd
 github.com/yaacov/kubectl-mtv/cmd/archive
@@ -253,6 +253,7 @@ github.com/yaacov/kubectl-mtv/pkg/cmd/create/mapping/offload
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/fetchers
+github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/fetchers/azure
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/fetchers/ec2
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/fetchers/hyperv
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/fetchers/openshift
@@ -261,6 +262,7 @@ github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/fetchers/ova
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/fetchers/ovirt
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/fetchers/vsphere
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/mapper
+github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/mapper/azure
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/mapper/ec2
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/mapper/hyperv
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/mapper/openshift
@@ -270,6 +272,7 @@ github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/mapper/ovirt
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/network/mapper/vsphere
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers
+github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers/azure
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers/ec2
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers/hyperv
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers/openshift
@@ -278,6 +281,7 @@ github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers/ova
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers/ovirt
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/fetchers/vsphere
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/mapper
+github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/mapper/azure
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/mapper/ec2
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/mapper/hyperv
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/mapper/openshift
@@ -286,6 +290,7 @@ github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/mapper/ova
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/mapper/ovirt
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/plan/storage/mapper/vsphere
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider
+github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/azure
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/defaultprovider
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/ec2
 github.com/yaacov/kubectl-mtv/pkg/cmd/create/provider/generic
@@ -302,12 +307,15 @@ github.com/yaacov/kubectl-mtv/pkg/cmd/delete/host
 github.com/yaacov/kubectl-mtv/pkg/cmd/delete/mapping
 github.com/yaacov/kubectl-mtv/pkg/cmd/delete/plan
 github.com/yaacov/kubectl-mtv/pkg/cmd/delete/provider
+github.com/yaacov/kubectl-mtv/pkg/cmd/describe/conversion
 github.com/yaacov/kubectl-mtv/pkg/cmd/describe/hook
 github.com/yaacov/kubectl-mtv/pkg/cmd/describe/host
 github.com/yaacov/kubectl-mtv/pkg/cmd/describe/mapping
 github.com/yaacov/kubectl-mtv/pkg/cmd/describe/plan
+github.com/yaacov/kubectl-mtv/pkg/cmd/describe/plan/diagnostics
 github.com/yaacov/kubectl-mtv/pkg/cmd/describe/provider
 github.com/yaacov/kubectl-mtv/pkg/cmd/describe/vm
+github.com/yaacov/kubectl-mtv/pkg/cmd/get/conversion
 github.com/yaacov/kubectl-mtv/pkg/cmd/get/hook
 github.com/yaacov/kubectl-mtv/pkg/cmd/get/host
 github.com/yaacov/kubectl-mtv/pkg/cmd/get/inventory

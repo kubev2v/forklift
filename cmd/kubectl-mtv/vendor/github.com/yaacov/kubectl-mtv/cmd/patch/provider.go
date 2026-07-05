@@ -103,6 +103,16 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 	cmd.Flags().StringVar(&opts.EC2TargetSecretKey, "target-secret-access-key", "", "Target AWS account secret access key (for cross-account migrations)")
 	flags.ExplicitBoolVar(cmd.Flags(), &opts.AutoTargetCredentials, "auto-target-credentials", false, "Automatically fetch target AWS credentials from cluster and target-az from worker nodes (true/false)")
 
+	// Azure specific flags
+	cmd.Flags().StringVar(&opts.AzureTenantID, "azure-tenant-id", "", "Azure AD tenant ID")
+	cmd.Flags().StringVar(&opts.AzureSubscriptionID, "azure-subscription-id", "", "Azure subscription ID")
+	cmd.Flags().StringVar(&opts.AzureClientID, "azure-client-id", "", "Azure service principal application (client) ID")
+	cmd.Flags().StringVar(&opts.AzureClientSecret, "azure-client-secret", "", "Azure service principal secret")
+	cmd.Flags().StringVar(&opts.AzureResourceGroup, "azure-resource-group", "", "Azure resource group containing source VMs")
+	cmd.Flags().StringVar(&opts.AzureTargetRegion, "azure-target-region", "", "Target region for cross-region migrations")
+	cmd.Flags().StringVar(&opts.AzureSnapshotSku, "azure-snapshot-sku", "", "Snapshot SKU (Standard_LRS, Standard_ZRS, Premium_LRS)")
+	cmd.Flags().StringVar(&opts.AzureSnapshotResourceGroup, "azure-snapshot-resource-group", "", "Resource group for snapshots")
+
 	_ = cmd.RegisterFlagCompletionFunc("name", completion.ProviderNameCompletion(kubeConfigFlags))
 	_ = cmd.RegisterFlagCompletionFunc("esxi-clone-method", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return esxiCloneMethod.GetValidValues(), cobra.ShellCompDirectiveNoFileComp

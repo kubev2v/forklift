@@ -133,19 +133,7 @@ func ListPlans(ctx context.Context, configFlags *genericclioptions.ConfigFlags, 
 		}
 
 		// Determine migration type and cutover information
-		cutoverInfo := "cold" // Default for cold migration
-
-		// First check the new 'type' field
-		migrationType, exists, _ := unstructured.NestedString(p.Object, "spec", "type")
-		if exists && migrationType != "" {
-			cutoverInfo = migrationType
-		} else {
-			// Fall back to legacy 'warm' boolean field
-			warm, exists, _ := unstructured.NestedBool(p.Object, "spec", "warm")
-			if exists && warm {
-				cutoverInfo = "warm"
-			}
-		}
+		cutoverInfo := status.GetMigrationType(&p)
 
 		// For warm migrations, check if there's a specific cutover time
 		if cutoverInfo == "warm" && planDetails.RunningMigration != nil {

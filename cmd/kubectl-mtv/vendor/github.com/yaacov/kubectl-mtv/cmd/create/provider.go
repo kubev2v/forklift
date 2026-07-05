@@ -41,6 +41,10 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 	// HyperV specific flags
 	var smbUrl, smbUser, smbPassword string
 
+	// Azure specific flags
+	var azureTenantID, azureSubscriptionID, azureClientID, azureClientSecret string
+	var azureResourceGroup, azureTargetRegion, azureSnapshotSku, azureSnapshotResourceGroup string
+
 	var dryRun bool
 	var outputFormat string
 
@@ -62,6 +66,7 @@ Providers represent source or target environments for VM migrations. Supported t
   - openshift: Target OpenShift cluster (usually named 'host')
   - ec2: Amazon EC2 instances
   - hyperv: Microsoft Hyper-V
+  - azure: Microsoft Azure VMs
 
 Credentials can be provided directly via flags or through an existing Kubernetes secret.`,
 		Example: `  # Create a vSphere provider
@@ -103,7 +108,16 @@ Credentials can be provided directly via flags or through an existing Kubernetes
     --url https://192.168.1.100 \
     --username Administrator \
     --password 'MyPassword' \
-    --smb-url '//192.168.1.100/VMShare'`,
+    --smb-url '//192.168.1.100/VMShare'
+
+  # Create an Azure provider
+  kubectl-mtv create provider --name my-azure \
+    --type azure \
+    --azure-tenant-id "$AZURE_TENANT_ID" \
+    --azure-subscription-id "$AZURE_SUBSCRIPTION_ID" \
+    --azure-client-id "$AZURE_CLIENT_ID" \
+    --azure-client-secret "$AZURE_CLIENT_SECRET" \
+    --azure-resource-group "my-resource-group"`,
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -139,35 +153,43 @@ Credentials can be provided directly via flags or through an existing Kubernetes
 			}
 
 			options := providerutil.ProviderOptions{
-				Name:                   name,
-				Namespace:              namespace,
-				Secret:                 secret,
-				URL:                    url,
-				Username:               username,
-				Password:               password,
-				CACert:                 cacert,
-				InsecureSkipTLS:        insecureSkipTLS,
-				VddkInitImage:          vddkInitImage,
-				SdkEndpoint:            sdkEndpointType.GetValue(),
-				Token:                  token,
-				DomainName:             domainName,
-				ProjectName:            projectName,
-				RegionName:             regionName,
-				UseVddkAioOptimization: useVddkAioOptimization,
-				VddkBufSizeIn64K:       vddkBufSizeIn64K,
-				VddkBufCount:           vddkBufCount,
-				EsxiCloneMethod:        esxiCloneMethod.GetValue(),
-				EC2Region:              ec2Region,
-				EC2TargetRegion:        ec2TargetRegion,
-				EC2TargetAZ:            ec2TargetAZ,
-				EC2TargetAccessKeyID:   ec2TargetAccessKeyID,
-				EC2TargetSecretKey:     ec2TargetSecretKey,
-				AutoTargetCredentials:  autoTargetCredentials,
-				SMBUrl:                 smbUrl,
-				SMBUser:                smbUser,
-				SMBPassword:            smbPassword,
-				DryRun:                 dryRun,
-				OutputFormat:           resolvedFormat,
+				Name:                       name,
+				Namespace:                  namespace,
+				Secret:                     secret,
+				URL:                        url,
+				Username:                   username,
+				Password:                   password,
+				CACert:                     cacert,
+				InsecureSkipTLS:            insecureSkipTLS,
+				VddkInitImage:              vddkInitImage,
+				SdkEndpoint:                sdkEndpointType.GetValue(),
+				Token:                      token,
+				DomainName:                 domainName,
+				ProjectName:                projectName,
+				RegionName:                 regionName,
+				UseVddkAioOptimization:     useVddkAioOptimization,
+				VddkBufSizeIn64K:           vddkBufSizeIn64K,
+				VddkBufCount:               vddkBufCount,
+				EsxiCloneMethod:            esxiCloneMethod.GetValue(),
+				EC2Region:                  ec2Region,
+				EC2TargetRegion:            ec2TargetRegion,
+				EC2TargetAZ:                ec2TargetAZ,
+				EC2TargetAccessKeyID:       ec2TargetAccessKeyID,
+				EC2TargetSecretKey:         ec2TargetSecretKey,
+				AutoTargetCredentials:      autoTargetCredentials,
+				SMBUrl:                     smbUrl,
+				SMBUser:                    smbUser,
+				SMBPassword:                smbPassword,
+				AzureTenantID:              azureTenantID,
+				AzureSubscriptionID:        azureSubscriptionID,
+				AzureClientID:              azureClientID,
+				AzureClientSecret:          azureClientSecret,
+				AzureResourceGroup:         azureResourceGroup,
+				AzureTargetRegion:          azureTargetRegion,
+				AzureSnapshotSku:           azureSnapshotSku,
+				AzureSnapshotResourceGroup: azureSnapshotResourceGroup,
+				DryRun:                     dryRun,
+				OutputFormat:               resolvedFormat,
 			}
 
 			return provider.Create(kubeConfigFlags, providerType.GetValue(), options)
@@ -175,7 +197,7 @@ Credentials can be provided directly via flags or through an existing Kubernetes
 	}
 
 	cmd.Flags().StringVarP(&name, "name", "M", "", "Provider name")
-	cmd.Flags().VarP(providerType, "type", "t", "Provider type (openshift, vsphere, ovirt, openstack, ova, ec2, hyperv)")
+	cmd.Flags().VarP(providerType, "type", "t", "Provider type (openshift, vsphere, ovirt, openstack, ova, ec2, hyperv, azure)")
 	cmd.Flags().StringVar(&secret, "secret", "", "Secret containing provider credentials")
 
 	// Provider credential flags
@@ -214,6 +236,16 @@ Credentials can be provided directly via flags or through an existing Kubernetes
 	cmd.Flags().StringVar(&smbUrl, "smb-url", "", "SMB share URL for HyperV (e.g., //server/share)")
 	cmd.Flags().StringVar(&smbUser, "smb-user", "", "SMB username (defaults to HyperV username)")
 	cmd.Flags().StringVar(&smbPassword, "smb-password", "", "SMB password (defaults to HyperV password)")
+
+	// Azure specific flags
+	cmd.Flags().StringVar(&azureTenantID, "azure-tenant-id", "", "Azure AD tenant ID")
+	cmd.Flags().StringVar(&azureSubscriptionID, "azure-subscription-id", "", "Azure subscription ID containing source VMs")
+	cmd.Flags().StringVar(&azureClientID, "azure-client-id", "", "Azure service principal application (client) ID")
+	cmd.Flags().StringVar(&azureClientSecret, "azure-client-secret", "", "Azure service principal secret")
+	cmd.Flags().StringVar(&azureResourceGroup, "azure-resource-group", "", "Azure resource group containing source VMs (required for azure type)")
+	cmd.Flags().StringVar(&azureTargetRegion, "azure-target-region", "", "Target region for cross-region migrations (optional)")
+	cmd.Flags().StringVar(&azureSnapshotSku, "azure-snapshot-sku", "", "Snapshot SKU (Standard_LRS, Standard_ZRS, Premium_LRS; default: Standard_ZRS)")
+	cmd.Flags().StringVar(&azureSnapshotResourceGroup, "azure-snapshot-resource-group", "", "Resource group for snapshots (defaults to source resource group)")
 
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Output Provider CR(s) to stdout instead of creating them")
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "", "Output format for dry-run (json, yaml). Defaults to yaml when --dry-run is used")

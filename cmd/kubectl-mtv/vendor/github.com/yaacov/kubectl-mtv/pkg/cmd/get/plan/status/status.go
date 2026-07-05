@@ -295,6 +295,23 @@ func GetDiskTransferProgress(migration *unstructured.Unstructured) (ProgressStat
 	return stats, nil
 }
 
+// GetMigrationType returns the resolved migration type for a plan by checking
+// spec.type first, then falling back to the legacy spec.warm boolean.
+func GetMigrationType(plan *unstructured.Unstructured) string {
+	if v, exists, _ := unstructured.NestedString(plan.Object, "spec", "type"); exists && v != "" {
+		return v
+	}
+	if warm, exists, _ := unstructured.NestedBool(plan.Object, "spec", "warm"); exists && warm {
+		return "warm"
+	}
+	return "cold"
+}
+
+// IsWarmMigration returns true if the plan is configured for warm migration.
+func IsWarmMigration(plan *unstructured.Unstructured) bool {
+	return GetMigrationType(plan) == "warm"
+}
+
 // PlanDetails contains all relevant status information for a plan
 type PlanDetails struct {
 	IsReady          bool

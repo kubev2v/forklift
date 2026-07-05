@@ -51,7 +51,7 @@ func (m *OpenStackNetworkMapper) CreateNetworkPairs(sourceNetworks []ref.Ref, ta
 		}
 
 		networkPairs = append(networkPairs, forkliftv1beta1.NetworkPair{
-			Source:      sourceNetwork,
+			Source:      forkliftv1beta1.NetworkSourceRef{Ref: sourceNetwork},
 			Destination: destination,
 		})
 	}

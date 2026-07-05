@@ -7,6 +7,9 @@ import (
 	forkliftv1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 )
 
+// Azure provider type constant (not yet in the released forklift types).
+const AzureProviderType forkliftv1beta1.ProviderType = "azure"
+
 // providerTypes is the single source of truth for built-in provider types.
 var providerTypes = []forkliftv1beta1.ProviderType{
 	forkliftv1beta1.OpenShift,
@@ -16,6 +19,7 @@ var providerTypes = []forkliftv1beta1.ProviderType{
 	forkliftv1beta1.Ova,
 	forkliftv1beta1.HyperV,
 	forkliftv1beta1.EC2,
+	AzureProviderType,
 }
 
 // providerTypeStrings returns the string representations of provider types.

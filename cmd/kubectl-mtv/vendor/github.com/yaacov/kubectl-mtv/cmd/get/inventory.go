@@ -23,7 +23,8 @@ Available resource types vary by provider:
   - oVirt: diskprofile, nicprofile
   - OpenStack: instance, image, flavor, project, volume, volumetype, snapshot, subnet
   - OpenShift: namespace, pvc, datavolume
-  - EC2: ec2instance, ec2volume, ec2volumetype, ec2network`,
+  - EC2: ec2instance, ec2volume, ec2volumetype, ec2network
+  - Azure: vm, network, storage`,
 		SilenceUsage: true,
 	}
 
