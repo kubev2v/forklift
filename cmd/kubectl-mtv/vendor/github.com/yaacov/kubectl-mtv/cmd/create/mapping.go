@@ -118,6 +118,7 @@ func newStorageMappingCmd(kubeConfigFlags *genericclioptions.ConfigFlags, global
 	var defaultOffloadPlugin string
 	var defaultOffloadSecret string
 	var defaultOffloadVendor string
+	var defaultOffloadMigrationHosts string
 
 	// Offload secret creation flags
 	var offloadVSphereUsername, offloadVSpherePassword, offloadVSphereURL string
@@ -181,19 +182,20 @@ plugin configuration for optimized data transfer.`,
 			}
 
 			return mapping.CreateStorageWithOptions(mapping.StorageCreateOptions{
-				ConfigFlags:              kubeConfigFlags,
-				Name:                     name,
-				Namespace:                namespace,
-				SourceProvider:           sourceProvider,
-				TargetProvider:           targetProvider,
-				StoragePairs:             storagePairs,
-				InventoryURL:             inventoryURL,
-				InventoryInsecureSkipTLS: inventoryInsecureSkipTLS,
-				DefaultVolumeMode:        defaultVolumeMode,
-				DefaultAccessMode:        defaultAccessMode,
-				DefaultOffloadPlugin:     defaultOffloadPlugin,
-				DefaultOffloadSecret:     defaultOffloadSecret,
-				DefaultOffloadVendor:     defaultOffloadVendor,
+				ConfigFlags:                  kubeConfigFlags,
+				Name:                         name,
+				Namespace:                    namespace,
+				SourceProvider:               sourceProvider,
+				TargetProvider:               targetProvider,
+				StoragePairs:                 storagePairs,
+				InventoryURL:                 inventoryURL,
+				InventoryInsecureSkipTLS:     inventoryInsecureSkipTLS,
+				DefaultVolumeMode:            defaultVolumeMode,
+				DefaultAccessMode:            defaultAccessMode,
+				DefaultOffloadPlugin:         defaultOffloadPlugin,
+				DefaultOffloadSecret:         defaultOffloadSecret,
+				DefaultOffloadVendor:         defaultOffloadVendor,
+				DefaultOffloadMigrationHosts: defaultOffloadMigrationHosts,
 				// Offload secret creation options
 				OffloadVSphereUsername: offloadVSphereUsername,
 				OffloadVSpherePassword: offloadVSpherePassword,
@@ -218,6 +220,7 @@ plugin configuration for optimized data transfer.`,
 	cmd.Flags().StringVar(&defaultOffloadPlugin, "default-offload-plugin", "", "Default offload plugin type for all storage pairs (vsphere)")
 	cmd.Flags().StringVar(&defaultOffloadSecret, "default-offload-secret", "", "Existing offload secret name to use (creates new secret if not provided and offload credentials given)")
 	cmd.Flags().StringVar(&defaultOffloadVendor, "default-offload-vendor", "", "Default offload plugin vendor for all storage pairs (flashsystem|vantara|ontap|primera3par|pureFlashArray|powerflex|powermax|powerstore|infinibox)")
+	cmd.Flags().StringVar(&defaultOffloadMigrationHosts, "default-offload-migration-hosts", "", "Default dedicated ESXi host IDs for XCOPY migrations (+-separated, e.g. host-10+host-11)")
 
 	// Offload secret creation flags
 	cmd.Flags().StringVar(&offloadVSphereUsername, "offload-vsphere-username", "", "vSphere username for offload secret (creates new secret if no --default-offload-secret provided)")

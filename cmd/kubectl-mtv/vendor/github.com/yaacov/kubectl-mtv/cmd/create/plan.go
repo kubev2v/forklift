@@ -58,6 +58,7 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig Glo
 	// Storage mapping enhancement options
 	var defaultVolumeMode, defaultAccessMode string
 	var defaultOffloadPlugin, defaultOffloadSecret, defaultOffloadVendor string
+	var defaultOffloadMigrationHosts string
 
 	// Offload secret creation flags
 	var offloadVSphereUsername, offloadVSpherePassword, offloadVSphereURL string
@@ -503,25 +504,26 @@ Affinity Syntax (KARL):
 			}
 
 			opts := plan.CreatePlanOptions{
-				Name:                      name,
-				Namespace:                 namespace,
-				SourceProvider:            sourceProvider,
-				TargetProvider:            targetProvider,
-				NetworkMapping:            networkMapping,
-				StorageMapping:            storageMapping,
-				ConfigFlags:               kubeConfigFlags,
-				InventoryURL:              inventoryURL,
-				InventoryInsecureSkipTLS:  inventoryInsecureSkipTLS,
-				DefaultTargetNetwork:      defaultTargetNetwork,
-				DefaultTargetStorageClass: defaultTargetStorageClass,
-				PlanSpec:                  planSpec,
-				NetworkPairs:              networkPairs,
-				StoragePairs:              storagePairs,
-				DefaultVolumeMode:         defaultVolumeMode,
-				DefaultAccessMode:         defaultAccessMode,
-				DefaultOffloadPlugin:      defaultOffloadPlugin,
-				DefaultOffloadSecret:      defaultOffloadSecret,
-				DefaultOffloadVendor:      defaultOffloadVendor,
+				Name:                         name,
+				Namespace:                    namespace,
+				SourceProvider:               sourceProvider,
+				TargetProvider:               targetProvider,
+				NetworkMapping:               networkMapping,
+				StorageMapping:               storageMapping,
+				ConfigFlags:                  kubeConfigFlags,
+				InventoryURL:                 inventoryURL,
+				InventoryInsecureSkipTLS:     inventoryInsecureSkipTLS,
+				DefaultTargetNetwork:         defaultTargetNetwork,
+				DefaultTargetStorageClass:    defaultTargetStorageClass,
+				PlanSpec:                     planSpec,
+				NetworkPairs:                 networkPairs,
+				StoragePairs:                 storagePairs,
+				DefaultVolumeMode:            defaultVolumeMode,
+				DefaultAccessMode:            defaultAccessMode,
+				DefaultOffloadPlugin:         defaultOffloadPlugin,
+				DefaultOffloadSecret:         defaultOffloadSecret,
+				DefaultOffloadVendor:         defaultOffloadVendor,
+				DefaultOffloadMigrationHosts: defaultOffloadMigrationHosts,
 				// Offload secret creation options
 				OffloadVSphereUsername: offloadVSphereUsername,
 				OffloadVSpherePassword: offloadVSpherePassword,
@@ -554,6 +556,7 @@ Affinity Syntax (KARL):
 	cmd.Flags().StringVar(&defaultOffloadPlugin, "default-offload-plugin", "", "Default offload plugin type for storage pairs (vsphere)")
 	cmd.Flags().StringVar(&defaultOffloadSecret, "default-offload-secret", "", "Existing offload secret name to use for storage offload")
 	cmd.Flags().StringVar(&defaultOffloadVendor, "default-offload-vendor", "", "Default offload plugin vendor for storage pairs (flashsystem|vantara|ontap|primera3par|pureFlashArray|powerflex|powermax|powerstore|infinibox)")
+	cmd.Flags().StringVar(&defaultOffloadMigrationHosts, "default-offload-migration-hosts", "", "Default dedicated ESXi host IDs for XCOPY migrations (+-separated, e.g. host-10+host-11)")
 
 	// Offload secret creation flags (storage offload/XCOPY is vSphere-only)
 	cmd.Flags().StringVar(&offloadVSphereUsername, "offload-vsphere-username", "", "vSphere username for offload secret (creates new secret if no --default-offload-secret provided)")

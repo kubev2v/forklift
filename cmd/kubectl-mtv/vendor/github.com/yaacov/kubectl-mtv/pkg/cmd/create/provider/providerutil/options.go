@@ -34,6 +34,15 @@ type ProviderOptions struct {
 	EC2TargetAccessKeyID  string // Target account access key (cross-account migrations)
 	EC2TargetSecretKey    string // Target account secret key (cross-account migrations)
 	AutoTargetCredentials bool   // Auto-fetch target credentials from cluster
+	// Azure specific options
+	AzureTenantID              string
+	AzureSubscriptionID        string
+	AzureClientID              string
+	AzureClientSecret          string
+	AzureResourceGroup         string
+	AzureTargetRegion          string
+	AzureSnapshotSku           string
+	AzureSnapshotResourceGroup string
 	// DryRun when true builds Provider (and Secret if applicable) without calling the API
 	DryRun bool
 	// OutputFormat is the serialization format for dry-run output ("yaml" or "json")

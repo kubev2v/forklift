@@ -147,6 +147,8 @@ func resolveNetworkNameToIDWithInsecure(ctx context.Context, configFlags *generi
 		return resolveOpenShiftNetworkNameToIDWithInsecure(ctx, configFlags, inventoryURL, provider, networkName, insecureSkipTLS)
 	case "ec2":
 		return resolveEC2NetworkNameToIDWithInsecure(ctx, configFlags, inventoryURL, provider, networkName, insecureSkipTLS)
+	case "azure":
+		return resolveAzureNetworkNameToIDWithInsecure(ctx, configFlags, inventoryURL, provider, networkName, insecureSkipTLS)
 	case "vsphere", "ovirt", "openstack", "ova":
 		return resolveVirtualizationNetworkNameToIDWithInsecure(ctx, configFlags, inventoryURL, provider, networkName, insecureSkipTLS)
 	default:
@@ -215,6 +217,43 @@ func resolveEC2NetworkNameToIDWithInsecure(ctx context.Context, configFlags *gen
 
 	if len(matchingRefs) == 0 {
 		return nil, fmt.Errorf("network '%s' not found in EC2 provider inventory", networkName)
+	}
+
+	return matchingRefs, nil
+}
+
+// resolveAzureNetworkNameToIDWithInsecure resolves network name for Azure provider with optional insecure TLS skip verification
+func resolveAzureNetworkNameToIDWithInsecure(ctx context.Context, configFlags *genericclioptions.ConfigFlags, inventoryURL string, provider *unstructured.Unstructured, networkName string, insecureSkipTLS bool) ([]ref.Ref, error) {
+	networksInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "networks?detail=4", insecureSkipTLS)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch networks inventory: %v", err)
+	}
+
+	networksArray, ok := networksInventory.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("unexpected data format: expected array for networks inventory")
+	}
+
+	var matchingRefs []ref.Ref
+	for _, item := range networksArray {
+		network, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		id, _ := network["id"].(string)
+		name, _ := network["name"].(string)
+
+		if name == networkName || id == networkName {
+			matchingRefs = append(matchingRefs, ref.Ref{
+				ID:   id,
+				Name: name,
+			})
+		}
+	}
+
+	if len(matchingRefs) == 0 {
+		return nil, fmt.Errorf("network '%s' not found in Azure provider inventory", networkName)
 	}
 
 	return matchingRefs, nil

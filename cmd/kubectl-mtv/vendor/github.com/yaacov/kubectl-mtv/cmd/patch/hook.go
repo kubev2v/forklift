@@ -58,6 +58,10 @@ Examples:
 			opts.DeadlineChanged = cmd.Flag("deadline").Changed
 			opts.AAPJobTemplateIDChanged = cmd.Flag("aap-job-template-id").Changed
 
+			opts.AAPURLChanged = cmd.Flag("aap-url").Changed
+			opts.AAPTokenChanged = cmd.Flag("aap-token-secret").Changed
+			opts.AAPTimeoutChanged = cmd.Flag("aap-timeout").Changed
+
 			if opts.PlaybookChanged && strings.HasPrefix(opts.Playbook, "@") {
 				filePath := opts.Playbook[1:]
 				fileContent, err := os.ReadFile(filePath)
@@ -79,6 +83,9 @@ Examples:
 	cmd.Flags().StringVar(&opts.Playbook, "playbook", "", "Ansible playbook content, or use @filename to read from file")
 	cmd.Flags().Int64Var(&opts.Deadline, "deadline", 0, "Hook deadline in seconds")
 	cmd.Flags().IntVar(&opts.AAPJobTemplateID, "aap-job-template-id", 0, "AAP job template ID")
+	cmd.Flags().StringVar(&opts.AAPURL, "aap-url", "", "Per-hook AAP base URL (overrides controller default)")
+	cmd.Flags().StringVar(&opts.AAPTokenSecret, "aap-token-secret", "", "Per-hook AAP token Secret name (overrides controller default)")
+	cmd.Flags().Int64Var(&opts.AAPTimeout, "aap-timeout", 0, "Per-hook AAP job poll timeout in seconds (overrides controller default)")
 	cmd.Flags().BoolVar(&opts.ClearAAP, "clear-aap", false, "Remove AAP configuration from the hook")
 
 	_ = cmd.RegisterFlagCompletionFunc("name", completion.HookResourceNameCompletion(kubeConfigFlags))

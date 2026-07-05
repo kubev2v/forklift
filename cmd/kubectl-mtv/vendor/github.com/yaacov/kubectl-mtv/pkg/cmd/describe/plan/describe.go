@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 
+	"github.com/yaacov/kubectl-mtv/pkg/cmd/describe/plan/diagnostics"
 	planutil "github.com/yaacov/kubectl-mtv/pkg/cmd/get/plan"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/get/plan/status"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
@@ -18,7 +20,7 @@ import (
 )
 
 // Describe describes a migration plan.
-func Describe(configFlags *genericclioptions.ConfigFlags, name, namespace string, withVMs bool, useUTC bool, outputFormat string) error {
+func Describe(configFlags *genericclioptions.ConfigFlags, name, namespace string, withVMs bool, withDiagnostics bool, logLines, showLines int, useUTC bool, outputFormat string) error {
 	c, err := client.GetDynamicClient(configFlags)
 	if err != nil {
 		return fmt.Errorf("failed to get client: %v", err)
@@ -54,7 +56,7 @@ func Describe(configFlags *genericclioptions.ConfigFlags, name, namespace string
 	// Mappings
 	networkMapping, _, _ := unstructured.NestedString(plan.Object, "spec", "map", "network", "name")
 	storageMapping, _, _ := unstructured.NestedString(plan.Object, "spec", "map", "storage", "name")
-	migrationType, _, _ := unstructured.NestedString(plan.Object, "spec", "type")
+	migrationType := status.GetMigrationType(plan)
 	buildMappingsSection(b, networkMapping, storageMapping, migrationType)
 
 	// Running / Latest migration
@@ -79,6 +81,29 @@ func Describe(configFlags *genericclioptions.ConfigFlags, name, namespace string
 		buildVMsSection(b, plan, migration, useUTC)
 	}
 
+	// Diagnostics
+	if withDiagnostics {
+		migration := planDetails.RunningMigration
+		if migration == nil {
+			migration = planDetails.LatestMigration
+		}
+		targetNS, _, _ := unstructured.NestedString(plan.Object, "spec", "targetNamespace")
+		if targetNS == "" {
+			targetNS = namespace
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+
+		report, err := diagnostics.GatherDiagnostics(ctx, configFlags, c, plan, migration, targetNS, logLines, showLines)
+		if err != nil {
+			b.Section("DIAGNOSTICS")
+			b.FieldC("Error", err.Error(), output.Red)
+		} else if report != nil {
+			diagnostics.Render(b, report)
+		}
+	}
+
 	return describe.Print(b.Build(), outputFormat)
 }
 
@@ -93,12 +118,7 @@ func buildSpecSection(b *describe.Builder, plan *unstructured.Unstructured) {
 	enableNestedVirt, enableNestedVirtExists, _ := unstructured.NestedBool(plan.Object, "spec", "enableNestedVirtualization")
 	xfsCompatibility, _, _ := unstructured.NestedBool(plan.Object, "spec", "xfsCompatibility")
 
-	migrationType := "cold"
-	if v, exists, _ := unstructured.NestedString(plan.Object, "spec", "type"); exists && v != "" {
-		migrationType = v
-	} else if warm, exists, _ := unstructured.NestedBool(plan.Object, "spec", "warm"); exists && warm {
-		migrationType = "warm"
-	}
+	migrationType := status.GetMigrationType(plan)
 
 	b.Section("SPECIFICATION")
 	b.SubSection("Providers")

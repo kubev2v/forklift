@@ -70,6 +70,11 @@ func NewGetCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig Glob
 	hookCmd.Aliases = []string{"hooks"}
 	cmd.AddCommand(hookCmd)
 
+	// Add conversion subcommand with plural alias
+	conversionCmd := NewConversionCmd(kubeConfigFlags, globalConfig)
+	conversionCmd.Aliases = []string{"conversions"}
+	cmd.AddCommand(conversionCmd)
+
 	// Add inventory subcommand
 	cmd.AddCommand(NewInventoryCmd(kubeConfigFlags, globalConfig))
 

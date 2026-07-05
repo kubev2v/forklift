@@ -14,7 +14,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	forkliftv1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
-	"github.com/yaacov/kubectl-mtv/pkg/cmd/get/plan/status"
+	planstatus "github.com/yaacov/kubectl-mtv/pkg/cmd/get/plan/status"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/output"
 )
@@ -33,7 +33,7 @@ func Start(configFlags *genericclioptions.ConfigFlags, name, namespace string, c
 	}
 
 	// Check if the plan is ready
-	planReady, err := status.IsPlanReady(plan)
+	planReady, err := planstatus.IsPlanReady(plan)
 	if err != nil {
 		return err
 	}
@@ -42,7 +42,7 @@ func Start(configFlags *genericclioptions.ConfigFlags, name, namespace string, c
 	}
 
 	// Check if the plan has running migrations
-	runningMigration, _, err := status.GetRunningMigration(c, namespace, plan, client.MigrationsGVR)
+	runningMigration, _, err := planstatus.GetRunningMigration(c, namespace, plan, client.MigrationsGVR)
 	if err != nil {
 		return err
 	}
@@ -51,19 +51,16 @@ func Start(configFlags *genericclioptions.ConfigFlags, name, namespace string, c
 	}
 
 	// Check if the plan has already succeeded
-	planStatus, err := status.GetPlanStatus(plan)
+	planStatus, err := planstatus.GetPlanStatus(plan)
 	if err != nil {
 		return err
 	}
-	if planStatus == status.StatusSucceeded {
+	if planStatus == planstatus.StatusSucceeded {
 		return fmt.Errorf("migration plan '%s' has already succeeded", name)
 	}
 
-	// Check if the plan is a warm migration
-	warm, _, err := unstructured.NestedBool(plan.Object, "spec", "warm")
-	if err != nil {
-		return fmt.Errorf("failed to check if plan is warm: %v", err)
-	}
+	// Check if the plan is a warm migration (handles both spec.type and legacy spec.warm)
+	warm := planstatus.IsWarmMigration(plan)
 
 	// Handle cutover time based on plan type
 	if !warm && cutoverTime != nil {

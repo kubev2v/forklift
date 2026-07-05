@@ -362,3 +362,63 @@ func buildTargetStorageList(storageArray []interface{}) ([]forkliftv1beta1.Desti
 	klog.V(4).Infof("Returning %d target storages (default: %s)", len(targetStorages), selectedName)
 	return targetStorages, nil
 }
+
+// FetchTargetStoragesWithProvisioners extracts available destination storages and
+// their provisioners from the target provider. Returns both the storage list and
+// a map of StorageClass name -> provisioner (CSI driver name).
+func (f *OpenShiftStorageFetcher) FetchTargetStoragesWithProvisioners(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, insecureSkipTLS bool) ([]forkliftv1beta1.DestinationStorage, map[string]string, error) {
+	klog.V(4).Infof("OpenShift storage fetcher - extracting target storages with provisioners for provider: %s", providerName)
+
+	provider, err := inventory.GetProviderByName(ctx, configFlags, providerName, namespace)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get target provider: %v", err)
+	}
+
+	klog.V(4).Infof("Fetching StorageClasses for OpenShift target (with provisioners)")
+	storageInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "storageclasses?detail=4", insecureSkipTLS)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to fetch target storage inventory: %v", err)
+	}
+
+	storageArray, ok := storageInventory.([]interface{})
+	if !ok {
+		return nil, nil, fmt.Errorf("unexpected data format: expected array for target storage inventory")
+	}
+
+	targetStorages, err := buildTargetStorageList(storageArray)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	provisioners := ExtractStorageClassProvisioners(storageArray)
+	return targetStorages, provisioners, nil
+}
+
+// ExtractStorageClassProvisioners extracts a map of StorageClass name -> provisioner
+// from the raw inventory storageArray. The provisioner is located at object.provisioner
+// in the Kubernetes StorageClass resource.
+func ExtractStorageClassProvisioners(storageArray []interface{}) map[string]string {
+	provisioners := make(map[string]string, len(storageArray))
+
+	for _, item := range storageArray {
+		storageItem, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		name, _ := storageItem["name"].(string)
+		if name == "" {
+			continue
+		}
+
+		if object, ok := storageItem["object"].(map[string]interface{}); ok {
+			if provisioner, ok := object["provisioner"].(string); ok && provisioner != "" {
+				provisioners[name] = provisioner
+				klog.V(4).Infof("StorageClass %s -> provisioner: %s", name, provisioner)
+			}
+		}
+	}
+
+	klog.V(4).Infof("Extracted provisioners for %d storage classes", len(provisioners))
+	return provisioners
+}

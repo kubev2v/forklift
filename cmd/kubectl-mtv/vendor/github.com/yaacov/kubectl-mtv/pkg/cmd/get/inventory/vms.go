@@ -70,6 +70,8 @@ func calculateTotalDiskCapacity(vm map[string]interface{}) float64 {
 
 		if capacity, ok := disk["capacity"].(float64); ok {
 			totalCapacity += capacity
+		} else if sizeGB, ok := disk["sizeGB"].(float64); ok {
+			totalCapacity += sizeGB * 1024 * 1024 * 1024
 		}
 	}
 
@@ -114,13 +116,29 @@ func augmentVMInfo(vm map[string]interface{}) {
 	vm["powerStateHuman"] = humanizePowerState(vm)
 }
 
+// augmentAzureVMInfo adds computed fields to Azure VM data for display purposes.
+// It delegates to the standard augmentVMInfo for common fields (concerns, memory,
+// disk capacity, power state) and then supplements with Azure-specific extras.
+func augmentAzureVMInfo(vm map[string]interface{}) {
+	augmentVMInfo(vm)
+
+	if vmSize, found, _ := unstructured.NestedString(vm, "object", "properties", "hardwareProfile", "vmSize"); found {
+		vm["azureVMSize"] = vmSize
+	}
+
+	if location, found, _ := unstructured.NestedString(vm, "object", "location"); found {
+		vm["azureLocation"] = location
+	}
+}
+
 // humanizePowerState derives a human-readable power state from a VM map.
 // It checks top-level powerState (vSphere, oVirt), then falls back to
 // object.status.printableStatus, object.status.phase, and
 // instance.status.phase (OpenShift/KubeVirt).
 func humanizePowerState(vm map[string]interface{}) string {
 	if ps, ok := vm["powerState"].(string); ok && ps != "" {
-		if strings.Contains(strings.ToLower(ps), "on") || strings.Contains(strings.ToLower(ps), "up") {
+		lower := strings.ToLower(ps)
+		if strings.Contains(lower, "on") || strings.Contains(lower, "up") || strings.Contains(lower, "running") {
 			return "On"
 		}
 		return "Off"
@@ -243,7 +261,7 @@ func FetchVMsByQueryWithInsecure(ctx context.Context, kubeConfigFlags *genericcl
 
 	// Verify provider supports VM inventory before fetching
 	switch providerType {
-	case "ovirt", "vsphere", "openstack", "ova", "openshift", "ec2", "hyperv":
+	case "ovirt", "vsphere", "openstack", "ova", "openshift", "ec2", "hyperv", "azure":
 		// Provider supports VMs, continue
 	default:
 		return nil, fmt.Errorf("provider type '%s' does not support VM inventory", providerType)
@@ -327,7 +345,7 @@ func listVMsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigF
 	// Fetch VM inventory from the provider based on provider type
 	var data interface{}
 	switch providerType {
-	case "ovirt", "vsphere", "openstack", "ova", "openshift", "ec2", "hyperv":
+	case "ovirt", "vsphere", "openstack", "ova", "openshift", "ec2", "hyperv", "azure":
 		data, err = providerClient.GetVMs(ctx, 4)
 	default:
 		return fmt.Errorf("provider type '%s' does not support VM inventory", providerType)
@@ -355,7 +373,12 @@ func listVMsOnce(ctx context.Context, kubeConfigFlags *genericclioptions.ConfigF
 		if vm, ok := item.(map[string]interface{}); ok {
 			vm["provider"] = providerName
 
-			if providerType != "ec2" {
+			switch providerType {
+			case "ec2":
+				// EC2 uses raw fields, no augmentation needed
+			case "azure":
+				augmentAzureVMInfo(vm)
+			default:
 				augmentVMInfo(vm)
 			}
 
@@ -430,7 +453,8 @@ func printVMsMarkdown(vms []map[string]interface{}, queryOpts *querypkg.QueryOpt
 
 // vmColumns returns the default table columns for VM listings based on provider type.
 func vmColumns(providerType string) []output.Column {
-	if providerType == "ec2" {
+	switch providerType {
+	case "ec2":
 		return []output.Column{
 			{Title: "NAME", Key: "name"},
 			{Title: "TYPE", Key: "InstanceType"},
@@ -440,15 +464,28 @@ func vmColumns(providerType string) []output.Column {
 			{Title: "PUBLIC-IP", Key: "PublicIpAddress"},
 			{Title: "PRIVATE-IP", Key: "PrivateIpAddress"},
 		}
-	}
-	return []output.Column{
-		{Title: "NAME", Key: "name"},
-		{Title: "ID", Key: "id"},
-		{Title: "POWER", Key: "powerStateHuman", ColorFunc: output.ColorizePowerState},
-		{Title: "CPU", Key: "cpuCount"},
-		{Title: "MEMORY", Key: "memoryGB"},
-		{Title: "DISK USAGE", Key: "storageUsedGB"},
-		{Title: "GUEST OS", Key: "guestId"},
-		{Title: "CONCERNS (C/W/I)", Key: "concernsHuman", ColorFunc: output.ColorizeConcerns},
+	case "azure":
+		return []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "VM SIZE", Key: "azureVMSize"},
+			{Title: "POWER", Key: "powerStateHuman", ColorFunc: output.ColorizePowerState},
+			{Title: "CPU", Key: "cpuCount"},
+			{Title: "MEMORY", Key: "memoryGB"},
+			{Title: "LOCATION", Key: "azureLocation"},
+			{Title: "GUEST OS", Key: "guestId"},
+			{Title: "DISK", Key: "diskCapacity"},
+			{Title: "CONCERNS (C/W/I)", Key: "concernsHuman", ColorFunc: output.ColorizeConcerns},
+		}
+	default:
+		return []output.Column{
+			{Title: "NAME", Key: "name"},
+			{Title: "ID", Key: "id", MaxWidth: 52},
+			{Title: "POWER", Key: "powerStateHuman", ColorFunc: output.ColorizePowerState},
+			{Title: "CPU", Key: "cpuCount"},
+			{Title: "MEMORY", Key: "memoryGB"},
+			{Title: "DISK USAGE", Key: "storageUsedGB"},
+			{Title: "GUEST OS", Key: "guestId"},
+			{Title: "CONCERNS (C/W/I)", Key: "concernsHuman", ColorFunc: output.ColorizeConcerns},
+		}
 	}
 }

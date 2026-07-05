@@ -199,6 +199,8 @@ func resolveStorageNameToID(ctx context.Context, configFlags *genericclioptions.
 		}}, nil
 	case "ec2":
 		return resolveEC2StorageNameToID(ctx, configFlags, inventoryURL, provider, storageName, insecureSkipTLS)
+	case "azure":
+		return resolveAzureStorageNameToID(ctx, configFlags, inventoryURL, provider, storageName, insecureSkipTLS)
 	case "vsphere":
 		return resolveVSphereStorageNameToID(ctx, configFlags, inventoryURL, provider, storageName, insecureSkipTLS)
 	case "ovirt":
@@ -292,6 +294,46 @@ func resolveEC2StorageNameToID(ctx context.Context, configFlags *genericclioptio
 
 	if len(matchingRefs) == 0 {
 		return nil, fmt.Errorf("EBS volume type '%s' not found in EC2 provider inventory", storageName)
+	}
+
+	return matchingRefs, nil
+}
+
+// resolveAzureStorageNameToID resolves storage name for Azure provider
+func resolveAzureStorageNameToID(ctx context.Context, configFlags *genericclioptions.ConfigFlags, inventoryURL string, provider *unstructured.Unstructured, storageName string, insecureSkipTLS bool) ([]ref.Ref, error) {
+	storageInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "storages?detail=4", insecureSkipTLS)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch storage inventory: %v", err)
+	}
+
+	storageArray, ok := storageInventory.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("unexpected data format: expected array for storage inventory")
+	}
+
+	var matchingRefs []ref.Ref
+	storageNameLower := strings.ToLower(storageName)
+
+	for _, item := range storageArray {
+		storage, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		name, _ := storage["name"].(string)
+		id, _ := storage["id"].(string)
+
+		if strings.ToLower(name) == storageNameLower {
+			matchingRefs = append(matchingRefs, ref.Ref{
+				ID:   id,
+				Name: name,
+			})
+			break
+		}
+	}
+
+	if len(matchingRefs) == 0 {
+		return nil, fmt.Errorf("disk type '%s' not found in Azure provider inventory", storageName)
 	}
 
 	return matchingRefs, nil
