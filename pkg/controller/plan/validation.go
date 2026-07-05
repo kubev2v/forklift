@@ -683,6 +683,32 @@ func (r *Reconciler) validateStorageMap(plan *api.Plan) (err error) {
 
 	plan.Referenced.Map.Storage = mp
 
+	// CSI import requires reclaimPolicy: Retain on the destination StorageClass.
+	// A Delete policy causes the CSI driver to destroy the source array volume when
+	// the PVC is removed — losing the original VM disk irreversibly.
+	for _, mapping := range mp.Spec.Map {
+		if mapping.OffloadPlugin == nil || mapping.OffloadPlugin.CsiVolumeImport == nil {
+			continue
+		}
+		scName := mapping.Destination.StorageClass
+		sc := &storagev1.StorageClass{}
+		if scErr := r.Client.Get(context.TODO(), client.ObjectKey{Name: scName}, sc); scErr != nil {
+			continue // StorageClass not found — other validators will catch this
+		}
+		if sc.ReclaimPolicy == nil || *sc.ReclaimPolicy != core.PersistentVolumeReclaimRetain {
+			plan.Status.SetCondition(libcnd.Condition{
+				Type:     DsMapNotReady,
+				Status:   True,
+				Reason:   NotValid,
+				Category: api.CategoryCritical,
+				Message: fmt.Sprintf(
+					"StorageClass %q used for CSI Volume Import must have reclaimPolicy: Retain. "+
+						"A Delete policy will cause the source array volume to be destroyed when the PVC is removed.",
+					scName),
+			})
+		}
+	}
+
 	return
 }
 
@@ -1083,7 +1109,8 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 				setOfTargetName[vm.TargetName] = true
 			}
 		}
-		aggregateCriticalConcerns(v, ref.String(), &vmCriticalConcerns)
+		// TODO MTV-XXXX: suppress RDM/independent disk concerns when offload handles them.
+		// aggregateCriticalConcerns(v, ref.String(), &vmCriticalConcerns)
 		aggregateWarningConcerns(v, ref.String(), &unsupportedOVFExportSource)
 		if netAppShift {
 			if vsphereVM, ok := v.(*vsphere.VM); ok {

@@ -1310,11 +1310,15 @@ func (r *Builder) SupportsVolumePopulators() bool {
 			return false
 		}
 
+		klog.V(2).Infof("SupportsVolumePopulators: ds=%s offloadPlugin=%v csiVolumeImport=%v xcopy=%v",
+			ds.ID, m.OffloadPlugin != nil,
+			m.OffloadPlugin != nil && m.OffloadPlugin.CsiVolumeImport != nil,
+			m.OffloadPlugin != nil && m.OffloadPlugin.VSphereXcopyPluginConfig != nil)
 		if m.OffloadPlugin != nil && (m.OffloadPlugin.VSphereXcopyPluginConfig != nil || m.OffloadPlugin.CsiVolumeImport != nil) {
-			klog.V(2).Infof("found offload plugin on ds map %+v", dsMapIn)
 			return true
 		}
 	}
+	klog.V(2).Infof("SupportsVolumePopulators: no offload plugin found in storage map")
 	return false
 }
 
@@ -1367,6 +1371,12 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 
 		pvblock := core.PersistentVolumeBlock
 		for diskIndex, disk := range sortedDisks {
+			diskSource := baseVolume(disk.File, r.Plan.IsWarm())
+			if r.diskHandledByCsiImport(pvcList, diskSource) {
+				r.Log.Info("Skipping disk in PopulatorVolumes (already handled by CSI import)", "disk", disk.File, "key", disk.Key)
+				continue
+			}
+
 			// Resolve the effective storage map entry for this disk.
 			// RDM disks are matched by NAA vendor prefix (not datastore)
 			// because the RDM's backing LUN may reside on a different
@@ -1402,12 +1412,6 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 			} else if disk.Datastore.ID == ds.ID {
 				effectiveMapped = mapped
 			} else {
-				continue
-			}
-
-			diskSource := baseVolume(disk.File, r.Plan.IsWarm())
-			if r.diskHandledByCsiImport(pvcList, diskSource) {
-				r.Log.Info("Skipping disk in PopulatorVolumes (already handled by CSI import)", "disk", disk.File, "key", disk.Key)
 				continue
 			}
 
@@ -2657,6 +2661,7 @@ func (r *Builder) CsiImportPVCs(vmRef ref.Ref, pvcLabels map[string]string) (pvc
 			continue
 		}
 
+		r.Log.V(2).Info("CSI import: resolving disk", "disk", disk.File, "vendor", mapped.OffloadPlugin.CsiVolumeImport.StorageVendorProduct)
 		pvc, pErr := r.buildCsiImportPVC(context.TODO(), vmRef, vm, disk, diskIndex, mapped, nil)
 		if pErr != nil {
 			err = pErr
