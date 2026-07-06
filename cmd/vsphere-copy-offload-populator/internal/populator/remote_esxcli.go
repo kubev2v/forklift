@@ -265,13 +265,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, migrationHostId, sourceVMD
 			cleanupLog.Info("failed to unmap during cleanup", "lun", lun.Name, "err", errUnmap)
 		}
 
-		cleanupLog.V(2).Info("mapping volume back to original initiator groups", "groups", originalInitiatorGroups)
-		for _, group := range originalInitiatorGroups {
-			_, errMap := p.StorageApi.Map(group, lun, mappingContext)
-			if errMap != nil {
-				cleanupLog.Info("failed to map volume back to original holder", "group", group, "err", errMap)
-			}
-		}
+		remapOriginalGroups(p.StorageApi, lun, mappingContext, originalInitiatorGroups, cleanupLog)
 		cleanupLog.V(2).Info("deleting dead devices after short delay")
 		time.Sleep(5 * time.Second)
 		deleteDeadDevices(cleanupCtx, p.VSphereClient, host, dsActiveAdapters)
@@ -328,6 +322,31 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, migrationHostId, sourceVMD
 }
 
 // waitForDeviceStateOff waits for the device state to become "off" using exponential backoff
+func remapOriginalGroups(storageApi VMDKCapable, lun LUN, mappingContext MappingContext, originalGroups []string, log klog.Logger) {
+	if len(originalGroups) == 0 {
+		return
+	}
+	currentGroups, errCurrent := storageApi.CurrentMappedGroups(lun, mappingContext)
+	if errCurrent != nil {
+		// unknown current state → safer to attempt all remaps than silently skip them;
+		// nil makes slices.Contains return false for every group
+		log.Info("failed to fetch current mapped groups, attempting remap for all original groups", "err", errCurrent)
+		currentGroups = nil
+	}
+	for _, group := range originalGroups {
+		if slices.Contains(currentGroups, group) {
+			log.V(2).Info("volume already mapped to original group, skipping", "group", group)
+			continue
+		}
+		_, errMap := storageApi.Map(group, lun, mappingContext)
+		if errMap != nil {
+			log.Info("failed to map volume back to original holder", "group", group, "err", errMap)
+		} else {
+			log.V(2).Info("volume remapped to original group", "group", group)
+		}
+	}
+}
+
 func waitForDeviceStateOff(ctx context.Context, client vmware.Client, host *object.HostSystem, deviceNAA string) error {
 	backoff := wait.Backoff{
 		Duration: 1 * time.Second,
