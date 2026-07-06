@@ -941,3 +941,88 @@ func createKubeVirtWithTransferNetwork(nad *k8snet.NetworkAttachmentDefinition, 
 	kubevirt.Plan = createPlanKubevirt(transferNetwork)
 	return kubevirt
 }
+
+var _ = ginkgo.Describe("EnsurePVCInitPod", func() {
+	ginkgo.BeforeEach(func() {
+		Settings.VirtV2vContainerRequestsCpu = "100m"
+		Settings.VirtV2vContainerRequestsMemory = "128Mi"
+		Settings.VirtV2vContainerLimitsCpu = "1"
+		Settings.VirtV2vContainerLimitsMemory = "512Mi"
+	})
+
+	newPVC := func(name string, phase v1.PersistentVolumeClaimPhase) *v1.PersistentVolumeClaim {
+		return &v1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ""},
+			Status:     v1.PersistentVolumeClaimStatus{Phase: phase},
+		}
+	}
+	vm := &plan.VMStatus{}
+
+	// vsphere source provider avoids a nil-deref in shouldRequestKVM (createPodToBindPVCs).
+	newKV := func() *KubeVirt {
+		kv := createKubeVirtWithProvider(v1beta1.VSphere)
+		vsphereType := v1beta1.VSphere
+		kv.Plan.Provider.Source = &v1beta1.Provider{
+			Spec: v1beta1.ProviderSpec{Type: &vsphereType},
+		}
+		return kv
+	}
+
+	listPods := func(kv *KubeVirt) []v1.Pod {
+		pods := &v1.PodList{}
+		_ = kv.Destination.List(context.TODO(), pods, &client.ListOptions{})
+		return pods.Items
+	}
+
+	ginkgo.It("creates pod with only ClaimPending PVCs", func() {
+		pending := newPVC("pvc-pending", v1.ClaimPending)
+		bound := newPVC("pvc-bound", v1.ClaimBound)
+		zero := newPVC("pvc-zero", "")
+		kv := newKV()
+		Expect(kv.EnsurePVCInitPod(vm, []*v1.PersistentVolumeClaim{pending, bound, zero})).To(Succeed())
+		pods := listPods(kv)
+		Expect(pods).To(HaveLen(1))
+		Expect(pods[0].Spec.Volumes).To(HaveLen(1))
+		Expect(pods[0].Spec.Volumes[0].Name).To(Equal("pvc-pending"))
+	})
+
+	ginkgo.It("deduplicates repeated PVC names", func() {
+		dup := newPVC("pvc-dup", v1.ClaimPending)
+		kv := newKV()
+		Expect(kv.EnsurePVCInitPod(vm, []*v1.PersistentVolumeClaim{dup, dup})).To(Succeed())
+		pods := listPods(kv)
+		Expect(pods).To(HaveLen(1))
+		Expect(pods[0].Spec.Volumes).To(HaveLen(1))
+	})
+
+	ginkgo.It("includes both xcopy and CSI import PVCs when both are pending", func() {
+		xcopy := newPVC("pvc-xcopy", v1.ClaimPending)
+		csi := newPVC("pvc-csi", v1.ClaimPending)
+		kv := newKV()
+		Expect(kv.EnsurePVCInitPod(vm, []*v1.PersistentVolumeClaim{xcopy, csi})).To(Succeed())
+		pods := listPods(kv)
+		Expect(pods).To(HaveLen(1))
+		Expect(pods[0].Spec.Volumes).To(HaveLen(2))
+		names := []string{pods[0].Spec.Volumes[0].Name, pods[0].Spec.Volumes[1].Name}
+		Expect(names).To(ConsistOf("pvc-xcopy", "pvc-csi"))
+	})
+
+	ginkgo.It("WFC: pvcinit pod includes CSI import PVCs (Pending) but not already-Bound xcopy PVCs", func() {
+		xcopyBound := newPVC("pvc-xcopy-bound", v1.ClaimBound)
+		csiWFC := newPVC("pvc-csi-wfc", v1.ClaimPending)
+		kv := newKV()
+		Expect(kv.EnsurePVCInitPod(vm, []*v1.PersistentVolumeClaim{xcopyBound, csiWFC})).To(Succeed())
+		pods := listPods(kv)
+		Expect(pods).To(HaveLen(1))
+		Expect(pods[0].Spec.Volumes).To(HaveLen(1))
+		Expect(pods[0].Spec.Volumes[0].Name).To(Equal("pvc-csi-wfc"))
+	})
+
+	ginkgo.It("creates no pod when all PVCs are already Bound", func() {
+		bound1 := newPVC("pvc-a", v1.ClaimBound)
+		bound2 := newPVC("pvc-b", v1.ClaimBound)
+		kv := newKV()
+		Expect(kv.EnsurePVCInitPod(vm, []*v1.PersistentVolumeClaim{bound1, bound2})).To(Succeed())
+		Expect(listPods(kv)).To(BeEmpty())
+	})
+})
