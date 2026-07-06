@@ -13,8 +13,9 @@ vet:
 	go vet ./...
 
 # Build flags
-PROD_LDFLAGS := -buildvcs=false -ldflags="-w -s"
-DEV_LDFLAGS := 
+VERSION_PKG := github.com/yaacov/kubectl-mtv/cmd
+PROD_LDFLAGS := -buildvcs=false -ldflags="-w -s -X '$(VERSION_PKG).clientVersion=$(MTV_VERSION)'"
+DEV_LDFLAGS := -ldflags="-X '$(VERSION_PKG).clientVersion=$(MTV_VERSION)'"
 
 .PHONY: build
 build: fmt vet
@@ -33,6 +34,10 @@ build-windows: fmt vet
 build-darwin: fmt vet
 	GOOS=darwin GOARCH=amd64 go build $(PROD_LDFLAGS) -o bin/kubectl-mtv-darwin-amd64
 	GOOS=darwin GOARCH=arm64 go build $(PROD_LDFLAGS) -o bin/kubectl-mtv-darwin-arm64
+
+.PHONY: build-mcp
+build-mcp:
+	go build $(PROD_LDFLAGS) -o mcp-bin/kubectl-mtv
 
 .PHONY: build-all
 build-all: build-linux build-windows build-darwin
