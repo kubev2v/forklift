@@ -864,7 +864,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			csiPVCs, csiErr := r.kubevirt.CsiImportPVCs(vm)
 			if csiErr != nil {
 				if !errors.As(csiErr, &web.ProviderNotReadyError{}) {
-					r.Log.Error(csiErr, "error creating CSI import PVCs", "vm", vm.Name)
+					r.Log.Error(csiErr, "error building CSI import PVCs", "vm", vm.Name)
 					step.AddError(csiErr.Error())
 					err = nil
 					break
@@ -873,6 +873,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 					return
 				}
 			}
+			var resolvedCsiPVCs []*core.PersistentVolumeClaim
 			if len(csiPVCs) > 0 {
 				if csiErr = r.ensurer.PersistentVolumeClaims(vm, csiPVCs); csiErr != nil {
 					if !errors.As(csiErr, &web.ProviderNotReadyError{}) {
@@ -884,11 +885,23 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 						return
 					}
 				}
+				var migrationPVCs []*core.PersistentVolumeClaim
+				if migrationPVCs, csiErr = r.kubevirt.getPVCs(vm.Ref); csiErr != nil {
+					if !errors.As(csiErr, &web.ProviderNotReadyError{}) {
+						step.AddError(csiErr.Error())
+						err = nil
+						break
+					} else {
+						err = csiErr
+						return
+					}
+				}
+				resolvedCsiPVCs = resolveCsiPVCs(csiPVCs, migrationPVCs)
 			}
 
+			var populatorPVCs []*core.PersistentVolumeClaim
 			if r.builder.SupportsVolumePopulators() {
-				var pvcs []*core.PersistentVolumeClaim
-				if pvcs, err = r.kubevirt.PopulatorVolumes(vm.Ref); err != nil {
+				if populatorPVCs, err = r.kubevirt.PopulatorVolumes(vm.Ref); err != nil {
 					if !errors.As(err, &web.ProviderNotReadyError{}) {
 						r.Log.Error(err, "error creating volumes", "vm", vm.Name)
 						step.AddError(err.Error())
@@ -898,7 +911,11 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 						return
 					}
 				}
-				err = r.kubevirt.EnsurePopulatorVolumes(vm, pvcs)
+			}
+
+			bindPVCs := append(populatorPVCs, resolvedCsiPVCs...)
+			if len(bindPVCs) > 0 {
+				err = r.kubevirt.EnsurePVCInitPod(vm, bindPVCs)
 				if err != nil {
 					if !errors.As(err, &web.ProviderNotReadyError{}) {
 						step.AddError(err.Error())
@@ -1663,6 +1680,60 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 	}
 
 	return
+}
+
+// Matches by AnnDiskSource, not name — CSI import PVC names may be unset until creation.
+func resolveCsiPVCs(csiSpecs []core.PersistentVolumeClaim, migrationPVCs []*core.PersistentVolumeClaim) []*core.PersistentVolumeClaim {
+	wanted := make(map[string]bool, len(csiSpecs))
+	for i := range csiSpecs {
+		if src := csiSpecs[i].Annotations[base.AnnDiskSource]; src != "" {
+			wanted[src] = true
+		}
+	}
+	var matched []*core.PersistentVolumeClaim
+	for _, pvc := range migrationPVCs {
+		if src := pvc.Annotations[base.AnnDiskSource]; src != "" && wanted[src] {
+			matched = append(matched, pvc)
+		}
+	}
+	return matched
+}
+
+const schedulerQueuedReasonFmt = "Waiting to start migration: in-flight limit reached (max %d)."
+
+func (r *Migration) markSchedulerQueuedVMs() {
+	limit := settings.Settings.MaxInFlight
+	queued := 0
+
+	for i := range r.Plan.Status.Migration.VMs {
+		vm := r.Plan.Status.Migration.VMs[i]
+		if vm.MarkedStarted() || vm.MarkedCompleted() || vm.HasCondition(api.ConditionCanceled) {
+			continue
+		}
+		queued++
+		vm.SetCondition(libcnd.Condition{
+			Type:     api.ConditionPending,
+			Status:   True,
+			Category: api.CategoryAdvisory,
+			Message:  fmt.Sprintf(schedulerQueuedReasonFmt, limit),
+			Durable:  true,
+		})
+	}
+
+	if queued == 0 {
+		return
+	}
+
+	r.Plan.Status.SetCondition(libcnd.Condition{
+		Type:     libcnd.Ready,
+		Status:   True,
+		Category: api.CategoryRequired,
+		Message: fmt.Sprintf(
+			"%d VM(s) waiting to start migration (in-flight limit: %d).",
+			queued,
+			limit),
+	})
+	r.Log.Info("VMs waiting for scheduler capacity.", "count", queued, "limit", limit)
 }
 
 func (r *Migration) resetPrecopyTasks(vm *plan.VMStatus, step *plan.Step) {
