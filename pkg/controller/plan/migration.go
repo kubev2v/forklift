@@ -2151,20 +2151,13 @@ func (r *Migration) executeStorageLayerMigration(vm *plan.VMStatus, step *plan.S
 	}
 
 	namespace := r.Plan.Spec.TargetNamespace
-	migrationLabels := map[string]string{
-		"migration": string(r.Migration.UID),
-		"plan":      string(r.Plan.GetUID()),
-		"vmID":      vm.ID,
-	}
 	apiGroup := api.SchemeGroupVersion.Group
 
 	for _, pvc := range pvcs {
 		if pvc.Annotations != nil && pvc.Annotations[base.AnnTargetPvcName] != "" {
-			// Already set up in a previous reconcile.
 			continue
 		}
 		if pvc.Annotations != nil && pvc.Annotations[base.AnnIntermediatePvc] != "" {
-			// This is a final PVC created by a previous reconcile, not an intermediate.
 			continue
 		}
 
@@ -2172,22 +2165,23 @@ func (r *Migration) executeStorageLayerMigration(vm *plan.VMStatus, step *plan.S
 		crName := finalPVCName + "-populator"
 		finalStorageClass := twoCfg.FinalStorageClass
 
-		// Create the final PVC.
-		pvBlock := core.PersistentVolumeBlock
+		pvcLabels := r.kubevirt.vmLabels(vm.Ref)
+		crLabels := r.kubevirt.vmLabels(vm.Ref)
+
 		finalPVC := &core.PersistentVolumeClaim{
 			ObjectMeta: meta.ObjectMeta{
 				Name:      finalPVCName,
 				Namespace: namespace,
-				Labels:    migrationLabels,
+				Labels:    pvcLabels,
 				Annotations: map[string]string{
-					base.AnnDiskSource:    pvc.Annotations[base.AnnDiskSource],
-					base.AnnDiskIndex:     pvc.Annotations[base.AnnDiskIndex],
+					base.AnnDiskSource:      pvc.Annotations[base.AnnDiskSource],
+					base.AnnDiskIndex:       pvc.Annotations[base.AnnDiskIndex],
 					base.AnnIntermediatePvc: pvc.Name,
 				},
 			},
 			Spec: core.PersistentVolumeClaimSpec{
 				StorageClassName: &finalStorageClass,
-				VolumeMode:       &pvBlock,
+				VolumeMode:       pvc.Spec.VolumeMode,
 				AccessModes:      pvc.Spec.AccessModes,
 				Resources:        pvc.Spec.Resources,
 				DataSourceRef: &core.TypedObjectReference{
@@ -2204,12 +2198,11 @@ func (r *Migration) executeStorageLayerMigration(vm *plan.VMStatus, step *plan.S
 			}
 		}
 
-		// Create the PortworxXcopyVolumePopulator CR.
 		cr := &api.PortworxXcopyVolumePopulator{
 			ObjectMeta: meta.ObjectMeta{
 				Name:      crName,
 				Namespace: namespace,
-				Labels:    migrationLabels,
+				Labels:    crLabels,
 			},
 			Spec: api.PortworxXcopyVolumePopulatorSpec{
 				SourcePvc:       pvc.Name,
@@ -2241,7 +2234,7 @@ func (r *Migration) executeStorageLayerMigration(vm *plan.VMStatus, step *plan.S
 	crList := &api.PortworxXcopyVolumePopulatorList{}
 	lErr := r.Destination.Client.List(context.TODO(), crList,
 		client.InNamespace(namespace),
-		client.MatchingLabels{"migration": string(r.Migration.UID), "vmID": vm.ID},
+		client.MatchingLabels{kMigration: string(r.Migration.UID), kVM: vm.ID},
 	)
 	if lErr != nil {
 		err = lErr

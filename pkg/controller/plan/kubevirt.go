@@ -2093,6 +2093,9 @@ func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, e
 		if strings.HasPrefix(pvc.Name, "prime-") || !hasDiskIdentity(pvc) {
 			continue
 		}
+		if pvc.Annotations != nil && pvc.Annotations[planbase.AnnIntermediatePvc] != "" {
+			continue
+		}
 		pvcs = append(pvcs, pvc)
 	}
 
@@ -2166,6 +2169,23 @@ func (r *KubeVirt) DeleteIntermediatePVCs(vmRef ref.Ref) error {
 	for i := range pvcList.Items {
 		pvc := &pvcList.Items[i]
 		if pvc.Annotations == nil || pvc.Annotations[planbase.AnnTargetPvcName] == "" {
+			continue
+		}
+		targetPVC := &core.PersistentVolumeClaim{}
+		tErr := r.Destination.Client.Get(context.TODO(), client.ObjectKey{
+			Namespace: pvc.Namespace,
+			Name:      pvc.Annotations[planbase.AnnTargetPvcName],
+		}, targetPVC)
+		if tErr != nil {
+			if k8serr.IsNotFound(tErr) {
+				r.Log.Info("Final PVC not found, keeping intermediate PVC", "pvc", pvc.Name)
+				continue
+			}
+			return liberr.Wrap(tErr)
+		}
+		if targetPVC.Status.Phase != core.ClaimBound {
+			r.Log.Info("Final PVC not bound, keeping intermediate PVC",
+				"intermediate", pvc.Name, "final", targetPVC.Name)
 			continue
 		}
 		r.Log.Info("Deleting intermediate PVC", "pvc", pvc.Name)
