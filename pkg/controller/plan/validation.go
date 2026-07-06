@@ -1851,7 +1851,7 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 			Status:   True,
 			Reason:   NotSet,
 			Category: api.CategoryCritical,
-			Message:  "VDDK image not set on the provider, this is required for the warm migration",
+			Message:  "VDDK image is required for warm migration. Set it on the source provider or configure a global VDDK image.",
 		})
 	}
 	if plan.Spec.SkipGuestConversion && vddkImage == "" && !plan.IsUsingOffloadPlugin() {
@@ -1860,7 +1860,7 @@ func (r *Reconciler) validateVddkImage(plan *api.Plan) (err error) {
 			Status:   True,
 			Reason:   NotSet,
 			Category: api.CategoryCritical,
-			Message:  "VDDK image not set on the provider, this is required for the raw copy mode migration",
+			Message:  "VDDK image is required for raw copy mode migration. Set it on the source provider or configure a global VDDK image.",
 		})
 	}
 
