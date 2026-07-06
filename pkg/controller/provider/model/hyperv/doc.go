@@ -8,9 +8,11 @@ import (
 func All() []interface{} {
 	return []interface{}{
 		&ocp.Provider{},
-		&VM{},
+		&Cluster{},
+		&Host{},
 		&Network{},
-		&Disk{},
 		&Storage{},
+		&VM{},
+		&Disk{},
 	}
 }

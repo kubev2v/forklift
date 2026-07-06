@@ -192,6 +192,7 @@ type VM struct {
 	TpmEnabled    bool                 `json:"tpmEnabled"`
 	SecureBoot    bool                 `json:"secureBoot"`
 	HasCheckpoint bool                 `json:"hasCheckpoint"`
+	Host          string               `json:"host,omitempty"`
 	GuestNetworks []model.GuestNetwork `json:"guestNetworks"`
 }
 
@@ -215,6 +216,7 @@ func (r *VM) With(m *model.VM) {
 	r.TpmEnabled = m.TpmEnabled
 	r.SecureBoot = m.SecureBoot
 	r.HasCheckpoint = m.HasCheckpoint
+	r.Host = m.Host
 	if m.GuestNetworks != nil {
 		r.GuestNetworks = m.GuestNetworks
 	} else {

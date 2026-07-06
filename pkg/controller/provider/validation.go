@@ -138,6 +138,12 @@ func (r *Reconciler) validate(provider *api.Provider) error {
 		return liberr.Wrap(err)
 	}
 
+	// Validate Hyper-V settings (managementType)
+	err = r.validateHyperVSettings(provider)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
 	if !provider.Status.HasBlockerCondition() {
 		provider.Status.SetCondition(
 			libcnd.Condition{
@@ -1300,5 +1306,32 @@ func (r *Reconciler) validateSMBCSI(provider *api.Provider) error {
 
 	// SMB CSI driver is installed - remove any previous condition
 	provider.Status.DeleteCondition(SMBCSIDriverNotReady)
+	return nil
+}
+
+func (r *Reconciler) validateHyperVSettings(provider *api.Provider) error {
+	if provider.Type() != api.HyperV {
+		return nil
+	}
+	if provider.Status.HasBlockerCondition() {
+		return nil
+	}
+
+	mt := provider.Spec.Settings[api.ManagementType]
+	if mt != "" && mt != api.HyperVStandalone && mt != api.HyperVCluster {
+		provider.Status.Phase = ValidationFailed
+		provider.Status.SetCondition(libcnd.Condition{
+			Type:     SettingsNotValid,
+			Status:   True,
+			Category: Critical,
+			Reason:   "InvalidManagementType",
+			Message: fmt.Sprintf(
+				"Invalid managementType '%s'. Allowed values: '%s', '%s', or empty (defaults to standalone).",
+				mt, api.HyperVStandalone, api.HyperVCluster),
+		})
+		return nil
+	}
+
+	provider.Status.DeleteCondition(SettingsNotValid)
 	return nil
 }
