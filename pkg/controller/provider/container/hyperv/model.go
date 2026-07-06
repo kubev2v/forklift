@@ -15,12 +15,19 @@ import (
 // All adapters.
 var adapterList []Adapter
 
+// Cluster-mode adapters prepended when provider is a Failover Cluster.
+var clusterAdapterList []Adapter
+
 func init() {
 	adapterList = []Adapter{
 		&NetworkAdapter{},
 		&StorageAdapter{},
 		&DiskAdapter{},
 		&VMAdapter{},
+	}
+	clusterAdapterList = []Adapter{
+		&ClusterAdapter{},
+		&HostAdapter{},
 	}
 }
 
@@ -385,6 +392,162 @@ func (r *VMAdapter) DeleteUnexisting(ctx *Context) (deletions []Updater, err err
 	return
 }
 
+// Cluster adapter.
+type ClusterAdapter struct {
+	BaseAdapter
+}
+
+func (r *ClusterAdapter) List(ctx *Context, provider *api.Provider) (itr fb.Iterator, err error) {
+	cluster, err := ctx.client.ListCluster()
+	if err != nil {
+		return
+	}
+	list := fb.NewList()
+	if cluster != nil {
+		m := &model.Cluster{}
+		applyClusterTo(cluster, m)
+		list.Append(m)
+	}
+	itr = list.Iter()
+	return
+}
+
+func (r *ClusterAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
+	cluster, err := ctx.client.ListCluster()
+	if err != nil || cluster == nil {
+		return
+	}
+	updater := func(tx *libmodel.Tx) (err error) {
+		m := &model.Cluster{
+			Base: model.Base{ID: cluster.Name},
+		}
+		err = tx.Get(m)
+		if err != nil {
+			if errors.Is(err, libmodel.NotFound) {
+				applyClusterTo(cluster, m)
+				err = tx.Insert(m)
+			}
+			return
+		}
+		applyClusterTo(cluster, m)
+		err = tx.Update(m)
+		return
+	}
+	updates = append(updates, updater)
+	return
+}
+
+func (r *ClusterAdapter) DeleteUnexisting(ctx *Context) (deletions []Updater, err error) {
+	return
+}
+
+// Host adapter.
+type HostAdapter struct {
+	BaseAdapter
+}
+
+func (r *HostAdapter) List(ctx *Context, provider *api.Provider) (itr fb.Iterator, err error) {
+	hosts, err := ctx.client.ListHosts()
+	if err != nil {
+		return
+	}
+	list := fb.NewList()
+	for i := range hosts {
+		m := &model.Host{}
+		applyHostTo(&hosts[i], m)
+		list.Append(m)
+	}
+	itr = list.Iter()
+	return
+}
+
+func (r *HostAdapter) GetUpdates(ctx *Context) (updates []Updater, err error) {
+	hosts, err := ctx.client.ListHosts()
+	if err != nil {
+		return
+	}
+	for i := range hosts {
+		host := &hosts[i]
+		updater := func(tx *libmodel.Tx) (err error) {
+			m := &model.Host{
+				Base: model.Base{ID: host.Name},
+			}
+			err = tx.Get(m)
+			if err != nil {
+				if errors.Is(err, libmodel.NotFound) {
+					applyHostTo(host, m)
+					err = tx.Insert(m)
+				}
+				return
+			}
+			applyHostTo(host, m)
+			err = tx.Update(m)
+			return
+		}
+		updates = append(updates, updater)
+	}
+	return
+}
+
+func (r *HostAdapter) DeleteUnexisting(ctx *Context) (deletions []Updater, err error) {
+	existing := []model.Host{}
+	err = ctx.db.List(&existing, libmodel.ListOptions{})
+	if err != nil {
+		if errors.Is(err, libmodel.NotFound) {
+			err = nil
+		}
+		return
+	}
+	serverList, err := ctx.client.ListHosts()
+	if err != nil {
+		return
+	}
+	serverMap := make(map[string]bool)
+	for _, h := range serverList {
+		serverMap[h.Name] = true
+	}
+	for _, h := range existing {
+		if _, found := serverMap[h.ID]; !found {
+			currentID := h.ID
+			updater := func(tx *libmodel.Tx) (err error) {
+				m := &model.Host{Base: model.Base{ID: currentID}}
+				err = tx.Delete(m)
+				if err != nil && errors.Is(err, libmodel.NotFound) {
+					err = nil
+				}
+				return
+			}
+			deletions = append(deletions, updater)
+		}
+	}
+	return
+}
+
+// Apply Cluster to (update) the model.
+func applyClusterTo(r *types.Cluster, m *model.Cluster) {
+	m.ID = r.Name
+	m.Name = r.Name
+	m.Domain = r.Domain
+	m.Nodes = nil
+	for _, nodeName := range r.Nodes {
+		m.Nodes = append(m.Nodes, model.Ref{
+			Kind: model.HostKind,
+			ID:   nodeName,
+		})
+	}
+}
+
+// Apply Host to (update) the model.
+func applyHostTo(r *types.Host, m *model.Host) {
+	m.ID = r.Name
+	m.Name = r.Name
+	m.State = r.State
+	m.Cluster = r.ClusterName
+	m.CpuSockets = int16(r.CpuCount)
+	m.CpuCores = int16(r.CpuCores)
+	m.MemoryBytes = r.MemoryMB * 1024 * 1024
+}
+
 // Apply VM to (update) the model.
 func applyVMTo(r *types.VM, m *model.VM) {
 	m.ID = r.UUID
@@ -398,6 +561,8 @@ func applyVMTo(r *types.VM, m *model.VM) {
 	m.TpmEnabled = r.TpmEnabled
 	m.SecureBoot = r.SecureBoot
 	m.HasCheckpoint = r.HasCheckpoint
+	m.Host = r.OwnerNode
+	m.IsClusterRole = r.IsClusterRole
 	addVMDisks(r, m)
 	addVMNICs(r, m)
 	addVMGuestNetworks(r, m)

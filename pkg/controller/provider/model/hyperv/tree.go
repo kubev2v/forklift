@@ -7,6 +7,8 @@ import (
 
 // Kinds
 var (
+	ClusterKind = libref.ToKind(Cluster{})
+	HostKind    = libref.ToKind(Host{})
 	VmKind      = libref.ToKind(VM{})
 	NetKind     = libref.ToKind(Network{})
 	DiskKind    = libref.ToKind(Disk{})

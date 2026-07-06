@@ -29,6 +29,20 @@ func Handlers(container *container.Container) []libweb.RequestHandler {
 			},
 			Config: DefaultConfig,
 		},
+		&ClusterHandler{
+			Handler: Handler{
+				Handler: base.Handler{
+					Container: container,
+				},
+			},
+		},
+		&HostHandler{
+			Handler: Handler{
+				Handler: base.Handler{
+					Container: container,
+				},
+			},
+		},
 		&VMHandler{
 			Handler: Handler{
 				Handler: base.Handler{

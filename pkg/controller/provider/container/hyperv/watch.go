@@ -363,3 +363,90 @@ func (r *VMEventHandler) workload(vmID string) (object interface{}, err error) {
 
 	return
 }
+
+// Watch for cluster changes and trigger VM revalidation.
+type ClusterEventHandler struct {
+	libmodel.StockEventHandler
+	DB  libmodel.DB
+	log logging.LevelLogger
+}
+
+// Cluster updated — revalidate all VMs on cluster member hosts.
+func (r *ClusterEventHandler) Updated(event libmodel.Event) {
+	cluster, cast := event.Model.(*model.Cluster)
+	if cast {
+		r.validate(cluster)
+	}
+}
+
+func (r *ClusterEventHandler) Error(err error) {
+	r.log.Error(liberr.Wrap(err), err.Error())
+}
+
+func (r *ClusterEventHandler) validate(cluster *model.Cluster) {
+	for _, ref := range cluster.Nodes {
+		host := &model.Host{Base: model.Base{ID: ref.ID}}
+		err := r.DB.Get(host)
+		if err != nil {
+			r.log.Error(err, "Host (get) failed.", "hostID", ref.ID)
+			continue
+		}
+		hostHandler := HostEventHandler{DB: r.DB, log: r.log}
+		hostHandler.validate(host)
+	}
+}
+
+// Watch for host changes and trigger VM revalidation.
+type HostEventHandler struct {
+	libmodel.StockEventHandler
+	DB  libmodel.DB
+	log logging.LevelLogger
+}
+
+// Host updated — revalidate all VMs running on this host.
+func (r *HostEventHandler) Updated(event libmodel.Event) {
+	host, cast := event.Model.(*model.Host)
+	if cast {
+		r.validate(host)
+	}
+}
+
+func (r *HostEventHandler) Error(err error) {
+	r.log.Error(liberr.Wrap(err), err.Error())
+}
+
+func (r *HostEventHandler) validate(host *model.Host) {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		r.log.Error(err, "begin tx failed.")
+		return
+	}
+	defer func() {
+		_ = tx.End()
+	}()
+	list := []model.VM{}
+	err = tx.List(
+		&list,
+		model.ListOptions{
+			Detail: model.MaxDetail,
+			Predicate: libmodel.Eq(
+				"Host",
+				host.Name),
+		})
+	if err != nil {
+		r.log.Error(err, "VM (list) failed.")
+		return
+	}
+	for i := range list {
+		list[i].RevisionValidated = 0
+		err = tx.Update(&list[i])
+		if err != nil {
+			r.log.Error(err, "VM (update) failed.")
+			return
+		}
+	}
+	err = tx.Commit()
+	if err != nil {
+		r.log.Error(err, "Tx commit failed.")
+	}
+}

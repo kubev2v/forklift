@@ -70,6 +70,32 @@ func (m *Base) GetName() string {
 	return m.Name
 }
 
+// Cluster node state constants.
+const (
+	NodeStateUp      = "Up"
+	NodeStateDown    = "Down"
+	NodeStatePaused  = "Paused"
+	NodeStateJoining = "Joining"
+)
+
+// Cluster represents a Windows Failover Cluster.
+type Cluster struct {
+	Base
+	Domain string `sql:""`
+	Nodes  []Ref  `sql:""`
+}
+
+// Host represents a Hyper-V cluster node.
+type Host struct {
+	Base
+	Cluster     string `sql:"d0,index(cluster)"`
+	State       string `sql:""`
+	CpuSockets  int16  `sql:""`
+	CpuCores    int16  `sql:""`
+	MemoryBytes int64  `sql:""`
+	Networks    []Ref  `sql:""`
+}
+
 type Network struct {
 	Base
 	UUID string `sql:"d0,index(uuid)"`
@@ -78,6 +104,8 @@ type Network struct {
 	// Switch type: External, Internal, Private
 	SwitchType  string `sql:""`
 	Description string `sql:""`
+	// Hosts tracks which cluster nodes have this virtual switch (empty in standalone mode).
+	Hosts []Ref `sql:""`
 }
 
 type Storage struct {
@@ -103,6 +131,8 @@ type VM struct {
 	TpmEnabled        bool           `sql:""`
 	SecureBoot        bool           `sql:""`
 	HasCheckpoint     bool           `sql:""`
+	IsClusterRole     bool           `sql:""`
+	Host              string         `sql:"d0,index(host)"`
 	RevisionValidated int64          `sql:"d0,index(revisionValidated)"`
 	PolicyVersion     int            `sql:"d0,index(policyVersion)"`
 	Disks             []Disk         `sql:""`

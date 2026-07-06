@@ -1,5 +1,23 @@
 package types
 
+// Cluster represents a Windows Failover Cluster.
+type Cluster struct {
+	Name   string   `json:"name"`
+	Domain string   `json:"domain"`
+	Nodes  []string `json:"nodes"`
+}
+
+// Host represents a Hyper-V cluster node.
+type Host struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	State       string `json:"state"`
+	ClusterName string `json:"clusterName"`
+	CpuCount    int    `json:"cpuCount"`
+	CpuCores    int    `json:"cpuCores"`
+	MemoryMB    int64  `json:"memoryMB"`
+}
+
 // VM represents a Hyper-V virtual machine.
 type VM struct {
 	UUID          string         `json:"uuid"`
@@ -12,6 +30,8 @@ type VM struct {
 	TpmEnabled    bool           `json:"tpmEnabled"`
 	SecureBoot    bool           `json:"secureBoot"`
 	HasCheckpoint bool           `json:"hasCheckpoint"`
+	OwnerNode     string         `json:"ownerNode,omitempty"`
+	IsClusterRole bool           `json:"isClusterRole,omitempty"`
 	Disks         []Disk         `json:"disks"`
 	NICs          []NIC          `json:"nics"`
 	GuestNetworks []GuestNetwork `json:"guestNetworks,omitempty"`

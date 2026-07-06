@@ -22,6 +22,16 @@ type Resolver struct {
 // Path builds the URL path for a resource.
 func (r *Resolver) Path(resource interface{}, id string) (path string, err error) {
 	switch resource.(type) {
+	case *Cluster:
+		path = base.Link(ClusterRoot, base.Params{
+			base.ProviderParam: string(r.UID),
+			ClusterParam:       id,
+		})
+	case *Host:
+		path = base.Link(HostRoot, base.Params{
+			base.ProviderParam: string(r.UID),
+			HostParam:          id,
+		})
 	case *VM:
 		path = base.Link(VMRoot, base.Params{
 			base.ProviderParam: string(r.Provider.UID),
@@ -219,6 +229,40 @@ func (r *Finder) ByRef(resource interface{}, ref base.Ref) (err error) {
 		} else {
 			err = base.NotFoundError{Ref: ref}
 		}
+	case *Host:
+		id := ref.ID
+		if id != "" {
+			err = r.Get(resource, id)
+			return
+		}
+		name := ref.Name
+		if name != "" {
+			list := []Host{}
+			err = r.List(
+				&list,
+				base.Param{
+					Key:   DetailParam,
+					Value: "all",
+				},
+				base.Param{
+					Key:   NameParam,
+					Value: name,
+				})
+			if err != nil {
+				return
+			}
+			if len(list) == 0 {
+				err = base.NotFoundError{Ref: ref}
+				return
+			}
+			if len(list) > 1 {
+				err = base.RefNotUniqueError{Ref: ref}
+				return
+			}
+			*res = list[0]
+		} else {
+			err = base.NotFoundError{Ref: ref}
+		}
 	default:
 		err = base.ResourceNotResolvedError{Object: resource}
 	}
@@ -309,6 +353,12 @@ func (r *Finder) Storage(ref *base.Ref) (object interface{}, err error) {
 //	NotFoundErr
 //	RefNotUniqueErr
 func (r *Finder) Host(ref *base.Ref) (object interface{}, err error) {
-	err = base.ResourceNotResolvedError{Object: ref}
+	host := &Host{}
+	err = r.ByRef(host, *ref)
+	if err == nil {
+		ref.ID = host.ID
+		ref.Name = host.Name
+		object = host
+	}
 	return
 }
