@@ -12,7 +12,7 @@ WORKDIR /app/cmd/kubectl-mtv
 RUN --mount=type=cache,target=${GOCACHE},uid=1001 make build-all
 
 # Build a native binary for the MCP server running inside the container
-RUN --mount=type=cache,target=${GOCACHE},uid=1001 go build -buildvcs=false -ldflags="-w -s" -o mcp-bin/kubectl-mtv
+RUN --mount=type=cache,target=${GOCACHE},uid=1001 make build-mcp
 
 # Nginx + MCP server stage
 FROM registry.access.redhat.com/ubi9/nginx-126:1-1772411898
