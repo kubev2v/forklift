@@ -14,6 +14,7 @@ import (
 const (
 	SourceStorageNotValid      = "SourceStorageNotValid"
 	DestinationStorageNotValid = "DestinationStorageNotValid"
+	OffloadPluginNotValid      = "OffloadPluginNotValid"
 )
 
 // Categories
@@ -27,9 +28,10 @@ const (
 
 // Reasons
 const (
-	NotSet    = "NotSet"
-	NotFound  = "NotFound"
-	Ambiguous = "Ambiguous"
+	NotSet               = "NotSet"
+	NotFound             = "NotFound"
+	Ambiguous            = "Ambiguous"
+	MissingXcopyFallback = "MissingXcopyFallback"
 )
 
 // Statuses
@@ -63,6 +65,7 @@ func (r *Reconciler) validate(mp *api.StorageMap) error {
 	if err != nil {
 		return err
 	}
+	r.validateOffloadPlugin(mp)
 
 	return nil
 }
@@ -163,4 +166,41 @@ func (r *Reconciler) validateDestination(mp *api.StorageMap) (err error) {
 	}
 
 	return
+}
+
+func (r *Reconciler) validateOffloadPlugin(mp *api.StorageMap) {
+	notValid := []string{}
+	for _, entry := range mp.Spec.Map {
+		plugin := entry.OffloadPlugin
+		if plugin == nil || plugin.CsiVolumeImport == nil {
+			continue
+		}
+		if !hasXcopyFallback(mp.Spec.Map, entry.Source, plugin.CsiVolumeImport.StorageVendorProduct) {
+			notValid = append(notValid, entry.Source.String())
+		}
+	}
+	if len(notValid) > 0 {
+		mp.Status.SetCondition(libcnd.Condition{
+			Type:     OffloadPluginNotValid,
+			Status:   True,
+			Reason:   MissingXcopyFallback,
+			Category: Critical,
+			Message:  "csiVolumeImport requires a vsphereXcopyConfig entry for the same source and vendor, as an xcopy fallback.",
+			Items:    notValid,
+		})
+	}
+}
+
+// hasXcopyFallback reports whether source has a vsphereXcopyConfig entry for vendor, same or sibling entry.
+func hasXcopyFallback(entries []api.StoragePair, source refapi.Ref, vendor api.StorageVendorProduct) bool {
+	for _, entry := range entries {
+		if entry.Source != source {
+			continue
+		}
+		cfg := entry.OffloadPlugin
+		if cfg != nil && cfg.VSphereXcopyPluginConfig != nil && cfg.VSphereXcopyPluginConfig.StorageVendorProduct == vendor {
+			return true
+		}
+	}
+	return false
 }

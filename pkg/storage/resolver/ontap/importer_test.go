@@ -102,9 +102,12 @@ func TestResolveRDM(t *testing.T) {
 	defer srv.Close()
 
 	backing := &resolver.DiskBacking{IsRDM: true, DeviceName: naa}
-	annotations, err := imp.Resolve(backing)
+	annotations, found, err := imp.Resolve(backing)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if !found {
+		t.Fatal("expected found = true")
 	}
 
 	if annotations[annImportOriginalName] != "eco_lun01_vmfs01" {
@@ -127,9 +130,12 @@ func TestResolveRDMFromVML(t *testing.T) {
 	defer srv.Close()
 
 	backing := &resolver.DiskBacking{IsRDM: true, DeviceName: vml}
-	annotations, err := imp.Resolve(backing)
+	annotations, found, err := imp.Resolve(backing)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if !found {
+		t.Fatal("expected found = true")
 	}
 	if annotations[annImportOriginalName] != "rdm_10g" {
 		t.Errorf("expected importOriginalName = 'rdm_10g', got %q", annotations[annImportOriginalName])
@@ -147,9 +153,12 @@ func TestResolveRDMEconomy(t *testing.T) {
 	imp.driverType = DriverOntapSanEconomy
 
 	backing := &resolver.DiskBacking{IsRDM: true, DeviceName: naa}
-	annotations, err := imp.Resolve(backing)
+	annotations, found, err := imp.Resolve(backing)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if !found {
+		t.Fatal("expected found = true")
 	}
 	if annotations[annImportOriginalName] != "trident_lun_pool_abc/lun1" {
 		t.Errorf("expected importOriginalName = 'trident_lun_pool_abc/lun1', got %q", annotations[annImportOriginalName])
@@ -161,7 +170,7 @@ func TestResolveRDMBadNAA(t *testing.T) {
 	defer srv.Close()
 
 	backing := &resolver.DiskBacking{IsRDM: true, DeviceName: "naa.60002ac0badbadserial"}
-	_, err := imp.Resolve(backing)
+	_, _, err := imp.Resolve(backing)
 	if err == nil {
 		t.Fatal("expected error for non-ONTAP NAA, got nil")
 	}
@@ -178,12 +187,15 @@ func TestResolveRDMNotFound(t *testing.T) {
 	naa := "naa." + ontapProviderID + hexSerial
 	backing := &resolver.DiskBacking{IsRDM: true, DeviceName: naa}
 
-	_, err := imp.Resolve(backing)
-	if err == nil {
-		t.Fatal("expected error for unknown serial, got nil")
+	annotations, found, err := imp.Resolve(backing)
+	if err != nil {
+		t.Fatalf("expected nil error for unknown serial (cross-array, defer to xcopy), got: %v", err)
 	}
-	if !strings.Contains(err.Error(), "no ONTAP LUN found") {
-		t.Errorf("expected 'no ONTAP LUN found' error, got: %v", err)
+	if found {
+		t.Fatal("expected found = false for unknown serial")
+	}
+	if annotations != nil {
+		t.Errorf("expected nil annotations for unknown serial, got: %v", annotations)
 	}
 }
 
@@ -192,9 +204,12 @@ func TestResolveVVol(t *testing.T) {
 	defer srv.Close()
 
 	backing := &resolver.DiskBacking{VVolID: "vvol:some-uuid"}
-	annotations, err := imp.Resolve(backing)
+	annotations, found, err := imp.Resolve(backing)
 	if err != nil {
 		t.Fatalf("expected nil error for VVol (not yet supported by ONTAP importer), got: %v", err)
+	}
+	if found {
+		t.Fatal("expected found = false for VVol (not yet supported by ONTAP importer)")
 	}
 	if annotations != nil {
 		t.Errorf("expected nil annotations for VVol (not yet supported by ONTAP importer), got: %v", annotations)
@@ -206,7 +221,7 @@ func TestResolveVMDK(t *testing.T) {
 	defer srv.Close()
 
 	backing := &resolver.DiskBacking{DeviceName: "[ds] vm/vm.vmdk"}
-	_, err := imp.Resolve(backing)
+	_, _, err := imp.Resolve(backing)
 	if err == nil {
 		t.Fatal("expected error for VMDK, got nil")
 	}
@@ -219,7 +234,7 @@ func TestResolveNilBacking(t *testing.T) {
 	srv, imp := mockOntapAPI(t, map[string]string{})
 	defer srv.Close()
 
-	_, err := imp.Resolve(nil)
+	_, _, err := imp.Resolve(nil)
 	if err == nil {
 		t.Fatal("expected error for nil backing, got nil")
 	}
