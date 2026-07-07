@@ -68,9 +68,10 @@ type FlashSystemHost struct {
 }
 
 type FlashSystemVolume struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	VdiskUID string `json:"vdisk_UID"` // Unique Identification Number, used for NAA.
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	VdiskUID   string `json:"vdisk_UID"`    // Unique Identification Number, used for NAA.
+	MdiskGrpID string `json:"mdisk_grp_id"` // Pool ID this volume belongs to.
 }
 
 type FlashSystemVolumeHostMapping struct {
@@ -280,6 +281,27 @@ func (c *FlashSystemAPIClient) GetSystemInfo() (*FlashSystemInfo, error) {
 	return &sysInfo, nil
 }
 
+// GetPoolProtection queries a single pool's detailed view to check vdisk_protection_enabled.
+// The concise lsmdiskgrp list does not include this field; only lsmdiskgrp/<id> returns it.
+func (c *FlashSystemAPIClient) GetPoolProtection(poolID string) (enabled bool, poolName string, err error) {
+	c.log.V(2).Info("checking pool vdisk protection", "pool_id", poolID)
+	respBytes, status, err := c.makeRequest("POST", "/lsmdiskgrp/"+poolID, map[string]string{})
+	if err != nil || status != http.StatusOK {
+		return false, "", fmt.Errorf("failed to get pool details for id=%s: %w, status: %d", poolID, err, status)
+	}
+
+	var detail struct {
+		Name                   string `json:"name"`
+		VdiskProtectionEnabled string `json:"vdisk_protection_enabled"`
+	}
+	if err := json.Unmarshal(respBytes, &detail); err != nil {
+		return false, "", fmt.Errorf("failed to unmarshal pool details for id=%s: %w", poolID, err)
+	}
+
+	c.log.V(2).Info("pool vdisk protection", "pool_id", poolID, "pool_name", detail.Name, "enabled", detail.VdiskProtectionEnabled)
+	return detail.VdiskProtectionEnabled == "yes", detail.Name, nil
+}
+
 // FlashCopyMapping represents one entry from lsfcmap (list FlashCopy mappings).
 type FlashCopyMapping struct {
 	ID              string `json:"id"`
@@ -417,13 +439,7 @@ func NewFlashSystemClonner(managementIP, username, password string, sslSkipVerif
 		return FlashSystemClonner{}, fmt.Errorf("failed to query FlashSystem system info (required to check vdisk protection): %w", err)
 	}
 
-	protectionEnabled := sysInfo.VdiskProtectionEnabled == "yes"
-	log.Info("FlashSystem volume protection settings", "enabled", protectionEnabled, "protection_time_minutes", sysInfo.VdiskProtectionTime)
-
-	if protectionEnabled {
-		log.Error(nil, "vdisk protection must be off on the IBM FlashSystem; read about it in the README in the section 'IBM FlashSystem'")
-		return FlashSystemClonner{}, fmt.Errorf("vdisk protection is enabled on the IBM FlashSystem; it must be disabled")
-	}
+	log.Info("FlashSystem volume protection settings", "system_level", sysInfo.VdiskProtectionEnabled, "protection_time_minutes", sysInfo.VdiskProtectionTime)
 
 	clonner := FlashSystemClonner{
 		api: client,
@@ -878,6 +894,17 @@ func (c *FlashSystemClonner) createLUNFromVDisk(vdiskDetails FlashSystemVolume, 
 	return lun, nil
 }
 
+func (c *FlashSystemClonner) checkPoolVdiskProtection(poolID string) error {
+	enabled, poolName, err := c.api.GetPoolProtection(poolID)
+	if err != nil {
+		return fmt.Errorf("failed to check vdisk protection for pool id=%s: %w", poolID, err)
+	}
+	if enabled {
+		return fmt.Errorf("vdisk protection is enabled on pool '%s' (id=%s); it must be disabled for pools used by migration volumes — see README section 'IBM FlashSystem'", poolName, poolID)
+	}
+	return nil
+}
+
 // ResolvePVToLUN resolves a PersistentVolume to a LUN by finding a volume with matching vdisk_UID.
 func (c *FlashSystemClonner) ResolvePVToLUN(pv populator.PersistentVolume) (populator.LUN, error) {
 	c.log.Info("resolving PV to LUN", "pv", pv.Name, "volume_handle", pv.VolumeHandle)
@@ -918,7 +945,12 @@ func (c *FlashSystemClonner) ResolvePVToLUN(pv populator.PersistentVolume) (popu
 	}
 
 	vdisk := vdisks[0]
-	c.log.V(2).Info("found matching volume", "vdisk", vdisk.Name, "vdisk_id", vdisk.ID, "pv", pv.Name)
+	c.log.V(2).Info("found matching volume", "vdisk", vdisk.Name, "vdisk_id", vdisk.ID, "pool_id", vdisk.MdiskGrpID, "pv", pv.Name)
+
+	if err := c.checkPoolVdiskProtection(vdisk.MdiskGrpID); err != nil {
+		return populator.LUN{}, err
+	}
+
 	return c.createLUNFromVDisk(vdisk, pv.VolumeHandle)
 }
 
@@ -944,6 +976,11 @@ func (c *FlashSystemClonner) getVDiskByUID(uid string) (*FlashSystemVolume, erro
 	if len(vdisks) > 1 {
 		return nil, fmt.Errorf("multiple volumes (%d) found for vdisk_UID %s", len(vdisks), uid)
 	}
+
+	if err := c.checkPoolVdiskProtection(vdisks[0].MdiskGrpID); err != nil {
+		return nil, err
+	}
+
 	return &vdisks[0], nil
 }
 
