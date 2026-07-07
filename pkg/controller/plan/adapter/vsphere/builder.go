@@ -176,7 +176,6 @@ var sanitizeNameRx = regexp.MustCompile(`[^a-zA-Z0-9_.-]+`)
 // vSphere builder.
 type Builder struct {
 	*plancontext.Context
-	// Host CRs.
 	hosts map[string]*api.Host
 }
 
@@ -1702,6 +1701,7 @@ func (r *Builder) buildCsiImportPVC(
 	diskIndex int,
 	mapped *api.StoragePair,
 	annotations map[string]string,
+	plugin resolver.CsiImportPlugin,
 ) (*core.PersistentVolumeClaim, error) {
 	if mapped.OffloadPlugin == nil || mapped.OffloadPlugin.CsiVolumeImport == nil {
 		return nil, liberr.New("CSI import plugin not configured for storage pair")
@@ -1719,15 +1719,11 @@ func (r *Builder) buildCsiImportPVC(
 		return nil, nil //nolint:nilnil
 	}
 
-	vsphereClient := &Client{Context: r.Context}
-	if err := vsphereClient.connect(); err != nil {
-		return nil, liberr.Wrap(err, "failed to connect to vSphere for disk backing detection")
-	}
-	defer vsphereClient.Close()
-
-	backing, err := vsphereClient.getDiskBacking(ctx, vmRef.ID, disk.File)
-	if err != nil {
-		return nil, liberr.Wrap(err, "disk", disk.File)
+	backing := &resolver.DiskBacking{
+		VVolID:     disk.VVolID,
+		IsRDM:      disk.RDM,
+		DeviceName: disk.DeviceName,
+		LunUuid:    disk.LunUuid,
 	}
 	diskType := resolver.DetectDiskType(backing)
 	r.Log.V(2).Info("CSI import: detected disk backing", "disk", disk.File, "type", diskType, "vvolId", backing.VVolID, "isRDM", backing.IsRDM, "deviceName", backing.DeviceName)
@@ -1737,27 +1733,31 @@ func (r *Builder) buildCsiImportPVC(
 		return nil, nil //nolint:nilnil
 	}
 
-	// Read storage credentials from the secret in the source provider's namespace
-	storageSecret := &core.Secret{}
-	if err = r.Destination.Get(ctx, client.ObjectKey{
-		Name:      csiCfg.SecretRef,
-		Namespace: r.Source.Provider.Namespace,
-	}, storageSecret); err != nil {
-		return nil, liberr.Wrap(err, "secretRef", csiCfg.SecretRef)
-	}
-	// Instantiate vendor plugin (xcopy pattern: switch in newCsiImportPlugin creates concrete type)
-	plugin, err := newCsiImportPlugin(csiCfg.StorageVendorProduct, storageSecret.Data, r.Destination.Client, mapped.Destination.StorageClass)
-	if err != nil {
-		return nil, liberr.Wrap(err, "vendor", string(csiCfg.StorageVendorProduct))
+	if plugin == nil {
+		storageSecret := &core.Secret{}
+		if err := r.Destination.Get(ctx, client.ObjectKey{
+			Name:      csiCfg.SecretRef,
+			Namespace: r.Source.Provider.Namespace,
+		}, storageSecret); err != nil {
+			return nil, liberr.Wrap(err, "secretRef", csiCfg.SecretRef)
+		}
+		var err error
+		plugin, err = newCsiImportPlugin(csiCfg.StorageVendorProduct, storageSecret.Data, r.Destination.Client, mapped.Destination.StorageClass)
+		if err != nil {
+			return nil, liberr.Wrap(err, "vendor", string(csiCfg.StorageVendorProduct))
+		}
 	}
 
 	r.Log.V(2).Info("CSI import: resolving vendor annotations", "disk", disk.File, "type", diskType, "deviceName", backing.DeviceName)
-	vendorAnnotations, err := plugin.Resolve(backing)
+	vendorAnnotations, found, err := plugin.Resolve(backing)
 	if err != nil {
 		return nil, liberr.Wrap(err, "disk", disk.File)
 	}
-	if vendorAnnotations == nil {
-		r.Log.Info("CSI import: vendor cannot handle this disk, deferring to other migration paths", "disk", disk.File)
+	if !found {
+		if mapped.OffloadPlugin.VSphereXcopyPluginConfig == nil {
+			return nil, liberr.New("CSI import volume not found and no xcopy fallback configured")
+		}
+		r.Log.Info("CSI import: volume not found on destination array, deferring to xcopy", "disk", disk.File)
 		return nil, nil //nolint:nilnil
 	}
 	r.Log.V(2).Info("CSI import: vendor resolution succeeded", "annotations", vendorAnnotations)
@@ -2660,7 +2660,12 @@ func (r *Builder) ensureXCopyVolumePopulator(vp *api.VSphereXcopyVolumePopulator
 
 // CsiImportPVCs creates PVCs for disks that have CsiVolumeImport configured.
 // VMDK disks are skipped (handled by DataVolumes via VDDK or PopulatorVolumes via xcopy).
-func (r *Builder) CsiImportPVCs(vmRef ref.Ref, pvcLabels map[string]string) (pvcs []core.PersistentVolumeClaim, err error) {
+func (r *Builder) CsiImportPVCs(vmRef ref.Ref, pvcLabels map[string]string) ([]core.PersistentVolumeClaim, error) {
+	return csiImportPVCs(r, vmRef, pvcLabels, nil)
+}
+
+// csiImportPVCs is CsiImportPVCs's logic with the vendor plugin taken as a parameter for testability.
+func csiImportPVCs(r *Builder, vmRef ref.Ref, pvcLabels map[string]string, plugin resolver.CsiImportPlugin) (pvcs []core.PersistentVolumeClaim, err error) {
 	vm := &model.VM{}
 	if err = r.Source.Inventory.Find(vm, vmRef); err != nil {
 		err = liberr.Wrap(err, "vm", vmRef.String())
@@ -2685,7 +2690,7 @@ func (r *Builder) CsiImportPVCs(vmRef ref.Ref, pvcLabels map[string]string) (pvc
 			continue
 		}
 
-		pvc, pErr := r.buildCsiImportPVC(context.TODO(), vmRef, vm, disk, diskIndex, mapped, pvcLabels)
+		pvc, pErr := r.buildCsiImportPVC(context.TODO(), vmRef, vm, disk, diskIndex, mapped, pvcLabels, plugin)
 		if pErr != nil {
 			err = pErr
 			return
