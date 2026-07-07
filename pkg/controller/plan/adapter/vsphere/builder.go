@@ -176,8 +176,9 @@ var sanitizeNameRx = regexp.MustCompile(`[^a-zA-Z0-9_.-]+`)
 // vSphere builder.
 type Builder struct {
 	*plancontext.Context
-	// Host CRs.
-	hosts map[string]*api.Host
+	hosts               map[string]*api.Host
+	diskBackingResolver diskBackingResolver
+	csiPlugin           resolver.CsiImportPlugin
 }
 
 // Create DataVolume certificate configmap.
@@ -1719,13 +1720,12 @@ func (r *Builder) buildCsiImportPVC(
 		return nil, nil //nolint:nilnil
 	}
 
-	vsphereClient := &Client{Context: r.Context}
-	if err := vsphereClient.connect(); err != nil {
-		return nil, liberr.Wrap(err, "failed to connect to vSphere for disk backing detection")
+	dbr := r.diskBackingResolver
+	if dbr == nil {
+		dbr = &vsphereDiskBackingResolver{planCtx: r.Context}
 	}
-	defer vsphereClient.Close()
 
-	backing, err := vsphereClient.getDiskBacking(ctx, vmRef.ID, disk.File)
+	backing, err := dbr.getDiskBacking(ctx, vmRef.ID, disk.File)
 	if err != nil {
 		return nil, liberr.Wrap(err, "disk", disk.File)
 	}
@@ -1737,49 +1737,57 @@ func (r *Builder) buildCsiImportPVC(
 		return nil, nil //nolint:nilnil
 	}
 
-	// Read storage credentials from the secret in the source provider's namespace
-	storageSecret := &core.Secret{}
-	if err = r.Destination.Get(ctx, client.ObjectKey{
-		Name:      csiCfg.SecretRef,
-		Namespace: r.Source.Provider.Namespace,
-	}, storageSecret); err != nil {
-		return nil, liberr.Wrap(err, "secretRef", csiCfg.SecretRef)
-	}
-	host := string(storageSecret.Data["STORAGE_HOSTNAME"])
-	user := string(storageSecret.Data["STORAGE_USERNAME"])
-	pass := string(storageSecret.Data["STORAGE_PASSWORD"])
-	skipSSL, err := strconv.ParseBool(string(storageSecret.Data["STORAGE_SKIP_SSL_VERIFICATION"]))
-	if err != nil {
-		r.Log.Error(err, "CSI import: invalid STORAGE_SKIP_SSL_VERIFICATION value, defaulting to false", "secretRef", csiCfg.SecretRef)
-		skipSSL = false
-	}
+	plugin := r.csiPlugin
+	if plugin == nil {
+		storageSecret := &core.Secret{}
+		if err = r.Destination.Get(ctx, client.ObjectKey{
+			Name:      csiCfg.SecretRef,
+			Namespace: r.Source.Provider.Namespace,
+		}, storageSecret); err != nil {
+			return nil, liberr.Wrap(err, "secretRef", csiCfg.SecretRef)
+		}
+		host := string(storageSecret.Data["STORAGE_HOSTNAME"])
+		user := string(storageSecret.Data["STORAGE_USERNAME"])
+		pass := string(storageSecret.Data["STORAGE_PASSWORD"])
+		skipSSL, err := strconv.ParseBool(string(storageSecret.Data["STORAGE_SKIP_SSL_VERIFICATION"]))
+		if err != nil {
+			r.Log.Error(err, "CSI import: invalid STORAGE_SKIP_SSL_VERIFICATION value, defaulting to false", "secretRef", csiCfg.SecretRef)
+			skipSSL = false
+		}
 
-	var missing []string
-	if host == "" {
-		missing = append(missing, "hostname")
-	}
-	if user == "" {
-		missing = append(missing, "username")
-	}
-	if pass == "" {
-		missing = append(missing, "password")
-	}
-	if len(missing) > 0 {
-		return nil, liberr.New(
-			fmt.Sprintf("storage secret %q is missing required keys: %s", csiCfg.SecretRef, strings.Join(missing, ", ")),
-		)
-	}
+		var missing []string
+		if host == "" {
+			missing = append(missing, "hostname")
+		}
+		if user == "" {
+			missing = append(missing, "username")
+		}
+		if pass == "" {
+			missing = append(missing, "password")
+		}
+		if len(missing) > 0 {
+			return nil, liberr.New(
+				fmt.Sprintf("storage secret %q is missing required keys: %s", csiCfg.SecretRef, strings.Join(missing, ", ")),
+			)
+		}
 
-	// Instantiate vendor plugin (xcopy pattern: switch in newCsiImportPlugin creates concrete type)
-	plugin, err := newCsiImportPlugin(csiCfg.StorageVendorProduct, host, user, pass, skipSSL)
-	if err != nil {
-		return nil, liberr.Wrap(err, "vendor", string(csiCfg.StorageVendorProduct))
+		plugin, err = newCsiImportPlugin(csiCfg.StorageVendorProduct, host, user, pass, skipSSL)
+		if err != nil {
+			return nil, liberr.Wrap(err, "vendor", string(csiCfg.StorageVendorProduct))
+		}
 	}
 
 	r.Log.V(2).Info("CSI import: resolving vendor annotations", "disk", disk.File, "type", diskType, "deviceName", backing.DeviceName)
-	vendorAnnotations, err := plugin.Resolve(backing)
+	vendorAnnotations, found, err := plugin.Resolve(backing)
 	if err != nil {
 		return nil, liberr.Wrap(err, "disk", disk.File)
+	}
+	if !found {
+		if mapped.OffloadPlugin.VSphereXcopyPluginConfig == nil {
+			return nil, liberr.New("CSI import volume not found and no xcopy fallback configured")
+		}
+		r.Log.Info("CSI import: volume not found on destination array, deferring to xcopy", "disk", disk.File)
+		return nil, nil //nolint:nilnil
 	}
 	r.Log.V(2).Info("CSI import: vendor resolution succeeded", "annotations", vendorAnnotations)
 
