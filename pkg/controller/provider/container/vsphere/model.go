@@ -669,6 +669,19 @@ func (v *DatastoreAdapter) Apply(u types.ObjectUpdate) {
 				}
 			case fVmfsExtent:
 				applyDatastoreInfoProperty(p.Val, &v.model)
+			case fDsCapabilityStorageIORMSupported:
+				if b, cast := p.Val.(bool); cast {
+					v.model.StorageIORMSupported = b
+				}
+			case fIormConfiguration:
+				switch val := p.Val.(type) {
+				case types.StorageIORMInfo:
+					applyIormConfiguration(&val, &v.model)
+				case *types.StorageIORMInfo:
+					if val != nil {
+						applyIormConfiguration(val, &v.model)
+					}
+				}
 			}
 		}
 	}
@@ -709,6 +722,20 @@ func applyNasDatastoreNfsInfo(info types.NasDatastoreInfo, ds *model.Datastore) 
 	ds.NasRemoteHost = info.Nas.RemoteHost
 	ds.NasRemotePath = info.Nas.RemotePath
 	ds.NasRemoteHostNames = append([]string(nil), info.Nas.RemoteHostNames...)
+}
+
+func applyIormConfiguration(info *types.StorageIORMInfo, ds *model.Datastore) {
+	ds.IORMEnabled = info.Enabled
+	ds.IORMCongestionThreshold = info.CongestionThreshold
+	ds.IORMCongestionThresholdMode = model.IORMThresholdModeAutomatic
+	if model.IORMThresholdMode(info.CongestionThresholdMode) == model.IORMThresholdModeManual {
+		ds.IORMCongestionThresholdMode = model.IORMThresholdModeManual
+	}
+	pct := info.PercentOfPeakThroughput
+	if pct > 100 {
+		pct = 100
+	}
+	ds.IORMPercentOfPeakThroughput = pct
 }
 
 // VM model adapter.

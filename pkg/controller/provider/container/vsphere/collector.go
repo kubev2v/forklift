@@ -114,11 +114,13 @@ const (
 	// ResourcePool
 	fResourcePool = "resourcePool"
 	// Datastore
-	fDsType      = "summary.type"
-	fCapacity    = "summary.capacity"
-	fFreeSpace   = "summary.freeSpace"
-	fDsMaintMode = "summary.maintenanceMode"
-	fVmfsExtent  = "info"
+	fDsType                           = "summary.type"
+	fCapacity                         = "summary.capacity"
+	fFreeSpace                        = "summary.freeSpace"
+	fDsMaintMode                      = "summary.maintenanceMode"
+	fVmfsExtent                       = "info"
+	fDsCapabilityStorageIORMSupported = "capability.storageIORMSupported"
+	fIormConfiguration                = "iormConfiguration"
 	// VM
 	fUUID                     = "config.uuid"
 	fInstanceUUID             = "config.instanceUuid"
@@ -1043,6 +1045,8 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 				fDsMaintMode,
 				fVmfsExtent,
 				fHost,
+				fDsCapabilityStorageIORMSupported,
+				fIormConfiguration,
 			},
 		},
 		{ // VM
