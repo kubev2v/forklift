@@ -1035,7 +1035,10 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 		}
 		if disk.RDM && r.shouldRDMAsLun(vm) {
 			diskDevice = cnv.DiskDevice{
-				LUN: &cnv.LunTarget{Bus: cnv.DiskBusSCSI},
+				LUN: &cnv.LunTarget{
+					Bus:         cnv.DiskBusSCSI,
+					Reservation: disk.Shared,
+				},
 			}
 		}
 		kubevirtDisk := cnv.Disk{
@@ -1045,6 +1048,9 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 		if disk.Shared {
 			kubevirtDisk.Shareable = ptr.To(true)
 			kubevirtDisk.Cache = cnv.CacheNone
+			if disk.RDM && r.shouldRDMAsLun(vm) {
+				kubevirtDisk.ErrorPolicy = ptr.To(cnv.DiskErrorPolicyReport)
+			}
 		}
 		// Disk serial numbers are only presented to the source guest if
 		// the disk is connected with SCSI and disk.EnableUUID is set to
