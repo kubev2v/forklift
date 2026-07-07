@@ -84,10 +84,10 @@ if (-not $groupedRoutes) {
     
     # First, handle duplicate default gateways
     foreach ($group in $gatewayDuplicates) {
-        $routes = $group.Group
+        $dupRoutes = $group.Group
 
         # Choose the route on a live interface with the lowest metric
-        $sortedRoutes = $routes | Sort-Object RouteMetric
+        $sortedRoutes = $dupRoutes | Sort-Object RouteMetric
         $toKeep = $null
         foreach ($route in $sortedRoutes) {
             $interface = $liveAdapters | Where-Object { $_.InterfaceIndex -eq $route.InterfaceIndex }
@@ -109,39 +109,53 @@ if (-not $groupedRoutes) {
         Write-Host "  Cleaning duplicate default gateway: $gateway (metric $metric) - keeping IF $($toKeep.InterfaceIndex)" -ForegroundColor Yellow
         
         # Remove ALL instances
-        foreach ($route in $routes) {
+        foreach ($route in $dupRoutes) {
             Remove-PersistentRoute $route
             Write-Host "    Deleted: $($route.DestinationPrefix) via $($route.NextHop) on IF $($route.InterfaceIndex)" -ForegroundColor Red
         }
         
-        # Re-add only ONE instance (preserve the first interface)
-        $reAddSucceeded = $false
-        try {
-            New-NetRoute -DestinationPrefix $dest -InterfaceIndex $toKeep.InterfaceIndex -NextHop $gateway -RouteMetric $metric -PolicyStore PersistentStore -ErrorAction Stop
-            Write-Host "    Re-added: $dest via $gateway on IF $($toKeep.InterfaceIndex)" -ForegroundColor Green
-            $reAddSucceeded = $true
-        } catch {
-            Write-Host "      PolicyStore method failed: $($_.Exception.Message)" -ForegroundColor Yellow
+        # Check if the chosen interface already has this gateway via its IP
+        # configuration (DefaultGateway registry, set by the network-configure
+        # script). If so, skip the PersistentStore re-add to avoid creating a
+        # duplicate persistent entry from a different source.
+        $ipCfg = Get-NetIPConfiguration -InterfaceIndex $toKeep.InterfaceIndex -ErrorAction SilentlyContinue
+        $alreadyHasGateway = $false
+        if ($ipCfg -and $ipCfg.IPv4DefaultGateway) {
+            $alreadyHasGateway = $ipCfg.IPv4DefaultGateway.NextHop -contains $gateway
         }
-        
-        # Fallback to route.exe if PolicyStore failed
-        if (-not $reAddSucceeded) {
+
+        if ($alreadyHasGateway) {
+            Write-Host "    Skipping re-add: IF $($toKeep.InterfaceIndex) already has gateway $gateway via DefaultGateway" -ForegroundColor Green
+        } else {
+            # Re-add only ONE instance (preserve the first interface)
+            $reAddSucceeded = $false
             try {
-                $parts = $dest.Split("/")
-                $network = $parts[0]
-                $prefix = [int]$parts[1]
-                $netmask = Convert-PrefixToMask $prefix
-                $metricStr = if ($null -ne $metric) { "METRIC $([int]$metric)" } else { "" }
-                $command = "route -p ADD $network MASK $netmask $gateway IF $($toKeep.InterfaceIndex) $metricStr"
-                Write-Host "      Trying route.exe: $command" -ForegroundColor Gray
-                cmd /c $command
-                if ($LASTEXITCODE -ne 0) {
-                    Write-Error "route.exe failed with exit code $LASTEXITCODE, command: $command"
-                } else {
-                    Write-Host "    Re-added with route.exe: $dest via $gateway on IF $($toKeep.InterfaceIndex)" -ForegroundColor Green
-                }
+                New-NetRoute -DestinationPrefix $dest -InterfaceIndex $toKeep.InterfaceIndex -NextHop $gateway -RouteMetric $metric -PolicyStore PersistentStore -ErrorAction Stop
+                Write-Host "    Re-added: $dest via $gateway on IF $($toKeep.InterfaceIndex)" -ForegroundColor Green
+                $reAddSucceeded = $true
             } catch {
-                Write-Host "      route.exe also failed: $($_.Exception.Message)" -ForegroundColor Red
+                Write-Host "      PolicyStore method failed: $($_.Exception.Message)" -ForegroundColor Yellow
+            }
+            
+            # Fallback to route.exe if PolicyStore failed
+            if (-not $reAddSucceeded) {
+                try {
+                    $parts = $dest.Split("/")
+                    $network = $parts[0]
+                    $prefix = [int]$parts[1]
+                    $netmask = Convert-PrefixToMask $prefix
+                    $metricStr = if ($null -ne $metric) { "METRIC $([int]$metric)" } else { "" }
+                    $command = "route -p ADD $network MASK $netmask $gateway IF $($toKeep.InterfaceIndex) $metricStr"
+                    Write-Host "      Trying route.exe: $command" -ForegroundColor Gray
+                    cmd /c $command
+                    if ($LASTEXITCODE -ne 0) {
+                        Write-Error "route.exe failed with exit code $LASTEXITCODE, command: $command"
+                    } else {
+                        Write-Host "    Re-added with route.exe: $dest via $gateway on IF $($toKeep.InterfaceIndex)" -ForegroundColor Green
+                    }
+                } catch {
+                    Write-Host "      route.exe also failed: $($_.Exception.Message)" -ForegroundColor Red
+                }
             }
         }
     }
