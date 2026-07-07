@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
+	cnv "kubevirt.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -1026,6 +1027,148 @@ var _ = Describe("PopulatorXcopyUsed", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(found).To(BeTrue())
 		Expect(xcopyUsed).To(Equal("0"))
+	})
+})
+
+var _ = Describe("mapDisks SCSI reservation", func() {
+	var builder *Builder
+
+	BeforeEach(func() {
+		builder = createBuilder()
+	})
+
+	buildPVC := func(diskFile string) *core.PersistentVolumeClaim {
+		return &core.PersistentVolumeClaim{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "test-pvc",
+				Namespace: "test",
+				Annotations: map[string]string{
+					"forklift.konveyor.io/disk-source": diskFile,
+				},
+			},
+		}
+	}
+
+	It("should set Reservation and ErrorPolicy on shared RDM LUN disk", func() {
+		builder.Plan.Spec.RDMAsLun = true
+		vm := &model.VM{
+			VM1: model.VM1{
+				VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
+				Disks: []vsphere.Disk{
+					{
+						Key:      2000,
+						File:     "[ds1] vm/disk.vmdk",
+						Capacity: 1 << 30,
+						RDM:      true,
+						Shared:   true,
+						Bus:      vsphere.SCSI,
+					},
+				},
+			},
+		}
+		pvcs := []*core.PersistentVolumeClaim{buildPVC("[ds1] vm/disk.vmdk")}
+		spec := &cnv.VirtualMachineSpec{Template: &cnv.VirtualMachineInstanceTemplateSpec{}}
+
+		err := builder.mapDisks(vm, ref.Ref{ID: "vm-1"}, pvcs, spec, false)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(spec.Template.Spec.Domain.Devices.Disks).To(HaveLen(1))
+		disk := spec.Template.Spec.Domain.Devices.Disks[0]
+		Expect(disk.LUN).NotTo(BeNil())
+		Expect(disk.LUN.Bus).To(Equal(cnv.DiskBusSCSI))
+		Expect(disk.LUN.Reservation).To(BeTrue())
+		Expect(disk.Shareable).To(Equal(ptr.To(true)))
+		Expect(disk.ErrorPolicy).To(Equal(ptr.To(cnv.DiskErrorPolicyReport)))
+	})
+
+	It("should NOT set Reservation when disk is RDM+LUN but not shared", func() {
+		builder.Plan.Spec.RDMAsLun = true
+		vm := &model.VM{
+			VM1: model.VM1{
+				VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
+				Disks: []vsphere.Disk{
+					{
+						Key:      2000,
+						File:     "[ds1] vm/disk.vmdk",
+						Capacity: 1 << 30,
+						RDM:      true,
+						Shared:   false,
+						Bus:      vsphere.SCSI,
+					},
+				},
+			},
+		}
+		pvcs := []*core.PersistentVolumeClaim{buildPVC("[ds1] vm/disk.vmdk")}
+		spec := &cnv.VirtualMachineSpec{Template: &cnv.VirtualMachineInstanceTemplateSpec{}}
+
+		err := builder.mapDisks(vm, ref.Ref{ID: "vm-1"}, pvcs, spec, false)
+		Expect(err).NotTo(HaveOccurred())
+
+		disk := spec.Template.Spec.Domain.Devices.Disks[0]
+		Expect(disk.LUN).NotTo(BeNil())
+		Expect(disk.LUN.Reservation).To(BeFalse())
+		Expect(disk.Shareable).To(BeNil())
+		Expect(disk.ErrorPolicy).To(BeNil())
+	})
+
+	It("should NOT set LUN or Reservation when disk is shared but not RDM", func() {
+		builder.Plan.Spec.RDMAsLun = true
+		vm := &model.VM{
+			VM1: model.VM1{
+				VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
+				Disks: []vsphere.Disk{
+					{
+						Key:      2000,
+						File:     "[ds1] vm/disk.vmdk",
+						Capacity: 1 << 30,
+						RDM:      false,
+						Shared:   true,
+						Bus:      vsphere.SCSI,
+					},
+				},
+			},
+		}
+		pvcs := []*core.PersistentVolumeClaim{buildPVC("[ds1] vm/disk.vmdk")}
+		spec := &cnv.VirtualMachineSpec{Template: &cnv.VirtualMachineInstanceTemplateSpec{}}
+
+		err := builder.mapDisks(vm, ref.Ref{ID: "vm-1"}, pvcs, spec, false)
+		Expect(err).NotTo(HaveOccurred())
+
+		disk := spec.Template.Spec.Domain.Devices.Disks[0]
+		Expect(disk.LUN).To(BeNil())
+		Expect(disk.Disk).NotTo(BeNil())
+		Expect(disk.Shareable).To(Equal(ptr.To(true)))
+		Expect(disk.ErrorPolicy).To(BeNil())
+	})
+
+	It("should NOT set Reservation when rdmAsLun is false", func() {
+		builder.Plan.Spec.RDMAsLun = false
+		vm := &model.VM{
+			VM1: model.VM1{
+				VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
+				Disks: []vsphere.Disk{
+					{
+						Key:      2000,
+						File:     "[ds1] vm/disk.vmdk",
+						Capacity: 1 << 30,
+						RDM:      true,
+						Shared:   true,
+						Bus:      vsphere.SCSI,
+					},
+				},
+			},
+		}
+		pvcs := []*core.PersistentVolumeClaim{buildPVC("[ds1] vm/disk.vmdk")}
+		spec := &cnv.VirtualMachineSpec{Template: &cnv.VirtualMachineInstanceTemplateSpec{}}
+
+		err := builder.mapDisks(vm, ref.Ref{ID: "vm-1"}, pvcs, spec, false)
+		Expect(err).NotTo(HaveOccurred())
+
+		disk := spec.Template.Spec.Domain.Devices.Disks[0]
+		Expect(disk.LUN).To(BeNil())
+		Expect(disk.Disk).NotTo(BeNil())
+		Expect(disk.Shareable).To(Equal(ptr.To(true)))
+		Expect(disk.ErrorPolicy).To(BeNil())
 	})
 })
 
