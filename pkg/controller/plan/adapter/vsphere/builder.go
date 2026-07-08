@@ -1034,12 +1034,13 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 			Disk: &cnv.DiskTarget{Bus: bus},
 		}
 		if disk.RDM && r.shouldRDMAsLun(vm) {
-			diskDevice = cnv.DiskDevice{
-				LUN: &cnv.LunTarget{
-					Bus:         cnv.DiskBusSCSI,
-					Reservation: disk.Shared,
-				},
+			lun := &cnv.LunTarget{
+				Bus: cnv.DiskBusSCSI,
 			}
+			if disk.Shared && r.shouldSCSIReservation(vm) {
+				lun.Reservation = true
+			}
+			diskDevice = cnv.DiskDevice{LUN: lun}
 		}
 		kubevirtDisk := cnv.Disk{
 			Name:       volumeName,
@@ -1941,6 +1942,16 @@ func (r *Builder) shouldRDMAsLun(vm *model.VM) bool {
 		return *planVM.RDMAsLun
 	}
 	return r.Context.Plan.Spec.RDMAsLun
+}
+
+// shouldSCSIReservation returns whether SCSI persistent reservation should be
+// enabled for shared RDM LUN disks on the given VM.
+// VM-level setting takes precedence; falls back to plan-level setting.
+func (r *Builder) shouldSCSIReservation(vm *model.VM) bool {
+	if planVM := r.getPlanVM(vm); planVM != nil && planVM.SCSIReservation != nil {
+		return *planVM.SCSIReservation
+	}
+	return r.Plan.Spec.SCSIReservation
 }
 
 // getPlanVMStatus get the plan VM status for the given vsphere VM
