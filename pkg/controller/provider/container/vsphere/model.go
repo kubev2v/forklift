@@ -1457,6 +1457,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					Bus:            bus,
 					Serial:         backing.Uuid,
 					WinDriveLetter: winDriveLetter,
+					VVolID:         backing.BackingObjectId,
 				}
 				if backing.Parent != nil {
 					md.ParentFile = backing.Parent.FileName
@@ -1484,6 +1485,7 @@ func (v *VmAdapter) updateDisks(devArray *types.ArrayOfVirtualDevice) {
 					Serial:         backing.Uuid,
 					WinDriveLetter: winDriveLetter,
 					DeviceName:     backing.DeviceName,
+					LunUuid:        backing.LunUuid,
 				}
 				if backing.Datastore != nil {
 					datastoreId, _ := sanitize(backing.Datastore.Value)
