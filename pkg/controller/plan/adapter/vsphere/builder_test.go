@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
@@ -1049,8 +1050,9 @@ var _ = Describe("mapDisks SCSI reservation", func() {
 		}
 	}
 
-	It("should set Reservation and ErrorPolicy on shared RDM LUN disk", func() {
+	It("should set Reservation and ErrorPolicy on shared RDM LUN disk when scsiReservation is enabled", func() {
 		builder.Plan.Spec.RDMAsLun = true
+		builder.Plan.Spec.SCSIReservation = true
 		vm := &model.VM{
 			VM1: model.VM1{
 				VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
@@ -1169,6 +1171,111 @@ var _ = Describe("mapDisks SCSI reservation", func() {
 		Expect(disk.Disk).NotTo(BeNil())
 		Expect(disk.Shareable).To(Equal(ptr.To(true)))
 		Expect(disk.ErrorPolicy).To(BeNil())
+	})
+
+	It("should NOT set Reservation on shared RDM LUN disk when scsiReservation flag is disabled (default)", func() {
+		builder.Plan.Spec.RDMAsLun = true
+		// SCSIReservation defaults to false — reservation must stay off
+		vm := &model.VM{
+			VM1: model.VM1{
+				VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
+				Disks: []vsphere.Disk{
+					{
+						Key:      2000,
+						File:     "[ds1] vm/disk.vmdk",
+						Capacity: 1 << 30,
+						RDM:      true,
+						Shared:   true,
+						Bus:      vsphere.SCSI,
+					},
+				},
+			},
+		}
+		pvcs := []*core.PersistentVolumeClaim{buildPVC("[ds1] vm/disk.vmdk")}
+		spec := &cnv.VirtualMachineSpec{Template: &cnv.VirtualMachineInstanceTemplateSpec{}}
+
+		err := builder.mapDisks(vm, ref.Ref{ID: "vm-1"}, pvcs, spec, false)
+		Expect(err).NotTo(HaveOccurred())
+
+		disk := spec.Template.Spec.Domain.Devices.Disks[0]
+		Expect(disk.LUN).NotTo(BeNil())
+		Expect(disk.LUN.Reservation).To(BeFalse())
+		Expect(disk.Shareable).To(Equal(ptr.To(true)))
+	})
+
+	It("should set Reservation when VM-level scsiReservation overrides a disabled plan-level flag", func() {
+		builder.Plan.Spec.RDMAsLun = true
+		builder.Plan.Spec.SCSIReservation = false
+		scsiReservation := true
+		builder.Plan.Spec.VMs = []plan.VM{
+			{
+				Ref:             ref.Ref{ID: "vm-1"},
+				SCSIReservation: &scsiReservation,
+			},
+		}
+		vm := &model.VM{
+			VM1: model.VM1{
+				VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
+				Disks: []vsphere.Disk{
+					{
+						Key:      2000,
+						File:     "[ds1] vm/disk.vmdk",
+						Capacity: 1 << 30,
+						RDM:      true,
+						Shared:   true,
+						Bus:      vsphere.SCSI,
+					},
+				},
+			},
+		}
+		pvcs := []*core.PersistentVolumeClaim{buildPVC("[ds1] vm/disk.vmdk")}
+		spec := &cnv.VirtualMachineSpec{Template: &cnv.VirtualMachineInstanceTemplateSpec{}}
+
+		err := builder.mapDisks(vm, ref.Ref{ID: "vm-1"}, pvcs, spec, false)
+		Expect(err).NotTo(HaveOccurred())
+
+		disk := spec.Template.Spec.Domain.Devices.Disks[0]
+		Expect(disk.LUN).NotTo(BeNil())
+		Expect(disk.LUN.Reservation).To(BeTrue())
+		Expect(disk.Shareable).To(Equal(ptr.To(true)))
+		Expect(disk.ErrorPolicy).To(Equal(ptr.To(cnv.DiskErrorPolicyReport)))
+	})
+
+	It("should NOT set Reservation when VM-level scsiReservation overrides an enabled plan-level flag", func() {
+		builder.Plan.Spec.RDMAsLun = true
+		builder.Plan.Spec.SCSIReservation = true
+		scsiReservation := false
+		builder.Plan.Spec.VMs = []plan.VM{
+			{
+				Ref:             ref.Ref{ID: "vm-1"},
+				SCSIReservation: &scsiReservation,
+			},
+		}
+		vm := &model.VM{
+			VM1: model.VM1{
+				VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
+				Disks: []vsphere.Disk{
+					{
+						Key:      2000,
+						File:     "[ds1] vm/disk.vmdk",
+						Capacity: 1 << 30,
+						RDM:      true,
+						Shared:   true,
+						Bus:      vsphere.SCSI,
+					},
+				},
+			},
+		}
+		pvcs := []*core.PersistentVolumeClaim{buildPVC("[ds1] vm/disk.vmdk")}
+		spec := &cnv.VirtualMachineSpec{Template: &cnv.VirtualMachineInstanceTemplateSpec{}}
+
+		err := builder.mapDisks(vm, ref.Ref{ID: "vm-1"}, pvcs, spec, false)
+		Expect(err).NotTo(HaveOccurred())
+
+		disk := spec.Template.Spec.Domain.Devices.Disks[0]
+		Expect(disk.LUN).NotTo(BeNil())
+		Expect(disk.LUN.Reservation).To(BeFalse())
+		Expect(disk.Shareable).To(Equal(ptr.To(true)))
 	})
 })
 
