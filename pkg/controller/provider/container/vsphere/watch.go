@@ -22,7 +22,6 @@ package vsphere
 import (
 	"context"
 	"errors"
-	"sync"
 	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -49,6 +48,8 @@ const (
 	VersionEndpoint    = BaseEndpoint + "rules_version"
 	ValidationEndpoint = BaseEndpoint + "validate"
 )
+
+const sharedDiskUpdateErr = "Shared disk flag update failed."
 
 // Concern IDs.
 const (
@@ -77,11 +78,6 @@ type VMEventHandler struct {
 	cancel context.CancelFunc
 	// Task result
 	taskResult chan *policy.Task
-	// Cached disk-file-to-VM-count map for shared disk detection.
-	// Rebuilt once per list() cycle; read by workload() from the
-	// policy-agent goroutine.
-	diskFileMap   map[string]int
-	diskFileMapMu sync.RWMutex
 }
 
 // Reset.
@@ -141,12 +137,11 @@ func (r *VMEventHandler) Deleted(event libmodel.Event) {
 	}
 	if vm, cast := event.Model.(*model.VM); cast {
 		r.revalidateSharedDiskVMs(vm)
-		r.rebuildDiskFileMap()
 	}
 }
 
 // revalidateSharedDiskVMs triggers revalidation of VMs that share
-// disks with the given (deleted) VM.
+// disks with the given (deleted) VM and updates persisted Shared flags.
 func (r *VMEventHandler) revalidateSharedDiskVMs(vm *model.VM) {
 	diskFiles := map[string]bool{}
 	for _, disk := range vm.Disks {
@@ -163,17 +158,29 @@ func (r *VMEventHandler) revalidateSharedDiskVMs(vm *model.VM) {
 	defer func() {
 		_ = tx.End()
 	}()
-	var allVMs []model.VM
-	err = tx.List(&allVMs, model.ListOptions{Detail: model.MaxDetail})
+	var listed []model.VM
+	err = tx.List(&listed, model.ListOptions{Detail: model.MaxDetail})
 	if err != nil {
 		r.log.Error(err, "List VMs for shared disk revalidation on delete failed.")
 		return
 	}
-	for i := range allVMs {
-		if allVMs[i].ID == vm.ID {
-			continue
+	allVMs := make([]model.VM, 0, len(listed))
+	for i := range listed {
+		if listed[i].ID != vm.ID {
+			allVMs = append(allVMs, listed[i])
 		}
+	}
+	fileCount := buildFileCount(allVMs)
+	for i := range allVMs {
+		changed := applySharedFlags(&allVMs[i], fileCount)
 		if !sharesDiskFile(&allVMs[i], diskFiles) {
+			if changed {
+				err = tx.Update(&allVMs[i])
+				if err != nil {
+					r.log.Error(err, sharedDiskUpdateErr+" (delete)",
+						"vmID", allVMs[i].ID)
+				}
+			}
 			continue
 		}
 		allVMs[i].RevisionValidated = 0
@@ -279,7 +286,7 @@ func (r *VMEventHandler) harvest() {
 // watch are ignored.
 func (r *VMEventHandler) list() {
 	r.log.V(3).Info("List VMs that need to be validated.")
-	r.rebuildDiskFileMap()
+	r.rebuildSharedDiskFlags()
 	version, err := policy.Agent.Version(VersionEndpoint)
 	if err != nil {
 		r.log.Error(err, err.Error())
@@ -315,25 +322,40 @@ func (r *VMEventHandler) list() {
 	}
 }
 
-// rebuildDiskFileMap lists all VMs once and builds a map of
-// disk-file-path to VM count.  The map is stored on the handler
-// and read by markSharedDisks during workload construction.
-func (r *VMEventHandler) rebuildDiskFileMap() {
+// rebuildSharedDiskFlags lists all VMs once, builds a file-count map,
+// and persists the computed Shared flags to the DB so the REST API can
+// serve them without recomputing.
+// Note: shared disk flags are eventually consistent. A VM created
+// between List and Commit will be picked up on the next validation sweep.
+func (r *VMEventHandler) rebuildSharedDiskFlags() {
 	var allVMs []model.VM
 	err := r.DB.List(&allVMs, model.ListOptions{Detail: model.MaxDetail})
 	if err != nil {
-		r.log.Error(err, "List VMs for disk file map failed.")
+		r.log.Error(err, "List VMs for shared disk flags failed.")
 		return
 	}
-	m := map[string]int{}
+	fileCount := buildFileCount(allVMs)
+	tx, err := r.DB.Begin()
+	if err != nil {
+		r.log.Error(err, "Begin tx for shared disk flag persistence failed.")
+		return
+	}
+	defer func() {
+		_ = tx.End()
+	}()
 	for i := range allVMs {
-		for _, disk := range allVMs[i].Disks {
-			m[disk.File]++
+		if applySharedFlags(&allVMs[i], fileCount) {
+			err = tx.Update(&allVMs[i])
+			if err != nil {
+				r.log.Error(err, sharedDiskUpdateErr,
+					"vmID", allVMs[i].ID)
+			}
 		}
 	}
-	r.diskFileMapMu.Lock()
-	r.diskFileMap = m
-	r.diskFileMapMu.Unlock()
+	err = tx.Commit()
+	if err != nil {
+		r.log.Error(err, "Tx commit for shared disk flag persistence failed.")
+	}
 }
 
 // Handler canceled.
@@ -445,7 +467,8 @@ func (r *VMEventHandler) validated(batch []*policy.Task) {
 
 // triggerSharedDiskRevalidation triggers revalidation of VMs that share
 // disks with the just-validated VMs, so they also pick up or drop the
-// shared disk concern.
+// shared disk concern.  It also persists the file-count-based Shared
+// flag within the same transaction.
 func (r *VMEventHandler) triggerSharedDiskRevalidation(tx *libmodel.Tx, validatedIDs, diskFiles map[string]bool) {
 	if len(diskFiles) == 0 {
 		return
@@ -456,21 +479,24 @@ func (r *VMEventHandler) triggerSharedDiskRevalidation(tx *libmodel.Tx, validate
 		r.log.Error(err, "List VMs for shared disk revalidation failed.")
 		return
 	}
+	fileCount := buildFileCount(allVMs)
 	for i := range allVMs {
-		if validatedIDs[allVMs[i].ID] {
-			continue
+		changed := applySharedFlags(&allVMs[i], fileCount)
+
+		needsRevalidation := !validatedIDs[allVMs[i].ID] &&
+			sharesDiskFile(&allVMs[i], diskFiles) &&
+			!hasConcern(&allVMs[i], SharedDiskConcern)
+		if needsRevalidation {
+			allVMs[i].RevisionValidated = 0
+			changed = true
 		}
-		if !sharesDiskFile(&allVMs[i], diskFiles) {
-			continue
-		}
-		if hasConcern(&allVMs[i], SharedDiskConcern) {
-			continue
-		}
-		allVMs[i].RevisionValidated = 0
-		err = tx.Update(&allVMs[i])
-		if err != nil {
-			r.log.Error(err, "VM revalidation trigger failed.",
-				"vmID", allVMs[i].ID)
+
+		if changed {
+			err = tx.Update(&allVMs[i])
+			if err != nil {
+				r.log.Error(err, sharedDiskUpdateErr,
+					"vmID", allVMs[i].ID)
+			}
 		}
 	}
 }
@@ -484,7 +510,6 @@ func (r *VMEventHandler) workload(vmID string) (object interface{}, err error) {
 	if err != nil {
 		return
 	}
-	r.markSharedDisks(vm)
 	workload := web.Workload{}
 	workload.With(vm)
 	err = workload.Expand(r.DB)
@@ -498,20 +523,26 @@ func (r *VMEventHandler) workload(vmID string) (object interface{}, err error) {
 	return
 }
 
-// markSharedDisks sets Shared=true on disks that are attached to multiple VMs
-// but lack multi-writer sharing in vSphere.  Uses the cached diskFileMap
-// built by rebuildDiskFileMap, so this is O(disks-on-vm) not O(all-VMs).
-func (r *VMEventHandler) markSharedDisks(vm *model.VM) {
-	r.diskFileMapMu.RLock()
-	defer r.diskFileMapMu.RUnlock()
-	if r.diskFileMap == nil {
-		return
-	}
-	for i := range vm.Disks {
-		if !vm.Disks[i].Shared && r.diskFileMap[vm.Disks[i].File] > 1 {
-			vm.Disks[i].Shared = true
+func buildFileCount(allVMs []model.VM) map[string]int {
+	m := map[string]int{}
+	for i := range allVMs {
+		for _, disk := range allVMs[i].Disks {
+			m[disk.File]++
 		}
 	}
+	return m
+}
+
+func applySharedFlags(vm *model.VM, fileCount map[string]int) bool {
+	changed := false
+	for j := range vm.Disks {
+		shouldBeShared := fileCount[vm.Disks[j].File] > 1
+		if vm.Disks[j].Shared != shouldBeShared {
+			vm.Disks[j].Shared = shouldBeShared
+			changed = true
+		}
+	}
+	return changed
 }
 
 func sharesDiskFile(vm *model.VM, diskFiles map[string]bool) bool {

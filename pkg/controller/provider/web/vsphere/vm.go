@@ -66,7 +66,6 @@ func (h VMHandler) List(ctx *gin.Context) {
 	if err != nil {
 		return
 	}
-	markSharedDisks(list, buildDiskFileCount(list))
 	content := []interface{}{}
 	err = h.filter(ctx, &list)
 	if err != nil {
@@ -122,20 +121,6 @@ func (h VMHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	var allVMs []model.VM
-	err = db.List(&allVMs, model.ListOptions{Detail: model.MaxDetail})
-	if err != nil {
-		log.Trace(
-			err,
-			"url",
-			ctx.Request.URL)
-		ctx.Status(http.StatusInternalServerError)
-		return
-	}
-	fileCount := buildDiskFileCount(allVMs)
-	vms := []model.VM{*m}
-	markSharedDisks(vms, fileCount)
-	*m = vms[0]
 	pb := PathBuilder{DB: db}
 	r := &VM{}
 	r.With(m)
@@ -435,29 +420,4 @@ func (r *VM) RemoveDisk(removeDisk model.Disk) {
 		}
 	}
 	r.Disks = disks
-}
-
-// buildDiskFileCount builds a map from disk file path to the number of
-// VMs that reference that file. Used to detect disks shared by multiple
-// VMs even when vSphere does not report multi-writer sharing.
-func buildDiskFileCount(vms []model.VM) map[string]int {
-	m := map[string]int{}
-	for i := range vms {
-		for _, disk := range vms[i].Disks {
-			m[disk.File]++
-		}
-	}
-	return m
-}
-
-// markSharedDisks sets Shared=true on disks whose backing file is used
-// by more than one VM according to the provided file count map.
-func markSharedDisks(vms []model.VM, fileCount map[string]int) {
-	for i := range vms {
-		for j := range vms[i].Disks {
-			if fileCount[vms[i].Disks[j].File] > 1 {
-				vms[i].Disks[j].Shared = true
-			}
-		}
-	}
 }
