@@ -383,6 +383,8 @@ type Disk struct {
 	ChangeTrackingEnabled bool   `json:"changeTrackingEnabled"`
 	ParentFile            string `json:"parent"`
 	DeviceName            string `json:"deviceName,omitempty"`
+	VVolID                string `json:"vvolId,omitempty"`
+	LunUuid               string `json:"lunUuid,omitempty"`
 }
 
 // Virtual Device.
