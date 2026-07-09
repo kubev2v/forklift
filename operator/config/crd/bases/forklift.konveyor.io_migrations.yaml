@@ -648,6 +648,14 @@ spec:
                     rootDisk:
                       description: Choose the primary disk the VM boots from
                       type: string
+                    scsiReservation:
+                      description: |-
+                        SCSIReservation controls whether SCSI persistent reservation is enabled for
+                        shared RDM LUN disks on this VM. Requires rdmAsLun=true to have any effect.
+                        When nil (default), the plan-level scsiReservation value is used.
+                        When explicitly set to true, shared RDM LUNs for this VM get lun.reservation=true.
+                        When explicitly set to false, shared RDM LUNs for this VM get lun.reservation=false.
+                      type: boolean
                     started:
                       description: Started timestamp.
                       format: date-time

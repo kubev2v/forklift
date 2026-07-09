@@ -5466,6 +5466,14 @@ spec:
                     rootDisk:
                       description: Choose the primary disk the VM boots from
                       type: string
+                    scsiReservation:
+                      description: |-
+                        SCSIReservation controls whether SCSI persistent reservation is enabled for
+                        shared RDM LUN disks on this VM. Requires rdmAsLun=true to have any effect.
+                        When nil (default), the plan-level scsiReservation value is used.
+                        When explicitly set to true, shared RDM LUNs for this VM get lun.reservation=true.
+                        When explicitly set to false, shared RDM LUNs for this VM get lun.reservation=false.
+                      type: boolean
                     started:
                       description: Started timestamp.
                       format: date-time
@@ -7678,6 +7686,15 @@ spec:
                   - true (default): Inspection step runs before transferring any disks and may fail if it detects the migration would fail.
                   - false: No inspection is performed before disk transfer.
                 type: boolean
+              scsiReservation:
+                description: |-
+                  SCSIReservation controls whether SCSI persistent reservation is enabled for
+                  shared RDM LUN disks. Requires rdmAsLun=true to have any effect.
+                  When false (default), shared RDM LUNs are migrated without persistent reservation.
+                  When true, shared RDM LUNs are configured with KubeVirt lun.reservation=true,
+                  which is required for workloads that use SCSI PR-based fencing (e.g. shared-disk clusters).
+                  Can be overridden per VM via spec.vms[].scsiReservation.
+                type: boolean
               serviceAccount:
                 description: |-
                   ServiceAccount is the name of the ServiceAccount to use for migration
@@ -8985,6 +9002,14 @@ spec:
                     rootDisk:
                       description: Choose the primary disk the VM boots from
                       type: string
+                    scsiReservation:
+                      description: |-
+                        SCSIReservation controls whether SCSI persistent reservation is enabled for
+                        shared RDM LUN disks on this VM. Requires rdmAsLun=true to have any effect.
+                        When nil (default), the plan-level scsiReservation value is used.
+                        When explicitly set to true, shared RDM LUNs for this VM get lun.reservation=true.
+                        When explicitly set to false, shared RDM LUNs for this VM get lun.reservation=false.
+                      type: boolean
                     targetName:
                       description: |-
                         TargetName specifies a custom name for the VM in the target cluster.
@@ -9780,6 +9805,14 @@ spec:
                         rootDisk:
                           description: Choose the primary disk the VM boots from
                           type: string
+                        scsiReservation:
+                          description: |-
+                            SCSIReservation controls whether SCSI persistent reservation is enabled for
+                            shared RDM LUN disks on this VM. Requires rdmAsLun=true to have any effect.
+                            When nil (default), the plan-level scsiReservation value is used.
+                            When explicitly set to true, shared RDM LUNs for this VM get lun.reservation=true.
+                            When explicitly set to false, shared RDM LUNs for this VM get lun.reservation=false.
+                          type: boolean
                         started:
                           description: Started timestamp.
                           format: date-time
