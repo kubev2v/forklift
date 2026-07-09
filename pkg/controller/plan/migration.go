@@ -139,7 +139,7 @@ func (r *Migration) Run() (reQ time.Duration, err error) {
 				return
 			}
 		} else {
-			r.Log.Info("The scheduler does not have any additional VMs.")
+			r.markSchedulerQueuedVMs()
 			break
 		}
 	}
@@ -1666,6 +1666,51 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 	}
 
 	return
+}
+
+const schedulerQueuedStepReasonFmt = "Waiting to start migration: in-flight limit reached (max %d)."
+
+func (r *Migration) markSchedulerQueuedVMs() {
+	snapshot := r.Plan.Status.Migration.ActiveSnapshot()
+	limit := settings.Settings.MaxInFlight
+	queued := 0
+
+	for i := range r.Plan.Status.Migration.VMs {
+		vm := r.Plan.Status.Migration.VMs[i]
+		if vm.MarkedStarted() || vm.MarkedCompleted() || vm.HasCondition(api.ConditionCanceled) {
+			continue
+		}
+		queued++
+		if step, found := vm.FindStep(planmigrbase.Initialize); found {
+			step.Phase = api.StepPending
+			step.Reason = fmt.Sprintf(schedulerQueuedStepReasonFmt, limit)
+		}
+	}
+
+	if queued == 0 {
+		return
+	}
+
+	r.Plan.Status.SetCondition(libcnd.Condition{
+		Type:     libcnd.Ready,
+		Status:   True,
+		Category: api.CategoryRequired,
+		Message: fmt.Sprintf(
+			"%d VM(s) waiting to start migration (in-flight limit: %d).",
+			queued,
+			limit),
+	})
+	r.Log.Info("VMs waiting for scheduler capacity.", "count", queued, "limit", limit)
+	snapshot.SetCondition(libcnd.Condition{
+		Type:     api.ConditionExecuting,
+		Status:   True,
+		Category: api.CategoryAdvisory,
+		Message: fmt.Sprintf(
+			"The plan is EXECUTING. %d VM(s) waiting to start (in-flight limit: %d).",
+			queued,
+			limit),
+		Durable: true,
+	})
 }
 
 func (r *Migration) resetPrecopyTasks(vm *plan.VMStatus, step *plan.Step) {

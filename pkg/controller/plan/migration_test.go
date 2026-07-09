@@ -2,10 +2,16 @@
 package plan
 
 import (
+	"testing"
+
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	planmigrbase "github.com/kubev2v/forklift/pkg/controller/plan/migrator/base"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/settings"
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -276,3 +282,49 @@ var _ = ginkgo.Describe("Cancellation", func() {
 		})
 	})
 })
+
+func TestMarkSchedulerQueuedVMs(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	initStep := &plan.Step{
+		Task: plan.Task{
+			Name:  planmigrbase.Initialize,
+			Phase: api.StepPending,
+		},
+	}
+	vm := &plan.VMStatus{
+		Phase:    api.PhaseStarted,
+		Pipeline: []*plan.Step{initStep},
+	}
+	snapshot := plan.Snapshot{}
+	snapshot.SetCondition(libcnd.Condition{
+		Type:     api.ConditionExecuting,
+		Status:   libcnd.True,
+		Category: api.CategoryAdvisory,
+		Message:  "The plan is EXECUTING.",
+		Durable:  true,
+	})
+
+	settings.Settings.MaxInFlight = 20
+	m := &Migration{
+		Context: &plancontext.Context{
+			Plan: &api.Plan{
+				Status: api.PlanStatus{
+					Migration: plan.MigrationStatus{
+						VMs:     []*plan.VMStatus{vm},
+						History: []plan.Snapshot{snapshot},
+					},
+				},
+			},
+			Log: logging.WithName("test"),
+		},
+	}
+
+	m.markSchedulerQueuedVMs()
+
+	g.Expect(initStep.Phase).To(gomega.Equal(api.StepPending))
+	g.Expect(initStep.Reason).To(gomega.Equal("Waiting to start migration: in-flight limit reached (max 20)."))
+	ready := m.Plan.Status.FindCondition(libcnd.Ready)
+	g.Expect(ready).NotTo(gomega.BeNil())
+	g.Expect(ready.Message).To(gomega.Equal("1 VM(s) waiting to start migration (in-flight limit: 20)."))
+}
