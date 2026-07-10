@@ -553,7 +553,7 @@ func (r *Collector) getUpdates(ctx context.Context) error {
 				err,
 				"tx commit failed.")
 		}
-		if updateSet.Truncated == nil || !*updateSet.Truncated {
+		if err == nil && (updateSet.Truncated == nil || !*updateSet.Truncated) {
 			if !r.parity {
 				r.parity = true
 				r.log.Info(
@@ -1127,7 +1127,7 @@ func (r *Collector) apply(ctx context.Context, tx *libmodel.Tx, updates []types.
 			break
 		}
 
-		if u.Obj.Type == VirtualMachine {
+		if u.Obj.Type == VirtualMachine && string(u.Kind) != Leave {
 			if !vmTagsFetched {
 				vmTagsMap, vmTagsErr = r.getVMsWithTags(ctx)
 				if vmTagsErr != nil {
