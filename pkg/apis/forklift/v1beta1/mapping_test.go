@@ -92,8 +92,9 @@ func TestDestinationNetwork_RoundTrip_CalicoWithNetworkAndVlan(t *testing.T) {
 }
 
 func TestCalicoDestination_OmitsZeroVlan(t *testing.T) {
-	// Zero (implicit) vlan must serialize as omitted so users who set 0 in
-	// YAML don't trip the kubebuilder Maximum validator on follow-up updates.
+	// Zero vlan means "not set" (a named Network requires an explicit VLAN,
+	// enforced at Plan validation) and must serialize as omitted so a stored
+	// object round-trips without growing a spurious vlan: 0 field.
 	in := DestinationNetwork{Type: "pod", Calico: &CalicoDestination{Network: "prod", Vlan: 0}}
 	raw, err := json.Marshal(in)
 	if err != nil {

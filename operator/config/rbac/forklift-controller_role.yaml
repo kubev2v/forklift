@@ -241,13 +241,15 @@ rules:
     - get
     - list
     - watch
-# Calico L2 (PMREQ-810): the Plan validator reads Calico Network and IPPool
-# CRs to validate L2-bridge NAD destinations and per-VM static IPs.
+# The Plan validator reads Calico Network and IPPool resources on the
+# destination cluster to validate L2-bridge NAD destinations and per-VM
+# static IPs.
 - apiGroups:
     - projectcalico.org
   resources:
     - networks
     - ippools
+    - felixconfigurations
   verbs:
     - get
     - list

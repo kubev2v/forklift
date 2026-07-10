@@ -23,6 +23,12 @@ var IPPoolGVK = schema.GroupVersionKind{
 // the default-when-absent ["Workload","Tunnel"]) is not eligible for L2 attach.
 const AllowedUseL2Workload = "L2Workload"
 
+// AllowedUseWorkload is the value Calico uses in spec.allowedUses to mark an
+// IPPool as a source of workload (pod) address assignments. Calico IPAM only
+// assigns workload addresses from pools that permit this use (explicitly, or
+// via the default-when-absent ["Workload","Tunnel"]).
+const AllowedUseWorkload = "Workload"
+
 // IPPool is a parsed view of projectcalico.org/v3 IPPool.
 //
 // AllowedUses distinguishes "absent" (nil) from "explicitly empty" ([]string{}).
@@ -80,53 +86,6 @@ func ListIPPools(ctx context.Context, c client.Client) ([]IPPool, error) {
 	return pools, nil
 }
 
-// HasEligiblePool reports whether at least one pool's CIDR is contained
-// within at least one of vlanSubnets. When false, Calico IPAM has nothing
-// to allocate from for this VLAN and CNI ADD will fail regardless of any
-// per-pod IP request.
-func HasEligiblePool(pools []IPPool, vlanSubnets []string) bool {
-	for i := range pools {
-		if poolContainedInAnyVLANSubnet(pools[i].CIDR, vlanSubnets) {
-			return true
-		}
-	}
-	return false
-}
-
-// EligiblePools returns the subset of pools whose CIDR is contained within
-// at least one vlanSubnet. Callers cache the result so per-IP membership
-// checks don't repeat the containment filter.
-func EligiblePools(pools []IPPool, vlanSubnets []string) []IPPool {
-	out := make([]IPPool, 0, len(pools))
-	for i := range pools {
-		if poolContainedInAnyVLANSubnet(pools[i].CIDR, vlanSubnets) {
-			out = append(out, pools[i])
-		}
-	}
-	return out
-}
-
-// EligiblePoolForIP returns the first pool that (a) contains the given IP and
-// (b) is itself contained within at least one VLAN subnet. Returns nil when
-// no pool qualifies.
-func EligiblePoolForIP(pools []IPPool, ip string, vlanSubnets []string) *IPPool {
-	parsedIP := net.ParseIP(ip)
-	if parsedIP == nil {
-		return nil
-	}
-	for i := range pools {
-		p := &pools[i]
-		if !ipInCIDR(parsedIP, p.CIDR) {
-			continue
-		}
-		if !poolContainedInAnyVLANSubnet(p.CIDR, vlanSubnets) {
-			continue
-		}
-		return p
-	}
-	return nil
-}
-
 func ipInCIDR(ip net.IP, cidr string) bool {
 	_, n, err := net.ParseCIDR(cidr)
 	if err != nil {
@@ -138,9 +97,10 @@ func ipInCIDR(ip net.IP, cidr string) bool {
 // isL3Eligible reports whether a pool can serve as a source of IP allocations
 // for a Calico-primary pod without L2 attach (Case A — implicit L3 IPAM).
 // A nil AllowedUses means the field was absent and the Calico default
-// ["Workload","Tunnel"] applies (L3-usable). An explicit empty slice means
-// the pool is restricted from all uses and is not eligible. A non-empty slice
-// is eligible iff it contains at least one entry that is not L2Workload.
+// ["Workload","Tunnel"] applies (workload-assignable). A non-nil slice is
+// eligible iff it contains "Workload" — Calico IPAM only assigns workload
+// addresses from pools that permit that use, so a Tunnel- or
+// LoadBalancer-only pool (and an explicit empty slice) is not eligible.
 func isL3Eligible(p *IPPool) bool {
 	if p.Disabled {
 		return false
@@ -148,12 +108,7 @@ func isL3Eligible(p *IPPool) bool {
 	if p.AllowedUses == nil {
 		return true
 	}
-	for _, u := range p.AllowedUses {
-		if u != AllowedUseL2Workload {
-			return true
-		}
-	}
-	return false
+	return containsAllowedUse(p, AllowedUseWorkload)
 }
 
 // containsAllowedUse reports whether the pool's AllowedUses contains the named
@@ -171,8 +126,8 @@ func containsAllowedUse(p *IPPool, use string) bool {
 
 // L3EligiblePools returns the subset of pools usable for Case A — implicit
 // L3 IPAM — Calico-primary attach. A pool is L3-eligible when it is not
-// disabled and its allowedUses permits a non-L2Workload use (or is absent,
-// implying the Calico default of L3-usable).
+// disabled and its allowedUses contains "Workload" (or is absent, implying
+// the Calico default ["Workload","Tunnel"]).
 func L3EligiblePools(pools []IPPool) []IPPool {
 	out := make([]IPPool, 0, len(pools))
 	for i := range pools {
@@ -204,8 +159,8 @@ func L3EligiblePoolForIP(pools []IPPool, ip string) *IPPool {
 	return nil
 }
 
-// L2WorkloadEligiblePools returns the subset of pools usable for Cases B/C —
-// Calico-primary L2 attach via a named Network CR. A pool is L2Workload-eligible
+// L2WorkloadEligiblePools returns the subset of pools usable for the L2-attach
+// path (Case C) — attach via a named Network CR. A pool is L2Workload-eligible
 // when it is not disabled, its allowedUses contains "L2Workload", and its CIDR
 // is fully contained in at least one of the matched VLAN's subnets.
 func L2WorkloadEligiblePools(pools []IPPool, vlanSubnets []string) []IPPool {

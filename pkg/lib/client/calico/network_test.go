@@ -75,6 +75,30 @@ func TestGetNetwork_NoL2Bridge(t *testing.T) {
 	}
 }
 
+func TestGetNetwork_VRF(t *testing.T) {
+	// A VRF (routed, L3) Network: classified via IsVRF, no l2Bridge parsed.
+	nw := makeNetwork("routed-net", map[string]interface{}{
+		"vrf": map[string]interface{}{
+			"hostConfig": []interface{}{
+				map[string]interface{}{"nodeSelector": "all()"},
+			},
+		},
+	})
+	cb, _ := newFakeClientWith(nw)
+	c := cb.Build()
+
+	got, err := GetNetwork(context.Background(), c, "routed-net")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !got.IsVRF {
+		t.Error("IsVRF = false, want true")
+	}
+	if got.L2Bridge != nil {
+		t.Errorf("L2Bridge = %+v, want nil", got.L2Bridge)
+	}
+}
+
 func TestGetNetwork_SingleVLAN(t *testing.T) {
 	nw := makeNetwork("vlan100", map[string]interface{}{
 		"l2Bridge": map[string]interface{}{
@@ -94,6 +118,9 @@ func TestGetNetwork_SingleVLAN(t *testing.T) {
 	got, err := GetNetwork(context.Background(), c, "vlan100")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.IsVRF {
+		t.Error("IsVRF = true, want false")
 	}
 	if got.L2Bridge == nil {
 		t.Fatal("L2Bridge = nil, want non-nil")
