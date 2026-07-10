@@ -83,146 +83,6 @@ func TestListIPPools_Multiple(t *testing.T) {
 	}
 }
 
-func TestHasEligiblePool(t *testing.T) {
-	tests := []struct {
-		name        string
-		pools       []IPPool
-		vlanSubnets []string
-		want        bool
-	}{
-		{
-			name:        "PoolContainedInVLANSubnet",
-			pools:       []IPPool{{CIDR: "10.100.0.0/24"}},
-			vlanSubnets: []string{"10.100.0.0/24"},
-			want:        true,
-		},
-		{
-			name:        "PoolStrictlyContainedInVLANSubnet",
-			pools:       []IPPool{{CIDR: "10.100.0.128/25"}},
-			vlanSubnets: []string{"10.100.0.0/24"},
-			want:        true,
-		},
-		{
-			name:        "PoolLargerThanVLANSubnet",
-			pools:       []IPPool{{CIDR: "10.0.0.0/8"}},
-			vlanSubnets: []string{"10.100.0.0/24"},
-			want:        false,
-		},
-		{
-			name:        "PoolOnDifferentNetwork",
-			pools:       []IPPool{{CIDR: "10.244.0.0/16"}},
-			vlanSubnets: []string{"10.100.0.0/24"},
-			want:        false,
-		},
-		{
-			name:        "AtLeastOnePoolMatches",
-			pools:       []IPPool{{CIDR: "10.244.0.0/16"}, {CIDR: "10.100.0.0/24"}},
-			vlanSubnets: []string{"10.100.0.0/24"},
-			want:        true,
-		},
-		{
-			name:        "MultipleVLANSubnets",
-			pools:       []IPPool{{CIDR: "10.200.0.0/24"}},
-			vlanSubnets: []string{"10.100.0.0/24", "10.200.0.0/24"},
-			want:        true,
-		},
-		{
-			name:        "NoPools",
-			pools:       nil,
-			vlanSubnets: []string{"10.100.0.0/24"},
-			want:        false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := HasEligiblePool(tt.pools, tt.vlanSubnets); got != tt.want {
-				t.Errorf("got %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestEligiblePoolForIP(t *testing.T) {
-	pools := []IPPool{
-		{Name: "default-ipv4-ippool", CIDR: "10.244.0.0/16"}, // cluster default, not in VLAN
-		{Name: "vlan100-pool", CIDR: "10.100.0.0/24"},        // matches VLAN 100 subnet exactly
-		{Name: "vlan100-subpool", CIDR: "10.100.0.128/25"},   // contained within VLAN 100 subnet
-		{Name: "vlan200-pool", CIDR: "10.200.0.0/24"},        // matches VLAN 200 subnet
-	}
-
-	tests := []struct {
-		name        string
-		ip          string
-		vlanSubnets []string
-		wantPool    string // empty means expect nil
-	}{
-		{
-			name:        "IPInExactlyMatchingPool",
-			ip:          "10.100.0.5",
-			vlanSubnets: []string{"10.100.0.0/24"},
-			wantPool:    "vlan100-pool",
-		},
-		{
-			name:        "IPInSubpoolWithinVLAN",
-			ip:          "10.100.0.200",
-			vlanSubnets: []string{"10.100.0.0/24"},
-			// Either vlan100-pool or vlan100-subpool covers it; first match wins.
-			wantPool: "vlan100-pool",
-		},
-		{
-			name:        "IPNotInVLANSubnet",
-			ip:          "10.244.5.1", // in cluster default pool but VLAN list excludes it
-			vlanSubnets: []string{"10.100.0.0/24"},
-			wantPool:    "",
-		},
-		{
-			name:        "PoolNotContainedInVLAN",
-			ip:          "10.100.0.5",
-			vlanSubnets: []string{"10.100.0.0/26"}, // VLAN is smaller than vlan100-pool
-			wantPool:    "",
-		},
-		{
-			name:        "MultipleVLANSubnets",
-			ip:          "10.200.0.5",
-			vlanSubnets: []string{"10.100.0.0/24", "10.200.0.0/24"},
-			wantPool:    "vlan200-pool",
-		},
-		{
-			name:        "InvalidIP",
-			ip:          "not-an-ip",
-			vlanSubnets: []string{"10.100.0.0/24"},
-			wantPool:    "",
-		},
-		{
-			name:        "NoPools",
-			ip:          "10.100.0.5",
-			vlanSubnets: []string{"10.100.0.0/24"},
-			wantPool:    "", // pools list is empty in this branch by override below
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			poolList := pools
-			if tt.name == "NoPools" {
-				poolList = nil
-			}
-			got := EligiblePoolForIP(poolList, tt.ip, tt.vlanSubnets)
-			if tt.wantPool == "" {
-				if got != nil {
-					t.Errorf("got pool %+v, want nil", got)
-				}
-				return
-			}
-			if got == nil {
-				t.Fatalf("got nil pool, want %q", tt.wantPool)
-			}
-			if got.Name != tt.wantPool {
-				t.Errorf("got pool %q, want %q", got.Name, tt.wantPool)
-			}
-		})
-	}
-}
-
 func TestListIPPools_ParsesDisabledAndAllowedUses(t *testing.T) {
 	c := newFakeClientWithIPPools(
 		makeIPPool("plain", "10.100.0.0/24"),
@@ -271,10 +131,11 @@ func TestL3EligiblePools(t *testing.T) {
 	}{
 		{"AbsentAllowedUses_NotDisabled", IPPool{Name: "p", CIDR: "10.0.0.0/8", AllowedUses: nil}, true},
 		{"ExplicitEmptyAllowedUses", IPPool{Name: "p", CIDR: "10.0.0.0/8", AllowedUses: []string{}}, false},
-		{"WorkloadOnly", IPPool{Name: "p", CIDR: "10.0.0.0/8", AllowedUses: []string{"Workload"}}, true},
-		{"TunnelOnly", IPPool{Name: "p", CIDR: "10.0.0.0/8", AllowedUses: []string{"Tunnel"}}, true},
+		{"WorkloadOnly", IPPool{Name: "p", CIDR: "10.0.0.0/8", AllowedUses: []string{AllowedUseWorkload}}, true},
+		{"TunnelOnly", IPPool{Name: "p", CIDR: "10.0.0.0/8", AllowedUses: []string{"Tunnel"}}, false},
+		{"LoadBalancerOnly", IPPool{Name: "p", CIDR: "10.0.0.0/8", AllowedUses: []string{"LoadBalancer"}}, false},
 		{"L2WorkloadOnly", IPPool{Name: "p", CIDR: "10.0.0.0/8", AllowedUses: []string{AllowedUseL2Workload}}, false},
-		{"WorkloadPlusL2Workload", IPPool{Name: "p", CIDR: "10.0.0.0/8", AllowedUses: []string{"Workload", AllowedUseL2Workload}}, true},
+		{"WorkloadPlusL2Workload", IPPool{Name: "p", CIDR: "10.0.0.0/8", AllowedUses: []string{AllowedUseWorkload, AllowedUseL2Workload}}, true},
 		{"Disabled_AbsentUses", IPPool{Name: "p", CIDR: "10.0.0.0/8", Disabled: true, AllowedUses: nil}, false},
 		{"Disabled_WorkloadOnly", IPPool{Name: "p", CIDR: "10.0.0.0/8", Disabled: true, AllowedUses: []string{"Workload"}}, false},
 	}
@@ -291,8 +152,8 @@ func TestL3EligiblePools(t *testing.T) {
 
 func TestL3EligiblePoolForIP(t *testing.T) {
 	pools := []IPPool{
-		{Name: "default-pool", CIDR: "10.244.0.0/16"},                                 // L3-eligible (nil allowedUses)
-		{Name: "disabled-pool", CIDR: "10.100.0.0/24", Disabled: true},                // disabled
+		{Name: "default-pool", CIDR: "10.244.0.0/16"},                                      // L3-eligible (nil allowedUses)
+		{Name: "disabled-pool", CIDR: "10.100.0.0/24", Disabled: true},                     // disabled
 		{Name: "l2-only-pool", CIDR: "10.200.0.0/24", AllowedUses: []string{"L2Workload"}}, // not L3-eligible
 	}
 	tests := []struct {
@@ -362,7 +223,7 @@ func TestL2WorkloadEligiblePoolForIP(t *testing.T) {
 	}{
 		{"L2 pool covers IP", "10.100.0.5", "l2-vlan100"},
 		{"Only Workload covers (not L2)", "10.100.0.5", "l2-vlan100"}, // l2-vlan100 wins by order
-		{"IP outside all L2-eligible", "10.101.0.5", ""},               // l2-disabled is disabled
+		{"IP outside all L2-eligible", "10.101.0.5", ""},              // l2-disabled is disabled
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

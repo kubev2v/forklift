@@ -116,6 +116,55 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 		})
 	})
 
+	ginkgo.Describe("validateNetworkMap preserveStaticIPs warning", func() {
+		// The NetMapPreservingIPsOnPodNetwork Warn fires when static IPs
+		// are preserved onto a plain pod-network mapping (masquerade drops
+		// the IP). A calico-flagged pod entry preserves the IP — that is
+		// the feature — so it must not trip the warning.
+		setup := func(entries []api.NetworkPair) *api.Plan {
+			source := createProvider(sourceName, sourceNamespace, "https://source", api.VSphere, &core.ObjectReference{})
+			destination := createProvider(destName, destNamespace, "", api.OpenShift, &core.ObjectReference{})
+			plan := createPlan(testPlanName, testNamespace, source, destination)
+			plan.Spec.PreserveStaticIPs = true
+			netMap := &api.NetworkMap{
+				ObjectMeta: meta.ObjectMeta{Name: "test-netmap", Namespace: testNamespace},
+				Spec:       api.NetworkMapSpec{Map: entries},
+			}
+			netMap.Status.Conditions.SetCondition(libcnd.Condition{Type: libcnd.Ready, Status: libcnd.True})
+			plan.Spec.Map.Network = core.ObjectReference{Name: "test-netmap", Namespace: testNamespace}
+			reconciler = createFakeReconciler(plan, source, destination, netMap)
+			return plan
+		}
+
+		ginkgo.It("warns for a plain type: pod entry", func() {
+			plan := setup([]api.NetworkPair{
+				{Destination: api.DestinationNetwork{Type: Pod}},
+			})
+			err := reconciler.validateNetworkMap(plan)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(NetMapPreservingIPsOnPodNetwork)).To(gomega.BeTrue())
+		})
+
+		ginkgo.It("does not warn for a calico-flagged pod entry", func() {
+			plan := setup([]api.NetworkPair{
+				{Destination: api.DestinationNetwork{Type: Pod, Calico: &api.CalicoDestination{}}},
+			})
+			err := reconciler.validateNetworkMap(plan)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(NetMapPreservingIPsOnPodNetwork)).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("still warns when a plain pod entry coexists with a calico-flagged one", func() {
+			plan := setup([]api.NetworkPair{
+				{Destination: api.DestinationNetwork{Type: Pod, Calico: &api.CalicoDestination{}}},
+				{Destination: api.DestinationNetwork{Type: Pod}},
+			})
+			err := reconciler.validateNetworkMap(plan)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(plan.Status.HasCondition(NetMapPreservingIPsOnPodNetwork)).To(gomega.BeTrue())
+		})
+	})
+
 	ginkgo.Describe("GuestToolsIssue aggregation", func() {
 		var (
 			mockValidator   *mockGuestToolsValidator

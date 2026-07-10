@@ -23,9 +23,9 @@ const (
 	// (Calico's default). The Networks annotation pulls in an L2 attach via
 	// a named projectcalico.org/v3 Network CR; absence means default L3
 	// IPAM. The Vlan annotation selects the 802.1Q VLAN within that
-	// Network; when omitted, Calico defaults to the Network's sole VLAN
-	// entry (multi-VLAN Networks require an explicit selection — enforced
-	// at Plan validation).
+	// Network; every Network reference requires an explicit VLAN (a zero
+	// VLAN means "not set" and Plan validation rejects it whenever a
+	// network is named), so Vlan is always written alongside Networks.
 	CalicoAnnPrimaryHwAddr  = "cni.projectcalico.org/hwAddr"
 	CalicoAnnPrimaryIPs     = "cni.projectcalico.org/ipAddrs"
 	CalicoAnnPrimaryNetwork = "cni.projectcalico.org/networks"
@@ -40,8 +40,13 @@ const (
 )
 
 // SetCalicoMAC writes the cni.projectcalico.org/<ifname>.hwAddr annotation
-// onto m. Lazy-inits Annotations when nil.
+// onto m. No-op when mac is empty (inventory tolerates NICs without a MAC;
+// an empty hwAddr annotation would fail the pod at CNI ADD). Lazy-inits
+// Annotations when nil.
 func SetCalicoMAC(m *meta.ObjectMeta, ifname, mac string) {
+	if mac == "" {
+		return
+	}
 	if m.Annotations == nil {
 		m.Annotations = map[string]string{}
 	}
@@ -77,9 +82,10 @@ type CalicoPrimaryParams struct {
 	// Network is the name of a projectcalico.org/v3 Network CR for L2
 	// attach. Empty → no annotation; pod uses Calico's default L3 IPAM.
 	Network string
-	// Vlan is the 802.1Q VLAN ID within the named Network. Zero → no
-	// annotation; Calico defaults to the Network's sole VLAN entry (the
-	// Plan validator rejects the implicit form on multi-VLAN Networks).
+	// Vlan is the 802.1Q VLAN ID within the named Network. Zero means "not
+	// set" → no annotation. Plan validation rejects a zero VLAN whenever a
+	// Network is named, so a Network always arrives here with a non-zero
+	// Vlan.
 	Vlan uint16
 }
 
@@ -127,8 +133,10 @@ func SetCalicoPrimaryNetwork(m *meta.ObjectMeta, network string) {
 }
 
 // SetCalicoPrimaryVlan writes the cni.projectcalico.org/vlan annotation as a
-// decimal 802.1Q VLAN ID. No-op when vlan is zero (Calico defaults to the
-// named Network's sole VLAN entry). Lazy-inits Annotations when nil.
+// decimal 802.1Q VLAN ID. No-op when vlan is zero — zero means "not set",
+// and Plan validation rejects it whenever a Network is named, so a named
+// Network is always accompanied by this annotation. Lazy-inits Annotations
+// when nil.
 func SetCalicoPrimaryVlan(m *meta.ObjectMeta, vlan uint16) {
 	if vlan == 0 {
 		return
