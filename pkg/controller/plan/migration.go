@@ -704,6 +704,7 @@ func (r *Migration) runningVMs() (vms []*plan.VMStatus) {
 // Steps a VM through the migration itinerary
 // and updates its status.
 func (r *Migration) execute(vm *plan.VMStatus) (err error) {
+	vm.DeleteCondition(api.ConditionPending)
 	// check whether the VM has been canceled by the user
 	if r.Context.Migration.Spec.Canceled(vm.Ref) {
 		vm.SetCondition(
@@ -1668,10 +1669,9 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 	return
 }
 
-const schedulerQueuedStepReasonFmt = "Waiting to start migration: in-flight limit reached (max %d)."
+const schedulerQueuedReasonFmt = "Waiting to start migration: in-flight limit reached (max %d)."
 
 func (r *Migration) markSchedulerQueuedVMs() {
-	snapshot := r.Plan.Status.Migration.ActiveSnapshot()
 	limit := settings.Settings.MaxInFlight
 	queued := 0
 
@@ -1681,10 +1681,13 @@ func (r *Migration) markSchedulerQueuedVMs() {
 			continue
 		}
 		queued++
-		if step, found := vm.FindStep(planmigrbase.Initialize); found {
-			step.Phase = api.StepPending
-			step.Reason = fmt.Sprintf(schedulerQueuedStepReasonFmt, limit)
-		}
+		vm.SetCondition(libcnd.Condition{
+			Type:     api.ConditionPending,
+			Status:   True,
+			Category: api.CategoryAdvisory,
+			Message:  fmt.Sprintf(schedulerQueuedReasonFmt, limit),
+			Durable:  true,
+		})
 	}
 
 	if queued == 0 {
@@ -1701,16 +1704,6 @@ func (r *Migration) markSchedulerQueuedVMs() {
 			limit),
 	})
 	r.Log.Info("VMs waiting for scheduler capacity.", "count", queued, "limit", limit)
-	snapshot.SetCondition(libcnd.Condition{
-		Type:     api.ConditionExecuting,
-		Status:   True,
-		Category: api.CategoryAdvisory,
-		Message: fmt.Sprintf(
-			"The plan is EXECUTING. %d VM(s) waiting to start (in-flight limit: %d).",
-			queued,
-			limit),
-		Durable: true,
-	})
 }
 
 func (r *Migration) resetPrecopyTasks(vm *plan.VMStatus, step *plan.Step) {
