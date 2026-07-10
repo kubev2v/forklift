@@ -753,7 +753,10 @@ func (r *Reconciler) validateNetworkMap(plan *api.Plan) (err error) {
 	if plan.Referenced.Provider.Source.SupportsPreserveStaticIps() && plan.Spec.PreserveStaticIPs {
 		var hasMappingToPodNetwork bool
 		for _, networkMap := range mp.Spec.Map {
-			if networkMap.Destination.Type == Pod {
+			// A calico-flagged pod entry preserves the VM's IP on the pod
+			// network (that is the feature), so the masquerade warning
+			// below does not apply to it.
+			if networkMap.Destination.Type == Pod && networkMap.Destination.Calico == nil {
 				hasMappingToPodNetwork = true
 				break
 			}
@@ -2121,6 +2124,10 @@ func calicoPrimaryIssueDetail(i planbase.CalicoPrimaryIssue) string {
 		return fmt.Sprintf("%s(PrimaryConflictsWithUDN: target namespace is labelled for a UDN primary network)", prefix)
 	case planbase.CalicoIssuePrimaryNetworkNotFound:
 		return fmt.Sprintf("%s(PrimaryNetworkNotFound network=%q)", prefix, i.Network)
+	case planbase.CalicoIssuePrimaryNetworkTypeUnsupported:
+		return fmt.Sprintf("%s(PrimaryNetworkTypeUnsupported network=%q: the referenced Network is not an L2 bridge network; only l2Bridge networks are supported)", prefix, i.Network)
+	case planbase.CalicoIssuePrimaryDataplaneNotBPF:
+		return fmt.Sprintf("%s(PrimaryDataplaneNotBPF network=%q: the destination Calico install is not running the BPF dataplane; L2 networks require FelixConfiguration bpfEnabled: true)", prefix, i.Network)
 	case planbase.CalicoIssuePrimaryNetworkHasNoL2Bridge:
 		return fmt.Sprintf("%s(PrimaryNetworkHasNoL2Bridge network=%q)", prefix, i.Network)
 	case planbase.CalicoIssuePrimaryNetworkHasNoVLANs:
@@ -2157,6 +2164,10 @@ func calicoNADIssueDetail(i planbase.CalicoNADIssue) string {
 		return fmt.Sprintf("%s (NetworkNotFound network=%q)", i.NAD.String(), i.Network)
 	case planbase.CalicoIssueNetworkCRDAbsent:
 		return fmt.Sprintf("%s (NetworkCRDAbsent network=%q: destination Calico install does not ship the projectcalico.org/v3 Network CRD)", i.NAD.String(), i.Network)
+	case planbase.CalicoIssueNetworkTypeUnsupported:
+		return fmt.Sprintf("%s (NetworkTypeUnsupported network=%q: the referenced Network is not an L2 bridge network; only l2Bridge networks are supported)", i.NAD.String(), i.Network)
+	case planbase.CalicoIssueDataplaneNotBPF:
+		return fmt.Sprintf("%s (DataplaneNotBPF: the destination Calico install is not running the BPF dataplane; L2 networks require FelixConfiguration bpfEnabled: true)", i.NAD.String())
 	case planbase.CalicoIssueNetworkHasNoL2Bridge:
 		return fmt.Sprintf("%s (NetworkHasNoL2Bridge network=%q)", i.NAD.String(), i.Network)
 	case planbase.CalicoIssueNetworkHasNoVLANs:

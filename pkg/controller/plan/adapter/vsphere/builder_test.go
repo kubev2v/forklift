@@ -1081,7 +1081,7 @@ var _ = Describe("vSphere builder", func() {
 		})
 
 		It("emits MAC only when PreserveStaticIPs is false", func() {
-			annotations, err := buildAndCall(`{"type":"calico","network":"datacenter-vlans"}`, false)
+			annotations, err := buildAndCall(`{"type":"calico","network":"datacenter-vlans","vlan":100}`, false)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(annotations).To(HaveKeyWithValue(hwAnnKey, nicMAC))
 			Expect(annotations).NotTo(HaveKey(ipsAnnKey))
@@ -1347,6 +1347,13 @@ var _ = Describe("vSphere builder", func() {
 			// Calico's VLAN selection is annotation-driven; the user's
 			// validated choice must reach the pod.
 			Expect(ann).To(HaveKeyWithValue("cni.projectcalico.org/vlan", "200"))
+		})
+
+		It("a calico block pins the source MAC on the interface", func() {
+			spec, err := runPrimary(v1beta1.DestinationNetwork{Type: "pod", Calico: &v1beta1.CalicoDestination{}}, false, nil, nil, nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.Template.Spec.Domain.Devices.Interfaces).To(HaveLen(1))
+			Expect(spec.Template.Spec.Domain.Devices.Interfaces[0].MacAddress).To(Equal(nicMAC))
 		})
 
 		It("Mixed: calico-flagged primary + type:multus secondary coexist with correct scoping", func() {

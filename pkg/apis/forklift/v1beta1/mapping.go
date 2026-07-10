@@ -56,12 +56,13 @@ type DestinationNetwork struct {
 type CalicoDestination struct {
 	// Name of a cluster-scoped projectcalico.org/v3 Network CR for L2
 	// primary attach. Empty value means no L2 attach: Calico's default L3
-	// IPAM is used.
+	// IPAM is used. Applies only when the entry's Type == "pod".
 	Network string `json:"network,omitempty"`
 	// 802.1Q VLAN ID within the named Calico Network. Applies only when
-	// Network != "". Value 0 (or omitted) means "implicit" and requires the
-	// named Network to have exactly one VLAN entry. Otherwise must match a
-	// VLAN entry's vlan.id in the named Network.
+	// Network != "" and is then required: it must match a VLAN entry's
+	// vlan.id in the named Network. Value 0 (or omitted) means "not set"
+	// and is rejected at Plan validation whenever a Network is named.
+	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=4094
 	Vlan uint16 `json:"vlan,omitempty"`
 }

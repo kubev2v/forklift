@@ -53,10 +53,10 @@ type CalicoValidationResult struct {
 // from this directly instead of re-fetching Network and IPPool objects for
 // every VM.
 //
-// The struct accommodates all three Calico-primary cases:
+// The struct accommodates both Calico-primary cases:
 //   - Case A (calico.network == ""): implicit L3 IPAM. Network/VLAN are zero;
 //     L3EligiblePools is the pool set the per-VM check uses to validate IP fit.
-//   - Cases B/C (calico.network != ""): L2 attach via named Calico Network CR.
+//   - Case C (calico.network != ""): L2 attach via named Calico Network CR.
 //     Network/VLAN are populated; L2EligiblePools is the L2Workload-restricted
 //     pool set whose CIDR is contained in the matched VLAN's subnet(s).
 type ResolvedCalicoPrimary struct {
@@ -64,7 +64,7 @@ type ResolvedCalicoPrimary struct {
 	Network string
 	// VLAN is the resolved l2Bridge VLAN entry (zero-value for Case A).
 	VLAN calicoclient.VLANEntry
-	// L2EligiblePools is the L2Workload-restricted pool set for Cases B/C.
+	// L2EligiblePools is the L2Workload-restricted pool set for Case C.
 	L2EligiblePools []calicoclient.IPPool
 	// L3EligiblePools is the L3-eligible pool set for Case A.
 	L3EligiblePools []calicoclient.IPPool
@@ -99,8 +99,8 @@ type CalicoPrimaryIssue struct {
 }
 
 // CalicoPrimaryValidationResult is the output of ValidateCalicoPrimary:
-// plan-level issues to report at plan level, warnings reserved for future
-// use (degraded-but-not-blocked configurations), and a cache for downstream
+// plan-level issues to report at plan level, warnings that describe
+// degraded-but-not-blocked configurations, and a cache for downstream
 // per-VM checks.
 type CalicoPrimaryValidationResult struct {
 	Issues   []CalicoPrimaryIssue

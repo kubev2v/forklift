@@ -313,7 +313,7 @@ type Validator interface {
 	// ValidateCalicoPrimary; when the cache is nil or Primary is nil (plan
 	// failed, or no calico-flagged entry exists), returns nil.
 	//
-	// When PreserveStaticIPs is true but the VM has no findable IPv4 IPs
+	// When IP preservation is on but the VM has no findable IPv4 IPs
 	// (IPv6-only or no GuestNetworks reported), no per-VM issue is emitted
 	// — the builder will likewise emit no ipAddrs annotation. Both
 	// behaviours are correct: preservation is best-effort.
@@ -336,6 +336,10 @@ const (
 	// Network but the CRD cannot be queried — distinct from a missing CR,
 	// which is CalicoIssueNetworkNotFound.
 	CalicoIssueNetworkCRDAbsent CalicoIssueKind = "NetworkCRDAbsent"
+	// CalicoIssueNetworkTypeUnsupported the referenced Network CR is not an
+	// l2Bridge network (e.g. a VRF network). Only l2Bridge networks are
+	// supported for identity preservation today.
+	CalicoIssueNetworkTypeUnsupported CalicoIssueKind = "NetworkTypeUnsupported"
 	// CalicoIssueNetworkHasNoL2Bridge Network CR existed but had no L2Bridge field spec'd.
 	CalicoIssueNetworkHasNoL2Bridge CalicoIssueKind = "NetworkHasNoL2Bridge"
 	// CalicoIssueNetworkHasNoVLANs Network CR's L2Bridge had an empty vlans list (no VLAN to select).
@@ -363,6 +367,11 @@ const (
 	// This is Calico's legacy L3 IPAM mode; identity preservation (MAC + IP)
 	// will not be applied for NICs mapped to this NAD. Warn-level.
 	CalicoIssueNADMissingNetwork CalicoIssueKind = "NADMissingNetwork"
+	// CalicoIssueDataplaneNotBPF a NAD resolved to an l2Bridge network but
+	// the destination Calico install is not running the BPF dataplane
+	// (FelixConfiguration "default" has bpfEnabled false or unset). L2
+	// networks require the BPF dataplane. Emitted once per plan.
+	CalicoIssueDataplaneNotBPF CalicoIssueKind = "DataplaneNotBPF"
 
 	// Calico-primary IssueKinds. Used by Validator.ValidateCalicoPrimary
 	// and Validator.CalicoPrimaryIssues for the calico-flagged NetworkMap
@@ -391,6 +400,10 @@ const (
 	// CalicoIssuePrimaryNetworkNotFound the named projectcalico.org/v3
 	// Network CR does not exist on the destination cluster.
 	CalicoIssuePrimaryNetworkNotFound CalicoIssueKind = "PrimaryNetworkNotFound"
+	// CalicoIssuePrimaryNetworkTypeUnsupported the named Network CR is not
+	// an l2Bridge network (e.g. a VRF network). Only l2Bridge networks are
+	// supported for identity preservation today.
+	CalicoIssuePrimaryNetworkTypeUnsupported CalicoIssueKind = "PrimaryNetworkTypeUnsupported"
 	// CalicoIssuePrimaryNetworkHasNoL2Bridge the named Network CR has no
 	// l2Bridge spec — incompatible with L2 attach.
 	CalicoIssuePrimaryNetworkHasNoL2Bridge CalicoIssueKind = "PrimaryNetworkHasNoL2Bridge"
@@ -406,9 +419,9 @@ const (
 	// not match any vlan.id in the named Network CR.
 	CalicoIssuePrimaryVLANNotInNetwork CalicoIssueKind = "PrimaryVLANNotInNetwork"
 	// CalicoIssuePrimaryNoEligibleIPPool no IPPool covers either the L3
-	// allocation (Case A) or the matched VLAN's subnet (Cases B/C).
+	// allocation (Case A) or the matched VLAN's subnet (Case C).
 	CalicoIssuePrimaryNoEligibleIPPool CalicoIssueKind = "PrimaryNoEligibleIPPool"
-	// CalicoIssuePrimaryIPNotInSubnet (Cases B/C only) the source NIC IP
+	// CalicoIssuePrimaryIPNotInSubnet (Case C only) the source NIC IP
 	// falls outside the matched VLAN's subnets.
 	CalicoIssuePrimaryIPNotInSubnet CalicoIssueKind = "PrimaryIPNotInSubnet"
 	// CalicoIssuePrimaryTooManyIPs the calico-mapped NIC carries more than
@@ -428,6 +441,11 @@ const (
 	// the veth. Static-IP-configured guests can have a divergent in-guest
 	// IP, with associated Calico drops. Warn-class — informational only.
 	CalicoIssuePrimaryStaticIPsNotPreserved CalicoIssueKind = "PrimaryStaticIPsNotPreserved"
+	// CalicoIssuePrimaryDataplaneNotBPF calico.network resolved to an
+	// l2Bridge network but the destination Calico install is not running
+	// the BPF dataplane (FelixConfiguration "default" has bpfEnabled false
+	// or unset). L2 networks require the BPF dataplane.
+	CalicoIssuePrimaryDataplaneNotBPF CalicoIssueKind = "PrimaryDataplaneNotBPF"
 )
 
 // CalicoIssue represents a per-VM Calico Network validation failure: the

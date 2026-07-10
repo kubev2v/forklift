@@ -15,6 +15,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
+	ocp "github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	calicoclient "github.com/kubev2v/forklift/pkg/lib/client/calico"
 	. "github.com/onsi/ginkgo/v2"
@@ -32,11 +33,36 @@ import (
 
 var ErrNotImplemented = errors.New("not implemented")
 
+// makeFelixConfiguration builds the cluster-wide "default" FelixConfiguration
+// with spec.bpfEnabled set as given.
+func makeFelixConfiguration(bpfEnabled bool) *unstructured.Unstructured {
+	u := &unstructured.Unstructured{}
+	u.SetGroupVersionKind(calicoclient.FelixConfigurationGVK)
+	u.SetName("default")
+	_ = unstructured.SetNestedField(u.Object, bpfEnabled, "spec", "bpfEnabled")
+	return u
+}
+
+// withDefaultFelix appends a BPF-enabled "default" FelixConfiguration unless
+// objs already carries a FelixConfiguration. l2Bridge networks are only valid
+// on a BPF dataplane, so the Calico setup helpers install one by default;
+// dataplane specs supply their own (bpfEnabled false, or per-node-only) to
+// exercise the failure modes.
+func withDefaultFelix(objs []runtime.Object) []runtime.Object {
+	for _, o := range objs {
+		if u, ok := o.(*unstructured.Unstructured); ok && u.GroupVersionKind() == calicoclient.FelixConfigurationGVK {
+			return objs
+		}
+	}
+	return append(objs, makeFelixConfiguration(true))
+}
+
 // Mock inventory struct and methods for testing
 type mockInventory struct {
 	ds       model.Datastore
 	vm       model.VM
 	networks map[string]model.Network // keyed by ID
+	destVMs  []ocp.VM                 // served by List for destination inventories
 }
 
 // defaultVM returns a VM with sensible defaults for testing
@@ -142,6 +168,9 @@ func (m *mockInventory) Host(ref *ref.Ref) (interface{}, error) {
 }
 
 func (m *mockInventory) List(list interface{}, param ...web.Param) error {
+	if l, ok := list.(*[]ocp.VM); ok {
+		*l = m.destVMs
+	}
 	return nil
 }
 
@@ -656,11 +685,23 @@ var _ = Describe("vsphere validation tests", func() {
 			}
 			return u
 		}
-		makeIPPool := func(name, cidr string) *unstructured.Unstructured {
+		makeIPPool := func(name, cidr string, allowedUses ...string) *unstructured.Unstructured {
 			u := &unstructured.Unstructured{}
 			u.SetGroupVersionKind(calicoclient.IPPoolGVK)
 			u.SetName(name)
 			_ = unstructured.SetNestedField(u.Object, cidr, "spec", "cidr")
+			if len(allowedUses) > 0 {
+				ifaces := make([]interface{}, len(allowedUses))
+				for i, v := range allowedUses {
+					ifaces[i] = v
+				}
+				_ = unstructured.SetNestedSlice(u.Object, ifaces, "spec", "allowedUses")
+			}
+			return u
+		}
+		makeDisabledIPPool := func(name, cidr string, allowedUses ...string) *unstructured.Unstructured {
+			u := makeIPPool(name, cidr, allowedUses...)
+			_ = unstructured.SetNestedField(u.Object, true, "spec", "disabled")
 			return u
 		}
 		// L2Bridge spec helpers — VLAN 100 maps to subnet 10.100.0.0/24.
@@ -688,9 +729,20 @@ var _ = Describe("vsphere validation tests", func() {
 				},
 			},
 		}
+		// VRF (routed, L3) Network spec — a real network type, but not one
+		// identity preservation supports.
+		vrfSpec := map[string]interface{}{
+			"vrf": map[string]interface{}{
+				"hostConfig": []interface{}{
+					map[string]interface{}{"nodeSelector": "all()"},
+				},
+			},
+		}
 
 		// setup builds a Validator + fake client. nicIP is the NIC's guest IP,
-		// preserveIPs controls Plan.Spec.PreserveStaticIPs.
+		// preserveIPs controls Plan.Spec.PreserveStaticIPs. A BPF-enabled
+		// "default" FelixConfiguration is installed unless the spec supplies
+		// its own (see withDefaultFelix).
 		setup := func(nicIP string, preserveIPs bool, k8sObjs ...runtime.Object) (*Validator, client.Client, ref.Ref) {
 			scheme := runtime.NewScheme()
 			_ = k8snet.AddToScheme(scheme)
@@ -698,7 +750,9 @@ var _ = Describe("vsphere validation tests", func() {
 			scheme.AddKnownTypeWithName(calicoclient.NetworkGVK.GroupVersion().WithKind("NetworkList"), &unstructured.UnstructuredList{})
 			scheme.AddKnownTypeWithName(calicoclient.IPPoolGVK, &unstructured.Unstructured{})
 			scheme.AddKnownTypeWithName(calicoclient.IPPoolGVK.GroupVersion().WithKind("IPPoolList"), &unstructured.UnstructuredList{})
-			c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(k8sObjs...).Build()
+			scheme.AddKnownTypeWithName(calicoclient.FelixConfigurationGVK, &unstructured.Unstructured{})
+			scheme.AddKnownTypeWithName(calicoclient.FelixConfigurationGVK.GroupVersion().WithKind("FelixConfigurationList"), &unstructured.UnstructuredList{})
+			c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(withDefaultFelix(k8sObjs)...).Build()
 
 			vm := model.VM{
 				VM1:  model.VM1{VM0: model.VM0{ID: "test-vm-id", Name: "test-vm"}},
@@ -752,7 +806,7 @@ var _ = Describe("vsphere validation tests", func() {
 			It("happy path — populates cache, no issues, when Network, VLAN, IPPool all line up", func() {
 				v, c, _ := setup("10.100.0.5", true,
 					makeCalicoNAD(100), makeNetwork(l2Single),
-					makeIPPool("vlan100-pool", "10.100.0.0/24"),
+					makeIPPool("vlan100-pool", "10.100.0.0/24", "L2Workload"),
 				)
 				result, err := v.ValidateCalicoNADs(c)
 				Expect(err).NotTo(HaveOccurred())
@@ -824,15 +878,122 @@ var _ = Describe("vsphere validation tests", func() {
 			})
 
 			It("emits VLANRequired when the NAD references a Calico Network but omits vlan", func() {
-				// A Network reference requires an explicit VLAN. The rejection
-				// fires before the Network is fetched, so the Network's own
-				// contents (single, multi, or empty vlans) are irrelevant.
+				// A Network reference requires an explicit VLAN. The Network
+				// is fetched and classified first (an l2Bridge network here),
+				// then the missing vlan is rejected before any VLAN matching.
 				v, c, _ := setup("10.100.0.5", true,
 					makeCalicoNAD(0), makeNetwork(l2Multi),
 				)
 				result, err := v.ValidateCalicoNADs(c)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(nadIssueKinds(result.Issues)).To(ConsistOf(planbase.CalicoIssueVLANRequired))
+			})
+
+			It("emits NetworkNotFound (not VLANRequired) when the Network is missing and vlan is unset", func() {
+				// The Network lookup precedes the vlan-required check: with a
+				// missing Network the accurate report is NetworkNotFound —
+				// asking for a vlan first would send the user chasing the
+				// wrong fix.
+				v, c, _ := setup("10.100.0.5", true, makeCalicoNAD(0))
+				result, err := v.ValidateCalicoNADs(c)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(nadIssueKinds(result.Issues)).To(ConsistOf(planbase.CalicoIssueNetworkNotFound))
+			})
+
+			It("emits NetworkTypeUnsupported when the referenced Network is a VRF network", func() {
+				// A VRF NAD legitimately carries no vlan; the misleading
+				// VLANRequired must not fire. The reference stops at
+				// classification and is not cached.
+				v, c, _ := setup("10.100.0.5", true,
+					makeCalicoNAD(0), makeNetwork(vrfSpec),
+				)
+				result, err := v.ValidateCalicoNADs(c)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(nadIssueKinds(result.Issues)).To(ConsistOf(planbase.CalicoIssueNetworkTypeUnsupported))
+				Expect(result.Cache.NADs).To(BeEmpty())
+			})
+
+			It("emits NetworkTypeUnsupported even when the NAD sets a vlan on a VRF network", func() {
+				// Same root cause — the network type is wrong; a VLAN check
+				// against a VRF network would mislead.
+				v, c, _ := setup("10.100.0.5", true,
+					makeCalicoNAD(100), makeNetwork(vrfSpec),
+				)
+				result, err := v.ValidateCalicoNADs(c)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(nadIssueKinds(result.Issues)).To(ConsistOf(planbase.CalicoIssueNetworkTypeUnsupported))
+				Expect(result.Cache.NADs).To(BeEmpty())
+			})
+
+			It("does not emit a dataplane issue when FelixConfiguration has bpfEnabled true", func() {
+				v, c, _ := setup("10.100.0.5", true,
+					makeCalicoNAD(100), makeNetwork(l2Single),
+					makeIPPool("vlan100-pool", "10.100.0.0/24", "L2Workload"),
+					makeFelixConfiguration(true),
+				)
+				result, err := v.ValidateCalicoNADs(c)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result.Issues).To(BeEmpty())
+				Expect(result.Cache.NADs).To(HaveLen(1))
+			})
+
+			It("emits DataplaneNotBPF when FelixConfiguration has bpfEnabled false", func() {
+				v, c, _ := setup("10.100.0.5", true,
+					makeCalicoNAD(100), makeNetwork(l2Single),
+					makeIPPool("vlan100-pool", "10.100.0.0/24", "L2Workload"),
+					makeFelixConfiguration(false),
+				)
+				result, err := v.ValidateCalicoNADs(c)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(nadIssueKinds(result.Issues)).To(ConsistOf(planbase.CalicoIssueDataplaneNotBPF))
+				// The issue is plan-scoped; the NAD's own configuration is
+				// valid and stays cached so per-VM checks still run.
+				Expect(result.Cache.NADs).To(HaveLen(1))
+			})
+
+			It("emits DataplaneNotBPF when the default FelixConfiguration is missing", func() {
+				// Only a per-node FelixConfiguration exists (suppresses the
+				// setup helper's auto-injected BPF-enabled default). Felix
+				// then runs the cluster default dataplane, which is not BPF.
+				perNode := makeFelixConfiguration(true)
+				perNode.SetName("node.worker-1")
+				v, c, _ := setup("10.100.0.5", true,
+					makeCalicoNAD(100), makeNetwork(l2Single),
+					makeIPPool("vlan100-pool", "10.100.0.0/24", "L2Workload"),
+					perNode,
+				)
+				result, err := v.ValidateCalicoNADs(c)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(nadIssueKinds(result.Issues)).To(ConsistOf(planbase.CalicoIssueDataplaneNotBPF))
+			})
+
+			It("emits DataplaneNotBPF once for a plan with multiple l2Bridge NADs", func() {
+				// The dataplane is a cluster property; two healthy l2Bridge
+				// NADs must not double-report it.
+				secondNAD := &k8snet.NetworkAttachmentDefinition{
+					ObjectMeta: metav1.ObjectMeta{Name: "calico-nad-2", Namespace: nadNS},
+					Spec: k8snet.NetworkAttachmentDefinitionSpec{
+						Config: fmt.Sprintf(`{"type":"calico","network":"%s","vlan":100}`, netName),
+					},
+				}
+				v, c, _ := setup("10.100.0.5", true,
+					makeCalicoNAD(100), secondNAD, makeNetwork(l2Single),
+					makeIPPool("vlan100-pool", "10.100.0.0/24", "L2Workload"),
+					makeFelixConfiguration(false),
+				)
+				v.Plan.Referenced.Map.Network.Spec.Map = append(
+					v.Plan.Referenced.Map.Network.Spec.Map,
+					v1beta1.NetworkPair{
+						Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{ID: "src-2"}},
+						Destination: v1beta1.DestinationNetwork{
+							Type: planbase.Multus, Namespace: nadNS, Name: "calico-nad-2",
+						},
+					},
+				)
+				result, err := v.ValidateCalicoNADs(c)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(nadIssueKinds(result.Issues)).To(ConsistOf(planbase.CalicoIssueDataplaneNotBPF))
+				Expect(result.Cache.NADs).To(HaveLen(2))
 			})
 
 			It("emits NetworkHasNoVLANs even when the NAD specifies a vlan ID", func() {
@@ -863,7 +1024,32 @@ var _ = Describe("vsphere validation tests", func() {
 			It("emits VLANHasNoIPPool when no IPPool overlaps the VLAN subnet", func() {
 				v, c, _ := setup("10.100.0.5", false,
 					makeCalicoNAD(100), makeNetwork(l2Single),
-					makeIPPool("cluster-default", "10.0.0.0/8"), // pool too large
+					makeIPPool("cluster-default", "10.0.0.0/8", "L2Workload"), // pool too large
+				)
+				result, err := v.ValidateCalicoNADs(c)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(nadIssueKinds(result.Issues)).To(ConsistOf(planbase.CalicoIssueVLANHasNoIPPool))
+			})
+
+			It("emits VLANHasNoIPPool when the only covering pool is disabled", func() {
+				// The pool's CIDR matches the VLAN subnet, but a disabled pool
+				// can never satisfy a CNI ADD — it must not pass validation.
+				v, c, _ := setup("10.100.0.5", false,
+					makeCalicoNAD(100), makeNetwork(l2Single),
+					makeDisabledIPPool("vlan100-disabled", "10.100.0.0/24", "L2Workload"),
+				)
+				result, err := v.ValidateCalicoNADs(c)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(nadIssueKinds(result.Issues)).To(ConsistOf(planbase.CalicoIssueVLANHasNoIPPool))
+			})
+
+			It("emits VLANHasNoIPPool when the only covering pool lacks the L2Workload use", func() {
+				// A Workload-only pool covers the subnet, but Calico won't
+				// assign L2-attached addresses from it — it must not pass
+				// validation.
+				v, c, _ := setup("10.100.0.5", false,
+					makeCalicoNAD(100), makeNetwork(l2Single),
+					makeIPPool("vlan100-workload-only", "10.100.0.0/24", "Workload"),
 				)
 				result, err := v.ValidateCalicoNADs(c)
 				Expect(err).NotTo(HaveOccurred())
@@ -1038,7 +1224,7 @@ var _ = Describe("vsphere validation tests", func() {
 				v, c, vmRef := setup("10.100.0.5", true,
 					makeCalicoNAD(100), // broken — no Network CR
 					healthyNAD, healthyNet,
-					makeIPPool("vlan200-pool", "10.200.0.0/24"),
+					makeIPPool("vlan200-pool", "10.200.0.0/24", "L2Workload"),
 				)
 				v.Plan.Referenced.Map.Network.Spec.Map = append(
 					v.Plan.Referenced.Map.Network.Spec.Map,
@@ -1082,7 +1268,7 @@ var _ = Describe("vsphere validation tests", func() {
 			It("emits IPNotInSubnet when preserveStaticIPs is on and source IP is outside the VLAN subnet", func() {
 				v, c, vmRef := setup("192.168.1.5", true,
 					makeCalicoNAD(100), makeNetwork(l2Single),
-					makeIPPool("vlan100-pool", "10.100.0.0/24"),
+					makeIPPool("vlan100-pool", "10.100.0.0/24", "L2Workload"),
 				)
 				result, err := v.ValidateCalicoNADs(c)
 				Expect(err).NotTo(HaveOccurred())
@@ -1096,7 +1282,7 @@ var _ = Describe("vsphere validation tests", func() {
 			It("emits IPNotInIPPool when preserveStaticIPs is on and no eligible pool covers the source IP", func() {
 				v, c, vmRef := setup("10.100.0.5", true,
 					makeCalicoNAD(100), makeNetwork(l2Single),
-					makeIPPool("vlan100-upper", "10.100.0.128/25"), // covers VLAN but not 10.100.0.5
+					makeIPPool("vlan100-upper", "10.100.0.128/25", "L2Workload"), // covers VLAN but not 10.100.0.5
 				)
 				result, err := v.ValidateCalicoNADs(c)
 				Expect(err).NotTo(HaveOccurred())
@@ -1111,7 +1297,7 @@ var _ = Describe("vsphere validation tests", func() {
 				// Source IP would fail subnet check, but preservation is off.
 				v, c, vmRef := setup("192.168.1.5", false,
 					makeCalicoNAD(100), makeNetwork(l2Single),
-					makeIPPool("vlan100-pool", "10.100.0.0/24"),
+					makeIPPool("vlan100-pool", "10.100.0.0/24", "L2Workload"),
 				)
 				result, err := v.ValidateCalicoNADs(c)
 				Expect(err).NotTo(HaveOccurred())
@@ -1139,7 +1325,7 @@ var _ = Describe("vsphere validation tests", func() {
 				// interface; a multi-IPv4 NIC would fail the pod at CNI ADD.
 				v, c, vmRef := setup("10.100.0.5", true,
 					makeCalicoNAD(100), makeNetwork(l2Single),
-					makeIPPool("vlan100-pool", "10.100.0.0/24"),
+					makeIPPool("vlan100-pool", "10.100.0.0/24", "L2Workload"),
 				)
 				vm := v.Source.Inventory.(*mockInventory).vm
 				vm.GuestNetworks = append(vm.GuestNetworks, vsphere.GuestNetwork{IP: "10.100.0.6", DeviceConfigId: 4001})
@@ -1172,7 +1358,7 @@ var _ = Describe("vsphere validation tests", func() {
 				}
 				v, c, vmRef := setup("192.168.1.5", true,
 					nadA, nadB, makeNetwork(l2Single),
-					makeIPPool("vlan100-pool", "10.100.0.0/24"),
+					makeIPPool("vlan100-pool", "10.100.0.0/24", "L2Workload"),
 				)
 				vm := v.Source.Inventory.(*mockInventory).vm
 				vm.NICs = append(vm.NICs, vsphere.NIC{Network: vsphere.Ref{ID: srcNetID}, DeviceKey: 4002})
@@ -1261,10 +1447,21 @@ var _ = Describe("vsphere validation tests", func() {
 				},
 			},
 		}
+		// VRF (routed, L3) Network spec — a real network type, but not one
+		// identity preservation supports.
+		vrfSpec := map[string]interface{}{
+			"vrf": map[string]interface{}{
+				"hostConfig": []interface{}{
+					map[string]interface{}{"nodeSelector": "all()"},
+				},
+			},
+		}
 
 		// setupPrimary builds a Validator + fake client with a single
 		// type: calico NetworkMap entry sourced from srcNetID. extraPairs
 		// adds additional NetworkMap entries (for coexistence / misuse tests).
+		// With registerCalicoKinds, a BPF-enabled "default" FelixConfiguration
+		// is installed unless the spec supplies its own (see withDefaultFelix).
 		setupPrimary := func(nicIP string, preserveIPs bool, dest v1beta1.DestinationNetwork, extraPairs []v1beta1.NetworkPair, registerCalicoKinds bool, k8sObjs ...runtime.Object) (*Validator, client.Client, ref.Ref) {
 			scheme := runtime.NewScheme()
 			_ = k8snet.AddToScheme(scheme)
@@ -1274,6 +1471,9 @@ var _ = Describe("vsphere validation tests", func() {
 				scheme.AddKnownTypeWithName(calicoclient.NetworkGVK.GroupVersion().WithKind("NetworkList"), &unstructured.UnstructuredList{})
 				scheme.AddKnownTypeWithName(calicoclient.IPPoolGVK, &unstructured.Unstructured{})
 				scheme.AddKnownTypeWithName(calicoclient.IPPoolGVK.GroupVersion().WithKind("IPPoolList"), &unstructured.UnstructuredList{})
+				scheme.AddKnownTypeWithName(calicoclient.FelixConfigurationGVK, &unstructured.Unstructured{})
+				scheme.AddKnownTypeWithName(calicoclient.FelixConfigurationGVK.GroupVersion().WithKind("FelixConfigurationList"), &unstructured.UnstructuredList{})
+				k8sObjs = withDefaultFelix(k8sObjs)
 			}
 			c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(k8sObjs...).Build()
 
@@ -1344,7 +1544,7 @@ var _ = Describe("vsphere validation tests", func() {
 				Expect(result.Cache.Primary.L3EligiblePools).To(HaveLen(1))
 			})
 
-			It("happy path (named single-VLAN network, explicit VLAN)", func() {
+			It("happy path Case C (single-VLAN Network, explicit VLAN)", func() {
 				dest := v1beta1.DestinationNetwork{Type: planbase.Pod, Calico: &v1beta1.CalicoDestination{Network: netName, Vlan: 100}}
 				v, c, _ := setupPrimary("10.100.0.5", false, dest, nil, true,
 					makeNetwork(l2Single),
@@ -1359,7 +1559,7 @@ var _ = Describe("vsphere validation tests", func() {
 				Expect(result.Cache.Primary.L2EligiblePools).To(HaveLen(1))
 			})
 
-			It("happy path Case C (named network, explicit VLAN)", func() {
+			It("happy path Case C (multi-VLAN Network, explicit VLAN)", func() {
 				dest := v1beta1.DestinationNetwork{Type: planbase.Pod, Calico: &v1beta1.CalicoDestination{Network: netName, Vlan: 200}}
 				v, c, _ := setupPrimary("10.200.0.5", false, dest, nil, true,
 					makeNetwork(l2Multi),
@@ -1461,6 +1661,27 @@ var _ = Describe("vsphere validation tests", func() {
 				Expect(kinds(result.Issues)).To(ContainElement(planbase.CalicoIssuePrimaryFieldsMisplaced))
 			})
 
+			It("emits PrimaryFieldsMisplaced when the calico block is set on a multus entry", func() {
+				dest := v1beta1.DestinationNetwork{
+					Type: planbase.Multus, Namespace: "ns", Name: "nad",
+					Calico: &v1beta1.CalicoDestination{},
+				}
+				v, c, _ := setupPrimary("10.244.0.5", false, dest, nil, true)
+				result, err := v.ValidateCalicoPrimary(c)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(kinds(result.Issues)).To(ConsistOf(planbase.CalicoIssuePrimaryFieldsMisplaced))
+				// A multus block never seeds the primary cache.
+				Expect(result.Cache.Primary).To(BeNil())
+			})
+
+			It("emits PrimaryFieldsMisplaced when the calico block is set on an ignored entry", func() {
+				dest := v1beta1.DestinationNetwork{Type: planbase.Ignored, Calico: &v1beta1.CalicoDestination{}}
+				v, c, _ := setupPrimary("10.244.0.5", false, dest, nil, true)
+				result, err := v.ValidateCalicoPrimary(c)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(kinds(result.Issues)).To(ConsistOf(planbase.CalicoIssuePrimaryFieldsMisplaced))
+			})
+
 			It("emits PrimaryNetworkNotFound when calico.network names a missing CR", func() {
 				dest := v1beta1.DestinationNetwork{Type: planbase.Pod, Calico: &v1beta1.CalicoDestination{Network: "missing", Vlan: 100}}
 				v, c, _ := setupPrimary("10.100.0.5", false, dest, nil, true)
@@ -1518,16 +1739,119 @@ var _ = Describe("vsphere validation tests", func() {
 			})
 
 			It("emits PrimaryVLANRequired when calico.network is set without calico.vlan", func() {
-				// A Network reference requires an explicit VLAN. The rejection
-				// fires before the Network is fetched, so the Network need not
-				// even exist.
+				// A Network reference requires an explicit VLAN. The Network
+				// is fetched and classified first (an l2Bridge network here),
+				// then the missing vlan is rejected before any VLAN matching.
 				dest := v1beta1.DestinationNetwork{Type: planbase.Pod, Calico: &v1beta1.CalicoDestination{Network: netName}}
 				v, c, _ := setupPrimary("10.100.0.5", false, dest, nil, true,
+					makeNetwork(l2Single),
 					makeIPPool("default-ipv4-ippool", "10.244.0.0/16"),
 				)
 				result, err := v.ValidateCalicoPrimary(c)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(kinds(result.Issues)).To(ConsistOf(planbase.CalicoIssuePrimaryVLANRequired))
+			})
+
+			It("emits PrimaryNetworkNotFound (not PrimaryVLANRequired) when the Network is missing and calico.vlan is unset", func() {
+				// The Network lookup precedes the vlan-required check: with a
+				// missing Network the accurate report is NetworkNotFound —
+				// asking for a vlan first would send the user chasing the
+				// wrong fix.
+				dest := v1beta1.DestinationNetwork{Type: planbase.Pod, Calico: &v1beta1.CalicoDestination{Network: "missing"}}
+				v, c, _ := setupPrimary("10.100.0.5", false, dest, nil, true,
+					makeIPPool("default-ipv4-ippool", "10.244.0.0/16"),
+				)
+				result, err := v.ValidateCalicoPrimary(c)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(kinds(result.Issues)).To(ConsistOf(planbase.CalicoIssuePrimaryNetworkNotFound))
+			})
+
+			It("emits PrimaryNetworkTypeUnsupported when calico.network names a VRF network", func() {
+				// A VRF reference legitimately carries no vlan; the misleading
+				// PrimaryVLANRequired must not fire, and the primary cache
+				// must not seed.
+				dest := v1beta1.DestinationNetwork{Type: planbase.Pod, Calico: &v1beta1.CalicoDestination{Network: netName}}
+				v, c, _ := setupPrimary("10.100.0.5", false, dest, nil, true,
+					makeNetwork(vrfSpec),
+					makeIPPool("default-ipv4-ippool", "10.244.0.0/16"),
+				)
+				result, err := v.ValidateCalicoPrimary(c)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(kinds(result.Issues)).To(ConsistOf(planbase.CalicoIssuePrimaryNetworkTypeUnsupported))
+				Expect(result.Cache.Primary).To(BeNil())
+			})
+
+			It("emits PrimaryNetworkTypeUnsupported even when calico.vlan is set on a VRF network", func() {
+				// Same root cause — the network type is wrong; a VLAN check
+				// against a VRF network would mislead.
+				dest := v1beta1.DestinationNetwork{Type: planbase.Pod, Calico: &v1beta1.CalicoDestination{Network: netName, Vlan: 100}}
+				v, c, _ := setupPrimary("10.100.0.5", false, dest, nil, true,
+					makeNetwork(vrfSpec),
+					makeIPPool("default-ipv4-ippool", "10.244.0.0/16"),
+				)
+				result, err := v.ValidateCalicoPrimary(c)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(kinds(result.Issues)).To(ConsistOf(planbase.CalicoIssuePrimaryNetworkTypeUnsupported))
+				Expect(result.Cache.Primary).To(BeNil())
+			})
+
+			It("does not emit a dataplane issue when FelixConfiguration has bpfEnabled true", func() {
+				dest := v1beta1.DestinationNetwork{Type: planbase.Pod, Calico: &v1beta1.CalicoDestination{Network: netName, Vlan: 100}}
+				v, c, _ := setupPrimary("10.100.0.5", false, dest, nil, true,
+					makeNetwork(l2Single),
+					makeIPPool("vlan100-pool", "10.100.0.0/24", "L2Workload"),
+					makeFelixConfiguration(true),
+				)
+				result, err := v.ValidateCalicoPrimary(c)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result.Issues).To(BeEmpty())
+				Expect(result.Cache.Primary).NotTo(BeNil())
+			})
+
+			It("emits PrimaryDataplaneNotBPF when FelixConfiguration has bpfEnabled false", func() {
+				dest := v1beta1.DestinationNetwork{Type: planbase.Pod, Calico: &v1beta1.CalicoDestination{Network: netName, Vlan: 100}}
+				v, c, _ := setupPrimary("10.100.0.5", false, dest, nil, true,
+					makeNetwork(l2Single),
+					makeIPPool("vlan100-pool", "10.100.0.0/24", "L2Workload"),
+					makeFelixConfiguration(false),
+				)
+				result, err := v.ValidateCalicoPrimary(c)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(kinds(result.Issues)).To(ConsistOf(planbase.CalicoIssuePrimaryDataplaneNotBPF))
+				// The issue is plan-scoped; the mapping itself is valid and
+				// the cache still seeds so per-VM checks run.
+				Expect(result.Cache.Primary).NotTo(BeNil())
+			})
+
+			It("emits PrimaryDataplaneNotBPF when the default FelixConfiguration is missing", func() {
+				// Only a per-node FelixConfiguration exists (suppresses the
+				// setup helper's auto-injected BPF-enabled default). Felix
+				// then runs the cluster default dataplane, which is not BPF.
+				perNode := makeFelixConfiguration(true)
+				perNode.SetName("node.worker-1")
+				dest := v1beta1.DestinationNetwork{Type: planbase.Pod, Calico: &v1beta1.CalicoDestination{Network: netName, Vlan: 100}}
+				v, c, _ := setupPrimary("10.100.0.5", false, dest, nil, true,
+					makeNetwork(l2Single),
+					makeIPPool("vlan100-pool", "10.100.0.0/24", "L2Workload"),
+					perNode,
+				)
+				result, err := v.ValidateCalicoPrimary(c)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(kinds(result.Issues)).To(ConsistOf(planbase.CalicoIssuePrimaryDataplaneNotBPF))
+			})
+
+			It("does not run the dataplane check for Case A (no calico.network)", func() {
+				// Case A is plain L3 IPAM — no l2Bridge network is engaged, so
+				// a non-BPF dataplane is fine.
+				dest := v1beta1.DestinationNetwork{Type: planbase.Pod, Calico: &v1beta1.CalicoDestination{}}
+				v, c, _ := setupPrimary("10.244.0.5", false, dest, nil, true,
+					makeIPPool("default-ipv4-ippool", "10.244.0.0/16"),
+					makeFelixConfiguration(false),
+				)
+				result, err := v.ValidateCalicoPrimary(c)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result.Issues).To(BeEmpty())
+				Expect(result.Cache.Primary).NotTo(BeNil())
 			})
 
 			It("emits PrimaryVLANNotInNetwork when calico.vlan is absent from the Network's VLAN list", func() {
@@ -1617,7 +1941,7 @@ var _ = Describe("vsphere validation tests", func() {
 				}))
 			})
 
-			It("Case B/C: emits IPNotInSubnet when source IP is outside the VLAN subnet", func() {
+			It("Case C: emits IPNotInSubnet when source IP is outside the VLAN subnet", func() {
 				dest := v1beta1.DestinationNetwork{Type: planbase.Pod, Calico: &v1beta1.CalicoDestination{Network: netName, Vlan: 100}}
 				v, c, vmRef := setupPrimary("192.168.1.5", true, dest, nil, true,
 					makeNetwork(l2Single),
@@ -1633,7 +1957,7 @@ var _ = Describe("vsphere validation tests", func() {
 				}))
 			})
 
-			It("Case B/C: emits NoEligibleIPPool when no L2Workload pool covers the source IP", func() {
+			It("Case C: emits NoEligibleIPPool when no L2Workload pool covers the source IP", func() {
 				dest := v1beta1.DestinationNetwork{Type: planbase.Pod, Calico: &v1beta1.CalicoDestination{Network: netName, Vlan: 100}}
 				v, c, vmRef := setupPrimary("10.100.0.5", true, dest, nil, true,
 					makeNetwork(l2Single),

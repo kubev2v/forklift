@@ -46,6 +46,13 @@ func TestSetCalicoMAC(t *testing.T) {
 			}
 		})
 	}
+	t.Run("EmptyMacIsNoOp", func(t *testing.T) {
+		m := &meta.ObjectMeta{}
+		SetCalicoMAC(m, "net-0", "")
+		if m.Annotations != nil {
+			t.Errorf("annotations should be nil, got %v", m.Annotations)
+		}
+	})
 }
 
 func TestSetCalicoStaticIPs(t *testing.T) {

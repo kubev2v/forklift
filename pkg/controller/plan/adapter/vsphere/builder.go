@@ -833,10 +833,11 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 			if mapped.Destination.Calico != nil {
 				// The destination's default pod network is Calico and the
 				// user opted into identity preservation: Bridge binding
-				// always, MAC always, IPs gated on PreserveStaticIPs,
-				// Network + Vlan annotations when the user named a
-				// projectcalico.org/v3 Network CR (zero Vlan omitted —
-				// Calico defaults to a single-VLAN Network's sole entry).
+				// always, MAC always, IPs when the Plan preserves static
+				// IPs, Network + Vlan annotations when the user named a
+				// projectcalico.org/v3 Network CR. Plan validation rejects
+				// a network entry without an explicit VLAN, so a named
+				// Network always arrives here with a non-zero Vlan.
 				kInterface.Bridge = &cnv.InterfaceBridge{}
 				calicoPrimary = true
 				calicoPrimaryMAC = nic.MAC
@@ -882,6 +883,10 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 				nadCache[nadKey] = cfg
 			}
 			if cfg != nil && cfg.ReferencesCalicoNetwork() {
+				// Calico identity preservation on a secondary NIC: the
+				// source MAC is always carried over via the scoped hwAddr
+				// annotation, and the source IPs when the Plan preserves
+				// static IPs. Non-Calico NADs are untouched.
 				calicoMacInterfaces[networkName] = nic.MAC
 				if r.Plan.Spec.PreserveStaticIPs {
 					if ips := findInterfaceIps(vm, nic); len(ips) > 0 {
