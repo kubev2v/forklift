@@ -545,13 +545,11 @@ func (r *Collector) getUpdates(ctx context.Context) error {
 		}
 		if err == nil {
 			err = tx.Commit()
+			if err != nil {
+				r.log.Error(err, "tx commit failed.")
+			}
 		} else {
-			err = tx.End()
-		}
-		if err != nil {
-			r.log.Error(
-				err,
-				"tx commit failed.")
+			_ = tx.End()
 		}
 		if err == nil && (updateSet.Truncated == nil || !*updateSet.Truncated) {
 			if !r.parity {
