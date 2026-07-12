@@ -2,16 +2,25 @@ package diagnostics
 
 // DiagnosticsReport holds the complete diagnostics for a migration plan.
 type DiagnosticsReport struct {
-	PlanName       string
-	PlanUID        string
-	MigrationName  string
-	MigrationUID   string
-	TargetNS       string
-	CutoverTime    string
-	RemoteTarget   bool
-	VMs            []VMDiagnostics
-	Config         ConfigContext
-	ControllerLogs []ControllerLogEntry
+	PlanName           string
+	PlanUID            string
+	MigrationName      string
+	MigrationUID       string
+	TargetNS           string
+	CutoverTime        string
+	RemoteTarget       bool
+	RequestedShowLines int
+	VMs                []VMDiagnostics
+	Config             ConfigContext
+	ControllerLogs     *ControllerLogAnalysis
+}
+
+// ControllerLogAnalysis holds error-classified log analysis for the forklift-controller.
+type ControllerLogAnalysis struct {
+	LogTail    []string
+	ErrorLines []string
+	ErrorCount int
+	WarnCount  int
 }
 
 // VMDiagnostics holds diagnostics for a single VM in a migration.
@@ -29,14 +38,16 @@ type VMDiagnostics struct {
 
 // PodDiagnostics holds log analysis and status for a migration workload pod.
 type PodDiagnostics struct {
-	Name       string
-	Phase      string // Running, Succeeded, Failed, Evicted
-	Reason     string
-	Container  string
-	LogTail    []string
-	ErrorLines []string // Significant error lines from the full log scan
-	ErrorCount int
-	WarnCount  int
+	Name        string
+	Phase       string // Running, Succeeded, Failed, Evicted
+	Reason      string
+	Container   string
+	LogTail     []string
+	ErrorLines  []string // Significant error lines from the full log scan
+	ErrorCount  int
+	WarnCount   int
+	V2VStage    string // Current virt-v2v conversion stage (e.g. "disk-copy")
+	ProgressPct string // Last known progress percentage (e.g. "50")
 }
 
 // ConversionInfo holds data from a Conversion CR linked to a VM.

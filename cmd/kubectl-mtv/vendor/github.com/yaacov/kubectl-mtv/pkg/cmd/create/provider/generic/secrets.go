@@ -29,7 +29,7 @@ func buildSecret(namespace, providerName, user, password, url, cacert, token str
 	}
 
 	if cacert != "" {
-		secretData["cacert"] = []byte(cacert)
+		secretData["ca.crt"] = []byte(cacert)
 	}
 
 	if insecureSkipTLS {
