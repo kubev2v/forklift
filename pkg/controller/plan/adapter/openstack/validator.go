@@ -1,14 +1,26 @@
 package openstack
 
 import (
+	"context"
+	"encoding/json"
+	"net"
+
+	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	ocpmodel "github.com/kubev2v/forklift/pkg/controller/provider/model/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/openstack"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	core "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	namespaceLabelPrimaryUDN = "k8s.ovn.org/primary-user-defined-network"
+	nadLabelUDN              = "k8s.ovn.org/user-defined-network"
 )
 
 // Validator
@@ -67,9 +79,142 @@ func (r *Validator) MaintenanceMode(vmRef ref.Ref) (ok bool, err error) {
 	return
 }
 
-// NO-OP
-func (r *Validator) UdnStaticIPs(vmRef ref.Ref, client client.Client) (ok bool, err error) {
-	return true, nil
+func (r *Validator) UdnStaticIPs(vmRef ref.Ref, cl client.Client) (ok bool, err error) {
+	if !r.Plan.DestinationHasUdnNetwork(cl) {
+		return true, nil
+	}
+	if !r.Plan.Spec.PreserveStaticIPs {
+		return true, nil
+	}
+
+	sourceNetwork, err := r.getSourceNetworkForPodNetworkTarget(vmRef)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef)
+		return
+	}
+	if sourceNetwork == nil {
+		return true, nil
+	}
+
+	vm := &model.Workload{}
+	err = r.Source.Inventory.Find(vm, vmRef)
+	if err != nil {
+		err = liberr.Wrap(err, "vm", vmRef)
+		return
+	}
+
+	udnSubnet, err := r.getUdnSubnet(cl)
+	if err != nil {
+		return false, liberr.Wrap(err, "vm", vmRef)
+	}
+	if udnSubnet == "" {
+		return true, nil
+	}
+
+	_, ipNet, err := net.ParseCIDR(udnSubnet)
+	if err != nil {
+		return false, liberr.Wrap(err, "udnSubnet", udnSubnet)
+	}
+
+	sourceIP := getFixedIPv4ForNetwork(vm, sourceNetwork.Name)
+	if sourceIP == "" {
+		r.Log.V(4).Info("No fixed IPv4 found for VM on source network, nothing to preserve", "vm", vmRef.String(), "network", sourceNetwork.Name)
+		return true, nil
+	}
+
+	ip := net.ParseIP(sourceIP)
+	if ip == nil {
+		r.Log.V(4).Info("Invalid IP in VM addresses", "vm", vmRef.String(), "ip", sourceIP)
+		return false, nil
+	}
+
+	return ipNet.Contains(ip), nil
+}
+
+func (r *Validator) getSourceNetworkForPodNetworkTarget(vmRef ref.Ref) (network *model.Network, err error) {
+	mapping := r.Plan.Map.Network.Spec.Map
+	for i := range mapping {
+		mapped := &mapping[i]
+		if mapped.Destination.Type == Pod {
+			network = &model.Network{}
+			err = r.Source.Inventory.Find(network, mapped.Source.Ref)
+			if err != nil {
+				err = liberr.Wrap(err, "network", mapped.Source.Ref)
+			}
+			return
+		}
+	}
+	return
+}
+
+func (r *Validator) getUdnSubnet(cl client.Client) (string, error) {
+	key := client.ObjectKey{
+		Name: r.Plan.Spec.TargetNamespace,
+	}
+	namespace := &core.Namespace{}
+	err := cl.Get(context.TODO(), key, namespace)
+	if err != nil {
+		return "", err
+	}
+	_, hasUdnLabel := namespace.Labels[namespaceLabelPrimaryUDN]
+	if !hasUdnLabel {
+		return "", nil
+	}
+
+	nadList := &k8snet.NetworkAttachmentDefinitionList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(r.Plan.Spec.TargetNamespace),
+		client.MatchingLabels{nadLabelUDN: ""},
+	}
+
+	err = cl.List(context.TODO(), nadList, listOpts...)
+	if err != nil {
+		return "", err
+	}
+	for _, nad := range nadList.Items {
+		var networkConfig ocpmodel.NetworkConfig
+		err = json.Unmarshal([]byte(nad.Spec.Config), &networkConfig)
+		if err != nil {
+			r.Log.Info("Skipping NAD: failed to parse network config", "namespace", nad.Namespace, "name", nad.Name, "error", err.Error())
+			continue
+		}
+		if networkConfig.IsUnsupportedUdn() && networkConfig.AllowPersistentIPs {
+			return networkConfig.Subnets, nil
+		}
+	}
+	return "", nil
+}
+
+// getFixedIPv4ForNetwork extracts the first fixed IPv4 address for the given
+// network name from the VM's Addresses map.
+func getFixedIPv4ForNetwork(vm *model.Workload, networkName string) string {
+	addrs, exists := vm.Addresses[networkName]
+	if !exists {
+		return ""
+	}
+	nics, ok := addrs.([]interface{})
+	if !ok {
+		return ""
+	}
+	for _, nic := range nics {
+		m, ok := nic.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		ipType, _ := m["OS-EXT-IPS:type"].(string)
+		if ipType != "fixed" {
+			continue
+		}
+		version, _ := m["version"].(float64)
+		if version != 4 {
+			continue
+		}
+		addr, _ := m["addr"].(string)
+		if addr != "" {
+			return addr
+		}
+	}
+	return ""
 }
 
 func (r *Validator) InvalidDiskSizes(vmRef ref.Ref) ([]string, error) {
