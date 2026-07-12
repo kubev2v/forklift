@@ -38,7 +38,7 @@ func buildSecret(namespace, providerName string, options providerutil.ProviderOp
 		secretData["insecureSkipVerify"] = []byte("true")
 	}
 	if options.CACert != "" {
-		secretData["cacert"] = []byte(options.CACert)
+		secretData["ca.crt"] = []byte(options.CACert)
 	}
 
 	return &corev1.Secret{

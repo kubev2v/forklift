@@ -24,7 +24,7 @@ func buildSecret(namespace, providerName, user, password, url, cacert string, in
 		secretData["insecureSkipVerify"] = []byte("true")
 	}
 	if cacert != "" {
-		secretData["cacert"] = []byte(cacert)
+		secretData["ca.crt"] = []byte(cacert)
 	}
 
 	secret := &corev1.Secret{

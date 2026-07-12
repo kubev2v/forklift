@@ -46,29 +46,20 @@ func BuildSecret(namespace, baseName string, opts SecretOptions, dryRun bool) (*
 
 	secretData := map[string][]byte{}
 
-	if opts.VSphereUsername != "" {
-		secretData["user"] = []byte(opts.VSphereUsername)
-	}
-	if opts.VSpherePassword != "" {
-		secretData["password"] = []byte(opts.VSpherePassword)
-	}
-	if opts.VSphereURL != "" {
-		secretData["url"] = []byte(opts.VSphereURL)
-	}
 	if opts.StorageUsername != "" {
-		secretData["storageUser"] = []byte(opts.StorageUsername)
+		secretData["STORAGE_USERNAME"] = []byte(opts.StorageUsername)
 	}
 	if opts.StoragePassword != "" {
-		secretData["storagePassword"] = []byte(opts.StoragePassword)
+		secretData["STORAGE_PASSWORD"] = []byte(opts.StoragePassword)
 	}
 	if opts.StorageEndpoint != "" {
-		secretData["storageEndpoint"] = []byte(opts.StorageEndpoint)
+		secretData["STORAGE_HOSTNAME"] = []byte(opts.StorageEndpoint)
 	}
 	if opts.InsecureSkipTLS {
-		secretData["insecureSkipVerify"] = []byte("true")
+		secretData["STORAGE_SKIP_SSL_VERIFICATION"] = []byte("true")
 	}
 	if cacert != "" {
-		secretData["cacert"] = []byte(cacert)
+		secretData["ca.crt"] = []byte(cacert)
 	}
 
 	if len(secretData) == 0 {
@@ -132,21 +123,11 @@ func ValidateSecretFields(opts SecretOptions) error {
 		return nil // No validation needed if no fields provided
 	}
 
-	// If any offload fields are provided, validate required combinations
+	// If any offload fields are provided, validate the required storage credentials.
+	// Forklift reads vSphere credentials from the source provider secret rather than
+	// from the StorageMap offload secret.
 	var missingFields []string
 
-	// vSphere credentials are required
-	if opts.VSphereUsername == "" {
-		missingFields = append(missingFields, "--offload-vsphere-username")
-	}
-	if opts.VSpherePassword == "" {
-		missingFields = append(missingFields, "--offload-vsphere-password")
-	}
-	if opts.VSphereURL == "" {
-		missingFields = append(missingFields, "--offload-vsphere-url")
-	}
-
-	// Storage credentials are required
 	if opts.StorageUsername == "" {
 		missingFields = append(missingFields, "--offload-storage-username")
 	}

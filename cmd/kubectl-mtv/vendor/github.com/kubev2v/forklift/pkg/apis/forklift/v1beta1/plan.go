@@ -256,6 +256,14 @@ type PlanSpec struct {
 	// direct SCSI access, such as shared storage clusters or database applications.
 	// +optional
 	RDMAsLun bool `json:"rdmAsLun,omitempty"`
+	// SCSIReservation controls whether SCSI persistent reservation is enabled for
+	// shared RDM LUN disks. Requires rdmAsLun=true to have any effect.
+	// When false (default), shared RDM LUNs are migrated without persistent reservation.
+	// When true, shared RDM LUNs are configured with KubeVirt lun.reservation=true,
+	// which is required for workloads that use SCSI PR-based fencing (e.g. shared-disk clusters).
+	// Can be overridden per VM via spec.vms[].scsiReservation.
+	// +optional
+	SCSIReservation bool `json:"scsiReservation,omitempty"`
 	// DeleteGuestConversionPod determines if the guest conversion pod should be deleted after successful migration.
 	// Note:
 	//   - If this option is enabled and migration succeeds then the pod will get deleted. However the VM could still not boot and the virt-v2v logs, with additional information, will be deleted alongside guest conversion pod.

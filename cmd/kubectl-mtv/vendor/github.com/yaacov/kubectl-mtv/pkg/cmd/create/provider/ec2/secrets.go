@@ -25,7 +25,7 @@ func buildSecret(namespace, providerName, accessKeyID, secretAccessKey, url, cac
 		secretData["insecureSkipVerify"] = []byte("true")
 	}
 	if cacert != "" {
-		secretData["cacert"] = []byte(cacert)
+		secretData["ca.crt"] = []byte(cacert)
 	}
 
 	if targetAccessKeyID != "" {

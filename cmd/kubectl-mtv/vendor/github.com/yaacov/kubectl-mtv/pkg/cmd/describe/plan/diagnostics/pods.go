@@ -13,6 +13,12 @@ import (
 const defaultLogTailLines = 500
 const defaultShowLines = 10
 
+// MaxLogTailLines is the maximum number of log lines that can be scanned per container.
+const MaxLogTailLines = 10000
+
+// MaxShowLines is the maximum number of log lines that can be displayed per container.
+const MaxShowLines = 500
+
 // CollectPodDiagnostics lists pods matching the plan/migration labels and collects logs.
 func CollectPodDiagnostics(ctx context.Context, clientset *kubernetes.Clientset, namespace, planUID, migrationUID, vmID string, logLines, showLines int) []PodDiagnostics {
 	selector := fmt.Sprintf("plan=%s,migration=%s", planUID, migrationUID)
@@ -62,8 +68,25 @@ func buildPodDiagnostics(ctx context.Context, clientset *kubernetes.Clientset, p
 		Container: containerName,
 	}
 
-	diag.LogTail, diag.ErrorLines, diag.ErrorCount, diag.WarnCount = collectLogs(ctx, clientset, pod.Namespace, pod.Name, containerName, logLines, showLines)
+	var allLines []string
+	diag.LogTail, diag.ErrorLines, diag.ErrorCount, diag.WarnCount, allLines = collectLogs(ctx, clientset, pod.Namespace, pod.Name, containerName, logLines, showLines)
+
+	if isV2VContainer(containerName) {
+		diag.V2VStage, diag.ProgressPct = detectV2VStage(allLines)
+		if diag.V2VStage == "" && len(allLines) > 0 {
+			diag.V2VStage = "init"
+		}
+	}
+
 	return diag
+}
+
+func isV2VContainer(name string) bool {
+	switch name {
+	case "virt-v2v", "convertor":
+		return true
+	}
+	return false
 }
 
 func mainContainerName(pod *corev1.Pod) string {
@@ -80,9 +103,9 @@ func mainContainerName(pod *corev1.Pod) string {
 	return pod.Spec.Containers[0].Name
 }
 
-func collectLogs(ctx context.Context, clientset *kubernetes.Clientset, namespace, podName, container string, logLines, showLines int) ([]string, []string, int, int) {
+func collectLogs(ctx context.Context, clientset *kubernetes.Clientset, namespace, podName, container string, logLines, showLines int) ([]string, []string, int, int, []string) {
 	if container == "" {
-		return nil, nil, 0, 0
+		return nil, nil, 0, 0, nil
 	}
 
 	tailLines := int64(logLines)
@@ -100,7 +123,7 @@ func collectLogs(ctx context.Context, clientset *kubernetes.Clientset, namespace
 		})
 		stream, err = req.Stream(ctx)
 		if err != nil {
-			return nil, nil, 0, 0
+			return nil, nil, 0, 0, nil
 		}
 	}
 	defer stream.Close()
@@ -143,13 +166,19 @@ func collectLogs(ctx context.Context, clientset *kubernetes.Clientset, namespace
 		}
 		errorLines = append(errorLines, otherErrorLines...)
 	}
+	if len(errorLines) > showLines {
+		errorLines = errorLines[len(errorLines)-showLines:]
+	}
+
+	// Keep all lines for stage detection
+	allLines := lines
 
 	// Keep only last N lines for tail display
 	if len(lines) > showLines {
 		lines = lines[len(lines)-showLines:]
 	}
 
-	return lines, errorLines, errorCount, warnCount
+	return lines, errorLines, errorCount, warnCount, allLines
 }
 
 func isErrorLine(line string) bool {

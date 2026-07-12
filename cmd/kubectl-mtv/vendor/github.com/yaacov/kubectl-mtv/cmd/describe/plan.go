@@ -96,8 +96,8 @@ Use --diagnostics to include pod logs, events, and configuration context.`,
 	cmd.Flags().StringVar(&vmName, "vm", "", "VM name to describe (switches to VM description mode)")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch VM status with live updates (only when --vm is used)")
 	cmd.Flags().BoolVarP(&withDiagnostics, "diagnostics", "D", false, "Include diagnostics (pod logs, events, configuration context)")
-	cmd.Flags().IntVar(&logLines, "scan-log-lines", 500, "Number of log lines to scan for diagnostics")
-	cmd.Flags().IntVar(&showLines, "show-log-lines", 10, "Number of log lines to display in diagnostics output")
+	cmd.Flags().IntVar(&logLines, "scan-log-lines", 500, "Number of log lines to scan for diagnostics (max 10000)")
+	cmd.Flags().IntVar(&showLines, "show-log-lines", 10, "Number of log lines to display in diagnostics output (max 500)")
 	cmd.Flags().VarP(outputFormatFlag, "output", "o", flags.OutputFormatHelp)
 
 	_ = cmd.RegisterFlagCompletionFunc("name", completion.PlanNameCompletion(kubeConfigFlags))
