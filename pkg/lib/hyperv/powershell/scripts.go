@@ -16,6 +16,23 @@ func BuildCommand(template string, args ...string) string {
 	return fmt.Sprintf(template, sanitized...)
 }
 
+// RunOnNode wraps cmd to run on a remote node via Invoke-Command -Credential.
+// If computerName is empty, returns cmd unchanged (runs on the connected host).
+func RunOnNode(cmd, computerName, password, username string) string {
+	if computerName == "" {
+		return cmd
+	}
+	escPass := strings.ReplaceAll(password, "'", "''")
+	escUser := strings.ReplaceAll(username, "'", "''")
+	escNode := strings.ReplaceAll(computerName, "'", "''")
+	return fmt.Sprintf(
+		"$pw = ConvertTo-SecureString '%s' -AsPlainText -Force; "+
+			"$cred = New-Object System.Management.Automation.PSCredential('%s', $pw); "+
+			"Invoke-Command -ComputerName '%s' -Credential $cred -ScriptBlock { %s }",
+		escPass, escUser, escNode, cmd,
+	)
+}
+
 const (
 	// TestConnection verifies WinRM connectivity
 	TestConnection = `echo ok`
@@ -24,6 +41,12 @@ const (
 const (
 	// ListAllVMs returns all VMs with basic properties
 	ListAllVMs = `Get-VM | Select-Object Id, Name, State, ProcessorCount, MemoryStartup, Generation | ConvertTo-Json`
+
+	// ListClusterVMs collects VMs from all cluster nodes using Invoke-Command
+	// with explicit credentials to avoid WinRM double-hop issues.
+	// Remote State enums must be cast to [int] to avoid complex JSON objects.
+	// Parameters: password, username
+	ListClusterVMs = `$pw = ConvertTo-SecureString '%s' -AsPlainText -Force; $cred = New-Object System.Management.Automation.PSCredential('%s', $pw); $localName = $env:COMPUTERNAME; $allVMs = @(); $allVMs += Get-VM | Select-Object Id, Name, @{N='State';E={[int]$_.State}}, ProcessorCount, MemoryStartup, Generation, @{N='ComputerName';E={$localName}}; Get-ClusterNode | Where-Object { $_.Name -ne $localName -and $_.State -eq 0 } | ForEach-Object { $node = $_.Name; try { $remote = Invoke-Command -ComputerName $node -Credential $cred -ScriptBlock { Get-VM | Select-Object Id, Name, @{N='State';E={[int]$_.State}}, ProcessorCount, MemoryStartup, Generation } -ErrorAction Stop; $remote | ForEach-Object { $_ | Add-Member -NotePropertyName ComputerName -NotePropertyValue $node -Force; $allVMs += $_ } } catch { Write-Warning "Node ${node}: $($_.Exception.Message)" } }; $allVMs | ConvertTo-Json`
 
 	// GetVMByName returns a single VM by name
 	// Parameters: vmName
@@ -133,4 +156,47 @@ const (
 	// Parameters: windowsPath
 	GetDiskRCTEnabled = `$vhd=Get-VHD -Path '%s' -ErrorAction SilentlyContinue
 if($vhd -and $vhd.RctId){'true'}else{'false'}`
+)
+
+// Failover Clustering scripts.
+// Cluster-level scripts run on the CNO (Cluster Name Object) entry node.
+// Per-node scripts run on direct WinRM connections to individual cluster nodes.
+const (
+	// GetCluster returns the Failover Cluster identity (name and domain).
+	// Run on the CNO / entry node connection.
+	GetCluster = `Get-Cluster | Select-Object Name, Domain | ConvertTo-Json`
+
+	// GetClusterNodes returns all nodes in the Failover Cluster with their state.
+	// Node State values: Up, Down, Paused, Joining.
+	// Run on the CNO / entry node connection.
+	GetClusterNodes = `Get-ClusterNode | Select-Object Name, @{N='State';E={[int]$_.State}}, Id | ConvertTo-Json`
+
+	// GetClusterVMGroups returns all VM roles in the cluster with their owner node.
+	// GroupType 'VirtualMachine' filters to only Hyper-V VM cluster roles.
+	// OwnerNode indicates which node currently runs the VM (real-time).
+	// Run on the CNO / entry node connection.
+	GetClusterVMGroups = `Get-ClusterGroup | Where-Object {$_.GroupType -eq 'VirtualMachine'} | Select-Object Name, @{N='OwnerNode';E={$_.OwnerNode.Name}}, @{N='State';E={[int]$_.State}}, Id | ConvertTo-Json`
+)
+
+const (
+	// GetComputerInfo returns hardware information for a cluster node.
+	// CsNumberOfProcessors = physical CPU sockets,
+	// CsNumberOfLogicalProcessors = total logical CPUs (cores x threads),
+	// OsTotalVisibleMemorySize = total RAM in KB,
+	// CsDNSHostName = node hostname, CsDomain = AD domain.
+	// Run on a direct per-node WinRM connection.
+	GetComputerInfo = `Get-ComputerInfo | Select-Object CsDNSHostName, CsDomain, CsNumberOfProcessors, CsNumberOfLogicalProcessors, OsTotalVisibleMemorySize | ConvertTo-Json`
+)
+
+// Batch VM detail scripts — split into two to fit WinRM's command-line limit.
+// Each returns JSON keyed by VM name.
+const (
+	// BatchGetVMHardware collects security info, checkpoint status, disk
+	// topology+capacity+RCT, and NIC info for all VMs on the host.
+	// Disk entries include controller type/number/location so the caller
+	// can build full Disk objects without per-VM WinRM round-trips.
+	BatchGetVMHardware = `$r=@{};foreach($vm in(Get-VM)){$n=$vm.Name;$e=@{};if($vm.Generation-eq 2){$s=Get-VMSecurity -VMName $n -EA 0;$f=Get-VMFirmware -VMName $n -EA 0;$t=$false;$b=$false;if($s){$t=$s.TpmEnabled};if($f-and$f.SecureBoot-eq'On'){$b=$true};$e['Security']=@{TpmEnabled=$t;SecureBoot=$b}}else{$e['Security']=@{TpmEnabled=$false;SecureBoot=$false}};$e['HasCheckpoint']=[bool](Get-VMSnapshot -VMName $n -EA 0);$dd=@();foreach($d in(Get-VMHardDiskDrive -VMName $n -EA 0)){if(-not$d.Path){continue};$v=Get-VHD -Path $d.Path -EA 0;$c=0;$rc=$false;if($v){$c=$v.Size;if($v.RctId){$rc=$true}};$dd+=@{Path=$d.Path;Capacity=$c;RCTEnabled=$rc;CT=[int]$d.ControllerType;CN=$d.ControllerNumber;CL=$d.ControllerLocation}};$e['Disks']=$dd;$nn=@();foreach($a in(Get-VMNetworkAdapter -VMName $n -EA 0)){$vl=0;$vi=$a|Get-VMNetworkAdapterVlan -EA 0;if($vi-and$vi.AccessVlanId){$vl=$vi.AccessVlanId};$nn+=@{Name=$a.Name;MAC=$a.MacAddress;Switch=$a.SwitchName;Vlan=$vl}};$e['NICs']=$nn;$r[$n]=$e};$r|ConvertTo-Json -Depth 4 -Compress`
+
+	// BatchGetVMGuest collects guest OS and guest network config for running VMs.
+	BatchGetVMGuest = `$r=@{};foreach($vm in(Get-VM|?{$_.State-eq'Running'})){$n=$vm.Name;$e=@{};$ci=Get-CimInstance -Namespace root\virtualization\v2 -ClassName Msvm_ComputerSystem -Filter "ElementName='$n'" -EA 0;if($ci){$kv=Get-CimAssociatedInstance -InputObject $ci -ResultClassName Msvm_KvpExchangeComponent -EA 0;if($kv-and$kv.GuestIntrinsicExchangeItems){$os='';$om='';foreach($i in $kv.GuestIntrinsicExchangeItems){$x=[xml]$i;$pn=$x.INSTANCE.PROPERTY|?{$_.NAME-eq'Name'}|Select -Exp VALUE;$pv=$x.INSTANCE.PROPERTY|?{$_.NAME-eq'Data'}|Select -Exp VALUE;if($pn-eq'OSName'){$os=$pv}elseif($pn-eq'OSMajorVersion'){$om=$pv}};if($os-and$om-and$os-notmatch'\d'){$os="$os $om"};$e['GuestOS']=$os};$vs=Get-CimAssociatedInstance -InputObject $ci -ResultClassName Msvm_VirtualSystemSettingData|?{$_.VirtualSystemType-eq'Microsoft:Hyper-V:System:Realized'};if($vs){$ps=Get-CimAssociatedInstance -InputObject $vs -ResultClassName Msvm_SyntheticEthernetPortSettingData;$nc=@();foreach($p in $ps){$gc=Get-CimAssociatedInstance -InputObject $p -ResultClassName Msvm_GuestNetworkAdapterConfiguration;if($gc){$nc+=[PSCustomObject]@{MAC=$p.Address;IPs=$gc.IPAddresses;Subnets=$gc.Subnets;DHCP=$gc.DHCPEnabled;GW=$gc.DefaultGateways;DNS=$gc.DNSServers}}};if($nc.Count-gt 0){$e['GuestNetworks']=$nc}}};if($e.Count-gt 0){$r[$n]=$e}};$r|ConvertTo-Json -Depth 4 -Compress`
 )
