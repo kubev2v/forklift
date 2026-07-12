@@ -141,7 +141,7 @@ var _ = Describe("vSphere builder", func() {
 				vm: vm,
 			}
 			builder.Source.Inventory = inventory
-			builder.Context.Map.Storage = &storageMap
+			builder.Map.Storage = &storageMap
 
 			// Execute
 			pvcs, err := builder.PopulatorVolumes(ref.Ref{ID: vm.ID}, annotations, secretName)
@@ -209,7 +209,7 @@ var _ = Describe("vSphere builder", func() {
 				vm: vm,
 			}
 			builder.Source.Inventory = inventory
-			builder.Context.Map.Storage = &storageMap
+			builder.Map.Storage = &storageMap
 
 			// Execute
 			pvcs, err := builder.PopulatorVolumes(ref.Ref{ID: vm.ID}, annotations, secretName)
