@@ -471,7 +471,8 @@ func updateSecretCredentials(configFlags *genericclioptions.ConfigFlags, secret 
 
 	// Update CA certificate for all types (if applicable)
 	if opts.CACert != "" {
-		secret.Data["cacert"] = []byte(opts.CACert)
+		secret.Data["ca.crt"] = []byte(opts.CACert)
+		delete(secret.Data, "cacert")
 		klog.V(2).Infof("Updated CA certificate")
 		updated = true
 	}

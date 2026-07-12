@@ -24,6 +24,12 @@ func GatherDiagnostics(ctx context.Context, configFlags *genericclioptions.Confi
 	if showLines <= 0 {
 		showLines = defaultShowLines
 	}
+	if logLines > MaxLogTailLines {
+		logLines = MaxLogTailLines
+	}
+	if showLines > MaxShowLines {
+		showLines = MaxShowLines
+	}
 
 	planUID := string(plan.GetUID())
 	planName := plan.GetName()
@@ -39,19 +45,20 @@ func GatherDiagnostics(ctx context.Context, configFlags *genericclioptions.Confi
 	localTarget := isLocalTarget(ctx, dynClient, plan)
 
 	report := &DiagnosticsReport{
-		PlanName:      planName,
-		PlanUID:       planUID,
-		MigrationName: migrationName,
-		MigrationUID:  migrationUID,
-		TargetNS:      targetNS,
-		RemoteTarget:  !localTarget,
+		PlanName:           planName,
+		PlanUID:            planUID,
+		MigrationName:      migrationName,
+		MigrationUID:       migrationUID,
+		TargetNS:           targetNS,
+		RemoteTarget:       !localTarget,
+		RequestedShowLines: showLines,
 	}
 
 	// Config context
 	report.Config = CollectConfigContext(ctx, configFlags, dynClient, plan)
 
-	// Controller logs (filtered by plan name/UID)
-	report.ControllerLogs = CollectControllerLogs(ctx, configFlags, clientset, planName, planUID)
+	// Controller logs (filtered by plan name/UID, with error analysis)
+	report.ControllerLogs = CollectControllerLogs(ctx, configFlags, clientset, planName, planUID, logLines, showLines)
 
 	// If no migration exists, return early with just config + controller logs
 	if migration == nil {

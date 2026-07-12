@@ -2,7 +2,7 @@ module github.com/kubev2v/forklift/cmd/kubectl-mtv
 
 go 1.25.0
 
-require github.com/yaacov/kubectl-mtv v0.3.19
+require github.com/yaacov/kubectl-mtv v0.3.22
 
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect

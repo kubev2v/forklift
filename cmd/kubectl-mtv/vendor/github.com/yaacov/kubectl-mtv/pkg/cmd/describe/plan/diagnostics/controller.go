@@ -3,7 +3,6 @@ package diagnostics
 import (
 	"bufio"
 	"context"
-	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -14,17 +13,9 @@ import (
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 )
 
-const controllerLogTailLines = 500
-const maxControllerLogEntries = 10
-
-// ControllerLogEntry holds a single relevant line from the forklift-controller logs.
-type ControllerLogEntry struct {
-	Line string
-}
-
-// CollectControllerLogs tails the forklift-controller pod logs and filters for
-// lines mentioning the plan name or plan UID.
-func CollectControllerLogs(ctx context.Context, configFlags *genericclioptions.ConfigFlags, clientset *kubernetes.Clientset, planName, planUID string) []ControllerLogEntry {
+// CollectControllerLogs tails the forklift-controller pod logs, filters for
+// lines mentioning the plan name or plan UID, and applies error pattern analysis.
+func CollectControllerLogs(ctx context.Context, configFlags *genericclioptions.ConfigFlags, clientset *kubernetes.Clientset, planName, planUID string, logLines, showLines int) *ControllerLogAnalysis {
 	operatorNS := client.GetMTVOperatorNamespace(ctx, configFlags)
 
 	pod := findControllerPod(ctx, clientset, operatorNS)
@@ -33,7 +24,6 @@ func CollectControllerLogs(ctx context.Context, configFlags *genericclioptions.C
 	}
 
 	containerName := ""
-	// Prefer known controller container names
 	for _, c := range pod.Spec.Containers {
 		switch c.Name {
 		case "main", "forklift-controller", "controller":
@@ -44,7 +34,7 @@ func CollectControllerLogs(ctx context.Context, configFlags *genericclioptions.C
 		containerName = pod.Spec.Containers[0].Name
 	}
 
-	tailLines := int64(controllerLogTailLines)
+	tailLines := int64(logLines)
 	req := clientset.CoreV1().Pods(operatorNS).GetLogs(pod.Name, &corev1.PodLogOptions{
 		Container: containerName,
 		TailLines: &tailLines,
@@ -56,23 +46,68 @@ func CollectControllerLogs(ctx context.Context, configFlags *genericclioptions.C
 	}
 	defer stream.Close()
 
-	var entries []ControllerLogEntry
+	var relevantLines []string
+	var rootCauseLines []string
+	var otherErrorLines []string
+	var errorCount, warnCount int
+
 	scanner := bufio.NewScanner(stream)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if matchesPlan(line, planName, planUID) {
-			entries = append(entries, ControllerLogEntry{Line: line})
-			if len(entries) >= maxControllerLogEntries {
-				break
-			}
+		if !matchesPlan(line, planName, planUID) {
+			continue
+		}
+
+		relevantLines = append(relevantLines, line)
+
+		if isIgnoredLine(line) {
+			continue
+		}
+		if isRootCauseLine(line) {
+			errorCount++
+			rootCauseLines = append(rootCauseLines, line)
+		} else if isErrorLine(line) {
+			errorCount++
+			otherErrorLines = append(otherErrorLines, line)
+		} else if isWarnLine(line) {
+			warnCount++
 		}
 	}
+	_ = scanner.Err()
 
-	return entries
+	if len(relevantLines) == 0 {
+		return nil
+	}
+
+	// Build significant error lines: root-cause first, then other errors (capped)
+	var errorLines []string
+	errorLines = append(errorLines, rootCauseLines...)
+	remaining := showLines - len(errorLines)
+	if remaining > 0 && len(otherErrorLines) > 0 {
+		if len(otherErrorLines) > remaining {
+			otherErrorLines = otherErrorLines[len(otherErrorLines)-remaining:]
+		}
+		errorLines = append(errorLines, otherErrorLines...)
+	}
+	if len(errorLines) > showLines {
+		errorLines = errorLines[len(errorLines)-showLines:]
+	}
+
+	// Keep only last N relevant lines for tail display
+	if len(relevantLines) > showLines {
+		relevantLines = relevantLines[len(relevantLines)-showLines:]
+	}
+
+	return &ControllerLogAnalysis{
+		LogTail:    relevantLines,
+		ErrorLines: errorLines,
+		ErrorCount: errorCount,
+		WarnCount:  warnCount,
+	}
 }
 
 func findControllerPod(ctx context.Context, clientset *kubernetes.Clientset, namespace string) *corev1.Pod {
-	// Try the common label selectors for the forklift controller
 	selectors := []string{
 		"app=forklift,control-plane=controller-manager",
 		"app.kubernetes.io/name=forklift-controller",
@@ -114,20 +149,4 @@ func matchesPlan(line, planName, planUID string) bool {
 		return true
 	}
 	return false
-}
-
-// FormatControllerLogLines formats the controller log entries for display.
-func FormatControllerLogLines(entries []ControllerLogEntry) string {
-	if len(entries) == 0 {
-		return ""
-	}
-	lines := make([]string, 0, len(entries))
-	for _, e := range entries {
-		line := e.Line
-		if len(line) > 200 {
-			line = line[:197] + "..."
-		}
-		lines = append(lines, line)
-	}
-	return fmt.Sprintf("%d relevant lines from forklift-controller:\n%s", len(entries), strings.Join(lines, "\n"))
 }
