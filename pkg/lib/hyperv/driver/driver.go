@@ -32,14 +32,25 @@ type HyperVDriver interface {
 	IsAlive() (bool, error)
 
 	ListAllDomains() ([]Domain, error)
+	ListAllClusterDomains() ([]Domain, error)
 	LookupDomainByName(name string) (Domain, error)
 	LookupDomainByUUIDString(uuid string) (Domain, error)
 
 	ListAllNetworks() ([]Network, error)
 	LookupNetworkByUUIDString(uuid string) (Network, error)
 
+	// Failover Cluster queries
+	GetCluster() (*ClusterData, error)
+	GetClusterNodes() ([]ClusterNodeData, error)
+	GetClusterVMGroups() ([]ClusterGroupData, error)
+	GetComputerInfo() (*ComputerInfoData, error)
+
 	// Raw command execution
 	ExecuteCommand(command string) (string, error)
+	// RunOnNode wraps a command to execute on a specific cluster node via
+	// Invoke-Command with explicit credentials. Returns the command output.
+	// If computerName is empty, executes locally.
+	RunOnNode(command, computerName string) (string, error)
 }
 
 // Domain represents a virtual machine
@@ -51,6 +62,8 @@ type Domain interface {
 	GetGeneration() (int, error)
 	GetDisks() ([]DiskInfo, error)
 	GetNICs() ([]NICInfo, error)
+	// GetComputerName returns the cluster node hosting this VM, or "" for local VMs.
+	GetComputerName() string
 	Shutdown(ctx context.Context) error
 	Free() error
 }

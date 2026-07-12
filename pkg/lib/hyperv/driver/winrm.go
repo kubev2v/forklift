@@ -35,12 +35,62 @@ type VMData struct {
 	ProcessorCount int    `json:"ProcessorCount"`
 	MemoryStartup  int64  `json:"MemoryStartup"`
 	Generation     int    `json:"Generation"`
+	ComputerName   string `json:"ComputerName,omitempty"`
 }
 
 type SwitchData struct {
 	Id         string `json:"Id"`
 	Name       string `json:"Name"`
 	SwitchType int    `json:"SwitchType"`
+}
+
+type ClusterData struct {
+	Name   string `json:"Name"`
+	Domain string `json:"Domain"`
+}
+
+type ClusterNodeData struct {
+	Name  string `json:"Name"`
+	State int    `json:"State"`
+	Id    string `json:"Id"`
+}
+
+// ClusterNode State values from the FailoverClusters module.
+const (
+	ClusterNodeStateUp      = 0
+	ClusterNodeStateDown    = 1
+	ClusterNodeStatePaused  = 2
+	ClusterNodeStateJoining = 3
+)
+
+func ClusterNodeStateName(state int) string {
+	switch state {
+	case ClusterNodeStateUp:
+		return "Up"
+	case ClusterNodeStateDown:
+		return "Down"
+	case ClusterNodeStatePaused:
+		return "Paused"
+	case ClusterNodeStateJoining:
+		return "Joining"
+	default:
+		return "Unknown"
+	}
+}
+
+type ClusterGroupData struct {
+	Name      string `json:"Name"`
+	OwnerNode string `json:"OwnerNode"`
+	State     int    `json:"State"`
+	Id        string `json:"Id"`
+}
+
+type ComputerInfoData struct {
+	DNSHostName               string `json:"CsDNSHostName"`
+	Domain                    string `json:"CsDomain"`
+	NumberOfProcessors        int    `json:"CsNumberOfProcessors"`
+	NumberOfLogicalProcessors int    `json:"CsNumberOfLogicalProcessors"`
+	TotalVisibleMemoryKB      int64  `json:"OsTotalVisibleMemorySize"`
 }
 
 type WinRMDriver struct {
@@ -72,7 +122,8 @@ func (d *WinRMDriver) Connect() error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	endpoint := winrm.NewEndpoint(d.host, d.port, true, d.insecureSkipVerify, d.caCert, nil, nil, 0)
+	useHTTPS := true
+	endpoint := winrm.NewEndpoint(d.host, d.port, useHTTPS, d.insecureSkipVerify, d.caCert, nil, nil, 0)
 	client, err := winrm.NewClient(endpoint, d.username, d.password)
 	if err != nil {
 		return fmt.Errorf("failed to create WinRM client: %w", err)
@@ -133,6 +184,11 @@ func (d *WinRMDriver) ExecuteCommandWithTimeout(command string, timeout time.Dur
 	return strings.TrimSpace(stdout), nil
 }
 
+func (d *WinRMDriver) RunOnNode(command, computerName string) (string, error) {
+	cmd := ps.RunOnNode(command, computerName, d.password, d.username)
+	return d.ExecuteCommand(cmd)
+}
+
 func utf16LEEncode(s string) []byte {
 	u16 := utf16.Encode([]rune(s))
 	encoded := make([]byte, len(u16)*2)
@@ -160,6 +216,36 @@ func (d *WinRMDriver) ListAllDomains() ([]Domain, error) {
 		var single VMData
 		if err := json.Unmarshal([]byte(stdout), &single); err != nil {
 			return nil, fmt.Errorf("failed to parse VMs JSON: %w", err)
+		}
+		vmsData = append(vmsData, single)
+	}
+
+	var domains []Domain
+	for i := range vmsData {
+		domains = append(domains, &WinRMDomain{
+			driver: d,
+			vmData: &vmsData[i],
+		})
+	}
+	return domains, nil
+}
+
+func (d *WinRMDriver) ListAllClusterDomains() ([]Domain, error) {
+	cmd := ps.BuildCommand(ps.ListClusterVMs, d.password, d.username)
+	stdout, err := d.ExecuteCommand(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	if stdout == "" {
+		return []Domain{}, nil
+	}
+
+	var vmsData []VMData
+	if err := json.Unmarshal([]byte(stdout), &vmsData); err != nil {
+		var single VMData
+		if err := json.Unmarshal([]byte(stdout), &single); err != nil {
+			return nil, fmt.Errorf("failed to parse cluster VMs JSON: %w", err)
 		}
 		vmsData = append(vmsData, single)
 	}
@@ -257,6 +343,61 @@ func (d *WinRMDriver) LookupNetworkByUUIDString(uuid string) (Network, error) {
 	return nil, fmt.Errorf("network not found: %s", uuid)
 }
 
+// runSingle executes a PowerShell script and unmarshals the JSON output into a
+// single object of type T. Returns an error when stdout is empty.
+func runSingle[T any](d *WinRMDriver, script, label string) (*T, error) {
+	stdout, err := d.ExecuteCommand(script)
+	if err != nil {
+		return nil, err
+	}
+	if stdout == "" {
+		return nil, fmt.Errorf("no %s returned", label)
+	}
+	var result T
+	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
+		return nil, fmt.Errorf("failed to parse %s JSON: %w", label, err)
+	}
+	return &result, nil
+}
+
+// runList executes a PowerShell script and unmarshals the JSON output into a
+// slice of T. Handles PowerShell's behavior of returning a bare object instead
+// of a one-element array.
+func runList[T any](d *WinRMDriver, script, label string) ([]T, error) {
+	stdout, err := d.ExecuteCommand(script)
+	if err != nil {
+		return nil, err
+	}
+	if stdout == "" {
+		return []T{}, nil
+	}
+	var results []T
+	if err := json.Unmarshal([]byte(stdout), &results); err != nil {
+		var single T
+		if err := json.Unmarshal([]byte(stdout), &single); err != nil {
+			return nil, fmt.Errorf("failed to parse %s JSON: %w", label, err)
+		}
+		results = append(results, single)
+	}
+	return results, nil
+}
+
+func (d *WinRMDriver) GetCluster() (*ClusterData, error) {
+	return runSingle[ClusterData](d, ps.GetCluster, "cluster")
+}
+
+func (d *WinRMDriver) GetClusterNodes() ([]ClusterNodeData, error) {
+	return runList[ClusterNodeData](d, ps.GetClusterNodes, "cluster nodes")
+}
+
+func (d *WinRMDriver) GetClusterVMGroups() ([]ClusterGroupData, error) {
+	return runList[ClusterGroupData](d, ps.GetClusterVMGroups, "cluster VM groups")
+}
+
+func (d *WinRMDriver) GetComputerInfo() (*ComputerInfoData, error) {
+	return runSingle[ComputerInfoData](d, ps.GetComputerInfo, "computer info")
+}
+
 // WinRMDomain implements Domain interface
 type WinRMDomain struct {
 	driver *WinRMDriver
@@ -303,8 +444,18 @@ func (d *WinRMDomain) GetGeneration() (int, error) {
 	return d.vmData.Generation, nil
 }
 
+func (d *WinRMDomain) GetComputerName() string {
+	return d.vmData.ComputerName
+}
+
+// nodeCommand wraps cmd to run on the VM's owner node via Invoke-Command
+// when ComputerName is set (cluster mode). In standalone mode it returns cmd unchanged.
+func (d *WinRMDomain) nodeCommand(cmd string) string {
+	return ps.RunOnNode(cmd, d.vmData.ComputerName, d.driver.password, d.driver.username)
+}
+
 func (d *WinRMDomain) GetDisks() ([]DiskInfo, error) {
-	cmd := ps.BuildCommand(ps.GetVMDisks, d.vmData.Name)
+	cmd := d.nodeCommand(ps.BuildCommand(ps.GetVMDisks, d.vmData.Name))
 	stdout, err := d.driver.ExecuteCommand(cmd)
 	if err != nil {
 		return nil, err
@@ -347,7 +498,7 @@ func (d *WinRMDomain) GetDisks() ([]DiskInfo, error) {
 }
 
 func (d *WinRMDomain) GetNICs() ([]NICInfo, error) {
-	cmd := ps.BuildCommand(ps.GetVMNICs, d.vmData.Name)
+	cmd := d.nodeCommand(ps.BuildCommand(ps.GetVMNICs, d.vmData.Name))
 	stdout, err := d.driver.ExecuteCommand(cmd)
 	if err != nil {
 		return nil, err

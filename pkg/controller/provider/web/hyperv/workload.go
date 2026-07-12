@@ -80,22 +80,24 @@ func (h WorkloadHandler) Get(ctx *gin.Context) {
 type Workload struct {
 	SelfLink string `json:"selfLink"`
 	// Embed VM fields for validation
-	ID            string               `json:"id"`
-	Name          string               `json:"name"`
-	UUID          string               `json:"uuid"`
-	Firmware      string               `json:"firmware"`
-	CpuCount      int32                `json:"cpuCount"`
-	MemoryMB      int32                `json:"memoryMB"`
-	PowerState    string               `json:"powerState"`
-	GuestOS       string               `json:"guestOS,omitempty"`
-	TpmEnabled    bool                 `json:"tpmEnabled"`
-	SecureBoot    bool                 `json:"secureBoot"`
-	HasCheckpoint bool                 `json:"hasCheckpoint"`
-	Disks         []model.Disk         `json:"disks"`
-	NICs          []model.NIC          `json:"nics"`
-	GuestNetworks []model.GuestNetwork `json:"guestNetworks"`
-	Concerns      []model.Concern      `json:"concerns"`
-	config        Config               // unexported, not serialized
+	ID             string               `json:"id"`
+	Name           string               `json:"name"`
+	UUID           string               `json:"uuid"`
+	Firmware       string               `json:"firmware"`
+	CpuCount       int32                `json:"cpuCount"`
+	MemoryMB       int32                `json:"memoryMB"`
+	PowerState     string               `json:"powerState"`
+	GuestOS        string               `json:"guestOS,omitempty"`
+	TpmEnabled     bool                 `json:"tpmEnabled"`
+	SecureBoot     bool                 `json:"secureBoot"`
+	HasCheckpoint  bool                 `json:"hasCheckpoint"`
+	IsClusterRole  bool                 `json:"isClusterRole"`
+	ManagementType string               `json:"managementType,omitempty"`
+	Disks          []model.Disk         `json:"disks"`
+	NICs           []model.NIC          `json:"nics"`
+	GuestNetworks  []model.GuestNetwork `json:"guestNetworks"`
+	Concerns       []model.Concern      `json:"concerns"`
+	config         Config               // unexported, not serialized
 }
 
 func (r *Workload) IsWindows() bool {
@@ -115,6 +117,7 @@ func (r *Workload) With(m *model.VM) {
 	r.TpmEnabled = m.TpmEnabled
 	r.SecureBoot = m.SecureBoot
 	r.HasCheckpoint = m.HasCheckpoint
+	r.IsClusterRole = m.IsClusterRole
 	r.Disks = m.Disks
 	r.NICs = m.NICs
 	r.GuestNetworks = m.GuestNetworks
@@ -142,6 +145,7 @@ func (r *Workload) Link(p *api.Provider) {
 			base.ProviderParam: string(p.UID),
 			VMParam:            r.ID,
 		})
+	r.ManagementType = p.Spec.Settings[api.ManagementType]
 }
 
 // Expand the resource.
