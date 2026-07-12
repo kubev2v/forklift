@@ -1105,15 +1105,35 @@ func parseIPv6PrefixLength(subnet string) int32 {
 }
 
 func (r *Client) mapWindowsPathToSMB(windowsPath, smbWindowsPrefix string) string {
-	if smbWindowsPrefix == "" || r.smbMountPath == "" {
-		r.Log.V(1).Info("Cannot map disk path: SMB Windows prefix not discovered",
+	if r.smbMountPath == "" {
+		r.Log.V(1).Info("Cannot map disk path: SMB mount path not configured",
 			"windowsPath", windowsPath)
 		return ""
 	}
 
 	normalizedWindowsPath := strings.ReplaceAll(windowsPath, "\\", "/")
-	normalizedPrefix := strings.ReplaceAll(smbWindowsPrefix, "\\", "/")
 
+	// Handle UNC paths (e.g. //SERVER/ShareName/file.vhdx) from cluster
+	// nodes that reference the SMB share by network path.
+	shareName := extractShareName(r.smbUrl)
+	if shareName != "" && strings.HasPrefix(normalizedWindowsPath, "//") {
+		parts := strings.SplitN(strings.TrimPrefix(normalizedWindowsPath, "//"), "/", 3)
+		if len(parts) >= 2 && strings.EqualFold(parts[1], shareName) {
+			relativePath := ""
+			if len(parts) == 3 {
+				relativePath = parts[2]
+			}
+			return r.smbMountPath + "/" + relativePath
+		}
+	}
+
+	// Handle local paths that start with the share's Windows directory.
+	if smbWindowsPrefix == "" {
+		r.Log.V(1).Info("Cannot map disk path: SMB Windows prefix not discovered",
+			"windowsPath", windowsPath)
+		return ""
+	}
+	normalizedPrefix := strings.ReplaceAll(smbWindowsPrefix, "\\", "/")
 	if strings.HasPrefix(strings.ToLower(normalizedWindowsPath), strings.ToLower(normalizedPrefix)) {
 		relativePath := normalizedWindowsPath[len(normalizedPrefix):]
 		relativePath = strings.TrimPrefix(relativePath, "/")

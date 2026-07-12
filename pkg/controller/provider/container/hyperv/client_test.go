@@ -459,6 +459,67 @@ func TestMapWindowsPathToSMB(t *testing.T) {
 	}
 }
 
+func TestMapWindowsPathToSMB_UNC(t *testing.T) {
+	client := &Client{
+		smbMountPath: "/hyperv",
+		smbUrl:       "//10.0.0.1/VMShare",
+		Log:          testLogger(),
+	}
+
+	tests := []struct {
+		name             string
+		windowsPath      string
+		smbWindowsPrefix string
+		expected         string
+	}{
+		{
+			name:             "UNC backslash path matching share name",
+			windowsPath:      `\\WIN-SERVER\VMShare\vm1.vhdx`,
+			smbWindowsPrefix: `C:\Hyper-V\Virtual_Hard_Disks`,
+			expected:         "/hyperv/vm1.vhdx",
+		},
+		{
+			name:             "UNC forward slash path matching share name",
+			windowsPath:      "//WIN-SERVER/VMShare/subdir/disk.vhdx",
+			smbWindowsPrefix: `C:\Hyper-V\Virtual_Hard_Disks`,
+			expected:         "/hyperv/subdir/disk.vhdx",
+		},
+		{
+			name:             "UNC case insensitive share name match",
+			windowsPath:      `\\SERVER\vmshare\disk.vhdx`,
+			smbWindowsPrefix: `C:\Hyper-V\Virtual_Hard_Disks`,
+			expected:         "/hyperv/disk.vhdx",
+		},
+		{
+			name:             "UNC different share name falls through to local",
+			windowsPath:      `\\SERVER\OtherShare\disk.vhdx`,
+			smbWindowsPrefix: `C:\Hyper-V\Virtual_Hard_Disks`,
+			expected:         "",
+		},
+		{
+			name:             "UNC share root without trailing file",
+			windowsPath:      `\\SERVER\VMShare`,
+			smbWindowsPrefix: `C:\Hyper-V\Virtual_Hard_Disks`,
+			expected:         "/hyperv/",
+		},
+		{
+			name:             "local path still works when smbUrl is set",
+			windowsPath:      `C:\Hyper-V\Virtual_Hard_Disks\vm2.vhdx`,
+			smbWindowsPrefix: `C:\Hyper-V\Virtual_Hard_Disks`,
+			expected:         "/hyperv/vm2.vhdx",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := client.mapWindowsPathToSMB(tc.windowsPath, tc.smbWindowsPrefix)
+			if result != tc.expected {
+				t.Errorf("Expected '%s', got '%s'", tc.expected, result)
+			}
+		})
+	}
+}
+
 func TestFormatMAC(t *testing.T) {
 	tests := []struct {
 		input    string
