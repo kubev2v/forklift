@@ -980,7 +980,7 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 	}
 
 	if populatorKind == api.VSphereXcopyVolumePopulatorKind {
-		xcopyRegExp := regexp.MustCompile(`xcopy_used\{ownerUID="` + string(pvc.UID) + `"\} (\d+)`)
+		xcopyRegExp := regexp.MustCompile(`vsphere_xcopy_volume_populator_xcopy_used\{[^}]*owner_uid="` + string(pvc.UID) + `"[^}]*\} (\d+)`)
 		xcopyMatch := xcopyRegExp.FindStringSubmatch(string(body))
 		if xcopyMatch != nil {
 			if err := unstructured.SetNestedField(latestPopulator.Object, xcopyMatch[1], "status", "xcopyUsed"); err != nil {
