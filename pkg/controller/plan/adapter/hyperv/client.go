@@ -12,6 +12,7 @@ import (
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/hyperv"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/hyperv"
 	"github.com/kubev2v/forklift/pkg/lib/hyperv/driver"
+	ps "github.com/kubev2v/forklift/pkg/lib/hyperv/powershell"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
@@ -96,6 +97,17 @@ func (r *Client) PowerOff(vmRef ref.Ref) error {
 	drv, err := r.connect()
 	if err != nil {
 		return err
+	}
+
+	// In cluster mode, the VM may be on a different node than the entry
+	// point. Route the Stop-VM command to the correct node via RunOnNode.
+	if r.Source.Provider.IsHyperVCluster() && vm.Host != "" {
+		cmd := ps.BuildCommand(ps.StopVM, vm.Name)
+		if _, err = drv.RunOnNode(cmd, vm.Host); err != nil {
+			return fmt.Errorf("failed to power off VM %s on node %s: %w", vm.Name, vm.Host, err)
+		}
+		log.Info("Powered off VM via RunOnNode", "vm", vm.Name, "node", vm.Host)
+		return nil
 	}
 
 	domain, err := drv.LookupDomainByName(vm.Name)
