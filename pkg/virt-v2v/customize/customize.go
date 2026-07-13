@@ -28,8 +28,6 @@ const (
 
 const vsphereVmwareCleanupScript = "9100_cleanup_vmware.bat"
 
-const qemuGAInstallScript = "5001_win_firstboot_qemu_ga_install.ps1"
-
 //go:embed scripts
 var scriptFS embed.FS
 
@@ -346,9 +344,6 @@ func (c *Customize) addWinFirstbootScripts(cmdBuilder utils.CommandBuilder) erro
 			uploadPreserveMultipleIpPath = c.formatUpload(preserveMultipleNicsPath, WinFirstbootScriptsPath)
 		}
 	}
-	// TODO: Remove once https://redhat.atlassian.net/browse/RHEL-184971 is resolved.
-	qemuGAPath := filepath.Join(windowsScriptsPath, qemuGAInstallScript)
-	cmdBuilder.AddArg(UploadCmd, c.formatUpload(qemuGAPath, filepath.Join(WinFirstbootScriptsPath, qemuGAInstallScript)))
 
 	uploadInitPath := c.formatUpload(initPath, WinFirstbootScriptsPath)
 	cmdBuilder.AddArgs(UploadCmd, uploadPreserveIpPath, uploadInitPath, uploadRemoveDuplicatesPath, uploadPreserveMultipleIpPath)

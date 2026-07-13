@@ -591,8 +591,7 @@ var _ = Describe("Customize", func() {
 			// DynamicScriptsDir does not exist
 			mockFileSystem.EXPECT().Stat(appConfig.DynamicScriptsDir).Return(nil, os.ErrNotExist)
 
-			// addWinFirstbootScripts - QEMU GA upload + batch upload
-			mockCommandBuilder.EXPECT().AddArg("--upload", gomock.Any()).Return(mockCommandBuilder)
+			// addWinFirstbootScripts
 			mockCommandBuilder.EXPECT().AddArgs("--upload", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockCommandBuilder)
 
 			for _, disk := range disks {
@@ -618,7 +617,6 @@ var _ = Describe("Customize", func() {
 			mockCommandBuilder.EXPECT().AddArg("--format", "raw").Return(mockCommandBuilder)
 
 			mockFileSystem.EXPECT().Stat(appConfig.DynamicScriptsDir).Return(nil, os.ErrNotExist)
-			mockCommandBuilder.EXPECT().AddArg("--upload", gomock.Any()).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArgs("--upload", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockCommandBuilder)
 
 			for _, disk := range disks {
@@ -652,8 +650,8 @@ var _ = Describe("Customize", func() {
 			mockCommandBuilder.EXPECT().AddFlag("--verbose").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--format", "raw").Return(mockCommandBuilder)
 
-			// Dynamic script upload + QEMU GA upload
-			mockCommandBuilder.EXPECT().AddArg("--upload", gomock.Any()).Return(mockCommandBuilder).Times(2)
+			// Dynamic script upload
+			mockCommandBuilder.EXPECT().AddArg("--upload", gomock.Any()).Return(mockCommandBuilder)
 
 			// addWinFirstbootScripts
 			mockCommandBuilder.EXPECT().AddArgs("--upload", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockCommandBuilder)
@@ -697,7 +695,7 @@ var _ = Describe("Customize", func() {
 			mockCommandBuilder.EXPECT().AddFlag("--verbose").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--format", "raw").Return(mockCommandBuilder)
 
-			mockCommandBuilder.EXPECT().AddArg("--upload", gomock.Any()).Return(mockCommandBuilder).Times(2)
+			mockCommandBuilder.EXPECT().AddArg("--upload", gomock.Any()).Return(mockCommandBuilder)
 
 			mockCommandBuilder.EXPECT().AddArgs("--upload", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockCommandBuilder)
 
@@ -945,7 +943,6 @@ var _ = Describe("Customize", func() {
 	Describe("addWinFirstbootScripts path selection", func() {
 		It("no static IPs - only init script uploaded", func() {
 			appConfig.StaticIPs = ""
-			mockCommandBuilder.EXPECT().AddArg("--upload", gomock.Any()).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArgs("--upload", "", gomock.Any(), "", "").Return(mockCommandBuilder)
 			err := customize.addWinFirstbootScripts(mockCommandBuilder)
 			Expect(err).ToNot(HaveOccurred())
@@ -955,7 +952,6 @@ var _ = Describe("Customize", func() {
 			appConfig.StaticIPs = "00:11:22:33:44:55:ip:10.0.0.1,10.0.0.254,24,8.8.8.8,"
 			appConfig.VirtIoWinLegacyDrivers = ""
 			appConfig.WindowsRegistryNetworkConfig = false
-			mockCommandBuilder.EXPECT().AddArg("--upload", gomock.Any()).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArgs("--upload", "", gomock.Any(), gomock.Any(), "").Return(mockCommandBuilder)
 			err := customize.addWinFirstbootScripts(mockCommandBuilder)
 			Expect(err).ToNot(HaveOccurred())
@@ -965,7 +961,6 @@ var _ = Describe("Customize", func() {
 			appConfig.VirtIoWinLegacyDrivers = "/mnt/virtio.iso"
 			appConfig.StaticIPs = ""
 			var capturedInit string
-			mockCommandBuilder.EXPECT().AddArg("--upload", gomock.Any()).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArgs("--upload", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 				Do(func(flag string, values ...string) {
 					capturedInit = values[1]
