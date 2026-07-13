@@ -1306,11 +1306,17 @@ func (v *VmAdapter) collectNICs(devArray types.ArrayOfVirtualDevice) []model.NIC
 			network = backing.OpaqueNetworkId
 		}
 
+		startConnected := true
+		if vd.Connectable != nil {
+			startConnected = vd.Connectable.StartConnected
+		}
+
 		nicList = append(nicList, model.NIC{
-			MAC:        strings.ToLower(nic.MacAddress),
-			Index:      len(nicList),
-			DeviceKey:  nic.Key,
-			PciAddress: computePciAddress(pciSlotNumber(vd), v.model.PciBridges),
+			MAC:            strings.ToLower(nic.MacAddress),
+			Index:          len(nicList),
+			DeviceKey:      nic.Key,
+			PciAddress:     computePciAddress(pciSlotNumber(vd), v.model.PciBridges),
+			StartConnected: startConnected,
 			Network: model.Ref{
 				Kind: model.NetKind,
 				ID:   network,

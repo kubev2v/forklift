@@ -412,11 +412,12 @@ type PciBridge struct {
 
 // Virtual ethernet card.
 type NIC struct {
-	Network    Ref    `json:"network"`
-	MAC        string `json:"mac"`
-	Index      int    `json:"order"`
-	DeviceKey  int32  `json:"deviceKey"`
-	PciAddress string `json:"pciAddress"`
+	Network        Ref    `json:"network"`
+	MAC            string `json:"mac"`
+	Index          int    `json:"order"`
+	DeviceKey      int32  `json:"deviceKey"`
+	PciAddress     string `json:"pciAddress"`
+	StartConnected bool   `json:"startConnected"`
 }
 
 // Guest network.
