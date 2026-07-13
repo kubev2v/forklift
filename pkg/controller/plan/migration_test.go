@@ -2,10 +2,15 @@
 package plan
 
 import (
+	"testing"
+
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/settings"
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -276,3 +281,69 @@ var _ = ginkgo.Describe("Cancellation", func() {
 		})
 	})
 })
+
+func TestMarkSchedulerQueuedVMs(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	originalLimit := settings.Settings.MaxInFlight
+	settings.Settings.MaxInFlight = 20
+	t.Cleanup(func() { settings.Settings.MaxInFlight = originalLimit })
+
+	queuedVM := &plan.VMStatus{Phase: api.PhaseStarted}
+
+	m := &Migration{
+		Context: &plancontext.Context{
+			Plan: &api.Plan{
+				Status: api.PlanStatus{
+					Migration: plan.MigrationStatus{
+						VMs: []*plan.VMStatus{queuedVM},
+					},
+				},
+			},
+			Log: logging.WithName("test"),
+		},
+	}
+
+	m.markSchedulerQueuedVMs()
+
+	g.Expect(queuedVM.HasCondition(api.ConditionPending)).To(gomega.BeTrue())
+	pending := queuedVM.FindCondition(api.ConditionPending)
+	g.Expect(pending.Message).To(gomega.Equal("Waiting to start migration: in-flight limit reached (max 20)."))
+
+	ready := m.Plan.Status.FindCondition(libcnd.Ready)
+	g.Expect(ready).NotTo(gomega.BeNil())
+	g.Expect(ready.Message).To(gomega.Equal("1 VM(s) waiting to start migration (in-flight limit: 20)."))
+}
+
+func TestExecuteClearsSchedulerPendingCondition(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	vm := &plan.VMStatus{
+		VM: plan.VM{
+			Ref: ref.Ref{ID: "vm-1", Name: "test-vm"},
+		},
+		Phase: api.PhaseStarted,
+	}
+	vm.SetCondition(libcnd.Condition{
+		Type:     api.ConditionPending,
+		Status:   libcnd.True,
+		Category: api.CategoryAdvisory,
+		Message:  "Waiting to start migration: in-flight limit reached (max 20).",
+		Durable:  true,
+	})
+
+	m := &Migration{
+		Context: &plancontext.Context{
+			Migration: &api.Migration{
+				Spec: api.MigrationSpec{
+					Cancel: []ref.Ref{{ID: "vm-1", Name: "test-vm"}},
+				},
+			},
+			Log: logging.WithName("test"),
+		},
+	}
+
+	err := m.execute(vm)
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+	g.Expect(vm.HasCondition(api.ConditionPending)).To(gomega.BeFalse())
+}
