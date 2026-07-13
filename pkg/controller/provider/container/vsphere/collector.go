@@ -553,7 +553,9 @@ func (r *Collector) getUpdates(ctx context.Context) error {
 				r.log.Error(err, "tx commit failed.")
 			}
 		} else {
-			_ = tx.End()
+			if endErr := tx.End(); endErr != nil {
+				r.log.Error(endErr, "tx rollback failed.")
+			}
 		}
 		if err == nil && (updateSet.Truncated == nil || !*updateSet.Truncated) {
 			if !r.parity {
