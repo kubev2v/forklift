@@ -810,6 +810,10 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 			kInterface.PciAddress = nic.PciAddress
 		}
 
+		if !nic.StartConnected {
+			kInterface.State = cnv.InterfaceStateLinkDown
+		}
+
 		switch mapped.Destination.Type {
 		case Pod:
 			kNetwork.Pod = &cnv.PodNetwork{}
