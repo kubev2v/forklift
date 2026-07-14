@@ -333,6 +333,7 @@ type VM struct {
 	ChangeTrackingEnabled    bool               `sql:""`
 	TpmEnabled               bool               `sql:""`
 	Devices                  []Device           `sql:""`
+	PciBridges               []PciBridge        `sql:""`
 	NICs                     []NIC              `sql:""`
 	Disks                    []Disk             `sql:""`
 	Controllers              []Controller       `sql:""`
@@ -389,15 +390,26 @@ type Disk struct {
 
 // Virtual Device.
 type Device struct {
-	Kind string `json:"kind"`
+	Kind          string `json:"kind"`
+	Key           int32  `json:"key"`
+	PciSlotNumber int32  `json:"pciSlotNumber"`
+}
+
+// PciBridge represents a virtual PCI bridge from the VM's extraConfig.
+// Used to compute guest-visible PCI addresses from persistent slot numbers.
+type PciBridge struct {
+	Number     int   `json:"number"`
+	SlotNumber int32 `json:"slotNumber"`
+	Functions  int   `json:"functions"`
 }
 
 // Virtual ethernet card.
 type NIC struct {
-	Network   Ref    `json:"network"`
-	MAC       string `json:"mac"`
-	Index     int    `json:"order"`
-	DeviceKey int32  `json:"deviceKey"`
+	Network    Ref    `json:"network"`
+	MAC        string `json:"mac"`
+	Index      int    `json:"order"`
+	DeviceKey  int32  `json:"deviceKey"`
+	PciAddress string `json:"pciAddress"`
 }
 
 // Guest network.
