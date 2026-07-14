@@ -1,7 +1,6 @@
 package vsphere
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"sort"
