@@ -525,6 +525,14 @@ func (v *HostAdapter) Apply(u types.ObjectUpdate) {
 				if b, cast := p.Val.(string); cast {
 					v.model.Vendor = b
 				}
+			case fVMotionSupported:
+				if b, cast := p.Val.(bool); cast {
+					v.model.VMotionSupported = b
+				}
+			case fStorageVMotionSupported:
+				if b, cast := p.Val.(bool); cast {
+					v.model.StorageVMotionSupported = b
+				}
 			}
 		}
 	}
