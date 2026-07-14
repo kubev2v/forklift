@@ -804,6 +804,11 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 		if !hasUDN || settings.Settings.UdnSupportsMac {
 			kInterface.MacAddress = nic.MAC
 		}
+
+		if nic.PciAddress != "" {
+			kInterface.PciAddress = nic.PciAddress
+		}
+
 		switch mapped.Destination.Type {
 		case Pod:
 			kNetwork.Pod = &cnv.PodNetwork{}
