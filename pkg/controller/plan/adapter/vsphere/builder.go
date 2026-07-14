@@ -1725,7 +1725,11 @@ func (r *Builder) buildCsiImportPVC(
 	host := string(storageSecret.Data["STORAGE_HOSTNAME"])
 	user := string(storageSecret.Data["STORAGE_USERNAME"])
 	pass := string(storageSecret.Data["STORAGE_PASSWORD"])
-	skipSSL := basecontroller.GetInsecureSkipVerifyFlag(r.Source.Secret)
+	skipSSL, err := strconv.ParseBool(string(storageSecret.Data["STORAGE_SKIP_SSL_VERIFICATION"]))
+	if err != nil {
+		r.Log.Error(err, "CSI import: invalid STORAGE_SKIP_SSL_VERIFICATION value, defaulting to false", "secretRef", csiCfg.SecretRef)
+		skipSSL = false
+	}
 
 	var missing []string
 	if host == "" {
