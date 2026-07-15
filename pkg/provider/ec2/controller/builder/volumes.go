@@ -285,7 +285,7 @@ func (r *Builder) BuildDirectPVC(vmRef ref.Ref, volumeInfo *VolumeInfo, index in
 	pvcLabels["forklift.konveyor.io/volume-id"] = volumeInfo.OriginalVolumeID
 
 	pvcAnnotations := map[string]string{
-		planbase.AnnDiskSource:                     volumeInfo.OriginalVolumeID,
+		planbase.AnnDiskSource:                    volumeInfo.OriginalVolumeID,
 		"forklift.konveyor.io/original-volume-id": volumeInfo.OriginalVolumeID,
 		"forklift.konveyor.io/ebs-volume-id":      volumeInfo.EBSVolumeID,
 		"forklift.konveyor.io/snapshot-id":        volumeInfo.SnapshotID,
