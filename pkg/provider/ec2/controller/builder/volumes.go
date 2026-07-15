@@ -6,6 +6,7 @@ import (
 
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	utils "github.com/kubev2v/forklift/pkg/controller/plan/util"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
@@ -284,6 +285,7 @@ func (r *Builder) BuildDirectPVC(vmRef ref.Ref, volumeInfo *VolumeInfo, index in
 	pvcLabels["forklift.konveyor.io/volume-id"] = volumeInfo.OriginalVolumeID
 
 	pvcAnnotations := map[string]string{
+		planbase.AnnDiskSource:                     volumeInfo.OriginalVolumeID,
 		"forklift.konveyor.io/original-volume-id": volumeInfo.OriginalVolumeID,
 		"forklift.konveyor.io/ebs-volume-id":      volumeInfo.EBSVolumeID,
 		"forklift.konveyor.io/snapshot-id":        volumeInfo.SnapshotID,
