@@ -33,8 +33,8 @@ type ResolvedCalicoNAD struct {
 
 // CalicoValidationCache holds resolved state for every Calico-referencing
 // NAD that passed plan-level validation. NADs with any resource-level issue
-// are absent from the map: per-VM checks treat that as "skip silently — the
-// failure is already surfaced at plan level".
+// are absent from the map: per-VM checks treat that as "skip silently", since
+// the failure is already surfaced at plan level.
 type CalicoValidationCache struct {
 	NADs map[types.NamespacedName]*ResolvedCalicoNAD
 }
@@ -78,19 +78,19 @@ type CalicoValidationResult struct {
 // every VM.
 //
 // The struct accommodates both Calico-primary cases:
-//   - Case A (calico.network == ""): implicit L3 IPAM. Network/VLAN are zero;
+//   - non-L2 (calico.network == ""): implicit L3 IPAM. Network/VLAN are zero;
 //     L3EligiblePools is the pool set the per-VM check uses to validate IP fit.
-//   - Case C (calico.network != ""): L2 attach via named Calico Network CR.
+//   - L2-attach (calico.network != ""): attach via named Calico Network CR.
 //     Network/VLAN are populated; L2EligiblePools is the L2Workload-restricted
 //     pool set whose CIDR is contained in the matched VLAN's subnet(s).
 type ResolvedCalicoPrimary struct {
-	// Network is the named Calico Network CR (empty for Case A).
+	// Network is the named Calico Network CR (empty in the non-L2 case).
 	Network string
-	// VLAN is the resolved l2Bridge VLAN entry (zero-value for Case A).
+	// VLAN is the resolved l2Bridge VLAN entry (zero-value in the non-L2 case).
 	VLAN calicoclient.VLANEntry
-	// L2EligiblePools is the L2Workload-restricted pool set for Case C.
+	// L2EligiblePools is the L2Workload-restricted pool set for the L2-attach case.
 	L2EligiblePools []calicoclient.IPPool
-	// L3EligiblePools is the L3-eligible pool set for Case A.
+	// L3EligiblePools is the L3-eligible pool set for the non-L2 case.
 	L3EligiblePools []calicoclient.IPPool
 	// Source is the NetworkMap entry's source ref — used by per-VM dispatch
 	// to identify which NIC source maps to the calico primary entry.
@@ -111,9 +111,7 @@ type CalicoPrimaryValidationCache struct {
 // for per-VM issues.
 //
 // All fields are comparable types, so the struct can be used directly as a
-// map key for dedup. Per-VM dispatch uses CalicoPrimaryIssue as the dedup key
-// — each per-VM invocation only sees one VMRef, so dedup-within-VM is the
-// natural behaviour.
+// map key for dedup. CalicoPrimaryIssue is the dedup key.
 type CalicoPrimaryIssue struct {
 	VMRef   ref.Ref
 	Kind    CalicoIssueKind
