@@ -808,13 +808,23 @@ func (r *Validator) ValidateCalicoNADs(c k8sclient.Client) (planbase.CalicoValid
 			if !vrfChecked[cfg.Network] {
 				vrfChecked[cfg.Network] = true
 
-				// Without a way to know ahead-of-time where a VM will land, and without parsing
-				// the entire Calico Selector to figure out which nodes the VRF config applies to,
-				// it becomes possible to schedule VMs on nodes without VRF, i.e. leaving them broken.
+				// An empty nodeSelector is the canonical all-nodes form, so
+				// all-scoped hostConfig means a node subset (Calico selectors
+				// are not parsed). A VM scheduled onto an uncovered node
+				// fails at CNI ADD, so with no placement constraints on the
+				// plan the outcome is a scheduling lottery: Critical. When
+				// the plan pins placement (targetNodeSelector/targetAffinity)
+				// the user has taken control; Warn that the pin cannot be
+				// verified against the network's selectors.
 				if !vrfHasAllNodesEntry(nw.VRFHostConfig) {
 					ib := issueBase
-					ib.Kind = planbase.CalicoIssueVRFNodeScoped
-					result.Warnings = append(result.Warnings, ib)
+					if len(r.Plan.Spec.TargetNodeSelector) > 0 || r.Plan.Spec.TargetAffinity != nil {
+						ib.Kind = planbase.CalicoIssueVRFPlacementUnverified
+						result.Warnings = append(result.Warnings, ib)
+					} else {
+						ib.Kind = planbase.CalicoIssueVRFNodeScoped
+						result.Issues = append(result.Issues, ib)
+					}
 				}
 
 				if vrfHasEntryWithoutHostInterfaces(nw.VRFHostConfig) {

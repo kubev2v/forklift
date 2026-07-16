@@ -1138,13 +1138,12 @@ var _ = Describe("vsphere validation tests", func() {
 			Describe("VRF viability", func() {
 				nadKey := k8stypes.NamespacedName{Namespace: nadNS, Name: nadName}
 
-				It("warns VRFNodeScoped when every hostConfig entry is node-scoped", func() {
-					// Both entries carry a nodeSelector. Whether the two
-					// selectors jointly cover every node is deliberately not
-					// evaluated (Calico selector grammar), so scoped-only
-					// hostConfig is reported as a warning, not a Critical.
-					// The bound BGPPeer keeps VRFNoBGPPeer out; the entries
-					// carry host interfaces.
+				It("emits VRFNodeScoped as Critical when every entry is node-scoped and the plan sets no placement", func() {
+					// Both entries carry a nodeSelector (empty is the
+					// canonical all-nodes form, so this is a node subset)
+					// and the plan pins nothing: VMs may land on uncovered
+					// nodes and fail at CNI ADD. The bound BGPPeer keeps
+					// VRFNoBGPPeer out; the entries carry host interfaces.
 					v, c, _ := setup("10.100.0.5", true,
 						makeCalicoNAD(0),
 						makeVRFNetwork(
@@ -1157,10 +1156,35 @@ var _ = Describe("vsphere validation tests", func() {
 					)
 					result, err := v.ValidateCalicoNADs(c)
 					Expect(err).NotTo(HaveOccurred())
+					Expect(result.Warnings).To(BeEmpty())
+					Expect(result.Issues).To(ConsistOf(planbase.CalicoNADIssue{
+						NAD:     nadKey,
+						Kind:    planbase.CalicoIssueVRFNodeScoped,
+						Network: netName,
+					}))
+				})
+
+				It("downgrades to VRFPlacementUnverified when the plan constrains VM placement", func() {
+					// Same node-scoped hostConfig, but the plan pins VMs via
+					// targetNodeSelector: the user took control of placement,
+					// which Forklift cannot verify against Calico selectors.
+					v, c, _ := setup("10.100.0.5", true,
+						makeCalicoNAD(0),
+						makeVRFNetwork(
+							vrfHostEntry("rack == 'a'", 101),
+							vrfHostEntry("rack == 'b'", 102),
+						),
+						makeIPPool("default-pool", "10.100.0.0/24", "Workload"),
+						makeNftablesFelixConfiguration("Enabled"),
+						makeBGPPeer("vrf-peer", netName),
+					)
+					v.Plan.Spec.TargetNodeSelector = map[string]string{"rack": "a"}
+					result, err := v.ValidateCalicoNADs(c)
+					Expect(err).NotTo(HaveOccurred())
 					Expect(result.Issues).To(BeEmpty())
 					Expect(result.Warnings).To(ConsistOf(planbase.CalicoNADIssue{
 						NAD:     nadKey,
-						Kind:    planbase.CalicoIssueVRFNodeScoped,
+						Kind:    planbase.CalicoIssueVRFPlacementUnverified,
 						Network: netName,
 					}))
 				})
@@ -1168,7 +1192,7 @@ var _ = Describe("vsphere validation tests", func() {
 				It("runs the viability checks once per referenced Network", func() {
 					// Two NADs referencing the same VRF Network: the checks
 					// dedupe per Network name, so the scoped-only hostConfig
-					// yields exactly one warning, attached to the first NAD.
+					// yields exactly one issue, attached to the first NAD.
 					secondNAD := &k8snet.NetworkAttachmentDefinition{
 						ObjectMeta: metav1.ObjectMeta{Name: "calico-nad-2", Namespace: nadNS},
 						Spec: k8snet.NetworkAttachmentDefinitionSpec{
@@ -1193,8 +1217,8 @@ var _ = Describe("vsphere validation tests", func() {
 					)
 					result, err := v.ValidateCalicoNADs(c)
 					Expect(err).NotTo(HaveOccurred())
-					Expect(result.Issues).To(BeEmpty())
-					Expect(nadIssueKinds(result.Warnings)).To(ConsistOf(planbase.CalicoIssueVRFNodeScoped))
+					Expect(result.Warnings).To(BeEmpty())
+					Expect(nadIssueKinds(result.Issues)).To(ConsistOf(planbase.CalicoIssueVRFNodeScoped))
 					Expect(result.Cache.NADs).To(HaveLen(2))
 				})
 

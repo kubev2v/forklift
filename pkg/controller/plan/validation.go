@@ -2167,7 +2167,9 @@ func calicoNADIssueDetail(i planbase.CalicoNADIssue) string {
 	case planbase.CalicoIssueVRFVlanIgnored:
 		return fmt.Sprintf("%s (VRFVlanIgnored network=%q vlan=%d: the referenced Network is a VRF (routed) network; VLANs apply only to l2Bridge networks and the vlan value is ignored)", i.NAD.String(), i.Network, i.VLAN)
 	case planbase.CalicoIssueVRFNodeScoped:
-		return fmt.Sprintf("%s (VRFNodeScoped network=%q: every hostConfig entry carries a nodeSelector, so the network exists only on matching nodes; VMs scheduled onto any other node will fail to start — add a hostConfig entry without a nodeSelector to cover all nodes)", i.NAD.String(), i.Network)
+		return fmt.Sprintf("%s (VRFNodeScoped network=%q: every hostConfig entry carries a nodeSelector, so the network exists only on matching nodes, and the plan does not constrain VM placement; VMs may schedule onto uncovered nodes and fail to start — set the plan's targetNodeSelector or targetAffinity to keep VMs on covered nodes, or add a hostConfig entry without a nodeSelector)", i.NAD.String(), i.Network)
+	case planbase.CalicoIssueVRFPlacementUnverified:
+		return fmt.Sprintf("%s (VRFPlacementUnverified network=%q: the network exists only on nodes matching its hostConfig selectors; the plan constrains VM placement, but Forklift cannot verify that placement keeps VMs on covered nodes)", i.NAD.String(), i.Network)
 	case planbase.CalicoIssueVRFRouteTableReserved:
 		return fmt.Sprintf("%s (VRFRouteTableReserved network=%q table=%d: route tables 253, 254 and 255 are reserved by the kernel; choose a different routeTableIndex)", i.NAD.String(), i.Network, i.RouteTable)
 	case planbase.CalicoIssueVRFRouteTableConflict:

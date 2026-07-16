@@ -332,23 +332,24 @@ const (
 	CalicoIssueNetworkNotFound CalicoIssueKind = "NetworkNotFound"
 	// CalicoIssueNetworkCRDAbsent the destination cluster does not have the
 	// projectcalico.org/v3 Network CRD installed (the Calico install is too
-	// old or does not ship the Network resource). The NAD references a
-	// Calico Network but the CRD cannot be queried — distinct from a missing
-	// CR, which is CalicoIssueNetworkNotFound.
+	// old or does not ship the Network resource).
 	CalicoIssueNetworkCRDAbsent CalicoIssueKind = "NetworkCRDAbsent"
 	// CalicoIssueVRFVlanIgnored the NAD names a VLAN but the referenced
-	// Network is a VRF (routed L3) network. VLANs apply only to l2Bridge
-	// networks, so the value is ignored. Warn-level — validation of the
-	// reference continues.
+	// Network is a VRF (routed L3) network.
 	CalicoIssueVRFVlanIgnored CalicoIssueKind = "VRFVlanIgnored"
 	// CalicoIssueVRFNodeScoped every spec.vrf.hostConfig entry on the
-	// referenced VRF Network carries a nodeSelector, so the network exists
-	// only on nodes those selectors match; a VM scheduled onto any other
-	// node fails to start. Warn-level: the selectors may well cover every
-	// node, but evaluating Calico's selector grammar is deliberately out
-	// of scope, so scoped-only hostConfig is reported as a caution rather
-	// than proven incomplete coverage.
+	// referenced VRF Network carries a nodeSelector (an empty selector is
+	// the canonical all-nodes form, so this means a node subset) and the
+	// plan sets neither targetNodeSelector nor targetAffinity. A VM
+	// scheduled onto an uncovered node fails to start, so with placement
+	// uncontrolled the migration outcome is nondeterministic. Critical.
 	CalicoIssueVRFNodeScoped CalicoIssueKind = "VRFNodeScoped"
+	// CalicoIssueVRFPlacementUnverified as VRFNodeScoped, but the plan
+	// constrains VM placement (targetNodeSelector/targetAffinity).
+	// Warn-level: Forklift does not evaluate Calico's selector grammar,
+	// so it cannot verify the plan's placement keeps VMs on nodes the
+	// network's selectors cover.
+	CalicoIssueVRFPlacementUnverified CalicoIssueKind = "VRFPlacementUnverified"
 	// CalicoIssueVRFRouteTableReserved a hostConfig entry on the referenced
 	// VRF Network claims kernel route table 253, 254 or 255 — the kernel's
 	// own default/main/local tables, which a VRF must never take over.
