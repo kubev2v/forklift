@@ -2164,8 +2164,27 @@ func calicoNADIssueDetail(i planbase.CalicoNADIssue) string {
 		return fmt.Sprintf("%s (NetworkNotFound network=%q)", i.NAD.String(), i.Network)
 	case planbase.CalicoIssueNetworkCRDAbsent:
 		return fmt.Sprintf("%s (NetworkCRDAbsent network=%q: destination Calico install does not ship the projectcalico.org/v3 Network CRD)", i.NAD.String(), i.Network)
-	case planbase.CalicoIssueNetworkTypeUnsupported:
-		return fmt.Sprintf("%s (NetworkTypeUnsupported network=%q: the referenced Network is not an L2 bridge network; only l2Bridge networks are supported)", i.NAD.String(), i.Network)
+	case planbase.CalicoIssueVRFVlanIgnored:
+		return fmt.Sprintf("%s (VRFVlanIgnored network=%q vlan=%d: the referenced Network is a VRF (routed) network; VLANs apply only to l2Bridge networks and the vlan value is ignored)", i.NAD.String(), i.Network, i.VLAN)
+	case planbase.CalicoIssueVRFNodeScoped:
+		return fmt.Sprintf("%s (VRFNodeScoped network=%q: every hostConfig entry carries a nodeSelector, so the network exists only on matching nodes; VMs scheduled onto any other node will fail to start — add a hostConfig entry without a nodeSelector to cover all nodes)", i.NAD.String(), i.Network)
+	case planbase.CalicoIssueVRFRouteTableReserved:
+		return fmt.Sprintf("%s (VRFRouteTableReserved network=%q table=%d: route tables 253, 254 and 255 are reserved by the kernel; choose a different routeTableIndex)", i.NAD.String(), i.Network, i.RouteTable)
+	case planbase.CalicoIssueVRFRouteTableConflict:
+		if i.ConflictsWith != "" {
+			return fmt.Sprintf("%s (VRFRouteTableConflict network=%q table=%d: route table %d is also claimed by VRF Network %q on an overlapping set of nodes, which can result in network outages; give each VRF Network a unique routeTableIndex)", i.NAD.String(), i.Network, i.RouteTable, i.RouteTable, i.ConflictsWith)
+		}
+		return fmt.Sprintf("%s (VRFRouteTableConflict network=%q table=%d: route table %d falls inside the FelixConfiguration routeTableRanges, which Calico reserves for its own routes; choose a routeTableIndex outside those ranges)", i.NAD.String(), i.Network, i.RouteTable, i.RouteTable)
+	case planbase.CalicoIssueVRFRouteTablePossibleConflict:
+		return fmt.Sprintf("%s (VRFRouteTablePossibleConflict network=%q table=%d: VRF Network %q also uses route table %d; both entries are node-scoped, so the overlap cannot be ruled out — verify the two selectors never match the same node, or give each network a unique routeTableIndex)", i.NAD.String(), i.Network, i.RouteTable, i.ConflictsWith, i.RouteTable)
+	case planbase.CalicoIssueVRFDataplaneNotNftables:
+		return fmt.Sprintf("%s (VRFDataplaneNotNftables: VRF networking requires the nftables dataplane; set nftablesMode: Enabled (and leave bpfEnabled off) in the default FelixConfiguration)", i.NAD.String())
+	case planbase.CalicoIssueVRFPoolNotPinned:
+		return fmt.Sprintf("%s (VRFPoolNotPinned network=%q: the NAD does not pin an IPPool, so each VM's address will come from whichever pool Calico's IPAM selects and the VRF's network may not be able to route it; pin the VRF's IPPool via ipv4_pools in the NAD's IPAM config)", i.NAD.String(), i.Network)
+	case planbase.CalicoIssueVRFNoBGPPeer:
+		return fmt.Sprintf("%s (VRFNoBGPPeer network=%q: cross-node reachability in this VRF requires a BGPPeer whose spec.network names it; VMs placed on different nodes will not reach each other until one exists)", i.NAD.String(), i.Network)
+	case planbase.CalicoIssueVRFNoHostInterfaces:
+		return fmt.Sprintf("%s (VRFNoHostInterfaces network=%q: a hostConfig entry names no hostInterfaces, so VMs on the nodes that entry matches are unreachable beyond their own node; name at least one host interface in every hostConfig entry)", i.NAD.String(), i.Network)
 	case planbase.CalicoIssueDataplaneNotBPF:
 		return fmt.Sprintf("%s (DataplaneNotBPF: the destination Calico install is not running the BPF dataplane; L2 networks require FelixConfiguration bpfEnabled: true)", i.NAD.String())
 	case planbase.CalicoIssueNetworkHasNoL2Bridge:

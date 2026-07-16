@@ -43,6 +43,28 @@ func makeFelixConfiguration(bpfEnabled bool) *unstructured.Unstructured {
 	return u
 }
 
+// makeNftablesFelixConfiguration builds the cluster-wide "default"
+// FelixConfiguration with spec.nftablesMode set as given and bpfEnabled
+// unset (BPF off). "Enabled" describes the only cluster flavour VRF
+// networking supports.
+func makeNftablesFelixConfiguration(mode string) *unstructured.Unstructured {
+	u := &unstructured.Unstructured{}
+	u.SetGroupVersionKind(calicoclient.FelixConfigurationGVK)
+	u.SetName("default")
+	_ = unstructured.SetNestedField(u.Object, mode, "spec", "nftablesMode")
+	return u
+}
+
+// withRouteTableRanges sets spec.routeTableRanges on a FelixConfiguration.
+func withRouteTableRanges(u *unstructured.Unstructured, ranges ...[2]int64) *unstructured.Unstructured {
+	entries := make([]interface{}, len(ranges))
+	for i, r := range ranges {
+		entries[i] = map[string]interface{}{"min": r[0], "max": r[1]}
+	}
+	_ = unstructured.SetNestedSlice(u.Object, entries, "spec", "routeTableRanges")
+	return u
+}
+
 // withDefaultFelix appends a BPF-enabled "default" FelixConfiguration unless
 // objs already carries a FelixConfiguration. l2Bridge networks are only valid
 // on a BPF dataplane, so the Calico setup helpers install one by default;
@@ -729,14 +751,53 @@ var _ = Describe("vsphere validation tests", func() {
 				},
 			},
 		}
-		// VRF (routed, L3) Network spec — a real network type, but not one
-		// identity preservation supports.
-		vrfSpec := map[string]interface{}{
-			"vrf": map[string]interface{}{
-				"hostConfig": []interface{}{
-					map[string]interface{}{"nodeSelector": "all()"},
-				},
-			},
+		// VRF (routed, L3) Network helpers. vrfHostEntry builds one
+		// spec.vrf.hostConfig entry; an empty selector omits the
+		// nodeSelector field, so the entry applies to every node. The entry
+		// names a host interface, keeping the VRFNoHostInterfaces check
+		// quiet — vrfHostEntryNoInterfaces builds the offending shape.
+		vrfHostEntry := func(selector string, routeTableIndex int64) map[string]interface{} {
+			e := map[string]interface{}{
+				"routeTableIndex": routeTableIndex,
+				"hostInterfaces":  []interface{}{map[string]interface{}{"name": "eth1"}},
+			}
+			if selector != "" {
+				e["nodeSelector"] = selector
+			}
+			return e
+		}
+		vrfHostEntryNoInterfaces := func(selector string, routeTableIndex int64) map[string]interface{} {
+			e := vrfHostEntry(selector, routeTableIndex)
+			delete(e, "hostInterfaces")
+			return e
+		}
+		makeVRFNetworkNamed := func(name string, entries ...map[string]interface{}) *unstructured.Unstructured {
+			u := &unstructured.Unstructured{}
+			u.SetGroupVersionKind(calicoclient.NetworkGVK)
+			u.SetName(name)
+			list := make([]interface{}, len(entries))
+			for i, e := range entries {
+				list[i] = e
+			}
+			_ = unstructured.SetNestedField(u.Object, map[string]interface{}{
+				"vrf": map[string]interface{}{"hostConfig": list},
+			}, "spec")
+			return u
+		}
+		makeVRFNetwork := func(entries ...map[string]interface{}) *unstructured.Unstructured {
+			return makeVRFNetworkNamed(netName, entries...)
+		}
+		// makeBGPPeer builds a projectcalico.org/v3 BGPPeer whose
+		// spec.network binds it to the named Network — the binding that
+		// distributes a VRF network's routes across nodes. VRF fixtures
+		// that must stay warning-free include one bound to their Network;
+		// the VRFNoBGPPeer specs leave it out (or bind it elsewhere).
+		makeBGPPeer := func(name, network string) *unstructured.Unstructured {
+			u := &unstructured.Unstructured{}
+			u.SetGroupVersionKind(calicoclient.BGPPeerGVK)
+			u.SetName(name)
+			_ = unstructured.SetNestedField(u.Object, network, "spec", "network")
+			return u
 		}
 
 		// setup builds a Validator + fake client. nicIP is the NIC's guest IP,
@@ -752,6 +813,8 @@ var _ = Describe("vsphere validation tests", func() {
 			scheme.AddKnownTypeWithName(calicoclient.IPPoolGVK.GroupVersion().WithKind("IPPoolList"), &unstructured.UnstructuredList{})
 			scheme.AddKnownTypeWithName(calicoclient.FelixConfigurationGVK, &unstructured.Unstructured{})
 			scheme.AddKnownTypeWithName(calicoclient.FelixConfigurationGVK.GroupVersion().WithKind("FelixConfigurationList"), &unstructured.UnstructuredList{})
+			scheme.AddKnownTypeWithName(calicoclient.BGPPeerGVK, &unstructured.Unstructured{})
+			scheme.AddKnownTypeWithName(calicoclient.BGPPeerGVK.GroupVersion().WithKind("BGPPeerList"), &unstructured.UnstructuredList{})
 			c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(withDefaultFelix(k8sObjs)...).Build()
 
 			vm := model.VM{
@@ -900,29 +963,595 @@ var _ = Describe("vsphere validation tests", func() {
 				Expect(nadIssueKinds(result.Issues)).To(ConsistOf(planbase.CalicoIssueNetworkNotFound))
 			})
 
-			It("emits NetworkTypeUnsupported when the referenced Network is a VRF network", func() {
-				// A VRF NAD legitimately carries no vlan; the misleading
-				// VLANRequired must not fire. The reference stops at
-				// classification and is not cached.
+			It("accepts a VRF network reference and caches the L3-eligible pools", func() {
+				// A VRF network is routed L3 — no VLAN to resolve, and the
+				// BPF-dataplane requirement is l2Bridge-only. The cluster runs
+				// the nftables dataplane (bpfEnabled unset → off), which the
+				// VRF dataplane check requires; if the l2Bridge BPF check ran
+				// on this plan it would report DataplaneNotBPF, so the empty
+				// issue list also proves that check never runs for a VRF-only
+				// plan. The all-nodes hostConfig entry (with a host
+				// interface), unique route table, bound BGPPeer, and the
+				// preserve-IPs plan (no pool pin needed) keep every viability
+				// check quiet: fully clean result.
 				v, c, _ := setup("10.100.0.5", true,
-					makeCalicoNAD(0), makeNetwork(vrfSpec),
+					makeCalicoNAD(0), makeVRFNetwork(vrfHostEntry("", 101)),
+					makeIPPool("default-pool", "10.100.0.0/24", "Workload"),
+					makeNftablesFelixConfiguration("Enabled"),
+					makeBGPPeer("vrf-peer", netName),
 				)
 				result, err := v.ValidateCalicoNADs(c)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(nadIssueKinds(result.Issues)).To(ConsistOf(planbase.CalicoIssueNetworkTypeUnsupported))
-				Expect(result.Cache.NADs).To(BeEmpty())
+				Expect(result.Issues).To(BeEmpty())
+				Expect(result.Warnings).To(BeEmpty())
+				entry := result.Cache.NADs[k8stypes.NamespacedName{Namespace: nadNS, Name: nadName}]
+				Expect(entry).NotTo(BeNil())
+				Expect(entry.IsVRF).To(BeTrue())
+				Expect(entry.VLAN).To(Equal(calicoclient.VLANEntry{}))
+				Expect(entry.EligiblePools).To(HaveLen(1))
 			})
 
-			It("emits NetworkTypeUnsupported even when the NAD sets a vlan on a VRF network", func() {
-				// Same root cause — the network type is wrong; a VLAN check
-				// against a VRF network would mislead.
+			It("warns VRFVlanIgnored when the NAD sets a vlan on a VRF network", func() {
+				// VLANs apply only to l2Bridge networks — the stray vlan is
+				// surfaced as a warning; the reference stays valid and cached.
+				// The bound BGPPeer, interface-carrying all-nodes entry, and
+				// preserve-IPs plan keep the other VRF warnings out.
 				v, c, _ := setup("10.100.0.5", true,
-					makeCalicoNAD(100), makeNetwork(vrfSpec),
+					makeCalicoNAD(100), makeVRFNetwork(vrfHostEntry("", 101)),
+					makeIPPool("default-pool", "10.100.0.0/24", "Workload"),
+					makeNftablesFelixConfiguration("Enabled"),
+					makeBGPPeer("vrf-peer", netName),
 				)
 				result, err := v.ValidateCalicoNADs(c)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(nadIssueKinds(result.Issues)).To(ConsistOf(planbase.CalicoIssueNetworkTypeUnsupported))
-				Expect(result.Cache.NADs).To(BeEmpty())
+				Expect(result.Issues).To(BeEmpty())
+				Expect(result.Warnings).To(ConsistOf(planbase.CalicoNADIssue{
+					NAD:     k8stypes.NamespacedName{Namespace: nadNS, Name: nadName},
+					Kind:    planbase.CalicoIssueVRFVlanIgnored,
+					Network: netName,
+					VLAN:    100,
+				}))
+				entry := result.Cache.NADs[k8stypes.NamespacedName{Namespace: nadNS, Name: nadName}]
+				Expect(entry).NotTo(BeNil())
+				Expect(entry.IsVRF).To(BeTrue())
+			})
+
+			Describe("VRF pool pinning", func() {
+				nadKey := k8stypes.NamespacedName{Namespace: nadNS, Name: nadName}
+
+				// makeCalicoNADPinned is makeCalicoNAD with the NAD's IPAM
+				// config pinning one IPPool via ipv4_pools, and without a
+				// vlan (VRF NADs carry none).
+				makeCalicoNADPinned := func(pool string) *k8snet.NetworkAttachmentDefinition {
+					cfg := fmt.Sprintf(`{"type":"calico","network":"%s","ipam":{"type":"calico-ipam","ipv4_pools":[%q]}}`, netName, pool)
+					return &k8snet.NetworkAttachmentDefinition{
+						ObjectMeta: metav1.ObjectMeta{Name: nadName, Namespace: nadNS},
+						Spec:       k8snet.NetworkAttachmentDefinitionSpec{Config: cfg},
+					}
+				}
+
+				It("warns VRFPoolNotPinned when the plan assigns fresh IPs and the NAD pins no ipv4_pools", func() {
+					// Calico's IPAM is VRF-unaware: with no ipv4_pools pin and
+					// the plan assigning fresh addresses (preserveStaticIPs
+					// false), the NIC's address comes from whichever pool IPAM
+					// selects. The bound BGPPeer, interface-carrying all-nodes
+					// entry, and nftables dataplane keep every other warning
+					// out, isolating the pool warning.
+					v, c, _ := setup("10.100.0.5", false,
+						makeCalicoNAD(0),
+						makeVRFNetwork(vrfHostEntry("", 101)),
+						makeIPPool("default-pool", "10.100.0.0/24", "Workload"),
+						makeNftablesFelixConfiguration("Enabled"),
+						makeBGPPeer("vrf-peer", netName),
+					)
+					result, err := v.ValidateCalicoNADs(c)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.Issues).To(BeEmpty())
+					Expect(result.Warnings).To(ConsistOf(planbase.CalicoNADIssue{
+						NAD:     nadKey,
+						Kind:    planbase.CalicoIssueVRFPoolNotPinned,
+						Network: netName,
+					}))
+					// Warn-class: the NAD stays cached for per-VM checks.
+					Expect(result.Cache.NADs).To(HaveLen(1))
+				})
+
+				It("does not warn when the plan preserves static IPs", func() {
+					// Deliberate: with preserveStaticIPs the addresses are
+					// explicit via ipAddrs and already validated against pools
+					// per-VM — the flat-pool risk exists only for freshly
+					// assigned addresses. Same fixture as above except the
+					// plan preserves.
+					v, c, _ := setup("10.100.0.5", true,
+						makeCalicoNAD(0),
+						makeVRFNetwork(vrfHostEntry("", 101)),
+						makeIPPool("default-pool", "10.100.0.0/24", "Workload"),
+						makeNftablesFelixConfiguration("Enabled"),
+						makeBGPPeer("vrf-peer", netName),
+					)
+					result, err := v.ValidateCalicoNADs(c)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.Issues).To(BeEmpty())
+					Expect(result.Warnings).To(BeEmpty())
+				})
+
+				It("does not warn when the NAD pins ipv4_pools", func() {
+					// Fresh assignment, but the NAD pins the VRF's pool — the
+					// convention the warning asks for.
+					v, c, _ := setup("10.100.0.5", false,
+						makeCalicoNADPinned("default-pool"),
+						makeVRFNetwork(vrfHostEntry("", 101)),
+						makeIPPool("default-pool", "10.100.0.0/24", "Workload"),
+						makeNftablesFelixConfiguration("Enabled"),
+						makeBGPPeer("vrf-peer", netName),
+					)
+					result, err := v.ValidateCalicoNADs(c)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.Issues).To(BeEmpty())
+					Expect(result.Warnings).To(BeEmpty())
+				})
+
+				It("warns per NAD, not per Network", func() {
+					// The pin lives in each NAD's IPAM config, so two unpinned
+					// NADs referencing the same VRF Network warn once each —
+					// unlike the per-Network viability checks, which dedupe.
+					secondNAD := &k8snet.NetworkAttachmentDefinition{
+						ObjectMeta: metav1.ObjectMeta{Name: "calico-nad-2", Namespace: nadNS},
+						Spec: k8snet.NetworkAttachmentDefinitionSpec{
+							Config: fmt.Sprintf(`{"type":"calico","network":"%s"}`, netName),
+						},
+					}
+					v, c, _ := setup("10.100.0.5", false,
+						makeCalicoNAD(0), secondNAD,
+						makeVRFNetwork(vrfHostEntry("", 101)),
+						makeIPPool("default-pool", "10.100.0.0/24", "Workload"),
+						makeNftablesFelixConfiguration("Enabled"),
+						makeBGPPeer("vrf-peer", netName),
+					)
+					v.Plan.Referenced.Map.Network.Spec.Map = append(
+						v.Plan.Referenced.Map.Network.Spec.Map,
+						v1beta1.NetworkPair{
+							Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{ID: "src-2"}},
+							Destination: v1beta1.DestinationNetwork{
+								Type: planbase.Multus, Namespace: nadNS, Name: "calico-nad-2",
+							},
+						},
+					)
+					result, err := v.ValidateCalicoNADs(c)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.Issues).To(BeEmpty())
+					Expect(result.Warnings).To(ConsistOf(
+						planbase.CalicoNADIssue{
+							NAD:     nadKey,
+							Kind:    planbase.CalicoIssueVRFPoolNotPinned,
+							Network: netName,
+						},
+						planbase.CalicoNADIssue{
+							NAD:     k8stypes.NamespacedName{Namespace: nadNS, Name: "calico-nad-2"},
+							Kind:    planbase.CalicoIssueVRFPoolNotPinned,
+							Network: netName,
+						},
+					))
+				})
+			})
+
+			Describe("VRF viability", func() {
+				nadKey := k8stypes.NamespacedName{Namespace: nadNS, Name: nadName}
+
+				It("warns VRFNodeScoped when every hostConfig entry is node-scoped", func() {
+					// Both entries carry a nodeSelector. Whether the two
+					// selectors jointly cover every node is deliberately not
+					// evaluated (Calico selector grammar), so scoped-only
+					// hostConfig is reported as a warning, not a Critical.
+					// The bound BGPPeer keeps VRFNoBGPPeer out; the entries
+					// carry host interfaces.
+					v, c, _ := setup("10.100.0.5", true,
+						makeCalicoNAD(0),
+						makeVRFNetwork(
+							vrfHostEntry("rack == 'a'", 101),
+							vrfHostEntry("rack == 'b'", 102),
+						),
+						makeIPPool("default-pool", "10.100.0.0/24", "Workload"),
+						makeNftablesFelixConfiguration("Enabled"),
+						makeBGPPeer("vrf-peer", netName),
+					)
+					result, err := v.ValidateCalicoNADs(c)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.Issues).To(BeEmpty())
+					Expect(result.Warnings).To(ConsistOf(planbase.CalicoNADIssue{
+						NAD:     nadKey,
+						Kind:    planbase.CalicoIssueVRFNodeScoped,
+						Network: netName,
+					}))
+				})
+
+				It("runs the viability checks once per referenced Network", func() {
+					// Two NADs referencing the same VRF Network: the checks
+					// dedupe per Network name, so the scoped-only hostConfig
+					// yields exactly one warning, attached to the first NAD.
+					secondNAD := &k8snet.NetworkAttachmentDefinition{
+						ObjectMeta: metav1.ObjectMeta{Name: "calico-nad-2", Namespace: nadNS},
+						Spec: k8snet.NetworkAttachmentDefinitionSpec{
+							Config: fmt.Sprintf(`{"type":"calico","network":"%s"}`, netName),
+						},
+					}
+					v, c, _ := setup("10.100.0.5", true,
+						makeCalicoNAD(0), secondNAD,
+						makeVRFNetwork(vrfHostEntry("rack == 'a'", 101)),
+						makeIPPool("default-pool", "10.100.0.0/24", "Workload"),
+						makeNftablesFelixConfiguration("Enabled"),
+						makeBGPPeer("vrf-peer", netName),
+					)
+					v.Plan.Referenced.Map.Network.Spec.Map = append(
+						v.Plan.Referenced.Map.Network.Spec.Map,
+						v1beta1.NetworkPair{
+							Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{ID: "src-2"}},
+							Destination: v1beta1.DestinationNetwork{
+								Type: planbase.Multus, Namespace: nadNS, Name: "calico-nad-2",
+							},
+						},
+					)
+					result, err := v.ValidateCalicoNADs(c)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.Issues).To(BeEmpty())
+					Expect(nadIssueKinds(result.Warnings)).To(ConsistOf(planbase.CalicoIssueVRFNodeScoped))
+					Expect(result.Cache.NADs).To(HaveLen(2))
+				})
+
+				It("emits VRFRouteTableReserved when a hostConfig entry claims a kernel table", func() {
+					// 254 is the kernel's main table; a VRF must never own it.
+					// The bound BGPPeer keeps the warning list empty.
+					v, c, _ := setup("10.100.0.5", true,
+						makeCalicoNAD(0),
+						makeVRFNetwork(vrfHostEntry("", 254)),
+						makeIPPool("default-pool", "10.100.0.0/24", "Workload"),
+						makeNftablesFelixConfiguration("Enabled"),
+						makeBGPPeer("vrf-peer", netName),
+					)
+					result, err := v.ValidateCalicoNADs(c)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.Issues).To(ConsistOf(planbase.CalicoNADIssue{
+						NAD:        nadKey,
+						Kind:       planbase.CalicoIssueVRFRouteTableReserved,
+						Network:    netName,
+						RouteTable: 254,
+					}))
+					Expect(result.Warnings).To(BeEmpty())
+				})
+
+				It("emits VRFRouteTableConflict when another VRF Network shares the index via an all-nodes entry", func() {
+					// The referenced Network claims table 101 on every node;
+					// any other Network claiming 101 anywhere provably
+					// overlaps it. The other Network need not be referenced by
+					// the plan — the collision scan covers every Network CR.
+					v, c, _ := setup("10.100.0.5", true,
+						makeCalicoNAD(0),
+						makeVRFNetwork(vrfHostEntry("", 101)),
+						makeVRFNetworkNamed("other-vrf", vrfHostEntry("rack == 'b'", 101)),
+						makeIPPool("default-pool", "10.100.0.0/24", "Workload"),
+						makeNftablesFelixConfiguration("Enabled"),
+						makeBGPPeer("vrf-peer", netName),
+					)
+					result, err := v.ValidateCalicoNADs(c)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.Issues).To(ConsistOf(planbase.CalicoNADIssue{
+						NAD:           nadKey,
+						Kind:          planbase.CalicoIssueVRFRouteTableConflict,
+						Network:       netName,
+						RouteTable:    101,
+						ConflictsWith: "other-vrf",
+					}))
+					Expect(result.Warnings).To(BeEmpty())
+				})
+
+				It("warns VRFRouteTablePossibleConflict when both sharing entries are node-scoped", func() {
+					// Both entries carrying table 101 are selector-scoped, so
+					// whether they ever land on the same node depends on what
+					// the selectors match — unprovable without evaluating
+					// them. The all-nodes entry on table 102 keeps the
+					// NodeScoped warning out of the picture.
+					v, c, _ := setup("10.100.0.5", true,
+						makeCalicoNAD(0),
+						makeVRFNetwork(
+							vrfHostEntry("rack == 'a'", 101),
+							vrfHostEntry("", 102),
+						),
+						makeVRFNetworkNamed("other-vrf", vrfHostEntry("rack == 'b'", 101)),
+						makeIPPool("default-pool", "10.100.0.0/24", "Workload"),
+						makeNftablesFelixConfiguration("Enabled"),
+						makeBGPPeer("vrf-peer", netName),
+					)
+					result, err := v.ValidateCalicoNADs(c)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.Issues).To(BeEmpty())
+					Expect(result.Warnings).To(ConsistOf(planbase.CalicoNADIssue{
+						NAD:           nadKey,
+						Kind:          planbase.CalicoIssueVRFRouteTablePossibleConflict,
+						Network:       netName,
+						RouteTable:    101,
+						ConflictsWith: "other-vrf",
+					}))
+				})
+
+				It("does not report entries of the same Network sharing an index", func() {
+					// Two hostConfig entries of one Network on the same table
+					// are legitimate — same VRF, same table.
+					v, c, _ := setup("10.100.0.5", true,
+						makeCalicoNAD(0),
+						makeVRFNetwork(
+							vrfHostEntry("", 101),
+							vrfHostEntry("rack == 'a'", 101),
+						),
+						makeIPPool("default-pool", "10.100.0.0/24", "Workload"),
+						makeNftablesFelixConfiguration("Enabled"),
+						makeBGPPeer("vrf-peer", netName),
+					)
+					result, err := v.ValidateCalicoNADs(c)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.Issues).To(BeEmpty())
+					Expect(result.Warnings).To(BeEmpty())
+				})
+
+				It("emits VRFRouteTableConflict when the index falls inside explicit FelixConfiguration routeTableRanges", func() {
+					felix := withRouteTableRanges(makeNftablesFelixConfiguration("Enabled"), [2]int64{100, 200})
+					v, c, _ := setup("10.100.0.5", true,
+						makeCalicoNAD(0),
+						makeVRFNetwork(vrfHostEntry("", 150)),
+						makeIPPool("default-pool", "10.100.0.0/24", "Workload"),
+						felix,
+						makeBGPPeer("vrf-peer", netName),
+					)
+					result, err := v.ValidateCalicoNADs(c)
+					Expect(err).NotTo(HaveOccurred())
+					// ConflictsWith stays empty: the collision is with the
+					// FelixConfiguration, not another Network.
+					Expect(result.Issues).To(ConsistOf(planbase.CalicoNADIssue{
+						NAD:        nadKey,
+						Kind:       planbase.CalicoIssueVRFRouteTableConflict,
+						Network:    netName,
+						RouteTable: 150,
+					}))
+					Expect(result.Warnings).To(BeEmpty())
+				})
+
+				It("skips the FelixConfiguration sub-check when routeTableRanges is absent", func() {
+					// With the field absent, Felix falls back to
+					// version-dependent defaults that the validator
+					// deliberately does not guess — table 42 would sit inside
+					// a typical default range, and no issue may be raised.
+					v, c, _ := setup("10.100.0.5", true,
+						makeCalicoNAD(0),
+						makeVRFNetwork(vrfHostEntry("", 42)),
+						makeIPPool("default-pool", "10.100.0.0/24", "Workload"),
+						makeNftablesFelixConfiguration("Enabled"),
+						makeBGPPeer("vrf-peer", netName),
+					)
+					result, err := v.ValidateCalicoNADs(c)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.Issues).To(BeEmpty())
+					Expect(result.Warnings).To(BeEmpty())
+				})
+
+				It("warns VRFNoBGPPeer when no BGPPeer names the network", func() {
+					// VRF networks ship with local routes only; without a
+					// BGPPeer whose spec.network names this Network, no
+					// cross-node routes exist. No BGPPeer at all here. The
+					// preserve-IPs plan and interface-carrying all-nodes entry
+					// keep the other warnings out.
+					v, c, _ := setup("10.100.0.5", true,
+						makeCalicoNAD(0),
+						makeVRFNetwork(vrfHostEntry("", 101)),
+						makeIPPool("default-pool", "10.100.0.0/24", "Workload"),
+						makeNftablesFelixConfiguration("Enabled"),
+					)
+					result, err := v.ValidateCalicoNADs(c)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.Issues).To(BeEmpty())
+					Expect(result.Warnings).To(ConsistOf(planbase.CalicoNADIssue{
+						NAD:     nadKey,
+						Kind:    planbase.CalicoIssueVRFNoBGPPeer,
+						Network: netName,
+					}))
+					// Warn-class: the NAD stays cached for per-VM checks.
+					Expect(result.Cache.NADs).To(HaveLen(1))
+				})
+
+				It("warns VRFNoBGPPeer when the only BGPPeer names a different network", func() {
+					// A peer exists, but it distributes routes for another
+					// Network — this VRF still has no cross-node routes.
+					v, c, _ := setup("10.100.0.5", true,
+						makeCalicoNAD(0),
+						makeVRFNetwork(vrfHostEntry("", 101)),
+						makeIPPool("default-pool", "10.100.0.0/24", "Workload"),
+						makeNftablesFelixConfiguration("Enabled"),
+						makeBGPPeer("other-peer", "other-vrf"),
+					)
+					result, err := v.ValidateCalicoNADs(c)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.Issues).To(BeEmpty())
+					Expect(result.Warnings).To(ConsistOf(planbase.CalicoNADIssue{
+						NAD:     nadKey,
+						Kind:    planbase.CalicoIssueVRFNoBGPPeer,
+						Network: netName,
+					}))
+				})
+
+				It("still warns VRFNoBGPPeer when the BGPPeer kind is unknown to the API server", func() {
+					// Older Calico installs don't ship the BGPPeer CRD (or its
+					// spec.network field). Absence of evidence is not a bound
+					// peer: with no peer able to name the network, the warning
+					// must still fire. The scheme deliberately omits the
+					// BGPPeer kinds; the interceptor turns the BGPPeer List
+					// into the NoKindMatchError a real API server would return
+					// and passes every other call through.
+					v, _, _ := setup("10.100.0.5", true)
+					scheme := runtime.NewScheme()
+					_ = k8snet.AddToScheme(scheme)
+					scheme.AddKnownTypeWithName(calicoclient.NetworkGVK, &unstructured.Unstructured{})
+					scheme.AddKnownTypeWithName(calicoclient.NetworkGVK.GroupVersion().WithKind("NetworkList"), &unstructured.UnstructuredList{})
+					scheme.AddKnownTypeWithName(calicoclient.IPPoolGVK, &unstructured.Unstructured{})
+					scheme.AddKnownTypeWithName(calicoclient.IPPoolGVK.GroupVersion().WithKind("IPPoolList"), &unstructured.UnstructuredList{})
+					scheme.AddKnownTypeWithName(calicoclient.FelixConfigurationGVK, &unstructured.Unstructured{})
+					scheme.AddKnownTypeWithName(calicoclient.FelixConfigurationGVK.GroupVersion().WithKind("FelixConfigurationList"), &unstructured.UnstructuredList{})
+					bgpPeerGK := calicoclient.BGPPeerGVK.GroupKind()
+					c := fake.NewClientBuilder().WithScheme(scheme).
+						WithRuntimeObjects(
+							makeCalicoNAD(0),
+							makeVRFNetwork(vrfHostEntry("", 101)),
+							makeIPPool("default-pool", "10.100.0.0/24", "Workload"),
+							makeNftablesFelixConfiguration("Enabled"),
+						).
+						WithInterceptorFuncs(interceptor.Funcs{
+							List: func(ctx context.Context, inner client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+								if list.GetObjectKind().GroupVersionKind() == calicoclient.BGPPeerGVK.GroupVersion().WithKind("BGPPeerList") {
+									return &meta.NoKindMatchError{GroupKind: bgpPeerGK}
+								}
+								return inner.List(ctx, list, opts...)
+							},
+						}).Build()
+					result, err := v.ValidateCalicoNADs(c)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.Issues).To(BeEmpty())
+					Expect(result.Warnings).To(ConsistOf(planbase.CalicoNADIssue{
+						NAD:     nadKey,
+						Kind:    planbase.CalicoIssueVRFNoBGPPeer,
+						Network: netName,
+					}))
+				})
+
+				It("warns VRFNoHostInterfaces when a hostConfig entry names no host interfaces", func() {
+					// The scoped entry names no hostInterfaces: VMs on its
+					// nodes have no path off the node inside the VRF, so one
+					// such entry warns for the whole Network. The all-nodes
+					// entry (with an interface) keeps NodeScoped quiet, the
+					// shared table within one Network is legitimate, and the
+					// bound BGPPeer keeps VRFNoBGPPeer out.
+					v, c, _ := setup("10.100.0.5", true,
+						makeCalicoNAD(0),
+						makeVRFNetwork(
+							vrfHostEntry("", 101),
+							vrfHostEntryNoInterfaces("rack == 'a'", 101),
+						),
+						makeIPPool("default-pool", "10.100.0.0/24", "Workload"),
+						makeNftablesFelixConfiguration("Enabled"),
+						makeBGPPeer("vrf-peer", netName),
+					)
+					result, err := v.ValidateCalicoNADs(c)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.Issues).To(BeEmpty())
+					Expect(result.Warnings).To(ConsistOf(planbase.CalicoNADIssue{
+						NAD:     nadKey,
+						Kind:    planbase.CalicoIssueVRFNoHostInterfaces,
+						Network: netName,
+					}))
+					// Warn-class: the NAD stays cached for per-VM checks.
+					Expect(result.Cache.NADs).To(HaveLen(1))
+				})
+
+				DescribeTable("emits VRFDataplaneNotNftables when the dataplane is not nftables",
+					func(felix *unstructured.Unstructured) {
+						objs := []runtime.Object{
+							makeCalicoNAD(0),
+							makeVRFNetwork(vrfHostEntry("", 101)),
+							makeIPPool("default-pool", "10.100.0.0/24", "Workload"),
+							makeBGPPeer("vrf-peer", netName),
+						}
+						if felix == nil {
+							// Only a per-node FelixConfiguration, so the
+							// "default" one is missing (and the setup helper's
+							// auto-injection is suppressed): Felix runs on
+							// built-in defaults, which are not nftables.
+							perNode := makeFelixConfiguration(true)
+							perNode.SetName("node.worker-1")
+							felix = perNode
+						}
+						v, c, _ := setup("10.100.0.5", true, append(objs, felix)...)
+						result, err := v.ValidateCalicoNADs(c)
+						Expect(err).NotTo(HaveOccurred())
+						Expect(nadIssueKinds(result.Issues)).To(ConsistOf(planbase.CalicoIssueVRFDataplaneNotNftables))
+						// The finding is cluster-scoped; the NAD itself is
+						// valid and stays cached so per-VM checks still run.
+						Expect(result.Cache.NADs).To(HaveLen(1))
+					},
+					Entry("bpfEnabled true", makeFelixConfiguration(true)),
+					Entry("nftablesMode absent (Felix default: Disabled)", makeFelixConfiguration(false)),
+					Entry("nftablesMode Disabled", makeNftablesFelixConfiguration("Disabled")),
+					// "Auto" leaves the dataplane to Felix's host detection,
+					// which cannot be verified from here — treated as failing.
+					Entry("nftablesMode Auto (indeterminate)", makeNftablesFelixConfiguration("Auto")),
+					Entry("default FelixConfiguration missing", nil),
+				)
+			})
+
+			Describe("mixed l2Bridge + VRF plans", func() {
+				// An l2Bridge network requires the BPF dataplane; a VRF
+				// network requires nftables. No FelixConfiguration satisfies
+				// both, so the two network types are mutually exclusive per
+				// cluster — a plan referencing both kinds of NAD always draws
+				// at least one dataplane Critical, naming whichever side the
+				// cluster cannot run.
+				const vrfNetName = "vrf-net"
+				const vrfNADName = "vrf-nad"
+
+				mixedSetup := func(felix *unstructured.Unstructured) (*Validator, client.Client) {
+					vrfNAD := &k8snet.NetworkAttachmentDefinition{
+						ObjectMeta: metav1.ObjectMeta{Name: vrfNADName, Namespace: nadNS},
+						Spec: k8snet.NetworkAttachmentDefinitionSpec{
+							Config: fmt.Sprintf(`{"type":"calico","network":"%s"}`, vrfNetName),
+						},
+					}
+					v, c, _ := setup("10.100.0.5", true,
+						makeCalicoNAD(100), makeNetwork(l2Single),
+						makeIPPool("vlan100-pool", "10.100.0.0/24", "L2Workload"),
+						vrfNAD, makeVRFNetworkNamed(vrfNetName, vrfHostEntry("", 101)),
+						makeIPPool("default-pool", "10.200.0.0/24", "Workload"),
+						felix,
+						makeBGPPeer("vrf-peer", vrfNetName),
+					)
+					v.Plan.Referenced.Map.Network.Spec.Map = append(
+						v.Plan.Referenced.Map.Network.Spec.Map,
+						v1beta1.NetworkPair{
+							Source: v1beta1.NetworkSourceRef{Ref: ref.Ref{ID: "src-2"}},
+							Destination: v1beta1.DestinationNetwork{
+								Type: planbase.Multus, Namespace: nadNS, Name: vrfNADName,
+							},
+						},
+					)
+					return v, c
+				}
+
+				It("reports only VRFDataplaneNotNftables on a BPF cluster", func() {
+					// BPF satisfies the l2Bridge side and fails the VRF side.
+					v, c := mixedSetup(makeFelixConfiguration(true))
+					result, err := v.ValidateCalicoNADs(c)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(nadIssueKinds(result.Issues)).To(ConsistOf(planbase.CalicoIssueVRFDataplaneNotNftables))
+					Expect(result.Cache.NADs).To(HaveLen(2))
+				})
+
+				It("reports only DataplaneNotBPF on an nftables cluster", func() {
+					// nftables satisfies the VRF side and fails the l2Bridge
+					// side.
+					v, c := mixedSetup(makeNftablesFelixConfiguration("Enabled"))
+					result, err := v.ValidateCalicoNADs(c)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(nadIssueKinds(result.Issues)).To(ConsistOf(planbase.CalicoIssueDataplaneNotBPF))
+					Expect(result.Cache.NADs).To(HaveLen(2))
+				})
+
+				It("reports both dataplane Criticals on a cluster running neither BPF nor nftables", func() {
+					// An iptables cluster (bpfEnabled false, nftablesMode
+					// unset) can honour neither network type; both sides
+					// report, each naming its own remedy.
+					v, c := mixedSetup(makeFelixConfiguration(false))
+					result, err := v.ValidateCalicoNADs(c)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(nadIssueKinds(result.Issues)).To(ConsistOf(
+						planbase.CalicoIssueDataplaneNotBPF,
+						planbase.CalicoIssueVRFDataplaneNotNftables,
+					))
+					Expect(result.Cache.NADs).To(HaveLen(2))
+				})
 			})
 
 			It("does not emit a dataplane issue when FelixConfiguration has bpfEnabled true", func() {
@@ -1339,6 +1968,58 @@ var _ = Describe("vsphere validation tests", func() {
 				Expect(issues[0].Kind).To(Equal(planbase.CalicoIssueTooManyIPs))
 			})
 
+			It("emits IPNotInIPPool for a VRF-backed NAD when no eligible pool covers the IP", func() {
+				// A VRF network has no subnets, so the subnet check is skipped
+				// — the preserved IP is validated directly against the
+				// L3-eligible pools. Here the only pool misses the IP.
+				v, c, vmRef := setup("10.100.0.5", true,
+					makeCalicoNAD(0), makeVRFNetwork(vrfHostEntry("", 101)),
+					makeIPPool("other-pool", "10.200.0.0/24", "Workload"),
+					makeNftablesFelixConfiguration("Enabled"),
+				)
+				result, err := v.ValidateCalicoNADs(c)
+				Expect(err).NotTo(HaveOccurred())
+				issues, err := v.CalicoVMIssues(vmRef, result.Cache)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(issues).To(ConsistOf(planbase.CalicoIssue{
+					Kind: planbase.CalicoIssueIPNotInIPPool, Network: netName, IP: "10.100.0.5",
+				}))
+			})
+
+			It("emits TooManyIPs when a VRF-backed NIC carries more than one IPv4", func() {
+				// Calico's ipAddrs annotation still caps at one IPv4 per
+				// interface on a VRF network.
+				v, c, vmRef := setup("10.100.0.5", true,
+					makeCalicoNAD(0), makeVRFNetwork(vrfHostEntry("", 101)),
+					makeIPPool("default-pool", "10.100.0.0/24", "Workload"),
+					makeNftablesFelixConfiguration("Enabled"),
+				)
+				vm := v.Source.Inventory.(*mockInventory).vm
+				vm.GuestNetworks = append(vm.GuestNetworks, vsphere.GuestNetwork{IP: "10.100.0.6", DeviceConfigId: 4001})
+				v.Source.Inventory.(*mockInventory).vm = vm
+
+				result, err := v.ValidateCalicoNADs(c)
+				Expect(err).NotTo(HaveOccurred())
+				issues, err := v.CalicoVMIssues(vmRef, result.Cache)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(issues).To(HaveLen(1))
+				Expect(issues[0].Kind).To(Equal(planbase.CalicoIssueTooManyIPs))
+			})
+
+			It("returns no issues for a VRF-backed NAD when preserveStaticIPs is false", func() {
+				// The IP is outside every pool, but preservation is off.
+				v, c, vmRef := setup("10.100.0.5", false,
+					makeCalicoNAD(0), makeVRFNetwork(vrfHostEntry("", 101)),
+					makeIPPool("other-pool", "10.200.0.0/24", "Workload"),
+					makeNftablesFelixConfiguration("Enabled"),
+				)
+				result, err := v.ValidateCalicoNADs(c)
+				Expect(err).NotTo(HaveOccurred())
+				issues, err := v.CalicoVMIssues(vmRef, result.Cache)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(issues).To(BeEmpty())
+			})
+
 			It("deduplicates identical per-NIC IP issues", func() {
 				// Two NICs on the same source network, two NetworkMap entries each
 				// pointing at a distinct NAD; both NADs reference the same Calico
@@ -1448,11 +2129,11 @@ var _ = Describe("vsphere validation tests", func() {
 			},
 		}
 		// VRF (routed, L3) Network spec — a real network type, but not one
-		// identity preservation supports.
+		// the calico-primary path supports.
 		vrfSpec := map[string]interface{}{
 			"vrf": map[string]interface{}{
 				"hostConfig": []interface{}{
-					map[string]interface{}{"nodeSelector": "all()"},
+					map[string]interface{}{"routeTableIndex": int64(101)},
 				},
 			},
 		}

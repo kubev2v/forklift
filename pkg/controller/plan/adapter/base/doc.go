@@ -336,10 +336,68 @@ const (
 	// Network but the CRD cannot be queried — distinct from a missing CR,
 	// which is CalicoIssueNetworkNotFound.
 	CalicoIssueNetworkCRDAbsent CalicoIssueKind = "NetworkCRDAbsent"
-	// CalicoIssueNetworkTypeUnsupported the referenced Network CR is not an
-	// l2Bridge network (e.g. a VRF network). Only l2Bridge networks are
-	// supported for identity preservation today.
-	CalicoIssueNetworkTypeUnsupported CalicoIssueKind = "NetworkTypeUnsupported"
+	// CalicoIssueVRFVlanIgnored the NAD names a VLAN but the referenced
+	// Network is a VRF (routed L3) network. VLANs apply only to l2Bridge
+	// networks, so the value is ignored. Warn-level — validation of the
+	// reference continues.
+	CalicoIssueVRFVlanIgnored CalicoIssueKind = "VRFVlanIgnored"
+	// CalicoIssueVRFNodeScoped every spec.vrf.hostConfig entry on the
+	// referenced VRF Network carries a nodeSelector, so the network exists
+	// only on nodes those selectors match; a VM scheduled onto any other
+	// node fails to start. Warn-level: the selectors may well cover every
+	// node, but evaluating Calico's selector grammar is deliberately out
+	// of scope, so scoped-only hostConfig is reported as a caution rather
+	// than proven incomplete coverage.
+	CalicoIssueVRFNodeScoped CalicoIssueKind = "VRFNodeScoped"
+	// CalicoIssueVRFRouteTableReserved a hostConfig entry on the referenced
+	// VRF Network claims kernel route table 253, 254 or 255 — the kernel's
+	// own default/main/local tables, which a VRF must never take over.
+	CalicoIssueVRFRouteTableReserved CalicoIssueKind = "VRFRouteTableReserved"
+	// CalicoIssueVRFRouteTableConflict a routeTableIndex on the referenced
+	// VRF Network is provably claimed elsewhere: another VRF Network uses
+	// it with at least one of the two entries unscoped (an all-nodes entry
+	// overlaps any node set), or it falls inside an explicit
+	// FelixConfiguration routeTableRanges range. Calico documents such
+	// conflicts as able to cause network outages.
+	CalicoIssueVRFRouteTableConflict CalicoIssueKind = "VRFRouteTableConflict"
+	// CalicoIssueVRFRouteTablePossibleConflict another VRF Network claims
+	// the same routeTableIndex, but both entries carry nodeSelectors, so
+	// whether they land on the same node depends on which nodes the
+	// selectors match — unprovable without selector evaluation. Warn-level.
+	CalicoIssueVRFRouteTablePossibleConflict CalicoIssueKind = "VRFRouteTablePossibleConflict"
+	// CalicoIssueVRFDataplaneNotNftables a NAD references a VRF network but
+	// the destination Calico install is not running the nftables dataplane.
+	// VRF networking is supported only on nftables — BPF and iptables
+	// installs cannot honour it — so FelixConfiguration "default" must have
+	// nftablesMode Enabled and bpfEnabled off. nftablesMode "Auto" is also
+	// reported: the mode Felix actually picks cannot be verified from here.
+	// Emitted once per plan.
+	CalicoIssueVRFDataplaneNotNftables CalicoIssueKind = "VRFDataplaneNotNftables"
+	// CalicoIssueVRFPoolNotPinned the NAD references a VRF network but its
+	// IPAM config pins no ipv4_pools, and the plan does not preserve static
+	// IPs. Calico's IPAM is VRF-unaware; the documented convention pins the
+	// VRF's dedicated IPPool via ipam.ipv4_pools in the NAD. Without the
+	// pin, a freshly assigned address comes from whichever pool IPAM
+	// selects — likely one the VRF's tenant fabric cannot route back to.
+	// Warn-level, per NAD (the pin is a NAD property, not a Network one).
+	// Deliberately not emitted when the plan preserves static IPs: the
+	// addresses are then explicit via ipAddrs and already validated against
+	// pools per-VM; the risk exists only for freshly-assigned addresses.
+	CalicoIssueVRFPoolNotPinned CalicoIssueKind = "VRFPoolNotPinned"
+	// CalicoIssueVRFNoBGPPeer no BGPPeer with spec.network naming the
+	// referenced VRF Network exists. VRF networks ship with
+	// inClusterMode: Local only — Felix programs a node's own pod routes;
+	// routes to pods on other nodes exist only when such a BGPPeer
+	// distributes them. Without one, VMs placed on different nodes silently
+	// cannot reach each other inside the VRF. Warn-level, once per
+	// referenced Network. Also emitted when the BGPPeer kind is unknown to
+	// the apiserver: no peer can be bound in that state either.
+	CalicoIssueVRFNoBGPPeer CalicoIssueKind = "VRFNoBGPPeer"
+	// CalicoIssueVRFNoHostInterfaces a spec.vrf.hostConfig entry on the
+	// referenced VRF Network names no hostInterfaces. Pods (and thus VMs)
+	// on the nodes that entry matches have no path off their node in the
+	// VRF. Warn-level, once per referenced Network.
+	CalicoIssueVRFNoHostInterfaces CalicoIssueKind = "VRFNoHostInterfaces"
 	// CalicoIssueNetworkHasNoL2Bridge Network CR existed but had no L2Bridge field spec'd.
 	CalicoIssueNetworkHasNoL2Bridge CalicoIssueKind = "NetworkHasNoL2Bridge"
 	// CalicoIssueNetworkHasNoVLANs Network CR's L2Bridge had an empty vlans list (no VLAN to select).
@@ -456,7 +514,8 @@ type CalicoIssue struct {
 	Kind CalicoIssueKind
 	// Network is the Calico Network CR name reference.
 	Network string
-	// VLAN is the resolved l2Bridge.vlans[].vlan.id (always non-zero).
+	// VLAN is the resolved l2Bridge.vlans[].vlan.id (zero when the NAD's
+	// Network is a VRF network — VRF networks carry no VLANs).
 	VLAN uint16
 	// IP is the source VM IP.
 	IP string

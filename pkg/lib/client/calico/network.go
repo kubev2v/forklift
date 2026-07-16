@@ -28,15 +28,34 @@ type L2BridgeSpec struct {
 	VLANs []VLANEntry
 }
 
+// VRFHostEntry is a parsed entry of Network.spec.vrf.hostConfig — the
+// per-node-set VRF placement the viability checks inspect. staticRoutes
+// is deliberately not modelled; no check reads it.
+type VRFHostEntry struct {
+	// NodeSelector is the Calico node selector choosing which nodes the
+	// entry applies to. Empty means the field was absent or empty — the
+	// entry then applies to every node.
+	NodeSelector string
+	// RouteTableIndex is the kernel route table the VRF owns on matching
+	// nodes.
+	RouteTableIndex int64
+	// HasHostInterfaces reports whether the entry names at least one host
+	// interface (hostInterfaces non-empty). Only presence is modelled: the
+	// checks care that an off-node path exists, not which interface it is.
+	HasHostInterfaces bool
+}
+
 // Network is a thin parsed view of projectcalico.org/v3 Network.
 //
 // spec is a strict one-of: an l2Bridge Network carries VLANs and is the type
 // identity preservation supports; a vrf Network is routed (L3, no VLANs).
-// IsVRF only classifies the Network — the VRF spec itself is not modelled.
+// For a vrf Network, VRFHostConfig carries the hostConfig entries the VRF
+// viability checks need; the rest of the VRF spec is not modelled.
 type Network struct {
-	Name     string
-	L2Bridge *L2BridgeSpec // nil when the Network has no l2Bridge spec
-	IsVRF    bool          // true when the Network has a vrf spec
+	Name          string
+	L2Bridge      *L2BridgeSpec  // nil when the Network has no l2Bridge spec
+	IsVRF         bool           // true when the Network has a vrf spec
+	VRFHostConfig []VRFHostEntry // parsed spec.vrf.hostConfig (IsVRF only)
 }
 
 // GetNetwork fetches projectcalico.org/v3 Network/name from the destination
@@ -50,16 +69,42 @@ func GetNetwork(ctx context.Context, c client.Client, name string) (*Network, er
 	return parseNetwork(u)
 }
 
+// ListNetworks lists every projectcalico.org/v3 Network CR on the cluster,
+// parsed into the same view GetNetwork returns. The VRF viability checks use
+// it to scan for route-table collisions across Network CRs.
+func ListNetworks(ctx context.Context, c client.Client) ([]Network, error) {
+	ul := &unstructured.UnstructuredList{}
+	ul.SetGroupVersionKind(NetworkGVK.GroupVersion().WithKind("NetworkList"))
+	if err := c.List(ctx, ul); err != nil {
+		return nil, err
+	}
+	networks := make([]Network, 0, len(ul.Items))
+	for i := range ul.Items {
+		n, err := parseNetwork(&ul.Items[i])
+		if err != nil {
+			return nil, fmt.Errorf("network %q: %w", ul.Items[i].GetName(), err)
+		}
+		networks = append(networks, *n)
+	}
+	return networks, nil
+}
+
 func parseNetwork(u *unstructured.Unstructured) (*Network, error) {
 	n := &Network{Name: u.GetName()}
 
-	// Presence-only check: a vrf spec marks the Network as a VRF (routed)
-	// network, which the validators reject as unsupported.
-	_, isVRF, err := unstructured.NestedMap(u.Object, "spec", "vrf")
+	// A vrf spec marks the Network as a VRF (routed) network; its
+	// hostConfig entries feed the VRF viability checks.
+	vrfMap, isVRF, err := unstructured.NestedMap(u.Object, "spec", "vrf")
 	if err != nil {
 		return nil, fmt.Errorf("parse spec.vrf: %w", err)
 	}
 	n.IsVRF = isVRF
+	if isVRF {
+		n.VRFHostConfig, err = parseVRFHostConfig(vrfMap)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	l2Bridge, found, err := unstructured.NestedMap(u.Object, "spec", "l2Bridge")
 	if err != nil {
@@ -89,6 +134,72 @@ func parseNetwork(u *unstructured.Unstructured) (*Network, error) {
 	}
 	n.L2Bridge = spec
 	return n, nil
+}
+
+// parseVRFHostConfig parses spec.vrf.hostConfig into the minimal entry view
+// the VRF viability checks need: nodeSelector, routeTableIndex and whether
+// hostInterfaces names anything. routeTableIndex is required by the API, so
+// a missing or non-integer value is a parse error; nodeSelector is optional
+// (absent means all nodes). hostInterfaces entries come in two API vintages
+// — objects with a name field, or plain strings — so only the list's
+// non-emptiness is read; the elements themselves are never interpreted.
+func parseVRFHostConfig(vrfMap map[string]interface{}) ([]VRFHostEntry, error) {
+	entriesRaw, found, err := unstructured.NestedSlice(vrfMap, "hostConfig")
+	if err != nil {
+		return nil, fmt.Errorf("parse spec.vrf.hostConfig: %w", err)
+	}
+	if !found {
+		return nil, nil
+	}
+	entries := make([]VRFHostEntry, 0, len(entriesRaw))
+	for i, e := range entriesRaw {
+		m, ok := e.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("spec.vrf.hostConfig[%d]: not an object", i)
+		}
+		selector, _, err := unstructured.NestedString(m, "nodeSelector")
+		if err != nil {
+			return nil, fmt.Errorf("spec.vrf.hostConfig[%d].nodeSelector: %w", i, err)
+		}
+		idxRaw, found, err := unstructured.NestedFieldNoCopy(m, "routeTableIndex")
+		if err != nil {
+			return nil, fmt.Errorf("spec.vrf.hostConfig[%d].routeTableIndex: %w", i, err)
+		}
+		if !found {
+			return nil, fmt.Errorf("spec.vrf.hostConfig[%d].routeTableIndex: missing", i)
+		}
+		index, ok := asInt64(idxRaw)
+		if !ok {
+			return nil, fmt.Errorf("spec.vrf.hostConfig[%d].routeTableIndex: not an integer (%v)", i, idxRaw)
+		}
+		ifaces, _, err := unstructured.NestedSlice(m, "hostInterfaces")
+		if err != nil {
+			return nil, fmt.Errorf("spec.vrf.hostConfig[%d].hostInterfaces: %w", i, err)
+		}
+		entries = append(entries, VRFHostEntry{
+			NodeSelector:      selector,
+			RouteTableIndex:   index,
+			HasHostInterfaces: len(ifaces) > 0,
+		})
+	}
+	return entries, nil
+}
+
+// asInt64 coerces an unstructured numeric field to int64. JSON decoding
+// yields int64 for integers, but some encoders produce float64; any other
+// type, and any float with a fractional part, reports false.
+func asInt64(v interface{}) (int64, bool) {
+	switch n := v.(type) {
+	case int64:
+		return n, true
+	case float64:
+		i := int64(n)
+		if float64(i) != n {
+			return 0, false
+		}
+		return i, true
+	}
+	return 0, false
 }
 
 func parseVLANEntry(m map[string]interface{}, idx int) (VLANEntry, error) {

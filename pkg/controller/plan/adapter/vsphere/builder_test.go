@@ -1087,6 +1087,16 @@ var _ = Describe("vSphere builder", func() {
 			Expect(annotations).NotTo(HaveKey(ipsAnnKey))
 		})
 
+		It("emits MAC and IP annotations for a Calico VRF NAD (network, no vlan)", func() {
+			// The builder keys off the NAD's Calico Network reference alone;
+			// a VRF network (which never carries a vlan) gets the same scoped
+			// identity annotations as an l2Bridge one.
+			annotations, err := buildAndCall(`{"type":"calico","network":"vrf-red"}`, true)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(annotations).To(HaveKeyWithValue(hwAnnKey, nicMAC))
+			Expect(annotations).To(HaveKeyWithValue(ipsAnnKey, fmt.Sprintf(`["%s"]`, nicIP)))
+		})
+
 		It("emits nothing for a Calico L3 NAD (no network field)", func() {
 			annotations, err := buildAndCall(`{"type":"calico"}`, true)
 			Expect(err).NotTo(HaveOccurred())

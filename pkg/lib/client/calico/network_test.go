@@ -2,6 +2,7 @@ package calico
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
@@ -80,7 +81,7 @@ func TestGetNetwork_VRF(t *testing.T) {
 	nw := makeNetwork("routed-net", map[string]interface{}{
 		"vrf": map[string]interface{}{
 			"hostConfig": []interface{}{
-				map[string]interface{}{"nodeSelector": "all()"},
+				map[string]interface{}{"nodeSelector": "all()", "routeTableIndex": int64(101)},
 			},
 		},
 	})
@@ -96,6 +97,189 @@ func TestGetNetwork_VRF(t *testing.T) {
 	}
 	if got.L2Bridge != nil {
 		t.Errorf("L2Bridge = %+v, want nil", got.L2Bridge)
+	}
+	want := []VRFHostEntry{{NodeSelector: "all()", RouteTableIndex: 101}}
+	if !reflect.DeepEqual(got.VRFHostConfig, want) {
+		t.Errorf("VRFHostConfig = %+v, want %+v", got.VRFHostConfig, want)
+	}
+}
+
+func TestGetNetwork_VRFHostConfigEntries(t *testing.T) {
+	// Multi-entry hostConfig: a scoped entry, an entry with the selector
+	// absent (matches all nodes → empty string), and an entry with an
+	// explicitly empty selector (same meaning).
+	nw := makeNetwork("routed-net", map[string]interface{}{
+		"vrf": map[string]interface{}{
+			"hostConfig": []interface{}{
+				map[string]interface{}{"nodeSelector": "rack == 'a'", "routeTableIndex": int64(101)},
+				map[string]interface{}{"routeTableIndex": int64(102)},
+				map[string]interface{}{"nodeSelector": "", "routeTableIndex": int64(103)},
+			},
+		},
+	})
+	cb, _ := newFakeClientWith(nw)
+	c := cb.Build()
+
+	got, err := GetNetwork(context.Background(), c, "routed-net")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []VRFHostEntry{
+		{NodeSelector: "rack == 'a'", RouteTableIndex: 101},
+		{NodeSelector: "", RouteTableIndex: 102},
+		{NodeSelector: "", RouteTableIndex: 103},
+	}
+	if !reflect.DeepEqual(got.VRFHostConfig, want) {
+		t.Errorf("VRFHostConfig = %+v, want %+v", got.VRFHostConfig, want)
+	}
+}
+
+func TestGetNetwork_VRFHostInterfaces(t *testing.T) {
+	// hostInterfaces comes in two API vintages — objects with a name field,
+	// or plain strings. Any non-empty list counts; empty or absent does not.
+	nw := makeNetwork("routed-net", map[string]interface{}{
+		"vrf": map[string]interface{}{
+			"hostConfig": []interface{}{
+				map[string]interface{}{
+					"routeTableIndex": int64(101),
+					"hostInterfaces":  []interface{}{map[string]interface{}{"name": "eth1"}},
+				},
+				map[string]interface{}{
+					"routeTableIndex": int64(102),
+					"hostInterfaces":  []interface{}{"eth1", "eth2"},
+				},
+				map[string]interface{}{
+					"routeTableIndex": int64(103),
+					"hostInterfaces":  []interface{}{},
+				},
+				map[string]interface{}{
+					"routeTableIndex": int64(104),
+				},
+			},
+		},
+	})
+	cb, _ := newFakeClientWith(nw)
+	c := cb.Build()
+
+	got, err := GetNetwork(context.Background(), c, "routed-net")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []VRFHostEntry{
+		{RouteTableIndex: 101, HasHostInterfaces: true},
+		{RouteTableIndex: 102, HasHostInterfaces: true},
+		{RouteTableIndex: 103},
+		{RouteTableIndex: 104},
+	}
+	if !reflect.DeepEqual(got.VRFHostConfig, want) {
+		t.Errorf("VRFHostConfig = %+v, want %+v", got.VRFHostConfig, want)
+	}
+}
+
+func TestGetNetwork_VRFBadHostConfig(t *testing.T) {
+	cases := []struct {
+		name  string
+		entry map[string]interface{}
+	}{
+		{
+			name:  "missing routeTableIndex",
+			entry: map[string]interface{}{"nodeSelector": "all()"},
+		},
+		{
+			name:  "non-integer routeTableIndex",
+			entry: map[string]interface{}{"routeTableIndex": 1.5},
+		},
+		{
+			name:  "string routeTableIndex",
+			entry: map[string]interface{}{"routeTableIndex": "101"},
+		},
+		{
+			name: "hostInterfaces not a list",
+			entry: map[string]interface{}{
+				"routeTableIndex": int64(101),
+				"hostInterfaces":  "eth1",
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			nw := makeNetwork("bad-vrf", map[string]interface{}{
+				"vrf": map[string]interface{}{
+					"hostConfig": []interface{}{tc.entry},
+				},
+			})
+			cb, _ := newFakeClientWith(nw)
+			c := cb.Build()
+
+			if _, err := GetNetwork(context.Background(), c, "bad-vrf"); err == nil {
+				t.Fatal("expected error, got nil")
+			}
+		})
+	}
+}
+
+func TestListNetworks(t *testing.T) {
+	l2 := makeNetwork("vlan-net", map[string]interface{}{
+		"l2Bridge": map[string]interface{}{
+			"vlans": []interface{}{
+				map[string]interface{}{
+					"vlan":    map[string]interface{}{"id": int64(100)},
+					"subnets": []interface{}{map[string]interface{}{"cidr": "10.100.0.0/24"}},
+				},
+			},
+		},
+	})
+	vrfA := makeNetwork("vrf-a", map[string]interface{}{
+		"vrf": map[string]interface{}{
+			"hostConfig": []interface{}{
+				map[string]interface{}{"routeTableIndex": int64(101)},
+			},
+		},
+	})
+	vrfB := makeNetwork("vrf-b", map[string]interface{}{
+		"vrf": map[string]interface{}{
+			"hostConfig": []interface{}{
+				map[string]interface{}{"nodeSelector": "rack == 'b'", "routeTableIndex": int64(102)},
+			},
+		},
+	})
+	cb, _ := newFakeClientWith(l2, vrfA, vrfB)
+	c := cb.Build()
+
+	got, err := ListNetworks(context.Background(), c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 3 {
+		t.Fatalf("len = %d, want 3", len(got))
+	}
+	byName := map[string]Network{}
+	for _, n := range got {
+		byName[n.Name] = n
+	}
+	if n := byName["vlan-net"]; n.IsVRF || n.L2Bridge == nil || len(n.L2Bridge.VLANs) != 1 {
+		t.Errorf("vlan-net parsed as %+v, want one-VLAN l2Bridge network", n)
+	}
+	if n := byName["vrf-a"]; !n.IsVRF ||
+		!reflect.DeepEqual(n.VRFHostConfig, []VRFHostEntry{{RouteTableIndex: 101}}) {
+		t.Errorf("vrf-a parsed as %+v, want all-nodes VRF on table 101", n)
+	}
+	if n := byName["vrf-b"]; !n.IsVRF ||
+		!reflect.DeepEqual(n.VRFHostConfig, []VRFHostEntry{{NodeSelector: "rack == 'b'", RouteTableIndex: 102}}) {
+		t.Errorf("vrf-b parsed as %+v, want scoped VRF on table 102", n)
+	}
+}
+
+func TestListNetworks_Empty(t *testing.T) {
+	cb, _ := newFakeClientWith()
+	c := cb.Build()
+
+	got, err := ListNetworks(context.Background(), c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("len = %d, want 0", len(got))
 	}
 }
 

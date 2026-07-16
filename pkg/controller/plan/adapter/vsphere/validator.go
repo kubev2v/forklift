@@ -675,11 +675,21 @@ func (r *Validator) ConsolidationNeeded(vmRef ref.Ref) (needed bool, err error) 
 // cache for downstream per-VM checks (see CalicoVMIssues).
 //
 // Resource-level short-circuit ordering: the Network is fetched and
-// classified first, so a missing Network or an unsupported network type
-// (e.g. VRF) is reported before any VLAN handling; failure to resolve a
-// VLAN entry prevents the IPPool check; failure of the IPPool check
-// excludes the NAD from the cache entirely. The BPF-dataplane check runs
-// once per plan, on the first NAD that resolves to an l2Bridge network.
+// classified first — a VRF (routed L3) network takes its own acceptance
+// branch before any VLAN handling, since VLANs don't apply to it. On the
+// l2Bridge path, failure to resolve a VLAN entry prevents the IPPool
+// check; failure of the IPPool check excludes the NAD from the cache
+// entirely. The BPF-dataplane check runs once per plan, on the first NAD
+// that resolves to an l2Bridge network; VRF references never trigger it.
+//
+// The VRF branch runs its own viability checks — node coverage and
+// host-interface coverage of the hostConfig entries, route-table safety
+// against other VRF Networks and the FelixConfiguration, a BGPPeer bound
+// to the Network for cross-node routes, and the nftables-dataplane
+// requirement — once per referenced Network, plus a per-NAD check that the
+// NAD pins the VRF's IPPool via ipam.ipv4_pools. Like the BPF issue on the
+// l2Bridge path, these are cluster/CR-level findings: the NAD itself stays
+// cached so per-VM checks still run.
 func (r *Validator) ValidateCalicoNADs(c k8sclient.Client) (planbase.CalicoValidationResult, error) {
 	result := planbase.CalicoValidationResult{
 		Cache: &planbase.CalicoValidationCache{
@@ -694,6 +704,53 @@ func (r *Validator) ValidateCalicoNADs(c k8sclient.Client) (planbase.CalicoValid
 	var pools []calicoclient.IPPool
 	poolsLoaded := false
 	bpfChecked := false
+
+	// VRF viability state. The checks run once per referenced VRF Network
+	// (several NADs may reference the same Network CR); the Network list,
+	// the BGPPeer-bound network set, FelixConfiguration facts, and the
+	// dataplane verdict are shared across the whole plan.
+	vrfChecked := map[string]bool{}
+	vrfDataplaneChecked := false
+	var vrfNetworks []calicoclient.Network
+	vrfNetworksLoaded := false
+	var bgpPeerNetworks map[string]bool
+	bgpPeerNetworksLoaded := false
+	var felixFacts *calicoclient.FelixConfig
+
+	// loadFelix reads the "default" FelixConfiguration's dataplane facts
+	// once per plan, lazily. A missing FelixConfiguration (or unknown kind)
+	// yields the zero-value facts; transient GET errors propagate.
+	loadFelix := func(key k8stypes.NamespacedName) (*calicoclient.FelixConfig, error) {
+		if felixFacts != nil {
+			return felixFacts, nil
+		}
+		fc, err := calicoclient.GetFelixConfig(context.TODO(), c)
+		if err != nil {
+			return nil, liberr.Wrap(err, "nad", key.String())
+		}
+		felixFacts = fc
+		return fc, nil
+	}
+
+	// loadPools lists IPPools once per plan, lazily, on the first NAD that
+	// needs them. IPPool CRD absent (with the Network CRD present — an
+	// unusual install) yields an empty pool set rather than hard-erroring
+	// the reconcile; the pool checks then report against an empty set.
+	loadPools := func(key k8stypes.NamespacedName) (err error) {
+		if poolsLoaded {
+			return
+		}
+		pools, err = calicoclient.ListIPPools(context.TODO(), c)
+		if err != nil {
+			if !meta.IsNoMatchError(err) {
+				return liberr.Wrap(err, "nad", key.String())
+			}
+			pools = nil
+			err = nil
+		}
+		poolsLoaded = true
+		return
+	}
 
 	for _, pair := range r.Plan.Referenced.Map.Network.Spec.Map {
 		if pair.Destination.Type != planbase.Multus {
@@ -756,12 +813,125 @@ func (r *Validator) ValidateCalicoNADs(c k8sclient.Client) (planbase.CalicoValid
 				return planbase.CalicoValidationResult{}, liberr.Wrap(err, "nad", key.String(), "network", cfg.Network)
 			}
 		}
-		// Classify the Network before any VLAN handling: a non-l2Bridge
-		// network (e.g. a VRF network) legitimately carries no VLAN, so the
-		// VLANRequired / VLAN-matching checks below would mislead.
+		// Classify the Network before any VLAN handling. A VRF network is
+		// routed L3 — no VLANs, no subnets — so none of the l2Bridge checks
+		// below (BPF dataplane, VLAN resolution, L2Workload pools) apply.
+		// Calico's manual IP assignment still requires the preserved IP to
+		// fall inside an enabled Workload-allowed pool, so the L3-eligible
+		// pool set is cached for the per-VM check.
 		if nw.IsVRF {
-			issueBase.Kind = planbase.CalicoIssueNetworkTypeUnsupported
-			result.Issues = append(result.Issues, issueBase)
+			if cfg.VLAN != 0 {
+				// The NAD names a VLAN, but VLANs apply only to l2Bridge
+				// networks; the value is ignored. Informational, not
+				// blocking.
+				ib := issueBase
+				ib.Kind = planbase.CalicoIssueVRFVlanIgnored
+				result.Warnings = append(result.Warnings, ib)
+			}
+			// Pool pinning, per NAD (the pin is a NAD property; two NADs on
+			// the same Network can differ): Calico's IPAM is VRF-unaware, so
+			// the documented convention pins the VRF's dedicated IPPool in
+			// the NAD's IPAM config ("ipam": {"ipv4_pools": [...]}). Without
+			// the pin, a freshly assigned address comes from whichever pool
+			// IPAM selects, which the VRF's tenant fabric may not route.
+			// Deliberately skipped when the plan preserves static IPs: the
+			// addresses are then explicit via ipAddrs and already validated
+			// against pools per-VM — the risk exists only for
+			// freshly-assigned addresses.
+			if len(cfg.IPv4Pools) == 0 && !r.Plan.Spec.PreserveStaticIPs {
+				ib := issueBase
+				ib.Kind = planbase.CalicoIssueVRFPoolNotPinned
+				result.Warnings = append(result.Warnings, ib)
+			}
+			// VRF viability checks, once per referenced Network. Issues
+			// attach to the first NAD referencing the Network.
+			if !vrfChecked[cfg.Network] {
+				vrfChecked[cfg.Network] = true
+
+				// Node coverage: an entry without a nodeSelector applies to
+				// every node; when every entry is scoped, the VRF exists
+				// only on matching nodes and a VM scheduled anywhere else
+				// fails to start. Whether the scoped selectors jointly
+				// cover every node is deliberately not evaluated — that
+				// would mean interpreting Calico's selector grammar, and a
+				// wrong "covered" verdict is worse than a cautious warning.
+				if !vrfHasAllNodesEntry(nw.VRFHostConfig) {
+					ib := issueBase
+					ib.Kind = planbase.CalicoIssueVRFNodeScoped
+					result.Warnings = append(result.Warnings, ib)
+				}
+
+				// Host-interface coverage: an entry without hostInterfaces
+				// leaves pods on its nodes with no path off the node in the
+				// VRF, so one entry lacking them is enough to warn.
+				if vrfHasEntryWithoutHostInterfaces(nw.VRFHostConfig) {
+					ib := issueBase
+					ib.Kind = planbase.CalicoIssueVRFNoHostInterfaces
+					result.Warnings = append(result.Warnings, ib)
+				}
+
+				// Cross-node routes: a VRF network ships with local routes
+				// only; routes to pods on other nodes exist only when a
+				// BGPPeer with spec.network naming this Network distributes
+				// them. The bound-network set is listed once per plan,
+				// lazily. An unknown BGPPeer kind yields the empty set —
+				// no peer bound — so the warning still fires.
+				if !bgpPeerNetworksLoaded {
+					bgpPeerNetworksLoaded = true
+					bgpPeerNetworks, err = calicoclient.ListBGPPeerNetworks(context.TODO(), c)
+					if err != nil {
+						return planbase.CalicoValidationResult{}, liberr.Wrap(err, "nad", key.String())
+					}
+				}
+				if !bgpPeerNetworks[cfg.Network] {
+					ib := issueBase
+					ib.Kind = planbase.CalicoIssueVRFNoBGPPeer
+					result.Warnings = append(result.Warnings, ib)
+				}
+
+				// Route-table safety: scan every Network CR once per plan,
+				// then check this Network's routeTableIndex values against
+				// the kernel-reserved tables, the other VRF Networks, and
+				// the FelixConfiguration routeTableRanges.
+				if !vrfNetworksLoaded {
+					vrfNetworksLoaded = true
+					vrfNetworks, err = calicoclient.ListNetworks(context.TODO(), c)
+					if err != nil {
+						return planbase.CalicoValidationResult{}, liberr.Wrap(err, "nad", key.String())
+					}
+				}
+				felix, ferr := loadFelix(key)
+				if ferr != nil {
+					return planbase.CalicoValidationResult{}, ferr
+				}
+				criticals, warns := vrfRouteTableIssues(issueBase, nw, vrfNetworks, felix)
+				result.Issues = append(result.Issues, criticals...)
+				result.Warnings = append(result.Warnings, warns...)
+
+				// Dataplane, once per plan: VRF networking runs only on the
+				// nftables dataplane — BPF and iptables are unsupported —
+				// so only an explicit nftablesMode Enabled with BPF off
+				// passes. "Auto" leaves the choice to Felix's host
+				// detection, which cannot be verified from here, so it is
+				// treated as failing with the same remedy: set
+				// FelixConfiguration nftablesMode: Enabled.
+				if !vrfDataplaneChecked {
+					vrfDataplaneChecked = true
+					if felix.BPFEnabled || felix.NftablesMode != calicoclient.NftablesModeEnabled {
+						ib := issueBase
+						ib.Kind = planbase.CalicoIssueVRFDataplaneNotNftables
+						result.Issues = append(result.Issues, ib)
+					}
+				}
+			}
+			if err = loadPools(key); err != nil {
+				return planbase.CalicoValidationResult{}, err
+			}
+			result.Cache.NADs[key] = &planbase.ResolvedCalicoNAD{
+				Network:       cfg.Network,
+				IsVRF:         true,
+				EligiblePools: calicoclient.L3EligiblePools(pools),
+			}
 			continue
 		}
 		if nw.L2Bridge == nil {
@@ -801,19 +971,8 @@ func (r *Validator) ValidateCalicoNADs(c k8sclient.Client) (planbase.CalicoValid
 			continue
 		}
 
-		if !poolsLoaded {
-			pools, err = calicoclient.ListIPPools(context.TODO(), c)
-			if err != nil {
-				// IPPool CRD absent (with the Network CRD present — an
-				// unusual install) means no pool can ever satisfy the
-				// VLAN's subnets; fall through to the no-pool issue below
-				// rather than hard-erroring the reconcile.
-				if !meta.IsNoMatchError(err) {
-					return planbase.CalicoValidationResult{}, liberr.Wrap(err, "nad", key.String())
-				}
-				pools = nil
-			}
-			poolsLoaded = true
+		if err = loadPools(key); err != nil {
+			return planbase.CalicoValidationResult{}, err
 		}
 		eligible := calicoclient.L2WorkloadEligiblePools(pools, entry.Subnets)
 		if len(eligible) == 0 {
@@ -838,8 +997,9 @@ func (r *Validator) ValidateCalicoNADs(c k8sclient.Client) (planbase.CalicoValid
 // plan level via CalicoNetworkInvalid.
 //
 // Issues are deduplicated by {Kind, Network, VLAN, IP}, so two NICs
-// hitting the same failure mode yield a single issue. IPNotInSubnet
-// short-circuits IPNotInIPPool for the same IP.
+// hitting the same failure mode yield a single issue. On the l2Bridge
+// path, IPNotInSubnet short-circuits IPNotInIPPool for the same IP; a
+// VRF-backed NAD has no subnets, so only the IPPool check runs there.
 func (r *Validator) CalicoVMIssues(vmRef ref.Ref, cache *planbase.CalicoValidationCache) ([]planbase.CalicoIssue, error) {
 	if !r.Plan.Spec.PreserveStaticIPs {
 		return nil, nil
@@ -898,6 +1058,16 @@ func (r *Validator) CalicoVMIssues(vmRef ref.Ref, cache *planbase.CalicoValidati
 		for _, ip := range ips {
 			perIP := issueBase
 			perIP.IP = ip
+			// A VRF network is routed L3 — there are no VLAN subnets to
+			// check; manual IP assignment still requires an enabled
+			// Workload-allowed pool covering the IP.
+			if resolved.IsVRF {
+				if calicoclient.L3EligiblePoolForIP(resolved.EligiblePools, ip) == nil {
+					perIP.Kind = planbase.CalicoIssueIPNotInIPPool
+					emit(perIP)
+				}
+				continue
+			}
 			if !ipInAnySubnet(ip, resolved.VLAN.Subnets) {
 				perIP.Kind = planbase.CalicoIssueIPNotInSubnet
 				emit(perIP)
@@ -1233,6 +1403,118 @@ func (r *Validator) buildNICResolver(nics []vsphere.NIC) ([]string, map[string][
 		nicKeys[i] = nic.Network.ID
 	}
 	return nicKeys, pairsBySource, nil
+}
+
+// vrfReservedRouteTables are the kernel's own route tables — 253 (default),
+// 254 (main), 255 (local) — which a VRF must never claim.
+var vrfReservedRouteTables = map[int64]bool{253: true, 254: true, 255: true}
+
+// vrfHasAllNodesEntry reports whether any spec.vrf.hostConfig entry has an
+// empty (or absent) nodeSelector — such an entry applies to every node, so
+// the VRF network is guaranteed to exist wherever a VM lands.
+func vrfHasAllNodesEntry(entries []calicoclient.VRFHostEntry) bool {
+	for _, e := range entries {
+		if e.NodeSelector == "" {
+			return true
+		}
+	}
+	return false
+}
+
+// vrfHasEntryWithoutHostInterfaces reports whether any spec.vrf.hostConfig
+// entry names no host interfaces. Such an entry gives pods on its nodes no
+// path off the node inside the VRF, so its VMs are unreachable beyond their
+// own node.
+func vrfHasEntryWithoutHostInterfaces(entries []calicoclient.VRFHostEntry) bool {
+	for _, e := range entries {
+		if !e.HasHostInterfaces {
+			return true
+		}
+	}
+	return false
+}
+
+// vrfRouteTableIssues checks the referenced VRF Network's routeTableIndex
+// values for reserved-table use and for collisions with other VRF Networks
+// and with the FelixConfiguration routeTableRanges. issueBase supplies the
+// NAD/Network attribution; each finding carries the offending table index.
+//
+// A collision with another VRF Network is provable (Critical) when at least
+// one of the two entries carrying the index has no nodeSelector — an
+// all-nodes entry overlaps any other node set. When both entries are
+// selector-scoped, the overlap depends on which nodes the selectors match;
+// selector evaluation is deliberately out of scope, so those pairs are
+// reported as possible conflicts (Warn). Entries of the same Network sharing
+// an index are legitimate — same VRF, same table — and never reported.
+//
+// The FelixConfiguration sub-check runs only when spec.routeTableRanges is
+// explicitly set. When absent, Felix falls back to version-dependent
+// defaults that are not modelled here — guessing them would risk false
+// Criticals against tables Felix never touches.
+func vrfRouteTableIssues(issueBase planbase.CalicoNADIssue, nw *calicoclient.Network, all []calicoclient.Network, felix *calicoclient.FelixConfig) (criticals, warnings []planbase.CalicoNADIssue) {
+	// Distinct indexes in entry order; per index, remember whether any
+	// entry carrying it applies to all nodes.
+	var indexes []int64
+	seen := map[int64]bool{}
+	allNodes := map[int64]bool{}
+	for _, e := range nw.VRFHostConfig {
+		if !seen[e.RouteTableIndex] {
+			seen[e.RouteTableIndex] = true
+			indexes = append(indexes, e.RouteTableIndex)
+		}
+		if e.NodeSelector == "" {
+			allNodes[e.RouteTableIndex] = true
+		}
+	}
+
+	for _, idx := range indexes {
+		if vrfReservedRouteTables[idx] {
+			ib := issueBase
+			ib.Kind = planbase.CalicoIssueVRFRouteTableReserved
+			ib.RouteTable = idx
+			criticals = append(criticals, ib)
+		}
+		for _, rng := range felix.RouteTableRanges {
+			if idx >= rng.Min && idx <= rng.Max {
+				ib := issueBase
+				ib.Kind = planbase.CalicoIssueVRFRouteTableConflict
+				ib.RouteTable = idx
+				criticals = append(criticals, ib)
+				break
+			}
+		}
+	}
+
+	for i := range all {
+		other := &all[i]
+		if other.Name == nw.Name || !other.IsVRF {
+			continue
+		}
+		otherHas := map[int64]bool{}
+		otherAllNodes := map[int64]bool{}
+		for _, o := range other.VRFHostConfig {
+			otherHas[o.RouteTableIndex] = true
+			if o.NodeSelector == "" {
+				otherAllNodes[o.RouteTableIndex] = true
+			}
+		}
+		for _, idx := range indexes {
+			if !otherHas[idx] {
+				continue
+			}
+			ib := issueBase
+			ib.RouteTable = idx
+			ib.ConflictsWith = other.Name
+			if allNodes[idx] || otherAllNodes[idx] {
+				ib.Kind = planbase.CalicoIssueVRFRouteTableConflict
+				criticals = append(criticals, ib)
+			} else {
+				ib.Kind = planbase.CalicoIssueVRFRouteTablePossibleConflict
+				warnings = append(warnings, ib)
+			}
+		}
+	}
+	return
 }
 
 // resolveVLANEntry returns the l2Bridge.vlans[] entry matched by nadVLAN.

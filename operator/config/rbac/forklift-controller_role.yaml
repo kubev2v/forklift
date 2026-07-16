@@ -243,13 +243,15 @@ rules:
     - watch
 # The Plan validator reads Calico Network and IPPool resources on the
 # destination cluster to validate L2-bridge NAD destinations and per-VM
-# static IPs.
+# static IPs, and BGPPeer resources to check that a VRF network's routes
+# are distributed across nodes.
 - apiGroups:
     - projectcalico.org
   resources:
     - networks
     - ippools
     - felixconfigurations
+    - bgppeers
   verbs:
     - get
     - list
