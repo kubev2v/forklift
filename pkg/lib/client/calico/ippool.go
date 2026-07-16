@@ -159,7 +159,7 @@ func L3EligiblePoolForIP(pools []IPPool, ip string) *IPPool {
 }
 
 // L2WorkloadEligiblePools returns the subset of pools usable for the L2-attach
-// path (Case C) — attach via a named Network CR. A pool is L2Workload-eligible
+// path (attach via a named Network CR). A pool is L2Workload-eligible
 // when it is not disabled, its allowedUses contains "L2Workload", and its CIDR
 // is fully contained in at least one of the matched VLAN's subnets.
 func L2WorkloadEligiblePools(pools []IPPool, vlanSubnets []string) []IPPool {
@@ -207,7 +207,7 @@ func L2WorkloadEligiblePoolForIP(pools []IPPool, ip string, vlanSubnets []string
 }
 
 // poolContainedInAnyVLANSubnet reports whether the pool CIDR is fully
-// contained within one of the VLAN subnets — i.e., every address in the pool
+// contained within one of the VLAN subnets, i.e., every address in the pool
 // also belongs to the VLAN subnet.
 func poolContainedInAnyVLANSubnet(poolCIDR string, vlanSubnets []string) bool {
 	_, poolNet, err := net.ParseCIDR(poolCIDR)
