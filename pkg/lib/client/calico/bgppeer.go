@@ -20,12 +20,12 @@ var BGPPeerGVK = schema.GroupVersionKind{
 // ListBGPPeerNetworks lists every projectcalico.org/v3 BGPPeer on the
 // cluster (the CR is cluster-scoped) and returns the set of spec.network
 // values found across them — the Network CRs whose routes at least one
-// peer distributes. Peers without the field are skipped.
+// peer distributes.
 //
 // When the API server does not know the BGPPeer kind at all (older Calico
-// installs lack the CRD), the empty set is returned with a nil error: no
-// peer can be bound to any Network in that state, which is exactly what
-// the empty set reports. Any other list failure propagates.
+// installs lack the CRD), no peer can be bound to any Network, so the
+// empty set is returned with a nil error. Any other list failure
+// propagates.
 func ListBGPPeerNetworks(ctx context.Context, c client.Client) (map[string]bool, error) {
 	ul := &unstructured.UnstructuredList{}
 	ul.SetGroupVersionKind(BGPPeerGVK.GroupVersion().WithKind("BGPPeerList"))

@@ -1776,9 +1776,9 @@ var _ = Describe("vsphere validation tests", func() {
 			It("populates Issues and Warnings independently when both classes coexist", func() {
 				// Two NADs in the same NetworkMap: the original (L2 Calico, but
 				// the referenced Network CR is absent — Critical NetworkNotFound)
-				// and a second L3-mode NAD (Warn NADMissingNetwork). Asserts the
-				// dispatcher's independence claim: both slices populated, items
-				// disjoint, no cross-contamination between Critical and Warn.
+				// and a second L3-mode NAD (Warn NADMissingNetwork). Both slices
+				// populate independently: items disjoint, no cross-contamination
+				// between Critical and Warn.
 				const (
 					l3NADName = "calico-nad-l3"
 					l3SrcID   = "src-l3"
@@ -2372,9 +2372,9 @@ var _ = Describe("vsphere validation tests", func() {
 			})
 
 			It("emits PrimaryNetworkCRDAbsent when calico.network is set but Network CRD missing (IPPool present)", func() {
-				// Calico installed (IPPool CRD present) but L2 feature not
-				// shipped (Network CRD absent). User asked for L2 attach;
-				// can't honour. Case A (no CalicoNetwork) would pass.
+				// Calico installed (IPPool CRD present) but the install does
+				// not ship the Network CRD. User asked for L2 attach; can't
+				// honour. Case A (no CalicoNetwork) would pass.
 				dest := v1beta1.DestinationNetwork{Type: planbase.Pod, Calico: &v1beta1.CalicoDestination{Network: netName, Vlan: 100}}
 				v, _, _ := setupPrimary("10.100.0.5", false, dest, nil, true)
 				networkGK := calicoclient.NetworkGVK.GroupKind()

@@ -210,7 +210,7 @@ const (
 	CalicoCNIType  NadType      = "calico"
 )
 
-// NetworkConfig represents the structure of the OVN-Kubernetes, or Calico CNI configuration JSON.
+// NetworkConfig represents the structure of the OVN-Kubernetes or Calico CNI configuration JSON.
 // The `json:"..."` tags are used by the encoding/json package to map the JSON keys
 // to the struct fields during marshalling and unmarshalling.
 type NetworkConfig struct {

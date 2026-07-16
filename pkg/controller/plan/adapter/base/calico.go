@@ -18,14 +18,11 @@ const (
 	CalicoAnnHwAddrFmt = "cni.projectcalico.org/%s.hwAddr"
 	CalicoAnnIPsFmt    = "cni.projectcalico.org/%s.ipAddrs"
 
-	// Unscoped (Calico primary-NIC path) annotation keys. Applied to the
-	// VM's pod template once, addressing the pod's primary interface
-	// (Calico's default). The Networks annotation pulls in an L2 attach via
-	// a named projectcalico.org/v3 Network CR; absence means default L3
-	// IPAM. The Vlan annotation selects the 802.1Q VLAN within that
-	// Network; every Network reference requires an explicit VLAN (a zero
-	// VLAN means "not set" and Plan validation rejects it whenever a
-	// network is named), so Vlan is always written alongside Networks.
+	// Unscoped (Calico primary-NIC path) annotation keys, addressing the
+	// pod's primary interface. Networks names a projectcalico.org/v3
+	// Network CR for L2 attach (absent means default L3 IPAM); Vlan
+	// selects the 802.1Q VLAN within it and is always written alongside
+	// Networks.
 	CalicoAnnPrimaryHwAddr  = "cni.projectcalico.org/hwAddr"
 	CalicoAnnPrimaryIPs     = "cni.projectcalico.org/ipAddrs"
 	CalicoAnnPrimaryNetwork = "cni.projectcalico.org/networks"
@@ -34,15 +31,13 @@ const (
 	// AnnAllowPodBridgeNetworkLiveMigration is KubeVirt's opt-in for live
 	// migration of VMs whose pod-network interface uses Bridge binding.
 	// Calico-primary VMs are bridge-bound, so without this annotation they
-	// cannot live-migrate — and Calico's IP persistence across live
-	// migration is a headline capability of the L2 feature.
+	// cannot live-migrate.
 	AnnAllowPodBridgeNetworkLiveMigration = "kubevirt.io/allow-pod-bridge-network-live-migration"
 )
 
 // SetCalicoMAC writes the cni.projectcalico.org/<ifname>.hwAddr annotation
 // onto m. No-op when mac is empty (inventory tolerates NICs without a MAC;
-// an empty hwAddr annotation would fail the pod at CNI ADD). Lazy-inits
-// Annotations when nil.
+// an empty hwAddr annotation would fail the pod at CNI ADD).
 func SetCalicoMAC(m *meta.ObjectMeta, ifname, mac string) {
 	if mac == "" {
 		return
@@ -55,7 +50,6 @@ func SetCalicoMAC(m *meta.ObjectMeta, ifname, mac string) {
 
 // SetCalicoStaticIPs JSON-marshals ips and writes the
 // cni.projectcalico.org/<ifname>.ipAddrs annotation. No-op when ips is empty.
-// Lazy-inits Annotations when nil.
 func SetCalicoStaticIPs(m *meta.ObjectMeta, ifname string, ips []string) error {
 	if len(ips) == 0 {
 		return nil
@@ -90,7 +84,7 @@ type CalicoPrimaryParams struct {
 }
 
 // SetCalicoPrimaryMAC writes the unscoped cni.projectcalico.org/hwAddr
-// annotation. No-op when mac is empty. Lazy-inits Annotations when nil.
+// annotation. No-op when mac is empty.
 func SetCalicoPrimaryMAC(m *meta.ObjectMeta, mac string) {
 	if mac == "" {
 		return
@@ -103,7 +97,6 @@ func SetCalicoPrimaryMAC(m *meta.ObjectMeta, mac string) {
 
 // SetCalicoPrimaryStaticIPs JSON-marshals ips and writes the unscoped
 // cni.projectcalico.org/ipAddrs annotation. No-op when ips is empty.
-// Lazy-inits Annotations when nil.
 func SetCalicoPrimaryStaticIPs(m *meta.ObjectMeta, ips []string) error {
 	if len(ips) == 0 {
 		return nil
@@ -121,7 +114,7 @@ func SetCalicoPrimaryStaticIPs(m *meta.ObjectMeta, ips []string) error {
 
 // SetCalicoPrimaryNetwork writes the cni.projectcalico.org/networks
 // annotation with the named Calico Network CR. No-op when network is empty
-// (default L3 IPAM). Lazy-inits Annotations when nil.
+// (default L3 IPAM).
 func SetCalicoPrimaryNetwork(m *meta.ObjectMeta, network string) {
 	if network == "" {
 		return
@@ -133,10 +126,7 @@ func SetCalicoPrimaryNetwork(m *meta.ObjectMeta, network string) {
 }
 
 // SetCalicoPrimaryVlan writes the cni.projectcalico.org/vlan annotation as a
-// decimal 802.1Q VLAN ID. No-op when vlan is zero — zero means "not set",
-// and Plan validation rejects it whenever a Network is named, so a named
-// Network is always accompanied by this annotation. Lazy-inits Annotations
-// when nil.
+// decimal 802.1Q VLAN ID. No-op when vlan is zero ("not set").
 func SetCalicoPrimaryVlan(m *meta.ObjectMeta, vlan uint16) {
 	if vlan == 0 {
 		return

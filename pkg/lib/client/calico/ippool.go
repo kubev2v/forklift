@@ -111,10 +111,9 @@ func isL3Eligible(p *IPPool) bool {
 	return containsAllowedUse(p, AllowedUseWorkload)
 }
 
-// containsAllowedUse reports whether the pool's AllowedUses contains the named
-// use. Returns false for both nil and explicit-empty AllowedUses — neither
-// includes any specific use (the Calico-default nil expands to
-// ["Workload","Tunnel"], which does not include L2Workload).
+// containsAllowedUse reports whether AllowedUses explicitly lists the named
+// use. A nil slice (field absent) lists nothing — callers that must honour
+// Calico's default-when-absent check nil before calling (see isL3Eligible).
 func containsAllowedUse(p *IPPool, use string) bool {
 	for _, u := range p.AllowedUses {
 		if u == use {

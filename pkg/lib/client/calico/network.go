@@ -47,10 +47,10 @@ type VRFHostEntry struct {
 
 // Network is a thin parsed view of projectcalico.org/v3 Network.
 //
-// spec is a strict one-of: an l2Bridge Network carries VLANs and is the type
-// identity preservation supports; a vrf Network is routed (L3, no VLANs).
-// For a vrf Network, VRFHostConfig carries the hostConfig entries the VRF
-// viability checks need; the rest of the VRF spec is not modelled.
+// spec is a strict one-of: an l2Bridge Network carries VLANs; a vrf Network
+// is routed (L3, no VLANs). For a vrf Network, VRFHostConfig carries the
+// hostConfig entries the VRF viability checks need; the rest of the VRF
+// spec is not modelled.
 type Network struct {
 	Name          string
 	L2Bridge      *L2BridgeSpec  // nil when the Network has no l2Bridge spec
@@ -92,8 +92,6 @@ func ListNetworks(ctx context.Context, c client.Client) ([]Network, error) {
 func parseNetwork(u *unstructured.Unstructured) (*Network, error) {
 	n := &Network{Name: u.GetName()}
 
-	// A vrf spec marks the Network as a VRF (routed) network; its
-	// hostConfig entries feed the VRF viability checks.
 	vrfMap, isVRF, err := unstructured.NestedMap(u.Object, "spec", "vrf")
 	if err != nil {
 		return nil, fmt.Errorf("parse spec.vrf: %w", err)

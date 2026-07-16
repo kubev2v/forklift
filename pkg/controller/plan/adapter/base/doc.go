@@ -315,8 +315,8 @@ type Validator interface {
 	//
 	// When IP preservation is on but the VM has no findable IPv4 IPs
 	// (IPv6-only or no GuestNetworks reported), no per-VM issue is emitted
-	// — the builder will likewise emit no ipAddrs annotation. Both
-	// behaviours are correct: preservation is best-effort.
+	// and the builder emits no ipAddrs annotation — preservation is
+	// best-effort.
 	CalicoPrimaryIssues(vmRef ref.Ref, cache *CalicoPrimaryValidationCache) ([]CalicoPrimaryIssue, error)
 }
 
@@ -332,9 +332,9 @@ const (
 	CalicoIssueNetworkNotFound CalicoIssueKind = "NetworkNotFound"
 	// CalicoIssueNetworkCRDAbsent the destination cluster does not have the
 	// projectcalico.org/v3 Network CRD installed (the Calico install is too
-	// old or doesn't ship the L2 feature). The NAD references a Calico
-	// Network but the CRD cannot be queried — distinct from a missing CR,
-	// which is CalicoIssueNetworkNotFound.
+	// old or does not ship the Network resource). The NAD references a
+	// Calico Network but the CRD cannot be queried — distinct from a missing
+	// CR, which is CalicoIssueNetworkNotFound.
 	CalicoIssueNetworkCRDAbsent CalicoIssueKind = "NetworkCRDAbsent"
 	// CalicoIssueVRFVlanIgnored the NAD names a VLAN but the referenced
 	// Network is a VRF (routed L3) network. VLANs apply only to l2Bridge
@@ -448,8 +448,8 @@ const (
 	// CalicoIssuePrimaryNetworkCRDAbsent the destination cluster has Calico
 	// (IPPool CRD present) but the projectcalico.org/v3 Network CRD is not
 	// installed. The user requested L2 attach via calico.network, but the
-	// install does not ship the L2 feature. Case A (calico.network == "")
-	// continues to work in this state and is not blocked.
+	// install does not ship the Network resource. Case A (calico.network
+	// == "") continues to work in this state and is not blocked.
 	CalicoIssuePrimaryNetworkCRDAbsent CalicoIssueKind = "PrimaryNetworkCRDAbsent"
 	// CalicoIssuePrimaryConflictsWithUDN indicates the destination namespace
 	// is labelled for a UDN primary network — incompatible with the calico
@@ -459,8 +459,8 @@ const (
 	// Network CR does not exist on the destination cluster.
 	CalicoIssuePrimaryNetworkNotFound CalicoIssueKind = "PrimaryNetworkNotFound"
 	// CalicoIssuePrimaryNetworkTypeUnsupported the named Network CR is not
-	// an l2Bridge network (e.g. a VRF network). Only l2Bridge networks are
-	// supported for identity preservation today.
+	// an l2Bridge network (e.g. a VRF network). Only l2Bridge networks can
+	// back the primary NIC; a VRF network attaches via a multus NAD instead.
 	CalicoIssuePrimaryNetworkTypeUnsupported CalicoIssueKind = "PrimaryNetworkTypeUnsupported"
 	// CalicoIssuePrimaryNetworkHasNoL2Bridge the named Network CR has no
 	// l2Bridge spec — incompatible with L2 attach.

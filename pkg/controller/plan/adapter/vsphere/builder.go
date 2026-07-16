@@ -777,7 +777,6 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 	var calicoPrimaryNetwork string
 	var calicoPrimaryVlan uint16
 
-	// cache for network configs to avoid duplicate GETs.
 	nadCache := map[k8stypes.NamespacedName]*ocpmodel.NetworkConfig{}
 
 	numNetworks := 0
@@ -835,9 +834,7 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 				// user opted into identity preservation: Bridge binding
 				// always, MAC always, IPs when the Plan preserves static
 				// IPs, Network + Vlan annotations when the user named a
-				// projectcalico.org/v3 Network CR. Plan validation rejects
-				// a network entry without an explicit VLAN, so a named
-				// Network always arrives here with a non-zero Vlan.
+				// projectcalico.org/v3 Network CR.
 				kInterface.Bridge = &cnv.InterfaceBridge{}
 				calicoPrimary = true
 				calicoPrimaryMAC = nic.MAC

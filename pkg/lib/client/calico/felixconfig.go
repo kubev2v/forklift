@@ -112,12 +112,10 @@ func GetFelixConfig(ctx context.Context, c client.Client) (*FelixConfig, error) 
 }
 
 // GetBPFEnabled reports whether the destination Calico install runs the BPF
-// dataplane, by reading spec.bpfEnabled of the cluster-scoped
-// FelixConfiguration named "default". Felix defaults to the non-BPF
-// dataplane, so "not enabled" is reported when the field is false or absent,
-// when no "default" FelixConfiguration exists, and when the API server does
-// not know the FelixConfiguration kind at all. Any other GET failure is
-// returned as an error.
+// dataplane, by reading spec.bpfEnabled via GetFelixConfig. Felix defaults
+// to the non-BPF dataplane, so "not enabled" is reported when the field,
+// the "default" FelixConfiguration, or the FelixConfiguration kind itself
+// is absent. Any other GET failure is returned as an error.
 func GetBPFEnabled(ctx context.Context, c client.Client) (bool, error) {
 	fc, err := GetFelixConfig(ctx, c)
 	if err != nil {

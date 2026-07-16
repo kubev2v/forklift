@@ -43,9 +43,9 @@ type CalicoValidationCache struct {
 // rather than a VM. Surfaced by ValidateCalicoNADs and rendered into the
 // plan-level CalicoNetworkInvalid condition.
 //
-// All fields are comparable types, so the struct compares with == (tests
-// rely on that; the per-VM CalicoIssue type is additionally used as a map
-// key, and this type stays parallel to it).
+// Fields must stay comparable (no slices/maps): the struct is compared
+// with == and stays parallel to the per-VM CalicoIssue, which keys a
+// dedup map.
 type CalicoNADIssue struct {
 	NAD     types.NamespacedName
 	Kind    CalicoIssueKind

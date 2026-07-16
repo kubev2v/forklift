@@ -114,8 +114,8 @@ func (r *Validator) ValidateCalicoPrimary(_ client.Client) (base.CalicoPrimaryVa
 	return base.CalicoPrimaryValidationResult{}, nil
 }
 
-// CalicoPrimaryIssues returns nil. The plan-level rejection in
-// ValidateCalicoPrimary short-circuits before per-VM dispatch.
+// CalicoPrimaryIssues returns nil; any calico-flagged entry was already
+// rejected at plan level by ValidateCalicoPrimary.
 func (r *Validator) CalicoPrimaryIssues(_ ref.Ref, _ *base.CalicoPrimaryValidationCache) ([]base.CalicoPrimaryIssue, error) {
 	return nil, nil
 }
