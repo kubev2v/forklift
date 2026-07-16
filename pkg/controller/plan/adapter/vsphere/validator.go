@@ -362,7 +362,7 @@ func (r *Validator) SharedDisks(vmRef ref.Ref, client client.Client) (ok bool, m
 		}
 	} else {
 		// Find duplicate already shared disk
-		sharedPVCs, _, err := findSharedPVCs(client, vm, r.Plan.Spec.TargetNamespace)
+		sharedPVCs, _, err := findSharedPVCs(client, vm, r.Plan.Spec.TargetNamespace, string(r.Plan.UID))
 		if err != nil {
 			return false, "", "", liberr.Wrap(err, "vm", vm)
 		}
