@@ -1298,7 +1298,7 @@ var _ = Describe("vSphere builder", func() {
 			return spec, err
 		}
 
-		It("Case A no preserveStaticIPs: MAC only, Bridge binding, no IP/Network", func() {
+		It("non-L2 without preserveStaticIPs: MAC only, Bridge binding, no IP/Network", func() {
 			spec, err := runPrimary(v1beta1.DestinationNetwork{Type: "pod", Calico: &v1beta1.CalicoDestination{}}, false, nil, nil, nil)
 			Expect(err).NotTo(HaveOccurred())
 			ann := spec.Template.ObjectMeta.Annotations
@@ -1324,7 +1324,7 @@ var _ = Describe("vSphere builder", func() {
 			Expect(ann).NotTo(HaveKey("kubevirt.io/allow-pod-bridge-network-live-migration"))
 		})
 
-		It("Case A with preserveStaticIPs: MAC + IPs", func() {
+		It("non-L2 with preserveStaticIPs: MAC + IPs", func() {
 			spec, err := runPrimary(v1beta1.DestinationNetwork{Type: "pod", Calico: &v1beta1.CalicoDestination{}}, true, nil, nil, nil)
 			Expect(err).NotTo(HaveOccurred())
 			ann := spec.Template.ObjectMeta.Annotations

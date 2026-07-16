@@ -1229,14 +1229,14 @@ func (r *Validator) CalicoPrimaryIssues(vmRef ref.Ref, cache *planbase.CalicoPri
 			perIP := issueBase
 			perIP.IP = ip
 			if primary.Network == "" {
-				// Case A: implicit L3 IPAM. Pool must cover IP.
+				// Non-L2 case: implicit L3 IPAM; the pool must cover the IP.
 				if calicoclient.L3EligiblePoolForIP(primary.L3EligiblePools, ip) == nil {
 					perIP.Kind = planbase.CalicoIssuePrimaryNoEligibleIPPool
 					emit(perIP)
 				}
 				continue
 			}
-			// Case C: IP must be in matched VLAN subnet AND covered by an
+			// L2-attach case: IP must be in the matched VLAN subnet AND covered by an
 			// L2Workload pool.
 			if !ipInAnySubnet(ip, primary.VLAN.Subnets) {
 				perIP.Kind = planbase.CalicoIssuePrimaryIPNotInSubnet

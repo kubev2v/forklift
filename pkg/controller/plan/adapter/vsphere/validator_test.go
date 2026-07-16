@@ -2236,7 +2236,7 @@ var _ = Describe("vsphere validation tests", func() {
 				Expect(result.Cache.Primary).To(BeNil())
 			})
 
-			It("happy path Case A (implicit L3 IPAM) — populates L3EligiblePools, no issues", func() {
+			It("happy path non-L2 (implicit L3 IPAM) — populates L3EligiblePools, no issues", func() {
 				dest := v1beta1.DestinationNetwork{Type: planbase.Pod, Calico: &v1beta1.CalicoDestination{}}
 				v, c, _ := setupPrimary("10.244.0.5", false, dest, nil, true,
 					makeIPPool("default-ipv4-ippool", "10.244.0.0/16"),
@@ -2249,7 +2249,7 @@ var _ = Describe("vsphere validation tests", func() {
 				Expect(result.Cache.Primary.L3EligiblePools).To(HaveLen(1))
 			})
 
-			It("happy path Case C (single-VLAN Network, explicit VLAN)", func() {
+			It("happy path L2-attach (single-VLAN Network, explicit VLAN)", func() {
 				dest := v1beta1.DestinationNetwork{Type: planbase.Pod, Calico: &v1beta1.CalicoDestination{Network: netName, Vlan: 100}}
 				v, c, _ := setupPrimary("10.100.0.5", false, dest, nil, true,
 					makeNetwork(l2Single),
@@ -2264,7 +2264,7 @@ var _ = Describe("vsphere validation tests", func() {
 				Expect(result.Cache.Primary.L2EligiblePools).To(HaveLen(1))
 			})
 
-			It("happy path Case C (multi-VLAN Network, explicit VLAN)", func() {
+			It("happy path L2-attach (multi-VLAN Network, explicit VLAN)", func() {
 				dest := v1beta1.DestinationNetwork{Type: planbase.Pod, Calico: &v1beta1.CalicoDestination{Network: netName, Vlan: 200}}
 				v, c, _ := setupPrimary("10.200.0.5", false, dest, nil, true,
 					makeNetwork(l2Multi),
@@ -2398,7 +2398,7 @@ var _ = Describe("vsphere validation tests", func() {
 			It("emits PrimaryNetworkCRDAbsent when calico.network is set but Network CRD missing (IPPool present)", func() {
 				// Calico installed (IPPool CRD present) but the install does
 				// not ship the Network CRD. User asked for L2 attach; can't
-				// honour. Case A (no CalicoNetwork) would pass.
+				// honour. The non-L2 case (no calico.network) would pass.
 				dest := v1beta1.DestinationNetwork{Type: planbase.Pod, Calico: &v1beta1.CalicoDestination{Network: netName, Vlan: 100}}
 				v, _, _ := setupPrimary("10.100.0.5", false, dest, nil, true)
 				networkGK := calicoclient.NetworkGVK.GroupKind()
@@ -2545,8 +2545,8 @@ var _ = Describe("vsphere validation tests", func() {
 				Expect(kinds(result.Issues)).To(ConsistOf(planbase.CalicoIssuePrimaryDataplaneNotBPF))
 			})
 
-			It("does not run the dataplane check for Case A (no calico.network)", func() {
-				// Case A is plain L3 IPAM — no l2Bridge network is engaged, so
+			It("does not run the dataplane check for the non-L2 case (no calico.network)", func() {
+				// The non-L2 case is plain L3 IPAM — no l2Bridge network is engaged, so
 				// a non-BPF dataplane is fine.
 				dest := v1beta1.DestinationNetwork{Type: planbase.Pod, Calico: &v1beta1.CalicoDestination{}}
 				v, c, _ := setupPrimary("10.244.0.5", false, dest, nil, true,
@@ -2632,7 +2632,7 @@ var _ = Describe("vsphere validation tests", func() {
 				Expect(issues).To(BeEmpty())
 			})
 
-			It("Case A: emits NoEligibleIPPool when no L3 pool covers the source IP", func() {
+			It("non-L2: emits NoEligibleIPPool when no L3 pool covers the source IP", func() {
 				dest := v1beta1.DestinationNetwork{Type: planbase.Pod, Calico: &v1beta1.CalicoDestination{}}
 				v, c, vmRef := setupPrimary("192.168.1.5", true, dest, nil, true,
 					makeIPPool("default-ipv4-ippool", "10.244.0.0/16"),
@@ -2646,7 +2646,7 @@ var _ = Describe("vsphere validation tests", func() {
 				}))
 			})
 
-			It("Case C: emits IPNotInSubnet when source IP is outside the VLAN subnet", func() {
+			It("L2-attach: emits IPNotInSubnet when source IP is outside the VLAN subnet", func() {
 				dest := v1beta1.DestinationNetwork{Type: planbase.Pod, Calico: &v1beta1.CalicoDestination{Network: netName, Vlan: 100}}
 				v, c, vmRef := setupPrimary("192.168.1.5", true, dest, nil, true,
 					makeNetwork(l2Single),
@@ -2662,7 +2662,7 @@ var _ = Describe("vsphere validation tests", func() {
 				}))
 			})
 
-			It("Case C: emits NoEligibleIPPool when no L2Workload pool covers the source IP", func() {
+			It("L2-attach: emits NoEligibleIPPool when no L2Workload pool covers the source IP", func() {
 				dest := v1beta1.DestinationNetwork{Type: planbase.Pod, Calico: &v1beta1.CalicoDestination{Network: netName, Vlan: 100}}
 				v, c, vmRef := setupPrimary("10.100.0.5", true, dest, nil, true,
 					makeNetwork(l2Single),

@@ -449,7 +449,7 @@ const (
 	// CalicoIssuePrimaryNetworkCRDAbsent the destination cluster has Calico
 	// (IPPool CRD present) but the projectcalico.org/v3 Network CRD is not
 	// installed. The user requested L2 attach via calico.network, but the
-	// install does not ship the Network resource. Case A (calico.network
+	// install does not ship the Network resource. The non-L2 case (calico.network
 	// == "") continues to work in this state and is not blocked.
 	CalicoIssuePrimaryNetworkCRDAbsent CalicoIssueKind = "PrimaryNetworkCRDAbsent"
 	// CalicoIssuePrimaryConflictsWithUDN indicates the destination namespace
@@ -471,16 +471,15 @@ const (
 	CalicoIssuePrimaryNetworkHasNoVLANs CalicoIssueKind = "PrimaryNetworkHasNoVLANs"
 	// CalicoIssuePrimaryVLANRequired calico.network is set but calico.vlan
 	// is not. A VLAN must be stated explicitly whenever a Network is
-	// selected; Forklift does not auto-select, not even for a single-VLAN
-	// Network.
+	// selected.
 	CalicoIssuePrimaryVLANRequired CalicoIssueKind = "PrimaryVLANRequired"
 	// CalicoIssuePrimaryVLANNotInNetwork the user-specified calico.vlan does
 	// not match any vlan.id in the named Network CR.
 	CalicoIssuePrimaryVLANNotInNetwork CalicoIssueKind = "PrimaryVLANNotInNetwork"
 	// CalicoIssuePrimaryNoEligibleIPPool no IPPool covers either the L3
-	// allocation (Case A) or the matched VLAN's subnet (Case C).
+	// allocation (non-L2 case) or the matched VLAN's subnet (L2-attach case).
 	CalicoIssuePrimaryNoEligibleIPPool CalicoIssueKind = "PrimaryNoEligibleIPPool"
-	// CalicoIssuePrimaryIPNotInSubnet (Case C only) the source NIC IP
+	// CalicoIssuePrimaryIPNotInSubnet (L2-attach case only) the source NIC IP
 	// falls outside the matched VLAN's subnets.
 	CalicoIssuePrimaryIPNotInSubnet CalicoIssueKind = "PrimaryIPNotInSubnet"
 	// CalicoIssuePrimaryTooManyIPs the calico-mapped NIC carries more than
@@ -497,8 +496,7 @@ const (
 	// NetworkMap entry exists while Plan.Spec.PreserveStaticIPs is false.
 	// Bridge binding is still enabled (Calico requires it for L2 attach),
 	// so DHCP-configured guests will pick up the Calico-assigned IP via
-	// the veth. Static-IP-configured guests can have a divergent in-guest
-	// IP, with associated Calico drops. Warn-class — informational only.
+	// the veth. Static-IP-configured guests would have a diver. Warn-class — informational only.
 	CalicoIssuePrimaryStaticIPsNotPreserved CalicoIssueKind = "PrimaryStaticIPsNotPreserved"
 	// CalicoIssuePrimaryDataplaneNotBPF calico.network resolved to an
 	// l2Bridge network but the destination Calico install is not running

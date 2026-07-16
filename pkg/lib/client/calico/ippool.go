@@ -95,7 +95,7 @@ func ipInCIDR(ip net.IP, cidr string) bool {
 }
 
 // isL3Eligible reports whether a pool can serve as a source of IP allocations
-// for a Calico-primary pod without L2 attach (Case A — implicit L3 IPAM).
+// for a Calico-primary pod in the non-L2 case (calico.network unset — implicit L3 IPAM).
 // A nil AllowedUses means the field was absent and the Calico default
 // ["Workload","Tunnel"] applies (workload-assignable). A non-nil slice is
 // eligible iff it contains "Workload" — Calico IPAM only assigns workload
@@ -123,7 +123,7 @@ func containsAllowedUse(p *IPPool, use string) bool {
 	return false
 }
 
-// L3EligiblePools returns the subset of pools usable for Case A — implicit
+// L3EligiblePools returns the subset of pools usable for the non-L2 case — implicit
 // L3 IPAM — Calico-primary attach. A pool is L3-eligible when it is not
 // disabled and its allowedUses contains "Workload" (or is absent, implying
 // the Calico default ["Workload","Tunnel"]).
