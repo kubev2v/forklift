@@ -2125,7 +2125,7 @@ func calicoPrimaryIssueDetail(i planbase.CalicoPrimaryIssue) string {
 	case planbase.CalicoIssuePrimaryNetworkNotFound:
 		return fmt.Sprintf("%s(PrimaryNetworkNotFound network=%q)", prefix, i.Network)
 	case planbase.CalicoIssuePrimaryNetworkTypeUnsupported:
-		return fmt.Sprintf("%s(PrimaryNetworkTypeUnsupported network=%q: the referenced Network is not an L2 bridge network; only l2Bridge networks are supported)", prefix, i.Network)
+		return fmt.Sprintf("%s(PrimaryNetworkTypeUnsupported network=%q: the referenced Network is not an L2 bridge network; only l2Bridge networks can back the primary NIC — a VRF network attaches via a multus NAD instead)", prefix, i.Network)
 	case planbase.CalicoIssuePrimaryDataplaneNotBPF:
 		return fmt.Sprintf("%s(PrimaryDataplaneNotBPF network=%q: the destination Calico install is not running the BPF dataplane; L2 networks require FelixConfiguration bpfEnabled: true)", prefix, i.Network)
 	case planbase.CalicoIssuePrimaryNetworkHasNoL2Bridge:

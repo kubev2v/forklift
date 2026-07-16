@@ -213,17 +213,18 @@ func TestL2WorkloadEligiblePoolForIP(t *testing.T) {
 	pools := []IPPool{
 		{Name: "l2-vlan100", CIDR: "10.100.0.0/24", AllowedUses: []string{"L2Workload"}},
 		{Name: "workload-vlan100", CIDR: "10.100.0.0/24", AllowedUses: []string{"Workload"}},
+		{Name: "workload-vlan102", CIDR: "10.102.0.0/24", AllowedUses: []string{"Workload"}},
 		{Name: "l2-disabled", CIDR: "10.101.0.0/24", Disabled: true, AllowedUses: []string{"L2Workload"}},
 	}
-	vlanSubnets := []string{"10.100.0.0/24"}
+	vlanSubnets := []string{"10.100.0.0/24", "10.102.0.0/24"}
 	tests := []struct {
 		name     string
 		ip       string
 		wantPool string
 	}{
 		{"L2 pool covers IP", "10.100.0.5", "l2-vlan100"},
-		{"Only Workload covers (not L2)", "10.100.0.5", "l2-vlan100"}, // l2-vlan100 wins by order
-		{"IP outside all L2-eligible", "10.101.0.5", ""},              // l2-disabled is disabled
+		{"Only Workload covers (not L2)", "10.102.0.5", ""},
+		{"IP outside all L2-eligible", "10.101.0.5", ""}, // l2-disabled is disabled
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
