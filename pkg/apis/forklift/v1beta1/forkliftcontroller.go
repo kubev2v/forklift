@@ -891,6 +891,13 @@ type ForkliftControllerSpec struct {
 	// +kubebuilder:validation:Pattern="^[0-9]+(s|m|h)$"
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
 	MetricInterval string `json:"metric_interval,omitempty"`
+
+	// OLM Metadata
+
+	// Set by the OLM subscription lifecycle to indicate the CR is managed by OLM.
+	// +optional
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
+	OlmManaged *bool `json:"olm_managed,omitempty"`
 }
 
 // ForkliftControllerStatus defines the observed state of ForkliftController.

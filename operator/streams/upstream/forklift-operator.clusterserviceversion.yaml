@@ -749,6 +749,13 @@ spec:
           path: metric_interval
           x-descriptors:
           - urn:alm:descriptor:com.tectonic.ui:hidden
+        # OLM Metadata
+        - description: Set by the OLM subscription lifecycle to indicate the CR is
+            managed by OLM.
+          displayName: Olm Managed
+          path: olm_managed
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Hook schema for the hooks API
         displayName: Hook
         kind: Hook

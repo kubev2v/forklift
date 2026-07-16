@@ -586,6 +586,10 @@ spec:
                 default: forklift-naa-oui-map
                 description: ConfigMap name for custom NAA OUI to storage vendor mappings.
                 type: string
+              olm_managed:
+                description: Set by the OLM subscription lifecycle to indicate the
+                  CR is managed by OLM.
+                type: boolean
               ova_container_limits_cpu:
                 default: 1000m
                 description: OVA CPU limit.

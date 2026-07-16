@@ -591,6 +591,12 @@ spec:
         path: metric_interval
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: Set by the OLM subscription lifecycle to indicate the CR is managed
+          by OLM.
+        displayName: Olm Managed
+        path: olm_managed
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Must-gather debugging image. Optional. If left empty, the operator
           automatically sets this from the release payload.
         displayName: Must Gather Image FQIN
