@@ -228,6 +228,30 @@ type NetworkConfig struct {
 	Network string `json:"network,omitempty"`
 	// 802.1Q VLAN ID (1-4094) for Calico CNI. Zero means unspecified.
 	VLAN uint16 `json:"vlan,omitempty"`
+	// IPPools (names or CIDRs) the NAD pins address assignment to, from
+	// ipam.ipv4_pools in the CNI config. Nil when the ipam block or the
+	// field is absent. Flattened out of the nested ipam block by
+	// UnmarshalJSON, so it carries no JSON tag of its own.
+	IPv4Pools []string `json:"-"`
+}
+
+// UnmarshalJSON decodes the flat NetworkConfig fields as usual and
+// additionally flattens ipam.ipv4_pools into IPv4Pools.
+func (m *NetworkConfig) UnmarshalJSON(data []byte) error {
+	// The alias sheds NetworkConfig's methods so the inner Unmarshal does
+	// not recurse into this one.
+	type alias NetworkConfig
+	aux := struct {
+		*alias
+		IPAM struct {
+			IPv4Pools []string `json:"ipv4_pools"`
+		} `json:"ipam"`
+	}{alias: (*alias)(m)}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	m.IPv4Pools = aux.IPAM.IPv4Pools
+	return nil
 }
 
 func (m *NetworkConfig) IsUnsupportedUdn() bool {

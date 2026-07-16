@@ -10,12 +10,24 @@ import (
 // Calico-referencing NAD after all resource-level validations have passed.
 // Per-VM checks read from this directly instead of re-fetching Network and
 // IPPool objects for every VM.
+//
+// The struct accommodates both Calico network flavours:
+//   - l2Bridge (IsVRF false): VLAN is the matched l2Bridge VLAN entry
+//     (subnets non-empty) and EligiblePools is the L2Workload-restricted
+//     pool set scoped to those subnets.
+//   - vrf (IsVRF true): routed L3 — the Network carries no VLANs or
+//     subnets, so VLAN is zero-value and EligiblePools is the L3-eligible
+//     (enabled, Workload-allowed) pool set.
 type ResolvedCalicoNAD struct {
 	// Network is the Calico Network CR name referenced by the NAD.
 	Network string
-	// VLAN is the resolved l2Bridge VLAN entry (subnets non-empty).
+	// IsVRF marks the referenced Network as a vrf (routed L3) network.
+	IsVRF bool
+	// VLAN is the resolved l2Bridge VLAN entry (zero-value when IsVRF).
 	VLAN calicoclient.VLANEntry
-	// EligiblePools are the IPPools whose CIDRs overlap any subnet in VLAN.
+	// EligiblePools are the IPPools the per-VM IP check runs against:
+	// L2Workload pools within the VLAN's subnets for l2Bridge networks,
+	// L3-eligible pools for vrf networks.
 	EligiblePools []calicoclient.IPPool
 }
 
@@ -30,11 +42,23 @@ type CalicoValidationCache struct {
 // CalicoNADIssue is a resource-level Calico failure tied to a specific NAD
 // rather than a VM. Surfaced by ValidateCalicoNADs and rendered into the
 // plan-level CalicoNetworkInvalid condition.
+//
+// All fields are comparable types, so the struct compares with == (tests
+// rely on that; the per-VM CalicoIssue type is additionally used as a map
+// key, and this type stays parallel to it).
 type CalicoNADIssue struct {
 	NAD     types.NamespacedName
 	Kind    CalicoIssueKind
 	Network string
 	VLAN    uint16
+	// RouteTable is the offending kernel route table index for the VRF
+	// route-table issue kinds (VRFRouteTableReserved / VRFRouteTableConflict
+	// / VRFRouteTablePossibleConflict); zero otherwise.
+	RouteTable int64
+	// ConflictsWith names the other VRF Network CR sharing RouteTable.
+	// Empty on a VRFRouteTableConflict means the index collides with the
+	// FelixConfiguration routeTableRanges rather than another Network.
+	ConflictsWith string
 }
 
 // CalicoValidationResult is the output of ValidateCalicoNADs:

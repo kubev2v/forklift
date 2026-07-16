@@ -2,16 +2,18 @@ package ocp
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 )
 
 func TestNetworkConfig_UnmarshalCalico(t *testing.T) {
 	tests := []struct {
-		name        string
-		input       string
-		wantType    NadType
-		wantNetwork string
-		wantVLAN    uint16
+		name          string
+		input         string
+		wantType      NadType
+		wantNetwork   string
+		wantVLAN      uint16
+		wantIPv4Pools []string
 	}{
 		{
 			name: "CalicoL2WithExplicitVLAN",
@@ -63,6 +65,38 @@ func TestNetworkConfig_UnmarshalCalico(t *testing.T) {
 			wantNetwork: "",
 			wantVLAN:    0,
 		},
+		{
+			// ipam.ipv4_pools pins address assignment to specific pools;
+			// both pool names and CIDRs are legal entries.
+			name:          "CalicoIPAMWithPinnedPools",
+			input:         `{"type":"calico","network":"vrf-red","ipam":{"type":"calico-ipam","ipv4_pools":["vrf-red-pool","10.66.0.0/24"]}}`,
+			wantType:      CalicoCNIType,
+			wantNetwork:   "vrf-red",
+			wantIPv4Pools: []string{"vrf-red-pool", "10.66.0.0/24"},
+		},
+		{
+			// ipam block present, ipv4_pools absent → nil (no pin).
+			name:        "CalicoIPAMWithoutPinnedPools",
+			input:       `{"type":"calico","network":"vrf-red","ipam":{"type":"calico-ipam"}}`,
+			wantType:    CalicoCNIType,
+			wantNetwork: "vrf-red",
+		},
+		{
+			// An explicitly empty list still means "no pin"; callers key off
+			// len(IPv4Pools) == 0.
+			name:          "CalicoIPAMEmptyPinnedPools",
+			input:         `{"type":"calico","network":"vrf-red","ipam":{"type":"calico-ipam","ipv4_pools":[]}}`,
+			wantType:      CalicoCNIType,
+			wantNetwork:   "vrf-red",
+			wantIPv4Pools: []string{},
+		},
+		{
+			// A non-calico IPAM has no ipv4_pools convention → nil.
+			name:        "CalicoWithNonCalicoIPAM",
+			input:       `{"type":"calico","network":"vrf-red","ipam":{"type":"dhcp"}}`,
+			wantType:    CalicoCNIType,
+			wantNetwork: "vrf-red",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -78,6 +112,9 @@ func TestNetworkConfig_UnmarshalCalico(t *testing.T) {
 			}
 			if cfg.VLAN != tt.wantVLAN {
 				t.Errorf("VLAN = %d, want %d", cfg.VLAN, tt.wantVLAN)
+			}
+			if !reflect.DeepEqual(cfg.IPv4Pools, tt.wantIPv4Pools) {
+				t.Errorf("IPv4Pools = %#v, want %#v", cfg.IPv4Pools, tt.wantIPv4Pools)
 			}
 		})
 	}
