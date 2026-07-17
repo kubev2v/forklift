@@ -19,7 +19,7 @@ ARG CONTROLLER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-co
 
 ARG DEEP_INSPECTION_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-deep-inspection-rhel10@sha256:e853b75935efd5f2e872b1724bb5ea2e8be3dcc497e88c88f8963c24ad5f298f"
 
-ARG DEEP_INSPECTION_IMAGE_RHEL9="registry.redhat.io/migration-toolkit-virtualization/mtv-deep-inspection-rhel9@sha256:6ae60dc7823720263e1695917bcf3b9a0f45b7ab9452266c2d1a7af45bb377c0"
+ARG DEEP_INSPECTION_IMAGE_RHEL9="registry.redhat.io/migration-toolkit-virtualization/mtv-deep-inspection-rhel9@sha256:5c3f7bcc8bd3df8ebaa32b9847a3d90e1b95212ba390707d49bfd57e6ff5e358"
 
 ARG HYPERV_PROVIDER_SERVER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-hyperv-provider-server-rhel9@sha256:9731429b43ff2540aa9fd476a153c233e6b47b99f5e8aa0255d6a6533e9074ee"
 
@@ -43,7 +43,7 @@ ARG VALIDATION_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-va
 
 ARG VIRT_V2V_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel10@sha256:1a66fc52432fce7c6ae5c27f1fe3d7b80e343fe76d7ba78e84eda22ca3d4f0e5"
 
-ARG VIRT_V2V_IMAGE_RHEL9="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel9@sha256:0ffa37173136789f7e79c5b6977fbe9145f527069aa286bcbedcb1ad526cfa98"
+ARG VIRT_V2V_IMAGE_RHEL9="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel9@sha256:dc44f1b011f5c8bcb38167021823b2726051def3613167024afdf7f0d77abf66"
 
 ARG VSPHERE_COPY_OFFLOAD_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-vsphere-copy-offload-populator-rhel9@sha256:b1db382c08974679a4430568d1c24be9263f090adb4e9caaf3ed66a35299c0a1"
 
