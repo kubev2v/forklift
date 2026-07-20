@@ -57,6 +57,11 @@ func (r *Resolver) Path(resource interface{}, id string) (path string, err error
 		res.ID = id
 		res.Link(provider)
 		path = res.SelfLink
+	case *Workload:
+		res := Workload{}
+		res.ID = id
+		res.Link(provider)
+		path = res.SelfLink
 	default:
 		err = liberr.Wrap(
 			base.ResourceNotResolvedError{
@@ -93,6 +98,21 @@ func (r *Finder) findByRef(resource interface{}, ref base.Ref) (err error) {
 	switch res := resource.(type) {
 	case *VM:
 		list := []VM{}
+		err = r.listByName(&list, ref.Name)
+		if err != nil {
+			return
+		}
+		if len(list) == 0 {
+			err = liberr.Wrap(NotFoundError{Ref: ref})
+			return
+		}
+		if len(list) > 1 {
+			err = liberr.Wrap(RefNotUniqueError{Ref: ref})
+			return
+		}
+		*res = list[0]
+	case *Workload:
+		list := []Workload{}
 		err = r.listByName(&list, ref.Name)
 		if err != nil {
 			return
@@ -199,6 +219,19 @@ func (r *Finder) VM(ref *base.Ref) (object interface{}, err error) {
 		ref.ID = vm.ID
 		ref.Name = vm.Name
 		object = vm
+	}
+
+	return
+}
+
+// Workload finds a workload by ref.
+func (r *Finder) Workload(ref *base.Ref) (object interface{}, err error) {
+	workload := &Workload{}
+	err = r.findByRef(workload, *ref)
+	if err == nil {
+		ref.ID = workload.ID
+		ref.Name = workload.Name
+		object = workload
 	}
 
 	return
