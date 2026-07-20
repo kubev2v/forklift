@@ -45,6 +45,8 @@ const (
 
 	// HyperV
 	HyperV ProviderType = "hyperv"
+	// Nutanix
+	Nutanix ProviderType = "nutanix"
 )
 
 var ProviderTypes = []ProviderType{
@@ -55,6 +57,7 @@ var ProviderTypes = []ProviderType{
 	Ova,
 	EC2,
 	HyperV,
+	Nutanix,
 }
 
 func (t ProviderType) String() string {
@@ -78,6 +81,9 @@ const (
 	ESXiCloneMethod        = "esxiCloneMethod"
 	TargetAZ               = "target-az"
 	TargetRegion           = "target-region"
+	// Nutanix settings
+	NutanixPrismType   = "prismType"   // "central" or "element"
+	NutanixClusterUUID = "clusterUuid" // For Prism Element mode
 )
 
 // ESXi clone method values.

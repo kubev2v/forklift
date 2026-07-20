@@ -1,0 +1,129 @@
+{
+  "api_version": "3.1",
+  "metadata": {
+    "total_matches": 4,
+    "kind": "image",
+    "length": 4,
+    "offset": 0
+  },
+  "entities": [
+    {
+      "metadata": {
+        "kind": "image",
+        "uuid": "img-0005b123-4567-89ab-cdef-000000000001",
+        "spec_version": 0,
+        "name": "RHEL-8.9-x86_64",
+        "categories": {
+          "OS": "Linux",
+          "Distribution": "RHEL"
+        }
+      },
+      "spec": {
+        "name": "RHEL-8.9-x86_64",
+        "description": "Red Hat Enterprise Linux 8.9",
+        "resources": {
+          "image_type": "DISK_IMAGE",
+          "source_uri": "https://downloads.example.com/rhel-8.9.qcow2",
+          "architecture": "X86_64"
+        }
+      },
+      "status": {
+        "state": "COMPLETE",
+        "name": "RHEL-8.9-x86_64",
+        "resources": {
+          "image_type": "DISK_IMAGE",
+          "size_bytes": 2147483648,
+          "architecture": "X86_64",
+          "retrieval_uri_list": [
+            "https://prism.local:9440/api/nutanix/v3/images/img-0005b123-4567-89ab-cdef-000000000001/file"
+          ]
+        }
+      }
+    },
+    {
+      "metadata": {
+        "kind": "image",
+        "uuid": "img-0005b123-4567-89ab-cdef-000000000002",
+        "spec_version": 0,
+        "name": "Ubuntu-22.04-LTS",
+        "categories": {
+          "OS": "Linux",
+          "Distribution": "Ubuntu"
+        }
+      },
+      "spec": {
+        "name": "Ubuntu-22.04-LTS",
+        "description": "Ubuntu 22.04 LTS Server",
+        "resources": {
+          "image_type": "DISK_IMAGE",
+          "architecture": "X86_64"
+        }
+      },
+      "status": {
+        "state": "COMPLETE",
+        "name": "Ubuntu-22.04-LTS",
+        "resources": {
+          "image_type": "DISK_IMAGE",
+          "size_bytes": 1879048192,
+          "architecture": "X86_64"
+        }
+      }
+    },
+    {
+      "metadata": {
+        "kind": "image",
+        "uuid": "img-0005b123-4567-89ab-cdef-000000000003",
+        "spec_version": 0,
+        "name": "Windows-Server-2022",
+        "categories": {
+          "OS": "Windows"
+        }
+      },
+      "spec": {
+        "name": "Windows-Server-2022",
+        "description": "Windows Server 2022 Standard",
+        "resources": {
+          "image_type": "DISK_IMAGE",
+          "architecture": "X86_64"
+        }
+      },
+      "status": {
+        "state": "COMPLETE",
+        "name": "Windows-Server-2022",
+        "resources": {
+          "image_type": "DISK_IMAGE",
+          "size_bytes": 8589934592,
+          "architecture": "X86_64"
+        }
+      }
+    },
+    {
+      "metadata": {
+        "kind": "image",
+        "uuid": "img-0005b123-4567-89ab-cdef-000000000004",
+        "spec_version": 0,
+        "name": "VirtIO-Drivers-Latest",
+        "categories": {
+          "Type": "Drivers"
+        }
+      },
+      "spec": {
+        "name": "VirtIO-Drivers-Latest",
+        "description": "VirtIO drivers ISO for Windows",
+        "resources": {
+          "image_type": "ISO_IMAGE",
+          "architecture": "X86_64"
+        }
+      },
+      "status": {
+        "state": "COMPLETE",
+        "name": "VirtIO-Drivers-Latest",
+        "resources": {
+          "image_type": "ISO_IMAGE",
+          "size_bytes": 536870912,
+          "architecture": "X86_64"
+        }
+      }
+    }
+  ]
+}
