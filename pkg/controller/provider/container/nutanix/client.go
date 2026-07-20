@@ -14,6 +14,7 @@ import (
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/lib/util"
 	core "k8s.io/api/core/v1"
 )
 
@@ -66,19 +67,16 @@ func (r *Client) connect() (status int, err error) {
 	// Configure TLS
 	if base.GetInsecureSkipVerifyFlag(r.secret) {
 		TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	} else {
-		cacert := r.secret.Data["cacert"]
-		if len(cacert) > 0 {
-			roots := x509.NewCertPool()
-			ok := roots.AppendCertsFromPEM(cacert)
-			if !ok {
-				err = liberr.New("failed to parse cacert")
-				return http.StatusBadRequest, err
-			}
-			TLSClientConfig = &tls.Config{RootCAs: roots}
-		} else {
-			TLSClientConfig = &tls.Config{InsecureSkipVerify: false}
+	} else if cacert, found := util.GetCACert(r.secret); found {
+		roots := x509.NewCertPool()
+		ok := roots.AppendCertsFromPEM(cacert)
+		if !ok {
+			err = liberr.New("failed to parse CA certificate")
+			return http.StatusBadRequest, err
 		}
+		TLSClientConfig = &tls.Config{RootCAs: roots}
+	} else {
+		TLSClientConfig = &tls.Config{InsecureSkipVerify: false}
 	}
 
 	r.url = strings.TrimRight(r.url, "/")
