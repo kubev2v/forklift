@@ -198,6 +198,7 @@ type VM1 struct {
 	VGAConsoleEnabled bool              `json:"vgaConsoleEnabled"`
 	HypervisorType    string            `json:"hypervisorType"`
 	GuestOSID         string            `json:"guestOsId"`
+	GuestOSVersion    string            `json:"guestOsVersion,omitempty"`
 	NICs              []NIC             `json:"nics"`
 	Disks             []Disk            `json:"disks"`
 	SerialPorts       []SerialPort      `json:"serialPorts"`
@@ -222,6 +223,7 @@ func (r *VM1) With(m *model.VM) {
 	r.VGAConsoleEnabled = m.VGAConsoleEnabled
 	r.HypervisorType = m.HypervisorType
 	r.GuestOSID = m.GuestOSID
+	r.GuestOSVersion = m.GuestOSVersion
 	r.NICs = m.NICs
 	r.Disks = m.Disks
 	r.SerialPorts = m.SerialPorts
