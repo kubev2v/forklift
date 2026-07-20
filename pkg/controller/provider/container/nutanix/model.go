@@ -1,0 +1,644 @@
+package nutanix
+
+import (
+	"strings"
+
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/nutanix"
+)
+
+// Helper functions to safely extract values from map[string]interface{}
+
+func getString(m map[string]interface{}, path string) string {
+	parts := strings.Split(path, ".")
+	current := m
+
+	for i, part := range parts {
+		if i == len(parts)-1 {
+			// Last part - get the value
+			if val, ok := current[part]; ok {
+				if str, ok := val.(string); ok {
+					return str
+				}
+			}
+			return ""
+		}
+
+		// Navigate deeper
+		if val, ok := current[part]; ok {
+			if next, ok := val.(map[string]interface{}); ok {
+				current = next
+			} else {
+				return ""
+			}
+		} else {
+			return ""
+		}
+	}
+
+	return ""
+}
+
+func getInt(m map[string]interface{}, path string) int {
+	parts := strings.Split(path, ".")
+	current := m
+
+	for i, part := range parts {
+		if i == len(parts)-1 {
+			// Last part - get the value
+			if val, ok := current[part]; ok {
+				switch v := val.(type) {
+				case int:
+					return v
+				case int64:
+					return int(v)
+				case float64:
+					return int(v)
+				}
+			}
+			return 0
+		}
+
+		// Navigate deeper
+		if val, ok := current[part]; ok {
+			if next, ok := val.(map[string]interface{}); ok {
+				current = next
+			} else {
+				return 0
+			}
+		} else {
+			return 0
+		}
+	}
+
+	return 0
+}
+
+func getInt64(m map[string]interface{}, path string) int64 {
+	parts := strings.Split(path, ".")
+	current := m
+
+	for i, part := range parts {
+		if i == len(parts)-1 {
+			// Last part - get the value
+			if val, ok := current[part]; ok {
+				switch v := val.(type) {
+				case int64:
+					return v
+				case int:
+					return int64(v)
+				case float64:
+					return int64(v)
+				}
+			}
+			return 0
+		}
+
+		// Navigate deeper
+		if val, ok := current[part]; ok {
+			if next, ok := val.(map[string]interface{}); ok {
+				current = next
+			} else {
+				return 0
+			}
+		} else {
+			return 0
+		}
+	}
+
+	return 0
+}
+
+func getBool(m map[string]interface{}, path string) bool {
+	parts := strings.Split(path, ".")
+	current := m
+
+	for i, part := range parts {
+		if i == len(parts)-1 {
+			// Last part - get the value
+			if val, ok := current[part]; ok {
+				if b, ok := val.(bool); ok {
+					return b
+				}
+			}
+			return false
+		}
+
+		// Navigate deeper
+		if val, ok := current[part]; ok {
+			if next, ok := val.(map[string]interface{}); ok {
+				current = next
+			} else {
+				return false
+			}
+		} else {
+			return false
+		}
+	}
+
+	return false
+}
+
+func getMap(m map[string]interface{}, path string) map[string]interface{} {
+	parts := strings.Split(path, ".")
+	current := m
+
+	for i, part := range parts {
+		if i == len(parts)-1 {
+			// Last part - get the map
+			if val, ok := current[part]; ok {
+				if m, ok := val.(map[string]interface{}); ok {
+					return m
+				}
+			}
+			return nil
+		}
+
+		// Navigate deeper
+		if val, ok := current[part]; ok {
+			if next, ok := val.(map[string]interface{}); ok {
+				current = next
+			} else {
+				return nil
+			}
+		} else {
+			return nil
+		}
+	}
+
+	return nil
+}
+
+func getSlice(m map[string]interface{}, path string) []interface{} {
+	parts := strings.Split(path, ".")
+	current := m
+
+	for i, part := range parts {
+		if i == len(parts)-1 {
+			// Last part - get the slice
+			if val, ok := current[part]; ok {
+				if s, ok := val.([]interface{}); ok {
+					return s
+				}
+			}
+			return nil
+		}
+
+		// Navigate deeper
+		if val, ok := current[part]; ok {
+			if next, ok := val.(map[string]interface{}); ok {
+				current = next
+			} else {
+				return nil
+			}
+		} else {
+			return nil
+		}
+	}
+
+	return nil
+}
+
+// Apply cluster data to model.
+func applyCluster(entity map[string]interface{}, m *model.Cluster) {
+	// metadata
+	metadata, _ := entity["metadata"].(map[string]interface{})
+	if uuid, ok := metadata["uuid"].(string); ok {
+		m.ID = uuid
+		m.ClusterUUID = uuid
+	}
+	if name, ok := metadata["name"].(string); ok {
+		m.Name = name
+	}
+
+	// status.resources
+	status, _ := entity["status"].(map[string]interface{})
+	resources, _ := status["resources"].(map[string]interface{})
+
+	// config
+	config, _ := resources["config"].(map[string]interface{})
+	if timezone, ok := config["timezone"].(string); ok {
+		m.Timezone = timezone
+	}
+	if arch, ok := config["cluster_arch"].(string); ok {
+		m.ClusterArch = arch
+	}
+	if opMode, ok := config["operation_mode"].(string); ok {
+		m.OperationMode = opMode
+	}
+
+	// build version
+	if build, ok := config["build"].(map[string]interface{}); ok {
+		if version, ok := build["version"].(string); ok {
+			m.Version = version
+		}
+		if fullVersion, ok := build["full_version"].(string); ok {
+			m.BuildVersion = fullVersion
+		}
+	}
+
+	// network
+	network, _ := resources["network"].(map[string]interface{})
+	if externalIP, ok := network["external_ip"].(string); ok {
+		m.ExternalIP = externalIP
+	}
+
+	// nodes count
+	nodes, _ := resources["nodes"].(map[string]interface{})
+	if hypervisors, ok := nodes["hypervisor_server_list"].([]interface{}); ok {
+		m.NumNodes = len(hypervisors)
+	}
+
+	// analysis
+	analysis, _ := resources["analysis"].(map[string]interface{})
+	if vmCount, ok := analysis["vm_count"].(float64); ok {
+		m.VMCount = int64(vmCount)
+	} else if vmCount, ok := analysis["vm_count"].(int); ok {
+		m.VMCount = int64(vmCount)
+	}
+
+	storage, _ := analysis["storage_summary"].(map[string]interface{})
+	if totalCap, ok := storage["total_capacity_bytes"].(float64); ok {
+		m.TotalCapacity = int64(totalCap)
+	} else if totalCap, ok := storage["total_capacity_bytes"].(int64); ok {
+		m.TotalCapacity = totalCap
+	}
+	if usedCap, ok := storage["usage_bytes"].(float64); ok {
+		m.UsedCapacity = int64(usedCap)
+	} else if usedCap, ok := storage["usage_bytes"].(int64); ok {
+		m.UsedCapacity = usedCap
+	}
+}
+
+// Apply host data to model.
+func applyHost(entity map[string]interface{}, m *model.Host) {
+	metadata, _ := entity["metadata"].(map[string]interface{})
+	if uuid, ok := metadata["uuid"].(string); ok {
+		m.ID = uuid
+		m.HostUUID = uuid
+	}
+	if name, ok := metadata["name"].(string); ok {
+		m.Name = name
+	}
+
+	status, _ := entity["status"].(map[string]interface{})
+	resources, _ := status["resources"].(map[string]interface{})
+
+	// cluster reference
+	if clusterRef, ok := resources["cluster_reference"].(map[string]interface{}); ok {
+		if clusterUUID, ok := clusterRef["uuid"].(string); ok {
+			m.Cluster = clusterUUID
+		}
+	}
+
+	// serial number
+	m.SerialNumber = getString(resources, "serial_number")
+	m.BlockModel = getString(resources, "block.block_model")
+
+	// hypervisor info
+	if hvState, ok := resources["hypervisor"].(map[string]interface{}); ok {
+		if hvType, ok := hvState["hypervisor_type"].(string); ok {
+			m.HypervisorType = hvType
+		}
+		if numVMs, ok := hvState["num_vms"].(float64); ok {
+			m.NumVMs = int(numVMs)
+		} else if numVMs, ok := hvState["num_vms"].(int); ok {
+			m.NumVMs = numVMs
+		}
+	}
+
+	m.State = getString(resources, "host_type")
+	m.HostType = getString(resources, "host_type")
+
+	// CPU info
+	m.CPUModel = getString(resources, "cpu_model")
+	m.CPUCapacityHz = getInt64(resources, "cpu_capacity_hz")
+	m.NumCpuSockets = getInt(resources, "num_cpu_sockets")
+	m.NumCpuCores = getInt(resources, "num_cpu_cores")
+	m.NumCpuThreads = getInt(resources, "num_cpu_threads")
+
+	// Memory
+	m.MemoryCapacityMiB = getInt64(resources, "memory_capacity_mib")
+
+	// Management
+	m.IPMIAddress = getString(resources, "ipmi.ip")
+}
+
+// Apply network data to model.
+func applyNetwork(entity map[string]interface{}, m *model.Network) {
+	metadata, _ := entity["metadata"].(map[string]interface{})
+	if uuid, ok := metadata["uuid"].(string); ok {
+		m.ID = uuid
+		m.NetworkUUID = uuid
+	}
+	if name, ok := metadata["name"].(string); ok {
+		m.Name = name
+	}
+
+	status, _ := entity["status"].(map[string]interface{})
+	resources, _ := status["resources"].(map[string]interface{})
+
+	// cluster reference
+	if clusterRef, ok := resources["cluster_reference"].(map[string]interface{}); ok {
+		if clusterUUID, ok := clusterRef["uuid"].(string); ok {
+			m.Cluster = clusterUUID
+		}
+	}
+
+	m.SubnetType = getString(resources, "subnet_type")
+	m.VlanID = getInt(resources, "vlan_id")
+
+	// IP config
+	if ipConfig, ok := resources["ip_config"].(map[string]interface{}); ok {
+		if subnetIP, ok := ipConfig["subnet_ip"].(string); ok {
+			m.NetworkAddress = subnetIP
+		}
+		if prefixLen, ok := ipConfig["prefix_length"].(float64); ok {
+			m.PrefixLength = int(prefixLen)
+		} else if prefixLen, ok := ipConfig["prefix_length"].(int); ok {
+			m.PrefixLength = prefixLen
+		}
+		if gateway, ok := ipConfig["default_gateway_ip"].(string); ok {
+			m.DefaultGateway = gateway
+		}
+
+		// DHCP info
+		if dhcpOptions, ok := ipConfig["dhcp_options"].(map[string]interface{}); ok {
+			if dhcpIP, ok := dhcpOptions["dhcp_server_address"].(string); ok {
+				m.DHCPServerIP = dhcpIP
+			}
+			if domainName, ok := dhcpOptions["domain_name"].(string); ok {
+				m.DHCPDomainName = domainName
+			}
+		}
+
+		// Pool ranges
+		if pools, ok := ipConfig["pool_list"].([]interface{}); ok {
+			ranges := make([]string, 0, len(pools))
+			for _, p := range pools {
+				if pool, ok := p.(map[string]interface{}); ok {
+					if start, ok := pool["range"].(string); ok {
+						ranges = append(ranges, start)
+					}
+				}
+			}
+			m.IPPoolRanges = strings.Join(ranges, ",")
+		}
+	}
+}
+
+// Apply storage container data to model.
+func applyStorageContainer(entity map[string]interface{}, m *model.StorageContainer) {
+	metadata, _ := entity["metadata"].(map[string]interface{})
+	if uuid, ok := metadata["uuid"].(string); ok {
+		m.ID = uuid
+		m.StorageContainerUUID = uuid
+	}
+	if name, ok := metadata["name"].(string); ok {
+		m.Name = name
+	}
+
+	status, _ := entity["status"].(map[string]interface{})
+	resources, _ := status["resources"].(map[string]interface{})
+
+	// cluster reference
+	if clusterRef, ok := resources["cluster_reference"].(map[string]interface{}); ok {
+		if clusterUUID, ok := clusterRef["uuid"].(string); ok {
+			m.Cluster = clusterUUID
+		}
+	}
+
+	m.ReplicationFactor = getInt(resources, "replication_factor")
+
+	// Capacity
+	m.MaxCapacityBytes = getInt64(resources, "max_capacity_bytes")
+	m.UsageBytes = getInt64(resources, "usage_bytes")
+	if m.MaxCapacityBytes > 0 && m.UsageBytes > 0 {
+		m.FreeBytes = m.MaxCapacityBytes - m.UsageBytes
+	}
+
+	// Features
+	m.CompressionEnabled = getBool(resources, "compression_enabled")
+	m.OnDiskDedup = getString(resources, "on_disk_dedup")
+	m.ErasureCode = getString(resources, "erasure_code")
+}
+
+// Apply image data to model.
+func applyImage(entity map[string]interface{}, m *model.Image) {
+	metadata, _ := entity["metadata"].(map[string]interface{})
+	if uuid, ok := metadata["uuid"].(string); ok {
+		m.ID = uuid
+		m.ImageUUID = uuid
+	}
+	if name, ok := metadata["name"].(string); ok {
+		m.Name = name
+	}
+
+	status, _ := entity["status"].(map[string]interface{})
+	resources, _ := status["resources"].(map[string]interface{})
+
+	m.ImageType = getString(resources, "image_type")
+	m.SizeBytes = getInt64(resources, "size_bytes")
+	m.Architecture = getString(resources, "architecture")
+	m.SourceURI = getString(resources, "source_uri")
+}
+
+// Apply VM data to model.
+func applyVM(entity map[string]interface{}, m *model.VM) {
+	metadata, _ := entity["metadata"].(map[string]interface{})
+	if uuid, ok := metadata["uuid"].(string); ok {
+		m.ID = uuid
+		m.UUID = uuid
+	}
+	if name, ok := metadata["name"].(string); ok {
+		m.Name = name
+	}
+
+	// Categories
+	if categories, ok := metadata["categories"].(map[string]interface{}); ok {
+		m.Categories = make(map[string]string)
+		for k, v := range categories {
+			if str, ok := v.(string); ok {
+				m.Categories[k] = str
+			}
+		}
+	}
+
+	status, _ := entity["status"].(map[string]interface{})
+	resources, _ := status["resources"].(map[string]interface{})
+
+	// cluster and host references
+	if clusterRef, ok := resources["cluster_reference"].(map[string]interface{}); ok {
+		if clusterUUID, ok := clusterRef["uuid"].(string); ok {
+			m.Cluster = clusterUUID
+		}
+	}
+	if hostRef, ok := resources["host_reference"].(map[string]interface{}); ok {
+		if hostUUID, ok := hostRef["uuid"].(string); ok {
+			m.Host = hostUUID
+		}
+	}
+
+	m.Description = getString(resources, "description")
+	m.PowerState = getString(resources, "power_state")
+
+	// CPU and memory
+	m.NumSockets = getInt(resources, "num_sockets")
+	m.NumVcpusPerSocket = getInt(resources, "num_vcpus_per_socket")
+	m.NumThreadsPerCore = getInt(resources, "num_threads_per_core")
+	m.MemorySizeMiB = getInt64(resources, "memory_size_mib")
+
+	// Boot config
+	if bootConfig, ok := resources["boot_config"].(map[string]interface{}); ok {
+		if bootType, ok := bootConfig["boot_type"].(string); ok {
+			m.BootType = bootType
+		}
+		if bootOrder, ok := bootConfig["boot_device_order_list"].([]interface{}); ok {
+			devices := make([]string, 0, len(bootOrder))
+			for _, d := range bootOrder {
+				if dev, ok := d.(string); ok {
+					devices = append(devices, dev)
+				}
+			}
+			m.BootDeviceOrder = strings.Join(devices, ",")
+		}
+	}
+
+	m.MachineType = getString(resources, "machine_type")
+	m.HardwareClockTZ = getString(resources, "hardware_clock_timezone")
+	m.VGAConsoleEnabled = getBool(resources, "vga_console_enabled")
+	m.HypervisorType = getString(resources, "hypervisor_type")
+	m.GuestOSID = getString(resources, "guest_os_id")
+
+	// Serial ports
+	if serialPorts, ok := resources["serial_port_list"].([]interface{}); ok {
+		m.SerialPorts = make([]model.SerialPort, 0, len(serialPorts))
+		for _, sp := range serialPorts {
+			if port, ok := sp.(map[string]interface{}); ok {
+				serialPort := model.SerialPort{}
+				if index, ok := port["index"].(float64); ok {
+					serialPort.Index = int(index)
+				} else if index, ok := port["index"].(int); ok {
+					serialPort.Index = index
+				}
+				if connected, ok := port["is_connected"].(bool); ok {
+					serialPort.IsConnected = connected
+				}
+				m.SerialPorts = append(m.SerialPorts, serialPort)
+			}
+		}
+	}
+
+	// NICs
+	if nics, ok := resources["nic_list"].([]interface{}); ok {
+		m.NICs = make([]model.NIC, 0, len(nics))
+		for _, n := range nics {
+			if nicData, ok := n.(map[string]interface{}); ok {
+				nic := model.NIC{}
+				nic.UUID = getString(nicData, "uuid")
+				nic.NicType = getString(nicData, "nic_type")
+				nic.MACAddress = getString(nicData, "mac_address")
+				nic.Model = getString(nicData, "model")
+				nic.IsConnected = getBool(nicData, "is_connected")
+
+				// Subnet reference
+				if subnetRef, ok := nicData["subnet_reference"].(map[string]interface{}); ok {
+					if subnetUUID, ok := subnetRef["uuid"].(string); ok {
+						nic.SubnetUUID = subnetUUID
+					}
+					if subnetName, ok := subnetRef["name"].(string); ok {
+						nic.SubnetName = subnetName
+					}
+				}
+
+				// IP addresses
+				if ips, ok := nicData["ip_endpoint_list"].([]interface{}); ok {
+					nic.IPAddresses = make([]string, 0, len(ips))
+					for _, ip := range ips {
+						if ipMap, ok := ip.(map[string]interface{}); ok {
+							if ipAddr, ok := ipMap["ip"].(string); ok {
+								nic.IPAddresses = append(nic.IPAddresses, ipAddr)
+							}
+						}
+					}
+				}
+
+				nic.VlanMode = getString(nicData, "vlan_mode")
+				m.NICs = append(m.NICs, nic)
+			}
+		}
+	}
+
+	// Disks
+	if disks, ok := resources["disk_list"].([]interface{}); ok {
+		m.Disks = make([]model.Disk, 0, len(disks))
+		for _, d := range disks {
+			if diskData, ok := d.(map[string]interface{}); ok {
+				disk := model.Disk{}
+				disk.UUID = getString(diskData, "uuid")
+				disk.DeviceType = getString(diskData, "device_properties.device_type")
+				disk.AdapterType = getString(diskData, "device_properties.disk_address.adapter_type")
+
+				if deviceIndex, ok := diskData["device_properties"].(map[string]interface{}); ok {
+					if diskAddr, ok := deviceIndex["disk_address"].(map[string]interface{}); ok {
+						if idx, ok := diskAddr["device_index"].(float64); ok {
+							disk.DeviceIndex = int(idx)
+						} else if idx, ok := diskAddr["device_index"].(int); ok {
+							disk.DeviceIndex = idx
+						}
+					}
+				}
+
+				// Disk size
+				if diskSizeMib, ok := diskData["disk_size_mib"].(float64); ok {
+					disk.DiskSizeMiB = int64(diskSizeMib)
+					disk.DiskSizeBytes = int64(diskSizeMib) * 1024 * 1024
+				} else if diskSizeMib, ok := diskData["disk_size_mib"].(int64); ok {
+					disk.DiskSizeMiB = diskSizeMib
+					disk.DiskSizeBytes = diskSizeMib * 1024 * 1024
+				}
+				if diskSizeBytes, ok := diskData["disk_size_bytes"].(int64); ok {
+					disk.DiskSizeBytes = diskSizeBytes
+				}
+
+				// Storage container reference
+				if scRef, ok := diskData["storage_container_reference"].(map[string]interface{}); ok {
+					if scUUID, ok := scRef["uuid"].(string); ok {
+						disk.StorageContainerUUID = scUUID
+					}
+					if scName, ok := scRef["name"].(string); ok {
+						disk.StorageContainerName = scName
+					}
+				}
+
+				// Source image
+				if imgRef, ok := diskData["data_source_reference"].(map[string]interface{}); ok {
+					if imgUUID, ok := imgRef["uuid"].(string); ok {
+						disk.SourceImageUUID = imgUUID
+					}
+				}
+
+				disk.IsCdrom = getBool(diskData, "device_properties.device_type") &&
+					getString(diskData, "device_properties.device_type") == "CDROM"
+				disk.FlashMode = getBool(diskData, "storage_config.flash_mode.is_enabled")
+
+				m.Disks = append(m.Disks, disk)
+			}
+		}
+	}
+
+	// Guest tools
+	if guestTools, ok := resources["guest_tools"].(map[string]interface{}); ok {
+		m.GuestToolsEnabled = getBool(guestTools, "enabled")
+		if version, ok := guestTools["nutanix_guest_tools"].(map[string]interface{}); ok {
+			if v, ok := version["version"].(string); ok {
+				m.GuestToolsVersion = v
+			}
+			if reachable, ok := version["is_reachable"].(bool); ok {
+				m.GuestToolsReachable = reachable
+			}
+			if mounted, ok := version["iso_mount_state"].(string); ok {
+				m.GuestToolsMounted = (mounted == "MOUNTED")
+			}
+		}
+	}
+}
