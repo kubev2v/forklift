@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: Check out forklift repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - run: ${{ matrix.shell }} ./pkg/virt-v2v/customize/scripts/rhel/run/test-network_config_util.sh
 
@@ -64,10 +64,10 @@ jobs:
           swap-storage: false
           docker-images: false
       - name: Check out forklift repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Checkout forkliftci
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: kubev2v/forkliftci
           ref: v17.0
@@ -105,7 +105,7 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       - name: Checks-out repository under $GITHUB_WORKSPACE
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: go/src/github.com/${{github.repository}}
 
