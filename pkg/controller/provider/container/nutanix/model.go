@@ -463,32 +463,45 @@ func applyVM(entity map[string]interface{}, m *model.VM) {
 		}
 	}
 
+	// Get both spec and status sections
+	spec, _ := entity["spec"].(map[string]interface{})
+	specResources, _ := spec["resources"].(map[string]interface{})
 	status, _ := entity["status"].(map[string]interface{})
-	resources, _ := status["resources"].(map[string]interface{})
+	statusResources, _ := status["resources"].(map[string]interface{})
 
-	// cluster and host references
-	if clusterRef, ok := resources["cluster_reference"].(map[string]interface{}); ok {
+	// Cluster reference from spec
+	if clusterRef, ok := spec["cluster_reference"].(map[string]interface{}); ok {
 		if clusterUUID, ok := clusterRef["uuid"].(string); ok {
 			m.Cluster = clusterUUID
 		}
 	}
-	if hostRef, ok := resources["host_reference"].(map[string]interface{}); ok {
+
+	// Host reference from status
+	if hostRef, ok := statusResources["host_reference"].(map[string]interface{}); ok {
 		if hostUUID, ok := hostRef["uuid"].(string); ok {
 			m.Host = hostUUID
 		}
 	}
 
-	m.Description = getString(resources, "description")
-	m.PowerState = getString(resources, "power_state")
+	// Description from spec
+	if desc, ok := spec["description"].(string); ok {
+		m.Description = desc
+	}
 
-	// CPU and memory
-	m.NumSockets = getInt(resources, "num_sockets")
-	m.NumVcpusPerSocket = getInt(resources, "num_vcpus_per_socket")
-	m.NumThreadsPerCore = getInt(resources, "num_threads_per_core")
-	m.MemorySizeMiB = getInt64(resources, "memory_size_mib")
+	// Power state from spec or status
+	m.PowerState = getString(specResources, "power_state")
+	if m.PowerState == "" {
+		m.PowerState = getString(statusResources, "power_state")
+	}
 
-	// Boot config
-	if bootConfig, ok := resources["boot_config"].(map[string]interface{}); ok {
+	// CPU and memory from spec.resources
+	m.NumSockets = getInt(specResources, "num_sockets")
+	m.NumVcpusPerSocket = getInt(specResources, "num_vcpus_per_socket")
+	m.NumThreadsPerCore = getInt(specResources, "num_threads_per_core")
+	m.MemorySizeMiB = getInt64(specResources, "memory_size_mib")
+
+	// Boot config from spec.resources
+	if bootConfig, ok := specResources["boot_config"].(map[string]interface{}); ok {
 		if bootType, ok := bootConfig["boot_type"].(string); ok {
 			m.BootType = bootType
 		}
@@ -503,14 +516,17 @@ func applyVM(entity map[string]interface{}, m *model.VM) {
 		}
 	}
 
-	m.MachineType = getString(resources, "machine_type")
-	m.HardwareClockTZ = getString(resources, "hardware_clock_timezone")
-	m.VGAConsoleEnabled = getBool(resources, "vga_console_enabled")
-	m.HypervisorType = getString(resources, "hypervisor_type")
-	m.GuestOSID = getString(resources, "guest_os_id")
+	// Machine config from spec.resources
+	m.MachineType = getString(specResources, "machine_type")
+	m.HardwareClockTZ = getString(specResources, "hardware_clock_timezone")
+	m.VGAConsoleEnabled = getBool(specResources, "vga_console_enabled")
 
-	// Serial ports
-	if serialPorts, ok := resources["serial_port_list"].([]interface{}); ok {
+	// Hypervisor type from status.resources
+	m.HypervisorType = getString(statusResources, "hypervisor_type")
+	m.GuestOSID = getString(specResources, "guest_os_id")
+
+	// Serial ports from spec.resources
+	if serialPorts, ok := specResources["serial_port_list"].([]interface{}); ok {
 		m.SerialPorts = make([]model.SerialPort, 0, len(serialPorts))
 		for _, sp := range serialPorts {
 			if port, ok := sp.(map[string]interface{}); ok {
@@ -528,8 +544,12 @@ func applyVM(entity map[string]interface{}, m *model.VM) {
 		}
 	}
 
-	// NICs
-	if nics, ok := resources["nic_list"].([]interface{}); ok {
+	// NICs from spec.resources (has complete info), fall back to status if needed
+	nicList := specResources["nic_list"]
+	if nicList == nil {
+		nicList = statusResources["nic_list"]
+	}
+	if nics, ok := nicList.([]interface{}); ok {
 		m.NICs = make([]model.NIC, 0, len(nics))
 		for _, n := range nics {
 			if nicData, ok := n.(map[string]interface{}); ok {
@@ -568,8 +588,8 @@ func applyVM(entity map[string]interface{}, m *model.VM) {
 		}
 	}
 
-	// Disks
-	if disks, ok := resources["disk_list"].([]interface{}); ok {
+	// Disks from spec.resources
+	if disks, ok := specResources["disk_list"].([]interface{}); ok {
 		m.Disks = make([]model.Disk, 0, len(disks))
 		for _, d := range disks {
 			if diskData, ok := d.(map[string]interface{}); ok {
@@ -600,14 +620,18 @@ func applyVM(entity map[string]interface{}, m *model.VM) {
 					disk.DiskSizeBytes = diskSizeBytes
 				}
 
-				// Storage container reference
-				if scRef, ok := diskData["storage_container_reference"].(map[string]interface{}); ok {
-					if scUUID, ok := scRef["uuid"].(string); ok {
-						disk.StorageContainerUUID = scUUID
+				// Storage container reference (in storage_config)
+				if storageConfig, ok := diskData["storage_config"].(map[string]interface{}); ok {
+					if scRef, ok := storageConfig["storage_container_reference"].(map[string]interface{}); ok {
+						if scUUID, ok := scRef["uuid"].(string); ok {
+							disk.StorageContainerUUID = scUUID
+						}
+						if scName, ok := scRef["name"].(string); ok {
+							disk.StorageContainerName = scName
+						}
 					}
-					if scName, ok := scRef["name"].(string); ok {
-						disk.StorageContainerName = scName
-					}
+					// Flash mode
+					disk.FlashMode = getBool(storageConfig, "flash_mode")
 				}
 
 				// Source image
@@ -617,17 +641,15 @@ func applyVM(entity map[string]interface{}, m *model.VM) {
 					}
 				}
 
-				disk.IsCdrom = getBool(diskData, "device_properties.device_type") &&
-					getString(diskData, "device_properties.device_type") == "CDROM"
-				disk.FlashMode = getBool(diskData, "storage_config.flash_mode.is_enabled")
+				disk.IsCdrom = getString(diskData, "device_properties.device_type") == "CDROM"
 
 				m.Disks = append(m.Disks, disk)
 			}
 		}
 	}
 
-	// Guest tools
-	if guestTools, ok := resources["guest_tools"].(map[string]interface{}); ok {
+	// Guest tools from spec.resources
+	if guestTools, ok := specResources["guest_tools"].(map[string]interface{}); ok {
 		m.GuestToolsEnabled = getBool(guestTools, "enabled")
 		if version, ok := guestTools["nutanix_guest_tools"].(map[string]interface{}); ok {
 			if v, ok := version["version"].(string); ok {
