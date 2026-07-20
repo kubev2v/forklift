@@ -385,6 +385,65 @@ func TestApplyVM(t *testing.T) {
 	if m.BootType != "UEFI" {
 		t.Errorf("Expected BootType to be 'UEFI', got %s", m.BootType)
 	}
+
+	if !m.GuestToolsEnabled {
+		t.Error("Expected GuestToolsEnabled to be true")
+	}
+	if m.GuestToolsVersion != "3.2.0" {
+		t.Errorf("Expected GuestToolsVersion '3.2.0', got %s", m.GuestToolsVersion)
+	}
+	if m.Disks[0].StorageContainerName != "default-container-prod" {
+		t.Errorf("Expected storage container name 'default-container-prod', got %s", m.Disks[0].StorageContainerName)
+	}
+}
+
+// TestApplyVMDetail tests VM mapping from a detailed API response.
+func TestApplyVMDetail(t *testing.T) {
+	data, err := os.ReadFile("testdata/vm_detail_example.json")
+	if err != nil {
+		t.Fatalf("Failed to read testdata: %v", err)
+	}
+
+	var entity map[string]interface{}
+	if err := json.Unmarshal(data, &entity); err != nil {
+		t.Fatalf("Failed to unmarshal JSON: %v", err)
+	}
+
+	m := &model.VM{}
+	applyVM(entity, m)
+
+	if m.GuestOSID != "rhel8_64Guest" {
+		t.Errorf("Expected GuestOSID 'rhel8_64Guest', got %s", m.GuestOSID)
+	}
+	if m.GuestOSVersion != "Red Hat Enterprise Linux 8.9 (Ootpa)" {
+		t.Errorf("Expected GuestOSVersion to be set, got %s", m.GuestOSVersion)
+	}
+	if m.HypervisorType != "AHV" {
+		t.Errorf("Expected HypervisorType 'AHV', got %s", m.HypervisorType)
+	}
+	if m.Host == "" {
+		t.Error("Expected Host to be set from status.resources")
+	}
+}
+
+func TestEnrichVM(t *testing.T) {
+	m := &model.VM{
+		Disks: []model.Disk{
+			{StorageContainerUUID: "sc-1"},
+		},
+		NICs: []model.NIC{
+			{SubnetUUID: "net-1"},
+		},
+	}
+
+	enrichVM(m, map[string]string{"sc-1": "default-container"}, map[string]string{"net-1": "Production-VLAN"})
+
+	if m.Disks[0].StorageContainerName != "default-container" {
+		t.Errorf("Expected storage container name to be enriched, got %s", m.Disks[0].StorageContainerName)
+	}
+	if m.NICs[0].SubnetName != "Production-VLAN" {
+		t.Errorf("Expected subnet name to be enriched, got %s", m.NICs[0].SubnetName)
+	}
 }
 
 // TestGetStringHelper tests the getString helper function.
