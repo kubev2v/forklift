@@ -43,10 +43,16 @@ type Client struct {
 	client *libweb.Client
 	// Secret containing credentials
 	secret *core.Secret
+	// Provider settings (prismType, clusterUuid, ...)
+	settings map[string]string
 	// Client timeout
 	clientTimeout time.Duration
 	// Logger
 	log logging.LevelLogger
+	// Resolved Prism endpoint configuration.
+	prism PrismConfig
+	// Whether prism config has been resolved.
+	prismResolved bool
 }
 
 // Connect and authenticate with Nutanix Prism
@@ -100,8 +106,14 @@ func (r *Client) connect() (status int, err error) {
 		return status, err
 	}
 
+	if err = r.ensurePrismConfig(); err != nil {
+		r.client = nil
+		return status, err
+	}
+
 	r.log.Info("Successfully connected to Nutanix",
-		"url", r.url)
+		"url", r.url,
+		"prismMode", r.prism.Mode)
 
 	return http.StatusOK, nil
 }
@@ -322,28 +334,6 @@ func (r *Client) listVMs() (entities []map[string]interface{}, err error) {
 // List all subnets (networks)
 func (r *Client) listSubnets() (entities []map[string]interface{}, err error) {
 	result, err := r.list("subnet", nil, 0, 500)
-	if err != nil {
-		return nil, err
-	}
-
-	entitiesList, ok := result["entities"].([]interface{})
-	if !ok {
-		return []map[string]interface{}{}, nil
-	}
-
-	entities = make([]map[string]interface{}, 0, len(entitiesList))
-	for _, e := range entitiesList {
-		if entity, ok := e.(map[string]interface{}); ok {
-			entities = append(entities, entity)
-		}
-	}
-
-	return entities, nil
-}
-
-// List all storage containers
-func (r *Client) listStorageContainers() (entities []map[string]interface{}, err error) {
-	result, err := r.list("storage_container", nil, 0, 500)
 	if err != nil {
 		return nil, err
 	}

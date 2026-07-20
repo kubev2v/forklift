@@ -23,11 +23,20 @@ func createTestClient(url string) *Client {
 	}
 
 	return &Client{
-		url:           url,
-		secret:        secret,
+		url:    url,
+		secret: secret,
+		settings: map[string]string{
+			api.NutanixPrismType: api.NutanixPrismElement,
+		},
 		log:           logging.WithName("test"),
 		clientTimeout: 30 * time.Second,
 	}
+}
+
+func createTestClientWithSettings(url string, settings map[string]string) *Client {
+	client := createTestClient(url)
+	client.settings = settings
+	return client
 }
 
 // TestClientConnect tests the connect method.
@@ -239,23 +248,37 @@ func TestClientListSubnets(t *testing.T) {
 	}
 }
 
-// TestClientListStorageContainers tests listing storage containers.
+// TestClientListStorageContainers tests listing storage containers on Prism Element.
 func TestClientListStorageContainers(t *testing.T) {
-	// Load test data
-	data, err := os.ReadFile("testdata/storage_containers_list.json")
+	data, err := os.ReadFile("testdata/storage_containers_v2_list.json")
 	if err != nil {
 		t.Fatalf("Failed to read testdata: %v", err)
 	}
 
-	// Create mock server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write(data)
+		switch r.URL.Path {
+		case "/api/nutanix/v3/clusters/list":
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"entities":[]}`))
+		case "/api/nutanix/v3/prism_central":
+			w.WriteHeader(http.StatusNotFound)
+		case "/api/nutanix/v2.0/storage_containers":
+			if r.Method != "GET" {
+				t.Errorf("Expected GET, got %s", r.Method)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write(data)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
 	}))
 	defer server.Close()
 
-	client := createTestClient(server.URL)
+	client := createTestClientWithSettings(server.URL, map[string]string{
+		api.NutanixPrismType: api.NutanixPrismElement,
+	})
 	client.url = server.URL
 
 	entities, err := client.listStorageContainers()
@@ -265,6 +288,47 @@ func TestClientListStorageContainers(t *testing.T) {
 
 	if len(entities) == 0 {
 		t.Error("Expected at least one storage container")
+	}
+}
+
+// TestClientListStorageContainersCentral tests listing storage containers on Prism Central.
+func TestClientListStorageContainersCentral(t *testing.T) {
+	data, err := os.ReadFile("testdata/storage_containers_v4_list.json")
+	if err != nil {
+		t.Fatalf("Failed to read testdata: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/nutanix/v3/clusters/list":
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"entities":[]}`))
+		case "/api/clustermgmt/v4.1/config/storage-containers":
+			if r.Method != "GET" {
+				t.Errorf("Expected GET, got %s", r.Method)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write(data)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client := createTestClientWithSettings(server.URL, map[string]string{
+		api.NutanixPrismType: api.NutanixPrismCentral,
+	})
+	client.url = server.URL
+
+	entities, err := client.listStorageContainers()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if len(entities) != 2 {
+		t.Fatalf("Expected 2 storage containers, got %d", len(entities))
 	}
 }
 
