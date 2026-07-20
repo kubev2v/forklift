@@ -10243,6 +10243,7 @@ spec:
                                 array vendor.
                               enum:
                               - primera3par
+                              - pureFlashArray
                               type: string
                           required:
                           - secretRef

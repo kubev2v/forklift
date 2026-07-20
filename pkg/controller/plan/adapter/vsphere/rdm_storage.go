@@ -132,10 +132,14 @@ func findStorageMapEntriesForVendor(storageMap []api.StoragePair, vendor api.Sto
 	var matches []*api.StoragePair
 	for i := range storageMap {
 		entry := &storageMap[i]
-		if entry.OffloadPlugin == nil || entry.OffloadPlugin.VSphereXcopyPluginConfig == nil {
+		if entry.OffloadPlugin == nil {
 			continue
 		}
-		if entry.OffloadPlugin.VSphereXcopyPluginConfig.StorageVendorProduct == vendor {
+		if entry.OffloadPlugin.CsiVolumeImport != nil &&
+			entry.OffloadPlugin.CsiVolumeImport.StorageVendorProduct == vendor {
+			matches = append(matches, entry)
+		} else if entry.OffloadPlugin.VSphereXcopyPluginConfig != nil &&
+			entry.OffloadPlugin.VSphereXcopyPluginConfig.StorageVendorProduct == vendor {
 			matches = append(matches, entry)
 		}
 	}

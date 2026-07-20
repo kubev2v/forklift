@@ -6,6 +6,7 @@ import (
 	forklift "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/storage/resolver"
 	"github.com/kubev2v/forklift/pkg/storage/resolver/hpe"
+	"github.com/kubev2v/forklift/pkg/storage/resolver/pure"
 )
 
 // newCsiImportPlugin instantiates the CsiImportPlugin for the given storage vendor.
@@ -15,9 +16,8 @@ func newCsiImportPlugin(product forklift.StorageVendorProduct, host, user, pass 
 	switch product {
 	case forklift.StorageVendorProductPrimera3Par:
 		return hpe.NewHpeImporter(host, user, pass, skipSSL)
-	// Future vendors:
-	// case forklift.StorageVendorProductOntap:
-	//     return netapp.NewNetappImporter(host, user, pass, skipSSL)
+	case forklift.StorageVendorProductPureFlashArray:
+		return pure.NewPureImporter(host, user, pass, skipSSL)
 	default:
 		return nil, fmt.Errorf("CSI import not supported for vendor %q", product)
 	}
