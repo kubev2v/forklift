@@ -157,57 +157,71 @@ type PlanSpec struct {
 	// Generated names must be valid DNS-1123 labels (lowercase alphanumerics, '-' allowed, max 63 chars).
 	// It follows Go template syntax and has access to provider-specific variables.
 	//
-	// Common variables (all providers):
-	//   - .VmName: name of the VM in the source cluster (original source name)
-	//   - .TargetVmName: final VM name in the target cluster (may equal .VmName if no rename/normalization)
-	//   - .PlanName: name of the migration plan
-	//   - .DiskIndex: initial volume index of the disk
+	// WARNING: The PVC name is reused as a building block in other K8s resource names
+	// (e.g., "scratch-dv-{pvcName}-xxxxx", "convert-{pvcName}-xxxxx").
+	// To avoid exceeding the 63-char DNS1123 label limit on derived resources,
+	// keep the template output to at most 40 characters (46 if UseGenerateName is false).
+	// The built-in default uses trunc 15 for plan and VM names to stay within this budget.
 	//
-	// VMware (vSphere) specific variables:
-	//   - .WinDriveLetter: Windows drive letter (lowercase, if applicable, e.g. "c", requires guest agent)
-	//   - .RootDiskIndex: index of the root disk
-	//   - .Shared: true if the volume is shared by multiple VMs, false otherwise
-	//   - .FileName: name of the file in the source provider (filename includes the .vmdk suffix)
+	// Available template variables:
 	//
-	// OpenShift specific variables:
+	// All providers:
+	//   - .VmName: original source VM name
+	//   - .TargetVmName: DNS1123-safe target VM name
+	//   - .PlanName: migration plan name
+	//   - .DiskIndex: sequential index of the disk being migrated
+	//   - .VmId: source VM identifier from the provider
+	//
+	// vSphere only (empty for other providers):
+	//   - .WinDriveLetter: Windows drive letter (lowercase, e.g. "c"; requires guest agent)
+	//   - .RootDiskIndex: index of the root/boot disk
+	//   - .Shared: true if the disk is shared by multiple VMs
+	//   - .FileName: source VMDK file name including the .vmdk suffix
+	//
+	// OpenShift only (empty for other providers):
 	//   - .SourcePVCName: name of the PVC in the source cluster
 	//   - .SourcePVCNamespace: namespace of the PVC in the source cluster
 	//
-	// Default behavior when not set:
-	//   - VMware: generates names like "{{trunc 4 .PlanName}}-{{trunc 4 .VmName}}-disk-{{.DiskIndex}}"
-	//   - OpenShift: uses the original source PVC name ("{{.SourcePVCName}}")
+	// EC2 only (empty for other providers):
+	//   - .VolumeID: original EBS volume ID
+	//   - .SnapshotID: snapshot ID used to create the volume
 	//
 	// Note:
 	//   This template can be overridden at the individual VM level.
+	//   When PVCNameTemplatePreserveSource is true (default) and the source has PVC names (OCP),
+	//   the source PVC name is used directly, bypassing this template.
+	//   Provider-specific variables are empty (zero value) when used with a different provider.
 	// Examples:
 	//   "{{.TargetVmName}}-disk-{{.DiskIndex}}"
-	//   "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}" (VMware)
-	//   "{{.TargetVmName}}-{{.SourcePVCName}}" (OpenShift)
+	//   "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}" (vSphere)
+	//   "{{.TargetVmName}}-{{.SourcePVCName}}" (OpenShift, with pvcNameTemplatePreserveSource: false)
+	//   "{{.PlanName}}-{{.VmId}}" (mimics legacy naming)
 	// See:
 	// 	 https://github.com/kubev2v/forklift/tree/main/pkg/templateutil for template functions.
-	// +optional
+	// +kubebuilder:default:="{{trunc 15 .PlanName}}-{{trunc 15 .TargetVmName}}-disk-{{.DiskIndex}}"
 	PVCNameTemplate string `json:"pvcNameTemplate,omitempty"`
 	// PVCNameTemplateUseGenerateName indicates if the PVC name template should use generateName instead of name.
 	// This field controls whether the template output is used as an exact name or as a prefix for generated names.
 	//
-	// Provider-specific behavior:
-	//
-	// VMware (vSphere):
 	//   - true (default): Template output is used as generateName prefix, Kubernetes adds a random suffix
 	//     (e.g., "my-vm-disk-0-" becomes "my-vm-disk-0-abc12")
 	//   - false: Template output is used as the exact PVC name
 	//     **DANGER**: May cause conflicts if the generated name is not unique
 	//
-	// OpenShift:
-	//   - Supported when a custom pvcNameTemplate is set (plan-level or VM-level).
-	//   - When no custom template is set, the default "{{.SourcePVCName}}" always uses exact names
-	//     regardless of this field.
-	//   - true: Template output is used as generateName prefix, Kubernetes adds a random suffix
-	//   - false: Template output is used as the exact PVC name
+	// Note: When PVCNameTemplatePreserveSource is true and source PVC names are available (OCP),
+	// the source PVC name is used as an exact name regardless of this field.
 	//
 	// +optional
 	// +kubebuilder:default:=true
 	PVCNameTemplateUseGenerateName bool `json:"pvcNameTemplateUseGenerateName,omitempty"`
+	// PVCNameTemplatePreserveSource controls whether PVC names are copied from the source when available.
+	// When true (default) and the source VM has existing PVC names (e.g., OCP-to-OCP migrations),
+	// the source PVC name is used directly, bypassing the PVCNameTemplate.
+	// When false, the PVCNameTemplate is always applied regardless of whether source PVC names exist.
+	// For providers without source PVCs (vSphere, oVirt, EC2, etc.), this flag has no effect.
+	// +optional
+	// +kubebuilder:default:=true
+	PVCNameTemplatePreserveSource bool `json:"pvcNameTemplatePreserveSource,omitempty"`
 	// VolumeNameTemplate is a template for generating volume interface names in the target virtual machine.
 	// It follows Go template syntax and has access to the following variables:
 	//   - .PVCName: name of the PVC mounted to the VM using this volume
@@ -565,26 +579,38 @@ func (r *Plan) IsUsingOffloadPlugin() bool {
 	return false
 }
 
-// VSpherePVCNameTemplateData contains fields used in PVC naming templates for vSphere migrations.
-type VSpherePVCNameTemplateData struct {
-	VmName         string `json:"vmName"`
-	TargetVmName   string `json:"targetVmName"`
-	PlanName       string `json:"planName"`
-	DiskIndex      int    `json:"diskIndex"`
-	WinDriveLetter string `json:"winDriveLetter,omitempty"`
-	RootDiskIndex  int    `json:"rootDiskIndex"`
-	Shared         bool   `json:"shared,omitempty"`
-	FileName       string `json:"fileName,omitempty"`
-}
+// PVCNameTemplateData contains all fields used in PVC naming templates across all providers.
+// Fields not applicable to a given provider are left empty (zero value).
+type PVCNameTemplateData struct {
+	// VmName is the original source VM name (all providers).
+	VmName string `json:"vmName"`
+	// TargetVmName is the DNS1123-safe target VM name (all providers).
+	TargetVmName string `json:"targetVmName"`
+	// PlanName is the migration plan name (all providers).
+	PlanName string `json:"planName"`
+	// DiskIndex is the sequential index of the disk being migrated (all providers).
+	DiskIndex int `json:"diskIndex"`
+	// VmId is the source VM identifier from the provider (all providers).
+	VmId string `json:"vmId"`
 
-// OCPPVCNameTemplateData contains fields used in PVC naming templates for OpenShift migrations.
-type OCPPVCNameTemplateData struct {
-	VmName             string `json:"vmName"`
-	TargetVmName       string `json:"targetVmName"`
-	PlanName           string `json:"planName"`
-	DiskIndex          int    `json:"diskIndex"`
-	SourcePVCName      string `json:"sourcePVCName"`
-	SourcePVCNamespace string `json:"sourcePVCNamespace"`
+	// WinDriveLetter is the Windows drive letter, lowercase (vSphere only; requires guest agent).
+	WinDriveLetter string `json:"winDriveLetter,omitempty"`
+	// RootDiskIndex is the index of the root/boot disk (vSphere only).
+	RootDiskIndex int `json:"rootDiskIndex,omitempty"`
+	// Shared is true if the disk is shared by multiple VMs (vSphere only).
+	Shared bool `json:"shared,omitempty"`
+	// FileName is the source VMDK file name including suffix (vSphere only).
+	FileName string `json:"fileName,omitempty"`
+
+	// SourcePVCName is the name of the PVC in the source cluster (OpenShift only).
+	SourcePVCName string `json:"sourcePVCName,omitempty"`
+	// SourcePVCNamespace is the namespace of the PVC in the source cluster (OpenShift only).
+	SourcePVCNamespace string `json:"sourcePVCNamespace,omitempty"`
+
+	// VolumeID is the original EBS volume ID (EC2 only).
+	VolumeID string `json:"volumeID,omitempty"`
+	// SnapshotID is the snapshot ID used to create the volume (EC2 only).
+	SnapshotID string `json:"snapshotID,omitempty"`
 }
 
 // VolumeNameTemplateData contains fields used in naming templates.

@@ -110,6 +110,7 @@ const (
 	VMCriticalConcerns              = "VMCriticalConcerns"
 	RDMDiskWarning                  = "RDMDiskWarning"
 	IndependentDiskWarning          = "IndependentDiskWarning"
+	PVCNameTemplateRequired         = "PVCNameTemplateRequired"
 	// NetAppShift (Advisory) reports whether the plan's storage map uses a NetApp Shift/Trident class.
 	NetAppShift = "NetAppShift"
 	// NetAppShiftWarmNotSupported (Critical) blocks warm migration when the storage map uses NetApp Shift.
@@ -1015,6 +1016,16 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 		return liberr.Wrap(err, "check NetApp Shift storage")
 	}
 
+	if plan.Spec.PVCNameTemplate == "" {
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     PVCNameTemplateRequired,
+			Status:   True,
+			Reason:   NotValid,
+			Category: api.CategoryCritical,
+			Message:  "PVCNameTemplate is required. Re-apply the plan to pick up the default, or set a custom template.",
+		})
+	}
+
 	// Referenced VMs.
 	for i := range plan.Spec.VMs {
 		vm := &plan.Spec.VMs[i]
@@ -1359,15 +1370,12 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 				consolidationNeeded.Items = append(consolidationNeeded.Items, ref.String())
 			}
 		}
-		// is valid vm pvc name template
-		if plan.Spec.PVCNameTemplate != "" || vm.PVCNameTemplate != "" {
-			// if vm level pvc name template is set, use it, otherwise use plan level pvc name template
-			pvcNameTemplate := plan.Spec.PVCNameTemplate
-			if vm.PVCNameTemplate != "" {
-				pvcNameTemplate = vm.PVCNameTemplate
-			}
-
-			// validate pvc name template for the vm
+		// validate pvc name template
+		pvcNameTemplate := plan.Spec.PVCNameTemplate
+		if vm.PVCNameTemplate != "" {
+			pvcNameTemplate = vm.PVCNameTemplate
+		}
+		if pvcNameTemplate != "" {
 			if _, err := validator.PVCNameTemplate(vm.Ref, pvcNameTemplate); err != nil {
 				r.Log.Info("PVC name template is invalid", "error", err.Error(), "template", pvcNameTemplate, "plan", plan.Name, "namespace", plan.Namespace)
 
@@ -1375,13 +1383,13 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 				pvcNameInvalid.Items = append(pvcNameInvalid.Items, conditionItem)
 			}
 		}
-		// is valid vm pvc name template
+		// validate volume name template
 		if vm.VolumeNameTemplate != "" {
 			if err := r.IsValidVolumeNameTemplate(vm.VolumeNameTemplate); err != nil {
 				volumeNameInvalid.Items = append(volumeNameInvalid.Items, ref.String())
 			}
 		}
-		// is valid vm pvc name template
+		// validate network name template
 		if vm.NetworkNameTemplate != "" {
 			if err := r.IsValidNetworkNameTemplate(vm.NetworkNameTemplate); err != nil {
 				networkNameInvalid.Items = append(networkNameInvalid.Items, ref.String())

@@ -3,6 +3,7 @@ package builder
 import (
 	"fmt"
 
+	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
@@ -60,5 +61,47 @@ var _ = Describe("BuildDirectPVC", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pvc.Spec.VolumeMode).NotTo(BeNil())
 		Expect(*pvc.Spec.VolumeMode).To(Equal(core.PersistentVolumeBlock))
+	})
+
+	It("should use PVC name template with GenerateName (default)", func() {
+		pvc, err := builder.BuildDirectPVC(vmRef, volumeInfo, 0)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvc.GenerateName).To(Equal("test-plan-test-vm-disk-0-"))
+		Expect(pvc.Name).To(BeEmpty())
+	})
+
+	It("should use custom PVC name template from plan", func() {
+		builder.Plan.Spec.PVCNameTemplate = "{{.PlanName}}-{{.VmId}}-disk-{{.DiskIndex}}"
+		pvc, err := builder.BuildDirectPVC(vmRef, volumeInfo, 1)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvc.GenerateName).To(Equal("test-plan-i-123-disk-1-"))
+	})
+
+	It("should use exact name when UseGenerateName is false", func() {
+		builder.Plan.Spec.PVCNameTemplateUseGenerateName = false
+		pvc, err := builder.BuildDirectPVC(vmRef, volumeInfo, 0)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvc.Name).To(Equal("test-plan-test-vm-disk-0"))
+		Expect(pvc.GenerateName).To(BeEmpty())
+	})
+
+	It("should include EC2-specific VolumeID and SnapshotID in templates", func() {
+		builder.Plan.Spec.PVCNameTemplate = "{{trunc 10 .VolumeID}}-{{.DiskIndex}}"
+		pvc, err := builder.BuildDirectPVC(vmRef, volumeInfo, 0)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvc.GenerateName).To(Equal("vol-0origi-0-"))
+	})
+
+	It("should use VM-level template override", func() {
+		builder.Plan.Spec.PVCNameTemplate = "plan-{{.DiskIndex}}"
+		builder.Plan.Spec.VMs = []planapi.VM{
+			{
+				Ref:             ref.Ref{ID: "i-123", Name: "test-vm"},
+				PVCNameTemplate: "vm-{{.TargetVmName}}-{{.DiskIndex}}",
+			},
+		}
+		pvc, err := builder.BuildDirectPVC(vmRef, volumeInfo, 0)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvc.GenerateName).To(Equal("vm-test-vm-0-"))
 	})
 })

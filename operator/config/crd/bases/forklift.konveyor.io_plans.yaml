@@ -1359,52 +1359,63 @@ spec:
                 - source
                 type: object
               pvcNameTemplate:
+                default: '{{trunc 15 .PlanName}}-{{trunc 15 .TargetVmName}}-disk-{{.DiskIndex}}'
                 description: "PVCNameTemplate is a template for generating PVC names
                   for VM disks.\nGenerated names must be valid DNS-1123 labels (lowercase
                   alphanumerics, '-' allowed, max 63 chars).\nIt follows Go template
-                  syntax and has access to provider-specific variables.\n\nCommon
-                  variables (all providers):\n  - .VmName: name of the VM in the source
-                  cluster (original source name)\n  - .TargetVmName: final VM name
-                  in the target cluster (may equal .VmName if no rename/normalization)\n
-                  \ - .PlanName: name of the migration plan\n  - .DiskIndex: initial
-                  volume index of the disk\n\nVMware (vSphere) specific variables:\n
-                  \ - .WinDriveLetter: Windows drive letter (lowercase, if applicable,
-                  e.g. \"c\", requires guest agent)\n  - .RootDiskIndex: index of
-                  the root disk\n  - .Shared: true if the volume is shared by multiple
-                  VMs, false otherwise\n  - .FileName: name of the file in the source
-                  provider (filename includes the .vmdk suffix)\n\nOpenShift specific
-                  variables:\n  - .SourcePVCName: name of the PVC in the source cluster\n
-                  \ - .SourcePVCNamespace: namespace of the PVC in the source cluster\n\nDefault
-                  behavior when not set:\n  - VMware: generates names like \"{{trunc
-                  4 .PlanName}}-{{trunc 4 .VmName}}-disk-{{.DiskIndex}}\"\n  - OpenShift:
-                  uses the original source PVC name (\"{{.SourcePVCName}}\")\n\nNote:\n
-                  \ This template can be overridden at the individual VM level.\nExamples:\n
+                  syntax and has access to provider-specific variables.\n\nWARNING:
+                  The PVC name is reused as a building block in other K8s resource
+                  names\n(e.g., \"scratch-dv-{pvcName}-xxxxx\", \"convert-{pvcName}-xxxxx\").\nTo
+                  avoid exceeding the 63-char DNS1123 label limit on derived resources,\nkeep
+                  the template output to at most 40 characters (46 if UseGenerateName
+                  is false).\nThe built-in default uses trunc 15 for plan and VM names
+                  to stay within this budget.\n\nAvailable template variables:\n\nAll
+                  providers:\n  - .VmName: original source VM name\n  - .TargetVmName:
+                  DNS1123-safe target VM name\n  - .PlanName: migration plan name\n
+                  \ - .DiskIndex: sequential index of the disk being migrated\n  -
+                  .VmId: source VM identifier from the provider\n\nvSphere only (empty
+                  for other providers):\n  - .WinDriveLetter: Windows drive letter
+                  (lowercase, e.g. \"c\"; requires guest agent)\n  - .RootDiskIndex:
+                  index of the root/boot disk\n  - .Shared: true if the disk is shared
+                  by multiple VMs\n  - .FileName: source VMDK file name including
+                  the .vmdk suffix\n\nOpenShift only (empty for other providers):\n
+                  \ - .SourcePVCName: name of the PVC in the source cluster\n  - .SourcePVCNamespace:
+                  namespace of the PVC in the source cluster\n\nEC2 only (empty for
+                  other providers):\n  - .VolumeID: original EBS volume ID\n  - .SnapshotID:
+                  snapshot ID used to create the volume\n\nNote:\n  This template
+                  can be overridden at the individual VM level.\n  When PVCNameTemplatePreserveSource
+                  is true (default) and the source has PVC names (OCP),\n  the source
+                  PVC name is used directly, bypassing this template.\n  Provider-specific
+                  variables are empty (zero value) when used with a different provider.\nExamples:\n
                   \ \"{{.TargetVmName}}-disk-{{.DiskIndex}}\"\n  \"{{if eq .DiskIndex
-                  .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}\" (VMware)\n
-                  \ \"{{.TargetVmName}}-{{.SourcePVCName}}\" (OpenShift)\nSee:\n\t
+                  .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}\" (vSphere)\n
+                  \ \"{{.TargetVmName}}-{{.SourcePVCName}}\" (OpenShift, with pvcNameTemplatePreserveSource:
+                  false)\n  \"{{.PlanName}}-{{.VmId}}\" (mimics legacy naming)\nSee:\n\t
                   https://github.com/kubev2v/forklift/tree/main/pkg/templateutil for
                   template functions."
                 type: string
+              pvcNameTemplatePreserveSource:
+                default: true
+                description: |-
+                  PVCNameTemplatePreserveSource controls whether PVC names are copied from the source when available.
+                  When true (default) and the source VM has existing PVC names (e.g., OCP-to-OCP migrations),
+                  the source PVC name is used directly, bypassing the PVCNameTemplate.
+                  When false, the PVCNameTemplate is always applied regardless of whether source PVC names exist.
+                  For providers without source PVCs (vSphere, oVirt, EC2, etc.), this flag has no effect.
+                type: boolean
               pvcNameTemplateUseGenerateName:
                 default: true
                 description: |-
                   PVCNameTemplateUseGenerateName indicates if the PVC name template should use generateName instead of name.
                   This field controls whether the template output is used as an exact name or as a prefix for generated names.
 
-                  Provider-specific behavior:
-
-                  VMware (vSphere):
                     - true (default): Template output is used as generateName prefix, Kubernetes adds a random suffix
                       (e.g., "my-vm-disk-0-" becomes "my-vm-disk-0-abc12")
                     - false: Template output is used as the exact PVC name
                       **DANGER**: May cause conflicts if the generated name is not unique
 
-                  OpenShift:
-                    - Supported when a custom pvcNameTemplate is set (plan-level or VM-level).
-                    - When no custom template is set, the default "{{.SourcePVCName}}" always uses exact names
-                      regardless of this field.
-                    - true: Template output is used as generateName prefix, Kubernetes adds a random suffix
-                    - false: Template output is used as the exact PVC name
+                  Note: When PVCNameTemplatePreserveSource is true and source PVC names are available (OCP),
+                  the source PVC name is used as an exact name regardless of this field.
                 type: boolean
               rdmAsLun:
                 description: |-
@@ -2707,24 +2718,38 @@ spec:
                         names for VM disks.\nGenerated names must be valid DNS-1123
                         labels (lowercase alphanumerics, '-' allowed, max 63 chars).\nIt
                         follows Go template syntax and has access to provider-specific
-                        variables.\n\nCommon variables (all providers):\n  - .VmName:
-                        name of the VM in the source cluster (original source name)\n
-                        \ - .TargetVmName: final VM name in the target cluster (may
-                        equal .VmName if no rename/normalization)\n  - .PlanName:
-                        name of the migration plan\n  - .DiskIndex: initial volume
-                        index of the disk\n\nVMware (vSphere) specific variables:\n
-                        \ - .WinDriveLetter: Windows drive letter (lowercase, if applicable,
-                        e.g. \"c\", requires guest agent)\n  - .RootDiskIndex: index
-                        of the root disk\n  - .Shared: true if the volume is shared
-                        by multiple VMs, false otherwise\n  - .FileName: name of the
-                        file in the source provider (filename includes the .vmdk suffix)\n\nOpenShift
+                        variables.\n\nWARNING: The PVC name is reused as a building
+                        block in other K8s resource names\n(e.g., \"scratch-dv-{pvcName}-xxxxx\",
+                        \"convert-{pvcName}-xxxxx\").\nTo avoid exceeding the 63-char
+                        DNS1123 label limit on derived resources,\nkeep the template
+                        output to at most 40 characters (46 if UseGenerateName is
+                        false).\nThe built-in default uses trunc 15 for plan and VM
+                        names to stay within this budget.\n\nCommon variables (all
+                        providers):\n  - .VmName: name of the VM in the source cluster
+                        (original source name)\n  - .TargetVmName: final VM name in
+                        the target cluster (may equal .VmName if no rename/normalization)\n
+                        \ - .PlanName: name of the migration plan\n  - .DiskIndex:
+                        initial volume index of the disk\n  - .VmId: source VM identifier
+                        from the provider (useful for mimicking old planName-vmId
+                        naming)\n\nVMware (vSphere) specific variables:\n  - .WinDriveLetter:
+                        Windows drive letter (lowercase, if applicable, e.g. \"c\",
+                        requires guest agent)\n  - .RootDiskIndex: index of the root
+                        disk\n  - .Shared: true if the volume is shared by multiple
+                        VMs, false otherwise\n  - .FileName: name of the file in the
+                        source provider (filename includes the .vmdk suffix)\n\nOpenShift
                         specific variables:\n  - .SourcePVCName: name of the PVC in
                         the source cluster\n  - .SourcePVCNamespace: namespace of
-                        the PVC in the source cluster\n\nNote:\n  This template overrides
-                        the plan level template.\nExamples:\n  \"{{.TargetVmName}}-disk-{{.DiskIndex}}\"\n
-                        \ \"{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}\"
-                        (VMware)\n  \"{{.TargetVmName}}-{{.SourcePVCName}}\" (OpenShift)\nSee:\n\t
-                        https://github.com/kubev2v/forklift/tree/main/pkg/templateutil
+                        the PVC in the source cluster\n\nEC2 specific variables:\n
+                        \ - .VolumeID: original EBS volume ID\n  - .SnapshotID: snapshot
+                        ID used to create the volume\n\nNote:\n  This template overrides
+                        the plan level template.\n  When PVCNameTemplatePreserveSource
+                        is true (default) and source PVC names exist (OCP),\n  the
+                        source PVC name is used directly, bypassing this template.\nExamples:\n
+                        \ \"{{.TargetVmName}}-disk-{{.DiskIndex}}\"\n  \"{{if eq .DiskIndex
+                        .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}\" (VMware)\n
+                        \ \"{{.TargetVmName}}-{{.SourcePVCName}}\" (OpenShift, with
+                        pvcNameTemplatePreserveSource: false)\n  \"{{.PlanName}}-{{.VmId}}\"
+                        (mimics legacy naming)\nSee:\n\t https://github.com/kubev2v/forklift/tree/main/pkg/templateutil
                         for template functions."
                       type: string
                     rdmAsLun:
@@ -3506,25 +3531,40 @@ spec:
                             PVC names for VM disks.\nGenerated names must be valid
                             DNS-1123 labels (lowercase alphanumerics, '-' allowed,
                             max 63 chars).\nIt follows Go template syntax and has
-                            access to provider-specific variables.\n\nCommon variables
-                            (all providers):\n  - .VmName: name of the VM in the source
-                            cluster (original source name)\n  - .TargetVmName: final
-                            VM name in the target cluster (may equal .VmName if no
-                            rename/normalization)\n  - .PlanName: name of the migration
-                            plan\n  - .DiskIndex: initial volume index of the disk\n\nVMware
-                            (vSphere) specific variables:\n  - .WinDriveLetter: Windows
-                            drive letter (lowercase, if applicable, e.g. \"c\", requires
-                            guest agent)\n  - .RootDiskIndex: index of the root disk\n
-                            \ - .Shared: true if the volume is shared by multiple
-                            VMs, false otherwise\n  - .FileName: name of the file
-                            in the source provider (filename includes the .vmdk suffix)\n\nOpenShift
-                            specific variables:\n  - .SourcePVCName: name of the PVC
-                            in the source cluster\n  - .SourcePVCNamespace: namespace
-                            of the PVC in the source cluster\n\nNote:\n  This template
-                            overrides the plan level template.\nExamples:\n  \"{{.TargetVmName}}-disk-{{.DiskIndex}}\"\n
+                            access to provider-specific variables.\n\nWARNING: The
+                            PVC name is reused as a building block in other K8s resource
+                            names\n(e.g., \"scratch-dv-{pvcName}-xxxxx\", \"convert-{pvcName}-xxxxx\").\nTo
+                            avoid exceeding the 63-char DNS1123 label limit on derived
+                            resources,\nkeep the template output to at most 40 characters
+                            (46 if UseGenerateName is false).\nThe built-in default
+                            uses trunc 15 for plan and VM names to stay within this
+                            budget.\n\nCommon variables (all providers):\n  - .VmName:
+                            name of the VM in the source cluster (original source
+                            name)\n  - .TargetVmName: final VM name in the target
+                            cluster (may equal .VmName if no rename/normalization)\n
+                            \ - .PlanName: name of the migration plan\n  - .DiskIndex:
+                            initial volume index of the disk\n  - .VmId: source VM
+                            identifier from the provider (useful for mimicking old
+                            planName-vmId naming)\n\nVMware (vSphere) specific variables:\n
+                            \ - .WinDriveLetter: Windows drive letter (lowercase,
+                            if applicable, e.g. \"c\", requires guest agent)\n  -
+                            .RootDiskIndex: index of the root disk\n  - .Shared: true
+                            if the volume is shared by multiple VMs, false otherwise\n
+                            \ - .FileName: name of the file in the source provider
+                            (filename includes the .vmdk suffix)\n\nOpenShift specific
+                            variables:\n  - .SourcePVCName: name of the PVC in the
+                            source cluster\n  - .SourcePVCNamespace: namespace of
+                            the PVC in the source cluster\n\nEC2 specific variables:\n
+                            \ - .VolumeID: original EBS volume ID\n  - .SnapshotID:
+                            snapshot ID used to create the volume\n\nNote:\n  This
+                            template overrides the plan level template.\n  When PVCNameTemplatePreserveSource
+                            is true (default) and source PVC names exist (OCP),\n
+                            \ the source PVC name is used directly, bypassing this
+                            template.\nExamples:\n  \"{{.TargetVmName}}-disk-{{.DiskIndex}}\"\n
                             \ \"{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}\"
-                            (VMware)\n  \"{{.TargetVmName}}-{{.SourcePVCName}}\" (OpenShift)\nSee:\n\t
-                            https://github.com/kubev2v/forklift/tree/main/pkg/templateutil
+                            (VMware)\n  \"{{.TargetVmName}}-{{.SourcePVCName}}\" (OpenShift,
+                            with pvcNameTemplatePreserveSource: false)\n  \"{{.PlanName}}-{{.VmId}}\"
+                            (mimics legacy naming)\nSee:\n\t https://github.com/kubev2v/forklift/tree/main/pkg/templateutil
                             for template functions."
                           type: string
                         rdmAsLun:

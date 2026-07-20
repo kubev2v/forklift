@@ -29,14 +29,15 @@ const GlanceSource = "glance"
 
 // Conditions
 const (
-	ConditionExecuting = "Executing"
-	ConditionRunning   = "Running"
-	ConditionPending   = "Pending"
-	ConditionCanceled  = "Canceled"
-	ConditionSucceeded = "Succeeded"
-	ConditionFailed    = "Failed"
-	ConditionBlocked   = "Blocked"
-	ConditionDeleted   = "Deleted"
+	ConditionExecuting          = "Executing"
+	ConditionRunning            = "Running"
+	ConditionPending            = "Pending"
+	ConditionCanceled           = "Canceled"
+	ConditionSucceeded          = "Succeeded"
+	ConditionFailed             = "Failed"
+	ConditionBlocked            = "Blocked"
+	ConditionDeleted            = "Deleted"
+	ConditionPVCNameTemplateReq = "PVCNameTemplateRequired"
 )
 
 // Condition categories

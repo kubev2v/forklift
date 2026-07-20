@@ -342,10 +342,37 @@ func (r *Validator) VMMigrationType(vmRef ref.Ref) (ok bool, err error) {
 	return
 }
 
-// NO-OP
 func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (ok bool, err error) {
-	ok = true
-	return
+	workload := &model.Workload{}
+	err = r.Source.Inventory.Find(workload, vmRef)
+	if err != nil {
+		return false, liberr.Wrap(err, "vm", vmRef.String())
+	}
+
+	targetVmName := planbase.ResolveTargetVmName(r.Plan, vmRef.ID, vmRef.Name)
+
+	// Validate template for each volume plus the boot image if present
+	diskCount := len(workload.Volumes)
+	if workload.ImageID != "" {
+		diskCount++
+	}
+	if diskCount == 0 {
+		diskCount = 1
+	}
+	for i := 0; i < diskCount; i++ {
+		testData := &api.PVCNameTemplateData{
+			VmName:       vmRef.Name,
+			TargetVmName: targetVmName,
+			PlanName:     r.Plan.Name,
+			DiskIndex:    i,
+			VmId:         vmRef.ID,
+		}
+		_, err = planbase.ValidatePVCNameTemplate(pvcNameTemplate, testData)
+		if err != nil {
+			return false, liberr.Wrap(err, "vm", vmRef.String())
+		}
+	}
+	return true, nil
 }
 
 // NO-OP

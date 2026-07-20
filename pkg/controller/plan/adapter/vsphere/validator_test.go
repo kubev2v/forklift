@@ -288,7 +288,8 @@ var _ = Describe("vsphere validation tests", func() {
 			Entry("valid template with filename", "{{.FileName | trimSuffix \".vmdk\"}}", "test", true, ""),
 			Entry("valid template with drive letter", "disk-{{.WinDriveLetter}}", "test", true, ""),
 			Entry("valid template with conditional", "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}", "test", true, ""),
-			Entry("empty template should pass", "", "test", true, ""),
+			Entry("valid template with VmId", "{{.PlanName}}-{{.VmId}}", "test", true, ""),
+			Entry("valid universal default template", "{{trunc 15 .PlanName}}-{{trunc 15 .TargetVmName}}-disk-{{.DiskIndex}}", "test", true, ""),
 
 			// Invalid templates - syntax errors
 			Entry("invalid template syntax", "{{.VmName", "test", false, "Invalid template syntax"),
@@ -316,7 +317,7 @@ var _ = Describe("vsphere validation tests", func() {
 				Context: &ctx,
 			}
 
-			ok, err := validator.PVCNameTemplate(ref.Ref{Name: "empty_disk_vm", ID: "test-vm-id"}, "")
+			ok, err := validator.PVCNameTemplate(ref.Ref{Name: "empty_disk_vm", ID: "test-vm-id"}, "{{.VmName}}-disk-{{.DiskIndex}}")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(ok).To(BeTrue())
 		})
