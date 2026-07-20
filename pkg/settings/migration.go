@@ -69,6 +69,8 @@ const (
 	HostLeaseNamespace                     = "HOST_LEASE_NAMESPACE"
 	HostLeaseDurationSeconds               = "HOST_LEASE_DURATION_SECONDS"
 	MigrationServiceAccount                = "MIGRATION_SERVICE_ACCOUNT"
+	PVCNameTemplate                        = "PVC_NAME_TEMPLATE"
+	OCPPVCNameTemplate                     = "OCP_PVC_NAME_TEMPLATE"
 	NetAppShiftDiskPermsInitRequestsCpu    = "NETAPP_SHIFT_DISK_PERMS_INIT_REQUESTS_CPU"
 	NetAppShiftDiskPermsInitRequestsMemory = "NETAPP_SHIFT_DISK_PERMS_INIT_REQUESTS_MEMORY"
 	NetAppShiftDiskPermsInitLimitsCpu      = "NETAPP_SHIFT_DISK_PERMS_INIT_LIMITS_CPU"
@@ -182,6 +184,12 @@ type Migration struct {
 	HostLeaseDurationSeconds string
 	// ServiceAccount is the cluster-wide default ServiceAccount for migration pods
 	ServiceAccount string
+	// PVCNameTemplate is the cluster-wide default PVC name template for non-OCP providers.
+	// Empty falls back to the hardcoded DefaultPVCNameTemplate.
+	PVCNameTemplate string
+	// OCPPVCNameTemplate is the cluster-wide default PVC name template for OCP sources.
+	// Empty falls back to DefaultOCPPVCNameTemplate ("{{.SourcePVCName}}").
+	OCPPVCNameTemplate string
 	// NetAppShiftDiskPermsInit* are CPU/memory for the privileged NetApp Shift disk-perms init on virt-v2v conversion pods
 	NetAppShiftDiskPermsInitRequestsCpu    string
 	NetAppShiftDiskPermsInitRequestsMemory string
@@ -426,6 +434,12 @@ func (r *Migration) Load() (err error) {
 	if val, found := os.LookupEnv(MigrationServiceAccount); found {
 		r.ServiceAccount = val
 	}
+	if val, found := os.LookupEnv(PVCNameTemplate); found {
+		r.PVCNameTemplate = unescapeGoTemplate(val)
+	}
+	if val, found := os.LookupEnv(OCPPVCNameTemplate); found {
+		r.OCPPVCNameTemplate = unescapeGoTemplate(val)
+	}
 	r.NetAppShiftDiskPermsInitRequestsCpu = Lookup(NetAppShiftDiskPermsInitRequestsCpu, "10m")
 	r.NetAppShiftDiskPermsInitRequestsMemory = Lookup(NetAppShiftDiskPermsInitRequestsMemory, "32Mi")
 	r.NetAppShiftDiskPermsInitLimitsCpu = Lookup(NetAppShiftDiskPermsInitLimitsCpu, "200m")
@@ -464,4 +478,14 @@ func (r *Migration) Load() (err error) {
 		return liberr.Wrap(err)
 	}
 	return
+}
+
+// unescapeGoTemplate converts escaped Go template delimiters back to their
+// original form. The ForkliftController CRD requires \{ and \} escaping to
+// prevent Ansible's Jinja2 engine from interpreting Go template {{ }} syntax.
+func unescapeGoTemplate(s string) string {
+	s = strings.ReplaceAll(s, `\{`, `{`)
+	s = strings.ReplaceAll(s, `\}`, `}`)
+	s = strings.ReplaceAll(s, `\\`, `\`)
+	return s
 }

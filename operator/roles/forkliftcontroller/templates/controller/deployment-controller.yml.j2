@@ -132,6 +132,14 @@ spec:
         - name: MIGRATION_SERVICE_ACCOUNT
           value: "{{ controller_migration_service_account }}"
 {% endif %}
+{% if controller_pvc_name_template is defined and controller_pvc_name_template|length > 0 %}
+        - name: PVC_NAME_TEMPLATE
+          value: '{{ controller_pvc_name_template }}'
+{% endif %}
+{% if controller_ocp_pvc_name_template is defined and controller_ocp_pvc_name_template|length > 0 %}
+        - name: OCP_PVC_NAME_TEMPLATE
+          value: '{{ controller_ocp_pvc_name_template }}'
+{% endif %}
 {% if aap_url is defined and aap_url is string and aap_url|length > 0 %}
         - name: AAP_URL
           value: "{{ aap_url }}"

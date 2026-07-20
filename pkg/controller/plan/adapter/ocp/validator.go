@@ -393,10 +393,6 @@ func (r *KubeVirt) FeatureGate(feature string) (enabled bool) {
 
 // PVCNameTemplate validates that the PVC name template is valid for the given VM
 func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (ok bool, err error) {
-	if pvcNameTemplate == "" {
-		return true, nil
-	}
-
 	// Get the VM from source
 	vm := &cnv.VirtualMachine{}
 	err = r.sourceClient.Get(context.TODO(), k8sclient.ObjectKey{Namespace: vmRef.Namespace, Name: vmRef.Name}, vm)
@@ -428,15 +424,15 @@ func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (ok b
 			pvcName = vol.DataVolume.Name
 			pvcNamespace = vmRef.Namespace
 		default:
-			// Skip non-PVC volumes
 			continue
 		}
 
-		testData := api.OCPPVCNameTemplateData{
+		testData := api.PVCNameTemplateData{
 			VmName:             vmRef.Name,
 			TargetVmName:       targetVmName,
 			PlanName:           r.Plan.Name,
 			DiskIndex:          diskIndex,
+			VmId:               vmRef.ID,
 			SourcePVCName:      pvcName,
 			SourcePVCNamespace: pvcNamespace,
 		}

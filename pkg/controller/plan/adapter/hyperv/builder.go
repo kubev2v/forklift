@@ -304,8 +304,8 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 		return
 	}
 
-	for _, disk := range vm.Disks {
-		dv, dvErr := r.mapDataVolume(disk, dvTemplate)
+	for i, disk := range vm.Disks {
+		dv, dvErr := r.mapDataVolume(vm, disk, i, dvTemplate)
 		if dvErr != nil {
 			err = dvErr
 			return
@@ -315,7 +315,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 	return
 }
 
-func (r *Builder) mapDataVolume(disk hyperv.Disk, dvTemplate *cdi.DataVolume) (*cdi.DataVolume, error) {
+func (r *Builder) mapDataVolume(vm *model.VM, disk hyperv.Disk, diskIndex int, dvTemplate *cdi.DataVolume) (*cdi.DataVolume, error) {
 	storageClass := r.getStorageClass()
 	dvSource := cdi.DataVolumeSource{
 		Blank: &cdi.DataVolumeBlankImage{},
@@ -338,6 +338,19 @@ func (r *Builder) mapDataVolume(disk hyperv.Disk, dvTemplate *cdi.DataVolume) (*
 		dv.ObjectMeta.Annotations = make(map[string]string)
 	}
 	dv.ObjectMeta.Annotations[planbase.AnnDiskSource] = disk.ID
+
+	templateData := &api.PVCNameTemplateData{
+		VmName:       vm.Name,
+		TargetVmName: planbase.ResolveTargetVmName(r.Plan, vm.ID, vm.Name),
+		PlanName:     r.Plan.Name,
+		DiskIndex:    diskIndex,
+		VmId:         vm.ID,
+		DiskId:       disk.ID,
+	}
+	pvcNameTemplate := planbase.GetPVCNameTemplate(r.Plan, vm.ID)
+	if err := planbase.SetPVCNameOnObject(&dv.ObjectMeta, pvcNameTemplate, planbase.GetPVCNameTemplateUseGenerateName(r.Plan), templateData); err != nil {
+		return nil, liberr.Wrap(err, "vm", vm.ID, "disk", disk.ID, "diskIndex", diskIndex)
+	}
 	return dv, nil
 }
 

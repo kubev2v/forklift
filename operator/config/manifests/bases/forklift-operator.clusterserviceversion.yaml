@@ -281,6 +281,15 @@ spec:
         path: controller_migration_service_account
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: |-
+          Global default PVC name template for OpenShift (OCP) sources.
+          Used when Plan/VM pvcNameTemplate is empty. Empty falls back to "{{.SourcePVCName}}"
+          (exact name, preserves the source PVC name).
+          Does not apply to non-OCP providers (see controller_pvc_name_template).
+        displayName: Controller OCP PVC Name Template
+        path: controller_ocp_pvc_name_template
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Enable oVirt warm migration.
         displayName: Controller Ovirt Warm Migration
         path: controller_ovirt_warm_migration
@@ -289,6 +298,15 @@ spec:
       - description: Precopy interval in minutes.
         displayName: Controller Precopy Interval
         path: controller_precopy_interval
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:hidden
+      - description: |-
+          Global default PVC name template for non-OCP providers.
+          Used when Plan/VM pvcNameTemplate is empty. Empty falls back to the hardcoded default
+          "{{trunc 15 .PlanName}}-{{trunc 15 .TargetVmName}}-disk-{{.DiskIndex}}".
+          Does not apply to OpenShift sources (see controller_ocp_pvc_name_template).
+        displayName: Controller PVC Name Template
+        path: controller_pvc_name_template
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:hidden
       - description: Retain populator pods after migration for debugging.
