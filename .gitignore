@@ -80,3 +80,6 @@ gha-creds-*.json
 
 # developer-private test scenarios (verification, bug reproduction, etc.)
 tests/scenarios/
+
+# Mock server certificates
+pkg/controller/provider/container/nutanix/testdata/*.pem
