@@ -1,0 +1,219 @@
+{
+  "api_version": "3.1",
+  "metadata": {
+    "kind": "vm",
+    "uuid": "vm-0005a123-4567-89ab-cdef-000000000001",
+    "spec_version": 5,
+    "name": "web-server-rhel8",
+    "creation_time": "2024-01-15T10:30:00Z",
+    "last_update_time": "2024-06-20T14:22:00Z",
+    "categories": {
+      "Environment": "Production",
+      "Application": "WebServer",
+      "Owner": "Platform-Team"
+    },
+    "owner_reference": {
+      "kind": "user",
+      "uuid": "user-admin-uuid",
+      "name": "admin"
+    }
+  },
+  "spec": {
+    "name": "web-server-rhel8",
+    "description": "Production RHEL 8 web server running Apache",
+    "cluster_reference": {
+      "kind": "cluster",
+      "uuid": "0005e123-4567-89ab-cdef-000000000001",
+      "name": "prod-cluster-01"
+    },
+    "resources": {
+      "power_state": "ON",
+      "num_sockets": 2,
+      "num_vcpus_per_socket": 2,
+      "num_threads_per_core": 1,
+      "memory_size_mib": 8192,
+      "boot_config": {
+        "boot_type": "UEFI",
+        "boot_device_order_list": [
+          "DISK",
+          "CDROM",
+          "NETWORK"
+        ]
+      },
+      "machine_type": "PC",
+      "hardware_clock_timezone": "America/Los_Angeles",
+      "vga_console_enabled": true,
+      "enable_cpu_passthrough": false,
+      "is_agent_vm": false,
+      "vnuma_config": {
+        "num_vnuma_nodes": 0
+      },
+      "serial_port_list": [
+        {
+          "index": 0,
+          "is_connected": true
+        }
+      ],
+      "nic_list": [
+        {
+          "uuid": "nic-001",
+          "nic_type": "NORMAL_NIC",
+          "mac_address": "50:6b:8d:12:34:56",
+          "model": "VIRTIO",
+          "is_connected": true,
+          "subnet_reference": {
+            "kind": "subnet",
+            "uuid": "0005d123-4567-89ab-cdef-000000000001",
+            "name": "Production-VLAN-100"
+          },
+          "ip_endpoint_list": [
+            {
+              "ip": "192.168.100.101",
+              "type": "ASSIGNED",
+              "ip_type": "DHCP"
+            }
+          ],
+          "vlan_mode": "ACCESS",
+          "network_function_chain_reference": null
+        }
+      ],
+      "disk_list": [
+        {
+          "uuid": "disk-001",
+          "device_properties": {
+            "device_type": "DISK",
+            "disk_address": {
+              "device_index": 0,
+              "adapter_type": "SCSI"
+            }
+          },
+          "disk_size_mib": 102400,
+          "disk_size_bytes": 107374182400,
+          "storage_config": {
+            "storage_container_reference": {
+              "kind": "storage_container",
+              "uuid": "0005c123-4567-89ab-cdef-000000000001",
+              "name": "default-container-prod"
+            },
+            "flash_mode": false
+          },
+          "data_source_reference": {
+            "kind": "image",
+            "uuid": "img-rhel8",
+            "name": "RHEL-8.9-x86_64"
+          },
+          "volume_group_reference": null
+        }
+      ],
+      "gpu_list": [],
+      "parent_reference": null,
+      "guest_tools": {
+        "nutanix_guest_tools": {
+          "enabled": true,
+          "iso_mount_state": "MOUNTED",
+          "version": "3.2.0",
+          "available_version": "3.2.0",
+          "vss_snapshot_capable": false,
+          "is_reachable": true,
+          "vm_mobility_drivers_installed": true,
+          "capabilities": [
+            "SELF_SERVICE_RESTORE",
+            "VSS_SNAPSHOT"
+          ],
+          "guest_os_version": "Red Hat Enterprise Linux 8.9 (Ootpa)",
+          "enabled_capability_list": [
+            "SELF_SERVICE_RESTORE"
+          ]
+        }
+      },
+      "guest_customization": {
+        "is_overridable": false,
+        "cloud_init": {
+          "meta_data": "",
+          "user_data": ""
+        }
+      },
+      "protection_policy_state": {
+        "is_protected": false
+      }
+    }
+  },
+  "status": {
+    "state": "COMPLETE",
+    "name": "web-server-rhel8",
+    "description": "Production RHEL 8 web server running Apache",
+    "resources": {
+      "power_state": "ON",
+      "hypervisor_type": "kKvm",
+      "num_sockets": 2,
+      "num_vcpus_per_socket": 2,
+      "num_threads_per_core": 1,
+      "memory_size_mib": 8192,
+      "guest_os_id": "rhel8_64Guest",
+      "host_reference": {
+        "kind": "host",
+        "uuid": "0005f123-4567-89ab-cdef-000000000101",
+        "name": "ahv-node-01"
+      },
+      "cluster_reference": {
+        "kind": "cluster",
+        "uuid": "0005e123-4567-89ab-cdef-000000000001",
+        "name": "prod-cluster-01"
+      },
+      "nic_list": [
+        {
+          "uuid": "nic-001",
+          "mac_address": "50:6b:8d:12:34:56",
+          "model": "VIRTIO",
+          "nic_type": "NORMAL_NIC",
+          "is_connected": true,
+          "subnet_reference": {
+            "kind": "subnet",
+            "uuid": "0005d123-4567-89ab-cdef-000000000001",
+            "name": "Production-VLAN-100"
+          },
+          "ip_endpoint_list": [
+            {
+              "ip": "192.168.100.101",
+              "type": "ASSIGNED"
+            }
+          ]
+        }
+      ],
+      "disk_list": [
+        {
+          "uuid": "disk-001",
+          "device_properties": {
+            "device_type": "DISK",
+            "disk_address": {
+              "device_index": 0,
+              "adapter_type": "SCSI"
+            }
+          },
+          "disk_size_mib": 102400,
+          "disk_size_bytes": 107374182400,
+          "storage_container_reference": {
+            "kind": "storage_container",
+            "uuid": "0005c123-4567-89ab-cdef-000000000001",
+            "name": "default-container-prod"
+          }
+        }
+      ],
+      "gpu_list": [],
+      "guest_tools": {
+        "nutanix_guest_tools": {
+          "enabled": true,
+          "version": "3.2.0",
+          "is_reachable": true,
+          "vss_snapshot_capable": false,
+          "vm_mobility_drivers_installed": true
+        }
+      }
+    },
+    "execution_context": {
+      "task_uuid": [
+        "task-create-vm-uuid"
+      ]
+    }
+  }
+}
