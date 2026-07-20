@@ -80,6 +80,7 @@ func New(db libmodel.DB, provider *api.Provider, secret *core.Secret) (r *Collec
 		client: &Client{
 			url:           provider.Spec.URL,
 			secret:        secret,
+			settings:      provider.Spec.Settings,
 			log:           clientLog,
 			clientTimeout: clientTimeout,
 		},
@@ -413,7 +414,8 @@ func (r *Collector) storageContainers() (err error) {
 
 	entities, err := r.client.listStorageContainers()
 	if err != nil {
-		return
+		r.log.Error(err, "Storage container collection failed; continuing without storage inventory")
+		return nil
 	}
 
 	tx, err := r.db.Begin()

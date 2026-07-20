@@ -142,7 +142,65 @@ func handleSubnets(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleStorageContainers handles /api/nutanix/v3/storage_containers/list
+// handlePrismCentral handles /api/nutanix/v3/prism_central
+func handlePrismCentral(w http.ResponseWriter, r *http.Request) {
+	if !checkAuth(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		sendJSON(w, map[string]string{"error": "unauthorized"})
+		return
+	}
+
+	if r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	sendJSON(w, map[string]interface{}{
+		"resources": map[string]string{
+			"version": "mock-pc",
+		},
+	})
+}
+
+// handleStorageContainersV2 handles /api/nutanix/v2.0/storage_containers
+func handleStorageContainersV2(w http.ResponseWriter, r *http.Request) {
+	if !checkAuth(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		sendJSON(w, map[string]string{"error": "unauthorized"})
+		return
+	}
+
+	if r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err := sendFile(w, "storage_containers_v2_list.json"); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		sendJSON(w, map[string]string{"error": err.Error()})
+	}
+}
+
+// handleStorageContainersV4 handles /api/clustermgmt/v4.1/config/storage-containers
+func handleStorageContainersV4(w http.ResponseWriter, r *http.Request) {
+	if !checkAuth(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		sendJSON(w, map[string]string{"error": "unauthorized"})
+		return
+	}
+
+	if r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err := sendFile(w, "storage_containers_v4_list.json"); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		sendJSON(w, map[string]string{"error": err.Error()})
+	}
+}
+
+// handleStorageContainers handles legacy v3 storage list with 404.
 func handleStorageContainers(w http.ResponseWriter, r *http.Request) {
 	if !checkAuth(r) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -150,15 +208,8 @@ func handleStorageContainers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if r.Method != "POST" {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-
-	if err := sendFile(w, "storage_containers_list.json"); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		sendJSON(w, map[string]string{"error": err.Error()})
-	}
+	w.WriteHeader(http.StatusNotFound)
+	sendJSON(w, map[string]string{"error": "v3 storage_containers/list is not available"})
 }
 
 // handleImages handles /api/nutanix/v3/images/list
@@ -211,7 +262,9 @@ func main() {
 	fmt.Println("  POST /api/nutanix/v3/hosts/list")
 	fmt.Println("  POST /api/nutanix/v3/vms/list")
 	fmt.Println("  POST /api/nutanix/v3/subnets/list")
-	fmt.Println("  POST /api/nutanix/v3/storage_containers/list")
+	fmt.Println("  GET  /api/nutanix/v3/prism_central")
+	fmt.Println("  GET  /api/nutanix/v2.0/storage_containers")
+	fmt.Println("  GET  /api/clustermgmt/v4.1/config/storage-containers")
 	fmt.Println("  POST /api/nutanix/v3/images/list")
 	fmt.Println()
 	fmt.Println("Press Ctrl+C to stop")
@@ -224,6 +277,9 @@ func main() {
 	http.HandleFunc("/api/nutanix/v3/hosts/list", handleHosts)
 	http.HandleFunc("/api/nutanix/v3/vms/list", handleVMs)
 	http.HandleFunc("/api/nutanix/v3/subnets/list", handleSubnets)
+	http.HandleFunc("/api/nutanix/v3/prism_central", handlePrismCentral)
+	http.HandleFunc("/api/nutanix/v2.0/storage_containers", handleStorageContainersV2)
+	http.HandleFunc("/api/clustermgmt/v4.1/config/storage-containers", handleStorageContainersV4)
 	http.HandleFunc("/api/nutanix/v3/storage_containers/list", handleStorageContainers)
 	http.HandleFunc("/api/nutanix/v3/images/list", handleImages)
 

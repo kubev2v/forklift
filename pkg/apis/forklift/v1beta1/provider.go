@@ -81,9 +81,15 @@ const (
 	ESXiCloneMethod        = "esxiCloneMethod"
 	TargetAZ               = "target-az"
 	TargetRegion           = "target-region"
-	// Nutanix settings
-	NutanixPrismType   = "prismType"   // "central" or "element"
-	NutanixClusterUUID = "clusterUuid" // For Prism Element mode
+	// Nutanix Prism endpoint settings.
+	NutanixPrismType   = "prismType"
+	NutanixClusterUUID = "clusterUuid"
+)
+
+// Nutanix Prism endpoint types.
+const (
+	NutanixPrismCentral = "central"
+	NutanixPrismElement = "element"
 )
 
 // ESXi clone method values.
