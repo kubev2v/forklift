@@ -15,6 +15,7 @@ const (
 )
 
 // Types
+type Model = base.Model
 type ListOptions = base.ListOptions
 type Concern = base.Concern
 type Ref = base.Ref
