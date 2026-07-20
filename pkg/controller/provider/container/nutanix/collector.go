@@ -496,6 +496,11 @@ func (r *Collector) vms() (err error) {
 		return
 	}
 
+	storageNames, networkNames, err := r.vmLookupMaps()
+	if err != nil {
+		return
+	}
+
 	tx, err := r.db.Begin()
 	if err != nil {
 		return
@@ -510,6 +515,7 @@ func (r *Collector) vms() (err error) {
 		}
 		m := &model.VM{}
 		applyVM(entity, m)
+		enrichVM(m, storageNames, networkNames)
 		err = tx.Insert(m)
 		if err != nil {
 			return
@@ -522,6 +528,31 @@ func (r *Collector) vms() (err error) {
 	}
 
 	r.log.V(3).Info("VMs collected.", "count", len(entities))
+
+	return
+}
+
+func (r *Collector) vmLookupMaps() (storageNames, networkNames map[string]string, err error) {
+	storageNames = map[string]string{}
+	networkNames = map[string]string{}
+
+	storageList := []model.StorageContainer{}
+	err = r.db.List(&storageList, libmodel.ListOptions{Detail: model.MaxDetail})
+	if err != nil {
+		return
+	}
+	for _, sc := range storageList {
+		storageNames[sc.ID] = sc.Name
+	}
+
+	networkList := []model.Network{}
+	err = r.db.List(&networkList, libmodel.ListOptions{Detail: model.MaxDetail})
+	if err != nil {
+		return
+	}
+	for _, network := range networkList {
+		networkNames[network.ID] = network.Name
+	}
 
 	return
 }

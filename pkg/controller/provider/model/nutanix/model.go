@@ -137,7 +137,7 @@ type VM struct {
 	Host                string            `sql:"d0,index(host)"`
 	RevisionValidated   int64             `sql:"d0,index(revisionValidated)"`
 	PolicyVersion       int               `sql:"d0,index(policyVersion)"`
-	UUID                string            `sql:""`
+	UUID                string            `sql:"d0"`
 	Description         string            `sql:""`
 	PowerState          string            `sql:""`
 	NumSockets          int               `sql:""`
@@ -151,6 +151,7 @@ type VM struct {
 	VGAConsoleEnabled   bool              `sql:""`
 	HypervisorType      string            `sql:""`
 	GuestOSID           string            `sql:""`
+	GuestOSVersion      string            `sql:""`
 	SerialPorts         []SerialPort      `sql:""`
 	NICs                []NIC             `sql:""`
 	Disks               []Disk            `sql:""`

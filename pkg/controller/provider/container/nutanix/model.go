@@ -523,8 +523,11 @@ func applyVM(entity map[string]interface{}, m *model.VM) {
 	m.VGAConsoleEnabled = getBool(specResources, "vga_console_enabled")
 
 	// Hypervisor type from status.resources
-	m.HypervisorType = getString(statusResources, "hypervisor_type")
+	m.HypervisorType = normalizeHypervisorType(getString(statusResources, "hypervisor_type"))
 	m.GuestOSID = getString(specResources, "guest_os_id")
+	if m.GuestOSID == "" {
+		m.GuestOSID = getString(statusResources, "guest_os_id")
+	}
 
 	// Serial ports from spec.resources
 	if serialPorts, ok := specResources["serial_port_list"].([]interface{}); ok {
@@ -589,79 +592,129 @@ func applyVM(entity map[string]interface{}, m *model.VM) {
 		}
 	}
 
-	// Disks from spec.resources
-	if disks, ok := specResources["disk_list"].([]interface{}); ok {
+	// Disks from spec.resources, fall back to status.resources
+	diskList := specResources["disk_list"]
+	if diskList == nil {
+		diskList = statusResources["disk_list"]
+	}
+	if disks, ok := diskList.([]interface{}); ok {
 		m.Disks = make([]model.Disk, 0, len(disks))
 		for _, d := range disks {
 			if diskData, ok := d.(map[string]interface{}); ok {
-				disk := model.Disk{}
-				disk.UUID = getString(diskData, "uuid")
-				disk.DeviceType = getString(diskData, "device_properties.device_type")
-				disk.AdapterType = getString(diskData, "device_properties.disk_address.adapter_type")
-
-				if deviceIndex, ok := diskData["device_properties"].(map[string]interface{}); ok {
-					if diskAddr, ok := deviceIndex["disk_address"].(map[string]interface{}); ok {
-						if idx, ok := diskAddr["device_index"].(float64); ok {
-							disk.DeviceIndex = int(idx)
-						} else if idx, ok := diskAddr["device_index"].(int); ok {
-							disk.DeviceIndex = idx
-						}
-					}
-				}
-
-				// Disk size
-				if diskSizeMib, ok := diskData["disk_size_mib"].(float64); ok {
-					disk.DiskSizeMiB = int64(diskSizeMib)
-					disk.DiskSizeBytes = int64(diskSizeMib) * 1024 * 1024
-				} else if diskSizeMib, ok := diskData["disk_size_mib"].(int64); ok {
-					disk.DiskSizeMiB = diskSizeMib
-					disk.DiskSizeBytes = diskSizeMib * 1024 * 1024
-				}
-				if diskSizeBytes, ok := diskData["disk_size_bytes"].(int64); ok {
-					disk.DiskSizeBytes = diskSizeBytes
-				}
-
-				// Storage container reference (in storage_config)
-				if storageConfig, ok := diskData["storage_config"].(map[string]interface{}); ok {
-					if scRef, ok := storageConfig["storage_container_reference"].(map[string]interface{}); ok {
-						if scUUID, ok := scRef["uuid"].(string); ok {
-							disk.StorageContainerUUID = scUUID
-						}
-						if scName, ok := scRef["name"].(string); ok {
-							disk.StorageContainerName = scName
-						}
-					}
-					// Flash mode
-					disk.FlashMode = getBool(storageConfig, "flash_mode")
-				}
-
-				// Source image
-				if imgRef, ok := diskData["data_source_reference"].(map[string]interface{}); ok {
-					if imgUUID, ok := imgRef["uuid"].(string); ok {
-						disk.SourceImageUUID = imgUUID
-					}
-				}
-
-				disk.IsCdrom = getString(diskData, "device_properties.device_type") == "CDROM"
-
-				m.Disks = append(m.Disks, disk)
+				m.Disks = append(m.Disks, applyDiskFromMap(diskData))
 			}
 		}
 	}
 
-	// Guest tools from spec.resources
-	if guestTools, ok := specResources["guest_tools"].(map[string]interface{}); ok {
-		m.GuestToolsEnabled = getBool(guestTools, "enabled")
-		if version, ok := guestTools["nutanix_guest_tools"].(map[string]interface{}); ok {
-			if v, ok := version["version"].(string); ok {
-				m.GuestToolsVersion = v
+	applyGuestTools(specResources, statusResources, m)
+}
+
+func normalizeHypervisorType(hypervisorType string) string {
+	switch hypervisorType {
+	case "kKvm", "KKVM":
+		return "AHV"
+	default:
+		return hypervisorType
+	}
+}
+
+func applyGuestTools(specResources, statusResources map[string]interface{}, m *model.VM) {
+	for _, resources := range []map[string]interface{}{specResources, statusResources} {
+		guestTools, ok := resources["guest_tools"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		ngt, ok := guestTools["nutanix_guest_tools"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if enabled, ok := ngt["enabled"].(bool); ok {
+			m.GuestToolsEnabled = enabled
+		}
+		if v, ok := ngt["version"].(string); ok && v != "" {
+			m.GuestToolsVersion = v
+		}
+		if reachable, ok := ngt["is_reachable"].(bool); ok {
+			m.GuestToolsReachable = reachable
+		}
+		if mounted, ok := ngt["iso_mount_state"].(string); ok {
+			m.GuestToolsMounted = mounted == "MOUNTED"
+		}
+		if guestOSVersion, ok := ngt["guest_os_version"].(string); ok && guestOSVersion != "" {
+			m.GuestOSVersion = guestOSVersion
+		}
+	}
+}
+
+func applyDiskFromMap(diskData map[string]interface{}) model.Disk {
+	disk := model.Disk{}
+	disk.UUID = getString(diskData, "uuid")
+	disk.DeviceType = getString(diskData, "device_properties.device_type")
+	disk.AdapterType = getString(diskData, "device_properties.disk_address.adapter_type")
+
+	if deviceProps, ok := diskData["device_properties"].(map[string]interface{}); ok {
+		if diskAddr, ok := deviceProps["disk_address"].(map[string]interface{}); ok {
+			if idx, ok := diskAddr["device_index"].(float64); ok {
+				disk.DeviceIndex = int(idx)
+			} else if idx, ok := diskAddr["device_index"].(int); ok {
+				disk.DeviceIndex = idx
 			}
-			if reachable, ok := version["is_reachable"].(bool); ok {
-				m.GuestToolsReachable = reachable
-			}
-			if mounted, ok := version["iso_mount_state"].(string); ok {
-				m.GuestToolsMounted = (mounted == "MOUNTED")
-			}
+		}
+	}
+
+	if diskSizeMib, ok := diskData["disk_size_mib"].(float64); ok {
+		disk.DiskSizeMiB = int64(diskSizeMib)
+		disk.DiskSizeBytes = int64(diskSizeMib) * 1024 * 1024
+	} else if diskSizeMib, ok := diskData["disk_size_mib"].(int64); ok {
+		disk.DiskSizeMiB = diskSizeMib
+		disk.DiskSizeBytes = diskSizeMib * 1024 * 1024
+	}
+	if diskSizeBytes, ok := diskData["disk_size_bytes"].(float64); ok {
+		disk.DiskSizeBytes = int64(diskSizeBytes)
+	} else if diskSizeBytes, ok := diskData["disk_size_bytes"].(int64); ok {
+		disk.DiskSizeBytes = diskSizeBytes
+	}
+
+	if storageConfig, ok := diskData["storage_config"].(map[string]interface{}); ok {
+		applyStorageContainerRef(storageConfig, &disk)
+		disk.FlashMode = getBool(storageConfig, "flash_mode")
+	}
+	if disk.StorageContainerUUID == "" {
+		applyStorageContainerRef(diskData, &disk)
+	}
+
+	if imgRef, ok := diskData["data_source_reference"].(map[string]interface{}); ok {
+		if imgUUID, ok := imgRef["uuid"].(string); ok {
+			disk.SourceImageUUID = imgUUID
+		}
+	}
+
+	disk.IsCdrom = disk.DeviceType == "CDROM"
+	return disk
+}
+
+func applyStorageContainerRef(data map[string]interface{}, disk *model.Disk) {
+	scRef, ok := data["storage_container_reference"].(map[string]interface{})
+	if !ok {
+		return
+	}
+	if scUUID, ok := scRef["uuid"].(string); ok {
+		disk.StorageContainerUUID = scUUID
+	}
+	if scName, ok := scRef["name"].(string); ok {
+		disk.StorageContainerName = scName
+	}
+}
+
+func enrichVM(m *model.VM, storageNames, networkNames map[string]string) {
+	for i := range m.Disks {
+		if m.Disks[i].StorageContainerName == "" && m.Disks[i].StorageContainerUUID != "" {
+			m.Disks[i].StorageContainerName = storageNames[m.Disks[i].StorageContainerUUID]
+		}
+	}
+	for i := range m.NICs {
+		if m.NICs[i].SubnetName == "" && m.NICs[i].SubnetUUID != "" {
+			m.NICs[i].SubnetName = networkNames[m.NICs[i].SubnetUUID]
 		}
 	}
 }
