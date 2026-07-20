@@ -449,9 +449,6 @@ func applyVM(entity map[string]interface{}, m *model.VM) {
 		m.ID = uuid
 		m.UUID = uuid
 	}
-	if name, ok := metadata["name"].(string); ok {
-		m.Name = name
-	}
 
 	// Categories
 	if categories, ok := metadata["categories"].(map[string]interface{}); ok {
@@ -468,6 +465,10 @@ func applyVM(entity map[string]interface{}, m *model.VM) {
 	specResources, _ := spec["resources"].(map[string]interface{})
 	status, _ := entity["status"].(map[string]interface{})
 	statusResources, _ := status["resources"].(map[string]interface{})
+
+	if name, ok := spec["name"].(string); ok {
+		m.Name = name
+	}
 
 	// Cluster reference from spec
 	if clusterRef, ok := spec["cluster_reference"].(map[string]interface{}); ok {
