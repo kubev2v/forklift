@@ -174,7 +174,7 @@ jobs:
         id: backport
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        uses: kiegroup/git-backporting@v4.8.5
+        uses: kiegroup/git-backporting@v4.9.1
         with:
           target-branch: ${{ steps.parse_comment.outputs.branch_name }}
           pull-request: ${{ github.server_url }}/${{ github.repository }}/pull/${{ steps.parse_comment.outputs.pr_number }}
