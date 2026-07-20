@@ -291,6 +291,17 @@ func (r *Collector) collect() (err error) {
 	return
 }
 
+// staleIDs returns the IDs present in existingIDs but absent from current.
+func staleIDs(existingIDs []string, current map[string]bool) (stale []string) {
+	for _, id := range existingIDs {
+		if !current[id] {
+			stale = append(stale, id)
+		}
+	}
+
+	return
+}
+
 // Collect clusters.
 func (r *Collector) clusters() (err error) {
 	r.log.V(3).Info("Collecting clusters.")
@@ -308,13 +319,31 @@ func (r *Collector) clusters() (err error) {
 		_ = tx.End()
 	}()
 
+	current := map[string]bool{}
 	for _, entity := range entities {
 		if r.canceled() {
 			return
 		}
 		m := &model.Cluster{}
 		applyCluster(entity, m)
+		current[m.ID] = true
 		err = tx.Insert(m)
+		if err != nil {
+			return
+		}
+	}
+
+	existing := []model.Cluster{}
+	err = tx.List(&existing, libmodel.ListOptions{})
+	if err != nil {
+		return
+	}
+	existingIDs := make([]string, len(existing))
+	for i := range existing {
+		existingIDs[i] = existing[i].ID
+	}
+	for _, id := range staleIDs(existingIDs, current) {
+		err = tx.Delete(&model.Cluster{Base: model.Base{ID: id}})
 		if err != nil {
 			return
 		}
@@ -347,13 +376,31 @@ func (r *Collector) hosts() (err error) {
 		_ = tx.End()
 	}()
 
+	current := map[string]bool{}
 	for _, entity := range entities {
 		if r.canceled() {
 			return
 		}
 		m := &model.Host{}
 		applyHost(entity, m)
+		current[m.ID] = true
 		err = tx.Insert(m)
+		if err != nil {
+			return
+		}
+	}
+
+	existing := []model.Host{}
+	err = tx.List(&existing, libmodel.ListOptions{})
+	if err != nil {
+		return
+	}
+	existingIDs := make([]string, len(existing))
+	for i := range existing {
+		existingIDs[i] = existing[i].ID
+	}
+	for _, id := range staleIDs(existingIDs, current) {
+		err = tx.Delete(&model.Host{Base: model.Base{ID: id}})
 		if err != nil {
 			return
 		}
@@ -386,13 +433,31 @@ func (r *Collector) networks() (err error) {
 		_ = tx.End()
 	}()
 
+	current := map[string]bool{}
 	for _, entity := range entities {
 		if r.canceled() {
 			return
 		}
 		m := &model.Network{}
 		applyNetwork(entity, m)
+		current[m.ID] = true
 		err = tx.Insert(m)
+		if err != nil {
+			return
+		}
+	}
+
+	existing := []model.Network{}
+	err = tx.List(&existing, libmodel.ListOptions{})
+	if err != nil {
+		return
+	}
+	existingIDs := make([]string, len(existing))
+	for i := range existing {
+		existingIDs[i] = existing[i].ID
+	}
+	for _, id := range staleIDs(existingIDs, current) {
+		err = tx.Delete(&model.Network{Base: model.Base{ID: id}})
 		if err != nil {
 			return
 		}
@@ -426,13 +491,31 @@ func (r *Collector) storageContainers() (err error) {
 		_ = tx.End()
 	}()
 
+	current := map[string]bool{}
 	for _, entity := range entities {
 		if r.canceled() {
 			return
 		}
 		m := &model.StorageContainer{}
 		applyStorageContainer(entity, m)
+		current[m.ID] = true
 		err = tx.Insert(m)
+		if err != nil {
+			return
+		}
+	}
+
+	existing := []model.StorageContainer{}
+	err = tx.List(&existing, libmodel.ListOptions{})
+	if err != nil {
+		return
+	}
+	existingIDs := make([]string, len(existing))
+	for i := range existing {
+		existingIDs[i] = existing[i].ID
+	}
+	for _, id := range staleIDs(existingIDs, current) {
+		err = tx.Delete(&model.StorageContainer{Base: model.Base{ID: id}})
 		if err != nil {
 			return
 		}
@@ -465,13 +548,31 @@ func (r *Collector) images() (err error) {
 		_ = tx.End()
 	}()
 
+	current := map[string]bool{}
 	for _, entity := range entities {
 		if r.canceled() {
 			return
 		}
 		m := &model.Image{}
 		applyImage(entity, m)
+		current[m.ID] = true
 		err = tx.Insert(m)
+		if err != nil {
+			return
+		}
+	}
+
+	existing := []model.Image{}
+	err = tx.List(&existing, libmodel.ListOptions{})
+	if err != nil {
+		return
+	}
+	existingIDs := make([]string, len(existing))
+	for i := range existing {
+		existingIDs[i] = existing[i].ID
+	}
+	for _, id := range staleIDs(existingIDs, current) {
+		err = tx.Delete(&model.Image{Base: model.Base{ID: id}})
 		if err != nil {
 			return
 		}
@@ -509,6 +610,7 @@ func (r *Collector) vms() (err error) {
 		_ = tx.End()
 	}()
 
+	current := map[string]bool{}
 	for _, entity := range entities {
 		if r.canceled() {
 			return
@@ -516,7 +618,24 @@ func (r *Collector) vms() (err error) {
 		m := &model.VM{}
 		applyVM(entity, m)
 		enrichVM(m, storageNames, networkNames)
+		current[m.ID] = true
 		err = tx.Insert(m)
+		if err != nil {
+			return
+		}
+	}
+
+	existing := []model.VM{}
+	err = tx.List(&existing, libmodel.ListOptions{})
+	if err != nil {
+		return
+	}
+	existingIDs := make([]string, len(existing))
+	for i := range existing {
+		existingIDs[i] = existing[i].ID
+	}
+	for _, id := range staleIDs(existingIDs, current) {
+		err = tx.Delete(&model.VM{Base: model.Base{ID: id}})
 		if err != nil {
 			return
 		}
