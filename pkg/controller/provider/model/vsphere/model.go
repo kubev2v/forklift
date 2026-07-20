@@ -6,6 +6,7 @@ import (
 )
 
 type ProtocolType string
+type IORMThresholdMode string
 
 // Variants.
 const (
@@ -26,6 +27,9 @@ const (
 	ProtocolPCIe         ProtocolType = "PCIe"         // PCI Express storage interface
 	ProtocolRDMA         ProtocolType = "RDMA"         // Remote Direct Memory Access
 	ProtocolTCP          ProtocolType = "TCP"          // Generic TCP-based adapter
+	// IORM Congestion Threshold Mode
+	IORMThresholdModeAutomatic IORMThresholdMode = "automatic"
+	IORMThresholdModeManual    IORMThresholdMode = "manual"
 )
 
 // Bus types
@@ -293,14 +297,19 @@ type DVSHost struct {
 
 type Datastore struct {
 	Base
-	Type                string   `sql:""`
-	Capacity            int64    `sql:""`
-	Free                int64    `sql:""`
-	MaintenanceMode     string   `sql:""`
-	BackingDevicesNames []string `sql:""`
-	NasRemoteHost       string   `sql:""`
-	NasRemotePath       string   `sql:""`
-	NasRemoteHostNames  []string `sql:""`
+	Type                        string            `sql:""`
+	Capacity                    int64             `sql:""`
+	Free                        int64             `sql:""`
+	MaintenanceMode             string            `sql:""`
+	BackingDevicesNames         []string          `sql:""`
+	NasRemoteHost               string            `sql:""`
+	NasRemotePath               string            `sql:""`
+	NasRemoteHostNames          []string          `sql:""`
+	StorageIORMSupported        bool              `sql:""`
+	IORMEnabled                 bool              `sql:""`
+	IORMCongestionThreshold     int32             `sql:""`
+	IORMCongestionThresholdMode IORMThresholdMode `sql:""`
+	IORMPercentOfPeakThroughput int32             `sql:""`
 }
 
 type VM struct {
