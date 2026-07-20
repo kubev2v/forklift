@@ -173,6 +173,53 @@ func (r *Client) post(url string, body interface{}, object interface{}) (status 
 	return
 }
 
+// listAll pages through a v3 list endpoint, following the response's
+// total_matches, and returns every entity across all pages. This keeps a
+// single provider from silently truncating on Prism inventories larger than
+// one page.
+func (r *Client) listAll(resourceKind string, filter map[string]interface{}, pageSize int) (entities []map[string]interface{}, err error) {
+	offset := 0
+	entities = make([]map[string]interface{}, 0)
+
+	for {
+		result, err := r.list(resourceKind, filter, offset, pageSize)
+		if err != nil {
+			return nil, err
+		}
+
+		entitiesList, ok := result["entities"].([]interface{})
+		if !ok {
+			break
+		}
+		for _, e := range entitiesList {
+			if entity, ok := e.(map[string]interface{}); ok {
+				entities = append(entities, entity)
+			}
+		}
+
+		// No entities came back; nothing left to page through.
+		if len(entitiesList) == 0 {
+			break
+		}
+
+		metadata, ok := result["metadata"].(map[string]interface{})
+		if !ok {
+			break
+		}
+		totalMatches, ok := metadata["total_matches"].(float64)
+		if !ok {
+			break
+		}
+
+		offset += len(entitiesList)
+		if offset >= int(totalMatches) {
+			break
+		}
+	}
+
+	return entities, nil
+}
+
 // List resources using Nutanix v3 API pattern
 // Nutanix uses POST for list operations with a filter body
 func (r *Client) list(resourceKind string, filter map[string]interface{}, offset, length int) (result map[string]interface{}, err error) {
@@ -243,132 +290,25 @@ func basicAuth(username, password string) string {
 
 // List all clusters
 func (r *Client) listClusters() (entities []map[string]interface{}, err error) {
-	result, err := r.list("cluster", nil, 0, 100)
-	if err != nil {
-		return nil, err
-	}
-
-	entitiesList, ok := result["entities"].([]interface{})
-	if !ok {
-		return []map[string]interface{}{}, nil
-	}
-
-	entities = make([]map[string]interface{}, 0, len(entitiesList))
-	for _, e := range entitiesList {
-		if entity, ok := e.(map[string]interface{}); ok {
-			entities = append(entities, entity)
-		}
-	}
-
-	return entities, nil
+	return r.listAll("cluster", nil, 100)
 }
 
 // List all hosts
 func (r *Client) listHosts() (entities []map[string]interface{}, err error) {
-	result, err := r.list("host", nil, 0, 1000)
-	if err != nil {
-		return nil, err
-	}
-
-	entitiesList, ok := result["entities"].([]interface{})
-	if !ok {
-		return []map[string]interface{}{}, nil
-	}
-
-	entities = make([]map[string]interface{}, 0, len(entitiesList))
-	for _, e := range entitiesList {
-		if entity, ok := e.(map[string]interface{}); ok {
-			entities = append(entities, entity)
-		}
-	}
-
-	return entities, nil
+	return r.listAll("host", nil, 1000)
 }
 
 // List all VMs
 func (r *Client) listVMs() (entities []map[string]interface{}, err error) {
-	// Start with first page
-	offset := 0
-	length := 100
-	allEntities := make([]map[string]interface{}, 0)
-
-	for {
-		result, err := r.list("vm", nil, offset, length)
-		if err != nil {
-			return nil, err
-		}
-
-		metadata, ok := result["metadata"].(map[string]interface{})
-		if !ok {
-			break
-		}
-
-		totalMatches, ok := metadata["total_matches"].(float64)
-		if !ok {
-			break
-		}
-
-		entitiesList, ok := result["entities"].([]interface{})
-		if !ok {
-			break
-		}
-
-		for _, e := range entitiesList {
-			if entity, ok := e.(map[string]interface{}); ok {
-				allEntities = append(allEntities, entity)
-			}
-		}
-
-		// Check if we've fetched all
-		offset += length
-		if offset >= int(totalMatches) {
-			break
-		}
-	}
-
-	return allEntities, nil
+	return r.listAll("vm", nil, 100)
 }
 
 // List all subnets (networks)
 func (r *Client) listSubnets() (entities []map[string]interface{}, err error) {
-	result, err := r.list("subnet", nil, 0, 500)
-	if err != nil {
-		return nil, err
-	}
-
-	entitiesList, ok := result["entities"].([]interface{})
-	if !ok {
-		return []map[string]interface{}{}, nil
-	}
-
-	entities = make([]map[string]interface{}, 0, len(entitiesList))
-	for _, e := range entitiesList {
-		if entity, ok := e.(map[string]interface{}); ok {
-			entities = append(entities, entity)
-		}
-	}
-
-	return entities, nil
+	return r.listAll("subnet", nil, 500)
 }
 
 // List all images
 func (r *Client) listImages() (entities []map[string]interface{}, err error) {
-	result, err := r.list("image", nil, 0, 500)
-	if err != nil {
-		return nil, err
-	}
-
-	entitiesList, ok := result["entities"].([]interface{})
-	if !ok {
-		return []map[string]interface{}{}, nil
-	}
-
-	entities = make([]map[string]interface{}, 0, len(entitiesList))
-	for _, e := range entitiesList {
-		if entity, ok := e.(map[string]interface{}); ok {
-			entities = append(entities, entity)
-		}
-	}
-
-	return entities, nil
+	return r.listAll("image", nil, 500)
 }

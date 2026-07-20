@@ -2,6 +2,7 @@ package nutanix
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -358,6 +359,103 @@ func TestClientListImages(t *testing.T) {
 
 	if len(entities) == 0 {
 		t.Error("Expected at least one image")
+	}
+}
+
+// TestClientListAllPaginates verifies that listAll follows total_matches
+// across multiple pages instead of stopping after the first, which is what
+// clusters/hosts/subnets/images did before they were switched to it.
+func TestClientListAllPaginates(t *testing.T) {
+	const total = 5
+	const pageSize = 2
+
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+
+		var body map[string]interface{}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("failed to decode request body: %v", err)
+		}
+		offset := int(body["offset"].(float64))
+
+		entities := []map[string]interface{}{}
+		for i := offset; i < offset+pageSize && i < total; i++ {
+			entities = append(entities, map[string]interface{}{
+				"metadata": map[string]interface{}{"uuid": fmt.Sprintf("uuid-%d", i)},
+			})
+		}
+
+		resp := map[string]interface{}{
+			"metadata": map[string]interface{}{"total_matches": total},
+			"entities": entities,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			t.Fatalf("failed to encode response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	client := createTestClient(server.URL)
+	client.url = server.URL
+
+	// Connect first so the initial testConnection() probe (which also hits
+	// the clusters/list endpoint) doesn't count as a pagination request.
+	if _, err := client.connect(); err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	requests = 0
+
+	entities, err := client.listAll("cluster", nil, pageSize)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(entities) != total {
+		t.Fatalf("expected %d entities across all pages, got %d", total, len(entities))
+	}
+
+	wantPages := 3 // pages of 2, 2, 1
+	if requests != wantPages {
+		t.Errorf("expected %d page requests, got %d", wantPages, requests)
+	}
+
+	seen := map[string]bool{}
+	for _, e := range entities {
+		uuid := e["metadata"].(map[string]interface{})["uuid"].(string)
+		if seen[uuid] {
+			t.Fatalf("duplicate entity %s returned across pages", uuid)
+		}
+		seen[uuid] = true
+	}
+}
+
+// TestClientListAllStopsOnEmptyPage guards against an infinite loop if a
+// page comes back empty before total_matches is reached.
+func TestClientListAllStopsOnEmptyPage(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]interface{}{
+			"metadata": map[string]interface{}{"total_matches": 100},
+			"entities": []map[string]interface{}{},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			t.Fatalf("failed to encode response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	client := createTestClient(server.URL)
+	client.url = server.URL
+
+	entities, err := client.listAll("cluster", nil, 2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(entities) != 0 {
+		t.Fatalf("expected no entities, got %d", len(entities))
 	}
 }
 
