@@ -2,6 +2,7 @@ package primera3par
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"strings"
 
@@ -11,6 +12,8 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
 )
+
+const maxHostSetNameLen = 27
 
 const PROVIDER_ID = "60002ac"
 
@@ -56,8 +59,17 @@ func NewPrimera3ParClonner(storageHostname, storageUsername, storagePassword str
 	return clonner, nil
 }
 
+func sanitizeHostSetName(name string) string {
+	if len(name) <= maxHostSetNameLen {
+		return name
+	}
+	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(name)))
+	return fmt.Sprintf("xcopy-%s", hash[:maxHostSetNameLen-len("xcopy-")])
+}
+
 // EnsureClonnerIgroup creates or update an initiator group with the clonnerIqn
 func (c *Primera3ParClonner) EnsureClonnerIgroup(initiatorGroup string, adapterIds []string) (populator.MappingContext, error) {
+	initiatorGroup = sanitizeHostSetName(initiatorGroup)
 	c.log.Info("ensuring initiator group", "group", initiatorGroup, "adapters", adapterIds)
 
 	c.initiatorGroup = initiatorGroup
