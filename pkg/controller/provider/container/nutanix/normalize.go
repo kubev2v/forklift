@@ -76,9 +76,19 @@ func storageContainerEntityFromV4(raw map[string]interface{}) map[string]interfa
 	}
 }
 
-func filterStorageContainersByCluster(
+// filterEntitiesByCluster keeps only the entities whose cluster UUID -- read
+// from entity via the given dot-separated field path -- matches clusterUUID.
+// If clusterUUID is empty (Prism Element, or no clusterUuid setting
+// configured on the Provider), every entity is returned unfiltered.
+//
+// This filters client-side on data we've already fetched, rather than
+// relying on the v3 API's "filter" (FIQL) query parameter, whose supported
+// attributes vary and are inconsistently documented/implemented across
+// entity kinds.
+func filterEntitiesByCluster(
 	entities []map[string]interface{},
 	clusterUUID string,
+	clusterUUIDPath string,
 ) []map[string]interface{} {
 	if clusterUUID == "" {
 		return entities
@@ -86,15 +96,19 @@ func filterStorageContainersByCluster(
 
 	filtered := make([]map[string]interface{}, 0, len(entities))
 	for _, entity := range entities {
-		status, _ := entity["status"].(map[string]interface{})
-		resources, _ := status["resources"].(map[string]interface{})
-		clusterRef, _ := resources["cluster_reference"].(map[string]interface{})
-		if uuid, ok := clusterRef["uuid"].(string); ok && uuid == clusterUUID {
+		if getString(entity, clusterUUIDPath) == clusterUUID {
 			filtered = append(filtered, entity)
 		}
 	}
 
 	return filtered
+}
+
+func filterStorageContainersByCluster(
+	entities []map[string]interface{},
+	clusterUUID string,
+) []map[string]interface{} {
+	return filterEntitiesByCluster(entities, clusterUUID, "status.resources.cluster_reference.uuid")
 }
 
 func extractMapList(result map[string]interface{}, key string) ([]map[string]interface{}, error) {
