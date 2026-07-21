@@ -67,9 +67,10 @@ type FlashSystemHost struct {
 }
 
 type FlashSystemVolume struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	VdiskUID string `json:"vdisk_UID"` // Unique Identification Number, used for NAA.
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	VdiskUID   string `json:"vdisk_UID"`    // Unique Identification Number, used for NAA.
+	MdiskGrpID string `json:"mdisk_grp_id"` // Pool ID for this volume (from lsvdisk concise response).
 }
 
 type FlashSystemVolumeHostMapping struct {
@@ -276,6 +277,25 @@ func (c *FlashSystemAPIClient) GetSystemInfo() (*FlashSystemInfo, error) {
 	return &sysInfo, nil
 }
 
+// GetPoolProtection queries the detailed view of a specific pool (lsmdiskgrp/<id>)
+// and returns whether vdisk protection is enabled and the pool name.
+func (c *FlashSystemAPIClient) GetPoolProtection(poolID string) (enabled bool, poolName string, err error) {
+	endpoint := fmt.Sprintf("/lsmdiskgrp/%s", poolID)
+	respBytes, status, reqErr := c.makeRequest("POST", endpoint, map[string]string{})
+	if reqErr != nil || status != http.StatusOK {
+		return false, "", fmt.Errorf("failed to query pool %s protection: %w, status: %d", poolID, reqErr, status)
+	}
+
+	var poolInfo struct {
+		Name                   string `json:"name"`
+		VdiskProtectionEnabled string `json:"vdisk_protection_enabled"`
+	}
+	if err := json.Unmarshal(respBytes, &poolInfo); err != nil {
+		return false, "", fmt.Errorf("failed to unmarshal pool %s info: %w", poolID, err)
+	}
+	return poolInfo.VdiskProtectionEnabled == "yes", poolInfo.Name, nil
+}
+
 // FlashCopyMapping represents one entry from lsfcmap (list FlashCopy mappings).
 type FlashCopyMapping struct {
 	ID              string `json:"id"`
@@ -399,19 +419,26 @@ func NewFlashSystemClonner(managementIP, username, password string, sslSkipVerif
 
 	sysInfo, err := client.GetSystemInfo()
 	if err != nil {
-		return FlashSystemClonner{}, fmt.Errorf("failed to query FlashSystem system info (required to check vdisk protection): %w", err)
+		return FlashSystemClonner{}, fmt.Errorf("failed to query FlashSystem system info: %w", err)
 	}
 
-	protectionEnabled := sysInfo.VdiskProtectionEnabled == "yes"
-	klog.Infof("FlashSystem volume protection settings: enabled=%v, protection_time=%s minutes",
-		protectionEnabled, sysInfo.VdiskProtectionTime)
-
-	if protectionEnabled {
-		klog.Error("vdisk protection must be off on the IBM FlashSystem; read about it in the README in the section 'IBM FlashSystem'")
-		return FlashSystemClonner{}, fmt.Errorf("vdisk protection is enabled on the IBM FlashSystem; it must be disabled")
-	}
+	log := klog.Background().WithName("copy-offload").WithName("flashsystem")
+	log.Info("FlashSystem volume protection settings",
+		"system_level", sysInfo.VdiskProtectionEnabled,
+		"protection_time_minutes", sysInfo.VdiskProtectionTime)
 
 	return FlashSystemClonner{api: client}, nil
+}
+
+func (c *FlashSystemClonner) checkPoolVdiskProtection(poolID string) error {
+	enabled, poolName, err := c.api.GetPoolProtection(poolID)
+	if err != nil {
+		return fmt.Errorf("failed to check vdisk protection for pool id=%s: %w", poolID, err)
+	}
+	if enabled {
+		return fmt.Errorf("vdisk protection is enabled on pool '%s' (id=%s); it must be disabled for pools used by migration volumes — see README section 'IBM FlashSystem'", poolName, poolID)
+	}
+	return nil
 }
 
 func (c *FlashSystemClonner) MapTarget(targetLUN populator.LUN, context populator.MappingContext) (populator.LUN, error) {
@@ -896,6 +923,11 @@ func (c *FlashSystemClonner) ResolvePVToLUN(pv populator.PersistentVolume) (popu
 
 	vdisk := vdisks[0]
 	klog.Infof("Found matching volume: '%s' (ID: %s) for PV '%s'", vdisk.Name, vdisk.ID, pv.Name)
+
+	if err := c.checkPoolVdiskProtection(vdisk.MdiskGrpID); err != nil {
+		return populator.LUN{}, err
+	}
+
 	return c.createLUNFromVDisk(vdisk, pv.VolumeHandle)
 }
 
@@ -921,6 +953,11 @@ func (c *FlashSystemClonner) getVDiskByUID(uid string) (*FlashSystemVolume, erro
 	if len(vdisks) > 1 {
 		return nil, fmt.Errorf("multiple volumes (%d) found for vdisk_UID %s", len(vdisks), uid)
 	}
+
+	if err := c.checkPoolVdiskProtection(vdisks[0].MdiskGrpID); err != nil {
+		return nil, err
+	}
+
 	return &vdisks[0], nil
 }
 
