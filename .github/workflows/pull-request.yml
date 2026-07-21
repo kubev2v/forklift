@@ -133,7 +133,7 @@ jobs:
 
       # Push code coverage using Codecov Action
       - name: Push code coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         with:
           working-directory: ./go/src/github.com/${{ github.repository }}
           file: ./cover.out
