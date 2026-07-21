@@ -86,7 +86,6 @@ type Host struct {
 	SerialNumber      string `sql:""`
 	BlockModel        string `sql:""`
 	HypervisorType    string `sql:""`
-	HypervisorVersion string `sql:""`
 	NumVMs            int    `sql:""`
 	State             string `sql:""`
 	HostType          string `sql:""`
@@ -111,7 +110,6 @@ type Network struct {
 	DefaultGateway string `sql:""`
 	DHCPServerIP   string `sql:""`
 	DHCPDomainName string `sql:""`
-	DNSServers     string `sql:""` // Comma-separated list
 	IPPoolRanges   string `sql:""` // Comma-separated list
 }
 
@@ -125,7 +123,6 @@ type StorageContainer struct {
 	UsageBytes           int64  `sql:""`
 	FreeBytes            int64  `sql:""`
 	CompressionEnabled   bool   `sql:""`
-	DeduplicationEnabled bool   `sql:""`
 	OnDiskDedup          string `sql:""`
 	ErasureCode          string `sql:""`
 }
