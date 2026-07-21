@@ -18,6 +18,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/provider/container"
 	vsphereCollector "github.com/kubev2v/forklift/pkg/controller/provider/container/vsphere"
 	vsphere "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	providervalidation "github.com/kubev2v/forklift/pkg/controller/provider/validation"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/lib/inventory/model"
@@ -123,6 +124,7 @@ func (r *Reconciler) validate(provider *api.Provider) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	providervalidation.Build(provider).Validate(provider, secret, r.Client)
 	err = r.validateVSpherePrivileges(provider)
 	if err != nil {
 		return liberr.Wrap(err)
