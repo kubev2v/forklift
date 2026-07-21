@@ -168,9 +168,16 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, migrationHostId, sourceVMD
 	xcopyInitiatorGroup := fmt.Sprintf("xcopy-%s", hostID)
 	setupLog.Info("initiator group", "group", xcopyInitiatorGroup)
 
+	// TODO(workaround): revisit — see MTV-5780.
+	_, destinationRequiresScini := p.StorageApi.(SciniAware)
+	setupLog.Info("destination vendor check", "destinationRequiresScini", destinationRequiresScini)
+
 	// Filter HBA UIDs based on datastore active adapters
 	var dsActiveAdapters []vmware.HostAdapter
-	dsActiveAdapters, err = p.VSphereClient.GetDatastoreActiveAdapters(context.Background(), host, vmDisk.Datastore)
+	dsActiveAdapters, err = p.VSphereClient.GetDatastoreActiveAdapters(context.Background(), host, vmDisk.Datastore, destinationRequiresScini)
+	if err != nil {
+		return fmt.Errorf("failed to get active adapters for datastore %s: %w", vmDisk.Datastore, err)
+	}
 	initiators := []string{}
 	setupLog.Info("Datastore active adapters", "datastore", vmDisk.Datastore, "activeAdapters", dsActiveAdapters)
 	for _, a := range dsActiveAdapters {

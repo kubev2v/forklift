@@ -45,7 +45,7 @@ type Client interface {
 	// layoutEx (thin-used blocks on VMFS). VVol/RDM returns (provisioned, 0, backing, nil).
 	// Returns (0, 0, nil, nil) if the disk cannot be matched.
 	GetVirtualDiskSizes(ctx context.Context, vmId, vmdkPath string) (provisionedBytes, datastoreAllocatedBytes int64, backing *resolver.DiskBacking, err error)
-	GetDatastoreActiveAdapters(ctx context.Context, host *object.HostSystem, datastoreName string) ([]HostAdapter, error)
+	GetDatastoreActiveAdapters(ctx context.Context, host *object.HostSystem, datastoreName string, destinationRequiresScini bool) ([]HostAdapter, error)
 }
 
 type HostAdapter struct {
@@ -133,7 +133,7 @@ func (c *VSphereClient) getSciniGuid(ctx context.Context, host *object.HostSyste
 	return ""
 }
 
-func (c *VSphereClient) GetDatastoreActiveAdapters(ctx context.Context, host *object.HostSystem, datastoreName string) ([]HostAdapter, error) {
+func (c *VSphereClient) GetDatastoreActiveAdapters(ctx context.Context, host *object.HostSystem, datastoreName string, destinationRequiresScini bool) ([]HostAdapter, error) {
 	// Get scini GUID if the module is present (for PowerFlex)
 	sciniGuid := c.getSciniGuid(ctx, host)
 
@@ -292,10 +292,16 @@ func (c *VSphereClient) GetDatastoreActiveAdapters(ctx context.Context, host *ob
 		klog.V(1).Infof("Active adapter %s with initiator ID: %s, driver: %s", adapter.Name, adapter.Id, adapter.Driver)
 	}
 
-	// Check if any result has an FC or iSCSI adapter
+	// TODO(workaround): revisit — see MTV-5780. destinationRequiresScini is threaded in
+	// from main() rather than derived from adapter/device data. Replace once destination-
+	// aware adapter selection (MTV-5910) lands.
 	hasSANAdapter := false
 	for _, a := range result {
 		if strings.HasPrefix(a.Id, "iqn.") || strings.HasPrefix(a.Id, "fc.") {
+			hasSANAdapter = true
+			break
+		}
+		if destinationRequiresScini && a.Driver == "scini" {
 			hasSANAdapter = true
 			break
 		}

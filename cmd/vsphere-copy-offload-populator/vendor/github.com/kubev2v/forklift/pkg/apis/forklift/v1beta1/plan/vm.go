@@ -177,6 +177,14 @@ type VM struct {
 	//
 	// +optional
 	RDMAsLun *bool `json:"rdmAsLun,omitempty"`
+	// SCSIReservation controls whether SCSI persistent reservation is enabled for
+	// shared RDM LUN disks on this VM. Requires rdmAsLun=true to have any effect.
+	// When nil (default), the plan-level scsiReservation value is used.
+	// When explicitly set to true, shared RDM LUNs for this VM get lun.reservation=true.
+	// When explicitly set to false, shared RDM LUNs for this VM get lun.reservation=false.
+	//
+	// +optional
+	SCSIReservation *bool `json:"scsiReservation,omitempty"`
 }
 
 // Find a Hook for the specified step.
