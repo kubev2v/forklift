@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Setup Arkade to get kustomize
-        uses: alexellis/setup-arkade@v1
+        uses: alexellis/setup-arkade@v3
       - name: Install kustomize
         uses: alexellis/arkade-get@master
         with:
