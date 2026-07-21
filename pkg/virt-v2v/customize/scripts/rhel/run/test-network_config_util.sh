@@ -18,6 +18,7 @@ test_dir() {
     export NETWORK_SCRIPTS_DIR_SUSE="$TEST_DIR/etc/sysconfig/network"
     export NETWORK_CONNECTIONS_DIR="$TEST_DIR/etc/NetworkManager/system-connections"
     export UDEV_RULES_FILE="$TEST_DIR/etc/udev/rules.d/70-persistent-net.rules"
+    export SYSTEMD_LINK_DIR="$TEST_DIR/etc/systemd/network"
     export SYSTEMD_NETWORK_DIR="$TEST_DIR/run/systemd/network"
     export NETPLAN_DIR="$TEST_DIR/"
     export NM_LEASES_DIR="$TEST_DIR/var/lib/NetworkManager"
@@ -61,6 +62,26 @@ test_dir() {
             show_file $TEST_DIR/main.log
         }
         FAIL "The content of $UDEV_RULES_FILE does not match the expected rule."
+    fi
+
+    # Verify .link files were generated if expected
+    if [ -d "$TEST_SRC_DIR/expected-link" ]; then
+        for EXPECTED_LINK in "$TEST_SRC_DIR/expected-link"/*; do
+            LINK_BASENAME=$(basename "$EXPECTED_LINK")
+            ACTUAL_LINK="$SYSTEMD_LINK_DIR/$LINK_BASENAME"
+            if [ ! -f "$ACTUAL_LINK" ]; then
+                [ "$FAIL_IS_FATAL" = "true" ] && show_file $TEST_DIR/main.log
+                FAIL "Expected .link file $LINK_BASENAME not found."
+            fi
+            if ! cmp -s "$EXPECTED_LINK" "$ACTUAL_LINK"; then
+                [ "$FAIL_IS_FATAL" = "true" ] && {
+                    show_file "$ACTUAL_LINK"
+                    diff -u "$EXPECTED_LINK" "$ACTUAL_LINK"
+                    show_file $TEST_DIR/main.log
+                }
+                FAIL ".link file $LINK_BASENAME does not match expected content."
+            fi
+        done
     fi
 
     PASS_IS_FATAL=false PASS $(basename $TEST_SRC_DIR)

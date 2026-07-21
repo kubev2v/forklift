@@ -1,0 +1,12 @@
+[connection]
+id=eth0
+type=ethernet
+interface-name=eth0
+
+[ipv4]
+method=manual
+address1=10.37.160.50/24,10.37.160.254
+dns=10.37.136.1;10.37.136.3;
+
+[ipv6]
+method=disabled
