@@ -16,6 +16,7 @@ import (
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/hyperv"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
+	"github.com/kubev2v/forklift/pkg/settings"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
@@ -159,6 +160,23 @@ func (r *Builder) mapInput(object *cnv.VirtualMachineSpec) {
 	}
 }
 
+// shouldUseQualifiedNetworkName determines whether to use namespace/nad-name format
+// for Multus networks based on ForkliftController settings and namespace comparison.
+func (r *Builder) shouldUseQualifiedNetworkName(nadNamespace, targetVMNamespace string) bool {
+	// If global setting forces qualified names, always use qualified format
+	if settings.Settings.Migration.MultusNetworkNameAlwaysQualified {
+		return true
+	}
+
+	// If NAD and target VM are in different namespaces, use qualified format for safety
+	if nadNamespace != targetVMNamespace {
+		return true
+	}
+
+	// NAD and VM are in same namespace, use unqualified format
+	return false
+}
+
 func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) {
 	var kNetworks []cnv.Network
 	var kInterfaces []cnv.Interface
@@ -190,8 +208,14 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) {
 
 		switch mapped.Destination.Type {
 		case Multus:
+			var networkName string
+			if r.shouldUseQualifiedNetworkName(mapped.Destination.Namespace, r.Plan.Spec.TargetNamespace) {
+				networkName = path.Join(mapped.Destination.Namespace, mapped.Destination.Name)
+			} else {
+				networkName = mapped.Destination.Name
+			}
 			kNetwork.Multus = &cnv.MultusNetwork{
-				NetworkName: path.Join(mapped.Destination.Namespace, mapped.Destination.Name),
+				NetworkName: networkName,
 			}
 			kInterface.Bridge = &cnv.InterfaceBridge{}
 		case Pod:
