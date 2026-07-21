@@ -362,6 +362,125 @@ func TestClientListImages(t *testing.T) {
 	}
 }
 
+// TestClientListClusters_ScopedToCluster verifies that setting clusterUuid
+// scopes the clusters list down to just that cluster, instead of every
+// cluster registered to Prism Central.
+func TestClientListClusters_ScopedToCluster(t *testing.T) {
+	data, err := os.ReadFile("testdata/clusters_list.json")
+	if err != nil {
+		t.Fatalf("Failed to read testdata: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(data)
+	}))
+	defer server.Close()
+
+	const prodClusterUUID = "0005e123-4567-89ab-cdef-000000000001"
+	client := createTestClientWithSettings(server.URL, map[string]string{
+		api.NutanixPrismType:   api.NutanixPrismCentral,
+		api.NutanixClusterUUID: prodClusterUUID,
+	})
+	client.url = server.URL
+
+	entities, err := client.listClusters()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(entities) != 1 {
+		t.Fatalf("expected 1 cluster scoped to %s, got %d", prodClusterUUID, len(entities))
+	}
+	if uuid := getString(entities[0], "metadata.uuid"); uuid != prodClusterUUID {
+		t.Errorf("expected cluster %s, got %s", prodClusterUUID, uuid)
+	}
+}
+
+// TestClientListHosts_ScopedToCluster verifies that setting clusterUuid
+// scopes the hosts list to hosts belonging to that cluster.
+func TestClientListHosts_ScopedToCluster(t *testing.T) {
+	data, err := os.ReadFile("testdata/hosts_list.json")
+	if err != nil {
+		t.Fatalf("Failed to read testdata: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(data)
+	}))
+	defer server.Close()
+
+	const devClusterUUID = "0005e123-4567-89ab-cdef-000000000002"
+	client := createTestClientWithSettings(server.URL, map[string]string{
+		api.NutanixPrismType:   api.NutanixPrismCentral,
+		api.NutanixClusterUUID: devClusterUUID,
+	})
+	client.url = server.URL
+
+	entities, err := client.listHosts()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(entities) != 1 {
+		t.Fatalf("expected 1 host scoped to %s, got %d", devClusterUUID, len(entities))
+	}
+	if name := getString(entities[0], "metadata.name"); name != "ahv-dev-node-01" {
+		t.Errorf("expected ahv-dev-node-01, got %s", name)
+	}
+}
+
+// TestClientListVMs_ScopedToCluster verifies that setting clusterUuid scopes
+// the VM list to VMs belonging to that cluster, and that leaving it unset
+// (the default) still returns VMs across every cluster.
+func TestClientListVMs_ScopedToCluster(t *testing.T) {
+	data, err := os.ReadFile("testdata/vms_list.json")
+	if err != nil {
+		t.Fatalf("Failed to read testdata: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(data)
+	}))
+	defer server.Close()
+
+	const prodClusterUUID = "0005e123-4567-89ab-cdef-000000000001"
+	scoped := createTestClientWithSettings(server.URL, map[string]string{
+		api.NutanixPrismType:   api.NutanixPrismCentral,
+		api.NutanixClusterUUID: prodClusterUUID,
+	})
+	scoped.url = server.URL
+
+	entities, err := scoped.listVMs()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(entities) != 4 {
+		t.Fatalf("expected 4 VMs scoped to %s, got %d", prodClusterUUID, len(entities))
+	}
+	for _, e := range entities {
+		if uuid := getString(e, "spec.cluster_reference.uuid"); uuid != prodClusterUUID {
+			t.Errorf("expected VM cluster %s, got %s", prodClusterUUID, uuid)
+		}
+	}
+
+	unscoped := createTestClientWithSettings(server.URL, map[string]string{
+		api.NutanixPrismType: api.NutanixPrismCentral,
+	})
+	unscoped.url = server.URL
+
+	all, err := unscoped.listVMs()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(all) != 6 {
+		t.Fatalf("expected all 6 VMs when clusterUuid is unset, got %d", len(all))
+	}
+}
+
 // TestClientListAllPaginates verifies that listAll follows total_matches
 // across multiple pages instead of stopping after the first, which is what
 // clusters/hosts/subnets/images did before they were switched to it.

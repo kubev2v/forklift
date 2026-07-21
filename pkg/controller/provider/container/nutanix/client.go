@@ -28,6 +28,17 @@ const (
 	DefaultPort = "9440"
 )
 
+// Per-request page sizes for v3 list endpoints. listAll() pages through as
+// many requests as needed regardless of these values; they only bound how
+// many entities are requested per page.
+const (
+	clusterPageSize = 100
+	hostPageSize    = 1000
+	vmPageSize      = 100
+	subnetPageSize  = 500
+	imagePageSize   = 500
+)
+
 // Not found error.
 type NotFound struct {
 }
@@ -288,27 +299,58 @@ func basicAuth(username, password string) string {
 	return base64.StdEncoding.EncodeToString([]byte(auth))
 }
 
-// List all clusters
+// List all clusters, scoped to the configured clusterUuid (if any).
 func (r *Client) listClusters() (entities []map[string]interface{}, err error) {
-	return r.listAll("cluster", nil, 100)
+	entities, err = r.listAll("cluster", nil, clusterPageSize)
+	if err != nil {
+		return nil, err
+	}
+	if err = r.ensurePrismConfig(); err != nil {
+		return nil, err
+	}
+	return filterEntitiesByCluster(entities, r.prism.ClusterUUID, "metadata.uuid"), nil
 }
 
-// List all hosts
+// List all hosts, scoped to the configured clusterUuid (if any).
 func (r *Client) listHosts() (entities []map[string]interface{}, err error) {
-	return r.listAll("host", nil, 1000)
+	entities, err = r.listAll("host", nil, hostPageSize)
+	if err != nil {
+		return nil, err
+	}
+	if err = r.ensurePrismConfig(); err != nil {
+		return nil, err
+	}
+	return filterEntitiesByCluster(entities, r.prism.ClusterUUID, "status.resources.cluster_reference.uuid"), nil
 }
 
-// List all VMs
+// List all VMs, scoped to the configured clusterUuid (if any).
 func (r *Client) listVMs() (entities []map[string]interface{}, err error) {
-	return r.listAll("vm", nil, 100)
+	entities, err = r.listAll("vm", nil, vmPageSize)
+	if err != nil {
+		return nil, err
+	}
+	if err = r.ensurePrismConfig(); err != nil {
+		return nil, err
+	}
+	return filterEntitiesByCluster(entities, r.prism.ClusterUUID, "spec.cluster_reference.uuid"), nil
 }
 
-// List all subnets (networks)
+// List all subnets (networks), scoped to the configured clusterUuid (if any).
 func (r *Client) listSubnets() (entities []map[string]interface{}, err error) {
-	return r.listAll("subnet", nil, 500)
+	entities, err = r.listAll("subnet", nil, subnetPageSize)
+	if err != nil {
+		return nil, err
+	}
+	if err = r.ensurePrismConfig(); err != nil {
+		return nil, err
+	}
+	return filterEntitiesByCluster(entities, r.prism.ClusterUUID, "status.resources.cluster_reference.uuid"), nil
 }
 
-// List all images
+// List all images. Images are not scoped by clusterUuid: on Prism Central an
+// image can be shared across every cluster it's registered to (there is no
+// single owning cluster_reference), which is also why model.Image has no
+// Cluster field.
 func (r *Client) listImages() (entities []map[string]interface{}, err error) {
-	return r.listAll("image", nil, 500)
+	return r.listAll("image", nil, imagePageSize)
 }
