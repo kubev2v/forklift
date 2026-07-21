@@ -203,6 +203,14 @@ type VM1 struct {
 	Disks             []Disk            `json:"disks"`
 	SerialPorts       []SerialPort      `json:"serialPorts"`
 	Categories        map[string]string `json:"categories,omitempty"`
+	// RevisionValidated is the model Revision that was last checked
+	// against policy. It's only ever populated by a policy-agent
+	// submission loop, which Nutanix doesn't have yet -- so today this
+	// is always 0, meaning "never validated".
+	RevisionValidated int64 `json:"revisionValidated"`
+	// Concerns reported by the policy agent for this VM. Always empty
+	// until a submission loop exists to populate model.VM.Concerns.
+	Concerns []model.Concern `json:"concerns"`
 }
 
 type NIC = model.NIC
@@ -228,6 +236,8 @@ func (r *VM1) With(m *model.VM) {
 	r.Disks = m.Disks
 	r.SerialPorts = m.SerialPorts
 	r.Categories = m.Categories
+	r.RevisionValidated = m.RevisionValidated
+	r.Concerns = m.Concerns
 }
 
 // As content.
@@ -245,6 +255,10 @@ type VM struct {
 	GuestToolsVersion   string `json:"guestToolsVersion"`
 	GuestToolsReachable bool   `json:"guestToolsReachable"`
 	GuestToolsMounted   bool   `json:"guestToolsMounted"`
+	// PolicyVersion is the policy ruleset version this VM was last
+	// checked against. Always 0 until a submission loop exists to
+	// populate model.VM.PolicyVersion.
+	PolicyVersion int `json:"policyVersion"`
 }
 
 // Build the resource using the model.
@@ -254,6 +268,14 @@ func (r *VM) With(m *model.VM) {
 	r.GuestToolsVersion = m.GuestToolsVersion
 	r.GuestToolsReachable = m.GuestToolsReachable
 	r.GuestToolsMounted = m.GuestToolsMounted
+	r.PolicyVersion = m.PolicyVersion
+}
+
+// GetConcerns satisfies base.ConcernHolder, so plan validation's concern
+// aggregation recognizes Nutanix VMs. Concerns is always empty today since
+// nothing populates it yet -- see the field comment on VM1.
+func (r *VM) GetConcerns() []model.Concern {
+	return r.Concerns
 }
 
 // Build self link (URI).
