@@ -117,7 +117,7 @@ var _ = Describe("Populator", func() {
 			setup: func() {
 				vmwareClient.EXPECT().GetEsxByVm(gomock.Any(), gomock.Any()).Return(dummyHost, nil)
 				vibVersionOK()
-				vmwareClient.EXPECT().GetDatastoreActiveAdapters(context.Background(), gomock.Any(), "my-ds").Return([]vmware.HostAdapter{{Name: "vmhb64", Id: "iqn.foobar"}}, nil)
+				vmwareClient.EXPECT().GetDatastoreActiveAdapters(context.Background(), gomock.Any(), "my-ds", false).Return([]vmware.HostAdapter{{Name: "vmhb64", Id: "iqn.foobar"}}, nil)
 
 				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any()).Return(nil, nil)
 				storageClient.EXPECT().ResolvePVToLUN(populator.PersistentVolume{Name: "pvc-12345"}).Return(populator.LUN{}, fmt.Errorf("some error")).Times(1)
@@ -131,7 +131,7 @@ var _ = Describe("Populator", func() {
 			setup: func() {
 				vmwareClient.EXPECT().GetEsxByVm(gomock.Any(), gomock.Any()).Return(dummyHost, nil)
 				vibVersionOK()
-				vmwareClient.EXPECT().GetDatastoreActiveAdapters(context.Background(), gomock.Any(), "my-ds").Return([]vmware.HostAdapter{{Name: "vmhb64", Id: "iqn.foobar"}}, nil)
+				vmwareClient.EXPECT().GetDatastoreActiveAdapters(context.Background(), gomock.Any(), "my-ds", false).Return([]vmware.HostAdapter{{Name: "vmhb64", Id: "iqn.foobar"}}, nil)
 
 				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any()).Return(nil, nil)
 				storageClient.EXPECT().ResolvePVToLUN(populator.PersistentVolume{Name: "pvc-12345"}).Return(populator.LUN{NAA: "616263"}, nil)
@@ -170,7 +170,7 @@ var _ = Describe("Populator", func() {
 				underTest.SSHPublicKey = []byte("fake-pub")
 				vmwareClient.EXPECT().GetEsxByVm(gomock.Any(), gomock.Any()).Return(dummyHost, nil)
 				vmwareClient.EXPECT().RunEsxCommand(gomock.Any(), gomock.Any(), gomock.Eq(vibVersionCmd)).Times(0)
-				vmwareClient.EXPECT().GetDatastoreActiveAdapters(context.Background(), gomock.Any(), "my-ds").Return([]vmware.HostAdapter{{Name: "vmhb64", Id: "iqn.foobar"}}, nil)
+				vmwareClient.EXPECT().GetDatastoreActiveAdapters(context.Background(), gomock.Any(), "my-ds", false).Return([]vmware.HostAdapter{{Name: "vmhb64", Id: "iqn.foobar"}}, nil)
 				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any()).Return(nil, nil)
 				storageClient.EXPECT().ResolvePVToLUN(populator.PersistentVolume{Name: "pvc-12345"}).Return(populator.LUN{}, fmt.Errorf("some error")).Times(1)
 			},
@@ -183,7 +183,7 @@ var _ = Describe("Populator", func() {
 			setup: func() {
 				vmwareClient.EXPECT().GetEsxByVm(gomock.Any(), gomock.Any()).Return(dummyHost, nil)
 				vibVersionOK()
-				vmwareClient.EXPECT().GetDatastoreActiveAdapters(context.Background(), gomock.Any(), "my-ds").Return([]vmware.HostAdapter{{Name: "vmhbatest", Id: "iqn.foobar"}}, nil)
+				vmwareClient.EXPECT().GetDatastoreActiveAdapters(context.Background(), gomock.Any(), "my-ds", false).Return([]vmware.HostAdapter{{Name: "vmhbatest", Id: "iqn.foobar"}}, nil)
 
 				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any()).Return(nil, nil)
 				storageClient.EXPECT().ResolvePVToLUN(gomock.Any()).Return(populator.LUN{NAA: "naa.616263"}, nil)
