@@ -107,7 +107,7 @@ jobs:
           path: go/src/github.com/${{github.repository}}
 
       - name: Cache Go modules
-        uses: actions/cache@v3
+        uses: actions/cache@v6
         with:
           path: ${HOME}/go/pkg/mod
           key: ${{ runner.os }}-build-${{ hashFiles('**/go.sum') }}
