@@ -138,66 +138,6 @@ func getBool(m map[string]interface{}, path string) bool {
 	return false
 }
 
-func getMap(m map[string]interface{}, path string) map[string]interface{} {
-	parts := strings.Split(path, ".")
-	current := m
-
-	for i, part := range parts {
-		if i == len(parts)-1 {
-			// Last part - get the map
-			if val, ok := current[part]; ok {
-				if m, ok := val.(map[string]interface{}); ok {
-					return m
-				}
-			}
-			return nil
-		}
-
-		// Navigate deeper
-		if val, ok := current[part]; ok {
-			if next, ok := val.(map[string]interface{}); ok {
-				current = next
-			} else {
-				return nil
-			}
-		} else {
-			return nil
-		}
-	}
-
-	return nil
-}
-
-func getSlice(m map[string]interface{}, path string) []interface{} {
-	parts := strings.Split(path, ".")
-	current := m
-
-	for i, part := range parts {
-		if i == len(parts)-1 {
-			// Last part - get the slice
-			if val, ok := current[part]; ok {
-				if s, ok := val.([]interface{}); ok {
-					return s
-				}
-			}
-			return nil
-		}
-
-		// Navigate deeper
-		if val, ok := current[part]; ok {
-			if next, ok := val.(map[string]interface{}); ok {
-				current = next
-			} else {
-				return nil
-			}
-		} else {
-			return nil
-		}
-	}
-
-	return nil
-}
-
 // Apply cluster data to model.
 func applyCluster(entity map[string]interface{}, m *model.Cluster) {
 	// metadata

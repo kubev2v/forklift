@@ -106,6 +106,103 @@ func TestResolvePrismConfig_Explicit(t *testing.T) {
 	}
 }
 
+// TestResolvePrismConfig_AutoDetect verifies the fallback path taken when no
+// prismType setting is configured: resolvePrismConfig defers to
+// detectPrismMode instead of trusting an explicit setting.
+func TestResolvePrismConfig_AutoDetect(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/nutanix/v3/prism_central":
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"resources":{"version":"pc.2024.1"}}`))
+		case "/api/nutanix/v3/clusters/list":
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"entities":[]}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client := createTestClientWithSettings(server.URL, map[string]string{})
+
+	config, err := client.resolvePrismConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if config.Explicit {
+		t.Fatal("expected a non-explicit config when no prismType setting is present")
+	}
+	if config.Mode != PrismCentral {
+		t.Fatalf("expected auto-detected central, got %s", config.Mode)
+	}
+}
+
+// TestEnsurePrismConfig_CachesResult verifies that a second call to
+// ensurePrismConfig doesn't re-resolve (and re-probe the API) once the mode
+// has already been determined.
+func TestEnsurePrismConfig_CachesResult(t *testing.T) {
+	requestCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		switch r.URL.Path {
+		case "/api/nutanix/v3/prism_central":
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"resources":{"version":"pc.2024.1"}}`))
+		case "/api/nutanix/v3/clusters/list":
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"entities":[]}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client := createTestClientWithSettings(server.URL, map[string]string{})
+
+	if err := client.ensurePrismConfig(); err != nil {
+		t.Fatalf("unexpected error on first call: %v", err)
+	}
+	if client.prism.Mode != PrismCentral {
+		t.Fatalf("expected central, got %s", client.prism.Mode)
+	}
+
+	countAfterFirst := requestCount
+	if countAfterFirst == 0 {
+		t.Fatal("expected the first call to make at least one request")
+	}
+
+	if err := client.ensurePrismConfig(); err != nil {
+		t.Fatalf("unexpected error on second call: %v", err)
+	}
+	if requestCount != countAfterFirst {
+		t.Fatalf("expected ensurePrismConfig to be cached after the first resolution; "+
+			"request count grew from %d to %d", countAfterFirst, requestCount)
+	}
+}
+
+// TestDetectPrismMode_NeitherResponds verifies that detectPrismMode returns
+// an error, rather than silently defaulting, when neither the Prism Central
+// nor Prism Element probe succeeds.
+func TestDetectPrismMode_NeitherResponds(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/nutanix/v3/clusters/list":
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"entities":[]}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client := createTestClient(server.URL)
+	_, err := client.detectPrismMode()
+	if err == nil {
+		t.Fatal("expected an error when neither Prism Central nor Element probes succeed")
+	}
+}
+
 func TestStorageContainerEntityFromV2(t *testing.T) {
 	data, err := os.ReadFile("testdata/storage_containers_v2_list.json")
 	if err != nil {

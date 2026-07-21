@@ -543,3 +543,208 @@ func TestGetBoolHelper(t *testing.T) {
 		})
 	}
 }
+
+// TestGetInt64Helper tests the getInt64 helper function.
+func TestGetInt64Helper(t *testing.T) {
+	testMap := map[string]interface{}{
+		"int":     42,
+		"int64":   int64(100),
+		"float64": float64(200),
+		"nested": map[string]interface{}{
+			"value": int64(123),
+		},
+	}
+
+	tests := []struct {
+		name     string
+		path     string
+		expected int64
+	}{
+		{"int value", "int", 42},
+		{"int64 value", "int64", 100},
+		{"float64 value", "float64", 200},
+		{"nested value", "nested.value", 123},
+		{"non-existent", "nonexistent", 0},
+		{"non-existent nested", "nested.nonexistent", 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getInt64(testMap, tt.path)
+			if result != tt.expected {
+				t.Errorf("Expected %d, got %d", tt.expected, result)
+			}
+		})
+	}
+}
+
+// TestNormalizeHypervisorType covers both the recognized AHV spellings and
+// the passthrough default branch for anything else (e.g. ESXi values that
+// might show up if a Nutanix cluster is ever mixed-hypervisor).
+func TestNormalizeHypervisorType(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"lowercase kKvm", "kKvm", "AHV"},
+		{"uppercase KKVM", "KKVM", "AHV"},
+		{"unrecognized value passthrough", "kVMware", "kVMware"},
+		{"empty value passthrough", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if result := normalizeHypervisorType(tt.input); result != tt.expected {
+				t.Errorf("Expected %q, got %q", tt.expected, result)
+			}
+		})
+	}
+}
+
+// TestApplyGuestTools_Disabled verifies a VM with Nutanix Guest Tools never
+// installed comes back with every guest-tools field at its zero value,
+// rather than erroring or leaving stale values from a previous VM.
+func TestApplyGuestTools_Disabled(t *testing.T) {
+	specResources := map[string]interface{}{
+		"guest_tools": map[string]interface{}{
+			"nutanix_guest_tools": map[string]interface{}{
+				"enabled": false,
+			},
+		},
+	}
+	statusResources := map[string]interface{}{}
+
+	m := &model.VM{}
+	applyGuestTools(specResources, statusResources, m)
+
+	if m.GuestToolsEnabled {
+		t.Error("Expected GuestToolsEnabled to be false")
+	}
+	if m.GuestToolsVersion != "" {
+		t.Errorf("Expected empty GuestToolsVersion, got %q", m.GuestToolsVersion)
+	}
+	if m.GuestToolsMounted {
+		t.Error("Expected GuestToolsMounted to be false")
+	}
+	if m.GuestToolsReachable {
+		t.Error("Expected GuestToolsReachable to be false")
+	}
+}
+
+// TestApplyGuestTools_UnmountedISO verifies that an ISO mount state other
+// than "MOUNTED" (e.g. "UNMOUNTED") is correctly reported as not mounted.
+func TestApplyGuestTools_UnmountedISO(t *testing.T) {
+	specResources := map[string]interface{}{
+		"guest_tools": map[string]interface{}{
+			"nutanix_guest_tools": map[string]interface{}{
+				"enabled":          true,
+				"version":          "3.2.0",
+				"is_reachable":     true,
+				"iso_mount_state":  "UNMOUNTED",
+				"guest_os_version": "Red Hat Enterprise Linux 8.9",
+			},
+		},
+	}
+	statusResources := map[string]interface{}{}
+
+	m := &model.VM{}
+	applyGuestTools(specResources, statusResources, m)
+
+	if !m.GuestToolsEnabled {
+		t.Error("Expected GuestToolsEnabled to be true")
+	}
+	if m.GuestToolsMounted {
+		t.Error("Expected GuestToolsMounted to be false for an UNMOUNTED ISO")
+	}
+	if !m.GuestToolsReachable {
+		t.Error("Expected GuestToolsReachable to be true")
+	}
+}
+
+// TestApplyGuestTools_NoSection verifies a VM with no guest_tools section at
+// all in either spec or status resources doesn't error, and leaves the
+// model at its zero values.
+func TestApplyGuestTools_NoSection(t *testing.T) {
+	m := &model.VM{}
+	applyGuestTools(map[string]interface{}{}, map[string]interface{}{}, m)
+
+	if m.GuestToolsEnabled || m.GuestToolsMounted || m.GuestToolsReachable || m.GuestToolsVersion != "" {
+		t.Errorf("Expected all guest tools fields to remain at zero value, got %+v", m)
+	}
+}
+
+// TestApplyDiskFromMap_VolumeGroupDisk verifies that a volume-group-backed
+// disk (which has no storage_container_reference of its own) still gets its
+// size and device properties captured, even though the storage container
+// attribution is only resolvable via a separate Volume Group lookup that
+// doesn't exist yet.
+func TestApplyDiskFromMap_VolumeGroupDisk(t *testing.T) {
+	diskData := map[string]interface{}{
+		"uuid": "disk-vg-1",
+		"device_properties": map[string]interface{}{
+			"device_type": "DISK",
+			"disk_address": map[string]interface{}{
+				"device_index": float64(1),
+				"adapter_type": "SCSI",
+			},
+		},
+		"disk_size_mib":          float64(51200),
+		"volume_group_reference": map[string]interface{}{"uuid": "vg-1"},
+	}
+
+	disk := applyDiskFromMap(diskData)
+
+	if disk.UUID != "disk-vg-1" {
+		t.Errorf("Expected UUID 'disk-vg-1', got %s", disk.UUID)
+	}
+	if disk.DiskSizeMiB != 51200 {
+		t.Errorf("Expected DiskSizeMiB 51200, got %d", disk.DiskSizeMiB)
+	}
+	if disk.DeviceIndex != 1 {
+		t.Errorf("Expected DeviceIndex 1, got %d", disk.DeviceIndex)
+	}
+	if disk.StorageContainerUUID != "" {
+		t.Errorf("Expected empty StorageContainerUUID for a volume-group disk, got %q", disk.StorageContainerUUID)
+	}
+	if disk.IsCdrom {
+		t.Error("Expected IsCdrom to be false for a DISK device type")
+	}
+}
+
+// TestApplyDiskFromMap_Cdrom verifies IsCdrom is derived correctly from
+// device_type, and that a CD-ROM with no data source doesn't error.
+func TestApplyDiskFromMap_Cdrom(t *testing.T) {
+	diskData := map[string]interface{}{
+		"uuid": "disk-cdrom-1",
+		"device_properties": map[string]interface{}{
+			"device_type": "CDROM",
+			"disk_address": map[string]interface{}{
+				"device_index": float64(0),
+				"adapter_type": "IDE",
+			},
+		},
+	}
+
+	disk := applyDiskFromMap(diskData)
+
+	if !disk.IsCdrom {
+		t.Error("Expected IsCdrom to be true for a CDROM device type")
+	}
+	if disk.SourceImageUUID != "" {
+		t.Errorf("Expected empty SourceImageUUID, got %q", disk.SourceImageUUID)
+	}
+}
+
+// TestApplyStorageContainerRef_Missing verifies that a disk with no
+// storage_container_reference at all leaves the disk's storage fields at
+// their zero value instead of erroring.
+func TestApplyStorageContainerRef_Missing(t *testing.T) {
+	disk := &model.Disk{}
+	applyStorageContainerRef(map[string]interface{}{}, disk)
+
+	if disk.StorageContainerUUID != "" || disk.StorageContainerName != "" {
+		t.Errorf("Expected empty storage container fields, got UUID=%q Name=%q",
+			disk.StorageContainerUUID, disk.StorageContainerName)
+	}
+}
