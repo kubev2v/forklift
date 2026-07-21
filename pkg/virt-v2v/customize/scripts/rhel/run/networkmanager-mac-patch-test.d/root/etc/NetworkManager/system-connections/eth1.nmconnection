@@ -1,0 +1,11 @@
+[connection]
+id=eth1
+type=ethernet
+interface-name=eth1
+
+[ipv4]
+method=manual
+address1=192.168.122.50/24
+
+[ipv6]
+method=disabled

@@ -1,0 +1,14 @@
+[connection]
+id=ens224
+type=ethernet
+interface-name=ens224
+
+[ipv4]
+method=manual
+address1=172.16.0.50/24,172.16.0.1
+
+[ipv6]
+method=disabled
+
+[ethernet]
+mac-address=ff:ff:ff:ff:ff:ff
