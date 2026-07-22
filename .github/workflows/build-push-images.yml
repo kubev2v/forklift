@@ -63,7 +63,7 @@ jobs:
           password: ${{ secrets.QUAY_TOKEN }}
 
       - name: Build and push ${{ matrix.name }} image to ${{ env.REGISTRY }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           push: true
           file: "${{ matrix.file }}"
@@ -84,7 +84,7 @@ jobs:
           password: ${{ secrets.QUAY_TOKEN }}
 
       - name: Build and push forklift-operator-bundle image to ${{ env.REGISTRY }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           push: true
           file: "build/forklift-operator-bundle/Containerfile"
@@ -107,7 +107,7 @@ jobs:
           password: ${{ secrets.QUAY_TOKEN }}
 
       - name: Build and push forklift-operator-index image to ${{ env.REGISTRY }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           push: true
           file: "build/forklift-operator-index/Containerfile"
