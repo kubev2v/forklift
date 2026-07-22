@@ -1019,6 +1019,56 @@ var _ = Describe("vSphere builder", func() {
 			},
 		),
 	)
+
+	DescribeTable("TranslateDiskIndexFromLibvirt", func(disks []vsphere.Disk, libvirtIndex int, expectedTargetIndex int) {
+		vm := &model.VM1{}
+		vm.Disks = disks
+		targetOrder := vm.SortedDisksAsVmware()
+		Expect(vm.TranslateDiskIndexFromLibvirt(libvirtIndex, targetOrder)).Should(Equal(expectedTargetIndex))
+	},
+		Entry("translates libvirt boot index to vmware order (boot on SATA, data on SCSI)",
+			[]vsphere.Disk{
+				{Key: 100, Bus: vsphere.SCSI, File: "data.vmdk"},
+				{Key: 200, Bus: vsphere.SATA, File: "boot.vmdk"},
+			},
+			1,  // libvirt index: SCSI first → SATA boot is index 1
+			0,  // vmware index: SATA first → SATA boot is index 0
+		),
+		Entry("same index when single bus (all SCSI)",
+			[]vsphere.Disk{
+				{Key: 100, Bus: vsphere.SCSI, File: "disk0.vmdk"},
+				{Key: 200, Bus: vsphere.SCSI, File: "disk1.vmdk"},
+				{Key: 300, Bus: vsphere.SCSI, File: "disk2.vmdk"},
+			},
+			0,
+			0,
+		),
+		Entry("returns -1 when libvirt index out of range",
+			[]vsphere.Disk{
+				{Key: 100, Bus: vsphere.SCSI, File: "disk0.vmdk"},
+			},
+			5,
+			-1,
+		),
+		Entry("passes through negative index unchanged",
+			[]vsphere.Disk{
+				{Key: 100, Bus: vsphere.SCSI, File: "disk0.vmdk"},
+			},
+			-1,
+			-1,
+		),
+		Entry("translates correctly with multiple buses (IDE boot, SCSI data, SATA extra)",
+			[]vsphere.Disk{
+				{Key: 300, Bus: vsphere.IDE, File: "boot.vmdk"},
+				{Key: 100, Bus: vsphere.SCSI, File: "data.vmdk"},
+				{Key: 200, Bus: vsphere.SATA, File: "extra.vmdk"},
+			},
+			// Libvirt order: SCSI(100), SATA(200), IDE(300) → IDE boot is index 2
+			// VMware order:  SATA(200), IDE(300), SCSI(100) → IDE boot is index 1
+			2,
+			1,
+		),
+	)
 })
 
 var _ = Describe("PopulatorXcopyUsed", func() {

@@ -83,6 +83,7 @@ const (
 	Failed                          = "Failed"
 	Canceled                        = "Canceled"
 	ConversionHasWarnings           = "ConversionHasWarnings"
+	BootDiskNotDetected             = "BootDiskNotDetected"
 	InspectionHasConcerns           = "InspectionHasConcerns"
 	Deleted                         = "Deleted"
 	Paused                          = "Paused"

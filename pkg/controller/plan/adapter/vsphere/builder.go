@@ -979,7 +979,7 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 		}
 	}
 
-	var bootDisk int
+	bootDisk := -1
 	for _, vmConf := range r.Plan.Spec.VMs {
 		if vmConf.ID == vmRef.ID {
 			if vmConf.RootDisk != "" {
@@ -989,6 +989,21 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 				bootDisk = *vmStatus.DetectedBootDisk
 			}
 			break
+		}
+	}
+
+	// Boot disk indices from inspection/virt-v2v/user RootDisk are in libvirt
+	// order. When the final VM uses VMware order, translate to the correct index.
+	if !sortByLibvirt && bootDisk >= 0 {
+		translated := vm.TranslateDiskIndexFromLibvirt(bootDisk, disks)
+		if translated < 0 {
+			r.Log.Info("Failed to translate boot disk index from libvirt to target disk order",
+				"libvirtIndex", bootDisk, "vm", vm.Name)
+			bootDisk = -1
+		} else {
+			r.Log.V(1).Info("Translated boot disk index from libvirt to VMware order",
+				"libvirtIndex", bootDisk, "targetIndex", translated, "vm", vm.Name)
+			bootDisk = translated
 		}
 	}
 
@@ -1077,11 +1092,9 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 			r.Log.Info("Available PVC mapping", "diskKey", key, "pvcName", pvc.Name)
 		}
 		return fmt.Errorf("no disks were successfully mapped for VM %s", vm.Name)
-	} else if bootDisk < len(kDisks) {
-		// For multiboot VMs, if the selected boot device is the current disk,
-		// set it as the first in the boot order.
+	} else if bootDisk >= 0 && bootDisk < len(kDisks) {
 		kDisks[bootDisk].BootOrder = ptr.To(uint(1))
-	} else {
+	} else if bootDisk >= len(kDisks) {
 		r.Log.Info("Boot disk index out of range", "bootDisk", bootDisk, "diskCount", len(kDisks), "vm", vm.Name)
 	}
 

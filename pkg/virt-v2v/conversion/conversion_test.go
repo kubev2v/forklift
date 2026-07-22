@@ -137,12 +137,14 @@ var _ = Describe("Conversion", func() {
 		It("passes virt-v2v-in-place with libvirtxml",
 			func() {
 				appConfig.LibvirtDomainFile = config.V2vInPlaceLibvirtDomain
+				appConfig.InspectionOutputFile = config.InspectionOutputFile
 
 				mockCommandBuilder.EXPECT().New("virt-v2v-in-place").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("-i", "libvirtxml").Return(mockCommandBuilder)
+				mockCommandBuilder.EXPECT().AddArg("-O", config.InspectionOutputFile).Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddPositional(config.V2vInPlaceLibvirtDomain).Return(mockCommandBuilder)
 
@@ -161,12 +163,14 @@ var _ = Describe("Conversion", func() {
 			func() {
 				appConfig.LibvirtDomainFile = config.V2vInPlaceLibvirtDomain
 				appConfig.ExtraArgs = []string{"--debug", "--verbose"}
+				appConfig.InspectionOutputFile = config.InspectionOutputFile
 
 				mockCommandBuilder.EXPECT().New("virt-v2v-in-place").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("-i", "libvirtxml").Return(mockCommandBuilder)
+				mockCommandBuilder.EXPECT().AddArg("-O", config.InspectionOutputFile).Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddExtraArgs("--debug", "--verbose").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddPositional(config.V2vInPlaceLibvirtDomain).Return(mockCommandBuilder)
@@ -185,12 +189,14 @@ var _ = Describe("Conversion", func() {
 		It("returns error when command fails",
 			func() {
 				appConfig.LibvirtDomainFile = config.V2vInPlaceLibvirtDomain
+				appConfig.InspectionOutputFile = config.InspectionOutputFile
 
 				mockCommandBuilder.EXPECT().New("virt-v2v-in-place").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("-i", "libvirtxml").Return(mockCommandBuilder)
+				mockCommandBuilder.EXPECT().AddArg("-O", config.InspectionOutputFile).Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddPositional(config.V2vInPlaceLibvirtDomain).Return(mockCommandBuilder)
 
@@ -210,6 +216,7 @@ var _ = Describe("Conversion", func() {
 	Describe("RunVirtV2vInPlaceDisk", func() {
 		It("runs virt-v2v-in-place with disk mode",
 			func() {
+				appConfig.InspectionOutputFile = config.InspectionOutputFile
 				conversion.Disks = []*Disk{
 					{Link: "/var/tmp/v2v/vm-sda"},
 					{Link: "/var/tmp/v2v/vm-sdb"},
@@ -219,6 +226,7 @@ var _ = Describe("Conversion", func() {
 				mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("-i", "disk").Return(mockCommandBuilder)
+				mockCommandBuilder.EXPECT().AddArg("-O", config.InspectionOutputFile).Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddPositional("/var/tmp/v2v/vm-sda").Return(mockCommandBuilder)
@@ -248,6 +256,7 @@ var _ = Describe("Conversion", func() {
 		It("runs virt-v2v-in-place disk mode with extra args",
 			func() {
 				appConfig.ExtraArgs = []string{"--custom-flag"}
+				appConfig.InspectionOutputFile = config.InspectionOutputFile
 				conversion.Disks = []*Disk{
 					{Link: "/var/tmp/v2v/vm-sda"},
 				}
@@ -256,6 +265,7 @@ var _ = Describe("Conversion", func() {
 				mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("-i", "disk").Return(mockCommandBuilder)
+				mockCommandBuilder.EXPECT().AddArg("-O", config.InspectionOutputFile).Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 				mockCommandBuilder.EXPECT().AddExtraArgs("--custom-flag").Return(mockCommandBuilder)
@@ -445,6 +455,7 @@ var _ = Describe("Conversion", func() {
 
 	Describe("RunVirtV2vInPlaceDisk error cases", func() {
 		It("returns error when command fails", func() {
+			appConfig.InspectionOutputFile = config.InspectionOutputFile
 			conversion.Disks = []*Disk{
 				{Link: "/var/tmp/v2v/vm-sda"},
 			}
@@ -453,6 +464,7 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-i", "disk").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-O", config.InspectionOutputFile).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("/var/tmp/v2v/vm-sda").Return(mockCommandBuilder)
@@ -471,6 +483,7 @@ var _ = Describe("Conversion", func() {
 		It("returns error when addCommonArgs fails", func() {
 			luksDir := "/etc/luks"
 			appConfig.Luksdir = luksDir
+			appConfig.InspectionOutputFile = config.InspectionOutputFile
 			conversion.Disks = []*Disk{
 				{Link: "/var/tmp/v2v/vm-sda"},
 			}
@@ -479,6 +492,7 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-i", "disk").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-O", config.InspectionOutputFile).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 
 			mockFileSystem.EXPECT().Stat(luksDir).Return(nil, nil)
@@ -523,11 +537,13 @@ var _ = Describe("Conversion", func() {
 		It("passes static IP arguments", func() {
 			appConfig.LibvirtDomainFile = config.V2vInPlaceLibvirtDomain
 			appConfig.StaticIPs = "00:11:22:33:44:55:ip:192.168.1.100"
+			appConfig.InspectionOutputFile = config.InspectionOutputFile
 
 			mockCommandBuilder.EXPECT().New("virt-v2v-in-place").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-i", "libvirtxml").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-O", config.InspectionOutputFile).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--mac", "00:11:22:33:44:55:ip:192.168.1.100").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("--no-fstrim").Return(mockCommandBuilder)
@@ -545,6 +561,7 @@ var _ = Describe("Conversion", func() {
 
 		It("returns error when addCommonArgs fails", func() {
 			appConfig.LibvirtDomainFile = config.V2vInPlaceLibvirtDomain
+			appConfig.InspectionOutputFile = config.InspectionOutputFile
 			luksDir := "/etc/luks"
 			appConfig.Luksdir = luksDir
 
@@ -552,6 +569,7 @@ var _ = Describe("Conversion", func() {
 			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-i", "libvirtxml").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-O", config.InspectionOutputFile).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 
 			mockFileSystem.EXPECT().Stat(luksDir).Return(nil, nil)
@@ -1195,12 +1213,14 @@ var _ = Describe("Conversion", func() {
 		It("omits --no-fstrim for RunVirtV2vInPlace", func() {
 			appConfig.LibvirtDomainFile = config.V2vInPlaceLibvirtDomain
 			appConfig.XfsCompatibility = true
+			appConfig.InspectionOutputFile = config.InspectionOutputFile
 
 			mockCommandBuilder.EXPECT().New("virt-v2v-in-place").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-i", "libvirtxml").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-O", config.InspectionOutputFile).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional(config.V2vInPlaceLibvirtDomain).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
 			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
@@ -1213,12 +1233,14 @@ var _ = Describe("Conversion", func() {
 
 		It("omits --no-fstrim for RunVirtV2vInPlaceDisk", func() {
 			appConfig.XfsCompatibility = true
+			appConfig.InspectionOutputFile = config.InspectionOutputFile
 			conversion.Disks = []*Disk{{Link: "/var/tmp/v2v/vm-sda"}}
 
 			mockCommandBuilder.EXPECT().New("virt-v2v-in-place").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-i", "disk").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-O", config.InspectionOutputFile).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("/var/tmp/v2v/vm-sda").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
@@ -1257,12 +1279,14 @@ var _ = Describe("Conversion", func() {
 		It("omits --no-fstrim for RunVirtV2vInPlace on upstream images", func() {
 			appConfig.LibvirtDomainFile = config.V2vInPlaceLibvirtDomain
 			appConfig.SupportsNoFstrim = false
+			appConfig.InspectionOutputFile = config.InspectionOutputFile
 
 			mockCommandBuilder.EXPECT().New("virt-v2v-in-place").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-i", "libvirtxml").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-O", config.InspectionOutputFile).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional(config.V2vInPlaceLibvirtDomain).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
 			mockCommandExecutor.EXPECT().SetStdout(os.Stdout)
@@ -1275,12 +1299,14 @@ var _ = Describe("Conversion", func() {
 
 		It("omits --no-fstrim for RunVirtV2vInPlaceDisk on upstream images", func() {
 			appConfig.SupportsNoFstrim = false
+			appConfig.InspectionOutputFile = config.InspectionOutputFile
 			conversion.Disks = []*Disk{{Link: "/var/tmp/v2v/vm-sda"}}
 
 			mockCommandBuilder.EXPECT().New("virt-v2v-in-place").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("-v").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddFlag("-x").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("-i", "disk").Return(mockCommandBuilder)
+			mockCommandBuilder.EXPECT().AddArg("-O", config.InspectionOutputFile).Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--root", "first").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddPositional("/var/tmp/v2v/vm-sda").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().Build().Return(mockCommandExecutor)
