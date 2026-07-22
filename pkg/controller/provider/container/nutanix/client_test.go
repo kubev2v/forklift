@@ -305,7 +305,7 @@ func TestClientListStorageContainersCentral(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"entities":[]}`))
-		case "/api/clustermgmt/v4.1/config/storage-containers":
+		case "/api/clustermgmt/v4.0/config/storage-containers":
 			if r.Method != "GET" {
 				t.Errorf("Expected GET, got %s", r.Method)
 			}
