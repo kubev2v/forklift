@@ -988,6 +988,17 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 				return err
 			}
 		}
+
+		vibVerRegExp := regexp.MustCompile(`vsphere_xcopy_volume_populator_vib_version\{[^}]*owner_uid="` + string(pvc.UID) + `"[^}]*\} (\d+)`)
+		vibVerLine := vibVerRegExp.FindString(bodyStr)
+		if vibVerLine != "" {
+			if vibVersion := extractLabel(vibVerLine, "version"); vibVersion != "" {
+				if err := unstructured.SetNestedField(latestPopulator.Object, vibVersion, "status", "vibVersion"); err != nil {
+					klog.V(5).Info("Failed to update vibVersion: ", err)
+					return err
+				}
+			}
+		}
 	}
 
 	_, err = c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Update(context.TODO(), latestPopulator, metav1.UpdateOptions{})

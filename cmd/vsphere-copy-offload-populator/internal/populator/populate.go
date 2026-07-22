@@ -14,6 +14,8 @@ type CopyContext struct {
 	CloneMethod string
 	// StorageProtocol is the storage protocol when known (e.g. "iscsi", "fc"). May be empty.
 	StorageProtocol string
+	// VibVersion is the installed VIB version when known. Empty if unavailable (old or missing VIB).
+	VibVersion string
 	// SourceDiskCapacityBytes is provisioned (guest-visible) size of the source disk.
 	SourceDiskCapacityBytes int64
 	// SourceDiskDatastoreAllocatedBytes is datastore footprint (layoutEx diskExtent sizes) when known.
