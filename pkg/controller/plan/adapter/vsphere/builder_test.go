@@ -710,7 +710,7 @@ var _ = Describe("vSphere builder", func() {
 
 	builder := createBuilder()
 	DescribeTable("should", func(vm *model.VM, outputMap string) {
-		Expect(builder.mapMacStaticIps(vm)).Should(Equal(outputMap))
+		Expect(builder.mapMacStaticIps(vm, nil)).Should(Equal(outputMap))
 	},
 		Entry("no static ips", &model.VM{GuestID: "windows9Guest"}, ""),
 		Entry("single static ip", &model.VM{
@@ -868,6 +868,99 @@ var _ = Describe("vSphere builder", func() {
 				}},
 		}, "00:50:56:83:25:47:ip:172.29.3.193,172.29.3.1,24,8.8.8.8"),
 	)
+
+	Context("mapMacStaticIps with networkIPMode filtering", func() {
+		It("should skip NICs with mode 'none'", func() {
+			b := createBuilder()
+			vm := &model.VM{
+				GuestID: "windows9Guest",
+				GuestNetworks: []vsphere.GuestNetwork{
+					{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+					{MAC: "00:50:56:83:25:48", IP: "172.29.3.194", Origin: ManualOrigin, PrefixLength: 16},
+				},
+				GuestIpStacks: []vsphere.GuestIpStack{{Gateway: "172.29.3.1", Network: "0.0.0.0"}},
+			}
+			modeByMAC := map[string]string{
+				"00:50:56:83:25:47": "preserve",
+				"00:50:56:83:25:48": "none",
+			}
+			result, err := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(ContainSubstring("00:50:56:83:25:47"))
+			Expect(result).NotTo(ContainSubstring("00:50:56:83:25:48"))
+		})
+
+		It("should skip NICs with mode 'dhcp'", func() {
+			b := createBuilder()
+			vm := &model.VM{
+				GuestID: "windows9Guest",
+				GuestNetworks: []vsphere.GuestNetwork{
+					{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+				},
+			}
+			modeByMAC := map[string]string{
+				"00:50:56:83:25:47": "dhcp",
+			}
+			result, err := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(BeEmpty())
+		})
+
+		It("should include NICs not in modeByMAC (backward compat)", func() {
+			b := createBuilder()
+			vm := &model.VM{
+				GuestID: "windows9Guest",
+				GuestNetworks: []vsphere.GuestNetwork{
+					{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+				},
+				GuestIpStacks: []vsphere.GuestIpStack{{Gateway: "172.29.3.1", Network: "0.0.0.0"}},
+			}
+			// NIC not in the map at all — should proceed
+			modeByMAC := map[string]string{}
+			result, err := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(ContainSubstring("00:50:56:83:25:47"))
+		})
+
+		It("should include all NICs when modeByMAC is nil", func() {
+			b := createBuilder()
+			vm := &model.VM{
+				GuestID: "windows9Guest",
+				GuestNetworks: []vsphere.GuestNetwork{
+					{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+					{MAC: "00:50:56:83:25:48", IP: "172.29.3.194", Origin: ManualOrigin, PrefixLength: 16},
+				},
+				GuestIpStacks: []vsphere.GuestIpStack{{Gateway: "172.29.3.1", Network: "0.0.0.0"}},
+			}
+			result, err := b.mapMacStaticIps(vm, nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(ContainSubstring("00:50:56:83:25:47"))
+			Expect(result).To(ContainSubstring("00:50:56:83:25:48"))
+		})
+
+		It("should preserve only marked NICs in a mixed-mode map", func() {
+			b := createBuilder()
+			vm := &model.VM{
+				GuestID: "windows9Guest",
+				GuestNetworks: []vsphere.GuestNetwork{
+					{MAC: "00:50:56:83:25:47", IP: "172.29.3.193", Origin: ManualOrigin, PrefixLength: 16},
+					{MAC: "00:50:56:83:25:48", IP: "172.29.3.194", Origin: ManualOrigin, PrefixLength: 16},
+					{MAC: "00:50:56:83:25:49", IP: "172.29.3.195", Origin: ManualOrigin, PrefixLength: 16},
+				},
+				GuestIpStacks: []vsphere.GuestIpStack{{Gateway: "172.29.3.1", Network: "0.0.0.0"}},
+			}
+			modeByMAC := map[string]string{
+				"00:50:56:83:25:47": "preserve",
+				"00:50:56:83:25:48": "dhcp",
+				"00:50:56:83:25:49": "none",
+			}
+			result, err := b.mapMacStaticIps(vm, modeByMAC)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(ContainSubstring("00:50:56:83:25:47"))
+			Expect(result).NotTo(ContainSubstring("00:50:56:83:25:48"))
+			Expect(result).NotTo(ContainSubstring("00:50:56:83:25:49"))
+		})
+	})
 
 	DescribeTable("should", func(disks []vsphere.Disk, output []vsphere.Disk) {
 		vm := &model.VM1{}
