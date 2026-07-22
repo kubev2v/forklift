@@ -146,9 +146,9 @@ func applyCluster(entity map[string]interface{}, m *model.Cluster) {
 		m.ID = uuid
 		m.ClusterUUID = uuid
 	}
-	if name, ok := metadata["name"].(string); ok {
-		m.Name = name
-	}
+	// v3 intentful entities carry their name under spec/status, never
+	// under metadata.
+	m.Name = firstString(entity, "spec.name", "status.name")
 
 	// status.resources
 	status, _ := entity["status"].(map[string]interface{})
@@ -216,19 +216,16 @@ func applyHost(entity map[string]interface{}, m *model.Host) {
 		m.ID = uuid
 		m.HostUUID = uuid
 	}
-	if name, ok := metadata["name"].(string); ok {
-		m.Name = name
-	}
+	// v3 intentful entities carry their name under spec/status, never
+	// under metadata.
+	m.Name = firstString(entity, "spec.name", "status.name")
 
 	status, _ := entity["status"].(map[string]interface{})
 	resources, _ := status["resources"].(map[string]interface{})
 
-	// cluster reference
-	if clusterRef, ok := resources["cluster_reference"].(map[string]interface{}); ok {
-		if clusterUUID, ok := clusterRef["uuid"].(string); ok {
-			m.Cluster = clusterUUID
-		}
-	}
+	// cluster reference lives directly under spec/status, not nested
+	// under status.resources.
+	m.Cluster = firstString(entity, "spec.cluster_reference.uuid", "status.cluster_reference.uuid")
 
 	// serial number
 	m.SerialNumber = getString(resources, "serial_number")
@@ -270,19 +267,16 @@ func applyNetwork(entity map[string]interface{}, m *model.Network) {
 		m.ID = uuid
 		m.NetworkUUID = uuid
 	}
-	if name, ok := metadata["name"].(string); ok {
-		m.Name = name
-	}
+	// v3 intentful entities carry their name under spec/status, never
+	// under metadata.
+	m.Name = firstString(entity, "spec.name", "status.name")
 
 	status, _ := entity["status"].(map[string]interface{})
 	resources, _ := status["resources"].(map[string]interface{})
 
-	// cluster reference
-	if clusterRef, ok := resources["cluster_reference"].(map[string]interface{}); ok {
-		if clusterUUID, ok := clusterRef["uuid"].(string); ok {
-			m.Cluster = clusterUUID
-		}
-	}
+	// cluster reference lives directly under spec/status, not nested
+	// under status.resources.
+	m.Cluster = firstString(entity, "spec.cluster_reference.uuid", "status.cluster_reference.uuid")
 
 	m.SubnetType = getString(resources, "subnet_type")
 	m.VlanID = getInt(resources, "vlan_id")
@@ -369,9 +363,9 @@ func applyImage(entity map[string]interface{}, m *model.Image) {
 		m.ID = uuid
 		m.ImageUUID = uuid
 	}
-	if name, ok := metadata["name"].(string); ok {
-		m.Name = name
-	}
+	// v3 intentful entities carry their name under spec/status, never
+	// under metadata.
+	m.Name = firstString(entity, "spec.name", "status.name")
 
 	status, _ := entity["status"].(map[string]interface{})
 	resources, _ := status["resources"].(map[string]interface{})

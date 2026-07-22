@@ -151,3 +151,39 @@ func TestFilterEntitiesByCluster_Matches(t *testing.T) {
 		t.Errorf("expected the surviving entity to be id=1, got %+v", filtered[0])
 	}
 }
+
+// TestFilterEntitiesByCluster_FallbackPath verifies that when the first
+// path is absent on an entity, the next path is tried -- needed because
+// hosts/subnets carry cluster_reference under spec on some responses and
+// under status on others, never nested under status.resources.
+func TestFilterEntitiesByCluster_FallbackPath(t *testing.T) {
+	entities := []map[string]interface{}{
+		{
+			"spec": map[string]interface{}{
+				"cluster_reference": map[string]interface{}{"uuid": "cluster-a"},
+			},
+			"id": "1",
+		},
+		{
+			"status": map[string]interface{}{
+				"cluster_reference": map[string]interface{}{"uuid": "cluster-a"},
+			},
+			"id": "2",
+		},
+		{
+			"spec": map[string]interface{}{
+				"cluster_reference": map[string]interface{}{"uuid": "cluster-b"},
+			},
+			"id": "3",
+		},
+	}
+
+	filtered := filterEntitiesByCluster(entities, "cluster-a",
+		"spec.cluster_reference.uuid", "status.cluster_reference.uuid")
+	if len(filtered) != 2 {
+		t.Fatalf("expected 2 matching entities, got %d: %+v", len(filtered), filtered)
+	}
+	if filtered[0]["id"] != "1" || filtered[1]["id"] != "2" {
+		t.Errorf("expected entities id=1 and id=2 to survive, got %+v", filtered)
+	}
+}
