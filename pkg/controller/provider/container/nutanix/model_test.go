@@ -74,6 +74,29 @@ func TestApplyCluster(t *testing.T) {
 	}
 }
 
+// TestApplyClusterNameNotFromMetadata verifies that Cluster.Name is read
+// from spec/status, not metadata -- Nutanix's v3 intentful entities never
+// carry "name" under metadata, only under spec/status. This also verifies
+// the status.name fallback used when spec.name is absent.
+func TestApplyClusterNameNotFromMetadata(t *testing.T) {
+	entity := map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"uuid": "cluster-1",
+			"name": "wrong-name",
+		},
+		"status": map[string]interface{}{
+			"name": "right-name",
+		},
+	}
+
+	m := &model.Cluster{}
+	applyCluster(entity, m)
+
+	if m.Name != "right-name" {
+		t.Errorf("Expected name 'right-name' from status, got %s", m.Name)
+	}
+}
+
 // TestApplyHost tests host mapping from API response to model.
 func TestApplyHost(t *testing.T) {
 	data, err := os.ReadFile("testdata/hosts_list.json")
@@ -112,8 +135,8 @@ func TestApplyHost(t *testing.T) {
 	}
 
 	// Verify cluster reference
-	if m.Cluster == "" {
-		t.Error("Expected Cluster to be set")
+	if m.Cluster != "0005e123-4567-89ab-cdef-000000000001" {
+		t.Errorf("Expected Cluster '0005e123-4567-89ab-cdef-000000000001', got %s", m.Cluster)
 	}
 
 	// Verify hardware details
@@ -133,6 +156,40 @@ func TestApplyHost(t *testing.T) {
 	// Verify hypervisor info (note: may not be present in all responses)
 	// Just check it doesn't error out
 	_ = m.HypervisorType
+}
+
+// TestApplyHostNameAndClusterNotFromWrongPaths verifies Host.Name is read
+// from spec/status (not metadata) and Host.Cluster is read from a
+// top-level spec/status.cluster_reference (not nested under
+// status.resources.cluster_reference), using the status-only fallback.
+func TestApplyHostNameAndClusterNotFromWrongPaths(t *testing.T) {
+	entity := map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"uuid": "host-1",
+			"name": "wrong-name",
+		},
+		"status": map[string]interface{}{
+			"name": "right-name",
+			"cluster_reference": map[string]interface{}{
+				"uuid": "right-cluster",
+			},
+			"resources": map[string]interface{}{
+				"cluster_reference": map[string]interface{}{
+					"uuid": "wrong-cluster",
+				},
+			},
+		},
+	}
+
+	m := &model.Host{}
+	applyHost(entity, m)
+
+	if m.Name != "right-name" {
+		t.Errorf("Expected name 'right-name' from status, got %s", m.Name)
+	}
+	if m.Cluster != "right-cluster" {
+		t.Errorf("Expected cluster 'right-cluster' from top-level status, got %s", m.Cluster)
+	}
 }
 
 // TestApplyNetwork tests network mapping from API response to model.
@@ -172,9 +229,10 @@ func TestApplyNetwork(t *testing.T) {
 		t.Errorf("Expected name 'Production-VLAN-100', got %s", m.Name)
 	}
 
-	// Verify cluster reference (may not be present in all responses)
-	// Just verify it doesn't cause errors
-	_ = m.Cluster
+	// Verify cluster reference
+	if m.Cluster != "0005e123-4567-89ab-cdef-000000000001" {
+		t.Errorf("Expected Cluster '0005e123-4567-89ab-cdef-000000000001', got %s", m.Cluster)
+	}
 
 	// Verify network type
 	if m.SubnetType != "VLAN" {
@@ -192,6 +250,40 @@ func TestApplyNetwork(t *testing.T) {
 	}
 	if m.PrefixLength == 0 {
 		t.Error("Expected PrefixLength to be > 0")
+	}
+}
+
+// TestApplyNetworkNameAndClusterNotFromWrongPaths verifies Network.Name is
+// read from spec/status (not metadata) and Network.Cluster is read from a
+// top-level spec/status.cluster_reference (not nested under
+// status.resources.cluster_reference), using the status-only fallback.
+func TestApplyNetworkNameAndClusterNotFromWrongPaths(t *testing.T) {
+	entity := map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"uuid": "network-1",
+			"name": "wrong-name",
+		},
+		"status": map[string]interface{}{
+			"name": "right-name",
+			"cluster_reference": map[string]interface{}{
+				"uuid": "right-cluster",
+			},
+			"resources": map[string]interface{}{
+				"cluster_reference": map[string]interface{}{
+					"uuid": "wrong-cluster",
+				},
+			},
+		},
+	}
+
+	m := &model.Network{}
+	applyNetwork(entity, m)
+
+	if m.Name != "right-name" {
+		t.Errorf("Expected name 'right-name' from status, got %s", m.Name)
+	}
+	if m.Cluster != "right-cluster" {
+		t.Errorf("Expected cluster 'right-cluster' from top-level status, got %s", m.Cluster)
 	}
 }
 

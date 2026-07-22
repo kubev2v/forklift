@@ -291,7 +291,8 @@ func (r *Client) listHosts() (entities []map[string]interface{}, err error) {
 	if err = r.ensurePrismConfig(); err != nil {
 		return nil, err
 	}
-	return filterEntitiesByCluster(entities, r.prism.ClusterUUID, "status.resources.cluster_reference.uuid"), nil
+	return filterEntitiesByCluster(entities, r.prism.ClusterUUID,
+		"spec.cluster_reference.uuid", "status.cluster_reference.uuid"), nil
 }
 
 // List all VMs, scoped to the configured clusterUuid (if any).
@@ -315,7 +316,8 @@ func (r *Client) listSubnets() (entities []map[string]interface{}, err error) {
 	if err = r.ensurePrismConfig(); err != nil {
 		return nil, err
 	}
-	return filterEntitiesByCluster(entities, r.prism.ClusterUUID, "status.resources.cluster_reference.uuid"), nil
+	return filterEntitiesByCluster(entities, r.prism.ClusterUUID,
+		"spec.cluster_reference.uuid", "status.cluster_reference.uuid"), nil
 }
 
 // List all images. Images are not scoped by clusterUuid: on Prism Central an
