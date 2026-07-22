@@ -186,8 +186,8 @@ type Builder interface {
 	PopulatorVolumes(vmRef ref.Ref, annotations map[string]string, secretName string) ([]*core.PersistentVolumeClaim, error)
 	// Transferred bytes
 	PopulatorTransferredBytes(persistentVolumeClaim *core.PersistentVolumeClaim) (transferredBytes int64, err error)
-	// Whether xcopy offload was used for populator copy
-	PopulatorXcopyUsed(pvc *core.PersistentVolumeClaim) (xcopyUsed string, found bool, err error)
+	// Storage offload metadata for the populator copy (e.g. "xcopyUsed"), surfaced as task annotations.
+	PopulatorOffloadInfo(pvc *core.PersistentVolumeClaim) (info map[string]string, err error)
 	// Set the populator PVC labels
 	SetPopulatorDataSourceLabels(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (err error)
 	// Get the populator task name associated to a PVC

@@ -29,6 +29,7 @@ const (
 type CopyMetrics struct {
 	progressCounter       *prometheus.CounterVec
 	xcopyUsedGauge        *prometheus.GaugeVec
+	vibVersionInfoGauge   *prometheus.GaugeVec
 	storageArrayInfoGauge *prometheus.GaugeVec
 	sourceDiskBytesGauge  *prometheus.GaugeVec
 	copyDurationGauge     *prometheus.GaugeVec
@@ -48,6 +49,10 @@ func (m *CopyMetrics) RecordProgress(ownerUID string, progress uint64) {
 
 func (m *CopyMetrics) RecordXcopyUsed(ownerUID, storageVendor, cloneMethod string, xcopyUsed int) {
 	m.xcopyUsedGauge.WithLabelValues(ownerUID, storageVendor, cloneMethod).Set(float64(xcopyUsed))
+}
+
+func (m *CopyMetrics) RecordVibVersion(ownerUID, version string) {
+	m.vibVersionInfoGauge.WithLabelValues(ownerUID, version).Set(1)
 }
 
 // RecordStorageArrayInfo sets the info metric once with storage array metadata (constant value 1).
@@ -104,6 +109,15 @@ func NewCopyMetrics() (*CopyMetrics, error) {
 		baseLabels,
 	)
 
+	// Info metric (value=1) for the VIB version detected on the ESXi host. Only emitted for VIB clone method.
+	vibVersionInfoGauge := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "vsphere_xcopy_volume_populator_vib_version",
+			Help: "VIB version installed on the ESXi host during migration (info metric, value=1).",
+		},
+		[]string{labelOwnerUID, "version"},
+	)
+
 	// Info metric (constant value 1) for storage array metadata. Correlate with other metrics via storage_vendor.
 	storageArrayInfoGauge := prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -132,7 +146,7 @@ func NewCopyMetrics() (*CopyMetrics, error) {
 		completionLabels,
 	)
 
-	for _, collector := range []prometheus.Collector{progressCounter, xcopyUsedGauge, storageArrayInfoGauge, sourceDiskBytesGauge, copyDurationGauge} {
+	for _, collector := range []prometheus.Collector{progressCounter, xcopyUsedGauge, vibVersionInfoGauge, storageArrayInfoGauge, sourceDiskBytesGauge, copyDurationGauge} {
 		if err := prometheus.Register(collector); err != nil {
 			return nil, err
 		}
@@ -141,6 +155,7 @@ func NewCopyMetrics() (*CopyMetrics, error) {
 	return &CopyMetrics{
 		progressCounter:       progressCounter,
 		xcopyUsedGauge:        xcopyUsedGauge,
+		vibVersionInfoGauge:   vibVersionInfoGauge,
 		storageArrayInfoGauge: storageArrayInfoGauge,
 		sourceDiskBytesGauge:  sourceDiskBytesGauge,
 		copyDurationGauge:     copyDurationGauge,

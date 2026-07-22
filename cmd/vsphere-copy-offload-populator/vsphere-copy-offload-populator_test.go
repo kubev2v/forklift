@@ -10,6 +10,7 @@ import (
 
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
 	populator_mocks "github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator/mocks"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/version"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
 	vmware_mocks "github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware/mocks"
 	"github.com/vmware/govmomi/cli/esx"
@@ -32,6 +33,12 @@ var _ = Describe("Populator", func() {
 		hostLocker    *populator_mocks.MockHostlocker
 		dummyHost     *object.HostSystem
 	)
+
+	vibVersionCmd := []string{"vmkfstools", "version"}
+	vibVersionOK := func() {
+		vmwareClient.EXPECT().RunEsxCommand(gomock.Any(), gomock.Any(), gomock.Eq(vibVersionCmd)).
+			Return([]esx.Values{{"message": {fmt.Sprintf(`{"version": "%s"}`, version.VibVersion)}}}, nil)
+	}
 
 	BeforeEach(func() {
 		mockCtrl = gomock.NewController(GinkgoT())
@@ -109,6 +116,7 @@ var _ = Describe("Populator", func() {
 			targetPVC:  "pvc-12345",
 			setup: func() {
 				vmwareClient.EXPECT().GetEsxByVm(gomock.Any(), gomock.Any()).Return(dummyHost, nil)
+				vibVersionOK()
 				vmwareClient.EXPECT().GetDatastoreActiveAdapters(context.Background(), gomock.Any(), "my-ds").Return([]vmware.HostAdapter{{Name: "vmhb64", Id: "iqn.foobar"}}, nil)
 
 				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any()).Return(nil, nil)
@@ -122,6 +130,7 @@ var _ = Describe("Populator", func() {
 			targetPVC:  "pvc-12345",
 			setup: func() {
 				vmwareClient.EXPECT().GetEsxByVm(gomock.Any(), gomock.Any()).Return(dummyHost, nil)
+				vibVersionOK()
 				vmwareClient.EXPECT().GetDatastoreActiveAdapters(context.Background(), gomock.Any(), "my-ds").Return([]vmware.HostAdapter{{Name: "vmhb64", Id: "iqn.foobar"}}, nil)
 
 				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any()).Return(nil, nil)
@@ -151,12 +160,29 @@ var _ = Describe("Populator", func() {
 			},
 			want: fmt.Errorf("no host found"),
 		}),
+		Entry("SSH method skips VIB version check", testCase{
+			sourceVmId: "my-vm",
+			sourceVMDK: "[my-ds] my-vm/vmdisk.vmdk",
+			targetPVC:  "pvc-12345",
+			setup: func() {
+				underTest.UseSSHMethod = true
+				underTest.SSHPrivateKey = []byte("fake-key")
+				underTest.SSHPublicKey = []byte("fake-pub")
+				vmwareClient.EXPECT().GetEsxByVm(gomock.Any(), gomock.Any()).Return(dummyHost, nil)
+				vmwareClient.EXPECT().RunEsxCommand(gomock.Any(), gomock.Any(), gomock.Eq(vibVersionCmd)).Times(0)
+				vmwareClient.EXPECT().GetDatastoreActiveAdapters(context.Background(), gomock.Any(), "my-ds").Return([]vmware.HostAdapter{{Name: "vmhb64", Id: "iqn.foobar"}}, nil)
+				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any()).Return(nil, nil)
+				storageClient.EXPECT().ResolvePVToLUN(populator.PersistentVolume{Name: "pvc-12345"}).Return(populator.LUN{}, fmt.Errorf("some error")).Times(1)
+			},
+			want: fmt.Errorf("some error"),
+		}),
 		Entry("working source and target", testCase{
 			sourceVmId: "my-vm",
 			sourceVMDK: "[my-ds] my-vm/vmdisk.vmdk",
 			targetPVC:  "pvc-12345",
 			setup: func() {
 				vmwareClient.EXPECT().GetEsxByVm(gomock.Any(), gomock.Any()).Return(dummyHost, nil)
+				vibVersionOK()
 				vmwareClient.EXPECT().GetDatastoreActiveAdapters(context.Background(), gomock.Any(), "my-ds").Return([]vmware.HostAdapter{{Name: "vmhbatest", Id: "iqn.foobar"}}, nil)
 
 				storageClient.EXPECT().EnsureClonnerIgroup(gomock.Any(), gomock.Any()).Return(nil, nil)

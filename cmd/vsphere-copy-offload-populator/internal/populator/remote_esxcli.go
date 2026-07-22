@@ -156,6 +156,14 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, migrationHostId, sourceVMD
 	}
 	setupLog.Info("ESXi host", "host", host.String())
 
+	if !p.UseSSHMethod {
+		vibVersion, vibErr := validateVibVersion(setupCtx, p.VSphereClient, host)
+		p.copyCtx.VibVersion = vibVersion
+		if vibErr != nil {
+			return vibErr
+		}
+	}
+
 	hostID := strings.ReplaceAll(strings.ToLower(host.String()), ":", "-")
 	xcopyInitiatorGroup := fmt.Sprintf("xcopy-%s", hostID)
 	setupLog.Info("initiator group", "group", xcopyInitiatorGroup)
