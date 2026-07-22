@@ -16,7 +16,7 @@ type Client struct {
 }
 
 func (r *Client) connect() error {
-	r.log = r.Context.Log.WithName("client")
+	r.log = r.Log.WithName("client")
 	// TODO: wire container/nutanix.Client for PreTransferActions and power management
 	return nil
 }
@@ -71,8 +71,8 @@ func (r *Client) SetCheckpoints(_ ref.Ref, _ []planapi.Precopy, _ []cdi.DataVolu
 	return nil
 }
 
-func (r *Client) GetSnapshotDeltas(_ ref.Ref, _ string, _ util.HostsFunc) (map[string]string, error) {
-	return nil, nil
+func (r *Client) GetSnapshotDeltas(_ ref.Ref, _ string, _ util.HostsFunc) (s map[string]string, err error) {
+	return
 }
 
 func (r *Client) PreTransferActions(_ ref.Ref) (ready bool, err error) {

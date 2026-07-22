@@ -39,7 +39,8 @@ func (r *Builder) Tasks(_ ref.Ref) (tasks []*plan.Task, err error) {
 }
 
 func (r *Builder) TemplateLabels(_ ref.Ref) (labels map[string]string, err error) {
-	return nil, nil
+	labels = make(map[string]string)
+	return
 }
 
 func (r *Builder) ResolveDataVolumeIdentifier(dv *cdi.DataVolume) string {
