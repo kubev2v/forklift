@@ -67,6 +67,21 @@
          <execute>/opt/redhat/vmkfstools-wrapper --task-clean -i $val{id}</execute>
       </command>
 
+      <command path="vmkfstools.version">
+         <description>Get vmkfstools-wrapper version</description>
+         <input-spec/>
+         <output-spec>
+            <structure typeName="result">
+               <field name="status"> <string/></field>
+               <field name="message"> <string/></field>
+            </structure>
+         </output-spec>
+         <format-parameters>
+            <formatter>simple</formatter>
+         </format-parameters>
+         <execute>/opt/redhat/vmkfstools-wrapper --version</execute>
+      </command>
+
    </commands>
 
 </plugin>
