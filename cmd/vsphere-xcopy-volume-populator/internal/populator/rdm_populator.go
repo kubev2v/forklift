@@ -11,13 +11,19 @@ import (
 type RDMPopulator struct {
 	vSphereClient vmware.Client
 	storageApi    RDMCapable
+	copyCtx       CopyContext
+}
+
+func (p *RDMPopulator) GetCopyContext() CopyContext {
+	return p.copyCtx
 }
 
 // NewRDMPopulator creates a new RDM populator
-func NewRDMPopulator(storageApi RDMCapable, vmwareClient vmware.Client) (Populator, error) {
+func NewRDMPopulator(storageApi RDMCapable, vmwareClient vmware.Client, copyCtx CopyContext) (Populator, error) {
 	return &RDMPopulator{
 		vSphereClient: vmwareClient,
 		storageApi:    storageApi,
+		copyCtx:       copyCtx,
 	}, nil
 }
 

@@ -21,7 +21,9 @@ type SSHConfig struct {
 	PublicKey      []byte
 }
 
-// NewPopulator creates a new PopulatorSelector
+// NewPopulator creates a Populator with an embedded CopyContext describing how the
+// copy will be performed (clone method, source disk sizes). StorageProtocol is
+// detected by the populator during Populate() and available via GetCopyContext().
 func NewPopulator(
 	storageApi StorageApi,
 	vsphereHostname string,
@@ -40,69 +42,99 @@ func NewPopulator(
 	ctx := context.Background()
 	log := klog.Background().WithName("copy-offload").WithName("setup")
 
-	diskType, err := detectDiskType(ctx, vsphereClient, vmId, vmdkPath)
-	if err != nil {
-		log.Info("disk type detection failed, using VMDK/Xcopy", "err", err)
-		return createVMDKPopulator(storageApi, vsphereClient, sshConfig)
-	}
+	// Single vSphere roundtrip: fetch source disk sizes and backing info.
+	sourceDiskCap, sourceDatastoreAlloc, backing := fetchDiskInfo(ctx, log, vsphereClient, vmId, vmdkPath)
 
+	diskType := detectDiskType(backing)
 	log.Info("disk type detected", "type", diskType)
 
 	switch diskType {
 	case DiskTypeVVol:
 		if canUse(storageApi, DiskTypeVVol) {
 			log.Info("using VVol populator")
-			return createVVolPopulator(storageApi, vsphereClient)
+			return createVVolPopulator(storageApi, vsphereClient, sourceDiskCap, sourceDatastoreAlloc)
 		}
 
 	case DiskTypeRDM:
 		if canUse(storageApi, DiskTypeRDM) {
 			log.Info("using RDM populator")
-			return createRDMPopulator(storageApi, vsphereClient)
+			return createRDMPopulator(storageApi, vsphereClient, sourceDiskCap, sourceDatastoreAlloc)
 		}
 	}
 
 	log.Info("using VMDK/Xcopy populator")
-	return createVMDKPopulator(storageApi, vsphereClient, sshConfig)
+	return createVMDKPopulator(storageApi, vsphereClient, sshConfig, sourceDiskCap, sourceDatastoreAlloc)
+}
+
+// fetchDiskInfo retrieves provisioned capacity, datastore-allocated bytes, and disk
+// backing info from vSphere in a single VM lookup. Best-effort: returns zeros and
+// an empty DiskBacking on failure.
+func fetchDiskInfo(ctx context.Context, log klog.Logger, vsphereClient vmware.Client, vmId, vmdkPath string) (int64, int64, *vmware.DiskBacking) {
+	sourceDiskCap, sourceDatastoreAlloc, backing, err := vsphereClient.GetVirtualDiskSizes(ctx, vmId, vmdkPath)
+	if err != nil {
+		log.V(1).Info("could not read source disk info for metrics", "err", err)
+		return 0, 0, &vmware.DiskBacking{}
+	}
+	if sourceDiskCap > 0 {
+		log.V(1).Info("source virtual disk provisioned size for metrics", "bytes", sourceDiskCap)
+	}
+	if sourceDatastoreAlloc > 0 {
+		if sourceDiskCap > 0 && sourceDatastoreAlloc > sourceDiskCap {
+			sourceDatastoreAlloc = sourceDiskCap
+		}
+		log.V(1).Info("source VMDK datastore allocated bytes for metrics", "bytes", sourceDatastoreAlloc)
+	}
+	if backing == nil {
+		backing = &vmware.DiskBacking{}
+	}
+	return sourceDiskCap, sourceDatastoreAlloc, backing
 }
 
 // createVVolPopulator creates VVol populator
-func createVVolPopulator(storageApi StorageApi, vmwareClient vmware.Client) (Populator, error) {
+func createVVolPopulator(storageApi StorageApi, vmwareClient vmware.Client, sourceDiskCap, sourceDatastoreAlloc int64) (Populator, error) {
 	vvolApi, ok := storageApi.(VVolCapable)
 	if !ok {
 		return nil, fmt.Errorf("storage API does not implement VVolCapable")
 	}
 
-	return NewVvolPopulator(vvolApi, vmwareClient)
+	copyCtx := CopyContext{CloneMethod: "vvol", SourceDiskCapacityBytes: sourceDiskCap, SourceDiskDatastoreAllocatedBytes: sourceDatastoreAlloc}
+	return NewVvolPopulator(vvolApi, vmwareClient, copyCtx)
 }
 
 // createRDMPopulator creates RDM populator
-func createRDMPopulator(storageApi StorageApi, vmwareClient vmware.Client) (Populator, error) {
+func createRDMPopulator(storageApi StorageApi, vmwareClient vmware.Client, sourceDiskCap, sourceDatastoreAlloc int64) (Populator, error) {
 	rdmApi, ok := storageApi.(RDMCapable)
 	if !ok {
 		return nil, fmt.Errorf("storage API does not implement RDMCapable")
 	}
 
-	return NewRDMPopulator(rdmApi, vmwareClient)
+	copyCtx := CopyContext{CloneMethod: "rdm", SourceDiskCapacityBytes: sourceDiskCap, SourceDiskDatastoreAllocatedBytes: sourceDatastoreAlloc}
+	return NewRDMPopulator(rdmApi, vmwareClient, copyCtx)
 }
 
 // createVMDKPopulator creates VMDK/Xcopy populator (default/fallback)
-func createVMDKPopulator(storageApi StorageApi, vmwareClient vmware.Client, sshConfig *SSHConfig) (Populator, error) {
+func createVMDKPopulator(storageApi StorageApi, vmwareClient vmware.Client, sshConfig *SSHConfig, sourceDiskCap, sourceDatastoreAlloc int64) (Populator, error) {
 	vmdkApi, ok := storageApi.(VMDKCapable)
 	if !ok {
 		return nil, fmt.Errorf("storage API does not implement VMDKCapable (required)")
 	}
 
+	cloneMethod := "vib"
+	if sshConfig != nil && sshConfig.UseSSH {
+		cloneMethod = "ssh"
+	}
+	copyCtx := CopyContext{CloneMethod: cloneMethod, SourceDiskCapacityBytes: sourceDiskCap, SourceDiskDatastoreAllocatedBytes: sourceDatastoreAlloc}
+
 	var pop Populator
 	var err error
-
 	if sshConfig != nil && sshConfig.UseSSH {
 		pop, err = NewWithRemoteEsxcliSSH(vmdkApi,
 			vmwareClient,
+			copyCtx,
 			sshConfig.PrivateKey,
 			sshConfig.PublicKey)
 	} else {
-		pop, err = NewWithRemoteEsxcli(vmdkApi, vmwareClient)
+		pop, err = NewWithRemoteEsxcli(vmdkApi, vmwareClient, copyCtx)
 	}
 
 	if err != nil {

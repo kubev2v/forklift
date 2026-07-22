@@ -40,16 +40,30 @@ func (m *MockPopulator) EXPECT() *MockPopulatorMockRecorder {
 	return m.recorder
 }
 
-// Populate mocks base method.
-func (m *MockPopulator) Populate(vmId, sourceVMDKFile string, persistentVolume populator.PersistentVolume, progress chan<- uint64, quit chan error, xcopyUsed chan<- int) error {
+// GetCopyContext mocks base method.
+func (m *MockPopulator) GetCopyContext() populator.CopyContext {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Populate", vmId, sourceVMDKFile, persistentVolume, progress, quit, xcopyUsed)
+	ret := m.ctrl.Call(m, "GetCopyContext")
+	ret0, _ := ret[0].(populator.CopyContext)
+	return ret0
+}
+
+// GetCopyContext indicates an expected call of GetCopyContext.
+func (mr *MockPopulatorMockRecorder) GetCopyContext() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCopyContext", reflect.TypeOf((*MockPopulator)(nil).GetCopyContext))
+}
+
+// Populate mocks base method.
+func (m *MockPopulator) Populate(vmId, sourceVMDKFile string, persistentVolume populator.PersistentVolume, hostLocker populator.Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Populate", vmId, sourceVMDKFile, persistentVolume, hostLocker, progress, xcopyUsed, quit)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Populate indicates an expected call of Populate.
-func (mr *MockPopulatorMockRecorder) Populate(vmId, sourceVMDKFile, persistentVolume, progress, quit, xcopyUsed any) *gomock.Call {
+func (mr *MockPopulatorMockRecorder) Populate(vmId, sourceVMDKFile, persistentVolume, hostLocker, progress, xcopyUsed, quit any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Populate", reflect.TypeOf((*MockPopulator)(nil).Populate), vmId, sourceVMDKFile, persistentVolume, progress, quit, xcopyUsed)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Populate", reflect.TypeOf((*MockPopulator)(nil).Populate), vmId, sourceVMDKFile, persistentVolume, hostLocker, progress, xcopyUsed, quit)
 }
