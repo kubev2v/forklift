@@ -8,9 +8,11 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/vmware/govmomi/cli/esx"
 	"github.com/vmware/govmomi/object"
 	"go.uber.org/mock/gomock"
 
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/version"
 	vmware_mocks "github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware/mocks"
 )
 
@@ -304,6 +306,90 @@ var _ = Describe("checkScriptVersion", func() {
 			err := checkScriptVersion(context.Background(), client, datastore, "invalid-version", publicKey)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("invalid embedded version format"))
+		})
+	})
+})
+
+var _ = Describe("validateVibVersion", func() {
+	var (
+		ctrl       *gomock.Controller
+		mockClient *vmware_mocks.MockClient
+		host       *object.HostSystem
+		origVibVer string
+	)
+
+	versionCmd := []string{"vmkfstools", "version"}
+
+	BeforeEach(func() {
+		ctrl = gomock.NewController(GinkgoT())
+		mockClient = vmware_mocks.NewMockClient(ctrl)
+		host = &object.HostSystem{}
+		origVibVer = version.VibVersion
+		version.VibVersion = "0.3.3"
+	})
+
+	AfterEach(func() {
+		version.VibVersion = origVibVer
+		ctrl.Finish()
+	})
+
+	Context("when VIB version matches required version", func() {
+		It("should succeed", func() {
+			mockClient.EXPECT().RunEsxCommand(gomock.Any(), host, gomock.Eq(versionCmd)).
+				Return([]esx.Values{{"message": {fmt.Sprintf(`{"version": "%s"}`, version.VibVersion)}}}, nil)
+
+			_, err := validateVibVersion(context.Background(), mockClient, host)
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	Context("when VIB version is newer than required", func() {
+		It("should succeed", func() {
+			mockClient.EXPECT().RunEsxCommand(gomock.Any(), host, gomock.Eq(versionCmd)).
+				Return([]esx.Values{{"message": {`{"version": "0.5.0"}`}}}, nil)
+
+			_, err := validateVibVersion(context.Background(), mockClient, host)
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	Context("when VIB version is older than required", func() {
+		It("should warn and proceed without error", func() {
+			mockClient.EXPECT().RunEsxCommand(gomock.Any(), host, gomock.Eq(versionCmd)).
+				Return([]esx.Values{{"message": {`{"version": "0.1.0"}`}}}, nil)
+
+			_, err := validateVibVersion(context.Background(), mockClient, host)
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	Context("when VIB is not installed (command fails)", func() {
+		It("should succeed (skip validation for backward compatibility)", func() {
+			mockClient.EXPECT().RunEsxCommand(gomock.Any(), host, gomock.Eq(versionCmd)).
+				Return(nil, errors.New("method 'version' not found in name space 'vmkfstools'"))
+
+			_, err := validateVibVersion(context.Background(), mockClient, host)
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	Context("when version response contains invalid JSON", func() {
+		It("should succeed (skip validation for backward compatibility)", func() {
+			mockClient.EXPECT().RunEsxCommand(gomock.Any(), host, gomock.Eq(versionCmd)).
+				Return([]esx.Values{{"message": {"not-json"}}}, nil)
+
+			_, err := validateVibVersion(context.Background(), mockClient, host)
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	Context("when version string is not valid semver", func() {
+		It("should succeed (skip validation for backward compatibility)", func() {
+			mockClient.EXPECT().RunEsxCommand(gomock.Any(), host, gomock.Eq(versionCmd)).
+				Return([]esx.Values{{"message": {`{"version": "not-a-version"}`}}}, nil)
+
+			_, err := validateVibVersion(context.Background(), mockClient, host)
+			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 })

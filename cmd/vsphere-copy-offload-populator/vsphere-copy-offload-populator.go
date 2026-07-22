@@ -246,6 +246,13 @@ func main() {
 			cloneLog.Info("xcopy", "xcopyUsed", c)
 			lastXcopyUsed = c
 			copyMetrics.RecordXcopyUsed(ownerUID, storageVendor, cloneMethod, c)
+			if cloneMethod == string(populator.CloneMethodVIB) {
+				vibVersion := p.GetCopyContext().VibVersion
+				if vibVersion == "" {
+					vibVersion = "unknown"
+				}
+				copyMetrics.RecordVibVersion(ownerUID, vibVersion)
+			}
 		case q := <-quitCh:
 			duration := time.Since(copyStartTime)
 			if q != nil {

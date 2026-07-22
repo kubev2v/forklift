@@ -39,6 +39,11 @@ mkdir -p ${ESXCLI_PLUGINS_DIR}
 cp -v esxcli-vmkfstools.xml ${ESXCLI_PLUGINS_DIR}
 cp -v vmkfstools_wrapper.sh ${CUSTOM_VIB_BIN_DIR}/vmkfstools-wrapper
 chmod +x ${CUSTOM_VIB_BIN_DIR}/vmkfstools-wrapper
+sed -i "s/^SCRIPT_VERSION=.*/SCRIPT_VERSION=\"${CUSTOM_VIB_VERSION}\"/" ${CUSTOM_VIB_BIN_DIR}/vmkfstools-wrapper
+grep -q "^SCRIPT_VERSION=\"${CUSTOM_VIB_VERSION}\"$" ${CUSTOM_VIB_BIN_DIR}/vmkfstools-wrapper || {
+  echo "ERROR: failed to set SCRIPT_VERSION in vmkfstools-wrapper" >&2
+  exit 1
+}
 
 # Create tgz with payload
 tar czvf ${CUSTOM_VIB_TEMP_DIR}/payload1 -C ${VIB_PAYLOAD_DIR} opt usr

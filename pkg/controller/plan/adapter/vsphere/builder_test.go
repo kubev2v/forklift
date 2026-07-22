@@ -1021,7 +1021,7 @@ var _ = Describe("vSphere builder", func() {
 	)
 })
 
-var _ = Describe("PopulatorXcopyUsed", func() {
+var _ = Describe("PopulatorOffloadInfo", func() {
 	It("should return xcopyUsed when populator CR has the field set", func() {
 		populatorCr := &v1beta1.VSphereXcopyVolumePopulator{
 			ObjectMeta: meta.ObjectMeta{
@@ -1053,13 +1053,12 @@ var _ = Describe("PopulatorXcopyUsed", func() {
 			},
 		}
 
-		xcopyUsed, found, err := builder.PopulatorXcopyUsed(pvc)
+		info, err := builder.PopulatorOffloadInfo(pvc)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(found).To(BeTrue())
-		Expect(xcopyUsed).To(Equal("1"))
+		Expect(info).To(HaveKeyWithValue("xcopyUsed", "1"))
 	})
 
-	It("should return found=false when xcopyUsed is empty", func() {
+	It("should omit xcopyUsed when it is empty", func() {
 		populatorCr := &v1beta1.VSphereXcopyVolumePopulator{
 			ObjectMeta: meta.ObjectMeta{
 				Name:      "test-pop",
@@ -1089,10 +1088,9 @@ var _ = Describe("PopulatorXcopyUsed", func() {
 			},
 		}
 
-		xcopyUsed, found, err := builder.PopulatorXcopyUsed(pvc)
+		info, err := builder.PopulatorOffloadInfo(pvc)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(found).To(BeFalse())
-		Expect(xcopyUsed).To(BeEmpty())
+		Expect(info).NotTo(HaveKey("xcopyUsed"))
 	})
 
 	It("should return error when populator CR is not found", func() {
@@ -1108,7 +1106,7 @@ var _ = Describe("PopulatorXcopyUsed", func() {
 			},
 		}
 
-		_, _, err := builder.PopulatorXcopyUsed(pvc)
+		_, err := builder.PopulatorOffloadInfo(pvc)
 		Expect(err).To(HaveOccurred())
 	})
 
@@ -1143,10 +1141,9 @@ var _ = Describe("PopulatorXcopyUsed", func() {
 			},
 		}
 
-		xcopyUsed, found, err := builder.PopulatorXcopyUsed(pvc)
+		info, err := builder.PopulatorOffloadInfo(pvc)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(found).To(BeTrue())
-		Expect(xcopyUsed).To(Equal("0"))
+		Expect(info).To(HaveKeyWithValue("xcopyUsed", "0"))
 	})
 })
 

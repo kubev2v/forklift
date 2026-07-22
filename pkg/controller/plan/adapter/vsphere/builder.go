@@ -1877,15 +1877,16 @@ func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (tr
 	return (progressPercentage * pvcSize.Value()) / 100, nil
 }
 
-func (r *Builder) PopulatorXcopyUsed(pvc *core.PersistentVolumeClaim) (string, bool, error) {
+func (r *Builder) PopulatorOffloadInfo(pvc *core.PersistentVolumeClaim) (map[string]string, error) {
 	populatorCr, err := r.getPopulatorForPVC(pvc)
 	if err != nil {
-		return "", false, err
+		return nil, err
 	}
-	if populatorCr.Status.XcopyUsed == "" {
-		return "", false, nil
+	info := make(map[string]string)
+	if populatorCr.Status.XcopyUsed != "" {
+		info["xcopyUsed"] = populatorCr.Status.XcopyUsed
 	}
-	return populatorCr.Status.XcopyUsed, true, nil
+	return info, nil
 }
 
 func (r *Builder) getVolumePopulator(vmId, vmdkKey string) (api.VSphereXcopyVolumePopulator, error) {

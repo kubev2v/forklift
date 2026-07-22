@@ -2167,13 +2167,15 @@ func (r *Migration) updatePopulatorCopyProgress(vm *plan.VMStatus, step *plan.St
 
 		taskSeen[taskName] = true
 
-		if xcopyUsed, xcopyFound, xcopyErr := r.builder.PopulatorXcopyUsed(pvc); xcopyErr != nil {
-			r.Log.Info("Failed to get xcopyUsed", "pvc", pvc.Name, "error", xcopyErr)
-		} else if xcopyFound {
+		if offloadInfo, offloadErr := r.builder.PopulatorOffloadInfo(pvc); offloadErr != nil {
+			r.Log.Info("Failed to get populator offload info", "pvc", pvc.Name, "error", offloadErr)
+		} else if len(offloadInfo) > 0 {
 			if task.Annotations == nil {
 				task.Annotations = make(map[string]string)
 			}
-			task.Annotations["xcopyUsed"] = xcopyUsed
+			for k, v := range offloadInfo {
+				task.Annotations[k] = v
+			}
 		}
 
 		if pvc.Status.Phase == core.ClaimBound {
