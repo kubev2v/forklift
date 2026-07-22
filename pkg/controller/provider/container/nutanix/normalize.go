@@ -77,9 +77,10 @@ func storageContainerEntityFromV4(raw map[string]interface{}) map[string]interfa
 }
 
 // filterEntitiesByCluster keeps only the entities whose cluster UUID -- read
-// from entity via the given dot-separated field path -- matches clusterUUID.
-// If clusterUUID is empty (Prism Element, or no clusterUuid setting
-// configured on the Provider), every entity is returned unfiltered.
+// from entity via the given dot-separated field paths, in order, using the
+// first one present -- matches clusterUUID. If clusterUUID is empty (Prism
+// Element, or no clusterUuid setting configured on the Provider), every
+// entity is returned unfiltered.
 //
 // This filters client-side on data we've already fetched, rather than
 // relying on the v3 API's "filter" (FIQL) query parameter, whose supported
@@ -88,7 +89,7 @@ func storageContainerEntityFromV4(raw map[string]interface{}) map[string]interfa
 func filterEntitiesByCluster(
 	entities []map[string]interface{},
 	clusterUUID string,
-	clusterUUIDPath string,
+	clusterUUIDPaths ...string,
 ) []map[string]interface{} {
 	if clusterUUID == "" {
 		return entities
@@ -96,7 +97,7 @@ func filterEntitiesByCluster(
 
 	filtered := make([]map[string]interface{}, 0, len(entities))
 	for _, entity := range entities {
-		if getString(entity, clusterUUIDPath) == clusterUUID {
+		if firstString(entity, clusterUUIDPaths...) == clusterUUID {
 			filtered = append(filtered, entity)
 		}
 	}
