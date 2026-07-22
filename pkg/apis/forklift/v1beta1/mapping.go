@@ -68,6 +68,30 @@ type NetworkPair struct {
 type OffloadPlugin struct {
 	VSphereXcopyPluginConfig *VSphereXcopyPluginConfig `json:"vsphereXcopyConfig,omitempty"`
 	CsiVolumeImport          *CsiVolumeImport          `json:"csiVolumeImport,omitempty"`
+	// +optional
+	TwoPhaseConfig *TwoPhaseConfig `json:"twoPhaseConfig,omitempty"`
+}
+
+// TwoPhaseFailurePolicy controls behavior when the second storage-layer copy fails.
+// +kubebuilder:validation:Enum=failMigration;keepOnBaseStorage
+type TwoPhaseFailurePolicy string
+
+const (
+	TwoPhaseFailMigration     TwoPhaseFailurePolicy = "failMigration"
+	TwoPhaseKeepOnBaseStorage TwoPhaseFailurePolicy = "keepOnBaseStorage"
+)
+
+// TwoPhaseConfig configures a second storage-layer migration phase after the
+// initial copy-offload. Intermediate PVCs are cloned onto the final storage
+// class via a vendor-specific volume populator (e.g. Portworx Stork).
+type TwoPhaseConfig struct {
+	// FinalStorageClass is the StorageClass for the final PVC (e.g. "pxd").
+	FinalStorageClass string `json:"finalStorageClass"`
+	// FailurePolicy controls what happens if the second copy fails.
+	// +kubebuilder:validation:Enum=failMigration;keepOnBaseStorage
+	// +kubebuilder:default:=failMigration
+	// +optional
+	FailurePolicy TwoPhaseFailurePolicy `json:"failurePolicy,omitempty"`
 }
 
 // CsiVolumeImport uses the CSI driver's native import capability to migrate VVol/RDM disks.

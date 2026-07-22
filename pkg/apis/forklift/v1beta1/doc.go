@@ -82,6 +82,7 @@ const (
 	PhaseRemovePenultimateSnapshot         = "RemovePenultimateSnapshot"
 	PhaseRemovePreviousSnapshot            = "RemovePreviousSnapshot"
 	PhaseStoreInitialSnapshotDeltas        = "StoreInitialSnapshotDeltas"
+	PhaseStorageLayerMigration             = "StorageLayerMigration"
 	PhaseStorePowerState                   = "StorePowerState"
 	PhaseStoreSnapshotDeltas               = "StoreSnapshotDeltas"
 	PhaseWaitForFinalSnapshot              = "WaitForFinalSnapshot"

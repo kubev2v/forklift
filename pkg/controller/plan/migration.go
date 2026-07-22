@@ -1064,6 +1064,14 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				err = liberr.Wrap(err)
 				return
 			}
+			// Delete intermediate FADA PVCs left over from two-phase migration.
+			if r.Plan.NeedsTwoPhaseStorageMigration() {
+				err = r.kubevirt.DeleteIntermediatePVCs(vm.Ref)
+				if err != nil {
+					err = liberr.Wrap(err)
+					return
+				}
+			}
 			r.NextPhase(vm)
 		case api.PhaseWaitForGuestReboots:
 			step, found := vm.FindStep(r.migrator.Step(vm))
@@ -1182,6 +1190,23 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 					vm.Warm.NextPrecopyAt = &next
 					vm.Warm.Successes++
 				}
+				r.NextPhase(vm)
+			}
+		case api.PhaseStorageLayerMigration:
+			step, found := vm.FindStep(r.migrator.Step(vm))
+			if !found {
+				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
+				break
+			}
+			step.MarkStarted()
+			step.Phase = api.StepRunning
+			err = r.executeStorageLayerMigration(vm, step)
+			if err != nil {
+				step.AddError(err.Error())
+				err = nil
+				break
+			}
+			if step.MarkedCompleted() && !step.HasError() {
 				r.NextPhase(vm)
 			}
 		case api.PhaseConvertOpenstackSnapshot:
@@ -2137,6 +2162,154 @@ func (r *Migration) setDataVolumeCheckpoints(vm *plan.VMStatus) (err error) {
 		}
 	}
 
+	return
+}
+
+// executeStorageLayerMigration handles the PhaseStorageLayerMigration phase.
+// For each intermediate FADA PVC (not yet annotated with AnnTargetPvcName) it:
+//  1. Creates a final PVC on TwoPhaseConfig.FinalStorageClass with a
+//     DataSourceRef pointing to a PortworxXcopyVolumePopulator CR.
+//  2. Creates the PortworxXcopyVolumePopulator CR referencing the intermediate PVC.
+//  3. Annotates the intermediate PVC with AnnTargetPvcName → final PVC name.
+//
+// On subsequent reconciles it checks CR status and marks the step complete when
+// all CRs reach Completed, or applies the failure policy on failure.
+func (r *Migration) executeStorageLayerMigration(vm *plan.VMStatus, step *plan.Step) (err error) {
+	twoCfg := r.Plan.GetTwoPhaseConfig()
+	if twoCfg == nil {
+		step.Progress.Completed = 1
+		step.MarkCompleted()
+		return
+	}
+
+	pvcs, pErr := r.kubevirt.getPVCs(vm.Ref)
+	if pErr != nil {
+		err = pErr
+		return
+	}
+
+	namespace := r.Plan.Spec.TargetNamespace
+	apiGroup := api.SchemeGroupVersion.Group
+
+	for _, pvc := range pvcs {
+		if pvc.Annotations != nil && pvc.Annotations[base.AnnTargetPvcName] != "" {
+			continue
+		}
+		if pvc.Annotations != nil && pvc.Annotations[base.AnnIntermediatePvc] != "" {
+			continue
+		}
+
+		finalPVCName := "pxd-" + pvc.Name
+		crName := finalPVCName + "-populator"
+		finalStorageClass := twoCfg.FinalStorageClass
+
+		pvcLabels := r.kubevirt.vmLabels(vm.Ref)
+		crLabels := r.kubevirt.vmLabels(vm.Ref)
+
+		finalPVC := &core.PersistentVolumeClaim{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      finalPVCName,
+				Namespace: namespace,
+				Labels:    pvcLabels,
+				Annotations: map[string]string{
+					base.AnnDiskSource:      pvc.Annotations[base.AnnDiskSource],
+					base.AnnDiskIndex:       pvc.Annotations[base.AnnDiskIndex],
+					base.AnnIntermediatePvc: pvc.Name,
+				},
+			},
+			Spec: core.PersistentVolumeClaimSpec{
+				StorageClassName: &finalStorageClass,
+				VolumeMode:       pvc.Spec.VolumeMode,
+				AccessModes:      pvc.Spec.AccessModes,
+				Resources:        pvc.Spec.Resources,
+				DataSourceRef: &core.TypedObjectReference{
+					APIGroup: &apiGroup,
+					Kind:     api.PortworxXcopyVolumePopulatorKind,
+					Name:     crName,
+				},
+			},
+		}
+		if cErr := r.Destination.Client.Create(context.TODO(), finalPVC); cErr != nil {
+			if !k8serr.IsAlreadyExists(cErr) {
+				err = cErr
+				return
+			}
+		}
+
+		cr := &api.PortworxXcopyVolumePopulator{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      crName,
+				Namespace: namespace,
+				Labels:    crLabels,
+			},
+			Spec: api.PortworxXcopyVolumePopulatorSpec{
+				SourcePvc:       pvc.Name,
+				SourceNamespace: namespace,
+			},
+		}
+		if cErr := r.Destination.Client.Create(context.TODO(), cr); cErr != nil {
+			if !k8serr.IsAlreadyExists(cErr) {
+				err = cErr
+				return
+			}
+		}
+
+		// Annotate the intermediate PVC so getPVCs() can swap it.
+		if pvc.Annotations == nil {
+			pvc.Annotations = map[string]string{}
+		}
+		pvc.Annotations[base.AnnTargetPvcName] = finalPVCName
+		if uErr := r.Destination.Client.Update(context.TODO(), pvc); uErr != nil {
+			err = uErr
+			return
+		}
+
+		r.Log.Info("Created two-phase resources",
+			"intermediate", pvc.Name, "final", finalPVCName, "cr", crName)
+	}
+
+	// Check progress — list all CRs for this migration+VM.
+	crList := &api.PortworxXcopyVolumePopulatorList{}
+	lErr := r.Destination.Client.List(context.TODO(), crList,
+		client.InNamespace(namespace),
+		client.MatchingLabels{kMigration: string(r.Migration.UID), kVM: vm.ID},
+	)
+	if lErr != nil {
+		err = lErr
+		return
+	}
+
+	if len(crList.Items) == 0 {
+		// No two-phase disks for this VM.
+		step.Progress.Completed = 1
+		step.MarkCompleted()
+		return
+	}
+
+	allDone := true
+	for i := range crList.Items {
+		cr := &crList.Items[i]
+		switch cr.Status.Phase {
+		case "Completed":
+			// ok
+		case "Failed":
+			if twoCfg.FailurePolicy == api.TwoPhaseKeepOnBaseStorage {
+				r.Log.Info("Storage-layer copy failed, keeping VM on base storage",
+					"cr", cr.Name, "message", cr.Status.Message)
+			} else {
+				step.AddError(fmt.Sprintf("storage layer migration failed for %s: %s",
+					cr.Name, cr.Status.Message))
+				return
+			}
+		default:
+			allDone = false
+		}
+	}
+
+	if allDone {
+		step.Progress.Completed = 1
+		step.MarkCompleted()
+	}
 	return
 }
 
