@@ -271,23 +271,34 @@ func basicAuth(username, password string) string {
 }
 
 // List all clusters, scoped to the configured clusterUuid (if any).
+// Prism Central's own self-registered pseudo-cluster entry is excluded --
+// see isPrismCentralCluster.
 func (r *Client) listClusters() (entities []map[string]interface{}, err error) {
 	entities, err = r.listAll("cluster", nil, clusterPageSize)
 	if err != nil {
 		return nil, err
 	}
+	entities = withoutPrismCentralClusters(entities)
 	if err = r.ensurePrismConfig(); err != nil {
 		return nil, err
 	}
 	return filterEntitiesByCluster(entities, r.prism.ClusterUUID, "metadata.uuid"), nil
 }
 
-// List all hosts, scoped to the configured clusterUuid (if any).
+// List all hosts, scoped to the configured clusterUuid (if any). Hosts
+// belonging to Prism Central's own pseudo-cluster (i.e. its underlying
+// appliance, not a real hypervisor node) are excluded.
 func (r *Client) listHosts() (entities []map[string]interface{}, err error) {
 	entities, err = r.listAll("host", nil, hostPageSize)
 	if err != nil {
 		return nil, err
 	}
+	clusters, err := r.listAll("cluster", nil, clusterPageSize)
+	if err != nil {
+		return nil, err
+	}
+	entities = excludeEntitiesByCluster(entities, excludedClusterUUIDs(clusters),
+		"spec.cluster_reference.uuid", "status.cluster_reference.uuid")
 	if err = r.ensurePrismConfig(); err != nil {
 		return nil, err
 	}
