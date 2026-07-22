@@ -187,3 +187,77 @@ func TestFilterEntitiesByCluster_FallbackPath(t *testing.T) {
 		t.Errorf("expected entities id=1 and id=2 to survive, got %+v", filtered)
 	}
 }
+
+func clusterEntityWithServiceList(uuid string, services ...string) map[string]interface{} {
+	serviceList := make([]interface{}, len(services))
+	for i, s := range services {
+		serviceList[i] = s
+	}
+	return map[string]interface{}{
+		"metadata": map[string]interface{}{"uuid": uuid},
+		"status": map[string]interface{}{
+			"resources": map[string]interface{}{
+				"config": map[string]interface{}{"service_list": serviceList},
+			},
+		},
+	}
+}
+
+func TestIsPrismCentralCluster(t *testing.T) {
+	if !isPrismCentralCluster(clusterEntityWithServiceList("pc-cluster", "PRISM_CENTRAL")) {
+		t.Error("expected a service_list of [PRISM_CENTRAL] to be detected as Prism Central's pseudo-cluster")
+	}
+	if isPrismCentralCluster(clusterEntityWithServiceList("real-cluster", "AOS")) {
+		t.Error("expected a service_list of [AOS] to not be detected as Prism Central's pseudo-cluster")
+	}
+	if isPrismCentralCluster(map[string]interface{}{}) {
+		t.Error("expected an entity with no service_list to not be detected as Prism Central's pseudo-cluster")
+	}
+}
+
+func TestWithoutPrismCentralClusters(t *testing.T) {
+	entities := []map[string]interface{}{
+		clusterEntityWithServiceList("real-cluster", "AOS"),
+		clusterEntityWithServiceList("pc-cluster", "PRISM_CENTRAL"),
+	}
+
+	filtered := withoutPrismCentralClusters(entities)
+	if len(filtered) != 1 {
+		t.Fatalf("expected 1 cluster to remain, got %d", len(filtered))
+	}
+	if getString(filtered[0], "metadata.uuid") != "real-cluster" {
+		t.Errorf("expected the real cluster to remain, got %+v", filtered[0])
+	}
+}
+
+func TestExcludedClusterUUIDs(t *testing.T) {
+	entities := []map[string]interface{}{
+		clusterEntityWithServiceList("real-cluster", "AOS"),
+		clusterEntityWithServiceList("pc-cluster", "PRISM_CENTRAL"),
+	}
+
+	excluded := excludedClusterUUIDs(entities)
+	if len(excluded) != 1 || !excluded["pc-cluster"] {
+		t.Errorf("expected only pc-cluster to be excluded, got %+v", excluded)
+	}
+}
+
+func TestExcludeEntitiesByCluster(t *testing.T) {
+	entities := []map[string]interface{}{
+		{"spec": map[string]interface{}{"cluster_reference": map[string]interface{}{"uuid": "pc-cluster"}}, "id": "1"},
+		{"spec": map[string]interface{}{"cluster_reference": map[string]interface{}{"uuid": "real-cluster"}}, "id": "2"},
+	}
+
+	filtered := excludeEntitiesByCluster(entities, map[string]bool{"pc-cluster": true}, "spec.cluster_reference.uuid")
+	if len(filtered) != 1 {
+		t.Fatalf("expected 1 entity to remain, got %d", len(filtered))
+	}
+	if filtered[0]["id"] != "2" {
+		t.Errorf("expected the entity referencing real-cluster to remain, got %+v", filtered[0])
+	}
+
+	// An empty exclusion set should be a no-op.
+	if filtered := excludeEntitiesByCluster(entities, map[string]bool{}, "spec.cluster_reference.uuid"); len(filtered) != len(entities) {
+		t.Errorf("expected no filtering with an empty exclusion set, got %d entities", len(filtered))
+	}
+}

@@ -605,6 +605,45 @@ func TestGetIntHelper(t *testing.T) {
 	}
 }
 
+// TestGetStringSliceHelper tests the getStringSlice helper function.
+func TestGetStringSliceHelper(t *testing.T) {
+	testMap := map[string]interface{}{
+		"list": []interface{}{"AOS", "PRISM_CENTRAL"},
+		"nested": map[string]interface{}{
+			"list": []interface{}{"a", "b"},
+		},
+		"mixed":    []interface{}{"a", 1, "b"},
+		"notAList": "value",
+	}
+
+	tests := []struct {
+		name     string
+		path     string
+		expected []string
+	}{
+		{"top-level list", "list", []string{"AOS", "PRISM_CENTRAL"}},
+		{"nested list", "nested.list", []string{"a", "b"}},
+		{"non-string entries dropped", "mixed", []string{"a", "b"}},
+		{"non-list value", "notAList", nil},
+		{"non-existent key", "nonexistent", nil},
+		{"non-existent nested", "nested.nonexistent", nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getStringSlice(testMap, tt.path)
+			if len(result) != len(tt.expected) {
+				t.Fatalf("Expected %v, got %v", tt.expected, result)
+			}
+			for i := range result {
+				if result[i] != tt.expected[i] {
+					t.Errorf("Expected %v, got %v", tt.expected, result)
+				}
+			}
+		})
+	}
+}
+
 // TestGetBoolHelper tests the getBool helper function.
 func TestGetBoolHelper(t *testing.T) {
 	testMap := map[string]interface{}{

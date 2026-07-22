@@ -112,6 +112,73 @@ func filterStorageContainersByCluster(
 	return filterEntitiesByCluster(entities, clusterUUID, "status.resources.cluster_reference.uuid")
 }
 
+// isPrismCentralCluster reports whether a v3 cluster entity is Prism
+// Central's own self-registered pseudo-cluster entry, rather than a real
+// AHV/Prism Element cluster it manages. Prism Central always includes
+// "PRISM_CENTRAL" in its service_list; real clusters report "AOS"
+// instead. The pseudo-cluster has no hosts and isn't a migration target,
+// so it's excluded from inventory.
+func isPrismCentralCluster(entity map[string]interface{}) bool {
+	for _, path := range []string{"spec.resources.config.service_list", "status.resources.config.service_list"} {
+		for _, service := range getStringSlice(entity, path) {
+			if service == "PRISM_CENTRAL" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// withoutPrismCentralClusters drops Prism Central's own self-registered
+// pseudo-cluster entry from a list of cluster entities.
+func withoutPrismCentralClusters(entities []map[string]interface{}) []map[string]interface{} {
+	filtered := make([]map[string]interface{}, 0, len(entities))
+	for _, entity := range entities {
+		if !isPrismCentralCluster(entity) {
+			filtered = append(filtered, entity)
+		}
+	}
+	return filtered
+}
+
+// excludedClusterUUIDs returns the UUIDs of any Prism Central pseudo-
+// cluster entries found among clusterEntities, so callers can filter out
+// hosts (and similar) that reference them.
+func excludedClusterUUIDs(clusterEntities []map[string]interface{}) map[string]bool {
+	excluded := map[string]bool{}
+	for _, entity := range clusterEntities {
+		if !isPrismCentralCluster(entity) {
+			continue
+		}
+		if uuid := getString(entity, "metadata.uuid"); uuid != "" {
+			excluded[uuid] = true
+		}
+	}
+	return excluded
+}
+
+// excludeEntitiesByCluster drops any entity whose cluster UUID -- read via
+// the given dot-separated field paths, in order, using the first one
+// present -- is in excludedUUIDs.
+func excludeEntitiesByCluster(
+	entities []map[string]interface{},
+	excludedUUIDs map[string]bool,
+	clusterUUIDPaths ...string,
+) []map[string]interface{} {
+	if len(excludedUUIDs) == 0 {
+		return entities
+	}
+
+	filtered := make([]map[string]interface{}, 0, len(entities))
+	for _, entity := range entities {
+		if !excludedUUIDs[firstString(entity, clusterUUIDPaths...)] {
+			filtered = append(filtered, entity)
+		}
+	}
+
+	return filtered
+}
+
 func extractMapList(result map[string]interface{}, key string) ([]map[string]interface{}, error) {
 	raw, ok := result[key]
 	if !ok {

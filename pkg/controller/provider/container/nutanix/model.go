@@ -108,6 +108,42 @@ func getInt64(m map[string]interface{}, path string) int64 {
 	return 0
 }
 
+func getStringSlice(m map[string]interface{}, path string) []string {
+	parts := strings.Split(path, ".")
+	current := m
+
+	for i, part := range parts {
+		if i == len(parts)-1 {
+			// Last part - get the value
+			if val, ok := current[part]; ok {
+				if list, ok := val.([]interface{}); ok {
+					result := make([]string, 0, len(list))
+					for _, item := range list {
+						if str, ok := item.(string); ok {
+							result = append(result, str)
+						}
+					}
+					return result
+				}
+			}
+			return nil
+		}
+
+		// Navigate deeper
+		if val, ok := current[part]; ok {
+			if next, ok := val.(map[string]interface{}); ok {
+				current = next
+			} else {
+				return nil
+			}
+		} else {
+			return nil
+		}
+	}
+
+	return nil
+}
+
 func getBool(m map[string]interface{}, path string) bool {
 	parts := strings.Split(path, ".")
 	current := m
