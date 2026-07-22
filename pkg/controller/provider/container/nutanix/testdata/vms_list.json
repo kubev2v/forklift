@@ -114,7 +114,7 @@
         "state": "COMPLETE",
         "resources": {
           "power_state": "ON",
-          "hypervisor_type": "kKvm",
+          "hypervisor_type": "AHV",
           "host_reference": {
             "kind": "host",
             "uuid": "0005f123-4567-89ab-cdef-000000000101",
@@ -244,7 +244,7 @@
         "state": "COMPLETE",
         "resources": {
           "power_state": "ON",
-          "hypervisor_type": "kKvm",
+          "hypervisor_type": "AHV",
           "host_reference": {
             "kind": "host",
             "uuid": "0005f123-4567-89ab-cdef-000000000102",
@@ -379,7 +379,7 @@
         "state": "COMPLETE",
         "resources": {
           "power_state": "ON",
-          "hypervisor_type": "kKvm",
+          "hypervisor_type": "AHV",
           "host_reference": {
             "kind": "host",
             "uuid": "0005f123-4567-89ab-cdef-000000000101",
@@ -475,7 +475,7 @@
         "state": "COMPLETE",
         "resources": {
           "power_state": "ON",
-          "hypervisor_type": "kKvm",
+          "hypervisor_type": "AHV",
           "host_reference": {
             "kind": "host",
             "uuid": "0005f123-4567-89ab-cdef-000000000201",
@@ -558,7 +558,7 @@
         "state": "COMPLETE",
         "resources": {
           "power_state": "OFF",
-          "hypervisor_type": "kKvm"
+          "hypervisor_type": "AHV"
         }
       }
     },
@@ -649,7 +649,7 @@
         "state": "COMPLETE",
         "resources": {
           "power_state": "ON",
-          "hypervisor_type": "kKvm",
+          "hypervisor_type": "AHV",
           "host_reference": {
             "kind": "host",
             "uuid": "0005f123-4567-89ab-cdef-000000000102",

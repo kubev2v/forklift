@@ -43,7 +43,9 @@ Response from `POST /api/nutanix/v3/hosts/list`
 - `spec.cluster_reference` - Parent cluster
 - `status.resources.num_cpu_sockets/cores` - CPU topology
 - `status.resources.memory_capacity_mib` - Memory in MiB
-- `status.resources.hypervisor.type` - "kKvm" (AHV is KVM-based)
+- `status.resources.hypervisor.hypervisor_full_name` - free-text hypervisor
+  version string (e.g. "Nutanix 20240802.100"); hosts have no dedicated
+  type-enum field like VMs do
 
 ### vms_list.json
 Response from `POST /api/nutanix/v3/vms/list`
@@ -272,7 +274,8 @@ For cross-referencing in tests:
 - All timestamps use ISO 8601 format
 - Capacities are in bytes, MiB, or GB depending on the field
 - AOS version is 6.8.2 across all resources
-- All hypervisors are AHV (type: "kKvm")
+- All hypervisors are AHV (VM `hypervisor_type`: "AHV"; host
+  `hypervisor_full_name`: "Nutanix ...")
 
 ## Updating Test Data
 

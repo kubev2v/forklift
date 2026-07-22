@@ -34,9 +34,7 @@
           },
           "hypervisor": {
             "hypervisor_full_name": "Nutanix 20240802.100",
-            "num_vms": 15,
-            "state": "kNormal",
-            "type": "kKvm"
+            "num_vms": 15
           },
           "controller_vm": {
             "ip": "10.10.1.31",
@@ -58,7 +56,6 @@
             "eth2",
             "eth3"
           ],
-          "state": "NORMAL",
           "cluster_reference": {
             "kind": "cluster",
             "uuid": "0005e123-4567-89ab-cdef-000000000001",
@@ -94,9 +91,7 @@
           },
           "hypervisor": {
             "hypervisor_full_name": "Nutanix 20240802.100",
-            "num_vms": 10,
-            "state": "kNormal",
-            "type": "kKvm"
+            "num_vms": 10
           },
           "controller_vm": {
             "ip": "10.10.1.32",
@@ -118,7 +113,6 @@
             "eth2",
             "eth3"
           ],
-          "state": "NORMAL",
           "cluster_reference": {
             "kind": "cluster",
             "uuid": "0005e123-4567-89ab-cdef-000000000001",
@@ -154,9 +148,7 @@
           },
           "hypervisor": {
             "hypervisor_full_name": "Nutanix 20240802.100",
-            "num_vms": 8,
-            "state": "kNormal",
-            "type": "kKvm"
+            "num_vms": 8
           },
           "controller_vm": {
             "ip": "10.10.2.31",
@@ -176,7 +168,6 @@
             "eth0",
             "eth1"
           ],
-          "state": "NORMAL",
           "cluster_reference": {
             "kind": "cluster",
             "uuid": "0005e123-4567-89ab-cdef-000000000002",
