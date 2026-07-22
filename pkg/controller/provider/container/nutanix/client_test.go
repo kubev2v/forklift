@@ -152,6 +152,109 @@ func TestClientListHosts(t *testing.T) {
 	}
 }
 
+// TestClientListClusters_ExcludesPrismCentral verifies that Prism
+// Central's own self-registered pseudo-cluster entry (identified by
+// "PRISM_CENTRAL" in its service_list) is filtered out of the clusters
+// list, leaving only real AHV/Prism Element clusters.
+func TestClientListClusters_ExcludesPrismCentral(t *testing.T) {
+	data, err := json.Marshal(map[string]interface{}{
+		"metadata": map[string]interface{}{"total_matches": 2},
+		"entities": []interface{}{
+			clusterEntityWithServiceList("real-cluster", "AOS"),
+			clusterEntityWithServiceList("pc-cluster", "PRISM_CENTRAL"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to marshal response: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(data)
+	}))
+	defer server.Close()
+
+	client := createTestClient(server.URL)
+	client.url = server.URL
+
+	entities, err := client.listClusters()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if len(entities) != 1 {
+		t.Fatalf("expected 1 cluster after excluding Prism Central, got %d", len(entities))
+	}
+	if uuid := getString(entities[0], "metadata.uuid"); uuid != "real-cluster" {
+		t.Errorf("expected real-cluster, got %s", uuid)
+	}
+}
+
+// TestClientListHosts_ExcludesPrismCentralHosts verifies that hosts
+// belonging to Prism Central's own pseudo-cluster (its underlying
+// appliance, not a real hypervisor node) are filtered out.
+func TestClientListHosts_ExcludesPrismCentralHosts(t *testing.T) {
+	clustersData, err := json.Marshal(map[string]interface{}{
+		"metadata": map[string]interface{}{"total_matches": 2},
+		"entities": []interface{}{
+			clusterEntityWithServiceList("real-cluster", "AOS"),
+			clusterEntityWithServiceList("pc-cluster", "PRISM_CENTRAL"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to marshal clusters response: %v", err)
+	}
+
+	hostsData, err := json.Marshal(map[string]interface{}{
+		"metadata": map[string]interface{}{"total_matches": 2},
+		"entities": []interface{}{
+			map[string]interface{}{
+				"metadata": map[string]interface{}{"uuid": "real-host"},
+				"spec": map[string]interface{}{
+					"cluster_reference": map[string]interface{}{"uuid": "real-cluster"},
+				},
+			},
+			map[string]interface{}{
+				"metadata": map[string]interface{}{"uuid": "pc-host"},
+				"spec": map[string]interface{}{
+					"cluster_reference": map[string]interface{}{"uuid": "pc-cluster"},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to marshal hosts response: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		switch r.URL.Path {
+		case "/api/nutanix/v3/clusters/list":
+			_, _ = w.Write(clustersData)
+		case "/api/nutanix/v3/hosts/list":
+			_, _ = w.Write(hostsData)
+		default:
+			t.Fatalf("Unexpected request path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client := createTestClient(server.URL)
+	client.url = server.URL
+
+	entities, err := client.listHosts()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if len(entities) != 1 {
+		t.Fatalf("expected 1 host after excluding Prism Central's pseudo-cluster, got %d", len(entities))
+	}
+	if uuid := getString(entities[0], "metadata.uuid"); uuid != "real-host" {
+		t.Errorf("expected real-host, got %s", uuid)
+	}
+}
+
 // TestClientListVMs tests listing VMs.
 func TestClientListVMs(t *testing.T) {
 	// Load test data
