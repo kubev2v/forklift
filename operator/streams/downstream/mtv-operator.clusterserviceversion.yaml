@@ -109,7 +109,7 @@ spec:
     - name: Forklift Operator
       url: https://github.com/kubev2v/forklift
   version: ${MTV_VERSION}
-  minKubeVersion: 1.27.0
+  minKubeVersion: 1.36.0
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
