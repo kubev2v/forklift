@@ -33,10 +33,10 @@ func TestDetectPrismMode_Element(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 		case "/api/nutanix/v2.0/storage_containers":
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"entities":[]}`))
+			_, _ = w.Write([]byte(`{"entities":[]}`))
 		case "/api/nutanix/v3/clusters/list":
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"entities":[]}`))
+			_, _ = w.Write([]byte(`{"entities":[]}`))
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -58,10 +58,10 @@ func TestDetectPrismMode_Central(t *testing.T) {
 		switch r.URL.Path {
 		case "/api/nutanix/v3/prism_central":
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"resources":{"version":"pc.2024.1"}}`))
+			_, _ = w.Write([]byte(`{"resources":{"version":"pc.2024.1"}}`))
 		case "/api/nutanix/v3/clusters/list":
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"entities":[]}`))
+			_, _ = w.Write([]byte(`{"entities":[]}`))
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -82,7 +82,7 @@ func TestResolvePrismConfig_Explicit(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/nutanix/v3/clusters/list" {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"entities":[]}`))
+			_, _ = w.Write([]byte(`{"entities":[]}`))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -114,10 +114,10 @@ func TestResolvePrismConfig_AutoDetect(t *testing.T) {
 		switch r.URL.Path {
 		case "/api/nutanix/v3/prism_central":
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"resources":{"version":"pc.2024.1"}}`))
+			_, _ = w.Write([]byte(`{"resources":{"version":"pc.2024.1"}}`))
 		case "/api/nutanix/v3/clusters/list":
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"entities":[]}`))
+			_, _ = w.Write([]byte(`{"entities":[]}`))
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -148,10 +148,10 @@ func TestEnsurePrismConfig_CachesResult(t *testing.T) {
 		switch r.URL.Path {
 		case "/api/nutanix/v3/prism_central":
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"resources":{"version":"pc.2024.1"}}`))
+			_, _ = w.Write([]byte(`{"resources":{"version":"pc.2024.1"}}`))
 		case "/api/nutanix/v3/clusters/list":
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"entities":[]}`))
+			_, _ = w.Write([]byte(`{"entities":[]}`))
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -189,7 +189,7 @@ func TestDetectPrismMode_NeitherResponds(t *testing.T) {
 		switch r.URL.Path {
 		case "/api/nutanix/v3/clusters/list":
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"entities":[]}`))
+			_, _ = w.Write([]byte(`{"entities":[]}`))
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}

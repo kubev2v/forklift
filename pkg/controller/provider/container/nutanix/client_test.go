@@ -52,7 +52,7 @@ func TestClientConnect(t *testing.T) {
 
 		// Return success
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"api_version": "3.1"}`))
+		_, _ = w.Write([]byte(`{"api_version": "3.1"}`))
 	}))
 	defer server.Close()
 
@@ -88,7 +88,7 @@ func TestClientListClusters(t *testing.T) {
 		// Return test data
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(data)
+		_, _ = w.Write(data)
 	}))
 	defer server.Close()
 
@@ -135,7 +135,7 @@ func TestClientListHosts(t *testing.T) {
 		// Return test data
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(data)
+		_, _ = w.Write(data)
 	}))
 	defer server.Close()
 
@@ -183,7 +183,7 @@ func TestClientListVMs(t *testing.T) {
 		// Return test data
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(data)
+		_, _ = w.Write(data)
 	}))
 	defer server.Close()
 
@@ -232,7 +232,7 @@ func TestClientListSubnets(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(data)
+		_, _ = w.Write(data)
 	}))
 	defer server.Close()
 
@@ -261,7 +261,7 @@ func TestClientListStorageContainers(t *testing.T) {
 		case "/api/nutanix/v3/clusters/list":
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"entities":[]}`))
+			_, _ = w.Write([]byte(`{"entities":[]}`))
 		case "/api/nutanix/v3/prism_central":
 			w.WriteHeader(http.StatusNotFound)
 		case "/api/nutanix/v2.0/storage_containers":
@@ -270,7 +270,7 @@ func TestClientListStorageContainers(t *testing.T) {
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			w.Write(data)
+			_, _ = w.Write(data)
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -304,14 +304,14 @@ func TestClientListStorageContainersCentral(t *testing.T) {
 		case "/api/nutanix/v3/clusters/list":
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"entities":[]}`))
+			_, _ = w.Write([]byte(`{"entities":[]}`))
 		case "/api/clustermgmt/v4.1/config/storage-containers":
 			if r.Method != "GET" {
 				t.Errorf("Expected GET, got %s", r.Method)
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			w.Write(data)
+			_, _ = w.Write(data)
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -345,7 +345,7 @@ func TestClientListImages(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(data)
+		_, _ = w.Write(data)
 	}))
 	defer server.Close()
 
@@ -374,7 +374,7 @@ func TestClientListClusters_ScopedToCluster(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(data)
+		_, _ = w.Write(data)
 	}))
 	defer server.Close()
 
@@ -408,7 +408,7 @@ func TestClientListHosts_ScopedToCluster(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(data)
+		_, _ = w.Write(data)
 	}))
 	defer server.Close()
 
@@ -443,7 +443,7 @@ func TestClientListVMs_ScopedToCluster(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(data)
+		_, _ = w.Write(data)
 	}))
 	defer server.Close()
 
@@ -599,7 +599,7 @@ func TestClientErrorHandling(t *testing.T) {
 		// Return 401 for authentication errors
 		w.WriteHeader(http.StatusUnauthorized)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"error": "unauthorized"}`))
+		_, _ = w.Write([]byte(`{"error": "unauthorized"}`))
 	}))
 	defer server.Close()
 

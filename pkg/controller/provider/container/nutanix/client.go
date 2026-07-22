@@ -39,14 +39,6 @@ const (
 	imagePageSize   = 500
 )
 
-// Not found error.
-type NotFound struct {
-}
-
-func (e *NotFound) Error() string {
-	return "not found."
-}
-
 // Nutanix API Client
 type Client struct {
 	// Base URL (e.g., https://prism-central:9440)
@@ -251,27 +243,6 @@ func (r *Client) list(resourceKind string, filter map[string]interface{}, offset
 	status, err := r.post(url, body, &result)
 	if err != nil {
 		return nil, err
-	}
-
-	if status != http.StatusOK {
-		return nil, liberr.New(fmt.Sprintf("unexpected status: %d", status))
-	}
-
-	return result, nil
-}
-
-// Get resource by UUID
-func (r *Client) getResource(resourceKind, uuid string) (result map[string]interface{}, err error) {
-	url := fmt.Sprintf("%s/api/nutanix/v3/%ss/%s", r.url, resourceKind, uuid)
-
-	result = make(map[string]interface{})
-	status, err := r.get(url, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	if status == http.StatusNotFound {
-		return nil, &NotFound{}
 	}
 
 	if status != http.StatusOK {
