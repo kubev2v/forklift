@@ -91,7 +91,7 @@ func stringifyWithQuotes(s []string) string {
 	return fmt.Sprintf("'%s'", strings.Join(s, "', '"))
 }
 
-// Return all shareable PVCs
+// listShareablePVCs returns all non-terminating shareable PVCs in the namespace.
 func listShareablePVCs(c client.Client, targetNamespace string) (pvcs []*core.PersistentVolumeClaim, err error) {
 	pvcsList := &core.PersistentVolumeClaimList{}
 	err = c.List(
@@ -108,18 +108,39 @@ func listShareablePVCs(c client.Client, targetNamespace string) (pvcs []*core.Pe
 		err = liberr.Wrap(err)
 		return
 	}
-	pvcs = make([]*core.PersistentVolumeClaim, len(pvcsList.Items))
-	for i, pvc := range pvcsList.Items {
-		// loopvar
-		copyPvc := pvc
-		pvcs[i] = &copyPvc
+	for i := range pvcsList.Items {
+		pvc := &pvcsList.Items[i]
+		if pvc.DeletionTimestamp == nil {
+			pvcs = append(pvcs, pvc)
+		}
 	}
-
 	return
 }
 
-// Return PersistentVolumeClaims and disks associated with a VM.
-func findSharedPVCs(client client.Client, vm *model.VM, targetNamespace string) (pvcs []*core.PersistentVolumeClaim, missingDiskPVCs []vsphere.Disk, err error) {
+// getDiskSharedPVC finds a shareable PVC for the given disk. It prefers a PVC
+// that belongs to the same plan (matched by the "plan" label); if none is
+// found it falls back to any shareable PVC with a matching disk source.
+func getDiskSharedPVC(disk vsphere.Disk, pvcs []*core.PersistentVolumeClaim, planID string) *core.PersistentVolumeClaim {
+	diskSource := baseVolume(disk.File, false)
+	var fallback *core.PersistentVolumeClaim
+	for _, pvc := range pvcs {
+		if pvc.Annotations[planbase.AnnDiskSource] != diskSource {
+			continue
+		}
+		if planID != "" && pvc.Labels["plan"] == planID {
+			return pvc
+		}
+		if fallback == nil {
+			fallback = pvc
+		}
+	}
+	return fallback
+}
+
+// findSharedPVCs returns the shareable PVCs that match the VM's shared disks.
+// For each disk it prefers a PVC belonging to the same plan (by planID label),
+// falling back to any matching shareable PVC.
+func findSharedPVCs(client client.Client, vm *model.VM, targetNamespace, planID string) (pvcs []*core.PersistentVolumeClaim, missingDiskPVCs []vsphere.Disk, err error) {
 	allPvcs, err := listShareablePVCs(client, targetNamespace)
 	if err != nil {
 		return
@@ -129,8 +150,7 @@ func findSharedPVCs(client client.Client, vm *model.VM, targetNamespace string) 
 		if !disk.Shared {
 			continue
 		}
-		// Warm migration disabled as the shared disks can't be migrated with warm migration
-		pvc := getDisksPvc(disk, allPvcs, false)
+		pvc := getDiskSharedPVC(disk, allPvcs, planID)
 		if pvc != nil {
 			pvcs = append(pvcs, pvc)
 		} else {
