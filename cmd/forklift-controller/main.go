@@ -24,6 +24,7 @@ import (
 
 	"github.com/go-logr/logr"
 	net "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/kubev2v/forklift/pkg/apis"
 	"github.com/kubev2v/forklift/pkg/controller"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
@@ -142,6 +143,9 @@ func main() {
 	}
 	if err := multicluster.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "proceeding without optional multicluster APIs.")
+	}
+	if err := snapshotv1.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "proceeding without optional CSI snapshot APIs")
 	}
 	if Settings.OpenShift {
 		if err := route.Install(mgr.GetScheme()); err != nil {

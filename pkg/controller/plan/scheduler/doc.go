@@ -11,6 +11,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/plan/scheduler/ovirt"
 	"github.com/kubev2v/forklift/pkg/controller/plan/scheduler/vsphere"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	azurescheduler "github.com/kubev2v/forklift/pkg/provider/azure/controller/scheduler"
 	ec2scheduler "github.com/kubev2v/forklift/pkg/provider/ec2/controller/scheduler"
 	"github.com/kubev2v/forklift/pkg/settings"
 )
@@ -57,6 +58,11 @@ func New(ctx *plancontext.Context) (scheduler Scheduler, err error) {
 		}
 	case api.EC2:
 		scheduler = &ec2scheduler.Scheduler{
+			Context:     ctx,
+			MaxInFlight: settings.Settings.MaxInFlight,
+		}
+	case api.Azure:
+		scheduler = &azurescheduler.Scheduler{
 			Context:     ctx,
 			MaxInFlight: settings.Settings.MaxInFlight,
 		}
