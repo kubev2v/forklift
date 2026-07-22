@@ -181,7 +181,7 @@ func handleStorageContainersV2(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleStorageContainersV4 handles /api/clustermgmt/v4.1/config/storage-containers
+// handleStorageContainersV4 handles /api/clustermgmt/v4.0/config/storage-containers
 func handleStorageContainersV4(w http.ResponseWriter, r *http.Request) {
 	if !checkAuth(r) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -264,7 +264,7 @@ func main() {
 	fmt.Println("  POST /api/nutanix/v3/subnets/list")
 	fmt.Println("  GET  /api/nutanix/v3/prism_central")
 	fmt.Println("  GET  /api/nutanix/v2.0/storage_containers")
-	fmt.Println("  GET  /api/clustermgmt/v4.1/config/storage-containers")
+	fmt.Println("  GET  /api/clustermgmt/v4.0/config/storage-containers")
 	fmt.Println("  POST /api/nutanix/v3/images/list")
 	fmt.Println()
 	fmt.Println("Press Ctrl+C to stop")
@@ -279,7 +279,7 @@ func main() {
 	http.HandleFunc("/api/nutanix/v3/subnets/list", handleSubnets)
 	http.HandleFunc("/api/nutanix/v3/prism_central", handlePrismCentral)
 	http.HandleFunc("/api/nutanix/v2.0/storage_containers", handleStorageContainersV2)
-	http.HandleFunc("/api/clustermgmt/v4.1/config/storage-containers", handleStorageContainersV4)
+	http.HandleFunc("/api/clustermgmt/v4.0/config/storage-containers", handleStorageContainersV4)
 	http.HandleFunc("/api/nutanix/v3/storage_containers/list", handleStorageContainers)
 	http.HandleFunc("/api/nutanix/v3/images/list", handleImages)
 

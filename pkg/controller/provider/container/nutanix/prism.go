@@ -11,7 +11,7 @@ import (
 const (
 	prismCentralPath        = "/api/nutanix/v3/prism_central"
 	storageContainersV2Path = "/api/nutanix/v2.0/storage_containers"
-	storageContainersV4Path = "/api/clustermgmt/v4.1/config/storage-containers"
+	storageContainersV4Path = "/api/clustermgmt/v4.0/config/storage-containers"
 )
 
 // PrismMode identifies whether the provider URL targets Prism Central or Element.
