@@ -3,6 +3,7 @@ package handler
 import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/host/handler/hyperv"
+	"github.com/kubev2v/forklift/pkg/controller/host/handler/nutanix"
 	"github.com/kubev2v/forklift/pkg/controller/host/handler/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/host/handler/openstack"
 	"github.com/kubev2v/forklift/pkg/controller/host/handler/ova"
@@ -64,6 +65,11 @@ func New(
 		// EC2 provider does not support host-level operations
 		// Return a no-op handler that satisfies the interface
 		h = &ec2handler.NoOpHostHandler{}
+	case api.Nutanix:
+		h, err = nutanix.New(
+			client,
+			channel,
+			provider)
 	default:
 		err = liberr.New("provider not supported.")
 	}
