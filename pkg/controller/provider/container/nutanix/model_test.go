@@ -153,9 +153,22 @@ func TestApplyHost(t *testing.T) {
 		t.Error("Expected MemoryCapacityMiB to be > 0")
 	}
 
-	// Verify hypervisor info (note: may not be present in all responses)
-	// Just check it doesn't error out
-	_ = m.HypervisorType
+	// Verify hypervisor info
+	if m.HypervisorType != "Nutanix 20240802.100" {
+		t.Errorf("Expected HypervisorType 'Nutanix 20240802.100', got %s", m.HypervisorType)
+	}
+	if m.NumVMs != 15 {
+		t.Errorf("Expected NumVMs 15, got %d", m.NumVMs)
+	}
+
+	// Verify State (read from status.state) and HostType (read from
+	// status.resources.host_type) are distinct fields.
+	if m.State != "COMPLETE" {
+		t.Errorf("Expected State 'COMPLETE', got %s", m.State)
+	}
+	if m.HostType != "HYPER_CONVERGED" {
+		t.Errorf("Expected HostType 'HYPER_CONVERGED', got %s", m.HostType)
+	}
 }
 
 // TestApplyHostNameAndClusterNotFromWrongPaths verifies Host.Name is read
@@ -189,6 +202,39 @@ func TestApplyHostNameAndClusterNotFromWrongPaths(t *testing.T) {
 	}
 	if m.Cluster != "right-cluster" {
 		t.Errorf("Expected cluster 'right-cluster' from top-level status, got %s", m.Cluster)
+	}
+}
+
+// TestApplyHostHypervisorTypeAndState verifies that Host.HypervisorType is
+// read as-is from resources.hypervisor.hypervisor_full_name (there is no
+// dedicated type-enum key on host entities, unlike VMs), and that
+// Host.State is read from the top-level status.state field rather than
+// duplicating HostType's status.resources.host_type.
+func TestApplyHostHypervisorTypeAndState(t *testing.T) {
+	entity := map[string]interface{}{
+		"metadata": map[string]interface{}{"uuid": "host-1"},
+		"status": map[string]interface{}{
+			"state": "COMPLETE",
+			"resources": map[string]interface{}{
+				"hypervisor": map[string]interface{}{
+					"hypervisor_full_name": "Nutanix 20240802.100",
+				},
+				"host_type": "HYPER_CONVERGED",
+			},
+		},
+	}
+
+	m := &model.Host{}
+	applyHost(entity, m)
+
+	if m.HypervisorType != "Nutanix 20240802.100" {
+		t.Errorf("Expected HypervisorType 'Nutanix 20240802.100', got %s", m.HypervisorType)
+	}
+	if m.State != "COMPLETE" {
+		t.Errorf("Expected State 'COMPLETE', got %s", m.State)
+	}
+	if m.HostType != "HYPER_CONVERGED" {
+		t.Errorf("Expected HostType 'HYPER_CONVERGED', got %s", m.HostType)
 	}
 }
 
@@ -704,30 +750,6 @@ func TestGetInt64Helper(t *testing.T) {
 			result := getInt64(testMap, tt.path)
 			if result != tt.expected {
 				t.Errorf("Expected %d, got %d", tt.expected, result)
-			}
-		})
-	}
-}
-
-// TestNormalizeHypervisorType covers both the recognized AHV spellings and
-// the passthrough default branch for anything else (e.g. ESXi values that
-// might show up if a Nutanix cluster is ever mixed-hypervisor).
-func TestNormalizeHypervisorType(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{"lowercase kKvm", "kKvm", "AHV"},
-		{"uppercase KKVM", "KKVM", "AHV"},
-		{"unrecognized value passthrough", "kVMware", "kVMware"},
-		{"empty value passthrough", "", ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if result := normalizeHypervisorType(tt.input); result != tt.expected {
-				t.Errorf("Expected %q, got %q", tt.expected, result)
 			}
 		})
 	}

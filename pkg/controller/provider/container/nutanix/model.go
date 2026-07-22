@@ -267,11 +267,11 @@ func applyHost(entity map[string]interface{}, m *model.Host) {
 	m.SerialNumber = getString(resources, "serial_number")
 	m.BlockModel = getString(resources, "block.block_model")
 
-	// hypervisor info
+	// hypervisor info -- unlike VMs, hosts have no dedicated type-enum
+	// field (no "type"/"hypervisor_type" key); only a free-text
+	// "hypervisor_full_name" is available (e.g. "Nutanix 20240802.100").
 	if hvState, ok := resources["hypervisor"].(map[string]interface{}); ok {
-		if hvType, ok := hvState["hypervisor_type"].(string); ok {
-			m.HypervisorType = hvType
-		}
+		m.HypervisorType = getString(hvState, "hypervisor_full_name")
 		if numVMs, ok := hvState["num_vms"].(float64); ok {
 			m.NumVMs = int(numVMs)
 		} else if numVMs, ok := hvState["num_vms"].(int); ok {
@@ -279,7 +279,10 @@ func applyHost(entity map[string]interface{}, m *model.Host) {
 		}
 	}
 
-	m.State = getString(resources, "host_type")
+	// State (entity lifecycle status, e.g. "COMPLETE") lives directly
+	// under status, not status.resources. HostType (topology, e.g.
+	// "HYPER_CONVERGED") is a distinct field under status.resources.
+	m.State = getString(status, "state")
 	m.HostType = getString(resources, "host_type")
 
 	// CPU info
@@ -493,7 +496,7 @@ func applyVM(entity map[string]interface{}, m *model.VM) {
 	m.VGAConsoleEnabled = getBool(specResources, "vga_console_enabled")
 
 	// Hypervisor type from status.resources
-	m.HypervisorType = normalizeHypervisorType(getString(statusResources, "hypervisor_type"))
+	m.HypervisorType = getString(statusResources, "hypervisor_type")
 	m.GuestOSID = getString(specResources, "guest_os_id")
 	if m.GuestOSID == "" {
 		m.GuestOSID = getString(statusResources, "guest_os_id")
@@ -577,15 +580,6 @@ func applyVM(entity map[string]interface{}, m *model.VM) {
 	}
 
 	applyGuestTools(specResources, statusResources, m)
-}
-
-func normalizeHypervisorType(hypervisorType string) string {
-	switch hypervisorType {
-	case "kKvm", "KKVM":
-		return "AHV"
-	default:
-		return hypervisorType
-	}
 }
 
 func applyGuestTools(specResources, statusResources map[string]interface{}, m *model.VM) {

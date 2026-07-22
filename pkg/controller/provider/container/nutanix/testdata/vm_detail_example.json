@@ -144,7 +144,7 @@
     "description": "Production RHEL 8 web server running Apache",
     "resources": {
       "power_state": "ON",
-      "hypervisor_type": "kKvm",
+      "hypervisor_type": "AHV",
       "num_sockets": 2,
       "num_vcpus_per_socket": 2,
       "num_threads_per_core": 1,
