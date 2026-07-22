@@ -246,6 +246,121 @@ func TestEnsureClonnerIgroup(t *testing.T) {
 	})
 }
 
+func TestResolvePortGroupProtocol(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+	log := klog.Background()
+
+	t.Run("returns PortGroupProtocol when set (V4)", func(t *testing.T) {
+		pg := &v100.PortGroup{PortGroupProtocol: "SCSI_FC", PortGroupType: "SCSI_FC"}
+		protocol, err := resolvePortGroupProtocol(pg, log)
+		g.Expect(err).ToNot(gomega.HaveOccurred())
+		g.Expect(protocol).To(gomega.Equal("SCSI_FC"))
+	})
+
+	t.Run("returns iSCSI PortGroupProtocol when set (V4)", func(t *testing.T) {
+		pg := &v100.PortGroup{PortGroupProtocol: "iSCSI", PortGroupType: "iSCSI"}
+		protocol, err := resolvePortGroupProtocol(pg, log)
+		g.Expect(err).ToNot(gomega.HaveOccurred())
+		g.Expect(protocol).To(gomega.Equal("iSCSI"))
+	})
+
+	t.Run("maps Fibre type to SCSI_FC when PortGroupProtocol is empty (V3)", func(t *testing.T) {
+		pg := &v100.PortGroup{PortGroupType: "Fibre"}
+		protocol, err := resolvePortGroupProtocol(pg, log)
+		g.Expect(err).ToNot(gomega.HaveOccurred())
+		g.Expect(protocol).To(gomega.Equal("SCSI_FC"))
+	})
+
+	t.Run("maps iSCSI type to iSCSI when PortGroupProtocol is empty (V3)", func(t *testing.T) {
+		pg := &v100.PortGroup{PortGroupType: "iSCSI"}
+		protocol, err := resolvePortGroupProtocol(pg, log)
+		g.Expect(err).ToNot(gomega.HaveOccurred())
+		g.Expect(protocol).To(gomega.Equal("iSCSI"))
+	})
+
+	t.Run("returns error for unknown type when PortGroupProtocol is empty", func(t *testing.T) {
+		pg := &v100.PortGroup{PortGroupType: "SomeNewType"}
+		_, err := resolvePortGroupProtocol(pg, log)
+		g.Expect(err).To(gomega.HaveOccurred())
+		g.Expect(err.Error()).To(gomega.ContainSubstring("unable to determine port group protocol"))
+		g.Expect(err.Error()).To(gomega.ContainSubstring("SomeNewType"))
+	})
+
+	t.Run("returns error when both fields are empty", func(t *testing.T) {
+		pg := &v100.PortGroup{}
+		_, err := resolvePortGroupProtocol(pg, log)
+		g.Expect(err).To(gomega.HaveOccurred())
+		g.Expect(err.Error()).To(gomega.ContainSubstring("unable to determine port group protocol"))
+	})
+}
+
+func TestEnsureClonnerIgroupV3Fallback(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	t.Run("V3 FC: resolves protocol from type=Fibre when port_group_protocol is absent", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockClient := NewMockPmax(ctrl)
+
+		clonner := PowermaxClonner{
+			client:      mockClient,
+			symmetrixID: "123",
+			portGroup:   "v3-fc-pg",
+			log:         klog.Background(),
+		}
+
+		initiatorGroup := "test-ig"
+		clonnerIqn := []string{"10000000c9a12345:10000000c9a12346"}
+
+		mockClient.EXPECT().GetStorageGroup(context.TODO(), "123", gomock.Not(gomock.Nil())).Return(&v100.StorageGroup{}, nil)
+		mockClient.EXPECT().GetPortGroupByID(context.TODO(), "123", "v3-fc-pg").Return(&v100.PortGroup{
+			PortGroupType: "Fibre",
+		}, nil)
+		mockClient.EXPECT().GetInitiatorList(context.TODO(), "123", "10000000c9a12346", false, true).Return(&v100.InitiatorList{
+			InitiatorIDs: []string{"FA-2D:0:10000000c9a12346"},
+		}, nil)
+		mockClient.EXPECT().GetInitiatorByID(context.TODO(), "123", "FA-2D:0:10000000c9a12346").Return(&v100.Initiator{
+			InitiatorID: "FA-2D:0:10000000c9a12346",
+			Host:        "v3-host",
+		}, nil)
+
+		mappingContext, err := clonner.EnsureClonnerIgroup(initiatorGroup, clonnerIqn)
+		g.Expect(err).ToNot(gomega.HaveOccurred())
+		g.Expect(mappingContext).ToNot(gomega.BeNil())
+		g.Expect(clonner.hostID).To(gomega.Equal("v3-host"))
+	})
+
+	t.Run("V3 iSCSI: resolves protocol from type=iSCSI when port_group_protocol is absent", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockClient := NewMockPmax(ctrl)
+
+		clonner := PowermaxClonner{
+			client:      mockClient,
+			symmetrixID: "123",
+			portGroup:   "v3-iscsi-pg",
+			log:         klog.Background(),
+		}
+
+		initiatorGroup := "test-ig"
+		clonnerIqn := []string{"iqn.1994-05.com.redhat:v3-host"}
+
+		mockClient.EXPECT().GetStorageGroup(context.TODO(), "123", gomock.Not(gomock.Nil())).Return(&v100.StorageGroup{}, nil)
+		mockClient.EXPECT().GetPortGroupByID(context.TODO(), "123", "v3-iscsi-pg").Return(&v100.PortGroup{
+			PortGroupType: "iSCSI",
+		}, nil)
+		mockClient.EXPECT().GetInitiatorByID(context.TODO(), "123", "iqn.1994-05.com.redhat:v3-host").Return(&v100.Initiator{
+			InitiatorID: "iqn.1994-05.com.redhat:v3-host",
+			Host:        "v3-iscsi-host",
+		}, nil)
+
+		mappingContext, err := clonner.EnsureClonnerIgroup(initiatorGroup, clonnerIqn)
+		g.Expect(err).ToNot(gomega.HaveOccurred())
+		g.Expect(mappingContext).ToNot(gomega.BeNil())
+		g.Expect(clonner.hostID).To(gomega.Equal("v3-iscsi-host"))
+	})
+}
+
 func TestRetryOnTransient(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 	log := klog.Background()

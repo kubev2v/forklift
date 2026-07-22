@@ -6,6 +6,7 @@ import (
 )
 
 type ProtocolType string
+type IORMThresholdMode string
 
 // Variants.
 const (
@@ -26,6 +27,9 @@ const (
 	ProtocolPCIe         ProtocolType = "PCIe"         // PCI Express storage interface
 	ProtocolRDMA         ProtocolType = "RDMA"         // Remote Direct Memory Access
 	ProtocolTCP          ProtocolType = "TCP"          // Generic TCP-based adapter
+	// IORM Congestion Threshold Mode
+	IORMThresholdModeAutomatic IORMThresholdMode = "automatic"
+	IORMThresholdModeManual    IORMThresholdMode = "manual"
 )
 
 // Bus types
@@ -147,27 +151,29 @@ type Cluster struct {
 
 type Host struct {
 	Base
-	Cluster            string             `sql:"d0,index(cluster)"`
-	Status             string             `sql:""`
-	InMaintenanceMode  bool               `sql:""`
-	ManagementServerIp string             `sql:""`
-	ManagementIPs      []string           `sql:""`
-	Thumbprint         string             `sql:""`
-	Timezone           string             `sql:""`
-	CpuSockets         int16              `sql:""`
-	CpuCores           int16              `sql:""`
-	MemoryBytes        int64              `sql:""`
-	ProductName        string             `sql:""`
-	ProductVersion     string             `sql:""`
-	Model              string             `sql:""`
-	Vendor             string             `sql:""`
-	Network            HostNetwork        `sql:""`
-	Networks           []Ref              `sql:""`
-	Datastores         []Ref              `sql:""`
-	HostScsiDisks      []HostScsiDisk     `sql:""`
-	AdvancedOptions    Ref                `sql:""`
-	HbaDiskInfo        []HbaDiskInfo      `sql:""`
-	HostScsiTopology   []HostScsiTopology `sql:""`
+	Cluster                 string             `sql:"d0,index(cluster)"`
+	Status                  string             `sql:""`
+	InMaintenanceMode       bool               `sql:""`
+	ManagementServerIp      string             `sql:""`
+	ManagementIPs           []string           `sql:""`
+	Thumbprint              string             `sql:""`
+	Timezone                string             `sql:""`
+	CpuSockets              int16              `sql:""`
+	CpuCores                int16              `sql:""`
+	MemoryBytes             int64              `sql:""`
+	ProductName             string             `sql:""`
+	ProductVersion          string             `sql:""`
+	Model                   string             `sql:""`
+	Vendor                  string             `sql:""`
+	Network                 HostNetwork        `sql:""`
+	Networks                []Ref              `sql:""`
+	Datastores              []Ref              `sql:""`
+	HostScsiDisks           []HostScsiDisk     `sql:""`
+	AdvancedOptions         Ref                `sql:""`
+	HbaDiskInfo             []HbaDiskInfo      `sql:""`
+	HostScsiTopology        []HostScsiTopology `sql:""`
+	VMotionSupported        bool               `sql:""`
+	StorageVMotionSupported bool               `sql:""`
 }
 
 type HostScsiDisk struct {
@@ -291,14 +297,19 @@ type DVSHost struct {
 
 type Datastore struct {
 	Base
-	Type                string   `sql:""`
-	Capacity            int64    `sql:""`
-	Free                int64    `sql:""`
-	MaintenanceMode     string   `sql:""`
-	BackingDevicesNames []string `sql:""`
-	NasRemoteHost       string   `sql:""`
-	NasRemotePath       string   `sql:""`
-	NasRemoteHostNames  []string `sql:""`
+	Type                        string            `sql:""`
+	Capacity                    int64             `sql:""`
+	Free                        int64             `sql:""`
+	MaintenanceMode             string            `sql:""`
+	BackingDevicesNames         []string          `sql:""`
+	NasRemoteHost               string            `sql:""`
+	NasRemotePath               string            `sql:""`
+	NasRemoteHostNames          []string          `sql:""`
+	StorageIORMSupported        bool              `sql:""`
+	IORMEnabled                 bool              `sql:""`
+	IORMCongestionThreshold     int32             `sql:""`
+	IORMCongestionThresholdMode IORMThresholdMode `sql:""`
+	IORMPercentOfPeakThroughput int32             `sql:""`
 }
 
 type VM struct {

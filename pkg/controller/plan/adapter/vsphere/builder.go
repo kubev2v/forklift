@@ -1366,6 +1366,46 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 	dsMapIn := r.Context.Map.Storage.Spec.Map
 	naaPrefixes := loadNAAPrefixes(r.Client)
 	dsNaaMap := make(map[string]string)
+
+	// Pre-pass: resolve RDM disks by NAA vendor prefix.
+	// Builds a map from disk index to the storage map entry whose offload
+	// plugin matches the RDM's vendor. Disks that fail NAA resolution are
+	// left out and will fall back to datastore-based matching in the main loop.
+	rdmMapped := make(map[int]*api.StoragePair)
+	for diskIndex, disk := range sortedDisks {
+		if !disk.RDM || disk.DeviceName == "" {
+			continue
+		}
+		rdmVendor, matched := vendorFromNAA(disk.DeviceName, naaPrefixes)
+		if !matched {
+			r.Log.Info("RDM disk NAA prefix not recognized, falling back to datastore matching",
+				"diskKey", disk.Key, "deviceName", disk.DeviceName)
+			continue
+		}
+		candidates := findStorageMapEntriesForVendor(dsMapIn, rdmVendor)
+		switch len(candidates) {
+		case 0:
+			r.Log.Info("No storage map entry found for RDM vendor, falling back to datastore matching",
+				"diskKey", disk.Key, "vendor", rdmVendor)
+		case 1:
+			rdmMapped[diskIndex] = candidates[0]
+			r.Log.Info("RDM disk resolved to storage vendor by NAA",
+				"diskKey", disk.Key, "deviceName", disk.DeviceName,
+				"vendor", rdmVendor, "storageClass", candidates[0].Destination.StorageClass)
+		default:
+			entry, disambigErr := disambiguateRDMByNAA(r.Source.Inventory, candidates, disk.DeviceName, naaPrefixes)
+			if disambigErr != nil {
+				r.Log.Info("RDM NAA disambiguation failed, falling back to datastore matching",
+					"diskKey", disk.Key, "vendor", rdmVendor, "error", disambigErr)
+			} else {
+				rdmMapped[diskIndex] = entry
+				r.Log.Info("RDM disk resolved to storage vendor by NAA",
+					"diskKey", disk.Key, "deviceName", disk.DeviceName,
+					"vendor", rdmVendor, "storageClass", entry.Destination.StorageClass)
+			}
+		}
+	}
+
 	for i := range dsMapIn {
 		mapped := &dsMapIn[i]
 		sourceRef := mapped.Source
@@ -1378,38 +1418,21 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 
 		pvblock := core.PersistentVolumeBlock
 		for diskIndex, disk := range sortedDisks {
-			// Resolve the effective storage map entry for this disk.
-			// RDM disks are matched by NAA vendor prefix (not datastore)
-			// because the RDM's backing LUN may reside on a different
-			// storage array than the VM's datastore.
 			var effectiveMapped *api.StoragePair
 			if disk.RDM && disk.DeviceName != "" {
-				if i > 0 {
-					continue // RDM disks are processed once, in the first outer iteration
-				}
-				rdmVendor, matched := vendorFromNAA(disk.DeviceName, naaPrefixes)
-				if !matched {
-					return nil, fmt.Errorf(
-						"RDM disk (key=%d) has device name %q that does not match any known storage vendor NAA prefix",
-						disk.Key, disk.DeviceName)
-				}
-				candidates := findStorageMapEntriesForVendor(dsMapIn, rdmVendor)
-				switch len(candidates) {
-				case 0:
-					return nil, fmt.Errorf(
-						"no storage map entry with offload plugin found for vendor %q; "+
-							"add a storage map entry with an offload plugin for this vendor", rdmVendor)
-				case 1:
-					effectiveMapped = candidates[0]
-				default:
-					effectiveMapped, err = disambiguateRDMByNAA(r.Source.Inventory, candidates, disk.DeviceName, naaPrefixes)
-					if err != nil {
-						return nil, err
+				if entry, ok := rdmMapped[diskIndex]; ok {
+					if mapped != entry {
+						continue
 					}
+					effectiveMapped = entry
+				} else if disk.Datastore.ID == ds.ID {
+					effectiveMapped = mapped
+					r.Log.Info("RDM disk matched by datastore fallback",
+						"diskKey", disk.Key, "deviceName", disk.DeviceName,
+						"datastoreID", ds.ID)
+				} else {
+					continue
 				}
-				r.Log.Info("RDM disk resolved to storage vendor by NAA",
-					"diskKey", disk.Key, "deviceName", disk.DeviceName,
-					"vendor", rdmVendor, "storageClass", effectiveMapped.Destination.StorageClass)
 			} else if disk.Datastore.ID == ds.ID {
 				effectiveMapped = mapped
 			} else {
@@ -1725,7 +1748,11 @@ func (r *Builder) buildCsiImportPVC(
 	host := string(storageSecret.Data["STORAGE_HOSTNAME"])
 	user := string(storageSecret.Data["STORAGE_USERNAME"])
 	pass := string(storageSecret.Data["STORAGE_PASSWORD"])
-	skipSSL := basecontroller.GetInsecureSkipVerifyFlag(r.Source.Secret)
+	skipSSL, err := strconv.ParseBool(string(storageSecret.Data["STORAGE_SKIP_SSL_VERIFICATION"]))
+	if err != nil {
+		r.Log.Error(err, "CSI import: invalid STORAGE_SKIP_SSL_VERIFICATION value, defaulting to false", "secretRef", csiCfg.SecretRef)
+		skipSSL = false
+	}
 
 	var missing []string
 	if host == "" {

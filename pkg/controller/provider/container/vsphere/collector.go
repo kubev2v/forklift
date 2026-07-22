@@ -80,28 +80,30 @@ const (
 	fDrsVmBehavior = "configuration.drsConfig.defaultVmBehavior"
 	fDrsVmCfg      = "configuration.drsVmConfig"
 	// Host
-	fVm                   = "vm"
-	fOverallStatus        = "overallStatus"
-	fProductName          = "config.product.name"
-	fProductVersion       = "config.product.version"
-	fVSwitch              = "config.network.vswitch"
-	fPortGroup            = "config.network.portgroup"
-	fPNIC                 = "config.network.pnic"
-	fVNIC                 = "config.network.vnic"
-	fVirtualNicManagerNet = "config.virtualNicManagerInfo.netConfig"
-	fTimezone             = "config.dateTimeInfo.timeZone.name"
-	fInMaintMode          = "summary.runtime.inMaintenanceMode"
-	fCpuSockets           = "summary.hardware.numCpuPkgs"
-	fCpuCores             = "summary.hardware.numCpuCores"
-	fHostMemorySize       = "summary.hardware.memorySize"
-	fThumbprint           = "summary.config.sslThumbprint"
-	fMgtServerIp          = "summary.managementServerIp"
-	fScsiLun              = "config.storageDevice.scsiLun"
-	fHostBusAdapter       = "config.storageDevice.hostBusAdapter"
-	fScsiTopology         = "config.storageDevice.scsiTopology.adapter"
-	fAdvancedOption       = "configManager.advancedOption"
-	fmodel                = "hardware.systemInfo.model"
-	fvendor               = "hardware.systemInfo.vendor"
+	fVm                      = "vm"
+	fOverallStatus           = "overallStatus"
+	fProductName             = "config.product.name"
+	fProductVersion          = "config.product.version"
+	fVSwitch                 = "config.network.vswitch"
+	fPortGroup               = "config.network.portgroup"
+	fPNIC                    = "config.network.pnic"
+	fVNIC                    = "config.network.vnic"
+	fVirtualNicManagerNet    = "config.virtualNicManagerInfo.netConfig"
+	fTimezone                = "config.dateTimeInfo.timeZone.name"
+	fInMaintMode             = "summary.runtime.inMaintenanceMode"
+	fCpuSockets              = "summary.hardware.numCpuPkgs"
+	fCpuCores                = "summary.hardware.numCpuCores"
+	fHostMemorySize          = "summary.hardware.memorySize"
+	fThumbprint              = "summary.config.sslThumbprint"
+	fMgtServerIp             = "summary.managementServerIp"
+	fScsiLun                 = "config.storageDevice.scsiLun"
+	fHostBusAdapter          = "config.storageDevice.hostBusAdapter"
+	fScsiTopology            = "config.storageDevice.scsiTopology.adapter"
+	fAdvancedOption          = "configManager.advancedOption"
+	fmodel                   = "hardware.systemInfo.model"
+	fvendor                  = "hardware.systemInfo.vendor"
+	fVMotionSupported        = "capability.vmotionSupported"
+	fStorageVMotionSupported = "capability.storageVMotionSupported"
 	// Network
 	fTag     = "tag"
 	fSummary = "summary"
@@ -114,11 +116,13 @@ const (
 	// ResourcePool
 	fResourcePool = "resourcePool"
 	// Datastore
-	fDsType      = "summary.type"
-	fCapacity    = "summary.capacity"
-	fFreeSpace   = "summary.freeSpace"
-	fDsMaintMode = "summary.maintenanceMode"
-	fVmfsExtent  = "info"
+	fDsType                           = "summary.type"
+	fCapacity                         = "summary.capacity"
+	fFreeSpace                        = "summary.freeSpace"
+	fDsMaintMode                      = "summary.maintenanceMode"
+	fVmfsExtent                       = "info"
+	fDsCapabilityStorageIORMSupported = "capability.storageIORMSupported"
+	fIormConfiguration                = "iormConfiguration"
 	// VM
 	fUUID                     = "config.uuid"
 	fInstanceUUID             = "config.instanceUuid"
@@ -545,15 +549,15 @@ func (r *Collector) getUpdates(ctx context.Context) error {
 		}
 		if err == nil {
 			err = tx.Commit()
+			if err != nil {
+				r.log.Error(err, "tx commit failed.")
+			}
 		} else {
-			err = tx.End()
+			if endErr := tx.End(); endErr != nil {
+				r.log.Error(endErr, "tx rollback failed.")
+			}
 		}
-		if err != nil {
-			r.log.Error(
-				err,
-				"tx commit failed.")
-		}
-		if updateSet.Truncated == nil || !*updateSet.Truncated {
+		if err == nil && (updateSet.Truncated == nil || !*updateSet.Truncated) {
 			if !r.parity {
 				r.parity = true
 				r.log.Info(
@@ -995,6 +999,8 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 				fScsiTopology,
 				fmodel,
 				fvendor,
+				fVMotionSupported,
+				fStorageVMotionSupported,
 			},
 		},
 		{ // Network
@@ -1043,6 +1049,8 @@ func (r *Collector) propertySpec() []types.PropertySpec {
 				fDsMaintMode,
 				fVmfsExtent,
 				fHost,
+				fDsCapabilityStorageIORMSupported,
+				fIormConfiguration,
 			},
 		},
 		{ // VM
@@ -1127,7 +1135,7 @@ func (r *Collector) apply(ctx context.Context, tx *libmodel.Tx, updates []types.
 			break
 		}
 
-		if u.Obj.Type == VirtualMachine {
+		if u.Obj.Type == VirtualMachine && string(u.Kind) != Leave {
 			if !vmTagsFetched {
 				vmTagsMap, vmTagsErr = r.getVMsWithTags(ctx)
 				if vmTagsErr != nil {

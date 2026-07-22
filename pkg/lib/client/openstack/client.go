@@ -175,9 +175,7 @@ func (c *Client) Authenticate() (err error) {
 func (c *Client) getTLSConfig() (tlsConfig *tls.Config, err error) {
 	identityUrl, err := url.Parse(c.URL)
 	if err != nil {
-		if c.Log != nil {
-			c.Log.Error(err, "error parsing the URL", "url", c.URL)
-		}
+		c.Log.Error(err, "error parsing the URL", "url", c.URL)
 		return
 	}
 	if identityUrl.Scheme == "https" {
@@ -185,14 +183,13 @@ func (c *Client) getTLSConfig() (tlsConfig *tls.Config, err error) {
 			tlsConfig = &tls.Config{InsecureSkipVerify: true}
 		} else {
 			var cacert []byte
-			var hasCACert bool
 			if c.secret != nil {
-				cacert, hasCACert = util.GetCACert(c.secret)
+				cacert, _ = util.GetCACert(c.secret)
+			} else {
+				cacert = []byte(c.getStringFromOptions(CACert))
 			}
-			if !hasCACert {
-				if c.Log != nil {
-					c.Log.Info("CA certificate was not provided,system CA cert pool is used")
-				}
+			if len(cacert) == 0 {
+				c.Log.Info("CA certificate was not provided, system CA cert pool is used")
 			} else {
 				roots := x509.NewCertPool()
 				ok := roots.AppendCertsFromPEM(cacert)
