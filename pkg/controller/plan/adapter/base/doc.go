@@ -286,6 +286,238 @@ type Validator interface {
 	GuestToolsInstalled(vmRef ref.Ref) (ok bool, err error)
 	// Validate that VM does not need to collapse any snapshots into a single base file
 	ConsolidationNeeded(vmRef ref.Ref) (needed bool, err error)
+	// ValidateCalicoNADs validates every Calico-referencing NAD in the
+	// plan's network map. Issues are NAD-scoped (network/IPPool config);
+	// the returned cache is consumed by CalicoVMIssues.
+	ValidateCalicoNADs(client client.Client) (CalicoValidationResult, error)
+	// CalicoVMIssues returns per-VM Calico issues (IP membership in subnet
+	// / IPPool). Reads only from the cache produced by ValidateCalicoNADs;
+	// VMs whose mapped NAD failed plan-level validation are skipped here
+	// — their failure is already reported via CalicoNetworkInvalid.
+	CalicoVMIssues(vmRef ref.Ref, cache *CalicoValidationCache) ([]CalicoIssue, error)
+	// ValidateCalicoPrimary validates the (at most one) calico-flagged
+	// NetworkMap entry — a type: pod destination carrying the calico
+	// field. Returns plan-level issues (CRD presence, UDN conflict,
+	// Network/VLAN/IPPool resolution) plus a cache consumed by
+	// CalicoPrimaryIssues. On non-vSphere providers, returns a single
+	// CalicoIssuePrimaryProviderUnsupported issue when any calico-flagged
+	// entry is present.
+	//
+	// Precondition: Plan.Referenced.Map.Network is populated by the
+	// dispatcher before this is called. With a nil NetworkMap, returns an
+	// empty result and a non-nil cache with Primary == nil.
+	ValidateCalicoPrimary(client client.Client) (CalicoPrimaryValidationResult, error)
+	// CalicoPrimaryIssues returns per-VM issues for the calico-flagged
+	// primary NIC (IP membership in IPPool / VLAN subnet, gated on
+	// PreserveStaticIPs). Reads only from the cache produced by
+	// ValidateCalicoPrimary; when the cache is nil or Primary is nil (plan
+	// failed, or no calico-flagged entry exists), returns nil.
+	//
+	// When IP preservation is on but the VM has no findable IPv4 IPs
+	// (IPv6-only or no GuestNetworks reported), no per-VM issue is emitted
+	// and the builder emits no ipAddrs annotation — preservation is
+	// best-effort.
+	CalicoPrimaryIssues(vmRef ref.Ref, cache *CalicoPrimaryValidationCache) ([]CalicoPrimaryIssue, error)
+}
+
+// CalicoIssueKind enumerates the Calico Network failure modes.
+type CalicoIssueKind string
+
+const (
+	// CalicoIssueNADUnreadable indicates the destination NAD could not be
+	// fetched or parsed (NotFound, malformed JSON, transient API error). The
+	// NAD's Calico configuration is unknowable until this is resolved.
+	CalicoIssueNADUnreadable CalicoIssueKind = "NADUnreadable"
+	// CalicoIssueNetworkNotFound no Network CR existed.
+	CalicoIssueNetworkNotFound CalicoIssueKind = "NetworkNotFound"
+	// CalicoIssueNetworkCRDAbsent the destination cluster does not have the
+	// projectcalico.org/v3 Network CRD installed (the Calico install is too
+	// old or does not ship the Network resource).
+	CalicoIssueNetworkCRDAbsent CalicoIssueKind = "NetworkCRDAbsent"
+	// CalicoIssueVRFVlanIgnored the NAD names a VLAN but the referenced
+	// Network is a VRF (routed L3) network.
+	CalicoIssueVRFVlanIgnored CalicoIssueKind = "VRFVlanIgnored"
+	// CalicoIssueVRFNodeScoped every spec.vrf.hostConfig entry on the
+	// referenced VRF Network carries a nodeSelector (an empty selector is
+	// the canonical all-nodes form, so this means a node subset) and the
+	// plan sets neither targetNodeSelector nor targetAffinity. A VM
+	// scheduled onto an uncovered node fails to start, so with placement
+	// uncontrolled the migration outcome is nondeterministic. Critical.
+	CalicoIssueVRFNodeScoped CalicoIssueKind = "VRFNodeScoped"
+	// CalicoIssueVRFPlacementUnverified as VRFNodeScoped, but the plan
+	// constrains VM placement (targetNodeSelector/targetAffinity).
+	// Warn-level: Forklift does not evaluate Calico's selector grammar,
+	// so it cannot verify the plan's placement keeps VMs on nodes the
+	// network's selectors cover.
+	CalicoIssueVRFPlacementUnverified CalicoIssueKind = "VRFPlacementUnverified"
+	// CalicoIssueVRFRouteTableReserved a hostConfig entry on the referenced
+	// VRF Network claims kernel route table 253, 254 or 255 — the kernel's
+	// own default/main/local tables, which a VRF must never take over.
+	CalicoIssueVRFRouteTableReserved CalicoIssueKind = "VRFRouteTableReserved"
+	// CalicoIssueVRFRouteTableConflict a routeTableIndex on the referenced
+	// VRF Network is provably claimed elsewhere: another VRF Network uses
+	// it with at least one of the two entries unscoped (an all-nodes entry
+	// overlaps any node set), or it falls inside an explicit
+	// FelixConfiguration routeTableRanges range. Calico documents such
+	// conflicts as able to cause network outages.
+	CalicoIssueVRFRouteTableConflict CalicoIssueKind = "VRFRouteTableConflict"
+	// CalicoIssueVRFRouteTablePossibleConflict another VRF Network claims
+	// the same routeTableIndex, but both entries carry nodeSelectors, so
+	// whether they land on the same node depends on which nodes the
+	// selectors match — unprovable without selector evaluation. Warn-level.
+	CalicoIssueVRFRouteTablePossibleConflict CalicoIssueKind = "VRFRouteTablePossibleConflict"
+	// CalicoIssueVRFDataplaneNotNftables a NAD references a VRF network but
+	// the destination Calico install is not running the nftables dataplane.
+	// VRF networking is supported only on nftables — BPF and iptables
+	// installs cannot honour it — so FelixConfiguration "default" must have
+	// nftablesMode Enabled and bpfEnabled off. nftablesMode "Auto" is also
+	// reported: the mode Felix actually picks cannot be verified from here.
+	// Emitted once per plan.
+	CalicoIssueVRFDataplaneNotNftables CalicoIssueKind = "VRFDataplaneNotNftables"
+	// CalicoIssueVRFPoolNotPinned the NAD references a VRF network but its
+	// IPAM config pins no ipv4_pools, and the plan does not preserve static
+	// IPs. Calico's IPAM is VRF-unaware; the documented convention pins the
+	// VRF's dedicated IPPool via ipam.ipv4_pools in the NAD. Without the
+	// pin, a freshly assigned address comes from whichever pool IPAM
+	// selects — likely one the VRF's tenant fabric cannot route back to.
+	// Warn-level, per NAD (the pin is a NAD property, not a Network one).
+	// Deliberately not emitted when the plan preserves static IPs: the
+	// addresses are then explicit via ipAddrs and already validated against
+	// pools per-VM; the risk exists only for freshly-assigned addresses.
+	CalicoIssueVRFPoolNotPinned CalicoIssueKind = "VRFPoolNotPinned"
+	// CalicoIssueVRFNoBGPPeer no BGPPeer with spec.network naming the
+	// referenced VRF Network exists. VRF networks ship with
+	// inClusterMode: Local only — Felix programs a node's own pod routes;
+	// routes to pods on other nodes exist only when such a BGPPeer
+	// distributes them. Without one, VMs placed on different nodes silently
+	// cannot reach each other inside the VRF. Warn-level, once per
+	// referenced Network. Also emitted when the BGPPeer kind is unknown to
+	// the apiserver: no peer can be bound in that state either.
+	CalicoIssueVRFNoBGPPeer CalicoIssueKind = "VRFNoBGPPeer"
+	// CalicoIssueVRFNoHostInterfaces a spec.vrf.hostConfig entry on the
+	// referenced VRF Network names no hostInterfaces. Pods (and thus VMs)
+	// on the nodes that entry matches have no path off their node in the
+	// VRF. Warn-level, once per referenced Network.
+	CalicoIssueVRFNoHostInterfaces CalicoIssueKind = "VRFNoHostInterfaces"
+	// CalicoIssueNetworkHasNoL2Bridge Network CR existed but had no L2Bridge field spec'd.
+	CalicoIssueNetworkHasNoL2Bridge CalicoIssueKind = "NetworkHasNoL2Bridge"
+	// CalicoIssueNetworkHasNoVLANs Network CR's L2Bridge had an empty vlans list (no VLAN to select).
+	CalicoIssueNetworkHasNoVLANs CalicoIssueKind = "NetworkHasNoVLANs"
+	// CalicoIssueVLANNotInNetwork NIC's NAD entry's VLAN was not present in the referenced Network CR.
+	CalicoIssueVLANNotInNetwork CalicoIssueKind = "VLANNotInNetwork"
+	// CalicoIssueVLANRequired the NAD references a Calico Network but names
+	// no VLAN. A VLAN must be stated explicitly whenever a Network is
+	// selected; Forklift does not auto-select, not even for a single-VLAN
+	// Network.
+	CalicoIssueVLANRequired CalicoIssueKind = "VLANRequired"
+	// CalicoIssueVLANHasNoIPPool no IPPool existed satisfying the VLAN subnet's requirements.
+	CalicoIssueVLANHasNoIPPool CalicoIssueKind = "VLANHasNoIPPool"
+	// CalicoIssueIPNotInSubnet NIC's IP was not in any Network.spec.l2Bridge.vlans[].subnets[].cidr.
+	CalicoIssueIPNotInSubnet CalicoIssueKind = "IPNotInSubnet"
+	// CalicoIssueIPNotInIPPool NIC's IP was not in any Calico IPPool.
+	CalicoIssueIPNotInIPPool CalicoIssueKind = "IPNotInIPPool"
+	// CalicoIssueTooManyIPs the NIC carries more than one IPv4 address.
+	// Calico's ipAddrs annotation accepts at most one IPv4 per interface,
+	// so preservation cannot represent this NIC — CNI ADD would fail and
+	// the pod would never start.
+	CalicoIssueTooManyIPs CalicoIssueKind = "TooManyIPs"
+	// CalicoIssueNADMissingNetwork the NAD requests the Calico CNI but does
+	// not name a projectcalico.org Network resource (no "network" field).
+	// This is Calico's legacy L3 IPAM mode; identity preservation (MAC + IP)
+	// will not be applied for NICs mapped to this NAD. Warn-level.
+	CalicoIssueNADMissingNetwork CalicoIssueKind = "NADMissingNetwork"
+	// CalicoIssueDataplaneNotBPF a NAD resolved to an l2Bridge network but
+	// the destination Calico install is not running the BPF dataplane
+	// (FelixConfiguration "default" has bpfEnabled false or unset). L2
+	// networks require the BPF dataplane. Emitted once per plan.
+	CalicoIssueDataplaneNotBPF CalicoIssueKind = "DataplaneNotBPF"
+
+	// Calico-primary IssueKinds. Used by Validator.ValidateCalicoPrimary
+	// and Validator.CalicoPrimaryIssues for the calico-flagged NetworkMap
+	// path (type: pod destinations carrying the calico field). The Primary
+	// prefix disambiguates from the NAD-path kinds above.
+
+	// CalicoIssuePrimaryProviderUnsupported indicates a NetworkMap with a
+	// calico-flagged entry is being consumed by a provider that does not
+	// support the feature in this release (any non-vSphere provider).
+	CalicoIssuePrimaryProviderUnsupported CalicoIssueKind = "PrimaryProviderUnsupported"
+	// CalicoIssuePrimaryUnsupported indicates the destination cluster does
+	// not have Calico installed (projectcalico.org/v3 IPPool CRD absent).
+	// Network CRD absence with IPPool present is reported as the more
+	// specific CalicoIssuePrimaryNetworkCRDAbsent.
+	CalicoIssuePrimaryUnsupported CalicoIssueKind = "PrimaryUnsupported"
+	// CalicoIssuePrimaryNetworkCRDAbsent the destination cluster has Calico
+	// (IPPool CRD present) but the projectcalico.org/v3 Network CRD is not
+	// installed. The user requested L2 attach via calico.network, but the
+	// install does not ship the Network resource. The non-L2 case (calico.network
+	// == "") continues to work in this state and is not blocked.
+	CalicoIssuePrimaryNetworkCRDAbsent CalicoIssueKind = "PrimaryNetworkCRDAbsent"
+	// CalicoIssuePrimaryConflictsWithUDN indicates the destination namespace
+	// is labelled for a UDN primary network — incompatible with the calico
+	// field.
+	CalicoIssuePrimaryConflictsWithUDN CalicoIssueKind = "PrimaryConflictsWithUDN"
+	// CalicoIssuePrimaryNetworkNotFound the named projectcalico.org/v3
+	// Network CR does not exist on the destination cluster.
+	CalicoIssuePrimaryNetworkNotFound CalicoIssueKind = "PrimaryNetworkNotFound"
+	// CalicoIssuePrimaryNetworkTypeUnsupported the named Network CR is not
+	// an l2Bridge network (e.g. a VRF network). Only l2Bridge networks can
+	// back the primary NIC; a VRF network attaches via a multus NAD instead.
+	CalicoIssuePrimaryNetworkTypeUnsupported CalicoIssueKind = "PrimaryNetworkTypeUnsupported"
+	// CalicoIssuePrimaryNetworkHasNoL2Bridge the named Network CR has no
+	// l2Bridge spec — incompatible with L2 attach.
+	CalicoIssuePrimaryNetworkHasNoL2Bridge CalicoIssueKind = "PrimaryNetworkHasNoL2Bridge"
+	// CalicoIssuePrimaryNetworkHasNoVLANs the named Network CR's
+	// l2Bridge.vlans is empty.
+	CalicoIssuePrimaryNetworkHasNoVLANs CalicoIssueKind = "PrimaryNetworkHasNoVLANs"
+	// CalicoIssuePrimaryVLANRequired calico.network is set but calico.vlan
+	// is not. A VLAN must be stated explicitly whenever a Network is
+	// selected.
+	CalicoIssuePrimaryVLANRequired CalicoIssueKind = "PrimaryVLANRequired"
+	// CalicoIssuePrimaryVLANNotInNetwork the user-specified calico.vlan does
+	// not match any vlan.id in the named Network CR.
+	CalicoIssuePrimaryVLANNotInNetwork CalicoIssueKind = "PrimaryVLANNotInNetwork"
+	// CalicoIssuePrimaryNoEligibleIPPool no IPPool covers either the L3
+	// allocation (non-L2 case) or the matched VLAN's subnet (L2-attach case).
+	CalicoIssuePrimaryNoEligibleIPPool CalicoIssueKind = "PrimaryNoEligibleIPPool"
+	// CalicoIssuePrimaryIPNotInSubnet (L2-attach case only) the source NIC IP
+	// falls outside the matched VLAN's subnets.
+	CalicoIssuePrimaryIPNotInSubnet CalicoIssueKind = "PrimaryIPNotInSubnet"
+	// CalicoIssuePrimaryTooManyIPs the calico-mapped NIC carries more than
+	// one IPv4 address. Calico's ipAddrs annotation accepts at most one
+	// IPv4 per interface, so preservation cannot represent this NIC — CNI
+	// ADD would fail and the pod would never start.
+	CalicoIssuePrimaryTooManyIPs CalicoIssueKind = "PrimaryTooManyIPs"
+	// CalicoIssuePrimaryFieldsMisplaced the calico block is set on a
+	// non-pod entry, or calico.vlan is set without calico.network, or more
+	// than one calico-flagged entry exists in the map. The Network field
+	// on the issue carries the offending value for message disambiguation.
+	CalicoIssuePrimaryFieldsMisplaced CalicoIssueKind = "PrimaryFieldsMisplaced"
+	// CalicoIssuePrimaryStaticIPsNotPreserved indicates a calico-flagged
+	// NetworkMap entry exists while Plan.Spec.PreserveStaticIPs is false.
+	// Bridge binding is still enabled (Calico requires it for L2 attach),
+	// so DHCP-configured guests will pick up the Calico-assigned IP via
+	// the veth. Static-IP-configured guests would have a diver. Warn-class — informational only.
+	CalicoIssuePrimaryStaticIPsNotPreserved CalicoIssueKind = "PrimaryStaticIPsNotPreserved"
+	// CalicoIssuePrimaryDataplaneNotBPF calico.network resolved to an
+	// l2Bridge network but the destination Calico install is not running
+	// the BPF dataplane (FelixConfiguration "default" has bpfEnabled false
+	// or unset). L2 networks require the BPF dataplane.
+	CalicoIssuePrimaryDataplaneNotBPF CalicoIssueKind = "PrimaryDataplaneNotBPF"
+)
+
+// CalicoIssue represents a per-VM Calico Network validation failure: the
+// VM's NIC IP does not fit the destination's Calico Network VLAN subnet or
+// IPPool. NAD-level issues (NetworkNotFound, NetworkHasNoL2Bridge, etc.)
+// are surfaced via CalicoNADIssue, not this type.
+type CalicoIssue struct {
+	Kind CalicoIssueKind
+	// Network is the Calico Network CR name reference.
+	Network string
+	// VLAN is the resolved l2Bridge.vlans[].vlan.id (zero when the NAD's
+	// Network is a VRF network — VRF networks carry no VLANs).
+	VLAN uint16
+	// IP is the source VM IP.
+	IP string
 }
 
 // DestinationClient API.

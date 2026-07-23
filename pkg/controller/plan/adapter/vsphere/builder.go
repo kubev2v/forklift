@@ -27,6 +27,7 @@ import (
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	utils "github.com/kubev2v/forklift/pkg/controller/plan/util"
+	ocpmodel "github.com/kubev2v/forklift/pkg/controller/provider/model/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
@@ -46,6 +47,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
@@ -746,7 +748,7 @@ func isIPv4(address string) bool {
 	return ip != nil && ip.To4() != nil
 }
 
-func (r *Builder) findInterfaceIps(vm *model.VM, nic vsphere.NIC) []string {
+func findInterfaceIps(vm *model.VM, nic vsphere.NIC) []string {
 	var interfaceIps []string
 	for _, net := range vm.GuestNetworks {
 		if net.DeviceConfigId == nic.DeviceKey {
@@ -762,6 +764,20 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 	var kNetworks []cnv.Network
 	var kInterfaces []cnv.Interface
 	staticIpInterfaces := make(map[string][]string)
+	calicoMacInterfaces := map[string]string{}
+	calicoIpInterfaces := map[string][]string{}
+	// A calico-flagged pod mapping produces at most one NIC's worth of
+	// primary annotations per VM: the map-level validator rejects multiple
+	// calico-flagged entries, and the per-VM VMMultiplePodNetworkMappings
+	// Critical rejects a VM with two NICs resolving to one pod entry — so
+	// single locals are enough.
+	var calicoPrimary bool
+	var calicoPrimaryMAC string
+	var calicoPrimaryIPs []string
+	var calicoPrimaryNetwork string
+	var calicoPrimaryVlan uint16
+
+	nadCache := map[k8stypes.NamespacedName]*ocpmodel.NetworkConfig{}
 
 	numNetworks := 0
 	hasUDN := r.Plan.DestinationHasUdnNetwork(r.Destination)
@@ -817,12 +833,30 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 		switch mapped.Destination.Type {
 		case Pod:
 			kNetwork.Pod = &cnv.PodNetwork{}
-			if hasUDN {
+			if mapped.Destination.Calico != nil {
+				// The destination's default pod network is Calico and the
+				// user opted into identity preservation: Bridge binding
+				// always, MAC always, IPs when the Plan preserves static
+				// IPs, Network + Vlan annotations when the user named a
+				// projectcalico.org/v3 Network CR.
+				kInterface.Bridge = &cnv.InterfaceBridge{}
+				calicoPrimary = true
+				calicoPrimaryMAC = nic.MAC
+				if r.Plan.Spec.PreserveStaticIPs {
+					if ips := findInterfaceIps(vm, nic); len(ips) > 0 {
+						calicoPrimaryIPs = ips
+					}
+				}
+				if mapped.Destination.Calico.Network != "" {
+					calicoPrimaryNetwork = mapped.Destination.Calico.Network
+					calicoPrimaryVlan = mapped.Destination.Calico.Vlan
+				}
+			} else if hasUDN {
 				kInterface.Binding = &cnv.PluginBinding{
 					Name: planbase.UdnL2bridge,
 				}
 				if r.Plan.Spec.PreserveStaticIPs {
-					ips := r.findInterfaceIps(vm, nic)
+					ips := findInterfaceIps(vm, nic)
 					if len(ips) > 0 {
 						staticIpInterfaces[networkName] = ips
 					}
@@ -835,6 +869,32 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 				NetworkName: path.Join(mapped.Destination.Namespace, mapped.Destination.Name),
 			}
 			kInterface.Bridge = &cnv.InterfaceBridge{}
+
+			nadKey := k8stypes.NamespacedName{
+				Namespace: mapped.Destination.Namespace,
+				Name:      mapped.Destination.Name,
+			}
+			cfg, cached := nadCache[nadKey]
+			if !cached {
+				cfg, err = planbase.FetchAndParseNAD(context.TODO(), r.Destination.Client,
+					nadKey.Namespace, nadKey.Name)
+				if err != nil {
+					return err
+				}
+				nadCache[nadKey] = cfg
+			}
+			if cfg != nil && cfg.ReferencesCalicoNetwork() {
+				// Calico identity preservation on a secondary NIC: the
+				// source MAC is always carried over via the scoped hwAddr
+				// annotation, and the source IPs when the Plan preserves
+				// static IPs. Non-Calico NADs are untouched.
+				calicoMacInterfaces[networkName] = nic.MAC
+				if r.Plan.Spec.PreserveStaticIPs {
+					if ips := findInterfaceIps(vm, nic); len(ips) > 0 {
+						calicoIpInterfaces[networkName] = ips
+					}
+				}
+			}
 		}
 
 		kNetworks = append(kNetworks, kNetwork)
@@ -854,6 +914,32 @@ func (r *Builder) mapNetworks(vm *model.VM, object *cnv.VirtualMachineSpec) (err
 			object.Template.ObjectMeta.Annotations = make(map[string]string)
 		}
 		object.Template.ObjectMeta.Annotations[planbase.AnnStaticUdnIp] = string(staticIpInterfacesAnnotation)
+	}
+
+	for ifname, mac := range calicoMacInterfaces {
+		planbase.SetCalicoMAC(&object.Template.ObjectMeta, ifname, mac)
+	}
+	for ifname, ips := range calicoIpInterfaces {
+		if err = planbase.SetCalicoStaticIPs(&object.Template.ObjectMeta, ifname, ips); err != nil {
+			return
+		}
+	}
+	if err = planbase.StampCalicoPrimary(&object.Template.ObjectMeta, planbase.CalicoPrimaryParams{
+		MAC:     calicoPrimaryMAC,
+		IPs:     calicoPrimaryIPs,
+		Network: calicoPrimaryNetwork,
+		Vlan:    calicoPrimaryVlan,
+	}); err != nil {
+		return
+	}
+	// Bridge binding on the pod network blocks live migration unless the
+	// VM opts in. Calico's IP persistence is designed to survive live
+	// migration, so opt calico-primary VMs in.
+	if calicoPrimary {
+		if object.Template.ObjectMeta.Annotations == nil {
+			object.Template.ObjectMeta.Annotations = map[string]string{}
+		}
+		object.Template.ObjectMeta.Annotations[planbase.AnnAllowPodBridgeNetworkLiveMigration] = "true"
 	}
 	return
 }

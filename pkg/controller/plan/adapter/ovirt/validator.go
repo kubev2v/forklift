@@ -269,3 +269,38 @@ func (r *Validator) GuestToolsInstalled(vmRef ref.Ref) (ok bool, err error) {
 func (r *Validator) ConsolidationNeeded(vmRef ref.Ref) (needed bool, err error) {
 	return
 }
+
+// ValidateCalicoNADs returns empty results. Non-vSphere providers aren't a
+// target for Calico-Network IP/MAC preservation today.
+func (r *Validator) ValidateCalicoNADs(_ client.Client) (planbase.CalicoValidationResult, error) {
+	return planbase.CalicoValidationResult{}, nil
+}
+
+// CalicoVMIssues returns no issues. Non-vSphere providers aren't a target
+// for Calico-Network IP/MAC preservation today.
+func (r *Validator) CalicoVMIssues(_ ref.Ref, _ *planbase.CalicoValidationCache) ([]planbase.CalicoIssue, error) {
+	return nil, nil
+}
+
+// ValidateCalicoPrimary scans the NetworkMap. If any calico-flagged entry
+// exists, returns a single CalicoIssuePrimaryProviderUnsupported issue —
+// the feature is not supported on this provider in this release.
+func (r *Validator) ValidateCalicoPrimary(_ client.Client) (planbase.CalicoPrimaryValidationResult, error) {
+	if r.Plan.Referenced.Map.Network == nil {
+		return planbase.CalicoPrimaryValidationResult{}, nil
+	}
+	for _, pair := range r.Plan.Referenced.Map.Network.Spec.Map {
+		if pair.Destination.Calico != nil {
+			return planbase.CalicoPrimaryValidationResult{
+				Issues: []planbase.CalicoPrimaryIssue{{Kind: planbase.CalicoIssuePrimaryProviderUnsupported}},
+			}, nil
+		}
+	}
+	return planbase.CalicoPrimaryValidationResult{}, nil
+}
+
+// CalicoPrimaryIssues returns nil; any calico-flagged entry was already
+// rejected at plan level by ValidateCalicoPrimary.
+func (r *Validator) CalicoPrimaryIssues(_ ref.Ref, _ *planbase.CalicoPrimaryValidationCache) ([]planbase.CalicoPrimaryIssue, error) {
+	return nil, nil
+}

@@ -86,3 +86,36 @@ func (r *Validator) WarmMigration() bool {
 func (r *Validator) ConsolidationNeeded(vmRef ref.Ref) (bool, error) {
 	return false, nil
 }
+
+// ValidateCalicoNADs returns empty results (not applicable for EC2).
+func (r *Validator) ValidateCalicoNADs(_ client.Client) (base.CalicoValidationResult, error) {
+	return base.CalicoValidationResult{}, nil
+}
+
+// CalicoVMIssues returns no issues (not applicable for EC2).
+func (r *Validator) CalicoVMIssues(_ ref.Ref, _ *base.CalicoValidationCache) ([]base.CalicoIssue, error) {
+	return nil, nil
+}
+
+// ValidateCalicoPrimary scans the NetworkMap. If any calico-flagged entry
+// exists, returns a single CalicoIssuePrimaryProviderUnsupported issue —
+// the feature is not supported on this provider in this release.
+func (r *Validator) ValidateCalicoPrimary(_ client.Client) (base.CalicoPrimaryValidationResult, error) {
+	if r.Plan.Referenced.Map.Network == nil {
+		return base.CalicoPrimaryValidationResult{}, nil
+	}
+	for _, pair := range r.Plan.Referenced.Map.Network.Spec.Map {
+		if pair.Destination.Calico != nil {
+			return base.CalicoPrimaryValidationResult{
+				Issues: []base.CalicoPrimaryIssue{{Kind: base.CalicoIssuePrimaryProviderUnsupported}},
+			}, nil
+		}
+	}
+	return base.CalicoPrimaryValidationResult{}, nil
+}
+
+// CalicoPrimaryIssues returns nil; any calico-flagged entry was already
+// rejected at plan level by ValidateCalicoPrimary.
+func (r *Validator) CalicoPrimaryIssues(_ ref.Ref, _ *base.CalicoPrimaryValidationCache) ([]base.CalicoPrimaryIssue, error) {
+	return nil, nil
+}
