@@ -42,12 +42,11 @@ func NewHpeImporter(host, user, pass string, skipSSL bool) (*HpeImporter, error)
 	}, nil
 }
 
-const annotationKey = "csi.hpe.com/importVolAsClone"
+const AnnotationKey = "csi.hpe.com/importVolAsClone"
 
-// Resolve returns the PVC annotations the HPE CSI driver needs to import the source array volume.
-func (i *HpeImporter) Resolve(backing *resolver.DiskBacking) (map[string]string, error) {
+func (i *HpeImporter) Resolve(backing *resolver.DiskBacking) (map[string]string, bool, error) {
 	if backing == nil {
-		return nil, fmt.Errorf("nil disk backing")
+		return nil, false, fmt.Errorf("nil disk backing")
 	}
 	switch resolver.DetectDiskType(backing) {
 	case resolver.DiskTypeVVol:
@@ -55,42 +54,49 @@ func (i *HpeImporter) Resolve(backing *resolver.DiskBacking) (map[string]string,
 	case resolver.DiskTypeRDM:
 		return i.resolveRDM(backing.DeviceName)
 	default:
-		return nil, fmt.Errorf("HPE CSI import does not support VMDK disks")
+		return nil, false, fmt.Errorf("HPE CSI import does not support VMDK disks")
 	}
 }
 
 // resolveVVol maps a vSphere VVol BackingObjectId to an HPE volume name via WSAPI.
 // BackingObjectId is normally "vvol:<uuid>", but HPE Primera reports it as "naa.<hex>" (a WWN).
 // In the NAA case we strip the prefix and query by wwn, same as RDM resolution.
-func (i *HpeImporter) resolveVVol(vVolId string) (map[string]string, error) {
+func (i *HpeImporter) resolveVVol(vVolId string) (map[string]string, bool, error) {
 	var name string
+	var found bool
 	var err error
 	if strings.HasPrefix(vVolId, "naa.") {
 		wwn := strings.ToUpper(strings.TrimPrefix(vVolId, "naa."))
-		name, err = i.volumeNameByFilter(fmt.Sprintf(`"wwn EQ %s"`, wwn))
+		name, found, err = i.volumeNameByFilter(fmt.Sprintf(`"wwn EQ %s"`, wwn))
 	} else {
 		uuid := strings.TrimPrefix(vVolId, "vvol:")
-		name, err = i.volumeNameByFilter(fmt.Sprintf(`"uuid EQ %s"`, uuid))
+		name, found, err = i.volumeNameByFilter(fmt.Sprintf(`"uuid EQ %s"`, uuid))
 	}
 	if err != nil {
-		return nil, fmt.Errorf("HPE VVol resolution failed (VVolID: %s): %w", vVolId, err)
+		return nil, false, fmt.Errorf("HPE VVol resolution failed (VVolID: %s): %w", vVolId, err)
 	}
-	return map[string]string{annotationKey: name}, nil
+	if !found {
+		return nil, false, nil
+	}
+	return map[string]string{AnnotationKey: name}, true, nil
 }
 
 // resolveRDM maps a vSphere RDM device name to an HPE volume name via WSAPI.
 // DeviceName can be "naa.<hex>" or VML format "vml.<hex>". For VML, the HPE WWN
 // is embedded at hex positions 10–42 (NAA type 6 = IEEE Registered Extended).
-func (i *HpeImporter) resolveRDM(deviceName string) (map[string]string, error) {
+func (i *HpeImporter) resolveRDM(deviceName string) (map[string]string, bool, error) {
 	wwn, err := extractWWN(deviceName)
 	if err != nil {
-		return nil, fmt.Errorf("HPE RDM resolution failed (DeviceName: %s): %w", deviceName, err)
+		return nil, false, fmt.Errorf("HPE RDM resolution failed (DeviceName: %s): %w", deviceName, err)
 	}
-	name, err := i.volumeNameByFilter(fmt.Sprintf(`"wwn EQ %s"`, wwn))
+	name, found, err := i.volumeNameByFilter(fmt.Sprintf(`"wwn EQ %s"`, wwn))
 	if err != nil {
-		return nil, fmt.Errorf("HPE RDM resolution failed (DeviceName: %s): %w", deviceName, err)
+		return nil, false, fmt.Errorf("HPE RDM resolution failed (DeviceName: %s): %w", deviceName, err)
 	}
-	return map[string]string{annotationKey: name}, nil
+	if !found {
+		return nil, false, nil
+	}
+	return map[string]string{AnnotationKey: name}, true, nil
 }
 
 // extractWWN returns the uppercase HPE WWN from either NAA or VML device name format.
@@ -113,33 +119,32 @@ func extractWWN(deviceName string) (string, error) {
 	}
 }
 
-// volumeNameByFilter queries GET /api/v1/volumes?query=<filter> and returns the first match's name.
-func (i *HpeImporter) volumeNameByFilter(filter string) (string, error) {
+func (i *HpeImporter) volumeNameByFilter(filter string) (string, bool, error) {
 	sessionKey, err := i.getSessionKey()
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	defer i.deleteSessionKey(sessionKey)
 
 	queryURL := fmt.Sprintf("%s/api/v1/volumes?query=%s", i.baseURL, url.PathEscape(filter))
 	req, err := http.NewRequest("GET", queryURL, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to build WSAPI request: %w", err)
+		return "", false, fmt.Errorf("failed to build WSAPI request: %w", err)
 	}
 	req.Header.Set("X-HP3PAR-WSAPI-SessionKey", sessionKey)
 
 	resp, err := i.client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("WSAPI volumes request failed: %w", err)
+		return "", false, fmt.Errorf("WSAPI volumes request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read WSAPI response: %w", err)
+		return "", false, fmt.Errorf("failed to read WSAPI response: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("WSAPI returned %d: %s", resp.StatusCode, string(body))
+		return "", false, fmt.Errorf("WSAPI returned %d: %s", resp.StatusCode, string(body))
 	}
 
 	var result struct {
@@ -149,12 +154,12 @@ func (i *HpeImporter) volumeNameByFilter(filter string) (string, error) {
 		} `json:"members"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
-		return "", fmt.Errorf("failed to parse WSAPI response: %w", err)
+		return "", false, fmt.Errorf("failed to parse WSAPI response: %w", err)
 	}
 	if result.Total == 0 || len(result.Members) == 0 {
-		return "", fmt.Errorf("no HPE volume found for filter %s", filter)
+		return "", false, nil
 	}
-	return result.Members[0].Name, nil
+	return result.Members[0].Name, true, nil
 }
 
 // getSessionKey authenticates to POST /api/v1/credentials and returns the session key.

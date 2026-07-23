@@ -86,11 +86,14 @@ func TestResolveAnnotationKey(t *testing.T) {
 	defer srv.Close()
 
 	backing := &resolver.DiskBacking{VVolID: "vvol:" + uuid}
-	annotations, err := imp.Resolve(backing)
+	annotations, found, err := imp.Resolve(backing)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, ok := annotations["csi.hpe.com/importVolAsClone"]; !ok {
+	if !found {
+		t.Fatal("expected found=true")
+	}
+	if _, ok := annotations[AnnotationKey]; !ok {
 		t.Errorf("expected annotation key csi.hpe.com/importVolAsClone, got: %v", annotations)
 	}
 }
@@ -103,28 +106,53 @@ func TestResolveVVol(t *testing.T) {
 	defer srv.Close()
 
 	backing := &resolver.DiskBacking{VVolID: "vvol:" + uuid}
-	annotations, err := imp.Resolve(backing)
+	annotations, found, err := imp.Resolve(backing)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if annotations["csi.hpe.com/importVolAsClone"] != "my-hpe-volume" {
+	if !found {
+		t.Fatal("expected found=true")
+	}
+	if annotations[AnnotationKey] != "my-hpe-volume" {
 		t.Errorf("unexpected annotation value: %v", annotations)
 	}
 }
 
-func TestResolveVVolNotFound(t *testing.T) {
+func TestResolveVVolNotFoundCrossArray(t *testing.T) {
 	srv, imp := mockWSAPI(t, map[string]string{})
 	defer srv.Close()
 
 	backing := &resolver.DiskBacking{VVolID: "vvol:no-such-uuid"}
-	_, err := imp.Resolve(backing)
-	if err == nil {
-		t.Fatal("expected error for unknown VVol, got nil")
+	annotations, found, err := imp.Resolve(backing)
+	if err != nil {
+		t.Fatalf("expected no error for cross-array (not found), got: %v", err)
+	}
+	if found {
+		t.Fatal("expected found=false for volume not on this array")
+	}
+	if annotations != nil {
+		t.Errorf("expected nil annotations, got: %v", annotations)
+	}
+}
+
+func TestResolveRDMNotFoundCrossArray(t *testing.T) {
+	srv, imp := mockWSAPI(t, map[string]string{})
+	defer srv.Close()
+
+	backing := &resolver.DiskBacking{IsRDM: true, DeviceName: "naa.60002ac0000000000000182d00021f6b"}
+	annotations, found, err := imp.Resolve(backing)
+	if err != nil {
+		t.Fatalf("expected no error for cross-array (not found), got: %v", err)
+	}
+	if found {
+		t.Fatal("expected found=false for volume not on this array")
+	}
+	if annotations != nil {
+		t.Errorf("expected nil annotations, got: %v", annotations)
 	}
 }
 
 func TestResolveRDM(t *testing.T) {
-	// NAA from vSphere is lowercase; WWN on HPE is uppercase
 	naa := "naa.60002ac0000000000000182d00021f6b"
 	wwn := "60002AC0000000000000182D00021F6B"
 	srv, imp := mockWSAPI(t, map[string]string{
@@ -133,17 +161,19 @@ func TestResolveRDM(t *testing.T) {
 	defer srv.Close()
 
 	backing := &resolver.DiskBacking{IsRDM: true, DeviceName: naa}
-	annotations, err := imp.Resolve(backing)
+	annotations, found, err := imp.Resolve(backing)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if annotations["csi.hpe.com/importVolAsClone"] != "tshefi-ecosystem-vmware" {
+	if !found {
+		t.Fatal("expected found=true")
+	}
+	if annotations[AnnotationKey] != "tshefi-ecosystem-vmware" {
 		t.Errorf("unexpected annotation value: %v", annotations)
 	}
 }
 
 func TestResolveRDMFromVML(t *testing.T) {
-	// VML format from vSphere — HPE WWN at hex[10:42]
 	vml := "vml.020001000060002ac0000000000000186b00021f6b565620202020"
 	wwn := "60002AC0000000000000186B00021F6B"
 	srv, imp := mockWSAPI(t, map[string]string{
@@ -152,11 +182,14 @@ func TestResolveRDMFromVML(t *testing.T) {
 	defer srv.Close()
 
 	backing := &resolver.DiskBacking{IsRDM: true, DeviceName: vml}
-	annotations, err := imp.Resolve(backing)
+	annotations, found, err := imp.Resolve(backing)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if annotations["csi.hpe.com/importVolAsClone"] != "tshefi-vml-volume" {
+	if !found {
+		t.Fatal("expected found=true")
+	}
+	if annotations[AnnotationKey] != "tshefi-vml-volume" {
 		t.Errorf("unexpected annotation value: %v", annotations)
 	}
 }
@@ -166,7 +199,7 @@ func TestResolveVMDK(t *testing.T) {
 	defer srv.Close()
 
 	backing := &resolver.DiskBacking{DeviceName: "[ds] vm/vm.vmdk"}
-	_, err := imp.Resolve(backing)
+	_, _, err := imp.Resolve(backing)
 	if err == nil {
 		t.Fatal("expected error for VMDK, got nil")
 	}

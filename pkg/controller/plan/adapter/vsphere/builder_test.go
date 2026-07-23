@@ -7,10 +7,13 @@ import (
 	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
+	"github.com/kubev2v/forklift/pkg/storage/resolver"
+	"github.com/kubev2v/forklift/pkg/storage/resolver/hpe"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/vmware/govmomi/vim25/types"
@@ -141,7 +144,7 @@ var _ = Describe("vSphere builder", func() {
 				vm: vm,
 			}
 			builder.Source.Inventory = inventory
-			builder.Context.Map.Storage = &storageMap
+			builder.Map.Storage = &storageMap
 
 			// Execute
 			pvcs, err := builder.PopulatorVolumes(ref.Ref{ID: vm.ID}, annotations, secretName)
@@ -209,7 +212,7 @@ var _ = Describe("vSphere builder", func() {
 				vm: vm,
 			}
 			builder.Source.Inventory = inventory
-			builder.Context.Map.Storage = &storageMap
+			builder.Map.Storage = &storageMap
 
 			// Execute
 			pvcs, err := builder.PopulatorVolumes(ref.Ref{ID: vm.ID}, annotations, secretName)
@@ -1163,7 +1166,7 @@ var _ = Describe("mapDisks SCSI reservation", func() {
 				Name:      "test-pvc",
 				Namespace: "test",
 				Annotations: map[string]string{
-					"forklift.konveyor.io/disk-source": diskFile,
+					planbase.AnnDiskSource: diskFile,
 				},
 			},
 		}
@@ -1397,6 +1400,587 @@ var _ = Describe("mapDisks SCSI reservation", func() {
 		Expect(disk.Shareable).To(Equal(ptr.To(true)))
 	})
 })
+
+var _ = Describe("buildCsiImportPVC", func() {
+	var (
+		csiStoragePair *v1beta1.StoragePair
+		vvolDisk       vsphere.Disk
+		testVM         *model.VM
+	)
+
+	BeforeEach(func() {
+		csiStoragePair = &v1beta1.StoragePair{
+			Source: ref.Ref{ID: "ds-1"},
+			Destination: v1beta1.DestinationStorage{
+				StorageClass: "hpe-sc",
+			},
+			OffloadPlugin: &v1beta1.OffloadPlugin{
+				CsiVolumeImport: &v1beta1.CsiVolumeImport{
+					SecretRef:            "hpe-creds",
+					StorageVendorProduct: v1beta1.StorageVendorProductPrimera3Par,
+				},
+				VSphereXcopyPluginConfig: &v1beta1.VSphereXcopyPluginConfig{
+					SecretRef:            "hpe-creds",
+					StorageVendorProduct: v1beta1.StorageVendorProductPrimera3Par,
+				},
+			},
+		}
+		vvolDisk = vsphere.Disk{
+			Datastore: vsphere.Ref{ID: "ds-1"},
+			File:      "[datastore1] vm/vm.vmdk",
+			Bus:       vsphere.SCSI,
+			Capacity:  1024 * 1024 * 1024,
+			Key:       2000,
+		}
+		testVM = &model.VM{
+			VM1: model.VM1{
+				VM0:   model.VM0{ID: "vm-1", Name: "test-vm"},
+				Disks: []vsphere.Disk{vvolDisk},
+			},
+		}
+	})
+
+	It("should return nil for warm migration", func() {
+		builder := createBuilder()
+		builder.Plan.Spec.Warm = true
+
+		pvc, err := builder.buildCsiImportPVC(
+			context.TODO(), ref.Ref{ID: "vm-1"}, testVM, vvolDisk, 0, csiStoragePair, nil)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvc).To(BeNil())
+	})
+
+	It("should return nil when VVol volume not found on destination array (cross-array)", func() {
+		builder := createBuilder()
+		builder.diskBackingResolver = &mockDiskBackingResolver{
+			backing: &resolver.DiskBacking{VVolID: "vvol:cross-array-uuid"},
+		}
+		builder.csiPlugin = resolver.CsiImportPluginFunc(func(_ *resolver.DiskBacking) (map[string]string, bool, error) {
+			return nil, false, nil
+		})
+
+		pvc, err := builder.buildCsiImportPVC(
+			context.TODO(), ref.Ref{ID: "vm-1"}, testVM, vvolDisk, 0, csiStoragePair, nil)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvc).To(BeNil())
+	})
+
+	It("should return PVC with vendor annotations when volume found on same array", func() {
+		builder := createBuilder()
+		builder.diskBackingResolver = &mockDiskBackingResolver{
+			backing: &resolver.DiskBacking{VVolID: "vvol:real-uuid"},
+		}
+		builder.csiPlugin = resolver.CsiImportPluginFunc(func(_ *resolver.DiskBacking) (map[string]string, bool, error) {
+			return map[string]string{hpe.AnnotationKey: "my-hpe-volume"}, true, nil
+		})
+
+		pvc, err := builder.buildCsiImportPVC(
+			context.TODO(), ref.Ref{ID: "vm-1"}, testVM, vvolDisk, 0, csiStoragePair, nil)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvc).NotTo(BeNil())
+		Expect(pvc.Annotations[hpe.AnnotationKey]).To(Equal("my-hpe-volume"))
+		Expect(pvc.Annotations[planbase.AnnCopyMethod]).To(Equal(planbase.CopyMethodCsiImport))
+		Expect(pvc.Annotations[planbase.AnnDiskSource]).NotTo(BeEmpty())
+		Expect(*pvc.Spec.StorageClassName).To(Equal("hpe-sc"))
+		Expect(*pvc.Spec.VolumeMode).To(Equal(core.PersistentVolumeBlock))
+		Expect(pvc.Spec.AccessModes).To(ContainElement(core.ReadWriteMany))
+	})
+
+	It("should fail migration when storage API error occurs (not fall through to xcopy)", func() {
+		builder := createBuilder()
+		builder.diskBackingResolver = &mockDiskBackingResolver{
+			backing: &resolver.DiskBacking{VVolID: "vvol:some-uuid"},
+		}
+		builder.csiPlugin = resolver.CsiImportPluginFunc(func(_ *resolver.DiskBacking) (map[string]string, bool, error) {
+			return nil, false, fmt.Errorf("WSAPI connection refused")
+		})
+
+		pvc, err := builder.buildCsiImportPVC(
+			context.TODO(), ref.Ref{ID: "vm-1"}, testVM, vvolDisk, 0, csiStoragePair, nil)
+
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("WSAPI connection refused"))
+		Expect(pvc).To(BeNil())
+	})
+
+	It("should error when storage secret is missing required credential keys", func() {
+		builder := createBuilder(
+			&core.Secret{
+				ObjectMeta: meta.ObjectMeta{Name: "hpe-creds", Namespace: "test"},
+				Data: map[string][]byte{
+					"STORAGE_HOSTNAME": []byte("https://hpe:8080"),
+				},
+			},
+		)
+		builder.diskBackingResolver = &mockDiskBackingResolver{
+			backing: &resolver.DiskBacking{VVolID: "vvol:some-uuid"},
+		}
+
+		pvc, err := builder.buildCsiImportPVC(
+			context.TODO(), ref.Ref{ID: "vm-1"}, testVM, vvolDisk, 0, csiStoragePair, nil)
+
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("missing required keys"))
+		Expect(pvc).To(BeNil())
+	})
+
+	It("should return nil when RDM volume not found on destination array (cross-array)", func() {
+		builder := createBuilder()
+		builder.diskBackingResolver = &mockDiskBackingResolver{
+			backing: &resolver.DiskBacking{IsRDM: true, DeviceName: "naa.60002ac0000000000000182d00021f6b"},
+		}
+		builder.csiPlugin = resolver.CsiImportPluginFunc(func(_ *resolver.DiskBacking) (map[string]string, bool, error) {
+			return nil, false, nil
+		})
+
+		pvc, err := builder.buildCsiImportPVC(
+			context.TODO(), ref.Ref{ID: "vm-1"}, testVM, vvolDisk, 0, csiStoragePair, nil)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvc).To(BeNil())
+	})
+
+	It("should error when volume not found and no xcopy fallback configured", func() {
+		noXcopyPair := &v1beta1.StoragePair{
+			Source: ref.Ref{ID: "ds-1"},
+			Destination: v1beta1.DestinationStorage{
+				StorageClass: "hpe-sc",
+			},
+			OffloadPlugin: &v1beta1.OffloadPlugin{
+				CsiVolumeImport: &v1beta1.CsiVolumeImport{
+					SecretRef:            "hpe-creds",
+					StorageVendorProduct: v1beta1.StorageVendorProductPrimera3Par,
+				},
+				// no VSphereXcopyPluginConfig — xcopy fallback not available
+			},
+		}
+		builder := createBuilder()
+		builder.diskBackingResolver = &mockDiskBackingResolver{
+			backing: &resolver.DiskBacking{VVolID: "vvol:cross-array-uuid"},
+		}
+		builder.csiPlugin = resolver.CsiImportPluginFunc(func(_ *resolver.DiskBacking) (map[string]string, bool, error) {
+			return nil, false, nil
+		})
+
+		pvc, err := builder.buildCsiImportPVC(
+			context.TODO(), ref.Ref{ID: "vm-1"}, testVM, vvolDisk, 0, noXcopyPair, nil)
+
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("no xcopy fallback configured"))
+		Expect(pvc).To(BeNil())
+	})
+
+	It("should return nil for VMDK disk (CSI import only supports VVol and RDM)", func() {
+		builder := createBuilder()
+		builder.diskBackingResolver = &mockDiskBackingResolver{
+			backing: &resolver.DiskBacking{DeviceName: "[datastore1] vm/vm.vmdk"},
+		}
+
+		pvc, err := builder.buildCsiImportPVC(
+			context.TODO(), ref.Ref{ID: "vm-1"}, testVM, vvolDisk, 0, csiStoragePair, nil)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvc).To(BeNil())
+	})
+})
+
+var _ = Describe("CsiImportPVCs and PopulatorVolumes integration", func() {
+	It("all VVol disks on different array: CsiImportPVCs empty, PopulatorVolumes creates xcopy PVCs", func() {
+		builder := createBuilder(
+			&core.Secret{
+				ObjectMeta: meta.ObjectMeta{Name: "xcopy-secret", Namespace: "test"},
+				Data:       map[string][]byte{"foo": []byte("bar")},
+			},
+		)
+		vm := model.VM{
+			VM1: model.VM1{
+				VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
+				Disks: []vsphere.Disk{
+					{Datastore: vsphere.Ref{ID: "ds-1"}, File: "[ds] vm/disk1.vmdk", Bus: vsphere.SCSI, Capacity: 1 << 30, Key: 2000},
+					{Datastore: vsphere.Ref{ID: "ds-1"}, File: "[ds] vm/disk2.vmdk", Bus: vsphere.SCSI, Capacity: 1 << 30, Key: 2001},
+				},
+			},
+		}
+		storageMap := v1beta1.StorageMap{
+			Spec: v1beta1.StorageMapSpec{
+				Map: []v1beta1.StoragePair{
+					{
+						Source:      ref.Ref{ID: "ds-1"},
+						Destination: v1beta1.DestinationStorage{StorageClass: "hpe-sc"},
+						OffloadPlugin: &v1beta1.OffloadPlugin{
+							CsiVolumeImport: &v1beta1.CsiVolumeImport{
+								SecretRef:            "hpe-creds",
+								StorageVendorProduct: v1beta1.StorageVendorProductPrimera3Par,
+							},
+							VSphereXcopyPluginConfig: &v1beta1.VSphereXcopyPluginConfig{
+								StorageVendorProduct: "primera3par",
+								SecretRef:            "xcopy-secret",
+							},
+						},
+					},
+				},
+			},
+		}
+		builder.Source.Inventory = &mockInventory{
+			ds: model.Datastore{Resource: model.Resource{ID: "ds-1"}},
+			vm: vm,
+		}
+		builder.Map.Storage = &storageMap
+		builder.diskBackingResolver = &mockDiskBackingResolver{
+			backing: &resolver.DiskBacking{VVolID: "vvol:cross-array"},
+		}
+		builder.csiPlugin = resolver.CsiImportPluginFunc(func(_ *resolver.DiskBacking) (map[string]string, bool, error) {
+			return nil, false, nil
+		})
+
+		csiPVCs, err := builder.CsiImportPVCs(ref.Ref{ID: "vm-1"}, nil)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(csiPVCs).To(BeEmpty())
+
+		xcopyPVCs, err := builder.PopulatorVolumes(ref.Ref{ID: "vm-1"}, nil, "xcopy-secret")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(xcopyPVCs).To(HaveLen(2))
+	})
+
+	It("disk 1 on same array (CSI PVC), disk 2 on different array (xcopy PVC)", func() {
+		builder := createBuilder(
+			&core.Secret{
+				ObjectMeta: meta.ObjectMeta{Name: "xcopy-secret", Namespace: "test"},
+				Data:       map[string][]byte{"foo": []byte("bar")},
+			},
+		)
+		disk1File := "[ds] vm/disk1.vmdk"
+		disk2File := "[ds] vm/disk2.vmdk"
+		vm := model.VM{
+			VM1: model.VM1{
+				VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
+				Disks: []vsphere.Disk{
+					{Datastore: vsphere.Ref{ID: "ds-1"}, File: disk1File, Bus: vsphere.SCSI, Capacity: 1 << 30, Key: 2000},
+					{Datastore: vsphere.Ref{ID: "ds-1"}, File: disk2File, Bus: vsphere.SCSI, Capacity: 1 << 30, Key: 2001},
+				},
+			},
+		}
+		storageMap := v1beta1.StorageMap{
+			Spec: v1beta1.StorageMapSpec{
+				Map: []v1beta1.StoragePair{
+					{
+						Source:      ref.Ref{ID: "ds-1"},
+						Destination: v1beta1.DestinationStorage{StorageClass: "hpe-sc"},
+						OffloadPlugin: &v1beta1.OffloadPlugin{
+							CsiVolumeImport: &v1beta1.CsiVolumeImport{
+								SecretRef:            "hpe-creds",
+								StorageVendorProduct: v1beta1.StorageVendorProductPrimera3Par,
+							},
+							VSphereXcopyPluginConfig: &v1beta1.VSphereXcopyPluginConfig{
+								StorageVendorProduct: "primera3par",
+								SecretRef:            "xcopy-secret",
+							},
+						},
+					},
+				},
+			},
+		}
+		builder.Source.Inventory = &mockInventory{
+			ds: model.Datastore{Resource: model.Resource{ID: "ds-1"}},
+			vm: vm,
+		}
+		builder.Map.Storage = &storageMap
+
+		// vSphere returns different VVolIDs per disk
+		builder.diskBackingResolver = &mockDiskBackingResolver{
+			backings: map[string]*resolver.DiskBacking{
+				disk1File: {VVolID: "vvol:uuid-disk-1"},
+				disk2File: {VVolID: "vvol:uuid-disk-2"},
+			},
+		}
+
+		// Volumes that exist on the destination HPE array — disk 2 is on a different array
+		arrayVolumes := map[string]string{
+			"vvol:uuid-disk-1": "hpe-vol-disk-1",
+		}
+		builder.csiPlugin = resolver.CsiImportPluginFunc(func(backing *resolver.DiskBacking) (map[string]string, bool, error) {
+			name, found := arrayVolumes[backing.VVolID]
+			if !found {
+				return nil, false, nil
+			}
+			return map[string]string{hpe.AnnotationKey: name}, true, nil
+		})
+
+		// Phase 1: CsiImportPVCs — only disk 1 resolves
+		csiPVCs, err := builder.CsiImportPVCs(ref.Ref{ID: "vm-1"}, nil)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(csiPVCs).To(HaveLen(1))
+		Expect(csiPVCs[0].Annotations[hpe.AnnotationKey]).To(Equal("hpe-vol-disk-1"))
+
+		// Persist the CSI PVC so diskHandledByCsiImport finds it
+		err = builder.Destination.Create(context.TODO(), &csiPVCs[0])
+		Expect(err).NotTo(HaveOccurred())
+
+		// Phase 2: PopulatorVolumes — picks up only disk 2
+		xcopyPVCs, err := builder.PopulatorVolumes(ref.Ref{ID: "vm-1"}, nil, "xcopy-secret")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(xcopyPVCs).To(HaveLen(1))
+		Expect(xcopyPVCs[0].Annotations[planbase.AnnDiskSource]).To(Equal(disk2File))
+	})
+
+	It("should CSI-import the RDM and xcopy the VMDK when disk types are mixed", func() {
+		builder := createBuilder(
+			&core.Secret{
+				ObjectMeta: meta.ObjectMeta{Name: "xcopy-secret", Namespace: "test"},
+				Data:       map[string][]byte{"foo": []byte("bar")},
+			},
+		)
+		vmdkFile := "[ds] vm/os.vmdk"
+		rdmFile := "[ds] vm/data.vmdk"
+		vm := model.VM{
+			VM1: model.VM1{
+				VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
+				Disks: []vsphere.Disk{
+					{Datastore: vsphere.Ref{ID: "ds-1"}, File: vmdkFile, Bus: vsphere.SCSI, Capacity: 1 << 30, Key: 2000},
+					{Datastore: vsphere.Ref{ID: "ds-1"}, File: rdmFile, Bus: vsphere.SCSI, Capacity: 1 << 30, Key: 2001, RDM: true, DeviceName: "naa.60002ac0000000000000182d00021f6b"},
+				},
+			},
+		}
+		storageMap := v1beta1.StorageMap{
+			Spec: v1beta1.StorageMapSpec{
+				Map: []v1beta1.StoragePair{
+					{
+						Source:      ref.Ref{ID: "ds-1"},
+						Destination: v1beta1.DestinationStorage{StorageClass: "hpe-sc"},
+						OffloadPlugin: &v1beta1.OffloadPlugin{
+							CsiVolumeImport: &v1beta1.CsiVolumeImport{
+								SecretRef:            "hpe-creds",
+								StorageVendorProduct: v1beta1.StorageVendorProductPrimera3Par,
+							},
+							VSphereXcopyPluginConfig: &v1beta1.VSphereXcopyPluginConfig{
+								StorageVendorProduct: "primera3par",
+								SecretRef:            "xcopy-secret",
+							},
+						},
+					},
+				},
+			},
+		}
+		builder.Source.Inventory = &mockInventory{
+			ds: model.Datastore{Resource: model.Resource{ID: "ds-1"}},
+			vm: vm,
+		}
+		builder.Map.Storage = &storageMap
+
+		// vSphere returns VMDK backing for disk 1, RDM backing for disk 2
+		builder.diskBackingResolver = &mockDiskBackingResolver{
+			backings: map[string]*resolver.DiskBacking{
+				vmdkFile: {DeviceName: vmdkFile},
+				rdmFile:  {IsRDM: true, DeviceName: "naa.60002ac0000000000000182d00021f6b"},
+			},
+		}
+
+		// RDM volume exists on the destination array
+		arrayVolumes := map[string]string{
+			"naa.60002ac0000000000000182d00021f6b": "hpe-data-vol",
+		}
+		builder.csiPlugin = resolver.CsiImportPluginFunc(func(backing *resolver.DiskBacking) (map[string]string, bool, error) {
+			name, found := arrayVolumes[backing.DeviceName]
+			if !found {
+				return nil, false, nil
+			}
+			return map[string]string{hpe.AnnotationKey: name}, true, nil
+		})
+
+		// Phase 1: CsiImportPVCs — VMDK falls through, RDM resolves
+		csiPVCs, err := builder.CsiImportPVCs(ref.Ref{ID: "vm-1"}, nil)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(csiPVCs).To(HaveLen(1))
+		Expect(csiPVCs[0].Annotations[hpe.AnnotationKey]).To(Equal("hpe-data-vol"))
+		Expect(csiPVCs[0].Annotations[planbase.AnnDiskSource]).To(Equal(rdmFile))
+
+		// Persist CSI PVC
+		err = builder.Destination.Create(context.TODO(), &csiPVCs[0])
+		Expect(err).NotTo(HaveOccurred())
+
+		// Phase 2: PopulatorVolumes — picks up only the VMDK
+		xcopyPVCs, err := builder.PopulatorVolumes(ref.Ref{ID: "vm-1"}, nil, "xcopy-secret")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(xcopyPVCs).To(HaveLen(1))
+		Expect(xcopyPVCs[0].Annotations[planbase.AnnDiskSource]).To(Equal(vmdkFile))
+	})
+
+	It("should xcopy both disks when VMDK is unsupported and RDM is cross-array", func() {
+		builder := createBuilder(
+			&core.Secret{
+				ObjectMeta: meta.ObjectMeta{Name: "xcopy-secret", Namespace: "test"},
+				Data:       map[string][]byte{"foo": []byte("bar")},
+			},
+		)
+		vmdkFile := "[ds] vm/os.vmdk"
+		rdmFile := "[ds] vm/data.vmdk"
+		vm := model.VM{
+			VM1: model.VM1{
+				VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
+				Disks: []vsphere.Disk{
+					{Datastore: vsphere.Ref{ID: "ds-1"}, File: vmdkFile, Bus: vsphere.SCSI, Capacity: 1 << 30, Key: 2000},
+					{Datastore: vsphere.Ref{ID: "ds-1"}, File: rdmFile, Bus: vsphere.SCSI, Capacity: 1 << 30, Key: 2001, RDM: true, DeviceName: "naa.60002ac0000000000000182d00021f6b"},
+				},
+			},
+		}
+		storageMap := v1beta1.StorageMap{
+			Spec: v1beta1.StorageMapSpec{
+				Map: []v1beta1.StoragePair{
+					{
+						Source:      ref.Ref{ID: "ds-1"},
+						Destination: v1beta1.DestinationStorage{StorageClass: "hpe-sc"},
+						OffloadPlugin: &v1beta1.OffloadPlugin{
+							CsiVolumeImport: &v1beta1.CsiVolumeImport{
+								SecretRef:            "hpe-creds",
+								StorageVendorProduct: v1beta1.StorageVendorProductPrimera3Par,
+							},
+							VSphereXcopyPluginConfig: &v1beta1.VSphereXcopyPluginConfig{
+								StorageVendorProduct: "primera3par",
+								SecretRef:            "xcopy-secret",
+							},
+						},
+					},
+				},
+			},
+		}
+		builder.Source.Inventory = &mockInventory{
+			ds: model.Datastore{Resource: model.Resource{ID: "ds-1"}},
+			vm: vm,
+		}
+		builder.Map.Storage = &storageMap
+		builder.diskBackingResolver = &mockDiskBackingResolver{
+			backings: map[string]*resolver.DiskBacking{
+				vmdkFile: {DeviceName: vmdkFile},
+				rdmFile:  {IsRDM: true, DeviceName: "naa.60002ac0000000000000182d00021f6b"},
+			},
+		}
+
+		// Empty array — RDM volume is on a different array
+		builder.csiPlugin = resolver.CsiImportPluginFunc(func(backing *resolver.DiskBacking) (map[string]string, bool, error) {
+			return nil, false, nil
+		})
+
+		// CsiImportPVCs: VMDK skipped (disk type), RDM not found (cross-array) → empty
+		csiPVCs, err := builder.CsiImportPVCs(ref.Ref{ID: "vm-1"}, nil)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(csiPVCs).To(BeEmpty())
+
+		// PopulatorVolumes: picks up both
+		xcopyPVCs, err := builder.PopulatorVolumes(ref.Ref{ID: "vm-1"}, nil, "xcopy-secret")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(xcopyPVCs).To(HaveLen(2))
+	})
+
+	It("should send all disks to xcopy when no CsiVolumeImport is configured", func() {
+		builder := createBuilder(
+			&core.Secret{
+				ObjectMeta: meta.ObjectMeta{Name: "xcopy-secret", Namespace: "test"},
+				Data:       map[string][]byte{"foo": []byte("bar")},
+			},
+		)
+		vm := model.VM{
+			VM1: model.VM1{
+				VM0: model.VM0{ID: "vm-1", Name: "test-vm"},
+				Disks: []vsphere.Disk{
+					{Datastore: vsphere.Ref{ID: "ds-1"}, File: "[ds] vm/os.vmdk", Bus: vsphere.SCSI, Capacity: 1 << 30, Key: 2000},
+					{Datastore: vsphere.Ref{ID: "ds-1"}, File: "[ds] vm/data.vmdk", Bus: vsphere.SCSI, Capacity: 1 << 30, Key: 2001, RDM: true, DeviceName: "naa.60002ac0000000000000182d00021f6b"},
+				},
+			},
+		}
+		storageMap := v1beta1.StorageMap{
+			Spec: v1beta1.StorageMapSpec{
+				Map: []v1beta1.StoragePair{
+					{
+						Source:      ref.Ref{ID: "ds-1"},
+						Destination: v1beta1.DestinationStorage{StorageClass: "sc"},
+						OffloadPlugin: &v1beta1.OffloadPlugin{
+							VSphereXcopyPluginConfig: &v1beta1.VSphereXcopyPluginConfig{
+								StorageVendorProduct: "primera3par",
+								SecretRef:            "xcopy-secret",
+							},
+						},
+					},
+				},
+			},
+		}
+		builder.Source.Inventory = &mockInventory{
+			ds: model.Datastore{Resource: model.Resource{ID: "ds-1"}},
+			vm: vm,
+		}
+		builder.Map.Storage = &storageMap
+
+		csiPVCs, err := builder.CsiImportPVCs(ref.Ref{ID: "vm-1"}, nil)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(csiPVCs).To(BeEmpty())
+
+		xcopyPVCs, err := builder.PopulatorVolumes(ref.Ref{ID: "vm-1"}, nil, "xcopy-secret")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(xcopyPVCs).To(HaveLen(2))
+	})
+})
+
+var _ = Describe("diskHandledByCsiImport", func() {
+	It("should return true when PVC exists with csi-import copy method", func() {
+		builder := createBuilder()
+		pvcList := &core.PersistentVolumeClaimList{
+			Items: []core.PersistentVolumeClaim{
+				{
+					ObjectMeta: meta.ObjectMeta{
+						Annotations: map[string]string{
+							planbase.AnnDiskSource: "vm/vm.vmdk",
+							planbase.AnnCopyMethod: planbase.CopyMethodCsiImport,
+						},
+					},
+				},
+			},
+		}
+
+		Expect(builder.diskHandledByCsiImport(pvcList, "vm/vm.vmdk")).To(BeTrue())
+	})
+
+	It("should return false when PVC has different copy method", func() {
+		builder := createBuilder()
+		pvcList := &core.PersistentVolumeClaimList{
+			Items: []core.PersistentVolumeClaim{
+				{
+					ObjectMeta: meta.ObjectMeta{
+						Annotations: map[string]string{
+							planbase.AnnDiskSource: "vm/vm.vmdk",
+							planbase.AnnCopyMethod: "xcopy",
+						},
+					},
+				},
+			},
+		}
+
+		Expect(builder.diskHandledByCsiImport(pvcList, "vm/vm.vmdk")).To(BeFalse())
+	})
+
+	It("should return false when no matching PVC exists", func() {
+		builder := createBuilder()
+		pvcList := &core.PersistentVolumeClaimList{}
+
+		Expect(builder.diskHandledByCsiImport(pvcList, "vm/vm.vmdk")).To(BeFalse())
+	})
+})
+
+type mockDiskBackingResolver struct {
+	backing  *resolver.DiskBacking
+	backings map[string]*resolver.DiskBacking
+	err      error
+}
+
+func (m *mockDiskBackingResolver) getDiskBacking(_ context.Context, _, diskFile string) (*resolver.DiskBacking, error) {
+	if m.backings != nil {
+		if b, ok := m.backings[diskFile]; ok {
+			return b, m.err
+		}
+	}
+	return m.backing, m.err
+}
 
 //nolint:errcheck
 func createBuilder(objs ...runtime.Object) *Builder {
