@@ -249,13 +249,24 @@ func (r *Scheduler) migratesSharedDisks(vmStatus *plan.VMStatus) bool {
 
 func (r *Scheduler) cost(vm *model.VM, vmStatus *plan.VMStatus) int {
 	useV2vForTransfer, _ := r.Plan.ShouldUseV2vForTransfer(vmStatus.Ref, r.Destination.Client)
-	if useV2vForTransfer || r.Plan.IsUsingOffloadPlugin() {
+	if useV2vForTransfer {
 		switch vmStatus.Phase {
 		case CreateVM, PostHook, Completed:
 			// In these phases we already have the disk transferred and are left only to create the VM
 			// By setting the cost to 0 other VMs can start migrating
 			return 0
 		default:
+			return 1
+		}
+	} else if r.Plan.IsUsingOffloadPlugin() {
+		switch vmStatus.Phase {
+		case CreateVM, PostHook, Completed, ConvertGuest, CreateGuestConversionPod:
+			// In these phases we already have the disk transferred and are left only to create the VM
+			// By setting the cost to 0 other VMs can start migrating
+			return 0
+		default:
+			// Once all disks have been copied by the offload plugin, release the host slot
+			// so that other VMs can start migrating without waiting for conversion to begin.
 			return 1
 		}
 	} else {
