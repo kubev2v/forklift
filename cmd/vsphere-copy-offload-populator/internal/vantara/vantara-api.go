@@ -306,28 +306,34 @@ func (api *BlockStorageAPI) Disconnect() error {
 	return nil
 }
 
-// GetLdev retrieves LDEV information
-func (api *BlockStorageAPI) GetLdev(ldevId string) (*LdevResponse, error) {
+func (api *BlockStorageAPI) GetLdev(ldevId string) (*LdevResponse, int, error) {
 	if err := api.ensureConnected(); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	url := api.Ldev(ldevId)
-	headers := api.sessionHeaders()
-
-	r, err := api.makeHTTPRequest("GET", url, nil, headers)
+	req, err := http.NewRequest("GET", api.Ldev(ldevId), nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get LDEV %s: %w", ldevId, err)
+		return nil, 0, fmt.Errorf("failed to create LDEV request: %w", err)
+	}
+	for key, value := range api.sessionHeaders() {
+		req.Header.Set(key, value)
 	}
 
-	// Convert map to typed struct
+	resp, err := api.httpClient.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get LDEV %s: %w", ldevId, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, resp.StatusCode, nil
+	}
+
 	var ldev LdevResponse
-	jsonBytes, _ := json.Marshal(r)
-	if err := json.Unmarshal(jsonBytes, &ldev); err != nil {
-		return nil, fmt.Errorf("failed to parse LDEV response: %w", err)
+	if err := json.NewDecoder(resp.Body).Decode(&ldev); err != nil {
+		return nil, resp.StatusCode, fmt.Errorf("failed to parse LDEV response: %w", err)
 	}
-
-	return &ldev, nil
+	return &ldev, resp.StatusCode, nil
 }
 
 // AddPath adds a path mapping for a LUN

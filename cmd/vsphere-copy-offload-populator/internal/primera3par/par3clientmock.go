@@ -14,6 +14,7 @@ type MockPrimera3ParClient struct {
 	VLUNs      map[string][]VLun
 	Hosts      map[string]string
 	HostSets   map[string][]string
+	LastQuery  string
 }
 
 func NewMockPrimera3ParClient() *MockPrimera3ParClient {
@@ -144,6 +145,7 @@ func (m *MockPrimera3ParClient) GetSystemInfo() (SystemInfo, error) {
 }
 
 func (m *MockPrimera3ParClient) GetVolumes(query string) ([]Volume, error) {
+	m.LastQuery = query
 	var result []Volume
 	id := 0
 	for _, lun := range m.Volumes {

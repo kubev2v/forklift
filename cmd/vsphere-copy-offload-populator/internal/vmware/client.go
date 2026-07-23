@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/storage"
 	"github.com/kubev2v/forklift/pkg/storage/resolver"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/cli/esx"
@@ -45,7 +46,7 @@ type Client interface {
 	// layoutEx (thin-used blocks on VMFS). VVol/RDM returns (provisioned, 0, backing, nil).
 	// Returns (0, 0, nil, nil) if the disk cannot be matched.
 	GetVirtualDiskSizes(ctx context.Context, vmId, vmdkPath string) (provisionedBytes, datastoreAllocatedBytes int64, backing *resolver.DiskBacking, err error)
-	GetDatastoreActiveAdapters(ctx context.Context, host *object.HostSystem, datastoreName string) ([]HostAdapter, error)
+	GetDatastoreActiveAdapters(ctx context.Context, host *object.HostSystem, datastoreName string, arrayIdentifier storage.ArrayIdentifier) ([]HostAdapter, error)
 }
 
 type HostAdapter struct {
@@ -133,7 +134,7 @@ func (c *VSphereClient) getSciniGuid(ctx context.Context, host *object.HostSyste
 	return ""
 }
 
-func (c *VSphereClient) GetDatastoreActiveAdapters(ctx context.Context, host *object.HostSystem, datastoreName string) ([]HostAdapter, error) {
+func (c *VSphereClient) GetDatastoreActiveAdapters(ctx context.Context, host *object.HostSystem, datastoreName string, arrayIdentifier storage.ArrayIdentifier) ([]HostAdapter, error) {
 	// Get scini GUID if the module is present (for PowerFlex)
 	sciniGuid := c.getSciniGuid(ctx, host)
 
@@ -168,6 +169,12 @@ func (c *VSphereClient) GetDatastoreActiveAdapters(ctx context.Context, host *ob
 	}
 
 	klog.V(2).Infof("Datastore %s maps to device %s", datastoreName, deviceName)
+
+	sameArray, err := arrayIdentifier.MatchesDevice(deviceName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if source device %s belongs to destination array: %w", deviceName, err)
+	}
+	klog.V(1).Infof("Same-array check for device %s: sameArray=%v", deviceName, sameArray)
 
 	// 2. Fetch Host Storage Topology (MultipathInfo and ScsiLun)
 	var hostConfig mo.HostSystem
@@ -250,17 +257,13 @@ func (c *VSphereClient) GetDatastoreActiveAdapters(ctx context.Context, host *ob
 		hbaByKey[h.Key] = adapter
 	}
 
-	// 5. Find the Multipath LogicalUnit using the ScsiLun Key
-	var logicalUnit *types.HostMultipathInfoLogicalUnit
-	for _, lun := range storageDevice.MultipathInfo.Lun {
-		if lun.Lun == scsiLunKey {
-			l := lun // pin
-			logicalUnit = &l
-			break
-		}
+	mpLunByKey := make(map[string]*types.HostMultipathInfoLogicalUnit, len(storageDevice.MultipathInfo.Lun))
+	for i := range storageDevice.MultipathInfo.Lun {
+		mpLunByKey[storageDevice.MultipathInfo.Lun[i].Lun] = &storageDevice.MultipathInfo.Lun[i]
 	}
 
-	if logicalUnit == nil {
+	logicalUnit, ok := mpLunByKey[scsiLunKey]
+	if !ok {
 		return nil, fmt.Errorf("multipath logical unit for device %s (key %s) not found", deviceName, scsiLunKey)
 	}
 
@@ -280,58 +283,101 @@ func (c *VSphereClient) GetDatastoreActiveAdapters(ctx context.Context, host *ob
 		}
 	}
 
-	var result []HostAdapter
-	for _, adapter := range activeAdapters {
-		// For scini driver, override the initiator ID with the GUID from kernel module
-		if adapter.Driver == "scini" && sciniGuid != "" {
-			adapter.Id = sciniGuid
-			klog.V(1).Infof("Using scini GUID for adapter %s: %s", adapter.Name, adapter.Id)
-		}
-
-		result = append(result, adapter)
-		klog.V(1).Infof("Active adapter %s with initiator ID: %s, driver: %s", adapter.Name, adapter.Id, adapter.Driver)
+	if sameArray {
+		klog.V(1).Infof("Same array detected for datastore %s (device %s) — returning source active-path adapters only (XCOPY possible)", datastoreName, deviceName)
+		return prepareAdapters(activeAdapters, sciniGuid, datastoreName)
 	}
 
-	// Check if any result has an FC or iSCSI adapter
-	hasSANAdapter := false
-	for _, a := range result {
-		if strings.HasPrefix(a.Id, "iqn.") || strings.HasPrefix(a.Id, "fc.") {
-			hasSANAdapter = true
-			break
-		}
+	klog.V(1).Infof("Cross-array detected for datastore %s (device %s) — investigating destination multipath", datastoreName, deviceName)
+	dstAdapters, dstDeviceCount := findDestinationAdapters(storageDevice, arrayIdentifier, mpLunByKey, hbaByKey)
+
+	if len(dstAdapters) == 0 {
+		klog.V(1).Infof("No destination array devices found on host (%d devices checked) — falling back to SAN adapters", dstDeviceCount)
+		return prepareAdapters(filterSANAdapters(hbaByKey), sciniGuid, datastoreName)
 	}
+	klog.V(1).Infof("Cross-array: found %d destination devices, using %d destination adapters", dstDeviceCount, len(dstAdapters))
+	return prepareAdapters(dstAdapters, sciniGuid, datastoreName)
+}
 
-	// Fallback for local datastores: if no SAN (FC/iSCSI) adapters were found
-	// among active paths, pick the first FC or iSCSI adapter available on the host.
-	if !hasSANAdapter {
-		klog.V(1).Infof("No FC/iSCSI adapters found in active paths for datastore %s, falling back to first available SAN adapter", datastoreName)
-
-		var firstFC, firstISCSI *HostAdapter
-		for _, adapter := range hbaByKey {
-			switch {
-			case strings.HasPrefix(adapter.Id, "fc.") && firstFC == nil:
-				a := adapter
-				firstFC = &a
-			case strings.HasPrefix(adapter.Id, "iqn.") && firstISCSI == nil:
-				a := adapter
-				firstISCSI = &a
+// findDestinationAdapters walks the host's SCSI LUN table to find devices owned
+// by the destination array, then collects adapters with active/standby multipath
+// paths to those devices. Returns the adapter map and the count of matched devices.
+func findDestinationAdapters(
+	storageDevice *types.HostStorageDeviceInfo,
+	arrayIdentifier storage.ArrayIdentifier,
+	mpLunByKey map[string]*types.HostMultipathInfoLogicalUnit,
+	hbaByKey map[string]HostAdapter,
+) (map[string]HostAdapter, int) {
+	dstAdapters := make(map[string]HostAdapter)
+	dstDeviceCount := 0
+	for _, lun := range storageDevice.ScsiLun {
+		dstDeviceName := lun.GetScsiLun().CanonicalName
+		matches, err := arrayIdentifier.MatchesDevice(dstDeviceName)
+		if err != nil {
+			klog.Warningf("MatchesDevice failed for %s: %v", dstDeviceName, err)
+			continue
+		}
+		if !matches {
+			continue
+		}
+		dstDeviceCount++
+		klog.V(2).Infof("Destination device found on host: %s", dstDeviceName)
+		mpLun, found := mpLunByKey[lun.GetScsiLun().Key]
+		if !found {
+			klog.V(2).Infof("Destination device %s has no multipath info, skipping", dstDeviceName)
+			continue
+		}
+		for _, path := range mpLun.Path {
+			state := strings.ToLower(path.State)
+			if state == "dead" || state == "disabled" {
+				continue
+			}
+			if adapter, found := hbaByKey[path.Adapter]; found {
+				dstAdapters[adapter.Name] = adapter
+			} else {
+				klog.Warningf("HBA Key %s not found in host bus adapter list", path.Adapter)
 			}
 		}
+	}
+	return dstAdapters, dstDeviceCount
+}
 
-		if firstFC != nil {
-			klog.V(1).Infof("Falling back to FC adapter %s (ID: %s)", firstFC.Name, firstFC.Id)
-			return []HostAdapter{*firstFC}, nil
-		}
-		if firstISCSI != nil {
-			klog.V(1).Infof("Falling back to iSCSI adapter %s (ID: %s)", firstISCSI.Name, firstISCSI.Id)
-			return []HostAdapter{*firstISCSI}, nil
-		}
-
-		klog.Warningf("No FC or iSCSI adapters found on host for fallback")
-		if len(result) == 0 {
-			return nil, fmt.Errorf("no active adapters found for datastore %s", datastoreName)
+func filterSANAdapters(hbas map[string]HostAdapter) map[string]HostAdapter {
+	san := make(map[string]HostAdapter)
+	for k, a := range hbas {
+		if strings.HasPrefix(a.Id, "fc.") || strings.HasPrefix(a.Id, "iqn.") ||
+			strings.HasPrefix(a.Id, "nqn.") || a.Driver == "scini" {
+			san[k] = a
 		}
 	}
+	return san
+}
+
+// prepareAdapters processes a set of adapters: applies scini GUID override,
+// logs the selection, and returns the final list.
+func prepareAdapters(adapters map[string]HostAdapter, sciniGuid, datastoreName string) ([]HostAdapter, error) {
+	var result []HostAdapter
+	for _, adapter := range adapters {
+		if adapter.Driver == "scini" {
+			if sciniGuid != "" {
+				adapter.Id = sciniGuid
+				klog.V(1).Infof("Using scini GUID for adapter %s: %s", adapter.Name, adapter.Id)
+			} else {
+				klog.Warningf("scini adapter %s found but SDC GUID is unavailable — PowerFlex destinations will fail", adapter.Name)
+			}
+		}
+		result = append(result, adapter)
+	}
+
+	if len(result) == 0 {
+		return nil, fmt.Errorf("no adapters found for datastore %s", datastoreName)
+	}
+
+	adapterSummary := make([]string, 0, len(result))
+	for _, a := range result {
+		adapterSummary = append(adapterSummary, fmt.Sprintf("%s(%s/%s)", a.Name, a.Driver, a.Id))
+	}
+	klog.V(1).Infof("Adapter selection for datastore %s: %d adapters — %v", datastoreName, len(result), adapterSummary)
 
 	return result, nil
 }

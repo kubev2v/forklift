@@ -89,7 +89,7 @@ func main() {
 		}
 		storageApi = &sm
 	case forklift.StorageVendorProductOntap:
-		sm, err := ontap.NewNetappClonner(storageHostname, storageUsername, storagePassword)
+		sm, err := ontap.NewNetappClonner(storageHostname, storageUsername, storagePassword, storageSkipSSLVerification == "true")
 		if err != nil {
 			klog.Fatalf("failed to initialize Ontap storage mapper with %s", err)
 		}

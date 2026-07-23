@@ -20,6 +20,7 @@ type mockVantaraClient struct {
 	connectErr               error
 	disconnectErr            error
 	getLdevResp              *LdevResponse
+	getLdevStatusCode        int
 	getLdevErr               error
 	addPathErr               error
 	deletePathErr            error
@@ -58,9 +59,9 @@ func (m *mockVantaraClient) Disconnect() error {
 	return m.disconnectErr
 }
 
-func (m *mockVantaraClient) GetLdev(ldevId string) (*LdevResponse, error) {
+func (m *mockVantaraClient) GetLdev(ldevId string) (*LdevResponse, int, error) {
 	m.getLdevCallCount++
-	return m.getLdevResp, m.getLdevErr
+	return m.getLdevResp, m.getLdevStatusCode, m.getLdevErr
 }
 
 func (m *mockVantaraClient) AddPath(ldevId string, portId string, hostGroupNumber string) error {
