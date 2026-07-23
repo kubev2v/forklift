@@ -153,6 +153,27 @@ Response from `POST /api/nutanix/v3/images/list`
 - `status.resources.size_bytes` - Image size
 - `status.resources.architecture` - "X86_64"
 
+### images_v4_list.json
+Response from `GET /api/vmm/v4.0/content/images`
+
+**Contains**: 2 images, in Prism Central's v4 Image Service shape
+
+The v3 "image" kind (`images_list.json`, above) is what Prism Element
+serves directly. On Prism Central, the v3 kind isn't reliably populated,
+so images are instead listed via this v4 endpoint and reshaped by
+`imageEntityFromV4()` into the same v3-style structure before
+`applyImage()` runs, so both Prism modes share one mapping function.
+
+**Key fields** (note the flatter, non-nested shape vs. the v3 files above):
+- `extId` - Image UUID
+- `type` - "DISK_IMAGE" or "ISO_IMAGE"
+- `sizeBytes` - Image size
+- `clusterLocationExtIds` - Clusters the image is registered on (a list;
+  images aren't scoped to a single cluster in either Prism mode)
+
+v4 has no equivalent of v3's `architecture` field, so it's always empty
+when mapped from this source.
+
 ## Data Relationships
 
 ### Cluster → Hosts

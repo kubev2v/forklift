@@ -38,9 +38,11 @@ const (
 	vmPageSize      = 100
 	subnetPageSize  = 500
 	imagePageSize   = 500
-	// Per-request page size for the v4 storage-container endpoint. listAllV4()
-	// pages through as many requests as needed regardless of this value.
+	// Per-request page sizes for v4 "config"/"content" namespace endpoints.
+	// listAllV4() pages through as many requests as needed regardless of
+	// these values; the v4 image endpoint additionally caps $limit at 100.
 	storageContainerV4PageSize = 100
+	imageV4PageSize            = 100
 )
 
 // Nutanix API Client
@@ -388,12 +390,4 @@ func (r *Client) listSubnets() (entities []map[string]interface{}, err error) {
 	}
 	return filterEntitiesByCluster(entities, r.prism.ClusterUUID,
 		"spec.cluster_reference.uuid", "status.cluster_reference.uuid"), nil
-}
-
-// List all images. Images are not scoped by clusterUuid: on Prism Central an
-// image can be shared across every cluster it's registered to (there is no
-// single owning cluster_reference), which is also why model.Image has no
-// Cluster field.
-func (r *Client) listImages() (entities []map[string]interface{}, err error) {
-	return r.listAll("image", nil, imagePageSize)
 }
