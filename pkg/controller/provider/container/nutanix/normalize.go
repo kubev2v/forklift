@@ -76,6 +76,33 @@ func storageContainerEntityFromV4(raw map[string]interface{}) map[string]interfa
 	}
 }
 
+// imageEntityFromV4 reshapes a raw entity from Prism Central's vmm v4
+// content/images collection into the v3-style shape applyImage() expects,
+// so both Prism modes can share the same model-mapping code.
+func imageEntityFromV4(raw map[string]interface{}) map[string]interface{} {
+	uuid := getString(raw, "extId")
+	name := getString(raw, "name")
+
+	// v4 has no "architecture" field for images at all (dropped from the
+	// API), and "source" (the create-time URL/disk/object reference) isn't
+	// guaranteed to be echoed back on read, so both are best-effort here.
+	sourceURI := getString(raw, "source.url")
+
+	return map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"uuid": uuid,
+		},
+		"status": map[string]interface{}{
+			"name": name,
+			"resources": map[string]interface{}{
+				"image_type": getString(raw, "type"),
+				"size_bytes": getInt64(raw, "sizeBytes"),
+				"source_uri": sourceURI,
+			},
+		},
+	}
+}
+
 // filterEntitiesByCluster keeps only the entities whose cluster UUID -- read
 // from entity via the given dot-separated field paths, in order, using the
 // first one present -- matches clusterUUID. If clusterUUID is empty (Prism

@@ -287,3 +287,54 @@ func TestFilterStorageContainersByCluster(t *testing.T) {
 		t.Fatalf("expected 1 container, got %d", len(filtered))
 	}
 }
+
+// TestImageEntityFromV4 verifies that a raw vmm v4 content/images entity is
+// reshaped into the v3-style structure applyImage() expects, and that
+// applyImage() can then read every mapped field back out correctly.
+func TestImageEntityFromV4(t *testing.T) {
+	entity := imageEntityFromV4(map[string]interface{}{
+		"extId":                 "img-1",
+		"name":                  "RHEL-8.9-x86_64",
+		"type":                  "DISK_IMAGE",
+		"sizeBytes":             float64(2147483648),
+		"clusterLocationExtIds": []interface{}{"cluster-a"},
+	})
+
+	m := &model.Image{}
+	applyImage(entity, m)
+
+	if m.ID != "img-1" {
+		t.Errorf("expected ID 'img-1', got %q", m.ID)
+	}
+	if m.ImageUUID != "img-1" {
+		t.Errorf("expected ImageUUID 'img-1', got %q", m.ImageUUID)
+	}
+	if m.Name != "RHEL-8.9-x86_64" {
+		t.Errorf("expected name to be set, got %q", m.Name)
+	}
+	if m.ImageType != "DISK_IMAGE" {
+		t.Errorf("expected image type 'DISK_IMAGE', got %q", m.ImageType)
+	}
+	if m.SizeBytes != 2147483648 {
+		t.Errorf("expected size 2147483648, got %d", m.SizeBytes)
+	}
+}
+
+// TestImageEntityFromV4MissingFields guards against a panic when optional
+// v4 fields (e.g. a missing/unset source) are absent from the raw entity.
+func TestImageEntityFromV4MissingFields(t *testing.T) {
+	entity := imageEntityFromV4(map[string]interface{}{
+		"extId": "img-2",
+		"name":  "minimal-image",
+	})
+
+	m := &model.Image{}
+	applyImage(entity, m)
+
+	if m.ID != "img-2" {
+		t.Errorf("expected ID 'img-2', got %q", m.ID)
+	}
+	if m.SourceURI != "" {
+		t.Errorf("expected empty SourceURI, got %q", m.SourceURI)
+	}
+}

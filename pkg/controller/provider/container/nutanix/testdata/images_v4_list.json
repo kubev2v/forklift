@@ -1,0 +1,28 @@
+{
+  "data": [
+    {
+      "extId": "img-0005c123-4567-89ab-cdef-000000000001",
+      "name": "RHEL-8.9-x86_64",
+      "description": "Red Hat Enterprise Linux 8.9",
+      "type": "DISK_IMAGE",
+      "sizeBytes": 2147483648,
+      "clusterLocationExtIds": [
+        "0005e123-4567-89ab-cdef-000000000001"
+      ]
+    },
+    {
+      "extId": "img-0005c123-4567-89ab-cdef-000000000002",
+      "name": "VirtIO-Drivers-Latest",
+      "description": "VirtIO drivers ISO for Windows",
+      "type": "ISO_IMAGE",
+      "sizeBytes": 536870912,
+      "clusterLocationExtIds": [
+        "0005e123-4567-89ab-cdef-000000000001",
+        "0005e123-4567-89ab-cdef-000000000002"
+      ]
+    }
+  ],
+  "metadata": {
+    "totalAvailableResults": 2
+  }
+}

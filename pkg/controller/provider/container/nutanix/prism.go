@@ -12,6 +12,11 @@ const (
 	prismCentralPath        = "/api/nutanix/v3/prism_central"
 	storageContainersV2Path = "/api/nutanix/v2.0/storage_containers"
 	storageContainersV4Path = "/api/clustermgmt/v4.0/config/storage-containers"
+	// imagesV4Path is Prism Central's Image Service (vmm) list endpoint.
+	// The v3 "image" kind (used via listAll("image", ...) on Prism Element)
+	// isn't reliably populated when queried through Prism Central; images
+	// registered with PC's image service only show up here.
+	imagesV4Path = "/api/vmm/v4.0/content/images"
 )
 
 // PrismMode identifies whether the provider URL targets Prism Central or Element.
