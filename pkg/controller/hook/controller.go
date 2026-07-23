@@ -18,14 +18,18 @@ package hook
 
 import (
 	"context"
+	"strconv"
+	"strings"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/base"
+	"github.com/kubev2v/forklift/pkg/lib/aap"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	"github.com/kubev2v/forklift/pkg/settings"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/storage/names"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -36,6 +40,10 @@ import (
 const (
 	// Name.
 	Name = "hook"
+
+	// kubectl-friendly annotations for AAP hooks.
+	annAAPJobTemplateID   = "forklift.konveyor.io/aap-job-template-id"
+	annAAPJobTemplateName = "forklift.konveyor.io/aap-job-template-name"
 )
 
 // Package logger.
@@ -124,6 +132,19 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 		return
 	}
 
+	// kubectl UX: surface AAP job template name on the Hook for terminal users.
+	// Keep this non-blocking: failure to resolve the name should not prevent hook readiness.
+	updated, aapErr := r.ensureAAPJobTemplateAnnotations(ctx, hook)
+	if aapErr != nil {
+		err = aapErr
+		return
+	}
+	if updated {
+		// Requeue so we reconcile again with refreshed object data.
+		result.Requeue = true
+		return
+	}
+
 	// Ready condition.
 	if !hook.Status.HasBlockerCondition() {
 		hook.Status.SetCondition(libcnd.Condition{
@@ -149,4 +170,41 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 
 	// Done
 	return
+}
+
+func (r *Reconciler) ensureAAPJobTemplateAnnotations(ctx context.Context, hook *api.Hook) (updated bool, err error) {
+	if hook.Spec.AAP == nil {
+		return false, nil
+	}
+
+	wantID := strconv.Itoa(hook.Spec.AAP.JobTemplateID)
+	curID := ""
+	curName := ""
+	if hook.Annotations != nil {
+		curID = strings.TrimSpace(hook.Annotations[annAAPJobTemplateID])
+		curName = strings.TrimSpace(hook.Annotations[annAAPJobTemplateName])
+	}
+	if curID == wantID && curName != "" {
+		return false, nil
+	}
+
+	name, nameErr := aap.JobTemplateNameForHook(ctx, r.Client, hook)
+	if nameErr != nil || name == "" {
+		if nameErr != nil {
+			r.Log.V(1).Info("AAP job template name lookup skipped", "error", nameErr.Error(), "jobTemplateId", hook.Spec.AAP.JobTemplateID)
+		}
+		return false, nil
+	}
+
+	original := hook.DeepCopy()
+	if hook.Annotations == nil {
+		hook.Annotations = map[string]string{}
+	}
+	hook.Annotations[annAAPJobTemplateID] = wantID
+	hook.Annotations[annAAPJobTemplateName] = name
+
+	if pErr := r.Patch(ctx, hook, client.MergeFrom(original)); pErr != nil {
+		return false, pErr
+	}
+	return true, nil
 }

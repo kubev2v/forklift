@@ -65,6 +65,8 @@ type HookStatus struct {
 // +k8s:openapi-gen=true
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="Image",type=string,JSONPath=".spec.image"
+// +kubebuilder:printcolumn:name="AAPTemplateID",type=integer,JSONPath=".spec.aap.jobTemplateId"
+// +kubebuilder:printcolumn:name="AAPTemplate",type=string,JSONPath=".metadata.annotations['forklift.konveyor.io/aap-job-template-name']"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:subresource:status
 type Hook struct {

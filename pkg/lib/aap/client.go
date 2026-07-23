@@ -18,6 +18,7 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/settings"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // AAP controller API job status values (subset used for polling).
@@ -86,6 +87,58 @@ type JobTemplateListResponse struct {
 	Next     string               `json:"next"`
 	Previous string               `json:"previous"`
 	Results  []JobTemplateSummary `json:"results"`
+}
+
+// JobTemplateNameForHook resolves the AAP job template display name for an AAP hook.
+func JobTemplateNameForHook(ctx context.Context, k8sClient client.Client, hook *api.Hook) (string, error) {
+	if hook == nil || hook.Spec.AAP == nil || hook.Spec.AAP.JobTemplateID <= 0 {
+		return "", fmt.Errorf("invalid AAP hook")
+	}
+	cl, err := newClientFromHook(ctx, k8sClient, hook)
+	if err != nil {
+		return "", err
+	}
+	id := hook.Spec.AAP.JobTemplateID
+	templates, err := cl.ListAllJobTemplates(ctx, defaultMaxJobTemplatesList)
+	if err != nil {
+		return "", err
+	}
+	for _, t := range templates {
+		if t.ID == id {
+			return strings.TrimSpace(t.Name), nil
+		}
+	}
+	return "", fmt.Errorf("job template %d not found in AAP", id)
+}
+
+func newClientFromHook(ctx context.Context, k8sClient client.Client, hook *api.Hook) (*Client, error) {
+	a := hook.Spec.AAP
+	m := settings.Settings.Migration
+	useHook := strings.TrimSpace(a.URL) != "" && a.TokenSecret != nil && strings.TrimSpace(a.TokenSecret.Name) != ""
+	if !useHook && (strings.TrimSpace(m.AAPURL) == "" || strings.TrimSpace(m.AAPTokenSecretName) == "") {
+		return nil, fmt.Errorf("AAP is not configured")
+	}
+	var url, token string
+	var err error
+	if useHook {
+		url = strings.TrimSpace(a.URL)
+		token, err = GetTokenFromSecret(ctx, k8sClient, hook.Namespace, a.TokenSecret)
+	} else {
+		url = strings.TrimSpace(m.AAPURL)
+		token, err = GetTokenFromSecretName(ctx, k8sClient, settings.ControllerNamespace(), m.AAPTokenSecretName)
+	}
+	if err != nil {
+		return nil, err
+	}
+	to := 30 * time.Second
+	if m.AAPTimeoutSeconds > 0 {
+		to = time.Duration(m.AAPTimeoutSeconds) * time.Second
+	}
+	tr, err := TLSTransportFromSettings(ctx, k8sClient, m.AAPInsecureSkipVerify, m.AAPCASecretName)
+	if err != nil {
+		return nil, err
+	}
+	return NewClient(url, token, to, tr), nil
 }
 
 // resolvePathPrefix sets apiPathPrefix once: optional static ([WithPathPrefix]), else GET {baseURL}/api
