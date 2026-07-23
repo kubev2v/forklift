@@ -202,24 +202,6 @@ func TestVMCollection(t *testing.T) {
 }
 ```
 
-### For Mock HTTP Server
-
-```go
-func mockNutanixServer(t *testing.T) *httptest.Server {
-    return httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        switch r.URL.Path {
-        case "/api/nutanix/v3/vms/list":
-            data, _ := os.ReadFile("testdata/vms_list.json")
-            w.Write(data)
-        case "/api/nutanix/v3/clusters/list":
-            data, _ := os.ReadFile("testdata/clusters_list.json")
-            w.Write(data)
-        // ... other endpoints
-        }
-    }))
-}
-```
-
 ### For Development
 
 Use these files to understand Nutanix API response structure before implementing:
