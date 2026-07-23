@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -37,6 +38,9 @@ const (
 	vmPageSize      = 100
 	subnetPageSize  = 500
 	imagePageSize   = 500
+	// Per-request page size for the v4 storage-container endpoint. listAllV4()
+	// pages through as many requests as needed regardless of this value.
+	storageContainerV4PageSize = 100
 )
 
 // Nutanix API Client
@@ -228,6 +232,51 @@ func (r *Client) listAll(resourceKind string, filter map[string]interface{}, pag
 		if offset >= int(totalMatches) {
 			break
 		}
+	}
+
+	return entities, nil
+}
+
+// listAllV4 pages through a v4 "config" namespace list endpoint, following
+// the response's metadata.totalAvailableResults, and returns every raw
+// entity across all pages. v4 endpoints paginate via $page/$limit query
+// params rather than v3's offset/length body fields and total_matches, so
+// this mirrors listAll()'s intent for v4 without reusing it directly.
+func (r *Client) listAllV4(path string, pageSize int) (entities []map[string]interface{}, err error) {
+	url := fmt.Sprintf("%s%s", r.url, path)
+	page := 0
+	entities = make([]map[string]interface{}, 0)
+
+	for {
+		result := make(map[string]interface{})
+		status, err := r.get(url, &result,
+			libweb.Param{Key: "$page", Value: strconv.Itoa(page)},
+			libweb.Param{Key: "$limit", Value: strconv.Itoa(pageSize)},
+		)
+		if err != nil {
+			return nil, err
+		}
+		if status != http.StatusOK {
+			return nil, liberr.New(fmt.Sprintf("unexpected status listing %s: %d", path, status))
+		}
+
+		rawEntities, err := extractMapList(result, "data")
+		if err != nil {
+			return nil, err
+		}
+		entities = append(entities, rawEntities...)
+
+		// No entities came back; nothing left to page through.
+		if len(rawEntities) == 0 {
+			break
+		}
+
+		total := getInt(result, "metadata.totalAvailableResults")
+		if len(entities) >= total {
+			break
+		}
+
+		page++
 	}
 
 	return entities, nil

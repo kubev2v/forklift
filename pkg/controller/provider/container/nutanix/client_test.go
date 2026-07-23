@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -673,6 +674,119 @@ func TestClientListAllStopsOnEmptyPage(t *testing.T) {
 	client.url = server.URL
 
 	entities, err := client.listAll("cluster", nil, 2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(entities) != 0 {
+		t.Fatalf("expected no entities, got %d", len(entities))
+	}
+}
+
+// TestClientListAllV4Paginates verifies that listAllV4 pages through a v4
+// "config" namespace endpoint using $page/$limit query params, following
+// metadata.totalAvailableResults, instead of truncating at the first page.
+func TestClientListAllV4Paginates(t *testing.T) {
+	const total = 5
+	const pageSize = 2
+
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/nutanix/v3/clusters/list" {
+			// The connect()-time testConnection() probe; not part of the
+			// paginated listing under test.
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"entities":[]}`))
+			return
+		}
+
+		requests++
+
+		page, err := strconv.Atoi(r.URL.Query().Get("$page"))
+		if err != nil {
+			t.Errorf("failed to parse $page: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		limit, err := strconv.Atoi(r.URL.Query().Get("$limit"))
+		if err != nil {
+			t.Errorf("failed to parse $limit: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if limit != pageSize {
+			t.Errorf("expected $limit=%d, got %d", pageSize, limit)
+		}
+
+		offset := page * limit
+		data := []map[string]interface{}{}
+		for i := offset; i < offset+limit && i < total; i++ {
+			data = append(data, map[string]interface{}{"extId": fmt.Sprintf("uuid-%d", i)})
+		}
+
+		resp := map[string]interface{}{
+			"data":     data,
+			"metadata": map[string]interface{}{"totalAvailableResults": total},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			t.Errorf("failed to encode response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	client := createTestClient(server.URL)
+	client.url = server.URL
+
+	if _, err := client.connect(); err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	requests = 0
+
+	entities, err := client.listAllV4(storageContainersV4Path, pageSize)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(entities) != total {
+		t.Fatalf("expected %d entities across all pages, got %d", total, len(entities))
+	}
+
+	wantPages := 3 // pages of 2, 2, 1
+	if requests != wantPages {
+		t.Errorf("expected %d page requests, got %d", wantPages, requests)
+	}
+
+	seen := map[string]bool{}
+	for _, e := range entities {
+		uuid := e["extId"].(string)
+		if seen[uuid] {
+			t.Fatalf("duplicate entity %s returned across pages", uuid)
+		}
+		seen[uuid] = true
+	}
+}
+
+// TestClientListAllV4StopsOnEmptyPage guards against an infinite loop if a
+// page comes back empty before totalAvailableResults is reached.
+func TestClientListAllV4StopsOnEmptyPage(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]interface{}{
+			"data":     []map[string]interface{}{},
+			"metadata": map[string]interface{}{"totalAvailableResults": 100},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			t.Fatalf("failed to encode response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	client := createTestClient(server.URL)
+	client.url = server.URL
+
+	entities, err := client.listAllV4(storageContainersV4Path, 2)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
