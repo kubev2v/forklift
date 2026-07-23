@@ -45,7 +45,8 @@ func (r *Provider) Link() {
 // VM Resource.
 type VM struct {
 	Resource
-	Object *model.InstanceDetails `json:"object,omitempty"`
+	PowerState string                 `json:"powerState"`
+	Object     *model.InstanceDetails `json:"object,omitempty"`
 }
 
 // Build self link (URI).
@@ -90,6 +91,22 @@ func (r *Storage) Link(p *api.Provider) {
 		})
 }
 
+// Snapshot Resource.
+type Snapshot struct {
+	Resource
+	Object *model.SnapshotDetails `json:"object,omitempty"`
+}
+
+// Build self link (URI).
+func (r *Snapshot) Link(p *api.Provider) {
+	r.SelfLink = base.Link(
+		SnapshotRoot,
+		base.Params{
+			base.ProviderParam: string(p.UID),
+			"id":               r.ID,
+		})
+}
+
 // Volume Resource.
 type Volume struct {
 	Resource
@@ -109,13 +126,14 @@ func (r *Volume) Link(p *api.Provider) {
 // Workload Resource (same as VM for EC2).
 type Workload struct {
 	Resource
-	Object *model.InstanceDetails `json:"object,omitempty"`
+	PowerState string                 `json:"powerState"`
+	Object     *model.InstanceDetails `json:"object,omitempty"`
 }
 
 // Build self link (URI).
 func (r *Workload) Link(p *api.Provider) {
 	r.SelfLink = base.Link(
-		VMRoot,
+		WorkloadRoot,
 		base.Params{
 			base.ProviderParam: string(p.UID),
 			VMParam:            r.ID,

@@ -40,5 +40,15 @@ func Handlers(container *container.Container) []libweb.RequestHandler {
 				base.Handler{Container: container},
 			},
 		},
+		&WorkloadHandler{
+			Handler: Handler{
+				base.Handler{Container: container},
+			},
+		},
+		&SnapshotHandler{
+			Handler: Handler{
+				base.Handler{Container: container},
+			},
+		},
 	}
 }
