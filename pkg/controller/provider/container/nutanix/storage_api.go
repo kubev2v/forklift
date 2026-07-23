@@ -47,17 +47,7 @@ func (r *Client) listStorageContainersElement() ([]map[string]interface{}, error
 }
 
 func (r *Client) listStorageContainersCentral() ([]map[string]interface{}, error) {
-	url := fmt.Sprintf("%s%s", r.url, storageContainersV4Path)
-	result := make(map[string]interface{})
-	status, err := r.get(url, &result)
-	if err != nil {
-		return nil, err
-	}
-	if status != http.StatusOK {
-		return nil, liberr.New(fmt.Sprintf("unexpected status listing storage containers: %d", status))
-	}
-
-	rawEntities, err := extractMapList(result, "data")
+	rawEntities, err := r.listAllV4(storageContainersV4Path, storageContainerV4PageSize)
 	if err != nil {
 		return nil, err
 	}
