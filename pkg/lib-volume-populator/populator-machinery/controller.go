@@ -83,8 +83,7 @@ const (
 
 	qemuGroup = 107
 
-	labelSourceHost   = api.LabelSourceHost
-	labelThrottleHost = api.LabelThrottleHost
+	labelSourceHost = api.LabelSourceHost
 )
 
 type empty struct{}
@@ -614,16 +613,16 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 		if pod == nil {
 			sourceHost, _, _ := unstructured.NestedString(crInstance.Object, "metadata", "labels", labelSourceHost)
 			migrationHost, _, _ := unstructured.NestedString(crInstance.Object, "spec", "migrationHost")
-			throttleHost := sourceHost
+			runtimeHost := sourceHost
 			if migrationHost != "" {
-				throttleHost = migrationHost
+				runtimeHost = migrationHost
 			}
-			if c.maxInFlight > 0 && throttleHost != "" {
-				if active := c.countActivePopulatorPodsForHost(throttleHost); active >= c.maxInFlight {
+			if c.maxInFlight > 0 && runtimeHost != "" {
+				if active := c.countActivePopulatorPodsForHost(runtimeHost); active >= c.maxInFlight {
 					klog.V(2).Infof("Max populator pods in-flight reached for host %s (%d/%d), deferring PVC %s/%s",
-						throttleHost, active, c.maxInFlight, pvcNamespace, pvcName)
+						runtimeHost, active, c.maxInFlight, pvcNamespace, pvcName)
 					c.recorder.Eventf(pvc, corev1.EventTypeNormal, "PopulatorThrottled",
-						"Waiting for available populator slot on host %s (%d/%d in-flight)", throttleHost, active, c.maxInFlight)
+						"Waiting for available populator slot on host %s (%d/%d in-flight)", runtimeHost, active, c.maxInFlight)
 					c.workqueue.AddAfter(key, 10*time.Second)
 					return nil
 				}
@@ -652,14 +651,11 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 			if plan, ok, _ := unstructured.NestedString(crInstance.Object, "metadata", "labels", "plan"); ok && plan != "" {
 				labels["plan"] = plan
 			}
-			if sourceHost != "" {
-				labels[labelSourceHost] = sourceHost
-			}
-			if throttleHost != "" {
-				if errs := k8svalidation.IsValidLabelValue(throttleHost); len(errs) == 0 {
-					labels[labelThrottleHost] = throttleHost
+			if runtimeHost != "" {
+				if errs := k8svalidation.IsValidLabelValue(runtimeHost); len(errs) == 0 {
+					labels[labelSourceHost] = runtimeHost
 				} else {
-					klog.Warningf("throttleHost %q is not a valid label value, pod throttle label will be skipped: %v", throttleHost, errs)
+					klog.Warningf("runtimeHost %q is not a valid label value, pod sourceHost label will be skipped: %v", runtimeHost, errs)
 				}
 			}
 
@@ -1162,7 +1158,7 @@ func (c *controller) checkIntreeStorageClass(pvc *corev1.PersistentVolumeClaim, 
 }
 
 func (c *controller) countActivePopulatorPodsForHost(host string) int {
-	selector := labels.SelectorFromSet(labels.Set{labelThrottleHost: host})
+	selector := labels.SelectorFromSet(labels.Set{labelSourceHost: host})
 	pods, err := c.podLister.List(selector)
 	if err != nil {
 		klog.V(2).Infof("Failed to list populator pods for host %s: %v", host, err)
