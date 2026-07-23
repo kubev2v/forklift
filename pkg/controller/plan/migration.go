@@ -13,6 +13,7 @@ import (
 	"time"
 
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/fields"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
@@ -1965,6 +1966,25 @@ func (r *Migration) updateCopyProgress(vm *plan.VMStatus, step *plan.Step) (err 
 					task.MarkedCompleted()
 					msg, _ := terminationMessage(importer)
 					task.AddError(msg)
+
+					if r.Plan.Status.Migration.Started == nil { // Check for failure events since plan start time
+						continue
+					}
+					events, evtErr := r.failedImporterEvents(dv.Status.ClaimName)
+					if evtErr != nil {
+						log.Error(
+							evtErr,
+							"Could not get importer pod events from DataVolume, failed disk transfer will only show the final error message.",
+							"vm",
+							vm.String(),
+							"dv",
+							path.Join(dv.Namespace, dv.Name))
+					}
+					for _, event := range events.Items {
+						if event.LastTimestamp.After(r.Plan.Status.Migration.Started.Time) {
+							task.AddError(event.Message) // Depend on AddError to avoid duplicate messages
+						}
+					}
 				}
 			}
 		}
@@ -2276,6 +2296,23 @@ func (r *Migration) propagateInspectionConcerns(vm *plan.VMStatus, result *api.I
 		}
 	}
 	return
+}
+
+// Get an importer pod's failure events from its PVC. Sometimes the very first
+// error is different from subsequent ones, so it is useful to try to get them
+// all for debugging.
+func (r *Migration) failedImporterEvents(pvcName string) (*core.EventList, error) {
+	events := &core.EventList{}
+	err := r.Destination.List(context.TODO(), events, &client.ListOptions{
+		Namespace: r.Plan.Spec.TargetNamespace,
+		FieldSelector: fields.AndSelectors(
+			fields.OneTermEqualSelector("involvedObject.kind", "PersistentVolumeClaim"),
+			fields.OneTermEqualSelector("involvedObject.name", pvcName),
+			fields.OneTermEqualSelector("reason", "ErrImportFailed"),
+			fields.OneTermEqualSelector("type", "Warning"),
+		),
+	})
+	return events, err
 }
 
 // Retrieve the termination message from a pod's first container.
