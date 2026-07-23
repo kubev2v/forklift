@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
@@ -82,7 +83,7 @@ const (
 
 	qemuGroup = 107
 
-	labelSourceHost = "sourceHost"
+	labelSourceHost = api.LabelSourceHost
 )
 
 type empty struct{}
@@ -611,12 +612,17 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 		// If the pod doesn't exist yet, create it
 		if pod == nil {
 			sourceHost, _, _ := unstructured.NestedString(crInstance.Object, "metadata", "labels", labelSourceHost)
-			if c.maxInFlight > 0 && sourceHost != "" {
-				if active := c.countActivePopulatorPodsForHost(sourceHost); active >= c.maxInFlight {
+			migrationHost, _, _ := unstructured.NestedString(crInstance.Object, "spec", "migrationHost")
+			runtimeHost := sourceHost
+			if migrationHost != "" {
+				runtimeHost = migrationHost
+			}
+			if c.maxInFlight > 0 && runtimeHost != "" {
+				if active := c.countActivePopulatorPodsForHost(runtimeHost); active >= c.maxInFlight {
 					klog.V(2).Infof("Max populator pods in-flight reached for host %s (%d/%d), deferring PVC %s/%s",
-						sourceHost, active, c.maxInFlight, pvcNamespace, pvcName)
+						runtimeHost, active, c.maxInFlight, pvcNamespace, pvcName)
 					c.recorder.Eventf(pvc, corev1.EventTypeNormal, "PopulatorThrottled",
-						"Waiting for available populator slot on host %s (%d/%d in-flight)", sourceHost, active, c.maxInFlight)
+						"Waiting for available populator slot on host %s (%d/%d in-flight)", runtimeHost, active, c.maxInFlight)
 					c.workqueue.AddAfter(key, 10*time.Second)
 					return nil
 				}
@@ -645,8 +651,12 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 			if plan, ok, _ := unstructured.NestedString(crInstance.Object, "metadata", "labels", "plan"); ok && plan != "" {
 				labels["plan"] = plan
 			}
-			if sourceHost != "" {
-				labels[labelSourceHost] = sourceHost
+			if runtimeHost != "" {
+				if errs := k8svalidation.IsValidLabelValue(runtimeHost); len(errs) == 0 {
+					labels[labelSourceHost] = runtimeHost
+				} else {
+					klog.Warningf("runtimeHost %q is not a valid label value, pod sourceHost label will be skipped: %v", runtimeHost, errs)
+				}
 			}
 
 			// Make the pod
