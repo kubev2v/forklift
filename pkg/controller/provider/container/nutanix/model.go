@@ -385,7 +385,7 @@ func applyStorageContainer(entity map[string]interface{}, m *model.StorageContai
 	// Capacity
 	m.MaxCapacityBytes = getInt64(resources, "max_capacity_bytes")
 	m.UsageBytes = getInt64(resources, "usage_bytes")
-	if m.MaxCapacityBytes > 0 && m.UsageBytes > 0 {
+	if m.MaxCapacityBytes > 0 {
 		m.FreeBytes = m.MaxCapacityBytes - m.UsageBytes
 	}
 

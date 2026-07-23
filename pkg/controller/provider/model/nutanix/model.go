@@ -45,11 +45,15 @@ func (m *Base) Labels() libmodel.Labels {
 	return nil
 }
 
+// Equals compares by the promoted Pk(), not by asserting other to *Base.
+// Concrete Nutanix models (e.g. *VM, *Host) embed Base but are never
+// literally *Base at runtime, so a type assertion against *Base would
+// always fail for them even when their primary keys match.
 func (m *Base) Equals(other libmodel.Model) bool {
-	if b, cast := other.(*Base); cast {
-		return m.ID == b.ID
+	if other == nil {
+		return false
 	}
-	return false
+	return m.ID == other.Pk()
 }
 
 // Populate PK using the ref.

@@ -84,6 +84,15 @@ func (r *Client) connect() (status int, err error) {
 
 	r.url = strings.TrimRight(r.url, "/")
 
+	// Bound how long we wait for a response once a request has been sent, so
+	// a hung Prism endpoint can't block a request indefinitely. libweb.Client
+	// builds its http.Client without a Timeout, so this is enforced via the
+	// transport's ResponseHeaderTimeout instead.
+	responseHeaderTimeout := r.clientTimeout
+	if responseHeaderTimeout <= 0 {
+		responseHeaderTimeout = ConnectionTimeout
+	}
+
 	// Create HTTP client
 	r.client = &libweb.Client{
 		Transport: &http.Transport{
@@ -96,6 +105,7 @@ func (r *Client) connect() (status int, err error) {
 			IdleConnTimeout:       10 * time.Second,
 			TLSHandshakeTimeout:   10 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,
+			ResponseHeaderTimeout: responseHeaderTimeout,
 			TLSClientConfig:       TLSClientConfig,
 		},
 	}

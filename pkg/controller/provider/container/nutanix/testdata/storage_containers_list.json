@@ -40,7 +40,12 @@
           "on_disk_dedup": "OFF",
           "erasure_code": "off",
           "erasure_code_delay_secs": 0,
-          "storage_pool_uuid": "pool-uuid-1"
+          "storage_pool_uuid": "pool-uuid-1",
+          "cluster_reference": {
+            "kind": "cluster",
+            "uuid": "0005e123-4567-89ab-cdef-000000000001",
+            "name": "prod-cluster-01"
+          }
         }
       }
     },
@@ -77,7 +82,12 @@
           "on_disk_dedup": "POST_PROCESS",
           "erasure_code": "off",
           "erasure_code_delay_secs": 0,
-          "storage_pool_uuid": "pool-uuid-2"
+          "storage_pool_uuid": "pool-uuid-2",
+          "cluster_reference": {
+            "kind": "cluster",
+            "uuid": "0005e123-4567-89ab-cdef-000000000001",
+            "name": "prod-cluster-01"
+          }
         }
       }
     },
@@ -114,7 +124,12 @@
           "on_disk_dedup": "OFF",
           "erasure_code": "off",
           "erasure_code_delay_secs": 0,
-          "storage_pool_uuid": "pool-uuid-3"
+          "storage_pool_uuid": "pool-uuid-3",
+          "cluster_reference": {
+            "kind": "cluster",
+            "uuid": "0005e123-4567-89ab-cdef-000000000002",
+            "name": "dev-cluster-01"
+          }
         }
       }
     }

@@ -84,8 +84,7 @@ func (r *Client) resolvePrismConfig() (PrismConfig, error) {
 
 	detected, err := r.detectPrismMode()
 	if err != nil {
-		r.log.Error(err, "Prism mode detection failed, defaulting to central")
-		detected = PrismCentral
+		return PrismConfig{}, liberr.Wrap(err, "Prism mode auto-detection failed")
 	}
 
 	return PrismConfig{
