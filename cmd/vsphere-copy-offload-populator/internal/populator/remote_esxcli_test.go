@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/vmware/govmomi/object"
 	"go.uber.org/mock/gomock"
+	"k8s.io/klog/v2"
 
 	vmware_mocks "github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware/mocks"
 )
@@ -304,6 +305,95 @@ var _ = Describe("checkScriptVersion", func() {
 			err := checkScriptVersion(context.Background(), client, datastore, "invalid-version", publicKey)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("invalid embedded version format"))
+		})
+	})
+})
+
+// stubRemapApi is a test double for VMDKCapable covering only the methods used by remapOriginalGroups.
+type stubRemapApi struct {
+	currentGroupsResult []string
+	currentGroupsErr    error
+	currentGroupsCalled bool
+	mapCalls            []string
+	mapFn               func(group string) (LUN, error)
+}
+
+func (s *stubRemapApi) CurrentMappedGroups(_ LUN, _ MappingContext) ([]string, error) {
+	s.currentGroupsCalled = true
+	return s.currentGroupsResult, s.currentGroupsErr
+}
+
+func (s *stubRemapApi) Map(group string, lun LUN, _ MappingContext) (LUN, error) {
+	s.mapCalls = append(s.mapCalls, group)
+	if s.mapFn != nil {
+		return s.mapFn(group)
+	}
+	return lun, nil
+}
+
+func (s *stubRemapApi) EnsureClonnerIgroup(string, []string) (MappingContext, error) { return nil, nil }
+func (s *stubRemapApi) MapTarget(lun LUN, _ MappingContext) (LUN, error)             { return lun, nil }
+func (s *stubRemapApi) UnmapTarget(LUN, MappingContext) error                        { return nil }
+func (s *stubRemapApi) UnMap(string, LUN, MappingContext) error                      { return nil }
+func (s *stubRemapApi) ResolvePVToLUN(PersistentVolume) (LUN, error)                 { return LUN{}, nil }
+
+var _ = Describe("remapOriginalGroups", func() {
+	var (
+		api *stubRemapApi
+		lun LUN
+		ctx MappingContext
+		log klog.Logger
+	)
+
+	BeforeEach(func() {
+		api = &stubRemapApi{}
+		lun = LUN{Name: "test-lun"}
+		ctx = MappingContext{}
+		log = klog.Background()
+	})
+
+	Context("when originalGroups is empty", func() {
+		It("makes no storage calls", func() {
+			remapOriginalGroups(api, lun, ctx, nil, log)
+			Expect(api.currentGroupsCalled).To(BeFalse())
+			Expect(api.mapCalls).To(BeEmpty())
+		})
+	})
+
+	Context("when all groups are already mapped", func() {
+		It("skips all Map calls", func() {
+			api.currentGroupsResult = []string{"group-a", "group-b"}
+			remapOriginalGroups(api, lun, ctx, []string{"group-a", "group-b"}, log)
+			Expect(api.mapCalls).To(BeEmpty())
+		})
+	})
+
+	Context("when only some groups are already mapped", func() {
+		It("calls Map only for the missing group", func() {
+			api.currentGroupsResult = []string{"group-a"}
+			remapOriginalGroups(api, lun, ctx, []string{"group-a", "group-b"}, log)
+			Expect(api.mapCalls).To(ConsistOf("group-b"))
+		})
+	})
+
+	Context("when CurrentMappedGroups fails", func() {
+		It("attempts remap for all original groups", func() {
+			api.currentGroupsErr = errors.New("storage unreachable")
+			remapOriginalGroups(api, lun, ctx, []string{"group-a", "group-b"}, log)
+			Expect(api.mapCalls).To(ConsistOf("group-a", "group-b"))
+		})
+	})
+
+	Context("when Map fails for one group", func() {
+		It("continues and attempts remaining groups", func() {
+			api.mapFn = func(group string) (LUN, error) {
+				if group == "group-a" {
+					return LUN{}, errors.New("404 not found")
+				}
+				return lun, nil
+			}
+			remapOriginalGroups(api, lun, ctx, []string{"group-a", "group-b"}, log)
+			Expect(api.mapCalls).To(ConsistOf("group-a", "group-b"))
 		})
 	})
 })
