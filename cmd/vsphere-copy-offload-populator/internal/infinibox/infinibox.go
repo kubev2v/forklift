@@ -1,11 +1,11 @@
 package infinibox
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
 
-	"github.com/go-logr/logr"
 	"github.com/infinidat/infinibox-csi-driver/iboxapi"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/fcutil"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
@@ -56,7 +56,7 @@ func (c *InfiniboxClonner) Map(initiatorGroup string, targetLUN populator.LUN, m
 	}
 	c.log.Info("mapping volume to group", "volume", targetLUN.Name, "group", hostName)
 
-	host, err := c.api.GetHostByName(hostName)
+	host, err := c.api.GetHostByName(context.TODO(), hostName)
 	if err != nil {
 		return targetLUN, fmt.Errorf("failed to find host for host name %s: %w", hostName, err)
 	}
@@ -66,7 +66,7 @@ func (c *InfiniboxClonner) Map(initiatorGroup string, targetLUN populator.LUN, m
 		return targetLUN, fmt.Errorf("invalid volume ID %q, expected integer: %w", targetLUN.LDeviceID, err)
 	}
 	// Idempotency: check if already mapped
-	existingMappings, err := c.api.GetLunsByVolume(volumeID)
+	existingMappings, err := c.api.GetLunsByVolume(context.TODO(), volumeID)
 	if err == nil {
 		for _, mapping := range existingMappings {
 			if mapping.HostID == host.ID {
@@ -77,7 +77,7 @@ func (c *InfiniboxClonner) Map(initiatorGroup string, targetLUN populator.LUN, m
 	}
 
 	c.log.V(2).Info("mapping volume to host", "volume_id", volumeID, "host_id", host.ID)
-	_, err = c.api.MapVolumeToHost(host.ID, volumeID, 0)
+	_, err = c.api.MapVolumeToHost(context.TODO(), host.ID, volumeID, 0)
 	if err != nil {
 		return targetLUN, fmt.Errorf("failed to map volume %s to host %s: %w", targetLUN.Name, hostName, err)
 	}
@@ -99,7 +99,7 @@ func (c *InfiniboxClonner) UnMap(initiatorGroup string, targetLUN populator.LUN,
 	}
 	c.log.Info("unmapping volume from group", "volume", targetLUN.Name, "group", hostName)
 
-	host, err := c.api.GetHostByName(hostName)
+	host, err := c.api.GetHostByName(context.TODO(), hostName)
 	if err != nil {
 		return fmt.Errorf("failed to find host for host name %s: %w", hostName, err)
 	}
@@ -110,7 +110,7 @@ func (c *InfiniboxClonner) UnMap(initiatorGroup string, targetLUN populator.LUN,
 	}
 
 	c.log.V(2).Info("unmapping volume from host", "volume_id", volumeID, "host_id", host.ID)
-	_, err = c.api.UnMapVolumeFromHost(host.ID, volumeID)
+	_, err = c.api.UnMapVolumeFromHost(context.TODO(), host.ID, volumeID)
 	if err != nil {
 		return fmt.Errorf("failed to unmap volume %s from host %s: %w", targetLUN.Name, hostName, err)
 	}
@@ -123,7 +123,7 @@ func (c *InfiniboxClonner) EnsureClonnerIgroup(initiatorGroup string, adapterIds
 	c.log.Info("ensuring initiator group", "group", initiatorGroup, "adapters", adapterIds)
 
 	c.initiatorGroup = initiatorGroup
-	hosts, err := c.api.GetAllHosts()
+	hosts, err := c.api.GetAllHosts(context.TODO())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all hosts: %w", err)
 	}
@@ -175,11 +175,8 @@ func NewInfiniboxClonner(hostname, username, password string, insecure bool) (In
 		URL:      hostname,
 	}
 
-	// Create logger (using klog adapter)
-	logger := logr.Discard()
-
 	// Create InfiniBox client
-	client := iboxapi.NewIboxClient(logger, creds)
+	client := iboxapi.NewIboxClient(creds)
 
 	clonner := InfiniboxClonner{
 		api: client,
@@ -191,7 +188,7 @@ func NewInfiniboxClonner(hostname, username, password string, insecure bool) (In
 	}
 
 	// Fetch model and version from the API
-	sysInfo, err := client.GetSystem()
+	sysInfo, err := client.GetSystem(context.TODO())
 	if err != nil {
 		log.Info("failed to get InfiniBox system info for metrics", "err", err)
 	} else {
@@ -210,7 +207,7 @@ func (c *InfiniboxClonner) ResolvePVToLUN(pv populator.PersistentVolume) (popula
 	volumeName := volumeAttributes["Name"]
 	c.log.V(2).Info("looking up volume by name", "name", volumeName)
 
-	volume, err := c.api.GetVolumeByName(volumeName)
+	volume, err := c.api.GetVolumeByName(context.TODO(), volumeName)
 	if err != nil {
 		return populator.LUN{}, fmt.Errorf("failed to get volume by name %s: %w", volumeName, err)
 	}
@@ -250,7 +247,7 @@ func (c *InfiniboxClonner) CurrentMappedGroups(targetLUN populator.LUN, mappingC
 	}
 
 	c.log.V(2).Info("checking mappings for volume", "volume_id", volumeIDInt)
-	lunInfos, err := c.api.GetLunsByVolume(volumeIDInt)
+	lunInfos, err := c.api.GetLunsByVolume(context.TODO(), volumeIDInt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get LUN mappings for volume %s: %w", volumeID, err)
 	}
@@ -262,7 +259,7 @@ func (c *InfiniboxClonner) CurrentMappedGroups(targetLUN populator.LUN, mappingC
 		return []string{}, nil
 	}
 
-	allHosts, err := c.api.GetAllHosts()
+	allHosts, err := c.api.GetAllHosts(context.TODO())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all hosts: %w", err)
 	}
