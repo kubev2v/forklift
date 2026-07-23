@@ -87,6 +87,14 @@ spec:
   install:
     spec:
       deployments: null
+      clusterPermissions:
+        - serviceAccountName: forklift-operator
+          rules:
+            - apiGroups:
+                - networking.k8s.io
+              resources:
+                - networkpolicies
+              verbs: ["*"]
     strategy: deployment
   installModes:
     - type: OwnNamespace
