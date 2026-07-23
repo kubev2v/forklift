@@ -81,6 +81,10 @@ func (r *Builder) PopulatorTransferredBytes(_ *core.PersistentVolumeClaim) (int6
 	return 0, planbase.VolumePopulatorNotSupportedError
 }
 
+func (r *Builder) PopulatorOffloadInfo(_ *core.PersistentVolumeClaim) (map[string]string, error) {
+	return map[string]string{}, nil
+}
+
 func (r *Builder) PopulatorXcopyUsed(_ *core.PersistentVolumeClaim) (string, bool, error) {
 	return "", false, nil
 }
