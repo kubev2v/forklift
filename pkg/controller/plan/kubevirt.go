@@ -1995,10 +1995,12 @@ func (r *KubeVirt) ensureVddkConfigMap() (configMap *core.ConfigMap, err error) 
 	return
 }
 
-func (r *KubeVirt) EnsurePopulatorVolumes(vm *plan.VMStatus, pvcs []*core.PersistentVolumeClaim) (err error) {
+func (r *KubeVirt) EnsurePVCInitPod(vm *plan.VMStatus, pvcs []*core.PersistentVolumeClaim) (err error) {
+	seen := make(map[string]bool)
 	var pendingPvcNames []string
 	for _, pvc := range pvcs {
-		if pvc.Status.Phase == core.ClaimPending {
+		if pvc.Status.Phase == core.ClaimPending && !seen[pvc.Name] {
+			seen[pvc.Name] = true
 			pendingPvcNames = append(pendingPvcNames, pvc.Name)
 		}
 	}

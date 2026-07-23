@@ -7,12 +7,14 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	"github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	"github.com/kubev2v/forklift/pkg/settings"
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -346,4 +348,90 @@ func TestExecuteClearsSchedulerPendingCondition(t *testing.T) {
 	err := m.execute(vm)
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	g.Expect(vm.HasCondition(api.ConditionPending)).To(gomega.BeFalse())
+}
+
+func TestResolveCsiPVCs(t *testing.T) {
+	pvcWithSource := func(name, diskSource string) *core.PersistentVolumeClaim {
+		return &core.PersistentVolumeClaim{
+			ObjectMeta: meta.ObjectMeta{
+				Name:        name,
+				Annotations: map[string]string{base.AnnDiskSource: diskSource},
+			},
+		}
+	}
+	specWithSource := func(diskSource string) core.PersistentVolumeClaim {
+		return core.PersistentVolumeClaim{
+			ObjectMeta: meta.ObjectMeta{Annotations: map[string]string{base.AnnDiskSource: diskSource}},
+		}
+	}
+
+	tests := []struct {
+		name          string
+		csiSpecs      []core.PersistentVolumeClaim
+		migrationPVCs []*core.PersistentVolumeClaim
+		wantNames     []string
+	}{
+		{
+			name:          "basic match",
+			csiSpecs:      []core.PersistentVolumeClaim{specWithSource("disk-a")},
+			migrationPVCs: []*core.PersistentVolumeClaim{pvcWithSource("pvc-a", "disk-a")},
+			wantNames:     []string{"pvc-a"},
+		},
+		{
+			name:          "no match",
+			csiSpecs:      []core.PersistentVolumeClaim{specWithSource("disk-a")},
+			migrationPVCs: []*core.PersistentVolumeClaim{pvcWithSource("pvc-b", "disk-b")},
+			wantNames:     nil,
+		},
+		{
+			name: "selective match among several",
+			csiSpecs: []core.PersistentVolumeClaim{
+				specWithSource("disk-a"),
+				specWithSource("disk-b"),
+			},
+			migrationPVCs: []*core.PersistentVolumeClaim{
+				pvcWithSource("pvc-a", "disk-a"),
+				pvcWithSource("pvc-b", "disk-b"),
+				pvcWithSource("pvc-c", "disk-c"),
+			},
+			wantNames: []string{"pvc-a", "pvc-b"},
+		},
+		{
+			name:     "PVC with no disk source annotation is excluded",
+			csiSpecs: []core.PersistentVolumeClaim{specWithSource("disk-a")},
+			migrationPVCs: []*core.PersistentVolumeClaim{
+				pvcWithSource("pvc-a", "disk-a"),
+				{ObjectMeta: meta.ObjectMeta{Name: "lun-pvc"}}, // no AnnDiskSource, e.g. a LUN PVC
+			},
+			wantNames: []string{"pvc-a"},
+		},
+		{
+			name: "empty disk source never matches empty disk source",
+			csiSpecs: []core.PersistentVolumeClaim{
+				{ObjectMeta: meta.ObjectMeta{}}, // no AnnDiskSource set
+			},
+			migrationPVCs: []*core.PersistentVolumeClaim{
+				{ObjectMeta: meta.ObjectMeta{Name: "pvc-empty"}}, // also no AnnDiskSource
+			},
+			wantNames: nil,
+		},
+		{
+			name:          "empty built specs",
+			csiSpecs:      nil,
+			migrationPVCs: []*core.PersistentVolumeClaim{pvcWithSource("pvc-a", "disk-a")},
+			wantNames:     nil,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			g := gomega.NewGomegaWithT(t)
+			matched := resolveCsiPVCs(tc.csiSpecs, tc.migrationPVCs)
+			var gotNames []string
+			for _, pvc := range matched {
+				gotNames = append(gotNames, pvc.Name)
+			}
+			g.Expect(gotNames).To(gomega.Equal(tc.wantNames))
+		})
+	}
 }
