@@ -567,6 +567,13 @@ type ForkliftControllerSpec struct {
 	// +kubebuilder:validation:Minimum=1
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:hidden"}
 	ControllerMaxParentBackingRetries *int32 `json:"controller_max_parent_backing_retries,omitempty"`
+	// Always use qualified namespace/nad-name format for Multus networks.
+	// When false, uses unqualified nad-name when NAD is in same namespace as target VM.
+	// +optional
+	// +kubebuilder:default="false"
+	// +kubebuilder:validation:Enum="true";"false"
+	// +operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:radio:true","urn:alm:descriptor:com.tectonic.ui:radio:false"}
+	ControllerMultusNetworkNameAlwaysQualified string `json:"controller_multus_network_name_always_qualified,omitempty"`
 
 	// Ansible Automation Platform (AAP) Settings
 

@@ -48,6 +48,7 @@ const (
 	VirtV2vContainerRequestsMemory         = "VIRT_V2V_CONTAINER_REQUESTS_MEMORY"
 	HooksContainerLimitsCpu                = "HOOKS_CONTAINER_LIMITS_CPU"
 	HooksContainerLimitsMemory             = "HOOKS_CONTAINER_LIMITS_MEMORY"
+	MultusNetworkNameAlwaysQualified       = "MULTUS_NETWORK_NAME_ALWAYS_QUALIFIED"
 	HooksContainerRequestsCpu              = "HOOKS_CONTAINER_REQUESTS_CPU"
 	HooksContainerRequestsMemory           = "HOOKS_CONTAINER_REQUESTS_MEMORY"
 	OvaContainerLimitsCpu                  = "OVA_CONTAINER_LIMITS_CPU"
@@ -202,6 +203,9 @@ type Migration struct {
 	// ConversionPodPendingTimeout is how long (in minutes) a conversion pod may stay
 	// in Pending phase before the controller fails it. 0 means no timeout.
 	ConversionPodPendingTimeout int
+	// MultusNetworkNameAlwaysQualified controls whether Multus network names are always
+	// qualified with namespace (true) or use unqualified names when NAD is in same namespace (false).
+	MultusNetworkNameAlwaysQualified bool
 }
 
 // Load settings.
@@ -460,6 +464,7 @@ func (r *Migration) Load() (err error) {
 		r.DeepInspectionImageXFS = strings.TrimSpace(val)
 	}
 	r.WaitForFinalSnapshotConsolidation = getEnvBool(WaitForFinalSnapshotConsolidation, true)
+	r.MultusNetworkNameAlwaysQualified = getEnvBool(MultusNetworkNameAlwaysQualified, false)
 	if r.ConversionPodPendingTimeout, err = getEnvLimit(ConversionPodPendingTimeout, DefaultPendingPodTimeoutMinutes, 0); err != nil {
 		return liberr.Wrap(err)
 	}
