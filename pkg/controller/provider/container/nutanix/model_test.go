@@ -370,8 +370,10 @@ func TestApplyStorageContainer(t *testing.T) {
 		t.Errorf("Expected name 'default-container-prod', got %s", m.Name)
 	}
 
-	// Verify cluster reference (may not be present in all responses)
-	_ = m.Cluster
+	// Verify cluster reference is populated for this fixture entity.
+	if m.Cluster == "" {
+		t.Error("Expected Cluster to be set")
+	}
 
 	// Verify replication factor
 	if m.ReplicationFactor == 0 {
