@@ -165,6 +165,28 @@ func (c *Client) DescribeVolumes(ctx context.Context) ([]ec2types.Volume, error)
 	return volumes, nil
 }
 
+// DescribeSnapshots fetches all owned EBS snapshots in the configured region.
+// Filters to only return snapshots owned by the caller (not public/shared).
+// Used by inventory collector to discover available snapshots.
+func (c *Client) DescribeSnapshots(ctx context.Context) ([]ec2types.Snapshot, error) {
+	var snapshots []ec2types.Snapshot
+
+	paginator := ec2.NewDescribeSnapshotsPaginator(c.ec2Client, &ec2.DescribeSnapshotsInput{
+		OwnerIds: []string{"self"},
+	})
+
+	for paginator.HasMorePages() {
+		output, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, liberr.Wrap(err, "failed to describe snapshots")
+		}
+
+		snapshots = append(snapshots, output.Snapshots...)
+	}
+
+	return snapshots, nil
+}
+
 // DescribeVpcs fetches all VPCs
 // A VPC is a logically isolated virtual network within AWS
 func (c *Client) DescribeVpcs(ctx context.Context) ([]ec2types.Vpc, error) {

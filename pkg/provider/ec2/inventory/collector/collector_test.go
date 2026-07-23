@@ -97,7 +97,7 @@ var _ = Describe("EC2 Collector", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify: Check DB has the instance
-			m := &model.Instance{Base: model.Base{UID: "i-1234567890abcdef0"}}
+			m := &model.Instance{Base: model.Base{ID: "i-1234567890abcdef0"}}
 			err = db.Get(m)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(m.Name).To(Equal("test-vm"))
@@ -139,7 +139,7 @@ var _ = Describe("EC2 Collector", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify initial state
-			m := &model.Instance{Base: model.Base{UID: "i-123"}}
+			m := &model.Instance{Base: model.Base{ID: "i-123"}}
 			err = db.Get(m)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(m.State).To(Equal("running"))
@@ -154,7 +154,7 @@ var _ = Describe("EC2 Collector", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify: State should be updated, revision incremented
-			m = &model.Instance{Base: model.Base{UID: "i-123"}}
+			m = &model.Instance{Base: model.Base{ID: "i-123"}}
 			err = db.Get(m)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(m.State).To(Equal("stopped"))
@@ -205,7 +205,7 @@ var _ = Describe("EC2 Collector", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify: Name should fallback to instance ID
-			m := &model.Instance{Base: model.Base{UID: "i-noname"}}
+			m := &model.Instance{Base: model.Base{ID: "i-noname"}}
 			err = db.Get(m)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(m.Name).To(Equal("i-noname"))
@@ -230,7 +230,7 @@ var _ = Describe("EC2 Collector", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify: Check DB has the volume
-			m := &model.Volume{Base: model.Base{UID: "vol-1234567890abcdef0"}}
+			m := &model.Volume{Base: model.Base{ID: "vol-1234567890abcdef0"}}
 			err = db.Get(m)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(m.Name).To(Equal("test-volume"))
@@ -274,7 +274,7 @@ var _ = Describe("EC2 Collector", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Get initial revision
-			m := &model.Volume{Base: model.Base{UID: "vol-123"}}
+			m := &model.Volume{Base: model.Base{ID: "vol-123"}}
 			err = db.Get(m)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(m.State).To(Equal("available"))
@@ -288,7 +288,7 @@ var _ = Describe("EC2 Collector", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify: State should be updated
-			m = &model.Volume{Base: model.Base{UID: "vol-123"}}
+			m = &model.Volume{Base: model.Base{ID: "vol-123"}}
 			err = db.Get(m)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(m.State).To(Equal("in-use"))
@@ -319,7 +319,7 @@ var _ = Describe("EC2 Collector", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify: Check DB has the VPC
-			m := &model.Network{Base: model.Base{UID: "vpc-123"}}
+			m := &model.Network{Base: model.Base{ID: "vpc-123"}}
 			err = db.Get(m)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(m.Name).To(Equal("test-vpc"))
@@ -342,7 +342,7 @@ var _ = Describe("EC2 Collector", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify: Check DB has the subnet
-			m := &model.Network{Base: model.Base{UID: "subnet-123"}}
+			m := &model.Network{Base: model.Base{ID: "subnet-123"}}
 			err = db.Get(m)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(m.Name).To(Equal("test-subnet"))
@@ -389,6 +389,57 @@ var _ = Describe("EC2 Collector", func() {
 		})
 	})
 
+	Describe("collectSnapshots", func() {
+		It("should collect snapshots and store in DB", func() {
+			// Setup: Add snapshot to fake API
+			snapshot := testutil.NewSnapshotBuilder("snap-123").
+				WithVolumeID("vol-123").
+				WithState(ec2types.SnapshotStateCompleted).
+				WithTag("Name", "test-snapshot").
+				Build()
+			fakeEC2.AddSnapshot(snapshot)
+
+			// Execute
+			err := collector.collectSnapshots(ctx)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify: Check DB has the snapshot
+			m := &model.Snapshot{Base: model.Base{ID: "snap-123"}}
+			err = db.Get(m)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(m.Name).To(Equal("test-snapshot"))
+			Expect(m.State).To(Equal("completed"))
+			Expect(m.VolumeID).To(Equal("vol-123"))
+			Expect(m.Kind).To(Equal("Snapshot"))
+		})
+
+		It("should handle multiple snapshots", func() {
+			snap1 := testutil.NewSnapshotBuilder("snap-111").
+				WithState(ec2types.SnapshotStateCompleted).
+				Build()
+			snap2 := testutil.NewSnapshotBuilder("snap-222").
+				WithState(ec2types.SnapshotStatePending).
+				Build()
+			fakeEC2.AddSnapshot(snap1)
+			fakeEC2.AddSnapshot(snap2)
+
+			err := collector.collectSnapshots(ctx)
+			Expect(err).NotTo(HaveOccurred())
+
+			var snapshots []model.Snapshot
+			err = db.List(&snapshots, libmodel.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(snapshots).To(HaveLen(2))
+		})
+
+		It("should handle API errors", func() {
+			fakeEC2.Errors[testutil.MethodDescribeSnapshots] = errAPIFailed
+
+			err := collector.collectSnapshots(ctx)
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
 	Describe("collectStorageTypes", func() {
 		It("should collect all EBS volume types", func() {
 			// Execute
@@ -421,7 +472,7 @@ var _ = Describe("EC2 Collector", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Get revision of gp3 after first collection
-			m := &model.Storage{Base: model.Base{UID: "gp3"}}
+			m := &model.Storage{Base: model.Base{ID: "gp3"}}
 			err = db.Get(m)
 			Expect(err).NotTo(HaveOccurred())
 			initialRevision := m.Revision
@@ -432,7 +483,7 @@ var _ = Describe("EC2 Collector", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify storage type still exists with valid data
-			m = &model.Storage{Base: model.Base{UID: "gp3"}}
+			m = &model.Storage{Base: model.Base{ID: "gp3"}}
 			err = db.Get(m)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(m.VolumeType).To(Equal("gp3"))
@@ -441,16 +492,22 @@ var _ = Describe("EC2 Collector", func() {
 	})
 
 	Describe("Collect", func() {
-		It("should collect all resource types", func() {
+		It("should collect all resource types including snapshots", func() {
 			// Setup: Add resources
 			instance := testutil.NewInstanceBuilder("i-123", "test-vm").Build()
 			volume := testutil.NewVolumeBuilder("vol-123").Build()
 			vpc := testutil.NewVpcBuilder("vpc-123").Build()
 			subnet := testutil.NewSubnetBuilder("subnet-123", "vpc-123").Build()
+			snap := testutil.NewSnapshotBuilder("snap-123").
+				WithVolumeID("vol-123").
+				WithState(ec2types.SnapshotStateCompleted).
+				WithTag("Name", "test-snap").
+				Build()
 			fakeEC2.AddInstance(instance)
 			fakeEC2.AddVolume(volume)
 			fakeEC2.AddVpc(vpc)
 			fakeEC2.AddSubnet(subnet)
+			fakeEC2.AddSnapshot(snap)
 
 			// Execute
 			err := collector.Collect()
@@ -476,6 +533,16 @@ var _ = Describe("EC2 Collector", func() {
 			err = db.List(&storages, libmodel.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(storages).To(HaveLen(len(ebsVolumeTypes)))
+
+			// Verify: Snapshot collected via "snapshots" task
+			var snapshots []model.Snapshot
+			err = db.List(&snapshots, libmodel.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(snapshots).To(HaveLen(1))
+			Expect(snapshots[0].ID).To(Equal("snap-123"))
+			Expect(snapshots[0].Name).To(Equal("test-snap"))
+			Expect(snapshots[0].VolumeID).To(Equal("vol-123"))
+			Expect(snapshots[0].State).To(Equal("completed"))
 		})
 
 		It("should succeed with partial failures", func() {
@@ -501,8 +568,9 @@ var _ = Describe("EC2 Collector", func() {
 			fakeEC2.Errors[testutil.MethodDescribeInstances] = errAPIFailed
 			fakeEC2.Errors[testutil.MethodDescribeVolumes] = errAPIFailed
 			fakeEC2.Errors[testutil.MethodDescribeVpcs] = errAPIFailed
+			fakeEC2.Errors[testutil.MethodDescribeSnapshots] = errAPIFailed
 
-			// Execute - should succeed because storageTypes (1/4) succeeds
+			// Execute - should succeed because storageTypes (1/5) succeeds
 			err := collector.Collect()
 			Expect(err).NotTo(HaveOccurred())
 
@@ -560,6 +628,28 @@ var _ = Describe("EC2 Collector", func() {
 			table.Entry("handles nil value",
 				[]ec2types.Tag{{Key: aws.String("Name"), Value: nil}},
 				""),
+		)
+
+		table.DescribeTable("mapPowerState",
+			func(state *ec2types.InstanceState, expected string) {
+				Expect(mapPowerState(state)).To(Equal(expected))
+			},
+			table.Entry("running maps to On",
+				&ec2types.InstanceState{Name: ec2types.InstanceStateNameRunning}, "On"),
+			table.Entry("pending maps to On",
+				&ec2types.InstanceState{Name: ec2types.InstanceStateNamePending}, "On"),
+			table.Entry("stopped maps to Off",
+				&ec2types.InstanceState{Name: ec2types.InstanceStateNameStopped}, "Off"),
+			table.Entry("stopping maps to Off",
+				&ec2types.InstanceState{Name: ec2types.InstanceStateNameStopping}, "Off"),
+			table.Entry("terminated maps to Off",
+				&ec2types.InstanceState{Name: ec2types.InstanceStateNameTerminated}, "Off"),
+			table.Entry("shutting-down maps to Off",
+				&ec2types.InstanceState{Name: ec2types.InstanceStateNameShuttingDown}, "Off"),
+			table.Entry("nil state maps to Unknown",
+				nil, "Unknown"),
+			table.Entry("unknown state maps to Unknown",
+				&ec2types.InstanceState{Name: "some-other-state"}, "Unknown"),
 		)
 
 		table.DescribeTable("getPlatform",

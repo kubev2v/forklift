@@ -52,7 +52,7 @@ func (h *StorageHandler) List(ctx *gin.Context) {
 	var result []interface{}
 	for _, storage := range list {
 		r := &Storage{}
-		r.ID = storage.UID
+		r.ID = storage.ID
 		r.Name = storage.Name
 		r.Revision = storage.Revision
 		r.Link(h.Provider)
@@ -76,7 +76,7 @@ func (h *StorageHandler) Get(ctx *gin.Context) {
 	}
 
 	storage := &model.Storage{}
-	storage.UID = ctx.Param("id")
+	storage.ID = ctx.Param("id")
 
 	db := h.Collector.DB()
 	err = db.Get(storage)
@@ -86,7 +86,7 @@ func (h *StorageHandler) Get(ctx *gin.Context) {
 	}
 
 	r := &Storage{}
-	r.ID = storage.UID
+	r.ID = storage.ID
 	r.Name = storage.Name
 	r.Revision = storage.Revision
 	r.Link(h.Provider)
@@ -113,7 +113,7 @@ func (h *StorageHandler) watch(ctx *gin.Context) {
 		func(in libmodel.Model) (r interface{}) {
 			m := in.(*model.Storage)
 			storage := &Storage{}
-			storage.ID = m.UID
+			storage.ID = m.ID
 			storage.Name = m.Name
 			storage.Revision = m.Revision
 			storage.Link(h.Provider)
