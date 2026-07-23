@@ -11,6 +11,7 @@ import (
 	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/model/nutanix"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	core "k8s.io/api/core/v1"
 )
@@ -434,6 +435,65 @@ func TestClientListStorageContainersCentral(t *testing.T) {
 
 	if len(entities) != 2 {
 		t.Fatalf("Expected 2 storage containers, got %d", len(entities))
+	}
+}
+
+// TestClientListImagesCentral verifies that listImages() dispatches to
+// Prism Central's vmm v4 content/images collection -- rather than the v3
+// "image" kind used on Prism Element -- when the provider is configured
+// for Prism Central.
+func TestClientListImagesCentral(t *testing.T) {
+	data, err := os.ReadFile("testdata/images_v4_list.json")
+	if err != nil {
+		t.Fatalf("Failed to read testdata: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/nutanix/v3/clusters/list":
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"entities":[]}`))
+		case "/api/vmm/v4.0/content/images":
+			if r.Method != "GET" {
+				t.Errorf("Expected GET, got %s", r.Method)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(data)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client := createTestClientWithSettings(server.URL, map[string]string{
+		api.NutanixPrismType: api.NutanixPrismCentral,
+	})
+	client.url = server.URL
+
+	entities, err := client.listImages()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if len(entities) != 2 {
+		t.Fatalf("Expected 2 images, got %d", len(entities))
+	}
+
+	m := &model.Image{}
+	applyImage(entities[0], m)
+	if m.ID != "img-0005c123-4567-89ab-cdef-000000000001" {
+		t.Errorf("Expected ID from extId, got %q", m.ID)
+	}
+	if m.Name != "RHEL-8.9-x86_64" {
+		t.Errorf("Expected name to be set, got %q", m.Name)
+	}
+	if m.ImageType != "DISK_IMAGE" {
+		t.Errorf("Expected image type DISK_IMAGE, got %q", m.ImageType)
+	}
+	if m.SizeBytes != 2147483648 {
+		t.Errorf("Expected size 2147483648, got %d", m.SizeBytes)
 	}
 }
 
