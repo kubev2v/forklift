@@ -239,26 +239,26 @@ func (r *Validator) MacConflicts(vmRef ref.Ref) ([]planbase.MacConflict, error) 
 }
 
 func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (bool, error) {
-	if pvcNameTemplate == "" {
-		return true, nil
-	}
-
 	vm := &hyperv.VM{}
 	err := r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
 		return false, liberr.Wrap(err, "vm", vmRef.String())
 	}
 
+	targetVmName := planbase.ResolveTargetVmName(r.Plan, vmRef.ID, vmRef.Name)
+
 	// Validate template produces valid k8s labels for each disk
-	for i, disk := range vm.Disks {
-		testData := map[string]interface{}{
-			"VmName":    vm.Name,
-			"DiskIndex": i,
-			"DiskId":    disk.ID,
+	for i := range vm.Disks {
+		testData := &api.PVCNameTemplateData{
+			VmName:       vm.Name,
+			TargetVmName: targetVmName,
+			PlanName:     r.Plan.Name,
+			DiskIndex:    i,
+			VmId:         vm.ID,
 		}
 		_, err := planbase.ValidatePVCNameTemplate(pvcNameTemplate, testData)
 		if err != nil {
-			return false, liberr.Wrap(err, "vm", vmRef.String(), "disk", disk.ID)
+			return false, liberr.Wrap(err, "vm", vmRef.String(), "diskIndex", i)
 		}
 	}
 	return true, nil

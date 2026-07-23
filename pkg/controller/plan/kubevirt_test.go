@@ -10,6 +10,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	convctx "github.com/kubev2v/forklift/pkg/controller/conversion/context"
+	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	ginkgo "github.com/onsi/ginkgo/v2"
@@ -941,3 +942,94 @@ func createKubeVirtWithTransferNetwork(nad *k8snet.NetworkAttachmentDefinition, 
 	kubevirt.Plan = createPlanKubevirt(transferNetwork)
 	return kubevirt
 }
+
+var _ = ginkgo.Describe("PVC name template", func() {
+	ginkgo.Describe("GetPVCNameTemplate", func() {
+		ginkgo.It("should return the universal default when plan has no template", func() {
+			kv := createKubeVirt()
+			kv.Plan.Name = "my-plan"
+			template := planbase.GetPVCNameTemplate(kv.Plan, "vm-1")
+			Expect(template).To(ContainSubstring("PlanName"))
+			Expect(template).To(ContainSubstring("TargetVmName"))
+			Expect(template).To(ContainSubstring("DiskIndex"))
+		})
+
+		ginkgo.It("should return the plan-level template when set", func() {
+			kv := createKubeVirt()
+			kv.Plan.Spec.PVCNameTemplate = "{{.PlanName}}-{{.VmId}}-disk-{{.DiskIndex}}"
+			template := planbase.GetPVCNameTemplate(kv.Plan, "vm-1")
+			Expect(template).To(Equal("{{.PlanName}}-{{.VmId}}-disk-{{.DiskIndex}}"))
+		})
+
+		ginkgo.It("should return the VM-level template when set", func() {
+			kv := createKubeVirt()
+			kv.Plan.Spec.PVCNameTemplate = "plan-level"
+			kv.Plan.Spec.VMs = []plan.VM{
+				{Ref: ref.Ref{ID: "vm-1"}, PVCNameTemplate: "vm-level-{{.DiskIndex}}"},
+			}
+			template := planbase.GetPVCNameTemplate(kv.Plan, "vm-1")
+			Expect(template).To(Equal("vm-level-{{.DiskIndex}}"))
+		})
+	})
+
+	ginkgo.Describe("applyPVCNameTemplate", func() {
+		ginkgo.It("should set GenerateName with default template and UseGenerateName=true", func() {
+			kv := createKubeVirt()
+			kv.Plan.Name = "test-plan"
+			kv.Plan.Spec.PVCNameTemplateUseGenerateName = true
+			vm := &plan.VMStatus{}
+			vm.ID = "vm-1"
+			vm.Name = "my-vm"
+
+			objectMeta := &metav1.ObjectMeta{}
+			err := kv.applyPVCNameTemplate(objectMeta, vm, 0)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(objectMeta.GenerateName).To(Equal("test-plan-my-vm-disk-0-"))
+			Expect(objectMeta.Name).To(BeEmpty())
+		})
+
+		ginkgo.It("should set Name with default template and UseGenerateName=false", func() {
+			kv := createKubeVirt()
+			kv.Plan.Name = "test-plan"
+			kv.Plan.Spec.PVCNameTemplateUseGenerateName = false
+			vm := &plan.VMStatus{}
+			vm.ID = "vm-1"
+			vm.Name = "my-vm"
+
+			objectMeta := &metav1.ObjectMeta{}
+			err := kv.applyPVCNameTemplate(objectMeta, vm, 2)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(objectMeta.Name).To(Equal("test-plan-my-vm-disk-2"))
+			Expect(objectMeta.GenerateName).To(BeEmpty())
+		})
+
+		ginkgo.It("should use NewName when set", func() {
+			kv := createKubeVirt()
+			kv.Plan.Name = "plan"
+			kv.Plan.Spec.PVCNameTemplateUseGenerateName = false
+			vm := &plan.VMStatus{}
+			vm.ID = "vm-1"
+			vm.Name = "Original VM!"
+			vm.NewName = "safe-vm-name"
+
+			objectMeta := &metav1.ObjectMeta{}
+			err := kv.applyPVCNameTemplate(objectMeta, vm, 0)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(objectMeta.Name).To(Equal("plan-safe-vm-name-disk-0"))
+		})
+
+		ginkgo.It("should truncate long names", func() {
+			kv := createKubeVirt()
+			kv.Plan.Name = "very-long-plan-name-exceeding"
+			kv.Plan.Spec.PVCNameTemplateUseGenerateName = false
+			vm := &plan.VMStatus{}
+			vm.ID = "vm-1"
+			vm.Name = "very-long-vm-name-exceeding-limit"
+
+			objectMeta := &metav1.ObjectMeta{}
+			err := kv.applyPVCNameTemplate(objectMeta, vm, 0)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(len(objectMeta.Name)).To(BeNumerically("<=", 63))
+		})
+	})
+})

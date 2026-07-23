@@ -943,6 +943,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		images = append(images, image)
 	}
 
+	diskIndex := 0
 	for _, image := range images {
 		if imageID, ok := image.Properties[forkliftPropertyOriginalImageID]; ok && imageID == workload.ImageID {
 			if image.DiskFormat != "raw" {
@@ -955,22 +956,23 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 			r.Log.Info("the image is not ready yet", "image", image.Name, "status", image.Status)
 			continue
 		}
-		if pvc, pvcErr := r.getCorrespondingPvc(image, workload, annotations, secretName); pvcErr == nil {
+		if pvc, pvcErr := r.getCorrespondingPvc(image, workload, annotations, secretName, vmRef, diskIndex); pvcErr == nil {
 			pvcs = append(pvcs, pvc)
 		} else {
 			err = pvcErr
 			return
 		}
+		diskIndex++
 	}
 	return
 }
 
-func (r *Builder) getCorrespondingPvc(image model.Image, workload *model.Workload, annotations map[string]string, secretName string) (pvc *core.PersistentVolumeClaim, err error) {
+func (r *Builder) getCorrespondingPvc(image model.Image, workload *model.Workload, annotations map[string]string, secretName string, vmRef ref.Ref, diskIndex int) (pvc *core.PersistentVolumeClaim, err error) {
 	populatorCR, err := r.ensureVolumePopulator(workload, &image, secretName)
 	if err != nil {
 		return
 	}
-	return r.ensureVolumePopulatorPVC(workload, &image, annotations, populatorCR.Name)
+	return r.ensureVolumePopulatorPVC(workload, &image, annotations, populatorCR.Name, vmRef, diskIndex)
 }
 
 func (r *Builder) ensureVolumePopulator(workload *model.Workload, image *model.Image, secretName string) (populatorCR *api.OpenstackVolumePopulator, err error) {
@@ -986,7 +988,7 @@ func (r *Builder) ensureVolumePopulator(workload *model.Workload, image *model.I
 	return
 }
 
-func (r *Builder) ensureVolumePopulatorPVC(workload *model.Workload, image *model.Image, annotations map[string]string, populatorName string) (pvc *core.PersistentVolumeClaim, err error) {
+func (r *Builder) ensureVolumePopulatorPVC(workload *model.Workload, image *model.Image, annotations map[string]string, populatorName string, vmRef ref.Ref, diskIndex int) (pvc *core.PersistentVolumeClaim, err error) {
 	if pvc, err = r.getVolumePopulatorPVC(image.ID); err != nil {
 		if !k8serr.IsNotFound(err) {
 			err = liberr.Wrap(err)
@@ -1026,7 +1028,7 @@ func (r *Builder) ensureVolumePopulatorPVC(workload *model.Workload, image *mode
 			}
 		}
 
-		if pvc, err = r.persistentVolumeClaimWithSourceRef(*image, storageClassName, populatorName, annotations, workload.ID); err != nil {
+		if pvc, err = r.persistentVolumeClaimWithSourceRef(*image, storageClassName, populatorName, annotations, vmRef, diskIndex); err != nil {
 			err = liberr.Wrap(err)
 			return
 		}
@@ -1222,7 +1224,8 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image,
 	storageClassName string,
 	populatorName string,
 	annotations map[string]string,
-	vmID string) (pvc *core.PersistentVolumeClaim, err error) {
+	vmRef ref.Ref,
+	diskIndex int) (pvc *core.PersistentVolumeClaim, err error) {
 
 	apiGroup := "forklift.konveyor.io"
 	virtualSize := image.VirtualSize
@@ -1252,14 +1255,13 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image,
 
 	pvc = &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
-			GenerateName: fmt.Sprintf("%s-", image.ID),
-			Namespace:    r.Plan.Spec.TargetNamespace,
-			Annotations:  annotations,
+			Namespace:   r.Plan.Spec.TargetNamespace,
+			Annotations: annotations,
 			Labels: map[string]string{
 				"migration": getMigrationID(r.Context),
 				"plan":      string(r.Plan.GetUID()),
 				"imageID":   image.ID,
-				"vmID":      vmID,
+				"vmID":      vmRef.ID,
 			},
 		},
 		Spec: core.PersistentVolumeClaimSpec{
@@ -1276,6 +1278,20 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(image model.Image,
 				Name:     populatorName,
 			},
 		},
+	}
+
+	// Apply PVC name template
+	templateData := &api.PVCNameTemplateData{
+		VmName:       vmRef.Name,
+		TargetVmName: planbase.ResolveTargetVmName(r.Plan, vmRef.ID, vmRef.Name),
+		PlanName:     r.Plan.Name,
+		DiskIndex:    diskIndex,
+		VmId:         vmRef.ID,
+	}
+	pvcNameTemplate := planbase.GetPVCNameTemplate(r.Plan, vmRef.ID)
+	if templateErr := planbase.SetPVCNameOnObject(&pvc.ObjectMeta, pvcNameTemplate, r.Plan.Spec.PVCNameTemplateUseGenerateName, templateData); templateErr != nil {
+		err = templateErr
+		return
 	}
 
 	err = r.Client.Create(context.TODO(), pvc, &client.CreateOptions{})

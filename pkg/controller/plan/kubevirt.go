@@ -2732,17 +2732,22 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 			Annotations: annotations,
 		},
 	}
-	if !(r.Builder.SupportsVolumePopulators() && r.Plan.IsWarm()) {
-		// For storage offload warm migrations, the template should have already
-		// been applied to the PVC that will be adopted by this DataVolume, so
-		// only add generateName for other migration types.
-		dvTemplate.ObjectMeta.GenerateName = r.getGeneratedName(vm)
-	}
 	dvTemplate.Labels = r.vmLabels(vm.Ref)
 
 	dataVolumes, err = r.Builder.DataVolumes(vm.Ref, secret, configMap, &dvTemplate, vddkConfigMap)
 	if err != nil {
 		return
+	}
+
+	// Apply PVC name template to any DVs that the builder didn't name
+	for i := range dataVolumes {
+		dv := &dataVolumes[i]
+		if dv.Name == "" && dv.GenerateName == "" {
+			if templateErr := r.applyPVCNameTemplate(&dv.ObjectMeta, vm, i); templateErr != nil {
+				r.Log.Info("Failed to apply PVC name template, using fallback", "error", templateErr)
+				dv.ObjectMeta.GenerateName = r.getGeneratedName(vm)
+			}
+		}
 	}
 
 	err = r.createLunDisks(vm.Ref)
@@ -2758,6 +2763,25 @@ func (r *KubeVirt) getGeneratedName(vm *plan.VMStatus) string {
 			vm.ID,
 		},
 		"-") + "-"
+}
+
+// applyPVCNameTemplate applies the PVC name template to an ObjectMeta using
+// the generic template data (common fields only). This is the centralized
+// naming path for providers that don't override naming in their DataVolumes().
+func (r *KubeVirt) applyPVCNameTemplate(objectMeta *meta.ObjectMeta, vm *plan.VMStatus, diskIndex int) error {
+	pvcNameTemplate := planbase.GetPVCNameTemplate(r.Plan, vm.ID)
+	targetVmName := vm.Name
+	if vm.NewName != "" {
+		targetVmName = vm.NewName
+	}
+	templateData := &api.PVCNameTemplateData{
+		VmName:       vm.Name,
+		TargetVmName: targetVmName,
+		PlanName:     r.Plan.Name,
+		DiskIndex:    diskIndex,
+		VmId:         vm.ID,
+	}
+	return planbase.SetPVCNameOnObject(objectMeta, pvcNameTemplate, r.Plan.Spec.PVCNameTemplateUseGenerateName, templateData)
 }
 
 // Return the generated name for a specific VM and plan.

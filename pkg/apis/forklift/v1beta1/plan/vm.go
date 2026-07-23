@@ -60,11 +60,18 @@ type VM struct {
 	// Generated names must be valid DNS-1123 labels (lowercase alphanumerics, '-' allowed, max 63 chars).
 	// It follows Go template syntax and has access to provider-specific variables.
 	//
+	// WARNING: The PVC name is reused as a building block in other K8s resource names
+	// (e.g., "scratch-dv-{pvcName}-xxxxx", "convert-{pvcName}-xxxxx").
+	// To avoid exceeding the 63-char DNS1123 label limit on derived resources,
+	// keep the template output to at most 40 characters (46 if UseGenerateName is false).
+	// The built-in default uses trunc 15 for plan and VM names to stay within this budget.
+	//
 	// Common variables (all providers):
 	//   - .VmName: name of the VM in the source cluster (original source name)
 	//   - .TargetVmName: final VM name in the target cluster (may equal .VmName if no rename/normalization)
 	//   - .PlanName: name of the migration plan
 	//   - .DiskIndex: initial volume index of the disk
+	//   - .VmId: source VM identifier from the provider (useful for mimicking old planName-vmId naming)
 	//
 	// VMware (vSphere) specific variables:
 	//   - .WinDriveLetter: Windows drive letter (lowercase, if applicable, e.g. "c", requires guest agent)
@@ -76,12 +83,19 @@ type VM struct {
 	//   - .SourcePVCName: name of the PVC in the source cluster
 	//   - .SourcePVCNamespace: namespace of the PVC in the source cluster
 	//
+	// EC2 specific variables:
+	//   - .VolumeID: original EBS volume ID
+	//   - .SnapshotID: snapshot ID used to create the volume
+	//
 	// Note:
 	//   This template overrides the plan level template.
+	//   When PVCNameTemplatePreserveSource is true (default) and source PVC names exist (OCP),
+	//   the source PVC name is used directly, bypassing this template.
 	// Examples:
 	//   "{{.TargetVmName}}-disk-{{.DiskIndex}}"
 	//   "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}" (VMware)
-	//   "{{.TargetVmName}}-{{.SourcePVCName}}" (OpenShift)
+	//   "{{.TargetVmName}}-{{.SourcePVCName}}" (OpenShift, with pvcNameTemplatePreserveSource: false)
+	//   "{{.PlanName}}-{{.VmId}}" (mimics legacy naming)
 	// See:
 	// 	 https://github.com/kubev2v/forklift/tree/main/pkg/templateutil for template functions.
 	// +optional

@@ -5,14 +5,12 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io"
-	"net/http"
-	"strings"
-
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
+	"io"
 	"k8s.io/apimachinery/pkg/types"
 	export "kubevirt.io/api/export/v1alpha1"
+	"net/http"
 
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
@@ -21,11 +19,11 @@ import (
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
 	ocpclient "github.com/kubev2v/forklift/pkg/lib/client/openshift"
-	"github.com/kubev2v/forklift/pkg/templateutil"
 	core "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
 	cnv "kubevirt.io/api/core/v1"
@@ -117,20 +115,12 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *v1.Secret, configMap *v1.Co
 		dataVolume := dvTemplate.DeepCopy()
 		dataVolume.GenerateName = ""
 
-		pvcName, templateErr := r.setPVCNameFromTemplate(vmRef, pvc, diskIndex)
-		if templateErr != nil {
-			r.Log.Info("Failed to generate PVC name using template, using source PVC name", "error", templateErr)
-			pvcName = pvc.Name
-		}
-
-		if r.hasCustomPVCNameTemplate(vmRef) && r.Plan.Spec.PVCNameTemplateUseGenerateName {
-			if !strings.HasSuffix(pvcName, "-") {
-				pvcName = pvcName + "-"
-			}
-			dataVolume.GenerateName = pvcName
-			dataVolume.Name = ""
+		if r.Plan.Spec.PVCNameTemplatePreserveSource && pvc.Name != "" {
+			dataVolume.Name = pvc.Name
 		} else {
-			dataVolume.Name = pvcName
+			if err = r.setPVCNameFromTemplate(&dataVolume.ObjectMeta, vmRef, pvc, diskIndex); err != nil {
+				return nil, liberr.Wrap(err, "failed to generate PVC name from template")
+			}
 		}
 
 		dataVolume.Annotations[planbase.AnnDiskSource] = fmt.Sprintf("%s/%s", pvc.Namespace, pvc.Name)
@@ -726,100 +716,24 @@ func (r *Builder) CsiImportPVCs(_ ref.Ref, _ map[string]string) ([]v1.Persistent
 	return nil, nil
 }
 
-// getPlanVM returns the plan VM for the given vmRef
-func (r *Builder) getPlanVM(vmRef ref.Ref) *planapi.VM {
-	var fallback *planapi.VM
-	for i := range r.Plan.Spec.VMs {
-		planVM := &r.Plan.Spec.VMs[i]
-		if planVM.ID != "" && planVM.ID == vmRef.ID {
-			return planVM
-		}
-		if fallback == nil && planVM.Name != "" && planVM.Name == vmRef.Name {
-			fallback = planVM
-		}
-	}
-	return fallback
-}
-
-// getPlanVMStatus returns the plan VM status for the given vmRef
-func (r *Builder) getPlanVMStatus(vmRef ref.Ref) *planapi.VMStatus {
-	if r.Plan == nil || r.Plan.Status.Migration.VMs == nil {
-		return nil
-	}
-	var fallback *planapi.VMStatus
-	for _, planVMStatus := range r.Plan.Status.Migration.VMs {
-		if planVMStatus.ID != "" && planVMStatus.ID == vmRef.ID {
-			return planVMStatus
-		}
-		if fallback == nil && planVMStatus.Name != "" && planVMStatus.Name == vmRef.Name {
-			fallback = planVMStatus
-		}
-	}
-	return fallback
-}
-
-// hasCustomPVCNameTemplate returns true when a pvcNameTemplate has been
-// explicitly set at the VM or Plan level (i.e. it is not the built-in default).
-func (r *Builder) hasCustomPVCNameTemplate(vmRef ref.Ref) bool {
-	planVM := r.getPlanVM(vmRef)
-	if planVM != nil && planVM.PVCNameTemplate != "" {
-		return true
-	}
-	return r.Plan.Spec.PVCNameTemplate != ""
-}
-
-// getPVCNameTemplate returns the PVC name template for the given vmRef
-// Returns the VM-level template if set, otherwise the Plan-level template.
-// If neither is set, returns the default template "{{.SourcePVCName}}" which preserves
-// the original PVC name (backward compatible behavior).
-func (r *Builder) getPVCNameTemplate(vmRef ref.Ref) string {
-	// Check VM-level template first
-	planVM := r.getPlanVM(vmRef)
-	if planVM != nil && planVM.PVCNameTemplate != "" {
-		return planVM.PVCNameTemplate
-	}
-
-	// Check Plan-level template
-	if r.Plan.Spec.PVCNameTemplate != "" {
-		return r.Plan.Spec.PVCNameTemplate
-	}
-
-	// Default template that preserves original PVC name
-	return "{{.SourcePVCName}}"
-}
-
-// executeTemplate executes a Go template with the given data
-func (r *Builder) executeTemplate(templateText string, templateData any) (string, error) {
-	return templateutil.ExecuteTemplate(templateText, templateData)
-}
-
 // setPVCNameFromTemplate generates a PVC name using the configured template
-func (r *Builder) setPVCNameFromTemplate(vmRef ref.Ref, sourcePVC *core.PersistentVolumeClaim, diskIndex int) (string, error) {
-	pvcNameTemplate := r.getPVCNameTemplate(vmRef)
+// and sets it on the provided ObjectMeta, including DNS1123 validation.
+func (r *Builder) setPVCNameFromTemplate(objectMeta *metav1.ObjectMeta, vmRef ref.Ref, sourcePVC *core.PersistentVolumeClaim, diskIndex int) error {
+	pvcNameTemplate := planbase.GetPVCNameTemplate(r.Plan, vmRef.ID)
 
-	// Get target VM name
-	targetVmName := vmRef.Name
-	planVMStatus := r.getPlanVMStatus(vmRef)
-	if planVMStatus != nil && planVMStatus.NewName != "" {
-		targetVmName = planVMStatus.NewName
-	}
+	targetVmName := planbase.ResolveTargetVmName(r.Plan, vmRef.ID, vmRef.Name)
 
-	// Create template data
-	templateData := v1beta1.OCPPVCNameTemplateData{
+	templateData := &v1beta1.PVCNameTemplateData{
 		VmName:             vmRef.Name,
 		TargetVmName:       targetVmName,
 		PlanName:           r.Plan.Name,
 		DiskIndex:          diskIndex,
+		VmId:               vmRef.ID,
 		SourcePVCName:      sourcePVC.Name,
 		SourcePVCNamespace: sourcePVC.Namespace,
 	}
 
-	generatedName, err := r.executeTemplate(pvcNameTemplate, &templateData)
-	if err != nil {
-		return "", liberr.Wrap(err, "failed to execute PVC name template")
-	}
-
-	return generatedName, nil
+	return planbase.SetPVCNameOnObject(objectMeta, pvcNameTemplate, r.Plan.Spec.PVCNameTemplateUseGenerateName, templateData)
 }
 
 // NO-OP

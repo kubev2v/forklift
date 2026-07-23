@@ -557,26 +557,38 @@ func (r *Plan) IsUsingOffloadPlugin() bool {
 	return false
 }
 
-// VSpherePVCNameTemplateData contains fields used in PVC naming templates for vSphere migrations.
-type VSpherePVCNameTemplateData struct {
-	VmName         string `json:"vmName"`
-	TargetVmName   string `json:"targetVmName"`
-	PlanName       string `json:"planName"`
-	DiskIndex      int    `json:"diskIndex"`
-	WinDriveLetter string `json:"winDriveLetter,omitempty"`
-	RootDiskIndex  int    `json:"rootDiskIndex"`
-	Shared         bool   `json:"shared,omitempty"`
-	FileName       string `json:"fileName,omitempty"`
-}
+// PVCNameTemplateData contains all fields used in PVC naming templates across all providers.
+// Fields not applicable to a given provider are left empty (zero value).
+type PVCNameTemplateData struct {
+	// VmName is the original source VM name (all providers).
+	VmName string `json:"vmName"`
+	// TargetVmName is the DNS1123-safe target VM name (all providers).
+	TargetVmName string `json:"targetVmName"`
+	// PlanName is the migration plan name (all providers).
+	PlanName string `json:"planName"`
+	// DiskIndex is the sequential index of the disk being migrated (all providers).
+	DiskIndex int `json:"diskIndex"`
+	// VmId is the source VM identifier from the provider (all providers).
+	VmId string `json:"vmId"`
 
-// OCPPVCNameTemplateData contains fields used in PVC naming templates for OpenShift migrations.
-type OCPPVCNameTemplateData struct {
-	VmName             string `json:"vmName"`
-	TargetVmName       string `json:"targetVmName"`
-	PlanName           string `json:"planName"`
-	DiskIndex          int    `json:"diskIndex"`
-	SourcePVCName      string `json:"sourcePVCName"`
-	SourcePVCNamespace string `json:"sourcePVCNamespace"`
+	// WinDriveLetter is the Windows drive letter, lowercase (vSphere only; requires guest agent).
+	WinDriveLetter string `json:"winDriveLetter,omitempty"`
+	// RootDiskIndex is the index of the root/boot disk (vSphere only).
+	RootDiskIndex int `json:"rootDiskIndex,omitempty"`
+	// Shared is true if the disk is shared by multiple VMs (vSphere only).
+	Shared bool `json:"shared,omitempty"`
+	// FileName is the source VMDK file name including suffix (vSphere only).
+	FileName string `json:"fileName,omitempty"`
+
+	// SourcePVCName is the name of the PVC in the source cluster (OpenShift only).
+	SourcePVCName string `json:"sourcePVCName,omitempty"`
+	// SourcePVCNamespace is the namespace of the PVC in the source cluster (OpenShift only).
+	SourcePVCNamespace string `json:"sourcePVCNamespace,omitempty"`
+
+	// VolumeID is the original EBS volume ID (EC2 only).
+	VolumeID string `json:"volumeID,omitempty"`
+	// SnapshotID is the snapshot ID used to create the volume (EC2 only).
+	SnapshotID string `json:"snapshotID,omitempty"`
 }
 
 // VolumeNameTemplateData contains fields used in naming templates.

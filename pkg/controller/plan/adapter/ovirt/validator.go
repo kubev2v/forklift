@@ -253,10 +253,34 @@ func (r *Validator) VMMigrationType(vmRef ref.Ref) (ok bool, err error) {
 	return
 }
 
-// NO-OP
 func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (ok bool, err error) {
-	ok = true
-	return
+	workload := &model.Workload{}
+	err = r.Source.Inventory.Find(workload, vmRef)
+	if err != nil {
+		return false, liberr.Wrap(err, "vm", vmRef.String())
+	}
+
+	targetVmName := planbase.ResolveTargetVmName(r.Plan, vmRef.ID, vmRef.Name)
+
+	diskIndex := 0
+	for _, da := range workload.DiskAttachments {
+		if da.Disk.StorageType == "lun" {
+			continue
+		}
+		testData := &api.PVCNameTemplateData{
+			VmName:       vmRef.Name,
+			TargetVmName: targetVmName,
+			PlanName:     r.Plan.Name,
+			DiskIndex:    diskIndex,
+			VmId:         vmRef.ID,
+		}
+		_, err = planbase.ValidatePVCNameTemplate(pvcNameTemplate, testData)
+		if err != nil {
+			return false, liberr.Wrap(err, "vm", vmRef.String(), "diskAttachment", da.DiskAttachment.ID)
+		}
+		diskIndex++
+	}
+	return true, nil
 }
 
 // NO-OP

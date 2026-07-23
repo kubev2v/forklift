@@ -82,18 +82,19 @@ VMware has full support for all template features.
 
 #### PVCNameTemplate
 
-**Data Structure:** `VSpherePVCNameTemplateData`
+**Data Structure:** `PVCNameTemplateData` (unified across all providers)
 
-| Variable | Type | Description | K8s Compliant |
-|----------|------|-------------|---------------|
-| `.VmName` | string | Name of the VM in the source cluster (original source name) | No, may need `lower` |
-| `.TargetVmName` | string | Final VM name in the target cluster (DNS1123 normalized) | Yes |
-| `.PlanName` | string | Name of the migration plan | Yes |
-| `.DiskIndex` | int | Initial volume index of the disk (0-based) | Yes |
-| `.WinDriveLetter` | string | Windows drive letter (lowercase, e.g., "c"). Requires guest agent | Yes |
-| `.RootDiskIndex` | int | Index of the root/boot disk | Yes |
-| `.Shared` | bool | `true` if the volume is shared by multiple VMs | Yes |
-| `.FileName` | string | Name of the vmdk file in the source provider (includes .vmdk suffix) | No, may need `lower` |
+| Variable | Type | Description | Providers | K8s Compliant |
+|----------|------|-------------|-----------|---------------|
+| `.VmName` | string | Name of the VM in the source cluster (original source name) | All | No, may need `lower` |
+| `.TargetVmName` | string | Final VM name in the target cluster (DNS1123 normalized) | All | Yes |
+| `.PlanName` | string | Name of the migration plan | All | Yes |
+| `.DiskIndex` | int | Initial volume index of the disk (0-based) | All | Yes |
+| `.VmId` | string | Source VM identifier from the provider | All | Depends on provider |
+| `.WinDriveLetter` | string | Windows drive letter (lowercase, e.g., "c"). Requires guest agent | vSphere | Yes |
+| `.RootDiskIndex` | int | Index of the root/boot disk | vSphere | Yes |
+| `.Shared` | bool | `true` if the volume is shared by multiple VMs | vSphere | Yes |
+| `.FileName` | string | Name of the vmdk file in the source provider (includes .vmdk suffix) | vSphere | No, may need `lower` |
 
 **Default Template:** `{{trunc 4 .PlanName}}-{{trunc 4 .VmName}}-disk-{{.DiskIndex}}`
 
@@ -173,16 +174,17 @@ OpenShift supports PVC naming templates only.
 
 #### PVCNameTemplate
 
-**Data Structure:** `OCPPVCNameTemplateData`
+**Data Structure:** `PVCNameTemplateData` (unified across all providers)
 
-| Variable | Type | Description | K8s Compliant |
-|----------|------|-------------|---------------|
-| `.VmName` | string | Name of the VM in the source OpenShift cluster | Yes |
-| `.TargetVmName` | string | Final VM name in the target cluster | Yes |
-| `.PlanName` | string | Name of the migration plan | Yes |
-| `.DiskIndex` | int | Index of the disk (0-based) | Yes |
-| `.SourcePVCName` | string | Original name of the PVC in the source cluster | Yes |
-| `.SourcePVCNamespace` | string | Namespace of the PVC in the source cluster | Yes |
+| Variable | Type | Description | Providers | K8s Compliant |
+|----------|------|-------------|-----------|---------------|
+| `.VmName` | string | Name of the VM in the source OpenShift cluster | All | Yes |
+| `.TargetVmName` | string | Final VM name in the target cluster | All | Yes |
+| `.PlanName` | string | Name of the migration plan | All | Yes |
+| `.DiskIndex` | int | Index of the disk (0-based) | All | Yes |
+| `.VmId` | string | Source VM identifier from the provider | All | Yes |
+| `.SourcePVCName` | string | Original name of the PVC in the source cluster | OpenShift | Yes |
+| `.SourcePVCNamespace` | string | Namespace of the PVC in the source cluster | OpenShift | Yes |
 
 **Default Template:** `{{.SourcePVCName}}` (preserves original PVC name)
 
