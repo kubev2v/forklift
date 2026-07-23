@@ -97,99 +97,44 @@ func (r *Finder) findByRef(resource interface{}, ref base.Ref) (err error) {
 
 	switch res := resource.(type) {
 	case *VM:
-		list := []VM{}
-		err = r.listByName(&list, ref.Name)
-		if err != nil {
-			return
-		}
-		if len(list) == 0 {
-			err = liberr.Wrap(NotFoundError{Ref: ref})
-			return
-		}
-		if len(list) > 1 {
-			err = liberr.Wrap(RefNotUniqueError{Ref: ref})
-			return
-		}
-		*res = list[0]
+		err = findOneByName(r, ref, res)
 	case *Workload:
-		list := []Workload{}
-		err = r.listByName(&list, ref.Name)
-		if err != nil {
-			return
-		}
-		if len(list) == 0 {
-			err = liberr.Wrap(NotFoundError{Ref: ref})
-			return
-		}
-		if len(list) > 1 {
-			err = liberr.Wrap(RefNotUniqueError{Ref: ref})
-			return
-		}
-		*res = list[0]
+		err = findOneByName(r, ref, res)
 	case *Network:
-		list := []Network{}
-		err = r.listByName(&list, ref.Name)
-		if err != nil {
-			return
-		}
-		if len(list) == 0 {
-			err = liberr.Wrap(NotFoundError{Ref: ref})
-			return
-		}
-		if len(list) > 1 {
-			err = liberr.Wrap(RefNotUniqueError{Ref: ref})
-			return
-		}
-		*res = list[0]
+		err = findOneByName(r, ref, res)
 	case *StorageContainer:
-		list := []StorageContainer{}
-		err = r.listByName(&list, ref.Name)
-		if err != nil {
-			return
-		}
-		if len(list) == 0 {
-			err = liberr.Wrap(NotFoundError{Ref: ref})
-			return
-		}
-		if len(list) > 1 {
-			err = liberr.Wrap(RefNotUniqueError{Ref: ref})
-			return
-		}
-		*res = list[0]
+		err = findOneByName(r, ref, res)
 	case *Host:
-		list := []Host{}
-		err = r.listByName(&list, ref.Name)
-		if err != nil {
-			return
-		}
-		if len(list) == 0 {
-			err = liberr.Wrap(NotFoundError{Ref: ref})
-			return
-		}
-		if len(list) > 1 {
-			err = liberr.Wrap(RefNotUniqueError{Ref: ref})
-			return
-		}
-		*res = list[0]
+		err = findOneByName(r, ref, res)
 	case *Cluster:
-		list := []Cluster{}
-		err = r.listByName(&list, ref.Name)
-		if err != nil {
-			return
-		}
-		if len(list) == 0 {
-			err = liberr.Wrap(NotFoundError{Ref: ref})
-			return
-		}
-		if len(list) > 1 {
-			err = liberr.Wrap(RefNotUniqueError{Ref: ref})
-			return
-		}
-		*res = list[0]
+		err = findOneByName(r, ref, res)
 	default:
 		err = liberr.Wrap(ResourceNotResolvedError{Object: resource})
 	}
 
+	return
+}
+
+// findOneByName looks up exactly one resource of type T by name via the
+// Finder's listByName(), returning NotFoundError or RefNotUniqueError
+// depending on how many matches came back. Go methods can't declare their
+// own type parameters, so this is a free function taking the Finder
+// explicitly rather than a generic method on *Finder.
+func findOneByName[T any](r *Finder, ref base.Ref, out *T) (err error) {
+	list := []T{}
+	err = r.listByName(&list, ref.Name)
+	if err != nil {
+		return
+	}
+	if len(list) == 0 {
+		err = liberr.Wrap(NotFoundError{Ref: ref})
+		return
+	}
+	if len(list) > 1 {
+		err = liberr.Wrap(RefNotUniqueError{Ref: ref})
+		return
+	}
+	*out = list[0]
 	return
 }
 
