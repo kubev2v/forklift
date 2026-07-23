@@ -42,10 +42,9 @@ func TestBase_GetName(t *testing.T) {
 	}
 }
 
-// TestBase_Equals documents the actual (narrow) behavior of Equals: it only
-// matches when compared against another *Base with the same ID -- not
-// against another model that merely embeds Base (e.g. *VM), since the type
-// assertion in Equals() is against *Base specifically.
+// TestBase_Equals verifies that Equals compares by the promoted Pk(), so it
+// correctly matches concrete models (e.g. *VM) that embed Base and share the
+// same primary key, not just other *Base values directly.
 func TestBase_Equals(t *testing.T) {
 	a := &Base{ID: "vm-1"}
 	same := &Base{ID: "vm-1"}
@@ -57,10 +56,55 @@ func TestBase_Equals(t *testing.T) {
 	if a.Equals(different) {
 		t.Error("expected two *Base with different IDs to not be equal")
 	}
+	if a.Equals(nil) {
+		t.Error("expected Equals() to return false when compared against nil")
+	}
 
 	vm := &VM{Base: Base{ID: "vm-1"}}
 	var asModel libmodel.Model = vm
-	if a.Equals(asModel) {
-		t.Error("expected Equals() to return false when compared against a type that merely embeds Base")
+	if !a.Equals(asModel) {
+		t.Error("expected Equals() to return true when Pk() matches, even for a concrete model that merely embeds Base")
+	}
+
+	otherVM := &VM{Base: Base{ID: "vm-2"}}
+	if a.Equals(otherVM) {
+		t.Error("expected Equals() to return false when Pk() differs, even for a concrete model")
+	}
+}
+
+// TestAll verifies that All() registers exactly the six expected concrete
+// Nutanix model types. All() controls which inventory tables get created and
+// persisted, so an accidental omission here would only otherwise surface
+// later, during inventory persistence.
+func TestAll(t *testing.T) {
+	models := All()
+	if len(models) != 6 {
+		t.Fatalf("expected All() to return 6 models, got %d", len(models))
+	}
+
+	seen := make(map[string]bool)
+	for _, m := range models {
+		switch m.(type) {
+		case *Cluster:
+			seen["Cluster"] = true
+		case *Host:
+			seen["Host"] = true
+		case *Network:
+			seen["Network"] = true
+		case *StorageContainer:
+			seen["StorageContainer"] = true
+		case *VM:
+			seen["VM"] = true
+		case *Image:
+			seen["Image"] = true
+		default:
+			t.Errorf("unexpected model type registered in All(): %T", m)
+		}
+	}
+
+	for _, name := range []string{"Cluster", "Host", "Network", "StorageContainer", "VM", "Image"} {
+		if !seen[name] {
+			t.Errorf("expected All() to register %s, but it was missing", name)
+		}
 	}
 }
