@@ -94,6 +94,50 @@ var _ = Describe("ovirt destinationclient tests", func() {
 			Expect(patchedOvirtVolPopCr.GetOwnerReferences()[0].Name).To(Equal("testPVC"))
 		})
 	})
+
+	Describe("DeletePopulatorDataSource (MTV-6212)", func() {
+		It("should only delete populator CRs belonging to the completing VM", func() {
+			vm1PopCr := &v1beta1.OvirtVolumePopulator{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "vm1-disk",
+					Namespace: "test",
+					Labels: map[string]string{
+						"migration": "migration1",
+						"vmID":      "vm-1111",
+						"diskID":    "disk-aaa",
+					},
+				},
+				Spec: v1beta1.OvirtVolumePopulatorSpec{DiskID: "disk-aaa"},
+			}
+			vm2PopCr := &v1beta1.OvirtVolumePopulator{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "vm2-disk",
+					Namespace: "test",
+					Labels: map[string]string{
+						"migration": "migration1",
+						"vmID":      "vm-2222",
+						"diskID":    "disk-bbb",
+					},
+				},
+				Spec: v1beta1.OvirtVolumePopulatorSpec{DiskID: "disk-bbb"},
+			}
+
+			destinationClient = createDestinationClient(vm1PopCr, vm2PopCr)
+
+			// Delete populator CRs for vm-1111 only.
+			vm1Status := &plan.VMStatus{}
+			vm1Status.ID = "vm-1111"
+			err := destinationClient.DeletePopulatorDataSource(vm1Status)
+			Expect(err).ToNot(HaveOccurred())
+
+			// vm1's CR should be gone.
+			list := &v1beta1.OvirtVolumePopulatorList{}
+			err = destinationClient.Destination.List(context.TODO(), list, &client.ListOptions{Namespace: "test"})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(list.Items).To(HaveLen(1))
+			Expect(list.Items[0].Name).To(Equal("vm2-disk"))
+		})
+	})
 })
 
 func createDestinationClient(objs ...runtime.Object) *DestinationClient {
