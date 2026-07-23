@@ -17,6 +17,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	fakeClient "sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -28,6 +29,7 @@ func newTestScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
 	_ = core.AddToScheme(scheme)
 	_ = cdi.AddToScheme(scheme)
+	_ = cnv.AddToScheme(scheme)
 	return scheme
 }
 
@@ -419,6 +421,307 @@ var _ = ginkgo.Describe("hasVMOwner", func() {
 	)
 })
 
+var _ = ginkgo.Describe("referencedVolumeNames / in-use PVC protection (MTV-6183)", func() {
+	const (
+		planName      = "test-plan"
+		planNamespace = "test-ns"
+		targetNS      = "target-ns"
+	)
+
+	labels := func() map[string]string {
+		return map[string]string{
+			kPlanName:      planName,
+			kPlanNamespace: planNamespace,
+		}
+	}
+
+	ginkgo.Context("PVC referenced in VM spec.volumes via persistentVolumeClaim", func() {
+		ginkgo.It("should NOT delete a PVC referenced by a VM's persistentVolumeClaim volume", func() {
+			pvc := &core.PersistentVolumeClaim{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "target-pvc",
+					Namespace: targetNS,
+					Labels:    labels(),
+				},
+			}
+			vm := &cnv.VirtualMachine{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "my-vm",
+					Namespace: targetNS,
+				},
+				Spec: cnv.VirtualMachineSpec{
+					Template: &cnv.VirtualMachineInstanceTemplateSpec{
+						Spec: cnv.VirtualMachineInstanceSpec{
+							Volumes: []cnv.Volume{
+								{
+									Name: "disk-0",
+									VolumeSource: cnv.VolumeSource{
+										PersistentVolumeClaim: &cnv.PersistentVolumeClaimVolumeSource{
+											PersistentVolumeClaimVolumeSource: core.PersistentVolumeClaimVolumeSource{
+												ClaimName: "target-pvc",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			r := newTestReconciler(pvc, vm)
+
+			r.cleanupOrphanedResources(planName, planNamespace)
+
+			gomega.Expect(objectExists(r.Client, types.NamespacedName{
+				Name: "target-pvc", Namespace: targetNS,
+			}, &core.PersistentVolumeClaim{})).To(gomega.BeTrue(),
+				"PVC referenced in VM spec.volumes should be preserved")
+		})
+	})
+
+	ginkgo.Context("PVC referenced in VM spec.volumes via dataVolume", func() {
+		ginkgo.It("should NOT delete a PVC whose name matches a VM's dataVolume volume", func() {
+			pvc := &core.PersistentVolumeClaim{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "dv-backed-pvc",
+					Namespace: targetNS,
+					Labels:    labels(),
+				},
+			}
+			vm := &cnv.VirtualMachine{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "my-vm",
+					Namespace: targetNS,
+				},
+				Spec: cnv.VirtualMachineSpec{
+					Template: &cnv.VirtualMachineInstanceTemplateSpec{
+						Spec: cnv.VirtualMachineInstanceSpec{
+							Volumes: []cnv.Volume{
+								{
+									Name: "disk-0",
+									VolumeSource: cnv.VolumeSource{
+										DataVolume: &cnv.DataVolumeSource{
+											Name: "dv-backed-pvc",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			r := newTestReconciler(pvc, vm)
+
+			r.cleanupOrphanedResources(planName, planNamespace)
+
+			gomega.Expect(objectExists(r.Client, types.NamespacedName{
+				Name: "dv-backed-pvc", Namespace: targetNS,
+			}, &core.PersistentVolumeClaim{})).To(gomega.BeTrue(),
+				"PVC matching a dataVolume name in VM spec should be preserved")
+		})
+	})
+
+	ginkgo.Context("DataVolume referenced in VM spec.volumes", func() {
+		ginkgo.It("should NOT delete a DataVolume referenced in VM's dataVolume volume", func() {
+			dv := &cdi.DataVolume{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "target-dv",
+					Namespace: targetNS,
+					Labels:    labels(),
+				},
+			}
+			vm := &cnv.VirtualMachine{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "my-vm",
+					Namespace: targetNS,
+				},
+				Spec: cnv.VirtualMachineSpec{
+					Template: &cnv.VirtualMachineInstanceTemplateSpec{
+						Spec: cnv.VirtualMachineInstanceSpec{
+							Volumes: []cnv.Volume{
+								{
+									Name: "disk-0",
+									VolumeSource: cnv.VolumeSource{
+										DataVolume: &cnv.DataVolumeSource{
+											Name: "target-dv",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			r := newTestReconciler(dv, vm)
+
+			r.cleanupOrphanedResources(planName, planNamespace)
+
+			gomega.Expect(objectExists(r.Client, types.NamespacedName{
+				Name: "target-dv", Namespace: targetNS,
+			}, &cdi.DataVolume{})).To(gomega.BeTrue(),
+				"DataVolume referenced in VM spec.volumes should be preserved")
+		})
+	})
+
+	ginkgo.Context("PVC referenced in VMI spec.volumes (live volume migration)", func() {
+		ginkgo.It("should NOT delete a PVC referenced by a running VMI", func() {
+			pvc := &core.PersistentVolumeClaim{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "vmi-ref-pvc",
+					Namespace: targetNS,
+					Labels:    labels(),
+				},
+			}
+			vmi := &cnv.VirtualMachineInstance{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "my-vmi",
+					Namespace: targetNS,
+				},
+				Spec: cnv.VirtualMachineInstanceSpec{
+					Volumes: []cnv.Volume{
+						{
+							Name: "disk-0",
+							VolumeSource: cnv.VolumeSource{
+								PersistentVolumeClaim: &cnv.PersistentVolumeClaimVolumeSource{
+									PersistentVolumeClaimVolumeSource: core.PersistentVolumeClaimVolumeSource{
+										ClaimName: "vmi-ref-pvc",
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			r := newTestReconciler(pvc, vmi)
+
+			r.cleanupOrphanedResources(planName, planNamespace)
+
+			gomega.Expect(objectExists(r.Client, types.NamespacedName{
+				Name: "vmi-ref-pvc", Namespace: targetNS,
+			}, &core.PersistentVolumeClaim{})).To(gomega.BeTrue(),
+				"PVC referenced in VMI spec.volumes should be preserved")
+		})
+
+		ginkgo.It("should NOT delete a DataVolume referenced by a running VMI", func() {
+			dv := &cdi.DataVolume{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "vmi-ref-dv",
+					Namespace: targetNS,
+					Labels:    labels(),
+				},
+			}
+			vmi := &cnv.VirtualMachineInstance{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "my-vmi",
+					Namespace: targetNS,
+				},
+				Spec: cnv.VirtualMachineInstanceSpec{
+					Volumes: []cnv.Volume{
+						{
+							Name: "disk-0",
+							VolumeSource: cnv.VolumeSource{
+								DataVolume: &cnv.DataVolumeSource{
+									Name: "vmi-ref-dv",
+								},
+							},
+						},
+					},
+				},
+			}
+			r := newTestReconciler(dv, vmi)
+
+			r.cleanupOrphanedResources(planName, planNamespace)
+
+			gomega.Expect(objectExists(r.Client, types.NamespacedName{
+				Name: "vmi-ref-dv", Namespace: targetNS,
+			}, &cdi.DataVolume{})).To(gomega.BeTrue(),
+				"DataVolume referenced in VMI spec.volumes should be preserved")
+		})
+
+		ginkgo.It("should delete PVC not referenced by VM or VMI", func() {
+			pvc := &core.PersistentVolumeClaim{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "no-vmi-ref-pvc",
+					Namespace: targetNS,
+					Labels:    labels(),
+				},
+			}
+			vmi := &cnv.VirtualMachineInstance{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "my-vmi",
+					Namespace: targetNS,
+				},
+				Spec: cnv.VirtualMachineInstanceSpec{
+					Volumes: []cnv.Volume{
+						{
+							Name: "disk-0",
+							VolumeSource: cnv.VolumeSource{
+								PersistentVolumeClaim: &cnv.PersistentVolumeClaimVolumeSource{
+									PersistentVolumeClaimVolumeSource: core.PersistentVolumeClaimVolumeSource{
+										ClaimName: "different-pvc",
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			r := newTestReconciler(pvc, vmi)
+
+			r.cleanupOrphanedResources(planName, planNamespace)
+
+			gomega.Expect(objectExists(r.Client, types.NamespacedName{
+				Name: "no-vmi-ref-pvc", Namespace: targetNS,
+			}, &core.PersistentVolumeClaim{})).To(gomega.BeFalse(),
+				"PVC not referenced by any VM or VMI should be deleted")
+		})
+	})
+
+	ginkgo.Context("unreferenced resources are still deleted", func() {
+		ginkgo.It("should delete PVC not referenced by any VM", func() {
+			pvc := &core.PersistentVolumeClaim{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "unreferenced-pvc",
+					Namespace: targetNS,
+					Labels:    labels(),
+				},
+			}
+			vm := &cnv.VirtualMachine{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "unrelated-vm",
+					Namespace: targetNS,
+				},
+				Spec: cnv.VirtualMachineSpec{
+					Template: &cnv.VirtualMachineInstanceTemplateSpec{
+						Spec: cnv.VirtualMachineInstanceSpec{
+							Volumes: []cnv.Volume{
+								{
+									Name: "disk-0",
+									VolumeSource: cnv.VolumeSource{
+										PersistentVolumeClaim: &cnv.PersistentVolumeClaimVolumeSource{
+											PersistentVolumeClaimVolumeSource: core.PersistentVolumeClaimVolumeSource{
+												ClaimName: "some-other-pvc",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			r := newTestReconciler(pvc, vm)
+
+			r.cleanupOrphanedResources(planName, planNamespace)
+
+			gomega.Expect(objectExists(r.Client, types.NamespacedName{
+				Name: "unreferenced-pvc", Namespace: targetNS,
+			}, &core.PersistentVolumeClaim{})).To(gomega.BeFalse(),
+				"PVC not referenced by any VM should be deleted")
+		})
+	})
+})
+
 var _ = ginkgo.Describe("failExecutingMigrationOnBlocker", func() {
 	newPlanWithSnapshot := func(snapshotConditions ...libcnd.Condition) *api.Plan {
 		plan := &api.Plan{
@@ -779,5 +1082,132 @@ var _ = ginkgo.Describe("criticalOrErrorCondition", func() {
 			"old condition should be included")
 		gomega.Expect(result).NotTo(gomega.ContainSubstring("Map.Storage"),
 			"recent condition should be excluded")
+	})
+})
+
+// countingReader wraps a client.Reader and counts List calls by GVK.
+type countingReader struct {
+	client.Reader
+	vmListCount  int
+	vmiListCount int
+}
+
+func (c *countingReader) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	switch list.(type) {
+	case *cnv.VirtualMachineList:
+		c.vmListCount++
+	case *cnv.VirtualMachineInstanceList:
+		c.vmiListCount++
+	}
+	return c.Reader.List(ctx, list, opts...)
+}
+
+var _ = ginkgo.Describe("referencedVolumeNames caching (N+1 regression)", func() {
+	const (
+		planName      = "test-plan"
+		planNamespace = "test-ns"
+		targetNS      = "target-ns"
+	)
+
+	labels := func() map[string]string {
+		return map[string]string{
+			kPlanName:      planName,
+			kPlanNamespace: planNamespace,
+		}
+	}
+
+	ginkgo.It("should issue exactly one VM and one VMI List call for multiple PVCs in the same namespace", func() {
+		pvc1 := &core.PersistentVolumeClaim{
+			ObjectMeta: meta.ObjectMeta{Name: "pvc-1", Namespace: targetNS, Labels: labels()},
+		}
+		pvc2 := &core.PersistentVolumeClaim{
+			ObjectMeta: meta.ObjectMeta{Name: "pvc-2", Namespace: targetNS, Labels: labels()},
+		}
+		pvc3 := &core.PersistentVolumeClaim{
+			ObjectMeta: meta.ObjectMeta{Name: "pvc-3", Namespace: targetNS, Labels: labels()},
+		}
+		vm := &cnv.VirtualMachine{
+			ObjectMeta: meta.ObjectMeta{Name: "my-vm", Namespace: targetNS},
+			Spec: cnv.VirtualMachineSpec{
+				Template: &cnv.VirtualMachineInstanceTemplateSpec{
+					Spec: cnv.VirtualMachineInstanceSpec{
+						Volumes: []cnv.Volume{
+							{
+								Name: "disk-0",
+								VolumeSource: cnv.VolumeSource{
+									PersistentVolumeClaim: &cnv.PersistentVolumeClaimVolumeSource{
+										PersistentVolumeClaimVolumeSource: core.PersistentVolumeClaimVolumeSource{
+											ClaimName: "pvc-1",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		scheme := newTestScheme()
+		c := fakeClient.NewClientBuilder().
+			WithScheme(scheme).
+			WithObjects(pvc1, pvc2, pvc3, vm).
+			Build()
+		counter := &countingReader{Reader: c}
+		r := &Reconciler{
+			Reconciler: base.Reconciler{
+				Client: c,
+				Log:    controllerLog,
+			},
+			APIReader: counter,
+		}
+
+		r.cleanupOrphanedResources(planName, planNamespace)
+
+		gomega.Expect(counter.vmListCount).To(gomega.Equal(1),
+			"VMs should be listed exactly once for the namespace, not per-PVC")
+		gomega.Expect(counter.vmiListCount).To(gomega.Equal(1),
+			"VMIs should be listed exactly once for the namespace, not per-PVC")
+
+		// pvc-1 is referenced by the VM — preserved.
+		gomega.Expect(objectExists(c, types.NamespacedName{
+			Name: "pvc-1", Namespace: targetNS,
+		}, &core.PersistentVolumeClaim{})).To(gomega.BeTrue())
+		// pvc-2 and pvc-3 are not referenced — deleted.
+		gomega.Expect(objectExists(c, types.NamespacedName{
+			Name: "pvc-2", Namespace: targetNS,
+		}, &core.PersistentVolumeClaim{})).To(gomega.BeFalse())
+		gomega.Expect(objectExists(c, types.NamespacedName{
+			Name: "pvc-3", Namespace: targetNS,
+		}, &core.PersistentVolumeClaim{})).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should issue separate List calls for PVCs in different namespaces", func() {
+		pvcA := &core.PersistentVolumeClaim{
+			ObjectMeta: meta.ObjectMeta{Name: "pvc-a", Namespace: "ns-a", Labels: labels()},
+		}
+		pvcB := &core.PersistentVolumeClaim{
+			ObjectMeta: meta.ObjectMeta{Name: "pvc-b", Namespace: "ns-b", Labels: labels()},
+		}
+
+		scheme := newTestScheme()
+		c := fakeClient.NewClientBuilder().
+			WithScheme(scheme).
+			WithObjects(pvcA, pvcB).
+			Build()
+		counter := &countingReader{Reader: c}
+		r := &Reconciler{
+			Reconciler: base.Reconciler{
+				Client: c,
+				Log:    controllerLog,
+			},
+			APIReader: counter,
+		}
+
+		r.cleanupOrphanedResources(planName, planNamespace)
+
+		// Two different namespaces = two VM lists + two VMI lists.
+		gomega.Expect(counter.vmListCount).To(gomega.Equal(2))
+		gomega.Expect(counter.vmiListCount).To(gomega.Equal(2))
 	})
 })

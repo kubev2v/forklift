@@ -41,6 +41,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/storage/names"
+	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -922,36 +923,88 @@ func (r *Reconciler) deleteOrphanedResources(list client.ObjectList, labels clie
 		r.Log.Error(err, "Failed to list resources for cleanup.", "kind", kind)
 		return
 	}
+
+	checkVolRefs := preserveVMOwned && (kind == "PVC" || kind == "DataVolume")
+	// Per-namespace cache of volume names referenced by VMs/VMIs (avoids N+1 API calls).
+	refCache := &volumeRefCache{
+		names: map[string]map[string]bool{},
+		errs:  map[string]bool{},
+	}
+
 	_ = apimeta.EachListItem(list, func(obj runtime.Object) error {
 		resource, ok := obj.(client.Object)
 		if !ok {
 			r.Log.Error(nil, "Unexpected object type during cleanup.", "kind", kind)
 			return nil
 		}
-		// Preserve resources already owned by a migrated VirtualMachine.
-		if preserveVMOwned && hasVMOwner(resource.GetOwnerReferences()) {
-			r.Log.V(1).Info(
-				"Skipping resource owned by VirtualMachine.",
-				"kind", kind,
-				"name", resource.GetName(),
-				"namespace", resource.GetNamespace())
+		if r.shouldPreserveResource(resource, kind, preserveVMOwned, checkVolRefs, refCache) {
 			return nil
 		}
-		if err := r.Delete(context.TODO(), resource); err != nil {
-			if !k8serr.IsNotFound(err) {
-				r.Log.Error(err, "Failed to delete resource.",
-					"kind", kind,
-					"name", resource.GetName(),
-					"namespace", resource.GetNamespace())
-			}
+		r.deleteResource(resource, kind)
+		return nil
+	})
+}
+
+// volumeRefCache caches per-namespace volume names referenced by VMs/VMIs.
+type volumeRefCache struct {
+	names map[string]map[string]bool
+	errs  map[string]bool
+}
+
+// shouldPreserveResource returns true if the resource should be kept rather than deleted.
+func (r *Reconciler) shouldPreserveResource(resource client.Object, kind string, preserveVMOwned, checkVolRefs bool, refCache *volumeRefCache) bool {
+	if preserveVMOwned && hasVMOwner(resource.GetOwnerReferences()) {
+		r.Log.V(1).Info(
+			"Skipping resource owned by VirtualMachine.",
+			"kind", kind,
+			"name", resource.GetName(),
+			"namespace", resource.GetNamespace())
+		return true
+	}
+	if checkVolRefs && r.isReferencedVolume(resource, kind, refCache) {
+		return true
+	}
+	return false
+}
+
+// isReferencedVolume checks whether a PVC/DataVolume is actively referenced in
+// a VM/VMI spec.volumes, even if ownership hasn't been transferred yet (MTV-6183).
+func (r *Reconciler) isReferencedVolume(resource client.Object, kind string, cache *volumeRefCache) bool {
+	ns := resource.GetNamespace()
+	if _, seen := cache.names[ns]; !seen && !cache.errs[ns] {
+		refs, err := r.referencedVolumeNames(ns)
+		if err != nil {
+			cache.errs[ns] = true
 		} else {
-			r.Log.Info("Deleted orphaned resource.",
+			cache.names[ns] = refs
+		}
+	}
+	if cache.errs[ns] || cache.names[ns][resource.GetName()] {
+		r.Log.Info(
+			"Skipping resource referenced by a VirtualMachine spec.",
+			"kind", kind,
+			"name", resource.GetName(),
+			"namespace", resource.GetNamespace())
+		return true
+	}
+	return false
+}
+
+// deleteResource attempts to delete a resource and logs the outcome.
+func (r *Reconciler) deleteResource(resource client.Object, kind string) {
+	if err := r.Delete(context.TODO(), resource); err != nil {
+		if !k8serr.IsNotFound(err) {
+			r.Log.Error(err, "Failed to delete resource.",
 				"kind", kind,
 				"name", resource.GetName(),
 				"namespace", resource.GetNamespace())
 		}
-		return nil
-	})
+	} else {
+		r.Log.Info("Deleted orphaned resource.",
+			"kind", kind,
+			"name", resource.GetName(),
+			"namespace", resource.GetNamespace())
+	}
 }
 
 func hasVMOwner(owners []meta.OwnerReference) bool {
@@ -961,4 +1014,49 @@ func hasVMOwner(owners []meta.OwnerReference) bool {
 		}
 	}
 	return false
+}
+
+// referencedVolumeNames returns the set of PVC/DataVolume names referenced by
+// any VM or VMI in the given namespace.
+func (r *Reconciler) referencedVolumeNames(ns string) (map[string]bool, error) {
+	refs := map[string]bool{}
+
+	vms := &cnv.VirtualMachineList{}
+	if err := r.APIReader.List(context.TODO(), vms, &client.ListOptions{Namespace: ns}); err != nil {
+		r.Log.Error(err, "Failed to list VMs for in-use check, preserving resources as precaution.", "namespace", ns)
+		return nil, err
+	}
+	for _, vm := range vms.Items {
+		if vm.Spec.Template == nil {
+			continue
+		}
+		for _, vol := range vm.Spec.Template.Spec.Volumes {
+			if vol.PersistentVolumeClaim != nil {
+				refs[vol.PersistentVolumeClaim.ClaimName] = true
+			}
+			if vol.DataVolume != nil {
+				refs[vol.DataVolume.Name] = true
+			}
+		}
+	}
+
+	// Also check running VMIs — during live volume migration the VMI may reference
+	// the new PVC before the VM spec is updated.
+	vmis := &cnv.VirtualMachineInstanceList{}
+	if err := r.APIReader.List(context.TODO(), vmis, &client.ListOptions{Namespace: ns}); err != nil {
+		r.Log.Error(err, "Failed to list VMIs for in-use check, preserving resources as precaution.", "namespace", ns)
+		return nil, err
+	}
+	for _, vmi := range vmis.Items {
+		for _, vol := range vmi.Spec.Volumes {
+			if vol.PersistentVolumeClaim != nil {
+				refs[vol.PersistentVolumeClaim.ClaimName] = true
+			}
+			if vol.DataVolume != nil {
+				refs[vol.DataVolume.Name] = true
+			}
+		}
+	}
+
+	return refs, nil
 }
