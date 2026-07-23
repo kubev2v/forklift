@@ -95,6 +95,48 @@ var _ = Describe("openstack destinationclient tests", func() {
 			Expect(patchedOpenstackVolPopCr.GetOwnerReferences()[0].Name).To(Equal("testPVC"))
 		})
 	})
+
+	Describe("DeletePopulatorDataSource (MTV-6212)", func() {
+		It("should only delete populator CRs belonging to the completing VM", func() {
+			vm1PopCr := &v1beta1.OpenstackVolumePopulator{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "vm1-image",
+					Namespace: "test",
+					Labels: map[string]string{
+						"migration": "migration1",
+						"vmID":      "vm-1111",
+						"imageID":   "img-aaa",
+					},
+				},
+				Spec: v1beta1.OpenstackVolumePopulatorSpec{ImageID: "img-aaa"},
+			}
+			vm2PopCr := &v1beta1.OpenstackVolumePopulator{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "vm2-image",
+					Namespace: "test",
+					Labels: map[string]string{
+						"migration": "migration1",
+						"vmID":      "vm-2222",
+						"imageID":   "img-bbb",
+					},
+				},
+				Spec: v1beta1.OpenstackVolumePopulatorSpec{ImageID: "img-bbb"},
+			}
+
+			destinationClient = createDestinationClient(vm1PopCr, vm2PopCr)
+
+			vm1Status := &plan.VMStatus{}
+			vm1Status.ID = "vm-1111"
+			err := destinationClient.DeletePopulatorDataSource(vm1Status)
+			Expect(err).ToNot(HaveOccurred())
+
+			list := &v1beta1.OpenstackVolumePopulatorList{}
+			err = destinationClient.Destination.List(context.TODO(), list, &client.ListOptions{Namespace: "test"})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(list.Items).To(HaveLen(1))
+			Expect(list.Items[0].Name).To(Equal("vm2-image"))
+		})
+	})
 })
 
 func createDestinationClient(objs ...runtime.Object) *DestinationClient {
