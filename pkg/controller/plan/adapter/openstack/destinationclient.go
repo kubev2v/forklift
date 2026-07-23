@@ -19,9 +19,9 @@ type DestinationClient struct {
 	*plancontext.Context
 }
 
-// Delete OpenstackVolumePopulator CustomResource list.
+// Delete OpenstackVolumePopulator CustomResource list for a specific VM.
 func (r *DestinationClient) DeletePopulatorDataSource(vm *plan.VMStatus) error {
-	populatorCrList, err := r.getPopulatorCrList()
+	populatorCrList, err := r.getPopulatorCrList(vm.ID)
 	if err != nil {
 		return err
 	}
@@ -36,7 +36,7 @@ func (r *DestinationClient) DeletePopulatorDataSource(vm *plan.VMStatus) error {
 
 // Set the OpenstackVolumePopulator CustomResource Ownership.
 func (r *DestinationClient) SetPopulatorCrOwnership() (err error) {
-	populatorCrList, err := r.getPopulatorCrList()
+	populatorCrList, err := r.getPopulatorCrList("")
 	if err != nil {
 		return
 	}
@@ -60,14 +60,19 @@ func (r *DestinationClient) SetPopulatorCrOwnership() (err error) {
 }
 
 // Get the OpenstackVolumePopulator CustomResource List.
-func (r *DestinationClient) getPopulatorCrList() (populatorCrList v1beta1.OpenstackVolumePopulatorList, err error) {
+// When vmID is non-empty, results are filtered to that VM only.
+func (r *DestinationClient) getPopulatorCrList(vmID string) (populatorCrList v1beta1.OpenstackVolumePopulatorList, err error) {
 	populatorCrList = v1beta1.OpenstackVolumePopulatorList{}
+	labelSet := map[string]string{"migration": string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID)}
+	if vmID != "" {
+		labelSet["vmID"] = vmID
+	}
 	err = r.Destination.Client.List(
 		context.TODO(),
 		&populatorCrList,
 		&client.ListOptions{
 			Namespace:     r.Plan.Spec.TargetNamespace,
-			LabelSelector: labels.SelectorFromSet(map[string]string{"migration": string(r.Plan.Status.Migration.ActiveSnapshot().Migration.UID)}),
+			LabelSelector: labels.SelectorFromSet(labelSet),
 		})
 	return
 }
