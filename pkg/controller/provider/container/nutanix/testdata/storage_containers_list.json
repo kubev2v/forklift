@@ -1,0 +1,137 @@
+{
+  "api_version": "3.1",
+  "metadata": {
+    "total_matches": 3,
+    "kind": "storage_container",
+    "length": 3,
+    "offset": 0
+  },
+  "entities": [
+    {
+      "metadata": {
+        "kind": "storage_container",
+        "uuid": "0005c123-4567-89ab-cdef-000000000001",
+        "spec_version": 0,
+        "name": "default-container-prod"
+      },
+      "spec": {
+        "name": "default-container-prod",
+        "cluster_reference": {
+          "kind": "cluster",
+          "uuid": "0005e123-4567-89ab-cdef-000000000001",
+          "name": "prod-cluster-01"
+        }
+      },
+      "status": {
+        "state": "COMPLETE",
+        "name": "default-container-prod",
+        "resources": {
+          "replication_factor": 2,
+          "max_capacity_bytes": 8796093022208,
+          "advertised_capacity_bytes": 7516192768000,
+          "usage_stats": {
+            "storage.user_capacity_bytes": "7516192768000",
+            "storage.user_usage_bytes": "3221225472000",
+            "storage.user_free_bytes": "4294967296000"
+          },
+          "compression_enabled": true,
+          "compression_delay_in_secs": 0,
+          "dedup_enabled": false,
+          "on_disk_dedup": "OFF",
+          "erasure_code": "off",
+          "erasure_code_delay_secs": 0,
+          "storage_pool_uuid": "pool-uuid-1",
+          "cluster_reference": {
+            "kind": "cluster",
+            "uuid": "0005e123-4567-89ab-cdef-000000000001",
+            "name": "prod-cluster-01"
+          }
+        }
+      }
+    },
+    {
+      "metadata": {
+        "kind": "storage_container",
+        "uuid": "0005c123-4567-89ab-cdef-000000000002",
+        "spec_version": 0,
+        "name": "ssd-container-prod"
+      },
+      "spec": {
+        "name": "ssd-container-prod",
+        "cluster_reference": {
+          "kind": "cluster",
+          "uuid": "0005e123-4567-89ab-cdef-000000000001",
+          "name": "prod-cluster-01"
+        }
+      },
+      "status": {
+        "state": "COMPLETE",
+        "name": "ssd-container-prod",
+        "resources": {
+          "replication_factor": 2,
+          "max_capacity_bytes": 2199023255552,
+          "advertised_capacity_bytes": 1879048192000,
+          "usage_stats": {
+            "storage.user_capacity_bytes": "1879048192000",
+            "storage.user_usage_bytes": "536870912000",
+            "storage.user_free_bytes": "1342177280000"
+          },
+          "compression_enabled": true,
+          "compression_delay_in_secs": 0,
+          "dedup_enabled": true,
+          "on_disk_dedup": "POST_PROCESS",
+          "erasure_code": "off",
+          "erasure_code_delay_secs": 0,
+          "storage_pool_uuid": "pool-uuid-2",
+          "cluster_reference": {
+            "kind": "cluster",
+            "uuid": "0005e123-4567-89ab-cdef-000000000001",
+            "name": "prod-cluster-01"
+          }
+        }
+      }
+    },
+    {
+      "metadata": {
+        "kind": "storage_container",
+        "uuid": "0005c123-4567-89ab-cdef-000000000003",
+        "spec_version": 0,
+        "name": "default-container-dev"
+      },
+      "spec": {
+        "name": "default-container-dev",
+        "cluster_reference": {
+          "kind": "cluster",
+          "uuid": "0005e123-4567-89ab-cdef-000000000002",
+          "name": "dev-cluster-01"
+        }
+      },
+      "status": {
+        "state": "COMPLETE",
+        "name": "default-container-dev",
+        "resources": {
+          "replication_factor": 2,
+          "max_capacity_bytes": 4398046511104,
+          "advertised_capacity_bytes": 3758096384000,
+          "usage_stats": {
+            "storage.user_capacity_bytes": "3758096384000",
+            "storage.user_usage_bytes": "1073741824000",
+            "storage.user_free_bytes": "2684354560000"
+          },
+          "compression_enabled": true,
+          "compression_delay_in_secs": 0,
+          "dedup_enabled": false,
+          "on_disk_dedup": "OFF",
+          "erasure_code": "off",
+          "erasure_code_delay_secs": 0,
+          "storage_pool_uuid": "pool-uuid-3",
+          "cluster_reference": {
+            "kind": "cluster",
+            "uuid": "0005e123-4567-89ab-cdef-000000000002",
+            "name": "dev-cluster-01"
+          }
+        }
+      }
+    }
+  ]
+}

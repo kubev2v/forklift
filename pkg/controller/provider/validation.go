@@ -411,6 +411,23 @@ func (r *Reconciler) validateSecret(provider *api.Provider) (secret *core.Secret
 		}
 		tlsURL := buildTLSURL(provider.Spec.URL, hvutil.WinRMPort(provider.Spec.Settings))
 		r.validateTLSConnection(provider, secret, tlsURL, insecureSkipVerify)
+	case api.Nutanix:
+		keyList = []string{
+			"user",
+			"password",
+		}
+
+		// Check insecure flag once and use it for both validation and connection status
+		insecureSkipVerify := base.GetInsecureSkipVerifyFlag(secret)
+
+		// Validate required keys based on TLS settings
+		if !insecureSkipVerify && !util.HasCACert(secret) {
+			keyList = append(keyList, "ca.crt")
+			break
+		}
+
+		// Validate connection status
+		r.validateTLSConnection(provider, secret, provider.Spec.URL, insecureSkipVerify)
 	}
 	for _, key := range keyList {
 		if _, found := secret.Data[key]; !found {

@@ -1,0 +1,180 @@
+{
+  "api_version": "3.1",
+  "metadata": {
+    "total_matches": 3,
+    "kind": "host",
+    "length": 3,
+    "offset": 0
+  },
+  "entities": [
+    {
+      "metadata": {
+        "kind": "host",
+        "uuid": "0005f123-4567-89ab-cdef-000000000101",
+        "spec_version": 1,
+        "name": "ahv-node-01",
+        "categories": {}
+      },
+      "spec": {
+        "name": "ahv-node-01",
+        "cluster_reference": {
+          "kind": "cluster",
+          "uuid": "0005e123-4567-89ab-cdef-000000000001",
+          "name": "prod-cluster-01"
+        },
+        "resources": {}
+      },
+      "status": {
+        "state": "COMPLETE",
+        "resources": {
+          "serial_number": "NX-1234-567890",
+          "block": {
+            "block_serial_number": "NX-1234-567890",
+            "block_model": "NX-3060-G7"
+          },
+          "hypervisor": {
+            "hypervisor_full_name": "Nutanix 20240802.100",
+            "num_vms": 15
+          },
+          "controller_vm": {
+            "ip": "10.10.1.31",
+            "nat_ip": "10.10.1.31"
+          },
+          "host_type": "HYPER_CONVERGED",
+          "ipmi": {
+            "ip": "10.10.1.131"
+          },
+          "cpu_model": "Intel(R) Xeon(R) Gold 6130",
+          "cpu_capacity_hz": 2100000000,
+          "num_cpu_sockets": 2,
+          "num_cpu_cores": 32,
+          "num_cpu_threads": 64,
+          "memory_capacity_mib": 262144,
+          "host_nics_id_list": [
+            "eth0",
+            "eth1",
+            "eth2",
+            "eth3"
+          ],
+          "cluster_reference": {
+            "kind": "cluster",
+            "uuid": "0005e123-4567-89ab-cdef-000000000001",
+            "name": "prod-cluster-01"
+          }
+        }
+      }
+    },
+    {
+      "metadata": {
+        "kind": "host",
+        "uuid": "0005f123-4567-89ab-cdef-000000000102",
+        "spec_version": 1,
+        "name": "ahv-node-02",
+        "categories": {}
+      },
+      "spec": {
+        "name": "ahv-node-02",
+        "cluster_reference": {
+          "kind": "cluster",
+          "uuid": "0005e123-4567-89ab-cdef-000000000001",
+          "name": "prod-cluster-01"
+        },
+        "resources": {}
+      },
+      "status": {
+        "state": "COMPLETE",
+        "resources": {
+          "serial_number": "NX-1234-567891",
+          "block": {
+            "block_serial_number": "NX-1234-567891",
+            "block_model": "NX-3060-G7"
+          },
+          "hypervisor": {
+            "hypervisor_full_name": "Nutanix 20240802.100",
+            "num_vms": 10
+          },
+          "controller_vm": {
+            "ip": "10.10.1.32",
+            "nat_ip": "10.10.1.32"
+          },
+          "host_type": "HYPER_CONVERGED",
+          "ipmi": {
+            "ip": "10.10.1.132"
+          },
+          "cpu_model": "Intel(R) Xeon(R) Gold 6130",
+          "cpu_capacity_hz": 2100000000,
+          "num_cpu_sockets": 2,
+          "num_cpu_cores": 32,
+          "num_cpu_threads": 64,
+          "memory_capacity_mib": 262144,
+          "host_nics_id_list": [
+            "eth0",
+            "eth1",
+            "eth2",
+            "eth3"
+          ],
+          "cluster_reference": {
+            "kind": "cluster",
+            "uuid": "0005e123-4567-89ab-cdef-000000000001",
+            "name": "prod-cluster-01"
+          }
+        }
+      }
+    },
+    {
+      "metadata": {
+        "kind": "host",
+        "uuid": "0005f123-4567-89ab-cdef-000000000201",
+        "spec_version": 1,
+        "name": "ahv-dev-node-01",
+        "categories": {}
+      },
+      "spec": {
+        "name": "ahv-dev-node-01",
+        "cluster_reference": {
+          "kind": "cluster",
+          "uuid": "0005e123-4567-89ab-cdef-000000000002",
+          "name": "dev-cluster-01"
+        },
+        "resources": {}
+      },
+      "status": {
+        "state": "COMPLETE",
+        "resources": {
+          "serial_number": "NX-1234-567892",
+          "block": {
+            "block_serial_number": "NX-1234-567892",
+            "block_model": "NX-1065-G6"
+          },
+          "hypervisor": {
+            "hypervisor_full_name": "Nutanix 20240802.100",
+            "num_vms": 8
+          },
+          "controller_vm": {
+            "ip": "10.10.2.31",
+            "nat_ip": "10.10.2.31"
+          },
+          "host_type": "HYPER_CONVERGED",
+          "ipmi": {
+            "ip": "10.10.2.131"
+          },
+          "cpu_model": "Intel(R) Xeon(R) Silver 4110",
+          "cpu_capacity_hz": 2100000000,
+          "num_cpu_sockets": 2,
+          "num_cpu_cores": 16,
+          "num_cpu_threads": 32,
+          "memory_capacity_mib": 131072,
+          "host_nics_id_list": [
+            "eth0",
+            "eth1"
+          ],
+          "cluster_reference": {
+            "kind": "cluster",
+            "uuid": "0005e123-4567-89ab-cdef-000000000002",
+            "name": "dev-cluster-01"
+          }
+        }
+      }
+    }
+  ]
+}

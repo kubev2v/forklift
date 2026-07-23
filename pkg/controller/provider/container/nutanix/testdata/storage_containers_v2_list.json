@@ -1,0 +1,34 @@
+{
+  "metadata": {
+    "grand_total_entities": 2,
+    "total_entities": 2
+  },
+  "entities": [
+    {
+      "storage_container_uuid": "0005c123-4567-89ab-cdef-000000000001",
+      "name": "default-container-prod",
+      "cluster_uuid": "0005e123-4567-89ab-cdef-000000000001",
+      "replication_factor": 2,
+      "max_capacity": 8796093022208,
+      "compression_enabled": true,
+      "on_disk_dedup": "OFF",
+      "erasure_code": "off",
+      "usage_stats": {
+        "storage.user_usage_bytes": "3221225472000"
+      }
+    },
+    {
+      "storage_container_uuid": "0005c123-4567-89ab-cdef-000000000002",
+      "name": "ssd-container-prod",
+      "cluster_uuid": "0005e123-4567-89ab-cdef-000000000001",
+      "replication_factor": 2,
+      "max_capacity": 2199023255552,
+      "compression_enabled": true,
+      "on_disk_dedup": "POST_PROCESS",
+      "erasure_code": "off",
+      "usage_stats": {
+        "storage.user_usage_bytes": "536870912000"
+      }
+    }
+  ]
+}

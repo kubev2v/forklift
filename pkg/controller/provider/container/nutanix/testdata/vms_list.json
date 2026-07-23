@@ -1,0 +1,662 @@
+{
+  "api_version": "3.1",
+  "metadata": {
+    "total_matches": 6,
+    "kind": "vm",
+    "length": 6,
+    "offset": 0
+  },
+  "entities": [
+    {
+      "metadata": {
+        "kind": "vm",
+        "uuid": "vm-0005a123-4567-89ab-cdef-000000000001",
+        "spec_version": 5,
+        "name": "web-server-rhel8",
+        "categories": {
+          "Environment": "Production",
+          "Application": "WebServer"
+        }
+      },
+      "spec": {
+        "name": "web-server-rhel8",
+        "description": "Production RHEL 8 web server",
+        "cluster_reference": {
+          "kind": "cluster",
+          "uuid": "0005e123-4567-89ab-cdef-000000000001",
+          "name": "prod-cluster-01"
+        },
+        "resources": {
+          "power_state": "ON",
+          "num_sockets": 2,
+          "num_vcpus_per_socket": 2,
+          "num_threads_per_core": 1,
+          "memory_size_mib": 8192,
+          "boot_config": {
+            "boot_type": "UEFI",
+            "boot_device_order_list": [
+              "DISK",
+              "CDROM",
+              "NETWORK"
+            ]
+          },
+          "machine_type": "PC",
+          "hardware_clock_timezone": "America/Los_Angeles",
+          "vga_console_enabled": true,
+          "nic_list": [
+            {
+              "uuid": "nic-001",
+              "nic_type": "NORMAL_NIC",
+              "mac_address": "50:6b:8d:12:34:56",
+              "model": "VIRTIO",
+              "is_connected": true,
+              "subnet_reference": {
+                "kind": "subnet",
+                "uuid": "0005d123-4567-89ab-cdef-000000000001",
+                "name": "Production-VLAN-100"
+              },
+              "ip_endpoint_list": [
+                {
+                  "ip": "192.168.100.101",
+                  "type": "ASSIGNED"
+                }
+              ]
+            }
+          ],
+          "disk_list": [
+            {
+              "uuid": "disk-001",
+              "device_properties": {
+                "device_type": "DISK",
+                "disk_address": {
+                  "device_index": 0,
+                  "adapter_type": "SCSI"
+                }
+              },
+              "disk_size_mib": 102400,
+              "disk_size_bytes": 107374182400,
+              "storage_config": {
+                "storage_container_reference": {
+                  "kind": "storage_container",
+                  "uuid": "0005c123-4567-89ab-cdef-000000000001",
+                  "name": "default-container-prod"
+                },
+                "flash_mode": false
+              },
+              "data_source_reference": {
+                "kind": "image",
+                "uuid": "img-rhel8"
+              }
+            }
+          ],
+          "guest_tools": {
+            "nutanix_guest_tools": {
+              "enabled": true,
+              "iso_mount_state": "MOUNTED",
+              "version": "3.2.0",
+              "available_version": "3.2.0",
+              "vss_snapshot_capable": false,
+              "is_reachable": true,
+              "vm_mobility_drivers_installed": true,
+              "capabilities": [
+                "SELF_SERVICE_RESTORE",
+                "VSS_SNAPSHOT"
+              ]
+            }
+          },
+          "guest_customization": {
+            "is_overridable": false,
+            "cloud_init": {}
+          }
+        }
+      },
+      "status": {
+        "state": "COMPLETE",
+        "resources": {
+          "power_state": "ON",
+          "hypervisor_type": "AHV",
+          "host_reference": {
+            "kind": "host",
+            "uuid": "0005f123-4567-89ab-cdef-000000000101",
+            "name": "ahv-node-01"
+          },
+          "nic_list": [
+            {
+              "uuid": "nic-001",
+              "mac_address": "50:6b:8d:12:34:56",
+              "model": "VIRTIO",
+              "ip_endpoint_list": [
+                {
+                  "ip": "192.168.100.101"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "metadata": {
+        "kind": "vm",
+        "uuid": "vm-0005a123-4567-89ab-cdef-000000000002",
+        "spec_version": 3,
+        "name": "db-server-rhel9",
+        "categories": {
+          "Environment": "Production",
+          "Application": "Database"
+        }
+      },
+      "spec": {
+        "name": "db-server-rhel9",
+        "description": "Production database server - PostgreSQL",
+        "cluster_reference": {
+          "kind": "cluster",
+          "uuid": "0005e123-4567-89ab-cdef-000000000001",
+          "name": "prod-cluster-01"
+        },
+        "resources": {
+          "power_state": "ON",
+          "num_sockets": 4,
+          "num_vcpus_per_socket": 2,
+          "num_threads_per_core": 1,
+          "memory_size_mib": 16384,
+          "boot_config": {
+            "boot_type": "UEFI",
+            "boot_device_order_list": [
+              "DISK",
+              "NETWORK"
+            ]
+          },
+          "machine_type": "PC",
+          "vga_console_enabled": true,
+          "nic_list": [
+            {
+              "uuid": "nic-002",
+              "nic_type": "NORMAL_NIC",
+              "mac_address": "50:6b:8d:aa:bb:cc",
+              "model": "VIRTIO",
+              "is_connected": true,
+              "subnet_reference": {
+                "kind": "subnet",
+                "uuid": "0005d123-4567-89ab-cdef-000000000002",
+                "name": "Production-VLAN-200"
+              },
+              "ip_endpoint_list": [
+                {
+                  "ip": "192.168.200.51",
+                  "type": "ASSIGNED"
+                }
+              ]
+            }
+          ],
+          "disk_list": [
+            {
+              "uuid": "disk-002-os",
+              "device_properties": {
+                "device_type": "DISK",
+                "disk_address": {
+                  "device_index": 0,
+                  "adapter_type": "SCSI"
+                }
+              },
+              "disk_size_mib": 102400,
+              "disk_size_bytes": 107374182400,
+              "storage_config": {
+                "storage_container_reference": {
+                  "kind": "storage_container",
+                  "uuid": "0005c123-4567-89ab-cdef-000000000001",
+                  "name": "default-container-prod"
+                }
+              }
+            },
+            {
+              "uuid": "disk-002-data",
+              "device_properties": {
+                "device_type": "DISK",
+                "disk_address": {
+                  "device_index": 1,
+                  "adapter_type": "SCSI"
+                }
+              },
+              "disk_size_mib": 512000,
+              "disk_size_bytes": 536870912000,
+              "storage_config": {
+                "storage_container_reference": {
+                  "kind": "storage_container",
+                  "uuid": "0005c123-4567-89ab-cdef-000000000002",
+                  "name": "ssd-container-prod"
+                },
+                "flash_mode": true
+              }
+            }
+          ],
+          "guest_tools": {
+            "nutanix_guest_tools": {
+              "enabled": true,
+              "iso_mount_state": "MOUNTED",
+              "version": "3.2.0",
+              "is_reachable": true
+            }
+          }
+        }
+      },
+      "status": {
+        "state": "COMPLETE",
+        "resources": {
+          "power_state": "ON",
+          "hypervisor_type": "AHV",
+          "host_reference": {
+            "kind": "host",
+            "uuid": "0005f123-4567-89ab-cdef-000000000102",
+            "name": "ahv-node-02"
+          }
+        }
+      }
+    },
+    {
+      "metadata": {
+        "kind": "vm",
+        "uuid": "vm-0005a123-4567-89ab-cdef-000000000003",
+        "spec_version": 2,
+        "name": "win2022-app-server",
+        "categories": {
+          "Environment": "Production",
+          "OS": "Windows"
+        }
+      },
+      "spec": {
+        "name": "win2022-app-server",
+        "description": "Windows Server 2022 application server",
+        "cluster_reference": {
+          "kind": "cluster",
+          "uuid": "0005e123-4567-89ab-cdef-000000000001",
+          "name": "prod-cluster-01"
+        },
+        "resources": {
+          "power_state": "ON",
+          "num_sockets": 2,
+          "num_vcpus_per_socket": 4,
+          "num_threads_per_core": 1,
+          "memory_size_mib": 32768,
+          "boot_config": {
+            "boot_type": "UEFI",
+            "boot_device_order_list": [
+              "DISK",
+              "CDROM"
+            ]
+          },
+          "machine_type": "Q35",
+          "vga_console_enabled": true,
+          "enable_cpu_passthrough": false,
+          "nic_list": [
+            {
+              "uuid": "nic-003-1",
+              "nic_type": "NORMAL_NIC",
+              "mac_address": "50:6b:8d:11:22:33",
+              "model": "VIRTIO",
+              "is_connected": true,
+              "subnet_reference": {
+                "kind": "subnet",
+                "uuid": "0005d123-4567-89ab-cdef-000000000001",
+                "name": "Production-VLAN-100"
+              },
+              "ip_endpoint_list": [
+                {
+                  "ip": "192.168.100.110",
+                  "type": "ASSIGNED"
+                }
+              ]
+            },
+            {
+              "uuid": "nic-003-2",
+              "nic_type": "NORMAL_NIC",
+              "mac_address": "50:6b:8d:11:22:44",
+              "model": "VIRTIO",
+              "is_connected": true,
+              "subnet_reference": {
+                "kind": "subnet",
+                "uuid": "0005d123-4567-89ab-cdef-000000000002",
+                "name": "Production-VLAN-200"
+              },
+              "ip_endpoint_list": [
+                {
+                  "ip": "192.168.200.110",
+                  "type": "ASSIGNED"
+                }
+              ]
+            }
+          ],
+          "disk_list": [
+            {
+              "uuid": "disk-003-c",
+              "device_properties": {
+                "device_type": "DISK",
+                "disk_address": {
+                  "device_index": 0,
+                  "adapter_type": "SCSI"
+                }
+              },
+              "disk_size_mib": 204800,
+              "disk_size_bytes": 214748364800,
+              "storage_config": {
+                "storage_container_reference": {
+                  "kind": "storage_container",
+                  "uuid": "0005c123-4567-89ab-cdef-000000000001"
+                }
+              }
+            },
+            {
+              "uuid": "disk-003-d",
+              "device_properties": {
+                "device_type": "DISK",
+                "disk_address": {
+                  "device_index": 1,
+                  "adapter_type": "SCSI"
+                }
+              },
+              "disk_size_mib": 307200,
+              "disk_size_bytes": 322122547200,
+              "storage_config": {
+                "storage_container_reference": {
+                  "kind": "storage_container",
+                  "uuid": "0005c123-4567-89ab-cdef-000000000001"
+                }
+              }
+            }
+          ],
+          "guest_tools": {
+            "nutanix_guest_tools": {
+              "enabled": true,
+              "iso_mount_state": "MOUNTED",
+              "version": "3.2.0",
+              "vss_snapshot_capable": true,
+              "is_reachable": true
+            }
+          }
+        }
+      },
+      "status": {
+        "state": "COMPLETE",
+        "resources": {
+          "power_state": "ON",
+          "hypervisor_type": "AHV",
+          "host_reference": {
+            "kind": "host",
+            "uuid": "0005f123-4567-89ab-cdef-000000000101",
+            "name": "ahv-node-01"
+          }
+        }
+      }
+    },
+    {
+      "metadata": {
+        "kind": "vm",
+        "uuid": "vm-0005a123-4567-89ab-cdef-000000000004",
+        "spec_version": 1,
+        "name": "ubuntu-test-vm",
+        "categories": {
+          "Environment": "Development"
+        }
+      },
+      "spec": {
+        "name": "ubuntu-test-vm",
+        "description": "Ubuntu 22.04 test environment",
+        "cluster_reference": {
+          "kind": "cluster",
+          "uuid": "0005e123-4567-89ab-cdef-000000000002",
+          "name": "dev-cluster-01"
+        },
+        "resources": {
+          "power_state": "ON",
+          "num_sockets": 1,
+          "num_vcpus_per_socket": 2,
+          "num_threads_per_core": 1,
+          "memory_size_mib": 4096,
+          "boot_config": {
+            "boot_type": "LEGACY",
+            "boot_device_order_list": [
+              "DISK",
+              "NETWORK"
+            ]
+          },
+          "machine_type": "PC",
+          "vga_console_enabled": true,
+          "nic_list": [
+            {
+              "uuid": "nic-004",
+              "nic_type": "NORMAL_NIC",
+              "mac_address": "50:6b:8d:99:88:77",
+              "model": "VIRTIO",
+              "is_connected": true,
+              "subnet_reference": {
+                "kind": "subnet",
+                "uuid": "0005d123-4567-89ab-cdef-000000000003",
+                "name": "Dev-Network"
+              },
+              "ip_endpoint_list": [
+                {
+                  "ip": "10.0.10.101",
+                  "type": "ASSIGNED"
+                }
+              ]
+            }
+          ],
+          "disk_list": [
+            {
+              "uuid": "disk-004",
+              "device_properties": {
+                "device_type": "DISK",
+                "disk_address": {
+                  "device_index": 0,
+                  "adapter_type": "SCSI"
+                }
+              },
+              "disk_size_mib": 51200,
+              "disk_size_bytes": 53687091200,
+              "storage_config": {
+                "storage_container_reference": {
+                  "kind": "storage_container",
+                  "uuid": "0005c123-4567-89ab-cdef-000000000003"
+                }
+              }
+            }
+          ],
+          "guest_tools": {
+            "nutanix_guest_tools": {
+              "enabled": true,
+              "iso_mount_state": "MOUNTED",
+              "version": "3.1.0",
+              "is_reachable": true
+            }
+          }
+        }
+      },
+      "status": {
+        "state": "COMPLETE",
+        "resources": {
+          "power_state": "ON",
+          "hypervisor_type": "AHV",
+          "host_reference": {
+            "kind": "host",
+            "uuid": "0005f123-4567-89ab-cdef-000000000201",
+            "name": "ahv-dev-node-01"
+          }
+        }
+      }
+    },
+    {
+      "metadata": {
+        "kind": "vm",
+        "uuid": "vm-0005a123-4567-89ab-cdef-000000000005",
+        "spec_version": 0,
+        "name": "powered-off-vm",
+        "categories": {}
+      },
+      "spec": {
+        "name": "powered-off-vm",
+        "description": "VM in powered off state",
+        "cluster_reference": {
+          "kind": "cluster",
+          "uuid": "0005e123-4567-89ab-cdef-000000000002",
+          "name": "dev-cluster-01"
+        },
+        "resources": {
+          "power_state": "OFF",
+          "num_sockets": 1,
+          "num_vcpus_per_socket": 1,
+          "num_threads_per_core": 1,
+          "memory_size_mib": 2048,
+          "boot_config": {
+            "boot_type": "UEFI",
+            "boot_device_order_list": [
+              "DISK"
+            ]
+          },
+          "machine_type": "PC",
+          "vga_console_enabled": false,
+          "nic_list": [
+            {
+              "uuid": "nic-005",
+              "nic_type": "NORMAL_NIC",
+              "mac_address": "50:6b:8d:ff:ee:dd",
+              "model": "VIRTIO",
+              "is_connected": false,
+              "subnet_reference": {
+                "kind": "subnet",
+                "uuid": "0005d123-4567-89ab-cdef-000000000003"
+              }
+            }
+          ],
+          "disk_list": [
+            {
+              "uuid": "disk-005",
+              "device_properties": {
+                "device_type": "DISK",
+                "disk_address": {
+                  "device_index": 0,
+                  "adapter_type": "SCSI"
+                }
+              },
+              "disk_size_mib": 25600,
+              "disk_size_bytes": 26843545600,
+              "storage_config": {
+                "storage_container_reference": {
+                  "kind": "storage_container",
+                  "uuid": "0005c123-4567-89ab-cdef-000000000003"
+                }
+              }
+            }
+          ],
+          "guest_tools": {
+            "nutanix_guest_tools": {
+              "enabled": false
+            }
+          }
+        }
+      },
+      "status": {
+        "state": "COMPLETE",
+        "resources": {
+          "power_state": "OFF",
+          "hypervisor_type": "AHV"
+        }
+      }
+    },
+    {
+      "metadata": {
+        "kind": "vm",
+        "uuid": "vm-0005a123-4567-89ab-cdef-000000000006",
+        "spec_version": 1,
+        "name": "secure-boot-vm",
+        "categories": {
+          "Environment": "Production",
+          "Security": "High"
+        }
+      },
+      "spec": {
+        "name": "secure-boot-vm",
+        "description": "VM with UEFI Secure Boot enabled",
+        "cluster_reference": {
+          "kind": "cluster",
+          "uuid": "0005e123-4567-89ab-cdef-000000000001",
+          "name": "prod-cluster-01"
+        },
+        "resources": {
+          "power_state": "ON",
+          "num_sockets": 2,
+          "num_vcpus_per_socket": 2,
+          "num_threads_per_core": 1,
+          "memory_size_mib": 8192,
+          "boot_config": {
+            "boot_type": "SECURE_BOOT",
+            "boot_device_order_list": [
+              "DISK"
+            ]
+          },
+          "machine_type": "Q35",
+          "vga_console_enabled": true,
+          "nic_list": [
+            {
+              "uuid": "nic-006",
+              "nic_type": "NORMAL_NIC",
+              "mac_address": "50:6b:8d:ab:cd:ef",
+              "model": "VIRTIO",
+              "is_connected": true,
+              "subnet_reference": {
+                "kind": "subnet",
+                "uuid": "0005d123-4567-89ab-cdef-000000000001"
+              },
+              "ip_endpoint_list": [
+                {
+                  "ip": "192.168.100.120",
+                  "type": "ASSIGNED"
+                }
+              ]
+            }
+          ],
+          "disk_list": [
+            {
+              "uuid": "disk-006",
+              "device_properties": {
+                "device_type": "DISK",
+                "disk_address": {
+                  "device_index": 0,
+                  "adapter_type": "SCSI"
+                }
+              },
+              "disk_size_mib": 102400,
+              "disk_size_bytes": 107374182400,
+              "storage_config": {
+                "storage_container_reference": {
+                  "kind": "storage_container",
+                  "uuid": "0005c123-4567-89ab-cdef-000000000002"
+                },
+                "flash_mode": true
+              }
+            }
+          ],
+          "guest_tools": {
+            "nutanix_guest_tools": {
+              "enabled": true,
+              "iso_mount_state": "MOUNTED",
+              "version": "3.2.0",
+              "is_reachable": true
+            }
+          }
+        }
+      },
+      "status": {
+        "state": "COMPLETE",
+        "resources": {
+          "power_state": "ON",
+          "hypervisor_type": "AHV",
+          "host_reference": {
+            "kind": "host",
+            "uuid": "0005f123-4567-89ab-cdef-000000000102",
+            "name": "ahv-node-02"
+          }
+        }
+      }
+    }
+  ]
+}
