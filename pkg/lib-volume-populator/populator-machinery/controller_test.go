@@ -82,13 +82,13 @@ func makeCR(name, namespace, sourceHost, migrationHost string) *unstructured.Uns
 	return obj
 }
 
-// makeRunningPod returns a Running pod with the given throttleHost label, simulating an active populator.
-func makeRunningPod(name, namespace, throttleHost string) *corev1.Pod {
+// makeRunningPod returns a Running pod with the given sourceHost label, simulating an active populator.
+func makeRunningPod(name, namespace, runtimeHost string) *corev1.Pod {
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
-			Labels:    map[string]string{labelThrottleHost: throttleHost},
+			Labels:    map[string]string{labelSourceHost: runtimeHost},
 		},
 		Status: corev1.PodStatus{Phase: corev1.PodRunning},
 	}
@@ -234,7 +234,7 @@ func TestThrottle_MigrationHost_ThrottlesOnMigrationHost(t *testing.T) {
 	}
 }
 
-// 2.2 Dedicated host (1 host) — created pod carries throttleHost=migrationHost label.
+// 2.2 Dedicated host (1 host) — created pod's sourceHost label is overwritten with migrationHost.
 func TestThrottle_MigrationHost_PodLabel(t *testing.T) {
 	pvc := makePVC("pvc-1", "test-ns", "cr-1", "test-sc")
 	cr := makeCR("cr-1", "test-ns", "source-host", "dedicated-host")
@@ -249,11 +249,8 @@ func TestThrottle_MigrationHost_PodLabel(t *testing.T) {
 	if labels == nil {
 		t.Fatal("expected pod to be created")
 	}
-	if labels[labelThrottleHost] != "dedicated-host" {
-		t.Errorf("expected throttleHost label = %q, got %q", "dedicated-host", labels[labelThrottleHost])
-	}
-	if labels[labelSourceHost] != "source-host" {
-		t.Errorf("expected sourceHost label = %q, got %q", "source-host", labels[labelSourceHost])
+	if labels[labelSourceHost] != "dedicated-host" {
+		t.Errorf("expected sourceHost label = %q, got %q", "dedicated-host", labels[labelSourceHost])
 	}
 }
 
@@ -277,7 +274,7 @@ func TestThrottle_TwoDedicatedHosts_ThrottleIndependent(t *testing.T) {
 	}
 }
 
-// 3.2 Dedicated hosts (2 hosts) — pod gets correct throttleHost label for each host.
+// 3.2 Dedicated hosts (2 hosts) — pod's sourceHost label is overwritten per assigned dedicated host.
 func TestThrottle_TwoDedicatedHosts_PodLabel(t *testing.T) {
 	pvc := makePVC("pvc-1", "test-ns", "cr-1", "test-sc")
 	cr := makeCR("cr-1", "test-ns", "source-host", "dedicated-host2")
@@ -292,8 +289,8 @@ func TestThrottle_TwoDedicatedHosts_PodLabel(t *testing.T) {
 	if labels == nil {
 		t.Fatal("expected pod to be created")
 	}
-	if labels[labelThrottleHost] != "dedicated-host2" {
-		t.Errorf("expected throttleHost label = %q, got %q", "dedicated-host2", labels[labelThrottleHost])
+	if labels[labelSourceHost] != "dedicated-host2" {
+		t.Errorf("expected sourceHost label = %q, got %q", "dedicated-host2", labels[labelSourceHost])
 	}
 }
 

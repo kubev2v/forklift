@@ -109,6 +109,5 @@ const (
 
 // Labels.
 const (
-	LabelSourceHost   = "sourceHost"
-	LabelThrottleHost = "throttleHost"
+	LabelSourceHost = "sourceHost"
 )
