@@ -16,7 +16,7 @@
  *
  */
 
-package api
+package api // revive:disable:var-naming
 
 import (
 	"context"
