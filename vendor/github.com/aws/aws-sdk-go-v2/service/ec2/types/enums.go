@@ -122,6 +122,54 @@ func (AccountAttributeName) Values() []AccountAttributeName {
 	}
 }
 
+type AccountVpcEncryptionControlMode string
+
+// Enum values for AccountVpcEncryptionControlMode
+const (
+	AccountVpcEncryptionControlModeUnmanaged      AccountVpcEncryptionControlMode = "unmanaged"
+	AccountVpcEncryptionControlModeAttemptMonitor AccountVpcEncryptionControlMode = "attempt-monitor"
+	AccountVpcEncryptionControlModeAttemptEnforce AccountVpcEncryptionControlMode = "attempt-enforce"
+)
+
+// Values returns all known values for AccountVpcEncryptionControlMode. Note that
+// this can be expanded in the future, and so it is only as up to date as the
+// client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (AccountVpcEncryptionControlMode) Values() []AccountVpcEncryptionControlMode {
+	return []AccountVpcEncryptionControlMode{
+		"unmanaged",
+		"attempt-monitor",
+		"attempt-enforce",
+	}
+}
+
+type AccountVpcEncryptionControlState string
+
+// Enum values for AccountVpcEncryptionControlState
+const (
+	AccountVpcEncryptionControlStateDefaultState                   AccountVpcEncryptionControlState = "default-state"
+	AccountVpcEncryptionControlStateTransitionsInProgress          AccountVpcEncryptionControlState = "transitions-in-progress"
+	AccountVpcEncryptionControlStateTransitionsPartiallySuccessful AccountVpcEncryptionControlState = "transitions-partially-successful"
+	AccountVpcEncryptionControlStateTransitionsSuccessful          AccountVpcEncryptionControlState = "transitions-successful"
+	AccountVpcEncryptionControlStateTransitionsFailed              AccountVpcEncryptionControlState = "transitions-failed"
+)
+
+// Values returns all known values for AccountVpcEncryptionControlState. Note that
+// this can be expanded in the future, and so it is only as up to date as the
+// client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (AccountVpcEncryptionControlState) Values() []AccountVpcEncryptionControlState {
+	return []AccountVpcEncryptionControlState{
+		"default-state",
+		"transitions-in-progress",
+		"transitions-partially-successful",
+		"transitions-successful",
+		"transitions-failed",
+	}
+}
+
 type ActivityStatus string
 
 // Enum values for ActivityStatus
@@ -231,6 +279,7 @@ const (
 	AllocationStateReleased                 AllocationState = "released"
 	AllocationStateReleasedPermanentFailure AllocationState = "released-permanent-failure"
 	AllocationStatePending                  AllocationState = "pending"
+	AllocationStateConfiguring              AllocationState = "configuring"
 )
 
 // Values returns all known values for AllocationState. Note that this can be
@@ -245,6 +294,7 @@ func (AllocationState) Values() []AllocationState {
 		"released",
 		"released-permanent-failure",
 		"pending",
+		"configuring",
 	}
 }
 
@@ -277,8 +327,9 @@ type AllocationType string
 
 // Enum values for AllocationType
 const (
-	AllocationTypeUsed   AllocationType = "used"
-	AllocationTypeFuture AllocationType = "future"
+	AllocationTypeUsed       AllocationType = "used"
+	AllocationTypeFuture     AllocationType = "future"
+	AllocationTypeCancelling AllocationType = "cancelling"
 )
 
 // Values returns all known values for AllocationType. Note that this can be
@@ -289,6 +340,7 @@ func (AllocationType) Values() []AllocationType {
 	return []AllocationType{
 		"used",
 		"future",
+		"cancelling",
 	}
 }
 
@@ -349,6 +401,25 @@ func (AllowsMultipleInstanceTypes) Values() []AllowsMultipleInstanceTypes {
 	}
 }
 
+type AmdSevSnp string
+
+// Enum values for AmdSevSnp
+const (
+	AmdSevSnpEnabled  AmdSevSnp = "enabled"
+	AmdSevSnpDisabled AmdSevSnp = "disabled"
+)
+
+// Values returns all known values for AmdSevSnp. Note that this can be expanded
+// in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (AmdSevSnp) Values() []AmdSevSnp {
+	return []AmdSevSnp{
+		"enabled",
+		"disabled",
+	}
+}
+
 type AmdSevSnpSpecification string
 
 // Enum values for AmdSevSnpSpecification
@@ -405,6 +476,23 @@ func (ApplianceModeSupportValue) Values() []ApplianceModeSupportValue {
 	return []ApplianceModeSupportValue{
 		"enable",
 		"disable",
+	}
+}
+
+type ApplyCancellationCharges string
+
+// Enum values for ApplyCancellationCharges
+const (
+	ApplyCancellationChargesCommitmentWindDown ApplyCancellationCharges = "commitment-wind-down"
+)
+
+// Values returns all known values for ApplyCancellationCharges. Note that this
+// can be expanded in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (ApplyCancellationCharges) Values() []ApplyCancellationCharges {
+	return []ApplyCancellationCharges{
+		"commitment-wind-down",
 	}
 }
 
@@ -1161,6 +1249,30 @@ func (CapacityManagerDataExportStatus) Values() []CapacityManagerDataExportStatu
 	}
 }
 
+type CapacityManagerMonitoredTagKeyStatus string
+
+// Enum values for CapacityManagerMonitoredTagKeyStatus
+const (
+	CapacityManagerMonitoredTagKeyStatusActivating   CapacityManagerMonitoredTagKeyStatus = "activating"
+	CapacityManagerMonitoredTagKeyStatusActivated    CapacityManagerMonitoredTagKeyStatus = "activated"
+	CapacityManagerMonitoredTagKeyStatusDeactivating CapacityManagerMonitoredTagKeyStatus = "deactivating"
+	CapacityManagerMonitoredTagKeyStatusSuspended    CapacityManagerMonitoredTagKeyStatus = "suspended"
+)
+
+// Values returns all known values for CapacityManagerMonitoredTagKeyStatus. Note
+// that this can be expanded in the future, and so it is only as up to date as the
+// client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (CapacityManagerMonitoredTagKeyStatus) Values() []CapacityManagerMonitoredTagKeyStatus {
+	return []CapacityManagerMonitoredTagKeyStatus{
+		"activating",
+		"activated",
+		"deactivating",
+		"suspended",
+	}
+}
+
 type CapacityManagerStatus string
 
 // Enum values for CapacityManagerStatus
@@ -1204,6 +1316,28 @@ func (CapacityReservationBillingRequestStatus) Values() []CapacityReservationBil
 		"rejected",
 		"cancelled",
 		"revoked",
+		"expired",
+	}
+}
+
+type CapacityReservationCancellationQuoteState string
+
+// Enum values for CapacityReservationCancellationQuoteState
+const (
+	CapacityReservationCancellationQuoteStatePending CapacityReservationCancellationQuoteState = "pending"
+	CapacityReservationCancellationQuoteStateActive  CapacityReservationCancellationQuoteState = "active"
+	CapacityReservationCancellationQuoteStateExpired CapacityReservationCancellationQuoteState = "expired"
+)
+
+// Values returns all known values for CapacityReservationCancellationQuoteState.
+// Note that this can be expanded in the future, and so it is only as up to date as
+// the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (CapacityReservationCancellationQuoteState) Values() []CapacityReservationCancellationQuoteState {
+	return []CapacityReservationCancellationQuoteState{
+		"pending",
+		"active",
 		"expired",
 	}
 }
@@ -1351,6 +1485,7 @@ const (
 	CapacityReservationStateAssessing      CapacityReservationState = "assessing"
 	CapacityReservationStateDelayed        CapacityReservationState = "delayed"
 	CapacityReservationStateUnsupported    CapacityReservationState = "unsupported"
+	CapacityReservationStateCancelling     CapacityReservationState = "cancelling"
 	CapacityReservationStateUnavailable    CapacityReservationState = "unavailable"
 )
 
@@ -1371,6 +1506,7 @@ func (CapacityReservationState) Values() []CapacityReservationState {
 		"assessing",
 		"delayed",
 		"unsupported",
+		"cancelling",
 		"unavailable",
 	}
 }
@@ -1572,6 +1708,7 @@ const (
 	ClientVpnEndpointStatusCodeAvailable        ClientVpnEndpointStatusCode = "available"
 	ClientVpnEndpointStatusCodeDeleting         ClientVpnEndpointStatusCode = "deleting"
 	ClientVpnEndpointStatusCodeDeleted          ClientVpnEndpointStatusCode = "deleted"
+	ClientVpnEndpointStatusCodePending          ClientVpnEndpointStatusCode = "pending"
 )
 
 // Values returns all known values for ClientVpnEndpointStatusCode. Note that this
@@ -1584,6 +1721,7 @@ func (ClientVpnEndpointStatusCode) Values() []ClientVpnEndpointStatusCode {
 		"available",
 		"deleting",
 		"deleted",
+		"pending",
 	}
 }
 
@@ -1800,6 +1938,28 @@ func (DatafeedSubscriptionState) Values() []DatafeedSubscriptionState {
 	}
 }
 
+type DefaultHttpTokensEnforcedState string
+
+// Enum values for DefaultHttpTokensEnforcedState
+const (
+	DefaultHttpTokensEnforcedStateDisabled     DefaultHttpTokensEnforcedState = "disabled"
+	DefaultHttpTokensEnforcedStateEnabled      DefaultHttpTokensEnforcedState = "enabled"
+	DefaultHttpTokensEnforcedStateNoPreference DefaultHttpTokensEnforcedState = "no-preference"
+)
+
+// Values returns all known values for DefaultHttpTokensEnforcedState. Note that
+// this can be expanded in the future, and so it is only as up to date as the
+// client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (DefaultHttpTokensEnforcedState) Values() []DefaultHttpTokensEnforcedState {
+	return []DefaultHttpTokensEnforcedState{
+		"disabled",
+		"enabled",
+		"no-preference",
+	}
+}
+
 type DefaultInstanceMetadataEndpointState string
 
 // Enum values for DefaultInstanceMetadataEndpointState
@@ -1888,9 +2048,10 @@ type DefaultTargetCapacityType string
 
 // Enum values for DefaultTargetCapacityType
 const (
-	DefaultTargetCapacityTypeSpot          DefaultTargetCapacityType = "spot"
-	DefaultTargetCapacityTypeOnDemand      DefaultTargetCapacityType = "on-demand"
-	DefaultTargetCapacityTypeCapacityBlock DefaultTargetCapacityType = "capacity-block"
+	DefaultTargetCapacityTypeSpot             DefaultTargetCapacityType = "spot"
+	DefaultTargetCapacityTypeOnDemand         DefaultTargetCapacityType = "on-demand"
+	DefaultTargetCapacityTypeCapacityBlock    DefaultTargetCapacityType = "capacity-block"
+	DefaultTargetCapacityTypeReservedCapacity DefaultTargetCapacityType = "reserved-capacity"
 )
 
 // Values returns all known values for DefaultTargetCapacityType. Note that this
@@ -1902,6 +2063,7 @@ func (DefaultTargetCapacityType) Values() []DefaultTargetCapacityType {
 		"spot",
 		"on-demand",
 		"capacity-block",
+		"reserved-capacity",
 	}
 }
 
@@ -2633,6 +2795,7 @@ const (
 	FilterByDimensionResourceRegion                   FilterByDimension = "resource-region"
 	FilterByDimensionAvailabilityZoneId               FilterByDimension = "availability-zone-id"
 	FilterByDimensionAccountId                        FilterByDimension = "account-id"
+	FilterByDimensionAccountName                      FilterByDimension = "account-name"
 	FilterByDimensionInstanceFamily                   FilterByDimension = "instance-family"
 	FilterByDimensionInstanceType                     FilterByDimension = "instance-type"
 	FilterByDimensionInstancePlatform                 FilterByDimension = "instance-platform"
@@ -2658,6 +2821,7 @@ func (FilterByDimension) Values() []FilterByDimension {
 		"resource-region",
 		"availability-zone-id",
 		"account-id",
+		"account-name",
 		"instance-family",
 		"instance-type",
 		"instance-platform",
@@ -2796,6 +2960,25 @@ func (FleetExcessCapacityTerminationPolicy) Values() []FleetExcessCapacityTermin
 	}
 }
 
+type FleetHttpTokensState string
+
+// Enum values for FleetHttpTokensState
+const (
+	FleetHttpTokensStateOptional FleetHttpTokensState = "optional"
+	FleetHttpTokensStateRequired FleetHttpTokensState = "required"
+)
+
+// Values returns all known values for FleetHttpTokensState. Note that this can be
+// expanded in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (FleetHttpTokensState) Values() []FleetHttpTokensState {
+	return []FleetHttpTokensState{
+		"optional",
+		"required",
+	}
+}
+
 type FleetInstanceMatchCriteria string
 
 // Enum values for FleetInstanceMatchCriteria
@@ -2810,6 +2993,26 @@ const (
 func (FleetInstanceMatchCriteria) Values() []FleetInstanceMatchCriteria {
 	return []FleetInstanceMatchCriteria{
 		"open",
+	}
+}
+
+type FleetInstanceMetadataEndpointState string
+
+// Enum values for FleetInstanceMetadataEndpointState
+const (
+	FleetInstanceMetadataEndpointStateDisabled FleetInstanceMetadataEndpointState = "disabled"
+	FleetInstanceMetadataEndpointStateEnabled  FleetInstanceMetadataEndpointState = "enabled"
+)
+
+// Values returns all known values for FleetInstanceMetadataEndpointState. Note
+// that this can be expanded in the future, and so it is only as up to date as the
+// client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (FleetInstanceMetadataEndpointState) Values() []FleetInstanceMetadataEndpointState {
+	return []FleetInstanceMetadataEndpointState{
+		"disabled",
+		"enabled",
 	}
 }
 
@@ -2849,6 +3052,23 @@ func (FleetReplacementStrategy) Values() []FleetReplacementStrategy {
 	return []FleetReplacementStrategy{
 		"launch",
 		"launch-before-terminate",
+	}
+}
+
+type FleetReservationType string
+
+// Enum values for FleetReservationType
+const (
+	FleetReservationTypeInterruptibleCapacityReservation FleetReservationType = "interruptible-capacity-reservation"
+)
+
+// Values returns all known values for FleetReservationType. Note that this can be
+// expanded in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (FleetReservationType) Values() []FleetReservationType {
+	return []FleetReservationType{
+		"interruptible-capacity-reservation",
 	}
 }
 
@@ -3041,6 +3261,7 @@ const (
 	GroupByResourceRegion                   GroupBy = "resource-region"
 	GroupByAvailabilityZoneId               GroupBy = "availability-zone-id"
 	GroupByAccountId                        GroupBy = "account-id"
+	GroupByAccountName                      GroupBy = "account-name"
 	GroupByInstanceFamily                   GroupBy = "instance-family"
 	GroupByInstanceType                     GroupBy = "instance-type"
 	GroupByInstancePlatform                 GroupBy = "instance-platform"
@@ -3066,6 +3287,7 @@ func (GroupBy) Values() []GroupBy {
 		"resource-region",
 		"availability-zone-id",
 		"account-id",
+		"account-name",
 		"instance-family",
 		"instance-type",
 		"instance-platform",
@@ -3181,6 +3403,25 @@ func (HostTenancy) Values() []HostTenancy {
 		"default",
 		"dedicated",
 		"host",
+	}
+}
+
+type HttpTokensEnforcedState string
+
+// Enum values for HttpTokensEnforcedState
+const (
+	HttpTokensEnforcedStateDisabled HttpTokensEnforcedState = "disabled"
+	HttpTokensEnforcedStateEnabled  HttpTokensEnforcedState = "enabled"
+)
+
+// Values returns all known values for HttpTokensEnforcedState. Note that this can
+// be expanded in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (HttpTokensEnforcedState) Values() []HttpTokensEnforcedState {
+	return []HttpTokensEnforcedState{
+		"disabled",
+		"enabled",
 	}
 }
 
@@ -3690,8 +3931,9 @@ type InstanceLifecycle string
 
 // Enum values for InstanceLifecycle
 const (
-	InstanceLifecycleSpot     InstanceLifecycle = "spot"
-	InstanceLifecycleOnDemand InstanceLifecycle = "on-demand"
+	InstanceLifecycleSpot                             InstanceLifecycle = "spot"
+	InstanceLifecycleOnDemand                         InstanceLifecycle = "on-demand"
+	InstanceLifecycleInterruptibleCapacityReservation InstanceLifecycle = "interruptible-capacity-reservation"
 )
 
 // Values returns all known values for InstanceLifecycle. Note that this can be
@@ -3702,6 +3944,7 @@ func (InstanceLifecycle) Values() []InstanceLifecycle {
 	return []InstanceLifecycle{
 		"spot",
 		"on-demand",
+		"interruptible-capacity-reservation",
 	}
 }
 
@@ -4982,6 +5225,326 @@ const (
 	InstanceTypeR8a48xlarge        InstanceType = "r8a.48xlarge"
 	InstanceTypeR8aMetal24xl       InstanceType = "r8a.metal-24xl"
 	InstanceTypeR8aMetal48xl       InstanceType = "r8a.metal-48xl"
+	InstanceTypeP6B30048xlarge     InstanceType = "p6-b300.48xlarge"
+	InstanceTypeC8aMedium          InstanceType = "c8a.medium"
+	InstanceTypeC8aLarge           InstanceType = "c8a.large"
+	InstanceTypeC8aXlarge          InstanceType = "c8a.xlarge"
+	InstanceTypeC8a2xlarge         InstanceType = "c8a.2xlarge"
+	InstanceTypeC8a4xlarge         InstanceType = "c8a.4xlarge"
+	InstanceTypeC8a8xlarge         InstanceType = "c8a.8xlarge"
+	InstanceTypeC8a12xlarge        InstanceType = "c8a.12xlarge"
+	InstanceTypeC8a16xlarge        InstanceType = "c8a.16xlarge"
+	InstanceTypeC8a24xlarge        InstanceType = "c8a.24xlarge"
+	InstanceTypeC8a48xlarge        InstanceType = "c8a.48xlarge"
+	InstanceTypeC8aMetal24xl       InstanceType = "c8a.metal-24xl"
+	InstanceTypeC8aMetal48xl       InstanceType = "c8a.metal-48xl"
+	InstanceTypeC8gb12xlarge       InstanceType = "c8gb.12xlarge"
+	InstanceTypeC8gb16xlarge       InstanceType = "c8gb.16xlarge"
+	InstanceTypeC8gb24xlarge       InstanceType = "c8gb.24xlarge"
+	InstanceTypeC8gb2xlarge        InstanceType = "c8gb.2xlarge"
+	InstanceTypeC8gb4xlarge        InstanceType = "c8gb.4xlarge"
+	InstanceTypeC8gb8xlarge        InstanceType = "c8gb.8xlarge"
+	InstanceTypeC8gbLarge          InstanceType = "c8gb.large"
+	InstanceTypeC8gbMedium         InstanceType = "c8gb.medium"
+	InstanceTypeC8gbMetal24xl      InstanceType = "c8gb.metal-24xl"
+	InstanceTypeC8gbXlarge         InstanceType = "c8gb.xlarge"
+	InstanceTypeC8gb48xlarge       InstanceType = "c8gb.48xlarge"
+	InstanceTypeC8gbMetal48xl      InstanceType = "c8gb.metal-48xl"
+	InstanceTypeM8gb12xlarge       InstanceType = "m8gb.12xlarge"
+	InstanceTypeM8gb16xlarge       InstanceType = "m8gb.16xlarge"
+	InstanceTypeM8gb24xlarge       InstanceType = "m8gb.24xlarge"
+	InstanceTypeM8gb2xlarge        InstanceType = "m8gb.2xlarge"
+	InstanceTypeM8gb4xlarge        InstanceType = "m8gb.4xlarge"
+	InstanceTypeM8gb8xlarge        InstanceType = "m8gb.8xlarge"
+	InstanceTypeM8gbLarge          InstanceType = "m8gb.large"
+	InstanceTypeM8gbMedium         InstanceType = "m8gb.medium"
+	InstanceTypeM8gbXlarge         InstanceType = "m8gb.xlarge"
+	InstanceTypeM8gb48xlarge       InstanceType = "m8gb.48xlarge"
+	InstanceTypeM8gbMetal24xl      InstanceType = "m8gb.metal-24xl"
+	InstanceTypeM8gbMetal48xl      InstanceType = "m8gb.metal-48xl"
+	InstanceTypeM8gn12xlarge       InstanceType = "m8gn.12xlarge"
+	InstanceTypeM8gn16xlarge       InstanceType = "m8gn.16xlarge"
+	InstanceTypeM8gn24xlarge       InstanceType = "m8gn.24xlarge"
+	InstanceTypeM8gn2xlarge        InstanceType = "m8gn.2xlarge"
+	InstanceTypeM8gn48xlarge       InstanceType = "m8gn.48xlarge"
+	InstanceTypeM8gn4xlarge        InstanceType = "m8gn.4xlarge"
+	InstanceTypeM8gn8xlarge        InstanceType = "m8gn.8xlarge"
+	InstanceTypeM8gnLarge          InstanceType = "m8gn.large"
+	InstanceTypeM8gnMedium         InstanceType = "m8gn.medium"
+	InstanceTypeM8gnXlarge         InstanceType = "m8gn.xlarge"
+	InstanceTypeM8gnMetal24xl      InstanceType = "m8gn.metal-24xl"
+	InstanceTypeM8gnMetal48xl      InstanceType = "m8gn.metal-48xl"
+	InstanceTypeX8aedz12xlarge     InstanceType = "x8aedz.12xlarge"
+	InstanceTypeX8aedz24xlarge     InstanceType = "x8aedz.24xlarge"
+	InstanceTypeX8aedz3xlarge      InstanceType = "x8aedz.3xlarge"
+	InstanceTypeX8aedz6xlarge      InstanceType = "x8aedz.6xlarge"
+	InstanceTypeX8aedzLarge        InstanceType = "x8aedz.large"
+	InstanceTypeX8aedzMetal12xl    InstanceType = "x8aedz.metal-12xl"
+	InstanceTypeX8aedzMetal24xl    InstanceType = "x8aedz.metal-24xl"
+	InstanceTypeX8aedzXlarge       InstanceType = "x8aedz.xlarge"
+	InstanceTypeM8aznMedium        InstanceType = "m8azn.medium"
+	InstanceTypeM8aznLarge         InstanceType = "m8azn.large"
+	InstanceTypeM8aznXlarge        InstanceType = "m8azn.xlarge"
+	InstanceTypeM8azn3xlarge       InstanceType = "m8azn.3xlarge"
+	InstanceTypeM8azn6xlarge       InstanceType = "m8azn.6xlarge"
+	InstanceTypeM8azn12xlarge      InstanceType = "m8azn.12xlarge"
+	InstanceTypeM8azn24xlarge      InstanceType = "m8azn.24xlarge"
+	InstanceTypeM8aznMetal12xl     InstanceType = "m8azn.metal-12xl"
+	InstanceTypeM8aznMetal24xl     InstanceType = "m8azn.metal-24xl"
+	InstanceTypeX8iLarge           InstanceType = "x8i.large"
+	InstanceTypeX8iXlarge          InstanceType = "x8i.xlarge"
+	InstanceTypeX8i2xlarge         InstanceType = "x8i.2xlarge"
+	InstanceTypeX8i4xlarge         InstanceType = "x8i.4xlarge"
+	InstanceTypeX8i8xlarge         InstanceType = "x8i.8xlarge"
+	InstanceTypeX8i12xlarge        InstanceType = "x8i.12xlarge"
+	InstanceTypeX8i16xlarge        InstanceType = "x8i.16xlarge"
+	InstanceTypeX8i24xlarge        InstanceType = "x8i.24xlarge"
+	InstanceTypeX8i32xlarge        InstanceType = "x8i.32xlarge"
+	InstanceTypeX8i48xlarge        InstanceType = "x8i.48xlarge"
+	InstanceTypeX8i64xlarge        InstanceType = "x8i.64xlarge"
+	InstanceTypeX8i96xlarge        InstanceType = "x8i.96xlarge"
+	InstanceTypeX8iMetal48xl       InstanceType = "x8i.metal-48xl"
+	InstanceTypeX8iMetal96xl       InstanceType = "x8i.metal-96xl"
+	InstanceTypeMacM4maxMetal      InstanceType = "mac-m4max.metal"
+	InstanceTypeG7e2xlarge         InstanceType = "g7e.2xlarge"
+	InstanceTypeG7e4xlarge         InstanceType = "g7e.4xlarge"
+	InstanceTypeG7e8xlarge         InstanceType = "g7e.8xlarge"
+	InstanceTypeG7e12xlarge        InstanceType = "g7e.12xlarge"
+	InstanceTypeG7e24xlarge        InstanceType = "g7e.24xlarge"
+	InstanceTypeG7e48xlarge        InstanceType = "g7e.48xlarge"
+	InstanceTypeR8idLarge          InstanceType = "r8id.large"
+	InstanceTypeR8idXlarge         InstanceType = "r8id.xlarge"
+	InstanceTypeR8id2xlarge        InstanceType = "r8id.2xlarge"
+	InstanceTypeR8id4xlarge        InstanceType = "r8id.4xlarge"
+	InstanceTypeR8id8xlarge        InstanceType = "r8id.8xlarge"
+	InstanceTypeR8id12xlarge       InstanceType = "r8id.12xlarge"
+	InstanceTypeR8id16xlarge       InstanceType = "r8id.16xlarge"
+	InstanceTypeR8id24xlarge       InstanceType = "r8id.24xlarge"
+	InstanceTypeR8id32xlarge       InstanceType = "r8id.32xlarge"
+	InstanceTypeR8id48xlarge       InstanceType = "r8id.48xlarge"
+	InstanceTypeR8id96xlarge       InstanceType = "r8id.96xlarge"
+	InstanceTypeR8idMetal48xl      InstanceType = "r8id.metal-48xl"
+	InstanceTypeR8idMetal96xl      InstanceType = "r8id.metal-96xl"
+	InstanceTypeC8idLarge          InstanceType = "c8id.large"
+	InstanceTypeC8idXlarge         InstanceType = "c8id.xlarge"
+	InstanceTypeC8id2xlarge        InstanceType = "c8id.2xlarge"
+	InstanceTypeC8id4xlarge        InstanceType = "c8id.4xlarge"
+	InstanceTypeC8id8xlarge        InstanceType = "c8id.8xlarge"
+	InstanceTypeC8id12xlarge       InstanceType = "c8id.12xlarge"
+	InstanceTypeC8id16xlarge       InstanceType = "c8id.16xlarge"
+	InstanceTypeC8id24xlarge       InstanceType = "c8id.24xlarge"
+	InstanceTypeC8id32xlarge       InstanceType = "c8id.32xlarge"
+	InstanceTypeC8id48xlarge       InstanceType = "c8id.48xlarge"
+	InstanceTypeC8id96xlarge       InstanceType = "c8id.96xlarge"
+	InstanceTypeC8idMetal48xl      InstanceType = "c8id.metal-48xl"
+	InstanceTypeC8idMetal96xl      InstanceType = "c8id.metal-96xl"
+	InstanceTypeM8idLarge          InstanceType = "m8id.large"
+	InstanceTypeM8idXlarge         InstanceType = "m8id.xlarge"
+	InstanceTypeM8id2xlarge        InstanceType = "m8id.2xlarge"
+	InstanceTypeM8id4xlarge        InstanceType = "m8id.4xlarge"
+	InstanceTypeM8id8xlarge        InstanceType = "m8id.8xlarge"
+	InstanceTypeM8id12xlarge       InstanceType = "m8id.12xlarge"
+	InstanceTypeM8id16xlarge       InstanceType = "m8id.16xlarge"
+	InstanceTypeM8id24xlarge       InstanceType = "m8id.24xlarge"
+	InstanceTypeM8id32xlarge       InstanceType = "m8id.32xlarge"
+	InstanceTypeM8id48xlarge       InstanceType = "m8id.48xlarge"
+	InstanceTypeM8id96xlarge       InstanceType = "m8id.96xlarge"
+	InstanceTypeM8idMetal48xl      InstanceType = "m8id.metal-48xl"
+	InstanceTypeM8idMetal96xl      InstanceType = "m8id.metal-96xl"
+	InstanceTypeHpc8a96xlarge      InstanceType = "hpc8a.96xlarge"
+	InstanceTypeC8inLarge          InstanceType = "c8in.large"
+	InstanceTypeC8inXlarge         InstanceType = "c8in.xlarge"
+	InstanceTypeC8in2xlarge        InstanceType = "c8in.2xlarge"
+	InstanceTypeC8in4xlarge        InstanceType = "c8in.4xlarge"
+	InstanceTypeC8in8xlarge        InstanceType = "c8in.8xlarge"
+	InstanceTypeC8in12xlarge       InstanceType = "c8in.12xlarge"
+	InstanceTypeC8in16xlarge       InstanceType = "c8in.16xlarge"
+	InstanceTypeC8in24xlarge       InstanceType = "c8in.24xlarge"
+	InstanceTypeC8in32xlarge       InstanceType = "c8in.32xlarge"
+	InstanceTypeC8in48xlarge       InstanceType = "c8in.48xlarge"
+	InstanceTypeC8in96xlarge       InstanceType = "c8in.96xlarge"
+	InstanceTypeC8inMetal48xl      InstanceType = "c8in.metal-48xl"
+	InstanceTypeC8inMetal96xl      InstanceType = "c8in.metal-96xl"
+	InstanceTypeC8ibLarge          InstanceType = "c8ib.large"
+	InstanceTypeC8ibXlarge         InstanceType = "c8ib.xlarge"
+	InstanceTypeC8ib2xlarge        InstanceType = "c8ib.2xlarge"
+	InstanceTypeC8ib4xlarge        InstanceType = "c8ib.4xlarge"
+	InstanceTypeC8ib8xlarge        InstanceType = "c8ib.8xlarge"
+	InstanceTypeC8ib12xlarge       InstanceType = "c8ib.12xlarge"
+	InstanceTypeC8ib16xlarge       InstanceType = "c8ib.16xlarge"
+	InstanceTypeC8ib24xlarge       InstanceType = "c8ib.24xlarge"
+	InstanceTypeC8ib32xlarge       InstanceType = "c8ib.32xlarge"
+	InstanceTypeC8ib48xlarge       InstanceType = "c8ib.48xlarge"
+	InstanceTypeC8ib96xlarge       InstanceType = "c8ib.96xlarge"
+	InstanceTypeC8ibMetal48xl      InstanceType = "c8ib.metal-48xl"
+	InstanceTypeC8ibMetal96xl      InstanceType = "c8ib.metal-96xl"
+	InstanceTypeR8inLarge          InstanceType = "r8in.large"
+	InstanceTypeR8inXlarge         InstanceType = "r8in.xlarge"
+	InstanceTypeR8in2xlarge        InstanceType = "r8in.2xlarge"
+	InstanceTypeR8in4xlarge        InstanceType = "r8in.4xlarge"
+	InstanceTypeR8in8xlarge        InstanceType = "r8in.8xlarge"
+	InstanceTypeR8in12xlarge       InstanceType = "r8in.12xlarge"
+	InstanceTypeR8in16xlarge       InstanceType = "r8in.16xlarge"
+	InstanceTypeR8in24xlarge       InstanceType = "r8in.24xlarge"
+	InstanceTypeR8in32xlarge       InstanceType = "r8in.32xlarge"
+	InstanceTypeR8in48xlarge       InstanceType = "r8in.48xlarge"
+	InstanceTypeR8in96xlarge       InstanceType = "r8in.96xlarge"
+	InstanceTypeR8ibLarge          InstanceType = "r8ib.large"
+	InstanceTypeR8ibXlarge         InstanceType = "r8ib.xlarge"
+	InstanceTypeR8ib2xlarge        InstanceType = "r8ib.2xlarge"
+	InstanceTypeR8ib4xlarge        InstanceType = "r8ib.4xlarge"
+	InstanceTypeR8ib8xlarge        InstanceType = "r8ib.8xlarge"
+	InstanceTypeR8ib12xlarge       InstanceType = "r8ib.12xlarge"
+	InstanceTypeR8ib16xlarge       InstanceType = "r8ib.16xlarge"
+	InstanceTypeR8ib24xlarge       InstanceType = "r8ib.24xlarge"
+	InstanceTypeR8ib32xlarge       InstanceType = "r8ib.32xlarge"
+	InstanceTypeR8ib48xlarge       InstanceType = "r8ib.48xlarge"
+	InstanceTypeR8ib96xlarge       InstanceType = "r8ib.96xlarge"
+	InstanceTypeM8inLarge          InstanceType = "m8in.large"
+	InstanceTypeM8inXlarge         InstanceType = "m8in.xlarge"
+	InstanceTypeM8in2xlarge        InstanceType = "m8in.2xlarge"
+	InstanceTypeM8in4xlarge        InstanceType = "m8in.4xlarge"
+	InstanceTypeM8in8xlarge        InstanceType = "m8in.8xlarge"
+	InstanceTypeM8in12xlarge       InstanceType = "m8in.12xlarge"
+	InstanceTypeM8in16xlarge       InstanceType = "m8in.16xlarge"
+	InstanceTypeM8in24xlarge       InstanceType = "m8in.24xlarge"
+	InstanceTypeM8in32xlarge       InstanceType = "m8in.32xlarge"
+	InstanceTypeM8in48xlarge       InstanceType = "m8in.48xlarge"
+	InstanceTypeM8in96xlarge       InstanceType = "m8in.96xlarge"
+	InstanceTypeM8ibLarge          InstanceType = "m8ib.large"
+	InstanceTypeM8ibXlarge         InstanceType = "m8ib.xlarge"
+	InstanceTypeM8ib2xlarge        InstanceType = "m8ib.2xlarge"
+	InstanceTypeM8ib4xlarge        InstanceType = "m8ib.4xlarge"
+	InstanceTypeM8ib8xlarge        InstanceType = "m8ib.8xlarge"
+	InstanceTypeM8ib12xlarge       InstanceType = "m8ib.12xlarge"
+	InstanceTypeM8ib16xlarge       InstanceType = "m8ib.16xlarge"
+	InstanceTypeM8ib24xlarge       InstanceType = "m8ib.24xlarge"
+	InstanceTypeM8ib32xlarge       InstanceType = "m8ib.32xlarge"
+	InstanceTypeM8ib48xlarge       InstanceType = "m8ib.48xlarge"
+	InstanceTypeM8ib96xlarge       InstanceType = "m8ib.96xlarge"
+	InstanceTypeM8ineLarge         InstanceType = "m8ine.large"
+	InstanceTypeM8ineXlarge        InstanceType = "m8ine.xlarge"
+	InstanceTypeM8ine2xlarge       InstanceType = "m8ine.2xlarge"
+	InstanceTypeM8ine4xlarge       InstanceType = "m8ine.4xlarge"
+	InstanceTypeM8ine8xlarge       InstanceType = "m8ine.8xlarge"
+	InstanceTypeM8ine12xlarge      InstanceType = "m8ine.12xlarge"
+	InstanceTypeC8ineLarge         InstanceType = "c8ine.large"
+	InstanceTypeC8ineXlarge        InstanceType = "c8ine.xlarge"
+	InstanceTypeC8ine2xlarge       InstanceType = "c8ine.2xlarge"
+	InstanceTypeC8ine4xlarge       InstanceType = "c8ine.4xlarge"
+	InstanceTypeC8ine8xlarge       InstanceType = "c8ine.8xlarge"
+	InstanceTypeC8ine12xlarge      InstanceType = "c8ine.12xlarge"
+	InstanceTypeM8idnLarge         InstanceType = "m8idn.large"
+	InstanceTypeM8idnXlarge        InstanceType = "m8idn.xlarge"
+	InstanceTypeM8idn2xlarge       InstanceType = "m8idn.2xlarge"
+	InstanceTypeM8idn4xlarge       InstanceType = "m8idn.4xlarge"
+	InstanceTypeM8idn8xlarge       InstanceType = "m8idn.8xlarge"
+	InstanceTypeM8idn12xlarge      InstanceType = "m8idn.12xlarge"
+	InstanceTypeM8idn16xlarge      InstanceType = "m8idn.16xlarge"
+	InstanceTypeM8idn24xlarge      InstanceType = "m8idn.24xlarge"
+	InstanceTypeM8idn32xlarge      InstanceType = "m8idn.32xlarge"
+	InstanceTypeM8idn48xlarge      InstanceType = "m8idn.48xlarge"
+	InstanceTypeM8idn96xlarge      InstanceType = "m8idn.96xlarge"
+	InstanceTypeR8idnLarge         InstanceType = "r8idn.large"
+	InstanceTypeR8idnXlarge        InstanceType = "r8idn.xlarge"
+	InstanceTypeR8idn2xlarge       InstanceType = "r8idn.2xlarge"
+	InstanceTypeR8idn4xlarge       InstanceType = "r8idn.4xlarge"
+	InstanceTypeR8idn8xlarge       InstanceType = "r8idn.8xlarge"
+	InstanceTypeR8idn12xlarge      InstanceType = "r8idn.12xlarge"
+	InstanceTypeR8idn16xlarge      InstanceType = "r8idn.16xlarge"
+	InstanceTypeR8idn24xlarge      InstanceType = "r8idn.24xlarge"
+	InstanceTypeR8idn32xlarge      InstanceType = "r8idn.32xlarge"
+	InstanceTypeR8idn48xlarge      InstanceType = "r8idn.48xlarge"
+	InstanceTypeR8idn96xlarge      InstanceType = "r8idn.96xlarge"
+	InstanceTypeM8idbLarge         InstanceType = "m8idb.large"
+	InstanceTypeM8idbXlarge        InstanceType = "m8idb.xlarge"
+	InstanceTypeM8idb2xlarge       InstanceType = "m8idb.2xlarge"
+	InstanceTypeM8idb4xlarge       InstanceType = "m8idb.4xlarge"
+	InstanceTypeM8idb8xlarge       InstanceType = "m8idb.8xlarge"
+	InstanceTypeM8idb12xlarge      InstanceType = "m8idb.12xlarge"
+	InstanceTypeM8idb16xlarge      InstanceType = "m8idb.16xlarge"
+	InstanceTypeM8idb24xlarge      InstanceType = "m8idb.24xlarge"
+	InstanceTypeM8idb32xlarge      InstanceType = "m8idb.32xlarge"
+	InstanceTypeM8idb48xlarge      InstanceType = "m8idb.48xlarge"
+	InstanceTypeM8idb96xlarge      InstanceType = "m8idb.96xlarge"
+	InstanceTypeR8idbLarge         InstanceType = "r8idb.large"
+	InstanceTypeR8idbXlarge        InstanceType = "r8idb.xlarge"
+	InstanceTypeR8idb2xlarge       InstanceType = "r8idb.2xlarge"
+	InstanceTypeR8idb4xlarge       InstanceType = "r8idb.4xlarge"
+	InstanceTypeR8idb8xlarge       InstanceType = "r8idb.8xlarge"
+	InstanceTypeR8idb12xlarge      InstanceType = "r8idb.12xlarge"
+	InstanceTypeR8idb16xlarge      InstanceType = "r8idb.16xlarge"
+	InstanceTypeR8idb24xlarge      InstanceType = "r8idb.24xlarge"
+	InstanceTypeR8idb32xlarge      InstanceType = "r8idb.32xlarge"
+	InstanceTypeR8idb48xlarge      InstanceType = "r8idb.48xlarge"
+	InstanceTypeR8idb96xlarge      InstanceType = "r8idb.96xlarge"
+	InstanceTypeMacM3ultraMetal    InstanceType = "mac-m3ultra.metal"
+	InstanceTypeM9gLarge           InstanceType = "m9g.large"
+	InstanceTypeM9gXlarge          InstanceType = "m9g.xlarge"
+	InstanceTypeM9g2xlarge         InstanceType = "m9g.2xlarge"
+	InstanceTypeM9g4xlarge         InstanceType = "m9g.4xlarge"
+	InstanceTypeM9g8xlarge         InstanceType = "m9g.8xlarge"
+	InstanceTypeM9g12xlarge        InstanceType = "m9g.12xlarge"
+	InstanceTypeM9g16xlarge        InstanceType = "m9g.16xlarge"
+	InstanceTypeM9g24xlarge        InstanceType = "m9g.24xlarge"
+	InstanceTypeM9g48xlarge        InstanceType = "m9g.48xlarge"
+	InstanceTypeM9gMetal24xl       InstanceType = "m9g.metal-24xl"
+	InstanceTypeM9gMetal48xl       InstanceType = "m9g.metal-48xl"
+	InstanceTypeM9gdLarge          InstanceType = "m9gd.large"
+	InstanceTypeM9gdXlarge         InstanceType = "m9gd.xlarge"
+	InstanceTypeM9gd2xlarge        InstanceType = "m9gd.2xlarge"
+	InstanceTypeM9gd4xlarge        InstanceType = "m9gd.4xlarge"
+	InstanceTypeM9gd8xlarge        InstanceType = "m9gd.8xlarge"
+	InstanceTypeM9gd12xlarge       InstanceType = "m9gd.12xlarge"
+	InstanceTypeM9gd16xlarge       InstanceType = "m9gd.16xlarge"
+	InstanceTypeM9gd24xlarge       InstanceType = "m9gd.24xlarge"
+	InstanceTypeM9gd48xlarge       InstanceType = "m9gd.48xlarge"
+	InstanceTypeM9gdMetal24xl      InstanceType = "m9gd.metal-24xl"
+	InstanceTypeM9gdMetal48xl      InstanceType = "m9gd.metal-48xl"
+	InstanceTypeR8inMetal48xl      InstanceType = "r8in.metal-48xl"
+	InstanceTypeR8inMetal96xl      InstanceType = "r8in.metal-96xl"
+	InstanceTypeR8ibMetal48xl      InstanceType = "r8ib.metal-48xl"
+	InstanceTypeR8ibMetal96xl      InstanceType = "r8ib.metal-96xl"
+	InstanceTypeR8idnMetal48xl     InstanceType = "r8idn.metal-48xl"
+	InstanceTypeR8idnMetal96xl     InstanceType = "r8idn.metal-96xl"
+	InstanceTypeR8idbMetal48xl     InstanceType = "r8idb.metal-48xl"
+	InstanceTypeR8idbMetal96xl     InstanceType = "r8idb.metal-96xl"
+	InstanceTypeM8inMetal48xl      InstanceType = "m8in.metal-48xl"
+	InstanceTypeM8inMetal96xl      InstanceType = "m8in.metal-96xl"
+	InstanceTypeM8ibMetal48xl      InstanceType = "m8ib.metal-48xl"
+	InstanceTypeM8ibMetal96xl      InstanceType = "m8ib.metal-96xl"
+	InstanceTypeM8idnMetal48xl     InstanceType = "m8idn.metal-48xl"
+	InstanceTypeM8idnMetal96xl     InstanceType = "m8idn.metal-96xl"
+	InstanceTypeM8idbMetal48xl     InstanceType = "m8idb.metal-48xl"
+	InstanceTypeM8idbMetal96xl     InstanceType = "m8idb.metal-96xl"
+	InstanceTypeG72xlarge          InstanceType = "g7.2xlarge"
+	InstanceTypeG74xlarge          InstanceType = "g7.4xlarge"
+	InstanceTypeG78xlarge          InstanceType = "g7.8xlarge"
+	InstanceTypeG712xlarge         InstanceType = "g7.12xlarge"
+	InstanceTypeG724xlarge         InstanceType = "g7.24xlarge"
+	InstanceTypeG748xlarge         InstanceType = "g7.48xlarge"
+	InstanceTypeC9gMedium          InstanceType = "c9g.medium"
+	InstanceTypeC9gLarge           InstanceType = "c9g.large"
+	InstanceTypeC9gXlarge          InstanceType = "c9g.xlarge"
+	InstanceTypeC9g2xlarge         InstanceType = "c9g.2xlarge"
+	InstanceTypeC9g4xlarge         InstanceType = "c9g.4xlarge"
+	InstanceTypeC9g8xlarge         InstanceType = "c9g.8xlarge"
+	InstanceTypeC9g12xlarge        InstanceType = "c9g.12xlarge"
+	InstanceTypeC9g16xlarge        InstanceType = "c9g.16xlarge"
+	InstanceTypeC9g24xlarge        InstanceType = "c9g.24xlarge"
+	InstanceTypeC9g48xlarge        InstanceType = "c9g.48xlarge"
+	InstanceTypeC9gMetal48xl       InstanceType = "c9g.metal-48xl"
+	InstanceTypeC9gdMedium         InstanceType = "c9gd.medium"
+	InstanceTypeC9gdLarge          InstanceType = "c9gd.large"
+	InstanceTypeC9gdXlarge         InstanceType = "c9gd.xlarge"
+	InstanceTypeC9gd2xlarge        InstanceType = "c9gd.2xlarge"
+	InstanceTypeC9gd4xlarge        InstanceType = "c9gd.4xlarge"
+	InstanceTypeC9gd8xlarge        InstanceType = "c9gd.8xlarge"
+	InstanceTypeC9gd12xlarge       InstanceType = "c9gd.12xlarge"
+	InstanceTypeC9gd16xlarge       InstanceType = "c9gd.16xlarge"
+	InstanceTypeC9gd24xlarge       InstanceType = "c9gd.24xlarge"
+	InstanceTypeC9gd48xlarge       InstanceType = "c9gd.48xlarge"
+	InstanceTypeC9gdMetal48xl      InstanceType = "c9gd.metal-48xl"
 )
 
 // Values returns all known values for InstanceType. Note that this can be
@@ -6075,6 +6638,326 @@ func (InstanceType) Values() []InstanceType {
 		"r8a.48xlarge",
 		"r8a.metal-24xl",
 		"r8a.metal-48xl",
+		"p6-b300.48xlarge",
+		"c8a.medium",
+		"c8a.large",
+		"c8a.xlarge",
+		"c8a.2xlarge",
+		"c8a.4xlarge",
+		"c8a.8xlarge",
+		"c8a.12xlarge",
+		"c8a.16xlarge",
+		"c8a.24xlarge",
+		"c8a.48xlarge",
+		"c8a.metal-24xl",
+		"c8a.metal-48xl",
+		"c8gb.12xlarge",
+		"c8gb.16xlarge",
+		"c8gb.24xlarge",
+		"c8gb.2xlarge",
+		"c8gb.4xlarge",
+		"c8gb.8xlarge",
+		"c8gb.large",
+		"c8gb.medium",
+		"c8gb.metal-24xl",
+		"c8gb.xlarge",
+		"c8gb.48xlarge",
+		"c8gb.metal-48xl",
+		"m8gb.12xlarge",
+		"m8gb.16xlarge",
+		"m8gb.24xlarge",
+		"m8gb.2xlarge",
+		"m8gb.4xlarge",
+		"m8gb.8xlarge",
+		"m8gb.large",
+		"m8gb.medium",
+		"m8gb.xlarge",
+		"m8gb.48xlarge",
+		"m8gb.metal-24xl",
+		"m8gb.metal-48xl",
+		"m8gn.12xlarge",
+		"m8gn.16xlarge",
+		"m8gn.24xlarge",
+		"m8gn.2xlarge",
+		"m8gn.48xlarge",
+		"m8gn.4xlarge",
+		"m8gn.8xlarge",
+		"m8gn.large",
+		"m8gn.medium",
+		"m8gn.xlarge",
+		"m8gn.metal-24xl",
+		"m8gn.metal-48xl",
+		"x8aedz.12xlarge",
+		"x8aedz.24xlarge",
+		"x8aedz.3xlarge",
+		"x8aedz.6xlarge",
+		"x8aedz.large",
+		"x8aedz.metal-12xl",
+		"x8aedz.metal-24xl",
+		"x8aedz.xlarge",
+		"m8azn.medium",
+		"m8azn.large",
+		"m8azn.xlarge",
+		"m8azn.3xlarge",
+		"m8azn.6xlarge",
+		"m8azn.12xlarge",
+		"m8azn.24xlarge",
+		"m8azn.metal-12xl",
+		"m8azn.metal-24xl",
+		"x8i.large",
+		"x8i.xlarge",
+		"x8i.2xlarge",
+		"x8i.4xlarge",
+		"x8i.8xlarge",
+		"x8i.12xlarge",
+		"x8i.16xlarge",
+		"x8i.24xlarge",
+		"x8i.32xlarge",
+		"x8i.48xlarge",
+		"x8i.64xlarge",
+		"x8i.96xlarge",
+		"x8i.metal-48xl",
+		"x8i.metal-96xl",
+		"mac-m4max.metal",
+		"g7e.2xlarge",
+		"g7e.4xlarge",
+		"g7e.8xlarge",
+		"g7e.12xlarge",
+		"g7e.24xlarge",
+		"g7e.48xlarge",
+		"r8id.large",
+		"r8id.xlarge",
+		"r8id.2xlarge",
+		"r8id.4xlarge",
+		"r8id.8xlarge",
+		"r8id.12xlarge",
+		"r8id.16xlarge",
+		"r8id.24xlarge",
+		"r8id.32xlarge",
+		"r8id.48xlarge",
+		"r8id.96xlarge",
+		"r8id.metal-48xl",
+		"r8id.metal-96xl",
+		"c8id.large",
+		"c8id.xlarge",
+		"c8id.2xlarge",
+		"c8id.4xlarge",
+		"c8id.8xlarge",
+		"c8id.12xlarge",
+		"c8id.16xlarge",
+		"c8id.24xlarge",
+		"c8id.32xlarge",
+		"c8id.48xlarge",
+		"c8id.96xlarge",
+		"c8id.metal-48xl",
+		"c8id.metal-96xl",
+		"m8id.large",
+		"m8id.xlarge",
+		"m8id.2xlarge",
+		"m8id.4xlarge",
+		"m8id.8xlarge",
+		"m8id.12xlarge",
+		"m8id.16xlarge",
+		"m8id.24xlarge",
+		"m8id.32xlarge",
+		"m8id.48xlarge",
+		"m8id.96xlarge",
+		"m8id.metal-48xl",
+		"m8id.metal-96xl",
+		"hpc8a.96xlarge",
+		"c8in.large",
+		"c8in.xlarge",
+		"c8in.2xlarge",
+		"c8in.4xlarge",
+		"c8in.8xlarge",
+		"c8in.12xlarge",
+		"c8in.16xlarge",
+		"c8in.24xlarge",
+		"c8in.32xlarge",
+		"c8in.48xlarge",
+		"c8in.96xlarge",
+		"c8in.metal-48xl",
+		"c8in.metal-96xl",
+		"c8ib.large",
+		"c8ib.xlarge",
+		"c8ib.2xlarge",
+		"c8ib.4xlarge",
+		"c8ib.8xlarge",
+		"c8ib.12xlarge",
+		"c8ib.16xlarge",
+		"c8ib.24xlarge",
+		"c8ib.32xlarge",
+		"c8ib.48xlarge",
+		"c8ib.96xlarge",
+		"c8ib.metal-48xl",
+		"c8ib.metal-96xl",
+		"r8in.large",
+		"r8in.xlarge",
+		"r8in.2xlarge",
+		"r8in.4xlarge",
+		"r8in.8xlarge",
+		"r8in.12xlarge",
+		"r8in.16xlarge",
+		"r8in.24xlarge",
+		"r8in.32xlarge",
+		"r8in.48xlarge",
+		"r8in.96xlarge",
+		"r8ib.large",
+		"r8ib.xlarge",
+		"r8ib.2xlarge",
+		"r8ib.4xlarge",
+		"r8ib.8xlarge",
+		"r8ib.12xlarge",
+		"r8ib.16xlarge",
+		"r8ib.24xlarge",
+		"r8ib.32xlarge",
+		"r8ib.48xlarge",
+		"r8ib.96xlarge",
+		"m8in.large",
+		"m8in.xlarge",
+		"m8in.2xlarge",
+		"m8in.4xlarge",
+		"m8in.8xlarge",
+		"m8in.12xlarge",
+		"m8in.16xlarge",
+		"m8in.24xlarge",
+		"m8in.32xlarge",
+		"m8in.48xlarge",
+		"m8in.96xlarge",
+		"m8ib.large",
+		"m8ib.xlarge",
+		"m8ib.2xlarge",
+		"m8ib.4xlarge",
+		"m8ib.8xlarge",
+		"m8ib.12xlarge",
+		"m8ib.16xlarge",
+		"m8ib.24xlarge",
+		"m8ib.32xlarge",
+		"m8ib.48xlarge",
+		"m8ib.96xlarge",
+		"m8ine.large",
+		"m8ine.xlarge",
+		"m8ine.2xlarge",
+		"m8ine.4xlarge",
+		"m8ine.8xlarge",
+		"m8ine.12xlarge",
+		"c8ine.large",
+		"c8ine.xlarge",
+		"c8ine.2xlarge",
+		"c8ine.4xlarge",
+		"c8ine.8xlarge",
+		"c8ine.12xlarge",
+		"m8idn.large",
+		"m8idn.xlarge",
+		"m8idn.2xlarge",
+		"m8idn.4xlarge",
+		"m8idn.8xlarge",
+		"m8idn.12xlarge",
+		"m8idn.16xlarge",
+		"m8idn.24xlarge",
+		"m8idn.32xlarge",
+		"m8idn.48xlarge",
+		"m8idn.96xlarge",
+		"r8idn.large",
+		"r8idn.xlarge",
+		"r8idn.2xlarge",
+		"r8idn.4xlarge",
+		"r8idn.8xlarge",
+		"r8idn.12xlarge",
+		"r8idn.16xlarge",
+		"r8idn.24xlarge",
+		"r8idn.32xlarge",
+		"r8idn.48xlarge",
+		"r8idn.96xlarge",
+		"m8idb.large",
+		"m8idb.xlarge",
+		"m8idb.2xlarge",
+		"m8idb.4xlarge",
+		"m8idb.8xlarge",
+		"m8idb.12xlarge",
+		"m8idb.16xlarge",
+		"m8idb.24xlarge",
+		"m8idb.32xlarge",
+		"m8idb.48xlarge",
+		"m8idb.96xlarge",
+		"r8idb.large",
+		"r8idb.xlarge",
+		"r8idb.2xlarge",
+		"r8idb.4xlarge",
+		"r8idb.8xlarge",
+		"r8idb.12xlarge",
+		"r8idb.16xlarge",
+		"r8idb.24xlarge",
+		"r8idb.32xlarge",
+		"r8idb.48xlarge",
+		"r8idb.96xlarge",
+		"mac-m3ultra.metal",
+		"m9g.large",
+		"m9g.xlarge",
+		"m9g.2xlarge",
+		"m9g.4xlarge",
+		"m9g.8xlarge",
+		"m9g.12xlarge",
+		"m9g.16xlarge",
+		"m9g.24xlarge",
+		"m9g.48xlarge",
+		"m9g.metal-24xl",
+		"m9g.metal-48xl",
+		"m9gd.large",
+		"m9gd.xlarge",
+		"m9gd.2xlarge",
+		"m9gd.4xlarge",
+		"m9gd.8xlarge",
+		"m9gd.12xlarge",
+		"m9gd.16xlarge",
+		"m9gd.24xlarge",
+		"m9gd.48xlarge",
+		"m9gd.metal-24xl",
+		"m9gd.metal-48xl",
+		"r8in.metal-48xl",
+		"r8in.metal-96xl",
+		"r8ib.metal-48xl",
+		"r8ib.metal-96xl",
+		"r8idn.metal-48xl",
+		"r8idn.metal-96xl",
+		"r8idb.metal-48xl",
+		"r8idb.metal-96xl",
+		"m8in.metal-48xl",
+		"m8in.metal-96xl",
+		"m8ib.metal-48xl",
+		"m8ib.metal-96xl",
+		"m8idn.metal-48xl",
+		"m8idn.metal-96xl",
+		"m8idb.metal-48xl",
+		"m8idb.metal-96xl",
+		"g7.2xlarge",
+		"g7.4xlarge",
+		"g7.8xlarge",
+		"g7.12xlarge",
+		"g7.24xlarge",
+		"g7.48xlarge",
+		"c9g.medium",
+		"c9g.large",
+		"c9g.xlarge",
+		"c9g.2xlarge",
+		"c9g.4xlarge",
+		"c9g.8xlarge",
+		"c9g.12xlarge",
+		"c9g.16xlarge",
+		"c9g.24xlarge",
+		"c9g.48xlarge",
+		"c9g.metal-48xl",
+		"c9gd.medium",
+		"c9gd.large",
+		"c9gd.xlarge",
+		"c9gd.2xlarge",
+		"c9gd.4xlarge",
+		"c9gd.8xlarge",
+		"c9gd.12xlarge",
+		"c9gd.16xlarge",
+		"c9gd.24xlarge",
+		"c9gd.48xlarge",
+		"c9gd.metal-48xl",
 	}
 }
 
@@ -7798,6 +8681,26 @@ func (ManagedBy) Values() []ManagedBy {
 	}
 }
 
+type ManagedResourceDefaultVisibility string
+
+// Enum values for ManagedResourceDefaultVisibility
+const (
+	ManagedResourceDefaultVisibilityHidden  ManagedResourceDefaultVisibility = "hidden"
+	ManagedResourceDefaultVisibilityVisible ManagedResourceDefaultVisibility = "visible"
+)
+
+// Values returns all known values for ManagedResourceDefaultVisibility. Note that
+// this can be expanded in the future, and so it is only as up to date as the
+// client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (ManagedResourceDefaultVisibility) Values() []ManagedResourceDefaultVisibility {
+	return []ManagedResourceDefaultVisibility{
+		"hidden",
+		"visible",
+	}
+}
+
 type MarketType string
 
 // Enum values for MarketType
@@ -7907,6 +8810,12 @@ const (
 	MetricSpotAvgRunTimeBeforeInterruptionInst  Metric = "spot-avg-run-time-before-interruption-inst"
 	MetricSpotMaxRunTimeBeforeInterruptionInst  Metric = "spot-max-run-time-before-interruption-inst"
 	MetricSpotMinRunTimeBeforeInterruptionInst  Metric = "spot-min-run-time-before-interruption-inst"
+	MetricSpotTotalInterruptionsInst            Metric = "spot-total-interruptions-inst"
+	MetricSpotTotalInterruptionsVcpu            Metric = "spot-total-interruptions-vcpu"
+	MetricSpotTotalCountInst                    Metric = "spot-total-count-inst"
+	MetricSpotTotalCountVcpu                    Metric = "spot-total-count-vcpu"
+	MetricSpotInterruptionRateInst              Metric = "spot-interruption-rate-inst"
+	MetricSpotInterruptionRateVcpu              Metric = "spot-interruption-rate-vcpu"
 )
 
 // Values returns all known values for Metric. Note that this can be expanded in
@@ -7958,6 +8867,12 @@ func (Metric) Values() []Metric {
 		"spot-avg-run-time-before-interruption-inst",
 		"spot-max-run-time-before-interruption-inst",
 		"spot-min-run-time-before-interruption-inst",
+		"spot-total-interruptions-inst",
+		"spot-total-interruptions-vcpu",
+		"spot-total-count-inst",
+		"spot-total-count-vcpu",
+		"spot-interruption-rate-inst",
+		"spot-interruption-rate-vcpu",
 	}
 }
 
@@ -8086,6 +9001,72 @@ func (NatGatewayAddressStatus) Values() []NatGatewayAddressStatus {
 	}
 }
 
+type NatGatewayApplianceModifyState string
+
+// Enum values for NatGatewayApplianceModifyState
+const (
+	NatGatewayApplianceModifyStateModifying NatGatewayApplianceModifyState = "modifying"
+	NatGatewayApplianceModifyStateCompleted NatGatewayApplianceModifyState = "completed"
+	NatGatewayApplianceModifyStateFailed    NatGatewayApplianceModifyState = "failed"
+)
+
+// Values returns all known values for NatGatewayApplianceModifyState. Note that
+// this can be expanded in the future, and so it is only as up to date as the
+// client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (NatGatewayApplianceModifyState) Values() []NatGatewayApplianceModifyState {
+	return []NatGatewayApplianceModifyState{
+		"modifying",
+		"completed",
+		"failed",
+	}
+}
+
+type NatGatewayApplianceState string
+
+// Enum values for NatGatewayApplianceState
+const (
+	NatGatewayApplianceStateAttaching    NatGatewayApplianceState = "attaching"
+	NatGatewayApplianceStateAttached     NatGatewayApplianceState = "attached"
+	NatGatewayApplianceStateDetaching    NatGatewayApplianceState = "detaching"
+	NatGatewayApplianceStateDetached     NatGatewayApplianceState = "detached"
+	NatGatewayApplianceStateAttachFailed NatGatewayApplianceState = "attach-failed"
+	NatGatewayApplianceStateDetachFailed NatGatewayApplianceState = "detach-failed"
+)
+
+// Values returns all known values for NatGatewayApplianceState. Note that this
+// can be expanded in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (NatGatewayApplianceState) Values() []NatGatewayApplianceState {
+	return []NatGatewayApplianceState{
+		"attaching",
+		"attached",
+		"detaching",
+		"detached",
+		"attach-failed",
+		"detach-failed",
+	}
+}
+
+type NatGatewayApplianceType string
+
+// Enum values for NatGatewayApplianceType
+const (
+	NatGatewayApplianceTypeNetworkFirewallProxy NatGatewayApplianceType = "network-firewall-proxy"
+)
+
+// Values returns all known values for NatGatewayApplianceType. Note that this can
+// be expanded in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (NatGatewayApplianceType) Values() []NatGatewayApplianceType {
+	return []NatGatewayApplianceType{
+		"network-firewall-proxy",
+	}
+}
+
 type NatGatewayState string
 
 // Enum values for NatGatewayState
@@ -8108,6 +9089,26 @@ func (NatGatewayState) Values() []NatGatewayState {
 		"available",
 		"deleting",
 		"deleted",
+	}
+}
+
+type NestedVirtualizationSpecification string
+
+// Enum values for NestedVirtualizationSpecification
+const (
+	NestedVirtualizationSpecificationEnabled  NestedVirtualizationSpecification = "enabled"
+	NestedVirtualizationSpecificationDisabled NestedVirtualizationSpecification = "disabled"
+)
+
+// Values returns all known values for NestedVirtualizationSpecification. Note
+// that this can be expanded in the future, and so it is only as up to date as the
+// client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (NestedVirtualizationSpecification) Values() []NestedVirtualizationSpecification {
+	return []NestedVirtualizationSpecification{
+		"enabled",
+		"disabled",
 	}
 }
 
@@ -8441,6 +9442,42 @@ func (PayerResponsibility) Values() []PayerResponsibility {
 	}
 }
 
+type PayerResponsibilityScope string
+
+// Enum values for PayerResponsibilityScope
+const (
+	PayerResponsibilityScopeVpcEndpointCharges PayerResponsibilityScope = "vpc-endpoint-charges"
+)
+
+// Values returns all known values for PayerResponsibilityScope. Note that this
+// can be expanded in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (PayerResponsibilityScope) Values() []PayerResponsibilityScope {
+	return []PayerResponsibilityScope{
+		"vpc-endpoint-charges",
+	}
+}
+
+type PayerResponsibilityType string
+
+// Enum values for PayerResponsibilityType
+const (
+	PayerResponsibilityTypeVpcEndpointAccount        PayerResponsibilityType = "vpc-endpoint-account"
+	PayerResponsibilityTypeVpcEndpointServiceAccount PayerResponsibilityType = "vpc-endpoint-service-account"
+)
+
+// Values returns all known values for PayerResponsibilityType. Note that this can
+// be expanded in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (PayerResponsibilityType) Values() []PayerResponsibilityType {
+	return []PayerResponsibilityType{
+		"vpc-endpoint-account",
+		"vpc-endpoint-service-account",
+	}
+}
+
 type PaymentOption string
 
 // Enum values for PaymentOption
@@ -8573,9 +9610,10 @@ type PlacementStrategy string
 
 // Enum values for PlacementStrategy
 const (
-	PlacementStrategyCluster   PlacementStrategy = "cluster"
-	PlacementStrategySpread    PlacementStrategy = "spread"
-	PlacementStrategyPartition PlacementStrategy = "partition"
+	PlacementStrategyCluster       PlacementStrategy = "cluster"
+	PlacementStrategySpread        PlacementStrategy = "spread"
+	PlacementStrategyPartition     PlacementStrategy = "partition"
+	PlacementStrategyPrecisionTime PlacementStrategy = "precision-time"
 )
 
 // Values returns all known values for PlacementStrategy. Note that this can be
@@ -8587,6 +9625,7 @@ func (PlacementStrategy) Values() []PlacementStrategy {
 		"cluster",
 		"spread",
 		"partition",
+		"precision-time",
 	}
 }
 
@@ -9148,8 +10187,13 @@ const (
 	ResourceTypeIpamPrefixListResolver                                 ResourceType = "ipam-prefix-list-resolver"
 	ResourceTypeIpamPolicy                                             ResourceType = "ipam-policy"
 	ResourceTypeIpamPrefixListResolverTarget                           ResourceType = "ipam-prefix-list-resolver-target"
+	ResourceTypeSecondaryInterface                                     ResourceType = "secondary-interface"
+	ResourceTypeSecondaryNetwork                                       ResourceType = "secondary-network"
+	ResourceTypeSecondarySubnet                                        ResourceType = "secondary-subnet"
 	ResourceTypeCapacityManagerDataExport                              ResourceType = "capacity-manager-data-export"
 	ResourceTypeVpnConcentrator                                        ResourceType = "vpn-concentrator"
+	ResourceTypeIpamPoolAllocation                                     ResourceType = "ipam-pool-allocation"
+	ResourceTypeCapacityReservationCancellationQuote                   ResourceType = "capacity-reservation-cancellation-quote"
 )
 
 // Values returns all known values for ResourceType. Note that this can be
@@ -9260,8 +10304,13 @@ func (ResourceType) Values() []ResourceType {
 		"ipam-prefix-list-resolver",
 		"ipam-policy",
 		"ipam-prefix-list-resolver-target",
+		"secondary-interface",
+		"secondary-network",
+		"secondary-subnet",
 		"capacity-manager-data-export",
 		"vpn-concentrator",
+		"ipam-pool-allocation",
+		"capacity-reservation-cancellation-quote",
 	}
 }
 
@@ -9698,6 +10747,169 @@ func (Scope) Values() []Scope {
 	return []Scope{
 		"Availability Zone",
 		"Region",
+	}
+}
+
+type SecondaryInterfaceStatus string
+
+// Enum values for SecondaryInterfaceStatus
+const (
+	SecondaryInterfaceStatusAvailable SecondaryInterfaceStatus = "available"
+	SecondaryInterfaceStatusInUse     SecondaryInterfaceStatus = "in-use"
+)
+
+// Values returns all known values for SecondaryInterfaceStatus. Note that this
+// can be expanded in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (SecondaryInterfaceStatus) Values() []SecondaryInterfaceStatus {
+	return []SecondaryInterfaceStatus{
+		"available",
+		"in-use",
+	}
+}
+
+type SecondaryInterfaceType string
+
+// Enum values for SecondaryInterfaceType
+const (
+	SecondaryInterfaceTypeSecondary SecondaryInterfaceType = "secondary"
+)
+
+// Values returns all known values for SecondaryInterfaceType. Note that this can
+// be expanded in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (SecondaryInterfaceType) Values() []SecondaryInterfaceType {
+	return []SecondaryInterfaceType{
+		"secondary",
+	}
+}
+
+type SecondaryNetworkCidrBlockAssociationState string
+
+// Enum values for SecondaryNetworkCidrBlockAssociationState
+const (
+	SecondaryNetworkCidrBlockAssociationStateAssociating          SecondaryNetworkCidrBlockAssociationState = "associating"
+	SecondaryNetworkCidrBlockAssociationStateAssociated           SecondaryNetworkCidrBlockAssociationState = "associated"
+	SecondaryNetworkCidrBlockAssociationStateAssociationFailed    SecondaryNetworkCidrBlockAssociationState = "association-failed"
+	SecondaryNetworkCidrBlockAssociationStateDisassociating       SecondaryNetworkCidrBlockAssociationState = "disassociating"
+	SecondaryNetworkCidrBlockAssociationStateDisassociated        SecondaryNetworkCidrBlockAssociationState = "disassociated"
+	SecondaryNetworkCidrBlockAssociationStateDisassociationFailed SecondaryNetworkCidrBlockAssociationState = "disassociation-failed"
+)
+
+// Values returns all known values for SecondaryNetworkCidrBlockAssociationState.
+// Note that this can be expanded in the future, and so it is only as up to date as
+// the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (SecondaryNetworkCidrBlockAssociationState) Values() []SecondaryNetworkCidrBlockAssociationState {
+	return []SecondaryNetworkCidrBlockAssociationState{
+		"associating",
+		"associated",
+		"association-failed",
+		"disassociating",
+		"disassociated",
+		"disassociation-failed",
+	}
+}
+
+type SecondaryNetworkState string
+
+// Enum values for SecondaryNetworkState
+const (
+	SecondaryNetworkStateCreateInProgress SecondaryNetworkState = "create-in-progress"
+	SecondaryNetworkStateCreateComplete   SecondaryNetworkState = "create-complete"
+	SecondaryNetworkStateCreateFailed     SecondaryNetworkState = "create-failed"
+	SecondaryNetworkStateDeleteInProgress SecondaryNetworkState = "delete-in-progress"
+	SecondaryNetworkStateDeleteComplete   SecondaryNetworkState = "delete-complete"
+	SecondaryNetworkStateDeleteFailed     SecondaryNetworkState = "delete-failed"
+)
+
+// Values returns all known values for SecondaryNetworkState. Note that this can
+// be expanded in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (SecondaryNetworkState) Values() []SecondaryNetworkState {
+	return []SecondaryNetworkState{
+		"create-in-progress",
+		"create-complete",
+		"create-failed",
+		"delete-in-progress",
+		"delete-complete",
+		"delete-failed",
+	}
+}
+
+type SecondaryNetworkType string
+
+// Enum values for SecondaryNetworkType
+const (
+	SecondaryNetworkTypeRdma SecondaryNetworkType = "rdma"
+)
+
+// Values returns all known values for SecondaryNetworkType. Note that this can be
+// expanded in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (SecondaryNetworkType) Values() []SecondaryNetworkType {
+	return []SecondaryNetworkType{
+		"rdma",
+	}
+}
+
+type SecondarySubnetCidrBlockAssociationState string
+
+// Enum values for SecondarySubnetCidrBlockAssociationState
+const (
+	SecondarySubnetCidrBlockAssociationStateAssociating          SecondarySubnetCidrBlockAssociationState = "associating"
+	SecondarySubnetCidrBlockAssociationStateAssociated           SecondarySubnetCidrBlockAssociationState = "associated"
+	SecondarySubnetCidrBlockAssociationStateAssociationFailed    SecondarySubnetCidrBlockAssociationState = "association-failed"
+	SecondarySubnetCidrBlockAssociationStateDisassociating       SecondarySubnetCidrBlockAssociationState = "disassociating"
+	SecondarySubnetCidrBlockAssociationStateDisassociated        SecondarySubnetCidrBlockAssociationState = "disassociated"
+	SecondarySubnetCidrBlockAssociationStateDisassociationFailed SecondarySubnetCidrBlockAssociationState = "disassociation-failed"
+)
+
+// Values returns all known values for SecondarySubnetCidrBlockAssociationState.
+// Note that this can be expanded in the future, and so it is only as up to date as
+// the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (SecondarySubnetCidrBlockAssociationState) Values() []SecondarySubnetCidrBlockAssociationState {
+	return []SecondarySubnetCidrBlockAssociationState{
+		"associating",
+		"associated",
+		"association-failed",
+		"disassociating",
+		"disassociated",
+		"disassociation-failed",
+	}
+}
+
+type SecondarySubnetState string
+
+// Enum values for SecondarySubnetState
+const (
+	SecondarySubnetStateCreateInProgress SecondarySubnetState = "create-in-progress"
+	SecondarySubnetStateCreateComplete   SecondarySubnetState = "create-complete"
+	SecondarySubnetStateCreateFailed     SecondarySubnetState = "create-failed"
+	SecondarySubnetStateDeleteInProgress SecondarySubnetState = "delete-in-progress"
+	SecondarySubnetStateDeleteComplete   SecondarySubnetState = "delete-complete"
+	SecondarySubnetStateDeleteFailed     SecondarySubnetState = "delete-failed"
+)
+
+// Values returns all known values for SecondarySubnetState. Note that this can be
+// expanded in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (SecondarySubnetState) Values() []SecondarySubnetState {
+	return []SecondarySubnetState{
+		"create-in-progress",
+		"create-complete",
+		"create-failed",
+		"delete-in-progress",
+		"delete-complete",
+		"delete-failed",
 	}
 }
 
@@ -10410,7 +11622,8 @@ type SupportedAdditionalProcessorFeature string
 
 // Enum values for SupportedAdditionalProcessorFeature
 const (
-	SupportedAdditionalProcessorFeatureAmdSevSnp SupportedAdditionalProcessorFeature = "amd-sev-snp"
+	SupportedAdditionalProcessorFeatureAmdSevSnp            SupportedAdditionalProcessorFeature = "amd-sev-snp"
+	SupportedAdditionalProcessorFeatureNestedVirtualization SupportedAdditionalProcessorFeature = "nested-virtualization"
 )
 
 // Values returns all known values for SupportedAdditionalProcessorFeature. Note
@@ -10421,6 +11634,28 @@ const (
 func (SupportedAdditionalProcessorFeature) Values() []SupportedAdditionalProcessorFeature {
 	return []SupportedAdditionalProcessorFeature{
 		"amd-sev-snp",
+		"nested-virtualization",
+	}
+}
+
+type TaggableResourceType string
+
+// Enum values for TaggableResourceType
+const (
+	TaggableResourceTypeNetworkInterface TaggableResourceType = "network-interface"
+	TaggableResourceTypeInstance         TaggableResourceType = "instance"
+	TaggableResourceTypeAutoScalingGroup TaggableResourceType = "auto-scaling-group"
+)
+
+// Values returns all known values for TaggableResourceType. Note that this can be
+// expanded in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (TaggableResourceType) Values() []TaggableResourceType {
+	return []TaggableResourceType{
+		"network-interface",
+		"instance",
+		"auto-scaling-group",
 	}
 }
 
@@ -10789,6 +12024,7 @@ const (
 	TransitGatewayAttachmentResourceTypePeering              TransitGatewayAttachmentResourceType = "peering"
 	TransitGatewayAttachmentResourceTypeTgwPeering           TransitGatewayAttachmentResourceType = "tgw-peering"
 	TransitGatewayAttachmentResourceTypeNetworkFunction      TransitGatewayAttachmentResourceType = "network-function"
+	TransitGatewayAttachmentResourceTypeClientVpn            TransitGatewayAttachmentResourceType = "client-vpn"
 )
 
 // Values returns all known values for TransitGatewayAttachmentResourceType. Note
@@ -10806,6 +12042,7 @@ func (TransitGatewayAttachmentResourceType) Values() []TransitGatewayAttachmentR
 		"peering",
 		"tgw-peering",
 		"network-function",
+		"client-vpn",
 	}
 }
 
@@ -10848,6 +12085,34 @@ func (TransitGatewayAttachmentState) Values() []TransitGatewayAttachmentState {
 		"rejected",
 		"rejecting",
 		"failing",
+	}
+}
+
+type TransitGatewayAttachmentStatusType string
+
+// Enum values for TransitGatewayAttachmentStatusType
+const (
+	TransitGatewayAttachmentStatusTypePendingAcceptance TransitGatewayAttachmentStatusType = "pending-acceptance"
+	TransitGatewayAttachmentStatusTypePending           TransitGatewayAttachmentStatusType = "pending"
+	TransitGatewayAttachmentStatusTypeRejected          TransitGatewayAttachmentStatusType = "rejected"
+	TransitGatewayAttachmentStatusTypeAvailable         TransitGatewayAttachmentStatusType = "available"
+	TransitGatewayAttachmentStatusTypeDeleting          TransitGatewayAttachmentStatusType = "deleting"
+	TransitGatewayAttachmentStatusTypeDeleted           TransitGatewayAttachmentStatusType = "deleted"
+)
+
+// Values returns all known values for TransitGatewayAttachmentStatusType. Note
+// that this can be expanded in the future, and so it is only as up to date as the
+// client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (TransitGatewayAttachmentStatusType) Values() []TransitGatewayAttachmentStatusType {
+	return []TransitGatewayAttachmentStatusType{
+		"pending-acceptance",
+		"pending",
+		"rejected",
+		"available",
+		"deleting",
+		"deleted",
 	}
 }
 
