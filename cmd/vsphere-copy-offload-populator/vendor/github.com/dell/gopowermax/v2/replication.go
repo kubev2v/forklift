@@ -337,7 +337,6 @@ func (c *Client) CreateSnapshotPolicy(ctx context.Context, symID string, snapsho
 	}
 
 	snapshotPolicy := &types.SnapshotPolicy{}
-	Debug = true
 	ifDebugLogPayload(snapshotPolicyParam)
 	URL := c.urlPrefix() + Replication + SymmetrixX + symID + SnapshotPolicy
 	ctx, cancel := c.GetTimeoutContext(ctx)

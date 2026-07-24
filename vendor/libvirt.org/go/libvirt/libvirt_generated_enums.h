@@ -72,6 +72,9 @@
 #  if !LIBVIR_CHECK_VERSION(1, 2, 14)
 #    define VIR_CONNECT_BASELINE_CPU_MIGRATABLE (1 << 1)
 #  endif
+#  if !LIBVIR_CHECK_VERSION(11, 6, 0)
+#    define VIR_CONNECT_BASELINE_CPU_IGNORE_HOST (1 << 2)
+#  endif
 
 /* enum virConnectCloseReason */
 #  if !LIBVIR_CHECK_VERSION(0, 10, 0)
@@ -172,6 +175,31 @@
 #    define VIR_DOMAIN_BLOCK_JOB_LAST 4
 #  endif
 
+/* enum virConnectDomainEventChannelLifecycleReason */
+#  if !LIBVIR_CHECK_VERSION(12, 4, 0)
+#    define VIR_CONNECT_DOMAIN_EVENT_CHANNEL_LIFECYCLE_REASON_UNKNOWN 0
+#  endif
+#  if !LIBVIR_CHECK_VERSION(12, 4, 0)
+#    define VIR_CONNECT_DOMAIN_EVENT_CHANNEL_LIFECYCLE_REASON_DOMAIN_STARTED 1
+#  endif
+#  if !LIBVIR_CHECK_VERSION(12, 4, 0)
+#    define VIR_CONNECT_DOMAIN_EVENT_CHANNEL_LIFECYCLE_REASON_CHANNEL 2
+#  endif
+#  if !LIBVIR_CHECK_VERSION(12, 4, 0)
+#    define VIR_CONNECT_DOMAIN_EVENT_CHANNEL_LIFECYCLE_REASON_LAST 3
+#  endif
+
+/* enum virConnectDomainEventChannelLifecycleState */
+#  if !LIBVIR_CHECK_VERSION(12, 4, 0)
+#    define VIR_CONNECT_DOMAIN_EVENT_CHANNEL_LIFECYCLE_STATE_CONNECTED 1
+#  endif
+#  if !LIBVIR_CHECK_VERSION(12, 4, 0)
+#    define VIR_CONNECT_DOMAIN_EVENT_CHANNEL_LIFECYCLE_STATE_DISCONNECTED 2
+#  endif
+#  if !LIBVIR_CHECK_VERSION(12, 4, 0)
+#    define VIR_CONNECT_DOMAIN_EVENT_CHANNEL_LIFECYCLE_STATE_LAST 3
+#  endif
+
 /* enum virConnectDomainEventDiskChangeReason */
 #  if !LIBVIR_CHECK_VERSION(0, 9, 7)
 #    define VIR_DOMAIN_EVENT_DISK_CHANGE_MISSING_ON_START 0
@@ -224,6 +252,17 @@
 #  endif
 #  if !LIBVIR_CHECK_VERSION(1, 2, 8)
 #    define VIR_CONNECT_GET_ALL_DOMAINS_STATS_ENFORCE_STATS (1U << 31)
+#  endif
+
+/* enum virConnectGetDomainCapabilitiesFlags */
+#  if !LIBVIR_CHECK_VERSION(11, 0, 0)
+#    define VIR_CONNECT_GET_DOMAIN_CAPABILITIES_DISABLE_DEPRECATED_FEATURES (1 << 0)
+#  endif
+#  if !LIBVIR_CHECK_VERSION(12, 2, 0)
+#    define VIR_CONNECT_GET_DOMAIN_CAPABILITIES_EXPAND_CPU_FEATURES (1 << 1)
+#  endif
+#  if !LIBVIR_CHECK_VERSION(12, 5, 0)
+#    define VIR_CONNECT_GET_DOMAIN_CAPABILITIES_SUPPORTED_CPU_FEATURES (1 << 2)
 #  endif
 
 /* enum virConnectListAllDomainsFlags */
@@ -371,6 +410,12 @@
 #  if !LIBVIR_CHECK_VERSION(7, 9, 0)
 #    define VIR_CONNECT_LIST_NODE_DEVICES_CAP_VPD (1 << 21)
 #  endif
+#  if !LIBVIR_CHECK_VERSION(11, 1, 0)
+#    define VIR_CONNECT_LIST_NODE_DEVICES_CAP_CCWGROUP_DEV (1 << 22)
+#  endif
+#  if !LIBVIR_CHECK_VERSION(11, 1, 0)
+#    define VIR_CONNECT_LIST_NODE_DEVICES_CAP_CCWGROUP_MEMBER (1 << 23)
+#  endif
 #  if !LIBVIR_CHECK_VERSION(10, 1, 0)
 #    define VIR_CONNECT_LIST_NODE_DEVICES_PERSISTENT (1 << 28)
 #  endif
@@ -488,6 +533,9 @@
 #  if !LIBVIR_CHECK_VERSION(6, 0, 0)
 #    define VIR_DOMAIN_BACKUP_BEGIN_REUSE_EXTERNAL (1 << 0)
 #  endif
+#  if !LIBVIR_CHECK_VERSION(11, 10, 0)
+#    define VIR_DOMAIN_BACKUP_BEGIN_PRESERVE_SHUTDOWN_DOMAIN (1 << 1)
+#  endif
 
 /* enum virDomainBlockCommitFlags */
 #  if !LIBVIR_CHECK_VERSION(0, 10, 2)
@@ -518,6 +566,9 @@
 #  endif
 #  if !LIBVIR_CHECK_VERSION(8, 0, 0)
 #    define VIR_DOMAIN_BLOCK_COPY_SYNCHRONOUS_WRITES (1 << 3)
+#  endif
+#  if !LIBVIR_CHECK_VERSION(12, 2, 0)
+#    define VIR_DOMAIN_BLOCK_COPY_TARGET_ZEROED (1 << 4)
 #  endif
 
 /* enum virDomainBlockJobAbortFlags */
@@ -595,6 +646,9 @@
 #  endif
 #  if !LIBVIR_CHECK_VERSION(10, 0, 0)
 #    define VIR_DOMAIN_BLOCK_RESIZE_CAPACITY (1 << 1)
+#  endif
+#  if !LIBVIR_CHECK_VERSION(12, 3, 0)
+#    define VIR_DOMAIN_BLOCK_RESIZE_EXTEND (1 << 2)
 #  endif
 
 /* enum virDomainBlockedReason */
@@ -980,8 +1034,17 @@
 #  if !LIBVIR_CHECK_VERSION(7, 9, 0)
 #    define VIR_DOMAIN_EVENT_ID_MEMORY_DEVICE_SIZE_CHANGE 26
 #  endif
+#  if !LIBVIR_CHECK_VERSION(11, 2, 0)
+#    define VIR_DOMAIN_EVENT_ID_NIC_MAC_CHANGE 27
+#  endif
+#  if !LIBVIR_CHECK_VERSION(12, 4, 0)
+#    define VIR_DOMAIN_EVENT_ID_VCPU_REMOVED 28
+#  endif
+#  if !LIBVIR_CHECK_VERSION(12, 4, 0)
+#    define VIR_DOMAIN_EVENT_ID_CHANNEL_LIFECYCLE 29
+#  endif
 #  if !LIBVIR_CHECK_VERSION(0, 8, 0)
-#    define VIR_DOMAIN_EVENT_ID_LAST 27
+#    define VIR_DOMAIN_EVENT_ID_LAST 30
 #  endif
 
 /* enum virDomainEventIOErrorAction */
@@ -1059,8 +1122,11 @@
 #  if !LIBVIR_CHECK_VERSION(0, 9, 11)
 #    define VIR_DOMAIN_EVENT_STARTED_WAKEUP 4
 #  endif
+#  if !LIBVIR_CHECK_VERSION(11, 6, 0)
+#    define VIR_DOMAIN_EVENT_STARTED_RECREATED 5
+#  endif
 #  if !LIBVIR_CHECK_VERSION(0, 9, 10)
-#    define VIR_DOMAIN_EVENT_STARTED_LAST 5
+#    define VIR_DOMAIN_EVENT_STARTED_LAST 6
 #  endif
 
 /* enum virDomainEventStoppedDetailType */
@@ -1085,8 +1151,11 @@
 #  if !LIBVIR_CHECK_VERSION(0, 8, 0)
 #    define VIR_DOMAIN_EVENT_STOPPED_FROM_SNAPSHOT 6
 #  endif
+#  if !LIBVIR_CHECK_VERSION(11, 6, 0)
+#    define VIR_DOMAIN_EVENT_STOPPED_RECREATED 7
+#  endif
 #  if !LIBVIR_CHECK_VERSION(0, 9, 10)
-#    define VIR_DOMAIN_EVENT_STOPPED_LAST 7
+#    define VIR_DOMAIN_EVENT_STOPPED_LAST 8
 #  endif
 
 /* enum virDomainEventSuspendedDetailType */
@@ -1117,8 +1186,11 @@
 #  if !LIBVIR_CHECK_VERSION(1, 3, 3)
 #    define VIR_DOMAIN_EVENT_SUSPENDED_POSTCOPY_FAILED 8
 #  endif
+#  if !LIBVIR_CHECK_VERSION(11, 10, 0)
+#    define VIR_DOMAIN_EVENT_SUSPENDED_GUEST_SHUTDOWN 9
+#  endif
 #  if !LIBVIR_CHECK_VERSION(0, 9, 10)
-#    define VIR_DOMAIN_EVENT_SUSPENDED_LAST 9
+#    define VIR_DOMAIN_EVENT_SUSPENDED_LAST 10
 #  endif
 
 /* enum virDomainEventTrayChangeReason */
@@ -1257,6 +1329,9 @@
 #  endif
 #  if !LIBVIR_CHECK_VERSION(7, 10, 0)
 #    define VIR_DOMAIN_GUEST_INFO_INTERFACES (1 << 6)
+#  endif
+#  if !LIBVIR_CHECK_VERSION(11, 2, 0)
+#    define VIR_DOMAIN_GUEST_INFO_LOAD (1 << 7)
 #  endif
 
 /* enum virDomainInterfaceAddressesSource */
@@ -1482,6 +1557,9 @@
 #  endif
 #  if !LIBVIR_CHECK_VERSION(7, 1, 0)
 #    define VIR_DOMAIN_MESSAGE_TAINTING (1 << 1)
+#  endif
+#  if !LIBVIR_CHECK_VERSION(11, 1, 0)
+#    define VIR_DOMAIN_MESSAGE_IOERRORS (1 << 2)
 #  endif
 
 /* enum virDomainMetadataType */
@@ -1965,6 +2043,20 @@
 #    define VIR_DOMAIN_PASSWORD_ENCRYPTED (1 << 0)
 #  endif
 
+/* enum virDomainSetVcpuFlags */
+#  if !LIBVIR_CHECK_VERSION(12, 4, 0)
+#    define VIR_DOMAIN_SETVCPU_AFFECT_CURRENT VIR_DOMAIN_AFFECT_CURRENT
+#  endif
+#  if !LIBVIR_CHECK_VERSION(12, 4, 0)
+#    define VIR_DOMAIN_SETVCPU_AFFECT_LIVE VIR_DOMAIN_AFFECT_LIVE
+#  endif
+#  if !LIBVIR_CHECK_VERSION(12, 4, 0)
+#    define VIR_DOMAIN_SETVCPU_AFFECT_CONFIG VIR_DOMAIN_AFFECT_CONFIG
+#  endif
+#  if !LIBVIR_CHECK_VERSION(12, 4, 0)
+#    define VIR_DOMAIN_SETVCPU_ASYNC_UNPLUG (1 << 2)
+#  endif
+
 /* enum virDomainShutdownFlagValues */
 #  if !LIBVIR_CHECK_VERSION(0, 9, 10)
 #    define VIR_DOMAIN_SHUTDOWN_DEFAULT 0
@@ -2233,6 +2325,9 @@
 #  endif
 #  if !LIBVIR_CHECK_VERSION(2, 4, 0)
 #    define VIR_DOMAIN_VCPU_HOTPLUGGABLE (1 << 4)
+#  endif
+#  if !LIBVIR_CHECK_VERSION(12, 4, 0)
+#    define VIR_DOMAIN_VCPU_ASYNC_UNPLUG (1 << 5)
 #  endif
 
 /* enum virDomainXMLFlags */
@@ -2821,8 +2916,17 @@
 #  if !LIBVIR_CHECK_VERSION(9, 7, 0)
 #    define VIR_ERR_NO_NETWORK_METADATA 111
 #  endif
+#  if !LIBVIR_CHECK_VERSION(11, 2, 0)
+#    define VIR_ERR_AGENT_COMMAND_TIMEOUT 112
+#  endif
+#  if !LIBVIR_CHECK_VERSION(11, 2, 0)
+#    define VIR_ERR_AGENT_COMMAND_FAILED 113
+#  endif
+#  if !LIBVIR_CHECK_VERSION(12, 1, 0)
+#    define VIR_ERR_INVALID_ENCR_KEY_SECRET 114
+#  endif
 #  if !LIBVIR_CHECK_VERSION(5, 0, 0)
-#    define VIR_ERR_NUMBER_LAST 112
+#    define VIR_ERR_NUMBER_LAST 115
 #  endif
 
 /* enum virEventHandleType */
