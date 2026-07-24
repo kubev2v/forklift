@@ -4,6 +4,7 @@
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
 
+//go:build sqlite_preupdate_hook
 // +build sqlite_preupdate_hook
 
 package sqlite3
@@ -54,17 +55,21 @@ func (d *SQLitePreUpdateData) Count() int {
 	return int(C.sqlite3_preupdate_count(d.Conn.db))
 }
 
-func (d *SQLitePreUpdateData) row(dest []interface{}, new bool) error {
+func (d *SQLitePreUpdateData) row(dest []any, new bool) error {
 	for i := 0; i < d.Count() && i < len(dest); i++ {
 		var val *C.sqlite3_value
-		var src interface{}
+		var src any
+		var rc C.int
 
 		// Initially I tried making this just a function pointer argument, but
 		// it's absurdly complicated to pass C function pointers.
 		if new {
-			C.sqlite3_preupdate_new(d.Conn.db, C.int(i), &val)
+			rc = C.sqlite3_preupdate_new(d.Conn.db, C.int(i), &val)
 		} else {
-			C.sqlite3_preupdate_old(d.Conn.db, C.int(i), &val)
+			rc = C.sqlite3_preupdate_old(d.Conn.db, C.int(i), &val)
+		}
+		if rc != C.SQLITE_OK {
+			return Error{Code: ErrNo(rc)}
 		}
 
 		switch C.sqlite3_value_type(val) {
@@ -95,7 +100,7 @@ func (d *SQLitePreUpdateData) row(dest []interface{}, new bool) error {
 
 // Old populates dest with the row data to be replaced. This works similar to
 // database/sql's Rows.Scan()
-func (d *SQLitePreUpdateData) Old(dest ...interface{}) error {
+func (d *SQLitePreUpdateData) Old(dest ...any) error {
 	if d.Op == SQLITE_INSERT {
 		return errors.New("There is no old row for INSERT operations")
 	}
@@ -104,7 +109,7 @@ func (d *SQLitePreUpdateData) Old(dest ...interface{}) error {
 
 // New populates dest with the replacement row data. This works similar to
 // database/sql's Rows.Scan()
-func (d *SQLitePreUpdateData) New(dest ...interface{}) error {
+func (d *SQLitePreUpdateData) New(dest ...any) error {
 	if d.Op == SQLITE_DELETE {
 		return errors.New("There is no new row for DELETE operations")
 	}

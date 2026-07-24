@@ -34,7 +34,7 @@ var klogV = func(lvl klog.Level) bool {
 // Field is a key value pair that provides additional details about the trace.
 type Field struct {
 	Key   string
-	Value interface{}
+	Value any
 }
 
 func (f Field) format() string {
@@ -192,7 +192,7 @@ func (t *Trace) Log() {
 	t.endTime = &endTime
 	t.lock.Unlock()
 	// an explicit logging request should dump all the steps out at the higher level
-	if t.parentTrace == nil { // We don't start logging until Log or LogIfLong is called on the root trace
+	if t.parentTrace == nil && klogV(2) { // We don't start logging until Log or LogIfLong is called on the root trace
 		t.logTrace()
 	}
 }

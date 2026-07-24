@@ -1,8 +1,10 @@
 package v1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"encoding/json"
 	"net"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // +genclient
@@ -105,6 +107,7 @@ type NetworkStatus struct {
 	Interface  string      `json:"interface,omitempty"`
 	IPs        []string    `json:"ips,omitempty"`
 	Mac        string      `json:"mac,omitempty"`
+	Mtu        int         `json:"mtu,omitempty"`
 	Default    bool        `json:"default,omitempty"`
 	DNS        DNS         `json:"dns,omitempty"`
 	DeviceInfo *DeviceInfo `json:"device-info,omitempty"`
@@ -162,6 +165,20 @@ type NetworkSelectionElement struct {
 	CNIArgs *map[string]interface{} `json:"cni-args,omitempty"`
 	// GatewayRequest contains default route IP address for the pod
 	GatewayRequest []net.IP `json:"default-route,omitempty"`
+	// IPAMClaimReference container the IPAMClaim name where the IPs for this
+	// attachment will be located.
+	IPAMClaimReference string `json:"ipam-claim-reference,omitempty"`
+}
+
+func (nse *NetworkSelectionElement) UnmarshalJSON(b []byte) error {
+	type networkSelectionElement NetworkSelectionElement
+
+	var netSelectionElement networkSelectionElement
+	if err := json.Unmarshal(b, &netSelectionElement); err != nil {
+		return err
+	}
+	*nse = NetworkSelectionElement(netSelectionElement)
+	return nil
 }
 
 const (
