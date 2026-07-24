@@ -31,10 +31,6 @@ type VSphereXcopyVolumePopulatorSpec struct {
 	// StorageVendorProduct is the storage vendor the target disk and PVC are connected to
 	// Supported values [vantara, ontap, primera3par]
 	StorageVendorProduct string `json:"storageVendorProduct"`
-	// MigrationHost is the ESXi host ID to use for the XCOPY operation.
-	// If empty, the host where the source VM is registered will be used.
-	// +optional
-	MigrationHost string `json:"migrationHost,omitempty"`
 }
 
 type VSphereXcopyVolumePopulatorStatus struct {

@@ -1,11 +1,12 @@
 // © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
+// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 package internal
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -16,6 +17,8 @@ import (
 	"path"
 	"slices"
 	"strings"
+
+	"github.com/google/uuid"
 
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/mo"
@@ -167,4 +170,9 @@ func (arg ReflectManagedMethodExecuterSoapArgument) Value() []string {
 
 func EsxcliName(name string) string {
 	return strings.ReplaceAll(strings.Title(name), ".", "")
+}
+
+// OID returns a stable UUID based on input s
+func OID(s string) uuid.UUID {
+	return uuid.NewHash(sha256.New(), uuid.NameSpaceOID, []byte(s), 5)
 }
