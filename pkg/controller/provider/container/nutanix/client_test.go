@@ -855,20 +855,6 @@ func TestClientListAllV4StopsOnEmptyPage(t *testing.T) {
 	}
 }
 
-// TestClientBasicAuth tests the basic auth encoding.
-func TestClientBasicAuth(t *testing.T) {
-	username := "admin"
-	password := "password"
-
-	result := basicAuth(username, password)
-
-	// The base64 encoding of "admin:password" is "YWRtaW46cGFzc3dvcmQ="
-	expected := "YWRtaW46cGFzc3dvcmQ="
-	if result != expected {
-		t.Errorf("Expected %s, got %s", expected, result)
-	}
-}
-
 // TestClientErrorHandling tests error handling.
 func TestClientErrorHandling(t *testing.T) {
 	// Create mock server that returns an error

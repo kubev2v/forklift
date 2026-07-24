@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/nutanix"
+	libclient "github.com/kubev2v/forklift/pkg/lib/client/nutanix"
 )
 
 func TestApplyCluster(t *testing.T) {
@@ -138,7 +139,7 @@ func TestApplyHostNameAndClusterNotFromWrongPaths(t *testing.T) {
 	e.Metadata.UUID = "host-1"
 	e.Metadata.Name = "wrong-name"
 	e.Status.Name = "right-name"
-	e.Status.ClusterReference = ref{UUID: "right-cluster"}
+	e.Status.ClusterReference = libclient.Ref{UUID: "right-cluster"}
 	// status.Resources has no ClusterReference field in the typed struct,
 	// so wrong-path reads are impossible by construction.
 
@@ -227,7 +228,7 @@ func TestApplyNetworkNameAndClusterNotFromWrongPaths(t *testing.T) {
 	e.Metadata.UUID = "network-1"
 	e.Metadata.Name = "wrong-name"
 	e.Status.Name = "right-name"
-	e.Status.ClusterReference = ref{UUID: "right-cluster"}
+	e.Status.ClusterReference = libclient.Ref{UUID: "right-cluster"}
 
 	m := &model.Network{}
 	e.ApplyTo(m)
@@ -444,9 +445,9 @@ func TestEnrichVM(t *testing.T) {
 }
 
 func TestApplyGuestTools_Disabled(t *testing.T) {
-	spec := guestTools{}
+	spec := libclient.VMGuestTools{}
 	spec.NutanixGuestTools.Enabled = false
-	status := guestTools{}
+	status := libclient.VMGuestTools{}
 
 	m := &model.VM{}
 	mergeGuestTools(spec, status, m)
@@ -468,13 +469,13 @@ func TestApplyGuestTools_Disabled(t *testing.T) {
 // TestApplyGuestTools_UnmountedISO verifies that an ISO mount state other than
 // "MOUNTED" is correctly reported as not mounted.
 func TestApplyGuestTools_UnmountedISO(t *testing.T) {
-	spec := guestTools{}
+	spec := libclient.VMGuestTools{}
 	spec.NutanixGuestTools.Enabled = true
 	spec.NutanixGuestTools.Version = "3.2.0"
 	spec.NutanixGuestTools.IsReachable = true
 	spec.NutanixGuestTools.ISOMountState = "UNMOUNTED"
 	spec.NutanixGuestTools.GuestOSVersion = "Red Hat Enterprise Linux 8.9"
-	status := guestTools{}
+	status := libclient.VMGuestTools{}
 
 	m := &model.VM{}
 	mergeGuestTools(spec, status, m)
@@ -492,7 +493,7 @@ func TestApplyGuestTools_UnmountedISO(t *testing.T) {
 
 func TestApplyGuestTools_NoSection(t *testing.T) {
 	m := &model.VM{}
-	mergeGuestTools(guestTools{}, guestTools{}, m)
+	mergeGuestTools(libclient.VMGuestTools{}, libclient.VMGuestTools{}, m)
 
 	if m.GuestToolsEnabled || m.GuestToolsMounted || m.GuestToolsReachable || m.GuestToolsVersion != "" {
 		t.Errorf("Expected all guest tools fields to remain at zero value, got %+v", m)
@@ -502,7 +503,7 @@ func TestApplyGuestTools_NoSection(t *testing.T) {
 // TestApplyDisk_VolumeGroupDisk verifies that a volume-group-backed disk (no
 // storage_container_reference) still captures size and device properties.
 func TestApplyDisk_VolumeGroupDisk(t *testing.T) {
-	d := diskEntity{
+	d := libclient.VMDisk{
 		UUID: "disk-vg-1",
 		DeviceProperties: struct {
 			DeviceType  string `json:"device_type"`
@@ -523,7 +524,7 @@ func TestApplyDisk_VolumeGroupDisk(t *testing.T) {
 		DiskSizeMiB: 51200,
 	}
 
-	disk := d.ApplyTo()
+	disk := applyDisk(&d)
 
 	if disk.UUID != "disk-vg-1" {
 		t.Errorf("Expected UUID 'disk-vg-1', got %s", disk.UUID)
@@ -543,7 +544,7 @@ func TestApplyDisk_VolumeGroupDisk(t *testing.T) {
 }
 
 func TestApplyDisk_Cdrom(t *testing.T) {
-	d := diskEntity{
+	d := libclient.VMDisk{
 		UUID: "disk-cdrom-1",
 		DeviceProperties: struct {
 			DeviceType  string `json:"device_type"`
@@ -556,7 +557,7 @@ func TestApplyDisk_Cdrom(t *testing.T) {
 		},
 	}
 
-	disk := d.ApplyTo()
+	disk := applyDisk(&d)
 
 	if !disk.IsCdrom {
 		t.Error("Expected IsCdrom to be true for a CDROM device type")
@@ -569,8 +570,8 @@ func TestApplyDisk_Cdrom(t *testing.T) {
 // TestApplyDisk_NoStorageContainerRef verifies that a disk with no
 // storage_container_reference leaves the storage fields at their zero value.
 func TestApplyDisk_NoStorageContainerRef(t *testing.T) {
-	d := diskEntity{UUID: "disk-1"}
-	disk := d.ApplyTo()
+	d := libclient.VMDisk{UUID: "disk-1"}
+	disk := applyDisk(&d)
 
 	if disk.StorageContainerUUID != "" || disk.StorageContainerName != "" {
 		t.Errorf("Expected empty storage container fields, got UUID=%q Name=%q",

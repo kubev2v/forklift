@@ -96,17 +96,26 @@ func (r *Client) resolvePrismConfig() (PrismConfig, error) {
 	}, nil
 }
 
+// detectPrismMode probes the API to tell Prism Central and Prism Element
+// apart. It is only ever reached via ensurePrismConfig(), which itself is
+// only reached once the shared client is already connected (either from
+// connect(), or from a listAll()/etc. call that already connected) --
+// so this calls the shared client directly rather than through this
+// package's connect()-wrapping get(), to avoid recursing back into
+// ensurePrismConfig() while it is still resolving.
 func (r *Client) detectPrismMode() (PrismMode, error) {
+	r.ensureWebClient()
+
 	pcURL := fmt.Sprintf("%s/api/nutanix/v3/prism_central", r.url)
 	var pcBody map[string]interface{}
-	status, err := r.get(pcURL, &pcBody)
+	status, err := r.web.Get(pcURL, &pcBody)
 	if err == nil && status == http.StatusOK {
 		return PrismCentral, nil
 	}
 
 	peURL := fmt.Sprintf("%s%s", r.url, storageContainersV2Path)
 	var peBody map[string]interface{}
-	status, err = r.get(peURL, &peBody)
+	status, err = r.web.Get(peURL, &peBody)
 	if err == nil && status == http.StatusOK {
 		return PrismElement, nil
 	}

@@ -3,12 +3,14 @@ package nutanix
 import (
 	"encoding/json"
 	"testing"
+
+	libclient "github.com/kubev2v/forklift/pkg/lib/client/nutanix"
 )
 
 func TestNutanixBool(t *testing.T) {
 	tests := []struct {
 		name     string
-		value    interface{}
+		value    any
 		expected bool
 	}{
 		{"native true", true, true},
@@ -20,7 +22,7 @@ func TestNutanixBool(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := nutanixBool(tt.value); got != tt.expected {
+			if got := libclient.NutanixBool(tt.value); got != tt.expected {
 				t.Fatalf("expected %v, got %v", tt.expected, got)
 			}
 		})
@@ -51,12 +53,12 @@ func TestListAllV3DecodeVMWithStringFlashMode(t *testing.T) {
 		}]
 	}`)
 
-	var response v3ListResponse[vmEntity]
+	var response libclient.V3ListResponse[vmEntity]
 	if err := json.Unmarshal(payload, &response); err != nil {
 		t.Fatalf("failed to decode VM list: %v", err)
 	}
 
-	disk := response.Entities[0].Spec.Resources.DiskList[0].ApplyTo()
+	disk := applyDisk(&response.Entities[0].Spec.Resources.DiskList[0])
 	if disk.FlashMode {
 		t.Fatal("expected flash_mode DISABLED to map to false")
 	}
