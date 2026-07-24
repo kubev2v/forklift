@@ -77,7 +77,7 @@ func newSink(fn func(prefix, args string), formatter Formatter) logr.LogSink {
 		write:     fn,
 	}
 	// For skipping fnlogger.Info and fnlogger.Error.
-	l.Formatter.AddCallDepth(1)
+	l.AddCallDepth(1) // via Formatter
 	return l
 }
 
@@ -99,6 +99,11 @@ type Options struct {
 	// is enabled.  If not specified, a default format will be used.  For more
 	// details, see docs for Go's time.Layout.
 	TimestampFormat string
+
+	// LogInfoLevel tells funcr what key to use to log the info level.
+	// If not specified, the info level will be logged as "level".
+	// If this is set to "", the info level will not be logged at all.
+	LogInfoLevel *string
 
 	// Verbosity tells funcr which V logs to produce.  Higher values enable
 	// more logs.  Info logs at or below this level will be written, while logs
@@ -159,17 +164,17 @@ type fnlogger struct {
 }
 
 func (l fnlogger) WithName(name string) logr.LogSink {
-	l.Formatter.AddName(name)
+	l.AddName(name) // via Formatter
 	return &l
 }
 
 func (l fnlogger) WithValues(kvList ...any) logr.LogSink {
-	l.Formatter.AddValues(kvList)
+	l.AddValues(kvList) // via Formatter
 	return &l
 }
 
 func (l fnlogger) WithCallDepth(depth int) logr.LogSink {
-	l.Formatter.AddCallDepth(depth)
+	l.AddCallDepth(depth) // via Formatter
 	return &l
 }
 
@@ -213,6 +218,10 @@ func newFormatter(opts Options, outfmt outputFormat) Formatter {
 	if opts.MaxLogDepth == 0 {
 		opts.MaxLogDepth = defaultMaxLogDepth
 	}
+	if opts.LogInfoLevel == nil {
+		opts.LogInfoLevel = new(string)
+		*opts.LogInfoLevel = "level"
+	}
 	f := Formatter{
 		outputFormat: outfmt,
 		prefix:       "",
@@ -233,6 +242,8 @@ type Formatter struct {
 	valuesStr    string
 	depth        int
 	opts         *Options
+	groupName    string // for slog groups
+	groups       []groupDef
 }
 
 // outputFormat indicates which outputFormat to use.
@@ -245,6 +256,13 @@ const (
 	outputJSON
 )
 
+// groupDef represents a saved group.  The values may be empty, but we don't
+// know if we need to render the group until the final record is rendered.
+type groupDef struct {
+	name   string
+	values string
+}
+
 // PseudoStruct is a list of key-value pairs that gets logged as a struct.
 type PseudoStruct []any
 
@@ -252,63 +270,125 @@ type PseudoStruct []any
 func (f Formatter) render(builtins, args []any) string {
 	// Empirically bytes.Buffer is faster than strings.Builder for this.
 	buf := bytes.NewBuffer(make([]byte, 0, 1024))
+
 	if f.outputFormat == outputJSON {
-		buf.WriteByte('{')
+		buf.WriteByte('{') // for the whole record
 	}
+
+	// Render builtins
 	vals := builtins
 	if hook := f.opts.RenderBuiltinsHook; hook != nil {
 		vals = hook(f.sanitize(vals))
 	}
-	f.flatten(buf, vals, false, false) // keys are ours, no need to escape
+	f.flatten(buf, vals, false) // keys are ours, no need to escape
 	continuing := len(builtins) > 0
-	if len(f.valuesStr) > 0 {
-		if continuing {
-			if f.outputFormat == outputJSON {
-				buf.WriteByte(',')
-			} else {
-				buf.WriteByte(' ')
-			}
+
+	// Turn the inner-most group into a string
+	argsStr := func() string {
+		buf := bytes.NewBuffer(make([]byte, 0, 1024))
+
+		vals = args
+		if hook := f.opts.RenderArgsHook; hook != nil {
+			vals = hook(f.sanitize(vals))
 		}
-		continuing = true
-		buf.WriteString(f.valuesStr)
+		f.flatten(buf, vals, true) // escape user-provided keys
+
+		return buf.String()
+	}()
+
+	// Render the stack of groups from the inside out.
+	bodyStr := f.renderGroup(f.groupName, f.valuesStr, argsStr)
+	for i := len(f.groups) - 1; i >= 0; i-- {
+		grp := &f.groups[i]
+		if grp.values == "" && bodyStr == "" {
+			// no contents, so we must elide the whole group
+			continue
+		}
+		bodyStr = f.renderGroup(grp.name, grp.values, bodyStr)
 	}
-	vals = args
-	if hook := f.opts.RenderArgsHook; hook != nil {
-		vals = hook(f.sanitize(vals))
+
+	if bodyStr != "" {
+		if continuing {
+			buf.WriteByte(f.comma())
+		}
+		buf.WriteString(bodyStr)
 	}
-	f.flatten(buf, vals, continuing, true) // escape user-provided keys
+
 	if f.outputFormat == outputJSON {
-		buf.WriteByte('}')
+		buf.WriteByte('}') // for the whole record
 	}
+
 	return buf.String()
 }
 
-// flatten renders a list of key-value pairs into a buffer.  If continuing is
-// true, it assumes that the buffer has previous values and will emit a
-// separator (which depends on the output format) before the first pair it
-// writes.  If escapeKeys is true, the keys are assumed to have
-// non-JSON-compatible characters in them and must be evaluated for escapes.
+// renderGroup returns a string representation of the named group with rendered
+// values and args.  If the name is empty, this will return the values and args,
+// joined.  If the name is not empty, this will return a single key-value pair,
+// where the value is a grouping of the values and args.  If the values and
+// args are both empty, this will return an empty string, even if the name was
+// specified.
+func (f Formatter) renderGroup(name string, values string, args string) string {
+	buf := bytes.NewBuffer(make([]byte, 0, 1024))
+
+	needClosingBrace := false
+	if name != "" && (values != "" || args != "") {
+		buf.WriteString(f.quoted(name, true)) // escape user-provided keys
+		buf.WriteByte(f.colon())
+		buf.WriteByte('{')
+		needClosingBrace = true
+	}
+
+	continuing := false
+	if values != "" {
+		buf.WriteString(values)
+		continuing = true
+	}
+
+	if args != "" {
+		if continuing {
+			buf.WriteByte(f.comma())
+		}
+		buf.WriteString(args)
+	}
+
+	if needClosingBrace {
+		buf.WriteByte('}')
+	}
+
+	return buf.String()
+}
+
+// flatten renders a list of key-value pairs into a buffer.  If escapeKeys is
+// true, the keys are assumed to have non-JSON-compatible characters in them
+// and must be evaluated for escapes.
 //
 // This function returns a potentially modified version of kvList, which
 // ensures that there is a value for every key (adding a value if needed) and
 // that each key is a string (substituting a key if needed).
-func (f Formatter) flatten(buf *bytes.Buffer, kvList []any, continuing bool, escapeKeys bool) []any {
+func (f Formatter) flatten(buf *bytes.Buffer, kvList []any, escapeKeys bool) []any {
 	// This logic overlaps with sanitize() but saves one type-cast per key,
 	// which can be measurable.
 	if len(kvList)%2 != 0 {
 		kvList = append(kvList, noValue)
 	}
+	copied := false
 	for i := 0; i < len(kvList); i += 2 {
 		k, ok := kvList[i].(string)
 		if !ok {
+			if !copied {
+				newList := make([]any, len(kvList))
+				copy(newList, kvList)
+				kvList = newList
+				copied = true
+			}
 			k = f.nonStringKey(kvList[i])
 			kvList[i] = k
 		}
 		v := kvList[i+1]
 
-		if i > 0 || continuing {
+		if i > 0 {
 			if f.outputFormat == outputJSON {
-				buf.WriteByte(',')
+				buf.WriteByte(f.comma())
 			} else {
 				// In theory the format could be something we don't understand.  In
 				// practice, we control it, so it won't be.
@@ -316,26 +396,37 @@ func (f Formatter) flatten(buf *bytes.Buffer, kvList []any, continuing bool, esc
 			}
 		}
 
-		if escapeKeys {
-			buf.WriteString(prettyString(k))
-		} else {
-			// this is faster
-			buf.WriteByte('"')
-			buf.WriteString(k)
-			buf.WriteByte('"')
-		}
-		if f.outputFormat == outputJSON {
-			buf.WriteByte(':')
-		} else {
-			buf.WriteByte('=')
-		}
+		buf.WriteString(f.quoted(k, escapeKeys))
+		buf.WriteByte(f.colon())
 		buf.WriteString(f.pretty(v))
 	}
 	return kvList
 }
 
+func (f Formatter) quoted(str string, escape bool) string {
+	if escape {
+		return prettyString(str)
+	}
+	// this is faster
+	return `"` + str + `"`
+}
+
+func (f Formatter) comma() byte {
+	if f.outputFormat == outputJSON {
+		return ','
+	}
+	return ' '
+}
+
+func (f Formatter) colon() byte {
+	if f.outputFormat == outputJSON {
+		return ':'
+	}
+	return '='
+}
+
 func (f Formatter) pretty(value any) string {
-	return f.prettyWithFlags(value, 0, 0)
+	return f.prettyWithFlags(value, 0, 0, 0, nil)
 }
 
 const (
@@ -343,7 +434,13 @@ const (
 )
 
 // TODO: This is not fast. Most of the overhead goes here.
-func (f Formatter) prettyWithFlags(value any, flags uint32, depth int) string {
+// value: The value to render
+// flags: Bitmask of flags (see above)
+// depth: The current depth of nested structs, slices, arrays, and maps
+// ptrDepth: The current depth of including pointer dereferences
+// ptrMap: A map of pointers already seen, to avoid infinite recursion (usually
+// nil unless ptrDepth is large)
+func (f Formatter) prettyWithFlags(value any, flags uint32, depth int, ptrDepth int, ptrMap map[uintptr]bool) string {
 	if depth > f.opts.MaxLogDepth {
 		return `"<max-log-depth-exceeded>"`
 	}
@@ -407,13 +504,13 @@ func (f Formatter) prettyWithFlags(value any, flags uint32, depth int) string {
 		}
 		for i := 0; i < len(v); i += 2 {
 			if i > 0 {
-				buf.WriteByte(',')
+				buf.WriteByte(f.comma())
 			}
 			k, _ := v[i].(string) // sanitize() above means no need to check success
 			// arbitrary keys might need escaping
 			buf.WriteString(prettyString(k))
-			buf.WriteByte(':')
-			buf.WriteString(f.prettyWithFlags(v[i+1], 0, depth+1))
+			buf.WriteByte(f.colon())
+			buf.WriteString(f.prettyWithFlags(v[i+1], 0, depth+1, ptrDepth+1, ptrMap))
 		}
 		if flags&flagRawStruct == 0 {
 			buf.WriteByte('}')
@@ -481,22 +578,20 @@ func (f Formatter) prettyWithFlags(value any, flags uint32, depth int) string {
 				continue
 			}
 			if printComma {
-				buf.WriteByte(',')
+				buf.WriteByte(f.comma())
 			}
 			printComma = true // if we got here, we are rendering a field
 			if fld.Anonymous && fld.Type.Kind() == reflect.Struct && name == "" {
-				buf.WriteString(f.prettyWithFlags(v.Field(i).Interface(), flags|flagRawStruct, depth+1))
+				buf.WriteString(f.prettyWithFlags(v.Field(i).Interface(), flags|flagRawStruct, depth+1, ptrDepth+1, ptrMap))
 				continue
 			}
 			if name == "" {
 				name = fld.Name
 			}
 			// field names can't contain characters which need escaping
-			buf.WriteByte('"')
-			buf.WriteString(name)
-			buf.WriteByte('"')
-			buf.WriteByte(':')
-			buf.WriteString(f.prettyWithFlags(v.Field(i).Interface(), 0, depth+1))
+			buf.WriteString(f.quoted(name, false))
+			buf.WriteByte(f.colon())
+			buf.WriteString(f.prettyWithFlags(v.Field(i).Interface(), 0, depth+1, ptrDepth+1, ptrMap))
 		}
 		if flags&flagRawStruct == 0 {
 			buf.WriteByte('}')
@@ -520,10 +615,10 @@ func (f Formatter) prettyWithFlags(value any, flags uint32, depth int) string {
 		buf.WriteByte('[')
 		for i := 0; i < v.Len(); i++ {
 			if i > 0 {
-				buf.WriteByte(',')
+				buf.WriteByte(f.comma())
 			}
 			e := v.Index(i)
-			buf.WriteString(f.prettyWithFlags(e.Interface(), 0, depth+1))
+			buf.WriteString(f.prettyWithFlags(e.Interface(), 0, depth+1, ptrDepth+1, ptrMap))
 		}
 		buf.WriteByte(']')
 		return buf.String()
@@ -534,7 +629,7 @@ func (f Formatter) prettyWithFlags(value any, flags uint32, depth int) string {
 		i := 0
 		for it.Next() {
 			if i > 0 {
-				buf.WriteByte(',')
+				buf.WriteByte(f.comma())
 			}
 			// If a map key supports TextMarshaler, use it.
 			keystr := ""
@@ -548,7 +643,8 @@ func (f Formatter) prettyWithFlags(value any, flags uint32, depth int) string {
 				keystr = prettyString(keystr)
 			} else {
 				// prettyWithFlags will produce already-escaped values
-				keystr = f.prettyWithFlags(it.Key().Interface(), 0, depth+1)
+				// key depth is unrelated to overall depth
+				keystr = f.prettyWithFlags(it.Key().Interface(), 0, 0, ptrDepth, ptrMap)
 				if t.Key().Kind() != reflect.String {
 					// JSON only does string keys.  Unlike Go's standard JSON, we'll
 					// convert just about anything to a string.
@@ -556,17 +652,35 @@ func (f Formatter) prettyWithFlags(value any, flags uint32, depth int) string {
 				}
 			}
 			buf.WriteString(keystr)
-			buf.WriteByte(':')
-			buf.WriteString(f.prettyWithFlags(it.Value().Interface(), 0, depth+1))
+			buf.WriteByte(f.colon())
+			buf.WriteString(f.prettyWithFlags(it.Value().Interface(), 0, depth+1, ptrDepth+1, ptrMap))
 			i++
 		}
 		buf.WriteByte('}')
 		return buf.String()
-	case reflect.Ptr, reflect.Interface:
+	case reflect.Pointer, reflect.Interface:
 		if v.IsNil() {
 			return "null"
 		}
-		return f.prettyWithFlags(v.Elem().Interface(), 0, depth)
+		// Special case: recursive pointers.  For normal use we do not want to
+		// count pointer dereferences as depth, but if we see the same pointer
+		// again we have a recursion and need to stop.  After a large number of
+		// pointer dereferences we will start tracking pointers to avoid the
+		// perf hit of doing it in the normal path.
+		//
+		// This should not happen accidentally (e.g. json decoding should never
+		// do this) but we can handle it gracefully.
+		if ptrMap != nil && ptrMap[uintptr(v.Pointer())] {
+			depth = f.opts.MaxLogDepth + 1 // force a depth error
+		}
+		const maxDepthFactor = 4 // arbitrary, but we want it large enough to not false-alert
+		if ptrDepth > f.opts.MaxLogDepth*maxDepthFactor && ptrMap == nil {
+			ptrMap = map[uintptr]bool{}
+		}
+		if ptrMap != nil {
+			ptrMap[(uintptr)(v.Pointer())] = true
+		}
+		return f.prettyWithFlags(v.Elem().Interface(), 0, depth, ptrDepth+1, ptrMap)
 	}
 	return fmt.Sprintf(`"<unhandled-%s>"`, t.Kind().String())
 }
@@ -608,7 +722,7 @@ func isEmpty(v reflect.Value) bool {
 		return v.Float() == 0
 	case reflect.Complex64, reflect.Complex128:
 		return v.Complex() == 0
-	case reflect.Interface, reflect.Ptr:
+	case reflect.Interface, reflect.Pointer:
 		return v.IsNil()
 	}
 	return false
@@ -706,6 +820,24 @@ func (f Formatter) sanitize(kvList []any) []any {
 	return kvList
 }
 
+// startGroup opens a new group scope (basically a sub-struct), which locks all
+// the current saved values and starts them anew.  This is needed to satisfy
+// slog.
+func (f *Formatter) startGroup(name string) {
+	// Unnamed groups are just inlined.
+	if name == "" {
+		return
+	}
+
+	n := len(f.groups)
+	f.groups = append(f.groups[:n:n], groupDef{f.groupName, f.valuesStr})
+
+	// Start collecting new values.
+	f.groupName = name
+	f.valuesStr = ""
+	f.values = nil
+}
+
 // Init configures this Formatter from runtime info, such as the call depth
 // imposed by logr itself.
 // Note that this receiver is a pointer, so depth can be saved.
@@ -740,7 +872,10 @@ func (f Formatter) FormatInfo(level int, msg string, kvList []any) (prefix, args
 	if policy := f.opts.LogCaller; policy == All || policy == Info {
 		args = append(args, "caller", f.caller())
 	}
-	args = append(args, "level", level, "msg", msg)
+	if key := *f.opts.LogInfoLevel; key != "" {
+		args = append(args, key, level)
+	}
+	args = append(args, "msg", msg)
 	return prefix, f.render(args, kvList)
 }
 
@@ -793,7 +928,7 @@ func (f *Formatter) AddValues(kvList []any) {
 
 	// Pre-render values, so we don't have to do it on each Info/Error call.
 	buf := bytes.NewBuffer(make([]byte, 0, 1024))
-	f.flatten(buf, vals, false, true) // escape user-provided keys
+	f.flatten(buf, vals, true) // escape user-provided keys
 	f.valuesStr = buf.String()
 }
 

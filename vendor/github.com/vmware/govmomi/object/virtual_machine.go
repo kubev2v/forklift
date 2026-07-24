@@ -1,18 +1,6 @@
-/*
-Copyright (c) 2015-2023 VMware, Inc. All Rights Reserved.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// © Broadcom. All Rights Reserved.
+// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
+// SPDX-License-Identifier: Apache-2.0
 
 package object
 
@@ -500,7 +488,7 @@ func diskFileOperation(op types.VirtualDeviceConfigSpecOperation, fop types.Virt
 	return ""
 }
 
-func (v VirtualMachine) configureDevice(ctx context.Context, op types.VirtualDeviceConfigSpecOperation, fop types.VirtualDeviceConfigSpecFileOperation, devices ...types.BaseVirtualDevice) error {
+func (v VirtualMachine) configureDevice(ctx context.Context, profile []types.BaseVirtualMachineProfileSpec, op types.VirtualDeviceConfigSpecOperation, fop types.VirtualDeviceConfigSpecFileOperation, devices ...types.BaseVirtualDevice) error {
 	spec := types.VirtualMachineConfigSpec{}
 
 	for _, device := range devices {
@@ -508,6 +496,7 @@ func (v VirtualMachine) configureDevice(ctx context.Context, op types.VirtualDev
 			Device:        device,
 			Operation:     op,
 			FileOperation: diskFileOperation(op, fop, device),
+			Profile:       profile,
 		}
 
 		spec.DeviceChange = append(spec.DeviceChange, config)
@@ -523,12 +512,22 @@ func (v VirtualMachine) configureDevice(ctx context.Context, op types.VirtualDev
 
 // AddDevice adds the given devices to the VirtualMachine
 func (v VirtualMachine) AddDevice(ctx context.Context, device ...types.BaseVirtualDevice) error {
-	return v.configureDevice(ctx, types.VirtualDeviceConfigSpecOperationAdd, types.VirtualDeviceConfigSpecFileOperationCreate, device...)
+	return v.AddDeviceWithProfile(ctx, nil, device...)
+}
+
+// AddDeviceWithProfile adds the given devices to the VirtualMachine with the given profile
+func (v VirtualMachine) AddDeviceWithProfile(ctx context.Context, profile []types.BaseVirtualMachineProfileSpec, device ...types.BaseVirtualDevice) error {
+	return v.configureDevice(ctx, profile, types.VirtualDeviceConfigSpecOperationAdd, types.VirtualDeviceConfigSpecFileOperationCreate, device...)
 }
 
 // EditDevice edits the given (existing) devices on the VirtualMachine
 func (v VirtualMachine) EditDevice(ctx context.Context, device ...types.BaseVirtualDevice) error {
-	return v.configureDevice(ctx, types.VirtualDeviceConfigSpecOperationEdit, types.VirtualDeviceConfigSpecFileOperationReplace, device...)
+	return v.EditDeviceWithProfile(ctx, nil, device...)
+}
+
+// EditDeviceWithProfile edits the given (existing) devices on the VirtualMachine with the given profile
+func (v VirtualMachine) EditDeviceWithProfile(ctx context.Context, profile []types.BaseVirtualMachineProfileSpec, device ...types.BaseVirtualDevice) error {
+	return v.configureDevice(ctx, profile, types.VirtualDeviceConfigSpecOperationEdit, types.VirtualDeviceConfigSpecFileOperationReplace, device...)
 }
 
 // RemoveDevice removes the given devices on the VirtualMachine
@@ -537,17 +536,17 @@ func (v VirtualMachine) RemoveDevice(ctx context.Context, keepFiles bool, device
 	if keepFiles {
 		fop = ""
 	}
-	return v.configureDevice(ctx, types.VirtualDeviceConfigSpecOperationRemove, fop, device...)
+	return v.configureDevice(ctx, nil, types.VirtualDeviceConfigSpecOperationRemove, fop, device...)
 }
 
 // AttachDisk attaches the given disk to the VirtualMachine
-func (v VirtualMachine) AttachDisk(ctx context.Context, id string, datastore *Datastore, controllerKey int32, unitNumber int32) error {
+func (v VirtualMachine) AttachDisk(ctx context.Context, id string, datastore *Datastore, controllerKey int32, unitNumber *int32) error {
 	req := types.AttachDisk_Task{
 		This:          v.Reference(),
 		DiskId:        types.ID{Id: id},
 		Datastore:     datastore.Reference(),
 		ControllerKey: controllerKey,
-		UnitNumber:    &unitNumber,
+		UnitNumber:    unitNumber,
 	}
 
 	res, err := methods.AttachDisk_Task(ctx, v.c, &req)
@@ -642,6 +641,24 @@ func (v VirtualMachine) CreateSnapshot(ctx context.Context, name string, descrip
 	}
 
 	res, err := methods.CreateSnapshot_Task(ctx, v.c, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewTask(v.c, res.Returnval), nil
+}
+
+// CreateSnapshotEx creates a new snapshot of a virtual machine.
+func (v VirtualMachine) CreateSnapshotEx(ctx context.Context, name string, description string, memory bool, quiesceSpec types.BaseVirtualMachineGuestQuiesceSpec) (*Task, error) {
+	req := types.CreateSnapshotEx_Task{
+		This:        v.Reference(),
+		Name:        name,
+		Description: description,
+		Memory:      memory,
+		QuiesceSpec: quiesceSpec,
+	}
+
+	res, err := methods.CreateSnapshotEx_Task(ctx, v.c, &req)
 	if err != nil {
 		return nil, err
 	}
@@ -1078,4 +1095,19 @@ func (v *VirtualMachine) ExportSnapshot(ctx context.Context, snapshot *types.Man
 		return nil, err
 	}
 	return nfc.NewLease(v.c, resp.Returnval), nil
+}
+
+func (v *VirtualMachine) PromoteDisks(ctx context.Context, unlink bool, disks []types.VirtualDisk) (*Task, error) {
+	req := types.PromoteDisks_Task{
+		This:   v.Reference(),
+		Unlink: unlink,
+		Disks:  disks,
+	}
+
+	res, err := methods.PromoteDisks_Task(ctx, v.Client(), &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewTask(v.Client(), res.Returnval), nil
 }

@@ -77,8 +77,9 @@ cover() {
 
     pushd "$dir"
     go test -covermode=atomic  -coverpkg=./... -coverprofile=coverage.out.tmp ./...
-    cat coverage.out.tmp | grep -v fuzz | grep -v testsuite | grep -v tomltestgen | grep -v gotoml-test-decoder > coverage.out
+    grep -Ev '(fuzz|testsuite|tomltestgen|gotoml-test-decoder|gotoml-test-encoder)' coverage.out.tmp > coverage.out
     go tool cover -func=coverage.out
+    echo "Coverage profile for ${branch}: ${dir}/coverage.out" >&2
     popd
 
     if [ "${branch}" != "HEAD" ]; then
@@ -145,13 +146,17 @@ bench() {
 
     pushd "$dir"
 
+    tags=""
     if [ "${replace}" != "" ]; then
-        find ./benchmark/ -iname '*.go' -exec sed -i -E "s|github.com/pelletier/go-toml/v2|${replace}|g" {} \;
+        find ./benchmark/ -iname '*.go' -exec sed -i -E "s|github.com/pelletier/go-toml/v2\"|${replace}\"|g" {} \;
         go get "${replace}"
+        # The realworld benchmarks use v2-only API and cannot compile against
+        # the other libraries; exclude them from cross-library comparisons.
+        tags="-tags cross_library_benchmark"
     fi
 
     export GOMAXPROCS=2
-    nice -n -19 taskset --cpu-list 0,1 go test '-bench=^Benchmark(Un)?[mM]arshal' -count=5 -run=Nothing ./... | tee "${out}"
+    go test ${tags} '-bench=^Benchmark(Un)?[mM]arshal' -count=10 -run=Nothing ./... | tee "${out}"
     popd
 
     if [ "${branch}" != "HEAD" ]; then
@@ -160,10 +165,12 @@ bench() {
 }
 
 fmktemp() {
-    if mktemp --version|grep GNU >/dev/null; then
-        mktemp --suffix=-$1;
+    if mktemp --version &> /dev/null; then
+	# GNU
+        mktemp --suffix=-$1
     else
-        mktemp -t $1;
+	# BSD
+	mktemp -t $1
     fi
 }
 
@@ -183,13 +190,20 @@ with open(sys.argv[1]) as f:
             lines.append(line.split(','))
 
 results = []
-for line in reversed(lines[1:]):
+for line in reversed(lines[2:]):
+    if len(line) < 8 or line[0] == "":
+        continue
     v2 = float(line[1])
     results.append([
         line[0].replace("-32", ""),
         "%.1fx" % (float(line[3])/v2),  # v1
-        "%.1fx" % (float(line[5])/v2),  # bs
+        "%.1fx" % (float(line[7])/v2),  # bs
     ])
+
+if not results:
+    print("No benchmark results to display.", file=sys.stderr)
+    sys.exit(1)
+
 # move geomean to the end
 results.append(results[0])
 del results[0]
@@ -259,10 +273,10 @@ benchmark() {
 
         if [ "$1" = "-html" ]; then
             tmpcsv=`fmktemp csv`
-            benchstat -csv -geomean go-toml-v2.txt go-toml-v1.txt bs-toml.txt > $tmpcsv
+            benchstat -format csv go-toml-v2.txt go-toml-v1.txt bs-toml.txt > $tmpcsv
             benchstathtml $tmpcsv
         else
-            benchstat -geomean go-toml-v2.txt go-toml-v1.txt bs-toml.txt
+            benchstat go-toml-v2.txt go-toml-v1.txt bs-toml.txt
         fi
 
         rm -f go-toml-v2.txt go-toml-v1.txt bs-toml.txt
