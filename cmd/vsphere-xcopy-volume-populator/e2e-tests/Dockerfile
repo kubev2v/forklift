@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/go-toolset:1.25.7-1773088126 AS builder
+FROM registry.access.redhat.com/ubi9/go-toolset:1.26.5-1784751462 AS builder
 USER root
 WORKDIR /forklift
 
