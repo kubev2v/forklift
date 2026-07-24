@@ -492,7 +492,6 @@ func (c *Client) CreateSGReplica(ctx context.Context, symID, remoteSymID, rdfMod
 	}
 	rdfgNo, _ := strconv.Atoi(rdfGroupNo)
 	createSGReplicaPayload := c.GetCreateSGReplicaPayload(remoteSymID, rdfMode, rdfgNo, remoteSGName, remoteServiceLevel, true, bias)
-	Debug = true
 	ifDebugLogPayload(createSGReplicaPayload)
 	URL := c.urlPrefix() + ReplicationX + SymmetrixX + symID + XStorageGroup + "/" + sourceSG + XRDFGroup
 
@@ -565,7 +564,6 @@ func (c *Client) CreateRDFPair(ctx context.Context, symID, rdfGroupNo, deviceID,
 		LocalDeviceList: deviceList,
 	}
 	createPairPayload := c.GetCreateRDFPairPayload(devList, rdfMode, rdfType, establish, exemptConsistency)
-	Debug = true
 	ifDebugLogPayload(createPairPayload)
 	URL := c.urlPrefix() + ReplicationX + SymmetrixX + symID + XRDFGroup + "/" + rdfGroupNo + XVolume + "/" + deviceID
 
@@ -650,4 +648,21 @@ func (c *Client) GetStorageGroupRDFInfo(ctx context.Context, symID, sgName, rdfG
 		return nil, err
 	}
 	return sgRdfInfo, nil
+}
+
+// CloneVolumeFromVolume creates a clone between the source volume and the target volume
+func (c *Client) CloneVolumeFromVolume(ctx context.Context, symID string, replicaPair types.ReplicationRequest) error {
+	defer c.TimeSpent("CloneVolumeFromVolume", time.Now())
+	if _, err := c.IsAllowedArray(symID); err != nil {
+		return err
+	}
+	ctx, cancel := c.GetTimeoutContext(ctx)
+	defer cancel()
+	URL := c.privURLPrefix() + ReplicationX + SymmetrixX + symID + XClone + XVolume
+	err := c.api.Post(ctx, URL, c.getDefaultHeaders(), replicaPair, nil)
+	if err != nil {
+		return err
+	}
+	log.Infof("Successfully created volume replica for %+v", replicaPair)
+	return nil
 }

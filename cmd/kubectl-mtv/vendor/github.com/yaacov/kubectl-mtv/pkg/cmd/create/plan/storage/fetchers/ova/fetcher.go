@@ -1,18 +1,16 @@
 package ova
 
-import "context"
-
 import (
+	"context"
 	"fmt"
 
 	forkliftv1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/klog/v2"
-
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/get/inventory"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/query"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/klog/v2"
 )
 
 // OVAStorageFetcher implements storage fetching for OVA providers
@@ -24,7 +22,7 @@ func NewOVAStorageFetcher() *OVAStorageFetcher {
 }
 
 // FetchSourceStorages extracts storage references from OVA VMs
-func (f *OVAStorageFetcher) FetchSourceStorages(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, planVMNames []string) ([]ref.Ref, error) {
+func (f *OVAStorageFetcher) FetchSourceStorages(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, planVMNames []string, insecureSkipTLS bool) ([]ref.Ref, error) {
 	klog.V(4).Infof("OVA storage fetcher - extracting source storages for provider: %s", providerName)
 
 	// Get the provider object
@@ -34,7 +32,7 @@ func (f *OVAStorageFetcher) FetchSourceStorages(ctx context.Context, configFlags
 	}
 
 	// Fetch storage inventory first to create ID-to-storage mapping
-	storageInventory, err := client.FetchProviderInventory(configFlags, inventoryURL, provider, "storages?detail=4")
+	storageInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "storages?detail=4", insecureSkipTLS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch storage inventory: %v", err)
 	}
@@ -62,7 +60,7 @@ func (f *OVAStorageFetcher) FetchSourceStorages(ctx context.Context, configFlags
 	}
 
 	// Fetch VMs inventory to get storage references from VMs
-	vmsInventory, err := client.FetchProviderInventory(configFlags, inventoryURL, provider, "vms?detail=4")
+	vmsInventory, err := client.FetchProviderInventoryWithInsecure(ctx, configFlags, inventoryURL, provider, "vms?detail=4", insecureSkipTLS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch VMs inventory: %v", err)
 	}
@@ -139,7 +137,7 @@ func (f *OVAStorageFetcher) FetchSourceStorages(ctx context.Context, configFlags
 }
 
 // FetchTargetStorages is not supported for OVA as target - only OpenShift is supported as target
-func (f *OVAStorageFetcher) FetchTargetStorages(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string) ([]forkliftv1beta1.DestinationStorage, error) {
+func (f *OVAStorageFetcher) FetchTargetStorages(ctx context.Context, configFlags *genericclioptions.ConfigFlags, providerName, namespace, inventoryURL string, insecureSkipTLS bool) ([]forkliftv1beta1.DestinationStorage, error) {
 	klog.V(4).Infof("OVA provider does not support target storage fetching - only OpenShift is supported as target")
 	return nil, fmt.Errorf("OVA provider does not support target storage fetching - only OpenShift is supported as migration target")
 }

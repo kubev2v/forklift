@@ -12,6 +12,8 @@ import (
 
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/output"
+	querypkg "github.com/yaacov/kubectl-mtv/pkg/util/query"
+	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
 // extractProviderName gets the provider name from the host spec
@@ -99,8 +101,8 @@ func createHostItem(host unstructured.Unstructured, useUTC bool) map[string]inte
 	return item
 }
 
-// List lists hosts
-func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace, outputFormat string, hostName string, useUTC bool) error {
+// ListHosts lists hosts without watch functionality
+func ListHosts(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace, outputFormat string, hostName string, useUTC bool, query string) error {
 	dynamicClient, err := client.GetDynamicClient(configFlags)
 	if err != nil {
 		return fmt.Errorf("failed to get client: %v", err)
@@ -108,8 +110,8 @@ func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, names
 
 	// Format validation
 	outputFormat = strings.ToLower(outputFormat)
-	if outputFormat != "table" && outputFormat != "json" && outputFormat != "yaml" {
-		return fmt.Errorf("unsupported output format: %s. Supported formats: table, json, yaml", outputFormat)
+	if outputFormat != "table" && outputFormat != "json" && outputFormat != "yaml" && outputFormat != "markdown" {
+		return fmt.Errorf("unsupported output format: %s. Supported formats: table, json, yaml, markdown", outputFormat)
 	}
 
 	var allItems []map[string]interface{}
@@ -127,14 +129,26 @@ func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, names
 		return err
 	}
 
+	// Apply query filter
+	if query != "" {
+		queryOpts, err := querypkg.ParseQueryString(query)
+		if err != nil {
+			return fmt.Errorf("failed to parse query: %v", err)
+		}
+		allItems, err = querypkg.ApplyQuery(allItems, queryOpts)
+		if err != nil {
+			return fmt.Errorf("error applying query: %v", err)
+		}
+	}
+
 	// Handle output based on format
 	switch outputFormat {
 	case "json":
 		return output.PrintJSONWithEmpty(allItems, "No hosts found.")
 	case "yaml":
 		return output.PrintYAMLWithEmpty(allItems, "No hosts found.")
-	default: // table
-		return printHostTable(allItems)
+	default:
+		return printHostOutput(allItems, outputFormat)
 	}
 }
 
@@ -164,8 +178,8 @@ func getSpecificHost(ctx context.Context, dynamicClient dynamic.Interface, names
 	return allItems, nil
 }
 
-// printHostTable prints hosts in table format
-func printHostTable(items []map[string]interface{}) error {
+// printHostOutput prints hosts in table or markdown format.
+func printHostOutput(items []map[string]interface{}, outputFormat string) error {
 	if len(items) == 0 {
 		fmt.Println("No hosts found.")
 		return nil
@@ -192,15 +206,22 @@ func printHostTable(items []map[string]interface{}) error {
 	printer := output.NewTablePrinter()
 
 	// Create headers using Header struct
-	var tableHeaders []output.Header
+	colorFuncs := map[string]func(string) string{
+		"STATUS": output.ColorizeStatus,
+	}
+	var tableHeaders []output.Column
 	for _, header := range headers {
-		tableHeaders = append(tableHeaders, output.Header{
-			DisplayName: header,
-			JSONPath:    strings.ToLower(strings.ReplaceAll(header, " ", "")),
-		})
+		h := output.Column{
+			Title: header,
+			Key:   strings.ToLower(strings.ReplaceAll(header, " ", "")),
+		}
+		if cf, ok := colorFuncs[header]; ok {
+			h.ColorFunc = cf
+		}
+		tableHeaders = append(tableHeaders, h)
 	}
 
-	printer.WithHeaders(tableHeaders...)
+	printer.WithColumns(tableHeaders...)
 
 	// Convert data to map format for the table printer
 	for _, row := range data {
@@ -215,5 +236,15 @@ func printHostTable(items []map[string]interface{}) error {
 		printer.AddItem(item)
 	}
 
+	if outputFormat == "markdown" {
+		return printer.PrintMarkdown()
+	}
 	return printer.Print()
+}
+
+// List lists hosts with optional watch mode
+func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace string, watchMode bool, outputFormat string, hostName string, useUTC bool, query string) error {
+	return watch.WrapWithWatch(watchMode, outputFormat, func() error {
+		return ListHosts(ctx, configFlags, namespace, outputFormat, hostName, useUTC, query)
+	}, watch.DefaultInterval)
 }

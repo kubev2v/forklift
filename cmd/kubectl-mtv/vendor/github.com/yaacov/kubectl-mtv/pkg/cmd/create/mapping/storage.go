@@ -14,7 +14,9 @@ import (
 
 	forkliftv1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/provider"
+	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/mapping/offload"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
+	"github.com/yaacov/kubectl-mtv/pkg/util/output"
 )
 
 // validateVolumeMode validates volume mode values
@@ -59,28 +61,30 @@ func validateOffloadVendor(vendor string) error {
 
 // StoragePairOptions holds options for parsing storage pairs
 type StoragePairOptions struct {
-	DefaultVolumeMode    string
-	DefaultAccessMode    string
-	DefaultOffloadPlugin string
-	DefaultOffloadSecret string
-	DefaultOffloadVendor string
+	DefaultVolumeMode            string
+	DefaultAccessMode            string
+	DefaultOffloadPlugin         string
+	DefaultOffloadSecret         string
+	DefaultOffloadVendor         string
+	DefaultOffloadMigrationHosts string
 }
 
 // parseStoragePairsWithOptions parses storage pairs with additional options for VolumeMode, AccessMode, and OffloadPlugin
-func parseStoragePairsWithOptions(ctx context.Context, pairStr, defaultNamespace string, configFlags *genericclioptions.ConfigFlags, sourceProvider, inventoryURL string, defaultVolumeMode, defaultAccessMode, defaultOffloadPlugin, defaultOffloadSecret, defaultOffloadVendor string) ([]forkliftv1beta1.StoragePair, error) {
+func parseStoragePairsWithOptions(ctx context.Context, pairStr, defaultNamespace string, configFlags *genericclioptions.ConfigFlags, sourceProvider, inventoryURL string, defaultVolumeMode, defaultAccessMode, defaultOffloadPlugin, defaultOffloadSecret, defaultOffloadVendor, defaultOffloadMigrationHosts string, insecureSkipTLS bool) ([]forkliftv1beta1.StoragePair, error) {
 	options := StoragePairOptions{
-		DefaultVolumeMode:    defaultVolumeMode,
-		DefaultAccessMode:    defaultAccessMode,
-		DefaultOffloadPlugin: defaultOffloadPlugin,
-		DefaultOffloadSecret: defaultOffloadSecret,
-		DefaultOffloadVendor: defaultOffloadVendor,
+		DefaultVolumeMode:            defaultVolumeMode,
+		DefaultAccessMode:            defaultAccessMode,
+		DefaultOffloadPlugin:         defaultOffloadPlugin,
+		DefaultOffloadSecret:         defaultOffloadSecret,
+		DefaultOffloadVendor:         defaultOffloadVendor,
+		DefaultOffloadMigrationHosts: defaultOffloadMigrationHosts,
 	}
 
-	return parseStoragePairsInternal(pairStr, defaultNamespace, configFlags, sourceProvider, inventoryURL, &options)
+	return parseStoragePairsInternal(pairStr, defaultNamespace, configFlags, sourceProvider, inventoryURL, &options, insecureSkipTLS)
 }
 
 // parseStoragePairsInternal is the internal implementation that handles the parsing logic
-func parseStoragePairsInternal(pairStr, defaultNamespace string, configFlags *genericclioptions.ConfigFlags, sourceProvider, inventoryURL string, options *StoragePairOptions) ([]forkliftv1beta1.StoragePair, error) {
+func parseStoragePairsInternal(pairStr, defaultNamespace string, configFlags *genericclioptions.ConfigFlags, sourceProvider, inventoryURL string, options *StoragePairOptions, insecureSkipTLS bool) ([]forkliftv1beta1.StoragePair, error) {
 	if pairStr == "" {
 		return nil, nil
 	}
@@ -132,6 +136,7 @@ func parseStoragePairsInternal(pairStr, defaultNamespace string, configFlags *ge
 		offloadPlugin := options.DefaultOffloadPlugin
 		offloadSecret := options.DefaultOffloadSecret
 		offloadVendor := options.DefaultOffloadVendor
+		offloadMigrationHosts := options.DefaultOffloadMigrationHosts
 
 		for i := 1; i < len(pairParts); i++ {
 			optionPart := strings.TrimSpace(pairParts[i])
@@ -170,6 +175,8 @@ func parseStoragePairsInternal(pairStr, defaultNamespace string, configFlags *ge
 					return nil, fmt.Errorf("invalid offloadVendor '%s': %v", value, err)
 				}
 				offloadVendor = value
+			case "offloadMigrationHosts":
+				offloadMigrationHosts = value
 			default:
 				return nil, fmt.Errorf("unknown option '%s' in storage pair", key)
 			}
@@ -181,7 +188,7 @@ func parseStoragePairsInternal(pairStr, defaultNamespace string, configFlags *ge
 		}
 
 		// Resolve source storage name to ID
-		sourceStorageRefs, err := resolveStorageNameToID(context.TODO(), configFlags, sourceProvider, defaultNamespace, inventoryURL, sourceName)
+		sourceStorageRefs, err := resolveStorageNameToID(context.TODO(), configFlags, sourceProvider, defaultNamespace, inventoryURL, sourceName, insecureSkipTLS)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve source storage '%s': %v", sourceName, err)
 		}
@@ -213,10 +220,19 @@ func parseStoragePairsInternal(pairStr, defaultNamespace string, configFlags *ge
 
 				switch offloadPlugin {
 				case "vsphere":
-					offloadPluginConfig.VSphereXcopyPluginConfig = &forkliftv1beta1.VSphereXcopyPluginConfig{
+					xcopyConfig := &forkliftv1beta1.VSphereXcopyPluginConfig{
 						SecretRef:            offloadSecret,
 						StorageVendorProduct: forkliftv1beta1.StorageVendorProduct(offloadVendor),
 					}
+					if offloadMigrationHosts != "" {
+						for _, h := range strings.Split(offloadMigrationHosts, "+") {
+							h = strings.TrimSpace(h)
+							if h != "" {
+								xcopyConfig.DedicatedMigrationHosts = append(xcopyConfig.DedicatedMigrationHosts, h)
+							}
+						}
+					}
+					offloadPluginConfig.VSphereXcopyPluginConfig = xcopyConfig
 				default:
 					return nil, fmt.Errorf("unknown offload plugin '%s' for storage pair '%s': supported plugins are: vsphere", offloadPlugin, sourceName)
 				}
@@ -232,20 +248,16 @@ func parseStoragePairsInternal(pairStr, defaultNamespace string, configFlags *ge
 }
 
 // createStorageMappingWithOptions creates a new storage mapping with additional options for VolumeMode, AccessMode, and OffloadPlugin
-func createStorageMappingWithOptions(ctx context.Context, configFlags *genericclioptions.ConfigFlags, name, namespace, sourceProvider, targetProvider, storagePairs, inventoryURL string, defaultVolumeMode, defaultAccessMode, defaultOffloadPlugin, defaultOffloadSecret, defaultOffloadVendor string) error {
-	dynamicClient, err := client.GetDynamicClient(configFlags)
-	if err != nil {
-		return fmt.Errorf("failed to get client: %v", err)
-	}
-
+func createStorageMappingWithOptions(ctx context.Context, opts StorageCreateOptions) error {
 	// Parse provider references to extract names and namespaces
-	sourceProviderName, sourceProviderNamespace := parseProviderReference(sourceProvider, namespace)
-	targetProviderName, targetProviderNamespace := parseProviderReference(targetProvider, namespace)
+	sourceProviderName, sourceProviderNamespace := parseProviderReference(opts.SourceProvider, opts.Namespace)
+	targetProviderName, targetProviderNamespace := parseProviderReference(opts.TargetProvider, opts.Namespace)
 
 	// Parse storage pairs if provided
 	var mappingPairs []forkliftv1beta1.StoragePair
-	if storagePairs != "" {
-		mappingPairs, err = parseStoragePairsWithOptions(ctx, storagePairs, namespace, configFlags, sourceProvider, inventoryURL, defaultVolumeMode, defaultAccessMode, defaultOffloadPlugin, defaultOffloadSecret, defaultOffloadVendor)
+	var err error
+	if opts.StoragePairs != "" {
+		mappingPairs, err = parseStoragePairsWithOptions(ctx, opts.StoragePairs, opts.Namespace, opts.ConfigFlags, opts.SourceProvider, opts.InventoryURL, opts.DefaultVolumeMode, opts.DefaultAccessMode, opts.DefaultOffloadPlugin, opts.DefaultOffloadSecret, opts.DefaultOffloadVendor, opts.DefaultOffloadMigrationHosts, opts.InventoryInsecureSkipTLS)
 		if err != nil {
 			return fmt.Errorf("failed to parse storage pairs: %v", err)
 		}
@@ -254,8 +266,8 @@ func createStorageMappingWithOptions(ctx context.Context, configFlags *genericcl
 	// Create a typed StorageMap
 	storageMap := &forkliftv1beta1.StorageMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:      opts.Name,
+			Namespace: opts.Namespace,
 		},
 		Spec: forkliftv1beta1.StorageMapSpec{
 			Provider: provider.Pair{
@@ -271,6 +283,17 @@ func createStorageMappingWithOptions(ctx context.Context, configFlags *genericcl
 			Map: mappingPairs,
 		},
 	}
+	storageMap.Kind = "StorageMap"
+	storageMap.APIVersion = forkliftv1beta1.SchemeGroupVersion.String()
+
+	if opts.DryRun {
+		return output.OutputResource(storageMap, opts.OutputFormat)
+	}
+
+	dynamicClient, err := client.GetDynamicClient(opts.ConfigFlags)
+	if err != nil {
+		return fmt.Errorf("failed to get client: %v", err)
+	}
 
 	// Convert to unstructured
 	unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(storageMap)
@@ -285,12 +308,12 @@ func createStorageMappingWithOptions(ctx context.Context, configFlags *genericcl
 		Kind:    "StorageMap",
 	})
 
-	_, err = dynamicClient.Resource(client.StorageMapGVR).Namespace(namespace).Create(context.TODO(), mapping, metav1.CreateOptions{})
+	_, err = dynamicClient.Resource(client.StorageMapGVR).Namespace(opts.Namespace).Create(ctx, mapping, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create storage mapping: %v", err)
 	}
 
-	fmt.Printf("storagemap/%s created\n", name)
+	fmt.Printf("storagemap/%s created\n", opts.Name)
 	return nil
 }
 
@@ -304,30 +327,37 @@ func createStorageMappingWithOptionsAndSecret(ctx context.Context, opts StorageC
 		return err
 	}
 
-	// Determine if we need to create an offload secret
-	if needsOffloadSecret(opts) {
-		fmt.Printf("Creating offload secret for storage mapping '%s'\n", opts.Name)
+	effectiveOpts := opts
 
-		createdOffloadSecret, err = createOffloadSecret(opts.ConfigFlags, opts.Namespace, opts.Name, opts)
+	// Dry-run: build and emit the offload Secret so users see all resources that would be created
+	if effectiveOpts.DryRun && needsOffloadSecret(effectiveOpts) {
+		sec, err := buildOffloadSecret(effectiveOpts.Namespace, effectiveOpts.Name, effectiveOpts, true)
+		if err != nil {
+			return fmt.Errorf("failed to build offload secret for dry-run: %v", err)
+		}
+		if err := output.OutputResource(sec, effectiveOpts.OutputFormat); err != nil {
+			return err
+		}
+		effectiveOpts.DefaultOffloadSecret = sec.Name
+	} else if !effectiveOpts.DryRun && needsOffloadSecret(effectiveOpts) {
+		fmt.Printf("Creating offload secret for storage mapping '%s'\n", effectiveOpts.Name)
+
+		createdOffloadSecret, err = createOffloadSecret(effectiveOpts.ConfigFlags, effectiveOpts.Namespace, effectiveOpts.Name, effectiveOpts)
 		if err != nil {
 			return fmt.Errorf("failed to create offload secret: %v", err)
 		}
 
 		// Use the created secret name as the default offload secret
-		opts.DefaultOffloadSecret = createdOffloadSecret.Name
+		effectiveOpts.DefaultOffloadSecret = createdOffloadSecret.Name
 		fmt.Printf("Created offload secret '%s' for storage mapping authentication\n", createdOffloadSecret.Name)
 	}
 
-	// Call the original function with the updated options
-	err = createStorageMappingWithOptions(ctx, opts.ConfigFlags, opts.Name, opts.Namespace,
-		opts.SourceProvider, opts.TargetProvider, opts.StoragePairs, opts.InventoryURL,
-		opts.DefaultVolumeMode, opts.DefaultAccessMode, opts.DefaultOffloadPlugin,
-		opts.DefaultOffloadSecret, opts.DefaultOffloadVendor)
+	err = createStorageMappingWithOptions(ctx, effectiveOpts)
 
 	if err != nil {
 		// Clean up the created secret if mapping creation fails
 		if createdOffloadSecret != nil {
-			if delErr := cleanupOffloadSecret(opts.ConfigFlags, opts.Namespace, createdOffloadSecret.Name); delErr != nil {
+			if delErr := cleanupOffloadSecret(effectiveOpts.ConfigFlags, effectiveOpts.Namespace, createdOffloadSecret.Name); delErr != nil {
 				fmt.Printf("Warning: failed to clean up offload secret '%s': %v\n", createdOffloadSecret.Name, delErr)
 			}
 		}
@@ -339,10 +369,5 @@ func createStorageMappingWithOptionsAndSecret(ctx context.Context, opts StorageC
 
 // cleanupOffloadSecret removes a created offload secret on failure
 func cleanupOffloadSecret(configFlags *genericclioptions.ConfigFlags, namespace, secretName string) error {
-	k8sClient, err := client.GetKubernetesClientset(configFlags)
-	if err != nil {
-		return fmt.Errorf("failed to get kubernetes client: %v", err)
-	}
-
-	return k8sClient.CoreV1().Secrets(namespace).Delete(context.Background(), secretName, metav1.DeleteOptions{})
+	return offload.CleanupSecret(configFlags, namespace, secretName)
 }
