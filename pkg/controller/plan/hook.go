@@ -11,7 +11,7 @@ import (
 	plancontext "github.com/konveyor/forklift-controller/pkg/controller/plan/context"
 	libcnd "github.com/konveyor/forklift-controller/pkg/lib/condition"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
