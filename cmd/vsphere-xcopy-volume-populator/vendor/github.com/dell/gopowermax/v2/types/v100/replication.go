@@ -332,3 +332,18 @@ type StorageGroupRDFG struct {
 	Modes            []string `json:"modes"`
 	LargerRdfSides   []string `json:"largerRdfSides"`
 }
+
+type CommandParams struct {
+	SkipVolumeValidation bool `json:"skip_volume_validation"`
+}
+
+type ReplicationRequest struct {
+	ReplicationPair    []ReplicationPair `json:"replication_pair"`
+	Establish          bool              `json:"establish"`
+	EstablishTerminate bool              `json:"establish_terminate"`
+}
+
+type ReplicationPair struct {
+	SourceVolumeName string `json:"source_volume_name"`
+	TargetVolumeName string `json:"target_volume_name"`
+}

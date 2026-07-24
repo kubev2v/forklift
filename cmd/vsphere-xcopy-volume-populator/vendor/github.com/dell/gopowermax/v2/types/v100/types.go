@@ -1,5 +1,5 @@
 /*
- Copyright © 2020 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2020-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 package v100
 
 import (
+	"net/http"
 	"strings"
 )
 
@@ -29,6 +30,127 @@ func (e Error) Error() string {
 	return e.Message
 }
 
+// HasHTTPStatus reports whether the error carries the given HTTP status code.
+func (e Error) HasHTTPStatus(code int) bool {
+	return e.HTTPStatusCode == code
+}
+
+// IsNotFound reports whether the error represents an HTTP 404 Not Found.
+func (e Error) IsNotFound() bool {
+	return e.HTTPStatusCode == http.StatusNotFound
+}
+
+// IsBadRequest reports whether the error represents an HTTP 400 Bad Request.
+func (e Error) IsBadRequest() bool {
+	return e.HTTPStatusCode == http.StatusBadRequest
+}
+
+// IsUnauthorized reports whether the error represents an HTTP 401 Unauthorized.
+func (e Error) IsUnauthorized() bool {
+	return e.HTTPStatusCode == http.StatusUnauthorized
+}
+
+// IsForbidden reports whether the error represents an HTTP 403 Forbidden.
+func (e Error) IsForbidden() bool {
+	return e.HTTPStatusCode == http.StatusForbidden
+}
+
+// IsConflict reports whether the error represents an HTTP 409 Conflict.
+func (e Error) IsConflict() bool {
+	return e.HTTPStatusCode == http.StatusConflict
+}
+
+// IsUnprocessableEntity reports whether the error represents an HTTP 422 Unprocessable Entity.
+func (e Error) IsUnprocessableEntity() bool {
+	return e.HTTPStatusCode == http.StatusUnprocessableEntity
+}
+
+// IsInternalServerError reports whether the error represents an HTTP 500 Internal Server Error.
+func (e Error) IsInternalServerError() bool {
+	return e.HTTPStatusCode == http.StatusInternalServerError
+}
+
+// IsServiceUnavailable reports whether the error represents an HTTP 503 Service Unavailable.
+func (e Error) IsServiceUnavailable() bool {
+	return e.HTTPStatusCode == http.StatusServiceUnavailable
+}
+
+// IsClientError reports whether the error represents any 4xx status code (client error).
+func (e Error) IsClientError() bool {
+	return e.HTTPStatusCode >= 400 && e.HTTPStatusCode < 500
+}
+
+// IsServerError reports whether the error represents any 5xx status code (server error).
+func (e Error) IsServerError() bool {
+	return e.HTTPStatusCode >= 500 && e.HTTPStatusCode < 600
+}
+
+// GetHTTPStatus returns the HTTP status code from err if err is a *Error.
+// If err is nil or not a *Error it returns 0.
+func GetHTTPStatus(err error) int {
+	if apiErr, ok := err.(*Error); ok {
+		return apiErr.HTTPStatusCode
+	}
+	return 0
+}
+
+// HasHTTPStatus reports whether err is a *Error whose HTTP status code equals code.
+func HasHTTPStatus(err error, code int) bool {
+	return GetHTTPStatus(err) == code
+}
+
+// IsNotFoundError reports whether err is a *Error with HTTP 404 Not Found.
+func IsNotFoundError(err error) bool {
+	return HasHTTPStatus(err, http.StatusNotFound)
+}
+
+// IsBadRequestError reports whether err is a *Error with HTTP 400 Bad Request.
+func IsBadRequestError(err error) bool {
+	return HasHTTPStatus(err, http.StatusBadRequest)
+}
+
+// IsUnauthorizedError reports whether err is a *Error with HTTP 401 Unauthorized.
+func IsUnauthorizedError(err error) bool {
+	return HasHTTPStatus(err, http.StatusUnauthorized)
+}
+
+// IsForbiddenError reports whether err is a *Error with HTTP 403 Forbidden.
+func IsForbiddenError(err error) bool {
+	return HasHTTPStatus(err, http.StatusForbidden)
+}
+
+// IsConflictError reports whether err is a *Error with HTTP 409 Conflict.
+func IsConflictError(err error) bool {
+	return HasHTTPStatus(err, http.StatusConflict)
+}
+
+// IsUnprocessableEntityError reports whether err is a *Error with HTTP 422 Unprocessable Entity.
+func IsUnprocessableEntityError(err error) bool {
+	return HasHTTPStatus(err, http.StatusUnprocessableEntity)
+}
+
+// IsInternalServerError reports whether err is a *Error with HTTP 500 Internal Server Error.
+func IsInternalServerError(err error) bool {
+	return HasHTTPStatus(err, http.StatusInternalServerError)
+}
+
+// IsServiceUnavailableError reports whether err is a *Error with HTTP 503 Service Unavailable.
+func IsServiceUnavailableError(err error) bool {
+	return HasHTTPStatus(err, http.StatusServiceUnavailable)
+}
+
+// IsClientError reports whether err is a *Error with any 4xx status code (client error).
+func IsClientError(err error) bool {
+	code := GetHTTPStatus(err)
+	return code >= 400 && code < 500
+}
+
+// IsServerError reports whether err is a *Error with any 5xx status code (server error).
+func IsServerError(err error) bool {
+	code := GetHTTPStatus(err)
+	return code >= 500 && code < 600
+}
+
 // Version : /unixmax/restapi/system/version
 type Version struct {
 	Version string `json:"version"`
@@ -41,27 +163,31 @@ type SymmetrixIDList struct {
 
 // Symmetrix : information about a Symmetrix system
 type Symmetrix struct {
-	SymmetrixID          string                `json:"symmetrixId"`
-	DellServiceTag       string                `json:"dell_service_tag"`
-	DeviceCount          int                   `json:"device_count"`
-	Ucode                string                `json:"ucode"`
-	UcodeDate            string                `json:"ucode_date"`
-	Model                string                `json:"model"`
-	Local                bool                  `json:"local"`
-	AllFlash             bool                  `json:"all_flash"`
-	DisplayName          string                `json:"display_name"`
-	DiskCount            int                   `json:"disk_count"`
-	CacheSizeMB          int                   `json:"cache_size_mb"`
-	DataEncryption       string                `json:"data_encryption"`
-	FEDirCount           int                   `json:"fe_dir_count"`
-	BEDirCount           int                   `json:"be_dir_count"`
-	RDFDirCount          int                   `json:"rdf_dir_count"`
-	MaxHyperPerDisk      int                   `json:"max_hyper_per_disk"`
-	VCMState             string                `json:"vcm_state"`
-	VCMDBState           string                `json:"vcmdb_state"`
-	ReliabilityState     string                `json:"reliability_state"`
-	UcodeRegisteredBuild int                   `json:"ucode_registered_build"`
-	SystemSizedProperty  []SystemSizedProperty `json:"system_sized_property"`
+	SymmetrixID              string                `json:"symmetrixId"`
+	DellServiceTag           string                `json:"dell_service_tag"`
+	DeviceCount              int                   `json:"device_count"`
+	Ucode                    string                `json:"ucode"`
+	UcodeDate                string                `json:"ucode_date"`
+	Model                    string                `json:"model"`
+	Local                    bool                  `json:"local"`
+	AllFlash                 bool                  `json:"all_flash"`
+	DisplayName              string                `json:"display_name"`
+	DiskCount                int                   `json:"disk_count"`
+	CacheSizeMB              int                   `json:"cache_size_mb"`
+	DataEncryption           string                `json:"data_encryption"`
+	FEDirCount               int                   `json:"fe_dir_count"`
+	BEDirCount               int                   `json:"be_dir_count"`
+	RDFDirCount              int                   `json:"rdf_dir_count"`
+	MaxHyperPerDisk          int                   `json:"max_hyper_per_disk"`
+	VCMState                 string                `json:"vcm_state"`
+	VCMDBState               string                `json:"vcmdb_state"`
+	ReliabilityState         string                `json:"reliability_state"`
+	UcodeRegisteredBuild     int                   `json:"ucode_registered_build"`
+	Microcode                string                `json:"microcode"`
+	MicrocodeDate            string                `json:"microcode_date"`
+	MicrocodeRegisteredBuild int                   `json:"microcode_registered_build"`
+	MicrocodePackageVersion  string                `json:"microcode_package_version"`
+	SystemSizedProperty      []SystemSizedProperty `json:"system_sized_property"`
 }
 
 // SystemSizedProperty contains information about size data
@@ -103,15 +229,15 @@ type StoragePool struct {
 
 // FbaCap FBA storage pool capacity
 type FbaCap struct {
-	Provisioned *provisioned `json:"provisioned"`
+	Provisioned *Provisioned `json:"provisioned"`
 }
 
 // CkdCap CKD storage pool capacity
 type CkdCap struct {
-	Provisioned *provisioned `json:"provisioned"`
+	Provisioned *Provisioned `json:"provisioned"`
 }
 
-type provisioned struct {
+type Provisioned struct {
 	UsableUsedInTB float64 `json:"used_tb"`
 	UsableTotInTB  float64 `json:"effective_capacity_tb"`
 	//	EffectiveUsedCapacityPercent float64 `json:"provisioned_percent"`
@@ -377,4 +503,45 @@ type SymmetrixPortType struct {
 type Port struct {
 	ExecutionOption string            `json:"executionOption,omitempty"`
 	SymmetrixPort   SymmetrixPortType `json:"symmetrixPort"`
+}
+
+type VersionDetails struct {
+	Version    string `json:"version"`
+	APIVersion string `json:"api_version"`
+}
+
+type PortGroupListResult struct {
+	Results []PortGroupListv1 `json:"results,omitempty"`
+}
+
+// PortGroupListByID : list of port groups by ID
+type PortGroupListv1 struct {
+	ID       string       `json:"id,omitempty"`
+	Protocol string       `json:"protocol,omitempty"`
+	Ports    []PortValues `json:"ports,omitempty"`
+}
+
+// PortValues : list of port values
+type PortValues struct {
+	PortID   string     `json:"id,omitempty"`
+	Type     string     `json:"type,omitempty"`
+	Director DirectorID `json:"director,omitempty"`
+}
+
+// DirectorID : list of director IDs
+type DirectorID struct {
+	ID string `json:"id,omitempty"`
+}
+
+type PortV1 struct {
+	ID             string         `json:"id,omitempty"`
+	ResourceType   string         `json:"resource_type,omitempty"`
+	PortNumber     string         `json:"port_number,omitempty"`
+	PortIdentifier string         `json:"port_identifier,omitempty"`
+	PortStatus     string         `json:"port_status"`
+	DirectorStatus string         `json:"director_status"`
+	Director       []PortDirector `json:"director,omitempty"`
+}
+type PortDirector struct {
+	ID string `json:"id,omitempty"`
 }
