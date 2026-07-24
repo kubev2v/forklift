@@ -10,118 +10,98 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
+	"github.com/yaacov/kubectl-mtv/pkg/util/describe"
 	"github.com/yaacov/kubectl-mtv/pkg/util/output"
 )
 
-// Describe describes a network or storage mapping
-func Describe(configFlags *genericclioptions.ConfigFlags, mappingType, name, namespace string, useUTC bool) error {
+// Describe describes a network or storage mapping.
+func Describe(configFlags *genericclioptions.ConfigFlags, mappingType, name, namespace string, useUTC bool, outputFormat string) error {
 	c, err := client.GetDynamicClient(configFlags)
 	if err != nil {
 		return fmt.Errorf("failed to get client: %v", err)
 	}
 
-	// Select appropriate GVR based on mapping type
-	var gvr = client.NetworkMapGVR
-	var resourceType = "NETWORK MAPPING"
+	gvr := client.NetworkMapGVR
+	resourceTitle := "NETWORK MAPPING"
 	if mappingType == "storage" {
 		gvr = client.StorageMapGVR
-		resourceType = "STORAGE MAPPING"
+		resourceTitle = "STORAGE MAPPING"
 	}
 
-	// Get the mapping
-	mapping, err := c.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	m, err := c.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get %s mapping: %v", mappingType, err)
 	}
 
-	// Print the mapping details
-	fmt.Printf("\n%s", output.ColorizedSeparator(105, output.YellowColor))
-	fmt.Printf("\n%s\n", output.Cyan(resourceType))
+	b := describe.NewBuilder(resourceTitle)
 
-	// Basic Information
-	fmt.Printf("%s %s\n", output.Bold("Name:"), output.Yellow(mapping.GetName()))
-	fmt.Printf("%s %s\n", output.Bold("Namespace:"), output.Yellow(mapping.GetNamespace()))
-	fmt.Printf("%s %s\n", output.Bold("Created:"), output.Yellow(output.FormatTimestamp(mapping.GetCreationTimestamp().Time, useUTC)))
+	// Basic information
+	b.Field("Name", m.GetName())
+	b.Field("Namespace", m.GetNamespace())
+	b.Field("Created", output.FormatTimestamp(m.GetCreationTimestamp().Time, useUTC))
 
-	// Provider Information
-	if sourceProvider, found, _ := unstructured.NestedMap(mapping.Object, "spec", "provider", "source"); found {
-		if sourceName, ok := sourceProvider["name"].(string); ok {
-			fmt.Printf("%s %s\n", output.Bold("Source Provider:"), output.Yellow(sourceName))
+	if srcProvider, found, _ := unstructured.NestedMap(m.Object, "spec", "provider", "source"); found {
+		if sname, ok := srcProvider["name"].(string); ok {
+			b.Field("Source Provider", sname)
+		}
+	}
+	if dstProvider, found, _ := unstructured.NestedMap(m.Object, "spec", "provider", "destination"); found {
+		if dname, ok := dstProvider["name"].(string); ok {
+			b.Field("Destination Provider", dname)
 		}
 	}
 
-	if destProvider, found, _ := unstructured.NestedMap(mapping.Object, "spec", "provider", "destination"); found {
-		if destName, ok := destProvider["name"].(string); ok {
-			fmt.Printf("%s %s\n", output.Bold("Destination Provider:"), output.Yellow(destName))
-		}
-	}
-
-	// Owner References
-	if len(mapping.GetOwnerReferences()) > 0 {
-		fmt.Printf("\n%s\n", output.Cyan("OWNERSHIP"))
-		for _, owner := range mapping.GetOwnerReferences() {
-			fmt.Printf("%s %s/%s", output.Bold("Owner:"), owner.Kind, owner.Name)
+	// Ownership
+	if owners := m.GetOwnerReferences(); len(owners) > 0 {
+		b.Section("OWNERSHIP")
+		for _, owner := range owners {
+			val := owner.Kind + "/" + owner.Name
 			if owner.Controller != nil && *owner.Controller {
-				fmt.Printf(" %s", output.Green("(controller)"))
+				val += " (controller)"
 			}
-			fmt.Println()
+			b.Field("Owner", val)
 		}
 	}
 
-	// Mapping Specification
-	if err := displayMappingSpec(mapping, mappingType); err != nil {
-		fmt.Printf("\n%s: %v\n", output.Bold("Mapping Details"), output.Red("Failed to display"))
-	}
+	// Mapping entries
+	if mapEntries, found, _ := unstructured.NestedSlice(m.Object, "spec", "map"); found && len(mapEntries) > 0 {
+		b.Section("MAPPING ENTRIES")
 
-	// Status Information
-	if status, found, _ := unstructured.NestedMap(mapping.Object, "status"); found && status != nil {
-		fmt.Printf("\n%s\n", output.Cyan("STATUS"))
-
-		// Conditions
-		if conditions, found, _ := unstructured.NestedSlice(mapping.Object, "status", "conditions"); found {
-			output.PrintConditions(conditions)
+		headers := []describe.TableColumn{
+			{Display: "SOURCE", Key: "source"},
+			{Display: "DESTINATION", Key: "destination"},
 		}
 
-		// Other status fields
-		if observedGeneration, found, _ := unstructured.NestedInt64(mapping.Object, "status", "observedGeneration"); found {
-			fmt.Printf("%s %d\n", output.Bold("Observed Generation:"), observedGeneration)
+		rows := make([]map[string]string, 0, len(mapEntries))
+		for _, entry := range mapEntries {
+			entryMap, ok := entry.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			rows = append(rows, map[string]string{
+				"source":      formatMappingEntry(entryMap, "source"),
+				"destination": formatMappingEntry(entryMap, "destination"),
+			})
 		}
+		b.Table(headers, rows)
 	}
 
-	// Annotations
-	if annotations := mapping.GetAnnotations(); len(annotations) > 0 {
-		fmt.Printf("\n%s\n", output.Cyan("ANNOTATIONS"))
-		for key, value := range annotations {
-			fmt.Printf("%s: %s\n", output.Bold(key), value)
-		}
+	// Status / conditions
+	if conditions, found, _ := unstructured.NestedSlice(m.Object, "status", "conditions"); found && len(conditions) > 0 {
+		b.Section("STATUS")
+		addConditionsTable(b, conditions)
 	}
 
-	// Labels
-	if labels := mapping.GetLabels(); len(labels) > 0 {
-		fmt.Printf("\n%s\n", output.Cyan("LABELS"))
-		for key, value := range labels {
-			fmt.Printf("%s: %s\n", output.Bold(key), value)
-		}
+	if gen, found, _ := unstructured.NestedInt64(m.Object, "status", "observedGeneration"); found {
+		b.Field("Observed Generation", fmt.Sprintf("%d", gen))
 	}
 
-	fmt.Println() // Add a newline at the end
-	return nil
+	// Annotations & labels
+	addAnnotationsAndLabels(b, m)
+
+	return describe.Print(b.Build(), outputFormat)
 }
 
-// displayMappingSpec displays the mapping specification details with custom formatting
-func displayMappingSpec(mapping *unstructured.Unstructured, mappingType string) error {
-	// Get the map entries
-	mapEntries, found, _ := unstructured.NestedSlice(mapping.Object, "spec", "map")
-	if !found || len(mapEntries) == 0 {
-		return fmt.Errorf("no mapping entries found")
-	}
-
-	fmt.Printf("\n%s\n", output.Cyan("MAPPING ENTRIES"))
-
-	return output.PrintMappingTable(mapEntries, formatMappingEntry)
-}
-
-// formatMappingEntry formats a single mapping entry (source or destination) as a string
 func formatMappingEntry(entryMap map[string]interface{}, entryType string) string {
 	entry, found, _ := unstructured.NestedMap(entryMap, entryType)
 	if !found {
@@ -130,52 +110,83 @@ func formatMappingEntry(entryMap map[string]interface{}, entryType string) strin
 
 	var parts []string
 
-	// Common fields that might be present
 	if id, ok := entry["id"].(string); ok && id != "" {
-		parts = append(parts, fmt.Sprintf("ID: %s", id))
+		parts = append(parts, "ID: "+id)
 	}
-
 	if name, ok := entry["name"].(string); ok && name != "" {
-		parts = append(parts, fmt.Sprintf("Name: %s", name))
+		parts = append(parts, "Name: "+name)
 	}
-
 	if path, ok := entry["path"].(string); ok && path != "" {
-		parts = append(parts, fmt.Sprintf("Path: %s", path))
+		parts = append(parts, "Path: "+path)
 	}
-
-	// For storage mappings
-	if storageClass, ok := entry["storageClass"].(string); ok && storageClass != "" {
-		parts = append(parts, fmt.Sprintf("Storage Class: %s", storageClass))
+	if sc, ok := entry["storageClass"].(string); ok && sc != "" {
+		parts = append(parts, "Storage Class: "+sc)
 	}
-
-	if accessMode, ok := entry["accessMode"].(string); ok && accessMode != "" {
-		parts = append(parts, fmt.Sprintf("Access Mode: %s", accessMode))
+	if am, ok := entry["accessMode"].(string); ok && am != "" {
+		parts = append(parts, "Access Mode: "+am)
 	}
-
-	// For network mappings
 	if vlan, ok := entry["vlan"].(string); ok && vlan != "" {
-		parts = append(parts, fmt.Sprintf("VLAN: %s", vlan))
+		parts = append(parts, "VLAN: "+vlan)
 	}
-
 	if multus, found, _ := unstructured.NestedMap(entry, "multus"); found {
-		if networkName, ok := multus["networkName"].(string); ok && networkName != "" {
-			parts = append(parts, fmt.Sprintf("Multus Network: %s", networkName))
+		if nn, ok := multus["networkName"].(string); ok && nn != "" {
+			parts = append(parts, "Multus Network: "+nn)
 		}
 	}
-
-	// Any other string fields that might be interesting
 	for key, value := range entry {
 		if strValue, ok := value.(string); ok && strValue != "" {
-			// Skip fields we've already handled
 			if key != "id" && key != "name" && key != "path" && key != "storageClass" &&
 				key != "accessMode" && key != "vlan" && key != "multus" {
-				// Capitalize first letter for display
 				displayKey := strings.ToUpper(key[:1]) + key[1:]
-				parts = append(parts, fmt.Sprintf("%s: %s", displayKey, strValue))
+				parts = append(parts, displayKey+": "+strValue)
 			}
 		}
 	}
 
-	// Join all parts with newlines for multi-line cell display
-	return strings.Join(parts, "\n")
+	return strings.Join(parts, ", ")
+}
+
+func addConditionsTable(b *describe.Builder, conditions []interface{}) {
+	headers := []describe.TableColumn{
+		{Display: "TYPE", Key: "type"},
+		{Display: "STATUS", Key: "status", ColorFunc: output.ColorizeConditionStatus},
+		{Display: "CATEGORY", Key: "category", ColorFunc: output.ColorizeCategory},
+		{Display: "MESSAGE", Key: "message"},
+	}
+
+	rows := make([]map[string]string, 0, len(conditions))
+	for _, c := range conditions {
+		condMap, ok := c.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		condType, _ := condMap["type"].(string)
+		condStatus, _ := condMap["status"].(string)
+		category, _ := condMap["category"].(string)
+		message, _ := condMap["message"].(string)
+		rows = append(rows, map[string]string{
+			"type":     condType,
+			"status":   condStatus,
+			"category": category,
+			"message":  message,
+		})
+	}
+
+	b.Table(headers, rows)
+}
+
+func addAnnotationsAndLabels(b *describe.Builder, obj *unstructured.Unstructured) {
+	if annotations := obj.GetAnnotations(); len(annotations) > 0 {
+		b.Section("ANNOTATIONS")
+		for key, value := range annotations {
+			b.Field(key, value)
+		}
+	}
+
+	if labels := obj.GetLabels(); len(labels) > 0 {
+		b.Section("LABELS")
+		for key, value := range labels {
+			b.Field(key, value)
+		}
+	}
 }

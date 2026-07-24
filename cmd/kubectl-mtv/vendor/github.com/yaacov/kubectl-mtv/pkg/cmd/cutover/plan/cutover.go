@@ -7,11 +7,10 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
-	"github.com/yaacov/kubectl-mtv/pkg/cmd/get/plan/status"
+	planstatus "github.com/yaacov/kubectl-mtv/pkg/cmd/get/plan/status"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 )
 
@@ -28,14 +27,13 @@ func Cutover(configFlags *genericclioptions.ConfigFlags, planName, namespace str
 		return fmt.Errorf("failed to get plan '%s': %v", planName, err)
 	}
 
-	// Check if the plan is warm
-	warm, exists, err := unstructured.NestedBool(planObj.Object, "spec", "warm")
-	if err != nil || !exists || !warm {
+	// Check if the plan is warm (handles both spec.type and legacy spec.warm)
+	if !planstatus.IsWarmMigration(planObj) {
 		return fmt.Errorf("plan '%s' is not configured for warm migration", planName)
 	}
 
 	// Find the running migration for this plan
-	runningMigration, _, err := status.GetRunningMigration(c, namespace, planObj, client.MigrationsGVR)
+	runningMigration, _, err := planstatus.GetRunningMigration(c, namespace, planObj, client.MigrationsGVR)
 	if err != nil {
 		return err
 	}
