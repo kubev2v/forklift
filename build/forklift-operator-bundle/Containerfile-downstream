@@ -31,13 +31,13 @@ ARG OPERATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-rhel
 
 ARG OVA_PROVIDER_SERVER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-ova-provider-server-rhel9@sha256:e5d4bcf3fac7af9d4b145515cc7b0990496b0c78b3e8c652fcff8df43b3c4691"
 
-ARG OVA_PROXY_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-ova-proxy-rhel9@sha256:2bcb84b2c21e011bb5159d1c425dfe15c419cf34eec05a409ae664b409181174"
+ARG OVA_PROXY_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-ova-proxy-rhel9@sha256:7d2691475b80ddbb5f1966cdbf5378292b5cf1b9768a8ef7cb20f0dc135a9b84"
 
-ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-rhv-populator-rhel8@sha256:bea95086695eb8adea72bf1b71f4a949a0e0ae388049a864c57f83ee8a455031"
+ARG OVIRT_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-rhv-populator-rhel8@sha256:a94f41ac6e9e80ffaa4599a21f37d818fca2f1b56fdb5443aaa721b36d8788df"
 
 ARG POPULATOR_CONTROLLER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-populator-controller-rhel9@sha256:ee2bf357f317b50cd3f0ad426ac7f65e515defc0648690bcc8776af42dd41e22"
 
-ARG UI_PLUGIN_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-console-plugin-rhel9@sha256:11669f747fbd066efa5a69a56301030ba0e90698d80a26008eea92effe9d8322"
+ARG UI_PLUGIN_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-console-plugin-rhel9@sha256:9f08577a13569ddab14e33f2740231801838dbdde0bddd0fa05bc6b14e7873f5"
 
 ARG VALIDATION_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-validation-rhel9@sha256:016c0a09ffaec272f2a38db8469a35d1bf4ce184f8409015dec5b76d85a51182"
 
