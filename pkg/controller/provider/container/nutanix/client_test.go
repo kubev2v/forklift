@@ -69,6 +69,24 @@ func TestClientConnect(t *testing.T) {
 	}
 }
 
+// TestClientConnect_FailsOnUnauthorized verifies that connect() surfaces an
+// error when the connectivity probe itself is rejected (e.g. bad
+// credentials), rather than treating any response that completes the HTTP
+// round-trip as a successful connection.
+func TestClientConnect_FailsOnUnauthorized(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer server.Close()
+
+	client := createTestClient(server.URL)
+	client.url = server.URL
+
+	if _, err := client.connect(); err == nil {
+		t.Error("expected an error when the connectivity probe returns 401")
+	}
+}
+
 // TestClientListClusters tests listing clusters.
 func TestClientListClusters(t *testing.T) {
 	// Load test data
