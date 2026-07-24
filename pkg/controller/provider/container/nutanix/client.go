@@ -151,6 +151,9 @@ func (r *Client) testConnection() (status int, err error) {
 	if err != nil {
 		return status, liberr.Wrap(err, "connection test failed")
 	}
+	if status != http.StatusOK {
+		return status, liberr.New("connection test failed", "status", status)
+	}
 
 	return http.StatusOK, nil
 }
