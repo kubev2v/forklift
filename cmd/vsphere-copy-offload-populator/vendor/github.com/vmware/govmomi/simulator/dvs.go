@@ -1,5 +1,5 @@
 // © Broadcom. All Rights Reserved.
-// The term “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.
+// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
 // SPDX-License-Identifier: Apache-2.0
 
 package simulator
@@ -92,6 +92,7 @@ func (s *DistributedVirtualSwitch) AddDVPortgroupTask(ctx *Context, c *types.Add
 				VmVnicNetworkResourcePoolKey: spec.VmVnicNetworkResourcePoolKey,
 				LogicalSwitchUuid:            spec.LogicalSwitchUuid,
 				SegmentId:                    spec.SegmentId,
+				SubnetId:                     spec.SubnetId,
 				BackingType:                  spec.BackingType,
 			}
 

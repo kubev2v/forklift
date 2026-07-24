@@ -26,9 +26,10 @@ import (
 )
 
 const (
-	metricsURL = "metrics"
-	mirrorURL  = "volume_mirror_transfer_rate_cma_view"
-	limit      = 1
+	metricsURL          = "metrics"
+	volumeMirrorURL     = "volume_mirror_transfer_rate_cma_view"
+	filesystemMirrorURL = "file_system_mirror_transfer_rate_cma_view"
+	limit               = 1
 )
 
 func (c *ClientIMPL) metricsRequest(ctx context.Context, response interface{}, entity string, entityID string, interval MetricsIntervalEnum) error {
@@ -52,13 +53,19 @@ func (c *ClientIMPL) metricsRequest(ctx context.Context, response interface{}, e
 }
 
 // mirrorTransferRate - Volume Mirror Transfer Rate
-func (c *ClientIMPL) mirrorTransferRate(ctx context.Context, response interface{}, entityID string, limit int) error {
+// entityID can be ID of volume or filesystem
+// nfs = bool that will be 'true' if entity is filesystem, or false otherwise
+func (c *ClientIMPL) mirrorTransferRate(ctx context.Context, response interface{}, entityID string, limit int, nfs bool) error {
+	mirrorURL := volumeMirrorURL
+	if nfs {
+		// metrics for filesystem require a different endpoint
+		mirrorURL = filesystemMirrorURL
+	}
 	qp := getFSDefaultQueryParams(c)
 	qp.RawArg("id", fmt.Sprintf("eq.%s", entityID))
 	qp.Limit(limit)
 	qp.RawArg("order", "timestamp.desc")
 	qp.RawArg("select", "id,timestamp,synchronization_bandwidth,mirror_bandwidth,data_remaining")
-
 	customHeader := http.Header{}
 	customHeader.Add("DELL-VISIBILITY", "Internal")
 	apiClient := c.APIClient()
@@ -103,9 +110,18 @@ func (c *ClientIMPL) PerformanceMetricsByVolume(ctx context.Context, entityID st
 }
 
 // VolumeMirrorTransferRate - Volume Mirror Transfer Rate
+// entityID can be ID of volume
 func (c *ClientIMPL) VolumeMirrorTransferRate(ctx context.Context, entityID string) ([]VolumeMirrorTransferRateResponse, error) {
 	var resp []VolumeMirrorTransferRateResponse
-	err := c.mirrorTransferRate(ctx, &resp, entityID, limit)
+	err := c.mirrorTransferRate(ctx, &resp, entityID, limit, false)
+	return resp, err
+}
+
+// FileSystemMirrorTransferRate - NFS FileSystem Mirror Transfer Rate
+// entityID can be ID of filesystem
+func (c *ClientIMPL) FileSystemMirrorTransferRate(ctx context.Context, entityID string) ([]VolumeMirrorTransferRateResponse, error) {
+	var resp []VolumeMirrorTransferRateResponse
+	err := c.mirrorTransferRate(ctx, &resp, entityID, limit, true)
 	return resp, err
 }
 

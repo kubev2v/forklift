@@ -19,8 +19,9 @@ package gopowerstore
 import "errors"
 
 type (
-	RPOEnum     string
-	RSStateEnum string
+	RPOEnum                 string
+	RSStateEnum             string
+	RSDataTransferStateEnum string
 )
 
 const (
@@ -48,6 +49,17 @@ const (
 	RsStatePartialCutoverForMigration RSStateEnum = "Partial_Cutover_For_Migration"
 	RsStateSwitchingToMetroSync       RSStateEnum = "Switching_To_Metro_Sync"
 	RsStateError                      RSStateEnum = "Error"
+	// Data Transfer State
+	RSDataTransferStateAsynchronous                  RSDataTransferStateEnum = "Asynchronous"
+	RSDataTransferStateAsynchronousInitialSync       RSDataTransferStateEnum = "Asynchronous_Initial_Sync"
+	RSDataTransferStateSystemAsynchronousInitialSync RSDataTransferStateEnum = "System_Asynchronous_Initial_Sync"
+	RSDataTransferStateSystemAsynchronous            RSDataTransferStateEnum = "System_Asynchronous"
+	RSDataTransferStateSwitchToSyncDiffCopy          RSDataTransferStateEnum = "Switch_To_Sync_Diff_Copy"
+	RSDataTransferStateSynchronous                   RSDataTransferStateEnum = "Synchronous"
+	RSDataTransferStateActiveActive                  RSDataTransferStateEnum = "Active_Active"
+	RSDataTransferStateFaulted                       RSDataTransferStateEnum = "Faulted"
+	RSDataTransferStatePaused                        RSDataTransferStateEnum = "Paused"
+	RSDataTransferStateFaultedFromInSync             RSDataTransferStateEnum = "Faulted_From_In_Sync"
 )
 
 func (rpo RPOEnum) IsValid() error {
@@ -138,6 +150,12 @@ type FailoverParams struct {
 	Force bool `json:"force,omitempty"`
 }
 
+// ReplicationSessionParams - Parameters for modifying replication session
+type ReplicationSessionParams struct {
+	// New role for the replication session
+	Role ReplicationRoleEnum `json:"role,omitempty"`
+}
+
 type ProtectionPolicy struct {
 	ID               string             `json:"id"`
 	Name             string             `json:"name"`
@@ -170,21 +188,25 @@ type StorageElementPair struct {
 }
 
 type ReplicationSession struct {
-	ID               string      `json:"id,omitempty"`
-	State            RSStateEnum `json:"state,omitempty"`
-	Role             string      `json:"role,omitempty"`
-	ResourceType     string      `json:"resource_type,omitempty"`
-	LocalResourceID  string      `json:"local_resource_id,omitempty"`
-	RemoteResourceID string      `json:"remote_resource_id,omitempty"`
-	RemoteSystemID   string      `json:"remote_system_id,omitempty"` // todo: maybe name?
+	ID                string                  `json:"id,omitempty"`
+	State             RSStateEnum             `json:"state,omitempty"`
+	DataTransferState RSDataTransferStateEnum `json:"data_transfer_state,omitempty"`
+	Role              string                  `json:"role,omitempty"`
+	ResourceType      string                  `json:"resource_type,omitempty"`
+	LocalResourceID   string                  `json:"local_resource_id,omitempty"`
+	RemoteResourceID  string                  `json:"remote_resource_id,omitempty"`
+	RemoteSystemID    string                  `json:"remote_system_id,omitempty"` // todo: maybe name?
 	// Type of replication session. One of Synchronous, Asynchronous, or Metro_Active_Active.
 	Type string `json:"type,omitempty"`
 
 	StorageElementPairs []StorageElementPair `json:"storage_element_pairs,omitempty"`
+
+	// Should be one of "System_Defined", "Promoted", "Demoted", "System_Promoted", or "System_Demoted".
+	LocalResourceState string `json:"local_resource_state,omitempty"`
 }
 
 func (r *ReplicationSession) Fields() []string {
-	return []string{"id", "state", "role", "resource_type", "local_resource_id", "remote_resource_id", "remote_system_id", "type", "storage_element_pairs"}
+	return []string{"id", "state", "data_transfer_state", "role", "resource_type", "local_resource_id", "remote_resource_id", "remote_system_id", "type", "storage_element_pairs", "local_resource_state"}
 }
 
 // ReplicationRoleEnum - List of replication role types associated with a replication session
@@ -195,6 +217,17 @@ const (
 	ReplicationRoleDestination       ReplicationRoleEnum = "Destination"
 	ReplicationRoleMetroPreferred    ReplicationRoleEnum = "Metro_Preferred"
 	ReplicationRoleMetroNonPreferred ReplicationRoleEnum = "Metro_Non_Preferred"
+)
+
+// ReplicationResourceStateEnum - List of replication resource state types associated with a replication session
+type ReplicationResourceStateEnum string
+
+const (
+	ReplicationResourceStateSystemDefined  ReplicationResourceStateEnum = "System_Defined"
+	ReplicationResourceStatePromoted       ReplicationResourceStateEnum = "Promoted"
+	ReplicationResourceStateDemoted        ReplicationResourceStateEnum = "Demoted"
+	ReplicationResourceStateSystemPromoted ReplicationResourceStateEnum = "System_Promoted"
+	ReplicationResourceStateSystemDemoted  ReplicationResourceStateEnum = "System_Demoted"
 )
 
 // ReplicationRuleModify modifies replication rule
