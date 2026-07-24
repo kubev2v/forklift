@@ -56,7 +56,7 @@ jobs:
           fi
 
       - name: Perform backport
-        uses: kiegroup/git-backporting@v4.8.5
+        uses: kiegroup/git-backporting@v4.9.1
         with:
           target-branch: ${{ inputs.branch_name }}
           pull-request: ${{ github.server_url }}/${{ github.repository }}/pull/${{ inputs.pr_number }}
