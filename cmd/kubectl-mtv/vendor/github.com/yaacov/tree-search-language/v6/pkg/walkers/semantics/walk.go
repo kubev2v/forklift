@@ -264,6 +264,10 @@ func evaluateLogicalExpression(operator tsl.Operator, leftVal, rightVal interfac
 }
 
 func evaluateCompareExpressions(operator tsl.Operator, leftVal, rightVal interface{}) (interface{}, error) {
+	if leftVal == nil || rightVal == nil {
+		return false, nil
+	}
+
 	leftNum, leftIsNum := toFloat64(leftVal)
 	rightNum, rightIsNum := toFloat64(rightVal)
 	leftDate, leftIsDate := toDate(leftVal)

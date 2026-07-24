@@ -13,6 +13,8 @@ import (
 
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/output"
+	querypkg "github.com/yaacov/kubectl-mtv/pkg/util/query"
+	"github.com/yaacov/kubectl-mtv/pkg/util/watch"
 )
 
 // extractHookImage gets the image from the hook spec
@@ -91,8 +93,8 @@ func createHookItem(hook unstructured.Unstructured, useUTC bool) map[string]inte
 	return item
 }
 
-// List lists hooks
-func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace, outputFormat string, hookName string, useUTC bool) error {
+// ListHooks lists hooks without watch functionality
+func ListHooks(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace, outputFormat string, hookName string, useUTC bool, query string) error {
 	dynamicClient, err := client.GetDynamicClient(configFlags)
 	if err != nil {
 		return fmt.Errorf("failed to get client: %v", err)
@@ -100,8 +102,8 @@ func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, names
 
 	// Format validation
 	outputFormat = strings.ToLower(outputFormat)
-	if outputFormat != "table" && outputFormat != "json" && outputFormat != "yaml" {
-		return fmt.Errorf("unsupported output format: %s. Supported formats: table, json, yaml", outputFormat)
+	if outputFormat != "table" && outputFormat != "json" && outputFormat != "yaml" && outputFormat != "markdown" {
+		return fmt.Errorf("unsupported output format: %s. Supported formats: table, json, yaml, markdown", outputFormat)
 	}
 
 	var allItems []map[string]interface{}
@@ -119,14 +121,26 @@ func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, names
 		return err
 	}
 
+	// Apply query filter
+	if query != "" {
+		queryOpts, err := querypkg.ParseQueryString(query)
+		if err != nil {
+			return fmt.Errorf("failed to parse query: %v", err)
+		}
+		allItems, err = querypkg.ApplyQuery(allItems, queryOpts)
+		if err != nil {
+			return fmt.Errorf("error applying query: %v", err)
+		}
+	}
+
 	// Handle output based on format
 	switch outputFormat {
 	case "json":
 		return output.PrintJSONWithEmpty(allItems, "No hooks found.")
 	case "yaml":
 		return output.PrintYAMLWithEmpty(allItems, "No hooks found.")
-	default: // table
-		return printHookTable(allItems)
+	default:
+		return printHookOutput(allItems, outputFormat)
 	}
 }
 
@@ -156,8 +170,8 @@ func getSpecificHook(ctx context.Context, dynamicClient dynamic.Interface, names
 	return allItems, nil
 }
 
-// printHookTable prints hooks in table format
-func printHookTable(items []map[string]interface{}) error {
+// printHookOutput prints hooks in table or markdown format.
+func printHookOutput(items []map[string]interface{}, outputFormat string) error {
 	if len(items) == 0 {
 		fmt.Println("No hooks found.")
 		return nil
@@ -194,7 +208,7 @@ func printHookTable(items []map[string]interface{}) error {
 	printer := output.NewTablePrinter()
 
 	// Create headers using Header struct
-	var tableHeaders []output.Header
+	var tableHeaders []output.Column
 	headerMappings := map[string]string{
 		"NAME":            "name",
 		"IMAGE":           "image",
@@ -205,14 +219,21 @@ func printHookTable(items []map[string]interface{}) error {
 		"CREATED":         "created",
 	}
 
+	colorFuncs := map[string]func(string) string{
+		"STATUS": output.ColorizeStatus,
+	}
 	for _, header := range headers {
-		tableHeaders = append(tableHeaders, output.Header{
-			DisplayName: header,
-			JSONPath:    headerMappings[header],
-		})
+		h := output.Column{
+			Title: header,
+			Key:   headerMappings[header],
+		}
+		if cf, ok := colorFuncs[header]; ok {
+			h.ColorFunc = cf
+		}
+		tableHeaders = append(tableHeaders, h)
 	}
 
-	printer.WithHeaders(tableHeaders...)
+	printer.WithColumns(tableHeaders...)
 
 	// Convert data to map format for the table printer
 	for _, row := range data {
@@ -228,6 +249,9 @@ func printHookTable(items []map[string]interface{}) error {
 		printer.AddItem(item)
 	}
 
+	if outputFormat == "markdown" {
+		return printer.PrintMarkdown()
+	}
 	return printer.Print()
 }
 
@@ -245,4 +269,11 @@ func GetHookPlaybookContent(hook unstructured.Unstructured) (string, error) {
 	}
 
 	return string(decoded), nil
+}
+
+// List lists hooks with optional watch mode
+func List(ctx context.Context, configFlags *genericclioptions.ConfigFlags, namespace string, watchMode bool, outputFormat string, hookName string, useUTC bool, query string) error {
+	return watch.WrapWithWatch(watchMode, outputFormat, func() error {
+		return ListHooks(ctx, configFlags, namespace, outputFormat, hookName, useUTC, query)
+	}, watch.DefaultInterval)
 }
