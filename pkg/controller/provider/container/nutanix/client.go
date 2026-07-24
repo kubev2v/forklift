@@ -1,21 +1,11 @@
 package nutanix
 
 import (
-	"crypto/tls"
-	"crypto/x509"
-	"encoding/base64"
-	"fmt"
-	"net"
-	"net/http"
-	"strconv"
-	"strings"
 	"time"
 
-	"github.com/kubev2v/forklift/pkg/controller/base"
-	liberr "github.com/kubev2v/forklift/pkg/lib/error"
+	nutanixweb "github.com/kubev2v/forklift/pkg/lib/client/nutanix"
 	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
-	"github.com/kubev2v/forklift/pkg/lib/util"
 	core "k8s.io/api/core/v1"
 )
 
@@ -24,10 +14,10 @@ const (
 	// Connect retry delay.
 	RetryDelay = time.Second * 5
 	// Connection timeout.
-	ConnectionTimeout = 30 * time.Second
+	ConnectionTimeout = nutanixweb.ConnectionTimeout
 )
 
-// Per-request page sizes for v3 list endpoints. listAll() pages through as
+// Per-request page sizes for v3 list endpoints. ListAllV3 pages through as
 // many requests as needed regardless of these values; they only bound how
 // many entities are requested per page.
 const (
@@ -37,18 +27,18 @@ const (
 	subnetPageSize  = 500
 	imagePageSize   = 500
 	// Per-request page sizes for v4 "config"/"content" namespace endpoints.
-	// listAllV4() pages through as many requests as needed regardless of
+	// ListAllV4 pages through as many requests as needed regardless of
 	// these values; the v4 image endpoint additionally caps $limit at 100.
 	storageContainerV4PageSize = 100
 	imageV4PageSize            = 100
 )
 
-// Nutanix API Client
+// Client wraps the shared pkg/lib/client/nutanix REST client with the
+// collector-specific concerns: Prism mode resolution/caching and the
+// cluster-scoped, entity-specific list methods used by the collector.
 type Client struct {
 	// Base URL (e.g., https://prism-central:9440)
 	url string
-	// HTTP client
-	client *libweb.Client
 	// Secret containing credentials
 	secret *core.Secret
 	// Provider settings (prismType, clusterUuid, ...)
@@ -61,68 +51,39 @@ type Client struct {
 	prism PrismConfig
 	// Whether prism config has been resolved.
 	prismResolved bool
+
+	// Shared REST client (connect/auth/get/post/pagination).
+	web nutanixweb.Client
 }
 
-// Connect and authenticate with Nutanix Prism
-func (r *Client) connect() (status int, err error) {
-	var TLSClientConfig *tls.Config
-
-	if r.client != nil {
-		return http.StatusOK, nil
-	}
-
-	// Configure TLS
-	if base.GetInsecureSkipVerifyFlag(r.secret) {
-		TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	} else if cacert, found := util.GetCACert(r.secret); found {
-		roots := x509.NewCertPool()
-		ok := roots.AppendCertsFromPEM(cacert)
-		if !ok {
-			err = liberr.New("failed to parse CA certificate")
-			return http.StatusBadRequest, err
+// ensureWebClient populates the shared REST client from this client's
+// fields the first time it's needed. It never resets an already-populated
+// r.web, so a live connection (and its TLS-configured transport) survives
+// repeated calls.
+func (r *Client) ensureWebClient() {
+	if r.web.URL == "" {
+		r.web = nutanixweb.Client{
+			URL:     r.url,
+			Secret:  r.secret,
+			Timeout: r.clientTimeout,
+			Log:     r.log,
 		}
-		TLSClientConfig = &tls.Config{RootCAs: roots}
-	} else {
-		TLSClientConfig = &tls.Config{InsecureSkipVerify: false}
 	}
+}
 
-	r.url = strings.TrimRight(r.url, "/")
+// Connect and authenticate with Nutanix Prism, then resolve the Prism
+// mode (Central vs Element) for this provider.
+func (r *Client) connect() (status int, err error) {
+	r.ensureWebClient()
 
-	// Bound how long we wait for a response once a request has been sent, so
-	// a hung Prism endpoint can't block a request indefinitely. libweb.Client
-	// builds its http.Client without a Timeout, so this is enforced via the
-	// transport's ResponseHeaderTimeout instead.
-	responseHeaderTimeout := r.clientTimeout
-	if responseHeaderTimeout <= 0 {
-		responseHeaderTimeout = ConnectionTimeout
-	}
-
-	// Create HTTP client
-	r.client = &libweb.Client{
-		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			DialContext: (&net.Dialer{
-				Timeout:   10 * time.Second,
-				KeepAlive: 10 * time.Second,
-			}).DialContext,
-			MaxIdleConns:          10,
-			IdleConnTimeout:       10 * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
-			ResponseHeaderTimeout: responseHeaderTimeout,
-			TLSClientConfig:       TLSClientConfig,
-		},
-	}
-
-	// Test connection by listing clusters
-	status, err = r.testConnection()
+	status, err = r.web.Connect()
 	if err != nil {
-		r.client = nil
-		return status, err
+		return
 	}
+	// Pick up the trimmed (no trailing slash) URL.
+	r.url = r.web.URL
 
 	if err = r.ensurePrismConfig(); err != nil {
-		r.client = nil
 		return status, err
 	}
 
@@ -130,170 +91,46 @@ func (r *Client) connect() (status int, err error) {
 		"url", r.url,
 		"prismMode", r.prism.Mode)
 
-	return http.StatusOK, nil
-}
-
-// Test connection to Nutanix API
-func (r *Client) testConnection() (status int, err error) {
-	// Test by listing clusters (minimal API call)
-	url := fmt.Sprintf("%s/api/nutanix/v3/clusters/list", r.url)
-
-	// Create a simple list request
-	body := map[string]interface{}{
-		"kind":   "cluster",
-		"offset": 0,
-		"length": 1,
-	}
-
-	status, err = r.post(url, body, nil)
-	if err != nil {
-		return status, liberr.Wrap(err, "connection test failed")
-	}
-	if status != http.StatusOK {
-		return status, liberr.New("connection test failed", "status", status)
-	}
-
-	return http.StatusOK, nil
+	return status, nil
 }
 
 // GET request
-func (r *Client) get(url string, object interface{}, params ...libweb.Param) (status int, err error) {
+func (r *Client) get(url string, object any, params ...libweb.Param) (status int, err error) {
 	status, err = r.connect()
 	if err != nil {
 		return
 	}
-
-	// Set Basic Auth header
-	r.client.Header = r.createAuthHeader()
-
-	status, err = r.client.Get(url, object, params...)
-	if err != nil {
-		return
-	}
-
-	return
+	return r.web.Get(url, object, params...)
 }
 
 // POST request (Nutanix uses POST for list operations)
-func (r *Client) post(url string, body interface{}, object interface{}) (status int, err error) {
+func (r *Client) post(url string, body any, object any) (status int, err error) {
 	status, err = r.connect()
 	if err != nil {
 		return
 	}
-
-	// Set Basic Auth header
-	r.client.Header = r.createAuthHeader()
-
-	// Use the client's Post method
-	return r.client.Post(url, body, object)
+	return r.web.Post(url, body, object)
 }
 
-// listAllV3 pages through a v3 list endpoint and unmarshals entities directly
-// into typed structs, following the response's total_matches across pages.
-func listAllV3[T any](r *Client, resourceKind string, filter map[string]interface{}, pageSize int) ([]T, error) {
-	offset := 0
-	entities := make([]T, 0)
-
-	for {
-		body := map[string]interface{}{
-			"kind":   resourceKind,
-			"length": pageSize,
-			"offset": offset,
-		}
-		if filter != nil {
-			body["filter"] = filter
-		}
-
-		var result v3ListResponse[T]
-		url := fmt.Sprintf("%s/api/nutanix/v3/%ss/list", r.url, resourceKind)
-		status, err := r.post(url, body, &result)
-		if err != nil {
-			return nil, err
-		}
-		if status != http.StatusOK {
-			return nil, liberr.New(fmt.Sprintf("unexpected status: %d", status))
-		}
-
-		entities = append(entities, result.Entities...)
-
-		if len(result.Entities) == 0 {
-			break
-		}
-
-		offset += len(result.Entities)
-		if offset >= result.Metadata.TotalMatches {
-			break
-		}
-	}
-
-	return entities, nil
-}
-
-// listAll pages through a v3 list endpoint, following the response's
-// total_matches, and returns every entity across all pages. This keeps a
-// single provider from silently truncating on Prism inventories larger than
-// one page.
-func (r *Client) listAll(resourceKind string, filter map[string]interface{}, pageSize int) (entities []map[string]interface{}, err error) {
-	rawEntities, err := listAllV3[map[string]interface{}](r, resourceKind, filter, pageSize)
-	if err != nil {
+// listAllV3 pages through a v3 list endpoint via the shared client.
+func listAllV3[T any](r *Client, resourceKind string, filter map[string]any, pageSize int) ([]T, error) {
+	if _, err := r.connect(); err != nil {
 		return nil, err
 	}
-	return rawEntities, nil
+	return nutanixweb.ListAllV3[T](&r.web, resourceKind, pageSize, filter)
 }
 
-// listAllV4 pages through a v4 "config" namespace list endpoint, following
-// the response's metadata.totalAvailableResults, and returns every raw
-// entity across all pages.
+// listAll pages through a v3 list endpoint and returns raw entity maps.
+func (r *Client) listAll(resourceKind string, filter map[string]any, pageSize int) (entities []map[string]any, err error) {
+	return listAllV3[map[string]any](r, resourceKind, filter, pageSize)
+}
+
+// listAllV4 pages through a v4 list endpoint via the shared client.
 func listAllV4[T any](r *Client, path string, pageSize int) ([]T, error) {
-	url := fmt.Sprintf("%s%s", r.url, path)
-	page := 0
-	entities := make([]T, 0)
-
-	for {
-		var result v4ListResponse[T]
-		status, err := r.get(url, &result,
-			libweb.Param{Key: "$page", Value: strconv.Itoa(page)},
-			libweb.Param{Key: "$limit", Value: strconv.Itoa(pageSize)},
-		)
-		if err != nil {
-			return nil, err
-		}
-		if status != http.StatusOK {
-			return nil, liberr.New(fmt.Sprintf("unexpected status listing %s: %d", path, status))
-		}
-
-		entities = append(entities, result.Data...)
-
-		if len(result.Data) == 0 {
-			break
-		}
-
-		if len(entities) >= result.Metadata.TotalAvailableResults {
-			break
-		}
-
-		page++
+	if _, err := r.connect(); err != nil {
+		return nil, err
 	}
-
-	return entities, nil
-}
-
-// Create HTTP Header with Basic Auth
-func (r *Client) createAuthHeader() http.Header {
-	user := string(r.secret.Data["user"])
-	password := string(r.secret.Data["password"])
-
-	header := http.Header{}
-	header.Set("Content-Type", "application/json")
-	header.Set("Authorization", "Basic "+basicAuth(user, password))
-
-	return header
-}
-
-// Encode Basic Auth credentials
-func basicAuth(username, password string) string {
-	auth := username + ":" + password
-	return base64.StdEncoding.EncodeToString([]byte(auth))
+	return nutanixweb.ListAllV4[T](&r.web, path, pageSize)
 }
 
 // List all clusters, scoped to the configured clusterUuid (if any).

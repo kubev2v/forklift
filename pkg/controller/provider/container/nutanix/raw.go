@@ -1,25 +1,29 @@
 package nutanix
 
+import (
+	libclient "github.com/kubev2v/forklift/pkg/lib/client/nutanix"
+)
+
 // Version-specific API shapes. Normalizers convert these into the canonical
 // v3-style entities in resource.go so ApplyTo stays shared across Prism modes.
 
 type storageContainerV2Raw struct {
-	ClusterUUID          string                 `json:"cluster_uuid"`
-	CompressionEnabled   bool                   `json:"compression_enabled"`
-	ErasureCode          string                 `json:"erasure_code"`
-	MaxCapacity          int64                  `json:"max_capacity"`
-	MaxCapacityBytes     int64                  `json:"max_capacity_bytes"`
-	Name                 string                 `json:"name"`
-	OnDiskDedup          string                 `json:"on_disk_dedup"`
-	ReplicationFactor    int                    `json:"replication_factor"`
-	StorageContainerUUID string                 `json:"storage_container_uuid"`
-	TotalCapacity        int64                  `json:"total_capacity"`
-	UsageStats           map[string]interface{} `json:"usage_stats"`
-	UUID                 string                 `json:"uuid"`
+	ClusterUUID          string         `json:"cluster_uuid"`
+	CompressionEnabled   bool           `json:"compression_enabled"`
+	ErasureCode          string         `json:"erasure_code"`
+	MaxCapacity          int64          `json:"max_capacity"`
+	MaxCapacityBytes     int64          `json:"max_capacity_bytes"`
+	Name                 string         `json:"name"`
+	OnDiskDedup          string         `json:"on_disk_dedup"`
+	ReplicationFactor    int            `json:"replication_factor"`
+	StorageContainerUUID string         `json:"storage_container_uuid"`
+	TotalCapacity        int64          `json:"total_capacity"`
+	UsageStats           map[string]any `json:"usage_stats"`
+	UUID                 string         `json:"uuid"`
 }
 
 func (r storageContainerV2Raw) toEntity() storageContainerEntity {
-	uuid := coalesce(r.StorageContainerUUID, r.UUID)
+	uuid := libclient.Coalesce(r.StorageContainerUUID, r.UUID)
 	maxCapacity := r.MaxCapacityBytes
 	if maxCapacity == 0 {
 		maxCapacity = coalesceInt64(r.MaxCapacity, r.TotalCapacity)
@@ -27,20 +31,20 @@ func (r storageContainerV2Raw) toEntity() storageContainerEntity {
 
 	usageBytes := int64(0)
 	if r.UsageStats != nil {
-		usageBytes = parseNumericString(r.UsageStats["storage.user_usage_bytes"])
+		usageBytes = libclient.ParseNumericString(r.UsageStats["storage.user_usage_bytes"])
 		if usageBytes == 0 {
-			usageBytes = parseNumericString(r.UsageStats["storage.reserved_usage_bytes"])
+			usageBytes = libclient.ParseNumericString(r.UsageStats["storage.reserved_usage_bytes"])
 		}
 	}
 
 	return storageContainerEntity{
-		Metadata: metadata{
+		Metadata: libclient.Metadata{
 			Name: r.Name,
 			UUID: uuid,
 		},
 		Status: storageContainerStatus{
 			Resources: storageContainerResources{
-				ClusterReference:   ref{UUID: r.ClusterUUID},
+				ClusterReference:   libclient.Ref{UUID: r.ClusterUUID},
 				CompressionEnabled: r.CompressionEnabled,
 				ErasureCode:        r.ErasureCode,
 				MaxCapacityBytes:   maxCapacity,
@@ -74,27 +78,27 @@ type storageContainerV4Raw struct {
 }
 
 func (r storageContainerV4Raw) toEntity() storageContainerEntity {
-	uuid := coalesce(r.ExtID, r.ContainerExtIDAlt, r.ContainerExtID)
-	clusterUUID := coalesce(r.ClusterExtIDAlt, r.ClusterExtID)
+	uuid := libclient.Coalesce(r.ExtID, r.ContainerExtIDAlt, r.ContainerExtID)
+	clusterUUID := libclient.Coalesce(r.ClusterExtIDAlt, r.ClusterExtID)
 
 	return storageContainerEntity{
-		Metadata: metadata{
+		Metadata: libclient.Metadata{
 			Name: r.Name,
 			UUID: uuid,
 		},
 		Status: storageContainerStatus{
 			Resources: storageContainerResources{
-				ClusterReference: ref{UUID: clusterUUID},
+				ClusterReference: libclient.Ref{UUID: clusterUUID},
 				CompressionEnabled: coalesceBool(
 					r.IsCompressionEnabled,
 					r.CompressionEnabled,
 				),
-				ErasureCode: coalesce(r.ErasureCodeAlt, r.ErasureCode),
+				ErasureCode: libclient.Coalesce(r.ErasureCodeAlt, r.ErasureCode),
 				MaxCapacityBytes: coalesceInt64(
 					r.MaxCapacityBytesAlt,
 					r.MaxCapacityBytes,
 				),
-				OnDiskDedup: coalesce(r.OnDiskDedupAlt, r.OnDiskDedup),
+				OnDiskDedup: libclient.Coalesce(r.OnDiskDedupAlt, r.OnDiskDedup),
 				ReplicationFactor: coalesceInt(
 					r.ReplicationFactorAlt,
 					r.ReplicationFactor,
@@ -116,17 +120,16 @@ type imageV4Raw struct {
 }
 
 func (r imageV4Raw) toEntity() imageEntity {
-	return imageEntity{
-		Metadata: metadata{UUID: r.ExtID},
-		Status: imageStatus{
-			Name: r.Name,
-			Resources: imageResources{
-				ImageType: r.Type,
-				SizeBytes: r.SizeBytes,
-				SourceURI: r.Source.URL,
-			},
-		},
+	entity := imageEntity(libclient.V3Image{
+		Metadata: libclient.Metadata{UUID: r.ExtID},
+	})
+	entity.Status.Name = r.Name
+	entity.Status.Resources = libclient.V3ImageResources{
+		ImageType: r.Type,
+		SizeBytes: r.SizeBytes,
+		SourceURI: r.Source.URL,
 	}
+	return entity
 }
 
 func coalesceInt(values ...int) int {
