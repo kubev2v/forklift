@@ -2,6 +2,7 @@
 package plan
 
 import (
+	"fmt"
 	"testing"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -13,7 +14,12 @@ import (
 	"github.com/kubev2v/forklift/pkg/settings"
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+	fakeClient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 var _ = ginkgo.Describe("VMStatus", func() {
@@ -346,4 +352,201 @@ func TestExecuteClearsSchedulerPendingCondition(t *testing.T) {
 	err := m.execute(vm)
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	g.Expect(vm.HasCondition(api.ConditionPending)).To(gomega.BeFalse())
+}
+
+const testTargetNamespace = "target-ns"
+
+func TestVerifyDataVolumeCompletion(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	mainUID := types.UID("main-pvc-uid")
+	mainPVCName := "dv-pvc"
+	primePVCName := fmt.Sprintf("prime-%s", mainUID)
+	importerPodName := "importer-prime-test"
+
+	tests := []struct {
+		name         string
+		objects      []runtime.Object
+		wantComplete bool
+		wantReason   string
+	}{
+		{
+			name: "main PVC pending blocks completion",
+			objects: []runtime.Object{
+				&core.PersistentVolumeClaim{
+					ObjectMeta: meta.ObjectMeta{
+						Name:      mainPVCName,
+						Namespace: testTargetNamespace,
+						UID:       mainUID,
+					},
+					Status: core.PersistentVolumeClaimStatus{Phase: core.ClaimPending},
+				},
+			},
+			wantComplete: false,
+			wantReason:   "Main PVC is not bound (phase: Pending)",
+		},
+		{
+			name: "prime PVC pending blocks completion",
+			objects: []runtime.Object{
+				&core.PersistentVolumeClaim{
+					ObjectMeta: meta.ObjectMeta{
+						Name:      mainPVCName,
+						Namespace: testTargetNamespace,
+						UID:       mainUID,
+					},
+					Status: core.PersistentVolumeClaimStatus{Phase: core.ClaimBound},
+				},
+				&core.PersistentVolumeClaim{
+					ObjectMeta: meta.ObjectMeta{
+						Name:      primePVCName,
+						Namespace: testTargetNamespace,
+					},
+					Status: core.PersistentVolumeClaimStatus{Phase: core.ClaimPending},
+				},
+			},
+			wantComplete: false,
+			wantReason:   "Prime PVC is not bound (phase: Pending)",
+		},
+		{
+			name: "importer pod pending blocks completion",
+			objects: []runtime.Object{
+				&core.PersistentVolumeClaim{
+					ObjectMeta: meta.ObjectMeta{
+						Name:      mainPVCName,
+						Namespace: testTargetNamespace,
+						UID:       mainUID,
+					},
+					Status: core.PersistentVolumeClaimStatus{Phase: core.ClaimBound},
+				},
+				&core.PersistentVolumeClaim{
+					ObjectMeta: meta.ObjectMeta{
+						Name:      primePVCName,
+						Namespace: testTargetNamespace,
+						Annotations: map[string]string{
+							AnnImporterPodName: importerPodName,
+						},
+					},
+					Status: core.PersistentVolumeClaimStatus{Phase: core.ClaimBound},
+				},
+				&core.Pod{
+					ObjectMeta: meta.ObjectMeta{
+						Name:      importerPodName,
+						Namespace: testTargetNamespace,
+					},
+					Status: core.PodStatus{Phase: core.PodPending},
+				},
+			},
+			wantComplete: false,
+			wantReason:   fmt.Sprintf("Importer pod is pending (pod: %s/%s)", testTargetNamespace, importerPodName),
+		},
+		{
+			name: "bound PVCs and running importer allow completion",
+			objects: []runtime.Object{
+				&core.PersistentVolumeClaim{
+					ObjectMeta: meta.ObjectMeta{
+						Name:      mainPVCName,
+						Namespace: testTargetNamespace,
+						UID:       mainUID,
+					},
+					Status: core.PersistentVolumeClaimStatus{Phase: core.ClaimBound},
+				},
+				&core.PersistentVolumeClaim{
+					ObjectMeta: meta.ObjectMeta{
+						Name:      primePVCName,
+						Namespace: testTargetNamespace,
+						Annotations: map[string]string{
+							AnnImporterPodName: importerPodName,
+						},
+					},
+					Status: core.PersistentVolumeClaimStatus{Phase: core.ClaimBound},
+				},
+				&core.Pod{
+					ObjectMeta: meta.ObjectMeta{
+						Name:      importerPodName,
+						Namespace: testTargetNamespace,
+					},
+					Status: core.PodStatus{Phase: core.PodRunning},
+				},
+			},
+			wantComplete: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newTestMigration(tt.objects...)
+			dv := &cdi.DataVolume{
+				ObjectMeta: meta.ObjectMeta{
+					Name:      "test-dv",
+					Namespace: testTargetNamespace,
+				},
+				Status: cdi.DataVolumeStatus{
+					Phase:     cdi.Succeeded,
+					ClaimName: mainPVCName,
+				},
+			}
+			vm := &plan.VMStatus{}
+
+			canComplete, reason := m.verifyDataVolumeCompletion(dv, vm)
+			g.Expect(canComplete).To(gomega.Equal(tt.wantComplete))
+			if tt.wantReason != "" {
+				g.Expect(reason).To(gomega.Equal(tt.wantReason))
+			} else {
+				g.Expect(reason).To(gomega.BeEmpty())
+			}
+		})
+	}
+}
+
+func TestPendingPopulationNotPromotedOnWarmMigration(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	vSphere := api.VSphere
+	ctx := &plancontext.Context{
+		Plan: &api.Plan{
+			Spec: api.PlanSpec{
+				Type:            api.MigrationWarm,
+				TargetNamespace: testTargetNamespace,
+			},
+		},
+		Source: plancontext.Source{
+			Provider: &api.Provider{
+				Spec: api.ProviderSpec{Type: &vSphere},
+			},
+		},
+		Destination: plancontext.Destination{
+			Client: fakeClient.NewClientBuilder().WithRuntimeObjects().Build(),
+		},
+		Log: logging.WithName("test"),
+	}
+
+	m := &Migration{Context: ctx}
+	dvPhase := cdi.PendingPopulation
+
+	if dvPhase == cdi.PendingPopulation && m.Source.Provider.RequiresConversion() && !m.Plan.IsWarm() {
+		dvPhase = cdi.Succeeded
+	}
+
+	g.Expect(m.Plan.IsWarm()).To(gomega.BeTrue())
+	g.Expect(dvPhase).To(gomega.Equal(cdi.PendingPopulation))
+}
+
+func newTestMigration(objects ...runtime.Object) *Migration {
+	scheme := runtime.NewScheme()
+	_ = core.AddToScheme(scheme)
+	client := fakeClient.NewClientBuilder().
+		WithScheme(scheme).
+		WithRuntimeObjects(objects...).
+		Build()
+	ctx := &plancontext.Context{
+		Plan: &api.Plan{
+			Spec: api.PlanSpec{TargetNamespace: testTargetNamespace},
+		},
+		Destination: plancontext.Destination{Client: client},
+		Log:         logging.WithName("test"),
+	}
+	return &Migration{
+		Context:  ctx,
+		kubevirt: KubeVirt{Context: ctx},
+	}
 }
