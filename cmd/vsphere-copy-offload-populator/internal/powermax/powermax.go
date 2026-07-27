@@ -22,15 +22,16 @@ import (
 )
 
 type PowermaxClonner struct {
-	client         gopowermax.Pmax
-	symmetrixID    string
-	portGroup      string
-	initiatorID    string
-	storageGroupID string
-	hostID         string
-	maskingViewID  string
-	arrayInfo      populator.StorageArrayInfo
-	log            klog.Logger
+	client              gopowermax.Pmax
+	symmetrixID         string
+	portGroup           string
+	initiatorID         string
+	storageGroupID      string
+	hostID              string
+	maskingViewID       string
+	volumeStorageGroups []string
+	arrayInfo           populator.StorageArrayInfo
+	log                 klog.Logger
 }
 
 // Ensure PowermaxClonner implements StorageArrayInfoProvider
@@ -204,9 +205,12 @@ func (p *PowermaxClonner) Map(_ string, targetLUN populator.LUN, mappingContext 
 		return targetLUN, nil
 	}
 
-	p.log.Info("mapping volume to storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID)
-
 	ctx := context.TODO()
+	if err := p.adoptOrphanSG(ctx, targetLUN.ProviderID); err != nil {
+		return populator.LUN{}, fmt.Errorf("failed to adopt orphaned xcopy storage group: %w", err)
+	}
+
+	p.log.Info("mapping volume to storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID)
 	var volumesMapped []string
 	err := retryOnTransient(ctx, p.log, "GetVolumeIDListInStorageGroup", func() error {
 		var e error
@@ -218,16 +222,15 @@ func (p *PowermaxClonner) Map(_ string, targetLUN populator.LUN, mappingContext 
 	}
 	if slices.Contains(volumesMapped, targetLUN.ProviderID) {
 		p.log.V(2).Info("volume already mapped to storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID)
-		return targetLUN, nil
-	}
-
-	p.log.V(2).Info("adding volume to storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID)
-	err = retryOnTransient(ctx, p.log, "AddVolumesToStorageGroupS", func() error {
-		return p.client.AddVolumesToStorageGroupS(ctx, p.symmetrixID, p.storageGroupID, false, targetLUN.ProviderID)
-	})
-	if err != nil {
-		p.log.Info("failed to add volume to storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID, "err", err)
-		return targetLUN, err
+	} else {
+		p.log.V(2).Info("adding volume to storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID)
+		err = retryOnTransient(ctx, p.log, "AddVolumesToStorageGroupS", func() error {
+			return p.client.AddVolumesToStorageGroupS(ctx, p.symmetrixID, p.storageGroupID, false, targetLUN.ProviderID)
+		})
+		if err != nil {
+			p.log.Info("failed to add volume to storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID, "err", err)
+			return targetLUN, err
+		}
 	}
 
 	var mv *pmxtypes.MaskingView
@@ -293,10 +296,51 @@ func (p *PowermaxClonner) ResolvePVToLUN(pv populator.PersistentVolume) (populat
 		return populator.LUN{}, fmt.Errorf("failed getting details for volume %v: %v", volume, err)
 	}
 
+	p.volumeStorageGroups = volume.StorageGroupIDList
+
 	naa := fmt.Sprintf("naa.%s", volume.WWN)
 	lun := populator.LUN{Name: volume.VolumeIdentifier, ProviderID: volume.VolumeID, NAA: naa}
 	p.log.Info("LUN resolved", "lun", lun.Name, "naa", lun.NAA, "provider_id", lun.ProviderID)
 	return lun, nil
+}
+
+// adoptOrphanSG checks whether the volume is already in an orphaned xcopy
+// storage group left by a previously evicted pod. If found, the orphan is
+// adopted (p.storageGroupID and p.initiatorID are swapped to the orphan's
+// names) and the unused empty SG that EnsureClonnerIgroup just created is
+// deleted best-effort. At most one orphan can exist per volume because the
+// retry that created the second SG fails at CreateMaskingView before the
+// volume is added.
+func (p *PowermaxClonner) adoptOrphanSG(ctx context.Context, volID string) error {
+	var orphanSG string
+	for _, sg := range p.volumeStorageGroups {
+		if strings.HasPrefix(sg, "xcopy-") && strings.HasSuffix(sg, "-SG") && sg != p.storageGroupID {
+			orphanSG = sg
+			break
+		}
+	}
+	if orphanSG == "" {
+		return nil
+	}
+
+	adoptedInitiator := strings.TrimSuffix(orphanSG, "-SG")
+	emptySG := p.storageGroupID
+
+	p.log.Info("adopting orphaned xcopy storage group from previous evicted pod",
+		"adopted_sg", orphanSG, "adopted_initiator", adoptedInitiator,
+		"discarding_sg", emptySG, "volume", volID)
+
+	p.storageGroupID = orphanSG
+	p.initiatorID = adoptedInitiator
+
+	err := retryOnTransient(ctx, p.log, "DeleteStorageGroup", func() error {
+		return p.client.DeleteStorageGroup(ctx, p.symmetrixID, emptySG)
+	})
+	if err != nil {
+		p.log.Info("failed to delete unused empty storage group (non-critical)", "sg", emptySG, "err", err)
+	}
+
+	return nil
 }
 
 // UnMap implements populator.StorageApi.

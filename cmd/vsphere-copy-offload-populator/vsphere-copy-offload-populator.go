@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
 	"path"
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -233,12 +235,23 @@ func main() {
 	copyMetrics.RecordStorageArrayInfo(storageVendor, arrayInfo)
 
 	hll := populator.NewHostLeaseLocker(clientSet)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
+
 	klog.InfoS("populator", "stage", "starting")
 	copyStartTime = time.Now()
-	go p.Populate(sourceVmId, migrationHost, sourceVMDKFile, pv, hll, progressCh, xCopyUsedCh, quitCh)
+	go p.Populate(ctx, sourceVmId, migrationHost, sourceVMDKFile, pv, hll, progressCh, xCopyUsedCh, quitCh)
 
 	for {
 		select {
+		case sig := <-sigCh:
+			log.Info("received termination signal, cancelling operation and waiting for cleanup", "signal", sig)
+			cancel()
+			continue
 		case progress := <-progressCh:
 			cloneLog.Info("clone progress", "progress", progress)
 			copyMetrics.RecordProgress(ownerUID, progress)

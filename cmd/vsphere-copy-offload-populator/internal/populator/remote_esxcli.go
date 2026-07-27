@@ -111,7 +111,7 @@ func NewWithRemoteEsxcliSSH(storageApi VMDKCapable, vmwareClient vmware.Client, 
 	}, nil
 }
 
-func (p *RemoteEsxcliPopulator) Populate(vmId string, migrationHostId, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) (errFinal error) {
+func (p *RemoteEsxcliPopulator) Populate(ctx context.Context, vmId string, migrationHostId, sourceVMDKFile string, pv PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) (errFinal error) {
 	log := logger.New("xcopy")
 	setupLog := log.WithName("setup")
 	mapLog := log.WithName("map-volume")
@@ -141,7 +141,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, migrationHostId, sourceVMD
 	}
 	setupLog.Info("VMDK/Xcopy populate started", "method", cloneMethod, "source", sourceVMDKFile, "target", pv.Name)
 
-	setupCtx := klog.NewContext(context.Background(), setupLog)
+	setupCtx := klog.NewContext(ctx, setupLog)
 	var host *object.HostSystem
 	if migrationHostId == "" {
 		host, err = p.VSphereClient.GetEsxByVm(setupCtx, vmId)
@@ -174,7 +174,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, migrationHostId, sourceVMD
 
 	// Filter HBA UIDs based on datastore active adapters
 	var dsActiveAdapters []vmware.HostAdapter
-	dsActiveAdapters, err = p.VSphereClient.GetDatastoreActiveAdapters(context.Background(), host, vmDisk.Datastore, destinationRequiresScini)
+	dsActiveAdapters, err = p.VSphereClient.GetDatastoreActiveAdapters(ctx, host, vmDisk.Datastore, destinationRequiresScini)
 	if err != nil {
 		return fmt.Errorf("failed to get active adapters for datastore %s: %w", vmDisk.Datastore, err)
 	}
@@ -241,9 +241,9 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, migrationHostId, sourceVMD
 
 	leaseHostID := strings.ReplaceAll(strings.ToLower(host.String()), ":", "-")
 	rescanLog.Info("rescanning host for device", "device", lun.NAA)
-	err = hostLocker.WithLock(context.Background(), leaseHostID,
-		func(ctx context.Context) error {
-			return rescan(ctx, p.VSphereClient, host, lun.NAA)
+	err = hostLocker.WithLock(ctx, leaseHostID,
+		func(lockCtx context.Context) error {
+			return rescan(lockCtx, p.VSphereClient, host, lun.NAA)
 		},
 	)
 	if err != nil {
@@ -296,7 +296,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, migrationHostId, sourceVMD
 	// Execute the clone using the unified task handling approach
 	var executor TaskExecutor
 	if p.UseSSHMethod {
-		sshSetupCtx := klog.NewContext(context.Background(), setupLog)
+		sshSetupCtx := klog.NewContext(ctx, setupLog)
 
 		// Get host IP (needed for SSH version check and connection)
 		hostIP, err := vmware.GetHostIPAddress(sshSetupCtx, host)
@@ -338,7 +338,7 @@ func (p *RemoteEsxcliPopulator) Populate(vmId string, migrationHostId, sourceVMD
 	}
 
 	// Use unified task execution (clone context so all clone/SSH logs show under clone)
-	cloneCtx := klog.NewContext(context.Background(), cloneLog)
+	cloneCtx := klog.NewContext(ctx, cloneLog)
 	return ExecuteCloneTask(cloneCtx, executor, host, vmDisk.Datastore, vmDisk.Path(), targetLUN, progress, xcopyUsed)
 }
 
