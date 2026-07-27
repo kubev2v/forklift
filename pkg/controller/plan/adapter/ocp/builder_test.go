@@ -7,6 +7,9 @@ import (
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
+	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
 func newBuilder(plan *api.Plan) *Builder {
@@ -176,4 +179,84 @@ func TestExecuteTemplate_OCPTemplateData(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestApplyDestinationStorageModes_UsesMappingAccessModeWhenSet(t *testing.T) {
+	spec := createDataVolumeSpec(resource.MustParse("10Gi"), "target-sc", "https://example", "cm", "secret")
+	sourcePVC := &core.PersistentVolumeClaim{
+		Spec: core.PersistentVolumeClaimSpec{
+			AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+		},
+	}
+	destination := api.DestinationStorage{
+		StorageClass: "target-sc",
+		AccessMode:   core.ReadWriteMany,
+	}
+
+	applyDestinationStorageModes(spec, destination, sourcePVC)
+
+	if len(spec.Storage.AccessModes) != 1 || spec.Storage.AccessModes[0] != core.ReadWriteMany {
+		t.Fatalf("expected mapping AccessMode RWX, got %v", spec.Storage.AccessModes)
+	}
+}
+
+func TestApplyDestinationStorageModes_PreservesSourceAccessModeWhenMappingOmits(t *testing.T) {
+	spec := createDataVolumeSpec(resource.MustParse("11Mi"), "ocs-storagecluster-ceph-rbd-virtualization", "https://example", "cm", "secret")
+	sourcePVC := &core.PersistentVolumeClaim{
+		Spec: core.PersistentVolumeClaimSpec{
+			AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+		},
+	}
+	destination := api.DestinationStorage{
+		StorageClass: "ocs-storagecluster-ceph-rbd-virtualization",
+	}
+
+	applyDestinationStorageModes(spec, destination, sourcePVC)
+
+	if len(spec.Storage.AccessModes) != 1 || spec.Storage.AccessModes[0] != core.ReadWriteOnce {
+		t.Fatalf("expected source AccessMode RWO, got %v", spec.Storage.AccessModes)
+	}
+}
+
+func TestApplyDestinationStorageModes_PreservesSourceVolumeModeWhenMappingOmits(t *testing.T) {
+	blockMode := core.PersistentVolumeBlock
+	spec := createDataVolumeSpec(resource.MustParse("10Gi"), "target-sc", "https://example", "cm", "secret")
+	sourcePVC := &core.PersistentVolumeClaim{
+		Spec: core.PersistentVolumeClaimSpec{
+			VolumeMode: &blockMode,
+		},
+	}
+	destination := api.DestinationStorage{StorageClass: "target-sc"}
+
+	applyDestinationStorageModes(spec, destination, sourcePVC)
+
+	if spec.Storage.VolumeMode == nil || *spec.Storage.VolumeMode != core.PersistentVolumeBlock {
+		t.Fatalf("expected source VolumeMode Block, got %v", spec.Storage.VolumeMode)
+	}
+}
+
+func TestApplyDestinationStorageModes_UsesMappingVolumeModeWhenSet(t *testing.T) {
+	filesystemMode := core.PersistentVolumeFilesystem
+	spec := createDataVolumeSpec(resource.MustParse("10Gi"), "target-sc", "https://example", "cm", "secret")
+	sourcePVC := &core.PersistentVolumeClaim{
+		Spec: core.PersistentVolumeClaimSpec{
+			VolumeMode: &filesystemMode,
+		},
+	}
+	destination := api.DestinationStorage{
+		StorageClass: "target-sc",
+		VolumeMode:   core.PersistentVolumeBlock,
+	}
+
+	applyDestinationStorageModes(spec, destination, sourcePVC)
+
+	if spec.Storage.VolumeMode == nil || *spec.Storage.VolumeMode != core.PersistentVolumeBlock {
+		t.Fatalf("expected mapping VolumeMode Block, got %v", spec.Storage.VolumeMode)
+	}
+}
+
+func TestApplyDestinationStorageModes_NilSafe(t *testing.T) {
+	applyDestinationStorageModes(nil, api.DestinationStorage{}, &core.PersistentVolumeClaim{})
+	applyDestinationStorageModes(&cdi.DataVolumeSpec{}, api.DestinationStorage{}, &core.PersistentVolumeClaim{})
+	applyDestinationStorageModes(createDataVolumeSpec(resource.MustParse("1Gi"), "sc", "https://example", "cm", "secret"), api.DestinationStorage{}, nil)
 }

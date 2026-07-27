@@ -140,8 +140,9 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *v1.Secret, configMap *v1.Co
 		if url == "" {
 			return nil, liberr.Wrap(fmt.Errorf("failed to get export URL, available formats: %v", volume.Formats))
 		}
-		storageClassName := storageMap[*pvc.Spec.StorageClassName].StorageClass
-		dataVolume.Spec = *createDataVolumeSpec(size, storageClassName, url, configMap.Name, secret.Name)
+		destination := storageMap[*pvc.Spec.StorageClassName]
+		dataVolume.Spec = *createDataVolumeSpec(size, destination.StorageClass, url, configMap.Name, secret.Name)
+		applyDestinationStorageModes(&dataVolume.Spec, destination, pvc)
 
 		err = r.Destination.Client.Create(context.TODO(), dataVolume, &client.CreateOptions{})
 		if err != nil {
@@ -669,6 +670,28 @@ func createDataVolumeSpec(size resource.Quantity, storageClassName, url, configM
 			},
 			StorageClassName: &storageClassName,
 		},
+	}
+}
+
+// applyDestinationStorageModes sets AccessModes and VolumeMode on the DataVolume.
+// When the plan storage mapping specifies a mode, that value wins. Otherwise the
+// source PVC values are preserved so CDI does not fall back to StorageProfile
+// defaults (e.g. RWO→RWX on ocs-storagecluster-ceph-rbd-virtualization).
+func applyDestinationStorageModes(spec *cdi.DataVolumeSpec, destination v1beta1.DestinationStorage, sourcePVC *core.PersistentVolumeClaim) {
+	if spec == nil || spec.Storage == nil || sourcePVC == nil {
+		return
+	}
+	if destination.AccessMode != "" {
+		spec.Storage.AccessModes = []core.PersistentVolumeAccessMode{destination.AccessMode}
+	} else if len(sourcePVC.Spec.AccessModes) > 0 {
+		spec.Storage.AccessModes = append([]core.PersistentVolumeAccessMode(nil), sourcePVC.Spec.AccessModes...)
+	}
+	if destination.VolumeMode != "" {
+		volumeMode := destination.VolumeMode
+		spec.Storage.VolumeMode = &volumeMode
+	} else if sourcePVC.Spec.VolumeMode != nil {
+		volumeMode := *sourcePVC.Spec.VolumeMode
+		spec.Storage.VolumeMode = &volumeMode
 	}
 }
 
