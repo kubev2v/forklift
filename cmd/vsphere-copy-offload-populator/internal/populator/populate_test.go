@@ -1,6 +1,7 @@
 package populator_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
@@ -124,9 +125,9 @@ func TestPopulate(t *testing.T) {
 	xcopyUsed := make(chan int)
 	quit := make(chan error)
 
-	mockPopulator.EXPECT().Populate("vm-1", "source.vmdk", pv, gomock.Any(), progress, xcopyUsed, quit).Return(nil)
+	mockPopulator.EXPECT().Populate(gomock.Any(), "vm-1", "source.vmdk", pv, gomock.Any(), progress, xcopyUsed, quit).Return(nil)
 
-	err := mockPopulator.Populate("vm-1", "source.vmdk", pv, nil, progress, xcopyUsed, quit)
+	err := mockPopulator.Populate(context.Background(), "vm-1", "source.vmdk", pv, nil, progress, xcopyUsed, quit)
 	if err != nil {
 		t.Errorf("Populate() error = %v, wantErr %v", err, false)
 	}

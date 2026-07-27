@@ -88,7 +88,7 @@ var _ = Describe("Populator", func() {
 
 			go func() {
 				defer GinkgoRecover()
-				underTest.Populate(tc.sourceVmId, tc.sourceVMDK, populator.PersistentVolume{Name: tc.targetPVC}, hostLocker, progressCh, xcopyUsedCh, quitCh)
+				underTest.Populate(context.Background(), tc.sourceVmId, tc.sourceVMDK, populator.PersistentVolume{Name: tc.targetPVC}, hostLocker, progressCh, xcopyUsedCh, quitCh)
 			}()
 
 			if tc.want != nil {
