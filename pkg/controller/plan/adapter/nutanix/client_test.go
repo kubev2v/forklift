@@ -426,6 +426,124 @@ func newImageTestServer(t *testing.T, images map[string]libclient.V3Image) *http
 	}))
 }
 
+// newPrismCentralTestServer serves the connectivity probe plus a 200 OK
+// on Prism Central's self-describing endpoint, simulating a Prism Central
+// connection. It doesn't implement the v3 image endpoints used by the
+// catalog-image workflow, since requireElement is expected to reject
+// Prism Central before any of those are reached; imageListRequests counts
+// requests to the image list endpoint so tests can confirm that.
+func newPrismCentralTestServer(t *testing.T) (server *httptest.Server, imageListRequests *int) {
+	t.Helper()
+	var requests int
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/clusters/list"):
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"entities":[]}`))
+		case r.Method == http.MethodGet && r.URL.Path == prismCentralPath:
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{}`))
+		case strings.HasSuffix(r.URL.Path, "/images/list"):
+			requests++
+			w.WriteHeader(http.StatusNotFound)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	return server, &requests
+}
+
+// TestIsPrismElement_DetectsElementViaProbe verifies isPrismElement
+// treats a non-200 response from prismCentralPath as Prism Element, with
+// no explicit provider setting.
+func TestIsPrismElement_DetectsElementViaProbe(t *testing.T) {
+	server := newImageTestServer(t, map[string]libclient.V3Image{})
+	defer server.Close()
+
+	client := newConnectedTestClient(t, server.URL)
+	element, err := client.isPrismElement()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !element {
+		t.Fatal("expected isPrismElement to be true when the prism_central probe doesn't respond 200")
+	}
+}
+
+// TestIsPrismElement_DetectsCentralViaProbe verifies isPrismElement
+// treats a 200 response from prismCentralPath as Prism Central.
+func TestIsPrismElement_DetectsCentralViaProbe(t *testing.T) {
+	server, _ := newPrismCentralTestServer(t)
+	defer server.Close()
+
+	client := newConnectedTestClient(t, server.URL)
+	element, err := client.isPrismElement()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if element {
+		t.Fatal("expected isPrismElement to be false when the prism_central probe responds 200")
+	}
+}
+
+// TestIsPrismElement_HonorsExplicitProviderSetting verifies an explicit
+// prismType provider setting is trusted over the live probe.
+func TestIsPrismElement_HonorsExplicitProviderSetting(t *testing.T) {
+	server := newImageTestServer(t, map[string]libclient.V3Image{})
+	defer server.Close()
+
+	client := newConnectedTestClient(t, server.URL)
+	client.Context.Source.Provider.Spec.Settings = map[string]string{api.NutanixPrismType: api.NutanixPrismCentral}
+
+	element, err := client.isPrismElement()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if element {
+		t.Fatal("expected the explicit prismType=central setting to override probing")
+	}
+}
+
+// TestPreTransferActions_ErrorsOnPrismCentral verifies the catalog-image
+// workflow refuses to run against Prism Central, rather than attempting
+// image creation and failing later with a confusing API error.
+func TestPreTransferActions_ErrorsOnPrismCentral(t *testing.T) {
+	vm := &model.VM{VM1: model.VM1{Disks: []model.Disk{{UUID: "disk-1"}}}}
+	server, imageListRequests := newPrismCentralTestServer(t)
+	defer server.Close()
+
+	client := newTestClientWithInventory(server.URL, vm)
+	if err := client.connect(); err != nil {
+		t.Fatalf("unexpected error connecting: %v", err)
+	}
+
+	ready, err := client.PreTransferActions(ref.Ref{ID: "vm-1"})
+	if err == nil {
+		t.Fatal("expected an error when running the catalog-image workflow against Prism Central")
+	}
+	if ready {
+		t.Fatal("expected ready=false")
+	}
+	if *imageListRequests != 0 {
+		t.Fatalf("expected no image lookups against Prism Central, got %d", *imageListRequests)
+	}
+}
+
+// TestFinalize_SkipsCleanupOnPrismCentral verifies Finalize doesn't
+// attempt any image lookups against Prism Central, since
+// PreTransferActions never creates images there.
+func TestFinalize_SkipsCleanupOnPrismCentral(t *testing.T) {
+	server, imageListRequests := newPrismCentralTestServer(t)
+	defer server.Close()
+
+	client := newConnectedTestClient(t, server.URL)
+	client.Finalize([]*planapi.VMStatus{{VM: planapi.VM{Ref: ref.Ref{ID: "vm-1"}}}}, "test-plan")
+
+	if *imageListRequests != 0 {
+		t.Fatalf("expected Finalize to skip image lookups for Prism Central, got %d", *imageListRequests)
+	}
+}
+
 func TestFindImageByName_NotFound(t *testing.T) {
 	server := newImageTestServer(t, map[string]libclient.V3Image{})
 	defer server.Close()

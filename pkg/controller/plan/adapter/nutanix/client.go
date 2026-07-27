@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
@@ -67,6 +68,11 @@ const imagePageSize = 50
 // longer than 256 characters are rejected with HTTP 422 (v3) or 400 (v4).
 const migrationImageNameMaxLen = 256
 
+// prismCentralPath is Prism Central's own self-describing v3 endpoint. It
+// doesn't exist on Prism Element, so probing it (once connected) reliably
+// tells the two apart -- the same check the inventory collector uses.
+const prismCentralPath = "/api/nutanix/v3/prism_central"
+
 // Client performs source-side Nutanix migration actions. It embeds the
 // shared REST client (pkg/lib/client/nutanix) also used by the inventory
 // collector, so Get/Post/Put/Delete/Connect are available directly on r.
@@ -90,7 +96,14 @@ func (r *Client) Close() {}
 // with them. Deletion failures are logged rather than returned, since
 // finalization runs after the migration's outcome is already decided and a
 // leftover image shouldn't be reported as a migration failure.
+//
+// Prism Central migrations never reach here with images to clean up --
+// PreTransferActions refuses to create any (see requireElement) -- so
+// this returns early rather than issuing pointless lookups per disk.
 func (r *Client) Finalize(vms []*planapi.VMStatus, _ string) {
+	if element, err := r.isPrismElement(); err != nil || !element {
+		return
+	}
 	for _, vm := range vms {
 		disks, err := r.vmDisks(vm.Ref)
 		if err != nil {
@@ -277,7 +290,14 @@ func (r *Client) GetSnapshotDeltas(_ ref.Ref, _ string, _ util.HostsFunc) (s map
 // each of the VM's non-CDROM disks, so their contents become downloadable
 // over HTTP for Builder.DataVolumes (GET /images/{uuid}/file). Returns
 // ready=true only once every disk's image has finished creating.
+//
+// This catalog-image workflow is Prism Element "compatibility mode" only
+// -- see requireElement.
 func (r *Client) PreTransferActions(vmRef ref.Ref) (ready bool, err error) {
+	if err = r.requireElement("catalog image based disk transfer"); err != nil {
+		return false, err
+	}
+
 	disks, err := r.vmDisks(vmRef)
 	if err != nil {
 		return false, err
@@ -295,6 +315,42 @@ func (r *Client) PreTransferActions(vmRef ref.Ref) (ready bool, err error) {
 		ready = ready && diskReady
 	}
 	return ready, nil
+}
+
+// isPrismElement reports whether the connected endpoint is Prism Element,
+// as opposed to Prism Central, preferring an explicit provider setting
+// (api.NutanixPrismType, as used by the inventory collector) over a live
+// probe of prismCentralPath.
+func (r *Client) isPrismElement() (bool, error) {
+	switch r.Context.Source.Provider.Spec.Settings[api.NutanixPrismType] {
+	case api.NutanixPrismElement:
+		return true, nil
+	case api.NutanixPrismCentral:
+		return false, nil
+	}
+
+	url := fmt.Sprintf("%s%s", r.URL, prismCentralPath)
+	status, _, err := r.GetNoRedirect(url)
+	if err != nil {
+		return false, liberr.Wrap(err, "failed to detect Prism endpoint type")
+	}
+	return status != http.StatusOK, nil
+}
+
+// requireElement returns an error unless the connected endpoint is Prism
+// Element. The catalog-image-based disk transfer used by
+// PreTransferActions/Builder.DataVolumes only works there today: it's a
+// Prism Element "compatibility mode" transfer. Prism Central needs its
+// own v3/v4 export API integration instead, which isn't implemented yet.
+func (r *Client) requireElement(action string) error {
+	element, err := r.isPrismElement()
+	if err != nil {
+		return err
+	}
+	if !element {
+		return liberr.New(action+" is only supported for Prism Element", "provider", r.Context.Source.Provider.Name)
+	}
+	return nil
 }
 
 // vmDisks looks up a VM's disks from inventory.
