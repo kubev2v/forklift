@@ -335,6 +335,11 @@ func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec, usesIn
 // (GET /images/{uuid}/file). By the time this runs, the migration
 // controller has already confirmed PreTransferActions reported every
 // image ready, so images are expected to be present and COMPLETE.
+//
+// This is Prism Element "compatibility mode" only -- see
+// Client.requireElement. Prism Central migrations fail here with a clear
+// error instead of the confusing 404s Prism Central's v3 image API
+// returns for an endpoint it doesn't really support.
 func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume, _ *core.ConfigMap) (dvs []cdi.DataVolume, err error) {
 	vm := &model.VM{}
 	if err = r.Source.Inventory.Find(vm, vmRef); err != nil {
@@ -348,6 +353,9 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 
 	client := &Client{Context: r.Context}
 	if err = client.connect(); err != nil {
+		return nil, err
+	}
+	if err = client.requireElement("catalog image based disk transfer"); err != nil {
 		return nil, err
 	}
 
@@ -417,6 +425,11 @@ func (r *Builder) mapDataVolume(
 		dv.Annotations = make(map[string]string)
 	}
 	dv.Annotations[planbase.AnnDiskSource] = disk.UUID
+	// Nutanix has no conversion pod to act as the first consumer of a
+	// WaitForFirstConsumer storage class during a cold migration to the
+	// local cluster (unlike vSphere), so request immediate binding here --
+	// otherwise the PVC, and thus the import, would never start.
+	dv.Annotations[planbase.AnnBindImmediate] = "true"
 	return dv
 }
 
