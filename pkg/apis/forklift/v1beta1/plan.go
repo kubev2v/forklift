@@ -565,6 +565,34 @@ func (r *Plan) IsUsingOffloadPlugin() bool {
 	return false
 }
 
+// NeedsTwoPhaseStorageMigration returns true if any storage map entry has a
+// TwoPhaseConfig, meaning a second storage-layer migration phase is required.
+func (r *Plan) NeedsTwoPhaseStorageMigration() bool {
+	if r.Map.Storage == nil {
+		return false
+	}
+	for _, m := range r.Map.Storage.Spec.Map {
+		if m.OffloadPlugin != nil && m.OffloadPlugin.TwoPhaseConfig != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// GetTwoPhaseConfig returns the TwoPhaseConfig from the first storage map entry
+// that has one set, or nil if none is configured.
+func (r *Plan) GetTwoPhaseConfig() *TwoPhaseConfig {
+	if r.Map.Storage == nil {
+		return nil
+	}
+	for _, m := range r.Map.Storage.Spec.Map {
+		if m.OffloadPlugin != nil && m.OffloadPlugin.TwoPhaseConfig != nil {
+			return m.OffloadPlugin.TwoPhaseConfig
+		}
+	}
+	return nil
+}
+
 // VSpherePVCNameTemplateData contains fields used in PVC naming templates for vSphere migrations.
 type VSpherePVCNameTemplateData struct {
 	VmName         string `json:"vmName"`

@@ -119,6 +119,11 @@ const (
 	AnnVmId        = "forklift.konveyor.io/vm-id"
 	AnnVmUUID      = "forklift.konveyor.io/vm-uuid"
 	AnnNetAppShift = "forklift.konveyor.io/netapp-shift"
+
+	// Two-phase storage migration: set on intermediate PVC, holds the name of the final PVC.
+	AnnTargetPvcName = "forklift.konveyor.io/target-pvc-name"
+	// Two-phase storage migration: set on final PVC, holds the name of the intermediate PVC.
+	AnnIntermediatePvc = "forklift.konveyor.io/intermediate-pvc"
 )
 
 var VolumePopulatorNotSupportedError = liberr.New("provider does not support volume populators")

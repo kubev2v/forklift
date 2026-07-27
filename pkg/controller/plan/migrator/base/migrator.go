@@ -162,6 +162,17 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 					},
 					Tasks: tasks,
 				})
+		case api.PhaseStorageLayerMigration:
+			pipeline = append(
+				pipeline,
+				&plan.Step{
+					Task: plan.Task{
+						Name:        StorageLayerTransfer,
+						Description: "Migrate disks to final storage layer.",
+						Progress:    libitr.Progress{Total: 1},
+						Phase:       api.StepPending,
+					},
+				})
 		case api.PhaseConvertGuest:
 			pipeline = append(
 				pipeline,
@@ -290,6 +301,8 @@ func (r *BaseMigrator) Step(status *plan.VMStatus) (step string) {
 	case api.PhaseRemovePenultimateSnapshot, api.PhaseWaitForPenultimateSnapshotRemoval, api.PhaseCreateFinalSnapshot,
 		api.PhaseWaitForFinalSnapshot, api.PhaseAddFinalCheckpoint, api.PhaseFinalize, api.PhaseRemoveFinalSnapshot:
 		step = Cutover
+	case api.PhaseStorageLayerMigration:
+		step = StorageLayerTransfer
 	case api.PhaseCreateGuestConversionPod, api.PhaseConvertGuest:
 		step = ImageConversion
 	case api.PhaseCopyDisksVirtV2V:
@@ -347,6 +360,7 @@ func (r *BaseMigrator) warmItinerary() *libitr.Itinerary {
 			{Name: api.PhaseAddFinalCheckpoint},
 			{Name: api.PhaseFinalize},
 			{Name: api.PhaseRemoveFinalSnapshot, All: VSphere},
+			{Name: api.PhaseStorageLayerMigration, All: CDIDiskCopy | NeedsTwoPhase},
 			{Name: api.PhaseCreateGuestConversionPod, All: RequiresConversion},
 			{Name: api.PhaseConvertGuest, All: RequiresConversion},
 			{Name: api.PhaseCreateVM},
@@ -370,6 +384,7 @@ func (r *BaseMigrator) coldItinerary() *libitr.Itinerary {
 			{Name: api.PhaseCreateDataVolumes},
 			{Name: api.PhaseCopyDisks, All: CDIDiskCopy},
 			{Name: api.PhaseAllocateDisks, All: VirtV2vDiskCopy},
+			{Name: api.PhaseStorageLayerMigration, All: CDIDiskCopy | NeedsTwoPhase},
 			{Name: api.PhaseCreateGuestConversionPod, All: RequiresConversion},
 			{Name: api.PhaseConvertGuest, All: RequiresConversion},
 			{Name: api.PhaseCopyDisksVirtV2V, All: RequiresConversion | VirtV2vDiskCopy},
@@ -478,11 +493,13 @@ func (r *BasePredicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
 		allowed = r.context.Source.Provider.RequiresConversion() && !r.context.Plan.Spec.SkipGuestConversion
 	case WaitForFinalSnapshotConsolidation:
 		allowed = settings.Settings.WaitForFinalSnapshotConsolidation
+	case NeedsTwoPhase:
+		allowed = r.context.Plan.NeedsTwoPhaseStorageMigration()
 	}
 
 	return
 }
 
 func (r *BasePredicate) Count() int {
-	return 0x200
+	return 0x800
 }
