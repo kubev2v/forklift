@@ -245,7 +245,7 @@ func (r *KubeVirt) resolveConversionResources(vm *plan.VMStatus, podType convctx
 	}
 
 	var vddkConfigMap *core.ConfigMap
-	if r.Source.Provider.UseVddkAioOptimization() {
+	if r.needsVddkConfigMap() {
 		vddkConfigMap, err = r.ensureVddkConfigMap()
 		if err != nil {
 			return
@@ -1842,7 +1842,7 @@ func (r *KubeVirt) DataVolumes(vm *plan.VMStatus) (dataVolumes []cdi.DataVolume,
 		return
 	}
 	var vddkConfigMap *core.ConfigMap
-	if r.Source.Provider.UseVddkAioOptimization() {
+	if r.needsVddkConfigMap() {
 		vddkConfigMap, err = r.ensureVddkConfigMap()
 		if err != nil {
 			return nil, err
@@ -1922,6 +1922,11 @@ func (r *KubeVirt) CsiImportPVCs(vm *plan.VMStatus) ([]core.PersistentVolumeClai
 	return r.Builder.CsiImportPVCs(vm.Ref, labels)
 }
 
+// Whether a VDDK extra-args ConfigMap is needed for AIO tuning or node selector propagation.
+func (r *KubeVirt) needsVddkConfigMap() bool {
+	return r.Source.Provider.UseVddkAioOptimization() || len(r.Plan.Spec.ConvertorNodeSelector) > 0
+}
+
 func (r *KubeVirt) vddkConfigMap(labels map[string]string) (*core.ConfigMap, error) {
 	data := make(map[string]string)
 	if r.Source.Provider.UseVddkAioOptimization() {
@@ -1932,6 +1937,13 @@ func (r *KubeVirt) vddkConfigMap(labels map[string]string) (*core.ConfigMap, err
 			data["vddk-config-file"] = "VixDiskLib.nfcAio.Session.BufSizeIn64KB=16\n" +
 				"VixDiskLib.nfcAio.Session.BufCount=4"
 		}
+	}
+	if len(r.Plan.Spec.ConvertorNodeSelector) > 0 {
+		nsJSON, err := json.Marshal(r.Plan.Spec.ConvertorNodeSelector)
+		if err != nil {
+			return nil, liberr.Wrap(err)
+		}
+		data["vddk-node-selector"] = string(nsJSON)
 	}
 	configMap := core.ConfigMap{
 		Data: data,

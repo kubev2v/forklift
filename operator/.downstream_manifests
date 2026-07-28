@@ -7288,6 +7288,10 @@ spec:
                   ConvertorNodeSelector constrains the scheduler to only schedule virt-v2v convertor pods on nodes
                   which contain the specified labels. This is useful for dedicating specific nodes for disk conversion
                   workloads that require high I/O performance or network access to source VMware infrastructure.
+                  For vSphere warm migrations that use CDI VDDK DataVolumes for disk transfer,
+                  this selector is also propagated to the CDI importer pods via the VDDK extra-args
+                  ConfigMap (requires CDI with CNV-84595 support). The ConfigMap is automatically
+                  cleaned up when the migration completes.
                   See Pod NodeSelector documentation for more details,
                   https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector
                 type: object
