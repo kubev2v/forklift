@@ -562,8 +562,9 @@ func buildGuestNetworks(cfgs []guestNetCfg, nics []types.NIC) []types.GuestNetwo
 }
 
 // validateDisksOnSMB calls the provider-server validation endpoint to verify
-// that disk files mapped to SMB paths actually exist on the mount. Disks that
-// are missing get a DiskNotFoundOnSMB concern attached to their parent VM.
+// that disk files mapped to SMB paths actually exist on the mount. Disks whose
+// files are missing have their SMBPath cleared so the OPA validation policy
+// (hyperv.disk.smb_path.missing) can flag them.
 func (r *Client) validateDisksOnSMB(vms []types.VM) {
 	if r.provider == nil || r.provider.Status.Service == nil {
 		r.Log.V(1).Info("Skipping SMB disk validation: no provider service available")
@@ -573,22 +574,22 @@ func (r *Client) validateDisksOnSMB(vms []types.VM) {
 	svc := r.provider.Status.Service
 	baseURL := fmt.Sprintf("http://%s.%s.svc.cluster.local:8080", svc.Name, svc.Namespace)
 
-	// Collect all SMB paths, tracking which VM(s) own each path.
-	type pathOwner struct {
-		vmIndex  int
-		diskPath string
+	type diskRef struct {
+		vmIdx   int
+		diskIdx int
 	}
 	var allPaths []string
-	pathOwners := make(map[string][]pathOwner)
-	for i, vm := range vms {
-		for _, disk := range vm.Disks {
-			if disk.SMBPath == "" {
+	pathToDiskRefs := make(map[string][]diskRef)
+	for i := range vms {
+		for j := range vms[i].Disks {
+			p := vms[i].Disks[j].SMBPath
+			if p == "" {
 				continue
 			}
-			if _, seen := pathOwners[disk.SMBPath]; !seen {
-				allPaths = append(allPaths, disk.SMBPath)
+			if _, seen := pathToDiskRefs[p]; !seen {
+				allPaths = append(allPaths, p)
 			}
-			pathOwners[disk.SMBPath] = append(pathOwners[disk.SMBPath], pathOwner{vmIndex: i, diskPath: disk.SMBPath})
+			pathToDiskRefs[p] = append(pathToDiskRefs[p], diskRef{vmIdx: i, diskIdx: j})
 		}
 	}
 
@@ -629,16 +630,16 @@ func (r *Client) validateDisksOnSMB(vms []types.VM) {
 		missingSet[p] = true
 	}
 
-	for path, owners := range pathOwners {
+	for path, refs := range pathToDiskRefs {
 		if !missingSet[path] {
 			continue
 		}
-		for _, o := range owners {
-			vms[o.vmIndex].Concerns = append(vms[o.vmIndex].Concerns, types.Concern{
-				Category: "Warning",
-				Label:    "DiskNotFoundOnSMB",
-				Message:  fmt.Sprintf("Disk file not found on SMB mount: %s", o.diskPath),
-			})
+		for _, ref := range refs {
+			r.Log.Info("Disk file not found on SMB mount, clearing SMBPath",
+				"vm", vms[ref.vmIdx].Name,
+				"windowsPath", vms[ref.vmIdx].Disks[ref.diskIdx].WindowsPath,
+				"smbPath", path)
+			vms[ref.vmIdx].Disks[ref.diskIdx].SMBPath = ""
 		}
 	}
 
