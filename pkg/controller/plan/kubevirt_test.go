@@ -702,6 +702,45 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 		})
 	})
 
+	ginkgo.Describe("vddkConfigMap", func() {
+		ginkgo.It("should include vddk-node-selector when ConvertorNodeSelector is set", func() {
+			kubevirt := createKubeVirtWithProvider(v1beta1.VSphere)
+			kubevirt.Plan.Spec.ConvertorNodeSelector = map[string]string{
+				"dedicated-nic": "vmware",
+				"zone":          "east",
+			}
+			cm, err := kubevirt.vddkConfigMap(map[string]string{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cm.Data).To(HaveKey("vddk-node-selector"))
+			Expect(cm.Data["vddk-node-selector"]).To(SatisfyAll(
+				ContainSubstring(`"dedicated-nic":"vmware"`),
+				ContainSubstring(`"zone":"east"`),
+			))
+		})
+
+		ginkgo.It("should not include vddk-node-selector when ConvertorNodeSelector is empty", func() {
+			kubevirt := createKubeVirtWithProvider(v1beta1.VSphere)
+			cm, err := kubevirt.vddkConfigMap(map[string]string{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cm.Data).ToNot(HaveKey("vddk-node-selector"))
+		})
+
+		ginkgo.It("should include both AIO config and node selector when both are set", func() {
+			kubevirt := createKubeVirtWithProvider(v1beta1.VSphere)
+			kubevirt.Source.Provider.Spec.Settings = map[string]string{
+				v1beta1.UseVddkAioOptimization: "true",
+			}
+			kubevirt.Plan.Spec.ConvertorNodeSelector = map[string]string{
+				"node-role": "migration",
+			}
+			cm, err := kubevirt.vddkConfigMap(map[string]string{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cm.Data).To(HaveKey("vddk-config-file"))
+			Expect(cm.Data).To(HaveKey("vddk-node-selector"))
+			Expect(cm.Data["vddk-node-selector"]).To(ContainSubstring(`"node-role":"migration"`))
+		})
+	})
+
 	ginkgo.Describe("podVolumeMounts", func() {
 		var kubevirt *KubeVirt
 
