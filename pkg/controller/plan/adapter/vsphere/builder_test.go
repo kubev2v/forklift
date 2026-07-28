@@ -2,7 +2,6 @@ package vsphere
 
 import (
 	"context"
-	"fmt"
 
 	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
@@ -218,11 +217,35 @@ var _ = Describe("vSphere builder", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(pvcs).To(HaveLen(1))
 			pvc := pvcs[0]
-			// The default template now uses trunc 4 for both plan and VM names
-			Expect(pvc.Name).Should(HavePrefix(fmt.Sprintf("%.4s-%.4s-disk-", builder.Plan.Name, vm.Name)))
+			// Default template: trunc(15,"unit-test-plan-single-vm") = "unit-test-plan-"
+			// + "-" + trunc(15,"customer-frontend-server") = "customer-fronte" + "-disk-"
+			Expect(pvc.Name).Should(HavePrefix("unit-test-plan--customer-fronte-disk-"))
 			Expect(pvc.Spec.DataSourceRef.Kind).To(Equal(v1beta1.VSphereXcopyVolumePopulatorKind))
 			Expect(pvc.Spec.DataSourceRef.APIGroup).To(Equal(&v1beta1.SchemeGroupVersion.Group))
 			Expect(pvc.Spec.DataSourceRef.Name).To(Equal(pvc.Name))
+		})
+		It("should sanitize invalid VM names via ChangeVmName fallback in setPVCNameFromTemplate", func() {
+			builder := createBuilder()
+			builder.Plan.Spec.PVCNameTemplateUseGenerateName = ptr.To(false)
+			vm := &model.VM{
+				VM1: model.VM1{
+					VM0: model.VM0{
+						ID:   "test-vm-id",
+						Name: "My VM With Spaces",
+					},
+				},
+			}
+			disk := vsphere.Disk{
+				File: "[datastore1] vm-123/vm-123.vmdk",
+				Key:  2000,
+			}
+			objectMeta := &meta.ObjectMeta{}
+
+			err := builder.setPVCNameFromTemplate(objectMeta, vm, 0, disk)
+			Expect(err).NotTo(HaveOccurred())
+			// ChangeVmName("My VM With Spaces") -> "my-vm-with-spaces"; trunc 15 -> "my-vm-with-spac"
+			Expect(objectMeta.Name).To(Equal("unit-test-plan--my-vm-with-spac-disk-0"))
+			Expect(objectMeta.GenerateName).To(BeEmpty())
 		})
 
 		It("should honor explicit AccessMode StorageMap and ignore VolumeMode from StorageMap", func() {

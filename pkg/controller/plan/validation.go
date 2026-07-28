@@ -1359,15 +1359,9 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 				consolidationNeeded.Items = append(consolidationNeeded.Items, ref.String())
 			}
 		}
-		// is valid vm pvc name template
-		if plan.Spec.PVCNameTemplate != "" || vm.PVCNameTemplate != "" {
-			// if vm level pvc name template is set, use it, otherwise use plan level pvc name template
-			pvcNameTemplate := plan.Spec.PVCNameTemplate
-			if vm.PVCNameTemplate != "" {
-				pvcNameTemplate = vm.PVCNameTemplate
-			}
-
-			// validate pvc name template for the vm
+		// validate pvc name template (VM → Plan → controller global → hardcoded)
+		pvcNameTemplate := planbase.GetPVCNameTemplate(plan, vm.ID)
+		if pvcNameTemplate != "" {
 			if _, err := validator.PVCNameTemplate(vm.Ref, pvcNameTemplate); err != nil {
 				r.Log.Info("PVC name template is invalid", "error", err.Error(), "template", pvcNameTemplate, "plan", plan.Name, "namespace", plan.Namespace)
 
@@ -1375,13 +1369,13 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 				pvcNameInvalid.Items = append(pvcNameInvalid.Items, conditionItem)
 			}
 		}
-		// is valid vm pvc name template
+		// validate volume name template
 		if vm.VolumeNameTemplate != "" {
 			if err := r.IsValidVolumeNameTemplate(vm.VolumeNameTemplate); err != nil {
 				volumeNameInvalid.Items = append(volumeNameInvalid.Items, ref.String())
 			}
 		}
-		// is valid vm pvc name template
+		// validate network name template
 		if vm.NetworkNameTemplate != "" {
 			if err := r.IsValidNetworkNameTemplate(vm.NetworkNameTemplate); err != nil {
 				networkNameInvalid.Items = append(networkNameInvalid.Items, ref.String())

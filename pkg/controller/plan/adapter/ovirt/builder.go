@@ -747,8 +747,11 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 	}
 
 	var sdToStorageClass map[string]string
+	diskIndex := 0
 	for _, diskAttachment := range workload.DiskAttachments {
 		if diskAttachment.Disk.StorageType == "lun" {
+			// LUN disks are passed through directly; skip without incrementing
+			// diskIndex so that the index stays aligned with migrated disks.
 			continue
 		}
 		_, err = r.getVolumePopulator(diskAttachment.DiskAttachment.ID)
@@ -770,17 +773,22 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				}
 			}
 			storageClassName := sdToStorageClass[diskAttachment.Disk.StorageDomain]
-			pvc, err = r.persistentVolumeClaimWithSourceRef(diskAttachment, storageClassName, populatorName, annotations, vmRef.ID)
+			pvc, err = r.persistentVolumeClaimWithSourceRef(diskAttachment, storageClassName, populatorName, annotations, vmRef, diskIndex)
 			if err != nil {
 				if !k8serr.IsAlreadyExists(err) {
 					err = liberr.Wrap(err, "disk attachment", diskAttachment.DiskAttachment.ID, "storage class", storageClassName, "populator", populatorName)
 					return
 				}
 				err = nil
+				diskIndex++
 				continue
 			}
 			pvcs = append(pvcs, pvc)
 		}
+		// Always increment even when the volume populator already existed
+		// (outer if branch not taken) so PVC name templates get a stable,
+		// sequential disk index per non-LUN attachment.
+		diskIndex++
 	}
 	return
 }
@@ -892,7 +900,8 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskA
 	storageClassName string,
 	populatorName string,
 	annotations map[string]string,
-	vmID string) (pvc *core.PersistentVolumeClaim, err error) {
+	vmRef ref.Ref,
+	diskIndex int) (pvc *core.PersistentVolumeClaim, err error) {
 	diskSize := diskAttachment.Disk.ProvisionedSize
 	var accessModes []core.PersistentVolumeAccessMode
 	var volumeMode *core.PersistentVolumeMode
@@ -911,13 +920,12 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskA
 
 	pvc = &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
-			GenerateName: fmt.Sprintf("%s-", diskAttachment.DiskAttachment.ID),
-			Namespace:    r.Plan.Spec.TargetNamespace,
-			Annotations:  annotations,
+			Namespace:   r.Plan.Spec.TargetNamespace,
+			Annotations: annotations,
 			Labels: map[string]string{
 				"migration": string(r.Migration.UID),
 				"plan":      string(r.Plan.GetUID()),
-				"vmID":      vmID,
+				"vmID":      vmRef.ID,
 				"diskID":    diskAttachment.Disk.ID,
 			},
 		},
@@ -935,6 +943,21 @@ func (r *Builder) persistentVolumeClaimWithSourceRef(diskAttachment model.XDiskA
 				Name:     populatorName,
 			},
 		},
+	}
+
+	// Apply PVC name template
+	templateData := &api.PVCNameTemplateData{
+		VmName:       vmRef.Name,
+		TargetVmName: planbase.ResolveTargetVmName(r.Plan, vmRef.ID, vmRef.Name),
+		PlanName:     r.Plan.Name,
+		DiskIndex:    diskIndex,
+		VmId:         vmRef.ID,
+		DiskId:       diskAttachment.ID,
+	}
+	pvcNameTemplate := planbase.GetPVCNameTemplate(r.Plan, vmRef.ID)
+	if templateErr := planbase.SetPVCNameOnObject(&pvc.ObjectMeta, pvcNameTemplate, planbase.GetPVCNameTemplateUseGenerateName(r.Plan), templateData); templateErr != nil {
+		err = templateErr
+		return
 	}
 
 	err = r.Client.Create(context.TODO(), pvc, &client.CreateOptions{})

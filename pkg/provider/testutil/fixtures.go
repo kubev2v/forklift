@@ -7,6 +7,7 @@ import (
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 )
 
 // PlanBuilder provides a fluent interface for building test Plan objects.
@@ -25,7 +26,7 @@ func NewPlanBuilder() *PlanBuilder {
 			},
 			Spec: api.PlanSpec{
 				TargetNamespace:                "test",
-				PVCNameTemplateUseGenerateName: true,
+				PVCNameTemplateUseGenerateName: ptr.To(true),
 			},
 		},
 	}
