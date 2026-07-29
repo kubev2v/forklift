@@ -124,6 +124,7 @@ type controller struct {
 	imageName         string
 	devicePath        string
 	mountPath         string
+	resources         *corev1.ResourceRequirements
 	pvcLister         corelisters.PersistentVolumeClaimLister
 	pvcSynced         cache.InformerSynced
 	pvLister          corelisters.PersistentVolumeLister
@@ -148,6 +149,7 @@ type controller struct {
 func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, prefix string,
 	gk schema.GroupKind, gvr schema.GroupVersionResource, mountPath, devicePath string,
 	populatorArgs func(bool, *unstructured.Unstructured, corev1.PersistentVolumeClaim) ([]string, error),
+	resources *corev1.ResourceRequirements,
 ) {
 	klog.Infof("Starting populator controller for %s", gk)
 
@@ -191,6 +193,7 @@ func RunController(masterURL, kubeconfig, imageName, httpEndpoint, metricsPath, 
 		imageName:         imageName,
 		devicePath:        devicePath,
 		mountPath:         mountPath,
+		resources:         resources,
 		populatedFromAnno: prefix + "/" + populatedFromAnnoSuffix,
 		pvcFinalizer:      prefix + "/" + pvcFinalizerSuffix,
 		pvcLister:         pvcInformer.Lister(),
@@ -641,6 +644,9 @@ func (c *controller) syncPvc(ctx context.Context, key, pvcNamespace, pvcName str
 			con := &pod.Spec.Containers[0]
 			con.Image = c.imageName
 			con.Args = args
+			if c.resources != nil {
+				con.Resources = *c.resources
+			}
 			if rawBlock {
 				con.VolumeDevices = []corev1.VolumeDevice{
 					{

@@ -8,7 +8,9 @@ import (
 
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	populator_machinery "github.com/kubev2v/forklift/pkg/lib-volume-populator/populator-machinery"
+	"github.com/kubev2v/forklift/pkg/settings"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -71,6 +73,10 @@ func main() {
 	klog.InitFlags(nil)
 	flag.Parse()
 
+	var populatorSettings settings.Populator
+	populatorSettings.Load()
+	resources := buildResources(&populatorSettings)
+
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	stop := make(chan bool)
@@ -91,7 +97,7 @@ func main() {
 		metricsEndpoint := populator.metricsEndpoint
 		go func() {
 			populator_machinery.RunController(masterURL, kubeconfig, imageName, metricsEndpoint, metricsPath,
-				prefix, gk, gvr, mountPath, devicePath, controllerFunc)
+				prefix, gk, gvr, mountPath, devicePath, controllerFunc, resources)
 			<-stop
 		}()
 	}
@@ -157,5 +163,18 @@ func getVolumePath(rawBlock bool) string {
 		return devicePath
 	} else {
 		return mountPath + "disk.img"
+	}
+}
+
+func buildResources(s *settings.Populator) *corev1.ResourceRequirements {
+	return &corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(s.ContainerLimitsCpu),
+			corev1.ResourceMemory: resource.MustParse(s.ContainerLimitsMemory),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(s.ContainerRequestsCpu),
+			corev1.ResourceMemory: resource.MustParse(s.ContainerRequestsMemory),
+		},
 	}
 }

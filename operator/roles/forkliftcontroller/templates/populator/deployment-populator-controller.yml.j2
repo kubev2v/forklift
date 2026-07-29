@@ -32,6 +32,14 @@ spec:
           - name: VSPHERE_XCOPY_VOLUME_POPULATOR_IMAGE
             value: {{ populator_vsphere_xcopy_volume_image_fqin }}
 {% endif %}
+          - name: POPULATOR_CONTAINER_LIMITS_CPU
+            value: "1000m"
+          - name: POPULATOR_CONTAINER_LIMITS_MEMORY
+            value: "1Gi"
+          - name: POPULATOR_CONTAINER_REQUESTS_CPU
+            value: "100m"
+          - name: POPULATOR_CONTAINER_REQUESTS_MEMORY
+            value: "512Mi"
           ports:
             - containerPort: 8080
               name: http-endpoint
