@@ -73,10 +73,9 @@ func main() {
 	klog.InitFlags(nil)
 	flag.Parse()
 
-	resources, err := getResources()
-	if err != nil {
-		klog.Fatalf("Failed to parse resources: %v", err)
-	}
+	var populatorSettings settings.Populator
+	populatorSettings.Load()
+	resources := buildResources(&populatorSettings)
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
@@ -181,19 +180,15 @@ func getVolumePath(rawBlock bool) string {
 	}
 }
 
-func getResources() (*corev1.ResourceRequirements, error) {
-	cpuLimit := settings.Settings.Migration.PopulatorContainerLimitsCpu
-	memoryLimit := settings.Settings.Migration.PopulatorContainerLimitsMemory
-	cpuRequest := settings.Settings.Migration.PopulatorContainerRequestsCpu
-	memoryRequest := settings.Settings.Migration.PopulatorContainerRequestsMemory
+func buildResources(s *settings.Populator) *corev1.ResourceRequirements {
 	return &corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    cpuLimit,
-			corev1.ResourceMemory: memoryLimit,
+			corev1.ResourceCPU:    s.ContainerLimitsCpu,
+			corev1.ResourceMemory: s.ContainerLimitsMemory,
 		},
 		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    cpuRequest,
-			corev1.ResourceMemory: memoryRequest,
+			corev1.ResourceCPU:    s.ContainerRequestsCpu,
+			corev1.ResourceMemory: s.ContainerRequestsMemory,
 		},
-	}, nil
+	}
 }
