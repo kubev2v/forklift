@@ -267,6 +267,23 @@ func (r *Builder) mapDisks(awsInstance *model.InstanceDetails, persistentVolumeC
 }
 
 // mapNetworks configures VM networks based on EC2 network interfaces and network mappings.
+// shouldUseQualifiedNetworkName determines whether to use namespace/nad-name format
+// for Multus networks based on ForkliftController settings and namespace comparison.
+func (r *Builder) shouldUseQualifiedNetworkName(nadNamespace, targetVMNamespace string) bool {
+	// If global setting forces qualified names, always use qualified format
+	if settings.Settings.Migration.MultusNetworkNameAlwaysQualified {
+		return true
+	}
+
+	// If NAD and target VM are in different namespaces, use qualified format for safety
+	if nadNamespace != targetVMNamespace {
+		return true
+	}
+
+	// NAD and VM are in same namespace, use unqualified format
+	return false
+}
+
 // Supports pod networking, Multus, and UDN (User Defined Networks).
 // Preserves MAC addresses from source (when UDN supports it or when not using UDN).
 // In compatibility mode, uses E1000e NIC model instead of VirtIO.
@@ -356,8 +373,14 @@ func (r *Builder) mapNetworks(awsInstance *model.InstanceDetails, object *cnv.Vi
 				}
 			} else if mapped.Destination.Type == Multus {
 				// Multus network
+				var networkName string
+				if r.shouldUseQualifiedNetworkName(mapped.Destination.Namespace, r.Plan.Spec.TargetNamespace) {
+					networkName = path.Join(mapped.Destination.Namespace, mapped.Destination.Name)
+				} else {
+					networkName = mapped.Destination.Name
+				}
 				kNetwork.Multus = &cnv.MultusNetwork{
-					NetworkName: path.Join(mapped.Destination.Namespace, mapped.Destination.Name),
+					NetworkName: networkName,
 				}
 				kInterface.InterfaceBindingMethod = cnv.InterfaceBindingMethod{
 					Bridge: &cnv.InterfaceBridge{},
