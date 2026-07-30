@@ -93,6 +93,10 @@ type Client struct {
 	smbMountPath     string
 	smbWindowsPrefix string
 	cache            *clusterCache
+	vmCached         bool
+	vmCache          []types.VM
+	netCached        bool
+	netCache         []types.Network
 }
 
 // Connect establishes a WinRM connection to the HyperV host using Secret credentials.
@@ -147,9 +151,13 @@ func (r *Client) getClusterCache() (*clusterCache, error) {
 	return r.cache, nil
 }
 
-// InvalidateClusterCache clears cached cluster data so the next call re-fetches.
-func (r *Client) InvalidateClusterCache() {
+// InvalidateCycleCache clears all per-cycle caches so the next call re-fetches.
+func (r *Client) InvalidateCycleCache() {
 	r.cache = nil
+	r.vmCached = false
+	r.vmCache = nil
+	r.netCached = false
+	r.netCache = nil
 }
 
 // ListCluster returns the cluster info when in cluster mode, nil for standalone.
@@ -222,6 +230,10 @@ func (r *Client) getNodeComputerInfo(nodeName string) (*driver.ComputerInfoData,
 // In cluster mode, VMs are enriched with OwnerNode from cluster group data.
 // Uses batch PowerShell to minimize WinRM round trips.
 func (r *Client) ListVMs() ([]types.VM, error) {
+	if r.vmCached {
+		return r.vmCache, nil
+	}
+
 	networks, err := r.ListNetworks()
 	if err != nil {
 		return nil, err
@@ -241,12 +253,7 @@ func (r *Client) ListVMs() ([]types.VM, error) {
 
 	var vms []types.VM
 	for _, domain := range domains {
-		var vm *types.VM
-		if isCluster {
-			vm, err = r.getVMBaseFromDomain(domain)
-		} else {
-			vm, err = r.getVMFromDomain(domain, networks, r.smbWindowsPrefix)
-		}
+		vm, err := r.getVMBaseFromDomain(domain)
 		if err != nil {
 			r.Log.Error(err, "Failed to process domain")
 			_ = domain.Free()
@@ -263,6 +270,9 @@ func (r *Client) ListVMs() ([]types.VM, error) {
 	r.enrichVMDetails(vms, networks)
 
 	r.validateDisksOnSMB(vms)
+
+	r.vmCached = true
+	r.vmCache = vms
 
 	return vms, nil
 }
@@ -422,8 +432,8 @@ func (r *Client) collectBatchVMDetails(computerName string) (map[string]*batchVM
 }
 
 // applyBatchDetails enriches the VMs at the given indices with details from the batch script result.
-// In cluster mode (disks/NICs empty), it builds full Disk and NIC arrays from batch data.
-// In standalone mode (disks/NICs pre-populated), it only enriches capacity/RCT on existing disks.
+// Builds full Disk and NIC arrays from batch data when empty (normal path for both standalone and cluster).
+// Falls back to enriching capacity/RCT on pre-populated disks if present.
 func (r *Client) applyBatchDetails(vms []types.VM, indices []int, batchMap map[string]*batchVMDetail, networks []types.Network) {
 	for _, i := range indices {
 		detail, found := batchMap[vms[i].Name]
@@ -440,7 +450,7 @@ func (r *Client) applyBatchDetails(vms []types.VM, indices []int, batchMap map[s
 		}
 
 		if len(vms[i].Disks) == 0 && len(detail.Disks) > 0 {
-			// Cluster mode: build full disk array from batch data.
+			// Build full disk array from batch data.
 			for j, bd := range detail.Disks {
 				if bd.Path == "" {
 					continue
@@ -460,7 +470,7 @@ func (r *Client) applyBatchDetails(vms []types.VM, indices []int, batchMap map[s
 				})
 			}
 		} else {
-			// Standalone mode: enrich existing disks with capacity/RCT.
+			// Enrich pre-populated disks with capacity/RCT (defensive fallback).
 			for j := range vms[i].Disks {
 				for _, bd := range detail.Disks {
 					if strings.EqualFold(
@@ -475,7 +485,7 @@ func (r *Client) applyBatchDetails(vms []types.VM, indices []int, batchMap map[s
 		}
 
 		if len(vms[i].NICs) == 0 && len(detail.NICs) > 0 {
-			// Cluster mode: build full NIC array from batch data.
+			// Build full NIC array from batch data.
 			for j, nd := range detail.NICs {
 				mac := formatMAC(nd.MACAddress)
 				vms[i].NICs = append(vms[i].NICs, types.NIC{
@@ -654,6 +664,10 @@ func (r *Client) validateDisksOnSMB(vms []types.VM) {
 // In cluster mode, switches are collected from all cluster nodes so that NICs
 // on VMs running on remote nodes can be resolved to a known network UUID.
 func (r *Client) ListNetworks() ([]types.Network, error) {
+	if r.netCached {
+		return r.netCache, nil
+	}
+
 	netDomains, err := r.driver.ListAllNetworks()
 	if err != nil {
 		return nil, err
@@ -701,11 +715,14 @@ func (r *Client) ListNetworks() ([]types.Network, error) {
 		r.mergeRemoteNodeNetworks(&result, seen)
 	}
 
+	r.netCached = true
+	r.netCache = result
+
 	return result, nil
 }
 
 // mergeRemoteNodeNetworks queries Get-VMSwitch on each remote cluster node.
-// New switches are appended to resultת switches whose UUID was already seen
+// New switches are appended to result; switches whose UUID was already seen
 // get the remote node appended to their OwnerNodes list.
 func (r *Client) mergeRemoteNodeNetworks(result *[]types.Network, seen map[string]bool) {
 	cc, err := r.getClusterCache()
@@ -849,108 +866,6 @@ func (r *Client) getVMBaseFromDomain(domain driver.Domain) (*types.VM, error) {
 		Firmware:   firmware,
 		OwnerNode:  domain.GetComputerName(),
 	}, nil
-}
-
-func (r *Client) getVMFromDomain(domain driver.Domain, networks []types.Network, smbWindowsPrefix string) (*types.VM, error) {
-	uuid, err := domain.GetUUIDString()
-	if err != nil {
-		return nil, err
-	}
-
-	name, err := domain.GetName()
-	if err != nil {
-		return nil, err
-	}
-
-	state, _, err := domain.GetState()
-	if err != nil {
-		return nil, err
-	}
-
-	info, err := domain.GetInfo()
-	if err != nil {
-		return nil, err
-	}
-
-	generation, err := domain.GetGeneration()
-	if err != nil {
-		r.Log.V(1).Info("Failed to get VM generation, defaulting to BIOS", "vm", name, "error", err)
-	}
-	firmware := "bios"
-	if generation == VMGenerationGen2 {
-		firmware = "uefi"
-	}
-
-	computerName := domain.GetComputerName()
-
-	vm := &types.VM{
-		UUID:       uuid,
-		Name:       name,
-		PowerState: mapPowerState(state),
-		CpuCount:   int(info.NrVirtCpu),
-		MemoryMB:   int64(info.Memory / 1024), // KB to MB
-		Firmware:   firmware,
-		OwnerNode:  computerName,
-	}
-
-	vm.Disks = r.extractDisks(domain, smbWindowsPrefix, uuid)
-	vm.NICs = r.extractNICs(domain, computerName, networks)
-
-	return vm, nil
-}
-
-func (r *Client) extractDisks(domain driver.Domain, smbWindowsPrefix string, vmUUID string) []types.Disk {
-	diskInfos, err := domain.GetDisks()
-	if err != nil {
-		r.Log.Error(err, "Failed to get disks")
-		return []types.Disk{}
-	}
-
-	var disks []types.Disk
-	for i, di := range diskInfos {
-		if di.Path == "" {
-			continue
-		}
-
-		smbPath := r.mapWindowsPathToSMB(di.Path, smbWindowsPrefix)
-
-		format := "vhdx"
-		if strings.HasSuffix(strings.ToLower(di.Path), ".vhd") {
-			format = "vhd"
-		}
-
-		disks = append(disks, types.Disk{
-			ID:          fmt.Sprintf("%s-disk-%d", vmUUID, i),
-			WindowsPath: di.Path,
-			SMBPath:     smbPath,
-			Format:      format,
-		})
-	}
-	return disks
-}
-
-func (r *Client) extractNICs(domain driver.Domain, vmOwnerNode string, networks []types.Network) []types.NIC {
-	nicInfos, err := domain.GetNICs()
-	if err != nil {
-		r.Log.Error(err, "Failed to get NICs")
-		return []types.NIC{}
-	}
-
-	var nics []types.NIC
-	for i, ni := range nicInfos {
-		networkUUID := resolveNetworkUUID(ni.SwitchName, vmOwnerNode, networks)
-		mac := formatMAC(ni.MACAddress)
-
-		nics = append(nics, types.NIC{
-			Name:        fmt.Sprintf("nic-%d", i),
-			MAC:         mac,
-			DeviceIndex: i,
-			NetworkUUID: networkUUID,
-			NetworkName: ni.SwitchName,
-			VlanId:      ni.VlanId,
-		})
-	}
-	return nics
 }
 
 // collectPerVMDisks fetches disk info for a single VM on a specific node.
