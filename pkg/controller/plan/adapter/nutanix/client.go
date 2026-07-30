@@ -96,12 +96,10 @@ func (r *Client) Close() {}
 // with them. Deletion failures are logged rather than returned, since
 // finalization runs after the migration's outcome is already decided and a
 // leftover image shouldn't be reported as a migration failure.
-//
-// Prism Central migrations never reach here with images to clean up --
-// PreTransferActions refuses to create any (see requireElement) -- so
-// this returns early rather than issuing pointless lookups per disk.
 func (r *Client) Finalize(vms []*planapi.VMStatus, _ string) {
-	if element, err := r.isPrismElement(); err != nil || !element {
+	element, err := r.isPrismElement()
+	if err != nil {
+		r.Context.Log.Error(err, "Failed to detect Prism endpoint type during image cleanup")
 		return
 	}
 	for _, vm := range vms {
@@ -114,7 +112,11 @@ func (r *Client) Finalize(vms []*planapi.VMStatus, _ string) {
 			if disk.IsCdrom {
 				continue
 			}
-			r.deleteImage(vm.Ref, disk.UUID)
+			if element {
+				r.deleteImage(vm.Ref, disk.UUID)
+			} else {
+				r.deleteImageV4(vm.Ref, disk.UUID)
+			}
 		}
 	}
 }
@@ -286,15 +288,17 @@ func (r *Client) GetSnapshotDeltas(_ ref.Ref, _ string, _ util.HostsFunc) (s map
 	return
 }
 
-// PreTransferActions creates a Nutanix Image Service catalog image from
-// each of the VM's non-CDROM disks, so their contents become downloadable
-// over HTTP for Builder.DataVolumes (GET /images/{uuid}/file). Returns
-// ready=true only once every disk's image has finished creating.
+// PreTransferActions creates a per-disk catalog image for each of the
+// VM's non-CDROM disks, so their contents become downloadable over HTTP
+// for Builder.DataVolumes. Returns ready=true only once every disk's
+// image has finished creating.
 //
-// This catalog-image workflow is Prism Element "compatibility mode" only
-// -- see requireElement.
+// Prism Element uses the v3 Image Service (GET /images/{uuid}/file);
+// Prism Central uses the v4 Image Service instead, since v3 image
+// creation/listing isn't reliably populated when queried through it.
 func (r *Client) PreTransferActions(vmRef ref.Ref) (ready bool, err error) {
-	if err = r.requireElement("catalog image based disk transfer"); err != nil {
+	element, err := r.isPrismElement()
+	if err != nil {
 		return false, err
 	}
 
@@ -308,7 +312,13 @@ func (r *Client) PreTransferActions(vmRef ref.Ref) (ready bool, err error) {
 		if disk.IsCdrom {
 			continue
 		}
-		diskReady, imgErr := r.ensureImage(vmRef, disk)
+		var diskReady bool
+		var imgErr error
+		if element {
+			diskReady, imgErr = r.ensureImage(vmRef, disk)
+		} else {
+			diskReady, imgErr = r.ensureImageV4(vmRef, disk)
+		}
 		if imgErr != nil {
 			return false, imgErr
 		}
@@ -335,22 +345,6 @@ func (r *Client) isPrismElement() (bool, error) {
 		return false, liberr.Wrap(err, "failed to detect Prism endpoint type")
 	}
 	return status != http.StatusOK, nil
-}
-
-// requireElement returns an error unless the connected endpoint is Prism
-// Element. The catalog-image-based disk transfer used by
-// PreTransferActions/Builder.DataVolumes only works there today: it's a
-// Prism Element "compatibility mode" transfer. Prism Central needs its
-// own v3/v4 export API integration instead, which isn't implemented yet.
-func (r *Client) requireElement(action string) error {
-	element, err := r.isPrismElement()
-	if err != nil {
-		return err
-	}
-	if !element {
-		return liberr.New(action+" is only supported for Prism Element", "provider", r.Context.Source.Provider.Name)
-	}
-	return nil
 }
 
 // vmDisks looks up a VM's disks from inventory.
