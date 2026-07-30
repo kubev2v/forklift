@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	hyperv "github.com/kubev2v/forklift/pkg/controller/provider/model/hyperv"
+	model "github.com/kubev2v/forklift/pkg/controller/provider/web/hyperv"
+	cnv "kubevirt.io/api/core/v1"
 )
 
 func TestBuildNICKeys(t *testing.T) {
@@ -83,6 +85,41 @@ func TestBuildNICKeys(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestMapMemory(t *testing.T) {
+	r := &Builder{}
+	vm := &model.VM{}
+	vm.MemoryMB = 2048
+	object := &cnv.VirtualMachineSpec{
+		Template: &cnv.VirtualMachineInstanceTemplateSpec{},
+	}
+
+	r.mapMemory(vm, object, false)
+
+	if object.Template.Spec.Domain.Memory == nil || object.Template.Spec.Domain.Memory.Guest == nil {
+		t.Fatalf("expected Memory.Guest to be set, got nil")
+	}
+	expected := int64(2048) * 1024 * 1024
+	actual := object.Template.Spec.Domain.Memory.Guest.Value()
+	if actual != expected {
+		t.Errorf("Memory.Guest = %d, want %d", actual, expected)
+	}
+}
+
+func TestMapMemoryUsesInstanceType(t *testing.T) {
+	r := &Builder{}
+	vm := &model.VM{}
+	vm.MemoryMB = 2048
+	object := &cnv.VirtualMachineSpec{
+		Template: &cnv.VirtualMachineInstanceTemplateSpec{},
+	}
+
+	r.mapMemory(vm, object, true)
+
+	if object.Template.Spec.Domain.Memory != nil {
+		t.Errorf("expected Memory to be nil when usesInstanceType is true, got %+v", object.Template.Spec.Domain.Memory)
 	}
 }
 
