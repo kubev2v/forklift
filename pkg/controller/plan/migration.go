@@ -577,6 +577,46 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool, force
 	return nil
 }
 
+// ensureStaleObjectDeleted checks whether a stale object is terminating and
+// either waits (returns done=false) or force-deletes it after the timeout.
+// If the object has no DeletionTimestamp, it issues a normal delete via deleteFn.
+// When forceDeleteDirect is true and the timeout has elapsed, a zero-grace-period
+// client delete is issued (used for pods). Otherwise deleteFn is called on timeout
+// as well (used for Conversion CRs where DeleteConversion performs full teardown).
+// Always returns done=false after issuing a delete — the caller should requeue
+// and will observe done=true on the next reconciliation when no objects remain.
+func (r *Migration) ensureStaleObjectDeleted(obj client.Object, vm *plan.VMStatus, kind string, deleteFn func() error, forceDeleteDirect bool) (done bool, err error) {
+	if obj.GetDeletionTimestamp() != nil {
+		timeout := time.Duration(settings.Settings.StaleConversionTimeout) * time.Second
+		if time.Since(obj.GetDeletionTimestamp().Time) < timeout {
+			r.Log.Info("Stale object still terminating, will requeue.",
+				"kind", kind, "name", obj.GetName(), "namespace", obj.GetNamespace(), "vm", vm.String())
+			return false, nil
+		}
+		r.Log.Info("Stale object stuck terminating, force-deleting.",
+			"kind", kind, "name", obj.GetName(), "namespace", obj.GetNamespace(), "vm", vm.String(),
+			"terminatingSince", obj.GetDeletionTimestamp().Time)
+		var delErr error
+		if forceDeleteDirect {
+			grace := int64(0)
+			delErr = r.Destination.Delete(context.TODO(), obj, &client.DeleteOptions{GracePeriodSeconds: &grace})
+		} else {
+			delErr = deleteFn()
+		}
+		if delErr != nil {
+			if k8serr.IsNotFound(delErr) {
+				return false, nil
+			}
+			return false, delErr
+		}
+		return false, nil
+	}
+	if delErr := deleteFn(); delErr != nil {
+		return false, delErr
+	}
+	return false, nil
+}
+
 // deleteStaleConversionWorkloads requests deletion of guest-conversion pods
 // and CRs left over from a prior failed migration. Returns done=true when
 // no stale objects remain (safe to proceed), or done=false when objects are
@@ -585,32 +625,14 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool, force
 func (r *Migration) deleteStaleConversionWorkloads(vm *plan.VMStatus) (done bool, err error) {
 	r.Log.Info("Checking for stale conversion workloads.", "vm", vm.String())
 
-	stalePods, err := r.kubevirt.GetPodsWithLabels(r.kubevirt.conversionLabels(vm.Ref, true))
+	stalePod, err := r.kubevirt.GetConversionPod(vm.Ref, VirtV2vConversionPod, true)
 	if err != nil {
 		return false, err
 	}
-	if len(stalePods.Items) > 0 {
-		pod := &stalePods.Items[0]
-		if pod.DeletionTimestamp != nil {
-			timeout := time.Duration(settings.Settings.StaleConversionTimeout) * time.Second
-			if time.Since(pod.DeletionTimestamp.Time) < timeout {
-				r.Log.Info("Stale conversion pod still terminating, will requeue.",
-					"pod", pod.Name, "vm", vm.String())
-				return false, nil
-			}
-			r.Log.Info("Stale conversion pod stuck terminating, force-deleting.",
-				"pod", pod.Name, "vm", vm.String(),
-				"terminatingSince", pod.DeletionTimestamp.Time)
-			grace := int64(0)
-			if delErr := r.Destination.Delete(context.TODO(), pod, &client.DeleteOptions{GracePeriodSeconds: &grace}); delErr != nil {
-				return false, delErr
-			}
-			return false, nil
-		}
-		if delErr := r.kubevirt.DeleteObject(pod, vm, "Deleted stale conversion pod.", "pod"); delErr != nil {
-			return false, delErr
-		}
-		return false, nil
+	if stalePod != nil {
+		return r.ensureStaleObjectDeleted(stalePod, vm, "pod", func() error {
+			return r.kubevirt.DeleteObject(stalePod, vm, "Deleted stale conversion pod.", "pod")
+		}, true)
 	}
 
 	if settings.Settings.UseConversionCR {
@@ -619,21 +641,9 @@ func (r *Migration) deleteStaleConversionWorkloads(vm *plan.VMStatus) (done bool
 			return false, gErr
 		}
 		if gConv != nil {
-			if gConv.DeletionTimestamp != nil {
-				timeout := time.Duration(settings.Settings.StaleConversionTimeout) * time.Second
-				if time.Since(gConv.DeletionTimestamp.Time) < timeout {
-					r.Log.Info("Stale Conversion CR still terminating, will requeue.",
-						"conversion", gConv.Name, "vm", vm.String())
-					return false, nil
-				}
-				r.Log.Info("Stale Conversion CR stuck terminating, force-deleting.",
-					"conversion", gConv.Name, "vm", vm.String(),
-					"terminatingSince", gConv.DeletionTimestamp.Time)
-			}
-			if delErr := r.kubevirt.DeleteConversion(gConv); delErr != nil {
-				return false, delErr
-			}
-			return false, nil
+			return r.ensureStaleObjectDeleted(gConv, vm, "conversion", func() error {
+				return r.kubevirt.DeleteConversion(gConv)
+			}, false)
 		}
 	}
 
@@ -1746,7 +1756,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			}
 
 			var pod *core.Pod
-			pod, err = r.kubevirt.GetConversionPod(vm.Ref, VirtV2vInspectionPod)
+			pod, err = r.kubevirt.GetConversionPod(vm.Ref, VirtV2vInspectionPod, true)
 			if err != nil {
 				step.AddError(err.Error())
 				err = nil

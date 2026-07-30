@@ -1222,11 +1222,16 @@ func (r *KubeVirt) EnsureGuestInspectionPod(vm *plan.VMStatus, step *plan.Step) 
 }
 
 // GetConversionPod returns the managed pod for the given VM ref and pod type.
-func (r *KubeVirt) GetConversionPod(vmRef ref.Ref, podType convctx.V2vPodType) (*core.Pod, error) {
+// When filterOutMigrationLabel is true the search spans all migrations for the
+// VM (used for stale-workload discovery). when false it is scoped to the
+// current migration only. Note: filterOutMigrationLabel only applies to
+// VirtV2vConversionPod. inspection pods use plan-scoped labels that already
+// span migrations.
+func (r *KubeVirt) GetConversionPod(vmRef ref.Ref, podType convctx.V2vPodType, filterOutMigrationLabel bool) (*core.Pod, error) {
 	var labels map[string]string
 	switch podType {
 	case convctx.VirtV2vConversionPod:
-		labels = r.conversionLabels(vmRef, true)
+		labels = r.conversionLabels(vmRef, filterOutMigrationLabel)
 	case convctx.VirtV2vInspectionPod:
 		labels = r.inspectionLabels(vmRef)
 	}
@@ -2069,21 +2074,18 @@ func getDiskIndex(pvc *core.PersistentVolumeClaim) int {
 
 // Return PersistentVolumeClaims associated with a VM.
 func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, err error) {
-	pvcsList := &core.PersistentVolumeClaimList{}
-	// Add VM uuid
-	labelSelector := map[string]string{
-		kVM: vmRef.ID,
-	}
-	// We need to have this in getPVCs so we create VM with corect disks, this will also help us with the guest generation
 	if r.Plan.Spec.Type == api.MigrationOnlyConversion || r.IsResumeConversion() {
 		uuid, uuidErr := r.resolveVMUUID(vmRef)
 		if uuidErr != nil {
 			return nil, uuidErr
 		}
-		labelSelector[kVmUuid] = uuid
-	} else {
-		labelSelector[kMigration] = string(r.Migration.UID)
+		return r.listDiskPVCsByUUID(vmRef.ID, uuid)
 	}
+	labelSelector := map[string]string{
+		kVM:        vmRef.ID,
+		kMigration: string(r.Migration.UID),
+	}
+	pvcsList := &core.PersistentVolumeClaimList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
 		pvcsList,
@@ -2105,14 +2107,47 @@ func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, e
 		pvcs = append(pvcs, pvc)
 	}
 
-	// Sort the pvcs slice by disk index
 	sort.Slice(pvcs, func(i, j int) bool {
-		iIdx := getDiskIndex(pvcs[i])
-		jIdx := getDiskIndex(pvcs[j])
-		return iIdx < jIdx
+		return getDiskIndex(pvcs[i]) < getDiskIndex(pvcs[j])
 	})
 
 	return
+}
+
+// listDiskPVCsByUUID returns the disk PVCs for a VM identified by vmID and
+// vmUUID labels, filtered (excluding prime- and non-disk PVCs) and sorted by
+// disk index. Used by getPVCs, validateResumePVCsByUUID, and validation code.
+func (r *KubeVirt) listDiskPVCsByUUID(vmID, vmUUID string) ([]*core.PersistentVolumeClaim, error) {
+	pvcsList := &core.PersistentVolumeClaimList{}
+	err := r.Destination.List(
+		context.TODO(),
+		pvcsList,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(map[string]string{
+				kVM:     vmID,
+				kVmUuid: vmUUID,
+			}),
+			Namespace: r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
+	var pvcs []*core.PersistentVolumeClaim
+	for i := range pvcsList.Items {
+		pvc := &pvcsList.Items[i]
+		if strings.HasPrefix(pvc.Name, "prime-") || !hasDiskIdentity(pvc) {
+			continue
+		}
+		pvcs = append(pvcs, pvc)
+	}
+
+	sort.Slice(pvcs, func(i, j int) bool {
+		return getDiskIndex(pvcs[i]) < getDiskIndex(pvcs[j])
+	})
+
+	return pvcs, nil
 }
 
 // resolveVMUUID fetches the source VM from inventory and extracts the UUID
@@ -2153,29 +2188,9 @@ func (r *KubeVirt) ValidateResumePVCs(vmRef ref.Ref) error {
 // validateResumePVCsByUUID performs the actual PVC validation given a
 // pre-resolved VM UUID. Separated for testability without inventory.
 func (r *KubeVirt) validateResumePVCsByUUID(vmRef ref.Ref, vmUUID string) error {
-	pvcsList := &core.PersistentVolumeClaimList{}
-	err := r.Destination.List(
-		context.TODO(),
-		pvcsList,
-		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(map[string]string{
-				kVM:     vmRef.ID,
-				kVmUuid: vmUUID,
-			}),
-			Namespace: r.Plan.Spec.TargetNamespace,
-		},
-	)
+	pvcs, err := r.listDiskPVCsByUUID(vmRef.ID, vmUUID)
 	if err != nil {
-		return liberr.Wrap(err)
-	}
-
-	var pvcs []*core.PersistentVolumeClaim
-	for i := range pvcsList.Items {
-		pvc := &pvcsList.Items[i]
-		if strings.HasPrefix(pvc.Name, "prime-") || !hasDiskIdentity(pvc) {
-			continue
-		}
-		pvcs = append(pvcs, pvc)
+		return err
 	}
 
 	if len(pvcs) == 0 {
@@ -2401,24 +2416,10 @@ func (r *KubeVirt) EnsureProviderVirtV2VPVCStatus(vmID string) (ready bool, err 
 	return
 }
 
-// Get the guest conversion pod for the VM.
-func (r *KubeVirt) GetGuestConversionPod(vm *plan.VMStatus) (pod *core.Pod, err error) {
-	list := &core.PodList{}
-	err = r.Destination.Client.List(
-		context.TODO(),
-		list,
-		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(r.conversionLabels(vm.Ref, false)),
-			Namespace:     r.Plan.Spec.TargetNamespace,
-		})
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	if len(list.Items) > 0 {
-		pod = &list.Items[0]
-	}
-	return
+// GetGuestConversionPod returns the guest-conversion pod scoped to the
+// current migration for the given VM.
+func (r *KubeVirt) GetGuestConversionPod(vm *plan.VMStatus) (*core.Pod, error) {
+	return r.GetConversionPod(vm.Ref, convctx.VirtV2vConversionPod, false)
 }
 
 func (r *KubeVirt) getInspectionXml(pod *core.Pod) (string, error) {
