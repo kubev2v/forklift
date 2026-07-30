@@ -2,6 +2,7 @@ package main
 
 import (
 	_ "embed"
+	"errors"
 	"fmt"
 	"os"
 
@@ -42,9 +43,10 @@ func main() {
 	} else {
 		// virt-v2v or virt-v2v-in-place
 		if convert.IsInPlace {
-			// Choose in-place conversion method based on available configuration:
-			// - If LibvirtUrl is set: fetch domain XML from libvirt and use -i libvirtxml mode
-			// - Otherwise: use -i disk mode directly on the mounted disks (e.g., EC2)
+			// Choose in-place conversion method:
+			// - libvirt URL set: fetch domain XML from source via libvirt (vSphere)
+			// - domain XML file pre-exists: use it directly (e.g., mounted from ConfigMap for Nutanix)
+			// - otherwise: use -i disk mode directly on the mounted disks (e.g., EC2)
 			if convert.LibvirtUrl != "" {
 				err = func() error {
 					domainXML, err := convert.GetDomainXML()
@@ -63,6 +65,12 @@ func main() {
 						err = convert.RunVirtV2vInPlace()
 					}
 				}
+			} else if _, statErr := os.Stat(convert.LibvirtDomainFile); statErr == nil {
+				// Domain XML already present (pre-mounted from a ConfigMap)
+				err = convert.RunVirtV2vInPlace()
+			} else if !errors.Is(statErr, os.ErrNotExist) {
+				// domain xml file was present but there were other errors
+				err = statErr
 			} else {
 				if convert.OverlayEnabled {
 					err = convert.RunInPlaceWithOverlay(convert.RunVirtV2vInPlaceDisk)
