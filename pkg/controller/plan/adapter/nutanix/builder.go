@@ -331,15 +331,16 @@ func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec, usesIn
 }
 
 // DataVolumes builds one CDI HTTP-import DataVolume per non-CDROM disk,
-// sourced from the catalog image PreTransferActions created for that disk
-// (GET /images/{uuid}/file). By the time this runs, the migration
-// controller has already confirmed PreTransferActions reported every
-// image ready, so images are expected to be present and COMPLETE.
+// sourced from the catalog image PreTransferActions created for that
+// disk. By the time this runs, the migration controller has already
+// confirmed PreTransferActions reported every image ready, so images are
+// expected to be present and finished uploading.
 //
-// This is Prism Element "compatibility mode" only -- see
-// Client.requireElement. Prism Central migrations fail here with a clear
-// error instead of the confusing 404s Prism Central's v3 image API
-// returns for an endpoint it doesn't really support.
+// Prism Element's images are served directly over Basic Auth (the v3
+// Image Service); Prism Central's v4 Image Service instead requires
+// resolving a one-time redirect+cookie handshake up front, since a
+// generic HTTP client -- like CDI's importer -- can't complete that
+// itself (see resolveImageV4DownloadURL).
 func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume, _ *core.ConfigMap) (dvs []cdi.DataVolume, err error) {
 	vm := &model.VM{}
 	if err = r.Source.Inventory.Find(vm, vmRef); err != nil {
@@ -355,7 +356,8 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 	if err = client.connect(); err != nil {
 		return nil, err
 	}
-	if err = client.requireElement("catalog image based disk transfer"); err != nil {
+	element, err := client.isPrismElement()
+	if err != nil {
 		return nil, err
 	}
 
@@ -370,36 +372,78 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 			continue
 		}
 
+		var httpSource *cdi.DataVolumeSourceHTTP
 		name := migrationImageName(string(r.Migration.UID), vmRef, disk.UUID)
-		entity, found, findErr := client.findImageByName(name)
-		if findErr != nil {
-			return nil, findErr
+		if element {
+			httpSource, err = r.elementHTTPSource(baseURL, name, secret, configMap, client)
+		} else {
+			httpSource, err = r.centralHTTPSource(name, configMap, client)
 		}
-		if !found {
-			return nil, liberr.New("catalog image not found", "vm", vmRef.String(), "disk", disk.UUID, "image", name)
+		if err != nil {
+			return nil, liberr.Wrap(err, "vm", vmRef.String(), "disk", disk.UUID)
 		}
 
-		dv := r.mapDataVolume(disk, destination, dvTemplate, baseURL, entity.Metadata.UUID, secret, configMap)
+		dv := r.mapDataVolume(disk, destination, dvTemplate, httpSource)
 		dvs = append(dvs, *dv)
 	}
 
 	return dvs, nil
 }
 
+// elementHTTPSource builds a DataVolumeSourceHTTP pointing at a Prism
+// Element catalog image's v3 file download endpoint, authenticated with
+// the same Basic Auth credentials as the rest of the provider's API.
+func (r *Builder) elementHTTPSource(baseURL, name string, secret *core.Secret, configMap *core.ConfigMap, client *Client) (*cdi.DataVolumeSourceHTTP, error) {
+	entity, found, err := client.findImageByName(name)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, liberr.New("catalog image not found", "image", name)
+	}
+	return &cdi.DataVolumeSourceHTTP{
+		URL:           fmt.Sprintf("%s/api/nutanix/v3/images/%s/file", baseURL, entity.Metadata.UUID),
+		SecretRef:     secret.Name,
+		CertConfigMap: configMap.Name,
+	}, nil
+}
+
+// centralHTTPSource builds a DataVolumeSourceHTTP pointing at a Prism
+// Central catalog image's already-resolved download location, carrying
+// the one-time session cookie that location requires as an extra header
+// (see resolveImageV4DownloadURL). There's no Basic Auth secret here: the
+// resolved URL/cookie pair is itself the credential.
+//
+// Prism Central redirects to a CVM address that often isn't covered by the
+// Prism Element certificate's SAN (the VIP is). The PE VIP serves the same
+// entity_download path with the same cookie, so we rewrite the Location
+// host to the cluster's external IP when we can discover one.
+func (r *Builder) centralHTTPSource(name string, configMap *core.ConfigMap, client *Client) (*cdi.DataVolumeSourceHTTP, error) {
+	entity, found, _, err := client.findImageV4ByName(name)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, liberr.New("catalog image not found", "image", name)
+	}
+	downloadURL, cookie, err := client.resolveImageV4DownloadURL(entity.ExtID)
+	if err != nil {
+		return nil, err
+	}
+	downloadURL = client.preferClusterExternalURL(downloadURL)
+	return &cdi.DataVolumeSourceHTTP{
+		URL:           downloadURL,
+		CertConfigMap: configMap.Name,
+		ExtraHeaders:  []string{"Cookie: " + cookie},
+	}, nil
+}
+
 func (r *Builder) mapDataVolume(
 	disk model.Disk,
 	destination api.DestinationStorage,
 	dvTemplate *cdi.DataVolume,
-	baseURL, imageUUID string,
-	secret *core.Secret,
-	configMap *core.ConfigMap,
+	httpSource *cdi.DataVolumeSourceHTTP,
 ) (dv *cdi.DataVolume) {
-	httpSource := &cdi.DataVolumeSourceHTTP{
-		URL:           fmt.Sprintf("%s/api/nutanix/v3/images/%s/file", baseURL, imageUUID),
-		SecretRef:     secret.Name,
-		CertConfigMap: configMap.Name,
-	}
-
 	storageClass := destination.StorageClass
 	dvSpec := cdi.DataVolumeSpec{
 		Source: &cdi.DataVolumeSource{HTTP: httpSource},
