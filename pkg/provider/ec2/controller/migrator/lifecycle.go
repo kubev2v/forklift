@@ -34,14 +34,14 @@ func (r *Migrator) Status(vm planapi.VM) *planapi.VMStatus {
 }
 
 // Reset re-initializes a VM's migration status for retry after failure or cancellation.
-// Replaces pipeline, resets phase to first in itinerary, clears errors and timestamps.
+// EC2 has a single cold itinerary (always starts with PhaseStarted), never sets
+// DisksCopied or Warm, and does not support resume-conversion — so this is a
+// minimal reset without the warm/resume logic in BaseMigrator.Reset.
 func (r *Migrator) Reset(vm *planapi.VMStatus, pipeline []*planapi.Step) {
 	vm.DeleteCondition(api.ConditionCanceled, api.ConditionFailed)
 	vm.MarkReset()
 	vm.Pipeline = pipeline
-	itr := r.Itinerary(vm.VM)
-	step, _ := itr.First()
-	vm.Phase = step.Name
+	vm.Phase = api.PhaseStarted
 	vm.Error = nil
 
 	r.log.V(1).Info("VM status reset", "vm", vm.Name)
