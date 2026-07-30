@@ -130,6 +130,7 @@ type AppConfig struct {
 
 	// V2V_multipleIPsPerNic
 	MultipleIpsPerNicName string
+
 	// Paths
 	VddkConfFile         string
 	InspectionOutputFile string

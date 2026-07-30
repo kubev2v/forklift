@@ -744,3 +744,7 @@ func (r *Builder) setPVCNameFromTemplate(objectMeta *metav1.ObjectMeta, vmRef re
 func (r *Builder) SourceVMLabelsAndAnnotations(vmRef ref.Ref, tagMapping *v1beta1.TagMapping) (labels map[string]string, annotations map[string]string, sanitizationReport map[string]string, err error) {
 	return
 }
+
+func (r *Builder) DomainXML(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (string, error) {
+	return "", nil
+}
