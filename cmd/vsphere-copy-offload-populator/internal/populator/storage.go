@@ -61,6 +61,31 @@ type SciniAware interface {
 	SciniRequired() bool
 }
 
+// ProtocolConflictResolver is an optional interface for storage backends that need to
+// temporarily remove NVMe-connected hosts before the iSCSI/FC xcopy mapping can succeed.
+//
+// SCSI XCOPY requires SCSI, so the ESXi host performing xcopy always connects via iSCSI or
+// FC.  Pure FlashArray (and similar arrays) reject adding an iSCSI/FC host connection to a
+// volume that already has an NVMe-oF host connected.  When the target PVC was provisioned
+// on OpenShift via NVMe-oF/TCP by the CSI driver, the volume is pre-connected to one or
+// more NVMe hosts that must be temporarily removed before xcopy can proceed.
+//
+// Implementations must:
+//   - Record the evicted host names inside MappingContext so RestoreConflictingConnections
+//     can restore them unconditionally after xcopy finishes (success or failure).
+//   - Be idempotent: if there are no NVMe connections the call is a no-op.
+type ProtocolConflictResolver interface {
+	// EvictConflictingConnections disconnects any NVMe-connected hosts from targetLUN
+	// so that the iSCSI/FC xcopy initiator can be mapped.  Evicted host names are stored
+	// in mappingContext for later restoration.
+	EvictConflictingConnections(targetLUN LUN, mappingContext MappingContext) error
+
+	// RestoreConflictingConnections reconnects any hosts that were evicted by
+	// EvictConflictingConnections.  Should be called in a defer after xcopy completes,
+	// whether or not xcopy succeeded.
+	RestoreConflictingConnections(targetLUN LUN, mappingContext MappingContext) error
+}
+
 // StorageArrayInfo holds metadata about the storage array, retrieved from the API at connection time.
 type StorageArrayInfo struct {
 	// Vendor is the storage array vendor (e.g. "IBM", "Dell", "NetApp").
