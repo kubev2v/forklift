@@ -814,3 +814,7 @@ func verifyExportTLS(exportURL, caPEM string) error {
 	}
 	return err
 }
+
+func (r *Builder) DomainXML(vmRef ref.Ref, pvcs []*core.PersistentVolumeClaim) (string, error) {
+	return "", nil
+}

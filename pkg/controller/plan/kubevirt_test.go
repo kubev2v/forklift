@@ -10,6 +10,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	convctx "github.com/kubev2v/forklift/pkg/controller/conversion/context"
+	"github.com/kubev2v/forklift/pkg/controller/plan/adapter"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
@@ -877,6 +878,35 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 		})
 	})
 
+	ginkgo.Describe("podVolumeMounts DomainXML", func() {
+		ginkgo.It("adds domain XML volume and mount when builder returns XML", func() {
+			kv := createKubeVirtWithProvider(v1beta1.Nutanix)
+			kv.Builder = &fakeDomainXMLBuilder{xml: "<domain type=\"kvm\"><name>test</name></domain>"}
+
+			vm := &plan.VMStatus{}
+			volumes, mounts, _, extraVolumes, extraMounts, err := kv.podVolumeMounts(nil, nil, nil, vm)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(volumes).To(ContainElement(HaveField("Name", LibvirtDomainXML)))
+			Expect(mounts).To(ContainElement(HaveField("Name", LibvirtDomainXML)))
+			Expect(extraVolumes).To(ContainElement(HaveField("Name", LibvirtDomainXML)))
+			Expect(extraMounts).To(ContainElement(HaveField("Name", LibvirtDomainXML)))
+		})
+
+		ginkgo.It("does not add domain XML volume when builder returns empty string", func() {
+			kv := createKubeVirtWithProvider(v1beta1.Nutanix)
+			kv.Builder = &fakeDomainXMLBuilder{xml: ""}
+
+			vm := &plan.VMStatus{}
+			volumes, _, _, extraVolumes, _, err := kv.podVolumeMounts(nil, nil, nil, vm)
+			Expect(err).ToNot(HaveOccurred())
+
+			for _, v := range append(volumes, extraVolumes...) {
+				Expect(v.Name).ToNot(Equal(LibvirtDomainXML))
+			}
+		})
+	})
+
 	ginkgo.Describe("GetDeepInspectionConversion", func() {
 		ginkgo.It("returns nil when a Conversion CR for the same VM exists under a different plan UID", func() {
 			const (
@@ -1180,3 +1210,14 @@ var _ = ginkgo.Describe("PVC name template", func() {
 		})
 	})
 })
+
+// fakeDomainXMLBuilder embeds adapter.Builder (satisfying the interface with zero values)
+// and overrides only DomainXML for use in podVolumeMounts tests.
+type fakeDomainXMLBuilder struct {
+	adapter.Builder
+	xml string
+}
+
+func (f *fakeDomainXMLBuilder) DomainXML(_ ref.Ref, _ []*v1.PersistentVolumeClaim) (string, error) {
+	return f.xml, nil
+}
