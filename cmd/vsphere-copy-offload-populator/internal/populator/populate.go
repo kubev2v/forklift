@@ -30,9 +30,13 @@ type Populator interface {
 	GetCopyContext() CopyContext
 	// Populate will populate the volume identified by volumeHanle with the content of
 	// the sourceVMDKFile.
+	// ctx controls the lifetime of the operation — cancelling it (e.g. on SIGTERM)
+	// aborts in-flight work and lets deferred cleanup run before the process exits.
+	// vmId the vm that has the source vmdk
+	// sourceVMDKFile the path to the vmdk file
 	// persistentVolume is a slim version of k8s PersistentVolume created by the CSI driver,
 	// to help identify its underlying LUN in the storage system.
-	Populate(vmId string, sourceVMDKFile string, persistentVolume PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) error
+	Populate(ctx context.Context, vmId string, sourceVMDKFile string, persistentVolume PersistentVolume, hostLocker Hostlocker, progress chan<- uint64, xcopyUsed chan<- int, quit chan error) error
 }
 
 //go:generate go run go.uber.org/mock/mockgen -destination=mocks/hostlocker_mock.go -package=mocks . Hostlocker
