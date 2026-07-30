@@ -82,6 +82,7 @@ const (
 	AAPCASecretName                        = "AAP_CA_SECRET_NAME"
 	WaitForFinalSnapshotConsolidation      = "WAIT_FOR_FINAL_SNAPSHOT_CONSOLIDATION"
 	ConversionPodPendingTimeout            = "CONVERSION_POD_PENDING_TIMEOUT"
+	StaleConversionTimeout                 = "STALE_CONVERSION_TIMEOUT"
 )
 
 // Default values for populator container resources
@@ -95,6 +96,10 @@ var (
 // DefaultPendingPodTimeoutMinutes is the default number of minutes a
 // conversion pod may stay in Pending before the controller fails it.
 const DefaultPendingPodTimeoutMinutes = 5
+
+// DefaultStaleConversionTimeoutSeconds is the default number of seconds to
+// wait for a stale conversion pod/CR to finish terminating before force-deleting it.
+const DefaultStaleConversionTimeoutSeconds = 180
 
 // Migration settings
 type Migration struct {
@@ -210,6 +215,10 @@ type Migration struct {
 	// ConversionPodPendingTimeout is how long (in minutes) a conversion pod may stay
 	// in Pending phase before the controller fails it. 0 means no timeout.
 	ConversionPodPendingTimeout int
+	// StaleConversionTimeout is how long (in seconds) to wait for a stale
+	// conversion pod/CR to finish terminating before force-deleting it
+	// during resume-conversion. Default 180s (3 minutes).
+	StaleConversionTimeout int
 }
 
 // Load settings.
@@ -475,6 +484,9 @@ func (r *Migration) Load() (err error) {
 	}
 	r.WaitForFinalSnapshotConsolidation = getEnvBool(WaitForFinalSnapshotConsolidation, true)
 	if r.ConversionPodPendingTimeout, err = getEnvLimit(ConversionPodPendingTimeout, DefaultPendingPodTimeoutMinutes, 0); err != nil {
+		return liberr.Wrap(err)
+	}
+	if r.StaleConversionTimeout, err = getPositiveEnvLimit(StaleConversionTimeout, DefaultStaleConversionTimeoutSeconds); err != nil {
 		return liberr.Wrap(err)
 	}
 	return

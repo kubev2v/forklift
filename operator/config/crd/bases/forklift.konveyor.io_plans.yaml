@@ -3174,6 +3174,12 @@ spec:
                           description: Boot disk index (0-based) detected by virt-v2v.
                             nil means undetected.
                           type: integer
+                        disksCopied:
+                          description: |-
+                            DisksCopied is set to true when all disk transfer tasks complete
+                            successfully. Used to determine if conversion can be resumed
+                            without re-copying disks.
+                          type: boolean
                         enableNestedVirtualization:
                           description: |-
                             EnableNestedVirtualization controls whether nested virtualization CPU features (vmx/svm)

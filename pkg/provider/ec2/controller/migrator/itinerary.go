@@ -15,14 +15,16 @@ const (
 	CrossAccountFlag = 1 << 3 // Include cross-account snapshot sharing phase
 )
 
-// Itinerary builds the EC2 cold migration workflow sequence defining phase order.
-// Includes: Initialize→PreHook→PowerOff→CreateSnapshots→WaitSnapshots→[ShareSnapshots]→CreateVolumes→WaitForVolumes→CreatePVsAndPVCs→CreateGuestConversionPod→ConvertGuest→Finalize→CreateVM→RemoveSnapshots→PostHook→Completed.
-// Pre/post hooks are conditionally included based on VM hook configuration.
-// ShareSnapshots phase is conditionally included for cross-account migrations.
+// Itinerary builds the EC2 migration workflow sequence defining phase order.
 func (r *Migrator) Itinerary(vm planapi.VM) *libitr.Itinerary {
 	r.vm = &vm
+	return r.coldItinerary(vm)
+}
 
-	itinerary := &libitr.Itinerary{
+// coldItinerary is the full EC2 cold migration workflow.
+// Includes: Initialize→PreHook→PowerOff→CreateSnapshots→WaitSnapshots→[ShareSnapshots]→CreateVolumes→WaitForVolumes→CreatePVsAndPVCs→CreateGuestConversionPod→ConvertGuest→Finalize→CreateVM→RemoveSnapshots→PostHook→Completed.
+func (r *Migrator) coldItinerary(vm planapi.VM) *libitr.Itinerary {
+	return &libitr.Itinerary{
 		Name: "EC2 Cold Migration",
 		Pipeline: libitr.Pipeline{
 			{Name: api.PhaseStarted},
@@ -50,8 +52,6 @@ func (r *Migrator) Itinerary(vm planapi.VM) *libitr.Itinerary {
 			migrator: r,
 		},
 	}
-
-	return itinerary
 }
 
 // EC2Predicate implements conditional phase evaluation for the EC2 migration itinerary.

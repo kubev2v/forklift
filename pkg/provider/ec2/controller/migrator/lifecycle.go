@@ -34,13 +34,15 @@ func (r *Migrator) Status(vm planapi.VM) *planapi.VMStatus {
 }
 
 // Reset re-initializes a VM's migration status for retry after failure or cancellation.
-// Replaces pipeline, resets phase to Started, clears errors and timestamps. Preserves VM reference.
+// Replaces pipeline, resets phase to first in itinerary, clears errors and timestamps.
 func (r *Migrator) Reset(vm *planapi.VMStatus, pipeline []*planapi.Step) {
+	vm.DeleteCondition(api.ConditionCanceled, api.ConditionFailed)
+	vm.MarkReset()
 	vm.Pipeline = pipeline
-	vm.Phase = api.PhaseStarted
+	itr := r.Itinerary(vm.VM)
+	step, _ := itr.First()
+	vm.Phase = step.Name
 	vm.Error = nil
-	vm.Started = nil
-	vm.Completed = nil
 
 	r.log.V(1).Info("VM status reset", "vm", vm.Name)
 }
