@@ -61,6 +61,10 @@ func (r *BaseMigrator) Reset(vm *plan.VMStatus, pipeline []*plan.Step) {
 	vm.Phase = step.Name
 	vm.Pipeline = pipeline
 	vm.Error = nil
+	if r.IsResumeConversion() {
+		return
+	}
+	vm.DisksCopied = false
 	if r.Context.Plan.IsWarm() {
 		vm.Warm = &plan.Warm{}
 	}
@@ -250,12 +254,14 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 }
 
 func (r *BaseMigrator) Itinerary(vm plan.VM) (itinerary *libitr.Itinerary) {
-	// Plan.Spec.Type supersedes the deprecated Warm boolean.
-	if r.Context.Plan.Spec.Type == api.MigrationOnlyConversion {
+	switch {
+	case r.IsResumeConversion():
+		itinerary = r.resumeConversionItinerary()
+	case r.Plan.Spec.Type == api.MigrationOnlyConversion:
 		itinerary = r.onlyConversionItinerary()
-	} else if r.Context.Plan.IsWarm() {
+	case r.Plan.IsWarm():
 		itinerary = r.warmItinerary()
-	} else {
+	default:
 		itinerary = r.coldItinerary()
 	}
 	itinerary.Predicate = &BasePredicate{vm: &vm, context: r.Context}
@@ -391,6 +397,24 @@ func (r *BaseMigrator) onlyConversionItinerary() *libitr.Itinerary {
 			{Name: api.PhaseStorePowerState},
 			{Name: api.PhasePowerOffSource},
 			{Name: api.PhaseWaitForPowerOff},
+			{Name: api.PhaseCreateGuestConversionPod, All: RequiresConversion},
+			{Name: api.PhaseConvertGuest, All: RequiresConversion},
+			{Name: api.PhaseCreateVM},
+			{Name: api.PhaseWaitForGuestReboots, All: WindowsWaitForGuestReboot},
+			{Name: api.PhasePostHook, All: HasPostHook},
+			{Name: api.PhaseCompleted},
+		},
+	}
+}
+
+// resumeConversionItinerary skips disk copy AND power-off (source was already
+// powered off during the original migration's cutover).
+func (r *BaseMigrator) resumeConversionItinerary() *libitr.Itinerary {
+	return &libitr.Itinerary{
+		Name: "ResumeConversion",
+		Pipeline: libitr.Pipeline{
+			{Name: api.PhaseStarted},
+			{Name: api.PhasePreHook, All: HasPreHook},
 			{Name: api.PhaseCreateGuestConversionPod, All: RequiresConversion},
 			{Name: api.PhaseConvertGuest, All: RequiresConversion},
 			{Name: api.PhaseCreateVM},

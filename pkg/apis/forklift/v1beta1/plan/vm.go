@@ -240,6 +240,11 @@ type VMStatus struct {
 	DetectedBootDisk *int `json:"detectedBootDisk,omitempty"`
 	// The new name of the VM after matching DNS1123 requirements.
 	NewName string `json:"newName,omitempty"`
+	// DisksCopied is set to true when all disk transfer tasks complete
+	// successfully. Used to determine if conversion can be resumed
+	// without re-copying disks.
+	// +optional
+	DisksCopied bool `json:"disksCopied,omitempty"`
 
 	// Conditions.
 	libcnd.Conditions `json:",inline"`

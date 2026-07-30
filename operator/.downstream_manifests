@@ -4979,6 +4979,13 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              resumeConversion:
+                description: |-
+                  ResumeConversion skips disk copy and runs only the virt-v2v
+                  conversion step, reusing PVCs from a previous failed migration.
+                  Valid for any plan whose disk copy and conversion are separate
+                  phases and whose disk copy completed before conversion failed.
+                type: boolean
             required:
             - plan
             type: object
@@ -5105,6 +5112,12 @@ spec:
                       description: Boot disk index (0-based) detected by virt-v2v.
                         nil means undetected.
                       type: integer
+                    disksCopied:
+                      description: |-
+                        DisksCopied is set to true when all disk transfer tasks complete
+                        successfully. Used to determine if conversion can be resumed
+                        without re-copying disks.
+                      type: boolean
                     enableNestedVirtualization:
                       description: |-
                         EnableNestedVirtualization controls whether nested virtualization CPU features (vmx/svm)
@@ -9482,6 +9495,12 @@ spec:
                           description: Boot disk index (0-based) detected by virt-v2v.
                             nil means undetected.
                           type: integer
+                        disksCopied:
+                          description: |-
+                            DisksCopied is set to true when all disk transfer tasks complete
+                            successfully. Used to determine if conversion can be resumed
+                            without re-copying disks.
+                          type: boolean
                         enableNestedVirtualization:
                           description: |-
                             EnableNestedVirtualization controls whether nested virtualization CPU features (vmx/svm)

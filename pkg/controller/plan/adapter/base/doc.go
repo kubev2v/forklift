@@ -13,6 +13,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// Labels
+const (
+	// LabelVMUUID is the PVC/DV label that carries the source VM UUID,
+	// used by resume-conversion and conversion-only flows to discover
+	// PVCs across migration boundaries.
+	LabelVMUUID = "vmUUID"
+)
+
 // Annotations
 const (
 	// JSON map of original → sanitized label/annotation keys on the destination VM.

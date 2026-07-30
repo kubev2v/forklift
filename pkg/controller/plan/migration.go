@@ -22,6 +22,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/controller/plan/migrator"
 	planmigrbase "github.com/kubev2v/forklift/pkg/controller/plan/migrator/base"
 	"github.com/kubev2v/forklift/pkg/controller/plan/scheduler"
+	util "github.com/kubev2v/forklift/pkg/controller/plan/util"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
@@ -97,6 +98,17 @@ func (r *Migration) Run() (reQ time.Duration, err error) {
 	err = r.begin()
 	if err != nil {
 		err = liberr.Wrap(err)
+		return
+	}
+
+	// begin() may reject the migration early (setting Failed/Canceled
+	// without Executing). Return now to prevent end() from overwriting
+	// the specific error with a generic status.
+	snapshot := r.Plan.Status.Migration.ActiveSnapshot()
+	if !snapshot.HasCondition(api.ConditionExecuting) {
+		if snapshot.HasAnyCondition(api.ConditionFailed, api.ConditionCanceled) {
+			reQ = NoReQ
+		}
 		return
 	}
 
@@ -198,6 +210,41 @@ func (r *Migration) begin() (err error) {
 	if snapshot.HasAnyCondition(api.ConditionExecuting, api.ConditionSucceeded, api.ConditionFailed, api.ConditionCanceled) {
 		return
 	}
+
+	// Validate resume-conversion prerequisites
+	if r.Migration.Spec.ResumeConversion {
+		hasResumable := false
+		for _, specVM := range r.Plan.Spec.VMs {
+			if !util.HasSeparateCopyAndConversion(r.Plan, specVM.Ref, r.Destination.Client) {
+				snapshot.SetCondition(libcnd.Condition{
+					Type:     api.ConditionFailed,
+					Status:   True,
+					Category: api.CategoryCritical,
+					Message: fmt.Sprintf(
+						"Resume conversion is not supported for VM %q: disk copy and conversion are not separate phases.",
+						specVM.ID),
+					Durable: true,
+				})
+				return
+			}
+			if status, found := r.Plan.Status.Migration.FindVM(specVM.Ref); found &&
+				status.DisksCopied && status.HasCondition(api.ConditionFailed) {
+				hasResumable = true
+			}
+		}
+		if !hasResumable {
+			snapshot.SetCondition(libcnd.Condition{
+				Type:     api.ConditionFailed,
+				Status:   True,
+				Category: api.CategoryCritical,
+				Message:  "Resume conversion requires VMs with completed disk copy (DisksCopied=true).",
+				Durable:  true,
+			})
+			return
+		}
+		r.Log.Info("Resume-conversion mode: skipping disk copy, running conversion only.")
+	}
+
 	r.Plan.Status.Migration.MarkReset()
 	r.Plan.Status.Migration.MarkStarted()
 	snapshot.SetCondition(
@@ -246,6 +293,17 @@ func (r *Migration) begin() (err error) {
 	for _, vm := range r.Plan.Spec.VMs {
 		status := r.migrator.Status(vm)
 		if status.Phase != api.PhaseCompleted || status.HasAnyCondition(api.ConditionCanceled, api.ConditionFailed) {
+			// For resume-conversion, only reset VMs that actually have their disks copied.
+			// VMs that failed before disk copy completed cannot be resumed — exclude them
+			// from this migration's VM list so stale failures don't cause end() to
+			// mark the overall migration as failed.
+			if r.IsResumeConversion() && !status.DisksCopied {
+				log.Info(
+					"Skipping VM without completed disk copy in resume-conversion.",
+					"vm",
+					vm.String())
+				continue
+			}
 			pipeline, pErr := r.migrator.Pipeline(vm)
 			if pErr != nil {
 				err = liberr.Wrap(pErr)
@@ -415,9 +473,12 @@ func markStartedStepsCompleted(vm *plan.VMStatus) {
 func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool, forceDeleteGuestConversionPod bool) error {
 	r.Log.Info("Starting cleanup of migration resources.", "vm", vm.String())
 
-	// If the migration fails and the DeleteVmOnFailMigration is enabled, clean up the VM.
+	// If the migration fails, DeleteVmOnFailMigration is enabled and the disks were NOT fully copied, clean up the VM.
 	// When DeleteVmOnFailMigration is disabled, VM resources are preserved on failure.
-	if !vm.HasCondition(api.ConditionSucceeded) && (r.Plan.Spec.DeleteVmOnFailMigration || vm.DeleteVmOnFailMigration) && r.Plan.Spec.Type != api.MigrationOnlyConversion {
+	// During archive/cancel (forceDeleteGuestConversionPod=true), allow deletion even when
+	// DisksCopied is set — there's no opportunity to resume from those contexts.
+	if !vm.HasCondition(api.ConditionSucceeded) && (r.Plan.Spec.DeleteVmOnFailMigration || vm.DeleteVmOnFailMigration) &&
+		r.Plan.Spec.Type != api.MigrationOnlyConversion && (!vm.DisksCopied || forceDeleteGuestConversionPod) {
 		r.Log.Info("Deleting VM (failed migration with deleteVmOnFailMigration enabled).", "vm", vm.String())
 		if err := r.kubevirt.DeleteVM(vm); failOnErr(err) {
 			return err
@@ -508,10 +569,75 @@ func (r *Migration) cleanup(vm *plan.VMStatus, failOnErr func(error) bool, force
 		return err
 	}
 
-	r.removeLastWarmSnapshot(vm)
+	if !r.IsResumeConversion() {
+		r.removeLastWarmSnapshot(vm)
+	}
 
 	r.Log.Info("Cleanup of migration resources completed.", "vm", vm.String())
 	return nil
+}
+
+// deleteStaleConversionWorkloads requests deletion of guest-conversion pods
+// and CRs left over from a prior failed migration. Returns done=true when
+// no stale objects remain (safe to proceed), or done=false when objects are
+// still terminating (caller should requeue and retry). If an object has been
+// terminating longer than staleTerminationTimeout, it is force-deleted.
+func (r *Migration) deleteStaleConversionWorkloads(vm *plan.VMStatus) (done bool, err error) {
+	r.Log.Info("Checking for stale conversion workloads.", "vm", vm.String())
+
+	stalePods, err := r.kubevirt.GetPodsWithLabels(r.kubevirt.conversionLabels(vm.Ref, true))
+	if err != nil {
+		return false, err
+	}
+	if len(stalePods.Items) > 0 {
+		pod := &stalePods.Items[0]
+		if pod.DeletionTimestamp != nil {
+			timeout := time.Duration(settings.Settings.StaleConversionTimeout) * time.Second
+			if time.Since(pod.DeletionTimestamp.Time) < timeout {
+				r.Log.Info("Stale conversion pod still terminating, will requeue.",
+					"pod", pod.Name, "vm", vm.String())
+				return false, nil
+			}
+			r.Log.Info("Stale conversion pod stuck terminating, force-deleting.",
+				"pod", pod.Name, "vm", vm.String(),
+				"terminatingSince", pod.DeletionTimestamp.Time)
+			grace := int64(0)
+			if delErr := r.Destination.Delete(context.TODO(), pod, &client.DeleteOptions{GracePeriodSeconds: &grace}); delErr != nil {
+				return false, delErr
+			}
+			return false, nil
+		}
+		if delErr := r.kubevirt.DeleteObject(pod, vm, "Deleted stale conversion pod.", "pod"); delErr != nil {
+			return false, delErr
+		}
+		return false, nil
+	}
+
+	if settings.Settings.UseConversionCR {
+		gConv, gErr := r.kubevirt.GetGuestConversion(vm)
+		if gErr != nil {
+			return false, gErr
+		}
+		if gConv != nil {
+			if gConv.DeletionTimestamp != nil {
+				timeout := time.Duration(settings.Settings.StaleConversionTimeout) * time.Second
+				if time.Since(gConv.DeletionTimestamp.Time) < timeout {
+					r.Log.Info("Stale Conversion CR still terminating, will requeue.",
+						"conversion", gConv.Name, "vm", vm.String())
+					return false, nil
+				}
+				r.Log.Info("Stale Conversion CR stuck terminating, force-deleting.",
+					"conversion", gConv.Name, "vm", vm.String(),
+					"terminatingSince", gConv.DeletionTimestamp.Time)
+			}
+			if delErr := r.kubevirt.DeleteConversion(gConv); delErr != nil {
+				return false, delErr
+			}
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
 
 func (r *Migration) removeLastWarmSnapshot(vm *plan.VMStatus) {
@@ -755,11 +881,34 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 			vm.MarkStarted()
 			step.MarkStarted()
 			step.Phase = api.StepRunning
-			err = r.cleanup(vm, func(err error) bool { return err != nil }, true)
+			// Resume-conversion passes forceCleanup=false to preserve copied PVCs/DVs,
+			// but we must still remove stale conversion pods/CRs from the prior
+			// failed migration so the new workload can mount the reused disks.
+			forceCleanup := !r.IsResumeConversion()
+			err = r.cleanup(vm, func(err error) bool { return err != nil }, forceCleanup)
 			if err != nil {
 				step.AddError(err.Error())
 				err = nil
 				break
+			}
+			if r.IsResumeConversion() {
+				var staleGone bool
+				staleGone, err = r.deleteStaleConversionWorkloads(vm)
+				if err != nil {
+					step.AddError(err.Error())
+					err = nil
+					break
+				}
+				if !staleGone {
+					r.Log.Info("Stale conversion workloads still terminating, requeuing.",
+						"vm", vm.String())
+					return
+				}
+				if err = r.kubevirt.ValidateResumePVCs(vm.Ref); err != nil {
+					step.AddError(fmt.Sprintf("Resume-conversion PVC validation failed: %v", err))
+					err = nil
+					break
+				}
 			}
 
 			// Check if user provided explicit a target virtual machine name
@@ -1443,6 +1592,13 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				}
 			}
 		case api.PhaseCreateGuestConversionPod:
+
+			if !vm.DisksCopied && !r.IsResumeConversion() &&
+				util.HasSeparateCopyAndConversion(r.Plan, vm.Ref, r.Destination.Client) {
+				vm.DisksCopied = true
+				r.Log.Info("All disks copied, marking VM as resumable on conversion failure.",
+					"vm", vm.String())
+			}
 			step, found := vm.FindStep(r.migrator.Step(vm))
 			if !found {
 				vm.AddError(fmt.Sprintf("Step '%s' not found", r.migrator.Step(vm)))
@@ -1669,7 +1825,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 
 		// Failed warm migration can't follow its planned itinerary to snapshot removal phase
 		// so we remove the snapshot here to prevent an orphaned snapshot.
-		if r.Plan.IsWarm() && !vm.HasCondition(api.ConditionFailed) {
+		if r.Plan.IsWarm() && !vm.HasCondition(api.ConditionFailed) && !r.IsResumeConversion() {
 			r.removeLastWarmSnapshot(vm)
 		}
 

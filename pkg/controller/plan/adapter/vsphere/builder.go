@@ -1783,6 +1783,9 @@ func (r *Builder) buildCsiImportPVC(
 		"vmdkKey":   fmt.Sprint(disk.Key),
 		"vmID":      vmRef.ID,
 	}
+	if vm.UUID != "" {
+		pvcLabels[planbase.LabelVMUUID] = vm.UUID
+	}
 
 	pvc := &core.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{

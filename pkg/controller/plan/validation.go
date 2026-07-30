@@ -117,6 +117,7 @@ const (
 	// NetAppShiftDatastoreNASMissing (Critical) blocks when a disk maps to NetApp Shift but the source
 	// datastore lacks NAS export details in inventory (required for MTV annotations).
 	NetAppShiftDatastoreNASMissing = "NetAppShiftDatastoreNASMissing"
+	ConversionResumable            = "ConversionResumable"
 )
 
 // Categories
@@ -2544,4 +2545,41 @@ func (r *Reconciler) vmUsesVddk(storageMap *api.StorageMap, vsphereVM *vsphere.V
 	}
 
 	return false, nil
+}
+
+// checkConversionResumable sets the ConversionResumable condition on plans
+// whose migration failed after disk copy completed (DisksCopied=true).
+// Works for any provider where copy and conversion are separate phases.
+func (r *Reconciler) checkConversionResumable(plan *api.Plan) {
+	plan.Status.DeleteCondition(ConversionResumable)
+
+	if !plan.Status.HasCondition(Failed) {
+		return
+	}
+
+	resumableVMs := []string{}
+	for _, vm := range plan.Status.Migration.VMs {
+		if !vm.DisksCopied {
+			continue
+		}
+		if !vm.HasCondition(api.ConditionFailed) {
+			continue
+		}
+		resumableVMs = append(resumableVMs, vm.Name)
+	}
+
+	if len(resumableVMs) == 0 {
+		return
+	}
+
+	plan.Status.SetCondition(libcnd.Condition{
+		Type:     ConversionResumable,
+		Status:   True,
+		Durable:  true,
+		Category: api.CategoryAdvisory,
+		Message: fmt.Sprintf(
+			"%d VM(s) have migrated disks available for conversion resume: %s",
+			len(resumableVMs),
+			strings.Join(resumableVMs, ", ")),
+	})
 }
