@@ -71,6 +71,8 @@ spec:
             properties:
               progress:
                 type: string
+              vibVersion:
+                type: string
               xcopyUsed:
                 type: string
             type: object

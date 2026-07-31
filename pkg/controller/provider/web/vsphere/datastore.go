@@ -174,14 +174,19 @@ func (h *DatastoreHandler) filter(ctx *gin.Context, list *[]model.Datastore) (er
 // REST Resource.
 type Datastore struct {
 	Resource
-	Type                string   `json:"type"`
-	Capacity            int64    `json:"capacity"`
-	Free                int64    `json:"free"`
-	MaintenanceMode     string   `json:"maintenance"`
-	BackingDevicesNames []string `json:"backingDevicesNames"`
-	NasRemoteHost       string   `json:"nasRemoteHost,omitempty"`
-	NasRemotePath       string   `json:"nasRemotePath,omitempty"`
-	NasRemoteHostNames  []string `json:"nasRemoteHostNames,omitempty"`
+	Type                        string                  `json:"type"`
+	Capacity                    int64                   `json:"capacity"`
+	Free                        int64                   `json:"free"`
+	MaintenanceMode             string                  `json:"maintenance"`
+	BackingDevicesNames         []string                `json:"backingDevicesNames"`
+	NasRemoteHost               string                  `json:"nasRemoteHost,omitempty"`
+	NasRemotePath               string                  `json:"nasRemotePath,omitempty"`
+	NasRemoteHostNames          []string                `json:"nasRemoteHostNames,omitempty"`
+	StorageIORMSupported        bool                    `json:"storageIORMSupported"`
+	IORMEnabled                 bool                    `json:"iormEnabled"`
+	IORMCongestionThreshold     int32                   `json:"iormCongestionThreshold"`
+	IORMCongestionThresholdMode model.IORMThresholdMode `json:"iormCongestionThresholdMode"`
+	IORMPercentOfPeakThroughput int32                   `json:"iormPercentOfPeakThroughput"`
 }
 
 // Build the resource using the model.
@@ -195,6 +200,11 @@ func (r *Datastore) With(m *model.Datastore) {
 	r.NasRemoteHost = m.NasRemoteHost
 	r.NasRemotePath = m.NasRemotePath
 	r.NasRemoteHostNames = m.NasRemoteHostNames
+	r.StorageIORMSupported = m.StorageIORMSupported
+	r.IORMEnabled = m.IORMEnabled
+	r.IORMCongestionThreshold = m.IORMCongestionThreshold
+	r.IORMCongestionThresholdMode = m.IORMCongestionThresholdMode
+	r.IORMPercentOfPeakThroughput = m.IORMPercentOfPeakThroughput
 }
 
 // Build self link (URI).

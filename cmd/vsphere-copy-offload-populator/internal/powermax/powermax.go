@@ -22,15 +22,16 @@ import (
 )
 
 type PowermaxClonner struct {
-	client         gopowermax.Pmax
-	symmetrixID    string
-	portGroup      string
-	initiatorID    string
-	storageGroupID string
-	hostID         string
-	maskingViewID  string
-	arrayInfo      populator.StorageArrayInfo
-	log            klog.Logger
+	client              gopowermax.Pmax
+	symmetrixID         string
+	portGroup           string
+	initiatorID         string
+	storageGroupID      string
+	hostID              string
+	maskingViewID       string
+	volumeStorageGroups []string
+	arrayInfo           populator.StorageArrayInfo
+	log                 klog.Logger
 }
 
 // Ensure PowermaxClonner implements StorageArrayInfoProvider
@@ -112,21 +113,25 @@ func (p *PowermaxClonner) EnsureClonnerIgroup(_ string, clonnerIqn []string) (po
 	if err != nil {
 		return nil, fmt.Errorf("failed to get port group %s: %w", p.portGroup, err)
 	}
-	p.log.V(2).Info("port group protocol", "port_group", p.portGroup, "protocol", portGroup.PortGroupProtocol)
+	protocol, err := resolvePortGroupProtocol(portGroup, p.log)
+	if err != nil {
+		return nil, fmt.Errorf("port group %s: %w", p.portGroup, err)
+	}
+	p.log.V(2).Info("port group protocol", "port_group", p.portGroup, "protocol", protocol)
 
 	// Filter initiators based on port group protocol
-	filteredInitiators := filterInitiatorsByProtocol(clonnerIqn, portGroup.PortGroupProtocol, p.log)
+	filteredInitiators := filterInitiatorsByProtocol(clonnerIqn, protocol, p.log)
 	if len(filteredInitiators) == 0 {
-		return nil, fmt.Errorf("no initiators matching protocol %s found in %v", portGroup.PortGroupProtocol, clonnerIqn)
+		return nil, fmt.Errorf("no initiators matching protocol %s found in %v", protocol, clonnerIqn)
 	}
-	p.log.V(2).Info("filtered initiators by protocol", "protocol", portGroup.PortGroupProtocol, "initiators", filteredInitiators)
+	p.log.V(2).Info("filtered initiators by protocol", "protocol", protocol, "initiators", filteredInitiators)
 
 	// Direct initiator lookup (1 API call per initiator instead of N+1)
 	for _, filteredInit := range filteredInitiators {
 		lookupID := initiatorToLookupID(filteredInit)
 		var initiator *pmxtypes.Initiator
 
-		if portGroup.PortGroupProtocol == "SCSI_FC" {
+		if protocol == "SCSI_FC" {
 			// FC initiators from ESXi are in WWNN:WWPN format, but the PowerMax API
 			// expects initiator IDs in <director>:<port>:<wwn> format (e.g., OR-2C:0:10000000c99debc3).
 			// Use GetInitiatorList with the WWPN to find the correct PowerMax initiator ID.
@@ -181,7 +186,7 @@ func (p *PowermaxClonner) EnsureClonnerIgroup(_ string, clonnerIqn []string) (po
 			"Ensure the ESXi host has a corresponding host object in PowerMax with the correct FC/iSCSI initiators registered",
 			p.symmetrixID, filteredInitiators)
 	}
-	p.log.Info("found matching host", "host_id", p.hostID, "protocol", portGroup.PortGroupProtocol)
+	p.log.Info("found matching host", "host_id", p.hostID, "protocol", protocol)
 
 	p.log.V(2).Info("port group configured", "port_group", p.portGroup)
 	p.log.Info("initiator group ready", "group", p.initiatorID)
@@ -200,9 +205,12 @@ func (p *PowermaxClonner) Map(_ string, targetLUN populator.LUN, mappingContext 
 		return targetLUN, nil
 	}
 
-	p.log.Info("mapping volume to storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID)
-
 	ctx := context.TODO()
+	if err := p.adoptOrphanSG(ctx, targetLUN.ProviderID); err != nil {
+		return populator.LUN{}, fmt.Errorf("failed to adopt orphaned xcopy storage group: %w", err)
+	}
+
+	p.log.Info("mapping volume to storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID)
 	var volumesMapped []string
 	err := retryOnTransient(ctx, p.log, "GetVolumeIDListInStorageGroup", func() error {
 		var e error
@@ -214,16 +222,15 @@ func (p *PowermaxClonner) Map(_ string, targetLUN populator.LUN, mappingContext 
 	}
 	if slices.Contains(volumesMapped, targetLUN.ProviderID) {
 		p.log.V(2).Info("volume already mapped to storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID)
-		return targetLUN, nil
-	}
-
-	p.log.V(2).Info("adding volume to storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID)
-	err = retryOnTransient(ctx, p.log, "AddVolumesToStorageGroupS", func() error {
-		return p.client.AddVolumesToStorageGroupS(ctx, p.symmetrixID, p.storageGroupID, false, targetLUN.ProviderID)
-	})
-	if err != nil {
-		p.log.Info("failed to add volume to storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID, "err", err)
-		return targetLUN, err
+	} else {
+		p.log.V(2).Info("adding volume to storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID)
+		err = retryOnTransient(ctx, p.log, "AddVolumesToStorageGroupS", func() error {
+			return p.client.AddVolumesToStorageGroupS(ctx, p.symmetrixID, p.storageGroupID, false, targetLUN.ProviderID)
+		})
+		if err != nil {
+			p.log.Info("failed to add volume to storage group", "volume", targetLUN.ProviderID, "storage_group", p.storageGroupID, "err", err)
+			return targetLUN, err
+		}
 	}
 
 	var mv *pmxtypes.MaskingView
@@ -289,10 +296,51 @@ func (p *PowermaxClonner) ResolvePVToLUN(pv populator.PersistentVolume) (populat
 		return populator.LUN{}, fmt.Errorf("failed getting details for volume %v: %v", volume, err)
 	}
 
+	p.volumeStorageGroups = volume.StorageGroupIDList
+
 	naa := fmt.Sprintf("naa.%s", volume.WWN)
 	lun := populator.LUN{Name: volume.VolumeIdentifier, ProviderID: volume.VolumeID, NAA: naa}
 	p.log.Info("LUN resolved", "lun", lun.Name, "naa", lun.NAA, "provider_id", lun.ProviderID)
 	return lun, nil
+}
+
+// adoptOrphanSG checks whether the volume is already in an orphaned xcopy
+// storage group left by a previously evicted pod. If found, the orphan is
+// adopted (p.storageGroupID and p.initiatorID are swapped to the orphan's
+// names) and the unused empty SG that EnsureClonnerIgroup just created is
+// deleted best-effort. At most one orphan can exist per volume because the
+// retry that created the second SG fails at CreateMaskingView before the
+// volume is added.
+func (p *PowermaxClonner) adoptOrphanSG(ctx context.Context, volID string) error {
+	var orphanSG string
+	for _, sg := range p.volumeStorageGroups {
+		if strings.HasPrefix(sg, "xcopy-") && strings.HasSuffix(sg, "-SG") && sg != p.storageGroupID {
+			orphanSG = sg
+			break
+		}
+	}
+	if orphanSG == "" {
+		return nil
+	}
+
+	adoptedInitiator := strings.TrimSuffix(orphanSG, "-SG")
+	emptySG := p.storageGroupID
+
+	p.log.Info("adopting orphaned xcopy storage group from previous evicted pod",
+		"adopted_sg", orphanSG, "adopted_initiator", adoptedInitiator,
+		"discarding_sg", emptySG, "volume", volID)
+
+	p.storageGroupID = orphanSG
+	p.initiatorID = adoptedInitiator
+
+	err := retryOnTransient(ctx, p.log, "DeleteStorageGroup", func() error {
+		return p.client.DeleteStorageGroup(ctx, p.symmetrixID, emptySG)
+	})
+	if err != nil {
+		p.log.Info("failed to delete unused empty storage group (non-critical)", "sg", emptySG, "err", err)
+	}
+
+	return nil
 }
 
 // UnMap implements populator.StorageApi.
@@ -494,6 +542,25 @@ func extractWWPN(wwnnWwpn string) string {
 	return wwnnWwpn
 }
 
+// resolvePortGroupProtocol returns the protocol for a port group. On V4 arrays (2500/8500),
+// the port_group_protocol field is returned directly. On V3 arrays (2000/8000), this field
+// is absent so we fall back to the type field: "Fibre" maps to "SCSI_FC", "iSCSI" stays "iSCSI".
+func resolvePortGroupProtocol(pg *pmxtypes.PortGroup, log klog.Logger) (string, error) {
+	if pg.PortGroupProtocol != "" {
+		return pg.PortGroupProtocol, nil
+	}
+	switch pg.PortGroupType {
+	case "Fibre":
+		log.Info("port_group_protocol not set (V3 array), resolved from type field", "type", pg.PortGroupType, "protocol", "SCSI_FC")
+		return "SCSI_FC", nil
+	case "iSCSI":
+		log.Info("port_group_protocol not set (V3 array), resolved from type field", "type", pg.PortGroupType, "protocol", "iSCSI")
+		return "iSCSI", nil
+	default:
+		return "", fmt.Errorf("unable to determine port group protocol: port_group_protocol is empty and type %q is not recognized (expected \"Fibre\" or \"iSCSI\")", pg.PortGroupType)
+	}
+}
+
 // filterInitiatorsByProtocol filters the initiator list based on the port group protocol
 // iSCSI protocol requires IQN format initiators (e.g., "iqn.1994-05.com.redhat:...")
 // SCSI_FC protocol requires FC WWN format initiators (e.g., "10000000c9a12345:10000000c9a12346")
@@ -514,9 +581,8 @@ func filterInitiatorsByProtocol(initiators []string, protocol string, log klog.L
 				filtered = append(filtered, initiator)
 			}
 		default:
-			log.Info("unknown protocol, skipping initiator filtering", "protocol", protocol)
-			// For unknown protocols, return all initiators
-			return initiators
+			log.Info("unknown protocol, returning no initiators as a safety net", "protocol", protocol)
+			return nil
 		}
 	}
 

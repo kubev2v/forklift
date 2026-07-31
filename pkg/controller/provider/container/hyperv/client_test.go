@@ -461,10 +461,12 @@ func TestMapWindowsPathToSMB(t *testing.T) {
 
 func TestMapWindowsPathToSMB_UNC(t *testing.T) {
 	client := &Client{
-		smbMountPath: "/hyperv",
+		smbMountPath: "/mnt/smb/hyperv-share",
 		smbUrl:       "//10.0.0.1/VMShare",
 		Log:          testLogger(),
 	}
+
+	localPrefix := `C:\Hyper-V\Virtual_Hard_Disks`
 
 	tests := []struct {
 		name             string
@@ -475,38 +477,38 @@ func TestMapWindowsPathToSMB_UNC(t *testing.T) {
 		{
 			name:             "UNC backslash path matching share name",
 			windowsPath:      `\\WIN-SERVER\VMShare\vm1.vhdx`,
-			smbWindowsPrefix: `C:\Hyper-V\Virtual_Hard_Disks`,
-			expected:         "/hyperv/vm1.vhdx",
+			smbWindowsPrefix: localPrefix,
+			expected:         "/mnt/smb/hyperv-share/vm1.vhdx",
 		},
 		{
 			name:             "UNC forward slash path matching share name",
 			windowsPath:      "//WIN-SERVER/VMShare/subdir/disk.vhdx",
-			smbWindowsPrefix: `C:\Hyper-V\Virtual_Hard_Disks`,
-			expected:         "/hyperv/subdir/disk.vhdx",
+			smbWindowsPrefix: localPrefix,
+			expected:         "/mnt/smb/hyperv-share/subdir/disk.vhdx",
 		},
 		{
 			name:             "UNC case insensitive share name match",
 			windowsPath:      `\\SERVER\vmshare\disk.vhdx`,
-			smbWindowsPrefix: `C:\Hyper-V\Virtual_Hard_Disks`,
-			expected:         "/hyperv/disk.vhdx",
+			smbWindowsPrefix: localPrefix,
+			expected:         "/mnt/smb/hyperv-share/disk.vhdx",
 		},
 		{
 			name:             "UNC different share name falls through to local",
 			windowsPath:      `\\SERVER\OtherShare\disk.vhdx`,
-			smbWindowsPrefix: `C:\Hyper-V\Virtual_Hard_Disks`,
+			smbWindowsPrefix: localPrefix,
 			expected:         "",
 		},
 		{
 			name:             "UNC share root without trailing file",
 			windowsPath:      `\\SERVER\VMShare`,
-			smbWindowsPrefix: `C:\Hyper-V\Virtual_Hard_Disks`,
-			expected:         "/hyperv/",
+			smbWindowsPrefix: localPrefix,
+			expected:         "/mnt/smb/hyperv-share/",
 		},
 		{
 			name:             "local path still works when smbUrl is set",
 			windowsPath:      `C:\Hyper-V\Virtual_Hard_Disks\vm2.vhdx`,
-			smbWindowsPrefix: `C:\Hyper-V\Virtual_Hard_Disks`,
-			expected:         "/hyperv/vm2.vhdx",
+			smbWindowsPrefix: localPrefix,
+			expected:         "/mnt/smb/hyperv-share/vm2.vhdx",
 		},
 	}
 

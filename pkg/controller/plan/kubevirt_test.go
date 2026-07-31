@@ -10,6 +10,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	convctx "github.com/kubev2v/forklift/pkg/controller/conversion/context"
+	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
 	ginkgo "github.com/onsi/ginkgo/v2"
@@ -18,6 +19,7 @@ import (
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -702,6 +704,45 @@ var _ = ginkgo.Describe("kubevirt tests", func() {
 		})
 	})
 
+	ginkgo.Describe("vddkConfigMap", func() {
+		ginkgo.It("should include vddk-node-selector when ConvertorNodeSelector is set", func() {
+			kubevirt := createKubeVirtWithProvider(v1beta1.VSphere)
+			kubevirt.Plan.Spec.ConvertorNodeSelector = map[string]string{
+				"dedicated-nic": "vmware",
+				"zone":          "east",
+			}
+			cm, err := kubevirt.vddkConfigMap(map[string]string{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cm.Data).To(HaveKey("vddk-node-selector"))
+			Expect(cm.Data["vddk-node-selector"]).To(SatisfyAll(
+				ContainSubstring(`"dedicated-nic":"vmware"`),
+				ContainSubstring(`"zone":"east"`),
+			))
+		})
+
+		ginkgo.It("should not include vddk-node-selector when ConvertorNodeSelector is empty", func() {
+			kubevirt := createKubeVirtWithProvider(v1beta1.VSphere)
+			cm, err := kubevirt.vddkConfigMap(map[string]string{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cm.Data).ToNot(HaveKey("vddk-node-selector"))
+		})
+
+		ginkgo.It("should include both AIO config and node selector when both are set", func() {
+			kubevirt := createKubeVirtWithProvider(v1beta1.VSphere)
+			kubevirt.Source.Provider.Spec.Settings = map[string]string{
+				v1beta1.UseVddkAioOptimization: "true",
+			}
+			kubevirt.Plan.Spec.ConvertorNodeSelector = map[string]string{
+				"node-role": "migration",
+			}
+			cm, err := kubevirt.vddkConfigMap(map[string]string{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cm.Data).To(HaveKey("vddk-config-file"))
+			Expect(cm.Data).To(HaveKey("vddk-node-selector"))
+			Expect(cm.Data["vddk-node-selector"]).To(ContainSubstring(`"node-role":"migration"`))
+		})
+	})
+
 	ginkgo.Describe("podVolumeMounts", func() {
 		var kubevirt *KubeVirt
 
@@ -941,3 +982,201 @@ func createKubeVirtWithTransferNetwork(nad *k8snet.NetworkAttachmentDefinition, 
 	kubevirt.Plan = createPlanKubevirt(transferNetwork)
 	return kubevirt
 }
+
+var _ = ginkgo.Describe("EnsurePVCInitPod", func() {
+	ginkgo.BeforeEach(func() {
+		Settings.VirtV2vContainerRequestsCpu = "100m"
+		Settings.VirtV2vContainerRequestsMemory = "128Mi"
+		Settings.VirtV2vContainerLimitsCpu = "1"
+		Settings.VirtV2vContainerLimitsMemory = "512Mi"
+	})
+
+	newPVC := func(name string, phase v1.PersistentVolumeClaimPhase) *v1.PersistentVolumeClaim {
+		return &v1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ""},
+			Status:     v1.PersistentVolumeClaimStatus{Phase: phase},
+		}
+	}
+	vm := &plan.VMStatus{}
+
+	// vsphere source provider avoids a nil-deref in shouldRequestKVM (createPodToBindPVCs).
+	newKV := func() *KubeVirt {
+		kv := createKubeVirtWithProvider(v1beta1.VSphere)
+		vsphereType := v1beta1.VSphere
+		kv.Plan.Provider.Source = &v1beta1.Provider{
+			Spec: v1beta1.ProviderSpec{Type: &vsphereType},
+		}
+		return kv
+	}
+
+	listPods := func(kv *KubeVirt) []v1.Pod {
+		pods := &v1.PodList{}
+		_ = kv.Destination.List(context.TODO(), pods, &client.ListOptions{})
+		return pods.Items
+	}
+
+	ginkgo.It("creates pod with only ClaimPending PVCs", func() {
+		pending := newPVC("pvc-pending", v1.ClaimPending)
+		bound := newPVC("pvc-bound", v1.ClaimBound)
+		zero := newPVC("pvc-zero", "")
+		kv := newKV()
+		Expect(kv.EnsurePVCInitPod(vm, []*v1.PersistentVolumeClaim{pending, bound, zero})).To(Succeed())
+		pods := listPods(kv)
+		Expect(pods).To(HaveLen(1))
+		Expect(pods[0].Spec.Volumes).To(HaveLen(1))
+		Expect(pods[0].Spec.Volumes[0].Name).To(Equal("pvc-pending"))
+	})
+
+	ginkgo.It("deduplicates repeated PVC names", func() {
+		dup := newPVC("pvc-dup", v1.ClaimPending)
+		kv := newKV()
+		Expect(kv.EnsurePVCInitPod(vm, []*v1.PersistentVolumeClaim{dup, dup})).To(Succeed())
+		pods := listPods(kv)
+		Expect(pods).To(HaveLen(1))
+		Expect(pods[0].Spec.Volumes).To(HaveLen(1))
+	})
+
+	ginkgo.It("includes both xcopy and CSI import PVCs when both are pending", func() {
+		xcopy := newPVC("pvc-xcopy", v1.ClaimPending)
+		csi := newPVC("pvc-csi", v1.ClaimPending)
+		kv := newKV()
+		Expect(kv.EnsurePVCInitPod(vm, []*v1.PersistentVolumeClaim{xcopy, csi})).To(Succeed())
+		pods := listPods(kv)
+		Expect(pods).To(HaveLen(1))
+		Expect(pods[0].Spec.Volumes).To(HaveLen(2))
+		names := []string{pods[0].Spec.Volumes[0].Name, pods[0].Spec.Volumes[1].Name}
+		Expect(names).To(ConsistOf("pvc-xcopy", "pvc-csi"))
+	})
+
+	ginkgo.It("WFC: pvcinit pod includes CSI import PVCs (Pending) but not already-Bound xcopy PVCs", func() {
+		xcopyBound := newPVC("pvc-xcopy-bound", v1.ClaimBound)
+		csiWFC := newPVC("pvc-csi-wfc", v1.ClaimPending)
+		kv := newKV()
+		Expect(kv.EnsurePVCInitPod(vm, []*v1.PersistentVolumeClaim{xcopyBound, csiWFC})).To(Succeed())
+		pods := listPods(kv)
+		Expect(pods).To(HaveLen(1))
+		Expect(pods[0].Spec.Volumes).To(HaveLen(1))
+		Expect(pods[0].Spec.Volumes[0].Name).To(Equal("pvc-csi-wfc"))
+	})
+
+	ginkgo.It("creates no pod when all PVCs are already Bound", func() {
+		bound1 := newPVC("pvc-a", v1.ClaimBound)
+		bound2 := newPVC("pvc-b", v1.ClaimBound)
+		kv := newKV()
+		Expect(kv.EnsurePVCInitPod(vm, []*v1.PersistentVolumeClaim{bound1, bound2})).To(Succeed())
+		Expect(listPods(kv)).To(BeEmpty())
+	})
+})
+
+var _ = ginkgo.Describe("PVC name template", func() {
+	ginkgo.Describe("GetPVCNameTemplate", func() {
+		ginkgo.It("should return the universal default when plan has no template", func() {
+			kv := createKubeVirt()
+			kv.Plan.Name = "my-plan"
+			template := planbase.GetPVCNameTemplate(kv.Plan, "vm-1")
+			Expect(template).To(ContainSubstring("PlanName"))
+			Expect(template).To(ContainSubstring("TargetVmName"))
+			Expect(template).To(ContainSubstring("DiskIndex"))
+		})
+
+		ginkgo.It("should return the plan-level template when set", func() {
+			kv := createKubeVirt()
+			kv.Plan.Spec.PVCNameTemplate = "{{.PlanName}}-{{.VmId}}-disk-{{.DiskIndex}}"
+			template := planbase.GetPVCNameTemplate(kv.Plan, "vm-1")
+			Expect(template).To(Equal("{{.PlanName}}-{{.VmId}}-disk-{{.DiskIndex}}"))
+		})
+
+		ginkgo.It("should return the VM-level template when set", func() {
+			kv := createKubeVirt()
+			kv.Plan.Spec.PVCNameTemplate = "plan-level"
+			kv.Plan.Spec.VMs = []plan.VM{
+				{Ref: ref.Ref{ID: "vm-1"}, PVCNameTemplate: "vm-level-{{.DiskIndex}}"},
+			}
+			template := planbase.GetPVCNameTemplate(kv.Plan, "vm-1")
+			Expect(template).To(Equal("vm-level-{{.DiskIndex}}"))
+		})
+	})
+
+	ginkgo.Describe("applyPVCNameTemplate", func() {
+		ginkgo.It("should set GenerateName with default template and UseGenerateName=true", func() {
+			kv := createKubeVirt()
+			kv.Plan.Name = "test-plan"
+			kv.Plan.Spec.PVCNameTemplateUseGenerateName = ptr.To(true)
+			vm := &plan.VMStatus{}
+			vm.ID = "vm-1"
+			vm.Name = "my-vm"
+
+			objectMeta := &metav1.ObjectMeta{}
+			err := kv.applyPVCNameTemplate(objectMeta, vm, 0)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(objectMeta.GenerateName).To(Equal("test-plan-my-vm-disk-0-"))
+			Expect(objectMeta.Name).To(BeEmpty())
+		})
+
+		ginkgo.It("should set Name with default template and UseGenerateName=false", func() {
+			kv := createKubeVirt()
+			kv.Plan.Name = "test-plan"
+			kv.Plan.Spec.PVCNameTemplateUseGenerateName = ptr.To(false)
+			vm := &plan.VMStatus{}
+			vm.ID = "vm-1"
+			vm.Name = "my-vm"
+
+			objectMeta := &metav1.ObjectMeta{}
+			err := kv.applyPVCNameTemplate(objectMeta, vm, 2)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(objectMeta.Name).To(Equal("test-plan-my-vm-disk-2"))
+			Expect(objectMeta.GenerateName).To(BeEmpty())
+		})
+
+		ginkgo.It("should use NewName when set", func() {
+			kv := createKubeVirt()
+			kv.Plan.Name = "plan"
+			kv.Plan.Spec.PVCNameTemplateUseGenerateName = ptr.To(false)
+			vm := &plan.VMStatus{}
+			vm.ID = "vm-1"
+			vm.Name = "Original VM!"
+			vm.NewName = "safe-vm-name"
+
+			objectMeta := &metav1.ObjectMeta{}
+			err := kv.applyPVCNameTemplate(objectMeta, vm, 0)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(objectMeta.Name).To(Equal("plan-safe-vm-name-disk-0"))
+		})
+
+		ginkgo.It("should truncate long names", func() {
+			kv := createKubeVirt()
+			kv.Plan.Name = "very-long-plan-name-exceeding"
+			kv.Plan.Spec.PVCNameTemplateUseGenerateName = ptr.To(false)
+			vm := &plan.VMStatus{}
+			vm.ID = "vm-1"
+			vm.Name = "very-long-vm-name-exceeding-limit"
+
+			objectMeta := &metav1.ObjectMeta{}
+			err := kv.applyPVCNameTemplate(objectMeta, vm, 0)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(len(objectMeta.Name)).To(BeNumerically("<=", 63))
+		})
+
+		ginkgo.It("should fall back to getGeneratedName when vm.Name is invalid and NewName is empty", func() {
+			kv := createKubeVirt()
+			kv.Plan.Name = "test-plan"
+			kv.Plan.Spec.PVCNameTemplate = planbase.DefaultPVCNameTemplate
+			kv.Plan.Spec.PVCNameTemplateUseGenerateName = ptr.To(true)
+			vm := &plan.VMStatus{}
+			vm.ID = "vm-1"
+			vm.Name = "Invalid VM Name!"
+			// NewName intentionally empty — TargetVmName stays invalid for DNS1123
+
+			objectMeta := &metav1.ObjectMeta{}
+			err := kv.applyPVCNameTemplate(objectMeta, vm, 0)
+			// Mirror DataVolumes: on template failure, fall back to getGeneratedName
+			if err != nil {
+				objectMeta.GenerateName = kv.getGeneratedName(vm)
+				err = nil
+			}
+			Expect(err).ToNot(HaveOccurred())
+			Expect(objectMeta.GenerateName).To(Equal("test-plan-vm-1-"))
+			Expect(objectMeta.Name).To(BeEmpty())
+		})
+	})
+})

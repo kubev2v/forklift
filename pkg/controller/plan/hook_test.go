@@ -4,8 +4,10 @@ import (
 	"testing"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/lib/aap"
+	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -289,5 +291,45 @@ func TestGetAAPTokenFromSecretName(t *testing.T) {
 				t.Fatalf("token = %q, want %q", tok, tt.want)
 			}
 		})
+	}
+}
+
+func TestAAPLaunchFailureIsTerminalViaReflectPipeline(t *testing.T) {
+	t.Parallel()
+
+	vm := &planapi.VMStatus{
+		Phase: api.PhasePreHook,
+		Pipeline: []*planapi.Step{
+			{Task: planapi.Task{Name: api.PhasePreHook}},
+		},
+	}
+	step, found := vm.FindStep(api.PhasePreHook)
+	if !found {
+		t.Fatal("PreHook step missing")
+	}
+
+	// Mimic runAAPJob after LaunchJob failure: record on step, clear err, return.
+	step.AddError("failed to launch AAP job: tls: failed to verify certificate: x509: certificate signed by unknown authority")
+	step.MarkCompleted()
+
+	if step.MarkedCompleted() && step.Error == nil {
+		t.Fatal("must not advance phase on hook failure")
+	}
+
+	vm.ReflectPipeline()
+	if vm.Error == nil {
+		t.Fatal("expected ReflectPipeline to copy step error onto VM")
+	}
+
+	vm.Phase = api.PhaseCompleted
+	vm.SetCondition(libcnd.Condition{
+		Type:     api.ConditionFailed,
+		Status:   libcnd.True,
+		Category: api.CategoryAdvisory,
+		Message:  "The VM migration has FAILED.",
+		Durable:  true,
+	})
+	if !vm.HasCondition(api.ConditionFailed) {
+		t.Fatal("expected Failed condition")
 	}
 }

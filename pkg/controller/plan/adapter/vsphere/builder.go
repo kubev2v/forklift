@@ -631,9 +631,8 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 				dv.ObjectMeta.Name = pvc.Name
 			}
 		} else {
-			// Set PVC name/generateName using template if configured
-			if err := r.setPVCNameFromTemplate(&dv.ObjectMeta, vm, diskIndex, disk); err != nil {
-				r.Log.Info("Failed to set PVC name from template", "error", err)
+			if err = r.setPVCNameFromTemplate(&dv.ObjectMeta, vm, diskIndex, disk); err != nil {
+				return
 			}
 		}
 
@@ -1366,6 +1365,46 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 	dsMapIn := r.Context.Map.Storage.Spec.Map
 	naaPrefixes := loadNAAPrefixes(r.Client)
 	dsNaaMap := make(map[string]string)
+
+	// Pre-pass: resolve RDM disks by NAA vendor prefix.
+	// Builds a map from disk index to the storage map entry whose offload
+	// plugin matches the RDM's vendor. Disks that fail NAA resolution are
+	// left out and will fall back to datastore-based matching in the main loop.
+	rdmMapped := make(map[int]*api.StoragePair)
+	for diskIndex, disk := range sortedDisks {
+		if !disk.RDM || disk.DeviceName == "" {
+			continue
+		}
+		rdmVendor, matched := vendorFromNAA(disk.DeviceName, naaPrefixes)
+		if !matched {
+			r.Log.Info("RDM disk NAA prefix not recognized, falling back to datastore matching",
+				"diskKey", disk.Key, "deviceName", disk.DeviceName)
+			continue
+		}
+		candidates := findStorageMapEntriesForVendor(dsMapIn, rdmVendor)
+		switch len(candidates) {
+		case 0:
+			r.Log.Info("No storage map entry found for RDM vendor, falling back to datastore matching",
+				"diskKey", disk.Key, "vendor", rdmVendor)
+		case 1:
+			rdmMapped[diskIndex] = candidates[0]
+			r.Log.Info("RDM disk resolved to storage vendor by NAA",
+				"diskKey", disk.Key, "deviceName", disk.DeviceName,
+				"vendor", rdmVendor, "storageClass", candidates[0].Destination.StorageClass)
+		default:
+			entry, disambigErr := disambiguateRDMByNAA(r.Source.Inventory, candidates, disk.DeviceName, naaPrefixes)
+			if disambigErr != nil {
+				r.Log.Info("RDM NAA disambiguation failed, falling back to datastore matching",
+					"diskKey", disk.Key, "vendor", rdmVendor, "error", disambigErr)
+			} else {
+				rdmMapped[diskIndex] = entry
+				r.Log.Info("RDM disk resolved to storage vendor by NAA",
+					"diskKey", disk.Key, "deviceName", disk.DeviceName,
+					"vendor", rdmVendor, "storageClass", entry.Destination.StorageClass)
+			}
+		}
+	}
+
 	for i := range dsMapIn {
 		mapped := &dsMapIn[i]
 		sourceRef := mapped.Source
@@ -1378,38 +1417,21 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 
 		pvblock := core.PersistentVolumeBlock
 		for diskIndex, disk := range sortedDisks {
-			// Resolve the effective storage map entry for this disk.
-			// RDM disks are matched by NAA vendor prefix (not datastore)
-			// because the RDM's backing LUN may reside on a different
-			// storage array than the VM's datastore.
 			var effectiveMapped *api.StoragePair
 			if disk.RDM && disk.DeviceName != "" {
-				if i > 0 {
-					continue // RDM disks are processed once, in the first outer iteration
-				}
-				rdmVendor, matched := vendorFromNAA(disk.DeviceName, naaPrefixes)
-				if !matched {
-					return nil, fmt.Errorf(
-						"RDM disk (key=%d) has device name %q that does not match any known storage vendor NAA prefix",
-						disk.Key, disk.DeviceName)
-				}
-				candidates := findStorageMapEntriesForVendor(dsMapIn, rdmVendor)
-				switch len(candidates) {
-				case 0:
-					return nil, fmt.Errorf(
-						"no storage map entry with offload plugin found for vendor %q; "+
-							"add a storage map entry with an offload plugin for this vendor", rdmVendor)
-				case 1:
-					effectiveMapped = candidates[0]
-				default:
-					effectiveMapped, err = disambiguateRDMByNAA(r.Source.Inventory, candidates, disk.DeviceName, naaPrefixes)
-					if err != nil {
-						return nil, err
+				if entry, ok := rdmMapped[diskIndex]; ok {
+					if mapped != entry {
+						continue
 					}
+					effectiveMapped = entry
+				} else if disk.Datastore.ID == ds.ID {
+					effectiveMapped = mapped
+					r.Log.Info("RDM disk matched by datastore fallback",
+						"diskKey", disk.Key, "deviceName", disk.DeviceName,
+						"datastoreID", ds.ID)
+				} else {
+					continue
 				}
-				r.Log.Info("RDM disk resolved to storage vendor by NAA",
-					"diskKey", disk.Key, "deviceName", disk.DeviceName,
-					"vendor", rdmVendor, "storageClass", effectiveMapped.Destination.StorageClass)
 			} else if disk.Datastore.ID == ds.ID {
 				effectiveMapped = mapped
 			} else {
@@ -1465,7 +1487,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 					labels[TemplateNAALabel] = naa
 				}
 				if errs := k8svalidation.IsValidLabelValue(vm.Host); vm.Host != "" && len(errs) == 0 {
-					labels["sourceHost"] = vm.Host
+					labels[api.LabelSourceHost] = vm.Host
 				}
 
 				if disk.Shared {
@@ -1506,9 +1528,9 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 				pvc.Annotations[planbase.AnnDiskSource] = baseVolume(disk.File, r.Plan.IsWarm())
 				pvc.Annotations["copy-offload"] = baseVolume(disk.File, r.Plan.IsWarm())
 
-				// Apply PVC template naming if configured, replacing the commonName
-				if err := r.setColdMigrationDefaultPVCName(&pvc.ObjectMeta, vm, diskIndex, disk); err != nil {
-					r.Log.Info("Failed to set PVC name from template for populator volume, using default name", "error", err)
+				// Apply PVC template naming
+				if err = r.setPVCNameFromTemplate(&pvc.ObjectMeta, vm, diskIndex, disk); err != nil {
+					return
 				}
 				if pvc.ObjectMeta.GenerateName != "" {
 					suffix := r.generatePopulatorSuffix(string(r.Migration.UID), vmRef.ID, disk.Key, disk.File, diskIndex)
@@ -1722,29 +1744,8 @@ func (r *Builder) buildCsiImportPVC(
 	}, storageSecret); err != nil {
 		return nil, liberr.Wrap(err, "secretRef", csiCfg.SecretRef)
 	}
-	host := string(storageSecret.Data["STORAGE_HOSTNAME"])
-	user := string(storageSecret.Data["STORAGE_USERNAME"])
-	pass := string(storageSecret.Data["STORAGE_PASSWORD"])
-	skipSSL := basecontroller.GetInsecureSkipVerifyFlag(r.Source.Secret)
-
-	var missing []string
-	if host == "" {
-		missing = append(missing, "hostname")
-	}
-	if user == "" {
-		missing = append(missing, "username")
-	}
-	if pass == "" {
-		missing = append(missing, "password")
-	}
-	if len(missing) > 0 {
-		return nil, liberr.New(
-			fmt.Sprintf("storage secret %q is missing required keys: %s", csiCfg.SecretRef, strings.Join(missing, ", ")),
-		)
-	}
-
 	// Instantiate vendor plugin (xcopy pattern: switch in newCsiImportPlugin creates concrete type)
-	plugin, err := newCsiImportPlugin(csiCfg.StorageVendorProduct, host, user, pass, skipSSL)
+	plugin, err := newCsiImportPlugin(csiCfg.StorageVendorProduct, storageSecret.Data, r.Destination.Client, mapped.Destination.StorageClass)
 	if err != nil {
 		return nil, liberr.Wrap(err, "vendor", string(csiCfg.StorageVendorProduct))
 	}
@@ -1753,6 +1754,10 @@ func (r *Builder) buildCsiImportPVC(
 	vendorAnnotations, err := plugin.Resolve(backing)
 	if err != nil {
 		return nil, liberr.Wrap(err, "disk", disk.File)
+	}
+	if vendorAnnotations == nil {
+		r.Log.Info("CSI import: vendor cannot handle this disk, deferring to other migration paths", "disk", disk.File)
+		return nil, nil //nolint:nilnil
 	}
 	r.Log.V(2).Info("CSI import: vendor resolution succeeded", "annotations", vendorAnnotations)
 
@@ -1778,6 +1783,9 @@ func (r *Builder) buildCsiImportPVC(
 		"vmdkKey":   fmt.Sprint(disk.Key),
 		"vmID":      vmRef.ID,
 	}
+	if vm.UUID != "" {
+		pvcLabels[planbase.LabelVMUUID] = vm.UUID
+	}
 
 	pvc := &core.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1801,7 +1809,7 @@ func (r *Builder) buildCsiImportPVC(
 		pvc.Spec.AccessModes = []core.PersistentVolumeAccessMode{mapped.Destination.AccessMode}
 	}
 
-	if err = r.setColdMigrationDefaultPVCName(&pvc.ObjectMeta, vm, diskIndex, disk); err != nil {
+	if err = r.setPVCNameFromTemplate(&pvc.ObjectMeta, vm, diskIndex, disk); err != nil {
 		return nil, liberr.Wrap(err)
 	}
 
@@ -1850,15 +1858,16 @@ func (r *Builder) PopulatorTransferredBytes(pvc *core.PersistentVolumeClaim) (tr
 	return (progressPercentage * pvcSize.Value()) / 100, nil
 }
 
-func (r *Builder) PopulatorXcopyUsed(pvc *core.PersistentVolumeClaim) (string, bool, error) {
+func (r *Builder) PopulatorOffloadInfo(pvc *core.PersistentVolumeClaim) (map[string]string, error) {
 	populatorCr, err := r.getPopulatorForPVC(pvc)
 	if err != nil {
-		return "", false, err
+		return nil, err
 	}
-	if populatorCr.Status.XcopyUsed == "" {
-		return "", false, nil
+	info := make(map[string]string)
+	if populatorCr.Status.XcopyUsed != "" {
+		info["xcopyUsed"] = populatorCr.Status.XcopyUsed
 	}
-	return populatorCr.Status.XcopyUsed, true, nil
+	return info, nil
 }
 
 func (r *Builder) getVolumePopulator(vmId, vmdkKey string) (api.VSphereXcopyVolumePopulator, error) {
@@ -1983,142 +1992,40 @@ func (r *Builder) executeTemplate(templateText string, templateData any) (string
 	return templateutil.ExecuteTemplate(templateText, templateData)
 }
 
-// TemplateConfig defines configuration for template-based naming
-type TemplateConfig struct {
-	Template        string
-	UseGenerateName bool
-	TemplateType    string
-}
-
-// setObjectNameFromTemplate sets the Name or GenerateName field on an object's metadata
-// based on a template and template data. This refactors the common naming logic.
-func (r *Builder) setObjectNameFromTemplate(objectMeta *metav1.ObjectMeta, templateConfig TemplateConfig, templateData any) error {
-	if templateConfig.Template == "" {
-		return nil
-	}
-
-	generatedName, err := r.executeTemplate(templateConfig.Template, templateData)
-	if err != nil {
-		r.Log.Info("Failed to generate name using template",
-			"template", templateConfig.Template,
-			"templateType", templateConfig.TemplateType,
-			"error", err)
-		return err
-	}
-
-	if generatedName == "" {
-		return nil
-	}
-
-	// Validate that template output is a valid k8s label
-	errs := k8svalidation.IsDNS1123Label(generatedName)
-	if len(errs) > 0 {
-		err = errors.New("generated name is not valid")
-		r.Log.Info("Generated name is not a valid k8s label",
-			"template", templateConfig.Template,
-			"templateType", templateConfig.TemplateType,
-			"generatedName", generatedName,
-			"errors", errs,
-			"error", err)
-		return err
-	}
-
-	if templateConfig.UseGenerateName {
-		// Ensure generatedName ends with "-"
-		if !strings.HasSuffix(generatedName, "-") {
-			generatedName = generatedName + "-"
-		}
-		objectMeta.GenerateName = generatedName
-	} else {
-		// Ensure generatedName does not end with "-"
-		if strings.HasSuffix(generatedName, "-") {
-			generatedName = strings.Trim(generatedName, "-")
-		}
-		objectMeta.Name = generatedName
-	}
-
-	return nil
-}
-
-func (r *Builder) setColdMigrationDefaultPVCName(objectMeta *metav1.ObjectMeta, vm *model.VM, diskIndex int, disk vsphere.Disk) error {
-	pvcNameTemplate := r.getPVCNameTemplate(vm)
-	if pvcNameTemplate == "" {
-		pvcNameTemplate = "{{trunc 4 .PlanName}}-{{trunc 4 .VmName}}-disk-{{.DiskIndex}}"
-	}
-
-	planVM := r.getPlanVM(vm)
-	rootDiskIndex := 0
-	if planVM != nil {
-		rootDiskIndex = utils.GetBootDiskNumber(planVM.RootDisk)
-	}
-
-	templateData := api.VSpherePVCNameTemplateData{
-		VmName:         r.getPlanVMSafeName(vm),
-		PlanName:       r.Plan.Name,
-		DiskIndex:      diskIndex,
-		RootDiskIndex:  rootDiskIndex,
-		Shared:         disk.Shared,
-		FileName:       extractDiskFileName(baseVolume(disk.File, false)),
-		WinDriveLetter: disk.WinDriveLetter,
-	}
-
-	templateConfig := TemplateConfig{
-		Template:        pvcNameTemplate,
-		UseGenerateName: r.Plan.Spec.PVCNameTemplateUseGenerateName,
-		TemplateType:    "PVC",
-	}
-
-	return r.setObjectNameFromTemplate(objectMeta, templateConfig, &templateData)
-}
-
-// setPVCNameFromTemplate sets PVC name/generateName using the PVC template
+// setPVCNameFromTemplate sets PVC name/generateName using the PVC template.
+// The template is guaranteed non-empty by the CRD default and validator.
 func (r *Builder) setPVCNameFromTemplate(objectMeta *metav1.ObjectMeta, vm *model.VM, diskIndex int, disk vsphere.Disk) error {
-	pvcNameTemplate := r.getPVCNameTemplate(vm)
-	if pvcNameTemplate == "" {
-		return nil
-	}
+	pvcNameTemplate := planbase.GetPVCNameTemplate(r.Plan, vm.ID)
 
-	// Get the VM root disk index
 	planVM := r.getPlanVM(vm)
 	rootDiskIndex := 0
 	if planVM != nil {
 		rootDiskIndex = utils.GetBootDiskNumber(planVM.RootDisk)
 	}
 
-	isWarm := r.Plan.IsWarm()
-
-	// Get plan VM status
-	planVMStatus := r.getPlanVMStatus(vm)
-
-	// Resolve names with safe fallbacks
-	vmName := vm.Name
-	targetVmName := ""
-	if planVMStatus != nil && planVMStatus.NewName != "" {
-		targetVmName = planVMStatus.NewName
-	} else {
-		// Best-effort DNS1123-safe fallback
-		targetVmName = utils.ChangeVmName(vmName)
+	targetVmName := planbase.ResolveTargetVmName(r.Plan, vm.ID, vm.Name)
+	if targetVmName == vm.Name {
+		if errs := k8svalidation.IsDNS1123Label(targetVmName); len(errs) > 0 {
+			targetVmName = utils.ChangeVmName(vm.Name)
+		}
 	}
 
-	// Create template data
-	templateData := api.VSpherePVCNameTemplateData{
-		VmName:         vmName,
+	templateData := &api.PVCNameTemplateData{
+		VmName:         vm.Name,
 		TargetVmName:   targetVmName,
 		PlanName:       r.Plan.Name,
 		DiskIndex:      diskIndex,
+		VmId:           vm.ID,
 		RootDiskIndex:  rootDiskIndex,
 		Shared:         disk.Shared,
-		FileName:       extractDiskFileName(baseVolume(disk.File, isWarm)),
+		FileName:       extractDiskFileName(baseVolume(disk.File, r.Plan.IsWarm())),
 		WinDriveLetter: disk.WinDriveLetter,
 	}
 
-	templateConfig := TemplateConfig{
-		Template:        pvcNameTemplate,
-		UseGenerateName: r.Plan.Spec.PVCNameTemplateUseGenerateName,
-		TemplateType:    "PVC",
+	if err := planbase.SetPVCNameOnObject(objectMeta, pvcNameTemplate, planbase.GetPVCNameTemplateUseGenerateName(r.Plan), templateData); err != nil {
+		return liberr.Wrap(err, "vm", vm.ID, "diskIndex", diskIndex)
 	}
-
-	return r.setObjectNameFromTemplate(objectMeta, templateConfig, &templateData)
+	return nil
 }
 
 // setVolumeNameFromTemplate generates volume name using volume template
@@ -2153,56 +2060,6 @@ func (r *Builder) setNetworkNameFromTemplate(vm *model.VM, mapped *api.NetworkPa
 	}
 
 	return r.executeTemplate(networkNameTemplate, &templateData)
-}
-
-// GetPVCNameTemplate returns the PVC name template
-func (r *Builder) getPVCNameTemplate(vm *model.VM) string {
-	// Check VM-level template first
-	planVM := r.getPlanVM(vm)
-	if planVM != nil && planVM.PVCNameTemplate != "" {
-		return planVM.PVCNameTemplate
-	}
-
-	// Check Plan-level template
-	if r.Plan.Spec.PVCNameTemplate != "" {
-		return r.Plan.Spec.PVCNameTemplate
-	}
-
-	return ""
-}
-
-// getPlanVMSafeName returns a safe name for the VM
-// that can be used in the template output
-// The name is sanitized to be a valid k8s label
-func (r *Builder) getPlanVMSafeName(vm *model.VM) string {
-	// Default to vm name
-	newName := vm.Name
-
-	// Get plan VM
-	planVM := r.getPlanVMStatus(vm)
-
-	// if plan VM status has a new name, use it
-	if planVM != nil && planVM.NewName != "" {
-		newName = planVM.NewName
-	}
-
-	// New name is a valid subdomain name,
-	// but we need to check if it is a valid k8s label
-
-	// Check if new vm name is valid k8s label
-	if len(newName) > 63 {
-		// if the new name is longer then 63 characters, trancate it
-		newName = newName[:63]
-	}
-
-	// Validate that template output is a valid k8s label
-	errs := k8svalidation.IsDNS1123Label(newName)
-	if len(errs) > 0 {
-		// if the new name replace "." with "-"
-		newName = strings.ReplaceAll(newName, ".", "-")
-	}
-
-	return newName
 }
 
 // getVolumeNameTemplate returns the volume name template
@@ -2678,7 +2535,7 @@ func (r *Builder) CsiImportPVCs(vmRef ref.Ref, pvcLabels map[string]string) (pvc
 			continue
 		}
 
-		pvc, pErr := r.buildCsiImportPVC(context.TODO(), vmRef, vm, disk, diskIndex, mapped, nil)
+		pvc, pErr := r.buildCsiImportPVC(context.TODO(), vmRef, vm, disk, diskIndex, mapped, pvcLabels)
 		if pErr != nil {
 			err = pErr
 			return
@@ -2765,8 +2622,7 @@ func (r *Builder) NetAppShiftPVCs(vmRef ref.Ref, labels map[string]string) (pvcs
 		}
 
 		if err = r.setPVCNameFromTemplate(&pvc.ObjectMeta, vm, diskIndex, disk); err != nil {
-			r.Log.Info("Failed to set PVC name from template", "error", err)
-			err = nil
+			return
 		}
 
 		ann := pvc.ObjectMeta.Annotations

@@ -92,6 +92,10 @@ type PlanSpec struct {
 	// ConvertorNodeSelector constrains the scheduler to only schedule virt-v2v convertor pods on nodes
 	// which contain the specified labels. This is useful for dedicating specific nodes for disk conversion
 	// workloads that require high I/O performance or network access to source VMware infrastructure.
+	// For vSphere warm migrations that use CDI VDDK DataVolumes for disk transfer,
+	// this selector is also propagated to the CDI importer pods via the VDDK extra-args
+	// ConfigMap (requires CDI with CNV-84595 support). The ConfigMap is automatically
+	// cleaned up when the migration completes.
 	// See Pod NodeSelector documentation for more details,
 	// https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector
 	ConvertorNodeSelector map[string]string `json:"convertorNodeSelector,omitempty"`
@@ -256,6 +260,14 @@ type PlanSpec struct {
 	// direct SCSI access, such as shared storage clusters or database applications.
 	// +optional
 	RDMAsLun bool `json:"rdmAsLun,omitempty"`
+	// SCSIReservation controls whether SCSI persistent reservation is enabled for
+	// shared RDM LUN disks. Requires rdmAsLun=true to have any effect.
+	// When false (default), shared RDM LUNs are migrated without persistent reservation.
+	// When true, shared RDM LUNs are configured with KubeVirt lun.reservation=true,
+	// which is required for workloads that use SCSI PR-based fencing (e.g. shared-disk clusters).
+	// Can be overridden per VM via spec.vms[].scsiReservation.
+	// +optional
+	SCSIReservation bool `json:"scsiReservation,omitempty"`
 	// DeleteGuestConversionPod determines if the guest conversion pod should be deleted after successful migration.
 	// Note:
 	//   - If this option is enabled and migration succeeds then the pod will get deleted. However the VM could still not boot and the virt-v2v logs, with additional information, will be deleted alongside guest conversion pod.
@@ -557,26 +569,38 @@ func (r *Plan) IsUsingOffloadPlugin() bool {
 	return false
 }
 
-// VSpherePVCNameTemplateData contains fields used in PVC naming templates for vSphere migrations.
-type VSpherePVCNameTemplateData struct {
-	VmName         string `json:"vmName"`
-	TargetVmName   string `json:"targetVmName"`
-	PlanName       string `json:"planName"`
-	DiskIndex      int    `json:"diskIndex"`
-	WinDriveLetter string `json:"winDriveLetter,omitempty"`
-	RootDiskIndex  int    `json:"rootDiskIndex"`
-	Shared         bool   `json:"shared,omitempty"`
-	FileName       string `json:"fileName,omitempty"`
-}
+// PVCNameTemplateData contains all fields used in PVC naming templates across all providers.
+// Fields not applicable to a given provider are left empty (zero value).
+type PVCNameTemplateData struct {
+	// VmName is the original source VM name (all providers).
+	VmName string `json:"vmName"`
+	// TargetVmName is the DNS1123-safe target VM name (all providers).
+	TargetVmName string `json:"targetVmName"`
+	// PlanName is the migration plan name (all providers).
+	PlanName string `json:"planName"`
+	// DiskIndex is the sequential index of the disk being migrated (all providers).
+	DiskIndex int `json:"diskIndex"`
+	// VmId is the source VM identifier from the provider (all providers).
+	VmId string `json:"vmId"`
 
-// OCPPVCNameTemplateData contains fields used in PVC naming templates for OpenShift migrations.
-type OCPPVCNameTemplateData struct {
-	VmName             string `json:"vmName"`
-	TargetVmName       string `json:"targetVmName"`
-	PlanName           string `json:"planName"`
-	DiskIndex          int    `json:"diskIndex"`
-	SourcePVCName      string `json:"sourcePVCName"`
-	SourcePVCNamespace string `json:"sourcePVCNamespace"`
+	// WinDriveLetter is the Windows drive letter, lowercase (vSphere only; requires guest agent).
+	WinDriveLetter string `json:"winDriveLetter,omitempty"`
+	// RootDiskIndex is the index of the root/boot disk (vSphere only).
+	RootDiskIndex int `json:"rootDiskIndex,omitempty"`
+	// Shared is true if the disk is shared by multiple VMs (vSphere only).
+	Shared bool `json:"shared,omitempty"`
+	// FileName is the source VMDK file name including suffix (vSphere only).
+	FileName string `json:"fileName,omitempty"`
+
+	// SourcePVCName is the name of the PVC in the source cluster (OpenShift only).
+	SourcePVCName string `json:"sourcePVCName,omitempty"`
+	// SourcePVCNamespace is the namespace of the PVC in the source cluster (OpenShift only).
+	SourcePVCNamespace string `json:"sourcePVCNamespace,omitempty"`
+
+	// VolumeID is the original EBS volume ID (EC2 only).
+	VolumeID string `json:"volumeID,omitempty"`
+	// SnapshotID is the snapshot ID used to create the volume (EC2 only).
+	SnapshotID string `json:"snapshotID,omitempty"`
 }
 
 // VolumeNameTemplateData contains fields used in naming templates.

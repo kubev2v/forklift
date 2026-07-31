@@ -121,8 +121,8 @@ const (
 	kPlanNamespace = "plan-namespace"
 	// VM label (value=vmID)
 	kVM = "vmID"
-	// VM UUID label
-	kVmUuid = "vmUUID"
+	// VM UUID label — alias for planbase.LabelVMUUID
+	kVmUuid = planbase.LabelVMUUID
 	// App label
 	kApp = "forklift.app"
 	// LUKS
@@ -245,7 +245,7 @@ func (r *KubeVirt) resolveConversionResources(vm *plan.VMStatus, podType convctx
 	}
 
 	var vddkConfigMap *core.ConfigMap
-	if r.Source.Provider.UseVddkAioOptimization() {
+	if r.needsVddkConfigMap() {
 		vddkConfigMap, err = r.ensureVddkConfigMap()
 		if err != nil {
 			return
@@ -1222,11 +1222,16 @@ func (r *KubeVirt) EnsureGuestInspectionPod(vm *plan.VMStatus, step *plan.Step) 
 }
 
 // GetConversionPod returns the managed pod for the given VM ref and pod type.
-func (r *KubeVirt) GetConversionPod(vmRef ref.Ref, podType convctx.V2vPodType) (*core.Pod, error) {
+// When filterOutMigrationLabel is true the search spans all migrations for the
+// VM (used for stale-workload discovery). when false it is scoped to the
+// current migration only. Note: filterOutMigrationLabel only applies to
+// VirtV2vConversionPod. inspection pods use plan-scoped labels that already
+// span migrations.
+func (r *KubeVirt) GetConversionPod(vmRef ref.Ref, podType convctx.V2vPodType, filterOutMigrationLabel bool) (*core.Pod, error) {
 	var labels map[string]string
 	switch podType {
 	case convctx.VirtV2vConversionPod:
-		labels = r.conversionLabels(vmRef, true)
+		labels = r.conversionLabels(vmRef, filterOutMigrationLabel)
 	case convctx.VirtV2vInspectionPod:
 		labels = r.inspectionLabels(vmRef)
 	}
@@ -1842,7 +1847,7 @@ func (r *KubeVirt) DataVolumes(vm *plan.VMStatus) (dataVolumes []cdi.DataVolume,
 		return
 	}
 	var vddkConfigMap *core.ConfigMap
-	if r.Source.Provider.UseVddkAioOptimization() {
+	if r.needsVddkConfigMap() {
 		vddkConfigMap, err = r.ensureVddkConfigMap()
 		if err != nil {
 			return nil, err
@@ -1922,6 +1927,11 @@ func (r *KubeVirt) CsiImportPVCs(vm *plan.VMStatus) ([]core.PersistentVolumeClai
 	return r.Builder.CsiImportPVCs(vm.Ref, labels)
 }
 
+// Whether a VDDK extra-args ConfigMap is needed for AIO tuning or node selector propagation.
+func (r *KubeVirt) needsVddkConfigMap() bool {
+	return r.Source.Provider.UseVddkAioOptimization() || len(r.Plan.Spec.ConvertorNodeSelector) > 0
+}
+
 func (r *KubeVirt) vddkConfigMap(labels map[string]string) (*core.ConfigMap, error) {
 	data := make(map[string]string)
 	if r.Source.Provider.UseVddkAioOptimization() {
@@ -1932,6 +1942,13 @@ func (r *KubeVirt) vddkConfigMap(labels map[string]string) (*core.ConfigMap, err
 			data["vddk-config-file"] = "VixDiskLib.nfcAio.Session.BufSizeIn64KB=16\n" +
 				"VixDiskLib.nfcAio.Session.BufCount=4"
 		}
+	}
+	if len(r.Plan.Spec.ConvertorNodeSelector) > 0 {
+		nsJSON, err := json.Marshal(r.Plan.Spec.ConvertorNodeSelector)
+		if err != nil {
+			return nil, liberr.Wrap(err)
+		}
+		data["vddk-node-selector"] = string(nsJSON)
 	}
 	configMap := core.ConfigMap{
 		Data: data,
@@ -1995,10 +2012,12 @@ func (r *KubeVirt) ensureVddkConfigMap() (configMap *core.ConfigMap, err error) 
 	return
 }
 
-func (r *KubeVirt) EnsurePopulatorVolumes(vm *plan.VMStatus, pvcs []*core.PersistentVolumeClaim) (err error) {
+func (r *KubeVirt) EnsurePVCInitPod(vm *plan.VMStatus, pvcs []*core.PersistentVolumeClaim) (err error) {
+	seen := make(map[string]bool)
 	var pendingPvcNames []string
 	for _, pvc := range pvcs {
-		if pvc.Status.Phase == core.ClaimPending {
+		if pvc.Status.Phase == core.ClaimPending && !seen[pvc.Name] {
+			seen[pvc.Name] = true
 			pendingPvcNames = append(pendingPvcNames, pvc.Name)
 		}
 	}
@@ -2055,26 +2074,18 @@ func getDiskIndex(pvc *core.PersistentVolumeClaim) int {
 
 // Return PersistentVolumeClaims associated with a VM.
 func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, err error) {
-	pvcsList := &core.PersistentVolumeClaimList{}
-	// Add VM uuid
+	if r.Plan.Spec.Type == api.MigrationOnlyConversion || r.IsResumeConversion() {
+		uuid, uuidErr := r.resolveVMUUID(vmRef)
+		if uuidErr != nil {
+			return nil, uuidErr
+		}
+		return r.listDiskPVCsByUUID(vmRef.ID, uuid)
+	}
 	labelSelector := map[string]string{
-		kVM: vmRef.ID,
+		kVM:        vmRef.ID,
+		kMigration: string(r.Migration.UID),
 	}
-	// We need to have this in getPVCs so we create VM with corect disks, this will also help us with the guest generation
-	if r.Plan.Spec.Type == api.MigrationOnlyConversion {
-		v, err := r.Source.Inventory.VM(&vmRef)
-		if err != nil {
-			err = liberr.Wrap(err)
-			return nil, err
-		}
-		if vm, ok := v.(*model.VM); ok {
-			labelSelector[kVmUuid] = vm.UUID
-		} else {
-			return nil, fmt.Errorf("failed to parse the VM for only conversion mode, we need to UUID to prevent accidental overwrites, stopping migration")
-		}
-	} else {
-		labelSelector[kMigration] = string(r.Migration.UID)
-	}
+	pvcsList := &core.PersistentVolumeClaimList{}
 	err = r.Destination.Client.List(
 		context.TODO(),
 		pvcsList,
@@ -2096,14 +2107,119 @@ func (r *KubeVirt) getPVCs(vmRef ref.Ref) (pvcs []*core.PersistentVolumeClaim, e
 		pvcs = append(pvcs, pvc)
 	}
 
-	// Sort the pvcs slice by disk index
 	sort.Slice(pvcs, func(i, j int) bool {
-		iIdx := getDiskIndex(pvcs[i])
-		jIdx := getDiskIndex(pvcs[j])
-		return iIdx < jIdx
+		return getDiskIndex(pvcs[i]) < getDiskIndex(pvcs[j])
 	})
 
 	return
+}
+
+// listDiskPVCsByUUID returns the disk PVCs for a VM identified by vmID and
+// vmUUID labels, filtered (excluding prime- and non-disk PVCs) and sorted by
+// disk index. Used by getPVCs, validateResumePVCsByUUID, and validation code.
+func (r *KubeVirt) listDiskPVCsByUUID(vmID, vmUUID string) ([]*core.PersistentVolumeClaim, error) {
+	pvcsList := &core.PersistentVolumeClaimList{}
+	err := r.Destination.List(
+		context.TODO(),
+		pvcsList,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(map[string]string{
+				kVM:     vmID,
+				kVmUuid: vmUUID,
+			}),
+			Namespace: r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
+	var pvcs []*core.PersistentVolumeClaim
+	for i := range pvcsList.Items {
+		pvc := &pvcsList.Items[i]
+		if strings.HasPrefix(pvc.Name, "prime-") || !hasDiskIdentity(pvc) {
+			continue
+		}
+		pvcs = append(pvcs, pvc)
+	}
+
+	sort.Slice(pvcs, func(i, j int) bool {
+		return getDiskIndex(pvcs[i]) < getDiskIndex(pvcs[j])
+	})
+
+	return pvcs, nil
+}
+
+// resolveVMUUID fetches the source VM from inventory and extracts the UUID
+// used as the vmUUID label value for PVC/DV discovery.
+func (r *KubeVirt) resolveVMUUID(vmRef ref.Ref) (string, error) {
+	v, err := r.Source.Inventory.VM(&vmRef)
+	if err != nil {
+		return "", liberr.Wrap(err)
+	}
+	return vmUUIDFromInventory(v, vmRef)
+}
+
+// vmUUIDFromInventory extracts the UUID from an already-fetched inventory VM.
+func vmUUIDFromInventory(v interface{}, vmRef ref.Ref) (string, error) {
+	if vsVM, ok := v.(*model.VM); ok {
+		if vsVM.UUID != "" {
+			return vsVM.UUID, nil
+		}
+		return "", fmt.Errorf("vSphere VM %q has an empty UUID", vmRef.ID)
+	}
+	// Non-vSphere providers use vmRef.ID as the vmUUID label.
+	if vmRef.ID == "" {
+		return "", fmt.Errorf("VM ref has an empty ID for non-vSphere provider")
+	}
+	return vmRef.ID, nil
+}
+
+// ValidateResumePVCs checks that reusable PVCs exist for the VM, are Bound,
+// and have no duplicate disk source or index.
+func (r *KubeVirt) ValidateResumePVCs(vmRef ref.Ref) error {
+	uuid, err := r.resolveVMUUID(vmRef)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	return r.validateResumePVCsByUUID(vmRef, uuid)
+}
+
+// validateResumePVCsByUUID performs the actual PVC validation given a
+// pre-resolved VM UUID. Separated for testability without inventory.
+func (r *KubeVirt) validateResumePVCsByUUID(vmRef ref.Ref, vmUUID string) error {
+	pvcs, err := r.listDiskPVCsByUUID(vmRef.ID, vmUUID)
+	if err != nil {
+		return err
+	}
+
+	if len(pvcs) == 0 {
+		return fmt.Errorf("no reusable PVCs found for VM %q in namespace %q", vmRef.ID, r.Plan.Spec.TargetNamespace)
+	}
+
+	seenSources := map[string]string{}
+	seenIndexes := map[int]string{}
+	for _, pvc := range pvcs {
+		if pvc.Status.Phase != core.ClaimBound {
+			return fmt.Errorf("PVC %q is not Bound (phase=%s); cannot resume conversion", pvc.Name, pvc.Status.Phase)
+		}
+
+		source := pvc.Annotations[planbase.AnnDiskSource]
+		if prev, dup := seenSources[source]; dup {
+			return fmt.Errorf("duplicate disk source %q on PVCs %q and %q; ambiguous disk set", source, prev, pvc.Name)
+		}
+		seenSources[source] = pvc.Name
+
+		idx := getDiskIndex(pvc)
+		if idx >= 0 {
+			if prev, dup := seenIndexes[idx]; dup {
+				return fmt.Errorf("duplicate disk index %d on PVCs %q and %q; ambiguous disk set", idx, prev, pvc.Name)
+			}
+			seenIndexes[idx] = pvc.Name
+		}
+	}
+
+	return nil
 }
 
 // hasDiskIdentity reports whether the PVC carries the AnnDiskSource annotation
@@ -2300,24 +2416,10 @@ func (r *KubeVirt) EnsureProviderVirtV2VPVCStatus(vmID string) (ready bool, err 
 	return
 }
 
-// Get the guest conversion pod for the VM.
-func (r *KubeVirt) GetGuestConversionPod(vm *plan.VMStatus) (pod *core.Pod, err error) {
-	list := &core.PodList{}
-	err = r.Destination.Client.List(
-		context.TODO(),
-		list,
-		&client.ListOptions{
-			LabelSelector: k8slabels.SelectorFromSet(r.conversionLabels(vm.Ref, false)),
-			Namespace:     r.Plan.Spec.TargetNamespace,
-		})
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-	if len(list.Items) > 0 {
-		pod = &list.Items[0]
-	}
-	return
+// GetGuestConversionPod returns the guest-conversion pod scoped to the
+// current migration for the given VM.
+func (r *KubeVirt) GetGuestConversionPod(vm *plan.VMStatus) (*core.Pod, error) {
+	return r.GetConversionPod(vm.Ref, convctx.VirtV2vConversionPod, false)
 }
 
 func (r *KubeVirt) getInspectionXml(pod *core.Pod) (string, error) {
@@ -2684,7 +2786,7 @@ func (r *KubeVirt) getPopulatorPods(vmID string) (pods []core.Pod, err error) {
 
 // Build the DataVolume CRs.
 func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap *core.ConfigMap, vddkConfigMap *core.ConfigMap) (dataVolumes []cdi.DataVolume, err error) {
-	_, err = r.Source.Inventory.VM(&vm.Ref)
+	srcVM, err := r.Source.Inventory.VM(&vm.Ref)
 	if err != nil {
 		return
 	}
@@ -2732,17 +2834,31 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 			Annotations: annotations,
 		},
 	}
-	if !(r.Builder.SupportsVolumePopulators() && r.Plan.IsWarm()) {
-		// For storage offload warm migrations, the template should have already
-		// been applied to the PVC that will be adopted by this DataVolume, so
-		// only add generateName for other migration types.
-		dvTemplate.ObjectMeta.GenerateName = r.getGeneratedName(vm)
-	}
 	dvTemplate.Labels = r.vmLabels(vm.Ref)
 
+	// Add vmUUID for any migration where copy and conversion are separate,
+	// so PVCs can be discovered by a resume-conversion migration.
+	if util.HasSeparateCopyAndConversion(r.Plan, vm.Ref, r.Destination.Client) {
+		if uuid, uuidErr := vmUUIDFromInventory(srcVM, vm.Ref); uuidErr != nil {
+			r.Log.Error(uuidErr, "Failed to resolve vmUUID label for DV; resume-conversion discovery may fail.", "vm", vm.String())
+		} else {
+			dvTemplate.Labels[kVmUuid] = uuid
+		}
+	}
 	dataVolumes, err = r.Builder.DataVolumes(vm.Ref, secret, configMap, &dvTemplate, vddkConfigMap)
 	if err != nil {
 		return
+	}
+
+	// Apply PVC name template to any DVs that the builder didn't name
+	for i := range dataVolumes {
+		dv := &dataVolumes[i]
+		if dv.Name == "" && dv.GenerateName == "" {
+			if templateErr := r.applyPVCNameTemplate(&dv.ObjectMeta, vm, i); templateErr != nil {
+				r.Log.Error(templateErr, "Failed to apply PVC name template, using fallback")
+				dv.GenerateName = r.getGeneratedName(vm)
+			}
+		}
 	}
 
 	err = r.createLunDisks(vm.Ref)
@@ -2758,6 +2874,25 @@ func (r *KubeVirt) getGeneratedName(vm *plan.VMStatus) string {
 			vm.ID,
 		},
 		"-") + "-"
+}
+
+// applyPVCNameTemplate applies the PVC name template to an ObjectMeta using
+// the generic template data (common fields only). This is the centralized
+// naming path for providers that don't override naming in their DataVolumes().
+func (r *KubeVirt) applyPVCNameTemplate(objectMeta *meta.ObjectMeta, vm *plan.VMStatus, diskIndex int) error {
+	pvcNameTemplate := planbase.GetPVCNameTemplate(r.Plan, vm.ID)
+	targetVmName := vm.Name
+	if vm.NewName != "" {
+		targetVmName = vm.NewName
+	}
+	templateData := &api.PVCNameTemplateData{
+		VmName:       vm.Name,
+		TargetVmName: targetVmName,
+		PlanName:     r.Plan.Name,
+		DiskIndex:    diskIndex,
+		VmId:         vm.ID,
+	}
+	return planbase.SetPVCNameOnObject(objectMeta, pvcNameTemplate, planbase.GetPVCNameTemplateUseGenerateName(r.Plan), templateData)
 }
 
 // Return the generated name for a specific VM and plan.

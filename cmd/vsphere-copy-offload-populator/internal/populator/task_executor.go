@@ -94,13 +94,21 @@ func ExecuteCloneTask(ctx context.Context, executor TaskExecutor, host *object.H
 	}
 
 	for {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("clone task cancelled: %w", err)
+		}
+
 		taskStatus, err := updateTaskStatus(ctx, task, executor, host, datastore, progress, xcopyUsed)
 		if err != nil {
 			return fmt.Errorf("failed to update task status: %w", err)
 		}
 
 		if taskStatus != nil && taskStatus.ExitCode != "" {
-			time.Sleep(taskPollingInterval)
+			select {
+			case <-time.After(taskPollingInterval):
+			case <-ctx.Done():
+				return fmt.Errorf("clone task cancelled: %w", ctx.Err())
+			}
 			taskStatus, err := updateTaskStatus(ctx, task, executor, host, datastore, progress, xcopyUsed)
 			if err != nil {
 				return fmt.Errorf("failed to update task status: %w", err)
@@ -112,6 +120,10 @@ func ExecuteCloneTask(ctx context.Context, executor TaskExecutor, host *object.H
 			return fmt.Errorf("clone task failed with exit code %s, stderr: %s", taskStatus.ExitCode, taskStatus.Stderr)
 		}
 
-		time.Sleep(taskPollingInterval)
+		select {
+		case <-time.After(taskPollingInterval):
+		case <-ctx.Done():
+			return fmt.Errorf("clone task cancelled: %w", ctx.Err())
+		}
 	}
 }
