@@ -98,8 +98,9 @@ func (r *Client) ensureImageV4(vmRef ref.Ref, disk model.Disk) (ready bool, err 
 // 302 pointing at the actual download location, plus an X-Redirect-Token
 // header that must be replayed as a Cookie on the follow-up request. A
 // generic HTTP client -- like CDI's importer -- has no way to know to do
-// that on its own, so this resolves it once, up front, and the result is
-// baked directly into the DataVolume's URL/ExtraHeaders instead.
+// that on its own, so this resolves it once, up front. The cookie is kept
+// in a SecretExtraHeaders Secret (see Builder.centralHTTPSource) rather
+// than baked into the DataVolume spec.
 func (r *Client) resolveImageV4DownloadURL(extID string) (downloadURL, cookie string, err error) {
 	requestURL := fmt.Sprintf("%s%s/%s/file", r.URL, imagesV4Path, url.PathEscape(extID))
 	status, header, err := r.GetNoRedirect(requestURL)

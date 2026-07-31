@@ -1,6 +1,7 @@
 package nutanix
 
 import (
+	"context"
 	"encoding/pem"
 	"fmt"
 	"net/url"
@@ -19,9 +20,13 @@ import (
 	libutil "github.com/kubev2v/forklift/pkg/lib/util"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8slabels "k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Firmware boot types (model.VM.BootType).
@@ -36,6 +41,13 @@ const (
 	adapterSCSI = "SCSI"
 	adapterSATA = "SATA"
 	adapterIDE  = "IDE"
+)
+
+// Labels / secret keys for Prism Central download-cookie Secrets referenced
+// via DataVolumeSourceHTTP.SecretExtraHeaders.
+const (
+	labelDownloadCookie = "forklift.konveyor.io/nutanix-download-cookie"
+	cookieHeaderKey     = "cookie"
 )
 
 type Builder struct {
@@ -340,7 +352,9 @@ func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec, usesIn
 // Image Service); Prism Central's v4 Image Service instead requires
 // resolving a one-time redirect+cookie handshake up front, since a
 // generic HTTP client -- like CDI's importer -- can't complete that
-// itself (see resolveImageV4DownloadURL).
+// itself (see resolveImageV4DownloadURL). The cookie is stored in a
+// SecretExtraHeaders Secret so it can be rotated without recreating the
+// DataVolume if the session expires mid-transfer.
 func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume, _ *core.ConfigMap) (dvs []cdi.DataVolume, err error) {
 	vm := &model.VM{}
 	if err = r.Source.Inventory.Find(vm, vmRef); err != nil {
@@ -377,7 +391,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 		if element {
 			httpSource, err = r.elementHTTPSource(baseURL, name, secret, configMap, client)
 		} else {
-			httpSource, err = r.centralHTTPSource(name, configMap, client)
+			httpSource, err = r.centralHTTPSource(vmRef, disk.UUID, name, configMap, client, dvTemplate.Labels)
 		}
 		if err != nil {
 			return nil, liberr.Wrap(err, "vm", vmRef.String(), "disk", disk.UUID)
@@ -409,33 +423,201 @@ func (r *Builder) elementHTTPSource(baseURL, name string, secret *core.Secret, c
 }
 
 // centralHTTPSource builds a DataVolumeSourceHTTP pointing at a Prism
-// Central catalog image's already-resolved download location, carrying
-// the one-time session cookie that location requires as an extra header
-// (see resolveImageV4DownloadURL). There's no Basic Auth secret here: the
-// resolved URL/cookie pair is itself the credential.
+// Central catalog image's already-resolved download location. The session
+// cookie from resolveImageV4DownloadURL is stored in a dedicated Secret and
+// referenced via SecretExtraHeaders (same pattern as OCP VM export tokens)
+// so the token is not left in plaintext on the DataVolume spec. There's no
+// Basic Auth SecretRef here: the resolved URL/cookie pair is itself the
+// credential.
 //
 // Prism Central redirects to a CVM address that often isn't covered by the
 // Prism Element certificate's SAN (the VIP is). The PE VIP serves the same
 // entity_download path with the same cookie, so we rewrite the Location
 // host to the cluster's external IP when we can discover one.
-func (r *Builder) centralHTTPSource(name string, configMap *core.ConfigMap, client *Client) (*cdi.DataVolumeSourceHTTP, error) {
-	entity, found, _, err := client.findImageV4ByName(name)
+func (r *Builder) centralHTTPSource(vmRef ref.Ref, diskUUID, name string, configMap *core.ConfigMap, client *Client, labels map[string]string) (*cdi.DataVolumeSourceHTTP, error) {
+	downloadURL, cookie, err := r.resolveCentralDownload(client, name)
 	if err != nil {
 		return nil, err
+	}
+	cookieSecret, err := r.ensureDownloadCookieSecret(vmRef, diskUUID, cookie, labels)
+	if err != nil {
+		return nil, err
+	}
+	return &cdi.DataVolumeSourceHTTP{
+		URL:                downloadURL,
+		CertConfigMap:      configMap.Name,
+		SecretExtraHeaders: []string{cookieSecret.Name},
+	}, nil
+}
+
+// resolveCentralDownload looks up the v4 catalog image and performs the
+// redirect+cookie handshake, rewriting the Location host to the PE VIP when
+// possible.
+func (r *Builder) resolveCentralDownload(client *Client, imageName string) (downloadURL, cookie string, err error) {
+	entity, found, _, err := client.findImageV4ByName(imageName)
+	if err != nil {
+		return "", "", err
 	}
 	if !found {
-		return nil, liberr.New("catalog image not found", "image", name)
+		return "", "", liberr.New("catalog image not found", "image", imageName)
 	}
-	downloadURL, cookie, err := client.resolveImageV4DownloadURL(entity.ExtID)
+	downloadURL, cookie, err = client.resolveImageV4DownloadURL(entity.ExtID)
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
-	downloadURL = client.preferClusterExternalURL(downloadURL)
-	return &cdi.DataVolumeSourceHTTP{
-		URL:           downloadURL,
-		CertConfigMap: configMap.Name,
-		ExtraHeaders:  []string{"Cookie: " + cookie},
-	}, nil
+	return client.preferClusterExternalURL(downloadURL), cookie, nil
+}
+
+// ensureDownloadCookieSecret creates or updates the per-disk Secret that
+// holds the Prism Central download Cookie header for CDI's importer.
+func (r *Builder) ensureDownloadCookieSecret(vmRef ref.Ref, diskUUID, cookie string, labels map[string]string) (*core.Secret, error) {
+	secretLabels := map[string]string{
+		labelDownloadCookie:    "true",
+		planbase.AnnDiskSource: diskUUID,
+	}
+	for k, v := range labels {
+		secretLabels[k] = v
+	}
+
+	header := cookieHeaderValue(cookie)
+	selector := map[string]string{
+		labelDownloadCookie:    "true",
+		planbase.AnnDiskSource: diskUUID,
+	}
+	if migrationID, ok := labels["migration"]; ok && migrationID != "" {
+		selector["migration"] = migrationID
+	}
+	list := &core.SecretList{}
+	err := r.Destination.Client.List(
+		context.TODO(),
+		list,
+		&client.ListOptions{
+			LabelSelector: k8slabels.SelectorFromSet(selector),
+			Namespace:     r.Plan.Spec.TargetNamespace,
+		},
+	)
+	if err != nil {
+		return nil, liberr.Wrap(err, "vm", vmRef.String(), "disk", diskUUID)
+	}
+
+	if len(list.Items) > 0 {
+		secret := &list.Items[0]
+		secret.StringData = map[string]string{cookieHeaderKey: header}
+		if err = r.Destination.Client.Update(context.TODO(), secret); err != nil {
+			return nil, liberr.Wrap(err, "secret", secret.Name, "disk", diskUUID)
+		}
+		r.Log.V(1).Info("Updated Nutanix download cookie secret.",
+			"secret", path.Join(secret.Namespace, secret.Name),
+			"vm", vmRef.String(),
+			"disk", diskUUID)
+		return secret, nil
+	}
+
+	secret := &core.Secret{
+		ObjectMeta: meta.ObjectMeta{
+			Namespace: r.Plan.Spec.TargetNamespace,
+			GenerateName: strings.Join(
+				[]string{r.Plan.Name, vmRef.ID, "dlcookie"},
+				"-") + "-",
+			Labels: secretLabels,
+			Annotations: map[string]string{
+				planbase.AnnDiskSource: diskUUID,
+			},
+		},
+		StringData: map[string]string{cookieHeaderKey: header},
+	}
+	if err = r.Destination.Client.Create(context.TODO(), secret); err != nil {
+		return nil, liberr.Wrap(err, "vm", vmRef.String(), "disk", diskUUID)
+	}
+	r.Log.V(1).Info("Created Nutanix download cookie secret.",
+		"secret", path.Join(secret.Namespace, secret.Name),
+		"vm", vmRef.String(),
+		"disk", diskUUID)
+	return secret, nil
+}
+
+func cookieHeaderValue(cookie string) string {
+	return "Cookie: " + cookie
+}
+
+// RefreshImportCredentials re-resolves the Prism Central download URL/cookie
+// for a DataVolume whose importer failed with an auth error, updates the
+// SecretExtraHeaders Secret (and the DV URL if the Location changed), and
+// returns refreshed=true so the caller can restart the importer pod.
+func (r *Builder) RefreshImportCredentials(dv *cdi.DataVolume) (bool, error) {
+	if dv == nil || dv.Spec.Source == nil || dv.Spec.Source.HTTP == nil {
+		return false, nil
+	}
+	httpSource := dv.Spec.Source.HTTP
+	if len(httpSource.SecretExtraHeaders) == 0 {
+		return false, nil
+	}
+
+	diskUUID := ""
+	if dv.Annotations != nil {
+		diskUUID = dv.Annotations[planbase.AnnDiskSource]
+	}
+	if diskUUID == "" {
+		return false, nil
+	}
+
+	client := &Client{Context: r.Context}
+	if err := client.connect(); err != nil {
+		return false, err
+	}
+	element, err := client.isPrismElement()
+	if err != nil {
+		return false, err
+	}
+	if element {
+		return false, nil
+	}
+
+	vmID := ""
+	if dv.Labels != nil {
+		vmID = dv.Labels["vmID"]
+	}
+	if vmID == "" {
+		return false, liberr.New("missing vmID label on DataVolume", "dv", path.Join(dv.Namespace, dv.Name))
+	}
+
+	imageName := migrationImageName(string(r.Migration.UID), ref.Ref{ID: vmID}, diskUUID)
+	downloadURL, cookie, err := r.resolveCentralDownload(client, imageName)
+	if err != nil {
+		return false, liberr.Wrap(err, "dv", path.Join(dv.Namespace, dv.Name), "disk", diskUUID)
+	}
+
+	secretName := httpSource.SecretExtraHeaders[0]
+	secret := &core.Secret{}
+	err = r.Destination.Client.Get(
+		context.TODO(),
+		types.NamespacedName{Namespace: dv.Namespace, Name: secretName},
+		secret,
+	)
+	if err != nil {
+		return false, liberr.Wrap(err, "secret", secretName)
+	}
+	secret.StringData = map[string]string{cookieHeaderKey: cookieHeaderValue(cookie)}
+	if err = r.Destination.Client.Update(context.TODO(), secret); err != nil {
+		return false, liberr.Wrap(err, "secret", secretName)
+	}
+
+	if httpSource.URL != downloadURL {
+		updated := dv.DeepCopy()
+		updated.Spec.Source.HTTP.URL = downloadURL
+		if err = r.Destination.Client.Update(context.TODO(), updated); err != nil {
+			return false, liberr.Wrap(err, "dv", path.Join(dv.Namespace, dv.Name))
+		}
+		r.Log.Info("Updated Nutanix download URL after cookie refresh.",
+			"dv", path.Join(dv.Namespace, dv.Name),
+			"disk", diskUUID)
+	}
+
+	r.Log.Info("Refreshed Nutanix download cookie secret.",
+		"secret", path.Join(secret.Namespace, secret.Name),
+		"dv", path.Join(dv.Namespace, dv.Name),
+		"disk", diskUUID)
+	return true, nil
 }
 
 func (r *Builder) mapDataVolume(
