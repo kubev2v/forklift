@@ -1035,7 +1035,7 @@ func (r *Client) collectPerVMNICs(vmName, computerName string, networks []types.
 func formatMAC(mac string) string {
 	mac = strings.ReplaceAll(mac, "-", "")
 	mac = strings.ReplaceAll(mac, ":", "")
-	mac = strings.ToUpper(mac)
+	mac = strings.ToLower(mac)
 	if len(mac) == 12 {
 		return fmt.Sprintf("%s:%s:%s:%s:%s:%s",
 			mac[0:2], mac[2:4], mac[4:6], mac[6:8], mac[8:10], mac[10:12])

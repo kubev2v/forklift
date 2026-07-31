@@ -268,7 +268,7 @@ func TestApplyBatchDetails(t *testing.T) {
 		t.Errorf("vm-linux-01: expected prefix length 24, got %d", vms[0].GuestNetworks[0].PrefixLength)
 	}
 	// MAC should be normalized to colon-separated format
-	expectedMAC := "00:15:5D:01:01:01"
+	expectedMAC := "00:15:5d:01:01:01"
 	if vms[0].GuestNetworks[0].MAC != expectedMAC {
 		t.Errorf("vm-linux-01: expected MAC '%s', got '%s'", expectedMAC, vms[0].GuestNetworks[0].MAC)
 	}
@@ -380,8 +380,8 @@ func TestApplyBatchDetails_ClusterModeBuildDisksAndNICs(t *testing.T) {
 	if len(vms[0].NICs) != 1 {
 		t.Fatalf("Expected 1 NIC, got %d", len(vms[0].NICs))
 	}
-	if vms[0].NICs[0].MAC != "00:15:5D:01:01:01" {
-		t.Errorf("Expected normalized MAC '00:15:5D:01:01:01', got '%s'", vms[0].NICs[0].MAC)
+	if vms[0].NICs[0].MAC != "00:15:5d:01:01:01" {
+		t.Errorf("Expected normalized MAC '00:15:5d:01:01:01', got '%s'", vms[0].NICs[0].MAC)
 	}
 	if vms[0].NICs[0].NetworkUUID != "switch-uuid-1" {
 		t.Errorf("Expected NetworkUUID 'switch-uuid-1', got '%s'", vms[0].NICs[0].NetworkUUID)
@@ -541,10 +541,10 @@ func TestFormatMAC(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"00155D010101", "00:15:5D:01:01:01"},
-		{"00-15-5D-01-01-01", "00:15:5D:01:01:01"},
-		{"00:15:5D:01:01:01", "00:15:5D:01:01:01"},
-		{"short", "SHORT"},
+		{"00155D010101", "00:15:5d:01:01:01"},
+		{"00-15-5D-01-01-01", "00:15:5d:01:01:01"},
+		{"00:15:5D:01:01:01", "00:15:5d:01:01:01"},
+		{"short", "short"},
 	}
 
 	for _, tc := range tests {
@@ -823,7 +823,7 @@ func TestBuildGuestNetworks(t *testing.T) {
 	if ipv4.IP != "192.168.1.10" {
 		t.Errorf("Expected IPv4 '192.168.1.10', got '%s'", ipv4.IP)
 	}
-	if ipv4.MAC != "00:15:5D:01:01:01" {
+	if ipv4.MAC != "00:15:5d:01:01:01" {
 		t.Errorf("Expected normalized MAC, got '%s'", ipv4.MAC)
 	}
 	if ipv4.Origin != "Dhcp" {
@@ -856,7 +856,7 @@ func TestBuildGuestNetworks_DashedMAC(t *testing.T) {
 	if len(result) != 1 {
 		t.Fatalf("Expected 1 result, got %d", len(result))
 	}
-	if result[0].MAC != "00:15:5D:01:01:01" {
+	if result[0].MAC != "00:15:5d:01:01:01" {
 		t.Errorf("Expected colon-separated MAC from dashed input, got '%s'", result[0].MAC)
 	}
 }
