@@ -1,7 +1,6 @@
 package hyperv
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -158,38 +157,12 @@ func (r *Client) PowerOff(vmRef ref.Ref) error {
 		return err
 	}
 
-	// In cluster mode, the VM may be on a different node than the entry
-	// point. Route the Stop-VM command to the correct node via RunOnNode.
-	if r.Source.Provider.IsHyperVCluster() && vm.Host != "" {
-		cmd := ps.BuildCommand(ps.StopVM, vm.Name)
-		if _, err = drv.RunOnNode(cmd, vm.Host); err != nil {
-			return fmt.Errorf("failed to power off VM %s on node %s: %w", vm.Name, vm.Host, err)
-		}
-		log.Info("Powered off VM via RunOnNode", "vm", vm.Name, "node", vm.Host)
-		return nil
+	cmd := ps.BuildCommand(ps.InitiateShutdown, vm.Name)
+	if _, err = drv.RunOnNode(cmd, vm.Host); err != nil {
+		return fmt.Errorf("failed to initiate shutdown for VM %s: %w", vm.Name, err)
 	}
 
-	domain, err := drv.LookupDomainByName(vm.Name)
-	if err != nil {
-		log.Info("VM not found on provider, treating as already off", "vm", vm.Name)
-		return nil
-	}
-	defer func() { _ = domain.Free() }()
-
-	state, _, err := domain.GetState()
-	if err != nil {
-		return fmt.Errorf("failed to get VM state: %w", err)
-	}
-	if state == driver.DOMAIN_SHUTOFF {
-		log.Info("VM already powered off (confirmed via WinRM)", "vm", vm.Name)
-		return nil
-	}
-
-	if err := domain.Shutdown(context.TODO()); err != nil {
-		return fmt.Errorf("failed to power off VM %s: %w", vm.Name, err)
-	}
-
-	log.Info("Powered off VM", "vm", vm.Name)
+	log.Info("Initiated graceful shutdown", "vm", vm.Name, "host", vm.Host)
 	return nil
 }
 

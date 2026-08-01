@@ -65,9 +65,18 @@ const (
 	// Parameters: vmName
 	GetVMState = `Get-VM -Name '%s' | Select-Object -ExpandProperty State`
 
-	// StopVM forcefully stops a VM.
+	// InitiateShutdown gracefully shuts down a VM via Hyper-V WMI.
+	// Uses Msvm_ShutdownComponent which is async — returns immediately,
+	// shutdown is owned by vmms.exe and survives WinRM session closure.
 	// Parameters: vmName
-	StopVM = `Stop-VM -Name '%s' -Force -Confirm:$false`
+	InitiateShutdown = `$vmName = '%s'
+$vm = Get-CimInstance -Namespace root\virtualization\v2 -ClassName Msvm_ComputerSystem -Filter "ElementName='$vmName'" | Select-Object -First 1
+if (-not $vm) { throw "VM '$vmName' not found" }
+if ($vm.EnabledState -eq 3) { return }
+$sc = @(Get-CimAssociatedInstance -InputObject $vm -ResultClassName Msvm_ShutdownComponent)
+if ($sc.Count -eq 0) { throw "Shutdown Integration Service not available for VM '$vmName'" }
+$r = Invoke-CimMethod -InputObject $sc[0] -MethodName InitiateShutdown -Arguments @{Force=$true; Reason='Forklift migration'}
+if ($r.ReturnValue -notin 0, 4096, 32782) { throw "InitiateShutdown failed for VM '$vmName': return code $($r.ReturnValue)" }`
 )
 
 const (
