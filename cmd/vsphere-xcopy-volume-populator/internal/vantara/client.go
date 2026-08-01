@@ -1,5 +1,11 @@
 package vantara
 
+// StorageInfo represents storage system details from the Vantara API
+type StorageInfo struct {
+	Model            string `json:"model"`
+	DkcMicroVersion  string `json:"dkcMicroVersion"`
+}
+
 // VantaraClient defines the interface for interacting with Vantara storage REST API
 // This interface abstracts the HTTP client implementation for better testability
 type VantaraClient interface {
@@ -20,6 +26,9 @@ type VantaraClient interface {
 	// Snapshot and clone operations
 	CreateCloneLdev(snapshotGroupName string, snapshotPoolId string, pvolLdevId string, svolLdevId string, copySpeed string) error
 	GetClonePairs(snapshotGroupName string, pvolLdevId string) (*ClonePairResponse, error)
+
+	// System information
+	GetStorageInfo() (*StorageInfo, error)
 }
 
 // LdevResponse represents the response from GetLdev API call

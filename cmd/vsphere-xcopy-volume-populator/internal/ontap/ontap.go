@@ -17,10 +17,17 @@ const OntapProviderID = "600a0980"
 
 // Ensure NetappClonner implements required interfaces
 var _ populator.VMDKCapable = &NetappClonner{}
+var _ populator.StorageArrayInfoProvider = &NetappClonner{}
 
 type NetappClonner struct {
 	api                  api.OntapAPI
 	initiatorHostOrGroup string
+	arrayInfo            populator.StorageArrayInfo
+}
+
+// GetStorageArrayInfo returns metadata about the ONTAP array for metric labels.
+func (c *NetappClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
+	return c.arrayInfo
 }
 
 // Map the targetLUN to the initiator group.
@@ -118,7 +125,22 @@ func NewNetappClonner(hostname, username, password string) (NetappClonner, error
 		return NetappClonner{}, fmt.Errorf("failed to initialize ONTAP client (common causes: incorrect password, invalid SVM name, network connectivity): %w", err)
 	}
 
-	nc := NetappClonner{api: client}
+	nc := NetappClonner{
+		api: client,
+		arrayInfo: populator.StorageArrayInfo{
+			Vendor:  "NetApp",
+			Product: "ONTAP",
+		},
+	}
+
+	// Fetch ONTAP API version
+	ontapVersion, err := client.APIVersion(context.TODO())
+	if err != nil {
+		klog.Warningf("Failed to get ONTAP version for metrics: %v", err)
+	} else {
+		nc.arrayInfo.Version = ontapVersion
+	}
+
 	return nc, nil
 }
 

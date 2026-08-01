@@ -133,6 +133,13 @@ func (m *MockPrimera3ParClient) CopyVolume(sourceVolName string, destVolName str
 	return nil
 }
 
+func (m *MockPrimera3ParClient) GetSystemInfo() (SystemInfo, error) {
+	return SystemInfo{
+		SystemVersion: "4.0.0",
+		Model:         "HPE Primera 630",
+	}, nil
+}
+
 func (m *MockPrimera3ParClient) GetVolumes() ([]Volume, error) {
 	var result []Volume
 	id := 0

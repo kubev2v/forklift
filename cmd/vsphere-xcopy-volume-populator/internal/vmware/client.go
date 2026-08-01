@@ -37,6 +37,12 @@ type Client interface {
 	GetDatastore(ctx context.Context, dc *object.Datacenter, datastore string) (*object.Datastore, error)
 	// GetVMDiskBacking returns disk backing information for detecting disk type (VVol, RDM, VMDK)
 	GetVMDiskBacking(ctx context.Context, vmId string, vmdkPath string) (*DiskBacking, error)
+	// GetVirtualDiskSizes returns provisioned capacity, datastore-allocated bytes, and disk
+	// backing info for the virtual disk matching vmdkPath in a single VM lookup. Provisioned
+	// is the guest-visible disk size; allocated is the sum of diskExtent file sizes from
+	// layoutEx (thin-used blocks on VMFS). VVol/RDM returns (provisioned, 0, backing, nil).
+	// Returns (0, 0, nil, nil) if the disk cannot be matched.
+	GetVirtualDiskSizes(ctx context.Context, vmId, vmdkPath string) (provisionedBytes, datastoreAllocatedBytes int64, backing *DiskBacking, err error)
 	GetDatastoreActiveAdapters(ctx context.Context, host *object.HostSystem, datastoreName string) ([]HostAdapter, error)
 }
 
@@ -428,38 +434,9 @@ func (c *VSphereClient) GetDatastore(ctx context.Context, dc *object.Datacenter,
 // GetVMDiskBacking retrieves disk backing information to determine disk type
 func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkPath string) (*DiskBacking, error) {
 	log := klog.FromContext(ctx).WithName("esxcli")
-	finder := find.NewFinder(c.Client.Client, true)
-	datacenters, err := finder.DatacenterList(ctx, "*")
+	_, vmProps, err := c.getVMWithConfig(ctx, vmId)
 	if err != nil {
-		return nil, fmt.Errorf("failed getting datacenters: %w", err)
-	}
-
-	var vm *object.VirtualMachine
-	for _, dc := range datacenters {
-		finder.SetDatacenter(dc)
-		result, err := finder.VirtualMachine(ctx, vmId)
-		if err != nil {
-			if _, ok := err.(*find.NotFoundError); !ok {
-				return nil, fmt.Errorf("error searching for VM in Datacenter '%s': %w", dc.Name(), err)
-			}
-		} else {
-			vm = result
-			break
-		}
-	}
-	if vm == nil {
-		moref := types.ManagedObjectReference{Type: "VirtualMachine", Value: vmId}
-		vm = object.NewVirtualMachine(c.Client.Client, moref)
-	}
-	if vm == nil {
-		return nil, fmt.Errorf("failed to find VM with ID %s", vmId)
-	}
-
-	// Get VM configuration to inspect disk devices
-	var vmProps mo.VirtualMachine
-	err = vm.Properties(ctx, vm.Reference(), []string{"config.hardware.device"}, &vmProps)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get VM properties: %w", err)
+		return nil, err
 	}
 
 	// Normalize vmdkPath for comparison (remove brackets and spaces)
@@ -528,6 +505,153 @@ func (c *VSphereClient) GetVMDiskBacking(ctx context.Context, vmId string, vmdkP
 		IsRDM:      false,
 		DeviceName: "",
 	}, nil
+}
+
+// getVMWithConfig looks up a VM across all datacenters and fetches its hardware device config.
+// Falls back to a direct moref lookup if the VM is not found by name/path.
+func (c *VSphereClient) getVMWithConfig(ctx context.Context, vmId string) (*object.VirtualMachine, *mo.VirtualMachine, error) {
+	finder := find.NewFinder(c.Client.Client, true)
+	datacenters, err := finder.DatacenterList(ctx, "*")
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed getting datacenters: %w", err)
+	}
+
+	var vm *object.VirtualMachine
+	for _, dc := range datacenters {
+		finder.SetDatacenter(dc)
+		result, err := finder.VirtualMachine(ctx, vmId)
+		if err != nil {
+			if _, ok := err.(*find.NotFoundError); !ok {
+				return nil, nil, fmt.Errorf("error searching for VM in Datacenter '%s': %w", dc.Name(), err)
+			}
+		} else {
+			vm = result
+			break
+		}
+	}
+	if vm == nil {
+		moref := types.ManagedObjectReference{Type: "VirtualMachine", Value: vmId}
+		vm = object.NewVirtualMachine(c.Client.Client, moref)
+	}
+
+	var vmProps mo.VirtualMachine
+	err = vm.Properties(ctx, vm.Reference(), []string{"config.hardware.device"}, &vmProps)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get VM properties: %w", err)
+	}
+
+	return vm, &vmProps, nil
+}
+
+func virtualDiskProvisionedBytes(d *types.VirtualDisk) int64 {
+	if d.CapacityInBytes > 0 {
+		return d.CapacityInBytes
+	}
+	return d.CapacityInKB * 1024
+}
+
+// GetVirtualDiskSizes implements Client. It returns provisioned bytes, datastore-allocated
+// bytes, and disk backing info for the disk matching vmdkPath in a single VM lookup.
+func (c *VSphereClient) GetVirtualDiskSizes(ctx context.Context, vmId, vmdkPath string) (int64, int64, *DiskBacking, error) {
+	log := klog.FromContext(ctx).WithName("esxcli")
+	vm, vmProps, err := c.getVMWithConfig(ctx, vmId)
+	if err != nil {
+		return 0, 0, nil, err
+	}
+	if vmProps.Config == nil {
+		return 0, 0, nil, nil
+	}
+
+	normalizedPath := strings.ToLower(vmdkPath)
+	var matchedDisk *types.VirtualDisk
+	var diskBacking *DiskBacking
+	for _, device := range vmProps.Config.Hardware.Device {
+		disk, ok := device.(*types.VirtualDisk)
+		if !ok {
+			continue
+		}
+		switch backing := disk.Backing.(type) {
+		case *types.VirtualDiskFlatVer2BackingInfo:
+			if !strings.Contains(strings.ToLower(backing.FileName), normalizedPath) &&
+				!strings.Contains(normalizedPath, strings.ToLower(backing.FileName)) {
+				if !diskPathMatches(backing.FileName, vmdkPath) {
+					continue
+				}
+			}
+			matchedDisk = disk
+			if backing.BackingObjectId != "" {
+				log.V(2).Info("disk is VVol-backed", "vmdk", vmdkPath, "backing_object_id", backing.BackingObjectId)
+				diskBacking = &DiskBacking{VVolId: backing.BackingObjectId, DeviceName: backing.FileName}
+			} else {
+				log.V(2).Info("disk is VMDK-backed", "vmdk", vmdkPath)
+				diskBacking = &DiskBacking{DeviceName: backing.FileName}
+			}
+		case *types.VirtualDiskRawDiskMappingVer1BackingInfo:
+			if !strings.Contains(strings.ToLower(backing.FileName), normalizedPath) &&
+				!strings.Contains(normalizedPath, strings.ToLower(backing.FileName)) {
+				if !diskPathMatches(backing.FileName, vmdkPath) {
+					continue
+				}
+			}
+			matchedDisk = disk
+			log.V(2).Info("disk is RDM-backed", "vmdk", vmdkPath, "device", backing.DeviceName, "lunUuid", backing.LunUuid)
+			diskBacking = &DiskBacking{IsRDM: true, DeviceName: backing.DeviceName, LunUuid: backing.LunUuid}
+		}
+		if matchedDisk != nil {
+			break
+		}
+	}
+	if matchedDisk == nil {
+		log.V(2).Info("disk not found, assuming VMDK type", "vmdk", vmdkPath)
+		return 0, 0, &DiskBacking{}, nil
+	}
+
+	provisionedBytes := virtualDiskProvisionedBytes(matchedDisk)
+
+	// VVol/RDM: layoutEx extent semantics differ; return provisioned only.
+	if diskBacking.VVolId != "" || diskBacking.IsRDM {
+		return provisionedBytes, 0, diskBacking, nil
+	}
+
+	// Fetch datastore-allocated bytes from layoutEx for VMDK disks.
+	if err := vm.RefreshStorageInfo(ctx); err != nil {
+		return provisionedBytes, 0, diskBacking, fmt.Errorf("RefreshStorageInfo: %w", err)
+	}
+
+	var moVM mo.VirtualMachine
+	err = vm.Properties(ctx, vm.Reference(), []string{"layoutEx"}, &moVM)
+	if err != nil {
+		return provisionedBytes, 0, diskBacking, fmt.Errorf("layoutEx: %w", err)
+	}
+	if moVM.LayoutEx == nil {
+		return provisionedBytes, 0, diskBacking, nil
+	}
+
+	fileByKey := make(map[int32]types.VirtualMachineFileLayoutExFileInfo, len(moVM.LayoutEx.File))
+	for _, f := range moVM.LayoutEx.File {
+		fileByKey[f.Key] = f
+	}
+
+	extentType := string(types.VirtualMachineFileLayoutExFileTypeDiskExtent)
+	var total int64
+	for _, dl := range moVM.LayoutEx.Disk {
+		if dl.Key != matchedDisk.Key {
+			continue
+		}
+		for _, unit := range dl.Chain {
+			for _, fk := range unit.FileKey {
+				f := fileByKey[fk]
+				if f.Type == extentType {
+					total += f.Size
+				}
+			}
+		}
+		break
+	}
+	if total <= 0 {
+		return provisionedBytes, 0, diskBacking, nil
+	}
+	return provisionedBytes, total, diskBacking, nil
 }
 
 // diskPathMatches compares two VMDK paths accounting for different formats

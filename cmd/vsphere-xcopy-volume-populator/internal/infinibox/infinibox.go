@@ -22,6 +22,15 @@ const (
 type InfiniboxClonner struct {
 	api            iboxapi.Client
 	initiatorGroup string
+	arrayInfo      populator.StorageArrayInfo
+}
+
+// Ensure InfiniboxClonner implements StorageArrayInfoProvider
+var _ populator.StorageArrayInfoProvider = &InfiniboxClonner{}
+
+// GetStorageArrayInfo returns metadata about the InfiniBox array for metric labels.
+func (c *InfiniboxClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
+	return c.arrayInfo
 }
 
 func (c *InfiniboxClonner) MapTarget(targetLUN populator.LUN, context populator.MappingContext) (populator.LUN, error) {
@@ -158,9 +167,24 @@ func NewInfiniboxClonner(hostname, username, password string, insecure bool) (In
 	// Create InfiniBox client
 	client := iboxapi.NewIboxClient(logger, creds)
 
-	return InfiniboxClonner{
+	clonner := InfiniboxClonner{
 		api: client,
-	}, nil
+		arrayInfo: populator.StorageArrayInfo{
+			Vendor:  "Infinidat",
+			Product: "InfiniBox",
+		},
+	}
+
+	// Fetch model and version from the API
+	sysInfo, err := client.GetSystem()
+	if err != nil {
+		klog.Warningf("Failed to get InfiniBox system info for metrics: %v", err)
+	} else {
+		clonner.arrayInfo.Model = sysInfo.Model
+		clonner.arrayInfo.Version = sysInfo.Version
+	}
+
+	return clonner, nil
 }
 
 func (c *InfiniboxClonner) ResolvePVToLUN(pv populator.PersistentVolume) (populator.LUN, error) {

@@ -16,17 +16,39 @@ const PROVIDER_ID = "60002ac"
 // Ensure Primera3ParClonner implements required interfaces
 var _ populator.RDMCapable = &Primera3ParClonner{}
 var _ populator.VVolCapable = &Primera3ParClonner{}
+var _ populator.StorageArrayInfoProvider = &Primera3ParClonner{}
 
 type Primera3ParClonner struct {
 	client         Primera3ParClient
 	initiatorGroup string
+	arrayInfo      populator.StorageArrayInfo
+}
+
+// GetStorageArrayInfo returns metadata about the Primera/3PAR array for metric labels.
+func (c *Primera3ParClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
+	return c.arrayInfo
 }
 
 func NewPrimera3ParClonner(storageHostname, storageUsername, storagePassword string, sslSkipVerify bool) (Primera3ParClonner, error) {
 	clon := NewPrimera3ParClientWsImpl(storageHostname, storageUsername, storagePassword, sslSkipVerify)
-	return Primera3ParClonner{
+	clonner := Primera3ParClonner{
 		client: &clon,
-	}, nil
+		arrayInfo: populator.StorageArrayInfo{
+			Vendor:  "HPE",
+			Product: "Primera/3PAR",
+		},
+	}
+
+	// Fetch model and version from the API
+	sysInfo, err := clon.GetSystemInfo()
+	if err != nil {
+		klog.Warningf("Failed to get Primera/3PAR system info for metrics: %v", err)
+	} else {
+		clonner.arrayInfo.Model = sysInfo.Model
+		clonner.arrayInfo.Version = sysInfo.SystemVersion
+	}
+
+	return clonner, nil
 }
 
 // EnsureClonnerIgroup creates or update an initiator group with the clonnerIqn

@@ -10,12 +10,18 @@ import (
 type VvolPopulator struct {
 	vSphereClient vmware.Client
 	storageApi    VVolCapable
+	copyCtx       CopyContext
 }
 
-func NewVvolPopulator(storageApi VVolCapable, vmwareClient vmware.Client) (Populator, error) {
+func (p *VvolPopulator) GetCopyContext() CopyContext {
+	return p.copyCtx
+}
+
+func NewVvolPopulator(storageApi VVolCapable, vmwareClient vmware.Client, copyCtx CopyContext) (Populator, error) {
 	return &VvolPopulator{
 		vSphereClient: vmwareClient,
 		storageApi:    storageApi,
+		copyCtx:       copyCtx,
 	}, nil
 }
 

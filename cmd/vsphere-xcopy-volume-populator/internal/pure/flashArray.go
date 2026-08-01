@@ -19,12 +19,14 @@ const FlashProviderID = "624a9370"
 var _ populator.RDMCapable = &FlashArrayClonner{}
 var _ populator.VVolCapable = &FlashArrayClonner{}
 var _ populator.VMDKCapable = &FlashArrayClonner{}
+var _ populator.StorageArrayInfoProvider = &FlashArrayClonner{}
 
 type FlashArrayClonner struct {
 	restClient    *RestClient
 	clusterPrefix string
 	// TODO use this instead of mappingContext[hosts]
 	initiatorHostOrGroup string
+	arrayInfo            populator.StorageArrayInfo
 }
 
 const ClusterPrefixEnv = "PURE_CLUSTER_PREFIX"
@@ -48,10 +50,30 @@ func NewFlashArrayClonner(hostname, username, password, apiToken string, skipSSL
 		return FlashArrayClonner{}, fmt.Errorf("failed to create REST client: %w", err)
 	}
 
-	return FlashArrayClonner{
+	clonner := FlashArrayClonner{
 		restClient:    restClient,
 		clusterPrefix: clusterPrefix,
-	}, nil
+		arrayInfo: populator.StorageArrayInfo{
+			Vendor:  "Pure Storage",
+			Product: "FlashArray",
+		},
+	}
+
+	// Fetch model and version from the API
+	info, err := restClient.GetArrayInfo()
+	if err != nil {
+		klog.Warningf("Failed to get Pure FlashArray info for metrics: %v", err)
+	} else {
+		clonner.arrayInfo.Model = info.Model
+		clonner.arrayInfo.Version = info.Version
+	}
+
+	return clonner, nil
+}
+
+// GetStorageArrayInfo returns metadata about the Pure FlashArray for metric labels.
+func (f *FlashArrayClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
+	return f.arrayInfo
 }
 
 // EnsureClonnerIgroup creates or updates an initiator group with the ESX adapters

@@ -90,6 +90,8 @@ type HostPort struct {
 type FlashSystemInfo struct {
 	VdiskProtectionEnabled string `json:"vdisk_protection_enabled"`
 	VdiskProtectionTime    string `json:"vdisk_protection_time"`
+	ProductName            string `json:"product_name"`
+	CodeLevel              string `json:"code_level"`
 }
 
 // FlashSystemAPIClient handles communication with the FlashSystem REST API.
@@ -386,6 +388,15 @@ var _ populator.RDMCapable = &FlashSystemClonner{}
 type FlashSystemClonner struct {
 	api            *FlashSystemAPIClient
 	initiatorGroup string
+	arrayInfo      populator.StorageArrayInfo
+}
+
+// Ensure FlashSystemClonner implements StorageArrayInfoProvider
+var _ populator.StorageArrayInfoProvider = &FlashSystemClonner{}
+
+// GetStorageArrayInfo returns metadata about the FlashSystem array for metric labels.
+func (c *FlashSystemClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
+	return c.arrayInfo
 }
 
 // NewFlashSystemClonner creates a new FlashSystemClonner.
@@ -411,7 +422,17 @@ func NewFlashSystemClonner(managementIP, username, password string, sslSkipVerif
 		return FlashSystemClonner{}, fmt.Errorf("vdisk protection is enabled on the IBM FlashSystem; it must be disabled")
 	}
 
-	return FlashSystemClonner{api: client}, nil
+	clonner := FlashSystemClonner{
+		api: client,
+		arrayInfo: populator.StorageArrayInfo{
+			Vendor:  "IBM",
+			Product: "FlashSystem",
+			Model:   sysInfo.ProductName,
+			Version: sysInfo.CodeLevel,
+		},
+	}
+
+	return clonner, nil
 }
 
 func (c *FlashSystemClonner) MapTarget(targetLUN populator.LUN, context populator.MappingContext) (populator.LUN, error) {
