@@ -15,7 +15,7 @@ require (
 	github.com/hashicorp/go-version v1.9.0
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.7
 	github.com/mattn/go-sqlite3 v1.14.44
-	github.com/onsi/ginkgo v1.16.5
+	github.com/onsi/ginkgo/v2 v2.32.0
 	github.com/onsi/ginkgo/v2 v2.27.4
 	github.com/onsi/gomega v1.40.0
 	github.com/openshift/api v0.0.0-20260511191110-9b69e5fa27e9
