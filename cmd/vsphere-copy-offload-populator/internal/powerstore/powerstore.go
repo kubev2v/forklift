@@ -10,6 +10,7 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/fcutil"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/storage"
 	"k8s.io/klog/v2"
 )
 
@@ -28,10 +29,39 @@ type PowerstoreClonner struct {
 
 // Ensure PowerstoreClonner implements StorageArrayInfoProvider
 var _ populator.StorageArrayInfoProvider = &PowerstoreClonner{}
+var _ storage.ArrayIdentifier = &PowerstoreClonner{}
 
 // GetStorageArrayInfo returns metadata about the PowerStore array for metric labels.
 func (p *PowerstoreClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 	return p.arrayInfo
+}
+
+// TargetPorts returns this array's own FC and iSCSI target port identities.
+func (p *PowerstoreClonner) TargetPorts() ([]string, error) {
+	var ports []string
+
+	fcPorts, err := p.Client.GetFCPorts(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to list FC ports: %w", err)
+	}
+	for _, port := range fcPorts {
+		if port.Wwn != "" {
+			ports = append(ports, "fc."+port.Wwn)
+		}
+	}
+
+	iscsiAddrs, err := p.Client.GetStorageISCSITargetAddresses(context.Background())
+	if err != nil {
+		p.log.V(1).Info("no iSCSI target addresses (array may be FC-only)", "err", err)
+	} else {
+		for _, addr := range iscsiAddrs {
+			if addr.IPPort.TargetIqn != "" {
+				ports = append(ports, addr.IPPort.TargetIqn)
+			}
+		}
+	}
+
+	return ports, nil
 }
 
 func (p *PowerstoreClonner) MapTarget(targetLUN populator.LUN, mappingContext populator.MappingContext) (populator.LUN, error) {

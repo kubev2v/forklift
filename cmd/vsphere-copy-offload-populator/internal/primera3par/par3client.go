@@ -37,6 +37,13 @@ type Primera3ParClient interface {
 	CopyVolume(sourceVolName string, destVolName string, progress chan<- uint64) error
 	GetVolumes(query string) ([]Volume, error)
 	GetSystemInfo() (SystemInfo, error)
+	GetPorts() ([]Port, error)
+}
+
+// Port describes a single 3PAR array port, as returned by /api/v1/ports.
+type Port struct {
+	PortWWN   string `json:"portWWN,omitempty"`
+	ISCSIName string `json:"iSCSIName,omitempty"`
 }
 
 type Volume struct {
@@ -1062,6 +1069,26 @@ func (p *Primera3ParClientWsImpl) GetSystemInfo() (SystemInfo, error) {
 	}
 
 	return sysInfo, nil
+}
+
+// GetPorts returns this array's own ports (FC and iSCSI).
+func (p *Primera3ParClientWsImpl) GetPorts() ([]Port, error) {
+	reqURL := fmt.Sprintf("%s/api/v1/ports", p.BaseURL)
+
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GetPorts request: %w", err)
+	}
+
+	type getPortsResponse struct {
+		Members []Port `json:"members"`
+	}
+	var response getPortsResponse
+	if err := p.doRequestUnmarshalResponse(req, "GetPorts", &response); err != nil {
+		return nil, fmt.Errorf("failed to get ports: %w", err)
+	}
+
+	return response.Members, nil
 }
 
 // wsApiBuild2023 is the WSAPI build number starting from which snapCPG is

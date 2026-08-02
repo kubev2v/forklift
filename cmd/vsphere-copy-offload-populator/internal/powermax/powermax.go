@@ -17,6 +17,7 @@ import (
 	pmxtypes "github.com/dell/gopowermax/v2/types/v100"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/storage"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
@@ -35,10 +36,47 @@ type PowermaxClonner struct {
 
 // Ensure PowermaxClonner implements StorageArrayInfoProvider
 var _ populator.StorageArrayInfoProvider = &PowermaxClonner{}
+var _ storage.ArrayIdentifier = &PowermaxClonner{}
 
 // GetStorageArrayInfo returns metadata about the PowerMax array for metric labels.
 func (p *PowermaxClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 	return p.arrayInfo
+}
+
+// TargetPorts returns this array's own target port identities for the configured port group.
+func (p *PowermaxClonner) TargetPorts() ([]string, error) {
+	ctx := context.TODO()
+	var portGroup *pmxtypes.PortGroup
+	err := retryOnTransient(ctx, p.log, "GetPortGroupByID", func() error {
+		var e error
+		portGroup, e = p.client.GetPortGroupByID(ctx, p.symmetrixID, p.portGroup)
+		return e
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get port group %s: %w", p.portGroup, err)
+	}
+
+	var ports []string
+	for _, key := range portGroup.SymmetrixPortKey {
+		var port *pmxtypes.Port
+		err := retryOnTransient(ctx, p.log, "GetPort", func() error {
+			var e error
+			port, e = p.client.GetPort(ctx, p.symmetrixID, key.DirectorID, key.PortID)
+			return e
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get port %s/%s: %w", key.DirectorID, key.PortID, err)
+		}
+		if port.SymmetrixPort.Identifier == "" {
+			continue
+		}
+		if port.SymmetrixPort.ISCSITarget {
+			ports = append(ports, port.SymmetrixPort.Identifier)
+		} else {
+			ports = append(ports, "fc."+port.SymmetrixPort.Identifier)
+		}
+	}
+	return ports, nil
 }
 
 func (p *PowermaxClonner) MapTarget(targetLUN populator.LUN, mappingContext populator.MappingContext) (populator.LUN, error) {

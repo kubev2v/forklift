@@ -14,6 +14,7 @@ type MockPrimera3ParClient struct {
 	VLUNs      map[string][]VLun
 	Hosts      map[string]string
 	HostSets   map[string][]string
+	Ports      []Port
 }
 
 func NewMockPrimera3ParClient() *MockPrimera3ParClient {
@@ -141,6 +142,10 @@ func (m *MockPrimera3ParClient) GetSystemInfo() (SystemInfo, error) {
 		SystemVersion: "4.0.0",
 		Model:         "HPE Primera 630",
 	}, nil
+}
+
+func (m *MockPrimera3ParClient) GetPorts() ([]Port, error) {
+	return m.Ports, nil
 }
 
 func (m *MockPrimera3ParClient) GetVolumes(query string) ([]Volume, error) {

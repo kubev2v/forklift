@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/storage"
 	"github.com/kubev2v/forklift/pkg/storage/resolver"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/cli/esx"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
-	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/session"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
@@ -45,7 +45,7 @@ type Client interface {
 	// layoutEx (thin-used blocks on VMFS). VVol/RDM returns (provisioned, 0, backing, nil).
 	// Returns (0, 0, nil, nil) if the disk cannot be matched.
 	GetVirtualDiskSizes(ctx context.Context, vmId, vmdkPath string) (provisionedBytes, datastoreAllocatedBytes int64, backing *resolver.DiskBacking, err error)
-	GetDatastoreActiveAdapters(ctx context.Context, host *object.HostSystem, datastoreName string) ([]HostAdapter, error)
+	GetAdaptersForArray(ctx context.Context, host *object.HostSystem, arrayIdentifier storage.ArrayIdentifier) ([]HostAdapter, error)
 }
 
 type HostAdapter struct {
@@ -133,46 +133,13 @@ func (c *VSphereClient) getSciniGuid(ctx context.Context, host *object.HostSyste
 	return ""
 }
 
-func (c *VSphereClient) GetDatastoreActiveAdapters(ctx context.Context, host *object.HostSystem, datastoreName string) ([]HostAdapter, error) {
+func (c *VSphereClient) GetAdaptersForArray(ctx context.Context, host *object.HostSystem, arrayIdentifier storage.ArrayIdentifier) ([]HostAdapter, error) {
 	// Get scini GUID if the module is present (for PowerFlex)
 	sciniGuid := c.getSciniGuid(ctx, host)
 
-	// 1. Find the Datastore and get its underlying device ID (NAA)
-	var hostMo mo.HostSystem
-	err := host.Properties(ctx, host.Reference(), []string{"datastore"}, &hostMo)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch host datastores: %w", err)
-	}
-
-	pc := property.DefaultCollector(c.Client.Client)
-	var dss []mo.Datastore
-	err = pc.Retrieve(ctx, hostMo.Datastore, []string{"name", "info"}, &dss)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve datastore properties: %w", err)
-	}
-
-	var deviceName string
-	for _, ds := range dss {
-		if ds.Name == datastoreName {
-			if info, ok := ds.Info.(*types.VmfsDatastoreInfo); ok {
-				if info.Vmfs != nil && len(info.Vmfs.Extent) > 0 {
-					deviceName = info.Vmfs.Extent[0].DiskName
-				}
-			}
-			break
-		}
-	}
-
-	if deviceName == "" {
-		return nil, fmt.Errorf("could not determine underlying device for datastore %s (likely not VMFS)", datastoreName)
-	}
-
-	klog.V(2).Infof("Datastore %s maps to device %s", datastoreName, deviceName)
-
-	// 2. Fetch Host Storage Topology (MultipathInfo and ScsiLun)
+	// We need storageDevice which contains HostBusAdapter and ScsiTopology
 	var hostConfig mo.HostSystem
-	// We need storageDevice which contains both ScsiLun list and MultipathInfo
-	err = host.Properties(ctx, host.Reference(), []string{"config.storageDevice"}, &hostConfig)
+	err := host.Properties(ctx, host.Reference(), []string{"config.storageDevice"}, &hostConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch host storage device info: %w", err)
 	}
@@ -183,31 +150,6 @@ func (c *VSphereClient) GetDatastoreActiveAdapters(ctx context.Context, host *ob
 
 	storageDevice := hostConfig.Config.StorageDevice
 
-	// 3. Find the ScsiLun key using the canonical name
-	var scsiLunKey string
-	for _, lun := range storageDevice.ScsiLun {
-		if lun.GetScsiLun().CanonicalName == deviceName {
-			scsiLunKey = lun.GetScsiLun().Key
-			klog.V(2).Infof("Found ScsiLun key %s for device %s", scsiLunKey, deviceName)
-			break
-		}
-	}
-
-	if scsiLunKey == "" {
-		// Fallback: Try identifying by ID if CanonicalName didn't match (unlikely for VMFS)
-		// Or maybe deviceName isn't the canonical name?
-		// For now, let's log and error out, or try a direct ID match in multipath as backup?
-		klog.Warningf("Could not find ScsiLun with CanonicalName %s", deviceName)
-		// Let's try the direct Multipath match as a fallback, reusing previous logic is risky if it was wrong.
-		// Better to fail active detection than return wrong one, but user reported "goes with all adapters", so we want to be precise.
-		return nil, fmt.Errorf("scsi lun with canonical name %s not found", deviceName)
-	}
-
-	if storageDevice.MultipathInfo == nil {
-		return nil, fmt.Errorf("host multipath info is missing")
-	}
-
-	// 4. Build HBA map with full adapter information
 	hbaByKey := make(map[string]HostAdapter) // Maps HBA Key to HostAdapter
 
 	for _, hba := range storageDevice.HostBusAdapter {
@@ -250,90 +192,7 @@ func (c *VSphereClient) GetDatastoreActiveAdapters(ctx context.Context, host *ob
 		hbaByKey[h.Key] = adapter
 	}
 
-	// 5. Find the Multipath LogicalUnit using the ScsiLun Key
-	var logicalUnit *types.HostMultipathInfoLogicalUnit
-	for _, lun := range storageDevice.MultipathInfo.Lun {
-		if lun.Lun == scsiLunKey {
-			l := lun // pin
-			logicalUnit = &l
-			break
-		}
-	}
-
-	if logicalUnit == nil {
-		return nil, fmt.Errorf("multipath logical unit for device %s (key %s) not found", deviceName, scsiLunKey)
-	}
-
-	// 6. Collect adapters from active paths
-	activeAdapters := make(map[string]HostAdapter)
-	for _, path := range logicalUnit.Path {
-		klog.V(5).Infof("Path %s: State=%s, AdapterKey=%s", path.Name, path.State, path.Adapter)
-		if !strings.EqualFold(path.State, "active") {
-			continue
-		}
-
-		if adapter, ok := hbaByKey[path.Adapter]; ok {
-			activeAdapters[adapter.Name] = adapter
-			klog.V(5).Infof("Found active adapter: %s", adapter.Name)
-		} else {
-			klog.Warningf("HBA Key %s not found in host bus adapter list", path.Adapter)
-		}
-	}
-
-	var result []HostAdapter
-	for _, adapter := range activeAdapters {
-		// For scini driver, override the initiator ID with the GUID from kernel module
-		if adapter.Driver == "scini" && sciniGuid != "" {
-			adapter.Id = sciniGuid
-			klog.V(1).Infof("Using scini GUID for adapter %s: %s", adapter.Name, adapter.Id)
-		}
-
-		result = append(result, adapter)
-		klog.V(1).Infof("Active adapter %s with initiator ID: %s, driver: %s", adapter.Name, adapter.Id, adapter.Driver)
-	}
-
-	// Check if any result has an FC or iSCSI adapter
-	hasSANAdapter := false
-	for _, a := range result {
-		if strings.HasPrefix(a.Id, "iqn.") || strings.HasPrefix(a.Id, "fc.") {
-			hasSANAdapter = true
-			break
-		}
-	}
-
-	// Fallback for local datastores: if no SAN (FC/iSCSI) adapters were found
-	// among active paths, pick the first FC or iSCSI adapter available on the host.
-	if !hasSANAdapter {
-		klog.V(1).Infof("No FC/iSCSI adapters found in active paths for datastore %s, falling back to first available SAN adapter", datastoreName)
-
-		var firstFC, firstISCSI *HostAdapter
-		for _, adapter := range hbaByKey {
-			switch {
-			case strings.HasPrefix(adapter.Id, "fc.") && firstFC == nil:
-				a := adapter
-				firstFC = &a
-			case strings.HasPrefix(adapter.Id, "iqn.") && firstISCSI == nil:
-				a := adapter
-				firstISCSI = &a
-			}
-		}
-
-		if firstFC != nil {
-			klog.V(1).Infof("Falling back to FC adapter %s (ID: %s)", firstFC.Name, firstFC.Id)
-			return []HostAdapter{*firstFC}, nil
-		}
-		if firstISCSI != nil {
-			klog.V(1).Infof("Falling back to iSCSI adapter %s (ID: %s)", firstISCSI.Name, firstISCSI.Id)
-			return []HostAdapter{*firstISCSI}, nil
-		}
-
-		klog.Warningf("No FC or iSCSI adapters found on host for fallback")
-		if len(result) == 0 {
-			return nil, fmt.Errorf("no active adapters found for datastore %s", datastoreName)
-		}
-	}
-
-	return result, nil
+	return selectAdaptersForArray(hbaByKey, storageDevice.ScsiTopology, arrayIdentifier, sciniGuid)
 }
 
 func (c *VSphereClient) RunEsxCommand(ctx context.Context, host *object.HostSystem, command []string) ([]esx.Values, error) {

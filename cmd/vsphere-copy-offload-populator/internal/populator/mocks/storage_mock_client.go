@@ -115,6 +115,21 @@ func (mr *MockStorageApiMockRecorder) ResolvePVToLUN(persistentVolume any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResolvePVToLUN", reflect.TypeOf((*MockStorageApi)(nil).ResolvePVToLUN), persistentVolume)
 }
 
+// TargetPorts mocks base method.
+func (m *MockStorageApi) TargetPorts() ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "TargetPorts")
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// TargetPorts indicates an expected call of TargetPorts.
+func (mr *MockStorageApiMockRecorder) TargetPorts() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TargetPorts", reflect.TypeOf((*MockStorageApi)(nil).TargetPorts))
+}
+
 // UnMap mocks base method.
 func (m *MockStorageApi) UnMap(initatorGroup string, targetLUN populator.LUN, context populator.MappingContext) error {
 	m.ctrl.T.Helper()

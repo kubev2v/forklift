@@ -2,13 +2,19 @@ package ontap
 
 import (
 	"context"
+	"crypto/tls"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/fcutil"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/storage"
 	drivers "github.com/netapp/trident/storage_drivers"
 	"github.com/netapp/trident/storage_drivers/ontap/api"
 	"k8s.io/klog/v2"
@@ -19,17 +25,99 @@ const OntapProviderID = "600a0980"
 // Ensure NetappClonner implements required interfaces
 var _ populator.VMDKCapable = &NetappClonner{}
 var _ populator.StorageArrayInfoProvider = &NetappClonner{}
+var _ storage.ArrayIdentifier = &NetappClonner{}
 
 type NetappClonner struct {
 	api                  api.OntapAPI
 	initiatorHostOrGroup string
 	arrayInfo            populator.StorageArrayInfo
 	log                  klog.Logger
+	managementLIF        string
+	username             string
+	password             string
+	svm                  string
+	sslSkipVerify        bool
 }
 
 // GetStorageArrayInfo returns metadata about the ONTAP array for metric labels.
 func (c *NetappClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 	return c.arrayInfo
+}
+
+type ontapFcInterfaceResponse struct {
+	Records []struct {
+		Wwpn string `json:"wwpn"`
+	} `json:"records"`
+}
+
+// fcInterfaceWWPNs queries the ONTAP REST API directly (bypassing Trident SDK, which
+// doesn't expose FC interfaces) for this SVM's own FC LIF WWPNs.
+func (c *NetappClonner) fcInterfaceWWPNs() ([]string, error) {
+	u := &url.URL{
+		Scheme: "https",
+		Host:   c.managementLIF,
+		Path:   "/api/network/fc/interfaces",
+	}
+	q := u.Query()
+	q.Set("svm.name", c.svm)
+	q.Set("fields", "wwpn")
+	u.RawQuery = q.Encode()
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.SetBasicAuth(c.username, c.password)
+
+	client := &http.Client{Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: c.sslSkipVerify},
+	}}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("ONTAP API returned %d", resp.StatusCode)
+	}
+
+	var result ontapFcInterfaceResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	wwpns := make([]string, 0, len(result.Records))
+	for _, r := range result.Records {
+		if r.Wwpn != "" {
+			wwpns = append(wwpns, r.Wwpn)
+		}
+	}
+	return wwpns, nil
+}
+
+// TargetPorts returns this SVM's own FC and iSCSI target port identities.
+func (c *NetappClonner) TargetPorts() ([]string, error) {
+	var ports []string
+
+	wwpns, err := c.fcInterfaceWWPNs()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list FC interfaces: %w", err)
+	}
+	for _, wwpn := range wwpns {
+		ports = append(ports, "fc."+wwpn)
+	}
+
+	iqn, err := c.api.IscsiNodeGetNameRequest(context.Background())
+	if err != nil {
+		c.log.V(1).Info("no iSCSI node name (SVM may be FC-only)", "err", err)
+	} else if iqn != "" {
+		ports = append(ports, iqn)
+	}
+
+	return ports, nil
 }
 
 // Map the targetLUN to the initiator group.
@@ -126,7 +214,7 @@ func (c *NetappClonner) EnsureClonnerIgroup(initiatorGroup string, adapterIds []
 	return nil, nil
 }
 
-func NewNetappClonner(hostname, username, password string) (NetappClonner, error) {
+func NewNetappClonner(hostname, username, password string, sslSkipVerify bool) (NetappClonner, error) {
 	log := logger.New("ontap")
 
 	// additional ontap values should be passed as env variables using prefix ONTAP_
@@ -152,7 +240,12 @@ func NewNetappClonner(hostname, username, password string) (NetappClonner, error
 			Vendor:  "NetApp",
 			Product: "ONTAP",
 		},
-		log: log,
+		log:           log,
+		managementLIF: hostname,
+		username:      username,
+		password:      password,
+		svm:           svm,
+		sslSkipVerify: sslSkipVerify,
 	}
 
 	// Fetch ONTAP API version

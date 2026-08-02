@@ -2,6 +2,7 @@ package vmware
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -194,16 +195,12 @@ func TestVSphereClient_GetEsxById_ReturnsBareMoRef(t *testing.T) {
 	}
 	finder.SetDatacenter(dc)
 
-	// Get any host via the finder to learn a valid host ID
 	hosts, err := finder.HostSystemList(context.TODO(), "*")
 	if err != nil || len(hosts) == 0 {
 		t.Fatal("no hosts in simulator")
 	}
 	hostId := hosts[0].Reference().Value
 
-	// GetEsxById must return a bare HostSystem without InventoryPath,
-	// so its String() doesn't include "@ /path" which would break
-	// ONTAP igroup names.
 	host, err := client.GetEsxById(context.TODO(), hostId)
 	if err != nil {
 		t.Fatal(err)
@@ -218,6 +215,114 @@ func TestVSphereClient_GetEsxById_ReturnsBareMoRef(t *testing.T) {
 	}
 	if host.Reference().Value != hostId {
 		t.Errorf("GetEsxById() returned wrong host: got %s, want %s", host.Reference().Value, hostId)
+	}
+}
+
+type fakeTargetPortArrayIdentifier struct {
+	ports []string
+}
+
+func (f *fakeTargetPortArrayIdentifier) TargetPorts() ([]string, error) { return f.ports, nil }
+
+// TestSelectAdaptersForArray_IgnoresRDMDescriptorArray is the regression test for the
+// original bug: an RDM disk's real backing LUN can live on an array entirely different
+// from the array backing the RDM's own descriptor .vmdk file (whatever datastore that
+// happens to sit on). The old GetDatastoreActiveAdapters resolved "the source array" from
+// that descriptor's datastore via a datastoreName parameter, so it could pick adapters
+// zoned to the wrong array. GetAdaptersForArray has no datastoreName parameter at all
+// anymore -- this proves the fix by modeling exactly that scenario: HBA1 is zoned to
+// "Array A" (the descriptor's array), HBA2 is zoned to the real migration destination.
+// Selection must depend only on the destination, never on Array A.
+func TestSelectAdaptersForArray_IgnoresRDMDescriptorArray(t *testing.T) {
+	const destinationTargetWWN = 0x6000000000000001
+
+	hbaByKey := map[string]HostAdapter{
+		"key-hba-to-descriptor-array": {Name: "vmhba1", Driver: "qlnativefc", Id: "fc.1000000000000001:5000000000000001"},
+		"key-hba-to-destination":      {Name: "vmhba2", Driver: "qlnativefc", Id: "fc.1000000000000002:6000000000000001"},
+	}
+	topology := &types.HostScsiTopology{
+		Adapter: []types.HostScsiTopologyInterface{
+			{
+				Adapter: "key-hba-to-descriptor-array",
+				Target: []types.HostScsiTopologyTarget{{
+					Transport: &types.HostFibreChannelTargetTransport{PortWorldWideName: 0x5000000000000001},
+				}},
+			},
+			{
+				Adapter: "key-hba-to-destination",
+				Target: []types.HostScsiTopologyTarget{{
+					Transport: &types.HostFibreChannelTargetTransport{PortWorldWideName: destinationTargetWWN},
+				}},
+			},
+		},
+	}
+	destination := &fakeTargetPortArrayIdentifier{ports: []string{fmt.Sprintf("fc.%016x", uint64(destinationTargetWWN))}}
+
+	result, err := selectAdaptersForArray(hbaByKey, topology, destination, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 1 || result[0].Name != "vmhba2" {
+		t.Fatalf("expected only vmhba2 (zoned to the destination), got %+v -- selection must never depend on the RDM descriptor's array", result)
+	}
+}
+
+type fakeSciniArrayIdentifier struct{}
+
+func (f *fakeSciniArrayIdentifier) TargetPorts() ([]string, error) {
+	return nil, fmt.Errorf("TargetPorts must not be called when SciniRequired")
+}
+func (f *fakeSciniArrayIdentifier) SciniRequired() bool { return true }
+
+func TestSelectAdaptersForArray_ScinigGUIDOverride(t *testing.T) {
+	const (
+		sciniGUID  = "1a2b3c4d-5e6f-7890-abcd-ef1234567890"
+		sciniRawId = "fc.0000000000000000:0000000000000001"
+	)
+
+	tests := []struct {
+		name      string
+		hbaByKey  map[string]HostAdapter
+		sciniGUID string
+		wantErr   bool
+		wantId    string
+	}{
+		{
+			name:      "scini adapter gets GUID override",
+			hbaByKey:  map[string]HostAdapter{"key-vmhba67": {Name: "vmhba67", Id: sciniRawId, Driver: "scini"}},
+			sciniGUID: sciniGUID,
+			wantId:    sciniGUID,
+		},
+		{
+			name:      "scini without GUID keeps raw ID",
+			hbaByKey:  map[string]HostAdapter{"key-vmhba67": {Name: "vmhba67", Id: sciniRawId, Driver: "scini"}},
+			sciniGUID: "",
+			wantId:    sciniRawId,
+		},
+		{
+			name:      "no scini adapter on host returns error",
+			hbaByKey:  map[string]HostAdapter{"key-vmhba2": {Name: "vmhba2", Id: "fc.2000f4e9d45532da:2100f4e9d45532da", Driver: "qlnativefc"}},
+			sciniGUID: sciniGUID,
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := selectAdaptersForArray(tt.hbaByKey, &types.HostScsiTopology{}, &fakeSciniArrayIdentifier{}, tt.sciniGUID)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(result) != 1 || result[0].Id != tt.wantId {
+				t.Errorf("expected adapter with Id %q, got %+v", tt.wantId, result)
+			}
+		})
 	}
 }
 
