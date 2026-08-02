@@ -11,6 +11,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
+	_ "time/tzdata"
 
 	k8snet "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -118,6 +120,7 @@ const (
 	// datastore lacks NAS export details in inventory (required for MTV annotations).
 	NetAppShiftDatastoreNASMissing = "NetAppShiftDatastoreNASMissing"
 	ConversionResumable            = "ConversionResumable"
+	TimezoneNotValid               = "TimezoneNotValid"
 )
 
 // Categories
@@ -187,6 +190,8 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 	if err = r.validateTargetNamespace(plan); err != nil {
 		return err
 	}
+
+	r.validateTimezone(plan)
 
 	if err = r.validateNetworkMap(plan); err != nil {
 		return err
@@ -506,6 +511,33 @@ func (r *Reconciler) validateTargetNamespace(plan *api.Plan) (err error) {
 		plan.Status.SetCondition(newCnd)
 	}
 	return
+}
+
+func (r *Reconciler) validateTimezone(plan *api.Plan) {
+	if plan.Spec.Timezone == "" {
+		return
+	}
+	// "Local" is accepted by time.LoadLocation but is not a valid IANA timezone name.
+	if plan.Spec.Timezone == "Local" {
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     TimezoneNotValid,
+			Status:   True,
+			Category: Critical,
+			Reason:   NotValid,
+			Message:  fmt.Sprintf("Timezone %q is not a valid IANA timezone name.", plan.Spec.Timezone),
+		})
+		return
+	}
+	_, err := time.LoadLocation(plan.Spec.Timezone)
+	if err != nil {
+		plan.Status.SetCondition(libcnd.Condition{
+			Type:     TimezoneNotValid,
+			Status:   True,
+			Category: Critical,
+			Reason:   NotValid,
+			Message:  fmt.Sprintf("Timezone %q is not a valid IANA timezone name.", plan.Spec.Timezone),
+		})
+	}
 }
 
 // Validate unsupported User Defined Network configurations in the destination namespace.

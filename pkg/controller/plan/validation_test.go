@@ -735,6 +735,57 @@ var _ = ginkgo.Describe("Plan Validations", func() {
 	})
 })
 
+var _ = ginkgo.Describe("validateTimezone", func() {
+	var reconciler *Reconciler
+
+	ginkgo.BeforeEach(func() {
+		reconciler = &Reconciler{
+			base.Reconciler{},
+			nil,
+		}
+	})
+
+	ginkgo.It("should not set condition when timezone is empty", func() {
+		plan := &api.Plan{}
+		plan.Spec.Timezone = ""
+		reconciler.validateTimezone(plan)
+		gomega.Expect(plan.Status.HasCondition(TimezoneNotValid)).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should not set condition for valid IANA timezone", func() {
+		plan := &api.Plan{}
+		plan.Spec.Timezone = "America/New_York"
+		reconciler.validateTimezone(plan)
+		gomega.Expect(plan.Status.HasCondition(TimezoneNotValid)).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should not set condition for UTC", func() {
+		plan := &api.Plan{}
+		plan.Spec.Timezone = "UTC"
+		reconciler.validateTimezone(plan)
+		gomega.Expect(plan.Status.HasCondition(TimezoneNotValid)).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should set condition for invalid timezone", func() {
+		plan := &api.Plan{}
+		plan.Spec.Timezone = "Foo/Bar"
+		reconciler.validateTimezone(plan)
+		gomega.Expect(plan.Status.HasCondition(TimezoneNotValid)).To(gomega.BeTrue())
+		cnd := plan.Status.FindCondition(TimezoneNotValid)
+		gomega.Expect(cnd.Category).To(gomega.Equal(Critical))
+		gomega.Expect(cnd.Message).To(gomega.ContainSubstring("Foo/Bar"))
+	})
+
+	ginkgo.It("should reject the special Local value", func() {
+		plan := &api.Plan{}
+		plan.Spec.Timezone = "Local"
+		reconciler.validateTimezone(plan)
+		gomega.Expect(plan.Status.HasCondition(TimezoneNotValid)).To(gomega.BeTrue())
+		cnd := plan.Status.FindCondition(TimezoneNotValid)
+		gomega.Expect(cnd.Message).To(gomega.ContainSubstring("Local"))
+	})
+})
+
 var _ = ginkgo.Describe("vmUsesVddk", func() {
 	var (
 		reconciler *Reconciler
