@@ -13,6 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	storage "github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/storage"
 	vmware "github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
 	resolver "github.com/kubev2v/forklift/pkg/storage/resolver"
 	esx "github.com/vmware/govmomi/cli/esx"
@@ -44,6 +45,21 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 	return m.recorder
 }
 
+// GetAdaptersForArray mocks base method.
+func (m *MockClient) GetAdaptersForArray(ctx context.Context, host *object.HostSystem, arrayIdentifier storage.ArrayIdentifier) ([]vmware.HostAdapter, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAdaptersForArray", ctx, host, arrayIdentifier)
+	ret0, _ := ret[0].([]vmware.HostAdapter)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetAdaptersForArray indicates an expected call of GetAdaptersForArray.
+func (mr *MockClientMockRecorder) GetAdaptersForArray(ctx, host, arrayIdentifier any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAdaptersForArray", reflect.TypeOf((*MockClient)(nil).GetAdaptersForArray), ctx, host, arrayIdentifier)
+}
+
 // GetDatastore mocks base method.
 func (m *MockClient) GetDatastore(ctx context.Context, dc *object.Datacenter, datastore string) (*object.Datastore, error) {
 	m.ctrl.T.Helper()
@@ -57,21 +73,6 @@ func (m *MockClient) GetDatastore(ctx context.Context, dc *object.Datacenter, da
 func (mr *MockClientMockRecorder) GetDatastore(ctx, dc, datastore any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDatastore", reflect.TypeOf((*MockClient)(nil).GetDatastore), ctx, dc, datastore)
-}
-
-// GetDatastoreActiveAdapters mocks base method.
-func (m *MockClient) GetDatastoreActiveAdapters(ctx context.Context, host *object.HostSystem, datastoreName string, destinationRequiresScini bool) ([]vmware.HostAdapter, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetDatastoreActiveAdapters", ctx, host, datastoreName, destinationRequiresScini)
-	ret0, _ := ret[0].([]vmware.HostAdapter)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetDatastoreActiveAdapters indicates an expected call of GetDatastoreActiveAdapters.
-func (mr *MockClientMockRecorder) GetDatastoreActiveAdapters(ctx, host, datastoreName, destinationRequiresScini any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDatastoreActiveAdapters", reflect.TypeOf((*MockClient)(nil).GetDatastoreActiveAdapters), ctx, host, datastoreName, destinationRequiresScini)
 }
 
 // GetEsxById mocks base method.

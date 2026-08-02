@@ -14,7 +14,7 @@ type VantaraClient interface {
 	Disconnect() error
 
 	// LUN operations
-	GetLdev(ldevId string) (*LdevResponse, error)
+	GetLdev(ldevId string) (*LdevResponse, int, error)
 
 	// Path operations
 	AddPath(ldevId string, portId string, hostGroupNumber string) error
