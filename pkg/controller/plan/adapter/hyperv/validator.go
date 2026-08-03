@@ -66,7 +66,12 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (bool, error) {
 
 	for _, nic := range vm.NICs {
 		if nic.Network.ID == "" {
-			continue // Disconnected NIC is OK
+			if nic.NetworkName != "" {
+				// NIC is attached to a switch that wasn't discovered in inventory.
+				// Treat as unmapped rather than silently skipping.
+				return false, nil
+			}
+			continue // Truly disconnected NIC
 		}
 		mapped := false
 		for _, pair := range r.Context.Map.Network.Spec.Map {
