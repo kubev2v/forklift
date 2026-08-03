@@ -3,7 +3,6 @@ package mapping
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -83,14 +82,6 @@ func patchNetworkMapping(configFlags *genericclioptions.ConfigFlags, name, names
 				continue
 			}
 			newUnstructuredPairs = append(newUnstructuredPairs, pairMap)
-		}
-
-		// Check for duplicate sources
-		duplicates := checkUnstructuredSourceDuplicates(workingPairs, newUnstructuredPairs)
-		if len(duplicates) > 0 {
-			klog.V(1).Infof("Warning: Found duplicate sources in add-pairs, skipping: %v", duplicates)
-			fmt.Printf("Warning: Skipping duplicate sources: %s\n", strings.Join(duplicates, ", "))
-			newUnstructuredPairs = filterOutDuplicateUnstructuredPairs(workingPairs, newUnstructuredPairs)
 		}
 
 		if len(newUnstructuredPairs) > 0 {
@@ -196,192 +187,61 @@ func removeSourceFromUnstructuredPairs(pairs []interface{}, sourcesToRemove []st
 	return filteredPairs
 }
 
-// checkUnstructuredSourceDuplicates checks if any of the new pairs have sources that already exist in current pairs
-func checkUnstructuredSourceDuplicates(currentPairs []interface{}, newPairs []interface{}) []string {
-	var duplicates []string
-
-	// Create a map of existing sources for quick lookup
-	existingSourceMap := make(map[string]bool)
-	for _, pairInterface := range currentPairs {
-		pairMap, ok := pairInterface.(map[string]interface{})
-		if !ok {
-			continue
-		}
-
-		sourceInterface, found := pairMap["source"]
-		if !found {
-			continue
-		}
-
-		sourceMap, ok := sourceInterface.(map[string]interface{})
-		if !ok {
-			continue
-		}
-
-		if sourceName, ok := sourceMap["name"].(string); ok && sourceName != "" {
-			existingSourceMap[sourceName] = true
-		}
-		if sourceID, ok := sourceMap["id"].(string); ok && sourceID != "" {
-			existingSourceMap[sourceID] = true
-		}
-	}
-
-	// Check new pairs against existing sources
-	for _, pairInterface := range newPairs {
-		pairMap, ok := pairInterface.(map[string]interface{})
-		if !ok {
-			continue
-		}
-
-		sourceInterface, found := pairMap["source"]
-		if !found {
-			continue
-		}
-
-		sourceMap, ok := sourceInterface.(map[string]interface{})
-		if !ok {
-			continue
-		}
-
-		sourceName, _ := sourceMap["name"].(string)
-		sourceID, _ := sourceMap["id"].(string)
-
-		if sourceName != "" && existingSourceMap[sourceName] {
-			duplicates = append(duplicates, sourceName)
-		} else if sourceID != "" && existingSourceMap[sourceID] {
-			duplicates = append(duplicates, sourceID)
-		}
-	}
-
-	return duplicates
-}
-
-// filterOutDuplicateUnstructuredPairs removes pairs that have duplicate sources, keeping only unique ones
-func filterOutDuplicateUnstructuredPairs(currentPairs []interface{}, newPairs []interface{}) []interface{} {
-	// Create a map of existing sources for quick lookup
-	existingSourceMap := make(map[string]bool)
-	for _, pairInterface := range currentPairs {
-		pairMap, ok := pairInterface.(map[string]interface{})
-		if !ok {
-			continue
-		}
-
-		sourceInterface, found := pairMap["source"]
-		if !found {
-			continue
-		}
-
-		sourceMap, ok := sourceInterface.(map[string]interface{})
-		if !ok {
-			continue
-		}
-
-		if sourceName, ok := sourceMap["name"].(string); ok && sourceName != "" {
-			existingSourceMap[sourceName] = true
-		}
-		if sourceID, ok := sourceMap["id"].(string); ok && sourceID != "" {
-			existingSourceMap[sourceID] = true
-		}
-	}
-
-	// Filter new pairs to exclude duplicates
-	var filteredPairs []interface{}
-	for _, pairInterface := range newPairs {
-		pairMap, ok := pairInterface.(map[string]interface{})
-		if !ok {
-			continue
-		}
-
-		sourceInterface, found := pairMap["source"]
-		if !found {
-			filteredPairs = append(filteredPairs, pairInterface)
-			continue
-		}
-
-		sourceMap, ok := sourceInterface.(map[string]interface{})
-		if !ok {
-			filteredPairs = append(filteredPairs, pairInterface)
-			continue
-		}
-
-		sourceName, _ := sourceMap["name"].(string)
-		sourceID, _ := sourceMap["id"].(string)
-
-		isDuplicate := false
-		if sourceName != "" && existingSourceMap[sourceName] {
-			isDuplicate = true
-		} else if sourceID != "" && existingSourceMap[sourceID] {
-			isDuplicate = true
-		}
-
-		if !isDuplicate {
-			filteredPairs = append(filteredPairs, pairInterface)
-		}
-	}
-
-	return filteredPairs
-}
-
-// updateUnstructuredPairsBySource updates or adds pairs based on source name/ID matching
+// updateUnstructuredPairsBySource replaces all existing pairs for each updated
+// source with the new pair(s). A single source may map to multiple destinations
+// (1:N), so --update-pairs src:nad1,src:nad2 replaces every old mapping for
+// "src" with the two new ones. Sources not mentioned in newPairs are kept as-is.
 func updateUnstructuredPairsBySource(existingPairs []interface{}, newPairs []interface{}) []interface{} {
-	updatedPairs := make([]interface{}, len(existingPairs))
-	copy(updatedPairs, existingPairs)
-
-	for _, newPairInterface := range newPairs {
-		newPairMap, ok := newPairInterface.(map[string]interface{})
+	// Collect the set of source name/IDs being updated
+	updatedSources := make(map[string]bool)
+	for _, p := range newPairs {
+		pairMap, ok := p.(map[string]interface{})
 		if !ok {
 			continue
 		}
-
-		newSourceInterface, found := newPairMap["source"]
-		if !found {
-			// Add new pair if no source info
-			updatedPairs = append(updatedPairs, newPairInterface)
-			continue
-		}
-
-		newSourceMap, ok := newSourceInterface.(map[string]interface{})
+		srcIface, ok := pairMap["source"]
 		if !ok {
-			updatedPairs = append(updatedPairs, newPairInterface)
 			continue
 		}
-
-		newSourceName, _ := newSourceMap["name"].(string)
-		newSourceID, _ := newSourceMap["id"].(string)
-
-		found = false
-		for i, existingPairInterface := range updatedPairs {
-			existingPairMap, ok := existingPairInterface.(map[string]interface{})
-			if !ok {
-				continue
-			}
-
-			existingSourceInterface, hasSource := existingPairMap["source"]
-			if !hasSource {
-				continue
-			}
-
-			existingSourceMap, ok := existingSourceInterface.(map[string]interface{})
-			if !ok {
-				continue
-			}
-
-			existingSourceName, _ := existingSourceMap["name"].(string)
-			existingSourceID, _ := existingSourceMap["id"].(string)
-
-			if (existingSourceName != "" && existingSourceName == newSourceName) ||
-				(existingSourceID != "" && existingSourceID == newSourceID) {
-				// Update existing pair
-				updatedPairs[i] = newPairInterface
-				found = true
-				break
-			}
+		srcMap, ok := srcIface.(map[string]interface{})
+		if !ok {
+			continue
 		}
-		if !found {
-			// Add new pair
-			updatedPairs = append(updatedPairs, newPairInterface)
+		if name, _ := srcMap["name"].(string); name != "" {
+			updatedSources[name] = true
+		}
+		if id, _ := srcMap["id"].(string); id != "" {
+			updatedSources[id] = true
 		}
 	}
 
-	return updatedPairs
+	// Keep existing pairs whose source is NOT being replaced
+	var result []interface{}
+	for _, p := range existingPairs {
+		pairMap, ok := p.(map[string]interface{})
+		if !ok {
+			result = append(result, p)
+			continue
+		}
+		srcIface, ok := pairMap["source"]
+		if !ok {
+			result = append(result, p)
+			continue
+		}
+		srcMap, ok := srcIface.(map[string]interface{})
+		if !ok {
+			result = append(result, p)
+			continue
+		}
+		name, _ := srcMap["name"].(string)
+		id, _ := srcMap["id"].(string)
+		if (name != "" && updatedSources[name]) || (id != "" && updatedSources[id]) {
+			continue // will be replaced by newPairs
+		}
+		result = append(result, p)
+	}
+
+	// Append all new pairs
+	result = append(result, newPairs...)
+	return result
 }
