@@ -36,7 +36,7 @@ jobs:
           status: pending
 
       - name: Checkout forklift
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: prepare the secrets
         uses: kubev2v/forkliftci/ci/prepare-ansible-secrets@v6.0
@@ -63,12 +63,12 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout forklift
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: forklift
 
       - name: Checkout forkliftci
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: kubev2v/forkliftci
           ref: v6.0
