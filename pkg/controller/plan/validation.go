@@ -273,6 +273,11 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		return err
 	}
 
+	// Warn when ESXi Disk.MaxLUN is too low for copy-offload migrations
+	if err = r.validateDiskMaxLUN(plan); err != nil {
+		return err
+	}
+
 	// Validate conversion temp storage configuration
 	if err = r.validateConversionTempStorage(plan); err != nil {
 		return err
