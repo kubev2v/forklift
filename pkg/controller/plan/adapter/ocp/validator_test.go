@@ -4,10 +4,12 @@ import (
 	"testing"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/lib/logging"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	cnv "kubevirt.io/api/core/v1"
@@ -357,5 +359,55 @@ func TestNICNetworkRefs_VMNotFound(t *testing.T) {
 	_, err := validator.NICNetworkRefs(ref.Ref{Name: "nonexistent", Namespace: "test-ns"})
 	if err == nil {
 		t.Errorf("expected error for missing VM, got nil")
+	}
+}
+
+func TestPVCNameTemplate_UsesSpecTargetName(t *testing.T) {
+	vm := &cnv.VirtualMachine{
+		ObjectMeta: metav1.ObjectMeta{Name: "source-vm", Namespace: "test-ns"},
+		Spec: cnv.VirtualMachineSpec{
+			Template: &cnv.VirtualMachineInstanceTemplateSpec{
+				Spec: cnv.VirtualMachineInstanceSpec{
+					Volumes: []cnv.Volume{
+						{Name: "vol-0", VolumeSource: cnv.VolumeSource{
+							PersistentVolumeClaim: &cnv.PersistentVolumeClaimVolumeSource{
+								PersistentVolumeClaimVolumeSource: corev1.PersistentVolumeClaimVolumeSource{ClaimName: "src-pvc"},
+							},
+						}},
+					},
+				},
+			},
+		},
+	}
+	client := newFakeClient(vm).Build()
+
+	plan := &api.Plan{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-plan"},
+		Spec: api.PlanSpec{
+			VMs: []planapi.VM{{
+				Ref:        ref.Ref{ID: "vm-id", Name: "source-vm", Namespace: "test-ns"},
+				TargetName: "my-target",
+			}},
+		},
+	}
+
+	validator := &Validator{
+		log:          logging.WithName("test").WithValues("test", "pvc-template"),
+		sourceClient: client,
+		Context:      &plancontext.Context{Plan: plan},
+	}
+
+	// Template that only produces a valid name when .TargetVmName == "my-target".
+	tmpl := `{{if eq .TargetVmName "my-target"}}ok-{{.DiskIndex}}{{else}}INVALID{{end}}`
+
+	ok, err := validator.PVCNameTemplate(
+		ref.Ref{ID: "vm-id", Name: "source-vm", Namespace: "test-ns"},
+		tmpl,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ok {
+		t.Error("expected ok=true: validator should resolve spec.targetName via ResolveTargetVmName")
 	}
 }

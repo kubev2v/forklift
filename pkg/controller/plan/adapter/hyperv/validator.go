@@ -250,7 +250,7 @@ func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (bool
 		return false, liberr.Wrap(err, "vm", vmRef.String())
 	}
 
-	targetVmName := planbase.ResolveTargetVmName(r.Plan, vmRef.ID, vmRef.Name)
+	targetVmName := planbase.ResolveTargetVmName(r.Plan, vm.ID, vm.Name)
 
 	// Validate template produces valid k8s labels for each disk
 	for i := range vm.Disks {

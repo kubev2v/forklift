@@ -2004,11 +2004,6 @@ func (r *Builder) setPVCNameFromTemplate(objectMeta *metav1.ObjectMeta, vm *mode
 	}
 
 	targetVmName := planbase.ResolveTargetVmName(r.Plan, vm.ID, vm.Name)
-	if targetVmName == vm.Name {
-		if errs := k8svalidation.IsDNS1123Label(targetVmName); len(errs) > 0 {
-			targetVmName = utils.ChangeVmName(vm.Name)
-		}
-	}
 
 	templateData := &api.PVCNameTemplateData{
 		VmName:         vm.Name,

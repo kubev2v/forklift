@@ -401,16 +401,7 @@ func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (ok b
 		return
 	}
 
-	// Get target VM name (either from VM status NewName or source VM name)
-	targetVmName := vmRef.Name
-	if r.Plan != nil && r.Plan.Status.Migration.VMs != nil {
-		for _, vmStatus := range r.Plan.Status.Migration.VMs {
-			if vmStatus.ID == vmRef.ID && vmStatus.NewName != "" {
-				targetVmName = vmStatus.NewName
-				break
-			}
-		}
-	}
+	targetVmName := planbase.ResolveTargetVmName(r.Plan, vmRef.ID, vmRef.Name)
 
 	// Test template with sample data for each disk
 	diskIndex := 0
