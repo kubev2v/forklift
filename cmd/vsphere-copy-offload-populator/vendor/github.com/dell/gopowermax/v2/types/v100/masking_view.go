@@ -200,3 +200,128 @@ type MaskingViewConnection struct {
 type MaskingViewConnectionsResult struct {
 	MaskingViewConnections []*MaskingViewConnection `json:"maskingViewConnection"`
 }
+
+// PublishMaskingViewsParam is the request payload for the Publish masking-views API
+type PublishMaskingViewsParam struct {
+	MaskingViews []MaskingViewPublishParam `json:"masking_views"`
+}
+
+// MaskingViewPublishParam holds the parameters for publishing a single masking view
+type MaskingViewPublishParam struct {
+	ID           string                    `json:"id"`
+	StorageGroup *StorageGroupPublishParam `json:"storage_group,omitempty"`
+	Host         *HostPublishParam         `json:"host,omitempty"`
+	PortGroup    *PortGroupPublishParam    `json:"port_group,omitempty"`
+}
+
+// StorageGroupPublishParam holds storage group parameters for publish
+type StorageGroupPublishParam struct {
+	ID              string                      `json:"id"`
+	SRP             string                      `json:"srp,omitempty"`
+	HostIOLimitInfo *HostIOLimitInfo            `json:"host_io_limit_info,omitempty"`
+	Actions         *StorageGroupPublishActions `json:"actions,omitempty"`
+}
+
+// HostIOLimitInfo holds the host IO limit information
+type HostIOLimitInfo struct {
+	HostIOLimitMBSec    int    `json:"host_io_limit_mb_sec,omitempty"`
+	HostIOLimitIOSec    int    `json:"host_io_limit_io_sec,omitempty"`
+	DynamicDistribution string `json:"dynamic_distribution,omitempty"`
+}
+
+// StorageGroupPublishActions holds actions for storage group publish
+type StorageGroupPublishActions struct {
+	AddVolumesToStorageGroupAction *AddVolumesToStorageGroupAction `json:"add_volumes_to_storage_group_action,omitempty"`
+}
+
+// AddVolumesToStorageGroupAction holds parameters to add volumes to storage group
+type AddVolumesToStorageGroupAction struct {
+	Volumes []VolumePublishParam `json:"volumes,omitempty"`
+}
+
+// VolumePublishParam holds volume parameters for publish
+type VolumePublishParam struct {
+	ExistingVolumes []ExistingVolumeParam `json:"existing_volumes,omitempty"`
+}
+
+// ExistingVolumeParam holds existing volume identification
+type ExistingVolumeParam struct {
+	ID         string `json:"id,omitempty"`
+	Identifier string `json:"identifier,omitempty"`
+}
+
+// HostPublishParam holds host parameters for publish
+type HostPublishParam struct {
+	ID      string              `json:"id"`
+	Actions *HostPublishActions `json:"actions,omitempty"`
+}
+
+// HostPublishActions holds actions for host publish
+type HostPublishActions struct {
+	AddInitiatorsToHostAction *AddInitiatorsToHostAction `json:"add_initiators_to_host_action,omitempty"`
+}
+
+// AddInitiatorsToHostAction holds parameters to add initiators to host
+type AddInitiatorsToHostAction struct {
+	Initiators []InitiatorPublishParam `json:"initiators,omitempty"`
+}
+
+// InitiatorPublishParam holds initiator parameters for publish
+type InitiatorPublishParam struct {
+	ID  string    `json:"id,omitempty"`
+	NQN *NQNParam `json:"nqn,omitempty"`
+}
+
+// NQNParam holds NQN parameters for NVMe initiators
+type NQNParam struct {
+	Name   string `json:"name,omitempty"`
+	HostID string `json:"host_id,omitempty"`
+}
+
+// PortGroupPublishParam holds port group parameters for publish
+type PortGroupPublishParam struct {
+	ID       string                   `json:"id"`
+	Protocol string                   `json:"protocol,omitempty"`
+	Actions  *PortGroupPublishActions `json:"actions,omitempty"`
+}
+
+// PortGroupPublishActions holds actions for port group publish
+type PortGroupPublishActions struct {
+	AddPortsToPortGroupAction *AddPortsToPortGroupAction `json:"add_ports_to_port_group_action,omitempty"`
+}
+
+// AddPortsToPortGroupAction holds parameters to add ports to port group
+type AddPortsToPortGroupAction struct {
+	Ports []PortPublishParam `json:"ports,omitempty"`
+}
+
+// PortPublishParam holds port parameters for publish
+type PortPublishParam struct {
+	ID string `json:"id"`
+}
+
+// PublishMaskingViewResponse is the response for the Publish masking-views API
+type PublishMaskingViewResponse struct {
+	HTTPStatusCode int                 `json:"http_status_code"`
+	Summary        PublishSummary      `json:"summary"`
+	Results        PublishResultsBlock `json:"results"`
+}
+
+type PublishSummary struct {
+	Total              int `json:"total"`
+	PartiallySucceeded int `json:"partially_succeeded"`
+	Succeeded          int `json:"succeeded"`
+	Failed             int `json:"failed"`
+	NotRun             int `json:"not_run"`
+	Rejected           int `json:"rejected"`
+}
+
+type PublishResultsBlock struct {
+	Result []PublishResult `json:"result"`
+}
+
+type PublishResult struct {
+	Status     string `json:"status"`
+	RequestID  string `json:"request_id"`
+	ResourceID string `json:"resource_id"`
+}

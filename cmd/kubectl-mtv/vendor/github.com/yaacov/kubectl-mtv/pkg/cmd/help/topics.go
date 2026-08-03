@@ -94,6 +94,7 @@ EC2 (PascalCase):
   Identity:    name, InstanceType, State.Name, PlatformDetails
   Placement:   Placement.AvailabilityZone
   Network:     PublicIpAddress, PrivateIpAddress, VpcId, SubnetId
+  Snapshots:   State, VolumeId, VolumeSize, sizeHuman, Encrypted, Progress
 
 Computed Fields (added by kubectl-mtv, available for all providers):
   criticalConcerns   count of critical migration concerns
@@ -145,6 +146,27 @@ Examples
     where any(concerns[*].category = 'Critical')
     where any(concerns[*].category = 'Warning')
     where any(disks[*].datastore.id = 'datastore-12')
+
+  Deep field access (dot notation, index, wildcard):
+    where parent.kind = 'Folder'
+    where disks[0].capacity > 50Gi
+    where any(disks[*].datastore.id = 'datastore-17')
+    where concerns[0].category = 'Critical'
+
+  Aggregate functions (sum, all):
+    where sum(disks[*].capacity) > 100Gi
+    where all(disks[*].shared = false)
+
+  Null checks:
+    where ipAddress is null
+    where ipAddress is not null
+
+  Arithmetic expressions:
+    where memoryMB / 1024 > 8
+
+  Select with deep fields and functions:
+    select name, disks[0].capacity, parent.kind where len(disks) > 1 limit 5
+    select name, sum(disks[*].capacity) as totalDisk where len(disks) > 1 order by totalDisk desc limit 10
 
   By migration concerns:
     where criticalConcerns > 0
@@ -232,6 +254,127 @@ Examples
 
   Spread VMs across zones:
     --target-affinity "REPEL pods(app=myapp) on zone weight=50"`,
+	},
+	{
+		Name:  "offload",
+		Short: "Storage copy-offload (XCOPY) configuration reference",
+		Content: `Storage Copy-Offload (XCOPY) Reference
+======================================
+
+Copy-offload delegates disk copying to the storage array instead of streaming
+data through the cluster network, dramatically improving migration speed.
+
+Prerequisites:
+  kubectl mtv settings set --setting feature_copy_offload --value true
+
+How It Works:
+  1. StorageMap entry includes an OffloadPlugin with vendor + secret
+  2. Controller creates a VSphereXcopyVolumePopulator per disk
+  3. Populator pod uses VAAI/XCOPY to clone directly on the array
+  4. Plans with mixed VDDK/offload pairs are rejected at validation
+
+Supported Vendors
+-----------------
+  flashsystem    IBM FlashSystem (Spectrum Virtualize)
+  vantara        Hitachi Vantara
+  ontap          NetApp ONTAP (AFF/FAS)
+  primera3par    HPE Primera / 3PAR / Alletra
+  pureFlashArray Pure Storage FlashArray
+  powerflex      Dell PowerFlex
+  powermax       Dell PowerMax
+  powerstore     Dell PowerStore
+  infinibox      Infinidat InfiniBox
+
+Secret Keys (Environment Variables)
+------------------------------------
+  Common (all vendors):
+    STORAGE_HOSTNAME               storage array management API endpoint
+    STORAGE_USERNAME               username (required unless using token)
+    STORAGE_PASSWORD               password (required unless using token)
+    STORAGE_SKIP_SSL_VERIFICATION  "true" to skip TLS (optional)
+
+  Vendor-specific:
+    STORAGE_TOKEN                  API token (pureFlashArray, alt to user/pass)
+    PURE_CLUSTER_PREFIX            px_<8-char-cluster-uid> (pureFlashArray)
+    POWERFLEX_SYSTEM_ID            system ID from vxflexos-config (powerflex)
+    POWERMAX_SYMMETRIX_ID          Symmetrix array ID (powermax)
+    POWERMAX_PORT_GROUP_NAME       port group for masking view (powermax)
+    ONTAP_SVM                      SVM name (ontap)
+    STORAGE_HTTP_TIMEOUT_SECONDS   HTTP timeout in seconds (optional)
+
+Clone Methods
+-------------
+  vib (default)   Custom VIB on ESXi hosts, no SSH needed
+  ssh             SSH to ESXi hosts with restricted commands
+
+  Configure on provider:
+    kubectl mtv patch provider --name my-vsphere --esxi-clone-method ssh
+
+Creating Offload Credentials (Inline)
+--------------------------------------
+  kubectl mtv create mapping storage --name my-offload \
+    --source my-vsphere --target host \
+    --storage-pairs "datastore1:sc-block;offloadPlugin=vsphere;offloadVendor=flashsystem" \
+    --offload-storage-username "admin" \
+    --offload-storage-password "secret" \
+    --offload-storage-endpoint "https://flashsystem.example.com:7443"
+
+  Or reference an existing secret:
+    --default-offload-secret my-storage-secret
+
+  Additional inline flags:
+    --offload-cacert @/path/to/ca.pem
+    --offload-insecure-skip-tls
+
+Examples
+--------
+
+  Basic FlashSystem mapping:
+    kubectl mtv create mapping storage --name ibm-offload \
+      --source vsphere-prod --target host \
+      --storage-pairs "ibm-ds:flashsystem-sc;offloadPlugin=vsphere;offloadVendor=flashsystem" \
+      --offload-storage-username admin \
+      --offload-storage-password "$STORAGE_PASS" \
+      --offload-storage-endpoint "https://flashsystem.company.com:7443"
+
+  NetApp ONTAP:
+    kubectl mtv create mapping storage --name ontap-offload \
+      --source vsphere-prod --target host \
+      --storage-pairs "netapp-nfs:trident-nas;offloadPlugin=vsphere;offloadVendor=ontap" \
+      --offload-storage-username ontap-admin \
+      --offload-storage-password "$STORAGE_PASS" \
+      --offload-storage-endpoint "https://ontap-cluster.company.com"
+
+  Pure FlashArray (with existing secret):
+    kubectl create secret generic pure-creds -n openshift-mtv \
+      --from-literal=STORAGE_HOSTNAME="pure-array.company.com" \
+      --from-literal=STORAGE_TOKEN="$PURE_API_TOKEN" \
+      --from-literal=PURE_CLUSTER_PREFIX="px_a1b2c3d4"
+
+    kubectl mtv create mapping storage --name pure-offload \
+      --source vsphere-prod --target host \
+      --storage-pairs "pure-vvol:pure-block;offloadPlugin=vsphere;offloadVendor=pureFlashArray" \
+      --default-offload-secret pure-creds
+
+  Plan with offload mapping:
+    kubectl mtv create plan --name fast-migration \
+      --source vsphere-prod \
+      --storage-mapping ibm-offload \
+      --vms "where name ~= 'prod-.*'"
+
+  Dedicated migration hosts (optional, for performance isolation):
+    kubectl mtv create mapping storage --name offload-dedicated \
+      --source vsphere-prod --target host \
+      --storage-pairs "ds1:sc1;offloadPlugin=vsphere;offloadVendor=ontap" \
+      --default-offload-migration-hosts "host-10+host-11" \
+      --default-offload-secret my-storage-secret
+
+Important Constraints
+---------------------
+  - A plan cannot mix VDDK and offload storage pairs (all or none)
+  - Source VMDK and target PVC must be on the SAME physical storage array
+  - ESXi hosts must have VAAI enabled
+  - Works with vVol, RDM, and VMFS-backed disks`,
 	},
 }
 

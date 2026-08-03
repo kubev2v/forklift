@@ -16,6 +16,7 @@ import (
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/provider"
 	"github.com/yaacov/kubectl-mtv/pkg/cmd/create/mapping/offload"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
+	"github.com/yaacov/kubectl-mtv/pkg/util/flags"
 	"github.com/yaacov/kubectl-mtv/pkg/util/output"
 )
 
@@ -51,12 +52,7 @@ func validateOffloadPlugin(plugin string) error {
 
 // validateOffloadVendor validates offload vendor values
 func validateOffloadVendor(vendor string) error {
-	switch vendor {
-	case "flashsystem", "vantara", "ontap", "primera3par", "pureFlashArray", "powerflex", "powermax", "powerstore", "infinibox":
-		return nil
-	default:
-		return fmt.Errorf("must be one of: flashsystem, vantara, ontap, primera3par, pureFlashArray, powerflex, powermax, powerstore, infinibox")
-	}
+	return flags.ValidateOffloadVendor(vendor)
 }
 
 // StoragePairOptions holds options for parsing storage pairs
@@ -249,6 +245,13 @@ func parseStoragePairsInternal(pairStr, defaultNamespace string, configFlags *ge
 
 // createStorageMappingWithOptions creates a new storage mapping with additional options for VolumeMode, AccessMode, and OffloadPlugin
 func createStorageMappingWithOptions(ctx context.Context, opts StorageCreateOptions) error {
+	// Validate default offload vendor early (before parsing pairs)
+	if opts.DefaultOffloadVendor != "" {
+		if err := validateOffloadVendor(opts.DefaultOffloadVendor); err != nil {
+			return fmt.Errorf("invalid --default-offload-vendor '%s': %v", opts.DefaultOffloadVendor, err)
+		}
+	}
+
 	// Parse provider references to extract names and namespaces
 	sourceProviderName, sourceProviderNamespace := parseProviderReference(opts.SourceProvider, opts.Namespace)
 	targetProviderName, targetProviderNamespace := parseProviderReference(opts.TargetProvider, opts.Namespace)
