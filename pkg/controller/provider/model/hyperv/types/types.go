@@ -71,9 +71,10 @@ type GuestNetwork struct {
 
 // Network represents a Hyper-V virtual network/switch.
 type Network struct {
-	UUID       string `json:"uuid"`
-	Name       string `json:"name"`
-	SwitchType string `json:"switchType"`
+	UUID       string   `json:"uuid"`
+	Name       string   `json:"name"`
+	SwitchType string   `json:"switchType"`
+	OwnerNodes []string `json:"ownerNodes,omitempty"`
 }
 
 // Storage represents a Hyper-V storage location.
