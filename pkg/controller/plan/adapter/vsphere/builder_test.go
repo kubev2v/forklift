@@ -6,6 +6,7 @@ import (
 	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
@@ -1041,6 +1042,87 @@ var _ = Describe("vSphere builder", func() {
 				{Key: 2000, Bus: vsphere.SCSI, ControllerKey: 1001, UnitNumber: 0},
 			},
 		),
+	)
+
+	DescribeTable("should set instance UUID if available", func(instanceUUID, biosUUID, expectedUUID string) {
+		builder := createBuilder(
+			&core.Secret{
+				ObjectMeta: meta.ObjectMeta{Name: "storage-test-secret", Namespace: "test"},
+				Data: map[string][]byte{
+					"storagekey": []byte("storageval"),
+				},
+			},
+			&core.Secret{
+				ObjectMeta: meta.ObjectMeta{Name: "migration-test-secret", Namespace: "test"},
+				Data: map[string][]byte{
+					"providerkey": []byte("providerval"),
+				},
+			},
+			&core.Secret{
+				ObjectMeta: meta.ObjectMeta{Name: "offload-ssh-keys-test-vsphere-provider-private", Namespace: "test"},
+				Data: map[string][]byte{
+					"private-key": []byte("fake-private-key"),
+				},
+			},
+			&core.Secret{
+				ObjectMeta: meta.ObjectMeta{Name: "offload-ssh-keys-test-vsphere-provider-public", Namespace: "test"},
+				Data: map[string][]byte{
+					"public-key": []byte("fake-public-key"),
+				},
+			},
+			&core.PersistentVolumeClaim{
+				ObjectMeta: meta.ObjectMeta{Name: "test-pvc", Namespace: "test"},
+			},
+		)
+		vm := model.VM{
+			InstanceUUID: instanceUUID,
+			UUID:         biosUUID,
+			VM1: model.VM1{
+				VM0: model.VM0{ID: "vm-2", Name: "vm"},
+				Disks: []vsphere.Disk{
+					{
+						Datastore: vsphere.Ref{ID: "ds-2"},
+						File:      "[datastore2] vm-2/vm-2.vmdk",
+						Bus:       vsphere.SCSI, Capacity: 1 << 20, Key: 2000,
+					},
+				},
+			},
+		}
+		builder.Source.Inventory = &mockInventory{ds: model.Datastore{Resource: model.Resource{ID: "ds-2"}}, vm: vm}
+		builder.Map.Storage = &v1beta1.StorageMap{
+			Spec: v1beta1.StorageMapSpec{
+				Map: []v1beta1.StoragePair{{
+					Source: ref.Ref{ID: "ds-2"},
+					Destination: v1beta1.DestinationStorage{
+						StorageClass: "test-sc",
+						AccessMode:   core.ReadWriteOnce,
+						VolumeMode:   core.PersistentVolumeFilesystem,
+					},
+					OffloadPlugin: &v1beta1.OffloadPlugin{
+						VSphereXcopyPluginConfig: &v1beta1.VSphereXcopyPluginConfig{
+							StorageVendorProduct: "test-vendor",
+							SecretRef:            "migration-test-secret",
+						},
+					},
+				}},
+			},
+		}
+		builder.Plan.Spec.Type = v1beta1.MigrationWarm
+		builder.Plan.Status.Migration.VMs = []*plan.VMStatus{
+			{
+				VM: plan.VM{
+					Ref: ref.Ref{ID: vm.ID, Name: vm.Name},
+				},
+				Warm: &plan.Warm{},
+			},
+		}
+		pvcs, err := builder.PopulatorVolumes(ref.Ref{ID: vm.ID}, map[string]string{}, "migration-test-secret")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvcs).To(HaveLen(1))
+		Expect(pvcs[0].Annotations[planbase.AnnUUID]).To(Equal(expectedUUID))
+	},
+		Entry("should set instance UUID correctly", "12345", "", "12345"),
+		Entry("should set BIOS UUID if instance UUID is missing", "", "54321", "54321"),
 	)
 })
 
