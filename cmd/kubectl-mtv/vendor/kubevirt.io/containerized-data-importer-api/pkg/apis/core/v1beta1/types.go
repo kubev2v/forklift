@@ -56,6 +56,9 @@ type DataVolumeSpec struct {
 	Storage *StorageSpec `json:"storage,omitempty"`
 	//PriorityClassName for Importer, Cloner and Uploader pod
 	PriorityClassName string `json:"priorityClassName,omitempty"`
+	// ServiceAccountName for Importer and Uploader pod
+	// +optional
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 	//DataVolumeContentType options: "kubevirt", "archive"
 	// +kubebuilder:validation:Enum="kubevirt";"archive"
 	ContentType DataVolumeContentType `json:"contentType,omitempty"`
@@ -253,6 +256,11 @@ type DataVolumeSourceHTTP struct {
 	// SecretExtraHeaders is a list of Secret references, each containing an extra HTTP header that may include sensitive information
 	// +optional
 	SecretExtraHeaders []string `json:"secretExtraHeaders,omitempty"`
+	// Checksum is the expected checksum of the file. Format: "algorithm:hash", e.g., "sha256:1234abcd..." or "md5:5678efgh..."
+	// Supported algorithms: md5, sha1, sha256, sha512
+	// If specified, the importer will verify the downloaded content matches this checksum
+	// +optional
+	Checksum string `json:"checksum,omitempty"`
 }
 
 // DataVolumeSourceImageIO provides the parameters to create a Data Volume from an imageio source
@@ -467,7 +475,23 @@ type StorageProfileStatus struct {
 	DataImportCronSourceFormat *DataImportCronSourceFormat `json:"dataImportCronSourceFormat,omitempty"`
 	// SnapshotClass is optional specific VolumeSnapshotClass for CloneStrategySnapshot. If not set, a VolumeSnapshotClass is chosen according to the provisioner.
 	SnapshotClass *string `json:"snapshotClass,omitempty"`
+	// Conditions contains the current conditions observed for the StorageProfile
+	Conditions []StorageProfileCondition `json:"conditions,omitempty" optional:"true"`
 }
+
+// StorageProfileCondition represents the state of a storage profile condition
+type StorageProfileCondition struct {
+	Type           StorageProfileConditionType `json:"type" description:"type of condition ie. Recognized"`
+	ConditionState `json:",inline"`
+}
+
+// StorageProfileConditionType is the string representation of known condition types
+type StorageProfileConditionType string
+
+const (
+	// StorageProfileRecognized is the condition that indicates if the storage class provisioner and parameters are recognized by CDI
+	StorageProfileRecognized StorageProfileConditionType = "Recognized"
+)
 
 // ClaimPropertySet is a set of properties applicable to PVC
 type ClaimPropertySet struct {
@@ -596,10 +620,10 @@ type DataImportCronSpec struct {
 	// RetentionPolicy specifies whether the created DataVolumes and DataSources are retained when their DataImportCron is deleted. Default is RatainAll.
 	// +optional
 	RetentionPolicy *DataImportCronRetentionPolicy `json:"retentionPolicy,omitempty"`
-	// CreatedBy is the JSON-marshaled UserInfo of the user who created this DataImportCron.
-	// This field is set by the mutating webhook and cannot be set by users.
+	// ServiceAccountName is the name of the ServiceAccount for creating DataVolumes.
 	// +optional
-	CreatedBy *string `json:"createdBy,omitempty"`
+	// +kubebuilder:validation:MinLength=1
+	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
 }
 
 // DataImportCronGarbageCollect represents the DataImportCron garbage collection mode
