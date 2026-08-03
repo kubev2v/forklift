@@ -22,6 +22,7 @@ import (
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	cnv "kubevirt.io/api/core/v1"
@@ -1479,7 +1480,11 @@ func (r *Builder) targetPvc(source *model.PersistentVolumeClaim, storage api.Des
 	pvc.Namespace = r.Plan.Spec.TargetNamespace
 	pvc.Name = source.Name
 	pvc.Spec = core.PersistentVolumeClaimSpec{
-		Resources:        source.Object.Spec.Resources,
+		Resources: core.VolumeResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceStorage: r.requestSize(source),
+			},
+		},
 		StorageClassName: &storage.StorageClass,
 	}
 	if storage.AccessMode != "" {
@@ -1493,7 +1498,6 @@ func (r *Builder) targetPvc(source *model.PersistentVolumeClaim, storage api.Des
 
 // targetDataVolume creates a target CR based on the source CR.
 func (r *Builder) targetDataVolume(source *model.DataVolume, pvc *model.PersistentVolumeClaim, storage api.DestinationStorage) (dv cdi.DataVolume) {
-	size := pvc.Object.Spec.Resources.Requests["storage"]
 	dv = cdi.DataVolume{}
 	dv.Namespace = r.Plan.Spec.TargetNamespace
 	dv.Name = source.Name
@@ -1508,7 +1512,7 @@ func (r *Builder) targetDataVolume(source *model.DataVolume, pvc *model.Persiste
 		Storage: &cdi.StorageSpec{
 			Resources: core.VolumeResourceRequirements{
 				Requests: core.ResourceList{
-					core.ResourceStorage: size,
+					core.ResourceStorage: r.requestSize(pvc),
 				},
 			},
 			StorageClassName: &storage.StorageClass,
@@ -1529,6 +1533,17 @@ func (r *Builder) targetDataVolume(source *model.DataVolume, pvc *model.Persiste
 		dv.Spec.Storage.VolumeMode = &storage.VolumeMode
 	}
 	return
+}
+
+func (r *Builder) requestSize(pvc *model.PersistentVolumeClaim) resource.Quantity {
+	isBlock := (pvc.Object.Spec.VolumeMode != nil) && (*pvc.Object.Spec.VolumeMode == core.PersistentVolumeBlock)
+	if isBlock {
+		// MTV-5328: some block storage backings may create
+		// the pvc with a capacity that is higher than
+		// the request.
+		return *pvc.Object.Status.Capacity.Storage()
+	}
+	return *pvc.Object.Spec.Resources.Requests.Storage()
 }
 
 // LocalInstanceType builds a copy of a namespace-local InstanceType from the source.
