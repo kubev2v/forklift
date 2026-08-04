@@ -1,7 +1,7 @@
 # Configures static IP on Windows network interfaces via registry.
 # Registry writes don't depend on RPC or DHCP Client service.
 # Changes take effect after reboot.
-# Input format: MAC:ip:IP,Gateway,Prefix,DNS1,DNS2 (entries separated by '_')
+# Input format: MAC:ip:IP,Gateway,Prefix,DNS1[,DNS2,...,DNSn] (entries separated by '_')
 
 $inputString = "{{.InputString}}"
 $adapterWaitMinutes = 5
@@ -55,13 +55,23 @@ $adapterConfigs = @{}
 Write-Host "[INFO] Parsing $totalEntries entries..."
 
 foreach ($entry in $entries) {
-    if ($entry -match "^([0-9A-Fa-f:\-]+):ip:([^,]+),([^,]+),([^,]+),([^,]+),([^,]*)$") {
+    if ($entry -match "^([0-9A-Fa-f:\-]+):ip:(.+)$") {
         $mac = $matches[1].ToUpper().Replace(":", "-")
-        $ip = $matches[2]
-        $gw = $matches[3]
-        $prefix = [int]$matches[4]
-        $dns1 = $matches[5]
-        $dns2 = $matches[6]
+        $fields = $matches[2].Split(",")
+
+        if ($fields.Count -lt 4) {
+            Write-Warning "[ERROR] Not enough fields (need at least IP,GW,Prefix,DNS1): '$entry'"
+            continue
+        }
+
+        $ip = $fields[0]
+        $gw = $fields[1]
+        $prefix = [int]$fields[2]
+        $dnsServers = @($fields[3..($fields.Count - 1)] | Where-Object { $_ -ne "" })
+        if ($dnsServers.Count -eq 0) {
+            Write-Warning "[ERROR] No DNS servers provided for entry: '$entry'"
+            continue
+        }
         $mask = Convert-PrefixToMask $prefix
 
         if (-not $adapterConfigs.ContainsKey($mac)) {
@@ -69,8 +79,7 @@ foreach ($entry in $entries) {
                 IPs = @()
                 Masks = @()
                 Gateway = $gw
-                DNS1 = $dns1
-                DNS2 = $dns2
+                DNSServers = $dnsServers
             }
         }
 
@@ -78,7 +87,7 @@ foreach ($entry in $entries) {
         $adapterConfigs[$mac].Masks += $mask
     } else {
         Write-Warning "[ERROR] Invalid input format: '$entry'"
-        Write-Warning "[ERROR] Expected: MAC:ip:IP,Gateway,Prefix,DNS1,DNS2"
+        Write-Warning "[ERROR] Expected: MAC:ip:IP,Gateway,Prefix,DNS1[,DNS2,...,DNSn]"
     }
 }
 
@@ -91,7 +100,7 @@ foreach ($mac in $adapterConfigs.Keys) {
     Write-Host "--- Adapter MAC=$mac ---"
     Write-Host "[INFO] IPs: $($config.IPs -join ', ')"
     Write-Host "[INFO] Masks: $($config.Masks -join ', ')"
-    Write-Host "[INFO] GW=$($config.Gateway) DNS=$($config.DNS1),$($config.DNS2)"
+    Write-Host "[INFO] GW=$($config.Gateway) DNS=$($config.DNSServers -join ',')"
 
     $adapter = Find-AdapterByMAC $mac
     if ($adapter -eq $null) {
@@ -117,11 +126,10 @@ foreach ($mac in $adapterConfigs.Keys) {
         Set-ItemProperty -Path $regPath -Name "DefaultGateway" -Value @($config.Gateway) -Type MultiString
         Set-ItemProperty -Path $regPath -Name "DefaultGatewayMetric" -Value @("0") -Type MultiString
 
-        $dnsServers = $config.DNS1
-        if ($config.DNS2 -ne "") { $dnsServers = "$($config.DNS1),$($config.DNS2)" }
-        Set-ItemProperty -Path $regPath -Name "NameServer" -Value $dnsServers -Type String
+        $dnsString = $config.DNSServers -join ","
+        Set-ItemProperty -Path $regPath -Name "NameServer" -Value $dnsString -Type String
 
-        Write-Host "[OK] Registry updated: IPs=($($config.IPs -join ', ')) GW=$($config.Gateway) DNS=$dnsServers"
+        Write-Host "[OK] Registry updated: IPs=($($config.IPs -join ', ')) GW=$($config.Gateway) DNS=$dnsString"
         $successCount++
     } catch {
         Write-Error "[FAIL] Registry write failed for MAC=$mac at ${regPath}: $_"
