@@ -60,10 +60,8 @@ import (
 )
 
 const (
-	// Name.
-	Name               = "provider"
-	OvaTimeout         = 10 * time.Minute
-	OvaReconcilerRetry = 5 * time.Second
+	Name         = "provider"
+	AuthRetryReQ = 3 * time.Minute
 )
 
 // Package logger.
@@ -194,7 +192,11 @@ func (r Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (r
 	}()
 
 	defer func() {
-		// Stop reconciliation when auth fails
+		if provider.Status.HasCondition(ConnectionAuthRetry) {
+			result.RequeueAfter = AuthRetryReQ
+			err = nil
+			return
+		}
 		if provider.Status.HasCondition(ConnectionAuthFailed) {
 			result.RequeueAfter = 0
 			err = nil
