@@ -236,7 +236,7 @@ func (r *KubeVirt) resolveConversionResources(vm *plan.VMStatus, podType convctx
 			return
 		}
 
-		useV2v, v2vErr := r.Context.Plan.ShouldUseV2vForTransfer(vm.Ref, r.Destination.Client)
+		useV2v, v2vErr := r.Plan.ShouldUseV2vForTransfer(vm.Ref)
 		if v2vErr != nil {
 			err = v2vErr
 			return
@@ -355,7 +355,7 @@ func (r *KubeVirt) checkProviderReady(vmID string) (ready bool, err error) {
 // should use InPlace or Remote conversion based on the plan transfer mode
 // and PVC copy-offload annotations.
 func (r *KubeVirt) ResolveConversionType(vm *plan.VMStatus) (api.ConversionType, error) {
-	useV2v, err := r.Context.Plan.ShouldUseV2vForTransfer(vm.Ref, r.Destination.Client)
+	useV2v, err := r.Plan.ShouldUseV2vForTransfer(vm.Ref)
 	if err != nil {
 		return "", err
 	}
@@ -407,7 +407,8 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 	maps.Copy(labels, resources.podConfig.PodLabels)
 
 	list := &api.ConversionList{}
-	err = r.Client.List(context.TODO(), list,
+	err = r.Client.List(
+		context.TODO(), list,
 		client.InNamespace(r.Plan.Namespace),
 		client.MatchingLabels(labels),
 	)
@@ -419,7 +420,8 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 		r.Log.Info(
 			"Conversion CR already exists.",
 			"conversion", path.Join(list.Items[0].Namespace, list.Items[0].Name),
-			"vm", vm.String())
+			"vm", vm.String(),
+		)
 		return r.checkProviderReady(vm.ID)
 	}
 
@@ -493,7 +495,8 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 			sourceNS = r.Plan.Namespace
 		}
 		source := &core.Secret{}
-		if err = r.Client.Get(context.TODO(),
+		if err = r.Client.Get(
+			context.TODO(),
 			types.NamespacedName{Namespace: sourceNS, Name: vm.LUKS.Name}, source,
 		); err != nil {
 			err = liberr.Wrap(err)
@@ -532,7 +535,8 @@ func (r *KubeVirt) EnsureConversion(vm *plan.VMStatus, conversionType api.Conver
 		"Conversion CR created.",
 		"conversion", path.Join(conversion.Namespace, conversion.Name),
 		"type", string(conversionType),
-		"vm", vm.String())
+		"vm", vm.String(),
+	)
 	return
 }
 
@@ -557,7 +561,8 @@ func (r *KubeVirt) getConversionLabels(convType api.ConversionType, vmID, planID
 // all supplied labels. Returns nil (no error) when no match is found.
 func (r *KubeVirt) getConversion(labels map[string]string) (*api.Conversion, error) {
 	list := &api.ConversionList{}
-	if err := r.Client.List(context.TODO(), list,
+	if err := r.Client.List(
+		context.TODO(), list,
 		client.InNamespace(r.Plan.Namespace),
 		client.MatchingLabels(labels),
 	); err != nil {
@@ -586,7 +591,8 @@ func (r *KubeVirt) buildConversion(planName, vmID string, labels map[string]stri
 // found its Spec is refreshed; otherwise the provided CR is created verbatim.
 func (r *KubeVirt) ensureConversion(cr *api.Conversion) (*api.Conversion, error) {
 	list := &api.ConversionList{}
-	if err := r.Client.List(context.TODO(), list,
+	if err := r.Client.List(
+		context.TODO(), list,
 		client.InNamespace(cr.Namespace),
 		client.MatchingLabels(cr.Labels),
 	); err != nil {
@@ -634,7 +640,8 @@ func (r *KubeVirt) ensureConversionSecret(cl client.Client, secret *core.Secret)
 		}
 	}
 	list := &core.SecretList{}
-	if err := cl.List(context.TODO(), list,
+	if err := cl.List(
+		context.TODO(), list,
 		&client.ListOptions{
 			LabelSelector: k8slabels.SelectorFromSet(lookupLabels),
 			Namespace:     secret.Namespace,
@@ -677,7 +684,8 @@ func (r *KubeVirt) GetGuestConversion(vm *plan.VMStatus) (*api.Conversion, error
 	}).Add(*typeReq)
 
 	list := &api.ConversionList{}
-	if err := r.List(context.TODO(), list,
+	if err := r.List(
+		context.TODO(), list,
 		client.InNamespace(r.Plan.Namespace),
 		client.MatchingLabelsSelector{Selector: selector},
 	); err != nil {
@@ -728,7 +736,8 @@ func (r *KubeVirt) CreateDeepInspectionConversion(
 			sourceNS = r.Plan.Namespace
 		}
 		source := &core.Secret{}
-		if err = r.Client.Get(context.TODO(),
+		if err = r.Client.Get(
+			context.TODO(),
 			types.NamespacedName{Namespace: sourceNS, Name: vm.LUKS.Name}, source,
 		); err != nil {
 			return nil, liberr.Wrap(err)
@@ -812,7 +821,8 @@ func (r *KubeVirt) DeleteAllConversions(vm *plan.VMStatus) error {
 		convctx.LabelVM:   vm.Ref.ID,
 	}
 	list := &api.ConversionList{}
-	if err := r.Client.List(context.TODO(), list,
+	if err := r.Client.List(
+		context.TODO(), list,
 		client.InNamespace(r.Plan.Namespace),
 		client.MatchingLabels(labels),
 	); err != nil {
@@ -842,7 +852,8 @@ func (r *KubeVirt) deleteConversionPod(cr *api.Conversion) error {
 		return nil
 	}
 	list := &core.PodList{}
-	if err := cl.List(context.TODO(), list,
+	if err := cl.List(
+		context.TODO(), list,
 		&client.ListOptions{
 			LabelSelector: k8slabels.SelectorFromSet(matchLabels),
 			Namespace:     cr.Spec.TargetNamespace,
@@ -889,7 +900,8 @@ func (r *KubeVirt) deleteConversionSecrets(cr *api.Conversion) error {
 		convctx.LabelConversionType: string(cr.Spec.Type),
 	}
 	list := &core.SecretList{}
-	if err := cl.List(context.TODO(), list,
+	if err := cl.List(
+		context.TODO(), list,
 		&client.ListOptions{
 			LabelSelector: k8slabels.SelectorFromSet(matchLabels),
 			Namespace:     cr.Spec.TargetNamespace,
@@ -911,7 +923,8 @@ func (r *KubeVirt) deleteConversionSecrets(cr *api.Conversion) error {
 		return nil
 	}
 	v2vList := &core.SecretList{}
-	if err := r.Destination.Client.List(context.TODO(), v2vList,
+	if err := r.Destination.Client.List(
+		context.TODO(), v2vList,
 		&client.ListOptions{
 			LabelSelector: k8slabels.SelectorFromSet(map[string]string{
 				convctx.LabelVM: vmID,
@@ -958,7 +971,8 @@ func (r *KubeVirt) CancelConversion(vm *plan.VMStatus) error {
 		convctx.LabelVM:   vm.Ref.ID,
 	}
 	list := &api.ConversionList{}
-	err := r.Client.List(context.TODO(), list,
+	err := r.Client.List(
+		context.TODO(), list,
 		client.InNamespace(r.Plan.Namespace),
 		client.MatchingLabels(labels),
 	)
@@ -1213,7 +1227,8 @@ func (r *KubeVirt) EnsureGuestInspectionPod(vm *plan.VMStatus, step *plan.Step) 
 	err = convbuilder.EnsureVirtV2vPod(
 		r.Destination.Client, r.Log, vm,
 		res.volumes, res.mounts, res.devices,
-		res.secret, convctx.VirtV2vInspectionPod, false, res.podConfig)
+		res.secret, convctx.VirtV2vInspectionPod, false, res.podConfig,
+	)
 	if err != nil {
 		return
 	}
@@ -1317,7 +1332,8 @@ func (r *KubeVirt) ListVMs() ([]VirtualMachine, error) {
 			list,
 			VirtualMachine{
 				VirtualMachine: vm,
-			})
+			},
+		)
 	}
 	dvList := &cdi.DataVolumeList{}
 	err = r.Destination.Client.List(
@@ -1347,7 +1363,8 @@ func (r *KubeVirt) ListVMs() ([]VirtualMachine, error) {
 					ExtendedDataVolume{
 						DataVolume: dv,
 						PVC:        pvc,
-					})
+					},
+				)
 			}
 		}
 	}
@@ -1362,7 +1379,8 @@ func (r *KubeVirt) EnsureNamespace() error {
 		r.Log.Info(
 			"Created namespace.",
 			"import",
-			r.Plan.Spec.TargetNamespace)
+			r.Plan.Spec.TargetNamespace,
+		)
 	}
 	return err
 }
@@ -1389,7 +1407,8 @@ func (r *KubeVirt) EnsureExtraV2vConfConfigMap() error {
 		r.Log.Info(
 			"Created config map for extra configuration for virt-v2v.",
 			"target namespace",
-			r.Plan.Spec.TargetNamespace)
+			r.Plan.Spec.TargetNamespace,
+		)
 	}
 	return err
 }
@@ -1439,7 +1458,8 @@ func (r *KubeVirt) EnsureCustomizationScriptsConfigMap() error {
 		r.Log.V(4).Info(
 			"Ensured ConfigMap for customization scripts in target namespace.",
 			"configMap namespace", configMapNamespace,
-			"target namespace", r.Plan.Spec.TargetNamespace)
+			"target namespace", r.Plan.Spec.TargetNamespace,
+		)
 	}
 	return err
 }
@@ -1558,7 +1578,8 @@ func (r *KubeVirt) DeleteDataVolumes(vm *plan.VMStatus) (err error) {
 			"dv",
 			path.Join(dv.Namespace, dv.Name),
 			"vm",
-			vm.String())
+			vm.String(),
+		)
 		err = r.Destination.Client.Delete(context.TODO(), dv.DataVolume)
 		if err != nil {
 			return
@@ -1583,9 +1604,11 @@ func (r *KubeVirt) DeleteImporterPods(pvc *core.PersistentVolumeClaim) (err erro
 				"pod",
 				path.Join(
 					pod.Namespace,
-					pod.Name),
+					pod.Name,
+				),
 				"pvc",
-				pvc.Name)
+				pvc.Name,
+			)
 			continue
 		}
 		r.Log.Info(
@@ -1593,9 +1616,11 @@ func (r *KubeVirt) DeleteImporterPods(pvc *core.PersistentVolumeClaim) (err erro
 			"pod",
 			path.Join(
 				pod.Namespace,
-				pod.Name),
+				pod.Name,
+			),
 			"pvc",
-			pvc.Name)
+			pvc.Name,
+		)
 	}
 	return
 }
@@ -1628,7 +1653,9 @@ func (r *KubeVirt) DeleteJobs(vm *plan.VMStatus) (err error) {
 				"job",
 				path.Join(
 					job.Namespace,
-					job.Name))
+					job.Name,
+				),
+			)
 			continue
 		}
 
@@ -1661,7 +1688,9 @@ func (r *KubeVirt) DeleteJobs(vm *plan.VMStatus) (err error) {
 					"pod",
 					path.Join(
 						pod.Namespace,
-						pod.Name))
+						pod.Name,
+					),
+				)
 				continue
 			}
 		}
@@ -1698,9 +1727,11 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) error {
 			"vm",
 			path.Join(
 				virtualMachine.Namespace,
-				virtualMachine.Name),
+				virtualMachine.Name,
+			),
 			"source",
-			vm.String())
+			vm.String(),
+		)
 	} else {
 		virtualMachine = &vms.Items[0]
 	}
@@ -1714,7 +1745,8 @@ func (r *KubeVirt) EnsureVM(vm *plan.VMStatus) error {
 		&client.ListOptions{
 			LabelSelector: k8slabels.SelectorFromSet(r.vmLabels(vm.Ref)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
-		})
+		},
+	)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -1822,9 +1854,11 @@ func (r *KubeVirt) DeleteVM(vm *plan.VMStatus) (err error) {
 				"vm",
 				path.Join(
 					object.Namespace,
-					object.Name),
+					object.Name,
+				),
 				"source",
-				vm.String())
+				vm.String(),
+			)
 		}
 	}
 	return
@@ -1885,7 +1919,8 @@ func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVo
 		&client.ListOptions{
 			LabelSelector: k8slabels.SelectorFromSet(r.vmLabels(vm.Ref)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
-		})
+		},
+	)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -1902,7 +1937,8 @@ func (r *KubeVirt) EnsureDataVolumes(vm *plan.VMStatus, dataVolumes []cdi.DataVo
 				"dv",
 				path.Join(
 					dv.Namespace,
-					dv.Name),
+					dv.Name,
+				),
 				"vm",
 				vm.String())
 		}
@@ -1977,7 +2013,9 @@ func (r *KubeVirt) ensureVddkConfigMap() (configMap *core.ConfigMap, err error) 
 			"configmap",
 			path.Join(
 				configMap.Namespace,
-				configMap.Name))
+				configMap.Name,
+			),
+		)
 	} else {
 		configMap = newConfigMap
 		err = r.Destination.Client.Create(context.TODO(), configMap)
@@ -1990,7 +2028,9 @@ func (r *KubeVirt) ensureVddkConfigMap() (configMap *core.ConfigMap, err error) 
 			"configmap",
 			path.Join(
 				configMap.Namespace,
-				configMap.Name))
+				configMap.Name,
+			),
+		)
 	}
 	return
 }
@@ -2027,7 +2067,8 @@ func (r *KubeVirt) getDVs(vm *plan.VMStatus) (edvs []ExtendedDataVolume, err err
 		&client.ListOptions{
 			LabelSelector: k8slabels.SelectorFromSet(r.vmAllButMigrationLabels(vm.Ref)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
-		})
+		},
+	)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -2309,7 +2350,8 @@ func (r *KubeVirt) GetGuestConversionPod(vm *plan.VMStatus) (pod *core.Pod, err 
 		&client.ListOptions{
 			LabelSelector: k8slabels.SelectorFromSet(r.conversionLabels(vm.Ref, false)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
-		})
+		},
+	)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -2481,7 +2523,8 @@ func (r *KubeVirt) DeleteDeepInspectionPods(vm *plan.VMStatus) error {
 		convctx.LabelConversionType: string(api.DeepInspection),
 	}
 	list := &core.PodList{}
-	if err := r.List(context.TODO(), list,
+	if err := r.List(
+		context.TODO(), list,
 		client.InNamespace(r.Plan.Namespace),
 		client.MatchingLabels(matchLabels),
 	); err != nil {
@@ -2552,9 +2595,11 @@ func (r *KubeVirt) DeleteObject(object client.Object, vm *plan.VMStatus, message
 			objType,
 			path.Join(
 				object.GetNamespace(),
-				object.GetName()),
+				object.GetName(),
+			),
 			"vm",
-			vm.String())
+			vm.String(),
+		)
 	}
 	return
 }
@@ -2648,7 +2693,8 @@ func (r *KubeVirt) DeletePopulatorPods(vm *plan.VMStatus) (err error) {
 			r.Log.Info(
 				"WARNING: FEATURE_RETAIN_POPULATOR_PODS is enabled but DeleteVmOnFailMigration is also set;"+
 					" on failure the PVCs will be deleted and Kubernetes GC will remove the populator pods via OwnerReference.",
-				"vm", vm.String())
+				"vm", vm.String(),
+			)
 		}
 		r.Log.Info("Retaining populator pods (feature flag enabled).", "vm", vm.String())
 		return
@@ -2757,7 +2803,8 @@ func (r *KubeVirt) getGeneratedName(vm *plan.VMStatus) string {
 			r.Plan.Name,
 			vm.ID,
 		},
-		"-") + "-"
+		"-",
+	) + "-"
 }
 
 // Return the generated name for a specific VM and plan.
@@ -2987,7 +3034,8 @@ func (r *KubeVirt) getVirtualMachineInstanceType(instanceTypeName string) (kind 
 	err = r.Destination.Client.Get(
 		context.TODO(),
 		client.ObjectKey{Name: instanceTypeName, Namespace: r.Plan.Spec.TargetNamespace},
-		virtualMachineInstancetype)
+		virtualMachineInstancetype,
+	)
 	if err != nil {
 		return
 	}
@@ -3000,7 +3048,8 @@ func (r *KubeVirt) getVirtualMachineClusterInstanceType(vm *plan.VMStatus, insta
 	err = r.Destination.Client.Get(
 		context.TODO(),
 		client.ObjectKey{Name: instanceTypeName},
-		virtualMachineClusterInstancetype)
+		virtualMachineClusterInstancetype,
+	)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
 			r.Log.Info("could not find instance type for destination VM.",
@@ -3059,7 +3108,8 @@ func (r *KubeVirt) getVirtualMachinePreference(preferenceName string) (name, kin
 	err = r.Destination.Client.Get(
 		context.TODO(),
 		client.ObjectKey{Name: preferenceName, Namespace: r.Plan.Spec.TargetNamespace},
-		virtualMachinePreference)
+		virtualMachinePreference,
+	)
 	if err != nil {
 		return
 	}
@@ -3071,7 +3121,8 @@ func (r *KubeVirt) getVirtualMachineClusterPreference(vm *plan.VMStatus, prefere
 	err = r.Destination.Client.Get(
 		context.TODO(),
 		client.ObjectKey{Name: preferenceName},
-		virtualMachineClusterPreference)
+		virtualMachineClusterPreference,
+	)
 	if err != nil {
 		if k8serr.IsNotFound(err) {
 			r.Log.Info("could not find instance type preference for destination VM.",
@@ -3236,7 +3287,8 @@ func (r *KubeVirt) findTemplate(vm *plan.VMStatus) (tmpl *template.Template, err
 		&client.ListOptions{
 			LabelSelector: k8slabels.SelectorFromSet(templateLabels),
 			Namespace:     "openshift",
-		})
+		},
+	)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -3372,7 +3424,8 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 				"volume",
 				v.Name,
 				"pvc",
-				v.PersistentVolumeClaim.ClaimName)
+				v.PersistentVolumeClaim.ClaimName,
+			)
 			continue
 		}
 		vol := core.Volume{
@@ -3475,14 +3528,16 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 		extraVolumes = append(extraVolumes, providerVol)
 		extraMounts = append(extraMounts, providerMount)
 	case api.VSphere:
-		mounts = append(mounts,
+		mounts = append(
+			mounts,
 			core.VolumeMount{
 				Name:      VddkVolumeName,
 				MountPath: "/opt",
 			},
 		)
 		if extraConfigMapExists {
-			mounts = append(mounts,
+			mounts = append(
+				mounts,
 				core.VolumeMount{
 					Name:      ExtraV2vConf,
 					MountPath: fmt.Sprintf("/mnt/%s", ExtraV2vConf),
@@ -3490,7 +3545,8 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 			)
 		}
 		if vddkConfigmap != nil {
-			mounts = append(mounts,
+			mounts = append(
+				mounts,
 				core.VolumeMount{
 					Name:      VddkConf,
 					MountPath: fmt.Sprintf("/mnt/%s", VddkConf),
@@ -3522,7 +3578,8 @@ func (r *KubeVirt) podVolumeMounts(vmVolumes []cnv.Volume, vddkConfigmap *core.C
 		if !exists {
 			err = liberr.New(
 				fmt.Sprintf("CustomizationScripts ConfigMap %s not found in namespace %s",
-					volumeConfigMapName, r.Plan.Spec.TargetNamespace))
+					volumeConfigMapName, r.Plan.Spec.TargetNamespace),
+			)
 			return
 		}
 		scriptsVol := core.Volume{
@@ -3651,9 +3708,11 @@ func (r *KubeVirt) ensureConfigMap(vmRef ref.Ref) (configMap *core.ConfigMap, er
 			"configMap",
 			path.Join(
 				configMap.Namespace,
-				configMap.Name),
+				configMap.Name,
+			),
 			"vm",
-			vmRef.String())
+			vmRef.String(),
+		)
 	}
 
 	return
@@ -3670,7 +3729,8 @@ func (r *KubeVirt) configMap(vmRef ref.Ref) (object *core.ConfigMap, err error) 
 					r.Plan.Name,
 					vmRef.ID,
 				},
-				"-") + "-",
+				"-",
+			) + "-",
 		},
 		BinaryData: make(map[string][]byte),
 	}
@@ -3742,9 +3802,11 @@ func (r *KubeVirt) ensureSecret(vmRef ref.Ref, setSecretData func(*core.Secret) 
 			"secret",
 			path.Join(
 				secret.Namespace,
-				secret.Name),
+				secret.Name,
+			),
 			"vm",
-			vmRef.String())
+			vmRef.String(),
+		)
 	} else {
 		secret = newSecret
 		err = r.Destination.Client.Create(context.TODO(), secret)
@@ -3757,9 +3819,11 @@ func (r *KubeVirt) ensureSecret(vmRef ref.Ref, setSecretData func(*core.Secret) 
 			"secret",
 			path.Join(
 				secret.Namespace,
-				secret.Name),
+				secret.Name,
+			),
 			"vm",
-			vmRef.String())
+			vmRef.String(),
+		)
 	}
 
 	return
@@ -3776,7 +3840,8 @@ func (r *KubeVirt) secret(vmRef ref.Ref, setSecretData func(*core.Secret) error,
 					r.Plan.Name,
 					vmRef.ID,
 				},
-				"-") + "-",
+				"-",
+			) + "-",
 		},
 	}
 	err = setSecretData(secret)
@@ -3935,7 +4000,8 @@ func (r *KubeVirt) setTransferNetwork(annotations map[string]string) (err error)
 			} else {
 				err = liberr.New(
 					"Transfer network default route is not a valid IP address.",
-					"route", route)
+					"route", route,
+				)
 				return
 			}
 		}
@@ -4061,7 +4127,8 @@ func (r *KubeVirt) EnsurePersistentVolume(vmRef ref.Ref, persistentVolumes []cor
 		&client.ListOptions{
 			LabelSelector: k8slabels.SelectorFromSet(r.vmLabels(vmRef)),
 			Namespace:     r.Plan.Spec.TargetNamespace,
-		})
+		},
+	)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -4087,7 +4154,8 @@ func (r *KubeVirt) EnsurePersistentVolume(vmRef ref.Ref, persistentVolumes []cor
 				"pv",
 				path.Join(
 					pv.Namespace,
-					pv.Name),
+					pv.Name,
+				),
 				"vm",
 				vmRef.String())
 		}
@@ -4477,7 +4545,8 @@ func (r *KubeVirt) EnsurePersistentVolumeClaim(vmRef ref.Ref, persistentVolumeCl
 				"pvc",
 				path.Join(
 					pvc.Namespace,
-					pvc.Name),
+					pvc.Name,
+				),
 				"vmRef",
 				vmRef.String())
 		}
