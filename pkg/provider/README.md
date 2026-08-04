@@ -18,3 +18,22 @@ To add a provider, use an existing one (for example, `ec2`) as a reference and c
 6. **Register the host handler** in `pkg/controller/host/handler/doc.go` (or a no-op handler if the provider has no host concept).
 
 After wiring these points, implement the new provider under `pkg/provider/<name>` following the common layout.
+
+## Field Naming Convention
+
+Inventory API responses contain two categories of fields:
+
+**Provider-native fields** -- Embed or expose the source platform's data
+structures using the provider's original field names. This preserves maximum
+information and lets users familiar with the source platform find fields by the
+names they know. When it makes sense, embed the full provider struct (e.g. EC2
+embeds `ec2types.Instance`).
+
+**MTV metadata fields** -- Fields added by Forklift that do not exist in the
+provider API. These always use camelCase:
+- Common base: `id`, `name`, `revision`, `selfLink`, `path`
+- VM-specific: `powerState` (normalized On/Off/Unknown), `concerns`
+- Resource discrimination: `provider`, `kind`, `networkType`
+
+Do not rename provider-native fields to MTV conventions. Instead, add
+MTV-specific fields alongside the provider data.

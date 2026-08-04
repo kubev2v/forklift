@@ -79,3 +79,154 @@ func TestBasePredicate_useV2vForTransferCached(t *testing.T) {
 		t.Fatalf("destination Get calls = %d, want 1 (cached)", cl.n.Load())
 	}
 }
+
+func newBaseMigratorWithProvider(t *testing.T, p *api.Plan, migration *api.Migration) *BaseMigrator {
+	t.Helper()
+	vsphere, openshift := api.VSphere, api.OpenShift
+
+	scheme := runtime.NewScheme()
+	if err := storagev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("register storage types: %v", err)
+	}
+	cl := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+	ctx := &plancontext.Context{
+		Plan:      p,
+		Migration: migration,
+		Source: plancontext.Source{
+			Provider: &api.Provider{Spec: api.ProviderSpec{Type: &vsphere, URL: "https://vc"}},
+		},
+		Destination: plancontext.Destination{
+			Client: cl,
+		},
+	}
+
+	if p.Provider.Source == nil {
+		p.Provider.Source = &api.Provider{Spec: api.ProviderSpec{Type: &vsphere, URL: "https://vc"}}
+	}
+	if p.Provider.Destination == nil {
+		p.Provider.Destination = &api.Provider{Spec: api.ProviderSpec{Type: &openshift, URL: ""}}
+	}
+
+	return &BaseMigrator{Context: ctx}
+}
+
+func TestItinerary_ResumeConversion_SelectsResumeConversion(t *testing.T) {
+	p := &api.Plan{Spec: api.PlanSpec{Warm: true}}
+	m := &api.Migration{}
+	m.Spec.ResumeConversion = true
+	migrator := newBaseMigratorWithProvider(t, p, m)
+
+	vm := plan.VM{Ref: ref.Ref{ID: "vm-1"}}
+	itr := migrator.Itinerary(vm)
+
+	if itr.Name != "ResumeConversion" {
+		t.Fatalf("expected ResumeConversion itinerary, got %q", itr.Name)
+	}
+
+	phases := map[string]bool{}
+	for _, step := range itr.Pipeline {
+		phases[step.Name] = true
+	}
+
+	excluded := []string{
+		api.PhaseCopyDisks,
+		api.PhaseCopyDisksVirtV2V,
+		api.PhaseStorePowerState,
+		api.PhasePowerOffSource,
+	}
+	for _, p := range excluded {
+		if phases[p] {
+			t.Errorf("resume-conversion itinerary should not contain %q", p)
+		}
+	}
+
+	required := []string{
+		api.PhaseCreateGuestConversionPod,
+		api.PhaseConvertGuest,
+		api.PhaseCreateVM,
+		api.PhaseCompleted,
+	}
+	for _, p := range required {
+		if !phases[p] {
+			t.Errorf("resume-conversion itinerary missing required phase %q", p)
+		}
+	}
+}
+
+func TestItinerary_ConversionOnlyPlanType(t *testing.T) {
+	p := &api.Plan{Spec: api.PlanSpec{Type: api.MigrationOnlyConversion}}
+	migrator := newBaseMigratorWithProvider(t, p, nil)
+
+	vm := plan.VM{Ref: ref.Ref{ID: "vm-1"}}
+	itr := migrator.Itinerary(vm)
+
+	if itr.Name != "OnlyConversion" {
+		t.Fatalf("expected OnlyConversion itinerary for conversion-only plan type, got %q", itr.Name)
+	}
+}
+
+func TestItinerary_NormalWarm_SelectsWarm(t *testing.T) {
+	p := &api.Plan{Spec: api.PlanSpec{Warm: true}}
+	migrator := newBaseMigratorWithProvider(t, p, nil)
+
+	vm := plan.VM{Ref: ref.Ref{ID: "vm-1"}}
+	itr := migrator.Itinerary(vm)
+
+	if itr.Name != "Warm" {
+		t.Fatalf("expected Warm itinerary, got %q", itr.Name)
+	}
+}
+
+func TestItinerary_NilMigration_DoesNotSelectConversion(t *testing.T) {
+	p := &api.Plan{}
+	migrator := newBaseMigratorWithProvider(t, p, nil)
+
+	vm := plan.VM{Ref: ref.Ref{ID: "vm-1"}}
+	itr := migrator.Itinerary(vm)
+
+	if itr.Name == "OnlyConversion" || itr.Name == "Warm" {
+		t.Fatalf("expected default (cold) itinerary with nil migration, got %q", itr.Name)
+	}
+}
+
+func TestReset_ResumeConversion_PreservesState(t *testing.T) {
+	p := &api.Plan{Spec: api.PlanSpec{Warm: true}}
+	m := &api.Migration{}
+	m.Spec.ResumeConversion = true
+	migrator := newBaseMigratorWithProvider(t, p, m)
+
+	vmStatus := &plan.VMStatus{
+		VM:          plan.VM{Ref: ref.Ref{ID: "vm-1"}},
+		DisksCopied: true,
+	}
+	pipeline := []*plan.Step{}
+
+	migrator.Reset(vmStatus, pipeline)
+
+	if vmStatus.Warm != nil {
+		t.Fatal("expected Warm to remain nil during resume-conversion reset")
+	}
+	if !vmStatus.DisksCopied {
+		t.Fatal("expected DisksCopied to be preserved during reset")
+	}
+	if vmStatus.Phase != api.PhaseStarted {
+		t.Fatalf("expected phase Started, got %q", vmStatus.Phase)
+	}
+}
+
+func TestReset_NormalWarm_SetsWarm(t *testing.T) {
+	p := &api.Plan{Spec: api.PlanSpec{Warm: true}}
+	migrator := newBaseMigratorWithProvider(t, p, nil)
+
+	vmStatus := &plan.VMStatus{
+		VM: plan.VM{Ref: ref.Ref{ID: "vm-1"}},
+	}
+	pipeline := []*plan.Step{}
+
+	migrator.Reset(vmStatus, pipeline)
+
+	if vmStatus.Warm == nil {
+		t.Fatal("expected Warm to be set during normal warm reset")
+	}
+}

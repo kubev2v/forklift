@@ -130,19 +130,16 @@ func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (ok b
 		return
 	}
 
-	if pvcNameTemplate == "" {
-		return true, nil
-	}
-
 	// Get target VM name (either from TargetName field or cleaned VM name)
 	targetVmName := r.getPlanVMTargetName(vm)
 
 	for i, disk := range vm.Disks {
-		testData := api.VSpherePVCNameTemplateData{
+		testData := api.PVCNameTemplateData{
 			VmName:         vm.Name,
 			TargetVmName:   targetVmName,
 			PlanName:       r.Plan.Name,
 			DiskIndex:      i,
+			VmId:           vm.ID,
 			RootDiskIndex:  1,
 			Shared:         false,
 			FileName:       extractDiskFileName(disk.File),

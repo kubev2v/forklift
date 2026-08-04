@@ -213,3 +213,55 @@ func TestMaintenanceMode_VMNotFound(t *testing.T) {
 		t.Error("expected error when VM lookup fails")
 	}
 }
+
+func TestNetworksMapped_UnresolvedNICTreatedAsUnmapped(t *testing.T) {
+	vm := &hyperv.VM{}
+	vm.ID = "vm-1"
+	vm.NICs = []model.NIC{
+		{Name: "nic-0", Network: model.Ref{Kind: model.NetKind, ID: ""}, NetworkName: "LabSwitch"},
+	}
+
+	inv := &stubInventory{vms: map[string]*hyperv.VM{"vm-1": vm}}
+	v := &Validator{
+		Context: &plancontext.Context{
+			Source: plancontext.Source{Inventory: inv},
+			Plan: &api.Plan{
+				Spec: api.PlanSpec{},
+			},
+		},
+	}
+	v.Map.Network = &api.NetworkMap{}
+
+	ok, err := v.NetworksMapped(ref.Ref{ID: "vm-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ok {
+		t.Error("expected ok=false: NIC with networkName but empty network.ID should be treated as unmapped, not disconnected")
+	}
+}
+
+func TestNetworksMapped_TrulyDisconnectedNICSkipped(t *testing.T) {
+	vm := &hyperv.VM{}
+	vm.ID = "vm-1"
+	vm.NICs = []model.NIC{
+		{Name: "nic-0", Network: model.Ref{Kind: model.NetKind, ID: ""}, NetworkName: ""},
+	}
+
+	inv := &stubInventory{vms: map[string]*hyperv.VM{"vm-1": vm}}
+	v := &Validator{
+		Context: &plancontext.Context{
+			Source: plancontext.Source{Inventory: inv},
+			Plan:   &api.Plan{},
+		},
+	}
+	v.Map.Network = &api.NetworkMap{}
+
+	ok, err := v.NetworksMapped(ref.Ref{ID: "vm-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ok {
+		t.Error("expected ok=true: truly disconnected NIC (empty name and ID) should be skipped")
+	}
+}

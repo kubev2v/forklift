@@ -66,7 +66,12 @@ func (r *Validator) NetworksMapped(vmRef ref.Ref) (bool, error) {
 
 	for _, nic := range vm.NICs {
 		if nic.Network.ID == "" {
-			continue // Disconnected NIC is OK
+			if nic.NetworkName != "" {
+				// NIC is attached to a switch that wasn't discovered in inventory.
+				// Treat as unmapped rather than silently skipping.
+				return false, nil
+			}
+			continue // Truly disconnected NIC
 		}
 		mapped := false
 		for _, pair := range r.Context.Map.Network.Spec.Map {
@@ -239,26 +244,28 @@ func (r *Validator) MacConflicts(vmRef ref.Ref) ([]planbase.MacConflict, error) 
 }
 
 func (r *Validator) PVCNameTemplate(vmRef ref.Ref, pvcNameTemplate string) (bool, error) {
-	if pvcNameTemplate == "" {
-		return true, nil
-	}
-
 	vm := &hyperv.VM{}
 	err := r.Source.Inventory.Find(vm, vmRef)
 	if err != nil {
 		return false, liberr.Wrap(err, "vm", vmRef.String())
 	}
 
+	targetVmName := planbase.ResolveTargetVmName(r.Plan, vmRef.ID, vmRef.Name)
+
 	// Validate template produces valid k8s labels for each disk
-	for i, disk := range vm.Disks {
-		testData := map[string]interface{}{
-			"VmName":    vm.Name,
-			"DiskIndex": i,
-			"DiskId":    disk.ID,
+	for i := range vm.Disks {
+		disk := &vm.Disks[i]
+		testData := &api.PVCNameTemplateData{
+			VmName:       vm.Name,
+			TargetVmName: targetVmName,
+			PlanName:     r.Plan.Name,
+			DiskIndex:    i,
+			VmId:         vm.ID,
+			DiskId:       disk.ID,
 		}
 		_, err := planbase.ValidatePVCNameTemplate(pvcNameTemplate, testData)
 		if err != nil {
-			return false, liberr.Wrap(err, "vm", vmRef.String(), "disk", disk.ID)
+			return false, liberr.Wrap(err, "vm", vmRef.String(), "diskIndex", i, "disk", disk.ID)
 		}
 	}
 	return true, nil

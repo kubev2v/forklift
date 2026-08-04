@@ -1,11 +1,12 @@
 #This script configures static IP settings on legacy Windows network interfaces
 #based on input that maps MAC addresses to IP configuration details.
 #Input string will be added to the script while creating the virt-v2v pod
-#Input string format: MAC:ip:IP,Gateway,Prefix,DNS1,DNS2
+#Input string format: MAC:ip:IP,Gateway,Prefix,DNS1[,DNS2,...,DNSn]
 
 # Input string
 $inputString = "{{.InputString}}"
-
+$adapterWaitSeconds = 60
+$adapterPollInterval = 5
 
 # Lookup table avoids [Convert]::ToInt32() which is blocked in Constrained Language Mode
 $PrefixToMaskTable = @(
@@ -24,57 +25,104 @@ function Convert-PrefixToMask($prefix) {
     return $PrefixToMaskTable[[int]$prefix]
 }
 
-# Split entries by '_'
-$entries = $inputString.Split("_")
+function Find-AdapterByMAC($mac) {
+    $startTime = Get-Date
+    $deadline = $startTime.AddSeconds($adapterWaitSeconds)
+    Write-Host "Waiting for adapter with MAC $mac...`n"
 
-# Extract parts
-foreach ($entry in $entries) {
-    if ($entry -match "^([0-9A-Fa-f:\-]+):ip:([^,]+),([^,]+),([^,]+),([^,]+),([^,]+)$") {
-        $mac = $matches[1]
-        $mac = $mac.ToUpper()
-        $mac = $mac.Replace(":", "-")
-        $ip = $matches[2]
-        $gw = $matches[3]
-        $prefix = [int]$matches[4]
-        $dns1 = $matches[5]
-        $dns2 = $matches[6]
-        $mask = Convert-PrefixToMask $prefix
-
-        Write-Host "Searching for MAC: $mac`n"
-
+    while ((Get-Date) -lt $deadline) {
         $adapters = Get-WmiObject Win32_NetworkAdapter
-        $adapter = $null
-
         foreach ($a in $adapters) {
             if ($a.MACAddress -and $a.NetConnectionID) {
                 $aMac = $a.MACAddress.ToUpper().Replace(":", "-")
                 if ($aMac -eq $mac) {
-                    $adapter = $a
-                    break
+                    $elapsed = [int]((Get-Date) - $startTime).TotalSeconds
+                    Write-Host "Found adapter '$($a.NetConnectionID)' after ${elapsed}s`n"
+                    return $a
                 }
             }
         }
+        Start-Sleep -Seconds $adapterPollInterval
+    }
+    return $null
+}
+
+# Split entries by '_'
+$entries = $inputString.Split("_")
+$failCount = 0
+
+# Extract parts: MAC:ip:IP,Gateway,Prefix,DNS1[,DNS2,...,DNSn]
+foreach ($entry in $entries) {
+    if ($entry -match "^([0-9A-Fa-f:\-]+):ip:(.+)$") {
+        $mac = $matches[1].ToUpper().Replace(":", "-")
+        $fields = $matches[2].Split(",")
+
+        if ($fields.Count -lt 4) {
+            Write-Warning "Not enough fields for entry (need at least IP,GW,Prefix,DNS1): '$entry'`n"
+            $failCount++
+            continue
+        }
+
+        $ip = $fields[0]
+        $gw = $fields[1]
+        $prefix = [int]$fields[2]
+        $dnsServers = @($fields[3..($fields.Count - 1)] | Where-Object { $_ -ne "" })
+        if ($dnsServers.Count -eq 0) {
+            Write-Warning "No DNS servers provided for entry: '$entry'`n"
+            $failCount++
+            continue
+        }
+        $mask = Convert-PrefixToMask $prefix
+
+        $adapter = Find-AdapterByMAC $mac
 
         if ($adapter -eq $null) {
-            Write-Warning "Adapter with MAC $mac not found!`n"
-            exit 1
+            Write-Warning "Adapter with MAC $mac not found after waiting ${adapterWaitSeconds}s`n"
+            $failCount++
+            continue
         }
 
         $iface = $adapter.NetConnectionID
         Write-Host "Using interface: $iface`n"
 
-       # Use cmd /c instead of COM objects (blocked in Constrained Language Mode)
-       cmd /c "netsh interface ip set address name=`"$iface`" static $ip $mask $gw" 2>&1 | Out-Null
+        # Use cmd /c instead of COM objects (blocked in Constrained Language Mode)
+        $cmdFailed = $false
 
-       cmd /c "netsh interface ip set dns name=`"$iface`" static $dns1" 2>&1 | Out-Null
-        
-        if ($dns2 -ne "") {
-            cmd /c "netsh interface ip add dns name=`"$iface`" $dns2 index=2" 2>&1 | Out-Null
-        } 
-        
-        Write-Host "IP configuration applied`n"
+        cmd /c "netsh interface ip set address name=`"$iface`" static $ip $mask $gw" 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Failed to set IP address on $iface (exit code $LASTEXITCODE)`n"
+            $cmdFailed = $true
+        }
+
+        # Set first DNS as primary, add remaining as alternates
+        cmd /c "netsh interface ip set dns name=`"$iface`" static $($dnsServers[0])" 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Failed to set primary DNS on $iface (exit code $LASTEXITCODE)`n"
+            $cmdFailed = $true
+        }
+        for ($i = 1; $i -lt $dnsServers.Count; $i++) {
+            $idx = $i + 1
+            cmd /c "netsh interface ip add dns name=`"$iface`" $($dnsServers[$i]) index=$idx" 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "Failed to add DNS $($dnsServers[$i]) on $iface (exit code $LASTEXITCODE)`n"
+                $cmdFailed = $true
+            }
+        }
+
+        if ($cmdFailed) {
+            Write-Warning "One or more netsh commands failed for $iface`n"
+            $failCount++
+        } else {
+            Write-Host "IP configuration applied (DNS servers: $($dnsServers.Count))`n"
+        }
     }
     else {
-        Write-Warning "Input string format is invalid`n"
+        Write-Warning "Input string format is invalid: '$entry'`n"
+        $failCount++
     }
+}
+
+if ($failCount -gt 0) {
+    Write-Warning "$failCount adapter(s) failed to configure`n"
+    exit 1
 }

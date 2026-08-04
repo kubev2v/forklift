@@ -62,9 +62,10 @@ func (h *VMHandler) List(ctx *gin.Context) {
 	var result []interface{}
 	for _, instance := range list {
 		r := &VM{}
-		r.ID = instance.UID
+		r.ID = instance.ID
 		r.Name = instance.Name
 		r.Revision = instance.Revision
+		r.PowerState = instance.PowerState
 		r.Link(h.Provider)
 		// Include full object data
 		if details, err := instance.GetDetails(); err == nil {
@@ -86,7 +87,7 @@ func (h *VMHandler) Get(ctx *gin.Context) {
 	}
 
 	instance := &model.Instance{}
-	instance.UID = ctx.Param(VMParam)
+	instance.ID = ctx.Param(VMParam)
 
 	db := h.Collector.DB()
 	err = db.Get(instance)
@@ -96,9 +97,10 @@ func (h *VMHandler) Get(ctx *gin.Context) {
 	}
 
 	r := &VM{}
-	r.ID = instance.UID
+	r.ID = instance.ID
 	r.Name = instance.Name
 	r.Revision = instance.Revision
+	r.PowerState = instance.PowerState
 	r.Link(h.Provider)
 	// Include full object data
 	details, err := instance.GetDetails()
@@ -123,9 +125,10 @@ func (h *VMHandler) watch(ctx *gin.Context) {
 		func(in libmodel.Model) (r interface{}) {
 			m := in.(*model.Instance)
 			vm := &VM{}
-			vm.ID = m.UID
+			vm.ID = m.ID
 			vm.Name = m.Name
 			vm.Revision = m.Revision
+			vm.PowerState = m.PowerState
 			vm.Link(h.Provider)
 			if details, err := m.GetDetails(); err == nil {
 				vm.Object = details

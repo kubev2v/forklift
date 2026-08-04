@@ -117,6 +117,7 @@ const (
 	// NetAppShiftDatastoreNASMissing (Critical) blocks when a disk maps to NetApp Shift but the source
 	// datastore lacks NAS export details in inventory (required for MTV annotations).
 	NetAppShiftDatastoreNASMissing = "NetAppShiftDatastoreNASMissing"
+	ConversionResumable            = "ConversionResumable"
 )
 
 // Categories
@@ -1359,15 +1360,9 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 				consolidationNeeded.Items = append(consolidationNeeded.Items, ref.String())
 			}
 		}
-		// is valid vm pvc name template
-		if plan.Spec.PVCNameTemplate != "" || vm.PVCNameTemplate != "" {
-			// if vm level pvc name template is set, use it, otherwise use plan level pvc name template
-			pvcNameTemplate := plan.Spec.PVCNameTemplate
-			if vm.PVCNameTemplate != "" {
-				pvcNameTemplate = vm.PVCNameTemplate
-			}
-
-			// validate pvc name template for the vm
+		// validate pvc name template (VM → Plan → controller global → hardcoded)
+		pvcNameTemplate := planbase.GetPVCNameTemplate(plan, vm.ID)
+		if pvcNameTemplate != "" {
 			if _, err := validator.PVCNameTemplate(vm.Ref, pvcNameTemplate); err != nil {
 				r.Log.Info("PVC name template is invalid", "error", err.Error(), "template", pvcNameTemplate, "plan", plan.Name, "namespace", plan.Namespace)
 
@@ -1375,13 +1370,13 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 				pvcNameInvalid.Items = append(pvcNameInvalid.Items, conditionItem)
 			}
 		}
-		// is valid vm pvc name template
+		// validate volume name template
 		if vm.VolumeNameTemplate != "" {
 			if err := r.IsValidVolumeNameTemplate(vm.VolumeNameTemplate); err != nil {
 				volumeNameInvalid.Items = append(volumeNameInvalid.Items, ref.String())
 			}
 		}
-		// is valid vm pvc name template
+		// validate network name template
 		if vm.NetworkNameTemplate != "" {
 			if err := r.IsValidNetworkNameTemplate(vm.NetworkNameTemplate); err != nil {
 				networkNameInvalid.Items = append(networkNameInvalid.Items, ref.String())
@@ -2550,4 +2545,41 @@ func (r *Reconciler) vmUsesVddk(storageMap *api.StorageMap, vsphereVM *vsphere.V
 	}
 
 	return false, nil
+}
+
+// checkConversionResumable sets the ConversionResumable condition on plans
+// whose migration failed after disk copy completed (DisksCopied=true).
+// Works for any provider where copy and conversion are separate phases.
+func (r *Reconciler) checkConversionResumable(plan *api.Plan) {
+	plan.Status.DeleteCondition(ConversionResumable)
+
+	if !plan.Status.HasCondition(Failed) {
+		return
+	}
+
+	resumableVMs := []string{}
+	for _, vm := range plan.Status.Migration.VMs {
+		if !vm.DisksCopied {
+			continue
+		}
+		if !vm.HasCondition(api.ConditionFailed) {
+			continue
+		}
+		resumableVMs = append(resumableVMs, vm.Name)
+	}
+
+	if len(resumableVMs) == 0 {
+		return
+	}
+
+	plan.Status.SetCondition(libcnd.Condition{
+		Type:     ConversionResumable,
+		Status:   True,
+		Durable:  true,
+		Category: api.CategoryAdvisory,
+		Message: fmt.Sprintf(
+			"%d VM(s) have migrated disks available for conversion resume: %s",
+			len(resumableVMs),
+			strings.Join(resumableVMs, ", ")),
+	})
 }

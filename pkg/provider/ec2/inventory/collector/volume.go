@@ -21,14 +21,14 @@ func (r *Collector) collectVolumes(ctx context.Context) error {
 
 		// Set minimal indexed fields
 		if awsVolume.VolumeId != nil {
-			m.UID = *awsVolume.VolumeId
+			m.ID = *awsVolume.VolumeId
 		} else {
 			continue // Skip volumes without ID
 		}
 
 		m.Name = getNameFromTags(awsVolume.Tags)
 		if m.Name == "" {
-			m.Name = m.UID // Use volume ID as name if no Name tag
+			m.Name = m.ID // Use volume ID as name if no Name tag
 		}
 
 		m.Kind = "Volume"
@@ -46,7 +46,7 @@ func (r *Collector) collectVolumes(ctx context.Context) error {
 
 		// Check if record exists and has changed
 		existing := &model.Volume{}
-		existing.UID = m.UID
+		existing.ID = m.ID
 		if err := r.db.Get(existing); err == nil {
 			// Record exists - check if it changed
 			if !existing.HasChanged(m) {
@@ -56,7 +56,7 @@ func (r *Collector) collectVolumes(ctx context.Context) error {
 			// Changed - update with incremented revision
 			m.Revision = existing.Revision + 1
 			if err := r.db.Update(m); err != nil {
-				r.log.Error(err, "Failed to update volume", "volumeId", m.UID)
+				r.log.Error(err, "Failed to update volume", "volumeId", m.ID)
 				continue
 			}
 			updated++
@@ -64,7 +64,7 @@ func (r *Collector) collectVolumes(ctx context.Context) error {
 			// New record - insert
 			m.Revision = 1
 			if err := r.db.Insert(m); err != nil {
-				r.log.Error(err, "Failed to insert volume", "volumeId", m.UID)
+				r.log.Error(err, "Failed to insert volume", "volumeId", m.ID)
 				continue
 			}
 			created++

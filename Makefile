@@ -713,12 +713,15 @@ deploy-ocp-controller: kubectl ## Deploy ForkliftController CR on OpenShift. Usa
 	fi; \
 	KUBECTL=$(KUBECTL) ./hack/deploy-ocp-controller.sh $$NAMESPACE
 
+.PHONY: deploy-all
+deploy-all: deploy-operator-index deploy-ocp deploy-ocp-controller ## Deploy operator index, OLM subscription, and ForkliftController CR in sequence
+
 .PHONY: remove-deployment
 remove-deployment: ## Remove all Forklift resources from the cluster. Usage: make remove-deployment [NAMESPACE=konveyor-forklift] [DRY_RUN=true]
 	@ARGS=""; \
 	if [ "$(DRY_RUN)" = "true" ]; then ARGS="$$ARGS --dry-run"; fi; \
 	if [ -n "$(NAMESPACE)" ]; then ARGS="$$ARGS --namespace $(NAMESPACE)"; fi; \
-	KUBECTL=$(KUBECTL) ./hack/remove-deployment.sh $$ARGS
+	KUBECTL=$(KUBECTL) bash ./hack/remove-deployment.sh $$ARGS
 
 ##@ Tool Installation
 

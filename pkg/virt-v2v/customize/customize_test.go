@@ -942,6 +942,94 @@ var _ = Describe("Customize", func() {
 		})
 	})
 
+	Describe("injectComplementryStaticIPTemplate", func() {
+		It("parses entries with a single DNS server (4 fields)", func() {
+			tmpDir := GinkgoT().TempDir()
+			tmplPath := filepath.Join(tmpDir, "tmpl.ps1.tmpl")
+			outPath := filepath.Join(tmpDir, "out.ps1")
+
+			tmplContent := `$networkConfigs = @(
+{{- range $i, $cfg := . }}
+    @{
+        MAC = '{{ lower $cfg.MAC }}'
+        IPs = @{{ formatIPs $cfg.IPs }}
+        PrefixLength = {{ (index $cfg.IPs 0).PrefixLength }}
+        DNS = @{{ formatDNS $cfg }}
+    }{{ if ne (add $i 1) (len $) }},{{ end }}
+{{- end }}
+)`
+			Expect(os.WriteFile(tmplPath, []byte(tmplContent), 0644)).To(Succeed())
+
+			// Two IPs for the same MAC with only one DNS each (4 comma-separated fields).
+			// Before the fix this was silently skipped because len(ipParts) < 5.
+			appConfig.StaticIPs = "00:50:56:89:ab:76:ip:10.0.0.1,10.0.0.254,25,10.203.123.84_00:50:56:89:ab:76:ip:10.0.0.2,10.0.0.254,25,10.203.123.84"
+
+			err := customize.injectComplementryStaticIPTemplate(tmplPath, outPath)
+			Expect(err).NotTo(HaveOccurred())
+
+			content, err := os.ReadFile(outPath)
+			Expect(err).NotTo(HaveOccurred())
+
+			rendered := string(content)
+			Expect(rendered).To(ContainSubstring("10.0.0.2"), "complementary IP should appear")
+			Expect(rendered).To(ContainSubstring("10.203.123.84"), "single DNS should appear")
+			Expect(rendered).NotTo(ContainSubstring("$networkConfigs = @(\n)"), "config array must not be empty")
+		})
+
+		It("parses entries with two DNS servers (5 fields)", func() {
+			tmpDir := GinkgoT().TempDir()
+			tmplPath := filepath.Join(tmpDir, "tmpl.ps1.tmpl")
+			outPath := filepath.Join(tmpDir, "out.ps1")
+
+			tmplContent := `$networkConfigs = @(
+{{- range $i, $cfg := . }}
+    @{
+        MAC = '{{ lower $cfg.MAC }}'
+        IPs = @{{ formatIPs $cfg.IPs }}
+        DNS = @{{ formatDNS $cfg }}
+    }{{ if ne (add $i 1) (len $) }},{{ end }}
+{{- end }}
+)`
+			Expect(os.WriteFile(tmplPath, []byte(tmplContent), 0644)).To(Succeed())
+
+			appConfig.StaticIPs = "00:50:56:89:ab:76:ip:10.0.0.1,10.0.0.254,25,8.8.8.8,8.8.4.4_00:50:56:89:ab:76:ip:10.0.0.2,10.0.0.254,25,8.8.8.8,8.8.4.4"
+
+			err := customize.injectComplementryStaticIPTemplate(tmplPath, outPath)
+			Expect(err).NotTo(HaveOccurred())
+
+			content, err := os.ReadFile(outPath)
+			Expect(err).NotTo(HaveOccurred())
+
+			rendered := string(content)
+			Expect(rendered).To(ContainSubstring("10.0.0.2"))
+			Expect(rendered).To(ContainSubstring("8.8.8.8"))
+			Expect(rendered).To(ContainSubstring("8.8.4.4"))
+		})
+
+		It("skips entries with fewer than 4 fields", func() {
+			tmpDir := GinkgoT().TempDir()
+			tmplPath := filepath.Join(tmpDir, "tmpl.ps1.tmpl")
+			outPath := filepath.Join(tmpDir, "out.ps1")
+
+			tmplContent := `$networkConfigs = @(
+{{- range $i, $cfg := . }}
+    @{ MAC = '{{ lower $cfg.MAC }}' }{{ if ne (add $i 1) (len $) }},{{ end }}
+{{- end }}
+)`
+			Expect(os.WriteFile(tmplPath, []byte(tmplContent), 0644)).To(Succeed())
+
+			// Only 3 fields (IP, GATEWAY, PREFIX) — no DNS at all, should be skipped.
+			appConfig.StaticIPs = "00:50:56:89:ab:76:ip:10.0.0.1,10.0.0.254,25_00:50:56:89:ab:76:ip:10.0.0.2,10.0.0.254,25"
+
+			err := customize.injectComplementryStaticIPTemplate(tmplPath, outPath)
+			Expect(err).NotTo(HaveOccurred())
+
+			content, err := os.ReadFile(outPath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(content)).To(ContainSubstring("$networkConfigs = @(\n)"))
+		})
+	})
+
 	Describe("addWinFirstbootScripts path selection", func() {
 		It("no static IPs - only init script uploaded", func() {
 			appConfig.StaticIPs = ""

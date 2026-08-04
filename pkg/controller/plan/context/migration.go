@@ -67,6 +67,12 @@ type Context struct {
 	Labeler Labeler
 }
 
+// IsResumeConversion returns true when the active migration is a
+// resume-conversion run (disk copy skipped, only virt-v2v conversion).
+func (r *Context) IsResumeConversion() bool {
+	return r.Migration != nil && r.Migration.IsResumeConversion()
+}
+
 // Build.
 func (r *Context) build() (err error) {
 	r.Map.Network = r.Plan.Referenced.Map.Network

@@ -21,7 +21,7 @@ const (
 // Base model with indexed fields for efficient queries.
 // Each resource type adds its own typed Object field.
 type Base struct {
-	UID      string `sql:"pk"`                             // Primary key - AWS resource ID
+	ID       string `sql:"pk"`                             // Primary key - AWS resource ID
 	Name     string `sql:"d0,index(name)"`                 // Resource name
 	Kind     string `sql:"d0,index(kind)"`                 // Resource type (Instance, Volume, Network, Storage)
 	Provider string `sql:"d0,index(provider)"`             // Provider UID
@@ -34,12 +34,12 @@ type Base struct {
 
 // Pk returns the primary key.
 func (m *Base) Pk() string {
-	return m.UID
+	return m.ID
 }
 
 // String representation.
 func (m *Base) String() string {
-	return m.UID
+	return m.ID
 }
 
 //
@@ -52,6 +52,7 @@ type Instance struct {
 	Base
 	InstanceType string            `sql:"d0,index(instanceType)"` // t2.micro, m5.large, etc.
 	State        string            `sql:"d0,index(state)"`        // running, stopped, terminated, etc.
+	PowerState   string            `sql:"d0,index(powerState)"`   // Normalized: On, Off, Unknown
 	Platform     string            `sql:"d0,index(platform)"`     // Linux, Windows, etc.
 	Object       ec2types.Instance `sql:"d0"`                     // Complete AWS Instance object
 }
@@ -73,12 +74,13 @@ func (m *Instance) Labels() libmodel.Labels {
 // GetDetails returns the instance details for API responses.
 func (m *Instance) GetDetails() (*InstanceDetails, error) {
 	details := &InstanceDetails{
-		Instance: m.Object,
-		ID:       m.UID,
-		Name:     m.Name,
-		Kind:     m.Kind,
-		Provider: m.Provider,
-		Revision: m.Revision,
+		Instance:   m.Object,
+		ID:         m.ID,
+		Name:       m.Name,
+		Kind:       m.Kind,
+		Provider:   m.Provider,
+		Revision:   m.Revision,
+		PowerState: m.PowerState,
 	}
 
 	// Convert AWS BlockDeviceMappings to our simplified type
@@ -111,7 +113,7 @@ func (m *Instance) HasChanged(new *Instance) bool {
 	if m.Name != new.Name || m.Kind != new.Kind {
 		return true
 	}
-	if m.InstanceType != new.InstanceType || m.State != new.State || m.Platform != new.Platform {
+	if m.InstanceType != new.InstanceType || m.State != new.State || m.PowerState != new.PowerState || m.Platform != new.Platform {
 		return true
 	}
 	return !reflect.DeepEqual(m.Object, new.Object)
@@ -126,6 +128,7 @@ type InstanceDetails struct {
 	Kind                string                       `json:"kind"`
 	Provider            string                       `json:"provider"`
 	Revision            int64                        `json:"revision"`
+	PowerState          string                       `json:"powerState"`
 }
 
 // InstanceBlockDeviceMapping represents a simplified block device mapping.
@@ -174,7 +177,7 @@ func (m *Volume) Labels() libmodel.Labels {
 func (m *Volume) GetDetails() (*VolumeDetails, error) {
 	return &VolumeDetails{
 		Volume:   m.Object,
-		ID:       m.UID,
+		ID:       m.ID,
 		Name:     m.Name,
 		Kind:     m.Kind,
 		Provider: m.Provider,
@@ -232,12 +235,13 @@ func (m *Network) Labels() libmodel.Labels {
 // GetDetails returns the network details for API responses.
 func (m *Network) GetDetails() (*NetworkDetails, error) {
 	return &NetworkDetails{
-		Subnet:   m.Object,
-		ID:       m.UID,
-		Name:     m.Name,
-		Kind:     m.Kind,
-		Provider: m.Provider,
-		Revision: m.Revision,
+		Subnet:      m.Object,
+		ID:          m.ID,
+		Name:        m.Name,
+		Kind:        m.Kind,
+		Provider:    m.Provider,
+		Revision:    m.Revision,
+		NetworkType: m.NetworkType,
 	}, nil
 }
 
@@ -254,11 +258,12 @@ func (m *Network) HasChanged(new *Network) bool {
 
 type NetworkDetails struct {
 	ec2types.Subnet
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Kind     string `json:"kind"`
-	Provider string `json:"provider"`
-	Revision int64  `json:"revision"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Kind        string `json:"kind"`
+	Provider    string `json:"provider"`
+	Revision    int64  `json:"revision"`
+	NetworkType string `json:"networkType"`
 }
 
 // Storage represents EBS volume types (analogous to storage classes).
@@ -286,7 +291,7 @@ func (m *Storage) Labels() libmodel.Labels {
 // GetDetails returns the storage details for API responses.
 func (m *Storage) GetDetails() (*StorageDetails, error) {
 	return &StorageDetails{
-		ID:            m.UID,
+		ID:            m.ID,
 		Name:          m.Name,
 		Kind:          m.Kind,
 		Provider:      m.Provider,
@@ -321,6 +326,52 @@ type StorageDetails struct {
 	MaxThroughput int32  `json:"maxThroughput"`
 }
 
+// Snapshot represents an EBS snapshot.
+// Extends Base with snapshot-specific indexed fields and typed AWS object.
+type Snapshot struct {
+	Base
+	VolumeID string            `sql:"d0,index(volumeID)"` // Source volume ID
+	State    string            `sql:"d0,index(state)"`    // pending, completed, error
+	Object   ec2types.Snapshot `sql:"d0"`                 // Complete AWS Snapshot object
+}
+
+// Labels returns AWS tags as labels for label-based filtering.
+func (m *Snapshot) Labels() libmodel.Labels {
+	if len(m.Object.Tags) == 0 {
+		return nil
+	}
+	labels := make(libmodel.Labels, len(m.Object.Tags))
+	for _, tag := range m.Object.Tags {
+		if tag.Key != nil && tag.Value != nil {
+			labels[*tag.Key] = *tag.Value
+		}
+	}
+	return labels
+}
+
+// GetDetails returns the snapshot details for API responses.
+func (m *Snapshot) GetDetails() (*SnapshotDetails, error) {
+	return &SnapshotDetails{
+		Snapshot: m.Object,
+		ID:       m.ID,
+		Name:     m.Name,
+		Kind:     m.Kind,
+		Provider: m.Provider,
+		Revision: m.Revision,
+	}, nil
+}
+
+// HasChanged checks if the snapshot has changed.
+func (m *Snapshot) HasChanged(new *Snapshot) bool {
+	if m.Name != new.Name || m.Kind != new.Kind {
+		return true
+	}
+	if m.VolumeID != new.VolumeID || m.State != new.State {
+		return true
+	}
+	return !reflect.DeepEqual(m.Object, new.Object)
+}
+
 type SnapshotDetails struct {
 	ec2types.Snapshot
 	ID       string `json:"id"`
@@ -342,5 +393,6 @@ func All() []interface{} {
 		&Volume{},
 		&Network{},
 		&Storage{},
+		&Snapshot{},
 	}
 }

@@ -194,7 +194,7 @@ func (c *Customize) injectComplementryStaticIPTemplate(templatePath, outputPath 
 		}
 		mac := strings.ReplaceAll(parts[0], ":", "-") // Windows format
 		ipParts := strings.Split(parts[1], ",")
-		if len(ipParts) < 5 {
+		if len(ipParts) < 4 {
 			continue
 		}
 

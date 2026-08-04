@@ -12,6 +12,7 @@ import (
 	"unicode"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	"github.com/kubev2v/forklift/pkg/settings"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -224,4 +225,23 @@ func AnyNetAppShiftPersistentVolumeClaim(pvcs []*core.PersistentVolumeClaim) boo
 		}
 	}
 	return false
+}
+
+// HasSeparateCopyAndConversion reports whether copy (CDI/populators) and
+// conversion (virt-v2v-in-place) are distinct phases. False for
+// virt-v2v-for-transfer (single-step copy+convert), providers that don't
+// require guest conversion (oVirt, OpenStack, OCP), EC2 (whose "copy" is
+// a near-instant EBS snapshot-to-volume operation), or on error.
+func HasSeparateCopyAndConversion(plan *api.Plan, vmRef ref.Ref, client k8sclient.Client) bool {
+	if plan.Provider.Source == nil || !plan.Provider.Source.RequiresConversion() {
+		return false
+	}
+	if plan.Provider.Source.Type() == api.EC2 {
+		return false
+	}
+	useV2v, err := plan.ShouldUseV2vForTransfer(vmRef, client)
+	if err != nil {
+		return false
+	}
+	return !useV2v
 }

@@ -20,6 +20,8 @@ import (
 	core "k8s.io/api/core/v1"
 )
 
+var clientLog = logging.WithName("client|hyperv")
+
 // Not found error.
 type NotFound struct {
 }
@@ -480,7 +482,7 @@ func (r *Client) applyBatchDetails(vms []types.VM, indices []int, batchMap map[s
 					Name:        fmt.Sprintf("nic-%d", j),
 					MAC:         mac,
 					DeviceIndex: j,
-					NetworkUUID: resolveNetworkUUID(nd.SwitchName, networks),
+					NetworkUUID: resolveNetworkUUID(nd.SwitchName, vms[i].OwnerNode, networks),
 					NetworkName: nd.SwitchName,
 					VlanId:      nd.VlanId,
 				})
@@ -562,8 +564,9 @@ func buildGuestNetworks(cfgs []guestNetCfg, nics []types.NIC) []types.GuestNetwo
 }
 
 // validateDisksOnSMB calls the provider-server validation endpoint to verify
-// that disk files mapped to SMB paths actually exist on the mount. Disks that
-// are missing get a DiskNotFoundOnSMB concern attached to their parent VM.
+// that disk files mapped to SMB paths actually exist on the mount. Disks whose
+// files are missing have their SMBPath cleared so the OPA validation policy
+// (hyperv.disk.smb_path.missing) can flag them.
 func (r *Client) validateDisksOnSMB(vms []types.VM) {
 	if r.provider == nil || r.provider.Status.Service == nil {
 		r.Log.V(1).Info("Skipping SMB disk validation: no provider service available")
@@ -573,22 +576,22 @@ func (r *Client) validateDisksOnSMB(vms []types.VM) {
 	svc := r.provider.Status.Service
 	baseURL := fmt.Sprintf("http://%s.%s.svc.cluster.local:8080", svc.Name, svc.Namespace)
 
-	// Collect all SMB paths, tracking which VM(s) own each path.
-	type pathOwner struct {
-		vmIndex  int
-		diskPath string
+	type diskRef struct {
+		vmIdx   int
+		diskIdx int
 	}
 	var allPaths []string
-	pathOwners := make(map[string][]pathOwner)
-	for i, vm := range vms {
-		for _, disk := range vm.Disks {
-			if disk.SMBPath == "" {
+	pathToDiskRefs := make(map[string][]diskRef)
+	for i := range vms {
+		for j := range vms[i].Disks {
+			p := vms[i].Disks[j].SMBPath
+			if p == "" {
 				continue
 			}
-			if _, seen := pathOwners[disk.SMBPath]; !seen {
-				allPaths = append(allPaths, disk.SMBPath)
+			if _, seen := pathToDiskRefs[p]; !seen {
+				allPaths = append(allPaths, p)
 			}
-			pathOwners[disk.SMBPath] = append(pathOwners[disk.SMBPath], pathOwner{vmIndex: i, diskPath: disk.SMBPath})
+			pathToDiskRefs[p] = append(pathToDiskRefs[p], diskRef{vmIdx: i, diskIdx: j})
 		}
 	}
 
@@ -629,16 +632,16 @@ func (r *Client) validateDisksOnSMB(vms []types.VM) {
 		missingSet[p] = true
 	}
 
-	for path, owners := range pathOwners {
+	for path, refs := range pathToDiskRefs {
 		if !missingSet[path] {
 			continue
 		}
-		for _, o := range owners {
-			vms[o.vmIndex].Concerns = append(vms[o.vmIndex].Concerns, types.Concern{
-				Category: "Warning",
-				Label:    "DiskNotFoundOnSMB",
-				Message:  fmt.Sprintf("Disk file not found on SMB mount: %s", o.diskPath),
-			})
+		for _, ref := range refs {
+			r.Log.Info("Disk file not found on SMB mount, clearing SMBPath",
+				"vm", vms[ref.vmIdx].Name,
+				"windowsPath", vms[ref.vmIdx].Disks[ref.diskIdx].WindowsPath,
+				"smbPath", path)
+			vms[ref.vmIdx].Disks[ref.diskIdx].SMBPath = ""
 		}
 	}
 
@@ -647,13 +650,23 @@ func (r *Client) validateDisksOnSMB(vms []types.VM) {
 	}
 }
 
-// ListNetworks collects all networks from the HyperV host via WinRM.
+// ListNetworks collects all virtual switches from the Hyper-V host via WinRM.
+// In cluster mode, switches are collected from all cluster nodes so that NICs
+// on VMs running on remote nodes can be resolved to a known network UUID.
 func (r *Client) ListNetworks() ([]types.Network, error) {
 	netDomains, err := r.driver.ListAllNetworks()
 	if err != nil {
 		return nil, err
 	}
 
+	localName := ""
+	if r.provider != nil && r.provider.IsHyperVCluster() {
+		if info, err := r.driver.GetComputerInfo(); err == nil {
+			localName = info.DNSHostName
+		}
+	}
+
+	seen := make(map[string]bool)
 	var result []types.Network
 	for _, n := range netDomains {
 		uuid, err := n.GetUUIDString()
@@ -670,14 +683,82 @@ func (r *Client) ListNetworks() ([]types.Network, error) {
 		}
 		switchType, _ := n.GetSwitchType()
 
+		seen[uuid] = true
+		ownerNodes := []string{}
+		if localName != "" {
+			ownerNodes = []string{localName}
+		}
 		result = append(result, types.Network{
 			UUID:       uuid,
 			Name:       name,
 			SwitchType: switchType,
+			OwnerNodes: ownerNodes,
 		})
 		_ = n.Free()
 	}
+
+	if r.provider != nil && r.provider.IsHyperVCluster() {
+		r.mergeRemoteNodeNetworks(&result, seen)
+	}
+
 	return result, nil
+}
+
+// mergeRemoteNodeNetworks queries Get-VMSwitch on each remote cluster node.
+// New switches are appended to resultת switches whose UUID was already seen
+// get the remote node appended to their OwnerNodes list.
+func (r *Client) mergeRemoteNodeNetworks(result *[]types.Network, seen map[string]bool) {
+	cc, err := r.getClusterCache()
+	if err != nil {
+		r.Log.Error(err, "Cannot collect remote node networks: cluster cache unavailable")
+		return
+	}
+
+	localInfo, err := r.driver.GetComputerInfo()
+	if err != nil {
+		r.Log.V(1).Info("Cannot determine local hostname for network dedup", "error", err)
+		return
+	}
+	localName := strings.ToUpper(localInfo.DNSHostName)
+
+	for _, node := range cc.nodes {
+		if strings.EqualFold(node.Name, localName) || node.State != driver.ClusterNodeStateUp {
+			continue
+		}
+		stdout, err := r.driver.RunOnNode(ps.ListAllSwitches, node.Name)
+		if err != nil {
+			r.Log.Info("Failed to collect switches from remote node", "node", node.Name, "error", err)
+			continue
+		}
+		stdout = strings.TrimSpace(stdout)
+		if stdout == "" {
+			continue
+		}
+		switchesData, err := driver.UnmarshalArrayOrSingle[driver.SwitchData]([]byte(stdout))
+		if err != nil {
+			r.Log.Info("Failed to parse remote node switches", "node", node.Name, "error", err)
+			continue
+		}
+		for _, sw := range switchesData {
+			if seen[sw.Id] {
+				for i := range *result {
+					if (*result)[i].UUID == sw.Id {
+						(*result)[i].OwnerNodes = append((*result)[i].OwnerNodes, node.Name)
+						break
+					}
+				}
+				continue
+			}
+			seen[sw.Id] = true
+			*result = append(*result, types.Network{
+				UUID:       sw.Id,
+				Name:       sw.Name,
+				SwitchType: mapSwitchType(sw.SwitchType),
+				OwnerNodes: []string{node.Name},
+			})
+			r.Log.Info("Discovered remote-only switch", "node", node.Name, "name", sw.Name, "id", sw.Id)
+		}
+	}
 }
 
 // ListStorages returns the SMB storage record from the HyperV host via WinRM.
@@ -813,7 +894,7 @@ func (r *Client) getVMFromDomain(domain driver.Domain, networks []types.Network,
 	}
 
 	vm.Disks = r.extractDisks(domain, smbWindowsPrefix, uuid)
-	vm.NICs = r.extractNICs(domain, networks)
+	vm.NICs = r.extractNICs(domain, computerName, networks)
 
 	return vm, nil
 }
@@ -848,7 +929,7 @@ func (r *Client) extractDisks(domain driver.Domain, smbWindowsPrefix string, vmU
 	return disks
 }
 
-func (r *Client) extractNICs(domain driver.Domain, networks []types.Network) []types.NIC {
+func (r *Client) extractNICs(domain driver.Domain, vmOwnerNode string, networks []types.Network) []types.NIC {
 	nicInfos, err := domain.GetNICs()
 	if err != nil {
 		r.Log.Error(err, "Failed to get NICs")
@@ -857,7 +938,7 @@ func (r *Client) extractNICs(domain driver.Domain, networks []types.Network) []t
 
 	var nics []types.NIC
 	for i, ni := range nicInfos {
-		networkUUID := resolveNetworkUUID(ni.SwitchName, networks)
+		networkUUID := resolveNetworkUUID(ni.SwitchName, vmOwnerNode, networks)
 		mac := formatMAC(ni.MACAddress)
 
 		nics = append(nics, types.NIC{
@@ -889,14 +970,10 @@ func (r *Client) collectPerVMDisks(vmName, vmUUID, computerName string) []types.
 		ControllerNumber   int    `json:"ControllerNumber"`
 		ControllerLocation int    `json:"ControllerLocation"`
 	}
-	var disksData []diskData
-	if err := json.Unmarshal([]byte(stdout), &disksData); err != nil {
-		var single diskData
-		if err := json.Unmarshal([]byte(stdout), &single); err != nil {
-			r.Log.Error(err, "Failed to parse disks JSON", "vm", vmName)
-			return []types.Disk{}
-		}
-		disksData = append(disksData, single)
+	disksData, err := driver.UnmarshalArrayOrSingle[diskData]([]byte(stdout))
+	if err != nil {
+		r.Log.Error(err, "Failed to parse disks JSON", "vm", vmName)
+		return []types.Disk{}
 	}
 	var disks []types.Disk
 	for i, dd := range disksData {
@@ -935,14 +1012,10 @@ func (r *Client) collectPerVMNICs(vmName, computerName string, networks []types.
 		SwitchName string `json:"SwitchName"`
 		VlanId     int    `json:"VlanId"`
 	}
-	var nicsData []nicData
-	if err := json.Unmarshal([]byte(stdout), &nicsData); err != nil {
-		var single nicData
-		if err := json.Unmarshal([]byte(stdout), &single); err != nil {
-			r.Log.Error(err, "Failed to parse NICs JSON", "vm", vmName)
-			return []types.NIC{}
-		}
-		nicsData = append(nicsData, single)
+	nicsData, err := driver.UnmarshalArrayOrSingle[nicData]([]byte(stdout))
+	if err != nil {
+		r.Log.Error(err, "Failed to parse NICs JSON", "vm", vmName)
+		return []types.NIC{}
 	}
 	var nics []types.NIC
 	for i, nd := range nicsData {
@@ -951,7 +1024,7 @@ func (r *Client) collectPerVMNICs(vmName, computerName string, networks []types.
 			Name:        fmt.Sprintf("nic-%d", i),
 			MAC:         mac,
 			DeviceIndex: i,
-			NetworkUUID: resolveNetworkUUID(nd.SwitchName, networks),
+			NetworkUUID: resolveNetworkUUID(nd.SwitchName, computerName, networks),
 			NetworkName: nd.SwitchName,
 			VlanId:      nd.VlanId,
 		})
@@ -1022,13 +1095,9 @@ func (r *Client) collectGuestNetworkConfig(vmName string, nics []types.NIC, comp
 		return []types.GuestNetwork{}, nil
 	}
 
-	var configs []guestNetCfg
-	if err := json.Unmarshal([]byte(stdout), &configs); err != nil {
-		var single guestNetCfg
-		if err := json.Unmarshal([]byte(stdout), &single); err != nil {
-			return nil, fmt.Errorf("failed to parse KVP JSON: %w", err)
-		}
-		configs = append(configs, single)
+	configs, err := driver.UnmarshalArrayOrSingle[guestNetCfg]([]byte(stdout))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse KVP JSON: %w", err)
 	}
 
 	return buildGuestNetworks(configs, nics), nil
@@ -1236,16 +1305,71 @@ func mapPowerState(state driver.DomainState) string {
 	}
 }
 
-func resolveNetworkUUID(name string, networks []types.Network) string {
+// resolveNetworkUUID returns the UUID of the switch named `name`.
+// When vmOwnerNode is set, a switch whose OwnerNodes includes that node
+// is preferred. A switch with empty OwnerNodes (no ownership data) is
+// treated as unscoped and matches any VM. A scoped fallback (populated
+// OwnerNodes that don't include vmOwnerNode) is only used when the VM
+// owner node is unknown.
+func resolveNetworkUUID(name, vmOwnerNode string, networks []types.Network) string {
 	if name == "" {
 		return ""
 	}
+	unscopedFallback := ""
+	scopedFallback := ""
 	for _, n := range networks {
-		if strings.EqualFold(n.Name, name) {
+		if !strings.EqualFold(n.Name, name) {
+			continue
+		}
+		if len(n.OwnerNodes) == 0 {
+			if unscopedFallback == "" {
+				unscopedFallback = n.UUID
+			}
+			continue
+		}
+		if vmOwnerNode != "" && containsIgnoreCase(n.OwnerNodes, vmOwnerNode) {
 			return n.UUID
 		}
+		if scopedFallback == "" {
+			scopedFallback = n.UUID
+		}
 	}
+	if unscopedFallback != "" {
+		return unscopedFallback
+	}
+	if scopedFallback != "" && vmOwnerNode == "" {
+		return scopedFallback
+	}
+	clientLog.Info("NIC references undiscovered virtual switch",
+		"switchName", name,
+		"vmOwnerNode", vmOwnerNode,
+		"discoveredSwitches", len(networks))
 	return ""
+}
+
+// containsIgnoreCase reports whether any element of ss case-insensitively
+// matches target.
+func containsIgnoreCase(ss []string, target string) bool {
+	for _, s := range ss {
+		if strings.EqualFold(s, target) {
+			return true
+		}
+	}
+	return false
+}
+
+// mapSwitchType converts the PowerShell SwitchType int to a human-readable string.
+func mapSwitchType(switchType int) string {
+	switch switchType {
+	case 0:
+		return "External"
+	case 1:
+		return "Internal"
+	case 2:
+		return "Private"
+	default:
+		return "Unknown"
+	}
 }
 
 func extractHostFromURL(addr string) string {
