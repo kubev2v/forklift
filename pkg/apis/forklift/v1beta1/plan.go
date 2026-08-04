@@ -412,6 +412,10 @@ type PlanStatus struct {
 	// The most recent generation observed by the controller.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	// NetAppShiftDestination indicates whether the plan's storage map resolves to a NetApp
+	// Shift/Trident destination StorageClass.
+	// +optional
+	NetAppShiftDestination bool `json:"netAppShiftDestination,omitempty"`
 	// Migration
 	Migration plan.MigrationStatus `json:"migration,omitempty"`
 }
@@ -446,12 +450,15 @@ func (p *Plan) IsWarm() bool {
 // just use virt-v2v directly to convert the vm while copying data over. In other
 // cases, we use CDI to transfer disks to the destination cluster and then use
 // virt-v2v-in-place to convert these disks after cutover.
-func (p *Plan) ShouldUseV2vForTransfer(vmRef ref.Ref, destinationClient k8sclient.Client) (bool, error) {
-	source := p.Referenced.Provider.Source
+//
+// Note: this is called once per VM from several places (adapters, scheduler, migrator,
+// kubevirt.go, migration.go) on every reconcile, so it must not perform any API/client calls itself.
+func (p *Plan) ShouldUseV2vForTransfer(vmRef ref.Ref) (bool, error) {
+	source := p.Provider.Source
 	if source == nil {
 		return false, liberr.New("Cannot analyze plan, source provider is missing.")
 	}
-	destination := p.Referenced.Provider.Destination
+	destination := p.Provider.Destination
 	if destination == nil {
 		return false, liberr.New("Cannot analyze plan, destination provider is missing.")
 	}
@@ -468,14 +475,8 @@ func (p *Plan) ShouldUseV2vForTransfer(vmRef ref.Ref, destinationClient k8sclien
 			p.Spec.SkipGuestConversion || p.Spec.Type == MigrationOnlyConversion {
 			return false, nil
 		}
-		if p.Map.Storage != nil {
-			hasNetAppShift, err := p.Map.Storage.HasNetAppShiftDestination(destinationClient)
-			if err != nil {
-				return false, err
-			}
-			if hasNetAppShift {
-				return false, nil
-			}
+		if p.HasNetAppShiftDestination() {
+			return false, nil
 		}
 		if p.IsUsingOffloadPlugin() {
 			return false, nil
@@ -486,6 +487,10 @@ func (p *Plan) ShouldUseV2vForTransfer(vmRef ref.Ref, destinationClient k8sclien
 	default:
 		return false, nil
 	}
+}
+
+func (p *Plan) HasNetAppShiftDestination() bool {
+	return p.Status.NetAppShiftDestination
 }
 
 func (r *Plan) DestinationHasUdnNetwork(client k8sclient.Client) bool {

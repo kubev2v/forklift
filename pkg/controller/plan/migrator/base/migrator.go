@@ -81,7 +81,8 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 						Progress:    libitr.Progress{Total: 1},
 						Phase:       api.StepPending,
 					},
-				})
+				},
+			)
 		case api.PhasePreHook:
 			pipeline = append(
 				pipeline,
@@ -92,7 +93,8 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 						Progress:    libitr.Progress{Total: 1},
 						Phase:       api.StepPending,
 					},
-				})
+				},
+			)
 		case api.PhaseAllocateDisks, api.PhaseCopyDisks, api.PhaseCopyDisksVirtV2V, api.PhaseConvertOpenstackSnapshot:
 			tasks, pErr := r.builder.Tasks(vm.Ref)
 			if pErr != nil {
@@ -136,7 +138,8 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 						Phase: api.StepPending,
 					},
 					Tasks: tasks,
-				})
+				},
+			)
 		case api.PhaseFinalize:
 			tasks, pErr := r.builder.Tasks(vm.Ref)
 			if pErr != nil {
@@ -161,7 +164,8 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 						},
 					},
 					Tasks: tasks,
-				})
+				},
+			)
 		case api.PhaseConvertGuest:
 			pipeline = append(
 				pipeline,
@@ -172,7 +176,8 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 						Progress:    libitr.Progress{Total: 1},
 						Phase:       api.StepPending,
 					},
-				})
+				},
+			)
 		case api.PhasePostHook:
 			pipeline = append(
 				pipeline,
@@ -183,7 +188,8 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 						Progress:    libitr.Progress{Total: 1},
 						Phase:       api.StepPending,
 					},
-				})
+				},
+			)
 		case api.PhaseCreateVM:
 			pipeline = append(
 				pipeline,
@@ -194,7 +200,8 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 						Phase:       api.StepPending,
 						Progress:    libitr.Progress{Total: 1},
 					},
-				})
+				},
+			)
 		case api.PhaseWaitForGuestReboots:
 			pipeline = append(
 				pipeline,
@@ -205,7 +212,8 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 						Phase:       api.StepPending,
 						Progress:    libitr.Progress{Total: 1},
 					},
-				})
+				},
+			)
 		case api.PhasePreflightInspection:
 			pipeline = append(
 				pipeline,
@@ -216,7 +224,8 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 						Phase:       api.StepPending,
 						Progress:    libitr.Progress{Total: 1},
 					},
-				})
+				},
+			)
 		case api.PhaseWaitForFinalSnapshotRemoval:
 			pipeline = append(
 				pipeline,
@@ -227,7 +236,8 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 						Phase:       api.StepPending,
 						Progress:    libitr.Progress{Total: 1},
 					},
-				})
+				},
+			)
 		}
 		next, done, _ := itinerary.Next(step.Name)
 		if !done {
@@ -245,7 +255,8 @@ func (r *BaseMigrator) Pipeline(vm plan.VM) (pipeline []*plan.Step, err error) {
 	r.Log.V(2).Info(
 		"Pipeline built.",
 		"vm",
-		vm.String())
+		vm.String(),
+	)
 	return
 }
 
@@ -411,7 +422,7 @@ type BasePredicate struct {
 
 // Evaluate predicate flags.
 func (r *BasePredicate) Evaluate(flag libitr.Flag) (allowed bool, err error) {
-	useV2vForTransfer, vErr := r.context.Plan.ShouldUseV2vForTransfer(r.vm.Ref, r.context.Destination.Client)
+	useV2vForTransfer, vErr := r.context.Plan.ShouldUseV2vForTransfer(r.vm.Ref)
 	if vErr != nil {
 		err = vErr
 		return

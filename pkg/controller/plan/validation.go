@@ -376,7 +376,7 @@ func (r *Reconciler) ensureSecretForProvider(plan *api.Plan) error {
 // and returns whether the plan uses Shift storage so callers can pass the flag forward.
 func (r *Reconciler) validateNetAppShift(ctx *plancontext.Context) (err error) {
 	plan := ctx.Plan
-	src := plan.Referenced.Provider.Source
+	src := plan.Provider.Source
 	if src == nil || src.Type() != api.VSphere || plan.Map.Storage == nil {
 		return nil
 	}
@@ -384,6 +384,7 @@ func (r *Reconciler) validateNetAppShift(ctx *plancontext.Context) (err error) {
 	if err != nil {
 		return liberr.Wrap(err, "check NetApp Shift storage")
 	}
+	plan.Status.NetAppShiftDestination = shift
 	if !shift {
 		return nil
 	}
@@ -1003,17 +1004,7 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 	source := plan.Referenced.Provider.Source
 	checkMixedUsage := source != nil && source.Type() == api.VSphere && settings.Settings.Features.CopyOffload
 	planUsesOffload := checkMixedUsage && plan.IsUsingOffloadPlugin()
-	netAppShift := false
-	var err error
-	if source != nil && source.Type() == api.VSphere && plan.Map.Storage != nil {
-		netAppShift, err = plan.Map.Storage.HasNetAppShiftDestination(ctx.Destination.Client)
-		if err != nil {
-			return liberr.Wrap(err, "check NetApp Shift storage")
-		}
-	}
-	if err != nil {
-		return liberr.Wrap(err, "check NetApp Shift storage")
-	}
+	netAppShift := plan.HasNetAppShiftDestination()
 
 	// Referenced VMs.
 	for i := range plan.Spec.VMs {
