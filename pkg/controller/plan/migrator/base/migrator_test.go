@@ -26,7 +26,7 @@ func (c *getCountingClient) Get(ctx context.Context, key client.ObjectKey, obj c
 	return c.Client.Get(ctx, key, obj, opts...)
 }
 
-func newVsphereColdPredicate(t *testing.T, c client.Client, storageClass string) *BasePredicate {
+func newVsphereColdPredicate(t *testing.T, c client.Client, storageClass string, netAppShift bool) *BasePredicate {
 	t.Helper()
 	vsphere, openshift := api.VSphere, api.OpenShift
 	return &BasePredicate{
@@ -34,6 +34,9 @@ func newVsphereColdPredicate(t *testing.T, c client.Client, storageClass string)
 		context: &plancontext.Context{
 			Plan: &api.Plan{
 				Spec: api.PlanSpec{MigrateSharedDisks: true},
+				// Simulates the result validateNetAppShift persists once per reconcile,
+				// during plan validation, before ShouldUseV2vForTransfer is ever called.
+				Status: api.PlanStatus{NetAppShiftDestination: netAppShift},
 				Referenced: api.Referenced{
 					Provider: struct {
 						Source, Destination *api.Provider
@@ -58,7 +61,10 @@ func newVsphereColdPredicate(t *testing.T, c client.Client, storageClass string)
 	}
 }
 
-// ShouldUseV2vForTransfer hits the API once per predicate; second Evaluate must reuse the cache.
+// ShouldUseV2vForTransfer must never query the API itself: the NetApp Shift destination
+// check is resolved once per reconcile by plan validation and persisted on
+// Plan.Status.NetAppShiftDestination, so BasePredicate's own cache (and repeat Evaluate
+// calls) should never trigger a destination Get.
 func TestBasePredicate_useV2vForTransferCached(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = storagev1.AddToScheme(scheme)
@@ -67,16 +73,50 @@ func TestBasePredicate_useV2vForTransferCached(t *testing.T) {
 		WithObjects(&storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: "sc1"}}).
 		Build()}
 
-	pred := newVsphereColdPredicate(t, cl, "sc1")
+	pred := newVsphereColdPredicate(t, cl, "sc1", false)
 
-	if _, err := pred.Evaluate(CDIDiskCopy); err != nil {
+	cdiAllowed, err := pred.Evaluate(CDIDiskCopy)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pred.Evaluate(VirtV2vDiskCopy); err != nil {
+	v2vAllowed, err := pred.Evaluate(VirtV2vDiskCopy)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if cl.n.Load() != 1 {
-		t.Fatalf("destination Get calls = %d, want 1 (cached)", cl.n.Load())
+	if cdiAllowed || !v2vAllowed {
+		t.Fatalf("netAppShift=false: CDIDiskCopy allowed = %v (want false), VirtV2vDiskCopy allowed = %v (want true)", cdiAllowed, v2vAllowed)
+	}
+	if cl.n.Load() != 0 {
+		t.Fatalf("destination Get calls = %d, want 0 (never queried; must use cached Status.NetAppShiftDestination)", cl.n.Load())
+	}
+}
+
+// When the destination is a NetApp Shift StorageClass, ShouldUseV2vForTransfer must reject
+// virt-v2v transfer (CDI handles the copy instead), and this must still be decided purely
+// from the cached Status.NetAppShiftDestination without ever querying the destination.
+func TestBasePredicate_useV2vForTransferNetAppShift(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = storagev1.AddToScheme(scheme)
+	cl := &getCountingClient{Client: fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(&storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: "sc1"}}).
+		Build()}
+
+	pred := newVsphereColdPredicate(t, cl, "sc1", true)
+
+	cdiAllowed, err := pred.Evaluate(CDIDiskCopy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v2vAllowed, err := pred.Evaluate(VirtV2vDiskCopy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cdiAllowed || v2vAllowed {
+		t.Fatalf("netAppShift=true: CDIDiskCopy allowed = %v (want true), VirtV2vDiskCopy allowed = %v (want false)", cdiAllowed, v2vAllowed)
+	}
+	if cl.n.Load() != 0 {
+		t.Fatalf("destination Get calls = %d, want 0 (never queried; must use cached Status.NetAppShiftDestination)", cl.n.Load())
 	}
 }
 
