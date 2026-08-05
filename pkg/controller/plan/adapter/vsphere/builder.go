@@ -1366,44 +1366,11 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 	naaPrefixes := loadNAAPrefixes(r.Client)
 	dsNaaMap := make(map[string]string)
 
-	// Pre-pass: resolve RDM disks by NAA vendor prefix.
-	// Builds a map from disk index to the storage map entry whose offload
-	// plugin matches the RDM's vendor. Disks that fail NAA resolution are
-	// left out and will fall back to datastore-based matching in the main loop.
-	rdmMapped := make(map[int]*api.StoragePair)
-	for diskIndex, disk := range sortedDisks {
-		if !disk.RDM || disk.DeviceName == "" {
-			continue
-		}
-		rdmVendor, matched := vendorFromNAA(disk.DeviceName, naaPrefixes)
-		if !matched {
-			r.Log.Info("RDM disk NAA prefix not recognized, falling back to datastore matching",
-				"diskKey", disk.Key, "deviceName", disk.DeviceName)
-			continue
-		}
-		candidates := findStorageMapEntriesForVendor(dsMapIn, rdmVendor)
-		switch len(candidates) {
-		case 0:
-			r.Log.Info("No storage map entry found for RDM vendor, falling back to datastore matching",
-				"diskKey", disk.Key, "vendor", rdmVendor)
-		case 1:
-			rdmMapped[diskIndex] = candidates[0]
-			r.Log.Info("RDM disk resolved to storage vendor by NAA",
-				"diskKey", disk.Key, "deviceName", disk.DeviceName,
-				"vendor", rdmVendor, "storageClass", candidates[0].Destination.StorageClass)
-		default:
-			entry, disambigErr := disambiguateRDMByNAA(r.Source.Inventory, candidates, disk.DeviceName, naaPrefixes)
-			if disambigErr != nil {
-				r.Log.Info("RDM NAA disambiguation failed, falling back to datastore matching",
-					"diskKey", disk.Key, "vendor", rdmVendor, "error", disambigErr)
-			} else {
-				rdmMapped[diskIndex] = entry
-				r.Log.Info("RDM disk resolved to storage vendor by NAA",
-					"diskKey", disk.Key, "deviceName", disk.DeviceName,
-					"vendor", rdmVendor, "storageClass", entry.Destination.StorageClass)
-			}
-		}
-	}
+	// Pre-pass: resolve RDM/VVol disks by NAA vendor. Builds a map from disk
+	// index to the storage map entry whose xcopy offload plugin matches the
+	// disk's vendor. Disks that fail vendor resolution are left out and will
+	// fall back to datastore-based matching in the main loop.
+	resolved := resolvePassthroughDisksByVendor(sortedDisks, dsMapIn, r.Source.Inventory, naaPrefixes, OffloadKindXcopy, r.Log)
 
 	for i := range dsMapIn {
 		mapped := &dsMapIn[i]
@@ -1418,16 +1385,16 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		pvblock := core.PersistentVolumeBlock
 		for diskIndex, disk := range sortedDisks {
 			var effectiveMapped *api.StoragePair
-			if disk.RDM && disk.DeviceName != "" {
-				if entry, ok := rdmMapped[diskIndex]; ok {
+			if passthroughIdentifier(disk) != "" {
+				if entry, ok := resolved[diskIndex]; ok {
 					if mapped != entry {
 						continue
 					}
 					effectiveMapped = entry
 				} else if disk.Datastore.ID == ds.ID {
 					effectiveMapped = mapped
-					r.Log.Info("RDM disk matched by datastore fallback",
-						"diskKey", disk.Key, "deviceName", disk.DeviceName,
+					r.Log.Info("RDM/VVol disk matched by datastore fallback",
+						"diskKey", disk.Key, "identifier", passthroughIdentifier(disk),
 						"datastoreID", ds.ID)
 				} else {
 					continue
@@ -1449,12 +1416,12 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 			}
 
 			{
-				// For RDM disks, look up the NAA from the resolved storage map entry's
-				// source datastore (not the outer-loop ds) since the RDM may be on a
+				// For RDM/VVol disks, look up the NAA from the resolved storage map entry's
+				// source datastore (not the outer-loop ds) since the disk's LUN may be on a
 				// different array. Use the storage map ref directly as a synthetic
 				// Datastore to ensure the correct cache key and vSphere query.
 				naaDS := ds
-				if disk.RDM && disk.DeviceName != "" {
+				if passthroughIdentifier(disk) != "" {
 					naaDS = &model.Datastore{}
 					naaDS.ID = effectiveMapped.Source.ID
 					naaDS.Name = effectiveMapped.Source.Name
@@ -2526,10 +2493,20 @@ func (r *Builder) CsiImportPVCs(vmRef ref.Ref, pvcLabels map[string]string) (pvc
 	}
 
 	disks := vm.SortedDisksAsVmware()
+	dsMapIn := r.Context.Map.Storage.Spec.Map
+	naaPrefixes := loadNAAPrefixes(r.Client)
+	resolved := resolvePassthroughDisksByVendor(disks, dsMapIn, r.Source.Inventory, naaPrefixes, OffloadKindCsi, r.Log)
+
 	for diskIndex, disk := range disks {
-		mapped, found := dsMap[disk.Datastore.ID]
+		mapped, found := resolved[diskIndex]
 		if !found {
-			continue
+			// Fallback for disks the vendor search couldn't resolve (not RDM/VVol,
+			// unrecognized vendor, or ambiguous NAA match) — limited to whichever
+			// storage map entry was last written for this datastore ID.
+			mapped, found = dsMap[disk.Datastore.ID]
+			if !found {
+				continue
+			}
 		}
 		if mapped.OffloadPlugin == nil || mapped.OffloadPlugin.CsiVolumeImport == nil {
 			continue

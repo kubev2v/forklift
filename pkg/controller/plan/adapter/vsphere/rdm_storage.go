@@ -9,7 +9,9 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
+	"github.com/kubev2v/forklift/pkg/lib/logging"
 	"github.com/kubev2v/forklift/pkg/settings"
 	core "k8s.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -126,20 +128,95 @@ func vendorFromNAA(deviceName string, prefixes []naaVendorEntry) (api.StorageVen
 	return "", false
 }
 
+// PassthroughOffloadKind selects which OffloadPlugin field a vendor search
+// should match against — RDM/VVol disks can be routed via either kind,
+// depending on which one is configured for their array's vendor.
+type PassthroughOffloadKind int
+
+const (
+	OffloadKindXcopy PassthroughOffloadKind = iota
+	OffloadKindCsi
+)
+
 // findStorageMapEntriesForVendor searches the storage map for all entries whose
-// offload plugin matches the given vendor.
-func findStorageMapEntriesForVendor(storageMap []api.StoragePair, vendor api.StorageVendorProduct) []*api.StoragePair {
+// offload plugin of the given kind matches the given vendor.
+func findStorageMapEntriesForVendor(storageMap []api.StoragePair, vendor api.StorageVendorProduct, kind PassthroughOffloadKind) []*api.StoragePair {
 	var matches []*api.StoragePair
 	for i := range storageMap {
 		entry := &storageMap[i]
-		if entry.OffloadPlugin == nil || entry.OffloadPlugin.VSphereXcopyPluginConfig == nil {
+		if entry.OffloadPlugin == nil {
 			continue
 		}
-		if entry.OffloadPlugin.VSphereXcopyPluginConfig.StorageVendorProduct == vendor {
-			matches = append(matches, entry)
+		switch kind {
+		case OffloadKindXcopy:
+			if cfg := entry.OffloadPlugin.VSphereXcopyPluginConfig; cfg != nil && cfg.StorageVendorProduct == vendor {
+				matches = append(matches, entry)
+			}
+		case OffloadKindCsi:
+			if cfg := entry.OffloadPlugin.CsiVolumeImport; cfg != nil && cfg.StorageVendorProduct == vendor {
+				matches = append(matches, entry)
+			}
 		}
 	}
 	return matches
+}
+
+// passthroughIdentifier returns the NAA-bearing identifier to use for vendor
+// detection on an RDM or VVol ("passthrough") disk, or "" if the disk is a
+// plain VMDK or otherwise has no usable identifier.
+func passthroughIdentifier(disk vsphere.Disk) string {
+	if disk.RDM && disk.DeviceName != "" {
+		return disk.DeviceName
+	}
+	if disk.VVolID != "" {
+		return disk.VVolID
+	}
+	return ""
+}
+
+// resolvePassthroughDisksByVendor pre-resolves RDM/VVol disks to the storage
+// map entry whose offload plugin (of the requested kind) matches the disk's
+// storage vendor, identified via NAA. Returns disk-index -> entry; disks that
+// aren't passthrough, whose vendor can't be determined, or for which no
+// unambiguous match of the requested kind exists are omitted — callers fall
+// back to datastore-ID matching for those.
+func resolvePassthroughDisksByVendor(
+	sortedDisks []vsphere.Disk,
+	dsMapIn []api.StoragePair,
+	inventory datastoreFinder,
+	naaPrefixes []naaVendorEntry,
+	kind PassthroughOffloadKind,
+	log logging.LevelLogger,
+) map[int]*api.StoragePair {
+	resolved := make(map[int]*api.StoragePair)
+	for diskIndex, disk := range sortedDisks {
+		identifier := passthroughIdentifier(disk)
+		if identifier == "" {
+			continue
+		}
+		vendor, matched := vendorFromNAA(identifier, naaPrefixes)
+		if !matched {
+			log.Info("passthrough disk NAA/VVol prefix not recognized, falling back to datastore matching",
+				"diskKey", disk.Key, "identifier", identifier)
+			continue
+		}
+		candidates := findStorageMapEntriesForVendor(dsMapIn, vendor, kind)
+		switch len(candidates) {
+		case 0:
+			log.Info("no storage map entry found for vendor of this kind, falling back to datastore matching",
+				"diskKey", disk.Key, "vendor", vendor)
+		case 1:
+			resolved[diskIndex] = candidates[0]
+		default:
+			if entry, err := disambiguateRDMByNAA(inventory, candidates, identifier, naaPrefixes); err == nil {
+				resolved[diskIndex] = entry
+			} else {
+				log.Info("NAA disambiguation failed, falling back to datastore matching",
+					"diskKey", disk.Key, "vendor", vendor, "error", err)
+			}
+		}
+	}
+	return resolved
 }
 
 // datastoreFinder can look up a Datastore by ref. Satisfied by web.Client.
