@@ -2126,8 +2126,11 @@ func (r *Builder) setColdMigrationDefaultPVCName(objectMeta *metav1.ObjectMeta, 
 		rootDiskIndex = utils.GetBootDiskNumber(planVM.RootDisk)
 	}
 
+	targetVmName := planbase.ResolveTargetVmName(r.Plan, vm.ID, vm.Name)
+
 	templateData := api.VSpherePVCNameTemplateData{
-		VmName:         r.getPlanVMSafeName(vm),
+		VmName:         vm.Name,
+		TargetVmName:   targetVmName,
 		PlanName:       r.Plan.Name,
 		DiskIndex:      diskIndex,
 		RootDiskIndex:  rootDiskIndex,
