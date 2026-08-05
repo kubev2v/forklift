@@ -56,6 +56,10 @@ const (
 	// Parameters: vmId
 	GetVMByID = `Get-VM -Id '%s' | Select-Object Id, Name, State, ProcessorCount, MemoryStartup, Generation | ConvertTo-Json`
 
+	// GetVMState returns the power state of a VM as a string (e.g. "Running", "Off").
+	// Parameters: vmName
+	GetVMState = `Get-VM -Name '%s' | Select-Object -ExpandProperty State`
+
 	// StopVM forcefully stops a VM
 	// Parameters: vmName
 	StopVM = `Stop-VM -Name '%s' -Force -Confirm:$false`
