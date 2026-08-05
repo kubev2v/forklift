@@ -3,6 +3,7 @@ package hyperv
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
@@ -68,13 +69,71 @@ func (r *Client) PowerState(vmRef ref.Ref) (planapi.VMPowerState, error) {
 		return planapi.VMPowerStateUnknown, err
 	}
 
-	switch vm.PowerState {
-	case model.PowerStateOn:
+	drv, err := r.connect()
+	if err != nil {
+		log.Info("WinRM connect failed, falling back to inventory cache", "vm", vm.Name, "error", err)
+		return r.powerStateFromInventory(vm), nil
+	}
+
+	// In cluster mode the VM may reside on a different node than the
+	// provider entry-point. Route the Get-VM query to the owner node.
+	if r.Source.Provider.IsHyperVCluster() && vm.Host != "" {
+		cmd := ps.BuildCommand(ps.GetVMState, vm.Name)
+		out, err := drv.RunOnNode(cmd, vm.Host)
+		if err != nil {
+			log.Info("RunOnNode Get-VM failed, falling back to inventory cache",
+				"vm", vm.Name, "node", vm.Host, "error", err)
+			return r.powerStateFromInventory(vm), nil
+		}
+		return r.parseStateString(out), nil
+	}
+
+	domain, err := drv.LookupDomainByName(vm.Name)
+	if err != nil {
+		log.Info("VM not found via WinRM, falling back to inventory cache", "vm", vm.Name, "error", err)
+		return r.powerStateFromInventory(vm), nil
+	}
+	defer func() { _ = domain.Free() }()
+
+	state, _, err := domain.GetState()
+	if err != nil {
+		log.Info("Failed to get VM state via WinRM, falling back to inventory cache", "vm", vm.Name, "error", err)
+		return r.powerStateFromInventory(vm), nil
+	}
+
+	switch state {
+	case driver.DOMAIN_RUNNING:
 		return planapi.VMPowerStateOn, nil
-	case model.PowerStateOff:
+	case driver.DOMAIN_SHUTOFF:
 		return planapi.VMPowerStateOff, nil
 	default:
 		return planapi.VMPowerStateUnknown, nil
+	}
+}
+
+// parseStateString maps the textual output of PowerShell's VM State property
+// (e.g. "Off", "Running") to the plan VMPowerState enum.
+func (r *Client) parseStateString(raw string) planapi.VMPowerState {
+	s := strings.TrimSpace(strings.ToLower(raw))
+	switch {
+	case strings.Contains(s, "off"):
+		return planapi.VMPowerStateOff
+	case strings.Contains(s, "running"):
+		return planapi.VMPowerStateOn
+	default:
+		log.Info("Unrecognised VM state string from WinRM", "raw", raw)
+		return planapi.VMPowerStateUnknown
+	}
+}
+
+func (r *Client) powerStateFromInventory(vm *hyperv.VM) planapi.VMPowerState {
+	switch vm.PowerState {
+	case model.PowerStateOn:
+		return planapi.VMPowerStateOn
+	case model.PowerStateOff:
+		return planapi.VMPowerStateOff
+	default:
+		return planapi.VMPowerStateUnknown
 	}
 }
 
