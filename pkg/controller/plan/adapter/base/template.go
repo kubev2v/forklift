@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/controller/plan/util"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	"github.com/kubev2v/forklift/pkg/settings"
 	"github.com/kubev2v/forklift/pkg/templateutil"
@@ -92,18 +93,65 @@ func SetPVCNameOnObject(objectMeta *metav1.ObjectMeta, templateStr string, useGe
 	return nil
 }
 
-// ResolveTargetVmName returns the DNS1123-safe target VM name. If the plan has
-// assigned a NewName (because the original was not DNS1123-compliant), that is
-// returned; otherwise vmName is returned as-is.
+// ResolveTargetVmName returns the DNS1123-safe target VM name.
+// Resolution order (first non-empty wins):
+//  1. spec.vms[].targetName  — explicit user override
+//  2. status.migration.vms[].newName — assigned during a previous migration run
+//  3. util.ChangeVmName(vmName) — automatic sanitization when vmName is not a valid DNS1123 label
+//  4. vmName as-is
 func ResolveTargetVmName(p *api.Plan, vmID, vmName string) string {
-	if p != nil && p.Status.Migration.VMs != nil {
-		for _, vmStatus := range p.Status.Migration.VMs {
-			if vmStatus.ID == vmID && vmStatus.NewName != "" {
-				return vmStatus.NewName
-			}
+	if name := planOverrideName(p, vmID); name != "" {
+		return name
+	}
+	if errs := k8svalidation.IsDNS1123Label(vmName); len(errs) > 0 {
+		if hasAlphanumeric(vmName) {
+			return util.ChangeVmName(vmName)
 		}
+		return vmIDFallbackName(vmID)
 	}
 	return vmName
+}
+
+// planOverrideName checks the plan for an explicit target name (spec.targetName
+// or status.newName) for the given vmID.
+func planOverrideName(p *api.Plan, vmID string) string {
+	if p == nil {
+		return ""
+	}
+	for i := range p.Spec.VMs {
+		if p.Spec.VMs[i].ID == vmID {
+			if name := strings.TrimSpace(p.Spec.VMs[i].TargetName); name != "" {
+				return name
+			}
+			break
+		}
+	}
+	for _, vmStatus := range p.Status.Migration.VMs {
+		if vmStatus.ID == vmID && vmStatus.NewName != "" {
+			return vmStatus.NewName
+		}
+	}
+	return ""
+}
+
+// hasAlphanumeric reports whether s contains at least one ASCII letter or digit.
+// When false, ChangeVmName would strip all characters and produce a random suffix.
+func hasAlphanumeric(s string) bool {
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			return true
+		}
+	}
+	return false
+}
+
+// vmIDFallbackName produces a deterministic DNS1123-safe name from a VM ID.
+// Used when the original VM name is completely Irreparable.
+func vmIDFallbackName(vmID string) string {
+	if hasAlphanumeric(vmID) {
+		return util.ChangeVmName(vmID)
+	}
+	return "vm-0000"
 }
 
 // isOCPSource reports whether the plan's resolved source provider is OpenShift.

@@ -236,7 +236,7 @@ func (r *KubeVirt) resolveConversionResources(vm *plan.VMStatus, podType convctx
 			return
 		}
 
-		useV2v, v2vErr := r.Context.Plan.ShouldUseV2vForTransfer(vm.Ref, r.Destination.Client)
+		useV2v, v2vErr := r.Plan.ShouldUseV2vForTransfer(vm.Ref)
 		if v2vErr != nil {
 			err = v2vErr
 			return
@@ -355,7 +355,7 @@ func (r *KubeVirt) checkProviderReady(vmID string) (ready bool, err error) {
 // should use InPlace or Remote conversion based on the plan transfer mode
 // and PVC copy-offload annotations.
 func (r *KubeVirt) ResolveConversionType(vm *plan.VMStatus) (api.ConversionType, error) {
-	useV2v, err := r.Context.Plan.ShouldUseV2vForTransfer(vm.Ref, r.Destination.Client)
+	useV2v, err := r.Plan.ShouldUseV2vForTransfer(vm.Ref)
 	if err != nil {
 		return "", err
 	}
@@ -2838,7 +2838,7 @@ func (r *KubeVirt) dataVolumes(vm *plan.VMStatus, secret *core.Secret, configMap
 
 	// Add vmUUID for any migration where copy and conversion are separate,
 	// so PVCs can be discovered by a resume-conversion migration.
-	if util.HasSeparateCopyAndConversion(r.Plan, vm.Ref, r.Destination.Client) {
+	if util.HasSeparateCopyAndConversion(r.Plan, vm.Ref) {
 		if uuid, uuidErr := vmUUIDFromInventory(srcVM, vm.Ref); uuidErr != nil {
 			r.Log.Error(uuidErr, "Failed to resolve vmUUID label for DV; resume-conversion discovery may fail.", "vm", vm.String())
 		} else {

@@ -3692,6 +3692,11 @@ spec:
                       type: object
                     type: array
                 type: object
+              netAppShiftDestination:
+                description: |-
+                  NetAppShiftDestination indicates whether the plan's storage map resolves to a NetApp
+                  Shift/Trident destination StorageClass.
+                type: boolean
               observedGeneration:
                 description: The most recent generation observed by the controller.
                 format: int64

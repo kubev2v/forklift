@@ -445,7 +445,7 @@ func (r *BasePredicate) ensureUseV2vForTransfer() (bool, error) {
 		}
 		return *r.useV2vForTransfer, nil
 	}
-	result, vErr := r.context.Plan.ShouldUseV2vForTransfer(r.vm.Ref, r.context.Destination.Client)
+	result, vErr := r.context.Plan.ShouldUseV2vForTransfer(r.vm.Ref)
 	r.useV2vResolved = true
 	if vErr != nil {
 		r.useV2vErr = vErr

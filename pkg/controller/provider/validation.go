@@ -41,6 +41,7 @@ const (
 	SettingsNotValid        = "SettingsNotValid"
 	Validated               = "Validated"
 	ConnectionAuthFailed    = "ConnectionAuthFailed"
+	ConnectionAuthRetry     = "ConnectionAuthRetry"
 	ConnectionTestSucceeded = "ConnectionTestSucceeded"
 	ConnectionTestFailed    = "ConnectionTestFailed"
 	InventoryCreated        = "InventoryCreated"
@@ -463,17 +464,7 @@ func (r *Reconciler) testConnection(provider *api.Provider, secret *core.Secret)
 		// When the status is unauthorized controller stops the reconciliation, so the user account does not get locked.
 		// Providing bad credentials when requesting the token results in 400, and not 401.
 		if status == http.StatusUnauthorized || status == http.StatusBadRequest {
-			provider.Status.Phase = ConnectionFailed
-			provider.Status.SetCondition(
-				libcnd.Condition{
-					Type:     ConnectionAuthFailed,
-					Status:   True,
-					Reason:   Tested,
-					Category: Critical,
-					Message: fmt.Sprintf(
-						"Connection auth failed, error: %s",
-						err.Error()),
-				})
+			setAuthFailureConditions(provider, err)
 			return nil
 		}
 		log.Info(
@@ -1381,4 +1372,31 @@ func (r *Reconciler) ValidateHyperVSettings(provider *api.Provider) error {
 
 	provider.Status.DeleteCondition(SettingsNotValid)
 	return nil
+}
+
+// setAuthFailureConditions sets ConnectionAuthFailed on the provider.
+// For HyperV, it also sets ConnectionAuthRetry because a 401 may indicate
+// disabled WinRM Basic auth rather than wrong credentials.
+func setAuthFailureConditions(provider *api.Provider, connErr error) {
+	provider.Status.Phase = ConnectionFailed
+	provider.Status.SetCondition(
+		libcnd.Condition{
+			Type:     ConnectionAuthFailed,
+			Status:   True,
+			Reason:   Tested,
+			Category: Critical,
+			Message: fmt.Sprintf(
+				"Connection auth failed, error: %s",
+				connErr.Error()),
+		})
+	if provider.Type() == api.HyperV {
+		provider.Status.SetCondition(
+			libcnd.Condition{
+				Type:     ConnectionAuthRetry,
+				Status:   True,
+				Reason:   Tested,
+				Category: Advisory,
+				Message:  "HyperV auth failure may be a host-side WinRM configuration issue, periodic retry enabled.",
+			})
+	}
 }

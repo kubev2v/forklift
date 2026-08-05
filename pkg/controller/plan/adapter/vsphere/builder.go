@@ -563,7 +563,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 
 		storageClass := mapped.Destination.StorageClass
 		var dvSource cdi.DataVolumeSource
-		useV2vForTransfer, vErr := r.Context.Plan.ShouldUseV2vForTransfer(vmRef, r.Context.Destination.Client)
+		useV2vForTransfer, vErr := r.Plan.ShouldUseV2vForTransfer(vmRef)
 		if vErr != nil {
 			err = vErr
 			return
@@ -2004,11 +2004,6 @@ func (r *Builder) setPVCNameFromTemplate(objectMeta *metav1.ObjectMeta, vm *mode
 	}
 
 	targetVmName := planbase.ResolveTargetVmName(r.Plan, vm.ID, vm.Name)
-	if targetVmName == vm.Name {
-		if errs := k8svalidation.IsDNS1123Label(targetVmName); len(errs) > 0 {
-			targetVmName = utils.ChangeVmName(vm.Name)
-		}
-	}
 
 	templateData := &api.PVCNameTemplateData{
 		VmName:         vm.Name,

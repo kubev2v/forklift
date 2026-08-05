@@ -232,14 +232,14 @@ func AnyNetAppShiftPersistentVolumeClaim(pvcs []*core.PersistentVolumeClaim) boo
 // virt-v2v-for-transfer (single-step copy+convert), providers that don't
 // require guest conversion (oVirt, OpenStack, OCP), EC2 (whose "copy" is
 // a near-instant EBS snapshot-to-volume operation), or on error.
-func HasSeparateCopyAndConversion(plan *api.Plan, vmRef ref.Ref, client k8sclient.Client) bool {
+func HasSeparateCopyAndConversion(plan *api.Plan, vmRef ref.Ref) bool {
 	if plan.Provider.Source == nil || !plan.Provider.Source.RequiresConversion() {
 		return false
 	}
 	if plan.Provider.Source.Type() == api.EC2 {
 		return false
 	}
-	useV2v, err := plan.ShouldUseV2vForTransfer(vmRef, client)
+	useV2v, err := plan.ShouldUseV2vForTransfer(vmRef)
 	if err != nil {
 		return false
 	}

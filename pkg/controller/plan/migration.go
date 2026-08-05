@@ -215,7 +215,7 @@ func (r *Migration) begin() (err error) {
 	if r.Migration.Spec.ResumeConversion {
 		hasResumable := false
 		for _, specVM := range r.Plan.Spec.VMs {
-			if !util.HasSeparateCopyAndConversion(r.Plan, specVM.Ref, r.Destination.Client) {
+			if !util.HasSeparateCopyAndConversion(r.Plan, specVM.Ref) {
 				snapshot.SetCondition(libcnd.Condition{
 					Type:     api.ConditionFailed,
 					Status:   True,
@@ -1604,7 +1604,7 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 		case api.PhaseCreateGuestConversionPod:
 
 			if !vm.DisksCopied && !r.IsResumeConversion() &&
-				util.HasSeparateCopyAndConversion(r.Plan, vm.Ref, r.Destination.Client) {
+				util.HasSeparateCopyAndConversion(r.Plan, vm.Ref) {
 				vm.DisksCopied = true
 				r.Log.Info("All disks copied, marking VM as resumable on conversion failure.",
 					"vm", vm.String())
@@ -2248,7 +2248,7 @@ func (r *Migration) updateConversionProgress(vm *plan.VMStatus, step *plan.Step)
 			break
 		}
 
-		useV2vForTransfer, err := r.Context.Plan.ShouldUseV2vForTransfer(vm.Ref, r.Destination.Client)
+		useV2vForTransfer, err := r.Plan.ShouldUseV2vForTransfer(vm.Ref)
 		switch {
 		case err != nil:
 			return liberr.Wrap(err)
