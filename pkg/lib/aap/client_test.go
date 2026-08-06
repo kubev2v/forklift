@@ -62,3 +62,28 @@ func TestClientResolveAPIPrefixFromGetAPI(t *testing.T) {
 		t.Fatalf("expected one GET to discovered job_templates path, got %d", jtHits)
 	}
 }
+
+func TestClientJobTemplateName(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/", "/api":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"current_version": "/api/v2/"}`))
+		case "/api/v2/job_templates/":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"count": 1, "next": null, "previous": null, "results": [{"id": 123, "name": "My Playbook Template"}]}`))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	cl := NewClient(srv.URL, "tok", 0, nil)
+	templates, err := cl.ListAllJobTemplates(context.Background(), 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(templates) != 1 || templates[0].Name != "My Playbook Template" {
+		t.Fatalf("unexpected templates: %#v", templates)
+	}
+}
