@@ -265,6 +265,23 @@ func (r *VM1) SortedDisksAsVmware() []model.Disk {
 	return r.sortedDisksByBusses(r.Disks, buses)
 }
 
+func (r *VM1) TranslateDiskIndexFromLibvirt(libvirtIndex int, targetOrder []model.Disk) int {
+	if libvirtIndex < 0 {
+		return libvirtIndex
+	}
+	libvirtDisks := r.SortedDisksAsLibvirt()
+	if libvirtIndex >= len(libvirtDisks) {
+		return -1
+	}
+	targetKey := libvirtDisks[libvirtIndex].Key
+	for i, disk := range targetOrder {
+		if disk.Key == targetKey {
+			return i
+		}
+	}
+	return -1
+}
+
 // VM full detail.
 type VM struct {
 	VM1
