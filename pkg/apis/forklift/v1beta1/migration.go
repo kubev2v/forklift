@@ -24,6 +24,16 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// VMCutover associates a VM with a per-VM cutover time.
+type VMCutover struct {
+	// The VM ID (e.g. the vSphere managed object ID). Required.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	ID string `json:"id"`
+	// Date and time to finalize the warm migration for this VM.
+	Cutover meta.Time `json:"cutover"`
+}
+
 // MigrationSpec defines the desired state of Migration
 type MigrationSpec struct {
 	// Reference to the associated Plan.
@@ -33,12 +43,28 @@ type MigrationSpec struct {
 	// Date and time to finalize a warm migration.
 	// If present, this will override the value set on the Plan.
 	Cutover *meta.Time `json:"cutover,omitempty"`
+	// Per-VM cutover times. Overrides spec.cutover for the listed VMs.
+	// +optional
+	VMCutover []VMCutover `json:"vmCutover,omitempty"`
 	// ResumeConversion skips disk copy and runs only the virt-v2v
 	// conversion step, reusing PVCs from a previous failed migration.
 	// Valid for any plan whose disk copy and conversion are separate
 	// phases and whose disk copy completed before conversion failed.
 	// +optional
 	ResumeConversion bool `json:"resumeConversion,omitempty"`
+}
+
+// CutoverFor returns the effective cutover time for a VM.
+// Per-VM cutover takes precedence over the global cutover.
+func (r *MigrationSpec) CutoverFor(vmRef ref.Ref) *meta.Time {
+	if vmRef.ID != "" {
+		for i := range r.VMCutover {
+			if r.VMCutover[i].ID == vmRef.ID {
+				return &r.VMCutover[i].Cutover
+			}
+		}
+	}
+	return r.Cutover
 }
 
 // Canceled indicates whether a VM ref is present

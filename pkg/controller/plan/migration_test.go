@@ -3,6 +3,7 @@ package plan
 
 import (
 	"testing"
+	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
@@ -283,6 +284,66 @@ var _ = ginkgo.Describe("Cancellation", func() {
 		})
 	})
 })
+
+func TestCutoverFor(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+	globalCutover := meta.NewTime(time.Now().Add(-time.Hour))
+
+	t.Run("returns global cutover when no per-VM cutover is set", func(t *testing.T) {
+		g := gomega.NewGomegaWithT(t)
+		spec := &api.MigrationSpec{Cutover: &globalCutover}
+		result := spec.CutoverFor(ref.Ref{ID: "vm-1", Name: "test-vm"})
+		g.Expect(result).To(gomega.Equal(&globalCutover))
+	})
+
+	t.Run("returns nil when no cutover is set at all", func(t *testing.T) {
+		g := gomega.NewGomegaWithT(t)
+		spec := &api.MigrationSpec{}
+		result := spec.CutoverFor(ref.Ref{ID: "vm-1", Name: "test-vm"})
+		g.Expect(result).To(gomega.BeNil())
+	})
+
+	t.Run("returns per-VM cutover when it matches", func(t *testing.T) {
+		g := gomega.NewGomegaWithT(t)
+		vmCutoverTime := meta.NewTime(time.Now().Add(-30 * time.Minute))
+		spec := &api.MigrationSpec{
+			Cutover: &globalCutover,
+			VMCutover: []api.VMCutover{
+				{ID: "vm-1", Cutover: vmCutoverTime},
+			},
+		}
+		result := spec.CutoverFor(ref.Ref{ID: "vm-1", Name: "test-vm"})
+		g.Expect(result.Time).To(gomega.Equal(vmCutoverTime.Time))
+	})
+
+	t.Run("falls back to global cutover for unlisted VMs", func(t *testing.T) {
+		g := gomega.NewGomegaWithT(t)
+		vmCutoverTime := meta.NewTime(time.Now().Add(-30 * time.Minute))
+		spec := &api.MigrationSpec{
+			Cutover: &globalCutover,
+			VMCutover: []api.VMCutover{
+				{ID: "vm-1", Cutover: vmCutoverTime},
+			},
+		}
+		result := spec.CutoverFor(ref.Ref{ID: "vm-2", Name: "other-vm"})
+		g.Expect(result).To(gomega.Equal(&globalCutover))
+	})
+
+	t.Run("skips matching when VM ref has no ID", func(t *testing.T) {
+		g := gomega.NewGomegaWithT(t)
+		vmCutoverTime := meta.NewTime(time.Now().Add(-30 * time.Minute))
+		spec := &api.MigrationSpec{
+			Cutover: &globalCutover,
+			VMCutover: []api.VMCutover{
+				{ID: "vm-1", Cutover: vmCutoverTime},
+			},
+		}
+		result := spec.CutoverFor(ref.Ref{Name: "test-vm"})
+		g.Expect(result).To(gomega.Equal(&globalCutover))
+	})
+
+	_ = g // parent scope used for table-level setup
+}
 
 func TestMarkSchedulerQueuedVMs(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)

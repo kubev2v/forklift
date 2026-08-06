@@ -139,6 +139,27 @@ spec:
                   Valid for any plan whose disk copy and conversion are separate
                   phases and whose disk copy completed before conversion failed.
                 type: boolean
+              vmCutover:
+                description: Per-VM cutover times. Overrides spec.cutover for the
+                  listed VMs.
+                items:
+                  description: VMCutover associates a VM with a per-VM cutover time.
+                  properties:
+                    cutover:
+                      description: Date and time to finalize the warm migration for
+                        this VM.
+                      format: date-time
+                      type: string
+                    id:
+                      description: The VM ID (e.g. the vSphere managed object ID).
+                        Required.
+                      minLength: 1
+                      type: string
+                  required:
+                  - cutover
+                  - id
+                  type: object
+                type: array
             required:
             - plan
             type: object

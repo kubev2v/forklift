@@ -1412,7 +1412,8 @@ func (r *Migration) execute(vm *plan.VMStatus) (err error) {
 				r.NextPhase(vm)
 			}
 		case api.PhaseCopyingPaused:
-			if r.Migration.Spec.Cutover != nil && !r.Migration.Spec.Cutover.After(time.Now()) {
+			cutover := r.Migration.Spec.CutoverFor(vm.Ref)
+			if cutover != nil && !cutover.After(time.Now()) {
 				vm.Phase = api.PhaseStorePowerState
 			} else if vm.Warm.NextPrecopyAt != nil && !vm.Warm.NextPrecopyAt.After(time.Now()) {
 				r.NextPhase(vm)
