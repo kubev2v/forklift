@@ -951,26 +951,6 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 		c.parseAndRecordCompletion(bodyStr, pvc, cr)
 	}
 
-	// Pick the right progress regex for the populator type.
-	var importRegExp *regexp.Regexp
-	if populatorKind == api.VSphereXcopyVolumePopulatorKind {
-		importRegExp = regexp.MustCompile(`vsphere_xcopy_volume_populator_progress\{[^}]*owner_uid="` + string(pvc.UID) + `"[^}]*\} (\d+\.?\d*)`)
-	} else {
-		importRegExp = regexp.MustCompile("progress\\{ownerUID=\"" + string(pvc.UID) + "\"\\} (\\d+\\.?\\d*)")
-	}
-
-	match := importRegExp.FindStringSubmatch(bodyStr)
-	if match == nil {
-		klog.V(5).Info("Failed to find matches, regex: ", importRegExp)
-		return nil
-	}
-
-	progress, err := strconv.ParseFloat(string(match[1]), 64)
-	if err != nil {
-		klog.V(5).Info("Could not convert progress: ", err)
-		return err
-	}
-
 	gvr := schema.GroupVersionResource{
 		Group:    *pvc.Spec.DataSourceRef.APIGroup,
 		Version:  "v1beta1",
@@ -983,36 +963,61 @@ func (c *controller) updateProgress(pod *corev1.Pod, pvc *corev1.PersistentVolum
 		return err
 	}
 
-	err = updatePopulatorProgress(int64(progress), latestPopulator)
-	if err != nil {
-		klog.V(5).Info("Failed to update progress: ", err)
-		return err
+	dirty := false
+	var progress float64
+
+	// Pick the right progress regex for the populator type.
+	// Best-effort: a miss or parse/write failure here is logged and skipped, and must
+	// not prevent the independent xcopyUsed/vibVersion scrapes below from being applied.
+	var importRegExp *regexp.Regexp
+	if populatorKind == api.VSphereXcopyVolumePopulatorKind {
+		importRegExp = regexp.MustCompile(`vsphere_xcopy_volume_populator_progress\{[^}]*owner_uid="` + string(pvc.UID) + `"[^}]*\} (\d+\.?\d*)`)
+	} else {
+		importRegExp = regexp.MustCompile("progress\\{ownerUID=\"" + string(pvc.UID) + "\"\\} (\\d+\\.?\\d*)")
 	}
 
+	if match := importRegExp.FindStringSubmatch(bodyStr); match == nil {
+		klog.V(5).Info("Failed to find matches, regex: ", importRegExp)
+	} else if p, perr := strconv.ParseFloat(match[1], 64); perr != nil {
+		klog.V(5).Info("Could not convert progress: ", perr)
+	} else {
+		progress = p
+		if err := updatePopulatorProgress(int64(progress), latestPopulator); err != nil {
+			klog.V(5).Info("Failed to update progress: ", err)
+		} else {
+			dirty = true
+		}
+	}
+
+	// xcopyUsed / vibVersion: best-effort, independent of progress above so that a
+	// failure/miss on either side never blocks the other from reaching the CR.
 	if populatorKind == api.VSphereXcopyVolumePopulatorKind {
 		xcopyRegExp := regexp.MustCompile(`vsphere_xcopy_volume_populator_xcopy_used\{[^}]*owner_uid="` + string(pvc.UID) + `"[^}]*\} (\d+)`)
-		xcopyMatch := xcopyRegExp.FindStringSubmatch(string(body))
-		if xcopyMatch != nil {
+		if xcopyMatch := xcopyRegExp.FindStringSubmatch(bodyStr); xcopyMatch != nil {
 			if err := unstructured.SetNestedField(latestPopulator.Object, xcopyMatch[1], "status", "xcopyUsed"); err != nil {
 				klog.V(5).Info("Failed to update xcopyUsed: ", err)
-				return err
+			} else {
+				dirty = true
 			}
 		}
 
 		vibVerRegExp := regexp.MustCompile(`vsphere_xcopy_volume_populator_vib_version\{[^}]*owner_uid="` + string(pvc.UID) + `"[^}]*\} (\d+)`)
-		vibVerLine := vibVerRegExp.FindString(bodyStr)
-		if vibVerLine != "" {
+		if vibVerLine := vibVerRegExp.FindString(bodyStr); vibVerLine != "" {
 			if vibVersion := extractLabel(vibVerLine, "version"); vibVersion != "" {
 				if err := unstructured.SetNestedField(latestPopulator.Object, vibVersion, "status", "vibVersion"); err != nil {
 					klog.V(5).Info("Failed to update vibVersion: ", err)
-					return err
+				} else {
+					dirty = true
 				}
 			}
 		}
 	}
 
-	_, err = c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Update(context.TODO(), latestPopulator, metav1.UpdateOptions{})
-	if err != nil {
+	if !dirty {
+		return nil
+	}
+
+	if _, err := c.dynamicClient.Resource(gvr).Namespace(pvc.Namespace).Update(context.TODO(), latestPopulator, metav1.UpdateOptions{}); err != nil {
 		klog.V(5).Info("Failed to update CR ", err)
 		return err
 	}
