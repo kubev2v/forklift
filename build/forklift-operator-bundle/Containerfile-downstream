@@ -25,7 +25,7 @@ ARG HYPERV_PROVIDER_SERVER_IMAGE="registry.redhat.io/migration-toolkit-virtualiz
 
 ARG MUST_GATHER_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-must-gather-rhel8@sha256:68216c295d45bf8d68df216c4e5ff4a4c0ad35b4f18cc8b3e125bd84e54d4be9"
 
-ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-openstack-populator-rhel9@sha256:25fb897e47e4adb73b592d5d9d599bc279fb74ada04a926d7937fcbcd1e4d5c5"
+ARG OPENSTACK_POPULATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-openstack-populator-rhel9@sha256:8f3d802c4a71596a1610291b767efba0865bbcd840118e363ee3a6d5ab965c38"
 
 ARG OPERATOR_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-rhel9-operator@sha256:40bef01671999a8c30f47e08802a43dc83a2ffff6129f6fc31dc40dcf7769ae6"
 
@@ -41,7 +41,7 @@ ARG UI_PLUGIN_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-con
 
 ARG VALIDATION_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-validation-rhel9@sha256:b63a5948a6ebd57d22547427e538f0d0fa4762d47a2d1c9b2e1cfae8351f0681"
 
-ARG VIRT_V2V_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel10@sha256:7cd1e6160656f99d6249c2d1de2725171b0e87d2a0c63ee64b5c35cf39d9410a"
+ARG VIRT_V2V_IMAGE="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel10@sha256:ab41b359d47a2b468f6060c288027458520afdc2f10029dbb5bd8c7612c51109"
 
 ARG VIRT_V2V_IMAGE_RHEL9="registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel9@sha256:cbccf086a028134843f9bf0bcf30e803cde6038c2c172171f9f4ab4a87aeb70d"
 
