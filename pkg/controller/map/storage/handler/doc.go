@@ -3,6 +3,7 @@ package handler
 import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/map/storage/handler/hyperv"
+	"github.com/kubev2v/forklift/pkg/controller/map/storage/handler/nutanix"
 	"github.com/kubev2v/forklift/pkg/controller/map/storage/handler/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/map/storage/handler/openstack"
 	"github.com/kubev2v/forklift/pkg/controller/map/storage/handler/ova"
@@ -62,6 +63,11 @@ func New(
 			provider)
 	case api.EC2:
 		h, err = ec2handler.NewStorageHandler(
+			client,
+			channel,
+			provider)
+	case api.Nutanix:
+		h, err = nutanix.New(
 			client,
 			channel,
 			provider)

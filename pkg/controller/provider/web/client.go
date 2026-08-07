@@ -8,6 +8,7 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/hyperv"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/nutanix"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/ocp"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/openstack"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/ova"
@@ -114,6 +115,14 @@ func NewClient(provider *api.Provider) (client Client, err error) {
 			finder:   hyperv.NewFinder(),
 			restClient: base.RestClient{
 				Resolver: &hyperv.Resolver{Provider: provider},
+			},
+		}
+	case api.Nutanix:
+		client = &ProviderClient{
+			provider: provider,
+			finder:   &nutanix.Finder{},
+			restClient: base.RestClient{
+				Resolver: &nutanix.Resolver{Provider: provider},
 			},
 		}
 	default:
