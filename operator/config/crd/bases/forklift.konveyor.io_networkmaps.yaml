@@ -53,11 +53,35 @@ spec:
                     destination:
                       description: Destination network.
                       properties:
+                        calico:
+                          description: |-
+                            Calico marks the destination's default pod network as Calico-provided
+                            and opts the VM's primary NIC into Calico identity preservation: the
+                            source MAC is carried over, and the source IPs too when the Plan sets
+                            preserveStaticIPs. Applies only when Type == "pod".
+                          properties:
+                            network:
+                              description: |-
+                                Name of a cluster-scoped projectcalico.org/v3 Network CR for L2
+                                primary attach. Empty value means no L2 attach: Calico's default L3
+                                IPAM is used. Applies only when the entry's Type == "pod".
+                              type: string
+                            vlan:
+                              description: |-
+                                802.1Q VLAN ID within the named Calico Network. Applies only when
+                                Network != "" and is then required: it must match a VLAN entry's
+                                vlan.id in the named Network. Value 0 (or omitted) means "not set"
+                                and is rejected at Plan validation whenever a Network is named.
+                              maximum: 4094
+                              minimum: 0
+                              type: integer
+                          type: object
                         name:
-                          description: The name.
+                          description: The name. Applies only when Type == "multus"
+                            (the NetworkAttachmentDefinition name).
                           type: string
                         namespace:
-                          description: The namespace (multus only).
+                          description: The namespace. Applies only when Type == "multus".
                           type: string
                         type:
                           description: |-
