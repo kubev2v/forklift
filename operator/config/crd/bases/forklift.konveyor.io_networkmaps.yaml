@@ -74,6 +74,14 @@ spec:
                       required:
                       - type
                       type: object
+                    networkIPMode:
+                      description: Network IP mode for this network, overrides plan-level
+                        preserveStaticIPs.
+                      enum:
+                      - preserve
+                      - dhcp
+                      - none
+                      type: string
                     source:
                       description: Source network.
                       properties:
