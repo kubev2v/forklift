@@ -1,3 +1,21 @@
+/*
+ *
+ * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package v100
 
 // FileSystemIDName holds id and name for a file system
@@ -288,4 +306,21 @@ type FileInterface struct {
 	Role       string `json:"role"`
 	IsDisabled bool   `json:"is_disabled"`
 	Override   bool   `json:"override"`
+}
+
+// NFSServerList holds nfs server metadata items
+type NFSServerList struct {
+	ID string `json:"id"`
+}
+
+// NFSServerIterator holds the iterator of resultant NFS server list
+type NFSServerIterator struct {
+	Entries []NFSServerList `json:"entries"`
+}
+
+// NFSServer holds nfs server details
+type NFSServer struct {
+	ID           string `json:"id"`
+	NFSV3Enabled bool   `json:"nfsv3_enabled"`
+	NFSV4Enabled bool   `json:"nfsv4_enabled"`
 }

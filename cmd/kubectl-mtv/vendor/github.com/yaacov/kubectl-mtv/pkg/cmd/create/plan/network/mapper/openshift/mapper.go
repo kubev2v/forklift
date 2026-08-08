@@ -90,7 +90,7 @@ func createSameNameNetworkPairs(sourceNetworks []ref.Ref, targetNetworks []forkl
 	for _, sourceNetwork := range sourceNetworks {
 		if targetNetwork, exists := targetByName[sourceNetwork.Name]; exists {
 			networkPairs = append(networkPairs, forkliftv1beta1.NetworkPair{
-				Source:      sourceNetwork,
+				Source:      forkliftv1beta1.NetworkSourceRef{Ref: sourceNetwork},
 				Destination: targetNetwork,
 			})
 			klog.V(4).Infof("DEBUG: Mapped source network %s -> %s/%s (same name)",
@@ -128,7 +128,7 @@ func createDefaultNetworkPairs(sourceNetworks []ref.Ref, targetNetworks []forkli
 		}
 
 		networkPairs = append(networkPairs, forkliftv1beta1.NetworkPair{
-			Source:      sourceNetwork,
+			Source:      forkliftv1beta1.NetworkSourceRef{Ref: sourceNetwork},
 			Destination: destination,
 		})
 	}
