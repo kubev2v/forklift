@@ -161,32 +161,52 @@ type PlanSpec struct {
 	// Generated names must be valid DNS-1123 labels (lowercase alphanumerics, '-' allowed, max 63 chars).
 	// It follows Go template syntax and has access to provider-specific variables.
 	//
-	// Common variables (all providers):
-	//   - .VmName: name of the VM in the source cluster (original source name)
-	//   - .TargetVmName: final VM name in the target cluster (may equal .VmName if no rename/normalization)
-	//   - .PlanName: name of the migration plan
-	//   - .DiskIndex: initial volume index of the disk
+	// WARNING: The PVC name is reused as a building block in other K8s resource names
+	// (e.g., "scratch-dv-{pvcName}-xxxxx", "convert-{pvcName}-xxxxx").
+	// To avoid exceeding the 63-char DNS1123 label limit on derived resources,
+	// keep the template output to at most 40 characters (46 if UseGenerateName is false).
+	// The built-in default uses trunc 15 for plan and VM names to stay within this budget.
 	//
-	// VMware (vSphere) specific variables:
-	//   - .WinDriveLetter: Windows drive letter (lowercase, if applicable, e.g. "c", requires guest agent)
-	//   - .RootDiskIndex: index of the root disk
-	//   - .Shared: true if the volume is shared by multiple VMs, false otherwise
-	//   - .FileName: name of the file in the source provider (filename includes the .vmdk suffix)
+	// Available template variables:
 	//
-	// OpenShift specific variables:
+	// All providers:
+	//   - .VmName: original source VM name
+	//   - .TargetVmName: DNS1123-safe target VM name
+	//   - .PlanName: migration plan name
+	//   - .DiskIndex: sequential index of the disk being migrated
+	//   - .VmId: source VM identifier from the provider
+	//
+	// vSphere only (empty for other providers):
+	//   - .WinDriveLetter: Windows drive letter (lowercase, e.g. "c"; requires guest agent)
+	//   - .RootDiskIndex: index of the root/boot disk
+	//   - .Shared: true if the disk is shared by multiple VMs
+	//   - .FileName: source VMDK file name including the .vmdk suffix
+	//
+	// OpenShift only (empty for other providers):
 	//   - .SourcePVCName: name of the PVC in the source cluster
 	//   - .SourcePVCNamespace: namespace of the PVC in the source cluster
 	//
-	// Default behavior when not set:
-	//   - VMware: generates names like "{{trunc 4 .PlanName}}-{{trunc 4 .VmName}}-disk-{{.DiskIndex}}"
-	//   - OpenShift: uses the original source PVC name ("{{.SourcePVCName}}")
+	// EC2 only (empty for other providers):
+	//   - .VolumeID: original EBS volume ID
+	//   - .SnapshotID: snapshot ID used to create the volume
+	//
+	// Hyper-V / oVirt only (empty for other providers):
+	//   - .DiskId: provider-specific disk identifier (Hyper-V VHDX GUID, oVirt disk attachment ID)
 	//
 	// Note:
+	//   Optional. When empty, falls back at runtime to ForkliftController
+	//   controller_pvc_name_template (non-OCP) or controller_ocp_pvc_name_template (OCP),
+	//   then to the hardcoded default. Non-OCP hardcoded default is
+	//   "{{trunc 15 .PlanName}}-{{trunc 15 .TargetVmName}}-disk-{{.DiskIndex}}".
+	//   OCP hardcoded default is "{{.SourcePVCName}}" (exact name, preserves source PVC name).
 	//   This template can be overridden at the individual VM level.
+	//   Provider-specific variables are empty (zero value) when used with a different provider.
 	// Examples:
 	//   "{{.TargetVmName}}-disk-{{.DiskIndex}}"
-	//   "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}" (VMware)
+	//   "{{if eq .DiskIndex .RootDiskIndex}}root{{else}}data{{end}}-{{.DiskIndex}}" (vSphere)
 	//   "{{.TargetVmName}}-{{.SourcePVCName}}" (OpenShift)
+	//   "{{.PlanName}}-{{.VmId}}" (plan + provider VM ID)
+	//   "{{.VmName}}-{{.DiskId}}" (Hyper-V / oVirt stable disk identity)
 	// See:
 	// 	 https://github.com/kubev2v/forklift/tree/main/pkg/templateutil for template functions.
 	// +optional
@@ -194,24 +214,17 @@ type PlanSpec struct {
 	// PVCNameTemplateUseGenerateName indicates if the PVC name template should use generateName instead of name.
 	// This field controls whether the template output is used as an exact name or as a prefix for generated names.
 	//
-	// Provider-specific behavior:
-	//
-	// VMware (vSphere):
-	//   - true (default): Template output is used as generateName prefix, Kubernetes adds a random suffix
+	//   - true: Template output is used as generateName prefix, Kubernetes adds a random suffix
 	//     (e.g., "my-vm-disk-0-" becomes "my-vm-disk-0-abc12")
 	//   - false: Template output is used as the exact PVC name
 	//     **DANGER**: May cause conflicts if the generated name is not unique
 	//
-	// OpenShift:
-	//   - Supported when a custom pvcNameTemplate is set (plan-level or VM-level).
-	//   - When no custom template is set, the default "{{.SourcePVCName}}" always uses exact names
-	//     regardless of this field.
-	//   - true: Template output is used as generateName prefix, Kubernetes adds a random suffix
-	//   - false: Template output is used as the exact PVC name
+	// When unset (nil), defaults at runtime by source provider:
+	//   - OpenShift (OCP): false (exact name; pairs with default "{{.SourcePVCName}}")
+	//   - All other providers: true (generateName)
 	//
 	// +optional
-	// +kubebuilder:default:=true
-	PVCNameTemplateUseGenerateName bool `json:"pvcNameTemplateUseGenerateName,omitempty"`
+	PVCNameTemplateUseGenerateName *bool `json:"pvcNameTemplateUseGenerateName,omitempty"`
 	// VolumeNameTemplate is a template for generating volume interface names in the target virtual machine.
 	// It follows Go template syntax and has access to the following variables:
 	//   - .PVCName: name of the PVC mounted to the VM using this volume
@@ -416,6 +429,10 @@ type PlanStatus struct {
 	// The most recent generation observed by the controller.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	// NetAppShiftDestination indicates whether the plan's storage map resolves to a NetApp
+	// Shift/Trident destination StorageClass.
+	// +optional
+	NetAppShiftDestination bool `json:"netAppShiftDestination,omitempty"`
 	// Migration
 	Migration plan.MigrationStatus `json:"migration,omitempty"`
 }
@@ -450,12 +467,15 @@ func (p *Plan) IsWarm() bool {
 // just use virt-v2v directly to convert the vm while copying data over. In other
 // cases, we use CDI to transfer disks to the destination cluster and then use
 // virt-v2v-in-place to convert these disks after cutover.
-func (p *Plan) ShouldUseV2vForTransfer(vmRef ref.Ref, destinationClient k8sclient.Client) (bool, error) {
-	source := p.Referenced.Provider.Source
+//
+// Note: this is called once per VM from several places (adapters, scheduler, migrator,
+// kubevirt.go, migration.go) on every reconcile, so it must not perform any API/client calls itself.
+func (p *Plan) ShouldUseV2vForTransfer(vmRef ref.Ref) (bool, error) {
+	source := p.Provider.Source
 	if source == nil {
 		return false, liberr.New("Cannot analyze plan, source provider is missing.")
 	}
-	destination := p.Referenced.Provider.Destination
+	destination := p.Provider.Destination
 	if destination == nil {
 		return false, liberr.New("Cannot analyze plan, destination provider is missing.")
 	}
@@ -472,14 +492,8 @@ func (p *Plan) ShouldUseV2vForTransfer(vmRef ref.Ref, destinationClient k8sclien
 			p.Spec.SkipGuestConversion || p.Spec.Type == MigrationOnlyConversion {
 			return false, nil
 		}
-		if p.Map.Storage != nil {
-			hasNetAppShift, err := p.Map.Storage.HasNetAppShiftDestination(destinationClient)
-			if err != nil {
-				return false, err
-			}
-			if hasNetAppShift {
-				return false, nil
-			}
+		if p.HasNetAppShiftDestination() {
+			return false, nil
 		}
 		if p.IsUsingOffloadPlugin() {
 			return false, nil
@@ -490,6 +504,10 @@ func (p *Plan) ShouldUseV2vForTransfer(vmRef ref.Ref, destinationClient k8sclien
 	default:
 		return false, nil
 	}
+}
+
+func (p *Plan) HasNetAppShiftDestination() bool {
+	return p.Status.NetAppShiftDestination
 }
 
 func (r *Plan) DestinationHasUdnNetwork(client k8sclient.Client) bool {
@@ -601,6 +619,9 @@ type PVCNameTemplateData struct {
 	VolumeID string `json:"volumeID,omitempty"`
 	// SnapshotID is the snapshot ID used to create the volume (EC2 only).
 	SnapshotID string `json:"snapshotID,omitempty"`
+
+	// DiskId is the provider-specific disk identifier (Hyper-V VHDX GUID, oVirt disk attachment ID).
+	DiskId string `json:"diskId,omitempty"`
 }
 
 // VolumeNameTemplateData contains fields used in naming templates.

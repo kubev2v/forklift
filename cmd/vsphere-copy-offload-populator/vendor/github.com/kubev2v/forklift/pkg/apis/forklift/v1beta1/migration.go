@@ -33,6 +33,12 @@ type MigrationSpec struct {
 	// Date and time to finalize a warm migration.
 	// If present, this will override the value set on the Plan.
 	Cutover *meta.Time `json:"cutover,omitempty"`
+	// ResumeConversion skips disk copy and runs only the virt-v2v
+	// conversion step, reusing PVCs from a previous failed migration.
+	// Valid for any plan whose disk copy and conversion are separate
+	// phases and whose disk copy completed before conversion failed.
+	// +optional
+	ResumeConversion bool `json:"resumeConversion,omitempty"`
 }
 
 // Canceled indicates whether a VM ref is present
@@ -102,4 +108,8 @@ type MigrationList struct {
 
 func init() {
 	SchemeBuilder.Register(&Migration{}, &MigrationList{})
+}
+
+func (r *Migration) IsResumeConversion() bool {
+	return r.Spec.ResumeConversion
 }

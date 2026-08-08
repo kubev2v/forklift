@@ -35,8 +35,9 @@ the command path (e.g., help --machine get plan). Use --short with --machine
 to omit long descriptions and examples for a condensed view.
 
 Help topics are also available for domain-specific languages:
-  tsl   - Tree Search Language query syntax reference
-  karl  - Kubernetes Affinity Rule Language syntax reference`,
+  tsl     - Tree Search Language query syntax reference
+  karl    - Kubernetes Affinity Rule Language syntax reference
+  offload - Storage copy-offload (XCOPY) configuration reference`,
 		Example: `  # Get help for a command
   kubectl-mtv help get plan
 
@@ -45,6 +46,9 @@ Help topics are also available for domain-specific languages:
 
   # Learn about the KARL affinity syntax
   kubectl-mtv help karl
+
+  # Learn about storage copy-offload configuration
+  kubectl-mtv help offload
 
   # Output complete command schema as JSON
   kubectl-mtv help --machine
