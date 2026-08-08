@@ -309,6 +309,15 @@ func (b *MigrationBuilder) WithCutover(cutover meta.Time) *MigrationBuilder {
 	return b
 }
 
+// WithVMCutover adds a per-VM cutover time.
+func (b *MigrationBuilder) WithVMCutover(vmID string, cutover meta.Time) *MigrationBuilder {
+	b.migration.Spec.VMCutover = append(b.migration.Spec.VMCutover, api.VMCutover{
+		ID:      vmID,
+		Cutover: cutover,
+	})
+	return b
+}
+
 // Build returns the constructed Migration.
 func (b *MigrationBuilder) Build() *api.Migration {
 	return b.migration
