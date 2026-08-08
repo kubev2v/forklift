@@ -3,9 +3,11 @@ package vsphere
 import (
 	"context"
 
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
@@ -21,6 +23,8 @@ import (
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+	sdkapi "kubevirt.io/controller-lifecycle-operator-sdk/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -1042,6 +1046,99 @@ var _ = Describe("vSphere builder", func() {
 			},
 		),
 	)
+
+	DescribeTable("should set instance UUID if available", func(instanceUUID, biosUUID, expectedUUID string) {
+		builder := createBuilder(
+			&core.Secret{
+				ObjectMeta: meta.ObjectMeta{Name: "storage-test-secret", Namespace: "test"},
+				Data: map[string][]byte{
+					"storagekey": []byte("storageval"),
+				},
+			},
+			&core.Secret{
+				ObjectMeta: meta.ObjectMeta{Name: "migration-test-secret", Namespace: "test"},
+				Data: map[string][]byte{
+					"providerkey": []byte("providerval"),
+				},
+			},
+			&core.Secret{
+				ObjectMeta: meta.ObjectMeta{Name: "offload-ssh-keys-test-vsphere-provider-private", Namespace: "test"},
+				Data: map[string][]byte{
+					"private-key": []byte("fake-private-key"),
+				},
+			},
+			&core.Secret{
+				ObjectMeta: meta.ObjectMeta{Name: "offload-ssh-keys-test-vsphere-provider-public", Namespace: "test"},
+				Data: map[string][]byte{
+					"public-key": []byte("fake-public-key"),
+				},
+			},
+			&core.PersistentVolumeClaim{
+				ObjectMeta: meta.ObjectMeta{Name: "test-pvc", Namespace: "test"},
+			},
+		)
+		cdiCDI := &cdi.CDI{
+			ObjectMeta: meta.ObjectMeta{
+				Name: "test-cdi",
+			},
+			Status: cdi.CDIStatus{
+				Status: sdkapi.Status{
+					ObservedVersion: "4.22.1",
+				},
+			},
+		}
+		_ = cdi.AddToScheme(builder.Destination.Scheme())
+		builder.Context.Destination.Client.Create(context.TODO(), cdiCDI)
+		vm := model.VM{
+			InstanceUUID: instanceUUID,
+			UUID:         biosUUID,
+			VM1: model.VM1{
+				VM0: model.VM0{ID: "vm-2", Name: "vm"},
+				Disks: []vsphere.Disk{
+					{
+						Datastore: vsphere.Ref{ID: "ds-2"},
+						File:      "[datastore2] vm-2/vm-2.vmdk",
+						Bus:       vsphere.SCSI, Capacity: 1 << 20, Key: 2000,
+					},
+				},
+			},
+		}
+		builder.Source.Inventory = &mockInventory{ds: model.Datastore{Resource: model.Resource{ID: "ds-2"}}, vm: vm}
+		builder.Map.Storage = &v1beta1.StorageMap{
+			Spec: v1beta1.StorageMapSpec{
+				Map: []v1beta1.StoragePair{{
+					Source: ref.Ref{ID: "ds-2"},
+					Destination: v1beta1.DestinationStorage{
+						StorageClass: "test-sc",
+						AccessMode:   core.ReadWriteOnce,
+						VolumeMode:   core.PersistentVolumeFilesystem,
+					},
+					OffloadPlugin: &v1beta1.OffloadPlugin{
+						VSphereXcopyPluginConfig: &v1beta1.VSphereXcopyPluginConfig{
+							StorageVendorProduct: "test-vendor",
+							SecretRef:            "migration-test-secret",
+						},
+					},
+				}},
+			},
+		}
+		builder.Plan.Spec.Type = v1beta1.MigrationWarm
+		builder.Plan.Status.Migration.VMs = []*plan.VMStatus{
+			{
+				VM: plan.VM{
+					Ref: ref.Ref{ID: vm.ID, Name: vm.Name},
+				},
+				Warm: &plan.Warm{},
+			},
+		}
+		pvcs, err := builder.PopulatorVolumes(ref.Ref{ID: vm.ID}, map[string]string{}, "migration-test-secret")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvcs).To(HaveLen(1))
+		Expect(pvcs[0].Annotations[planbase.AnnUUID]).To(Equal(expectedUUID))
+	},
+		Entry("should set instance UUID correctly", "12345", "", "12345"),
+		Entry("should set BIOS UUID if instance UUID is missing", "", "54321", "54321"),
+	)
 })
 
 var _ = Describe("PopulatorOffloadInfo", func() {
@@ -1418,6 +1515,38 @@ var _ = Describe("mapDisks SCSI reservation", func() {
 	})
 })
 
+var _ = DescribeTable("instance UUID check", func(cdiVersion string, expected bool) {
+	builder := createBuilder()
+	cdiCDI := &cdi.CDI{
+		ObjectMeta: meta.ObjectMeta{
+			Name: "test-cdi",
+		},
+		Status: cdi.CDIStatus{
+			Status: sdkapi.Status{
+				ObservedVersion: cdiVersion,
+			},
+		},
+	}
+	_ = cdi.AddToScheme(builder.Destination.Scheme())
+	builder.Context.Destination.Client.Create(context.TODO(), cdiCDI)
+	Expect(builder.canUseInstanceUUID()).To(Equal(expected))
+},
+	Entry("should use instance UUIDs on 4.22.1", "4.22.1", true),
+	Entry("should use instance UUIDs on 4.22.2", "4.22.2", true),
+	Entry("should use instance UUIDs on 4.22.3", "4.22.3", true),
+	Entry("should use instance UUIDs on 4.21.9", "4.21.9", true),
+	Entry("should use instance UUIDs on 4.21.200", "4.21.200", true),
+	Entry("should use instance UUIDs on 4.20.16", "4.20.16", true),
+	Entry("should use instance UUIDs on 4.20.17", "4.20.17", true),
+	Entry("should use instance UUIDs on 4.23.0", "4.23.0", true),
+	Entry("should use instance UUIDs on upstream 1.65.0", "1.65.0", true),
+	Entry("should not use instance UUIDs on 4.22.0", "4.22.0", false),
+	Entry("should not use instance UUIDs on 4.21.2", "4.21.2", false),
+	Entry("should not use instance UUIDs on 4.20.0", "4.20.0", false),
+	Entry("should not use instance UUIDs on 4.19.0", "4.19.0", false),
+	Entry("should not use instance UUIDs on 4.18.5", "4.18.5", false),
+)
+
 //nolint:errcheck
 func createBuilder(objs ...runtime.Object) *Builder {
 	scheme := runtime.NewScheme()
@@ -1433,6 +1562,12 @@ func createBuilder(objs ...runtime.Object) *Builder {
 		Context: &plancontext.Context{
 			Destination: plancontext.Destination{
 				Client: client,
+				Provider: &v1beta1.Provider{
+					ObjectMeta: meta.ObjectMeta{Name: "test-openshift", Namespace: "test"},
+					Spec: v1beta1.ProviderSpec{
+						Type: (*v1beta1.ProviderType)(ptr.To(api.OpenShift)),
+					},
+				},
 			},
 			Source: plancontext.Source{
 				Provider: &v1beta1.Provider{
