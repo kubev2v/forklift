@@ -5,9 +5,12 @@
 package jsonrpc2
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	internaljson "github.com/modelcontextprotocol/go-sdk/internal/json"
 )
 
 // ID is a Request identifier, which is defined by the spec to be a string, integer, or null.
@@ -145,9 +148,9 @@ func toWireError(err error) *WireError {
 func EncodeMessage(msg Message) ([]byte, error) {
 	wire := wireCombined{VersionTag: wireVersion}
 	msg.marshal(&wire)
-	data, err := json.Marshal(&wire)
+	data, err := jsonMarshal(&wire)
 	if err != nil {
-		return data, fmt.Errorf("marshaling jsonrpc message: %w", err)
+		return nil, fmt.Errorf("marshaling jsonrpc message: %w", err)
 	}
 	return data, nil
 }
@@ -158,16 +161,31 @@ func EncodeMessage(msg Message) ([]byte, error) {
 func EncodeIndent(msg Message, prefix, indent string) ([]byte, error) {
 	wire := wireCombined{VersionTag: wireVersion}
 	msg.marshal(&wire)
-	data, err := json.MarshalIndent(&wire, prefix, indent)
-	if err != nil {
-		return data, fmt.Errorf("marshaling jsonrpc message: %w", err)
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent(prefix, indent)
+	if err := enc.Encode(&wire); err != nil {
+		return nil, fmt.Errorf("marshaling jsonrpc message: %w", err)
 	}
-	return data, nil
+	return bytes.TrimRight(buf.Bytes(), "\n"), nil
+}
+
+// wireDecode is the decode form of [wireCombined]. Method is a [json.RawMessage]
+// so we can tell whether the "method" key was present on the wire, including
+// when its value is the empty string (see go-sdk#976).
+type wireDecode struct {
+	VersionTag string          `json:"jsonrpc"`
+	ID         any             `json:"id,omitempty"`
+	Method     json.RawMessage `json:"method"`
+	Params     json.RawMessage `json:"params,omitempty"`
+	Result     json.RawMessage `json:"result,omitempty"`
+	Error      *WireError      `json:"error,omitempty"`
 }
 
 func DecodeMessage(data []byte) (Message, error) {
-	msg := wireCombined{}
-	if err := json.Unmarshal(data, &msg); err != nil {
+	msg := wireDecode{}
+	if err := internaljson.Unmarshal(data, &msg); err != nil {
 		return nil, fmt.Errorf("unmarshaling jsonrpc message: %w", err)
 	}
 	if msg.VersionTag != wireVersion {
@@ -177,15 +195,19 @@ func DecodeMessage(data []byte) (Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	if msg.Method != "" {
-		// has a method, must be a call
+	if len(msg.Method) > 0 {
+		// The "method" key was present. Decode its value (including "").
+		var method string
+		if err := internaljson.Unmarshal(msg.Method, &method); err != nil {
+			return nil, fmt.Errorf("unmarshaling jsonrpc message: %w", err)
+		}
 		return &Request{
-			Method: msg.Method,
+			Method: method,
 			ID:     id,
 			Params: msg.Params,
 		}, nil
 	}
-	// no method, should be a response
+	// no method key, should be a response
 	if !id.IsValid() {
 		return nil, ErrInvalidRequest
 	}
@@ -204,9 +226,21 @@ func marshalToRaw(obj any) (json.RawMessage, error) {
 	if obj == nil {
 		return nil, nil
 	}
-	data, err := json.Marshal(obj)
+	data, err := jsonMarshal(obj)
 	if err != nil {
 		return nil, err
 	}
 	return json.RawMessage(data), nil
+}
+
+// jsonMarshal marshals obj to JSON like json.Marshal but without HTML escaping.
+func jsonMarshal(obj any) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(obj); err != nil {
+		return nil, err
+	}
+	// json.Encoder.Encode adds a trailing newline. Trim it to be consistent with json.Marshal.
+	return bytes.TrimRight(buf.Bytes(), "\n"), nil
 }

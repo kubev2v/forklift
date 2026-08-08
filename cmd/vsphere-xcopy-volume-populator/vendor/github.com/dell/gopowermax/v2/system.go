@@ -1,5 +1,5 @@
 /*
- Copyright © 2020 Dell Inc. or its subsidiaries. All Rights Reserved.
+ Copyright © 2020-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -30,6 +30,8 @@ import (
 // The following constants are for internal use of the pmax library.
 const (
 	RESTPrefix          = "univmax/restapi/"
+	RESTPrefixV1        = "univmax/rest/v1"
+	RESTPrivateV1       = "univmax/rest/private/v1/"
 	StorageResourcePool = "srp"
 )
 
@@ -43,6 +45,10 @@ var (
 
 func (c *Client) urlPrefix() string {
 	return RESTPrefix + c.version + "/"
+}
+
+func (c *Client) urlPrefixV1() string {
+	return RESTPrefixV1 + "/systems/"
 }
 
 // There are many internal REST APIs provided by U4P, Defining the internal RESTAPI signature
@@ -277,6 +283,25 @@ func (c *Client) GetPort(ctx context.Context, symID string, directorID string, p
 	return port, nil
 }
 
+// GetPorts returns port details (Enhanced API)
+func (c *Client) GetPorts(ctx context.Context, symID string) (*types.PortV1, error) {
+	if _, err := c.IsAllowedArray(symID); err != nil {
+		return nil, err
+	}
+	port := &types.PortV1{}
+	URL := c.urlPrefixV1() + symID + XPortsEnhance + SelectQuery + SelectID + SelectResourceType + SelectPortNumber + SelectPortIdentifier + SelectDirector
+
+	ctx, cancel := c.GetTimeoutContext(ctx)
+	defer cancel()
+	err := c.api.Get(ctx, URL, c.getDefaultHeaders(), port)
+	if err != nil {
+		log.Error("GetPorts failed: " + err.Error())
+		return nil, err
+	}
+
+	return port, nil
+}
+
 // GetListOfTargetAddresses returns list of target addresses
 func (c *Client) GetListOfTargetAddresses(ctx context.Context, symID string) ([]string, error) {
 	if _, err := c.IsAllowedArray(symID); err != nil {
@@ -368,6 +393,55 @@ func (c *Client) GetISCSITargets(ctx context.Context, symID string) ([]ISCSITarg
 	return targets, nil
 }
 
+// GetISCSIEndpoints returns list of iSCSI endpoint addresses
+func (c *Client) GetISCSIEndpoints(ctx context.Context, symID string) ([]ISCSITarget, error) {
+	if _, err := c.IsAllowedArray(symID); err != nil {
+		return nil, err
+	}
+	targets := make([]ISCSITarget, 0)
+	// Get list of all directors
+	directors, err := c.GetDirectorIDList(ctx, symID)
+	if err != nil {
+		return []ISCSITarget{}, err
+	}
+
+	for _, d := range directors.DirectorIDs {
+		// Direct query for iSCSI endpoints on this director
+		virtualPorts, err := c.GetPortList(ctx, symID, d, "iscsi_endpoint=true")
+		if err != nil {
+			// Ignore the error and continue
+			log.Errorf("Failed to get iSCSI endpoint ports for director: %s. Error: %s",
+				d, err.Error())
+			continue
+		}
+
+		// If we found iSCSI endpoint ports, get their details
+		if len(virtualPorts.SymmetrixPortKey) > 0 {
+			// we have a list of virtual director ports which have ISCSI endpoints
+			// and portal IPs associated with it
+			for _, vp := range virtualPorts.SymmetrixPortKey {
+				port, err := c.GetPort(ctx, symID, vp.DirectorID, vp.PortID)
+				if err != nil {
+					// Ignore the error and continue
+					log.Errorf("Failed to fetch port details for %s:%s. Error: %s",
+						vp.DirectorID, vp.PortID, err.Error())
+					continue
+				}
+				// Only add targets that have portal IPs
+				if port.SymmetrixPort.Identifier != "" && len(port.SymmetrixPort.IPAddresses) > 0 {
+					tgt := ISCSITarget{
+						IQN:        port.SymmetrixPort.Identifier,
+						PortalIPs:  port.SymmetrixPort.IPAddresses,
+						PortStatus: port.SymmetrixPort.PortStatus,
+					}
+					targets = append(targets, tgt)
+				}
+			}
+		}
+	}
+	return targets, nil
+}
+
 // GetNVMeTCPTargets returns list of target addresses
 func (c *Client) GetNVMeTCPTargets(ctx context.Context, symID string) ([]NVMeTCPTarget, error) {
 	if _, err := c.IsAllowedArray(symID); err != nil {
@@ -381,7 +455,7 @@ func (c *Client) GetNVMeTCPTargets(ctx context.Context, symID string) ([]NVMeTCP
 	}
 
 	for _, d := range directors.DirectorIDs {
-		// Check if director is ISCSI
+		// Check if director is NVMETCP
 		// To do this, check if any ports have ports with GigE enabled
 		ports, err := c.GetPortList(ctx, symID, d, "type=OSHostAndRDF")
 		if err != nil {
@@ -391,8 +465,8 @@ func (c *Client) GetNVMeTCPTargets(ctx context.Context, symID string) ([]NVMeTCP
 			continue
 		}
 		if len(ports.SymmetrixPortKey) > 0 {
-			// This is a director with ISCSI port(s)
-			// Query for iscsi_targets
+			// This is a director with NVMeTCP port(s)
+			// Query for nvmetcp_endpoints
 			virtualPorts, err := c.GetPortList(ctx, symID, d, "nvmetcp_endpoint=true")
 			if err != nil {
 				return []NVMeTCPTarget{}, err
@@ -410,8 +484,9 @@ func (c *Client) GetNVMeTCPTargets(ctx context.Context, symID string) ([]NVMeTCP
 				// this should always be set
 				if port.SymmetrixPort.Identifier != "" {
 					tgt := NVMeTCPTarget{
-						NQN:       port.SymmetrixPort.Identifier,
-						PortalIPs: port.SymmetrixPort.IPAddresses,
+						NQN:        port.SymmetrixPort.Identifier,
+						PortalIPs:  port.SymmetrixPort.IPAddresses,
+						PortStatus: port.SymmetrixPort.PortStatus,
 					}
 					targets = append(targets, tgt)
 				}
@@ -470,4 +545,30 @@ func (c *Client) IsAllowedArray(array string) (bool, error) {
 	}
 	// we did not find the array
 	return false, fmt.Errorf("the requested array (%s) is ignored as it is not managed", array)
+}
+
+func (c *Client) GetVersionDetails(ctx context.Context) (*types.VersionDetails, error) {
+	URL := RESTPrefix + "version"
+	log.Debug("==URL", URL)
+	ctx, cancel := c.GetTimeoutContext(ctx)
+	defer cancel()
+	resp, err := c.api.DoAndGetResponseBody(
+		ctx, http.MethodGet, URL, c.getDefaultHeaders(), nil)
+	if err != nil {
+		log.Error("GetVersion failed: " + err.Error())
+		return nil, err
+	}
+	if err = c.checkResponse(resp); err != nil {
+		return nil, err
+	}
+	versionDetails := &types.VersionDetails{}
+	decoder := json.NewDecoder(resp.Body)
+	if err = decoder.Decode(versionDetails); err != nil {
+		return nil, err
+	}
+	err = resp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+	return versionDetails, nil
 }
