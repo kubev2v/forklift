@@ -10991,6 +10991,12 @@ rules:
   - patch
   - delete
 - apiGroups:
+  - cdi.kubevirt.io
+  resources:
+  - cdis
+  verbs:
+  - list
+- apiGroups:
   - security.openshift.io
   resourceNames:
   - anyuid
