@@ -3,6 +3,7 @@ package vsphere
 import (
 	"context"
 
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	v1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
@@ -22,6 +23,8 @@ import (
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
+	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+	sdkapi "kubevirt.io/controller-lifecycle-operator-sdk/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -1074,6 +1077,18 @@ var _ = Describe("vSphere builder", func() {
 				ObjectMeta: meta.ObjectMeta{Name: "test-pvc", Namespace: "test"},
 			},
 		)
+		cdiCDI := &cdi.CDI{
+			ObjectMeta: meta.ObjectMeta{
+				Name: "test-cdi",
+			},
+			Status: cdi.CDIStatus{
+				Status: sdkapi.Status{
+					ObservedVersion: "4.22.1",
+				},
+			},
+		}
+		_ = cdi.AddToScheme(builder.Destination.Scheme())
+		builder.Context.Destination.Client.Create(context.TODO(), cdiCDI)
 		vm := model.VM{
 			InstanceUUID: instanceUUID,
 			UUID:         biosUUID,
@@ -1500,6 +1515,38 @@ var _ = Describe("mapDisks SCSI reservation", func() {
 	})
 })
 
+var _ = DescribeTable("instance UUID check", func(cdiVersion string, expected bool) {
+	builder := createBuilder()
+	cdiCDI := &cdi.CDI{
+		ObjectMeta: meta.ObjectMeta{
+			Name: "test-cdi",
+		},
+		Status: cdi.CDIStatus{
+			Status: sdkapi.Status{
+				ObservedVersion: cdiVersion,
+			},
+		},
+	}
+	_ = cdi.AddToScheme(builder.Destination.Scheme())
+	builder.Context.Destination.Client.Create(context.TODO(), cdiCDI)
+	Expect(builder.canUseInstanceUUID()).To(Equal(expected))
+},
+	Entry("should use instance UUIDs on 4.22.1", "4.22.1", true),
+	Entry("should use instance UUIDs on 4.22.2", "4.22.2", true),
+	Entry("should use instance UUIDs on 4.22.3", "4.22.3", true),
+	Entry("should use instance UUIDs on 4.21.9", "4.21.9", true),
+	Entry("should use instance UUIDs on 4.21.200", "4.21.200", true),
+	Entry("should use instance UUIDs on 4.20.16", "4.20.16", true),
+	Entry("should use instance UUIDs on 4.20.17", "4.20.17", true),
+	Entry("should use instance UUIDs on 4.23.0", "4.23.0", true),
+	Entry("should use instance UUIDs on upstream 1.65.0", "1.65.0", true),
+	Entry("should not use instance UUIDs on 4.22.0", "4.22.0", false),
+	Entry("should not use instance UUIDs on 4.21.2", "4.21.2", false),
+	Entry("should not use instance UUIDs on 4.20.0", "4.20.0", false),
+	Entry("should not use instance UUIDs on 4.19.0", "4.19.0", false),
+	Entry("should not use instance UUIDs on 4.18.5", "4.18.5", false),
+)
+
 //nolint:errcheck
 func createBuilder(objs ...runtime.Object) *Builder {
 	scheme := runtime.NewScheme()
@@ -1515,6 +1562,12 @@ func createBuilder(objs ...runtime.Object) *Builder {
 		Context: &plancontext.Context{
 			Destination: plancontext.Destination{
 				Client: client,
+				Provider: &v1beta1.Provider{
+					ObjectMeta: meta.ObjectMeta{Name: "test-openshift", Namespace: "test"},
+					Spec: v1beta1.ProviderSpec{
+						Type: (*v1beta1.ProviderType)(ptr.To(api.OpenShift)),
+					},
+				},
 			},
 			Source: plancontext.Source{
 				Provider: &v1beta1.Provider{
