@@ -69,8 +69,9 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags, globalConfig Glo
 	// PlanSpec fields
 	var planSpec forkliftv1beta1.PlanSpec
 	var transferNetwork string
-	var installLegacyDrivers string       // "true", "false", or "auto" for nil (auto-detect)
-	var enableNestedVirtualization string // "true", "false", or "auto" for nil (auto-detect)
+	var installLegacyDrivers string              // "true", "false", or "auto" for nil (auto-detect)
+	var enableNestedVirtualization string        // "true", "false", or "auto" for nil (auto-detect)
+	var pvcNameTemplateUseGenerateName string    // "true", "false", or "auto" for nil (auto-detect)
 	migrationTypeFlag := flags.NewMigrationTypeFlag()
 	var targetLabels []string
 	var targetNodeSelector []string
@@ -136,7 +137,8 @@ Mapping Pair Formats (when overriding auto-generated mappings):
     source:storageclass               - Basic mapping
     source:sc;volumeMode=Block        - With volume mode (Filesystem|Block)
     source:sc;accessMode=ReadWriteMany - With access mode
-    source:sc;offloadPlugin=vsphere;offloadVendor=ontap - Storage offload
+    source:sc;offloadPlugin=vsphere;offloadVendor=ontap - Storage offload (XCOPY)
+    source:sc;offloadPlugin=csiVolumeImport;offloadVendor=primera3par - CSI import offload
     Options are semicolon-separated and can be combined:
     Example: "ds1:fast-ssd,ds2:economy;volumeMode=Block;accessMode=ReadWriteOnce"
 
@@ -378,6 +380,20 @@ Affinity Syntax (KARL):
 				return fmt.Errorf("invalid value for --enable-nested-virtualization: %q (must be 'true', 'false', or 'auto')", enableNestedVirtualization)
 			}
 
+			// Handle PVCNameTemplateUseGenerateName flag
+			switch pvcNameTemplateUseGenerateName {
+			case "true":
+				val := true
+				planSpec.PVCNameTemplateUseGenerateName = &val
+			case "false":
+				val := false
+				planSpec.PVCNameTemplateUseGenerateName = &val
+			case "auto":
+				// leave nil (auto-detect by provider)
+			default:
+				return fmt.Errorf("invalid value for --pvc-name-template-use-generate-name: %q (must be 'true', 'false', or 'auto')", pvcNameTemplateUseGenerateName)
+			}
+
 			// Handle migration type flag
 			if migrationTypeFlag.GetValue() != "" {
 				if planSpec.Warm {
@@ -553,9 +569,9 @@ Affinity Syntax (KARL):
 	// Storage enhancement flags
 	cmd.Flags().StringVar(&defaultVolumeMode, "default-volume-mode", "", "Default volume mode for storage pairs (Filesystem|Block)")
 	cmd.Flags().StringVar(&defaultAccessMode, "default-access-mode", "", "Default access mode for storage pairs (ReadWriteOnce|ReadWriteMany|ReadOnlyMany)")
-	cmd.Flags().StringVar(&defaultOffloadPlugin, "default-offload-plugin", "", "Default offload plugin type for storage pairs (vsphere)")
+	cmd.Flags().StringVar(&defaultOffloadPlugin, "default-offload-plugin", "", flags.OffloadPluginHelp)
 	cmd.Flags().StringVar(&defaultOffloadSecret, "default-offload-secret", "", "Existing offload secret name to use for storage offload")
-	cmd.Flags().StringVar(&defaultOffloadVendor, "default-offload-vendor", "", "Default offload plugin vendor for storage pairs (flashsystem|vantara|ontap|primera3par|pureFlashArray|powerflex|powermax|powerstore|infinibox)")
+	cmd.Flags().StringVar(&defaultOffloadVendor, "default-offload-vendor", "", flags.OffloadVendorHelp)
 	cmd.Flags().StringVar(&defaultOffloadMigrationHosts, "default-offload-migration-hosts", "", "Default dedicated ESXi host IDs for XCOPY migrations (+-separated, e.g. host-10+host-11)")
 
 	// Offload secret creation flags (storage offload/XCOPY is vSphere-only)
@@ -586,7 +602,7 @@ Affinity Syntax (KARL):
 	cmd.Flags().StringVar(&planSpec.NetworkNameTemplate, "network-name-template", "", "Template for generating network interface names in the target VM. Variables: {{.NetworkName}}, {{.NetworkNamespace}}, {{.NetworkType}}, {{.NetworkIndex}}")
 	flags.ExplicitBoolVar(cmd.Flags(), &planSpec.MigrateSharedDisks, "migrate-shared-disks", true, "Migrate disks shared between multiple VMs (true/false)")
 	cmd.Flags().BoolVar(&planSpec.Archived, "archived", false, "Whether this plan should be archived")
-	flags.ExplicitBoolVar(cmd.Flags(), &planSpec.PVCNameTemplateUseGenerateName, "pvc-name-template-use-generate-name", true, "Use generateName instead of name for PVC name template (true/false)")
+	cmd.Flags().StringVar(&pvcNameTemplateUseGenerateName, "pvc-name-template-use-generate-name", "auto", "Use generateName instead of name for PVC name template (true/false/auto)")
 	cmd.Flags().BoolVar(&planSpec.DeleteGuestConversionPod, "delete-guest-conversion-pod", false, "Delete guest conversion pod after successful migration")
 	flags.ExplicitBoolVar(cmd.Flags(), &planSpec.DeleteVmOnFailMigration, "delete-vm-on-fail-migration", true, "Delete target VM when migration fails (true/false)")
 	cmd.Flags().BoolVar(&planSpec.SkipGuestConversion, "skip-guest-conversion", false, "Skip the guest conversion process (raw disk copy mode)")
@@ -642,13 +658,13 @@ Affinity Syntax (KARL):
 	}
 
 	if err := cmd.RegisterFlagCompletionFunc("default-offload-plugin", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"vsphere"}, cobra.ShellCompDirectiveNoFileComp
+		return flags.OffloadPlugins, cobra.ShellCompDirectiveNoFileComp
 	}); err != nil {
 		panic(err)
 	}
 
 	if err := cmd.RegisterFlagCompletionFunc("default-offload-vendor", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"flashsystem", "vantara", "ontap", "primera3par", "pureFlashArray", "powerflex", "powermax", "powerstore", "infinibox"}, cobra.ShellCompDirectiveNoFileComp
+		return flags.OffloadVendors, cobra.ShellCompDirectiveNoFileComp
 	}); err != nil {
 		panic(err)
 	}
@@ -668,6 +684,12 @@ Affinity Syntax (KARL):
 	}
 
 	if err := cmd.RegisterFlagCompletionFunc("enable-nested-virtualization", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"true", "false", "auto"}, cobra.ShellCompDirectiveNoFileComp
+	}); err != nil {
+		panic(err)
+	}
+
+	if err := cmd.RegisterFlagCompletionFunc("pvc-name-template-use-generate-name", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"true", "false", "auto"}, cobra.ShellCompDirectiveNoFileComp
 	}); err != nil {
 		panic(err)

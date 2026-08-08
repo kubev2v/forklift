@@ -64,7 +64,7 @@ func NewPlanCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Command {
 	var networkNameTemplate string
 	var migrateSharedDisks bool
 	var archived bool
-	var pvcNameTemplateUseGenerateName bool
+	var pvcNameTemplateUseGenerateName string
 	var deleteGuestConversionPod bool
 	var deleteVmOnFailMigration string
 	var skipGuestConversion bool
@@ -256,7 +256,7 @@ Affinity Syntax (KARL):
 	cmd.Flags().StringVar(&networkNameTemplate, "network-name-template", "", "Template for generating network interface names in the target VM. Variables: {{.NetworkName}}, {{.NetworkNamespace}}, {{.NetworkType}}, {{.NetworkIndex}}")
 	flags.ExplicitBoolVar(cmd.Flags(), &migrateSharedDisks, "migrate-shared-disks", true, "Migrate disks shared between multiple VMs (true/false)")
 	flags.ExplicitBoolVar(cmd.Flags(), &archived, "archived", false, "Whether this plan should be archived (true/false)")
-	flags.ExplicitBoolVar(cmd.Flags(), &pvcNameTemplateUseGenerateName, "pvc-name-template-use-generate-name", true, "Use generateName instead of name for PVC name template (true/false)")
+	cmd.Flags().StringVar(&pvcNameTemplateUseGenerateName, "pvc-name-template-use-generate-name", "", "Use generateName instead of name for PVC name template (true/false/auto)")
 	flags.ExplicitBoolVar(cmd.Flags(), &deleteGuestConversionPod, "delete-guest-conversion-pod", false, "Delete guest conversion pod after successful migration (true/false)")
 	cmd.Flags().StringVar(&deleteVmOnFailMigration, "delete-vm-on-fail-migration", "", "Delete target VM when migration fails (true/false)")
 	flags.ExplicitBoolVar(cmd.Flags(), &skipGuestConversion, "skip-guest-conversion", false, "Skip the guest conversion process (raw disk copy mode) (true/false)")
@@ -282,6 +282,12 @@ Affinity Syntax (KARL):
 	}
 
 	if err := cmd.RegisterFlagCompletionFunc("enable-nested-virtualization", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"true", "false", "auto"}, cobra.ShellCompDirectiveNoFileComp
+	}); err != nil {
+		panic(err)
+	}
+
+	if err := cmd.RegisterFlagCompletionFunc("pvc-name-template-use-generate-name", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"true", "false", "auto"}, cobra.ShellCompDirectiveNoFileComp
 	}); err != nil {
 		panic(err)
