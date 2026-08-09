@@ -2192,7 +2192,7 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 		dst.Data[key] = value
 	}
 
-	for key, value := range dst.Data {
+	for key, value := range baseMigrationSecret.Data {
 		switch key {
 		case "user":
 			dst.Data["GOVMOMI_USERNAME"] = value
@@ -2202,6 +2202,20 @@ func (r *Builder) mergeSecrets(migrationSecret, migrationSecretNS, storageVendor
 			dst.Data["secretKey"] = value
 		case "insecureSkipVerify":
 			dst.Data["GOVMOMI_INSECURE"] = value
+		}
+	}
+
+	// Map storage vendor keys to the env var names the populator expects.
+	// Uses src.Data (the vendor secret) to avoid picking up overwritten
+	// keys from dst.Data.
+	for key, value := range src.Data {
+		switch key {
+		case "management_address":
+			dst.Data["STORAGE_HOSTNAME"] = value
+		case "username":
+			dst.Data["STORAGE_USERNAME"] = value
+		case "password":
+			dst.Data["STORAGE_PASSWORD"] = value
 		}
 	}
 
@@ -2337,22 +2351,29 @@ func (r *Builder) ensurePopulatorServiceAccount(namespace string) error {
 		return err
 	}
 
-	// Create Role in openshift-mtv namespace for cross-namespace lease access
-	mtvRole := rbacv1.Role{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "populator-lease-reader",
-			Namespace: "openshift-mtv",
+	// Create or update Role in openshift-mtv namespace for cross-namespace lease + secret access
+	desiredRules := []rbacv1.PolicyRule{
+		{
+			APIGroups: []string{"coordination.k8s.io"},
+			Resources: []string{"leases"},
+			Verbs:     []string{"get", "list", "watch", "create", "update"},
 		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				APIGroups: []string{"coordination.k8s.io"},
-				Resources: []string{"leases"},
-				Verbs:     []string{"get", "list", "watch", "create", "update"},
-			},
+		{
+			APIGroups:     []string{""},
+			Resources:     []string{"secrets"},
+			Verbs:         []string{"get", "update", "patch"},
+			ResourceNames: []string{storageArraySecretName},
 		},
 	}
-	err = r.Destination.Client.Create(context.TODO(), &mtvRole, &client.CreateOptions{})
-	if err != nil && !k8serr.IsAlreadyExists(err) {
+	updatedMtvRole := &rbacv1.Role{ObjectMeta: metav1.ObjectMeta{Name: "populator-lease-reader", Namespace: storageArraySecretNSName}}
+	_, err = controllerutil.CreateOrPatch(
+		context.TODO(),
+		r.Destination.Client,
+		updatedMtvRole, func() error {
+			updatedMtvRole.Rules = desiredRules
+			return nil
+		})
+	if err != nil {
 		return err
 	}
 
@@ -2360,7 +2381,7 @@ func (r *Builder) ensurePopulatorServiceAccount(namespace string) error {
 	mtvBinding := rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "populator-lease-reader-binding",
-			Namespace: "openshift-mtv",
+			Namespace: storageArraySecretNSName,
 		},
 		Subjects: []rbacv1.Subject{
 			{
@@ -2392,6 +2413,19 @@ func (r *Builder) ensurePopulatorServiceAccount(namespace string) error {
 			return nil
 		})
 	if err != nil {
+		return err
+	}
+
+	// Pre-create the shared storage-array-secret so populator pods can
+	// cache FlashSystem auth tokens in it via Patch.
+	storageSecret := &core.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      storageArraySecretName,
+			Namespace: storageArraySecretNSName,
+		},
+		Data: map[string][]byte{},
+	}
+	if err := r.Destination.Create(context.TODO(), storageSecret, &client.CreateOptions{}); err != nil && !k8serr.IsAlreadyExists(err) {
 		return err
 	}
 
@@ -2451,6 +2485,11 @@ func (r *Builder) ensurePopulatorServiceAccount(namespace string) error {
 
 	return nil
 }
+
+const (
+	storageArraySecretName   = "storage-array-secret"
+	storageArraySecretNSName = "openshift-mtv"
+)
 
 // addSSHKeysToSecret adds SSH keys from provider controller to the migration secret
 func (r *Builder) addSSHKeysToSecret(secret *core.Secret) error {
