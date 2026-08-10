@@ -697,7 +697,7 @@ var _ = Describe("Customize", func() {
 			mockCommandBuilder.EXPECT().AddFlag("--verbose").Return(mockCommandBuilder)
 			mockCommandBuilder.EXPECT().AddArg("--format", "raw").Return(mockCommandBuilder)
 
-			mockCommandBuilder.EXPECT().AddArg("--upload", gomock.Any()).Return(mockCommandBuilder).Times(2)
+			mockCommandBuilder.EXPECT().AddArg("--upload", gomock.Any()).Return(mockCommandBuilder).Times(3)
 
 			mockCommandBuilder.EXPECT().AddArgs("--upload", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockCommandBuilder)
 
