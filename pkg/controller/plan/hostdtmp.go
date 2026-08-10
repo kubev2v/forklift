@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
-	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web"
 	vsphere "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	libcnd "github.com/kubev2v/forklift/pkg/lib/condition"
@@ -16,37 +15,37 @@ import (
 const (
 	HostdTmpMemoryLow = "HostdTmpMemoryLow"
 
-	// Default ESXi hostd-tmp memory limit. Concurrent vmkfstools can exceed this;
-	// see cmd/vsphere-copy-offload-populator/vmkfstools-wrapper/tweak-esxi-mem.sh.
-	defaultHostdTmpMB = 500
-
-	// Planned XCOPY disks per host at/above this count risks hostd-tmp pressure.
+	// Default ESXi hostd-tmp limit (~500MB). See tweak-esxi-mem.sh in the populator.
+	defaultHostdTmpMB         = 500
 	hostdTmpDiskWarnThreshold = 10
 )
 
-// validateHostdTmpMemory sets a non-blocking warning when a VSphere XCOPY plan
-// has enough disks per ESXi host that concurrent vmkfstools may exceed the
-// default hostd-tmp memory limit (~500MB).
+func shouldWarnHostdTmp(plannedDisks int) bool {
+	return plannedDisks >= hostdTmpDiskWarnThreshold
+}
+
+// validateHostdTmpMemory warns when an XCOPY plan may push concurrent vmkfstools
+// past the default ESXi hostd-tmp memory limit (~500MB).
 func (r *Reconciler) validateHostdTmpMemory(plan *api.Plan) error {
 	plan.Status.DeleteCondition(HostdTmpMemoryLow)
 
-	if plan.Referenced.Provider.Source == nil || plan.Referenced.Provider.Source.Type() != api.VSphere {
+	if plan.Provider.Source == nil || plan.Provider.Source.Type() != api.VSphere {
 		return nil
 	}
-	if !settings.Settings.Features.CopyOffload || !r.planUsesVSphereXcopyPopulator(plan) {
+	if !settings.Settings.CopyOffload || !r.planUsesVSphereXcopyPopulator(plan) {
 		return nil
 	}
-	if plan.Referenced.Map.Storage == nil {
+	if plan.Map.Storage == nil {
 		return nil
 	}
 
-	inventory, err := web.NewClient(plan.Referenced.Provider.Source)
+	inventory, err := web.NewClient(plan.Provider.Source)
 	if err != nil {
 		r.Log.V(1).Info("Skipping hostd-tmp check", "error", err)
 		return nil
 	}
 
-	diskCountByHost := map[string]int{}
+	disksByHost := map[string]int{}
 	for i := range plan.Spec.VMs {
 		vmRef := &plan.Spec.VMs[i].Ref
 		if vmRef.NotSet() {
@@ -57,7 +56,6 @@ func (r *Reconciler) validateHostdTmpMemory(plan *api.Plan) error {
 			if errors.As(vErr, &web.NotFoundError{}) || errors.As(vErr, &web.RefNotUniqueError{}) {
 				continue
 			}
-			r.Log.V(1).Info("Skipping hostd-tmp check for VM", "vm", vmRef.String(), "error", vErr)
 			continue
 		}
 		vm, ok := v.(*vsphere.VM)
@@ -65,29 +63,20 @@ func (r *Reconciler) validateHostdTmpMemory(plan *api.Plan) error {
 			continue
 		}
 		for _, disk := range vm.Disks {
-			mapping, found := plan.Referenced.Map.Storage.FindStorage(disk.Datastore.ID)
-			if found && mapping.OffloadPlugin != nil && mapping.OffloadPlugin.VSphereXcopyPluginConfig != nil {
-				diskCountByHost[vm.Host]++
+			m, found := plan.Map.Storage.FindStorage(disk.Datastore.ID)
+			if found && m.OffloadPlugin != nil && m.OffloadPlugin.VSphereXcopyPluginConfig != nil {
+				disksByHost[vm.Host]++
 			}
 		}
 	}
 
-	var items []string
-	var details []string
-	for hostID, planned := range diskCountByHost {
-		if planned < hostdTmpDiskWarnThreshold {
-			continue
+	var hosts []string
+	for hostID, n := range disksByHost {
+		if shouldWarnHostdTmp(n) {
+			hosts = append(hosts, fmt.Sprintf("%s (%d disks)", hostID, n))
 		}
-		name := hostID
-		host := &vsphere.Host{}
-		if fErr := inventory.Find(host, ref.Ref{ID: hostID}); fErr == nil && host.Name != "" {
-			name = host.Name
-		}
-		items = append(items, hostID)
-		details = append(details, fmt.Sprintf("%s (%d XCOPY disks)", name, planned))
 	}
-
-	if len(items) == 0 {
+	if len(hosts) == 0 {
 		return nil
 	}
 
@@ -97,10 +86,10 @@ func (r *Reconciler) validateHostdTmpMemory(plan *api.Plan) error {
 		Reason:   NotValid,
 		Category: Warn,
 		Message: fmt.Sprintf(
-			"Concurrent vmkfstools for this copy-offload migration may exceed the default ESXi hostd-tmp memory limit (~%dMB) on: %s. "+
-				"Raise hostd-tmp (e.g. run vmkfstools-wrapper/tweak-esxi-mem.sh 2048 on those hosts) before migrating.",
-			defaultHostdTmpMB, strings.Join(details, ", ")),
-		Items: items,
+			"Concurrent vmkfstools may exceed ESXi hostd-tmp (~%dMB) on: %s. "+
+				"Raise hostd-tmp (e.g. tweak-esxi-mem.sh 2048) before migrating.",
+			defaultHostdTmpMB, strings.Join(hosts, ", ")),
+		Items: hosts,
 	})
 	return nil
 }

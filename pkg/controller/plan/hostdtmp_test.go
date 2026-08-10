@@ -6,11 +6,10 @@ import (
 	"github.com/onsi/gomega"
 )
 
-func TestHostdTmpDiskWarnThreshold(t *testing.T) {
+func TestShouldWarnHostdTmp(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
-	g.Expect(defaultHostdTmpMB).To(gomega.Equal(500))
-	g.Expect(hostdTmpDiskWarnThreshold).To(gomega.Equal(10))
-	g.Expect(10 >= hostdTmpDiskWarnThreshold).To(gomega.BeTrue())
-	g.Expect(9 >= hostdTmpDiskWarnThreshold).To(gomega.BeFalse())
+	g.Expect(shouldWarnHostdTmp(9)).To(gomega.BeFalse())
+	g.Expect(shouldWarnHostdTmp(10)).To(gomega.BeTrue())
+	g.Expect(shouldWarnHostdTmp(25)).To(gomega.BeTrue())
 }
