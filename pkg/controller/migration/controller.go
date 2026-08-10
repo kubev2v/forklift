@@ -89,6 +89,7 @@ func Add(mgr manager.Manager) error {
 
 	// Gather migration metrics
 	metrics.RecordMigrationMetrics(mgr.GetClient())
+	metrics.RecordXcopyMetrics(mgr.GetClient())
 
 	return nil
 }
