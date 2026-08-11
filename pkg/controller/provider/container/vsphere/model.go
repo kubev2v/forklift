@@ -734,13 +734,23 @@ func applyNasDatastoreNfsInfo(info types.NasDatastoreInfo, ds *model.Datastore) 
 
 func applyIormConfiguration(info *types.StorageIORMInfo, ds *model.Datastore) {
 	ds.IORMEnabled = info.Enabled
-	ds.IORMCongestionThreshold = info.CongestionThreshold
+	// vSphere returns 0 when SIOC is disabled/unconfigured; downstream requires 5-100ms range, default 30ms
+	threshold := info.CongestionThreshold
+	if threshold < 5 {
+		threshold = 30
+	} else if threshold > 100 {
+		threshold = 100
+	}
+	ds.IORMCongestionThreshold = threshold
 	ds.IORMCongestionThresholdMode = model.IORMThresholdModeAutomatic
 	if model.IORMThresholdMode(info.CongestionThresholdMode) == model.IORMThresholdModeManual {
 		ds.IORMCongestionThresholdMode = model.IORMThresholdModeManual
 	}
+	// vSphere returns 0 when SIOC is disabled; valid range 50-100, default 90
 	pct := info.PercentOfPeakThroughput
-	if pct > 100 {
+	if pct < 50 {
+		pct = 90
+	} else if pct > 100 {
 		pct = 100
 	}
 	ds.IORMPercentOfPeakThroughput = pct
