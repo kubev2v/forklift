@@ -54,3 +54,26 @@ jobs:
 
           # Optional: The mode to install golangci-lint. It can be 'binary' or 'goinstall'.
           install-mode: "goinstall"
+
+  verify-vendor-offload:
+    name: verify-vendor (offload)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25'
+          cache: false
+      - name: Verify go mod vendor is up to date
+        working-directory: cmd/vsphere-copy-offload-populator
+        run: |
+          go mod vendor
+          if [[ -n $(git status --porcelain -- vendor go.mod go.sum) ]]; then
+            echo "ERROR: vendor directory is out of date."
+            echo "Run 'go mod vendor' in cmd/vsphere-copy-offload-populator and commit the changes."
+            git status --porcelain -- vendor go.mod go.sum
+            git diff -- vendor go.mod go.sum
+            exit 1
+          fi

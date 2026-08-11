@@ -58,10 +58,6 @@ const (
 	HyperVContainerLimitsMemory            = "HYPERV_CONTAINER_LIMITS_MEMORY"
 	HyperVContainerRequestsCpu             = "HYPERV_CONTAINER_REQUESTS_CPU"
 	HyperVContainerRequestsMemory          = "HYPERV_CONTAINER_REQUESTS_MEMORY"
-	PopulatorContainerLimitsCpu            = "POPULATOR_CONTAINER_LIMITS_CPU"
-	PopulatorContainerLimitsMemory         = "POPULATOR_CONTAINER_LIMITS_MEMORY"
-	PopulatorContainerRequestsCpu          = "POPULATOR_CONTAINER_REQUESTS_CPU"
-	PopulatorContainerRequestsMemory       = "POPULATOR_CONTAINER_REQUESTS_MEMORY"
 	TlsConnectionTimeout                   = "TLS_CONNECTION_TIMEOUT"
 	ControllerWindowsRebootTimeout         = "CONTROLLER_WINDOWS_REBOOT_TIMEOUT"
 	MaxConcurrentReconciles                = "MAX_CONCURRENT_RECONCILES"
@@ -69,6 +65,8 @@ const (
 	HostLeaseNamespace                     = "HOST_LEASE_NAMESPACE"
 	HostLeaseDurationSeconds               = "HOST_LEASE_DURATION_SECONDS"
 	MigrationServiceAccount                = "MIGRATION_SERVICE_ACCOUNT"
+	PVCNameTemplate                        = "PVC_NAME_TEMPLATE"
+	OCPPVCNameTemplate                     = "OCP_PVC_NAME_TEMPLATE"
 	NetAppShiftDiskPermsInitRequestsCpu    = "NETAPP_SHIFT_DISK_PERMS_INIT_REQUESTS_CPU"
 	NetAppShiftDiskPermsInitRequestsMemory = "NETAPP_SHIFT_DISK_PERMS_INIT_REQUESTS_MEMORY"
 	NetAppShiftDiskPermsInitLimitsCpu      = "NETAPP_SHIFT_DISK_PERMS_INIT_LIMITS_CPU"
@@ -80,19 +78,16 @@ const (
 	AAPCASecretName                        = "AAP_CA_SECRET_NAME"
 	WaitForFinalSnapshotConsolidation      = "WAIT_FOR_FINAL_SNAPSHOT_CONSOLIDATION"
 	ConversionPodPendingTimeout            = "CONVERSION_POD_PENDING_TIMEOUT"
-)
-
-// Default values for populator container resources
-var (
-	DefaultPopulatorContainerLimitsCpu      = resource.NewQuantity(1000, resource.DecimalSI)
-	DefaultPopulatorContainerLimitsMemory   = resource.NewQuantity(1024, resource.BinarySI)
-	DefaultPopulatorContainerRequestsCpu    = resource.NewQuantity(100, resource.DecimalSI)
-	DefaultPopulatorContainerRequestsMemory = resource.NewQuantity(512, resource.BinarySI)
+	StaleConversionTimeout                 = "STALE_CONVERSION_TIMEOUT"
 )
 
 // DefaultPendingPodTimeoutMinutes is the default number of minutes a
 // conversion pod may stay in Pending before the controller fails it.
 const DefaultPendingPodTimeoutMinutes = 5
+
+// DefaultStaleConversionTimeoutSeconds is the default number of seconds to
+// wait for a stale conversion pod/CR to finish terminating before force-deleting it.
+const DefaultStaleConversionTimeoutSeconds = 180
 
 // Migration settings
 type Migration struct {
@@ -149,23 +144,19 @@ type Migration struct {
 	// Memory (in MB) allocated for the virt-v2v conversion appliance
 	VirtV2vMemSize int
 	// Number of virtual CPUs used for the virt-v2v conversion appliance
-	VirtV2vSmp                       int
-	VirtV2vContainerLimitsCpu        string
-	VirtV2vContainerLimitsMemory     string
-	VirtV2vContainerRequestsCpu      string
-	VirtV2vContainerRequestsMemory   string
-	HooksContainerLimitsCpu          string
-	HooksContainerLimitsMemory       string
-	HooksContainerRequestsCpu        string
-	HooksContainerRequestsMemory     string
-	OvaContainerLimitsCpu            string
-	OvaContainerLimitsMemory         string
-	OvaContainerRequestsCpu          string
-	OvaContainerRequestsMemory       string
-	PopulatorContainerLimitsCpu      resource.Quantity
-	PopulatorContainerLimitsMemory   resource.Quantity
-	PopulatorContainerRequestsCpu    resource.Quantity
-	PopulatorContainerRequestsMemory resource.Quantity
+	VirtV2vSmp                     int
+	VirtV2vContainerLimitsCpu      string
+	VirtV2vContainerLimitsMemory   string
+	VirtV2vContainerRequestsCpu    string
+	VirtV2vContainerRequestsMemory string
+	HooksContainerLimitsCpu        string
+	HooksContainerLimitsMemory     string
+	HooksContainerRequestsCpu      string
+	HooksContainerRequestsMemory   string
+	OvaContainerLimitsCpu          string
+	OvaContainerLimitsMemory       string
+	OvaContainerRequestsCpu        string
+	OvaContainerRequestsMemory     string
 	// VDDK image for guest conversion
 	VddkImage string
 	// TlsConnectionTimeout is the timeout for TLS connections in seconds
@@ -182,6 +173,12 @@ type Migration struct {
 	HostLeaseDurationSeconds string
 	// ServiceAccount is the cluster-wide default ServiceAccount for migration pods
 	ServiceAccount string
+	// PVCNameTemplate is the cluster-wide default PVC name template for non-OCP providers.
+	// Empty falls back to the hardcoded DefaultPVCNameTemplate.
+	PVCNameTemplate string
+	// OCPPVCNameTemplate is the cluster-wide default PVC name template for OCP sources.
+	// Empty falls back to DefaultOCPPVCNameTemplate ("{{.SourcePVCName}}").
+	OCPPVCNameTemplate string
 	// NetAppShiftDiskPermsInit* are CPU/memory for the privileged NetApp Shift disk-perms init on virt-v2v conversion pods
 	NetAppShiftDiskPermsInitRequestsCpu    string
 	NetAppShiftDiskPermsInitRequestsMemory string
@@ -202,6 +199,10 @@ type Migration struct {
 	// ConversionPodPendingTimeout is how long (in minutes) a conversion pod may stay
 	// in Pending phase before the controller fails it. 0 means no timeout.
 	ConversionPodPendingTimeout int
+	// StaleConversionTimeout is how long (in seconds) to wait for a stale
+	// conversion pod/CR to finish terminating before force-deleting it
+	// during resume-conversion. Default 180s (3 minutes).
+	StaleConversionTimeout int
 }
 
 // Load settings.
@@ -380,38 +381,6 @@ func (r *Migration) Load() (err error) {
 	} else {
 		r.OvaContainerRequestsMemory = "512Mi"
 	}
-	if val, found := os.LookupEnv(PopulatorContainerLimitsCpu); found {
-		r.PopulatorContainerLimitsCpu, err = resource.ParseQuantity(val)
-		if err != nil {
-			return fmt.Errorf("invalid Populator CPU limit %q: %w", val, err)
-		}
-	} else {
-		r.PopulatorContainerLimitsCpu = *DefaultPopulatorContainerLimitsCpu
-	}
-	if val, found := os.LookupEnv(PopulatorContainerLimitsMemory); found {
-		r.PopulatorContainerLimitsMemory, err = resource.ParseQuantity(val)
-		if err != nil {
-			return fmt.Errorf("invalid Populator memory limit %q: %w", val, err)
-		}
-	} else {
-		r.PopulatorContainerLimitsMemory = *DefaultPopulatorContainerLimitsMemory
-	}
-	if val, found := os.LookupEnv(PopulatorContainerRequestsCpu); found {
-		r.PopulatorContainerRequestsCpu, err = resource.ParseQuantity(val)
-		if err != nil {
-			return fmt.Errorf("invalid Populator CPU request %q: %w", val, err)
-		}
-	} else {
-		r.PopulatorContainerRequestsCpu = *DefaultPopulatorContainerRequestsCpu
-	}
-	if val, found := os.LookupEnv(PopulatorContainerRequestsMemory); found {
-		r.PopulatorContainerRequestsMemory, err = resource.ParseQuantity(val)
-		if err != nil {
-			return fmt.Errorf("invalid Populator memory request %q: %w", val, err)
-		}
-	} else {
-		r.PopulatorContainerRequestsMemory = *DefaultPopulatorContainerRequestsMemory
-	}
 	r.MaxConcurrentReconciles, err = getPositiveEnvLimit(MaxConcurrentReconciles, 10)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -425,6 +394,12 @@ func (r *Migration) Load() (err error) {
 	r.HostLeaseDurationSeconds = Lookup(HostLeaseDurationSeconds, "10")
 	if val, found := os.LookupEnv(MigrationServiceAccount); found {
 		r.ServiceAccount = val
+	}
+	if val, found := os.LookupEnv(PVCNameTemplate); found {
+		r.PVCNameTemplate = unescapeGoTemplate(val)
+	}
+	if val, found := os.LookupEnv(OCPPVCNameTemplate); found {
+		r.OCPPVCNameTemplate = unescapeGoTemplate(val)
 	}
 	r.NetAppShiftDiskPermsInitRequestsCpu = Lookup(NetAppShiftDiskPermsInitRequestsCpu, "10m")
 	r.NetAppShiftDiskPermsInitRequestsMemory = Lookup(NetAppShiftDiskPermsInitRequestsMemory, "32Mi")
@@ -463,5 +438,18 @@ func (r *Migration) Load() (err error) {
 	if r.ConversionPodPendingTimeout, err = getEnvLimit(ConversionPodPendingTimeout, DefaultPendingPodTimeoutMinutes, 0); err != nil {
 		return liberr.Wrap(err)
 	}
+	if r.StaleConversionTimeout, err = getPositiveEnvLimit(StaleConversionTimeout, DefaultStaleConversionTimeoutSeconds); err != nil {
+		return liberr.Wrap(err)
+	}
 	return
+}
+
+// unescapeGoTemplate converts escaped Go template delimiters back to their
+// original form. The ForkliftController CRD requires \{ and \} escaping to
+// prevent Ansible's Jinja2 engine from interpreting Go template {{ }} syntax.
+func unescapeGoTemplate(s string) string {
+	s = strings.ReplaceAll(s, `\{`, `{`)
+	s = strings.ReplaceAll(s, `\}`, `}`)
+	s = strings.ReplaceAll(s, `\\`, `\`)
+	return s
 }
