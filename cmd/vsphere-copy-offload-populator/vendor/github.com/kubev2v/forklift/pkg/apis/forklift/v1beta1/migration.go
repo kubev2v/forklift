@@ -46,6 +46,12 @@ type MigrationSpec struct {
 	// Per-VM cutover times. Overrides spec.cutover for the listed VMs.
 	// +optional
 	VMCutover []VMCutover `json:"vmCutover,omitempty"`
+	// ResumeConversion skips disk copy and runs only the virt-v2v
+	// conversion step, reusing PVCs from a previous failed migration.
+	// Valid for any plan whose disk copy and conversion are separate
+	// phases and whose disk copy completed before conversion failed.
+	// +optional
+	ResumeConversion bool `json:"resumeConversion,omitempty"`
 }
 
 // CutoverFor returns the effective cutover time for a VM.
@@ -128,4 +134,8 @@ type MigrationList struct {
 
 func init() {
 	SchemeBuilder.Register(&Migration{}, &MigrationList{})
+}
+
+func (r *Migration) IsResumeConversion() bool {
+	return r.Spec.ResumeConversion
 }
