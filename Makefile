@@ -9,6 +9,7 @@
 .DEFAULT_GOAL := help
 
 GOOS ?= $(shell go env GOOS)
+GOARCH ?= $(shell go env GOARCH)
 GOPATH ?= $(shell go env GOPATH)
 GOBIN ?= $(GOPATH)/bin
 # GO111MODULE is enabled by default in modern Go; uncomment to force
@@ -733,7 +734,7 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 .PHONY: kubectl
 kubectl: $(KUBECTL) ## Install kubectl
 $(DEFAULT_KUBECTL):
-	curl -L https://dl.k8s.io/release/v1.25.10/bin/linux/amd64/kubectl -o $(GOBIN)/kubectl && chmod +x $(GOBIN)/kubectl
+	curl -L https://dl.k8s.io/release/v1.25.10/bin/$(GOOS)/$(GOARCH)/kubectl -o $(GOBIN)/kubectl && chmod +x $(GOBIN)/kubectl
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Install kustomize
