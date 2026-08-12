@@ -146,12 +146,8 @@ func TestNICNetworkRefs_NoDuplicates(t *testing.T) {
 		t.Fatalf("expected 2 NIC refs, got %d", len(nicRefs))
 	}
 
-	foundNadDup, foundPodDup := planbase.ValidateNetworkDuplicates(nicRefs, plan.Referenced.Map.Network)
-	if foundNadDup {
-		t.Errorf("expected no NAD duplicates, got foundNadDup=true")
-	}
-	if foundPodDup {
-		t.Errorf("expected no pod duplicates, got foundPodDup=true")
+	if planbase.ValidatePodNetworkDuplicates(nicRefs, plan.Map.Network) {
+		t.Errorf("expected no pod duplicates")
 	}
 }
 
@@ -197,9 +193,8 @@ func TestNICNetworkRefs_TwoNICsSameNAD(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	foundNadDup, _ := planbase.ValidateNetworkDuplicates(nicRefs, plan.Referenced.Map.Network)
-	if !foundNadDup {
-		t.Errorf("expected NAD duplicate detected, got foundNadDup=false")
+	if planbase.ValidatePodNetworkDuplicates(nicRefs, plan.Map.Network) {
+		t.Errorf("expected no pod duplicate when two NICs map to same NAD")
 	}
 }
 
@@ -241,9 +236,8 @@ func TestNICNetworkRefs_TwoNICsSameSourceNetwork(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	foundNadDup, _ := planbase.ValidateNetworkDuplicates(nicRefs, plan.Referenced.Map.Network)
-	if !foundNadDup {
-		t.Errorf("expected NAD duplicate detected (two NICs on same source network), got foundNadDup=false")
+	if planbase.ValidatePodNetworkDuplicates(nicRefs, plan.Map.Network) {
+		t.Errorf("expected no pod duplicate when two NICs on same source map to same NAD")
 	}
 }
 
@@ -288,9 +282,8 @@ func TestNICNetworkRefs_VMOnlyUsesOneOfDuplicateMappings(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	foundNadDup, _ := planbase.ValidateNetworkDuplicates(nicRefs, plan.Referenced.Map.Network)
-	if foundNadDup {
-		t.Errorf("expected no NAD duplicate (VM only uses one of the duplicate mappings), got foundNadDup=true")
+	if planbase.ValidatePodNetworkDuplicates(nicRefs, plan.Map.Network) {
+		t.Errorf("expected no pod duplicate (VM only uses one of the duplicate mappings)")
 	}
 }
 
@@ -339,12 +332,8 @@ func TestNICNetworkRefs_PodAndMultus(t *testing.T) {
 		t.Fatalf("expected 2 NIC refs (pod + multus), got %d", len(nicRefs))
 	}
 
-	foundNadDup, foundPodDup := planbase.ValidateNetworkDuplicates(nicRefs, plan.Referenced.Map.Network)
-	if foundNadDup {
-		t.Errorf("expected no NAD duplicate (single multus NAD), got foundNadDup=true")
-	}
-	if foundPodDup {
-		t.Errorf("expected no pod duplicate (single pod network), got foundPodDup=true")
+	if planbase.ValidatePodNetworkDuplicates(nicRefs, plan.Map.Network) {
+		t.Errorf("expected no pod duplicate (single pod network and single multus NAD)")
 	}
 }
 

@@ -64,7 +64,6 @@ const (
 	VMStorageNotMapped              = "VMStorageNotMapped"
 	VMStorageNotSupported           = "VMStorageNotSupported"
 	VMMultiplePodNetworkMappings    = "VMMultiplePodNetworkMappings"
-	VMDuplicateNADMappings          = "VMDuplicateNADMappings"
 	VMMissingGuestIPs               = "VMMissingGuestIPs"
 	VMIpNotMatchingUdnSubnet        = "VMIpNotMatchingUdnSubnet"
 	VMMissingChangedBlockTracking   = "VMMissingChangedBlockTracking"
@@ -802,14 +801,6 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 		Message:  "VM has more than one interface mapped to the pod network.",
 		Items:    []string{},
 	}
-	duplicateNADMappings := libcnd.Condition{
-		Type:     VMDuplicateNADMappings,
-		Status:   True,
-		Reason:   NotValid,
-		Category: api.CategoryCritical,
-		Message:  "Multiple VM NICs mapped to the same Multus NAD. Add additional NetworkMap entries with different destination NADs for the same source network.",
-		Items:    []string{},
-	}
 	missingStaticIPs := libcnd.Condition{
 		Type:     VMMissingGuestIPs,
 		Status:   True,
@@ -1144,12 +1135,8 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 			if nErr != nil {
 				return nErr
 			}
-			foundNadDup, foundPodDup := planbase.ValidateNetworkDuplicates(nicRefs, plan.Referenced.Map.Network)
-			if foundPodDup {
+			if planbase.ValidatePodNetworkDuplicates(nicRefs, plan.Map.Network) {
 				multiplePodNetworkMappings.Items = append(multiplePodNetworkMappings.Items, ref.String())
-			}
-			if foundNadDup {
-				duplicateNADMappings.Items = append(duplicateNADMappings.Items, ref.String())
 			}
 		}
 		if plan.Referenced.Map.Storage != nil {
@@ -1403,9 +1390,6 @@ func (r *Reconciler) validateVM(plan *api.Plan, ctx *plancontext.Context) error 
 	}
 	if len(multiplePodNetworkMappings.Items) > 0 {
 		plan.Status.SetCondition(multiplePodNetworkMappings)
-	}
-	if len(duplicateNADMappings.Items) > 0 {
-		plan.Status.SetCondition(duplicateNADMappings)
 	}
 	if len(missingStaticIPs.Items) > 0 {
 		plan.Status.SetCondition(missingStaticIPs)

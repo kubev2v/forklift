@@ -42,16 +42,28 @@ func NewNADPool() *NADPool {
 	}
 }
 
+func nadKey(dest api.DestinationNetwork) string {
+	if dest.Namespace == "" {
+		return dest.Name
+	}
+	return dest.Namespace + "/" + dest.Name
+}
+
 // Allocate picks the first Multus NAD not yet used on this VM.
 // pairsForSource are pre-filtered by source network (matched by ID or
 // name), so every pair shares the same source. Only pass Multus pairs;
 // for mixed-type routing use AllocateNetwork.
 func (p *NADPool) Allocate(pairsForSource []api.NetworkPair) (api.NetworkPair, bool) {
+	if len(pairsForSource) == 0 {
+		return api.NetworkPair{}, false
+	}
+
+	if len(pairsForSource) == 1 {
+		return pairsForSource[0], true
+	}
+
 	for _, pair := range pairsForSource {
-		key := pair.Destination.Namespace + "/" + pair.Destination.Name
-		if pair.Destination.Namespace == "" {
-			key = pair.Destination.Name
-		}
+		key := nadKey(pair.Destination)
 		if !p.used[key] {
 			p.used[key] = true
 			return pair, true
@@ -75,32 +87,27 @@ func AllocateNetwork(pool *NADPool, pairsForSource []api.NetworkPair) (api.Netwo
 	return pool.Allocate(nadPairs)
 }
 
-// ValidateNetworkDuplicates checks whether more than one NIC resolves to the
-// pod network or more than one NIC resolves to the same Multus NAD name.
-// With NAD pool mapping, duplicate NADs are only flagged when the pool for a
-// source network is exhausted (NIC count exceeds available NADs).
-func ValidateNetworkDuplicates(nicRefs []ref.Ref, networkMap *api.NetworkMap) (foundNadDup bool, foundPodDup bool) {
+// ValidatePodNetworkDuplicates reports whether more than one NIC resolves
+// to the pod network. Duplicate Multus NAD assignments are allowed.
+func ValidatePodNetworkDuplicates(nicRefs []ref.Ref, networkMap *api.NetworkMap) bool {
 	if networkMap == nil {
-		return
+		return false
 	}
 
 	pool := NewNADPool()
 	podCount := 0
-
 	for _, nicRef := range nicRefs {
-		pairsForSource := FindAllMappingsForNICRef(nicRef, networkMap)
-		pair, allocated := AllocateNetwork(pool, pairsForSource)
-		if !allocated {
-			if len(pairsForSource) > 0 {
-				foundNadDup = true
-			}
+		pairs := FindAllMappingsForNICRef(nicRef, networkMap)
+		if len(pairs) == 0 {
+			continue
+		}
+		pair, ok := AllocateNetwork(pool, pairs)
+		if !ok {
 			continue
 		}
 		if pair.Destination.Type == Pod {
 			podCount++
 		}
 	}
-
-	foundPodDup = podCount > 1
-	return
+	return podCount > 1
 }
