@@ -26,7 +26,8 @@ const (
 	FirstbootCmd            = "--firstboot"
 )
 
-const vsphereVmwareCleanupScript = "9100_cleanup_vmware.bat"
+const vsphereVmwareCleanupScript = "9100_cleanup_vmware.ps1"
+const vsphereVmwareVerifyScript = "verify_vmware_cleanup.ps1"
 
 const qemuGAInstallScript = "5001_win_firstboot_qemu_ga_install.ps1"
 
@@ -294,11 +295,13 @@ func (c *Customize) runCmd(builder utils.CommandBuilder) error {
 	return nil
 }
 
-// addVsphereVmwareDriverRemoval uploads the VMware cleanup script to the guest Firstboot scripts directory.
+// addVsphereVmwareDriverRemoval uploads the VMware cleanup and verification scripts to the guest Firstboot scripts directory.
 func (c *Customize) addVsphereVmwareDriverRemoval(cmdBuilder utils.CommandBuilder) {
 	windowsScriptsPath := filepath.Join(c.appConfig.Workdir, "scripts", "windows")
 	src := filepath.Join(windowsScriptsPath, vsphereVmwareCleanupScript)
 	cmdBuilder.AddArg(UploadCmd, c.formatUpload(src, filepath.Join(WinFirstbootScriptsPath, vsphereVmwareCleanupScript)))
+	verifySrc := filepath.Join(windowsScriptsPath, vsphereVmwareVerifyScript)
+	cmdBuilder.AddArg(UploadCmd, c.formatUpload(verifySrc, filepath.Join(WinFirstbootScriptsPath, vsphereVmwareVerifyScript)))
 }
 
 // addWinFirstbootScripts appends firstboot script arguments to extraArgs
