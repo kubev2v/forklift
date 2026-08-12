@@ -235,52 +235,22 @@ func (r *Collector) collect() (err error) {
 	mark := time.Now()
 
 	// Collect all resources
-	err = r.clusters()
-	if err != nil {
-		return
+	fns := []func() error{
+		r.clusters,
+		r.hosts,
+		r.networks,
+		r.storageContainers,
+		r.images,
+		r.vms,
 	}
-	if r.canceled() {
-		return
-	}
-
-	err = r.hosts()
-	if err != nil {
-		return
-	}
-	if r.canceled() {
-		return
-	}
-
-	err = r.networks()
-	if err != nil {
-		return
-	}
-	if r.canceled() {
-		return
-	}
-
-	err = r.storageContainers()
-	if err != nil {
-		return
-	}
-	if r.canceled() {
-		return
-	}
-
-	err = r.images()
-	if err != nil {
-		return
-	}
-	if r.canceled() {
-		return
-	}
-
-	err = r.vms()
-	if err != nil {
-		return
-	}
-	if r.canceled() {
-		return
+	for _, f := range fns {
+		err = f()
+		if err != nil {
+			return
+		}
+		if r.canceled() {
+			return
+		}
 	}
 
 	r.log.V(3).Info(
