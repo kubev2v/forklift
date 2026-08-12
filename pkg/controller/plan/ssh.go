@@ -99,17 +99,17 @@ func (r *Reconciler) validateSSHReadiness(plan *api.Plan) error {
 func (r *Reconciler) validateDiskMaxLUN(plan *api.Plan) error {
 	plan.Status.DeleteCondition(DiskMaxLUNTooLow)
 
-	if plan.Referenced.Provider.Source == nil || plan.Referenced.Provider.Source.Type() != api.VSphere {
+	if plan.Provider.Source == nil || plan.Provider.Source.Type() != api.VSphere {
 		return nil
 	}
-	if !settings.Settings.Features.CopyOffload || !r.planUsesVSphereXcopyPopulator(plan) {
+	if !settings.Settings.CopyOffload || !r.planUsesVSphereXcopyPopulator(plan) {
 		return nil
 	}
-	if plan.Referenced.Map.Storage == nil {
+	if plan.Map.Storage == nil {
 		return nil
 	}
 
-	inventory, err := web.NewClient(plan.Referenced.Provider.Source)
+	inventory, err := web.NewClient(plan.Provider.Source)
 	if err != nil {
 		r.Log.V(1).Info("Skipping Disk.MaxLUN check", "error", err)
 		return nil
@@ -134,7 +134,7 @@ func (r *Reconciler) validateDiskMaxLUN(plan *api.Plan) error {
 			continue
 		}
 		for _, disk := range vm.Disks {
-			mapping, found := plan.Referenced.Map.Storage.FindStorage(disk.Datastore.ID)
+			mapping, found := plan.Map.Storage.FindStorage(disk.Datastore.ID)
 			if found && mapping.OffloadPlugin != nil && mapping.OffloadPlugin.VSphereXcopyPluginConfig != nil {
 				plannedByHost[vm.Host]++
 			}
