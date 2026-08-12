@@ -272,7 +272,7 @@ func (r *Reconciler) validate(plan *api.Plan) error {
 		return err
 	}
 
-	// Warn when concurrent vmkfstools may exceed ESXi hostd-tmp memory (~500MB)
+	// Warn when concurrent vmkfstools may exceed ESXi hostd-tmp memory
 	if err = r.validateHostdTmpMemory(plan); err != nil {
 		return err
 	}
