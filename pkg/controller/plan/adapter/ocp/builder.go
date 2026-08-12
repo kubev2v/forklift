@@ -303,10 +303,11 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 
 	// Sanitize DataVolumeTemplates to prevent conflicts with Forklift-created DataVolumes:
 	// 1. Match template names to the PVC names (Forklift creates DataVolumes with Name = pvc.Name)
-	// 2. Clear spec.source to prevent KubeVirt from trying to create new DataVolumes with invalid sources
+	// 2. Clear spec.source so CDI does not re-import from source-cluster references
+	//    (HTTP/registry/PVC sources); Forklift already created the destination DataVolumes
 	// 3. Ensure namespace is set correctly (will be set by KubeVirt to match VM namespace)
 	// 4. Update volume references to match renamed DataVolumeTemplates
-	r.sanitizeDataVolumeTemplates(vmRef, object.DataVolumeTemplates, object)
+	r.sanitizeDataVolumeTemplates(sourceVm, object.DataVolumeTemplates, object)
 
 	r.mapNetworks(sourceVm, targetVmSpec)
 	r.mapVolumes(sourceVm, targetVmSpec, persistentVolumeClaims)
@@ -316,18 +317,13 @@ func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, 
 
 // sanitizeDataVolumeTemplates ensures DataVolumeTemplates are compatible with Forklift-created DataVolumes.
 // Forklift creates DataVolumes with Name = pvc.Name, so templates must match these names.
-// We also clear spec.source to prevent KubeVirt from trying to create new DataVolumes with invalid source URLs.
+// spec.source is cleared because templates copied from the source VM still point at
+// source-cluster import specs; Forklift has already created the destination DataVolumes.
 // Additionally, we update volume references to match any renamed DataVolumeTemplates.
-func (r *Builder) sanitizeDataVolumeTemplates(vmRef ref.Ref, templates []cnv.DataVolumeTemplateSpec, object *cnv.VirtualMachineSpec) {
+func (r *Builder) sanitizeDataVolumeTemplates(sourceVm *cnv.VirtualMachine, templates []cnv.DataVolumeTemplateSpec, object *cnv.VirtualMachineSpec) {
 	// Build a map of volume name -> PVC name from VM volumes
 	// This allows us to match DataVolumeTemplates to the PVCs that Forklift will create DataVolumes for
 	volumeToPVCName := make(map[string]string)
-	sourceVm, err := r.getSourceVmFromDefinition(vmRef)
-	if err != nil {
-		r.Log.Error(err, "Failed to get source VM for DataVolumeTemplate sanitization")
-		return
-	}
-
 	for _, vol := range sourceVm.Spec.Template.Spec.Volumes {
 		var pvcName string
 		switch {
@@ -340,7 +336,7 @@ func (r *Builder) sanitizeDataVolumeTemplates(vmRef ref.Ref, templates []cnv.Dat
 			// But we need to check the actual PVC name from the source
 			dv := &cdi.DataVolume{}
 			err := r.sourceClient.Get(context.TODO(), client.ObjectKey{
-				Namespace: vmRef.Namespace,
+				Namespace: sourceVm.Namespace,
 				Name:      vol.DataVolume.Name,
 			}, dv)
 			if err != nil {
@@ -407,9 +403,9 @@ func (r *Builder) sanitizeDataVolumeTemplates(vmRef ref.Ref, templates []cnv.Dat
 			}
 		}
 
-		// Clear spec.source to prevent KubeVirt from trying to create new DataVolumes
-		// with source URLs/namespaces that don't exist on the destination cluster.
-		// Forklift has already created the DataVolumes, so templates should not have source specs.
+		// Clear spec.source: templates still carry source-cluster import specs, but Forklift
+		// already created the destination DataVolumes. Leaving source set would make CDI try
+		// to import again from URLs/registry/PVC refs that do not exist on the destination.
 		template.Spec.Source = nil
 
 		// Ensure namespace is empty - KubeVirt will set it to match the VM namespace
