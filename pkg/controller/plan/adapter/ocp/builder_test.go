@@ -470,3 +470,101 @@ func TestDataVolumes_ArchiveExportSetsContentType(t *testing.T) {
 		t.Errorf("expected source access modes preserved, got %#v", dv.Spec.Storage.AccessModes)
 	}
 }
+
+func TestDataVolumes_ArchiveExportKeepsFilesystemWithBlockDestination(t *testing.T) {
+	const (
+		ns      = "src-ns"
+		vmName  = "test-vm"
+		pvcName = "virtiofs-pvc"
+		scName  = "source-sc"
+	)
+
+	scheme := runtime.NewScheme()
+	_ = core.AddToScheme(scheme)
+	_ = export.AddToScheme(scheme)
+	_ = cdi.AddToScheme(scheme)
+
+	ocpType := api.OpenShift
+	storageClass := scName
+	fsMode := core.PersistentVolumeFilesystem
+	srcClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(
+		&export.VirtualMachineExport{
+			ObjectMeta: metav1.ObjectMeta{Name: vmName, Namespace: ns},
+			Status: &export.VirtualMachineExportStatus{
+				Links: &export.VirtualMachineExportLinks{
+					External: &export.VirtualMachineExportLink{
+						Cert: "cert",
+						Volumes: []export.VirtualMachineExportVolume{{
+							Name: pvcName,
+							Formats: []export.VirtualMachineExportVolumeFormat{
+								{Format: export.ArchiveGz, Url: "https://export.example/fs.tar.gz"},
+							},
+						}},
+					},
+				},
+			},
+		},
+		&core.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{Name: pvcName, Namespace: ns},
+			Spec: core.PersistentVolumeClaimSpec{
+				StorageClassName: &storageClass,
+				VolumeMode:       &fsMode,
+				Resources: core.VolumeResourceRequirements{
+					Requests: core.ResourceList{core.ResourceStorage: resource.MustParse("1Gi")},
+				},
+			},
+		},
+	).Build()
+	dstClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+	plan := &api.Plan{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-plan"},
+		Spec:       api.PlanSpec{TargetNamespace: "target-ns"},
+	}
+	plan.Provider.Source = &api.Provider{Spec: api.ProviderSpec{Type: &ocpType}}
+	builder := &Builder{
+		Context: &plancontext.Context{
+			Plan: plan,
+			Map: struct {
+				Network *api.NetworkMap
+				Storage *api.StorageMap
+			}{
+				Storage: &api.StorageMap{
+					Spec: api.StorageMapSpec{
+						Map: []api.StoragePair{{
+							Source: ref.Ref{Name: scName},
+							Destination: api.DestinationStorage{
+								StorageClass: "dest-sc",
+								VolumeMode:   core.PersistentVolumeBlock,
+							},
+						}},
+					},
+				},
+			},
+			Destination: plancontext.Destination{Client: dstClient},
+			Log:         logging.WithName("ocp-builder-test"),
+		},
+		sourceClient: srcClient,
+	}
+
+	dvs, err := builder.DataVolumes(
+		ref.Ref{ID: "vm-1", Name: vmName, Namespace: ns},
+		&core.Secret{ObjectMeta: metav1.ObjectMeta{Name: "secret"}},
+		&core.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cm"}},
+		&cdi.DataVolume{ObjectMeta: metav1.ObjectMeta{Namespace: "target-ns", Annotations: map[string]string{}}},
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(dvs) != 1 {
+		t.Fatalf("expected 1 DataVolume, got %d", len(dvs))
+	}
+	dv := dvs[0]
+	if dv.Spec.ContentType != cdi.DataVolumeArchive {
+		t.Errorf("expected contentType archive, got %q", dv.Spec.ContentType)
+	}
+	if dv.Spec.Storage == nil || dv.Spec.Storage.VolumeMode == nil || *dv.Spec.Storage.VolumeMode != core.PersistentVolumeFilesystem {
+		t.Errorf("expected Filesystem volume mode for archive import, got %#v", dv.Spec.Storage)
+	}
+}

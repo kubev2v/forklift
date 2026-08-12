@@ -681,12 +681,10 @@ func createDataVolumeSpec(
 		spec.ContentType = cdi.DataVolumeArchive
 		fsMode := core.PersistentVolumeFilesystem
 		spec.Storage.VolumeMode = &fsMode
-	}
-
-	if destStorage.VolumeMode != "" {
+	} else if destStorage.VolumeMode != "" {
 		volumeMode := destStorage.VolumeMode
 		spec.Storage.VolumeMode = &volumeMode
-	} else if contentType != cdi.DataVolumeArchive && sourcePVC != nil && sourcePVC.Spec.VolumeMode != nil {
+	} else if sourcePVC != nil && sourcePVC.Spec.VolumeMode != nil {
 		volumeMode := *sourcePVC.Spec.VolumeMode
 		spec.Storage.VolumeMode = &volumeMode
 	}
