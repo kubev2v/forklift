@@ -94,6 +94,7 @@ func NewProviderCmd(kubeConfigFlags *genericclioptions.ConfigFlags) *cobra.Comma
 	cmd.Flags().StringVar(&opts.SMBUrl, "smb-url", "", "SMB share URL for HyperV (e.g., //server/share)")
 	cmd.Flags().StringVar(&opts.SMBUser, "smb-user", "", "SMB username (defaults to HyperV username)")
 	cmd.Flags().StringVar(&opts.SMBPassword, "smb-password", "", "SMB password (defaults to HyperV password)")
+	cmd.Flags().StringVar(&opts.HyperVMgmtType, "hyperv-management-type", "", "HyperV management type (e.g., cluster)")
 
 	// EC2 specific flags
 	cmd.Flags().StringVar(&opts.EC2Region, "ec2-region", "", "AWS region where source EC2 instances are located")
