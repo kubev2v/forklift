@@ -59,6 +59,13 @@ func ApplyOffloadToPairs(pairs []forkliftv1beta1.StoragePair, opts StorageMappin
 				pairs[i].OffloadPlugin = &forkliftv1beta1.OffloadPlugin{
 					VSphereXcopyPluginConfig: xcopyConfig,
 				}
+			case "csiVolumeImport":
+				pairs[i].OffloadPlugin = &forkliftv1beta1.OffloadPlugin{
+					CsiVolumeImport: &forkliftv1beta1.CsiVolumeImport{
+						SecretRef:            opts.DefaultOffloadSecret,
+						StorageVendorProduct: forkliftv1beta1.StorageVendorProduct(opts.DefaultOffloadVendor),
+					},
+				}
 			}
 		}
 	}

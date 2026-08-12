@@ -57,9 +57,10 @@ type PatchProviderOptions struct {
 	AutoTargetCredentials bool
 
 	// HyperV settings
-	SMBUrl      string
-	SMBUser     string
-	SMBPassword string
+	SMBUrl         string
+	SMBUser        string
+	SMBPassword    string
+	HyperVMgmtType string
 
 	// Azure settings
 	AzureTenantID              string
@@ -223,6 +224,15 @@ func PatchProvider(opts PatchProviderOptions) error {
 		if opts.AzureSnapshotResourceGroup != "" {
 			klog.V(2).Infof("Updating Azure snapshotResourceGroup to '%s'", opts.AzureSnapshotResourceGroup)
 			currentSettings["snapshotResourceGroup"] = opts.AzureSnapshotResourceGroup
+			providerUpdated = true
+		}
+	}
+
+	// Update HyperV settings for HyperV providers
+	if providerType == "hyperv" {
+		if opts.HyperVMgmtType != "" {
+			klog.V(2).Infof("Updating HyperV managementType to '%s'", opts.HyperVMgmtType)
+			currentSettings["managementType"] = opts.HyperVMgmtType
 			providerUpdated = true
 		}
 	}
