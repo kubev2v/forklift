@@ -233,16 +233,8 @@ func TestExcludeHostsByCluster(t *testing.T) {
 
 func TestFilterStorageContainersByCluster(t *testing.T) {
 	entities := []storageContainerEntity{
-		storageContainerFromV4(map[string]interface{}{
-			"clusterExtId": "cluster-a",
-			"extId":        "sc-1",
-			"name":         "one",
-		}),
-		storageContainerFromV4(map[string]interface{}{
-			"clusterExtId": "cluster-b",
-			"extId":        "sc-2",
-			"name":         "two",
-		}),
+		storageContainerV4Raw{ExtID: "sc-1", Name: "one", ClusterExtID: "cluster-a"}.toEntity(),
+		storageContainerV4Raw{ExtID: "sc-2", Name: "two", ClusterExtID: "cluster-b"}.toEntity(),
 	}
 
 	filtered := filterStorageContainersByCluster(entities, "cluster-a")
