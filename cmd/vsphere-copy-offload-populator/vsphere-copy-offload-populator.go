@@ -97,7 +97,8 @@ func main() {
 		}
 		storageApi = &sm
 	case forklift.StorageVendorProductFlashSystem:
-		sm, err := flashsystem.NewFlashSystemClonner(storageHostname, storageUsername, storagePassword, storageSkipSSLVerification == "true")
+		tokenCache := flashsystem.NewSecretTokenCache(clientSet, storageHostname)
+		sm, err := flashsystem.NewFlashSystemClonner(storageHostname, storageUsername, storagePassword, storageSkipSSLVerification == "true", tokenCache)
 		if err != nil {
 			klog.Fatalf("failed to initialize flashsystem storage mapper with %s", err)
 		}
