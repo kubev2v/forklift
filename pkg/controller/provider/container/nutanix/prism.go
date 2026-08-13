@@ -70,9 +70,6 @@ func (r *Client) resolvePrismConfig() (PrismConfig, error) {
 	clusterUUID := ""
 	if r.settings != nil {
 		clusterUUID = r.settings[api.NutanixClusterUUID]
-	}
-
-	if r.settings != nil {
 		if raw, ok := r.settings[api.NutanixPrismType]; ok && raw != "" {
 			mode, err := parsePrismMode(raw)
 			if err != nil {
