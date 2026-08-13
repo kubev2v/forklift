@@ -248,7 +248,7 @@ func (c *Primera3ParClonner) RDMCopy(vsphereClient vmware.Client, vmId string, s
 func (c *Primera3ParClonner) resolveRDMToLUN(deviceName string) (populator.LUN, error) {
 	c.log.V(2).Info("resolving RDM device to LUN", "device", deviceName)
 
-	serial, err := extractSerialFromNAA(deviceName)
+	serial, err := extractSerialFromVML(deviceName)
 	if err != nil {
 		c.log.Info("could not extract serial from NAA, trying to find by listing volumes", "device", deviceName, "err", err)
 		return c.findVolumeByDeviceName(deviceName)
@@ -260,12 +260,13 @@ func (c *Primera3ParClonner) resolveRDMToLUN(deviceName string) (populator.LUN, 
 	}
 
 	c.log.V(2).Info("searching for volume by serial", "serial", serial)
+	expectedWWN := strings.ToLower(PROVIDER_ID + serial)
 	for _, v := range volumes {
-		if strings.ToLower(v.WWN) == strings.ToLower(serial) {
+		if strings.ToLower(v.WWN) == expectedWWN {
 			lun := populator.LUN{
 				Name:         v.Name,
 				SerialNumber: v.WWN,
-				NAA:          fmt.Sprintf("naa.%s%s", PROVIDER_ID, strings.ToLower(v.WWN)),
+				NAA:          fmt.Sprintf("naa.%s", strings.ToLower(v.WWN)),
 			}
 			c.log.Info("resolved source LUN", "lun", lun.Name, "serial", lun.SerialNumber, "naa", lun.NAA)
 			return lun, nil
@@ -275,9 +276,20 @@ func (c *Primera3ParClonner) resolveRDMToLUN(deviceName string) (populator.LUN, 
 	return populator.LUN{}, fmt.Errorf("failed to find volume by serial %s", serial)
 }
 
-func extractSerialFromNAA(naa string) (string, error) {
-	naa = strings.ToLower(naa)
-	naa = strings.TrimPrefix(naa, "naa.")
+func extractSerialFromVML(deviceName string) (string, error) {
+	naa := strings.ToLower(deviceName)
+
+	const vmlPrefix = "vml."
+	const vmlHeaderLen = 10
+	const naaHexLen = 32
+	if !strings.HasPrefix(naa, vmlPrefix) {
+		return "", fmt.Errorf("device name %s is not in vml. format", naa)
+	}
+	rest := strings.TrimPrefix(naa, vmlPrefix)
+	if len(rest) < vmlHeaderLen+naaHexLen {
+		return "", fmt.Errorf("NAA %s does not appear to be a 3PAR device (vml. name too short)", naa)
+	}
+	naa = rest[vmlHeaderLen : vmlHeaderLen+naaHexLen]
 
 	providerIDLower := strings.ToLower(PROVIDER_ID)
 	if !strings.HasPrefix(naa, providerIDLower) {
