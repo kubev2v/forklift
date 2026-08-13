@@ -8,33 +8,25 @@ import (
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/nutanix"
 )
 
-// TestApplyCluster tests cluster mapping from API response to model.
 func TestApplyCluster(t *testing.T) {
 	data, err := os.ReadFile("testdata/clusters_list.json")
 	if err != nil {
 		t.Fatalf("Failed to read testdata: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response struct {
+		Entities []clusterEntity `json:"entities"`
+	}
 	if err := json.Unmarshal(data, &response); err != nil {
 		t.Fatalf("Failed to unmarshal JSON: %v", err)
 	}
-
-	entities, ok := response["entities"].([]interface{})
-	if !ok || len(entities) == 0 {
+	if len(response.Entities) == 0 {
 		t.Fatal("No entities in response")
 	}
 
-	// Test first cluster
-	entity, ok := entities[0].(map[string]interface{})
-	if !ok {
-		t.Fatal("Entity is not a map")
-	}
-
 	m := &model.Cluster{}
-	applyCluster(entity, m)
+	response.Entities[0].ApplyTo(m)
 
-	// Verify metadata
 	if m.ID == "" {
 		t.Error("Expected ID to be set")
 	}
@@ -44,28 +36,18 @@ func TestApplyCluster(t *testing.T) {
 	if m.Name != "prod-cluster-01" {
 		t.Errorf("Expected name 'prod-cluster-01', got %s", m.Name)
 	}
-
-	// Verify version
 	if m.Version != "6.8.2" {
 		t.Errorf("Expected version '6.8.2', got %s", m.Version)
 	}
-
-	// Verify timezone
 	if m.Timezone != "America/Los_Angeles" {
 		t.Errorf("Expected timezone 'America/Los_Angeles', got %s", m.Timezone)
 	}
-
-	// Verify node count
 	if m.NumNodes != 2 {
 		t.Errorf("Expected 2 nodes, got %d", m.NumNodes)
 	}
-
-	// Verify VM count
 	if m.VMCount != 25 {
 		t.Errorf("Expected 25 VMs, got %d", m.VMCount)
 	}
-
-	// Verify capacity
 	if m.TotalCapacity == 0 {
 		t.Error("Expected TotalCapacity to be set")
 	}
@@ -74,56 +56,42 @@ func TestApplyCluster(t *testing.T) {
 	}
 }
 
-// TestApplyClusterNameNotFromMetadata verifies that Cluster.Name is read
-// from spec/status, not metadata -- Nutanix's v3 intentful entities never
-// carry "name" under metadata, only under spec/status. This also verifies
-// the status.name fallback used when spec.name is absent.
+// TestApplyClusterNameNotFromMetadata verifies that Cluster.Name is read from
+// spec/status, not metadata -- v3 intentful entities never carry "name" under
+// metadata, only under spec/status. Also verifies the status.name fallback.
 func TestApplyClusterNameNotFromMetadata(t *testing.T) {
-	entity := map[string]interface{}{
-		"metadata": map[string]interface{}{
-			"uuid": "cluster-1",
-			"name": "wrong-name",
-		},
-		"status": map[string]interface{}{
-			"name": "right-name",
-		},
-	}
+	e := clusterEntity{}
+	e.Metadata.UUID = "cluster-1"
+	e.Metadata.Name = "wrong-name"
+	e.Status.Name = "right-name"
 
 	m := &model.Cluster{}
-	applyCluster(entity, m)
+	e.ApplyTo(m)
 
 	if m.Name != "right-name" {
 		t.Errorf("Expected name 'right-name' from status, got %s", m.Name)
 	}
 }
 
-// TestApplyHost tests host mapping from API response to model.
 func TestApplyHost(t *testing.T) {
 	data, err := os.ReadFile("testdata/hosts_list.json")
 	if err != nil {
 		t.Fatalf("Failed to read testdata: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response struct {
+		Entities []hostEntity `json:"entities"`
+	}
 	if err := json.Unmarshal(data, &response); err != nil {
 		t.Fatalf("Failed to unmarshal JSON: %v", err)
 	}
-
-	entities, ok := response["entities"].([]interface{})
-	if !ok || len(entities) == 0 {
+	if len(response.Entities) == 0 {
 		t.Fatal("No entities in response")
 	}
 
-	// Test first host
-	entity, ok := entities[0].(map[string]interface{})
-	if !ok {
-		t.Fatal("Entity is not a map")
-	}
-
 	m := &model.Host{}
-	applyHost(entity, m)
+	response.Entities[0].ApplyTo(m)
 
-	// Verify basic fields
 	if m.ID == "" {
 		t.Error("Expected ID to be set")
 	}
@@ -133,13 +101,9 @@ func TestApplyHost(t *testing.T) {
 	if m.Name != "ahv-node-01" {
 		t.Errorf("Expected name 'ahv-node-01', got %s", m.Name)
 	}
-
-	// Verify cluster reference
 	if m.Cluster != "0005e123-4567-89ab-cdef-000000000001" {
 		t.Errorf("Expected Cluster '0005e123-4567-89ab-cdef-000000000001', got %s", m.Cluster)
 	}
-
-	// Verify hardware details
 	if m.CPUModel == "" {
 		t.Error("Expected CPUModel to be set")
 	}
@@ -152,17 +116,12 @@ func TestApplyHost(t *testing.T) {
 	if m.MemoryCapacityMiB == 0 {
 		t.Error("Expected MemoryCapacityMiB to be > 0")
 	}
-
-	// Verify hypervisor info
 	if m.HypervisorType != "Nutanix 20240802.100" {
 		t.Errorf("Expected HypervisorType 'Nutanix 20240802.100', got %s", m.HypervisorType)
 	}
 	if m.NumVMs != 15 {
 		t.Errorf("Expected NumVMs 15, got %d", m.NumVMs)
 	}
-
-	// Verify State (read from status.state) and HostType (read from
-	// status.resources.host_type) are distinct fields.
 	if m.State != "COMPLETE" {
 		t.Errorf("Expected State 'COMPLETE', got %s", m.State)
 	}
@@ -171,31 +130,20 @@ func TestApplyHost(t *testing.T) {
 	}
 }
 
-// TestApplyHostNameAndClusterNotFromWrongPaths verifies Host.Name is read
-// from spec/status (not metadata) and Host.Cluster is read from a
-// top-level spec/status.cluster_reference (not nested under
-// status.resources.cluster_reference), using the status-only fallback.
+// TestApplyHostNameAndClusterNotFromWrongPaths verifies Host.Name is read from
+// spec/status (not metadata) and Host.Cluster is read from the top-level
+// spec/status.cluster_reference, not from status.resources.cluster_reference.
 func TestApplyHostNameAndClusterNotFromWrongPaths(t *testing.T) {
-	entity := map[string]interface{}{
-		"metadata": map[string]interface{}{
-			"uuid": "host-1",
-			"name": "wrong-name",
-		},
-		"status": map[string]interface{}{
-			"name": "right-name",
-			"cluster_reference": map[string]interface{}{
-				"uuid": "right-cluster",
-			},
-			"resources": map[string]interface{}{
-				"cluster_reference": map[string]interface{}{
-					"uuid": "wrong-cluster",
-				},
-			},
-		},
-	}
+	e := hostEntity{}
+	e.Metadata.UUID = "host-1"
+	e.Metadata.Name = "wrong-name"
+	e.Status.Name = "right-name"
+	e.Status.ClusterReference = ref{UUID: "right-cluster"}
+	// status.Resources has no ClusterReference field in the typed struct,
+	// so wrong-path reads are impossible by construction.
 
 	m := &model.Host{}
-	applyHost(entity, m)
+	e.ApplyTo(m)
 
 	if m.Name != "right-name" {
 		t.Errorf("Expected name 'right-name' from status, got %s", m.Name)
@@ -205,27 +153,15 @@ func TestApplyHostNameAndClusterNotFromWrongPaths(t *testing.T) {
 	}
 }
 
-// TestApplyHostHypervisorTypeAndState verifies that Host.HypervisorType is
-// read as-is from resources.hypervisor.hypervisor_full_name (there is no
-// dedicated type-enum key on host entities, unlike VMs), and that
-// Host.State is read from the top-level status.state field rather than
-// duplicating HostType's status.resources.host_type.
 func TestApplyHostHypervisorTypeAndState(t *testing.T) {
-	entity := map[string]interface{}{
-		"metadata": map[string]interface{}{"uuid": "host-1"},
-		"status": map[string]interface{}{
-			"state": "COMPLETE",
-			"resources": map[string]interface{}{
-				"hypervisor": map[string]interface{}{
-					"hypervisor_full_name": "Nutanix 20240802.100",
-				},
-				"host_type": "HYPER_CONVERGED",
-			},
-		},
-	}
+	e := hostEntity{}
+	e.Metadata.UUID = "host-1"
+	e.Status.State = "COMPLETE"
+	e.Status.Resources.Hypervisor.HypervisorFullName = "Nutanix 20240802.100"
+	e.Status.Resources.HostType = "HYPER_CONVERGED"
 
 	m := &model.Host{}
-	applyHost(entity, m)
+	e.ApplyTo(m)
 
 	if m.HypervisorType != "Nutanix 20240802.100" {
 		t.Errorf("Expected HypervisorType 'Nutanix 20240802.100', got %s", m.HypervisorType)
@@ -238,33 +174,25 @@ func TestApplyHostHypervisorTypeAndState(t *testing.T) {
 	}
 }
 
-// TestApplyNetwork tests network mapping from API response to model.
 func TestApplyNetwork(t *testing.T) {
 	data, err := os.ReadFile("testdata/subnets_list.json")
 	if err != nil {
 		t.Fatalf("Failed to read testdata: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response struct {
+		Entities []networkEntity `json:"entities"`
+	}
 	if err := json.Unmarshal(data, &response); err != nil {
 		t.Fatalf("Failed to unmarshal JSON: %v", err)
 	}
-
-	entities, ok := response["entities"].([]interface{})
-	if !ok || len(entities) == 0 {
+	if len(response.Entities) == 0 {
 		t.Fatal("No entities in response")
 	}
 
-	// Test first network
-	entity, ok := entities[0].(map[string]interface{})
-	if !ok {
-		t.Fatal("Entity is not a map")
-	}
-
 	m := &model.Network{}
-	applyNetwork(entity, m)
+	response.Entities[0].ApplyTo(m)
 
-	// Verify basic fields
 	if m.ID == "" {
 		t.Error("Expected ID to be set")
 	}
@@ -274,23 +202,15 @@ func TestApplyNetwork(t *testing.T) {
 	if m.Name != "Production-VLAN-100" {
 		t.Errorf("Expected name 'Production-VLAN-100', got %s", m.Name)
 	}
-
-	// Verify cluster reference
 	if m.Cluster != "0005e123-4567-89ab-cdef-000000000001" {
 		t.Errorf("Expected Cluster '0005e123-4567-89ab-cdef-000000000001', got %s", m.Cluster)
 	}
-
-	// Verify network type
 	if m.SubnetType != "VLAN" {
 		t.Errorf("Expected subnet type 'VLAN', got %s", m.SubnetType)
 	}
-
-	// Verify VLAN
 	if m.VlanID == 0 {
 		t.Error("Expected VlanID to be > 0")
 	}
-
-	// Verify IP config
 	if m.NetworkAddress == "" {
 		t.Error("Expected NetworkAddress to be set")
 	}
@@ -300,30 +220,17 @@ func TestApplyNetwork(t *testing.T) {
 }
 
 // TestApplyNetworkNameAndClusterNotFromWrongPaths verifies Network.Name is
-// read from spec/status (not metadata) and Network.Cluster is read from a
-// top-level spec/status.cluster_reference (not nested under
-// status.resources.cluster_reference), using the status-only fallback.
+// read from spec/status (not metadata) and Network.Cluster is read from the
+// top-level spec/status.cluster_reference.
 func TestApplyNetworkNameAndClusterNotFromWrongPaths(t *testing.T) {
-	entity := map[string]interface{}{
-		"metadata": map[string]interface{}{
-			"uuid": "network-1",
-			"name": "wrong-name",
-		},
-		"status": map[string]interface{}{
-			"name": "right-name",
-			"cluster_reference": map[string]interface{}{
-				"uuid": "right-cluster",
-			},
-			"resources": map[string]interface{}{
-				"cluster_reference": map[string]interface{}{
-					"uuid": "wrong-cluster",
-				},
-			},
-		},
-	}
+	e := networkEntity{}
+	e.Metadata.UUID = "network-1"
+	e.Metadata.Name = "wrong-name"
+	e.Status.Name = "right-name"
+	e.Status.ClusterReference = ref{UUID: "right-cluster"}
 
 	m := &model.Network{}
-	applyNetwork(entity, m)
+	e.ApplyTo(m)
 
 	if m.Name != "right-name" {
 		t.Errorf("Expected name 'right-name' from status, got %s", m.Name)
@@ -333,33 +240,25 @@ func TestApplyNetworkNameAndClusterNotFromWrongPaths(t *testing.T) {
 	}
 }
 
-// TestApplyStorageContainer tests storage container mapping.
 func TestApplyStorageContainer(t *testing.T) {
 	data, err := os.ReadFile("testdata/storage_containers_list.json")
 	if err != nil {
 		t.Fatalf("Failed to read testdata: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response struct {
+		Entities []storageContainerEntity `json:"entities"`
+	}
 	if err := json.Unmarshal(data, &response); err != nil {
 		t.Fatalf("Failed to unmarshal JSON: %v", err)
 	}
-
-	entities, ok := response["entities"].([]interface{})
-	if !ok || len(entities) == 0 {
+	if len(response.Entities) == 0 {
 		t.Fatal("No entities in response")
 	}
 
-	// Test first storage container
-	entity, ok := entities[0].(map[string]interface{})
-	if !ok {
-		t.Fatal("Entity is not a map")
-	}
-
 	m := &model.StorageContainer{}
-	applyStorageContainer(entity, m)
+	response.Entities[0].ApplyTo(m)
 
-	// Verify basic fields
 	if m.ID == "" {
 		t.Error("Expected ID to be set")
 	}
@@ -369,50 +268,36 @@ func TestApplyStorageContainer(t *testing.T) {
 	if m.Name != "default-container-prod" {
 		t.Errorf("Expected name 'default-container-prod', got %s", m.Name)
 	}
-
-	// Verify cluster reference is populated for this fixture entity.
 	if m.Cluster == "" {
 		t.Error("Expected Cluster to be set")
 	}
-
-	// Verify replication factor
 	if m.ReplicationFactor == 0 {
 		t.Error("Expected ReplicationFactor to be > 0")
 	}
-
-	// Verify capacity
 	if m.MaxCapacityBytes == 0 {
 		t.Error("Expected MaxCapacityBytes to be > 0")
 	}
 }
 
-// TestApplyImage tests image mapping from API response to model.
 func TestApplyImage(t *testing.T) {
 	data, err := os.ReadFile("testdata/images_list.json")
 	if err != nil {
 		t.Fatalf("Failed to read testdata: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response struct {
+		Entities []imageEntity `json:"entities"`
+	}
 	if err := json.Unmarshal(data, &response); err != nil {
 		t.Fatalf("Failed to unmarshal JSON: %v", err)
 	}
-
-	entities, ok := response["entities"].([]interface{})
-	if !ok || len(entities) == 0 {
+	if len(response.Entities) == 0 {
 		t.Fatal("No entities in response")
 	}
 
-	// Test first image
-	entity, ok := entities[0].(map[string]interface{})
-	if !ok {
-		t.Fatal("Entity is not a map")
-	}
-
 	m := &model.Image{}
-	applyImage(entity, m)
+	response.Entities[0].ApplyTo(m)
 
-	// Verify basic fields
 	if m.ID == "" {
 		t.Error("Expected ID to be set")
 	}
@@ -422,45 +307,33 @@ func TestApplyImage(t *testing.T) {
 	if m.Name == "" {
 		t.Error("Expected name to be set")
 	}
-
-	// Verify image type
 	if m.ImageType == "" {
 		t.Error("Expected ImageType to be set")
 	}
-
-	// Verify size
 	if m.SizeBytes == 0 {
 		t.Error("Expected SizeBytes to be > 0")
 	}
 }
 
-// TestApplyVM tests VM mapping from API response to model.
 func TestApplyVM(t *testing.T) {
 	data, err := os.ReadFile("testdata/vms_list.json")
 	if err != nil {
 		t.Fatalf("Failed to read testdata: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response struct {
+		Entities []vmEntity `json:"entities"`
+	}
 	if err := json.Unmarshal(data, &response); err != nil {
 		t.Fatalf("Failed to unmarshal JSON: %v", err)
 	}
-
-	entities, ok := response["entities"].([]interface{})
-	if !ok || len(entities) == 0 {
+	if len(response.Entities) == 0 {
 		t.Fatal("No entities in response")
 	}
 
-	// Test first VM
-	entity, ok := entities[0].(map[string]interface{})
-	if !ok {
-		t.Fatal("Entity is not a map")
-	}
-
 	m := &model.VM{}
-	applyVM(entity, m)
+	response.Entities[0].ApplyTo(m)
 
-	// Verify basic fields
 	if m.ID == "" {
 		t.Error("Expected ID to be set")
 	}
@@ -470,13 +343,9 @@ func TestApplyVM(t *testing.T) {
 	if m.Name != "web-server-rhel8" {
 		t.Errorf("Expected name 'web-server-rhel8', got %s", m.Name)
 	}
-
-	// Verify cluster and host
 	if m.Cluster == "" {
 		t.Error("Expected Cluster to be set")
 	}
-
-	// Verify CPU and memory
 	if m.NumSockets != 2 {
 		t.Errorf("Expected NumSockets to be 2, got %d", m.NumSockets)
 	}
@@ -486,46 +355,35 @@ func TestApplyVM(t *testing.T) {
 	if m.MemorySizeMiB != 8192 {
 		t.Errorf("Expected MemorySizeMiB to be 8192, got %d", m.MemorySizeMiB)
 	}
-
-	// Verify power state
 	if m.PowerState != "ON" {
 		t.Errorf("Expected PowerState to be 'ON', got %s", m.PowerState)
 	}
-
-	// Verify NICs
 	if len(m.NICs) == 0 {
 		t.Error("Expected at least one NIC")
 	} else {
-		nic := m.NICs[0]
-		if nic.MACAddress == "" {
+		if m.NICs[0].MACAddress == "" {
 			t.Error("Expected NIC MAC address to be set")
 		}
-		if nic.SubnetUUID == "" {
+		if m.NICs[0].SubnetUUID == "" {
 			t.Error("Expected NIC subnet UUID to be set")
 		}
 	}
-
-	// Verify disks
 	if len(m.Disks) == 0 {
 		t.Error("Expected at least one disk")
 	} else {
-		disk := m.Disks[0]
-		if disk.UUID == "" {
+		if m.Disks[0].UUID == "" {
 			t.Error("Expected disk UUID to be set")
 		}
-		if disk.DiskSizeMiB == 0 {
+		if m.Disks[0].DiskSizeMiB == 0 {
 			t.Error("Expected disk size to be > 0")
 		}
-		if disk.StorageContainerUUID == "" {
+		if m.Disks[0].StorageContainerUUID == "" {
 			t.Error("Expected storage container UUID to be set")
 		}
 	}
-
-	// Verify boot config
 	if m.BootType != "UEFI" {
 		t.Errorf("Expected BootType to be 'UEFI', got %s", m.BootType)
 	}
-
 	if !m.GuestToolsEnabled {
 		t.Error("Expected GuestToolsEnabled to be true")
 	}
@@ -537,20 +395,19 @@ func TestApplyVM(t *testing.T) {
 	}
 }
 
-// TestApplyVMDetail tests VM mapping from a detailed API response.
 func TestApplyVMDetail(t *testing.T) {
 	data, err := os.ReadFile("testdata/vm_detail_example.json")
 	if err != nil {
 		t.Fatalf("Failed to read testdata: %v", err)
 	}
 
-	var entity map[string]interface{}
-	if err := json.Unmarshal(data, &entity); err != nil {
+	var e vmEntity
+	if err := json.Unmarshal(data, &e); err != nil {
 		t.Fatalf("Failed to unmarshal JSON: %v", err)
 	}
 
 	m := &model.VM{}
-	applyVM(entity, m)
+	e.ApplyTo(m)
 
 	if m.GuestOSID != "rhel8_64Guest" {
 		t.Errorf("Expected GuestOSID 'rhel8_64Guest', got %s", m.GuestOSID)
@@ -586,21 +443,13 @@ func TestEnrichVM(t *testing.T) {
 	}
 }
 
-// TestApplyGuestTools_Disabled verifies a VM with Nutanix Guest Tools never
-// installed comes back with every guest-tools field at its zero value,
-// rather than erroring or leaving stale values from a previous VM.
 func TestApplyGuestTools_Disabled(t *testing.T) {
-	specResources := map[string]interface{}{
-		"guest_tools": map[string]interface{}{
-			"nutanix_guest_tools": map[string]interface{}{
-				"enabled": false,
-			},
-		},
-	}
-	statusResources := map[string]interface{}{}
+	spec := guestTools{}
+	spec.NutanixGuestTools.Enabled = false
+	status := guestTools{}
 
 	m := &model.VM{}
-	applyGuestTools(specResources, statusResources, m)
+	mergeGuestTools(spec, status, m)
 
 	if m.GuestToolsEnabled {
 		t.Error("Expected GuestToolsEnabled to be false")
@@ -616,24 +465,19 @@ func TestApplyGuestTools_Disabled(t *testing.T) {
 	}
 }
 
-// TestApplyGuestTools_UnmountedISO verifies that an ISO mount state other
-// than "MOUNTED" (e.g. "UNMOUNTED") is correctly reported as not mounted.
+// TestApplyGuestTools_UnmountedISO verifies that an ISO mount state other than
+// "MOUNTED" is correctly reported as not mounted.
 func TestApplyGuestTools_UnmountedISO(t *testing.T) {
-	specResources := map[string]interface{}{
-		"guest_tools": map[string]interface{}{
-			"nutanix_guest_tools": map[string]interface{}{
-				"enabled":          true,
-				"version":          "3.2.0",
-				"is_reachable":     true,
-				"iso_mount_state":  "UNMOUNTED",
-				"guest_os_version": "Red Hat Enterprise Linux 8.9",
-			},
-		},
-	}
-	statusResources := map[string]interface{}{}
+	spec := guestTools{}
+	spec.NutanixGuestTools.Enabled = true
+	spec.NutanixGuestTools.Version = "3.2.0"
+	spec.NutanixGuestTools.IsReachable = true
+	spec.NutanixGuestTools.ISOMountState = "UNMOUNTED"
+	spec.NutanixGuestTools.GuestOSVersion = "Red Hat Enterprise Linux 8.9"
+	status := guestTools{}
 
 	m := &model.VM{}
-	applyGuestTools(specResources, statusResources, m)
+	mergeGuestTools(spec, status, m)
 
 	if !m.GuestToolsEnabled {
 		t.Error("Expected GuestToolsEnabled to be true")
@@ -646,38 +490,40 @@ func TestApplyGuestTools_UnmountedISO(t *testing.T) {
 	}
 }
 
-// TestApplyGuestTools_NoSection verifies a VM with no guest_tools section at
-// all in either spec or status resources doesn't error, and leaves the
-// model at its zero values.
 func TestApplyGuestTools_NoSection(t *testing.T) {
 	m := &model.VM{}
-	applyGuestTools(map[string]interface{}{}, map[string]interface{}{}, m)
+	mergeGuestTools(guestTools{}, guestTools{}, m)
 
 	if m.GuestToolsEnabled || m.GuestToolsMounted || m.GuestToolsReachable || m.GuestToolsVersion != "" {
 		t.Errorf("Expected all guest tools fields to remain at zero value, got %+v", m)
 	}
 }
 
-// TestApplyDiskFromMap_VolumeGroupDisk verifies that a volume-group-backed
-// disk (which has no storage_container_reference of its own) still gets its
-// size and device properties captured, even though the storage container
-// attribution is only resolvable via a separate Volume Group lookup that
-// doesn't exist yet.
-func TestApplyDiskFromMap_VolumeGroupDisk(t *testing.T) {
-	diskData := map[string]interface{}{
-		"uuid": "disk-vg-1",
-		"device_properties": map[string]interface{}{
-			"device_type": "DISK",
-			"disk_address": map[string]interface{}{
-				"device_index": float64(1),
-				"adapter_type": "SCSI",
+// TestApplyDisk_VolumeGroupDisk verifies that a volume-group-backed disk (no
+// storage_container_reference) still captures size and device properties.
+func TestApplyDisk_VolumeGroupDisk(t *testing.T) {
+	d := diskEntity{
+		UUID: "disk-vg-1",
+		DeviceProperties: struct {
+			DeviceType  string `json:"device_type"`
+			DiskAddress struct {
+				AdapterType string `json:"adapter_type"`
+				DeviceIndex int    `json:"device_index"`
+			} `json:"disk_address"`
+		}{
+			DeviceType: "DISK",
+			DiskAddress: struct {
+				AdapterType string `json:"adapter_type"`
+				DeviceIndex int    `json:"device_index"`
+			}{
+				DeviceIndex: 1,
+				AdapterType: "SCSI",
 			},
 		},
-		"disk_size_mib":          float64(51200),
-		"volume_group_reference": map[string]interface{}{"uuid": "vg-1"},
+		DiskSizeMiB: 51200,
 	}
 
-	disk := applyDiskFromMap(diskData)
+	disk := d.ApplyTo()
 
 	if disk.UUID != "disk-vg-1" {
 		t.Errorf("Expected UUID 'disk-vg-1', got %s", disk.UUID)
@@ -696,21 +542,21 @@ func TestApplyDiskFromMap_VolumeGroupDisk(t *testing.T) {
 	}
 }
 
-// TestApplyDiskFromMap_Cdrom verifies IsCdrom is derived correctly from
-// device_type, and that a CD-ROM with no data source doesn't error.
-func TestApplyDiskFromMap_Cdrom(t *testing.T) {
-	diskData := map[string]interface{}{
-		"uuid": "disk-cdrom-1",
-		"device_properties": map[string]interface{}{
-			"device_type": "CDROM",
-			"disk_address": map[string]interface{}{
-				"device_index": float64(0),
-				"adapter_type": "IDE",
-			},
+func TestApplyDisk_Cdrom(t *testing.T) {
+	d := diskEntity{
+		UUID: "disk-cdrom-1",
+		DeviceProperties: struct {
+			DeviceType  string `json:"device_type"`
+			DiskAddress struct {
+				AdapterType string `json:"adapter_type"`
+				DeviceIndex int    `json:"device_index"`
+			} `json:"disk_address"`
+		}{
+			DeviceType: "CDROM",
 		},
 	}
 
-	disk := applyDiskFromMap(diskData)
+	disk := d.ApplyTo()
 
 	if !disk.IsCdrom {
 		t.Error("Expected IsCdrom to be true for a CDROM device type")
@@ -720,12 +566,11 @@ func TestApplyDiskFromMap_Cdrom(t *testing.T) {
 	}
 }
 
-// TestApplyStorageContainerRef_Missing verifies that a disk with no
-// storage_container_reference at all leaves the disk's storage fields at
-// their zero value instead of erroring.
-func TestApplyStorageContainerRef_Missing(t *testing.T) {
-	disk := &model.Disk{}
-	applyStorageContainerRef(map[string]interface{}{}, disk)
+// TestApplyDisk_NoStorageContainerRef verifies that a disk with no
+// storage_container_reference leaves the storage fields at their zero value.
+func TestApplyDisk_NoStorageContainerRef(t *testing.T) {
+	d := diskEntity{UUID: "disk-1"}
+	disk := d.ApplyTo()
 
 	if disk.StorageContainerUUID != "" || disk.StorageContainerName != "" {
 		t.Errorf("Expected empty storage container fields, got UUID=%q Name=%q",

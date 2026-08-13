@@ -209,19 +209,19 @@ func TestStorageContainerEntityFromV2(t *testing.T) {
 		t.Fatalf("failed to read testdata: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response struct {
+		Entities []storageContainerV2Raw `json:"entities"`
+	}
 	if err := json.Unmarshal(data, &response); err != nil {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
-
-	entities, err := extractMapList(response, "entities")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if len(response.Entities) == 0 {
+		t.Fatal("no entities in response")
 	}
 
-	entity := storageContainerFromV2(entities[0])
 	m := &model.StorageContainer{}
-	entity.ApplyTo(m)
+	e := response.Entities[0].toEntity()
+	e.ApplyTo(m)
 
 	if m.Name != "default-container-prod" {
 		t.Fatalf("unexpected name: %s", m.Name)
@@ -246,19 +246,19 @@ func TestStorageContainerEntityFromV4(t *testing.T) {
 		t.Fatalf("failed to read testdata: %v", err)
 	}
 
-	var response map[string]interface{}
+	var response struct {
+		Data []storageContainerV4Raw `json:"data"`
+	}
 	if err := json.Unmarshal(data, &response); err != nil {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
-
-	entities, err := extractMapList(response, "data")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if len(response.Data) == 0 {
+		t.Fatal("no entities in response")
 	}
 
-	entity := storageContainerFromV4(entities[0])
 	m := &model.StorageContainer{}
-	entity.ApplyTo(m)
+	e := response.Data[0].toEntity()
+	e.ApplyTo(m)
 
 	if m.Name != "default-container-prod" {
 		t.Fatalf("unexpected name: %s", m.Name)
@@ -270,16 +270,8 @@ func TestStorageContainerEntityFromV4(t *testing.T) {
 
 func TestFilterStorageContainersByCluster_Prism(t *testing.T) {
 	entities := []storageContainerEntity{
-		storageContainerFromV4(map[string]interface{}{
-			"clusterExtId": "cluster-a",
-			"extId":        "sc-1",
-			"name":         "one",
-		}),
-		storageContainerFromV4(map[string]interface{}{
-			"clusterExtId": "cluster-b",
-			"extId":        "sc-2",
-			"name":         "two",
-		}),
+		storageContainerV4Raw{ExtID: "sc-1", Name: "one", ClusterExtID: "cluster-a"}.toEntity(),
+		storageContainerV4Raw{ExtID: "sc-2", Name: "two", ClusterExtID: "cluster-b"}.toEntity(),
 	}
 
 	filtered := filterStorageContainersByCluster(entities, "cluster-a")
@@ -288,20 +280,19 @@ func TestFilterStorageContainersByCluster_Prism(t *testing.T) {
 	}
 }
 
-// TestImageEntityFromV4 verifies that a raw vmm v4 content/images entity is
-// normalized into the canonical v3-style imageEntity and ApplyTo reads every
-// mapped field back out correctly.
+// TestImageEntityFromV4 verifies that a v4 image raw entity is normalised into
+// the canonical imageEntity and ApplyTo reads every mapped field correctly.
 func TestImageEntityFromV4(t *testing.T) {
-	entity := imageFromV4(map[string]interface{}{
-		"extId":                 "img-1",
-		"name":                  "RHEL-8.9-x86_64",
-		"type":                  "DISK_IMAGE",
-		"sizeBytes":             float64(2147483648),
-		"clusterLocationExtIds": []interface{}{"cluster-a"},
-	})
+	raw := imageV4Raw{
+		ExtID:     "img-1",
+		Name:      "RHEL-8.9-x86_64",
+		Type:      "DISK_IMAGE",
+		SizeBytes: 2147483648,
+	}
 
 	m := &model.Image{}
-	entity.ApplyTo(m)
+	e := raw.toEntity()
+	e.ApplyTo(m)
 
 	if m.ID != "img-1" {
 		t.Errorf("expected ID 'img-1', got %q", m.ID)
@@ -323,10 +314,8 @@ func TestImageEntityFromV4(t *testing.T) {
 // TestImageEntityFromV4MissingFields guards against a panic when optional
 // v4 fields (e.g. a missing/unset source) are absent from the raw entity.
 func TestImageEntityFromV4MissingFields(t *testing.T) {
-	entity := imageFromV4(map[string]interface{}{
-		"extId": "img-2",
-		"name":  "minimal-image",
-	})
+	raw := imageV4Raw{ExtID: "img-2", Name: "minimal-image"}
+	entity := raw.toEntity()
 
 	m := &model.Image{}
 	entity.ApplyTo(m)

@@ -1,12 +1,8 @@
 package nutanix
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
-
-	liberr "github.com/kubev2v/forklift/pkg/lib/error"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type ref struct {
@@ -36,10 +32,6 @@ type v4ListMetadata struct {
 type v4ListResponse[T any] struct {
 	Metadata v4ListMetadata `json:"metadata"`
 	Data     []T            `json:"data"`
-}
-
-func decodeEntity(entity map[string]interface{}, out any) error {
-	return runtime.DefaultUnstructuredConverter.FromUnstructured(entity, out)
 }
 
 func coalesce(values ...string) string {
@@ -122,25 +114,3 @@ func excludeByMatch[T any](entities []T, excludedUUIDs map[string]bool, match fu
 	return filtered
 }
 
-func extractMapList(result map[string]interface{}, key string) ([]map[string]interface{}, error) {
-	raw, ok := result[key]
-	if !ok {
-		return nil, liberr.New(fmt.Sprintf("missing %q in response", key))
-	}
-
-	list, ok := raw.([]interface{})
-	if !ok {
-		return nil, liberr.New(fmt.Sprintf("invalid %q list in response", key))
-	}
-
-	entities := make([]map[string]interface{}, 0, len(list))
-	for _, item := range list {
-		entity, ok := item.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		entities = append(entities, entity)
-	}
-
-	return entities, nil
-}

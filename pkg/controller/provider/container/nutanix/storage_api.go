@@ -24,7 +24,9 @@ func (r *Client) listStorageContainers() (entities []storageContainerEntity, err
 
 func (r *Client) listStorageContainersElement() ([]storageContainerEntity, error) {
 	url := fmt.Sprintf("%s%s", r.url, storageContainersV2Path)
-	result := make(map[string]interface{})
+	var result struct {
+		Entities []storageContainerV2Raw `json:"entities"`
+	}
 	status, err := r.get(url, &result)
 	if err != nil {
 		return nil, err
@@ -33,14 +35,9 @@ func (r *Client) listStorageContainersElement() ([]storageContainerEntity, error
 		return nil, liberr.New(fmt.Sprintf("unexpected status listing storage containers: %d", status))
 	}
 
-	rawEntities, err := extractMapList(result, "entities")
-	if err != nil {
-		return nil, err
-	}
-
-	entities := make([]storageContainerEntity, 0, len(rawEntities))
-	for _, raw := range rawEntities {
-		entities = append(entities, storageContainerFromV2(raw))
+	entities := make([]storageContainerEntity, 0, len(result.Entities))
+	for _, raw := range result.Entities {
+		entities = append(entities, raw.toEntity())
 	}
 
 	return filterStorageContainersByCluster(entities, r.prism.ClusterUUID), nil

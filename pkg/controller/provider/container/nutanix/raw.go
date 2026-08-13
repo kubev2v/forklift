@@ -129,24 +129,6 @@ func (r imageV4Raw) toEntity() imageEntity {
 	}
 }
 
-func storageContainerFromV2(raw map[string]interface{}) storageContainerEntity {
-	var entity storageContainerV2Raw
-	_ = decodeEntity(raw, &entity)
-	return entity.toEntity()
-}
-
-func storageContainerFromV4(raw map[string]interface{}) storageContainerEntity {
-	var entity storageContainerV4Raw
-	_ = decodeEntity(raw, &entity)
-	return entity.toEntity()
-}
-
-func imageFromV4(raw map[string]interface{}) imageEntity {
-	var entity imageV4Raw
-	_ = decodeEntity(raw, &entity)
-	return entity.toEntity()
-}
-
 func coalesceInt(values ...int) int {
 	for _, value := range values {
 		if value != 0 {
