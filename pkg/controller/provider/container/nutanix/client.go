@@ -185,12 +185,7 @@ func (r *Client) post(url string, body interface{}, object interface{}) (status 
 	r.client.Header = r.createAuthHeader()
 
 	// Use the client's Post method
-	status, err = r.client.Post(url, body, object)
-	if err != nil {
-		return status, err
-	}
-
-	return
+	return r.client.Post(url, body, object)
 }
 
 // listAllV3 pages through a v3 list endpoint and unmarshals entities directly
