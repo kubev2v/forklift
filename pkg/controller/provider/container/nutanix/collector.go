@@ -325,7 +325,7 @@ func (r *Collector) clusters() (err error) {
 			return
 		}
 		m := &model.Cluster{}
-		applyCluster(entity, m)
+		entity.ApplyTo(m)
 		current[m.ID] = true
 		err = tx.Insert(m)
 		if err != nil {
@@ -382,7 +382,7 @@ func (r *Collector) hosts() (err error) {
 			return
 		}
 		m := &model.Host{}
-		applyHost(entity, m)
+		entity.ApplyTo(m)
 		current[m.ID] = true
 		err = tx.Insert(m)
 		if err != nil {
@@ -439,7 +439,7 @@ func (r *Collector) networks() (err error) {
 			return
 		}
 		m := &model.Network{}
-		applyNetwork(entity, m)
+		entity.ApplyTo(m)
 		current[m.ID] = true
 		err = tx.Insert(m)
 		if err != nil {
@@ -497,7 +497,7 @@ func (r *Collector) storageContainers() (err error) {
 			return
 		}
 		m := &model.StorageContainer{}
-		applyStorageContainer(entity, m)
+		entity.ApplyTo(m)
 		current[m.ID] = true
 		err = tx.Insert(m)
 		if err != nil {
@@ -554,7 +554,7 @@ func (r *Collector) images() (err error) {
 			return
 		}
 		m := &model.Image{}
-		applyImage(entity, m)
+		entity.ApplyTo(m)
 		current[m.ID] = true
 		err = tx.Insert(m)
 		if err != nil {
@@ -616,7 +616,7 @@ func (r *Collector) vms() (err error) {
 			return
 		}
 		m := &model.VM{}
-		applyVM(entity, m)
+		entity.ApplyTo(m)
 		enrichVM(m, storageNames, networkNames)
 		current[m.ID] = true
 		err = tx.Insert(m)

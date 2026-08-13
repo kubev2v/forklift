@@ -125,15 +125,8 @@ func TestClientListClusters(t *testing.T) {
 	}
 
 	// Verify first cluster has expected fields
-	if len(entities) > 0 {
-		cluster := entities[0]
-		metadata, ok := cluster["metadata"].(map[string]interface{})
-		if !ok {
-			t.Error("Expected metadata field")
-		}
-		if _, ok := metadata["uuid"]; !ok {
-			t.Error("Expected uuid in metadata")
-		}
+	if len(entities) > 0 && entities[0].Metadata.UUID == "" {
+		t.Error("Expected uuid in metadata")
 	}
 }
 
@@ -205,8 +198,8 @@ func TestClientListClusters_ExcludesPrismCentral(t *testing.T) {
 	if len(entities) != 1 {
 		t.Fatalf("expected 1 cluster after excluding Prism Central, got %d", len(entities))
 	}
-	if uuid := getString(entities[0], "metadata.uuid"); uuid != "real-cluster" {
-		t.Errorf("expected real-cluster, got %s", uuid)
+	if entities[0].Metadata.UUID != "real-cluster" {
+		t.Errorf("expected real-cluster, got %s", entities[0].Metadata.UUID)
 	}
 }
 
@@ -270,8 +263,8 @@ func TestClientListHosts_ExcludesPrismCentralHosts(t *testing.T) {
 	if len(entities) != 1 {
 		t.Fatalf("expected 1 host after excluding Prism Central's pseudo-cluster, got %d", len(entities))
 	}
-	if uuid := getString(entities[0], "metadata.uuid"); uuid != "real-host" {
-		t.Errorf("expected real-host, got %s", uuid)
+	if entities[0].Metadata.UUID != "real-host" {
+		t.Errorf("expected real-host, got %s", entities[0].Metadata.UUID)
 	}
 }
 
@@ -324,21 +317,8 @@ func TestClientListVMs(t *testing.T) {
 
 	// Verify VM has expected structure
 	if len(entities) > 0 {
-		vm := entities[0]
-		metadata, ok := vm["metadata"].(map[string]interface{})
-		if !ok {
-			t.Error("Expected metadata field")
-		}
-		if _, ok := metadata["uuid"]; !ok {
+		if entities[0].Metadata.UUID == "" {
 			t.Error("Expected uuid in metadata")
-		}
-
-		status, ok := vm["status"].(map[string]interface{})
-		if !ok {
-			t.Error("Expected status field")
-		}
-		if _, ok := status["resources"]; !ok {
-			t.Error("Expected resources in status")
 		}
 	}
 }
@@ -500,7 +480,7 @@ func TestClientListImagesCentral(t *testing.T) {
 	}
 
 	m := &model.Image{}
-	applyImage(entities[0], m)
+	entities[0].ApplyTo(m)
 	if m.ID != "img-0005c123-4567-89ab-cdef-000000000001" {
 		t.Errorf("Expected ID from extId, got %q", m.ID)
 	}
@@ -574,8 +554,8 @@ func TestClientListClusters_ScopedToCluster(t *testing.T) {
 	if len(entities) != 1 {
 		t.Fatalf("expected 1 cluster scoped to %s, got %d", prodClusterUUID, len(entities))
 	}
-	if uuid := getString(entities[0], "metadata.uuid"); uuid != prodClusterUUID {
-		t.Errorf("expected cluster %s, got %s", prodClusterUUID, uuid)
+	if entities[0].Metadata.UUID != prodClusterUUID {
+		t.Errorf("expected cluster %s, got %s", prodClusterUUID, entities[0].Metadata.UUID)
 	}
 }
 
@@ -608,8 +588,10 @@ func TestClientListHosts_ScopedToCluster(t *testing.T) {
 	if len(entities) != 1 {
 		t.Fatalf("expected 1 host scoped to %s, got %d", devClusterUUID, len(entities))
 	}
-	if name := getString(entities[0], "metadata.name"); name != "ahv-dev-node-01" {
-		t.Errorf("expected ahv-dev-node-01, got %s", name)
+	m := &model.Host{}
+	entities[0].ApplyTo(m)
+	if m.Name != "ahv-dev-node-01" {
+		t.Errorf("expected ahv-dev-node-01, got %s", m.Name)
 	}
 }
 
@@ -644,8 +626,8 @@ func TestClientListVMs_ScopedToCluster(t *testing.T) {
 		t.Fatalf("expected 4 VMs scoped to %s, got %d", prodClusterUUID, len(entities))
 	}
 	for _, e := range entities {
-		if uuid := getString(e, "spec.cluster_reference.uuid"); uuid != prodClusterUUID {
-			t.Errorf("expected VM cluster %s, got %s", prodClusterUUID, uuid)
+		if e.Spec.ClusterReference.UUID != prodClusterUUID {
+			t.Errorf("expected VM cluster %s, got %s", prodClusterUUID, e.Spec.ClusterReference.UUID)
 		}
 	}
 
@@ -822,7 +804,7 @@ func TestClientListAllV4Paginates(t *testing.T) {
 	}
 	requests = 0
 
-	entities, err := client.listAllV4(storageContainersV4Path, pageSize)
+	entities, err := listAllV4[map[string]interface{}](client, storageContainersV4Path, pageSize)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -864,7 +846,7 @@ func TestClientListAllV4StopsOnEmptyPage(t *testing.T) {
 	client := createTestClient(server.URL)
 	client.url = server.URL
 
-	entities, err := client.listAllV4(storageContainersV4Path, 2)
+	entities, err := listAllV4[map[string]interface{}](client, storageContainersV4Path, 2)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

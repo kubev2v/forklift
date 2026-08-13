@@ -219,9 +219,9 @@ func TestStorageContainerEntityFromV2(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	entity := storageContainerEntityFromV2(entities[0])
+	entity := storageContainerFromV2(entities[0])
 	m := &model.StorageContainer{}
-	applyStorageContainer(entity, m)
+	entity.ApplyTo(m)
 
 	if m.Name != "default-container-prod" {
 		t.Fatalf("unexpected name: %s", m.Name)
@@ -256,9 +256,9 @@ func TestStorageContainerEntityFromV4(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	entity := storageContainerEntityFromV4(entities[0])
+	entity := storageContainerFromV4(entities[0])
 	m := &model.StorageContainer{}
-	applyStorageContainer(entity, m)
+	entity.ApplyTo(m)
 
 	if m.Name != "default-container-prod" {
 		t.Fatalf("unexpected name: %s", m.Name)
@@ -268,17 +268,17 @@ func TestStorageContainerEntityFromV4(t *testing.T) {
 	}
 }
 
-func TestFilterStorageContainersByCluster(t *testing.T) {
-	entities := []map[string]interface{}{
-		storageContainerEntityFromV4(map[string]interface{}{
+func TestFilterStorageContainersByCluster_Prism(t *testing.T) {
+	entities := []storageContainerEntity{
+		storageContainerFromV4(map[string]interface{}{
+			"clusterExtId": "cluster-a",
 			"extId":        "sc-1",
 			"name":         "one",
-			"clusterExtId": "cluster-a",
 		}),
-		storageContainerEntityFromV4(map[string]interface{}{
+		storageContainerFromV4(map[string]interface{}{
+			"clusterExtId": "cluster-b",
 			"extId":        "sc-2",
 			"name":         "two",
-			"clusterExtId": "cluster-b",
 		}),
 	}
 
@@ -289,10 +289,10 @@ func TestFilterStorageContainersByCluster(t *testing.T) {
 }
 
 // TestImageEntityFromV4 verifies that a raw vmm v4 content/images entity is
-// reshaped into the v3-style structure applyImage() expects, and that
-// applyImage() can then read every mapped field back out correctly.
+// normalized into the canonical v3-style imageEntity and ApplyTo reads every
+// mapped field back out correctly.
 func TestImageEntityFromV4(t *testing.T) {
-	entity := imageEntityFromV4(map[string]interface{}{
+	entity := imageFromV4(map[string]interface{}{
 		"extId":                 "img-1",
 		"name":                  "RHEL-8.9-x86_64",
 		"type":                  "DISK_IMAGE",
@@ -301,7 +301,7 @@ func TestImageEntityFromV4(t *testing.T) {
 	})
 
 	m := &model.Image{}
-	applyImage(entity, m)
+	entity.ApplyTo(m)
 
 	if m.ID != "img-1" {
 		t.Errorf("expected ID 'img-1', got %q", m.ID)
@@ -323,13 +323,13 @@ func TestImageEntityFromV4(t *testing.T) {
 // TestImageEntityFromV4MissingFields guards against a panic when optional
 // v4 fields (e.g. a missing/unset source) are absent from the raw entity.
 func TestImageEntityFromV4MissingFields(t *testing.T) {
-	entity := imageEntityFromV4(map[string]interface{}{
+	entity := imageFromV4(map[string]interface{}{
 		"extId": "img-2",
 		"name":  "minimal-image",
 	})
 
 	m := &model.Image{}
-	applyImage(entity, m)
+	entity.ApplyTo(m)
 
 	if m.ID != "img-2" {
 		t.Errorf("expected ID 'img-2', got %q", m.ID)

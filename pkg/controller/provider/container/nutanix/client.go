@@ -195,46 +195,40 @@ func (r *Client) post(url string, body interface{}, object interface{}) (status 
 	return
 }
 
-// listAll pages through a v3 list endpoint, following the response's
-// total_matches, and returns every entity across all pages. This keeps a
-// single provider from silently truncating on Prism inventories larger than
-// one page.
-func (r *Client) listAll(resourceKind string, filter map[string]interface{}, pageSize int) (entities []map[string]interface{}, err error) {
+// listAllV3 pages through a v3 list endpoint and unmarshals entities directly
+// into typed structs, following the response's total_matches across pages.
+func listAllV3[T any](r *Client, resourceKind string, filter map[string]interface{}, pageSize int) ([]T, error) {
 	offset := 0
-	entities = make([]map[string]interface{}, 0)
+	entities := make([]T, 0)
 
 	for {
-		result, err := r.list(resourceKind, filter, offset, pageSize)
+		body := map[string]interface{}{
+			"kind":   resourceKind,
+			"length": pageSize,
+			"offset": offset,
+		}
+		if filter != nil {
+			body["filter"] = filter
+		}
+
+		var result v3ListResponse[T]
+		url := fmt.Sprintf("%s/api/nutanix/v3/%ss/list", r.url, resourceKind)
+		status, err := r.post(url, body, &result)
 		if err != nil {
 			return nil, err
 		}
-
-		entitiesList, ok := result["entities"].([]interface{})
-		if !ok {
-			break
-		}
-		for _, e := range entitiesList {
-			if entity, ok := e.(map[string]interface{}); ok {
-				entities = append(entities, entity)
-			}
+		if status != http.StatusOK {
+			return nil, liberr.New(fmt.Sprintf("unexpected status: %d", status))
 		}
 
-		// No entities came back; nothing left to page through.
-		if len(entitiesList) == 0 {
+		entities = append(entities, result.Entities...)
+
+		if len(result.Entities) == 0 {
 			break
 		}
 
-		metadata, ok := result["metadata"].(map[string]interface{})
-		if !ok {
-			break
-		}
-		totalMatches, ok := metadata["total_matches"].(float64)
-		if !ok {
-			break
-		}
-
-		offset += len(entitiesList)
-		if offset >= int(totalMatches) {
+		offset += len(result.Entities)
+		if offset >= result.Metadata.TotalMatches {
 			break
 		}
 	}
@@ -242,18 +236,28 @@ func (r *Client) listAll(resourceKind string, filter map[string]interface{}, pag
 	return entities, nil
 }
 
+// listAll pages through a v3 list endpoint, following the response's
+// total_matches, and returns every entity across all pages. This keeps a
+// single provider from silently truncating on Prism inventories larger than
+// one page.
+func (r *Client) listAll(resourceKind string, filter map[string]interface{}, pageSize int) (entities []map[string]interface{}, err error) {
+	rawEntities, err := listAllV3[map[string]interface{}](r, resourceKind, filter, pageSize)
+	if err != nil {
+		return nil, err
+	}
+	return rawEntities, nil
+}
+
 // listAllV4 pages through a v4 "config" namespace list endpoint, following
 // the response's metadata.totalAvailableResults, and returns every raw
-// entity across all pages. v4 endpoints paginate via $page/$limit query
-// params rather than v3's offset/length body fields and total_matches, so
-// this mirrors listAll()'s intent for v4 without reusing it directly.
-func (r *Client) listAllV4(path string, pageSize int) (entities []map[string]interface{}, err error) {
+// entity across all pages.
+func listAllV4[T any](r *Client, path string, pageSize int) ([]T, error) {
 	url := fmt.Sprintf("%s%s", r.url, path)
 	page := 0
-	entities = make([]map[string]interface{}, 0)
+	entities := make([]T, 0)
 
 	for {
-		result := make(map[string]interface{})
+		var result v4ListResponse[T]
 		status, err := r.get(url, &result,
 			libweb.Param{Key: "$page", Value: strconv.Itoa(page)},
 			libweb.Param{Key: "$limit", Value: strconv.Itoa(pageSize)},
@@ -265,19 +269,13 @@ func (r *Client) listAllV4(path string, pageSize int) (entities []map[string]int
 			return nil, liberr.New(fmt.Sprintf("unexpected status listing %s: %d", path, status))
 		}
 
-		rawEntities, err := extractMapList(result, "data")
-		if err != nil {
-			return nil, err
-		}
-		entities = append(entities, rawEntities...)
+		entities = append(entities, result.Data...)
 
-		// No entities came back; nothing left to page through.
-		if len(rawEntities) == 0 {
+		if len(result.Data) == 0 {
 			break
 		}
 
-		total := getInt(result, "metadata.totalAvailableResults")
-		if len(entities) >= total {
+		if len(entities) >= result.Metadata.TotalAvailableResults {
 			break
 		}
 
@@ -285,35 +283,6 @@ func (r *Client) listAllV4(path string, pageSize int) (entities []map[string]int
 	}
 
 	return entities, nil
-}
-
-// List resources using Nutanix v3 API pattern
-// Nutanix uses POST for list operations with a filter body
-func (r *Client) list(resourceKind string, filter map[string]interface{}, offset, length int) (result map[string]interface{}, err error) {
-	url := fmt.Sprintf("%s/api/nutanix/v3/%ss/list", r.url, resourceKind)
-
-	body := map[string]interface{}{
-		"kind":   resourceKind,
-		"offset": offset,
-		"length": length,
-	}
-
-	// Add filter if provided
-	if filter != nil {
-		body["filter"] = filter
-	}
-
-	result = make(map[string]interface{})
-	status, err := r.post(url, body, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	if status != http.StatusOK {
-		return nil, liberr.New(fmt.Sprintf("unexpected status: %d", status))
-	}
-
-	return result, nil
 }
 
 // Create HTTP Header with Basic Auth
@@ -337,8 +306,8 @@ func basicAuth(username, password string) string {
 // List all clusters, scoped to the configured clusterUuid (if any).
 // Prism Central's own self-registered pseudo-cluster entry is excluded --
 // see isPrismCentralCluster.
-func (r *Client) listClusters() (entities []map[string]interface{}, err error) {
-	entities, err = r.listAll("cluster", nil, clusterPageSize)
+func (r *Client) listClusters() (entities []clusterEntity, err error) {
+	entities, err = listAllV3[clusterEntity](r, "cluster", nil, clusterPageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -346,51 +315,56 @@ func (r *Client) listClusters() (entities []map[string]interface{}, err error) {
 	if err = r.ensurePrismConfig(); err != nil {
 		return nil, err
 	}
-	return filterEntitiesByCluster(entities, r.prism.ClusterUUID, "metadata.uuid"), nil
+	return filterByMatch(entities, r.prism.ClusterUUID, func(entity clusterEntity) string {
+		return entity.Metadata.UUID
+	}), nil
 }
 
 // List all hosts, scoped to the configured clusterUuid (if any). Hosts
 // belonging to Prism Central's own pseudo-cluster (i.e. its underlying
 // appliance, not a real hypervisor node) are excluded.
-func (r *Client) listHosts() (entities []map[string]interface{}, err error) {
-	entities, err = r.listAll("host", nil, hostPageSize)
+func (r *Client) listHosts() (entities []hostEntity, err error) {
+	entities, err = listAllV3[hostEntity](r, "host", nil, hostPageSize)
 	if err != nil {
 		return nil, err
 	}
-	clusters, err := r.listAll("cluster", nil, clusterPageSize)
+	clusters, err := listAllV3[clusterEntity](r, "cluster", nil, clusterPageSize)
 	if err != nil {
 		return nil, err
 	}
-	entities = excludeEntitiesByCluster(entities, excludedClusterUUIDs(clusters),
-		"spec.cluster_reference.uuid", "status.cluster_reference.uuid")
+	entities = excludeHostsByCluster(entities, excludedClusterUUIDs(clusters))
 	if err = r.ensurePrismConfig(); err != nil {
 		return nil, err
 	}
-	return filterEntitiesByCluster(entities, r.prism.ClusterUUID,
-		"spec.cluster_reference.uuid", "status.cluster_reference.uuid"), nil
+	return filterByMatch(entities, r.prism.ClusterUUID, func(entity hostEntity) string {
+		return entity.clusterUUID()
+	}), nil
 }
 
 // List all VMs, scoped to the configured clusterUuid (if any).
-func (r *Client) listVMs() (entities []map[string]interface{}, err error) {
-	entities, err = r.listAll("vm", nil, vmPageSize)
+func (r *Client) listVMs() (entities []vmEntity, err error) {
+	entities, err = listAllV3[vmEntity](r, "vm", nil, vmPageSize)
 	if err != nil {
 		return nil, err
 	}
 	if err = r.ensurePrismConfig(); err != nil {
 		return nil, err
 	}
-	return filterEntitiesByCluster(entities, r.prism.ClusterUUID, "spec.cluster_reference.uuid"), nil
+	return filterByMatch(entities, r.prism.ClusterUUID, func(entity vmEntity) string {
+		return entity.Spec.ClusterReference.UUID
+	}), nil
 }
 
 // List all subnets (networks), scoped to the configured clusterUuid (if any).
-func (r *Client) listSubnets() (entities []map[string]interface{}, err error) {
-	entities, err = r.listAll("subnet", nil, subnetPageSize)
+func (r *Client) listSubnets() (entities []networkEntity, err error) {
+	entities, err = listAllV3[networkEntity](r, "subnet", nil, subnetPageSize)
 	if err != nil {
 		return nil, err
 	}
 	if err = r.ensurePrismConfig(); err != nil {
 		return nil, err
 	}
-	return filterEntitiesByCluster(entities, r.prism.ClusterUUID,
-		"spec.cluster_reference.uuid", "status.cluster_reference.uuid"), nil
+	return filterByMatch(entities, r.prism.ClusterUUID, func(entity networkEntity) string {
+		return entity.clusterUUID()
+	}), nil
 }
