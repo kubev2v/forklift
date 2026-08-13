@@ -27,6 +27,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	types "github.com/dell/gopowermax/v2/types/v100"
@@ -105,16 +106,51 @@ type Client interface {
 	// GetToken gets the Auth token for the HTTP client
 	GetToken() string
 
+	// SetCustomHTTPHeaders sets custom HTTP headers that will be sent with every request
+	SetCustomHTTPHeaders(headers http.Header)
+
+	// GetCustomHTTPHeaders returns the current custom HTTP headers
+	GetCustomHTTPHeaders() http.Header
+
 	// ParseJSONError parses the JSON in r into an error object
 	ParseJSONError(r *http.Response) error
 }
 
+// SafeHeader provides thread-safe access to HTTP headers.
+type SafeHeader struct {
+	mu     *sync.RWMutex
+	header http.Header
+}
+
+// NewSafeHeader returns a new thread-safe header container.
+func NewSafeHeader() *SafeHeader {
+	return &SafeHeader{
+		mu:     &sync.RWMutex{},
+		header: make(http.Header),
+	}
+}
+
+// SetHeader replaces the stored headers with a clone of h.
+func (s *SafeHeader) SetHeader(h http.Header) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.header = h.Clone()
+}
+
+// GetHeader returns a safe copy of the stored headers.
+func (s *SafeHeader) GetHeader() http.Header {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.header.Clone()
+}
+
 type client struct {
-	http     *http.Client
-	host     string
-	token    string
-	showHTTP bool
-	debug    bool
+	http              *http.Client
+	host              string
+	token             string
+	showHTTP          bool
+	debug             bool
+	customHTTPHeaders *SafeHeader
 }
 
 // ClientOptions are options for the API client.
@@ -149,8 +185,9 @@ func New(
 	host = strings.Replace(host, "/api", "", 1)
 
 	c := &client{
-		http: &http.Client{},
-		host: host,
+		http:              &http.Client{},
+		host:              host,
+		customHTTPHeaders: NewSafeHeader(),
 	}
 
 	if opts.Timeout != 0 {
@@ -381,13 +418,20 @@ func (c *client) DoAndGetResponseBody(
 		req.SetBasicAuth("", c.token)
 	}
 
+	// add custom HTTP headers
+	for key, values := range c.customHTTPHeaders.GetHeader() {
+		for _, elem := range values {
+			req.Header.Add(key, elem)
+		}
+	}
+
 	if c.showHTTP {
 		logRequest(ctx, req, c.doLog)
 	}
 
 	// send the request
 	req = req.WithContext(ctx)
-	if res, err = c.http.Do(req); err != nil {
+	if res, err = c.http.Do(req); err != nil { // #nosec G704 -- URL is constructed from the configured host endpoint, not user input
 		return nil, err
 	}
 
@@ -404,6 +448,16 @@ func (c *client) SetToken(token string) {
 
 func (c *client) GetToken() string {
 	return c.token
+}
+
+// SetCustomHTTPHeaders registers headers which will be sent with every request.
+func (c *client) SetCustomHTTPHeaders(headers http.Header) {
+	c.customHTTPHeaders.SetHeader(headers)
+}
+
+// GetCustomHTTPHeaders returns the current custom HTTP headers.
+func (c *client) GetCustomHTTPHeaders() http.Header {
+	return c.customHTTPHeaders.GetHeader()
 }
 
 func (c *client) ParseJSONError(r *http.Response) error {
