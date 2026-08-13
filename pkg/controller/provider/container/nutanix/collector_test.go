@@ -16,8 +16,8 @@ import (
 	core "k8s.io/api/core/v1"
 )
 
-// clusterEntity builds a minimal cluster entity with the given UUID/name.
-func clusterEntity(uuid, name string) map[string]interface{} {
+// clusterMapEntity builds a minimal cluster entity with the given UUID/name.
+func clusterMapEntity(uuid, name string) map[string]interface{} {
 	return map[string]interface{}{
 		"metadata": map[string]interface{}{
 			"uuid": uuid,
@@ -29,8 +29,8 @@ func clusterEntity(uuid, name string) map[string]interface{} {
 	}
 }
 
-// hostEntity builds a minimal host entity with the given UUID/name.
-func hostEntity(uuid, name string) map[string]interface{} {
+// hostMapEntity builds a minimal host entity with the given UUID/name.
+func hostMapEntity(uuid, name string) map[string]interface{} {
 	return map[string]interface{}{
 		"metadata": map[string]interface{}{
 			"uuid": uuid,
@@ -42,9 +42,9 @@ func hostEntity(uuid, name string) map[string]interface{} {
 	}
 }
 
-// networkEntity builds a minimal subnet/network entity with the given
+// networkMapEntity builds a minimal subnet/network entity with the given
 // UUID/name.
-func networkEntity(uuid, name string) map[string]interface{} {
+func networkMapEntity(uuid, name string) map[string]interface{} {
 	return map[string]interface{}{
 		"metadata": map[string]interface{}{
 			"uuid": uuid,
@@ -56,8 +56,8 @@ func networkEntity(uuid, name string) map[string]interface{} {
 	}
 }
 
-// imageEntity builds a minimal image entity with the given UUID/name.
-func imageEntity(uuid, name string) map[string]interface{} {
+// imageMapEntity builds a minimal image entity with the given UUID/name.
+func imageMapEntity(uuid, name string) map[string]interface{} {
 	return map[string]interface{}{
 		"metadata": map[string]interface{}{
 			"uuid": uuid,
@@ -69,8 +69,8 @@ func imageEntity(uuid, name string) map[string]interface{} {
 	}
 }
 
-// vmEntity builds a minimal VM entity with the given UUID/name.
-func vmEntity(uuid, name string) map[string]interface{} {
+// vmMapEntity builds a minimal VM entity with the given UUID/name.
+func vmMapEntity(uuid, name string) map[string]interface{} {
 	return map[string]interface{}{
 		"metadata": map[string]interface{}{
 			"uuid": uuid,
@@ -171,8 +171,8 @@ func TestClusters_DeletesStaleEntries(t *testing.T) {
 
 	// First cycle: two clusters present.
 	setEntities([]map[string]interface{}{
-		clusterEntity("cluster-1", "Cluster1"),
-		clusterEntity("cluster-2", "Cluster2"),
+		clusterMapEntity("cluster-1", "Cluster1"),
+		clusterMapEntity("cluster-2", "Cluster2"),
 	})
 	if err := collector.clusters(); err != nil {
 		t.Fatalf("Unexpected error on first collection: %v", err)
@@ -188,7 +188,7 @@ func TestClusters_DeletesStaleEntries(t *testing.T) {
 
 	// Second cycle: cluster-2 removed from the source.
 	setEntities([]map[string]interface{}{
-		clusterEntity("cluster-1", "Cluster1"),
+		clusterMapEntity("cluster-1", "Cluster1"),
 	})
 	if err := collector.clusters(); err != nil {
 		t.Fatalf("Unexpected error on second collection: %v", err)
@@ -221,7 +221,7 @@ func TestClusters_NoChangesWhenSourceUnchanged(t *testing.T) {
 	collector, db := newTestCollector(t, url)
 
 	setEntities([]map[string]interface{}{
-		clusterEntity("cluster-1", "Cluster1"),
+		clusterMapEntity("cluster-1", "Cluster1"),
 	})
 	if err := collector.clusters(); err != nil {
 		t.Fatalf("Unexpected error on first collection: %v", err)
@@ -264,15 +264,15 @@ func TestHosts_DeletesStaleEntries(t *testing.T) {
 	collector, db := newTestCollector(t, url)
 
 	setEntities([]map[string]interface{}{
-		hostEntity("host-1", "Host1"),
-		hostEntity("host-2", "Host2"),
+		hostMapEntity("host-1", "Host1"),
+		hostMapEntity("host-2", "Host2"),
 	})
 	if err := collector.hosts(); err != nil {
 		t.Fatalf("Unexpected error on first collection: %v", err)
 	}
 
 	setEntities([]map[string]interface{}{
-		hostEntity("host-1", "Host1"),
+		hostMapEntity("host-1", "Host1"),
 	})
 	if err := collector.hosts(); err != nil {
 		t.Fatalf("Unexpected error on second collection: %v", err)
@@ -301,7 +301,7 @@ func TestHosts_NoChangesWhenSourceUnchanged(t *testing.T) {
 	collector, db := newTestCollector(t, url)
 
 	setEntities([]map[string]interface{}{
-		hostEntity("host-1", "Host1"),
+		hostMapEntity("host-1", "Host1"),
 	})
 	if err := collector.hosts(); err != nil {
 		t.Fatalf("Unexpected error on first collection: %v", err)
@@ -328,15 +328,15 @@ func TestNetworks_DeletesStaleEntries(t *testing.T) {
 	collector, db := newTestCollector(t, url)
 
 	setEntities([]map[string]interface{}{
-		networkEntity("net-1", "Net1"),
-		networkEntity("net-2", "Net2"),
+		networkMapEntity("net-1", "Net1"),
+		networkMapEntity("net-2", "Net2"),
 	})
 	if err := collector.networks(); err != nil {
 		t.Fatalf("Unexpected error on first collection: %v", err)
 	}
 
 	setEntities([]map[string]interface{}{
-		networkEntity("net-1", "Net1"),
+		networkMapEntity("net-1", "Net1"),
 	})
 	if err := collector.networks(); err != nil {
 		t.Fatalf("Unexpected error on second collection: %v", err)
@@ -365,7 +365,7 @@ func TestNetworks_NoChangesWhenSourceUnchanged(t *testing.T) {
 	collector, db := newTestCollector(t, url)
 
 	setEntities([]map[string]interface{}{
-		networkEntity("net-1", "Net1"),
+		networkMapEntity("net-1", "Net1"),
 	})
 	if err := collector.networks(); err != nil {
 		t.Fatalf("Unexpected error on first collection: %v", err)
@@ -457,15 +457,15 @@ func TestImages_DeletesStaleEntries(t *testing.T) {
 	collector, db := newTestCollector(t, url)
 
 	setEntities([]map[string]interface{}{
-		imageEntity("img-1", "Image1"),
-		imageEntity("img-2", "Image2"),
+		imageMapEntity("img-1", "Image1"),
+		imageMapEntity("img-2", "Image2"),
 	})
 	if err := collector.images(); err != nil {
 		t.Fatalf("Unexpected error on first collection: %v", err)
 	}
 
 	setEntities([]map[string]interface{}{
-		imageEntity("img-1", "Image1"),
+		imageMapEntity("img-1", "Image1"),
 	})
 	if err := collector.images(); err != nil {
 		t.Fatalf("Unexpected error on second collection: %v", err)
@@ -494,7 +494,7 @@ func TestImages_NoChangesWhenSourceUnchanged(t *testing.T) {
 	collector, db := newTestCollector(t, url)
 
 	setEntities([]map[string]interface{}{
-		imageEntity("img-1", "Image1"),
+		imageMapEntity("img-1", "Image1"),
 	})
 	if err := collector.images(); err != nil {
 		t.Fatalf("Unexpected error on first collection: %v", err)
@@ -521,15 +521,15 @@ func TestVMs_DeletesStaleEntries(t *testing.T) {
 	collector, db := newTestCollector(t, url)
 
 	setEntities([]map[string]interface{}{
-		vmEntity("vm-1", "VM1"),
-		vmEntity("vm-2", "VM2"),
+		vmMapEntity("vm-1", "VM1"),
+		vmMapEntity("vm-2", "VM2"),
 	})
 	if err := collector.vms(); err != nil {
 		t.Fatalf("Unexpected error on first collection: %v", err)
 	}
 
 	setEntities([]map[string]interface{}{
-		vmEntity("vm-1", "VM1"),
+		vmMapEntity("vm-1", "VM1"),
 	})
 	if err := collector.vms(); err != nil {
 		t.Fatalf("Unexpected error on second collection: %v", err)
@@ -558,7 +558,7 @@ func TestVMs_NoChangesWhenSourceUnchanged(t *testing.T) {
 	collector, db := newTestCollector(t, url)
 
 	setEntities([]map[string]interface{}{
-		vmEntity("vm-1", "VM1"),
+		vmMapEntity("vm-1", "VM1"),
 	})
 	if err := collector.vms(); err != nil {
 		t.Fatalf("Unexpected error on first collection: %v", err)

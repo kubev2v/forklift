@@ -7,7 +7,7 @@ import (
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 )
 
-func (r *Client) listStorageContainers() (entities []map[string]interface{}, err error) {
+func (r *Client) listStorageContainers() (entities []storageContainerEntity, err error) {
 	if err = r.ensurePrismConfig(); err != nil {
 		return nil, err
 	}
@@ -22,7 +22,7 @@ func (r *Client) listStorageContainers() (entities []map[string]interface{}, err
 	}
 }
 
-func (r *Client) listStorageContainersElement() ([]map[string]interface{}, error) {
+func (r *Client) listStorageContainersElement() ([]storageContainerEntity, error) {
 	url := fmt.Sprintf("%s%s", r.url, storageContainersV2Path)
 	result := make(map[string]interface{})
 	status, err := r.get(url, &result)
@@ -38,23 +38,23 @@ func (r *Client) listStorageContainersElement() ([]map[string]interface{}, error
 		return nil, err
 	}
 
-	entities := make([]map[string]interface{}, 0, len(rawEntities))
+	entities := make([]storageContainerEntity, 0, len(rawEntities))
 	for _, raw := range rawEntities {
-		entities = append(entities, storageContainerEntityFromV2(raw))
+		entities = append(entities, storageContainerFromV2(raw))
 	}
 
 	return filterStorageContainersByCluster(entities, r.prism.ClusterUUID), nil
 }
 
-func (r *Client) listStorageContainersCentral() ([]map[string]interface{}, error) {
-	rawEntities, err := r.listAllV4(storageContainersV4Path, storageContainerV4PageSize)
+func (r *Client) listStorageContainersCentral() ([]storageContainerEntity, error) {
+	rawEntities, err := listAllV4[storageContainerV4Raw](r, storageContainersV4Path, storageContainerV4PageSize)
 	if err != nil {
 		return nil, err
 	}
 
-	entities := make([]map[string]interface{}, 0, len(rawEntities))
+	entities := make([]storageContainerEntity, 0, len(rawEntities))
 	for _, raw := range rawEntities {
-		entities = append(entities, storageContainerEntityFromV4(raw))
+		entities = append(entities, raw.toEntity())
 	}
 
 	return filterStorageContainersByCluster(entities, r.prism.ClusterUUID), nil

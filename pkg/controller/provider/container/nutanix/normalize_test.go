@@ -2,67 +2,39 @@ package nutanix
 
 import "testing"
 
-func TestFirstString(t *testing.T) {
-	values := map[string]interface{}{
-		"a": "",
-		"b": "value-b",
-		"c": "value-c",
-	}
-
-	if result := firstString(values, "a", "b", "c"); result != "value-b" {
+func TestCoalesce(t *testing.T) {
+	if result := coalesce("", "value-b", "value-c"); result != "value-b" {
 		t.Errorf("expected first non-empty value 'value-b', got %q", result)
 	}
-	if result := firstString(values, "missing"); result != "" {
-		t.Errorf("expected empty string for missing key, got %q", result)
+	if result := coalesce(""); result != "" {
+		t.Errorf("expected empty string, got %q", result)
 	}
 }
 
-func TestFirstInt(t *testing.T) {
-	values := map[string]interface{}{
-		"zero":    0,
-		"nonzero": 7,
-	}
-
-	if result := firstInt(values, "zero", "nonzero"); result != 7 {
+func TestCoalesceInt(t *testing.T) {
+	if result := coalesceInt(0, 7); result != 7 {
 		t.Errorf("expected first non-zero value 7, got %d", result)
 	}
-	// When every candidate is zero/missing, firstInt falls back to
-	// re-reading the first key rather than returning a hardcoded 0.
-	if result := firstInt(values, "zero", "missing"); result != 0 {
+	if result := coalesceInt(0); result != 0 {
 		t.Errorf("expected fallback to first key's value 0, got %d", result)
 	}
 }
 
-func TestFirstInt64(t *testing.T) {
-	values := map[string]interface{}{
-		"zero":    int64(0),
-		"nonzero": int64(42),
-	}
-
-	if result := firstInt64(values, "zero", "nonzero"); result != 42 {
+func TestCoalesceInt64(t *testing.T) {
+	if result := coalesceInt64(0, 42); result != 42 {
 		t.Errorf("expected first non-zero value 42, got %d", result)
 	}
-	if result := firstInt64(values, "zero", "missing"); result != 0 {
+	if result := coalesceInt64(0); result != 0 {
 		t.Errorf("expected fallback to first key's value 0, got %d", result)
 	}
 }
 
-func TestFirstBool(t *testing.T) {
-	values := map[string]interface{}{
-		"present": true,
-		"nested":  map[string]interface{}{"flag": true},
+func TestCoalesceBool(t *testing.T) {
+	if !coalesceBool(false, true) {
+		t.Error("expected coalesceBool to find the first true value")
 	}
-
-	if result := firstBool(values, "missing", "present"); !result {
-		t.Error("expected firstBool to find the first present boolean key")
-	}
-	if result := firstBool(values, "missing"); result {
-		t.Error("expected false when no candidate key is present")
-	}
-	// firstBool reads keys as top-level map lookups, unlike the other
-	// helpers in this file which support dot-separated nested paths.
-	if result := firstBool(values, "nested.flag"); result {
-		t.Error("expected firstBool to not support dot-separated nested paths")
+	if coalesceBool(false) {
+		t.Error("expected false when no candidate is true")
 	}
 }
 
@@ -78,7 +50,6 @@ func TestParseNumericString(t *testing.T) {
 		{"int64", int64(99), 99},
 		{"float64", float64(7), 7},
 		{"unsupported type", true, 0},
-		{"nil", nil, 0},
 	}
 
 	for _, tt := range tests {
@@ -90,114 +61,107 @@ func TestParseNumericString(t *testing.T) {
 	}
 }
 
-func TestExtractMapList_MissingKey(t *testing.T) {
-	_, err := extractMapList(map[string]interface{}{}, "entities")
-	if err == nil {
-		t.Fatal("expected an error when the key is missing")
-	}
-}
-
-func TestExtractMapList_WrongType(t *testing.T) {
-	_, err := extractMapList(map[string]interface{}{"entities": "not-a-list"}, "entities")
-	if err == nil {
-		t.Fatal("expected an error when the value is not a list")
-	}
-}
-
-func TestExtractMapList_SkipsNonMapEntries(t *testing.T) {
-	result := map[string]interface{}{
-		"entities": []interface{}{
-			map[string]interface{}{"name": "valid"},
-			"not-a-map",
-			42,
-		},
+func TestFilterByMatch_EmptyClusterUUID(t *testing.T) {
+	entities := []clusterEntity{
+		{Metadata: metadata{UUID: "cluster-a"}},
+		{Metadata: metadata{UUID: "cluster-b"}},
 	}
 
-	entities, err := extractMapList(result, "entities")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(entities) != 1 {
-		t.Fatalf("expected non-map entries to be skipped, got %d entities: %+v", len(entities), entities)
-	}
-	if entities[0]["name"] != "valid" {
-		t.Errorf("expected the surviving entity to be the valid one, got %+v", entities[0])
-	}
-}
-
-func TestFilterEntitiesByCluster_EmptyClusterUUID(t *testing.T) {
-	entities := []map[string]interface{}{
-		{"id": "1"},
-		{"id": "2"},
-	}
-
-	filtered := filterEntitiesByCluster(entities, "", "some.path")
+	filtered := filterByMatch(entities, "", func(entity clusterEntity) string {
+		return entity.Metadata.UUID
+	})
 	if len(filtered) != len(entities) {
 		t.Errorf("expected every entity to be returned unfiltered when clusterUUID is empty, got %d", len(filtered))
 	}
 }
 
-func TestFilterEntitiesByCluster_Matches(t *testing.T) {
-	entities := []map[string]interface{}{
-		{"metadata": map[string]interface{}{"uuid": "cluster-a"}, "id": "1"},
-		{"metadata": map[string]interface{}{"uuid": "cluster-b"}, "id": "2"},
+func TestFilterByMatch_Matches(t *testing.T) {
+	entities := []clusterEntity{
+		{Metadata: metadata{UUID: "cluster-a"}},
+		{Metadata: metadata{UUID: "cluster-b"}},
 	}
 
-	filtered := filterEntitiesByCluster(entities, "cluster-a", "metadata.uuid")
+	filtered := filterByMatch(entities, "cluster-a", func(entity clusterEntity) string {
+		return entity.Metadata.UUID
+	})
 	if len(filtered) != 1 {
 		t.Fatalf("expected 1 matching entity, got %d", len(filtered))
 	}
-	if filtered[0]["id"] != "1" {
-		t.Errorf("expected the surviving entity to be id=1, got %+v", filtered[0])
+	if filtered[0].Metadata.UUID != "cluster-a" {
+		t.Errorf("expected cluster-a to survive, got %s", filtered[0].Metadata.UUID)
 	}
 }
 
-// TestFilterEntitiesByCluster_FallbackPath verifies that when the first
-// path is absent on an entity, the next path is tried -- needed because
-// hosts/subnets carry cluster_reference under spec on some responses and
-// under status on others, never nested under status.resources.
-func TestFilterEntitiesByCluster_FallbackPath(t *testing.T) {
-	entities := []map[string]interface{}{
-		{
-			"spec": map[string]interface{}{
-				"cluster_reference": map[string]interface{}{"uuid": "cluster-a"},
-			},
-			"id": "1",
-		},
-		{
-			"status": map[string]interface{}{
-				"cluster_reference": map[string]interface{}{"uuid": "cluster-a"},
-			},
-			"id": "2",
-		},
-		{
-			"spec": map[string]interface{}{
-				"cluster_reference": map[string]interface{}{"uuid": "cluster-b"},
-			},
-			"id": "3",
-		},
+func TestFilterByMatch_FallbackClusterRef(t *testing.T) {
+	entities := []hostEntity{
+		{Spec: struct {
+			ClusterReference ref    `json:"cluster_reference"`
+			Name             string `json:"name"`
+		}{ClusterReference: ref{UUID: "cluster-a"}}},
+		{Status: struct {
+			ClusterReference ref           `json:"cluster_reference"`
+			Name             string        `json:"name"`
+			State            string        `json:"state"`
+			Resources        hostResources `json:"resources"`
+		}{ClusterReference: ref{UUID: "cluster-a"}}},
+		{Spec: struct {
+			ClusterReference ref    `json:"cluster_reference"`
+			Name             string `json:"name"`
+		}{ClusterReference: ref{UUID: "cluster-b"}}},
 	}
 
-	filtered := filterEntitiesByCluster(entities, "cluster-a",
-		"spec.cluster_reference.uuid", "status.cluster_reference.uuid")
+	filtered := filterByMatch(entities, "cluster-a", func(entity hostEntity) string {
+		return entity.clusterUUID()
+	})
 	if len(filtered) != 2 {
-		t.Fatalf("expected 2 matching entities, got %d: %+v", len(filtered), filtered)
-	}
-	if filtered[0]["id"] != "1" || filtered[1]["id"] != "2" {
-		t.Errorf("expected entities id=1 and id=2 to survive, got %+v", filtered)
+		t.Fatalf("expected 2 matching entities, got %d", len(filtered))
 	}
 }
 
-func clusterEntityWithServiceList(uuid string, services ...string) map[string]interface{} {
-	serviceList := make([]interface{}, len(services))
-	for i, s := range services {
-		serviceList[i] = s
-	}
-	return map[string]interface{}{
-		"metadata": map[string]interface{}{"uuid": uuid},
-		"status": map[string]interface{}{
-			"resources": map[string]interface{}{
-				"config": map[string]interface{}{"service_list": serviceList},
+func clusterEntityWithServiceList(uuid string, services ...string) clusterEntity {
+	return clusterEntity{
+		Metadata: metadata{UUID: uuid},
+		Status: struct {
+			Name      string `json:"name"`
+			State     string `json:"state"`
+			Resources struct {
+				Analysis struct {
+					Storage struct {
+						TotalCapacityBytes int64 `json:"total_capacity_bytes"`
+						UsageBytes         int64 `json:"usage_bytes"`
+					} `json:"storage_summary"`
+					VMCount int64 `json:"vm_count"`
+				} `json:"analysis"`
+				Config  clusterConfig `json:"config"`
+				Network struct {
+					ExternalIP string `json:"external_ip"`
+				} `json:"network"`
+				Nodes struct {
+					HypervisorServerList []struct {
+						IP string `json:"ip"`
+					} `json:"hypervisor_server_list"`
+				} `json:"nodes"`
+			} `json:"resources"`
+		}{
+			Resources: struct {
+				Analysis struct {
+					Storage struct {
+						TotalCapacityBytes int64 `json:"total_capacity_bytes"`
+						UsageBytes         int64 `json:"usage_bytes"`
+					} `json:"storage_summary"`
+					VMCount int64 `json:"vm_count"`
+				} `json:"analysis"`
+				Config  clusterConfig `json:"config"`
+				Network struct {
+					ExternalIP string `json:"external_ip"`
+				} `json:"network"`
+				Nodes struct {
+					HypervisorServerList []struct {
+						IP string `json:"ip"`
+					} `json:"hypervisor_server_list"`
+				} `json:"nodes"`
+			}{
+				Config: clusterConfig{ServiceList: services},
 			},
 		},
 	}
@@ -210,13 +174,13 @@ func TestIsPrismCentralCluster(t *testing.T) {
 	if isPrismCentralCluster(clusterEntityWithServiceList("real-cluster", "AOS")) {
 		t.Error("expected a service_list of [AOS] to not be detected as Prism Central's pseudo-cluster")
 	}
-	if isPrismCentralCluster(map[string]interface{}{}) {
+	if isPrismCentralCluster(clusterEntity{}) {
 		t.Error("expected an entity with no service_list to not be detected as Prism Central's pseudo-cluster")
 	}
 }
 
 func TestWithoutPrismCentralClusters(t *testing.T) {
-	entities := []map[string]interface{}{
+	entities := []clusterEntity{
 		clusterEntityWithServiceList("real-cluster", "AOS"),
 		clusterEntityWithServiceList("pc-cluster", "PRISM_CENTRAL"),
 	}
@@ -225,13 +189,13 @@ func TestWithoutPrismCentralClusters(t *testing.T) {
 	if len(filtered) != 1 {
 		t.Fatalf("expected 1 cluster to remain, got %d", len(filtered))
 	}
-	if getString(filtered[0], "metadata.uuid") != "real-cluster" {
-		t.Errorf("expected the real cluster to remain, got %+v", filtered[0])
+	if filtered[0].Metadata.UUID != "real-cluster" {
+		t.Errorf("expected the real cluster to remain, got %s", filtered[0].Metadata.UUID)
 	}
 }
 
 func TestExcludedClusterUUIDs(t *testing.T) {
-	entities := []map[string]interface{}{
+	entities := []clusterEntity{
 		clusterEntityWithServiceList("real-cluster", "AOS"),
 		clusterEntityWithServiceList("pc-cluster", "PRISM_CENTRAL"),
 	}
@@ -242,22 +206,50 @@ func TestExcludedClusterUUIDs(t *testing.T) {
 	}
 }
 
-func TestExcludeEntitiesByCluster(t *testing.T) {
-	entities := []map[string]interface{}{
-		{"spec": map[string]interface{}{"cluster_reference": map[string]interface{}{"uuid": "pc-cluster"}}, "id": "1"},
-		{"spec": map[string]interface{}{"cluster_reference": map[string]interface{}{"uuid": "real-cluster"}}, "id": "2"},
+func TestExcludeHostsByCluster(t *testing.T) {
+	entities := []hostEntity{
+		{Spec: struct {
+			ClusterReference ref    `json:"cluster_reference"`
+			Name             string `json:"name"`
+		}{ClusterReference: ref{UUID: "pc-cluster"}}},
+		{Spec: struct {
+			ClusterReference ref    `json:"cluster_reference"`
+			Name             string `json:"name"`
+		}{ClusterReference: ref{UUID: "real-cluster"}}},
 	}
 
-	filtered := excludeEntitiesByCluster(entities, map[string]bool{"pc-cluster": true}, "spec.cluster_reference.uuid")
+	filtered := excludeHostsByCluster(entities, map[string]bool{"pc-cluster": true})
 	if len(filtered) != 1 {
 		t.Fatalf("expected 1 entity to remain, got %d", len(filtered))
 	}
-	if filtered[0]["id"] != "2" {
-		t.Errorf("expected the entity referencing real-cluster to remain, got %+v", filtered[0])
+	if filtered[0].clusterUUID() != "real-cluster" {
+		t.Errorf("expected the entity referencing real-cluster to remain, got %s", filtered[0].clusterUUID())
 	}
 
-	// An empty exclusion set should be a no-op.
-	if filtered := excludeEntitiesByCluster(entities, map[string]bool{}, "spec.cluster_reference.uuid"); len(filtered) != len(entities) {
+	if filtered := excludeHostsByCluster(entities, map[string]bool{}); len(filtered) != len(entities) {
 		t.Errorf("expected no filtering with an empty exclusion set, got %d entities", len(filtered))
+	}
+}
+
+func TestFilterStorageContainersByCluster(t *testing.T) {
+	entities := []storageContainerEntity{
+		storageContainerFromV4(map[string]interface{}{
+			"clusterExtId": "cluster-a",
+			"extId":        "sc-1",
+			"name":         "one",
+		}),
+		storageContainerFromV4(map[string]interface{}{
+			"clusterExtId": "cluster-b",
+			"extId":        "sc-2",
+			"name":         "two",
+		}),
+	}
+
+	filtered := filterStorageContainersByCluster(entities, "cluster-a")
+	if len(filtered) != 1 {
+		t.Fatalf("expected 1 matching storage container, got %d", len(filtered))
+	}
+	if filtered[0].Metadata.UUID != "sc-1" {
+		t.Errorf("expected sc-1 to survive, got %s", filtered[0].Metadata.UUID)
 	}
 }
