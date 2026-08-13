@@ -23,7 +23,7 @@ const (
 	// Refresh interval.
 	RefreshInterval = 10 * time.Second
 	// Default timeout for the HTTP client
-	DefaultClientTimeout = 30 * time.Minute
+	DefaultClientTimeout = 30 * time.Second
 )
 
 // Phases
