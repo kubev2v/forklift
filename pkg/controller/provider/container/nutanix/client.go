@@ -25,8 +25,6 @@ const (
 	RetryDelay = time.Second * 5
 	// Connection timeout.
 	ConnectionTimeout = 30 * time.Second
-	// Default API port
-	DefaultPort = "9440"
 )
 
 // Per-request page sizes for v3 list endpoints. listAll() pages through as
