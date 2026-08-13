@@ -10,6 +10,7 @@ import (
 	siotypes "github.com/dell/goscaleio/types/v1"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/storage"
 	"k8s.io/klog/v2"
 )
 
@@ -28,10 +29,16 @@ type PowerflexClonner struct {
 
 // Ensure PowerflexClonner implements StorageArrayInfoProvider
 var _ populator.StorageArrayInfoProvider = &PowerflexClonner{}
+var _ storage.ArrayIdentifier = &PowerflexClonner{}
 
 // GetStorageArrayInfo returns metadata about the PowerFlex array for metric labels.
 func (p *PowerflexClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 	return p.arrayInfo
+}
+
+// TargetPorts: interim stub, pending verification (see plan).
+func (p *PowerflexClonner) TargetPorts() ([]string, error) {
+	return nil, fmt.Errorf("TargetPorts not yet implemented for PowerFlex")
 }
 
 // CurrentMappedGroups implements populator.StorageApi.

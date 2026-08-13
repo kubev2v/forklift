@@ -10,6 +10,7 @@ import (
 
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/storage"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
 )
 
@@ -21,6 +22,7 @@ const PROVIDER_ID = "60002ac"
 var _ populator.RDMCapable = &Primera3ParClonner{}
 var _ populator.VVolCapable = &Primera3ParClonner{}
 var _ populator.StorageArrayInfoProvider = &Primera3ParClonner{}
+var _ storage.ArrayIdentifier = &Primera3ParClonner{}
 
 type Primera3ParClonner struct {
 	client         Primera3ParClient
@@ -32,6 +34,25 @@ type Primera3ParClonner struct {
 // GetStorageArrayInfo returns metadata about the Primera/3PAR array for metric labels.
 func (c *Primera3ParClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 	return c.arrayInfo
+}
+
+// TargetPorts returns this array's own FC and iSCSI target port identities.
+func (c *Primera3ParClonner) TargetPorts() ([]string, error) {
+	ports, err := c.client.GetPorts()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list ports: %w", err)
+	}
+
+	var result []string
+	for _, port := range ports {
+		if port.PortWWN != "" {
+			result = append(result, "fc."+port.PortWWN)
+		}
+		if port.ISCSIName != "" {
+			result = append(result, port.ISCSIName)
+		}
+	}
+	return result, nil
 }
 
 func NewPrimera3ParClonner(storageHostname, storageUsername, storagePassword string, sslSkipVerify bool) (Primera3ParClonner, error) {

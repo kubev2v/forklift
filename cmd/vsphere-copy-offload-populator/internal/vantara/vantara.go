@@ -12,6 +12,7 @@ import (
 
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/storage"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
 	"k8s.io/klog/v2"
 )
@@ -32,10 +33,32 @@ type VantaraCloner struct {
 
 // Ensure VantaraCloner implements StorageArrayInfoProvider
 var _ populator.StorageArrayInfoProvider = &VantaraCloner{}
+var _ storage.ArrayIdentifier = &VantaraCloner{}
 
 // GetStorageArrayInfo returns metadata about the Vantara array for metric labels.
 func (v *VantaraCloner) GetStorageArrayInfo() populator.StorageArrayInfo {
 	return v.arrayInfo
+}
+
+// TargetPorts returns this array's own FC and iSCSI target port identities.
+func (v *VantaraCloner) TargetPorts() ([]string, error) {
+	portDetails, err := v.client.GetPortDetails()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get port details: %w", err)
+	}
+
+	var ports []string
+	for _, entry := range portDetails.Data {
+		if entry.WWN != "" {
+			ports = append(ports, "fc."+entry.WWN)
+		}
+		for _, login := range entry.Logins {
+			if login.IscsiTargetName != "" {
+				ports = append(ports, login.IscsiTargetName)
+			}
+		}
+	}
+	return ports, nil
 }
 
 func NewVantaraClonner(hostname, username, password string) (VantaraCloner, error) {
@@ -138,7 +161,7 @@ func getStorageEnvVars() (map[string]interface{}, error) {
 func (v *VantaraCloner) CurrentMappedGroups(lun populator.LUN, context populator.MappingContext) ([]string, error) {
 	v.log.V(2).Info("querying current mapped groups", "ldev_id", lun.LDeviceID)
 
-	ldevResp, err := v.client.GetLdev(lun.LDeviceID)
+	ldevResp, _, err := v.client.GetLdev(lun.LDeviceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get LDEV: %w", err)
 	}
@@ -186,7 +209,7 @@ func (v *VantaraCloner) ResolvePVToLUN(pv populator.PersistentVolume) (populator
 }
 
 func (v *VantaraCloner) GetNaaID(lun populator.LUN) populator.LUN {
-	ldevResp, err := v.client.GetLdev(lun.LDeviceID)
+	ldevResp, _, err := v.client.GetLdev(lun.LDeviceID)
 	if err != nil {
 		v.log.Info("failed to get LDEV NAA ID", "ldev_id", lun.LDeviceID, "err", err)
 		return lun
@@ -258,7 +281,7 @@ func (v *VantaraCloner) UnMap(xcopyInitiatorGroup string, lun populator.LUN, con
 	hostGroupIds := context["hostGroupIds"].([]string)
 
 	// First get the LDEV to find LUN IDs
-	ldevResp, err := v.client.GetLdev(lun.LDeviceID)
+	ldevResp, _, err := v.client.GetLdev(lun.LDeviceID)
 	if err != nil {
 		return fmt.Errorf("failed to get LDEV info: %w", err)
 	}
@@ -325,7 +348,7 @@ func (v *VantaraCloner) VvolCopy(vsphereClient vmware.Client, vmId string, sourc
 
 	v.log.Info("copying volume", "source", sourceVolumeID, "target", targetLUN.Name)
 
-	ldevResp, err := v.client.GetLdev(targetLUN.LDeviceID)
+	ldevResp, _, err := v.client.GetLdev(targetLUN.LDeviceID)
 	if err != nil {
 		return fmt.Errorf("failed to get target LDEV %s: %w", targetLUN.LDeviceID, err)
 	}
@@ -437,7 +460,7 @@ func (v *VantaraCloner) RDMCopy(vsphereClient vmware.Client, vmId string, source
 
 	progress <- 10
 
-	ldevResp, err := v.client.GetLdev(targetLUN.LDeviceID)
+	ldevResp, _, err := v.client.GetLdev(targetLUN.LDeviceID)
 	if err != nil {
 		return fmt.Errorf("failed to get target LDEV %s: %w", targetLUN.LDeviceID, err)
 	}
@@ -479,7 +502,7 @@ func (v *VantaraCloner) resolveRDMToLUN(deviceName string) (populator.LUN, error
 	ldevIds := strconv.FormatUint(ldevId, 10)
 	v.log.V(2).Info("parsing LDEV ID from device", "ldev_id", ldevIds, "hex", ldevIdHex)
 
-	ldevResp, err := v.client.GetLdev(ldevIds)
+	ldevResp, _, err := v.client.GetLdev(ldevIds)
 	if err != nil {
 		return populator.LUN{}, fmt.Errorf("failed to get LDEV info for device name %s: %w", deviceName, err)
 	}

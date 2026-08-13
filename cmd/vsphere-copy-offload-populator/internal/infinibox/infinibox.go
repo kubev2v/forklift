@@ -10,6 +10,7 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/fcutil"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/storage"
 	"k8s.io/klog/v2"
 )
 
@@ -29,10 +30,29 @@ type InfiniboxClonner struct {
 
 // Ensure InfiniboxClonner implements StorageArrayInfoProvider
 var _ populator.StorageArrayInfoProvider = &InfiniboxClonner{}
+var _ storage.ArrayIdentifier = &InfiniboxClonner{}
 
 // GetStorageArrayInfo returns metadata about the InfiniBox array for metric labels.
 func (c *InfiniboxClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 	return c.arrayInfo
+}
+
+// TargetPorts returns this array's own FC target port identities.
+func (c *InfiniboxClonner) TargetPorts() ([]string, error) {
+	nodes, err := c.api.GetFCPorts()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list FC ports: %w", err)
+	}
+
+	var ports []string
+	for _, node := range nodes {
+		for _, port := range node.Ports {
+			if port.WWPn != "" {
+				ports = append(ports, "fc."+port.WWPn)
+			}
+		}
+	}
+	return ports, nil
 }
 
 func (c *InfiniboxClonner) MapTarget(targetLUN populator.LUN, context populator.MappingContext) (populator.LUN, error) {

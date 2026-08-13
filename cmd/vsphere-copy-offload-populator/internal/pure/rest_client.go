@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"sort"
 	"strconv"
@@ -627,6 +628,65 @@ func (c *RestClient) FindVolumeBySerial(serial string) (*Volume, error) {
 
 	klog.Infof("Pure REST Client: Found volume %s for serial %s", volumesResponse.Items[0].Name, serial)
 	return &volumesResponse.Items[0], nil
+}
+
+// Port describes a single FlashArray port, as returned by the v1 /port endpoint.
+type Port struct {
+	WWN string `json:"wwn"`
+	IQN string `json:"iqn"`
+}
+
+// GetPorts returns this array's own FC and iSCSI target ports. The v1 /port endpoint
+// doesn't accept the v2 x-auth-token this client otherwise uses; it needs its own
+// cookie-based session (POST .../auth/session), so this opens one just for this call.
+func (c *RestClient) GetPorts() ([]Port, error) {
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cookie jar: %w", err)
+	}
+	sessionClient := &http.Client{Transport: c.httpClient.Transport, Jar: jar}
+
+	sessionBody, err := json.Marshal(map[string]string{"api_token": c.apiToken})
+	if err != nil {
+		return nil, fmt.Errorf("failed to build v1 session request: %w", err)
+	}
+	sessionReq, err := http.NewRequest("POST", fmt.Sprintf("https://%s/api/%s/auth/session", c.hostname, c.apiV1), bytes.NewReader(sessionBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create v1 session request: %w", err)
+	}
+	sessionReq.Header.Set("Content-Type", "application/json")
+	sessionResp, err := sessionClient.Do(sessionReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start v1 session: %w", err)
+	}
+	sessionResp.Body.Close()
+	if sessionResp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("v1 session request failed with status %d", sessionResp.StatusCode)
+	}
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("https://%s/api/%s/port", c.hostname, c.apiV1), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create get ports request: %w", err)
+	}
+	resp, err := sessionClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send get ports request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read get ports response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("get ports request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var ports []Port
+	if err := json.Unmarshal(body, &ports); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal ports response: %w", err)
+	}
+	return ports, nil
 }
 
 // ArrayInfo holds array metadata aggregated from /arrays and /controllers endpoints.

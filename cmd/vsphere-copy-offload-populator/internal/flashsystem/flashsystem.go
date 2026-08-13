@@ -15,6 +15,7 @@ import (
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/fcutil"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/logger"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/populator"
+	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/storage"
 	"github.com/kubev2v/forklift/cmd/vsphere-copy-offload-populator/internal/vmware"
 	"k8s.io/klog/v2"
 )
@@ -98,6 +99,7 @@ type FlashSystemInfo struct {
 // FlashSystemAPIClient handles communication with the FlashSystem REST API.
 type FlashSystemAPIClient struct {
 	ManagementIP string
+	Port         string
 	httpClient   *http.Client
 	authToken    string // Session token from /auth
 	username     string // Store for re-authentication
@@ -114,6 +116,7 @@ func NewFlashSystemAPIClient(managementIP, username, password string, sslSkipVer
 
 	client := &FlashSystemAPIClient{
 		ManagementIP: managementIP,
+		Port:         "7443",
 		httpClient:   httpClient,
 		username:     username,
 		password:     password,
@@ -130,7 +133,7 @@ func NewFlashSystemAPIClient(managementIP, username, password string, sslSkipVer
 
 // authenticate handles the authentication process using v1 API best practices
 func (c *FlashSystemAPIClient) authenticate() error {
-	authURL := fmt.Sprintf("https://%s:7443/rest/v1/auth", c.ManagementIP)
+	authURL := fmt.Sprintf("https://%s:%s/rest/v1/auth", c.ManagementIP, c.Port)
 
 	// FlashSystem expects username and password via HTTP headers, not JSON body
 	req, err := http.NewRequest("POST", authURL, bytes.NewBuffer([]byte{}))
@@ -194,7 +197,7 @@ func (c *FlashSystemAPIClient) makeRequest(method, path string, payload interfac
 
 // doRequest performs the actual HTTP request
 func (c *FlashSystemAPIClient) doRequest(method, path string, payload interface{}) ([]byte, int, error) {
-	fullURL := fmt.Sprintf("https://%s:7443/rest/v1%s", c.ManagementIP, path)
+	fullURL := fmt.Sprintf("https://%s:%s/rest/v1%s", c.ManagementIP, c.Port, path)
 	c.log.V(2).Info("API request", "method", method, "url", fullURL)
 
 	var reqBody *bytes.Buffer
@@ -396,10 +399,52 @@ type FlashSystemClonner struct {
 
 // Ensure FlashSystemClonner implements StorageArrayInfoProvider
 var _ populator.StorageArrayInfoProvider = &FlashSystemClonner{}
+var _ storage.ArrayIdentifier = &FlashSystemClonner{}
 
 // GetStorageArrayInfo returns metadata about the FlashSystem array for metric labels.
 func (c *FlashSystemClonner) GetStorageArrayInfo() populator.StorageArrayInfo {
 	return c.arrayInfo
+}
+
+// TargetPorts returns this array's own FC port WWPNs (lsportfc) and iSCSI name (lsnode,
+// which reports one shared iSCSI target name per node).
+func (c *FlashSystemClonner) TargetPorts() ([]string, error) {
+	var ports []string
+
+	fcBytes, status, err := c.api.makeRequest("POST", "/lsportfc", map[string]string{})
+	if err != nil || status != http.StatusOK {
+		return nil, fmt.Errorf("failed to list FC ports: %w, status: %d", err, status)
+	}
+	var fcPorts []struct {
+		WWPN string `json:"WWPN"`
+	}
+	if err := json.Unmarshal(fcBytes, &fcPorts); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal FC ports: %w", err)
+	}
+	for _, p := range fcPorts {
+		if p.WWPN != "" {
+			ports = append(ports, "fc."+p.WWPN)
+		}
+	}
+
+	nodeBytes, status, err := c.api.makeRequest("POST", "/lsnode", map[string]string{})
+	if err != nil || status != http.StatusOK {
+		c.log.V(1).Info("failed to list nodes for iSCSI name (array may be FC-only)", "err", err, "status", status)
+		return ports, nil
+	}
+	var nodes []struct {
+		IscsiName string `json:"iscsi_name"`
+	}
+	if err := json.Unmarshal(nodeBytes, &nodes); err != nil {
+		return ports, nil
+	}
+	for _, n := range nodes {
+		if n.IscsiName != "" {
+			ports = append(ports, n.IscsiName)
+		}
+	}
+
+	return ports, nil
 }
 
 // NewFlashSystemClonner creates a new FlashSystemClonner.
