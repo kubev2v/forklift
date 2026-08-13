@@ -12617,7 +12617,7 @@ spec:
   - email: openshift-operators@redhat.com
     name: Red Hat
   maturity: stable
-  minKubeVersion: 1.27.0
+  minKubeVersion: 1.35.0
   provider:
     name: Red Hat
   version: ${MTV_VERSION}
