@@ -12,7 +12,7 @@ RUN go build -buildvcs=false -ldflags="-w -s" -o image-converter ./cmd/image-con
 RUN go build -buildvcs=false -ldflags="-w -s" -o virt-v2v-wrapper ./cmd/virt-v2v/entrypoint.go
 
 # Main container
-FROM quay.io/fedora/fedora:41
+FROM quay.io/fedora/fedora:46
 RUN rm /etc/pki/tls/fips_local.cnf && \
     echo -e '[fips_sect]\ntls1-prf-ems-check = 0\nactivate = 1' > /etc/pki/tls/fips_local.cnf && \
     sed -i '/^\\[ crypto_policy \\]/a Options=RHNoEnforceEMSinFIPS' /etc/pki/tls/openssl.cnf
