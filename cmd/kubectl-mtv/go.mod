@@ -64,7 +64,7 @@ require (
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
-	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
+	github.com/xo/terminfo v1.0.0 // indirect
 	github.com/yaacov/karl-interpreter v0.0.1 // indirect
 	github.com/yaacov/tree-search-language/v6 v6.0.10 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
