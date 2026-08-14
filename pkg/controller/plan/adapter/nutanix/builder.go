@@ -73,7 +73,7 @@ func (r *Builder) Secret(_ ref.Ref, in, object *core.Secret) error {
 // explicitly here -- the same fallback oVirt uses for older CNV versions.
 func (r *Builder) ConfigMap(_ ref.Ref, in *core.Secret, object *core.ConfigMap) error {
 	if cacert, found := libutil.GetCACert(in); found && len(cacert) > 0 {
-		object.BinaryData["ca.pem"] = cacert
+		setCDICACerts(object, cacert)
 		return nil
 	}
 	if !providerbase.GetInsecureSkipVerifyFlag(in) {
@@ -87,8 +87,19 @@ func (r *Builder) ConfigMap(_ ref.Ref, in *core.Secret, object *core.ConfigMap) 
 		// clearer error from CDI if the certificate is actually needed.
 		return nil
 	}
-	object.BinaryData["ca.pem"] = cacert
+	setCDICACerts(object, cacert)
 	return nil
+}
+
+// setCDICACerts stores the trusted CA for CDI HTTP imports. CDI's Go
+// HTTP client reads any PEM file under /certs/, but CDI passes
+// cainfo=/certs/tls.crt when starting nbdkit curl.
+func setCDICACerts(object *core.ConfigMap, cacert []byte) {
+	if object.BinaryData == nil {
+		object.BinaryData = map[string][]byte{}
+	}
+	object.BinaryData["ca.pem"] = cacert
+	object.BinaryData["tls.crt"] = cacert
 }
 
 // fetchProviderCert dials the Nutanix provider URL and returns its leaf
