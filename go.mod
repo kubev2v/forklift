@@ -23,7 +23,7 @@ require (
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.6
 	github.com/kubev2v/vm-migration-detective v0.0.0-20260506144435-77e61ac7d78d
 	github.com/masterzen/winrm v0.0.0-20250927112105-5f8e6c707321
-	github.com/onsi/ginkgo v1.16.5
+	github.com/onsi/ginkgo/v2 v2.32.1
 	github.com/onsi/ginkgo/v2 v2.27.4
 	github.com/onsi/gomega v1.38.2
 	github.com/openshift/api v0.0.0-20230613151523-ba04973d3ed1
