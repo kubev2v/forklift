@@ -313,7 +313,7 @@ func (r *Collector) adapters() []Adapter {
 // Load the inventory.
 func (r *Collector) load(ctx *Context) (err error) {
 	r.phase = Load
-	r.client.InvalidateClusterCache()
+	r.client.InvalidateCycleCache()
 	mark := time.Now()
 	for _, adapter := range r.adapters() {
 		if ctx.canceled() {
@@ -374,7 +374,7 @@ func (r *Collector) create(ctx *Context, adapter Adapter) (err error) {
 // can block or be slow.
 func (r *Collector) refresh(ctx *Context) (err error) {
 	r.phase = Refresh
-	r.client.InvalidateClusterCache()
+	r.client.InvalidateCycleCache()
 	var deletions, updates []Updater
 	mark := time.Now()
 	for _, adapter := range r.adapters() {

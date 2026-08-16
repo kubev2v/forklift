@@ -15,32 +15,38 @@ import (
 
 // mockDriver implements driver.HyperVDriver for unit tests.
 type mockDriver struct {
-	clusterData  *driver.ClusterData
-	clusterNodes []driver.ClusterNodeData
-	clusterVMs   []driver.ClusterGroupData
-	networks     []driver.Network
-	computerInfo *driver.ComputerInfoData
-	runOnNodeFn  func(command, computerName string) (string, error)
+	clusterData       *driver.ClusterData
+	clusterNodes      []driver.ClusterNodeData
+	clusterVMs        []driver.ClusterGroupData
+	networks          []driver.Network
+	computerInfo      *driver.ComputerInfoData
+	runOnNodeFn       func(command, computerName string) (string, error)
+	listAllDomainsFn  func() ([]driver.Domain, error)
+	listAllNetworksFn func() ([]driver.Network, error)
 }
 
-func (m *mockDriver) Connect() error                                           { return nil }
-func (m *mockDriver) Close() error                                             { return nil }
-func (m *mockDriver) IsAlive() (bool, error)                                   { return true, nil }
-func (m *mockDriver) ListAllDomains() ([]driver.Domain, error)                 { return nil, nil }
-func (m *mockDriver) ListAllClusterDomains() ([]driver.Domain, error)          { return nil, nil }
-func (m *mockDriver) LookupDomainByName(string) (driver.Domain, error)         { return nil, nil } //nolint:nilnil
-func (m *mockDriver) LookupDomainByUUIDString(string) (driver.Domain, error)   { return nil, nil } //nolint:nilnil
+func (m *mockDriver) Connect() error                                  { return nil }
+func (m *mockDriver) Close() error                                    { return nil }
+func (m *mockDriver) IsAlive() (bool, error)                          { return true, nil }
+func (m *mockDriver) ListAllClusterDomains() ([]driver.Domain, error) { return nil, nil }
+func (m *mockDriver) ListAllDomains() ([]driver.Domain, error) {
+	if m.listAllDomainsFn != nil {
+		return m.listAllDomainsFn()
+	}
+	return nil, nil
+}
+func (m *mockDriver) LookupDomainByName(string) (driver.Domain, error)       { return nil, nil } //nolint:nilnil
+func (m *mockDriver) LookupDomainByUUIDString(string) (driver.Domain, error) { return nil, nil } //nolint:nilnil
+func (m *mockDriver) ListAllNetworks() ([]driver.Network, error) {
+	if m.listAllNetworksFn != nil {
+		return m.listAllNetworksFn()
+	}
+	return m.networks, nil
+}
 func (m *mockDriver) LookupNetworkByUUIDString(string) (driver.Network, error) { return nil, nil } //nolint:nilnil
 func (m *mockDriver) ExecuteCommand(string) (string, error)                    { return "", nil }
 func (m *mockDriver) GetCluster() (*driver.ClusterData, error)                 { return m.clusterData, nil }
 func (m *mockDriver) GetClusterNodes() ([]driver.ClusterNodeData, error)       { return m.clusterNodes, nil }
-
-func (m *mockDriver) ListAllNetworks() ([]driver.Network, error) {
-	if m.networks != nil {
-		return m.networks, nil
-	}
-	return nil, nil
-}
 
 func (m *mockDriver) GetComputerInfo() (*driver.ComputerInfoData, error) {
 	if m.computerInfo != nil {
@@ -679,13 +685,77 @@ func TestGetClusterCache_Caching(t *testing.T) {
 		t.Errorf("Expected 1 GetCluster call (cached), got %d", callCount)
 	}
 
-	client.InvalidateClusterCache()
+	client.InvalidateCycleCache()
 	_, err = client.getClusterCache()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if callCount != 2 {
 		t.Errorf("Expected 2 GetCluster calls after invalidation, got %d", callCount)
+	}
+}
+
+func TestListVMs_Caching(t *testing.T) {
+	domainCalls := 0
+	md := &mockDriver{
+		listAllDomainsFn: func() ([]driver.Domain, error) {
+			domainCalls++
+			return nil, nil
+		},
+	}
+	client := &Client{driver: md, provider: newStandaloneProvider(), Log: testLogger()}
+
+	_, err := client.ListVMs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.ListVMs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if domainCalls != 1 {
+		t.Errorf("Expected 1 ListAllDomains call (cached), got %d", domainCalls)
+	}
+
+	client.InvalidateCycleCache()
+	_, err = client.ListVMs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if domainCalls != 2 {
+		t.Errorf("Expected 2 ListAllDomains calls after invalidation, got %d", domainCalls)
+	}
+}
+
+func TestListNetworks_Caching(t *testing.T) {
+	networkCalls := 0
+	md := &mockDriver{
+		listAllNetworksFn: func() ([]driver.Network, error) {
+			networkCalls++
+			return nil, nil
+		},
+	}
+	client := &Client{driver: md, Log: testLogger()}
+
+	_, err := client.ListNetworks()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.ListNetworks()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if networkCalls != 1 {
+		t.Errorf("Expected 1 ListAllNetworks call (cached), got %d", networkCalls)
+	}
+
+	client.InvalidateCycleCache()
+	_, err = client.ListNetworks()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if networkCalls != 2 {
+		t.Errorf("Expected 2 ListAllNetworks calls after invalidation, got %d", networkCalls)
 	}
 }
 
