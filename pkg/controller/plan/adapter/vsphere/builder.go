@@ -46,6 +46,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/utils/ptr"
 	cnv "kubevirt.io/api/core/v1"
 	cdi "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
@@ -489,6 +490,43 @@ func (r *Builder) buildDatastoreMap() (map[string]*api.StoragePair, error) {
 	return dsMap, nil
 }
 
+// Check destination CDI version to see if we can use instance UUIDs instead of
+// BIOS UUIDs, which can be duplicated.
+func (r *Builder) canUseInstanceUUID() bool {
+	cdiList := &cdi.CDIList{}
+	err := r.Destination.List(context.TODO(), cdiList)
+	if err != nil {
+		r.Log.Error(err, "Failed to get destination CDI version, assuming use of BIOS UUIDs")
+		return false
+	}
+	if len(cdiList.Items) < 1 {
+		r.Log.Info("No CDI installations found on destination")
+		return false
+	}
+
+	cdiCDI := cdiList.Items[0]
+	cdiVersion, err := version.ParseSemantic(cdiCDI.Status.ObservedVersion)
+	if err != nil {
+		r.Log.Error(err, "Failed to parse destination CDI version, assuming use of BIOS UUIDs")
+		return false
+	}
+
+	// Minimum CNV versions supporting instance UUIDs: 4.22.1, 4.21.9, 4.20.16
+	// This can be removed when these versions fall off the support list.
+	if cdiVersion.AtLeast(version.MustParse("v4.22.0")) &&
+		cdiVersion.LessThan(version.MustParse("v4.22.1")) {
+		return false
+	} else if cdiVersion.AtLeast(version.MustParse("v4.21.0")) &&
+		cdiVersion.LessThan(version.MustParse("v4.21.9")) {
+		return false
+	} else if cdiVersion.AtLeast(version.MustParse("v4.0.0")) &&
+		cdiVersion.LessThan(version.MustParse("v4.20.16")) {
+		return false // Cover all real OpenShift versions below 4.20.16, but try not to touch upstream CDI versions (1.65 etc.)
+	}
+
+	return true
+}
+
 // Create DataVolume specs for the VM.
 func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.ConfigMap, dvTemplate *cdi.DataVolume, vddkConfigMap *core.ConfigMap) (dvs []cdi.DataVolume, err error) {
 	vm := &model.VM{}
@@ -507,6 +545,8 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 	if err != nil {
 		return
 	}
+
+	canUseInstanceUUID := r.canUseInstanceUUID()
 
 	// Build datastore map for more efficient lookups
 	dsMap, err := r.buildDatastoreMap()
@@ -574,12 +614,16 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 			}
 		} else {
 			vddkImage := settings.GetVDDKImage(r.Source.Provider.Spec.Settings)
+			uuid := vm.UUID
+			if canUseInstanceUUID && vm.InstanceUUID != "" {
+				uuid = vm.InstanceUUID
+			}
 
 			// Let CDI do the copying
 			dvSource = cdi.DataVolumeSource{
 				VDDK: &cdi.DataVolumeSourceVDDK{
 					BackingFile:  baseVolume(disk.File, r.Plan.IsWarm()),
-					UUID:         vm.UUID,
+					UUID:         uuid,
 					URL:          url,
 					SecretRef:    secret.Name,
 					Thumbprint:   thumbprint,
@@ -1333,6 +1377,10 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		err = liberr.Wrap(err, "vm", vmRef.String())
 		return
 	}
+	uuid := vm.UUID
+	if r.canUseInstanceUUID() && vm.InstanceUUID != "" {
+		uuid = vm.InstanceUUID
+	}
 
 	// Get a list of existing PVCs to avoid creating duplicates
 	pvcLabels := map[string]string{
@@ -1549,7 +1597,7 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 
 					pvc.Annotations[planbase.AnnEndpoint] = url
 					pvc.Annotations[planbase.AnnImportBackingFile] = baseVolume(disk.File, r.Plan.IsWarm())
-					pvc.Annotations[planbase.AnnUUID] = vm.UUID
+					pvc.Annotations[planbase.AnnUUID] = uuid
 					pvc.Annotations[planbase.AnnThumbprint] = thumbprint
 					pvc.Annotations[planbase.AnnVddkInitImageURL] = settings.GetVDDKImage(r.Source.Provider.Spec.Settings)
 					pvc.Annotations[planbase.AnnPodPhase] = "Succeeded"
