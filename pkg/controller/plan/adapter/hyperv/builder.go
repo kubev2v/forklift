@@ -291,9 +291,7 @@ func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec, usesIn
 		return
 	}
 	memory := resource.NewQuantity(int64(vm.MemoryMB)*1024*1024, resource.BinarySI)
-	object.Template.Spec.Domain.Resources.Requests = core.ResourceList{
-		core.ResourceMemory: *memory,
-	}
+	object.Template.Spec.Domain.Memory = &cnv.Memory{Guest: memory}
 }
 
 func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume, vddkConfigMap *core.ConfigMap) (dvs []cdi.DataVolume, err error) {
