@@ -55,7 +55,7 @@ func (r *Handler) Created(e libweb.Event) {
 func (r *Handler) Updated(e libweb.Event) {
 	if host, cast := e.Resource.(*vsphere.Host); cast {
 		updated := e.Updated.(*vsphere.Host)
-		if updated.Path != host.Path || updated.InMaintenanceMode != host.InMaintenanceMode {
+		if updated.Path != host.Path || updated.InMaintenanceMode != host.InMaintenanceMode || updated.Status != host.Status {
 			r.changed(host, updated)
 		}
 	}
