@@ -1083,6 +1083,56 @@ var _ = Describe("PopulatorOffloadInfo", func() {
 		Expect(err).To(HaveOccurred())
 	})
 
+	It("should return all completion metric fields when set", func() {
+		populatorCr := &v1beta1.VSphereXcopyVolumePopulator{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "test-pop",
+				Namespace: "test",
+				Labels: map[string]string{
+					"migration": "123",
+					"vmdkKey":   "2000",
+					"vmID":      "vm-1",
+				},
+			},
+			Spec: v1beta1.VSphereXcopyVolumePopulatorSpec{
+				VmId: "vm-1",
+			},
+			Status: v1beta1.VSphereXcopyVolumePopulatorStatus{
+				Progress:            "100",
+				XcopyUsed:           "1",
+				CopyDurationSeconds: "42.5",
+				Result:              "success",
+				StorageVendor:       "ontap",
+				CloneMethod:         "vib",
+				StorageProtocol:     "iscsi",
+				ProvisionedBytes:    "1.073741824e+10",
+				AllocatedBytes:      "5.36870912e+09",
+			},
+		}
+		builder := createBuilder(populatorCr)
+		pvc := &core.PersistentVolumeClaim{
+			ObjectMeta: meta.ObjectMeta{
+				Name:      "test-pvc",
+				Namespace: "test",
+				Labels: map[string]string{
+					"vmdkKey": "2000",
+					"vmID":    "vm-1",
+				},
+			},
+		}
+
+		info, err := builder.PopulatorOffloadInfo(pvc)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(info).To(HaveKeyWithValue("xcopyUsed", "1"))
+		Expect(info).To(HaveKeyWithValue("copyDurationSeconds", "42.5"))
+		Expect(info).To(HaveKeyWithValue("result", "success"))
+		Expect(info).To(HaveKeyWithValue("storageVendor", "ontap"))
+		Expect(info).To(HaveKeyWithValue("cloneMethod", "vib"))
+		Expect(info).To(HaveKeyWithValue("storageProtocol", "iscsi"))
+		Expect(info).To(HaveKeyWithValue("provisionedBytes", "1.073741824e+10"))
+		Expect(info).To(HaveKeyWithValue("allocatedBytes", "5.36870912e+09"))
+	})
+
 	It("should return xcopyUsed=0 when xcopy was not used", func() {
 		populatorCr := &v1beta1.VSphereXcopyVolumePopulator{
 			ObjectMeta: meta.ObjectMeta{

@@ -1918,8 +1918,19 @@ func (r *Builder) PopulatorOffloadInfo(pvc *core.PersistentVolumeClaim) (map[str
 		return nil, err
 	}
 	info := make(map[string]string)
-	if populatorCr.Status.XcopyUsed != "" {
-		info["xcopyUsed"] = populatorCr.Status.XcopyUsed
+	for key, value := range map[string]string{
+		"xcopyUsed":           populatorCr.Status.XcopyUsed,
+		"copyDurationSeconds": populatorCr.Status.CopyDurationSeconds,
+		"result":              populatorCr.Status.Result,
+		"storageVendor":       populatorCr.Status.StorageVendor,
+		"cloneMethod":         populatorCr.Status.CloneMethod,
+		"storageProtocol":     populatorCr.Status.StorageProtocol,
+		"provisionedBytes":    populatorCr.Status.ProvisionedBytes,
+		"allocatedBytes":      populatorCr.Status.AllocatedBytes,
+	} {
+		if value != "" {
+			info[key] = value
+		}
 	}
 	return info, nil
 }
