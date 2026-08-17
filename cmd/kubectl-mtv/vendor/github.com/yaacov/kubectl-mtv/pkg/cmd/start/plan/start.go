@@ -3,6 +3,7 @@ package plan
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -13,13 +14,13 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	forkliftv1beta1 "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
-	"github.com/yaacov/kubectl-mtv/pkg/cmd/get/plan/status"
+	planstatus "github.com/yaacov/kubectl-mtv/pkg/cmd/get/plan/status"
 	"github.com/yaacov/kubectl-mtv/pkg/util/client"
 	"github.com/yaacov/kubectl-mtv/pkg/util/output"
 )
 
-// Start starts a migration plan
-func Start(configFlags *genericclioptions.ConfigFlags, name, namespace string, cutoverTime *time.Time, useUTC bool) error {
+// Start starts a migration plan or outputs the Migration CR if dry-run is enabled
+func Start(configFlags *genericclioptions.ConfigFlags, name, namespace string, cutoverTime *time.Time, useUTC bool, dryRun bool, outputFormat string) error {
 	c, err := client.GetDynamicClient(configFlags)
 	if err != nil {
 		return fmt.Errorf("failed to get client: %v", err)
@@ -32,7 +33,7 @@ func Start(configFlags *genericclioptions.ConfigFlags, name, namespace string, c
 	}
 
 	// Check if the plan is ready
-	planReady, err := status.IsPlanReady(plan)
+	planReady, err := planstatus.IsPlanReady(plan)
 	if err != nil {
 		return err
 	}
@@ -41,7 +42,7 @@ func Start(configFlags *genericclioptions.ConfigFlags, name, namespace string, c
 	}
 
 	// Check if the plan has running migrations
-	runningMigration, _, err := status.GetRunningMigration(c, namespace, plan, client.MigrationsGVR)
+	runningMigration, _, err := planstatus.GetRunningMigration(c, namespace, plan, client.MigrationsGVR)
 	if err != nil {
 		return err
 	}
@@ -50,29 +51,26 @@ func Start(configFlags *genericclioptions.ConfigFlags, name, namespace string, c
 	}
 
 	// Check if the plan has already succeeded
-	planStatus, err := status.GetPlanStatus(plan)
+	planStatus, err := planstatus.GetPlanStatus(plan)
 	if err != nil {
 		return err
 	}
-	if planStatus == status.StatusSucceeded {
+	if planStatus == planstatus.StatusSucceeded {
 		return fmt.Errorf("migration plan '%s' has already succeeded", name)
 	}
 
-	// Check if the plan is a warm migration
-	warm, _, err := unstructured.NestedBool(plan.Object, "spec", "warm")
-	if err != nil {
-		return fmt.Errorf("failed to check if plan is warm: %v", err)
-	}
+	// Check if the plan is a warm migration (handles both spec.type and legacy spec.warm)
+	warm := planstatus.IsWarmMigration(plan)
 
 	// Handle cutover time based on plan type
 	if !warm && cutoverTime != nil {
-		fmt.Printf("Warning: Cutover time is specified but plan '%s' is not a warm migration. Ignoring cutover time.\n", name)
+		fmt.Fprintf(os.Stderr, "Warning: Cutover time is specified but plan '%s' is not a warm migration. Ignoring cutover time.\n", name)
 		cutoverTime = nil
 	} else if warm && cutoverTime == nil {
 		// For warm migrations without specified cutover, default to now + 1 hour
 		defaultTime := time.Now().Add(1 * time.Hour)
 		cutoverTime = &defaultTime
-		fmt.Printf("Warning: No cutover time specified for warm migration. Setting default cutover time to %s (1 hour from now).\n", output.FormatTimestamp(*cutoverTime, useUTC))
+		fmt.Fprintf(os.Stderr, "Warning: No cutover time specified for warm migration. Setting default cutover time to %s (1 hour from now).\n", output.FormatTimestamp(*cutoverTime, useUTC))
 	}
 
 	// Extract the plan's UID
@@ -110,6 +108,11 @@ func Start(configFlags *genericclioptions.ConfigFlags, name, namespace string, c
 		migration.Spec.Cutover = &metaTime
 	}
 
+	// Handle dry-run mode
+	if dryRun {
+		return output.OutputResource(migration, outputFormat)
+	}
+
 	// Convert Migration object to Unstructured
 	unstructuredMigration, err := runtime.DefaultUnstructuredConverter.ToUnstructured(migration)
 	if err != nil {
@@ -123,9 +126,9 @@ func Start(configFlags *genericclioptions.ConfigFlags, name, namespace string, c
 		return fmt.Errorf("failed to create migration: %v", err)
 	}
 
-	fmt.Printf("Migration started for plan '%s' in namespace '%s'\n", name, namespace)
+	fmt.Fprintf(os.Stderr, "Migration started for plan '%s' in namespace '%s'\n", name, namespace)
 	if warm && cutoverTime != nil {
-		fmt.Printf("Cutover scheduled for: %s\n", output.FormatTimestamp(*cutoverTime, useUTC))
+		fmt.Fprintf(os.Stderr, "Cutover scheduled for: %s\n", output.FormatTimestamp(*cutoverTime, useUTC))
 	}
 	return nil
 }

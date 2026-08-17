@@ -160,6 +160,10 @@ func isValueInRange(value, min, max interface{}) (bool, error) {
 // evaluateLikePattern performs pattern matching with SQL LIKE semantics
 // Supports % for any sequence of characters and _ for single character
 func evaluateLikePattern(value interface{}, pattern interface{}) (bool, error) {
+	if value == nil || pattern == nil {
+		return false, nil
+	}
+
 	valueStr, okValue := value.(string)
 	patternStr, okPattern := pattern.(string)
 
@@ -176,15 +180,24 @@ func evaluateLikePattern(value interface{}, pattern interface{}) (bool, error) {
 		}
 	}
 
-	// Convert SQL LIKE pattern to regex pattern
+	// Escape regex metacharacters, then convert SQL LIKE wildcards to regex
+	patternStr = regexp.QuoteMeta(patternStr)
 	patternStr = strings.ReplaceAll(patternStr, "%", ".*")
 	patternStr = strings.ReplaceAll(patternStr, "_", ".")
-	matched, _ := regexp.MatchString("^"+patternStr+"$", valueStr)
-	return matched, nil
+
+	re, err := regexp.Compile("^" + patternStr + "$")
+	if err != nil {
+		return false, err
+	}
+	return re.MatchString(valueStr), nil
 }
 
 // evaluateIlikePattern performs case-insensitive pattern matching with SQL LIKE semantics
 func evaluateIlikePattern(value interface{}, pattern interface{}) (bool, error) {
+	if value == nil || pattern == nil {
+		return false, nil
+	}
+
 	valueStr, okValue := value.(string)
 	patternStr, okPattern := pattern.(string)
 
@@ -206,6 +219,10 @@ func evaluateIlikePattern(value interface{}, pattern interface{}) (bool, error) 
 
 // evaluateRegexMatch evaluates if a string matches a regular expression pattern
 func evaluateRegexMatch(value interface{}, pattern interface{}) (bool, error) {
+	if value == nil || pattern == nil {
+		return false, nil
+	}
+
 	valueStr, okValue := value.(string)
 	patternStr, okPattern := pattern.(string)
 
@@ -222,9 +239,9 @@ func evaluateRegexMatch(value interface{}, pattern interface{}) (bool, error) {
 		}
 	}
 
-	matched, err := regexp.MatchString(patternStr, valueStr)
+	re, err := regexp.Compile(patternStr)
 	if err != nil {
 		return false, err
 	}
-	return matched, nil
+	return re.MatchString(valueStr), nil
 }
