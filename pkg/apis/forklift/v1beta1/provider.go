@@ -45,6 +45,9 @@ const (
 
 	// HyperV
 	HyperV ProviderType = "hyperv"
+
+	// Azure
+	Azure ProviderType = "azure"
 )
 
 var ProviderTypes = []ProviderType{
@@ -55,6 +58,7 @@ var ProviderTypes = []ProviderType{
 	Ova,
 	EC2,
 	HyperV,
+	Azure,
 }
 
 func (t ProviderType) String() string {
@@ -192,7 +196,7 @@ func (p *Provider) HasReconciled() bool {
 
 // This provider requires VM guest conversion.
 func (p *Provider) RequiresConversion() bool {
-	return p.Type() == VSphere || p.Type() == Ova || p.Type() == HyperV || p.Type() == EC2
+	return p.Type() == VSphere || p.Type() == Ova || p.Type() == HyperV || p.Type() == EC2 || p.Type() == Azure
 }
 
 // This provider support the vddk aio parameters.
