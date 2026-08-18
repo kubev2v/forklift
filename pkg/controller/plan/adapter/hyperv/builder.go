@@ -483,6 +483,12 @@ func (r *Builder) ResolvePersistentVolumeClaimIdentifier(pvc *core.PersistentVol
 	return pvc.Name
 }
 
+func nicRefsFromVM(vm *model.VM) []planbase.NICRef {
+	return planbase.NICRefsFrom(vm.NICs, func(n hyperv.NIC) planbase.NICRef {
+		return planbase.NICRef{MAC: n.MAC, NetworkID: n.Network.ID}
+	})
+}
+
 func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env []core.EnvVar, err error) {
 	vm := &model.VM{}
 	err = r.Source.Inventory.Find(vm, vmRef)
@@ -504,14 +510,15 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		core.EnvVar{Name: "V2V_diskPath", Value: strings.Join(diskPaths, ",")},
 	)
 
-	if r.Plan.Spec.PreserveStaticIPs {
-		macsToIps := r.mapMacStaticIps(vm)
+	modeByMAC := planbase.ResolveNICModes(nicRefsFromVM(vm), r.Map.Network, r.Plan.Spec.PreserveStaticIPs)
+	if planbase.HasPreserveMode(modeByMAC) {
+		macsToIps := r.mapMacStaticIps(vm, modeByMAC)
 		if macsToIps != "" {
 			env = append(env,
 				core.EnvVar{Name: "V2V_staticIPs", Value: macsToIps},
 			)
 		}
-		if hasMultipleStaticIPsPerNIC(vm) {
+		if hasMultipleStaticIPsPerNIC(vm, modeByMAC) {
 			env = append(env, core.EnvVar{
 				Name:  "V2V_multipleIPsPerNic",
 				Value: "true",
@@ -526,12 +533,15 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 	return
 }
 
-func hasMultipleStaticIPsPerNIC(vm *model.VM) bool {
+func hasMultipleStaticIPsPerNIC(vm *model.VM, modeByMAC map[string]string) bool {
 	if !isWindows(vm) {
 		return false
 	}
 	var manualMACs []string
 	for _, gn := range vm.GuestNetworks {
+		if mode, ok := modeByMAC[gn.MAC]; ok && mode != string(api.NetworkIPModePreserve) {
+			continue
+		}
 		if gn.Origin == hyperv.OriginManual {
 			manualMACs = append(manualMACs, gn.MAC)
 		}
@@ -539,12 +549,15 @@ func hasMultipleStaticIPsPerNIC(vm *model.VM) bool {
 	return planbase.HasMultipleIPsPerMAC(manualMACs)
 }
 
-func (r *Builder) mapMacStaticIps(vm *model.VM) string {
+func (r *Builder) mapMacStaticIps(vm *model.VM, modeByMAC map[string]string) string {
 	isWin := isWindows(vm)
 	networks := planbase.SortedIPv4First(vm.GuestNetworks, func(gn hyperv.GuestNetwork) string { return gn.IP })
 
 	var configurations []string
 	for _, gn := range networks {
+		if mode, ok := modeByMAC[gn.MAC]; ok && mode != string(api.NetworkIPModePreserve) {
+			continue
+		}
 		if !isWin || gn.Origin == hyperv.OriginManual {
 			ip := net.ParseIP(gn.IP)
 			if ip == nil {

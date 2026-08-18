@@ -210,8 +210,9 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 		vm.RemoveSharedDisks()
 	}
 	macsToIps := ""
-	if r.Plan.Spec.PreserveStaticIPs {
-		macsToIps, err = r.mapMacStaticIps(vm)
+	modeByMAC := planbase.ResolveNICModes(nicRefsFromVM(vm), r.Map.Network, r.Plan.Spec.PreserveStaticIPs)
+	if planbase.HasPreserveMode(modeByMAC) {
+		macsToIps, err = r.mapMacStaticIps(vm, modeByMAC)
 		if err != nil {
 			return
 		}
@@ -237,6 +238,9 @@ func (r *Builder) PodEnvironment(vmRef ref.Ref, sourceSecret *core.Secret) (env 
 	} else if isWindows(vm) {
 		var manualMACs []string
 		for _, gn := range vm.GuestNetworks {
+			if mode, ok := modeByMAC[gn.MAC]; ok && mode != string(api.NetworkIPModePreserve) {
+				continue
+			}
 			if gn.Origin == string(types.NetIpConfigInfoIpAddressOriginManual) {
 				manualMACs = append(manualMACs, gn.MAC)
 			}
@@ -414,12 +418,21 @@ func formatNetworkConfig(network vsphere.GuestNetwork, gateway string) string {
 	return strings.TrimSuffix(config, ",")
 }
 
-func (r *Builder) mapMacStaticIps(vm *model.VM) (ipMap string, err error) {
+func nicRefsFromVM(vm *model.VM) []planbase.NICRef {
+	return planbase.NICRefsFrom(vm.NICs, func(n vsphere.NIC) planbase.NICRef {
+		return planbase.NICRef{MAC: n.MAC, NetworkID: n.Network.ID}
+	})
+}
+
+func (r *Builder) mapMacStaticIps(vm *model.VM, modeByMAC map[string]string) (ipMap string, err error) {
 	isWindowsFlag := isWindows(vm)
 	sortedNetworks := planbase.SortedIPv4First(vm.GuestNetworks, func(gn vsphere.GuestNetwork) string { return gn.IP })
 
 	var configurations []string
 	for _, guestNetwork := range sortedNetworks {
+		if mode, ok := modeByMAC[guestNetwork.MAC]; ok && mode != string(api.NetworkIPModePreserve) {
+			continue
+		}
 		if !shouldIncludeNetwork(guestNetwork, isWindowsFlag) {
 			continue
 		}
