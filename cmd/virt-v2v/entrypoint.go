@@ -40,39 +40,9 @@ func main() {
 			os.Exit(1)
 		}
 	} else {
-		// virt-v2v or virt-v2v-in-place
-		if convert.IsInPlace {
-			// Choose in-place conversion method based on available configuration:
-			// - If LibvirtUrl is set: fetch domain XML from libvirt and use -i libvirtxml mode
-			// - Otherwise: use -i disk mode directly on the mounted disks (e.g., EC2)
-			if convert.LibvirtUrl != "" {
-				err = func() error {
-					domainXML, err := convert.GetDomainXML()
-					if err != nil {
-						return fmt.Errorf("failed to get domain XML: %v", err)
-					}
-					if err := os.WriteFile(convert.LibvirtDomainFile, []byte(domainXML), 0644); err != nil {
-						return fmt.Errorf("failed to write domain XML file: %v", err)
-					}
-					return nil
-				}()
-				if err == nil {
-					if convert.OverlayEnabled {
-						err = convert.RunInPlaceWithOverlay(convert.RunVirtV2vInPlace)
-					} else {
-						err = convert.RunVirtV2vInPlace()
-					}
-				}
-			} else {
-				if convert.OverlayEnabled {
-					err = convert.RunInPlaceWithOverlay(convert.RunVirtV2vInPlaceDisk)
-				} else {
-					err = convert.RunVirtV2vInPlaceDisk()
-				}
-			}
-		} else {
-			err = convert.RunVirtV2v()
-		}
+		// Cold vSphere Remote: kc-copy then virt-v2v-in-place.
+		// InPlace: virt-v2v-in-place only. OVA/HyperV Remote: virt-v2v.
+		err = convert.Convert()
 		if err != nil {
 			fmt.Println("Failed to execute virt-v2v command", err)
 			os.Exit(1)
