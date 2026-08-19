@@ -28,14 +28,14 @@ $VMwareServices = @(
     'vmci', 'vmxnet3', 'vmxnet3ndis6', 'pvscsi',
     'vmusbmouse', 'vmmouse',
     'vm3dmp', 'vm3dmp-debug', 'vm3dmp-stats', 'vm3dmp_loader',
-    # Additional short names from vmware-cleanup-tool's canonical
-    # component list (vmware_components.txt) - mirrors 9100_cleanup_vmware.ps1.
+    # Additional short names - mirrors 9100_cleanup_vmware.ps1.
     'vsock', 'efifw', 'svga_wddm', 'vmaudio', 'vgauth', 'cblauncher',
     'vmwtimeprovider', 'vmstatsprovider', 'vmupgradehelper',
-    # vmwefifw: real on-disk service key name for the EFI firmware
-    # component - found via a broad post-cleanup sweep on all 3 test
-    # VMs. Mirrors 9100_cleanup_vmware.ps1.
-    'vmwefifw'
+    # vmwefifw: on-disk service name for the EFI firmware component.
+    'vmwefifw',
+    # Legacy/newer names - mirrors 9100_cleanup_vmware.ps1.
+    'VMCISockets', 'vm3dservice', 'vmxnet', 'vmx_svga', 'vmkbd',
+    'vmdesched', 'vmdebug', 'vmware', 'vmx86', 'VMwareCertService'
 )
 
 # Registry keys checked via reg.exe (avoids WOW64 redirection on SOFTWARE hive).
@@ -55,7 +55,9 @@ $RegKeysToCheck = @(
     'HKLM\SYSTEM\CurrentControlSet\services\eventLog\System\vnetWFP',
     'HKLM\SYSTEM\CurrentControlSet\services\eventLog\System\vnetflt',
     'HKLM\SYSTEM\CurrentControlSet\services\eventLog\System\vsepflt',
-    'HKLM\SYSTEM\CurrentControlSet\services\eventLog\System\vmci'
+    'HKLM\SYSTEM\CurrentControlSet\services\eventLog\System\vmci',
+    # App Paths entry for vmtoolsd.exe - mirrors 9100_cleanup_vmware.ps1.
+    'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\vmtoolsd.exe'
 )
 
 $VMwareDirs = @(
@@ -66,6 +68,12 @@ $VMwareDirs = @(
     "$env:ProgramData\VMware"
 )
 
+# Wildcarded temp folders - one "vmware-<account>" folder per account.
+$VMwareTempDirPatterns = @(
+    "$env:SystemRoot\Temp\vmware-*",
+    "$env:TEMP\vmware-*"
+)
+
 $VMwareDriverFiles = @(
     'vmci.sys', 'vmmouse.sys', 'vmrawdsk.sys', 'vmhgfs.sys',
     'vmusbmouse.sys', 'pvscsi.sys', 'vmxnet3.sys',
@@ -73,8 +81,13 @@ $VMwareDriverFiles = @(
     'vsock.sys', 'vmmemctl.sys', 'vsepflt.sys', 'vnetWFP.sys',
     'vnetflt.sys',
     # svga_wddm/efifw/vmaudio - mirrors 9100_cleanup_vmware.ps1.
-    'svga_wddm.sys', 'efifw.sys', 'vmaudio.sys'
+    'svga_wddm.sys', 'efifw.sys', 'vmaudio.sys',
+    # Legacy pre-WDDM driver files.
+    'vmx_svga.sys', 'vmkbd.sys', 'vmdesched.sys'
 )
+
+# DriverStore dirs matching this pattern are VMware (Hyper-V's own dirs excluded).
+$DriverStorePattern = '^vm(3d|ci|hgfs|mouse|rawdsk|memctl|xnet|ware|tools|vss|usb)'
 
 $VMwareSystemFiles = @(
     'vmGuestLib.dll', 'vmhgfs.dll', 'vm3dgl64.dll', 'vm3dver.dll',
@@ -119,8 +132,7 @@ function Test-RegKey {
     return ($LASTEXITCODE -eq 0)
 }
 
-# List immediate subkey paths of a key via reg.exe (WOW64-safe - mirrors
-# 9100_cleanup_vmware.ps1).
+# List immediate subkey paths via reg.exe (WOW64-safe).
 function Get-RegSubKeyPaths {
     param([string]$KeyPath)
     $out = & $RegExe query $KeyPath 2>&1
@@ -200,9 +212,7 @@ if (-not $vmwareUninstallKeys) {
     }
 }
 
-# Enumerate every SID under UserData rather than hardcoding S-1-5-18
-# (SYSTEM) - per-machine installs land there, but we don't want to
-# silently miss a registration under an unexpected context.
+# Enumerate every SID under UserData rather than hardcoding SYSTEM.
 $UserDataRoot = 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Installer\UserData'
 $productsRoots = @('HKLM\SOFTWARE\Classes\Installer\Products')
 foreach ($sidKey in (Get-RegSubKeyPaths $UserDataRoot)) {
@@ -224,12 +234,8 @@ if (-not $vmwareInstallerProducts) {
     }
 }
 
-# Windows Installer "Components" ownership map - one entry per
-# installed file/registry key, keyed by ComponentGuid with a value
-# named after the owning product's packed ProductCode. Only cleaned
-# automatically by a successful msiexec /x; survives the registry
-# fallback in 9100_cleanup_vmware.ps1's Phase 0 if not explicitly
-# swept (mirrors that script's Components cleanup).
+# Windows Installer "Components" ownership map - only cleaned
+# automatically by a successful msiexec /x. Mirrors 9100_cleanup_vmware.ps1.
 function Get-RegDataMatches {
     param([string]$KeyPath, [string]$Pattern)
     $out = & $RegExe query $KeyPath /f $Pattern /d /s 2>&1 | Out-String
@@ -261,32 +267,69 @@ if (-not $vmwareComponentHits) {
 Write-Host ""
 Write-Host "--- Driver Packages ---"
 
-# Mirrors 9100_cleanup_vmware.ps1: post Broadcom/VMware acquisition,
-# VMware's driver packages get republished with "Provider Name:
-# Broadcom Inc." instead of "VMware, Inc.", but the Original Name
-# (.inf filename) stays the same. Anchor on the known VMware .inf
-# basenames rather than the ambiguous "Broadcom" text, since Broadcom
-# also makes plenty of unrelated physical NICs/RAID controllers.
-# vm3d.inf (the SVGA 3D "setup" package) has no .sys of its own - the
-# binary is vm3dmp.sys, already in $VMwareDriverFiles - so it can't be
-# derived from that list and is listed explicitly.
+# Post-Broadcom-acquisition, packages can be republished as "Broadcom
+# Inc." but keep the same .inf filename, so match known VMware .inf
+# basenames rather than the ambiguous "Broadcom" text. vm3d.inf has no
+# matching .sys (its binary is vm3dmp.sys), so it's listed explicitly.
 $VMwareExtraInfNames = @('vm3d.inf')
 $VMwareInfNames = ((($VMwareDriverFiles | ForEach-Object { $_ -replace '\.sys$', '.inf' }) + $VMwareExtraInfNames) |
     ForEach-Object { [regex]::Escape($_) }) -join '|'
 
-$pnpOutput = & $PnpUtil /enum-drivers 2>&1 | Out-String
-$driverBlocks = $pnpOutput -split '(?=Published Name)' |
-    Where-Object {
-        $_ -match 'VMware' -or
-        $_ -match "(?i)Original Name:\s*($VMwareInfNames)\b"
-    }
+# Get-WindowsDriver is locale-independent; pnputil's text fields are English-only.
+$publishedNames = $null
+try {
+    $publishedNames = @(
+        Get-WindowsDriver -Online -ErrorAction Stop |
+            Where-Object {
+                $_.ProviderName -match 'VMware' -or
+                $_.OriginalFileName -match "(?i)($VMwareInfNames)"
+            } |
+            ForEach-Object { $_.Driver }
+    )
+} catch {
+    Write-Host "  (Get-WindowsDriver unavailable ($_) - falling back to pnputil text parsing)"
+}
 
-if ($driverBlocks.Count -eq 0) {
-    Check-Pass "No VMware driver packages in driver store"
+if ($null -ne $publishedNames) {
+    if ($publishedNames.Count -eq 0) {
+        Check-Pass "No VMware driver packages in driver store"
+    } else {
+        foreach ($inf in $publishedNames) {
+            Check-Fail "VMware driver package still in store: $inf"
+        }
+    }
 } else {
-    foreach ($block in $driverBlocks) {
-        $inf = if ($block -match 'Published Name\s*:\s*(\S+)') { $Matches[1] } else { '(unknown)' }
-        Check-Fail "VMware driver package still in store: $inf"
+    $pnpOutput = & $PnpUtil /enum-drivers 2>&1 | Out-String
+    $driverBlocks = $pnpOutput -split '(?=Published Name)' |
+        Where-Object {
+            $_ -match 'VMware' -or
+            $_ -match "(?i)Original Name:\s*($VMwareInfNames)\b"
+        }
+
+    if ($driverBlocks.Count -eq 0) {
+        Check-Pass "No VMware driver packages in driver store"
+    } else {
+        foreach ($block in $driverBlocks) {
+            $inf = if ($block -match 'Published Name\s*:\s*(\S+)') { $Matches[1] } else { '(unknown)' }
+            Check-Fail "VMware driver package still in store: $inf"
+        }
+    }
+}
+
+# DriverStore\FileRepository residuals. 9100_cleanup_vmware.ps1's Phase 6
+# doesn't force-delete these (unsupported, risks CBS inconsistency) - it
+# only logs them. Surfaced here too for the reviewer.
+$Sys32ForDriverStore = if (Test-Path (Join-Path $env:SystemRoot 'Sysnative')) { Join-Path $env:SystemRoot 'Sysnative' } else { Join-Path $env:SystemRoot 'System32' }
+$driverStorePath = Join-Path $Sys32ForDriverStore 'DriverStore\FileRepository'
+if (Test-Path $driverStorePath) {
+    $driverStoreResiduals = Get-ChildItem -Path $driverStorePath -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match $DriverStorePattern }
+    if (-not $driverStoreResiduals) {
+        Check-Pass "No residual VMware folders in DriverStore\FileRepository"
+    } else {
+        foreach ($residual in $driverStoreResiduals) {
+            Check-Warn "Residual DriverStore folder (needs manual pnputil cleanup): $($residual.FullName)"
+        }
     }
 }
 
@@ -301,10 +344,11 @@ $vmDevices = Get-PnpDevice -ErrorAction SilentlyContinue |
         $_.Manufacturer -match 'VMware' -or
         $_.FriendlyName -match 'VMware' -or
         $_.InstanceId -match 'VEN_15AD' -or
-        # VMware's USB vendor ID - catches the USB composite PARENT of
-        # "VMware USB Pointing Device", whose own description doesn't
-        # say VMware. Mirrors 9100_cleanup_vmware.ps1.
-        $_.InstanceId -match 'VID_0E0F'
+        # VMware's USB vendor ID - catches the USB composite parent of
+        # "VMware USB Pointing Device", which doesn't say VMware itself.
+        $_.InstanceId -match 'VID_0E0F' -or
+        # ROOT-enumerated software devices (e.g. ROOT\VMWVMCIHOSTDEV\0000).
+        $_.InstanceId -match '^ROOT\\(VMWVMCI|VMware)'
     }
 
 if (-not $vmDevices -or $vmDevices.Count -eq 0) {
@@ -315,6 +359,65 @@ if (-not $vmDevices -or $vmDevices.Count -eq 0) {
             Check-Warn "Ghost VMware device: $($d.FriendlyName) [$($d.InstanceId)]"
         } else {
             Check-Fail "Active VMware device: $($d.FriendlyName) [$($d.InstanceId)] Status=$($d.Status)"
+        }
+    }
+}
+
+# Builds an InstanceId -> [DeviceClasses key path] lookup in one pass via
+# .NET instead of reg.exe (mirrors 9100_cleanup_vmware.ps1). DeviceClasses
+# can hold thousands of entries - walking it per device via reg.exe would
+# mean tens of thousands of process spawns.
+function Get-DeviceClassesInstanceMap {
+    $map = @{}
+    $hklm64 = [Microsoft.Win32.RegistryKey]::OpenBaseKey('LocalMachine', 'Registry64')
+    $root = $hklm64.OpenSubKey('SYSTEM\CurrentControlSet\Control\DeviceClasses')
+    if (-not $root) { return $map }
+    foreach ($ifaceGuidName in $root.GetSubKeyNames()) {
+        $ifaceGuidKey = $root.OpenSubKey($ifaceGuidName)
+        if (-not $ifaceGuidKey) { continue }
+        foreach ($instName in $ifaceGuidKey.GetSubKeyNames()) {
+            $instKey = $ifaceGuidKey.OpenSubKey($instName)
+            if ($instKey) {
+                $devInst = $instKey.GetValue('DeviceInstance')
+                if ($devInst) {
+                    if (-not $map.ContainsKey($devInst)) {
+                        $map[$devInst] = New-Object System.Collections.Generic.List[string]
+                    }
+                    $map[$devInst].Add("HKLM\SYSTEM\CurrentControlSet\Control\DeviceClasses\$ifaceGuidName\$instName")
+                }
+                $instKey.Close()
+            }
+        }
+        $ifaceGuidKey.Close()
+    }
+    $root.Close()
+    return $map
+}
+
+# For any device still present, also check the secondary registry
+# locations Clear-GhostDeviceReferences targets - a stale entry there is
+# a suspected cause of Windows resynthesizing a ghost Enum entry.
+if ($vmDevices -and $vmDevices.Count -gt 0) {
+    $deviceClassesMap = Get-DeviceClassesInstanceMap
+    foreach ($d in $vmDevices) {
+        # Enum key's "Driver" value points at its class driver binding key.
+        $driverBinding = Get-RegValue "HKLM\SYSTEM\CurrentControlSet\Enum\$($d.InstanceId)" 'Driver'
+        if ($driverBinding) {
+            $bindingKey = "HKLM\SYSTEM\CurrentControlSet\Control\Class\$driverBinding"
+            if (Test-RegKey $bindingKey) {
+                Check-Fail "Class driver binding still references $($d.InstanceId): $bindingKey"
+            }
+        }
+
+        if ($deviceClassesMap.ContainsKey($d.InstanceId)) {
+            foreach ($ifaceInstanceKey in $deviceClassesMap[$d.InstanceId]) {
+                Check-Fail "DeviceClasses interface registration still references $($d.InstanceId): $ifaceInstanceKey"
+            }
+        }
+
+        $containerHits = Get-RegDataMatches 'HKLM\SYSTEM\CurrentControlSet\Control\DeviceContainers' $d.InstanceId
+        foreach ($hit in $containerHits) {
+            Check-Warn "DeviceContainers still references $($d.InstanceId) (may be shared with another device): $($hit.KeyPath)\$($hit.ValueName)"
         }
     }
 }
@@ -361,10 +464,8 @@ if ($strayKeys.Count -eq 0) {
 }
 
 # Stray COM registrations (CLSID/TypeLib) - mirrors 9100_cleanup_vmware.ps1.
-# Uses the .NET registry API directly (in-process, forced to the 64-bit
-# view) rather than "reg query /s" - CLSID/TypeLib can each have tens
-# of thousands of subkeys, and recursively dumping/parsing the entire
-# subtree as text took several minutes in testing.
+# Uses .NET directly rather than "reg query /s" - CLSID/TypeLib can each
+# have tens of thousands of subkeys, and text-parsing took minutes.
 Write-Host ""
 Write-Host "--- COM registrations (CLSID/TypeLib) ---"
 function Test-RegValueContainsVMware {
@@ -378,9 +479,7 @@ function Test-RegValueContainsVMware {
 }
 
 # Bounded-depth recursive scan - mirrors 9100_cleanup_vmware.ps1. CLSID's
-# implementation path normally sits one level down (InprocServer32/
-# LocalServer32), but TypeLib's path values sit two levels down (e.g.
-# {GUID}\1.0\0\win64) - a fixed depth of 3 comfortably covers both.
+# path is one level down, TypeLib's is two - depth 3 covers both.
 function Test-KeyTreeContainsVMware {
     param([Microsoft.Win32.RegistryKey]$Key, [int]$Depth = 3)
     if (-not $Key) { return $false }
@@ -431,9 +530,7 @@ if ($strayComTotal -eq 0) {
 }
 
 # Installer\Folders stale path references (value NAME is the folder
-# path, e.g. "C:\ProgramData\VMware\VMware VGAuth\msgCatalog\"). This
-# key is WOW64-shared (non-redirected), so there's no separate
-# WOW6432Node copy to also check.
+# path). WOW64-shared, so no separate WOW6432Node copy exists.
 Write-Host ""
 Write-Host "--- Installer Folders ---"
 $foldersProps = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Installer\Folders' -ErrorAction SilentlyContinue
@@ -496,10 +593,8 @@ if (-not $strayVideoKeys) {
     }
 }
 
-# SVGA 3D class coinstaller (vm3dc003) under the Display-adapters class
-# GUID's CoDeviceInstallers value - can silently veto removal of ANY
-# display device (not just VMware's own) if left behind. Mirrors the
-# fix in 9100_cleanup_vmware.ps1's Phase 3.
+# SVGA 3D class coinstaller (vm3dc003) can silently veto removal of any
+# display device if left behind. Mirrors 9100_cleanup_vmware.ps1 Phase 3.
 $displayClassGuid = '{4d36e968-e325-11ce-bfc1-08002be10318}'
 $coDevProp = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\CoDeviceInstallers' -Name $displayClassGuid -ErrorAction SilentlyContinue
 if ($coDevProp -and (@($coDevProp.$displayClassGuid) -match 'vm3dc003')) {
@@ -522,9 +617,7 @@ foreach ($dir in $VMwareDirs) {
     }
 }
 
-# Per-user VMware AppData folders - mirrors 9100_cleanup_vmware.ps1's
-# Phase 6 sweep. Path depends on each profile under \Users, so
-# enumerate rather than hardcode.
+# Per-user AppData folders - path depends on each profile under \Users.
 $usersRoot = Join-Path $env:SystemDrive 'Users'
 $staleUserDirs = @()
 if (Test-Path $usersRoot) {
@@ -542,6 +635,25 @@ if ($staleUserDirs.Count -eq 0) {
 } else {
     foreach ($d in $staleUserDirs) {
         Check-Fail "VMware AppData folder still exists: $d"
+    }
+}
+
+# Wildcarded temp folders - mirrors 9100_cleanup_vmware.ps1's Phase 6
+# sweep of vmware-<account> folders (not just vmware-SYSTEM).
+$staleTempDirs = @()
+foreach ($pattern in $VMwareTempDirPatterns) {
+    $parent = Split-Path $pattern -Parent
+    $leaf   = Split-Path $pattern -Leaf
+    if (Test-Path $parent) {
+        Get-ChildItem -Path $parent -Directory -Filter $leaf -ErrorAction SilentlyContinue |
+            ForEach-Object { $staleTempDirs += $_.FullName }
+    }
+}
+if ($staleTempDirs.Count -eq 0) {
+    Check-Pass "No VMware temp folders (vmware-*)"
+} else {
+    foreach ($d in $staleTempDirs) {
+        Check-Fail "VMware temp folder still exists: $d"
     }
 }
 
@@ -576,17 +688,38 @@ if (-not $vmTasks -or $vmTasks.Count -eq 0) {
 }
 
 # -------------------------------------------------------------------
-# 8. Windows Update Agent driver-install history (msu provider)
+# 8. Component store integrity (DISM CheckHealth)
+# -------------------------------------------------------------------
+# Catches component-store corruption, e.g. from DriverStore residuals
+# that 9100_cleanup_vmware.ps1's Phase 6 deliberately doesn't force-delete.
+# `sfc /scannow` is intentionally skipped here - it can take 10-20+
+# minutes, disproportionate to this check; run it manually if DISM flags
+# corruption. DISM's output is English-only; non-English falls through
+# to a WARN with the raw text.
+Write-Host ""
+Write-Host "--- Component Store Integrity ---"
+
+Write-Host "  Running DISM /Online /Cleanup-Image /CheckHealth..."
+$dismOutput = & DISM.exe /Online /Cleanup-Image /CheckHealth 2>&1 | Out-String
+$dismNormalized = ($dismOutput.ToLowerInvariant() -replace '[^a-z]', '')
+if ($dismNormalized -match 'nocomponentstorecorruptiondetected') {
+    Check-Pass "DISM /CheckHealth: no component store corruption detected"
+} elseif ($dismNormalized -match 'isrepairable') {
+    Check-Warn "DISM /CheckHealth: component store corruption detected (repairable) - run DISM /Online /Cleanup-Image /RestoreHealth"
+} elseif ($dismNormalized -match 'isnotrepairable') {
+    Check-Fail "DISM /CheckHealth: component store corruption detected (NOT repairable) - review $env:windir\Logs\DISM\dism.log"
+} else {
+    Check-Warn "DISM /CheckHealth: could not parse result (non-English output?) - raw: $($dismOutput.Trim())"
+}
+
+# -------------------------------------------------------------------
+# 9. Windows Update Agent driver-install history (msu provider)
 # -------------------------------------------------------------------
 # Informational only (WARN, never FAIL). Since the Broadcom/VMware
-# acquisition, driver packages like vmci.inf get delivered/tracked via
-# Windows Update Agent and show up under Get-Package -ProviderName msu
-# (e.g. "Broadcom Inc. - System - 9.8.30.0"). This is just WU's own
-# local install-history bookkeeping - there is no supported API or
-# registry location to remove a stale entry from it, and its presence
-# does not mean the corresponding driver/service is still active (the
-# actual driver-store/service/file checks above are authoritative for
-# that). We still surface it so a reviewer isn't surprised by it later.
+# acquisition, driver packages can show up under
+# Get-Package -ProviderName msu. This is just WU's own install-history
+# bookkeeping with no supported removal path, and doesn't mean the
+# driver/service is still active - surfaced so it isn't a surprise later.
 Write-Host ""
 Write-Host "--- Windows Update Driver History (informational) ---"
 
