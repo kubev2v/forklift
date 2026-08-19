@@ -177,7 +177,6 @@ var sanitizeNameRx = regexp.MustCompile(`[^a-zA-Z0-9_.-]+`)
 // vSphere builder.
 type Builder struct {
 	*plancontext.Context
-	// Host CRs.
 	hosts map[string]*api.Host
 }
 
@@ -472,13 +471,37 @@ func (r *Builder) Secret(vmRef ref.Ref, in, object *core.Secret) (err error) {
 	return
 }
 
-// buildDatastoreMap builds a map of storage mappings keyed by source datastore ID
-func (r *Builder) buildDatastoreMap() (map[string]*api.StoragePair, error) {
+type copyMethod string
+
+const (
+	copyMethodVDDK  copyMethod = "vddk"
+	copyMethodXcopy copyMethod = "xcopy"
+	copyMethodCsi   copyMethod = "csi"
+)
+
+// Shift destinations classify as vddk since Shift is identified by the destination StorageClass, not an offload plugin.
+func storagePairCopyMethod(pair *api.StoragePair) copyMethod {
+	if pair.OffloadPlugin != nil {
+		if pair.OffloadPlugin.VSphereXcopyPluginConfig != nil {
+			return copyMethodXcopy
+		}
+		if pair.OffloadPlugin.CsiVolumeImport != nil {
+			return copyMethodCsi
+		}
+	}
+	return copyMethodVDDK
+}
+
+// buildDatastoreMap builds a map of storage mappings keyed by source datastore ID, restricted to entries matching method.
+func (r *Builder) buildDatastoreMap(method copyMethod) (map[string]*api.StoragePair, error) {
 	dsMap := make(map[string]*api.StoragePair)
 	dsMapIn := r.Context.Map.Storage.Spec.Map
 
 	for i := range dsMapIn {
 		mapped := &dsMapIn[i]
+		if storagePairCopyMethod(mapped) != method {
+			continue
+		}
 		ref := mapped.Source
 		ds := &model.Datastore{}
 		err := r.Source.Inventory.Find(ds, ref)
@@ -550,7 +573,7 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, _ *core.Config
 	canUseInstanceUUID := r.canUseInstanceUUID()
 
 	// Build datastore map for more efficient lookups
-	dsMap, err := r.buildDatastoreMap()
+	dsMap, err := r.buildDatastoreMap(copyMethodVDDK)
 	if err != nil {
 		return
 	}
@@ -1411,47 +1434,14 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 	sortedDisks := vm.SortedDisksAsVmware()
 
 	dsMapIn := r.Context.Map.Storage.Spec.Map
+	xcopyDsMap, dsErr := r.buildDatastoreMap(copyMethodXcopy)
+	if dsErr != nil {
+		return nil, dsErr
+	}
 	naaPrefixes := loadNAAPrefixes(r.Client)
 	dsNaaMap := make(map[string]string)
 
-	// Pre-pass: resolve RDM disks by NAA vendor prefix.
-	// Builds a map from disk index to the storage map entry whose offload
-	// plugin matches the RDM's vendor. Disks that fail NAA resolution are
-	// left out and will fall back to datastore-based matching in the main loop.
-	rdmMapped := make(map[int]*api.StoragePair)
-	for diskIndex, disk := range sortedDisks {
-		if !disk.RDM || disk.DeviceName == "" {
-			continue
-		}
-		rdmVendor, matched := vendorFromNAA(disk.DeviceName, naaPrefixes)
-		if !matched {
-			r.Log.Info("RDM disk NAA prefix not recognized, falling back to datastore matching",
-				"diskKey", disk.Key, "deviceName", disk.DeviceName)
-			continue
-		}
-		candidates := findStorageMapEntriesForVendor(dsMapIn, rdmVendor)
-		switch len(candidates) {
-		case 0:
-			r.Log.Info("No storage map entry found for RDM vendor, falling back to datastore matching",
-				"diskKey", disk.Key, "vendor", rdmVendor)
-		case 1:
-			rdmMapped[diskIndex] = candidates[0]
-			r.Log.Info("RDM disk resolved to storage vendor by NAA",
-				"diskKey", disk.Key, "deviceName", disk.DeviceName,
-				"vendor", rdmVendor, "storageClass", candidates[0].Destination.StorageClass)
-		default:
-			entry, disambigErr := disambiguateRDMByNAA(r.Source.Inventory, candidates, disk.DeviceName, naaPrefixes)
-			if disambigErr != nil {
-				r.Log.Info("RDM NAA disambiguation failed, falling back to datastore matching",
-					"diskKey", disk.Key, "vendor", rdmVendor, "error", disambigErr)
-			} else {
-				rdmMapped[diskIndex] = entry
-				r.Log.Info("RDM disk resolved to storage vendor by NAA",
-					"diskKey", disk.Key, "deviceName", disk.DeviceName,
-					"vendor", rdmVendor, "storageClass", entry.Destination.StorageClass)
-			}
-		}
-	}
+	resolved := resolvePassthroughDisksByVendor(sortedDisks, dsMapIn, r.Source.Inventory, naaPrefixes, offloadKindXcopy, r.Log)
 
 	for i := range dsMapIn {
 		mapped := &dsMapIn[i]
@@ -1466,14 +1456,17 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 		pvblock := core.PersistentVolumeBlock
 		for diskIndex, disk := range sortedDisks {
 			var effectiveMapped *api.StoragePair
-			if disk.RDM && disk.DeviceName != "" {
-				if entry, ok := rdmMapped[diskIndex]; ok {
+			if passthroughIdentifier(disk) != "" {
+				if entry, ok := resolved[diskIndex]; ok {
 					if mapped != entry {
 						continue
 					}
 					effectiveMapped = entry
-				} else if disk.Datastore.ID == ds.ID {
-					effectiveMapped = mapped
+				} else if entry, ok := xcopyDsMap[disk.Datastore.ID]; ok { // datastore fallback is xcopy-only; csi entries are never guessed at here
+					if mapped != entry {
+						continue
+					}
+					effectiveMapped = entry
 					r.Log.Info("RDM disk matched by datastore fallback",
 						"diskKey", disk.Key, "deviceName", disk.DeviceName,
 						"datastoreID", ds.ID)
@@ -1497,12 +1490,10 @@ func (r *Builder) PopulatorVolumes(vmRef ref.Ref, annotations map[string]string,
 			}
 
 			{
-				// For RDM disks, look up the NAA from the resolved storage map entry's
-				// source datastore (not the outer-loop ds) since the RDM may be on a
-				// different array. Use the storage map ref directly as a synthetic
-				// Datastore to ensure the correct cache key and vSphere query.
+				// Use the resolved entry's source datastore (not the outer-loop ds) because
+				// the disk's LUN may be on a different array.
 				naaDS := ds
-				if disk.RDM && disk.DeviceName != "" {
+				if passthroughIdentifier(disk) != "" {
 					naaDS = &model.Datastore{}
 					naaDS.ID = effectiveMapped.Source.ID
 					naaDS.Name = effectiveMapped.Source.Name
@@ -1749,6 +1740,7 @@ func (r *Builder) buildCsiImportPVC(
 	diskIndex int,
 	mapped *api.StoragePair,
 	annotations map[string]string,
+	plugin resolver.CsiImportPlugin,
 ) (*core.PersistentVolumeClaim, error) {
 	if mapped.OffloadPlugin == nil || mapped.OffloadPlugin.CsiVolumeImport == nil {
 		return nil, liberr.New("CSI import plugin not configured for storage pair")
@@ -1766,15 +1758,11 @@ func (r *Builder) buildCsiImportPVC(
 		return nil, nil //nolint:nilnil
 	}
 
-	vsphereClient := &Client{Context: r.Context}
-	if err := vsphereClient.connect(); err != nil {
-		return nil, liberr.Wrap(err, "failed to connect to vSphere for disk backing detection")
-	}
-	defer vsphereClient.Close()
-
-	backing, err := vsphereClient.getDiskBacking(ctx, vmRef.ID, disk.File)
-	if err != nil {
-		return nil, liberr.Wrap(err, "disk", disk.File)
+	backing := &resolver.DiskBacking{
+		VVolID:     disk.VVolID,
+		IsRDM:      disk.RDM,
+		DeviceName: disk.DeviceName,
+		LunUuid:    disk.LunUuid,
 	}
 	diskType := resolver.DetectDiskType(backing)
 	r.Log.V(2).Info("CSI import: detected disk backing", "disk", disk.File, "type", diskType, "vvolId", backing.VVolID, "isRDM", backing.IsRDM, "deviceName", backing.DeviceName)
@@ -1784,27 +1772,30 @@ func (r *Builder) buildCsiImportPVC(
 		return nil, nil //nolint:nilnil
 	}
 
-	// Read storage credentials from the secret in the source provider's namespace
-	storageSecret := &core.Secret{}
-	if err = r.Destination.Get(ctx, client.ObjectKey{
-		Name:      csiCfg.SecretRef,
-		Namespace: r.Source.Provider.Namespace,
-	}, storageSecret); err != nil {
-		return nil, liberr.Wrap(err, "secretRef", csiCfg.SecretRef)
-	}
-	// Instantiate vendor plugin (xcopy pattern: switch in newCsiImportPlugin creates concrete type)
-	plugin, err := newCsiImportPlugin(csiCfg.StorageVendorProduct, storageSecret.Data, r.Destination.Client, mapped.Destination.StorageClass)
-	if err != nil {
-		return nil, liberr.Wrap(err, "vendor", string(csiCfg.StorageVendorProduct))
+	if plugin == nil {
+		storageSecret := &core.Secret{}
+		if err := r.Destination.Get(ctx, client.ObjectKey{
+			Name:      csiCfg.SecretRef,
+			Namespace: r.Source.Provider.Namespace,
+		}, storageSecret); err != nil {
+			return nil, liberr.Wrap(err, "secretRef", csiCfg.SecretRef)
+		}
+		var err error
+		plugin, err = newCsiImportPlugin(csiCfg.StorageVendorProduct, storageSecret.Data, r.Destination.Client, mapped.Destination.StorageClass)
+		if err != nil {
+			return nil, liberr.Wrap(err, "vendor", string(csiCfg.StorageVendorProduct))
+		}
 	}
 
 	r.Log.V(2).Info("CSI import: resolving vendor annotations", "disk", disk.File, "type", diskType, "deviceName", backing.DeviceName)
-	vendorAnnotations, err := plugin.Resolve(backing)
+	vendorAnnotations, found, err := plugin.Resolve(backing)
+	// Anything short of a confirmed match (not on this array, or array unreachable) defers to the guaranteed xcopy fallback.
 	if err != nil {
-		return nil, liberr.Wrap(err, "disk", disk.File)
+		r.Log.Info("CSI import: array query failed, deferring to xcopy", "disk", disk.File, "error", err)
+		return nil, nil //nolint:nilnil
 	}
-	if vendorAnnotations == nil {
-		r.Log.Info("CSI import: vendor cannot handle this disk, deferring to other migration paths", "disk", disk.File)
+	if !found {
+		r.Log.Info("CSI import: volume not found on destination array, deferring to xcopy", "disk", disk.File)
 		return nil, nil //nolint:nilnil
 	}
 	r.Log.V(2).Info("CSI import: vendor resolution succeeded", "annotations", vendorAnnotations)
@@ -2603,7 +2594,12 @@ func (r *Builder) ensureXCopyVolumePopulator(vp *api.VSphereXcopyVolumePopulator
 
 // CsiImportPVCs creates PVCs for disks that have CsiVolumeImport configured.
 // VMDK disks are skipped (handled by DataVolumes via VDDK or PopulatorVolumes via xcopy).
-func (r *Builder) CsiImportPVCs(vmRef ref.Ref, pvcLabels map[string]string) (pvcs []core.PersistentVolumeClaim, err error) {
+func (r *Builder) CsiImportPVCs(vmRef ref.Ref, pvcLabels map[string]string) ([]core.PersistentVolumeClaim, error) {
+	return csiImportPVCs(r, vmRef, pvcLabels, nil)
+}
+
+// csiImportPVCs is CsiImportPVCs's logic with the vendor plugin taken as a parameter for testability.
+func csiImportPVCs(r *Builder, vmRef ref.Ref, pvcLabels map[string]string, plugin resolver.CsiImportPlugin) (pvcs []core.PersistentVolumeClaim, err error) {
 	vm := &model.VM{}
 	if err = r.Source.Inventory.Find(vm, vmRef); err != nil {
 		err = liberr.Wrap(err, "vm", vmRef.String())
@@ -2613,22 +2609,31 @@ func (r *Builder) CsiImportPVCs(vmRef ref.Ref, pvcLabels map[string]string) (pvc
 		vm.RemoveSharedDisks()
 	}
 
-	dsMap, err := r.buildDatastoreMap()
+	csiDsMap, err := r.buildDatastoreMap(copyMethodCsi)
 	if err != nil {
 		return
 	}
+	if len(csiDsMap) == 0 {
+		return nil, nil
+	}
 
 	disks := vm.SortedDisksAsVmware()
+	dsMapIn := r.Map.Storage.Spec.Map
+	naaPrefixes := loadNAAPrefixes(r.Client)
+	resolved := resolvePassthroughDisksByVendor(disks, dsMapIn, r.Source.Inventory, naaPrefixes, offloadKindCsi, r.Log)
+	maps.Copy(resolved, resolveVVolDisksByDatastore(disks, csiDsMap))
+
 	for diskIndex, disk := range disks {
-		mapped, found := dsMap[disk.Datastore.ID]
+		mapped, found := resolved[diskIndex]
 		if !found {
-			continue
-		}
-		if mapped.OffloadPlugin == nil || mapped.OffloadPlugin.CsiVolumeImport == nil {
+			if passthroughIdentifier(disk) != "" {
+				r.Log.Info("RDM disk has no recognized vendor for CSI import; deferring to xcopy/populator handling",
+					"diskKey", disk.Key, "deviceName", disk.DeviceName, "datastoreID", disk.Datastore.ID)
+			}
 			continue
 		}
 
-		pvc, pErr := r.buildCsiImportPVC(context.TODO(), vmRef, vm, disk, diskIndex, mapped, pvcLabels)
+		pvc, pErr := r.buildCsiImportPVC(context.TODO(), vmRef, vm, disk, diskIndex, mapped, pvcLabels, plugin)
 		if pErr != nil {
 			err = pErr
 			return
@@ -2659,7 +2664,7 @@ func (r *Builder) NetAppShiftPVCs(vmRef ref.Ref, labels map[string]string) (pvcs
 		vm.RemoveSharedDisks()
 	}
 
-	dsMap, err := r.buildDatastoreMap()
+	dsMap, err := r.buildDatastoreMap(copyMethodVDDK)
 	if err != nil {
 		return
 	}

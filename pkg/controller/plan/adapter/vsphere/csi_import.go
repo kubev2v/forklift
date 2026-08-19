@@ -13,9 +13,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// newCsiImportPlugin instantiates the CsiImportPlugin for the given storage vendor.
-// This is the equivalent of xcopy's main() vendor switch — the only place that imports
-// vendor sub-packages. Adding a new vendor = new sub-package + one case here.
 func newCsiImportPlugin(product forklift.StorageVendorProduct, secretData map[string][]byte, k8sClient client.Client, storageClass string) (resolver.CsiImportPlugin, error) {
 	host := string(secretData["STORAGE_HOSTNAME"])
 	user := string(secretData["STORAGE_USERNAME"])

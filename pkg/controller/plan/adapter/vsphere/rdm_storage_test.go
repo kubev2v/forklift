@@ -5,6 +5,7 @@ import (
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -130,7 +131,7 @@ var _ = Describe("RDM storage resolution", func() {
 
 		It("should find a single matching entry", func() {
 			storageMap := []api.StoragePair{pureEntry, powerMaxEntry}
-			result := findStorageMapEntriesForVendor(storageMap, api.StorageVendorProductPowerMax)
+			result := findStorageMapEntriesForVendor(storageMap, api.StorageVendorProductPowerMax, offloadKindXcopy)
 			Expect(result).To(HaveLen(1))
 			Expect(result[0].OffloadPlugin.VSphereXcopyPluginConfig.SecretRef).To(Equal("powermax-secret"))
 			Expect(result[0].Destination.StorageClass).To(Equal("powermax-sc"))
@@ -138,7 +139,7 @@ var _ = Describe("RDM storage resolution", func() {
 
 		It("should return empty when no entry matches", func() {
 			storageMap := []api.StoragePair{pureEntry}
-			result := findStorageMapEntriesForVendor(storageMap, api.StorageVendorProductPowerMax)
+			result := findStorageMapEntriesForVendor(storageMap, api.StorageVendorProductPowerMax, offloadKindXcopy)
 			Expect(result).To(BeEmpty())
 		})
 
@@ -146,13 +147,13 @@ var _ = Describe("RDM storage resolution", func() {
 			secondPure := pureEntry
 			secondPure.Destination = api.DestinationStorage{StorageClass: "pure-sc-2"}
 			storageMap := []api.StoragePair{pureEntry, secondPure, powerMaxEntry}
-			result := findStorageMapEntriesForVendor(storageMap, api.StorageVendorProductPureFlashArray)
+			result := findStorageMapEntriesForVendor(storageMap, api.StorageVendorProductPureFlashArray, offloadKindXcopy)
 			Expect(result).To(HaveLen(2))
 		})
 
 		It("should skip entries without offload plugin", func() {
 			storageMap := []api.StoragePair{noOffloadEntry, powerMaxEntry}
-			result := findStorageMapEntriesForVendor(storageMap, api.StorageVendorProductPowerMax)
+			result := findStorageMapEntriesForVendor(storageMap, api.StorageVendorProductPowerMax, offloadKindXcopy)
 			Expect(result).To(HaveLen(1))
 			Expect(result[0].Destination.StorageClass).To(Equal("powermax-sc"))
 		})
@@ -162,9 +163,50 @@ var _ = Describe("RDM storage resolution", func() {
 				OffloadPlugin: &api.OffloadPlugin{},
 			}
 			storageMap := []api.StoragePair{nilConfigEntry, pureEntry}
-			result := findStorageMapEntriesForVendor(storageMap, api.StorageVendorProductPureFlashArray)
+			result := findStorageMapEntriesForVendor(storageMap, api.StorageVendorProductPureFlashArray, offloadKindXcopy)
 			Expect(result).To(HaveLen(1))
 			Expect(result[0].Destination.StorageClass).To(Equal("pure-sc"))
+		})
+
+		It("should only match entries of the requested kind, even for the same vendor", func() {
+			ontapCsiEntry := api.StoragePair{
+				Source:      ref.Ref{ID: "ds-1"},
+				Destination: api.DestinationStorage{StorageClass: "ontap-csi-sc"},
+				OffloadPlugin: &api.OffloadPlugin{
+					CsiVolumeImport: &api.CsiVolumeImport{
+						StorageVendorProduct: api.StorageVendorProductOntap,
+						SecretRef:            "ontap-secret",
+					},
+				},
+			}
+			ontapXcopyEntry := api.StoragePair{
+				Source:      ref.Ref{ID: "ds-1"},
+				Destination: api.DestinationStorage{StorageClass: "ontap-xcopy-sc"},
+				OffloadPlugin: &api.OffloadPlugin{
+					VSphereXcopyPluginConfig: &api.VSphereXcopyPluginConfig{
+						StorageVendorProduct: api.StorageVendorProductOntap,
+						SecretRef:            "ontap-secret",
+					},
+				},
+			}
+
+			// CSI-only entry first, xcopy-only entry second.
+			storageMap := []api.StoragePair{ontapCsiEntry, ontapXcopyEntry}
+			csiResult := findStorageMapEntriesForVendor(storageMap, api.StorageVendorProductOntap, offloadKindCsi)
+			Expect(csiResult).To(HaveLen(1))
+			Expect(csiResult[0].Destination.StorageClass).To(Equal("ontap-csi-sc"))
+			xcopyResult := findStorageMapEntriesForVendor(storageMap, api.StorageVendorProductOntap, offloadKindXcopy)
+			Expect(xcopyResult).To(HaveLen(1))
+			Expect(xcopyResult[0].Destination.StorageClass).To(Equal("ontap-xcopy-sc"))
+
+			// Order flipped: xcopy-only entry first, CSI-only entry second — identical results.
+			flipped := []api.StoragePair{ontapXcopyEntry, ontapCsiEntry}
+			csiResultFlipped := findStorageMapEntriesForVendor(flipped, api.StorageVendorProductOntap, offloadKindCsi)
+			Expect(csiResultFlipped).To(HaveLen(1))
+			Expect(csiResultFlipped[0].Destination.StorageClass).To(Equal("ontap-csi-sc"))
+			xcopyResultFlipped := findStorageMapEntriesForVendor(flipped, api.StorageVendorProductOntap, offloadKindXcopy)
+			Expect(xcopyResultFlipped).To(HaveLen(1))
+			Expect(xcopyResultFlipped[0].Destination.StorageClass).To(Equal("ontap-xcopy-sc"))
 		})
 	})
 
@@ -344,6 +386,106 @@ var _ = Describe("RDM storage resolution", func() {
 			result, err := disambiguateRDMByNAA(inv, candidates, "naa.6000097000011111000000000000099", naaVendorPrefixes)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.Destination.StorageClass).To(Equal("powermax-1-sc"))
+		})
+	})
+
+	Context("resolvePassthroughDisksByVendor", func() {
+		ontapCsiEntry := api.StoragePair{
+			Source:      ref.Ref{ID: "ds-1"},
+			Destination: api.DestinationStorage{StorageClass: "ontap-csi-sc"},
+			OffloadPlugin: &api.OffloadPlugin{
+				CsiVolumeImport: &api.CsiVolumeImport{
+					StorageVendorProduct: api.StorageVendorProductOntap,
+					SecretRef:            "ontap-secret",
+				},
+			},
+		}
+		ontapXcopyEntry := api.StoragePair{
+			Source:      ref.Ref{ID: "ds-1"},
+			Destination: api.DestinationStorage{StorageClass: "ontap-xcopy-sc"},
+			OffloadPlugin: &api.OffloadPlugin{
+				VSphereXcopyPluginConfig: &api.VSphereXcopyPluginConfig{
+					StorageVendorProduct: api.StorageVendorProductOntap,
+					SecretRef:            "ontap-secret",
+				},
+			},
+		}
+		rdmDisk := vsphere.Disk{Key: 2000, RDM: true, DeviceName: "naa.600a0980123456789abcdef0"}
+		vmdkDisk := vsphere.Disk{Key: 2003}
+		unrecognizedVendorRDM := vsphere.Disk{Key: 2004, RDM: true, DeviceName: "naa.6999999999999999"}
+
+		It("resolves an RDM disk to the single matching CSI-kind entry", func() {
+			storageMap := []api.StoragePair{ontapCsiEntry, ontapXcopyEntry}
+			resolved := resolvePassthroughDisksByVendor(
+				[]vsphere.Disk{rdmDisk}, storageMap, &dsInventory{}, naaVendorPrefixes, offloadKindCsi, builderLog)
+			Expect(resolved).To(HaveKey(0))
+			Expect(resolved[0].Destination.StorageClass).To(Equal("ontap-csi-sc"))
+		})
+
+		It("resolves the same RDM disk to the xcopy-kind entry when asked for xcopy", func() {
+			storageMap := []api.StoragePair{ontapCsiEntry, ontapXcopyEntry}
+			resolved := resolvePassthroughDisksByVendor(
+				[]vsphere.Disk{rdmDisk}, storageMap, &dsInventory{}, naaVendorPrefixes, offloadKindXcopy, builderLog)
+			Expect(resolved).To(HaveKey(0))
+			Expect(resolved[0].Destination.StorageClass).To(Equal("ontap-xcopy-sc"))
+		})
+
+		It("resolves identically regardless of entry order (MTV-6322 regression)", func() {
+			flipped := []api.StoragePair{ontapXcopyEntry, ontapCsiEntry}
+			resolved := resolvePassthroughDisksByVendor(
+				[]vsphere.Disk{rdmDisk}, flipped, &dsInventory{}, naaVendorPrefixes, offloadKindCsi, builderLog)
+			Expect(resolved).To(HaveKey(0))
+			Expect(resolved[0].Destination.StorageClass).To(Equal("ontap-csi-sc"))
+		})
+
+		It("falls back (omits the disk) when the vendor prefix isn't recognized", func() {
+			storageMap := []api.StoragePair{ontapCsiEntry}
+			resolved := resolvePassthroughDisksByVendor(
+				[]vsphere.Disk{unrecognizedVendorRDM}, storageMap, &dsInventory{}, naaVendorPrefixes, offloadKindCsi, builderLog)
+			Expect(resolved).NotTo(HaveKey(0))
+		})
+
+		It("falls back when the vendor is recognized but no entry of the requested kind exists", func() {
+			storageMap := []api.StoragePair{ontapXcopyEntry}
+			resolved := resolvePassthroughDisksByVendor(
+				[]vsphere.Disk{rdmDisk}, storageMap, &dsInventory{}, naaVendorPrefixes, offloadKindCsi, builderLog)
+			Expect(resolved).NotTo(HaveKey(0))
+		})
+
+		It("disambiguates two same-kind, same-vendor candidates by NAA array match", func() {
+			inv := &dsInventory{
+				datastores: map[string]model.Datastore{
+					"ds-pm1": {BackingDevicesNames: []string{"naa.6000097000011111000000000000001"}},
+					"ds-pm2": {BackingDevicesNames: []string{"naa.6000097000022222000000000000001"}},
+				},
+			}
+			powerMaxEntry1 := api.StoragePair{
+				Source:      ref.Ref{ID: "ds-pm1"},
+				Destination: api.DestinationStorage{StorageClass: "powermax-1-sc"},
+				OffloadPlugin: &api.OffloadPlugin{
+					VSphereXcopyPluginConfig: &api.VSphereXcopyPluginConfig{StorageVendorProduct: api.StorageVendorProductPowerMax, SecretRef: "pm1-secret"},
+				},
+			}
+			powerMaxEntry2 := api.StoragePair{
+				Source:      ref.Ref{ID: "ds-pm2"},
+				Destination: api.DestinationStorage{StorageClass: "powermax-2-sc"},
+				OffloadPlugin: &api.OffloadPlugin{
+					VSphereXcopyPluginConfig: &api.VSphereXcopyPluginConfig{StorageVendorProduct: api.StorageVendorProductPowerMax, SecretRef: "pm2-secret"},
+				},
+			}
+			disk := vsphere.Disk{Key: 3000, RDM: true, DeviceName: "naa.6000097000022222000000000000099"}
+			storageMap := []api.StoragePair{powerMaxEntry1, powerMaxEntry2}
+			resolved := resolvePassthroughDisksByVendor(
+				[]vsphere.Disk{disk}, storageMap, inv, naaVendorPrefixes, offloadKindXcopy, builderLog)
+			Expect(resolved).To(HaveKey(0))
+			Expect(resolved[0].Destination.StorageClass).To(Equal("powermax-2-sc"))
+		})
+
+		It("never resolves a plain VMDK disk", func() {
+			storageMap := []api.StoragePair{ontapCsiEntry, ontapXcopyEntry}
+			resolved := resolvePassthroughDisksByVendor(
+				[]vsphere.Disk{vmdkDisk}, storageMap, &dsInventory{}, naaVendorPrefixes, offloadKindCsi, builderLog)
+			Expect(resolved).To(BeEmpty())
 		})
 	})
 })
