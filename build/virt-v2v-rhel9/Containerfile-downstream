@@ -23,7 +23,7 @@ RUN mkdir -p /usr/local/lib/guestfs/appliance && \
     qemu-img convert -c -O qcow2 root root.qcow2 && \
     mv -vf root.qcow2 root
 
-FROM registry.redhat.io/ubi9/go-toolset:1.25.9-1778604137 AS builder
+FROM registry.redhat.io/ubi9/go-toolset:9.8-1787080706 AS builder
 USER 0
 RUN dnf install -y libvirt-devel
 WORKDIR /app
