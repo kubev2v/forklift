@@ -394,6 +394,7 @@ func (r *Builder) mapDisks(vm *model.VM, persistentVolumeClaims []*core.Persiste
 					Bus: Virtio,
 				},
 			},
+			Serial: planbase.DiskSerial(disk.DiskId, vm.ID, i),
 		}
 		kVolumes = append(kVolumes, volume)
 		kDisks = append(kDisks, kubevirtDisk)

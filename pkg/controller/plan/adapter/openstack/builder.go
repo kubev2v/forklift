@@ -453,7 +453,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []*core.Pe
 
 	var bootOrderSet bool
 	var imagePVC *core.PersistentVolumeClaim
-	for _, pvc := range persistentVolumeClaims {
+	for diskIdx, pvc := range persistentVolumeClaims {
 		// Handle loopvar https://go.dev/wiki/LoopvarExperiment
 		pvc := pvc
 
@@ -520,6 +520,7 @@ func (r *Builder) mapDisks(vm *model.Workload, persistentVolumeClaims []*core.Pe
 						Bus: cnv.DiskBus(bus),
 					},
 				},
+				Serial: planbase.DiskSerial(pvc.Annotations[planbase.AnnDiskSource], vm.ID, diskIdx),
 			}
 		default:
 			r.Log.Info("image disk format not supported", "format", image.DiskFormat)

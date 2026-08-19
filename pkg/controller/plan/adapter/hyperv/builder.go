@@ -101,6 +101,7 @@ func (r *Builder) mapDisks(vm *model.VM, pvcs []*core.PersistentVolumeClaim, obj
 					Bus: cnv.DiskBusVirtio,
 				},
 			},
+			Serial: planbase.DiskSerial(disk.ID, vm.ID, i),
 		})
 	}
 	object.Template.Spec.Volumes = kVolumes
