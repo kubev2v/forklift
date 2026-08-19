@@ -5,8 +5,7 @@
 
 $ErrorActionPreference = 'Continue'
 
-# Schedule-for-reboot helper via MoveFileEx(MOVEFILE_DELAY_UNTIL_REBOOT).
-# Used as last resort when a file is locked (e.g. loaded driver).
+# Schedules a locked file for deletion on next reboot (last resort).
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;
@@ -17,9 +16,8 @@ public static class LockedFileDeleter {
     public const int MOVEFILE_DELAY_UNTIL_REBOOT = 0x4;
 }
 
-// CM_Uninstall_DevNode: same API Device Manager's "Uninstall device"
-// uses to remove a ghost/non-present device. Safer than deleting the
-// CurrentControlSet\Enum key by hand, which can corrupt the PnP database.
+// CM_Uninstall_DevNode: same API Device Manager uses to remove a
+// device. Safer than deleting the Enum registry key by hand.
 public static class CfgMgr {
     public const uint CM_LOCATE_DEVNODE_PHANTOM = 0x00000001;
     public const uint CR_SUCCESS = 0x00000000;
@@ -48,8 +46,8 @@ function Remove-GhostDevNode {
 # ===================================================================
 # WOW64-safe path resolution
 # ===================================================================
-# Use Sysnative (not System32) in case this runs as a 32-bit process,
-# where System32 would otherwise be redirected to SysWOW64.
+# Sysnative avoids System32 being redirected to SysWOW64 if this runs
+# as a 32-bit process.
 $Sysnative = Join-Path $env:SystemRoot 'Sysnative'
 if (Test-Path $Sysnative) {
     $Sys32   = $Sysnative
@@ -71,11 +69,15 @@ $VMwareServices = @(
     'vmci', 'vmxnet3', 'vmxnet3ndis6', 'pvscsi',
     'vmusbmouse', 'vmmouse',
     'vm3dmp', 'vm3dmp-debug', 'vm3dmp-stats', 'vm3dmp_loader',
-    # vgauth/cblauncher are alternate/legacy names alongside
-    # VGAuthService/CbLauncher - a no-op if not present.
+    # vgauth/cblauncher: legacy alternate names, no-op if absent.
     'vsock', 'efifw', 'svga_wddm', 'vmaudio', 'vgauth', 'cblauncher',
     'vmwtimeprovider', 'vmstatsprovider', 'vmupgradehelper',
-    'vmwefifw'
+    'vmwefifw',
+    # vm3dservice backs the vm3dservice.exe in $VMwareSystemFiles below.
+    # The rest are newer (vmx86, VMwareCertService) or legacy pre-WDDM
+    # names from older Tools builds.
+    'VMCISockets', 'vm3dservice', 'vmxnet', 'vmx_svga', 'vmkbd',
+    'vmdesched', 'vmdebug', 'vmware', 'vmx86', 'VMwareCertService'
 )
 
 # Registry keys that are NOT auto-derived from service names.
@@ -95,7 +97,9 @@ $VMwareRegistryKeys = @(
     'HKLM\SYSTEM\CurrentControlSet\services\eventLog\System\vnetWFP',
     'HKLM\SYSTEM\CurrentControlSet\services\eventLog\System\vnetflt',
     'HKLM\SYSTEM\CurrentControlSet\services\eventLog\System\vsepflt',
-    'HKLM\SYSTEM\CurrentControlSet\services\eventLog\System\vmci'
+    'HKLM\SYSTEM\CurrentControlSet\services\eventLog\System\vmci',
+    # App Paths entry for vmtoolsd.exe - orphaned once the exe is gone.
+    'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\vmtoolsd.exe'
 )
 
 $VMwareDirs = @(
@@ -103,8 +107,14 @@ $VMwareDirs = @(
     "$env:ProgramFiles\Common Files\VMware",
     "${env:ProgramFiles(x86)}\VMware",
     "${env:ProgramFiles(x86)}\Common Files\VMware",
-    "$env:ProgramData\VMware",
-    "$env:SystemRoot\Temp\vmware-SYSTEM"
+    "$env:ProgramData\VMware"
+)
+
+# Handled separately from $VMwareDirs: Tools creates one
+# "vmware-<account>" temp folder per account that's run it.
+$VMwareTempDirPatterns = @(
+    "$env:SystemRoot\Temp\vmware-*",
+    "$env:TEMP\vmware-*"
 )
 
 $VMwareDriverFiles = @(
@@ -112,11 +122,12 @@ $VMwareDriverFiles = @(
     'vmusbmouse.sys', 'pvscsi.sys', 'vmxnet3.sys',
     'vm3dmp.sys', 'vm3dmp-debug.sys', 'vm3dmp-stats.sys', 'vm3dmp_loader.sys',
     'vsock.sys', 'vmmemctl.sys', 'vsepflt.sys', 'vnetWFP.sys',
-    # vnetflt: pre-10.2.5 predecessor of vnetWFP for the Tools
-    # "NetworkIntrospection" feature. A Tools installer bug can leave
-    # it behind and BSOD alongside the newer vsepflt driver.
+    # vnetflt: legacy predecessor of vnetWFP, can be left behind by a
+    # Tools installer bug and BSOD alongside vsepflt.
     'vnetflt.sys',
-    'svga_wddm.sys', 'efifw.sys', 'vmaudio.sys'
+    'svga_wddm.sys', 'efifw.sys', 'vmaudio.sys',
+    # Legacy pre-WDDM driver files.
+    'vmx_svga.sys', 'vmkbd.sys', 'vmdesched.sys'
 )
 
 $VMwareSystemFiles = @(
@@ -143,7 +154,7 @@ $VMwareSysWOW64Files = @(
     'vm3dum_loader.dll'
 )
 
-# DriverStore dirs matching this pattern are VMware; Hyper-V dirs
+# DriverStore dirs matching this pattern are VMware, Hyper-V dirs
 # (vmbus, vmgid, vmgen*, vmstor*, vms3cap, vmbk*) are excluded.
 $DriverStorePattern = '^vm(3d|ci|hgfs|mouse|rawdsk|memctl|xnet|ware|tools|vss|usb)'
 
@@ -162,8 +173,7 @@ function Log {
     Add-Content -Path $LogFile -Value $line
 }
 
-# Delete a registry key tree. Uses reg.exe (not PowerShell) to avoid
-# WOW64 redirection.
+# Delete a registry key tree via reg.exe (avoids WOW64 redirection).
 function Delete-RegKey {
     param([string]$KeyPath)
     & $RegExe query $KeyPath /ve 2>&1 | Out-Null
@@ -214,9 +224,8 @@ function Get-RegValue {
     return $null
 }
 
-# Remove a file or directory with logging and counter updates.
-# Falls back to cmd /c rd/del, then schedules locked files for
-# deletion on reboot via MoveFileEx(MOVEFILE_DELAY_UNTIL_REBOOT).
+# Removes a file/dir, falling back to cmd /c rd/del, then scheduling
+# locked files for deletion on reboot.
 function Remove-PathItem {
     param([string]$Path, [switch]$Recurse)
     if (-not (Test-Path $Path)) { return }
@@ -239,12 +248,11 @@ function Remove-PathItem {
         return
     }
     # File is locked (e.g. loaded driver) - schedule for reboot deletion.
-    # Resolve Sysnative back to System32 so the kernel can find the file.
     if (-not $Recurse) {
+        # Resolve back to System32 so the kernel can find the file.
         $kernelPath = $Path -replace '(?i)\\Sysnative\\', '\System32\'
-        # Must pass [NullString]::Value, not $null - PowerShell marshals a
-        # bare $null as "", which MoveFileEx treats as "rename to empty
-        # path" (fails) instead of "delete on reboot".
+        # [NullString]::Value, not $null - PowerShell marshals bare $null
+        # as "", which MoveFileEx treats as a failing rename instead of delete.
         $ok = [LockedFileDeleter]::MoveFileEx($kernelPath, [NullString]::Value,
                 [LockedFileDeleter]::MOVEFILE_DELAY_UNTIL_REBOOT)
         if ($ok) {
@@ -269,17 +277,13 @@ Log "[INFO] Sys32=$Sys32  PnpUtil=$PnpUtil  RegExe=$RegExe"
 # -------------------------------------------------------------------
 # PHASE 0: Uninstall VMware Tools via Windows Installer (MSI)
 # -------------------------------------------------------------------
-# VMware Tools is an MSI product. Manually deleting its files/services/
-# drivers (Phases 1-6) never touches Windows Installer's own bookkeeping,
-# so it would keep showing up in Programs and Features forever. Uninstall
-# it properly first, then force-delete the registry remnants if msiexec
-# can't fully clean up (e.g. the payload was already removed by a
-# previous partial run).
+# Uninstall via MSI first so it doesn't linger in Programs and Features,
+# then force-delete any registry remnants msiexec leaves behind.
 Log ''
 Log '  PHASE 0: VMware Tools MSI Uninstall'
 Log '---------------------------------------------------------------'
 
-# Declared here since Phase 0 is the first phase to call Delete-RegKey/Value.
+# Counters used by Delete-RegKey/Value, first called below.
 $regDeleted = 0
 $regErrors  = 0
 $msiRemoved = 0
@@ -328,16 +332,14 @@ if (-not $vmwareUninstallKeys) {
             Log "[WARNING] No product code found for $($entry.DisplayName) - forcing registry cleanup"
         }
 
-        # Guarantee the Add/Remove Programs entry is gone even if msiexec
-        # left it behind (e.g. payload already missing).
+        # Ensure the Add/Remove Programs entry is gone even if msiexec left it.
         Delete-RegKey $entry.KeyPath
     }
 }
 
-# Clean orphaned Windows Installer product registrations - these drive
-# Get-Package/Win32_Product visibility independently of the Uninstall key
-# above and can survive even a clean msiexec /x. Enumerate every SID
-# under UserData rather than hardcoding S-1-5-18 (SYSTEM).
+# Clean orphaned Windows Installer product registrations (drive
+# Get-Package/Win32_Product visibility; can survive a clean msiexec /x).
+# Enumerate every SID under UserData rather than hardcoding SYSTEM.
 $UserDataRoot = 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Installer\UserData'
 $productsRoots = @('HKLM\SOFTWARE\Classes\Installer\Products')
 foreach ($sidKey in (Get-RegSubKeyPaths $UserDataRoot)) {
@@ -356,13 +358,10 @@ foreach ($productsRoot in $productsRoots) {
 
 Log "[INFO] VMware MSI products uninstalled via msiexec: $msiRemoved"
 
-# Clean orphaned Windows Installer "Components" ownership entries. Every
-# file/registry-key a product installs is tracked under
-# UserData\<SID>\Components\<ComponentGuid>, keyed by the owning
-# product's packed ProductCode (value data = install path). A clean
-# msiexec /x removes these automatically; the registry fallback above
-# doesn't. A component can be shared by multiple products, so delete
-# only the matching value, then remove the key once it has no owners left.
+# Clean orphaned Windows Installer "Components" ownership entries
+# (UserData\<SID>\Components\<ComponentGuid>), not handled by the
+# registry fallback above. A component can be shared by multiple
+# products, so only delete the matching value, then the key if empty.
 function Get-RegDataMatches {
     param([string]$KeyPath, [string]$Pattern)
     $out = & $RegExe query $KeyPath /f $Pattern /d /s 2>&1 | Out-String
@@ -394,14 +393,12 @@ foreach ($sidKey in (Get-RegSubKeyPaths $UserDataRoot)) {
 Log "[INFO] Orphaned Windows Installer Components entries removed: $componentsRemoved"
 
 # -------------------------------------------------------------------
-# PHASE 1: Stop and disable VMware services (quiesce before touching
-# drivers/devices below)
+# PHASE 1: Stop and disable VMware services
 # -------------------------------------------------------------------
-# Phase order matters: quiesce services first, remove driver packages
-# before PnP device instances, and only delete service definitions last
-# (Phase 4, after devices are gone). Otherwise: vmci (a PnP bus
-# enumerator) can keep re-asserting its bus device during removal, and
-# drivers still in the driver store can get re-selected on a PnP rescan.
+# Phase order matters: quiesce services, then drivers, then devices,
+# and only delete service definitions last (Phase 4). Otherwise vmci
+# (a PnP bus enumerator) can re-assert its device, and drivers still in
+# the driver store can get re-selected on a PnP rescan.
 Log ''
 Log '  PHASE 1: Stop and Disable VMware Services'
 Log '---------------------------------------------------------------'
@@ -451,42 +448,66 @@ if ($servicesToRemove.Count -eq 0) {
 }
 
 # -------------------------------------------------------------------
-# PHASE 2: Remove VMware driver packages (pnputil) - before PnP
-# device instances, see Phase 1 rationale above.
+# PHASE 2: Remove VMware driver packages (pnputil)
 # -------------------------------------------------------------------
 Log ''
 Log '  PHASE 2: VMware Driver Packages'
 Log '---------------------------------------------------------------'
 
-# Post-Broadcom-acquisition, VMware driver packages are republished with
-# "Provider Name: Broadcom Inc." instead of "VMware, Inc.", though the
-# .inf filename is unchanged. Matching "Broadcom" alone would be unsafe
-# (unrelated Broadcom NICs/RAID controllers exist), so anchor on known
-# VMware .inf basenames derived from $VMwareDriverFiles instead.
-# vm3d.inf (SVGA 3D setup package) has no matching .sys of its own
-# (the binary is vm3dmp.sys, already in that list), so add it explicitly.
+# Post-Broadcom-acquisition, some VMware driver packages are republished
+# as "Provider Name: Broadcom Inc.", but the .inf filename is unchanged.
+# Matching "Broadcom" alone would be unsafe (unrelated Broadcom hardware
+# exists), so match known VMware .inf basenames instead. vm3d.inf has no
+# matching .sys (its binary is vm3dmp.sys), so it's added explicitly.
 $VMwareExtraInfNames = @('vm3d.inf')
 $VMwareInfNames = ((($VMwareDriverFiles | ForEach-Object { $_ -replace '\.sys$', '.inf' }) + $VMwareExtraInfNames) |
     ForEach-Object { [regex]::Escape($_) }) -join '|'
 
-$pnpOutput = & $PnpUtil /enum-drivers 2>&1 | Out-String
-$driverBlocks = $pnpOutput -split '(?=Published Name)' |
-    Where-Object {
-        $_ -match 'VMware' -or
-        $_ -match "(?i)Original Name:\s*($VMwareInfNames)\b"
-    }
+# Get-WindowsDriver returns structured fields, so it works regardless of
+# display language. pnputil's text output is English-only, so it's only
+# a fallback below.
+$publishedNames = $null
+try {
+    $publishedNames = @(
+        Get-WindowsDriver -Online -ErrorAction Stop |
+            Where-Object {
+                $_.ProviderName -match 'VMware' -or
+                $_.OriginalFileName -match "(?i)($VMwareInfNames)"
+            } |
+            ForEach-Object { $_.Driver }
+    )
+    Log "[INFO] Get-WindowsDriver identified $($publishedNames.Count) VMware driver package(s)"
+} catch {
+    Log "[WARNING] Get-WindowsDriver unavailable ($_) - falling back to pnputil text parsing (English output only)"
+}
 
 $drvRemoved = 0
-if ($driverBlocks.Count -eq 0) {
-    Log '[INFO] No VMware driver packages found in driver store.'
-} else {
-    Log "[INFO] Found $($driverBlocks.Count) VMware driver package(s)"
-    foreach ($block in $driverBlocks) {
-        $inf = if ($block -match 'Published Name\s*:\s*(\S+)') { $Matches[1] } else { '(unknown)' }
+if ($null -ne $publishedNames) {
+    foreach ($inf in $publishedNames) {
         Log "[DRIVER] Removing $inf ..."
         $result = & $PnpUtil /delete-driver "$inf" /uninstall /force 2>&1 | Out-String
         Log "  $result"
         $drvRemoved++
+    }
+} else {
+    $pnpOutput = & $PnpUtil /enum-drivers 2>&1 | Out-String
+    $driverBlocks = $pnpOutput -split '(?=Published Name)' |
+        Where-Object {
+            $_ -match 'VMware' -or
+            $_ -match "(?i)Original Name:\s*($VMwareInfNames)\b"
+        }
+
+    if ($driverBlocks.Count -eq 0) {
+        Log '[INFO] No VMware driver packages found in driver store.'
+    } else {
+        Log "[INFO] Found $($driverBlocks.Count) VMware driver package(s)"
+        foreach ($block in $driverBlocks) {
+            $inf = if ($block -match 'Published Name\s*:\s*(\S+)') { $Matches[1] } else { '(unknown)' }
+            Log "[DRIVER] Removing $inf ..."
+            $result = & $PnpUtil /delete-driver "$inf" /uninstall /force 2>&1 | Out-String
+            Log "  $result"
+            $drvRemoved++
+        }
     }
 }
 
@@ -497,19 +518,16 @@ Log ''
 Log '  PHASE 3: VMware PnP Devices'
 Log '---------------------------------------------------------------'
 
-# vmci is a PnP bus enumerator and can keep re-asserting its bus device
-# during removal below - Phase 1 only stopped/disabled it, so delete it
-# outright here, immediately before device removal. Remove it from the
-# pending Phase 4 list so that phase doesn't warn it's already gone.
+# vmci is a PnP bus enumerator that can keep re-asserting its device, so
+# delete it outright now, right before device removal. Drop it from the
+# Phase 4 list since it's already gone.
 & sc.exe stop vmci 2>&1 | Out-Null
 & sc.exe delete vmci 2>&1 | Out-Null
 $servicesToRemove = @($servicesToRemove | Where-Object { $_.Name -ne 'vmci' })
 
-# vm3d.inf registers a class coinstaller (vm3dc003.dll) under the
-# Display-adapters class GUID. A class coinstaller runs for every
-# device in that class and can veto removal for any of them, so strip
-# only the matching entry - never the whole REG_MULTI_SZ value, since
-# other legitimate coinstallers may share it.
+# vm3d.inf registers a class coinstaller (vm3dc003.dll) that runs for
+# every display device and can veto removal, so strip only that entry -
+# other legitimate coinstallers may share the same REG_MULTI_SZ value.
 $displayClassGuid = '{4d36e968-e325-11ce-bfc1-08002be10318}'
 $coDevKey = 'HKLM:\SYSTEM\CurrentControlSet\Control\CoDeviceInstallers'
 $coDevProp = Get-ItemProperty -Path $coDevKey -Name $displayClassGuid -ErrorAction SilentlyContinue
@@ -526,11 +544,85 @@ $vmDevices = Get-PnpDevice -ErrorAction SilentlyContinue |
         $_.Manufacturer -match 'VMware' -or
         $_.FriendlyName -match 'VMware' -or
         $_.InstanceId -match 'VEN_15AD' -or
-        # VMware's USB vendor ID - catches the generic "USB Composite
-        # Device"/"USB Input Device" parent of the VMware USB mouse,
-        # which never says VMware in its own description.
-        $_.InstanceId -match 'VID_0E0F'
+        # VMware's USB vendor ID - catches the "USB Composite Device"
+        # parent of the VMware USB mouse, which doesn't say VMware itself.
+        $_.InstanceId -match 'VID_0E0F' -or
+        # ROOT-enumerated software devices (e.g. ROOT\VMWVMCIHOSTDEV\0000)
+        # that can lack a VMware Manufacturer/FriendlyName entirely.
+        $_.InstanceId -match '^ROOT\\(VMWVMCI|VMware)'
     }
+
+# Builds an InstanceId -> [DeviceClasses key path] lookup in one pass,
+# using the .NET registry API instead of reg.exe. DeviceClasses can hold
+# thousands of entries, and this runs once per ghost device below, so a
+# fresh reg.exe scan per call would mean tens of thousands of process
+# spawns - one cached in-process scan avoids that.
+function Get-DeviceClassesInstanceMap {
+    $map = @{}
+    $hklm64 = [Microsoft.Win32.RegistryKey]::OpenBaseKey('LocalMachine', 'Registry64')
+    $root = $hklm64.OpenSubKey('SYSTEM\CurrentControlSet\Control\DeviceClasses')
+    if (-not $root) { return $map }
+    foreach ($ifaceGuidName in $root.GetSubKeyNames()) {
+        $ifaceGuidKey = $root.OpenSubKey($ifaceGuidName)
+        if (-not $ifaceGuidKey) { continue }
+        foreach ($instName in $ifaceGuidKey.GetSubKeyNames()) {
+            $instKey = $ifaceGuidKey.OpenSubKey($instName)
+            if ($instKey) {
+                $devInst = $instKey.GetValue('DeviceInstance')
+                if ($devInst) {
+                    if (-not $map.ContainsKey($devInst)) {
+                        $map[$devInst] = New-Object System.Collections.Generic.List[string]
+                    }
+                    $map[$devInst].Add("HKLM\SYSTEM\CurrentControlSet\Control\DeviceClasses\$ifaceGuidName\$instName")
+                }
+                $instKey.Close()
+            }
+        }
+        $ifaceGuidKey.Close()
+    }
+    $root.Close()
+    return $map
+}
+
+# Cleans stale references to a ghost device that the raw Enum key
+# delete below doesn't touch: its class-specific driver binding and its
+# DeviceClasses interface registration(s). Leftovers here are a
+# suspected cause of Windows resynthesizing a fresh "Unknown" Enum entry
+# for an already-deleted device. DeviceContainers is only reported, not
+# deleted - it can be shared by sibling functions of a composite device.
+# Must run BEFORE the Enum key delete - it's the source of the "Driver"
+# pointer used below.
+function Clear-GhostDeviceReferences {
+    param([string]$InstanceId)
+
+    # The Enum key's "Driver" value ("{ClassGUID}\NNNN") points to its
+    # class driver binding key - the only way to find it, since that key
+    # has no value pointing back.
+    $enumKey = "HKLM\SYSTEM\CurrentControlSet\Enum\$InstanceId"
+    $driverBinding = Get-RegValue $enumKey 'Driver'
+    if ($driverBinding) {
+        $bindingKey = "HKLM\SYSTEM\CurrentControlSet\Control\Class\$driverBinding"
+        Delete-RegKey $bindingKey
+        Log "[INFO] Cleared class driver binding for $InstanceId ($bindingKey)"
+    }
+
+    # Built once, lazily, and reused across calls - see
+    # Get-DeviceClassesInstanceMap above.
+    if (-not $script:deviceClassesMap) {
+        $script:deviceClassesMap = Get-DeviceClassesInstanceMap
+    }
+    if ($script:deviceClassesMap.ContainsKey($InstanceId)) {
+        foreach ($ifaceInstanceKey in $script:deviceClassesMap[$InstanceId]) {
+            Delete-RegKey $ifaceInstanceKey
+            Log "[INFO] Cleared DeviceClasses interface registration for $InstanceId ($ifaceInstanceKey)"
+        }
+    }
+
+    $containerHits = Get-RegDataMatches 'HKLM\SYSTEM\CurrentControlSet\Control\DeviceContainers' $InstanceId
+    foreach ($hit in $containerHits) {
+        Log "[WARNING] DeviceContainers still references $InstanceId (not removed - may be shared with another device): $($hit.KeyPath)\$($hit.ValueName)"
+    }
+}
 
 if (-not $vmDevices -or $vmDevices.Count -eq 0) {
     Log '[INFO] No VMware PnP devices found.'
@@ -561,11 +653,9 @@ if (-not $vmDevices -or $vmDevices.Count -eq 0) {
             }
         }
 
-        # Ghost devices (Status=Unknown) commonly survive both
-        # Disable-PnpDevice and pnputil /remove-device (which also
-        # doesn't exist pre-Windows 10 2004/Server 2022). Try
-        # CM_Uninstall_DevNode next; fall back to a raw registry
-        # delete only as a last resort.
+        # Ghost devices (Status=Unknown) often survive Disable-PnpDevice
+        # and pnputil /remove-device (also missing pre-2004/Server 2022).
+        # Try CM_Uninstall_DevNode, then raw registry delete as last resort.
         if (-not $removed -and $dev.Status -eq 'Unknown') {
             if (Remove-GhostDevNode -InstanceId $dev.InstanceId) {
                 Log "[REMOVED] $($dev.FriendlyName) (CM_Uninstall_DevNode)"
@@ -574,6 +664,7 @@ if (-not $vmDevices -or $vmDevices.Count -eq 0) {
         }
 
         if (-not $removed -and $dev.Status -eq 'Unknown') {
+            Clear-GhostDeviceReferences -InstanceId $dev.InstanceId
             $enumKey = "HKLM\SYSTEM\CurrentControlSet\Enum\$($dev.InstanceId)"
             & $RegExe delete $enumKey /f 2>&1 | Out-Null
             if ($LASTEXITCODE -eq 0) {
@@ -624,12 +715,10 @@ foreach ($key in $allRegKeys) {
 Delete-RegValue 'HKLM\SOFTWARE\RegisteredApplications' 'VMware Host Open'
 
 # --- Stray COM registrations (CLSID/TypeLib) ---
-# VMware Tools registers several COM components under CLSID/TypeLib
-# GUIDs that vary across Tools builds, so hardcoding them doesn't scale.
-# CLSID/TypeLib can each have tens of thousands of subkeys, so this uses
-# the .NET registry API directly (64-bit view) instead of spawning
-# reg.exe per GUID or recursively text-dumping the whole subtree
-# (both far too slow - minutes vs. seconds).
+# VMware Tools registers COM components under CLSID/TypeLib GUIDs that
+# vary across builds, so they can't be hardcoded. CLSID/TypeLib can each
+# have tens of thousands of subkeys, so this scans in-process via .NET
+# instead of spawning reg.exe per GUID (minutes vs. seconds).
 function Test-RegValueContainsVMware {
     param([Microsoft.Win32.RegistryKey]$Key)
     if (-not $Key) { return $false }
@@ -640,9 +729,8 @@ function Test-RegValueContainsVMware {
     return $false
 }
 
-# Bounded-depth recursive scan. CLSID's path sits one level down
-# (InprocServer32/LocalServer32), TypeLib's two levels down
-# (e.g. {GUID}\1.0\0\win64) - depth 3 covers both cheaply.
+# Bounded-depth recursive scan: CLSID's path is one level down,
+# TypeLib's is two levels down - depth 3 covers both.
 function Test-KeyTreeContainsVMware {
     param([Microsoft.Win32.RegistryKey]$Key, [int]$Depth = 3)
     if (-not $Key) { return $false }
@@ -691,11 +779,9 @@ foreach ($root in $comRoots) {
 Log "[INFO] Stray VMware COM (CLSID/TypeLib) registrations removed: $comRemoved"
 
 # --- Installer\Folders stale path references ---
-# Windows Installer records every folder a per-machine MSI product wrote
-# to under Installer\Folders (the folder path is the value NAME, e.g.
-# "C:\ProgramData\VMware\VMware VGAuth\msgCatalog\"). Not reliably
-# pruned by msiexec /x, so sweep it directly. This key is WOW64-shared,
-# so there's no separate WOW6432Node copy to check.
+# Records every folder an MSI product wrote to, keyed by folder path as
+# the value NAME. Not reliably pruned by msiexec /x, so swept directly.
+# This key is WOW64-shared - no separate WOW6432Node copy exists.
 $foldersKeyPS = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Installer\Folders'
 $foldersProps = Get-ItemProperty -Path $foldersKeyPS -ErrorAction SilentlyContinue
 if ($foldersProps) {
@@ -710,8 +796,8 @@ if ($foldersProps) {
 }
 
 # --- Run/RunOnce autostart entries ---
-# e.g. "VMware VM3DService Process" under Run - a harmless but visible
-# leftover once the target .exe is gone.
+# e.g. "VMware VM3DService Process" - a harmless leftover once the
+# target .exe is gone.
 function Remove-VMwareRunEntries {
     param([string]$KeyPath)
     $psPath = $KeyPath -replace '^HKLM\\', 'HKLM:\'
@@ -735,9 +821,8 @@ foreach ($runKey in @(
 )) { Remove-VMwareRunEntries $runKey }
 
 # --- SVGA 3D display adapter "software device" node ---
-# HKLM\SYSTEM\CurrentControlSet\Control\Video\{GUID}\Video holds a
-# separate DeviceDesc/Service registration from the vm3dmp_loader
-# service key already deleted above.
+# Control\Video\{GUID}\Video holds a separate registration from the
+# vm3dmp_loader service key already deleted above.
 $videoRoot = 'HKLM\SYSTEM\CurrentControlSet\Control\Video'
 foreach ($guidKey in (Get-RegSubKeyPaths $videoRoot)) {
     $desc = Get-RegValue "$guidKey\Video" 'DeviceDesc'
@@ -761,8 +846,16 @@ foreach ($dir in $VMwareDirs) {
     Remove-PathItem $dir -Recurse
 }
 
-# Per-user VMware AppData folders - not covered by $VMwareDirs since
-# the path depends on each profile under \Users.
+foreach ($pattern in $VMwareTempDirPatterns) {
+    $parent = Split-Path $pattern -Parent
+    $leaf   = Split-Path $pattern -Leaf
+    if (Test-Path $parent) {
+        Get-ChildItem -Path $parent -Directory -Filter $leaf -ErrorAction SilentlyContinue |
+            ForEach-Object { Remove-PathItem $_.FullName -Recurse }
+    }
+}
+
+# Per-user AppData folders - path depends on each profile under \Users.
 $usersRoot = Join-Path $env:SystemDrive 'Users'
 if (Test-Path $usersRoot) {
     # -Force: C:\Users\Default is hidden and would otherwise be skipped.
@@ -783,12 +876,20 @@ foreach ($f in $allFiles) {
     Remove-PathItem $f
 }
 
-# DriverStore leftovers
+# DriverStore leftovers - report only, don't delete directly.
+# DriverStore\FileRepository is tracked by Component-Based Servicing;
+# force-deleting a folder here can leave that bookkeeping inconsistent
+# and surface as DISM /CheckHealth corruption later. Anything pnputil
+# didn't remove in Phase 2 is logged here for manual follow-up instead.
+$driverStoreResidual = 0
 $driverStore = Join-Path $Sys32 'DriverStore\FileRepository'
 if (Test-Path $driverStore) {
     Get-ChildItem -Path $driverStore -Directory -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -match $DriverStorePattern } |
-        ForEach-Object { Remove-PathItem $_.FullName -Recurse }
+        ForEach-Object {
+            Log "[WARNING] Residual DriverStore folder (not removed - use pnputil /delete-driver or investigate manually): $($_.FullName)"
+            $driverStoreResidual++
+        }
 }
 
 # -------------------------------------------------------------------
@@ -831,5 +932,6 @@ Log "  Registry keys deleted:   $regDeleted"
 Log "  Registry errors:         $regErrors"
 Log "  Files/dirs removed:      $fileDeleted"
 Log "  File removal errors:     $fileErrors"
+Log "  DriverStore residuals (not removed, need follow-up): $driverStoreResidual"
 Log "  Log: $LogFile"
 Log '==============================================================='
