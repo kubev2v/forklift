@@ -18,6 +18,8 @@ type mockDriver struct {
 	clusterData  *driver.ClusterData
 	clusterNodes []driver.ClusterNodeData
 	clusterVMs   []driver.ClusterGroupData
+	networks     []driver.Network
+	computerInfo *driver.ComputerInfoData
 	runOnNodeFn  func(command, computerName string) (string, error)
 }
 
@@ -28,12 +30,24 @@ func (m *mockDriver) ListAllDomains() ([]driver.Domain, error)                 {
 func (m *mockDriver) ListAllClusterDomains() ([]driver.Domain, error)          { return nil, nil }
 func (m *mockDriver) LookupDomainByName(string) (driver.Domain, error)         { return nil, nil } //nolint:nilnil
 func (m *mockDriver) LookupDomainByUUIDString(string) (driver.Domain, error)   { return nil, nil } //nolint:nilnil
-func (m *mockDriver) ListAllNetworks() ([]driver.Network, error)               { return nil, nil }
 func (m *mockDriver) LookupNetworkByUUIDString(string) (driver.Network, error) { return nil, nil } //nolint:nilnil
 func (m *mockDriver) ExecuteCommand(string) (string, error)                    { return "", nil }
-func (m *mockDriver) GetComputerInfo() (*driver.ComputerInfoData, error)       { return nil, nil } //nolint:nilnil
 func (m *mockDriver) GetCluster() (*driver.ClusterData, error)                 { return m.clusterData, nil }
 func (m *mockDriver) GetClusterNodes() ([]driver.ClusterNodeData, error)       { return m.clusterNodes, nil }
+
+func (m *mockDriver) ListAllNetworks() ([]driver.Network, error) {
+	if m.networks != nil {
+		return m.networks, nil
+	}
+	return nil, nil
+}
+
+func (m *mockDriver) GetComputerInfo() (*driver.ComputerInfoData, error) {
+	if m.computerInfo != nil {
+		return m.computerInfo, nil
+	}
+	return nil, nil //nolint:nilnil
+}
 func (m *mockDriver) GetClusterVMGroups() ([]driver.ClusterGroupData, error) {
 	return m.clusterVMs, nil
 }
@@ -911,5 +925,274 @@ func TestApplyHostTo(t *testing.T) {
 	expectedMemBytes := int64(32768) * 1024 * 1024
 	if m.MemoryBytes != expectedMemBytes {
 		t.Errorf("Expected MemoryBytes %d, got %d", expectedMemBytes, m.MemoryBytes)
+	}
+}
+
+// mockNetwork implements driver.Network for tests.
+type mockNetwork struct {
+	uuid       string
+	name       string
+	switchType string
+}
+
+func (n *mockNetwork) GetName() (string, error)       { return n.name, nil }
+func (n *mockNetwork) GetUUIDString() (string, error) { return n.uuid, nil }
+func (n *mockNetwork) GetSwitchType() (string, error) { return n.switchType, nil }
+func (n *mockNetwork) Free() error                    { return nil }
+
+func TestListNetworks_ClusterCollectsRemoteSwitches(t *testing.T) {
+	localSwitch := &mockNetwork{uuid: "local-uuid-1", name: "Lab-External", switchType: "External"}
+	remoteJSON := `[{"Id":"remote-uuid-1","Name":"LabSwitch","SwitchType":1}]`
+
+	md := &mockDriver{
+		networks: []driver.Network{localSwitch},
+		computerInfo: &driver.ComputerInfoData{
+			DNSHostName: "WIN-LOCAL",
+		},
+		clusterData: &driver.ClusterData{Name: "cluster01"},
+		clusterNodes: []driver.ClusterNodeData{
+			{Name: "WIN-LOCAL", State: driver.ClusterNodeStateUp, Id: "1"},
+			{Name: "HV-NODE02", State: driver.ClusterNodeStateUp, Id: "2"},
+		},
+		runOnNodeFn: func(command, computerName string) (string, error) {
+			if computerName == "HV-NODE02" {
+				return remoteJSON, nil
+			}
+			return "", nil
+		},
+	}
+
+	client := &Client{driver: md, provider: newClusterProvider(), Log: testLogger()}
+	networks, err := client.ListNetworks()
+	if err != nil {
+		t.Fatalf("ListNetworks error: %v", err)
+	}
+
+	if len(networks) != 2 {
+		t.Fatalf("Expected 2 networks (local + remote), got %d", len(networks))
+	}
+
+	found := false
+	for _, n := range networks {
+		if n.UUID == "remote-uuid-1" && n.Name == "LabSwitch" {
+			found = true
+			if n.SwitchType != "Internal" {
+				t.Errorf("Expected SwitchType 'Internal', got '%s'", n.SwitchType)
+			}
+		}
+	}
+	if !found {
+		t.Error("Remote LabSwitch not found in combined network list")
+	}
+}
+
+func TestListNetworks_ClusterDeduplicatesSharedSwitches(t *testing.T) {
+	localSwitch := &mockNetwork{uuid: "shared-uuid", name: "Lab-External", switchType: "External"}
+	// Remote node has the same switch (same UUID)
+	remoteJSON := `[{"Id":"shared-uuid","Name":"Lab-External","SwitchType":2}]`
+
+	md := &mockDriver{
+		networks:     []driver.Network{localSwitch},
+		computerInfo: &driver.ComputerInfoData{DNSHostName: "WIN-LOCAL"},
+		clusterData:  &driver.ClusterData{Name: "cluster01"},
+		clusterNodes: []driver.ClusterNodeData{
+			{Name: "WIN-LOCAL", State: driver.ClusterNodeStateUp, Id: "1"},
+			{Name: "HV-NODE02", State: driver.ClusterNodeStateUp, Id: "2"},
+		},
+		runOnNodeFn: func(command, computerName string) (string, error) {
+			return remoteJSON, nil
+		},
+	}
+
+	client := &Client{driver: md, provider: newClusterProvider(), Log: testLogger()}
+	networks, err := client.ListNetworks()
+	if err != nil {
+		t.Fatalf("ListNetworks error: %v", err)
+	}
+
+	if len(networks) != 1 {
+		t.Fatalf("Expected 1 network (deduped), got %d", len(networks))
+	}
+}
+
+func TestListNetworks_StandaloneSkipsRemoteCollection(t *testing.T) {
+	localSwitch := &mockNetwork{uuid: "local-uuid-1", name: "Default Switch", switchType: "Private"}
+
+	md := &mockDriver{
+		networks: []driver.Network{localSwitch},
+		runOnNodeFn: func(command, computerName string) (string, error) {
+			t.Error("RunOnNode should not be called in standalone mode")
+			return "", nil
+		},
+	}
+
+	client := &Client{driver: md, provider: newStandaloneProvider(), Log: testLogger()}
+	networks, err := client.ListNetworks()
+	if err != nil {
+		t.Fatalf("ListNetworks error: %v", err)
+	}
+
+	if len(networks) != 1 {
+		t.Fatalf("Expected 1 network, got %d", len(networks))
+	}
+}
+
+func TestResolveNetworkUUID(t *testing.T) {
+	networks := []types.Network{
+		{UUID: "uuid-1", Name: "Lab-External"},
+		{UUID: "uuid-2", Name: "LabSwitch"},
+	}
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"exact match", "Lab-External", "uuid-1"},
+		{"case insensitive", "lab-external", "uuid-1"},
+		{"empty name returns empty", "", ""},
+		{"not found returns empty", "NonExistent", ""},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := resolveNetworkUUID(tc.input, "", networks)
+			if result != tc.expected {
+				t.Errorf("resolveNetworkUUID(%q) = %q, want %q", tc.input, result, tc.expected)
+			}
+		})
+	}
+}
+
+func TestResolveNetworkUUID_NodeScoped(t *testing.T) {
+	// Two nodes each have a switch named "LabSwitch" with different UUIDs.
+	// "Lab-External" has the same UUID on both nodes (shared switch).
+	networks := []types.Network{
+		{UUID: "local-uuid", Name: "LabSwitch", OwnerNodes: []string{"NODE-01"}},
+		{UUID: "remote-uuid", Name: "LabSwitch", OwnerNodes: []string{"NODE-02"}},
+		{UUID: "shared-uuid", Name: "Lab-External", OwnerNodes: []string{"NODE-01", "NODE-02"}},
+	}
+
+	tests := []struct {
+		name        string
+		switchName  string
+		vmOwnerNode string
+		expected    string
+	}{
+		{
+			name:        "VM on NODE-01 gets local UUID",
+			switchName:  "LabSwitch",
+			vmOwnerNode: "NODE-01",
+			expected:    "local-uuid",
+		},
+		{
+			name:        "VM on NODE-02 gets remote UUID",
+			switchName:  "LabSwitch",
+			vmOwnerNode: "NODE-02",
+			expected:    "remote-uuid",
+		},
+		{
+			name:        "node match is case-insensitive",
+			switchName:  "LabSwitch",
+			vmOwnerNode: "node-02",
+			expected:    "remote-uuid",
+		},
+		{
+			name:        "no node hint falls back to first name match",
+			switchName:  "LabSwitch",
+			vmOwnerNode: "",
+			expected:    "local-uuid",
+		},
+		{
+			name:        "VM on unknown node returns empty not wrong UUID",
+			switchName:  "LabSwitch",
+			vmOwnerNode: "NODE-99",
+			expected:    "",
+		},
+		{
+			name:        "shared switch resolves for VM on NODE-01",
+			switchName:  "Lab-External",
+			vmOwnerNode: "NODE-01",
+			expected:    "shared-uuid",
+		},
+		{
+			name:        "shared switch resolves for VM on NODE-02",
+			switchName:  "Lab-External",
+			vmOwnerNode: "NODE-02",
+			expected:    "shared-uuid",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := resolveNetworkUUID(tc.switchName, tc.vmOwnerNode, networks)
+			if result != tc.expected {
+				t.Errorf("resolveNetworkUUID(%q, %q) = %q, want %q",
+					tc.switchName, tc.vmOwnerNode, result, tc.expected)
+			}
+		})
+	}
+}
+
+func TestResolveNetworkUUID_UnscopedFallback(t *testing.T) {
+	// Simulates GetComputerInfo() failure: networks have empty OwnerNodes
+	// but VMs still have OwnerNode from GetClusterVMGroups.
+	networks := []types.Network{
+		{UUID: "uuid-1", Name: "LabSwitch"},
+		{UUID: "uuid-2", Name: "Lab-External"},
+	}
+
+	tests := []struct {
+		name        string
+		switchName  string
+		vmOwnerNode string
+		expected    string
+	}{
+		{
+			name:        "unscoped network resolves even with known VM node",
+			switchName:  "LabSwitch",
+			vmOwnerNode: "NODE-01",
+			expected:    "uuid-1",
+		},
+		{
+			name:        "unscoped network resolves with unknown VM node",
+			switchName:  "Lab-External",
+			vmOwnerNode: "",
+			expected:    "uuid-2",
+		},
+		{
+			name:        "not found still returns empty",
+			switchName:  "NoSuchSwitch",
+			vmOwnerNode: "NODE-01",
+			expected:    "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := resolveNetworkUUID(tc.switchName, tc.vmOwnerNode, networks)
+			if result != tc.expected {
+				t.Errorf("resolveNetworkUUID(%q, %q) = %q, want %q",
+					tc.switchName, tc.vmOwnerNode, result, tc.expected)
+			}
+		})
+	}
+}
+
+func TestMapSwitchType(t *testing.T) {
+	tests := []struct {
+		input    int
+		expected string
+	}{
+		{0, "External"},
+		{1, "Internal"},
+		{2, "Private"},
+		{99, "Unknown"},
+	}
+	for _, tc := range tests {
+		result := mapSwitchType(tc.input)
+		if result != tc.expected {
+			t.Errorf("mapSwitchType(%d) = %q, want %q", tc.input, result, tc.expected)
+		}
 	}
 }
