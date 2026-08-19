@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	planapi "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/model/hyperv"
@@ -263,5 +264,44 @@ func TestNetworksMapped_TrulyDisconnectedNICSkipped(t *testing.T) {
 	}
 	if !ok {
 		t.Error("expected ok=true: truly disconnected NIC (empty name and ID) should be skipped")
+	}
+}
+
+func TestPVCNameTemplate_UsesInventoryVMIdentity(t *testing.T) {
+	lookupID := "lookup-ref-id"
+	inventoryID := "358ce831-f790-4ad9-8ee0-ee272b0ecac4"
+	inventoryName := "rhel9-node_2"
+
+	vm := &hyperv.VM{}
+	vm.ID = inventoryID
+	vm.Name = inventoryName
+	vm.Disks = []model.Disk{
+		{Base: model.Base{ID: inventoryID + "-disk-0"}, Capacity: 16 * 1024 * 1024 * 1024},
+	}
+
+	inv := &stubInventory{vms: map[string]*hyperv.VM{lookupID: vm}}
+
+	plan := &api.Plan{}
+	plan.Name = "test-plan"
+	plan.Spec.VMs = []planapi.VM{{
+		Ref:        ref.Ref{ID: inventoryID},
+		TargetName: "my-custom-target",
+	}}
+
+	v := &Validator{
+		Context: &plancontext.Context{
+			Source: plancontext.Source{Inventory: inv},
+			Plan:   plan,
+		},
+	}
+
+	tmpl := `{{if eq .TargetVmName "my-custom-target"}}ok-{{.DiskIndex}}{{else}}INVALID{{end}}`
+
+	ok, err := v.PVCNameTemplate(ref.Ref{ID: lookupID}, tmpl)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ok {
+		t.Error("expected ok=true: PVC name template should be valid when TargetVmName resolves to spec.targetName")
 	}
 }
