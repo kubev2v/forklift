@@ -1,10 +1,6 @@
-#This script configures static IP settings on legacy Windows network interfaces
-#based on input that maps MAC addresses to IP configuration details.
-#Input string will be added to the script while creating the virt-v2v pod
-#Input string format: MAC:ip:IP,Gateway,Prefix,DNS1[,DNS2,...,DNSn]
+#This script configures static IP settings on legacy Windows network interfaces.
+#Network configurations are rendered by the Go template engine from typed data.
 
-# Input string
-$inputString = "{{.InputString}}"
 $adapterWaitSeconds = 60
 $adapterPollInterval = 5
 
@@ -47,78 +43,104 @@ function Find-AdapterByMAC($mac) {
     return $null
 }
 
-# Split entries by '_'
-$entries = $inputString.Split("_")
+# Network configurations populated by Go template (MAC -> IPs with gateway/prefix/DNS)
+$networkConfigs = @(
+{{- range $i, $cfg := . }}
+    @{
+        MAC = '{{ lower $cfg.MAC }}'
+        IPs = @{{ formatIPs $cfg.IPs }}
+        DNS = @{{ formatDNS $cfg }}
+    }{{ if ne (add $i 1) (len $) }},{{ end }}
+{{- end }}
+)
+
 $failCount = 0
 
-# Extract parts: MAC:ip:IP,Gateway,Prefix,DNS1[,DNS2,...,DNSn]
-foreach ($entry in $entries) {
-    if ($entry -match "^([0-9A-Fa-f:\-]+):ip:(.+)$") {
-        $mac = $matches[1].ToUpper().Replace(":", "-")
-        $fields = $matches[2].Split(",")
+foreach ($config in $networkConfigs) {
+    $mac = $config.MAC.ToUpper() -replace '[:-]', '-'
+    $adapter = Find-AdapterByMAC $mac
 
-        if ($fields.Count -lt 4) {
-            Write-Warning "Not enough fields for entry (need at least IP,GW,Prefix,DNS1): '$entry'`n"
-            $failCount++
+    if (-not $adapter) {
+        Write-Warning "Adapter with MAC $mac not found after waiting ${adapterWaitSeconds}s`n"
+        $failCount++
+        continue
+    }
+
+    $iface = $adapter.NetConnectionID
+    $ifIdx = $adapter.InterfaceIndex
+    Write-Host "Configuring interface: $iface (MAC=$mac)`n"
+
+    $ipConfigured = $false
+    foreach ($ip in $config.IPs) {
+        $ipAddr = $ip.IPAddress
+        $gw = $ip.Gateway
+        $prefix = [int]$ip.PrefixLength
+
+        # IPv6: use New-NetIPAddress/New-NetRoute (netsh is IPv4-only).
+        if ($ipAddr -match ':') {
+            $v6Failed = $false
+            try {
+                New-NetIPAddress -InterfaceIndex $ifIdx -IPAddress $ipAddr -PrefixLength $prefix -ErrorAction Stop | Out-Null
+            } catch {
+                Write-Warning "Failed to set IPv6 address $ipAddr : $_`n"
+                $v6Failed = $true
+            }
+            if ($gw -and $gw -ne '') {
+                $existingRoute = Get-NetRoute -DestinationPrefix "::/0" -InterfaceIndex $ifIdx -NextHop $gw -ErrorAction SilentlyContinue
+                if (-not $existingRoute) {
+                    try {
+                        New-NetRoute -DestinationPrefix "::/0" -InterfaceIndex $ifIdx -NextHop $gw -ErrorAction Stop | Out-Null
+                    } catch {
+                        Write-Warning "Failed to add IPv6 route via ${gw}: $_`n"
+                        $v6Failed = $true
+                    }
+                }
+            }
+            if ($v6Failed) { $failCount++ }
+            else { Write-Host "IPv6 configured: $ipAddr/$prefix on $iface`n" }
+            $ipConfigured = $true
             continue
         }
 
-        $ip = $fields[0]
-        $gw = $fields[1]
-        $prefix = [int]$fields[2]
-        $dnsServers = @($fields[3..($fields.Count - 1)] | Where-Object { $_ -ne "" })
-        if ($dnsServers.Count -eq 0) {
-            Write-Warning "No DNS servers provided for entry: '$entry'`n"
-            $failCount++
-            continue
-        }
+        # IPv4: use netsh for legacy driver compatibility.
         $mask = Convert-PrefixToMask $prefix
-
-        $adapter = Find-AdapterByMAC $mac
-
-        if ($adapter -eq $null) {
-            Write-Warning "Adapter with MAC $mac not found after waiting ${adapterWaitSeconds}s`n"
-            $failCount++
-            continue
-        }
-
-        $iface = $adapter.NetConnectionID
-        Write-Host "Using interface: $iface`n"
-
-        # Use cmd /c instead of COM objects (blocked in Constrained Language Mode)
         $cmdFailed = $false
 
-        cmd /c "netsh interface ip set address name=`"$iface`" static $ip $mask $gw" 2>&1 | Out-Null
+        if (-not $ipConfigured) {
+            cmd /c "netsh interface ip set address name=`"$iface`" static $ipAddr $mask $gw" 2>&1 | Out-Null
+        } else {
+            cmd /c "netsh interface ip add address name=`"$iface`" $ipAddr $mask" 2>&1 | Out-Null
+        }
         if ($LASTEXITCODE -ne 0) {
-            Write-Warning "Failed to set IP address on $iface (exit code $LASTEXITCODE)`n"
+            Write-Warning "Failed to set IP address $ipAddr on $iface (exit code $LASTEXITCODE)`n"
             $cmdFailed = $true
         }
 
-        # Set first DNS as primary, add remaining as alternates
+        if ($cmdFailed) { $failCount++ }
+        else { Write-Host "IPv4 configured: $ipAddr/$prefix gw=$gw on $iface`n" }
+        $ipConfigured = $true
+    }
+
+    # Configure DNS (filter blanks, set once per adapter via netsh)
+    $dnsServers = @()
+    if ($config.DNS) {
+        $dnsServers = @($config.DNS | Where-Object { $_ -and $_.Trim() -ne '' })
+    }
+    if ($dnsServers.Count -gt 0) {
         cmd /c "netsh interface ip set dns name=`"$iface`" static $($dnsServers[0])" 2>&1 | Out-Null
         if ($LASTEXITCODE -ne 0) {
             Write-Warning "Failed to set primary DNS on $iface (exit code $LASTEXITCODE)`n"
-            $cmdFailed = $true
+            $failCount++
         }
         for ($i = 1; $i -lt $dnsServers.Count; $i++) {
             $idx = $i + 1
             cmd /c "netsh interface ip add dns name=`"$iface`" $($dnsServers[$i]) index=$idx" 2>&1 | Out-Null
             if ($LASTEXITCODE -ne 0) {
                 Write-Warning "Failed to add DNS $($dnsServers[$i]) on $iface (exit code $LASTEXITCODE)`n"
-                $cmdFailed = $true
+                $failCount++
             }
         }
-
-        if ($cmdFailed) {
-            Write-Warning "One or more netsh commands failed for $iface`n"
-            $failCount++
-        } else {
-            Write-Host "IP configuration applied (DNS servers: $($dnsServers.Count))`n"
-        }
-    }
-    else {
-        Write-Warning "Input string format is invalid: '$entry'`n"
-        $failCount++
+        Write-Host "DNS configured ($($dnsServers.Count) servers) on $iface`n"
     }
 }
 

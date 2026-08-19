@@ -1,9 +1,41 @@
 package base
 
 import (
+	"net"
+	"sort"
+
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
 )
+
+// SortedIPv4First returns a copy of items with IPv4 addresses before IPv6.
+// ipOf extracts the IP string from each element.
+func SortedIPv4First[T any](items []T, ipOf func(T) string) []T {
+	sorted := make([]T, len(items))
+	copy(sorted, items)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		ipI := net.ParseIP(ipOf(sorted[i]))
+		ipJ := net.ParseIP(ipOf(sorted[j]))
+		return ipI != nil && ipI.To4() != nil && (ipJ == nil || ipJ.To4() == nil)
+	})
+	return sorted
+}
+
+// HasMultipleIPsPerMAC returns true when any MAC address appears more than
+// once in the given (mac, ip) pairs. Callers should pre-filter to only
+// include manual-origin, non-link-local addresses.
+func HasMultipleIPsPerMAC(macs []string) bool {
+	count := make(map[string]int, len(macs))
+	for _, mac := range macs {
+		count[mac]++
+	}
+	for _, c := range count {
+		if c > 1 {
+			return true
+		}
+	}
+	return false
+}
 
 // Network destination types.
 const (

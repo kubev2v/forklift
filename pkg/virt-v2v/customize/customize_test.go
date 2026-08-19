@@ -476,18 +476,18 @@ var _ = Describe("Customize", func() {
 
 	Describe("formatIPs", func() {
 		It("formats single IP", func() {
-			ips := []IPEntry{{IP: "192.168.1.1"}}
+			ips := []IPEntry{{IP: "192.168.1.1", Gateway: "192.168.1.254", PrefixLength: "24"}}
 			result := formatIPs(ips)
-			Expect(result).To(Equal("(\n'192.168.1.1'\n)"))
+			Expect(result).To(Equal("(\n    @{ IPAddress = '192.168.1.1'; Gateway = '192.168.1.254'; PrefixLength = 24 }\n)"))
 		})
 
 		It("formats multiple IPs", func() {
 			ips := []IPEntry{
-				{IP: "192.168.1.1"},
-				{IP: "192.168.1.2"},
+				{IP: "192.168.1.1", Gateway: "192.168.1.254", PrefixLength: "24"},
+				{IP: "2001:db8::100", Gateway: "2001:db8::1", PrefixLength: "64"},
 			}
 			result := formatIPs(ips)
-			Expect(result).To(Equal("(\n'192.168.1.1',\n'192.168.1.2'\n)"))
+			Expect(result).To(Equal("(\n    @{ IPAddress = '192.168.1.1'; Gateway = '192.168.1.254'; PrefixLength = 24 },\n    @{ IPAddress = '2001:db8::100'; Gateway = '2001:db8::1'; PrefixLength = 64 }\n)"))
 		})
 
 		It("handles empty IPs", func() {
@@ -514,6 +514,123 @@ var _ = Describe("Customize", func() {
 			dns := []string{}
 			result := formatDNS(dns)
 			Expect(result).To(Equal("(\n)"))
+		})
+	})
+
+	Describe("parseStaticIPConfigs", func() {
+		It("parses single MAC with one IP and DNS", func() {
+			configs := parseStaticIPConfigs("00:50:56:83:25:47:ip:10.0.0.1,10.0.0.254,24,8.8.8.8")
+			Expect(configs).To(HaveLen(1))
+			Expect(configs[0].MAC).To(Equal("00-50-56-83-25-47"))
+			Expect(configs[0].IPs).To(HaveLen(1))
+			Expect(configs[0].IPs[0].IP).To(Equal("10.0.0.1"))
+			Expect(configs[0].IPs[0].Gateway).To(Equal("10.0.0.254"))
+			Expect(configs[0].IPs[0].PrefixLength).To(Equal("24"))
+			Expect(configs[0].IPs[0].DNS).To(Equal([]string{"8.8.8.8"}))
+		})
+
+		It("parses multiple IPs on the same MAC", func() {
+			configs := parseStaticIPConfigs("AA:BB:CC:DD:EE:01:ip:10.0.0.1,10.0.0.254,24,8.8.8.8_AA:BB:CC:DD:EE:01:ip:10.0.0.2,10.0.0.254,24")
+			Expect(configs).To(HaveLen(1))
+			Expect(configs[0].IPs).To(HaveLen(2))
+			Expect(configs[0].IPs[0].IP).To(Equal("10.0.0.1"))
+			Expect(configs[0].IPs[1].IP).To(Equal("10.0.0.2"))
+			Expect(configs[0].IPs[1].DNS).To(BeEmpty())
+		})
+
+		It("parses multiple MACs", func() {
+			configs := parseStaticIPConfigs("AA:BB:CC:DD:EE:01:ip:10.0.0.1,10.0.0.254,24,8.8.8.8_AA:BB:CC:DD:EE:02:ip:10.0.0.2,10.0.0.1,16,4.4.4.4")
+			Expect(configs).To(HaveLen(2))
+			Expect(configs[0].MAC).To(Equal("AA-BB-CC-DD-EE-01"))
+			Expect(configs[1].MAC).To(Equal("AA-BB-CC-DD-EE-02"))
+		})
+
+		It("handles IPv6 entries without DNS", func() {
+			configs := parseStaticIPConfigs("AA:BB:CC:DD:EE:01:ip:2001:db8::1,2001:db8::ff,64")
+			Expect(configs).To(HaveLen(1))
+			Expect(configs[0].IPs[0].IP).To(Equal("2001:db8::1"))
+			Expect(configs[0].IPs[0].PrefixLength).To(Equal("64"))
+			Expect(configs[0].IPs[0].DNS).To(BeEmpty())
+		})
+
+		It("skips entries with fewer than 3 fields", func() {
+			configs := parseStaticIPConfigs("AA:BB:CC:DD:EE:01:ip:10.0.0.1,10.0.0.254")
+			Expect(configs).To(BeEmpty())
+		})
+
+		It("skips malformed entries without :ip: separator", func() {
+			configs := parseStaticIPConfigs("not-a-valid-entry")
+			Expect(configs).To(BeEmpty())
+		})
+
+		It("returns empty for empty input", func() {
+			configs := parseStaticIPConfigs("")
+			Expect(configs).To(BeEmpty())
+		})
+
+		It("preserves MAC order", func() {
+			configs := parseStaticIPConfigs("CC:DD:EE:01:02:03:ip:10.0.0.1,gw,24_AA:BB:CC:01:02:03:ip:10.0.0.2,gw,24_CC:DD:EE:01:02:03:ip:10.0.0.3,gw,24")
+			Expect(configs).To(HaveLen(2))
+			Expect(configs[0].MAC).To(Equal("CC-DD-EE-01-02-03"))
+			Expect(configs[0].IPs).To(HaveLen(2))
+			Expect(configs[1].MAC).To(Equal("AA-BB-CC-01-02-03"))
+		})
+	})
+
+	Describe("injectStaticIPTemplate renders typed data", func() {
+		It("renders IPv4 and IPv6 entries grouped by MAC", func() {
+			tmpDir := GinkgoT().TempDir()
+			tmplPath := filepath.Join(tmpDir, "test-network-config.ps1.tmpl")
+			outPath := filepath.Join(tmpDir, "out.ps1")
+
+			tmplContent := `$networkConfigs = @(
+{{- range $i, $cfg := . }}
+    @{
+        MAC = '{{ lower $cfg.MAC }}'
+        IPs = @{{ formatIPs $cfg.IPs }}
+        DNS = @{{ formatDNS $cfg }}
+    }{{ if ne (add $i 1) (len $) }},{{ end }}
+{{- end }}
+)`
+			Expect(os.WriteFile(tmplPath, []byte(tmplContent), 0644)).To(Succeed())
+
+			appConfig.StaticIPs = "00:50:56:83:25:47:ip:10.0.0.1,10.0.0.254,24,8.8.8.8_00:50:56:83:25:47:ip:2001:db8::1,2001:db8::ff,64,2001:db8::53"
+
+			err := customize.injectStaticIPTemplate(tmplPath, outPath)
+			Expect(err).NotTo(HaveOccurred())
+
+			content, err := os.ReadFile(outPath)
+			Expect(err).NotTo(HaveOccurred())
+			rendered := string(content)
+
+			Expect(rendered).NotTo(ContainSubstring("$inputString"), "should not contain raw input string")
+			Expect(rendered).To(ContainSubstring("00-50-56-83-25-47"), "MAC should be dash-separated")
+			Expect(rendered).To(ContainSubstring("10.0.0.1"), "IPv4 address")
+			Expect(rendered).To(ContainSubstring("2001:db8::1"), "IPv6 address")
+			Expect(rendered).To(ContainSubstring("IPAddress = '10.0.0.1'"), "typed hashtable entry")
+			Expect(rendered).To(ContainSubstring("PrefixLength = 24"), "prefix as number")
+			Expect(rendered).To(ContainSubstring("'8.8.8.8'"), "DNS entry")
+		})
+
+		It("renders empty config for empty StaticIPs", func() {
+			tmpDir := GinkgoT().TempDir()
+			tmplPath := filepath.Join(tmpDir, "test-network-config.ps1.tmpl")
+			outPath := filepath.Join(tmpDir, "out.ps1")
+
+			tmplContent := `$networkConfigs = @(
+{{- range $i, $cfg := . }}
+    @{ MAC = '{{ lower $cfg.MAC }}' }
+{{- end }}
+)`
+			Expect(os.WriteFile(tmplPath, []byte(tmplContent), 0644)).To(Succeed())
+
+			appConfig.StaticIPs = ""
+			err := customize.injectStaticIPTemplate(tmplPath, outPath)
+			Expect(err).NotTo(HaveOccurred())
+
+			content, err := os.ReadFile(outPath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(content)).To(Equal("$networkConfigs = @(\n)"))
 		})
 	})
 
@@ -964,7 +1081,7 @@ var _ = Describe("Customize", func() {
 			// Before the fix this was silently skipped because len(ipParts) < 5.
 			appConfig.StaticIPs = "00:50:56:89:ab:76:ip:10.0.0.1,10.0.0.254,25,10.203.123.84_00:50:56:89:ab:76:ip:10.0.0.2,10.0.0.254,25,10.203.123.84"
 
-			err := customize.injectComplementryStaticIPTemplate(tmplPath, outPath)
+			err := customize.injectComplementaryStaticIPTemplate(tmplPath, outPath)
 			Expect(err).NotTo(HaveOccurred())
 
 			content, err := os.ReadFile(outPath)
@@ -994,7 +1111,7 @@ var _ = Describe("Customize", func() {
 
 			appConfig.StaticIPs = "00:50:56:89:ab:76:ip:10.0.0.1,10.0.0.254,25,8.8.8.8,8.8.4.4_00:50:56:89:ab:76:ip:10.0.0.2,10.0.0.254,25,8.8.8.8,8.8.4.4"
 
-			err := customize.injectComplementryStaticIPTemplate(tmplPath, outPath)
+			err := customize.injectComplementaryStaticIPTemplate(tmplPath, outPath)
 			Expect(err).NotTo(HaveOccurred())
 
 			content, err := os.ReadFile(outPath)
@@ -1006,7 +1123,7 @@ var _ = Describe("Customize", func() {
 			Expect(rendered).To(ContainSubstring("8.8.4.4"))
 		})
 
-		It("skips entries with fewer than 4 fields", func() {
+		It("skips entries with fewer than 3 fields", func() {
 			tmpDir := GinkgoT().TempDir()
 			tmplPath := filepath.Join(tmpDir, "tmpl.ps1.tmpl")
 			outPath := filepath.Join(tmpDir, "out.ps1")
@@ -1018,10 +1135,10 @@ var _ = Describe("Customize", func() {
 )`
 			Expect(os.WriteFile(tmplPath, []byte(tmplContent), 0644)).To(Succeed())
 
-			// Only 3 fields (IP, GATEWAY, PREFIX) — no DNS at all, should be skipped.
-			appConfig.StaticIPs = "00:50:56:89:ab:76:ip:10.0.0.1,10.0.0.254,25_00:50:56:89:ab:76:ip:10.0.0.2,10.0.0.254,25"
+			// Only 2 fields (IP, GATEWAY) — no prefix, should be skipped.
+			appConfig.StaticIPs = "00:50:56:89:ab:76:ip:10.0.0.1,10.0.0.254"
 
-			err := customize.injectComplementryStaticIPTemplate(tmplPath, outPath)
+			err := customize.injectComplementaryStaticIPTemplate(tmplPath, outPath)
 			Expect(err).NotTo(HaveOccurred())
 
 			content, err := os.ReadFile(outPath)
