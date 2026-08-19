@@ -1100,14 +1100,7 @@ func (r *Builder) mapDisks(vm *model.VM, vmRef ref.Ref, persistentVolumeClaims [
 				kubevirtDisk.ErrorPolicy = ptr.To(cnv.DiskErrorPolicyReport)
 			}
 		}
-		// Disk serial numbers are only presented to the source guest if
-		// the disk is connected with SCSI and disk.EnableUUID is set to
-		// TRUE, so only save the serial number for those disks. If the
-		// destination VM is configured with VirtIO or SATA, the resulting
-		// serial number will be truncated to 20 characters.
-		if vm.DiskEnableUuid && cnv.DiskBus(disk.Bus) == cnv.DiskBusSCSI {
-			kubevirtDisk.Serial = disk.Serial
-		}
+		kubevirtDisk.Serial = planbase.DiskSerial(disk.Serial, vm.ID, int(disk.Key))
 		kVolumes = append(kVolumes, volume)
 		kDisks = append(kDisks, kubevirtDisk)
 	}
