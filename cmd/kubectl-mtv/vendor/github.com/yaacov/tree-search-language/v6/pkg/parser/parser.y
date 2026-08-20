@@ -54,80 +54,80 @@ expr:
 
 or_expr:
       and_expr
-    | or_expr K_OR and_expr        { $$ = NewBinaryOpNode(OpOr, $1, $3, 0) }
+    | or_expr K_OR and_expr        { $$ = NewBinaryOpNode(OpOr, $1, $3, $1.Position) }
     ;
 
 and_expr:
       comparison_expr
-    | and_expr K_AND comparison_expr      { $$ = NewBinaryOpNode(OpAnd, $1, $3, 0) }
+    | and_expr K_AND comparison_expr      { $$ = NewBinaryOpNode(OpAnd, $1, $3, $1.Position) }
     ;
 
 comparison_expr:
       additive_expr
-    | comparison_expr EQ additive_expr      { $$ = NewBinaryOpNode(OpEQ, $1, $3, 0) }
-    | comparison_expr NE additive_expr      { $$ = NewBinaryOpNode(OpNE, $1, $3, 0) }
-    | comparison_expr LT additive_expr      { $$ = NewBinaryOpNode(OpLT, $1, $3, 0) }
-    | comparison_expr LE additive_expr      { $$ = NewBinaryOpNode(OpLE, $1, $3, 0) }
-    | comparison_expr GT additive_expr      { $$ = NewBinaryOpNode(OpGT, $1, $3, 0) }
-    | comparison_expr GE additive_expr      { $$ = NewBinaryOpNode(OpGE, $1, $3, 0) }
-    | comparison_expr REQ additive_expr     { $$ = NewBinaryOpNode(OpREQ, $1, $3, 0) }
-    | comparison_expr RNE additive_expr     { $$ = NewBinaryOpNode(OpRNE, $1, $3, 0) }
-    | comparison_expr K_LIKE additive_expr  { $$ = NewBinaryOpNode(OpLike, $1, $3, 0) }
-    | comparison_expr K_ILIKE additive_expr { $$ = NewBinaryOpNode(OpILike, $1, $3, 0) }
+    | comparison_expr EQ additive_expr      { $$ = NewBinaryOpNode(OpEQ, $1, $3, $1.Position) }
+    | comparison_expr NE additive_expr      { $$ = NewBinaryOpNode(OpNE, $1, $3, $1.Position) }
+    | comparison_expr LT additive_expr      { $$ = NewBinaryOpNode(OpLT, $1, $3, $1.Position) }
+    | comparison_expr LE additive_expr      { $$ = NewBinaryOpNode(OpLE, $1, $3, $1.Position) }
+    | comparison_expr GT additive_expr      { $$ = NewBinaryOpNode(OpGT, $1, $3, $1.Position) }
+    | comparison_expr GE additive_expr      { $$ = NewBinaryOpNode(OpGE, $1, $3, $1.Position) }
+    | comparison_expr REQ additive_expr     { $$ = NewBinaryOpNode(OpREQ, $1, $3, $1.Position) }
+    | comparison_expr RNE additive_expr     { $$ = NewBinaryOpNode(OpRNE, $1, $3, $1.Position) }
+    | comparison_expr K_LIKE additive_expr  { $$ = NewBinaryOpNode(OpLike, $1, $3, $1.Position) }
+    | comparison_expr K_ILIKE additive_expr { $$ = NewBinaryOpNode(OpILike, $1, $3, $1.Position) }
     | comparison_expr K_NOT K_LIKE additive_expr  {
-        likeExpr := NewBinaryOpNode(OpLike, $1, $4, 0)
-        $$ = NewUnaryOpNode(OpNot, likeExpr, 0)
+        likeExpr := NewBinaryOpNode(OpLike, $1, $4, $1.Position)
+        $$ = NewUnaryOpNode(OpNot, likeExpr, $1.Position)
     }
     | comparison_expr K_NOT K_ILIKE additive_expr {
-        ilikeExpr := NewBinaryOpNode(OpILike, $1, $4, 0)
-        $$ = NewUnaryOpNode(OpNot, ilikeExpr, 0)
+        ilikeExpr := NewBinaryOpNode(OpILike, $1, $4, $1.Position)
+        $$ = NewUnaryOpNode(OpNot, ilikeExpr, $1.Position)
     }
-    | comparison_expr K_IS K_NULL           { $$ = NewBinaryOpNode(OpIs, $1, NewNullNode(0), 0) }
+    | comparison_expr K_IS K_NULL           { $$ = NewBinaryOpNode(OpIs, $1, NewNullNode($1.Position), $1.Position) }
     | comparison_expr K_IS K_NOT K_NULL     {
-        isNullExpr := NewBinaryOpNode(OpIs, $1, NewNullNode(0), 0)
-        $$ = NewUnaryOpNode(OpNot, isNullExpr, 0)
+        isNullExpr := NewBinaryOpNode(OpIs, $1, NewNullNode($1.Position), $1.Position)
+        $$ = NewUnaryOpNode(OpNot, isNullExpr, $1.Position)
     }
     | comparison_expr K_BETWEEN additive_expr K_AND additive_expr {
-        rangeArray := NewArrayNode([]*Node{$3, $5}, 0)
-        $$ = NewBinaryOpNode(OpBetween, $1, rangeArray, 0)
+        rangeArray := NewArrayNode([]*Node{$3, $5}, $3.Position)
+        $$ = NewBinaryOpNode(OpBetween, $1, rangeArray, $1.Position)
     }
     | comparison_expr K_NOT K_BETWEEN additive_expr K_AND additive_expr {
-        rangeArray := NewArrayNode([]*Node{$4, $6}, 0)
-        betweenExpr := NewBinaryOpNode(OpBetween, $1, rangeArray, 0)
-        $$ = NewUnaryOpNode(OpNot, betweenExpr, 0)
+        rangeArray := NewArrayNode([]*Node{$4, $6}, $4.Position)
+        betweenExpr := NewBinaryOpNode(OpBetween, $1, rangeArray, $1.Position)
+        $$ = NewUnaryOpNode(OpNot, betweenExpr, $1.Position)
     }
-    | comparison_expr K_IN additive_expr     { $$ = NewBinaryOpNode(OpIn, $1, $3, 0) }
+    | comparison_expr K_IN additive_expr     { $$ = NewBinaryOpNode(OpIn, $1, $3, $1.Position) }
     | comparison_expr K_NOT K_IN additive_expr {
-        inExpr := NewBinaryOpNode(OpIn, $1, $4, 0)
-        $$ = NewUnaryOpNode(OpNot, inExpr, 0)
+        inExpr := NewBinaryOpNode(OpIn, $1, $4, $1.Position)
+        $$ = NewUnaryOpNode(OpNot, inExpr, $1.Position)
     }
     ;
 
 additive_expr:
       multiplicative_expr
-    | additive_expr PLUS multiplicative_expr   { $$ = NewBinaryOpNode(OpPlus, $1, $3, 0) }
-    | additive_expr MINUS multiplicative_expr  { $$ = NewBinaryOpNode(OpMinus, $1, $3, 0) }
+    | additive_expr PLUS multiplicative_expr   { $$ = NewBinaryOpNode(OpPlus, $1, $3, $1.Position) }
+    | additive_expr MINUS multiplicative_expr  { $$ = NewBinaryOpNode(OpMinus, $1, $3, $1.Position) }
     ;
 
 multiplicative_expr:
       not_expr
-    | multiplicative_expr STAR not_expr    { $$ = NewBinaryOpNode(OpStar, $1, $3, 0) }
-    | multiplicative_expr SLASH not_expr   { $$ = NewBinaryOpNode(OpSlash, $1, $3, 0) }
-    | multiplicative_expr PERCENT not_expr { $$ = NewBinaryOpNode(OpPercent, $1, $3, 0) }
+    | multiplicative_expr STAR not_expr    { $$ = NewBinaryOpNode(OpStar, $1, $3, $1.Position) }
+    | multiplicative_expr SLASH not_expr   { $$ = NewBinaryOpNode(OpSlash, $1, $3, $1.Position) }
+    | multiplicative_expr PERCENT not_expr { $$ = NewBinaryOpNode(OpPercent, $1, $3, $1.Position) }
     ;
 
 not_expr:
       unary_expr
-    | K_NOT not_expr               { $$ = NewUnaryOpNode(OpNot, $2, 0) }
-    | K_LEN not_expr               { $$ = NewUnaryOpNode(OpLen, $2, 0) }
-    | K_ANY not_expr               { $$ = NewUnaryOpNode(OpAny, $2, 0) }
-    | K_ALL not_expr               { $$ = NewUnaryOpNode(OpAll, $2, 0) }
-    | K_SUM not_expr               { $$ = NewUnaryOpNode(OpSum, $2, 0) }
+    | K_NOT not_expr               { $$ = NewUnaryOpNode(OpNot, $2, $2.Position) }
+    | K_LEN not_expr               { $$ = NewUnaryOpNode(OpLen, $2, $2.Position) }
+    | K_ANY not_expr               { $$ = NewUnaryOpNode(OpAny, $2, $2.Position) }
+    | K_ALL not_expr               { $$ = NewUnaryOpNode(OpAll, $2, $2.Position) }
+    | K_SUM not_expr               { $$ = NewUnaryOpNode(OpSum, $2, $2.Position) }
     ;
 
 unary_expr:
       primary
-    | MINUS unary_expr             { $$ = NewUnaryOpNode(OpUMinus, $2, 0) }
+    | MINUS unary_expr             { $$ = NewUnaryOpNode(OpUMinus, $2, $2.Position) }
     | PLUS unary_expr              { $$ = $2 }  // unary plus is a no-op
     | LPAREN expr RPAREN           { $$ = $2 }
     | array                        { $$ = $1 }
@@ -145,7 +145,7 @@ opt_array_elements:
 
 array_elements:
       expr                          {
-                                      $$ = NewArrayNode([]*Node{$1}, 0)
+                                      $$ = NewArrayNode([]*Node{$1}, $1.Position)
                                     }
     | array_elements COMMA expr     {
                                       // Append to existing array
@@ -155,13 +155,13 @@ array_elements:
     ;
 
 primary:
-      NUMERIC_LITERAL       { $$ = NewNumberNode($1, 0) }
-    | STRING_LITERAL        { $$ = NewStringNode($1, 0) }
-    | IDENTIFIER            { $$ = NewIdentifierNode($1, 0) }
-    | RFC3339               { $$ = NewTimestampNode($1, 0) }
-    | DATE                  { $$ = NewDateNode($1, 0) }
-    | K_TRUE                { $$ = NewBooleanNode(true, 0) }
-    | K_FALSE               { $$ = NewBooleanNode(false, 0) }
+      NUMERIC_LITERAL       { $$ = NewNumberNode($1, $<pos>1) }
+    | STRING_LITERAL        { $$ = NewStringNode($1, $<pos>1) }
+    | IDENTIFIER            { $$ = NewIdentifierNode($1, $<pos>1) }
+    | RFC3339               { $$ = NewTimestampNode($1, $<pos>1) }
+    | DATE                  { $$ = NewDateNode($1, $<pos>1) }
+    | K_TRUE                { $$ = NewBooleanNode(true, $<pos>1) }
+    | K_FALSE               { $$ = NewBooleanNode(false, $<pos>1) }
     ;
 
 %%
