@@ -256,12 +256,21 @@ HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\vmtoolsd.exe
 ### Directories (`$VMwareDirs`)
 
 ```
-%ProgramFiles%\VMware
-%ProgramFiles%\Common Files\VMware
+%ProgramW6432%\VMware
+%CommonProgramW6432%\VMware
 %ProgramFiles(x86)%\VMware
-%ProgramFiles(x86)%\Common Files\VMware
+%CommonProgramFiles(x86)%\VMware
 %ProgramData%\VMware
 ```
+
+The real (64-bit) paths are resolved via `%ProgramW6432%` /
+`%CommonProgramW6432%`, not `%ProgramFiles%` / `%CommonProgramFiles%`.
+The firstboot mechanism runs this script under a 32-bit PowerShell
+(WOW64), where `%ProgramFiles%` is silently redirected to
+`...\Program Files (x86)` — same idea as the `Sysnative` trick used for
+`System32`, just for `Program Files`. Using the redirected variable here
+meant the real `C:\Program Files\VMware` and
+`C:\Program Files\Common Files\VMware` were never actually targeted.
 
 ...plus wildcarded temp folders (`$VMwareTempDirPatterns`, Phase 6 step 2):
 

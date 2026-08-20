@@ -111,11 +111,15 @@ $VMwareRegistryKeys = @(
     'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\vmtoolsd.exe'
 )
 
+# This script runs under a 32-bit PowerShell on firstboot (WOW64), where
+# $env:ProgramFiles gets silently redirected to "...Program Files (x86)" -
+# so it can't be used to reach the real 64-bit folder. $env:ProgramW6432 /
+# CommonProgramW6432 are the unambiguous, non-redirected equivalents.
 $VMwareDirs = @(
-    "$env:ProgramFiles\VMware",
-    "$env:ProgramFiles\Common Files\VMware",
+    "$env:ProgramW6432\VMware",
+    "$env:CommonProgramW6432\VMware",
     "${env:ProgramFiles(x86)}\VMware",
-    "${env:ProgramFiles(x86)}\Common Files\VMware",
+    "${env:CommonProgramFiles(x86)}\VMware",
     "$env:ProgramData\VMware"
 )
 
