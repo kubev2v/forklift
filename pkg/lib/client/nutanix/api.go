@@ -58,8 +58,8 @@ type V3Image struct {
 		Name string `json:"name"`
 	} `json:"spec"`
 	Status struct {
-		Name      string            `json:"name"`
-		State     string            `json:"state"`
+		Name      string           `json:"name"`
+		State     string           `json:"state"`
 		Resources V3ImageResources `json:"resources"`
 	} `json:"status"`
 }
@@ -117,21 +117,21 @@ type VMResources struct {
 		BootDeviceOrderList []string `json:"boot_device_order_list"`
 		BootType            string   `json:"boot_type"`
 	} `json:"boot_config"`
-	DiskList          []VMDisk     `json:"disk_list"`
-	GuestOSID         string       `json:"guest_os_id"`
-	GuestTools        VMGuestTools `json:"guest_tools"`
-	HardwareClockTZ   string       `json:"hardware_clock_timezone"`
-	HostReference     Ref          `json:"host_reference"`
-	HypervisorType    string       `json:"hypervisor_type"`
-	MachineType       string       `json:"machine_type"`
-	MemorySizeMiB     int64        `json:"memory_size_mib"`
-	NICList           []VMNIC      `json:"nic_list"`
-	NumSockets        int          `json:"num_sockets"`
-	NumThreadsPerCore int          `json:"num_threads_per_core"`
-	NumVcpusPerSocket int          `json:"num_vcpus_per_socket"`
-	PowerState        string       `json:"power_state"`
+	DiskList          []VMDisk       `json:"disk_list"`
+	GuestOSID         string         `json:"guest_os_id"`
+	GuestTools        VMGuestTools   `json:"guest_tools"`
+	HardwareClockTZ   string         `json:"hardware_clock_timezone"`
+	HostReference     Ref            `json:"host_reference"`
+	HypervisorType    string         `json:"hypervisor_type"`
+	MachineType       string         `json:"machine_type"`
+	MemorySizeMiB     int64          `json:"memory_size_mib"`
+	NICList           []VMNIC        `json:"nic_list"`
+	NumSockets        int            `json:"num_sockets"`
+	NumThreadsPerCore int            `json:"num_threads_per_core"`
+	NumVcpusPerSocket int            `json:"num_vcpus_per_socket"`
+	PowerState        string         `json:"power_state"`
 	SerialPortList    []VMSerialPort `json:"serial_port_list"`
-	VGAConsoleEnabled bool         `json:"vga_console_enabled"`
+	VGAConsoleEnabled bool           `json:"vga_console_enabled"`
 }
 
 type VMSerialPort struct {

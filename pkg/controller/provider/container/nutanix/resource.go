@@ -100,7 +100,7 @@ type hostEntity struct {
 		ClusterReference libclient.Ref `json:"cluster_reference"`
 		Name             string        `json:"name"`
 		State            string        `json:"state"`
-		Resources        hostResources  `json:"resources"`
+		Resources        hostResources `json:"resources"`
 	} `json:"status"`
 }
 
@@ -221,12 +221,12 @@ type storageContainerStatus struct {
 
 type storageContainerResources struct {
 	ClusterReference   libclient.Ref `json:"cluster_reference"`
-	CompressionEnabled bool   `json:"compression_enabled"`
-	ErasureCode        string `json:"erasure_code"`
-	MaxCapacityBytes   int64  `json:"max_capacity_bytes"`
-	OnDiskDedup        string `json:"on_disk_dedup"`
-	ReplicationFactor  int    `json:"replication_factor"`
-	UsageBytes         int64  `json:"usage_bytes"`
+	CompressionEnabled bool          `json:"compression_enabled"`
+	ErasureCode        string        `json:"erasure_code"`
+	MaxCapacityBytes   int64         `json:"max_capacity_bytes"`
+	OnDiskDedup        string        `json:"on_disk_dedup"`
+	ReplicationFactor  int           `json:"replication_factor"`
+	UsageBytes         int64         `json:"usage_bytes"`
 }
 
 func (e storageContainerEntity) clusterUUID() string {
