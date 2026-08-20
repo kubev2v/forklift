@@ -1,17 +1,22 @@
 package nutanix
 
 import (
+	"encoding/pem"
 	"fmt"
+	"net/url"
 	"path"
+	"strings"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/plan"
 	"github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1/ref"
+	providerbase "github.com/kubev2v/forklift/pkg/controller/base"
 	planbase "github.com/kubev2v/forklift/pkg/controller/plan/adapter/base"
 	plancontext "github.com/kubev2v/forklift/pkg/controller/plan/context"
 	model "github.com/kubev2v/forklift/pkg/controller/provider/web/nutanix"
 	liberr "github.com/kubev2v/forklift/pkg/lib/error"
 	libitr "github.com/kubev2v/forklift/pkg/lib/itinerary"
+	libutil "github.com/kubev2v/forklift/pkg/lib/util"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
@@ -37,12 +42,64 @@ type Builder struct {
 	*plancontext.Context
 }
 
-func (r *Builder) Secret(_ ref.Ref, _, _ *core.Secret) error {
+// Secret builds the DataVolume credential secret from the provider's
+// connection secret. CDI's HTTP importer expects accessKeyId/secretKey
+// (Basic Auth username/password), which Nutanix's Image Service also uses.
+func (r *Builder) Secret(_ ref.Ref, in, object *core.Secret) error {
+	object.StringData = map[string]string{
+		"accessKeyId": string(in.Data["user"]),
+		"secretKey":   string(in.Data["password"]),
+	}
 	return nil
 }
 
-func (r *Builder) ConfigMap(_ ref.Ref, _ *core.Secret, _ *core.ConfigMap) error {
+// ConfigMap carries a CA certificate for CDI's HTTP importer to trust when
+// downloading catalog images. CDI's DataVolumeSourceHTTP has no
+// insecureSkipVerify field (unlike e.g. ImageIO), so when the provider is
+// configured with insecureSkipVerify instead of a real CA, the only way to
+// honor that is to fetch the server's own certificate once and trust it
+// explicitly here -- the same fallback oVirt uses for older CNV versions.
+func (r *Builder) ConfigMap(_ ref.Ref, in *core.Secret, object *core.ConfigMap) error {
+	if cacert, found := libutil.GetCACert(in); found && len(cacert) > 0 {
+		object.BinaryData["ca.pem"] = cacert
+		return nil
+	}
+	if !providerbase.GetInsecureSkipVerifyFlag(in) {
+		return nil
+	}
+
+	cacert, err := r.fetchProviderCert()
+	if err != nil {
+		r.Log.Error(err, "Failed to fetch Nutanix provider certificate")
+		// Don't fail here -- let the migration proceed and fail with a
+		// clearer error from CDI if the certificate is actually needed.
+		return nil
+	}
+	object.BinaryData["ca.pem"] = cacert
 	return nil
+}
+
+// fetchProviderCert dials the Nutanix provider URL and returns its leaf
+// certificate PEM-encoded, for use as a trusted CA when insecureSkipVerify
+// is set instead of a real CA certificate.
+func (r *Builder) fetchProviderCert() ([]byte, error) {
+	providerURL := r.Source.Provider.Spec.URL
+	parsedURL, err := url.Parse(providerURL)
+	if err != nil {
+		return nil, liberr.Wrap(err, "failed to parse Nutanix provider URL", "url", providerURL)
+	}
+
+	cert, err := libutil.GetTlsCertificate(parsedURL, &core.Secret{
+		Data: map[string][]byte{"insecureSkipVerify": []byte("true")},
+	})
+	if err != nil {
+		return nil, liberr.Wrap(err, "failed to fetch certificate from Nutanix provider")
+	}
+	if cert == nil {
+		return nil, liberr.New("no certificate returned from Nutanix provider")
+	}
+
+	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw}), nil
 }
 
 func (r *Builder) VirtualMachine(vmRef ref.Ref, object *cnv.VirtualMachineSpec, persistentVolumeClaims []*core.PersistentVolumeClaim, usesInstanceType bool, sortVolumesByLibvirt bool) error {
@@ -273,9 +330,94 @@ func (r *Builder) mapMemory(vm *model.VM, object *cnv.VirtualMachineSpec, usesIn
 	}
 }
 
-func (r *Builder) DataVolumes(_ ref.Ref, _ *core.Secret, _ *core.ConfigMap, _ *cdi.DataVolume, _ *core.ConfigMap) (dvs []cdi.DataVolume, err error) {
-	// TODO: build CDI HTTP import DataVolumes from catalog image file URLs
-	return nil, nil
+// DataVolumes builds one CDI HTTP-import DataVolume per non-CDROM disk,
+// sourced from the catalog image PreTransferActions created for that disk
+// (GET /images/{uuid}/file). By the time this runs, the migration
+// controller has already confirmed PreTransferActions reported every
+// image ready, so images are expected to be present and COMPLETE.
+func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *core.ConfigMap, dvTemplate *cdi.DataVolume, _ *core.ConfigMap) (dvs []cdi.DataVolume, err error) {
+	vm := &model.VM{}
+	if err = r.Source.Inventory.Find(vm, vmRef); err != nil {
+		return nil, liberr.Wrap(err, "vm", vmRef.String())
+	}
+
+	storageMap := map[string]api.DestinationStorage{}
+	for _, mapped := range r.Map.Storage.Spec.Map {
+		storageMap[mapped.Source.ID] = mapped.Destination
+	}
+
+	client := &Client{Context: r.Context}
+	if err = client.connect(); err != nil {
+		return nil, err
+	}
+
+	baseURL := strings.TrimRight(r.Source.Provider.Spec.URL, "/")
+
+	for _, disk := range vm.Disks {
+		if disk.IsCdrom {
+			continue
+		}
+		destination, mapped := storageMap[disk.StorageContainerUUID]
+		if !mapped {
+			continue
+		}
+
+		name := migrationImageName(string(r.Migration.UID), vmRef, disk.UUID)
+		entity, found, findErr := client.findImageByName(name)
+		if findErr != nil {
+			return nil, findErr
+		}
+		if !found {
+			return nil, liberr.New("catalog image not found", "vm", vmRef.String(), "disk", disk.UUID, "image", name)
+		}
+
+		dv := r.mapDataVolume(disk, destination, dvTemplate, baseURL, entity.Metadata.UUID, secret, configMap)
+		dvs = append(dvs, *dv)
+	}
+
+	return dvs, nil
+}
+
+func (r *Builder) mapDataVolume(
+	disk model.Disk,
+	destination api.DestinationStorage,
+	dvTemplate *cdi.DataVolume,
+	baseURL, imageUUID string,
+	secret *core.Secret,
+	configMap *core.ConfigMap,
+) (dv *cdi.DataVolume) {
+	httpSource := &cdi.DataVolumeSourceHTTP{
+		URL:           fmt.Sprintf("%s/api/nutanix/v3/images/%s/file", baseURL, imageUUID),
+		SecretRef:     secret.Name,
+		CertConfigMap: configMap.Name,
+	}
+
+	storageClass := destination.StorageClass
+	dvSpec := cdi.DataVolumeSpec{
+		Source: &cdi.DataVolumeSource{HTTP: httpSource},
+		Storage: &cdi.StorageSpec{
+			Resources: core.VolumeResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceStorage: *resource.NewQuantity(disk.DiskSizeBytes, resource.BinarySI),
+				},
+			},
+			StorageClassName: &storageClass,
+		},
+	}
+	if destination.AccessMode != "" {
+		dvSpec.Storage.AccessModes = []core.PersistentVolumeAccessMode{destination.AccessMode}
+	}
+	if destination.VolumeMode != "" {
+		dvSpec.Storage.VolumeMode = &destination.VolumeMode
+	}
+
+	dv = dvTemplate.DeepCopy()
+	dv.Spec = dvSpec
+	if dv.Annotations == nil {
+		dv.Annotations = make(map[string]string)
+	}
+	dv.Annotations[planbase.AnnDiskSource] = disk.UUID
+	return dv
 }
 
 func (r *Builder) Tasks(vmRef ref.Ref) (tasks []*plan.Task, err error) {
