@@ -138,14 +138,7 @@ func (b *Builder) GetVirtV2vPodSpec(vm *plan.VMStatus, volumes []core.Volume, vo
 		maps.Copy(annotations, cfg.TransferNetworkAnnotations)
 	}
 
-	seccompProfile := core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}
-	if settings.Settings.OpenShift {
-		unshare := "profiles/unshare.json"
-		seccompProfile = core.SeccompProfile{
-			Type:             core.SeccompProfileTypeLocalhost,
-			LocalhostProfile: &unshare,
-		}
-	}
+	seccompProfile := conversionSeccompProfile()
 
 	podLabels := make(map[string]string)
 	if cfg.PodLabels != nil {
@@ -319,14 +312,7 @@ func (b *Builder) GetDeepInspectionPodSpec(volumes []core.Volume, volumeMounts [
 		maps.Copy(annotations, cfg.PodAnnotations)
 	}
 
-	seccompProfile := core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}
-	if settings.Settings.OpenShift {
-		unshare := "profiles/unshare.json"
-		seccompProfile = core.SeccompProfile{
-			Type:             core.SeccompProfileTypeLocalhost,
-			LocalhostProfile: &unshare,
-		}
-	}
+	seccompProfile := conversionSeccompProfile()
 
 	podLabels := make(map[string]string)
 	if cfg.PodLabels != nil {
@@ -391,6 +377,30 @@ func (b *Builder) GetDeepInspectionPodSpec(volumes []core.Volume, volumeMounts [
 	SetKvmOnPodSpec(&pod.Spec, cfg.RequestKVM)
 
 	return pod, nil
+}
+
+// conversionSeccompProfile returns the seccomp profile for a conversion pod.
+//
+// The conversion appliance starts passt for its network, and passt calls
+// clone(CLONE_NEWUSER), which a container runtime's default seccomp profile
+// denies without CAP_SYS_ADMIN. OpenShift ships a profile permitting that
+// syscall, so it has always been selected there. VIRT_V2V_SECCOMP_PROFILE lets
+// any cluster that provides an equivalent node-level profile name it, which
+// keeps syscall filtering enabled and, unlike Unconfined, is admitted by the
+// baseline and restricted Pod Security Standards. Unset preserves the previous
+// behaviour exactly.
+func conversionSeccompProfile() core.SeccompProfile {
+	profile := settings.Settings.Migration.VirtV2vSeccompProfile
+	if profile == "" && settings.Settings.OpenShift {
+		profile = "profiles/unshare.json"
+	}
+	if profile != "" {
+		return core.SeccompProfile{
+			Type:             core.SeccompProfileTypeLocalhost,
+			LocalhostProfile: &profile,
+		}
+	}
+	return core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}
 }
 
 func vddkVolumeInList(volumes []core.Volume) bool {
