@@ -499,7 +499,7 @@ func (r *Builder) ensureDownloadCookieSecret(vmRef ref.Ref, diskUUID, cookie str
 		selector["migration"] = migrationID
 	}
 	list := &core.SecretList{}
-	err := r.Destination.Client.List(
+	err := r.Destination.List(
 		context.TODO(),
 		list,
 		&client.ListOptions{
@@ -514,7 +514,7 @@ func (r *Builder) ensureDownloadCookieSecret(vmRef ref.Ref, diskUUID, cookie str
 	if len(list.Items) > 0 {
 		secret := &list.Items[0]
 		secret.StringData = map[string]string{cookieHeaderKey: header}
-		if err = r.Destination.Client.Update(context.TODO(), secret); err != nil {
+		if err = r.Destination.Update(context.TODO(), secret); err != nil {
 			return nil, liberr.Wrap(err, "secret", secret.Name, "disk", diskUUID)
 		}
 		r.Log.V(1).Info("Updated Nutanix download cookie secret.",
@@ -537,7 +537,7 @@ func (r *Builder) ensureDownloadCookieSecret(vmRef ref.Ref, diskUUID, cookie str
 		},
 		StringData: map[string]string{cookieHeaderKey: header},
 	}
-	if err = r.Destination.Client.Create(context.TODO(), secret); err != nil {
+	if err = r.Destination.Create(context.TODO(), secret); err != nil {
 		return nil, liberr.Wrap(err, "vm", vmRef.String(), "disk", diskUUID)
 	}
 	r.Log.V(1).Info("Created Nutanix download cookie secret.",
@@ -600,7 +600,7 @@ func (r *Builder) RefreshImportCredentials(dv *cdi.DataVolume) (bool, error) {
 
 	secretName := httpSource.SecretExtraHeaders[0]
 	secret := &core.Secret{}
-	err = r.Destination.Client.Get(
+	err = r.Destination.Get(
 		context.TODO(),
 		types.NamespacedName{Namespace: dv.Namespace, Name: secretName},
 		secret,
@@ -609,14 +609,14 @@ func (r *Builder) RefreshImportCredentials(dv *cdi.DataVolume) (bool, error) {
 		return false, liberr.Wrap(err, "secret", secretName)
 	}
 	secret.StringData = map[string]string{cookieHeaderKey: cookieHeaderValue(cookie)}
-	if err = r.Destination.Client.Update(context.TODO(), secret); err != nil {
+	if err = r.Destination.Update(context.TODO(), secret); err != nil {
 		return false, liberr.Wrap(err, "secret", secretName)
 	}
 
 	if httpSource.URL != downloadURL {
 		updated := dv.DeepCopy()
 		updated.Spec.Source.HTTP.URL = downloadURL
-		if err = r.Destination.Client.Update(context.TODO(), updated); err != nil {
+		if err = r.Destination.Update(context.TODO(), updated); err != nil {
 			return false, liberr.Wrap(err, "dv", path.Join(dv.Namespace, dv.Name))
 		}
 		r.Log.Info("Updated Nutanix download URL after cookie refresh.",
