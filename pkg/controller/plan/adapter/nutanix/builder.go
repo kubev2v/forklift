@@ -150,15 +150,7 @@ func (r *Builder) mapDisks(vm *model.VM, pvcs []*core.PersistentVolumeClaim, obj
 	var kVolumes []cnv.Volume
 	var kDisks []cnv.Disk
 
-	bootDiskIndex := -1
-	for _, disk := range vm.Disks {
-		if disk.IsCdrom {
-			continue
-		}
-		if bootDiskIndex == -1 || disk.DeviceIndex < bootDiskIndex {
-			bootDiskIndex = disk.DeviceIndex
-		}
-	}
+	bootDisk := bootDiskUUID(vm)
 
 	for _, disk := range vm.Disks {
 		if disk.IsCdrom {
@@ -191,7 +183,7 @@ func (r *Builder) mapDisks(vm *model.VM, pvcs []*core.PersistentVolumeClaim, obj
 			},
 			Serial: disk.UUID,
 		}
-		if disk.DeviceIndex == bootDiskIndex {
+		if disk.UUID == bootDisk {
 			var bootOrder uint = 1
 			kDisk.BootOrder = &bootOrder
 		}
@@ -199,6 +191,48 @@ func (r *Builder) mapDisks(vm *model.VM, pvcs []*core.PersistentVolumeClaim, obj
 	}
 	object.Template.Spec.Volumes = kVolumes
 	object.Template.Spec.Domain.Devices.Disks = kDisks
+}
+
+// bootDiskUUID selects the disk that receives KubeVirt boot order, using
+// Nutanix boot_device_order_list from inventory. vm.Disks preserves
+// disk_list order, so the first matching block disk wins when multiple
+// disks share the same device index on different adapter types.
+func bootDiskUUID(vm *model.VM) string {
+	for _, bootType := range parseBootDeviceOrder(vm.BootDeviceOrder) {
+		if bootType != "DISK" {
+			continue
+		}
+		for _, disk := range vm.Disks {
+			if disk.IsCdrom {
+				continue
+			}
+			if disk.DeviceType != "" && disk.DeviceType != "DISK" {
+				continue
+			}
+			return disk.UUID
+		}
+	}
+	for _, disk := range vm.Disks {
+		if !disk.IsCdrom {
+			return disk.UUID
+		}
+	}
+	return ""
+}
+
+func parseBootDeviceOrder(order string) []string {
+	if order == "" {
+		return []string{"DISK", "CDROM", "NETWORK"}
+	}
+	parts := strings.Split(order, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			result = append(result, strings.ToUpper(part))
+		}
+	}
+	return result
 }
 
 func (r *Builder) findPVC(diskID string, pvcs []*core.PersistentVolumeClaim) *core.PersistentVolumeClaim {
@@ -394,7 +428,11 @@ func (r *Builder) DataVolumes(vmRef ref.Ref, secret *core.Secret, configMap *cor
 		}
 		destination, mapped := storageMap[disk.StorageContainerUUID]
 		if !mapped {
-			continue
+			return nil, liberr.New(
+				"no storage mapping for disk storage container",
+				"vm", vmRef.String(),
+				"disk", disk.UUID,
+				"storageContainer", disk.StorageContainerUUID)
 		}
 
 		var httpSource *cdi.DataVolumeSourceHTTP

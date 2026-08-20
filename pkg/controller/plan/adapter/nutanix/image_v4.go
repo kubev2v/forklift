@@ -37,8 +37,12 @@ func (r *Client) findImageV4ByName(name string) (entity libclient.ImageV4, found
 	if len(result.Data) == 0 {
 		return libclient.ImageV4{}, false, false, nil
 	}
-	entity = result.Data[0]
-	return entity, true, entity.SizeBytes > 0, nil
+	for _, candidate := range result.Data {
+		if candidate.Name == name {
+			return candidate, true, candidate.SizeBytes > 0, nil
+		}
+	}
+	return libclient.ImageV4{}, false, false, nil
 }
 
 // createImageV4 submits a v4 image creation request for a DISK_IMAGE
@@ -160,10 +164,20 @@ func (r *Client) clusterExternalIP() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	var vips []string
 	for _, entity := range result.Entities {
 		if ip := entity.Status.Resources.Network.ExternalIP; ip != "" {
-			return ip, nil
+			vips = append(vips, ip)
 		}
 	}
-	return "", nil
+	switch len(vips) {
+	case 0:
+		return "", nil
+	case 1:
+		return vips[0], nil
+	default:
+		// Multiple managed clusters: rewriting to an arbitrary VIP risks
+		// sending the download to the wrong cluster.
+		return "", nil
+	}
 }

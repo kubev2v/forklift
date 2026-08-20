@@ -412,6 +412,8 @@ func newImageTestServer(t *testing.T, images map[string]libclient.V3Image) *http
 		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/clusters/list"):
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"entities":[]}`))
+		case r.Method == http.MethodGet && r.URL.Path == prismCentralPath:
+			w.WriteHeader(http.StatusNotFound)
 		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/images/list"):
 			entities := make([]libclient.V3Image, 0, len(images))
 			for _, image := range images {
@@ -489,8 +491,8 @@ func newPrismCentralTestServer(t *testing.T, images map[string]libclient.ImageV4
 }
 
 // TestIsPrismElement_DetectsElementViaProbe verifies isPrismElement
-// treats a non-200 response from prismCentralPath as Prism Element, with
-// no explicit provider setting.
+// treats a 404 from prismCentralPath as Prism Element, with no explicit
+// provider setting.
 func TestIsPrismElement_DetectsElementViaProbe(t *testing.T) {
 	server := newImageTestServer(t, map[string]libclient.V3Image{})
 	defer server.Close()
@@ -501,7 +503,50 @@ func TestIsPrismElement_DetectsElementViaProbe(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !element {
-		t.Fatal("expected isPrismElement to be true when the prism_central probe doesn't respond 200")
+		t.Fatal("expected isPrismElement to be true when the prism_central probe returns 404")
+	}
+}
+
+// TestIsPrismElement_ErrorsOnUnexpectedProbeStatus verifies isPrismElement
+// returns an error for non-404, non-200 probe responses.
+func TestIsPrismElement_ErrorsOnUnexpectedProbeStatus(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/clusters/list"):
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"entities":[]}`))
+		case r.Method == http.MethodGet && r.URL.Path == prismCentralPath:
+			w.WriteHeader(http.StatusForbidden)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}))
+	defer server.Close()
+
+	client := newConnectedTestClient(t, server.URL)
+	_, err := client.isPrismElement()
+	if err == nil {
+		t.Fatal("expected an error when the prism_central probe returns 403")
+	}
+}
+
+// TestSetPowerState_PreservesSpecVersion verifies GET-to-PUT round-trips
+// retain metadata.spec_version required by Nutanix v3 updates.
+func TestSetPowerState_PreservesSpecVersion(t *testing.T) {
+	entity := vmEntityPtr("uuid-1", powerStateOn)
+	entity.Metadata.SpecVersion = 42
+	server, puts, _ := newPowerTestServer(t, entity)
+	defer server.Close()
+
+	client := newConnectedTestClient(t, server.URL)
+	if err := client.setPowerState(ref.Ref{ID: "uuid-1"}, powerStateOff); err != nil {
+		t.Fatalf("setPowerState failed: %v", err)
+	}
+	if len(*puts) != 1 {
+		t.Fatalf("expected 1 PUT, got %d", len(*puts))
+	}
+	if (*puts)[0].Metadata.SpecVersion != 42 {
+		t.Fatalf("expected spec_version 42 in PUT body, got %d", (*puts)[0].Metadata.SpecVersion)
 	}
 }
 

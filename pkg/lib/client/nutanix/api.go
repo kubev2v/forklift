@@ -7,9 +7,10 @@ import (
 
 // Metadata is the common v3 entity metadata block.
 type Metadata struct {
-	UUID       string            `json:"uuid"`
-	Name       string            `json:"name"`
-	Categories map[string]string `json:"categories"`
+	UUID        string            `json:"uuid"`
+	Name        string            `json:"name"`
+	SpecVersion int               `json:"spec_version,omitempty"`
+	Categories  map[string]string `json:"categories"`
 }
 
 // Ref is a Nutanix v3 UUID/name reference pair.

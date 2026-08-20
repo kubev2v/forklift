@@ -2580,15 +2580,16 @@ func (r *Migration) maybeRefreshImportCredentials(vm *plan.VMStatus, dv *cdi.Dat
 	if err != nil {
 		log.Error(err, "Failed to get DataVolume after credential refresh.",
 			"dv", path.Join(dv.Namespace, dv.Name))
-	} else {
-		if fresh.Annotations == nil {
-			fresh.Annotations = map[string]string{}
-		}
-		fresh.Annotations[annCookieRefreshedAt] = time.Now().UTC().Format(time.RFC3339)
-		if err = r.Destination.Update(context.TODO(), fresh); err != nil {
-			log.Error(err, "Failed to annotate DataVolume after credential refresh.",
-				"dv", path.Join(dv.Namespace, dv.Name))
-		}
+		return
+	}
+	if fresh.Annotations == nil {
+		fresh.Annotations = map[string]string{}
+	}
+	fresh.Annotations[annCookieRefreshedAt] = time.Now().UTC().Format(time.RFC3339)
+	if err = r.Destination.Update(context.TODO(), fresh); err != nil {
+		log.Error(err, "Failed to annotate DataVolume after credential refresh.",
+			"dv", path.Join(dv.Namespace, dv.Name))
+		return
 	}
 
 	if err = r.Destination.Delete(context.TODO(), importer); err != nil && !k8serr.IsNotFound(err) {

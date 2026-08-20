@@ -103,6 +103,7 @@ func (r *Client) Finalize(vms []*planapi.VMStatus, _ string) {
 		return
 	}
 	for _, vm := range vms {
+		clearPowerOffTracking(string(r.Context.Migration.UID), vm.Ref.ID)
 		disks, err := r.vmDisks(vm.Ref)
 		if err != nil {
 			r.Context.Log.Error(err, "Failed to look up VM disks for image cleanup", "vm", vm.String())
@@ -166,7 +167,7 @@ func (r *Client) PowerOff(vmRef ref.Ref) error {
 		return nil
 	}
 	key := powerOffKey(string(r.Context.Migration.UID), vmRef.ID)
-	powerOffStates.Store(key, powerOffState{started: time.Now()})
+	powerOffStates.LoadOrStore(key, powerOffState{started: time.Now()})
 	if err := r.transitionPowerState(vmRef, powerStateTransitionAcpiShutdown); err != nil {
 		r.Context.Log.Error(err, "ACPI shutdown failed, forcing power off", "vm", vmRef.String())
 		return r.transitionPowerState(vmRef, powerStateTransitionOff)
@@ -344,7 +345,14 @@ func (r *Client) isPrismElement() (bool, error) {
 	if err != nil {
 		return false, liberr.Wrap(err, "failed to detect Prism endpoint type")
 	}
-	return status != http.StatusOK, nil
+	switch status {
+	case http.StatusOK:
+		return false, nil
+	case http.StatusNotFound:
+		return true, nil
+	default:
+		return false, liberr.New("unexpected status detecting Prism endpoint type", "status", status)
+	}
 }
 
 // vmDisks looks up a VM's disks from inventory.
