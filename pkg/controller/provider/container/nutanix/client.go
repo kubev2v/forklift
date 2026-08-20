@@ -103,15 +103,6 @@ func (r *Client) get(url string, object any, params ...libweb.Param) (status int
 	return r.web.Get(url, object, params...)
 }
 
-// POST request (Nutanix uses POST for list operations)
-func (r *Client) post(url string, body any, object any) (status int, err error) {
-	status, err = r.connect()
-	if err != nil {
-		return
-	}
-	return r.web.Post(url, body, object)
-}
-
 // listAllV3 pages through a v3 list endpoint via the shared client.
 func listAllV3[T any](r *Client, resourceKind string, filter map[string]any, pageSize int) ([]T, error) {
 	if _, err := r.connect(); err != nil {

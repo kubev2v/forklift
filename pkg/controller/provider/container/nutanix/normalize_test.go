@@ -106,7 +106,7 @@ func TestFilterByMatch_FallbackClusterRef(t *testing.T) {
 			ClusterReference libclient.Ref `json:"cluster_reference"`
 			Name             string        `json:"name"`
 			State            string        `json:"state"`
-			Resources        hostResources  `json:"resources"`
+			Resources        hostResources `json:"resources"`
 		}{ClusterReference: libclient.Ref{UUID: "cluster-a"}}},
 		{Spec: struct {
 			ClusterReference libclient.Ref `json:"cluster_reference"`
